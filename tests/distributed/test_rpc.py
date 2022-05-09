@@ -83,7 +83,7 @@ class HelloRequest(dgl.distributed.Request):
         res = HelloResponse(self.hello_str, self.integer, new_tensor)
         return res
 
-def start_server(num_clients, ip_config, server_id=0, keep_alive=False, num_servers=1):
+def start_server(num_clients, ip_config, server_id=0, keep_alive=False, num_servers=1, net_type='tensorpipe'):
     print("Sleep 1 seconds to test client re-connect.")
     time.sleep(1)
     server_state = dgl.distributed.ServerState(
@@ -95,12 +95,13 @@ def start_server(num_clients, ip_config, server_id=0, keep_alive=False, num_serv
                                  ip_config=ip_config, 
                                  num_servers=num_servers,
                                  num_clients=num_clients, 
-                                 server_state=server_state)
+                                 server_state=server_state,
+                                 net_type=net_type)
 
-def start_client(ip_config, group_id=0, num_servers=1):
+def start_client(ip_config, group_id=0, num_servers=1, net_type='tensorpipe'):
     dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
     dgl.distributed.connect_to_server(
-        ip_config=ip_config, num_servers=num_servers, group_id=group_id)
+        ip_config=ip_config, num_servers=num_servers, group_id=group_id, net_type=net_type)
     req = HelloRequest(STR, INTEGER, TENSOR, simple_func)
     # test send and recv
     dgl.distributed.send_request(0, req)
@@ -183,16 +184,18 @@ def test_rpc():
     pclient.join()
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
-def test_multi_client():
+@pytest.mark.parametrize("net_type", ['socket', 'tensorpipe'])
+def test_multi_client(net_type):
     reset_envs()
     os.environ['DGL_DIST_MODE'] = 'distributed'
-    generate_ip_config("rpc_ip_config_mul_client.txt", 1, 1)
+    ip_config = "rpc_ip_config_mul_client.txt"
+    generate_ip_config(ip_config, 1, 1)
     ctx = mp.get_context('spawn')
     num_clients = 20
-    pserver = ctx.Process(target=start_server, args=(num_clients, "rpc_ip_config_mul_client.txt"))
+    pserver = ctx.Process(target=start_server, args=(num_clients, ip_config, 0, False, 1, net_type))
     pclient_list = []
     for i in range(num_clients):
-        pclient = ctx.Process(target=start_client, args=("rpc_ip_config_mul_client.txt",))
+        pclient = ctx.Process(target=start_client, args=(ip_config, 0, 1, net_type))
         pclient_list.append(pclient)
     pserver.start()
     for i in range(num_clients):
@@ -280,5 +283,6 @@ if __name__ == '__main__':
     test_serialize()
     test_rpc_msg()
     test_rpc()
-    test_multi_client()
+    test_multi_client('socket')
+    test_multi_client('tesnsorpipe')
     test_multi_thread_rpc()

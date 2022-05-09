@@ -44,12 +44,12 @@ class GIN(nn.Module):
                                 nn.Linear(hidden_size, hidden_size), nn.ReLU())
 
             self.conv_list.append(GINConv(mlp, aggregator_type, 1e-5, True))
-        self.out_mlp = nn.Linear(hidden_size, self.out_size)
+        self.out_mlp = nn.Linear(hidden_size, data_info["out_size"])
 
     def forward(self, graph, node_feat, edge_feat=None):
         if self.embed_size > 0:
             dgl_warning(
-                "The embedding for node feature is used, and input node_feat is ignored, due to the provided embed_size.", norepeat=True)
+                "The embedding for node feature is used, and input node_feat is ignored, due to the provided embed_size.")
             h = self.embed.weight
         else:
             h = node_feat
