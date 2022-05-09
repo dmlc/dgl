@@ -14,7 +14,7 @@
 #   limitations under the License.
 #
 """Modules for transform"""
-# pylint: disable= no-member, arguments-differ, invalid-name
+# pylint: disable= no-member, arguments-differ, invalid-name, missing-function-docstring
 
 from scipy.linalg import expm
 
@@ -1554,7 +1554,9 @@ class SIGNDiffusion(BaseTransform):
     >>> g.edata['w'] = torch.randn(num_edges)
     >>> transform(g)
     Graph(num_nodes=5, num_edges=20,
-          ndata_schemes={'feat': Scheme(shape=(10,), dtype=torch.float32), 'feat_1': Scheme(shape=(10,), dtype=torch.float32), 'feat_2': Scheme(shape=(10,), dtype=torch.float32)}
+          ndata_schemes={'feat': Scheme(shape=(10,), dtype=torch.float32),
+                         'feat_1': Scheme(shape=(10,), dtype=torch.float32),
+                         'feat_2': Scheme(shape=(10,), dtype=torch.float32)}
           edata_schemes={'w': Scheme(shape=(), dtype=torch.float32)})
     """
     def __init__(self,
@@ -1582,15 +1584,16 @@ class SIGNDiffusion(BaseTransform):
                 got {}".format(diffuse_op))
 
     def __call__(self, g):
-        use_eweight = False
-        if (self.eweight_name is not None) and self.eweight_name in g.edata:
-            use_eweight = True
-        feat_list = self.diffuse(g, use_eweight)
+        feat_list = self.diffuse(g)
 
         for i in range(1, self.k + 1):
             g.ndata[self.feat_name + '_' + str(i)] = feat_list[i - 1]
 
-    def raw(self, g, use_eweight):
+    def raw(self, g):
+        use_eweight = False
+        if (self.eweight_name is not None) and self.eweight_name in g.edata:
+            use_eweight = True
+
         feat_list = []
         with g.local_scope():
             if use_eweight:
@@ -1602,7 +1605,11 @@ class SIGNDiffusion(BaseTransform):
                 feat_list.append(g.ndata[self.feat_name])
         return feat_list
 
-    def rw(self, g, use_eweight):
+    def rw(self, g):
+        use_eweight = False
+        if (self.eweight_name is not None) and self.eweight_name in g.edata:
+            use_eweight = True
+
         feat_list = []
         with g.local_scope():
             g.ndata['h'] = g.ndata[self.feat_name]
@@ -1622,7 +1629,7 @@ class SIGNDiffusion(BaseTransform):
                 feat_list.append(g.ndata['h'])
         return feat_list
 
-    def gcn(self, g, use_eweight):
+    def gcn(self, g):
         feat_list = []
         with g.local_scope():
             eweight_name = 'w' if self.eweight_name is None else self.eweight_name
@@ -1635,7 +1642,7 @@ class SIGNDiffusion(BaseTransform):
                 feat_list.append(g.ndata[self.feat_name])
         return feat_list
 
-    def ppr(self, g, use_eweight):
+    def ppr(self, g):
         feat_list = []
         with g.local_scope():
             eweight_name = 'w' if self.eweight_name is None else self.eweight_name
