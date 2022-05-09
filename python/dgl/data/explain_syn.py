@@ -289,8 +289,8 @@ class BACommunity(DGLBuiltinDataset):
         num_nodes = g.num_nodes() // 2
         src = np.random.randint(0, num_nodes, (self.num_inter_edges,))
         dst = np.random.randint(num_nodes, 2 * num_nodes, (self.num_inter_edges,))
-        src = F.zerocopy_from_numpy(src)
-        dst = F.zerocopy_from_numpy(dst)
+        src = F.astype(F.zerocopy_from_numpy(src), g.idtype)
+        dst = F.astype(F.zerocopy_from_numpy(dst), g.idtype)
         g.add_edges(src, dst)
         g.ndata['label'] = F.cat([g1.ndata['label'], g2.ndata['label'] + 4], dim=0)
 
