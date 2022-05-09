@@ -26,13 +26,13 @@ using dgl::network::DefaultMessageDeleter;
 
 const int64_t kQueueSize = 500 * 1024;
 const int kThreadNum = 2;
+const int kMaxTryTimes = 1024;
 
 #ifndef WIN32
 
 const int kNumSender = 3;
 const int kNumReceiver = 3;
 const int kNumMessage = 10;
-const int kMaxTryTimes = 1024;
 
 const char* ip_addr[] = {
   "tcp://127.0.0.1:50091",
