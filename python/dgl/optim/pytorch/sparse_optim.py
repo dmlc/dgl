@@ -529,6 +529,8 @@ class SparseAdam(SparseGradOptimizer):
         no effect.
         Default: True if the gradients are generated on the GPU, and False
         if the gradients are on the CPU.
+    dtype : torch.dtype, Optional
+        The type to store optimizer state with. Default: th.float32.
 
     Examples
     --------
@@ -553,6 +555,9 @@ class SparseAdam(SparseGradOptimizer):
         self._eps = eps
         self._use_uva = use_uva
         self._is_using_uva = {}
+        assert dtype in [th.float16, th.float32], \
+            "Unsupported dtype {}. Valid choices are th.float32 " \
+            "and th.float32".format(dtype)
         self._dtype = dtype
 
     def _setup_uva(self, name, mem, power):
@@ -646,8 +651,16 @@ class SparseAdam(SparseGradOptimizer):
             exec_dev = grad.device
             state_dev = state_step.device
 
-            if self._is_using_uva[emb.name] is None \
-                    and state_dev == th.device('cpu') and exec_dev != state_dev:
+            # whether or not we need to transfer data from the GPU to the CPU
+            # while updating the weights
+            is_d2h = state_dev.type == 'cpu' and exec_dev.type == 'cuda'
+
+            # only perform async copies cpu -> gpu, or gpu-> gpu, but block
+            # when copying to the cpu, so as to ensure the copy is finished
+            # before operating on the data on the cpu
+            state_block = is_d2h
+
+            if self._is_using_uva[emb.name] is None and is_d2h:
                 # we should use UVA going forward
                 self._setup_uva(emb.name, state_mem, state_power)
             elif self._is_using_uva[emb.name] is None:
@@ -661,11 +674,6 @@ class SparseAdam(SparseGradOptimizer):
             eps = self._eps
 
             clr = self._lr
-            # only perform async copies cpu -> gpu, or gpu-> gpu, but block
-            # when copying to the cpu, so as to ensure the copy is finished
-            # before operating on the data on the cpu
-            state_block = state_dev == th.device('cpu') and exec_dev != state_dev
-
             # There can be duplicated indices due to sampling.
             # Thus unique them here and average the gradient here.
             grad_indices, inverse, cnt = th.unique(idx,
