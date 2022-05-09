@@ -211,9 +211,9 @@ def test_explain_syn():
     assert 'label' in g.ndata
     assert 'feat' in g.ndata
 
-    g1 = data.BAShapes(force_reload=True, seed=0)
+    g1 = data.BAShapes(force_reload=True, seed=0)[0]
     src1, dst1 = g1.edges()
-    g2 = data.BAShapes(force_reload=True, seed=0)
+    g2 = data.BAShapes(force_reload=True, seed=0)[0]
     src2, dst2 = g2.edges()
     assert F.allclose(src1, src2)
     assert F.allclose(dst1, dst2)
@@ -224,9 +224,9 @@ def test_explain_syn():
     assert 'label' in g.ndata
     assert 'feat' in g.ndata
 
-    g1 = data.BACommunity(force_reload=True, seed=0)
+    g1 = data.BACommunity(force_reload=True, seed=0)[0]
     src1, dst1 = g1.edges()
-    g2 = data.BACommunity(force_reload=True, seed=0)
+    g2 = data.BACommunity(force_reload=True, seed=0)[0]
     src2, dst2 = g2.edges()
     assert F.allclose(src1, src2)
     assert F.allclose(dst1, dst2)
@@ -237,9 +237,9 @@ def test_explain_syn():
     assert 'label' in g.ndata
     assert 'feat' in g.ndata
 
-    g1 = data.TreeCycles(force_reload=True, seed=0)
+    g1 = data.TreeCycles(force_reload=True, seed=0)[0]
     src1, dst1 = g1.edges()
-    g2 = data.TreeCycles(force_reload=True, seed=0)
+    g2 = data.TreeCycles(force_reload=True, seed=0)[0]
     src2, dst2 = g2.edges()
     assert F.allclose(src1, src2)
     assert F.allclose(dst1, dst2)
@@ -250,9 +250,9 @@ def test_explain_syn():
     assert 'label' in g.ndata
     assert 'feat' in g.ndata
 
-    g1 = data.TreeGrids(force_reload=True, seed=0)
+    g1 = data.TreeGrids(force_reload=True, seed=0)[0]
     src1, dst1 = g1.edges()
-    g2 = data.TreeGrids(force_reload=True, seed=0)
+    g2 = data.TreeGrids(force_reload=True, seed=0)[0]
     src2, dst2 = g2.edges()
     assert F.allclose(src1, src2)
     assert F.allclose(dst1, dst2)

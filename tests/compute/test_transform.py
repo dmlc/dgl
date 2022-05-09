@@ -2355,6 +2355,7 @@ def test_module_laplacian_pe(idtype):
 @pytest.mark.parametrize('g', get_cases(['has_scalar_e_feature']))
 @pytest.mark.parametrize('op', ['raw', 'rw', 'gcn', 'ppr'])
 def test_module_sign(g, op):
+    g = g.to(F.ctx())
     transform = dgl.SIGNDiffusion(k=2, feat_name='h', diffuse_op=op)
     transform(g)
     transform = dgl.SIGNDiffusion(k=2, feat_name='h', eweight_name='scalar_w', diffuse_op=op)
