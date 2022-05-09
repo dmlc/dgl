@@ -350,7 +350,7 @@ class EntityClassify(nn.Module):
                 for k in g.ntypes}
 
             sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
-            dataloader = dgl.dataloading.NodeDataLoader(
+            dataloader = dgl.dataloading.DataLoader(
                 g,
                 {k: th.arange(g.number_of_nodes(k)) for k in g.ntypes},
                 sampler,
@@ -445,7 +445,7 @@ class EntityClassify_HeteroAPI(nn.Module):
                 for k in g.ntypes}
 
             sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
-            dataloader = dgl.dataloading.NodeDataLoader(
+            dataloader = dgl.dataloading.DataLoader(
                 g,
                 {k: th.arange(g.number_of_nodes(k)) for k in g.ntypes},
                 sampler,
