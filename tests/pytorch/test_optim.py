@@ -10,9 +10,9 @@ from dgl.nn import NodeEmbedding
 from dgl.optim import SparseAdam, SparseAdagrad
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
-def test_sparse_adam():
+@pytest.mark.parametrize('emb_dim', [1, 4, 101, 1024])
+def test_sparse_adam(emb_dim):
     num_embs = 10
-    emb_dim = 4
     device=F.ctx()
     dgl_emb = NodeEmbedding(num_embs, emb_dim, 'test')
     torch_emb = th.nn.Embedding(num_embs, emb_dim, sparse=True)
@@ -28,7 +28,9 @@ def test_sparse_adam():
     idx = th.randint(0, num_embs, size=(4,))
     dgl_value = dgl_emb(idx, device).to(th.device('cpu'))
     torch_value = torch_emb(idx)
-    labels = th.ones((4,)).long()
+    labels = th.zeros((4,)).long()
+    print("dgl_value = {}".format(dgl_value))
+    print("labels = {}".format(labels))
 
     dgl_adam.zero_grad()
     torch_adam.zero_grad()
@@ -47,13 +49,13 @@ def test_sparse_adam():
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @pytest.mark.parametrize('use_uva', [False, True, None])
-def test_sparse_adam_uva(use_uva):
+@pytest.mark.parametrize('emb_dim', [1, 4, 101, 1024])
+def test_sparse_adam_uva(use_uva, emb_dim):
     if F.ctx().type == 'cpu' and use_uva == True:
         # we want to only test values of False and None when not using GPU
         pytest.skip("UVA cannot be used without GPUs.")
 
     num_embs = 10
-    emb_dim = 4
     device=F.ctx()
     dgl_emb = NodeEmbedding(num_embs, emb_dim, 'test_uva{}'.format(use_uva))
     torch_emb = th.nn.Embedding(num_embs, emb_dim, sparse=True)
@@ -69,7 +71,7 @@ def test_sparse_adam_uva(use_uva):
     idx = th.randint(0, num_embs, size=(4,))
     dgl_value = dgl_emb(idx, device).to(th.device('cpu'))
     torch_value = torch_emb(idx)
-    labels = th.ones((4,)).long()
+    labels = th.zeros((4,)).long()
 
     dgl_adam.zero_grad()
     torch_adam.zero_grad()
@@ -88,9 +90,9 @@ def test_sparse_adam_uva(use_uva):
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @pytest.mark.parametrize('dtype', [th.float32, th.float16])
-def test_sparse_adam_dtype(dtype):
+@pytest.mark.parametrize('emb_dim', [1, 4, 101, 1024])
+def test_sparse_adam_dtype(dtype, emb_dim):
     num_embs = 10
-    emb_dim = 4
     device=F.ctx()
     dgl_emb = NodeEmbedding(num_embs, emb_dim, 'test_dtype{}'.format(dtype))
     torch_emb = th.nn.Embedding(num_embs, emb_dim, sparse=True)
@@ -106,7 +108,7 @@ def test_sparse_adam_dtype(dtype):
     idx = th.randint(0, num_embs, size=(4,))
     dgl_value = dgl_emb(idx, device).to(th.device('cpu'))
     torch_value = torch_emb(idx)
-    labels = th.ones((4,)).long()
+    labels = th.zeros((4,)).long()
 
     dgl_adam.zero_grad()
     torch_adam.zero_grad()
@@ -465,7 +467,10 @@ def test_multiprocess_sparse_adam_zero_step_cuda_tensor(num_workers):
     assert F.allclose(dgl_weight, torch_weight)
 
 if __name__ == '__main__':
-    test_sparse_adam()
+    test_sparse_adam(1)
+    test_sparse_adam(4)
+    test_sparse_adam(101)
+    test_sparse_adam(1024)
     test_sparse_adam_zero_step()
 
     test_multiprocess_cpu_sparse_adam(2)
