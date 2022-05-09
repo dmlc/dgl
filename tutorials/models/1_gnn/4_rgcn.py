@@ -361,4 +361,5 @@ for epoch in range(n_epochs):
 #
 # The implementation is similar to that presented here, but with an extra DistMult layer
 # stacked on top of the R-GCN layers. You can find the complete
-# implementation of link prediction with R-GCN in our `Github Python code example <https://github.com/dmlc/dgl/blob/master/examples/pytorch/rgcn/link.py>`_.
+# implementation of link prediction with R-GCN in our `Github Python code example
+# <https://github.com/dmlc/dgl/blob/master/examples/pytorch/rgcn/link.py>`_.
