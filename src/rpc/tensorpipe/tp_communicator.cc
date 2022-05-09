@@ -25,6 +25,11 @@ bool TPSender::ConnectReceiver(const std::string &addr, int recv_id) {
     LOG(WARNING) << "Duplicate recv_id[" << recv_id << "]. Ignoring...";
     return true;
   }
+  static std::unordered_map<int, int> try_times;
+  ++try_times[recv_id];
+  if (try_times[recv_id] % kLogInterval == 0) {
+    LOG(INFO) << "Trying to connect receiver: " << addr;
+  }
   std::shared_ptr<Pipe> pipe;
   pipe = context->connect(addr);
   auto done = std::make_shared<std::promise<bool>>();

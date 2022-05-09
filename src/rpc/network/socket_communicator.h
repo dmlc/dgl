@@ -69,7 +69,7 @@ class SocketSender : public Sender {
    *
    * The function is *not* thread-safe; only one thread can invoke this API.
    */
-  bool ConnectReceiverFinalize(const int max_try_times = kMaxTryCount) override;
+  bool ConnectReceiverFinalize(const int max_try_times) override;
 
   /*!
    * \brief Send RPCMessage to specified Receiver.

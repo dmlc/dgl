@@ -32,6 +32,7 @@ const int kThreadNum = 2;
 const int kNumSender = 3;
 const int kNumReceiver = 3;
 const int kNumMessage = 10;
+const int kMaxTryTimes = 1024;
 
 const char* ip_addr[] = {
   "tcp://127.0.0.1:50091",
@@ -66,7 +67,7 @@ void start_client() {
   for (int i = 0; i < kNumReceiver; ++i) {
     sender.ConnectReceiver(ip_addr[i], i);
   }
-  sender.ConnectReceiverFinalize();
+  sender.ConnectReceiverFinalize(kMaxTryTimes);
   for (int i = 0; i < kNumMessage; ++i) {
     for (int n = 0; n < kNumReceiver; ++n) {
       char* str_data = new char[9];
@@ -171,7 +172,7 @@ static void start_client() {
   t.close();
   SocketSender sender(kQueueSize, kThreadNum);
   sender.ConnectReceiver(ip_addr.c_str(), 0);
-  sender.ConnectReceiverFinalize();
+  sender.ConnectReceiverFinalize(kMaxTryTimes);
   char* str_data = new char[9];
   memcpy(str_data, "123456789", 9);
   Message msg = {str_data, 9};
