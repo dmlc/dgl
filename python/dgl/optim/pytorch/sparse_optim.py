@@ -5,10 +5,12 @@ import torch as th
 
 from ...utils import get_shared_mem_array, create_shared_mem_array, \
                      pin_memory_inplace, gather_pinned_tensor_rows, \
-                     scatter_pinned_tensor_rows
+                     scatter_pinned_tensor_rows, to_dgl_context
 from ...nn.pytorch import NodeEmbedding
 from ...cuda import nccl
 from ...partition import NDArrayPartition
+from ... import backend as F
+from ... import ndarray
 
 class SparseGradOptimizer(abc.ABC):
     r''' The abstract sparse optimizer.
@@ -579,14 +581,17 @@ class SparseAdam(SparseGradOptimizer):
                         (emb.weight.shape[0],),
                         dtype=th.int32,
                         device=th.device('cpu')).zero_()
-                    state_mem = th.empty(
+                    # TODO(@nv-dlasalle): Pinning memory allocated by pytorch
+                    # is problematic as it doesn't get unpinned upon being
+                    # freed. So instead allocate DGL arrays here.
+                    state_mem = F.zerocopy_from_dlpack(ndarray.empty(
                         emb.weight.shape,
-                        dtype=self._dtype,
-                        device=th.device('cpu')).zero_()
-                    state_power = th.empty(
+                        dtype=F.reverse_data_type_dict[self._dtype],
+                        ctx=to_dgl_context(th.device('cpu'))).to_dlpack()).zero_()
+                    state_power = F.zerocopy_from_dlpack(ndarray.empty(
                         emb.weight.shape,
-                        dtype=self._dtype,
-                        device=th.device('cpu')).zero_()
+                        dtype=F.reverse_data_type_dict[self._dtype],
+                        ctx=to_dgl_context(th.device('cpu'))).to_dlpack()).zero_()
                 elif self._rank == 0:
                     state_step = create_shared_mem_array(emb_name+'_step', \
                         (emb.weight.shape[0],), th.int32).zero_()
