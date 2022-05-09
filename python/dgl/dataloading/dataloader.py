@@ -67,7 +67,7 @@ class _TensorizedDatasetIter(object):
         batch = self._next_indices()
         if self.mapping_keys is None:
             # clone() fixes #3755, probably.  Not sure why.  Need to take a look afterwards.
-            return batch
+            return batch.clone()
 
         # convert the type-ID pairs to dictionary
         type_ids = batch[:, 0]
