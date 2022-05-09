@@ -62,6 +62,7 @@ NDArray IndexSelectCPUFromGPU(NDArray array, IdArray index) {
   return ret;
 }
 
+// floating point types are treated as their equal width integer types
 template NDArray IndexSelectCPUFromGPU<int8_t, int32_t>(NDArray, IdArray);
 template NDArray IndexSelectCPUFromGPU<int8_t, int64_t>(NDArray, IdArray);
 template NDArray IndexSelectCPUFromGPU<int16_t, int32_t>(NDArray, IdArray);
@@ -70,10 +71,6 @@ template NDArray IndexSelectCPUFromGPU<int32_t, int32_t>(NDArray, IdArray);
 template NDArray IndexSelectCPUFromGPU<int32_t, int64_t>(NDArray, IdArray);
 template NDArray IndexSelectCPUFromGPU<int64_t, int32_t>(NDArray, IdArray);
 template NDArray IndexSelectCPUFromGPU<int64_t, int64_t>(NDArray, IdArray);
-template NDArray IndexSelectCPUFromGPU<float, int32_t>(NDArray, IdArray);
-template NDArray IndexSelectCPUFromGPU<float, int64_t>(NDArray, IdArray);
-template NDArray IndexSelectCPUFromGPU<double, int32_t>(NDArray, IdArray);
-template NDArray IndexSelectCPUFromGPU<double, int64_t>(NDArray, IdArray);
 
 
 template<typename DType, typename IdType>
@@ -115,6 +112,7 @@ void IndexScatterGPUToCPU(NDArray dest, IdArray index, NDArray source) {
   }
 }
 
+// floating point types are treated as their equal width integer types
 template void IndexScatterGPUToCPU<int8_t, int32_t>(NDArray, IdArray, NDArray);
 template void IndexScatterGPUToCPU<int8_t, int64_t>(NDArray, IdArray, NDArray);
 template void IndexScatterGPUToCPU<int16_t, int32_t>(NDArray, IdArray, NDArray);
@@ -123,10 +121,6 @@ template void IndexScatterGPUToCPU<int32_t, int32_t>(NDArray, IdArray, NDArray);
 template void IndexScatterGPUToCPU<int32_t, int64_t>(NDArray, IdArray, NDArray);
 template void IndexScatterGPUToCPU<int64_t, int32_t>(NDArray, IdArray, NDArray);
 template void IndexScatterGPUToCPU<int64_t, int64_t>(NDArray, IdArray, NDArray);
-template void IndexScatterGPUToCPU<float, int32_t>(NDArray, IdArray, NDArray);
-template void IndexScatterGPUToCPU<float, int64_t>(NDArray, IdArray, NDArray);
-template void IndexScatterGPUToCPU<double, int32_t>(NDArray, IdArray, NDArray);
-template void IndexScatterGPUToCPU<double, int64_t>(NDArray, IdArray, NDArray);
 
 }  // namespace impl
 }  // namespace aten
