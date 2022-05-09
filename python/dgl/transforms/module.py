@@ -1625,7 +1625,7 @@ class SIGNDiffusion(BaseTransform):
             for _ in range(self.k):
                 g.update_all(message_func, reduce_func)
                 if use_eweight:
-                    g.ndata['h'] = g.ndata['h'] / g.ndata['z']
+                    g.ndata['h'] = g.ndata['h'] / F.reshape(g.ndata['z'], (g.num_nodes(), 1))
                 feat_list.append(g.ndata['h'])
         return feat_list
 
