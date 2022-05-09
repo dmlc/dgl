@@ -186,7 +186,11 @@ def test_ogbg_gin(virtual_node):
                     virtual_node=virtual_node)
     num_nodes = 5
     num_edges = 15
-    g = dgl.rand_graph(num_nodes, num_edges)
+    g1 = dgl.rand_graph(num_nodes, num_edges)
+    g2 = dgl.rand_graph(num_nodes, num_edges)
+    g = dgl.batch([g1, g2])
+    num_nodes = g.num_nodes()
+    num_edges = g.num_edges()
     nfeat = torch.zeros(num_nodes, 9).long()
     efeat = torch.zeros(num_edges, 3).long()
     model(g, nfeat, efeat)
