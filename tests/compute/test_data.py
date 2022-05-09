@@ -1044,7 +1044,7 @@ def _test_CSVDataset_customized_data_parser():
         assert 'label' in csv_dataset.data
         for i, (g, g_data) in enumerate(csv_dataset):
             assert not g.is_homogeneous
-            assert F.asnumpy(g_data['label']) == label_gdata[i] + 2
+            assert F.asnumpy(g_data) == label_gdata[i] + 2
             for ntype in g.ntypes:
                 assert g.num_nodes(ntype) == num_nodes
                 offset = 2 if ntype == 'user' else 0
