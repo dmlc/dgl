@@ -345,10 +345,10 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
         out_cols,
         out_idxs);
   } else {
-    constexpr int BLOCK_WARPS = 128/WARP_SIZE;
+    constexpr int BLOCK_WARPS = 128/CTA_SIZE;
     // the number of rows each thread block will cover
-    constexpr int TILE_SIZE = BLOCK_WARPS*16;
-    const dim3 block(WARP_SIZE, BLOCK_WARPS);
+    constexpr int TILE_SIZE = BLOCK_WARPS;
+    const dim3 block(CTA_SIZE, BLOCK_WARPS);
     const dim3 grid((num_rows+TILE_SIZE-1)/TILE_SIZE);
     _CSRRowWiseSampleKernel<IdType, BLOCK_WARPS, TILE_SIZE><<<grid, block, 0, stream>>>(
         random_seed,
