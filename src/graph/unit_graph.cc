@@ -381,7 +381,8 @@ class UnitGraph::COO : public BaseHeteroGraph {
     CHECK(aten::IsValidIdArray(dstvids)) << "Invalid vertex id array.";
     HeteroSubgraph subg;
     const auto& submat = aten::COOSliceMatrix(adj_, srcvids, dstvids);
-    IdArray sub_eids = aten::Range(0, submat.data->shape[0], NumBits(), Context());
+    DLContext ctx = aten::GetContextOf(vids);
+    IdArray sub_eids = aten::Range(0, submat.data->shape[0], NumBits(), ctx);
     subg.graph = std::make_shared<COO>(meta_graph(), submat.num_rows, submat.num_cols,
         submat.row, submat.col);
     subg.induced_vertices = vids;
@@ -801,7 +802,8 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     CHECK(aten::IsValidIdArray(dstvids)) << "Invalid vertex id array.";
     HeteroSubgraph subg;
     const auto& submat = aten::CSRSliceMatrix(adj_, srcvids, dstvids);
-    IdArray sub_eids = aten::Range(0, submat.data->shape[0], NumBits(), Context());
+    DLContext ctx = aten::GetContextOf(vids);
+    IdArray sub_eids = aten::Range(0, submat.data->shape[0], NumBits(), ctx);
     subg.graph = std::make_shared<CSR>(meta_graph(), submat.num_rows, submat.num_cols,
         submat.indptr, submat.indices, sub_eids);
     subg.induced_vertices = vids;
@@ -1386,10 +1388,6 @@ UnitGraph::CSRPtr UnitGraph::GetInCSR(bool inplace) const {
   // Prefers converting from COO since it is parallelized.
   // TODO(BarclayII): need benchmarking.
   if (!in_csr_->defined()) {
-    // inplace new formats materialization is not allowed for pinned graphs
-    if (inplace && IsPinned())
-      LOG(FATAL) << "Cannot create new formats for pinned graphs, " <<
-        "please create the CSC format before pinning.";
     if (coo_->defined()) {
       const auto& newadj = aten::COOToCSR(
             aten::COOTranspose(coo_->adj()));
@@ -1407,6 +1405,8 @@ UnitGraph::CSRPtr UnitGraph::GetInCSR(bool inplace) const {
       else
         ret = std::make_shared<CSR>(meta_graph(), newadj);
     }
+    if (inplace && IsPinned())
+      in_csr_->PinMemory_();
   }
   return ret;
 }
@@ -1421,10 +1421,6 @@ UnitGraph::CSRPtr UnitGraph::GetOutCSR(bool inplace) const {
   // Prefers converting from COO since it is parallelized.
   // TODO(BarclayII): need benchmarking.
   if (!out_csr_->defined()) {
-    // inplace new formats materialization is not allowed for pinned graphs
-    if (inplace && IsPinned())
-      LOG(FATAL) << "Cannot create new formats for pinned graphs, " <<
-        "please create the CSR format before pinning.";
     if (coo_->defined()) {
       const auto& newadj = aten::COOToCSR(coo_->adj());
 
@@ -1441,6 +1437,8 @@ UnitGraph::CSRPtr UnitGraph::GetOutCSR(bool inplace) const {
       else
         ret = std::make_shared<CSR>(meta_graph(), newadj);
     }
+    if (inplace && IsPinned())
+      out_csr_->PinMemory_();
   }
   return ret;
 }
@@ -1453,10 +1451,6 @@ UnitGraph::COOPtr UnitGraph::GetCOO(bool inplace) const {
         CodeToStr(formats_) << ", cannot create COO matrix.";
   COOPtr ret = coo_;
   if (!coo_->defined()) {
-    // inplace new formats materialization is not allowed for pinned graphs
-    if (inplace && IsPinned())
-      LOG(FATAL) << "Cannot create new formats for pinned graphs, " <<
-        "please create the COO format before pinning.";
     if (in_csr_->defined()) {
       const auto& newadj = aten::COOTranspose(aten::CSRToCOO(in_csr_->adj(), true));
 
@@ -1473,6 +1467,8 @@ UnitGraph::COOPtr UnitGraph::GetCOO(bool inplace) const {
       else
         ret = std::make_shared<COO>(meta_graph(), newadj);
     }
+    if (inplace && IsPinned())
+      coo_->PinMemory_();
   }
   return ret;
 }

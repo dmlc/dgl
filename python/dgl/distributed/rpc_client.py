@@ -103,7 +103,7 @@ def get_local_usable_addr(probe_addr):
 
 
 def connect_to_server(ip_config, num_servers, max_queue_size=MAX_QUEUE_SIZE,
-                      net_type='socket', group_id=0):
+                      net_type='tensorpipe', group_id=0):
     """Connect this client to server.
 
     Parameters
@@ -117,7 +117,7 @@ def connect_to_server(ip_config, num_servers, max_queue_size=MAX_QUEUE_SIZE,
         Note that the 20 GB is just an upper-bound and DGL uses zero-copy and
         it will not allocate 20GB memory at once.
     net_type : str
-        Networking type. Current options are: 'socket'.
+        Networking type. Current options are: 'socket', 'tensorpipe'.
     group_id : int
         Indicates which group this client belongs to. Clients that are
         booted together in each launch are gathered as a group and should
@@ -129,7 +129,8 @@ def connect_to_server(ip_config, num_servers, max_queue_size=MAX_QUEUE_SIZE,
     """
     assert num_servers > 0, 'num_servers (%d) must be a positive number.' % num_servers
     assert max_queue_size > 0, 'queue_size (%d) cannot be a negative number.' % max_queue_size
-    assert net_type in ('socket'), 'net_type (%s) can only be \'socket\'.' % net_type
+    assert net_type in ('socket', 'tensorpipe'), \
+        'net_type (%s) can only be \'socket\' or \'tensorpipe\'.' % net_type
     # Register some basic service
     rpc.register_service(rpc.CLIENT_REGISTER,
                          rpc.ClientRegisterRequest,
@@ -169,16 +170,19 @@ def connect_to_server(ip_config, num_servers, max_queue_size=MAX_QUEUE_SIZE,
         server_port = addr[2]
         while not rpc.connect_receiver(server_ip, server_port, server_id):
             time.sleep(3)
+    rpc.connect_receiver_finalize()
     # Get local usable IP address and port
     ip_addr = get_local_usable_addr(server_ip)
     client_ip, client_port = ip_addr.split(':')
-    # wait server connect back
-    rpc.receiver_wait(client_ip, client_port, num_servers, blocking=False)
-    print("Client [{}] waits on {}:{}".format(os.getpid(), client_ip, client_port))
     # Register client on server
     register_req = rpc.ClientRegisterRequest(ip_addr)
     for server_id in range(num_servers):
         rpc.send_request(server_id, register_req)
+    # wait server connect back
+    rpc.wait_for_senders(client_ip, client_port, num_servers,
+                         blocking=net_type == 'socket')
+    print("Client [{}] waits on {}:{}".format(
+        os.getpid(), client_ip, client_port))
     # recv client ID from server
     res = rpc.recv_response()
     rpc.set_rank(res.client_id)
@@ -222,7 +226,7 @@ def shutdown_servers(ip_config, num_servers):
     rpc.register_sig_handler()
     server_namebook = rpc.read_ip_config(ip_config, num_servers)
     num_servers = len(server_namebook)
-    rpc.create_sender(MAX_QUEUE_SIZE, 'socket')
+    rpc.create_sender(MAX_QUEUE_SIZE, 'tensorpipe')
     # Get connected with all server nodes
     for server_id, addr in server_namebook.items():
         server_ip = addr[1]
