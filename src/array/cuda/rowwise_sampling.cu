@@ -22,6 +22,7 @@ namespace impl {
 namespace {
 
 constexpr int WARP_SIZE = 32;
+constexpr int CTA_SIZE = 128;
 
 /**
 * @brief Compute the size of each row in the sampled CSR, without replacement.
@@ -125,13 +126,12 @@ __global__ void _CSRRowWiseSampleKernel(
     IdType * const out_cols,
     IdType * const out_idxs) {
   // we assign one warp per row
-  assert(blockDim.x == WARP_SIZE);
-  assert(blockDim.y == BLOCK_WARPS);
+  assert(blockDim.x == CTA_SIZE);
 
   int64_t out_row = blockIdx.x*TILE_SIZE+threadIdx.y;
   const int64_t last_row = min(static_cast<int64_t>(blockIdx.x+1)*TILE_SIZE, num_rows);
 
-  curandState rng;
+  curandStatePhilox4_32_10_t rng;
   curand_init((rand_seed*gridDim.x+blockIdx.x)*blockDim.y+threadIdx.y, threadIdx.x, 0, &rng);
 
   while (out_row < last_row) {
@@ -144,7 +144,7 @@ __global__ void _CSRRowWiseSampleKernel(
 
     if (deg <= num_picks) {
       // just copy row
-      for (int idx = threadIdx.x; idx < deg; idx += WARP_SIZE) {
+      for (int idx = threadIdx.x; idx < deg; idx += CTA_SIZE) {
         const IdType in_idx = in_row_start+idx;
         out_rows[out_row_start+idx] = row;
         out_cols[out_row_start+idx] = in_index[in_idx];
@@ -152,12 +152,12 @@ __global__ void _CSRRowWiseSampleKernel(
       }
     } else {
       // generate permutation list via reservoir algorithm
-      for (int idx = threadIdx.x; idx < num_picks; idx+=WARP_SIZE) {
+      for (int idx = threadIdx.x; idx < num_picks; idx+=CTA_SIZE) {
         out_idxs[out_row_start+idx] = idx;
       }
-      __syncwarp();
+      __syncthreads();
 
-      for (int idx = num_picks+threadIdx.x; idx < deg; idx+=WARP_SIZE) {
+      for (int idx = num_picks+threadIdx.x; idx < deg; idx+=CTA_SIZE) {
         const int num = curand(&rng)%(idx+1);
         if (num < num_picks) {
           // use max so as to achieve the replacement order the serial
@@ -165,10 +165,10 @@ __global__ void _CSRRowWiseSampleKernel(
           AtomicMax(out_idxs+out_row_start+num, idx);
         }
       }
-      __syncwarp();
+      __syncthreads();
 
       // copy permutation over
-      for (int idx = threadIdx.x; idx < num_picks; idx += WARP_SIZE) {
+      for (int idx = threadIdx.x; idx < num_picks; idx += CTA_SIZE) {
         const IdType perm_idx = out_idxs[out_row_start+idx]+in_row_start;
         out_rows[out_row_start+idx] = row;
         out_cols[out_row_start+idx] = in_index[perm_idx];
