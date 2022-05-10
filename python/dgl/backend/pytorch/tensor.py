@@ -351,6 +351,8 @@ else:
 def zerocopy_to_dgl_ndarray_for_write(input):
     assert input.is_contiguous(), "Cannot convert non-contiguous tensors " \
         "to dgl ndarray for write."
+    assert input.numel() == input.storage().size(), "Cannot convert view " \
+        "tensors to dgl ndarray for write."
     return zerocopy_to_dgl_ndarray(input)
 
 def zerocopy_from_dgl_ndarray(data):
