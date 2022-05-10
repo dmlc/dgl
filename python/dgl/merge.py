@@ -19,6 +19,11 @@ def merge(graphs):
     graphs : list[DGLGraph]
         Input graphs.
 
+    Returns
+    -------
+    DGLGraph
+        The merged graph.
+
     Notes
     ----------
     * Inplace updates are applied to a new, empty graph.
@@ -36,15 +41,17 @@ def merge(graphs):
     >>> g.ndata["x"] = torch.zeros(4)
     >>> h = dgl.graph((torch.tensor([1,2]), torch.tensor([0,4])))
     >>> h.ndata["x"] = torch.ones(5)
-    >>> m = dgl.merge([g,h])
+    >>> m = dgl.merge([g, h])
 
     ``m`` now contains edges and nodes from ``h`` and ``g``.
+
     >>> m.edges()
     (tensor([0, 1, 1, 2]), tensor([2, 3, 0, 4]))
     >>> m.nodes()
     tensor([0, 1, 2, 3, 4])
 
     ``g``'s data has updated with ``h``'s in ``m``.
+
     >>> m.ndata["x"]
     tensor([1., 1., 1., 1., 1.])
 

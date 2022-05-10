@@ -27,8 +27,7 @@ namespace network {
 /////////////////////////////////////// SocketSender ///////////////////////////////////////////
 
 
-void SocketSender::AddReceiver(const char* addr, int recv_id) {
-  CHECK_NOTNULL(addr);
+bool SocketSender::ConnectReceiver(const std::string& addr, int recv_id) {
   if (recv_id < 0) {
     LOG(FATAL) << "recv_id cannot be a negative number.";
   }
@@ -36,25 +35,27 @@ void SocketSender::AddReceiver(const char* addr, int recv_id) {
   std::vector<std::string> ip_and_port;
   SplitStringUsing(addr, "//", &substring);
   // Check address format
-  if (substring[0] != "socket:" || substring.size() != 2) {
+  if (substring[0] != "tcp:" || substring.size() != 2) {
     LOG(FATAL) << "Incorrect address format:" << addr
                << " Please provide right address format, "
-               << "e.g, 'socket://127.0.0.1:50051'. ";
+               << "e.g, 'tcp://127.0.0.1:50051'. ";
   }
   // Get IP and port
   SplitStringUsing(substring[1], ":", &ip_and_port);
   if (ip_and_port.size() != 2) {
     LOG(FATAL) << "Incorrect address format:" << addr
                << " Please provide right address format, "
-               << "e.g, 'socket://127.0.0.1:50051'. ";
+               << "e.g, 'tcp://127.0.0.1:50051'. ";
   }
   IPAddr address;
   address.ip = ip_and_port[0];
   address.port = std::stoi(ip_and_port[1]);
   receiver_addrs_[recv_id] = address;
+
+  return true;
 }
 
-bool SocketSender::Connect() {
+bool SocketSender::ConnectReceiverFinalize() {
   // Create N sockets for Receiver
   int receiver_count = static_cast<int>(receiver_addrs_.size());
   if (max_thread_count_ == 0 || max_thread_count_ > receiver_count) {
@@ -79,11 +80,7 @@ bool SocketSender::Connect() {
           LOG(INFO) << "Try to connect to: " << ip << ":" << port;
         }
         try_count++;
-#ifdef _WIN32
-        Sleep(5);
-#else   // !_WIN32
-        sleep(5);
-#endif  // _WIN32
+        std::this_thread::sleep_for(std::chrono::seconds(5));
       }
     }
     if (bo == false) {
@@ -103,6 +100,34 @@ bool SocketSender::Connect() {
   return true;
 }
 
+void SocketSender::Send(const rpc::RPCMessage& msg, int recv_id) {
+  std::shared_ptr<std::string> zerocopy_blob(new std::string());
+  StreamWithBuffer zc_write_strm(zerocopy_blob.get(), true);
+  zc_write_strm.Write(msg);
+  int32_t nonempty_ndarray_count = zc_write_strm.buffer_list().size();
+  zerocopy_blob->append(reinterpret_cast<char*>(&nonempty_ndarray_count),
+                        sizeof(int32_t));
+  Message rpc_meta_msg;
+  rpc_meta_msg.data = const_cast<char*>(zerocopy_blob->data());
+  rpc_meta_msg.size = zerocopy_blob->size();
+  rpc_meta_msg.deallocator = [zerocopy_blob](Message*) {};
+  CHECK_EQ(Send(
+    rpc_meta_msg, recv_id), ADD_SUCCESS);
+  // send real ndarray data
+  for (auto ptr : zc_write_strm.buffer_list()) {
+    Message ndarray_data_msg;
+    ndarray_data_msg.data = reinterpret_cast<char*>(ptr.data);
+    if (ptr.size == 0) {
+      LOG(FATAL) << "Cannot send a empty NDArray.";
+    }
+    ndarray_data_msg.size = ptr.size;
+    NDArray tensor = ptr.tensor;
+    ndarray_data_msg.deallocator = [tensor](Message*) {};
+    CHECK_EQ(Send(
+      ndarray_data_msg, recv_id), ADD_SUCCESS);
+  }
+}
+
 STATUS SocketSender::Send(Message msg, int recv_id) {
   CHECK_NOTNULL(msg.data);
   CHECK_GT(msg.size, 0);
@@ -119,11 +144,7 @@ void SocketSender::Finalize() {
     // wait until queue is empty
     auto& mq = msg_queue_[i];
     while (mq->Empty() == false) {
-#ifdef _WIN32
-        // just loop
-#else   // !_WIN32
-        usleep(1000);
-#endif  // _WIN32
+      std::this_thread::sleep_for(std::chrono::seconds(1));
     }
     // All queues have only one producer, which is main thread, so
     // the producerID argument here should be zero.
@@ -185,25 +206,24 @@ void SocketSender::SendLoop(
 }
 
 /////////////////////////////////////// SocketReceiver ///////////////////////////////////////////
-
-bool SocketReceiver::Wait(const char* addr, int num_sender) {
-  CHECK_NOTNULL(addr);
+bool SocketReceiver::Wait(const std::string &addr, int num_sender, bool blocking) {
   CHECK_GT(num_sender, 0);
+  CHECK_EQ(blocking, true);
   std::vector<std::string> substring;
   std::vector<std::string> ip_and_port;
   SplitStringUsing(addr, "//", &substring);
   // Check address format
-  if (substring[0] != "socket:" || substring.size() != 2) {
+  if (substring[0] != "tcp:" || substring.size() != 2) {
     LOG(FATAL) << "Incorrect address format:" << addr
                << " Please provide right address format, "
-               << "e.g, 'socket://127.0.0.1:50051'. ";
+               << "e.g, 'tcp://127.0.0.1:50051'. ";
   }
   // Get IP and port
   SplitStringUsing(substring[1], ":", &ip_and_port);
   if (ip_and_port.size() != 2) {
     LOG(FATAL) << "Incorrect address format:" << addr
                << " Please provide right address format, "
-               << "e.g, 'socket://127.0.0.1:50051'. ";
+               << "e.g, 'tcp://127.0.0.1:50051'. ";
   }
   std::string ip = ip_and_port[0];
   int port = stoi(ip_and_port[1]);
@@ -255,6 +275,26 @@ bool SocketReceiver::Wait(const char* addr, int num_sender) {
   return true;
 }
 
+void SocketReceiver::Recv(rpc::RPCMessage* msg) {
+  Message rpc_meta_msg;
+  int send_id;
+  CHECK_EQ(Recv(
+    &rpc_meta_msg, &send_id), REMOVE_SUCCESS);
+  char* count_ptr = rpc_meta_msg.data+rpc_meta_msg.size-sizeof(int32_t);
+  int32_t nonempty_ndarray_count = *(reinterpret_cast<int32_t*>(count_ptr));
+  // Recv real ndarray data
+  std::vector<void*> buffer_list(nonempty_ndarray_count);
+  for (int i = 0; i < nonempty_ndarray_count; ++i) {
+    Message ndarray_data_msg;
+    CHECK_EQ(RecvFrom(
+        &ndarray_data_msg, send_id), REMOVE_SUCCESS);
+    buffer_list[i] = ndarray_data_msg.data;
+  }
+  StreamWithBuffer zc_read_strm(rpc_meta_msg.data, rpc_meta_msg.size-sizeof(int32_t), buffer_list);
+  zc_read_strm.Read(msg);
+  rpc_meta_msg.deallocator(&rpc_meta_msg);
+}
+
 STATUS SocketReceiver::Recv(Message* msg, int* send_id) {
   // queue_sem_ is a semaphore indicating how many elements in multiple
   // message queues.
@@ -288,11 +328,7 @@ void SocketReceiver::Finalize() {
   for (auto& mq : msg_queue_) {
     // wait until queue is empty
     while (mq.second->Empty() == false) {
-#ifdef _WIN32
-        // just loop
-#else   // !_WIN32
-        usleep(1000);
-#endif  // _WIN32
+        std::this_thread::sleep_for(std::chrono::seconds(1));
     }
     mq.second->SignalFinished(mq.first);
   }

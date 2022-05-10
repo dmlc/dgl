@@ -1,5 +1,3 @@
-
-import torch
 import torch.nn as nn
 import dgl.function as fn
 import torch.nn.functional as F
@@ -30,16 +28,18 @@ class SGC(nn.Module):
         super().__init__()
         self.data_info = data_info
         self.out_size = data_info["out_size"]
-        self.in_size = data_info["in_size"]
         self.embed_size = embed_size
         if embed_size > 0:
             self.embed = nn.Embedding(data_info["num_nodes"], embed_size)
-        self.sgc = SGConv(self.in_size, self.out_size, k=k, cached=True,
+            in_size = embed_size
+        else:
+            in_size = data_info["in_size"]
+        self.sgc = SGConv(in_size, self.out_size, k=k, cached=True,
                           bias=bias, norm=self.normalize)
 
     def forward(self, g, node_feat, edge_feat=None):
         if self.embed_size > 0:
-            dgl_warning("The embedding for node feature is used, and input node_feat is ignored, due to the provided embed_size.", norepeat=True)
+            dgl_warning("The embedding for node feature is used, and input node_feat is ignored, due to the provided embed_size.")
             h = self.embed.weight
         else:
             h = node_feat

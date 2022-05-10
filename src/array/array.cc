@@ -857,6 +857,16 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
   return ret;
 }
 
+COOMatrix DisjointUnionCoo(const std::vector<COOMatrix>& coos) {
+  COOMatrix ret;
+  ATEN_XPU_SWITCH_CUDA(coos[0].row->ctx.device_type, XPU, "DisjointUnionCoo", {
+    ATEN_ID_TYPE_SWITCH(coos[0].row->dtype, IdType, {
+      ret = impl::DisjointUnionCoo<XPU, IdType>(coos);
+    });
+  });
+  return ret;
+}
+
 COOMatrix COOLineGraph(const COOMatrix &coo, bool backtracking) {
   COOMatrix ret;
   ATEN_COO_SWITCH(coo, XPU, IdType, "COOLineGraph", {
