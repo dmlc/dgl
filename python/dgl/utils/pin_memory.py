@@ -5,12 +5,12 @@ from .._ffi.function import _init_api
 
 def pin_memory_inplace(tensor):
     """Register the tensor into pinned memory in-place (i.e. without copying)."""
-    # needs to be writable to allow in-place modification 
+    # needs to be writable to allow in-place modification
     F.zerocopy_to_dgl_ndarray_for_write(tensor).pin_memory_()
 
 def unpin_memory_inplace(tensor):
     """Unregister the tensor from pinned memory in-place (i.e. without copying)."""
-    # needs to be writable to allow in-place modification 
+    # needs to be writable to allow in-place modification
     F.zerocopy_to_dgl_ndarray_for_write(tensor).unpin_memory_()
 
 def gather_pinned_tensor_rows(tensor, rows):
