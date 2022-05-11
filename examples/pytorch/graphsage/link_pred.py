@@ -77,7 +77,7 @@ class SAGE(nn.Module):
         # example is that the intermediate results can also benefit from prefetching.
         feat = g.ndata['feat']
         sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1, prefetch_node_feats=['feat'])
-        dataloader = dgl.dataloading.NodeDataLoader(
+        dataloader = dgl.dataloading.DataLoader(
                 g, torch.arange(g.num_nodes()).to(g.device), sampler, device=device,
                 batch_size=1000, shuffle=False, drop_last=False, num_workers=num_workers)
         if buffer_device is None:
