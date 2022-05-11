@@ -68,7 +68,7 @@ class GAT(nn.Module):
                 y = th.zeros(g.num_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
 
             sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
-            dataloader = dgl.dataloading.NodeDataLoader(
+            dataloader = dgl.dataloading.DataLoader(
                 g,
                 th.arange(g.num_nodes()),
                 sampler,
@@ -132,7 +132,7 @@ def run(args, device, data):
     # Create PyTorch DataLoader for constructing blocks
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
         [int(fanout) for fanout in args.fan_out.split(',')])
-    dataloader = dgl.dataloading.NodeDataLoader(
+    dataloader = dgl.dataloading.DataLoader(
         g,
         train_nid,
         sampler,
