@@ -177,7 +177,7 @@ NDArray NDArray::CreateView(std::vector<int64_t> shape,
   CHECK(IsContiguous()) << "Can only create view for compact tensor";
   NDArray ret = Internal::Create(shape, dtype, data_->dl_tensor.ctx);
   ret.data_->dl_tensor.byte_offset =
-      this->data_->dl_tensor.byte_offset + offset;
+      this->data_->dl_tensor.byte_offset;
   size_t curr_size = GetDataSize(this->data_->dl_tensor);
   size_t view_size = GetDataSize(ret.data_->dl_tensor);
   CHECK_LE(view_size, curr_size)
@@ -185,7 +185,8 @@ NDArray NDArray::CreateView(std::vector<int64_t> shape,
   // increase ref count
   this->data_->IncRef();
   ret.data_->manager_ctx = this->data_;
-  ret.data_->dl_tensor.data = this->data_->dl_tensor.data;
+  ret.data_->dl_tensor.data =
+    static_cast<char*>(this->data_->dl_tensor.data) + offset;
   return ret;
 }
 
