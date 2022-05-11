@@ -78,6 +78,12 @@ struct NDArray::Internal {
   // This enables us to create NDArray from memory allocated by other
   // frameworks that are DLPack compatible
   static void DLPackDeleter(NDArray::Container* ptr) {
+    if (ptr->from_tensor_dispatcher_) {
+       if (IsDataPinned(&(ptr->dl_tensor))) {
+        UnpinData(&(ptr->dl_tensor));
+      }
+    }
+
     DLManagedTensor* tensor = static_cast<DLManagedTensor*>(ptr->manager_ctx);
     if (tensor->deleter != nullptr) {
       (*tensor->deleter)(tensor);
@@ -171,7 +177,7 @@ NDArray NDArray::CreateView(std::vector<int64_t> shape,
   CHECK(IsContiguous()) << "Can only create view for compact tensor";
   NDArray ret = Internal::Create(shape, dtype, data_->dl_tensor.ctx);
   ret.data_->dl_tensor.byte_offset =
-      this->data_->dl_tensor.byte_offset;
+      this->data_->dl_tensor.byte_offset + offset;
   size_t curr_size = GetDataSize(this->data_->dl_tensor);
   size_t view_size = GetDataSize(ret.data_->dl_tensor);
   CHECK_LE(view_size, curr_size)
@@ -179,8 +185,7 @@ NDArray NDArray::CreateView(std::vector<int64_t> shape,
   // increase ref count
   this->data_->IncRef();
   ret.data_->manager_ctx = this->data_;
-  ret.data_->dl_tensor.data =
-    static_cast<char*>(this->data_->dl_tensor.data) + offset;
+  ret.data_->dl_tensor.data = this->data_->dl_tensor.data;
   return ret;
 }
 
@@ -210,8 +215,11 @@ NDArray NDArray::Empty(std::vector<int64_t> shape,
                        DLDataType dtype,
                        DLContext ctx) {
   TensorDispatcher* td = TensorDispatcher::Global();
-  if (td->IsAvailable())
-    return td->Empty(shape, dtype, ctx);
+  if (td->IsAvailable()) {
+    auto nd = td->Empty(shape, dtype, ctx);
+    nd.data_->from_tensor_dispatcher_ = true;
+    return nd;
+  }
 
   NDArray ret = Internal::Create(shape, dtype, ctx);
   // setup memory content
