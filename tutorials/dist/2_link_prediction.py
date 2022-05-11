@@ -167,6 +167,12 @@ Pytorch's `DistributedDataParallel`.
 
     model = th.nn.parallel.DistributedDataParallel(model)
 
+We also define an edge predictor :class:`~dgl.nn.pytorch.link.EdgePredictor` to predict the edge scores of pairs of node representations
+
+.. code-block:: python
+
+    from dgl.nn import EdgePredictor
+    predictor = EdgePredictor('dot').to(device)
 
 Distributed mini-batch sampler
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -224,6 +230,8 @@ The training loop for distributed training is also exactly the same as the singl
             label = th.cat([th.ones_like(pos_score), th.zeros_like(neg_score)])
             loss = F.binary_cross_entropy_with_logits(score, label)
             
+            optimizer.zero_grad()
+            loss.backward()
             optimizer.step()
 
 Inference
