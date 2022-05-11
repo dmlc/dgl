@@ -95,6 +95,9 @@ def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
                 try_times = 0
                 while not rpc.connect_receiver(client_ip, client_port, client_id, group_id):
                     try_times += 1
+                    if try_times % 200 == 0:
+                        print("Server~{} is trying to connect client receiver: {}:{}".format(
+                            server_id, client_ip, client_port))
                     if try_times >= max_try_times:
                         raise rpc.DistConnectError(max_try_times, client_ip, client_port)
                     time.sleep(1)

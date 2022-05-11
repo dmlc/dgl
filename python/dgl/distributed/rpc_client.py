@@ -172,6 +172,9 @@ def connect_to_server(ip_config, num_servers, max_queue_size=MAX_QUEUE_SIZE,
         try_times = 0
         while not rpc.connect_receiver(server_ip, server_port, server_id):
             try_times += 1
+            if try_times % 200 == 0:
+                print("Client is trying to connect server receiver: {}:{}".format(
+                    server_ip, server_port))
             if try_times >= max_try_times:
                 raise rpc.DistConnectError(max_try_times, server_ip, server_port)
             time.sleep(3)

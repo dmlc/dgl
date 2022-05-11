@@ -75,7 +75,7 @@ bool SocketSender::ConnectReceiverFinalize(const int max_try_times) {
       if (client_socket->Connect(ip, port)) {
         bo = true;
       } else {
-        if (try_count % kLogInterval == 0 && try_count != 0) {
+        if (try_count % 200 == 0 && try_count != 0) {
           // every 600 seconds show this message
           LOG(INFO) << "Trying to connect receiver: " << ip << ":" << port;
         }

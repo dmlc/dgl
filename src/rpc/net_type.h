@@ -27,8 +27,6 @@ struct RPCBase {
 };
 
 struct RPCSender : RPCBase {
-  static constexpr int kLogInterval = 200;
-
   /*!
    * \brief Connect to a receiver.
    * 
