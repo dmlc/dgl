@@ -13,6 +13,12 @@ CMAKE_VARS="-DBUILD_CPP_TEST=ON -DUSE_OPENMP=ON -DBUILD_TORCH=ON"
 # statement for default Python interpreter.
 CMAKE_VARS="$CMAKE_VARS -DTORCH_PYTHON_INTERPS=/opt/conda/envs/pytorch-ci/bin/python"
 
+#This is implemented to detect underlying architecture and enable arch specific optimization.
+arch=`uname -m`
+if [[ $arch == *"x86"* ]]; then
+  CMAKE_VARS="-DUSE_AVX=ON $CMAKE_VARS"
+fi
+
 if [ "$1" == "gpu" ]; then
     CMAKE_VARS="-DUSE_CUDA=ON -DUSE_NCCL=ON $CMAKE_VARS"
 fi
