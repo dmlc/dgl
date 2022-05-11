@@ -38,8 +38,6 @@ sampler = dgl.dataloading.ClusterGCNSampler(
         prefetch_ndata=['feat', 'label', 'train_mask', 'val_mask', 'test_mask'])
 # DataLoader for generic dataloading with a graph, a set of indices (any indices, like
 # partition IDs here), and a graph sampler.
-# NodeDataLoader and EdgeDataLoader are simply special cases of DataLoader where the
-# indices are guaranteed to be node and edge IDs.
 dataloader = dgl.dataloading.DataLoader(
         graph,
         torch.arange(num_partitions).to('cuda'),

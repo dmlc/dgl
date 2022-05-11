@@ -1,9 +1,9 @@
 import torch
 import dgl
 
-from dgl.dataloading.dataloader import EdgeCollator
-from dgl.dataloading import BlockSampler
-from dgl.dataloading.pytorch import _pop_subgraph_storage, _pop_storages
+from dgl._dataloading.dataloader import EdgeCollator
+from dgl._dataloading import BlockSampler
+from dgl._dataloading.pytorch import _pop_subgraph_storage, _pop_storages
 from dgl.base import DGLError
 
 from functools import partial
