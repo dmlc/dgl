@@ -41,7 +41,7 @@ class SAGE(LightningModule):
         # example is that the intermediate results can also benefit from prefetching.
         g.ndata['h'] = g.ndata['feat']
         sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1, prefetch_node_feats=['h'])
-        dataloader = dgl.dataloading.NodeDataLoader(
+        dataloader = dgl.dataloading.DataLoader(
                 g, torch.arange(g.num_nodes()).to(g.device), sampler, device=device,
                 batch_size=batch_size, shuffle=False, drop_last=False, num_workers=num_workers,
                 persistent_workers=(num_workers > 0))

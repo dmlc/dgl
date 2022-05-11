@@ -38,7 +38,7 @@ class SAGE(nn.Module):
     def inference(self, g, device, batch_size, num_workers, buffer_device=None):
         feat = g.ndata['feat']
         sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1, prefetch_node_feats=['feat'])
-        dataloader = dgl.dataloading.NodeDataLoader(
+        dataloader = dgl.dataloading.DataLoader(
                 g, torch.arange(g.num_nodes()).to(g.device), sampler, device=device,
                 batch_size=batch_size, shuffle=False, drop_last=False,
                 num_workers=num_workers)
@@ -85,7 +85,7 @@ sampler = dgl.dataloading.NeighborSampler(
 train_dataloader = dgl.dataloading.DataLoader(
         graph, train_idx, sampler, device=device, batch_size=1024, shuffle=True,
         drop_last=False, num_workers=0, use_uva=not args.pure_gpu)
-valid_dataloader = dgl.dataloading.NodeDataLoader(
+valid_dataloader = dgl.dataloading.DataLoader(
         graph, valid_idx, sampler, device=device, batch_size=1024, shuffle=True,
         drop_last=False, num_workers=0, use_uva=not args.pure_gpu)
 
