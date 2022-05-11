@@ -278,6 +278,35 @@ def test_multi_client_groups():
     for p in pserver_list:
         p.join()
 
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
+@pytest.mark.parametrize("net_type", ['socket', 'tensorpipe'])
+def test_multi_client_connect(net_type):
+    reset_envs()
+    os.environ['DGL_DIST_MODE'] = 'distributed'
+    ip_config = "rpc_ip_config_mul_client.txt"
+    generate_ip_config(ip_config, 1, 1)
+    ctx = mp.get_context('spawn')
+    num_clients = 1
+    pserver = ctx.Process(target=start_server, args=(num_clients, ip_config, 0, False, 1, net_type))
+
+    # small max try times
+    os.environ['DGL_DIST_MAX_TRY_TIMES'] = '1'
+    expect_except = False
+    try:
+        start_client(ip_config, 0, 1, net_type)
+    except dgl.distributed.DistConnectError as err:
+        print("Expected error: {}".format(err))
+        expect_except = True
+    assert expect_except
+
+    # large max try times
+    os.environ['DGL_DIST_MAX_TRY_TIMES'] = '1024'
+    pclient = ctx.Process(target=start_client, args=(ip_config, 0, 1, net_type))
+    pclient.start()
+    pserver.start()
+    pclient.join()
+    pserver.join()
+    reset_envs()
 
 if __name__ == '__main__':
     test_serialize()
@@ -286,3 +315,5 @@ if __name__ == '__main__':
     test_multi_client('socket')
     test_multi_client('tesnsorpipe')
     test_multi_thread_rpc()
+    test_multi_client_connect('socket')
+    test_multi_client_connect('tensorpipe')
