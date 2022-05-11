@@ -35,7 +35,7 @@ class SAGE(nn.Module):
         # example is that the intermediate results can also benefit from prefetching.
         feat = g.ndata['feat']
         sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1, prefetch_node_feats=['feat'])
-        dataloader = dgl.dataloading.NodeDataLoader(
+        dataloader = dgl.dataloading.DataLoader(
                 g, torch.arange(g.num_nodes()).to(g.device), sampler, device=device,
                 batch_size=batch_size, shuffle=False, drop_last=False,
                 num_workers=num_workers)
@@ -84,7 +84,7 @@ sampler = dgl.dataloading.NeighborSampler(
 train_dataloader = dgl.dataloading.DataLoader(
         graph, train_idx, sampler, device=device, batch_size=1024, shuffle=True,
         drop_last=False, num_workers=0, use_uva=False)
-valid_dataloader = dgl.dataloading.NodeDataLoader(
+valid_dataloader = dgl.dataloading.DataLoader(
         graph, valid_idx, sampler, device=device, batch_size=1024, shuffle=True,
         drop_last=False, num_workers=0, use_uva=False)
 
