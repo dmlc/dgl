@@ -361,7 +361,7 @@ class SparseGradOptimizer(abc.ABC):
     @abstractmethod
     def update(self, idx, grad, emb):
         """ Update embeddings in a sparse manner
-        Sparse embeddings are updated in mini batches. we maintains gradient states for
+        Sparse embeddings are updated in mini batches. We maintain gradient states for
         each embedding so they can be updated separately.
 
         Parameters
@@ -456,7 +456,7 @@ class SparseAdagrad(SparseGradOptimizer):
 
     def update(self, idx, grad, emb):
         """ Update embeddings in a sparse manner
-        Sparse embeddings are updated in mini batches. we maintains gradient states for
+        Sparse embeddings are updated in mini batches. We maintain gradient states for
         each embedding so they can be updated separately.
 
         Parameters
@@ -600,7 +600,7 @@ class SparseAdam(SparseGradOptimizer):
 
     def update(self, idx, grad, emb):
         """ Update embeddings in a sparse manner
-        Sparse embeddings are updated in mini batches. we maintains gradient states for
+        Sparse embeddings are updated in mini batches. We maintain gradient states for
         each embedding so they can be updated separately.
 
         Parameters
