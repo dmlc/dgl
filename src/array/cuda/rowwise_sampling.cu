@@ -21,7 +21,6 @@ namespace impl {
 
 namespace {
 
-constexpr int WARP_SIZE = 32;
 constexpr int CTA_SIZE = 128;
 
 /**
@@ -98,7 +97,7 @@ __global__ void _CSRRowWiseSampleDegreeReplaceKernel(
 * without replacement.
 *
 * @tparam IdType The ID type used for matrices.
-* @tparam BLOCK_WARPS The number of rows each thread block runs in parallel.
+* @tparam BLOCK_CTAS The number of rows each thread block runs in parallel.
 * @tparam TILE_SIZE The number of rows covered by each threadblock.
 * @param rand_seed The random seed to use.
 * @param num_picks The number of non-zeros to pick per row.
@@ -112,7 +111,7 @@ __global__ void _CSRRowWiseSampleDegreeReplaceKernel(
 * @param out_cols The columns of the output COO (output).
 * @param out_idxs The data array of the output COO (output).
 */
-template<typename IdType, int BLOCK_WARPS, int TILE_SIZE>
+template<typename IdType, int BLOCK_CTAS, int TILE_SIZE>
 __global__ void _CSRRowWiseSampleKernel(
     const uint64_t rand_seed,
     const int64_t num_picks,
@@ -178,7 +177,7 @@ __global__ void _CSRRowWiseSampleKernel(
       }
     }
 
-    out_row += BLOCK_WARPS;
+    out_row += BLOCK_CTAS;
   }
 }
 
@@ -187,7 +186,7 @@ __global__ void _CSRRowWiseSampleKernel(
 * with replacement.
 *
 * @tparam IdType The ID type used for matrices.
-* @tparam BLOCK_WARPS The number of rows each thread block runs in parallel.
+* @tparam BLOCK_CTAS The number of rows each thread block runs in parallel.
 * @tparam TILE_SIZE The number of rows covered by each threadblock.
 * @param rand_seed The random seed to use.
 * @param num_picks The number of non-zeros to pick per row.
@@ -201,7 +200,7 @@ __global__ void _CSRRowWiseSampleKernel(
 * @param out_cols The columns of the output COO (output).
 * @param out_idxs The data array of the output COO (output).
 */
-template<typename IdType, int BLOCK_WARPS, int TILE_SIZE>
+template<typename IdType, int BLOCK_CTAS, int TILE_SIZE>
 __global__ void _CSRRowWiseSampleReplaceKernel(
     const uint64_t rand_seed,
     const int64_t num_picks,
@@ -215,12 +214,12 @@ __global__ void _CSRRowWiseSampleReplaceKernel(
     IdType * const out_cols,
     IdType * const out_idxs) {
   // we assign one warp per row
-  assert(blockDim.x == WARP_SIZE);
+  assert(blockDim.x == CTA_SIZE);
 
   int64_t out_row = blockIdx.x*TILE_SIZE+threadIdx.y;
   const int64_t last_row = min(static_cast<int64_t>(blockIdx.x+1)*TILE_SIZE, num_rows);
 
-  curandState rng;
+  curandStatePhilox4_32_10_t rng;
   curand_init((rand_seed*gridDim.x+blockIdx.x)*blockDim.y+threadIdx.y, threadIdx.x, 0, &rng);
 
   while (out_row < last_row) {
@@ -233,7 +232,7 @@ __global__ void _CSRRowWiseSampleReplaceKernel(
 
     if (deg > 0) {
       // each thread then blindly copies in rows only if deg > 0.
-      for (int idx = threadIdx.x; idx < num_picks; idx += blockDim.x) {
+      for (int idx = threadIdx.x; idx < num_picks; idx += CTA_SIZE) {
         const int64_t edge = curand(&rng) % deg;
         const int64_t out_idx = out_row_start+idx;
         out_rows[out_idx] = row;
@@ -241,7 +240,7 @@ __global__ void _CSRRowWiseSampleReplaceKernel(
         out_idxs[out_idx] = data ? data[in_row_start+edge] : in_row_start+edge;
       }
     }
-    out_row += BLOCK_WARPS;
+    out_row += BLOCK_CTAS;
   }
 }
 
@@ -327,12 +326,12 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
 
   // select edges
   if (replace) {
-    constexpr int BLOCK_WARPS = 128/WARP_SIZE;
+    constexpr int BLOCK_CTAS = 128/CTA_SIZE;
     // the number of rows each thread block will cover
-    constexpr int TILE_SIZE = BLOCK_WARPS*16;
-    const dim3 block(WARP_SIZE, BLOCK_WARPS);
+    constexpr int TILE_SIZE = BLOCK_CTAS;
+    const dim3 block(CTA_SIZE, BLOCK_CTAS);
     const dim3 grid((num_rows+TILE_SIZE-1)/TILE_SIZE);
-    _CSRRowWiseSampleReplaceKernel<IdType, BLOCK_WARPS, TILE_SIZE><<<grid, block, 0, stream>>>(
+    _CSRRowWiseSampleReplaceKernel<IdType, BLOCK_CTAS, TILE_SIZE><<<grid, block, 0, stream>>>(
         random_seed,
         num_picks,
         num_rows,
@@ -345,12 +344,12 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
         out_cols,
         out_idxs);
   } else {
-    constexpr int BLOCK_WARPS = 128/CTA_SIZE;
+    constexpr int BLOCK_CTAS = 128/CTA_SIZE;
     // the number of rows each thread block will cover
-    constexpr int TILE_SIZE = BLOCK_WARPS;
-    const dim3 block(CTA_SIZE, BLOCK_WARPS);
+    constexpr int TILE_SIZE = BLOCK_CTAS;
+    const dim3 block(CTA_SIZE, BLOCK_CTAS);
     const dim3 grid((num_rows+TILE_SIZE-1)/TILE_SIZE);
-    _CSRRowWiseSampleKernel<IdType, BLOCK_WARPS, TILE_SIZE><<<grid, block, 0, stream>>>(
+    _CSRRowWiseSampleKernel<IdType, BLOCK_CTAS, TILE_SIZE><<<grid, block, 0, stream>>>(
         random_seed,
         num_picks,
         num_rows,
