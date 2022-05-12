@@ -3,14 +3,14 @@ This file is used to provide node information to this framework. Following is th
 ```
 <node_type> <weight1> <weight2> <weight3> <weight4> <global_type_node_id> <attributes>
 ```
-where node_type is the type id of this node, weights can be any number of columns as determined by the user, type_node_id is the `locally` contiguous ids starting from `0` for a particular node_type. And attributes can be any number of columns at the end of each line. 
+where node_type is the type id of this node, weights can be any number of columns as determined by the user, global_type_node_id are the contiguous ids starting from `0` for a particular node_type. And attributes can be any number of columns at the end of each line. 
 
 ###xxx___edges.txt format
 This file is used to provide edge information to this framework. Following is the format for each line in this file:
 ```
 <global_src_id> <global_dst_id> <global_type_edge_id> <edge_type> <attributes>
 ```
-where global_src_id and global_dst_id are two end points of an edge, global_type_edge_id is the unique edge_id assigned to each edge and are contiguous, and starting from 0, for each edge_type. And attributes can be any number of columns at the end of each line. 
+where global_src_id and global_dst_id are two end points of an edge, global_type_edge_id is the unique id assigned to each edge type and are contiguous, and starting from 0, for each edge_type. Attributes can be any number of columns at the end of each line. 
 
 ###Naming convention 
 `global_` prefix (for any node or edge ids) indicate that these ids are read from graph input files. These ids are allocated to nodes and edges before `data shuffling`. These ids are globally unique across all partitions.

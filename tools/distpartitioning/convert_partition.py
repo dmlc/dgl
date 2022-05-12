@@ -7,25 +7,22 @@ import dgl
 import torch as th
 import pyarrow
 import pandas as pd
+import constants
 from pyarrow import csv
 
-def create_dgl_object(input_dir, graph_name, num_parts, \
-                        output_dir, schema, part_id, node_data, node_feats, \
-                        edge_data, edge_feats, nodeid_offset, edgeid_offset):
+def create_dgl_object(graph_name, num_parts, \
+                        schema, part_id, node_data, \
+                        edge_data, nodeid_offset, edgeid_offset):
     """
     This function creates dgl objects for a given graph partition, as in function
     arguments. 
 
     Parameters:
     -----------
-    input_dir : string
-        directory where the input graph files are located. 
     graph_name : string
         name of the graph
     num_parts : int
         total no. of partitions (of the original graph)
-    output_dir : string
-        directory where the output files are to be stored
     schame : json object
         json object created by reading the graph metadata json file
     part_id : int
@@ -33,24 +30,20 @@ def create_dgl_object(input_dir, graph_name, num_parts, \
     node_data : numpy ndarray
         node_data, where each row is of the following format:
         <global_nid> <ntype_id> <global_type_nid>
-    node_feats : dictionary
-        dictionary where keys are ntypes and values are tensors
     edge_data : numpy ndarray
         edge_data, where each row is of the following format: 
         <global_src_id> <global_dst_id> <etype_id> <global_type_eid>
-    edge_feats : dictionary
-        dictionary where keys are etypes and values are tensors
     nodeid_offset : int
         offset to be used when assigning node global ids in the current partition
     edgeid_offset : int
         offset to be used when assigning edge global ids in the current partition
 
+    return compact_g2, node_map_val, edge_map_val, ntypes_map, etypes_map
+
     Returns: 
     --------
-    int
-        no. of nodes in the current partition
-    int
-        no. of edges in the current partition
+    dgl object
+        dgl object created for the current graph partition
     dictionary
         map between node types and the range of global node ids used
     dictionary
@@ -85,18 +78,13 @@ def create_dgl_object(input_dir, graph_name, num_parts, \
     node_map_val = {ntype: [] for ntype in ntypes}
     edge_map_val = {etype: [] for etype in etypes}
 
-    part_dir = output_dir + '/part' + str(part_id)
-    os.makedirs(part_dir, exist_ok=True)
-
-    shuffle_global_nids, ntype_ids, global_type_nid = node_data[:,0], node_data[:,1], node_data[:,2]
+    shuffle_global_nids, ntype_ids, global_type_nid = node_data[constants.SHUFFLE_GLOBAL_NID], \
+            node_data[constants.NTYPE_ID], node_data[constants.GLOBAL_TYPE_NID]
 
     global_homo_nid = ntype_offset_np[ntype_ids] + global_type_nid
     assert np.all(shuffle_global_nids[1:] - shuffle_global_nids[:-1] == 1)
     shuffle_global_nid_range = (shuffle_global_nids[0], shuffle_global_nids[-1])
 
-    if node_feats != None:
-        dgl.data.utils.save_tensors(os.path.join(
-                part_dir, "node_feat.dgl"), node_feats)
 
     # Determine the node ID ranges of different node types.
     for ntype_name in global_nid_ranges:
@@ -107,26 +95,25 @@ def create_dgl_object(input_dir, graph_name, num_parts, \
 
     #process edges
     shuffle_global_src_id, shuffle_global_dst_id, global_src_id, global_dst_id, global_edge_id, etype_ids = \
-                [ edge_data[:,i] for i in [0, 1, 2, 3, 4, 5] ]
+                edge_data[constants.SHUFFLE_GLOBAL_SRC_ID], edge_data[constants.SHUFFLE_GLOBAL_DST_ID], \
+                edge_data[constants.GLOBAL_SRC_ID], edge_data[constants.GLOBAL_DST_ID], \
+                edge_data[constants.GLOBAL_TYPE_EID], edge_data[constants.ETYPE_ID]
     print('There are {} edges in partition {}'.format(len(shuffle_global_src_id), part_id))
 
     # It's not guaranteed that the edges are sorted based on edge type.
     # Let's sort edges and all attributes on the edges.
     sort_idx = np.argsort(etype_ids)
-    shuffle_global_src_id, shuffle_global_dst_id, global_src_id, global_dst_id, global_edge_id, etype_ids = shuffle_global_src_id[sort_idx], \
-        shuffle_global_dst_id[sort_idx], global_src_id[sort_idx], global_dst_id[sort_idx], global_edge_id[sort_idx], etype_ids[sort_idx]
+    shuffle_global_src_id, shuffle_global_dst_id, global_src_id, global_dst_id, global_edge_id, etype_ids = \
+            shuffle_global_src_id[sort_idx], shuffle_global_dst_id[sort_idx], global_src_id[sort_idx], \
+            global_dst_id[sort_idx], global_edge_id[sort_idx], etype_ids[sort_idx]
     assert np.all(np.diff(etype_ids) >= 0)
-
-    if (edge_feats != None):
-        dgl.data.utils.save_tensors(os.path.join(
-            part_dir, "edge_feat.dgl"), edge_feats)
 
     # Determine the edge ID range of different edge types.
     edge_id_start = edgeid_offset 
     for etype_name in global_eid_ranges:
         etype_id = etypes_map[etype_name]
-        edge_map_val[etype_name].append([int(edge_id_start),
-                                         int(edge_id_start + np.sum(etype_ids == etype_id))])
+        edge_map_val[etype_name].append([edge_id_start,
+                                         edge_id_start + np.sum(etype_ids == etype_id)])
         edge_id_start += np.sum(etype_ids == etype_id)
 
     # Here we want to compute the unique IDs in the edge list.
@@ -195,9 +182,7 @@ def create_dgl_object(input_dir, graph_name, num_parts, \
         edgeid_offset, edgeid_offset + compact_g2.number_of_edges(), dtype=th.int64)
     edgeid_offset += compact_g2.number_of_edges()
 
-    dgl.save_graphs(part_dir + '/graph.dgl', [compact_g2])
-
-    return node_data.shape[0], compact_g2.number_of_edges(), node_map_val, edge_map_val, ntypes_map, etypes_map
+    return compact_g2, node_map_val, edge_map_val, ntypes_map, etypes_map
 
 def create_metadata_json(graph_name, num_nodes, num_edges, num_parts, node_map_val, \
                             edge_map_val, ntypes_map, etypes_map, output_dir ):

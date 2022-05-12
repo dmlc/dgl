@@ -1,11 +1,10 @@
 import os
-import sys
-import math
 import json
 import numpy as np
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
+import constants
 
 from timeit import default_timer as timer
 from datetime import timedelta
@@ -13,7 +12,7 @@ from utils import augment_node_data, augment_edge_data,\
                   read_nodes_file, read_edges_file,\
                   read_node_features_file, read_edge_features_file,\
                   read_partitions_file, read_json,\
-                  get_node_types, write_metadata_json
+                  get_node_types, write_metadata_json, write_dgl_objects
 from globalids import assign_shuffle_global_nids_nodes, assign_shuffle_global_nids_edges,\
                       get_shuffle_global_nids_edges
 from gloo_wrapper import gather_metadata_json
@@ -39,24 +38,27 @@ def send_node_data(rank, node_data, part_ids):
         
         #extract <node_type>, <global_type_nid>, <global_nid>
         #which belong to `part_id`
-        send_data = (node_data[:, 7] == part_id) 
-        idx = send_data.reshape(node_data.shape[0])
-        filt_send_data = node_data[:,[0,5,6]][idx == 1] # send ntype, global_type_nid, global_nid
+        send_data_idx = (node_data[constants.OWNER_PROCESS] == part_id) 
+        idx = send_data_idx.reshape(node_data[constants.GLOBAL_NID].shape[0])
+        filt_data = np.column_stack((node_data[constants.NTYPE_ID], \
+                                    node_data[constants.GLOBAL_TYPE_NID], \
+                                    node_data[constants.GLOBAL_NID]))
+        filt_data = filt_data[idx == 1]
 
         #prepare tensor to send
-        send_size = filt_send_data.shape
-        send_tensor = torch.tensor(filt_send_data.shape, dtype=torch.int64)
+        send_size = filt_data.shape
+        size_tensor = torch.tensor(filt_data.shape, dtype=torch.int64)
 
         # Send size first, so that the part-id (rank)
         # can create appropriately sized buffers
-        dist.send(send_tensor, dst=part_id)
+        dist.send(size_tensor, dst=part_id)
 
         #send actual node_data to part-id rank
         start = timer()
-        send_tensor = torch.from_numpy(filt_send_data.astype(np.int64))
+        send_tensor = torch.from_numpy(filt_data.astype(np.int64))
         dist.send(send_tensor, dst=part_id)
         end = timer()
-        print('Rank: ', rank, ' Sent data size: ', filt_send_data.shape, \
+        print('Rank: ', rank, ' Sent data size: ', filt_data.shape, \
                 ', to Process: ', part_id, 'in: ', timedelta(seconds = end - start))
 
 def send_edge_data(rank, edge_data, part_ids): 
@@ -77,19 +79,22 @@ def send_edge_data(rank, edge_data, part_ids):
             continue
 
         #extract global_sid, global_dit, global_type_eid, etype_id
-        send_data = (edge_data[:, 4] == part_id) 
-        idx = send_data.reshape(edge_data.shape[0])
-        filt_send_data = edge_data[:,[0,1,2,3]][idx == 1]
+        send_data = (edge_data[constants.OWNER_PROCESS] == part_id) 
+        idx = send_data.reshape(edge_data[constants.GLOBAL_SRC_ID].shape[0])
+        filt_data = np.column_stack((edge_data[constants.GLOBAL_SRC_ID][idx == 1], \
+                                    edge_data[constants.GLOBAL_DST_ID][idx == 1], \
+                                    edge_data[constants.GLOBAL_TYPE_EID][idx == 1], \
+                                    edge_data[constants.ETYPE_ID][idx == 1]))
 
         #send shape
-        send_size = filt_send_data.shape
-        send_tensor = torch.tensor(filt_send_data.shape, dtype=torch.int64)
+        send_size = filt_data.shape
+        size_tensor = torch.tensor(filt_data.shape, dtype=torch.int64)
 
         # Send size first, so that the rProc can create appropriately sized tensor
-        dist.send(send_tensor, dst=part_id)
+        dist.send(size_tensor, dst=part_id)
 
         start = timer()
-        send_tensor = torch.from_numpy(filt_send_data)
+        send_tensor = torch.from_numpy(filt_data)
         dist.send(send_tensor, dst=part_id)
         end = timer()
 
@@ -126,15 +131,11 @@ def send_node_features(rank, node_data, node_features, part_ids, ntype_map):
         #    ntype = x[1]
         for ntype_name, ntype in ntype_map.items():
             
-            #extract orig_type_node_id
-            idx = (node_data[:,7] == part_id) & (node_data[:,0] == ntype) 
-            filt_global_ntype_ids = node_data[:,[5]][idx] # extract global_ntype_id here
-            filt_global_ntype_ids = np.concatenate(filt_global_ntype_ids) 
-
             if (ntype_name +'/feat' in node_features) and (node_features[ntype_name+'/feat'].shape[0] > 0): 
-                part_node_features[ntype_name+'/feat'] = node_features[ntype_name+'/feat'][filt_global_ntype_ids]
-            #else: 
-            #    send_node_features[node_type_name+'/feat'] = None
+                #extract orig_type_node_id
+                idx = (node_data[constants.OWNER_PROCESS] == part_id) & (node_data[constants.NTYPE_ID] == ntype) 
+                filt_global_type_nids = node_data[constants.GLOBAL_TYPE_NID][idx] # extract global_ntype_id here
+                part_node_features[ntype_name+'/feat'] = node_features[ntype_name+'/feat'][filt_global_type_nids]
 
         #accumulate subset of node_features targetted for part-id rank
         node_features_out.append(part_node_features)
@@ -144,7 +145,6 @@ def send_node_features(rank, node_data, node_features, part_ids, ntype_map):
     start = timer ()
     dist.scatter_object_list(output_list, node_features_out, src=0)
     end = timer ()
-
     print('Rank: ', rank, ', Done sending Node Features to: ', part_id, \
             ' in: ', timedelta(seconds = end - start))
 
@@ -302,17 +302,15 @@ def read_graph_files(rank, params, node_part_ids):
     numpy ndarray
         floats, edge_features are read from the edge feature file
     """
-    augmted_node_data = []
     node_data = read_nodes_file(params.input_dir+'/'+params.nodes_file)
-    augmted_node_data = augment_node_data(node_data, node_part_ids)
-    print('Rank: ', rank, ', Completed loading nodes data: ', augmted_node_data.shape)
+    augment_node_data(node_data, node_part_ids)
+    print('Rank: ', rank, ', Completed loading nodes data: ', node_data[constants.GLOBAL_TYPE_NID].shape)
 
-    augmted_edge_data = []
-    edge_data = read_edges_file(params.input_dir+'/'+params.edges_file)
-    removed_edge_data = read_edges_file(params.input_dir+'/'+params.removed_edges)
-    edge_data = np.vstack((edge_data, removed_edge_data))
-    augmted_edge_data = augment_edge_data(edge_data, node_part_ids)
-    print('Rank: ', rank, ', Completed loading edges data: ', augmted_edge_data.shape)
+    edge_data = read_edges_file(params.input_dir+'/'+params.edges_file, None)
+    print('Rank: ', rank, ', Completed loading edge data: ', edge_data[constants.GLOBAL_SRC_ID].shape)
+    edge_data = read_edges_file(params.input_dir+'/'+params.removed_edges, edge_data)
+    augment_edge_data(edge_data, node_part_ids)
+    print('Rank: ', rank, ', Completed adding removed edges : ', edge_data[constants.GLOBAL_SRC_ID].shape)
 
     node_features = {}
     node_features = read_node_features_file( params.input_dir+'/'+params.node_feats_file )
@@ -322,7 +320,7 @@ def read_graph_files(rank, params, node_part_ids):
     #edge_features = read_edge_features_file( params.input_dir+'/'+params.edge_feats_file )
     #print( 'Rank: ', rank, ', Completed edge features reading from file ', len(edge_features) )
 
-    return augmted_node_data, node_features, augmted_edge_data, edge_features
+    return node_data, node_features, edge_data, edge_features
 
 def proc_exec(rank, world_size, params):
     """ 
@@ -353,11 +351,14 @@ def proc_exec(rank, world_size, params):
         # order node_data by node_type before extracting node features. 
         # once this is ordered, node_features are automatically ordered and 
         # can be assigned contiguous ids starting from 0 for each type. 
-        node_data = node_data[node_data[:, 0].argsort()]
+        #node_data = node_data[node_data[:, 0].argsort()]
+        sorted_idx = node_data[constants.NTYPE_ID].argsort()
+        for k, v in node_data.items(): 
+            node_data[k] = v[sorted_idx]
 
-        print('Rank: ', rank, ', node_data: ', node_data.shape)
+        print('Rank: ', rank, ', node_data: ', len(node_data))
         print('Rank: ', rank, ', node_features: ', len(node_features))
-        print('Rank: ', rank, ', edge_data: ', edge_data.shape)
+        print('Rank: ', rank, ', edge_data: ', len(edge_data))
         #print('Rank: ', rank, ', edge_features : ',len( edge_features))
         print('Rank: ', rank, ', partitions : ', len(node_part_ids))
 
@@ -368,72 +369,70 @@ def proc_exec(rank, world_size, params):
         for name, ntype_id in ntypes_map.items(): 
             ntype = name + '/feat'
             if(ntype in node_features): 
-                idx = node_data[:,5][(node_data[:,0] == ntype_id) & (node_data[:,7] == rank)]
+                idx = node_data[constants.GLOBAL_TYPE_NID][(node_data[constants.NTYPE_ID] == ntype_id) & (node_data[constants.OWNER_PROCESS] == rank)]
                 node_features[ntype] = node_features[ntype][idx]
 
         # Filter data owned by rank-0
         #extract only ntype, global_type_nid, global_nid 
-        node_data = node_data[:,[0,5,6]][node_data[:,7] == 0] 
+        #node_data = node_data[:,[0,5,6]][node_data[:,7] == 0] 
+        idx = np.where(node_data[constants.OWNER_PROCESS] == 0)[0]
+        for k, v in node_data.items(): 
+            node_data[k] = v[idx]
 
         #extract only global_src_id, global_dst_id, global_type_eid etype
-        edge_data = edge_data[:,[0,1,2,3]][edge_data[:,4] == 0] 
-
+        #edge_data = edge_data[:,[0,1,2,3]][edge_data[:,4] == 0] 
+        idx = np.where(edge_data[constants.OWNER_PROCESS] == 0)[0]
+        for k, v in edge_data.items(): 
+            edge_data[k] = v[idx]
     else: 
         #non-rank-0 processes receive data from rank-0
-        node_data = recv_node_data(rank, 2, torch.int64)
-        edge_data = recv_edge_data(rank, 2, torch.int64)
+        rcvd_node_data = recv_node_data(rank, 2, torch.int64)
+        node_data = {}
+        node_data[constants.NTYPE_ID] = rcvd_node_data[:,0]
+        node_data[constants.GLOBAL_TYPE_NID] = rcvd_node_data[:,1]
+        node_data[constants.GLOBAL_NID] = rcvd_node_data[:,2]
+
+        rcvd_edge_data = recv_edge_data(rank, 2, torch.int64)
+        edge_data = {}
+        edge_data[constants.GLOBAL_SRC_ID] = rcvd_edge_data[:,0]
+        edge_data[constants.GLOBAL_DST_ID] = rcvd_edge_data[:,1]
+        edge_data[constants.GLOBAL_TYPE_EID] = rcvd_edge_data[:,2]
+        edge_data[constants.ETYPE_ID] = rcvd_edge_data[:,3]
+
         node_features = recv_node_features_obj(rank, world_size)
         edge_features = {}
 
     #syncronize
     dist.barrier()
 
-
-    #determine ntypes present in the graph
-    ntypes = np.unique(node_data[:,0])
-    ntypes.sort ()
-
-    #for a list of tuples (ntype, count)
-    ntype_counts = []
-    bins = np.bincount(node_data[:,0])
-    for ntype in ntypes: 
-        ntype_counts.append((ntype, bins[ntype]))
-        
-    # after this call node_data changes to [globalId, node_type, orig_node_type_id, orig_node_id, local_type_id]
-    # note that orig_node_id is the line no. of a node in the file xxx_nodes.txt
-    node_data, shuffle_global_nid_start = assign_shuffle_global_nids_nodes(rank, world_size, ntype_counts, node_data)
+    # assign shuffle_global ids to nodes
+    #node_data, shuffle_global_nid_start = assign_shuffle_global_nids_nodes(rank, world_size, node_data)
+    assign_shuffle_global_nids_nodes(rank, world_size, node_data)
     print('Rank: ', rank, ' Done assign Global ids to nodes...')
 
-    #Work on the edge and assign GlobalIds
-    etypes = np.unique(edge_data[:,3])
-    etypes.sort()
-    
     #sort edge_data by etype
-    edge_data = edge_data[edge_data[:,3].argsort()]
+    sorted_idx = edge_data[constants.ETYPE_ID].argsort()
+    for k, v in edge_data.items(): 
+        edge_data[k] = v[sorted_idx]
 
-    etype_counts = []
-    bins = np.bincount(edge_data[:,3])
-    for etype in etypes: 
-        etype_counts.append((etype, bins[etype]) )
-
-    edge_data, shuffle_global_eid_start = assign_shuffle_global_nids_edges(rank, world_size, etype_counts, edge_data)
+    # assign shuffle_global ids to edges
+    shuffle_global_eid_start = assign_shuffle_global_nids_edges(rank, world_size, edge_data)
     print('Rank: ', rank, ' Done assign Global ids to edges...')
 
-    edge_data = get_shuffle_global_nids_edges(rank, world_size, edge_data, node_part_ids, node_data)
+    # resolve shuffle_global ids for nodes which are not locally owned
+    get_shuffle_global_nids_edges(rank, world_size, edge_data, node_part_ids, node_data)
     print('Rank: ', rank, ' Done retrieving Global Node Ids for non-local nodes... ')
 
-    #call convert_parititio.py for serialization 
+    #create dgl objects
     print('Rank: ', rank, ' Creating DGL objects for all partitions')
-    #json_metadata, output_dir, graph_name = gen_dgl_objs(False, pipeline_args, params)
     num_nodes = 0
     num_edges = shuffle_global_eid_start
-
-    #create dgl objects
     with open('{}/{}'.format(params.input_dir, params.schema)) as json_file: 
         schema = json.load(json_file)
-    num_nodes, num_edges, ntypes_map_val, etypes_map_val, ntypes_map, etypes_map = create_dgl_object(params.input_dir, \
+    graph_obj, ntypes_map_val, etypes_map_val, ntypes_map, etypes_map = create_dgl_object(\
             params.graph_name, params.num_parts, \
-            params.output, schema, rank, node_data, node_features, edge_data, edge_features, num_nodes, num_edges)
+            schema, rank, node_data, edge_data, num_nodes, num_edges)
+    write_dgl_objects(graph_obj, node_features, edge_features, params.output, rank)
 
     #get the meta-data 
     json_metadata = create_metadata_json(params.graph_name, num_nodes, num_edges, params.num_parts, ntypes_map_val, \

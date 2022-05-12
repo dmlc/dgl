@@ -81,7 +81,7 @@ if __name__ == "__main__":
     parser.add_argument('--removed-edges', help='a file that contains the removed self-loops and duplicated edges',
                     default=None, type=str)
     parser.add_argument('--exec-type', type=int, default=0,
-                    help='Use 1 for single machine run and 2 for distributed execution')
+                    help='Use 0 for single machine run and 1 for distributed execution')
 
     #arguments needed for the distributed implementation
     parser.add_argument('--world-size', help='no. of processes to spawn',
