@@ -130,19 +130,12 @@ def edge_softmax(graph, logits, eids=ALL, norm_by='dst'):
     """
     if not is_all(eids):
         eids = astype(eids, graph.idtype)
-    if graph._graph.number_of_etypes() == 1:
-        return edge_softmax_internal(graph._graph, logits,
-                                     eids=eids, norm_by=norm_by)
-    else:
-        logits_list = [None] * graph._graph.number_of_etypes()
-        for rel in graph.canonical_etypes:
-            etid = graph.get_etype_id(rel)
-            logits_list[etid] = logits[rel]
-        logits_tuple = tuple(logits_list)
-        score_tuple = edge_softmax_hetero_internal(graph._graph,
-                                                   eids, norm_by, *logits_tuple)
-        score = {}
-        for rel in graph.canonical_etypes:
-            etid = graph.get_etype_id(rel)
-            score[rel] = score_tuple[etid]
-        return score
+    ret = edge_softmax_internal(graph._graph, logits,
+                                 eids=eids, norm_by=norm_by)
+    # TODO: figure out the weird behavior
+    # that if no such statemenet is used, for JAX, it returns zeros
+    # when such tensor is used for computation
+    from .. import backend as F
+    if F.backend_name == "jax":
+        ret = F.tensor(ret)
+    return ret

@@ -1,19 +1,3 @@
-##
-#   Copyright 2019-2021 Contributors
-#
-#   Licensed under the Apache License, Version 2.0 (the "License");
-#   you may not use this file except in compliance with the License.
-#   You may obtain a copy of the License at
-#
-#       http://www.apache.org/licenses/LICENSE-2.0
-#
-#   Unless required by applicable law or agreed to in writing, software
-#   distributed under the License is distributed on an "AS IS" BASIS,
-#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#   See the License for the specific language governing permissions and
-#   limitations under the License.
-#
-
 from scipy import sparse as spsp
 import networkx as nx
 import numpy as np
@@ -22,8 +6,8 @@ import dgl
 import dgl.function as fn
 import dgl.partition
 import backend as F
+from dgl.graph_index import from_scipy_sparse_matrix
 import unittest
-import math
 from utils import parametrize_dtype
 
 from test_heterograph import create_test_heterograph3, create_test_heterograph4, create_test_heterograph5
@@ -320,7 +304,7 @@ def test_add_reverse_edges():
 
     # zero edge graph
     g = dgl.graph(([], []))
-    bg = dgl.add_reverse_edges(g, copy_ndata=True, copy_edata=True, exclude_self=False)
+    bg = dgl.add_reverse_edges(g, copy_ndata=True, copy_edata=True)
 
     # heterogeneous graph
     g = dgl.heterograph({
@@ -401,16 +385,6 @@ def test_add_reverse_edges():
     assert F.array_equal(F.cat([g.edges['wins'].data['h'], g.edges['wins'].data['h']], dim=0),
                          bg.edges['wins'].data['h'])
 
-    # test exclude_self
-    g = dgl.heterograph({
-        ('A', 'r1', 'A'): (F.tensor([0, 0, 1, 1]), F.tensor([0, 1, 1, 2])),
-        ('A', 'r2', 'A'): (F.tensor([0, 1]), F.tensor([1, 2]))
-    })
-    g.edges['r1'].data['h'] = F.tensor([0, 1, 2, 3])
-    rg = dgl.add_reverse_edges(g, copy_edata=True, exclude_self=True)
-    assert rg.num_edges('r1') == 6
-    assert rg.num_edges('r2') == 4
-    assert F.array_equal(rg.edges['r1'].data['h'], F.tensor([0, 1, 2, 3, 1, 3]))
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_simple_graph():
@@ -509,13 +483,13 @@ def test_laplacian_lambda_max():
         assert l_max < 2 + eps
     '''
 
-def create_large_graph(num_nodes, idtype=F.int64):
+def create_large_graph(num_nodes):
     row = np.random.choice(num_nodes, num_nodes * 10)
     col = np.random.choice(num_nodes, num_nodes * 10)
     spm = spsp.coo_matrix((np.ones(len(row)), (row, col)))
     spm.sum_duplicates()
 
-    return dgl.from_scipy(spm, idtype=idtype)
+    return dgl.from_scipy(spm)
 
 def get_nodeflow(g, node_ids, num_layers):
     batch_size = len(node_ids)
@@ -530,39 +504,29 @@ def get_nodeflow(g, node_ids, num_layers):
 def test_partition_with_halo():
     g = create_large_graph(1000)
     node_part = np.random.choice(4, g.number_of_nodes())
-    subgs, _, _ = dgl.transforms.partition_graph_with_halo(g, node_part, 2, reshuffle=True)
+    subgs = dgl.transform.partition_graph_with_halo(g, node_part, 2, reshuffle=True)
     for part_id, subg in subgs.items():
         node_ids = np.nonzero(node_part == part_id)[0]
         lnode_ids = np.nonzero(F.asnumpy(subg.ndata['inner_node']))[0]
-        orig_nids = F.asnumpy(subg.ndata['orig_id'])[lnode_ids]
-        assert np.all(np.sort(orig_nids) == node_ids)
-        assert np.all(F.asnumpy(subg.in_degrees(lnode_ids)) == F.asnumpy(g.in_degrees(orig_nids)))
-        assert np.all(F.asnumpy(subg.out_degrees(lnode_ids)) == F.asnumpy(g.out_degrees(orig_nids)))
+        assert np.all(np.sort(F.asnumpy(subg.ndata['orig_id'])[lnode_ids]) == node_ids)
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(F._default_context_str == 'gpu', reason="METIS doesn't support GPU")
-@parametrize_dtype
-def test_metis_partition(idtype):
+@unittest.skipIf(F.backend_name == 'jax', reason="Introduces segmentation error.")
+def test_metis_partition():
     # TODO(zhengda) Metis fails to partition a small graph.
-    g = create_large_graph(1000, idtype=idtype)
-    if idtype == F.int64:
-        check_metis_partition(g, 0)
-        check_metis_partition(g, 1)
-        check_metis_partition(g, 2)
-        check_metis_partition_with_constraint(g)
-    else:
-        assert_fail = False
-        try:
-            check_metis_partition(g, 1)
-        except:
-            assert_fail = True
-        assert assert_fail
+    g = create_large_graph(1000)
+    check_metis_partition(g, 0)
+    check_metis_partition(g, 1)
+    check_metis_partition(g, 2)
+    check_metis_partition_with_constraint(g)
+
 
 def check_metis_partition_with_constraint(g):
     ntypes = np.zeros((g.number_of_nodes(),), dtype=np.int32)
     ntypes[0:int(g.number_of_nodes()/4)] = 1
     ntypes[int(g.number_of_nodes()*3/4):] = 2
-    subgs = dgl.transforms.metis_partition(g, 4, extra_cached_hops=1, balance_ntypes=ntypes)
+    subgs = dgl.transform.metis_partition(g, 4, extra_cached_hops=1, balance_ntypes=ntypes)
     if subgs is not None:
         for i in subgs:
             subg = subgs[i]
@@ -571,7 +535,7 @@ def check_metis_partition_with_constraint(g):
             print('type0:', np.sum(sub_ntypes == 0))
             print('type1:', np.sum(sub_ntypes == 1))
             print('type2:', np.sum(sub_ntypes == 2))
-    subgs = dgl.transforms.metis_partition(g, 4, extra_cached_hops=1,
+    subgs = dgl.transform.metis_partition(g, 4, extra_cached_hops=1,
                                           balance_ntypes=ntypes, balance_edges=True)
     if subgs is not None:
         for i in subgs:
@@ -583,7 +547,7 @@ def check_metis_partition_with_constraint(g):
             print('type2:', np.sum(sub_ntypes == 2))
 
 def check_metis_partition(g, extra_hops):
-    subgs = dgl.transforms.metis_partition(g, 4, extra_cached_hops=extra_hops)
+    subgs = dgl.transform.metis_partition(g, 4, extra_cached_hops=extra_hops)
     num_inner_nodes = 0
     num_inner_edges = 0
     if subgs is not None:
@@ -600,7 +564,7 @@ def check_metis_partition(g, extra_hops):
         return
 
     # partitions with node reshuffling
-    subgs = dgl.transforms.metis_partition(g, 4, extra_cached_hops=extra_hops, reshuffle=True)
+    subgs = dgl.transform.metis_partition(g, 4, extra_cached_hops=extra_hops, reshuffle=True)
     num_inner_nodes = 0
     num_inner_edges = 0
     edge_cnts = np.zeros((g.number_of_edges(),))
@@ -673,23 +637,24 @@ def test_reorder_nodes():
         old_neighs2 = g.predecessors(old_nid)
         assert np.all(np.sort(old_neighs1) == np.sort(F.asnumpy(old_neighs2)))
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU compaction not implemented")
 @parametrize_dtype
 def test_compact(idtype):
     g1 = dgl.heterograph({
         ('user', 'follow', 'user'): ([1, 3], [3, 5]),
         ('user', 'plays', 'game'): ([2, 3, 2], [4, 4, 5]),
         ('game', 'wished-by', 'user'): ([6, 5], [7, 7])},
-        {'user': 20, 'game': 10}, idtype=idtype, device=F.ctx())
+        {'user': 20, 'game': 10}, idtype=idtype)
 
     g2 = dgl.heterograph({
         ('game', 'clicked-by', 'user'): ([3], [1]),
         ('user', 'likes', 'user'): ([1, 8], [8, 9])},
-        {'user': 20, 'game': 10}, idtype=idtype, device=F.ctx())
+        {'user': 20, 'game': 10}, idtype=idtype)
 
     g3 = dgl.heterograph({('user', '_E', 'user'): ((0, 1), (1, 2))},
-                         {'user': 10}, idtype=idtype, device=F.ctx())
+                         {'user': 10}, idtype=idtype)
     g4 = dgl.heterograph({('user', '_E', 'user'): ((1, 3), (3, 5))},
-                         {'user': 10}, idtype=idtype, device=F.ctx())
+                         {'user': 10}, idtype=idtype)
 
     def _check(g, new_g, induced_nodes):
         assert g.ntypes == new_g.ntypes
@@ -808,14 +773,6 @@ def test_to_simple(idtype):
     assert 'h' not in sg.ndata
     assert 'h' not in sg.edata
 
-    # test coalesce edge feature
-    sg = dgl.to_simple(g, copy_edata=True, aggregator='arbitrary')
-    assert F.allclose(sg.edata['h'][1], F.tensor([4.]))
-    sg = dgl.to_simple(g, copy_edata=True, aggregator='sum')
-    assert F.allclose(sg.edata['h'][1], F.tensor([10.]))
-    sg = dgl.to_simple(g, copy_edata=True, aggregator='mean')
-    assert F.allclose(sg.edata['h'][1], F.tensor([5.]))
-
     # heterogeneous graph
     g = dgl.heterograph({
         ('user', 'follow', 'user'): ([0, 1, 2, 1, 1, 1],
@@ -865,16 +822,7 @@ def test_to_simple(idtype):
     assert 'h' not in sg.nodes['user'].data
     assert 'hh' not in sg.nodes['user'].data
 
-    # verify DGLGraph.edge_ids() after dgl.to_simple()
-    # in case ids are not initialized in underlying coo2csr()
-    u = F.tensor([0, 1, 2])
-    v = F.tensor([1, 2, 3])
-    eids = F.tensor([0, 1, 2])
-    g = dgl.graph((u, v))
-    assert F.array_equal(g.edge_ids(u, v), eids)
-    sg = dgl.to_simple(g)
-    assert F.array_equal(sg.edge_ids(u, v), eids)
-
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU compaction not implemented")
 @parametrize_dtype
 def test_to_block(idtype):
     def check(g, bg, ntype, etype, dst_nodes, include_dst_in_src=True):
@@ -891,7 +839,6 @@ def test_to_block(idtype):
         induced_src = bg.srcdata[dgl.NID]
         induced_dst = bg.dstdata[dgl.NID]
         induced_eid = bg.edata[dgl.EID]
-
         bg_src, bg_dst = bg.all_edges(order='eid')
         src_ans, dst_ans = g.all_edges(order='eid')
 
@@ -914,7 +861,7 @@ def test_to_block(idtype):
     g = dgl.heterograph({
         ('A', 'AA', 'A'): ([0, 2, 1, 3], [1, 3, 2, 4]),
         ('A', 'AB', 'B'): ([0, 1, 3, 1], [1, 3, 5, 6]),
-        ('B', 'BA', 'A'): ([2, 3], [3, 2])}, idtype=idtype, device=F.ctx())
+        ('B', 'BA', 'A'): ([2, 3], [3, 2])}, idtype=idtype)
     g.nodes['A'].data['x'] = F.randn((5, 10))
     g.nodes['B'].data['x'] = F.randn((7, 5))
     g.edges['AA'].data['x'] = F.randn((4, 3))
@@ -978,32 +925,6 @@ def test_to_block(idtype):
     bg = dgl.to_block(g, dst_nodes=dst_nodes)
     checkall(g, bg, dst_nodes)
     check_features(g, bg)
-
-    # test specifying lhs_nodes with include_dst_in_src
-    src_nodes = {}
-    for ntype in dst_nodes.keys():
-        # use the previous run to get the list of source nodes
-        src_nodes[ntype] = bg.srcnodes[ntype].data[dgl.NID]
-    bg = dgl.to_block(g, dst_nodes=dst_nodes, src_nodes=src_nodes)
-    checkall(g, bg, dst_nodes)
-    check_features(g, bg)
-
-    # test without include_dst_in_src
-    dst_nodes = {'A': F.tensor([4, 3, 2, 1], dtype=idtype), 'B': F.tensor([3, 5, 6, 1], dtype=idtype)}
-    bg = dgl.to_block(g, dst_nodes=dst_nodes, include_dst_in_src=False)
-    checkall(g, bg, dst_nodes, False)
-    check_features(g, bg)
-
-    # test specifying lhs_nodes without include_dst_in_src
-    src_nodes = {}
-    for ntype in dst_nodes.keys():
-        # use the previous run to get the list of source nodes
-        src_nodes[ntype] = bg.srcnodes[ntype].data[dgl.NID]
-    bg = dgl.to_block(g, dst_nodes=dst_nodes, include_dst_in_src=False,
-        src_nodes=src_nodes)
-    checkall(g, bg, dst_nodes, False)
-    check_features(g, bg)
-
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 @parametrize_dtype
@@ -1367,84 +1288,6 @@ def test_remove_edges(idtype):
     assert F.array_equal(g.nodes['game'].data['h'], F.tensor([2, 2], dtype=idtype))
     assert F.array_equal(g.nodes['developer'].data['h'], F.tensor([3, 3], dtype=idtype))
 
-    # batched graph
-    ctx = F.ctx()
-    g1 = dgl.graph(([0, 1], [1, 2]), num_nodes=5, idtype=idtype, device=ctx)
-    g2 = dgl.graph(([], []), idtype=idtype, device=ctx)
-    g3 = dgl.graph(([2, 3, 4], [3, 2, 1]), idtype=idtype, device=ctx)
-    bg = dgl.batch([g1, g2, g3])
-    bg_r = dgl.remove_edges(bg, 2)
-    assert bg.batch_size == bg_r.batch_size
-    assert F.array_equal(bg.batch_num_nodes(), bg_r.batch_num_nodes())
-    assert F.array_equal(bg_r.batch_num_edges(), F.tensor([2, 0, 2], dtype=F.int64))
-
-    bg_r = dgl.remove_edges(bg, [0, 2])
-    assert bg.batch_size == bg_r.batch_size
-    assert F.array_equal(bg.batch_num_nodes(), bg_r.batch_num_nodes())
-    assert F.array_equal(bg_r.batch_num_edges(), F.tensor([1, 0, 2], dtype=F.int64))
-
-    bg_r = dgl.remove_edges(bg, F.tensor([0, 2], dtype=idtype))
-    assert bg.batch_size == bg_r.batch_size
-    assert F.array_equal(bg.batch_num_nodes(), bg_r.batch_num_nodes())
-    assert F.array_equal(bg_r.batch_num_edges(), F.tensor([1, 0, 2], dtype=F.int64))
-
-    # batched heterogeneous graph
-    g1 = dgl.heterograph({
-        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
-        ('user', 'plays', 'game'): ([1, 3], [0, 1])
-    }, num_nodes_dict={'user': 4, 'game': 3}, idtype=idtype, device=ctx)
-    g2 = dgl.heterograph({
-        ('user', 'follows', 'user'): ([0, 2], [3, 4]),
-        ('user', 'plays', 'game'): ([], [])
-    }, num_nodes_dict={'user': 6, 'game': 2}, idtype=idtype, device=ctx)
-    g3 = dgl.heterograph({
-        ('user', 'follows', 'user'): ([], []),
-        ('user', 'plays', 'game'): ([1, 2], [1, 2])
-    }, idtype=idtype, device=ctx)
-    bg = dgl.batch([g1, g2, g3])
-    bg_r = dgl.remove_edges(bg, 1, etype='follows')
-    assert bg.batch_size == bg_r.batch_size
-    ntypes = bg.ntypes
-    for nty in ntypes:
-        assert F.array_equal(bg.batch_num_nodes(nty), bg_r.batch_num_nodes(nty))
-    assert F.array_equal(bg_r.batch_num_edges('follows'), F.tensor([1, 2, 0], dtype=F.int64))
-    assert F.array_equal(bg_r.batch_num_edges('plays'), bg.batch_num_edges('plays'))
-
-    bg_r = dgl.remove_edges(bg, 2, etype='plays')
-    assert bg.batch_size == bg_r.batch_size
-    for nty in ntypes:
-        assert F.array_equal(bg.batch_num_nodes(nty), bg_r.batch_num_nodes(nty))
-    assert F.array_equal(bg.batch_num_edges('follows'), bg_r.batch_num_edges('follows'))
-    assert F.array_equal(bg_r.batch_num_edges('plays'), F.tensor([2, 0, 1], dtype=F.int64))
-
-    bg_r = dgl.remove_edges(bg, [0, 1, 3], etype='follows')
-    assert bg.batch_size == bg_r.batch_size
-    for nty in ntypes:
-        assert F.array_equal(bg.batch_num_nodes(nty), bg_r.batch_num_nodes(nty))
-    assert F.array_equal(bg_r.batch_num_edges('follows'), F.tensor([0, 1, 0], dtype=F.int64))
-    assert F.array_equal(bg.batch_num_edges('plays'), bg_r.batch_num_edges('plays'))
-
-    bg_r = dgl.remove_edges(bg, [1, 2], etype='plays')
-    assert bg.batch_size == bg_r.batch_size
-    for nty in ntypes:
-        assert F.array_equal(bg.batch_num_nodes(nty), bg_r.batch_num_nodes(nty))
-    assert F.array_equal(bg.batch_num_edges('follows'), bg_r.batch_num_edges('follows'))
-    assert F.array_equal(bg_r.batch_num_edges('plays'), F.tensor([1, 0, 1], dtype=F.int64))
-
-    bg_r = dgl.remove_edges(bg, F.tensor([0, 1, 3], dtype=idtype), etype='follows')
-    assert bg.batch_size == bg_r.batch_size
-    for nty in ntypes:
-        assert F.array_equal(bg.batch_num_nodes(nty), bg_r.batch_num_nodes(nty))
-    assert F.array_equal(bg_r.batch_num_edges('follows'), F.tensor([0, 1, 0], dtype=F.int64))
-    assert F.array_equal(bg.batch_num_edges('plays'), bg_r.batch_num_edges('plays'))
-
-    bg_r = dgl.remove_edges(bg, F.tensor([1, 2], dtype=idtype), etype='plays')
-    assert bg.batch_size == bg_r.batch_size
-    for nty in ntypes:
-        assert F.array_equal(bg.batch_num_nodes(nty), bg_r.batch_num_nodes(nty))
-    assert F.array_equal(bg.batch_num_edges('follows'), bg_r.batch_num_edges('follows'))
-    assert F.array_equal(bg_r.batch_num_edges('plays'), F.tensor([1, 0, 1], dtype=F.int64))
-
 @parametrize_dtype
 def test_remove_nodes(idtype):
     # homogeneous Graphs
@@ -1543,83 +1386,6 @@ def test_remove_nodes(idtype):
     assert F.array_equal(u, F.tensor([1], dtype=idtype))
     assert F.array_equal(v, F.tensor([0], dtype=idtype))
 
-    # batched graph
-    ctx = F.ctx()
-    g1 = dgl.graph(([0, 1], [1, 2]), num_nodes=5, idtype=idtype, device=ctx)
-    g2 = dgl.graph(([], []), idtype=idtype, device=ctx)
-    g3 = dgl.graph(([2, 3, 4], [3, 2, 1]), idtype=idtype, device=ctx)
-    bg = dgl.batch([g1, g2, g3])
-    bg_r = dgl.remove_nodes(bg, 1)
-    assert bg_r.batch_size == bg.batch_size
-    assert F.array_equal(bg_r.batch_num_nodes(), F.tensor([4, 0, 5], dtype=F.int64))
-    assert F.array_equal(bg_r.batch_num_edges(), F.tensor([0, 0, 3], dtype=F.int64))
-
-    bg_r = dgl.remove_nodes(bg, [1, 7])
-    assert bg_r.batch_size == bg.batch_size
-    assert F.array_equal(bg_r.batch_num_nodes(), F.tensor([4, 0, 4], dtype=F.int64))
-    assert F.array_equal(bg_r.batch_num_edges(), F.tensor([0, 0, 1], dtype=F.int64))
-
-    bg_r = dgl.remove_nodes(bg, F.tensor([1, 7], dtype=idtype))
-    assert bg_r.batch_size == bg.batch_size
-    assert F.array_equal(bg_r.batch_num_nodes(), F.tensor([4, 0, 4], dtype=F.int64))
-    assert F.array_equal(bg_r.batch_num_edges(), F.tensor([0, 0, 1], dtype=F.int64))
-
-    # batched heterogeneous graph
-    g1 = dgl.heterograph({
-        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
-        ('user', 'plays', 'game'): ([1, 3], [0, 1])
-    }, num_nodes_dict={'user': 4, 'game': 3}, idtype=idtype, device=ctx)
-    g2 = dgl.heterograph({
-        ('user', 'follows', 'user'): ([0, 2], [3, 4]),
-        ('user', 'plays', 'game'): ([], [])
-    }, num_nodes_dict={'user': 6, 'game': 2}, idtype=idtype, device=ctx)
-    g3 = dgl.heterograph({
-        ('user', 'follows', 'user'): ([], []),
-        ('user', 'plays', 'game'): ([1, 2], [1, 2])
-    }, idtype=idtype, device=ctx)
-    bg = dgl.batch([g1, g2, g3])
-    bg_r = dgl.remove_nodes(bg, 1, ntype='user')
-    assert bg_r.batch_size == bg.batch_size
-    assert F.array_equal(bg_r.batch_num_nodes('user'), F.tensor([3, 6, 3], dtype=F.int64))
-    assert F.array_equal(bg.batch_num_nodes('game'), bg_r.batch_num_nodes('game'))
-    assert F.array_equal(bg_r.batch_num_edges('follows'), F.tensor([0, 2, 0], dtype=F.int64))
-    assert F.array_equal(bg_r.batch_num_edges('plays'), F.tensor([1, 0, 2], dtype=F.int64))
-
-    bg_r = dgl.remove_nodes(bg, 6, ntype='game')
-    assert bg_r.batch_size == bg.batch_size
-    assert F.array_equal(bg.batch_num_nodes('user'), bg_r.batch_num_nodes('user'))
-    assert F.array_equal(bg_r.batch_num_nodes('game'), F.tensor([3, 2, 2], dtype=F.int64))
-    assert F.array_equal(bg.batch_num_edges('follows'), bg_r.batch_num_edges('follows'))
-    assert F.array_equal(bg_r.batch_num_edges('plays'), F.tensor([2, 0, 1], dtype=F.int64))
-
-    bg_r = dgl.remove_nodes(bg, [1, 5, 6, 11], ntype='user')
-    assert bg_r.batch_size == bg.batch_size
-    assert F.array_equal(bg_r.batch_num_nodes('user'), F.tensor([3, 4, 2], dtype=F.int64))
-    assert F.array_equal(bg.batch_num_nodes('game'), bg_r.batch_num_nodes('game'))
-    assert F.array_equal(bg_r.batch_num_edges('follows'), F.tensor([0, 1, 0], dtype=F.int64))
-    assert F.array_equal(bg_r.batch_num_edges('plays'), F.tensor([1, 0, 1], dtype=F.int64))
-
-    bg_r = dgl.remove_nodes(bg, [0, 3, 4, 7], ntype='game')
-    assert bg_r.batch_size == bg.batch_size
-    assert F.array_equal(bg.batch_num_nodes('user'), bg_r.batch_num_nodes('user'))
-    assert F.array_equal(bg_r.batch_num_nodes('game'), F.tensor([2, 0, 2], dtype=F.int64))
-    assert F.array_equal(bg.batch_num_edges('follows'), bg_r.batch_num_edges('follows'))
-    assert F.array_equal(bg_r.batch_num_edges('plays'), F.tensor([1, 0, 1], dtype=F.int64))
-
-    bg_r = dgl.remove_nodes(bg, F.tensor([1, 5, 6, 11], dtype=idtype), ntype='user')
-    assert bg_r.batch_size == bg.batch_size
-    assert F.array_equal(bg_r.batch_num_nodes('user'), F.tensor([3, 4, 2], dtype=F.int64))
-    assert F.array_equal(bg.batch_num_nodes('game'), bg_r.batch_num_nodes('game'))
-    assert F.array_equal(bg_r.batch_num_edges('follows'), F.tensor([0, 1, 0], dtype=F.int64))
-    assert F.array_equal(bg_r.batch_num_edges('plays'), F.tensor([1, 0, 1], dtype=F.int64))
-
-    bg_r = dgl.remove_nodes(bg, F.tensor([0, 3, 4, 7], dtype=idtype), ntype='game')
-    assert bg_r.batch_size == bg.batch_size
-    assert F.array_equal(bg.batch_num_nodes('user'), bg_r.batch_num_nodes('user'))
-    assert F.array_equal(bg_r.batch_num_nodes('game'), F.tensor([2, 0, 2], dtype=F.int64))
-    assert F.array_equal(bg.batch_num_edges('follows'), bg_r.batch_num_edges('follows'))
-    assert F.array_equal(bg_r.batch_num_edges('plays'), F.tensor([1, 0, 1], dtype=F.int64))
-
 @parametrize_dtype
 def test_add_selfloop(idtype):
     # homogeneous graph
@@ -1703,7 +1469,6 @@ def test_remove_selfloop(idtype):
     except:
         raise_error = True
     assert raise_error
-
 
 @parametrize_dtype
 def test_reorder_graph(idtype):
@@ -2419,5 +2184,4 @@ def test_module_feat_mask(idtype):
 
 
 if __name__ == '__main__':
-    test_partition_with_halo()
-    test_module_heat_kernel(F.int32)
+    pass

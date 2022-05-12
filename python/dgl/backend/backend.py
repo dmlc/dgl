@@ -1957,13 +1957,15 @@ class no_grad(object):
     def __exit__(self, exc_type, exc_value, exc_traceback):
         pass
 
-class NodeEmbedding(object):
-    """Sparse node embeddings"""
-    def __init__(self):
-        pass
 
-    def __enter__(self):
-        pass
+def cross(x, y):
+    pass
 
-    def __exit__(self, exc_type, exc_value, exc_traceback):
-        pass
+def norm(x, dim=-1, keepdims=False):
+    pass
+
+def arctan2(x, y):
+    pass
+
+def cos(x):
+    pass

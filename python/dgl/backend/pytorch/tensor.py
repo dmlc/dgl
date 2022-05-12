@@ -587,3 +587,15 @@ class record_grad(object):
         pass
 
 no_grad = th.no_grad
+
+def cross(x, y):
+    return th.cross(x, y)
+
+def norm(x, dim=-1, keepdims=False):
+    return th.norm(x, dim=dim, keepdim=keepdims)
+
+def arctan2(x, y):
+    return th.atan2(x, y)
+
+def cos(x):
+    return th.cos(x)

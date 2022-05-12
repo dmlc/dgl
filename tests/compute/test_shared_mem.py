@@ -42,7 +42,7 @@ def _assert_is_identical_hetero(g, g2):
         assert F.array_equal(src, src2)
         assert F.array_equal(dst, dst2)
 
-@unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
+@unittest.skipIf(os.name == 'nt' or dgl.backend.backend_name == "jax", reason='Do not support windows yet')
 @parametrize_dtype
 def test_single_process(idtype):
     hg = create_test_graph(idtype=idtype)
@@ -59,7 +59,7 @@ def sub_proc(hg_origin, name):
     _assert_is_identical_hetero(hg_origin, hg_rebuild)
     _assert_is_identical_hetero(hg_origin, hg_save_again)
 
-@unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
+@unittest.skipIf(os.name == 'nt' or dgl.backend.backend_name == "jax", reason='Do not support windows yet')
 @parametrize_dtype
 def test_multi_process(idtype):
     hg = create_test_graph(idtype=idtype)
@@ -68,8 +68,8 @@ def test_multi_process(idtype):
     p.start()
     p.join()
 
+@unittest.skipIf(os.name == 'nt' or dgl.backend.backend_name == "jax", reason='Do not support windows yet')
 @unittest.skipIf(F._default_context_str == 'cpu', reason="Need gpu for this test")
-@unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
 def test_copy_from_gpu():
     hg = create_test_graph(idtype=F.int32)
     hg_gpu = hg.to(F.cuda())
