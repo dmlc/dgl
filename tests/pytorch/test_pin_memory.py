@@ -11,7 +11,7 @@ def test_pin_noncontiguous():
     assert not F.is_pinned(t)
 
     with pytest.raises(dgl.DGLError):
-        dgl.utils.pin_memory_inplace(t) 
+        dgl.utils.pin_memory_inplace(t)
 
 @pytest.mark.skipIf(F._default_context_str == 'cpu', reason="Need gpu for this test")
 def test_pin_view():
@@ -22,7 +22,7 @@ def test_pin_view():
     assert not F.is_pinned(t)
 
     with pytest.raises(dgl.DGLError):
-        dgl.utils.pin_memory_inplace(v) 
+        dgl.utils.pin_memory_inplace(v)
 
 
 if __name__ == "__main__":

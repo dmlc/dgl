@@ -6,6 +6,10 @@ from .._ffi.function import _init_api
 
 def pin_memory_inplace(tensor):
     """Register the tensor into pinned memory in-place (i.e. without copying)."""
+    if F.backend_name in ['mxnet', 'tensorflow']:
+        raise DGLError("The {} backend does not support pinning " \
+            "tensors in-place.".format(F.backend_name))
+
     # needs to be writable to allow in-place modification
     try:
         F.zerocopy_to_dgl_ndarray_for_write(tensor).pin_memory_()
