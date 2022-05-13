@@ -3531,8 +3531,6 @@ def laplacian_pe(g, k):
 
     return PE
 
-_init_api("dgl.transform", __name__)
-
 def to_half(g):
     r"""Cast this graph to use float16 (half-precision) for any
     floating-point edge and node feature data.
@@ -3549,8 +3547,6 @@ def to_half(g):
     ret._edge_frames = [frame.half() for frame in ret._edge_frames]
     ret._node_frames = [frame.half() for frame in ret._node_frames]
     return ret
-
-DGLHeteroGraph.to_half = utils.alias_func(to_half)
 
 def to_float(g):
     r"""Cast this graph to use float32 (single-precision) for any
@@ -3569,8 +3565,6 @@ def to_float(g):
     ret._node_frames = [frame.float() for frame in ret._node_frames]
     return ret
 
-DGLHeteroGraph.to_float = utils.alias_func(to_float)
-
 def to_double(g):
     r"""Cast this graph to use float64 (double-precision) for any
     floating-point edge and node feature data.
@@ -3588,4 +3582,4 @@ def to_double(g):
     ret._node_frames = [frame.double() for frame in ret._node_frames]
     return ret
 
-DGLHeteroGraph.to_double = utils.alias_func(to_double)
+_init_api("dgl.transform", __name__)
