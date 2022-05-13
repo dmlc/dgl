@@ -311,10 +311,13 @@ class DistGraphServer(KVServer):
         The graph formats.
     keep_alive : bool
         Whether to keep server alive when clients exit
+    net_type : str
+        Backend rpc type: ``'socket'`` or ``'tensorpipe'``
     '''
     def __init__(self, server_id, ip_config, num_servers,
                  num_clients, part_config, disable_shared_mem=False,
-                 graph_format=('csc', 'coo'), keep_alive=False):
+                 graph_format=('csc', 'coo'), keep_alive=False,
+                 net_type='tensorpipe'):
         super(DistGraphServer, self).__init__(server_id=server_id,
                                               ip_config=ip_config,
                                               num_servers=num_servers,
@@ -322,6 +325,7 @@ class DistGraphServer(KVServer):
         self.ip_config = ip_config
         self.num_servers = num_servers
         self.keep_alive = keep_alive
+        self.net_type = net_type
         # Load graph partition data.
         if self.is_backup_server():
             # The backup server doesn't load the graph partition. It'll initialized afterwards.
@@ -376,7 +380,9 @@ class DistGraphServer(KVServer):
         start_server(server_id=self.server_id,
                      ip_config=self.ip_config,
                      num_servers=self.num_servers,
-                     num_clients=self.num_clients, server_state=server_state)
+                     num_clients=self.num_clients,
+                     server_state=server_state,
+                     net_type=self.net_type)
 
 class DistGraph:
     '''The class for accessing a distributed graph.
@@ -1511,7 +1517,7 @@ def node_split(nodes, partition_book=None, ntype='_N', rank=None, force_even=Tru
                                         num_client_per_part, client_id_in_part)
     else:
         # Get all nodes that belong to the rank.
-        local_nids = partition_book.partid2nids(partition_book.partid)
+        local_nids = partition_book.partid2nids(partition_book.partid, ntype=ntype)
         return _split_local(partition_book, rank, nodes, local_nids)
 
 def edge_split(edges, partition_book=None, etype='_E', rank=None, force_even=True,
@@ -1591,7 +1597,7 @@ def edge_split(edges, partition_book=None, etype='_E', rank=None, force_even=Tru
                                         num_client_per_part, client_id_in_part)
     else:
         # Get all edges that belong to the rank.
-        local_eids = partition_book.partid2eids(partition_book.partid)
+        local_eids = partition_book.partid2eids(partition_book.partid, etype=etype)
         return _split_local(partition_book, rank, edges, local_eids)
 
 rpc.register_service(INIT_GRAPH, InitGraphRequest, InitGraphResponse)

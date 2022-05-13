@@ -28,3 +28,7 @@ dgl.transforms
     DropNode
     DropEdge
     AddEdge
+    RandomWalkPE
+    LaplacianPE
+    FeatMask
+    RowFeatNormalizer

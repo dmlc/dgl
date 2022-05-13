@@ -4,13 +4,14 @@ from queue import Queue, Empty, Full
 import itertools
 import threading
 from distutils.version import LooseVersion
-import random
 import math
 import inspect
 import re
 import atexit
 import os
+import psutil
 
+import numpy as np
 import torch
 import torch.distributed as dist
 from torch.utils.data.distributed import DistributedSampler
@@ -18,15 +19,15 @@ from torch.utils.data.distributed import DistributedSampler
 from ..base import NID, EID, dgl_warning
 from ..batch import batch as batch_graphs
 from ..heterograph import DGLHeteroGraph
-from .. import ndarray as nd
 from ..utils import (
     recursive_apply, ExceptionWrapper, recursive_apply_pair, set_num_threads,
-    create_shared_mem_array, get_shared_mem_array, context_of, pin_memory_inplace)
+    context_of, dtype_of)
 from ..frame import LazyFeature
 from ..storages import wrap_storage
 from .base import BlockSampler, as_edge_prediction_sampler
 from .. import backend as F
 from ..distributed import DistGraph
+from ..multiprocessing import call_once_and_share
 
 PYTHON_EXIT_STATUS = False
 def _set_python_exit_flag():
@@ -86,11 +87,20 @@ class _TensorizedDatasetIter(object):
 
 
 def _get_id_tensor_from_mapping(indices, device, keys):
-    lengths = torch.LongTensor([
-        (indices[k].shape[0] if k in indices else 0) for k in keys]).to(device)
-    type_ids = torch.arange(len(keys), device=device).repeat_interleave(lengths)
-    all_indices = torch.cat([indices[k] for k in keys if k in indices])
-    return torch.stack([type_ids, all_indices], 1)
+    dtype = dtype_of(indices)
+    id_tensor = torch.empty(
+        sum(v.shape[0] for v in indices.values()), 2, dtype=dtype, device=device)
+
+    offset = 0
+    for i, k in enumerate(keys):
+        if k not in indices:
+            continue
+        index = indices[k]
+        length = index.shape[0]
+        id_tensor[offset:offset+length, 0] = i
+        id_tensor[offset:offset+length, 1] = index
+        offset += length
+    return id_tensor
 
 
 def _divide_by_worker(dataset, batch_size, drop_last):
@@ -113,7 +123,6 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
     When the dataset is on the GPU, this significantly reduces the overhead.
     """
     def __init__(self, indices, batch_size, drop_last):
-        name, _ = _generate_shared_mem_name_id()
         if isinstance(indices, Mapping):
             self._mapping_keys = list(indices.keys())
             self._device = next(iter(indices.values())).device
@@ -126,17 +135,13 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
         # Use a shared memory array to permute indices for shuffling.  This is to make sure that
         # the worker processes can see it when persistent_workers=True, where self._indices
         # would not be duplicated every epoch.
-        self._indices = create_shared_mem_array(name, (self._id_tensor.shape[0],), torch.int64)
-        self._indices[:] = torch.arange(self._id_tensor.shape[0])
+        self._indices = torch.arange(self._id_tensor.shape[0], dtype=torch.int64).share_memory_()
         self.batch_size = batch_size
         self.drop_last = drop_last
-        self.shared_mem_name = name
-        self.shared_mem_size = self._indices.shape[0]
 
     def shuffle(self):
         """Shuffle the dataset."""
-        # TODO: may need an in-place shuffle kernel
-        self._indices[:] = self._indices[torch.randperm(self._indices.shape[0])]
+        np.random.shuffle(self._indices.numpy())
 
     def __iter__(self):
         indices = _divide_by_worker(self._indices, self.batch_size, self.drop_last)
@@ -147,17 +152,6 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
     def __len__(self):
         num_samples = self._id_tensor.shape[0]
         return (num_samples + (0 if self.drop_last else (self.batch_size - 1))) // self.batch_size
-
-def _get_shared_mem_name(id_):
-    return f'ddp_{id_}'
-
-def _generate_shared_mem_name_id():
-    for _ in range(3):     # 3 trials
-        id_ = random.getrandbits(32)
-        name = _get_shared_mem_name(id_)
-        if not nd.exist_shared_mem_array(name):
-            return name, id_
-    raise DGLError('Unable to generate a shared memory array')
 
 class DDPTensorizedDataset(torch.utils.data.IterableDataset):
     """Custom Dataset wrapper that returns a minibatch as tensors or dicts of tensors.
@@ -195,40 +189,33 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
 
         if isinstance(indices, Mapping):
             self._device = next(iter(indices.values())).device
-            self._id_tensor = _get_id_tensor_from_mapping(
-                    indices, self._device, self._mapping_keys)
+            self._id_tensor = call_once_and_share(
+                lambda: _get_id_tensor_from_mapping(indices, self._device, self._mapping_keys),
+                (self.num_indices, 2), dtype_of(indices))
         else:
             self._id_tensor = indices
             self._device = self._id_tensor.device
 
-        if self.rank == 0:
-            name, id_ = _generate_shared_mem_name_id()
-            self._indices = create_shared_mem_array(
-                name, (self.shared_mem_size,), torch.int64)
-            self._indices[:self._id_tensor.shape[0]] = torch.arange(self._id_tensor.shape[0])
-            meta_info = torch.LongTensor([id_, self._indices.shape[0]])
-        else:
-            meta_info = torch.LongTensor([0, 0])
+        self._indices = call_once_and_share(
+            self._create_shared_indices, (self.shared_mem_size,), torch.int64)
 
-        if dist.get_backend() == 'nccl':
-            # Use default CUDA device; PyTorch DDP required the users to set the CUDA
-            # device for each process themselves so calling .cuda() should be safe.
-            meta_info = meta_info.cuda()
-        dist.broadcast(meta_info, src=0)
-
-        if self.rank != 0:
-            id_, num_samples = meta_info.tolist()
-            name = _get_shared_mem_name(id_)
-            indices_shared = get_shared_mem_array(name, (num_samples,), torch.int64)
-            self._indices = indices_shared
-        self.shared_mem_name = name
+    def _create_shared_indices(self):
+        indices = torch.empty(self.shared_mem_size, dtype=torch.int64)
+        num_ids = self._id_tensor.shape[0]
+        torch.arange(num_ids, out=indices[:num_ids])
+        torch.arange(self.shared_mem_size - num_ids, out=indices[num_ids:])
+        return indices
 
     def shuffle(self):
         """Shuffles the dataset."""
         # Only rank 0 does the actual shuffling.  The other ranks wait for it.
         if self.rank == 0:
-            self._indices[:self.num_indices] = self._indices[
-                torch.randperm(self.num_indices, device=self._device)]
+            if self._device == torch.device('cpu'):
+                np.random.shuffle(self._indices[:self.num_indices].numpy())
+            else:
+                self._indices[:self.num_indices] = self._indices[
+                    torch.randperm(self.num_indices, device=self._device)]
+
             if not self.drop_last:
                 # pad extra
                 self._indices[self.num_indices:] = \
@@ -523,11 +510,18 @@ class CollateWrapper(object):
     """Wraps a collate function with :func:`remove_parent_storage_columns` for serializing
     from PyTorch DataLoader workers.
     """
-    def __init__(self, sample_func, g):
+    def __init__(self, sample_func, g, use_uva, device):
         self.sample_func = sample_func
         self.g = g
+        self.use_uva = use_uva
+        self.device = device
 
     def __call__(self, items):
+        graph_device = getattr(self.g, 'device', None)
+        if self.use_uva or (graph_device != torch.device('cpu')):
+            # Only copy the indices to the given device if in UVA mode or the graph
+            # is not on CPU.
+            items = recursive_apply(items, lambda x: x.to(self.device))
         batch = self.sample_func(self.g, items)
         return recursive_apply(batch, remove_parent_storage_columns, self.g)
 
@@ -563,10 +557,13 @@ def _get_device(device):
     return device
 
 class DataLoader(torch.utils.data.DataLoader):
-    """PyTorch dataloader for batch-iterating over a set of nodes, edges or any other
-    kinds of indices.  The minibatch of such indices will be then passed to a sampler
-    generating subgraphs, message flow graphs (MFGs), or any other structures necessary
-    to compute the representations.
+    """Sampled graph data loader. Wrap a :class:`~dgl.DGLGraph` and a
+    :class:`~dgl.dataloading.Sampler` into an iterable over mini-batches of samples.
+
+    DGL's ``DataLoader`` extends PyTorch's ``DataLoader`` by handling creation
+    and transmission of graph samples. It supports iterating over a set of nodes,
+    edges or any kinds of indices to get samples in the form of ``DGLGraph``, message
+    flow graphs (MFGS), or any other structures necessary to train a graph neural network.
 
     Parameters
     ----------
@@ -584,7 +581,9 @@ class DataLoader(torch.utils.data.DataLoader):
         The device of the generated MFGs in each iteration, which should be a
         PyTorch device object (e.g., ``torch.device``).
 
-        By default this value is the same as the device of :attr:`g`.
+        By default this value is None. If :attr:`use_uva` is True, MFGs and graphs will
+        generated in torch.cuda.current_device(), otherwise generated in the same device
+        of :attr:`g`.
     use_ddp : boolean, optional
         If True, tells the DataLoader to split the training set for each
         participating process appropriately using
@@ -622,11 +621,14 @@ class DataLoader(torch.utils.data.DataLoader):
         Whether to pin the feature tensors into pinned memory.
 
         Default: True if the graph is on CPU and :attr:`device` is CUDA.  False otherwise.
-    batch_size : int, optional
-    drop_last : bool, optional
-    shuffle : bool, optional
     kwargs : dict
-        Arguments being passed to :py:class:`torch.utils.data.DataLoader`.
+        Key-word arguments to be passed to the parent PyTorch
+        :py:class:`torch.utils.data.DataLoader` class. Common arguments are:
+
+          - ``batch_size`` (int): The number of indices in each batch.
+          - ``drop_last`` (bool): Whether to drop the last incomplete batch.
+          - ``shuffle`` (bool): Whether to randomly shuffle the indices at each epoch.
+
 
     Examples
     --------
@@ -678,10 +680,41 @@ class DataLoader(torch.utils.data.DataLoader):
 
       - Otherwise, both the sampling and subgraph construction will take place on the CPU.
     """
-    def __init__(self, graph, indices, graph_sampler, device='cpu', use_ddp=False,
+    def __init__(self, graph, indices, graph_sampler, device=None, use_ddp=False,
                  ddp_seed=0, batch_size=1, drop_last=False, shuffle=False,
                  use_prefetch_thread=None, use_alternate_streams=None,
-                 pin_prefetcher=None, use_uva=False, **kwargs):
+                 pin_prefetcher=None, use_uva=False,
+                 use_cpu_worker_affinity=False, cpu_worker_affinity_cores=None, **kwargs):
+        # (BarclayII) PyTorch Lightning sometimes will recreate a DataLoader from an existing
+        # DataLoader with modifications to the original arguments.  The arguments are retrieved
+        # from the attributes with the same name, and because we change certain arguments
+        # when calling super().__init__() (e.g. batch_size attribute is None even if the
+        # batch_size argument is not, so the next DataLoader's batch_size argument will be
+        # None), we cannot reinitialize the DataLoader with attributes from the previous
+        # DataLoader directly.
+        # A workaround is to check whether "collate_fn" appears in kwargs.  If "collate_fn"
+        # is indeed in kwargs and it's already a CollateWrapper object, we can assume that
+        # the arguments come from a previously created DGL DataLoader, and directly initialize
+        # the new DataLoader from kwargs without any changes.
+        if isinstance(kwargs.get('collate_fn', None), CollateWrapper):
+            assert batch_size is None       # must be None
+            # restore attributes
+            self.graph = graph
+            self.indices = indices
+            self.graph_sampler = graph_sampler
+            self.device = device
+            self.use_ddp = use_ddp
+            self.ddp_seed = ddp_seed
+            self.shuffle = shuffle
+            self.drop_last = drop_last
+            self.use_prefetch_thread = use_prefetch_thread
+            self.use_alternate_streams = use_alternate_streams
+            self.pin_prefetcher = pin_prefetcher
+            self.use_uva = use_uva
+            kwargs['batch_size'] = None
+            super().__init__(**kwargs)
+            return
+
         if isinstance(graph, DistGraph):
             raise TypeError(
                 'Please use dgl.dataloading.DistNodeDataLoader or '
@@ -699,6 +732,7 @@ class DataLoader(torch.utils.data.DataLoader):
         self.indices = indices      # For PyTorch-Lightning
         num_workers = kwargs.get('num_workers', 0)
 
+        indices_device = None
         try:
             if isinstance(indices, Mapping):
                 indices = {k: (torch.tensor(v) if not torch.is_tensor(v) else v)
@@ -711,6 +745,17 @@ class DataLoader(torch.utils.data.DataLoader):
             # ignore when it fails to convert to torch Tensors.
             pass
 
+        if indices_device is None:
+            if not hasattr(indices, 'device'):
+                raise AttributeError('Custom indices dataset requires a \"device\" \
+                attribute indicating where the indices is.')
+            indices_device = indices.device
+
+        if device is None:
+            if use_uva:
+                device = torch.cuda.current_device()
+            else:
+                device = self.graph.device
         self.device = _get_device(device)
 
         # Sanity check - we only check for DGLGraphs.
@@ -719,10 +764,6 @@ class DataLoader(torch.utils.data.DataLoader):
             if use_uva:
                 if self.graph.device.type != 'cpu':
                     raise ValueError('Graph must be on CPU if UVA sampling is enabled.')
-                if indices_device != self.device:
-                    raise ValueError(
-                        f'Indices must be on the same device as the device argument '
-                        f'({self.device})')
                 if num_workers > 0:
                     raise ValueError('num_workers must be 0 if UVA sampling is enabled.')
 
@@ -730,9 +771,6 @@ class DataLoader(torch.utils.data.DataLoader):
                 # will need to do that themselves.
                 self.graph.create_formats_()
                 self.graph.pin_memory_()
-                for frame in itertools.chain(self.graph._node_frames, self.graph._edge_frames):
-                    for col in frame._columns.values():
-                        pin_memory_inplace(col.data)
             else:
                 if self.graph.device != indices_device:
                     raise ValueError(
@@ -789,13 +827,35 @@ class DataLoader(torch.utils.data.DataLoader):
         self.use_alternate_streams = use_alternate_streams
         self.pin_prefetcher = pin_prefetcher
         self.use_prefetch_thread = use_prefetch_thread
+
         worker_init_fn = WorkerInitWrapper(kwargs.get('worker_init_fn', None))
 
         self.other_storages = {}
 
+        if use_cpu_worker_affinity:
+            nw_work = kwargs.get('num_workers', 0)
+
+            if cpu_worker_affinity_cores is None:
+                cpu_worker_affinity_cores = []
+
+            if not isinstance(cpu_worker_affinity_cores, list):
+                raise Exception('ERROR: cpu_worker_affinity_cores should be a list of cores')
+            if not nw_work > 0:
+                raise Exception('ERROR: affinity should be used with --num_workers=X')
+            if len(cpu_worker_affinity_cores) not in [0, nw_work]:
+                raise Exception('ERROR: cpu_affinity incorrect '
+                                'settings for cores={} num_workers={}'
+                                .format(cpu_worker_affinity_cores, nw_work))
+
+            self.cpu_cores = (cpu_worker_affinity_cores
+                                if len(cpu_worker_affinity_cores)
+                                else range(0, nw_work))
+            worker_init_fn = WorkerInitWrapper(self.worker_init_function)
+
         super().__init__(
             self.dataset,
-            collate_fn=CollateWrapper(self.graph_sampler.sample, graph),
+            collate_fn=CollateWrapper(
+                self.graph_sampler.sample, graph, self.use_uva, self.device),
             batch_size=None,
             worker_init_fn=worker_init_fn,
             **kwargs)
@@ -810,6 +870,21 @@ class DataLoader(torch.utils.data.DataLoader):
             self, super().__iter__(), use_thread=self.use_prefetch_thread,
             use_alternate_streams=self.use_alternate_streams, num_threads=num_threads)
 
+    def worker_init_function(self, worker_id):
+        """Worker init default function.
+              Parameters
+              ----------
+              worker_id : int
+                  Worker ID.
+        """
+        try:
+            psutil.Process().cpu_affinity([self.cpu_cores[worker_id]])
+            print('CPU-affinity worker {} has been assigned to core={}'
+                  .format(worker_id, self.cpu_cores[worker_id]))
+        except:
+            raise Exception('ERROR: cannot use affinity id={} cpu_cores={}'
+                            .format(worker_id, self.cpu_cores))
+
     # To allow data other than node/edge data to be prefetched.
     def attach_data(self, name, data):
         """Add a data other than node and edge features for prefetching."""
@@ -818,309 +893,58 @@ class DataLoader(torch.utils.data.DataLoader):
 
 # Alias
 class NodeDataLoader(DataLoader):
-    """PyTorch dataloader for batch-iterating over a set of nodes, generating the list
-    of message flow graphs (MFGs) as computation dependency of the said minibatch.
+    """(DEPRECATED) Sampled graph data loader over a set of nodes.
 
-    Parameters
-    ----------
-    graph : DGLGraph
-        The graph.
-    indices : Tensor or dict[ntype, Tensor]
-        The node set to compute outputs.
-    graph_sampler : dgl.dataloading.Sampler
-        The subgraph sampler.
-    device : device context, optional
-        The device of the generated MFGs in each iteration, which should be a
-        PyTorch device object (e.g., ``torch.device``).
+    .. deprecated:: 0.8
 
-        By default this value is the same as the device of :attr:`g`.
-    use_ddp : boolean, optional
-        If True, tells the DataLoader to split the training set for each
-        participating process appropriately using
-        :class:`torch.utils.data.distributed.DistributedSampler`.
-
-        Overrides the :attr:`sampler` argument of :class:`torch.utils.data.DataLoader`.
-    ddp_seed : int, optional
-        The seed for shuffling the dataset in
-        :class:`torch.utils.data.distributed.DistributedSampler`.
-
-        Only effective when :attr:`use_ddp` is True.
-    use_uva : bool, optional
-        Whether to use Unified Virtual Addressing (UVA) to directly sample the graph
-        and slice the features from CPU into GPU.  Setting it to True will pin the
-        graph and feature tensors into pinned memory.
-
-        If True, requires that :attr:`indices` must have the same device as the
-        :attr:`device` argument.
-
-        Default: False.
-    use_prefetch_thread : bool, optional
-        (Advanced option)
-        Spawns a new Python thread to perform feature slicing
-        asynchronously.  Can make things faster at the cost of GPU memory.
-
-        Default: True if the graph is on CPU and :attr:`device` is CUDA.  False otherwise.
-    use_alternate_streams : bool, optional
-        (Advanced option)
-        Whether to slice and transfers the features to GPU on a non-default stream.
-
-        Default: True if the graph is on CPU, :attr:`device` is CUDA, and :attr:`use_uva`
-        is False.  False otherwise.
-    pin_prefetcher : bool, optional
-        (Advanced option)
-        Whether to pin the feature tensors into pinned memory.
-
-        Default: True if the graph is on CPU and :attr:`device` is CUDA.  False otherwise.
-    batch_size : int, optional
-    drop_last : bool, optional
-    shuffle : bool, optional
-    kwargs : dict
-        Arguments being passed to :py:class:`torch.utils.data.DataLoader`.
-
-    Examples
-    --------
-    To train a 3-layer GNN for node classification on a set of nodes ``train_nid`` on
-    a homogeneous graph where each node takes messages from all neighbors (assume
-    the backend is PyTorch):
-
-    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
-    >>> dataloader = dgl.dataloading.NodeDataLoader(
-    ...     g, train_nid, sampler,
-    ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
-    >>> for input_nodes, output_nodes, blocks in dataloader:
-    ...     train_on(input_nodes, output_nodes, blocks)
-
-    **Using with Distributed Data Parallel**
-
-    If you are using PyTorch's distributed training (e.g. when using
-    :mod:`torch.nn.parallel.DistributedDataParallel`), you can train the model by turning
-    on the `use_ddp` option:
-
-    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
-    >>> dataloader = dgl.dataloading.NodeDataLoader(
-    ...     g, train_nid, sampler, use_ddp=True,
-    ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
-    >>> for epoch in range(start_epoch, n_epochs):
-    ...     for input_nodes, output_nodes, blocks in dataloader:
-    ...         train_on(input_nodes, output_nodes, blocks)
-
-    Notes
-    -----
-    Please refer to
-    :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`
-    and :ref:`User Guide Section 6 <guide-minibatch>` for usage.
-
-    **Tips for selecting the proper device**
-
-    * If the input graph :attr:`g` is on GPU, the output device :attr:`device` must be the same GPU
-      and :attr:`num_workers` must be zero. In this case, the sampling and subgraph construction
-      will take place on the GPU. This is the recommended setting when using a single-GPU and
-      the whole graph fits in GPU memory.
-
-    * If the input graph :attr:`g` is on CPU while the output device :attr:`device` is GPU, then
-      depending on the value of :attr:`use_uva`:
-
-      - If :attr:`use_uva` is set to True, the sampling and subgraph construction will happen
-        on GPU even if the GPU itself cannot hold the entire graph. This is the recommended
-        setting unless there are operations not supporting UVA. :attr:`num_workers` must be 0
-        in this case.
-
-      - Otherwise, both the sampling and subgraph construction will take place on the CPU.
+        The class is deprecated since v0.8, replaced by :class:`~dgl.dataloading.DataLoader`.
     """
 
 
 class EdgeDataLoader(DataLoader):
-    """PyTorch dataloader for batch-iterating over a set of edges, generating the list
-    of message flow graphs (MFGs) as computation dependency of the said minibatch for
-    edge classification, edge regression, and link prediction.
+    """(DEPRECATED) Sampled graph data loader over a set of edges.
 
-    For more details, please refer to :ref:`guide-minibatch-edge-classification-sampler`
-    and :ref:`guide-minibatch-link-classification-sampler`.
+    .. deprecated:: 0.8
 
-    Parameters
-    ----------
-    g : DGLGraph
-        The graph.
-    indices : Tensor or dict[etype, Tensor]
-        The edge set in graph :attr:`g` to compute outputs.
-    graph_sampler : dgl.dataloading.Sampler
-        The subgraph sampler
-    device : device context, optional
-        The device of the generated MFGs and graphs in each iteration, which should be a
-        PyTorch device object (e.g., ``torch.device``).
+        The class is deprecated since v0.8 -- its function has been covered by
+        :class:`~dgl.dataloading.DataLoader` and :func:`~dgl.as_edge_prediction_sampler`.
 
-        By default this value is the same as the device of :attr:`g`.
-    use_ddp : boolean, optional
-        If True, tells the DataLoader to split the training set for each
-        participating process appropriately using
-        :class:`torch.utils.data.distributed.DistributedSampler`.
+        To migrate, change the legacy usage like:
 
-        Overrides the :attr:`sampler` argument of :class:`torch.utils.data.DataLoader`.
-    ddp_seed : int, optional
-        The seed for shuffling the dataset in
-        :class:`torch.utils.data.distributed.DistributedSampler`.
+        .. code:: python
 
-        Only effective when :attr:`use_ddp` is True.
-    use_prefetch_thread : bool, optional
-        (Advanced option)
-        Spawns a new Python thread to perform feature slicing
-        asynchronously.  Can make things faster at the cost of GPU memory.
+            sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
+            dataloader = dgl.dataloading.EdgeDataLoader(
+                g, train_eid, sampler, exclude='reverse_id',
+                reverse_eids=reverse_eids,
+                negative_sampler=dgl.dataloading.negative_sampler.Uniform(5),
+                batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
 
-        Default: True if the graph is on CPU and :attr:`device` is CUDA.  False otherwise.
-    use_alternate_streams : bool, optional
-        (Advanced option)
-        Whether to slice and transfers the features to GPU on a non-default stream.
+        to:
 
-        Default: True if the graph is on CPU, :attr:`device` is CUDA, and :attr:`use_uva`
-        is False.  False otherwise.
-    pin_prefetcher : bool, optional
-        (Advanced option)
-        Whether to pin the feature tensors into pinned memory.
+        .. code:: python
 
-        Default: True if the graph is on CPU and :attr:`device` is CUDA.  False otherwise.
-    use_uva : bool, optional
-        Whether to use Unified Virtual Addressing (UVA) to directly sample the graph
-        and slice the features from CPU into GPU.  Setting it to True will pin the
-        graph and feature tensors into pinned memory.
-
-        If True, requires that :attr:`indices` must have the same device as the
-        :attr:`device` argument.
-
-        Default: False.
-    exclude : str, optional
-    reverse_eids : Tensor or dict[etype, Tensor], optional
-    reverse_etypes : dict[etype, etype], optional
-    negative_sampler : callable, optional
-        Deprecated and will be passed to :func:`dgl.dataloading.as_edge_prediction_sampler`.
-    batch_size : int, optional
-    drop_last : bool, optional
-    shuffle : bool, optional
-    kwargs : dict
-        Arguments being passed to :py:class:`torch.utils.data.DataLoader`.
-
-    Examples
-    --------
-    The following example shows how to train a 3-layer GNN for edge classification on a
-    set of edges ``train_eid`` on a homogeneous undirected graph. Each node takes
-    messages from all neighbors.
-
-    Say that you have an array of source node IDs ``src`` and another array of destination
-    node IDs ``dst``.  One can make it bidirectional by adding another set of edges
-    that connects from ``dst`` to ``src``:
-
-    >>> g = dgl.graph((torch.cat([src, dst]), torch.cat([dst, src])))
-
-    One can then know that the ID difference of an edge and its reverse edge is ``|E|``,
-    where ``|E|`` is the length of your source/destination array.  The reverse edge
-    mapping can be obtained by
-
-    >>> E = len(src)
-    >>> reverse_eids = torch.cat([torch.arange(E, 2 * E), torch.arange(0, E)])
-
-    Note that the sampled edges as well as their reverse edges are removed from
-    computation dependencies of the incident nodes.  That is, the edge will not
-    involve in neighbor sampling and message aggregation.  This is a common trick
-    to avoid information leakage.
-
-    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
-    >>> dataloader = dgl.dataloading.EdgeDataLoader(
-    ...     g, train_eid, sampler, exclude='reverse_id',
-    ...     reverse_eids=reverse_eids,
-    ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
-    >>> for input_nodes, pair_graph, blocks in dataloader:
-    ...     train_on(input_nodes, pair_graph, blocks)
-
-    To train a 3-layer GNN for link prediction on a set of edges ``train_eid`` on a
-    homogeneous graph where each node takes messages from all neighbors (assume the
-    backend is PyTorch), with 5 uniformly chosen negative samples per edge:
-
-    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
-    >>> neg_sampler = dgl.dataloading.negative_sampler.Uniform(5)
-    >>> dataloader = dgl.dataloading.EdgeDataLoader(
-    ...     g, train_eid, sampler, exclude='reverse_id',
-    ...     reverse_eids=reverse_eids, negative_sampler=neg_sampler,
-    ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
-    >>> for input_nodes, pos_pair_graph, neg_pair_graph, blocks in dataloader:
-    ...     train_on(input_nodse, pair_graph, neg_pair_graph, blocks)
-
-    For heterogeneous graphs, the reverse of an edge may have a different edge type
-    from the original edge.  For instance, consider that you have an array of
-    user-item clicks, representated by a user array ``user`` and an item array ``item``.
-    You may want to build a heterogeneous graph with a user-click-item relation and an
-    item-clicked-by-user relation.
-
-    >>> g = dgl.heterograph({
-    ...     ('user', 'click', 'item'): (user, item),
-    ...     ('item', 'clicked-by', 'user'): (item, user)})
-
-    To train a 3-layer GNN for edge classification on a set of edges ``train_eid`` with
-    type ``click``, you can write
-
-    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
-    >>> dataloader = dgl.dataloading.EdgeDataLoader(
-    ...     g, {'click': train_eid}, sampler, exclude='reverse_types',
-    ...     reverse_etypes={'click': 'clicked-by', 'clicked-by': 'click'},
-    ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
-    >>> for input_nodes, pair_graph, blocks in dataloader:
-    ...     train_on(input_nodes, pair_graph, blocks)
-
-    To train a 3-layer GNN for link prediction on a set of edges ``train_eid`` with type
-    ``click``, you can write
-
-    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
-    >>> neg_sampler = dgl.dataloading.negative_sampler.Uniform(5)
-    >>> dataloader = dgl.dataloading.EdgeDataLoader(
-    ...     g, train_eid, sampler, exclude='reverse_types',
-    ...     reverse_etypes={'click': 'clicked-by', 'clicked-by': 'click'},
-    ...     negative_sampler=neg_sampler,
-    ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
-    >>> for input_nodes, pos_pair_graph, neg_pair_graph, blocks in dataloader:
-    ...     train_on(input_nodes, pair_graph, neg_pair_graph, blocks)
-
-    **Using with Distributed Data Parallel**
-
-    If you are using PyTorch's distributed training (e.g. when using
-    :mod:`torch.nn.parallel.DistributedDataParallel`), you can train the model by
-    turning on the :attr:`use_ddp` option:
-
-    >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
-    >>> dataloader = dgl.dataloading.EdgeDataLoader(
-    ...     g, train_eid, sampler, use_ddp=True, exclude='reverse_id',
-    ...     reverse_eids=reverse_eids,
-    ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
-    >>> for epoch in range(start_epoch, n_epochs):
-    ...     for input_nodes, pair_graph, blocks in dataloader:
-    ...         train_on(input_nodes, pair_graph, blocks)
-
-    Notes
-    -----
-    Please refer to
-    :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`
-    and :ref:`User Guide Section 6 <guide-minibatch>` for usage.
-
-    **Tips for selecting the proper device**
-
-    * If the input graph :attr:`g` is on GPU, the output device :attr:`device` must be the same GPU
-      and :attr:`num_workers` must be zero. In this case, the sampling and subgraph construction
-      will take place on the GPU. This is the recommended setting when using a single-GPU and
-      the whole graph fits in GPU memory.
-
-    * If the input graph :attr:`g` is on CPU while the output device :attr:`device` is GPU, then
-      depending on the value of :attr:`use_uva`:
-
-      - If :attr:`use_uva` is set to True, the sampling and subgraph construction will happen
-        on GPU even if the GPU itself cannot hold the entire graph. This is the recommended
-        setting unless there are operations not supporting UVA. :attr:`num_workers` must be 0
-        in this case.
-
-      - Otherwise, both the sampling and subgraph construction will take place on the CPU.
+            sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
+            sampler = dgl.dataloading.as_edge_prediction_sampler(
+                sampler, exclude='reverse_id',
+                reverse_eids=reverse_eids,
+                negative_sampler=dgl.dataloading.negative_sampler.Uniform(5))
+            dataloader = dgl.dataloading.DataLoader(
+                g, train_eid, sampler,
+                batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
     """
-    def __init__(self, graph, indices, graph_sampler, device='cpu', use_ddp=False,
+    def __init__(self, graph, indices, graph_sampler, device=None, use_ddp=False,
                  ddp_seed=0, batch_size=1, drop_last=False, shuffle=False,
                  use_prefetch_thread=False, use_alternate_streams=True,
                  pin_prefetcher=False,
                  exclude=None, reverse_eids=None, reverse_etypes=None, negative_sampler=None,
                  use_uva=False, **kwargs):
+
+        if device is None:
+            if use_uva:
+                device = torch.cuda.current_device()
+            else:
+                device = self.graph.device
         device = _get_device(device)
 
         if isinstance(graph_sampler, BlockSampler):
@@ -1248,11 +1072,15 @@ class GraphCollator(object):
         raise TypeError(self.graph_collate_err_msg_format.format(elem_type))
 
 class GraphDataLoader(torch.utils.data.DataLoader):
-    """PyTorch dataloader for batch-iterating over a set of graphs, generating the batched
+    """Batched graph data loader.
+
+    PyTorch dataloader for batch-iterating over a set of graphs, generating the batched
     graph and corresponding label tensor (if provided) of the said minibatch.
 
     Parameters
     ----------
+    dataset : torch.utils.data.Dataset
+        The dataset to load graphs from.
     collate_fn : Function, default is None
         The customized collate function. Will use the default collate
         function if not given.
@@ -1268,19 +1096,23 @@ class GraphDataLoader(torch.utils.data.DataLoader):
 
         Only effective when :attr:`use_ddp` is True.
     kwargs : dict
-        Arguments being passed to :py:class:`torch.utils.data.DataLoader`.
+        Key-word arguments to be passed to the parent PyTorch
+        :py:class:`torch.utils.data.DataLoader` class. Common arguments are:
+
+          - ``batch_size`` (int): The number of indices in each batch.
+          - ``drop_last`` (bool): Whether to drop the last incomplete batch.
+          - ``shuffle`` (bool): Whether to randomly shuffle the indices at each epoch.
 
     Examples
     --------
-    To train a GNN for graph classification on a set of graphs in ``dataset`` (assume
-    the backend is PyTorch):
+    To train a GNN for graph classification on a set of graphs in ``dataset``:
 
     >>> dataloader = dgl.dataloading.GraphDataLoader(
     ...     dataset, batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
     >>> for batched_graph, labels in dataloader:
     ...     train_on(batched_graph, labels)
 
-    **Using with Distributed Data Parallel**
+    **With Distributed Data Parallel**
 
     If you are using PyTorch's distributed training (e.g. when using
     :mod:`torch.nn.parallel.DistributedDataParallel`), you can train the model by

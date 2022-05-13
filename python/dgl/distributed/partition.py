@@ -293,7 +293,7 @@ def _set_trainer_ids(g, sim_g, node_parts):
 
 def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method="metis",
                     reshuffle=True, balance_ntypes=None, balance_edges=False, return_mapping=False,
-                    num_trainers_per_machine=1):
+                    num_trainers_per_machine=1, objtype='cut'):
     ''' Partition a graph for distributed training and store the partitions on files.
 
     The partitioning occurs in three steps: 1) run a partition algorithm (e.g., Metis) to
@@ -473,6 +473,9 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         each node will be stored in the node feature 'trainer_id'. Then the partitions of trainers
         on the same machine will be coalesced into one larger partition. The final number of
         partitions is `num_part`.
+    objtype : str, "cut" or "vol"
+        Set the objective as edge-cut minimization or communication volume minimization. This
+        argument is used by the Metis algorithm.
 
     Returns
     -------
@@ -532,6 +535,9 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
             bal_ntypes = sim_g.ndata[NTYPE]
         return sim_g, bal_ntypes
 
+    if objtype not in ['cut', 'vol']:
+        raise ValueError
+
     if not reshuffle:
         dgl_warning("The argument reshuffle will be deprecated in the next release. "
                     "For heterogeneous graphs, reshuffle must be enabled.")
@@ -583,7 +589,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                     sim_g, num_parts * num_trainers_per_machine,
                     balance_ntypes=balance_ntypes,
                     balance_edges=balance_edges,
-                    mode='k-way')
+                    mode='k-way', objtype=objtype)
                 _set_trainer_ids(g, sim_g, node_parts)
 
                 # And then coalesce the partitions of trainers on the same machine into one
@@ -592,7 +598,8 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
             else:
                 node_parts = metis_partition_assignment(sim_g, num_parts,
                                                         balance_ntypes=balance_ntypes,
-                                                        balance_edges=balance_edges)
+                                                        balance_edges=balance_edges,
+                                                        objtype=objtype)
             print('Assigning nodes to METIS partitions takes {:.3f}s, peak mem: {:.3f} GB'.format(
                 time.time() - start, get_peak_mem()))
         else:
