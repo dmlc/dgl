@@ -95,7 +95,7 @@ CompactGraphsGPU(
   CHECK_EQ(ctx.device_type, kDLGPU);
 
   // Step 1: Collect the nodes that has connections for each type.
-  const int64_t num_ntypes = graphs[0]->NumVertexTypes();
+  const uint64_t num_ntypes = graphs[0]->NumVertexTypes();
   std::vector<std::vector<EdgeArray>> all_edges(graphs.size());   // all_edges[i][etype]
 
   // count the number of nodes per type
@@ -122,7 +122,7 @@ CompactGraphsGPU(
   std::vector<IdArray> all_nodes(num_ntypes);
   std::vector<int64_t> node_offsets(num_ntypes, 0);
 
-  for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
+  for (uint64_t ntype = 0; ntype < num_ntypes; ++ntype) {
     all_nodes[ntype] = NewIdArray(max_vertex_cnt[ntype], ctx,
       sizeof(IdType)*8);
     // copy the nodes in always_preserve
@@ -192,7 +192,7 @@ CompactGraphsGPU(
       device->AllocWorkspace(ctx, sizeof(int64_t)*num_ntypes));
   // the set of unique nodes per type
   std::vector<IdArray> induced_nodes(num_ntypes);
-  for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
+  for (uint64_t ntype = 0; ntype < num_ntypes; ++ntype) {
     induced_nodes[ntype] = NewIdArray(max_vertex_cnt[ntype], ctx,
       sizeof(IdType)*8);
   }
@@ -218,7 +218,7 @@ CompactGraphsGPU(
   device->FreeWorkspace(ctx, count_unique_device);
 
   // resize induced nodes
-  for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
+  for (uint64_t ntype = 0; ntype < num_ntypes; ++ntype) {
     induced_nodes[ntype]->shape[0] = num_induced_nodes[ntype];
   }
 
