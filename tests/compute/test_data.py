@@ -205,59 +205,59 @@ def test_reddit():
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_explain_syn():
-    dataset = data.BAShapes()
+    dataset = data.BAShapeDataset()
     assert dataset.num_classes == 4
     g = dataset[0]
     assert 'label' in g.ndata
     assert 'feat' in g.ndata
 
-    g1 = data.BAShapes(force_reload=True, seed=0)[0]
+    g1 = data.BAShapeDataset(force_reload=True, seed=0)[0]
     src1, dst1 = g1.edges()
-    g2 = data.BAShapes(force_reload=True, seed=0)[0]
+    g2 = data.BAShapeDataset(force_reload=True, seed=0)[0]
     src2, dst2 = g2.edges()
     assert F.allclose(src1, src2)
     assert F.allclose(dst1, dst2)
 
-    dataset = data.BACommunity()
+    dataset = data.BACommunityDataset()
     assert dataset.num_classes == 8
     g = dataset[0]
     assert 'label' in g.ndata
     assert 'feat' in g.ndata
 
-    g1 = data.BACommunity(force_reload=True, seed=0)[0]
+    g1 = data.BACommunityDataset(force_reload=True, seed=0)[0]
     src1, dst1 = g1.edges()
-    g2 = data.BACommunity(force_reload=True, seed=0)[0]
+    g2 = data.BACommunityDataset(force_reload=True, seed=0)[0]
     src2, dst2 = g2.edges()
     assert F.allclose(src1, src2)
     assert F.allclose(dst1, dst2)
 
-    dataset = data.TreeCycles()
+    dataset = data.TreeCycleDataset()
     assert dataset.num_classes == 2
     g = dataset[0]
     assert 'label' in g.ndata
     assert 'feat' in g.ndata
 
-    g1 = data.TreeCycles(force_reload=True, seed=0)[0]
+    g1 = data.TreeCycleDataset(force_reload=True, seed=0)[0]
     src1, dst1 = g1.edges()
-    g2 = data.TreeCycles(force_reload=True, seed=0)[0]
+    g2 = data.TreeCycleDataset(force_reload=True, seed=0)[0]
     src2, dst2 = g2.edges()
     assert F.allclose(src1, src2)
     assert F.allclose(dst1, dst2)
 
-    dataset = data.TreeGrids()
+    dataset = data.TreeGridDataset()
     assert dataset.num_classes == 2
     g = dataset[0]
     assert 'label' in g.ndata
     assert 'feat' in g.ndata
 
-    g1 = data.TreeGrids(force_reload=True, seed=0)[0]
+    g1 = data.TreeGridDataset(force_reload=True, seed=0)[0]
     src1, dst1 = g1.edges()
-    g2 = data.TreeGrids(force_reload=True, seed=0)[0]
+    g2 = data.TreeGridDataset(force_reload=True, seed=0)[0]
     src2, dst2 = g2.edges()
     assert F.allclose(src1, src2)
     assert F.allclose(dst1, dst2)
 
-    dataset = data.BA2Motifs()
+    dataset = data.BA2MotifDataset()
     assert dataset.num_classes == 2
     g, label = dataset[0]
     assert 'feat' in g.ndata

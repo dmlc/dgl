@@ -13,7 +13,7 @@ from ..batch import batch
 from ..convert import graph
 from ..transforms import reorder_graph
 
-class BAShapes(DGLBuiltinDataset):
+class BAShapeDataset(DGLBuiltinDataset):
     r"""BA-SHAPES dataset from `GNNExplainer: Generating Explanations for Graph Neural Networks
     <https://arxiv.org/abs/1903.03894>`__
 
@@ -62,8 +62,8 @@ class BAShapes(DGLBuiltinDataset):
     Examples
     --------
 
-    >>> from dgl.data import BAShapes
-    >>> dataset = BAShapes()
+    >>> from dgl.data import BAShapeDataset
+    >>> dataset = BAShapeDataset()
     >>> dataset.num_classes
     4
     >>> g = dataset[0]
@@ -85,12 +85,12 @@ class BAShapes(DGLBuiltinDataset):
         self.num_motifs = num_motifs
         self.perturb_ratio = perturb_ratio
         self.seed = seed
-        super(BAShapes, self).__init__(name='BA-SHAPES',
-                                       url=None,
-                                       raw_dir=raw_dir,
-                                       force_reload=force_reload,
-                                       verbose=verbose,
-                                       transform=transform)
+        super(BAShapeDataset, self).__init__(name='BA-SHAPES',
+                                             url=None,
+                                             raw_dir=raw_dir,
+                                             force_reload=force_reload,
+                                             verbose=verbose,
+                                             transform=transform)
 
     def process(self):
         g = nx.barabasi_albert_graph(self.num_base_nodes, self.num_base_edges_per_node, self.seed)
@@ -179,7 +179,7 @@ class BAShapes(DGLBuiltinDataset):
     def num_classes(self):
         return 4
 
-class BACommunity(DGLBuiltinDataset):
+class BACommunityDataset(DGLBuiltinDataset):
     r"""BA-COMMUNITY dataset from `GNNExplainer: Generating Explanations for Graph Neural Networks
     <https://arxiv.org/abs/1903.03894>`__
 
@@ -233,8 +233,8 @@ class BACommunity(DGLBuiltinDataset):
     Examples
     --------
 
-    >>> from dgl.data import BACommunity
-    >>> dataset = BACommunity()
+    >>> from dgl.data import BACommunityDataset
+    >>> dataset = BACommunityDataset()
     >>> dataset.num_classes
     8
     >>> g = dataset[0]
@@ -258,12 +258,12 @@ class BACommunity(DGLBuiltinDataset):
         self.perturb_ratio = perturb_ratio
         self.num_inter_edges = num_inter_edges
         self.seed = seed
-        super(BACommunity, self).__init__(name='BA-COMMUNITY',
-                                          url=None,
-                                          raw_dir=raw_dir,
-                                          force_reload=force_reload,
-                                          verbose=verbose,
-                                          transform=transform)
+        super(BACommunityDataset, self).__init__(name='BA-COMMUNITY',
+                                                 url=None,
+                                                 raw_dir=raw_dir,
+                                                 force_reload=force_reload,
+                                                 verbose=verbose,
+                                                 transform=transform)
 
     def process(self):
         if self.seed is not None:
@@ -271,18 +271,18 @@ class BACommunity(DGLBuiltinDataset):
             np.random.seed(self.seed)
 
         # Construct two BA-SHAPES graphs
-        g1 = BAShapes(self.num_base_nodes,
-                      self.num_base_edges_per_node,
-                      self.num_motifs,
-                      self.perturb_ratio,
-                      force_reload=True,
-                      verbose=False)[0]
-        g2 = BAShapes(self.num_base_nodes,
-                      self.num_base_edges_per_node,
-                      self.num_motifs,
-                      self.perturb_ratio,
-                      force_reload=True,
-                      verbose=False)[0]
+        g1 = BAShapeDataset(self.num_base_nodes,
+                            self.num_base_edges_per_node,
+                            self.num_motifs,
+                            self.perturb_ratio,
+                            force_reload=True,
+                            verbose=False)[0]
+        g2 = BAShapeDataset(self.num_base_nodes,
+                            self.num_base_edges_per_node,
+                            self.num_motifs,
+                            self.perturb_ratio,
+                            force_reload=True,
+                            verbose=False)[0]
 
         # Join them and randomly add edges between them
         g = batch([g1, g2])
@@ -337,7 +337,7 @@ class BACommunity(DGLBuiltinDataset):
     def num_classes(self):
         return 8
 
-class TreeCycles(DGLBuiltinDataset):
+class TreeCycleDataset(DGLBuiltinDataset):
     r"""TREE-CYCLES dataset from `GNNExplainer: Generating Explanations for Graph Neural Networks
     <https://arxiv.org/abs/1903.03894>`__
 
@@ -382,8 +382,8 @@ class TreeCycles(DGLBuiltinDataset):
     Examples
     --------
 
-    >>> from dgl.data import TreeCycles
-    >>> dataset = TreeCycles()
+    >>> from dgl.data import TreeCycleDataset
+    >>> dataset = TreeCycleDataset()
     >>> dataset.num_classes
     2
     >>> g = dataset[0]
@@ -403,12 +403,12 @@ class TreeCycles(DGLBuiltinDataset):
         self.num_motifs = num_motifs
         self.perturb_ratio = perturb_ratio
         self.seed = seed
-        super(TreeCycles, self).__init__(name='TREE-CYCLES',
-                                         url=None,
-                                         raw_dir=raw_dir,
-                                         force_reload=force_reload,
-                                         verbose=verbose,
-                                         transform=transform)
+        super(TreeCycleDataset, self).__init__(name='TREE-CYCLES',
+                                               url=None,
+                                               raw_dir=raw_dir,
+                                               force_reload=force_reload,
+                                               verbose=verbose,
+                                               transform=transform)
 
     def process(self):
         if self.seed is not None:
@@ -499,7 +499,7 @@ class TreeCycles(DGLBuiltinDataset):
     def num_classes(self):
         return 2
 
-class TreeGrids(DGLBuiltinDataset):
+class TreeGridDataset(DGLBuiltinDataset):
     r"""TREE-GRIDS dataset from `GNNExplainer: Generating Explanations for Graph Neural Networks
     <https://arxiv.org/abs/1903.03894>`__
 
@@ -544,8 +544,8 @@ class TreeGrids(DGLBuiltinDataset):
     Examples
     --------
 
-    >>> from dgl.data import TreeGrids
-    >>> dataset = TreeGrids()
+    >>> from dgl.data import TreeGridDataset
+    >>> dataset = TreeGridDataset()
     >>> dataset.num_classes
     2
     >>> g = dataset[0]
@@ -565,12 +565,12 @@ class TreeGrids(DGLBuiltinDataset):
         self.num_motifs = num_motifs
         self.perturb_ratio = perturb_ratio
         self.seed = seed
-        super(TreeGrids, self).__init__(name='TREE-GRIDS',
-                                        url=None,
-                                        raw_dir=raw_dir,
-                                        force_reload=force_reload,
-                                        verbose=verbose,
-                                        transform=transform)
+        super(TreeGridDataset, self).__init__(name='TREE-GRIDS',
+                                              url=None,
+                                              raw_dir=raw_dir,
+                                              force_reload=force_reload,
+                                              verbose=verbose,
+                                              transform=transform)
 
     def process(self):
         if self.seed is not None:
@@ -657,7 +657,7 @@ class TreeGrids(DGLBuiltinDataset):
     def num_classes(self):
         return 2
 
-class BA2Motifs(DGLBuiltinDataset):
+class BA2MotifDataset(DGLBuiltinDataset):
     r"""BA-2motifs dataset from `Parameterized Explainer for Graph Neural Network
     <https://arxiv.org/abs/2011.04573>`__
 
@@ -690,8 +690,8 @@ class BA2Motifs(DGLBuiltinDataset):
     Examples
     --------
 
-    >>> from dgl.data import BA2Motifs
-    >>> dataset = BA2Motifs()
+    >>> from dgl.data import BA2MotifDataset
+    >>> dataset = BA2MotifDataset()
     >>> dataset.num_classes
     2
     >>> # Get the first graph and its label
@@ -703,12 +703,12 @@ class BA2Motifs(DGLBuiltinDataset):
                  force_reload=False,
                  verbose=True,
                  transform=None):
-        super(BA2Motifs, self).__init__(name='BA-2motifs',
-                                        url=_get_dgl_url('dataset/BA-2motif.pkl'),
-                                        raw_dir=raw_dir,
-                                        force_reload=force_reload,
-                                        verbose=verbose,
-                                        transform=transform)
+        super(BA2MotifDataset, self).__init__(name='BA-2motifs',
+                                              url=_get_dgl_url('dataset/BA-2motif.pkl'),
+                                              raw_dir=raw_dir,
+                                              force_reload=force_reload,
+                                              verbose=verbose,
+                                              transform=transform)
 
     def download(self):
         r""" Automatically download data."""

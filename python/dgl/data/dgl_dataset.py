@@ -17,7 +17,7 @@ class DGLDataset(object):
       1. Check whether there is a dataset cache on disk
          (already processed and stored on the disk) by
          invoking ``has_cache()``. If true, goto 5.
-      2. Call ``download()`` to download the data.
+      2. Call ``download()`` to download the data if ``url`` is not None.
       3. Call ``process()`` to process the data.
       4. Call ``save()`` to save the processed dataset on disk and goto 6.
       5. Call ``load()`` to load the processed dataset from disk.
@@ -31,7 +31,7 @@ class DGLDataset(object):
     name : str
         Name of the dataset
     url : str
-        Url to download the raw dataset
+        Url to download the raw dataset. Default: None
     raw_dir : str
         Specifying the directory that will store the
         downloaded data or the directory that

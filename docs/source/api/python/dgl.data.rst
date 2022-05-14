@@ -47,11 +47,11 @@ Datasets for node classification/regression tasks
     FraudDataset
     FraudYelpDataset
     FraudAmazonDataset
-    BAShapes
-    BACommunity
-    TreeCycles
-    TreeGrids
-    BA2Motifs
+    BAShapeDataset
+    BACommunityDataset
+    TreeCycleDataset
+    TreeGridDataset
+    BA2MotifDataset
 
 Edge Prediction Datasets
 ---------------------------------------
