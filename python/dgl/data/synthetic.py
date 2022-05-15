@@ -1,4 +1,4 @@
-"""Synthetic datasets for developing GNN explainability approaches."""
+"""Synthetic graph datasets."""
 import math
 import networkx as nx
 import numpy as np
@@ -192,7 +192,7 @@ class BACommunityDataset(DGLBuiltinDataset):
     - Perturb the graph by adding random edges.
     - Nodes are assigned to 4 classes. Nodes of label 0 belong to the base BA graph. Nodes of
       label 1, 2, 3 are separately at the middle, bottom, or top of houses.
-    - Generate normally distributed features.
+    - Generate normally distributed features of length 10
     - Repeat the above steps to generate another graph. Its nodes are assigned to class
       4, 5, 6, 7. Its node features are generated with a distinct normal distribution.
     - Join the two graphs by randomly adding edges between them.
@@ -345,7 +345,7 @@ class TreeCycleDataset(DGLBuiltinDataset):
     following steps in order.
 
     - Construct a balanced binary tree as the base graph.
-    - Construct a set of six-node cycle motifs.
+    - Construct a set of cycle motifs.
     - Attach the motifs to randomly selected nodes of the base graph.
     - Perturb the graph by adding random edges.
     - Generate constant feature for all nodes, which is 1.
@@ -357,6 +357,8 @@ class TreeCycleDataset(DGLBuiltinDataset):
         Height of the balanced binary tree. Default: 8
     num_motifs : int, optional
         Number of cycle motifs to use. Default: 60
+    cycle_size : int, optional
+        Number of nodes in a cycle motif. Default: 6
     perturb_ratio : float, optional
         Number of random edges to add in perturbation divided by the
         number of original edges in the graph. Default: 0.01
@@ -393,6 +395,7 @@ class TreeCycleDataset(DGLBuiltinDataset):
     def __init__(self,
                  tree_height=8,
                  num_motifs=60,
+                 cycle_size=6,
                  perturb_ratio=0.01,
                  seed=None,
                  raw_dir=None,
@@ -401,6 +404,7 @@ class TreeCycleDataset(DGLBuiltinDataset):
                  transform=None):
         self.tree_height = tree_height
         self.num_motifs = num_motifs
+        self.cycle_size = cycle_size
         self.perturb_ratio = perturb_ratio
         self.seed = seed
         super(TreeCycleDataset, self).__init__(name='TREE-CYCLES',
@@ -424,7 +428,6 @@ class TreeCycleDataset(DGLBuiltinDataset):
         # The motifs will be evenly attached to the nodes in the base graph.
         spacing = math.floor(n / self.num_motifs)
 
-        cycle_size = 6
         for motif_id in range(self.num_motifs):
             # Construct a six-node cycle
             motif_edges = [(n + i, n + i + 1) for i in range(5)]
@@ -434,7 +437,7 @@ class TreeCycleDataset(DGLBuiltinDataset):
             dst.extend(motif_dst)
 
             # Nodes in cycles belong to class 1
-            node_labels.extend([1] * cycle_size)
+            node_labels.extend([1] * self.cycle_size)
 
             # Attach the motif to the base tree graph
             anchor = int(motif_id * spacing)
@@ -447,7 +450,7 @@ class TreeCycleDataset(DGLBuiltinDataset):
                 src.append(n + a)
                 dst.append(anchor + b)
 
-            n += cycle_size
+            n += self.cycle_size
 
         g = graph((src, dst), num_nodes=n)
 
@@ -507,7 +510,7 @@ class TreeGridDataset(DGLBuiltinDataset):
     following steps in order.
 
     - Construct a balanced binary tree as the base graph.
-    - Construct a set of three-by-three grid motifs.
+    - Construct a set of n-by-n grid motifs.
     - Attach the motifs to randomly selected nodes of the base graph.
     - Perturb the graph by adding random edges.
     - Generate constant feature for all nodes, which is 1.
@@ -519,6 +522,8 @@ class TreeGridDataset(DGLBuiltinDataset):
         Height of the balanced binary tree. Default: 8
     num_motifs : int, optional
         Number of grid motifs to use. Default: 80
+    grid_size : int, optional
+        The number of nodes in a grid motif will be grid_size ^ 2. Default: 3
     perturb_ratio : float, optional
         Number of random edges to add in perturbation divided by the
         number of original edges in the graph. Default: 0.1
@@ -555,6 +560,7 @@ class TreeGridDataset(DGLBuiltinDataset):
     def __init__(self,
                  tree_height=8,
                  num_motifs=80,
+                 grid_size=3,
                  perturb_ratio=0.1,
                  seed=None,
                  raw_dir=None,
@@ -563,6 +569,7 @@ class TreeGridDataset(DGLBuiltinDataset):
                  transform=None):
         self.tree_height = tree_height
         self.num_motifs = num_motifs
+        self.grid_size = grid_size
         self.perturb_ratio = perturb_ratio
         self.seed = seed
         super(TreeGridDataset, self).__init__(name='TREE-GRIDS',
@@ -586,8 +593,8 @@ class TreeGridDataset(DGLBuiltinDataset):
         # The motifs will be evenly attached to the nodes in the base graph.
         spacing = math.floor(n / self.num_motifs)
 
-        # Construct a three-by-three grid
-        motif_g = nx.grid_graph([3, 3])
+        # Construct an n-by-n grid
+        motif_g = nx.grid_graph([self.grid_size, self.grid_size])
         grid_size = nx.number_of_nodes(motif_g)
         motif_g = nx.convert_node_labels_to_integers(motif_g, first_label=0)
         motif_edges = list(motif_g.edges())
@@ -661,7 +668,7 @@ class BA2MotifDataset(DGLBuiltinDataset):
     r"""BA-2motifs dataset from `Parameterized Explainer for Graph Neural Network
     <https://arxiv.org/abs/2011.04573>`__
 
-    This is a synthetic dataset of 800 graphs for graph classification. It was generated by
+    This is a synthetic dataset for graph classification. It was generated by
     performing the following steps in order.
 
     - Construct 1000 base Barabási–Albert (BA) graphs.

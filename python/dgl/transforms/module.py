@@ -1526,18 +1526,20 @@ class SIGNDiffusion(BaseTransform):
     ----------
     k : int
         The maximum number of times for node feature diffusion.
-    feat_name : str, optional
-        :attr:`g.ndata[{feat_name}]` should store the input node features.
-        :attr:`g.ndata[{feat_name}_i]` will store the result of diffusing
-        input node features for i times.
+    in_feat_name : str, optional
+        :attr:`g.ndata[{in_feat_name}]` should store the input node features. Default: 'feat'
+    out_feat_name : str, optional
+        :attr:`g.ndata[{out_feat_name}_i]` will store the result of diffusing
+        input node features for i times. Default: 'out_feat'
     eweight_name : str, optional
         Name to retrieve edge weights from :attr:`g.edata`. Default: None,
         treating the graph as unweighted.
     diffuse_op : str, optional
         The diffusion operator to use, which can be 'raw', 'rw', 'gcn', or 'ppr'.
+        Default: 'raw'
     alpha : float, optional
         Restart probability if :attr:`diffuse_op` is :attr:`'ppr'`,
-        which commonly lies in :math:`[0.05, 0.2]`.
+        which commonly lies in :math:`[0.05, 0.2]`. Default: 0.2
 
     Example
     -------
@@ -1555,18 +1557,20 @@ class SIGNDiffusion(BaseTransform):
     >>> transform(g)
     Graph(num_nodes=5, num_edges=20,
           ndata_schemes={'feat': Scheme(shape=(10,), dtype=torch.float32),
-                         'feat_1': Scheme(shape=(10,), dtype=torch.float32),
-                         'feat_2': Scheme(shape=(10,), dtype=torch.float32)}
+                         'out_feat_1': Scheme(shape=(10,), dtype=torch.float32),
+                         'out_feat_2': Scheme(shape=(10,), dtype=torch.float32)}
           edata_schemes={'w': Scheme(shape=(), dtype=torch.float32)})
     """
     def __init__(self,
                  k,
-                 feat_name='feat',
+                 in_feat_name='feat',
+                 out_feat_name='out_feat',
                  eweight_name=None,
                  diffuse_op='raw',
                  alpha=0.2):
         self.k = k
-        self.feat_name = feat_name
+        self.in_feat_name = in_feat_name
+        self.out_feat_name = out_feat_name
         self.eweight_name = eweight_name
         self.diffuse_op = diffuse_op
         self.alpha = alpha
@@ -1587,7 +1591,7 @@ class SIGNDiffusion(BaseTransform):
         feat_list = self.diffuse(g)
 
         for i in range(1, self.k + 1):
-            g.ndata[self.feat_name + '_' + str(i)] = feat_list[i - 1]
+            g.ndata[self.out_feat_name + '_' + str(i)] = feat_list[i - 1]
 
     def raw(self, g):
         use_eweight = False
@@ -1597,12 +1601,12 @@ class SIGNDiffusion(BaseTransform):
         feat_list = []
         with g.local_scope():
             if use_eweight:
-                message_func = fn.u_mul_e(self.feat_name, self.eweight_name, 'm')
+                message_func = fn.u_mul_e(self.in_feat_name, self.eweight_name, 'm')
             else:
-                message_func = fn.copy_u(self.feat_name, 'm')
+                message_func = fn.copy_u(self.in_feat_name, 'm')
             for _ in range(self.k):
-                g.update_all(message_func, fn.sum('m', self.feat_name))
-                feat_list.append(g.ndata[self.feat_name])
+                g.update_all(message_func, fn.sum('m', self.in_feat_name))
+                feat_list.append(g.ndata[self.in_feat_name])
         return feat_list
 
     def rw(self, g):
@@ -1612,7 +1616,7 @@ class SIGNDiffusion(BaseTransform):
 
         feat_list = []
         with g.local_scope():
-            g.ndata['h'] = g.ndata[self.feat_name]
+            g.ndata['h'] = g.ndata[self.in_feat_name]
             if use_eweight:
                 message_func = fn.u_mul_e('h', self.eweight_name, 'm')
                 reduce_func = fn.sum('m', 'h')
@@ -1637,9 +1641,9 @@ class SIGNDiffusion(BaseTransform):
             transform(g)
 
             for _ in range(self.k):
-                g.update_all(fn.u_mul_e(self.feat_name, eweight_name, 'm'),
-                             fn.sum('m', self.feat_name))
-                feat_list.append(g.ndata[self.feat_name])
+                g.update_all(fn.u_mul_e(self.in_feat_name, eweight_name, 'm'),
+                             fn.sum('m', self.in_feat_name))
+                feat_list.append(g.ndata[self.in_feat_name])
         return feat_list
 
     def ppr(self, g):
@@ -1649,11 +1653,11 @@ class SIGNDiffusion(BaseTransform):
             transform = GCNNorm(eweight_name=eweight_name)
             transform(g)
 
-            in_feat = g.ndata[self.feat_name]
+            in_feat = g.ndata[self.in_feat_name]
             for _ in range(self.k):
-                g.update_all(fn.u_mul_e(self.feat_name, eweight_name, 'm'),
-                             fn.sum('m', self.feat_name))
-                g.ndata[self.feat_name] = (1 - self.alpha) * g.ndata[self.feat_name] +\
+                g.update_all(fn.u_mul_e(self.in_feat_name, eweight_name, 'm'),
+                             fn.sum('m', self.in_feat_name))
+                g.ndata[self.in_feat_name] = (1 - self.alpha) * g.ndata[self.in_feat_name] +\
                     self.alpha * in_feat
-                feat_list.append(g.ndata[self.feat_name])
+                feat_list.append(g.ndata[self.in_feat_name])
         return feat_list
