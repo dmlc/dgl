@@ -2356,9 +2356,9 @@ def test_module_laplacian_pe(idtype):
 @pytest.mark.parametrize('op', ['raw', 'rw', 'gcn', 'ppr'])
 def test_module_sign(g, op):
     g = g.to(F.ctx())
-    transform = dgl.SIGNDiffusion(k=2, feat_name='h', diffuse_op=op)
+    transform = dgl.SIGNDiffusion(k=2, in_feat_name='h', diffuse_op=op)
     transform(g)
-    transform = dgl.SIGNDiffusion(k=2, feat_name='h', eweight_name='scalar_w', diffuse_op=op)
+    transform = dgl.SIGNDiffusion(k=2, in_feat_name='h', eweight_name='scalar_w', diffuse_op=op)
     transform(g)
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
