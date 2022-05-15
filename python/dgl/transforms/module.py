@@ -1636,7 +1636,13 @@ class SIGNDiffusion(BaseTransform):
     def gcn(self, g):
         feat_list = []
         with g.local_scope():
-            eweight_name = 'w' if self.eweight_name is None else self.eweight_name
+            if self.eweight_name is None:
+                eweight_name = 'w'
+                if eweight_name in g.edata:
+                    g.edata.pop(eweight_name)
+            else:
+                eweight_name = self.eweight_name
+
             transform = GCNNorm(eweight_name=eweight_name)
             transform(g)
 
