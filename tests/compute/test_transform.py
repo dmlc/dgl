@@ -2398,7 +2398,28 @@ def test_module_sign(g):
     transform(g)
     assert torch.allclose(g.ndata['out_feat_1'], torch.matmul(adj_gcn, g.ndata['h']))
 
+    gcn_norm = dgl.GCNNorm('scalar_w')
+    gcn_norm(g)
+    weight_adj_gcn = weight_adj.clone()
+    weight_adj_gcn[dst, src] = g.edata['scalar_w']
+    g.edata['scalar_w'] = raw_eweight
+    transform = dgl.SIGNDiffusion(k=1, in_feat_name='h',
+                                  eweight_name='scalar_w', diffuse_op='gcn')
+    transform(g)
+    assert torch.allclose(g.ndata['out_feat_1'], torch.matmul(weight_adj_gcn, g.ndata['h']))
+
     # ppr
+    alpha = 0.2
+    transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', diffuse_op='ppr', alpha=alpha)
+    transform(g)
+    target = (1 - alpha) * torch.matmul(adj_gcn, g.ndata['h']) + alpha * g.ndata['h']
+    assert torch.allclose(g.ndata['out_feat_1'], target)
+
+    transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', eweight_name='scalar_w',
+                                  diffuse_op='ppr', alpha=alpha)
+    transform(g)
+    target = (1 - alpha) * torch.matmul(weight_adj_gcn, g.ndata['h']) + alpha * g.ndata['h']
+    assert torch.allclose(g.ndata['out_feat_1'], target)
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
 @parametrize_dtype
