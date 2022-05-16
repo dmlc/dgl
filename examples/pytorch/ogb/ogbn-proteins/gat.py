@@ -15,7 +15,7 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 from dgl.dataloading import MultiLayerFullNeighborSampler, MultiLayerNeighborSampler
-from dgl.dataloading.pytorch import NodeDataLoader
+from dgl.dataloading import DataLoader
 from matplotlib.ticker import AutoMinorLocator, MultipleLocator
 from ogb.nodeproppred import DglNodePropPredDataset, Evaluator
 from torch import nn
@@ -179,7 +179,7 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
     train_sampler = MultiLayerNeighborSampler([32 for _ in range(args.n_layers)])
     # sampler = MultiLayerFullNeighborSampler(args.n_layers)
     train_dataloader = DataLoaderWrapper(
-        NodeDataLoader(
+        DataLoader(
             graph.cpu(),
             train_idx.cpu(),
             train_sampler,
@@ -191,7 +191,7 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
     eval_sampler = MultiLayerNeighborSampler([100 for _ in range(args.n_layers)])
     # sampler = MultiLayerFullNeighborSampler(args.n_layers)
     eval_dataloader = DataLoaderWrapper(
-        NodeDataLoader(
+        DataLoader(
             graph.cpu(),
             torch.cat([train_idx.cpu(), val_idx.cpu(), test_idx.cpu()]),
             eval_sampler,

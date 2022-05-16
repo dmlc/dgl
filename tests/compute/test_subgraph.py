@@ -33,7 +33,18 @@ def test_edge_subgraph():
     # Test when the graph has no node data and edge data.
     g = generate_graph(add_data=False)
     eid = [0, 2, 3, 6, 7, 9]
+
+    # relabel=True
     sg = g.edge_subgraph(eid)
+    assert F.array_equal(sg.ndata[dgl.NID], F.tensor([0, 2, 4, 5, 1, 9], g.idtype))
+    assert F.array_equal(sg.edata[dgl.EID], F.tensor(eid, g.idtype))
+    sg.ndata['h'] = F.arange(0, sg.number_of_nodes())
+    sg.edata['h'] = F.arange(0, sg.number_of_edges())
+
+    # relabel=False
+    sg = g.edge_subgraph(eid, relabel_nodes=False)
+    assert g.number_of_nodes() == sg.number_of_nodes()
+    assert F.array_equal(sg.edata[dgl.EID], F.tensor(eid, g.idtype))
     sg.ndata['h'] = F.arange(0, sg.number_of_nodes())
     sg.edata['h'] = F.arange(0, sg.number_of_edges())
 
@@ -655,4 +666,5 @@ def test_uva_subgraph(idtype, device):
     g.unpin_memory_()
 
 if __name__ == '__main__':
-    test_uva_subgraph(F.int64, F.cpu())
+    test_edge_subgraph()
+    # test_uva_subgraph(F.int64, F.cpu())

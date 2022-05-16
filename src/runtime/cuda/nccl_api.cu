@@ -445,13 +445,13 @@ NDArray SparsePull(
   // and then index select them into place
   Workspace<DType> filled_response_value(device, ctx,
       response_prefix_host.back()*num_feat);
-  if (request_prefix_host.back() > 0) {
+  if (response_prefix_host.back() > 0) {
     dim3 block(256, 1);
     while (block.x >= 2*num_feat) {
         block.x /= 2;
         block.y *= 2;
     }
-    const dim3 grid((request_prefix_host.back()+block.y-1)/block.y);
+    const dim3 grid((response_prefix_host.back()+block.y-1)/block.y);
 
     aten::impl::IndexSelectMultiKernel<<<grid, block, 0, stream>>>(
         static_cast<const DType*>(local_tensor->data),
