@@ -126,9 +126,6 @@ def send_node_features(rank, node_data, node_features, part_ids, ntype_map):
             continue
 
         part_node_features = {}
-        #for x in ntype_map.items(): 
-        #    ntype_name = x[0]
-        #    ntype = x[1]
         for ntype_name, ntype in ntype_map.items():
             
             if (ntype_name +'/feat' in node_features) and (node_features[ntype_name+'/feat'].shape[0] > 0): 
@@ -326,6 +323,11 @@ def proc_exec(rank, world_size, params):
     """ 
     `main` function for each rank in the distributed implementation.
 
+    This function is used when one-machine is used for executing the entire pipeline. 
+    In this case, all the gloo-processes will exist on the same machine. Also, this function
+    expects that the graph input files are in single file-format. Nodes, edges, node-features and 
+    edge features each will have their own file describing the appropriate parts of the input graph.
+
     Parameters: 
     -----------
     rank : integer
@@ -344,6 +346,9 @@ def proc_exec(rank, world_size, params):
     schema_map = read_json(params.input_dir+'/'+params.schema)
     ntypes_map, ntypes = get_node_types(schema_map)
 
+    # Rank-0 process will read the graph input files (nodes, edges, node-features and edge-features). 
+    # it will uses metis partitions, node-id to partition-id mappings, to determine the node and edge
+    # ownership and sends out data to all the other non rank-0 processes.
     if rank == 0: 
         #read input graph files
         node_data, node_features, edge_data, edge_features = read_graph_files(rank, params, node_part_ids)
@@ -374,18 +379,17 @@ def proc_exec(rank, world_size, params):
 
         # Filter data owned by rank-0
         #extract only ntype, global_type_nid, global_nid 
-        #node_data = node_data[:,[0,5,6]][node_data[:,7] == 0] 
         idx = np.where(node_data[constants.OWNER_PROCESS] == 0)[0]
         for k, v in node_data.items(): 
             node_data[k] = v[idx]
 
         #extract only global_src_id, global_dst_id, global_type_eid etype
-        #edge_data = edge_data[:,[0,1,2,3]][edge_data[:,4] == 0] 
         idx = np.where(edge_data[constants.OWNER_PROCESS] == 0)[0]
         for k, v in edge_data.items(): 
             edge_data[k] = v[idx]
     else: 
-        #non-rank-0 processes receive data from rank-0
+        #Non-rank-0 processes, receives nodes, edges, node-features and edge feautres from rank-0
+        # process and creates appropriate data structures. 
         rcvd_node_data = recv_node_data(rank, 2, torch.int64)
         node_data = {}
         node_data[constants.NTYPE_ID] = rcvd_node_data[:,0]
@@ -402,11 +406,15 @@ def proc_exec(rank, world_size, params):
         node_features = recv_node_features_obj(rank, world_size)
         edge_features = {}
 
+    # From this point onwards, all the processes will follow the same execution logic and
+    # process the data which is owned by the current process. 
+    # At this time, all the processes will have all the data which it owns (nodes, edges, 
+    # node-features and edge-features).
+
     #syncronize
     dist.barrier()
 
     # assign shuffle_global ids to nodes
-    #node_data, shuffle_global_nid_start = assign_shuffle_global_nids_nodes(rank, world_size, node_data)
     assign_shuffle_global_nids_nodes(rank, world_size, node_data)
     print('Rank: ', rank, ' Done assign Global ids to nodes...')
 
@@ -469,5 +477,23 @@ def single_dev_init(rank, world_size, func_exec, params, backend="gloo"):
 
     #create Gloo Process Group
     dist.init_process_group(backend, rank=rank, world_size=world_size)
+
     #Invoke the main function to kick-off each process
     func_exec(rank, world_size, params)
+
+def multi_dev_init(params):
+    """
+    Function to be invoked when executing data loading pipeline on multiple machines
+
+    Parameters:
+    -----------
+    params : argparser object
+        argparser object providing access to command line arguments.
+    """
+    #init the gloo process group here. 
+    dist.init_prcess_group("gloo", rank=params.rank, world_size=params.world_size)
+    print('[Rank: ', params.rank, '] Done with process group initialization...')
+
+    #invoke the main function here.
+    proc_exec(params.rank, params.world_size, params)
+    print('[Rank: ', params.rank, '] Done with Distributed data processing pipeline processing.')

@@ -1,8 +1,7 @@
 import argparse
 import numpy as np
 import torch.multiprocessing as mp
-from initialize import proc_exec, single_dev_init
-from multi_data_initialize import multi_dev_init
+from initialize import proc_exec, single_dev_init, multi_dev_init
 
 def log_params(params): 
     """ Print all the command line arguments for debugging purposes.

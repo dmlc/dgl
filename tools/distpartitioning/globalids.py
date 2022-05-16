@@ -19,8 +19,8 @@ def get_shuffle_global_nids(rank, world_size, global_nids_ranks, node_data):
     global_nids_ranks : list
         list of numpy arrays (of global_nids), index of the list is the rank of the process
                     where global_nid <-> shuffle_global_nid mapping is located. 
-    node_data : numpy ndarray, integers
-        node data with additional columns inserted
+    node_data : dictionary
+        node_data is a dictionary with keys as column names and values as numpy arrays
 
     Returns:
     --------
@@ -55,20 +55,9 @@ def get_shuffle_global_nids(rank, world_size, global_nids_ranks, node_data):
     #send-recieve messages
     alltoallv_cpu(rank, world_size, recv_nodes, send_nodes)
 
-    #TODO: This code is not needed, and will be same as the sizes of the sent global node ids
-    # in the very first exchange. Please remove this piece of code. 
-    # for each of the received orig-node-id requests lookup and send out the global node id
-    #send_sizes = [len(x.tolist()) for x in recv_nodes]
-    #send_counts = list(torch.Tensor(send_sizes).type(dtype=torch.int64).chunk(world_size))
-    #recv_counts = list(torch.zeros([world_size], dtype=torch.int64).chunk(world_size))
-    #alltoall_cpu( rank, world_size, recv_counts, send_counts)
-
     # allocate buffers to receive global-ids
     recv_shuffle_global_nids = []
-    #for i in recv_counts: 
     for i in sizes: 
-        #TODO - torch.zeros(i, dtype=torch.int64)
-        #recv_shuffle_global_nids.append(torch.zeros([i.item()], dtype=torch.int64))
         recv_shuffle_global_nids.append(torch.zeros((i), dtype=torch.int64))
 
     # Use node_data to lookup global id to send over.
@@ -81,17 +70,10 @@ def get_shuffle_global_nids(rank, world_size, global_nids_ranks, node_data):
             values = node_data[constants.SHUFFLE_GLOBAL_NID][ind1]
             send_nodes.append(torch.Tensor(values).type(dtype=torch.int64))
         else:
-            #send_nodes.append(torch.Tensor(np.empty(shape=(0,))).type(dtype=torch.int64))
             send_nodes.append(torch.empty((0,), dtype=torch.int64))
 
     #send receive global-ids
     alltoallv_cpu(rank, world_size, recv_shuffle_global_nids, send_nodes)
-
-    #form the lists with global-ids and orig-node-ids
-    #recv_shuffle_global_nids = [x.tolist() for x in recv_shuffle_global_nids]
-    #shuffle_global_nids = list(itertools.chain(*recv_shuffle_global_nids))
-    #global_nids = list(itertools.chain(*global_nids_ranks))
-    #return shuffle_global_nids, global_nids 
 
     shuffle_global_nids = [x.numpy() for x in recv_shuffle_global_nids]
     global_nids = [x for x in global_nids_ranks]
@@ -113,13 +95,8 @@ def get_shuffle_global_nids_edges(rank, world_size, edge_data, node_part_ids, no
         edge_data (augmented) as read from the xxx_edges.txt file
     node_part_ids : numpy array 
         list of partition ids indexed by global node ids.
-    node_data : numpy ndarray
-        node_data (augmented) as read from xxx_nodes.txt file
-
-    Returns:
-    --------
-    numpy ndarray
-        edge_data, with two new columns (shuffle_global_src_id, shuffle_global_dst_id) which are global ids after data shuffling
+    node_data : dictionary
+        node_data, is a dictionary with keys as column_names and values as numpy arrays
     """
 
     #determine unique node-ids present locally
@@ -186,16 +163,8 @@ def assign_shuffle_global_nids_nodes(rank, world_size, node_data):
         total number of processes used in the process group
     ntype_counts: list of tuples
         list of tuples (x,y), where x=ntype and y=no. of nodes whose shuffle_global_nids are needed
-    node_data : numpy ndarray
-        node_data, as read from the graph input file (with added additional columns)
-
-    Returns:
-    --------
-    numpy ndarray
-        node_data, as received in the input arguments, and with one additional column added which
-        is the locally assigned node-id after data shuffling for its node type
-    integer
-        this integer indicates the starting id from which global ids are allocated in the current rank
+    node_data : dictionary
+        node_data is a dictionary with keys as column names and values as numpy arrays
     """
     # Compute prefix sum to determine node-id offsets
     prefix_sum_nodes = allgather_sizes([node_data[constants.GLOBAL_NID].shape[0]], world_size)
@@ -229,9 +198,6 @@ def assign_shuffle_global_nids_edges(rank, world_size, edge_data):
 
     Returns:
     --------
-    numpy ndarray
-        edge_data, as received in the arguments, with one additional column indicating the locally 
-        assigned edge id (part_local_type_eid)
     integer
         shuffle_global_eid_start, which indicates the starting value from which shuffle_global-ids are assigned to edges
         on this rank

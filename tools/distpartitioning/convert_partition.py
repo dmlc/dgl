@@ -74,7 +74,6 @@ def create_dgl_object(graph_name, num_parts, \
     etypes = [e[0] for e in etypes]
     etypes_map = {e: i for i, e in enumerate(etypes)}
 
-    max_nid = np.iinfo(np.int32).max
     node_map_val = {ntype: [] for ntype in ntypes}
     edge_map_val = {etype: [] for etype in etypes}
 
