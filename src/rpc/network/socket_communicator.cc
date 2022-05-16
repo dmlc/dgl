@@ -55,7 +55,7 @@ bool SocketSender::ConnectReceiver(const std::string& addr, int recv_id) {
   return true;
 }
 
-bool SocketSender::ConnectReceiverFinalize() {
+bool SocketSender::ConnectReceiverFinalize(const int max_try_times) {
   // Create N sockets for Receiver
   int receiver_count = static_cast<int>(receiver_addrs_.size());
   if (max_thread_count_ == 0 || max_thread_count_ > receiver_count) {
@@ -71,16 +71,16 @@ bool SocketSender::ConnectReceiverFinalize() {
     int try_count = 0;
     const char* ip = r.second.ip.c_str();
     int port = r.second.port;
-    while (bo == false && try_count < kMaxTryCount) {
+    while (bo == false && try_count < max_try_times) {
       if (client_socket->Connect(ip, port)) {
         bo = true;
       } else {
         if (try_count % 200 == 0 && try_count != 0) {
-          // every 1000 seconds show this message
-          LOG(INFO) << "Try to connect to: " << ip << ":" << port;
+          // every 600 seconds show this message
+          LOG(INFO) << "Trying to connect receiver: " << ip << ":" << port;
         }
         try_count++;
-        std::this_thread::sleep_for(std::chrono::seconds(5));
+        std::this_thread::sleep_for(std::chrono::seconds(3));
       }
     }
     if (bo == false) {
