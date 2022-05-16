@@ -138,7 +138,7 @@ class RowFeatNormalizer(BaseTransform):
 
     Case1: Row normalize features of a homogeneous graph.
 
-    >>> transform = RowFeatNormalizer()
+    >>> transform = RowFeatNormalizer(subtract_min=True)
     >>> g = dgl.rand_graph(5, 20)
     >>> g.ndata['h'] = torch.randn((g.num_nodes(), 5))
     >>> print(g.ndata['h'].sum(1))
@@ -158,7 +158,7 @@ class RowFeatNormalizer(BaseTransform):
 
     Case2: Row normalize features of a heterogeneous graph.
 
-    >>> transform = RowFeatNormalizer()
+    >>> transform = RowFeatNormalizer(subtract_min=True)
     >>> g = dgl.heterograph({
     ...     ('user', 'follows', 'user'): (torch.tensor([1, 2]), torch.tensor([3, 4])),
     ...     ('player', 'plays', 'game'): (torch.tensor([2, 2]), torch.tensor([1, 1]))
