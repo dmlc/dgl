@@ -621,13 +621,13 @@ def test_subframes(parent_idx_device, child_device):
         g = g.to(F.cpu())
     idx = F.copy_to(idx, idx_device)
     sg = g.sample_neighbors(idx, 2).to(child_device)
-    assert sg.device == sg.ndata['x'].device
-    assert sg.device == sg.edata['a'].device
+    assert sg.device == F.context(sg.ndata['x'])
+    assert sg.device == F.context(sg.edata['a'])
     assert sg.device == child_device
     if parent_device != 'uva':
         sg = g.to(child_device).sample_neighbors(F.copy_to(idx, child_device), 2)
-        assert sg.device == sg.ndata['x'].device
-        assert sg.device == sg.edata['a'].device
+        assert sg.device == F.context(sg.ndata['x'])
+        assert sg.device == F.context(sg.edata['a'])
         assert sg.device == child_device
     if parent_device == 'uva':
         g.unpin_memory_()
