@@ -2,7 +2,7 @@ import backend as F
 import dgl
 import pytest
 
-@pytest.mark.skipIf(F._default_context_str == 'cpu', reason="Need gpu for this test")
+@pytest.mark.skipif(F._default_context_str == 'cpu', reason="Need gpu for this test")
 def test_pin_unpin():
     t = F.arange(0, 100, dtype=F.int64, ctx=F.cpu())
 

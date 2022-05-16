@@ -3,7 +3,7 @@ import dgl
 import pytest
 import torch
 
-@pytest.mark.skipIf(F._default_context_str == 'cpu', reason="Need gpu for this test")
+@pytest.mark.skipif(F._default_context_str == 'cpu', reason="Need gpu for this test")
 def test_pin_noncontiguous():
     t = torch.empty([10, 100]).transpose(0, 1)
 
@@ -13,7 +13,7 @@ def test_pin_noncontiguous():
     with pytest.raises(dgl.DGLError):
         dgl.utils.pin_memory_inplace(t)
 
-@pytest.mark.skipIf(F._default_context_str == 'cpu', reason="Need gpu for this test")
+@pytest.mark.skipif(F._default_context_str == 'cpu', reason="Need gpu for this test")
 def test_pin_view():
     t = torch.empty([100, 10])
     v = t[10:20]
