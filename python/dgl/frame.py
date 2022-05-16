@@ -842,7 +842,7 @@ class Frame(MutableMapping):
         for column in self._columns.values():
             column.unpin_memory_()
 
-    def __astype_float(self, new_type):
+    def _astype_float(self, new_type):
         assert new_type in [F.float64, F.float32, F.float16], \
             "'new_type' must be floating-point type: %s" % str(new_type)
         newframe = self.clone()
@@ -859,14 +859,14 @@ class Frame(MutableMapping):
     def half(self):
         """ Return a new frame with all floating-point columns converted
         to half-precision (float16) """
-        return self.__astype_float(F.float16)
+        return self._astype_float(F.float16)
 
     def float(self):
         """ Return a new frame with all floating-point columns converted
         to single-precision (float32) """
-        return self.__astype_float(F.float32)
+        return self._astype_float(F.float32)
 
     def double(self):
         """ Return a new frame with all floating-point columns converted
         to double-precision (float64) """
-        return self.__astype_float(F.float64)
+        return self._astype_float(F.float64)
