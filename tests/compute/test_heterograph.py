@@ -980,6 +980,7 @@ def test_to_device2(g, idtype):
         assert g1.canonical_etypes == g.canonical_etypes
 
 @unittest.skipIf(F._default_context_str == 'cpu', reason="Need gpu for this test")
+@unittest.skipIf(dgl.backend.backend_name != "pytorch", reason="Pinning graph inplace only supported for PyTorch")
 @parametrize_dtype
 def test_pin_memory_(idtype):
     # TODO: rewrite this test case to accept different graphs so we
