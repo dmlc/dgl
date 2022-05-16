@@ -20,7 +20,11 @@ from collections import defaultdict
 import numpy as np
 import scipy.sparse as sparse
 import scipy.sparse.linalg
-import torch as th
+
+try:
+    import torch as th
+except ImportError:
+    pass
 
 from .._ffi.function import _init_api
 from ..base import dgl_warning, DGLError, NID, EID
