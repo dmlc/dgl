@@ -605,20 +605,17 @@ def start_bipartite_etype_sample_client(rank, tmpdir, disable_shared_mem, fanout
 
     if gpb is None:
         gpb = dist_graph.get_partition_book()
-    try:
-        sampled_graph = sample_etype_neighbors(
-            dist_graph, nodes, dgl.ETYPE, fanout)
-        block = dgl.to_block(sampled_graph, nodes)
-        if sampled_graph.num_edges() > 0:
-            block.edata[dgl.EID] = sampled_graph.edata[dgl.EID]
-    except Exception as e:
-        print(e)
-        block = None
+    sampled_graph = sample_etype_neighbors(
+        dist_graph, nodes, dgl.ETYPE, fanout)
+    block = dgl.to_block(sampled_graph, nodes)
+    if sampled_graph.num_edges() > 0:
+        block.edata[dgl.EID] = sampled_graph.edata[dgl.EID]
     dgl.distributed.exit_client()
     return block, gpb
 
 
 def check_rpc_bipartite_sampling_empty(tmpdir, num_server):
+    """sample on bipartite via sample_neighbors() which yields empty sample results"""
     generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
     g = create_random_bipartite()
@@ -651,6 +648,7 @@ def check_rpc_bipartite_sampling_empty(tmpdir, num_server):
 
 
 def check_rpc_bipartite_sampling_shuffle(tmpdir, num_server):
+    """sample on bipartite via sample_neighbors() which yields non-empty sample results"""
     generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
     g = create_random_bipartite()
@@ -717,6 +715,7 @@ def check_rpc_bipartite_sampling_shuffle(tmpdir, num_server):
 
 
 def check_rpc_bipartite_etype_sampling_empty(tmpdir, num_server):
+    """sample on bipartite via sample_etype_neighbors() which yields empty sample results"""
     generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
     g = create_random_bipartite()
@@ -750,6 +749,7 @@ def check_rpc_bipartite_etype_sampling_empty(tmpdir, num_server):
 
 
 def check_rpc_bipartite_etype_sampling_shuffle(tmpdir, num_server):
+    """sample on bipartite via sample_etype_neighbors() which yields non-empty sample results"""
     generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
     g = create_random_bipartite()
