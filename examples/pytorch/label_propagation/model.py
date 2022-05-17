@@ -41,7 +41,7 @@ class LabelPropagation(nn.Module):
                 y = torch.zeros_like(labels)
                 y[mask] = labels[mask]
             
-            last = (1 - self.alpha) * y
+            init = (1 - self.alpha) * y
             degs = g.in_degrees().float().clamp(min=1)
             norm = torch.pow(degs, -0.5).to(labels.device).unsqueeze(1)
 
@@ -49,8 +49,7 @@ class LabelPropagation(nn.Module):
                 # Assume the graphs to be undirected
                 g.ndata['h'] = y * norm
                 g.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
-                y = last + self.alpha * g.ndata.pop('h') * norm
+                y = init + self.alpha * g.ndata.pop('h') * norm
                 y = post_step(y)
-                last = (1 - self.alpha) * y
             
             return y
