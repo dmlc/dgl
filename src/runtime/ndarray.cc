@@ -78,6 +78,12 @@ struct NDArray::Internal {
   // This enables us to create NDArray from memory allocated by other
   // frameworks that are DLPack compatible
   static void DLPackDeleter(NDArray::Container* ptr) {
+    if (ptr->from_tensor_dispatcher_) {
+       if (IsDataPinned(&(ptr->dl_tensor))) {
+        UnpinData(&(ptr->dl_tensor));
+      }
+    }
+
     DLManagedTensor* tensor = static_cast<DLManagedTensor*>(ptr->manager_ctx);
     if (tensor->deleter != nullptr) {
       (*tensor->deleter)(tensor);
@@ -210,8 +216,11 @@ NDArray NDArray::Empty(std::vector<int64_t> shape,
                        DLDataType dtype,
                        DLContext ctx) {
   TensorDispatcher* td = TensorDispatcher::Global();
-  if (td->IsAvailable())
-    return td->Empty(shape, dtype, ctx);
+  if (td->IsAvailable()) {
+    auto nd = td->Empty(shape, dtype, ctx);
+    nd.data_->from_tensor_dispatcher_ = true;
+    return nd;
+  }
 
   NDArray ret = Internal::Create(shape, dtype, ctx);
   // setup memory content
