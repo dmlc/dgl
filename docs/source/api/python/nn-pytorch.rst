@@ -111,3 +111,4 @@ Utility Modules
     ~dgl.nn.pytorch.utils.JumpingKnowledge
     ~dgl.nn.pytorch.sparse_emb.NodeEmbedding
     ~dgl.nn.pytorch.explain.GNNExplainer
+    ~dgl.nn.pytorch.utils.LabelPropagation
