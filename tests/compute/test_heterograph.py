@@ -1924,6 +1924,65 @@ def test_dtype_cast(idtype):
         assert g_cast.idtype == F.int32
     test_utils.check_graph_equal(g, g_cast, check_idtype=False)
 
+def test_float_cast():
+    for t in [F.float16, F.float32, F.float64]:
+        idtype = F.int32
+        g = dgl.heterograph({
+            ('user', 'follows', 'user'): (F.tensor([0, 1, 1, 2, 2, 3], dtype=idtype),
+                                        F.tensor([0, 0, 1, 1, 2, 2], dtype=idtype)),
+            ('user', 'plays', 'game'): (F.tensor([0, 1, 1], dtype=idtype),
+                                        F.tensor([0, 0, 1], dtype=idtype))},
+            idtype=idtype, device=F.ctx())
+        uvalues = [1, 2, 3, 4]
+        gvalues = [5, 6]
+        fvalues = [7, 8, 9, 10, 11, 12]
+        pvalues = [13, 14, 15]
+        dataNamesTypes = [
+            ('a',F.float16),
+            ('b',F.float32),
+            ('c',F.float64),
+            ('d',F.int32),
+            ('e',F.int64)]
+        for name,type in dataNamesTypes:
+            g.nodes['user'].data[name] = F.copy_to(F.tensor(uvalues, dtype=type), ctx=F.ctx())
+        for name,type in dataNamesTypes:
+            g.nodes['game'].data[name] = F.copy_to(F.tensor(gvalues, dtype=type), ctx=F.ctx())
+        for name,type in dataNamesTypes:
+            g.edges['follows'].data[name] = F.copy_to(F.tensor(fvalues, dtype=type), ctx=F.ctx())
+        for name,type in dataNamesTypes:
+            g.edges['plays'].data[name] = F.copy_to(F.tensor(pvalues, dtype=type), ctx=F.ctx())
+
+        if t == F.float16:
+            g = dgl.transforms.functional.to_half(g)
+        if t == F.float32:
+            g = dgl.transforms.functional.to_float(g)
+        if t == F.float64:
+            g = dgl.transforms.functional.to_double(g)
+
+        for name,origType in dataNamesTypes:
+            # integer tensors shouldn't be converted
+            reqType = t if (origType in [F.float16,F.float32,F.float64]) else origType
+
+            values = g.nodes['user'].data[name]
+            assert values.dtype == reqType
+            assert len(values) == len(uvalues)
+            assert F.allclose(values, F.tensor(uvalues), 0, 0)
+
+            values = g.nodes['game'].data[name]
+            assert values.dtype == reqType
+            assert len(values) == len(gvalues)
+            assert F.allclose(values, F.tensor(gvalues), 0, 0)
+
+            values = g.edges['follows'].data[name]
+            assert values.dtype == reqType
+            assert len(values) == len(fvalues)
+            assert F.allclose(values, F.tensor(fvalues), 0, 0)
+
+            values = g.edges['plays'].data[name]
+            assert values.dtype == reqType
+            assert len(values) == len(pvalues)
+            assert F.allclose(values, F.tensor(pvalues), 0, 0)
+
 @parametrize_dtype
 def test_format(idtype):
     # single relation
@@ -2865,6 +2924,7 @@ if __name__ == '__main__':
     # test_isolated_ntype()
     # test_bipartite()
     # test_dtype_cast()
+    # test_float_cast()
     # test_reverse("int32")
     # test_format()
     #test_add_edges(F.int32)

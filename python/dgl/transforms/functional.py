@@ -17,6 +17,7 @@
 
 from collections.abc import Iterable, Mapping
 from collections import defaultdict
+import copy
 import numpy as np
 import scipy.sparse as sparse
 import scipy.sparse.linalg
@@ -3529,5 +3530,56 @@ def laplacian_pe(g, k):
     PE = F.astype(F.tensor(rand_sign * topk_EigVec), F.float32)
 
     return PE
+
+def to_half(g):
+    r"""Cast this graph to use float16 (half-precision) for any
+    floating-point edge and node feature data.
+
+    A shallow copy is returned so that the original graph is not modified.
+    Feature tensors that are not floating-point will not be modified.
+
+    Returns
+    -------
+    DGLHeteroGraph
+        Clone of graph with the feature data converted to float16.
+    """
+    ret = copy.copy(g)
+    ret._edge_frames = [frame.half() for frame in ret._edge_frames]
+    ret._node_frames = [frame.half() for frame in ret._node_frames]
+    return ret
+
+def to_float(g):
+    r"""Cast this graph to use float32 (single-precision) for any
+    floating-point edge and node feature data.
+
+    A shallow copy is returned so that the original graph is not modified.
+    Feature tensors that are not floating-point will not be modified.
+
+    Returns
+    -------
+    DGLHeteroGraph
+        Clone of graph with the feature data converted to float32.
+    """
+    ret = copy.copy(g)
+    ret._edge_frames = [frame.float() for frame in ret._edge_frames]
+    ret._node_frames = [frame.float() for frame in ret._node_frames]
+    return ret
+
+def to_double(g):
+    r"""Cast this graph to use float64 (double-precision) for any
+    floating-point edge and node feature data.
+
+    A shallow copy is returned so that the original graph is not modified.
+    Feature tensors that are not floating-point will not be modified.
+
+    Returns
+    -------
+    DGLHeteroGraph
+        Clone of graph with the feature data converted to float64.
+    """
+    ret = copy.copy(g)
+    ret._edge_frames = [frame.double() for frame in ret._edge_frames]
+    ret._node_frames = [frame.double() for frame in ret._node_frames]
+    return ret
 
 _init_api("dgl.transform", __name__)
