@@ -39,6 +39,7 @@ Conv Layers
     ~dgl.nn.pytorch.conv.GroupRevRes
     ~dgl.nn.pytorch.conv.EGNNConv
     ~dgl.nn.pytorch.conv.PNAConv
+    ~dgl.nn.pytorch.conv.DGNConv
 
 Dense Conv Layers
 ----------------------------------------
