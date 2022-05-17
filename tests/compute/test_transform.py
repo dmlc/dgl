@@ -24,6 +24,8 @@ import dgl.partition
 import backend as F
 import unittest
 import math
+import pytest
+from test_utils.graph_cases import get_cases
 from utils import parametrize_dtype
 
 from test_heterograph import create_test_heterograph3, create_test_heterograph4, create_test_heterograph5
@@ -2351,6 +2353,75 @@ def test_module_laplacian_pe(idtype):
         assert F.allclose(new_g.ndata['lappe'].abs(), tgt)
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
+@pytest.mark.parametrize('g', get_cases(['has_scalar_e_feature']))
+def test_module_sign(g):
+    import torch
+
+    ctx = F.ctx()
+    g = g.to(ctx)
+    adj = g.adj(transpose=True, scipy_fmt='coo').todense()
+    adj = torch.tensor(adj).float().to(ctx)
+
+    weight_adj = g.adj(transpose=True, scipy_fmt='coo').astype(float).todense()
+    weight_adj = torch.tensor(weight_adj).float().to(ctx)
+    src, dst = g.edges()
+    src, dst = src.long(), dst.long()
+    weight_adj[dst, src] = g.edata['scalar_w']
+
+    # raw
+    transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', diffuse_op='raw')
+    transform(g)
+    assert torch.allclose(g.ndata['out_feat_1'], torch.matmul(adj, g.ndata['h']))
+
+    transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', eweight_name='scalar_w', diffuse_op='raw')
+    transform(g)
+    assert torch.allclose(g.ndata['out_feat_1'], torch.matmul(weight_adj, g.ndata['h']))
+
+    # rw
+    adj_rw = torch.matmul(torch.diag(1 / adj.sum(dim=1)), adj)
+    transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', diffuse_op='rw')
+    transform(g)
+    assert torch.allclose(g.ndata['out_feat_1'], torch.matmul(adj_rw, g.ndata['h']))
+
+    weight_adj_rw = torch.matmul(torch.diag(1 / weight_adj.sum(dim=1)), weight_adj)
+    transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', eweight_name='scalar_w', diffuse_op='rw')
+    transform(g)
+    assert torch.allclose(g.ndata['out_feat_1'], torch.matmul(weight_adj_rw, g.ndata['h']))
+
+    # gcn
+    raw_eweight = g.edata['scalar_w']
+    gcn_norm = dgl.GCNNorm()
+    gcn_norm(g)
+    adj_gcn = adj.clone()
+    adj_gcn[dst, src] = g.edata.pop('w')
+    transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', diffuse_op='gcn')
+    transform(g)
+    assert torch.allclose(g.ndata['out_feat_1'], torch.matmul(adj_gcn, g.ndata['h']))
+
+    gcn_norm = dgl.GCNNorm('scalar_w')
+    gcn_norm(g)
+    weight_adj_gcn = weight_adj.clone()
+    weight_adj_gcn[dst, src] = g.edata['scalar_w']
+    g.edata['scalar_w'] = raw_eweight
+    transform = dgl.SIGNDiffusion(k=1, in_feat_name='h',
+                                  eweight_name='scalar_w', diffuse_op='gcn')
+    transform(g)
+    assert torch.allclose(g.ndata['out_feat_1'], torch.matmul(weight_adj_gcn, g.ndata['h']))
+
+    # ppr
+    alpha = 0.2
+    transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', diffuse_op='ppr', alpha=alpha)
+    transform(g)
+    target = (1 - alpha) * torch.matmul(adj_gcn, g.ndata['h']) + alpha * g.ndata['h']
+    assert torch.allclose(g.ndata['out_feat_1'], target)
+
+    transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', eweight_name='scalar_w',
+                                  diffuse_op='ppr', alpha=alpha)
+    transform(g)
+    target = (1 - alpha) * torch.matmul(weight_adj_gcn, g.ndata['h']) + alpha * g.ndata['h']
+    assert torch.allclose(g.ndata['out_feat_1'], target)
+
+@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
 @parametrize_dtype
 def test_module_row_feat_normalizer(idtype):
     # Case1: Normalize features of a homogeneous graph.
@@ -2415,8 +2486,6 @@ def test_module_feat_mask(idtype):
     assert g.ndata['h']['player'].shape == (3, 5)
     assert g.edata['w'][('user', 'follows', 'user')].shape == (2, 5)
     assert g.edata['w'][('player', 'plays', 'game')].shape == (2, 5)
-
-
 
 if __name__ == '__main__':
     test_partition_with_halo()

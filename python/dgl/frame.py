@@ -182,11 +182,12 @@ class Column(TensorStorage):
     index : Tensor
         Index tensor
     """
-    def __init__(self, storage, scheme=None, index=None, device=None):
+    def __init__(self, storage, scheme=None, index=None, device=None, deferred_dtype=None):
         super().__init__(storage)
         self.scheme = scheme if scheme else infer_scheme(storage)
         self.index = index
         self.device = device
+        self.deferred_dtype = deferred_dtype
         self.pinned_by_dgl = False
 
     def __len__(self):
@@ -230,6 +231,11 @@ class Column(TensorStorage):
         if self.device is not None:
             self.storage = F.copy_to(self.storage, self.device[0], **self.device[1])
             self.device = None
+
+        # convert data to the right type
+        if self.deferred_dtype is not None:
+            self.storage = F.astype(self.storage, self.deferred_dtype)
+            self.deferred_dtype = None
         return self.storage
 
     @data.setter
@@ -256,6 +262,49 @@ class Column(TensorStorage):
         """
         col = self.clone()
         col.device = (device, kwargs)
+        return col
+
+    @property
+    def dtype(self):
+        """ Return the effective data type of this Column """
+        if self.deferred_dtype is not None:
+            return self.deferred_dtype
+        return self.storage.dtype
+
+    def astype(self, new_dtype):
+        """ Return a new column such that when its data is requested,
+        it will be converted to new_dtype.
+
+        Parameters
+        ----------
+        new_dtype : Framework-specific type object
+            The type to convert the data to.
+
+        Returns
+        -------
+        Column
+            A new column
+        """
+        col = self.clone()
+        if col.dtype != new_dtype:
+            # If there is already a pending conversion, ensure that the pending
+            # conversion and transfer/sampling are done before this new conversion.
+            if col.deferred_dtype is not None:
+                _ = col.data
+
+            if (col.device is None) and (col.index is None):
+                # Do the conversion immediately if no device transfer or index
+                # sampling is pending.  The assumption is that this is most
+                # likely to be the desired behaviour, such as converting an
+                # entire graph's feature data to float16 (half) before transfer
+                # to device when training, or converting back to float32 (float)
+                # after fetching the data to a device.
+                col.storage = F.astype(col.storage, new_dtype)
+            else:
+                # Defer the conversion if there is a pending transfer or sampling.
+                # This is so that feature data that never gets accessed on the
+                # device never needs to be transferred or sampled or converted.
+                col.deferred_dtype = new_dtype
         return col
 
     def __getitem__(self, rowids):
@@ -329,7 +378,7 @@ class Column(TensorStorage):
 
     def clone(self):
         """Return a shallow copy of this column."""
-        return Column(self.storage, self.scheme, self.index, self.device)
+        return Column(self.storage, self.scheme, self.index, self.device, self.deferred_dtype)
 
     def deepclone(self):
         """Return a deepcopy of this column.
@@ -358,13 +407,13 @@ class Column(TensorStorage):
             Sub-column
         """
         if self.index is None:
-            return Column(self.storage, self.scheme, rowids, self.device)
+            return Column(self.storage, self.scheme, rowids, self.device, self.deferred_dtype)
         else:
             index = self.index
             if not isinstance(index, _LazyIndex):
                 index = _LazyIndex(self.index)
             index = index.slice(rowids)
-            return Column(self.storage, self.scheme, index, self.device)
+            return Column(self.storage, self.scheme, index, self.device, self.deferred_dtype)
 
     @staticmethod
     def create(data):
@@ -792,3 +841,32 @@ class Frame(MutableMapping):
         if necessary."""
         for column in self._columns.values():
             column.unpin_memory_()
+
+    def _astype_float(self, new_type):
+        assert new_type in [F.float64, F.float32, F.float16], \
+            "'new_type' must be floating-point type: %s" % str(new_type)
+        newframe = self.clone()
+        new_columns = {}
+        for name, column in self._columns.items():
+            dtype = column.dtype
+            if dtype != new_type and dtype in [F.float64, F.float32, F.float16]:
+                new_columns[name] = column.astype(new_type)
+            else:
+                new_columns[name] = column
+        newframe._columns = new_columns
+        return newframe
+
+    def half(self):
+        """ Return a new frame with all floating-point columns converted
+        to half-precision (float16) """
+        return self._astype_float(F.float16)
+
+    def float(self):
+        """ Return a new frame with all floating-point columns converted
+        to single-precision (float32) """
+        return self._astype_float(F.float32)
+
+    def double(self):
+        """ Return a new frame with all floating-point columns converted
+        to double-precision (float64) """
+        return self._astype_float(F.float64)
