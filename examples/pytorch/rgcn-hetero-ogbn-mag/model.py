@@ -321,9 +321,8 @@ class EntityClassify(nn.Module):
                 if i < self._num_layers - 1:
                     h = self._apply_layers(i, h)
 
-                for ntype in h:
-                    if ntype in out_nodes:
-                        y[ntype][out_nodes[ntype]] = h[ntype]
+                for ntype in out_nodes:
+                    y[ntype][out_nodes[ntype]] = h[ntype]
 
             x = y
 
