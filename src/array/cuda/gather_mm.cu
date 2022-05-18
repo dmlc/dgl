@@ -26,6 +26,7 @@ cublasStatus_t cublasGemm(cublasHandle_t handle, cublasOperation_t transa,
   return CUBLAS_STATUS_EXECUTION_FAILED;
 }
 
+#ifdef USE_FP16
 template <>
 cublasStatus_t cublasGemm<__half>(cublasHandle_t handle, cublasOperation_t transa,
     cublasOperation_t transb, int m, int n, int k,
@@ -35,6 +36,7 @@ cublasStatus_t cublasGemm<__half>(cublasHandle_t handle, cublasOperation_t trans
   return cublasHgemm(handle, transa, transb, m, n, k, alpha, A, lda,
       B, ldb, beta, C, ldc);
 }
+#endif
 
 template <>
 cublasStatus_t cublasGemm<float>(cublasHandle_t handle, cublasOperation_t transa,
