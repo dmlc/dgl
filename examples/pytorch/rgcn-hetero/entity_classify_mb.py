@@ -97,14 +97,14 @@ def main(args):
 
     # train sampler
     sampler = dgl.dataloading.MultiLayerNeighborSampler([args.fanout] * args.n_layers)
-    loader = dgl.dataloading.NodeDataLoader(
+    loader = dgl.dataloading.DataLoader(
         g, {category: train_idx}, sampler,
         batch_size=args.batch_size, shuffle=True, num_workers=0)
 
     # validation sampler
     # we do not use full neighbor to save computation resources
     val_sampler = dgl.dataloading.MultiLayerNeighborSampler([args.fanout] * args.n_layers)
-    val_loader = dgl.dataloading.NodeDataLoader(
+    val_loader = dgl.dataloading.DataLoader(
         g, {category: val_idx}, val_sampler,
         batch_size=args.batch_size, shuffle=True, num_workers=0)
 

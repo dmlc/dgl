@@ -10,6 +10,7 @@
 
 #include <string>
 
+#include "../net_type.h"
 #include "msg_queue.h"
 
 namespace dgl {
@@ -23,7 +24,7 @@ namespace network {
  * networking libraries such TCP socket and MPI. One Sender can connect to 
  * multiple receivers and it can send data to specified receiver via receiver's ID.
  */
-class Sender {
+class Sender : public rpc::RPCSender {
  public:
   /*!
    * \brief Sender constructor
@@ -41,23 +42,6 @@ class Sender {
   virtual ~Sender() {}
 
   /*!
-   * \brief Add receiver's address and ID to the sender's namebook
-   * \param addr Networking address, e.g., 'socket://127.0.0.1:50091', 'mpi://0'
-   * \param id receiver's ID
-   *
-   * AddReceiver() is not thread-safe and only one thread can invoke this API.
-   */
-  virtual void AddReceiver(const char* addr, int id) = 0;
-
-  /*!
-   * \brief Connect with all the Receivers
-   * \return True for success and False for fail
-   *
-   * Connect() is not thread-safe and only one thread can invoke this API.
-   */
-  virtual bool Connect() = 0;
-
-  /*!
    * \brief Send data to specified Receiver.
    * \param msg data message
    * \param recv_id receiver's ID
@@ -71,18 +55,6 @@ class Sender {
    *     There is no guarantee for messages sent to different receivers.
    */
   virtual STATUS Send(Message msg, int recv_id) = 0;
-
-  /*!
-   * \brief Finalize Sender
-   *
-   * Finalize() is not thread-safe and only one thread can invoke this API.
-   */
-  virtual void Finalize() = 0;
-
-  /*!
-   * \brief Communicator type: 'socket', 'mpi', etc.
-   */
-  virtual std::string Type() const = 0;
 
  protected:
   /*!
@@ -103,7 +75,7 @@ class Sender {
  * libraries such as TCP socket and MPI. One Receiver can connect with multiple Senders 
  * and it can receive data from multiple Senders concurrently.
  */
-class Receiver {
+class Receiver : public rpc::RPCReceiver {
  public:
   /*!
    * \brief Receiver constructor
@@ -121,16 +93,6 @@ class Receiver {
   }
 
   virtual ~Receiver() {}
-
-  /*!
-   * \brief Wait for all the Senders to connect
-   * \param addr Networking address, e.g., 'socket://127.0.0.1:50051', 'mpi://0'
-   * \param num_sender total number of Senders
-   * \return True for success and False for fail
-   *
-   * Wait() is not thread-safe and only one thread can invoke this API.
-   */
-  virtual bool Wait(const char* addr, int num_sender) = 0;
 
   /*!
    * \brief Recv data from Sender
@@ -157,18 +119,6 @@ class Receiver {
    * (3) Memory allocated by communicator but will not own it after the function returns.
    */
   virtual STATUS RecvFrom(Message* msg, int send_id) = 0;
-
-  /*!
-   * \brief Finalize Receiver
-   *
-   * Finalize() is not thread-safe and only one thread can invoke this API.
-   */
-  virtual void Finalize() = 0;
-
-  /*!
-   * \brief Communicator type: 'socket', 'mpi', etc
-   */
-  virtual std::string Type() const = 0;
 
  protected:
   /*!

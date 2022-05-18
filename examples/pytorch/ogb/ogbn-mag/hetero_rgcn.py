@@ -353,7 +353,7 @@ def prepare_data(args):
 
     # train sampler
     sampler = dgl.dataloading.MultiLayerNeighborSampler(args['fanout'])
-    train_loader = dgl.dataloading.NodeDataLoader(
+    train_loader = dgl.dataloading.DataLoader(
         g, split_idx['train'], sampler,
         batch_size=args['batch_size'], shuffle=True, num_workers=0)
     
@@ -439,7 +439,7 @@ def test(g, model, node_embed, y_true, device, split_idx, args):
     evaluator = Evaluator(name='ogbn-mag')
 
     sampler = dgl.dataloading.MultiLayerFullNeighborSampler(args['num_layers'])
-    loader = dgl.dataloading.NodeDataLoader(
+    loader = dgl.dataloading.DataLoader(
         g, {'paper': th.arange(g.num_nodes('paper'))}, sampler,
         batch_size=16384, shuffle=False, num_workers=0)
     
