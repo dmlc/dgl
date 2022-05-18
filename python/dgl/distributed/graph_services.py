@@ -504,7 +504,7 @@ def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=No
         return _sample_etype_neighbors(local_g, partition_book, local_nids,
                                        etype_field, fanout, edge_dir, prob, replace)
     frontier = _distributed_access(g, nodes, issue_remote_req, local_access)
-    if len(gpb.etypes) > 1:
+    if not gpb.is_homogeneous:
         return _frontier_to_heterogeneous_graph(g, frontier, gpb)
     else:
         return frontier
@@ -559,7 +559,7 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
         A sampled subgraph containing only the sampled neighboring edges.  It is on CPU.
     """
     gpb = g.get_partition_book()
-    if len(gpb.etypes) > 1:
+    if not gpb.is_homogeneous:
         assert isinstance(nodes, dict)
         homo_nids = []
         for ntype in nodes:
@@ -581,7 +581,7 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
         return _sample_neighbors(local_g, partition_book, local_nids,
                                  fanout, edge_dir, prob, replace)
     frontier = _distributed_access(g, nodes, issue_remote_req, local_access)
-    if len(gpb.etypes) > 1:
+    if not gpb.is_homogeneous:
         return _frontier_to_heterogeneous_graph(g, frontier, gpb)
     else:
         return frontier

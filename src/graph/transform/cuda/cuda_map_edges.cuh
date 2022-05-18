@@ -117,13 +117,11 @@ class DeviceNodeMap {
       cudaStream_t stream) :
     num_types_(num_nodes.size()),
     rhs_offset_(offset),
-    workspaces_(),
     hash_tables_(),
     ctx_(ctx) {
     auto device = runtime::DeviceAPI::Get(ctx);
 
     hash_tables_.reserve(num_types_);
-    workspaces_.reserve(num_types_);
     for (int64_t i = 0; i < num_types_; ++i) {
       hash_tables_.emplace_back(
           new OrderedHashTable<IdType>(
@@ -170,7 +168,6 @@ class DeviceNodeMap {
  private:
   int64_t num_types_;
   size_t rhs_offset_;
-  std::vector<void*> workspaces_;
   std::vector<std::unique_ptr<OrderedHashTable<IdType>>> hash_tables_;
   DGLContext ctx_;
 
