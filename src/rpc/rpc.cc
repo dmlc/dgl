@@ -183,7 +183,8 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCConnectReceiver")
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCConnectReceiverFinalize")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
-  RPCContext::getInstance()->sender->ConnectReceiverFinalize();
+  const int max_try_times = args[0];
+  *rv = RPCContext::getInstance()->sender->ConnectReceiverFinalize(max_try_times);
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetRank")
