@@ -3,7 +3,7 @@
 from functools import partial
 import torch
 import torch.nn as nn
-from .pnaconv import AGGREGATORS, SCALERS, PNAConv, PNAConvTower, scale_identity
+from .pnaconv import AGGREGATORS, SCALERS, PNAConv, PNAConvTower
 
 def aggregate_dir_av(h, eig_s, eig_d, eig_idx):
     """directional average aggregation"""
