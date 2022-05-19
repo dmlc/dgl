@@ -48,18 +48,17 @@ class DGNConvTower(PNAConvTower):
         degree = msg.size(1)
 
         h = []
-        for aggregator in self.aggregators:
-            agg_name = aggregator.__name__
-            if agg_name.startswith('dir'):
-                if agg_name.endswith('av'):
-                    h.append(aggregator(msg, eig_s, eig_d))
+        for agg in self.aggregators:
+            if agg.startswith('dir'):
+                if agg.endswith('av'):
+                    h.append(AGGREGATORS[agg](msg, eig_s, eig_d))
                 else:
-                    h.append(aggregator(msg, eig_s, eig_d, h_in))
+                    h.append(AGGREGATORS[agg](msg, eig_s, eig_d, h_in))
             else:
-                h.append(aggregator(msg))
+                h.append(AGGREGATORS[agg](msg))
         h = torch.cat(h, dim=1)
         h = torch.cat([
-            scaler(h, D=degree, delta=self.delta) if scaler is not scale_identity else h
+            SCALERS[scaler](h, D=degree, delta=self.delta) if scaler != 'identity' else h
             for scaler in self.scalers
         ], dim=1)
         return {'h_neigh': h}
@@ -160,9 +159,6 @@ class DGNConv(PNAConv):
             in_size, out_size, aggregators, scalers, delta, dropout,
             num_towers, edge_feat_size, residual
         )
-
-        aggregators = [AGGREGATORS[aggr] for aggr in aggregators]
-        scalers = [SCALERS[scale] for scale in scalers]
 
         self.towers = nn.ModuleList([
             DGNConvTower(
