@@ -405,9 +405,10 @@ class LabelPropagation(nn.Module):
     .. math::
     \mathbf{Y}^{(t+1)} = \alpha \cdot \tilde{A} \mathbf{Y}^{(t)} + (1 - \alpha)
     \mathbf{Y}^{(0)},
-    where unlabeled data is inferred by labeled data via propagation. :math:`\alpha`
-    is a weight parameter for balancing between updated labels and initial labels.
-    :math:`\tilde{A}` denotes the normalized adjancency matrix.
+
+    where unlabeled data is initially set to zero and inferred from labeled data via
+    propagation. :math:`\alpha` is a weight parameter for balancing between updated labels
+    and initial labels. :math:`\tilde{A}` denotes the normalized adjacency matrix.
 
     Parameters
     ----------
@@ -421,7 +422,7 @@ class LabelPropagation(nn.Module):
 
         * ``row``: row-normalized adjacency as :math:`D^{-1}A`
 
-        * ``sym``: symmetric normalized adjacency as :math:`D^{-1/2}AD^{-1/2}`
+        * ``sym``: symmetrically normalized adjacency as :math:`D^{-1/2}AD^{-1/2}`
 
         Default: 'sym'.
     multi_label : bool, optional
@@ -488,7 +489,7 @@ class LabelPropagation(nn.Module):
             elif self.norm_type == 'row':
                 norm = th.pow(degs, -1.).to(labels.device).unsqueeze(1)
             else:
-                raise NotImplementedError
+                raise ValueError(f"Expect norm_type to be 'sym' or 'row', got {self.norm_type}")
 
             for _ in range(self.k):
                 if self.norm_type == 'sym':
@@ -497,7 +498,7 @@ class LabelPropagation(nn.Module):
                     g.ndata['h'] = y
                 g.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
                 y = init + self.alpha * g.ndata['h'] * norm
-                
+
                 if self.multi_label:
                     y = y.clamp_(0., 1.)
                 else:

@@ -1,8 +1,8 @@
 """Torch Module for Directional Graph Networks Convolution Layer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
+from functools import partial
 import torch
 import torch.nn as nn
-from functools import partial
 from .pnaconv import AGGREGATORS, SCALERS, PNAConv, PNAConvTower, scale_identity
 
 def aggregate_dir_av(h, eig_s, eig_d, eig_idx):
@@ -68,35 +68,18 @@ class DGNConv(PNAConv):
     r"""Directional Graph Network Layer from `Directional Graph Networks
     <https://arxiv.org/abs/2010.02863>`__
 
-    The main computation process follows Principal Neighbourhood Aggregation.
-    A PNA layer is composed of multiple PNA towers. Each tower takes as input a split of the
-    input features, and computes the message passing as below.
+    DGN provides two special directional aggregators according to the vector field
+    :math:`F`, which is defined as the gradient of the low-frequency eigenvectors of graph
+    laplacian.
 
-    .. math::
-        h_i^(l+1) = U(h_i^l, \oplus_{(i,j)\in E}M(h_i^l, e_{i,j}, h_j^l))
-
-    where :math:`h_i` and :math:`e_{i,j}` are node features and edge features, respectively.
-    :math:`M` and :math:`U` are MLPs, taking the concatenation of input for computing
-    output features. :math:`\oplus` represents the combination of various aggregators
-    and scalers. Aggregators aggregate messages from neighbours and scalers scale the
-    aggregated messages in different ways. :math:`\oplus` concatenates the output features
-    of each combination.
-
-    The output of multiple towers are concatenated and fed into a linear mixing layer for the
-    final output.
-    
-    Two additional directional aggregators are supported in DGN according to the vector field
-    :math:`F`, which is defined as the gradient of the low-frequency eigenvectors of graph laplacian.
-    
     The directional average aggregator is defined as
     :math:`h_i' = \sum_{j\in\mathcal{N}(i)}\frac{|F_{i,j}|\cdot h_j}{||F_{i,:}||_1+\epsilon}`
-    
+
     The directional derivative aggregator is defined as
     :math:`h_i' = \sum_{j\in\mathcal{N}(i)}\frac{F_{i,j}\cdot h_j}{||F_{i,:}||_1+\epsilon}
     -h_i\cdot\sum_{j\in\mathcal{N}(i)}\frac{F_{i,j}}{||F_{i,:}||_1+\epsilon}`
 
-    Directional Graph Networks allow a better representation of the anisotropic features in
-    different physical or biological problems
+    :math:`\epsilon` is the infinitesimal to keep the computation numerically stable.
 
     Parameters
     ----------
@@ -122,15 +105,15 @@ class DGNConv(PNAConv):
 
         * ``moment3``, ``moment4``, ``moment5``: the normalized moments aggregation
         :math:`(E[(X-E[X])^n])^{1/n}`
-        
+
         * ``dir{k}-av``: directional average aggregation with directions defined by the k-th
         smallest eigenvectors. k can be selected from 1, 2, 3.
-        
+
         * ``dir{k}-dx``: directional derivative aggregation with directions defined by the k-th
         smallest eigenvectors. k can be selected from 1, 2, 3.
 
         Note that using directional aggregation requires the LaplacianPE transform on the input
-        graph for eigenvectors computation (the PE size must be >= k above).
+        graph for eigenvector computation (the PE size must be >= k above).
     scalers: list of str
         List of scaler function names, selected from:
 
@@ -141,7 +124,7 @@ class DGNConv(PNAConv):
 
         * ``attenuation``: multiply the aggregated message by :math:`\delta/\log(d+1)`
     delta: float
-        The degree-related normalization factor computed over the training set, used by scalers
+        The in-degree-related normalization factor computed over the training set, used by scalers
         for normalization. :math:`E[\log(d+1)]`, where :math:`d` is the degree for each node
         in the training set.
     dropout: float, optional
