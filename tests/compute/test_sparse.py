@@ -293,34 +293,35 @@ def test_segment_reduce(reducer):
 def test_segment_mm(idtype, feat_size):
     import torch
     dev = F.ctx()
-    # input
-    a = torch.tensor(np.random.rand(100, feat_size)).to(dev)
-    a.requires_grad_()
-    b = torch.tensor(np.random.rand(10, feat_size, feat_size + 1)).to(dev)
-    b.requires_grad_()
-    seglen_a = torch.tensor([10, 15, 8, 0, 1, 9, 18, 24, 15, 0])
-    dc = torch.tensor(np.random.rand(100, feat_size + 1)).to(dev)
-    # compute
-    c = dgl.ops.segment_mm(a, b, seglen_a)
-    c.backward(dc)
-    da = a.grad.clone()
-    db = b.grad.clone()
-    # ground truth
-    c_t = []
-    off = 0
-    for i, l in enumerate(seglen_a):
-        c_t.append(a[off:off+l] @ b[i])
-        off += l
-    c_t = torch.cat(c_t)
-    a.grad.zero_()
-    b.grad.zero_()
-    c_t.backward(dc)
-    da_t = a.grad
-    db_t = b.grad
+    for dtype,tol in [(torch.float16,1e-2),(torch.float32,3e-3),(torch.float64,1e-4)]:
+        # input
+        a = torch.tensor(np.random.rand(100, feat_size)).to(dev).to(dtype)
+        a.requires_grad_()
+        b = torch.tensor(np.random.rand(10, feat_size, feat_size + 1)).to(dev).to(dtype)
+        b.requires_grad_()
+        seglen_a = torch.tensor([10, 15, 8, 0, 1, 9, 18, 24, 15, 0])
+        dc = torch.tensor(np.random.rand(100, feat_size + 1)).to(dev).to(dtype)
+        # compute
+        c = dgl.ops.segment_mm(a, b, seglen_a)
+        c.backward(dc)
+        da = a.grad.clone()
+        db = b.grad.clone()
+        # ground truth
+        c_t = []
+        off = 0
+        for i, l in enumerate(seglen_a):
+            c_t.append(a[off:off+l] @ b[i])
+            off += l
+        c_t = torch.cat(c_t).to(dtype)
+        a.grad.zero_()
+        b.grad.zero_()
+        c_t.backward(dc)
+        da_t = a.grad
+        db_t = b.grad
 
-    assert torch.allclose(c, c_t, atol=1e-4, rtol=1e-4)
-    assert torch.allclose(da, da_t, atol=1e-4, rtol=1e-4)
-    assert torch.allclose(db, db_t, atol=1e-4, rtol=1e-4)
+        assert torch.allclose(c, c_t, atol=tol, rtol=tol)
+        assert torch.allclose(da, da_t, atol=tol, rtol=tol)
+        assert torch.allclose(db, db_t, atol=tol, rtol=tol)
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
 @parametrize_idtype
