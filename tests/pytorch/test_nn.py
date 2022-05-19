@@ -1490,7 +1490,7 @@ def test_pna_conv(in_size, out_size, aggregators, scalers, delta,
 @pytest.mark.parametrize('clamp', [True, False])
 @pytest.mark.parametrize('normalize', [True, False])
 @pytest.mark.parametrize('reset', [True, False])
-def test_label_prop(k, alpha, norm_type, multi_label, reset):
+def test_label_prop(k, alpha, norm_type, clamp, normalize, reset):
     dev = F.ctx()
     num_nodes = 5
     num_edges = 20
@@ -1499,7 +1499,7 @@ def test_label_prop(k, alpha, norm_type, multi_label, reset):
     labels = th.tensor([0, 2, 1, 3, 0]).long().to(dev)
     ml_labels = th.rand(num_nodes, num_classes) > 0.7
     mask = th.tensor([0, 1, 1, 1, 0]).bool().to(dev)
-    model = nn.LabelPropagation(k, alpha, norm_type, multi_label, reset)
+    model = nn.LabelPropagation(k, alpha, norm_type, clamp, normalize, reset)
     model(g, labels, mask)
     # multi-label case
     model(g, ml_labels, mask)
