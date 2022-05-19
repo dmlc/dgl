@@ -1487,17 +1487,22 @@ def test_pna_conv(in_size, out_size, aggregators, scalers, delta,
 @pytest.mark.parametrize('k', [3, 5])
 @pytest.mark.parametrize('alpha', [0., 0.5, 1.])
 @pytest.mark.parametrize('norm_type', ['sym', 'row'])
-@pytest.mark.parametrize('multi_label', [True, False])
+@pytest.mark.parametrize('clamp', [True, False])
+@pytest.mark.parametrize('normalize', [True, False])
 @pytest.mark.parametrize('reset', [True, False])
 def test_label_prop(k, alpha, norm_type, multi_label, reset):
     dev = F.ctx()
     num_nodes = 5
     num_edges = 20
+    num_classes = 4
     g = dgl.rand_graph(num_nodes, num_edges).to(dev)
     labels = th.tensor([0, 2, 1, 3, 0]).long().to(dev)
+    ml_labels = th.rand(num_nodes, num_classes) > 0.7
     mask = th.tensor([0, 1, 1, 1, 0]).bool().to(dev)
     model = nn.LabelPropagation(k, alpha, norm_type, multi_label, reset)
     model(g, labels, mask)
+    # multi-label case
+    model(g, ml_labels, mask)
 
 @pytest.mark.parametrize('in_size', [16, 32])
 @pytest.mark.parametrize('out_size', [16, 32])
@@ -1517,7 +1522,7 @@ def test_dgn_conv(in_size, out_size, aggregators, scalers, delta,
     g = dgl.rand_graph(num_nodes, num_edges).to(dev)
     h = th.randn(num_nodes, in_size).to(dev)
     e = th.randn(num_edges, edge_feat_size).to(dev)
-    transform = dgl.LaplacianPE(k=3)
+    transform = dgl.LaplacianPE(k=3, feat_name='eig')
     g = transform(g)
     model = nn.DGNConv(in_size, out_size, aggregators, scalers, delta, dropout,
         num_towers, edge_feat_size, residual).to(dev)
