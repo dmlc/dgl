@@ -26,8 +26,8 @@ def aggregate_dir_dx(h, eig_s, eig_d, h_in, eig_idx):
     return torch.abs(torch.sum(h_mod, dim=1) - torch.sum(eig_w, dim=1) * h_in)
 
 for k in range(1, 4):
-    AGGREGATORS[f'dir{k}-av'] = partial(aggregate_dir_av, eig_idx=k)
-    AGGREGATORS[f'dir{k}-dx'] = partial(aggregate_dir_dx, eig_idx=k)
+    AGGREGATORS[f'dir{k}-av'] = partial(aggregate_dir_av, eig_idx=k-1)
+    AGGREGATORS[f'dir{k}-dx'] = partial(aggregate_dir_dx, eig_idx=k-1)
 
 class DGNConvTower(PNAConvTower):
     """A single DGN tower with modified reduce function"""
