@@ -367,6 +367,12 @@ class GraphPartitionBook(ABC):
         """Get the list of edge types
         """
 
+    @property
+    def is_homogeneous(self):
+        """check if homogeneous
+        """
+        return not(len(self.etypes) > 1 or len(self.ntypes) > 1)
+
     def map_to_per_ntype(self, ids):
         """Map homogeneous node IDs to type-wise IDs and node types.
 
