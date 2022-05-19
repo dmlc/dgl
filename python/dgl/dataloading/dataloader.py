@@ -510,15 +510,14 @@ class CollateWrapper(object):
     """Wraps a collate function with :func:`remove_parent_storage_columns` for serializing
     from PyTorch DataLoader workers.
     """
-    def __init__(self, sample_func, g, use_uva, device):
+    def __init__(self, sample_func, g, device):
         self.sample_func = sample_func
         self.g = g
-        self.use_uva = use_uva
         self.device = device
 
     def __call__(self, items):
         graph_device = getattr(self.g, 'device', None)
-        if self.use_uva or (graph_device != torch.device('cpu')):
+        if graph_device != torch.device('cpu'):
             # Only copy the indices to the given device if in UVA mode or the graph
             # is not on CPU.
             items = recursive_apply(items, lambda x: x.to(self.device))
@@ -581,9 +580,7 @@ class DataLoader(torch.utils.data.DataLoader):
         The device of the generated MFGs in each iteration, which should be a
         PyTorch device object (e.g., ``torch.device``).
 
-        By default this value is None. If :attr:`use_uva` is True, MFGs and graphs will
-        generated in torch.cuda.current_device(), otherwise generated in the same device
-        of :attr:`g`.
+        By default this value is None.
     use_ddp : boolean, optional
         If True, tells the DataLoader to split the training set for each
         participating process appropriately using
@@ -595,15 +592,6 @@ class DataLoader(torch.utils.data.DataLoader):
         :class:`torch.utils.data.distributed.DistributedSampler`.
 
         Only effective when :attr:`use_ddp` is True.
-    use_uva : bool, optional
-        Whether to use Unified Virtual Addressing (UVA) to directly sample the graph
-        and slice the features from CPU into GPU.  Setting it to True will pin the
-        graph and feature tensors into pinned memory.
-
-        If True, requires that :attr:`indices` must have the same device as the
-        :attr:`device` argument.
-
-        Default: False.
     use_prefetch_thread : bool, optional
         (Advanced option)
         Spawns a new Python thread to perform feature slicing
@@ -614,8 +602,7 @@ class DataLoader(torch.utils.data.DataLoader):
         (Advanced option)
         Whether to slice and transfers the features to GPU on a non-default stream.
 
-        Default: True if the graph is on CPU, :attr:`device` is CUDA, and :attr:`use_uva`
-        is False.  False otherwise.
+        Default: True if the graph is on CPU, :attr:`device` is CUDA. False otherwise.
     pin_prefetcher : bool, optional
         (Advanced option)
         Whether to pin the feature tensors into pinned memory.
@@ -670,20 +657,13 @@ class DataLoader(torch.utils.data.DataLoader):
       will take place on the GPU. This is the recommended setting when using a single-GPU and
       the whole graph fits in GPU memory.
 
-    * If the input graph :attr:`g` is on CPU while the output device :attr:`device` is GPU, then
-      depending on the value of :attr:`use_uva`:
-
-      - If :attr:`use_uva` is set to True, the sampling and subgraph construction will happen
-        on GPU even if the GPU itself cannot hold the entire graph. This is the recommended
-        setting unless there are operations not supporting UVA. :attr:`num_workers` must be 0
-        in this case.
-
-      - Otherwise, both the sampling and subgraph construction will take place on the CPU.
+    * If the input graph :attr:`g` is on CPU while the output device :attr:`device`
+      is GPU, then the sampling and subgraph construction will take place on the CPU.
     """
     def __init__(self, graph, indices, graph_sampler, device=None, use_ddp=False,
                  ddp_seed=0, batch_size=1, drop_last=False, shuffle=False,
                  use_prefetch_thread=None, use_alternate_streams=None,
-                 pin_prefetcher=None, use_uva=False,
+                 pin_prefetcher=None,
                  use_cpu_worker_affinity=False, cpu_worker_affinity_cores=None, **kwargs):
         # (BarclayII) PyTorch Lightning sometimes will recreate a DataLoader from an existing
         # DataLoader with modifications to the original arguments.  The arguments are retrieved
@@ -707,10 +687,11 @@ class DataLoader(torch.utils.data.DataLoader):
             self.ddp_seed = ddp_seed
             self.shuffle = shuffle
             self.drop_last = drop_last
+
             self.use_prefetch_thread = use_prefetch_thread
             self.use_alternate_streams = use_alternate_streams
             self.pin_prefetcher = pin_prefetcher
-            self.use_uva = use_uva
+
             kwargs['batch_size'] = None
             super().__init__(**kwargs)
             return
@@ -752,39 +733,24 @@ class DataLoader(torch.utils.data.DataLoader):
             indices_device = indices.device
 
         if device is None:
-            if use_uva:
-                device = torch.cuda.current_device()
-            else:
-                device = self.graph.device
+            device = self.graph.device
         self.device = _get_device(device)
 
         # Sanity check - we only check for DGLGraphs.
         if isinstance(self.graph, DGLHeteroGraph):
             # Check graph and indices device as well as num_workers
-            if use_uva:
-                if self.graph.device.type != 'cpu':
-                    raise ValueError('Graph must be on CPU if UVA sampling is enabled.')
-                if num_workers > 0:
-                    raise ValueError('num_workers must be 0 if UVA sampling is enabled.')
-
-                # Create all the formats and pin the features - custom GraphStorages
-                # will need to do that themselves.
+            if self.graph.device != indices_device:
+                raise ValueError(
+                    'Expect graph and indices to be on the same device. ')
+            if self.graph.device.type == 'cuda' and num_workers > 0:
+                raise ValueError('num_workers must be 0 if graph and indices are on CUDA.')
+            if self.graph.device.type == 'cpu' and num_workers > 0:
+                # Instantiate all the formats if the number of workers is greater than 0.
                 self.graph.create_formats_()
-                self.graph.pin_memory_()
-            else:
-                if self.graph.device != indices_device:
-                    raise ValueError(
-                        'Expect graph and indices to be on the same device. '
-                        'If you wish to use UVA sampling, please set use_uva=True.')
-                if self.graph.device.type == 'cuda' and num_workers > 0:
-                    raise ValueError('num_workers must be 0 if graph and indices are on CUDA.')
-                if self.graph.device.type == 'cpu' and num_workers > 0:
-                    # Instantiate all the formats if the number of workers is greater than 0.
-                    self.graph.create_formats_()
 
             # Check pin_prefetcher and use_prefetch_thread - should be only effective
             # if performing CPU sampling but output device is CUDA
-            if self.device.type == 'cuda' and self.graph.device.type == 'cpu' and not use_uva:
+            if self.device.type == 'cuda' and self.graph.device.type == 'cpu':
                 if pin_prefetcher is None:
                     pin_prefetcher = True
                 if use_prefetch_thread is None:
@@ -807,8 +773,7 @@ class DataLoader(torch.utils.data.DataLoader):
             # Check use_alternate_streams
             if use_alternate_streams is None:
                 use_alternate_streams = (
-                    self.device.type == 'cuda' and self.graph.device.type == 'cpu' and
-                    not use_uva)
+                    self.device.type == 'cuda' and self.graph.device.type == 'cpu')
 
         if (torch.is_tensor(indices) or (
                 isinstance(indices, Mapping) and
@@ -820,7 +785,6 @@ class DataLoader(torch.utils.data.DataLoader):
 
         self.ddp_seed = ddp_seed
         self.use_ddp = use_ddp
-        self.use_uva = use_uva
         self.shuffle = shuffle
         self.drop_last = drop_last
         self.graph_sampler = graph_sampler
@@ -855,7 +819,7 @@ class DataLoader(torch.utils.data.DataLoader):
         super().__init__(
             self.dataset,
             collate_fn=CollateWrapper(
-                self.graph_sampler.sample, graph, self.use_uva, self.device),
+                self.graph_sampler.sample, graph, self.device),
             batch_size=None,
             worker_init_fn=worker_init_fn,
             **kwargs)
@@ -938,13 +902,10 @@ class EdgeDataLoader(DataLoader):
                  use_prefetch_thread=False, use_alternate_streams=True,
                  pin_prefetcher=False,
                  exclude=None, reverse_eids=None, reverse_etypes=None, negative_sampler=None,
-                 use_uva=False, **kwargs):
+                 **kwargs):
 
         if device is None:
-            if use_uva:
-                device = torch.cuda.current_device()
-            else:
-                device = self.graph.device
+            device = self.graph.device
         device = _get_device(device)
 
         if isinstance(graph_sampler, BlockSampler):
@@ -953,13 +914,10 @@ class EdgeDataLoader(DataLoader):
                 'and it will not support feature prefetching. '
                 'Please use dgl.dataloading.as_edge_prediction_sampler to wrap it.')
             if reverse_eids is not None:
-                if use_uva:
-                    reverse_eids = recursive_apply(reverse_eids, lambda x: x.to(device))
-                else:
-                    reverse_eids_device = context_of(reverse_eids)
-                    indices_device = context_of(indices)
-                    if indices_device != reverse_eids_device:
-                        raise ValueError('Expect the same device for indices and reverse_eids')
+                reverse_eids_device = context_of(reverse_eids)
+                indices_device = context_of(indices)
+                if indices_device != reverse_eids_device:
+                    raise ValueError('Expect the same device for indices and reverse_eids')
             graph_sampler = as_edge_prediction_sampler(
                 graph_sampler, exclude=exclude, reverse_eids=reverse_eids,
                 reverse_etypes=reverse_etypes, negative_sampler=negative_sampler)
@@ -968,8 +926,7 @@ class EdgeDataLoader(DataLoader):
             graph, indices, graph_sampler, device=device, use_ddp=use_ddp, ddp_seed=ddp_seed,
             batch_size=batch_size, drop_last=drop_last, shuffle=shuffle,
             use_prefetch_thread=use_prefetch_thread, use_alternate_streams=use_alternate_streams,
-            pin_prefetcher=pin_prefetcher, use_uva=use_uva,
-            **kwargs)
+            pin_prefetcher=pin_prefetcher, **kwargs)
 
 
 ######## Graph DataLoaders ########

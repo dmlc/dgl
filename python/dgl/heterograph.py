@@ -4128,7 +4128,7 @@ class DGLHeteroGraph(object):
             #     g.ndata['x'] = torch.randn(...)
             #     sg = g.sample_neighbors(torch.LongTensor([...]).cuda())
             #     sg.ndata['x']    # Becomes a CPU tensor even if sg is on GPU due to lazy slicing
-            if self.is_pinned() and F.context(val) == 'cpu' and not F.is_pinned(val):
+            if self._is_pinned() and F.context(val) == 'cpu' and not F.is_pinned(val):
                 raise DGLError('Pinned graph requires the node data to be pinned as well. '
                                'Please pin the node data before assignment.')
 
@@ -5485,8 +5485,8 @@ class DGLHeteroGraph(object):
         """
         return self.to(F.cpu())
 
-    def pin_memory_(self):
-        """Pin the graph structure and node/edge data to the page-locked memory for
+    def _pin_structure_(self):
+        """Pin the graph structure data to the page-locked memory for
         GPU zero-copy access.
 
         This is an **inplace** method. The graph structure must be on CPU to be pinned.
@@ -5510,7 +5510,7 @@ class DGLHeteroGraph(object):
         >>> import torch
 
         >>> g = dgl.graph((torch.tensor([1, 0]), torch.tensor([1, 2])))
-        >>> g.pin_memory_()
+        >>> g._pin_structure_()
 
         Materialization of new sparse formats is not allowed for pinned graphs.
 
@@ -5526,9 +5526,9 @@ class DGLHeteroGraph(object):
         When ``eid`` is on CPU, ``find_edges()`` is executed on CPU, and the returned
         values are CPU tensors
 
-        >>> g.unpin_memory_()
+        >>> g._unpin_structure_()
         >>> g.create_formats_()
-        >>> g.pin_memory_()
+        >>> g._pin_structure_()
         >>> eid = torch.tensor([1])
         >>> g.find_edges(eids)
         (tensor([0]), tensor([2]))
@@ -5550,13 +5550,10 @@ class DGLHeteroGraph(object):
         if F.device_type(self.device) != 'cpu':
             raise DGLError("The graph structure must be on CPU to be pinned.")
         self._graph.pin_memory_()
-        for frame in itertools.chain(self._node_frames, self._edge_frames):
-            for col in frame._columns.values():
-                col.pin_memory_()
 
         return self
 
-    def unpin_memory_(self):
+    def _unpin_structure_(self):
         """Unpin the graph structure and node/edge data from the page-locked memory.
 
         This is an **inplace** method. If the graph struture is not pinned,
@@ -5570,13 +5567,10 @@ class DGLHeteroGraph(object):
         if not self._graph.is_pinned():
             return self
         self._graph.unpin_memory_()
-        for frame in itertools.chain(self._node_frames, self._edge_frames):
-            for col in frame._columns.values():
-                col.unpin_memory_()
 
         return self
 
-    def is_pinned(self):
+    def _is_pinned(self):
         """Check if the graph structure is pinned to the page-locked memory.
 
         Returns
