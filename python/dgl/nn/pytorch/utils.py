@@ -425,10 +425,12 @@ class LabelPropagation(nn.Module):
         * ``sym``: symmetrically normalized adjacency as :math:`D^{-1/2}AD^{-1/2}`
 
         Default: 'sym'.
-    multi_label : bool, optional
-        A bool flag to indicate the classification task is multi-label or multi-class.
-        The labels are clamped to [0, 1] if the task is multi-label (True); The labels
-        are row-normalized if the task is not multi-label (False). Default: True.
+    clamp : bool, optional
+        A bool flag to indicate whether to clamp the labels to [0, 1] after propagation.
+        Default: True.
+    normalize: bool, optional
+        A bool flag to indicate whether to apply row-normalization after propagation.
+        Default: False.
     reset : bool, optional
         A bool flag to indicate whether to reset the known labels after each
         propagation step. Default: False.
@@ -439,18 +441,19 @@ class LabelPropagation(nn.Module):
     >>> import dgl
     >>> from dgl.nn import LabelPropagation
 
-    >>> label_propagation = LabelPropagation(k=5, alpha=0.5, multi_label=False)
+    >>> label_propagation = LabelPropagation(k=5, alpha=0.5, clamp=False, normalize=True)
     >>> g = dgl.rand_graph(5, 10)
     >>> labels = torch.tensor([0, 2, 1, 3, 0]).long()
     >>> mask = torch.tensor([0, 1, 1, 1, 0]).bool()
     >>> new_labels = label_propagation(g, labels, mask)
     """
-    def __init__(self, k, alpha, norm_type='sym', multi_label=True, reset=False):
+    def __init__(self, k, alpha, norm_type='sym', clamp=True, normalize=False, reset=False):
         super(LabelPropagation, self).__init__()
         self.k = k
         self.alpha = alpha
         self.norm_type = norm_type
-        self.multi_label = multi_label
+        self.clamp = clamp
+        self.normalize = normalize
         self.reset = reset
 
     def forward(self, g, labels, mask=None):
@@ -462,9 +465,9 @@ class LabelPropagation(nn.Module):
             The input graph.
         labels : torch.Tensor
             The input labels of shape :math:`(N, 1)` or :math:`(N,)` with dtype as
-            torch.long; or input labels of shape :math:`(N, C)` with dtype as
-            torch.float. :math:`N` and :math:`C` are the number of nodes and the number
-            of categories, respectively.
+            torch.long; or input labels of shape :math:`(N, C)` (can be multi-label
+            in this case). :math:`N` and :math:`C` are the number of nodes and the number
+            of classes, respectively.
         mask : torch.Tensor
             The bool indicators of shape :math:`(N,)` with True denoting labeled nodes.
             Default: None, indicating all nodes are labeled.
@@ -474,7 +477,11 @@ class LabelPropagation(nn.Module):
         The propagated node label tensor of shape :math:`(N, C)` with float type.
         """
         with g.local_scope():
-            if labels.dtype == th.long:
+            # multi-label / multi-class
+            if len(labels.size()) > 1 and labels.size(1) > 1:
+                labels = labels.to(th.float32)
+            # single-label multi-class
+            else:
                 labels = F.one_hot(labels.view(-1)).to(th.float32)
 
             y = labels
@@ -483,27 +490,26 @@ class LabelPropagation(nn.Module):
                 y[mask] = labels[mask]
 
             init = (1 - self.alpha) * y
-            degs = g.in_degrees().float().clamp(min=1)
+            in_degs = g.in_degrees().float().clamp(min=1)
+            out_degs = g.out_degrees().float().clamp(min=1)
             if self.norm_type == 'sym':
-                norm = th.pow(degs, -0.5).to(labels.device).unsqueeze(1)
+                norm_i = th.pow(in_degs, -0.5).to(labels.device).unsqueeze(1)
+                norm_j = th.pow(out_degs, -0.5).to(labels.device).unsqueeze(1)
             elif self.norm_type == 'row':
-                norm = th.pow(degs, -1.).to(labels.device).unsqueeze(1)
+                norm_i = th.pow(in_degs, -1.).to(labels.device).unsqueeze(1)
+                norm_j = 1.
             else:
                 raise ValueError(f"Expect norm_type to be 'sym' or 'row', got {self.norm_type}")
 
             for _ in range(self.k):
-                if self.norm_type == 'sym':
-                    g.ndata['h'] = y * norm
-                else:
-                    g.ndata['h'] = y
+                g.ndata['h'] = y * norm_j
                 g.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
-                y = init + self.alpha * g.ndata['h'] * norm
+                y = init + self.alpha * g.ndata['h'] * norm_i
 
-                if self.multi_label:
+                if self.clamp:
                     y = y.clamp_(0., 1.)
-                else:
+                if self.normalize:
                     y = F.normalize(y, p=1)
-
                 if self.reset:
                     y[mask] = labels[mask]
 

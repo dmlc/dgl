@@ -146,7 +146,8 @@ class DGNConv(PNAConv):
     >>> from dgl.nn import DGNConv
     >>> from dgl import LaplacianPE
     >>>
-    >>> transform = LaplacianPE(k=3)
+    >>> # DGN requires precomputed eigenvectors, with 'eig' as feature name.
+    >>> transform = LaplacianPE(k=3, feat_name='eig')
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> g = transform(g)
     >>> feat = th.ones(6, 10)
@@ -155,20 +156,11 @@ class DGNConv(PNAConv):
     """
     def __init__(self, in_size, out_size, aggregators, scalers, delta,
         dropout=0., num_towers=1, edge_feat_size=0, residual=True):
-        aggregators = [AGGREGATORS[aggr] for aggr in aggregators]
-        scalers = [SCALERS[scale] for scale in scalers]
-
-        self.in_size = in_size
-        self.out_size = out_size
-        assert in_size % num_towers == 0, 'in_size must be divisible by num_towers'
-        assert out_size % num_towers == 0, 'out_size must be divisible by num_towers'
-        self.tower_in_size = in_size // num_towers
-        self.tower_out_size = out_size // num_towers
-        self.edge_feat_size = edge_feat_size
-        self.residual = residual
-        if self.in_size != self.out_size:
-            self.residual = False
-
+        super(DGNConv, self).__init__(
+            in_size, out_size, aggregators, scalers, delta, dropout,
+            num_towers, edge_feat_size, residual
+        )
+        
         self.towers = nn.ModuleList([
             DGNConvTower(
                 self.tower_in_size, self.tower_out_size,
@@ -176,8 +168,3 @@ class DGNConv(PNAConv):
                 dropout=dropout, edge_feat_size=edge_feat_size
             ) for _ in range(num_towers)
         ])
-
-        self.mixing_layer = nn.Sequential(
-            nn.Linear(out_size, out_size),
-            nn.LeakyReLU()
-        )
