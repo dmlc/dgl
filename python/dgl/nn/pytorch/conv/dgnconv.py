@@ -3,7 +3,7 @@
 from functools import partial
 import torch
 import torch.nn as nn
-from .pnaconv import AGGREGATORS, PNAConv, PNAConvTower, scale_identity
+from .pnaconv import AGGREGATORS, SCALERS, PNAConv, PNAConvTower, scale_identity
 
 def aggregate_dir_av(h, eig_s, eig_d, eig_idx):
     """directional average aggregation"""
@@ -160,6 +160,9 @@ class DGNConv(PNAConv):
             in_size, out_size, aggregators, scalers, delta, dropout,
             num_towers, edge_feat_size, residual
         )
+
+        aggregators = [AGGREGATORS[aggr] for aggr in aggregators]
+        scalers = [SCALERS[scale] for scale in scalers]
 
         self.towers = nn.ModuleList([
             DGNConvTower(
