@@ -3,7 +3,7 @@ import backend as F
 import dgl
 from dgl.dataloading import NeighborSampler, negative_sampler, \
     as_edge_prediction_sampler
-from test_utils import parametrize_dtype
+from test_utils import parametrize_idtype
 
 def create_test_graph(idtype):
     # test heterograph from the docstring, plus a user -- wishes -- game relation
@@ -25,7 +25,7 @@ def create_test_graph(idtype):
     return g
 
 
-@parametrize_dtype
+@parametrize_idtype
 def test_edge_prediction_sampler(idtype):
     g = create_test_graph(idtype)
     sampler = NeighborSampler([10,10])
