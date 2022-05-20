@@ -464,10 +464,14 @@ class LabelPropagation(nn.Module):
         g : DGLGraph
             The input graph.
         labels : torch.Tensor
-            The input labels of shape :math:`(N, 1)` or :math:`(N,)` with dtype as
-            torch.long; or input labels of shape :math:`(N, C)` (can be multi-label
-            in this case). :math:`N` and :math:`C` are the number of nodes and the number
-            of classes, respectively.
+            The input node labels. There are three cases supported.
+
+            * A LongTensor of shape :math:`(N, 1)` or :math:`(N,)` for node class labels in
+              multiclass classification, where :math:`N` is the number of nodes.
+            * A LongTensor of shape :math:`(N, C)` for one-hot encoding of node class labels
+              in multiclass classification, where :math:`C` is the number of classes.
+            * A LongTensor of shape :math:`(N, L)` for node labels in multilabel binary
+              classification, where :math:`L` is the number of labels.
         mask : torch.Tensor
             The bool indicators of shape :math:`(N,)` with True denoting labeled nodes.
             Default: None, indicating all nodes are labeled.
