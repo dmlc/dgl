@@ -252,7 +252,7 @@ class PNAConv(nn.Module):
             The input feature of shape :math:`(N, h_n)`. :math:`N` is the number of
             nodes, and :math:`h_n` must be the same as in_size.
         edge_feat : torch.Tensor, optional
-            The edge feature of shape :math:`(M, h)`. :math:`M` is the number of
+            The edge feature of shape :math:`(M, h_e)`. :math:`M` is the number of
             edges, and :math:`h_e` must be the same as edge_feat_size.
 
         Returns

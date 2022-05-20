@@ -1524,6 +1524,12 @@ def test_dgn_conv(in_size, out_size, aggregators, scalers, delta,
     e = th.randn(num_edges, edge_feat_size).to(dev)
     transform = dgl.LaplacianPE(k=3, feat_name='eig')
     g = transform(g)
+    eig = g.ndata['eig']
     model = nn.DGNConv(in_size, out_size, aggregators, scalers, delta, dropout,
+        num_towers, edge_feat_size, residual).to(dev)
+    model(g, h, edge_feat=e, eig_vec=eig)
+
+    aggregators_non_eig = [aggr for aggr in aggregators if not aggr.startswith('dir')]
+    model = nn.DGNConv(in_size, out_size, aggregators_non_eig, scalers, delta, dropout,
         num_towers, edge_feat_size, residual).to(dev)
     model(g, h, edge_feat=e)

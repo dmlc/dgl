@@ -478,7 +478,9 @@ class LabelPropagation(nn.Module):
 
         Returns
         -------
-        The propagated node label tensor of shape :math:`(N, C)` with float type.
+        torch.Tensor
+            The propagated node labels of shape :math:`(N, D)` with float type, where :math:`D`
+            is the number of classes or labels.
         """
         with g.local_scope():
             # multi-label / multi-class
@@ -501,12 +503,11 @@ class LabelPropagation(nn.Module):
                 norm_j = th.pow(out_degs, -0.5).to(labels.device).unsqueeze(1)
             elif self.norm_type == 'row':
                 norm_i = th.pow(in_degs, -1.).to(labels.device).unsqueeze(1)
-                norm_j = 1.
             else:
                 raise ValueError(f"Expect norm_type to be 'sym' or 'row', got {self.norm_type}")
 
             for _ in range(self.k):
-                g.ndata['h'] = y * norm_j
+                g.ndata['h'] = y * norm_j if self.norm_type == 'sym' else y
                 g.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
                 y = init + self.alpha * g.ndata['h'] * norm_i
 

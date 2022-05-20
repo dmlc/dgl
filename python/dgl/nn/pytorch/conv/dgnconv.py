@@ -67,7 +67,7 @@ class DGNConv(PNAConv):
     r"""Directional Graph Network Layer from `Directional Graph Networks
     <https://arxiv.org/abs/2010.02863>`__
 
-    DGN provides two special directional aggregators according to the vector field
+    DGN introduces two special directional aggregators according to the vector field
     :math:`F`, which is defined as the gradient of the low-frequency eigenvectors of graph
     laplacian.
 
@@ -124,7 +124,7 @@ class DGNConv(PNAConv):
         * ``attenuation``: multiply the aggregated message by :math:`\delta/\log(d+1)`
     delta: float
         The in-degree-related normalization factor computed over the training set, used by scalers
-        for normalization. :math:`E[\log(d+1)]`, where :math:`d` is the degree for each node
+        for normalization. :math:`E[\log(d+1)]`, where :math:`d` is the in-degree for each node
         in the training set.
     dropout: float, optional
         The dropout ratio. Default: 0.0.
@@ -149,9 +149,10 @@ class DGNConv(PNAConv):
     >>> transform = LaplacianPE(k=3, feat_name='eig')
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> g = transform(g)
+    >>> eig = g.ndata['eig']
     >>> feat = th.ones(6, 10)
     >>> conv = DGNConv(10, 10, ['dir1-av', 'dir1-dx', 'sum'], ['identity', 'amplification'], 2.5)
-    >>> ret = conv(g, feat)
+    >>> ret = conv(g, feat, eig_vec=eig)
     """
     def __init__(self, in_size, out_size, aggregators, scalers, delta,
         dropout=0., num_towers=1, edge_feat_size=0, residual=True):
@@ -167,3 +168,40 @@ class DGNConv(PNAConv):
                 dropout=dropout, edge_feat_size=edge_feat_size
             ) for _ in range(num_towers)
         ])
+
+        self.use_eig_vec = False
+        for aggr in aggregators:
+            if aggr.startswith('dir'):
+                self.use_eig_vec = True
+                break
+
+    def forward(self, graph, node_feat, edge_feat=None, eig_vec=None):
+        r"""
+        Description
+        -----------
+        Compute DGN layer.
+
+        Parameters
+        ----------
+        graph : DGLGraph
+            The graph.
+        node_feat : torch.Tensor
+            The input feature of shape :math:`(N, h_n)`. :math:`N` is the number of
+            nodes, and :math:`h_n` must be the same as in_size.
+        edge_feat : torch.Tensor, optional
+            The edge feature of shape :math:`(M, h_e)`. :math:`M` is the number of
+            edges, and :math:`h_e` must be the same as edge_feat_size.
+        eig_vec : torch.Tensor, optional
+            K smallest non-trivial eigenvectors of Graph Laplacian of shape :math:`(N, K)`.
+            It is only required when :attr:`aggregators` contains directional aggregators.
+
+        Returns
+        -------
+        torch.Tensor
+            The output node feature of shape :math:`(N, h_n')` where :math:`h_n'`
+            should be the same as out_size.
+        """
+        with graph.local_scope():
+            if self.use_eig_vec:
+                graph.ndata['eig'] = eig_vec
+            return super().forward(graph, node_feat, edge_feat)
