@@ -41,7 +41,7 @@ namespace cuda {
 #define SWITCH_BITS(bits, DType, ...)                           \
   do {                                                          \
     if ((bits) == 16) {                                         \
-      LOG(FATA) << "FP16 only supported on CUDA architectures >= 60"; \
+      LOG(FATAL) << "FP16 only supported on CUDA architectures >= 60"; \
     } else if ((bits) == 32) {                                  \
       typedef float DType;                                      \
       { __VA_ARGS__ }                                           \
