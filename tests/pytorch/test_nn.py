@@ -1497,7 +1497,7 @@ def test_label_prop(k, alpha, norm_type, clamp, normalize, reset):
     num_classes = 4
     g = dgl.rand_graph(num_nodes, num_edges).to(dev)
     labels = th.tensor([0, 2, 1, 3, 0]).long().to(dev)
-    ml_labels = th.rand(num_nodes, num_classes) > 0.7
+    ml_labels = th.rand(num_nodes, num_classes).to(dev) > 0.7
     mask = th.tensor([0, 1, 1, 1, 0]).bool().to(dev)
     model = nn.LabelPropagation(k, alpha, norm_type, clamp, normalize, reset)
     model(g, labels, mask)
