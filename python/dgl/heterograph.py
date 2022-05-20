@@ -8,6 +8,7 @@ import numbers
 import itertools
 import networkx as nx
 import numpy as np
+from python.dgl.convert import graph
 
 from ._ffi.function import _init_api
 from .ops import segment
@@ -18,7 +19,7 @@ from . import heterograph_index
 from . import utils
 from . import backend as F
 from .frame import Frame
-from .view import HeteroNodeView, HeteroNodeDataView, HeteroEdgeView, HeteroEdgeDataView
+from .view import HeteroGraphDataView, HeteroNodeView, HeteroNodeDataView, HeteroEdgeView, HeteroEdgeDataView
 
 __all__ = ['DGLHeteroGraph', 'combine_names']
 
@@ -44,6 +45,7 @@ class DGLHeteroGraph(object):
                  etypes=['_E'],
                  node_frames=None,
                  edge_frames=None,
+                 graph_frame=None,
                  **deprecate_kwargs):
         """Internal constructor for creating a DGLGraph.
 
@@ -84,7 +86,7 @@ class DGLHeteroGraph(object):
                         ' removed in all cases.'.format(list(deprecate_kwargs.keys())))
         self._init(gidx, ntypes, etypes, node_frames, edge_frames)
 
-    def _init(self, gidx, ntypes, etypes, node_frames, edge_frames):
+    def _init(self, gidx, ntypes, etypes, node_frames, edge_frames, graph_frame):
         """Init internal states."""
         self._graph = gidx
         self._canonical_etypes = None
@@ -139,7 +141,7 @@ class DGLHeteroGraph(object):
                 self._etype2canonical[ety] = self._canonical_etypes[i]
         self._etypes_invmap = {t : i for i, t in enumerate(self._canonical_etypes)}
 
-        # node and edge frame
+        # node, edge and graph frame
         if node_frames is None:
             node_frames = [None] * len(self._ntypes)
         node_frames = [Frame(num_rows=self._graph.number_of_nodes(i))
@@ -153,6 +155,11 @@ class DGLHeteroGraph(object):
                        if frame is None else frame
                        for i, frame in enumerate(edge_frames)]
         self._edge_frames = edge_frames
+
+        if graph_frame is None:
+            self._graph_frame = Frame(num_rows=1)
+        else:
+            self._graph_frame = graph_frame
 
     def __setstate__(self, state):
         # Compatibility check
@@ -181,7 +188,8 @@ class DGLHeteroGraph(object):
                    '      edata_schemes={edata})')
             return ret.format(node=self.number_of_nodes(), edge=self.number_of_edges(),
                               ndata=str(self.node_attr_schemes()),
-                              edata=str(self.edge_attr_schemes()))
+                              edata=str(self.edge_attr_schemes()),
+                              gdata=str(self.graph_attr_schemes()))  # TODO (Krzysztof): implement this function
         else:
             ret = ('Graph(num_nodes={node},\n'
                    '      num_edges={edge},\n'
@@ -2143,6 +2151,63 @@ class DGLHeteroGraph(object):
             (key[1] == SLICE_FULL or key[1] == etype) and
             (key[2] == SLICE_FULL or key[2] == dsttype)]
         return etypes
+
+    # TODO (Krzysztof): Update docs
+    @property
+    def gdata(self):
+        """Return a node data view for setting/getting node features
+
+        Let ``g`` be a DGLGraph. If ``g`` is a graph of a single node type, ``g.ndata[feat]``
+        returns the node feature associated with the name ``feat``. One can also set a node
+        feature associated with the name ``feat`` by setting ``g.ndata[feat]`` to a tensor.
+
+        If ``g`` is a graph of multiple node types, ``g.ndata[feat]`` returns a
+        dict[str, Tensor] mapping node types to the node features associated with the name
+        ``feat`` for the corresponding type. One can also set a node feature associated
+        with the name ``feat`` for some node type(s) by setting ``g.ndata[feat]`` to a
+        dictionary as described.
+
+        Notes
+        -----
+        For setting features, the device of the features must be the same as the device
+        of the graph.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Set and get feature 'h' for a graph of a single node type.
+
+        >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 2])))
+        >>> g.ndata['h'] = torch.ones(3, 1)
+        >>> g.ndata['h']
+        tensor([[1.],
+                [1.],
+                [1.]])
+
+        Set and get feature 'h' for a graph of multiple node types.
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): (torch.tensor([1, 2]), torch.tensor([3, 4])),
+        ...     ('player', 'plays', 'game'): (torch.tensor([2, 2]), torch.tensor([1, 1]))
+        ... })
+        >>> g.ndata['h'] = {'game': torch.zeros(2, 1), 'player': torch.ones(3, 1)}
+        >>> g.ndata['h']
+        {'game': tensor([[0.], [0.]]),
+         'player': tensor([[1.], [1.], [1.]])}
+        >>> g.ndata['h'] = {'game': torch.ones(2, 1)}
+        >>> g.ndata['h']
+        {'game': tensor([[1.], [1.]]),
+         'player': tensor([[1.], [1.], [1.]])}
+
+        See Also
+        --------
+        nodes
+        """
+        return HeteroGraphDataView(self)
 
     def __getitem__(self, key):
         """Return the relation slice of this graph.
@@ -4278,6 +4343,84 @@ class DGLHeteroGraph(object):
             The popped representation
         """
         self._edge_frames[etid].pop(key)
+    
+    # TODO (Krzysztof): Update docs
+    def _set_g_repr(self, data):
+        """Internal API to set node features.
+
+        `data` is a dictionary from the feature name to feature tensor. Each tensor
+        is of shape (B, D1, D2, ...), where B is the number of nodes to be updated,
+        and (D1, D2, ...) be the shape of the node representation tensor. The
+        length of the given node ids must match B (i.e, len(u) == B).
+
+        All updates will be done out of place to work with autograd.
+
+        Parameters
+        ----------
+        ntid : int
+            Node type id.
+        u : node, container or tensor
+            The node(s).
+        data : dict of tensor
+            Node representation.
+        """
+        for key, val in data.items():
+            nfeats = F.shape(val)[0]
+            if nfeats != 1:
+                raise DGLError('Expect number of features to match number of nodes (len(u)).'
+                               ' Got %d and %d instead.' % (nfeats, 1))
+            if F.context(val) != self.device:
+                raise DGLError('Cannot assign node feature "{}" on device {} to a graph on'
+                               ' device {}. Call DGLGraph.to() to copy the graph to the'
+                               ' same device.'.format(key, F.context(val), self.device))
+            # To prevent users from doing things like:
+            #
+            #     g.pin_memory_()
+            #     g.ndata['x'] = torch.randn(...)
+            #     sg = g.sample_neighbors(torch.LongTensor([...]).cuda())
+            #     sg.ndata['x']    # Becomes a CPU tensor even if sg is on GPU due to lazy slicing
+            if self.is_pinned() and F.context(val) == 'cpu' and not F.is_pinned(val):
+                raise DGLError('Pinned graph requires the node data to be pinned as well. '
+                               'Please pin the node data before assignment.')
+
+        self._graph_frames.update(data)
+
+
+    def _get_g_repr(self):
+        """Get node(s) representation of a single node type.
+
+        The returned feature tensor batches multiple node features on the first dimension.
+
+        Parameters
+        ----------
+        ntid : int
+            Node type id.
+        u : node, container or tensor
+            The node(s).
+
+        Returns
+        -------
+        dict
+            Representation dict from feature name to feature tensor.
+        """
+        return self._graph_frame
+
+    def _pop_g_repr(self, key):
+        """Internal API to get and remove the specified node feature.
+
+        Parameters
+        ----------
+        ntid : int
+            Node type id.
+        key : str
+            The attribute name.
+
+        Returns
+        -------
+        Tensor
+            The popped representation
+        """
+        return self._graph_frame.pop(key)
 
     #################################################################
     # Message passing

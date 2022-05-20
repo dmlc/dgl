@@ -233,3 +233,76 @@ class HeteroEdgeDataView(MutableMapping):
 
     def __repr__(self):
         return repr(self._transpose(as_dict=True))
+
+#TODO (Krzysztof): implement this
+class HeteroGraphDataView(MutableMapping):
+    """The data view class when G.ndata[ntype] is called."""
+    __slots__ = ['_graph', '_ntype', '_ntid', '_nodes']
+
+    def __init__(self, graph):
+        self._graph = graph
+
+    def __getitem__(self, key):
+        if isinstance(self._ntype, list):
+            ret = {}
+            for (i, ntype) in enumerate(self._ntype):
+                value = self._graph._get_n_repr(self._ntid[i], self._nodes).get(key, None)
+                if value is not None:
+                    ret[ntype] = value
+            return ret
+        else:
+            return self._graph._get_n_repr(self._ntid, self._nodes)[key]
+
+    def __setitem__(self, key, val):
+        if isinstance(val, LazyFeature):
+            self._graph._node_frames[self._ntid][key] = val
+        elif isinstance(self._ntype, list):
+            assert isinstance(val, dict), \
+                'Current HeteroNodeDataView has multiple node types, ' \
+                'please passing the node type and the corresponding data through a dict.'
+
+            for (ntype, data) in val.items():
+                ntid = self._graph.get_ntype_id(ntype)
+                self._graph._set_n_repr(ntid, self._nodes, {key : data})
+        else:
+            assert isinstance(val, dict) is False, \
+                'The HeteroNodeDataView has only one node type. ' \
+                'please pass a tensor directly'
+            self._graph._set_n_repr(self._ntid, self._nodes, {key : val})
+
+    def __delitem__(self, key):
+        if isinstance(self._ntype, list):
+            for ntid in self._ntid:
+                if self._graph._get_n_repr(ntid, ALL).get(key, None) is None:
+                    continue
+                self._graph._pop_n_repr(ntid, key)
+        else:
+            self._graph._pop_n_repr(self._ntid, key)
+
+    def _transpose(self, as_dict=False):
+        if isinstance(self._ntype, list):
+            ret = defaultdict(dict)
+            for (i, ntype) in enumerate(self._ntype):
+                data = self._graph._get_n_repr(self._ntid[i], self._nodes)
+                for key in self._graph._node_frames[self._ntid[i]]:
+                    ret[key][ntype] = data[key]
+        else:
+            ret = self._graph._get_n_repr(self._ntid, self._nodes)
+            if as_dict:
+                ret = {key: ret[key] for key in self._graph._node_frames[self._ntid]}
+        return ret
+
+    def __len__(self):
+        return len(self._transpose())
+
+    def __iter__(self):
+        return iter(self._transpose())
+
+    def keys(self):
+        return self._transpose().keys()
+
+    def values(self):
+        return self._transpose().values()
+
+    def __repr__(self):
+        return repr(self._transpose(as_dict=True))
