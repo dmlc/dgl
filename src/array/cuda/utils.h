@@ -52,7 +52,7 @@ namespace cuda {
       LOG(FATAL) << "Data type not recognized with bits " << bits; \
     }                                                           \
   } while (0)
-#endif // __CUDA_ARCH__ >= 600
+#endif  // __CUDA_ARCH__ >= 600
 #else  // USE_FP16
 #define SWITCH_BITS(bits, DType, ...)                           \
   do {                                                          \
