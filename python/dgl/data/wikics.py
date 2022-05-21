@@ -73,8 +73,8 @@ class WikiCSDataset(DGLBuiltinDataset):
     def process(self):
         """process raw data to graph, labels and masks"""
         data = json.load(open(os.path.join(self.raw_path, 'data.json')))
-        features = F.tensor(np.array(data['features'], dtype=F.data_type_dict['float32']))
-        labels = F.tensor(np.array(data['labels'], dtype=F.data_type_dict['int64']))
+        features = F.tensor(np.array(data['features']), dtype=F.data_type_dict['float32'])
+        labels = F.tensor(np.array(data['labels']), dtype=F.data_type_dict['int64'])
 
         train_masks = np.array(data['train_masks'], dtype=bool).T
         val_masks = np.array(data['val_masks'], dtype=bool).T
