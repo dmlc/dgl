@@ -3,8 +3,10 @@
 
 import torch as th
 from torch import nn
+import torch.nn.functional as F
 from ... import DGLGraph
 from ...base import dgl_warning
+from ... import function as fn
 
 def matmul_maybe_select(A, B):
     """Perform Matrix multiplication C = A * B but A could be an integer id vector.
@@ -395,3 +397,125 @@ class JumpingKnowledge(nn.Module):
             alpha = self.att(alpha).squeeze(-1)            # (N, num_layers)
             alpha = th.softmax(alpha, dim=-1)
             return (stacked_feat_list * alpha.unsqueeze(-1)).sum(dim=1)
+
+class LabelPropagation(nn.Module):
+    r"""Label Propagation from `Learning from Labeled and Unlabeled Data with Label
+    Propagation <http://mlg.eng.cam.ac.uk/zoubin/papers/CMU-CALD-02-107.pdf>`__
+
+    .. math::
+    \mathbf{Y}^{(t+1)} = \alpha \cdot \tilde{A} \mathbf{Y}^{(t)} + (1 - \alpha)
+    \mathbf{Y}^{(0)},
+
+    where unlabeled data is initially set to zero and inferred from labeled data via
+    propagation. :math:`\alpha` is a weight parameter for balancing between updated labels
+    and initial labels. :math:`\tilde{A}` denotes the normalized adjacency matrix.
+
+    Parameters
+    ----------
+    k: int
+        The number of propagation steps.
+    alpha : float
+        The :math:`\alpha` coefficient in range [0, 1].
+    norm_type : str, optional
+        The type of normalization applied to the adjacency matrix, must be one of the
+        following choices:
+
+        * ``row``: row-normalized adjacency as :math:`D^{-1}A`
+
+        * ``sym``: symmetrically normalized adjacency as :math:`D^{-1/2}AD^{-1/2}`
+
+        Default: 'sym'.
+    clamp : bool, optional
+        A bool flag to indicate whether to clamp the labels to [0, 1] after propagation.
+        Default: True.
+    normalize: bool, optional
+        A bool flag to indicate whether to apply row-normalization after propagation.
+        Default: False.
+    reset : bool, optional
+        A bool flag to indicate whether to reset the known labels after each
+        propagation step. Default: False.
+
+    Examples
+    --------
+    >>> import torch
+    >>> import dgl
+    >>> from dgl.nn import LabelPropagation
+
+    >>> label_propagation = LabelPropagation(k=5, alpha=0.5, clamp=False, normalize=True)
+    >>> g = dgl.rand_graph(5, 10)
+    >>> labels = torch.tensor([0, 2, 1, 3, 0]).long()
+    >>> mask = torch.tensor([0, 1, 1, 1, 0]).bool()
+    >>> new_labels = label_propagation(g, labels, mask)
+    """
+    def __init__(self, k, alpha, norm_type='sym', clamp=True, normalize=False, reset=False):
+        super(LabelPropagation, self).__init__()
+        self.k = k
+        self.alpha = alpha
+        self.norm_type = norm_type
+        self.clamp = clamp
+        self.normalize = normalize
+        self.reset = reset
+
+    def forward(self, g, labels, mask=None):
+        r"""Compute the label propagation process.
+
+        Parameters
+        ----------
+        g : DGLGraph
+            The input graph.
+        labels : torch.Tensor
+            The input node labels. There are three cases supported.
+
+            * A LongTensor of shape :math:`(N, 1)` or :math:`(N,)` for node class labels in
+              multiclass classification, where :math:`N` is the number of nodes.
+            * A LongTensor of shape :math:`(N, C)` for one-hot encoding of node class labels
+              in multiclass classification, where :math:`C` is the number of classes.
+            * A LongTensor of shape :math:`(N, L)` for node labels in multilabel binary
+              classification, where :math:`L` is the number of labels.
+        mask : torch.Tensor
+            The bool indicators of shape :math:`(N,)` with True denoting labeled nodes.
+            Default: None, indicating all nodes are labeled.
+
+        Returns
+        -------
+        torch.Tensor
+            The propagated node labels of shape :math:`(N, D)` with float type, where :math:`D`
+            is the number of classes or labels.
+        """
+        with g.local_scope():
+            # multi-label / multi-class
+            if len(labels.size()) > 1 and labels.size(1) > 1:
+                labels = labels.to(th.float32)
+            # single-label multi-class
+            else:
+                labels = F.one_hot(labels.view(-1)).to(th.float32)
+
+            y = labels
+            if mask is not None:
+                y = th.zeros_like(labels)
+                y[mask] = labels[mask]
+
+            init = (1 - self.alpha) * y
+            in_degs = g.in_degrees().float().clamp(min=1)
+            out_degs = g.out_degrees().float().clamp(min=1)
+            if self.norm_type == 'sym':
+                norm_i = th.pow(in_degs, -0.5).to(labels.device).unsqueeze(1)
+                norm_j = th.pow(out_degs, -0.5).to(labels.device).unsqueeze(1)
+            elif self.norm_type == 'row':
+                norm_i = th.pow(in_degs, -1.).to(labels.device).unsqueeze(1)
+            else:
+                raise ValueError(f"Expect norm_type to be 'sym' or 'row', got {self.norm_type}")
+
+            for _ in range(self.k):
+                g.ndata['h'] = y * norm_j if self.norm_type == 'sym' else y
+                g.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
+                y = init + self.alpha * g.ndata['h'] * norm_i
+
+                if self.clamp:
+                    y = y.clamp_(0., 1.)
+                if self.normalize:
+                    y = F.normalize(y, p=1)
+                if self.reset:
+                    y[mask] = labels[mask]
+
+            return y
