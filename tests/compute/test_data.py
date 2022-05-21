@@ -266,7 +266,7 @@ def test_explain_syn():
 def test_wiki_cs():
     g = data.WikiCSDataset()[0]
     assert g.num_nodes() == 11701
-    assert g.num_edges() == 216123
+    assert g.num_edges() == 431726
     dst = F.asnumpy(g.edges()[1])
     assert np.array_equal(dst, np.sort(dst))
 
