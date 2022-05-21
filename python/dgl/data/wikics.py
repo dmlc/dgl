@@ -22,11 +22,9 @@ class WikiCSDataset(DGLBuiltinDataset):
 
     - Classes : 10
     - Nodes: 11,701
-    - Edges: 216,123
+    - Edges: 431,726 (note that the original dataset has 216,123 edges but DGL adds
+      the reverse edges and remove the duplicates, hence with a different number)
     - Features dimension: 300
-    - Label rate: 0.05
-    - Mean degree: 36.94
-    - Average shortest path length: 3.01
     - Different train, validation, stopping splits: 20
 
     Parameters
