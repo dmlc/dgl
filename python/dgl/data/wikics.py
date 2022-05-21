@@ -6,13 +6,12 @@ import numpy as np
 from .. import backend as F
 from ..convert import graph
 from .dgl_dataset import DGLBuiltinDataset
-from ..transforms import to_bidirected, remove_self_loop, add_self_loop
+from ..transforms import to_bidirected, reorder_graph
 from .utils import generate_mask_tensor, load_graphs, save_graphs, _get_dgl_url
 
 
 class WikiCSDataset(DGLBuiltinDataset):
-    r"""Wiki-CS is a Wikipedia-based dataset for node classification and single-relation link
-    prediction.
+    r"""Wiki-CS is a Wikipedia-based dataset for node classification.
 
     The dataset consists of nodes corresponding to Computer Science articles, with edges based on
     hyperlinks and 10 classes representing different branches of the field.
@@ -45,9 +44,11 @@ class WikiCSDataset(DGLBuiltinDataset):
         A transform that takes in a :class:`~dgl.DGLGraph` object and returns
         a transformed version. The :class:`~dgl.DGLGraph` object will be
         transformed before every access.
-    self_loop : bool, optional
-        Whether to add self loops to the graph.
-        Default: False
+
+    Attributes
+    ----------
+    num_classes : int
+        Number of node classes
 
     Examples
     --------
@@ -60,9 +61,7 @@ class WikiCSDataset(DGLBuiltinDataset):
     ....    # your code here
     """
 
-    def __init__(self, raw_dir=None, force_reload=False, verbose=False, transform=None,
-                 self_loop=False):
-        self.self_loop = self_loop
+    def __init__(self, raw_dir=None, force_reload=False, verbose=False, transform=None):
         _url = _get_dgl_url('dataset/wiki_cs.zip')
         super(WikiCSDataset, self).__init__(name='wiki_cs',
                                             raw_dir=raw_dir,
@@ -77,10 +76,10 @@ class WikiCSDataset(DGLBuiltinDataset):
         features = F.tensor(np.array(data['features'], dtype=F.data_type_dict['float32']))
         labels = F.tensor(np.array(data['labels'], dtype=F.data_type_dict['int64']))
 
-        train_masks = np.array(data['train_masks']).T
-        val_masks = np.array(data['val_masks']).T
-        stopping_masks = np.array(data['stopping_masks']).T
-        test_mask = np.array(data['test_mask'])
+        train_masks = np.array(data['train_masks'], dtype=bool).T
+        val_masks = np.array(data['val_masks'], dtype=bool).T
+        stopping_masks = np.array(data['stopping_masks'], dtype=bool).T
+        test_mask = np.array(data['test_mask'], dtype=bool)
 
         edges = [[(i, j) for j in js] for i, js in enumerate(data['links'])]
         edges = np.array(list(itertools.chain(*edges)))
@@ -96,9 +95,7 @@ class WikiCSDataset(DGLBuiltinDataset):
         g.ndata['stopping_mask'] = generate_mask_tensor(stopping_masks)
         g.ndata['test_mask'] = generate_mask_tensor(test_mask)
 
-        if self.self_loop:
-            g = remove_self_loop(g)
-            g = add_self_loop(g)
+        g = reorder_graph(g, node_permute_algo='rcmk', edge_permute_algo='dst', store_ids=False)
 
         self._graph = g
 
@@ -114,6 +111,10 @@ class WikiCSDataset(DGLBuiltinDataset):
         graph_path = os.path.join(self.save_path, 'dgl_graph.bin')
         g, _ = load_graphs(graph_path)
         self._graph = g[0]
+
+    @property
+    def num_classes(self):
+        return 10
 
     def __len__(self):
         r"""The number of graphs in the dataset."""
