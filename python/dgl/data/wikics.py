@@ -20,12 +20,13 @@ class WikiCSDataset(DGLBuiltinDataset):
 
     WikiCS dataset statistics:
 
-    - Classes : 10
     - Nodes: 11,701
     - Edges: 431,726 (note that the original dataset has 216,123 edges but DGL adds
       the reverse edges and remove the duplicates, hence with a different number)
-    - Features dimension: 300
-    - Different train, validation, stopping splits: 20
+    - Number of Classes: 10
+    - Node feature size:: 300
+    - Number of different train, validation, stopping splits: 20
+    - Number of test split: 1
 
     Parameters
     ----------
