@@ -1592,6 +1592,7 @@ class SIGNDiffusion(BaseTransform):
 
         for i in range(1, self.k + 1):
             g.ndata[self.out_feat_name + '_' + str(i)] = feat_list[i - 1]
+        return g
 
     def raw(self, g):
         use_eweight = False
