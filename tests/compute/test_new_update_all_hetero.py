@@ -10,7 +10,7 @@ import networkx as nx
 import unittest, pytest
 from dgl import DGLError
 import test_utils
-from test_utils import parametrize_dtype, get_cases
+from test_utils import parametrize_idtype, get_cases
 from scipy.sparse import rand
 rfuncs = {'sum': fn.sum, 'max': fn.max, 'min': fn.min, 'mean': fn.mean}
 feat_size = 2
@@ -69,7 +69,7 @@ def create_test_heterograph_large(idtype):
     assert g.device == F.ctx()
     return g
 
-@parametrize_dtype
+@parametrize_idtype
 def test_unary_copy_u(idtype):
     def _test(mfunc, rfunc):
         g = create_test_heterograph_2(idtype)
@@ -134,7 +134,7 @@ def test_unary_copy_u(idtype):
     _test(fn.copy_u, fn.min)
     # _test('copy_u', 'mean')
 
-@parametrize_dtype
+@parametrize_idtype
 def test_unary_copy_e(idtype):
     def _test(mfunc, rfunc):
 
@@ -219,7 +219,7 @@ def test_unary_copy_e(idtype):
     _test(fn.copy_e, fn.min)
     # _test('copy_e', 'mean')
 
-@parametrize_dtype
+@parametrize_idtype
 def test_binary_op(idtype):
     def _test(lhs, rhs, binary_op, reducer):
 

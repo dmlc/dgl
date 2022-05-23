@@ -3,7 +3,7 @@ import networkx as nx
 import backend as F
 import unittest
 import utils as U
-from utils import parametrize_dtype
+from test_utils import parametrize_idtype
 
 def create_graph(idtype):
     g = dgl.from_networkx(nx.path_graph(5), idtype=idtype, device=F.ctx())
@@ -17,7 +17,7 @@ def rfunc(nodes):
     return {'x' : nodes.data['x'] + msg}
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
-@parametrize_dtype
+@parametrize_idtype
 def test_prop_nodes_bfs(idtype):
     g = create_graph(idtype)
     g.ndata['x'] = F.ones((5, 2))
@@ -27,7 +27,7 @@ def test_prop_nodes_bfs(idtype):
             F.tensor([[2., 2.], [4., 4.], [6., 6.], [8., 8.], [9., 9.]]))
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
-@parametrize_dtype
+@parametrize_idtype
 def test_prop_edges_dfs(idtype):
     g = create_graph(idtype)
     g.ndata['x'] = F.ones((5, 2))
@@ -49,7 +49,7 @@ def test_prop_edges_dfs(idtype):
             F.tensor([[3., 3.], [5., 5.], [7., 7.], [9., 9.], [5., 5.]]))
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
-@parametrize_dtype
+@parametrize_idtype
 def test_prop_nodes_topo(idtype):
     # bi-directional chain
     g = create_graph(idtype)
