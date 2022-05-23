@@ -1,8 +1,8 @@
 import backend as F
-from test_utils import parametrize_dtype
+from test_utils import parametrize_idtype
 import dgl
 
-@parametrize_dtype
+@parametrize_idtype
 def test_heterograph_merge(idtype):
     g1 = dgl.heterograph({("a", "to", "b"): ([0,1], [1,0])}).astype(idtype).to(F.ctx())
     g1_n_edges = g1.num_edges(etype="to")
