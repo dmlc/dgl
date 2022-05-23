@@ -415,6 +415,8 @@ struct NDArray::Container {
   std::vector<int64_t> stride_;
   /*! \brief The internal array object */
   std::atomic<int> ref_counter_{0};
+
+  bool from_tensor_dispatcher_{false};
 };
 
 // implementations of inline functions

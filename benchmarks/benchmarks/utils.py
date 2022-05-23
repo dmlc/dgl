@@ -91,7 +91,8 @@ def get_graph(name, format = None):
             g_list, _ = dgl.load_graphs(bin_path)
             g = g_list[0]
         else:
-            g = get_friendster().formats(format)
+            # the original node IDs of friendster are not consecutive, so we compact it 
+            g = dgl.compact_graphs(get_friendster()).formats(format)
             dgl.save_graphs(bin_path, [g])
     elif name == "reddit":
         bin_path = "/tmp/dataset/reddit/reddit_{}.bin".format(format)
