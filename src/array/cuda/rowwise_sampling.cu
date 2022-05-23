@@ -330,32 +330,60 @@ __global__ void _CSRRowWiseSampleKernel(
       }
     } else {
       // Algorithm A-Chao https://en.wikipedia.org/wiki/Reservoir_sampling#Algorithm_A-Chao
-      __shared__ FloatType weights_sum;
-      if (threadIdx.x == 0) {
-        weights_sum = (FloatType)0.0;
-      }
-      __syncthreads();
-      // fill the reservoir array
-      for (int idx = threadIdx.x; idx < num_picks; idx+=CTA_SIZE) {
-        out_idxs[out_row_start+idx] = idx;
-        FloatType p;
-        _DoubleSlice<IdType, FloatType>(prob, data, idx, in_row_start, &p);
-        AtomicAdd(&weights_sum, p);
-      }
-      __syncthreads();
+      using BlockScanT = cub::BlockScan<FloatType, CTA_SIZE>;
+      // Allocate shared memory for BlockScan
+      __shared__ typename BlockScanT::TempStorage temp_storage;
 
-      for (int idx = num_picks+threadIdx.x; idx < deg; idx+=CTA_SIZE) {
-        FloatType p;
-        _DoubleSlice<IdType, FloatType>(prob, data, idx, in_row_start, &p);
-        p = p / (AtomicAdd(&weights_sum, p) + p);
-        if (curand_uniform(&rng) < p) {
-          const int num = curand(&rng) % num_picks;
-          // use max so as to achieve the replacement order the serial
-          // algorithm would have
-          AtomicMax(out_idxs+out_row_start+num, idx);
+      FloatType weights_sum = (FloatType)0.0;
+      // fill the reservoir array and compute the sum of their weights
+      for (int i = 0; i < (num_picks + CTA_SIZE - 1) / CTA_SIZE; i++) {
+        // Obtain input item for each thread
+        IdType idx = threadIdx.x + i * CTA_SIZE;
+        FloatType thread_prob;
+        if (idx < num_picks) {
+          _DoubleSlice<IdType, FloatType>(prob, data, idx, in_row_start, &thread_prob);
+          out_idxs[out_row_start+idx] = idx;
+        } else {
+          thread_prob = (FloatType)0.0;
         }
+        __syncthreads();
+
+        // Collectively compute the block-wide inclusive prefix sum
+        FloatType block_aggregate;
+        BlockScanT(temp_storage).InclusiveSum(thread_prob, thread_prob, block_aggregate);
+
+        weights_sum += block_aggregate;
       }
-      __syncthreads();
+
+      // for items in [num_picks, deg), check if they can replace
+      for (int i = 0; i < (deg - num_picks + CTA_SIZE - 1) / CTA_SIZE; i++) {
+        // Obtain input item for each thread
+        IdType idx = num_picks + threadIdx.x + i * CTA_SIZE;
+        FloatType thread_prob, thread_sum;
+        if (idx < deg) {
+          _DoubleSlice<IdType, FloatType>(prob, data, idx, in_row_start, &thread_prob);
+        } else {
+          thread_prob = (FloatType)0.0;
+        }
+        __syncthreads();
+
+        // Collectively compute the block-wide inclusive prefix sum
+        FloatType block_aggregate;
+        BlockScanT(temp_storage).InclusiveSum(thread_prob, thread_sum, block_aggregate);
+
+        if (idx < deg) {
+          thread_prob /= (thread_sum + weights_sum);
+          if (curand_uniform(&rng) < thread_prob) {
+            const int num = curand(&rng) % num_picks;
+            // use max so as to achieve the replacement order the serial
+            // algorithm would have
+            AtomicMax(out_idxs+out_row_start+num, idx);
+          }
+        }
+        __syncthreads();
+
+        weights_sum += block_aggregate;
+      }
 
       // copy permutation over
       for (int idx = threadIdx.x; idx < num_picks; idx += CTA_SIZE) {
