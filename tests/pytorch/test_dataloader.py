@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 from collections import defaultdict
 from collections.abc import Iterator, Mapping
 from itertools import product
-from test_utils import parametrize_dtype
+from test_utils import parametrize_idtype
 import pytest
 
 
@@ -128,7 +128,7 @@ def _check_device(data):
     else:
         assert data.device == F.ctx()
 
-@parametrize_dtype
+@parametrize_idtype
 @pytest.mark.parametrize('sampler_name', ['full', 'neighbor', 'neighbor2'])
 @pytest.mark.parametrize('pin_graph', [None, 'cuda_indices', 'cpu_indices'])
 def test_node_dataloader(idtype, sampler_name, pin_graph):
