@@ -1483,3 +1483,53 @@ def test_pna_conv(in_size, out_size, aggregators, scalers, delta,
     model = nn.PNAConv(in_size, out_size, aggregators, scalers, delta, dropout,
         num_towers, edge_feat_size, residual).to(dev)
     model(g, h, edge_feat=e)
+
+@pytest.mark.parametrize('k', [3, 5])
+@pytest.mark.parametrize('alpha', [0., 0.5, 1.])
+@pytest.mark.parametrize('norm_type', ['sym', 'row'])
+@pytest.mark.parametrize('clamp', [True, False])
+@pytest.mark.parametrize('normalize', [True, False])
+@pytest.mark.parametrize('reset', [True, False])
+def test_label_prop(k, alpha, norm_type, clamp, normalize, reset):
+    dev = F.ctx()
+    num_nodes = 5
+    num_edges = 20
+    num_classes = 4
+    g = dgl.rand_graph(num_nodes, num_edges).to(dev)
+    labels = th.tensor([0, 2, 1, 3, 0]).long().to(dev)
+    ml_labels = th.rand(num_nodes, num_classes).to(dev) > 0.7
+    mask = th.tensor([0, 1, 1, 1, 0]).bool().to(dev)
+    model = nn.LabelPropagation(k, alpha, norm_type, clamp, normalize, reset)
+    model(g, labels, mask)
+    # multi-label case
+    model(g, ml_labels, mask)
+
+@pytest.mark.parametrize('in_size', [16, 32])
+@pytest.mark.parametrize('out_size', [16, 32])
+@pytest.mark.parametrize('aggregators',
+    [['mean', 'max', 'dir2-av'], ['min', 'std', 'dir1-dx'], ['moment3', 'moment4', 'dir3-av']])
+@pytest.mark.parametrize('scalers', [['identity'], ['amplification', 'attenuation']])
+@pytest.mark.parametrize('delta', [2.5, 7.4])
+@pytest.mark.parametrize('dropout', [0., 0.1])
+@pytest.mark.parametrize('num_towers', [1, 4])
+@pytest.mark.parametrize('edge_feat_size', [16, 0])
+@pytest.mark.parametrize('residual', [True, False])
+def test_dgn_conv(in_size, out_size, aggregators, scalers, delta,
+    dropout, num_towers, edge_feat_size, residual):
+    dev = F.ctx()
+    num_nodes = 5
+    num_edges = 20
+    g = dgl.rand_graph(num_nodes, num_edges).to(dev)
+    h = th.randn(num_nodes, in_size).to(dev)
+    e = th.randn(num_edges, edge_feat_size).to(dev)
+    transform = dgl.LaplacianPE(k=3, feat_name='eig')
+    g = transform(g)
+    eig = g.ndata['eig']
+    model = nn.DGNConv(in_size, out_size, aggregators, scalers, delta, dropout,
+        num_towers, edge_feat_size, residual).to(dev)
+    model(g, h, edge_feat=e, eig_vec=eig)
+
+    aggregators_non_eig = [aggr for aggr in aggregators if not aggr.startswith('dir')]
+    model = nn.DGNConv(in_size, out_size, aggregators_non_eig, scalers, delta, dropout,
+        num_towers, edge_feat_size, residual).to(dev)
+    model(g, h, edge_feat=e)
