@@ -4,7 +4,7 @@ from dgl.frame import Column
 import numpy as np
 import backend as F
 import unittest
-from test_utils import parametrize_dtype
+from test_utils import parametrize_idtype
 
 def test_column_subcolumn():
     data = F.copy_to(F.tensor([[1., 1., 1., 1.],
