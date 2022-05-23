@@ -233,8 +233,8 @@ class RowFeatNormalizer(BaseTransform):
         return g
 
 class FeatMask(BaseTransform):
-    r"""Randomly mask columns of the node and edge feature tensors, as described in `An Empirical
-    Study of Graph Contrastive Learning <https://arxiv.org/abs/2109.01116>`__.
+    r"""Randomly mask columns of the node and edge feature tensors, as described in `Graph
+    Contrastive Learning with Augmentations <https://arxiv.org/abs/2010.13902>`__.
 
     Parameters
     ----------
