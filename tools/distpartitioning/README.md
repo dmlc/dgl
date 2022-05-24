@@ -38,3 +38,32 @@ To run this code on a single machine using multiple processes, use the following
 python3 data_proc_pipeline.py --world-size 2 --nodes-file mag_nodes.txt --edges-file mag_edges.txt --node-feats-file node_feat.dgl --metis-partitions mag_part.2 --input-dir /home/ubuntu/data --graph-name mag --schema mag.json --num-parts 2 --num-node-weights 4 --workspace /home/ubuntu/data --node-attr-dtype float --output /home/ubuntu/data/outputs --removed-edges mag_removed_edges.txt
 ```
 Above command, assumes that there are `2` partitions and number of node weights are `4`. All other command line arguments are self-explanatory.
+
+To execute this code and use multilple file format dataset feature, please use the following command line option (in addition to the options mentioned in the above command): 
+``
+--mul-files-support
+```
+
+To run this code on multiple machines please use the following command
+```
+ python -m torch.distributed.launch --nproc_per_node=1 --nnodes=2 --node_rank=0 --master-addr="" --master-port=1234 \
+         data_proc_pipeline.py \
+        --exec-type 2 \
+        --world-size 2 \
+        --nodes-file mag_nodes.txt \
+        --edges-file mag_edtes.txt \
+        --node-feats-file node_feat.dgl \
+        --metis-partitions mag_part.2 \
+        --input_dir /home/ubuntu/data \
+        --graph-name mag \
+        --schema mag.json \
+        --num-parts 2 \
+        --num-node-weights 4 \
+        --workspace \home\ubuntu\data \
+        --node-attr-type float \
+        --output \home\ubuntu\data\outputs \
+        --removed-edges mag_removed_edges.txt \
+	--mul-files-supprt True
+```
+
+This above command assumes that no. of processes per node is set to 1, rank of this node is 0, master_addr and master_port can be passed in as command line options as shown above, nnodes option is for indicating no. of nodes in this execution. Rest of the command line options are as described in the single machine case. 

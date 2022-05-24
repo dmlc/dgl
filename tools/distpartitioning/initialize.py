@@ -5,6 +5,7 @@ import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
 import constants
+import random
 
 from timeit import default_timer as timer
 from datetime import timedelta
@@ -300,13 +301,13 @@ def read_graph_files(rank, params, node_part_ids):
         floats, edge_features are read from the edge feature file
     """
     node_data = read_nodes_file(params.input_dir+'/'+params.nodes_file)
-    augment_node_data(node_data, node_part_ids)
+    augment_node_data(node_data, node_part_ids, 0)
     print('Rank: ', rank, ', Completed loading nodes data: ', node_data[constants.GLOBAL_TYPE_NID].shape)
 
     edge_data = read_edges_file(params.input_dir+'/'+params.edges_file, None)
     print('Rank: ', rank, ', Completed loading edge data: ', edge_data[constants.GLOBAL_SRC_ID].shape)
     edge_data = read_edges_file(params.input_dir+'/'+params.removed_edges, edge_data)
-    augment_edge_data(edge_data, node_part_ids)
+    augment_edge_data(edge_data, node_part_ids, 0)
     print('Rank: ', rank, ', Completed adding removed edges : ', edge_data[constants.GLOBAL_SRC_ID].shape)
 
     node_features = {}
@@ -443,8 +444,9 @@ def proc_exec(rank, world_size, params):
     write_dgl_objects(graph_obj, node_features, edge_features, params.output, rank)
 
     #get the meta-data 
-    json_metadata = create_metadata_json(params.graph_name, num_nodes, num_edges, params.num_parts, ntypes_map_val, \
-                            etypes_map_val, ntypes_map, etypes_map, params.output)
+    json_metadata = create_metadata_json(params.graph_name, len(node_data[constants.NTYPE_ID]), \
+                    len(edge_data[constants.GLOBAL_SRC_ID]), params.num_parts, ntypes_map_val, \
+                    etypes_map_val, ntypes_map, etypes_map, params.output)
 
     if (rank == 0): 
         #get meta-data from all partitions and merge them on rank-0
@@ -491,9 +493,12 @@ def multi_dev_init(params):
         argparser object providing access to command line arguments.
     """
     #init the gloo process group here. 
-    dist.init_prcess_group("gloo", rank=params.rank, world_size=params.world_size)
+    dist.init_process_group("gloo", rank=params.rank, world_size=params.world_size)
     print('[Rank: ', params.rank, '] Done with process group initialization...')
 
     #invoke the main function here.
-    proc_exec(params.rank, params.world_size, params)
+    if (params.mul_files_dataset):
+        splitdata_exec(params.rank, params.world_size, params)
+    else:
+        proc_exec(params.rank, params.world_size, params)
     print('[Rank: ', params.rank, '] Done with Distributed data processing pipeline processing.')
