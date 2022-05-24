@@ -171,9 +171,7 @@ __global__ void _CSRRowWiseSampleUniformKernel(
         const IdType perm_idx = out_idxs[out_row_start+idx]+in_row_start;
         out_rows[out_row_start+idx] = row;
         out_cols[out_row_start+idx] = in_index[perm_idx];
-        if (data) {
-          out_idxs[out_row_start+idx] = data[perm_idx];
-        }
+        out_idxs[out_row_start+idx] = data ? data[perm_idx] : perm_idx;
       }
     }
 
@@ -390,9 +388,7 @@ __global__ void _CSRRowWiseSampleKernel(
         const IdType perm_idx = out_idxs[out_row_start+idx]+in_row_start;
         out_rows[out_row_start+idx] = row;
         out_cols[out_row_start+idx] = in_index[perm_idx];
-        if (data) {
-          out_idxs[out_row_start+idx] = data[perm_idx];
-        }
+        out_idxs[out_row_start+idx] = data ? data[perm_idx] : perm_idx;
       }
     }
 
