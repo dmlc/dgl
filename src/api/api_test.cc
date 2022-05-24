@@ -3,12 +3,11 @@
  * \file api/api_test.cc
  * \brief C APIs for testing FFI
  */
-#include <thread>
-
 #include <dgl/runtime/ndarray.h>
 #include <dgl/runtime/container.h>
 #include <dgl/runtime/registry.h>
 #include <dgl/packed_func_ext.h>
+#include <thread>
 
 namespace dgl {
 namespace runtime {
@@ -43,8 +42,7 @@ DGL_REGISTER_GLOBAL("_TestPythonCallbackThread")
         LOG(INFO) << "Callback thread " << std::this_thread::get_id();
         DGLArgs cb_args(args.values + 1, args.type_codes + 1, 1);
         fn.CallPacked(cb_args, rv);
-      }
-    );
+      });
   thr->join();
 });
 
