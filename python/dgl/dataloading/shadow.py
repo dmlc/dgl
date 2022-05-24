@@ -43,7 +43,7 @@ class ShaDowKHopSampler(Sampler):
     >>> dataloader = dgl.dataloading.DataLoader(
     ...     g, torch.arange(g.num_nodes()), sampler,
     ...     batch_size=5, shuffle=True, drop_last=False, num_workers=4)
-    >>> for input_nodes, output_nodes, (subgraph,) in dataloader:
+    >>> for input_nodes, output_nodes, subgraph in dataloader:
     ...     print(subgraph)
     ...     assert torch.equal(input_nodes, subgraph.ndata[dgl.NID])
     ...     assert torch.equal(input_nodes[:output_nodes.shape[0]], output_nodes)

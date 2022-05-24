@@ -3,7 +3,7 @@ import scipy.sparse as sp
 import dgl
 import dgl.function as fn
 import backend as F
-from test_utils import parametrize_dtype
+from test_utils import parametrize_idtype
 
 D = 5
 
@@ -22,7 +22,7 @@ def generate_graph(idtype):
     g.edata.update({'e1': weights, 'e2': F.unsqueeze(weights, 1)})
     return g
 
-@parametrize_dtype
+@parametrize_idtype
 def test_v2v_update_all(idtype):
     def _test(fld):
         def message_func(edges):
@@ -62,7 +62,7 @@ def test_v2v_update_all(idtype):
     # test 2d node features
     _test('f2')
 
-@parametrize_dtype
+@parametrize_idtype
 def test_v2v_snr(idtype):
     u = F.tensor([0, 0, 0, 3, 4, 9], idtype)
     v = F.tensor([1, 2, 3, 9, 9, 0], idtype)
@@ -106,7 +106,7 @@ def test_v2v_snr(idtype):
     _test('f2')
 
 
-@parametrize_dtype
+@parametrize_idtype
 def test_v2v_pull(idtype):
     nodes = F.tensor([1, 2, 3, 9], idtype)
     def _test(fld):
@@ -147,7 +147,7 @@ def test_v2v_pull(idtype):
     # test 2d node features
     _test('f2')
 
-@parametrize_dtype
+@parametrize_idtype
 def test_update_all_multi_fallback(idtype):
     # create a graph with zero in degree nodes
     g = dgl.DGLGraph()
@@ -193,7 +193,7 @@ def test_update_all_multi_fallback(idtype):
                  _afunc)
     assert F.allclose(o2, g.ndata.pop('o2'))
 
-@parametrize_dtype
+@parametrize_idtype
 def test_pull_multi_fallback(idtype):
     # create a graph with zero in degree nodes
     g = dgl.DGLGraph()
@@ -247,7 +247,7 @@ def test_pull_multi_fallback(idtype):
     nodes = [0, 1, 2, 9]
     _pull_nodes(nodes)
 
-@parametrize_dtype
+@parametrize_idtype
 def test_spmv_3d_feat(idtype):
     def src_mul_edge_udf(edges):
         return {'sum': edges.src['h'] * F.unsqueeze(F.unsqueeze(edges.data['h'], 1), 1)}
