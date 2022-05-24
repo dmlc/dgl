@@ -98,27 +98,25 @@ class Receiver : public rpc::RPCReceiver {
    * \brief Recv data from Sender
    * \param msg pointer of data message
    * \param send_id which sender current msg comes from
+   * \param timeout The timeout value in milliseconds. If zero, wait indefinitely.
    * \return Status code
    *
-   * (1) The Recv() API is blocking, which will not 
-   *     return until getting data from message queue.
-   * (2) The Recv() API is thread-safe.
-   * (3) Memory allocated by communicator but will not own it after the function returns.
+   * (1) The Recv() API is thread-safe.
+   * (2) Memory allocated by communicator but will not own it after the function returns.
    */
-  virtual STATUS Recv(Message* msg, int* send_id) = 0;
+  virtual STATUS Recv(Message* msg, int* send_id, int timeout = 0) = 0;
 
   /*!
    * \brief Recv data from a specified Sender
    * \param msg pointer of data message
    * \param send_id sender's ID
+   * \param timeout The timeout value in milliseconds. If zero, wait indefinitely.
    * \return Status code
    *
-   * (1) The RecvFrom() API is blocking, which will not 
-   *     return until getting data from message queue.
-   * (2) The RecvFrom() API is thread-safe.
-   * (3) Memory allocated by communicator but will not own it after the function returns.
+   * (1) The RecvFrom() API is thread-safe.
+   * (2) Memory allocated by communicator but will not own it after the function returns.
    */
-  virtual STATUS RecvFrom(Message* msg, int send_id) = 0;
+  virtual STATUS RecvFrom(Message* msg, int send_id, int timeout = 0) = 0;
 
  protected:
   /*!

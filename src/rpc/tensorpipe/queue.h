@@ -11,6 +11,8 @@
 #include <condition_variable>
 #include <deque>
 #include <mutex>
+#include <chrono>
+#include <dmlc/logging.h>
 
 namespace dgl {
 namespace rpc {
@@ -30,18 +32,27 @@ class Queue {
     cv_.notify_all();
   }
 
-  T pop() {
-    std::unique_lock<std::mutex> lock(mutex_);
-    while (items_.size() == 0) {
-      cv_.wait(lock);
+  bool pop(T &msg, int timeout) {
+    if (timeout == 0) {
+      DLOG(WARNING) << "Will wait infinitely until message is popped...";
     }
-    T t(std::move(items_.front()));
+    std::chrono::milliseconds real_timeout =
+        timeout == 0 ? std::chrono::milliseconds::max()
+                     : std::chrono::milliseconds(timeout);
+    std::unique_lock<std::mutex> lock(mutex_);
+    if (!cv_.wait_for(lock, real_timeout,
+                      [this] { return items_.size() > 0; })) {
+      DLOG(WARNING) << "Times out for popping message after " << timeout
+                    << " milliseconds.";
+      return false;
+    }
+    msg = std::move(items_.front());
     items_.pop_front();
     cv_.notify_all();
-    return t;
+    return true;
   }
 
- private:
+private:
   std::mutex mutex_;
   std::condition_variable cv_;
   const int capacity_;
