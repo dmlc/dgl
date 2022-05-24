@@ -6,7 +6,7 @@ import pytest
 
 import dgl
 import backend as F
-from test_utils import parametrize_dtype
+from test_utils import parametrize_idtype
 
 D = 5
 
@@ -118,7 +118,7 @@ def create_test_heterograph(idtype):
     return g
 
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="MXNet doesn't support bool tensor")
-@parametrize_dtype
+@parametrize_idtype
 def test_subgraph_mask(idtype):
     g = create_test_heterograph(idtype)
     g_graph = g['follows']
@@ -158,7 +158,7 @@ def test_subgraph_mask(idtype):
                            'wishes': F.tensor([False, True], dtype=F.bool)})
     _check_subgraph(g, sg2)
 
-@parametrize_dtype
+@parametrize_idtype
 def test_subgraph1(idtype):
     g = create_test_heterograph(idtype)
     g_graph = g['follows']
@@ -310,7 +310,7 @@ def test_subgraph1(idtype):
         dst = F.asnumpy(dst)
         assert np.array_equal(src, np.array([1]))
 
-@parametrize_dtype
+@parametrize_idtype
 def test_in_subgraph(idtype):
     hg = dgl.heterograph({
         ('user', 'follow', 'user'): ([1, 2, 3, 0, 2, 3, 0], [0, 0, 0, 1, 1, 1, 2]),
@@ -377,7 +377,7 @@ def test_in_subgraph(idtype):
     assert subg.num_nodes('coin') == 0
     assert subg.num_edges('flips') == 0
 
-@parametrize_dtype
+@parametrize_idtype
 def test_out_subgraph(idtype):
     hg = dgl.heterograph({
         ('user', 'follow', 'user'): ([1, 2, 3, 0, 2, 3, 0], [0, 0, 0, 1, 1, 1, 2]),
@@ -459,7 +459,7 @@ def test_subgraph_message_passing():
     sg = g.subgraph([1, 2, 3]).to(F.ctx())
     sg.update_all(lambda edges: {'x': edges.src['x']}, lambda nodes: {'y': F.sum(nodes.mailbox['x'], 1)})
 
-@parametrize_dtype
+@parametrize_idtype
 def test_khop_in_subgraph(idtype):
     g = dgl.graph(([1, 1, 2, 3, 4], [0, 2, 0, 4, 2]), idtype=idtype, device=F.ctx())
     g.edata['w'] = F.tensor([
@@ -535,7 +535,7 @@ def test_khop_in_subgraph(idtype):
     assert F.array_equal(F.astype(inv['user'], idtype), F.tensor([0, 1], idtype))
     assert F.array_equal(F.astype(inv['game'], idtype), F.tensor([0], idtype))
 
-@parametrize_dtype
+@parametrize_idtype
 def test_khop_out_subgraph(idtype):
     g = dgl.graph(([0, 2, 0, 4, 2], [1, 1, 2, 3, 4]), idtype=idtype, device=F.ctx())
     g.edata['w'] = F.tensor([
@@ -646,7 +646,7 @@ def test_subframes(parent_idx_device, child_device):
 @unittest.skipIf(F._default_context_str != "gpu", reason="UVA only available on GPU")
 @pytest.mark.parametrize('device', [F.cpu(), F.cuda()])
 @unittest.skipIf(dgl.backend.backend_name != "pytorch", reason="UVA only supported for PyTorch")
-@parametrize_dtype
+@parametrize_idtype
 def test_uva_subgraph(idtype, device):
     g = create_test_heterograph(idtype)
     g = g.to(F.cpu())
