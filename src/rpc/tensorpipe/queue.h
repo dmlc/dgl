@@ -8,11 +8,11 @@
 #ifndef DGL_RPC_TENSORPIPE_QUEUE_H_
 #define DGL_RPC_TENSORPIPE_QUEUE_H_
 
+#include <dmlc/logging.h>
 #include <condition_variable>
 #include <deque>
 #include <mutex>
 #include <chrono>
-#include <dmlc/logging.h>
 
 namespace dgl {
 namespace rpc {
@@ -32,7 +32,7 @@ class Queue {
     cv_.notify_all();
   }
 
-  bool pop(T &msg, int timeout) {
+  bool pop(T *msg, int timeout) {
     if (timeout == 0) {
       DLOG(WARNING) << "Will wait infinitely until message is popped...";
     }
@@ -46,13 +46,13 @@ class Queue {
                     << " milliseconds.";
       return false;
     }
-    msg = std::move(items_.front());
+    *msg = std::move(items_.front());
     items_.pop_front();
     cv_.notify_all();
     return true;
   }
 
-private:
+ private:
   std::mutex mutex_;
   std::condition_variable cv_;
   const int capacity_;

@@ -38,6 +38,7 @@ class Semaphore {
    * \brief increase semaphore by 1
    */
   void Post();
+
  private:
 #ifdef _WIN32
   HANDLE sem_;

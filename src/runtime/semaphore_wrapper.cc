@@ -72,7 +72,7 @@ bool Semaphore::TimedWait(int timeout) {
   int ret = 0;
   while ((ret = sem_timedwait(&sem_, &ts) != 0) && errno == EINTR) {
     continue;
-  };
+  }
   if (ret != 0) {
     if (errno == ETIMEDOUT) {
       DLOG(WARNING) << "sem_timedwait timed out after " << timeout

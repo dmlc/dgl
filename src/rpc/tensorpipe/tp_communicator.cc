@@ -194,7 +194,7 @@ void TPReceiver::ReceiveFromPipe(std::shared_ptr<Pipe> pipe,
 }
 
 RPCStatus TPReceiver::Recv(RPCMessage *msg, int timeout) {
-  return queue_->pop(*msg, timeout) ? kRPCSuccess : kRPCTimeOut;
+  return queue_->pop(msg, timeout) ? kRPCSuccess : kRPCTimeOut;
 }
 
 }  // namespace rpc

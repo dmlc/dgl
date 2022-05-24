@@ -314,7 +314,7 @@ STATUS SocketReceiver::Recv(Message* msg, int* send_id, int timeout) {
   // When calling queue_sem_.Wait(), this Recv will be suspended until
   // queue_sem_ > 0 or specified timeout expires, decrease queue_sem_ by 1,
   // then start to fetch a message.
-  if (!queue_sem_.TimedWait(timeout)){
+  if (!queue_sem_.TimedWait(timeout)) {
     return QUEUE_EMPTY;
   }
   for (;;) {
