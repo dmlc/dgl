@@ -2370,54 +2370,54 @@ def test_module_sign(g):
 
     # raw
     transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', diffuse_op='raw')
-    transform(g)
+    g = transform(g)
     assert torch.allclose(g.ndata['out_feat_1'], torch.matmul(adj, g.ndata['h']))
 
     transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', eweight_name='scalar_w', diffuse_op='raw')
-    transform(g)
+    g = transform(g)
     assert torch.allclose(g.ndata['out_feat_1'], torch.matmul(weight_adj, g.ndata['h']))
 
     # rw
     adj_rw = torch.matmul(torch.diag(1 / adj.sum(dim=1)), adj)
     transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', diffuse_op='rw')
-    transform(g)
+    g = transform(g)
     assert torch.allclose(g.ndata['out_feat_1'], torch.matmul(adj_rw, g.ndata['h']))
 
     weight_adj_rw = torch.matmul(torch.diag(1 / weight_adj.sum(dim=1)), weight_adj)
     transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', eweight_name='scalar_w', diffuse_op='rw')
-    transform(g)
+    g = transform(g)
     assert torch.allclose(g.ndata['out_feat_1'], torch.matmul(weight_adj_rw, g.ndata['h']))
 
     # gcn
     raw_eweight = g.edata['scalar_w']
     gcn_norm = dgl.GCNNorm()
-    gcn_norm(g)
+    g = gcn_norm(g)
     adj_gcn = adj.clone()
     adj_gcn[dst, src] = g.edata.pop('w')
     transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', diffuse_op='gcn')
-    transform(g)
+    g = transform(g)
     assert torch.allclose(g.ndata['out_feat_1'], torch.matmul(adj_gcn, g.ndata['h']))
 
     gcn_norm = dgl.GCNNorm('scalar_w')
-    gcn_norm(g)
+    g = gcn_norm(g)
     weight_adj_gcn = weight_adj.clone()
     weight_adj_gcn[dst, src] = g.edata['scalar_w']
     g.edata['scalar_w'] = raw_eweight
     transform = dgl.SIGNDiffusion(k=1, in_feat_name='h',
                                   eweight_name='scalar_w', diffuse_op='gcn')
-    transform(g)
+    g = transform(g)
     assert torch.allclose(g.ndata['out_feat_1'], torch.matmul(weight_adj_gcn, g.ndata['h']))
 
     # ppr
     alpha = 0.2
     transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', diffuse_op='ppr', alpha=alpha)
-    transform(g)
+    g = transform(g)
     target = (1 - alpha) * torch.matmul(adj_gcn, g.ndata['h']) + alpha * g.ndata['h']
     assert torch.allclose(g.ndata['out_feat_1'], target)
 
     transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', eweight_name='scalar_w',
                                   diffuse_op='ppr', alpha=alpha)
-    transform(g)
+    g = transform(g)
     target = (1 - alpha) * torch.matmul(weight_adj_gcn, g.ndata['h']) + alpha * g.ndata['h']
     assert torch.allclose(g.ndata['out_feat_1'], target)
 

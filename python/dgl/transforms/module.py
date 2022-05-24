@@ -138,17 +138,18 @@ class RowFeatNormalizer(BaseTransform):
 
     Case1: Row normalize features of a homogeneous graph.
 
-    >>> transform = RowFeatNormalizer(node_feat_names=['h'], edge_feat_names=['w'])
+    >>> transform = RowFeatNormalizer(subtract_min=True,
+    ...                               node_feat_names=['h'], edge_feat_names=['w'])
     >>> g = dgl.rand_graph(5, 20)
     >>> g.ndata['h'] = torch.randn((g.num_nodes(), 5))
-    >>> g.edata['w'] = torch.randn((g.num_edges, 5))
+    >>> g.edata['w'] = torch.randn((g.num_edges(), 5))
     >>> g = transform(g)
     >>> print(g.ndata['h'].sum(1))
-    tensor([1.0000, 1.0000, 1.0000, 1.0000, 1.0000])
+    tensor([1., 1., 1., 1., 1.])
     >>> print(g.edata['w'].sum(1))
-    tensor([1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000,
-            1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000,
-            1.0000, 1.0000])
+    tensor([1., 1., 1., 1., 1., 1., 1., 1., 1.,
+            1., 1., 1., 1., 1., 1., 1., 1., 1.,
+            1., 1.])
 
     Case2: Row normalize features of a heterogeneous graph.
 
@@ -163,10 +164,10 @@ class RowFeatNormalizer(BaseTransform):
     ... }
     >>> g = transform(g)
     >>> print(g.ndata['h']['game'].sum(1), g.ndata['h']['player'].sum(1))
-    tensor([1.0000, 1.0000]) tensor([1.0000, 1.0000, 1.0000])
+    tensor([1., 1.]) tensor([1., 1., 1.])
     >>> print(g.edata['w'][('user', 'follows', 'user')].sum(1),
     ...     g.edata['w'][('player', 'plays', 'game')].sum(1))
-    tensor([1.0000, 1.0000]) tensor([1.0000, 1.0000])
+    tensor([1., 1.]) tensor([1., 1.])
     """
     def __init__(self, subtract_min=False, node_feat_names=None, edge_feat_names=None):
         self.node_feat_names = [] if node_feat_names is None else node_feat_names
@@ -248,21 +249,21 @@ class FeatMask(BaseTransform):
     >>> g = transform(g)
     >>> print(g.ndata['h'])
     tensor([[0., 0., 1., 1., 0., 0., 1., 1., 1., 0.],
-        [0., 0., 1., 1., 0., 0., 1., 1., 1., 0.],
-        [0., 0., 1., 1., 0., 0., 1., 1., 1., 0.],
-        [0., 0., 1., 1., 0., 0., 1., 1., 1., 0.],
-        [0., 0., 1., 1., 0., 0., 1., 1., 1., 0.]])
+            [0., 0., 1., 1., 0., 0., 1., 1., 1., 0.],
+            [0., 0., 1., 1., 0., 0., 1., 1., 1., 0.],
+            [0., 0., 1., 1., 0., 0., 1., 1., 1., 0.],
+            [0., 0., 1., 1., 0., 0., 1., 1., 1., 0.]])
     >>> print(g.edata['w'])
     tensor([[1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
-        [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
-        [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
-        [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
-        [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
-        [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
-        [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
-        [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
-        [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
-        [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.]])
+            [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
+            [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
+            [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
+            [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
+            [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
+            [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
+            [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
+            [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
+            [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.]])
 
     Case2 : Mask node and edge feature tensors of a heterogeneous graph.
 
@@ -272,23 +273,19 @@ class FeatMask(BaseTransform):
     ... })
     >>> g.ndata['h'] = {'game': torch.ones(2, 5), 'player': torch.ones(3, 5)}
     >>> g.edata['w'] = {('user', 'follows', 'user'): torch.ones(2, 5)}
-    >>> print(g.ndata['h']['game'], g.ndata['h']['player'])
+    >>> print(g.ndata['h']['game'])
     tensor([[1., 1., 1., 1., 1.],
-        [1., 1., 1., 1., 1.]]) tensor([[1., 1., 1., 1., 1.],
-        [1., 1., 1., 1., 1.],
-        [1., 1., 1., 1., 1.]])
+            [1., 1., 1., 1., 1.]])
     >>> print(g.edata['w'][('user', 'follows', 'user')])
     tensor([[1., 1., 1., 1., 1.],
-        [1., 1., 1., 1., 1.]])
+            [1., 1., 1., 1., 1.]])
     >>> g = transform(g)
-    >>> print(g.ndata['h']['game'], g.ndata['h']['player'])
+    >>> print(g.ndata['h']['game'])
     tensor([[1., 1., 0., 1., 0.],
-        [1., 1., 0., 1., 0.]]) tensor([[0., 0., 0., 0., 1.],
-        [0., 0., 0., 0., 1.],
-        [0., 0., 0., 0., 1.]])
+            [1., 1., 0., 1., 0.]])
     >>> print(g.edata['w'][('user', 'follows', 'user')])
     tensor([[0., 1., 0., 1., 0.],
-        [0., 1., 0., 1., 0.]])
+            [0., 1., 0., 1., 0.]])
     """
     def __init__(self, p=0.5, node_feat_names=None, edge_feat_names=None):
         self.p = p
