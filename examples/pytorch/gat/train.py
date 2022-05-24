@@ -107,7 +107,8 @@ def main(args):
     for epoch in range(args.epochs):
         model.train()
         if epoch >= 3:
-            torch.cuda.synchronize()
+            if cuda:
+                torch.cuda.synchronize()
             t0 = time.time()
         # forward
         logits = model(features)
@@ -118,7 +119,8 @@ def main(args):
         optimizer.step()
 
         if epoch >= 3:
-            torch.cuda.synchronize()
+            if cuda:
+                torch.cuda.synchronize()
             dur.append(time.time() - t0)
 
         train_acc = accuracy(logits[train_mask], labels[train_mask])

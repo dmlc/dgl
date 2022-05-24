@@ -2,7 +2,7 @@ import numpy as np
 import scipy.sparse as ssp
 import pytest
 import dgl
-from utils import parametrize_dtype
+from test_utils import parametrize_idtype
 import backend as F
 
 def _random_simple_graph(idtype, dtype, ctx, M, N, max_nnz, srctype, dsttype, etype):
@@ -27,7 +27,7 @@ def _random_simple_graph(idtype, dtype, ctx, M, N, max_nnz, srctype, dsttype, et
     A.edata['w'] = F.copy_to(F.tensor(val, dtype=dtype), ctx)
     return a, A
 
-@parametrize_dtype
+@parametrize_idtype
 @pytest.mark.parametrize('dtype', [F.float32, F.float64])
 def test_csrmm(idtype, dtype):
     a, A = _random_simple_graph(idtype, dtype, F.ctx(), 500, 600, 9000, 'A', 'B', 'AB')
@@ -39,7 +39,7 @@ def test_csrmm(idtype, dtype):
     c = F.tensor((a * b).todense(), dtype=dtype)
     assert F.allclose(C_adj, c)
 
-@parametrize_dtype
+@parametrize_idtype
 @pytest.mark.parametrize('dtype', [F.float32, F.float64])
 @pytest.mark.parametrize('num_vtypes', [1, 2])
 def test_csrmm_backward(idtype, dtype, num_vtypes):
@@ -77,7 +77,7 @@ def test_csrmm_backward(idtype, dtype, num_vtypes):
         assert np.allclose(a_dense_grad, A_spspmm_grad, rtol=1e-4, atol=1e-4)
         assert np.allclose(b_dense_grad, B_spspmm_grad, rtol=1e-4, atol=1e-4)
 
-@parametrize_dtype
+@parametrize_idtype
 @pytest.mark.parametrize('dtype', [F.float32, F.float64])
 def test_csrsum(idtype, dtype):
     a, A = _random_simple_graph(idtype, dtype, F.ctx(), 500, 600, 9000, 'A', 'B', 'AB')
@@ -89,7 +89,7 @@ def test_csrsum(idtype, dtype):
     c = F.tensor((a + b).todense(), dtype=dtype)
     assert F.allclose(C_adj, c)
 
-@parametrize_dtype
+@parametrize_idtype
 @pytest.mark.parametrize('dtype', [F.float32, F.float64])
 @pytest.mark.parametrize('nelems', [1, 2])
 def test_csrsum_backward(idtype, dtype, nelems):
@@ -144,7 +144,7 @@ def test_csrsum_backward(idtype, dtype, nelems):
             A_spspmm_grad = F.asnumpy(F.grad(A.edata['w']))
             assert np.allclose(a_dense_grad, A_spspmm_grad, rtol=1e-4, atol=1e-4)
 
-@parametrize_dtype
+@parametrize_idtype
 @pytest.mark.parametrize('dtype', [F.float32, F.float64])
 @pytest.mark.parametrize('A_nnz', [9000, 0])
 @pytest.mark.parametrize('B_nnz', [9000, 0])
@@ -158,7 +158,7 @@ def test_csrmask(idtype, dtype, A_nnz, B_nnz):
     c = F.tensor(a.todense()[B_row, B_col], dtype)
     assert F.allclose(C, c)
 
-@parametrize_dtype
+@parametrize_idtype
 @pytest.mark.parametrize('dtype', [F.float32, F.float64])
 def test_csrmask_backward(idtype, dtype):
     a, A = _random_simple_graph(idtype, dtype, F.ctx(), 3, 4, 6, 'A', 'B', 'AB')

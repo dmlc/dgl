@@ -152,7 +152,7 @@ def main(args):
     output = model.inference(
         g, args.batch_size, 'cuda' if use_cuda else 'cpu', 0, node_embed)
     test_pred = output[category][test_idx]
-    test_labels = labels[test_idx]
+    test_labels = labels[test_idx].to(test_pred.device)
     test_acc = (test_pred.argmax(1) == test_labels).float().mean()
     print("Test Acc: {:.4f}".format(test_acc))
     print()

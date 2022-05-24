@@ -9,7 +9,7 @@ import networkx as nx
 import unittest, pytest
 from dgl import DGLError
 import test_utils
-from test_utils import parametrize_dtype, get_cases
+from test_utils import parametrize_idtype, get_cases
 from utils import assert_is_identical_hetero
 from scipy.sparse import rand
 import multiprocessing as mp
@@ -102,7 +102,7 @@ def create_test_heterograph5(idtype):
 def get_redfn(name):
     return getattr(F, name)
 
-@parametrize_dtype
+@parametrize_idtype
 def test_create(idtype):
     device = F.ctx()
     g0 = create_test_heterograph(idtype)
@@ -233,7 +233,7 @@ def test_create2():
     g = dgl.heterograph(
         {('A', 'AB', 'B'): ('csc', (indptr, indices, data))}, num_nodes_dict={'A': 20, 'B': 30})
 
-@parametrize_dtype
+@parametrize_idtype
 def test_query(idtype):
     g = create_test_heterograph(idtype)
 
@@ -393,7 +393,7 @@ def test_query(idtype):
     # test repr
     print(g)
 
-@parametrize_dtype
+@parametrize_idtype
 def test_empty_query(idtype):
     g = dgl.graph(([1, 2, 3], [0, 4, 5]), idtype=idtype, device=F.ctx())
     g.add_nodes(0)
@@ -512,7 +512,7 @@ def _test_edge_ids():
     eid = g2.edge_ids(0, 1, etype='follows')
     assert eid == 0
 
-@parametrize_dtype
+@parametrize_idtype
 def test_adj(idtype):
     g = create_test_heterograph(idtype)
     adj = F.sparse_to_numpy(g.adj(transpose=True, etype='follows'))
@@ -568,7 +568,7 @@ def test_adj(idtype):
                       [1., 0., 0.],
                       [0., 1., 0.]]))
 
-@parametrize_dtype
+@parametrize_idtype
 def test_inc(idtype):
     g = create_test_heterograph(idtype)
     adj = F.sparse_to_numpy(g['follows'].inc('in'))
@@ -607,7 +607,7 @@ def test_inc(idtype):
                       [1., -1.],
                       [0., 1.]]))
 
-@parametrize_dtype
+@parametrize_idtype
 def test_view(idtype):
     # test single node type
     g = dgl.heterograph({
@@ -689,7 +689,7 @@ def test_view(idtype):
     assert F.array_equal(g.dstnodes('user'), F.arange(0, 3, idtype))
     g.dstnodes['user'].data.pop('h')
 
-@parametrize_dtype
+@parametrize_idtype
 def test_view1(idtype):
     # test relation view
     HG = create_test_heterograph(idtype)
@@ -818,7 +818,7 @@ def test_view1(idtype):
     assert F.array_equal(f3, f4)
     assert F.array_equal(g.edges(form='eid'), F.arange(0, 2, g.idtype))
 
-@parametrize_dtype
+@parametrize_idtype
 def test_flatten(idtype):
     def check_mapping(g, fg):
         if len(fg.ntypes) == 1:
@@ -924,7 +924,7 @@ def test_flatten(idtype):
     check_mapping(g, fg)
 
 @unittest.skipIf(F._default_context_str == 'cpu', reason="Need gpu for this test")
-@parametrize_dtype
+@parametrize_idtype
 def test_to_device(idtype):
     # TODO: rewrite this test case to accept different graphs so we
     #  can test reverse graph and batched graph
@@ -966,7 +966,7 @@ def test_to_device(idtype):
             g1.edges['plays'].data['e'] = F.copy_to(F.ones((4, 4)), F.cpu())
 
 @unittest.skipIf(F._default_context_str == 'cpu', reason="Need gpu for this test")
-@parametrize_dtype
+@parametrize_idtype
 @pytest.mark.parametrize('g', get_cases(['block']))
 def test_to_device2(g, idtype):
     g = g.astype(idtype)
@@ -981,7 +981,7 @@ def test_to_device2(g, idtype):
 
 @unittest.skipIf(F._default_context_str == 'cpu', reason="Need gpu for this test")
 @unittest.skipIf(dgl.backend.backend_name != "pytorch", reason="Pinning graph inplace only supported for PyTorch")
-@parametrize_dtype
+@parametrize_idtype
 def test_pin_memory_(idtype):
     # TODO: rewrite this test case to accept different graphs so we
     #  can test reverse graph and batched graph
@@ -1039,7 +1039,7 @@ def test_pin_memory_(idtype):
         with pytest.raises(DGLError):
             g1.pin_memory_()
 
-@parametrize_dtype
+@parametrize_idtype
 def test_convert_bound(idtype):
     def _test_bipartite_bound(data, card):
         with pytest.raises(DGLError):
@@ -1057,7 +1057,7 @@ def test_convert_bound(idtype):
     _test_graph_bound(([0, 1], [1, 3]), 3)
 
 
-@parametrize_dtype
+@parametrize_idtype
 def test_convert(idtype):
     hg = create_test_heterograph(idtype)
     hs = []
@@ -1186,7 +1186,7 @@ def test_convert(idtype):
     assert g.num_nodes() == 2
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Test on cpu is enough")
-@parametrize_dtype
+@parametrize_idtype
 def test_to_homo_zero_nodes(idtype):
     # Fix gihub issue #2870
     g = dgl.heterograph({
@@ -1198,7 +1198,7 @@ def test_to_homo_zero_nodes(idtype):
     gg = dgl.to_homogeneous(g, ['x'])
     assert 'x' in gg.ndata
 
-@parametrize_dtype
+@parametrize_idtype
 def test_to_homo2(idtype):
     # test the result homogeneous graph has nodes and edges sorted by their types
     hg = create_test_heterograph(idtype)
@@ -1228,7 +1228,7 @@ def test_to_homo2(idtype):
     for i, count in enumerate(etype_count):
         assert count == hg.num_edges(hg.canonical_etypes[i])
 
-@parametrize_dtype
+@parametrize_idtype
 def test_invertible_conversion(idtype):
     # Test whether to_homogeneous and to_heterogeneous are invertible
     hg = create_test_heterograph(idtype)
@@ -1236,7 +1236,7 @@ def test_invertible_conversion(idtype):
     hg2 = dgl.to_heterogeneous(g, hg.ntypes, hg.etypes)
     assert_is_identical_hetero(hg, hg2, True)
 
-@parametrize_dtype
+@parametrize_idtype
 def test_metagraph_reachable(idtype):
     g = create_test_heterograph(idtype)
     x = F.randn((3, 5))
@@ -1255,7 +1255,7 @@ def test_metagraph_reachable(idtype):
     assert F.asnumpy(new_g.has_edges_between([0, 1], [1, 2])).all()
 
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="MXNet doesn't support bool tensor")
-@parametrize_dtype
+@parametrize_idtype
 def test_subgraph_mask(idtype):
     g = create_test_heterograph(idtype)
     g_graph = g['follows']
@@ -1297,7 +1297,7 @@ def test_subgraph_mask(idtype):
                                'wishes': F.tensor([False, True], dtype=F.bool)})
         _check_subgraph(g, sg2)
 
-@parametrize_dtype
+@parametrize_idtype
 def test_subgraph(idtype):
     g = create_test_heterograph(idtype)
     g_graph = g['follows']
@@ -1446,7 +1446,7 @@ def test_subgraph(idtype):
     sg5 = g.edge_type_subgraph(['follows', 'plays', 'wishes'])
     _check_typed_subgraph1(g, sg5)
 
-@parametrize_dtype
+@parametrize_idtype
 def test_apply(idtype):
     def node_udf(nodes):
         return {'h': nodes.data['h'] * 2}
@@ -1484,7 +1484,7 @@ def test_apply(idtype):
     with pytest.raises(DGLError):
         g.apply_edges(edge_udf)
 
-@parametrize_dtype
+@parametrize_idtype
 def test_level2(idtype):
     #edges = {
     #    'follows': ([0, 1], [1, 2]),
@@ -1608,7 +1608,7 @@ def test_level2(idtype):
 
     g.nodes['game'].data.clear()
 
-@parametrize_dtype
+@parametrize_idtype
 @unittest.skipIf(F._default_context_str == 'cpu', reason="Need gpu for this test")
 def test_more_nnz(idtype):
     g = dgl.graph(([0, 0, 0, 0, 0], [1, 1, 1, 1, 1]), idtype=idtype, device=F.ctx())
@@ -1620,7 +1620,7 @@ def test_more_nnz(idtype):
     ans = F.copy_to(F.tensor(ans, dtype=F.dtype(y)), ctx=F.ctx())
     assert F.array_equal(y, ans)
 
-@parametrize_dtype
+@parametrize_idtype
 def test_updates(idtype):
     def msg_func(edges):
         return {'m': edges.src['h']}
@@ -1662,7 +1662,7 @@ def test_updates(idtype):
         del g.nodes['game'].data['y']
 
 
-@parametrize_dtype
+@parametrize_idtype
 def test_backward(idtype):
     g = create_test_heterograph(idtype)
     x = F.randn((3, 5))
@@ -1681,7 +1681,7 @@ def test_backward(idtype):
                                               [2., 2., 2., 2., 2.]]))
 
 
-@parametrize_dtype
+@parametrize_idtype
 def test_empty_heterograph(idtype):
     def assert_empty(g):
         assert g.number_of_nodes('user') == 0
@@ -1708,7 +1708,7 @@ def test_empty_heterograph(idtype):
     assert g.number_of_edges('develops') == 2
     assert g.number_of_nodes('developer') == 2
 
-@parametrize_dtype
+@parametrize_idtype
 def test_types_in_function(idtype):
     def mfunc1(edges):
         assert edges.canonical_etype == ('user', 'follow', 'user')
@@ -1763,7 +1763,7 @@ def test_types_in_function(idtype):
     g.filter_nodes(filter_nodes2, ntype='game')
     g.filter_edges(filter_edges2)
 
-@parametrize_dtype
+@parametrize_idtype
 def test_stack_reduce(idtype):
     #edges = {
     #    'follows': ([0, 1], [1, 2]),
@@ -1790,7 +1790,7 @@ def test_stack_reduce(idtype):
             'stack')
     assert g.nodes['game'].data['y'].shape == (g.number_of_nodes('game'), 1, 200)
 
-@parametrize_dtype
+@parametrize_idtype
 def test_isolated_ntype(idtype):
     g = dgl.heterograph({
         ('A', 'AB', 'B'): ([0, 1, 2], [1, 2, 3])},
@@ -1817,7 +1817,7 @@ def test_isolated_ntype(idtype):
     assert g.number_of_nodes('C') == 4
 
 
-@parametrize_dtype
+@parametrize_idtype
 def test_ismultigraph(idtype):
     g1 = dgl.heterograph({('A', 'AB', 'B'): ([0, 0, 1, 2], [1, 2, 5, 5])},
                          {'A': 6, 'B': 6}, idtype=idtype, device=F.ctx())
@@ -1850,7 +1850,7 @@ def test_ismultigraph(idtype):
         {'A': 6, 'C': 6}, idtype=idtype, device=F.ctx())
     assert g.is_multigraph == True
 
-@parametrize_dtype
+@parametrize_idtype
 def test_bipartite(idtype):
     g1 = dgl.heterograph({('A', 'AB', 'B'): ([0, 0, 1], [1, 2, 5])},
                          idtype=idtype, device=F.ctx())
@@ -1910,7 +1910,7 @@ def test_bipartite(idtype):
 
     assert not g4.is_unibipartite
 
-@parametrize_dtype
+@parametrize_idtype
 def test_dtype_cast(idtype):
     g = dgl.graph(([0, 1, 0, 2], [0, 1, 1, 0]), idtype=idtype, device=F.ctx())
     assert g.idtype == idtype
@@ -1983,7 +1983,7 @@ def test_float_cast():
             assert len(values) == len(pvalues)
             assert F.allclose(values, F.tensor(pvalues), 0, 0)
 
-@parametrize_dtype
+@parametrize_idtype
 def test_format(idtype):
     # single relation
     g = dgl.graph(([0, 1, 0, 2], [0, 1, 1, 0]), idtype=idtype, device=F.ctx())
@@ -2020,7 +2020,7 @@ def test_format(idtype):
         assert g.in_degrees(vid) == ind_arr[vid]
     assert F.array_equal(in_degrees, g.in_degrees())
 
-@parametrize_dtype
+@parametrize_idtype
 def test_edges_order(idtype):
     # (0, 2), (1, 2), (0, 1), (0, 1), (2, 1)
     g = dgl.graph((
@@ -2033,7 +2033,7 @@ def test_edges_order(idtype):
     assert F.array_equal(src, F.tensor([0, 0, 0, 1, 2], dtype=idtype))
     assert F.array_equal(dst, F.tensor([1, 1, 2, 2, 1], dtype=idtype))
 
-@parametrize_dtype
+@parametrize_idtype
 def test_reverse(idtype):
     g = dgl.heterograph({
         ('user', 'follows', 'user'): ([0, 1, 2, 4, 3 ,1, 3], [1, 2, 3, 2, 0, 0, 1]),
@@ -2160,7 +2160,7 @@ def test_reverse(idtype):
     assert F.array_equal(g_s, rg_d)
     assert F.array_equal(g_d, rg_s)
 
-@parametrize_dtype
+@parametrize_idtype
 def test_clone(idtype):
     g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
     g.ndata['h'] = F.copy_to(F.tensor([1, 1, 1], dtype=idtype), ctx=F.ctx())
@@ -2220,7 +2220,7 @@ def test_clone(idtype):
     assert g.edges['plays'].data['h'].shape[0] != new_g.edges['plays'].data['h'].shape[0]
 
 
-@parametrize_dtype
+@parametrize_idtype
 def test_add_edges(idtype):
     # homogeneous graph
     g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
@@ -2390,7 +2390,7 @@ def test_add_edges(idtype):
     assert F.array_equal(g.nodes['game'].data['h'], F.tensor([2, 2, 1, 1], dtype=idtype))
     assert F.array_equal(g.edges['develops'].data['h'], F.tensor([0, 0, 2, 2], dtype=idtype))
 
-@parametrize_dtype
+@parametrize_idtype
 def test_add_nodes(idtype):
     # homogeneous Graphs
     g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
@@ -2427,7 +2427,7 @@ def test_add_nodes(idtype):
     assert F.array_equal(g.nodes['game'].data['h'], F.tensor([2, 2, 2, 2], dtype=idtype))
 
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="MXNet has error with (0,) shape tensor.")
-@parametrize_dtype
+@parametrize_idtype
 def test_remove_edges(idtype):
     # homogeneous Graphs
     g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
@@ -2520,7 +2520,7 @@ def test_remove_edges(idtype):
     assert F.array_equal(g.nodes['game'].data['h'], F.tensor([2, 2], dtype=idtype))
     assert F.array_equal(g.nodes['developer'].data['h'], F.tensor([3, 3], dtype=idtype))
 
-@parametrize_dtype
+@parametrize_idtype
 def test_remove_nodes(idtype):
     # homogeneous Graphs
     g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
@@ -2618,7 +2618,7 @@ def test_remove_nodes(idtype):
     assert F.array_equal(u, F.tensor([1], dtype=idtype))
     assert F.array_equal(v, F.tensor([0], dtype=idtype))
 
-@parametrize_dtype
+@parametrize_idtype
 def test_frame(idtype):
     g = dgl.graph(([0, 1, 2], [1, 2, 3]), idtype=idtype, device=F.ctx())
     g.ndata['h'] = F.copy_to(F.tensor([0, 1, 2, 3], dtype=idtype), ctx=F.ctx())
@@ -2659,7 +2659,7 @@ def test_frame(idtype):
 
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TensorFlow always create a new tensor")
 @unittest.skipIf(F._default_context_str == 'cpu', reason="cpu do not have context change problem")
-@parametrize_dtype
+@parametrize_idtype
 def test_frame_device(idtype):
     g = dgl.graph(([0,1,2], [2,3,1]))
     g.ndata['h'] = F.copy_to(F.tensor([1,1,1,2], dtype=idtype), ctx=F.cpu())
@@ -2710,7 +2710,7 @@ def test_frame_device(idtype):
     assert F.context(ng._node_frames[0]._columns['hh'].storage) == F.ctx()
     assert F.context(ng._edge_frames[0]._columns['h'].storage) == F.cpu()
 
-@parametrize_dtype
+@parametrize_idtype
 def test_create_block(idtype):
     block = dgl.create_block(([0, 1, 2], [1, 2, 3]), idtype=idtype, device=F.ctx())
     assert block.num_src_nodes() == 3
@@ -2822,7 +2822,7 @@ def test_create_block(idtype):
     assert hg.edges['AB'].data['x'] is eabx
     assert hg.edges['BA'].data['x'] is ebax
 
-@parametrize_dtype
+@parametrize_idtype
 @pytest.mark.parametrize('fmt', ['coo', 'csr', 'csc'])
 def test_adj_sparse(idtype, fmt):
     if fmt == 'coo':
