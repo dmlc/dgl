@@ -16,7 +16,7 @@ def test_callback(arg):
     assert ret == arg + 1
 
 @pytest.mark.parametrize('dtype', [F.float32, F.float64, F.int32, F.int64])
-def test_callback_array(dtype):
+def _test_callback_array(dtype):
     def cb(x):
         return F.to_dgl_nd(F.from_dgl_nd(x) + 1)
     arg = F.copy_to(F.tensor([1, 2, 3], dtype=dtype), F.ctx())
@@ -31,7 +31,7 @@ def test_callback_thread(arg):
     assert ret == arg + 1
 
 @pytest.mark.parametrize('dtype', [F.float32, F.float64, F.int32, F.int64])
-def test_callback_array_thread(dtype):
+def _test_callback_array_thread(dtype):
     def cb(x):
         return F.to_dgl_nd(F.from_dgl_nd(x) + 1)
     arg = F.copy_to(F.tensor([1, 2, 3], dtype=dtype), F.ctx())
