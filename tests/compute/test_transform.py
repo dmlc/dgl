@@ -2396,7 +2396,8 @@ def test_module_sign(g):
     adj_gcn[dst, src] = g.edata.pop('w')
     transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', diffuse_op='gcn')
     g = transform(g)
-    assert torch.allclose(g.ndata['out_feat_1'], torch.matmul(adj_gcn, g.ndata['h']))
+    target = torch.matmul(adj_gcn, g.ndata['h'])
+    assert torch.allclose(g.ndata['out_feat_1'], target)
 
     gcn_norm = dgl.GCNNorm('scalar_w')
     g = gcn_norm(g)
@@ -2406,7 +2407,8 @@ def test_module_sign(g):
     transform = dgl.SIGNDiffusion(k=1, in_feat_name='h',
                                   eweight_name='scalar_w', diffuse_op='gcn')
     g = transform(g)
-    assert torch.allclose(g.ndata['out_feat_1'], torch.matmul(weight_adj_gcn, g.ndata['h']))
+    target = torch.matmul(weight_adj_gcn, g.ndata['h'])
+    assert torch.allclose(g.ndata['out_feat_1'], target)
 
     # ppr
     alpha = 0.2
