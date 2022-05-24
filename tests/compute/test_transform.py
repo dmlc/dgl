@@ -24,6 +24,8 @@ import dgl.partition
 import backend as F
 import unittest
 import math
+import pytest
+from test_utils.graph_cases import get_cases
 from utils import parametrize_dtype
 
 from test_heterograph import create_test_heterograph3, create_test_heterograph4, create_test_heterograph5
@@ -2241,9 +2243,6 @@ def test_module_heat_kernel(idtype):
     assert new_g.idtype == g.idtype
     assert new_g.device == g.device
     assert new_g.num_nodes() == g.num_nodes()
-    src, dst = new_g.edges()
-    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
-    assert eset == {(0, 2), (0, 4), (1, 3), (1, 5), (2, 3), (2, 4), (3, 5), (4, 5)}
     assert F.allclose(g.ndata['h'], new_g.ndata['h'])
     assert 'w' in new_g.edata
 
@@ -2352,6 +2351,141 @@ def test_module_laplacian_pe(idtype):
     # pytorch & mxnet
     else:
         assert F.allclose(new_g.ndata['lappe'].abs(), tgt)
+
+@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
+@pytest.mark.parametrize('g', get_cases(['has_scalar_e_feature']))
+def test_module_sign(g):
+    import torch
+
+    ctx = F.ctx()
+    g = g.to(ctx)
+    adj = g.adj(transpose=True, scipy_fmt='coo').todense()
+    adj = torch.tensor(adj).float().to(ctx)
+
+    weight_adj = g.adj(transpose=True, scipy_fmt='coo').astype(float).todense()
+    weight_adj = torch.tensor(weight_adj).float().to(ctx)
+    src, dst = g.edges()
+    src, dst = src.long(), dst.long()
+    weight_adj[dst, src] = g.edata['scalar_w']
+
+    # raw
+    transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', diffuse_op='raw')
+    transform(g)
+    assert torch.allclose(g.ndata['out_feat_1'], torch.matmul(adj, g.ndata['h']))
+
+    transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', eweight_name='scalar_w', diffuse_op='raw')
+    transform(g)
+    assert torch.allclose(g.ndata['out_feat_1'], torch.matmul(weight_adj, g.ndata['h']))
+
+    # rw
+    adj_rw = torch.matmul(torch.diag(1 / adj.sum(dim=1)), adj)
+    transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', diffuse_op='rw')
+    transform(g)
+    assert torch.allclose(g.ndata['out_feat_1'], torch.matmul(adj_rw, g.ndata['h']))
+
+    weight_adj_rw = torch.matmul(torch.diag(1 / weight_adj.sum(dim=1)), weight_adj)
+    transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', eweight_name='scalar_w', diffuse_op='rw')
+    transform(g)
+    assert torch.allclose(g.ndata['out_feat_1'], torch.matmul(weight_adj_rw, g.ndata['h']))
+
+    # gcn
+    raw_eweight = g.edata['scalar_w']
+    gcn_norm = dgl.GCNNorm()
+    gcn_norm(g)
+    adj_gcn = adj.clone()
+    adj_gcn[dst, src] = g.edata.pop('w')
+    transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', diffuse_op='gcn')
+    transform(g)
+    assert torch.allclose(g.ndata['out_feat_1'], torch.matmul(adj_gcn, g.ndata['h']))
+
+    gcn_norm = dgl.GCNNorm('scalar_w')
+    gcn_norm(g)
+    weight_adj_gcn = weight_adj.clone()
+    weight_adj_gcn[dst, src] = g.edata['scalar_w']
+    g.edata['scalar_w'] = raw_eweight
+    transform = dgl.SIGNDiffusion(k=1, in_feat_name='h',
+                                  eweight_name='scalar_w', diffuse_op='gcn')
+    transform(g)
+    assert torch.allclose(g.ndata['out_feat_1'], torch.matmul(weight_adj_gcn, g.ndata['h']))
+
+    # ppr
+    alpha = 0.2
+    transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', diffuse_op='ppr', alpha=alpha)
+    transform(g)
+    target = (1 - alpha) * torch.matmul(adj_gcn, g.ndata['h']) + alpha * g.ndata['h']
+    assert torch.allclose(g.ndata['out_feat_1'], target)
+
+    transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', eweight_name='scalar_w',
+                                  diffuse_op='ppr', alpha=alpha)
+    transform(g)
+    target = (1 - alpha) * torch.matmul(weight_adj_gcn, g.ndata['h']) + alpha * g.ndata['h']
+    assert torch.allclose(g.ndata['out_feat_1'], target)
+
+@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
+@parametrize_dtype
+def test_module_row_feat_normalizer(idtype):
+    # Case1: Normalize features of a homogeneous graph.
+    transform = dgl.RowFeatNormalizer(subtract_min=True)
+    g = dgl.rand_graph(5, 5, idtype=idtype, device=F.ctx())
+    g.ndata['h'] = F.randn((g.num_nodes(), 128))
+    g.edata['w'] = F.randn((g.num_edges(), 128))
+    g = transform(g)
+    assert g.ndata['h'].shape == (g.num_nodes(), 128)
+    assert g.edata['w'].shape == (g.num_edges(), 128)
+    assert F.allclose(g.ndata['h'].sum(1), F.tensor([1.0, 1.0, 1.0, 1.0, 1.0]))
+    assert F.allclose(g.edata['w'].sum(1), F.tensor([1.0, 1.0, 1.0, 1.0, 1.0]))
+
+    # Case2: Normalize features of a heterogeneous graph.
+    transform = dgl.RowFeatNormalizer(subtract_min=True)
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): (F.tensor([1, 2]), F.tensor([3, 4])),
+        ('player', 'plays', 'game'): (F.tensor([2, 2]), F.tensor([1, 1]))
+    }, idtype=idtype, device=F.ctx())
+    g.ndata['h'] = {'game': F.randn((2, 128)), 'player': F.randn((3, 128))}
+    g.ndata['h2'] = {'user': F.randn((5, 128))}
+    g.edata['w'] = {('user', 'follows', 'user'): F.randn((2, 128)), ('player', 'plays', 'game'): F.randn((2, 128))}
+    g = transform(g)
+    assert g.ndata['h']['game'].shape == (2, 128)
+    assert g.ndata['h']['player'].shape == (3, 128)
+    assert g.ndata['h2']['user'].shape == (5, 128)
+    assert g.edata['w'][('user', 'follows', 'user')].shape == (2, 128)
+    assert g.edata['w'][('player', 'plays', 'game')].shape == (2, 128)
+    assert F.allclose(g.ndata['h']['game'].sum(1), F.tensor([1.0, 1.0]))
+    assert F.allclose(g.ndata['h']['player'].sum(1), F.tensor([1.0, 1.0, 1.0]))
+    assert F.allclose(g.ndata['h2']['user'].sum(1), F.tensor([1.0, 1.0, 1.0, 1.0, 1.0]))
+    assert F.allclose(g.edata['w'][('user', 'follows', 'user')].sum(1), F.tensor([1.0, 1.0]))
+    assert F.allclose(g.edata['w'][('player', 'plays', 'game')].sum(1), F.tensor([1.0, 1.0]))
+
+@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
+@parametrize_dtype
+def test_module_feat_mask(idtype):
+    # Case1: Mask node and edge feature tensors of a homogeneous graph.
+    transform = dgl.FeatMask()
+    g = dgl.rand_graph(5, 20, idtype=idtype, device=F.ctx())
+    g.ndata['h'] = F.ones((g.num_nodes(), 10))
+    g.edata['w'] = F.ones((g.num_edges(), 20))
+    g = transform(g)
+    assert g.device == g.device
+    assert g.idtype == g.idtype
+    assert g.ndata['h'].shape == (g.num_nodes(), 10)
+    assert g.edata['w'].shape == (g.num_edges(), 20)
+
+    # Case2: Mask node and edge feature tensors of a heterogeneous graph.
+    transform = dgl.FeatMask()
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): (F.tensor([1, 2]), F.tensor([3, 4])),
+        ('player', 'plays', 'game'): (F.tensor([2, 2]), F.tensor([1, 1]))
+    }, idtype=idtype, device=F.ctx())
+    g.ndata['h'] = {'game': F.randn((2, 5)), 'player': F.randn((3, 5))}
+    g.edata['w'] = {('user', 'follows', 'user'): F.randn((2, 5)),
+                    ('player', 'plays', 'game'): F.randn((2, 5))}
+    g = transform(g)
+    assert g.device == g.device
+    assert g.idtype == g.idtype
+    assert g.ndata['h']['game'].shape == (2, 5)
+    assert g.ndata['h']['player'].shape == (3, 5)
+    assert g.edata['w'][('user', 'follows', 'user')].shape == (2, 5)
+    assert g.edata['w'][('player', 'plays', 'game')].shape == (2, 5)
 
 if __name__ == '__main__':
     test_partition_with_halo()

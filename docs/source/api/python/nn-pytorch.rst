@@ -23,6 +23,7 @@ Conv Layers
     ~dgl.nn.pytorch.conv.SGConv
     ~dgl.nn.pytorch.conv.APPNPConv
     ~dgl.nn.pytorch.conv.GINConv
+    ~dgl.nn.pytorch.conv.GINEConv
     ~dgl.nn.pytorch.conv.GatedGraphConv
     ~dgl.nn.pytorch.conv.GMMConv
     ~dgl.nn.pytorch.conv.ChebConv

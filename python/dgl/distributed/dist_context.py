@@ -174,7 +174,7 @@ class CustomPool:
 
 
 def initialize(ip_config, num_servers=1, num_workers=0,
-               max_queue_size=MAX_QUEUE_SIZE, net_type='socket',
+               max_queue_size=MAX_QUEUE_SIZE, net_type='tensorpipe',
                num_worker_threads=1):
     """Initialize DGL's distributed module
 
@@ -201,9 +201,9 @@ def initialize(ip_config, num_servers=1, num_workers=0,
         Note that the 20 GB is just an upper-bound and DGL uses zero-copy and
         it will not allocate 20GB memory at once.
     net_type : str, optional
-        Networking type. Currently the only valid option is ``'socket'``.
+        Networking type. Valid options are: ``'socket'``, ``'tensorpipe'``.
 
-        Default: ``'socket'``
+        Default: ``'tensorpipe'``
     num_worker_threads: int
         The number of threads in a worker process.
 
@@ -235,7 +235,8 @@ def initialize(ip_config, num_servers=1, num_workers=0,
                                int(os.environ.get('DGL_NUM_CLIENT')),
                                os.environ.get('DGL_CONF_PATH'),
                                graph_format=formats,
-                               keep_alive=keep_alive)
+                               keep_alive=keep_alive,
+                               net_type=net_type)
         serv.start()
         sys.exit()
     else:

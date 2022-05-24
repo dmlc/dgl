@@ -1,7 +1,6 @@
 from typing import List
 import torch
 import torch.nn as nn
-import dgl.function as fn
 import torch.nn.functional as F
 from dgl.nn import GATConv
 from dgl.base import dgl_warning
@@ -39,7 +38,7 @@ class GAT(nn.Module):
             Dropout rate for features.
         attn_drop : float
             Dropout rate for attentions.
-        negative_slope: float
+        negative_slope : float
             Negative slope for leaky relu in GATConv
         residual : bool
             If true, the GATConv will use residule connection
@@ -61,17 +60,16 @@ class GAT(nn.Module):
             in_hidden = hidden_size*heads[i-1] if i > 0 else in_size
             out_hidden = hidden_size if i < num_layers - \
                 1 else data_info["out_size"]
-            use_residual = i == num_layers
-            activation = None if i == num_layers else self.activation
+            activation = None if i == num_layers - 1 else self.activation
 
             self.gat_layers.append(GATConv(
                 in_hidden, out_hidden, heads[i],
-                feat_drop, attn_drop, negative_slope, use_residual, activation))
+                feat_drop, attn_drop, negative_slope, residual, activation))
 
     def forward(self, graph, node_feat, edge_feat=None):
         if self.embed_size > 0:
             dgl_warning(
-                "The embedding for node feature is used, and input node_feat is ignored, due to the provided embed_size.", norepeat=True)
+                "The embedding for node feature is used, and input node_feat is ignored, due to the provided embed_size.")
             h = self.embed.weight
         else:
             h = node_feat

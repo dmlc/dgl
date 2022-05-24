@@ -40,6 +40,7 @@ def generate_ip_config(file_name, num_machines, num_servers):
 
 def reset_envs():
     """Reset common environment variable which are set in tests. """
-    for key in ['DGL_ROLE', 'DGL_NUM_SAMPLER', 'DGL_NUM_SERVER', 'DGL_DIST_MODE', 'DGL_NUM_CLIENT']:
+    for key in ['DGL_ROLE', 'DGL_NUM_SAMPLER', 'DGL_NUM_SERVER', \
+                'DGL_DIST_MODE', 'DGL_NUM_CLIENT', 'DGL_DIST_MAX_TRY_TIMES']:
         if key in os.environ:
             os.environ.pop(key)

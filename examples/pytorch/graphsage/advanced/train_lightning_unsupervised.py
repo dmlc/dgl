@@ -136,9 +136,9 @@ class DataModule(LightningDataModule):
             num_workers=self.num_workers)
 
     def val_dataloader(self):
-        # Note that the validation data loader is a NodeDataLoader
+        # Note that the validation data loader is a DataLoader
         # as we want to evaluate all the node embeddings.
-        return dgl.dataloading.NodeDataLoader(
+        return dgl.dataloading.DataLoader(
             self.g,
             np.arange(self.g.num_nodes()),
             self.sampler,

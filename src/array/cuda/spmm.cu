@@ -46,7 +46,6 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
              NDArray efeat,
              NDArray out,
              std::vector<NDArray> out_aux) {
-  int64_t feat_len = bcast.out_len;
   bool is_scalar_efeat = efeat.NumElements() == csr.indices->shape[0];
   bool use_efeat = op != "copy_lhs";
 

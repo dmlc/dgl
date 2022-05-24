@@ -54,7 +54,6 @@ class GAT(nn.Module):
     def forward(self, inputs):
         h = inputs
         for l in range(self.num_layers):
-            h = self.gat_layers[l](self.g, h).flatten(1)
-        # output projection
-        logits = self.gat_layers[-1](self.g, h).mean(1)
-        return logits
+            h = self.gat_layers[l](self.g, h)
+            h = h.flatten(1) if l != self.num_layers - 1 else h.mean(1)
+        return h

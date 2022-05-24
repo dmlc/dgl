@@ -21,7 +21,7 @@ def train(
     loss_function: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
     labels: torch.Tensor,
     predict_category: str,
-    dataloader: dgl.dataloading.NodeDataLoader,
+    dataloader: dgl.dataloading.DataLoader,
 ) -> Tuple[float]:
     model.train()
 
@@ -78,7 +78,7 @@ def validate(
     hg: dgl.DGLHeteroGraph,
     labels: torch.Tensor,
     predict_category: str,
-    dataloader: dgl.dataloading.NodeDataLoader = None,
+    dataloader: dgl.dataloading.DataLoader = None,
     eval_batch_size: int = None,
     eval_num_workers: int = None,
     mask: torch.Tensor = None,
@@ -173,7 +173,7 @@ def run(args: argparse.ArgumentParser) -> None:
     fanouts = [int(fanout) for fanout in args.fanouts.split(',')]
 
     train_sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts)
-    train_dataloader = dgl.dataloading.NodeDataLoader(
+    train_dataloader = dgl.dataloading.DataLoader(
         hg,
         {predict_category: train_idx},
         train_sampler,
@@ -185,7 +185,7 @@ def run(args: argparse.ArgumentParser) -> None:
 
     if inferfence_mode == 'neighbor_sampler':
         valid_sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts)
-        valid_dataloader = dgl.dataloading.NodeDataLoader(
+        valid_dataloader = dgl.dataloading.DataLoader(
             hg,
             {predict_category: valid_idx},
             valid_sampler,
@@ -197,7 +197,7 @@ def run(args: argparse.ArgumentParser) -> None:
 
         if args.test_validation:
             test_sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts)
-            test_dataloader = dgl.dataloading.NodeDataLoader(
+            test_dataloader = dgl.dataloading.DataLoader(
                 hg,
                 {predict_category: test_idx},
                 test_sampler,
