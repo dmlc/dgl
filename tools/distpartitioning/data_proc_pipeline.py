@@ -2,6 +2,7 @@ import argparse
 import numpy as np
 import torch.multiprocessing as mp
 from initialize import proc_exec, single_dev_init, multi_dev_init
+from multi_dev_init import splitdata_exec
 
 def log_params(params): 
     """ Print all the command line arguments for debugging purposes.
@@ -28,8 +29,9 @@ def log_params(params):
     print('Edge feats: ', params.edge_feats_file)
     print('Metis partitions: ', params.partitions_file)
     print('Exec Type: ', params.exec_type)
+    print('Multiple File Support: ', params.mul_files_dataset)
 
-def start_local_run(params): 
+def single_dev_init(params): 
     """ Main function for distributed implementation on a single machine
 
     Parameters:
@@ -45,7 +47,10 @@ def start_local_run(params):
     #Invoke `target` function from each of the spawned process for distributed 
     #implementation
     for rank in range(params.world_size):
-        p = mp.Process(target=single_dev_init, args=(rank, params.world_size, proc_exec, params))
+        if(params.mul_files_dataset): 
+            p = mp.Process(target=single_dev_init, args=(rank, params.world_size, splitdata_exec, params))
+        else:
+            p = mp.Process(target=single_dev_init, args=(rank, params.world_size, proc_exec, params))
         p.start()
         processes.append(p)
 
@@ -81,6 +86,8 @@ if __name__ == "__main__":
                     default=None, type=str)
     parser.add_argument('--exec-type', type=int, default=0,
                     help='Use 0 for single machine run and 1 for distributed execution')
+    parser.add_argument('--mul-files-dataset', type=bool, default=False,
+                    help='Whether the dataset is in single file format or multiple file format')
 
     #arguments needed for the distributed implementation
     parser.add_argument('--world-size', help='no. of processes to spawn',
@@ -99,6 +106,6 @@ if __name__ == "__main__":
 
     #invoke the starting function here.
     if(params.exec_type == 0):
-        start_local_run(params)
+        singe_dev_init(params)
     else:
         multi_dev_init(params)

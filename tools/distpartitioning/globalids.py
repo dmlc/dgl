@@ -99,8 +99,14 @@ def get_shuffle_global_nids_edges(rank, world_size, edge_data, node_part_ids, no
         node_data, is a dictionary with keys as column_names and values as numpy arrays
     """
 
+    #part_ids = node_part_ids[node_data[constants.GLOBAL_NID]]
+    #res = np.bincount(part_ids)
+    #print('Rank: ', rank, ' partition ids of node_data: ', res, node_data[constants.GLOBAL_NID].shape)
+
+
     #determine unique node-ids present locally
     global_nids = np.sort(np.unique(np.concatenate((edge_data[constants.GLOBAL_SRC_ID], edge_data[constants.GLOBAL_DST_ID], node_data[constants.GLOBAL_NID]))))
+    #print('Rank: ', rank, ' Total no. of unique nodes : ', global_nids.shape)
 
     #determine the rank which owns orig-node-id <-> partition/rank mappings
     part_ids = node_part_ids[global_nids]
@@ -111,6 +117,8 @@ def get_shuffle_global_nids_edges(rank, world_size, edge_data, node_part_ids, no
     for i in range(world_size):
         if (i == rank):
             global_nids_ranks.append(np.empty(shape=(0)))
+            #my_ids = np.where(part_ids == i)[0]
+            #print('Rank: ', rank, ' My own ids to get shuffle ids: ', my_ids.shape)
             continue
 
         #not_owned_nodes = part_ids[:,0][part_ids[:,1] == i]
@@ -119,17 +127,22 @@ def get_shuffle_global_nids_edges(rank, world_size, edge_data, node_part_ids, no
             not_owned_nodes = np.empty(shape=(0))
         else: 
             not_owned_nodes = global_nids[not_owned_node_ids]
+        #print('Rank: ', rank, ' Sending to ', i, ' to get shuffle ids: ', not_owned_nodes.shape)
         global_nids_ranks.append(not_owned_nodes)
 
     #Retrieve Global-ids for respective node owners
     resolved_global_nids = get_shuffle_global_nids(rank, world_size, global_nids_ranks, node_data)
+    #print(' Rank: ', rank, ' Received shuffle ids: ', resolved_global_nids.shape)
 
     #Add global_nid <-> shuffle_global_nid mappings to the received data
     for i in range(world_size):
         if (i == rank):
             own_node_ids = np.where(part_ids == i)[0]
             own_global_nids = global_nids[own_node_ids]
+            #print(' Rank: ', rank, ' own node count: ', own_global_nids.shape)
+            #print(' Rank: ', rank, ' node_data : ', node_data[constants.GLOBAL_NID].shape)
             common, ind1, ind2 = np.intersect1d(node_data[constants.GLOBAL_NID], own_global_nids, return_indices=True)
+            #print(' Rank: ', rank, ' common elements: ', ind1.shape)
             my_shuffle_global_nids = node_data[constants.SHUFFLE_GLOBAL_NID][ind1]
             local_mappings = np.column_stack((own_global_nids, my_shuffle_global_nids))
             resolved_global_nids = np.concatenate((resolved_global_nids, local_mappings))

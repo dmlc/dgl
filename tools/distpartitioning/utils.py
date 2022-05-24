@@ -79,6 +79,22 @@ def get_node_types(schema):
 
     return ntypes_map, ntypes
 
+def get_edge_types(schema): 
+
+    global_eid_ranges = schema['eid']
+    global_eid_ranges = {key: np.array(global_eid_ranges[key]).reshape(1,2)
+                    for key in global_eid_ranges}
+    etypes = [(key, global_eid_ranges[key][0, 0]) for key in global_eid_ranges]
+    etypes.sort(key=lambda e: e[1])
+
+    etypes = [e[0] for e in etypes]
+    etypes_map = {e: i for i, e in enumerate(etypes)}
+
+    return etypes_map, etypes
+
+def get_ntypes_map(schema): 
+    return schema["nid"], schema["node_type_id_count"]
+
 def write_metadata_json(metadata_list, output_dir, graph_name):
     """
     Merge json schema's from each of the rank's on rank-0. 
@@ -102,7 +118,7 @@ def write_metadata_json(metadata_list, output_dir, graph_name):
     for k in x:
         edge_map[k] = []
         for idx in range(len(metadata_list)):
-            edge_map[k].append(metadata_list[idx]["edge_map"][k][0])
+            edge_map[k].append([int(metadata_list[idx]["edge_map"][k][0][0]),int(metadata_list[idx]["edge_map"][k][0][1])])
     graph_metadata["edge_map"] = edge_map
 
     graph_metadata["etypes"] = metadata_list[0]["etypes"]
@@ -115,12 +131,12 @@ def write_metadata_json(metadata_list, output_dir, graph_name):
     for k in x:
         node_map[k] = []
         for idx in range(len(metadata_list)):
-            node_map[k].append(metadata_list[idx]["node_map"][k][0])
+            node_map[k].append([int(metadata_list[idx]["node_map"][k][0][0]), int(metadata_list[idx]["node_map"][k][0][1])])
     graph_metadata["node_map"] = node_map
 
     graph_metadata["ntypes"] = metadata_list[0]["ntypes"]
-    graph_metadata["num_edges"] = sum([metadata_list[i]["num_edges"] for i in range(len(metadata_list))])
-    graph_metadata["num_nodes"] = sum([metadata_list[i]["num_nodes"] for i in range(len(metadata_list))])
+    graph_metadata["num_edges"] = int(sum([metadata_list[i]["num_edges"] for i in range(len(metadata_list))]))
+    graph_metadata["num_nodes"] = int(sum([metadata_list[i]["num_nodes"] for i in range(len(metadata_list))]))
     graph_metadata["num_parts"] = metadata_list[0]["num_parts"]
     graph_metadata["part_method"] = metadata_list[0]["part_method"]
 
@@ -130,7 +146,7 @@ def write_metadata_json(metadata_list, output_dir, graph_name):
     with open('{}/{}.json'.format(output_dir, graph_name), 'w') as outfile: 
         json.dump(graph_metadata, outfile, sort_keys=True, indent=4)
 
-def augment_edge_data(edge_data, part_ids):
+def augment_edge_data(edge_data, part_ids, id_offset):
     """
     Add partition-id (rank which owns an edge) column to the edge_data.
     
@@ -141,21 +157,26 @@ def augment_edge_data(edge_data, part_ids):
     part_ids : numpy array
         array of part_ids indexed by global_nid
     """
+    #add global_nids to the node_data
+    global_eids = np.arange(id_offset, id_offset + len(edge_data[constants.GLOBAL_TYPE_EID]), dtype=np.int64)
+    edge_data[constants.GLOBAL_EID] = global_eids
+
     edge_data[constants.OWNER_PROCESS] = part_ids[edge_data[constants.GLOBAL_DST_ID]]
 
-def augment_node_data(node_data, part_ids): 
+def augment_node_data(node_data, part_ids, offset): 
     """
     Utility function to add auxilary columns to the node_data numpy ndarray.
 
     Parameters:
     -----------
-    node_data : numpy ndarray
-        Node information as read from xxx_nodes.txt file
+    node_data : dictionary
+        Node information as read from xxx_nodes.txt file and a dictionary is built using this data
+        using keys as column names and values as column data from the csv txt file.
     part_ids : numpy array 
         array of part_ids indexed by global_nid
     """
     #add global_nids to the node_data
-    global_nids = np.arange(len(node_data[constants.GLOBAL_TYPE_NID]), dtype=np.int64)
+    global_nids = np.arange(offset, offset + len(node_data[constants.GLOBAL_TYPE_NID]), dtype=np.int64)
     node_data[constants.GLOBAL_NID] = global_nids
 
     #add owner proc_ids to the node_data
@@ -323,7 +344,8 @@ def write_dgl_objects(graph_obj, node_features, edge_features, output_dir, part_
 
     part_dir = output_dir + '/part' + str(part_id)
     os.makedirs(part_dir, exist_ok=True)
-    write_graph_dgl(os.path.join(part_dir ,'part'+str(part_id)), graph_obj)
+    #write_graph_dgl(os.path.join(part_dir ,'part'+str(part_id)), graph_obj)
+    write_graph_dgl(os.path.join(part_dir ,'graph.dgl'), graph_obj)
 
     if node_features != None:
         write_node_features(node_features, os.path.join(part_dir, "node_feat.dgl"))
