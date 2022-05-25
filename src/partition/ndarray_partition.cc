@@ -44,9 +44,8 @@ class RemainderPartition : public NDArrayPartition {
   std::pair<IdArray, NDArray>
   GeneratePermutation(
       IdArray in_idx) const override {
-    auto ctx = in_idx->ctx;
-
 #ifdef DGL_USE_CUDA
+    auto ctx = in_idx->ctx;
     if (ctx.device_type == kDLGPU) {
       ATEN_ID_TYPE_SWITCH(in_idx->dtype, IdType, {
         return impl::GeneratePermutationFromRemainder<kDLGPU, IdType>(
@@ -63,8 +62,8 @@ class RemainderPartition : public NDArrayPartition {
 
   IdArray MapToLocal(
       IdArray in_idx) const override {
-    auto ctx = in_idx->ctx;
 #ifdef DGL_USE_CUDA
+    auto ctx = in_idx->ctx;
     if (ctx.device_type == kDLGPU) {
       ATEN_ID_TYPE_SWITCH(in_idx->dtype, IdType, {
         return impl::MapToLocalFromRemainder<kDLGPU, IdType>(
@@ -82,8 +81,8 @@ class RemainderPartition : public NDArrayPartition {
   IdArray MapToGlobal(
       IdArray in_idx,
       const int part_id) const override {
-    auto ctx = in_idx->ctx;
 #ifdef DGL_USE_CUDA
+    auto ctx = in_idx->ctx;
     if (ctx.device_type == kDLGPU) {
       ATEN_ID_TYPE_SWITCH(in_idx->dtype, IdType, {
         return impl::MapToGlobalFromRemainder<kDLGPU, IdType>(
@@ -129,9 +128,8 @@ class RangePartition : public NDArrayPartition {
   std::pair<IdArray, NDArray>
   GeneratePermutation(
       IdArray in_idx) const override {
-    auto ctx = in_idx->ctx;
-
 #ifdef DGL_USE_CUDA
+    auto ctx = in_idx->ctx;
     if (ctx.device_type == kDLGPU) {
       if (ctx.device_type != range_->ctx.device_type ||
           ctx.device_id != range_->ctx.device_id) {
@@ -155,8 +153,8 @@ class RangePartition : public NDArrayPartition {
 
   IdArray MapToLocal(
       IdArray in_idx) const override {
-    auto ctx = in_idx->ctx;
 #ifdef DGL_USE_CUDA
+    auto ctx = in_idx->ctx;
     if (ctx.device_type == kDLGPU) {
       ATEN_ID_TYPE_SWITCH(in_idx->dtype, IdType, {
         ATEN_ID_TYPE_SWITCH(range_->dtype, RangeType, {
@@ -176,8 +174,8 @@ class RangePartition : public NDArrayPartition {
   IdArray MapToGlobal(
       IdArray in_idx,
       const int part_id) const override {
-    auto ctx = in_idx->ctx;
 #ifdef DGL_USE_CUDA
+    auto ctx = in_idx->ctx;
     if (ctx.device_type == kDLGPU) {
       ATEN_ID_TYPE_SWITCH(in_idx->dtype, IdType, {
         ATEN_ID_TYPE_SWITCH(range_->dtype, RangeType, {
