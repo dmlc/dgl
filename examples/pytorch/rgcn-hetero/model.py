@@ -365,7 +365,7 @@ class EntityClassify(nn.Module):
                 h = {k: x[k][input_nodes[k]].to(device) for k in input_nodes.keys()}
                 h = layer(block, h)
 
-                for k in h.keys():
+                for k in output_nodes.keys():
                     y[k][output_nodes[k]] = h[k].cpu()
 
             x = y
