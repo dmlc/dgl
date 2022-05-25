@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import torchmetrics.functional as MF
 import dgl
 import dgl.nn as dglnn
+from dgl.dataloading import pin_graph_for_uva
 import time
 import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
@@ -70,7 +71,7 @@ graph.ndata['label'] = labels.squeeze()
 split_idx = dataset.get_idx_split()
 train_idx, valid_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
 
-device = 'cuda'
+device = torch.device('cuda', 0)
 train_idx = train_idx.to(device)
 valid_idx = valid_idx.to(device)
 test_idx = test_idx.to(device)
@@ -82,43 +83,45 @@ opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
 
 sampler = dgl.dataloading.NeighborSampler(
         [15, 10, 5], prefetch_node_feats=['feat'], prefetch_labels=['label'])
-train_dataloader = dgl.dataloading.DataLoader(
-        graph, train_idx, sampler, device=device, batch_size=1024, shuffle=True,
-        drop_last=False, num_workers=0, use_uva=not args.pure_gpu)
-valid_dataloader = dgl.dataloading.DataLoader(
-        graph, valid_idx, sampler, device=device, batch_size=1024, shuffle=True,
-        drop_last=False, num_workers=0, use_uva=not args.pure_gpu)
 
-durations = []
-for _ in range(10):
-    model.train()
-    t0 = time.time()
-    for it, (input_nodes, output_nodes, blocks) in enumerate(train_dataloader):
-        x = blocks[0].srcdata['feat']
-        y = blocks[-1].dstdata['label']
-        y_hat = model(blocks, x)
-        loss = F.cross_entropy(y_hat, y)
-        opt.zero_grad()
-        loss.backward()
-        opt.step()
-        if it % 20 == 0:
-            acc = MF.accuracy(y_hat, y)
-            mem = torch.cuda.max_memory_allocated() / 1000000
-            print('Loss', loss.item(), 'Acc', acc.item(), 'GPU Mem', mem, 'MB')
-    tt = time.time()
-    print(tt - t0)
-    durations.append(tt - t0)
+with pin_graph_for_uva(graph, device) as pinned_graph:
+    train_dataloader = dgl.dataloading.DataLoader(
+            pinned_graph, train_idx, sampler, device=device, batch_size=1024, shuffle=True,
+            drop_last=False, num_workers=0)
+    valid_dataloader = dgl.dataloading.DataLoader(
+            pinned_graph, valid_idx, sampler, device=device, batch_size=1024, shuffle=True,
+            drop_last=False, num_workers=0)
 
-    model.eval()
-    ys = []
-    y_hats = []
-    for it, (input_nodes, output_nodes, blocks) in enumerate(valid_dataloader):
-        with torch.no_grad():
+    durations = []
+    for _ in range(10):
+        model.train()
+        t0 = time.time()
+        for it, (input_nodes, output_nodes, blocks) in enumerate(train_dataloader):
             x = blocks[0].srcdata['feat']
-            ys.append(blocks[-1].dstdata['label'])
-            y_hats.append(model(blocks, x))
-    acc = MF.accuracy(torch.cat(y_hats), torch.cat(ys))
-    print('Validation acc:', acc.item())
+            y = blocks[-1].dstdata['label']
+            y_hat = model(blocks, x)
+            loss = F.cross_entropy(y_hat, y)
+            opt.zero_grad()
+            loss.backward()
+            opt.step()
+            if it % 20 == 0:
+                acc = MF.accuracy(y_hat, y)
+                mem = torch.cuda.max_memory_allocated() / 1000000
+                print('Loss', loss.item(), 'Acc', acc.item(), 'GPU Mem', mem, 'MB')
+        tt = time.time()
+        print(tt - t0)
+        durations.append(tt - t0)
+
+        model.eval()
+        ys = []
+        y_hats = []
+        for it, (input_nodes, output_nodes, blocks) in enumerate(valid_dataloader):
+            with torch.no_grad():
+                x = blocks[0].srcdata['feat']
+                ys.append(blocks[-1].dstdata['label'])
+                y_hats.append(model(blocks, x))
+        acc = MF.accuracy(torch.cat(y_hats), torch.cat(ys))
+        print('Validation acc:', acc.item())
 
 print(np.mean(durations[4:]), np.std(durations[4:]))
 

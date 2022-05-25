@@ -741,7 +741,8 @@ class DataLoader(torch.utils.data.DataLoader):
             # Check graph and indices device as well as num_workers
             if self.graph.device != indices_device:
                 raise ValueError(
-                    'Expect graph and indices to be on the same device. ')
+                    'Expect graph and indices to be on the same device. ' \
+                    '{} vs. {}'.format(self.graph.device, indices_device))
             if self.graph.device.type == 'cuda' and num_workers > 0:
                 raise ValueError('num_workers must be 0 if graph and indices are on CUDA.')
             if self.graph.device.type == 'cpu' and num_workers > 0:
