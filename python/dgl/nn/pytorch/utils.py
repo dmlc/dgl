@@ -403,8 +403,8 @@ class LabelPropagation(nn.Module):
     Propagation <http://mlg.eng.cam.ac.uk/zoubin/papers/CMU-CALD-02-107.pdf>`__
 
     .. math::
-    \mathbf{Y}^{(t+1)} = \alpha \cdot \tilde{A} \mathbf{Y}^{(t)} + (1 - \alpha)
-    \mathbf{Y}^{(0)},
+
+        \mathbf{Y}^{(t+1)} = \alpha \tilde{A} \mathbf{Y}^{(t)} + (1 - \alpha) \mathbf{Y}^{(0)}
 
     where unlabeled data is initially set to zero and inferred from labeled data via
     propagation. :math:`\alpha` is a weight parameter for balancing between updated labels
