@@ -13,10 +13,8 @@ Partition a graph
 -----------------
 
 In this tutorial, we will use `OGBL citation2 graph <https://ogb.stanford.edu/docs/linkprop/#ogbl-citation2>`_
-as an example to illustrate the graph partitioning. The general partition pipeline is similar to `Distributed Node Clssification <https://docs.dgl.ai/en/latest/tutorials/dist/1_node_classification.html>`_ 
-
-
-
+as an example to illustrate the graph partitioning. Let’s first load the graph into a DGL graph and convert it 
+into a training graph, validation edges and test edges with :class:`~dgl.data.AsLinkPredDataset`.
 
 .. code-block:: python
 
@@ -34,7 +32,7 @@ as an example to illustrate the graph partitioning. The general partition pipeli
 
 
 
-In link prediction task, we use :class:`~dgl.data.AsLinkPredDataset` to convert original graph into a training graph, validation edges and test edges. Then, we store the validation and test edges with the graph partitions.
+Then, we store the validation and test edges with the graph partitions.
 
 
 
@@ -58,7 +56,7 @@ The distributed link prediction script is very similar to distributed node class
 Initialize network communication
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-We first initialize the network communication and Pytorch's distributed communication by following the description in "Initialize network communication" section of `Distributed Node Clssification <https://docs.dgl.ai/tutorials/dist/1_node_classification.html#initialize-network-communication>`_ 
+We first initialize the network communication and Pytorch's distributed communication. 
 
 .. code-block:: python
 
@@ -88,8 +86,6 @@ DGL's servers load the graph partitions automatically. After the servers load th
 trainers connect to the servers and can start to reference to the distributed graph in the cluster as below.
 
 
-
-
 .. code-block:: python
 
     g = dgl.distributed.DistGraph('ogbl-citation2')
@@ -101,7 +97,8 @@ to the `partition_graph` function as shown in the section above.
 Get training and validation node IDs
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-For distributed training, each trainer can run its own set of training nodes. We can get the current graph in the trainer with its node ids and edge ids by invoking `node_split` and `edge_split`. We can also get the valid edges and test edges by loading the pickle files.
+For distributed training, each trainer can run its own set of training nodes. We can get the current graph in the trainer with its node ids and edge ids 
+by invoking `node_split` and `edge_split`. We can also get the valid edges and test edges by loading the pickle files.
 
 
 
@@ -172,12 +169,12 @@ We also define an edge predictor :class:`~dgl.nn.pytorch.link.EdgePredictor` to 
 .. code-block:: python
 
     from dgl.nn import EdgePredictor
-    predictor = EdgePredictor('dot').to(device)
+    predictor = EdgePredictor('dot')
 
 Distributed mini-batch sampler
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-We can use the same :class:`~dgl.dataloading.pytorch.DistEdgeDataLoader`, the distributed counterpart
+We can use :class:`~dgl.dataloading.pytorch.DistEdgeDataLoader`, the distributed counterpart
 of :class:`~dgl.dataloading.pytorch.EdgeDataLoader`, to create a distributed mini-batch sampler for
 link prediction. 
 
@@ -209,11 +206,10 @@ The training loop for distributed training is also exactly the same as the singl
     epoch = 0
     for epoch in range(10):
         for step, (input_nodes, pos_graph, neg_graph, mfgs) in enumerate(dataloader):
-            pos_graph = pos_graph.to(device)
-            neg_graph = neg_graph.to(device)
-            mfgs = [mfg.to(device) for mfg in mfgs]
+            pos_graph = pos_graph
+            neg_graph = neg_graph
             node_inputs = mfgs[0].srcdata[dgl.NID]
-            batch_inputs = g.ndata['feat'][node_inputs].to(device)
+            batch_inputs = g.ndata['feat'][node_inputs]
 
             batch_pred = model(mfgs, batch_inputs)
             pos_feature = batch_pred
@@ -241,7 +237,7 @@ In the inference stage, we use the model after training loop to get the embeddin
 
 .. code-block:: python
 
-    def inference(model, graph, node_features, device, args):
+    def inference(model, graph, node_features, args):
         with th.no_grad():
             sampler = dgl.dataloading.MultiLayerNeighborSampler([25,10])
             train_dataloader = dgl.dataloading.DistNodeDataLoader(
@@ -252,14 +248,13 @@ In the inference stage, we use the model after training loop to get the embeddin
 
             result = []
             for input_nodes, output_nodes, mfgs in train_dataloader:
-                mfgs = [mfg.to(device) for mfg in mfgs]
                 node_inputs = mfgs[0].srcdata[dgl.NID]
-                inputs = node_features[node_inputs].to(device)
+                inputs = node_features[node_inputs]
                 result.append(model(mfgs, inputs))
 
             return th.cat(result)
 
-    node_reprs = inference(model, g, g.ndata['feat'], device, args)
+    node_reprs = inference(model, g, g.ndata['feat'], args)
 
 The test edges is encoded as ((positive_edge_src, positive_edge_dst), (negative_edge_src, negative_edge_dst)). Therefore, we can get the ground truth with positive pairs and negative pairs. 
 
