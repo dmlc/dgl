@@ -9,7 +9,7 @@ import dgl.function as fn
 import pickle
 import io
 import unittest
-from utils import parametrize_dtype
+from test_utils import parametrize_idtype
 import multiprocessing as mp
 import os
 
@@ -43,7 +43,7 @@ def _assert_is_identical_hetero(g, g2):
         assert F.array_equal(dst, dst2)
 
 @unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
-@parametrize_dtype
+@parametrize_idtype
 def test_single_process(idtype):
     hg = create_test_graph(idtype=idtype)
     hg_share = hg.shared_memory("hg")
@@ -60,7 +60,7 @@ def sub_proc(hg_origin, name):
     _assert_is_identical_hetero(hg_origin, hg_save_again)
 
 @unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
-@parametrize_dtype
+@parametrize_idtype
 def test_multi_process(idtype):
     hg = create_test_graph(idtype=idtype)
     hg_share = hg.shared_memory("hg1")
