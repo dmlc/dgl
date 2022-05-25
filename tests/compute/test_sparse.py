@@ -1,6 +1,6 @@
 from dgl.ops import gspmm, gsddmm, edge_softmax, segment_reduce
 from test_utils.graph_cases import get_cases
-from utils import parametrize_dtype
+from test_utils import parametrize_idtype
 import dgl
 import random
 import pytest, unittest
@@ -99,7 +99,7 @@ edge_softmax_shapes = [
 @pytest.mark.parametrize('shp', spmm_shapes)
 @pytest.mark.parametrize('msg', ['add', 'sub', 'mul', 'div', 'copy_lhs', 'copy_rhs'])
 @pytest.mark.parametrize('reducer', ['sum', 'min', 'max'])
-@parametrize_dtype
+@parametrize_idtype
 def test_spmm(idtype, g, shp, msg, reducer):
     g = g.astype(idtype).to(F.ctx())
     print(g)
@@ -159,7 +159,7 @@ def test_spmm(idtype, g, shp, msg, reducer):
 @pytest.mark.parametrize('lhs_target', ['u', 'v', 'e'])
 @pytest.mark.parametrize('rhs_target', ['u', 'v', 'e'])
 @pytest.mark.parametrize('msg', ['add', 'sub', 'mul', 'div', 'dot', 'copy_lhs', 'copy_rhs'])
-@parametrize_dtype
+@parametrize_idtype
 def test_sddmm(g, shp, lhs_target, rhs_target, msg, idtype):
     if lhs_target == rhs_target:
         return
@@ -229,7 +229,7 @@ def test_sddmm(g, shp, lhs_target, rhs_target, msg, idtype):
 @pytest.mark.parametrize('g', get_cases(['clique']))
 @pytest.mark.parametrize('norm_by', ['src', 'dst'])
 @pytest.mark.parametrize('shp', edge_softmax_shapes)
-@parametrize_dtype
+@parametrize_idtype
 def test_edge_softmax(g, norm_by, shp, idtype):
     g = g.astype(idtype).to(F.ctx())
     edata = F.tensor(np.random.rand(g.number_of_edges(), *shp))
@@ -288,7 +288,7 @@ def test_segment_reduce(reducer):
         print('backward passed')
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
-@parametrize_dtype
+@parametrize_idtype
 @pytest.mark.parametrize('feat_size', [1, 8, 16, 64, 256])
 def test_segment_mm(idtype, feat_size):
     import torch
@@ -323,7 +323,7 @@ def test_segment_mm(idtype, feat_size):
     assert torch.allclose(db, db_t, atol=1e-4, rtol=1e-4)
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
-@parametrize_dtype
+@parametrize_idtype
 @pytest.mark.parametrize('feat_size', [1, 8, 16, 64, 256])
 def test_gather_mm_idx_b(idtype, feat_size):
     import torch
@@ -353,7 +353,7 @@ def test_gather_mm_idx_b(idtype, feat_size):
     assert torch.allclose(db, db_t, atol=1e-4, rtol=1e-4)
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
-@parametrize_dtype
+@parametrize_idtype
 @pytest.mark.parametrize('feat_size', [1, 8, 16, 64, 256])
 def _test_gather_mm_idx_a(idtype, feat_size):
     # TODO(minjie): currently disabled due to bugs in the CUDA kernel. Need to fix it later.

@@ -81,7 +81,7 @@ cdef extern from "dgl/runtime/c_runtime_api.h":
                     int* type_codes,
                     int num_args,
                     DGLValue* ret_val,
-                    int* ret_type_code)
+                    int* ret_type_code) nogil
     int DGLFuncFree(DGLFunctionHandle func)
     int DGLCFuncSetReturn(DGLRetValueHandle ret,
                           DGLValue* value,
