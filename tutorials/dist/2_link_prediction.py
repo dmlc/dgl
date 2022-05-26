@@ -5,7 +5,7 @@ Distributed Link Prediction
 In this tutorial, we will walk through the steps of performing distributed GNN training
 for a link prediction task. This tutorial assumes that you have read the `Distributed Node Clssification <https://docs.dgl.ai/en/latest/tutorials/dist/1_node_classification.html>`_ and `Stochastic Training of GNN for Link Prediction <https://docs.dgl.ai/en/latest/tutorials/large/L2_large_link_prediction.html#sphx-glr-tutorials-large-l2-large-link-prediction-py>`_. The general pipeline is shown below.
 
-.. figure:: ./link.pdf
+.. figure:: https://data.dgl.ai/tutorial/link.png
    :alt: Imgur
 
 
