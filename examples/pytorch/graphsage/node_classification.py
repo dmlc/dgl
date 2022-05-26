@@ -127,9 +127,10 @@ print(np.mean(durations[4:]), np.std(durations[4:]))
 
 # Test accuracy and offline inference of all nodes
 model.eval()
-with torch.no_grad():
-    pred = model.inference(graph, device, 4096, 0, 'cpu')
-    pred = pred[test_idx].to(device)
-    label = graph.ndata['label'][test_idx].to(device)
-    acc = MF.accuracy(pred, label)
-    print('Test acc:', acc.item())
+with pin_graph_for_uva(graph, device) as pinned_graph:
+    with torch.no_grad():
+        pred = model.inference(graph, device, 4096, 0, 'cpu')
+        pred = pred[test_idx].to(device)
+        label = graph.ndata['label'][test_idx].to(device)
+        acc = MF.accuracy(pred, label)
+        print('Test acc:', acc.item())

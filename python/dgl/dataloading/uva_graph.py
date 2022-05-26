@@ -14,17 +14,20 @@ class _PinnedGraph(DGLHeteroGraph):
         assert F.device_type(device) == 'cuda', "Target device for UVA " \
             "access must be a CUDA device. Got {}".format(F.device_type(device)) 
 
-        self._device = device
-
-        if not self._graph.is_pinned():
-            self._graph.pin_memory_()
+        # default to the original device until we've pinned everything
+        self._device = g.device
+        self.create_formats_()
+        self.pin_structure_()
 
         for frame in itertools.chain(self._node_frames, self._edge_frames):
             for col in frame._columns.values():
                 col.pin_memory_()
 
+        # setting the device must be done last
+        self._device = device
+
     def _close(self):
-        self._unpin_structure_()
+        self.unpin_structure_()
         # because backend tensors aren't automatically unpinned,
         # unpin them here instead of heterograph to ensure
         # we don't leak resources

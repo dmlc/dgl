@@ -289,7 +289,7 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
     tensor([False, False, False])
 
     """
-    if F.device_type(g.device) == 'cpu' and not g.is_pinned():
+    if F.device_type(g.device) == 'cpu':
         frontier = _sample_neighbors(
             g, nodes, fanout, edge_dir=edge_dir, prob=prob, replace=replace,
             copy_ndata=copy_ndata, copy_edata=copy_edata, exclude_edges=exclude_edges)
