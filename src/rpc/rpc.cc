@@ -69,9 +69,9 @@ RPCStatus SendRPCMessage(const RPCMessage& msg, const int32_t target_id) {
 }
 
 RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
-  static constexpr int32_t default_timeout = 5 * 1000;  // milliseconds
+  static constexpr int32_t retry_timeout = 5 * 1000;  // milliseconds
   RPCStatus status;
-  const int32_t real_timeout = timeout == 0 ? default_timeout : timeout;
+  const int32_t real_timeout = timeout == 0 ? retry_timeout : timeout;
   do {
     status = RPCContext::getInstance()->receiver->Recv(msg, real_timeout);
     if (status == kRPCTimeOut) {

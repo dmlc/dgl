@@ -108,7 +108,7 @@ def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
                     register_res = rpc.ClientRegisterResponse(client_id)
                     rpc.send_response(client_id, register_res, group_id)
         # receive incomming client requests
-        timeout = 5 * 1000  # in milliseconds
+        timeout = 60 * 1000  # in milliseconds
         req, client_id, group_id = rpc.recv_request(timeout)
         if req is None:
             continue

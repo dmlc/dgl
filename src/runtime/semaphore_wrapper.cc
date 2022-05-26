@@ -30,7 +30,7 @@ void Semaphore::Wait() {
 }
 
 bool Semaphore::TimedWait(int) {
-  // timed wait is not supported yet.
+  // Timed wait is not supported on WIN32.
   Wait();
   return true;
 }
