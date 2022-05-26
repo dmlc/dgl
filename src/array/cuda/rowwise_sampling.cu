@@ -10,6 +10,8 @@
 #include <numeric>
 
 #include "./dgl_cub.cuh"
+#include <thrust/binary_search.h>
+#include <thrust/execution_policy.h>
 #include "../../array/cuda/atomic.cuh"
 #include "../../runtime/cuda/cuda_common.h"
 
@@ -333,6 +335,7 @@ __global__ void _CSRRowWiseSampleKernel(
       __shared__ typename BlockScanT::TempStorage temp_storage;
 
       FloatType weights_sum = (FloatType)0.0;
+      // for the following two loops, we use a block scan window of size CTA_SIZE
       // fill the reservoir array and compute the sum of their weights
       for (int i = 0; i < (num_picks + CTA_SIZE - 1) / CTA_SIZE; i++) {
         // Obtain input item for each thread
@@ -430,6 +433,154 @@ __global__ void _CSRRowWiseSampleReplaceKernel(
     IdType * const out_rows,
     IdType * const out_cols,
     IdType * const out_idxs) {
+  // we assign one warp per row
+  assert(blockDim.x == CTA_SIZE);
+
+  int64_t out_row = blockIdx.x*TILE_SIZE+threadIdx.y;
+  const int64_t last_row = min(static_cast<int64_t>(blockIdx.x+1)*TILE_SIZE, num_rows);
+
+  curandStatePhilox4_32_10_t rng;
+  curand_init((rand_seed*gridDim.x+blockIdx.x)*blockDim.y+threadIdx.y, threadIdx.x, 0, &rng);
+
+  while (out_row < last_row) {
+    const int64_t row = in_rows[out_row];
+
+    const int64_t in_row_start = in_ptr[row];
+    const int64_t out_row_start = out_ptr[out_row];
+
+    const int64_t deg = in_ptr[row+1] - in_row_start;
+
+    if (deg > 0) {
+      constexpr int ITEMS_PER_THREAD = 1024/CTA_SIZE;
+      using BlockRadixSortT = cub::BlockRadixSort<float, CTA_SIZE, ITEMS_PER_THREAD>;
+      using BlockScanT = cub::BlockScan<FloatType, CTA_SIZE>;
+      using BlockReduceI = cub::BlockReduce<int, CTA_SIZE>;
+      using BlockReduceT = cub::BlockReduce<FloatType, CTA_SIZE>;
+
+      __shared__ FloatType prefix_sum[CTA_SIZE];
+      __shared__ typename BlockRadixSortT::TempStorage sort_storage;
+      __shared__ typename BlockScanT::TempStorage scan_storage;
+      __shared__ typename BlockReduceI::TempStorage reduce_storage_i;
+      __shared__ typename BlockReduceT::TempStorage reduce_storage_t;
+
+      // initialize thread_rn
+      // using float for the random number is enough
+      float thread_rn[ITEMS_PER_THREAD];
+      for (int idx = 0; idx < ITEMS_PER_THREAD; idx++) {
+        if (idx * CTA_SIZE + threadIdx.x < num_picks) {
+          // this is a workaround for that 1.0f is inclusive in curand_uniform
+          // while the sum of normalized probabilities is usually a bit smaller than 1.0
+          // (Xin): 1 - curand_uniform(&rng) doesn't work
+          thread_rn[idx] = curand_uniform(&rng) - 1e-6f;
+        } else {
+          thread_rn[idx] = 1.0;
+        }
+      }
+      __syncthreads();
+      // sort thread_rn.
+      BlockRadixSortT(sort_storage).SortBlockedToStriped(thread_rn);
+
+      // get the sum of probs for normalization
+      __shared__ FloatType weights_sum;
+      if (threadIdx.x == 0) {
+        weights_sum = (FloatType)0.0;
+      } // don't need to sync here
+      for (int i = 0; i < (deg + CTA_SIZE - 1) / CTA_SIZE; i++) {
+        // Obtain input item for each thread
+        IdType idx = threadIdx.x + i * CTA_SIZE;
+        FloatType thread_prob;
+        if (idx < deg) {
+          _DoubleSlice<IdType, FloatType>(prob, data, idx, in_row_start, &thread_prob);
+        } else {
+          thread_prob = (FloatType)0.0;
+        }
+        __syncthreads();
+
+        auto window_sum = BlockReduceT(reduce_storage_t).Sum(thread_prob);
+        if (threadIdx.x == 0) {
+          weights_sum += window_sum;
+        } // don't need to sync here
+      }
+
+      FloatType moving_sum = (FloatType)0.0;
+      __shared__ int64_t num_selected;
+      if (threadIdx.x == 0) {
+        num_selected = 0;
+      } // we don't need to sync here because there will be a sync before the first use
+      __shared__ int num_selected_this_round;
+      // we use a moving window to compute the inclusive prefix sum
+      // of [i * CTA_SIZE, (i + 1) * CTA_SIZE)
+      for (int i = 0; i < (deg + CTA_SIZE - 1) / CTA_SIZE; i++) {
+        // Obtain input item for each thread
+        IdType idx = threadIdx.x + i * CTA_SIZE;
+        FloatType thread_prob;
+        if (idx < deg) {
+          _DoubleSlice<IdType, FloatType>(prob, data, idx, in_row_start, &thread_prob);
+        } else {
+          thread_prob = (FloatType)0.0;
+        }
+        thread_prob /= weights_sum;
+        __syncthreads();
+
+        // Collectively compute the block-wide inclusive prefix sum
+        FloatType block_aggregate;
+        BlockScanT(scan_storage).InclusiveSum(thread_prob, thread_prob, block_aggregate);
+        // Store the block-wide inclusive prefix sum in shared memory
+        prefix_sum[threadIdx.x] = moving_sum + thread_prob;
+        __syncthreads();
+
+        // binary search to find the idx
+        for (int j = num_selected / CTA_SIZE; j < ITEMS_PER_THREAD; j++) {
+          IdType out_offset = j * CTA_SIZE + threadIdx.x;
+          // selected if out_offset is in [num_selected, num_picks)
+          // and its random number is found in this prefix sum window
+          int flag_selected = 0;
+          if (out_offset >= num_selected && out_offset < num_picks) {
+            auto rn_val = thread_rn[j];
+            // there could be a bank conflict here
+            auto ptr = thrust::lower_bound(thrust::seq, prefix_sum, prefix_sum + CTA_SIZE, rn_val);
+            auto idx_offset = thrust::distance(prefix_sum, ptr);
+            if (idx_offset < CTA_SIZE) {
+              flag_selected = 1;
+              // this should always be true since we use lower_bound
+              assert(idx_offset + i * CTA_SIZE < deg);
+              out_idxs[out_row_start+out_offset] = idx_offset + i * CTA_SIZE;
+            }
+          }
+          __syncthreads();
+
+          auto flag_sum = BlockReduceI(reduce_storage_i).Sum(flag_selected);
+          // let all threads see the results
+          if (threadIdx.x == 0) {
+            num_selected_this_round = flag_sum;
+            num_selected += num_selected_this_round;
+          }
+          __syncthreads();
+
+          // Move to the next window of prefix sum
+          if (num_selected % CTA_SIZE != 0) break;
+          // when num_selected % CTA_SIZE == 0, we move the window
+          // of rn_array to make full use of the current window of prefix sum
+        }
+        moving_sum += block_aggregate;
+        // if we have selected enough edges, skip the subsequent window
+        if (num_selected == num_picks) break;
+      }
+
+      // check if we have selected enough edges when stop natually
+      assert(num_selected == num_picks);
+
+      // copy permutation over
+      for (int idx = threadIdx.x; idx < num_picks; idx += CTA_SIZE) {
+        const IdType perm_idx = out_idxs[out_row_start+idx]+in_row_start;
+        out_rows[out_row_start+idx] = row;
+        out_cols[out_row_start+idx] = in_index[perm_idx];
+        out_idxs[out_row_start+idx] = data ? data[perm_idx] : perm_idx;
+      }
+    }
+
+    out_row += BLOCK_CTAS;
+  }
 }
 
 }  // namespace
@@ -671,6 +822,10 @@ COOMatrix CSRRowWiseSampling(CSRMatrix mat,
     constexpr int TILE_SIZE = BLOCK_CTAS;
     const dim3 block(CTA_SIZE, BLOCK_CTAS);
     const dim3 grid((num_rows+TILE_SIZE-1)/TILE_SIZE);
+
+    // (Xin): we need a constant array of random numbers for sorting
+    // and 1024 should be enough for any reasonable use case
+    CHECK_LE(num_picks, 1024) << "GPU sampling is not supported for fanout > 1024";
     CUDA_KERNEL_CALL(
         (_CSRRowWiseSampleReplaceKernel<IdType, FloatType, BLOCK_CTAS, TILE_SIZE>),
         grid, block, 0, stream,
