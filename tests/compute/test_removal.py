@@ -1,9 +1,9 @@
 import backend as F
 import numpy as np
 import dgl
-from test_utils import parametrize_dtype
+from test_utils import parametrize_idtype
 
-@parametrize_dtype
+@parametrize_idtype
 def test_node_removal(idtype):
     g = dgl.DGLGraph()
     g = g.astype(idtype).to(F.ctx())
@@ -31,7 +31,7 @@ def test_node_removal(idtype):
     assert dgl.NID in g.ndata
     assert dgl.EID in g.edata
 
-@parametrize_dtype
+@parametrize_idtype
 def test_multigraph_node_removal(idtype):
     g = dgl.DGLGraph()
     g = g.astype(idtype).to(F.ctx())
@@ -59,7 +59,7 @@ def test_multigraph_node_removal(idtype):
     assert g.number_of_nodes() == 3
     assert g.number_of_edges() == 6
 
-@parametrize_dtype
+@parametrize_idtype
 def test_multigraph_edge_removal(idtype):
     g = dgl.DGLGraph()
     g = g.astype(idtype).to(F.ctx())
@@ -86,7 +86,7 @@ def test_multigraph_edge_removal(idtype):
     assert g.number_of_nodes() == 5
     assert g.number_of_edges() == 8
 
-@parametrize_dtype
+@parametrize_idtype
 def test_edge_removal(idtype):
     g = dgl.DGLGraph()
     g = g.astype(idtype).to(F.ctx())
@@ -117,7 +117,7 @@ def test_edge_removal(idtype):
     assert F.array_equal(g.edata['id'], F.tensor([0, 1, 10, 11, 12, 20, 21, 22, 23, 24, 0]))
     assert dgl.EID in g.edata
 
-@parametrize_dtype
+@parametrize_idtype
 def test_node_and_edge_removal(idtype):
     g = dgl.DGLGraph()
     g = g.astype(idtype).to(F.ctx())
@@ -156,7 +156,7 @@ def test_node_and_edge_removal(idtype):
     assert g.number_of_nodes() == 10
     assert g.number_of_edges() == 48
 
-@parametrize_dtype
+@parametrize_idtype
 def test_node_frame(idtype):
     g = dgl.DGLGraph()
     g = g.astype(idtype).to(F.ctx())
@@ -169,7 +169,7 @@ def test_node_frame(idtype):
     g.remove_nodes(range(3, 7))
     assert F.allclose(g.ndata['h'], F.tensor(new_data))
 
-@parametrize_dtype
+@parametrize_idtype
 def test_edge_frame(idtype):
     g = dgl.DGLGraph()
     g = g.astype(idtype).to(F.ctx())
@@ -183,7 +183,7 @@ def test_edge_frame(idtype):
     g.remove_edges(range(3, 7))
     assert F.allclose(g.edata['h'], F.tensor(new_data))
 
-@parametrize_dtype
+@parametrize_idtype
 def test_issue1287(idtype):
     # reproduce https://github.com/dmlc/dgl/issues/1287.
     # setting features after remove nodes

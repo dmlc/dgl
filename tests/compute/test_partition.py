@@ -2,12 +2,12 @@ from dgl.partition import NDArrayPartition
 from dgl.distributed import graph_partition_book as gpb
 import unittest
 import backend as F
-from test_utils import parametrize_dtype
+from test_utils import parametrize_idtype
 
 
 
 @unittest.skipIf(F._default_context_str == 'cpu', reason="NDArrayPartition only works on GPU.")
-@parametrize_dtype
+@parametrize_idtype
 def test_get_node_partition_from_book(idtype):
     node_map = {
         "type_n": F.tensor([

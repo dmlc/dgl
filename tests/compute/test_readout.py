@@ -5,9 +5,9 @@ import networkx as nx
 import unittest
 import pytest
 from test_utils.graph_cases import get_cases
-from utils import parametrize_dtype
+from test_utils import parametrize_idtype
 
-@parametrize_dtype
+@parametrize_idtype
 def test_sum_case1(idtype):
     # NOTE: If you want to update this test case, remember to update the docstring
     #  example too!!!
@@ -21,7 +21,7 @@ def test_sum_case1(idtype):
     assert F.allclose(F.tensor([3., 6.]), dgl.sum_nodes(bg, 'h'))
     assert F.allclose(F.tensor([.5, 1.7]), dgl.sum_nodes(bg, 'h', 'w'))
 
-@parametrize_dtype
+@parametrize_idtype
 @pytest.mark.parametrize('g', get_cases(['homo'], exclude=['dglgraph']))
 @pytest.mark.parametrize('reducer', ['sum', 'max', 'mean'])
 def test_reduce_readout(g, idtype, reducer):
@@ -67,7 +67,7 @@ def test_reduce_readout(g, idtype, reducer):
         subx.append(sx)
     assert F.allclose(x, F.cat(subx, dim=0))
 
-@parametrize_dtype
+@parametrize_idtype
 @pytest.mark.parametrize('g', get_cases(['homo'], exclude=['dglgraph']))
 @pytest.mark.parametrize('reducer', ['sum', 'max', 'mean'])
 def test_weighted_reduce_readout(g, idtype, reducer):
@@ -115,7 +115,7 @@ def test_weighted_reduce_readout(g, idtype, reducer):
         subx.append(sx)
     assert F.allclose(x, F.cat(subx, dim=0))
 
-@parametrize_dtype
+@parametrize_idtype
 @pytest.mark.parametrize('g', get_cases(['homo'], exclude=['dglgraph']))
 @pytest.mark.parametrize('descending', [True, False])
 def test_topk(g, idtype, descending):
@@ -181,7 +181,7 @@ def test_topk(g, idtype, descending):
     assert F.allclose(val, F.cat(subval, dim=0))
     assert F.allclose(indices, F.cat(subidx, dim=0))
 
-@parametrize_dtype
+@parametrize_idtype
 @pytest.mark.parametrize('g', get_cases(['homo'], exclude=['dglgraph']))
 def test_softmax(g, idtype):
     g = g.astype(idtype).to(F.ctx())
@@ -204,7 +204,7 @@ def test_softmax(g, idtype):
         subx.append(F.softmax(sg.edata['h'], dim=0))
     assert F.allclose(x, F.cat(subx, dim=0))
 
-@parametrize_dtype
+@parametrize_idtype
 @pytest.mark.parametrize('g', get_cases(['homo'], exclude=['dglgraph']))
 def test_broadcast(idtype, g):
     g = g.astype(idtype).to(F.ctx())
