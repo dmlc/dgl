@@ -473,7 +473,7 @@ __global__ void _CSRRowWiseSampleReplaceKernel(
           // (Xin): 1 - curand_uniform(&rng) doesn't work
           thread_rn[idx] = curand_uniform(&rng) - 1e-6f;
         } else {
-          thread_rn[idx] = 1.0;
+          thread_rn[idx] = 1.0f;
         }
       }
       __syncthreads();
@@ -484,7 +484,7 @@ __global__ void _CSRRowWiseSampleReplaceKernel(
       __shared__ FloatType weights_sum;
       if (threadIdx.x == 0) {
         weights_sum = (FloatType)0.0;
-      } // don't need to sync here
+      }
       for (int i = 0; i < (deg + CTA_SIZE - 1) / CTA_SIZE; i++) {
         // Obtain input item for each thread
         IdType idx = threadIdx.x + i * CTA_SIZE;
@@ -499,15 +499,15 @@ __global__ void _CSRRowWiseSampleReplaceKernel(
         auto window_sum = BlockReduceT(reduce_storage_t).Sum(thread_prob);
         if (threadIdx.x == 0) {
           weights_sum += window_sum;
-        } // don't need to sync here
+        }
       }
+      __syncthreads();
 
       FloatType moving_sum = (FloatType)0.0;
       __shared__ int64_t num_selected;
       if (threadIdx.x == 0) {
         num_selected = 0;
       } // we don't need to sync here because there will be a sync before the first use
-      __shared__ int num_selected_this_round;
       // we use a moving window to compute the inclusive prefix sum
       // of [i * CTA_SIZE, (i + 1) * CTA_SIZE)
       for (int i = 0; i < (deg + CTA_SIZE - 1) / CTA_SIZE; i++) {
@@ -552,8 +552,7 @@ __global__ void _CSRRowWiseSampleReplaceKernel(
           auto flag_sum = BlockReduceI(reduce_storage_i).Sum(flag_selected);
           // let all threads see the results
           if (threadIdx.x == 0) {
-            num_selected_this_round = flag_sum;
-            num_selected += num_selected_this_round;
+            num_selected += flag_sum;
           }
           __syncthreads();
 
