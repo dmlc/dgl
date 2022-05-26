@@ -116,6 +116,7 @@ if __name__ == '__main__':
     dataset = DglNodePropPredDataset('ogbn-products')
     graph, labels = dataset[0]
     graph.ndata['label'] = labels.squeeze()
+    graph.create_formats_()
     split_idx = dataset.get_idx_split()
     train_idx, val_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
     datamodule = DataModule(graph, train_idx, val_idx, [15, 10, 5], 1024, dataset.num_classes)
