@@ -10,7 +10,7 @@ class GraphSAGE(nn.Module):
                  num_layers: int = 1,
                  activation: str = "relu",
                  dropout: float = 0.5,
-                 aggregator_type: str = "gcn"):        
+                 aggregator_type: str = "gcn"):
         """GraphSAGE model
 
         Parameters
@@ -41,7 +41,7 @@ class GraphSAGE(nn.Module):
         self.layers = nn.ModuleList()
         self.dropout = nn.Dropout(dropout)
         self.activation = getattr(nn.functional, activation)
-        
+
         for i in range(num_layers):
             in_hidden = hidden_size if i > 0 else in_size
             out_hidden = hidden_size if i < num_layers - 1 else data_info["out_size"]
@@ -49,7 +49,7 @@ class GraphSAGE(nn.Module):
 
     def forward(self, graph, node_feat, edge_feat = None):
         if self.embed_size > 0:
-            dgl_warning("The embedding for node feature is used, and input node_feat is ignored, due to the provided embed_size.", norepeat=True)
+            dgl_warning("The embedding for node feature is used, and input node_feat is ignored, due to the provided embed_size.")
             h = self.embed.weight
         else:
             h = node_feat
@@ -60,7 +60,7 @@ class GraphSAGE(nn.Module):
                 h = self.activation(h)
                 h = self.dropout(h)
         return h
-    
+
     def forward_block(self, blocks, node_feat, edge_feat = None):
         h = node_feat
         for l, (layer, block) in enumerate(zip(self.layers, blocks)):

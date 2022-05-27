@@ -38,7 +38,7 @@ def load_data(data_name, get_norm=False, inv_target=False):
     category_id = hg.ntypes.index(category)
 
     g = dgl.to_homogeneous(hg, edata=edata)
-    # Rename the fields as they can be changed by for example NodeDataLoader
+    # Rename the fields as they can be changed by for example DataLoader
     g.ndata['ntype'] = g.ndata.pop(dgl.NTYPE)
     g.ndata['type_id'] = g.ndata.pop(dgl.NID)
     node_ids = th.arange(g.num_nodes())

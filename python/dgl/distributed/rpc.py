@@ -15,10 +15,10 @@ from .. import backend as F
 
 __all__ = ['set_rank', 'get_rank', 'Request', 'Response', 'register_service', \
 'create_sender', 'create_receiver', 'finalize_sender', 'finalize_receiver', \
-'receiver_wait', 'connect_receiver', 'read_ip_config', 'get_group_id', \
+'wait_for_senders', 'connect_receiver', 'read_ip_config', 'get_group_id', \
 'get_num_machines', 'set_num_machines', 'get_machine_id', 'set_machine_id', \
 'send_request', 'recv_request', 'send_response', 'recv_response', 'remote_call', \
-'send_request_to_machine', 'remote_call_to_machine', 'fast_pull', \
+'send_request_to_machine', 'remote_call_to_machine', 'fast_pull', 'DistConnectError', \
 'get_num_client', 'set_num_client', 'client_barrier', 'copy_data_to_shared_memory']
 
 REQUEST_CLASS_TO_SERVICE_ID = {}
@@ -112,7 +112,7 @@ def create_sender(max_queue_size, net_type):
     max_queue_size : int
         Maximal size (bytes) of network queue buffer.
     net_type : str
-        Networking type. Current options are: 'socket'.
+        Networking type. Current options are: 'socket', 'tensorpipe'.
     """
     max_thread_count = int(os.getenv('DGL_SOCKET_MAX_THREAD_COUNT', '0'))
     _CAPI_DGLRPCCreateSender(int(max_queue_size), net_type, max_thread_count)
@@ -125,7 +125,7 @@ def create_receiver(max_queue_size, net_type):
     max_queue_size : int
         Maximal size (bytes) of network queue buffer.
     net_type : str
-        Networking type. Current options are: 'socket'.
+        Networking type. Current options are: 'socket', 'tensorpipe'.
     """
     max_thread_count = int(os.getenv('DGL_SOCKET_MAX_THREAD_COUNT', '0'))
     _CAPI_DGLRPCCreateReceiver(int(max_queue_size), net_type, max_thread_count)
@@ -140,7 +140,7 @@ def finalize_receiver():
     """
     _CAPI_DGLRPCFinalizeReceiver()
 
-def receiver_wait(ip_addr, port, num_senders, blocking=True):
+def wait_for_senders(ip_addr, port, num_senders, blocking=True):
     """Wait all of the senders' connections.
 
     This api will be blocked until all the senders connect to the receiver.
@@ -156,7 +156,7 @@ def receiver_wait(ip_addr, port, num_senders, blocking=True):
     blocking : bool
         whether to wait blockingly
     """
-    _CAPI_DGLRPCReceiverWait(ip_addr, int(port), int(num_senders), blocking)
+    _CAPI_DGLRPCWaitForSenders(ip_addr, int(port), int(num_senders), blocking)
 
 def connect_receiver(ip_addr, port, recv_id, group_id=-1):
     """Connect to target receiver
@@ -174,6 +174,20 @@ def connect_receiver(ip_addr, port, recv_id, group_id=-1):
     if target_id < 0:
         raise DGLError("Invalid target id: {}".format(target_id))
     return _CAPI_DGLRPCConnectReceiver(ip_addr, int(port), int(target_id))
+
+def connect_receiver_finalize(max_try_times):
+    """Finalize the action to connect to receivers. Make sure that either all connections are
+    successfully established or connection fails.
+
+    When "socket" network backend is in use, the function issues actual requests to receiver
+    sockets to establish connections.
+
+    Parameters
+    ----------
+    max_try_times : int
+        maximum try times
+    """
+    return _CAPI_DGLRPCConnectReceiverFinalize(max_try_times)
 
 def set_rank(rank):
     """Set the rank of this process.
@@ -1221,5 +1235,22 @@ def get_client(client_id, group_id):
         global client ID
     """
     return _CAPI_DGLRPCGetClient(int(client_id), int(group_id))
+
+class DistConnectError(DGLError):
+    """Exception raised for errors if fail to connect peer.
+
+    Attributes
+    ----------
+    kv_store : KVServer
+        reference for KVServer
+    """
+
+    def __init__(self, max_try_times, ip='', port=''):
+        peer_str = "peer[{}:{}]".format(ip, port) if ip != '' else "peer"
+        self.message = "Failed to build conncetion with {} after {} retries. " \
+                       "Please check network availability or increase max try " \
+                       "times via 'DGL_DIST_MAX_TRY_TIMES'.".format(
+                           peer_str, max_try_times)
+        super().__init__(self.message)
 
 _init_api("dgl.distributed.rpc")

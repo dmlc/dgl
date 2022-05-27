@@ -234,14 +234,17 @@ __device__ __forceinline__ double AtomicAdd<double>(double* addr, double val) {
 
 #ifdef USE_FP16
 #if defined(CUDART_VERSION) && CUDART_VERSION >= 10000
+// half make sure we have half support
+#if __CUDA_ARCH__ >= 600
 template <>
 __device__ __forceinline__ half AtomicAdd<half>(half* addr, half val) {
 #if __CUDA_ARCH__ >= 700
   return atomicAdd(addr, val);
 #else
   return *addr + val;
-#endif  // __CUDA_ARCH__
+#endif  // __CUDA_ARCH__ >= 700
 }
+#endif  // __CUDA_ARCH__ >= 600
 #endif  // defined(CUDART_VERSION) && CUDART_VERSION >= 10000
 #endif  // USE_FP16
 

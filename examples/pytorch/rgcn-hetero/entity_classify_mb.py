@@ -97,14 +97,14 @@ def main(args):
 
     # train sampler
     sampler = dgl.dataloading.MultiLayerNeighborSampler([args.fanout] * args.n_layers)
-    loader = dgl.dataloading.NodeDataLoader(
+    loader = dgl.dataloading.DataLoader(
         g, {category: train_idx}, sampler,
         batch_size=args.batch_size, shuffle=True, num_workers=0)
 
     # validation sampler
     # we do not use full neighbor to save computation resources
     val_sampler = dgl.dataloading.MultiLayerNeighborSampler([args.fanout] * args.n_layers)
-    val_loader = dgl.dataloading.NodeDataLoader(
+    val_loader = dgl.dataloading.DataLoader(
         g, {category: val_idx}, val_sampler,
         batch_size=args.batch_size, shuffle=True, num_workers=0)
 
@@ -152,7 +152,7 @@ def main(args):
     output = model.inference(
         g, args.batch_size, 'cuda' if use_cuda else 'cpu', 0, node_embed)
     test_pred = output[category][test_idx]
-    test_labels = labels[test_idx]
+    test_labels = labels[test_idx].to(test_pred.device)
     test_acc = (test_pred.argmax(1) == test_labels).float().mean()
     print("Test Acc: {:.4f}".format(test_acc))
     print()

@@ -8,7 +8,7 @@ import torch as th
 import torch.nn.functional as F
 import dgl
 
-from dgl.dataloading import MultiLayerNeighborSampler, NodeDataLoader
+from dgl.dataloading import MultiLayerNeighborSampler, DataLoader
 from torchmetrics.functional import accuracy
 from tqdm import tqdm
 
@@ -19,7 +19,7 @@ def init_dataloaders(args, g, train_idx, test_idx, target_idx, device, use_ddp=F
     fanouts = [int(fanout) for fanout in args.fanout.split(',')]
     sampler = MultiLayerNeighborSampler(fanouts)
 
-    train_loader = NodeDataLoader(
+    train_loader = DataLoader(
         g,
         target_idx[train_idx],
         sampler,
@@ -30,7 +30,7 @@ def init_dataloaders(args, g, train_idx, test_idx, target_idx, device, use_ddp=F
         drop_last=False)
 
     # The datasets do not have a validation subset, use the train subset
-    val_loader = NodeDataLoader(
+    val_loader = DataLoader(
         g,
         target_idx[train_idx],
         sampler,
@@ -42,7 +42,7 @@ def init_dataloaders(args, g, train_idx, test_idx, target_idx, device, use_ddp=F
 
     # -1 for sampling all neighbors
     test_sampler = MultiLayerNeighborSampler([-1] * len(fanouts))
-    test_loader = NodeDataLoader(
+    test_loader = DataLoader(
         g,
         target_idx[test_idx],
         test_sampler,

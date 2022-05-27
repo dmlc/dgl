@@ -260,6 +260,8 @@ class HeteroLinear(nn.Module):
         Input feature size for heterogeneous inputs. A key can be a string or a tuple of strings.
     out_size : int
         Output feature size.
+    bias : bool, optional
+        If True, learns a bias term. Defaults: ``True``.
 
     Examples
     --------
@@ -276,12 +278,12 @@ class HeteroLinear(nn.Module):
     >>> print(out_feats[('user', 'follows', 'user')].shape)
     torch.Size([3, 3])
     """
-    def __init__(self, in_size, out_size):
+    def __init__(self, in_size, out_size, bias=True):
         super(HeteroLinear, self).__init__()
 
         self.linears = nn.ModuleDict()
         for typ, typ_in_size in in_size.items():
-            self.linears[str(typ)] = nn.Linear(typ_in_size, out_size)
+            self.linears[str(typ)] = nn.Linear(typ_in_size, out_size, bias=bias)
 
     def forward(self, feat):
         """Forward function

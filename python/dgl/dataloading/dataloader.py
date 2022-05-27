@@ -9,7 +9,9 @@ import inspect
 import re
 import atexit
 import os
+import psutil
 
+import numpy as np
 import torch
 import torch.distributed as dist
 from torch.utils.data.distributed import DistributedSampler
@@ -133,15 +135,13 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
         # Use a shared memory array to permute indices for shuffling.  This is to make sure that
         # the worker processes can see it when persistent_workers=True, where self._indices
         # would not be duplicated every epoch.
-        self._indices = torch.empty(self._id_tensor.shape[0], dtype=torch.int64).share_memory_()
-        self._indices[:] = torch.arange(self._id_tensor.shape[0])
+        self._indices = torch.arange(self._id_tensor.shape[0], dtype=torch.int64).share_memory_()
         self.batch_size = batch_size
         self.drop_last = drop_last
 
     def shuffle(self):
         """Shuffle the dataset."""
-        # TODO: may need an in-place shuffle kernel
-        self._indices[:] = self._indices[torch.randperm(self._indices.shape[0])]
+        np.random.shuffle(self._indices.numpy())
 
     def __iter__(self):
         indices = _divide_by_worker(self._indices, self.batch_size, self.drop_last)
@@ -202,16 +202,20 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
     def _create_shared_indices(self):
         indices = torch.empty(self.shared_mem_size, dtype=torch.int64)
         num_ids = self._id_tensor.shape[0]
-        indices[:num_ids] = torch.arange(num_ids)
-        indices[num_ids:] = torch.arange(self.shared_mem_size - num_ids)
+        torch.arange(num_ids, out=indices[:num_ids])
+        torch.arange(self.shared_mem_size - num_ids, out=indices[num_ids:])
         return indices
 
     def shuffle(self):
         """Shuffles the dataset."""
         # Only rank 0 does the actual shuffling.  The other ranks wait for it.
         if self.rank == 0:
-            self._indices[:self.num_indices] = self._indices[
-                torch.randperm(self.num_indices, device=self._device)]
+            if self._device == torch.device('cpu'):
+                np.random.shuffle(self._indices[:self.num_indices].numpy())
+            else:
+                self._indices[:self.num_indices] = self._indices[
+                    torch.randperm(self.num_indices, device=self._device)]
+
             if not self.drop_last:
                 # pad extra
                 self._indices[self.num_indices:] = \
@@ -513,8 +517,10 @@ class CollateWrapper(object):
         self.device = device
 
     def __call__(self, items):
-        if self.use_uva:
-            # Only copy the indices to the given device if in UVA mode.
+        graph_device = getattr(self.g, 'device', None)
+        if self.use_uva or (graph_device != torch.device('cpu')):
+            # Only copy the indices to the given device if in UVA mode or the graph
+            # is not on CPU.
             items = recursive_apply(items, lambda x: x.to(self.device))
         batch = self.sample_func(self.g, items)
         return recursive_apply(batch, remove_parent_storage_columns, self.g)
@@ -677,7 +683,8 @@ class DataLoader(torch.utils.data.DataLoader):
     def __init__(self, graph, indices, graph_sampler, device=None, use_ddp=False,
                  ddp_seed=0, batch_size=1, drop_last=False, shuffle=False,
                  use_prefetch_thread=None, use_alternate_streams=None,
-                 pin_prefetcher=None, use_uva=False, **kwargs):
+                 pin_prefetcher=None, use_uva=False,
+                 use_cpu_worker_affinity=False, cpu_worker_affinity_cores=None, **kwargs):
         # (BarclayII) PyTorch Lightning sometimes will recreate a DataLoader from an existing
         # DataLoader with modifications to the original arguments.  The arguments are retrieved
         # from the attributes with the same name, and because we change certain arguments
@@ -825,6 +832,26 @@ class DataLoader(torch.utils.data.DataLoader):
 
         self.other_storages = {}
 
+        if use_cpu_worker_affinity:
+            nw_work = kwargs.get('num_workers', 0)
+
+            if cpu_worker_affinity_cores is None:
+                cpu_worker_affinity_cores = []
+
+            if not isinstance(cpu_worker_affinity_cores, list):
+                raise Exception('ERROR: cpu_worker_affinity_cores should be a list of cores')
+            if not nw_work > 0:
+                raise Exception('ERROR: affinity should be used with --num_workers=X')
+            if len(cpu_worker_affinity_cores) not in [0, nw_work]:
+                raise Exception('ERROR: cpu_affinity incorrect '
+                                'settings for cores={} num_workers={}'
+                                .format(cpu_worker_affinity_cores, nw_work))
+
+            self.cpu_cores = (cpu_worker_affinity_cores
+                                if len(cpu_worker_affinity_cores)
+                                else range(0, nw_work))
+            worker_init_fn = WorkerInitWrapper(self.worker_init_function)
+
         super().__init__(
             self.dataset,
             collate_fn=CollateWrapper(
@@ -842,6 +869,21 @@ class DataLoader(torch.utils.data.DataLoader):
         return _PrefetchingIter(
             self, super().__iter__(), use_thread=self.use_prefetch_thread,
             use_alternate_streams=self.use_alternate_streams, num_threads=num_threads)
+
+    def worker_init_function(self, worker_id):
+        """Worker init default function.
+              Parameters
+              ----------
+              worker_id : int
+                  Worker ID.
+        """
+        try:
+            psutil.Process().cpu_affinity([self.cpu_cores[worker_id]])
+            print('CPU-affinity worker {} has been assigned to core={}'
+                  .format(worker_id, self.cpu_cores[worker_id]))
+        except:
+            raise Exception('ERROR: cannot use affinity id={} cpu_cores={}'
+                            .format(worker_id, self.cpu_cores))
 
     # To allow data other than node/edge data to be prefetched.
     def attach_data(self, name, data):
