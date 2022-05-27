@@ -41,7 +41,7 @@ bool TensorDispatcher::Load(const char *path) {
 
   if (!handle_) {
     DLOG(WARNING) << "Could not open file: " << dlerror()
-      << ". This does not affect DGL's but might impact its performance." ;
+      << ". This does not affect DGL's but might impact its performance.";
     return false;
   }
 
