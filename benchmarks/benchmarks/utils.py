@@ -279,8 +279,6 @@ def load_nowplaying_rs():
             [], [])
         examples.append(example)
     textset = torchtext.data.Dataset(examples, fields)
-    for key, field in fields.items():
-        field.build_vocab(getattr(textset, key))
 
     return PinsageDataset(g, user_ntype, item_ntype, textset)
 
