@@ -88,7 +88,7 @@ class GlobalUniform(_BaseNegativeSampler):
         Whether to exclude self-loops from negative samples.  (Default: True)
     replace : bool, optional
         Whether to sample with replacement.  Setting it to True will make things
-        faster.  (Default: True)
+        faster.  (Default: False)
 
     Notes
     -----
