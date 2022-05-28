@@ -91,7 +91,7 @@ def get_graph(name, format = None):
             g_list, _ = dgl.load_graphs(bin_path)
             g = g_list[0]
         else:
-            # the original node IDs of friendster are not consecutive, so we compact it 
+            # the original node IDs of friendster are not consecutive, so we compact it
             g = dgl.compact_graphs(get_friendster()).formats(format)
             dgl.save_graphs(bin_path, [g])
     elif name == "reddit":
@@ -253,24 +253,16 @@ class PinsageDataset:
 
 def load_nowplaying_rs():
     import torchtext.legacy as torchtext
-    # follow examples/pytorch/pinsage/README to create nowplaying_rs.pkl
-    name = 'nowplaying_rs.pkl'
+    # follow examples/pytorch/pinsage/README to create train_g.bin
+    name = 'train_g.bin'
     dataset_dir = os.path.join(os.getcwd(), 'dataset')
     os.symlink('/tmp/dataset/', dataset_dir)
 
     dataset_path = os.path.join(dataset_dir, "nowplaying_rs", name)
-    # Load dataset
-    with open(dataset_path, 'rb') as f:
-        dataset = pickle.load(f)
-
-    g = dataset['train-graph']
-    val_matrix = dataset['val-matrix'].tocsr()
-    test_matrix = dataset['test-matrix'].tocsr()
-    item_texts = dataset['item-texts']
-    user_ntype = dataset['user-type']
-    item_ntype = dataset['item-type']
-    user_to_item_etype = dataset['user-to-item-type']
-    timestamp = dataset['timestamp-edge-column']
+    g_list, _ = dgl.load_graphs(dataset_path)
+    g = g_list[0]
+    user_ntype = 'user'
+    item_ntype = 'track'
 
     # Assign user and movie IDs and use them as features (to learn an individual trainable
     # embedding for each entity)
@@ -282,17 +274,11 @@ def load_nowplaying_rs():
     # Prepare torchtext dataset and vocabulary
     fields = {}
     examples = []
-    for key, texts in item_texts.items():
-        fields[key] = torchtext.data.Field(
-            include_lengths=True, lower=True, batch_first=True)
     for i in range(g.number_of_nodes(item_ntype)):
         example = torchtext.data.Example.fromlist(
-            [item_texts[key][i] for key in item_texts.keys()],
-            [(key, fields[key]) for key in item_texts.keys()])
+            [], [])
         examples.append(example)
     textset = torchtext.data.Dataset(examples, fields)
-    for key, field in fields.items():
-        field.build_vocab(getattr(textset, key))
 
     return PinsageDataset(g, user_ntype, item_ntype, textset)
 
