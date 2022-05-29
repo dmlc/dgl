@@ -21,6 +21,7 @@ namespace cuda {
 #define CUDA_MAX_NUM_THREADS 1024
 
 #ifdef USE_FP16
+#if __CUDA_ARCH__ >= 600
 #define SWITCH_BITS(bits, DType, ...)                           \
   do {                                                          \
     if ((bits) == 16) {                                         \
@@ -36,6 +37,22 @@ namespace cuda {
       LOG(FATAL) << "Data type not recognized with bits " << bits; \
     }                                                           \
   } while (0)
+#else
+#define SWITCH_BITS(bits, DType, ...)                           \
+  do {                                                          \
+    if ((bits) == 16) {                                         \
+      LOG(FATAL) << "FP16 only supported on CUDA architectures >= 60"; \
+    } else if ((bits) == 32) {                                  \
+      typedef float DType;                                      \
+      { __VA_ARGS__ }                                           \
+    } else if ((bits) == 64) {                                  \
+      typedef double DType;                                     \
+      { __VA_ARGS__ }                                           \
+    } else {                                                    \
+      LOG(FATAL) << "Data type not recognized with bits " << bits; \
+    }                                                           \
+  } while (0)
+#endif  // __CUDA_ARCH__ >= 600
 #else  // USE_FP16
 #define SWITCH_BITS(bits, DType, ...)                           \
   do {                                                          \

@@ -10,7 +10,7 @@ import pickle
 import io
 import unittest, pytest
 import test_utils
-from test_utils import parametrize_dtype, get_cases
+from test_utils import parametrize_idtype, get_cases
 from utils import assert_is_identical, assert_is_identical_hetero
 
 def _assert_is_identical_nodeflow(nf1, nf2):
@@ -92,7 +92,7 @@ def _global_message_func(nodes):
     return {'x': nodes.data['x']}
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
-@parametrize_dtype
+@parametrize_idtype
 @pytest.mark.parametrize('g', get_cases(exclude=['dglgraph', 'two_hetero_batch']))
 def test_pickling_graph(g, idtype):
     g = g.astype(idtype)
@@ -165,7 +165,7 @@ def test_pickling_subgraph():
 
 @unittest.skipIf(F._default_context_str != 'gpu', reason="Need GPU for pin")
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TensorFlow create graph on gpu when unpickle")
-@parametrize_dtype
+@parametrize_idtype
 def test_pickling_is_pinned(idtype):
     from copy import deepcopy
     g = dgl.rand_graph(10, 20, idtype=idtype, device=F.cpu())
