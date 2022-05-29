@@ -6,6 +6,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 import torchtext
 import dgl
+import os
 import tqdm
 
 import layers
@@ -137,6 +138,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Load dataset
-    with open(args.dataset_path, 'rb') as f:
+    data_info_path = os.path.join(args.dataset_path, 'data.pkl')
+    with open(data_info_path, 'rb') as f:
         dataset = pickle.load(f)
+    train_g_path = os.path.join(args.dataset_path, 'train_g.bin')
+    g_list, _ = dgl.load_graphs(train_g_path)
+    dataset['train-graph'] = g_list[0]
     train(dataset, args)
