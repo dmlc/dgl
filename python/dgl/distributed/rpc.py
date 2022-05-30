@@ -18,7 +18,7 @@ __all__ = ['set_rank', 'get_rank', 'Request', 'Response', 'register_service', \
 'wait_for_senders', 'connect_receiver', 'read_ip_config', 'get_group_id', \
 'get_num_machines', 'set_num_machines', 'get_machine_id', 'set_machine_id', \
 'send_request', 'recv_request', 'send_response', 'recv_response', 'remote_call', \
-'send_request_to_machine', 'remote_call_to_machine', 'fast_pull', \
+'send_request_to_machine', 'remote_call_to_machine', 'fast_pull', 'DistConnectError', \
 'get_num_client', 'set_num_client', 'client_barrier', 'copy_data_to_shared_memory']
 
 REQUEST_CLASS_TO_SERVICE_ID = {}
@@ -175,14 +175,19 @@ def connect_receiver(ip_addr, port, recv_id, group_id=-1):
         raise DGLError("Invalid target id: {}".format(target_id))
     return _CAPI_DGLRPCConnectReceiver(ip_addr, int(port), int(target_id))
 
-def connect_receiver_finalize():
+def connect_receiver_finalize(max_try_times):
     """Finalize the action to connect to receivers. Make sure that either all connections are
     successfully established or connection fails.
 
     When "socket" network backend is in use, the function issues actual requests to receiver
     sockets to establish connections.
+
+    Parameters
+    ----------
+    max_try_times : int
+        maximum try times
     """
-    _CAPI_DGLRPCConnectReceiverFinalize()
+    return _CAPI_DGLRPCConnectReceiverFinalize(max_try_times)
 
 def set_rank(rank):
     """Set the rank of this process.
@@ -1230,5 +1235,22 @@ def get_client(client_id, group_id):
         global client ID
     """
     return _CAPI_DGLRPCGetClient(int(client_id), int(group_id))
+
+class DistConnectError(DGLError):
+    """Exception raised for errors if fail to connect peer.
+
+    Attributes
+    ----------
+    kv_store : KVServer
+        reference for KVServer
+    """
+
+    def __init__(self, max_try_times, ip='', port=''):
+        peer_str = "peer[{}:{}]".format(ip, port) if ip != '' else "peer"
+        self.message = "Failed to build conncetion with {} after {} retries. " \
+                       "Please check network availability or increase max try " \
+                       "times via 'DGL_DIST_MAX_TRY_TIMES'.".format(
+                           peer_str, max_try_times)
+        super().__init__(self.message)
 
 _init_api("dgl.distributed.rpc")

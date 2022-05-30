@@ -21,7 +21,6 @@
 namespace dgl {
 namespace network {
 
-static constexpr int kMaxTryCount = 1024;    // maximal connection: 1024
 static constexpr int kTimeOut = 10 * 60;     // 10 minutes (in seconds) for socket timeout
 static constexpr int kMaxConnection = 1024;  // maximal connection: 1024
 
@@ -70,7 +69,7 @@ class SocketSender : public Sender {
    *
    * The function is *not* thread-safe; only one thread can invoke this API.
    */
-  bool ConnectReceiverFinalize() override;
+  bool ConnectReceiverFinalize(const int max_try_times) override;
 
   /*!
    * \brief Send RPCMessage to specified Receiver.

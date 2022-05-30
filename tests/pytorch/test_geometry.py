@@ -7,7 +7,7 @@ import torch as th
 from dgl import DGLError
 from dgl.base import DGLWarning
 from dgl.geometry import neighbor_matching, farthest_point_sampler
-from test_utils import parametrize_dtype
+from test_utils import parametrize_idtype
 from test_utils.graph_cases import get_cases
 
 
@@ -181,7 +181,7 @@ def test_knn_cuda(algorithm, dist):
         g = kg(x_empty, [3, 5], algorithm, dist)
 
 
-@parametrize_dtype
+@parametrize_idtype
 @pytest.mark.parametrize('g', get_cases(['homo'], exclude=['dglgraph']))
 @pytest.mark.parametrize('weight', [True, False])
 @pytest.mark.parametrize('relabel', [True, False])

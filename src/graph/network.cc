@@ -262,7 +262,8 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLSenderConnect")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     CommunicatorHandle chandle = args[0];
     network::Sender* sender = static_cast<network::Sender*>(chandle);
-    if (sender->ConnectReceiverFinalize() == false) {
+    const int max_try_times = 1024;
+    if (sender->ConnectReceiverFinalize(max_try_times) == false) {
       LOG(FATAL) << "Sender connection failed.";
     }
   });

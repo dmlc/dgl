@@ -286,7 +286,7 @@ class EntityClassify(nn.Module):
     ) -> Dict[str, torch.Tensor]:
         for i, layer in enumerate(self._layers):
             sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
-            dataloader = dgl.dataloading.NodeDataLoader(
+            dataloader = dgl.dataloading.DataLoader(
                 hg,
                 {ntype: hg.nodes(ntype) for ntype in hg.ntypes},
                 sampler,
@@ -321,7 +321,7 @@ class EntityClassify(nn.Module):
                 if i < self._num_layers - 1:
                     h = self._apply_layers(i, h)
 
-                for ntype in h:
+                for ntype in out_nodes:
                     y[ntype][out_nodes[ntype]] = h[ntype]
 
             x = y
