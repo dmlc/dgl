@@ -30,7 +30,7 @@ class EGATConv(nn.Module):
     ----------
     in_node_feats : int, or pair of ints
         Input feature size; i.e, the number of dimensions of :math:`h_{i}`.
-        GATConv can be applied on homogeneous graph and unidirectional
+        EGATConv can be applied on homogeneous graph and unidirectional
         `bipartite graph <https://docs.dgl.ai/generated/dgl.bipartite.html?highlight=bipartite>`__.
         If the layer is to be applied to a unidirectional bipartite graph, ``in_feats``
         specifies the input feature size on both the source and destination nodes.  If
@@ -57,7 +57,6 @@ class EGATConv(nn.Module):
     >>> num_nodes, num_edges = 8, 30
     >>> # generate a graph
     >>> graph = dgl.rand_graph(num_nodes,num_edges)
-
     >>> node_feats = th.rand((num_nodes, 20))
     >>> edge_feats = th.rand((num_edges, 12))
     >>> egat = EGATConv(in_node_feats=20,
@@ -76,25 +75,21 @@ class EGATConv(nn.Module):
     >>> g = dgl.heterograph({('A', 'r', 'B'): (u, v)})
     >>> u_feat = th.tensor(np.random.rand(2, 25).astype(np.float32))
     >>> v_feat = th.tensor(np.random.rand(4, 30).astype(np.float32))
-
     >>> nfeats = (u_feat,v_feat)
     >>> efeats = th.tensor(np.random.rand(5, 15).astype(np.float32))
-
     >>> in_node_feats = (25,30)
     >>> in_edge_feats = 15
     >>> out_node_feats = 10
     >>> out_edge_feats = 5
     >>> num_heads = 3
-
     >>> egat_model =  EGATConv(in_node_feats,
     ...                         in_edge_feats,
     ...                         out_node_feats,
     ...                         out_edge_feats,
     ...                         num_heads,
     ...                         bias=True)
-                        
+    >>> #forward pass
     >>> new_node_feats, new_edge_feats, attentions = egat_model(g, nfeats, efeats, get_attention=True)
-
     >>> new_node_feats.shape, new_edge_feats.shape, attentions.shape
     (torch.Size([4, 3, 10]), torch.Size([5, 3, 5]), torch.Size([5, 3, 1]))
     """
@@ -158,13 +153,13 @@ class EGATConv(nn.Module):
         graph : DGLGraph
             The graph.
         nfeat : torch.Tensor or pair of torch.Tensor
-            If a torch.Tensor is given, the input feature of shape :math:`(N, *, D_{in})` 
+            If a torch.Tensor is given, the input feature of shape :math:`(N, D_{in})` 
             where:
                 :math:`D_{in}` is size of input node feature, 
                 :math:`N` is the number of nodes.
             If a pair of torch.Tensor is given, the pair must contain two tensors of shape
-                :math:`(N_{in}, *, D_{in_{src}})` and 
-                :math:`(N_{out}, *, D_{in_{dst}})`.
+                :math:`(N_{in}, D_{in_{src}})` and 
+                :math:`(N_{out}, D_{in_{dst}})`.
         efeats: torch.Tensor
              The input edge feature of shape :math:`(E, F_{in})`
              where:
