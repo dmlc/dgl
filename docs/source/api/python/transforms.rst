@@ -32,3 +32,4 @@ dgl.transforms
     LaplacianPE
     FeatMask
     RowFeatNormalizer
+    SIGNDiffusion

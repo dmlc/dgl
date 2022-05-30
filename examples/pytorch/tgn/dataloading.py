@@ -3,7 +3,7 @@ import dgl
 
 from dgl._dataloading.dataloader import EdgeCollator
 from dgl._dataloading import BlockSampler
-from dgl._dataloading.pytorch import _pop_subgraph_storage, _pop_storages
+from dgl._dataloading.pytorch import _pop_subgraph_storage, _pop_storages, EdgeDataLoader
 from dgl.base import DGLError
 
 from functools import partial
@@ -234,7 +234,7 @@ class TemporalEdgeCollator(EdgeCollator):
         return result
 
 
-class TemporalEdgeDataLoader(dgl.dataloading.EdgeDataLoader):
+class TemporalEdgeDataLoader(EdgeDataLoader):
     """ TemporalEdgeDataLoader is an iteratable object to generate blocks for temporal embedding
     as well as pos and neg pair graph for memory update.
 
@@ -600,7 +600,7 @@ class FastTemporalEdgeCollator(EdgeCollator):
 # "APAN: Asynchronous Propagation Attention Network for Real-time Temporal Graph Embedding"
 # that will be appeared in SIGMOD 21, code repo https://github.com/WangXuhongCN/APAN
 
-class SimpleTemporalSampler(dgl.dataloading.BlockSampler):
+class SimpleTemporalSampler(BlockSampler):
     '''
     Simple Temporal Sampler just choose the edges that happen before the current timestamp, to build the subgraph of the corresponding nodes.
     And then the sampler uses the simplest static graph neighborhood sampling methods.
@@ -637,7 +637,7 @@ class SimpleTemporalSampler(dgl.dataloading.BlockSampler):
         return frontier
 
 
-class SimpleTemporalEdgeCollator(dgl.dataloading.EdgeCollator):
+class SimpleTemporalEdgeCollator(EdgeCollator):
     '''
     Temporal Edge collator merge the edges specified by eid: items
 

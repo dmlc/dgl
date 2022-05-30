@@ -95,14 +95,14 @@ def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
                 try_times = 0
                 while not rpc.connect_receiver(client_ip, client_port, client_id, group_id):
                     try_times += 1
+                    if try_times % 200 == 0:
+                        print("Server~{} is trying to connect client receiver: {}:{}".format(
+                            server_id, client_ip, client_port))
                     if try_times >= max_try_times:
-                        raise DGLError("Failed to connect to receiver [{}:{}] after {} "
-                                       "retries. Please check availability of this target "
-                                       "receiver or change the max retry times via "
-                                       "'DGL_DIST_MAX_TRY_TIMES'.".format(
-                                           client_ip, client_port, max_try_times))
+                        raise rpc.DistConnectError(max_try_times, client_ip, client_port)
                     time.sleep(1)
-            rpc.connect_receiver_finalize()
+            if not rpc.connect_receiver_finalize(max_try_times):
+                raise rpc.DistConnectError(max_try_times)
             if rpc.get_rank() == 0:  # server_0 send all the IDs
                 for client_id, _ in client_namebook.items():
                     register_res = rpc.ClientRegisterResponse(client_id)

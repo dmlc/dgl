@@ -14,13 +14,14 @@
 #   limitations under the License.
 #
 """Modules for transform"""
-# pylint: disable= no-member, arguments-differ, invalid-name
+# pylint: disable= no-member, arguments-differ, invalid-name, missing-function-docstring
 
 from scipy.linalg import expm
 
 from .. import convert
 from .. import backend as F
 from .. import function as fn
+from ..base import DGLError
 from . import functional
 
 try:
@@ -50,7 +51,8 @@ __all__ = [
     'NodeShuffle',
     'DropNode',
     'DropEdge',
-    'AddEdge'
+    'AddEdge',
+    'SIGNDiffusion'
 ]
 
 def update_graph_structure(g, data_dict, copy_edata=True):
@@ -119,11 +121,11 @@ class RowFeatNormalizer(BaseTransform):
         Subtraction will make all values non-negative. If all values are negative, after
         normalisation, the sum of each row of the feature tensor will be 1.
     node_feat_names : list[str], optional
-        The names of the node features to be normalized. Default: `None`.
-        If None, all node features will be normalized.
+        The names of the node feature tensors to be row-normalized. Default: `None`, which will
+        not normalize any node feature tensor.
     edge_feat_names : list[str], optional
-        The names of the edge features to be normalized. Default: `None`.
-        If None, all edge features will be normalized.
+        The names of the edge feature tensors to be row-normalized. Default: `None`, which will
+        not normalize any edge feature tensor.
 
     Example
     -------
@@ -136,51 +138,40 @@ class RowFeatNormalizer(BaseTransform):
 
     Case1: Row normalize features of a homogeneous graph.
 
-    >>> transform = RowFeatNormalizer()
+    >>> transform = RowFeatNormalizer(subtract_min=True,
+    ...                               node_feat_names=['h'], edge_feat_names=['w'])
     >>> g = dgl.rand_graph(5, 20)
     >>> g.ndata['h'] = torch.randn((g.num_nodes(), 5))
-    >>> print(g.ndata['h'].sum(1))
-    tensor([-3.0586,  3.4974,  3.1509,  1.5805,  0.4890])
-    >>> g.edata['w'] = torch.randn((g.num_edges, 5))
-    >>> print(g.edata['w'].sum(1))
-    tensor([ 2.9284, -3.8341,  1.5087,  0.8673, -2.5115,  2.4751,  0.1427,  1.7180,
-            2.7705,  1.0600, -0.7126,  0.1072, -0.8159,  1.2082,  2.0327, -2.3323,
-            -1.2495,  1.9458, -1.4240, -1.3575])
+    >>> g.edata['w'] = torch.randn((g.num_edges(), 5))
     >>> g = transform(g)
     >>> print(g.ndata['h'].sum(1))
-    tensor([1.0000, 1.0000, 1.0000, 1.0000, 1.0000])
+    tensor([1., 1., 1., 1., 1.])
     >>> print(g.edata['w'].sum(1))
-    tensor([1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000,
-            1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000,
-            1.0000, 1.0000])
+    tensor([1., 1., 1., 1., 1., 1., 1., 1., 1.,
+            1., 1., 1., 1., 1., 1., 1., 1., 1.,
+            1., 1.])
 
     Case2: Row normalize features of a heterogeneous graph.
 
-    >>> transform = RowFeatNormalizer()
     >>> g = dgl.heterograph({
     ...     ('user', 'follows', 'user'): (torch.tensor([1, 2]), torch.tensor([3, 4])),
     ...     ('player', 'plays', 'game'): (torch.tensor([2, 2]), torch.tensor([1, 1]))
     ... })
     >>> g.ndata['h'] = {'game': torch.randn(2, 5), 'player': torch.randn(3, 5)}
-    >>> print(g.ndata['h']['game'].sum(1), g.ndata['h']['player'].sum(1))
-    tensor([ 4.4201, -4.0683]) tensor([-2.2460, -1.1204, -2.0254])
     >>> g.edata['w'] = {
     ...     ('user', 'follows', 'user'): torch.randn(2, 5),
     ...     ('player', 'plays', 'game'): torch.randn(2, 5)
     ... }
-    >>> print(g.edata['w'][('user', 'follows', 'user')].sum(1),
-    ...     g.edata['w'][('player', 'plays', 'game')].sum(1))
-    tensor([-1.2663,  3.3789]) tensor([4.1371, 1.4743])
     >>> g = transform(g)
     >>> print(g.ndata['h']['game'].sum(1), g.ndata['h']['player'].sum(1))
-    tensor([1.0000, 1.0000]) tensor([1.0000, 1.0000, 1.0000])
+    tensor([1., 1.]) tensor([1., 1., 1.])
     >>> print(g.edata['w'][('user', 'follows', 'user')].sum(1),
     ...     g.edata['w'][('player', 'plays', 'game')].sum(1))
-    tensor([1.0000, 1.0000]) tensor([1.0000, 1.0000])
+    tensor([1., 1.]) tensor([1., 1.])
     """
     def __init__(self, subtract_min=False, node_feat_names=None, edge_feat_names=None):
-        self.node_feat_names = node_feat_names
-        self.edge_feat_names = edge_feat_names
+        self.node_feat_names = [] if node_feat_names is None else node_feat_names
+        self.edge_feat_names = [] if edge_feat_names is None else edge_feat_names
         self.subtract_min = subtract_min
 
     def row_normalize(self, feat):
@@ -206,12 +197,6 @@ class RowFeatNormalizer(BaseTransform):
         return feat
 
     def __call__(self, g):
-        if self.node_feat_names is None:
-            self.node_feat_names = g.ndata.keys()
-
-        if self.edge_feat_names is None:
-            self.edge_feat_names = g.edata.keys()
-
         for node_feat_name in self.node_feat_names:
             if isinstance(g.ndata[node_feat_name], torch.Tensor):
                 g.ndata[node_feat_name] = self.row_normalize(g.ndata[node_feat_name])
@@ -231,21 +216,19 @@ class RowFeatNormalizer(BaseTransform):
         return g
 
 class FeatMask(BaseTransform):
-    r"""Randomly mask columns of the node and edge feature tensors, as described in `An Empirical
-    Study of Graph Contrastive Learning <https://arxiv.org/abs/2109.01116>`__.
+    r"""Randomly mask columns of the node and edge feature tensors, as described in `Graph
+    Contrastive Learning with Augmentations <https://arxiv.org/abs/2010.13902>`__.
 
     Parameters
     ----------
     p : float, optional
         Probability of masking a column of a feature tensor. Default: `0.5`.
     node_feat_names : list[str], optional
-        The names of the node feature tensors to be masked. Default: `None`.
-        If None, all node feature tensors will be randomly mask some columns according to
-        probability :attr:`p`.
+        The names of the node feature tensors to be masked. Default: `None`, which will
+        not mask any node feature tensor.
     edge_feat_names : list[str], optional
-        The names of the edge features to be masked. Default: `None`.
-        If None, all edge feature tensors will be randomly mask some columns according to
-        probability :attr:`p`.
+        The names of the edge features to be masked. Default: `None`, which will not mask
+        any edge feature tensor.
 
     Example
     -------
@@ -258,7 +241,7 @@ class FeatMask(BaseTransform):
 
     Case1 : Mask node and edge feature tensors of a homogeneous graph.
 
-    >>> transform = FeatMask()
+    >>> transform = FeatMask(node_feat_names=['h'], edge_feat_names=['w'])
     >>> g = dgl.rand_graph(5, 10)
     >>> g.ndata['h'] = torch.ones((g.num_nodes(), 10))
     >>> g.edata['w'] = torch.ones((g.num_edges(), 10))
@@ -266,65 +249,54 @@ class FeatMask(BaseTransform):
     >>> g = transform(g)
     >>> print(g.ndata['h'])
     tensor([[0., 0., 1., 1., 0., 0., 1., 1., 1., 0.],
-        [0., 0., 1., 1., 0., 0., 1., 1., 1., 0.],
-        [0., 0., 1., 1., 0., 0., 1., 1., 1., 0.],
-        [0., 0., 1., 1., 0., 0., 1., 1., 1., 0.],
-        [0., 0., 1., 1., 0., 0., 1., 1., 1., 0.]])
+            [0., 0., 1., 1., 0., 0., 1., 1., 1., 0.],
+            [0., 0., 1., 1., 0., 0., 1., 1., 1., 0.],
+            [0., 0., 1., 1., 0., 0., 1., 1., 1., 0.],
+            [0., 0., 1., 1., 0., 0., 1., 1., 1., 0.]])
     >>> print(g.edata['w'])
     tensor([[1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
-        [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
-        [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
-        [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
-        [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
-        [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
-        [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
-        [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
-        [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
-        [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.]])
+            [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
+            [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
+            [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
+            [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
+            [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
+            [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
+            [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
+            [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
+            [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.]])
 
     Case2 : Mask node and edge feature tensors of a heterogeneous graph.
 
-    >>> transform = FeatMask()
     >>> g = dgl.heterograph({
     ...     ('user', 'follows', 'user'): (torch.tensor([1, 2]), torch.tensor([3, 4])),
     ...     ('player', 'plays', 'game'): (torch.tensor([2, 2]), torch.tensor([1, 1]))
     ... })
     >>> g.ndata['h'] = {'game': torch.ones(2, 5), 'player': torch.ones(3, 5)}
     >>> g.edata['w'] = {('user', 'follows', 'user'): torch.ones(2, 5)}
-    >>> print(g.ndata['h']['game'], g.ndata['h']['player'])
+    >>> print(g.ndata['h']['game'])
     tensor([[1., 1., 1., 1., 1.],
-        [1., 1., 1., 1., 1.]]) tensor([[1., 1., 1., 1., 1.],
-        [1., 1., 1., 1., 1.],
-        [1., 1., 1., 1., 1.]])
+            [1., 1., 1., 1., 1.]])
     >>> print(g.edata['w'][('user', 'follows', 'user')])
     tensor([[1., 1., 1., 1., 1.],
-        [1., 1., 1., 1., 1.]])
+            [1., 1., 1., 1., 1.]])
     >>> g = transform(g)
-    >>> print(g.ndata['h']['game'], g.ndata['h']['player'])
+    >>> print(g.ndata['h']['game'])
     tensor([[1., 1., 0., 1., 0.],
-        [1., 1., 0., 1., 0.]]) tensor([[0., 0., 0., 0., 1.],
-        [0., 0., 0., 0., 1.],
-        [0., 0., 0., 0., 1.]])
+            [1., 1., 0., 1., 0.]])
     >>> print(g.edata['w'][('user', 'follows', 'user')])
     tensor([[0., 1., 0., 1., 0.],
-        [0., 1., 0., 1., 0.]])
+            [0., 1., 0., 1., 0.]])
     """
     def __init__(self, p=0.5, node_feat_names=None, edge_feat_names=None):
         self.p = p
-        self.node_feat_names = node_feat_names
-        self.edge_feat_names = edge_feat_names
+        self.node_feat_names = [] if node_feat_names is None else node_feat_names
+        self.edge_feat_names = [] if edge_feat_names is None else edge_feat_names
         self.dist = Bernoulli(p)
 
     def __call__(self, g):
         # Fast path
         if self.p == 0:
             return g
-
-        if self.node_feat_names is None:
-            self.node_feat_names = g.ndata.keys()
-
-        if self.edge_feat_names is None:
-            self.edge_feat_names = g.edata.keys()
 
         for node_feat_name in self.node_feat_names:
             if isinstance(g.ndata[node_feat_name], torch.Tensor):
@@ -1492,3 +1464,182 @@ class AddEdge(BaseTransform):
             dst = F.randint([num_edges_to_add], idtype, device, low=0, high=g.num_nodes(vtype))
             g.add_edges(src, dst, etype=c_etype)
         return g
+
+class SIGNDiffusion(BaseTransform):
+    r"""The diffusion operator from `SIGN: Scalable Inception Graph Neural Networks
+    <https://arxiv.org/abs/2004.11198>`__
+
+    It performs node feature diffusion with :math:`TX, \cdots, T^{k}X`, where :math:`T`
+    is a diffusion matrix and :math:`X` is the input node features.
+
+    Specifically, this module provides four options for :math:`T`.
+
+    **raw**: raw adjacency matrix :math:`A`
+
+    **rw**: random walk (row-normalized) adjacency matrix :math:`D^{-1}A`, where
+    :math:`D` is the degree matrix.
+
+    **gcn**: symmetrically normalized adjacency matrix used by
+    `GCN <https://arxiv.org/abs/1609.02907>`__, :math:`D^{-1/2}AD^{-1/2}`
+
+    **ppr**: approximate personalized PageRank used by
+    `APPNP <https://arxiv.org/abs/1810.05997>`__
+
+    .. math::
+        H^{0} &= X
+
+        H^{l+1} &= (1-\alpha)\left(D^{-1/2}AD^{-1/2} H^{l}\right) + \alpha X
+
+    This module only works for homogeneous graphs.
+
+    Parameters
+    ----------
+    k : int
+        The maximum number of times for node feature diffusion.
+    in_feat_name : str, optional
+        :attr:`g.ndata[{in_feat_name}]` should store the input node features. Default: 'feat'
+    out_feat_name : str, optional
+        :attr:`g.ndata[{out_feat_name}_i]` will store the result of diffusing
+        input node features for i times. Default: 'out_feat'
+    eweight_name : str, optional
+        Name to retrieve edge weights from :attr:`g.edata`. Default: None,
+        treating the graph as unweighted.
+    diffuse_op : str, optional
+        The diffusion operator to use, which can be 'raw', 'rw', 'gcn', or 'ppr'.
+        Default: 'raw'
+    alpha : float, optional
+        Restart probability if :attr:`diffuse_op` is :attr:`'ppr'`,
+        which commonly lies in :math:`[0.05, 0.2]`. Default: 0.2
+
+    Example
+    -------
+
+    >>> import dgl
+    >>> import torch
+    >>> from dgl import SIGNDiffusion
+
+    >>> transform = SIGNDiffusion(k=2, eweight_name='w')
+    >>> num_nodes = 5
+    >>> num_edges = 20
+    >>> g = dgl.rand_graph(num_nodes, num_edges)
+    >>> g.ndata['feat'] = torch.randn(num_nodes, 10)
+    >>> g.edata['w'] = torch.randn(num_edges)
+    >>> transform(g)
+    Graph(num_nodes=5, num_edges=20,
+          ndata_schemes={'feat': Scheme(shape=(10,), dtype=torch.float32),
+                         'out_feat_1': Scheme(shape=(10,), dtype=torch.float32),
+                         'out_feat_2': Scheme(shape=(10,), dtype=torch.float32)}
+          edata_schemes={'w': Scheme(shape=(), dtype=torch.float32)})
+    """
+    def __init__(self,
+                 k,
+                 in_feat_name='feat',
+                 out_feat_name='out_feat',
+                 eweight_name=None,
+                 diffuse_op='raw',
+                 alpha=0.2):
+        self.k = k
+        self.in_feat_name = in_feat_name
+        self.out_feat_name = out_feat_name
+        self.eweight_name = eweight_name
+        self.diffuse_op = diffuse_op
+        self.alpha = alpha
+
+        if diffuse_op == 'raw':
+            self.diffuse = self.raw
+        elif diffuse_op == 'rw':
+            self.diffuse = self.rw
+        elif diffuse_op == 'gcn':
+            self.diffuse = self.gcn
+        elif diffuse_op == 'ppr':
+            self.diffuse = self.ppr
+        else:
+            raise DGLError("Expect diffuse_op to be from ['raw', 'rw', 'gcn', 'ppr'], \
+                got {}".format(diffuse_op))
+
+    def __call__(self, g):
+        feat_list = self.diffuse(g)
+
+        for i in range(1, self.k + 1):
+            g.ndata[self.out_feat_name + '_' + str(i)] = feat_list[i - 1]
+        return g
+
+    def raw(self, g):
+        use_eweight = False
+        if (self.eweight_name is not None) and self.eweight_name in g.edata:
+            use_eweight = True
+
+        feat_list = []
+        with g.local_scope():
+            if use_eweight:
+                message_func = fn.u_mul_e(self.in_feat_name, self.eweight_name, 'm')
+            else:
+                message_func = fn.copy_u(self.in_feat_name, 'm')
+            for _ in range(self.k):
+                g.update_all(message_func, fn.sum('m', self.in_feat_name))
+                feat_list.append(g.ndata[self.in_feat_name])
+        return feat_list
+
+    def rw(self, g):
+        use_eweight = False
+        if (self.eweight_name is not None) and self.eweight_name in g.edata:
+            use_eweight = True
+
+        feat_list = []
+        with g.local_scope():
+            g.ndata['h'] = g.ndata[self.in_feat_name]
+            if use_eweight:
+                message_func = fn.u_mul_e('h', self.eweight_name, 'm')
+                reduce_func = fn.sum('m', 'h')
+                # Compute the diagonal entries of D from the weighted A
+                g.update_all(fn.copy_e(self.eweight_name, 'm'), fn.sum('m', 'z'))
+            else:
+                message_func = fn.copy_u('h', 'm')
+                reduce_func = fn.mean('m', 'h')
+
+            for _ in range(self.k):
+                g.update_all(message_func, reduce_func)
+                if use_eweight:
+                    g.ndata['h'] = g.ndata['h'] / F.reshape(g.ndata['z'], (g.num_nodes(), 1))
+                feat_list.append(g.ndata['h'])
+        return feat_list
+
+    def gcn(self, g):
+        feat_list = []
+        with g.local_scope():
+            if self.eweight_name is None:
+                eweight_name = 'w'
+                if eweight_name in g.edata:
+                    g.edata.pop(eweight_name)
+            else:
+                eweight_name = self.eweight_name
+
+            transform = GCNNorm(eweight_name=eweight_name)
+            transform(g)
+
+            for _ in range(self.k):
+                g.update_all(fn.u_mul_e(self.in_feat_name, eweight_name, 'm'),
+                             fn.sum('m', self.in_feat_name))
+                feat_list.append(g.ndata[self.in_feat_name])
+        return feat_list
+
+    def ppr(self, g):
+        feat_list = []
+        with g.local_scope():
+            if self.eweight_name is None:
+                eweight_name = 'w'
+                if eweight_name in g.edata:
+                    g.edata.pop(eweight_name)
+            else:
+                eweight_name = self.eweight_name
+            transform = GCNNorm(eweight_name=eweight_name)
+            transform(g)
+
+            in_feat = g.ndata[self.in_feat_name]
+            for _ in range(self.k):
+                g.update_all(fn.u_mul_e(self.in_feat_name, eweight_name, 'm'),
+                             fn.sum('m', self.in_feat_name))
+                g.ndata[self.in_feat_name] = (1 - self.alpha) * g.ndata[self.in_feat_name] +\
+                    self.alpha * in_feat
+                feat_list.append(g.ndata[self.in_feat_name])
+        return feat_list

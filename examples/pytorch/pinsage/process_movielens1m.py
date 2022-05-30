@@ -28,10 +28,11 @@ from data_utils import *
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('directory', type=str)
-    parser.add_argument('output_path', type=str)
+    parser.add_argument('out_directory', type=str)
     args = parser.parse_args()
     directory = args.directory
-    output_path = args.output_path
+    out_directory = args.out_directory
+    os.makedirs(out_directory, exist_ok=True)
 
     ## Build heterogeneous graph
 
@@ -139,8 +140,9 @@ if __name__ == '__main__':
 
     ## Dump the graph and the datasets
 
+    dgl.save_graphs(os.path.join(out_directory, 'train_g.bin'), train_g)
+
     dataset = {
-        'train-graph': train_g,
         'val-matrix': val_matrix,
         'test-matrix': test_matrix,
         'item-texts': movie_textual_dataset,
@@ -151,5 +153,5 @@ if __name__ == '__main__':
         'item-to-user-type': 'watched-by',
         'timestamp-edge-column': 'timestamp'}
 
-    with open(output_path, 'wb') as f:
+    with open(os.path.join(out_directory, 'data.pkl'), 'wb') as f:
         pickle.dump(dataset, f)
