@@ -26,7 +26,7 @@ import unittest
 import math
 import pytest
 from test_utils.graph_cases import get_cases
-from utils import parametrize_dtype
+from test_utils import parametrize_idtype
 
 from test_heterograph import create_test_heterograph3, create_test_heterograph4, create_test_heterograph5
 
@@ -43,7 +43,7 @@ def test_line_graph1():
     assert F.allclose(L.ndata['h'], G.edata['h'])
     assert G.device == F.ctx()
 
-@parametrize_dtype
+@parametrize_idtype
 def test_line_graph2(idtype):
     g = dgl.heterograph({
         ('user', 'follows', 'user'): ([0, 1, 1, 2, 2],[2, 0, 2, 0, 1])
@@ -105,7 +105,7 @@ def test_no_backtracking():
         assert not L.has_edge_between(e2, e1)
 
 # reverse graph related
-@parametrize_dtype
+@parametrize_idtype
 def test_reverse(idtype):
     g = dgl.DGLGraph()
     g = g.astype(idtype).to(F.ctx())
@@ -239,7 +239,7 @@ def test_reverse(idtype):
     assert ('hhh' in g_r.edges['follows'].data) is True
 
 
-@parametrize_dtype
+@parametrize_idtype
 def test_reverse_shared_frames(idtype):
     g = dgl.DGLGraph()
     g = g.astype(idtype).to(F.ctx())
@@ -543,7 +543,7 @@ def test_partition_with_halo():
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(F._default_context_str == 'gpu', reason="METIS doesn't support GPU")
-@parametrize_dtype
+@parametrize_idtype
 def test_metis_partition(idtype):
     # TODO(zhengda) Metis fails to partition a small graph.
     g = create_large_graph(1000, idtype=idtype)
@@ -675,7 +675,7 @@ def test_reorder_nodes():
         old_neighs2 = g.predecessors(old_nid)
         assert np.all(np.sort(old_neighs1) == np.sort(F.asnumpy(old_neighs2)))
 
-@parametrize_dtype
+@parametrize_idtype
 def test_compact(idtype):
     g1 = dgl.heterograph({
         ('user', 'follow', 'user'): ([1, 3], [3, 5]),
@@ -776,7 +776,7 @@ def test_compact(idtype):
     _check(g4, new_g4, induced_nodes)
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU to simple not implemented")
-@parametrize_dtype
+@parametrize_idtype
 def test_to_simple(idtype):
     # homogeneous graph
     g = dgl.graph((F.tensor([0, 1, 2, 1]), F.tensor([1, 2, 0, 2])))
@@ -877,7 +877,7 @@ def test_to_simple(idtype):
     sg = dgl.to_simple(g)
     assert F.array_equal(sg.edge_ids(u, v), eids)
 
-@parametrize_dtype
+@parametrize_idtype
 def test_to_block(idtype):
     def check(g, bg, ntype, etype, dst_nodes, include_dst_in_src=True):
         if dst_nodes is not None:
@@ -1008,7 +1008,7 @@ def test_to_block(idtype):
 
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
-@parametrize_dtype
+@parametrize_idtype
 def test_remove_edges(idtype):
     def check(g1, etype, g, edges_removed):
         src, dst, eid = g.edges(etype=etype, form='all')
@@ -1061,7 +1061,7 @@ def test_remove_edges(idtype):
     check(g4, 'AB', g, [3, 1, 2, 0])
     check(g4, 'BA', g, [])
 
-@parametrize_dtype
+@parametrize_idtype
 def test_add_edges(idtype):
     # homogeneous graph
     g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
@@ -1239,7 +1239,7 @@ def test_add_edges(idtype):
     assert F.array_equal(g.nodes['game'].data['h'], F.tensor([2, 2, 1, 1], dtype=idtype))
     assert F.array_equal(g.edges['develops'].data['h'], F.tensor([0, 0, 2, 2], dtype=idtype))
 
-@parametrize_dtype
+@parametrize_idtype
 def test_add_nodes(idtype):
     # homogeneous Graphs
     g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
@@ -1277,7 +1277,7 @@ def test_add_nodes(idtype):
     assert F.array_equal(g.nodes['user'].data['h'], F.tensor([1, 1, 1, 0], dtype=idtype))
     assert F.array_equal(g.nodes['game'].data['h'], F.tensor([2, 2, 2, 2], dtype=idtype))
 
-@parametrize_dtype
+@parametrize_idtype
 def test_remove_edges(idtype):
     # homogeneous Graphs
     g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
@@ -1447,7 +1447,7 @@ def test_remove_edges(idtype):
     assert F.array_equal(bg.batch_num_edges('follows'), bg_r.batch_num_edges('follows'))
     assert F.array_equal(bg_r.batch_num_edges('plays'), F.tensor([1, 0, 1], dtype=F.int64))
 
-@parametrize_dtype
+@parametrize_idtype
 def test_remove_nodes(idtype):
     # homogeneous Graphs
     g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
@@ -1622,7 +1622,7 @@ def test_remove_nodes(idtype):
     assert F.array_equal(bg.batch_num_edges('follows'), bg_r.batch_num_edges('follows'))
     assert F.array_equal(bg_r.batch_num_edges('plays'), F.tensor([1, 0, 1], dtype=F.int64))
 
-@parametrize_dtype
+@parametrize_idtype
 def test_add_selfloop(idtype):
     # homogeneous graph
     g = dgl.graph(([0, 0, 2], [2, 1, 0]), idtype=idtype, device=F.ctx())
@@ -1666,7 +1666,7 @@ def test_add_selfloop(idtype):
         raise_error = True
     assert raise_error
 
-@parametrize_dtype
+@parametrize_idtype
 def test_remove_selfloop(idtype):
     # homogeneous graph
     g = dgl.graph(([0, 0, 0, 1], [1, 0, 0, 2]), idtype=idtype, device=F.ctx())
@@ -1707,7 +1707,7 @@ def test_remove_selfloop(idtype):
     assert raise_error
 
 
-@parametrize_dtype
+@parametrize_idtype
 def test_reorder_graph(idtype):
     g = dgl.graph(([0, 1, 2, 3, 4], [2, 2, 3, 2, 3]),
                   idtype=idtype, device=F.ctx())
@@ -1821,7 +1821,7 @@ def test_reorder_graph(idtype):
     #assert 'csc' in sum(rfg.formats().values(), [])
 
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support a slicing operation")
-@parametrize_dtype
+@parametrize_idtype
 def test_norm_by_dst(idtype):
     # Case1: A homogeneous graph
     g = dgl.graph(([0, 1, 1], [1, 1, 2]), idtype=idtype, device=F.ctx())
@@ -1836,7 +1836,7 @@ def test_norm_by_dst(idtype):
     eweight = dgl.norm_by_dst(g, etype=('user', 'plays', 'game'))
     assert F.allclose(eweight, F.tensor([0.5, 0.5, 1.0]))
 
-@parametrize_dtype
+@parametrize_idtype
 def test_module_add_self_loop(idtype):
     g = dgl.graph(([1, 1], [1, 2]), idtype=idtype, device=F.ctx())
     g.ndata['h'] = F.randn((g.num_nodes(), 2))
@@ -1914,7 +1914,7 @@ def test_module_add_self_loop(idtype):
     assert 'w1' in new_g.edges['plays'].data
     assert 'w2' in new_g.edges['follows'].data
 
-@parametrize_dtype
+@parametrize_idtype
 def test_module_remove_self_loop(idtype):
     transform = dgl.RemoveSelfLoop()
 
@@ -1957,7 +1957,7 @@ def test_module_remove_self_loop(idtype):
     assert 'w1' in new_g.edges['plays'].data
     assert 'w2' in new_g.edges['follows'].data
 
-@parametrize_dtype
+@parametrize_idtype
 def test_module_add_reverse(idtype):
     transform = dgl.AddReverse()
 
@@ -2044,7 +2044,7 @@ def test_module_add_reverse(idtype):
     assert eset == {(2, 1), (2, 2)}
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not supported for to_simple")
-@parametrize_dtype
+@parametrize_idtype
 def test_module_to_simple(idtype):
     transform = dgl.ToSimple()
     g = dgl.graph(([0, 1, 1], [1, 2, 2]), idtype=idtype, device=F.ctx())
@@ -2083,7 +2083,7 @@ def test_module_to_simple(idtype):
     eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
     assert eset == {(0, 1), (1, 1)}
 
-@parametrize_dtype
+@parametrize_idtype
 def test_module_line_graph(idtype):
     transform = dgl.LineGraph()
     g = dgl.graph(([0, 1, 1], [1, 0, 2]), idtype=idtype, device=F.ctx())
@@ -2106,7 +2106,7 @@ def test_module_line_graph(idtype):
     eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
     assert eset == {(0, 2)}
 
-@parametrize_dtype
+@parametrize_idtype
 def test_module_khop_graph(idtype):
     transform = dgl.KHopGraph(2)
     g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
@@ -2120,7 +2120,7 @@ def test_module_khop_graph(idtype):
     eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
     assert eset == {(0, 2)}
 
-@parametrize_dtype
+@parametrize_idtype
 def test_module_add_metapaths(idtype):
     g = dgl.heterograph({
         ('person', 'author', 'paper'): ([0, 0, 1], [1, 2, 2]),
@@ -2179,7 +2179,7 @@ def test_module_add_metapaths(idtype):
     eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
     assert eset == {(0, 1), (1, 1)}
 
-@parametrize_dtype
+@parametrize_idtype
 def test_module_compose(idtype):
     g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
     transform = dgl.Compose([dgl.AddReverse(), dgl.AddSelfLoop()])
@@ -2192,7 +2192,7 @@ def test_module_compose(idtype):
     eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
     assert eset == {(0, 1), (1, 2), (1, 0), (2, 1), (0, 0), (1, 1), (2, 2)}
 
-@parametrize_dtype
+@parametrize_idtype
 def test_module_gcnnorm(idtype):
     g = dgl.heterograph({
         ('A', 'r1', 'A'): ([0, 1, 2], [0, 0, 1]),
@@ -2208,7 +2208,7 @@ def test_module_gcnnorm(idtype):
     assert F.allclose(new_g.edges[('B', 'r3', 'B')].data['w'], F.tensor([1./3, 2./3, 0.]))
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
-@parametrize_dtype
+@parametrize_idtype
 def test_module_ppr(idtype):
     g = dgl.graph(([0, 1, 2, 3, 4], [2, 3, 4, 5, 3]), idtype=idtype, device=F.ctx())
     g.ndata['h'] = F.randn((6, 2))
@@ -2233,7 +2233,7 @@ def test_module_ppr(idtype):
                     (3, 3), (3, 5), (4, 3), (4, 4), (4, 5), (5, 5)}
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
-@parametrize_dtype
+@parametrize_idtype
 def test_module_heat_kernel(idtype):
     # Case1: directed graph
     g = dgl.graph(([0, 1, 2, 3, 4], [2, 3, 4, 5, 3]), idtype=idtype, device=F.ctx())
@@ -2255,7 +2255,7 @@ def test_module_heat_kernel(idtype):
     assert eset == {(0, 0), (1, 1), (2, 2), (3, 3)}
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
-@parametrize_dtype
+@parametrize_idtype
 def test_module_gdc(idtype):
     transform = dgl.GDC([0.1, 0.2, 0.1], avg_degree=1)
     g = dgl.graph(([0, 1, 2, 3, 4], [2, 3, 4, 5, 3]), idtype=idtype, device=F.ctx())
@@ -2278,7 +2278,7 @@ def test_module_gdc(idtype):
     eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
     assert eset == {(0, 0), (1, 1), (2, 2), (3, 3), (4, 3), (4, 4), (5, 5)}
 
-@parametrize_dtype
+@parametrize_idtype
 def test_module_node_shuffle(idtype):
     transform = dgl.NodeShuffle()
     g = dgl.heterograph({
@@ -2287,7 +2287,7 @@ def test_module_node_shuffle(idtype):
     new_g = transform(g)
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
-@parametrize_dtype
+@parametrize_idtype
 def test_module_drop_node(idtype):
     transform = dgl.DropNode()
     g = dgl.heterograph({
@@ -2300,7 +2300,7 @@ def test_module_drop_node(idtype):
     assert new_g.canonical_etypes == g.canonical_etypes
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
-@parametrize_dtype
+@parametrize_idtype
 def test_module_drop_edge(idtype):
     transform = dgl.DropEdge()
     g = dgl.heterograph({
@@ -2313,7 +2313,7 @@ def test_module_drop_edge(idtype):
     assert new_g.ntypes == g.ntypes
     assert new_g.canonical_etypes == g.canonical_etypes
 
-@parametrize_dtype
+@parametrize_idtype
 def test_module_add_edge(idtype):
     transform = dgl.AddEdge()
     g = dgl.heterograph({
@@ -2328,7 +2328,7 @@ def test_module_add_edge(idtype):
     assert new_g.ntypes == g.ntypes
     assert new_g.canonical_etypes == g.canonical_etypes
 
-@parametrize_dtype
+@parametrize_idtype
 def test_module_random_walk_pe(idtype):
     transform = dgl.RandomWalkPE(2, 'rwpe')
     g = dgl.graph(([0, 1, 1], [1, 1, 0]), idtype=idtype, device=F.ctx())
@@ -2336,7 +2336,7 @@ def test_module_random_walk_pe(idtype):
     tgt = F.copy_to(F.tensor([[0., 0.5],[0.5, 0.75]]), g.device)
     assert F.allclose(new_g.ndata['rwpe'], tgt)
 
-@parametrize_dtype
+@parametrize_idtype
 def test_module_laplacian_pe(idtype):
     transform = dgl.LaplacianPE(2, 'lappe')
     g = dgl.graph(([2, 1, 0, 3, 1, 1],[3, 0, 1, 3, 3, 1]), idtype=idtype, device=F.ctx())
@@ -2370,62 +2370,65 @@ def test_module_sign(g):
 
     # raw
     transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', diffuse_op='raw')
-    transform(g)
+    g = transform(g)
     assert torch.allclose(g.ndata['out_feat_1'], torch.matmul(adj, g.ndata['h']))
 
     transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', eweight_name='scalar_w', diffuse_op='raw')
-    transform(g)
+    g = transform(g)
     assert torch.allclose(g.ndata['out_feat_1'], torch.matmul(weight_adj, g.ndata['h']))
 
     # rw
     adj_rw = torch.matmul(torch.diag(1 / adj.sum(dim=1)), adj)
     transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', diffuse_op='rw')
-    transform(g)
+    g = transform(g)
     assert torch.allclose(g.ndata['out_feat_1'], torch.matmul(adj_rw, g.ndata['h']))
 
     weight_adj_rw = torch.matmul(torch.diag(1 / weight_adj.sum(dim=1)), weight_adj)
     transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', eweight_name='scalar_w', diffuse_op='rw')
-    transform(g)
+    g = transform(g)
     assert torch.allclose(g.ndata['out_feat_1'], torch.matmul(weight_adj_rw, g.ndata['h']))
 
     # gcn
     raw_eweight = g.edata['scalar_w']
     gcn_norm = dgl.GCNNorm()
-    gcn_norm(g)
+    g = gcn_norm(g)
     adj_gcn = adj.clone()
     adj_gcn[dst, src] = g.edata.pop('w')
     transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', diffuse_op='gcn')
-    transform(g)
-    assert torch.allclose(g.ndata['out_feat_1'], torch.matmul(adj_gcn, g.ndata['h']))
+    g = transform(g)
+    target = torch.matmul(adj_gcn, g.ndata['h'])
+    assert torch.allclose(g.ndata['out_feat_1'], target)
 
     gcn_norm = dgl.GCNNorm('scalar_w')
-    gcn_norm(g)
+    g = gcn_norm(g)
     weight_adj_gcn = weight_adj.clone()
     weight_adj_gcn[dst, src] = g.edata['scalar_w']
     g.edata['scalar_w'] = raw_eweight
     transform = dgl.SIGNDiffusion(k=1, in_feat_name='h',
                                   eweight_name='scalar_w', diffuse_op='gcn')
-    transform(g)
-    assert torch.allclose(g.ndata['out_feat_1'], torch.matmul(weight_adj_gcn, g.ndata['h']))
+    g = transform(g)
+    target = torch.matmul(weight_adj_gcn, g.ndata['h'])
+    assert torch.allclose(g.ndata['out_feat_1'], target)
 
     # ppr
     alpha = 0.2
     transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', diffuse_op='ppr', alpha=alpha)
-    transform(g)
+    g = transform(g)
     target = (1 - alpha) * torch.matmul(adj_gcn, g.ndata['h']) + alpha * g.ndata['h']
     assert torch.allclose(g.ndata['out_feat_1'], target)
 
     transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', eweight_name='scalar_w',
                                   diffuse_op='ppr', alpha=alpha)
-    transform(g)
+    g = transform(g)
     target = (1 - alpha) * torch.matmul(weight_adj_gcn, g.ndata['h']) + alpha * g.ndata['h']
     assert torch.allclose(g.ndata['out_feat_1'], target)
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
-@parametrize_dtype
+@parametrize_idtype
 def test_module_row_feat_normalizer(idtype):
     # Case1: Normalize features of a homogeneous graph.
-    transform = dgl.RowFeatNormalizer(subtract_min=True)
+    transform = dgl.RowFeatNormalizer(subtract_min=True,
+                                      node_feat_names=['h'], edge_feat_names=['w'])
     g = dgl.rand_graph(5, 5, idtype=idtype, device=F.ctx())
     g.ndata['h'] = F.randn((g.num_nodes(), 128))
     g.edata['w'] = F.randn((g.num_edges(), 128))
@@ -2436,7 +2439,8 @@ def test_module_row_feat_normalizer(idtype):
     assert F.allclose(g.edata['w'].sum(1), F.tensor([1.0, 1.0, 1.0, 1.0, 1.0]))
 
     # Case2: Normalize features of a heterogeneous graph.
-    transform = dgl.RowFeatNormalizer(subtract_min=True)
+    transform = dgl.RowFeatNormalizer(subtract_min=True,
+                                      node_feat_names=['h', 'h2'], edge_feat_names=['w'])
     g = dgl.heterograph({
         ('user', 'follows', 'user'): (F.tensor([1, 2]), F.tensor([3, 4])),
         ('player', 'plays', 'game'): (F.tensor([2, 2]), F.tensor([1, 1]))
@@ -2457,10 +2461,10 @@ def test_module_row_feat_normalizer(idtype):
     assert F.allclose(g.edata['w'][('player', 'plays', 'game')].sum(1), F.tensor([1.0, 1.0]))
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
-@parametrize_dtype
+@parametrize_idtype
 def test_module_feat_mask(idtype):
     # Case1: Mask node and edge feature tensors of a homogeneous graph.
-    transform = dgl.FeatMask()
+    transform = dgl.FeatMask(node_feat_names=['h'], edge_feat_names=['w'])
     g = dgl.rand_graph(5, 20, idtype=idtype, device=F.ctx())
     g.ndata['h'] = F.ones((g.num_nodes(), 10))
     g.edata['w'] = F.ones((g.num_edges(), 20))
@@ -2471,7 +2475,6 @@ def test_module_feat_mask(idtype):
     assert g.edata['w'].shape == (g.num_edges(), 20)
 
     # Case2: Mask node and edge feature tensors of a heterogeneous graph.
-    transform = dgl.FeatMask()
     g = dgl.heterograph({
         ('user', 'follows', 'user'): (F.tensor([1, 2]), F.tensor([3, 4])),
         ('player', 'plays', 'game'): (F.tensor([2, 2]), F.tensor([1, 1]))
