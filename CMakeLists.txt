@@ -46,6 +46,8 @@ endif(NOT MSVC)
 if(USE_CUDA)
   message(STATUS "Build with CUDA support")
   project(dgl C CXX)
+  # see https://github.com/NVIDIA/thrust/issues/1401
+  add_definitions(-DTHRUST_CUB_WRAPPED_NAMESPACE=dgl)
   include(cmake/modules/CUDA.cmake)
   if ((CUDA_VERSION_MAJOR LESS 11) OR
       ((CUDA_VERSION_MAJOR EQUAL 11) AND (CUDA_VERSION_MINOR EQUAL 0)))

@@ -448,6 +448,11 @@ __global__ void _CSRRowWiseSampleReplaceKernel(
     const int64_t deg = in_ptr[row+1] - in_row_start;
 
     if (deg > 0) {
+      /*
+      * The algorithm here is a simple sorted inverse transform sampling.
+      * To parallelize it, we use moving windows for the random numbers
+      * and the CDF (prefix sum here).
+      */
       constexpr int ITEMS_PER_THREAD = MAX_FANOUT/BLOCK_SIZE;
       using BlockRadixSortT = cub::BlockRadixSort<float, BLOCK_SIZE, ITEMS_PER_THREAD>;
       using BlockScanT = cub::BlockScan<FloatType, BLOCK_SIZE>;
@@ -534,7 +539,7 @@ __global__ void _CSRRowWiseSampleReplaceKernel(
           int flag_selected = 0;
           if (out_offset >= num_selected && out_offset < num_picks) {
             auto rn_val = thread_rn[j];
-            // there could be a bank conflict here
+            // (Xin): there could be bank conflicts here
             auto ptr = thrust::lower_bound(thrust::seq, prefix_sum, prefix_sum + BLOCK_SIZE, rn_val);
             auto idx_offset = thrust::distance(prefix_sum, ptr);
             if (idx_offset < BLOCK_SIZE) {
@@ -547,7 +552,7 @@ __global__ void _CSRRowWiseSampleReplaceKernel(
           __syncthreads();
 
           auto flag_sum = BlockReduceI(reduce_storage_i).Sum(flag_selected);
-          // let all threads see the results
+          // Reduced sum is stored in thread 0 only. Let other threads see the results.
           if (threadIdx.x == 0) {
             num_selected += flag_sum;
           }
