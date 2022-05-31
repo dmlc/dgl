@@ -30,6 +30,9 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
     If a random walk stops in advance, DGL pads the trace with -1 to have the same
     length.
 
+    GPU sampling is supported for this function. Refer to :ref:`guide-minibatch-gpu-sampling`
+    for more details.
+
     Parameters
     ----------
     g : DGLGraph

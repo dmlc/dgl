@@ -60,7 +60,7 @@ Using CUDA UVA-based neighborhood sampling in DGL data loaders
 
 For the case where the graph is too large to fit onto the GPU memory, we introduce the
 CUDA UVA (Unified Virtual Addressing)-based sampling, in which GPUs perform the sampling
-on the graph pinned on CPU memory via zero-copy access.
+on the graph pinned in CPU memory via zero-copy access.
 You can enable UVA-based neighborhood sampling in DGL data loaders via:
 
 * Put the ``train_nid`` onto GPU.
@@ -106,8 +106,7 @@ You can build your own GPU sampling pipelines with the following functions that 
 operating on GPU:
 
 * :func:`dgl.sampling.sample_neighbors`
-
-  * Only has support for uniform sampling; non-uniform sampling can only run on CPU.
+* :func:`dgl.sampling.random_walk`
 
 Subgraph extraction ops:
 
