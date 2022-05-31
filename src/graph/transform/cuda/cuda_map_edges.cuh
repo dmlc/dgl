@@ -239,11 +239,8 @@ MapEdges(
       const dim3 block(BLOCK_SIZE);
 
       // map the srcs
-      map_edge_ids<IdType, BLOCK_SIZE, TILE_SIZE><<<
-        grid,
-        block,
-        0,
-        stream>>>(
+      CUDA_KERNEL_CALL((map_edge_ids<IdType, BLOCK_SIZE, TILE_SIZE>),
+        grid, block, 0, stream,
         edges.src.Ptr<IdType>(),
         new_lhs.back().Ptr<IdType>(),
         edges.dst.Ptr<IdType>(),
@@ -251,7 +248,6 @@ MapEdges(
         num_edges,
         node_map.LhsHashTable(src_type).DeviceHandle(),
         node_map.RhsHashTable(dst_type).DeviceHandle());
-      CUDA_CALL(cudaGetLastError());
     } else {
       new_lhs.emplace_back(
           aten::NullArray(DLDataType{kDLInt, sizeof(IdType)*8, 1}, ctx));
