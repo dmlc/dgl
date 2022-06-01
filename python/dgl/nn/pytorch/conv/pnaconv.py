@@ -95,9 +95,9 @@ class PNAConvTower(nn.Module):
         tensordot of multiple aggregation and scaling operations"""
         msg = nodes.mailbox['msg']
         degree = msg.size(1)
-        h = torch.cat([aggregator(msg) for aggregator in self.aggregators], dim=1)
+        h = torch.cat([AGGREGATORS[agg](msg) for agg in self.aggregators], dim=1)
         h = torch.cat([
-            scaler(h, D=degree, delta=self.delta) if scaler is not scale_identity else h
+            SCALERS[scaler](h, D=degree, delta=self.delta) if scaler != 'identity' else h
             for scaler in self.scalers
         ], dim=1)
         return {'h_neigh': h}
@@ -213,8 +213,6 @@ class PNAConv(nn.Module):
     def __init__(self, in_size, out_size, aggregators, scalers, delta,
         dropout=0., num_towers=1, edge_feat_size=0, residual=True):
         super(PNAConv, self).__init__()
-        aggregators = [AGGREGATORS[aggr] for aggr in aggregators]
-        scalers = [SCALERS[scale] for scale in scalers]
 
         self.in_size = in_size
         self.out_size = out_size
@@ -254,7 +252,7 @@ class PNAConv(nn.Module):
             The input feature of shape :math:`(N, h_n)`. :math:`N` is the number of
             nodes, and :math:`h_n` must be the same as in_size.
         edge_feat : torch.Tensor, optional
-            The edge feature of shape :math:`(M, h)`. :math:`M` is the number of
+            The edge feature of shape :math:`(M, h_e)`. :math:`M` is the number of
             edges, and :math:`h_e` must be the same as edge_feat_size.
 
         Returns
