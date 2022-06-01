@@ -7,8 +7,8 @@ data:
 model:
   name: pna
   embed_size: 80              # Embedding size.
-  aggregators: mean max min std # Aggregation function names separated by comma, can include mean, max, min, std, sum
-  scalers: identity amplification attenuation # Scaler function names separated by comma, can include identity, amplification, and attenuation
+  aggregators: mean max min std # Aggregation function names separated by space, can include mean, max, min, std, sum
+  scalers: identity amplification attenuation # Scaler function names separated by space, can include identity, amplification, and attenuation
   dropout: 0.3                # Dropout rate.
   batch_norm: true            # Whether to use batch normalization.
   residual: true              # Whether to use residual connection.
