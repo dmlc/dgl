@@ -2422,10 +2422,11 @@ def test_module_sign(g):
     assert torch.allclose(g.ndata['out_feat_1'], target)
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
-@parametrize_dtype
+@parametrize_idtype
 def test_module_row_feat_normalizer(idtype):
     # Case1: Normalize features of a homogeneous graph.
-    transform = dgl.RowFeatNormalizer(subtract_min=True)
+    transform = dgl.RowFeatNormalizer(subtract_min=True,
+                                      node_feat_names=['h'], edge_feat_names=['w'])
     g = dgl.rand_graph(5, 5, idtype=idtype, device=F.ctx())
     g.ndata['h'] = F.randn((g.num_nodes(), 128))
     g.edata['w'] = F.randn((g.num_edges(), 128))
@@ -2436,7 +2437,8 @@ def test_module_row_feat_normalizer(idtype):
     assert F.allclose(g.edata['w'].sum(1), F.tensor([1.0, 1.0, 1.0, 1.0, 1.0]))
 
     # Case2: Normalize features of a heterogeneous graph.
-    transform = dgl.RowFeatNormalizer(subtract_min=True)
+    transform = dgl.RowFeatNormalizer(subtract_min=True,
+                                      node_feat_names=['h', 'h2'], edge_feat_names=['w'])
     g = dgl.heterograph({
         ('user', 'follows', 'user'): (F.tensor([1, 2]), F.tensor([3, 4])),
         ('player', 'plays', 'game'): (F.tensor([2, 2]), F.tensor([1, 1]))
@@ -2457,10 +2459,10 @@ def test_module_row_feat_normalizer(idtype):
     assert F.allclose(g.edata['w'][('player', 'plays', 'game')].sum(1), F.tensor([1.0, 1.0]))
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
-@parametrize_dtype
+@parametrize_idtype
 def test_module_feat_mask(idtype):
     # Case1: Mask node and edge feature tensors of a homogeneous graph.
-    transform = dgl.FeatMask()
+    transform = dgl.FeatMask(node_feat_names=['h'], edge_feat_names=['w'])
     g = dgl.rand_graph(5, 20, idtype=idtype, device=F.ctx())
     g.ndata['h'] = F.ones((g.num_nodes(), 10))
     g.edata['w'] = F.ones((g.num_edges(), 20))
@@ -2471,7 +2473,6 @@ def test_module_feat_mask(idtype):
     assert g.edata['w'].shape == (g.num_edges(), 20)
 
     # Case2: Mask node and edge feature tensors of a heterogeneous graph.
-    transform = dgl.FeatMask()
     g = dgl.heterograph({
         ('user', 'follows', 'user'): (F.tensor([1, 2]), F.tensor([3, 4])),
         ('player', 'plays', 'game'): (F.tensor([2, 2]), F.tensor([1, 1]))
