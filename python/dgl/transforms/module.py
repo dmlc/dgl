@@ -122,6 +122,7 @@ class RowFeatNormalizer(BaseTransform):
     edge_feat_names : list[str], optional
         The names of the edge feature tensors to be row-normalized. Default: `None`, which will
         not normalize any edge feature tensor.
+
     Example
     -------
     The following example uses PyTorch backend.
@@ -129,6 +130,7 @@ class RowFeatNormalizer(BaseTransform):
     >>> import torch
     >>> from dgl import RowFeatNormalizer
     Case1: Row normalize features of a homogeneous graph.
+
     >>> transform = RowFeatNormalizer(subtract_min=True,
     ...                               node_feat_names=['h'], edge_feat_names=['w'])
     >>> g = dgl.rand_graph(5, 20)
@@ -141,7 +143,9 @@ class RowFeatNormalizer(BaseTransform):
     tensor([1., 1., 1., 1., 1., 1., 1., 1., 1.,
             1., 1., 1., 1., 1., 1., 1., 1., 1.,
             1., 1.])
+
     Case2: Row normalize features of a heterogeneous graph.
+
     >>> g = dgl.heterograph({
     ...     ('user', 'follows', 'user'): (torch.tensor([1, 2]), torch.tensor([3, 4])),
     ...     ('player', 'plays', 'game'): (torch.tensor([2, 2]), torch.tensor([1, 1]))
@@ -204,6 +208,7 @@ class RowFeatNormalizer(BaseTransform):
 class FeatMask(BaseTransform):
     r"""Randomly mask columns of the node and edge feature tensors, as described in `Graph
     Contrastive Learning with Augmentations <https://arxiv.org/abs/2010.13902>`__.
+
     Parameters
     ----------
     p : float, optional
@@ -214,6 +219,7 @@ class FeatMask(BaseTransform):
     edge_feat_names : list[str], optional
         The names of the edge features to be masked. Default: `None`, which will not mask
         any edge feature tensor.
+
     Example
     -------
     The following example uses PyTorch backend.
@@ -221,6 +227,7 @@ class FeatMask(BaseTransform):
     >>> import torch
     >>> from dgl import FeatMask
     Case1 : Mask node and edge feature tensors of a homogeneous graph.
+
     >>> transform = FeatMask(node_feat_names=['h'], edge_feat_names=['w'])
     >>> g = dgl.rand_graph(5, 10)
     >>> g.ndata['h'] = torch.ones((g.num_nodes(), 10))
@@ -243,7 +250,9 @@ class FeatMask(BaseTransform):
             [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
             [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.],
             [1., 1., 0., 1., 0., 1., 0., 0., 0., 1.]])
+
     Case2 : Mask node and edge feature tensors of a heterogeneous graph.
+
     >>> g = dgl.heterograph({
     ...     ('user', 'follows', 'user'): (torch.tensor([1, 2]), torch.tensor([3, 4])),
     ...     ('player', 'plays', 'game'): (torch.tensor([2, 2]), torch.tensor([1, 1]))
@@ -1539,6 +1548,7 @@ class SIGNDiffusion(BaseTransform):
 
         for i in range(1, self.k + 1):
             g.ndata[self.out_feat_name + '_' + str(i)] = feat_list[i - 1]
+        return g
 
     def raw(self, g):
         use_eweight = False

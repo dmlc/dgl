@@ -89,6 +89,7 @@ Datasets for graph classification/regression tasks
     LegacyTUDataset
     GINDataset
     FakeNewsDataset
+    BA2MotifDataset
 
 Dataset adapters
 -------------------
