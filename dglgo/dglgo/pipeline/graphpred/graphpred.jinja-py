@@ -15,7 +15,7 @@ def train(device, loader, model, criterion, optimizer):
 
     for _, (g, labels) in enumerate(tqdm(loader, desc="Iteration")):
         g = g.to(device)
-        labels = labels.reshape(g.batch_size, -1).to(device)
+        labels = labels.to(device)
         node_feat = g.ndata['feat']
         edge_feat = g.edata['feat']
 
@@ -47,7 +47,7 @@ def evaluate(device, loader, model):
 
     for _, (g, labels) in enumerate(tqdm(loader, desc="Iteration")):
         g = g.to(device)
-        labels = labels.reshape(g.batch_size, -1).to(device)
+        labels = labels.to(device)
         node_feat = g.ndata['feat']
         edge_feat = g.edata['feat']
 
