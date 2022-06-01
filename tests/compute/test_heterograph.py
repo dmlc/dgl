@@ -427,6 +427,22 @@ def test_empty_query(idtype):
     assert F.shape(g.in_degrees([])) == (0,)
     assert F.shape(g.out_degrees([])) == (0,)
 
+    g = dgl.graph(([], []), idtype=idtype, device=F.ctx())
+    error_thrown = True
+    try:
+        g.in_degrees([0])
+        fail = False
+    except:
+        pass
+    assert error_thrown
+    error_thrown = True
+    try:
+        g.out_degrees([0])
+        fail = False
+    except:
+        pass
+    assert error_thrown
+
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU does not have COO impl.")
 def _test_hypersparse():
     N1 = 1 << 50        # should crash if allocated a CSR

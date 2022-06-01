@@ -8,6 +8,7 @@
 #include <vector>
 #include <unordered_set>
 #include <numeric>
+#include <atomic>
 #include "array_utils.h"
 
 namespace dgl {
@@ -380,6 +381,10 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
 
   std::vector<IdType> sums;
 
+  std::atomic_flag err_flag = ATOMIC_FLAG_INIT;
+  bool err = false;
+  std::stringstream err_msg_stream;
+
   // Perform two-round parallel prefix sum using OpenMP
   #pragma omp parallel
   {
@@ -398,8 +403,16 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
     #pragma omp for schedule(static) nowait
     for (int64_t i = 0; i < len; ++i) {
       int64_t rid = rows_data[i];
-      sum += indptr_data[rid + 1] - indptr_data[rid];
-      ret_indptr_data[i + 1] = sum;
+      if (rid >= csr.num_rows) {
+        if (!err_flag.test_and_set()) {
+          err_msg_stream << "expect row ID " << rid << " to be less than number of rows "
+            << csr.num_rows;
+          err = true;
+        }
+      } else {
+        sum += indptr_data[rid + 1] - indptr_data[rid];
+        ret_indptr_data[i + 1] = sum;
+      }
     }
     sums[tid + 1] = sum;
     #pragma omp barrier
@@ -416,6 +429,10 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
     #pragma omp for schedule(static)
     for (int64_t i = 0; i < len; ++i)
       ret_indptr_data[i + 1] += offset;
+  }
+  if (err) {
+    LOG(FATAL) << err_msg_stream.str();
+    return ret;
   }
 
   // After the prefix sum, the last element of ret_indptr_data holds the
