@@ -49,6 +49,11 @@ class GINDataset(DGLBuiltinDataset):
         a transformed version. The :class:`~dgl.DGLGraph` object will be
         transformed before every access.
 
+    Attributes
+    ----------
+    num_classes : int
+        Number of classes for multiclass classification
+
     Examples
     --------
     >>> data = GINDataset(name='MUTAG', self_loop=False)
