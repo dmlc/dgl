@@ -495,7 +495,7 @@ def _test_construct_graphs_multiple():
     assert len(data_dict) == len(gdata)
     for k, v in data_dict.items():
         assert F.dtype(v) != F.float64
-        assert F.array_equal(F.tensor(gdata[k], dtype=F.dtype(v)), v)
+        assert F.array_equal(F.reshape(F.tensor(gdata[k], dtype=F.dtype(v)), (len(graphs), -1)), v)
     for i, g in enumerate(graphs):
         assert g.is_homogeneous
         assert g.num_nodes() == num_nodes
