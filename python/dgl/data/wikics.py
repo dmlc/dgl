@@ -11,20 +11,19 @@ from .utils import generate_mask_tensor, load_graphs, save_graphs, _get_dgl_url
 
 
 class WikiCSDataset(DGLBuiltinDataset):
-    r"""Wiki-CS is a Wikipedia-based dataset for node classification.
+    r"""Wiki-CS is a Wikipedia-based dataset for node classification from `Wiki-CS: A Wikipedia-Based
+    Benchmark for Graph Neural Networks <https://arxiv.org/abs/2007.02901v2>`_
 
     The dataset consists of nodes corresponding to Computer Science articles, with edges based on
     hyperlinks and 10 classes representing different branches of the field.
-
-    Reference: `<https://arxiv.org/abs/2109.01116>`_
 
     WikiCS dataset statistics:
 
     - Nodes: 11,701
     - Edges: 431,726 (note that the original dataset has 216,123 edges but DGL adds
-      the reverse edges and remove the duplicates, hence with a different number)
+      the reverse edges and removes the duplicate edges, hence with a different number)
     - Number of Classes: 10
-    - Node feature size:: 300
+    - Node feature size: 300
     - Number of different train, validation, stopping splits: 20
     - Number of test split: 1
 
@@ -36,7 +35,7 @@ class WikiCSDataset(DGLBuiltinDataset):
     force_reload : bool
         Whether to reload the dataset.
         Default: False
-    verbose: bool
+    verbose : bool
         Whether to print out progress information.
         Default: False
     transform : callable, optional
@@ -52,12 +51,20 @@ class WikiCSDataset(DGLBuiltinDataset):
     Examples
     --------
     >>> dataset = WikiCSDataset()
-    >>> len(dataset)
-    1
-    >>> for g in dataset:
-    ....    # get edge feature
-    ....    feat = g.ndata['feat']
-    ....    # your code here
+    >>> dataset.num_classes
+    10
+    >>> g = dataset[0]
+    >>> # get node feature
+    >>> feat = g.ndata['feat']
+    >>> # get node labels
+    >>> labels = g.ndata['label']
+    >>> # get data split
+    >>> train_mask = g.ndata['train_masks']
+    >>> val_mask = g.ndata['val_masks']
+    >>> stopping_mask = g.ndata['stopping_masks']
+    >>> test_mask = g.ndata['test_mask']
+    >>>
+    >>> # Train, Validation and Test
     """
 
     def __init__(self, raw_dir=None, force_reload=False, verbose=False, transform=None):
@@ -71,9 +78,10 @@ class WikiCSDataset(DGLBuiltinDataset):
 
     def process(self):
         """process raw data to graph, labels and masks"""
-        data = json.load(open(os.path.join(self.raw_path, 'data.json')))
-        features = F.tensor(np.array(data['features']), dtype=F.data_type_dict['float32'])
-        labels = F.tensor(np.array(data['labels']), dtype=F.data_type_dict['int64'])
+        with open(os.path.join(self.raw_path, 'data.json')) as f:
+            data = json.load(f)
+        features = F.tensor(np.array(data['features']), dtype=F.float32)
+        labels = F.tensor(np.array(data['labels']), dtype=F.int64)
 
         train_masks = np.array(data['train_masks'], dtype=bool).T
         val_masks = np.array(data['val_masks'], dtype=bool).T
@@ -132,13 +140,6 @@ class WikiCSDataset(DGLBuiltinDataset):
         :class:`dgl.DGLGraph`
 
             graph structure, labels, features and masks.
-
-            - ``ndata['label']``: ground truth labels
-            - ``ndata['feat']``: node features
-            - ``ndata['train_mask']``: training mask
-            - ``ndata['val_mask']``: validation mask
-            - ``ndata['stopping_mask']``: stopping mask
-            - ``ndata['test_mask']``: test mask
         """
         assert idx == 0, "This dataset has only one graph"
         if self._transform is None:
