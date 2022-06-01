@@ -105,10 +105,14 @@ class BaseTransform:
 class RowFeatNormalizer(BaseTransform):
     r"""
     Row-normalizes the features given in ``node_feat_names`` and ``edge_feat_names``.
+
     The row normalization formular is:
+
     .. math::
       x = \frac{x}{\sum_i x_i}
+
     where :math:`x` denotes a row of the feature tensor.
+
     Parameters
     ----------
     subtract_min: bool
@@ -125,10 +129,13 @@ class RowFeatNormalizer(BaseTransform):
 
     Example
     -------
+
     The following example uses PyTorch backend.
+
     >>> import dgl
     >>> import torch
     >>> from dgl import RowFeatNormalizer
+
     Case1: Row normalize features of a homogeneous graph.
 
     >>> transform = RowFeatNormalizer(subtract_min=True,
@@ -169,13 +176,16 @@ class RowFeatNormalizer(BaseTransform):
 
     def row_normalize(self, feat):
         r"""
+
         Description
         -----------
         Row-normalize the given feature.
+
         Parameters
         ----------
         feat : Tensor
             The feature to be normalized.
+
         Returns
         -------
         Tensor
@@ -222,16 +232,20 @@ class FeatMask(BaseTransform):
 
     Example
     -------
+
     The following example uses PyTorch backend.
+
     >>> import dgl
     >>> import torch
     >>> from dgl import FeatMask
+
     Case1 : Mask node and edge feature tensors of a homogeneous graph.
 
     >>> transform = FeatMask(node_feat_names=['h'], edge_feat_names=['w'])
     >>> g = dgl.rand_graph(5, 10)
     >>> g.ndata['h'] = torch.ones((g.num_nodes(), 10))
     >>> g.edata['w'] = torch.ones((g.num_edges(), 10))
+
     >>> g = transform(g)
     >>> print(g.ndata['h'])
     tensor([[0., 0., 1., 1., 0., 0., 1., 1., 1., 0.],
