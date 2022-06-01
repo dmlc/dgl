@@ -203,6 +203,64 @@ def test_reddit():
     g2 = data.RedditDataset(transform=transform)[0]
     assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+def test_explain_syn():
+    dataset = data.BAShapeDataset()
+    assert dataset.num_classes == 4
+    g = dataset[0]
+    assert 'label' in g.ndata
+    assert 'feat' in g.ndata
+
+    g1 = data.BAShapeDataset(force_reload=True, seed=0)[0]
+    src1, dst1 = g1.edges()
+    g2 = data.BAShapeDataset(force_reload=True, seed=0)[0]
+    src2, dst2 = g2.edges()
+    assert F.allclose(src1, src2)
+    assert F.allclose(dst1, dst2)
+
+    dataset = data.BACommunityDataset()
+    assert dataset.num_classes == 8
+    g = dataset[0]
+    assert 'label' in g.ndata
+    assert 'feat' in g.ndata
+
+    g1 = data.BACommunityDataset(force_reload=True, seed=0)[0]
+    src1, dst1 = g1.edges()
+    g2 = data.BACommunityDataset(force_reload=True, seed=0)[0]
+    src2, dst2 = g2.edges()
+    assert F.allclose(src1, src2)
+    assert F.allclose(dst1, dst2)
+
+    dataset = data.TreeCycleDataset()
+    assert dataset.num_classes == 2
+    g = dataset[0]
+    assert 'label' in g.ndata
+    assert 'feat' in g.ndata
+
+    g1 = data.TreeCycleDataset(force_reload=True, seed=0)[0]
+    src1, dst1 = g1.edges()
+    g2 = data.TreeCycleDataset(force_reload=True, seed=0)[0]
+    src2, dst2 = g2.edges()
+    assert F.allclose(src1, src2)
+    assert F.allclose(dst1, dst2)
+
+    dataset = data.TreeGridDataset()
+    assert dataset.num_classes == 2
+    g = dataset[0]
+    assert 'label' in g.ndata
+    assert 'feat' in g.ndata
+
+    g1 = data.TreeGridDataset(force_reload=True, seed=0)[0]
+    src1, dst1 = g1.edges()
+    g2 = data.TreeGridDataset(force_reload=True, seed=0)[0]
+    src2, dst2 = g2.edges()
+    assert F.allclose(src1, src2)
+    assert F.allclose(dst1, dst2)
+
+    dataset = data.BA2MotifDataset()
+    assert dataset.num_classes == 2
+    g, label = dataset[0]
+    assert 'feat' in g.ndata
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_extract_archive():

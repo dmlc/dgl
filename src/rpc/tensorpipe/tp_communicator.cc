@@ -81,15 +81,21 @@ void TPSender::Send(const RPCMessage &msg, int recv_id) {
 
 void TPSender::Finalize() {
   for (auto &&p : pipes_) {
-    p.second->close();
+    if (p.second) {
+      p.second->close();
+    }
   }
   pipes_.clear();
 }
 
 void TPReceiver::Finalize() {
-  listener_->close();
+  if (listener_) {
+    listener_->close();
+  }
   for (auto &&p : pipes_) {
-    p.second->close();
+    if (p.second) {
+      p.second->close();
+    }
   }
   pipes_.clear();
 }

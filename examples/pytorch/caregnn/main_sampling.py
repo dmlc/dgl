@@ -103,7 +103,7 @@ def main(args):
         tr_recall = 0
         tr_auc = 0
         tr_blk = 0
-        train_dataloader = dgl.dataloading.NodeDataLoader(graph,
+        train_dataloader = dgl.dataloading.DataLoader(graph,
                                                           train_idx,
                                                           sampler,
                                                           batch_size=args.batch_size,
@@ -135,7 +135,7 @@ def main(args):
 
         # validation
         model.eval()
-        val_dataloader = dgl.dataloading.NodeDataLoader(graph,
+        val_dataloader = dgl.dataloading.DataLoader(graph,
                                                         val_idx,
                                                         sampler,
                                                         batch_size=args.batch_size,
@@ -159,7 +159,7 @@ def main(args):
     model.eval()
     if args.early_stop:
         model.load_state_dict(th.load('es_checkpoint.pt'))
-    test_dataloader = dgl.dataloading.NodeDataLoader(graph,
+    test_dataloader = dgl.dataloading.DataLoader(graph,
                                                      test_idx,
                                                      sampler,
                                                      batch_size=args.batch_size,
