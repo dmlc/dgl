@@ -40,6 +40,7 @@ def test_gin():
         ds = data.GINDataset(name, self_loop=False, degree_as_nlabel=False, transform=transform)
         g2 = ds[0][0]
         assert g2.num_edges() - g1.num_edges() == g1.num_nodes()
+        assert ds.num_classes == ds.gclasses
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_fraud():

@@ -83,8 +83,8 @@ def main(run):
     # data[0] is a tuple (g, label)
     cfg["model"]["data_info"] = {
         "name": cfg["data_name"],
-        "node_feat_size": data[0][0].ndata['feat'].shape[-1],
-        "edge_feat_size": data[0][0].edata['feat'].shape[-1],
+        "node_feat_size": data.node_feat_size,
+        "edge_feat_size": data.edge_feat_size,
         "out_size": data.num_tasks
     }
     if cfg["model_name"] == 'pna':

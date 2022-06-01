@@ -449,7 +449,7 @@ class AsGraphPredDataset(DGLDataset):
         else:
             if self.verbose:
                 print('Generating train/val/test split...')
-            train_ratio, val_ratio, test_ratio = self.split_ratio
+            train_ratio, val_ratio, _ = self.split_ratio
             num_graphs = len(self.dataset)
             num_train = int(num_graphs * train_ratio)
             num_val = int(num_graphs * val_ratio)
@@ -459,12 +459,9 @@ class AsGraphPredDataset(DGLDataset):
             self.val_idx = F.tensor(idx[num_train: num_train + num_val])
             self.test_idx = F.tensor(idx[num_train + num_val:])
 
-        if hasattr(self.dataset, 'gclasses'):
-            # GINDataset
-            self.num_classes = self.dataset.gclasses
-        elif hasattr(self.dataset, 'num_classes'):
-            # MiniGCDataset, FakeNewsDataset
-            self.num_classes = int(self.dataset.num_classes)
+        if hasattr(self.dataset, 'num_classes'):
+            # GINDataset, MiniGCDataset, FakeNewsDataset
+            self.num_classes = self.dataset.num_classes
         else:
             # None for multi-label classification
             self.num_classes = None
@@ -514,3 +511,13 @@ class AsGraphPredDataset(DGLDataset):
 
     def __len__(self):
         return len(self.dataset)
+
+    @property
+    def node_feat_size(self):
+        g = self[0][0]
+        return g.ndata['feat'].shape[-1] if 'feat' in g.ndata else None
+
+    @property
+    def edge_feat_size(self):
+        g = self[0][0]
+        return g.edata['feat'].shape[-1] if 'feat' in g.edata else None
