@@ -8,7 +8,7 @@ import backend as F
 import networkx as nx
 import unittest, pytest
 from dgl import DGLError
-from utils import parametrize_dtype
+from test_utils import parametrize_idtype
 
 def create_test_heterograph(num_nodes, num_adj, idtype):
     if isinstance(num_adj, int):
@@ -49,7 +49,7 @@ def check_sort(spm, tag_arr=None, tag_pos=None):
 
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sorting by tag not implemented")
-@parametrize_dtype
+@parametrize_idtype
 def test_sort_with_tag(idtype):
     num_nodes, num_adj, num_tags = 200, [20, 50], 5
     g = create_test_heterograph(num_nodes, num_adj, idtype=idtype)
@@ -68,7 +68,7 @@ def test_sort_with_tag(idtype):
     assert(not check_sort(old_csc, tag))
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sorting by tag not implemented")
-@parametrize_dtype
+@parametrize_idtype
 def test_sort_with_tag_bipartite(idtype):
     num_nodes, num_adj, num_tags = 200, [20, 50], 5
     g = create_test_heterograph(num_nodes, num_adj, idtype=idtype)
