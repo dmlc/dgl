@@ -692,7 +692,7 @@ class BA2MotifDataset(DGLBuiltinDataset):
     Attributes
     ----------
     num_classes : int
-        Number of node classes
+        Number of graph classes
 
     Examples
     --------
