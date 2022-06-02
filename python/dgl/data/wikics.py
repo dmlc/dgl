@@ -63,8 +63,13 @@ class WikiCSDataset(DGLBuiltinDataset):
     >>> val_mask = g.ndata['val_masks']
     >>> stopping_mask = g.ndata['stopping_masks']
     >>> test_mask = g.ndata['test_mask']
-    >>>
-    >>> # Train, Validation and Test
+    >>> # The shape of train, val and stopping masks are (num_nodes, num_splits).
+    >>> # The num_splits is the number of different train, validation, stopping splits.
+    >>> # Due to the number of test spilt is 1, the shape of test mask is (num_nodes,).
+    >>> print(train_mask.shape, val_mask.shape, stopping_mask.shape)
+    (11701, 20) (11701, 20) (11701, 20)
+    >>> print(test_mask.shape)
+    (11701,)
     """
 
     def __init__(self, raw_dir=None, force_reload=False, verbose=False, transform=None):
