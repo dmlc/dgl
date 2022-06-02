@@ -21,12 +21,6 @@ namespace cuda {
 #define CUDA_MAX_NUM_THREADS 1024
 
 #ifdef USE_FP16
-#define CUDA_FP16_HARDWARE_CHECK(dtype) \
-{ \
-  if (std::is_same<dtype, __half>::value) { \
-    return; \
-  } \
-}
 #define SWITCH_BITS(bits, DType, ...)                           \
   do {                                                          \
     if ((bits) == 16) {                                         \
@@ -43,7 +37,6 @@ namespace cuda {
     }                                                           \
   } while (0)
 #else  // USE_FP16
-#define CUDA_FP16_HARDWARE_CHECK(dtype)
 #define SWITCH_BITS(bits, DType, ...)                           \
   do {                                                          \
     if ((bits) == 32) {                                         \
