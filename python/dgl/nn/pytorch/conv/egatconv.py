@@ -83,11 +83,11 @@ class EGATConv(nn.Module):
     >>> out_edge_feats = 5
     >>> num_heads = 3
     >>> egat_model =  EGATConv(in_node_feats,
-    ...                         in_edge_feats,
-    ...                         out_node_feats,
-    ...                         out_edge_feats,
-    ...                         num_heads,
-    ...                         bias=True)
+    ...                        in_edge_feats,
+    ...                        out_node_feats,
+    ...                        out_edge_feats,
+    ...                        num_heads,
+    ...                        bias=True)
     >>> #forward pass
     >>> new_node_feats,
     >>> new_edge_feats,
