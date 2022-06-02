@@ -7,9 +7,9 @@
 #include <dgl/random.h>
 #include <dgl/runtime/device_api.h>
 #include <curand_kernel.h>
-#include <numeric>
 #include <thrust/binary_search.h>
 #include <thrust/execution_policy.h>
+#include <numeric>
 
 #include "./dgl_cub.cuh"
 #include "../../array/cuda/atomic.cuh"
