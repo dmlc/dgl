@@ -32,6 +32,7 @@ from .fakenews import FakeNewsDataset
 from .csv_dataset import CSVDataset
 from .adapter import *
 from .synthetic import BAShapeDataset, BACommunityDataset, TreeCycleDataset, TreeGridDataset, BA2MotifDataset
+from .wikics import WikiCSDataset
 
 def register_data_args(parser):
     parser.add_argument(
