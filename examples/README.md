@@ -28,7 +28,7 @@ To quickly locate the examples of your interest, search for the tagged keywords 
 - <a name='gatv2'></a> Brody et al. How Attentive are Graph Attention Networks? [Paper link](https://arxiv.org/abs/2105.14491).
     - Example code: [PyTorch](../examples/pytorch/gatv2)
     - Tags: graph attention, gat, gatv2, attention
-- <a name='bgrl'></a> Large-Scale Representation Learning on Graphs via Bootstrapping [Paper link](https://arxiv.org/abs/2102.06514).
+- <a name='bgrl'></a> Thakoor et al. Large-Scale Representation Learning on Graphs via Bootstrapping. [Paper link](https://arxiv.org/abs/2102.06514).
     - Example code: [PyTorch](../examples/pytorch/bgrl)
     - Tags: contrastive learning for node classification.
 
