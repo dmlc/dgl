@@ -52,7 +52,7 @@ class EGATConv(nn.Module):
     >>> import dgl
     >>> import torch as th
     >>> from dgl.nn import EGATConv
-    
+
     >>> # Case 1: Homogeneous graph
     >>> num_nodes, num_edges = 8, 30
     >>> # generate a graph
@@ -68,7 +68,7 @@ class EGATConv(nn.Module):
     >>> new_node_feats, new_edge_feats = egat(graph, node_feats, edge_feats)
     >>> new_node_feats.shape, new_edge_feats.shape
     torch.Size([8, 3, 15]) torch.Size([30, 3, 10])
-    
+
     >>> # Case 2: Unidirectional bipartite graph
     >>> u = [0, 1, 0, 0, 1]
     >>> v = [0, 1, 2, 3, 2]
@@ -89,12 +89,12 @@ class EGATConv(nn.Module):
     ...                         num_heads,
     ...                         bias=True)
     >>> #forward pass
-    >>> new_node_feats, new_edge_feats, attentions = egat_model(g, nfeats, efeats, get_attention=True)
+    >>> new_node_feats,
+    >>> new_edge_feats,
+    >>> attentions = egat_model(g, nfeats, efeats, get_attention=True)
     >>> new_node_feats.shape, new_edge_feats.shape, attentions.shape
     (torch.Size([4, 3, 10]), torch.Size([5, 3, 5]), torch.Size([5, 3, 1]))
     """
-    
-
     def __init__(self,
                  in_node_feats,
                  in_edge_feats,
@@ -108,7 +108,6 @@ class EGATConv(nn.Module):
         self._in_src_node_feats, self._in_dst_node_feats = expand_as_pair(in_node_feats)
         self._out_node_feats = out_node_feats
         self._out_edge_feats = out_edge_feats
-        
         if isinstance(in_node_feats, tuple):
             self.fc_node_src = nn.Linear(
                 self._in_src_node_feats, out_node_feats * num_heads, bias=False)
@@ -153,12 +152,12 @@ class EGATConv(nn.Module):
         graph : DGLGraph
             The graph.
         nfeat : torch.Tensor or pair of torch.Tensor
-            If a torch.Tensor is given, the input feature of shape :math:`(N, D_{in})` 
+            If a torch.Tensor is given, the input feature of shape :math:`(N, D_{in})`
             where:
-                :math:`D_{in}` is size of input node feature, 
+                :math:`D_{in}` is size of input node feature,
                 :math:`N` is the number of nodes.
             If a pair of torch.Tensor is given, the pair must contain two tensors of shape
-                :math:`(N_{in}, D_{in_{src}})` and 
+                :math:`(N_{in}, D_{in_{src}})` and
                 :math:`(N_{out}, D_{in_{dst}})`.
         efeats: torch.Tensor
              The input edge feature of shape :math:`(E, F_{in})`
@@ -218,7 +217,7 @@ class EGATConv(nn.Module):
             # compute attention factor
             e = (f_out * self.attn).sum(dim=-1).unsqueeze(-1)
             graph.edata['a'] = edge_softmax(graph, e)
-            graph.srcdata['h_out'] = self.fc_node_src(nfeats_src).view(-1, self._num_heads, 
+            graph.srcdata['h_out'] = self.fc_node_src(nfeats_src).view(-1, self._num_heads,
                                                              self._out_node_feats)
             # calc weighted sum
             graph.update_all(fn.u_mul_e('h_out', 'a', 'm'),
