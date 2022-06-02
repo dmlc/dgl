@@ -270,7 +270,7 @@ class TUDataset(DGLBuiltinDataset):
         Maximum number of nodes
     num_classes : int
         Number of classes
-    num_labels : LongTensor
+    num_labels : int
         (DEPRECATED, use num_classes instead) Number of classes
 
     Notes
@@ -337,7 +337,7 @@ class TUDataset(DGLBuiltinDataset):
         if os.path.exists(self._file_path("graph_labels")):
             DS_graph_labels = self._idx_reset(
                 loadtxt(self._file_path("graph_labels"), delimiter=",").astype(int))
-            self.num_labels = max(DS_graph_labels) + 1
+            self.num_labels = int(max(DS_graph_labels) + 1)
             self.graph_labels = F.tensor(DS_graph_labels)
         elif os.path.exists(self._file_path("graph_attributes")):
             DS_graph_labels = loadtxt(self._file_path("graph_attributes"), delimiter=",").astype(float)
@@ -453,4 +453,4 @@ class TUDataset(DGLBuiltinDataset):
 
     @property
     def num_classes(self):
-        return F.as_scalar(self.num_labels)
+        return self.num_labels
