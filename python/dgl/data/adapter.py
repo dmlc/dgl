@@ -397,13 +397,17 @@ class AsGraphPredDataset(DGLDataset):
     num_tasks : int
         Number of tasks to predict.
     num_classes : int
-        Number of classes to predict per task.
+        Number of classes to predict per task, None for regression datasets.
     train_idx : Tensor
         An 1-D integer tensor of training node IDs.
     val_idx : Tensor
         An 1-D integer tensor of validation node IDs.
     test_idx : Tensor
         An 1-D integer tensor of test node IDs.
+    node_feat_size : int
+        Input node feature size, None if not applicable.
+    edge_feat_size : int
+        Input edge feature size, None if not applicable.
 
     Examples
     --------
@@ -445,7 +449,8 @@ class AsGraphPredDataset(DGLDataset):
                     self.val_idx = F.nonzero_1d(self.dataset.val_mask)
                     self.test_idx = F.nonzero_1d(self.dataset.test_mask)
                 except:
-                    raise DGLError('split_ratio is required to generate the split.')
+                    raise DGLError('The input dataset does not have default train/val/test\
+                        split. Please specify split_ratio to generate the split.')
         else:
             if self.verbose:
                 print('Generating train/val/test split...')
@@ -460,10 +465,11 @@ class AsGraphPredDataset(DGLDataset):
             self.test_idx = F.tensor(idx[num_train + num_val:])
 
         if hasattr(self.dataset, 'num_classes'):
-            # GINDataset, MiniGCDataset, FakeNewsDataset
+            # GINDataset, MiniGCDataset, FakeNewsDataset, TUDataset,
+            # LegacyTUDataset, BA2MotifDataset
             self.num_classes = self.dataset.num_classes
         else:
-            # None for multi-label classification
+            # None for multi-label classification and regression
             self.num_classes = None
 
         if hasattr(self.dataset, 'num_tasks'):

@@ -35,8 +35,10 @@ class LegacyTUDataset(DGLBuiltinDataset):
     ----------
     max_num_node : int
         Maximum number of nodes
-    num_labels : int
+    num_classes : int
         Number of classes
+    num_labels : numpy.int64
+        (DEPRECATED, use num_classes instead) Number of classes
 
     Notes
     -----
@@ -244,6 +246,10 @@ class LegacyTUDataset(DGLBuiltinDataset):
             self.num_labels,\
             self.max_num_node
 
+    @property
+    def num_classes(self):
+        return int(self.num_labels)
+
 class TUDataset(DGLBuiltinDataset):
     r"""
     TUDataset contains lots of graph kernel datasets for graph classification.
@@ -262,8 +268,10 @@ class TUDataset(DGLBuiltinDataset):
     ----------
     max_num_node : int
         Maximum number of nodes
-    num_labels : int
+    num_classes : int
         Number of classes
+    num_labels : LongTensor
+        (DEPRECATED, use num_classes instead) Number of classes
 
     Notes
     -----
@@ -442,3 +450,7 @@ class TUDataset(DGLBuiltinDataset):
         return self.graph_lists[0].ndata['feat'].shape[1], \
             self.num_labels, \
             self.max_num_node
+
+    @property
+    def num_classes(self):
+        return F.as_scalar(self.num_labels)
