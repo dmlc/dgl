@@ -475,9 +475,6 @@ class AsGraphPredDataset(DGLDataset):
         if hasattr(self.dataset, 'num_tasks'):
             # OGB datasets
             self.num_tasks = self.dataset.num_tasks
-        elif hasattr(self.dataset, 'num_labels'):
-            # QM7bDataset, QM9Dataset, QM9EdgeDataset
-            self.num_tasks = self.dataset.num_labels
         else:
             self.num_tasks = 1
 

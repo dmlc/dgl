@@ -1406,6 +1406,18 @@ def test_as_graphpred():
     assert new_ds.num_tasks == 14
     assert new_ds.num_classes is None
 
+    ds = data.QM9Dataset(label_keys=['mu', 'gap'])
+    new_ds = data.AsGraphPredDataset(ds, [0.8, 0.1, 0.1], verbose=True)
+    assert len(new_ds) == 130831
+    assert new_ds.num_tasks == 2
+    assert new_ds.num_classes is None
+
+    ds = data.QM9EdgeDataset(label_keys=['mu', 'alpha'])
+    new_ds = data.AsGraphPredDataset(ds, [0.8, 0.1, 0.1], verbose=True)
+    assert len(new_ds) == 130831
+    assert new_ds.num_tasks == 2
+    assert new_ds.num_classes is None
+
     ds = data.TUDataset('DD')
     new_ds = data.AsGraphPredDataset(ds, [0.8, 0.1, 0.1], verbose=True)
     assert len(new_ds) == 1178
@@ -1451,6 +1463,24 @@ def test_as_graphpred_reprocess():
     assert len(ds.train_idx) == int(len(ds) * 0.8)
     # invalid cache, re-read
     ds = data.AsGraphPredDataset(data.QM7bDataset(), [0.1, 0.1, 0.8])
+    assert len(ds.train_idx) == int(len(ds) * 0.1)
+
+    ds = data.AsGraphPredDataset(data.QM9Dataset(label_keys=['mu', 'gap']), [0.8, 0.1, 0.1])
+    assert len(ds.train_idx) == int(len(ds) * 0.8)
+    # read from cache
+    ds = data.AsGraphPredDataset(data.QM9Dataset(label_keys=['mu', 'gap']), [0.8, 0.1, 0.1])
+    assert len(ds.train_idx) == int(len(ds) * 0.8)
+    # invalid cache, re-read
+    ds = data.AsGraphPredDataset(data.QM9Dataset(label_keys=['mu', 'gap']), [0.1, 0.1, 0.8])
+    assert len(ds.train_idx) == int(len(ds) * 0.1)
+
+    ds = data.AsGraphPredDataset(data.QM9EdgeDataset(label_keys=['mu', 'alpha']), [0.8, 0.1, 0.1])
+    assert len(ds.train_idx) == int(len(ds) * 0.8)
+    # read from cache
+    ds = data.AsGraphPredDataset(data.QM9EdgeDataset(label_keys=['mu', 'alpha']), [0.8, 0.1, 0.1])
+    assert len(ds.train_idx) == int(len(ds) * 0.8)
+    # invalid cache, re-read
+    ds = data.AsGraphPredDataset(data.QM9EdgeDataset(label_keys=['mu', 'alpha']), [0.1, 0.1, 0.8])
     assert len(ds.train_idx) == int(len(ds) * 0.1)
 
     ds = data.AsGraphPredDataset(data.TUDataset('DD'), [0.8, 0.1, 0.1])
