@@ -21,7 +21,7 @@ from ogb.nodeproppred import DglNodePropPredDataset, Evaluator
 from torch import nn
 
 from models import GAT
-from utils import BatchSampler, DataLoaderWrapper
+from utils import DataLoaderWrapper #, BatchSampler
 
 device = None
 dataset = "ogbn-proteins"

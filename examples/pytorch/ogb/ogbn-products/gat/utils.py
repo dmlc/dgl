@@ -17,19 +17,19 @@ class DataLoaderWrapper(object):
     #         raise StopIteration() from None
 
 
-class BatchSampler(object):
-    def __init__(self, n, batch_size, shuffle=False):
-        self.n = n
-        self.batch_size = batch_size
-        self.shuffle = shuffle
+# class BatchSampler(object):
+#     def __init__(self, n, batch_size, shuffle=False):
+#         self.n = n
+#         self.batch_size = batch_size
+#         self.shuffle = shuffle
 
-    def __iter__(self):
-        if not self.shuffle:
-            perm = torch.arange(start=0, end=self.n)
-        while True:
-            if self.shuffle:
-                perm = torch.randperm(self.n)
-            shuf = perm.split(self.batch_size)
-            for shuf_batch in shuf:
-                yield shuf_batch
-            yield None
+#     def __iter__(self):
+#         if not self.shuffle:
+#             perm = torch.arange(start=0, end=self.n)
+#         while True:
+#             if self.shuffle:
+#                 perm = torch.randperm(self.n)
+#             shuf = perm.split(self.batch_size)
+#             for shuf_batch in shuf:
+#                 yield shuf_batch
+#             yield None
