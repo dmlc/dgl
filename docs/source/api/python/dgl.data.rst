@@ -51,6 +51,7 @@ Datasets for node classification/regression tasks
     BACommunityDataset
     TreeCycleDataset
     TreeGridDataset
+    WikiCSDataset
 
 Edge Prediction Datasets
 ---------------------------------------
@@ -99,6 +100,7 @@ Dataset adapters
 
     AsNodePredDataset
     AsLinkPredDataset
+    AsGraphPredDataset
 
 Utilities
 -----------------
