@@ -224,7 +224,7 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
             graph.cpu(),
             train_idx.cpu(),
             train_sampler,
-            batch_sampler=BatchSampler(len(train_idx), batch_size=train_batch_size, shuffle=True),
+            batch_size=train_batch_size, shuffle=True,
             num_workers=4,
         )
     )
@@ -243,7 +243,7 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
             graph.cpu(),
             eval_idx,
             eval_sampler,
-            batch_sampler=BatchSampler(len(eval_idx), batch_size=eval_batch_size, shuffle=False),
+            batch_size=eval_batch_size, shuffle=False,
             num_workers=4,
         )
     )
@@ -292,7 +292,7 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
 
             if epoch == args.n_epochs or epoch % args.log_every == 0:
                 print(
-                    f"Run: {n_running}/{args.n_runs}, Epoch: {epoch}/{args.n_epochs}, Average epoch time: {total_time / epoch:.2s}\n"
+                    f"Run: {n_running}/{args.n_runs}, Epoch: {epoch}/{args.n_epochs}, Average epoch time: {total_time / epoch:.2f}\n"
                     f"Loss: {loss:.4f}, Score: {score:.4f}\n"
                     f"Train/Val/Test loss: {train_loss:.4f}/{val_loss:.4f}/{test_loss:.4f}\n"
                     f"Train/Val/Test/Best val/Final test score: {train_score:.4f}/{val_score:.4f}/{test_score:.4f}/{best_val_score:.4f}/{final_test_score:.4f}"
@@ -313,7 +313,7 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
                 graph.cpu(),
                 test_idx.cpu(),
                 eval_sampler,
-                batch_sampler=BatchSampler(len(test_idx), batch_size=eval_batch_size, shuffle=False),
+                batch_size=eval_batch_size, shuffle=False,
                 num_workers=4,
             )
         )

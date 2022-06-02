@@ -183,7 +183,7 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
             graph.cpu(),
             train_idx.cpu(),
             train_sampler,
-            batch_sampler=BatchSampler(len(train_idx), batch_size=train_batch_size),
+            batch_size=train_batch_size,
             num_workers=10,
         )
     )
@@ -195,7 +195,7 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
             graph.cpu(),
             torch.cat([train_idx.cpu(), val_idx.cpu(), test_idx.cpu()]),
             eval_sampler,
-            batch_sampler=BatchSampler(graph.number_of_nodes(), batch_size=65536),
+            batch_size=65536,
             num_workers=10,
         )
     )

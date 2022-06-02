@@ -91,16 +91,18 @@ class Logger(object):
 
 class DataLoaderWrapper(object):
     def __init__(self, dataloader):
-        self.iter = iter(dataloader)
+        # self.iter = iter(dataloader)
+        self.data = dataloader
 
     def __iter__(self):
-        return self
+        # rewind the iterator for every iteration in for loop
+        return iter(self.data)
 
-    def __next__(self):
-        try:
-            return next(self.iter)
-        except Exception:
-            raise StopIteration() from None
+    # def __next__(self):
+    #     try:
+    #         return next(self.iter)
+    #     except Exception:
+    #         raise StopIteration() from None
 
 
 class BatchSampler(object):
