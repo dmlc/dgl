@@ -286,6 +286,8 @@ void SDDMMCoo(
   const int64_t nnz = coo.row->shape[0];
   const bool use_idx = !IsNullArray(coo.data);
 
+  CheckDTypeSupport<DType>(out->ctx);
+
   if (std::is_same<Op, binary::Dot<DType> >::value && reduce_dim >= 32) {
     const int ntx = 32;  // on feature dimension
     const int nty = 8;   // on out dimension
@@ -359,6 +361,8 @@ void SDDMMCsr(
   const dim3 nblks(nbx, nby);
   const dim3 nthrs(ntx, nty);
   const bool use_idx = !IsNullArray(csr.data);
+
+  CheckDTypeSupport<DType>(out->ctx);
 
   BCAST_IDX_CTX_SWITCH(bcast, use_idx, out->ctx, lhs_off, rhs_off, {
     CUDA_KERNEL_CALL((SDDMMCsrKernel<Idx, DType, Op, UseBcast, UseIdx, LhsTarget, RhsTarget>),

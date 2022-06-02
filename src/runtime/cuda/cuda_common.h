@@ -112,6 +112,20 @@ inline const char* curandGetErrorString(curandStatus_t error) {
   return "Unrecognized curand error string";
 }
 
+template<typename DTYPE>
+void CheckDTypeSupport(DGLContext /* ctx */) {
+  return;
+}
+
+template<> inline void CheckDTypeSupport<__half>(DGLContext ctx) {
+  cudaDeviceProp prop;
+  CUDA_CALL(cudaGetDeviceProperties(&prop, ctx.device_id));
+  if (prop.major < 6) {
+    LOG(FATAL) << "FP16 kernels are only supported on compute capability 60 "
+      " or greater. Enountered " << prop.major << prop.minor << ".";
+  }
+}
+
 /*
  * \brief Cast data type to cudaDataType_t.
  */
