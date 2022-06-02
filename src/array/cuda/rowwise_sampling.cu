@@ -8,10 +8,10 @@
 #include <dgl/runtime/device_api.h>
 #include <curand_kernel.h>
 #include <numeric>
-
-#include "./dgl_cub.cuh"
 #include <thrust/binary_search.h>
 #include <thrust/execution_policy.h>
+
+#include "./dgl_cub.cuh"
 #include "../../array/cuda/atomic.cuh"
 #include "../../runtime/cuda/cuda_common.h"
 
@@ -509,7 +509,7 @@ __global__ void _CSRRowWiseSampleReplaceKernel(
       __shared__ int64_t num_selected;
       if (threadIdx.x == 0) {
         num_selected = 0;
-      } // we don't need to sync here because there will be a sync before the first use
+      }  // we don't need to sync here because there will be a sync before the first use
       // we use a moving window to compute the inclusive prefix sum
       // of [i * BLOCK_SIZE, (i + 1) * BLOCK_SIZE)
       for (int i = 0; i < (deg + BLOCK_SIZE - 1) / BLOCK_SIZE; i++) {
@@ -540,7 +540,8 @@ __global__ void _CSRRowWiseSampleReplaceKernel(
           if (out_offset >= num_selected && out_offset < num_picks) {
             auto rn_val = thread_rn[j];
             // (Xin): there could be bank conflicts here
-            auto ptr = thrust::lower_bound(thrust::seq, prefix_sum, prefix_sum + BLOCK_SIZE, rn_val);
+            auto ptr = thrust::lower_bound(thrust::seq,
+                prefix_sum, prefix_sum + BLOCK_SIZE, rn_val);
             auto idx_offset = thrust::distance(prefix_sum, ptr);
             if (idx_offset < BLOCK_SIZE) {
               flag_selected = 1;
@@ -675,7 +676,7 @@ COOMatrix CSRRowWiseSampling(CSRMatrix mat,
   constexpr int TILE_SIZE = 128/BLOCK_SIZE;
   const dim3 block(BLOCK_SIZE);
   const dim3 grid((num_rows+TILE_SIZE-1)/TILE_SIZE);
-  if (!prob.defined() or IsNullArray(prob)) {  //uniform sampling
+  if (!prob.defined() || IsNullArray(prob)) {  // uniform sampling
     if (replace) {  // with replacement
       CUDA_KERNEL_CALL(
           (_CSRRowWiseSampleUniformReplaceKernel<IdType, TILE_SIZE>),
