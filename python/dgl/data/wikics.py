@@ -139,7 +139,16 @@ class WikiCSDataset(DGLBuiltinDataset):
         -------
         :class:`dgl.DGLGraph`
 
-            graph structure, labels, features and masks.
+            The graph contains:
+
+            - ``ndata['feat']``: node features
+            - ``ndata['label']``: node labels
+            - ``ndata['train_mask']``: train mask is for retrieving the nodes for training.
+            - ``ndata['val_mask']``: val mask is for retrieving the nodes for hyperparameter tuning.
+            - ``ndata['stopping_mask']``: stopping mask is for retrieving the nodes for early
+            stopping criterion.
+            - ``ndata['test_mask']``: test mask is for retrieving the nodes for testing.
+
         """
         assert idx == 0, "This dataset has only one graph"
         if self._transform is None:
