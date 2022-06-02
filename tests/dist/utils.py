@@ -40,3 +40,14 @@ def execute_remote(
     proc = ctx.Process(target=run, args=(ssh_cmd,))
     proc.start()
     return proc
+
+def get_ips(ip_config):
+    ips = []
+    with open(ip_config) as f:
+        for line in f:
+            result = line.strip().split()
+            if len(result) != 1:
+                raise RuntimeError(
+                    "Invalid format of ip_config:{}".format(ip_config))
+            ips.append(result[0])
+    return ips

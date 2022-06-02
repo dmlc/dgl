@@ -1,6 +1,6 @@
 import os
 import unittest
-from utils import execute_remote
+from utils import execute_remote, get_ips
 
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
@@ -9,14 +9,7 @@ def test_tensorpipe_comm():
     ip_config = os.environ.get('DIST_DGL_TEST_IP_CONFIG', 'ip_config.txt')
     client_bin = os.path.join(base_dir, 'rpc_client')
     server_bin = os.path.join(base_dir, 'rpc_server')
-    ips = []
-    with open(ip_config) as f:
-        for line in f:
-            result = line.strip().split()
-            if len(result) != 1:
-                raise RuntimeError(
-                    "Invalid format of ip_config:{}".format(ip_config))
-            ips.append(result[0])
+    ips = get_ips(ip_config)
     num_machines = len(ips)
     procs = []
     for ip in ips:
