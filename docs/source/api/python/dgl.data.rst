@@ -99,6 +99,7 @@ Dataset adapters
 
     AsNodePredDataset
     AsLinkPredDataset
+    AsGraphPredDataset
 
 Utilities
 -----------------

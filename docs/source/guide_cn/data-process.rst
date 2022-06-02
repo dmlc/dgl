@@ -29,33 +29,33 @@
         _url = 'http://deepchem.io.s3-website-us-west-1.amazonaws.com/' \
                'datasets/qm7b.mat'
         _sha1_str = '4102c744bb9d6fd7b40ac67a300e49cd87e28392'
-    
+
         def __init__(self, raw_dir=None, force_reload=False, verbose=False):
             super(QM7bDataset, self).__init__(name='qm7b',
                                               url=self._url,
                                               raw_dir=raw_dir,
                                               force_reload=force_reload,
                                               verbose=verbose)
-    
+
         def process(self):
             mat_path = self.raw_path + '.mat'
             # 将数据处理为图列表和标签列表
             self.graphs, self.label = self._load_graph(mat_path)
-        
+
         def __getitem__(self, idx):
             """ 通过idx获取对应的图和标签
-    
+
             Parameters
             ----------
             idx : int
                 Item index
-    
+
             Returns
             -------
             (dgl.DGLGraph, Tensor)
             """
             return self.graphs[idx], self.label[idx]
-    
+
         def __len__(self):
             """数据集中图的数量"""
             return len(self.graphs)
@@ -66,31 +66,31 @@ DGL建议让 ``__getitem__(idx)`` 返回如上面代码所示的元组 ``(图，
 以获得 ``self._load_graph()`` 和 ``__getitem__`` 的详细信息。
 
 用户还可以向类添加属性以指示一些有用的数据集信息。在 :class:`~dgl.data.QM7bDataset` 中，
-用户可以添加属性 ``num_labels`` 来指示此多任务数据集中的预测任务总数：
+用户可以添加属性 ``num_tasks`` 来指示此多任务数据集中的预测任务总数：
 
 .. code::
 
     @property
-    def num_labels(self):
+    def num_tasks(self):
         """每个图的标签数，即预测任务数。"""
         return 14
 
 在编写完这些代码之后，用户可以按如下所示的方式来使用 :class:`~dgl.data.QM7bDataset`：
 
-.. code:: 
+.. code::
 
     import dgl
     import torch
 
     from dgl.dataloading import GraphDataLoader
-    
+
     # 数据导入
     dataset = QM7bDataset()
-    num_labels = dataset.num_labels
-    
+    num_tasks = dataset.num_tasks
+
     # 创建 dataloaders
     dataloader = GraphDataLoader(dataset, batch_size=1, shuffle=True)
-    
+
     # 训练
     for epoch in range(100):
         for g, labels in dataloader:
@@ -125,14 +125,14 @@ DGL提供了名为 :func:`dgl.reorder_graph` 的API用于此优化。更多细�
 
     from dgl.data import DGLBuiltinDataset
     from dgl.data.utils import _get_dgl_url
-    
+
     class CitationGraphDataset(DGLBuiltinDataset):
         _urls = {
             'cora_v2' : 'dataset/cora_v2.zip',
             'citeseer' : 'dataset/citeseer.zip',
             'pubmed' : 'dataset/pubmed.zip',
         }
-    
+
         def __init__(self, name, raw_dir=None, force_reload=False, verbose=True):
             assert name.lower() in ['cora', 'citeseer', 'pubmed']
             if name.lower() == 'cora':
@@ -143,11 +143,11 @@ DGL提供了名为 :func:`dgl.reorder_graph` 的API用于此优化。更多细�
                                                        raw_dir=raw_dir,
                                                        force_reload=force_reload,
                                                        verbose=verbose)
-    
+
         def process(self):
             # 跳过一些处理的代码
             # === 跳过数据处理 ===
-    
+
             # 构建图
             g = dgl.graph(graph)
 
@@ -162,15 +162,15 @@ DGL提供了名为 :func:`dgl.reorder_graph` 的API用于此优化。更多细�
             # 节点的特征
             g.ndata['feat'] = torch.tensor(_preprocess_features(features),
                                            dtype=F.data_type_dict['float32'])
-            self._num_labels = onehot_labels.shape[1]
+            self._num_tasks = onehot_labels.shape[1]
             self._labels = labels
             # 重排图以获得更优的局部性
             self._g = dgl.reorder_graph(g)
-    
+
         def __getitem__(self, idx):
             assert idx == 0, "这个数据集里只有一个图"
             return self._g
-    
+
         def __len__(self):
             return 1
 
@@ -184,20 +184,20 @@ DGL提供了名为 :func:`dgl.reorder_graph` 的API用于此优化。更多细�
 下面中使用 :class:`dgl.data.CitationGraphDataset` 的子类 :class:`dgl.data.CiteseerGraphDataset`
 来演示如何使用用于节点分类的数据集：
 
-.. code:: 
+.. code::
 
     # 导入数据
     dataset = CiteseerGraphDataset(raw_dir='')
     graph = dataset[0]
-    
+
     # 获取划分的掩码
     train_mask = graph.ndata['train_mask']
     val_mask = graph.ndata['val_mask']
     test_mask = graph.ndata['test_mask']
-    
+
     # 获取节点特征
     feats = graph.ndata['feat']
-    
+
     # 获取标签
     labels = graph.ndata['label']
 
@@ -246,7 +246,7 @@ DGL提供了名为 :func:`dgl.reorder_graph` 的API用于此优化。更多细�
                                                         raw_dir=raw_dir,
                                                         force_reload=force_reload,
                                                         verbose=verbose)
-    
+
         def process(self):
             # 跳过一些处理的代码
             # === 跳过数据处理 ===
@@ -262,11 +262,11 @@ DGL提供了名为 :func:`dgl.reorder_graph` 的API用于此优化。更多细�
             # 节点类型
             g.ndata['ntype'] = ntype
             self._g = g
-    
+
         def __getitem__(self, idx):
             assert idx == 0, "这个数据集只有一个图"
             return self._g
-    
+
         def __len__(self):
             return 1
 
@@ -275,14 +275,14 @@ DGL提供了名为 :func:`dgl.reorder_graph` 的API用于此优化。更多细�
 `KnowledgeGraphDataset 源代码 <https://docs.dgl.ai/en/0.5.x/_modules/dgl/data/knowledge_graph.html#KnowledgeGraphDataset>`__
 中可以查看完整的代码。下面使用 ``KnowledgeGraphDataset``的子类 :class:`dgl.data.FB15k237Dataset` 来做演示如何使用用于链路预测的数据集：
 
-.. code:: 
+.. code::
 
     from dgl.data import FB15k237Dataset
 
     # 导入数据
     dataset = FB15k237Dataset()
     graph = dataset[0]
-    
+
     # 获取训练集掩码
     train_mask = graph.edata['train_mask']
     train_idx = torch.nonzero(train_mask, as_tuple=False).squeeze()

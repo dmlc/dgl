@@ -35,8 +35,10 @@ class LegacyTUDataset(DGLBuiltinDataset):
     ----------
     max_num_node : int
         Maximum number of nodes
-    num_labels : int
+    num_classes : int
         Number of classes
+    num_labels : numpy.int64
+        (DEPRECATED, use num_classes instead) Number of classes
 
     Notes
     -----
@@ -244,6 +246,10 @@ class LegacyTUDataset(DGLBuiltinDataset):
             self.num_labels,\
             self.max_num_node
 
+    @property
+    def num_classes(self):
+        return int(self.num_labels)
+
 class TUDataset(DGLBuiltinDataset):
     r"""
     TUDataset contains lots of graph kernel datasets for graph classification.
@@ -262,8 +268,10 @@ class TUDataset(DGLBuiltinDataset):
     ----------
     max_num_node : int
         Maximum number of nodes
-    num_labels : int
+    num_classes : int
         Number of classes
+    num_labels : int
+        (DEPRECATED, use num_classes instead) Number of classes
 
     Notes
     -----
@@ -329,7 +337,7 @@ class TUDataset(DGLBuiltinDataset):
         if os.path.exists(self._file_path("graph_labels")):
             DS_graph_labels = self._idx_reset(
                 loadtxt(self._file_path("graph_labels"), delimiter=",").astype(int))
-            self.num_labels = max(DS_graph_labels) + 1
+            self.num_labels = int(max(DS_graph_labels) + 1)
             self.graph_labels = F.tensor(DS_graph_labels)
         elif os.path.exists(self._file_path("graph_attributes")):
             DS_graph_labels = loadtxt(self._file_path("graph_attributes"), delimiter=",").astype(float)
@@ -442,3 +450,7 @@ class TUDataset(DGLBuiltinDataset):
         return self.graph_lists[0].ndata['feat'].shape[1], \
             self.num_labels, \
             self.max_num_node
+
+    @property
+    def num_classes(self):
+        return self.num_labels
