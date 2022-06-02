@@ -79,8 +79,10 @@ class QM9Dataset(DGLDataset):
 
     Attributes
     ----------
+    num_tasks : int
+        Number of prediction tasks
     num_labels : int
-        Number of labels for each graph, i.e. number of prediction tasks
+        (DEPRECATED, use num_tasks instead) Number of prediction tasks
 
     Raises
     ------
@@ -90,7 +92,7 @@ class QM9Dataset(DGLDataset):
     Examples
     --------
     >>> data = QM9Dataset(label_keys=['mu', 'gap'], cutoff=5.0)
-    >>> data.num_labels
+    >>> data.num_tasks
     2
     >>>
     >>> # iterate over the dataset
@@ -143,7 +145,17 @@ class QM9Dataset(DGLDataset):
         Returns
         --------
         int
-            Number of labels for each graph, i.e. number of prediction tasks.
+            Number of prediction tasks.
+        """
+        return self.label.shape[1]
+
+    @property
+    def num_tasks(self):
+        r"""
+        Returns
+        --------
+        int
+            Number of prediction tasks.
         """
         return self.label.shape[1]
 

@@ -239,7 +239,7 @@ class GraphData(BaseData):
                     {('_V', '_E', '_V'): ([], [])})
         for graph_id in graph_ids:
             graphs.append(graphs_dict[graph_id])
-        data = {k: _tensor(v) for k, v in graph_data.data.items()}
+        data = {k: F.reshape(_tensor(v), (len(graphs), -1)) for k, v in graph_data.data.items()}
         return graphs, data
 
 
