@@ -81,7 +81,7 @@ def main(args):
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     print('Using device:', device)
 
-    dataset, train_data, val_data, test_data = get_dataset(args.dataset_dir, args.dataset)
+    dataset, train_data, val_data, test_data = get_dataset(args.dataset)
 
     g = dataset[0]
     g = g.to(device)

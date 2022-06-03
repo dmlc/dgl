@@ -39,8 +39,8 @@ def get_graph_drop_transform(drop_edge_p, feat_mask_p):
     return Compose(transforms)
 
 
-def get_wiki_cs(root, transform=RowFeatNormalizer(subtract_min=True)):
-    dataset = WikiCSDataset(root, transform=transform)
+def get_wiki_cs(transform=RowFeatNormalizer(subtract_min=True)):
+    dataset = WikiCSDataset(transform=transform)
     g = dataset[0]
     std, mean = torch.std_mean(g.ndata['feat'], dim=0, unbiased=False)
     g.ndata['feat'] = (g.ndata['feat'] - mean) / std
@@ -48,10 +48,10 @@ def get_wiki_cs(root, transform=RowFeatNormalizer(subtract_min=True)):
     return [g]
 
 
-def get_ppi(root, transform=None):
-    train_dataset = PPIDataset(mode='train', raw_dir=root)
-    val_dataset = PPIDataset(mode='valid', raw_dir=root)
-    test_dataset = PPIDataset(mode='test', raw_dir=root)
+def get_ppi():
+    train_dataset = PPIDataset(mode='train')
+    val_dataset = PPIDataset(mode='valid')
+    test_dataset = PPIDataset(mode='test')
     train_val_dataset = [i for i in train_dataset] + [i for i in val_dataset]
     for idx, data in enumerate(train_val_dataset):
         data.ndata['batch'] = torch.zeros(data.number_of_nodes()) + idx
@@ -59,10 +59,10 @@ def get_ppi(root, transform=None):
 
     g = list(GraphDataLoader(train_val_dataset, batch_size=22, shuffle=True))
 
-    return g, PPIDataset(mode='train', raw_dir=root), PPIDataset(mode='valid', raw_dir=root), test_dataset
+    return g, PPIDataset(mode='train'), PPIDataset(mode='valid'), test_dataset
 
 
-def get_dataset(root, name, transform=RowFeatNormalizer(subtract_min=True)):
+def get_dataset(name, transform=RowFeatNormalizer(subtract_min=True)):
     dgl_dataset_dict = {
         'coauthor_cs': CoauthorCSDataset,
         'coauthor_physics': CoauthorPhysicsDataset,
@@ -75,8 +75,8 @@ def get_dataset(root, name, transform=RowFeatNormalizer(subtract_min=True)):
     dataset_class = dgl_dataset_dict[name]
     train_data, val_data, test_data = None, None, None
     if name != 'ppi':
-        dataset = dataset_class(root, transform=transform)
+        dataset = dataset_class()
     else:
-        dataset, train_data, val_data, test_data = dataset_class(root, transform=transform)
+        dataset, train_data, val_data, test_data = dataset_class(transform=transform)
 
     return dataset, train_data, val_data, test_data
