@@ -75,8 +75,8 @@ def get_dataset(name, transform=RowFeatNormalizer(subtract_min=True)):
     dataset_class = dgl_dataset_dict[name]
     train_data, val_data, test_data = None, None, None
     if name != 'ppi':
-        dataset = dataset_class()
+        dataset = dataset_class(transform=transform)
     else:
-        dataset, train_data, val_data, test_data = dataset_class(transform=transform)
+        dataset, train_data, val_data, test_data = dataset_class()
 
     return dataset, train_data, val_data, test_data
