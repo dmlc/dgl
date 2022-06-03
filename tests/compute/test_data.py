@@ -84,6 +84,7 @@ def test_fakenews():
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_tudataset_regression():
     ds = data.TUDataset('ZINC_test', force_reload=True)
+    assert ds.num_classes == ds.num_labels
     assert len(ds) == 5000
     g = ds[0][0]
 
@@ -1405,6 +1406,36 @@ def test_as_graphpred():
     assert new_ds.num_tasks == 14
     assert new_ds.num_classes is None
 
+    ds = data.QM9Dataset(label_keys=['mu', 'gap'])
+    new_ds = data.AsGraphPredDataset(ds, [0.8, 0.1, 0.1], verbose=True)
+    assert len(new_ds) == 130831
+    assert new_ds.num_tasks == 2
+    assert new_ds.num_classes is None
+
+    ds = data.QM9EdgeDataset(label_keys=['mu', 'alpha'])
+    new_ds = data.AsGraphPredDataset(ds, [0.8, 0.1, 0.1], verbose=True)
+    assert len(new_ds) == 130831
+    assert new_ds.num_tasks == 2
+    assert new_ds.num_classes is None
+
+    ds = data.TUDataset('DD')
+    new_ds = data.AsGraphPredDataset(ds, [0.8, 0.1, 0.1], verbose=True)
+    assert len(new_ds) == 1178
+    assert new_ds.num_tasks == 1
+    assert new_ds.num_classes == 2
+
+    ds = data.LegacyTUDataset('DD')
+    new_ds = data.AsGraphPredDataset(ds, [0.8, 0.1, 0.1], verbose=True)
+    assert len(new_ds) == 1178
+    assert new_ds.num_tasks == 1
+    assert new_ds.num_classes == 2
+
+    ds = data.BA2MotifDataset()
+    new_ds = data.AsGraphPredDataset(ds, [0.8, 0.1, 0.1], verbose=True)
+    assert len(new_ds) == 1000
+    assert new_ds.num_tasks == 1
+    assert new_ds.num_classes == 2
+
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_as_graphpred_reprocess():
     ds = data.AsGraphPredDataset(data.GINDataset(name='MUTAG', self_loop=True), [0.8, 0.1, 0.1])
@@ -1432,6 +1463,51 @@ def test_as_graphpred_reprocess():
     assert len(ds.train_idx) == int(len(ds) * 0.8)
     # invalid cache, re-read
     ds = data.AsGraphPredDataset(data.QM7bDataset(), [0.1, 0.1, 0.8])
+    assert len(ds.train_idx) == int(len(ds) * 0.1)
+
+    ds = data.AsGraphPredDataset(data.QM9Dataset(label_keys=['mu', 'gap']), [0.8, 0.1, 0.1])
+    assert len(ds.train_idx) == int(len(ds) * 0.8)
+    # read from cache
+    ds = data.AsGraphPredDataset(data.QM9Dataset(label_keys=['mu', 'gap']), [0.8, 0.1, 0.1])
+    assert len(ds.train_idx) == int(len(ds) * 0.8)
+    # invalid cache, re-read
+    ds = data.AsGraphPredDataset(data.QM9Dataset(label_keys=['mu', 'gap']), [0.1, 0.1, 0.8])
+    assert len(ds.train_idx) == int(len(ds) * 0.1)
+
+    ds = data.AsGraphPredDataset(data.QM9EdgeDataset(label_keys=['mu', 'alpha']), [0.8, 0.1, 0.1])
+    assert len(ds.train_idx) == int(len(ds) * 0.8)
+    # read from cache
+    ds = data.AsGraphPredDataset(data.QM9EdgeDataset(label_keys=['mu', 'alpha']), [0.8, 0.1, 0.1])
+    assert len(ds.train_idx) == int(len(ds) * 0.8)
+    # invalid cache, re-read
+    ds = data.AsGraphPredDataset(data.QM9EdgeDataset(label_keys=['mu', 'alpha']), [0.1, 0.1, 0.8])
+    assert len(ds.train_idx) == int(len(ds) * 0.1)
+
+    ds = data.AsGraphPredDataset(data.TUDataset('DD'), [0.8, 0.1, 0.1])
+    assert len(ds.train_idx) == int(len(ds) * 0.8)
+    # read from cache
+    ds = data.AsGraphPredDataset(data.TUDataset('DD'), [0.8, 0.1, 0.1])
+    assert len(ds.train_idx) == int(len(ds) * 0.8)
+    # invalid cache, re-read
+    ds = data.AsGraphPredDataset(data.TUDataset('DD'), [0.1, 0.1, 0.8])
+    assert len(ds.train_idx) == int(len(ds) * 0.1)
+
+    ds = data.AsGraphPredDataset(data.LegacyTUDataset('DD'), [0.8, 0.1, 0.1])
+    assert len(ds.train_idx) == int(len(ds) * 0.8)
+    # read from cache
+    ds = data.AsGraphPredDataset(data.LegacyTUDataset('DD'), [0.8, 0.1, 0.1])
+    assert len(ds.train_idx) == int(len(ds) * 0.8)
+    # invalid cache, re-read
+    ds = data.AsGraphPredDataset(data.LegacyTUDataset('DD'), [0.1, 0.1, 0.8])
+    assert len(ds.train_idx) == int(len(ds) * 0.1)
+
+    ds = data.AsGraphPredDataset(data.BA2MotifDataset(), [0.8, 0.1, 0.1])
+    assert len(ds.train_idx) == int(len(ds) * 0.8)
+    # read from cache
+    ds = data.AsGraphPredDataset(data.BA2MotifDataset(), [0.8, 0.1, 0.1])
+    assert len(ds.train_idx) == int(len(ds) * 0.8)
+    # invalid cache, re-read
+    ds = data.AsGraphPredDataset(data.BA2MotifDataset(), [0.1, 0.1, 0.8])
     assert len(ds.train_idx) == int(len(ds) * 0.1)
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason="ogb only supports pytorch")
