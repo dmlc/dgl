@@ -1,7 +1,8 @@
 import os
 import numpy as np
 from .dgl_dataset import DGLDataset
-from .utils import save_graphs, load_graphs
+from .utils import save_graphs, load_graphs, Subset
+from .. import backend as F
 from ..base import DGLError
 
 
@@ -120,6 +121,8 @@ class CSVDataset(DGLDataset):
         # construct graphs
         self.graphs, self.data = DGLGraphConstructor.construct_graphs(
             node_data, edge_data, graph_data)
+        if len(self.data) == 1:
+            self.labels = list(self.data.values())[0]
 
     def has_cache(self):
         graph_path = os.path.join(self.save_path,
@@ -141,14 +144,21 @@ class CSVDataset(DGLDataset):
         graph_path = os.path.join(self.save_path,
                                   self.name + '.bin')
         self.graphs, self.data = load_graphs(graph_path)
+        if len(self.data) == 1:
+            self.labels = list(self.data.values())[0]
 
     def __getitem__(self, i):
+        if F.is_tensor(i) and F.ndim(i) == 1:
+            return Subset(self, F.copy_to(i, F.cpu()))
+
         if self._transform is None:
             g = self.graphs[i]
         else:
             g = self._transform(self.graphs[i])
 
-        if len(self.data) > 0:
+        if len(self.data) == 1:
+            return g, self.labels[i]
+        elif len(self.data) > 0:
             data = {k: v[i] for (k, v) in self.data.items()}
             return g, data
         else:
