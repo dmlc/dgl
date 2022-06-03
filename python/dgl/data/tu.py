@@ -418,7 +418,7 @@ class TUDataset(DGLBuiltinDataset):
         Returns
         -------
         (:class:`dgl.DGLGraph`, Tensor)
-            Graph with node feature stored in ``feat`` field and node label in ``node_label`` if available.
+            Graph with node feature stored in ``feat`` field and node label in ``node_labels`` if available.
             And its label.
         """
         g = self.graph_lists[idx]
