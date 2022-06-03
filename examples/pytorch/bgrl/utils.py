@@ -39,7 +39,7 @@ def get_graph_drop_transform(drop_edge_p, feat_mask_p):
     return Compose(transforms)
 
 
-def get_wiki_cs(root, transform=RowFeatNormalizer()):
+def get_wiki_cs(root, transform=RowFeatNormalizer(subtract_min=True)):
     dataset = WikiCSDataset(root, transform=transform)
     g = dataset[0]
     std, mean = torch.std_mean(g.ndata['feat'], dim=0, unbiased=False)
@@ -62,7 +62,7 @@ def get_ppi(root, transform=None):
     return g, PPIDataset(mode='train', raw_dir=root), PPIDataset(mode='valid', raw_dir=root), test_dataset
 
 
-def get_dataset(root, name, transform=RowFeatNormalizer()):
+def get_dataset(root, name, transform=RowFeatNormalizer(subtract_min=True)):
     dgl_dataset_dict = {
         'coauthor_cs': CoauthorCSDataset,
         'coauthor_physics': CoauthorPhysicsDataset,
