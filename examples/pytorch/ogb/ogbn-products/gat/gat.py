@@ -22,7 +22,7 @@ from torch import nn
 from tqdm import tqdm
 
 from models import GAT
-from utils import DataLoaderWrapper #BatchSampler, 
+from utils import DataLoaderWrapper
 
 epsilon = 1 - math.log(2)
 

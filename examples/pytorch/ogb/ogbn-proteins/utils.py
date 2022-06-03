@@ -97,22 +97,3 @@ class DataLoaderWrapper(object):
     def __iter__(self):
         # rewind the iterator for every iteration in for loop
         return iter(self.data)
-
-    # def __next__(self):
-    #     try:
-    #         return next(self.iter)
-    #     except Exception:
-    #         raise StopIteration() from None
-
-
-# class BatchSampler(object):
-#     def __init__(self, n, batch_size):
-#         self.n = n
-#         self.batch_size = batch_size
-
-#     def __iter__(self):
-#         while True:
-#             shuf = torch.randperm(self.n).split(self.batch_size)
-#             for shuf_batch in shuf:
-#                 yield shuf_batch
-#             yield None
