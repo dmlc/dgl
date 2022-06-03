@@ -506,12 +506,40 @@ def test_egat_conv(g, idtype, out_node_feats, out_edge_feats, num_heads):
                        num_heads=num_heads)
     nfeat = F.randn((g.number_of_nodes(), 10))
     efeat = F.randn((g.number_of_edges(), 5))
-
     egat = egat.to(ctx)
     h, f = egat(g, nfeat, efeat)
-    h, f, attn = egat(g, nfeat, efeat, True)
-
+    
     th.save(egat, tmp_buffer)
+
+    assert h.shape == (g.number_of_nodes(), num_heads, out_node_feats)
+    assert f.shape == (g.number_of_edges(), num_heads, out_edge_feats)
+    _, _, attn = egat(g, nfeat, efeat, True)
+    assert attn.shape == (g.number_of_edges(), num_heads, 1)
+    
+@parametrize_idtype
+@pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree']))
+@pytest.mark.parametrize('out_node_feats', [1, 5])
+@pytest.mark.parametrize('out_edge_feats', [1, 5])
+@pytest.mark.parametrize('num_heads', [1, 4])
+def test_egat_conv_bi(g, idtype, out_node_feats, out_edge_feats, num_heads):
+    g = g.astype(idtype).to(F.ctx())
+    ctx = F.ctx()
+    egat = nn.EGATConv(in_node_feats=(10,15),
+                       in_edge_feats=7,
+                       out_node_feats=out_node_feats,
+                       out_edge_feats=out_edge_feats,
+                       num_heads=num_heads)
+    nfeat = (F.randn((g.number_of_src_nodes(), 10)), F.randn((g.number_of_dst_nodes(), 15)))
+    efeat = F.randn((g.number_of_edges(), 7))
+    egat = egat.to(ctx)
+    h, f = egat(g, nfeat, efeat)
+    
+    th.save(egat, tmp_buffer)
+
+    assert h.shape == (g.number_of_dst_nodes(), num_heads, out_node_feats)
+    assert f.shape == (g.number_of_edges(), num_heads, out_edge_feats)
+    _, _, attn = egat(g, nfeat, efeat, True)
+    assert attn.shape == (g.number_of_edges(), num_heads, 1)
 
 @parametrize_idtype
 @pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite']))
