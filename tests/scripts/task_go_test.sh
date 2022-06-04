@@ -20,6 +20,8 @@ pip uninstall -y dglgo
 python3 setup.py install
 popd
 
+pip install Jinja2
+
 export LC_ALL=C.UTF-8
 export LANG=C.UTF-8
 
