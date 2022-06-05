@@ -33,4 +33,4 @@ general_pipeline:
   loss: BCEWithLogitsLoss
   metric: roc_auc_score
   num_epochs: 200             # Number of training epochs
-  save_path: model.pth        # Path to save the model
+  save_path: "results"        # Directory to save the experiment results

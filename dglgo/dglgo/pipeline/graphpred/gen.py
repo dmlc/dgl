@@ -14,7 +14,7 @@ pipeline_comments = {
     "eval_batch_size": "Graph batch size when evaluating",
     "num_workers": "Number of workers for data loading",
     "num_epochs": "Number of training epochs",
-    "save_path": "Path to save the model"
+    "save_path": "Directory to save the experiment results"
 }
 
 class GraphpredPipelineCfg(BaseModel):
@@ -28,7 +28,7 @@ class GraphpredPipelineCfg(BaseModel):
     loss: str = "BCEWithLogitsLoss"
     metric: str = "roc_auc_score"
     num_epochs: int = 100
-    save_path: str = "model.pth"
+    save_path: str = "results"
 
 @PipelineFactory.register("graphpred")
 class GraphpredPipeline(PipelineBase):

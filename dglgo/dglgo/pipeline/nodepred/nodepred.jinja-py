@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import dgl
 import os
+
 from dgl.data import AsNodePredDataset
 {{ data_import_code }}
 
@@ -13,7 +14,7 @@ from dgl.data import AsNodePredDataset
 class EarlyStopping:
     def __init__(self,
                  patience: int = -1,
-                 checkpoint_path: str = 'checkpoint.pt'):
+                 checkpoint_path: str = 'checkpoint.pth'):
         self.patience = patience
         self.checkpoint_path = checkpoint_path
         self.counter = 0
@@ -101,12 +102,10 @@ def train(cfg, pipeline_cfg, device, data, model, optimizer, loss_fcn):
 def main(run, cfg, data):
     device = cfg['device']
     pipeline_cfg = cfg['general_pipeline']
-    # create model
     model = {{ model_class_name }}(**cfg["model"])
     model = model.to(device)
     loss = torch.nn.{{ user_cfg.general_pipeline.loss }}()
     optimizer = torch.optim.{{ user_cfg.general_pipeline.optimizer.name }}(model.parameters(), **pipeline_cfg["optimizer"])
-    # train
     test_acc = train(cfg, pipeline_cfg, device, data, model, optimizer, loss)
     torch.save({'cfg': cfg, 'model': model.state_dict()},
                os.path.join(pipeline_cfg["save_path"], 'run_{}.pth'.format(run)))
@@ -115,14 +114,19 @@ def main(run, cfg, data):
 
 if __name__ == '__main__':
     {{ user_cfg_str }}
+    if not torch.cuda.is_available():
+        cfg['device'] = 'cpu'
+
     # load data
     data = AsNodePredDataset({{data_initialize_code}})
+
     model_cfg = cfg["model"]
     cfg["model"]["data_info"] = {
         "in_size": model_cfg['embed_size'] if model_cfg['embed_size'] > 0 else data[0].ndata['feat'].shape[1],
         "out_size": data.num_classes,
         "num_nodes": data[0].num_nodes()
     }
+
     os.makedirs(cfg['general_pipeline']["save_path"])
 
     all_acc = []

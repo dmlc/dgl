@@ -43,7 +43,7 @@ pipeline_comments = {
         "eval_batch_size": "Batch size of seed nodes in training stage in evaluation stage",
         "eval_num_workers": "Number of workers to accelerate the graph data processing step in evaluation stage"
     },
-    "save_path": "Path to save the model",
+    "save_path": "Directory to save the experiment results",
     "num_runs": "Number of experiments to run",
 }
 
@@ -55,7 +55,7 @@ class NodepredNSPipelineCfg(BaseModel):
     optimizer: dict = {"name": "Adam", "lr": 0.005, "weight_decay": 0.0}
     loss: str = "CrossEntropyLoss"
     num_runs: int = 1
-    save_path: str = "model.pth"
+    save_path: str = "results"
 
 @PipelineFactory.register("nodepred-ns")
 class NodepredNsPipeline(PipelineBase):

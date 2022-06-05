@@ -18,7 +18,7 @@ pipeline_comments = {
         "patience": "Steps before early stop",
         "checkpoint_path": "Early stop checkpoint model file path"
     },
-    "save_path": "Directory to save the checkpoints",
+    "save_path": "Directory to save the experiment results",
     "num_runs": "Number of experiments to run",
 }
 
