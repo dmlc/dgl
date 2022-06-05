@@ -44,7 +44,7 @@ class ApplyNodepredPipeline(PipelineBase):
             generated_cfg = {
                 "pipeline_name": self.pipeline_name,
                 "device": train_cfg['device'],
-                "data": {"name": data.name},
+                "data": {"name": data},
                 "cpt_path": cpt
             }
             output_cfg = self.user_cfg_cls(**generated_cfg).dict()
