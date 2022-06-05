@@ -303,30 +303,7 @@ def main(run, cfg, data):
     return test_acc
 
 if __name__ == '__main__':
-    cfg = {
-        'version': '0.0.1',
-        'device': 'cpu',
-        'model': {
-            'embed_size': -1,
-            'hidden_size': 16,
-            'num_layers': 1,
-            'activation': 'relu',
-            'dropout': 0.5,
-            'aggregator_type': 'gcn'},
-        'general_pipeline': {
-            'early_stop': {
-                'patience': 20,
-                'checkpoint_path': 'checkpoint.pth'},
-            'num_epochs': 200,
-            'eval_period': 5,
-            'optimizer': {
-                'lr': 0.01,
-                'weight_decay': 0.0005},
-            'loss': 'CrossEntropyLoss',
-            'save_path': 'results',
-            'num_runs': 1}}
-    if not torch.cuda.is_available():
-        cfg['device'] = 'cpu'
+    ...
 
     # load data
     data = AsNodePredDataset(CoraGraphDataset())
