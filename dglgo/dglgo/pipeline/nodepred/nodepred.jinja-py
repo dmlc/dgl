@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import dgl
+import os
 from dgl.data import AsNodePredDataset
 {{ data_import_code }}
 
@@ -41,6 +42,9 @@ class EarlyStopping:
 
     def load_checkpoint(self, model):
         model.load_state_dict(torch.load(self.checkpoint_path))
+
+    def close():
+        os.remove(self.checkpoint_path)
 {% endif %}
 
 
@@ -86,6 +90,7 @@ def train(cfg, pipeline_cfg, device, data, model, optimizer, loss_fcn):
 
     {% if user_cfg.general_pipeline.early_stop %}
     stopper.load_checkpoint(model)
+    stopper.close()
     {% endif %}
     model.eval()
     with torch.no_grad():
@@ -93,7 +98,7 @@ def train(cfg, pipeline_cfg, device, data, model, optimizer, loss_fcn):
         test_acc = accuracy(logits[test_mask], label[test_mask])
     return test_acc
 
-def main():
+def main(run):
     {{ user_cfg_str }}
     device = cfg['device']
     pipeline_cfg = cfg['general_pipeline']
@@ -112,7 +117,9 @@ def main():
     optimizer = torch.optim.{{ user_cfg.general_pipeline.optimizer.name }}(model.parameters(), **pipeline_cfg["optimizer"])
     # train
     test_acc = train(cfg, pipeline_cfg, device, data, model, optimizer, loss)
-    torch.save(model.state_dict(), pipeline_cfg["save_path"])
+    torch.save({'cfg': cfg, 'model': model.state_dict()},
+               os.path.join(pipeline_cfg["save_path"], 'run_{}.pth'.format(run)))
+
     return test_acc
 
 if __name__ == '__main__':
@@ -120,7 +127,7 @@ if __name__ == '__main__':
     num_runs = {{ user_cfg.general_pipeline.num_runs }}
     for run in range(num_runs):
         print(f'Run experiment #{run}')
-        test_acc = main()
+        test_acc = main(run)
         print("Test Accuracy {:.4f}".format(test_acc))
         all_acc.append(test_acc)
     avg_acc = np.round(np.mean(all_acc), 6)

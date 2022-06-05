@@ -18,7 +18,7 @@ pipeline_comments = {
         "patience": "Steps before early stop",
         "checkpoint_path": "Early stop checkpoint model file path"
     },
-    "save_path": "Path to save the model",
+    "save_path": "Directory to save the checkpoints",
     "num_runs": "Number of experiments to run",
 }
 
@@ -28,7 +28,7 @@ class NodepredPipelineCfg(BaseModel):
     eval_period: int = 5
     optimizer: dict = {"name": "Adam", "lr": 0.01, "weight_decay": 5e-4}
     loss: str = "CrossEntropyLoss"
-    save_path: str = "model.pth"
+    save_path: str = "results"
     num_runs: int = 1
 
 @PipelineFactory.register("nodepred")

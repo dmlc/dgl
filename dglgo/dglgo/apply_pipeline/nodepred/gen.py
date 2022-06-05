@@ -14,6 +14,7 @@ class ApplyNodepredPipeline(PipelineBase):
             cfg: Optional[str] = typer.Option(None, help="output configuration file path"),
             cpt: str = typer.Option(..., help="input checkpoint file path")
         ):
+            # Set default values for data and cfg if not specified
             pass
 
         return config
