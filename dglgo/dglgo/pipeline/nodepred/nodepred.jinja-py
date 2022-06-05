@@ -43,7 +43,7 @@ class EarlyStopping:
     def load_checkpoint(self, model):
         model.load_state_dict(torch.load(self.checkpoint_path))
 
-    def close():
+    def close(self):
         os.remove(self.checkpoint_path)
 {% endif %}
 
