@@ -38,17 +38,19 @@ class ApplyNodepredPipeline(PipelineBase):
                 print('data is not specified, use the training dataset')
                 data = train_cfg['data_name']
             if cfg is None:
-                cfg = "_".join(["nodepred", data, train_cfg['model_name']]) + ".yaml"
+                cfg = "_".join(["apply", "nodepred", data, train_cfg['model_name']]) + ".yaml"
 
             self.__class__.setup_user_cfg_cls()
             generated_cfg = {
                 "pipeline_name": self.pipeline_name,
-                "device": train_cfg['device']
+                "device": train_cfg['device'],
+                "cpt_path": cpt
             }
             output_cfg = self.user_cfg_cls(**generated_cfg).dict()
             output_cfg = deep_convert_dict(output_cfg)
             comment_dict = {
-                "device": "Torch device name, e.g., cpu or cuda or cuda:0"
+                "device": "Torch device name, e.g., cpu or cuda or cuda:0",
+                "cpt_path": "Path to the checkpoint file"
             }
             comment_dict = merge_comment(output_cfg, comment_dict)
 
