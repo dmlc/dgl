@@ -127,7 +127,6 @@ if __name__ == '__main__':
 
     all_acc = []
     num_runs = {{ user_cfg.general_pipeline.num_runs }}
-    os.makedirs()
     for run in range(num_runs):
         print(f'Run experiment #{run}')
         test_acc = main(run, cfg, data)
