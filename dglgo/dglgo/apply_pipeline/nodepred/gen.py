@@ -5,6 +5,9 @@ from ...utils.factory import ApplyPipelineFactory, PipelineBase, DataFactory
 @ApplyPipelineFactory.register("nodepred")
 class ApplyNodepredPipeline(PipelineBase):
 
+    def __init__(self):
+        super().__init__()
+
     def get_cfg_func(self):
         def config(
             data: DataFactory.filter("nodepred").get_dataset_enum() = typer.Option(..., help="input data name"),
@@ -14,6 +17,10 @@ class ApplyNodepredPipeline(PipelineBase):
             pass
 
         return config
+
+    @classmethod
+    def gen_script(cls, user_cfg_dict):
+        pass
 
     @staticmethod
     def get_description() -> str:
