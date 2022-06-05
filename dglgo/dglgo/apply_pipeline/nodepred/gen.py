@@ -2,11 +2,12 @@ import ruamel.yaml
 import torch
 import typer
 
+from copy import deepcopy
+from jinja2 import Template
 from pathlib import Path
-from pydantic import Field
 from typing import Optional
 
-from ...utils.factory import ApplyPipelineFactory, PipelineBase, DataFactory
+from ...utils.factory import ApplyPipelineFactory, PipelineBase, DataFactory, NodeModelFactory
 from ...utils.yaml_dump import deep_convert_dict, merge_comment
 
 @ApplyPipelineFactory.register("nodepred")
@@ -31,19 +32,18 @@ class ApplyNodepredPipeline(PipelineBase):
             cfg: Optional[str] = typer.Option(None, help="output configuration file path"),
             cpt: str = typer.Option(..., help="input checkpoint file path")
         ):
-            cpt_dict = torch.load(cpt)
             # Training configuration
-            train_cfg = cpt_dict['cfg']
+            train_cfg = torch.load(cpt)["cfg"]
             if data is None:
-                print('data is not specified, use the training dataset')
-                data = train_cfg['data_name']
+                print("data is not specified, use the training dataset")
+                data = train_cfg["data_name"]
             if cfg is None:
-                cfg = "_".join(["apply", "nodepred", data, train_cfg['model_name']]) + ".yaml"
+                cfg = "_".join(["apply", "nodepred", data, train_cfg["model_name"]]) + ".yaml"
 
             self.__class__.setup_user_cfg_cls()
             generated_cfg = {
                 "pipeline_name": self.pipeline_name,
-                "device": train_cfg['device'],
+                "device": train_cfg["device"],
                 "data": {"name": data},
                 "cpt_path": cpt
             }
@@ -63,7 +63,35 @@ class ApplyNodepredPipeline(PipelineBase):
 
     @classmethod
     def gen_script(cls, user_cfg_dict):
-        pass
+        # Check validation
+        cls.setup_user_cfg_cls()
+        cls.user_cfg_cls(**user_cfg_dict)
+
+        # Training configuration
+        train_cfg = torch.load(user_cfg_dict["cpt_path"])["cfg"]
+
+        # Dict for code rendering
+        render_cfg = deepcopy(user_cfg_dict)
+        model_name = train_cfg["model_name"]
+        model_code = NodeModelFactory.get_source_code(model_name)
+        render_cfg["model_code"] = model_code
+        render_cfg["model_class_name"] = NodeModelFactory.get_model_class_name(model_name)
+        render_cfg.update(DataFactory.get_generated_code_dict(train_cfg["data_name"]))
+
+        # Dict for defining cfg in the rendered code
+        generated_user_cfg = deepcopy(user_cfg_dict)
+        generated_user_cfg["data"].pop("name")
+        generated_user_cfg.pop("pipeline_name")
+        generated_user_cfg["model"] = train_cfg["model"]
+
+        render_cfg["user_cfg_str"] = f"cfg = {str(generated_user_cfg)}"
+        render_cfg["user_cfg"] = user_cfg_dict
+
+        file_current_dir = Path(__file__).resolve().parent
+        with open(file_current_dir / "nodepred.jinja-py", "r") as f:
+            template = Template(f.read())
+
+        return template.render(**render_cfg)
 
     @staticmethod
     def get_description() -> str:
