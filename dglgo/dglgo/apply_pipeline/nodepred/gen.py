@@ -1,3 +1,4 @@
+import torch
 import typer
 from typing import Optional
 from ...utils.factory import ApplyPipelineFactory, PipelineBase, DataFactory
@@ -14,6 +15,7 @@ class ApplyNodepredPipeline(PipelineBase):
             cfg: Optional[str] = typer.Option(None, help="output configuration file path"),
             cpt: str = typer.Option(..., help="input checkpoint file path")
         ):
+            cpt_dict = torch.load(cpt)
             # Set default values for data and cfg if not specified
             pass
 
