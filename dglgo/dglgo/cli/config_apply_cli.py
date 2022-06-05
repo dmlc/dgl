@@ -1,3 +1,4 @@
+from ..apply_pipeline import *
 from ..utils.factory import ApplyPipelineFactory
 import typer
 
