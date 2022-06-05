@@ -98,19 +98,10 @@ def train(cfg, pipeline_cfg, device, data, model, optimizer, loss_fcn):
         test_acc = accuracy(logits[test_mask], label[test_mask])
     return test_acc
 
-def main(run):
-    {{ user_cfg_str }}
+def main(run, cfg, data):
     device = cfg['device']
     pipeline_cfg = cfg['general_pipeline']
-    # load data
-    data = AsNodePredDataset({{data_initialize_code}})
     # create model
-    model_cfg = cfg["model"]
-    cfg["model"]["data_info"] = {
-        "in_size": model_cfg['embed_size'] if model_cfg['embed_size'] > 0 else data[0].ndata['feat'].shape[1],
-        "out_size": data.num_classes,
-        "num_nodes": data[0].num_nodes()
-    }
     model = {{ model_class_name }}(**cfg["model"])
     model = model.to(device)
     loss = torch.nn.{{ user_cfg.general_pipeline.loss }}()
@@ -123,11 +114,23 @@ def main(run):
     return test_acc
 
 if __name__ == '__main__':
+    {{ user_cfg_str }}
+    # load data
+    data = AsNodePredDataset({{data_initialize_code}})
+    model_cfg = cfg["model"]
+    cfg["model"]["data_info"] = {
+        "in_size": model_cfg['embed_size'] if model_cfg['embed_size'] > 0 else data[0].ndata['feat'].shape[1],
+        "out_size": data.num_classes,
+        "num_nodes": data[0].num_nodes()
+    }
+    os.makedirs(cfg['general_pipeline']["save_path"])
+
     all_acc = []
     num_runs = {{ user_cfg.general_pipeline.num_runs }}
+    os.makedirs()
     for run in range(num_runs):
         print(f'Run experiment #{run}')
-        test_acc = main(run)
+        test_acc = main(run, cfg, data)
         print("Test Accuracy {:.4f}".format(test_acc))
         all_acc.append(test_acc)
     avg_acc = np.round(np.mean(all_acc), 6)
