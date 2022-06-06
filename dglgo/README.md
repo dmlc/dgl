@@ -112,6 +112,9 @@ will list the available recipes:
 ===============================================================================
 | Filename                       |  Pipeline           | Dataset              |
 ===============================================================================
+| graphpred_pcba_gin.yaml        |  graphpred          | ogbg-molpcba         |
+| graphpred_hiv_pna.yaml         |  graphpred          | ogbg-molhiv          |
+| graphpred_hiv_gin.yaml         |  graphpred          | ogbg-molhiv          |
 | linkpred_citation2_sage.yaml   |  linkpred           | ogbl-citation2       |
 | linkpred_collab_sage.yaml      |  linkpred           | ogbl-collab          |
 | nodepred_citeseer_sage.yaml    |  nodepred           | citeseer             |
@@ -382,12 +385,11 @@ help message; use `dgl configure --help` for the configuration options; use
 `dgl configure nodepred --help` for the configuration options of node prediction pipeline.
 
 **Q: What exactly is nodepred/linkpred? How many are they?**
-A: They are called DGl-Go pipelines. A pipeline represents the training methodology for
+A: They are called DGL-Go pipelines. A pipeline represents the training methodology for
 a certain task. Therefore, its naming convention is *<task_name>[-<method_name>]*. For example,
 `nodepred` trains the selected GNN model for node classification using full-graph training method;
 while `nodepred-ns` trains the model for node classifiation but using neighbor sampling.
-The first release included three training pipelines (`nodepred`, `nodepred-ns` and `linkpred`)
-but you can expect more will be coming in the future. Use `dgl configure --help` to see
+Currently DGL-Go provides four training pipelines (`nodepred`, `nodepred-ns`, `linkpred`, and `graphpred`). Use `dgl configure --help` to see
 all the available pipelines.
 
 **Q: How to add my model to the official model recipe zoo?**

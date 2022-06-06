@@ -87,7 +87,7 @@ class GCMCGraphConv(nn.Module):
             if weight is not None:
                 feat = dot_or_identity(feat, weight, self.device)
 
-            feat = feat * self.dropout(cj).view(-1, 1)
+            feat = feat * self.dropout(cj)
             graph.srcdata['h'] = feat
             graph.update_all(fn.copy_src(src='h', out='m'),
                              fn.sum(msg='m', out='h'))
@@ -342,7 +342,7 @@ class BiDecoder(nn.Module):
                 graph.apply_edges(fn.u_dot_v('h', 'h', 'sr'))
                 basis_out.append(graph.edata['sr'])
             out = th.cat(basis_out, dim=1)
-            #out = self.combine_basis(out)
+            out = self.combine_basis(out)
         return out
 
 class DenseBiDecoder(nn.Module):

@@ -251,7 +251,8 @@ FrequencyHashmap<IdxType>::FrequencyHashmap(
   dim3 block(BLOCK_SIZE);
   dim3 grid((num_dst * num_items_each_dst + TILE_SIZE - 1) / TILE_SIZE);
   cudaMemset(dst_unique_edges, 0, (num_dst) * sizeof(IdxType));
-  _init_edge_table<IdxType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, _stream>>>(
+  CUDA_KERNEL_CALL((_init_edge_table<IdxType, BLOCK_SIZE, TILE_SIZE>),
+      grid, block, 0, _stream,
       edge_hashmap, (num_dst * num_items_each_dst));
   _device_edge_hashmap = new DeviceEdgeHashmap<IdxType>(
       num_dst, num_items_each_dst, dst_unique_edges, edge_hashmap);
@@ -305,7 +306,8 @@ std::tuple<IdArray, IdArray, IdArray> FrequencyHashmap<IdxType>::Topk(
   IdxType *unique_output_offsets = (num_unique_each_node_data + 2 * (num_dst_nodes + 1));
 
   // 1. Scan the all edges and count the unique edges and unique edges for each dst node
-  _count_frequency<IdxType, BLOCK_SIZE, TILE_SIZE><<<edges_grid, block, 0, _stream>>>(
+  CUDA_KERNEL_CALL((_count_frequency<IdxType, BLOCK_SIZE, TILE_SIZE>),
+      edges_grid, block, 0, _stream,
       src_data, num_edges, num_edges_per_node,
       edge_blocks_prefix, is_first_position, *_device_edge_hashmap);
 
@@ -337,7 +339,8 @@ std::tuple<IdArray, IdArray, IdArray> FrequencyHashmap<IdxType>::Topk(
   Idx64Type *unique_frequency = unique_frequency_data;
   Idx64Type *unique_frequency_alternate = unique_frequency_data + num_unique_edges;
   // 2.3 Compact the unique edges and their frequency
-  _compact_frequency<IdxType, Idx64Type, BLOCK_SIZE, TILE_SIZE><<<edges_grid, block, 0, _stream>>>(
+  CUDA_KERNEL_CALL((_compact_frequency<IdxType, Idx64Type, BLOCK_SIZE, TILE_SIZE>),
+      edges_grid, block, 0, _stream,
       src_data, dst_data, num_edges, num_edges_per_node,
       edge_blocks_prefix, is_first_position, num_unique_each_node,
       unique_src_edges, unique_frequency, *_device_edge_hashmap);
@@ -384,7 +387,8 @@ std::tuple<IdArray, IdArray, IdArray> FrequencyHashmap<IdxType>::Topk(
   // 4.1 Reset the min(num_pick, num_unique_each_node) to num_unique_each_node
   constexpr int NODE_TILE_SIZE  = BLOCK_SIZE * 2;
   const dim3 nodes_grid((num_dst_nodes + NODE_TILE_SIZE - 1) / NODE_TILE_SIZE);
-  _get_pick_num<IdxType, BLOCK_SIZE, NODE_TILE_SIZE><<<nodes_grid, block, 0, _stream>>>(
+  CUDA_KERNEL_CALL((_get_pick_num<IdxType, BLOCK_SIZE, NODE_TILE_SIZE>),
+      nodes_grid, block, 0, _stream,
       num_unique_each_node, num_pick, num_dst_nodes);
   // 4.2 ExclusiveSum the new num_unique_each_node as unique_output_offsets
   // use unique_output_offsets;
@@ -411,7 +415,8 @@ std::tuple<IdArray, IdArray, IdArray> FrequencyHashmap<IdxType>::Topk(
       dtype, _ctx);
   IdArray res_cnt = IdArray::Empty({static_cast<int64_t>(num_output)},
       dtype, _ctx);
-  _pick_data<IdxType, Idx64Type, BLOCK_SIZE, NODE_TILE_SIZE><<<nodes_grid, block, 0, _stream>>>(
+  CUDA_KERNEL_CALL((_pick_data<IdxType, Idx64Type, BLOCK_SIZE, NODE_TILE_SIZE>),
+      nodes_grid, block, 0, _stream,
       d_unique_frequency.Current(), d_unique_src_edges.Current(), num_unique_each_node_alternate,
       dst_data, num_edges_per_node, num_dst_nodes, num_edges,
       unique_output_offsets,
