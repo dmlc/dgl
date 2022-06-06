@@ -193,7 +193,8 @@ std::pair<IdArray, NDArray> SparsePush(
     const dim3 block(256);
     const dim3 grid((num_in+block.x-1)/block.x);
 
-    _DualPermKernel<<<grid, block, 0, stream>>>(
+    CUDA_KERNEL_CALL(_DualPermKernel,
+        grid, block, 0, stream,
         static_cast<const IdType*>(in_idx->data),
         static_cast<const DType*>(in_value->data),
         perm,
@@ -201,7 +202,6 @@ std::pair<IdArray, NDArray> SparsePush(
         num_feat,
         send_idx.get(),
         send_value.get());
-    CUDA_CALL(cudaGetLastError());
   }
 
   // compute the prefix sum of the send values
@@ -346,13 +346,13 @@ NDArray SparsePull(
     const dim3 block(256);
     const dim3 grid((num_in+block.x-1)/block.x);
 
-    aten::impl::IndexSelectSingleKernel<<<grid, block, 0, stream>>>(
+    CUDA_KERNEL_CALL(aten::impl::IndexSelectSingleKernel,
+        grid, block, 0, stream,
         static_cast<const IdType*>(req_idx->data),
         perm,
         num_in,
         req_idx->shape[0],
         send_idx.get());
-    CUDA_CALL(cudaGetLastError());
   }
 
   // compute the prefix sum of the indexes this process is requesting
@@ -453,14 +453,14 @@ NDArray SparsePull(
     }
     const dim3 grid((response_prefix_host.back()+block.y-1)/block.y);
 
-    aten::impl::IndexSelectMultiKernel<<<grid, block, 0, stream>>>(
+    CUDA_KERNEL_CALL(aten::impl::IndexSelectMultiKernel,
+        grid, block, 0, stream,
         static_cast<const DType*>(local_tensor->data),
         num_feat,
         static_cast<IdType*>(recv_idx->data),
         response_prefix_host.back(),
         local_tensor->shape[0],
         filled_response_value.get());
-    CUDA_CALL(cudaGetLastError());
   }
 
   // we will collect recieved values in this array
@@ -499,13 +499,13 @@ NDArray SparsePull(
     }
     const dim3 grid((num_in+block.y-1)/block.y);
 
-    _InversePermKernel<<<grid, block, 0, stream>>>(
+    CUDA_KERNEL_CALL(_InversePermKernel,
+        grid, block, 0, stream,
         filled_request_value.get(),
         num_feat,
         num_in,
         perm,
         static_cast<DType*>(result->data));
-    CUDA_CALL(cudaGetLastError());
   }
 
   return result;
