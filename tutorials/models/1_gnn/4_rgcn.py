@@ -363,4 +363,4 @@ for epoch in range(n_epochs):
 # stacked on top of the R-GCN layers. You can find the complete
 # implementation of link prediction with R-GCN in our `Github Python code
 
-# <https://github.com/dmlc/dgl/blob/master/examples/pytorch/rgcn/link.py>`_.
+# example <https://github.com/dmlc/dgl/blob/master/examples/pytorch/rgcn/link.py>`_.
