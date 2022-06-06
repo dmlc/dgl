@@ -14,4 +14,7 @@ static_assert(false, "THRUST_CUB_WRAPPED_NAMESPACE must be defined for DGL.");
 
 #include "cub/cub.cuh"
 
+static_assert(CUB_MAJOR_VERSION == 1 && CUB_MINOR_VERSION >= 14,
+    "CUB version is too old. Please update to 1.14 or later.");
+
 #endif

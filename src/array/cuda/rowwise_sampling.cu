@@ -15,6 +15,9 @@
 #include "../../array/cuda/atomic.cuh"
 #include "../../runtime/cuda/cuda_common.h"
 
+static_assert(THRUST_MAJOR_VERSION == 1 && THRUST_MINOR_VERSION >= 14,
+    "Thrust version is too old. Please update to 1.14 or later.");
+
 using namespace dgl::aten::cuda;
 
 namespace dgl {
