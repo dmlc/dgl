@@ -250,7 +250,7 @@ FrequencyHashmap<IdxType>::FrequencyHashmap(
   constexpr int TILE_SIZE  = BLOCK_SIZE * 8;
   dim3 block(BLOCK_SIZE);
   dim3 grid((num_dst * num_items_each_dst + TILE_SIZE - 1) / TILE_SIZE);
-  cudaMemset(dst_unique_edges, 0, (num_dst) * sizeof(IdxType));
+  CUDA_CALL(cudaMemset(dst_unique_edges, 0, (num_dst) * sizeof(IdxType)));
   CUDA_KERNEL_CALL((_init_edge_table<IdxType, BLOCK_SIZE, TILE_SIZE>),
       grid, block, 0, _stream,
       edge_hashmap, (num_dst * num_items_each_dst));
