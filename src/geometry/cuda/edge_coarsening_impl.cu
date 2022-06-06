@@ -168,7 +168,7 @@ void WeightedNeighborMatching(const aten::CSRMatrix &csr, const NDArray weight, 
   IdType *proposal_data = static_cast<IdType*>(proposal->data);
   FloatType *weight_data = static_cast<FloatType*>(weight->data);
 
-  // allocate workspace for prop used in Colorized()
+  // allocate workspace for prop used in Colorize()
   float *prop = static_cast<float*>(
       device->AllocWorkspace(ctx, num_nodes * sizeof(float)));
 
