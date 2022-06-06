@@ -868,7 +868,7 @@ def test_sample_neighbors_exclude_edges_heteroG(dtype):
         ('drug', 'interacts', 'drug'): (d_i_d_u_nodes, d_i_d_v_nodes),
         ('drug', 'interacts', 'gene'): (d_i_g_u_nodes, d_i_g_v_nodes),
         ('drug', 'treats', 'disease'): (d_t_d_u_nodes, d_t_d_v_nodes)
-    })
+    }).to(F.ctx())
 
     (U, V, EID) = (0, 1, 2)
 
@@ -924,7 +924,7 @@ def test_sample_neighbors_exclude_edges_heteroG(dtype):
 def test_sample_neighbors_exclude_edges_homoG(dtype):
     u_nodes = F.zerocopy_from_numpy(np.unique(np.random.randint(300,size=100, dtype=dtype)))
     v_nodes = F.zerocopy_from_numpy(np.random.randint(25, size=u_nodes.shape, dtype=dtype))
-    g = dgl.graph((u_nodes, v_nodes))
+    g = dgl.graph((u_nodes, v_nodes)).to(F.ctx())
 
     (U, V, EID) = (0, 1, 2)
 
