@@ -291,11 +291,13 @@ COOMatrix CSRToCOO(CSRMatrix csr) {
   const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
   NDArray ret_row = NDArray::Empty({nnz}, csr.indices->dtype, csr.indices->ctx);
   IdType* ret_row_data = static_cast<IdType*>(ret_row->data);
-  for (IdType i = 0; i < csr.indptr->shape[0] - 1; ++i) {
-    std::fill(ret_row_data + indptr_data[i],
-              ret_row_data + indptr_data[i + 1],
-              i);
-  }
+  parallel_for(0, csr.indptr->shape[0] - 1, 10000, [=](int64_t b, int64_t e) {
+    for (auto i = b; i < e; ++i) {
+      std::fill(ret_row_data + indptr_data[i],
+                ret_row_data + indptr_data[i + 1],
+                i);
+    }
+  });
   return COOMatrix(csr.num_rows, csr.num_cols,
                    ret_row, csr.indices, csr.data,
                    true, csr.sorted);
@@ -319,13 +321,15 @@ COOMatrix CSRToCOODataAsOrder(CSRMatrix csr) {
   IdType* ret_row_data = static_cast<IdType*>(ret_row->data);
   IdType* ret_col_data = static_cast<IdType*>(ret_col->data);
   // scatter using the indices in the data array
-  for (IdType row = 0; row < N; ++row) {
-    for (IdType j = indptr_data[row]; j < indptr_data[row + 1]; ++j) {
-      const IdType col = indices_data[j];
-      ret_row_data[data ? data[j] : j] = row;
-      ret_col_data[data ? data[j] : j] = col;
+  parallel_for(0, N, 10000, [=](int64_t b, int64_t e) {
+    for (auto row = b; row < e; ++row) {
+      for (IdType j = indptr_data[row]; j < indptr_data[row + 1]; ++j) {
+        const IdType col = indices_data[j];
+        ret_row_data[data ? data[j] : j] = row;
+        ret_col_data[data ? data[j] : j] = col;
+      }
     }
-  }
+  });
   return COOMatrix(N, M, ret_row, ret_col);
 }
 
