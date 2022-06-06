@@ -260,9 +260,9 @@ __device__ __forceinline__ half AtomicAdd<half>(half* addr, half val) {
 #if __CUDA_ARCH__ >= 700
   return atomicAdd(addr, val);
 #else
-  half res = half(float(*addr) + float(val));
-  *addr = res;
-  return res;
+  half old = *addr;
+  *addr = half(float(old) + float(val));
+  return old;
 #endif  // __CUDA_ARCH__ >= 700
 }
 #endif  // defined(CUDART_VERSION) && CUDART_VERSION >= 10000
