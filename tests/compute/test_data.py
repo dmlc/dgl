@@ -265,6 +265,19 @@ def test_explain_syn():
     assert 'feat' in g.ndata
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+def test_wiki_cs():
+    g = data.WikiCSDataset()[0]
+    assert g.num_nodes() == 11701
+    assert g.num_edges() == 431726
+    dst = F.asnumpy(g.edges()[1])
+    assert np.array_equal(dst, np.sort(dst))
+
+    transform = dgl.AddSelfLoop(allow_duplicate=True)
+    g2 = data.WikiCSDataset(transform=transform)[0]
+    assert g2.num_edges() - g.num_edges() == g.num_nodes()
+
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_extract_archive():
     # gzip
     with tempfile.TemporaryDirectory() as src_dir:
