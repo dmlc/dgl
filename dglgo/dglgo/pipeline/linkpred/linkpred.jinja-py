@@ -98,8 +98,10 @@ def main(run, cfg, data):
     loss = torch.nn.{{ loss }}()
     optimizer = torch.optim.Adam(model.parameters(), **pipeline_cfg["optimizer"])
     test_hits = train(cfg, pipeline_cfg, device, data, model, optimizer, loss)
-    torch.save({'cfg': cfg, 'model': model.state_dict()},
-               os.path.join(pipeline_cfg["save_path"], 'run_{}.pth'.format(run)))
+
+    cpt_path = os.path.join(pipeline_cfg["save_path"], 'run_{}.pth'.format(run))
+    torch.save({'cfg': cfg, 'model': model.state_dict()}, cpt_path)
+    print('Training checkpoint saved to {}'.format(cpt_path))
 
     return test_hits
 

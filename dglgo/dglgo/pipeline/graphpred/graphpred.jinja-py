@@ -106,8 +106,9 @@ def main(run, cfg, data):
     test_metric = evaluate(device, test_loader, model)
     print('Test Metric: {:.4f}'.format(test_metric))
 
-    torch.save({'cfg': cfg, 'model': model.state_dict()},
-               os.path.join(pipeline_cfg["save_path"], 'run_{}.pth'.format(run)))
+    cpt_path = os.path.join(pipeline_cfg["save_path"], 'run_{}.pth'.format(run))
+    torch.save({'cfg': cfg, 'model': model.state_dict()}, cpt_path)
+    print('Training checkpoint saved to {}'.format(cpt_path))
 
     return test_metric
 
