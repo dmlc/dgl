@@ -50,7 +50,7 @@ def main():
     model = {{ model_class_name }}(**cfg['model'])
     model.load_state_dict(torch.load(cfg['cpt_path'], map_location='cpu')['model'])
     logits = infer(device, data, model)
-    pred = logits.argmax(dim=1)
+    pred = logits.argmax(dim=1).cpu()
 
     # Dump the results
     os.makedirs(cfg['general_pipeline']["save_path"])
@@ -59,8 +59,9 @@ def main():
         writer = csv.writer(f)
         writer.writerow(['node id', 'predicted label'])
         writer.writerows([
-            [i, pred[i]] for i in range(len(pred))
+            [i, pred[i].item()] for i in range(len(pred))
         ])
+    print('Inference results saved to {}'.format(file_path))
 
 if __name__ == '__main__':
     main()
