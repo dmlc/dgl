@@ -109,7 +109,7 @@ def main(run, cfg, data):
     test_acc = train(cfg, pipeline_cfg, device, data, model, optimizer, loss)
     cpt_path = os.path.join(pipeline_cfg["save_path"], 'run_{}.pth'.format(run))
     torch.save({'cfg': cfg, 'model': model.state_dict()}, cpt_path)
-    print('Training checkpoint saved to {}'.format(cpt_path))
+    print('Saved training checkpoint to {}'.format(cpt_path))
 
     return test_acc
 

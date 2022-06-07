@@ -61,7 +61,7 @@ def main():
         writer.writerows([
             [i, pred[i].item()] for i in range(len(pred))
         ])
-    print('Inference results saved to {}'.format(file_path))
+    print('Saved inference results to {}'.format(file_path))
 
 if __name__ == '__main__':
     main()
