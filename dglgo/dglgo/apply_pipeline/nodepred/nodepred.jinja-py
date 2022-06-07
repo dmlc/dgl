@@ -1,5 +1,7 @@
 import torch
 import dgl
+import os
+import csv
 
 from dgl.data import AsNodePredDataset
 {{ data_import_code }}
@@ -20,6 +22,8 @@ def infer(device, data, model):
 
     with torch.no_grad():
         logits = model(g, node_feat, edge_feat)
+
+    return logits
 
 def main():
     {{ user_cfg_str }}
@@ -45,7 +49,18 @@ def main():
 
     model = {{ model_class_name }}(**cfg['model'])
     model.load_state_dict(torch.load(cfg['cpt_path'], map_location='cpu')['model'])
-    infer(device, data, model)
+    logits = infer(device, data, model)
+    pred = logits.argmax(dim=1)
+
+    # Dump the results
+    os.makedirs(cfg['general_pipeline']["save_path"])
+    file_path = os.path.join(cfg['general_pipeline']["save_path"], 'output.csv')
+    with open(file_path, 'w') as f:
+        writer = csv.writer(f)
+        writer.writerow(['node id', 'predicted label'])
+        writer.writerows([
+            [i, pred[i]] for i in len(pred)
+        ])
 
 if __name__ == '__main__':
     main()
