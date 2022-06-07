@@ -14,13 +14,17 @@ from ...utils.yaml_dump import deep_convert_dict, merge_comment
 class ApplyNodepredPipeline(PipelineBase):
 
     def __init__(self):
+        self.pipeline = {
+            "name": "nodepred",
+            "mode": "apply"
+        }
         self.pipeline_name = "nodepred"
 
     @classmethod
     def setup_user_cfg_cls(cls):
-        from ...utils.enter_config import ApplyUserConfig
+        from ...utils.enter_config import UserConfig
 
-        cls.user_cfg_cls = ApplyUserConfig
+        cls.user_cfg_cls = UserConfig
 
     @property
     def user_cfg_cls(self):
@@ -42,8 +46,7 @@ class ApplyNodepredPipeline(PipelineBase):
 
             self.__class__.setup_user_cfg_cls()
             generated_cfg = {
-                "pipeline_name": self.pipeline_name,
-                "pipeline_mode": "apply",
+                "pipeline": self.pipeline,
                 "device": train_cfg["device"],
                 "data": {"name": data},
                 "cpt_path": cpt

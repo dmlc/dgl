@@ -60,13 +60,16 @@ class NodepredNSPipelineCfg(BaseModel):
 @PipelineFactory.register("nodepred-ns")
 class NodepredNsPipeline(PipelineBase):
     def __init__(self):
-        self.pipeline_name = "nodepred-ns"
+        self.pipeline = {
+            "name": "nodepred",
+            "mode": "train"
+        }
         self.default_cfg = None
 
     @classmethod
     def setup_user_cfg_cls(cls):
-        from ...utils.enter_config import TrainUserConfig
-        class NodePredUserConfig(TrainUserConfig):
+        from ...utils.enter_config import UserConfig
+        class NodePredUserConfig(UserConfig):
             eval_device: DeviceEnum = Field("cpu")
             data: DataFactory.filter("nodepred-ns").get_pydantic_config() = Field(..., discriminator="name")
             model : NodeModelFactory.filter(lambda cls: hasattr(cls, "forward_block")).get_pydantic_model_config() = Field(..., discriminator="name")
@@ -87,7 +90,7 @@ class NodepredNsPipeline(PipelineBase):
         ):
             self.__class__.setup_user_cfg_cls()
             generated_cfg = {
-                "pipeline_name": "nodepred-ns",
+                "pipeline": self.pipeline,
                 "device": "cpu",
                 "data": {"name": data.name},
                 "model": {"name": model.value},

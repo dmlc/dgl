@@ -33,12 +33,15 @@ class GraphpredPipelineCfg(BaseModel):
 @PipelineFactory.register("graphpred")
 class GraphpredPipeline(PipelineBase):
     def __init__(self):
-        self.pipeline_name = "graphpred"
+        self.pipeline = {
+            "name": "graphpred",
+            "mode": "train"
+        }
 
     @classmethod
     def setup_user_cfg_cls(cls):
-        from ...utils.enter_config import TrainUserConfig
-        class GraphPredUserConfig(TrainUserConfig):
+        from ...utils.enter_config import UserConfig
+        class GraphPredUserConfig(UserConfig):
             data: DataFactory.filter("graphpred").get_pydantic_config() = Field(..., discriminator="name")
             model: GraphModelFactory.get_pydantic_model_config() = Field(..., discriminator="name")
             general_pipeline: GraphpredPipelineCfg = GraphpredPipelineCfg()
@@ -58,7 +61,7 @@ class GraphpredPipeline(PipelineBase):
         ):
             self.__class__.setup_user_cfg_cls()
             generated_cfg = {
-                "pipeline_name": self.pipeline_name,
+                "pipeline": self.pipeline,
                 "device": "cpu",
                 "data": {"name": data.name},
                 "model": {"name": model.value},

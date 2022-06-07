@@ -42,13 +42,16 @@ class LinkpredPipeline(PipelineBase):
     pipeline_name = "linkpred"
 
     def __init__(self):
-        self.pipeline_name = "linkpred"
+        self.pipeline = {
+            "name": "linkpred",
+            "mode": "train"
+        }
 
     @classmethod
     def setup_user_cfg_cls(cls):
-        from ...utils.enter_config import TrainUserConfig
+        from ...utils.enter_config import UserConfig
 
-        class LinkPredUserConfig(TrainUserConfig):
+        class LinkPredUserConfig(UserConfig):
             pipeline_name: str = "linkpred"
             data: DataFactory.filter("linkpred").get_pydantic_config() = Field(..., discriminator="name")
             node_model: NodeModelFactory.get_pydantic_model_config() = Field(...,
@@ -79,7 +82,7 @@ class LinkpredPipeline(PipelineBase):
         ):
             self.__class__.setup_user_cfg_cls()
             generated_cfg = {
-                "pipeline_name": "linkpred",
+                "pipeline_name": self.pipeline,
                 "device": "cpu",
                 "data": {"name": data.name},
                 "neg_sampler": {"name": neg_sampler.value},

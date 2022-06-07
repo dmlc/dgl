@@ -22,13 +22,11 @@ class PipelineConfig(DGLBaseModel):
     optimizer: dict = {"name": "Adam", "lr": 0.005}
     loss: str = "CrossEntropyLoss"
 
+class PipelineConfig(DGLBaseModel):
+    name: PipelineFactory.get_pipeline_enum()
+    mode: str
+
 class UserConfig(DGLBaseModel):
     version: Optional[str] = "0.0.1"
-    pipeline_name: PipelineFactory.get_pipeline_enum()
+    pipeline: PipelineConfig
     device: str = "cpu"
-
-class TrainUserConfig(UserConfig):
-    pipeline_mode: str = "train"
-
-class ApplyUserConfig(UserConfig):
-    pipeline_mode: str = "apply"

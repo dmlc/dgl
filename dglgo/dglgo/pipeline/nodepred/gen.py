@@ -37,12 +37,15 @@ class NodepredPipeline(PipelineBase):
     user_cfg_cls = None
 
     def __init__(self):
-        self.pipeline_name = "nodepred"
+        self.pipeline = {
+            "name": "nodepred",
+            "mode": "train"
+        }
 
     @classmethod
     def setup_user_cfg_cls(cls):
-        from ...utils.enter_config import TrainUserConfig
-        class NodePredUserConfig(TrainUserConfig):
+        from ...utils.enter_config import UserConfig
+        class NodePredUserConfig(UserConfig):
             data: DataFactory.filter("nodepred").get_pydantic_config() = Field(..., discriminator="name")
             model : NodeModelFactory.get_pydantic_model_config() = Field(..., discriminator="name")
             general_pipeline: NodepredPipelineCfg = NodepredPipelineCfg()
@@ -62,7 +65,7 @@ class NodepredPipeline(PipelineBase):
         ):
             self.__class__.setup_user_cfg_cls()
             generated_cfg = {
-                "pipeline_name": self.pipeline_name,
+                "pipeline": self.pipeline,
                 "device": "cpu",
                 "data": {"name": data.name},
                 "model": {"name": model.value},
