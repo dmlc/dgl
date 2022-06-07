@@ -65,8 +65,8 @@ class NodepredNsPipeline(PipelineBase):
 
     @classmethod
     def setup_user_cfg_cls(cls):
-        from ...utils.enter_config import UserConfig
-        class NodePredUserConfig(UserConfig):
+        from ...utils.enter_config import TrainUserConfig
+        class NodePredUserConfig(TrainUserConfig):
             eval_device: DeviceEnum = Field("cpu")
             data: DataFactory.filter("nodepred-ns").get_pydantic_config() = Field(..., discriminator="name")
             model : NodeModelFactory.filter(lambda cls: hasattr(cls, "forward_block")).get_pydantic_model_config() = Field(..., discriminator="name")

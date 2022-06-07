@@ -46,9 +46,9 @@ class LinkpredPipeline(PipelineBase):
 
     @classmethod
     def setup_user_cfg_cls(cls):
-        from ...utils.enter_config import UserConfig
+        from ...utils.enter_config import TrainUserConfig
 
-        class LinkPredUserConfig(UserConfig):
+        class LinkPredUserConfig(TrainUserConfig):
             pipeline_name: str = "linkpred"
             data: DataFactory.filter("linkpred").get_pydantic_config() = Field(..., discriminator="name")
             node_model: NodeModelFactory.get_pydantic_model_config() = Field(...,

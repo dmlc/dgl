@@ -18,9 +18,9 @@ class ApplyNodepredPipeline(PipelineBase):
 
     @classmethod
     def setup_user_cfg_cls(cls):
-        from ...utils.enter_config import UserConfig
+        from ...utils.enter_config import ApplyUserConfig
 
-        cls.user_cfg_cls = UserConfig
+        cls.user_cfg_cls = ApplyUserConfig
 
     @property
     def user_cfg_cls(self):
@@ -43,6 +43,7 @@ class ApplyNodepredPipeline(PipelineBase):
             self.__class__.setup_user_cfg_cls()
             generated_cfg = {
                 "pipeline_name": self.pipeline_name,
+                "pipeline_mode": "apply",
                 "device": train_cfg["device"],
                 "data": {"name": data},
                 "cpt_path": cpt

@@ -14,7 +14,7 @@ from .base_model import DGLBaseModel
 
 
 
-class PipelineConfig(DGLBaseModel):    
+class PipelineConfig(DGLBaseModel):
     node_embed_size: Optional[int] = -1
     early_stop: Optional[dict]
     num_epochs: int = 200
@@ -26,4 +26,9 @@ class UserConfig(DGLBaseModel):
     version: Optional[str] = "0.0.1"
     pipeline_name: PipelineFactory.get_pipeline_enum()
     device: str = "cpu"
-    # general_pipeline: PipelineConfig = PipelineConfig()
+
+class TrainUserConfig(UserConfig):
+    pipeline_mode: str = "train"
+
+class ApplyUserConfig(UserConfig):
+    pipeline_mode: str = "apply"
