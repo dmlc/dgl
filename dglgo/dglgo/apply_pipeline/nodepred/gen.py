@@ -48,13 +48,15 @@ class ApplyNodepredPipeline(PipelineBase):
                 "pipeline": self.pipeline,
                 "device": train_cfg["device"],
                 "data": {"name": data},
-                "cpt_path": cpt
+                "cpt_path": cpt,
+                "general_pipeline": {"save_path": "apply_results"}
             }
             output_cfg = self.user_cfg_cls(**generated_cfg).dict()
             output_cfg = deep_convert_dict(output_cfg)
             comment_dict = {
                 "device": "Torch device name, e.g., cpu or cuda or cuda:0",
-                "cpt_path": "Path to the checkpoint file"
+                "cpt_path": "Path to the checkpoint file",
+                "general_pipeline": {"save_path": "Directory to save the inference results"}
             }
             comment_dict = merge_comment(output_cfg, comment_dict)
 
