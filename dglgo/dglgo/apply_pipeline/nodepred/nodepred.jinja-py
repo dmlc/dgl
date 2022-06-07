@@ -59,7 +59,7 @@ def main():
         writer = csv.writer(f)
         writer.writerow(['node id', 'predicted label'])
         writer.writerows([
-            [i, pred[i]] for i in len(pred)
+            [i, pred[i]] for i in range(len(pred))
         ])
 
 if __name__ == '__main__':
