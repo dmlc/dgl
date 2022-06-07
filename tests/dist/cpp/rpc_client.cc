@@ -10,13 +10,13 @@
 class RPCClient {
 public:
   explicit RPCClient(const std::string &ip_config) : ip_config_(ip_config) {
-    parse_ips();
+    ParseIPs();
   }
 
-  void run() {
+  void Run() {
     std::vector<std::thread> threads;
     for (int i = 0; i < kNumSender; ++i) {
-      threads.push_back(std::thread(&RPCClient::start_client, this));
+      threads.push_back(std::thread(&RPCClient::StartClient, this));
     }
     for (auto &&t : threads) {
       t.join();
@@ -24,7 +24,7 @@ public:
   }
 
 private:
-  void parse_ips() {
+  void ParseIPs() {
     std::ifstream ifs(ip_config_);
     if (!ifs) {
       LOG(FATAL) << "Failed to open ip_config: " + ip_config_;
@@ -34,7 +34,7 @@ private:
       ips_.push_back(line);
     }
   }
-  void start_client() {
+  void StartClient() {
     dgl::rpc::TPSender sender(InitTPContext());
     int recv_id = 0;
     for (const auto &ip : ips_) {
@@ -73,7 +73,7 @@ int main(int argc, char **argv) {
     return -1;
   }
   RPCClient client(argv[1]);
-  client.run();
+  client.Run();
 
   return 0;
 }

@@ -12,7 +12,7 @@ public:
   void run() {
     std::vector<std::thread> threads;
     for (int i = 0; i < kNumReceiver; ++i) {
-      threads.push_back(std::thread(&RPCServer::start_server, this, i));
+      threads.push_back(std::thread(&RPCServer::StartServer, this, i));
     }
     for (auto &&t : threads) {
       t.join();
@@ -20,7 +20,7 @@ public:
   }
 
 private:
-  void start_server(int id) {
+  void StartServer(int id) {
     dgl::rpc::TPReceiver receiver(InitTPContext());
     std::string ip_addr =
         std::string{"tcp://"} + ip_ + ":" + std::to_string(kPort + id);
