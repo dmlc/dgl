@@ -4,6 +4,8 @@ import dgl
 from dgl.data import AsNodePredDataset
 {{ data_import_code }}
 
+{{ model_code }}
+
 def infer(device, data, model):
     g = data[0] # Only infer on the first graph
     g = dgl.remove_self_loop(g)
