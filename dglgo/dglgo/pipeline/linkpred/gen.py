@@ -52,7 +52,6 @@ class LinkpredPipeline(PipelineBase):
         from ...utils.enter_config import UserConfig
 
         class LinkPredUserConfig(UserConfig):
-            pipeline_name: str = "linkpred"
             data: DataFactory.filter("linkpred").get_pydantic_config() = Field(..., discriminator="name")
             node_model: NodeModelFactory.get_pydantic_model_config() = Field(...,
                                                                              discriminator="name")
@@ -82,7 +81,7 @@ class LinkpredPipeline(PipelineBase):
         ):
             self.__class__.setup_user_cfg_cls()
             generated_cfg = {
-                "pipeline_name": self.pipeline,
+                "pipeline": self.pipeline,
                 "device": "cpu",
                 "data": {"name": data.name},
                 "neg_sampler": {"name": neg_sampler.value},
@@ -140,7 +139,7 @@ class LinkpredPipeline(PipelineBase):
             generated_user_cfg.pop("data")
         else:
             generated_user_cfg["data"].pop("name")
-        generated_user_cfg.pop("pipeline_name")
+        generated_user_cfg.pop("pipeline")
         generated_user_cfg["node_model"].pop("name")
         generated_user_cfg["edge_model"].pop("name")
         generated_user_cfg["neg_sampler"].pop("name")

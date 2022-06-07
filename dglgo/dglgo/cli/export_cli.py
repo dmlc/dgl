@@ -13,8 +13,8 @@ def export(
     output: str = typer.Option("script.py", help="output python file name")
 ):
     user_cfg = yaml.safe_load(Path(cfg).open("r"))
-    pipeline_name = user_cfg["pipeline_name"]
-    pipeline_mode = user_cfg["pipeline_mode"]
+    pipeline_name = user_cfg["pipeline"]["name"]
+    pipeline_mode = user_cfg["pipeline"]["mode"]
     if pipeline_mode == 'train':
         output_file_content = PipelineFactory.registry[pipeline_name].gen_script(user_cfg)
     else:

@@ -106,7 +106,7 @@ class GraphpredPipeline(PipelineBase):
         if "split_ratio" in generated_user_cfg["data"]:
             generated_user_cfg["data"].pop("split_ratio")
         generated_user_cfg["data_name"] = generated_user_cfg["data"].pop("name")
-        generated_user_cfg.pop("pipeline_name")
+        generated_user_cfg.pop("pipeline")
         generated_user_cfg["model_name"] = generated_user_cfg["model"].pop("name")
         generated_user_cfg["general_pipeline"]["optimizer"].pop("name")
         generated_user_cfg["general_pipeline"]["lr_scheduler"].pop("name")

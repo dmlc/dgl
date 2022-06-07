@@ -18,7 +18,7 @@ def list_recipes():
         cfg = yaml.safe_load(Path(file).open("r"))
         output_list.append({
             "file_name": file.name,
-            "pipeline_name": cfg["pipeline_name"],
+            "pipeline_name": cfg["pipeline"]["name"],
             "dataset_name": cfg["data"]["name"]
         })
     # sort by pipeline, if same sort by dataset, if same sort by file name

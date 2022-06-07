@@ -151,7 +151,7 @@ class NodepredNsPipeline(PipelineBase):
         else:
             generated_user_cfg["data"].pop("name")
 
-        generated_user_cfg.pop("pipeline_name")
+        generated_user_cfg.pop("pipeline")
         generated_user_cfg["model"].pop("name")
         generated_user_cfg['general_pipeline']["optimizer"].pop("name")
 

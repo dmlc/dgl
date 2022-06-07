@@ -18,7 +18,6 @@ class ApplyNodepredPipeline(PipelineBase):
             "name": "nodepred",
             "mode": "apply"
         }
-        self.pipeline_name = "nodepred"
 
     @classmethod
     def setup_user_cfg_cls(cls):
@@ -85,7 +84,7 @@ class ApplyNodepredPipeline(PipelineBase):
         # Dict for defining cfg in the rendered code
         generated_user_cfg = deepcopy(user_cfg_dict)
         generated_user_cfg["data"].pop("name")
-        generated_user_cfg.pop("pipeline_name")
+        generated_user_cfg.pop("pipeline")
         generated_user_cfg["model"] = train_cfg["model"]
 
         render_cfg["user_cfg_str"] = f"cfg = {str(generated_user_cfg)}"
