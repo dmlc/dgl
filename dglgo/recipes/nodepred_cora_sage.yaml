@@ -1,6 +1,8 @@
 # Accuracy across 10 runs: 0.8163 ± 0.006856
 version: 0.0.1
-pipeline_name: nodepred
+pipeline:
+  name: nodepred
+  mode: train
 device: cuda:0
 data:
   name: cora

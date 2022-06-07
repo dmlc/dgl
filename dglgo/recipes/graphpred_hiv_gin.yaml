@@ -1,5 +1,7 @@
 version: 0.0.1
-pipeline_name: graphpred
+pipeline:
+  name: graphpred
+  mode: train
 device: cuda:0                # Torch device name, e.q. cpu or cuda or cuda:0
 data:
   name: ogbg-molhiv
