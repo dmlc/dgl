@@ -29,7 +29,7 @@ private:
     }
     for (int n = 0; n < kNumSender * kNumMessage * num_machines_; ++n) {
       dgl::rpc::RPCMessage msg;
-      receiver.Recv(&msg);
+      receiver.Recv(&msg, 0);
       bool eq = msg.data == std::string("123456789");
       eq = eq && (msg.tensors.size() == kNumTensor);
       for (int j = 0; j < kNumTensor; ++j) {
