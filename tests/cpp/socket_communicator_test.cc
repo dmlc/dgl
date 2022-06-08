@@ -10,7 +10,7 @@
 #include <vector>
 #include <fstream>
 #include <streambuf>
-
+#include <chrono>
 #include <stdlib.h>
 #include <time.h>
 
@@ -60,6 +60,49 @@ TEST(SocketCommunicatorTest, SendAndRecv) {
   for (int i = 0; i < kNumReceiver; ++i) {
     server_thread[i]->join();
   }
+}
+
+TEST(SocketCommunicatorTest, SendAndRecvTimeout) {
+  std::atomic_bool stop{false};
+  // start 1 client, connect to 1 server, send 2 messsage
+  auto client = std::thread([&stop]() {
+    SocketSender sender(kQueueSize, kThreadNum);
+    sender.ConnectReceiver(ip_addr[0], 0);
+    sender.ConnectReceiverFinalize(kMaxTryTimes);
+    for (int i = 0; i < 2; ++i) {
+      char *str_data = new char[9];
+      memcpy(str_data, "123456789", 9);
+      Message msg = {str_data, 9};
+      msg.deallocator = DefaultMessageDeleter;
+      EXPECT_EQ(sender.Send(msg, 0), ADD_SUCCESS);
+    }
+    while (!stop) {
+    }
+    sender.Finalize();
+  });
+  // start 1 server, accept 1 client, receive 2 message
+  auto server = std::thread([&stop]() {
+    SocketReceiver receiver(kQueueSize, kThreadNum);
+    receiver.Wait(ip_addr[0], 1);
+    Message msg;
+    int recv_id;
+    // receive 1st message
+    EXPECT_EQ(receiver.RecvFrom(&msg, 0, 0), REMOVE_SUCCESS);
+    EXPECT_EQ(string(msg.data, msg.size), string("123456789"));
+    msg.deallocator(&msg);
+    // receive 2nd message
+    EXPECT_EQ(receiver.Recv(&msg, &recv_id, 0), REMOVE_SUCCESS);
+    EXPECT_EQ(string(msg.data, msg.size), string("123456789"));
+    msg.deallocator(&msg);
+    // timed out
+    EXPECT_EQ(receiver.RecvFrom(&msg, 0, 1000), QUEUE_EMPTY);
+    EXPECT_EQ(receiver.Recv(&msg, &recv_id, 1000), QUEUE_EMPTY);
+    stop = true;
+    receiver.Finalize();
+  });
+  // join
+  client.join();
+  server.join();
 }
 
 void start_client() {

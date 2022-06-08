@@ -29,10 +29,12 @@ private:
     }
     for (int n = 0; n < kNumSender * kNumMessage * num_machines_; ++n) {
       dgl::rpc::RPCMessage msg;
-      receiver.Recv(&msg);
+      if (receiver.Recv(&msg, 0) != dgl::rpc::kRPCSuccess) {
+        LOG(FATAL) << "Failed to receive message on Server~" << id;
+      }
       bool eq = msg.data == std::string("123456789");
       eq = eq && (msg.tensors.size() == kNumTensor);
-      for (int j = 0; j < kNumTensor; ++j) {
+      for (int j = 0; eq && j < kNumTensor; ++j) {
         eq = eq && (msg.tensors[j].ToVector<int>().size() == kSizeTensor);
       }
       if (!eq) {
