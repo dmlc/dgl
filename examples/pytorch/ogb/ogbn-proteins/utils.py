@@ -88,12 +88,3 @@ class Logger(object):
             r = best_result[:, 3]
             print(f"   Final Test: {r.mean():.2f} ± {r.std():.2f}")
 
-
-class DataLoaderWrapper(object):
-    def __init__(self, dataloader):
-        # self.iter = iter(dataloader)
-        self.data = dataloader
-
-    def __iter__(self):
-        # rewind the iterator for every iteration in for loop
-        return iter(self.data)

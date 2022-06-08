@@ -22,7 +22,6 @@ from torch import nn
 from tqdm import tqdm
 
 from models import GAT
-from utils import DataLoaderWrapper
 
 epsilon = 1 - math.log(2)
 
@@ -219,14 +218,12 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
     n_train_samples = train_idx.shape[0]
     train_batch_size = (n_train_samples + 29) // 30
     train_sampler = MultiLayerNeighborSampler([10 for _ in range(args.n_layers)])
-    train_dataloader = DataLoaderWrapper(
-        DataLoader(
-            graph.cpu(),
-            train_idx.cpu(),
-            train_sampler,
-            batch_size=train_batch_size, shuffle=True,
-            num_workers=4,
-        )
+    train_dataloader = DataLoader(        
+        graph.cpu(),
+        train_idx.cpu(),
+        train_sampler,
+        batch_size=train_batch_size, shuffle=True,
+        num_workers=4,        
     )
 
     eval_batch_size = 32768
@@ -238,14 +235,12 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
         test_idx_during_training = test_idx
 
     eval_idx = torch.cat([train_idx.cpu(), val_idx.cpu(), test_idx_during_training.cpu()])
-    eval_dataloader = DataLoaderWrapper(
-        DataLoader(
-            graph.cpu(),
-            eval_idx,
-            eval_sampler,
-            batch_size=eval_batch_size, shuffle=False,
-            num_workers=4,
-        )
+    eval_dataloader = DataLoader(        
+        graph.cpu(),
+        eval_idx,
+        eval_sampler,
+        batch_size=eval_batch_size, shuffle=False,
+        num_workers=4,        
     )
 
     model = gen_model(args).to(device)
@@ -308,14 +303,12 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
 
     if args.estimation_mode:
         model.load_state_dict(best_model_state_dict)
-        eval_dataloader = DataLoaderWrapper(
-            DataLoader(
-                graph.cpu(),
-                test_idx.cpu(),
-                eval_sampler,
-                batch_size=eval_batch_size, shuffle=False,
-                num_workers=4,
-            )
+        eval_dataloader = DataLoader(            
+            graph.cpu(),
+            test_idx.cpu(),
+            eval_sampler,
+            batch_size=eval_batch_size, shuffle=False,
+            num_workers=4,            
         )
         final_test_score = evaluate(
             args, model, eval_dataloader, labels, train_idx, val_idx, test_idx, criterion, evaluator_wrapper
