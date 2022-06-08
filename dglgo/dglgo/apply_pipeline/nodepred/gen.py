@@ -22,8 +22,10 @@ class ApplyNodepredPipeline(PipelineBase):
     @classmethod
     def setup_user_cfg_cls(cls):
         from ...utils.enter_config import UserConfig
+        class ApplyNodePredUserConfig(UserConfig):
+            data: DataFactory.filter("nodepred").get_pydantic_config() = Field(..., discriminator="name")
 
-        cls.user_cfg_cls = UserConfig
+        cls.user_cfg_cls = ApplyNodePredUserConfig
 
     @property
     def user_cfg_cls(self):
