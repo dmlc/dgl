@@ -68,7 +68,6 @@ def start_client(ip_config, num_servers, group_id, net_type):
         ip_config=ip_config, num_servers=num_servers, group_id=group_id, net_type=net_type)
     req = HelloRequest(STR, INTEGER, TENSOR, tensor_func)
     server_namebook = dgl.distributed.read_ip_config(ip_config, num_servers)
-    return
     for server_id in server_namebook.keys():
         # test send and recv
         dgl.distributed.send_request(server_id, req)
