@@ -158,9 +158,3 @@ class FlickrDataset(DGLBuiltinDataset):
             return self._graph
         else:
             return self._transform(self._graph)
-
-
-if __name__ == '__main__':
-    dataset = FlickrDataset()
-    g = dataset[0]
-    print(g)
