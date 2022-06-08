@@ -6,6 +6,7 @@
 
 #include <dgl/runtime/device_api.h>
 
+#include "../../runtime/cuda/cuda_common.h"
 #include "../filter.h"
 #include "../../runtime/cuda/cuda_hashtable.cuh"
 #include "./dgl_cub.cuh"
@@ -74,12 +75,12 @@ IdArray _PerformFilter(
     const dim3 block(256);
     const dim3 grid((size+block.x-1)/block.x);
 
-    _IsInKernel<IdType, include><<<grid, block, 0, stream>>>(
+    CUDA_KERNEL_CALL((_IsInKernel<IdType, include>),
+        grid, block, 0, stream,
         table.DeviceHandle(),
         static_cast<const IdType*>(test->data),
         size,
         prefix);
-    CUDA_CALL(cudaGetLastError());
   }
 
   // generate prefix-sum
@@ -117,11 +118,11 @@ IdArray _PerformFilter(
     const dim3 block(256);
     const dim3 grid((size+block.x-1)/block.x);
 
-    _InsertKernel<<<grid, block, 0, stream>>>(
+    CUDA_KERNEL_CALL(_InsertKernel,
+        grid, block, 0, stream,
         prefix,
         size,
         static_cast<IdType*>(result->data));
-    CUDA_CALL(cudaGetLastError());
   }
   device->FreeWorkspace(ctx, prefix);
 

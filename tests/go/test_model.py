@@ -1,3 +1,4 @@
+import dgl
 import pytest
 import torch
 from dglgo.model import *
@@ -171,3 +172,69 @@ def test_ele():
     h_src = torch.randn(num_pairs, data_info['in_size'])
     h_dst = torch.randn(num_pairs, data_info['in_size'])
     model(h_src, h_dst)
+
+@pytest.mark.parametrize('virtual_node', [True, False])
+def test_ogbg_gin(virtual_node):
+    # Test for ogbg-mol datasets
+    data_info = {
+        'name': 'ogbg-molhiv',
+        'out_size': 1
+    }
+    model = OGBGGIN(data_info,
+                    embed_size=10,
+                    num_layers=2,
+                    virtual_node=virtual_node)
+    num_nodes = 5
+    num_edges = 15
+    g1 = dgl.rand_graph(num_nodes, num_edges)
+    g2 = dgl.rand_graph(num_nodes, num_edges)
+    g = dgl.batch([g1, g2])
+    num_nodes = g.num_nodes()
+    num_edges = g.num_edges()
+    nfeat = torch.zeros(num_nodes, 9).long()
+    efeat = torch.zeros(num_edges, 3).long()
+    model(g, nfeat, efeat)
+
+    # Test for non-ogbg-mol datasets
+    data_info = {
+        'name': 'a_dataset',
+        'out_size': 1,
+        'node_feat_size': 15,
+        'edge_feat_size': 5
+    }
+    model = OGBGGIN(data_info,
+                    embed_size=10,
+                    num_layers=2,
+                    virtual_node=virtual_node)
+    nfeat = torch.randn(num_nodes, data_info['node_feat_size'])
+    efeat = torch.randn(num_edges, data_info['edge_feat_size'])
+    model(g, nfeat, efeat)
+
+def test_pna():
+    # Test for ogbg-mol datasets
+    data_info = {
+        'name': 'ogbg-molhiv',
+        'delta': 1,
+        'out_size': 1
+    }
+    model = PNA(data_info,
+                embed_size=10,
+                num_layers=2)
+    num_nodes = 5
+    num_edges = 15
+    g = dgl.rand_graph(num_nodes, num_edges)
+    nfeat = torch.zeros(num_nodes, 9).long()
+    model(g, nfeat)
+
+    # Test for non-ogbg-mol datasets
+    data_info = {
+        'name': 'a_dataset',
+        'node_feat_size': 15,
+        'delta': 1,
+        'out_size': 1
+    }
+    model = PNA(data_info,
+                embed_size=10,
+                num_layers=2)
+    nfeat = torch.randn(num_nodes, data_info['node_feat_size'])
+    model(g, nfeat)
