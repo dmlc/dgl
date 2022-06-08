@@ -5,6 +5,7 @@ import typer
 from copy import deepcopy
 from jinja2 import Template
 from pathlib import Path
+from pydantic import Field
 from typing import Optional
 
 from ...utils.factory import ApplyPipelineFactory, PipelineBase, DataFactory, NodeModelFactory
