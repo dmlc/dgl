@@ -58,6 +58,8 @@ class ApplyNodepredPipeline(PipelineBase):
             }
             output_cfg = self.user_cfg_cls(**generated_cfg).dict()
             output_cfg = deep_convert_dict(output_cfg)
+            # Not applicable for inference
+            output_cfg['data'].pop('split_ratio')
             comment_dict = {
                 "device": "Torch device name, e.g., cpu or cuda or cuda:0",
                 "cpt_path": "Path to the checkpoint file",
