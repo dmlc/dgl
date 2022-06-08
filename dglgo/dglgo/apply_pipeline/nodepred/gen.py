@@ -43,6 +43,8 @@ class ApplyNodepredPipeline(PipelineBase):
             if data is None:
                 print("data is not specified, use the training dataset")
                 data = train_cfg["data_name"]
+            else:
+                data = data.name
             if cfg is None:
                 cfg = "_".join(["apply", "nodepred", data, train_cfg["model_name"]]) + ".yaml"
 
