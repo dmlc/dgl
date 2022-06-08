@@ -33,18 +33,17 @@ class Queue {
   }
 
   bool pop(T *msg, int timeout) {
+    std::unique_lock<std::mutex> lock(mutex_);
     if (timeout == 0) {
       DLOG(WARNING) << "Will wait infinitely until message is popped...";
-    }
-    std::chrono::milliseconds real_timeout =
-        timeout == 0 ? std::chrono::milliseconds::max()
-                     : std::chrono::milliseconds(timeout);
-    std::unique_lock<std::mutex> lock(mutex_);
-    if (!cv_.wait_for(lock, real_timeout,
-                      [this] { return items_.size() > 0; })) {
-      DLOG(WARNING) << "Times out for popping message after " << timeout
-                    << " milliseconds.";
-      return false;
+      cv_.wait(lock, [this] { return items_.size() > 0; });
+    } else {
+      if (!cv_.wait_for(lock, std::chrono::milliseconds(timeout),
+                        [this] { return items_.size() > 0; })) {
+        DLOG(WARNING) << "Times out for popping message after " << timeout
+                      << " milliseconds.";
+        return false;
+      }
     }
     *msg = std::move(items_.front());
     items_.pop_front();
