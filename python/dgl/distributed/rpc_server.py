@@ -108,7 +108,10 @@ def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
                     register_res = rpc.ClientRegisterResponse(client_id)
                     rpc.send_response(client_id, register_res, group_id)
         # receive incomming client requests
-        req, client_id, group_id = rpc.recv_request()
+        timeout = 60 * 1000  # in milliseconds
+        req, client_id, group_id = rpc.recv_request(timeout)
+        if req is None:
+            continue
         if isinstance(req, rpc.ClientRegisterRequest):
             if group_id not in recv_clients:
                 recv_clients[group_id] = []
