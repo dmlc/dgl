@@ -79,7 +79,10 @@ __all__ = [
     'norm_by_dst',
     'radius_graph',
     'random_walk_pe',
-    'laplacian_pe'
+    'laplacian_pe',
+    'to_half',
+    'to_float',
+    'to_double'
     ]
 
 
