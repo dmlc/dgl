@@ -330,6 +330,8 @@ STATUS SocketReceiver::Recv(Message* msg, int* send_id, int timeout) {
     }
     mq_iter_ = msg_queue_.begin();
   }
+  LOG(ERROR)
+      << "Failed to remove message from queue due to unexpected queue status.";
   return QUEUE_CLOSE;
 }
 

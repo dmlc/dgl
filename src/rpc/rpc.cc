@@ -77,12 +77,8 @@ RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
     if (status == kRPCTimeOut) {
       static const std::string log_str = [real_timeout, timeout]() {
         std::ostringstream oss;
-        oss << "Timed out when trying to receive rpc message within "
-            << real_timeout << " milliseconds.";
-        if (timeout == 0) {
-          oss << " Retrying to receive as timeout is configured as 0 which "
-                 "means waiting infinitely.";
-        }
+        oss << "Recv RPCMessage timeout in " << real_timeout << " ms."
+            << (timeout == 0 ? " Retrying ..." : "");
         return oss.str();
       }();
       DLOG(WARNING) << log_str;
