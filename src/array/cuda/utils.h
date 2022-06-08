@@ -168,8 +168,10 @@ __global__ void _LinearSearchKernel(
     }
     if (v == -1)
       out[tx] = filler;
-    else
-      out[tx] = weights ? weights[v] : v;
+    else {
+      // The casts here are to be able to handle DType being __half
+      out[tx] = weights ? weights[v] : DType((long long)v);
+    }
     tx += stride_x;
   }
 }

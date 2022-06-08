@@ -34,6 +34,28 @@ struct CSRGEMM {
   }
 };
 
+// NOTE: There is currently no cusparseHcsrgemm2_bufferSizeExt or cusparseHcsrgemm2.
+//ifdef USE_FP16
+#if 0
+template <>
+struct CSRGEMM<__half> {
+  template <typename... Args>
+  static inline cusparseStatus_t bufferSizeExt(Args... args) {
+    return cusparseHcsrgemm2_bufferSizeExt(args...);
+  }
+
+  template <typename... Args>
+  static inline cusparseStatus_t nnz(Args... args) {
+    return cusparseXcsrgemm2Nnz(args...);
+  }
+
+  template <typename... Args>
+  static inline cusparseStatus_t compute(Args... args) {
+    return cusparseHcsrgemm2(args...);
+  }
+};
+#endif
+
 template <>
 struct CSRGEMM<float> {
   template <typename... Args>
@@ -90,6 +112,28 @@ struct CSRGEAM {
     return static_cast<cusparseStatus_t>(0);
   }
 };
+
+// NOTE: There is currently no cusparseHcsrgeam2_bufferSizeExt or cusparseHcsrgeam2.
+//ifdef USE_FP16
+#if 0
+template <>
+struct CSRGEAM<__half> {
+  template <typename... Args>
+  static inline cusparseStatus_t bufferSizeExt(Args... args) {
+    return cusparseHcsrgeam2_bufferSizeExt(args...);
+  }
+
+  template <typename... Args>
+  static inline cusparseStatus_t nnz(Args... args) {
+    return cusparseXcsrgeam2Nnz(args...);
+  }
+
+  template <typename... Args>
+  static inline cusparseStatus_t compute(Args... args) {
+    return cusparseHcsrgeam2(args...);
+  }
+};
+#endif
 
 template <>
 struct CSRGEAM<float> {

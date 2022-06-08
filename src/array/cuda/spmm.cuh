@@ -32,6 +32,20 @@ cublasStatus_t Xgeam(cublasHandle_t handle, cublasOperation_t transa,
   return CUBLAS_STATUS_EXECUTION_FAILED;
 }
 
+// NOTE: There is currently no cublasHgeam.
+//ifdef USE_FP16
+#if 0
+template <>
+cublasStatus_t Xgeam<__half>(cublasHandle_t handle, cublasOperation_t transa,
+    cublasOperation_t transb, int m, int n,
+    const __half* alpha, const __half* A, int lda,
+    const __half* beta, const __half* B, int ldb,
+    __half* C, int ldc) {
+  return cublasHgeam(handle, transa, transb, m, n, alpha, A, lda,
+      beta, B, ldb, C, ldc);
+}
+#endif
+
 template <>
 cublasStatus_t Xgeam<float>(cublasHandle_t handle, cublasOperation_t transa,
     cublasOperation_t transb, int m, int n,
