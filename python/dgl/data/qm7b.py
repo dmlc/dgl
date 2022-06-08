@@ -43,8 +43,10 @@ class QM7bDataset(DGLDataset):
 
     Attributes
     ----------
+    num_tasks : int
+        Number of prediction tasks
     num_labels : int
-        Number of labels for each graph, i.e. number of prediction tasks
+        (DEPRECATED, use num_tasks instead) Number of prediction tasks
 
     Raises
     ------
@@ -54,7 +56,7 @@ class QM7bDataset(DGLDataset):
     Examples
     --------
     >>> data = QM7bDataset()
-    >>> data.num_labels
+    >>> data.num_tasks
     14
     >>>
     >>> # iterate over the dataset
@@ -118,8 +120,13 @@ class QM7bDataset(DGLDataset):
                               'Otherwise you can create an issue for it.'.format(self.name))
 
     @property
+    def num_tasks(self):
+        """Number of prediction tasks."""
+        return self.num_labels
+
+    @property
     def num_labels(self):
-        """Number of labels for each graph, i.e. number of prediction tasks."""
+        """Number of prediction tasks."""
         return 14
 
     def __getitem__(self, idx):

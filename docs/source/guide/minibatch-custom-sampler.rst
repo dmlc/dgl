@@ -47,8 +47,8 @@ The code below implements a classical neighbor sampler:
                sg = dgl.to_block(sg, seed_nodes)
                seed_nodes = sg.srcdata[NID]
                subgs.insert(0, sg)
-            input_nodes = seed_nodes
-            return input_nodes, output_nodes, subgs
+               input_nodes = seed_nodes
+           return input_nodes, output_nodes, subgs
 
 To use this sampler with ``DataLoader``:
 
@@ -136,8 +136,8 @@ subgraph:
                sg = dgl.to_block(sg, seed_nodes)
                seed_nodes = sg.srcdata[NID]
                subgs.insert(0, sg)
-            input_nodes = seed_nodes
-            return input_nodes, output_nodes, subgs
+               input_nodes = seed_nodes
+           return input_nodes, output_nodes, subgs
 
 Further Readings
 ~~~~~~~~~~~~~~~~~~

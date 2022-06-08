@@ -60,10 +60,10 @@ class MLP(nn.Module):
             self.linears = torch.nn.ModuleList()
             self.batch_norms = torch.nn.ModuleList()
 
-            self.linears.append(nn.Linear(input_dim, hidden_dim))
+            self.linears.append(nn.Linear(input_dim, hidden_dim, bias=False))
             for layer in range(num_layers - 2):
-                self.linears.append(nn.Linear(hidden_dim, hidden_dim))
-            self.linears.append(nn.Linear(hidden_dim, output_dim))
+                self.linears.append(nn.Linear(hidden_dim, hidden_dim, bias=False))
+            self.linears.append(nn.Linear(hidden_dim, output_dim, bias=False))
 
             for layer in range(num_layers - 1):
                 self.batch_norms.append(nn.BatchNorm1d((hidden_dim)))

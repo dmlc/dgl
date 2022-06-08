@@ -219,7 +219,17 @@ __device__ __forceinline__ float AtomicAdd<float>(float* addr, float val) {
 #if __CUDA_ARCH__ >= 200
   return atomicAdd(addr, val);
 #else
-  return *addr + val;
+  typedef float T;
+  typedef typename Cast<T>::Type CT;
+  CT* addr_as_ui = reinterpret_cast<CT*>(addr);
+  CT old = *addr_as_ui;
+  CT assumed = old;
+  do {
+    assumed = old;
+    old = atomicCAS(addr_as_ui, assumed,
+        Cast<T>::Encode(Cast<T>::Decode(old) + val));
+  } while (assumed != old);
+  return Cast<T>::Decode(old);
 #endif  // __CUDA_ARCH__
 }
 
@@ -228,7 +238,17 @@ __device__ __forceinline__ double AtomicAdd<double>(double* addr, double val) {
 #if __CUDA_ARCH__ >= 600
   return atomicAdd(addr, val);
 #else
-  return *addr + val;
+  typedef double T;
+  typedef typename Cast<T>::Type CT;
+  CT* addr_as_ui = reinterpret_cast<CT*>(addr);
+  CT old = *addr_as_ui;
+  CT assumed = old;
+  do {
+    assumed = old;
+    old = atomicCAS(addr_as_ui, assumed,
+        Cast<T>::Encode(Cast<T>::Decode(old) + val));
+  } while (assumed != old);
+  return Cast<T>::Decode(old);
 #endif
 }
 
@@ -236,11 +256,14 @@ __device__ __forceinline__ double AtomicAdd<double>(double* addr, double val) {
 #if defined(CUDART_VERSION) && CUDART_VERSION >= 10000
 template <>
 __device__ __forceinline__ half AtomicAdd<half>(half* addr, half val) {
+// half make sure we have half support
 #if __CUDA_ARCH__ >= 700
   return atomicAdd(addr, val);
 #else
-  return *addr + val;
-#endif  // __CUDA_ARCH__
+  half old = *addr;
+  *addr = half(float(old) + float(val));
+  return old;
+#endif  // __CUDA_ARCH__ >= 700
 }
 #endif  // defined(CUDART_VERSION) && CUDART_VERSION >= 10000
 #endif  // USE_FP16

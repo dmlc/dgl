@@ -39,6 +39,7 @@ Conv Layers
     ~dgl.nn.pytorch.conv.GroupRevRes
     ~dgl.nn.pytorch.conv.EGNNConv
     ~dgl.nn.pytorch.conv.PNAConv
+    ~dgl.nn.pytorch.conv.DGNConv
 
 Dense Conv Layers
 ----------------------------------------
@@ -111,3 +112,4 @@ Utility Modules
     ~dgl.nn.pytorch.utils.JumpingKnowledge
     ~dgl.nn.pytorch.sparse_emb.NodeEmbedding
     ~dgl.nn.pytorch.explain.GNNExplainer
+    ~dgl.nn.pytorch.utils.LabelPropagation
