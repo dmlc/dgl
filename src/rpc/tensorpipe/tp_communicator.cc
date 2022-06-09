@@ -193,7 +193,9 @@ void TPReceiver::ReceiveFromPipe(std::shared_ptr<Pipe> pipe,
   });
 }
 
-void TPReceiver::Recv(RPCMessage *msg) { *msg = std::move(queue_->pop()); }
+RPCStatus TPReceiver::Recv(RPCMessage *msg, int timeout) {
+  return queue_->pop(msg, timeout) ? kRPCSuccess : kRPCTimeOut;
+}
 
 }  // namespace rpc
 }  // namespace dgl

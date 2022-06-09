@@ -158,12 +158,6 @@ struct RPCContext {
   }
 };
 
-/*! \brief RPC status flag */
-enum RPCStatus {
-  kRPCSuccess = 0,
-  kRPCTimeOut,
-};
-
 /*!
  * \brief Send out one RPC message.
  *
