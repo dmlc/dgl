@@ -7,7 +7,8 @@ from .. import backend as F
 from ..convert import from_scipy
 from ..transforms import reorder_graph
 from .dgl_dataset import DGLBuiltinDataset
-from .utils import generate_mask_tensor, load_graphs, save_graphs, _get_dgl_url
+from .utils import generate_mask_tensor, load_graphs, save_graphs, _get_dgl_url, download, \
+    extract_archive
 
 
 class YelpDataset(DGLBuiltinDataset):
@@ -70,11 +71,27 @@ class YelpDataset(DGLBuiltinDataset):
                                           verbose=verbose,
                                           transform=transform)
 
+    def my_assert(self):
+        assert os.path.exists(self.raw_path)
+        assert os.path.exists(os.path.join(self.raw_path, "adj_full.npz"))
+        assert os.path.exists(os.path.join(self.raw_path, "feats.npy"))
+        assert os.path.exists(os.path.join(self.raw_path, "class_map.json"))
+        assert os.path.exists(os.path.join(self.raw_path, "role.json"))
+
+    def download(self):
+        r""" Automatically download data and extract it.
+        """
+        if self.url is not None:
+            zip_file_path = os.path.join(self.raw_dir, self.name + '.zip')
+            download(self.url, path=zip_file_path)
+            assert os.path.exists(os.path.join(self.raw_dir, 'yelp.zip'))
+            assert os.path.getsize(os.path.join(self.raw_dir, 'yelp.zip')) == 986517215
+            extract_archive(zip_file_path, self.raw_path)
+            self.my_assert()
+
     def process(self):
         """process raw data to graph, labels and masks"""
-        data_path = os.path.join(self.raw_dir, 'yelp.zip')
-        assert os.path.exists(data_path)
-        print(os.listdir(self.raw_path))
+        self.my_assert()
         coo_adj = sp.load_npz(os.path.join(self.raw_path, "adj_full.npz"))
         g = from_scipy(coo_adj)
 
