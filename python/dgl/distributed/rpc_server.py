@@ -44,7 +44,8 @@ def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
         assert net_type == 'tensorpipe', \
             "net_type can only be 'tensorpipe' if 'keep_alive' is enabled."
         print("As configured, this server will keep alive for multiple"
-              " client groups until force shutdown request is received.")
+              " client groups until force shutdown request is received."
+              " [WARNING] This feature is experimental and not fully tested.")
     # Register signal handler.
     rpc.register_sig_handler()
     # Register some basic services
@@ -108,7 +109,10 @@ def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
                     register_res = rpc.ClientRegisterResponse(client_id)
                     rpc.send_response(client_id, register_res, group_id)
         # receive incomming client requests
-        req, client_id, group_id = rpc.recv_request()
+        timeout = 60 * 1000  # in milliseconds
+        req, client_id, group_id = rpc.recv_request(timeout)
+        if req is None:
+            continue
         if isinstance(req, rpc.ClientRegisterRequest):
             if group_id not in recv_clients:
                 recv_clients[group_id] = []

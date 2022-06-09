@@ -69,10 +69,22 @@ RPCStatus SendRPCMessage(const RPCMessage& msg, const int32_t target_id) {
 }
 
 RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
-  // ignore timeout now
-  CHECK_EQ(timeout, 0) << "rpc cannot support timeout now.";
-  RPCContext::getInstance()->receiver->Recv(msg);
-  return kRPCSuccess;
+  static constexpr int32_t retry_timeout = 5 * 1000;  // milliseconds
+  RPCStatus status;
+  const int32_t real_timeout = timeout == 0 ? retry_timeout : timeout;
+  do {
+    status = RPCContext::getInstance()->receiver->Recv(msg, real_timeout);
+    if (status == kRPCTimeOut) {
+      static const std::string log_str = [real_timeout, timeout]() {
+        std::ostringstream oss;
+        oss << "Recv RPCMessage timeout in " << real_timeout << " ms."
+            << (timeout == 0 ? " Retrying ..." : "");
+        return oss.str();
+      }();
+      DLOG(WARNING) << log_str;
+    }
+  } while (timeout == 0 && status == kRPCTimeOut);
+  return status;
 }
 
 void InitGlobalTpContext() {
@@ -519,9 +531,12 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
     }
   });
   // Recv remote message
-  for (int i = 0; i < msg_count; ++i) {
+  int recv_cnt = 0;
+  while (recv_cnt < msg_count) {
     RPCMessage msg;
-    RecvRPCMessage(&msg, 0);
+    auto status = RecvRPCMessage(&msg, 0);
+    CHECK_EQ(status, kRPCSuccess);
+    ++recv_cnt;
     int part_id = msg.server_id / group_count;
     char* data_char = static_cast<char*>(msg.tensors[0]->data);
     dgl_id_t id_size = remote_ids[part_id].size();
