@@ -4,7 +4,7 @@ import json
 import numpy as np
 import scipy.sparse as sp
 from .. import backend as F
-from ..convert import graph
+from ..convert import from_scipy
 from ..transforms import reorder_graph
 from .dgl_dataset import DGLBuiltinDataset
 from .utils import generate_mask_tensor, load_graphs, save_graphs, _get_dgl_url
@@ -72,10 +72,8 @@ class FlickrDataset(DGLBuiltinDataset):
 
     def process(self):
         """process raw data to graph, labels and masks"""
-        f = np.load(os.path.join(self.raw_path, 'adj_full.npz'))
-        adj = sp.csr_matrix((f['data'], f['indices'], f['indptr']), f['shape'])
-        adj = adj.tocoo()
-        edges = np.vstack((adj.row, adj.col)).transpose()
+        coo_adj = sp.load_npz(os.path.join(self.raw_path, "adj_full.npz"))
+        g = from_scipy(coo_adj)
 
         features = np.load(os.path.join(self.raw_path, 'feats.npy'))
         features = F.tensor(features, dtype=F.float32)
@@ -98,8 +96,6 @@ class FlickrDataset(DGLBuiltinDataset):
 
         test_mask = np.zeros(features.shape[0], dtype=bool)
         test_mask[role['te']] = True
-
-        g = graph((edges[:, 0], edges[:, 1]))
 
         g.ndata['feat'] = features
         g.ndata['label'] = labels
