@@ -111,6 +111,8 @@ def execute_remote(
     thread = Thread(target=run, args=(ssh_cmd,))
     thread.setDaemon(True)
     thread.start()
+    # sleep for a while in case of ssh is rejected by peer due to busy connection
+    time.sleep(0.2)
     return thread
 
 def get_remote_pids(ip, port, cmd_regex):
