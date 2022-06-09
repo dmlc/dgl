@@ -914,6 +914,10 @@ def set_num_threads(num_threads):
     """
     _CAPI_DGLSetOMPThreads(num_threads)
 
+def get_num_threads():
+    """Get the number of OMP threads in the process"""
+    return _CAPI_DGLGetOMPThreads()
+
 def alias_func(func):
     """Return an alias function with proper docstring."""
     @wraps(func)

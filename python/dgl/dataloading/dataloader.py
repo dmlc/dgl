@@ -10,6 +10,7 @@ import re
 import atexit
 import os
 import psutil
+from contextlib import contextmanager
 
 import numpy as np
 import torch
@@ -20,7 +21,7 @@ from ..base import NID, EID, dgl_warning
 from ..batch import batch as batch_graphs
 from ..heterograph import DGLHeteroGraph
 from ..utils import (
-    recursive_apply, ExceptionWrapper, recursive_apply_pair, set_num_threads,
+    recursive_apply, ExceptionWrapper, recursive_apply_pair, set_num_threads, get_num_threads,
     context_of, dtype_of)
 from ..frame import LazyFeature
 from ..storages import wrap_storage
@@ -731,6 +732,7 @@ class DataLoader(torch.utils.data.DataLoader):
         self.graph = graph
         self.indices = indices      # For PyTorch-Lightning
         num_workers = kwargs.get('num_workers', 0)
+        self.num_workers = num_workers
 
         indices_device = None
         try:
@@ -827,6 +829,7 @@ class DataLoader(torch.utils.data.DataLoader):
         self.use_alternate_streams = use_alternate_streams
         self.pin_prefetcher = pin_prefetcher
         self.use_prefetch_thread = use_prefetch_thread
+        self.use_cpu_worker_affinity = use_cpu_worker_affinity
 
         worker_init_fn = WorkerInitWrapper(kwargs.get('worker_init_fn', None))
 
@@ -884,6 +887,25 @@ class DataLoader(torch.utils.data.DataLoader):
         except:
             raise Exception('ERROR: cannot use affinity id={} cpu_cores={}'
                             .format(worker_id, self.cpu_cores))
+
+    @contextmanager
+    def enable_cpu_affinity(self):
+        """ Helper method for enabling cpu affinity for compute threads
+        """
+        affinity_old = psutil.Process().cpu_affinity()
+        nthreads_old = get_num_threads()
+
+        ncores = psutil.cpu_count(logical = False)
+        compute_affinity = range(self.num_workers, ncores)
+
+        if self.use_cpu_worker_affinity:
+            psutil.Process().cpu_affinity()
+            set_num_threads(psutil.cpu_count(logical = False) - self.num_workers)
+        try:
+            yield affinity_old
+        finally:
+            psutil.Process().cpu_affinity(affinity_old)
+            set_num_threads(nthreads_old)
 
     # To allow data other than node/edge data to be prefetched.
     def attach_data(self, name, data):

@@ -26,6 +26,10 @@ DGL_REGISTER_GLOBAL("utils.internal._CAPI_DGLSetOMPThreads")
     omp_set_num_threads(num_threads);
   });
 
+DGL_REGISTER_GLOBAL("utils.internal._CAPI_DGLGetOMPThreads")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    *rv = omp_get_num_threads();
+  });
 
 DGL_REGISTER_GLOBAL("utils.checks._CAPI_DGLCOOIsSorted")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
