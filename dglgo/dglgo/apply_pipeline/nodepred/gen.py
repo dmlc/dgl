@@ -88,12 +88,13 @@ class ApplyNodepredPipeline(PipelineBase):
         model_code = NodeModelFactory.get_source_code(model_name)
         render_cfg["model_code"] = model_code
         render_cfg["model_class_name"] = NodeModelFactory.get_model_class_name(model_name)
-        render_cfg.update(DataFactory.get_generated_code_dict(train_cfg["data_name"]))
+        render_cfg.update(DataFactory.get_generated_code_dict(user_cfg_dict["data"]["name"]))
 
         # Dict for defining cfg in the rendered code
         generated_user_cfg = deepcopy(user_cfg_dict)
         generated_user_cfg["data"].pop("name")
         generated_user_cfg.pop("pipeline")
+        # model arch configuration
         generated_user_cfg["model"] = train_cfg["model"]
 
         render_cfg["user_cfg_str"] = f"cfg = {str(generated_user_cfg)}"
