@@ -128,4 +128,4 @@ class NodepredPipeline(PipelineBase):
 
     @staticmethod
     def get_description() -> str:
-        return "Node classification pipeline"
+        return "Node classification pipeline for training"

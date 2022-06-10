@@ -166,4 +166,4 @@ class NodepredNsPipeline(PipelineBase):
 
     @staticmethod
     def get_description() -> str:
-        return "Node classification neighbor sampling pipeline"
+        return "Node classification neighbor sampling pipeline for training"
