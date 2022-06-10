@@ -61,7 +61,7 @@ class NodepredNSPipelineCfg(BaseModel):
 class NodepredNsPipeline(PipelineBase):
     def __init__(self):
         self.pipeline = {
-            "name": "nodepred",
+            "name": "nodepred-ns",
             "mode": "train"
         }
         self.default_cfg = None
