@@ -115,7 +115,7 @@ def test_citation_graph():
     transform = dgl.AddSelfLoop(allow_duplicate=True)
 
     # cora
-    g = data.CoraGraphDataset()[0]
+    g = data.CoraGraphDataset(force_reload=True, reorder=True)[0]
     assert g.num_nodes() == 2708
     assert g.num_edges() == 10556
     dst = F.asnumpy(g.edges()[1])
@@ -124,7 +124,7 @@ def test_citation_graph():
     assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
     # Citeseer
-    g = data.CiteseerGraphDataset()[0]
+    g = data.CiteseerGraphDataset(force_reload=True, reorder=True)[0]
     assert g.num_nodes() == 3327
     assert g.num_edges() == 9228
     dst = F.asnumpy(g.edges()[1])
@@ -133,7 +133,7 @@ def test_citation_graph():
     assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
     # Pubmed
-    g = data.PubmedGraphDataset()[0]
+    g = data.PubmedGraphDataset(force_reload=True, reorder=True)[0]
     assert g.num_nodes() == 19717
     assert g.num_edges() == 88651
     dst = F.asnumpy(g.edges()[1])

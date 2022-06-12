@@ -47,11 +47,11 @@ IdArray NonZero(IdArray array) {
       device->AllocWorkspace(ctx, sizeof(int64_t)));
 
   size_t temp_size = 0;
-  cub::DeviceSelect::If(nullptr, temp_size, counter, out_data,
-      d_num_nonzeros, len, comp, stream);
+  CUDA_CALL(cub::DeviceSelect::If(nullptr, temp_size, counter, out_data,
+      d_num_nonzeros, len, comp, stream));
   void * temp = device->AllocWorkspace(ctx, temp_size);
-  cub::DeviceSelect::If(temp, temp_size, counter, out_data,
-      d_num_nonzeros, len, comp, stream);
+  CUDA_CALL(cub::DeviceSelect::If(temp, temp_size, counter, out_data,
+      d_num_nonzeros, len, comp, stream));
   device->FreeWorkspace(ctx, temp);
 
   // copy number of selected elements from GPU to CPU

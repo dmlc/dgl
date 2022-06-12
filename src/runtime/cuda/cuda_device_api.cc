@@ -120,9 +120,9 @@ class CUDADeviceAPI final : public DeviceAPI {
       if (ctx_from.device_id == ctx_to.device_id) {
         GPUCopy(from, to, size, cudaMemcpyDeviceToDevice, cu_stream);
       } else {
-        cudaMemcpyPeerAsync(to, ctx_to.device_id,
-                            from, ctx_from.device_id,
-                            size, cu_stream);
+        CUDA_CALL(cudaMemcpyPeerAsync(to, ctx_to.device_id,
+                                      from, ctx_from.device_id,
+                                      size, cu_stream));
       }
     } else if (ctx_from.device_type == kDLGPU && ctx_to.device_type == kDLCPU) {
       CUDA_CALL(cudaSetDevice(ctx_from.device_id));
