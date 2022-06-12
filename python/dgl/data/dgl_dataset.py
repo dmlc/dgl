@@ -243,7 +243,8 @@ class DGLDataset(object):
     def save_path(self):
         r"""Path to save the processed dataset.
         """
-        return os.path.join(self._save_dir, self.name)
+        path = 'reordered' if self._reorder else 'un_reordered'
+        return os.path.join(self._save_dir, self.name, path)
 
     @property
     def verbose(self):

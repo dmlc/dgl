@@ -52,7 +52,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
         a transformed version. The :class:`~dgl.DGLGraph` object will be
         transformed before every access.
     reorder : bool
-        Whether to reorder the graph. Default: False.
+        Whether to reorder the graph using :func:`~dgl.reorder_graph`. Default: False.
     """
     _urls = {
         'cora_v2' : 'dataset/cora_v2.zip',
@@ -381,7 +381,7 @@ class CoraGraphDataset(CitationGraphDataset):
         a transformed version. The :class:`~dgl.DGLGraph` object will be
         transformed before every access.
     reorder : bool
-        Whether to reorder the graph. Default: False.
+        Whether to reorder the graph using :func:`~dgl.reorder_graph`. Default: False.
 
     Attributes
     ----------
@@ -529,7 +529,7 @@ class CiteseerGraphDataset(CitationGraphDataset):
         a transformed version. The :class:`~dgl.DGLGraph` object will be
         transformed before every access.
     reorder : bool
-        Whether to reorder the graph. Default: False.
+        Whether to reorder the graph using :func:`~dgl.reorder_graph`. Default: False.
 
     Attributes
     ----------
@@ -680,7 +680,7 @@ class PubmedGraphDataset(CitationGraphDataset):
         a transformed version. The :class:`~dgl.DGLGraph` object will be
         transformed before every access.
     reorder : bool
-        Whether to reorder the graph. Default: False.
+        Whether to reorder the graph using :func:`~dgl.reorder_graph`. Default: False.
 
     Attributes
     ----------
