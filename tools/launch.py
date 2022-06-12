@@ -568,6 +568,8 @@ def submit_jobs(args, udf_command):
         pythonpath=os.environ.get("PYTHONPATH", ""),
     )
 
+    master_addr = hosts[0][0]
+    master_port = get_available_port(master_addr)
     for node_id, host in enumerate(hosts):
         ip, _ = host
         # Transform udf_command to follow torch's dist launcher format: `PYTHON_BIN -m torch.distributed.launch ... UDF`
@@ -576,8 +578,8 @@ def submit_jobs(args, udf_command):
             num_trainers=args.num_trainers,
             num_nodes=len(hosts),
             node_rank=node_id,
-            master_addr=hosts[0][0],
-            master_port=get_available_port(hosts[0][0]),
+            master_addr=master_addr,
+            master_port=master_port
         )
         cmd = wrap_cmd_with_local_envvars(torch_dist_udf_command, client_env_vars)
         cmd = wrap_cmd_with_extra_envvars(cmd, args.extra_envs) if len(args.extra_envs) > 0 else cmd
