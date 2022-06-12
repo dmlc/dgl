@@ -80,7 +80,9 @@ Take the survey [here](https://forms.gle/Ej3jHCocACmb49Gp8) and leave any feedba
 * GNN-RecSys: https://github.com/je-dbl/GNN-RecSys
 * Amazon Neptune ML: a new capability of Neptune that uses Graph Neural Networks (GNNs), a machine learning technique purpose-built for graphs, to make easy, fast, and more accurate predictions using graph data. https://aws.amazon.com/cn/neptune/machine-learning/
 * GNNLens2: Visualization tool for Graph Neural Networks. https://github.com/dmlc/GNNLens2
-* RNAGlib: A package to facilitate construction, analysis, visualization and machine learning on RNA 2.5D Graphs. Includes a pre-built dataset: https://rnaglib.cs.mcgill.ca 
+* RNAGlib: A package to facilitate construction, analysis, visualization and machine learning on RNA 2.5D Graphs. Includes a pre-built dataset: https://rnaglib.cs.mcgill.ca
+* OpenHGNN: Model zoo and benchmarks for Heterogeneous Graph Neural Networks. https://github.com/BUPT-GAMMA/OpenHGNN
+* TGL: A graph learning framework for large-scale temporal graphs. https://github.com/amazon-research/tgl
 
 ### Awesome Papers Using DGL
 
