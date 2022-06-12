@@ -17,6 +17,7 @@ from .graph_serialize import save_graphs, load_graphs, load_labels
 from .tensor_serialize import save_tensors, load_tensors
 
 from .. import backend as F
+from .._ffi.base import __version__
 
 __all__ = ['loadtxt','download', 'check_sha1', 'extract_archive',
         'get_download_dir', 'Subset', 'split_dataset', 'save_graphs',
@@ -240,7 +241,7 @@ def get_download_dir():
     dirname : str
         Path to the download directory
     """
-    default_dir = os.path.join(os.path.expanduser('~'), '.dgl')
+    default_dir = os.path.join(os.path.expanduser('~'), '.dgl_v{}'.format(__version__))
     dirname = os.environ.get('DGL_DOWNLOAD_DIR', default_dir)
     if not os.path.exists(dirname):
         os.makedirs(dirname)
