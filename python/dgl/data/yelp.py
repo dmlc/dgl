@@ -40,6 +40,9 @@ class YelpDataset(DGLBuiltinDataset):
             A transform that takes in a :class:`~dgl.DGLGraph` object and returns
             a transformed version. The :class:`~dgl.DGLGraph` object will be
             transformed before every access.
+        reorder : bool
+            Whether to reorder the graph using :func:`~dgl.reorder_graph`.
+            Default: False.
 
         Attributes
         ----------
@@ -62,8 +65,11 @@ class YelpDataset(DGLBuiltinDataset):
         >>> test_mask = g.ndata['test_mask']
         """
 
-    def __init__(self, raw_dir=None, force_reload=False, verbose=False, transform=None):
-        _url = _get_dgl_url('dataset/yelp.zip')
+    def __init__(self, raw_dir=None, force_reload=False, verbose=False, transform=None,
+                 reorder=False):
+        # _url = _get_dgl_url('dataset/yelp.zip')
+        _url = 'https://dgl-data.s3.cn-north-1.amazonaws.com.cn/dataset/yelp.zip'
+        self._reorder = reorder
         super(YelpDataset, self).__init__(name='yelp',
                                           raw_dir=raw_dir,
                                           url=_url,
@@ -112,9 +118,11 @@ class YelpDataset(DGLBuiltinDataset):
         g.ndata['val_mask'] = generate_mask_tensor(val_mask)
         g.ndata['test_mask'] = generate_mask_tensor(test_mask)
 
-        g = reorder_graph(g, node_permute_algo='rcmk', edge_permute_algo='dst', store_ids=False)
-
-        self._graph = g
+        if self._reorder:
+            self._graph = reorder_graph(
+                g, node_permute_algo='rcmk', edge_permute_algo='dst', store_ids=False)
+        else:
+            self._graph = g
 
     def has_cache(self):
         graph_path = os.path.join(self.save_path, 'dgl_graph.bin')
