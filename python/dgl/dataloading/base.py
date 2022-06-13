@@ -6,7 +6,8 @@ from ..convert import heterograph
 from .. import backend as F
 from ..transforms import compact_graphs
 from ..frame import LazyFeature
-from ..utils import recursive_apply, context_of
+from ..utils import recursive_apply, context_of, union, to_canonical_etype_keys, \
+                    assert_canonical_etype_keys
 
 def _set_lazy_features(x, xdata, feature_names):
     if feature_names is None:
@@ -246,7 +247,7 @@ class BlockSampler(Sampler):
 
 def _find_exclude_eids_with_reverse_id(g, eids, reverse_eid_map):
     if isinstance(eids, Mapping):
-        eids = {g.to_canonical_etype(k): v for k, v in eids.items()}
+        assert_canonical_etype_keys(eids)
         exclude_eids = {
             k: F.cat([v, F.gather_row(reverse_eid_map[k], v)], 0)
             for k, v in eids.items()}
@@ -255,7 +256,8 @@ def _find_exclude_eids_with_reverse_id(g, eids, reverse_eid_map):
     return exclude_eids
 
 def _find_exclude_eids_with_reverse_types(g, eids, reverse_etype_map):
-    exclude_eids = {g.to_canonical_etype(k): v for k, v in eids.items()}
+    assert_canonical_etype_keys(eids)
+    exclude_eids = eids.copy()
     reverse_etype_map = {
         g.to_canonical_etype(k): g.to_canonical_etype(v)
         for k, v in reverse_etype_map.items()}
@@ -332,7 +334,8 @@ def find_exclude_eids(g, seed_edges, exclude, exclude_eids=None, reverse_eids=No
         The device of the output edge IDs.
     """
     if exclude_eids is not None:
-        seed_edges = utils.union(seed_edges, exclude_eids)
+        exclude_eids = to_canonical_etype_keys(g, exclude_eids)
+        seed_edges = union(seed_edges, exclude_eids)
     exclude_eids = _find_exclude_eids(
         g,
         exclude,
@@ -402,8 +405,7 @@ class EdgePredictionSampler(Sampler):
         If :attr:`negative_sampler` is given, also returns another graph containing the
         negative pairs as edges.
         """
-        if isinstance(seed_edges, Mapping):
-            seed_edges = {g.to_canonical_etype(k): v for k, v in seed_edges.items()}
+        seed_edges = to_canonical_etype_keys(g, seed_edges)
         exclude = self.exclude
         pair_graph = g.edge_subgraph(
             seed_edges, relabel_nodes=False, output_device=self.output_device)

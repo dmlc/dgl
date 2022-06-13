@@ -1038,6 +1038,17 @@ def union(data1, data2):
     elif ismap1 or ismap2:
         raise TypeError('Expect arguments to be both tensors or both dictionaries.')
     else:
-        return F.unique(F.cat([data1, data2]))
+        return F.unique(F.cat([data1, data2], 0))
+
+def to_canonical_etype_keys(g, data):
+    """Convert the keys of data dictionary to canonical edge types if necessary, or
+    return the data itself if it is not a dictionary.
+    """
+    if not isinstance(data, Mapping):
+        return data
+    return {g.to_canonical_etype(k): v for k, v in data.items()}
+
+def assert_canonical_etype_keys(data):
+    assert all(isinstance(k, tuple) for k in data.keys())
 
 _init_api("dgl.utils.internal")
