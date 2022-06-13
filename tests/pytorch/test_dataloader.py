@@ -361,8 +361,9 @@ def test_edge_dataloader_excludes(exclude, always_exclude_flag):
         else exclude)
     kwargs['reverse_eids'] = reverse_eids if exclude == 'reverse_id' else None
     kwargs['reverse_etypes'] = reverse_etypes if exclude == 'reverse_types' else None
+    kwargs['exclude_eids'] = always_exclude
 
-    dataloader = dgl.dataloading.EdgeDataLoader(
+    dataloader = dgl.dataloading.DataLoader(
         g, seed_edges, sampler, batch_size=50, device=F.ctx(), **kwargs)
     for input_nodes, pair_graph, blocks in dataloader:
         block = blocks[0]

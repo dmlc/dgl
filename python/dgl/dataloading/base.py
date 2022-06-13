@@ -280,15 +280,17 @@ def _find_exclude_eids(g, exclude_mode, eids, **kwargs):
     else:
         raise ValueError('unsupported mode {}'.format(exclude_mode))
 
-def find_exclude_eids(g, seed_edges, exclude, reverse_eids=None, reverse_etypes=None,
-                      output_device=None):
+def find_exclude_eids(g, seed_edges, exclude, exclude_eids=None, reverse_eids=None,
+                      reverse_etypes=None, output_device=None):
     """Find all edge IDs to exclude according to :attr:`exclude_mode`.
 
     Parameters
     ----------
     g : DGLGraph
         The graph.
-    exclude_mode : str, optional
+    seed_edges : Tensor or dict[etype, Tensor]
+        The edge IDs.
+    exclude :
         Can be either of the following,
 
         None (default)
@@ -320,8 +322,8 @@ def find_exclude_eids(g, seed_edges, exclude, reverse_eids=None, reverse_etypes=
         callable
             Any function that takes in a single argument :attr:`seed_edges` and returns
             a tensor or dict of tensors.
-    eids : Tensor or dict[etype, Tensor]
-        The edge IDs.
+    exclude_eids : Tensor or dict[etype, Tensor]
+        The edge IDs to always exclude from subgraphs regardless of :attr:`seed_edges`.
     reverse_eids : Tensor or dict[etype, Tensor]
         The mapping from edge ID to its reverse edge ID.
     reverse_etypes : dict[etype, etype]
@@ -329,6 +331,8 @@ def find_exclude_eids(g, seed_edges, exclude, reverse_eids=None, reverse_etypes=
     output_device : device
         The device of the output edge IDs.
     """
+    if exclude_eids is not None:
+        seed_edges = utils.union(seed_edges, exclude_eids)
     exclude_eids = _find_exclude_eids(
         g,
         exclude,
@@ -347,7 +351,7 @@ class EdgePredictionSampler(Sampler):
     --------
     as_edge_prediction_sampler
     """
-    def __init__(self, sampler, exclude=None, reverse_eids=None,
+    def __init__(self, sampler, exclude=None, exclude_eids=None, reverse_eids=None,
                  reverse_etypes=None, negative_sampler=None, prefetch_labels=None):
         super().__init__()
         # Check if the sampler's sample method has an optional third argument.
@@ -359,6 +363,7 @@ class EdgePredictionSampler(Sampler):
         self.reverse_eids = reverse_eids
         self.reverse_etypes = reverse_etypes
         self.exclude = exclude
+        self.exclude_eids = exclude_eids
         self.sampler = sampler
         self.negative_sampler = negative_sampler
         self.prefetch_labels = prefetch_labels or []
@@ -414,7 +419,7 @@ class EdgePredictionSampler(Sampler):
         seed_nodes = pair_graph.ndata[NID]
 
         exclude_eids = find_exclude_eids(
-            g, seed_edges, exclude, self.reverse_eids, self.reverse_etypes,
+            g, seed_edges, exclude, self.exclude_eids, self.reverse_eids, self.reverse_etypes,
             self.output_device)
 
         input_nodes, _, blocks = self.sampler.sample(g, seed_nodes, exclude_eids)
@@ -425,8 +430,8 @@ class EdgePredictionSampler(Sampler):
             return self.assign_lazy_features((input_nodes, pair_graph, neg_graph, blocks))
 
 def as_edge_prediction_sampler(
-        sampler, exclude=None, reverse_eids=None, reverse_etypes=None, negative_sampler=None,
-        prefetch_labels=None):
+        sampler, exclude=None, exclude_eids=None, reverse_eids=None, reverse_etypes=None,
+        negative_sampler=None, prefetch_labels=None):
     """Create an edge-wise sampler from a node-wise sampler.
 
     For each batch of edges, the sampler applies the provided node-wise sampler to
@@ -475,6 +480,11 @@ def as_edge_prediction_sampler(
 
         * User-defined exclusion rule. It is a callable with edges in the current
           minibatch as a single argument and should return the edges to be excluded.
+    exclude_eids : Tensor or dict[etype, Tensor], optional
+        The edge IDs to always exclude from during neighborhood sampling.
+
+        Note that if :attr:`exclude` argument is ``reverse_id`` or ``reverse_types``,
+        the reverse edges of this argument will also be excluded.
     reverse_eids : Tensor or dict[etype, Tensor], optional
         A tensor of reverse edge ID mapping.  The i-th element indicates the ID of
         the i-th edge's reverse edge.
@@ -507,13 +517,20 @@ def as_edge_prediction_sampler(
     >>> E = len(src)
     >>> reverse_eids = torch.cat([torch.arange(E, 2 * E), torch.arange(0, E)])
 
+    If you have validation edges ``val_eid`` and test edges ``test_eid`` which you don't wish
+    to include in extracted subgraphs, then you will need to pass them into
+    this function as well:
+
+    >>> exclude_eids = torch.cat([val_eid, test_eid])
+
     By passing ``reverse_eids`` to the edge sampler, the edges in the current mini-batch and their
     reversed edges will be excluded from the extracted subgraphs to avoid information leakage.
+    Note that the reverse edges of ``exclude_eids`` will also be excluded.
 
     >>> sampler = dgl.dataloading.as_edge_prediction_sampler(
     ...     dgl.dataloading.NeighborSampler([15, 10, 5]),
-    ...     exclude='reverse_id', reverse_eids=reverse_eids)
-    >>> dataloader = dgl.dataloading.EdgeDataLoader(
+    ...     exclude='reverse_id', exclude_eids=exclude_eids, reverse_eids=reverse_eids)
+    >>> dataloader = dgl.dataloading.DataLoader(
     ...     g, train_eid, sampler,
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
     >>> for input_nodes, pair_graph, blocks in dataloader:
@@ -526,9 +543,9 @@ def as_edge_prediction_sampler(
     >>> neg_sampler = dgl.dataloading.negative_sampler.Uniform(5)
     >>> sampler = dgl.dataloading.as_edge_prediction_sampler(
     ...     dgl.dataloading.NeighborSampler([15, 10, 5]),
-    ...     sampler, exclude='reverse_id', reverse_eids=reverse_eids,
+    ...     exclude='reverse_id', exclude_eids=exclude_eids, reverse_eids=reverse_eids,
     ...     negative_sampler=neg_sampler)
-    >>> dataloader = dgl.dataloading.EdgeDataLoader(
+    >>> dataloader = dgl.dataloading.DataLoader(
     ...     g, train_eid, sampler,
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
     >>> for input_nodes, pos_pair_graph, neg_pair_graph, blocks in dataloader:
@@ -545,12 +562,15 @@ def as_edge_prediction_sampler(
     To correctly exclude edges from each mini-batch, set ``exclude='reverse_types'`` and
     pass a dictionary ``{'click': 'clicked-by', 'clicked-by': 'click'}`` to the
     ``reverse_etypes`` argument.
+    If you want to exclude the validation edges and test edges for heterogeneous graphs,
+    you need to pass in a dictionary to the :attr:`exclude_eids` argument.
 
     >>> sampler = dgl.dataloading.as_edge_prediction_sampler(
     ...     dgl.dataloading.NeighborSampler([15, 10, 5]),
     ...     exclude='reverse_types',
+    ...     exclude_eids={'click': exclude_eids},
     ...     reverse_etypes={'click': 'clicked-by', 'clicked-by': 'click'})
-    >>> dataloader = dgl.dataloading.EdgeDataLoader(
+    >>> dataloader = dgl.dataloading.DataLoader(
     ...     g, {'click': train_eid}, sampler,
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
     >>> for input_nodes, pair_graph, blocks in dataloader:
@@ -562,14 +582,16 @@ def as_edge_prediction_sampler(
     >>> sampler = dgl.dataloading.as_edge_prediction_sampler(
     ...     dgl.dataloading.NeighborSampler([15, 10, 5]),
     ...     exclude='reverse_types',
+    ...     exclude_eids={'click': exclude_eids},
     ...     reverse_etypes={'click': 'clicked-by', 'clicked-by': 'click'},
     ...     negative_sampler=neg_sampler)
-    >>> dataloader = dgl.dataloading.EdgeDataLoader(
+    >>> dataloader = dgl.dataloading.DataLoader(
     ...     g, train_eid, sampler,
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
     >>> for input_nodes, pos_pair_graph, neg_pair_graph, blocks in dataloader:
     ...     train_on(input_nodes, pair_graph, neg_pair_graph, blocks)
     """
     return EdgePredictionSampler(
-        sampler, exclude=exclude, reverse_eids=reverse_eids, reverse_etypes=reverse_etypes,
-        negative_sampler=negative_sampler, prefetch_labels=prefetch_labels)
+        sampler, exclude=exclude, exclude_eids=exclude_eids, reverse_eids=reverse_eids,
+        reverse_etypes=reverse_etypes, negative_sampler=negative_sampler,
+        prefetch_labels=prefetch_labels)

@@ -1023,4 +1023,21 @@ def dtype_of(data):
     """Return the dtype of the data which can be either a tensor or a dict of tensors."""
     return F.dtype(next(iter(data.values())) if isinstance(data, Mapping) else data)
 
+def union(data1, data2):
+    """Return the union of two tensors or two dictionaries of tensors."""
+    ismap1 = isinstance(data1, Mapping)
+    ismap2 = isinstance(data2, Mapping)
+    if ismap1 and ismap2:
+        result = data1.copy()
+        for k, v in data2.items():
+            if k in result:
+                result[k] = F.unique(F.cat([result[k], v], 0))
+            else:
+                result[k] = v
+        return result
+    elif ismap1 or ismap2:
+        raise TypeError('Expect arguments to be both tensors or both dictionaries.')
+    else:
+        return F.unique(F.cat([data1, data2]))
+
 _init_api("dgl.utils.internal")

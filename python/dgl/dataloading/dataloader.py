@@ -937,8 +937,8 @@ class EdgeDataLoader(DataLoader):
                  ddp_seed=0, batch_size=1, drop_last=False, shuffle=False,
                  use_prefetch_thread=False, use_alternate_streams=True,
                  pin_prefetcher=False,
-                 exclude=None, reverse_eids=None, reverse_etypes=None, negative_sampler=None,
-                 use_uva=False, **kwargs):
+                 exclude=None, exclude_eids=None, reverse_eids=None, reverse_etypes=None,
+                 negative_sampler=None, use_uva=False, **kwargs):
 
         if device is None:
             if use_uva:
@@ -961,7 +961,8 @@ class EdgeDataLoader(DataLoader):
                     if indices_device != reverse_eids_device:
                         raise ValueError('Expect the same device for indices and reverse_eids')
             graph_sampler = as_edge_prediction_sampler(
-                graph_sampler, exclude=exclude, reverse_eids=reverse_eids,
+                graph_sampler, exclude=exclude, exclude_eids=exclude_eids,
+                reverse_eids=reverse_eids,
                 reverse_etypes=reverse_etypes, negative_sampler=negative_sampler)
 
         super().__init__(
