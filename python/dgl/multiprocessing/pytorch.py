@@ -69,6 +69,7 @@ def call_once_and_share(func, shape, dtype, rank=0):
 
     # Process with the given rank creates and populates the shared memory array.
     if current_rank == rank:
+        random.seed()
         id_ = random.getrandbits(32)
         name = _get_shared_mem_name(id_)
         result = create_shared_mem_array(name, shape, dtype)
