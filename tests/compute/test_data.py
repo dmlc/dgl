@@ -276,7 +276,7 @@ def test_wiki_cs():
     g2 = data.WikiCSDataset(transform=transform)[0]
     assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
-@unittest.skip(reason="Bugs need to be fixed.")
+@unittest.skip(reason="Dataset too large to download for the latest CI.")
 def test_yelp():
     g = data.YelpDataset(reorder=True)[0]
     assert g.num_nodes() == 716847
