@@ -277,18 +277,6 @@ def test_wiki_cs():
     assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
-def test_flickr():
-    g = data.FlickrDataset(reorder=True)[0]
-    assert g.num_nodes() == 89250
-    assert g.num_edges() == 899756
-    dst = F.asnumpy(g.edges()[1])
-    assert np.array_equal(dst, np.sort(dst))
-
-    transform = dgl.AddSelfLoop(allow_duplicate=True)
-    g2 = data.FlickrDataset(transform=transform)[0]
-    assert g2.num_edges() - g.num_edges() == g.num_nodes()
-
-@unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
 def test_yelp():
     g = data.YelpDataset(reorder=True)[0]
     assert g.num_nodes() == 716847
@@ -298,6 +286,18 @@ def test_yelp():
 
     transform = dgl.AddSelfLoop(allow_duplicate=True)
     g2 = data.YelpDataset(transform=transform)[0]
+    assert g2.num_edges() - g.num_edges() == g.num_nodes()
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+def test_flickr():
+    g = data.FlickrDataset(reorder=True)[0]
+    assert g.num_nodes() == 89250
+    assert g.num_edges() == 899756
+    dst = F.asnumpy(g.edges()[1])
+    assert np.array_equal(dst, np.sort(dst))
+
+    transform = dgl.AddSelfLoop(allow_duplicate=True)
+    g2 = data.FlickrDataset(transform=transform)[0]
     assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
