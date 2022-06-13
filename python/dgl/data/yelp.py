@@ -67,8 +67,8 @@ class YelpDataset(DGLBuiltinDataset):
 
     def __init__(self, raw_dir=None, force_reload=False, verbose=False, transform=None,
                  reorder=False):
-        # _url = _get_dgl_url('dataset/yelp.zip')
-        _url = 'https://dgl-data.s3.cn-north-1.amazonaws.com.cn/dataset/yelp.zip'
+        _url = _get_dgl_url('dataset/yelp.zip')
+        # _url = 'https://dgl-data.s3.cn-north-1.amazonaws.com.cn/dataset/yelp.zip'
         self._reorder = reorder
         super(YelpDataset, self).__init__(name='yelp',
                                           raw_dir=raw_dir,
@@ -79,6 +79,13 @@ class YelpDataset(DGLBuiltinDataset):
 
     def process(self):
         """process raw data to graph, labels and masks"""
+        assert os.path.exists(os.path.join(self.raw_dir, 'yelp.zip'))
+        assert os.path.getsize(os.path.join(self.raw_dir, 'yelp.zip')) == 986517215
+        assert os.path.exists(self.raw_path)
+        assert os.path.exists(os.path.join(self.raw_path, "adj_full.npz"))
+        assert os.path.exists(os.path.join(self.raw_path, "feats.npy"))
+        assert os.path.exists(os.path.join(self.raw_path, "class_map.json"))
+        assert os.path.exists(os.path.join(self.raw_path, "role.json"))
         coo_adj = sp.load_npz(os.path.join(self.raw_path, "adj_full.npz"))
         g = from_scipy(coo_adj)
 
@@ -118,27 +125,16 @@ class YelpDataset(DGLBuiltinDataset):
 
     def download(self):
         """Download the dataset."""
-        try:
-            zip_file_path = os.path.join(self.raw_dir, self.name + '.zip')
-            download(self.url, path=zip_file_path)
-            extract_archive(zip_file_path, self.raw_path)
-            assert os.path.exists(os.path.join(self.raw_dir, 'yelp.zip'))
-            assert os.path.exists(self.raw_path)
-            assert os.path.exists(os.path.join(self.raw_path, "adj_full.npz"))
-            assert os.path.exists(os.path.join(self.raw_path, "feats.npy"))
-            assert os.path.exists(os.path.join(self.raw_path, "class_map.json"))
-            assert os.path.exists(os.path.join(self.raw_path, "role.json"))
-        except AssertionError:
-            _url = _get_dgl_url('dataset/yelp.zip')
-            zip_file_path = os.path.join(self.raw_dir, self.name + '.zip')
-            download(_url, path=zip_file_path)
-            extract_archive(zip_file_path, self.raw_path)
-            assert os.path.exists(os.path.join(self.raw_dir, 'yelp.zip'))
-            assert os.path.exists(self.raw_path)
-            assert os.path.exists(os.path.join(self.raw_path, "adj_full.npz"))
-            assert os.path.exists(os.path.join(self.raw_path, "feats.npy"))
-            assert os.path.exists(os.path.join(self.raw_path, "class_map.json"))
-            assert os.path.exists(os.path.join(self.raw_path, "role.json"))
+        zip_file_path = os.path.join(self.raw_dir, self.name + '.zip')
+        download(self.url, path=zip_file_path)
+        extract_archive(zip_file_path, self.raw_path)
+        assert os.path.exists(os.path.join(self.raw_dir, 'yelp.zip'))
+        assert os.path.getsize(os.path.join(self.raw_dir, 'yelp.zip')) == 986517215
+        assert os.path.exists(self.raw_path)
+        assert os.path.exists(os.path.join(self.raw_path, "adj_full.npz"))
+        assert os.path.exists(os.path.join(self.raw_path, "feats.npy"))
+        assert os.path.exists(os.path.join(self.raw_path, "class_map.json"))
+        assert os.path.exists(os.path.join(self.raw_path, "role.json"))
 
     def has_cache(self):
         graph_path = os.path.join(self.save_path, 'dgl_graph.bin')
