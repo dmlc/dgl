@@ -684,8 +684,7 @@ class DataLoader(torch.utils.data.DataLoader):
     def __init__(self, graph, indices, graph_sampler, device=None, use_ddp=False,
                  ddp_seed=0, batch_size=1, drop_last=False, shuffle=False,
                  use_prefetch_thread=None, use_alternate_streams=None,
-                 pin_prefetcher=None, use_uva=False,
-                 use_cpu_worker_affinity=False, cpu_worker_affinity_cores=None, **kwargs):
+                 pin_prefetcher=None, use_uva=False, **kwargs):
         # (BarclayII) PyTorch Lightning sometimes will recreate a DataLoader from an existing
         # DataLoader with modifications to the original arguments.  The arguments are retrieved
         # from the attributes with the same name, and because we change certain arguments
@@ -732,7 +731,6 @@ class DataLoader(torch.utils.data.DataLoader):
         self.graph = graph
         self.indices = indices      # For PyTorch-Lightning
         num_workers = kwargs.get('num_workers', 0)
-        self.num_workers = num_workers
 
         indices_device = None
         try:
@@ -829,31 +827,10 @@ class DataLoader(torch.utils.data.DataLoader):
         self.use_alternate_streams = use_alternate_streams
         self.pin_prefetcher = pin_prefetcher
         self.use_prefetch_thread = use_prefetch_thread
-        self.use_cpu_worker_affinity = use_cpu_worker_affinity
 
         worker_init_fn = WorkerInitWrapper(kwargs.get('worker_init_fn', None))
 
         self.other_storages = {}
-
-        if use_cpu_worker_affinity:
-            nw_work = kwargs.get('num_workers', 0)
-
-            if cpu_worker_affinity_cores is None:
-                cpu_worker_affinity_cores = []
-
-            if not isinstance(cpu_worker_affinity_cores, list):
-                raise Exception('ERROR: cpu_worker_affinity_cores should be a list of cores')
-            if not nw_work > 0:
-                raise Exception('ERROR: affinity should be used with --num_workers=X')
-            if len(cpu_worker_affinity_cores) not in [0, nw_work]:
-                raise Exception('ERROR: cpu_affinity incorrect '
-                                'settings for cores={} num_workers={}'
-                                .format(cpu_worker_affinity_cores, nw_work))
-
-            self.cpu_cores = (cpu_worker_affinity_cores
-                                if len(cpu_worker_affinity_cores)
-                                else range(0, nw_work))
-            worker_init_fn = WorkerInitWrapper(self.worker_init_function)
 
         super().__init__(
             self.dataset,
@@ -873,39 +850,55 @@ class DataLoader(torch.utils.data.DataLoader):
             self, super().__iter__(), use_thread=self.use_prefetch_thread,
             use_alternate_streams=self.use_alternate_streams, num_threads=num_threads)
 
-    def worker_init_function(self, worker_id):
-        """Worker init default function.
-              Parameters
-              ----------
-              worker_id : int
-                  Worker ID.
-        """
-        try:
-            psutil.Process().cpu_affinity([self.cpu_cores[worker_id]])
-            print('CPU-affinity worker {} has been assigned to core={}'
-                  .format(worker_id, self.cpu_cores[worker_id]))
-        except:
-            raise Exception('ERROR: cannot use affinity id={} cpu_cores={}'
-                            .format(worker_id, self.cpu_cores))
-
     @contextmanager
-    def enable_cpu_affinity(self):
-        """ Helper method for enabling cpu affinity for compute threads
+    def enable_cpu_affinity(self, loader_cores=None, compute_cores=None):
+        """ Helper method for enabling cpu affinity for compute threads and dataloader workers
         """
         affinity_old = psutil.Process().cpu_affinity()
         nthreads_old = get_num_threads()
+        worker_init_fn_old = self.worker_init_fn
 
         ncores = psutil.cpu_count(logical = False)
         compute_affinity = range(self.num_workers, ncores)
+        
+        def init_fn(worker_id):
+            try:
+                psutil.Process().cpu_affinity([loader_cores[worker_id]])
+                print('CPU-affinity worker {} has been assigned to core={}'
+                    .format(worker_id, loader_cores[worker_id]))
+            except:
+                raise Exception('ERROR: cannot use affinity id={} cpu_cores={}'
+                                .format(worker_id, loader_cores))
 
-        if self.use_cpu_worker_affinity:
-            psutil.Process().cpu_affinity()
-            set_num_threads(psutil.cpu_count(logical = False) - self.num_workers)
+            worker_init_fn_old(worker_id)
+
+        if self.device.type == 'cpu':
+            if loader_cores is None:
+                loader_cores = []
+
+            if not isinstance(loader_cores, list):
+                raise Exception('ERROR: loader_cores should be a list of cores')
+            if not self.num_workers > 0:
+                raise Exception('ERROR: affinity should be used with --num_workers=X')
+            if len(loader_cores) not in [0, self.num_workers]:
+                raise Exception('ERROR: cpu_affinity incorrect '
+                                'settings for loader_cores={} num_workers={}'
+                                .format(loader_cores, self.num_workers))
+
+            loader_cores = (loader_cores
+                            if len(loader_cores) == self.num_workers
+                            else range(0, self.num_workers))
+
+            psutil.Process().cpu_affinity(compute_cores)
+            set_num_threads(ncores - self.num_workers)
+            self.worker_init_fn = init_fn
+
         try:
             yield affinity_old
         finally:
             psutil.Process().cpu_affinity(affinity_old)
             set_num_threads(nthreads_old)
+            self.worker_init_fn = worker_init_fn_old
 
     # To allow data other than node/edge data to be prefetched.
     def attach_data(self, name, data):

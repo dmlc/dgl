@@ -28,7 +28,7 @@ DGL_REGISTER_GLOBAL("utils.internal._CAPI_DGLSetOMPThreads")
 
 DGL_REGISTER_GLOBAL("utils.internal._CAPI_DGLGetOMPThreads")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    *rv = omp_get_num_threads();
+    *rv = omp_get_max_threads();
   });
 
 DGL_REGISTER_GLOBAL("utils.checks._CAPI_DGLCOOIsSorted")
