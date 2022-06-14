@@ -87,7 +87,8 @@ static __device__ __forceinline__ unsigned short int atomicCASshort(
   (void)address;
   (void)compare;
   (void)val;
-  printf("Atomic operations are not supported for FP16 on this GPU.\n");
+  printf("Atomic operations are not supported for half precision (FP16) "
+      "on this GPU.\n");
   __trap();
   return val;
 #endif  // (defined(__CUDA_ARCH__) && (__CUDA_ARCH__) >= 700)
@@ -267,7 +268,8 @@ __device__ __forceinline__ half AtomicAdd<half>(half* addr, half val) {
 #else
   (void)addr;
   (void)val;
-  printf("Atomic operations are not supported for FP16 on this GPU.\n");
+  printf("Atomic operations are not supported for half precision (FP16) "
+      "on this GPU.\n");
   __trap();
   return val;
 #endif  // __CUDA_ARCH__ >= 700
