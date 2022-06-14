@@ -364,7 +364,7 @@ def test_edge_dataloader_excludes(exclude, always_exclude_flag):
     kwargs['exclude_eids'] = always_exclude
 
     dataloader = dgl.dataloading.EdgeDataLoader(
-        g, seed_edges, sampler, batch_size=50, device=F.ctx(), use_prefetch_thread=False, num_workers=0, **kwargs)
+        g, seed_edges, sampler, batch_size=50, device=F.ctx(), **kwargs)
     for input_nodes, pair_graph, blocks in dataloader:
         block = blocks[0]
         pair_eids = pair_graph.edata[dgl.EID]
