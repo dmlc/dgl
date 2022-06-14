@@ -80,12 +80,17 @@ static __device__ __forceinline__ unsigned short int atomicCASshort(
     unsigned short int *address,
     unsigned short int compare,
     unsigned short int val) {
-#if (defined(CUDART_VERSION) && (CUDART_VERSION > 10000))
+  static_assert(CUDART_VERSION >= 10000, "Requires at least CUDA 10");
 #if (defined(__CUDA_ARCH__) && (__CUDA_ARCH__) >= 700)
   return atomicCAS(address, compare, val);
-#endif  // (defined(__CUDA_ARCH__) && (__CUDA_ARCH__) >= 700)
-#endif  // (defined(CUDART_VERSION) && (CUDART_VERSION > 10000))
+#else
+  (void)address;
+  (void)compare;
+  (void)val;
+  printf("Atomic operations are not supported on this GPU.\n");
+  __trap();
   return val;
+#endif  // (defined(__CUDA_ARCH__) && (__CUDA_ARCH__) >= 700)
 }
 
 #define DEFINE_ATOMIC(NAME) \
@@ -260,9 +265,11 @@ __device__ __forceinline__ half AtomicAdd<half>(half* addr, half val) {
 #if __CUDA_ARCH__ >= 700
   return atomicAdd(addr, val);
 #else
-  half old = *addr;
-  *addr = half(float(old) + float(val));
-  return old;
+  (void)addr;
+  (void)val;
+  printf("Atomic operations are not supported on this GPU.\n");
+  __trap();
+  return val;
 #endif  // __CUDA_ARCH__ >= 700
 }
 #endif  // defined(CUDART_VERSION) && CUDART_VERSION >= 10000
