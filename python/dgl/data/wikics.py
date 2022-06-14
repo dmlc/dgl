@@ -22,7 +22,7 @@ class WikiCSDataset(DGLBuiltinDataset):
     - Nodes: 11,701
     - Edges: 431,726 (note that the original dataset has 216,123 edges but DGL adds
       the reverse edges and removes the duplicate edges, hence with a different number)
-    - Number of Classes: 10
+    - Number of classes: 10
     - Node feature size: 300
     - Number of different train, validation, stopping splits: 20
     - Number of test split: 1
@@ -59,9 +59,9 @@ class WikiCSDataset(DGLBuiltinDataset):
     >>> # get node labels
     >>> labels = g.ndata['label']
     >>> # get data split
-    >>> train_mask = g.ndata['train_masks']
-    >>> val_mask = g.ndata['val_masks']
-    >>> stopping_mask = g.ndata['stopping_masks']
+    >>> train_mask = g.ndata['train_mask']
+    >>> val_mask = g.ndata['val_mask']
+    >>> stopping_mask = g.ndata['stopping_mask']
     >>> test_mask = g.ndata['test_mask']
     >>> # The shape of train, val and stopping masks are (num_nodes, num_splits).
     >>> # The num_splits is the number of different train, validation, stopping splits.
@@ -150,8 +150,7 @@ class WikiCSDataset(DGLBuiltinDataset):
             - ``ndata['label']``: node labels
             - ``ndata['train_mask']``: train mask is for retrieving the nodes for training.
             - ``ndata['val_mask']``: val mask is for retrieving the nodes for hyperparameter tuning.
-            - ``ndata['stopping_mask']``: stopping mask is for retrieving the nodes for early
-            stopping criterion.
+            - ``ndata['stopping_mask']``: stopping mask is for retrieving the nodes for early stopping criterion.
             - ``ndata['test_mask']``: test mask is for retrieving the nodes for testing.
 
         """
