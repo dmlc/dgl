@@ -7,8 +7,7 @@ from .. import backend as F
 from ..convert import from_scipy
 from ..transforms import reorder_graph
 from .dgl_dataset import DGLBuiltinDataset
-from .utils import generate_mask_tensor, load_graphs, save_graphs, _get_dgl_url, download, \
-    extract_archive
+from .utils import generate_mask_tensor, load_graphs, save_graphs, _get_dgl_url
 
 
 class YelpDataset(DGLBuiltinDataset):
