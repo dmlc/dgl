@@ -245,7 +245,7 @@ class BlockSampler(Sampler):
         return self.assign_lazy_features(result)
 
 
-def _find_exclude_eids_with_reverse_id(g, eids, reverse_eid_map):
+def _find_exclude_eids_with_reverse_id(eids, reverse_eid_map):
     if isinstance(eids, Mapping):
         assert_canonical_etype_keys(eids)
         exclude_eids = {
@@ -276,7 +276,7 @@ def _find_exclude_eids(g, exclude_mode, eids, **kwargs):
     elif exclude_mode == 'self':
         return eids
     elif exclude_mode == 'reverse_id':
-        return _find_exclude_eids_with_reverse_id(g, eids, kwargs['reverse_eid_map'])
+        return _find_exclude_eids_with_reverse_id(eids, kwargs['reverse_eid_map'])
     elif exclude_mode == 'reverse_types':
         return _find_exclude_eids_with_reverse_types(g, eids, kwargs['reverse_etype_map'])
     else:

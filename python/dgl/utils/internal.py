@@ -1049,6 +1049,7 @@ def to_canonical_etype_keys(g, data):
     return {g.to_canonical_etype(k): v for k, v in data.items()}
 
 def assert_canonical_etype_keys(data):
+    """Asserts that if the keys of the given dictionaries are already canonical edge types."""
     assert all(isinstance(k, tuple) for k in data.keys())
 
 _init_api("dgl.utils.internal")
