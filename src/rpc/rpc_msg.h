@@ -70,6 +70,12 @@ struct RPCMessage : public runtime::Object {
 
 DGL_DEFINE_OBJECT_REF(RPCMessageRef, RPCMessage);
 
+/*! \brief RPC status flag */
+enum RPCStatus {
+  kRPCSuccess = 0,
+  kRPCTimeOut,
+};
+
 }  // namespace rpc
 }  // namespace dgl
 

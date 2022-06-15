@@ -69,7 +69,10 @@ def call_once_and_share(func, shape, dtype, rank=0):
 
     # Process with the given rank creates and populates the shared memory array.
     if current_rank == rank:
-        id_ = random.getrandbits(32)
+        # PyTorch Lightning 1.6+ seems to set the random seed during process spawning
+        # to the same seed value.
+        random_ = random.Random()
+        id_ = random_.getrandbits(32)
         name = _get_shared_mem_name(id_)
         result = create_shared_mem_array(name, shape, dtype)
         result[:] = func()
