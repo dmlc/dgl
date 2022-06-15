@@ -483,7 +483,7 @@ def as_edge_prediction_sampler(
         * User-defined exclusion rule. It is a callable with edges in the current
           minibatch as a single argument and should return the edges to be excluded.
     exclude_eids : Tensor or dict[etype, Tensor], optional
-        The edge IDs to always exclude from during neighborhood sampling.
+        The edge IDs to always exclude during neighborhood sampling.
 
         Note that if :attr:`exclude` argument is ``reverse_id`` or ``reverse_types``,
         the reverse edges of this argument will also be excluded.
