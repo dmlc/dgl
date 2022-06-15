@@ -2,6 +2,20 @@ import numpy as np
 import dgl
 import torch
 from torch.utils.data import IterableDataset, DataLoader
+from torchtext.data.functional import numericalize_tokens_from_iterator
+
+def padding(array, yy, val):
+    """
+    :param array: numpy array
+    :param yy: desirex width
+    :param val: padded value
+    :return: padded array
+    """
+    w = array.shape[0]
+    b = 0
+    bb = yy - b - w
+
+    return torch.nn.functional.pad(array, pad=(b, bb), mode='constant', value=val)
 
 def compact_and_copy(frontier, seeds):
     block = dgl.to_block(frontier, seeds)
@@ -111,12 +125,26 @@ def assign_textual_node_features(ndata, textset, ntype):
     """
     node_ids = ndata[dgl.NID].numpy()
 
-    for field_name, field in textset.fields.items():
-        examples = [getattr(textset[i], field_name) for i in node_ids]
+    for field_name, field in textset.items():
+        textlist, vocab, pad_var, batch_first = field
+        
+        examples = [textlist[i] for i in node_ids]
+        ids_iter = numericalize_tokens_from_iterator(vocab, examples)
+        
+        maxsize = max([len(textlist[i]) for i in node_ids])
+        ids = next(ids_iter)
+        x = torch.asarray([num for num in ids])
+        lengths = torch.tensor([len(x)])
+        tokens = padding(x, maxsize, pad_var)
 
-        tokens, lengths = field.process(examples)
-
-        if not field.batch_first:
+        for ids in ids_iter:
+            x = torch.asarray([num for num in ids])
+            l = torch.tensor([len(x)])
+            y = padding(x, maxsize, pad_var)
+            tokens = torch.vstack((tokens,y))
+            lengths = torch.cat((lengths, l))
+       
+        if not batch_first:
             tokens = tokens.t()
 
         ndata[field_name] = tokens

@@ -12,6 +12,8 @@ import tqdm
 import layers
 import sampler as sampler_module
 import evaluation
+from torchtext.data.utils import get_tokenizer
+from torchtext.vocab import vocab
 
 class PinSAGEModel(nn.Module):
     def __init__(self, full_graph, ntype, textsets, hidden_dims, n_layers):
@@ -50,19 +52,19 @@ def train(dataset, args):
     g.nodes[item_ntype].data['id'] = torch.arange(g.number_of_nodes(item_ntype))
 
     # Prepare torchtext dataset and vocabulary
-    fields = {}
-    examples = []
-    for key, texts in item_texts.items():
-        fields[key] = torchtext.legacy.data.Field(include_lengths=True, lower=True, batch_first=True)
+    textset = {}
+    tokenizer = get_tokenizer(None)
+
+    textlist = []
+    batch_first = True
+
     for i in range(g.number_of_nodes(item_ntype)):
-        example = torchtext.legacy.data.Example.fromlist(
-            [item_texts[key][i] for key in item_texts.keys()],
-            [(key, fields[key]) for key in item_texts.keys()])
-        examples.append(example)
-    textset = torchtext.legacy.data.Dataset(examples, fields)
-    for key, field in fields.items():
-        field.build_vocab(getattr(textset, key))
-        #field.build_vocab(getattr(textset, key), vectors='fasttext.simple.300d')
+        for key in item_texts.keys():
+            l = tokenizer(item_texts[key][i].lower())
+            textlist.append(l)
+    for key, field in item_texts.items():
+        vocab2 = torchtext.vocab.build_vocab_from_iterator(textlist, specials=["<unk>","<pad>"])
+        textset[key] = (textlist, vocab2, vocab2.get_stoi()['<pad>'], batch_first)
 
     # Sampler
     batch_sampler = sampler_module.ItemToItemBatchSampler(

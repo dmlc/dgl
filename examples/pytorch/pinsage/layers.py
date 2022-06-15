@@ -36,23 +36,24 @@ def _init_input_modules(g, ntype, textset, hidden_dims):
             module_dict[column] = m
 
     if textset is not None:
-        for column, field in textset.fields.items():
-            if field.vocab.vectors:
-                module_dict[column] = BagOfWordsPretrained(field, hidden_dims)
-            else:
-                module_dict[column] = BagOfWords(field, hidden_dims)
+        for column, field in textset.items():
+            textlist, vocab, pad_var, batch_first = field            
+#            if vocab.vectors:
+#                module_dict[column] = BagOfWordsPretrained(vocab, hidden_dims)
+#            else:
+            module_dict[column] = BagOfWords(vocab, hidden_dims)
 
     return module_dict
 
 class BagOfWordsPretrained(nn.Module):
-    def __init__(self, field, hidden_dims):
+    def __init__(self, vocab, hidden_dims):
         super().__init__()
 
-        input_dims = field.vocab.vectors.shape[1]
+        input_dims = vocab.vectors.shape[1]
         self.emb = nn.Embedding(
-            len(field.vocab.itos), input_dims,
-            padding_idx=field.vocab.stoi[field.pad_token])
-        self.emb.weight[:] = field.vocab.vectors
+            len(vocab.itos), input_dims,
+            padding_idx=vocab.get_stoi()['<pad>'])
+        self.emb.weight[:] = vocab.vectors
         self.proj = nn.Linear(input_dims, hidden_dims)
         nn.init.xavier_uniform_(self.proj.weight)
         nn.init.constant_(self.proj.bias, 0)
@@ -68,12 +69,12 @@ class BagOfWordsPretrained(nn.Module):
         return self.proj(x)
 
 class BagOfWords(nn.Module):
-    def __init__(self, field, hidden_dims):
+    def __init__(self, vocab, hidden_dims):
         super().__init__()
 
         self.emb = nn.Embedding(
-            len(field.vocab.itos), hidden_dims,
-            padding_idx=field.vocab.stoi[field.pad_token])
+            len(vocab.get_itos()), hidden_dims,
+            padding_idx=vocab.get_stoi()['<pad>'])
         nn.init.xavier_uniform_(self.emb.weight)
 
     def forward(self, x, length):
