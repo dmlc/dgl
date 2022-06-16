@@ -184,21 +184,27 @@ class DGLHeteroGraph(object):
         if len(self.ntypes) == 1 and len(self.etypes) == 1:
             ret = ('Graph(num_nodes={node}, num_edges={edge},\n'
                    '      ndata_schemes={ndata}\n'
-                   '      edata_schemes={edata})')
-            return ret.format(node=self.number_of_nodes(), edge=self.number_of_edges(),
+                   '      edata_schemes={edata}\n'
+                   '      gdata_schemes={gdata})')
+            return ret.format(node=self.number_of_nodes(), 
+                              edge=self.number_of_edges(),
                               ndata=str(self.node_attr_schemes()),
                               edata=str(self.edge_attr_schemes()),
-                              gdata=str(self.graph_attr_schemes()))  # TODO (Krzysztof): implement this function
+                              gdata=str(self.graph_attr_schemes()))
         else:
             ret = ('Graph(num_nodes={node},\n'
                    '      num_edges={edge},\n'
-                   '      metagraph={meta})')
+                   '      metagraph={meta},\n'
+                   '      gdata_schemes={gdata}))')
             nnode_dict = {self.ntypes[i] : self._graph.number_of_nodes(i)
                           for i in range(len(self.ntypes))}
             nedge_dict = {self.canonical_etypes[i] : self._graph.number_of_edges(i)
                           for i in range(len(self.etypes))}
             meta = str(self.metagraph().edges(keys=True))
-            return ret.format(node=nnode_dict, edge=nedge_dict, meta=meta)
+            return ret.format(node=nnode_dict,
+                              edge=nedge_dict,
+                              meta=meta,
+                              gdata=str(self.graph_attr_schemes()))
 
     def __copy__(self):
         """Shallow copy implementation."""
@@ -3867,8 +3873,7 @@ class DGLHeteroGraph(object):
     #################################################################
     # Features
     #################################################################
-    
-    # TODO (Krzysztof): Implement schemes and initializer for gdata
+
     def node_attr_schemes(self, ntype=None):
         """Return the node feature schemes for the specified type.
 
@@ -3914,6 +3919,7 @@ class DGLHeteroGraph(object):
         See Also
         --------
         edge_attr_schemes
+        graph_attr_schemes
         """
         return self._node_frames[self.get_ntype_id(ntype)].schemes
 
@@ -3970,8 +3976,42 @@ class DGLHeteroGraph(object):
         See Also
         --------
         node_attr_schemes
+        graph_attr_schemes
         """
         return self._edge_frames[self.get_etype_id(etype)].schemes
+
+    def graph_attr_schemes(self):
+        """Return the graph feature schemes.
+
+        The scheme of a feature describes the shape and data type of it.
+
+        Returns
+        -------
+        dict[str, Scheme]
+            A dictionary mapping a feature name to its associated feature scheme.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Query for a homogeneous and heterogeneous graphs.
+
+        >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 2])))
+        >>> g.gdata['target'] = torch.randn(1, 8)
+        >>> g.gdata['label'] = torch.randn(1)
+        >>> g.graph_attr_schemes()
+        {'target': Scheme(shape=(8,), dtype=torch.float32),
+         'label': Scheme(shape=(), dtype=torch.float32)}
+
+        See Also
+        --------
+        node_attr_schemes
+        edge_attr_schemes
+        """
+        return self._graph_frame.schemes
 
     def set_n_initializer(self, initializer, field=None, ntype=None):
         """Set the initializer for node features.

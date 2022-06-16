@@ -234,7 +234,6 @@ class HeteroEdgeDataView(MutableMapping):
     def __repr__(self):
         return repr(self._transpose(as_dict=True))
 
-#TODO (Krzysztof): implement this
 class HeteroGraphDataView(MutableMapping):
     """The data view class when G.gdata is called."""
     __slots__ = ['_graph']
