@@ -8,7 +8,6 @@ import numbers
 import itertools
 import networkx as nx
 import numpy as np
-from python.dgl.convert import graph
 
 from ._ffi.function import _init_api
 from .ops import segment
@@ -84,7 +83,7 @@ class DGLHeteroGraph(object):
         if len(deprecate_kwargs) != 0:
             dgl_warning('Keyword arguments {} are deprecated in v0.5, and can be safely'
                         ' removed in all cases.'.format(list(deprecate_kwargs.keys())))
-        self._init(gidx, ntypes, etypes, node_frames, edge_frames)
+        self._init(gidx, ntypes, etypes, node_frames, edge_frames, graph_frame)
 
     def _init(self, gidx, ntypes, etypes, node_frames, edge_frames, graph_frame):
         """Init internal states."""
@@ -3868,7 +3867,8 @@ class DGLHeteroGraph(object):
     #################################################################
     # Features
     #################################################################
-
+    
+    # TODO (Krzysztof): Implement schemes and initializer for gdata
     def node_attr_schemes(self, ntype=None):
         """Return the node feature schemes for the specified type.
 
@@ -4238,7 +4238,7 @@ class DGLHeteroGraph(object):
         Returns
         -------
         Tensor
-            The popped representation
+            The popped representation.
         """
         return self._node_frames[ntid].pop(key)
 
@@ -4318,7 +4318,7 @@ class DGLHeteroGraph(object):
         Returns
         -------
         dict
-            Representation dict
+            Representation dict.
         """
         # parse argument
         if is_all(edges):
@@ -4340,37 +4340,32 @@ class DGLHeteroGraph(object):
         Returns
         -------
         Tensor
-            The popped representation
+            The popped representation.
         """
         self._edge_frames[etid].pop(key)
     
     # TODO (Krzysztof): Update docs
     def _set_g_repr(self, data):
-        """Internal API to set node features.
+        """Internal API to set graph features.
 
         `data` is a dictionary from the feature name to feature tensor. Each tensor
-        is of shape (B, D1, D2, ...), where B is the number of nodes to be updated,
-        and (D1, D2, ...) be the shape of the node representation tensor. The
-        length of the given node ids must match B (i.e, len(u) == B).
+        is of shape (1, D1, D2, ...), where (D1, D2, ...) is the shape of the graph
+        representation tensor.
 
         All updates will be done out of place to work with autograd.
 
         Parameters
         ----------
-        ntid : int
-            Node type id.
-        u : node, container or tensor
-            The node(s).
         data : dict of tensor
-            Node representation.
+            Graph representation.
         """
         for key, val in data.items():
-            nfeats = F.shape(val)[0]
-            if nfeats != 1:
-                raise DGLError('Expect number of features to match number of nodes (len(u)).'
-                               ' Got %d and %d instead.' % (nfeats, 1))
+            gfeats = F.shape(val)[0]
+            if gfeats != 1:
+                raise DGLError('Number of graph features must be 1. '
+                               'Got %d instead.' % gfeats)
             if F.context(val) != self.device:
-                raise DGLError('Cannot assign node feature "{}" on device {} to a graph on'
+                raise DGLError('Cannot assign graph feature "{}" on device {} to a graph on'
                                ' device {}. Call DGLGraph.to() to copy the graph to the'
                                ' same device.'.format(key, F.context(val), self.device))
             # To prevent users from doing things like:
@@ -4380,23 +4375,14 @@ class DGLHeteroGraph(object):
             #     sg = g.sample_neighbors(torch.LongTensor([...]).cuda())
             #     sg.ndata['x']    # Becomes a CPU tensor even if sg is on GPU due to lazy slicing
             if self.is_pinned() and F.context(val) == 'cpu' and not F.is_pinned(val):
-                raise DGLError('Pinned graph requires the node data to be pinned as well. '
-                               'Please pin the node data before assignment.')
+                raise DGLError('Pinned graph requires the graph data to be pinned as well. '
+                               'Please pin the graph data before assignment.')
 
-        self._graph_frames.update(data)
+        self._graph_frame.update(data)
 
 
     def _get_g_repr(self):
-        """Get node(s) representation of a single node type.
-
-        The returned feature tensor batches multiple node features on the first dimension.
-
-        Parameters
-        ----------
-        ntid : int
-            Node type id.
-        u : node, container or tensor
-            The node(s).
+        """Get graph representation.
 
         Returns
         -------
@@ -4406,19 +4392,17 @@ class DGLHeteroGraph(object):
         return self._graph_frame
 
     def _pop_g_repr(self, key):
-        """Internal API to get and remove the specified node feature.
+        """Internal API to get and remove the specified graph feature.
 
         Parameters
         ----------
-        ntid : int
-            Node type id.
         key : str
             The attribute name.
 
         Returns
         -------
         Tensor
-            The popped representation
+            The popped representation.
         """
         return self._graph_frame.pop(key)
 

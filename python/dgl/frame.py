@@ -40,6 +40,7 @@ class _LazyIndex(object):
             flat_index = F.gather_row(flat_index, index)
         return flat_index
 
+# TODO (Krzysztof): Add support for gdata
 class LazyFeature(object):
     """Placeholder for feature prefetching.
 
