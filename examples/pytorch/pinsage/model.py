@@ -13,7 +13,7 @@ import layers
 import sampler as sampler_module
 import evaluation
 from torchtext.data.utils import get_tokenizer
-from torchtext.vocab import vocab
+from torchtext.vocab import build_vocab_from_iterator
 
 class PinSAGEModel(nn.Module):
     def __init__(self, full_graph, ntype, textsets, hidden_dims, n_layers):
@@ -48,22 +48,22 @@ def train(dataset, args):
 
     # Assign user and movie IDs and use them as features (to learn an individual trainable
     # embedding for each entity)
-    g.nodes[user_ntype].data['id'] = torch.arange(g.number_of_nodes(user_ntype))
-    g.nodes[item_ntype].data['id'] = torch.arange(g.number_of_nodes(item_ntype))
+    g.nodes[user_ntype].data['id'] = torch.arange(g.num_nodes(user_ntype))
+    g.nodes[item_ntype].data['id'] = torch.arange(g.num_nodes(item_ntype))
 
-    # Prepare torchtext dataset and vocabulary
+    # Prepare torchtext dataset and Vocabulary
     textset = {}
     tokenizer = get_tokenizer(None)
 
     textlist = []
     batch_first = True
 
-    for i in range(g.number_of_nodes(item_ntype)):
+    for i in range(g.num_nodes(item_ntype)):
         for key in item_texts.keys():
             l = tokenizer(item_texts[key][i].lower())
             textlist.append(l)
     for key, field in item_texts.items():
-        vocab2 = torchtext.vocab.build_vocab_from_iterator(textlist, specials=["<unk>","<pad>"])
+        vocab2 = build_vocab_from_iterator(textlist, specials=["<unk>","<pad>"])
         textset[key] = (textlist, vocab2, vocab2.get_stoi()['<pad>'], batch_first)
 
     # Sampler
@@ -79,7 +79,7 @@ def train(dataset, args):
         collate_fn=collator.collate_train,
         num_workers=args.num_workers)
     dataloader_test = DataLoader(
-        torch.arange(g.number_of_nodes(item_ntype)),
+        torch.arange(g.num_nodes(item_ntype)),
         batch_size=args.batch_size,
         collate_fn=collator.collate_test,
         num_workers=args.num_workers)
@@ -109,7 +109,7 @@ def train(dataset, args):
         # Evaluate
         model.eval()
         with torch.no_grad():
-            item_batches = torch.arange(g.number_of_nodes(item_ntype)).split(args.batch_size)
+            item_batches = torch.arange(g.num_nodes(item_ntype)).split(args.batch_size)
             h_item_batches = []
             for blocks in dataloader_test:
                 for i in range(len(blocks)):

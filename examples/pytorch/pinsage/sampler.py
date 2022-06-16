@@ -6,8 +6,8 @@ from torchtext.data.functional import numericalize_tokens_from_iterator
 
 def padding(array, yy, val):
     """
-    :param array: numpy array
-    :param yy: desirex width
+    :param array: torch tensor array
+    :param yy: desired width
     :param val: padded value
     :return: padded array
     """
@@ -36,12 +36,12 @@ class ItemToItemBatchSampler(IterableDataset):
 
     def __iter__(self):
         while True:
-            heads = torch.randint(0, self.g.number_of_nodes(self.item_type), (self.batch_size,))
+            heads = torch.randint(0, self.g.num_nodes(self.item_type), (self.batch_size,))
             tails = dgl.sampling.random_walk(
                 self.g,
                 heads,
                 metapath=[self.item_to_user_etype, self.user_to_item_etype])[0][:, 2]
-            neg_tails = torch.randint(0, self.g.number_of_nodes(self.item_type), (self.batch_size,))
+            neg_tails = torch.randint(0, self.g.num_nodes(self.item_type), (self.batch_size,))
 
             mask = (tails != -1)
             yield heads[mask], tails[mask], neg_tails[mask]
@@ -82,10 +82,10 @@ class NeighborSampler(object):
         # connections only.
         pos_graph = dgl.graph(
             (heads, tails),
-            num_nodes=self.g.number_of_nodes(self.item_type))
+            num_nodes=self.g.num_nodes(self.item_type))
         neg_graph = dgl.graph(
             (heads, neg_tails),
-            num_nodes=self.g.number_of_nodes(self.item_type))
+            num_nodes=self.g.num_nodes(self.item_type))
         pos_graph, neg_graph = dgl.compact_graphs([pos_graph, neg_graph])
         seeds = pos_graph.ndata[dgl.NID]
 

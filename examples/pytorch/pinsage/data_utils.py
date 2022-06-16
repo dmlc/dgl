@@ -44,8 +44,8 @@ def build_train_graph(g, train_indices, utype, itype, etype, etype_rev):
     return train_g
 
 def build_val_test_matrix(g, val_indices, test_indices, utype, itype, etype):
-    n_users = g.number_of_nodes(utype)
-    n_items = g.number_of_nodes(itype)
+    n_users = g.num_nodes(utype)
+    n_items = g.num_nodes(itype)
     val_src, val_dst = g.find_edges(val_indices, etype=etype)
     test_src, test_dst = g.find_edges(test_indices, etype=etype)
     val_src = val_src.numpy()
