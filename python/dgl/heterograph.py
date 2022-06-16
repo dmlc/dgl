@@ -18,7 +18,8 @@ from . import heterograph_index
 from . import utils
 from . import backend as F
 from .frame import Frame
-from .view import HeteroGraphDataView, HeteroNodeView, HeteroNodeDataView, HeteroEdgeView, HeteroEdgeDataView
+from .view import HeteroGraphDataView, HeteroNodeView, HeteroNodeDataView, \
+                  HeteroEdgeView, HeteroEdgeDataView
 
 __all__ = ['DGLHeteroGraph', 'combine_names']
 
@@ -176,7 +177,7 @@ class DGLHeteroGraph(object):
             dgl_warning("The object is pickled with DGL <= 0.4.2.  "
                         "Some of the original attributes are ignored.")
             self._init(state['_graph'], state['_ntypes'], state['_etypes'], state['_node_frames'],
-                       state['_edge_frames'])
+                       state['_edge_frames'], state['_graph_frame'])
         else:
             raise IOError("Unrecognized pickle format.")
 
@@ -186,7 +187,7 @@ class DGLHeteroGraph(object):
                    '      ndata_schemes={ndata}\n'
                    '      edata_schemes={edata}\n'
                    '      gdata_schemes={gdata})')
-            return ret.format(node=self.number_of_nodes(), 
+            return ret.format(node=self.number_of_nodes(),
                               edge=self.number_of_edges(),
                               ndata=str(self.node_attr_schemes()),
                               edata=str(self.edge_attr_schemes()),
@@ -4363,7 +4364,7 @@ class DGLHeteroGraph(object):
             The popped representation.
         """
         self._edge_frames[etid].pop(key)
-    
+
     def _set_g_repr(self, data):
         """Internal API to set graph features.
 
