@@ -2157,20 +2157,15 @@ class DGLHeteroGraph(object):
             (key[2] == SLICE_FULL or key[2] == dsttype)]
         return etypes
 
-    # TODO (Krzysztof): Update docs
     @property
     def gdata(self):
-        """Return a node data view for setting/getting node features
+        """Return a graph data view for setting/getting graph features.
 
-        Let ``g`` be a DGLGraph. If ``g`` is a graph of a single node type, ``g.ndata[feat]``
-        returns the node feature associated with the name ``feat``. One can also set a node
-        feature associated with the name ``feat`` by setting ``g.ndata[feat]`` to a tensor.
-
-        If ``g`` is a graph of multiple node types, ``g.ndata[feat]`` returns a
-        dict[str, Tensor] mapping node types to the node features associated with the name
-        ``feat`` for the corresponding type. One can also set a node feature associated
-        with the name ``feat`` for some node type(s) by setting ``g.ndata[feat]`` to a
-        dictionary as described.
+        Let ``g`` be a DGLGraph. Graph data view is the same for a graphs of a
+        single node type and of multiple node types. In both cases
+        ``g.gdata[feat]`` returns the graph feature associated with the name
+        ``feat``. One can also set a node feature associated with the name
+        ``feat`` by setting ``g.gdata[feat]`` to a tensor.
 
         Notes
         -----
@@ -2184,33 +2179,18 @@ class DGLHeteroGraph(object):
         >>> import dgl
         >>> import torch
 
-        Set and get feature 'h' for a graph of a single node type.
+        Set and get feature 'y' for a graph of a single node type and of
+        multiple types.
 
         >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 2])))
-        >>> g.ndata['h'] = torch.ones(3, 1)
-        >>> g.ndata['h']
-        tensor([[1.],
-                [1.],
-                [1.]])
-
-        Set and get feature 'h' for a graph of multiple node types.
-
-        >>> g = dgl.heterograph({
-        ...     ('user', 'follows', 'user'): (torch.tensor([1, 2]), torch.tensor([3, 4])),
-        ...     ('player', 'plays', 'game'): (torch.tensor([2, 2]), torch.tensor([1, 1]))
-        ... })
-        >>> g.ndata['h'] = {'game': torch.zeros(2, 1), 'player': torch.ones(3, 1)}
-        >>> g.ndata['h']
-        {'game': tensor([[0.], [0.]]),
-         'player': tensor([[1.], [1.], [1.]])}
-        >>> g.ndata['h'] = {'game': torch.ones(2, 1)}
-        >>> g.ndata['h']
-        {'game': tensor([[1.], [1.]]),
-         'player': tensor([[1.], [1.], [1.]])}
+        >>> g.gdata['y'] = torch.ones(1, 3)
+        >>> g.gdata['y']
+        tensor([[1., 1., 1.]])
 
         See Also
         --------
         nodes
+        edges
         """
         return HeteroGraphDataView(self)
 
@@ -4384,7 +4364,6 @@ class DGLHeteroGraph(object):
         """
         self._edge_frames[etid].pop(key)
     
-    # TODO (Krzysztof): Update docs
     def _set_g_repr(self, data):
         """Internal API to set graph features.
 
