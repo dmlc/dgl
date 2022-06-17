@@ -6,7 +6,8 @@ import torch
 __all__ = ['preload_with_thread']
 
 def _preloader_entry(num_threads, it, queue, done_event):
-    torch.set_num_threads(num_threads)
+    if num_threads is not None:
+        torch.set_num_threads(num_threads)
     try:
         batch = None
         while not done_event.is_set():
@@ -18,13 +19,14 @@ def _preloader_entry(num_threads, it, queue, done_event):
         queue.put((None, None))
     except Exception as e:
         queue.put((None, e))
-            
+
 class _ThreadedPreloadingIterator:
-    def __init__(self, super_iter):
+    def __init__(self, super_iter, use_worker_threads):
         self._shutting_down = False
         self._iter = super_iter
         self._queue = Queue(1)
-        self._num_threads = 1
+        self._num_threads = torch.get_num_threads() if use_worker_threads \
+            else None
         self._done_event = threading.Event()
         self._thread = threading.Thread(
             target=_preloader_entry, \
@@ -42,7 +44,7 @@ class _ThreadedPreloadingIterator:
                 raise StopIteration
             exception.reraise()
         return batch
-    
+
     def _shutdown(self):
         if not self._shutting_down:
             try:
@@ -67,8 +69,11 @@ class _IterableWrapper:
         self._wrapper = wrapper
 
     def __iter__(self):
-        return self._wrapper(iter(self._item))
+        return self._wrapper(iter(self._item), \
+                             use_worker_threads=self._item.num_workers > 0 )
 
-        
+
 def preload_with_thread(dataloader):
+    """ Use a separate thread to perform __next__ on the dataloader object.
+    """
     return _IterableWrapper(dataloader, _ThreadedPreloadingIterator)
