@@ -71,8 +71,8 @@ split_idx = dataset.get_idx_split()
 train_idx, valid_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
 
 device = 'cuda'
-train_idx = train_idx.to(device)
-valid_idx = valid_idx.to(device)
+train_idx = train_idx
+valid_idx = valid_idx
 test_idx = test_idx.to(device)
 
 graph = graph.to('cuda' if args.pure_gpu else 'cpu')
@@ -84,16 +84,16 @@ sampler = dgl.dataloading.NeighborSampler(
         [15, 10, 5], prefetch_node_feats=['feat'], prefetch_labels=['label'])
 train_dataloader = dgl.dataloading.DataLoader(
         graph, train_idx, sampler, device=device, batch_size=1024, shuffle=True,
-        drop_last=False, num_workers=0, use_uva=not args.pure_gpu)
+        drop_last=False, num_workers=0)
 valid_dataloader = dgl.dataloading.DataLoader(
         graph, valid_idx, sampler, device=device, batch_size=1024, shuffle=True,
-        drop_last=False, num_workers=0, use_uva=not args.pure_gpu)
+        drop_last=False, num_workers=0)
 
 durations = []
 for _ in range(10):
     model.train()
     t0 = time.time()
-    for it, (input_nodes, output_nodes, blocks) in enumerate(train_dataloader):
+    for it, (input_nodes, output_nodes, blocks) in enumerate(dgl.dataloading.preload_with_thread(train_dataloader)):
         x = blocks[0].srcdata['feat']
         y = blocks[-1].dstdata['label']
         y_hat = model(blocks, x)
