@@ -18,7 +18,16 @@ class DGLTracer(Tracer):
         self.conv_modules = dgl.nn.conv.__dict__["__all__"]
         super().__init__(autowrap_modules, autowrap_functions, param_shapes_constant)
 
+    def set_conv_modules(self, modules):
+        if isinstance(modules, tuple) or isinstance(modules, list):
+            for module in modules:
+                self.set_conv_module(module)
+        else:
+            self.set_conv_module(modules)
+
     def set_conv_module(self, module):
+        if not isinstance(module, torch.nn.module):
+            raise Exception("Conv Modules must be torch.nn.module.")
         self.conv_modules.append(module.__class__.__name__)
 
     def create_node(self, kind, target, args, kwargs, name=None, type_expr=None) -> Node:
@@ -50,8 +59,9 @@ class DGLTracer(Tracer):
 
 
 @compatibility(is_backward_compatible=True)
-def dgl_symbolic_trace(root, concrete_args=None):
+def dgl_symbolic_trace(root, conv_modules = (), concrete_args=None):
     tracer = DGLTracer()
+    tracer.set_conv_modules(conv_modules)
     graph = tracer.trace(root, concrete_args)
     name = root.__class__.__name__ if isinstance(root, torch.nn.Module) else root.__name__
     gm = GraphModule(tracer.root, graph, name)

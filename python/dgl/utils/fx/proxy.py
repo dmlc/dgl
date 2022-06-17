@@ -1,6 +1,4 @@
 import operator
-import builtins
-
 from torch.fx import Proxy, Node, Tracer
 from .constants import CALL_METHOD, CALL_FUNCTION, DGL_GRAPH
 
