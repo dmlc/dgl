@@ -394,5 +394,5 @@ To quickly locate the examples of your interest, search for the tagged keywords 
 ## 1998
 
 - <a name="pagerank"></a> Page et al. The PageRank Citation Ranking: Bringing Order to the Web. [Paper link](http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.38.5427).
-    - Example code: [PyTorch](../community_examples/pytorch/pagerank.py)
+    - Example code: [PyTorch](../examples/pagerank.py)
     - Tags: PageRank
