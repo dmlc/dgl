@@ -7,7 +7,7 @@ from . import rpc
 from .constants import MAX_QUEUE_SIZE, SERVER_EXIT, SERVER_KEEP_ALIVE
 
 def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
-    max_queue_size=MAX_QUEUE_SIZE, net_type='tensorpipe'):
+    max_queue_size=MAX_QUEUE_SIZE, net_type='socket'):
     """Start DGL server, which will be shared with all the rpc services.
 
     This is a blocking function -- it returns only when the server shutdown.
