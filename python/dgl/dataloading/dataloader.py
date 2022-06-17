@@ -1,8 +1,6 @@
 """DGL PyTorch DataLoaders"""
 from collections.abc import Mapping, Sequence
-from queue import Queue, Empty, Full
 import itertools
-import threading
 from distutils.version import LooseVersion
 import math
 import inspect
@@ -28,14 +26,6 @@ from .base import BlockSampler, as_edge_prediction_sampler
 from .. import backend as F
 from ..distributed import DistGraph
 from ..multiprocessing import call_once_and_share
-
-PYTHON_EXIT_STATUS = False
-def _set_python_exit_flag():
-    global PYTHON_EXIT_STATUS
-    PYTHON_EXIT_STATUS = True
-atexit.register(_set_python_exit_flag)
-
-prefetcher_timeout = int(os.environ.get('DGL_PREFETCHER_TIMEOUT', '30'))
 
 class _TensorizedDatasetIter(object):
     def __init__(self, dataset, batch_size, drop_last, mapping_keys):
@@ -323,52 +313,6 @@ def _assign_for(item, feat):
     else:
         return item
 
-def _put_if_event_not_set(queue, result, event):
-    while not event.is_set():
-        try:
-            queue.put(result, timeout=1.0)
-            break
-        except Full:
-            continue
-
-def _prefetcher_entry(
-        dataloader_it, dataloader, queue, num_threads, use_alternate_streams,
-        done_event):
-    # PyTorch will set the number of threads to 1 which slows down pin_memory() calls
-    # in main process if a prefetching thread is created.
-    if num_threads is not None:
-        torch.set_num_threads(num_threads)
-    if use_alternate_streams:
-        stream = (
-                torch.cuda.Stream(device=dataloader.device)
-                if dataloader.device.type == 'cuda' else None)
-    else:
-        stream = None
-
-    try:
-        while not done_event.is_set():
-            try:
-                batch = next(dataloader_it)
-            except StopIteration:
-                break
-            batch = recursive_apply(batch, restore_parent_storage_columns, dataloader.graph)
-            feats = _prefetch(batch, dataloader, stream)
-
-            _put_if_event_not_set(queue, (
-                # batch will be already in pinned memory as per the behavior of
-                # PyTorch DataLoader.
-                recursive_apply(
-                    batch, lambda x: x.to(dataloader.device, non_blocking=True)),
-                feats,
-                stream.record_event() if stream is not None else None,
-                None),
-                done_event)
-        _put_if_event_not_set(queue, (None, None, None, None), done_event)
-    except:     # pylint: disable=bare-except
-        _put_if_event_not_set(
-            queue, (None, None, None, ExceptionWrapper(where='in prefetcher')), done_event)
-
-
 # DGLHeteroGraphs have the semantics of lazy feature slicing with subgraphs.  Such behavior depends
 # on that DGLHeteroGraph's ndata and edata are maintained by Frames.  So to maintain compatibility
 # with older code, DGLHeteroGraphs and other graph storages are handled separately: (1)
@@ -420,57 +364,17 @@ def restore_parent_storage_columns(item, g):
 
 
 class _PrefetchingIter(object):
-    def __init__(self, dataloader, dataloader_it, use_thread=False, use_alternate_streams=True,
-                 num_threads=None):
-        self.queue = Queue(1)
+    def __init__(self, dataloader, dataloader_it, use_thread=False, use_alternate_streams=True):
         self.dataloader_it = dataloader_it
         self.dataloader = dataloader
         self.graph_sampler = self.dataloader.graph_sampler
         self.pin_prefetcher = self.dataloader.pin_prefetcher
-        self.num_threads = num_threads
-
-        self.use_thread = use_thread
         self.use_alternate_streams = use_alternate_streams
-        self._shutting_down = False
-        if use_thread:
-            self._done_event = threading.Event()
-            thread = threading.Thread(
-                target=_prefetcher_entry,
-                args=(dataloader_it, dataloader, self.queue, num_threads,
-                      use_alternate_streams, self._done_event),
-                daemon=True)
-            thread.start()
-            self.thread = thread
-
+        
     def __iter__(self):
         return self
 
-    def _shutdown(self):
-        # Sometimes when Python is exiting complicated operations like
-        # self.queue.get_nowait() will hang.  So we set it to no-op and let Python handle
-        # the rest since the thread is daemonic.
-        # PyTorch takes the same solution.
-        if PYTHON_EXIT_STATUS is True or PYTHON_EXIT_STATUS is None:
-            return
-        if not self._shutting_down:
-            try:
-                self._shutting_down = True
-                self._done_event.set()
-
-                try:
-                    self.queue.get_nowait()     # In case the thread is blocking on put().
-                except:     # pylint: disable=bare-except
-                    pass
-
-                self.thread.join()
-            except:         # pylint: disable=bare-except
-                pass
-
-    def __del__(self):
-        if self.use_thread:
-            self._shutdown()
-
-    def _next_non_threaded(self):
+    def __next__(self):
         batch = next(self.dataloader_it)
         batch = recursive_apply(batch, restore_parent_storage_columns, self.dataloader.graph)
         device = self.dataloader.device
@@ -481,24 +385,6 @@ class _PrefetchingIter(object):
         feats = _prefetch(batch, self.dataloader, stream)
         batch = recursive_apply(batch, lambda x: x.to(device, non_blocking=True))
         stream_event = stream.record_event() if stream is not None else None
-        return batch, feats, stream_event
-
-    def _next_threaded(self):
-        try:
-            batch, feats, stream_event, exception = self.queue.get(timeout=prefetcher_timeout)
-        except Empty:
-            raise RuntimeError(
-                f'Prefetcher thread timed out at {prefetcher_timeout} seconds.')
-        if batch is None:
-            self.thread.join()
-            if exception is None:
-                raise StopIteration
-            exception.reraise()
-        return batch, feats, stream_event
-
-    def __next__(self):
-        batch, feats, stream_event = \
-            self._next_non_threaded() if not self.use_thread else self._next_threaded()
         batch = recursive_apply_pair(batch, feats, _assign_for)
         if stream_event is not None:
             stream_event.wait()
@@ -604,12 +490,6 @@ class DataLoader(torch.utils.data.DataLoader):
         :attr:`device` argument.
 
         Default: False.
-    use_prefetch_thread : bool, optional
-        (Advanced option)
-        Spawns a new Python thread to perform feature slicing
-        asynchronously.  Can make things faster at the cost of GPU memory.
-
-        Default: True if the graph is on CPU and :attr:`device` is CUDA.  False otherwise.
     use_alternate_streams : bool, optional
         (Advanced option)
         Whether to slice and transfers the features to GPU on a non-default stream.
@@ -682,8 +562,7 @@ class DataLoader(torch.utils.data.DataLoader):
     """
     def __init__(self, graph, indices, graph_sampler, device=None, use_ddp=False,
                  ddp_seed=0, batch_size=1, drop_last=False, shuffle=False,
-                 use_prefetch_thread=None, use_alternate_streams=None,
-                 pin_prefetcher=None, use_uva=False,
+                 use_alternate_streams=None, pin_prefetcher=None, use_uva=False,
                  use_cpu_worker_affinity=False, cpu_worker_affinity_cores=None, **kwargs):
         # (BarclayII) PyTorch Lightning sometimes will recreate a DataLoader from an existing
         # DataLoader with modifications to the original arguments.  The arguments are retrieved
@@ -707,7 +586,6 @@ class DataLoader(torch.utils.data.DataLoader):
             self.ddp_seed = ddp_seed
             self.shuffle = shuffle
             self.drop_last = drop_last
-            self.use_prefetch_thread = use_prefetch_thread
             self.use_alternate_streams = use_alternate_streams
             self.pin_prefetcher = pin_prefetcher
             self.use_uva = use_uva
@@ -782,13 +660,11 @@ class DataLoader(torch.utils.data.DataLoader):
                     # Instantiate all the formats if the number of workers is greater than 0.
                     self.graph.create_formats_()
 
-            # Check pin_prefetcher and use_prefetch_thread - should be only effective
+            # Check pin_prefetcher - should be only effective
             # if performing CPU sampling but output device is CUDA
             if self.device.type == 'cuda' and self.graph.device.type == 'cpu' and not use_uva:
                 if pin_prefetcher is None:
                     pin_prefetcher = True
-                if use_prefetch_thread is None:
-                    use_prefetch_thread = True
             else:
                 if pin_prefetcher is True:
                     raise ValueError(
@@ -796,13 +672,6 @@ class DataLoader(torch.utils.data.DataLoader):
                         'sampling is performed on CPU.')
                 if pin_prefetcher is None:
                     pin_prefetcher = False
-
-                if use_prefetch_thread is True:
-                    raise ValueError(
-                        'use_prefetch_thread=True is only effective when device=cuda and '
-                        'sampling is performed on CPU.')
-                if use_prefetch_thread is None:
-                    use_prefetch_thread = False
 
             # Check use_alternate_streams
             if use_alternate_streams is None:
@@ -826,7 +695,6 @@ class DataLoader(torch.utils.data.DataLoader):
         self.graph_sampler = graph_sampler
         self.use_alternate_streams = use_alternate_streams
         self.pin_prefetcher = pin_prefetcher
-        self.use_prefetch_thread = use_prefetch_thread
 
         worker_init_fn = WorkerInitWrapper(kwargs.get('worker_init_fn', None))
 
@@ -863,12 +731,8 @@ class DataLoader(torch.utils.data.DataLoader):
     def __iter__(self):
         if self.shuffle:
             self.dataset.shuffle()
-        # When using multiprocessing PyTorch sometimes set the number of PyTorch threads to 1
-        # when spawning new Python threads.  This drastically slows down pinning features.
-        num_threads = torch.get_num_threads() if self.num_workers > 0 else None
         return _PrefetchingIter(
-            self, super().__iter__(), use_thread=self.use_prefetch_thread,
-            use_alternate_streams=self.use_alternate_streams, num_threads=num_threads)
+            self, super().__iter__(), use_alternate_streams=self.use_alternate_streams)
 
     def worker_init_function(self, worker_id):
         """Worker init default function.
@@ -935,8 +799,7 @@ class EdgeDataLoader(DataLoader):
     """
     def __init__(self, graph, indices, graph_sampler, device=None, use_ddp=False,
                  ddp_seed=0, batch_size=1, drop_last=False, shuffle=False,
-                 use_prefetch_thread=False, use_alternate_streams=True,
-                 pin_prefetcher=False,
+                 use_alternate_streams=True, pin_prefetcher=False,
                  exclude=None, reverse_eids=None, reverse_etypes=None, negative_sampler=None,
                  use_uva=False, **kwargs):
 
@@ -967,7 +830,7 @@ class EdgeDataLoader(DataLoader):
         super().__init__(
             graph, indices, graph_sampler, device=device, use_ddp=use_ddp, ddp_seed=ddp_seed,
             batch_size=batch_size, drop_last=drop_last, shuffle=shuffle,
-            use_prefetch_thread=use_prefetch_thread, use_alternate_streams=use_alternate_streams,
+            use_alternate_streams=use_alternate_streams,
             pin_prefetcher=pin_prefetcher, use_uva=use_uva,
             **kwargs)
 
