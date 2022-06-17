@@ -1,6 +1,7 @@
 from typing import Generic
 import functools
 
+import numpy as np
 import torch
 import dgl
 from dgl.dataloading.dataloader import _TensorizedDatasetIter
@@ -60,19 +61,18 @@ class LimitedEdgeDataset(dgl.dataloading.TensorizedDataset):
         self.prefix_sum_in_degrees = prefix_sum_in_degrees
         # Compute the prefix sum in degrees for the graph.
         if self.prefix_sum_in_degrees is None:
-            in_degrees = g.in_degrees(train_nids.to(g.device))
+            in_degrees = g.in_degrees(train_nids.to(g.device)).cpu()
+            prefix_sum_in_degrees = np.cumsum(in_degrees)
             self.prefix_sum_in_degrees = [0]
-            self.prefix_sum_in_degrees.extend(in_degrees.tolist())
-            for i in range(1, len(self.in_degrees)):
-                self.prefix_sum_in_degrees[i] += self.prefix_sum_in_degrees[i - 1]
+            self.prefix_sum_in_degrees.extend(prefix_sum_in_degrees.tolist())
             self.prefix_sum_in_degrees.append(2e18)
 
-        self.curr_iter = CustomDatasetIter(
+        self.curr_iter = LimitedEdgeDatasetIter(
             id_tensor, self.max_node, self.max_edge, self.prefix_sum_in_degrees, self.drop_last, self._mapping_keys)
 
     def __getattr__(self, attribute_name):
-        if attribute_name in CustomDataset.functions:
-            function = functools.partial(CustomDataset.functions[attribute_name], self)
+        if attribute_name in LimitedEdgeDataset.functions:
+            function = functools.partial(LimitedEdgeDataset.functions[attribute_name], self)
             return function
         else:
             return super(Generic, self).__getattr__(attribute_name)
@@ -96,13 +96,13 @@ class LimitedEdgeDatasetIter(_TensorizedDatasetIter):
         if self.prefix_sum_in_degrees[binary_end] - self.prefix_sum_in_degrees[self.index] < self.max_edge:
             return binary_end
         binary_middle = 0
-        while binary_end - binary_start > 5:
+        while binary_end - binary_start > 1:
             binary_middle = (binary_start + binary_end) // 2
             if self.prefix_sum_in_degrees[binary_middle] - self.prefix_sum_in_degrees[self.index] < self.max_edge:
                 binary_start = binary_middle
             else:
                 binary_end = binary_middle - 1
-        return binary_middle
+        return binary_start
 
     def _next_indices(self):
         if self.index >= self.num_item:
