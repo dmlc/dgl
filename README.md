@@ -84,6 +84,7 @@ Take the survey [here](https://forms.gle/Ej3jHCocACmb49Gp8) and leave any feedba
 * OpenHGNN: Model zoo and benchmarks for Heterogeneous Graph Neural Networks. https://github.com/BUPT-GAMMA/OpenHGNN
 * TGL: A graph learning framework for large-scale temporal graphs. https://github.com/amazon-research/tgl
 * gtrick: Bag of Tricks for Graph Neural Networks. https://github.com/sangyx/gtrick
+* ArangoDB-DGL Adapter: Import ArangoDB graphs into DGL and vice-versa. https://github.com/arangoml/dgl-adapter
 
 ### Awesome Papers Using DGL
 
