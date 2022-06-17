@@ -1,8 +1,10 @@
 # Official DGL Examples and Modules
 
-The folder contains example implementations of selected research papers related to Graph Neural Networks. Note that the examples may not work with incompatible DGL versions.
+The folder contains official example implementations of selected research papers related to Graph Neural Networks. Note that the examples may not work with incompatible DGL versions.
 * For examples working with the latest master (or the latest [nightly build](https://www.dgl.ai/pages/start.html)), check out https://github.com/dmlc/dgl/tree/master/examples.
 * For examples working with a certain release, check out `https://github.com/dmlc/dgl/tree/<release_version>/examples` (E.g., https://github.com/dmlc/dgl/tree/0.5.x/examples)
+
+There are non-official examples in [community_examples](../community_examples/).
 
 To quickly locate the examples of your interest, search for the tagged keywords or use the search tool on [dgl.ai](https://www.dgl.ai/).
 
@@ -13,10 +15,10 @@ To quickly locate the examples of your interest, search for the tagged keywords 
 - <a name="hilander"></a> Xing et al. Learning Hierarchical Graph Neural Networks for Image Clustering.
     - Example code: [PyTorch](../examples/pytorch/hilander)
     - Tags: clustering
-- <a name="bgnn"></a> Ivanov et al. Boost then Convolve: Gradient Boosting Meets Graph Neural Networks. [Paper link](https://openreview.net/forum?id=ebS5NUfoMKL). 
+- <a name="bgnn"></a> Ivanov et al. Boost then Convolve: Gradient Boosting Meets Graph Neural Networks. [Paper link](https://openreview.net/forum?id=ebS5NUfoMKL).
     - Example code: [PyTorch](../examples/pytorch/bgnn)
     - Tags: semi-supervised node classification, tabular data, GBDT
-- <a name="correct_and_smooth"></a> Huang et al. Combining Label Propagation and Simple Models Out-performs Graph Neural Networks. [Paper link](https://arxiv.org/abs/2010.13993). 
+- <a name="correct_and_smooth"></a> Huang et al. Combining Label Propagation and Simple Models Out-performs Graph Neural Networks. [Paper link](https://arxiv.org/abs/2010.13993).
     - Example code: [PyTorch](../examples/pytorch/correct_and_smooth)
     - Tags: efficiency, node classification, label propagation
 - <a name="point_transformer"></a> Zhao et al. Point Transformer. [Paper link](http://arxiv.org/abs/2012.09164).
@@ -33,19 +35,19 @@ To quickly locate the examples of your interest, search for the tagged keywords 
     - Tags: contrastive learning for node classification.
 
 ## 2020
-- <a name="eeg-gcnn"></a> Wagh et al. EEG-GCNN: Augmenting Electroencephalogram-based Neurological Disease Diagnosis using a Domain-guided Graph Convolutional Neural Network. [Paper link](http://proceedings.mlr.press/v136/wagh20a.html). 
+- <a name="eeg-gcnn"></a> Wagh et al. EEG-GCNN: Augmenting Electroencephalogram-based Neurological Disease Diagnosis using a Domain-guided Graph Convolutional Neural Network. [Paper link](http://proceedings.mlr.press/v136/wagh20a.html).
     - Example code: [PyTorch](../examples/pytorch/eeg-gcnn)
     - Tags: graph classification, eeg representation learning, brain activity, graph convolution,  neurological disease classification, large dataset, edge weights, node features, fully-connected graph, graph neural network
-- <a name="rect"></a> Wang et al. Network Embedding with Completely-imbalanced Labels. [Paper link](https://ieeexplore.ieee.org/document/8979355). 
+- <a name="rect"></a> Wang et al. Network Embedding with Completely-imbalanced Labels. [Paper link](https://ieeexplore.ieee.org/document/8979355).
     - Example code: [PyTorch](../examples/pytorch/rect)
     - Tags: node classification, network embedding, completely-imbalanced labels
-- <a name="mvgrl"></a> Hassani and Khasahmadi. Contrastive Multi-View Representation Learning on Graphs. [Paper link](https://arxiv.org/abs/2006.05582). 
+- <a name="mvgrl"></a> Hassani and Khasahmadi. Contrastive Multi-View Representation Learning on Graphs. [Paper link](https://arxiv.org/abs/2006.05582).
     - Example code: [PyTorch](../examples/pytorch/mvgrl)
     - Tags: graph diffusion, self-supervised learning
-- <a name="grace"></a> Zhu et al. Deep Graph Contrastive Representation Learning. [Paper link](https://arxiv.org/abs/2006.04131). 
+- <a name="grace"></a> Zhu et al. Deep Graph Contrastive Representation Learning. [Paper link](https://arxiv.org/abs/2006.04131).
     - Example code: [PyTorch](../examples/pytorch/grace)
     - Tags: contrastive learning for node classification.
-- <a name="grand"></a> Feng et al. Graph Random Neural Network for Semi-Supervised Learning on Graphs. [Paper link](https://arxiv.org/abs/2005.11079). 
+- <a name="grand"></a> Feng et al. Graph Random Neural Network for Semi-Supervised Learning on Graphs. [Paper link](https://arxiv.org/abs/2005.11079).
     - Example code: [PyTorch](../examples/pytorch/grand)
     - Tags: semi-supervised node classification, simplifying graph convolution, data augmentation
 - <a name="hgt"></a> Hu et al. Heterogeneous Graph Transformer. [Paper link](https://arxiv.org/abs/2003.01332).
@@ -74,7 +76,7 @@ To quickly locate the examples of your interest, search for the tagged keywords 
     - Tags: molecules, molecular property prediction, quantum chemistry
 - <a name="tgn"></a> Rossi et al. Temporal Graph Networks For Deep Learning on Dynamic Graphs. [Paper link](https://arxiv.org/abs/2006.10637).
     - Example code: [Pytorch](../examples/pytorch/tgn)
-    - Tags: temporal, node classification 
+    - Tags: temporal, node classification
 - <a name="compgcn"></a> Vashishth, Shikhar, et al. Composition-based Multi-Relational Graph Convolutional Networks. [Paper link](https://arxiv.org/abs/1911.03082).
     - Example code: [PyTorch](../examples/pytorch/compGCN)
     - Tags: multi-relational graphs, graph neural network
@@ -97,7 +99,7 @@ To quickly locate the examples of your interest, search for the tagged keywords 
 
 ## 2019
 
-- <a name="infograph"></a> Sun et al. InfoGraph: Unsupervised and Semi-supervised Graph-Level Representation Learning via Mutual Information Maximization. [Paper link](https://arxiv.org/abs/1908.01000). 
+- <a name="infograph"></a> Sun et al. InfoGraph: Unsupervised and Semi-supervised Graph-Level Representation Learning via Mutual Information Maximization. [Paper link](https://arxiv.org/abs/1908.01000).
     - Example code: [PyTorch](../examples/pytorch/infograph)
     - Tags: semi-supervised graph regression, unsupervised graph classification
 - <a name="arma"></a>  Bianchi et al. Graph Neural Networks with Convolutional ARMA Filters. [Paper link](https://arxiv.org/abs/1901.01343).
@@ -168,7 +170,7 @@ To quickly locate the examples of your interest, search for the tagged keywords 
     - Tags: node classification, graph attention
 - <a name='ngcf'></a> Wang, Xiang, et al. Neural Graph Collaborative Filtering. [Paper link](https://arxiv.org/abs/1905.08108).
     - Example code: [PyTorch](../examples/pytorch/NGCF)
-    - Tags: Collaborative Filtering, recommender system, Graph Neural Network 
+    - Tags: Collaborative Filtering, recommender system, Graph Neural Network
 - <a name='gnnexplainer'></a> Ying, Rex, et al. GNNExplainer: Generating Explanations for Graph Neural Networks. [Paper link](https://arxiv.org/abs/1903.03894).
     - Example code: [PyTorch](../examples/pytorch/gnn_explainer)
     - Tags: Graph Neural Network, Explainability
@@ -205,7 +207,7 @@ To quickly locate the examples of your interest, search for the tagged keywords 
 - <a name="agnn"></a> Thekumparampil et al. Attention-based Graph Neural Network for Semi-supervised Learning. [Paper link](https://arxiv.org/abs/1803.03735).
     - Example code: [PyTorch](../examples/pytorch/model_zoo/citation_network)
     - Tags: node classification
-    
+
 - <a name="pinsage"></a> Ying et al. Graph Convolutional Neural Networks for Web-Scale Recommender Systems. [Paper link](https://arxiv.org/abs/1806.01973).
     - Example code: [PyTorch](../examples/pytorch/pinsage)
     - Tags: recommender system, large-scale, sampling
@@ -236,14 +238,14 @@ To quickly locate the examples of your interest, search for the tagged keywords 
 
 ## 2017
 
-- <a name="gcn"></a> Kipf and Welling. Semi-Supervised Classification with Graph Convolutional Networks. [Paper link](https://arxiv.org/abs/1609.02907). 
+- <a name="gcn"></a> Kipf and Welling. Semi-Supervised Classification with Graph Convolutional Networks. [Paper link](https://arxiv.org/abs/1609.02907).
     - Example code: [PyTorch](../examples/pytorch/gcn), [PyTorch on ogbn-arxiv](../examples/pytorch/ogb/ogbn-arxiv), [PyTorch on ogbl-ppa](https://github.com/awslabs/dgl-lifesci/tree/master/examples/link_prediction/ogbl-ppa), [PyTorch on ogbg-ppa](https://github.com/awslabs/dgl-lifesci/tree/master/examples/property_prediction/ogbg_ppa), [TensorFlow](../examples/tensorflow/gcn), [MXNet](../examples/mxnet/gcn)
     - Tags: node classification, link prediction, graph classification, OGB
 
 - <a name="capsule"></a> Sabour et al. Dynamic Routing Between Capsules. [Paper link](https://arxiv.org/abs/1710.09829).
     - Example code: [PyTorch](../examples/pytorch/capsule)
     - Tags: image classification
-  
+
 - <a name="gcmc"></a> van den Berg et al. Graph Convolutional Matrix Completion. [Paper link](https://arxiv.org/abs/1706.02263).
     - Example code: [PyTorch](../examples/pytorch/gcmc)
     - Tags: matrix completion, recommender system, link prediction, bipartite graphs
@@ -259,7 +261,7 @@ To quickly locate the examples of your interest, search for the tagged keywords 
 - <a name="tagcn"></a> Du et al. Topology Adaptive Graph Convolutional Networks. [Paper link](https://arxiv.org/abs/1710.10370).
     - Example code: [PyTorch](../examples/pytorch/tagcn), [MXNet](../examples/mxnet/tagcn)
     - Tags: node classification
-    
+
 - <a name="pointnet"></a> Qi et al. PointNet: Deep Learning on Point Sets for 3D Classification and Segmentation. [Paper link](https://arxiv.org/abs/1612.00593).
     - Example code: [PyTorch](../examples/pytorch/pointcloud/pointnet)
     - Tags: point cloud classification, point cloud part-segmentation
@@ -267,7 +269,7 @@ To quickly locate the examples of your interest, search for the tagged keywords 
 - <a name="pointnet++"></a> Qi et al. PointNet++: Deep Hierarchical Feature Learning on Point Sets in a Metric Space. [Paper link](https://arxiv.org/abs/1706.02413).
     - Example code: [PyTorch](../examples/pytorch/pointcloud/pointnet)
     - Tags: point cloud classification
-    
+
 - <a name="rgcn"></a> Schlichtkrull. Modeling Relational Data with Graph Convolutional Networks. [Paper link](https://arxiv.org/abs/1703.06103).
     - Example code: [PyTorch example using homogeneous DGLGraphs](../examples/pytorch/rgcn), [PyTorch](../examples/pytorch/rgcn-hetero), [TensorFlow](../examples/tensorflow/rgcn), [MXNet](../examples/mxnet/rgcn)
     - Tags: node classification, link prediction, heterogeneous graph, sampling
@@ -322,11 +324,11 @@ To quickly locate the examples of your interest, search for the tagged keywords 
 - <a name="treelstm"></a> Sheng Tai et al. Improved Semantic Representations From Tree-Structured Long Short-Term Memory Networks. [Paper link](https://arxiv.org/abs/1503.00075).
     - Example code: [PyTorch](../examples/pytorch/tree_lstm), [MXNet](../examples/mxnet/tree_lstm)
     - Tags: sentiment classification
-    
+
 - <a name="seq2seq"></a> Vinyals et al. Order Matters: Sequence to sequence for sets. [Paper link](https://arxiv.org/abs/1511.06391).
     - Pooling module: [PyTorch](https://docs.dgl.ai/api/python/nn.pytorch.html#set2set), [MXNet](https://docs.dgl.ai/api/python/nn.mxnet.html#set2set)
     - Tags: graph classification
-    
+
 - <a name="transr"></a> Lin et al. Learning Entity and Relation Embeddings for Knowledge Graph Completion. [Paper link](https://www.aaai.org/ocs/index.php/AAAI/AAAI15/paper/viewPaper/9571).
     - Example code: [PyTorch](https://github.com/awslabs/dgl-ke/tree/master/examples), [PyTorch for custom data](https://aws-dglke.readthedocs.io/en/latest/commands.html)
     - Tags: knowledge graph
