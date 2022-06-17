@@ -34,14 +34,15 @@ struct CSRGEMM {
   }
 };
 
-// NOTE: There is currently no cusparseHcsrgemm2_bufferSizeExt or cusparseHcsrgemm2.
-//ifdef USE_FP16
-#if 0
+#ifdef USE_FP16
 template <>
 struct CSRGEMM<__half> {
   template <typename... Args>
   static inline cusparseStatus_t bufferSizeExt(Args... args) {
-    return cusparseHcsrgemm2_bufferSizeExt(args...);
+    // There is no cusparseHcsrgemm2_bufferSizeExt, so a different implementation
+    // would be required.
+    BUG_IF_FAIL(false) << "CSRGEMM::bufferSizeExt does not support dtype half (FP16).";
+    return static_cast<cusparseStatus_t>(0);
   }
 
   template <typename... Args>
@@ -51,7 +52,10 @@ struct CSRGEMM<__half> {
 
   template <typename... Args>
   static inline cusparseStatus_t compute(Args... args) {
-    return cusparseHcsrgemm2(args...);
+    // There is no cusparseHcsrgemm2, so a different implementation
+    // would be required.
+    BUG_IF_FAIL(false) << "CSRGEMM::compute does not support dtype half (FP16).";
+    return static_cast<cusparseStatus_t>(0);
   }
 };
 #endif
@@ -113,14 +117,15 @@ struct CSRGEAM {
   }
 };
 
-// NOTE: There is currently no cusparseHcsrgeam2_bufferSizeExt or cusparseHcsrgeam2.
-//ifdef USE_FP16
-#if 0
+#ifdef USE_FP16
 template <>
 struct CSRGEAM<__half> {
   template <typename... Args>
   static inline cusparseStatus_t bufferSizeExt(Args... args) {
-    return cusparseHcsrgeam2_bufferSizeExt(args...);
+    // There is no cusparseHcsrgeam2_bufferSizeExt, so a different implementation
+    // would be required.
+    BUG_IF_FAIL(false) << "CSRGEAM::bufferSizeExt does not support dtype half (FP16).";
+    return static_cast<cusparseStatus_t>(0);
   }
 
   template <typename... Args>
@@ -130,7 +135,10 @@ struct CSRGEAM<__half> {
 
   template <typename... Args>
   static inline cusparseStatus_t compute(Args... args) {
-    return cusparseHcsrgeam2(args...);
+    // There is no cusparseHcsrgeam2, so a different implementation
+    // would be required.
+    BUG_IF_FAIL(false) << "CSRGEAM::compute does not support dtype half (FP16).";
+    return static_cast<cusparseStatus_t>(0);
   }
 };
 #endif
