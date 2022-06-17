@@ -172,8 +172,8 @@ class NDArray {
    */
   inline NDArray Clone(const DGLStreamHandle &stream = nullptr) const;
   /*!
-   * \brief In-place method to pin the current array by calling PinData
-   *        on the underlying DLTensor.
+   * \brief In-place method to pin the current array by calling PinContainer
+   *        on the underlying NDArray:Container.
    * \note This is an in-place method. Behavior depends on the current context,
    *       kDLCPU: will be pinned;
    *       IsPinned: directly return;
@@ -181,8 +181,8 @@ class NDArray {
    */
   inline void PinMemory_();
   /*!
-   * \brief In-place method to unpin the current array by calling UnpinData
-   *        on the underlying DLTensor.
+   * \brief In-place method to unpin the current array by calling UnpinContainer
+   *        on the underlying NDArray:Container.
    * \note This is an in-place method. Behavior depends on the current context,
    *       IsPinned: will be unpinned;
    *       others: directly return.
@@ -294,32 +294,32 @@ class NDArray {
       DLTensor* from, DLTensor* to, DGLStreamHandle stream = nullptr);
 
   /*!
-   * \brief Function to pin the data of a DLTensor.
-   * \param tensor The array to be pinned.
+   * \brief Function to pin the DLTensor of a Container.
+   * \param ptr The container to be pinned.
    * \note Data of the given array will be pinned inplace.
    *       Behavior depends on the current context,
    *       kDLCPU: will be pinned;
    *       IsPinned: directly return;
    *       kDLGPU: invalid, will throw an error.
    */
-  DGL_DLL static void PinData(DLTensor* tensor);
+  DGL_DLL static void PinContainer(Container* ptr);
 
   /*!
-   * \brief Function to unpin the data of a DLTensor.
-   * \param tensor The array to be unpinned.
+   * \brief Function to unpin the DLTensor of a Container.
+   * \param ptr The container to be unpinned.
    * \note Data of the given array will be unpinned inplace.
    *       Behavior depends on the current context,
    *       IsPinned: will be unpinned;
    *       others: directly return.
    */
-  DGL_DLL static void UnpinData(DLTensor* tensor);
+  DGL_DLL static void UnpinContainer(Container* ptr);
 
   /*!
-   * \brief Function check if the data of a DLTensor is pinned.
-   * \param tensor The array to be checked.
+   * \brief Function check if the DLTensor of a Container is pinned.
+   * \param ptr The container to be checked.
    * \return true if pinned.
    */
-  DGL_DLL static bool IsDataPinned(DLTensor* tensor);
+  DGL_DLL static bool IsContainerPinned(Container* ptr);
 
   // internal namespace
   struct Internal;
@@ -361,8 +361,6 @@ struct NDArray::Container {
    *  The head ptr of this struct can be viewed as DLTensor*.
    */
   DLTensor dl_tensor;
-
-  std::shared_ptr<SharedMemory> mem;
   /*!
    * \brief addtional context, reserved for recycling
    * \note We can attach additional content here
@@ -386,6 +384,8 @@ struct NDArray::Container {
     dl_tensor.strides = nullptr;
     dl_tensor.byte_offset = 0;
   }
+  /*! \brief pointer to shared memory */
+  std::shared_ptr<SharedMemory> mem;
   /*! \brief developer function, increases reference counter */
   void IncRef() {
     ref_counter_.fetch_add(1, std::memory_order_relaxed);
@@ -416,6 +416,7 @@ struct NDArray::Container {
   /*! \brief The internal array object */
   std::atomic<int> ref_counter_{0};
 
+  bool pinned_by_dgl_{false};
   bool from_tensor_dispatcher_{false};
 };
 
@@ -484,17 +485,17 @@ inline NDArray NDArray::Clone(const DGLStreamHandle &stream) const {
 
 inline void NDArray::PinMemory_() {
   CHECK(data_ != nullptr);
-  PinData(&(data_->dl_tensor));
+  PinContainer(data_);
 }
 
 inline void NDArray::UnpinMemory_() {
   CHECK(data_ != nullptr);
-  UnpinData(&(data_->dl_tensor));
+  UnpinContainer(data_);
 }
 
 inline bool NDArray::IsPinned() const {
   CHECK(data_ != nullptr);
-  return IsDataPinned(&(data_->dl_tensor));
+  return IsContainerPinned(data_);
 }
 
 inline int NDArray::use_count() const {
