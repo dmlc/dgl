@@ -174,7 +174,7 @@ class CustomPool:
 
 
 def initialize(ip_config, num_servers=1, num_workers=0,
-               max_queue_size=MAX_QUEUE_SIZE, net_type='tensorpipe',
+               max_queue_size=MAX_QUEUE_SIZE, net_type='socket',
                num_worker_threads=1):
     """Initialize DGL's distributed module
 
@@ -203,7 +203,7 @@ def initialize(ip_config, num_servers=1, num_workers=0,
     net_type : str, optional
         Networking type. Valid options are: ``'socket'``, ``'tensorpipe'``.
 
-        Default: ``'tensorpipe'``
+        Default: ``'socket'``
     num_worker_threads: int
         The number of threads in a worker process.
 
