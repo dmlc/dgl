@@ -13,7 +13,10 @@ def _locate_eids_to_exclude(frontier_parent_eids, exclude_eids):
     Note that both arguments are numpy arrays or numpy dicts.
     """
     func = lambda x, y: np.isin(x, y).nonzero()[0]
-    result = recursive_apply_pair(frontier_parent_eids, exclude_eids, func)
+    result = {}
+    for k, v in frontier_parent_eids.items():
+        if k in exclude_eids:
+            result[k] = np.isin(v, exclude_eids[k]).nonzero()[0]
     return recursive_apply(result, F.zerocopy_from_numpy)
 
 class EidExcluder(object):
