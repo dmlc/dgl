@@ -25,9 +25,9 @@ def pin_memory_inplace(tensor):
 
     # needs to be writable to allow in-place modification
     try:
-        nd = F.zerocopy_to_dgl_ndarray_for_write(tensor)
-        nd.pin_memory_()
-        return nd
+        nd_array = F.zerocopy_to_dgl_ndarray_for_write(tensor)
+        nd_array.pin_memory_()
+        return nd_array
     except Exception as e:
         raise DGLError("Failed to pin memory in-place due to: {}".format(e))
 

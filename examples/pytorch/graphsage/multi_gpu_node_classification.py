@@ -69,7 +69,7 @@ class SAGE(nn.Module):
                 batch_size=batch_size, shuffle=False, drop_last=False,
                 num_workers=0, use_ddp=True, use_uva=True)
 
-        y_nd = None
+        last_nd = None
         for l, layer in enumerate(self.layers):
             # in order to prevent running out of GPU memory, we allocate a
             # shared output tensor 'y' in host memory, pin it to allow UVA
@@ -85,6 +85,8 @@ class SAGE(nn.Module):
                 y[output_nodes] = h.to(y.device)
             # make sure all GPUs are done writing to 'y'
             dist.barrier()
+            # save the ndarray handle for UVA feature gathering in the next layer
+            last_nd = y_nd
             if l + 1 < len(self.layers):
                 # assign the output features of this layer as the new input
                 # features for the next layer
