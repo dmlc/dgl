@@ -271,13 +271,14 @@ def test_rpc_msg():
     assert F.array_equal(rpcmsg.tensors[0], req.z)
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
-def test_rpc():
+@pytest.mark.parametrize("net_type", ['tensorpipe'])
+def test_rpc(net_type):
     reset_envs()
     os.environ['DGL_DIST_MODE'] = 'distributed'
     generate_ip_config("rpc_ip_config.txt", 1, 1)
     ctx = mp.get_context('spawn')
-    pserver = ctx.Process(target=start_server, args=(1, "rpc_ip_config.txt"))
-    pclient = ctx.Process(target=start_client, args=("rpc_ip_config.txt",))
+    pserver = ctx.Process(target=start_server, args=(1, "rpc_ip_config.txt", 0, False, 1, net_type))
+    pclient = ctx.Process(target=start_client, args=("rpc_ip_config.txt", 0, 1, net_type))
     pserver.start()
     pclient.start()
     pserver.join()
@@ -306,20 +307,22 @@ def test_multi_client(net_type):
 
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
-def test_multi_thread_rpc():
+@pytest.mark.parametrize("net_type", ['socket', 'tensorpipe'])
+def test_multi_thread_rpc(net_type):
     reset_envs()
     os.environ['DGL_DIST_MODE'] = 'distributed'
     num_servers = 2
-    generate_ip_config("rpc_ip_config_multithread.txt", num_servers, num_servers)
+    ip_config = "rpc_ip_config_multithread.txt"
+    generate_ip_config(ip_config, num_servers, num_servers)
     ctx = mp.get_context('spawn')
     pserver_list = []
     for i in range(num_servers):
-        pserver = ctx.Process(target=start_server, args=(1, "rpc_ip_config_multithread.txt", i))
+        pserver = ctx.Process(target=start_server, args=(1, ip_config, i, False, 1, net_type))
         pserver.start()
         pserver_list.append(pserver)
     def start_client_multithread(ip_config):
         import threading
-        dgl.distributed.connect_to_server(ip_config=ip_config, num_servers=1)
+        dgl.distributed.connect_to_server(ip_config=ip_config, num_servers=1, net_type=net_type)
         dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
         
         req = HelloRequest(STR, INTEGER, TENSOR, simple_func)
@@ -341,7 +344,7 @@ def test_multi_thread_rpc():
         assert_array_equal(F.asnumpy(res1.tensor), F.asnumpy(TENSOR))
         dgl.distributed.exit_client()
 
-    start_client_multithread("rpc_ip_config_multithread.txt")
+    start_client_multithread(ip_config)
     pserver.join()
 
 @unittest.skipIf(True, reason="Tests of multiple groups may fail and let's disable them for now.")
