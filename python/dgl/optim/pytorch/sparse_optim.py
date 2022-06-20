@@ -438,7 +438,7 @@ class SparseAdagrad(SparseGradOptimizer):
                     state = th.empty(
                         emb.weight.shape,
                         dtype=th.float32,
-                        device=eth.device('cpu')).zero_()
+                        device=th.device('cpu')).zero_()
                 elif self._rank == 0:
                     state = create_shared_mem_array(emb_name+'_state', \
                         emb.weight.shape, th.float32).zero_()
@@ -556,6 +556,7 @@ class SparseAdam(SparseGradOptimizer):
         self._beta2 = betas[1]
         self._eps = eps
         self._use_uva = use_uva
+        self._nd_handle = {}
         self._is_using_uva = {}
         assert dtype in [th.float16, th.float32], \
             "Unsupported dtype {}. Valid choices are th.float32 " \
@@ -564,8 +565,9 @@ class SparseAdam(SparseGradOptimizer):
 
     def _setup_uva(self, name, mem, power):
         self._is_using_uva[name] = True
-        pin_memory_inplace(mem)
-        pin_memory_inplace(power)
+        mem_nd = pin_memory_inplace(mem)
+        power_nd = pin_memory_inplace(power)
+        self._nd_handle[name] = [mem_nd, power_nd]
 
     def setup(self, params):
         # We need to register a state sum for each embedding in the kvstore.
@@ -581,17 +583,14 @@ class SparseAdam(SparseGradOptimizer):
                         (emb.weight.shape[0],),
                         dtype=th.int32,
                         device=th.device('cpu')).zero_()
-                    # TODO(@nv-dlasalle): Pinning memory allocated by pytorch
-                    # is problematic as it doesn't get unpinned upon being
-                    # freed. So instead allocate DGL arrays here.
-                    state_mem = F.zerocopy_from_dlpack(ndarray.empty(
+                    state_mem = th.empty(
                         emb.weight.shape,
-                        dtype=F.reverse_data_type_dict[self._dtype],
-                        ctx=to_dgl_context(th.device('cpu'))).to_dlpack()).zero_()
-                    state_power = F.zerocopy_from_dlpack(ndarray.empty(
+                        dtype=self._dtype,
+                        device=th.device('cpu')).zero_()
+                    state_power = th.empty(
                         emb.weight.shape,
-                        dtype=F.reverse_data_type_dict[self._dtype],
-                        ctx=to_dgl_context(th.device('cpu'))).to_dlpack()).zero_()
+                        dtype=self._dtype,
+                        device=th.device('cpu')).zero_()
                 elif self._rank == 0:
                     state_step = create_shared_mem_array(emb_name+'_step', \
                         (emb.weight.shape[0],), th.int32).zero_()
