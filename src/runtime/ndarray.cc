@@ -116,8 +116,8 @@ struct NDArray::Internal {
   }
   // Implementation of API function
   static DLTensor* MoveAsDLTensor(NDArray arr) {
-    DLTensor* tensor = const_cast<DLTensor*>(arr.operator->());
-    CHECK(reinterpret_cast<DLTensor*>(arr.data_) == tensor);
+    DLTensor* tensor = reinterpret_cast<DLTensor*>(arr.data_);
+    CHECK(tensor == const_cast<DLTensor*>(arr.operator->()));
     arr.data_ = nullptr;
     return tensor;
   }
