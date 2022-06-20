@@ -25,21 +25,20 @@ def test_pin_view():
         dgl.utils.pin_memory_inplace(v)
 
 @pytest.mark.skipif(F._default_context_str == 'cpu', reason='Need gpu for this test.')
-def test_unpin_tensoradapater():
+def test_unpin_automatically():
     # run a sufficient number of iterations such that the memory pool should be
     # re-used
-    for j in range(5):
-        nd = dgl.ndarray.empty(
-            [10000, 10],
-            F.reverse_data_type_dict[F.float32],
-            ctx=dgl.utils.to_dgl_context(torch.device('cpu')))
-        t = F.zerocopy_from_dlpack(nd.to_dlpack()).zero_()
+    for j in range(10):
+        t = torch.ones(10000, 10)
         assert not F.is_pinned(t)
-        nd.pin_memory_()
+        nd = dgl.utils.pin_memory_inplace(t)
         assert F.is_pinned(t)
+        del nd
+        # dgl.ndarray will unpin its data upon destruction
+        assert not F.is_pinned(t)
         del t
 
 if __name__ == "__main__":
     test_pin_noncontiguous()
     test_pin_view()
-    test_unpin_tensoradapater()
+    test_unpin_automatically()

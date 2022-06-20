@@ -8,7 +8,7 @@ from . import backend as F
 from .base import DGLError, dgl_warning
 from .init import zero_initializer
 from .storages import TensorStorage
-from .utils import gather_pinned_tensor_rows, pin_memory_inplace, unpin_memory_inplace
+from .utils import gather_pinned_tensor_rows, pin_memory_inplace
 
 class _LazyIndex(object):
     def __init__(self, index):
@@ -444,7 +444,7 @@ class Column(TensorStorage):
         Does nothing if the storage is already pinned.
         """
         if not self.pinned_by_dgl and not F.is_pinned(self.data):
-            pin_memory_inplace(self.data)
+            self.data_nd = pin_memory_inplace(self.data)
             self.pinned_by_dgl = True
 
     def unpin_memory_(self):
@@ -454,7 +454,7 @@ class Column(TensorStorage):
         it is actually in page-locked memory.
         """
         if self.pinned_by_dgl:
-            unpin_memory_inplace(self.data)
+            self.data_nd.unpin_memory_()
             self.pinned_by_dgl = False
 
 class Frame(MutableMapping):

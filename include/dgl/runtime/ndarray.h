@@ -417,7 +417,6 @@ struct NDArray::Container {
   std::atomic<int> ref_counter_{0};
 
   bool pinned_by_dgl_{false};
-  bool from_tensor_dispatcher_{false};
 };
 
 // implementations of inline functions

@@ -6,7 +6,7 @@ import torch.distributed.optim
 import torchmetrics.functional as MF
 import dgl
 import dgl.nn as dglnn
-from dgl.utils import pin_memory_inplace, unpin_memory_inplace
+from dgl.utils import pin_memory_inplace
 from dgl.multiprocessing import shared_tensor
 import time
 import numpy as np
@@ -69,13 +69,14 @@ class SAGE(nn.Module):
                 batch_size=batch_size, shuffle=False, drop_last=False,
                 num_workers=0, use_ddp=True, use_uva=True)
 
+        y_nd = None
         for l, layer in enumerate(self.layers):
             # in order to prevent running out of GPU memory, we allocate a
             # shared output tensor 'y' in host memory, pin it to allow UVA
             # access from each GPU during forward propagation.
             y = shared_tensor(
                     (g.num_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes))
-            pin_memory_inplace(y)
+            y_nd = pin_memory_inplace(y)
 
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader) \
                     if dist.get_rank() == 0 else dataloader:
@@ -84,8 +85,6 @@ class SAGE(nn.Module):
                 y[output_nodes] = h.to(y.device)
             # make sure all GPUs are done writing to 'y'
             dist.barrier()
-            if l > 0:
-                unpin_memory_inplace(g.ndata['h'])
             if l + 1 < len(self.layers):
                 # assign the output features of this layer as the new input
                 # features for the next layer
