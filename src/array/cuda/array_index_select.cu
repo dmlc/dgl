@@ -71,7 +71,8 @@ DType IndexSelect(NDArray array, int64_t index) {
   // The initialization constructor for __half is apparently a device-
   // only function in some setups, but the current function isn't run
   // on the device.
-  using SafeDType = typename std::conditional<std::is_same<DType,__half>::value, uint16_t, DType>::type;
+  using SafeDType = typename std::conditional<
+      std::is_same<DType, __half>::value, uint16_t, DType>::type;
   SafeDType ret = 0;
 #else
   DType ret = 0;
