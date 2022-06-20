@@ -62,7 +62,8 @@ def load_partition(part_config, part_id, load_feats=True):
     part_id : int
         The partition ID.
     load_feats : bool, optional
-        Whether to load node/edge feats. Default: True.
+        Whether to load node/edge feats. If False, the returned node/edge feature dictionaries 
+        will be empty. Default: True.
 
     Returns
     -------
