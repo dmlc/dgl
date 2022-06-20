@@ -486,7 +486,9 @@ def as_edge_prediction_sampler(
         The edge IDs to always exclude during neighborhood sampling.
 
         Note that if :attr:`exclude` argument is ``reverse_id`` or ``reverse_types``,
-        the reverse edges of this argument will also be excluded.
+        the reverse edges of this argument will also be excluded.  If :attr:`exclude`
+        is a callable, then its argument will be the union of the seed edges in the
+        minibatch and :attr:`exclude_eids`.
     reverse_eids : Tensor or dict[etype, Tensor], optional
         A tensor of reverse edge ID mapping.  The i-th element indicates the ID of
         the i-th edge's reverse edge.
