@@ -166,6 +166,7 @@ setup(
     zip_safe=False,
     maintainer='DGL Team',
     maintainer_email='wmjlyjemaine@gmail.com',
+    long_description='dgl',
     packages=find_packages(),
     install_requires=[
         'numpy>=1.14.0',
