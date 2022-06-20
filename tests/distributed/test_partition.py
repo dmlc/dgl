@@ -5,7 +5,7 @@ import numpy as np
 from scipy import sparse as spsp
 from numpy.testing import assert_array_equal
 from dgl.heterograph_index import create_unitgraph_from_coo
-from dgl.distributed import partition_graph, load_partition
+from dgl.distributed import partition_graph, load_partition, load_partition_feats
 from dgl import function as fn
 import backend as F
 import unittest
@@ -160,7 +160,7 @@ def verify_graph_feats(g, gpb, part, node_feats, edge_feats):
             edata = F.gather_row(edge_feats[etype + '/' + name], local_eids)
             assert np.all(F.asnumpy(edata == true_feats))
 
-def check_hetero_partition(hg, part_method, num_parts=4, num_trainers_per_machine=1):
+def check_hetero_partition(hg, part_method, num_parts=4, num_trainers_per_machine=1, load_feats=True):
     hg.nodes['n1'].data['labels'] = F.arange(0, hg.number_of_nodes('n1'))
     hg.nodes['n1'].data['feats'] = F.tensor(np.random.randn(hg.number_of_nodes('n1'), 10), F.float32)
     hg.edges['r1'].data['feats'] = F.tensor(np.random.randn(hg.number_of_edges('r1'), 10), F.float32)
@@ -180,7 +180,12 @@ def check_hetero_partition(hg, part_method, num_parts=4, num_trainers_per_machin
     shuffled_labels = []
     shuffled_elabels = []
     for i in range(num_parts):
-        part_g, node_feats, edge_feats, gpb, _, ntypes, etypes = load_partition('/tmp/partition/test.json', i)
+        part_g, node_feats, edge_feats, gpb, _, ntypes, etypes = load_partition(
+            '/tmp/partition/test.json', i, load_feats=load_feats)
+        if not load_feats:
+            assert not node_feats
+            assert not edge_feats
+            node_feats, edge_feats = load_partition_feats('/tmp/partition/test.json', i)
         if num_trainers_per_machine > 1:
             for ntype in hg.ntypes:
                 name = ntype + '/trainer_id'
@@ -237,7 +242,7 @@ def check_hetero_partition(hg, part_method, num_parts=4, num_trainers_per_machin
     assert np.all(orig_labels == F.asnumpy(hg.nodes['n1'].data['labels']))
     assert np.all(orig_elabels == F.asnumpy(hg.edges['r1'].data['labels']))
 
-def check_partition(g, part_method, reshuffle, num_parts=4, num_trainers_per_machine=1):
+def check_partition(g, part_method, reshuffle, num_parts=4, num_trainers_per_machine=1, load_feats=True):
     g.ndata['labels'] = F.arange(0, g.number_of_nodes())
     g.ndata['feats'] = F.tensor(np.random.randn(g.number_of_nodes(), 10), F.float32)
     g.edata['feats'] = F.tensor(np.random.randn(g.number_of_edges(), 10), F.float32)
@@ -252,7 +257,12 @@ def check_partition(g, part_method, reshuffle, num_parts=4, num_trainers_per_mac
     shuffled_labels = []
     shuffled_edata = []
     for i in range(num_parts):
-        part_g, node_feats, edge_feats, gpb, _, ntypes, etypes = load_partition('/tmp/partition/test.json', i)
+        part_g, node_feats, edge_feats, gpb, _, ntypes, etypes = load_partition(
+            '/tmp/partition/test.json', i, load_feats=load_feats)
+        if not load_feats:
+            assert not node_feats
+            assert not edge_feats
+            node_feats, edge_feats = load_partition_feats('/tmp/partition/test.json', i)
         if num_trainers_per_machine > 1:
             for ntype in g.ntypes:
                 name = ntype + '/trainer_id'
@@ -402,6 +412,7 @@ def test_partition():
     check_partition(g, 'metis', True, 1, 8)
     check_partition(g, 'random', False)
     check_partition(g, 'random', True)
+    check_partition(g, 'metis', True, 4, 8, load_feats=False)
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
@@ -413,6 +424,7 @@ def test_hetero_partition():
     check_hetero_partition(hg, 'metis', 1, 8)
     check_hetero_partition(hg, 'metis', 4, 8)
     check_hetero_partition(hg, 'random')
+    check_hetero_partition(hg, 'metis', 4, 8, load_feats=False)
 
 
 if __name__ == '__main__':

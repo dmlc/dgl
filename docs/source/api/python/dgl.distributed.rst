@@ -98,6 +98,7 @@ Split and Load Graphs
     :toctree: ../../generated/
 
     load_partition
+    load_partition_feats
     load_partition_book
     partition_graph
 
