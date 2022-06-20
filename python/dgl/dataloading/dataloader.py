@@ -72,7 +72,7 @@ class _TensorizedDatasetIter(object):
         # convert the type-ID pairs to dictionary
         type_ids = batch[:, 0]
         indices = batch[:, 1]
-        type_ids_sortidx = torch.argsort(type_ids)
+        _, type_ids_sortidx = torch.sort(type_ids, stable=True)
         type_ids = type_ids[type_ids_sortidx]
         indices = indices[type_ids_sortidx]
         type_id_uniq, type_id_count = torch.unique_consecutive(type_ids, return_counts=True)
