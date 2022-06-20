@@ -332,7 +332,7 @@ class DistGraphServer(KVServer):
             self.gpb, graph_name, ntypes, etypes = load_partition_book(part_config, self.part_id)
             self.client_g = None
         else:
-            # Loading of node_feats and edge_feats are deferred to lower the peak memory consumption.
+            # Loading of node/edge_feats are deferred to lower the peak memory consumption.
             self.client_g, _, _, self.gpb, graph_name, \
                     ntypes, etypes = load_partition(part_config, self.part_id, load_feats=False)
             print('load ' + graph_name)
