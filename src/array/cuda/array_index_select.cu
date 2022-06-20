@@ -67,12 +67,20 @@ template NDArray IndexSelect<kDLGPU, double, int64_t>(NDArray, IdArray);
 template <DLDeviceType XPU, typename DType>
 DType IndexSelect(NDArray array, int64_t index) {
   auto device = runtime::DeviceAPI::Get(array->ctx);
+#ifdef USE_FP16
+  // The initialization constructor for __half is apparently a device-
+  // only function in some setups, but the current function isn't run
+  // on the device.
+  using SafeDType = typename std::conditional<std::is_same<DType,__half>::value, uint16_t, DType>::type;
+  SafeDType ret = 0;
+#else
   DType ret = 0;
+#endif
   device->CopyDataFromTo(
-      static_cast<DType*>(array->data) + index, 0, &ret, 0,
+      static_cast<DType*>(array->data) + index, 0, reinterpret_cast<DType*>(&ret), 0,
       sizeof(DType), array->ctx, DLContext{kDLCPU, 0},
       array->dtype, nullptr);
-  return ret;
+  return reinterpret_cast<DType&>(ret);
 }
 
 template int32_t IndexSelect<kDLGPU, int32_t>(NDArray array, int64_t index);
