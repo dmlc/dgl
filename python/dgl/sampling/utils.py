@@ -12,7 +12,6 @@ def _locate_eids_to_exclude(frontier_parent_eids, exclude_eids):
 
     Note that both arguments are numpy arrays or numpy dicts.
     """
-    func = lambda x, y: np.isin(x, y).nonzero()[0]
     result = {}
     for k, v in frontier_parent_eids.items():
         if k in exclude_eids:
