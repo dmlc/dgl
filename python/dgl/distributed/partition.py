@@ -125,7 +125,7 @@ def load_partition(part_config, part_id, load_feats=True):
     return graph, node_feats, edge_feats, gpb, graph_name, ntypes_list, etypes_list
 
 def load_partition_feats(part_config, part_id):
-    ''' Load feat data of a partition from the data path.
+    '''Load node/edge feature data from a partition.
 
     Parameters
     ----------
