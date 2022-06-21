@@ -43,7 +43,7 @@ pipeline_comments = {
         "eval_batch_size": "Batch size of seed nodes in training stage in evaluation stage",
         "eval_num_workers": "Number of workers to accelerate the graph data processing step in evaluation stage"
     },
-    "save_path": "Path to save the model",
+    "save_path": "Directory to save the experiment results",
     "num_runs": "Number of experiments to run",
 }
 
@@ -55,12 +55,15 @@ class NodepredNSPipelineCfg(BaseModel):
     optimizer: dict = {"name": "Adam", "lr": 0.005, "weight_decay": 0.0}
     loss: str = "CrossEntropyLoss"
     num_runs: int = 1
-    save_path: str = "model.pth"
+    save_path: str = "results"
 
 @PipelineFactory.register("nodepred-ns")
 class NodepredNsPipeline(PipelineBase):
     def __init__(self):
-        self.pipeline_name = "nodepred-ns"
+        self.pipeline = {
+            "name": "nodepred-ns",
+            "mode": "train"
+        }
         self.default_cfg = None
 
     @classmethod
@@ -87,7 +90,8 @@ class NodepredNsPipeline(PipelineBase):
         ):
             self.__class__.setup_user_cfg_cls()
             generated_cfg = {
-                "pipeline_name": "nodepred-ns",
+                "pipeline_name": self.pipeline["name"],
+                "pipeline_mode": self.pipeline["mode"],
                 "device": "cpu",
                 "data": {"name": data.name},
                 "model": {"name": model.value},
@@ -143,13 +147,10 @@ class NodepredNsPipeline(PipelineBase):
 
         if "split_ratio" in generated_user_cfg["data"]:
             generated_user_cfg["data"].pop("split_ratio")
-        if len(generated_user_cfg["data"]) == 1:
-            generated_user_cfg.pop("data")
-        else:
-            generated_user_cfg["data"].pop("name")
-
+        generated_user_cfg["data_name"] = generated_user_cfg["data"].pop("name")
         generated_user_cfg.pop("pipeline_name")
-        generated_user_cfg["model"].pop("name")
+        generated_user_cfg.pop("pipeline_mode")
+        generated_user_cfg["model_name"] = generated_user_cfg["model"].pop("name")
         generated_user_cfg['general_pipeline']["optimizer"].pop("name")
 
 
@@ -163,4 +164,4 @@ class NodepredNsPipeline(PipelineBase):
 
     @staticmethod
     def get_description() -> str:
-        return "Node classification neighbor sampling pipeline"
+        return "Node classification neighbor sampling pipeline for training"
