@@ -10,7 +10,7 @@ def apply(
     cfg: str = typer.Option(..., help="config yaml file name")
 ):
     user_cfg = yaml.safe_load(Path(cfg).open("r"))
-    pipeline_name = user_cfg["pipeline"]["name"]
+    pipeline_name = user_cfg["pipeline_name"]
     output_file_content = ApplyPipelineFactory.registry[pipeline_name].gen_script(user_cfg)
 
     f_code = autopep8.fix_code(output_file_content, options={'aggressive': 1})
