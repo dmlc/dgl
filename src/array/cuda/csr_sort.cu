@@ -128,15 +128,15 @@ void CSRSort_<kDLGPU, int64_t>(CSRMatrix* csr) {
 
   // Allocate workspace
   size_t workspace_size = 0;
-  cub::DeviceSegmentedRadixSort::SortPairs(nullptr, workspace_size,
+  CUDA_CALL(cub::DeviceSegmentedRadixSort::SortPairs(nullptr, workspace_size,
       key_in, key_out, value_in, value_out,
-      nnz, csr->num_rows, offsets, offsets + 1);
+      nnz, csr->num_rows, offsets, offsets + 1));
   void* workspace = device->AllocWorkspace(ctx, workspace_size);
 
   // Compute
-  cub::DeviceSegmentedRadixSort::SortPairs(workspace, workspace_size,
+  CUDA_CALL(cub::DeviceSegmentedRadixSort::SortPairs(workspace, workspace_size,
       key_in, key_out, value_in, value_out,
-      nnz, csr->num_rows, offsets, offsets + 1);
+      nnz, csr->num_rows, offsets, offsets + 1));
 
   csr->sorted = true;
   csr->indices = new_indices;

@@ -42,4 +42,8 @@ export OMP_NUM_THREADS=1
 export DMLC_LOG_DEBUG=1
 if [ $2 != "gpu" ]; then
     python3 -m pytest -v --capture=tee-sys --junitxml=pytest_distributed.xml tests/distributed/*.py || fail "distributed"
+    if [ $DGLBACKEND == "pytorch" ]; then
+        python3 -m pip install filelock
+        PYTHONPATH=tools:$PYTHONPATH python3 -m pytest -v --capture=tee-sys --junitxml=pytest_tools.xml tests/tools/*.py || fail "tools"
+    fi
 fi
