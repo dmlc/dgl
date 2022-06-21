@@ -6,6 +6,7 @@ import math
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
+import dgl
 
 from timeit import default_timer as timer
 from datetime import timedelta
@@ -15,9 +16,9 @@ from utils import read_partitions_file, read_json, get_node_types, \
                     write_dgl_objects, write_metadata_json
 from gloo_wrapper import alltoall_cpu_object_lst, alltoallv_cpu, \
                     alltoall_cpu, allgather_sizes, gather_metadata_json
-from globalids import assign_shuffle_global_nids_nodes, 
+from globalids import assign_shuffle_global_nids_nodes, \
                     assign_shuffle_global_nids_edges, get_shuffle_global_nids_edges
-from convert_partition import create_dgl_object, create_metadata_json
+from convert_partition import create_dgl_object, create_metadata_json, validateDGLObjects
 
 def exchange_node_data(rank, world_size, node_data):
     """
@@ -56,6 +57,7 @@ def exchange_node_data(rank, world_size, node_data):
     print('[Rank: ', rank, '] Preparing node_data to send out: ', timedelta(seconds=end - start))
 
     #exchange sizes first followed by data. 
+    dist.barrier()
     start = timer()
     alltoall_cpu(rank, world_size, recv_sizes, send_sizes)
 
@@ -63,6 +65,7 @@ def exchange_node_data(rank, world_size, node_data):
     for s in recv_sizes: 
         output_list.append(torch.zeros(s.tolist(), dtype=torch.int64))
     
+    dist.barrier()
     alltoallv_cpu(rank, world_size, output_list, input_list)
     end = timer()
     print('[Rank: ', rank, '] Time to exchange node data : ', timedelta(seconds=end - start))
@@ -114,14 +117,15 @@ def exchange_edge_data(rank, world_size, edge_data):
             send_sizes.append(torch.tensor(filt_data.shape, dtype=torch.int64))
         recv_sizes.append(torch.zeros((2,), dtype=torch.int64))
     end = timer()
-    print('[Rank: ', rank, '] Preparing edge_data to send out: ', timedelta(seconds=end-start))
     
+    dist.barrier ()
     start = timer()
     alltoall_cpu(rank, world_size, recv_sizes, send_sizes)
     output_list = []
     for s in recv_sizes: 
         output_list.append(torch.zeros(s.tolist(), dtype=torch.int64))
 
+    dist.barrier ()
     alltoallv_cpu(rank, world_size, output_list, input_list)
     end = timer()
     print('[Rank: ', rank, '] Time to send/rcv edge data: ', timedelta(seconds=end-start))
@@ -134,6 +138,7 @@ def exchange_edge_data(rank, world_size, edge_data):
     edge_data[constants.ETYPE_ID] = rcvd_edge_data[:,3]
     edge_data[constants.GLOBAL_EID] = rcvd_edge_data[:,4]
     edge_data.pop(constants.OWNER_PROCESS)
+
 
 def exchange_node_features(rank, world_size, node_data, node_features, ntypes_map, \
         ntypes_nid_map, ntype_id_count, node_part_ids):
@@ -175,6 +180,7 @@ def exchange_node_features(rank, world_size, node_data, node_features, ntypes_ma
     """
 
     #determine Global_type_nid for the residing features 
+    start = timer()
     node_features_rank_lst = []
     global_nid_rank_lst = []
     for part_id in np.arange(world_size):
@@ -187,12 +193,13 @@ def exchange_node_features(rank, world_size, node_data, node_features, ntypes_ma
             #check if features exist for this node_type
             if (ntype_name+'/feat' in node_features) and (node_features[ntype_name+'/feat'].shape[0] > 0):
                 feature_count = node_features[ntype_name+'/feat'].shape[0]
+                global_feature_count = ntype_id_count[str(ntype_id)]
 
                 #determine the starting global_nid for this node_type_id
-                feat_per_proc = math.ceil(ntype_id_count[str(ntype_id)] / world_size)
+                feat_per_proc = math.ceil(global_feature_count / world_size)
                 global_type_nid_start = feat_per_proc * rank
                 global_type_nid_end = global_type_nid_start
-                if ((global_type_nid_start + feat_per_proc) > feature_count):
+                if((global_type_nid_start + feat_per_proc) > global_feature_count):
                     global_type_nid_end += (ntype_id_count[str(ntype_id)] - global_type_nid_start)
                     type_nid = np.arange(0, (ntype_id_count[str(ntype_id)] - global_type_nid_start))
                 else: 
@@ -204,12 +211,22 @@ def exchange_node_features(rank, world_size, node_data, node_features, ntypes_ma
                 global_nid_start = global_type_nid_start + global_nid_offset
                 global_nid_end = global_type_nid_end + global_nid_offset
 
-                assert (global_nid_end - global_nid_start) == feature_count
+                #assert (global_nid_end - global_nid_start) == feature_count
                 global_nids = np.arange(global_nid_start, global_nid_end, dtype=np.int64)
 
                 #determine node feature ownership 
-                part_ids = node_part_ids[global_nids]
+                #TODO: a Bug here. 
+                '''
+                part_ids = node_part_ids[global_nids] 
                 idx = (part_ids == part_id)
+                out_global_nid = global_nids[idx == 1]
+                out_type_nid = type_nid[idx == 1]
+                out_features = node_features[ntype_name+'/feat'][out_type_nid]
+                send_node_features[ntype_name+'/feat'] = out_features
+                send_global_nids[ntype_name+'/feat'] = out_global_nid
+                '''
+                part_ids_slice = node_part_ids[global_nid_start:global_nid_end]
+                idx = (part_ids_slice == part_id)
                 out_global_nid = global_nids[idx == 1]
                 out_type_nid = type_nid[idx == 1]
                 out_features = node_features[ntype_name+'/feat'][out_type_nid]
@@ -219,6 +236,7 @@ def exchange_node_features(rank, world_size, node_data, node_features, ntypes_ma
         node_features_rank_lst.append(send_node_features)
         global_nid_rank_lst.append(send_global_nids)
 
+    dist.barrier ()
     output_list = alltoall_cpu_object_lst(rank, world_size, node_features_rank_lst)
     output_list[rank] = node_features_rank_lst[rank]
 
@@ -238,6 +256,8 @@ def exchange_node_features(rank, world_size, node_data, node_features, ntypes_ma
                     torch.cat((rcvd_node_features[ntype_name+'/feat'], output_list[idx][ntype_name+'/feat']))
                 rcvd_global_nids[ntype_name+'/feat'] = \
                     np.concatenate((rcvd_global_nids[ntype_name+'/feat'], output_nid_list[idx][ntype_name+'/feat']))
+    end = timer()
+    print('[Rank: ', rank, '] Total time for node feature exchange: ', timedelta(seconds = end - start))
 
     return rcvd_node_features, rcvd_global_nids
 
@@ -311,17 +331,25 @@ def read_dataset(rank, world_size, node_part_ids, params):
     """
     edge_features = {}
     node_data, node_features, edge_data, removed_edges = \
-        get_dataset(params.input_dir, params.graph_name, rank)
+        get_dataset(params.input_dir, params.graph_name, rank, params.num_node_weights)
 
     prefix_sum_nodes = allgather_sizes([node_data[constants.NTYPE_ID].shape[0]], world_size)
 
     augment_node_data(node_data, node_part_ids, prefix_sum_nodes[rank])
     print('[Rank: ', rank, '] Done augmenting node_data: ', len(node_data), node_data[constants.GLOBAL_TYPE_NID].shape)
+    print('[Rank: ', rank, '] Done assigning Global_NIDS: ', prefix_sum_nodes[rank], prefix_sum_nodes[rank+1], prefix_sum_nodes[rank]+node_data[constants.GLOBAL_TYPE_NID].shape[0])
 
-    edge_data[constants.GLOBAL_SRC_ID] = np.concatenate((edge_data[constants.GLOBAL_SRC_ID], removed_edges[constants.GLOBAL_SRC_ID]))
-    edge_data[constants.GLOBAL_DST_ID] = np.concatenate((edge_data[constants.GLOBAL_DST_ID], removed_edges[constants.GLOBAL_DST_ID]))
-    edge_data[constants.GLOBAL_TYPE_EID] = np.concatenate((edge_data[constants.GLOBAL_TYPE_EID], removed_edges[constants.GLOBAL_TYPE_EID]))
-    edge_data[constants.ETYPE_ID] = np.concatenate((edge_data[constants.ETYPE_ID], removed_edges[constants.ETYPE_ID]))
+    if ((len(removed_edges) > 0) and \
+            (constants.GLOBAL_SRC_ID in removed_edges) and \
+            (removed_edges[constants.GLOBAL_SRC_ID].shape[0] > 0)):
+        edge_data[constants.GLOBAL_SRC_ID] = np.concatenate((edge_data[constants.GLOBAL_SRC_ID], \
+                                                removed_edges[constants.GLOBAL_SRC_ID]))
+        edge_data[constants.GLOBAL_DST_ID] = np.concatenate((edge_data[constants.GLOBAL_DST_ID], \
+                                                removed_edges[constants.GLOBAL_DST_ID]))
+        edge_data[constants.GLOBAL_TYPE_EID] = np.concatenate((edge_data[constants.GLOBAL_TYPE_EID], \
+                                                removed_edges[constants.GLOBAL_TYPE_EID]))
+        edge_data[constants.ETYPE_ID] = np.concatenate((edge_data[constants.ETYPE_ID], \
+                                                removed_edges[constants.ETYPE_ID]))
 
     prefix_sum_edges = allgather_sizes([edge_data[constants.ETYPE_ID].shape[0]], world_size)
 
@@ -402,7 +430,7 @@ def splitdata_exec(rank, world_size, params):
     params : argparser object
         this object, key value pairs, provides access to the command line arguments from the runtime environment
     """
-
+    global_start = timer()
     print('[Rank: ', rank, '] Starting distributed data processing pipeline...')
 
     #init processing
@@ -457,6 +485,7 @@ def splitdata_exec(rank, world_size, params):
     print('[Rank: ', rank, '] Done resolving orig_node_id for local node_ids...')
 
     #create dgl objects here
+    start = timer()
     num_nodes = 0
     num_edges = shuffle_global_eid_start
     graph_obj, ntypes_map_val, etypes_map_val, ntypes_map, etypes_map = create_dgl_object(\
@@ -466,7 +495,7 @@ def splitdata_exec(rank, world_size, params):
 
     #get the meta-data 
     json_metadata = create_metadata_json(params.graph_name, len(node_data[constants.NTYPE_ID]), len(edge_data[constants.ETYPE_ID]), \
-                            params.num_parts, ntypes_map_val, \
+                            rank, world_size, ntypes_map_val, \
                             etypes_map_val, ntypes_map, etypes_map, params.output)
 
     if (rank == 0):
@@ -477,3 +506,8 @@ def splitdata_exec(rank, world_size, params):
     else:
         #send meta-data to Rank-0 process
         gather_metadata_json(json_metadata, rank, world_size)
+    end = timer()
+    print('[Rank: ', rank, '] Time to create dgl objects: ', timedelta(seconds = end - start))
+
+    global_end = timer()
+    print('[Rank: ', rank, '] Total execution time of the program: ', timedelta(seconds = global_end - global_start))

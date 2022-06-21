@@ -16,6 +16,7 @@ from utils import augment_node_data, augment_edge_data,\
                   get_node_types, write_metadata_json, write_dgl_objects
 from globalids import assign_shuffle_global_nids_nodes, assign_shuffle_global_nids_edges,\
                       get_shuffle_global_nids_edges
+from multi_dev_init import splitdata_exec
 from gloo_wrapper import gather_metadata_json
 from convert_partition import create_dgl_object, create_metadata_json
 
@@ -457,7 +458,7 @@ def proc_exec(rank, world_size, params):
         #send meta-data to Rank-0 process
         gather_metadata_json(json_metadata, rank, world_size)
 
-def single_dev_init(rank, world_size, func_exec, params, backend="gloo"):
+def single_dev_proc_init(rank, world_size, func_exec, params, backend="gloo"):
     """
     Init. function which is run by each process in the Gloo ProcessGroup
 
@@ -478,12 +479,12 @@ def single_dev_init(rank, world_size, func_exec, params, backend="gloo"):
     os.environ["MASTER_PORT"] = '29500'
 
     #create Gloo Process Group
-    dist.init_process_group(backend, rank=rank, world_size=world_size)
+    dist.init_process_group(backend, rank=rank, world_size=world_size, timeout=timedelta(seconds=5*60))
 
     #Invoke the main function to kick-off each process
     func_exec(rank, world_size, params)
 
-def multi_dev_init(params):
+def multi_dev_proc_init(params):
     """
     Function to be invoked when executing data loading pipeline on multiple machines
 
@@ -492,13 +493,19 @@ def multi_dev_init(params):
     params : argparser object
         argparser object providing access to command line arguments.
     """
+    rank = int(os.environ["RANK"])
+    #rank = params.rank
+    #os.environ["MASTER_ADDR"] = params.master_addr
+    #os.environ["MASTER_PORT"] = params.master_port
+
+    
     #init the gloo process group here. 
-    dist.init_process_group("gloo", rank=params.rank, world_size=params.world_size)
-    print('[Rank: ', params.rank, '] Done with process group initialization...')
+    dist.init_process_group("gloo", rank=rank, world_size=params.world_size, timeout=timedelta(seconds=5*60))
+    print('[Rank: ', rank, '] Done with process group initialization...')
 
     #invoke the main function here.
     if (params.mul_files_dataset):
-        splitdata_exec(params.rank, params.world_size, params)
+        splitdata_exec(rank, params.world_size, params)
     else:
-        proc_exec(params.rank, params.world_size, params)
-    print('[Rank: ', params.rank, '] Done with Distributed data processing pipeline processing.')
+        proc_exec(rank, params.world_size, params)
+    print('[Rank: ', rank, '] Done with Distributed data processing pipeline processing.')

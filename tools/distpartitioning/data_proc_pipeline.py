@@ -1,7 +1,7 @@
 import argparse
 import numpy as np
 import torch.multiprocessing as mp
-from initialize import proc_exec, single_dev_init, multi_dev_init
+from initialize import proc_exec, single_dev_proc_init, multi_dev_proc_init
 from multi_dev_init import splitdata_exec
 
 def log_params(params): 
@@ -48,9 +48,9 @@ def single_dev_init(params):
     #implementation
     for rank in range(params.world_size):
         if(params.mul_files_dataset): 
-            p = mp.Process(target=single_dev_init, args=(rank, params.world_size, splitdata_exec, params))
+            p = mp.Process(target=single_dev_proc_init, args=(rank, params.world_size, splitdata_exec, params))
         else:
-            p = mp.Process(target=single_dev_init, args=(rank, params.world_size, proc_exec, params))
+            p = mp.Process(target=single_dev_proc_init, args=(rank, params.world_size, proc_exec, params))
         p.start()
         processes.append(p)
 
@@ -88,6 +88,8 @@ if __name__ == "__main__":
                     help='Use 0 for single machine run and 1 for distributed execution')
     parser.add_argument('--mul-files-dataset', type=bool, default=False,
                     help='Whether the dataset is in single file format or multiple file format')
+    #parser.add_argument('--local-rank', type=int, required=True, default=None,
+    #                help='rank of the process')
 
     #arguments needed for the distributed implementation
     parser.add_argument('--world-size', help='no. of processes to spawn',
@@ -106,6 +108,6 @@ if __name__ == "__main__":
 
     #invoke the starting function here.
     if(params.exec_type == 0):
-        singe_dev_init(params)
+        single_dev_init(params)
     else:
-        multi_dev_init(params)
+        multi_dev_proc_init(params)

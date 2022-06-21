@@ -1,8 +1,9 @@
 import os
 import numpy as np
 import constants
+import torch
 
-def get_dataset(input_dir, graph_name, rank):
+def get_dataset(input_dir, graph_name, rank, num_node_weights):
     """
     Function to read the multiple file formatted dataset. 
 
@@ -50,20 +51,24 @@ def get_dataset(input_dir, graph_name, rank):
                     node_features[ntype+'/feat'] = torch.tensor(features)
 
     #done build node_features locally. 
-    for k, v in node_features.items():
-        print('[Rank: ', rank, '] node feature name: ', k, ', feature data shape: ', v.size())
+    if len(node_features) <= 0: 
+        print('[Rank: ', rank, '] This dataset does not have any node features')
+    else: 
+        for k, v in node_features.items():
+            print('[Rank: ', rank, '] node feature name: ', k, ', feature data shape: ', v.size())
 
     #read (split) xxx_nodes.txt file
-    node_file = input_dir+'/'+graph_name+'_nodes'+'{:02d}.txt'.format(rank)
+    node_file = input_dir+'/'+graph_name+'_nodes'+'_{:02d}.txt'.format(rank)
     node_data = np.loadtxt(node_file, delimiter=' ', dtype='int64')
     nodes_datadict = {}
     nodes_datadict[constants.NTYPE_ID] = node_data[:,0]
-    nodes_datadict[constants.GLOBAL_TYPE_NID] = node_data[:,5]
+    type_idx = 0 + num_node_weights + 1
+    nodes_datadict[constants.GLOBAL_TYPE_NID] = node_data[:,type_idx]
     print('[Rank: ', rank, '] Done reading node_data: ', len(nodes_datadict), nodes_datadict[constants.NTYPE_ID].shape)
 
     #read (split) xxx_edges.txt file
     edge_datadict = {}
-    edge_file = input_dir+'/'+graph_name+'_edges'+'{:02d}.txt'.format(rank)
+    edge_file = input_dir+'/'+graph_name+'_edges'+'_{:02d}.txt'.format(rank)
     edge_data = np.loadtxt(edge_file, delimiter=' ', dtype='int64')
     edge_datadict[constants.GLOBAL_SRC_ID] = edge_data[:,0]
     edge_datadict[constants.GLOBAL_DST_ID] = edge_data[:,1]
@@ -73,12 +78,15 @@ def get_dataset(input_dir, graph_name, rank):
 
     #read (single) file xxx_removed_edges.txt file
     redge_datadict = {}
-    removed_edges_file = input_dir+'/'+graph_name+'_removed_edges'+'{:02d}.txt'.format(rank)
-    removed_edges = np.loadtxt(removed_edges_file, delimiter=' ', dtype='int64')
-    redge_datadict[constants.GLOBAL_SRC_ID] = removed_edges[:,0]
-    redge_datadict[constants.GLOBAL_DST_ID] = removed_edges[:,1]
-    redge_datadict[constants.GLOBAL_TYPE_EID] = removed_edges[:,2]
-    redge_datadict[constants.ETYPE_ID] = removed_edges[:,3]
-    print('[Rank: ', rank, '] Done reading removed_edge_file: ', len(redge_datadict), redge_datadict[constants.GLOBAL_SRC_ID].shape)
+    removed_edges_file = input_dir+'/'+graph_name+'_removed_edges'+'_{:02d}.txt'.format(rank)
+    if (os.path.exists(removed_edges_file)):
+        removed_edges = np.loadtxt(removed_edges_file, delimiter=' ', dtype='int64')
+        redge_datadict[constants.GLOBAL_SRC_ID] = removed_edges[:,0]
+        redge_datadict[constants.GLOBAL_DST_ID] = removed_edges[:,1]
+        redge_datadict[constants.GLOBAL_TYPE_EID] = removed_edges[:,2]
+        redge_datadict[constants.ETYPE_ID] = removed_edges[:,3]
+        print('[Rank: ', rank, '] Done reading removed_edge_file: ', len(redge_datadict), redge_datadict[constants.GLOBAL_SRC_ID].shape)
+    else:
+        print('[Rank: ', rank, '] This dataset does not have any removed edges')
 
     return nodes_datadict, node_features, edge_datadict, redge_datadict 
