@@ -172,34 +172,34 @@ class SocketReceiver : public Receiver {
   /*!
    * \brief Recv RPCMessage from Sender. Actually removing data from queue.
    * \param msg pointer of RPCmessage
+   * \param timeout The timeout value in milliseconds. If zero, wait indefinitely.
+   * \return RPCStatus: kRPCSuccess or kRPCTimeOut.
    */
-  void Recv(rpc::RPCMessage* msg) override;
+  rpc::RPCStatus Recv(rpc::RPCMessage* msg, int timeout) override;
 
   /*!
    * \brief Recv data from Sender. Actually removing data from msg_queue.
    * \param msg pointer of data message
    * \param send_id which sender current msg comes from
+   * \param timeout The timeout value in milliseconds. If zero, wait indefinitely.
    * \return Status code
    *
-   * (1) The Recv() API is blocking, which will not 
-   *     return until getting data from message queue.
-   * (2) The Recv() API is thread-safe.
-   * (3) Memory allocated by communicator but will not own it after the function returns.
+   * (1) The Recv() API is thread-safe.
+   * (2) Memory allocated by communicator but will not own it after the function returns.
    */
-  STATUS Recv(Message* msg, int* send_id) override;
+  STATUS Recv(Message* msg, int* send_id, int timeout = 0) override;
 
   /*!
    * \brief Recv data from a specified Sender. Actually removing data from msg_queue.
    * \param msg pointer of data message
    * \param send_id sender's ID
+   * \param timeout The timeout value in milliseconds. If zero, wait indefinitely.
    * \return Status code
    *
-   * (1) The RecvFrom() API is blocking, which will not 
-   *     return until getting data from message queue.
-   * (2) The RecvFrom() API is thread-safe.
-   * (3) Memory allocated by communicator but will not own it after the function returns.
+   * (1) The RecvFrom() API is thread-safe.
+   * (2) Memory allocated by communicator but will not own it after the function returns.
    */
-  STATUS RecvFrom(Message* msg, int send_id) override;
+  STATUS RecvFrom(Message* msg, int send_id, int timeout = 0) override;
 
   /*!
    * \brief Finalize SocketReceiver

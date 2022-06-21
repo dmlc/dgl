@@ -676,18 +676,17 @@ def recv_request(timeout=0):
     req : request
         One request received from the target, or None if it times out.
     client_id : int
-        Client' ID received from the target.
+        Client' ID received from the target, or -1 if it times out.
     group_id : int
-        Group' ID received from the target.
+        Group' ID received from the target, or -1 if it times out.
 
     Raises
     ------
     ConnectionError if there is any problem with the connection.
     """
-    # TODO(chao): handle timeout
     msg = recv_rpc_message(timeout)
     if msg is None:
-        return None
+        return None, -1, -1
     set_msg_seq(msg.msg_seq)
     req_cls, _ = SERVICE_ID_TO_PROPERTY[msg.service_id]
     if req_cls is None:
@@ -721,7 +720,6 @@ def recv_response(timeout=0):
     ------
     ConnectionError if there is any problem with the connection.
     """
-    # TODO(chao): handle timeout
     msg = recv_rpc_message(timeout)
     if msg is None:
         return None
@@ -764,7 +762,6 @@ def remote_call(target_and_requests, timeout=0):
     ------
     ConnectionError if there is any problem with the connection.
     """
-    # TODO(chao): handle timeout
     all_res = [None] * len(target_and_requests)
     msgseq2pos = {}
     num_res = 0
@@ -787,6 +784,9 @@ def remote_call(target_and_requests, timeout=0):
     while num_res != 0:
         # recv response
         msg = recv_rpc_message(timeout)
+        if msg is None:
+            raise DGLError(
+                f"Timed out for receiving message within {timeout} milliseconds")
         num_res -= 1
         _, res_cls = SERVICE_ID_TO_PROPERTY[msg.service_id]
         if res_cls is None:
@@ -864,6 +864,9 @@ def recv_responses(msgseq2pos, timeout=0):
     while num_res != 0:
         # recv response
         msg = recv_rpc_message(timeout)
+        if msg is None:
+            raise DGLError(
+                f"Timed out for receiving message within {timeout} milliseconds")
         num_res -= 1
         _, res_cls = SERVICE_ID_TO_PROPERTY[msg.service_id]
         if res_cls is None:
@@ -904,7 +907,6 @@ def remote_call_to_machine(target_and_requests, timeout=0):
     ------
     ConnectionError if there is any problem with the connection.
     """
-    # TODO(chao): handle timeout
     msgseq2pos = send_requests_to_machine(target_and_requests)
     return recv_responses(msgseq2pos, timeout)
 
@@ -955,8 +957,8 @@ def recv_rpc_message(timeout=0):
     ConnectionError if there is any problem with the connection.
     """
     msg = _CAPI_DGLRPCCreateEmptyRPCMessage()
-    _CAPI_DGLRPCRecvRPCMessage(timeout, msg)
-    return msg
+    status = _CAPI_DGLRPCRecvRPCMessage(timeout, msg)
+    return msg if status == 0 else None
 
 def client_barrier():
     """Barrier all client processes"""

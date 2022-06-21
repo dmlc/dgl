@@ -239,7 +239,7 @@ std::pair<IdArray, NDArray> SparsePush(
   comm->AllToAll(send_sum, recv_sum.get(), 1, stream);
 
   cudaEvent_t d2h;
-  cudaEventCreate(&d2h);
+  CUDA_CALL(cudaEventCreate(&d2h));
 
   // compute the prefix sum of the recv values
   Workspace<int64_t> recv_prefix(device, ctx, comm_size+1);
@@ -269,11 +269,11 @@ std::pair<IdArray, NDArray> SparsePush(
   recv_prefix.free();
 
   // use an event to track when copying is done
-  cudaEventRecord(d2h, stream);
+  CUDA_CALL(cudaEventRecord(d2h, stream));
 
   // allocate output space
-  cudaEventSynchronize(d2h);
-  cudaEventDestroy(d2h);
+  CUDA_CALL(cudaEventSynchronize(d2h));
+  CUDA_CALL(cudaEventDestroy(d2h));
 
   IdArray recv_idx = aten::NewIdArray(
       recv_prefix_host.back(), ctx, sizeof(IdType)*8);
@@ -369,7 +369,7 @@ NDArray SparsePull(
   }
 
   cudaEvent_t d2h;
-  cudaEventCreate(&d2h);
+  CUDA_CALL(cudaEventCreate(&d2h));
 
   std::vector<int64_t> request_prefix_host(comm_size+1);
   device->CopyDataFromTo(
@@ -420,11 +420,11 @@ NDArray SparsePull(
   response_prefix.free();
 
   // use an event to track when copying is done
-  cudaEventRecord(d2h, stream);
+  CUDA_CALL(cudaEventRecord(d2h, stream));
 
   // allocate output space
-  cudaEventSynchronize(d2h);
-  cudaEventDestroy(d2h);
+  CUDA_CALL(cudaEventSynchronize(d2h));
+  CUDA_CALL(cudaEventDestroy(d2h));
 
   // gather requested indexes
   IdArray recv_idx = aten::NewIdArray(
