@@ -201,7 +201,7 @@ def initialize(ip_config, num_servers=1, num_workers=0,
         Note that the 20 GB is just an upper-bound and DGL uses zero-copy and
         it will not allocate 20GB memory at once.
     net_type : str, optional
-        Networking type. Currently the only valid option is ``'socket'``.
+        Networking type. Valid options are: ``'socket'``, ``'tensorpipe'``.
 
         Default: ``'socket'``
     num_worker_threads: int
@@ -235,7 +235,8 @@ def initialize(ip_config, num_servers=1, num_workers=0,
                                int(os.environ.get('DGL_NUM_CLIENT')),
                                os.environ.get('DGL_CONF_PATH'),
                                graph_format=formats,
-                               keep_alive=keep_alive)
+                               keep_alive=keep_alive,
+                               net_type=net_type)
         serv.start()
         sys.exit()
     else:

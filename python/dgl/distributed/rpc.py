@@ -15,10 +15,10 @@ from .. import backend as F
 
 __all__ = ['set_rank', 'get_rank', 'Request', 'Response', 'register_service', \
 'create_sender', 'create_receiver', 'finalize_sender', 'finalize_receiver', \
-'receiver_wait', 'connect_receiver', 'read_ip_config', 'get_group_id', \
+'wait_for_senders', 'connect_receiver', 'read_ip_config', 'get_group_id', \
 'get_num_machines', 'set_num_machines', 'get_machine_id', 'set_machine_id', \
 'send_request', 'recv_request', 'send_response', 'recv_response', 'remote_call', \
-'send_request_to_machine', 'remote_call_to_machine', 'fast_pull', \
+'send_request_to_machine', 'remote_call_to_machine', 'fast_pull', 'DistConnectError', \
 'get_num_client', 'set_num_client', 'client_barrier', 'copy_data_to_shared_memory']
 
 REQUEST_CLASS_TO_SERVICE_ID = {}
@@ -112,7 +112,7 @@ def create_sender(max_queue_size, net_type):
     max_queue_size : int
         Maximal size (bytes) of network queue buffer.
     net_type : str
-        Networking type. Current options are: 'socket'.
+        Networking type. Current options are: 'socket', 'tensorpipe'.
     """
     max_thread_count = int(os.getenv('DGL_SOCKET_MAX_THREAD_COUNT', '0'))
     _CAPI_DGLRPCCreateSender(int(max_queue_size), net_type, max_thread_count)
@@ -125,7 +125,7 @@ def create_receiver(max_queue_size, net_type):
     max_queue_size : int
         Maximal size (bytes) of network queue buffer.
     net_type : str
-        Networking type. Current options are: 'socket'.
+        Networking type. Current options are: 'socket', 'tensorpipe'.
     """
     max_thread_count = int(os.getenv('DGL_SOCKET_MAX_THREAD_COUNT', '0'))
     _CAPI_DGLRPCCreateReceiver(int(max_queue_size), net_type, max_thread_count)
@@ -140,7 +140,7 @@ def finalize_receiver():
     """
     _CAPI_DGLRPCFinalizeReceiver()
 
-def receiver_wait(ip_addr, port, num_senders, blocking=True):
+def wait_for_senders(ip_addr, port, num_senders, blocking=True):
     """Wait all of the senders' connections.
 
     This api will be blocked until all the senders connect to the receiver.
@@ -156,7 +156,7 @@ def receiver_wait(ip_addr, port, num_senders, blocking=True):
     blocking : bool
         whether to wait blockingly
     """
-    _CAPI_DGLRPCReceiverWait(ip_addr, int(port), int(num_senders), blocking)
+    _CAPI_DGLRPCWaitForSenders(ip_addr, int(port), int(num_senders), blocking)
 
 def connect_receiver(ip_addr, port, recv_id, group_id=-1):
     """Connect to target receiver
@@ -174,6 +174,20 @@ def connect_receiver(ip_addr, port, recv_id, group_id=-1):
     if target_id < 0:
         raise DGLError("Invalid target id: {}".format(target_id))
     return _CAPI_DGLRPCConnectReceiver(ip_addr, int(port), int(target_id))
+
+def connect_receiver_finalize(max_try_times):
+    """Finalize the action to connect to receivers. Make sure that either all connections are
+    successfully established or connection fails.
+
+    When "socket" network backend is in use, the function issues actual requests to receiver
+    sockets to establish connections.
+
+    Parameters
+    ----------
+    max_try_times : int
+        maximum try times
+    """
+    return _CAPI_DGLRPCConnectReceiverFinalize(max_try_times)
 
 def set_rank(rank):
     """Set the rank of this process.
@@ -662,18 +676,17 @@ def recv_request(timeout=0):
     req : request
         One request received from the target, or None if it times out.
     client_id : int
-        Client' ID received from the target.
+        Client' ID received from the target, or -1 if it times out.
     group_id : int
-        Group' ID received from the target.
+        Group' ID received from the target, or -1 if it times out.
 
     Raises
     ------
     ConnectionError if there is any problem with the connection.
     """
-    # TODO(chao): handle timeout
     msg = recv_rpc_message(timeout)
     if msg is None:
-        return None
+        return None, -1, -1
     set_msg_seq(msg.msg_seq)
     req_cls, _ = SERVICE_ID_TO_PROPERTY[msg.service_id]
     if req_cls is None:
@@ -707,7 +720,6 @@ def recv_response(timeout=0):
     ------
     ConnectionError if there is any problem with the connection.
     """
-    # TODO(chao): handle timeout
     msg = recv_rpc_message(timeout)
     if msg is None:
         return None
@@ -750,7 +762,6 @@ def remote_call(target_and_requests, timeout=0):
     ------
     ConnectionError if there is any problem with the connection.
     """
-    # TODO(chao): handle timeout
     all_res = [None] * len(target_and_requests)
     msgseq2pos = {}
     num_res = 0
@@ -773,6 +784,9 @@ def remote_call(target_and_requests, timeout=0):
     while num_res != 0:
         # recv response
         msg = recv_rpc_message(timeout)
+        if msg is None:
+            raise DGLError(
+                f"Timed out for receiving message within {timeout} milliseconds")
         num_res -= 1
         _, res_cls = SERVICE_ID_TO_PROPERTY[msg.service_id]
         if res_cls is None:
@@ -850,6 +864,9 @@ def recv_responses(msgseq2pos, timeout=0):
     while num_res != 0:
         # recv response
         msg = recv_rpc_message(timeout)
+        if msg is None:
+            raise DGLError(
+                f"Timed out for receiving message within {timeout} milliseconds")
         num_res -= 1
         _, res_cls = SERVICE_ID_TO_PROPERTY[msg.service_id]
         if res_cls is None:
@@ -890,7 +907,6 @@ def remote_call_to_machine(target_and_requests, timeout=0):
     ------
     ConnectionError if there is any problem with the connection.
     """
-    # TODO(chao): handle timeout
     msgseq2pos = send_requests_to_machine(target_and_requests)
     return recv_responses(msgseq2pos, timeout)
 
@@ -941,8 +957,8 @@ def recv_rpc_message(timeout=0):
     ConnectionError if there is any problem with the connection.
     """
     msg = _CAPI_DGLRPCCreateEmptyRPCMessage()
-    _CAPI_DGLRPCRecvRPCMessage(timeout, msg)
-    return msg
+    status = _CAPI_DGLRPCRecvRPCMessage(timeout, msg)
+    return msg if status == 0 else None
 
 def client_barrier():
     """Barrier all client processes"""
@@ -1221,5 +1237,22 @@ def get_client(client_id, group_id):
         global client ID
     """
     return _CAPI_DGLRPCGetClient(int(client_id), int(group_id))
+
+class DistConnectError(DGLError):
+    """Exception raised for errors if fail to connect peer.
+
+    Attributes
+    ----------
+    kv_store : KVServer
+        reference for KVServer
+    """
+
+    def __init__(self, max_try_times, ip='', port=''):
+        peer_str = "peer[{}:{}]".format(ip, port) if ip != '' else "peer"
+        self.message = "Failed to build conncetion with {} after {} retries. " \
+                       "Please check network availability or increase max try " \
+                       "times via 'DGL_DIST_MAX_TRY_TIMES'.".format(
+                           peer_str, max_try_times)
+        super().__init__(self.message)
 
 _init_api("dgl.distributed.rpc")

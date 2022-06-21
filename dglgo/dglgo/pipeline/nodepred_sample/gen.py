@@ -65,11 +65,11 @@ class NodepredNsPipeline(PipelineBase):
 
     @classmethod
     def setup_user_cfg_cls(cls):
-        from ...utils.enter_config import UserConfig 
+        from ...utils.enter_config import UserConfig
         class NodePredUserConfig(UserConfig):
             eval_device: DeviceEnum = Field("cpu")
             data: DataFactory.filter("nodepred-ns").get_pydantic_config() = Field(..., discriminator="name")
-            model : NodeModelFactory.filter(lambda cls: hasattr(cls, "forward_block")).get_pydantic_model_config() = Field(..., discriminator="name")   
+            model : NodeModelFactory.filter(lambda cls: hasattr(cls, "forward_block")).get_pydantic_model_config() = Field(..., discriminator="name")
             general_pipeline: NodepredNSPipelineCfg
 
         cls.user_cfg_cls = NodePredUserConfig
@@ -86,7 +86,7 @@ class NodepredNsPipeline(PipelineBase):
             model: NodeModelFactory.filter(lambda cls: hasattr(cls, "forward_block")).get_model_enum() = typer.Option(..., help="Model name"),
         ):
             self.__class__.setup_user_cfg_cls()
-            generated_cfg = {                
+            generated_cfg = {
                 "pipeline_name": "nodepred-ns",
                 "device": "cpu",
                 "data": {"name": data.name},
@@ -96,7 +96,7 @@ class NodepredNsPipeline(PipelineBase):
             output_cfg = self.user_cfg_cls(**generated_cfg).dict()
             output_cfg = deep_convert_dict(output_cfg)
             comment_dict = {
-                "device": "Torch device name, e.q. cpu or cuda or cuda:0",
+                "device": "Torch device name, e.g., cpu or cuda or cuda:0",
                 "data": {
                     "split_ratio": 'Ratio to generate split masks, for example set to [0.8, 0.1, 0.1] for 80% train/10% val/10% test. Leave blank to use builtin split in original dataset'
                 },
@@ -126,10 +126,10 @@ class NodepredNsPipeline(PipelineBase):
             template = Template(f.read())
         pipeline_cfg = NodepredNSPipelineCfg(
             **user_cfg_dict["general_pipeline"])
-        
+
         if "num_layers" in user_cfg_dict["model"]:
             assert user_cfg_dict["model"]["num_layers"] == len(user_cfg_dict["general_pipeline"]["sampler"]["fan_out"]), \
-                "The num_layers in model config should be the same as the length of fan_out in sampler. For example, if num_layers is 1, the fan_out cannot be [5, 10]"          
+                "The num_layers in model config should be the same as the length of fan_out in sampler. For example, if num_layers is 1, the fan_out cannot be [5, 10]"
 
         render_cfg = copy.deepcopy(user_cfg_dict)
         model_code = NodeModelFactory.get_source_code(

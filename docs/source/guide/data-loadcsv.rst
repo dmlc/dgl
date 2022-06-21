@@ -389,6 +389,8 @@ After loaded, the dataset has multiple homographs with features and labels:
     >>> print(data1)
     {'feat': tensor([0.5348, 0.2864, 0.1155], dtype=torch.float64), 'label': tensor(0)}
 
+If there is a single feature column in ``graphs.csv``, ``data0`` will directly be a tensor for the feature.
+
 
 Custom Data Parser
 ~~~~~~~~~~~~~~~~~~

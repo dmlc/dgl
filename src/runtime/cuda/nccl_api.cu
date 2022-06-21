@@ -193,7 +193,8 @@ std::pair<IdArray, NDArray> SparsePush(
     const dim3 block(256);
     const dim3 grid((num_in+block.x-1)/block.x);
 
-    _DualPermKernel<<<grid, block, 0, stream>>>(
+    CUDA_KERNEL_CALL(_DualPermKernel,
+        grid, block, 0, stream,
         static_cast<const IdType*>(in_idx->data),
         static_cast<const DType*>(in_value->data),
         perm,
@@ -201,7 +202,6 @@ std::pair<IdArray, NDArray> SparsePush(
         num_feat,
         send_idx.get(),
         send_value.get());
-    CUDA_CALL(cudaGetLastError());
   }
 
   // compute the prefix sum of the send values
@@ -239,7 +239,7 @@ std::pair<IdArray, NDArray> SparsePush(
   comm->AllToAll(send_sum, recv_sum.get(), 1, stream);
 
   cudaEvent_t d2h;
-  cudaEventCreate(&d2h);
+  CUDA_CALL(cudaEventCreate(&d2h));
 
   // compute the prefix sum of the recv values
   Workspace<int64_t> recv_prefix(device, ctx, comm_size+1);
@@ -269,11 +269,11 @@ std::pair<IdArray, NDArray> SparsePush(
   recv_prefix.free();
 
   // use an event to track when copying is done
-  cudaEventRecord(d2h, stream);
+  CUDA_CALL(cudaEventRecord(d2h, stream));
 
   // allocate output space
-  cudaEventSynchronize(d2h);
-  cudaEventDestroy(d2h);
+  CUDA_CALL(cudaEventSynchronize(d2h));
+  CUDA_CALL(cudaEventDestroy(d2h));
 
   IdArray recv_idx = aten::NewIdArray(
       recv_prefix_host.back(), ctx, sizeof(IdType)*8);
@@ -346,13 +346,13 @@ NDArray SparsePull(
     const dim3 block(256);
     const dim3 grid((num_in+block.x-1)/block.x);
 
-    aten::impl::IndexSelectSingleKernel<<<grid, block, 0, stream>>>(
+    CUDA_KERNEL_CALL(aten::impl::IndexSelectSingleKernel,
+        grid, block, 0, stream,
         static_cast<const IdType*>(req_idx->data),
         perm,
         num_in,
         req_idx->shape[0],
         send_idx.get());
-    CUDA_CALL(cudaGetLastError());
   }
 
   // compute the prefix sum of the indexes this process is requesting
@@ -369,7 +369,7 @@ NDArray SparsePull(
   }
 
   cudaEvent_t d2h;
-  cudaEventCreate(&d2h);
+  CUDA_CALL(cudaEventCreate(&d2h));
 
   std::vector<int64_t> request_prefix_host(comm_size+1);
   device->CopyDataFromTo(
@@ -420,11 +420,11 @@ NDArray SparsePull(
   response_prefix.free();
 
   // use an event to track when copying is done
-  cudaEventRecord(d2h, stream);
+  CUDA_CALL(cudaEventRecord(d2h, stream));
 
   // allocate output space
-  cudaEventSynchronize(d2h);
-  cudaEventDestroy(d2h);
+  CUDA_CALL(cudaEventSynchronize(d2h));
+  CUDA_CALL(cudaEventDestroy(d2h));
 
   // gather requested indexes
   IdArray recv_idx = aten::NewIdArray(
@@ -445,22 +445,22 @@ NDArray SparsePull(
   // and then index select them into place
   Workspace<DType> filled_response_value(device, ctx,
       response_prefix_host.back()*num_feat);
-  if (request_prefix_host.back() > 0) {
+  if (response_prefix_host.back() > 0) {
     dim3 block(256, 1);
     while (block.x >= 2*num_feat) {
         block.x /= 2;
         block.y *= 2;
     }
-    const dim3 grid((request_prefix_host.back()+block.y-1)/block.y);
+    const dim3 grid((response_prefix_host.back()+block.y-1)/block.y);
 
-    aten::impl::IndexSelectMultiKernel<<<grid, block, 0, stream>>>(
+    CUDA_KERNEL_CALL(aten::impl::IndexSelectMultiKernel,
+        grid, block, 0, stream,
         static_cast<const DType*>(local_tensor->data),
         num_feat,
         static_cast<IdType*>(recv_idx->data),
         response_prefix_host.back(),
         local_tensor->shape[0],
         filled_response_value.get());
-    CUDA_CALL(cudaGetLastError());
   }
 
   // we will collect recieved values in this array
@@ -499,13 +499,13 @@ NDArray SparsePull(
     }
     const dim3 grid((num_in+block.y-1)/block.y);
 
-    _InversePermKernel<<<grid, block, 0, stream>>>(
+    CUDA_KERNEL_CALL(_InversePermKernel,
+        grid, block, 0, stream,
         filled_request_value.get(),
         num_feat,
         num_in,
         perm,
         static_cast<DType*>(result->data));
-    CUDA_CALL(cudaGetLastError());
   }
 
   return result;

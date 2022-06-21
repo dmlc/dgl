@@ -1,6 +1,7 @@
 """Functions used by server."""
 
 import time
+import os
 from ..base import DGLError
 from . import rpc
 from .constants import MAX_QUEUE_SIZE, SERVER_EXIT, SERVER_KEEP_ALIVE
@@ -31,16 +32,20 @@ def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
         Note that the 20 GB is just an upper-bound because DGL uses zero-copy and
         it will not allocate 20GB memory at once.
     net_type : str
-        Networking type. Current options are: 'socket'.
+        Networking type. Current options are: ``'socket'`` or ``'tensorpipe'``.
     """
     assert server_id >= 0, 'server_id (%d) cannot be a negative number.' % server_id
     assert num_servers > 0, 'num_servers (%d) must be a positive number.' % num_servers
     assert num_clients >= 0, 'num_client (%d) cannot be a negative number.' % num_clients
     assert max_queue_size > 0, 'queue_size (%d) cannot be a negative number.' % max_queue_size
-    assert net_type in ('socket'), 'net_type (%s) can only be \'socket\'' % net_type
+    assert net_type in ('socket', 'tensorpipe'), \
+        'net_type (%s) can only be \'socket\' or \'tensorpipe\'' % net_type
     if server_state.keep_alive:
+        assert net_type == 'tensorpipe', \
+            "net_type can only be 'tensorpipe' if 'keep_alive' is enabled."
         print("As configured, this server will keep alive for multiple"
-              " client groups until force shutdown request is received.")
+              " client groups until force shutdown request is received."
+              " [WARNING] This feature is experimental and not fully tested.")
     # Register signal handler.
     rpc.register_sig_handler()
     # Register some basic services
@@ -68,8 +73,9 @@ def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
     # Once all the senders connect to server, server will not
     # accept new sender's connection
     print(
-        "Server is waiting for connections non-blockingly on [{}:{}]...".format(ip_addr, port))
-    rpc.receiver_wait(ip_addr, port, num_clients, blocking=False)
+        "Server is waiting for connections on [{}:{}]...".format(ip_addr, port))
+    rpc.wait_for_senders(ip_addr, port, num_clients,
+                         blocking=net_type == 'socket')
     rpc.set_num_client(num_clients)
     recv_clients = {}
     while True:
@@ -83,17 +89,30 @@ def start_server(server_id, ip_config, num_servers, num_clients, server_state, \
             # a new client group is ready
             ips.sort()
             client_namebook = dict(enumerate(ips))
+            time.sleep(3) # wait for clients' receivers ready
+            max_try_times = int(os.environ.get('DGL_DIST_MAX_TRY_TIMES', 120))
             for client_id, addr in client_namebook.items():
                 client_ip, client_port = addr.split(':')
-                # TODO[Rhett]: server should not be blocked endlessly.
+                try_times = 0
                 while not rpc.connect_receiver(client_ip, client_port, client_id, group_id):
+                    try_times += 1
+                    if try_times % 200 == 0:
+                        print("Server~{} is trying to connect client receiver: {}:{}".format(
+                            server_id, client_ip, client_port))
+                    if try_times >= max_try_times:
+                        raise rpc.DistConnectError(max_try_times, client_ip, client_port)
                     time.sleep(1)
+            if not rpc.connect_receiver_finalize(max_try_times):
+                raise rpc.DistConnectError(max_try_times)
             if rpc.get_rank() == 0:  # server_0 send all the IDs
                 for client_id, _ in client_namebook.items():
                     register_res = rpc.ClientRegisterResponse(client_id)
                     rpc.send_response(client_id, register_res, group_id)
         # receive incomming client requests
-        req, client_id, group_id = rpc.recv_request()
+        timeout = 60 * 1000  # in milliseconds
+        req, client_id, group_id = rpc.recv_request(timeout)
+        if req is None:
+            continue
         if isinstance(req, rpc.ClientRegisterRequest):
             if group_id not in recv_clients:
                 recv_clients[group_id] = []

@@ -218,7 +218,7 @@ class UnitGraph : public BaseHeteroGraph {
   *       kDLGPU: invalid, will throw an error.
   *       The context check is deferred to pinning the NDArray.
   */
-  void PinMemory_();
+  void PinMemory_() override;
 
   /*!
   * \brief Unpin the in_csr_, out_scr_ and coo_ of the current graph.
@@ -305,14 +305,11 @@ class UnitGraph : public BaseHeteroGraph {
 
   void InvalidateCOO();
 
-  void SetCOOMatrix(dgl_type_t etype, aten::COOMatrix coo) override;
-  void SetCSRMatrix(dgl_type_t etype, aten::CSRMatrix csr) override;
-  void SetCSCMatrix(dgl_type_t etype, aten::CSRMatrix csc) override;
-
  private:
   friend class Serializer;
   friend class HeteroGraph;
   friend class ImmutableGraph;
+  friend HeteroGraphPtr HeteroForkingUnpickle(const HeteroPickleStates& states);
 
   // private empty constructor
   UnitGraph() {}
@@ -329,6 +326,7 @@ class UnitGraph : public BaseHeteroGraph {
 
   /*!
    * \brief constructor
+   * \param num_vtypes number of vertex types (1 or 2)
    * \param metagraph metagraph
    * \param in_csr in edge csr
    * \param out_csr out edge csr
@@ -337,7 +335,8 @@ class UnitGraph : public BaseHeteroGraph {
    * \param has_out_csr whether out_csr is valid
    * \param has_coo whether coo is valid
    */
-  static HeteroGraphPtr CreateHomographFrom(
+  static HeteroGraphPtr CreateUnitGraphFrom(
+      int num_vtypes,
       const aten::CSRMatrix &in_csr,
       const aten::CSRMatrix &out_csr,
       const aten::COOMatrix &coo,

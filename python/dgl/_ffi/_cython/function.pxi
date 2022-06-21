@@ -208,8 +208,11 @@ cdef inline int FuncCall3(void* chandle,
     temp_args = []
     for i in range(nargs):
         make_arg(args[i], &values[i], &tcodes[i], temp_args)
-    CALL(DGLFuncCall(chandle, &values[0], &tcodes[0],
-                     nargs, ret_val, ret_tcode))
+    with nogil:
+        ret = DGLFuncCall(chandle, &values[0], &tcodes[0],
+                          nargs, ret_val, ret_tcode)
+    if ret != 0:
+        raise DGLError(py_str(DGLGetLastError()))
     return 0
 
 cdef inline int FuncCall(void* chandle,
@@ -229,8 +232,11 @@ cdef inline int FuncCall(void* chandle,
     temp_args = []
     for i in range(nargs):
         make_arg(args[i], &values[i], &tcodes[i], temp_args)
-    CALL(DGLFuncCall(chandle, &values[0], &tcodes[0],
-                     nargs, ret_val, ret_tcode))
+    with nogil:
+        ret = DGLFuncCall(chandle, &values[0], &tcodes[0],
+                          nargs, ret_val, ret_tcode)
+    if ret != 0:
+        raise DGLError(py_str(DGLGetLastError()))
     return 0
 
 

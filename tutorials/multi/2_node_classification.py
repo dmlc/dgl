@@ -206,19 +206,6 @@ def run(proc_id, devices):
 # 
 # A typical scenario for multi-GPU training with DDP is to replicate the
 # model once per GPU, and spawn one trainer process per GPU.
-# 
-# PyTorch tutorials recommend using ``multiprocessing.spawn`` to spawn
-# multiple processes. This however is undesirable for training node
-# classification or link prediction models on a single large graph,
-# especially on Linux. The reason is that a single large graph itself may
-# take a lot of memory, and ``mp.spawn`` will duplicate all objects in the
-# program, including the large graph. Consequently, the large graph will
-# be duplicated as many times as the number of GPUs.
-# 
-# To alleviate the problem we recommend using ``multiprocessing.Process``,
-# which *forks* from the main process and allows sharing the same graph
-# object to trainer processes via *copy-on-write*. This can greatly reduce
-# the memory consumption.
 #
 # Normally, DGL maintains only one sparse matrix representation (usually COO)
 # for each graph, and will create new formats when some APIs are called for
@@ -238,12 +225,6 @@ graph.create_formats_()
 ######################################################################
 # Then you can spawn the subprocesses to train with multiple GPUs.
 # 
-# .. note::
-# 
-#    You will need to use ``dgl.multiprocessing`` instead of the Python
-#    ``multiprocessing`` package. ``dgl.multiprocessing`` is identical to
-#    Python’s built-in ``multiprocessing`` except that it handles the
-#    subtleties between forking and multithreading in Python.
 # 
 # .. code:: python
 #

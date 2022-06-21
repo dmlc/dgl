@@ -47,6 +47,13 @@ Datasets for node classification/regression tasks
     FraudDataset
     FraudYelpDataset
     FraudAmazonDataset
+    BAShapeDataset
+    BACommunityDataset
+    TreeCycleDataset
+    TreeGridDataset
+    WikiCSDataset
+    FlickrDataset
+    YelpDataset
 
 Edge Prediction Datasets
 ---------------------------------------
@@ -83,6 +90,7 @@ Datasets for graph classification/regression tasks
     LegacyTUDataset
     GINDataset
     FakeNewsDataset
+    BA2MotifDataset
 
 Dataset adapters
 -------------------
@@ -94,6 +102,7 @@ Dataset adapters
 
     AsNodePredDataset
     AsLinkPredDataset
+    AsGraphPredDataset
 
 Utilities
 -----------------

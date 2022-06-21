@@ -21,7 +21,6 @@
 namespace dgl {
 namespace network {
 
-static constexpr int kMaxTryCount = 1024;    // maximal connection: 1024
 static constexpr int kTimeOut = 10 * 60;     // 10 minutes (in seconds) for socket timeout
 static constexpr int kMaxConnection = 1024;  // maximal connection: 1024
 
@@ -49,21 +48,48 @@ class SocketSender : public Sender {
     : Sender(queue_size, max_thread_count) {}
 
   /*!
-   * \brief Add receiver's address and ID to the sender's namebook
-   * \param addr Networking address, e.g., 'socket://127.0.0.1:50091', 'mpi://0'
-   * \param id receiver's ID
-   *
-   * AddReceiver() is not thread-safe and only one thread can invoke this API.
-   */
-  void AddReceiver(const char* addr, int recv_id);
-
-  /*!
-   * \brief Connect with all the Receivers
+   * \brief Connect to a receiver.
+   * 
+   * When there are multiple receivers to be connected, application will call `ConnectReceiver`
+   * for each and then call `ConnectReceiverFinalize` to make sure that either all the connections are
+   * successfully established or some of them fail.
+   * 
+   * \param addr Networking address, e.g., 'tcp://127.0.0.1:50091'
+   * \param recv_id receiver's ID
    * \return True for success and False for fail
    *
-   * Connect() is not thread-safe and only one thread can invoke this API.
+   * The function is *not* thread-safe; only one thread can invoke this API.
    */
-  bool Connect();
+  bool ConnectReceiver(const std::string& addr, int recv_id) override;
+
+  /*!
+   * \brief Finalize the action to connect to receivers. Make sure that either
+   *        all connections are successfully established or connection fails.
+   * \return True for success and False for fail
+   *
+   * The function is *not* thread-safe; only one thread can invoke this API.
+   */
+  bool ConnectReceiverFinalize(const int max_try_times) override;
+
+  /*!
+   * \brief Send RPCMessage to specified Receiver.
+   * \param msg data message 
+   * \param recv_id receiver's ID
+   */
+  void Send(const rpc::RPCMessage& msg, int recv_id) override;
+
+  /*!
+   * \brief Finalize TPSender
+   */
+  void Finalize() override;
+
+  /*!
+   * \brief Communicator type: 'socket'
+   */
+  const std::string &NetType() const override {
+    static const std::string net_type = "socket";
+    return net_type;
+  }
 
   /*!
    * \brief Send data to specified Receiver. Actually pushing message to message queue.
@@ -78,19 +104,7 @@ class SocketSender : public Sender {
    * (4) Messages sent to the same receiver are guaranteed to be received in the same order. 
    *     There is no guarantee for messages sent to different receivers.
    */
-  STATUS Send(Message msg, int recv_id);
-
-  /*!
-   * \brief Finalize SocketSender
-   *
-   * Finalize() is not thread-safe and only one thread can invoke this API.
-   */
-  void Finalize();
-
-  /*!
-   * \brief Communicator type: 'socket'
-   */
-  inline std::string Type() const { return std::string("socket"); }
+  STATUS Send(Message msg, int recv_id) override;
 
  private:
   /*!
@@ -145,51 +159,62 @@ class SocketReceiver : public Receiver {
 
   /*!
    * \brief Wait for all the Senders to connect
-   * \param addr Networking address, e.g., 'socket://127.0.0.1:50051', 'mpi://0'
+   * \param addr Networking address, e.g., 'tcp://127.0.0.1:50051', 'mpi://0'
    * \param num_sender total number of Senders
+   * \param blocking whether wait blockingly
    * \return True for success and False for fail
    *
    * Wait() is not thread-safe and only one thread can invoke this API.
    */
-  bool Wait(const char* addr, int num_sender);
+  bool Wait(const std::string &addr, int num_sender,
+            bool blocking = true) override;
+
+  /*!
+   * \brief Recv RPCMessage from Sender. Actually removing data from queue.
+   * \param msg pointer of RPCmessage
+   * \param timeout The timeout value in milliseconds. If zero, wait indefinitely.
+   * \return RPCStatus: kRPCSuccess or kRPCTimeOut.
+   */
+  rpc::RPCStatus Recv(rpc::RPCMessage* msg, int timeout) override;
 
   /*!
    * \brief Recv data from Sender. Actually removing data from msg_queue.
    * \param msg pointer of data message
    * \param send_id which sender current msg comes from
+   * \param timeout The timeout value in milliseconds. If zero, wait indefinitely.
    * \return Status code
    *
-   * (1) The Recv() API is blocking, which will not 
-   *     return until getting data from message queue.
-   * (2) The Recv() API is thread-safe.
-   * (3) Memory allocated by communicator but will not own it after the function returns.
+   * (1) The Recv() API is thread-safe.
+   * (2) Memory allocated by communicator but will not own it after the function returns.
    */
-  STATUS Recv(Message* msg, int* send_id);
+  STATUS Recv(Message* msg, int* send_id, int timeout = 0) override;
 
   /*!
    * \brief Recv data from a specified Sender. Actually removing data from msg_queue.
    * \param msg pointer of data message
    * \param send_id sender's ID
+   * \param timeout The timeout value in milliseconds. If zero, wait indefinitely.
    * \return Status code
    *
-   * (1) The RecvFrom() API is blocking, which will not 
-   *     return until getting data from message queue.
-   * (2) The RecvFrom() API is thread-safe.
-   * (3) Memory allocated by communicator but will not own it after the function returns.
+   * (1) The RecvFrom() API is thread-safe.
+   * (2) Memory allocated by communicator but will not own it after the function returns.
    */
-  STATUS RecvFrom(Message* msg, int send_id);
+  STATUS RecvFrom(Message* msg, int send_id, int timeout = 0) override;
 
   /*!
    * \brief Finalize SocketReceiver
    *
    * Finalize() is not thread-safe and only one thread can invoke this API.
    */
-  void Finalize();
+  void Finalize() override;
 
   /*!
    * \brief Communicator type: 'socket'
    */
-  inline std::string Type() const { return std::string("socket"); }
+  const std::string &NetType() const override {
+    static const std::string net_type = "socket";
+    return net_type;
+  }
 
  private:
   struct RecvContext {

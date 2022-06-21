@@ -69,10 +69,22 @@ RPCStatus SendRPCMessage(const RPCMessage& msg, const int32_t target_id) {
 }
 
 RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
-  // ignore timeout now
-  CHECK_EQ(timeout, 0) << "rpc cannot support timeout now.";
-  RPCContext::getInstance()->receiver->Recv(msg);
-  return kRPCSuccess;
+  static constexpr int32_t retry_timeout = 5 * 1000;  // milliseconds
+  RPCStatus status;
+  const int32_t real_timeout = timeout == 0 ? retry_timeout : timeout;
+  do {
+    status = RPCContext::getInstance()->receiver->Recv(msg, real_timeout);
+    if (status == kRPCTimeOut) {
+      static const std::string log_str = [real_timeout, timeout]() {
+        std::ostringstream oss;
+        oss << "Recv RPCMessage timeout in " << real_timeout << " ms."
+            << (timeout == 0 ? " Retrying ..." : "");
+        return oss.str();
+      }();
+      DLOG(WARNING) << log_str;
+    }
+  } while (timeout == 0 && status == kRPCTimeOut);
+  return status;
 }
 
 void InitGlobalTpContext() {
@@ -114,18 +126,38 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateSender")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
   int64_t msg_queue_size = args[0];
   std::string type = args[1];
-  InitGlobalTpContext();
-  RPCContext::getInstance()->sender =
-    std::make_shared<TPSender>(RPCContext::getInstance()->ctx);
+  int max_thread_count = args[2];
+  if (type == "tensorpipe") {
+    InitGlobalTpContext();
+    RPCContext::getInstance()->sender.reset(
+        new TPSender(RPCContext::getInstance()->ctx));
+  } else if (type == "socket") {
+    RPCContext::getInstance()->sender.reset(
+        new network::SocketSender(msg_queue_size, max_thread_count));
+  } else {
+    LOG(FATAL) << "Unknown communicator type for rpc sender: " << type;
+  }
+  LOG(INFO) << "Sender with NetType~"
+            << RPCContext::getInstance()->sender->NetType() << " is created.";
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateReceiver")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
   int64_t msg_queue_size = args[0];
   std::string type = args[1];
-  InitGlobalTpContext();
-  RPCContext::getInstance()->receiver =
-    std::make_shared<TPReceiver>(RPCContext::getInstance()->ctx);
+  int max_thread_count = args[2];
+  if (type == "tensorpipe") {
+    InitGlobalTpContext();
+    RPCContext::getInstance()->receiver.reset(
+        new TPReceiver(RPCContext::getInstance()->ctx));
+  } else if (type == "socket") {
+    RPCContext::getInstance()->receiver.reset(
+        new network::SocketReceiver(msg_queue_size, max_thread_count));
+  } else {
+    LOG(FATAL) << "Unknown communicator type for rpc receiver: " << type;
+  }
+  LOG(INFO) << "Receiver with NetType~"
+            << RPCContext::getInstance()->receiver->NetType() << " is created.";
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFinalizeSender")
@@ -138,7 +170,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFinalizeReceiver")
   RPCContext::getInstance()->receiver->Finalize();
 });
 
-DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCReceiverWait")
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCWaitForSenders")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
   std::string ip = args[0];
   int port = args[1];
@@ -159,6 +191,12 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCConnectReceiver")
   std::string addr;
   addr = StringPrintf("tcp://%s:%d", ip.c_str(), port);
   *rv = RPCContext::getInstance()->sender->ConnectReceiver(addr, recv_id);
+});
+
+DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCConnectReceiverFinalize")
+.set_body([](DGLArgs args, DGLRetValue* rv) {
+  const int max_try_times = args[0];
+  *rv = RPCContext::getInstance()->sender->ConnectReceiverFinalize(max_try_times);
 });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCSetRank")
@@ -493,9 +531,12 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
     }
   });
   // Recv remote message
-  for (int i = 0; i < msg_count; ++i) {
+  int recv_cnt = 0;
+  while (recv_cnt < msg_count) {
     RPCMessage msg;
-    RecvRPCMessage(&msg, 0);
+    auto status = RecvRPCMessage(&msg, 0);
+    CHECK_EQ(status, kRPCSuccess);
+    ++recv_cnt;
     int part_id = msg.server_id / group_count;
     char* data_char = static_cast<char*>(msg.tensors[0]->data);
     dgl_id_t id_size = remote_ids[part_id].size();

@@ -10,7 +10,7 @@ import networkx as nx
 import unittest, pytest
 from dgl import DGLError
 import test_utils
-from test_utils import parametrize_dtype, get_cases
+from test_utils import parametrize_idtype, get_cases
 from scipy.sparse import rand
 
 rfuncs = {'sum': fn.sum, 'max': fn.max, 'min': fn.min, 'mean': fn.mean}
@@ -42,7 +42,7 @@ def create_test_heterograph(idtype):
 @pytest.mark.parametrize('g', get_cases(['clique']))
 @pytest.mark.parametrize('norm_by', ['src', 'dst'])
 # @pytest.mark.parametrize('shp', edge_softmax_shapes)
-@parametrize_dtype
+@parametrize_idtype
 def test_edge_softmax(g, norm_by, idtype):
     print("params", norm_by, idtype)
 

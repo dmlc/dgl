@@ -19,7 +19,9 @@
 #include <unordered_map>
 
 #include "./rpc_msg.h"
-#include "./tensorpipe/tp_communicator.h"
+#include "net_type.h"
+#include "network/socket_communicator.h"
+#include "tensorpipe/tp_communicator.h"
 #include "./network/common.h"
 #include "./server_state.h"
 
@@ -79,12 +81,12 @@ struct RPCContext {
   /*!
    * \brief Sender communicator.
    */
-  std::shared_ptr<TPSender> sender;
+  std::shared_ptr<RPCSender> sender;
 
   /*!
    * \brief Receiver communicator.
    */
-  std::shared_ptr<TPReceiver> receiver;
+  std::shared_ptr<RPCReceiver> receiver;
 
   /*!
    * \brief Tensorpipe global context
@@ -156,12 +158,6 @@ struct RPCContext {
   }
 };
 
-/*! \brief RPC status flag */
-enum RPCStatus {
-  kRPCSuccess = 0,
-  kRPCTimeOut,
-};
-
 /*!
  * \brief Send out one RPC message.
  *
@@ -193,9 +189,5 @@ RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout = 0);
 
 }  // namespace rpc
 }  // namespace dgl
-
-namespace dmlc {
-DMLC_DECLARE_TRAITS(has_saveload, dgl::rpc::RPCMessage, true);
-}  // namespace dmlc
 
 #endif  // DGL_RPC_RPC_H_

@@ -41,14 +41,14 @@ class NodepredPipeline(PipelineBase):
 
     @classmethod
     def setup_user_cfg_cls(cls):
-        from ...utils.enter_config import UserConfig        
+        from ...utils.enter_config import UserConfig
         class NodePredUserConfig(UserConfig):
             data: DataFactory.filter("nodepred").get_pydantic_config() = Field(..., discriminator="name")
-            model : NodeModelFactory.get_pydantic_model_config() = Field(..., discriminator="name")   
+            model : NodeModelFactory.get_pydantic_model_config() = Field(..., discriminator="name")
             general_pipeline: NodepredPipelineCfg = NodepredPipelineCfg()
 
         cls.user_cfg_cls = NodePredUserConfig
-    
+
     @property
     def user_cfg_cls(self):
         return self.__class__.user_cfg_cls
@@ -59,7 +59,7 @@ class NodepredPipeline(PipelineBase):
             cfg: Optional[str] = typer.Option(
                 None, help="output configuration path"),
             model: NodeModelFactory.get_model_enum() = typer.Option(..., help="Model name"),
-        ):  
+        ):
             self.__class__.setup_user_cfg_cls()
             generated_cfg = {
                 "pipeline_name": self.pipeline_name,
@@ -71,7 +71,7 @@ class NodepredPipeline(PipelineBase):
             output_cfg = self.user_cfg_cls(**generated_cfg).dict()
             output_cfg = deep_convert_dict(output_cfg)
             comment_dict = {
-                "device": "Torch device name, e.q. cpu or cuda or cuda:0",
+                "device": "Torch device name, e.g., cpu or cuda or cuda:0",
                 "data": {
                     "split_ratio": 'Ratio to generate split masks, for example set to [0.8, 0.1, 0.1] for 80% train/10% val/10% test. Leave blank to use builtin split in original dataset'
                 },
@@ -92,7 +92,7 @@ class NodepredPipeline(PipelineBase):
     def gen_script(cls, user_cfg_dict):
         # Check validation
         cls.setup_user_cfg_cls()
-        user_cfg = cls.user_cfg_cls(**user_cfg_dict)        
+        user_cfg = cls.user_cfg_cls(**user_cfg_dict)
         file_current_dir = Path(__file__).resolve().parent
         with open(file_current_dir / "nodepred.jinja-py", "r") as f:
             template = Template(f.read())
@@ -102,7 +102,7 @@ class NodepredPipeline(PipelineBase):
             user_cfg_dict["model"]["name"])
         render_cfg["model_code"] = model_code
         render_cfg["model_class_name"] = NodeModelFactory.get_model_class_name(
-            user_cfg_dict["model"]["name"])        
+            user_cfg_dict["model"]["name"])
         render_cfg.update(DataFactory.get_generated_code_dict(user_cfg_dict["data"]["name"], '**cfg["data"]'))
 
         generated_user_cfg = copy.deepcopy(user_cfg_dict)
