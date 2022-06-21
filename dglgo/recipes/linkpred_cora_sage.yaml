@@ -1,7 +1,6 @@
 version: 0.0.1
-pipeline:
-  name: linkpred
-  mode: train
+pipeline_name: linkpred
+pipeline_mode: train
 device: cuda
 data:
   name: cora
