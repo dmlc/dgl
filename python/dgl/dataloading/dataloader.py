@@ -5,8 +5,6 @@ from distutils.version import LooseVersion
 import math
 import inspect
 import re
-import atexit
-import os
 import psutil
 
 import numpy as np
@@ -18,7 +16,7 @@ from ..base import NID, EID, dgl_warning
 from ..batch import batch as batch_graphs
 from ..heterograph import DGLHeteroGraph
 from ..utils import (
-    recursive_apply, ExceptionWrapper, recursive_apply_pair, set_num_threads,
+    recursive_apply, recursive_apply_pair, set_num_threads,
     context_of, dtype_of)
 from ..frame import LazyFeature
 from ..storages import wrap_storage
@@ -370,7 +368,7 @@ class _PrefetchingIter(object):
         self.graph_sampler = self.dataloader.graph_sampler
         self.pin_prefetcher = self.dataloader.pin_prefetcher
         self.use_alternate_streams = use_alternate_streams
-        
+
     def __iter__(self):
         return self
 
@@ -716,8 +714,8 @@ class DataLoader(torch.utils.data.DataLoader):
                                 .format(cpu_worker_affinity_cores, nw_work))
 
             self.cpu_cores = (cpu_worker_affinity_cores
-                                if len(cpu_worker_affinity_cores)
-                                else range(0, nw_work))
+                              if len(cpu_worker_affinity_cores)
+                              else range(0, nw_work))
             worker_init_fn = WorkerInitWrapper(self.worker_init_function)
 
         super().__init__(

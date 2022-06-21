@@ -13,6 +13,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 #
+""" Methods for preloading elements when iterating dataloader.
+"""
 
 from . import DataLoader
 from queue import Queue
@@ -86,7 +88,7 @@ class _IterableWrapper:
 
     def __iter__(self):
         return self._wrapper(iter(self._item), \
-                             use_worker_threads=self._item.num_workers > 0 )
+                             use_worker_threads=self._item.num_workers > 0)
 
 
 def preload_with_thread(dataloader):
