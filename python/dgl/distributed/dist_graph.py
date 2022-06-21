@@ -17,7 +17,7 @@ from .kvstore import KVServer, get_kvstore
 from .._ffi.ndarray import empty_shared_mem
 from ..ndarray import exist_shared_mem_array
 from ..frame import infer_scheme
-from .partition import load_partition, load_partition_book
+from .partition import load_partition, load_partition_feats, load_partition_book
 from .graph_partition_book import PartitionPolicy, get_shared_mem_partition_book
 from .graph_partition_book import HeteroDataName, parse_hetero_data_name
 from .graph_partition_book import NodePartitionPolicy, EdgePartitionPolicy
@@ -311,10 +311,13 @@ class DistGraphServer(KVServer):
         The graph formats.
     keep_alive : bool
         Whether to keep server alive when clients exit
+    net_type : str
+        Backend rpc type: ``'socket'`` or ``'tensorpipe'``
     '''
     def __init__(self, server_id, ip_config, num_servers,
                  num_clients, part_config, disable_shared_mem=False,
-                 graph_format=('csc', 'coo'), keep_alive=False):
+                 graph_format=('csc', 'coo'), keep_alive=False,
+                 net_type='socket'):
         super(DistGraphServer, self).__init__(server_id=server_id,
                                               ip_config=ip_config,
                                               num_servers=num_servers,
@@ -322,14 +325,16 @@ class DistGraphServer(KVServer):
         self.ip_config = ip_config
         self.num_servers = num_servers
         self.keep_alive = keep_alive
+        self.net_type = net_type
         # Load graph partition data.
         if self.is_backup_server():
             # The backup server doesn't load the graph partition. It'll initialized afterwards.
             self.gpb, graph_name, ntypes, etypes = load_partition_book(part_config, self.part_id)
             self.client_g = None
         else:
-            self.client_g, node_feats, edge_feats, self.gpb, graph_name, \
-                    ntypes, etypes = load_partition(part_config, self.part_id)
+            # Loading of node/edge_feats are deferred to lower the peak memory consumption.
+            self.client_g, _, _, self.gpb, graph_name, \
+                    ntypes, etypes = load_partition(part_config, self.part_id, load_feats=False)
             print('load ' + graph_name)
             # Create the graph formats specified the users.
             self.client_g = self.client_g.formats(graph_format)
@@ -348,6 +353,7 @@ class DistGraphServer(KVServer):
             self.add_part_policy(PartitionPolicy(edge_name.policy_str, self.gpb))
 
         if not self.is_backup_server():
+            node_feats, edge_feats = load_partition_feats(part_config, self.part_id)
             for name in node_feats:
                 # The feature name has the following format: node_type + "/" + feature_name to avoid
                 # feature name collision for different node types.
@@ -376,7 +382,9 @@ class DistGraphServer(KVServer):
         start_server(server_id=self.server_id,
                      ip_config=self.ip_config,
                      num_servers=self.num_servers,
-                     num_clients=self.num_clients, server_state=server_state)
+                     num_clients=self.num_clients,
+                     server_state=server_state,
+                     net_type=self.net_type)
 
 class DistGraph:
     '''The class for accessing a distributed graph.

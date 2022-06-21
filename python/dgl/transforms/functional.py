@@ -17,9 +17,15 @@
 
 from collections.abc import Iterable, Mapping
 from collections import defaultdict
+import copy
 import numpy as np
 import scipy.sparse as sparse
 import scipy.sparse.linalg
+
+try:
+    import torch as th
+except ImportError:
+    pass
 
 from .._ffi.function import _init_api
 from ..base import dgl_warning, DGLError, NID, EID
@@ -70,7 +76,13 @@ __all__ = [
     'adj_product_graph',
     'adj_sum_graph',
     'reorder_graph',
-    'norm_by_dst'
+    'norm_by_dst',
+    'radius_graph',
+    'random_walk_pe',
+    'laplacian_pe',
+    'to_half',
+    'to_float',
+    'to_double'
     ]
 
 
@@ -1990,8 +2002,8 @@ def compact_graphs(graphs, always_preserve=None, copy_ndata=True, copy_edata=Tru
     The following would compact the graph above to another bipartite graph with only
     two users and two games.
 
-    >>> new_g, induced_nodes = dgl.compact_graphs(g)
-    >>> induced_nodes
+    >>> new_g = dgl.compact_graphs(g)
+    >>> new_g.ndata[dgl.NID]
     {'user': tensor([1, 3]), 'game': tensor([3, 5])}
 
     The mapping tells us that only user #1 and #3 as well as game #3 and #5 are kept.
@@ -2009,8 +2021,8 @@ def compact_graphs(graphs, always_preserve=None, copy_ndata=True, copy_edata=Tru
 
     >>> g2 = dgl.heterograph({('user', 'plays', 'game'): ([1, 6], [6, 8])},
     >>>                      {'user': 20, 'game': 10})
-    >>> (new_g, new_g2), induced_nodes = dgl.compact_graphs([g, g2])
-    >>> induced_nodes
+    >>> new_g, new_g2 = dgl.compact_graphs([g, g2])
+    >>> new_g.ndata[dgl.NID]
     {'user': tensor([1, 3, 6]), 'game': tensor([3, 5, 6, 8])}
 
     Then one can see that user #1 from both graphs, users #3 from the first graph, as
@@ -3299,5 +3311,282 @@ def norm_by_dst(g, etype=None):
     norm = F.replace_inf_with_zero(norm)
 
     return norm
+
+def radius_graph(x, r, p=2, self_loop=False,
+                 compute_mode='donot_use_mm_for_euclid_dist', get_distances=False):
+    r"""Construct a graph from a set of points with neighbors within given distance.
+
+    The function transforms the coordinates/features of a point set
+    into a bidirected homogeneous graph. The coordinates of the point
+    set is specified as a matrix whose rows correspond to points and
+    columns correspond to coordinate/feature dimensions.
+
+    The nodes of the returned graph correspond to the points, where the neighbors
+    of each point are within given distance.
+
+    The function requires the PyTorch backend.
+
+    Parameters
+    ----------
+    x : Tensor
+        The point coordinates. It can be either on CPU or GPU.
+        Device of the point coordinates specifies device of the radius graph and
+        ``x[i]`` corresponds to the i-th node in the radius graph.
+    r : float
+        Radius of the neighbors.
+    p : float, optional
+        Power parameter for the Minkowski metric. When :attr:`p = 1` it is the
+        equivalent of Manhattan distance (L1 norm) and Euclidean distance
+        (L2 norm) for :attr:`p = 2`.
+
+        (default: 2)
+    self_loop : bool, optional
+        Whether the radius graph will contain self-loops.
+
+        (default: False)
+    compute_mode : str, optional
+        ``use_mm_for_euclid_dist_if_necessary`` - will use matrix multiplication
+        approach to calculate euclidean distance (p = 2) if P > 25 or R > 25
+        ``use_mm_for_euclid_dist`` - will always use matrix multiplication
+        approach to calculate euclidean distance (p = 2)
+        ``donot_use_mm_for_euclid_dist`` - will never use matrix multiplication
+        approach to calculate euclidean distance (p = 2).
+
+        (default: donot_use_mm_for_euclid_dist)
+    get_distances : bool, optional
+        Whether to return the distances for the corresponding edges in the
+        radius graph.
+
+        (default: False)
+
+    Returns
+    -------
+    DGLGraph
+        The constructed graph. The node IDs are in the same order as :attr:`x`.
+    torch.Tensor, optional
+        The distances for the edges in the constructed graph. The distances are
+        in the same order as edge IDs.
+
+    Examples
+    --------
+
+    The following examples use PyTorch backend.
+
+    >>> import dgl
+    >>> import torch
+
+    >>> x = torch.tensor([[0.0, 0.0, 1.0],
+    ...                   [1.0, 0.5, 0.5],
+    ...                   [0.5, 0.2, 0.2],
+    ...                   [0.3, 0.2, 0.4]])
+    >>> r_g = dgl.radius_graph(x, 0.75)  # Each node has neighbors within 0.75 distance
+    >>> r_g.edges()
+    (tensor([0, 1, 2, 2, 3, 3]), tensor([3, 2, 1, 3, 0, 2]))
+
+    When :attr:`get_distances` is True, function returns the radius graph and
+    distances for the corresponding edges.
+
+    >>> x = torch.tensor([[0.0, 0.0, 1.0],
+    ...                   [1.0, 0.5, 0.5],
+    ...                   [0.5, 0.2, 0.2],
+    ...                   [0.3, 0.2, 0.4]])
+    >>> r_g, dist = dgl.radius_graph(x, 0.75, get_distances=True)
+    >>> r_g.edges()
+    (tensor([0, 1, 2, 2, 3, 3]), tensor([3, 2, 1, 3, 0, 2]))
+    >>> dist
+    tensor([[0.7000],
+            [0.6557],
+            [0.6557],
+            [0.2828],
+            [0.7000],
+            [0.2828]])
+    """
+    # check invalid r
+    if r <= 0:
+        raise DGLError("Invalid r value. expect r > 0, got r = {}".format(r))
+
+    # check empty point set
+    if F.shape(x)[0] == 0:
+        raise DGLError("Find empty point set")
+
+    distances = th.cdist(x, x, p=p, compute_mode=compute_mode)
+
+    if not self_loop:
+        distances.fill_diagonal_(r + 1e-4)
+
+    edges = th.nonzero(distances <= r, as_tuple=True)
+
+    g = convert.graph(edges, num_nodes=x.shape[0], device=x.device)
+
+    if get_distances:
+        distances = distances[edges].unsqueeze(-1)
+
+        return g, distances
+
+    return g
+
+def random_walk_pe(g, k, eweight_name=None):
+    r"""Random Walk Positional Encoding, as introduced in
+    `Graph Neural Networks with Learnable Structural and Positional Representations
+    <https://arxiv.org/abs/2110.07875>`__
+
+    This function computes the random walk positional encodings as landing probabilities
+    from 1-step to k-step, starting from each node to itself.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The input graph. Must be homogeneous.
+    k : int
+        The number of random walk steps. The paper found the best value to be 16 and 20
+        for two experiments.
+    eweight_name : str, optional
+        The name to retrieve the edge weights. Default: None, not using the edge weights.
+
+    Returns
+    -------
+    Tensor
+        The random walk positional encodings of shape :math:`(N, k)`, where :math:`N` is the
+        number of nodes in the input graph.
+
+    Example
+    -------
+    >>> import dgl
+    >>> g = dgl.graph(([0,1,1], [1,1,0]))
+    >>> dgl.random_walk_pe(g, 2)
+    tensor([[0.0000, 0.5000],
+            [0.5000, 0.7500]])
+    """
+    N = g.num_nodes() # number of nodes
+    M = g.num_edges() # number of edges
+    A = g.adj(scipy_fmt='csr') # adjacency matrix
+    if eweight_name is not None:
+        # add edge weights if required
+        W = sparse.csr_matrix(
+            (g.edata[eweight_name].squeeze(), g.find_edges(list(range(M)))),
+            shape = (N, N)
+        )
+        A = A.multiply(W)
+    RW = np.array(A / (A.sum(1) + 1e-30)) # 1-step transition probability
+
+    # Iterate for k steps
+    PE = [F.astype(F.tensor(RW.diagonal()), F.float32)]
+    RW_power = RW
+    for _ in range(k-1):
+        RW_power = RW_power @ RW
+        PE.append(F.astype(F.tensor(RW_power.diagonal()), F.float32))
+    PE = F.stack(PE,dim=-1)
+
+    return PE
+
+def laplacian_pe(g, k):
+    r"""Laplacian Positional Encoding, as introduced in
+    `Benchmarking Graph Neural Networks
+    <https://arxiv.org/abs/2003.00982>`__
+
+    This function computes the laplacian positional encodings as the
+    k smallest non-trivial eigenvectors (k << n). k and n are the positional
+    encoding dimensions and the number of nodes in the given graph.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The input graph. Must be homogeneous.
+    k : int
+        Number of smallest non-trivial eigenvectors to use for positional encoding
+        (smaller than the number of nodes).
+
+    Returns
+    -------
+    Tensor
+        The laplacian positional encodings of shape :math:`(N, k)`, where :math:`N` is the
+        number of nodes in the input graph.
+
+    Example
+    -------
+    >>> import dgl
+    >>> g = dgl.rand_graph(6, 12)
+    >>> dgl.laplacian_pe(g, 2)
+    tensor([[-0.8931, -0.7713],
+            [-0.0000,  0.6198],
+            [ 0.2704, -0.0138],
+            [-0.0000,  0.0554],
+            [ 0.3595, -0.0477],
+            [-0.0000,  0.1240]])
+    """
+    # check for the "k < n" constraint
+    n = g.num_nodes()
+    if n <= k:
+        assert "the number of eigenvectors k must be smaller than the number of nodes n, " + \
+            f"{k} and {n} detected."
+
+    # get laplacian matrix as I - D^-0.5 * A * D^-0.5
+    A = g.adj(scipy_fmt='csr') # adjacency matrix
+    N = sparse.diags(F.asnumpy(g.in_degrees()).clip(1) ** -0.5, dtype=float) # D^-1/2
+    L = sparse.eye(g.num_nodes()) - N * A * N
+
+    # select eigenvectors with smaller eigenvalues O(n + klogk)
+    EigVal, EigVec = np.linalg.eig(L.toarray())
+    kpartition_indices = np.argpartition(EigVal, k+1)[:k+1]
+    topk_eigvals = EigVal[kpartition_indices]
+    topk_indices = kpartition_indices[topk_eigvals.argsort()][1:]
+    topk_EigVec = np.real(EigVec[:, topk_indices])
+
+    # get random flip signs
+    rand_sign = 2 * (np.random.rand(k) > 0.5) - 1.
+    PE = F.astype(F.tensor(rand_sign * topk_EigVec), F.float32)
+
+    return PE
+
+def to_half(g):
+    r"""Cast this graph to use float16 (half-precision) for any
+    floating-point edge and node feature data.
+
+    A shallow copy is returned so that the original graph is not modified.
+    Feature tensors that are not floating-point will not be modified.
+
+    Returns
+    -------
+    DGLHeteroGraph
+        Clone of graph with the feature data converted to float16.
+    """
+    ret = copy.copy(g)
+    ret._edge_frames = [frame.half() for frame in ret._edge_frames]
+    ret._node_frames = [frame.half() for frame in ret._node_frames]
+    return ret
+
+def to_float(g):
+    r"""Cast this graph to use float32 (single-precision) for any
+    floating-point edge and node feature data.
+
+    A shallow copy is returned so that the original graph is not modified.
+    Feature tensors that are not floating-point will not be modified.
+
+    Returns
+    -------
+    DGLHeteroGraph
+        Clone of graph with the feature data converted to float32.
+    """
+    ret = copy.copy(g)
+    ret._edge_frames = [frame.float() for frame in ret._edge_frames]
+    ret._node_frames = [frame.float() for frame in ret._node_frames]
+    return ret
+
+def to_double(g):
+    r"""Cast this graph to use float64 (double-precision) for any
+    floating-point edge and node feature data.
+
+    A shallow copy is returned so that the original graph is not modified.
+    Feature tensors that are not floating-point will not be modified.
+
+    Returns
+    -------
+    DGLHeteroGraph
+        Clone of graph with the feature data converted to float64.
+    """
+    ret = copy.copy(g)
+    ret._edge_frames = [frame.double() for frame in ret._edge_frames]
+    ret._node_frames = [frame.double() for frame in ret._node_frames]
+    return ret
 
 _init_api("dgl.transform", __name__)

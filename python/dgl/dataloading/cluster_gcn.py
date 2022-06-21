@@ -9,7 +9,9 @@ from ..partition import metis_partition_assignment
 from .base import set_node_lazy_features, set_edge_lazy_features, Sampler
 
 class ClusterGCNSampler(Sampler):
-    """Cluster-GCN sampler.
+    """Cluster sampler from `Cluster-GCN: An Efficient Algorithm for Training
+    Deep and Large Graph Convolutional Networks
+    <https://arxiv.org/abs/1905.07953>`__
 
     This sampler first partitions the graph with METIS partitioning, then it caches the nodes of
     each partition to a file within the given cache directory.

@@ -7,6 +7,8 @@
 #define DGL_RPC_RPC_MSG_H_
 
 #include <dgl/runtime/object.h>
+#include <dgl/runtime/ndarray.h>
+#include <dgl/zerocopy_serializer.h>
 
 #include <string>
 #include <vector>
@@ -68,6 +70,17 @@ struct RPCMessage : public runtime::Object {
 
 DGL_DEFINE_OBJECT_REF(RPCMessageRef, RPCMessage);
 
+/*! \brief RPC status flag */
+enum RPCStatus {
+  kRPCSuccess = 0,
+  kRPCTimeOut,
+};
+
 }  // namespace rpc
 }  // namespace dgl
+
+namespace dmlc {
+DMLC_DECLARE_TRAITS(has_saveload, dgl::rpc::RPCMessage, true);
+}  // namespace dmlc
+
 #endif  // DGL_RPC_RPC_MSG_H_

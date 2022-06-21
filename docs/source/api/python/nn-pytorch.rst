@@ -23,6 +23,7 @@ Conv Layers
     ~dgl.nn.pytorch.conv.SGConv
     ~dgl.nn.pytorch.conv.APPNPConv
     ~dgl.nn.pytorch.conv.GINConv
+    ~dgl.nn.pytorch.conv.GINEConv
     ~dgl.nn.pytorch.conv.GatedGraphConv
     ~dgl.nn.pytorch.conv.GMMConv
     ~dgl.nn.pytorch.conv.ChebConv
@@ -36,6 +37,9 @@ Conv Layers
     ~dgl.nn.pytorch.conv.GCN2Conv
     ~dgl.nn.pytorch.conv.HGTConv
     ~dgl.nn.pytorch.conv.GroupRevRes
+    ~dgl.nn.pytorch.conv.EGNNConv
+    ~dgl.nn.pytorch.conv.PNAConv
+    ~dgl.nn.pytorch.conv.DGNConv
 
 Dense Conv Layers
 ----------------------------------------
@@ -104,6 +108,8 @@ Utility Modules
     ~dgl.nn.pytorch.utils.WeightBasis
     ~dgl.nn.pytorch.factory.KNNGraph
     ~dgl.nn.pytorch.factory.SegmentedKNNGraph
+    ~dgl.nn.pytorch.factory.RadiusGraph
     ~dgl.nn.pytorch.utils.JumpingKnowledge
     ~dgl.nn.pytorch.sparse_emb.NodeEmbedding
     ~dgl.nn.pytorch.explain.GNNExplainer
+    ~dgl.nn.pytorch.utils.LabelPropagation

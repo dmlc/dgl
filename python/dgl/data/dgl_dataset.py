@@ -8,6 +8,7 @@ import traceback
 import abc
 from .utils import download, extract_archive, get_download_dir, makedirs
 from ..utils import retry_method_with_fix
+from .._ffi.base import __version__
 
 class DGLDataset(object):
     r"""The basic DGL dataset for creating graph datasets.
@@ -17,7 +18,7 @@ class DGLDataset(object):
       1. Check whether there is a dataset cache on disk
          (already processed and stored on the disk) by
          invoking ``has_cache()``. If true, goto 5.
-      2. Call ``download()`` to download the data.
+      2. Call ``download()`` to download the data if ``url`` is not None.
       3. Call ``process()`` to process the data.
       4. Call ``save()`` to save the processed dataset on disk and goto 6.
       5. Call ``load()`` to load the processed dataset from disk.
@@ -31,7 +32,7 @@ class DGLDataset(object):
     name : str
         Name of the dataset
     url : str
-        Url to download the raw dataset
+        Url to download the raw dataset. Default: None
     raw_dir : str
         Specifying the directory that will store the
         downloaded data or the directory that
@@ -237,13 +238,17 @@ class DGLDataset(object):
     def save_dir(self):
         r"""Directory to save the processed dataset.
         """
-        return self._save_dir
+        return self._save_dir + "_v{}".format(__version__)
 
     @property
     def save_path(self):
         r"""Path to save the processed dataset.
         """
-        return os.path.join(self._save_dir, self.name)
+        if hasattr(self, '_reorder'):
+            path = 'reordered' if self._reorder else 'un_reordered'
+            return os.path.join(self._save_dir, self.name, path)
+        else:
+            return os.path.join(self._save_dir, self.name)
 
     @property
     def verbose(self):
@@ -313,6 +318,7 @@ class DGLBuiltinDataset(DGLDataset):
     def download(self):
         r""" Automatically download data and extract it.
         """
-        zip_file_path = os.path.join(self.raw_dir, self.name + '.zip')
-        download(self.url, path=zip_file_path)
-        extract_archive(zip_file_path, self.raw_path)
+        if self.url is not None:
+            zip_file_path = os.path.join(self.raw_dir, self.name + '.zip')
+            download(self.url, path=zip_file_path)
+            extract_archive(zip_file_path, self.raw_path)

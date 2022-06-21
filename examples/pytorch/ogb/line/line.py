@@ -1,7 +1,7 @@
 import torch
 import argparse
 import dgl
-import dgl.multiprocessing as mp
+import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
 import os
 import random

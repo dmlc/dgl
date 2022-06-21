@@ -66,26 +66,36 @@ void TPSender::Send(const RPCMessage &msg, int recv_id) {
       LOG(FATAL) << "Cannot send a empty NDArray.";
     }
   }
+  // Let's write blockingly in case of congestion in underlying transports.
+  auto done = std::make_shared<std::promise<void>>();
   pipe->write(tp_msg,
-              [ndarray_holder, recv_id](const tensorpipe::Error &error) {
+              [ndarray_holder, recv_id, done](const tensorpipe::Error &error) {
                 if (error) {
                   LOG(FATAL) << "Failed to send message to " << recv_id
                              << ". Details: " << error.what();
                 }
+                done->set_value();
               });
+  done->get_future().wait();
 }
 
 void TPSender::Finalize() {
   for (auto &&p : pipes_) {
-    p.second->close();
+    if (p.second) {
+      p.second->close();
+    }
   }
   pipes_.clear();
 }
 
 void TPReceiver::Finalize() {
-  listener_->close();
+  if (listener_) {
+    listener_->close();
+  }
   for (auto &&p : pipes_) {
-    p.second->close();
+    if (p.second) {
+      p.second->close();
+    }
   }
   pipes_.clear();
 }
@@ -183,7 +193,9 @@ void TPReceiver::ReceiveFromPipe(std::shared_ptr<Pipe> pipe,
   });
 }
 
-void TPReceiver::Recv(RPCMessage *msg) { *msg = std::move(queue_->pop()); }
+RPCStatus TPReceiver::Recv(RPCMessage *msg, int timeout) {
+  return queue_->pop(msg, timeout) ? kRPCSuccess : kRPCTimeOut;
+}
 
 }  // namespace rpc
 }  // namespace dgl

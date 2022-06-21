@@ -1,12 +1,12 @@
 """Base classes and functionalities for dataloaders"""
-from collections import Mapping
+from collections.abc import Mapping
 import inspect
 from ..base import NID, EID
 from ..convert import heterograph
 from .. import backend as F
 from ..transforms import compact_graphs
 from ..frame import LazyFeature
-from ..utils import recursive_apply
+from ..utils import recursive_apply, context_of
 
 def _set_lazy_features(x, xdata, feature_names):
     if feature_names is None:
@@ -18,7 +18,7 @@ def _set_lazy_features(x, xdata, feature_names):
             x[type_].data.update({k: LazyFeature(k) for k in names})
 
 def set_node_lazy_features(g, feature_names):
-    """Assign :class:`~dgl.LazyFeature`s to the node data of the input graph.
+    """Assign lazy features to the ``ndata`` of the input graph for prefetching optimization.
 
     When used in a :class:`~dgl.dataloading.Sampler`, lazy features mark which data
     should be fetched before computation in model. See :ref:`guide-minibatch-prefetching`
@@ -52,7 +52,7 @@ def set_node_lazy_features(g, feature_names):
     return _set_lazy_features(g.nodes, g.ndata, feature_names)
 
 def set_edge_lazy_features(g, feature_names):
-    """Assign :class:`~dgl.LazyFeature`s to the edge data of the input graph.
+    """Assign lazy features to the ``edata`` of the input graph for prefetching optimization.
 
     When used in a :class:`~dgl.dataloading.Sampler`, lazy features mark which data
     should be fetched before computation in model. See :ref:`guide-minibatch-prefetching`
@@ -87,7 +87,7 @@ def set_edge_lazy_features(g, feature_names):
     return _set_lazy_features(g.edges, g.edata, feature_names)
 
 def set_src_lazy_features(g, feature_names):
-    """Assign :class:`~dgl.LazyFeature`s to the source node data of the input MFG.
+    """Assign lazy features to the ``srcdata`` of the input graph for prefetching optimization.
 
     When used in a :class:`~dgl.dataloading.Sampler`, lazy features mark which data
     should be fetched before computation in model. See :ref:`guide-minibatch-prefetching`
@@ -121,7 +121,7 @@ def set_src_lazy_features(g, feature_names):
     return _set_lazy_features(g.srcnodes, g.srcdata, feature_names)
 
 def set_dst_lazy_features(g, feature_names):
-    """Assign :class:`~dgl.LazyFeature`s to the destination node data of the input MFG.
+    """Assign lazy features to the ``dstdata`` of the input graph for prefetching optimization.
 
     When used in a :class:`~dgl.dataloading.Sampler`, lazy features mark which data
     should be fetched before computation in model. See :ref:`guide-minibatch-prefetching`
@@ -155,7 +155,22 @@ def set_dst_lazy_features(g, feature_names):
     return _set_lazy_features(g.dstnodes, g.dstdata, feature_names)
 
 class Sampler(object):
-    """Abstract sampler class."""
+    """Base class for graph samplers.
+
+    All graph samplers must subclass this class and override the ``sample``
+    method.
+
+    .. code:: python
+
+        from dgl.dataloading import Sampler
+
+        class SubgraphSampler(Sampler):
+            def __init__(self):
+                super().__init__()
+
+            def sample(self, g, indices):
+                return g.subgraph(indices)
+    """
     def sample(self, g, indices):
         """Abstract sample method.
 
@@ -169,12 +184,11 @@ class Sampler(object):
         raise NotImplementedError
 
 class BlockSampler(Sampler):
-    """Abstract class that assumes to take in a set of nodes whose
-    outputs are to compute, and returns a list of MFGs.
+    """Base class for sampling mini-batches in the form of Message-passing
+    Flow Graphs (MFGs).
 
-    Moreover, it assumes that the input node features will be put in the first MFG's
-    ``srcdata``, the output node labels will be put in the last MFG's ``dstdata``, and
-    the edge data will be put in all the MFGs' ``edata``.
+    It provides prefetching options to fetch the node features for the first MFG's ``srcdata``,
+    the node labels for the last MFG's ``dstdata`` and the edge features of all MFG's ``edata``.
 
     Parameters
     ----------
@@ -217,29 +231,6 @@ class BlockSampler(Sampler):
 
     def assign_lazy_features(self, result):
         """Assign lazy features for prefetching."""
-        # A LazyFeature is a placeholder telling the dataloader where and which IDs
-        # to prefetch.  It has the signature LazyFeature(name, id_).  id_ can be None
-        # if the LazyFeature is set into one of the subgraph's ``xdata``, in which case the
-        # dataloader will infer from the subgraph's ``xdata[dgl.NID]`` (or ``xdata[dgl.EID]``
-        # if the LazyFeature is set as edge features).
-        #
-        # If you want to prefetch things other than ndata and edata, you can also
-        # return a LazyFeature(name, id_).  If a LazyFeature is returned in places other than
-        # in a graph's ndata/edata/srcdata/dstdata, the DataLoader will prefetch it
-        # from its dictionary ``other_data``.
-        # For instance, you can run
-        #
-        #     return blocks, LazyFeature('other_feat', id_)
-        #
-        # To make it work with the sampler returning the stuff above, your dataloader
-        # needs to have the following
-        #
-        #     dataloader.attach_data('other_feat', tensor)
-        #
-        # Then you can run
-        #
-        #     for blocks, other_feat in dataloader:
-        #         train_on(blocks, other_feat)
         input_nodes, output_nodes, blocks = result
         set_src_lazy_features(blocks[0], self.prefetch_node_feats)
         set_dst_lazy_features(blocks[-1], self.prefetch_labels)
@@ -382,8 +373,11 @@ class EdgePredictionSampler(Sampler):
             neg_srcdst = {g.canonical_etypes[0]: neg_srcdst}
 
         dtype = F.dtype(list(neg_srcdst.values())[0][0])
+        ctx = context_of(seed_edges) if seed_edges is not None else g.device
         neg_edges = {
-            etype: neg_srcdst.get(etype, (F.tensor([], dtype), F.tensor([], dtype)))
+            etype: neg_srcdst.get(etype,
+                                  (F.copy_to(F.tensor([], dtype), ctx=ctx),
+                                   F.copy_to(F.tensor([], dtype), ctx=ctx)))
             for etype in g.canonical_etypes}
         neg_pair_graph = heterograph(
             neg_edges, {ntype: g.num_nodes(ntype) for ntype in g.ntypes})

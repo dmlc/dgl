@@ -30,7 +30,11 @@ from .rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
 from .fraud import FraudDataset, FraudYelpDataset, FraudAmazonDataset
 from .fakenews import FakeNewsDataset
 from .csv_dataset import CSVDataset
-from .adapter import AsNodePredDataset, AsLinkPredDataset
+from .adapter import *
+from .synthetic import BAShapeDataset, BACommunityDataset, TreeCycleDataset, TreeGridDataset, BA2MotifDataset
+from .wikics import WikiCSDataset
+from .flickr import FlickrDataset
+from .yelp import YelpDataset
 
 def register_data_args(parser):
     parser.add_argument(

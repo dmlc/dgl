@@ -42,7 +42,7 @@ def _get_part_ranges(id_ranges):
         res[key] = np.concatenate([np.array(l) for l in id_ranges[key]]).reshape(-1, 2)
     return res
 
-def load_partition(part_config, part_id):
+def load_partition(part_config, part_id, load_feats=True):
     ''' Load data of a partition from the data path.
 
     A partition data includes a graph structure of the partition, a dict of node tensors,
@@ -61,6 +61,9 @@ def load_partition(part_config, part_id):
         The path of the partition config file.
     part_id : int
         The partition ID.
+    load_feats : bool, optional
+        Whether to load node/edge feats. If False, the returned node/edge feature
+        dictionaries will be empty. Default: True.
 
     Returns
     -------
@@ -86,28 +89,8 @@ def load_partition(part_config, part_id):
         part_metadata = json.load(conf_f)
     assert 'part-{}'.format(part_id) in part_metadata, "part-{} does not exist".format(part_id)
     part_files = part_metadata['part-{}'.format(part_id)]
-    assert 'node_feats' in part_files, "the partition does not contain node features."
-    assert 'edge_feats' in part_files, "the partition does not contain edge feature."
     assert 'part_graph' in part_files, "the partition does not contain graph structure."
-    node_feats = load_tensors(relative_to_config(part_files['node_feats']))
-    edge_feats = load_tensors(relative_to_config(part_files['edge_feats']))
     graph = load_graphs(relative_to_config(part_files['part_graph']))[0][0]
-    # In the old format, the feature name doesn't contain node/edge type.
-    # For compatibility, let's add node/edge types to the feature names.
-    node_feats1 = {}
-    edge_feats1 = {}
-    for name in node_feats:
-        feat = node_feats[name]
-        if name.find('/') == -1:
-            name = '_N/' + name
-        node_feats1[name] = feat
-    for name in edge_feats:
-        feat = edge_feats[name]
-        if name.find('/') == -1:
-            name = '_E/' + name
-        edge_feats1[name] = feat
-    node_feats = node_feats1
-    edge_feats = edge_feats1
 
     assert NID in graph.ndata, "the partition graph should contain node mapping to global node ID"
     assert EID in graph.edata, "the partition graph should contain edge mapping to global edge ID"
@@ -134,7 +117,60 @@ def load_partition(part_config, part_id):
         assert np.all(F.asnumpy(partids1 == part_id)), 'load a wrong partition'
         assert np.all(F.asnumpy(partids2 == part_id)), 'load a wrong partition'
         etypes_list.append(etype)
+
+    node_feats = {}
+    edge_feats = {}
+    if load_feats:
+        node_feats, edge_feats = load_partition_feats(part_config, part_id)
+
     return graph, node_feats, edge_feats, gpb, graph_name, ntypes_list, etypes_list
+
+def load_partition_feats(part_config, part_id):
+    '''Load node/edge feature data from a partition.
+
+    Parameters
+    ----------
+    part_config : str
+        The path of the partition config file.
+    part_id : int
+        The partition ID.
+
+    Returns
+    -------
+    Dict[str, Tensor]
+        Node features.
+    Dict[str, Tensor]
+        Edge features.
+    '''
+    config_path = os.path.dirname(part_config)
+    relative_to_config = lambda path: os.path.join(config_path, path)
+
+    with open(part_config) as conf_f:
+        part_metadata = json.load(conf_f)
+    assert 'part-{}'.format(part_id) in part_metadata, "part-{} does not exist".format(part_id)
+    part_files = part_metadata['part-{}'.format(part_id)]
+    assert 'node_feats' in part_files, "the partition does not contain node features."
+    assert 'edge_feats' in part_files, "the partition does not contain edge feature."
+    node_feats = load_tensors(relative_to_config(part_files['node_feats']))
+    edge_feats = load_tensors(relative_to_config(part_files['edge_feats']))
+    # In the old format, the feature name doesn't contain node/edge type.
+    # For compatibility, let's add node/edge types to the feature names.
+    node_feats1 = {}
+    edge_feats1 = {}
+    for name in node_feats:
+        feat = node_feats[name]
+        if name.find('/') == -1:
+            name = '_N/' + name
+        node_feats1[name] = feat
+    for name in edge_feats:
+        feat = edge_feats[name]
+        if name.find('/') == -1:
+            name = '_E/' + name
+        edge_feats1[name] = feat
+    node_feats = node_feats1
+    edge_feats = edge_feats1
+
+    return node_feats, edge_feats
 
 def load_partition_book(part_config, part_id, graph=None):
     ''' Load a graph partition book from the partition config file.
@@ -293,7 +329,7 @@ def _set_trainer_ids(g, sim_g, node_parts):
 
 def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method="metis",
                     reshuffle=True, balance_ntypes=None, balance_edges=False, return_mapping=False,
-                    num_trainers_per_machine=1):
+                    num_trainers_per_machine=1, objtype='cut'):
     ''' Partition a graph for distributed training and store the partitions on files.
 
     The partitioning occurs in three steps: 1) run a partition algorithm (e.g., Metis) to
@@ -473,6 +509,9 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         each node will be stored in the node feature 'trainer_id'. Then the partitions of trainers
         on the same machine will be coalesced into one larger partition. The final number of
         partitions is `num_part`.
+    objtype : str, "cut" or "vol"
+        Set the objective as edge-cut minimization or communication volume minimization. This
+        argument is used by the Metis algorithm.
 
     Returns
     -------
@@ -532,6 +571,9 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
             bal_ntypes = sim_g.ndata[NTYPE]
         return sim_g, bal_ntypes
 
+    if objtype not in ['cut', 'vol']:
+        raise ValueError
+
     if not reshuffle:
         dgl_warning("The argument reshuffle will be deprecated in the next release. "
                     "For heterogeneous graphs, reshuffle must be enabled.")
@@ -583,7 +625,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                     sim_g, num_parts * num_trainers_per_machine,
                     balance_ntypes=balance_ntypes,
                     balance_edges=balance_edges,
-                    mode='k-way')
+                    mode='k-way', objtype=objtype)
                 _set_trainer_ids(g, sim_g, node_parts)
 
                 # And then coalesce the partitions of trainers on the same machine into one
@@ -592,7 +634,8 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
             else:
                 node_parts = metis_partition_assignment(sim_g, num_parts,
                                                         balance_ntypes=balance_ntypes,
-                                                        balance_edges=balance_edges)
+                                                        balance_edges=balance_edges,
+                                                        objtype=objtype)
             print('Assigning nodes to METIS partitions takes {:.3f}s, peak mem: {:.3f} GB'.format(
                 time.time() - start, get_peak_mem()))
         else:

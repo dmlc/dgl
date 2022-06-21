@@ -5,8 +5,8 @@ from ..base import NID
 from .base import set_node_lazy_features, set_edge_lazy_features, Sampler
 
 class ShaDowKHopSampler(Sampler):
-    """K-hop subgraph sampler used by
-    `ShaDow-GNN <https://arxiv.org/abs/2012.01380>`__.
+    """K-hop subgraph sampler from `Deep Graph Neural Networks with Shallow
+    Subgraph Samplers <https://arxiv.org/abs/2012.01380>`__.
 
     It performs node-wise neighbor sampling and returns the subgraph induced by
     all the sampled nodes. The seed nodes from which the neighbors are sampled
@@ -43,7 +43,7 @@ class ShaDowKHopSampler(Sampler):
     >>> dataloader = dgl.dataloading.DataLoader(
     ...     g, torch.arange(g.num_nodes()), sampler,
     ...     batch_size=5, shuffle=True, drop_last=False, num_workers=4)
-    >>> for input_nodes, output_nodes, (subgraph,) in dataloader:
+    >>> for input_nodes, output_nodes, subgraph in dataloader:
     ...     print(subgraph)
     ...     assert torch.equal(input_nodes, subgraph.ndata[dgl.NID])
     ...     assert torch.equal(input_nodes[:output_nodes.shape[0]], output_nodes)
