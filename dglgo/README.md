@@ -10,7 +10,23 @@ experiments.
 ## Installation and get started
 
 DGL-Go requires DGL v0.8+ so please make sure DGL is updated properly.
-Install DGL-Go by `pip install dglgo` and type `dgl` in your console:
+
+### Install the latest stable version
+
+```
+pip install dglgo
+```
+
+### Install from source for experimental features
+
+```
+python setup.py install
+```
+
+### Get started
+
+Type `dgl` in your console:
+
 ```
 Usage: dgl [OPTIONS] COMMAND [ARGS]...
 
