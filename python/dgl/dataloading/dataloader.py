@@ -76,8 +76,9 @@ class _TensorizedDatasetIter(object):
             _, type_ids_sortidx = torch.sort(type_ids, stable=True)
         else:
             dgl_warning(
-                'The current output_nodes are out of order even if set shuffle to False in Dataloader, '
-                'the reason is that the current version of torch dose not support stable sort. '
+                'The current output_nodes are out of order even if set shuffle '
+                'to False in Dataloader, the reason is that the current version '
+                'of torch dose not support stable sort. '
                 'Please update torch to 1.10.0 or higher to fix it.')
             type_ids_sortidx = torch.argsort(type_ids)
         type_ids = type_ids[type_ids_sortidx]
