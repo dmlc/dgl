@@ -1,8 +1,7 @@
 # Accuracy across 10 runs: 0.6852 ± 0.008875
 version: 0.0.1
-pipeline:
-  name: nodepred
-  mode: train
+pipeline_name: nodepred
+pipeline_mode: train
 device: cuda:0
 data:
   name: citeseer

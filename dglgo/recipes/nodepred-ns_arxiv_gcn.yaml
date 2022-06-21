@@ -1,8 +1,7 @@
 # Accuracy across 5 runs: 0.593288 ± 0.006103
 version: 0.0.1
-pipeline:
-  name: nodepred-ns
-  mode: train
+pipeline_name: nodepred-ns
+pipeline_mode: train
 device: 'cuda:0'
 eval_device: 'cpu'
 data:
