@@ -50,7 +50,8 @@ class ApplyNodepredNsPipeline(PipelineBase):
 
             self.__class__.setup_user_cfg_cls()
             generated_cfg = {
-                "pipeline": self.pipeline,
+                "pipeline_name": self.pipeline["name"],
+                "pipeline_mode": self.pipeline["mode"],
                 "device": train_cfg["device"],
                 "data": {"name": data},
                 "cpt_path": cpt,
@@ -93,7 +94,8 @@ class ApplyNodepredNsPipeline(PipelineBase):
         # Dict for defining cfg in the rendered code
         generated_user_cfg = deepcopy(user_cfg_dict)
         generated_user_cfg["data"].pop("name")
-        generated_user_cfg.pop("pipeline")
+        generated_user_cfg.pop("pipeline_name")
+        generated_user_cfg.pop("pipeline_mode")
         # model arch configuration
         generated_user_cfg["model"] = train_cfg["model"]
 

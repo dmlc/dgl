@@ -90,7 +90,8 @@ class NodepredNsPipeline(PipelineBase):
         ):
             self.__class__.setup_user_cfg_cls()
             generated_cfg = {
-                "pipeline": self.pipeline,
+                "pipeline_name": self.pipeline["name"],
+                "pipeline_mode": self.pipeline["mode"],
                 "device": "cpu",
                 "data": {"name": data.name},
                 "model": {"name": model.value},
@@ -147,7 +148,8 @@ class NodepredNsPipeline(PipelineBase):
         if "split_ratio" in generated_user_cfg["data"]:
             generated_user_cfg["data"].pop("split_ratio")
         generated_user_cfg["data_name"] = generated_user_cfg["data"].pop("name")
-        generated_user_cfg.pop("pipeline")
+        generated_user_cfg.pop("pipeline_name")
+        generated_user_cfg.pop("pipeline_mode")
         generated_user_cfg["model_name"] = generated_user_cfg["model"].pop("name")
         generated_user_cfg['general_pipeline']["optimizer"].pop("name")
 

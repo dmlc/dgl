@@ -81,7 +81,8 @@ class LinkpredPipeline(PipelineBase):
         ):
             self.__class__.setup_user_cfg_cls()
             generated_cfg = {
-                "pipeline": self.pipeline,
+                "pipeline_name": self.pipeline["name"],
+                "pipeline_mode": self.pipeline["mode"],
                 "device": "cpu",
                 "data": {"name": data.name},
                 "neg_sampler": {"name": neg_sampler.value},
@@ -139,7 +140,8 @@ class LinkpredPipeline(PipelineBase):
             generated_user_cfg.pop("data")
         else:
             generated_user_cfg["data"].pop("name")
-        generated_user_cfg.pop("pipeline")
+        generated_user_cfg.pop("pipeline_name")
+        generated_user_cfg.pop("pipeline_mode")
         generated_user_cfg["node_model"].pop("name")
         generated_user_cfg["edge_model"].pop("name")
         generated_user_cfg["neg_sampler"].pop("name")
