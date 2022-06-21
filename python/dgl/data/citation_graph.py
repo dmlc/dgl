@@ -61,7 +61,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
     }
 
     def __init__(self, name, raw_dir=None, force_reload=False,
-                 verbose=True, reverse_edge=True, transform=None, 
+                 verbose=True, reverse_edge=True, transform=None,
                  reorder=False):
         assert name.lower() in ['cora', 'citeseer', 'pubmed']
 
