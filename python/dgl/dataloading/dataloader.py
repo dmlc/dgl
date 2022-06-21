@@ -339,9 +339,8 @@ def _prefetcher_entry(
     if num_threads is not None:
         torch.set_num_threads(num_threads)
     if use_alternate_streams:
-        stream = (
-                torch.cuda.Stream(device=dataloader.device)
-                if dataloader.device.type == 'cuda' else None)
+        stream = (torch.cuda.Stream(device=dataloader.device)
+                  if dataloader.device.type == 'cuda' else None)
     else:
         stream = None
 

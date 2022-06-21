@@ -1,8 +1,26 @@
+##
+#   Copyright 2021-2022 Contributors
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+#
+""" Methods for placing graphs into pinned/uva memory.
+"""
+
 from ..heterograph import DGLHeteroGraph
 from .. import backend as F
 import itertools
 
-__all__ = ['pin_graph']
+__all__ = ['pin_graph_for_uva']
 
 
 class _PinnedGraph(DGLHeteroGraph):
@@ -12,7 +30,7 @@ class _PinnedGraph(DGLHeteroGraph):
         assert F.device_type(super().device) == 'cpu', "Only graphs on the " \
             "cpu can be pinned. Got {}".format(F.device_type(super().device))
         assert F.device_type(device) == 'cuda', "Target device for UVA " \
-            "access must be a CUDA device. Got {}".format(F.device_type(device)) 
+            "access must be a CUDA device. Got {}".format(F.device_type(device))
 
         # default to the original device until we've pinned everything
         self._device = g.device
@@ -61,7 +79,9 @@ class _PinnedGraphContext():
 
 
 def pin_graph_for_uva(g, device):
-   return _PinnedGraphContext(g, device)
+    """ Pin a graph 'g' for access from GPU 'device'.
+    """
+    return _PinnedGraphContext(g, device)
 
 
 
