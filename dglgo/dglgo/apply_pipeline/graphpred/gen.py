@@ -92,7 +92,6 @@ class ApplyGraphpredPipeline(PipelineBase):
 
         # Dict for defining cfg in the rendered code
         generated_user_cfg = deepcopy(user_cfg_dict)
-        generated_user_cfg["data"].pop("name")
         generated_user_cfg.pop("pipeline_name")
         generated_user_cfg.pop("pipeline_mode")
         # model arch configuration
