@@ -1,6 +1,7 @@
 import torch
 
 from dgl.data import AsGraphPredDataset
+{{ data_import_code }}
 
 def main():
     {{ user_cfg_str }}
@@ -23,8 +24,6 @@ def main():
             have the same name, got {} and {}'.format(train_data_name, infer_data_name)
     model_node_feat_size = cfg['model']['data_info']['node_feat_size']
     model_edge_feat_size = cfg['model']['data_info']['edge_feat_size']
-    data_node_feat_size = 
-    data_edge_feat_size =
 
 if __name__ == '__main__':
     main()
