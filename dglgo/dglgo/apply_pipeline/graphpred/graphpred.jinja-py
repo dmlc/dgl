@@ -1,0 +1,17 @@
+import torch
+
+from dgl.data import AsGraphPredDataset
+
+def main():
+    {{ user_cfg_str }}
+
+    device = cfg['device']
+    if not torch.cuda.is_available():
+        device = 'cpu'
+
+    # load data
+    data = AsGraphPredDataset({{data_initialize_code}})
+    # validation
+
+if __name__ == '__main__':
+    main()
