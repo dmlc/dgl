@@ -63,11 +63,13 @@ def main():
     # Dump the results
     os.makedirs(cfg['general_pipeline']["save_path"])
     file_path = os.path.join(cfg['general_pipeline']["save_path"], 'output.csv')
+    header = ['graph id']
+    header.extend(['task_{:d}'.format(i) for i in range(cfg['model']['data_info']['out_size'])])
     with open(file_path, 'w') as f:
         writer = csv.writer(f)
-        writer.writerow(['graph id', 'predicted labels'])
+        writer.writerow(header)
         writer.writerows([
-            [i, pred[i].tolist()] for i in range(len(pred))
+            [i] + pred[i].tolist() for i in range(len(pred))
         ])
     print('Saved inference results to {}'.format(file_path))
 
