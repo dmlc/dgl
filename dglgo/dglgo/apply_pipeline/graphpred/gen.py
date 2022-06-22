@@ -5,11 +5,22 @@ import typer
 from copy import deepcopy
 from jinja2 import Template
 from pathlib import Path
-from pydantic import Field
+from pydantic import BaseModel, Field
 from typing import Optional
 
 from ...utils.factory import ApplyPipelineFactory, PipelineBase, DataFactory, GraphModelFactory
 from ...utils.yaml_dump import deep_convert_dict, merge_comment
+
+pipeline_comments = {
+    "batch_size": "Graph batch size",
+    "num_workers": "Number of workers for data loading",
+    "save_path": "Directory to save the inference results"
+}
+
+class ApplyGraphpredPipelineCfg(BaseModel):
+    batch_size: int = 32
+    num_workers: int = 4
+    save_path: str = "apply_results"
 
 @ApplyPipelineFactory.register("graphpred")
 class ApplyGraphpredPipeline(PipelineBase):
@@ -24,6 +35,7 @@ class ApplyGraphpredPipeline(PipelineBase):
         from ...utils.enter_config import UserConfig
         class ApplyGraphPredUserConfig(UserConfig):
             data: DataFactory.filter("graphpred").get_pydantic_config() = Field(..., discriminator="name")
+            general_pipeline: ApplyGraphpredPipelineCfg = ApplyGraphpredPipelineCfg()
 
         cls.user_cfg_cls = ApplyGraphPredUserConfig
 
@@ -54,7 +66,8 @@ class ApplyGraphpredPipeline(PipelineBase):
                 "device": train_cfg["device"],
                 "data": {"name": data},
                 "cpt_path": cpt,
-                "general_pipeline": {"save_path": "apply_results"}
+                "general_pipeline": {"batch_size": train_cfg["eval_batch_size"],
+                                     "num_workers": train_cfg["num_workers"]}
             }
             output_cfg = self.user_cfg_cls(**generated_cfg).dict()
             output_cfg = deep_convert_dict(output_cfg)
@@ -63,7 +76,7 @@ class ApplyGraphpredPipeline(PipelineBase):
             comment_dict = {
                 "device": "Torch device name, e.g., cpu or cuda or cuda:0",
                 "cpt_path": "Path to the checkpoint file",
-                "general_pipeline": {"save_path": "Directory to save the inference results"}
+                "general_pipeline": pipeline_comments
             }
             comment_dict = merge_comment(output_cfg, comment_dict)
 
