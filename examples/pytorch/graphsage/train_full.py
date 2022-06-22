@@ -26,7 +26,8 @@ def evaluate(model, graph, features, labels, nid):
         correct = torch.sum(indices == labels)
         return correct.item() * 1.0 / len(labels)
     
-def train(args, g, device, features, labels, train_nid, val_nid):
+def train(args, g, device, data):
+    features, labels, train_nid, val_nid = data
     # graph preprocess and calculate normalization factor
     n_edges = g.number_of_edges()
 
@@ -117,6 +118,7 @@ if __name__ == '__main__':
     val_nid = val_mask.nonzero().squeeze().to(device)
     test_nid = test_mask.nonzero().squeeze().to(device)
     g = dgl.remove_self_loop(g)
-    model = train(args, g, device, features, labels, train_nid, val_nid)
+    data = features, labels, train_nid, val_nid
+    model = train(args, g, device, data)
     acc = evaluate(model, g, features, labels, test_nid)
     print("Test Accuracy {:.4f}".format(acc))

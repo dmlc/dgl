@@ -77,7 +77,7 @@ def train(rank, world_size, args, graph, devices, data):
                                               acc.item(), mem))
         if world_size > 1: dist.barrier()
 
-    acc = evaluate(model, graph, device, test_idx, 2**16)
+    acc = evaluate(model, graph, device, test_idx, 2**16) # 2**16: batch_size for evaluation
     if rank==0:
         print("Test Accuracy on Master {:.4f}".format(acc.item()))
 

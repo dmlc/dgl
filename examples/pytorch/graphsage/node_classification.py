@@ -30,7 +30,8 @@ def evaluate(model, graph, device, nid, batch_size):
         label = graph.ndata['label'][nid].to(device)
         return MF.accuracy(pred, label)
 
-def train(args, g, device, in_feats, n_classes, train_idx, valid_idx):
+def train(args, g, device, data):
+    in_feats, n_classes, train_idx, valid_idx = data
     train_idx = train_idx.to(device)
     valid_idx = valid_idx.to(device)
 
@@ -97,6 +98,8 @@ if __name__ == '__main__':
                     help='Perform both sampling and training on GPU.')
     args = parser.parse_args()
     print(args)
+    
+    # load and preprocess dataset
     dataset = DglNodePropPredDataset('ogbn-products')
     g, labels = dataset[0]
     g.ndata['label'] = labels.squeeze()
@@ -121,9 +124,10 @@ if __name__ == '__main__':
     #Test samples %d""" %
     (n_edges, n_classes,
      len(train_idx), len(valid_idx), len(test_idx)))
-     
-    model = train(args, g, device, in_feats, n_classes, train_idx, valid_idx)
+
+    data = in_feats, n_classes, train_idx, valid_idx
+    model = train(args, g, device, data)
     # Test accuracy and offline inference of all nodes                           
-    acc = evaluate(model, g, device, test_idx, 4096)
+    acc = evaluate(model, g, device, test_idx, 4096) # 4096: batch size for evaluation
     print("Test Accuracy {:.4f}".format(acc.item()))
     
