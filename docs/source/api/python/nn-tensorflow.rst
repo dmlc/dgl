@@ -42,4 +42,4 @@ Heterogeneous Learning Modules
     :nosignatures:
     :template: classtemplate.rst
 
-    ~dgl.nn.tensorflow.glob.HeteroGraphConv
+    ~dgl.nn.tensorflow.HeteroGraphConv
