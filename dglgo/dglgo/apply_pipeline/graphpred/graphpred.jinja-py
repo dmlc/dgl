@@ -20,8 +20,10 @@ def infer(device, loader, model):
             node_feat = g.ndata['feat']
             edge_feat = g.edata['feat']
             pred = model(g, node_feat, edge_feat)
+            pred = (pred.sigmoid() >= 0.5).long()
+            all_pred.append(pred)
 
-    return all_pred
+    return torch.cat(all_pred, dim=0)
 
 def main():
     {{ user_cfg_str }}
@@ -56,7 +58,7 @@ def main():
 
     model = {{ model_class_name }}(**cfg['model'])
     model.load_state_dict(torch.load(cfg['cpt_path'], map_location='cpu')['model'])
-    pred = infer(device, data_loader, model)
+    pred = infer(device, data_loader, model).detach().cpu()
 
     # Dump the results
     os.makedirs(cfg['general_pipeline']["save_path"])
