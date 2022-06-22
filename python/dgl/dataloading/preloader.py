@@ -16,26 +16,26 @@
 """ Methods for preloading elements when iterating dataloader.
 """
 
-from . import DataLoader
 from queue import Queue
 import threading
 import torch
 
 __all__ = ['preload_with_thread']
 
-def _preloader_entry(num_threads, it, queue, done_event):
+def _preloader_entry(num_threads, iterator, queue, done_event):
     if num_threads is not None:
         torch.set_num_threads(num_threads)
     try:
         batch = None
         while not done_event.is_set():
             try:
-                batch = next(it)
+                batch = next(iterator)
             except StopIteration:
                 break
             queue.put((batch, None))
         queue.put((None, None))
-    except Exception as e:
+    except Exception as e: # pylint: disable=broad-except
+        # pass exception back to main thread for handling
         queue.put((None, e))
 
 class _ThreadedPreloadingIterator:

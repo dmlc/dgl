@@ -362,7 +362,7 @@ def restore_parent_storage_columns(item, g):
 
 
 class _PrefetchingIter(object):
-    def __init__(self, dataloader, dataloader_it, use_thread=False, use_alternate_streams=True):
+    def __init__(self, dataloader, dataloader_it, use_alternate_streams=True):
         self.dataloader_it = dataloader_it
         self.dataloader = dataloader
         self.graph_sampler = self.dataloader.graph_sampler
