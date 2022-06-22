@@ -128,7 +128,7 @@ if __name__ == '__main__':
     }
     if cfg["model_name"] == 'pna':
         in_deg = torch.cat([g.in_degrees() for (g, _) in data[data.train_idx]])
-        cfg["model"]["data_info"]["delta"] = torch.mean(torch.log(in_deg + 1))
+        cfg["model"]["data_info"]["delta"] = torch.mean(torch.log(in_deg + 1)).item()
 
     os.makedirs(cfg['general_pipeline']["save_path"])
 

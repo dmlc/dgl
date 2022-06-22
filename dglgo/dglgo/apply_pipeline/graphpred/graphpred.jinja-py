@@ -11,7 +11,20 @@ def main():
 
     # load data
     data = AsGraphPredDataset({{data_initialize_code}})
+
     # validation
+    train_data_name = cfg['model']['data_info']['name']
+    infer_data_name = cfg['data']['name']
+    if train_data_name.startswith('ogbg-mol'):
+        assert infer_data_name.startswith('ogbg-mol'), 'Expect the inference data name to start \
+            with ogbg-mol, got {}'.format(infer_data_name)
+    else:
+        assert train_data_name == infer_data_name, 'Expect the training and inference data to \
+            have the same name, got {} and {}'.format(train_data_name, infer_data_name)
+    model_node_feat_size = cfg['model']['data_info']['node_feat_size']
+    model_edge_feat_size = cfg['model']['data_info']['edge_feat_size']
+    data_node_feat_size = 
+    data_edge_feat_size =
 
 if __name__ == '__main__':
     main()
