@@ -66,8 +66,8 @@ class ApplyGraphpredPipeline(PipelineBase):
                 "device": train_cfg["device"],
                 "data": {"name": data},
                 "cpt_path": cpt,
-                "general_pipeline": {"batch_size": train_cfg["eval_batch_size"],
-                                     "num_workers": train_cfg["num_workers"]}
+                "general_pipeline": {"batch_size": train_cfg["general_pipeline"]["eval_batch_size"],
+                                     "num_workers": train_cfg["general_pipeline"]["num_workers"]}
             }
             output_cfg = self.user_cfg_cls(**generated_cfg).dict()
             output_cfg = deep_convert_dict(output_cfg)
