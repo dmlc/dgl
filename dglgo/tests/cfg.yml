@@ -1,5 +1,7 @@
 version: 0.0.1
-pipeline_name: nodepred
+pipeline:
+  name: nodepred
+  mode: train
 device: cpu
 data:
   name: cora
