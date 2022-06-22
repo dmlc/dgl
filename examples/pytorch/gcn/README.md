@@ -16,10 +16,11 @@ pip install torch requests
 
 Codes
 -----
-The folder contains three implementations of GCN:
-- `gcn.py` uses DGL's predefined graph convolution module.
-- `gcn_mp.py` uses user-defined message and reduce functions.
-Modify `train.py` to switch between different implementations.
+The folder contains two implementations of GCN:
+- DGL intrinsic graph convolution module (default)
+- Customized GCN layer with user-defined message and reduce functions (see `layer.py`)
+
+Use built-in GCN module as default. Specify `--custom-gcn` to enable customized GCN layer implementations.
 
 Results
 -------

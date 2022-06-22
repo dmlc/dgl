@@ -6,10 +6,9 @@ import torch.nn.functional as F
 import dgl
 from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
 
-from gcn import GCN
-#from gcn_mp import GCN
-#from gcn_spmv import GCN
-
+from model import GCN
+from dgl.nn.pytorch import GraphConv
+from layer import GCNLayer
 
 def evaluate(model, features, labels, mask):
     model.eval()
@@ -22,68 +21,19 @@ def evaluate(model, features, labels, mask):
         return correct.item() * 1.0 / len(labels)
 
 
-def main(args):
-    # load and preprocess dataset
-    if args.dataset == 'cora':
-        data = CoraGraphDataset()
-    elif args.dataset == 'citeseer':
-        data = CiteseerGraphDataset()
-    elif args.dataset == 'pubmed':
-        data = PubmedGraphDataset()
-    else:
-        raise ValueError('Unknown dataset: {}'.format(args.dataset))
-
-    g = data[0]
-    if args.gpu < 0:
-        cuda = False
-    else:
-        cuda = True
-        g = g.int().to(args.gpu)
-
-    features = g.ndata['feat']
-    labels = g.ndata['label']
-    train_mask = g.ndata['train_mask']
-    val_mask = g.ndata['val_mask']
-    test_mask = g.ndata['test_mask']
-    in_feats = features.shape[1]
-    n_classes = data.num_labels
+def main(args, g, device, data):
+    in_feats, features, n_classes, labels, train_mask, val_mask = data
     n_edges = g.number_of_edges()
-    print("""----Data statistics------'
-      #Edges %d
-      #Classes %d
-      #Train samples %d
-      #Val samples %d
-      #Test samples %d""" %
-          (n_edges, n_classes,
-              train_mask.int().sum().item(),
-              val_mask.int().sum().item(),
-              test_mask.int().sum().item()))
-
-    # add self loop
-    if args.self_loop:
-        g = dgl.remove_self_loop(g)
-        g = dgl.add_self_loop(g)
-    n_edges = g.number_of_edges()
-
-    # normalization
-    degs = g.in_degrees().float()
-    norm = torch.pow(degs, -0.5)
-    norm[torch.isinf(norm)] = 0
-    if cuda:
-        norm = norm.cuda()
-    g.ndata['norm'] = norm.unsqueeze(1)
-
+    
     # create GCN model
-    model = GCN(g,
+    Layer = GCNLayer if args.custom_gcn else GraphConv
+    model = GCN(g, Layer,
                 in_feats,
                 args.n_hidden,
                 n_classes,
                 args.n_layers,
                 F.relu,
-                args.dropout)
-
-    if cuda:
-        model.cuda()
+                args.dropout).to(device)
     loss_fcn = torch.nn.CrossEntropyLoss()
 
     # use optimizer
@@ -92,11 +42,10 @@ def main(args):
                                  weight_decay=args.weight_decay)
 
     # initialize graph
-    dur = []
+    time_sta = time.time()
     for epoch in range(args.n_epochs):
         model.train()
-        if epoch >= 3:
-            t0 = time.time()
+        t0 = time.time()
         # forward
         logits = model(features)
         loss = loss_fcn(logits[train_mask], labels[train_mask])
@@ -105,17 +54,15 @@ def main(args):
         loss.backward()
         optimizer.step()
 
-        if epoch >= 3:
-            dur.append(time.time() - t0)
+        epoch_time = time.time() - t0
 
         acc = evaluate(model, features, labels, val_mask)
         print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
-              "ETputs(KTEPS) {:.2f}". format(epoch, np.mean(dur), loss.item(),
-                                             acc, n_edges / np.mean(dur) / 1000))
-
+              "ETputs(KTEPS) {:.2f}". format(epoch, epoch_time, loss.item(),
+                                             acc, n_edges / epoch_time / 1000))
+    print("Training time(s) {:.4f}". format(time.time() - time_sta))
     print()
-    acc = evaluate(model, features, labels, test_mask)
-    print("Test accuracy {:.2%}".format(acc))
+    return model
 
 
 if __name__ == '__main__':
@@ -138,8 +85,62 @@ if __name__ == '__main__':
                         help="Weight for L2 loss")
     parser.add_argument("--self-loop", action='store_true',
                         help="graph self-loop (default=False)")
+    parser.add_argument("--custom-gcn", action='store_true',
+                        help="uses user-defined message and reduce functions")
+
     parser.set_defaults(self_loop=False)
     args = parser.parse_args()
     print(args)
 
-    main(args)
+    # load and preprocess dataset
+    if args.dataset == 'cora':
+        data = CoraGraphDataset()
+    elif args.dataset == 'citeseer':
+        data = CiteseerGraphDataset()
+    elif args.dataset == 'pubmed':
+        data = PubmedGraphDataset()
+    else:
+        raise ValueError('Unknown dataset: {}'.format(args.dataset))
+
+    g = data[0]
+    features = g.ndata['feat']
+    labels = g.ndata['label']
+    train_mask = g.ndata['train_mask']
+    val_mask = g.ndata['val_mask']
+    test_mask = g.ndata['test_mask']
+    in_feats = features.shape[1]
+    n_classes = data.num_classes
+    n_edges = g.number_of_edges()
+    print("""----Data statistics------'
+      #Edges %d
+      #Classes %d
+      #Train samples %d
+      #Val samples %d
+      #Test samples %d""" %
+          (n_edges, n_classes,
+              train_mask.int().sum().item(),
+              val_mask.int().sum().item(),
+              test_mask.int().sum().item()))
+    if args.gpu < 0:
+        device = torch.device('cpu')
+    else:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        features = features.to(device)
+        labels = labels.to(device)
+        g = g.int().to(device)
+
+
+    # add self loop
+    if args.self_loop:
+        g = dgl.remove_self_loop(g)
+        g = dgl.add_self_loop(g)
+    # normalization
+    degs = g.in_degrees().float()
+    norm = torch.pow(degs, -0.5).to(device)
+    norm[torch.isinf(norm)] = 0
+    g.ndata['norm'] = norm.unsqueeze(1)
+
+    data = in_feats, features, n_classes, labels, train_mask, val_mask
+    model = main(args, g, device, data)
+    acc = evaluate(model, features, labels, test_mask)
+    print("Test accuracy {:.2%}".format(acc))
