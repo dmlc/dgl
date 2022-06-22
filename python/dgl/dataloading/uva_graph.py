@@ -16,9 +16,9 @@
 """ Methods for placing graphs into pinned/uva memory.
 """
 
+import itertools
 from ..heterograph import DGLHeteroGraph
 from .. import backend as F
-import itertools
 
 __all__ = ['pin_graph_for_uva']
 
@@ -82,6 +82,3 @@ def pin_graph_for_uva(g, device):
     """ Pin a graph 'g' for access from GPU 'device'.
     """
     return _PinnedGraphContext(g, device)
-
-
-
