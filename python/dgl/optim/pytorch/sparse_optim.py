@@ -715,12 +715,10 @@ class SparseAdam(SparseGradOptimizer):
                                            grad_indices, \
                                            update_power.to(dtype=self._dtype))
             else:
-                update_mem_dst = update_mem.to(state_dev, \
-                                               dtype=self._dtype, \
-                                               non_blocking=True)
-                update_power_dst = update_power.to(state_dev, \
-                                                   dtype=self._dtype, \
-                                                   non_blocking=True)
+                update_mem_dst = update_mem.to(dtype=self._dtype).to(
+                    state_dev, non_blocking=True)
+                update_power_dst = update_power.to(dtype=self._dtype).to(
+                    state_dev, non_blocking=True)
                 if state_block:
                     # use events to try and overlap CPU and GPU as much as possible
                     update_event = th.cuda.Event()
