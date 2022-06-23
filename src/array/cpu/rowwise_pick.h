@@ -227,7 +227,7 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows, IdArray etypes,
   }
 
   runtime::parallel_for(0, num_rows, [&](size_t b, size_t e) {
-    for (int64_t i = b; i < e; ++i) {
+    for (size_t i = b; i < e; ++i) {
       const IdxType rid = rows_data[i];
       CHECK_LT(rid, mat.num_rows);
       const IdxType off = indptr[rid];

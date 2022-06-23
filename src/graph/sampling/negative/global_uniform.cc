@@ -26,8 +26,6 @@ std::pair<IdArray, IdArray> GlobalUniformNegativeSampling(
     bool exclude_self_loops,
     bool replace,
     double redundancy) {
-  dgl_format_code_t allowed = hg->GetAllowedFormats();
-
   auto format = hg->SelectFormat(etype, CSC_CODE | CSR_CODE);
   if (format == SparseFormat::kCSC) {
     CSRMatrix csc = hg->GetCSCMatrix(etype);
