@@ -1,4 +1,5 @@
 """Limited edge dataloader."""
+# pylint: disable=bad-super-call, no-value-for-parameter
 from typing import Generic
 import functools
 
