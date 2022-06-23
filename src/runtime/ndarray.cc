@@ -64,9 +64,7 @@ struct NDArray::Internal {
       ptr->mem = nullptr;
     } else if (ptr->dl_tensor.data != nullptr) {
       // if the array is still pinned before freeing, unpin it.
-      if (IsDataPinned(&(ptr->dl_tensor))) {
-        UnpinData(&(ptr->dl_tensor));
-      }
+      UnpinContainer(ptr);
       dgl::runtime::DeviceAPI::Get(ptr->dl_tensor.ctx)->FreeDataSpace(
           ptr->dl_tensor.ctx, ptr->dl_tensor.data);
     }
@@ -78,6 +76,9 @@ struct NDArray::Internal {
   // This enables us to create NDArray from memory allocated by other
   // frameworks that are DLPack compatible
   static void DLPackDeleter(NDArray::Container* ptr) {
+    // if the array is pinned by dgl, unpin it before freeing
+    if (ptr->pinned_by_dgl_)
+      UnpinContainer(ptr);
     DLManagedTensor* tensor = static_cast<DLManagedTensor*>(ptr->manager_ctx);
     if (tensor->deleter != nullptr) {
       (*tensor->deleter)(tensor);
@@ -115,8 +116,8 @@ struct NDArray::Internal {
   }
   // Implementation of API function
   static DLTensor* MoveAsDLTensor(NDArray arr) {
-    DLTensor* tensor = const_cast<DLTensor*>(arr.operator->());
-    CHECK(reinterpret_cast<DLTensor*>(arr.data_) == tensor);
+    DLTensor* tensor = reinterpret_cast<DLTensor*>(arr.data_);
+    CHECK(tensor == const_cast<DLTensor*>(arr.operator->()));
     arr.data_ = nullptr;
     return tensor;
   }
@@ -256,16 +257,26 @@ void NDArray::CopyFromTo(DLTensor* from,
     from_size, from->ctx, to->ctx, from->dtype, stream);
 }
 
-void NDArray::PinData(DLTensor* tensor) {
-  if (IsDataPinned(tensor)) return;
+void NDArray::PinContainer(NDArray::Container* ptr) {
+  if (IsContainerPinned(ptr)) return;
+  auto* tensor = &(ptr->dl_tensor);
   CHECK_EQ(tensor->ctx.device_type, kDLCPU)
     << "Only NDArray on CPU can be pinned";
   DeviceAPI::Get(kDLGPU)->PinData(tensor->data, GetDataSize(*tensor));
+  ptr->pinned_by_dgl_ = true;
 }
 
-void NDArray::UnpinData(DLTensor* tensor) {
-  if (!IsDataPinned(tensor)) return;
-  DeviceAPI::Get(kDLGPU)->UnpinData(tensor->data);
+void NDArray::UnpinContainer(NDArray::Container* ptr) {
+  auto container_is_pinned = IsContainerPinned(ptr);
+  // The tensor may be pinned outside of DGL via a different CUDA API,
+  // so we cannot unpin it with cudaHostUnregister.
+  CHECK(ptr->pinned_by_dgl_ || !container_is_pinned)
+    << "Cannot unpin a tensor that is pinned outside of DGL.";
+  // 1. not pinned, do nothing
+  if (!container_is_pinned) return;
+  // 2. pinned by DGL, unpin it
+  DeviceAPI::Get(kDLGPU)->UnpinData(ptr->dl_tensor.data);
+  ptr->pinned_by_dgl_ = false;
 }
 
 template<typename T>
@@ -327,7 +338,10 @@ std::shared_ptr<SharedMemory> NDArray::GetSharedMem() const {
   return this->data_->mem;
 }
 
-bool NDArray::IsDataPinned(DLTensor* tensor) {
+bool NDArray::IsContainerPinned(NDArray::Container* ptr) {
+  if (ptr->pinned_by_dgl_)
+    return true;
+  auto* tensor = &(ptr->dl_tensor);
   // Can only be pinned if on CPU...
   if (tensor->ctx.device_type != kDLCPU)
     return false;
@@ -533,13 +547,15 @@ int DGLArrayCopyToBytes(DGLArrayHandle handle,
 int DGLArrayPinData(DGLArrayHandle handle,
                     DLContext ctx) {
   API_BEGIN();
-  NDArray::PinData(handle);
+  auto* nd_container = reinterpret_cast<NDArray::Container*>(handle);
+  NDArray::PinContainer(nd_container);
   API_END();
 }
 
 int DGLArrayUnpinData(DGLArrayHandle handle,
                       DLContext ctx) {
   API_BEGIN();
-  NDArray::UnpinData(handle);
+  auto* nd_container = reinterpret_cast<NDArray::Container*>(handle);
+  NDArray::UnpinContainer(nd_container);
   API_END();
 }

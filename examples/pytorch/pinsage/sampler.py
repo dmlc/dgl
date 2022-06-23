@@ -2,6 +2,20 @@ import numpy as np
 import dgl
 import torch
 from torch.utils.data import IterableDataset, DataLoader
+from torchtext.data.functional import numericalize_tokens_from_iterator
+
+def padding(array, yy, val):
+    """
+    :param array: torch tensor array
+    :param yy: desired width
+    :param val: padded value
+    :return: padded array
+    """
+    w = array.shape[0]
+    b = 0
+    bb = yy - b - w
+
+    return torch.nn.functional.pad(array, pad=(b, bb), mode='constant', value=val)
 
 def compact_and_copy(frontier, seeds):
     block = dgl.to_block(frontier, seeds)
@@ -22,12 +36,12 @@ class ItemToItemBatchSampler(IterableDataset):
 
     def __iter__(self):
         while True:
-            heads = torch.randint(0, self.g.number_of_nodes(self.item_type), (self.batch_size,))
+            heads = torch.randint(0, self.g.num_nodes(self.item_type), (self.batch_size,))
             tails = dgl.sampling.random_walk(
                 self.g,
                 heads,
                 metapath=[self.item_to_user_etype, self.user_to_item_etype])[0][:, 2]
-            neg_tails = torch.randint(0, self.g.number_of_nodes(self.item_type), (self.batch_size,))
+            neg_tails = torch.randint(0, self.g.num_nodes(self.item_type), (self.batch_size,))
 
             mask = (tails != -1)
             yield heads[mask], tails[mask], neg_tails[mask]
@@ -68,10 +82,10 @@ class NeighborSampler(object):
         # connections only.
         pos_graph = dgl.graph(
             (heads, tails),
-            num_nodes=self.g.number_of_nodes(self.item_type))
+            num_nodes=self.g.num_nodes(self.item_type))
         neg_graph = dgl.graph(
             (heads, neg_tails),
-            num_nodes=self.g.number_of_nodes(self.item_type))
+            num_nodes=self.g.num_nodes(self.item_type))
         pos_graph, neg_graph = dgl.compact_graphs([pos_graph, neg_graph])
         seeds = pos_graph.ndata[dgl.NID]
 
@@ -111,12 +125,26 @@ def assign_textual_node_features(ndata, textset, ntype):
     """
     node_ids = ndata[dgl.NID].numpy()
 
-    for field_name, field in textset.fields.items():
-        examples = [getattr(textset[i], field_name) for i in node_ids]
+    for field_name, field in textset.items():
+        textlist, vocab, pad_var, batch_first = field
+        
+        examples = [textlist[i] for i in node_ids]
+        ids_iter = numericalize_tokens_from_iterator(vocab, examples)
+        
+        maxsize = max([len(textlist[i]) for i in node_ids])
+        ids = next(ids_iter)
+        x = torch.asarray([num for num in ids])
+        lengths = torch.tensor([len(x)])
+        tokens = padding(x, maxsize, pad_var)
 
-        tokens, lengths = field.process(examples)
-
-        if not field.batch_first:
+        for ids in ids_iter:
+            x = torch.asarray([num for num in ids])
+            l = torch.tensor([len(x)])
+            y = padding(x, maxsize, pad_var)
+            tokens = torch.vstack((tokens,y))
+            lengths = torch.cat((lengths, l))
+       
+        if not batch_first:
             tokens = tokens.t()
 
         ndata[field_name] = tokens

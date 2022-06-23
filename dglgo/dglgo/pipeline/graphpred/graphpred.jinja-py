@@ -2,10 +2,12 @@ import numpy as np
 import sklearn
 import torch
 import torch.nn as nn
-from dgl.data import AsGraphPredDataset
-from dgl.dataloading import GraphDataLoader
+import os
+
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from tqdm import tqdm
+from dgl.data import AsGraphPredDataset
+from dgl.dataloading import GraphDataLoader
 {{ data_import_code }}
 
 {{ model_code }}
@@ -61,16 +63,10 @@ def evaluate(device, loader, model):
 
     return calc_metric(y_true, y_pred)
 
-def main(run):
-    {{ user_cfg_str }}
+def main(run, cfg, data):
     device = cfg['device']
-    if not torch.cuda.is_available():
-        device = 'cpu'
     pipeline_cfg = cfg['general_pipeline']
-    save_path = pipeline_cfg['save_path']
 
-    # load data
-    data = AsGraphPredDataset({{data_initialize_code}})
     train_loader = GraphDataLoader(data[data.train_idx], batch_size=pipeline_cfg['train_batch_size'],
                                    shuffle=True, num_workers=pipeline_cfg['num_workers'])
     val_loader = GraphDataLoader(data[data.val_idx], batch_size=pipeline_cfg['eval_batch_size'],
@@ -79,17 +75,6 @@ def main(run):
                                   shuffle=False, num_workers=pipeline_cfg['num_workers'])
 
     # create model
-    model_cfg = cfg["model"]
-    # data[0] is a tuple (g, label)
-    cfg["model"]["data_info"] = {
-        "name": cfg["data_name"],
-        "node_feat_size": data.node_feat_size,
-        "edge_feat_size": data.edge_feat_size,
-        "out_size": data.num_tasks
-    }
-    if cfg["model_name"] == 'pna':
-        in_deg = torch.cat([g.in_degrees() for (g, _) in data[data.train_idx]])
-        cfg["model"]["data_info"]["delta"] = torch.mean(torch.log(in_deg + 1))
     model = {{ model_class_name }}(**cfg["model"])
     model = model.to(device)
 
@@ -100,12 +85,14 @@ def main(run):
         optimizer, **pipeline_cfg["lr_scheduler"])
     best_val_metric = 0.
 
+    tmp_cpt_path = 'checkpoint.pth'
+
     for epoch in range(pipeline_cfg['num_epochs']):
         train(device, train_loader, model, criterion, optimizer)
         val_metric = evaluate(device, val_loader, model)
         if val_metric >= best_val_metric:
             best_val_metric = val_metric
-            torch.save(model.state_dict(), save_path)
+            torch.save(model.state_dict(), tmp_cpt_path)
         print('Run {:d} | Epoch {:d} | Val Metric {:.4f} | Best Val Metric {:.4f}'.format(
               run, epoch, val_metric, best_val_metric))
 
@@ -114,18 +101,42 @@ def main(run):
         else:
             lr_scheduler.step()
 
-    model.load_state_dict(torch.load(save_path))
+    model.load_state_dict(torch.load(tmp_cpt_path))
+    os.remove(tmp_cpt_path)
     test_metric = evaluate(device, test_loader, model)
     print('Test Metric: {:.4f}'.format(test_metric))
+
+    cpt_path = os.path.join(pipeline_cfg["save_path"], 'run_{}.pth'.format(run))
+    torch.save({'cfg': cfg, 'model': model.state_dict()}, cpt_path)
+    print('Saved training checkpoint to {}'.format(cpt_path))
 
     return test_metric
 
 if __name__ == '__main__':
+    {{ user_cfg_str }}
+    if not torch.cuda.is_available():
+        cfg['device'] = 'cpu'
+
+    # load data
+    data = AsGraphPredDataset({{data_initialize_code}})
+
+    cfg["model"]["data_info"] = {
+        "name": cfg["data_name"],
+        "node_feat_size": data.node_feat_size,
+        "edge_feat_size": data.edge_feat_size,
+        "out_size": data.num_tasks
+    }
+    if cfg["model_name"] == 'pna':
+        in_deg = torch.cat([g.in_degrees() for (g, _) in data[data.train_idx]])
+        cfg["model"]["data_info"]["delta"] = torch.mean(torch.log(in_deg + 1))
+
+    os.makedirs(cfg['general_pipeline']["save_path"])
+
     all_run_metrics = []
     num_runs = {{ user_cfg.general_pipeline.num_runs }}
     for run in range(num_runs):
         print('Run experiment {:d}'.format(run))
-        test_metric = main(run)
+        test_metric = main(run, cfg, data)
         all_run_metrics.append(test_metric)
     avg_metric = np.round(np.mean(all_run_metrics), 6)
     std_metric = np.round(np.std(all_run_metrics), 6)

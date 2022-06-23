@@ -54,7 +54,7 @@ if __name__ == '__main__':
     g.edges['listened'].data['created_at'] = torch.LongTensor(events['created_at'].values)
     g.edges['listened-by'].data['created_at'] = torch.LongTensor(events['created_at'].values)
 
-    n_edges = g.number_of_edges('listened')
+    n_edges = g.num_edges('listened')
     train_indices, val_indices, test_indices = train_test_split_by_time(events, 'created_at', 'user_id')
     train_g = build_train_graph(g, train_indices, 'user', 'track', 'listened', 'listened-by')
     assert train_g.out_degrees(etype='listened').min() > 0
