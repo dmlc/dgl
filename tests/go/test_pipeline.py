@@ -60,8 +60,26 @@ def test_linkpred_default_neg_sampler(data, node_model, edge_model):
         data, node_model, edge_model, custom_config_file))
     assert os.path.exists(custom_config_file)
 
+@pytest.mark.parametrize('data', ['csv', 'ogbg-molhiv', 'ogbg-molpcba'])
+@pytest.mark.parametrize('model', ['gin', 'pna'])
+def test_graphpred(data, model):
+    os.system('dgl configure graphpred --data {} --model {}'.format(data, model))
+    assert os.path.exists('graphpred_{}_{}.yaml'.format(data, model))
+
+    custom_config_file = 'custom_{}_{}.yaml'.format(data, model)
+    os.system('dgl configure graphpred --data {} --model {} --cfg {}'.format(data, model,
+                                                                             custom_config_file))
+    assert os.path.exists(custom_config_file)
+
+    custom_script = '_'.join([data, model]) + '.py'
+    os.system('dgl export --cfg {} --output {}'.format(custom_config_file, custom_script))
+    assert os.path.exists(custom_script)
+
 @pytest.mark.parametrize('recipe',
-                         ['linkpred_cora_sage.yaml',
+                         ['graphpred_hiv_gin.yaml',
+                          'graphpred_hiv_pna.yaml',
+                          'graphpred_pcba_gin.yaml',
+                          'linkpred_cora_sage.yaml',
                           'linkpred_citation2_sage.yaml',
                           'linkpred_collab_sage.yaml',
                           'nodepred_citeseer_gat.yaml',
@@ -88,5 +106,13 @@ def test_recipe(recipe):
 def test_node_cora():
     os.system('dgl configure nodepred --data cora --model gcn')
     os.system('dgl train --cfg nodepred_cora_gcn.yaml')
-    assert os.path.exists('checkpoint.pth')
-    assert os.path.exists('model.pth')
+    assert os.path.exists('results')
+    assert os.path.exists('results/run_0.pth')
+    os.system('dgl configure-apply nodepred --cpt results/run_0.pth')
+    assert os.path.exists('apply_nodepred_cora_gcn.yaml')
+    os.system('dgl configure-apply nodepred --data cora --cpt results/run_0.pth --cfg apply.yaml')
+    assert os.path.exists('apply.yaml')
+    os.system('dgl apply --cfg apply.yaml')
+    assert os.path.exists('apply_results/output.csv')
+    os.system('dgl export --cfg apply.yaml --output apply.py')
+    assert os.path.exists('apply.py')

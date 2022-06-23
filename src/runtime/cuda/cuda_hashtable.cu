@@ -6,6 +6,7 @@
 
 #include <cassert>
 
+#include "cuda_common.h"
 #include "cuda_hashtable.cuh"
 #include "../../array/cuda/atomic.cuh"
 #include "../../array/cuda/dgl_cub.cuh"
@@ -416,21 +417,21 @@ void OrderedHashTable<IdType>::FillWithDuplicates(
 
   auto device_table = MutableDeviceOrderedHashTable<IdType>(this);
 
-  generate_hashmap_duplicates<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
+  CUDA_KERNEL_CALL((generate_hashmap_duplicates<IdType, BLOCK_SIZE, TILE_SIZE>),
+      grid, block, 0, stream,
       input,
       num_input,
       device_table);
-  CUDA_CALL(cudaGetLastError());
 
   IdType * item_prefix = static_cast<IdType*>(
       device->AllocWorkspace(ctx_, sizeof(IdType)*(num_input+1)));
 
-  count_hashmap<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
+  CUDA_KERNEL_CALL((count_hashmap<IdType, BLOCK_SIZE, TILE_SIZE>),
+      grid, block, 0, stream,
       input,
       num_input,
       device_table,
       item_prefix);
-  CUDA_CALL(cudaGetLastError());
 
   size_t workspace_bytes;
   CUDA_CALL(cub::DeviceScan::ExclusiveSum(
@@ -449,14 +450,14 @@ void OrderedHashTable<IdType>::FillWithDuplicates(
       grid.x+1, stream));
   device->FreeWorkspace(ctx_, workspace);
 
-  compact_hashmap<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
+  CUDA_KERNEL_CALL((compact_hashmap<IdType, BLOCK_SIZE, TILE_SIZE>),
+      grid, block, 0, stream,
       input,
       num_input,
       device_table,
       item_prefix,
       unique,
       num_unique);
-  CUDA_CALL(cudaGetLastError());
   device->FreeWorkspace(ctx_, item_prefix);
 }
 
@@ -473,11 +474,11 @@ void OrderedHashTable<IdType>::FillWithUnique(
 
   auto device_table = MutableDeviceOrderedHashTable<IdType>(this);
 
-  generate_hashmap_unique<IdType, BLOCK_SIZE, TILE_SIZE><<<grid, block, 0, stream>>>(
+  CUDA_KERNEL_CALL((generate_hashmap_unique<IdType, BLOCK_SIZE, TILE_SIZE>),
+      grid, block, 0, stream,
       input,
       num_input,
       device_table);
-  CUDA_CALL(cudaGetLastError());
 }
 
 template class OrderedHashTable<int32_t>;
