@@ -1,6 +1,6 @@
 /*!
- *  Copyright (c) 2019 by Contributors
- * \file array/cpu/array_index_select_uvm.cu
+ *  Copyright (c) 2019-2022 by Contributors
+ * \file array/cuda/uvm/array_index_select_uvm.cu
  * \brief Array index select GPU implementation
  */
 #include <dgl/array.h>

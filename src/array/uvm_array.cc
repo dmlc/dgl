@@ -1,5 +1,5 @@
 /*!
- *  Copyright (c) 2019 by Contributors
+ *  Copyright (c) 2019-2022 by Contributors
  * \file array/uvm_array.cc
  * \brief DGL array utilities implementation
  */
@@ -26,7 +26,7 @@ NDArray IndexSelectCPUFromGPU(NDArray array, IdArray index) {
     });
   });
 #endif
-  LOG(FATAL) << "IndexSelectCPUFromGPU requires CUDA";
+  LOG(FATAL) << "IndexSelectCPUFromGPU requires CUDA.";
   // Should be unreachable
   return NDArray{};
 }
@@ -38,7 +38,7 @@ void IndexScatterGPUToCPU(NDArray dest, IdArray index, NDArray source) {
   CHECK_EQ(source->ctx.device_type, kDLGPU) << "Source array must be on the GPU.";
   CHECK_EQ(dest->dtype, source->dtype) << "Destination array and source "
       "array must have the same dtype.";
-  CHECK_GE(dest->ndim, 1) << "Destination array must have at least 1 dimension";
+  CHECK_GE(dest->ndim, 1) << "Destination array must have at least 1 dimension.";
   CHECK_EQ(index->ndim, 1) << "Index must be a 1D array.";
 
   ATEN_DTYPE_BITS_ONLY_SWITCH(source->dtype, DType, "values", {
@@ -47,7 +47,7 @@ void IndexScatterGPUToCPU(NDArray dest, IdArray index, NDArray source) {
     });
   });
 #else
-  LOG(FATAL) << "IndexScatterGPUToCPU requires CUDA";
+  LOG(FATAL) << "IndexScatterGPUToCPU requires CUDA.";
 #endif
 }
 
