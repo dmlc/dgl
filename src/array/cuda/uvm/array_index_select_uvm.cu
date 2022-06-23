@@ -86,6 +86,7 @@ void IndexScatterGPUToCPU(NDArray dest, IdArray index, NDArray source) {
 
   CHECK(dest.IsPinned());
   CHECK_EQ(index->ctx.device_type, kDLGPU);
+  CHECK_EQ(source->ctx.device_type, kDLGPU);
 
   for (int d = 1; d < source->ndim; ++d) {
     num_feat *= source->shape[d];
