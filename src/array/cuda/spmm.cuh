@@ -39,8 +39,8 @@ cublasStatus_t Xgeam<__half>(cublasHandle_t handle, cublasOperation_t transa,
     const __half* alpha, const __half* A, int lda,
     const __half* beta, const __half* B, int ldb,
     __half* C, int ldc) {
-  // There is no cublasHgeam, so a different implementation
-  // would be required.
+  // TODO(ndickson): There is no cublasHgeam, so a different
+  // implementation would be required.
   LOG(INFO) << "Xgeam does not support dtype half (FP16)";
   return CUBLAS_STATUS_EXECUTION_FAILED;
 }

@@ -69,8 +69,8 @@ DType IndexSelect(NDArray array, int64_t index) {
   auto device = runtime::DeviceAPI::Get(array->ctx);
 #ifdef USE_FP16
   // The initialization constructor for __half is apparently a device-
-  // only function in some setups, but the current function isn't run
-  // on the device.
+  // only function in some setups, but the current function, IndexSelect,
+  // isn't run on the device, so it doesn't have access to that constructor.
   using SafeDType = typename std::conditional<
       std::is_same<DType, __half>::value, uint16_t, DType>::type;
   SafeDType ret = 0;
