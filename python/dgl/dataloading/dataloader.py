@@ -883,8 +883,8 @@ class DataLoader(torch.utils.data.DataLoader):
                 worker_init_fn_old(worker_id)
 
             ncores = psutil.cpu_count(logical = False)
-            loader_cores = loader_cores or range(0, self.num_workers)
-            compute_cores = compute_cores or range(self.num_workers, ncores)
+            loader_cores = loader_cores or list(range(0, self.num_workers))
+            compute_cores = compute_cores or list(range(self.num_workers, ncores))
 
             if not isinstance(loader_cores, list):
                 raise Exception('ERROR: loader_cores should be a list of cores')
