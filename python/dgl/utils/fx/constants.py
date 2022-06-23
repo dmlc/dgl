@@ -1,0 +1,10 @@
+"""Constants"""
+GET_ATTR = "get_attr"
+CALL_MODULE = "call_module"
+CALL_FUNCTION = "call_function"
+CALL_METHOD = "call_method"
+PLACEHOLDER = "placeholder"
+OUTPUT = "output"
+
+NORMAL_DATA = "NormalData"
+DGL_GRAPH = "DGLGraph"
