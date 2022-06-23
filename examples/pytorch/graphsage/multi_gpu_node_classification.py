@@ -17,10 +17,12 @@ from node_classification import batch_evaluate, evaluate
 def train(rank, world_size, args, graph, devices, data):
     in_feats, num_classes, train_idx, valid_idx, test_idx = data
     device = torch.device(devices[rank])
-    if world_size > 0:
+    use_uva = True
+    if world_size > 0: 
         torch.cuda.set_device(device)
-    else:
+    else:  # no gpu, pure cpu run
         world_size = 1
+        use_uva = False
         
     if world_size > 1:
         dist.init_process_group('nccl', 'tcp://127.0.0.1:12347', world_size=world_size, rank=rank)
@@ -35,7 +37,14 @@ def train(rank, world_size, args, graph, devices, data):
     # move ids to GPU
     train_idx = train_idx.to(device)
     valid_idx = valid_idx.to(device)
-    
+
+    if args.graph_device == 'gpu':
+        graph = graph.to(device)
+        use_uva = False
+    elif args.graph_device == 'uva':
+        graph.pin_memory_()
+
+        
     # For training, each process/GPU will get a subset of the
     # train_idx/valid_idx, and generate mini-batches indepednetly. This allows
     # the only communication neccessary in training to be the all-reduce for
@@ -45,11 +54,11 @@ def train(rank, world_size, args, graph, devices, data):
     train_dataloader = dgl.dataloading.DataLoader(
             graph, train_idx, sampler,
             device=device, batch_size=args.batch_size, shuffle=True, drop_last=False,
-            num_workers=0, use_ddp=world_size > 1, use_uva=True)
+            num_workers=0, use_ddp=world_size > 1, use_uva=use_uva)
     valid_dataloader = dgl.dataloading.DataLoader(
             graph, valid_idx, sampler, device=device, batch_size=args.batch_size, shuffle=True,
             drop_last=False, num_workers=0, use_ddp=world_size > 1,
-            use_uva=True)
+            use_uva=use_uva)
 
     dur = []
 
@@ -103,9 +112,11 @@ if __name__ == '__main__':
                         help="Weight for L2 loss")
     parser.add_argument("--aggregator-type", type=str, default="mean",
                         help="Aggregator type: mean/gcn/pool/lstm")
-    parser.add_argument('--pure-gpu', action='store_true',
-                    help='Perform both sampling and training on GPU.')
+    parser.add_argument('--graph-device', choices=('cpu', 'gpu', 'uva'), default='cpu',
+                           help="Device to perform the sampling. "
+                           "Must have 0 workers for 'gpu' and 'uva'")
     args = parser.parse_args()
+    print(args)
     
     dataset = DglNodePropPredDataset('ogbn-products')
     devices = list(map(int, args.gpu.split(',')))
@@ -133,6 +144,8 @@ if __name__ == '__main__':
     # and 3.86s per epoch with 8 GPUs on p2.8x, compared to 5.2s from official examples.
     import torch.multiprocessing as mp
     if devices[0] == -1:
+        assert args.graph_device == 'cpu', \
+               f"Must have GPUs to enable {args.graph_device} sampling."
         train(0, 0, args, g, ['cpu'], data)
     elif n_gpus == 1:
         train(0, 1, args, g, devices, data)
