@@ -103,7 +103,7 @@ def get_local_usable_addr(probe_addr):
 
 
 def connect_to_server(ip_config, num_servers, max_queue_size=MAX_QUEUE_SIZE,
-                      net_type='tensorpipe', group_id=0):
+                      net_type='socket', group_id=0):
     """Connect this client to server.
 
     Parameters

@@ -61,7 +61,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
     }
 
     def __init__(self, name, raw_dir=None, force_reload=False,
-                 verbose=True, reverse_edge=True, transform=None, 
+                 verbose=True, reverse_edge=True, transform=None,
                  reorder=False):
         assert name.lower() in ['cora', 'citeseer', 'pubmed']
 
@@ -122,8 +122,12 @@ class CitationGraphDataset(DGLBuiltinDataset):
 
         if self.reverse_edge:
             graph = nx.DiGraph(nx.from_dict_of_lists(graph))
+            g = from_networkx(graph)
         else:
             graph = nx.Graph(nx.from_dict_of_lists(graph))
+            edges = list(graph.edges())
+            u, v = map(list, zip(*edges))
+            g = dgl_graph((u, v))
 
         onehot_labels = np.vstack((ally, ty))
         onehot_labels[test_idx_reorder, :] = onehot_labels[test_idx_range, :]
@@ -136,9 +140,6 @@ class CitationGraphDataset(DGLBuiltinDataset):
         train_mask = generate_mask_tensor(_sample_mask(idx_train, labels.shape[0]))
         val_mask = generate_mask_tensor(_sample_mask(idx_val, labels.shape[0]))
         test_mask = generate_mask_tensor(_sample_mask(idx_test, labels.shape[0]))
-
-        self._graph = graph
-        g = from_networkx(graph)
 
         g.ndata['train_mask'] = train_mask
         g.ndata['val_mask'] = val_mask
@@ -204,7 +205,6 @@ class CitationGraphDataset(DGLBuiltinDataset):
         graph.ndata.pop('feat')
         graph.ndata.pop('label')
         graph = to_networkx(graph)
-        self._graph = nx.DiGraph(graph)
 
         self._num_classes = info['num_classes']
         self._g.ndata['train_mask'] = generate_mask_tensor(F.asnumpy(self._g.ndata['train_mask']))
@@ -250,10 +250,6 @@ class CitationGraphDataset(DGLBuiltinDataset):
     """ Citation graph is used in many examples
         We preserve these properties for compatability.
     """
-    @property
-    def graph(self):
-        deprecate_property('dataset.graph', 'dataset[0]')
-        return self._graph
 
     @property
     def train_mask(self):

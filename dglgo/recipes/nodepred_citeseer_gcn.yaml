@@ -1,6 +1,7 @@
 # Accuracy across 10 runs: 0.6852 ± 0.008875
 version: 0.0.1
 pipeline_name: nodepred
+pipeline_mode: train
 device: cuda:0
 data:
   name: citeseer
@@ -24,5 +25,5 @@ general_pipeline:
     lr: 0.01
     weight_decay: 0.0005
   loss: CrossEntropyLoss
-  save_path: "model.pth"
+  save_path: "results"        # Directory to save the experiment results
   num_runs: 10                # Number of experiments to run
