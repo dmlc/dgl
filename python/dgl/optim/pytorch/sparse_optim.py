@@ -5,12 +5,10 @@ import torch as th
 
 from ...utils import get_shared_mem_array, create_shared_mem_array, \
                      pin_memory_inplace, gather_pinned_tensor_rows, \
-                     scatter_pinned_tensor_rows, to_dgl_context
+                     scatter_pinned_tensor_rows
 from ...nn.pytorch import NodeEmbedding
 from ...cuda import nccl
 from ...partition import NDArrayPartition
-from ... import backend as F
-from ... import ndarray
 
 class SparseGradOptimizer(abc.ABC):
     r''' The abstract sparse optimizer.

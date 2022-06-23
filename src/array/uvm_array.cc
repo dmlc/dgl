@@ -16,12 +16,12 @@ namespace aten {
 NDArray IndexSelectCPUFromGPU(NDArray array, IdArray index) {
 #ifdef DGL_USE_CUDA
   CHECK(array.IsPinned())
-    << "Only the CPUPinned device type input array is supported";
+    << "Only the pinned input array is supported";
   CHECK_EQ(index->ctx.device_type, kDLGPU)
     << "Only the GPU device type input index is supported";
 
   CHECK_GE(array->ndim, 1) << "Only support array with at least 1 dimension";
-  CHECK_EQ(index->ndim, 1) << "Index array must be an 1D array.";
+  CHECK_EQ(index->ndim, 1) << "Index array must be a 1D array.";
   ATEN_DTYPE_BITS_ONLY_SWITCH(array->dtype, DType, "values", {
     ATEN_ID_TYPE_SWITCH(index->dtype, IdType, {
       return impl::IndexSelectCPUFromGPU<DType, IdType>(array, index);
@@ -36,14 +36,14 @@ NDArray IndexSelectCPUFromGPU(NDArray array, IdArray index) {
 void IndexScatterGPUToCPU(NDArray dest, IdArray index, NDArray source) {
 #ifdef DGL_USE_CUDA
   CHECK(dest.IsPinned())
-    << "Only the CPUPinned device type destination array is supported";
+    << "Only the pinned destination array is supported";
   CHECK_EQ(index->ctx.device_type, kDLGPU)
     << "Only the GPU device type input index is supported";
 
   CHECK_EQ(dest->dtype, source->dtype) << "Destination array and source "
       "array must have the same types.";
   CHECK_GE(dest->ndim, 1) << "Only support array with at least 1 dimension";
-  CHECK_EQ(index->ndim, 1) << "Index array must be an 1D array.";
+  CHECK_EQ(index->ndim, 1) << "Index array must be a 1D array.";
   ATEN_DTYPE_BITS_ONLY_SWITCH(source->dtype, DType, "values", {
     ATEN_ID_TYPE_SWITCH(index->dtype, IdType, {
       impl::IndexScatterGPUToCPU<DType, IdType>(dest, index, source);
