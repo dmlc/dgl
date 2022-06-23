@@ -9,8 +9,8 @@ import inspect
 import re
 import atexit
 import os
-import psutil
 from contextlib import contextmanager
+import psutil
 
 import numpy as np
 import torch
@@ -851,7 +851,7 @@ class DataLoader(torch.utils.data.DataLoader):
             use_alternate_streams=self.use_alternate_streams, num_threads=num_threads)
 
     @contextmanager
-    def enable_cpu_affinity(self, loader_cores=[], compute_cores=[]):
+    def enable_cpu_affinity(self, loader_cores=None, compute_cores=None):
         """ Helper method for enabling cpu affinity for compute threads and dataloader workers
         Only for CPU devices
 
@@ -866,10 +866,11 @@ class DataLoader(torch.utils.data.DataLoader):
             default: range(0, num_workers)
         """
         if self.device.type == 'cpu':
+            # False positive E0203 (access-member-before-definition) linter warning
+            worker_init_fn_old = self.worker_init_fn # pylint: disable=E0203
             affinity_old = psutil.Process().cpu_affinity()
             nthreads_old = get_num_threads()
-            worker_init_fn_old = self.worker_init_fn
-            
+
             def init_fn(worker_id):
                 try:
                     psutil.Process().cpu_affinity([loader_cores[worker_id]])
@@ -881,6 +882,10 @@ class DataLoader(torch.utils.data.DataLoader):
 
                 worker_init_fn_old(worker_id)
 
+            ncores = psutil.cpu_count(logical = False)
+            loader_cores = loader_cores or range(0, self.num_workers)
+            compute_cores = compute_cores or range(self.num_workers, ncores)
+
             if not isinstance(loader_cores, list):
                 raise Exception('ERROR: loader_cores should be a list of cores')
             if not self.num_workers > 0:
@@ -889,10 +894,6 @@ class DataLoader(torch.utils.data.DataLoader):
                 raise Exception('ERROR: cpu_affinity incorrect '
                                 'settings for loader_cores={} num_workers={}'
                                 .format(loader_cores, self.num_workers))
-
-            ncores = psutil.cpu_count(logical = False)
-            loader_cores = loader_cores or range(0, self.num_workers)
-            compute_cores = compute_cores or range(self.num_workers, ncores)
 
             try:
                 psutil.Process().cpu_affinity(compute_cores)
