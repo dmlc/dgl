@@ -1706,14 +1706,14 @@ def from_cugraph(cugraph_graph):
 
     Create a cugraph graph.
     >>> cugraph_g = cugraph.Graph(directed=True)
-    >>> df = cudf.DataFrame({"source":[0,1,2,4],
-                     "destination":[1,2,4,0]})
+    >>> df = cudf.DataFrame({"source":[0, 1, 2, 3],
+                     "destination":[1, 2, 3, 0]})
     >>> cugraph_g.from_cudf_edgelist(df)
 
     Convert it into a DGLGraph
     >>> g = dgl.from_cugraph(cugraph_g)
     >>> g.edges()
-    (tensor([2, 3, 4, 1], device='cuda:0'), tensor([3, 4, 1, 2], device='cuda:0'))
+    (tensor([1, 2, 3, 0], device='cuda:0'), tensor([2, 3, 0, 1], device='cuda:0'))
     """
     if not cugraph_graph.is_directed():
         cugraph_graph = cugraph_graph.to_directed()
