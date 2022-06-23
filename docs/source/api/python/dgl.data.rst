@@ -52,6 +52,8 @@ Datasets for node classification/regression tasks
     TreeCycleDataset
     TreeGridDataset
     WikiCSDataset
+    FlickrDataset
+    YelpDataset
 
 Edge Prediction Datasets
 ---------------------------------------
