@@ -117,8 +117,8 @@ GraphPtr GraphOp::DisjointUnion(std::vector<GraphPtr> graphs) {
       CHECK(gr) << "All the input graphs should be immutable graphs.";
       // TODO(minjie): why in csr?
       const CSRPtr g_csrptr = gr->GetInCSR();
-      const int64_t g_num_nodes = g_csrptr->NumVertices();
-      const int64_t g_num_edges = g_csrptr->NumEdges();
+      const uint64_t g_num_nodes = g_csrptr->NumVertices();
+      const uint64_t g_num_edges = g_csrptr->NumEdges();
       dgl_id_t* g_indptr = static_cast<dgl_id_t*>(g_csrptr->indptr()->data);
       dgl_id_t* g_indices = static_cast<dgl_id_t*>(g_csrptr->indices()->data);
       dgl_id_t* g_edge_ids = static_cast<dgl_id_t*>(g_csrptr->edge_ids()->data);
@@ -234,11 +234,11 @@ std::vector<GraphPtr> GraphOp::DisjointPartitionBySizes(
         g_indptr[l - start_pos] = indptr[l] - indptr[start_pos];
       }
 
-      for (int j = indptr[start_pos]; j < indptr[end_pos]; ++j) {
+      for (dgl_id_t j = indptr[start_pos]; j < indptr[end_pos]; ++j) {
         g_indices[j - idoff] = indices[j] - cumsum[i];
       }
 
-      for (int k = indptr[start_pos]; k < indptr[end_pos]; ++k) {
+      for (dgl_id_t k = indptr[start_pos]; k < indptr[end_pos]; ++k) {
         g_edge_ids[k - idoff] = edge_ids[k] - cum_sum_edges;
       }
 
@@ -390,7 +390,7 @@ GraphPtr GraphOp::ToBidirectedImmutableGraph(GraphPtr g) {
     }
     for (const dgl_id_t v : nbrs) {
       const auto new_n_e = std::max(n_e[u][v], n_e[v][u]);
-      for (size_t i = 0; i < new_n_e; ++i) {
+      for (int i = 0; i < new_n_e; ++i) {
         srcs.push_back(v);
         dsts.push_back(u);
       }
