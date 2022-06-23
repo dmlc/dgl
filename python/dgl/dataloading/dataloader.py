@@ -851,30 +851,35 @@ class DataLoader(torch.utils.data.DataLoader):
             use_alternate_streams=self.use_alternate_streams, num_threads=num_threads)
 
     @contextmanager
-    def enable_cpu_affinity(self, loader_cores=None, compute_cores=None):
+    def enable_cpu_affinity(self, loader_cores=[], compute_cores=[]):
         """ Helper method for enabling cpu affinity for compute threads and dataloader workers
+        Only for CPU devices
+
+        Parameters
+        ----------
+        loader_cores : [int] (optional)
+            List of cpu cores to which dataloader workers should affinitize to
+            default: range(0, num_workers)
+
+        compute_cores : [int] (optional)
+            List of cpu cores to which compute threads should affinitize to
+            default: range(0, num_workers)
         """
-        affinity_old = psutil.Process().cpu_affinity()
-        nthreads_old = get_num_threads()
-        worker_init_fn_old = self.worker_init_fn
-
-        ncores = psutil.cpu_count(logical = False)
-        compute_affinity = range(self.num_workers, ncores)
-        
-        def init_fn(worker_id):
-            try:
-                psutil.Process().cpu_affinity([loader_cores[worker_id]])
-                print('CPU-affinity worker {} has been assigned to core={}'
-                    .format(worker_id, loader_cores[worker_id]))
-            except:
-                raise Exception('ERROR: cannot use affinity id={} cpu_cores={}'
-                                .format(worker_id, loader_cores))
-
-            worker_init_fn_old(worker_id)
-
         if self.device.type == 'cpu':
-            if loader_cores is None:
-                loader_cores = []
+            affinity_old = psutil.Process().cpu_affinity()
+            nthreads_old = get_num_threads()
+            worker_init_fn_old = self.worker_init_fn
+            
+            def init_fn(worker_id):
+                try:
+                    psutil.Process().cpu_affinity([loader_cores[worker_id]])
+                    print('CPU-affinity worker {} has been assigned to core={}'
+                        .format(worker_id, loader_cores[worker_id]))
+                except:
+                    raise Exception('ERROR: cannot use affinity id={} cpu_cores={}'
+                                    .format(worker_id, loader_cores))
+
+                worker_init_fn_old(worker_id)
 
             if not isinstance(loader_cores, list):
                 raise Exception('ERROR: loader_cores should be a list of cores')
@@ -885,20 +890,21 @@ class DataLoader(torch.utils.data.DataLoader):
                                 'settings for loader_cores={} num_workers={}'
                                 .format(loader_cores, self.num_workers))
 
-            loader_cores = (loader_cores
-                            if len(loader_cores) == self.num_workers
-                            else range(0, self.num_workers))
+            ncores = psutil.cpu_count(logical = False)
+            loader_cores = loader_cores or range(0, self.num_workers)
+            compute_cores = compute_cores or range(self.num_workers, ncores)
 
-            psutil.Process().cpu_affinity(compute_cores)
-            set_num_threads(ncores - self.num_workers)
-            self.worker_init_fn = init_fn
-
-        try:
-            yield affinity_old
-        finally:
-            psutil.Process().cpu_affinity(affinity_old)
-            set_num_threads(nthreads_old)
-            self.worker_init_fn = worker_init_fn_old
+            try:
+                psutil.Process().cpu_affinity(compute_cores)
+                set_num_threads(ncores - self.num_workers)
+                self.worker_init_fn = init_fn
+                yield
+            finally:
+                psutil.Process().cpu_affinity(affinity_old)
+                set_num_threads(nthreads_old)
+                self.worker_init_fn = worker_init_fn_old
+        else:
+            yield
 
     # To allow data other than node/edge data to be prefetched.
     def attach_data(self, name, data):
