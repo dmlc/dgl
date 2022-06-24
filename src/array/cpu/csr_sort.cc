@@ -115,7 +115,7 @@ std::pair<CSRMatrix, NDArray> CSRSortByTag(
 
       for (IdType ptr = start ; ptr < end ; ++ptr) {
         const IdType dst = indices_data[ptr];
-        const TagType tag = tag_data[dst];
+        const TagType tag = tag_data[ptr];
         CHECK_LT(tag, num_tags);
         ++tag_pos_row[tag + 1];
       }  // count
@@ -127,7 +127,7 @@ std::pair<CSRMatrix, NDArray> CSRSortByTag(
       for (IdType ptr = start ; ptr < end ; ++ptr) {
         const IdType dst = indices_data[ptr];
         const IdType eid = eid_data[ptr];
-        const TagType tag = tag_data[dst];
+        const TagType tag = tag_data[ptr];
         const IdType offset = tag_pos_row[tag] + pointer[tag];
         CHECK_LT(offset, tag_pos_row[tag + 1]);
         ++pointer[tag];

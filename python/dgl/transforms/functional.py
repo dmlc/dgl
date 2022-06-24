@@ -2802,7 +2802,7 @@ def as_immutable_graph(hg):
                 '\tdgl.as_immutable_graph will do nothing and can be removed safely in all cases.')
     return hg
 
-def sort_csr_by_tag(g, tag, tag_offset_name='_TAG_OFFSET'):
+def sort_csr_by_tag(g, tag, tag_offset_name='_TAG_OFFSET', tag_type='node'):
     r"""Return a new graph whose CSR matrix is sorted by the given tag.
 
     Sort the internal CSR matrix of the graph so that the adjacency list of each node
@@ -2850,6 +2850,8 @@ def sort_csr_by_tag(g, tag, tag_offset_name='_TAG_OFFSET'):
         Integer tensor of shape :math:`(N,)`, :math:`N` being the number of (destination) nodes.
     tag_offset_name : str
         The name of the node feature to store tag offsets.
+    tag_type : str
+        Tag type which could be `node` or `edge`.
 
     Returns
     -------
@@ -2885,15 +2887,21 @@ def sort_csr_by_tag(g, tag, tag_offset_name='_TAG_OFFSET'):
     """
     if len(g.etypes) > 1:
         raise DGLError("Only support homograph and bipartite graph")
+    assert tag_type in ['node', 'edge'], "tag_type should be either 'node' or 'edge'."
+    if tag_type == 'node':
+        _, dst = g.adj(scipy_fmt='csr').nonzero()
+        tag = tag[dst]
+    assert len(tag) == g.num_edges()
     num_tags = int(F.asnumpy(F.max(tag, 0))) + 1
     tag_arr = F.zerocopy_to_dgl_ndarray(tag)
     new_g = g.clone()
     new_g._graph, tag_pos_arr = _CAPI_DGLHeteroSortOutEdges(g._graph, tag_arr, num_tags)
-    new_g.srcdata[tag_offset_name] = F.from_dgl_nd(tag_pos_arr)
+    if tag_type == 'node':
+        new_g.srcdata[tag_offset_name] = F.from_dgl_nd(tag_pos_arr)
     return new_g
 
 
-def sort_csc_by_tag(g, tag, tag_offset_name='_TAG_OFFSET'):
+def sort_csc_by_tag(g, tag, tag_offset_name='_TAG_OFFSET', tag_type='node'):
     r"""Return a new graph whose CSC matrix is sorted by the given tag.
 
     Sort the internal CSC matrix of the graph so that the adjacency list of each node
@@ -2942,6 +2950,8 @@ def sort_csc_by_tag(g, tag, tag_offset_name='_TAG_OFFSET'):
         Integer tensor of shape :math:`(N,)`, :math:`N` being the number of (source) nodes.
     tag_offset_name : str
         The name of the node feature to store tag offsets.
+    tag_type : str
+        Tag type which could be `node` or `edge`.
 
     Returns
     -------
@@ -2977,11 +2987,17 @@ def sort_csc_by_tag(g, tag, tag_offset_name='_TAG_OFFSET'):
     """
     if len(g.etypes) > 1:
         raise DGLError("Only support homograph and bipartite graph")
+    assert tag_type in ['node', 'edge'], "tag_type should be either 'node' or 'edge'."
+    if tag_type == 'node':
+        _, src = g.adj(scipy_fmt='csr', transpose=True).nonzero()
+        tag = tag[src]
+    assert len(tag) == g.num_edges()
     num_tags = int(F.asnumpy(F.max(tag, 0))) + 1
     tag_arr = F.zerocopy_to_dgl_ndarray(tag)
     new_g = g.clone()
     new_g._graph, tag_pos_arr = _CAPI_DGLHeteroSortInEdges(g._graph, tag_arr, num_tags)
-    new_g.dstdata[tag_offset_name] = F.from_dgl_nd(tag_pos_arr)
+    if tag_type == 'node':
+        new_g.dstdata[tag_offset_name] = F.from_dgl_nd(tag_pos_arr)
     return new_g
 
 
