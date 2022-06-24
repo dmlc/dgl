@@ -1,14 +1,14 @@
 """Degree balanced dataloader."""
-# pylint: disable=bad-super-call, no-value-for-parameter
+# pylint: disable=bad-super-call
 from typing import Generic
 import functools
 
 import numpy as np
 import dgl
-from .dataloader import _TensorizedDatasetIter
+from ..dataloading.dataloader import _TensorizedDatasetIter, DataLoader, TensorizedDataset
 
 
-class DegreeBalancedDataloader(dgl.dataloading.DataLoader):
+class DegreeBalancedDataloader(DataLoader):
     """Dataloader class that balances the degrees of each node minibatch.
 
     Instead of having a fixed number of seed nodes in each mini-batch, this dataloader
@@ -27,42 +27,39 @@ class DegreeBalancedDataloader(dgl.dataloading.DataLoader):
         Maximum number of nodes in a batch.
     max_edge : int
         Maximum number of edges in a batch.
-    prefix_sum_in_degrees : Tensor
-        Prefix sum array for graph in degrees. Predefined this item can accelarate
-        calculation when multiple dataloader are created.
     **kwargs : keyword arguments
         Other keyword arguments passed to :class:`~dgl.dataloading.DataLoader`.
 
     Examples
     ---------
-    To use LimitedEdgeDataloader on RedditDataset:
+    To use DegreeBalancedDataloader on RedditDataset:
 
     >>> import torch
     >>> import dgl
-    >>> from dgl.dataloading.limited_edge import LimitedEdgeDataloader
+    >>> from dgl.dataloading.degree_balanced import DegreeBalancedDataloader
     >>> from dgl.data import RedditDataset
 
     >>> data = RedditDataset(self_loop=True)
     >>> g = data[0].to("cuda")
     >>> nids = torch.arange(g.number_of_nodes()).to(g.device)
     >>> sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
-    >>> dataloader = LimitedEdgeDataloader(
+    >>> dataloader = DegreeBalancedDataloader(
     ...     g, nids, sampler, max_node=5000, max_edge=500000,
-    ...     shuffle=False, drop_last=False, device="cuda", num_workers=0)
+    ...     shuffle=False, device="cuda", num_workers=0)
     >>> for input_nodes, output_nodes, blocks in dataloader:
     ...     print(blocks)
     """
-    def __init__(self, g, nids, sampler, max_node, max_edge, prefix_sum_in_degrees=None, \
-        device='cpu', shuffle=False, use_uva=False, drop_last=False, num_workers=0):
+    def __init__(self, g, nids, sampler, max_node, max_edge, \
+        device='cpu', shuffle=False, use_uva=False, num_workers=0):
 
-        dataset = DegreeBalancedDataset(max_node, max_edge, g, nids, prefix_sum_in_degrees)
+        dataset = DegreeBalancedDataset(max_node, max_edge, g, nids, shuffle)
         super().__init__(g,
                          dataset,
                          sampler,
                          device=device,
                          use_uva=use_uva,
                          shuffle=shuffle,
-                         drop_last=drop_last,
+                         drop_last=False,
                          use_prefetch_thread=False,
                          num_workers=num_workers)
 
@@ -105,10 +102,10 @@ class DegreeBalancedDataloader(dgl.dataloading.DataLoader):
         super(Generic, self).__setattr__(__name, __value)
 
 
-class DegreeBalancedDataset(dgl.dataloading.TensorizedDataset):
+class DegreeBalancedDataset(TensorizedDataset):
     """Degree balanced tensorized dataset extended from dgl.dataloading."""
-    def __init__(self, max_node, max_edge, g, train_nids, prefix_sum_in_degrees=None):
-        super().__init__(train_nids, max_node, False)
+    def __init__(self, max_node, max_edge, g, train_nids, shuffle):
+        super().__init__(train_nids, max_node, drop_last=False, shuffle=shuffle)
         self.device = train_nids.device
         self.max_node = max_node
         self.max_edge = max_edge
@@ -116,18 +113,14 @@ class DegreeBalancedDataset(dgl.dataloading.TensorizedDataset):
         # TODO: support multi processing
         id_tensor = self._id_tensor[train_nids.to(self._device)]
 
-        self.prefix_sum_in_degrees = prefix_sum_in_degrees
         # Compute the prefix sum in degrees for the graph.
-        if self.prefix_sum_in_degrees is None:
-            in_degrees = g.in_degrees(train_nids.to(g.device)).cpu()
-            prefix_sum_in_degrees = np.cumsum(in_degrees)
-            self.prefix_sum_in_degrees = [0]
-            self.prefix_sum_in_degrees.extend(prefix_sum_in_degrees.tolist())
-            self.prefix_sum_in_degrees.append(2e18)
+        in_degrees = g.in_degrees(train_nids.to(g.device)).cpu()
+        prefix_sum_in_degrees = [0]
+        prefix_sum_in_degrees.extend(np.cumsum(in_degrees).tolist())
+        prefix_sum_in_degrees.append(2e18)
 
-        self.curr_iter = DegreeBalancedDatasetIter(
-            id_tensor, self.max_node, self.max_edge, self.prefix_sum_in_degrees,
-            self.drop_last, self._mapping_keys)
+        self.curr_iter = DegreeBalancedDatasetIter(id_tensor, self.max_node, self.max_edge,
+            prefix_sum_in_degrees, self._mapping_keys, self.shuffle)
 
     def __getattr__(self, attribute_name):
         if attribute_name in DegreeBalancedDataset.functions:
@@ -142,8 +135,8 @@ class DegreeBalancedDataset(dgl.dataloading.TensorizedDataset):
 
 class DegreeBalancedDatasetIter(_TensorizedDatasetIter):
     """Degree balanced tensorized datasetIter."""
-    def __init__(self, dataset, max_node, max_edge, prefix_sum_in_degrees, drop_last, mapping_keys):
-        super().__init__(dataset, max_node, drop_last, mapping_keys)
+    def __init__(self, dataset, max_node, max_edge, prefix_sum_in_degrees, mapping_keys, shuffle):
+        super().__init__(dataset, max_node, False, mapping_keys, shuffle)
         self.max_node = max_node
         self.max_edge = max_edge
         self.prefix_sum_in_degrees = prefix_sum_in_degrees
@@ -151,17 +144,16 @@ class DegreeBalancedDatasetIter(_TensorizedDatasetIter):
 
     def get_end_idx(self):
         """Get end index by binary search."""
-        # binary search
         binary_start = self.index + 1
         binary_end = min(self.index + self.max_node, self.num_item)
         if self.prefix_sum_in_degrees[binary_end] - self.prefix_sum_in_degrees[self.index] \
-            < self.max_edge:
+            <= self.max_edge:
             return binary_end
         binary_middle = 0
         while binary_end - binary_start > 1:
             binary_middle = (binary_start + binary_end) // 2
             if self.prefix_sum_in_degrees[binary_middle] - self.prefix_sum_in_degrees[self.index] \
-                < self.max_edge:
+                <= self.max_edge:
                 binary_start = binary_middle
             else:
                 binary_end = binary_middle - 1
