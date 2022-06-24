@@ -1,4 +1,4 @@
-"""Limited edge dataloader."""
+"""Degree balanced dataloader."""
 # pylint: disable=bad-super-call, no-value-for-parameter
 from typing import Generic
 import functools
@@ -106,7 +106,7 @@ class DegreeBalancedDataloader(dgl.dataloading.DataLoader):
 
 
 class DegreeBalancedDataset(dgl.dataloading.TensorizedDataset):
-    """Limited edge tensorized dataset extended from dgl.dataloading."""
+    """Degree balanced tensorized dataset extended from dgl.dataloading."""
     def __init__(self, max_node, max_edge, g, train_nids, prefix_sum_in_degrees=None):
         super().__init__(train_nids, max_node, False)
         self.device = train_nids.device
@@ -141,7 +141,7 @@ class DegreeBalancedDataset(dgl.dataloading.TensorizedDataset):
 
 
 class DegreeBalancedDatasetIter(_TensorizedDatasetIter):
-    """Limited edge tensorized datasetIter."""
+    """Degree balanced tensorized datasetIter."""
     def __init__(self, dataset, max_node, max_edge, prefix_sum_in_degrees, drop_last, mapping_keys):
         super().__init__(dataset, max_node, drop_last, mapping_keys)
         self.max_node = max_node
