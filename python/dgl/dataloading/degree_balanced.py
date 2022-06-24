@@ -28,7 +28,7 @@ class DegreeBalancedDataloader(dgl.dataloading.DataLoader):
     max_edge : int
         Maximum number of edges in a batch.
     prefix_sum_in_degrees : Tensor
-        Prefix sum array for graph in degrees. Predefined this item can accelarate 
+        Prefix sum array for graph in degrees. Predefined this item can accelarate
         calculation when multiple dataloader are created.
     **kwargs : keyword arguments
         Other keyword arguments passed to :class:`~dgl.dataloading.DataLoader`.
@@ -68,7 +68,7 @@ class DegreeBalancedDataloader(dgl.dataloading.DataLoader):
 
     def modify_max_edge(self, max_edge):
         """Modify maximum edges.
-        
+
         Parameters
         ----------
         max_edge : int
@@ -80,7 +80,7 @@ class DegreeBalancedDataloader(dgl.dataloading.DataLoader):
 
     def modify_max_node(self, max_node):
         """Modify maximum nodes.
-        
+
         Parameters
         ----------
         max_node : int
@@ -92,7 +92,7 @@ class DegreeBalancedDataloader(dgl.dataloading.DataLoader):
 
     def reset_batch_node(self, node_count):
         """Reset batch node.
-        
+
         Parameters
         ----------
         node_count : int
