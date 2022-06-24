@@ -2990,7 +2990,7 @@ def sort_csc_by_tag(g, tag, tag_offset_name='_TAG_OFFSET', tag_type='node'):
     assert tag_type in ['node', 'edge'], "tag_type should be either 'node' or 'edge'."
     if tag_type == 'node':
         _, src = g.adj(scipy_fmt='csr', transpose=True).nonzero()
-        tag = tag[src]
+        tag = F.gather_row(tag, F.tensor(src))
     assert len(tag) == g.num_edges()
     num_tags = int(F.asnumpy(F.max(tag, 0))) + 1
     tag_arr = F.zerocopy_to_dgl_ndarray(tag)
