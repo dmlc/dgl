@@ -1,9 +1,10 @@
-import torch
 import dgl
-import pytest
-from dgl.dataloading import DegreeBalancedDataloader
+import pytest, unittest
+from dgl.dataloading.degree_balanced import DegreeBalancedDataloader
 
+@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
 def test_degree_balanced_dataloader():
+    import torch
     g = dgl.graph(([1, 2, 3, 4, 0, 3, 0, 3, 0, 0, 0, 0], [0, 0, 0, 0, 1, 1, 2, 2, 3, 4, 5, 6]))
     nids = torch.arange(g.number_of_nodes())
     sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
