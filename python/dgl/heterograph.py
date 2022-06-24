@@ -5545,11 +5545,10 @@ class DGLHeteroGraph(object):
         >>> g.in_degrees()
         tensor([0, 1, 1])
         """
-        if self._graph.is_pinned():
-            return self
-        if F.device_type(self.device) != 'cpu':
-            raise DGLError("The graph structure must be on CPU to be pinned.")
-        self._graph.pin_memory_()
+        if not self._graph.is_pinned():
+            if F.device_type(self.device) != 'cpu':
+                raise DGLError("The graph structure must be on CPU to be pinned.")
+            self._graph.pin_memory_()
         for frame in itertools.chain(self._node_frames, self._edge_frames):
             for col in frame._columns.values():
                 col.pin_memory_()
@@ -5567,9 +5566,8 @@ class DGLHeteroGraph(object):
         DGLGraph
             The unpinned graph.
         """
-        if not self._graph.is_pinned():
-            return self
-        self._graph.unpin_memory_()
+        if self._graph.is_pinned():
+            self._graph.unpin_memory_()
         for frame in itertools.chain(self._node_frames, self._edge_frames):
             for col in frame._columns.values():
                 col.unpin_memory_()

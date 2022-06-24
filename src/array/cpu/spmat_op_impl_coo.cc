@@ -308,7 +308,6 @@ template <class IdType> CSRMatrix SortedCOOToCSR(const COOMatrix &coo) {
   const int64_t N = coo.num_rows;
   const int64_t NNZ = coo.row->shape[0];
   const IdType *const row_data = static_cast<IdType *>(coo.row->data);
-  const IdType *const col_data = static_cast<IdType *>(coo.col->data);
   const IdType *const data =
       COOHasData(coo) ? static_cast<IdType *>(coo.data->data) : nullptr;
 

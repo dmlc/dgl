@@ -265,6 +265,23 @@ class PipelineFactory:
             "PipelineName", {k: k for k, v in cls.registry.items()})
         return enum_class
 
+class ApplyPipelineFactory:
+    """The factory class for creating executors for inference"""
+
+    registry: Dict[str, PipelineBase] = {}
+    """ Internal registry for available executors """
+
+    @classmethod
+    def register(cls, name: str) -> Callable:
+
+        def inner_wrapper(wrapped_class) -> Callable:
+            if name in cls.registry:
+                logger.warning(
+                    'Executor %s already exists. Will replace it', name)
+            cls.registry[name] = wrapped_class()
+            return wrapped_class
+
+        return inner_wrapper
 
 model_dir = Path(__file__).parent.parent / "model"
 
