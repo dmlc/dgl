@@ -135,7 +135,7 @@ edge_split = dataset.get_edge_split()
 model = SAGE(graph.ndata['feat'].shape[1], 256).to(device)
 opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
 
-sampler = dgl.dataloading.NeighborSampler([15, 10, 5], prefetch_node_feats=['feat'])
+sampler = dgl.dataloading.NeighborSampler([5, 10, 15], prefetch_node_feats=['feat'])
 sampler = dgl.dataloading.as_edge_prediction_sampler(
         sampler, exclude='reverse_id', reverse_eids=reverse_eids,
         negative_sampler=dgl.dataloading.negative_sampler.Uniform(1))

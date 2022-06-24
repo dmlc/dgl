@@ -33,8 +33,8 @@ python3 train_full.py --dataset cora --gpu 0    # full graph
 Train w/ mini-batch sampling for node classification on OGB-products:
 
 ```bash
-python3 node_classification.py
-python3 multi_gpu_node_classification.py
+python3 node_classification.py --gpu 0 --pure-gpu
+python3 multi_gpu_node_classification.py --gpu 0,1,2,3 --graph-device uva
 ```
 
 ### PyTorch Lightning for node classification
