@@ -1647,7 +1647,7 @@ def to_cugraph(g):
     >>> import cugraph
     >>> import torch
 
-    >>> g = dgl.graph((torch.tensor([1, 2]), torch.tensor([1, 3])))
+    >>> g = dgl.graph((torch.tensor([1, 2]), torch.tensor([1, 3]))).to('cuda')
     >>> cugraph_g = g.to_cugraph()
     >>> cugraph_g.edges()
         src  dst
@@ -1656,7 +1656,8 @@ def to_cugraph(g):
     """
 
     if g.device.type != 'cuda':
-        raise DGLError(f"Cannot convert a {g.device.type} graph to cugraph. Call g.to('cuda') first.")
+        raise DGLError(f"Cannot convert a {g.device.type} graph to cugraph." +
+                        "Call g.to('cuda') first.")
     if not g.is_homogeneous:
         raise DGLError("dgl.to_cugraph only supports homogeneous graphs.")
 
