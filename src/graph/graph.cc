@@ -536,7 +536,7 @@ Subgraph Graph::EdgeSubgraph(IdArray eids, bool preserve_nodes) const {
       rst.graph->AddEdge(src_id, dst_id);
     }
 
-    for (int64_t i = 0; i < NumVertices(); ++i)
+    for (uint64_t i = 0; i < NumVertices(); ++i)
       nodes.push_back(i);
 
     rst.induced_vertices = IdArray::Empty(
