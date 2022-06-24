@@ -184,12 +184,7 @@ class Column(TensorStorage):
     """
     def __init__(self, storage, scheme=None, index=None, device=None, deferred_dtype=None):
         super().__init__(storage)
-        self.scheme = scheme if scheme else infer_scheme(storage)
-        self.index = index
-        self.device = device
-        self.deferred_dtype = deferred_dtype
-        self.pinned_by_dgl = False
-        self._data_nd = None
+        self._init(scheme, index, device, deferred_dtype)
 
     def __len__(self):
         """The number of features (number of rows) in this column."""
@@ -432,6 +427,28 @@ class Column(TensorStorage):
         if self.storage is not None:
             _ = self.data               # evaluate feature slicing
         return self.__dict__
+
+    def __setstate__(self, state):
+        self.__dict__ = state
+        # __getstate__ called data(), so there shouldn't be any deferred device
+        # transfer, indexing, or type conversion, but to be able to load old
+        # data that might not have these data members at all, they need to be
+        # initialized to None, else code trying to check if they're None will
+        # fail.  pinned_by_dgl and _data_nd have a similar problem, except
+        # that the memory won't be pinned upon loading, regardless of whether
+        # it was when saving.
+        # TODO(ndickson): It would be more robust if there were a cohesive,
+        # comprehensive strategy for data file format compatibility, instead
+        # of relying on serialization.
+        self._init(self.scheme if hasattr(self, 'scheme') else None)
+
+    def _init(self, scheme=None, index=None, device=None, deferred_dtype=None):
+        self.scheme = scheme if scheme else infer_scheme(self.storage)
+        self.index = index
+        self.device = device
+        self.deferred_dtype = deferred_dtype
+        self.pinned_by_dgl = False
+        self._data_nd = None
 
     def __copy__(self):
         return self.clone()
