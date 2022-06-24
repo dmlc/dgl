@@ -3,6 +3,7 @@
 from typing import Generic
 import functools
 
+import torch
 import numpy as np
 from ..dataloading.dataloader import _TensorizedDatasetIter, DataLoader, TensorizedDataset
 
@@ -108,18 +109,24 @@ class DegreeBalancedDataset(TensorizedDataset):
         self.device = train_nids.device
         self.max_node = max_node
         self.max_edge = max_edge
-        # move __iter__ to here
+
+        # We change the shuffle stretegy here. Since we need to compute the prefix sum of
+        # in degrees array.
+        self._indices = torch.arange(train_nids.shape[0], dtype=torch.int64).share_memory_()
+        if shuffle:
+            np.random.shuffle(self._indices.numpy())
+        # move __iter__ to here.
         # TODO: support multi processing
-        id_tensor = self._id_tensor[train_nids.to(self._device)]
+        id_tensor = self._id_tensor[self._indices.to(self._device)]
 
         # Compute the prefix sum in degrees for the graph.
-        in_degrees = g.in_degrees(train_nids.to(g.device)).cpu()
+        in_degrees = g.in_degrees(id_tensor.to(g.device)).cpu()
         prefix_sum_in_degrees = [0]
         prefix_sum_in_degrees.extend(np.cumsum(in_degrees).tolist())
         prefix_sum_in_degrees.append(2e18)
 
         self.curr_iter = DegreeBalancedDatasetIter(id_tensor, self.max_node, self.max_edge,
-            prefix_sum_in_degrees, self._mapping_keys, self.shuffle)
+            prefix_sum_in_degrees, self._mapping_keys, shuffle=False)
 
     def __getattr__(self, attribute_name):
         if attribute_name in DegreeBalancedDataset.functions:
@@ -128,14 +135,19 @@ class DegreeBalancedDataset(TensorizedDataset):
         else:
             return super(Generic, self).__getattr__(attribute_name)
 
+    def shuffle(self):
+        """We use another shuffle stretegy here."""
+        pass
+
     def __iter__(self):
         return self.curr_iter
 
 
 class DegreeBalancedDatasetIter(_TensorizedDatasetIter):
     """Degree balanced tensorized datasetIter."""
-    def __init__(self, dataset, max_node, max_edge, prefix_sum_in_degrees, mapping_keys, shuffle):
-        super().__init__(dataset, max_node, False, mapping_keys, shuffle)
+    def __init__(self, dataset, max_node, max_edge, prefix_sum_in_degrees, mapping_keys):
+        super().__init__(dataset, max_node,
+            drop_last=False, mapping_keys=mapping_keys, shuffle=False)
         self.max_node = max_node
         self.max_edge = max_edge
         self.prefix_sum_in_degrees = prefix_sum_in_degrees
