@@ -11,7 +11,6 @@ def test_degree_balanced_dataloader():
         g, nids, sampler, max_node=4, max_edge=4,
         shuffle=False, device="cpu", num_workers=0)
     for input_nodes, output_nodes, blocks in dataloader:
-        print(blocks)
         assert(blocks[0].num_dst_nodes() <= 4)
         assert(blocks[0].num_edges() <= 4)
 

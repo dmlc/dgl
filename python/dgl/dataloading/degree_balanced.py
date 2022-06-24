@@ -4,7 +4,6 @@ from typing import Generic
 import functools
 
 import numpy as np
-import dgl
 from ..dataloading.dataloader import _TensorizedDatasetIter, DataLoader, TensorizedDataset
 
 
