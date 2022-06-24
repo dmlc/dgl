@@ -5,23 +5,57 @@ import functools
 
 import numpy as np
 import dgl
-from dgl.dataloading.dataloader import _TensorizedDatasetIter
+from .dataloader import _TensorizedDatasetIter
 
 
-class LimitedEdgeDataloader(dgl.dataloading.NodeDataLoader):
-    """Limited Edge Dataloader class.
+class DegreeBalancedDataloader(dgl.dataloading.DataLoader):
+    """Dataloader class that balances the degrees of each node minibatch.
 
-    For the normal dataloader, each batch have a same batch size, which may cause the workload
-    unbanlance problem when some batches contains high degree nodes. The limited edge dataloader
-    can support different batch sizes among different batches. Users can parse two configures:
-    max_node and max_edge, which means the maximum number of nodes in a batch and the maximum
-    number of edges in a batch. The limited edge dataloader can provide the largest batch which
-    follows the rule.
+    Instead of having a fixed number of seed nodes in each mini-batch, this dataloader
+    tries to balance the total node degrees of each mini-batch, which is useful when
+    node degree variance is causing unbalanced mini-batch workloads.
+
+    Parameters
+    ----------
+    g : DGLGraph
+    The input graph to sample from.
+    nids : Tensor of dict[str, Tensor]
+        Seed node IDs.
+    sampler : dgl.dataloading.Sampler
+        The subgraph sampler.
+    max_node : int
+        Maximum number of nodes in a batch.
+    max_edge : int
+        Maximum number of edges in a batch.
+    prefix_sum_in_degrees : Tensor
+        Prefix sum array for graph in degrees. Predefined this item can accelarate 
+        calculation when multiple dataloader are created.
+    **kwargs : keyword arguments
+        Other keyword arguments passed to :class:`~dgl.dataloading.DataLoader`.
+
+    Examples
+    ---------
+    To use LimitedEdgeDataloader on RedditDataset:
+
+    >>> import torch
+    >>> import dgl
+    >>> from dgl.dataloading.limited_edge import LimitedEdgeDataloader
+    >>> from dgl.data import RedditDataset
+
+    >>> data = RedditDataset(self_loop=True)
+    >>> g = data[0].to("cuda")
+    >>> nids = torch.arange(g.number_of_nodes()).to(g.device)
+    >>> sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
+    >>> dataloader = LimitedEdgeDataloader(
+    ...     g, nids, sampler, max_node=5000, max_edge=500000,
+    ...     shuffle=False, drop_last=False, device="cuda", num_workers=0)
+    >>> for input_nodes, output_nodes, blocks in dataloader:
+    ...     print(blocks)
     """
     def __init__(self, g, nids, sampler, max_node, max_edge, prefix_sum_in_degrees=None, \
         device='cpu', shuffle=False, use_uva=False, drop_last=False, num_workers=0):
 
-        dataset = LimitedEdgeDataset(max_node, max_edge, g, nids, prefix_sum_in_degrees)
+        dataset = DegreeBalancedDataset(max_node, max_edge, g, nids, prefix_sum_in_degrees)
         super().__init__(g,
                          dataset,
                          sampler,
@@ -33,19 +67,37 @@ class LimitedEdgeDataloader(dgl.dataloading.NodeDataLoader):
                          num_workers=num_workers)
 
     def modify_max_edge(self, max_edge):
-        """Modify maximum edges."""
+        """Modify maximum edges.
+        
+        Parameters
+        ----------
+        max_edge : int
+            The modified maximum number of edges.
+        """
         self.dataset.max_edge = max_edge
         if self.dataset.curr_iter is not None:
             self.dataset.curr_iter.max_edge = max_edge
 
     def modify_max_node(self, max_node):
-        """Modify maximum nodes."""
+        """Modify maximum nodes.
+        
+        Parameters
+        ----------
+        max_node : int
+            The modified maximum number of nodes.
+        """
         self.dataset.max_node = max_node
         if self.dataset.curr_iter is not None:
             self.dataset.curr_iter.max_node = max_node
 
     def reset_batch_node(self, node_count):
-        """Reset batch node."""
+        """Reset batch node.
+        
+        Parameters
+        ----------
+        node_count : int
+            The number of nodes to be rollback.
+        """
         if self.dataset.curr_iter is not None:
             self.dataset.curr_iter.index -= node_count
 
@@ -53,7 +105,7 @@ class LimitedEdgeDataloader(dgl.dataloading.NodeDataLoader):
         super(Generic, self).__setattr__(__name, __value)
 
 
-class LimitedEdgeDataset(dgl.dataloading.TensorizedDataset):
+class DegreeBalancedDataset(dgl.dataloading.TensorizedDataset):
     """Limited edge tensorized dataset extended from dgl.dataloading."""
     def __init__(self, max_node, max_edge, g, train_nids, prefix_sum_in_degrees=None):
         super().__init__(train_nids, max_node, False)
@@ -73,13 +125,13 @@ class LimitedEdgeDataset(dgl.dataloading.TensorizedDataset):
             self.prefix_sum_in_degrees.extend(prefix_sum_in_degrees.tolist())
             self.prefix_sum_in_degrees.append(2e18)
 
-        self.curr_iter = LimitedEdgeDatasetIter(
+        self.curr_iter = DegreeBalancedDatasetIter(
             id_tensor, self.max_node, self.max_edge, self.prefix_sum_in_degrees,
             self.drop_last, self._mapping_keys)
 
     def __getattr__(self, attribute_name):
-        if attribute_name in LimitedEdgeDataset.functions:
-            function = functools.partial(LimitedEdgeDataset.functions[attribute_name], self)
+        if attribute_name in DegreeBalancedDataset.functions:
+            function = functools.partial(DegreeBalancedDataset.functions[attribute_name], self)
             return function
         else:
             return super(Generic, self).__getattr__(attribute_name)
@@ -88,7 +140,7 @@ class LimitedEdgeDataset(dgl.dataloading.TensorizedDataset):
         return self.curr_iter
 
 
-class LimitedEdgeDatasetIter(_TensorizedDatasetIter):
+class DegreeBalancedDatasetIter(_TensorizedDatasetIter):
     """Limited edge tensorized datasetIter."""
     def __init__(self, dataset, max_node, max_edge, prefix_sum_in_degrees, drop_last, mapping_keys):
         super().__init__(dataset, max_node, drop_last, mapping_keys)
