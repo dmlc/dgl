@@ -36,44 +36,19 @@ def _init_input_modules(g, ntype, textset, hidden_dims):
             module_dict[column] = m
 
     if textset is not None:
-        for column, field in textset.fields.items():
-            if field.vocab.vectors:
-                module_dict[column] = BagOfWordsPretrained(field, hidden_dims)
-            else:
-                module_dict[column] = BagOfWords(field, hidden_dims)
+        for column, field in textset.items():
+            textlist, vocab, pad_var, batch_first = field            
+            module_dict[column] = BagOfWords(vocab, hidden_dims)
 
     return module_dict
 
-class BagOfWordsPretrained(nn.Module):
-    def __init__(self, field, hidden_dims):
-        super().__init__()
-
-        input_dims = field.vocab.vectors.shape[1]
-        self.emb = nn.Embedding(
-            len(field.vocab.itos), input_dims,
-            padding_idx=field.vocab.stoi[field.pad_token])
-        self.emb.weight[:] = field.vocab.vectors
-        self.proj = nn.Linear(input_dims, hidden_dims)
-        nn.init.xavier_uniform_(self.proj.weight)
-        nn.init.constant_(self.proj.bias, 0)
-
-        disable_grad(self.emb)
-
-    def forward(self, x, length):
-        """
-        x: (batch_size, max_length) LongTensor
-        length: (batch_size,) LongTensor
-        """
-        x = self.emb(x).sum(1) / length.unsqueeze(1).float()
-        return self.proj(x)
-
 class BagOfWords(nn.Module):
-    def __init__(self, field, hidden_dims):
+    def __init__(self, vocab, hidden_dims):
         super().__init__()
 
         self.emb = nn.Embedding(
-            len(field.vocab.itos), hidden_dims,
-            padding_idx=field.vocab.stoi[field.pad_token])
+            len(vocab.get_itos()), hidden_dims,
+            padding_idx=vocab.get_stoi()['<pad>'])
         nn.init.xavier_uniform_(self.emb.weight)
 
     def forward(self, x, length):
@@ -98,7 +73,7 @@ class LinearProjector(nn.Module):
                 continue
 
             module = self.inputs[feature]
-            if isinstance(module, (BagOfWords, BagOfWordsPretrained)):
+            if isinstance(module, BagOfWords):
                 # Textual feature; find the length and pass it to the textual module.
                 length = ndata[feature + '__len']
                 result = module(data, length)
@@ -162,7 +137,7 @@ class SAGENet(nn.Module):
 
     def forward(self, blocks, h):
         for layer, block in zip(self.convs, blocks):
-            h_dst = h[:block.number_of_nodes('DST/' + block.ntypes[0])]
+            h_dst = h[:block.num_nodes('DST/' + block.ntypes[0])]
             h = layer(block, (h, h_dst), block.edata['weights'])
         return h
 
@@ -170,7 +145,7 @@ class ItemToItemScorer(nn.Module):
     def __init__(self, full_graph, ntype):
         super().__init__()
 
-        n_nodes = full_graph.number_of_nodes(ntype)
+        n_nodes = full_graph.num_nodes(ntype)
         self.bias = nn.Parameter(torch.zeros(n_nodes, 1))
 
     def _add_bias(self, edges):
