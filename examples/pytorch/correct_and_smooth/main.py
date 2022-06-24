@@ -78,9 +78,8 @@ def main():
                               autoscale=args.autoscale,
                               scale=args.scale)
         
-        mask_idx = torch.cat([train_idx, valid_idx])
-        y_soft = cs.correct(g, y_soft, labels[mask_idx], mask_idx)
-        y_soft = cs.smooth(g, y_soft, labels[mask_idx], mask_idx)
+        y_soft = cs.correct(g, y_soft, labels[train_idx], train_idx)
+        y_soft = cs.smooth(g, y_soft, labels[train_idx], train_idx)
         y_pred = y_soft.argmax(dim=-1, keepdim=True)
         valid_acc = evaluate(y_pred, labels, valid_idx, evaluator)
         test_acc = evaluate(y_pred, labels, test_idx, evaluator)
