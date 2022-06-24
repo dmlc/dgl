@@ -22,7 +22,7 @@ DGL建议用户尽量减少边的特征维数。
 
     linear = nn.Parameter(torch.FloatTensor(size=(node_feat_dim * 2, out_dim)))
     def concat_message_function(edges):
-         return {'cat_feat': torch.cat([edges.src.ndata['feat'], edges.dst.ndata['feat']], dim=1)}
+         return {'cat_feat': torch.cat([edges.src['feat'], edges.dst['feat']], dim=1)}
     g.apply_edges(concat_message_function)
     g.edata['out'] = g.edata['cat_feat'] @ linear
 
