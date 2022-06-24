@@ -28,7 +28,7 @@ cublasStatus_t Xgeam(cublasHandle_t handle, cublasOperation_t transa,
     const DType* alpha, const DType* A, int lda,
     const DType* beta, const DType* B, int ldb,
     DType* C, int ldc) {
-  LOG(INFO) << "Not supported dtype";
+  LOG(FATAL) << "Not supported dtype";
   return CUBLAS_STATUS_EXECUTION_FAILED;
 }
 
@@ -41,7 +41,7 @@ cublasStatus_t Xgeam<__half>(cublasHandle_t handle, cublasOperation_t transa,
     __half* C, int ldc) {
   // TODO(ndickson): There is no cublasHgeam, so a different
   // implementation would be required.
-  LOG(INFO) << "Xgeam does not support dtype half (FP16)";
+  LOG(FATAL) << "Xgeam does not support dtype half (FP16)";
   return CUBLAS_STATUS_EXECUTION_FAILED;
 }
 #endif
