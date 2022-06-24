@@ -126,7 +126,7 @@ class DegreeBalancedDataset(TensorizedDataset):
         prefix_sum_in_degrees.append(2e18)
 
         self.curr_iter = DegreeBalancedDatasetIter(id_tensor, self.max_node, self.max_edge,
-            prefix_sum_in_degrees, self._mapping_keys, shuffle=False)
+            prefix_sum_in_degrees, self._mapping_keys)
 
     def __getattr__(self, attribute_name):
         if attribute_name in DegreeBalancedDataset.functions:
@@ -137,7 +137,7 @@ class DegreeBalancedDataset(TensorizedDataset):
 
     def shuffle(self):
         """We use another shuffle stretegy here."""
-        pass
+        return
 
     def __iter__(self):
         return self.curr_iter
