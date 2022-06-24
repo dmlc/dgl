@@ -1,5 +1,5 @@
 import dgl
-import pytest, unittest
+import unittest
 from dgl.dataloading.degree_balanced import DegreeBalancedDataloader
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
