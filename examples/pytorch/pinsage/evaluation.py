@@ -26,7 +26,7 @@ class LatestNNRecommender(object):
         Return a (n_user, K) matrix of recommended items for each user
         """
         graph_slice = full_graph.edge_type_subgraph([self.user_to_item_etype])
-        n_users = full_graph.number_of_nodes(self.user_ntype)
+        n_users = full_graph.num_nodes(self.user_ntype)
         latest_interactions = dgl.sampling.select_topk(graph_slice, 1, self.timestamp, edge_dir='out')
         user, latest_items = latest_interactions.all_edges(form='uv', order='srcdst')
         # each user should have at least one "latest" interaction
