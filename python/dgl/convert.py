@@ -1663,9 +1663,8 @@ def to_cugraph(g):
     try:
         import cugraph
         import cudf
-    except ImportError:
-        raise ImportError("cugraph needs to be installed for to_cugraph")
-
+    except ModuleNotFoundError:
+        raise ModuleNotFoundError("to_cugraph requires cugraph which could not be imported")
 
     edgelist = g.edges()
     src_ser = cudf.from_dlpack(F.zerocopy_to_dlpack(edgelist[0]))

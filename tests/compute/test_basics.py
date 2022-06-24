@@ -9,11 +9,6 @@ import unittest
 import pytest
 from test_utils import parametrize_idtype
 
-try:
-    import cugraph
-except:
-    cugraph = None
-
 D = 5
 reduce_msg_shapes = set()
 
@@ -297,8 +292,8 @@ def _test_nx_conversion():
                                               [2., 3.], [2., 3.]]))
 
 def test_to_cugraph_conversion():
-    if cugraph is None:
-        pytest.skip("Skipping to_cugraph test because cugraph is not installed")
+    cugraph = pytest.importorskip("cugraph",
+       reason="Skipping to_cugraph test because cugraph is not installed")
 
     g = dgl.graph((F.tensor([0, 1, 2, 3]), F.tensor([1, 0, 3, 2]))).to('cuda')
     cugraph_g = g.to_cugraph()
@@ -311,8 +306,8 @@ def test_to_cugraph_conversion():
     assert cugraph_g.has_edge(3, 2)
 
 def test_from_cugraph_conversion():
-    if cugraph is None:
-        pytest.skip("Skipping from_cugraph test because cugraph is not installed")
+    cugraph = pytest.importorskip("cugraph",
+      reason="Skipping from_cugraph test because cugraph is not installed")
 
     # cudf is a dependency of cugraph
     import cudf
@@ -348,8 +343,6 @@ def test_from_cugraph_conversion():
 
     assert g.device.type == 'cuda'
     assert g.number_of_nodes() == cugraph_g.number_of_nodes()
-    assert g.number_of_edges() == cugraph_g.number_of_edges()
-
     # assert reverse edges are present
     assert g.has_edges_between(0, 1)
     assert g.has_edges_between(1, 0)
