@@ -123,6 +123,7 @@ if(USE_AVX)
 endif(USE_AVX)
 
 if (USE_EPOLL)
+  include(CheckIncludeFile)
   check_include_file("sys/epoll.h" USE_EPOLL)
   if (USE_EPOLL)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUSE_EPOLL")
