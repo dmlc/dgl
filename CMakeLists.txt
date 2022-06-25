@@ -122,7 +122,7 @@ if(USE_AVX)
   endif(USE_LIBXSMM)
 endif(USE_AVX)
 
-if (not MSVC AND USE_EPOLL)
+if (NOT MSVC AND USE_EPOLL)
   check_include_file("sys/epoll.h" USE_EPOLL)
   if (USE_EPOLL)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUSE_EPOLL")
