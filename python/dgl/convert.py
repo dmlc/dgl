@@ -1623,7 +1623,7 @@ def to_networkx(g, node_attrs=None, edge_attrs=None):
 DGLHeteroGraph.to_networkx = to_networkx
 
 def to_cugraph(g):
-    """Convert a DGL graph to a cugraph.Graph and return.
+    """Convert a DGL graph to a :class:`cugraph.Graph` and return.
 
     Parameters
     ----------
@@ -1673,19 +1673,20 @@ def to_cugraph(g):
     cudf_data = cudf.DataFrame({'source':src_ser, 'destination':dst_ser})
     g_cugraph = cugraph.Graph(directed=True)
     g_cugraph.from_cudf_edgelist(cudf_data,
-                                source='source',
-                                destination='destination')
+                                 source='source',
+                                 destination='destination')
     return g_cugraph
 
 DGLHeteroGraph.to_cugraph = to_cugraph
 
 def from_cugraph(cugraph_graph):
-    """Create a graph from a cugraph graph and return.
+    """Create a graph from a :class:`cugraph.Graph` object.
 
     Parameters
     ----------
     cugraph_graph : cugraph.Graph
-        The cugraph graph holding the graph structure and the node/edge attributes.
+        The cugraph graph object holding the graph structure. Node and edge attributes are
+        dropped.
 
         If the input graph is undirected, DGL converts it to a directed graph
         by :func:`cugraph.Graph.to_directed`.
