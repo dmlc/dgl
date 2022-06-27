@@ -28,6 +28,7 @@ from .base import BlockSampler, as_edge_prediction_sampler
 from .. import backend as F
 from ..distributed import DistGraph
 from ..multiprocessing import call_once_and_share
+from ..cuda import stream as dgl_stream
 
 PYTHON_EXIT_STATUS = False
 def _set_python_exit_flag():
@@ -314,7 +315,7 @@ def _prefetch(batch, dataloader, stream):
     #
     # Once the futures are fetched, this function waits for them to complete by
     # calling its wait() method.
-    with torch.cuda.stream(stream):
+    with torch.cuda.stream(stream), dgl_stream(stream):
         # fetch node/edge features
         feats = recursive_apply(batch, _prefetch_for, dataloader)
         feats = recursive_apply(feats, _await_or_return)
