@@ -121,4 +121,4 @@ class ApplyGraphpredPipeline(PipelineBase):
 
     @staticmethod
     def get_description() -> str:
-        return "Graph classification pipeline for inference"
+        return "Graph classification pipeline for inference on binary classification"

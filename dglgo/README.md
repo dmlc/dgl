@@ -70,8 +70,8 @@ dgl configure nodepred --data cora --model sage --cfg cora_sage.yaml
 ```
 
 Note that `nodepred` is the name of DGL-Go *pipeline*. For now, you can think of
-pipeline as training task: `nodepred` is for node prediction task; other
-options include `linkpred` for link prediction task, etc. The command will
+pipeline as training task: `nodepred` is for node multiclass classification task; other
+options include `linkpred` for link prediction task, and `graphpred` for graph binary classification etc. The command will
 generate a configurate file `cora_sage.yaml` which includes:
 
 * Options for the selected dataset (i.e., `cora` here).
