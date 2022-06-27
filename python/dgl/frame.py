@@ -182,9 +182,9 @@ class Column(TensorStorage):
     index : Tensor
         Index tensor
     """
-    def __init__(self, storage, scheme=None, index=None, device=None, deferred_dtype=None):
+    def __init__(self, storage, *args, **kwargs):
         super().__init__(storage)
-        self._init(scheme, index, device, deferred_dtype)
+        self._init(*args, **kwargs)
 
     def __len__(self):
         """The number of features (number of rows) in this column."""
@@ -425,21 +425,24 @@ class Column(TensorStorage):
 
     def __getstate__(self):
         if self.storage is not None:
-            _ = self.data               # evaluate feature slicing
-        return self.__dict__
+            # flush any deferred operations
+            _ = self.data
+        state = self.__dict__.copy()
+        # data pinning does not get serialized, so we need to remove that from
+        # the state
+        state['_data_nd'] = None
+        state['pinned_by_dgl'] = False
+        return state
 
     def __setstate__(self, state):
+        # make sure the state does not contain any deferred operations
+        assert 'index' not in state or state['index'] is None
+        assert 'device' not in state or state['device'] is None
+        assert 'deferred_dtype' not in state or state['deferred_dtype'] is None
+        assert 'pinned_by_dgl' not in state or state['pinned_by_dgl'] is False
+        assert '_data_nd' not in state or state['_data_nd'] is None
+
         self.__dict__ = state
-        # __getstate__ called data(), so there shouldn't be any deferred device
-        # transfer, indexing, or type conversion, but to be able to load old
-        # data that might not have these data members at all, they need to be
-        # initialized to None, else code trying to check if they're None will
-        # fail.  pinned_by_dgl and _data_nd have a similar problem, except
-        # that the memory won't be pinned upon loading, regardless of whether
-        # it was when saving.
-        # TODO(ndickson): It would be more robust if there were a cohesive,
-        # comprehensive strategy for data file format compatibility, instead
-        # of relying on serialization.
         self._init(self.scheme if hasattr(self, 'scheme') else None)
 
     def _init(self, scheme=None, index=None, device=None, deferred_dtype=None):
