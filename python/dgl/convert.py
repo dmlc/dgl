@@ -1725,7 +1725,6 @@ def from_cugraph(cugraph_graph):
 
     return g
 
-DGLHeteroGraph.from_cugraph = from_cugraph
 ############################################################
 # Internal APIs
 ############################################################
