@@ -10,7 +10,7 @@ def test_degree_balanced_dataloader():
     sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
     # not shuffle
     dataloader = DegreeBalancedDataloader(
-        g, nids, sampler, max_node=4, max_edge=4,
+        g, nids, sampler, max_node=4, max_degree=4,
         shuffle=False, device="cpu", num_workers=0)
     for input_nodes, output_nodes, blocks in dataloader:
         print(blocks, input_nodes, output_nodes)
@@ -19,7 +19,7 @@ def test_degree_balanced_dataloader():
     # max_node is None
     print()
     dataloader = DegreeBalancedDataloader(
-        g, nids, sampler, max_node=None, max_edge=4,
+        g, nids, sampler, max_node=None, max_degree=4,
         shuffle=False, device="cpu", num_workers=0)
     for input_nodes, output_nodes, blocks in dataloader:
         print(blocks, input_nodes, output_nodes)
@@ -27,7 +27,7 @@ def test_degree_balanced_dataloader():
     # shuffle
     print()
     dataloader = DegreeBalancedDataloader(
-        g, nids, sampler, max_node=4, max_edge=4,
+        g, nids, sampler, max_node=4, max_degree=4,
         shuffle=True, device="cpu", num_workers=0)
     for input_nodes, output_nodes, blocks in dataloader:
         print(blocks, input_nodes, output_nodes)

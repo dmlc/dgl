@@ -23,8 +23,8 @@ class DegreeBalancedDataloader(DataLoader):
         Seed node IDs.
     sampler : dgl.dataloading.Sampler
         The subgraph sampler.
-    max_edge : int
-        Maximum number of edges in a batch.
+    max_degree : int
+        Maximum number of degrees in a batch.
     max_node : int or None
         Maximum number of nodes in a batch. If `max_node` is None, it means the dataloader
         do not controlled by nodes.
@@ -55,7 +55,7 @@ class DegreeBalancedDataloader(DataLoader):
     >>> for input_nodes, output_nodes, blocks in dataloader:
     ...     print(blocks)
     """
-    def __init__(self, g, nids, sampler, max_edge, max_node=None, \
+    def __init__(self, g, nids, sampler, max_degree, max_node=None, \
         prefix_sum_in_degrees=None, device='cpu', shuffle=False, use_uva=False, num_workers=0):
 
         if shuffle is True and prefix_sum_in_degrees is not None:
@@ -64,7 +64,7 @@ class DegreeBalancedDataloader(DataLoader):
         if max_node is None:
             max_node = 1e18
 
-        dataset = DegreeBalancedDataset(max_node, max_edge, prefix_sum_in_degrees,
+        dataset = DegreeBalancedDataset(max_node, max_degree, prefix_sum_in_degrees,
             g, nids, shuffle)
         super().__init__(g,
                          dataset,
@@ -76,17 +76,17 @@ class DegreeBalancedDataloader(DataLoader):
                          use_prefetch_thread=False,
                          num_workers=num_workers)
 
-    def modify_max_edge(self, max_edge):
-        """Modify maximum edges.
+    def modify_max_degree(self, max_degree):
+        """Modify maximum degrees.
 
         Parameters
         ----------
-        max_edge : int
-            The modified maximum number of edges.
+        max_degree : int
+            The modified maximum number of degrees.
         """
-        self.dataset.max_edge = max_edge
+        self.dataset.max_degree = max_degree
         if self.dataset.curr_iter is not None:
-            self.dataset.curr_iter.max_edge = max_edge
+            self.dataset.curr_iter.max_degree = max_degree
 
     def modify_max_node(self, max_node):
         """Modify maximum nodes.
@@ -117,11 +117,11 @@ class DegreeBalancedDataloader(DataLoader):
 
 class DegreeBalancedDataset(TensorizedDataset):
     """Degree balanced tensorized dataset extended from dgl.dataloading."""
-    def __init__(self, max_node, max_edge, prefix_sum_in_degrees, g, train_nids, shuffle):
+    def __init__(self, max_node, max_degree, prefix_sum_in_degrees, g, train_nids, shuffle):
         super().__init__(train_nids, max_node, drop_last=False, shuffle=shuffle)
         self.device = train_nids.device
         self.max_node = max_node
-        self.max_edge = max_edge
+        self.max_degree = max_degree
 
         # We change the shuffle stretegy here. Since we need to compute the prefix sum of
         # in degrees array.
@@ -139,7 +139,7 @@ class DegreeBalancedDataset(TensorizedDataset):
             prefix_sum_in_degrees.extend(np.cumsum(in_degrees).tolist())
             prefix_sum_in_degrees.append(1e18)
 
-        self.curr_iter = DegreeBalancedDatasetIter(id_tensor, self.max_node, self.max_edge,
+        self.curr_iter = DegreeBalancedDatasetIter(id_tensor, self.max_node, self.max_degree,
             prefix_sum_in_degrees, self._mapping_keys)
 
     def __getattr__(self, attribute_name):
@@ -159,11 +159,11 @@ class DegreeBalancedDataset(TensorizedDataset):
 
 class DegreeBalancedDatasetIter(_TensorizedDatasetIter):
     """Degree balanced tensorized datasetIter."""
-    def __init__(self, dataset, max_node, max_edge, prefix_sum_in_degrees, mapping_keys):
+    def __init__(self, dataset, max_node, max_degree, prefix_sum_in_degrees, mapping_keys):
         super().__init__(dataset, max_node,
             drop_last=False, mapping_keys=mapping_keys, shuffle=False)
         self.max_node = max_node
-        self.max_edge = max_edge
+        self.max_degree = max_degree
         self.prefix_sum_in_degrees = prefix_sum_in_degrees
         self.num_item = self.dataset.shape[0]
 
@@ -171,7 +171,7 @@ class DegreeBalancedDatasetIter(_TensorizedDatasetIter):
         """Get end index by binary search."""
         def compare(start, end):
             return self.prefix_sum_in_degrees[end] - \
-                self.prefix_sum_in_degrees[start] <= self.max_edge
+                self.prefix_sum_in_degrees[start] <= self.max_degree
 
         start_idx = self.index + 1
         end_idx = min(self.index + self.max_node, self.num_item)
