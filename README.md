@@ -83,6 +83,8 @@ Take the survey [here](https://forms.gle/Ej3jHCocACmb49Gp8) and leave any feedba
 * RNAGlib: A package to facilitate construction, analysis, visualization and machine learning on RNA 2.5D Graphs. Includes a pre-built dataset: https://rnaglib.cs.mcgill.ca
 * OpenHGNN: Model zoo and benchmarks for Heterogeneous Graph Neural Networks. https://github.com/BUPT-GAMMA/OpenHGNN
 * TGL: A graph learning framework for large-scale temporal graphs. https://github.com/amazon-research/tgl
+* gtrick: Bag of Tricks for Graph Neural Networks. https://github.com/sangyx/gtrick
+* ArangoDB-DGL Adapter: Import [ArangoDB](https://github.com/arangodb/arangodb) graphs into DGL and vice-versa. https://github.com/arangoml/dgl-adapter
 
 ### Awesome Papers Using DGL
 

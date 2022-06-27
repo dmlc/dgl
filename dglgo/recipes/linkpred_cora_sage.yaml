@@ -1,5 +1,6 @@
 version: 0.0.1
 pipeline_name: linkpred
+pipeline_mode: train
 device: cuda
 data:
   name: cora
@@ -15,7 +16,7 @@ node_model:
   aggregator_type: gcn        # Aggregator type to use (``mean``, ``gcn``, ``pool``, ``lstm``).
 edge_model:
   name: ele
-  hidden_size: 64             # Hidden size.        
+  hidden_size: 64             # Hidden size.
   num_layers: 2               # Number of hidden layers.
   bias: true                  # Whether to use bias in the linaer layer.
 neg_sampler:
@@ -31,5 +32,5 @@ general_pipeline:
     name: Adam
     lr: 0.005
   loss: BCELoss
-  save_path: "model.pth"
+  save_path: "results"        # Directory to save the experiment results
   num_runs: 1                 # Number of experiments to run

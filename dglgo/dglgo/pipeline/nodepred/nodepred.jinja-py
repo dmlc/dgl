@@ -3,6 +3,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import dgl
+import os
+
 from dgl.data import AsNodePredDataset
 {{ data_import_code }}
 
@@ -12,7 +14,7 @@ from dgl.data import AsNodePredDataset
 class EarlyStopping:
     def __init__(self,
                  patience: int = -1,
-                 checkpoint_path: str = 'checkpoint.pt'):
+                 checkpoint_path: str = 'checkpoint.pth'):
         self.patience = patience
         self.checkpoint_path = checkpoint_path
         self.counter = 0
@@ -41,6 +43,9 @@ class EarlyStopping:
 
     def load_checkpoint(self, model):
         model.load_state_dict(torch.load(self.checkpoint_path))
+
+    def close(self):
+        os.remove(self.checkpoint_path)
 {% endif %}
 
 
@@ -86,6 +91,7 @@ def train(cfg, pipeline_cfg, device, data, model, optimizer, loss_fcn):
 
     {% if user_cfg.general_pipeline.early_stop %}
     stopper.load_checkpoint(model)
+    stopper.close()
     {% endif %}
     model.eval()
     with torch.no_grad():
@@ -93,34 +99,42 @@ def train(cfg, pipeline_cfg, device, data, model, optimizer, loss_fcn):
         test_acc = accuracy(logits[test_mask], label[test_mask])
     return test_acc
 
-def main():
-    {{ user_cfg_str }}
+def main(run, cfg, data):
     device = cfg['device']
     pipeline_cfg = cfg['general_pipeline']
+    model = {{ model_class_name }}(**cfg["model"])
+    model = model.to(device)
+    loss = torch.nn.{{ user_cfg.general_pipeline.loss }}()
+    optimizer = torch.optim.{{ user_cfg.general_pipeline.optimizer.name }}(model.parameters(), **pipeline_cfg["optimizer"])
+    test_acc = train(cfg, pipeline_cfg, device, data, model, optimizer, loss)
+    cpt_path = os.path.join(pipeline_cfg["save_path"], 'run_{}.pth'.format(run))
+    torch.save({'cfg': cfg, 'model': model.state_dict()}, cpt_path)
+    print('Saved training checkpoint to {}'.format(cpt_path))
+
+    return test_acc
+
+if __name__ == '__main__':
+    {{ user_cfg_str }}
+    if not torch.cuda.is_available():
+        cfg['device'] = 'cpu'
+
     # load data
     data = AsNodePredDataset({{data_initialize_code}})
-    # create model
+
     model_cfg = cfg["model"]
     cfg["model"]["data_info"] = {
         "in_size": model_cfg['embed_size'] if model_cfg['embed_size'] > 0 else data[0].ndata['feat'].shape[1],
         "out_size": data.num_classes,
         "num_nodes": data[0].num_nodes()
     }
-    model = {{ model_class_name }}(**cfg["model"])
-    model = model.to(device)
-    loss = torch.nn.{{ user_cfg.general_pipeline.loss }}()
-    optimizer = torch.optim.{{ user_cfg.general_pipeline.optimizer.name }}(model.parameters(), **pipeline_cfg["optimizer"])
-    # train
-    test_acc = train(cfg, pipeline_cfg, device, data, model, optimizer, loss)
-    torch.save(model.state_dict(), pipeline_cfg["save_path"])
-    return test_acc
 
-if __name__ == '__main__':
+    os.makedirs(cfg['general_pipeline']["save_path"])
+
     all_acc = []
     num_runs = {{ user_cfg.general_pipeline.num_runs }}
     for run in range(num_runs):
         print(f'Run experiment #{run}')
-        test_acc = main()
+        test_acc = main(run, cfg, data)
         print("Test Accuracy {:.4f}".format(test_acc))
         all_acc.append(test_acc)
     avg_acc = np.round(np.mean(all_acc), 6)
