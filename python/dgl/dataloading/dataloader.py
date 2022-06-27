@@ -16,7 +16,7 @@ import torch
 import torch.distributed as dist
 from torch.utils.data.distributed import DistributedSampler
 
-from ..base import NID, EID, dgl_warning
+from ..base import NID, EID, dgl_warning, DGLError
 from ..batch import batch as batch_graphs
 from ..heterograph import DGLHeteroGraph
 from ..utils import (
@@ -870,6 +870,7 @@ class DataLoader(torch.utils.data.DataLoader):
             collate_fn=CollateWrapper(
                 self.graph_sampler.sample, graph, self.use_uva, self.device),
             batch_size=None,
+            pin_memory=self.pin_prefetcher,
             worker_init_fn=worker_init_fn,
             **kwargs)
 
