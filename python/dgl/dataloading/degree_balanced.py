@@ -23,10 +23,16 @@ class DegreeBalancedDataloader(DataLoader):
         Seed node IDs.
     sampler : dgl.dataloading.Sampler
         The subgraph sampler.
-    max_node : int
-        Maximum number of nodes in a batch.
     max_edge : int
         Maximum number of edges in a batch.
+    max_node : int or None
+        Maximum number of nodes in a batch. If `max_node` is None, it means the dataloader
+        do not controlled by nodes.
+    prefix_sum_in_degrees : array
+        The prefix sum of in degrees, E.g., we have four nodes, and their in degrees array
+        is [1, 3, 2, 3], and the prefix sum in degrees is [0, 1, 4, 6, 9]. This array is used
+        for accelerating searching (we use binary search in the `get_end_idx` method in `Iter`,
+        so we create an incremental series).
     **kwargs : keyword arguments
         Other keyword arguments passed to :class:`~dgl.dataloading.DataLoader`.
 
@@ -49,10 +55,17 @@ class DegreeBalancedDataloader(DataLoader):
     >>> for input_nodes, output_nodes, blocks in dataloader:
     ...     print(blocks)
     """
-    def __init__(self, g, nids, sampler, max_node, max_edge, \
-        device='cpu', shuffle=False, use_uva=False, num_workers=0):
+    def __init__(self, g, nids, sampler, max_edge, max_node=None, \
+        prefix_sum_in_degrees=None, device='cpu', shuffle=False, use_uva=False, num_workers=0):
 
-        dataset = DegreeBalancedDataset(max_node, max_edge, g, nids, shuffle)
+        if shuffle is True and prefix_sum_in_degrees is not None:
+            raise Exception("Prefix sum in degrees can not work if shuffle is true.")
+        # If max_node is None, we set it to a large value (close to INF).
+        if max_node is None:
+            max_node = 1e18
+
+        dataset = DegreeBalancedDataset(max_node, max_edge, prefix_sum_in_degrees,
+            g, nids, shuffle)
         super().__init__(g,
                          dataset,
                          sampler,
@@ -104,7 +117,7 @@ class DegreeBalancedDataloader(DataLoader):
 
 class DegreeBalancedDataset(TensorizedDataset):
     """Degree balanced tensorized dataset extended from dgl.dataloading."""
-    def __init__(self, max_node, max_edge, g, train_nids, shuffle):
+    def __init__(self, max_node, max_edge, prefix_sum_in_degrees, g, train_nids, shuffle):
         super().__init__(train_nids, max_node, drop_last=False, shuffle=shuffle)
         self.device = train_nids.device
         self.max_node = max_node
@@ -119,11 +132,12 @@ class DegreeBalancedDataset(TensorizedDataset):
         # TODO: support multi processing
         id_tensor = self._id_tensor[self._indices.to(self._device)]
 
-        # Compute the prefix sum in degrees for the graph.
-        in_degrees = g.in_degrees(id_tensor.to(g.device)).cpu()
-        prefix_sum_in_degrees = [0]
-        prefix_sum_in_degrees.extend(np.cumsum(in_degrees).tolist())
-        prefix_sum_in_degrees.append(2e18)
+        if prefix_sum_in_degrees is None:
+            # Compute the prefix sum in degrees for the graph.
+            in_degrees = g.in_degrees(id_tensor.to(g.device)).cpu()
+            prefix_sum_in_degrees = [0]
+            prefix_sum_in_degrees.extend(np.cumsum(in_degrees).tolist())
+            prefix_sum_in_degrees.append(1e18)
 
         self.curr_iter = DegreeBalancedDatasetIter(id_tensor, self.max_node, self.max_edge,
             prefix_sum_in_degrees, self._mapping_keys)
@@ -155,20 +169,22 @@ class DegreeBalancedDatasetIter(_TensorizedDatasetIter):
 
     def get_end_idx(self):
         """Get end index by binary search."""
-        binary_start = self.index + 1
-        binary_end = min(self.index + self.max_node, self.num_item)
-        if self.prefix_sum_in_degrees[binary_end] - self.prefix_sum_in_degrees[self.index] \
-            <= self.max_edge:
-            return binary_end
-        binary_middle = 0
-        while binary_end - binary_start > 1:
-            binary_middle = (binary_start + binary_end) // 2
-            if self.prefix_sum_in_degrees[binary_middle] - self.prefix_sum_in_degrees[self.index] \
-                <= self.max_edge:
-                binary_start = binary_middle
+        def compare(start, end):
+            return self.prefix_sum_in_degrees[end] - \
+                self.prefix_sum_in_degrees[start] <= self.max_edge
+
+        start_idx = self.index + 1
+        end_idx = min(self.index + self.max_node, self.num_item)
+        if compare(self.index, end_idx):
+            return end_idx
+        mid_idx = 0
+        while end_idx - start_idx > 1:
+            mid_idx = (start_idx + end_idx) // 2
+            if compare(self.index, mid_idx):
+                start_idx = mid_idx
             else:
-                binary_end = binary_middle - 1
-        return binary_start
+                end_idx = mid_idx - 1
+        return end_idx if compare(self.index, end_idx) else start_idx
 
     def _next_indices(self):
         """Overwrite next indices."""

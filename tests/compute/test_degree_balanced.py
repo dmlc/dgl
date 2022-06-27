@@ -16,7 +16,16 @@ def test_degree_balanced_dataloader():
         print(blocks, input_nodes, output_nodes)
         assert(blocks[0].num_dst_nodes() <= 4)
         assert(blocks[0].num_edges() <= 4)
+    # max_node is None
+    print()
+    dataloader = DegreeBalancedDataloader(
+        g, nids, sampler, max_node=None, max_edge=4,
+        shuffle=False, device="cpu", num_workers=0)
+    for input_nodes, output_nodes, blocks in dataloader:
+        print(blocks, input_nodes, output_nodes)
+        assert(blocks[0].num_edges() <= 4)
     # shuffle
+    print()
     dataloader = DegreeBalancedDataloader(
         g, nids, sampler, max_node=4, max_edge=4,
         shuffle=True, device="cpu", num_workers=0)
