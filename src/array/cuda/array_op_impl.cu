@@ -224,6 +224,9 @@ NDArray Full(DType val, int64_t length, DLContext ctx) {
 
 template IdArray Full<kDLGPU, int32_t>(int32_t val, int64_t length, DLContext ctx);
 template IdArray Full<kDLGPU, int64_t>(int64_t val, int64_t length, DLContext ctx);
+#ifdef USE_FP16
+template IdArray Full<kDLGPU, __half>(__half val, int64_t length, DLContext ctx);
+#endif
 template IdArray Full<kDLGPU, float>(float val, int64_t length, DLContext ctx);
 template IdArray Full<kDLGPU, double>(double val, int64_t length, DLContext ctx);
 
