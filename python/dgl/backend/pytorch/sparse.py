@@ -1,5 +1,5 @@
 import torch as th
-from distutils.version import LooseVersion
+from torch.cuda.amp import custom_fwd, custom_bwd
 from ...base import is_all, ALL
 from ...sparse import _gspmm, _gspmm_hetero, _gsddmm, _gsddmm_hetero, _segment_reduce, _bwd_segment_cmp
 from ...sparse import _csrmm, _csrsum, _csrmask, _scatter_add, _update_grad_minmax_hetero
@@ -8,26 +8,6 @@ from ...sparse import _gspmm, _gspmm_hetero, _gsddmm, _gsddmm_hetero, _segment_r
 from ...sparse import _csrmm, _csrsum, _csrmask, _scatter_add, _update_grad_minmax_hetero
 from ...heterograph_index import create_unitgraph_from_csr
 
-if LooseVersion(th.__version__) >= LooseVersion("1.6.0"):
-    from torch.cuda.amp import custom_fwd, custom_bwd
-else:
-    import functools
-    """PyTorch natively supports automatic mixed precision in DGL 1.6, we redefine
-    the custom_fwd and custom_bwd function to be compatible with DGL 1.5.
-    """
-    def custom_fwd(**kwargs):
-        def custom_fwd_inner(fwd):
-            @functools.wraps(fwd)
-            def decorate_fwd(*args, **kwargs):
-                return fwd(*args, **kwargs)
-            return decorate_fwd
-        return custom_fwd_inner
-
-    def custom_bwd(bwd):
-        @functools.wraps(bwd)
-        def decorate_bwd(*args, **kwargs):
-            return bwd(*args, **kwargs)
-        return decorate_bwd
 
 __all__ = ['gspmm', 'gsddmm', 'gspmm_hetero', 'gsddmm_hetero', 'edge_softmax', 'edge_softmax_hetero',
            'segment_reduce', 'scatter_add', 'csrmm', 'csrsum', 'csrmask', 'gather_mm', 'segment_mm']
