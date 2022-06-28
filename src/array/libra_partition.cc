@@ -130,9 +130,9 @@ void LibraVertexCut(
       if (u != v)
         node_assignments[v].push_back(c);
 
-      CHECK(node_assignments[u].size() <= nc) <<
+      CHECK(node_assignments[u].size() <= static_cast<size_t>(nc)) <<
         "[bug] 1. generated splits (u) are greater than nc!";
-      CHECK(node_assignments[v].size() <= nc) <<
+      CHECK(node_assignments[v].size() <= static_cast<size_t>(nc)) <<
         "[bug] 1. generated splits (v) are greater than nc!";
       edgenum_unassigned_ptr[u]--;
       edgenum_unassigned_ptr[v]--;
@@ -148,7 +148,7 @@ void LibraVertexCut(
       community_weights_ptr[c] = community_weights_ptr[c] + w;
 
       node_assignments[v].push_back(c);
-      CHECK(node_assignments[v].size() <= nc) <<
+      CHECK(node_assignments[v].size() <= static_cast<size_t>(nc)) <<
         "[bug] 2. generated splits (v) are greater than nc!";
       edgenum_unassigned_ptr[u]--;
       edgenum_unassigned_ptr[v]--;
@@ -166,7 +166,7 @@ void LibraVertexCut(
       community_weights_ptr[c] = community_weights_ptr[c] + w;
 
       node_assignments[u].push_back(c);
-      CHECK(node_assignments[u].size() <= nc) <<
+      CHECK(node_assignments[u].size() <= static_cast<size_t>(nc)) <<
         "[bug] 3. generated splits (u) are greater than nc!";
       edgenum_unassigned_ptr[u]--;
       edgenum_unassigned_ptr[v]--;
@@ -175,16 +175,16 @@ void LibraVertexCut(
       for (int32_t j=0; j < nc; j++) setv[j] = 0;
       int32_t interset = 0;
 
-      CHECK(node_assignments[u].size() <= nc) <<
+      CHECK(node_assignments[u].size() <= static_cast<size_t>(nc)) <<
         "[bug] 4. generated splits (u) are greater than nc!";
-      CHECK(node_assignments[v].size() <= nc) <<
+      CHECK(node_assignments[v].size() <= static_cast<size_t>(nc)) <<
         "[bug] 4. generated splits (v) are greater than nc!";
-      for (int32_t j=0; j < node_assignments[v].size(); j++) {
+      for (size_t j=0; j < node_assignments[v].size(); j++) {
         CHECK(node_assignments[v][j] < nc) << "[bug] 4. Part assigned (v) greater than nc!";
         setv[node_assignments[v][j]]++;
       }
 
-      for (int32_t j=0; j < node_assignments[u].size(); j++) {
+      for (size_t j=0; j < node_assignments[u].size(); j++) {
         CHECK(node_assignments[u][j] < nc) << "[bug] 4. Part assigned (u) greater than nc!";
         setv[node_assignments[u][j]]++;
       }
@@ -197,7 +197,7 @@ void LibraVertexCut(
         }
       }
       if (interset) {
-        for (int32_t j=0; j < intersetv.size(); j++) {
+        for (size_t j=0; j < intersetv.size(); j++) {
           int32_t cind = intersetv[j];
           cache[j] = community_edges[cind];
         }
@@ -228,7 +228,7 @@ void LibraVertexCut(
           }
 
           node_assignments[v].push_back(c);
-          CHECK(node_assignments[v].size() <= nc) <<
+          CHECK(node_assignments[v].size() <= static_cast<size_t>(nc)) <<
             "[bug] 5. generated splits (v) greater than nc!!";
           replication_list.push_back(v);
           edgenum_unassigned_ptr[u]--;
@@ -251,7 +251,7 @@ void LibraVertexCut(
           if (u != v)
             node_assignments[u].push_back(c);
 
-          CHECK(node_assignments[u].size() <= nc) <<
+          CHECK(node_assignments[u].size() <= static_cast<size_t>(nc)) <<
             "[bug] 6. generated splits (u) greater than nc!!";
           replication_list.push_back(u);
           edgenum_unassigned_ptr[u]--;

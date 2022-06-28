@@ -50,6 +50,11 @@ void Semaphore::Wait() {
 }
 
 bool Semaphore::TimedWait(int timeout) {
+  // sem_timedwait does not exist in Mac OS.
+#ifdef __APPLE__
+  DLOG(WARNING) << "Timeout is not supported in semaphore's wait on Mac OS.";
+  Wait();
+#else
   // zero timeout means wait infinitely
   if (timeout == 0) {
     DLOG(WARNING) << "Will wait infinitely on semaphore until posted.";
@@ -82,6 +87,8 @@ bool Semaphore::TimedWait(int timeout) {
     }
     return false;
   }
+#endif
+
   return true;
 }
 

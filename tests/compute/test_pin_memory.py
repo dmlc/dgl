@@ -9,10 +9,20 @@ def test_pin_unpin():
     assert not F.is_pinned(t)
 
     if F.backend_name == 'pytorch':
-        dgl.utils.pin_memory_inplace(t)
+        nd = dgl.utils.pin_memory_inplace(t)
         assert F.is_pinned(t)
-        dgl.utils.unpin_memory_inplace(t)
+        nd.unpin_memory_()
         assert not F.is_pinned(t)
+        del nd
+
+        # tensor will be unpinned immediately if the returned ndarray is not saved
+        dgl.utils.pin_memory_inplace(t)
+        assert not F.is_pinned(t)
+
+        t_pin = t.pin_memory()
+        # cannot unpin a tensor that is pinned outside of DGL
+        with pytest.raises(dgl.DGLError):
+            F.to_dgl_nd(t_pin).unpin_memory_()
     else:
         with pytest.raises(dgl.DGLError):
             # tensorflow and mxnet should throw an erro

@@ -8,7 +8,7 @@ from . import backend as F
 from .base import DGLError, dgl_warning
 from .init import zero_initializer
 from .storages import TensorStorage
-from .utils import gather_pinned_tensor_rows, pin_memory_inplace, unpin_memory_inplace
+from .utils import gather_pinned_tensor_rows, pin_memory_inplace
 
 class _LazyIndex(object):
     def __init__(self, index):
@@ -189,6 +189,7 @@ class Column(TensorStorage):
         self.device = device
         self.deferred_dtype = deferred_dtype
         self.pinned_by_dgl = False
+        self._data_nd = None
 
     def __len__(self):
         """The number of features (number of rows) in this column."""
@@ -243,6 +244,7 @@ class Column(TensorStorage):
         """Update the column data."""
         self.index = None
         self.storage = val
+        self._data_nd = None  # should unpin data if it was pinned.
         self.pinned_by_dgl = False
 
     def to(self, device, **kwargs): # pylint: disable=invalid-name
@@ -436,7 +438,7 @@ class Column(TensorStorage):
 
     def fetch(self, indices, device, pin_memory=False, **kwargs):
         _ = self.data           # materialize in case of lazy slicing & data transfer
-        return super().fetch(indices, device, pin_memory=False, **kwargs)
+        return super().fetch(indices, device, pin_memory=pin_memory, **kwargs)
 
     def pin_memory_(self):
         """Pin the storage into page-locked memory.
@@ -444,7 +446,7 @@ class Column(TensorStorage):
         Does nothing if the storage is already pinned.
         """
         if not self.pinned_by_dgl and not F.is_pinned(self.data):
-            pin_memory_inplace(self.data)
+            self._data_nd = pin_memory_inplace(self.data)
             self.pinned_by_dgl = True
 
     def unpin_memory_(self):
@@ -454,7 +456,8 @@ class Column(TensorStorage):
         it is actually in page-locked memory.
         """
         if self.pinned_by_dgl:
-            unpin_memory_inplace(self.data)
+            self._data_nd.unpin_memory_()
+            self._data_nd = None
             self.pinned_by_dgl = False
 
 class Frame(MutableMapping):
