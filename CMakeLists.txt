@@ -128,6 +128,8 @@ if ((NOT MSVC) AND USE_EPOLL)
   if (EPOLL_AVAILABLE)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUSE_EPOLL")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_EPOLL")
+  else()
+    message(WARNING "EPOLL is not available on this platform...")
   endif()
 endif ()
 
