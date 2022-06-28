@@ -238,6 +238,8 @@ class Column(TensorStorage):
     def data(self, val):
         """Update the column data."""
         self.index = None
+        self.device = None
+        self.deferred_dtype = None
         self.storage = val
         self._data_nd = None  # should unpin data if it was pinned.
         self.pinned_by_dgl = False
@@ -435,15 +437,25 @@ class Column(TensorStorage):
         return state
 
     def __setstate__(self, state):
-        # make sure the state does not contain any deferred operations
-        assert 'index' not in state or state['index'] is None
-        assert 'device' not in state or state['device'] is None
+        index = None
+        device = None
+        if 'storage' in state and state['storage'] is not None:
+            assert 'index' not in state or state['index'] is None
+            assert 'device' not in state or state['device'] is None
+        else:
+            # we may have a column with only index information, and that is
+            # valid
+            index = None if 'index' not in state else state['index']
+            device = None if 'device' not in state else state['device']
         assert 'deferred_dtype' not in state or state['deferred_dtype'] is None
         assert 'pinned_by_dgl' not in state or state['pinned_by_dgl'] is False
         assert '_data_nd' not in state or state['_data_nd'] is None
 
         self.__dict__ = state
-        self._init(self.scheme if hasattr(self, 'scheme') else None)
+        # properly initialize this object
+        self._init(self.scheme if hasattr(self, 'scheme') else None,
+                   index=index,
+                   device=device)
 
     def _init(self, scheme=None, index=None, device=None, deferred_dtype=None):
         self.scheme = scheme if scheme else infer_scheme(self.storage)
