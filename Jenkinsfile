@@ -407,7 +407,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-gpu-node"
-                  image "dgllib/dgl-ci-gpu:cu101_v220217"
+                  image "dgllib/dgl-ci:rapids22.06-cu11.0-py3.8-v220628"
                   args "--runtime nvidia --shm-size=8gb"
                   alwaysPull true
                 }
