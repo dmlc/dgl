@@ -2371,22 +2371,26 @@ def test_module_sign(g):
     # raw
     transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', diffuse_op='raw')
     g = transform(g)
-    assert torch.allclose(g.ndata['out_feat_1'], torch.matmul(adj, g.ndata['h']))
+    target = torch.matmul(adj, g.ndata['h'])
+    assert torch.allclose(g.ndata['out_feat_1'], target)
 
     transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', eweight_name='scalar_w', diffuse_op='raw')
     g = transform(g)
-    assert torch.allclose(g.ndata['out_feat_1'], torch.matmul(weight_adj, g.ndata['h']))
+    target = torch.matmul(weight_adj, g.ndata['h'])
+    assert torch.allclose(g.ndata['out_feat_1'], target)
 
     # rw
     adj_rw = torch.matmul(torch.diag(1 / adj.sum(dim=1)), adj)
     transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', diffuse_op='rw')
     g = transform(g)
-    assert torch.allclose(g.ndata['out_feat_1'], torch.matmul(adj_rw, g.ndata['h']))
+    target = torch.matmul(adj_rw, g.ndata['h'])
+    assert torch.allclose(g.ndata['out_feat_1'], target)
 
     weight_adj_rw = torch.matmul(torch.diag(1 / weight_adj.sum(dim=1)), weight_adj)
     transform = dgl.SIGNDiffusion(k=1, in_feat_name='h', eweight_name='scalar_w', diffuse_op='rw')
     g = transform(g)
-    assert torch.allclose(g.ndata['out_feat_1'], torch.matmul(weight_adj_rw, g.ndata['h']))
+    target = torch.matmul(weight_adj_rw, g.ndata['h'])
+    assert torch.allclose(g.ndata['out_feat_1'], target)
 
     # gcn
     raw_eweight = g.edata['scalar_w']
