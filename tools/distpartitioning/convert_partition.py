@@ -9,6 +9,7 @@ import pyarrow
 import pandas as pd
 import constants
 from pyarrow import csv
+from utils import read_json
 
 def create_dgl_object(graph_name, num_parts, \
                         schema, part_id, node_data, \
@@ -129,7 +130,8 @@ def create_dgl_object(graph_name, num_parts, \
     assert len(uniq_ids) == len(idx)
     # We get the edge list with their node IDs mapped to a contiguous ID range.
     part_local_src_id, part_local_dst_id = np.split(inverse_idx[:len(shuffle_global_src_id) * 2], 2)
-    compact_g = dgl.graph((part_local_src_id, part_local_dst_id))
+
+    compact_g = dgl.graph(data=(part_local_src_id, part_local_dst_id), num_nodes=len(idx))
     compact_g.edata['orig_id'] = th.as_tensor(global_edge_id)
     compact_g.edata[dgl.ETYPE] = th.as_tensor(etype_ids)
     compact_g.edata['inner_edge'] = th.ones(
@@ -183,7 +185,7 @@ def create_dgl_object(graph_name, num_parts, \
 
     return compact_g2, node_map_val, edge_map_val, ntypes_map, etypes_map
 
-def create_metadata_json(graph_name, num_nodes, num_edges, num_parts, node_map_val, \
+def create_metadata_json(graph_name, num_nodes, num_edges, part_id, num_parts, node_map_val, \
                             edge_map_val, ntypes_map, etypes_map, output_dir ):
     """
     Auxiliary function to create json file for the graph partition metadata
@@ -226,12 +228,11 @@ def create_metadata_json(graph_name, num_nodes, num_edges, num_parts, node_map_v
                      'ntypes': ntypes_map,
                      'etypes': etypes_map}
 
-    for part_id in range(num_parts):
-        part_dir = 'part' + str(part_id)
-        node_feat_file = os.path.join(part_dir, "node_feat.dgl")
-        edge_feat_file = os.path.join(part_dir, "edge_feat.dgl")
-        part_graph_file = os.path.join(part_dir, "graph.dgl")
-        part_metadata['part-{}'.format(part_id)] = {'node_feats': node_feat_file,
+    part_dir = 'part' + str(part_id)
+    node_feat_file = os.path.join(part_dir, "node_feat.dgl")
+    edge_feat_file = os.path.join(part_dir, "edge_feat.dgl")
+    part_graph_file = os.path.join(part_dir, "graph.dgl")
+    part_metadata['part-{}'.format(part_id)] = {'node_feats': node_feat_file,
                                                 'edge_feats': edge_feat_file,
                                                 'part_graph': part_graph_file}
     return part_metadata

@@ -50,7 +50,7 @@ def get_shuffle_global_nids(rank, world_size, global_nids_ranks, node_data):
     #form the outgoing message
     send_nodes = []
     for i in range(world_size):
-        send_nodes.append(torch.Tensor(global_nids_ranks[i]).type(dtype=torch.int64))
+        send_nodes.append(torch.from_numpy(global_nids_ranks[i]).type(dtype=torch.int64))
 
     #send-recieve messages
     alltoallv_cpu(rank, world_size, recv_nodes, send_nodes)
