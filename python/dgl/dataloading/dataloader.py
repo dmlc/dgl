@@ -349,8 +349,7 @@ def _put_if_event_not_set(queue, result, event):
             continue
 
 def _prefetcher_entry(
-        dataloader_it, dataloader, queue, num_threads, stream,
-        done_event):
+        dataloader_it, dataloader, queue, num_threads, stream, done_event):
     # PyTorch will set the number of threads to 1 which slows down pin_memory() calls
     # in main process if a prefetching thread is created.
     if num_threads is not None:
