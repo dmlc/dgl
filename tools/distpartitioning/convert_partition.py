@@ -228,7 +228,7 @@ def create_metadata_json(graph_name, num_nodes, num_edges, num_parts, node_map_v
                      'ntypes': ntypes_map,
                      'etypes': etypes_map}
 
-    for part_id in range(num_parts): 
+    for part_id in range(num_parts):
         part_dir = 'part' + str(part_id)
         node_feat_file = os.path.join(part_dir, "node_feat.dgl")
         edge_feat_file = os.path.join(part_dir, "edge_feat.dgl")
