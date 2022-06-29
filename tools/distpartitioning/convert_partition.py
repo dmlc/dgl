@@ -183,7 +183,7 @@ def create_dgl_object(graph_name, num_parts, \
 
     return compact_g2, node_map_val, edge_map_val, ntypes_map, etypes_map
 
-def create_metadata_json(graph_name, num_nodes, num_edges, num_parts, node_map_val, \
+def create_metadata_json(graph_name, num_nodes, num_edges, part_id, num_parts, node_map_val, \
                             edge_map_val, ntypes_map, etypes_map, output_dir ):
     """
     Auxiliary function to create json file for the graph partition metadata
@@ -196,6 +196,8 @@ def create_metadata_json(graph_name, num_nodes, num_edges, num_parts, node_map_v
         no. of nodes in the graph partition
     num_edges : int
         no. of edges in the graph partition
+    part_id : int
+       integer indicating the partition id
     num_parts : int
         total no. of partitions of the original graph
     node_map_val : dictionary
@@ -226,12 +228,11 @@ def create_metadata_json(graph_name, num_nodes, num_edges, num_parts, node_map_v
                      'ntypes': ntypes_map,
                      'etypes': etypes_map}
 
-    for part_id in range(num_parts):
-        part_dir = 'part' + str(part_id)
-        node_feat_file = os.path.join(part_dir, "node_feat.dgl")
-        edge_feat_file = os.path.join(part_dir, "edge_feat.dgl")
-        part_graph_file = os.path.join(part_dir, "graph.dgl")
-        part_metadata['part-{}'.format(part_id)] = {'node_feats': node_feat_file,
+    part_dir = 'part' + str(part_id)
+    node_feat_file = os.path.join(part_dir, "node_feat.dgl")
+    edge_feat_file = os.path.join(part_dir, "edge_feat.dgl")
+    part_graph_file = os.path.join(part_dir, "graph.dgl")
+    part_metadata['part-{}'.format(part_id)] = {'node_feats': node_feat_file,
                                                 'edge_feats': edge_feat_file,
                                                 'part_graph': part_graph_file}
     return part_metadata
