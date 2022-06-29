@@ -25,15 +25,20 @@ class StreamContext(object):
 
         Parameters
         ----------
-        cuda_stream : torch.cuda.Stream
+        cuda_stream : torch.cuda.Stream. This manager is a no-op if it's ``None``.
             target stream will be set.
         """
-        self.ctx = to_dgl_context(cuda_stream.device)
-        self.curr_cuda_stream = cuda_stream.cuda_stream
+        if cuda_stream is None:
+            self.curr_cuda_stream = None
+        else:
+            self.ctx = to_dgl_context(cuda_stream.device)
+            self.curr_cuda_stream = cuda_stream.cuda_stream
 
     def __enter__(self):
         """ get previous stream and set target stream as current.
         """
+        if self.curr_cuda_stream is None:
+            return
         self.prev_cuda_stream = DGLStreamHandle()
         check_call(_LIB.DGLGetStream(
             self.ctx.device_type, self.ctx.device_id, ctypes.byref(self.prev_cuda_stream)))
@@ -43,6 +48,8 @@ class StreamContext(object):
     def __exit__(self, exc_type, exc_value, exc_traceback):
         """ restore previous stream when exiting.
         """
+        if self.curr_cuda_stream is None:
+            return
         check_call(_LIB.DGLSetStream(
             self.ctx.device_type, self.ctx.device_id, self.prev_cuda_stream))
 
@@ -52,7 +59,7 @@ def stream(cuda_stream):
 
     Parameters
     ----------
-    stream : torch.cuda.Stream
+    stream : torch.cuda.Stream. This manager is a no-op if it's ``None``.
         target stream will be set.
     """
     return StreamContext(cuda_stream)
