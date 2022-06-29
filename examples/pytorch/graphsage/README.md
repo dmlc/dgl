@@ -4,7 +4,7 @@ Inductive Representation Learning on Large Graphs (GraphSAGE)
 - Paper link: [http://papers.nips.cc/paper/6703-inductive-representation-learning-on-large-graphs.pdf](http://papers.nips.cc/paper/6703-inductive-representation-learning-on-large-graphs.pdf)
 - Author's code repo: [https://github.com/williamleif/graphsage-simple](https://github.com/williamleif/graphsage-simple)
 
-For advanced usages, including training with multi-gpu/multi-node, and PyTorch Lightning, etc., more examples can be found in [GraphSAGE advanced](https://github.com/dmlc/dgl/tree/master/examples/pytorch/graphsage/advanced) directory.
+For advanced usages, including training with multi-gpu/multi-node, and PyTorch Lightning, etc., more examples can be found in [advanced](https://github.com/dmlc/dgl/tree/master/examples/pytorch/graphsage/advanced) and [dist](https://github.com/dmlc/dgl/tree/master/examples/pytorch/graphsage/dist) directory.
 
 Requirements
 ------------
