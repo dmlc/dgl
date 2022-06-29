@@ -2,10 +2,9 @@ Inductive Representation Learning on Large Graphs (GraphSAGE)
 ============
 
 - Paper link: [http://papers.nips.cc/paper/6703-inductive-representation-learning-on-large-graphs.pdf](http://papers.nips.cc/paper/6703-inductive-representation-learning-on-large-graphs.pdf)
-- Author's code repo: [https://github.com/williamleif/graphsage-simple](https://github.com/williamleif/graphsage-simple). Note that the original code is 
-simple reference implementation of GraphSAGE.
+- Author's code repo: [https://github.com/williamleif/graphsage-simple](https://github.com/williamleif/graphsage-simple)
 
-Advanced usages, including how to run pure GPU sampling, how to train with PyTorch Lightning, etc., are in the `graphsage/advanced` directory.
+For advanced usages, including training with multi-gpu/multi-node, and PyTorch Lightning, etc., more examples can be found in [GraphSAGE advanced](https://github.com/dmlc/dgl/tree/master/examples/pytorch/graphsage/advanced) directory.
 
 Requirements
 ------------
@@ -18,11 +17,11 @@ How to run
 -------
 
 ### Mini-batch sampling for node classification
-Train w/ mini-batch sampling for node classification on OGB-products:
+Train w/ mini-batch sampling for node classification on "ogbn-products" 
 
 ```bash
-# mini-batch training on gpu
-python3 node_classification.py --gpu 0
+# mini-batch training with mixed (CPU+GPU) mode
+python3 node_classification.py
 ```
 
 Results:

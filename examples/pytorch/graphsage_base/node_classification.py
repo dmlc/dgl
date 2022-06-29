@@ -39,21 +39,20 @@ class SAGE(nn.Module):
                 batch_size=batch_size, shuffle=False, drop_last=False,
                 num_workers=0)
         buffer_device = 'cpu'
+        pin_memory = (buffer_device != device)
 
         for l, layer in enumerate(self.layers):
             y = torch.empty(
                 g.num_nodes(), self.hid_size if l != len(self.layers) - 1 else self.out_size,
-                device=buffer_device, pin_memory=True)
+                device=buffer_device, pin_memory=pin_memory)
             feat = feat.to(device)
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
-                # use an explicitly contiguous slice
                 x = feat[input_nodes]
                 h = layer(blocks[0], x)
                 if l != len(self.layers) - 1:
                     h = F.relu(h)
                     h = self.dropout(h)
-                # by design, our output nodes are contiguous so we can take
-                # advantage of that here
+                # by design, our output nodes are contiguous
                 y[output_nodes[0]:output_nodes[-1]+1] = h.to(buffer_device)
             feat = y
         return y
@@ -110,24 +109,25 @@ def train(args, device, g, dataset, model):
             opt.step()
             total_loss += loss.item()
         acc = evaluate(model, g, val_dataloader)
-        mem = torch.cuda.max_memory_allocated() / 1000000
-        print("Epoch {:05d} | Loss {:.4f} | Accuracy {:.4f} | "
-              "GPU Mem(MB) {:.2f}".format(epoch, total_loss / (it+1),
-                                          acc.item(), mem))
+        print("Epoch {:05d} | Loss {:.4f} | Accuracy {:.4f} "
+              .format(epoch, total_loss / (it+1),
+                                          acc.item()))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", default='mixed', choices=['mixed', 'puregpu'],
-                        help="Training mode. 'mixed' for CPU-GPU mixed training. "
+    parser.add_argument("--mode", default='mixed', choices=['cpu', 'mixed', 'puregpu'],
+                        help="Training mode. 'cpu' for CPU training, 'mixed' for CPU-GPU mixed training, "
                              "'puregpu' for pure-GPU training.")
     args = parser.parse_args()
+    if not torch.cuda.is_available():
+        args.mode = 'cpu'
     print(f'Training in {args.mode} mode.')
-
+    
     # load and preprocess dataset
     dataset = AsNodePredDataset(DglNodePropPredDataset('ogbn-products'))
     g = dataset[0]
     g = g.to('cuda' if args.mode == 'puregpu' else 'cpu')
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cpu' if args.mode == 'cpu' else 'cuda')
 
     # create GraphSAGE model
     in_size = g.ndata['feat'].shape[1]
