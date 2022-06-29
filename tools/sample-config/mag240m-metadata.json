@@ -1,0 +1,31 @@
+{
+	"num_nodes": {
+		"paper": 121751666,
+		"author": 122383112,
+		"institution": 25721
+	},
+	"edges": {
+		"paper:cites:paper": {
+			"path": "mag240m_kddcup2021/processed/paper___cites___paper/edge_index.npy"
+		},
+		"author:writes:paper": {
+			"path": "mag240m_kddcup2021/processed/author___writes___paper/edge_index.npy"
+		},
+		"author:affiliated_with:institution": {
+			"path": "mag240m_kddcup2021/processed/author___affiliated_with___institution/edge_index.npy"
+		}
+	},
+	"node_data": {
+		"paper": {
+			"feat": {
+				"path": "mag240m_kddcup2021/processed/paper/node_feat.npy"
+			},
+			"label": {
+				"path": "mag240m_kddcup2021/processed/paper/node_label.npy"
+			},
+			"year": {
+				"path": "mag240m_kddcup2021/processed/paper/node_year.npy"
+			}
+		}
+	}
+}
