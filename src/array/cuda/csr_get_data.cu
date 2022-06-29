@@ -52,6 +52,12 @@ NDArray CSRGetData(
   return rst;
 }
 
+#ifdef USE_FP16
+template NDArray CSRGetData<kDLGPU, int32_t, __half>(
+    CSRMatrix csr, NDArray rows, NDArray cols, bool return_eids, NDArray weights, __half filler);
+template NDArray CSRGetData<kDLGPU, int64_t, __half>(
+    CSRMatrix csr, NDArray rows, NDArray cols, bool return_eids, NDArray weights, __half filler);
+#endif
 template NDArray CSRGetData<kDLGPU, int32_t, float>(
     CSRMatrix csr, NDArray rows, NDArray cols, bool return_eids, NDArray weights, float filler);
 template NDArray CSRGetData<kDLGPU, int64_t, float>(
