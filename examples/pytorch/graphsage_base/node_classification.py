@@ -4,6 +4,8 @@ import torch.nn.functional as F
 import torchmetrics.functional as MF
 import dgl
 import dgl.nn as dglnn
+from dgl.data import AsNodePredDataset
+from dgl.dataloading import DataLoader, NeighborSampler, MultiLayerFullNeighborSampler
 from ogb.nodeproppred import DglNodePropPredDataset
 import tqdm
 import argparse
@@ -31,8 +33,8 @@ class SAGE(nn.Module):
     def inference(self, g, device, batch_size):
         """Conduct layer-wise inference to get all the node embeddings."""
         feat = g.ndata['feat']
-        sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1, prefetch_node_feats=['feat'])
-        dataloader = dgl.dataloading.DataLoader(
+        sampler = MultiLayerFullNeighborSampler(1, prefetch_node_feats=['feat'])
+        dataloader = DataLoader(
                 g, torch.arange(g.num_nodes()).to(g.device), sampler, device=device,
                 batch_size=batch_size, shuffle=False, drop_last=False,
                 num_workers=0)
@@ -69,36 +71,35 @@ def evaluate(model, graph, dataloader):
 
 def layerwise_infer(args, device, graph, nid, model, batch_size):
     model.eval()
-    nid = nid.to(device)
     with torch.no_grad():
         pred = model.inference(graph, device, batch_size)
-        pred = pred[nid].to(device)
-        label = graph.ndata['label'][nid].to(device)
+        pred = pred[nid]
+        label = graph.ndata['label'][nid]
         return MF.accuracy(pred, label)
 
 def train(args, device, g, dataset, model):
     # create sampler & dataloader
     train_idx = dataset.train_idx.to(device)
     val_idx = dataset.val_idx.to(device)
-    sampler = dgl.dataloading.NeighborSampler([15, 10, 5],
-                                              prefetch_node_feats=['feat'],
-                                              prefetch_labels=['label'])
+    sampler = NeighborSampler([15, 10, 5],
+                              prefetch_node_feats=['feat'],
+                              prefetch_labels=['label'])
     use_uva = (args.mode == 'mixed')
-    train_dataloader = dgl.dataloading.DataLoader(g, train_idx, sampler, device=device,
-                                                  batch_size=1024, shuffle=True,
-                                                  drop_last=False, num_workers=0,
-                                                  use_uva=use_uva)
+    train_dataloader = DataLoader(g, train_idx, sampler, device=device,
+                                  batch_size=1024, shuffle=True,
+                                  drop_last=False, num_workers=0,
+                                  use_uva=use_uva)
 
-    valid_dataloader = dgl.dataloading.DataLoader(g, val_idx, sampler, device=device,
-                                                  batch_size=1024, shuffle=True,
-                                                  drop_last=False, num_workers=0,
-                                                  use_uva=use_uva)
+    val_dataloader = DataLoader(g, val_idx, sampler, device=device,
+                                batch_size=1024, shuffle=True,
+                                drop_last=False, num_workers=0,
+                                use_uva=use_uva)
 
     opt = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=5e-4)
     
     for epoch in range(10):
         model.train()
-        total_loss = torch.tensor(0.0).to(device)
+        total_loss = 0
         for it, (input_nodes, output_nodes, blocks) in enumerate(train_dataloader):
             x = blocks[0].srcdata['feat']
             y = blocks[-1].dstdata['label']
@@ -107,11 +108,11 @@ def train(args, device, g, dataset, model):
             opt.zero_grad()
             loss.backward()
             opt.step()
-            total_loss += loss
-        acc = evaluate(model, g, valid_dataloader)
+            total_loss += loss.item()
+        acc = evaluate(model, g, val_dataloader)
         mem = torch.cuda.max_memory_allocated() / 1000000
         print("Epoch {:05d} | Loss {:.4f} | Accuracy {:.4f} | "
-              "GPU Mem(MB) {:.2f}".format(epoch, total_loss.item() / (it+1),
+              "GPU Mem(MB) {:.2f}".format(epoch, total_loss / (it+1),
                                           acc.item(), mem))
 
 if __name__ == '__main__':
@@ -123,7 +124,7 @@ if __name__ == '__main__':
     print(f'Training in {args.mode} mode.')
 
     # load and preprocess dataset
-    dataset = dgl.data.AsNodePredDataset(DglNodePropPredDataset('ogbn-products'))
+    dataset = AsNodePredDataset(DglNodePropPredDataset('ogbn-products'))
     g = dataset[0]
     g = g.to('cuda' if args.mode == 'puregpu' else 'cpu')
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -136,6 +137,6 @@ if __name__ == '__main__':
     # model training
     train(args, device, g, dataset, model)
 
-    # test accuracy and offline inference of all nodes                           
+    # test the model
     acc = layerwise_infer(args, device, g, dataset.test_idx.to(device), model, batch_size=4096)
     print("Test Accuracy {:.4f}".format(acc.item()))
