@@ -112,12 +112,15 @@ def add_reverse(metadata, output_path, config):
         else:
             os.makedirs(cetype, exist_ok=True)
             os.makedirs(rev_cetype, exist_ok=True)
+            new_metadata['edges'][cetype] = edges[cetype]["path"]
             new_metadata['edges'][rev_cetype] = reverse(edges[cetype], rev_cetype_path)
             if os.path.isdir(edges[cetype]["path"]):
                 shutil.copytree(edges[cetype]["path"], cetype_path, dirs_exist_ok=True)
             else:
                 shutil.copy(edges[cetype]["path"], cetype_path)
 
+    with open('metadata.json', 'w') as f:
+        json.dump(new_metadata, f)
     os.chdir(cwd)
 
 if __name__ == '__main__':
