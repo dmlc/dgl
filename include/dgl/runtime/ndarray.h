@@ -18,6 +18,10 @@
 #include "serializer.h"
 #include "shared_mem.h"
 
+#ifdef DGL_USE_CUDA
+#include <cuda_fp16.h>
+#endif
+
 // forward declaration
 inline std::ostream& operator << (std::ostream& os, DGLType t);
 
@@ -46,6 +50,11 @@ GEN_DLDATATYPETRAITS_FOR(int64_t, kDLInt, 64);
 // converting uints to signed DTypes.
 GEN_DLDATATYPETRAITS_FOR(uint32_t, kDLInt, 32);
 GEN_DLDATATYPETRAITS_FOR(uint64_t, kDLInt, 64);
+#ifdef DGL_USE_CUDA
+#ifdef USE_FP16
+GEN_DLDATATYPETRAITS_FOR(__half, kDLFloat, 16);
+#endif
+#endif
 GEN_DLDATATYPETRAITS_FOR(float, kDLFloat, 32);
 GEN_DLDATATYPETRAITS_FOR(double, kDLFloat, 64);
 #undef GEN_DLDATATYPETRAITS_FOR

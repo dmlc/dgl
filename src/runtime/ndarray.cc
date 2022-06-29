@@ -24,6 +24,9 @@ constexpr DLDataType DLDataTypeTraits<int32_t>::dtype;
 constexpr DLDataType DLDataTypeTraits<int64_t>::dtype;
 constexpr DLDataType DLDataTypeTraits<uint32_t>::dtype;
 constexpr DLDataType DLDataTypeTraits<uint64_t>::dtype;
+#ifdef USE_FP16
+constexpr DLDataType DLDataTypeTraits<__half>::dtype;
+#endif
 constexpr DLDataType DLDataTypeTraits<float>::dtype;
 constexpr DLDataType DLDataTypeTraits<double>::dtype;
 
