@@ -9,6 +9,7 @@ import pyarrow
 import pandas as pd
 import constants
 from pyarrow import csv
+from utils import read_json
 
 def create_dgl_object(graph_name, num_parts, \
                         schema, part_id, node_data, \
@@ -129,7 +130,7 @@ def create_dgl_object(graph_name, num_parts, \
     assert len(uniq_ids) == len(idx)
     # We get the edge list with their node IDs mapped to a contiguous ID range.
     part_local_src_id, part_local_dst_id = np.split(inverse_idx[:len(shuffle_global_src_id) * 2], 2)
-    compact_g = dgl.graph((part_local_src_id, part_local_dst_id))
+    compact_g = dgl.graph(data=(part_local_src_id, part_local_dst_id), num_nodes=len(idx))
     compact_g.edata['orig_id'] = th.as_tensor(global_edge_id)
     compact_g.edata[dgl.ETYPE] = th.as_tensor(etype_ids)
     compact_g.edata['inner_edge'] = th.ones(
