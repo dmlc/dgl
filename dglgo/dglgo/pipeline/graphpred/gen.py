@@ -125,4 +125,4 @@ class GraphpredPipeline(PipelineBase):
 
     @staticmethod
     def get_description() -> str:
-        return "Graph property prediction pipeline"
+        return "Graph property prediction pipeline on binary classification"
