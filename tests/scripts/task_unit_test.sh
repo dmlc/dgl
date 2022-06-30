@@ -32,18 +32,18 @@ fi
 
 conda activate ${DGLBACKEND}-ci
 
-python3 -m pip install pytest psutil pyyaml pandas pydantic rdflib ogb || fail "pip install"
-python3 -m pytest -v --junitxml=pytest_compute.xml --durations=20 tests/compute || fail "compute"
-python3 -m pytest -v --junitxml=pytest_backend.xml --durations=20 tests/$DGLBACKEND || fail "backend-specific"
+python3 -m pip install pytest psutil pandas rdflib ogb || fail "pip install"
+python3 -m pytest -v --junitxml=pytest_compute.xml --durations=100 tests/compute || fail "compute"
+python3 -m pytest -v --junitxml=pytest_backend.xml --durations=100 tests/$DGLBACKEND || fail "backend-specific"
 
 
 export PYTHONUNBUFFERED=1
 export OMP_NUM_THREADS=1
 export DMLC_LOG_DEBUG=1
 if [ $2 != "gpu" ]; then
-    python3 -m pytest -v --capture=tee-sys --junitxml=pytest_distributed.xml --durations=20 tests/distributed/*.py || fail "distributed"
+    python3 -m pytest -v --capture=tee-sys --junitxml=pytest_distributed.xml --durations=100 tests/distributed/*.py || fail "distributed"
     if [ $DGLBACKEND == "pytorch" ]; then
         python3 -m pip install filelock
-        PYTHONPATH=tools:$PYTHONPATH python3 -m pytest -v --capture=tee-sys --junitxml=pytest_tools.xml --durations=20 tests/tools/*.py || fail "tools"
+        PYTHONPATH=tools:$PYTHONPATH python3 -m pytest -v --capture=tee-sys --junitxml=pytest_tools.xml --durations=100 tests/tools/*.py || fail "tools"
     fi
 fi
