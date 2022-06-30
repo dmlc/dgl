@@ -4,7 +4,7 @@
  * \brief GPU specific API
  */
 #include <dgl/runtime/device_api.h>
-
+#include <dgl/runtime/tensordispatch.h>
 #include <dmlc/thread_local.h>
 #include <dgl/runtime/registry.h>
 #include <cuda_runtime.h>
@@ -223,12 +223,21 @@ class CUDADeviceAPI final : public DeviceAPI {
     return result;
   }
 
-  void* AllocWorkspace(DGLContext ctx, size_t size, DGLType type_hint) final {
-    return CUDAThreadEntry::ThreadLocal()->pool.AllocWorkspace(ctx, size);
+  void* AllocWorkspace(DGLContext ctx, size_t size, DGLType type_hint) final { 
+    SetDevice(ctx);
+    TensorDispatcher* td = TensorDispatcher::Global();
+    if (td->IsAvailable())
+      return td->AllocWorkspace(size);
+    else
+      return CUDAThreadEntry::ThreadLocal()->pool.AllocWorkspace(ctx, size);
   }
 
   void FreeWorkspace(DGLContext ctx, void* data) final {
-    CUDAThreadEntry::ThreadLocal()->pool.FreeWorkspace(ctx, data);
+    TensorDispatcher* td = TensorDispatcher::Global();
+    if (td->IsAvailable())
+      return td->FreeWorkspace(data);
+    else
+      CUDAThreadEntry::ThreadLocal()->pool.FreeWorkspace(ctx, data);
   }
 
   static const std::shared_ptr<CUDADeviceAPI>& Global() {

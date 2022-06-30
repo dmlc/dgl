@@ -7,6 +7,7 @@
 #include <tensoradapter_exports.h>
 #include <torch/torch.h>
 #include <ATen/DLConvertor.h>
+#include <c10/cuda/CUDACachingAllocator.h>
 #include <vector>
 #include <iostream>
 
@@ -45,6 +46,14 @@ TA_EXPORTS DLManagedTensor* TAempty(
     .dtype(at::toScalarType(dtype));
   torch::Tensor tensor = torch::empty(shape, options);
   return at::toDLPack(tensor);
+}
+
+TA_EXPORTS void* RawAlloc(size_t nbytes) {
+  return c10::cuda::CUDACachingAllocator::raw_alloc(nbytes);
+}
+
+TA_EXPORTS void RawDelete(void* ptr) {
+  c10::cuda::CUDACachingAllocator::raw_delete(ptr);
 }
 
 };

@@ -28,6 +28,10 @@ extern "C" {
 DLManagedTensor* TAempty(
     std::vector<int64_t> shape, DLDataType dtype, DLContext ctx);
 
+void* RawAlloc(size_t nbytes);
+
+void RawDelete(void* ptr);
+
 }
 
 };  // namespace tensoradapter

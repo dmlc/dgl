@@ -78,6 +78,16 @@ class TensorDispatcher {
     return NDArray::FromDLPack(result);
   }
 
+  inline void* AllocWorkspace(size_t nbytes) {
+    auto entry = entrypoints_[Op::kRawAlloc];
+    return FUNCCAST(tensoradapter::RawAlloc, entry)(nbytes);
+  }
+
+  inline void FreeWorkspace(void* ptr) {
+    auto entry = entrypoints_[Op::kRawDelete];
+    FUNCCAST(tensoradapter::RawDelete, entry)(ptr);
+  }
+
  private:
   /*! \brief ctor */
   TensorDispatcher() = default;
@@ -91,19 +101,27 @@ class TensorDispatcher {
    */
   static constexpr const char *names_[] = {
     "TAempty",
+    "RawAlloc",
+    "RawDelete",
   };
 
   /*! \brief Index of each function to the symbol list */
   class Op {
    public:
     static constexpr int kEmpty = 0;
+    static constexpr int kRawAlloc = 1;
+    static constexpr int kRawDelete = 2;
   };
 
   /*! \brief Number of functions */
   static constexpr int num_entries_ = sizeof(names_) / sizeof(names_[0]);
 
   /*! \brief Entrypoints of each function */
-  void* entrypoints_[num_entries_] = {nullptr};
+  void* entrypoints_[num_entries_] = {
+    nullptr,
+    nullptr,
+    nullptr,
+  };
 
   bool available_ = false;
 #if defined(WIN32) || defined(_WIN32)
