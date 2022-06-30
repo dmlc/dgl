@@ -24,7 +24,7 @@ def _(meta, output_path):
     return {'fmt': 'numpy', 'path': new_path}
 
 @reverse.register(files.is_c_blob)
-def _(meta, output_path)
+def _(meta, output_path):
     path = meta['path']
     dtype = meta['dtype']
     shape = [int(_) for _ in meta['shape'].split(',')]
