@@ -35,7 +35,14 @@ def exchange_node_data(rank, world_size, node_data):
     node_data : dictionary
         nodes data dictionary with keys as column names and values as
         columns from the nodes csv file
+
+    Returns:
+    --------
+    dictionary : 
+        the input argument, node_data, is updated with the node data received by other processes
+        in the world.
     """
+
     input_list = []
     send_sizes = []
     recv_sizes = []
@@ -80,6 +87,7 @@ def exchange_node_data(rank, world_size, node_data):
     node_data[constants.GLOBAL_TYPE_NID] = rcvd_node_data[:,1]
     node_data[constants.GLOBAL_NID] = rcvd_node_data[:,2]
     node_data.pop(constants.OWNER_PROCESS)
+    return node_data
 
 def exchange_edge_data(rank, world_size, edge_data):
     """
@@ -96,7 +104,14 @@ def exchange_edge_data(rank, world_size, edge_data):
     edge_data : dictionary
         edge information, as a dicitonary which stores column names as keys and values
         as column data. This information is read from the edges.txt file.
+
+    Returns:
+    --------
+    dictionary : 
+        the input argument, edge_data, is updated with the edge data received by other processes
+        in the world.
     """
+
     input_list = []
     send_sizes = []
     recv_sizes = []
@@ -138,6 +153,7 @@ def exchange_edge_data(rank, world_size, edge_data):
     edge_data[constants.ETYPE_ID] = rcvd_edge_data[:,3]
     edge_data[constants.GLOBAL_EID] = rcvd_edge_data[:,4]
     edge_data.pop(constants.OWNER_PROCESS)
+    return edge_data
 
 
 def exchange_node_features(rank, world_size, node_data, node_features, ntypes_map, \
@@ -177,6 +193,15 @@ def exchange_node_features(rank, world_size, node_data, node_features, ntypes_ma
         mapping between node type id and no of nodes which belong to each node_type_id
     node_part_ids : numpy array
         numpy array which store the partition-ids and indexed by global_nids
+
+    Returns:
+    --------
+    dictionary : 
+        node features are returned as a dictionary where keys are node type names and node feature names 
+        and values are tensors
+    list : 
+        a list of global_nids for the nodes whose node features are received during the data shuffle 
+        process. 
     """
 
     #determine Global_type_nid for the residing features 
@@ -184,12 +209,10 @@ def exchange_node_features(rank, world_size, node_data, node_features, ntypes_ma
     node_features_rank_lst = []
     global_nid_rank_lst = []
     for part_id in np.arange(world_size):
-
         #form outgoing features to each process
         send_node_features = {}
         send_global_nids = {}
         for ntype_name, ntype_id in ntypes_map.items(): 
-
             #check if features exist for this node_type
             if (ntype_name+'/feat' in node_features) and (node_features[ntype_name+'/feat'].shape[0] > 0):
                 feature_count = node_features[ntype_name+'/feat'].shape[0]
@@ -215,16 +238,6 @@ def exchange_node_features(rank, world_size, node_data, node_features, ntypes_ma
                 global_nids = np.arange(global_nid_start, global_nid_end, dtype=np.int64)
 
                 #determine node feature ownership 
-                #TODO: a Bug here. 
-                '''
-                part_ids = node_part_ids[global_nids] 
-                idx = (part_ids == part_id)
-                out_global_nid = global_nids[idx == 1]
-                out_type_nid = type_nid[idx == 1]
-                out_features = node_features[ntype_name+'/feat'][out_type_nid]
-                send_node_features[ntype_name+'/feat'] = out_features
-                send_global_nids[ntype_name+'/feat'] = out_global_nid
-                '''
                 part_ids_slice = node_part_ids[global_nid_start:global_nid_end]
                 idx = (part_ids_slice == part_id)
                 out_global_nid = global_nids[idx == 1]
@@ -289,14 +302,29 @@ def exchange_graph_data(rank, world_size, node_data, node_features, edge_data,
         mapping between node type names and global_nids which belong to the keys in this dictionary
     ntype_id_count : dictionary
         mapping between node type id and no of nodes which belong to each node_type_id
+
+    Returns:
+    --------
+    dictionary : 
+        the input argument, node_data dictionary, is updated with the node data received from other processes
+        in the world. The node data is received by each rank in the process of data shuffling.
+    dictionary : 
+        node features dictionary which has node features for the nodes which are owned by the current 
+        process
+    dictionary : 
+        list of global_nids for the nodes whose node features are received when node features shuffling was 
+        performed in the `exchange_node_features` function call
+    dictionary : 
+        the input argument, edge_data dictionary, is updated with the edge data received from other processes
+        in the world. The edge data is received by each rank in the process of data shuffling.
     """
     rcvd_node_features, rcvd_global_nids = exchange_node_features(rank, world_size, node_data, \
             node_features, ntypes_map, ntypes_nid_map, ntype_id_count, node_part_ids)
     print( 'Rank: ', rank, ' Done with node features exchange.')
 
-    exchange_node_data(rank, world_size, node_data)
-    exchange_edge_data(rank, world_size, edge_data)
-    return rcvd_node_features, rcvd_global_nids
+    node_data = exchange_node_data(rank, world_size, node_data)
+    edge_data = exchange_edge_data(rank, world_size, edge_data)
+    return node_data, rcvd_node_features, rcvd_global_nids, edge_data
 
 def read_dataset(rank, world_size, node_part_ids, params):
     """
@@ -329,6 +357,7 @@ def read_dataset(rank, world_size, node_part_ids, params):
     dictionary
         edge features which is also a dictionary, similar to node features dictionary
     """
+
     edge_features = {}
     node_data, node_features, edge_data = \
         get_dataset(params.input_dir, params.graph_name, rank, params.num_node_weights)
@@ -434,7 +463,7 @@ def gen_dist_partitions(rank, world_size, params):
     #this function will also stitch the data recvd from other processes
     #and return the aggregated data
     ntypes_nid_map, ntype_id_count = get_ntypes_map(schema_map)
-    rcvd_node_features, rcvd_global_nids  = exchange_graph_data(rank, world_size, node_data, \
+    node_data, rcvd_node_features, rcvd_global_nids, edge_data = exchange_graph_data(rank, world_size, node_data, \
             node_features, edge_data, node_part_ids, ntypes_map, ntypes_nid_map, ntype_id_count)
     print('[Rank: ', rank, '] Done with data shuffling...')
 
