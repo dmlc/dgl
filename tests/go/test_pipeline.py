@@ -32,27 +32,27 @@ def test_nodepred_model(model):
                                   'co-buy-computer', 'ogbn-arxiv', 'ogbn-products'])
 def test_nodepred_ns_data(data):
     os.system(f'dgl configure nodepred-ns --data {data} --model gcn')
-    assert os.path.exists(f'nodepred_{data}_gcn.yaml')
+    assert os.path.exists(f'nodepred-ns_{data}_gcn.yaml')
 
-    custom_cfg = f'custom_{data}_gcn.yaml'
+    custom_cfg = f'ns-custom_{data}_gcn.yaml'
     os.system(f'dgl configure nodepred-ns --data {data} --model gcn --cfg {custom_cfg}')
     assert os.path.exists(custom_cfg)
 
-    custom_script = f'{data}_gcn.py'
+    custom_script = f'ns-{data}_gcn.py'
     os.system(f'dgl export --cfg {custom_cfg} --output {custom_script}')
     assert os.path.exists(custom_script)
 
 
 @pytest.mark.parametrize('model', ['gcn', 'gat', 'sage'])
-def test_nodepred_model(model):
+def test_nodepred_ns_model(model):
     os.system(f'dgl configure nodepred-ns --data cora --model {model}')
-    assert os.path.exists(f'nodepred_cora_{model}.yaml')
+    assert os.path.exists(f'nodepred-ns_cora_{model}.yaml')
 
-    custom_cfg = f'custom_cora_{model}.yaml'
+    custom_cfg = f'ns-custom_cora_{model}.yaml'
     os.system(f'dgl configure nodepred-ns --data cora --model {model} --cfg {custom_cfg}')
     assert os.path.exists(custom_cfg)
 
-    custom_script = f'cora_{model}.py'
+    custom_script = f'ns-cora_{model}.py'
     os.system(f'dgl export --cfg {custom_cfg} --output {custom_script}')
     assert os.path.exists(custom_script)
 
