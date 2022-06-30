@@ -13,7 +13,7 @@ Requirements
 pip install requests torchmetrics
 ```
 
-Results
+How to run
 -------
 
 ### Full graph training
@@ -23,17 +23,25 @@ Run with following (available dataset: "cora", "citeseer", "pubmed")
 python3 train_full.py --dataset cora --gpu 0    # full graph
 ```
 
+Results:
+```
 * cora: ~0.8330 
 * citeseer: ~0.7110
 * pubmed: ~0.7830
+```
 
 ### Minibatch training for node classification
 
-Train w/ mini-batch sampling for node classification on "ogbn-products"
+Train w/ mini-batch sampling in mixed mode (CPU+GPU) for node classification on "ogbn-products"
 
 ```bash
 python3 node_classification.py
 python3 multi_gpu_node_classification.py
+```
+
+Results:
+```
+Test Accuracy: 0.7632
 ```
 
 ### PyTorch Lightning for node classification
