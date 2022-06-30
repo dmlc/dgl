@@ -80,7 +80,7 @@ def train(args, device, g, dataset, model):
     # create sampler & dataloader
     train_idx = dataset.train_idx.to(device)
     val_idx = dataset.val_idx.to(device)
-    sampler = NeighborSampler([10, 10],  # fanout for layer-0, layer-1
+    sampler = NeighborSampler([10, 10],  # fanout for [layer-0, layer-1]
                               prefetch_node_feats=['feat'],
                               prefetch_labels=['label'])
     use_uva = (args.mode == 'mixed')
