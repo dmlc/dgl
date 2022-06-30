@@ -376,7 +376,6 @@ def write_dgl_objects(graph_obj, node_features, edge_features, output_dir, part_
 
     part_dir = output_dir + '/part' + str(part_id)
     os.makedirs(part_dir, exist_ok=True)
-    #write_graph_dgl(os.path.join(part_dir ,'part'+str(part_id)), graph_obj)
     write_graph_dgl(os.path.join(part_dir ,'graph.dgl'), graph_obj)
 
     if node_features != None:
