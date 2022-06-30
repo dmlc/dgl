@@ -97,7 +97,7 @@ def tutorial_test_linux(backend) {
 def go_test_linux() {
   init_git()
   unpack_lib('dgl-cpu-linux', dgl_linux_libs)
-  timeout(time: 30, unit: 'MINUTES') {
+  timeout(time: 20, unit: 'MINUTES') {
     sh "bash tests/scripts/task_go_test.sh"
   }
 }
@@ -371,11 +371,6 @@ pipeline {
                     tutorial_test_linux('pytorch')
                   }
                 }
-                stage('DGL-Go CPU test') {
-                  steps {
-                    go_test_linux()
-                  }
-                }
               }
               post {
                 always {
@@ -445,11 +440,6 @@ pipeline {
                     unit_test_linux('mxnet', 'cpu')
                   }
                 }
-              //stage("Tutorial test") {
-              //  steps {
-              //    tutorial_test_linux("mxnet")
-              //  }
-              //}
               }
               post {
                 always {
@@ -471,6 +461,27 @@ pipeline {
                   steps {
                     sh 'nvidia-smi'
                     unit_test_linux('mxnet', 'gpu')
+                  }
+                }
+              }
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
+                }
+              }
+            }
+            stage('DGL-Go') {
+              agent {
+                docker {
+                  label "linux-cpu-node"
+                  image "dgllib/dgl-ci-cpu:cu101_v220629"
+                  alwaysPull true
+                }
+              }
+              stages {
+                stage('DGL-Go CPU test') {
+                  steps {
+                    go_test_linux()
                   }
                 }
               }
