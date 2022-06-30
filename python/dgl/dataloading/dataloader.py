@@ -773,8 +773,7 @@ class DataLoader(torch.utils.data.DataLoader):
             else:
                 if self.graph.device != indices_device:
                     raise ValueError(
-                        'Expect graph and indices to be on the same device. '
-                        'If you wish to use UVA sampling, please set use_uva=True.')
+                        'Expect graph and indices to be on the same device when use_uva=False. ')
                 if self.graph.device.type == 'cuda' and num_workers > 0:
                     raise ValueError('num_workers must be 0 if graph and indices are on CUDA.')
                 if self.graph.device.type == 'cpu' and num_workers > 0:
