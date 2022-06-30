@@ -23,8 +23,4 @@ popd
 export LC_ALL=C.UTF-8
 export LANG=C.UTF-8
 
-python3 -m pytest -v --junitxml=pytest_go.xml tests/go || fail "go"
-
-export PYTHONUNBUFFERED=1
-export OMP_NUM_THREADS=1
-export DMLC_LOG_DEBUG=1
+python3 -m pytest -v --junitxml=pytest_go.xml --durations=20 tests/go || fail "go"
