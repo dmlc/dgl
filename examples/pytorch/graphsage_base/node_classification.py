@@ -80,7 +80,7 @@ def train(args, device, g, dataset, model):
     # create sampler & dataloader
     train_idx = dataset.train_idx.to(device)
     val_idx = dataset.val_idx.to(device)
-    sampler = NeighborSampler([15, 10, 5],
+    sampler = NeighborSampler([10, 10, 10],  # fanout for layer-0, layer-1 and layer-2
                               prefetch_node_feats=['feat'],
                               prefetch_labels=['label'])
     use_uva = (args.mode == 'mixed')
@@ -124,6 +124,7 @@ if __name__ == '__main__':
     print(f'Training in {args.mode} mode.')
     
     # load and preprocess dataset
+    print('Loading data')
     dataset = AsNodePredDataset(DglNodePropPredDataset('ogbn-products'))
     g = dataset[0]
     g = g.to('cuda' if args.mode == 'puregpu' else 'cpu')
@@ -135,8 +136,10 @@ if __name__ == '__main__':
     model = SAGE(in_size, 256, out_size).to(device)
 
     # model training
+    print('Training')
     train(args, device, g, dataset, model)
 
     # test the model
+    print('Testing')
     acc = layerwise_infer(args, device, g, dataset.test_idx.to(device), model, batch_size=4096)
     print("Test Accuracy {:.4f}".format(acc.item()))
