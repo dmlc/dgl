@@ -34,7 +34,7 @@ rm -rf _download
 
 pushd build
 cmake $CMAKE_VARS ..
-make -j2
+make -j
 popd
 
 pushd python
