@@ -5,14 +5,63 @@ import dgl
 import dgl.nn as dglnn
 from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
 import argparse
+import math
+
+def gcn_msg(edge):
+    msg = edge.src['h'] * edge.src['norm']
+    return {'m': msg}
+
+def gcn_reduce(node):
+    accum = torch.sum(node.mailbox['m'], 1) * node.data['norm']
+    return {'h': accum}
+
+class NodeApplyModule(nn.Module):
+    def __init__(self, out_size, activation=None, bias=True):
+        super().__init__()
+        if bias:
+            self.bias = nn.Parameter(torch.Tensor(out_size))
+        else:
+            self.bias = None
+        self.activation = activation
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        if self.bias is not None:
+            stdv = 1. / math.sqrt(self.bias.size(0))
+            self.bias.data.uniform_(-stdv, stdv)
+
+    def forward(self, nodes):
+        h = nodes.data['h']
+        if self.bias is not None:
+            h = h + self.bias
+        if self.activation:
+            h = self.activation(h)
+        return {'h': h}
+
+class GCNLayer(nn.Module):
+    def __init__(self, in_size, out_size, activation=None, bias=True):
+        super().__init__()
+        self.weight = nn.Parameter(torch.Tensor(in_size, out_size))
+        self.node_update = NodeApplyModule(out_size, activation, bias)
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        stdv = 1. / math.sqrt(self.weight.size(1))
+        self.weight.data.uniform_(-stdv, stdv)
+
+    def forward(self, g, h):
+        g.ndata['h'] = torch.mm(h, self.weight)
+        g.update_all(gcn_msg, gcn_reduce, self.node_update)
+        h = g.ndata.pop('h')
+        return h
 
 class GCN(nn.Module):
     def __init__(self, in_size, hid_size, out_size):
         super().__init__()
         self.layers = nn.ModuleList()
         # two-layer GCN
-        self.layers.append(dglnn.GraphConv(in_size, hid_size, activation=F.relu))
-        self.layers.append(dglnn.GraphConv(hid_size, out_size))
+        self.layers.append(GCNLayer(in_size, hid_size, activation=F.relu))
+        self.layers.append(GCNLayer(hid_size, out_size))
         self.dropout = nn.Dropout(0.5)
 
     def forward(self, g, features):
@@ -32,7 +81,6 @@ def evaluate(g, features, labels, mask, model):
         _, indices = torch.max(logits, dim=1)
         correct = torch.sum(indices == labels)
         return correct.item() * 1.0 / len(labels)
-
 
 def train(device, g, features, labels, masks, model):
     # define train/val samples, loss function and optimizer
@@ -61,7 +109,7 @@ if __name__ == '__main__':
                         help="graph self-loop (default=False)")
     parser.set_defaults(self_loop=False)
     args = parser.parse_args()
-    print(f'Training with DGL intrinsic graph convolution module.')
+    print(f'Training with user-defined graph convolution module.')
  
     # load and preprocess dataset
     if args.dataset == 'cora':
