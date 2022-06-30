@@ -1,7 +1,4 @@
 """Degree balanced dataloader."""
-# pylint: disable=bad-super-call
-from typing import Generic
-import functools
 
 import torch
 import numpy as np
@@ -50,7 +47,7 @@ class DegreeBalancedDataloader(DataLoader):
     >>> nids = torch.arange(g.number_of_nodes()).to(g.device)
     >>> sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
     >>> dataloader = DegreeBalancedDataloader(
-    ...     g, nids, sampler, max_node=5000, max_edge=500000,
+    ...     g, nids, sampler, max_node=5000, max_degree=500000,
     ...     shuffle=False, device="cuda", num_workers=0)
     >>> for input_nodes, output_nodes, blocks in dataloader:
     ...     print(blocks)
@@ -75,44 +72,6 @@ class DegreeBalancedDataloader(DataLoader):
                          drop_last=False,
                          use_prefetch_thread=False,
                          num_workers=num_workers)
-
-    def modify_max_degree(self, max_degree):
-        """Modify maximum degrees.
-
-        Parameters
-        ----------
-        max_degree : int
-            The modified maximum number of degrees.
-        """
-        self.dataset.max_degree = max_degree
-        if self.dataset.curr_iter is not None:
-            self.dataset.curr_iter.max_degree = max_degree
-
-    def modify_max_node(self, max_node):
-        """Modify maximum nodes.
-
-        Parameters
-        ----------
-        max_node : int
-            The modified maximum number of nodes.
-        """
-        self.dataset.max_node = max_node
-        if self.dataset.curr_iter is not None:
-            self.dataset.curr_iter.max_node = max_node
-
-    def reset_batch_node(self, node_count):
-        """Reset batch node.
-
-        Parameters
-        ----------
-        node_count : int
-            The number of nodes to be rollback.
-        """
-        if self.dataset.curr_iter is not None:
-            self.dataset.curr_iter.index -= node_count
-
-    def __setattr__(self, __name, __value):
-        super(Generic, self).__setattr__(__name, __value)
 
 
 class DegreeBalancedDataset(TensorizedDataset):
@@ -142,18 +101,12 @@ class DegreeBalancedDataset(TensorizedDataset):
         self.curr_iter = DegreeBalancedDatasetIter(id_tensor, self.max_node, self.max_degree,
             prefix_sum_in_degrees, self._mapping_keys)
 
-    def __getattr__(self, attribute_name):
-        if attribute_name in DegreeBalancedDataset.functions:
-            function = functools.partial(DegreeBalancedDataset.functions[attribute_name], self)
-            return function
-        else:
-            return super(Generic, self).__getattr__(attribute_name)
-
     def shuffle(self):
         """We use another shuffle stretegy here."""
         return
 
     def __iter__(self):
+        self.curr_iter.index = 0
         return self.curr_iter
 
 
