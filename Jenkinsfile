@@ -102,6 +102,10 @@ def go_test_linux() {
   }
 }
 
+def sanity_check_for_nvidia_image() {
+  sh "python3 -c 'import cugraph; import torch; torch.cuda.is_available();'"
+}
+
 def is_authorized(name) {
   def authorized_user = ['VoVAllen', 'BarclayII', 'jermainewang', 'zheng-da', 'mufeili', 'Rhett-Ying', 'isratnisa']
   return (name in authorized_user)
@@ -232,6 +236,24 @@ pipeline {
               steps {
                 // sh "nvidia-smi"
                 build_dgl_linux('gpu')
+              }
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
+                }
+              }
+            }
+            stage('GPU Build Based on Nvidia image') {
+              agent {
+                docker {
+                  label "linux-cpu-node"
+                  image "nvcr.io/nvidia/pytorch:22.04-py3"
+                  args "-u root"
+                  alwaysPull false
+                }
+              }
+              steps {
+                build_dgl_linux('gpu_nv')
               }
               post {
                 always {
@@ -422,6 +444,35 @@ pipeline {
                 stage('Torch GPU Example test') {
                   steps {
                     example_test_linux('pytorch', 'gpu')
+                  }
+                }
+              }
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
+                }
+              }
+            }
+            stage('Torch GPU Based on Nvidia Image') {
+              agent {
+                docker {
+                  label "linux-gpu-node"
+                  image "nvcr.io/nvidia/pytorch:22.04-py3"
+                  args "--runtime nvidia --shm-size=8gb"
+                  alwaysPull false
+                }
+              }
+              stages {
+                stage('Torch GPU Unit test') {
+                  steps {
+                    sh 'nvidia-smi'
+                    sanity_check_for_nvidia_image()
+                    unit_test_linux('pytorch', 'gpu_nv')
+                  }
+                }
+                stage('Torch GPU Example test') {
+                  steps {
+                    example_test_linux('pytorch', 'gpu_nv')
                   }
                 }
               }
