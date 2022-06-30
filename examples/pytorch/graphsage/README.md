@@ -41,7 +41,7 @@ python3 multi_gpu_node_classification.py
 
 Results:
 ```
-Test Accuracy: 0.7632
+Test Accuracy: 0.7415
 ```
 
 ### PyTorch Lightning for node classification
