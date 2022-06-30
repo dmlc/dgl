@@ -48,7 +48,7 @@ class SAGE(nn.Module):
             feat = feat.to(device)
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
                 x = feat[input_nodes]
-                h = layer(blocks[0], x)
+                h = layer(blocks[0], x) # len(blocks) = 1
                 if l != len(self.layers) - 1:
                     h = F.relu(h)
                     h = self.dropout(h)
