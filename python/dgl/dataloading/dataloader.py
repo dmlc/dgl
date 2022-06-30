@@ -631,7 +631,8 @@ class DataLoader(torch.utils.data.DataLoader):
     Examples
     --------
     To train a 3-layer GNN for node classification on a set of nodes ``train_nid`` on
-    a homogeneous graph where each node takes messages from all neighbors (assume
+    a homogeneous graph where each node takes messages from 15 neighbors on the
+    first layer, 10 neighbors on the second, and 5 neighbors on the third (assume
     the backend is PyTorch):
 
     >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
