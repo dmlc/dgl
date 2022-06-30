@@ -82,7 +82,7 @@ def evaluate(g, features, labels, mask, model):
         correct = torch.sum(indices == labels)
         return correct.item() * 1.0 / len(labels)
 
-def train(device, g, features, labels, masks, model):
+def train(g, features, labels, masks, model):
     # define train/val samples, loss function and optimizer
     train_mask = masks[0]
     val_mask = masks[1]
@@ -143,7 +143,7 @@ if __name__ == '__main__':
 
     # model training
     print('Training...')
-    train(device, g, features, labels, masks, model)
+    train(g, features, labels, masks, model)
     
     # test the model
     print('Testing...')
