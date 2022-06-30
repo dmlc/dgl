@@ -16,21 +16,27 @@ if [ $# -ne 2 ]; then
     fail "Error: must specify backend and device"
 fi
 
+TEST_DEVICE=$2
+if [[ $2 == "gpu_nv" ]]; then
+    TEST_DEVICE=gpu
+
 export DGLBACKEND=$1
-export DGLTESTDEV=$2
+export DGLTESTDEV=${TEST_DEVICE}
 export DGL_LIBRARY_PATH=${PWD}/build
 export PYTHONPATH=tests:${PWD}/python:$PYTHONPATH
 export DGL_DOWNLOAD_DIR=${PWD}
 export TF_FORCE_GPU_ALLOW_GROWTH=true
 
-if [ $2 == "gpu" ] 
+if [[ $2 == *"gpu"* ]]
 then
   export CUDA_VISIBLE_DEVICES=0
 else
   export CUDA_VISIBLE_DEVICES=-1
 fi
 
-conda activate ${DGLBACKEND}-ci
+if [[ $2 != "gpu_nv" ]]; then
+    conda activate ${DGLBACKEND}-ci
+fi
 
 python3 -m pip install pytest psutil pyyaml pandas pydantic rdflib ogb || fail "pip install"
 python3 -m pytest -v --junitxml=pytest_compute.xml tests/compute || fail "compute"
