@@ -470,11 +470,6 @@ pipeline {
                     unit_test_linux('pytorch', 'gpu_nv')
                   }
                 }
-                stage('Torch GPU Example test') {
-                  steps {
-                    example_test_linux('pytorch', 'gpu_nv')
-                  }
-                }
               }
               post {
                 always {

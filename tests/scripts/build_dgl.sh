@@ -37,12 +37,12 @@ cmake $CMAKE_VARS ..
 make -j2
 popd
 
-if [[ $1 == "gpu_nv" ]]; then
-    exit 0
-
 pushd python
 for backend in pytorch mxnet tensorflow
 do
+if [[ $1 == "gpu_nv" ]]; then
+    continue
+fi
 conda activate "${backend}-ci"
 rm -rf build *.egg-info dist
 pip uninstall -y dgl
