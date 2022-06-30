@@ -328,9 +328,11 @@ def exchange_graph_data(rank, world_size, node_data, node_features, edge_data,
 
 def read_dataset(rank, world_size, node_part_ids, params):
     """
-    After reading input graph files, add additional information(columns) are added
-    to these data structures, as discussed in detail in the initialize.py file for the
-    case of single-file-format dataset use-case. 
+    This function gets the dataset and performs post-processing on the data which is read from files.
+    Additional information(columns) are added to nodes metadata like owner_process, global_nid which 
+    are later used in processing this information. For edge data, which is now a dictionary, we add new columns
+    like global_edge_id and owner_process. Augmenting these data structure helps in processing these data structures
+    when data shuffling is performed. 
 
     Parameters:
     -----------
@@ -526,3 +528,71 @@ def gen_dist_partitions(rank, world_size, params):
 
     global_end = timer()
     print('[Rank: ', rank, '] Total execution time of the program: ', timedelta(seconds = global_end - global_start))
+
+def single_machine_run(params):
+    """ Main function for distributed implementation on a single machine
+
+    Parameters:
+    -----------
+    params : argparser object
+        Argument Parser structure with pre-determined arguments as defined
+        at the bottom of this file.
+    """
+    log_params(params)
+    processes = []
+    mp.set_start_method("spawn")
+
+    #Invoke `target` function from each of the spawned process for distributed
+    #implementation
+    for rank in range(params.world_size):
+        p = mp.Process(target=run, args=(rank, params.world_size, gen_dist_partitions, params))
+        p.start()
+        processes.append(p)
+
+    for p in processes:
+        p.join()
+
+def run(rank, world_size, func_exec, params, backend="gloo"):
+    """
+    Init. function which is run by each process in the Gloo ProcessGroup
+
+    Parameters:
+    -----------
+    rank : integer
+        rank of the process
+    world_size : integer
+        number of processes configured in the Process Group
+    proc_exec : function name
+        function which will be invoked which has the logic for each process in the group
+    params : argparser object
+        argument parser object to access the command line arguments
+    backend : string
+        string specifying the type of backend to use for communication
+    """
+    os.environ["MASTER_ADDR"] = '127.0.0.1'
+    os.environ["MASTER_PORT"] = '29500'
+
+    #create Gloo Process Group
+    dist.init_process_group(backend, rank=rank, world_size=world_size, timeout=timedelta(seconds=5*60))
+
+    #Invoke the main function to kick-off each process
+    func_exec(rank, world_size, params)
+
+def multi_machine_run(params):
+    """
+    Function to be invoked when executing data loading pipeline on multiple machines
+
+    Parameters:
+    -----------
+    params : argparser object
+        argparser object providing access to command line arguments.
+    """
+    rank = int(os.environ["RANK"])
+
+    #init the gloo process group here.
+    dist.init_process_group("gloo", rank=rank, world_size=params.world_size, timeout=timedelta(seconds=5*60))
+    print('[Rank: ', rank, '] Done with process group initialization...')
+
+    #invoke the main function here.
+    gen_dist_partitions(rank, params.world_size, params)
+    print('[Rank: ', rank, '] Done with Distributed data processing pipeline processing.')

@@ -1,7 +1,7 @@
 import argparse
 import numpy as np
 import torch.multiprocessing as mp
-from initialize import single_dev_proc_init, multi_dev_proc_init
+from data_shuffle import single_machine_run, multi_machine_run 
 
 def log_params(params): 
     """ Print all the command line arguments for debugging purposes.
@@ -76,6 +76,6 @@ if __name__ == "__main__":
 
     #invoke the starting function here.
     if(params.exec_type == 0):
-        single_dev_proc_init(params)
+        single_machine_run(params)
     else:
-        multi_dev_proc_init(params)
+        multi_machine_run(params)
