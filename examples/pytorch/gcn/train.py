@@ -57,19 +57,16 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", type=str, default="cora",
                         help="Dataset name ('cora', 'citeseer', 'pubmed').")
-    parser.add_argument("--self-loop", action='store_true',
-                        help="graph self-loop (default=False)")
-    parser.set_defaults(self_loop=False)
     args = parser.parse_args()
     print(f'Training with DGL intrinsic graph convolution module.')
  
     # load and preprocess dataset
     if args.dataset == 'cora':
-        data = CoraGraphDataset()
+        data = CoraGraphDataset(transform=dgl.transforms.AddSelfLoop())
     elif args.dataset == 'citeseer':
-        data = CiteseerGraphDataset()
+        data = CiteseerGraphDataset(transform=dgl.transforms.AddSelfLoop())
     elif args.dataset == 'pubmed':
-        data = PubmedGraphDataset()
+        data = PubmedGraphDataset(transform=dgl.transforms.AddSelfLoop())
     else:
         raise ValueError('Unknown dataset: {}'.format(args.dataset))
     g = data[0]
@@ -78,9 +75,6 @@ if __name__ == '__main__':
     features = g.ndata['feat']
     labels = g.ndata['label']
     masks = g.ndata['train_mask'], g.ndata['val_mask'], g.ndata['test_mask']
-    if args.self_loop:
-        g = dgl.remove_self_loop(g)
-        g = dgl.add_self_loop(g)
         
     # normalization
     degs = g.in_degrees().float()
