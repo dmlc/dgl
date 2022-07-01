@@ -39,10 +39,16 @@ void Scatter_(IdArray index, NDArray value, NDArray out) {
 
 template void Scatter_<kDLGPU, int32_t, int32_t>(IdArray, NDArray, NDArray);
 template void Scatter_<kDLGPU, int64_t, int32_t>(IdArray, NDArray, NDArray);
+#ifdef USE_FP16
+template void Scatter_<kDLGPU, __half, int32_t>(IdArray, NDArray, NDArray);
+#endif
 template void Scatter_<kDLGPU, float, int32_t>(IdArray, NDArray, NDArray);
 template void Scatter_<kDLGPU, double, int32_t>(IdArray, NDArray, NDArray);
 template void Scatter_<kDLGPU, int32_t, int64_t>(IdArray, NDArray, NDArray);
 template void Scatter_<kDLGPU, int64_t, int64_t>(IdArray, NDArray, NDArray);
+#ifdef USE_FP16
+template void Scatter_<kDLGPU, __half, int64_t>(IdArray, NDArray, NDArray);
+#endif
 template void Scatter_<kDLGPU, float, int64_t>(IdArray, NDArray, NDArray);
 template void Scatter_<kDLGPU, double, int64_t>(IdArray, NDArray, NDArray);
 
