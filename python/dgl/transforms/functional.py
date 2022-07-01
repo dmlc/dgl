@@ -2850,7 +2850,8 @@ def sort_csr_by_tag(g, tag, tag_offset_name='_TAG_OFFSET', tag_type='node'):
     g : DGLGraph
         The input graph.
     tag : Tensor
-        Integer tensor of shape :math:`(N,)`, :math:`N` being the number of (destination) nodes.
+        Integer tensor of shape :math:`(N,)`, :math:`N` being the number
+        of (destination) nodes or edges.
     tag_offset_name : str
         The name of the node feature to store tag offsets.
     tag_type : str
@@ -2972,7 +2973,8 @@ def sort_csc_by_tag(g, tag, tag_offset_name='_TAG_OFFSET', tag_type='node'):
     g : DGLGraph
         The input graph.
     tag : Tensor
-        Integer tensor of shape :math:`(N,)`, :math:`N` being the number of (source) nodes.
+        Integer tensor of shape :math:`(N,)`, :math:`N` being the number
+        of (source) nodes or edges.
     tag_offset_name : str
         The name of the node feature to store tag offsets.
     tag_type : str
