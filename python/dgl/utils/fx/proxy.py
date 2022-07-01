@@ -23,7 +23,7 @@ class DGLGraphProxy(Proxy):
 
     def __getitem__(self, rhs):
         """Getitem function.
-        
+
         Here we need to specified the output. Since it is also a graph proxy.
         """
         return self.tracer.create_proxy(CALL_FUNCTION, operator.getitem, (self, rhs), {},
