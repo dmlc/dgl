@@ -631,7 +631,8 @@ class DataLoader(torch.utils.data.DataLoader):
     Examples
     --------
     To train a 3-layer GNN for node classification on a set of nodes ``train_nid`` on
-    a homogeneous graph where each node takes messages from all neighbors (assume
+    a homogeneous graph where each node takes messages from 15 neighbors on the
+    first layer, 10 neighbors on the second, and 5 neighbors on the third (assume
     the backend is PyTorch):
 
     >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
@@ -772,8 +773,7 @@ class DataLoader(torch.utils.data.DataLoader):
             else:
                 if self.graph.device != indices_device:
                     raise ValueError(
-                        'Expect graph and indices to be on the same device. '
-                        'If you wish to use UVA sampling, please set use_uva=True.')
+                        'Expect graph and indices to be on the same device when use_uva=False. ')
                 if self.graph.device.type == 'cuda' and num_workers > 0:
                     raise ValueError('num_workers must be 0 if graph and indices are on CUDA.')
                 if self.graph.device.type == 'cpu' and num_workers > 0:
