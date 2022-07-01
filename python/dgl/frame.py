@@ -182,14 +182,9 @@ class Column(TensorStorage):
     index : Tensor
         Index tensor
     """
-    def __init__(self, storage, scheme=None, index=None, device=None, deferred_dtype=None):
+    def __init__(self, storage, *args, **kwargs):
         super().__init__(storage)
-        self.scheme = scheme if scheme else infer_scheme(storage)
-        self.index = index
-        self.device = device
-        self.deferred_dtype = deferred_dtype
-        self.pinned_by_dgl = False
-        self._data_nd = None
+        self._init(*args, **kwargs)
 
     def __len__(self):
         """The number of features (number of rows) in this column."""
@@ -243,6 +238,8 @@ class Column(TensorStorage):
     def data(self, val):
         """Update the column data."""
         self.index = None
+        self.device = None
+        self.deferred_dtype = None
         self.storage = val
         self._data_nd = None  # should unpin data if it was pinned.
         self.pinned_by_dgl = False
@@ -430,15 +427,50 @@ class Column(TensorStorage):
 
     def __getstate__(self):
         if self.storage is not None:
-            _ = self.data               # evaluate feature slicing
-        return self.__dict__
+            # flush any deferred operations
+            _ = self.data
+        state = self.__dict__.copy()
+        # data pinning does not get serialized, so we need to remove that from
+        # the state
+        state['_data_nd'] = None
+        state['pinned_by_dgl'] = False
+        return state
+
+    def __setstate__(self, state):
+        index = None
+        device = None
+        if 'storage' in state and state['storage'] is not None:
+            assert 'index' not in state or state['index'] is None
+            assert 'device' not in state or state['device'] is None
+        else:
+            # we may have a column with only index information, and that is
+            # valid
+            index = None if 'index' not in state else state['index']
+            device = None if 'device' not in state else state['device']
+        assert 'deferred_dtype' not in state or state['deferred_dtype'] is None
+        assert 'pinned_by_dgl' not in state or state['pinned_by_dgl'] is False
+        assert '_data_nd' not in state or state['_data_nd'] is None
+
+        self.__dict__ = state
+        # properly initialize this object
+        self._init(self.scheme if hasattr(self, 'scheme') else None,
+                   index=index,
+                   device=device)
+
+    def _init(self, scheme=None, index=None, device=None, deferred_dtype=None):
+        self.scheme = scheme if scheme else infer_scheme(self.storage)
+        self.index = index
+        self.device = device
+        self.deferred_dtype = deferred_dtype
+        self.pinned_by_dgl = False
+        self._data_nd = None
 
     def __copy__(self):
         return self.clone()
 
     def fetch(self, indices, device, pin_memory=False, **kwargs):
         _ = self.data           # materialize in case of lazy slicing & data transfer
-        return super().fetch(indices, device, pin_memory=False, **kwargs)
+        return super().fetch(indices, device, pin_memory=pin_memory, **kwargs)
 
     def pin_memory_(self):
         """Pin the storage into page-locked memory.

@@ -35,7 +35,7 @@ dgl_option(LIBCXX_ENABLE_PARALLEL_ALGORITHMS "Enable the parallel algorithms lib
 dgl_option(USE_S3 "Build with S3 support" OFF)
 dgl_option(USE_HDFS "Build with HDFS support" OFF) # Set env HADOOP_HDFS_HOME if needed
 dgl_option(REBUILD_LIBXSMM "Clean LIBXSMM build cache at every build" OFF) # Set env HADOOP_HDFS_HOME if needed
-dgl_option(USE_EPOLL "Build with epoll for socket communicator" OFF)
+dgl_option(USE_EPOLL "Build with epoll for socket communicator" ON)
 dgl_option(TP_BUILD_LIBUV "Build libuv together with tensorpipe (only impacts Linux)" ON)
 
 # Set debug compile option for gdb, only happens when -DCMAKE_BUILD_TYPE=DEBUG
@@ -122,11 +122,14 @@ if(USE_AVX)
   endif(USE_LIBXSMM)
 endif(USE_AVX)
 
-if (USE_EPOLL)
-  check_include_file("sys/epoll.h" USE_EPOLL)
-  if (USE_EPOLL)
+if ((NOT MSVC) AND USE_EPOLL)
+  INCLUDE(CheckIncludeFile)
+  check_include_file("sys/epoll.h" EPOLL_AVAILABLE)
+  if (EPOLL_AVAILABLE)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUSE_EPOLL")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_EPOLL")
+  else()
+    message(WARNING "EPOLL is not available on this platform...")
   endif()
 endif ()
 
