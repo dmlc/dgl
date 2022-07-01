@@ -28,6 +28,7 @@ extern "C" {
 DLManagedTensor* TAempty(
     std::vector<int64_t> shape, DLDataType dtype, DLContext ctx);
 
+#ifdef DGL_USE_CUDA
 /*!
  * \brief Allocate a piece of GPU memory via
  * PyTorch's THCCachingAllocator.
@@ -43,6 +44,7 @@ void* RawAlloc(size_t nbytes);
  * \param ptr Pointer to the memory to be freed.
  */
 void RawDelete(void* ptr);
+#endif  // DGL_USE_CUDA
 
 }
 

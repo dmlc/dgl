@@ -82,6 +82,7 @@ class TensorDispatcher {
     return NDArray::FromDLPack(result);
   }
 
+#ifdef DGL_USE_CUDA
   /*!
   * \brief Allocate a piece of GPU memory via
   * PyTorch's THCCachingAllocator.
@@ -109,6 +110,7 @@ class TensorDispatcher {
     auto entry = entrypoints_[Op::kRawDelete];
     FUNCCAST(tensoradapter::RawDelete, entry)(ptr);
   }
+#endif  // DGL_USE_CUDA
 
  private:
   /*! \brief ctor */
@@ -123,16 +125,20 @@ class TensorDispatcher {
    */
   static constexpr const char *names_[] = {
     "TAempty",
+#ifdef DGL_USE_CUDA
     "RawAlloc",
     "RawDelete",
+#endif  // DGL_USE_CUDA
   };
 
   /*! \brief Index of each function to the symbol list */
   class Op {
    public:
     static constexpr int kEmpty = 0;
+#ifdef DGL_USE_CUDA
     static constexpr int kRawAlloc = 1;
     static constexpr int kRawDelete = 2;
+#endif  // DGL_USE_CUDA
   };
 
   /*! \brief Number of functions */
@@ -141,8 +147,10 @@ class TensorDispatcher {
   /*! \brief Entrypoints of each function */
   void* entrypoints_[num_entries_] = {
     nullptr,
+#ifdef DGL_USE_CUDA
     nullptr,
     nullptr,
+#endif  // DGL_USE_CUDA
   };
 
   bool available_ = false;
