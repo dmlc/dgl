@@ -1,6 +1,6 @@
 #!/usr/bin/env groovy
 
-dgl_linux_libs = 'build/libdgl.so, build/runUnitTests, python/dgl/_ffi/_cy3/core.cpython-36m-x86_64-linux-gnu.so, build/tensoradapter/pytorch/*.so'
+dgl_linux_libs = 'build/libdgl.so, build/runUnitTests, python/dgl/_ffi/_cy3/core.cpython-*-x86_64-linux-gnu.so, build/tensoradapter/pytorch/*.so'
 // Currently DGL on Windows is not working with Cython yet
 dgl_win64_libs = "build\\dgl.dll, build\\runUnitTests.exe, build\\tensoradapter\\pytorch\\*.dll"
 
@@ -253,7 +253,6 @@ pipeline {
                 }
               }
               steps {
-                sh 'pip3 install cython'
                 build_dgl_linux('gpu_nv')
               }
               post {
@@ -462,7 +461,6 @@ pipeline {
                 stage('Torch GPU Unit test') {
                   steps {
                     sh 'nvidia-smi'
-                    sh 'pip3 install cython'
                     sanity_check_for_nvidia_image()
                     unit_test_linux('pytorch', 'gpu_nv')
                   }
