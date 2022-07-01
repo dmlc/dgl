@@ -223,7 +223,8 @@ class CUDADeviceAPI final : public DeviceAPI {
     return result;
   }
 
-  void* AllocWorkspace(DGLContext ctx, size_t size, DGLType type_hint) final { 
+  void* AllocWorkspace(DGLContext ctx, size_t size, DGLType type_hint) final {
+    // Redirect to PyTorch's allocator when available.
     SetDevice(ctx);
     TensorDispatcher* td = TensorDispatcher::Global();
     if (td->IsAvailable())
@@ -235,7 +236,7 @@ class CUDADeviceAPI final : public DeviceAPI {
   void FreeWorkspace(DGLContext ctx, void* data) final {
     TensorDispatcher* td = TensorDispatcher::Global();
     if (td->IsAvailable())
-      return td->FreeWorkspace(data);
+      td->FreeWorkspace(data);
     else
       CUDAThreadEntry::ThreadLocal()->pool.FreeWorkspace(ctx, data);
   }

@@ -18,7 +18,7 @@ namespace tensoradapter {
 extern "C" {
 
 /*!
- * \brief Allocate an empty tensor
+ * \brief Allocate an empty tensor.
  *
  * \param shape The shape
  * \param dtype The data type
@@ -28,8 +28,20 @@ extern "C" {
 DLManagedTensor* TAempty(
     std::vector<int64_t> shape, DLDataType dtype, DLContext ctx);
 
+/*!
+ * \brief Allocate a piece of GPU memory via
+ * PyTorch's THCCachingAllocator.
+ *
+ * \param nbytes The size to be allocated.
+ * \return Pointer to the allocated memory.
+ */
 void* RawAlloc(size_t nbytes);
 
+/*!
+ * \brief Free the GPU memory.
+ *
+ * \param ptr Pointer to the memory to be freed.
+ */
 void RawDelete(void* ptr);
 
 }

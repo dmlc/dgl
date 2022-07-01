@@ -69,8 +69,12 @@ class TensorDispatcher {
 
   /*!
    * \brief Allocate an empty tensor.
-   *
    * Used in NDArray::Empty().
+
+   * \param shape The shape
+   * \param dtype The data type
+   * \param ctx The device
+   * \return An empty NDArray.
    */
   inline NDArray Empty(std::vector<int64_t> shape, DLDataType dtype, DLContext ctx) const {
     auto entry = entrypoints_[Op::kEmpty];
@@ -78,11 +82,29 @@ class TensorDispatcher {
     return NDArray::FromDLPack(result);
   }
 
+  /*!
+  * \brief Allocate a piece of GPU memory via
+  * PyTorch's THCCachingAllocator.
+  * Used in CUDADeviceAPI::AllocWorkspace().
+  * 
+  * \note THCCachingAllocator specify the device to allocate on
+  * via cudaGetDevice(). Make sure to call cudaSetDevice()
+  * before invoking this function.
+  *
+  * \param nbytes The size to be allocated.
+  * \return Pointer to the allocated memory.
+  */
   inline void* AllocWorkspace(size_t nbytes) {
     auto entry = entrypoints_[Op::kRawAlloc];
     return FUNCCAST(tensoradapter::RawAlloc, entry)(nbytes);
   }
 
+  /*!
+  * \brief Free the GPU memory.
+  * Used in CUDADeviceAPI::FreeWorkspace().
+  *
+  * \param ptr Pointer to the memory to be freed.
+  */
   inline void FreeWorkspace(void* ptr) {
     auto entry = entrypoints_[Op::kRawDelete];
     FUNCCAST(tensoradapter::RawDelete, entry)(ptr);
