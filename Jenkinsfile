@@ -253,6 +253,7 @@ pipeline {
                 }
               }
               steps {
+                sh 'pip3 install cython'
                 build_dgl_linux('gpu_nv')
               }
               post {
@@ -461,6 +462,7 @@ pipeline {
                 stage('Torch GPU Unit test') {
                   steps {
                     sh 'nvidia-smi'
+                    sh 'pip3 install cython'
                     sanity_check_for_nvidia_image()
                     unit_test_linux('pytorch', 'gpu_nv')
                   }

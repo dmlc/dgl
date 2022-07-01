@@ -41,9 +41,12 @@ pushd python
 for backend in pytorch mxnet tensorflow
 do
 if [[ $1 == "gpu_nv" ]]; then
-    continue
+    if [[ ${backend} != "pytorch" ]]; then
+        continue
+    fi
+else
+    conda activate "${backend}-ci"
 fi
-conda activate "${backend}-ci"
 rm -rf build *.egg-info dist
 pip uninstall -y dgl
 # test install
