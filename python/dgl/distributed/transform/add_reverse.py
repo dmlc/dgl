@@ -3,6 +3,7 @@ import json
 import shutil
 import copy
 import pathlib
+import argparse
 import numpy as np
 
 from ...utils.dispatchers import predicate_dispatch
@@ -132,7 +133,7 @@ if __name__ == '__main__':
 
     with open(args.config, 'r') as f:
         config = json.load(f)
-    with open(args.metadata_path, 'r') as f:
+    with open(args.metadata, 'r') as f:
         metadata = json.load(f)
 
     add_reverse(metadata, args.output_path, nparts, config)

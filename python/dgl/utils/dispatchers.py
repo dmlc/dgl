@@ -5,8 +5,11 @@ class _PredicateDispatcher(object):
         self.registry = []
         self.default_func = default_func
 
-    def register(self, predicate, impl):
-        self.registry.append((predicate, impl))
+    def register(self, predicate):
+        def _deco(impl):
+            self.registry.append((predicate, impl))
+            return impl
+        return _deco
 
     def __call__(self, *args, **kwargs):
         for predicate, impl in self.registry:
