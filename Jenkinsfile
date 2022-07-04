@@ -102,10 +102,6 @@ def go_test_linux() {
   }
 }
 
-def sanity_check_for_nvidia_image() {
-  sh "python3 -c 'import cugraph; import torch; torch.cuda.is_available();'"
-}
-
 def is_authorized(name) {
   def authorized_user = ['VoVAllen', 'BarclayII', 'jermainewang', 'zheng-da', 'mufeili', 'Rhett-Ying', 'isratnisa']
   return (name in authorized_user)
@@ -243,7 +239,7 @@ pipeline {
                 }
               }
             }
-            stage('GPU Build Based on Nvidia image') {
+            stage('PyTorch Cugraph GPU Build') {
               agent {
                 docker {
                   label "linux-cpu-node"
@@ -253,7 +249,7 @@ pipeline {
                 }
               }
               steps {
-                build_dgl_linux('gpu_nv')
+                build_dgl_linux('cugraph')
               }
               post {
                 always {
@@ -448,7 +444,7 @@ pipeline {
                 }
               }
             }
-            stage('Torch GPU Based on Nvidia Image') {
+            stage('PyTorch Cugraph GPU') {
               agent {
                 docker {
                   label "linux-gpu-node"
@@ -458,11 +454,10 @@ pipeline {
                 }
               }
               stages {
-                stage('Torch GPU Unit test') {
+                stage('PyTorch Cugraph GPU Unit test') {
                   steps {
                     sh 'nvidia-smi'
-                    sanity_check_for_nvidia_image()
-                    unit_test_linux('pytorch', 'gpu_nv')
+                    unit_test_linux('pytorch', 'cugraph')
                   }
                 }
               }
