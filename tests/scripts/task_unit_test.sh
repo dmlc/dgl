@@ -45,6 +45,7 @@ if [[ $2 == "cugraph" ]]; then
 else
     python3 -m pytest -v --junitxml=pytest_compute.xml --durations=100 tests/compute || fail "compute"
     python3 -m pytest -v --junitxml=pytest_backend.xml --durations=100 tests/$DGLBACKEND || fail "backend-specific"
+fi
 
 export PYTHONUNBUFFERED=1
 export OMP_NUM_THREADS=1
