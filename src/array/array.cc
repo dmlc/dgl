@@ -516,8 +516,8 @@ void CSRSort_(CSRMatrix* csr) {
 
 std::pair<CSRMatrix, NDArray> CSRSortByTag(
     const CSRMatrix &csr, IdArray tag, int64_t num_tags) {
-  CHECK_EQ(csr.num_cols, tag->shape[0])
-      << "The length of the tag array should be equal to the number of columns ";
+  CHECK_EQ(csr.indices->shape[0], tag->shape[0])
+      << "The length of the tag array should be equal to the number of non-zero data.";
   CHECK_SAME_CONTEXT(csr.indices, tag);
   CHECK_INT(tag, "tag");
   std::pair<CSRMatrix, NDArray> ret;
