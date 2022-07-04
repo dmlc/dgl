@@ -13,9 +13,10 @@ def _l1_dist(edges):
 
 class CARESampler(dgl.dataloading.BlockSampler):
     def __init__(self, p, dists, num_layers):
-        super().__init__(num_layers)
+        super().__init__()
         self.p = p
         self.dists = dists
+        self.num_layers = num_layers
 
     def sample_frontier(self, block_id, g, seed_nodes, *args, **kwargs):
         with g.local_scope():
@@ -28,13 +29,26 @@ class CARESampler(dgl.dataloading.BlockSampler):
                     num_neigh = th.ceil(g.in_degrees(node, etype=etype) * self.p[block_id][etype]).int().item()
                     neigh_dist = self.dists[block_id][etype][edges]
                     if neigh_dist.shape[0] > num_neigh:
-                        neigh_index = np.argpartition(neigh_dist.cpu().detach(), num_neigh)[:num_neigh]
+                        neigh_index = np.argpartition(neigh_dist, num_neigh)[:num_neigh]
                     else:
                         neigh_index = np.arange(num_neigh)
                     edge_mask[edges[neigh_index]] = 1
                 new_edges_masks[etype] = edge_mask.bool()
 
             return dgl.edge_subgraph(g, new_edges_masks, relabel_nodes=False)
+
+    def sample_blocks(self, g, seed_nodes, exclude_eids=None):
+        output_nodes = seed_nodes
+        blocks = []
+        for block_id in reversed(range(self.num_layers)):
+            frontier = self.sample_frontier(block_id, g, seed_nodes)
+            eid = frontier.edata[dgl.EID]
+            block = dgl.to_block(frontier, seed_nodes)
+            block.edata[dgl.EID] = eid
+            seed_nodes = block.srcdata[dgl.NID]
+            blocks.insert(0, block)
+
+        return seed_nodes, output_nodes, blocks
 
     def __len__(self):
         return self.num_layers
