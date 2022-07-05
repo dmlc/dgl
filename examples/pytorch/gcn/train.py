@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import dgl
 import dgl.nn as dglnn
 from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
+from dgl import AddSelfLoop
 import argparse
 
 class GCN(nn.Module):
@@ -38,7 +39,7 @@ def train(g, features, labels, masks, model):
     # define train/val samples, loss function and optimizer
     train_mask = masks[0]
     val_mask = masks[1]
-    loss_fcn = torch.nn.CrossEntropyLoss()
+    loss_fcn = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-2, weight_decay=5e-4)
 
     # training loop
@@ -58,15 +59,16 @@ if __name__ == '__main__':
     parser.add_argument("--dataset", type=str, default="cora",
                         help="Dataset name ('cora', 'citeseer', 'pubmed').")
     args = parser.parse_args()
-    print(f'Training with DGL intrinsic graph convolution module.')
+    print(f'Training with DGL built-in GraphConv module.')
  
     # load and preprocess dataset
+    transform = AddSelfLoop()  # by default, it will first remove self-loops to prevent duplication
     if args.dataset == 'cora':
-        data = CoraGraphDataset(transform=dgl.transforms.AddSelfLoop())
+        data = CoraGraphDataset(transform=transform)
     elif args.dataset == 'citeseer':
-        data = CiteseerGraphDataset(transform=dgl.transforms.AddSelfLoop())
+        data = CiteseerGraphDataset(transform=transform)
     elif args.dataset == 'pubmed':
-        data = PubmedGraphDataset(transform=dgl.transforms.AddSelfLoop())
+        data = PubmedGraphDataset(transform=transform)
     else:
         raise ValueError('Unknown dataset: {}'.format(args.dataset))
     g = data[0]
