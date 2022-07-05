@@ -40,7 +40,8 @@ bool TensorDispatcher::Load(const char *path) {
   handle_ = dlopen(path, RTLD_LAZY);
 
   if (!handle_) {
-    DLOG(WARNING) << "TensorDispatcher: dlopen failed: " << dlerror();
+    DLOG(WARNING) << "Could not open file: " << dlerror()
+      << ". This does not affect DGL's but might impact its performance.";
     return false;
   }
 

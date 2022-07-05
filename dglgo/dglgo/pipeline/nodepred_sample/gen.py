@@ -43,7 +43,7 @@ pipeline_comments = {
         "eval_batch_size": "Batch size of seed nodes in training stage in evaluation stage",
         "eval_num_workers": "Number of workers to accelerate the graph data processing step in evaluation stage"
     },
-    "save_path": "Path to save the model",
+    "save_path": "Directory to save the experiment results",
     "num_runs": "Number of experiments to run",
 }
 
@@ -55,21 +55,24 @@ class NodepredNSPipelineCfg(BaseModel):
     optimizer: dict = {"name": "Adam", "lr": 0.005, "weight_decay": 0.0}
     loss: str = "CrossEntropyLoss"
     num_runs: int = 1
-    save_path: str = "model.pth"
+    save_path: str = "results"
 
 @PipelineFactory.register("nodepred-ns")
 class NodepredNsPipeline(PipelineBase):
     def __init__(self):
-        self.pipeline_name = "nodepred-ns"
+        self.pipeline = {
+            "name": "nodepred-ns",
+            "mode": "train"
+        }
         self.default_cfg = None
 
     @classmethod
     def setup_user_cfg_cls(cls):
-        from ...utils.enter_config import UserConfig 
+        from ...utils.enter_config import UserConfig
         class NodePredUserConfig(UserConfig):
             eval_device: DeviceEnum = Field("cpu")
             data: DataFactory.filter("nodepred-ns").get_pydantic_config() = Field(..., discriminator="name")
-            model : NodeModelFactory.filter(lambda cls: hasattr(cls, "forward_block")).get_pydantic_model_config() = Field(..., discriminator="name")   
+            model : NodeModelFactory.filter(lambda cls: hasattr(cls, "forward_block")).get_pydantic_model_config() = Field(..., discriminator="name")
             general_pipeline: NodepredNSPipelineCfg
 
         cls.user_cfg_cls = NodePredUserConfig
@@ -86,8 +89,9 @@ class NodepredNsPipeline(PipelineBase):
             model: NodeModelFactory.filter(lambda cls: hasattr(cls, "forward_block")).get_model_enum() = typer.Option(..., help="Model name"),
         ):
             self.__class__.setup_user_cfg_cls()
-            generated_cfg = {                
-                "pipeline_name": "nodepred-ns",
+            generated_cfg = {
+                "pipeline_name": self.pipeline["name"],
+                "pipeline_mode": self.pipeline["mode"],
                 "device": "cpu",
                 "data": {"name": data.name},
                 "model": {"name": model.value},
@@ -96,7 +100,7 @@ class NodepredNsPipeline(PipelineBase):
             output_cfg = self.user_cfg_cls(**generated_cfg).dict()
             output_cfg = deep_convert_dict(output_cfg)
             comment_dict = {
-                "device": "Torch device name, e.q. cpu or cuda or cuda:0",
+                "device": "Torch device name, e.g., cpu or cuda or cuda:0",
                 "data": {
                     "split_ratio": 'Ratio to generate split masks, for example set to [0.8, 0.1, 0.1] for 80% train/10% val/10% test. Leave blank to use builtin split in original dataset'
                 },
@@ -126,10 +130,10 @@ class NodepredNsPipeline(PipelineBase):
             template = Template(f.read())
         pipeline_cfg = NodepredNSPipelineCfg(
             **user_cfg_dict["general_pipeline"])
-        
+
         if "num_layers" in user_cfg_dict["model"]:
             assert user_cfg_dict["model"]["num_layers"] == len(user_cfg_dict["general_pipeline"]["sampler"]["fan_out"]), \
-                "The num_layers in model config should be the same as the length of fan_out in sampler. For example, if num_layers is 1, the fan_out cannot be [5, 10]"          
+                "The num_layers in model config should be the same as the length of fan_out in sampler. For example, if num_layers is 1, the fan_out cannot be [5, 10]"
 
         render_cfg = copy.deepcopy(user_cfg_dict)
         model_code = NodeModelFactory.get_source_code(
@@ -143,13 +147,10 @@ class NodepredNsPipeline(PipelineBase):
 
         if "split_ratio" in generated_user_cfg["data"]:
             generated_user_cfg["data"].pop("split_ratio")
-        if len(generated_user_cfg["data"]) == 1:
-            generated_user_cfg.pop("data")
-        else:
-            generated_user_cfg["data"].pop("name")
-
+        generated_user_cfg["data_name"] = generated_user_cfg["data"].pop("name")
         generated_user_cfg.pop("pipeline_name")
-        generated_user_cfg["model"].pop("name")
+        generated_user_cfg.pop("pipeline_mode")
+        generated_user_cfg["model_name"] = generated_user_cfg["model"].pop("name")
         generated_user_cfg['general_pipeline']["optimizer"].pop("name")
 
 
@@ -163,4 +164,4 @@ class NodepredNsPipeline(PipelineBase):
 
     @staticmethod
     def get_description() -> str:
-        return "Node classification neighbor sampling pipeline"
+        return "Node classification neighbor sampling pipeline for training"

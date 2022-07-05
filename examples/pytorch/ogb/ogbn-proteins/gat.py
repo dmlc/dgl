@@ -21,7 +21,6 @@ from ogb.nodeproppred import DglNodePropPredDataset, Evaluator
 from torch import nn
 
 from models import GAT
-from utils import BatchSampler, DataLoaderWrapper
 
 device = None
 dataset = "ogbn-proteins"
@@ -178,26 +177,22 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
     # batch_size = len(train_idx)
     train_sampler = MultiLayerNeighborSampler([32 for _ in range(args.n_layers)])
     # sampler = MultiLayerFullNeighborSampler(args.n_layers)
-    train_dataloader = DataLoaderWrapper(
-        DataLoader(
-            graph.cpu(),
-            train_idx.cpu(),
-            train_sampler,
-            batch_sampler=BatchSampler(len(train_idx), batch_size=train_batch_size),
-            num_workers=10,
-        )
+    train_dataloader = DataLoader(
+        graph.cpu(),
+        train_idx.cpu(),
+        train_sampler,
+        batch_size=train_batch_size,
+        num_workers=10,        
     )
 
     eval_sampler = MultiLayerNeighborSampler([100 for _ in range(args.n_layers)])
     # sampler = MultiLayerFullNeighborSampler(args.n_layers)
-    eval_dataloader = DataLoaderWrapper(
-        DataLoader(
-            graph.cpu(),
-            torch.cat([train_idx.cpu(), val_idx.cpu(), test_idx.cpu()]),
-            eval_sampler,
-            batch_sampler=BatchSampler(graph.number_of_nodes(), batch_size=65536),
-            num_workers=10,
-        )
+    eval_dataloader = DataLoader(        
+        graph.cpu(),
+        torch.cat([train_idx.cpu(), val_idx.cpu(), test_idx.cpu()]),
+        eval_sampler,
+        batch_size=65536,
+        num_workers=10,        
     )
 
     criterion = nn.BCEWithLogitsLoss()

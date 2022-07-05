@@ -6,7 +6,7 @@ import networkx as nx
 from dgl import DGLGraph
 from collections import defaultdict as ddict
 import unittest
-from test_utils import parametrize_dtype
+from test_utils import parametrize_idtype
 
 D = 5
 reduce_msg_shapes = set()
@@ -89,7 +89,7 @@ def generate_graph(idtype, grad=False):
 def test_compatible():
     g = generate_graph_old()
 
-@parametrize_dtype
+@parametrize_idtype
 def test_batch_setter_getter(idtype):
     def _pfc(x):
         return list(F.zerocopy_to_numpy(x)[:,0])
@@ -159,7 +159,7 @@ def test_batch_setter_getter(idtype):
     v = F.tensor([6, 9, 7], g.idtype)
     assert _pfc(g.edges[u, v].data['l']) == [1.0, 1.0, 0.0]
 
-@parametrize_dtype
+@parametrize_idtype
 def test_batch_setter_autograd(idtype):
     g = generate_graph(idtype, grad=True)
     h1 = g.ndata['h']
@@ -290,7 +290,7 @@ def _test_nx_conversion():
     assert F.allclose(g.edata['h'], F.tensor([[1., 2.], [1., 2.],
                                               [2., 3.], [2., 3.]]))
 
-@parametrize_dtype
+@parametrize_idtype
 def test_apply_nodes(idtype):
     def _upd(nodes):
         return {'h' : nodes.data['h'] * 2}
@@ -302,7 +302,7 @@ def test_apply_nodes(idtype):
     g.apply_nodes(lambda nodes : {'h' : nodes.data['h'] * 0.}, u)
     assert F.allclose(F.gather_row(g.ndata['h'], u), F.zeros((4, D)))
 
-@parametrize_dtype
+@parametrize_idtype
 def test_apply_edges(idtype):
     def _upd(edges):
         return {'w' : edges.data['w'] * 2}
@@ -316,7 +316,7 @@ def test_apply_edges(idtype):
     eid = F.tensor(g.edge_ids(u, v))
     assert F.allclose(F.gather_row(g.edata['w'], eid), F.zeros((6, D)))
 
-@parametrize_dtype
+@parametrize_idtype
 def test_update_routines(idtype):
     g = generate_graph(idtype)
 
@@ -353,7 +353,7 @@ def test_update_routines(idtype):
     assert(reduce_msg_shapes == {(1, 8, D), (9, 1, D)})
     reduce_msg_shapes.clear()
 
-@parametrize_dtype
+@parametrize_idtype
 def test_update_all_0deg(idtype):
     # test#1
     g = dgl.graph(([1, 2, 3, 4], [0, 0, 0, 0]), idtype=idtype, device=F.ctx())
@@ -384,7 +384,7 @@ def test_update_all_0deg(idtype):
     # should fallback to apply
     assert F.allclose(new_repr, 2*old_repr)
 
-@parametrize_dtype
+@parametrize_idtype
 def test_pull_0deg(idtype):
     g = dgl.graph(([0], [1]), idtype=idtype, device=F.ctx())
     def _message(edges):
@@ -450,7 +450,7 @@ def test_dynamic_addition():
     assert len(g.edata['h1']) == len(g.edata['h2'])
 
 
-@parametrize_dtype
+@parametrize_idtype
 def test_repr(idtype):
     g = dgl.graph(([0, 0, 1], [1, 2, 2]), num_nodes=10, idtype=idtype, device=F.ctx())
     repr_string = g.__repr__()
@@ -460,7 +460,7 @@ def test_repr(idtype):
     repr_string = g.__repr__()
     print(repr_string)
 
-@parametrize_dtype
+@parametrize_idtype
 def test_local_var(idtype):
     g = dgl.graph(([0, 1, 2, 3], [1, 2, 3, 4]), idtype=idtype, device=F.ctx())
     g.ndata['h'] = F.zeros((g.number_of_nodes(), 3))
@@ -518,7 +518,7 @@ def test_local_var(idtype):
         assert F.allclose(g.edata['w'], F.tensor([[1.], [0.]]))
     foo(g)
 
-@parametrize_dtype
+@parametrize_idtype
 def test_local_scope(idtype):
     g = dgl.graph(([0, 1, 2, 3], [1, 2, 3, 4]), idtype=idtype, device=F.ctx())
     g.ndata['h'] = F.zeros((g.number_of_nodes(), 3))
@@ -590,7 +590,7 @@ def test_local_scope(idtype):
             assert F.allclose(g.edata['w'], F.tensor([[1.], [0.]]))
     foo(g)
 
-@parametrize_dtype
+@parametrize_idtype
 def test_isolated_nodes(idtype):
     g = dgl.graph(([0, 1], [1, 2]), num_nodes=5, idtype=idtype, device=F.ctx())
     assert g.number_of_nodes() == 5
@@ -610,7 +610,7 @@ def test_isolated_nodes(idtype):
     assert g.number_of_nodes('user') == 5
     assert g.number_of_nodes('game') == 7
 
-@parametrize_dtype
+@parametrize_idtype
 def test_send_multigraph(idtype):
     g = dgl.graph(([0, 0, 0, 2], [1, 1, 1, 1]), idtype=idtype, device=F.ctx())
 
@@ -636,7 +636,7 @@ def test_send_multigraph(idtype):
     assert F.allclose(new_repr[1], answer(old_repr[0], old_repr[2], old_repr[3]))
     assert F.allclose(new_repr[[0, 2]], F.zeros((2, 5)))
 
-@parametrize_dtype
+@parametrize_idtype
 def test_issue_1088(idtype):
     # This test ensures that message passing on a heterograph with one edge type
     # would not crash (GitHub issue #1088).
@@ -645,7 +645,7 @@ def test_issue_1088(idtype):
     g.nodes['U'].data['x'] = F.randn((3, 3))
     g.update_all(fn.copy_u('x', 'm'), fn.sum('m', 'y'))
 
-@parametrize_dtype
+@parametrize_idtype
 def test_degree_bucket_edge_ordering(idtype):
     import dgl.function as fn
     g = dgl.graph(
@@ -658,7 +658,7 @@ def test_degree_bucket_edge_ordering(idtype):
         return {'n': F.sum(nodes.mailbox['eid'], 1)}
     g.update_all(fn.copy_e('eid', 'eid'), reducer)
 
-@parametrize_dtype
+@parametrize_idtype
 def test_issue_2484(idtype):
     import dgl.function as fn
     g = dgl.graph(([0, 1, 2], [1, 2, 3]), idtype=idtype, device=F.ctx())

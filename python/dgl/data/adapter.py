@@ -9,16 +9,17 @@ from ..convert import graph as create_dgl_graph
 from ..sampling.negative import _calc_redundancy
 from .dgl_dataset import DGLDataset
 from . import utils
+from ..base import DGLError
 from .. import backend as F
 
-__all__ = ['AsNodePredDataset', 'AsLinkPredDataset']
+__all__ = ['AsNodePredDataset', 'AsLinkPredDataset', 'AsGraphPredDataset']
 
 
 class AsNodePredDataset(DGLDataset):
     """Repurpose a dataset for a standard semi-supervised transductive
     node prediction task.
 
-    The class converts a given dataset into a new dataset object that:
+    The class converts a given dataset into a new dataset object such that:
 
       - Contains only one graph, accessible from ``dataset[0]``.
       - The graph stores:
@@ -40,7 +41,7 @@ class AsNodePredDataset(DGLDataset):
         So do validation and test masks.
 
     The class will keep only the first graph in the provided dataset and
-    generate train/val/test masks according to the given spplit ratio. The generated
+    generate train/val/test masks according to the given split ratio. The generated
     masks will be cached to disk for fast re-loading. If the provided split ratio
     differs from the cached one, it will re-process the dataset properly.
 
@@ -49,7 +50,7 @@ class AsNodePredDataset(DGLDataset):
     dataset : DGLDataset
         The dataset to be converted.
     split_ratio : (float, float, float), optional
-        Split ratios for training, validation and test sets. Must sum to one.
+        Split ratios for training, validation and test sets. They must sum to one.
     target_ntype : str, optional
         The node type to add split mask for.
 
@@ -193,7 +194,7 @@ class AsLinkPredDataset(DGLDataset):
     """Repurpose a dataset for link prediction task.
 
     The created dataset will include data needed for link prediction.
-    Currently only support homogeneous graph. 
+    Currently it only supports homogeneous graphs.
     It will keep only the first graph in the provided dataset and
     generate train/val/test edges according to the given split ratio,
     and the correspondent negative edges based on the neg_ratio. The generated
@@ -368,3 +369,158 @@ class AsLinkPredDataset(DGLDataset):
 
     def __len__(self):
         return 1
+
+class AsGraphPredDataset(DGLDataset):
+    """Repurpose a dataset for standard graph property prediction task.
+
+    The created dataset will include data needed for graph property prediction.
+    Currently it only supports homogeneous graphs.
+
+    The class converts a given dataset into a new dataset object such that:
+
+      - It stores ``len(dataset)`` graphs.
+      - The i-th graph and its label is accessible from ``dataset[i]``.
+
+    The class will generate a train/val/test split if :attr:`split_ratio` is provided.
+    The generated split will be cached to disk for fast re-loading. If the provided split
+    ratio differs from the cached one, it will re-process the dataset properly.
+
+    Parameters
+    ----------
+    dataset : DGLDataset
+        The dataset to be converted.
+    split_ratio : (float, float, float), optional
+        Split ratios for training, validation and test sets. They must sum to one.
+
+    Attributes
+    ----------
+    num_tasks : int
+        Number of tasks to predict.
+    num_classes : int
+        Number of classes to predict per task, None for regression datasets.
+    train_idx : Tensor
+        An 1-D integer tensor of training node IDs.
+    val_idx : Tensor
+        An 1-D integer tensor of validation node IDs.
+    test_idx : Tensor
+        An 1-D integer tensor of test node IDs.
+    node_feat_size : int
+        Input node feature size, None if not applicable.
+    edge_feat_size : int
+        Input edge feature size, None if not applicable.
+
+    Examples
+    --------
+
+    >>> from dgl.data import AsGraphPredDataset
+    >>> from ogb.graphproppred import DglGraphPropPredDataset
+    >>> dataset = DglGraphPropPredDataset(name='ogbg-molhiv')
+    >>> new_dataset = AsGraphPredDataset(dataset)
+    >>> print(new_dataset)
+    Dataset("ogbg-molhiv-as-graphpred", num_graphs=41127, save_path=...)
+    >>> print(len(new_dataset))
+    41127
+    >>> print(new_dataset[0])
+    (Graph(num_nodes=19, num_edges=40,
+           ndata_schemes={'feat': Scheme(shape=(9,), dtype=torch.int64)}
+           edata_schemes={'feat': Scheme(shape=(3,), dtype=torch.int64)}), tensor([0]))
+    """
+    def __init__(self,
+                 dataset,
+                 split_ratio=None,
+                 **kwargs):
+        self.dataset = dataset
+        self.split_ratio = split_ratio
+        super().__init__(dataset.name + '-as-graphpred',
+                         hash_key=(split_ratio, dataset.name, 'graphpred'), **kwargs)
+
+    def process(self):
+        is_ogb = hasattr(self.dataset, 'get_idx_split')
+        if self.split_ratio is None:
+            if is_ogb:
+                split = self.dataset.get_idx_split()
+                self.train_idx = split['train']
+                self.val_idx = split['valid']
+                self.test_idx = split['test']
+            else:
+                # Handle FakeNewsDataset
+                try:
+                    self.train_idx = F.nonzero_1d(self.dataset.train_mask)
+                    self.val_idx = F.nonzero_1d(self.dataset.val_mask)
+                    self.test_idx = F.nonzero_1d(self.dataset.test_mask)
+                except:
+                    raise DGLError('The input dataset does not have default train/val/test\
+                        split. Please specify split_ratio to generate the split.')
+        else:
+            if self.verbose:
+                print('Generating train/val/test split...')
+            train_ratio, val_ratio, _ = self.split_ratio
+            num_graphs = len(self.dataset)
+            num_train = int(num_graphs * train_ratio)
+            num_val = int(num_graphs * val_ratio)
+
+            idx = np.random.permutation(num_graphs)
+            self.train_idx = F.tensor(idx[:num_train])
+            self.val_idx = F.tensor(idx[num_train: num_train + num_val])
+            self.test_idx = F.tensor(idx[num_train + num_val:])
+
+        if hasattr(self.dataset, 'num_classes'):
+            # GINDataset, MiniGCDataset, FakeNewsDataset, TUDataset,
+            # LegacyTUDataset, BA2MotifDataset
+            self.num_classes = self.dataset.num_classes
+        else:
+            # None for multi-label classification and regression
+            self.num_classes = None
+
+        if hasattr(self.dataset, 'num_tasks'):
+            # OGB datasets
+            self.num_tasks = self.dataset.num_tasks
+        else:
+            self.num_tasks = 1
+
+    def has_cache(self):
+        return os.path.isfile(os.path.join(self.save_path, 'info_{}.json'.format(self.hash)))
+
+    def load(self):
+        with open(os.path.join(self.save_path, 'info_{}.json'.format(self.hash)), 'r') as f:
+            info = json.load(f)
+            if info['split_ratio'] != self.split_ratio:
+                raise ValueError('Provided split ratio is different from the cached file. '
+                                 'Re-process the dataset.')
+            self.split_ratio = info['split_ratio']
+            self.num_tasks = info['num_tasks']
+            self.num_classes = info['num_classes']
+
+        split = np.load(os.path.join(self.save_path, 'split_{}.npz'.format(self.hash)))
+        self.train_idx = F.zerocopy_from_numpy(split['train_idx'])
+        self.val_idx = F.zerocopy_from_numpy(split['val_idx'])
+        self.test_idx = F.zerocopy_from_numpy(split['test_idx'])
+
+    def save(self):
+        if not os.path.exists(self.save_path):
+            os.makedirs(self.save_path)
+        with open(os.path.join(self.save_path, 'info_{}.json'.format(self.hash)), 'w') as f:
+            json.dump({
+                'split_ratio': self.split_ratio,
+                'num_tasks': self.num_tasks,
+                'num_classes': self.num_classes}, f)
+        np.savez(os.path.join(self.save_path, 'split_{}.npz'.format(self.hash)),
+                 train_idx=F.zerocopy_to_numpy(self.train_idx),
+                 val_idx=F.zerocopy_to_numpy(self.val_idx),
+                 test_idx=F.zerocopy_to_numpy(self.test_idx))
+
+    def __getitem__(self, idx):
+        return self.dataset[idx]
+
+    def __len__(self):
+        return len(self.dataset)
+
+    @property
+    def node_feat_size(self):
+        g = self[0][0]
+        return g.ndata['feat'].shape[-1] if 'feat' in g.ndata else None
+
+    @property
+    def edge_feat_size(self):
+        g = self[0][0]
+        return g.edata['feat'].shape[-1] if 'feat' in g.edata else None

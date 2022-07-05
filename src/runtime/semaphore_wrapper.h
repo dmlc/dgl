@@ -30,15 +30,26 @@ class Semaphore {
    */
   void Wait();
   /*!
+   * \brief timed wait, decrease semaphore by 1 or returns if times out
+   * \param timeout The timeout value in milliseconds. If zero, wait indefinitely.
+   */
+  bool TimedWait(int timeout);
+  /*!
    * \brief increase semaphore by 1
    */
   void Post();
+
  private:
 #ifdef _WIN32
   HANDLE sem_;
 #else
   sem_t sem_;
 #endif
+  enum {
+    MILLISECONDS_PER_SECOND = 1000,
+    NANOSECONDS_PER_MILLISECOND = 1000 * 1000,
+    NANOSECONDS_PER_SECOND = 1000 * 1000 * 1000
+  };
 };
 
 }  // namespace runtime

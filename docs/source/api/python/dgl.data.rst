@@ -51,7 +51,9 @@ Datasets for node classification/regression tasks
     BACommunityDataset
     TreeCycleDataset
     TreeGridDataset
-    BA2MotifDataset
+    WikiCSDataset
+    FlickrDataset
+    YelpDataset
 
 Edge Prediction Datasets
 ---------------------------------------
@@ -88,6 +90,7 @@ Datasets for graph classification/regression tasks
     LegacyTUDataset
     GINDataset
     FakeNewsDataset
+    BA2MotifDataset
 
 Dataset adapters
 -------------------
@@ -99,6 +102,7 @@ Dataset adapters
 
     AsNodePredDataset
     AsLinkPredDataset
+    AsGraphPredDataset
 
 Utilities
 -----------------

@@ -51,6 +51,8 @@ class CitationGraphDataset(DGLBuiltinDataset):
         A transform that takes in a :class:`~dgl.DGLGraph` object and returns
         a transformed version. The :class:`~dgl.DGLGraph` object will be
         transformed before every access.
+    reorder : bool
+        Whether to reorder the graph using :func:`~dgl.reorder_graph`. Default: False.
     """
     _urls = {
         'cora_v2' : 'dataset/cora_v2.zip',
@@ -59,7 +61,8 @@ class CitationGraphDataset(DGLBuiltinDataset):
     }
 
     def __init__(self, name, raw_dir=None, force_reload=False,
-                 verbose=True, reverse_edge=True, transform=None):
+                 verbose=True, reverse_edge=True, transform=None,
+                 reorder=False):
         assert name.lower() in ['cora', 'citeseer', 'pubmed']
 
         # Previously we use the pre-processing in pygcn (https://github.com/tkipf/pygcn)
@@ -69,6 +72,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
 
         url = _get_dgl_url(self._urls[name])
         self._reverse_edge = reverse_edge
+        self._reorder = reorder
 
         super(CitationGraphDataset, self).__init__(name,
                                                    url=url,
@@ -118,8 +122,12 @@ class CitationGraphDataset(DGLBuiltinDataset):
 
         if self.reverse_edge:
             graph = nx.DiGraph(nx.from_dict_of_lists(graph))
+            g = from_networkx(graph)
         else:
             graph = nx.Graph(nx.from_dict_of_lists(graph))
+            edges = list(graph.edges())
+            u, v = map(list, zip(*edges))
+            g = dgl_graph((u, v))
 
         onehot_labels = np.vstack((ally, ty))
         onehot_labels[test_idx_reorder, :] = onehot_labels[test_idx_range, :]
@@ -133,9 +141,6 @@ class CitationGraphDataset(DGLBuiltinDataset):
         val_mask = generate_mask_tensor(_sample_mask(idx_val, labels.shape[0]))
         test_mask = generate_mask_tensor(_sample_mask(idx_test, labels.shape[0]))
 
-        self._graph = graph
-        g = from_networkx(graph)
-
         g.ndata['train_mask'] = train_mask
         g.ndata['val_mask'] = val_mask
         g.ndata['test_mask'] = test_mask
@@ -143,8 +148,11 @@ class CitationGraphDataset(DGLBuiltinDataset):
         g.ndata['feat'] = F.tensor(_preprocess_features(features), dtype=F.data_type_dict['float32'])
         self._num_classes = onehot_labels.shape[1]
         self._labels = labels
-        self._g = reorder_graph(
-            g, node_permute_algo='rcmk', edge_permute_algo='dst', store_ids=False)
+        if self._reorder:
+            self._g = reorder_graph(
+                g, node_permute_algo='rcmk', edge_permute_algo='dst', store_ids=False)
+        else:
+            self._g = g
 
         if self.verbose:
             print('Finished data loading and preprocessing.')
@@ -197,7 +205,6 @@ class CitationGraphDataset(DGLBuiltinDataset):
         graph.ndata.pop('feat')
         graph.ndata.pop('label')
         graph = to_networkx(graph)
-        self._graph = nx.DiGraph(graph)
 
         self._num_classes = info['num_classes']
         self._g.ndata['train_mask'] = generate_mask_tensor(F.asnumpy(self._g.ndata['train_mask']))
@@ -243,10 +250,6 @@ class CitationGraphDataset(DGLBuiltinDataset):
     """ Citation graph is used in many examples
         We preserve these properties for compatability.
     """
-    @property
-    def graph(self):
-        deprecate_property('dataset.graph', 'dataset[0]')
-        return self._graph
 
     @property
     def train_mask(self):
@@ -373,6 +376,8 @@ class CoraGraphDataset(CitationGraphDataset):
         A transform that takes in a :class:`~dgl.DGLGraph` object and returns
         a transformed version. The :class:`~dgl.DGLGraph` object will be
         transformed before every access.
+    reorder : bool
+        Whether to reorder the graph using :func:`~dgl.reorder_graph`. Default: False.
 
     Attributes
     ----------
@@ -414,11 +419,11 @@ class CoraGraphDataset(CitationGraphDataset):
 
     """
     def __init__(self, raw_dir=None, force_reload=False, verbose=True,
-                 reverse_edge=True, transform=None):
+                 reverse_edge=True, transform=None, reorder=False):
         name = 'cora'
 
         super(CoraGraphDataset, self).__init__(name, raw_dir, force_reload,
-                                               verbose, reverse_edge, transform)
+                                               verbose, reverse_edge, transform, reorder)
 
     def __getitem__(self, idx):
         r"""Gets the graph object
@@ -519,6 +524,8 @@ class CiteseerGraphDataset(CitationGraphDataset):
         A transform that takes in a :class:`~dgl.DGLGraph` object and returns
         a transformed version. The :class:`~dgl.DGLGraph` object will be
         transformed before every access.
+    reorder : bool
+        Whether to reorder the graph using :func:`~dgl.reorder_graph`. Default: False.
 
     Attributes
     ----------
@@ -563,11 +570,11 @@ class CiteseerGraphDataset(CitationGraphDataset):
 
     """
     def __init__(self, raw_dir=None, force_reload=False,
-                 verbose=True, reverse_edge=True, transform=None):
+                 verbose=True, reverse_edge=True, transform=None, reorder=False):
         name = 'citeseer'
 
         super(CiteseerGraphDataset, self).__init__(name, raw_dir, force_reload,
-                                                   verbose, reverse_edge, transform)
+                                                   verbose, reverse_edge, transform, reorder)
 
     def __getitem__(self, idx):
         r"""Gets the graph object
@@ -668,6 +675,8 @@ class PubmedGraphDataset(CitationGraphDataset):
         A transform that takes in a :class:`~dgl.DGLGraph` object and returns
         a transformed version. The :class:`~dgl.DGLGraph` object will be
         transformed before every access.
+    reorder : bool
+        Whether to reorder the graph using :func:`~dgl.reorder_graph`. Default: False.
 
     Attributes
     ----------
@@ -709,11 +718,11 @@ class PubmedGraphDataset(CitationGraphDataset):
 
     """
     def __init__(self, raw_dir=None, force_reload=False, verbose=True,
-                 reverse_edge=True, transform=None):
+                 reverse_edge=True, transform=None, reorder=False):
         name = 'pubmed'
 
         super(PubmedGraphDataset, self).__init__(name, raw_dir, force_reload,
-                                                 verbose, reverse_edge, transform)
+                                                 verbose, reverse_edge, transform, reorder)
 
     def __getitem__(self, idx):
         r"""Gets the graph object

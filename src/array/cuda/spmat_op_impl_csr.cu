@@ -462,11 +462,11 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray 
   auto ptr_sorted_cols = sorted_array.Ptr<IdType>();
   auto ptr_cols = cols.Ptr<IdType>();
   size_t workspace_size = 0;
-  cub::DeviceRadixSort::SortKeys(
-    nullptr, workspace_size, ptr_cols, ptr_sorted_cols, cols->shape[0]);
+  CUDA_CALL(cub::DeviceRadixSort::SortKeys(
+      nullptr, workspace_size, ptr_cols, ptr_sorted_cols, cols->shape[0]));
   void *workspace = device->AllocWorkspace(ctx, workspace_size);
-  cub::DeviceRadixSort::SortKeys(
-    workspace, workspace_size, ptr_cols, ptr_sorted_cols, cols->shape[0]);
+  CUDA_CALL(cub::DeviceRadixSort::SortKeys(
+      workspace, workspace_size, ptr_cols, ptr_sorted_cols, cols->shape[0]));
   device->FreeWorkspace(ctx, workspace);
 
   // Execute SegmentMaskColKernel

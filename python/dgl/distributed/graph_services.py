@@ -70,7 +70,7 @@ def _sample_neighbors(local_g, partition_book, seed_nodes, fan_out, edge_dir, pr
     return global_src, global_dst, global_eids
 
 def _sample_etype_neighbors(local_g, partition_book, seed_nodes, etype_field,
-                            fan_out, edge_dir, prob, replace):
+                            fan_out, edge_dir, prob, replace, etype_sorted=False):
     """ Sample from local partition.
 
     The input nodes use global IDs. We need to map the global node IDs to local node IDs,
@@ -80,13 +80,10 @@ def _sample_etype_neighbors(local_g, partition_book, seed_nodes, etype_field,
     """
     local_ids = partition_book.nid2localnid(seed_nodes, partition_book.partid)
     local_ids = F.astype(local_ids, local_g.idtype)
-    # local_ids = self.seed_nodes
 
-    # DistGraph's edges are sorted by default according to
-    # graph partition mechanism.
     sampled_graph = local_sample_etype_neighbors(
         local_g, local_ids, etype_field, fan_out, edge_dir, prob, replace,
-        etype_sorted=True, _dist_training=True)
+        etype_sorted=etype_sorted, _dist_training=True)
     global_nid_mapping = local_g.ndata[NID]
     src, dst = sampled_graph.edges()
     global_src, global_dst = F.gather_row(global_nid_mapping, src), \

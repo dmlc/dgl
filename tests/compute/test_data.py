@@ -13,6 +13,7 @@ from dgl import DGLError
 import dgl
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
 def test_minigc():
     ds = data.MiniGCDataset(16, 10, 20)
     g, l = list(zip(*ds))
@@ -24,6 +25,7 @@ def test_minigc():
     assert g2.num_edges() - g1.num_edges() == g1.num_nodes()
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
 def test_gin():
     ds_n_graphs = {
         'MUTAG': 188,
@@ -40,8 +42,10 @@ def test_gin():
         ds = data.GINDataset(name, self_loop=False, degree_as_nlabel=False, transform=transform)
         g2 = ds[0][0]
         assert g2.num_edges() - g1.num_edges() == g1.num_nodes()
+        assert ds.num_classes == ds.gclasses
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
 def test_fraud():
     transform = dgl.AddSelfLoop(allow_duplicate=True)
 
@@ -65,6 +69,7 @@ def test_fraud():
     assert g2.num_edges() - g.num_edges() == g.num_nodes() * 3
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
 def test_fakenews():
     transform = dgl.AddSelfLoop(allow_duplicate=True)
 
@@ -81,8 +86,10 @@ def test_fakenews():
     assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
 def test_tudataset_regression():
     ds = data.TUDataset('ZINC_test', force_reload=True)
+    assert ds.num_classes == ds.num_labels
     assert len(ds) == 5000
     g = ds[0][0]
 
@@ -92,6 +99,7 @@ def test_tudataset_regression():
     assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
 def test_data_hash():
     class HashTestDataset(data.DGLDataset):
         def __init__(self, hash_key=()):
@@ -109,11 +117,12 @@ def test_data_hash():
 
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
 def test_citation_graph():
     transform = dgl.AddSelfLoop(allow_duplicate=True)
 
     # cora
-    g = data.CoraGraphDataset()[0]
+    g = data.CoraGraphDataset(force_reload=True, reorder=True)[0]
     assert g.num_nodes() == 2708
     assert g.num_edges() == 10556
     dst = F.asnumpy(g.edges()[1])
@@ -122,7 +131,7 @@ def test_citation_graph():
     assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
     # Citeseer
-    g = data.CiteseerGraphDataset()[0]
+    g = data.CiteseerGraphDataset(force_reload=True, reorder=True)[0]
     assert g.num_nodes() == 3327
     assert g.num_edges() == 9228
     dst = F.asnumpy(g.edges()[1])
@@ -131,7 +140,7 @@ def test_citation_graph():
     assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
     # Pubmed
-    g = data.PubmedGraphDataset()[0]
+    g = data.PubmedGraphDataset(force_reload=True, reorder=True)[0]
     assert g.num_nodes() == 19717
     assert g.num_edges() == 88651
     dst = F.asnumpy(g.edges()[1])
@@ -141,6 +150,7 @@ def test_citation_graph():
 
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
 def test_gnn_benchmark():
     transform = dgl.AddSelfLoop(allow_duplicate=True)
 
@@ -191,6 +201,7 @@ def test_gnn_benchmark():
 
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
 def test_reddit():
     # RedditDataset
     g = data.RedditDataset()[0]
@@ -204,6 +215,7 @@ def test_reddit():
     assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
 def test_explain_syn():
     dataset = data.BAShapeDataset()
     assert dataset.num_classes == 4
@@ -263,6 +275,46 @@ def test_explain_syn():
     assert 'feat' in g.ndata
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
+def test_wiki_cs():
+    g = data.WikiCSDataset()[0]
+    assert g.num_nodes() == 11701
+    assert g.num_edges() == 431726
+    dst = F.asnumpy(g.edges()[1])
+    assert np.array_equal(dst, np.sort(dst))
+
+    transform = dgl.AddSelfLoop(allow_duplicate=True)
+    g2 = data.WikiCSDataset(transform=transform)[0]
+    assert g2.num_edges() - g.num_edges() == g.num_nodes()
+
+@unittest.skip(reason="Dataset too large to download for the latest CI.")
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
+def test_yelp():
+    g = data.YelpDataset(reorder=True)[0]
+    assert g.num_nodes() == 716847
+    assert g.num_edges() == 13954819
+    dst = F.asnumpy(g.edges()[1])
+    assert np.array_equal(dst, np.sort(dst))
+
+    transform = dgl.AddSelfLoop(allow_duplicate=True)
+    g2 = data.YelpDataset(reorder=True, transform=transform)[0]
+    assert g2.num_edges() - g.num_edges() == g.num_nodes()
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
+def test_flickr():
+    g = data.FlickrDataset(reorder=True)[0]
+    assert g.num_nodes() == 89250
+    assert g.num_edges() == 899756
+    dst = F.asnumpy(g.edges()[1])
+    assert np.array_equal(dst, np.sort(dst))
+
+    transform = dgl.AddSelfLoop(allow_duplicate=True)
+    g2 = data.FlickrDataset(reorder=True, transform=transform)[0]
+    assert g2.num_edges() - g.num_edges() == g.num_nodes()
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
 def test_extract_archive():
     # gzip
     with tempfile.TemporaryDirectory() as src_dir:
@@ -494,7 +546,7 @@ def _test_construct_graphs_multiple():
     assert len(data_dict) == len(gdata)
     for k, v in data_dict.items():
         assert F.dtype(v) != F.float64
-        assert F.array_equal(F.tensor(gdata[k], dtype=F.dtype(v)), v)
+        assert F.array_equal(F.reshape(F.tensor(gdata[k], dtype=F.dtype(v)), (len(graphs), -1)), v)
     for i, g in enumerate(graphs):
         assert g.is_homogeneous
         assert g.num_nodes() == num_nodes
@@ -1102,7 +1154,7 @@ def _test_CSVDataset_customized_data_parser():
         assert 'label' in csv_dataset.data
         for i, (g, g_data) in enumerate(csv_dataset):
             assert not g.is_homogeneous
-            assert F.asnumpy(g_data['label']) == label_gdata[i] + 2
+            assert F.asnumpy(g_data) == label_gdata[i] + 2
             for ntype in g.ntypes:
                 assert g.num_nodes(ntype) == num_nodes
                 offset = 2 if ntype == 'user' else 0
@@ -1122,7 +1174,7 @@ def _test_CSVDataset_customized_data_parser():
         assert 'label' in csv_dataset.data
         for i, (g, g_data) in enumerate(csv_dataset):
             assert not g.is_homogeneous
-            assert F.asnumpy(g_data['label']) == label_gdata[i] + 2
+            assert F.asnumpy(g_data) == label_gdata[i] + 2
             for ntype in g.ntypes:
                 assert g.num_nodes(ntype) == num_nodes
                 offset = 2
@@ -1218,6 +1270,7 @@ def _test_NodeEdgeGraphData():
 
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
 def test_csvdataset():
     _test_NodeEdgeGraphData()
     _test_construct_graphs_node_ids()
@@ -1234,6 +1287,7 @@ def test_csvdataset():
     _test_CSVDataset_customized_data_parser()
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
 def test_add_nodepred_split():
     dataset = data.AmazonCoBuyComputerDataset()
     print('train_mask' in dataset[0].ndata)
@@ -1246,6 +1300,7 @@ def test_add_nodepred_split():
     assert 'train_mask' in dataset[0].nodes['Publikationen'].data
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
 def test_as_nodepred1():
     ds = data.AmazonCoBuyComputerDataset()
     print('train_mask' in ds[0].ndata)
@@ -1276,6 +1331,7 @@ def test_as_nodepred1():
         new_ds[0].nodes['Personen'].data['test_mask']))
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
 def test_as_nodepred2():
     # test proper reprocessing
 
@@ -1306,6 +1362,7 @@ def test_as_nodepred2():
     assert len(ds.train_idx) == int(ds[0].num_nodes('Personen') * 0.1)
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason="ogb only supports pytorch")
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
 def test_as_nodepred_ogb():
     from ogb.nodeproppred import DglNodePropPredDataset
     ds = data.AsNodePredDataset(DglNodePropPredDataset("ogbn-arxiv"), split_ratio=None, verbose=True)
@@ -1318,6 +1375,7 @@ def test_as_nodepred_ogb():
     ds = data.AsNodePredDataset(DglNodePropPredDataset("ogbn-arxiv"), split_ratio=[0.7, 0.2, 0.1], verbose=True)
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
 def test_as_linkpred():
     # create
     ds = data.AsLinkPredDataset(data.CoraGraphDataset(), split_ratio=[0.8, 0.1, 0.1], neg_ratio=1, verbose=True)
@@ -1343,6 +1401,7 @@ def test_as_linkpred_ogb():
     assert ds.test_edges[0][0].shape[0] == 235812
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
 def test_as_nodepred_csvdataset():
     with tempfile.TemporaryDirectory() as test_dir:
         # generate YAML/CSVs
@@ -1383,6 +1442,143 @@ def test_as_nodepred_csvdataset():
         assert 'feat' in new_ds[0].ndata
         assert 'label' in new_ds[0].ndata
         assert 'train_mask' in new_ds[0].ndata
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
+def test_as_graphpred():
+    ds = data.GINDataset(name='MUTAG', self_loop=True)
+    new_ds = data.AsGraphPredDataset(ds, [0.8, 0.1, 0.1], verbose=True)
+    assert len(new_ds) == 188
+    assert new_ds.num_tasks == 1
+    assert new_ds.num_classes == 2
+
+    ds = data.FakeNewsDataset('politifact', 'profile')
+    new_ds = data.AsGraphPredDataset(ds, verbose=True)
+    assert len(new_ds) == 314
+    assert new_ds.num_tasks == 1
+    assert new_ds.num_classes == 2
+
+    ds = data.QM7bDataset()
+    new_ds = data.AsGraphPredDataset(ds, [0.8, 0.1, 0.1], verbose=True)
+    assert len(new_ds) == 7211
+    assert new_ds.num_tasks == 14
+    assert new_ds.num_classes is None
+
+    ds = data.QM9Dataset(label_keys=['mu', 'gap'])
+    new_ds = data.AsGraphPredDataset(ds, [0.8, 0.1, 0.1], verbose=True)
+    assert len(new_ds) == 130831
+    assert new_ds.num_tasks == 2
+    assert new_ds.num_classes is None
+
+    ds = data.QM9EdgeDataset(label_keys=['mu', 'alpha'])
+    new_ds = data.AsGraphPredDataset(ds, [0.8, 0.1, 0.1], verbose=True)
+    assert len(new_ds) == 130831
+    assert new_ds.num_tasks == 2
+    assert new_ds.num_classes is None
+
+    ds = data.TUDataset('DD')
+    new_ds = data.AsGraphPredDataset(ds, [0.8, 0.1, 0.1], verbose=True)
+    assert len(new_ds) == 1178
+    assert new_ds.num_tasks == 1
+    assert new_ds.num_classes == 2
+
+    ds = data.LegacyTUDataset('DD')
+    new_ds = data.AsGraphPredDataset(ds, [0.8, 0.1, 0.1], verbose=True)
+    assert len(new_ds) == 1178
+    assert new_ds.num_tasks == 1
+    assert new_ds.num_classes == 2
+
+    ds = data.BA2MotifDataset()
+    new_ds = data.AsGraphPredDataset(ds, [0.8, 0.1, 0.1], verbose=True)
+    assert len(new_ds) == 1000
+    assert new_ds.num_tasks == 1
+    assert new_ds.num_classes == 2
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Datasets don't need to be tested on GPU.")
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
+def test_as_graphpred_reprocess():
+    ds = data.AsGraphPredDataset(data.GINDataset(name='MUTAG', self_loop=True), [0.8, 0.1, 0.1])
+    assert len(ds.train_idx) == int(len(ds) * 0.8)
+    # read from cache
+    ds = data.AsGraphPredDataset(data.GINDataset(name='MUTAG', self_loop=True), [0.8, 0.1, 0.1])
+    assert len(ds.train_idx) == int(len(ds) * 0.8)
+    # invalid cache, re-read
+    ds = data.AsGraphPredDataset(data.GINDataset(name='MUTAG', self_loop=True), [0.1, 0.1, 0.8])
+    assert len(ds.train_idx) == int(len(ds) * 0.1)
+
+    ds = data.AsGraphPredDataset(data.FakeNewsDataset('politifact', 'profile'), [0.8, 0.1, 0.1])
+    assert len(ds.train_idx) == int(len(ds) * 0.8)
+    # read from cache
+    ds = data.AsGraphPredDataset(data.FakeNewsDataset('politifact', 'profile'), [0.8, 0.1, 0.1])
+    assert len(ds.train_idx) == int(len(ds) * 0.8)
+    # invalid cache, re-read
+    ds = data.AsGraphPredDataset(data.FakeNewsDataset('politifact', 'profile'), [0.1, 0.1, 0.8])
+    assert len(ds.train_idx) == int(len(ds) * 0.1)
+
+    ds = data.AsGraphPredDataset(data.QM7bDataset(), [0.8, 0.1, 0.1])
+    assert len(ds.train_idx) == int(len(ds) * 0.8)
+    # read from cache
+    ds = data.AsGraphPredDataset(data.QM7bDataset(), [0.8, 0.1, 0.1])
+    assert len(ds.train_idx) == int(len(ds) * 0.8)
+    # invalid cache, re-read
+    ds = data.AsGraphPredDataset(data.QM7bDataset(), [0.1, 0.1, 0.8])
+    assert len(ds.train_idx) == int(len(ds) * 0.1)
+
+    ds = data.AsGraphPredDataset(data.QM9Dataset(label_keys=['mu', 'gap']), [0.8, 0.1, 0.1])
+    assert len(ds.train_idx) == int(len(ds) * 0.8)
+    # read from cache
+    ds = data.AsGraphPredDataset(data.QM9Dataset(label_keys=['mu', 'gap']), [0.8, 0.1, 0.1])
+    assert len(ds.train_idx) == int(len(ds) * 0.8)
+    # invalid cache, re-read
+    ds = data.AsGraphPredDataset(data.QM9Dataset(label_keys=['mu', 'gap']), [0.1, 0.1, 0.8])
+    assert len(ds.train_idx) == int(len(ds) * 0.1)
+
+    ds = data.AsGraphPredDataset(data.QM9EdgeDataset(label_keys=['mu', 'alpha']), [0.8, 0.1, 0.1])
+    assert len(ds.train_idx) == int(len(ds) * 0.8)
+    # read from cache
+    ds = data.AsGraphPredDataset(data.QM9EdgeDataset(label_keys=['mu', 'alpha']), [0.8, 0.1, 0.1])
+    assert len(ds.train_idx) == int(len(ds) * 0.8)
+    # invalid cache, re-read
+    ds = data.AsGraphPredDataset(data.QM9EdgeDataset(label_keys=['mu', 'alpha']), [0.1, 0.1, 0.8])
+    assert len(ds.train_idx) == int(len(ds) * 0.1)
+
+    ds = data.AsGraphPredDataset(data.TUDataset('DD'), [0.8, 0.1, 0.1])
+    assert len(ds.train_idx) == int(len(ds) * 0.8)
+    # read from cache
+    ds = data.AsGraphPredDataset(data.TUDataset('DD'), [0.8, 0.1, 0.1])
+    assert len(ds.train_idx) == int(len(ds) * 0.8)
+    # invalid cache, re-read
+    ds = data.AsGraphPredDataset(data.TUDataset('DD'), [0.1, 0.1, 0.8])
+    assert len(ds.train_idx) == int(len(ds) * 0.1)
+
+    ds = data.AsGraphPredDataset(data.LegacyTUDataset('DD'), [0.8, 0.1, 0.1])
+    assert len(ds.train_idx) == int(len(ds) * 0.8)
+    # read from cache
+    ds = data.AsGraphPredDataset(data.LegacyTUDataset('DD'), [0.8, 0.1, 0.1])
+    assert len(ds.train_idx) == int(len(ds) * 0.8)
+    # invalid cache, re-read
+    ds = data.AsGraphPredDataset(data.LegacyTUDataset('DD'), [0.1, 0.1, 0.8])
+    assert len(ds.train_idx) == int(len(ds) * 0.1)
+
+    ds = data.AsGraphPredDataset(data.BA2MotifDataset(), [0.8, 0.1, 0.1])
+    assert len(ds.train_idx) == int(len(ds) * 0.8)
+    # read from cache
+    ds = data.AsGraphPredDataset(data.BA2MotifDataset(), [0.8, 0.1, 0.1])
+    assert len(ds.train_idx) == int(len(ds) * 0.8)
+    # invalid cache, re-read
+    ds = data.AsGraphPredDataset(data.BA2MotifDataset(), [0.1, 0.1, 0.8])
+    assert len(ds.train_idx) == int(len(ds) * 0.1)
+
+@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason="ogb only supports pytorch")
+def test_as_graphpred_ogb():
+    from ogb.graphproppred import DglGraphPropPredDataset
+    ds = data.AsGraphPredDataset(DglGraphPropPredDataset('ogbg-molhiv'),
+                                 split_ratio=None, verbose=True)
+    assert len(ds.train_idx) == 32901
+    # force generate new split
+    ds = data.AsGraphPredDataset(DglGraphPropPredDataset('ogbg-molhiv'),
+                                 split_ratio=[0.6, 0.2, 0.2], verbose=True)
+    assert len(ds.train_idx) == 24676
 
 if __name__ == '__main__':
     test_minigc()
