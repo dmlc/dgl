@@ -1,7 +1,7 @@
 """A set of graph services of getting subgraphs from DistGraph"""
 from collections import namedtuple
-import numpy as np
 import os
+import numpy as np
 from .rpc import Request, Response, send_requests_to_machine, recv_responses
 from ..sampling import sample_neighbors as local_sample_neighbors
 from ..sampling import sample_etype_neighbors as local_sample_etype_neighbors
