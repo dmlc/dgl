@@ -48,7 +48,7 @@ def accuracy(logits, labels):
     return correct.item() * 1.0 / len(labels)
 
 
-def evaluate(model, g, features, labels, mask):
+def evaluate(g, model, features, labels, mask):
     model.eval()
     with torch.no_grad():
         logits = model(g, features)
@@ -82,7 +82,7 @@ def main(args):
     test_mask = g.ndata['test_mask']
     num_feats = features.shape[1]
     n_classes = data.num_labels
-    n_edges = data.graph.number_of_edges()
+    n_edges = g.number_of_edges()
     print("""----Data statistics------'
       #Edges %d
       #Classes %d
@@ -156,7 +156,7 @@ def main(args):
     print()
     if args.early_stop:
         model.load_state_dict(torch.load('es_checkpoint.pt'))
-    acc = evaluate(model, features, labels, test_mask)
+    acc = evaluate(g, model, features, labels, test_mask)
     print("Test Accuracy {:.4f}".format(acc))
 
 
