@@ -9,7 +9,7 @@ import numpy as np
 from ..heterograph import DGLHeteroGraph
 from ..convert import heterograph as dgl_heterograph
 from ..convert import graph as dgl_graph
-from ..transforms import compact_graphs
+from ..transforms import compact_graphs, sort_csr_by_tag, sort_csc_by_tag
 from .. import heterograph_index
 from .. import backend as F
 from ..base import NID, EID, NTYPE, ETYPE, ALL, is_all
@@ -309,6 +309,8 @@ class DistGraphServer(KVServer):
         Disable shared memory.
     graph_format : str or list of str
         The graph formats.
+    sort_etypes : str
+        Whether to sort etypes in ``csr`` or ``csc`` format.
     keep_alive : bool
         Whether to keep server alive when clients exit
     net_type : str
@@ -316,8 +318,8 @@ class DistGraphServer(KVServer):
     '''
     def __init__(self, server_id, ip_config, num_servers,
                  num_clients, part_config, disable_shared_mem=False,
-                 graph_format=('csc', 'coo'), keep_alive=False,
-                 net_type='socket'):
+                 graph_format=('csc', 'coo'), sort_etypes='',
+                 keep_alive=False, net_type='socket'):
         super(DistGraphServer, self).__init__(server_id=server_id,
                                               ip_config=ip_config,
                                               num_servers=num_servers,
@@ -339,6 +341,12 @@ class DistGraphServer(KVServer):
             # Create the graph formats specified the users.
             self.client_g = self.client_g.formats(graph_format)
             self.client_g.create_formats_()
+            if sort_etypes == 'csr':
+                self.client_g = sort_csr_by_tag(
+                    self.client_g, tag=self.client_g.edata[ETYPE], tag_type='edge')
+            elif sort_etypes == 'csc':
+                self.client_g = sort_csc_by_tag(
+                    self.client_g, tag=self.client_g.edata[ETYPE], tag_type='edge')
             if not disable_shared_mem:
                 self.client_g = _copy_graph_to_shared_mem(self.client_g, graph_name, graph_format)
 

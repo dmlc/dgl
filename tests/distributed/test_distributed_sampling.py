@@ -19,10 +19,10 @@ from dgl.distributed import DistGraphServer, DistGraph
 
 
 def start_server(rank, tmpdir, disable_shared_mem, graph_name, graph_format=['csc', 'coo'],
-                 keep_alive=False):
+                 sort_etypes='', keep_alive=False):
     g = DistGraphServer(rank, "rpc_ip_config.txt", 1, 1,
                         tmpdir / (graph_name + '.json'), disable_shared_mem=disable_shared_mem,
-                        graph_format=graph_format, keep_alive=keep_alive)
+                        graph_format=graph_format, sort_etypes=sort_etypes, keep_alive=keep_alive)
     g.start()
 
 
@@ -335,7 +335,9 @@ def start_hetero_sample_client(rank, tmpdir, disable_shared_mem, nodes):
     return block, gpb
 
 def start_hetero_etype_sample_client(rank, tmpdir, disable_shared_mem, fanout=3,
-                                     nodes={'n3': [0, 10, 99, 66, 124, 208]}):
+                                     nodes={'n3': [0, 10, 99, 66, 124, 208]},
+                                     sort_etypes=''):
+    os.environ['DGL_SORT_ETYPES'] = sort_etypes
     gpb = None
     if disable_shared_mem:
         _, _, _, gpb, _, _, _ = load_partition(tmpdir / 'test_sampling.json', rank)
@@ -364,6 +366,7 @@ def start_hetero_etype_sample_client(rank, tmpdir, disable_shared_mem, fanout=3,
     except Exception as e:
         print(e)
         block = None
+    os.environ.pop('DGL_SORT_ETYPES')
     dgl.distributed.exit_client()
     return block, gpb
 
@@ -461,7 +464,7 @@ def check_rpc_hetero_sampling_empty_shuffle(tmpdir, num_server):
     assert block.number_of_edges() == 0
     assert len(block.etypes) == len(g.etypes)
 
-def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server):
+def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server, sort_etypes=''):
     generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
     g = create_random_hetero(dense=True)
@@ -474,14 +477,15 @@ def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server):
     pserver_list = []
     ctx = mp.get_context('spawn')
     for i in range(num_server):
-        p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1, 'test_sampling'))
+        p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1, 'test_sampling', ['csc', 'coo'], sort_etypes))
         p.start()
         time.sleep(1)
         pserver_list.append(p)
 
     fanout = 3
     block, gpb = start_hetero_etype_sample_client(0, tmpdir, num_server > 1, fanout,
-                                                  nodes={'n3': [0, 10, 99, 66, 124, 208]})
+                                                  nodes={'n3': [0, 10, 99, 66, 124, 208]},
+                                                  sort_etypes=sort_etypes)
     print("Done sampling")
     for p in pserver_list:
         p.join()
@@ -832,6 +836,7 @@ def test_rpc_sampling_shuffle(num_server):
         check_rpc_hetero_sampling_shuffle(Path(tmpdirname), num_server)
         check_rpc_hetero_sampling_empty_shuffle(Path(tmpdirname), num_server)
         check_rpc_hetero_etype_sampling_shuffle(Path(tmpdirname), num_server)
+        check_rpc_hetero_etype_sampling_shuffle(Path(tmpdirname), num_server, sort_etypes='csc')
         check_rpc_hetero_etype_sampling_empty_shuffle(Path(tmpdirname), num_server)
         check_rpc_bipartite_sampling_empty(Path(tmpdirname), num_server)
         check_rpc_bipartite_sampling_shuffle(Path(tmpdirname), num_server)

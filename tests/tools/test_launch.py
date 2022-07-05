@@ -83,6 +83,7 @@ class TestConstructDglServerEnvVars(unittest.TestCase):
                 ip_config="path/to/ip.config",
                 num_servers=5,
                 graph_format="csc",
+                sort_etypes='',
                 keep_alive=False
             ),
             (
@@ -94,6 +95,7 @@ class TestConstructDglServerEnvVars(unittest.TestCase):
                 "DGL_IP_CONFIG=path/to/ip.config "
                 "DGL_NUM_SERVER=5 "
                 "DGL_GRAPH_FORMAT=csc "
+                "DGL_SORT_ETYPES= "
                 "DGL_KEEP_ALIVE=0 "
             )
         )
@@ -111,6 +113,7 @@ class TestConstructDglClientEnvVars(unittest.TestCase):
                 ip_config="path/to/ip.config",
                 num_servers=3,
                 graph_format="csc",
+                sort_etypes='',
                 num_omp_threads=4,
                 group_id=0,
                 pythonpath="some/pythonpath/"
@@ -124,6 +127,7 @@ class TestConstructDglClientEnvVars(unittest.TestCase):
                 "DGL_IP_CONFIG=path/to/ip.config "
                 "DGL_NUM_SERVER=3 "
                 "DGL_GRAPH_FORMAT=csc "
+                "DGL_SORT_ETYPES= "
                 "OMP_NUM_THREADS=4 "
                 "DGL_GROUP_ID=0 "
                 "PYTHONPATH=some/pythonpath/ "
@@ -138,6 +142,7 @@ class TestConstructDglClientEnvVars(unittest.TestCase):
                 ip_config="path/to/ip.config",
                 num_servers=3,
                 graph_format="csc",
+                sort_etypes='',
                 num_omp_threads=4,
                 group_id=0
             ),
@@ -150,6 +155,7 @@ class TestConstructDglClientEnvVars(unittest.TestCase):
                 "DGL_IP_CONFIG=path/to/ip.config "
                 "DGL_NUM_SERVER=3 "
                 "DGL_GRAPH_FORMAT=csc "
+                "DGL_SORT_ETYPES= "
                 "OMP_NUM_THREADS=4 "
                 "DGL_GROUP_ID=0 "
             )
@@ -180,6 +186,7 @@ def test_submit_jobs():
         args.keep_alive = False
         args.num_server_threads = 1
         args.graph_format = 'csc'
+        args.sort_etypes = 'csc'
         args.extra_envs = ["NCCL_DEBUG=INFO"]
         args.num_omp_threads = 1
         udf_command = "python3 train_dist.py --num_epochs 10"
@@ -194,6 +201,7 @@ def test_submit_jobs():
             assert f'DGL_IP_CONFIG={args.ip_config}' in cmd
             assert f'DGL_NUM_SERVER={args.num_servers}' in cmd
             assert f'DGL_GRAPH_FORMAT={args.graph_format}' in cmd
+            assert f'DGL_SORT_ETYPES={args.sort_etypes}' in cmd
             assert f'OMP_NUM_THREADS={args.num_omp_threads}' in cmd
             assert udf_command[len('python3 '):] in cmd
         for cmd in clients_cmd:

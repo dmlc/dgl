@@ -1,7 +1,7 @@
 """A set of graph services of getting subgraphs from DistGraph"""
 from collections import namedtuple
 import numpy as np
-
+import os
 from .rpc import Request, Response, send_requests_to_machine, recv_responses
 from ..sampling import sample_neighbors as local_sample_neighbors
 from ..sampling import sample_etype_neighbors as local_sample_etype_neighbors
@@ -70,7 +70,7 @@ def _sample_neighbors(local_g, partition_book, seed_nodes, fan_out, edge_dir, pr
     return global_src, global_dst, global_eids
 
 def _sample_etype_neighbors(local_g, partition_book, seed_nodes, etype_field,
-                            fan_out, edge_dir, prob, replace, etype_sorted=False):
+                            fan_out, edge_dir, prob, replace):
     """ Sample from local partition.
 
     The input nodes use global IDs. We need to map the global node IDs to local node IDs,
@@ -80,7 +80,9 @@ def _sample_etype_neighbors(local_g, partition_book, seed_nodes, etype_field,
     """
     local_ids = partition_book.nid2localnid(seed_nodes, partition_book.partid)
     local_ids = F.astype(local_ids, local_g.idtype)
-
+    sort_etypes = os.environ.get('DGL_SORT_ETYPES', '')
+    etype_sorted = (sort_etypes == 'csr' and edge_dir == 'out') or (
+        sort_etypes == 'csc' and edge_dir == 'in')
     sampled_graph = local_sample_etype_neighbors(
         local_g, local_ids, etype_field, fan_out, edge_dir, prob, replace,
         etype_sorted=etype_sorted, _dist_training=True)

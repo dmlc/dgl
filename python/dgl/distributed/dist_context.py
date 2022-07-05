@@ -227,6 +227,7 @@ def initialize(ip_config, num_servers=1, num_workers=0,
             'Please define DGL_CONF_PATH to run DistGraph server'
         formats = os.environ.get('DGL_GRAPH_FORMAT', 'csc').split(',')
         formats = [f.strip() for f in formats]
+        sort_etypes = os.environ.get('DGL_SORT_ETYPES', '')
         rpc.reset()
         keep_alive = bool(int(os.environ.get('DGL_KEEP_ALIVE', 0)))
         serv = DistGraphServer(int(os.environ.get('DGL_SERVER_ID')),
@@ -235,6 +236,7 @@ def initialize(ip_config, num_servers=1, num_workers=0,
                                int(os.environ.get('DGL_NUM_CLIENT')),
                                os.environ.get('DGL_CONF_PATH'),
                                graph_format=formats,
+                               sort_etypes=sort_etypes,
                                keep_alive=keep_alive,
                                net_type=net_type)
         serv.start()
