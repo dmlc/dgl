@@ -62,6 +62,14 @@ def unit_test_linux(backend, dev) {
   }
 }
 
+def unit_test_cugraph(backend, dev) {
+  init_git()
+  unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
+  timeout(time: 15, unit: 'MINUTES') {
+    sh "bash tests/scripts/cugraph_unit_test.sh ${backend}"
+  }
+}
+
 def unit_test_win64(backend, dev) {
   init_git_win64()
   unpack_lib("dgl-${dev}-win64", dgl_win64_libs)
@@ -457,7 +465,7 @@ pipeline {
                 stage('PyTorch Cugraph GPU Unit test') {
                   steps {
                     sh 'nvidia-smi'
-                    unit_test_linux('pytorch', 'cugraph')
+                    unit_test_cugraph('pytorch', 'cugraph')
                   }
                 }
               }
