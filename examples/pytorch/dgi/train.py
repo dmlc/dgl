@@ -4,6 +4,7 @@ import networkx as nx
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import dgl
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
 from dgi import DGI, Classifier
@@ -49,8 +50,8 @@ def main(args):
 
     # add self loop
     if args.self_loop:
-        g.remove_edges_from(nx.selfloop_edges(g))
-        g.add_edges_from(zip(g.nodes(), g.nodes()))
+        g = dgl.remove_self_loop(g)
+        g = dgl.add_self_loop(g)
     n_edges = g.number_of_edges()
 
     if args.gpu >= 0:
