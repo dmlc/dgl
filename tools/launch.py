@@ -328,7 +328,6 @@ def construct_dgl_server_env_vars(
         DGL_IP_CONFIG=ip_config,
         DGL_NUM_SERVER=num_servers,
         DGL_GRAPH_FORMAT=graph_format,
-        DGL_SORT_ETYPES=sort_etypes,
         DGL_KEEP_ALIVE=int(keep_alive),
         suffix_optional_envvars=suffix_optional_envvars,
     )
