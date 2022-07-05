@@ -1,7 +1,7 @@
 import argparse
 import numpy as np
 import torch.multiprocessing as mp
-from initialize import proc_exec, single_dev_init, multi_dev_init
+from data_shuffle import single_machine_run, multi_machine_run 
 
 def log_params(params): 
     """ Print all the command line arguments for debugging purposes.
@@ -28,29 +28,6 @@ def log_params(params):
     print('Edge feats: ', params.edge_feats_file)
     print('Metis partitions: ', params.partitions_file)
     print('Exec Type: ', params.exec_type)
-
-def start_local_run(params): 
-    """ Main function for distributed implementation on a single machine
-
-    Parameters:
-    -----------
-    params : argparser object
-        Argument Parser structure with pre-determined arguments as defined
-        at the bottom of this file.
-    """
-    log_params(params)
-    processes = []
-    mp.set_start_method("spawn")
-
-    #Invoke `target` function from each of the spawned process for distributed 
-    #implementation
-    for rank in range(params.world_size):
-        p = mp.Process(target=single_dev_init, args=(rank, params.world_size, proc_exec, params))
-        p.start()
-        processes.append(p)
-
-    for p in processes:
-        p.join()
 
 if __name__ == "__main__":
     """ 
@@ -99,6 +76,6 @@ if __name__ == "__main__":
 
     #invoke the starting function here.
     if(params.exec_type == 0):
-        start_local_run(params)
+        single_machine_run(params)
     else:
-        multi_dev_init(params)
+        multi_machine_run(params)

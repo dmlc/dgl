@@ -31,7 +31,7 @@ def allgather_sizes(send_data, world_size):
     dist.all_gather(in_tensor, out_tensor)
 
     #gather sizes in on array to return to the invoking function
-    rank_sizes = np.zeros(world_size + 1)
+    rank_sizes = np.zeros(world_size + 1, dtype=np.int64)
     count = rank_sizes[0]
     for i, t in enumerate(in_tensor): 
         count += t.item()
@@ -58,6 +58,40 @@ def alltoall_cpu(rank, world_size, output_tensor_list, input_tensor_list):
     input_tensor_list = [tensor.to(torch.device('cpu')) for tensor in input_tensor_list]
     for i in range(world_size):
         dist.scatter(output_tensor_list[i], input_tensor_list if i == rank else [], src=i)
+
+def alltoall_cpu_object_lst(rank, world_size, input_list):
+    """
+    Each process scatters list of input objects to all processes in a cluster
+    and return gathered list of objects in output list. 
+
+    Parameters
+    ----------
+    rank : int
+        The rank of current worker
+    world_size : int
+        The size of the entire
+    input_tensor_list : List of tensor
+        The tensors to exchange
+
+    Returns
+    -------
+    list: list of objects are received from other processes
+       This is the list of objects which are sent to the current process by
+       other processes as part of this exchange
+    """
+    rcv_list = []
+    output_list = [None] * world_size
+    for i in range(world_size):
+        rcv_list.clear()
+        rcv_list.append(None)
+        if (i == rank):
+            dist.scatter_object_list(rcv_list, input_list, src = rank)
+        else:
+            send_list = [None] * world_size
+            dist.scatter_object_list(rcv_list, send_list, src = i)
+        output_list[i] = rcv_list[0]
+
+    return output_list
 
 def alltoallv_cpu(rank, world_size, output_tensor_list, input_tensor_list):
     """
