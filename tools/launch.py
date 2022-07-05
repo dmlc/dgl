@@ -271,9 +271,9 @@ def construct_dgl_server_env_vars(
     ip_config: str,
     num_servers: int,
     graph_format: str,
-    sort_etypes: str,
     keep_alive: bool,
     pythonpath: Optional[str] = "",
+    sort_etypes: Optional[str] = None
 ) -> str:
     """Constructs the DGL server-specific env vars string that are required for DGL code to behave in the correct
     server role.
@@ -289,11 +289,14 @@ def construct_dgl_server_env_vars(
             Relative path to workspace.
         num_servers:
         graph_format:
-        sort_etypes:
-            Whether to sort etypes in 'csr' or 'csc' format.
         keep_alive:
             Whether to keep server alive when clients exit
         pythonpath: Optional. If given, this will pass this as PYTHONPATH.
+        sort_etypes : str, optional
+            If specified, sort the internal CSR or CSC format of the loaded
+            graph by edge type. Valid choices: ``"csr"``, ``"csc"``.
+            See :func:`dgl.sort_csr_by_tag` or :func:`dgl.sort_csc_by_tag`.
+            Default is ``None``.
 
     Returns:
         server_env_vars: The server-specific env-vars in a string format, friendly for CLI execution.
@@ -308,13 +311,14 @@ def construct_dgl_server_env_vars(
         "DGL_IP_CONFIG={DGL_IP_CONFIG} "
         "DGL_NUM_SERVER={DGL_NUM_SERVER} "
         "DGL_GRAPH_FORMAT={DGL_GRAPH_FORMAT} "
-        "DGL_SORT_ETYPES={DGL_SORT_ETYPES} "
         "DGL_KEEP_ALIVE={DGL_KEEP_ALIVE} "
         "{suffix_optional_envvars}"
     )
     suffix_optional_envvars = ""
     if pythonpath:
         suffix_optional_envvars += f"PYTHONPATH={pythonpath} "
+    if sort_etypes:
+        suffix_optional_envvars += f"DGL_SORT_ETYPES={sort_etypes} "
     return server_env_vars_template.format(
         DGL_ROLE="server",
         DGL_NUM_SAMPLER=num_samplers,
@@ -551,9 +555,9 @@ def submit_jobs(args, udf_command, dry_run=False):
             ip_config=args.ip_config,
             num_servers=args.num_servers,
             graph_format=args.graph_format,
-            sort_etypes=args.sort_etypes,
             keep_alive=args.keep_alive,
             pythonpath=os.environ.get("PYTHONPATH", ""),
+            sort_etypes=args.sort_etypes,
         )
         for i in range(len(hosts) * server_count_per_machine):
             ip, _ = hosts[int(i / server_count_per_machine)]
@@ -665,11 +669,10 @@ def main():
     parser.add_argument('--keep_alive', action='store_true', help='Servers keep alive when clients exit')
     parser.add_argument('--server_name', type=str,
                         help='Used to check whether there exist alive servers')
-    parser.add_argument('--sort_etypes', type=str, default='',
-                        help='Sort etypes when loading graph in servers which is beneficial \
-                        to sampling etype neighbours. For edge direction of `in` when sampling, \
-                        please specify this argument as `csc`. For `out` direction, please \
-                        specify as `csr`.')
+    parser.add_argument('--sort_etypes', type=str, default=None,
+                        help="If specified, sort the internal CSR or CSC format of the loaded \
+                        graph by edge type. Valid choices: 'csr', 'csc'. \
+                        See 'dgl.sort_csr_by_tag()' or 'dgl.sort_csc_by_tag()' for more details.")
     args, udf_command = parser.parse_known_args()
     if args.keep_alive:
         assert args.server_name is not None, "Server name is required if '--keep_alive' is enabled."

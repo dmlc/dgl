@@ -19,7 +19,7 @@ from dgl.distributed import DistGraphServer, DistGraph
 
 
 def start_server(rank, tmpdir, disable_shared_mem, graph_name, graph_format=['csc', 'coo'],
-                 sort_etypes='', keep_alive=False):
+                 sort_etypes=None, keep_alive=False):
     g = DistGraphServer(rank, "rpc_ip_config.txt", 1, 1,
                         tmpdir / (graph_name + '.json'), disable_shared_mem=disable_shared_mem,
                         graph_format=graph_format, sort_etypes=sort_etypes, keep_alive=keep_alive)
@@ -462,7 +462,7 @@ def check_rpc_hetero_sampling_empty_shuffle(tmpdir, num_server):
     assert block.number_of_edges() == 0
     assert len(block.etypes) == len(g.etypes)
 
-def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server, sort_etypes=''):
+def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server, sort_etypes=None):
     generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
     g = create_random_hetero(dense=True)

@@ -83,7 +83,6 @@ class TestConstructDglServerEnvVars(unittest.TestCase):
                 ip_config="path/to/ip.config",
                 num_servers=5,
                 graph_format="csc",
-                sort_etypes='',
                 keep_alive=False
             ),
             (
@@ -95,7 +94,6 @@ class TestConstructDglServerEnvVars(unittest.TestCase):
                 "DGL_IP_CONFIG=path/to/ip.config "
                 "DGL_NUM_SERVER=5 "
                 "DGL_GRAPH_FORMAT=csc "
-                "DGL_SORT_ETYPES= "
                 "DGL_KEEP_ALIVE=0 "
             )
         )
