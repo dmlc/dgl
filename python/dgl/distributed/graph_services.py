@@ -1,6 +1,5 @@
 """A set of graph services of getting subgraphs from DistGraph"""
 from collections import namedtuple
-import os
 import numpy as np
 from .rpc import Request, Response, send_requests_to_machine, recv_responses
 from ..sampling import sample_neighbors as local_sample_neighbors
@@ -192,7 +191,7 @@ class SamplingRequestEtype(Request):
                                                                       self.edge_dir,
                                                                       self.prob,
                                                                       self.replace,
-                                                                      etype_sorted=self.etype_sorted)
+                                                                      self.etype_sorted)
         return SubgraphResponse(global_src, global_dst, global_eids)
 
 class EdgesRequest(Request):

@@ -310,7 +310,10 @@ class DistGraphServer(KVServer):
     graph_format : str or list of str
         The graph formats.
     sort_etypes : str, optional
-        Whether to sort etypes in ``csr`` or ``csc`` format. Default is ``None``.
+        If specified, sort the internal CSR or CSC format of the loaded
+        graph by edge type. Valid choices: ``"csr"``, ``"csc"``.
+        See :func:`dgl.sort_csr_by_tag` or :func:`dgl.sort_csc_by_tag`.
+        Default is ``None``.
     keep_alive : bool
         Whether to keep server alive when clients exit
     net_type : str
@@ -318,7 +321,7 @@ class DistGraphServer(KVServer):
     '''
     def __init__(self, server_id, ip_config, num_servers,
                  num_clients, part_config, disable_shared_mem=False,
-                 graph_format=('csc', 'coo'), sort_etypes='',
+                 graph_format=('csc', 'coo'), sort_etypes=None,
                  keep_alive=False, net_type='socket'):
         super(DistGraphServer, self).__init__(server_id=server_id,
                                               ip_config=ip_config,
