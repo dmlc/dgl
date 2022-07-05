@@ -70,7 +70,7 @@ def _sample_neighbors(local_g, partition_book, seed_nodes, fan_out, edge_dir, pr
     return global_src, global_dst, global_eids
 
 def _sample_etype_neighbors(local_g, partition_book, seed_nodes, etype_field,
-                            fan_out, edge_dir, prob, replace):
+                            fan_out, edge_dir, prob, replace, etype_sorted=False):
     """ Sample from local partition.
 
     The input nodes use global IDs. We need to map the global node IDs to local node IDs,
@@ -80,9 +80,6 @@ def _sample_etype_neighbors(local_g, partition_book, seed_nodes, etype_field,
     """
     local_ids = partition_book.nid2localnid(seed_nodes, partition_book.partid)
     local_ids = F.astype(local_ids, local_g.idtype)
-    sort_etypes = os.environ.get('DGL_SORT_ETYPES', '')
-    etype_sorted = (sort_etypes == 'csr' and edge_dir == 'out') or (
-        sort_etypes == 'csc' and edge_dir == 'in')
     sampled_graph = local_sample_etype_neighbors(
         local_g, local_ids, etype_field, fan_out, edge_dir, prob, replace,
         etype_sorted=etype_sorted, _dist_training=True)
@@ -166,21 +163,23 @@ class SamplingRequest(Request):
 class SamplingRequestEtype(Request):
     """Sampling Request"""
 
-    def __init__(self, nodes, etype_field, fan_out, edge_dir='in', prob=None, replace=False):
+    def __init__(self, nodes, etype_field, fan_out, edge_dir='in',
+                    prob=None, replace=False, etype_sorted=False):
         self.seed_nodes = nodes
         self.edge_dir = edge_dir
         self.prob = prob
         self.replace = replace
         self.fan_out = fan_out
         self.etype_field = etype_field
+        self.etype_sorted = etype_sorted
 
     def __setstate__(self, state):
         self.seed_nodes, self.edge_dir, self.prob, self.replace, \
-            self.fan_out, self.etype_field = state
+            self.fan_out, self.etype_field, self.etype_sorted = state
 
     def __getstate__(self):
         return self.seed_nodes, self.edge_dir, self.prob, self.replace, \
-            self.fan_out, self.etype_field
+            self.fan_out, self.etype_field, self.etype_sorted
 
     def process_request(self, server_state):
         local_g = server_state.graph
@@ -192,7 +191,8 @@ class SamplingRequestEtype(Request):
                                                                       self.fan_out,
                                                                       self.edge_dir,
                                                                       self.prob,
-                                                                      self.replace)
+                                                                      self.replace,
+                                                                      etype_sorted=self.etype_sorted)
         return SubgraphResponse(global_src, global_dst, global_eids)
 
 class EdgesRequest(Request):
@@ -420,7 +420,8 @@ def _frontier_to_heterogeneous_graph(g, frontier, gpb):
         hg.edges[etype].data[EID] = edge_ids[etype]
     return hg
 
-def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=None, replace=False):
+def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in',
+                            prob=None, replace=False, etype_sorted=False):
     """Sample from the neighbors of the given nodes from a distributed graph.
 
     For each node, a number of inbound (or outbound when ``edge_dir == 'out'``) edges
@@ -473,6 +474,8 @@ def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=No
 
         For sampling without replacement, if fanout > the number of neighbors, all the
         neighbors are sampled. If fanout == -1, all neighbors are collected.
+    etype_sorted : bool, optional
+        Indicates whether etypes are sorted.
 
     Returns
     -------
@@ -498,10 +501,11 @@ def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=No
         nodes = F.cat(homo_nids, 0)
     def issue_remote_req(node_ids):
         return SamplingRequestEtype(node_ids, etype_field, fanout, edge_dir=edge_dir,
-                                    prob=prob, replace=replace)
+                                    prob=prob, replace=replace, etype_sorted=etype_sorted)
     def local_access(local_g, partition_book, local_nids):
         return _sample_etype_neighbors(local_g, partition_book, local_nids,
-                                       etype_field, fanout, edge_dir, prob, replace)
+                                       etype_field, fanout, edge_dir, prob, replace,
+                                       etype_sorted=etype_sorted)
     frontier = _distributed_access(g, nodes, issue_remote_req, local_access)
     if not gpb.is_homogeneous:
         return _frontier_to_heterogeneous_graph(g, frontier, gpb)

@@ -337,7 +337,6 @@ def construct_dgl_client_env_vars(
     ip_config: str,
     num_servers: int,
     graph_format: str,
-    sort_etypes: str,
     num_omp_threads: int,
     group_id: int,
     pythonpath: Optional[str] = "",
@@ -355,8 +354,6 @@ def construct_dgl_client_env_vars(
             Relative path to workspace.
         num_servers:
         graph_format:
-        sort_etypes:
-            Whether to sort etypes in 'csr' or 'csc' format.
         num_omp_threads:
         group_id:
             Used in client processes to indicate which group it belongs to.
@@ -375,7 +372,6 @@ def construct_dgl_client_env_vars(
         "DGL_IP_CONFIG={DGL_IP_CONFIG} "
         "DGL_NUM_SERVER={DGL_NUM_SERVER} "
         "DGL_GRAPH_FORMAT={DGL_GRAPH_FORMAT} "
-        "DGL_SORT_ETYPES={DGL_SORT_ETYPES} "
         "OMP_NUM_THREADS={OMP_NUM_THREADS} "
         "DGL_GROUP_ID={DGL_GROUP_ID} "
         "{suffix_optional_envvars}"
@@ -393,7 +389,6 @@ def construct_dgl_client_env_vars(
         DGL_IP_CONFIG=ip_config,
         DGL_NUM_SERVER=num_servers,
         DGL_GRAPH_FORMAT=graph_format,
-        DGL_SORT_ETYPES=sort_etypes,
         OMP_NUM_THREADS=num_omp_threads,
         DGL_GROUP_ID=group_id,
         suffix_optional_envvars=suffix_optional_envvars,
@@ -580,7 +575,6 @@ def submit_jobs(args, udf_command, dry_run=False):
         ip_config=args.ip_config,
         num_servers=args.num_servers,
         graph_format=args.graph_format,
-        sort_etypes=args.sort_etypes,
         num_omp_threads=os.environ.get("OMP_NUM_THREADS", str(args.num_omp_threads)),
         group_id=g_group_id,
         pythonpath=os.environ.get("PYTHONPATH", ""),

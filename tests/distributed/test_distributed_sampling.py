@@ -336,8 +336,7 @@ def start_hetero_sample_client(rank, tmpdir, disable_shared_mem, nodes):
 
 def start_hetero_etype_sample_client(rank, tmpdir, disable_shared_mem, fanout=3,
                                      nodes={'n3': [0, 10, 99, 66, 124, 208]},
-                                     sort_etypes=''):
-    os.environ['DGL_SORT_ETYPES'] = sort_etypes
+                                     etype_sorted=False):
     gpb = None
     if disable_shared_mem:
         _, _, _, gpb, _, _, _ = load_partition(tmpdir / 'test_sampling.json', rank)
@@ -360,13 +359,12 @@ def start_hetero_etype_sample_client(rank, tmpdir, disable_shared_mem, fanout=3,
     if gpb is None:
         gpb = dist_graph.get_partition_book()
     try:
-        sampled_graph = sample_etype_neighbors(dist_graph, nodes, dgl.ETYPE, fanout)
+        sampled_graph = sample_etype_neighbors(dist_graph, nodes, dgl.ETYPE, fanout, etype_sorted=etype_sorted)
         block = dgl.to_block(sampled_graph, nodes)
         block.edata[dgl.EID] = sampled_graph.edata[dgl.EID]
     except Exception as e:
         print(e)
         block = None
-    os.environ.pop('DGL_SORT_ETYPES')
     dgl.distributed.exit_client()
     return block, gpb
 
@@ -485,7 +483,7 @@ def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server, sort_etypes=''):
     fanout = 3
     block, gpb = start_hetero_etype_sample_client(0, tmpdir, num_server > 1, fanout,
                                                   nodes={'n3': [0, 10, 99, 66, 124, 208]},
-                                                  sort_etypes=sort_etypes)
+                                                  etype_sorted=sort_etypes == 'csc')
     print("Done sampling")
     for p in pserver_list:
         p.join()

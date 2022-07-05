@@ -309,8 +309,8 @@ class DistGraphServer(KVServer):
         Disable shared memory.
     graph_format : str or list of str
         The graph formats.
-    sort_etypes : str
-        Whether to sort etypes in ``csr`` or ``csc`` format.
+    sort_etypes : str, optional
+        Whether to sort etypes in ``csr`` or ``csc`` format. Default is ``None``.
     keep_alive : bool
         Whether to keep server alive when clients exit
     net_type : str
