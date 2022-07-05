@@ -4,6 +4,7 @@ import networkx as nx
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import dgl
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
 from dgi import DGI, Classifier
@@ -21,6 +22,7 @@ def evaluate(model, features, labels, mask):
 def main(args):
     # load and preprocess dataset
     data = load_data(args)
+    g = data[0]
     features = torch.FloatTensor(data.features)
     labels = torch.LongTensor(data.labels)
     if hasattr(torch, 'BoolTensor'):
@@ -33,7 +35,7 @@ def main(args):
         test_mask = torch.ByteTensor(data.test_mask)
     in_feats = features.shape[1]
     n_classes = data.num_labels
-    n_edges = data.graph.number_of_edges()
+    n_edges = g.number_of_edges()
 
     if args.gpu < 0:
         cuda = False
@@ -46,13 +48,10 @@ def main(args):
         val_mask = val_mask.cuda()
         test_mask = test_mask.cuda()
 
-    # graph preprocess
-    g = data.graph
     # add self loop
     if args.self_loop:
-        g.remove_edges_from(nx.selfloop_edges(g))
-        g.add_edges_from(zip(g.nodes(), g.nodes()))
-    g = DGLGraph(g)
+        g = dgl.remove_self_loop(g)
+        g = dgl.add_self_loop(g)
     n_edges = g.number_of_edges()
 
     if args.gpu >= 0:

@@ -4,7 +4,6 @@ dependencies:
   - pip
   - pip:
     - tensorflow==2.3.0
-    - tfdlpack
     - pytest
     - nose
     - numpy

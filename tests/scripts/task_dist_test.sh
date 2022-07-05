@@ -34,4 +34,4 @@ do
     done
 done < ${DIST_DGL_TEST_IP_CONFIG}
 
-python3 -m pytest -v --capture=tee-sys --junitxml=pytest_dist.xml tests/dist/test_*.py || fail "dist across machines"
+python3 -m pytest -v --capture=tee-sys --junitxml=pytest_dist.xml --durations=100 tests/dist/test_*.py || fail "dist across machines"

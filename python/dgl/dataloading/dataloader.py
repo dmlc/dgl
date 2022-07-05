@@ -30,6 +30,7 @@ from ..distributed import DistGraph
 from ..multiprocessing import call_once_and_share
 from ..cuda import stream as dgl_stream
 
+PYTORCH_VER = LooseVersion(torch.__version__)
 PYTHON_EXIT_STATUS = False
 def _set_python_exit_flag():
     global PYTHON_EXIT_STATUS
@@ -630,7 +631,8 @@ class DataLoader(torch.utils.data.DataLoader):
     Examples
     --------
     To train a 3-layer GNN for node classification on a set of nodes ``train_nid`` on
-    a homogeneous graph where each node takes messages from all neighbors (assume
+    a homogeneous graph where each node takes messages from 15 neighbors on the
+    first layer, 10 neighbors on the second, and 5 neighbors on the third (assume
     the backend is PyTorch):
 
     >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
@@ -771,8 +773,7 @@ class DataLoader(torch.utils.data.DataLoader):
             else:
                 if self.graph.device != indices_device:
                     raise ValueError(
-                        'Expect graph and indices to be on the same device. '
-                        'If you wish to use UVA sampling, please set use_uva=True.')
+                        'Expect graph and indices to be on the same device when use_uva=False. ')
                 if self.graph.device.type == 'cuda' and num_workers > 0:
                     raise ValueError('num_workers must be 0 if graph and indices are on CUDA.')
                 if self.graph.device.type == 'cpu' and num_workers > 0:
@@ -972,19 +973,13 @@ class EdgeDataLoader(DataLoader):
 # GraphDataLoader loads a set of graphs so it's not relevant to the above.  They are currently
 # copied from the old DataLoader implementation.
 
-PYTORCH_VER = LooseVersion(torch.__version__)
-PYTORCH_16 = PYTORCH_VER >= LooseVersion("1.6.0")
-PYTORCH_17 = PYTORCH_VER >= LooseVersion("1.7.0")
-
 def _create_dist_sampler(dataset, dataloader_kwargs, ddp_seed):
     # Note: will change the content of dataloader_kwargs
     dist_sampler_kwargs = {'shuffle': dataloader_kwargs.get('shuffle', False)}
     dataloader_kwargs['shuffle'] = False
-    if PYTORCH_16:
-        dist_sampler_kwargs['seed'] = ddp_seed
-    if PYTORCH_17:
-        dist_sampler_kwargs['drop_last'] = dataloader_kwargs.get('drop_last', False)
-        dataloader_kwargs['drop_last'] = False
+    dist_sampler_kwargs['seed'] = ddp_seed
+    dist_sampler_kwargs['drop_last'] = dataloader_kwargs.get('drop_last', False)
+    dataloader_kwargs['drop_last'] = False
 
     return DistributedSampler(dataset, **dist_sampler_kwargs)
 
