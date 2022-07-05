@@ -1,6 +1,6 @@
 #!/usr/bin/env groovy
 
-dgl_linux_libs = 'build/libdgl.so, build/runUnitTests, python/dgl/_ffi/_cy3/core.cpython-36m-x86_64-linux-gnu.so, build/tensoradapter/pytorch/*.so'
+dgl_linux_libs = 'build/libdgl.so, build/runUnitTests, python/dgl/_ffi/_cy3/core.cpython-*-x86_64-linux-gnu.so, build/tensoradapter/pytorch/*.so'
 // Currently DGL on Windows is not working with Cython yet
 dgl_win64_libs = "build\\dgl.dll, build\\runUnitTests.exe, build\\tensoradapter\\pytorch\\*.dll"
 
@@ -59,6 +59,14 @@ def unit_test_linux(backend, dev) {
   unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
   timeout(time: 30, unit: 'MINUTES') {
     sh "bash tests/scripts/task_unit_test.sh ${backend} ${dev}"
+  }
+}
+
+def unit_test_cugraph(backend, dev) {
+  init_git()
+  unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
+  timeout(time: 15, unit: 'MINUTES') {
+    sh "bash tests/scripts/cugraph_unit_test.sh ${backend}"
   }
 }
 
@@ -232,6 +240,24 @@ pipeline {
               steps {
                 // sh "nvidia-smi"
                 build_dgl_linux('gpu')
+              }
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
+                }
+              }
+            }
+            stage('PyTorch Cugraph GPU Build') {
+              agent {
+                docker {
+                  label "linux-cpu-node"
+                  image "nvcr.io/nvidia/pytorch:22.04-py3"
+                  args "-u root"
+                  alwaysPull false
+                }
+              }
+              steps {
+                build_dgl_linux('cugraph')
               }
               post {
                 always {
@@ -417,6 +443,29 @@ pipeline {
                 stage('Torch GPU Example test') {
                   steps {
                     example_test_linux('pytorch', 'gpu')
+                  }
+                }
+              }
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
+                }
+              }
+            }
+            stage('PyTorch Cugraph GPU') {
+              agent {
+                docker {
+                  label "linux-gpu-node"
+                  image "nvcr.io/nvidia/pytorch:22.04-py3"
+                  args "--runtime nvidia --shm-size=8gb"
+                  alwaysPull false
+                }
+              }
+              stages {
+                stage('PyTorch Cugraph GPU Unit test') {
+                  steps {
+                    sh 'nvidia-smi'
+                    unit_test_cugraph('pytorch', 'cugraph')
                   }
                 }
               }
