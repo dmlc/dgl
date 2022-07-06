@@ -277,6 +277,14 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows, IdArray etypes,
         int64_t et_offset = 0;
         int64_t et_len = 1;
         for (int64_t j = 0; j < len; ++j) {
+          if ( (j + 1 < len) && et[et_idx[j]] > et[et_idx[j + 1]]){
+            std::ostringstream oss;
+            oss << "j:"<<j<<", idx:"<<et_idx[j]<<", idx_1:"<< et_idx[j+1]<<", et:"<<et[et_idx[j]]<<"~"<<et[et_idx[j+1]];
+            for(const auto idx : et_idx){
+              oss<<" | ("<<idx<<","<<et[idx]<<")";
+            }
+            std::cout << oss.str() <<std::endl;
+          }
           CHECK((j + 1 == len) || (et[et_idx[j]] <= et[et_idx[j + 1]]))
               << "Edge type is not sorted. Please sort in advance or specify "
                  "'etype_sorted' as false.";

@@ -1257,12 +1257,14 @@ class DistGraph:
     def sample_neighbors(self, seed_nodes, fanout, edge_dir='in', prob=None,
                          exclude_edges=None, replace=False,
                          output_device=None):
+        # For debug only
+        etype_sorted = 'RYING_TEST' in os.environ and (self._gpb.part_id == 0)
         # pylint: disable=unused-argument
         """Sample neighbors from a distributed graph."""
         # Currently prob, exclude_edges, output_device, and edge_dir are ignored.
         if len(self.etypes) > 1:
             frontier = graph_services.sample_etype_neighbors(
-                self, seed_nodes, ETYPE, fanout, replace=replace)
+                self, seed_nodes, ETYPE, fanout, replace=replace, etype_sorted=etype_sorted)
         else:
             frontier = graph_services.sample_neighbors(
                 self, seed_nodes, fanout, replace=replace)
