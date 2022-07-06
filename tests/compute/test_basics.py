@@ -6,7 +6,6 @@ import networkx as nx
 from dgl import DGLGraph
 from collections import defaultdict as ddict
 import unittest
-import pytest
 from test_utils import parametrize_idtype
 
 D = 5
@@ -290,8 +289,6 @@ def _test_nx_conversion():
     assert F.allclose(g.ndata['h'], F.tensor([[1.], [2.], [3.]]))
     assert F.allclose(g.edata['h'], F.tensor([[1., 2.], [1., 2.],
                                               [2., 3.], [2., 3.]]))
-
-
 
 @parametrize_idtype
 def test_apply_nodes(idtype):
