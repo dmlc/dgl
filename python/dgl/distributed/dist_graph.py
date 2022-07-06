@@ -4,6 +4,7 @@ from collections.abc import MutableMapping
 from collections import namedtuple
 
 import os
+import time
 import numpy as np
 
 from ..heterograph import DGLHeteroGraph
@@ -337,19 +338,26 @@ class DistGraphServer(KVServer):
             self.gpb, graph_name, ntypes, etypes = load_partition_book(part_config, self.part_id)
             self.client_g = None
         else:
+            tic = time.time()
             # Loading of node/edge_feats are deferred to lower the peak memory consumption.
             self.client_g, _, _, self.gpb, graph_name, \
                     ntypes, etypes = load_partition(part_config, self.part_id, load_feats=False)
             print('load ' + graph_name)
+            print("Loading part~{} takes {} seconds whose num_nodes~{} and num_edges~{}.".format(
+                self.part_id, time.time()-tic, self.client_g.num_nodes(), self.client_g.num_edges()))
             # Create the graph formats specified the users.
+            tic = time.time()
             self.client_g = self.client_g.formats(graph_format)
             self.client_g.create_formats_()
+            print("Creating formats takes {} seconds".format(time.time() - tic))
+            tic = time.time()
             if sort_etypes == 'csr':
                 self.client_g = sort_csr_by_tag(
                     self.client_g, tag=self.client_g.edata[ETYPE], tag_type='edge')
             elif sort_etypes == 'csc':
                 self.client_g = sort_csc_by_tag(
                     self.client_g, tag=self.client_g.edata[ETYPE], tag_type='edge')
+            print("Sorting takes {} seconds.".format(time.time() - tic))
             if not disable_shared_mem:
                 self.client_g = _copy_graph_to_shared_mem(self.client_g, graph_name, graph_format)
 
@@ -1258,7 +1266,7 @@ class DistGraph:
                          exclude_edges=None, replace=False,
                          output_device=None):
         # For debug only
-        etype_sorted = 'RYING_TEST' in os.environ and (self._gpb.part_id == 0)
+        etype_sorted = 'RYING_TEST' in os.environ and (self._gpb.partid == 0)
         # pylint: disable=unused-argument
         """Sample neighbors from a distributed graph."""
         # Currently prob, exclude_edges, output_device, and edge_dir are ignored.
