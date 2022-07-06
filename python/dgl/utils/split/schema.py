@@ -1,7 +1,12 @@
+"""Schema."""
 from .constants import PLACEHOLDER, OUTPUT
 
 
 class Schema():
+    """The schema class.
+
+    Schema describe the relationship between ConvBlocks.
+    """
     def __init__(self):
         self.layers = []
         self.name2arg_map = {}
@@ -10,6 +15,7 @@ class Schema():
         self.last_layer_output = []
 
     def record_inputs_and_outputs(self, origin_graph):
+        """Record the inputs and outputs in the graph."""
         for node in origin_graph.nodes:
             if node.op == PLACEHOLDER:
                 self.first_layer_input.append(node.name)
@@ -19,6 +25,7 @@ class Schema():
                     self.last_layer_output.append(node.name)
 
     def create_layer(self, graph):
+        """Create a new graph layer."""
         self.layers.append(GraphLayer(self))
         if len(self.layers) != 1:
             self.layers[-2].next_layer = self.curr_layer
@@ -31,9 +38,11 @@ class Schema():
                 self.record_outputs(output_names)
 
     def get_layer(self, id):
+        """Get the `id` layer."""
         return self.layers[id]
 
     def record_input(self, name):
+        """Record input by name."""
         if self.blocks_name is None:
             self.blocks_name = name
         if name not in self.name2arg_map:
@@ -43,10 +52,12 @@ class Schema():
         input_arg.add_layer(self.curr_layer)
 
     def record_inputs(self, names):
+        """Record inputs by names."""
         for name in names:
             self.record_input(name)
 
     def record_output(self, name):
+        """Record output by name."""
         if name in self.name2arg_map:
             raise RuntimeError("The output name is used before!")
         output_arg = ArgNode(name, self.curr_layer)
@@ -54,19 +65,26 @@ class Schema():
         self.curr_layer.add_output(output_arg)
 
     def record_outputs(self, names):
+        """Record outputs by names."""
         for name in names:
             self.record_output(name)
 
     @property
     def curr_layer(self):
+        """Return the current layer."""
         return self.layers[-1]
 
     @property
     def layers_count(self):
+        """Return how many layers the schema holds."""
         return len(self.layers)
 
 
 class GraphLayer():
+    """the Graph Layer class.
+
+    Represent a single graph layer.
+    """
     def __init__(self, schema: Schema):
         super().__init__()
         self.schema = schema
@@ -76,16 +94,20 @@ class GraphLayer():
         self.next_layer = None
 
     def next(self):
+        """Pointer to the next layer."""
         return self.next_layer
 
     def add_input(self, input_arg):
+        """Append input in the layer."""
         self.inputs.append(input_arg)
 
     def add_output(self, output_arg):
+        """Append output in the layer."""
         self.outputs.append(output_arg)
 
 
 class ArgNode():
+    """The Argument Node class."""
     # Arg is always create by layer output, or the init
     def __init__(self, name: str, output_layer: GraphLayer = None):
         self.name = name
@@ -93,6 +115,7 @@ class ArgNode():
         self.output_layer = output_layer
 
     def add_layer(self, layer: GraphLayer):
+        """Add a layer for the node."""
         self.input_layers.append(layer)
     
     def __str__(self):

@@ -1,8 +1,9 @@
+"""Function Generator."""
 import types
 
-import dgl
+import dgl  # for holding the environment.
 import torch
-import torch.nn as nn
+import torch
 from torch.fx import GraphModule, Graph
 
 from ..fx import dgl_symbolic_trace
@@ -12,14 +13,22 @@ from .graph_rearranger import GraphRearranger
 from .constants import CONV_BLOCK
 
 
-class FunctionGenerator(nn.Module):
+class FunctionGenerator(torch.nn.Module):
+    """The function generator class.
+
+    Can split the forward function to layer-wise sub-functions.
+    """
     def __init__(self, debug=False):
         super().__init__()
         self.debug = debug
         self.schema = None
         self.funcs = []
 
-    def module_split(self, module: nn.Module):
+    def module_split(self, module: torch.nn.Module):
+        """The module split function.
+
+        Split the forward function of the input module.
+        """
         for name in module.__dict__:
             if hasattr(module, name):
                 attr = getattr(module, name)
@@ -48,13 +57,14 @@ class FunctionGenerator(nn.Module):
 
         rearranger = GraphRearranger(self.traced)
         rearranger.rearrange()
-        graphs_list = rearranger.get_splited_graphs()
+        graphs_list = rearranger.get_splitted_graphs()
 
         for layer_id, graph in enumerate(graphs_list):
             self.register_func_from_graph(graph, layer_id)
             self.schema.create_layer(graph)
 
     def register_func_from_graph(self, graph: Graph, layer_id: int):
+        """Register function from the computation graph."""
         graph_src = graph.python_code("self").src
 
         func_name = CONV_BLOCK + str(layer_id)
@@ -67,13 +77,16 @@ class FunctionGenerator(nn.Module):
             print("----------------------------------------")
 
     def set_function_from_string(self, func_src, func_name):
+        """Set the function from string."""
         globals_vals = globals()
         exec(func_src, globals_vals)
         setattr(self, func_name, types.MethodType(globals_vals[func_name], self))
         self.funcs.append(getattr(self, func_name))
 
     def get_schema(self):
+        """Get the schema."""
         return self.schema
 
     def get_funcs(self):
+        """Get the splitted functions."""
         return self.funcs

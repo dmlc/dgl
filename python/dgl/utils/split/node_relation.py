@@ -1,9 +1,11 @@
+"""Node Relation."""
 from torch.fx import Node
 
-from .constants import GET_ATTR, CALL_METHOD, CALL_MODULE, OUTPUT, PLACEHOLDER, DGL_GRAPH, NORMAL_DATA
+from .constants import GET_ATTR, CALL_MODULE, OUTPUT, PLACEHOLDER, DGL_GRAPH
 
 
 def arg_trace(a):
+    """Trace the args for a node, return a node set."""
     ret = set()
     if isinstance(a, Node):
         ret.add(a)
@@ -19,6 +21,7 @@ def arg_trace(a):
 
 
 class GGraph:
+    """The class to represent the node relation."""
     def __init__(self, node_list):
         self.nodes = []
         self.name2gnode_map = {}
@@ -27,6 +30,7 @@ class GGraph:
         self.get_node_relation(node_list)
 
     def get_node_relation(self, node_list):
+        """Tag nodes and compute their message degree."""
         for lineno, node in enumerate(node_list):
             self.nodes.append(GNode(node, lineno))
             self.name2gnode_map[node.name] = self.nodes[-1]
@@ -41,6 +45,7 @@ class GGraph:
         self.compute_message_degree()
 
     def tag_nodes(self):
+        """Static tags for nodes."""
         for node in self.nodes:
             if node.op == PLACEHOLDER:
                 self.inputs.append(node)
@@ -55,17 +60,20 @@ class GGraph:
                 self.output = node
 
     def add_edge(self, src, dst, allow_break=True):
+        """Add an edge in the graph."""
         edge = GEdge(src, dst, allow_break)
         src.add_out_edge(edge)
         dst.add_in_edge(edge)
 
     def check_allow_break(self, src, dst):
+        """Define rules that whether the edge can break."""
         # Could add more rules here.
         if src.op == GET_ATTR:
             return False
         return True
 
     def compute_message_degree(self):
+        """Compute message degree for the graph."""
         for node in self.nodes:
             for oe in node.out_edges:
                 oe.dst.message_degree = max(oe.dst.message_degree, node.message_degree + oe.src.is_message)
@@ -80,6 +88,7 @@ class GGraph:
 
     @property
     def max_message(self):
+        """The maximum message degree in the graph."""
         return self.output.message_degree
 
     def __str__(self):
@@ -90,6 +99,7 @@ class GGraph:
         return ret
 
 class GNode:
+    """The class to represent a single node."""
     def __init__(self, node: Node, lineno):
         self.node = node
         self.lineno = lineno                # Lineno in the computation graph.
@@ -106,9 +116,11 @@ class GNode:
         self.target = node.target
 
     def add_in_edge(self, e):
+        """Add an input edge for the node."""
         self.in_edges.append(e)
 
     def add_out_edge(self, e):
+        """Add an output edge for the node."""
         self.out_edges.append(e)
 
     def __str__(self):
@@ -120,6 +132,7 @@ class GNode:
         return self.name
 
 class GEdge:
+    """The class to represent an edge in the graph."""
     def __init__(self, src: GNode, dst: GNode, allow_break=True):
         self.src = src
         self.dst = dst
