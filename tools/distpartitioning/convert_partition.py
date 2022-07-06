@@ -54,14 +54,21 @@ def create_dgl_object(graph_name, num_parts, \
     dictionary
         map between edge type(string)  and edge_type_id(int)
     """
-
     #create auxiliary data structures from the schema object
-    global_nid_ranges = schema['nid']
-    global_eid_ranges = schema['eid']
-    global_nid_ranges = {key: np.array(global_nid_ranges[key]).reshape(
-        1, 2) for key in global_nid_ranges}
-    global_eid_ranges = {key: np.array(global_eid_ranges[key]).reshape(
-        1, 2) for key in global_eid_ranges}
+    node_info = schema["nid"]
+    offset = 0
+    global_nid_ranges = {}
+    for k, v in node_info.items():
+        global_nid_ranges[k] = np.array([offset + int(v["data"][0][1]), offset + int(v["data"][-1][2])]).reshape(1,2)
+        offset += int(v["data"][-1][2])
+
+    edge_info = schema["eid"]
+    offset = 0
+    global_eid_ranges = {}
+    for k, v in edge_info.items():
+        global_eid_ranges[k] = np.array([offset + int(v["data"][0][1]), offset + int(v["data"][-1][2])]).reshape(1,2)
+        offset += int(v["data"][-1][2])
+
     id_map = dgl.distributed.id_map.IdMap(global_nid_ranges)
 
     ntypes = [(key, global_nid_ranges[key][0, 0]) for key in global_nid_ranges]

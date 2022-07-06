@@ -45,7 +45,7 @@ def get_shuffle_global_nids(rank, world_size, global_nids_ranks, node_data):
     #allocate buffers to receive node-ids
     recv_nodes = []
     for i in recv_counts:
-        recv_nodes.append(torch.zeros([i.item()], dtype=torch.int64))
+        recv_nodes.append(torch.zeros(i.tolist(), dtype=torch.int64))
 
     #form the outgoing message
     send_nodes = []
@@ -67,17 +67,18 @@ def get_shuffle_global_nids(rank, world_size, global_nids_ranks, node_data):
         global_nids = proc_i_nodes.numpy()
         if (len(global_nids) != 0):
             common, ind1, ind2 = np.intersect1d(node_data[constants.GLOBAL_NID], global_nids, return_indices=True)
-            values = node_data[constants.SHUFFLE_GLOBAL_NID][ind1]
-            send_nodes.append(torch.Tensor(values).type(dtype=torch.int64))
+            shuffle_global_nids = node_data[constants.SHUFFLE_GLOBAL_NID][ind1]
+            send_nodes.append(torch.from_numpy(shuffle_global_nids).type(dtype=torch.int64))
         else:
-            send_nodes.append(torch.empty((0,), dtype=torch.int64))
+            send_nodes.append(torch.empty((0), dtype=torch.int64))
 
     #send receive global-ids
     alltoallv_cpu(rank, world_size, recv_shuffle_global_nids, send_nodes)
 
-    shuffle_global_nids = [x.numpy() for x in recv_shuffle_global_nids]
-    global_nids = [x for x in global_nids_ranks]
-    return np.column_stack((np.concatenate(global_nids), np.concatenate(shuffle_global_nids)))
+    shuffle_global_nids = np.concatenate([x.numpy() for x in recv_shuffle_global_nids])
+    global_nids = np.concatenate([x for x in global_nids_ranks])
+    ret_val = np.column_stack([global_nids, shuffle_global_nids])
+    return ret_val
 
 
 def get_shuffle_global_nids_edges(rank, world_size, edge_data, node_part_ids, node_data):
@@ -122,7 +123,7 @@ def get_shuffle_global_nids_edges(rank, world_size, edge_data, node_part_ids, no
         global_nids_ranks.append(not_owned_nodes)
 
     #Retrieve Global-ids for respective node owners
-    resolved_global_nids = get_shuffle_global_nids(rank, world_size, global_nids_ranks, node_data)
+    non_local_nids = get_shuffle_global_nids(rank, world_size, global_nids_ranks, node_data)
 
     #Add global_nid <-> shuffle_global_nid mappings to the received data
     for i in range(world_size):
@@ -132,7 +133,7 @@ def get_shuffle_global_nids_edges(rank, world_size, edge_data, node_part_ids, no
             common, ind1, ind2 = np.intersect1d(node_data[constants.GLOBAL_NID], own_global_nids, return_indices=True)
             my_shuffle_global_nids = node_data[constants.SHUFFLE_GLOBAL_NID][ind1]
             local_mappings = np.column_stack((own_global_nids, my_shuffle_global_nids))
-            resolved_global_nids = np.concatenate((resolved_global_nids, local_mappings))
+            resolved_global_nids = np.concatenate((non_local_nids, local_mappings))
 
     #form a dictionary of mappings between orig-node-ids and global-ids
     resolved_mappings = dict(zip(resolved_global_nids[:,0], resolved_global_nids[:,1]))
