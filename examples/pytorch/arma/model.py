@@ -65,6 +65,7 @@ class ARMAConv(nn.Module):
             degs = g.in_degrees().float().clamp(min=1)
             norm = torch.pow(degs, -0.5).to(feats.device).unsqueeze(1)
             output = None
+            tot_output = None
 
             for k in range(self.K):
                 feats = init_feats
@@ -88,13 +89,14 @@ class ARMAConv(nn.Module):
                     
                     if self.activation is not None:
                         feats = self.activation(feats)
-                    
-                if output is None:
-                    output = feats
+
+                output = feats.unsqueeze(-3)
+                if k == 0:
+                    tot_output = output
                 else:
-                    output += feats
-                
-            return output / self.K 
+                    tot_output = torch.cat((tot_output, output), 0)
+
+            return tot_output.mean(dim=-3) 
 
 class ARMA4NC(nn.Module):
     def __init__(self,
