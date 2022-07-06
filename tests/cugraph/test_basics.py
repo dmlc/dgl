@@ -11,9 +11,6 @@ def test_dummy():
     assert cg is not None
 
 def test_to_cugraph_conversion():
-    cugraph = pytest.importorskip("cugraph",
-       reason="Skipping to_cugraph test because cugraph is not installed")
-
     g = dgl.graph((F.tensor([0, 1, 2, 3]), F.tensor([1, 0, 3, 2]))).to('cuda')
     cugraph_g = g.to_cugraph()
 
@@ -25,9 +22,6 @@ def test_to_cugraph_conversion():
     assert cugraph_g.has_edge(3, 2)
 
 def test_from_cugraph_conversion():
-    cugraph = pytest.importorskip("cugraph",
-      reason="Skipping from_cugraph test because cugraph is not installed")
-
     # cudf is a dependency of cugraph
     import cudf
 
