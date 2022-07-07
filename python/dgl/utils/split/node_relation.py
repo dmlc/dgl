@@ -12,7 +12,7 @@ def arg_trace(a):
     if isinstance(a, dict):
         for _, v in a.items():
             ret = ret.union(arg_trace(v))
-    if isinstance(a, tuple) or isinstance(a, list):
+    if isinstance(a, (list, tuple)):
         for v in a:
             ret = ret.union(arg_trace(v))
     elif isinstance(a, slice):
@@ -67,19 +67,20 @@ class GGraph:
 
     def check_allow_break(self, src, dst):
         """Define rules that whether the edge can break."""
-        # Could add more rules here.
-        if src.op == GET_ATTR:
+        # TODO(peiqi): Could add more rules here.
+        if src.op == GET_ATTR or dst.op == GET_ATTR:
             return False
         return True
 
     def compute_message_degree(self):
         """Compute message degree for the graph."""
         for node in self.nodes:
-            for oe in node.out_edges:
-                oe.dst.message_degree = max(oe.dst.message_degree, node.message_degree + oe.src.is_message)
-            for ie in node.in_edges:
-                if ie.src.message_degree == -1:
-                    ie.src.message_degree = node.message_degree
+            for out_e in node.out_edges:
+                out_e.dst.message_degree = \
+                    max(out_e.dst.message_degree, node.message_degree + out_e.src.is_message)
+            for in_e in node.in_edges:
+                if in_e.src.message_degree == -1:
+                    in_e.src.message_degree = node.message_degree
 
         # remove the last layer
         for node in self.nodes:
@@ -124,7 +125,7 @@ class GNode:
         self.out_edges.append(e)
 
     def __str__(self):
-        return "{} {} {}: {} {}".format(self.lineno, self.name, self.node_type, 
+        return "{} {} {}: {} {}".format(self.lineno, self.name, self.node_type,
             [(("" if e.allow_break else "+") + str(e.src.lineno)) for e in self.in_edges],
             [(("" if e.allow_break else "+") + str(e.dst.lineno)) for e in self.out_edges])
 

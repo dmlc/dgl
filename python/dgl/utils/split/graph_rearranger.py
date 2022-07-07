@@ -1,6 +1,7 @@
 """Graph Rearranger."""
-from torch.fx import GraphModule
+# pylint: disable=comparison-with-callable
 import operator
+from torch.fx import GraphModule
 
 from .node_relation import GGraph
 from .graph_replicator import GraphReplicator
@@ -22,9 +23,9 @@ class GraphRearranger():
         passing_edges = []
         for node in nodes:
             if node.node_type == NORMAL_DATA:
-                for oe in node.out_edges:
-                    if node.is_message and oe.dst.message_degree != node.message_degree:
-                        passing_edges.append(oe)
+                for out_e in node.out_edges:
+                    if node.is_message and out_e.dst.message_degree != node.message_degree:
+                        passing_edges.append(out_e)
 
         for start_e in passing_edges:
             e = start_e
@@ -35,8 +36,8 @@ class GraphRearranger():
                     break
                 if len(e.dst.in_edges) != 1:
                     is_same_source = True
-                    for ie in e.dst.in_edges:
-                        if ie.src.message_degree != e.src.message_degree:
+                    for in_e in e.dst.in_edges:
+                        if in_e.src.message_degree != e.src.message_degree:
                             is_same_source = False
                     if not is_same_source:
                         break
@@ -46,22 +47,22 @@ class GraphRearranger():
     def generate_new_graphs(self, nodes):
         """Generate new sub-graphs according too message degrees."""
         message_layers = [[] for _ in range(self.ggraph.max_message + 1)]
-        layers_input = [set() for _ in range(self.ggraph.max_message + 1)]
-        layers_output = [set() for _ in range(self.ggraph.max_message + 1)]
+        layers_inputs = [set() for _ in range(self.ggraph.max_message + 1)]
+        layers_outputs = [set() for _ in range(self.ggraph.max_message + 1)]
         for node in nodes:
             message_layers[node.message_degree].append(node)
             for e in node.out_edges:
                 if node.message_degree != e.dst.message_degree:
-                    layers_input[e.dst.message_degree].add(node)
+                    layers_inputs[e.dst.message_degree].add(node)
                     if node.node_type != DGL_GRAPH:
-                        layers_output[node.message_degree].add(node)
+                        layers_outputs[node.message_degree].add(node)
 
-        for i, (inputs, nodes, outputs) in \
-            enumerate(zip(layers_input, message_layers, layers_output)):
+        for i, (inputs, layer_nodes, outputs) in \
+            enumerate(zip(layers_inputs, message_layers, layers_outputs)):
             curr_graph = GraphReplicator()
             for input_node in inputs:
                 curr_graph.insert_input(input_node.name)
-            for node in nodes:
+            for node in layer_nodes:
                 curr_graph.insert_node_copy(node.node)
             if i != self.ggraph.max_message:
                 curr_graph.insert_outputs(outputs)

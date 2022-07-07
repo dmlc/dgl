@@ -1,4 +1,5 @@
 """Function Generator."""
+# pylint: disable=unused-import, exec-used
 import types
 
 import dgl  # for holding the environment.

@@ -1,6 +1,6 @@
 """Graph Replicator."""
 from torch.fx import Graph, Node
-from torch.fx.node import map_arg 
+from torch.fx.node import map_arg
 
 
 class GraphReplicator(Graph):

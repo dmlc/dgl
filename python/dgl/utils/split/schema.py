@@ -21,8 +21,8 @@ class Schema():
                 self.first_layer_input.append(node.name)
             if node.op == OUTPUT:
                 args = node.args[0] if isinstance(node.args[0], tuple) else (node.args[0],)
-                for node in args:
-                    self.last_layer_output.append(node.name)
+                for arg in args:
+                    self.last_layer_output.append(arg.name)
 
     def create_layer(self, graph):
         """Create a new graph layer."""
@@ -37,9 +37,9 @@ class Schema():
                 output_names = [node.name for node in args]
                 self.record_outputs(output_names)
 
-    def get_layer(self, id):
-        """Get the `id` layer."""
-        return self.layers[id]
+    def get_layer(self, i):
+        """Get the `i` layer."""
+        return self.layers[i]
 
     def record_input(self, name):
         """Record input by name."""
@@ -88,7 +88,7 @@ class GraphLayer():
     def __init__(self, schema: Schema):
         super().__init__()
         self.schema = schema
-        self.id = schema.layers_count
+        self.layer_id = schema.layers_count
         self.inputs: list[ArgNode] = []
         self.outputs: list[ArgNode] = []
         self.next_layer = None
@@ -117,8 +117,8 @@ class ArgNode():
     def add_layer(self, layer: GraphLayer):
         """Add a layer for the node."""
         self.input_layers.append(layer)
-    
+
     def __str__(self):
         return "{}, input: {}, output: {}".format(self.name,
-                                                  [layer.id for layer in self.input_layers],
+                                                  [layer.layer_id for layer in self.input_layers],
                                                   self.output_layer)
