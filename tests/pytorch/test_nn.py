@@ -508,14 +508,14 @@ def test_egat_conv(g, idtype, out_node_feats, out_edge_feats, num_heads):
     efeat = F.randn((g.number_of_edges(), 5))
     egat = egat.to(ctx)
     h, f = egat(g, nfeat, efeat)
-    
+
     th.save(egat, tmp_buffer)
 
     assert h.shape == (g.number_of_nodes(), num_heads, out_node_feats)
     assert f.shape == (g.number_of_edges(), num_heads, out_edge_feats)
     _, _, attn = egat(g, nfeat, efeat, True)
     assert attn.shape == (g.number_of_edges(), num_heads, 1)
-    
+
 @parametrize_idtype
 @pytest.mark.parametrize('g', get_cases(['bipartite'], exclude=['zero-degree']))
 @pytest.mark.parametrize('out_node_feats', [1, 5])
@@ -533,7 +533,7 @@ def test_egat_conv_bi(g, idtype, out_node_feats, out_edge_feats, num_heads):
     efeat = F.randn((g.number_of_edges(), 7))
     egat = egat.to(ctx)
     h, f = egat(g, nfeat, efeat)
-    
+
     th.save(egat, tmp_buffer)
 
     assert h.shape == (g.number_of_dst_nodes(), num_heads, out_node_feats)
@@ -1473,7 +1473,8 @@ def test_group_rev_res(idtype):
     h = th.randn(num_nodes, feats).to(dev)
     conv = nn.GraphConv(feats // groups, feats // groups)
     model = nn.GroupRevRes(conv, groups).to(dev)
-    model(g, h)
+    result = model(g, h)
+    result.sum().backward()
 
 @pytest.mark.parametrize('in_size', [16, 32])
 @pytest.mark.parametrize('hidden_size', [16, 32])

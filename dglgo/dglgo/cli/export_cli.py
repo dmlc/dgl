@@ -1,5 +1,4 @@
-from ..utils.factory import ModelFactory, PipelineFactory
-from ..utils.enter_config import UserConfig
+from ..utils.factory import ModelFactory, PipelineFactory, ApplyPipelineFactory
 import typer
 from enum import Enum
 import typing
@@ -15,7 +14,11 @@ def export(
 ):
     user_cfg = yaml.safe_load(Path(cfg).open("r"))
     pipeline_name = user_cfg["pipeline_name"]
-    output_file_content = PipelineFactory.registry[pipeline_name].gen_script(user_cfg)
+    pipeline_mode = user_cfg["pipeline_mode"]
+    if pipeline_mode == 'train':
+        output_file_content = PipelineFactory.registry[pipeline_name].gen_script(user_cfg)
+    else:
+        output_file_content = ApplyPipelineFactory.registry[pipeline_name].gen_script(user_cfg)
 
     f_code = autopep8.fix_code(output_file_content, options={'aggressive': 1})
     f_code = isort.code(f_code)
