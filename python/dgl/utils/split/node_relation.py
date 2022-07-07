@@ -68,7 +68,7 @@ class GGraph:
     def check_allow_break(self, src, dst):
         """Define rules that whether the edge can break."""
         # TODO(peiqi): Could add more rules here.
-        if src.op == GET_ATTR or dst.op == GET_ATTR:
+        if GET_ATTR in (src.op, dst.op):
             return False
         return True
 
