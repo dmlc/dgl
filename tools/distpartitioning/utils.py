@@ -277,7 +277,7 @@ def read_edges_file(edge_file, edge_data_dict):
     # global_src_id -- global idx for the source node ... line # in the graph_nodes.txt
     # global_dst_id -- global idx for the destination id node ... line # in the graph_nodes.txt
 
-    edge_data_df = csv.read_csv(nodes_file, read_options=pyarrow.csv.ReadOptions(autogenerate_column_names=True), 
+    edge_data_df = csv.read_csv(edge_file, read_options=pyarrow.csv.ReadOptions(autogenerate_column_names=True), 
                                     parse_options=pyarrow.csv.ParseOptions(delimiter=' '))
     edge_data_dict = {}
     edge_data_dict[constants.GLOBAL_SRC_ID] = edge_data_df['f0'].to_numpy()

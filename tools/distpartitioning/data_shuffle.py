@@ -263,7 +263,7 @@ def exchange_node_features(rank, world_size, node_feature_tids, ntype_gnid_map, 
                         t = own_node_features[feat_key]
                         own_node_features[feat_key] = torch.cat([t, x[feat_key]])
                         t = own_global_nids[feat_key]
-                        own_global_nids[idx] = np.concatenate([t, output_nid_list[idx][feat_key]])
+                        own_global_nids[feat_key] = np.concatenate([t, output_nid_list[idx][feat_key]])
                     else:
                         own_node_features[feat_key] = x[feat_key]
                         own_global_nids[feat_key] = output_nid_list[idx][feat_key]
