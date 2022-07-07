@@ -17,6 +17,11 @@ class FunctionGenerator(torch.nn.Module):
     """The function generator class.
 
     Can split the forward function to layer-wise sub-functions.
+
+    Parameters
+    ----------
+    debug : bool
+        Whether display the debug messages.
     """
     def __init__(self, debug=False):
         super().__init__()
