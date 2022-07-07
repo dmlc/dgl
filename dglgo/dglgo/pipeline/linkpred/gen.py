@@ -20,7 +20,7 @@ class LinkpredPipelineCfg(BaseModel):
     eval_period: int = 5
     optimizer: dict = {"name": "Adam", "lr": 0.005}
     loss: str = "BCELoss"
-    save_path: str = "model.pth"
+    save_path: str = "results"
     num_runs: int = 1
 
 
@@ -30,7 +30,7 @@ pipeline_comments = {
     "train_batch_size": "Edge batch size when training",
     "num_epochs": "Number of training epochs",
     "eval_period": "Interval epochs between evaluations",
-    "save_path": "Path to save the model",
+    "save_path": "Directory to save the experiment results",
     "num_runs": "Number of experiments to run",
 }
 
@@ -42,14 +42,16 @@ class LinkpredPipeline(PipelineBase):
     pipeline_name = "linkpred"
 
     def __init__(self):
-        self.pipeline_name = "linkpred"
+        self.pipeline = {
+            "name": "linkpred",
+            "mode": "train"
+        }
 
     @classmethod
     def setup_user_cfg_cls(cls):
         from ...utils.enter_config import UserConfig
 
         class LinkPredUserConfig(UserConfig):
-            pipeline_name: str = "linkpred"
             data: DataFactory.filter("linkpred").get_pydantic_config() = Field(..., discriminator="name")
             node_model: NodeModelFactory.get_pydantic_model_config() = Field(...,
                                                                              discriminator="name")
@@ -79,7 +81,8 @@ class LinkpredPipeline(PipelineBase):
         ):
             self.__class__.setup_user_cfg_cls()
             generated_cfg = {
-                "pipeline_name": "linkpred",
+                "pipeline_name": self.pipeline["name"],
+                "pipeline_mode": self.pipeline["mode"],
                 "device": "cpu",
                 "data": {"name": data.name},
                 "neg_sampler": {"name": neg_sampler.value},
@@ -138,6 +141,7 @@ class LinkpredPipeline(PipelineBase):
         else:
             generated_user_cfg["data"].pop("name")
         generated_user_cfg.pop("pipeline_name")
+        generated_user_cfg.pop("pipeline_mode")
         generated_user_cfg["node_model"].pop("name")
         generated_user_cfg["edge_model"].pop("name")
         generated_user_cfg["neg_sampler"].pop("name")

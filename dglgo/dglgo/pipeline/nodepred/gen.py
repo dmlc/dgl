@@ -18,7 +18,7 @@ pipeline_comments = {
         "patience": "Steps before early stop",
         "checkpoint_path": "Early stop checkpoint model file path"
     },
-    "save_path": "Path to save the model",
+    "save_path": "Directory to save the experiment results",
     "num_runs": "Number of experiments to run",
 }
 
@@ -28,7 +28,7 @@ class NodepredPipelineCfg(BaseModel):
     eval_period: int = 5
     optimizer: dict = {"name": "Adam", "lr": 0.01, "weight_decay": 5e-4}
     loss: str = "CrossEntropyLoss"
-    save_path: str = "model.pth"
+    save_path: str = "results"
     num_runs: int = 1
 
 @PipelineFactory.register("nodepred")
@@ -37,7 +37,10 @@ class NodepredPipeline(PipelineBase):
     user_cfg_cls = None
 
     def __init__(self):
-        self.pipeline_name = "nodepred"
+        self.pipeline = {
+            "name": "nodepred",
+            "mode": "train"
+        }
 
     @classmethod
     def setup_user_cfg_cls(cls):
@@ -62,7 +65,8 @@ class NodepredPipeline(PipelineBase):
         ):
             self.__class__.setup_user_cfg_cls()
             generated_cfg = {
-                "pipeline_name": self.pipeline_name,
+                "pipeline_name": self.pipeline["name"],
+                "pipeline_mode": self.pipeline["mode"],
                 "device": "cpu",
                 "data": {"name": data.name},
                 "model": {"name": model.value},
@@ -108,12 +112,10 @@ class NodepredPipeline(PipelineBase):
         generated_user_cfg = copy.deepcopy(user_cfg_dict)
         if "split_ratio" in generated_user_cfg["data"]:
             generated_user_cfg["data"].pop("split_ratio")
-        if len(generated_user_cfg["data"]) == 1:
-            generated_user_cfg.pop("data")
-        else:
-            generated_user_cfg["data"].pop("name")
+        generated_user_cfg["data_name"] = generated_user_cfg["data"].pop("name")
         generated_user_cfg.pop("pipeline_name")
-        generated_user_cfg["model"].pop("name")
+        generated_user_cfg.pop("pipeline_mode")
+        generated_user_cfg["model_name"] = generated_user_cfg["model"].pop("name")
         generated_user_cfg["general_pipeline"]["optimizer"].pop("name")
 
         generated_train_cfg = copy.deepcopy(user_cfg_dict["general_pipeline"])
@@ -128,4 +130,4 @@ class NodepredPipeline(PipelineBase):
 
     @staticmethod
     def get_description() -> str:
-        return "Node classification pipeline"
+        return "Node classification pipeline for training"

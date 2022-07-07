@@ -12,9 +12,8 @@ from ... import ndarray as dglnd
 from ..._deprecate import kernel as K
 from ...function.base import TargetCode
 
-MX_VERSION = LooseVersion(mx.__version__)
-if MX_VERSION.version[0] == 1 and MX_VERSION.version[1] < 5:
-    raise RuntimeError("DGL requires mxnet >= 1.5")
+if LooseVersion(mx.__version__) < LooseVersion("1.6.0"):
+    raise RuntimeError("DGL requires MXNet >= 1.6")
 
 # After MXNet 1.5, empty tensors aren't supprted by default.
 # After we turn on the numpy compatible flag, MXNet supports empty NDArray.
@@ -214,19 +213,9 @@ def split(x, sizes_or_sections, dim):
         assert len(x) == sizes_or_sections[0]
         return [x]
 
-    if MX_VERSION.version[0] == 1 and MX_VERSION.version[1] >= 5:
-        if isinstance(sizes_or_sections, (np.ndarray, list)):
-            sizes_or_sections1 = tuple(np.cumsum(sizes_or_sections)[:-1])
-        return nd.split_v2(x, sizes_or_sections1, axis=dim)
-
-    if isinstance(sizes_or_sections, list) or isinstance(sizes_or_sections, np.ndarray):
-        # Old MXNet doesn't support split with different section sizes.
-        np_arr = x.asnumpy()
-        indices = np.cumsum(sizes_or_sections)[:-1]
-        res = np.split(np_arr, indices, axis=dim)
-        return [tensor(arr, dtype=x.dtype) for arr in res]
-    else:
-        return nd.split(x, sizes_or_sections, axis=dim)
+    if isinstance(sizes_or_sections, (np.ndarray, list)):
+        sizes_or_sections1 = tuple(np.cumsum(sizes_or_sections)[:-1])
+    return nd.split_v2(x, sizes_or_sections1, axis=dim)
 
 def repeat(input, repeats, dim):
     if isinstance(repeats, nd.NDArray):

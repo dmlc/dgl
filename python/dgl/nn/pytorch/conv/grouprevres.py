@@ -72,7 +72,8 @@ class InvertibleCheckpoint(torch.autograd.Function):
             detached_inputs = tuple(detached_inputs)
             temp_output = ctx.fn(*detached_inputs)
 
-        filtered_detached_inputs = tuple(filter(lambda x: x.requires_grad, detached_inputs))
+        filtered_detached_inputs = tuple(filter(lambda x: getattr(x, 'requires_grad', False),
+                                                detached_inputs))
         gradients = torch.autograd.grad(outputs=(temp_output,),
                                         inputs=filtered_detached_inputs + ctx.weights,
                                         grad_outputs=grad_outputs)

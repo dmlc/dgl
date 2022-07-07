@@ -4,44 +4,25 @@ from __future__ import absolute_import
 from distutils.version import LooseVersion
 
 import tensorflow as tf
-from tensorflow.python.eager import context
 import builtins
 import numbers
 import numpy as np
-import os
 
 from ... import ndarray as nd
 from ..._deprecate import kernel as K
 from ...function.base import TargetCode
 
-if not os.getenv("USE_TFDLPACK", False):
-    if LooseVersion(tf.__version__) < LooseVersion("2.2.0"):
-        raise RuntimeError("DGL requires tensorflow>=2.2.0 for the official DLPack support.")
+if LooseVersion(tf.__version__) < LooseVersion("2.3.0"):
+    raise RuntimeError("DGL requires TensorFlow>=2.3.0 for the official DLPack support.")
 
-    def zerocopy_to_dlpack(data):
-        return tf.experimental.dlpack.to_dlpack(data)
+def zerocopy_to_dlpack(data):
+    return tf.experimental.dlpack.to_dlpack(data)
 
-    def zerocopy_from_dlpack(dlpack_tensor):
-        # TODO(Jinjing): Tensorflow requires memory to be 64-bytes aligned. We check the
-        #   alignment and make a copy if needed. The functionality is better in TF's main repo.
-        aligned = nd.from_dlpack(dlpack_tensor).to_dlpack(64)
-        return tf.experimental.dlpack.from_dlpack(aligned)
-else:
-    # Use our own DLPack solution
-    try:
-        import tfdlpack
-    except ImportError:
-        raise ImportError('Cannot find tfdlpack, which is required by the Tensorflow backend. '
-                          'Please follow https://github.com/VoVAllen/tf-dlpack for installation.')
-
-    if LooseVersion(tf.__version__) < LooseVersion("2.1.0"):
-        raise RuntimeError("DGL requires tensorflow>=2.1.0.")
-
-    def zerocopy_to_dlpack(input):
-        return tfdlpack.to_dlpack(input)
-
-    def zerocopy_from_dlpack(input):
-        return tfdlpack.from_dlpack(input)
+def zerocopy_from_dlpack(dlpack_tensor):
+    # TODO(Jinjing): Tensorflow requires memory to be 64-bytes aligned. We check the
+    #   alignment and make a copy if needed. The functionality is better in TF's main repo.
+    aligned = nd.from_dlpack(dlpack_tensor).to_dlpack(64)
+    return tf.experimental.dlpack.from_dlpack(aligned)
 
 
 def data_type_dict():

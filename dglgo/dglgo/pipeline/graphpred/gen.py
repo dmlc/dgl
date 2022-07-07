@@ -14,7 +14,7 @@ pipeline_comments = {
     "eval_batch_size": "Graph batch size when evaluating",
     "num_workers": "Number of workers for data loading",
     "num_epochs": "Number of training epochs",
-    "save_path": "Path to save the model"
+    "save_path": "Directory to save the experiment results"
 }
 
 class GraphpredPipelineCfg(BaseModel):
@@ -28,12 +28,15 @@ class GraphpredPipelineCfg(BaseModel):
     loss: str = "BCEWithLogitsLoss"
     metric: str = "roc_auc_score"
     num_epochs: int = 100
-    save_path: str = "model.pth"
+    save_path: str = "results"
 
 @PipelineFactory.register("graphpred")
 class GraphpredPipeline(PipelineBase):
     def __init__(self):
-        self.pipeline_name = "graphpred"
+        self.pipeline = {
+            "name": "graphpred",
+            "mode": "train"
+        }
 
     @classmethod
     def setup_user_cfg_cls(cls):
@@ -58,7 +61,8 @@ class GraphpredPipeline(PipelineBase):
         ):
             self.__class__.setup_user_cfg_cls()
             generated_cfg = {
-                "pipeline_name": self.pipeline_name,
+                "pipeline_name": self.pipeline["name"],
+                "pipeline_mode": self.pipeline["mode"],
                 "device": "cpu",
                 "data": {"name": data.name},
                 "model": {"name": model.value},
@@ -104,6 +108,7 @@ class GraphpredPipeline(PipelineBase):
             generated_user_cfg["data"].pop("split_ratio")
         generated_user_cfg["data_name"] = generated_user_cfg["data"].pop("name")
         generated_user_cfg.pop("pipeline_name")
+        generated_user_cfg.pop("pipeline_mode")
         generated_user_cfg["model_name"] = generated_user_cfg["model"].pop("name")
         generated_user_cfg["general_pipeline"]["optimizer"].pop("name")
         generated_user_cfg["general_pipeline"]["lr_scheduler"].pop("name")
@@ -120,4 +125,4 @@ class GraphpredPipeline(PipelineBase):
 
     @staticmethod
     def get_description() -> str:
-        return "Graph property prediction pipeline"
+        return "Graph property prediction pipeline on binary classification"

@@ -1,5 +1,4 @@
 from ..utils.factory import ModelFactory, PipelineFactory
-from ..utils.enter_config import UserConfig
 import typer
 from enum import Enum
 import typing
