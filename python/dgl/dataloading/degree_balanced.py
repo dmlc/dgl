@@ -1,5 +1,4 @@
 """Degree balanced dataloader."""
-
 import torch
 import numpy as np
 from ..dataloading.dataloader import _TensorizedDatasetIter, DataLoader, TensorizedDataset
@@ -15,7 +14,7 @@ class DegreeBalancedDataloader(DataLoader):
     Parameters
     ----------
     g : DGLGraph
-    The input graph to sample from.
+        The input graph to sample from.
     nids : Tensor of dict[str, Tensor]
         Seed node IDs.
     sampler : dgl.dataloading.Sampler
@@ -75,15 +74,18 @@ class DegreeBalancedDataloader(DataLoader):
 
 
 class DegreeBalancedDataset(TensorizedDataset):
-    """Degree balanced tensorized dataset extended from dgl.dataloading."""
+    """Degree balanced tensorized dataset extended from dgl.dataloading.
+
+    The arguments are similiar to ``DegreeBalancedDataloader``. Unlike the normal datasets,
+    We change the shuffle logics here since we need to compute the prefix sum of in degrees
+    array.
+    """
     def __init__(self, max_node, max_degree, prefix_sum_in_degrees, g, train_nids, shuffle):
         super().__init__(train_nids, max_node, drop_last=False, shuffle=shuffle)
         self.device = train_nids.device
         self.max_node = max_node
         self.max_degree = max_degree
 
-        # We change the shuffle stretegy here. Since we need to compute the prefix sum of
-        # in degrees array.
         self._indices = torch.arange(train_nids.shape[0], dtype=torch.int64).share_memory_()
         if shuffle:
             np.random.shuffle(self._indices.numpy())
