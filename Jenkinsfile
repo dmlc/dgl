@@ -1,6 +1,6 @@
 #!/usr/bin/env groovy
 
-dgl_linux_libs = 'build/libdgl.so, build/runUnitTests, python/dgl/_ffi/_cy3/core.cpython-36m-x86_64-linux-gnu.so, build/tensoradapter/pytorch/*.so'
+dgl_linux_libs = 'build/libdgl.so, build/runUnitTests, python/dgl/_ffi/_cy3/core.cpython-*-x86_64-linux-gnu.so, build/tensoradapter/pytorch/*.so'
 // Currently DGL on Windows is not working with Cython yet
 dgl_win64_libs = "build\\dgl.dll, build\\runUnitTests.exe, build\\tensoradapter\\pytorch\\*.dll"
 
@@ -62,6 +62,14 @@ def unit_test_linux(backend, dev) {
   }
 }
 
+def unit_test_cugraph(backend, dev) {
+  init_git()
+  unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
+  timeout(time: 15, unit: 'MINUTES') {
+    sh "bash tests/scripts/cugraph_unit_test.sh ${backend}"
+  }
+}
+
 def unit_test_win64(backend, dev) {
   init_git_win64()
   unpack_lib("dgl-${dev}-win64", dgl_win64_libs)
@@ -97,7 +105,7 @@ def tutorial_test_linux(backend) {
 def go_test_linux() {
   init_git()
   unpack_lib('dgl-cpu-linux', dgl_linux_libs)
-  timeout(time: 30, unit: 'MINUTES') {
+  timeout(time: 20, unit: 'MINUTES') {
     sh "bash tests/scripts/task_go_test.sh"
   }
 }
@@ -206,7 +214,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:cu101_v220217"
+                  image "dgllib/dgl-ci-cpu:cu101_v220629"
                   args "-u root"
                   alwaysPull true
                 }
@@ -224,7 +232,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-gpu:cu101_v220217"
+                  image "dgllib/dgl-ci-gpu:cu101_v220629"
                   args "-u root"
                   alwaysPull true
                 }
@@ -232,6 +240,24 @@ pipeline {
               steps {
                 // sh "nvidia-smi"
                 build_dgl_linux('gpu')
+              }
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
+                }
+              }
+            }
+            stage('PyTorch Cugraph GPU Build') {
+              agent {
+                docker {
+                  label "linux-cpu-node"
+                  image "nvcr.io/nvidia/pytorch:22.04-py3"
+                  args "-u root"
+                  alwaysPull false
+                }
+              }
+              steps {
+                build_dgl_linux('cugraph')
               }
               post {
                 always {
@@ -261,7 +287,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:cu101_v220217"
+                  image "dgllib/dgl-ci-cpu:cu101_v220629"
                   alwaysPull true
                 }
               }
@@ -278,7 +304,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-gpu-node"
-                  image "dgllib/dgl-ci-gpu:cu101_v220217"
+                  image "dgllib/dgl-ci-gpu:cu101_v220629"
                   args "--runtime nvidia"
                   alwaysPull true
                 }
@@ -307,7 +333,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:cu101_v220217"
+                  image "dgllib/dgl-ci-cpu:cu101_v220629"
                   alwaysPull true
                 }
               }
@@ -328,7 +354,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-gpu-node"
-                  image "dgllib/dgl-ci-gpu:cu101_v220217"
+                  image "dgllib/dgl-ci-gpu:cu101_v220629"
                   args "--runtime nvidia"
                   alwaysPull true
                 }
@@ -350,7 +376,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:cu101_v220217"
+                  image "dgllib/dgl-ci-cpu:cu101_v220629"
                   args "--shm-size=4gb"
                   alwaysPull true
                 }
@@ -369,11 +395,6 @@ pipeline {
                 stage('Torch CPU Tutorial test') {
                   steps {
                     tutorial_test_linux('pytorch')
-                  }
-                }
-                stage('DGL-Go CPU test') {
-                  steps {
-                    go_test_linux()
                   }
                 }
               }
@@ -407,7 +428,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-gpu-node"
-                  image "dgllib/dgl-ci-gpu:cu101_v220217"
+                  image "dgllib/dgl-ci-gpu:cu101_v220629"
                   args "--runtime nvidia --shm-size=8gb"
                   alwaysPull true
                 }
@@ -431,11 +452,34 @@ pipeline {
                 }
               }
             }
+            stage('PyTorch Cugraph GPU') {
+              agent {
+                docker {
+                  label "linux-gpu-node"
+                  image "nvcr.io/nvidia/pytorch:22.04-py3"
+                  args "--runtime nvidia --shm-size=8gb"
+                  alwaysPull false
+                }
+              }
+              stages {
+                stage('PyTorch Cugraph GPU Unit test') {
+                  steps {
+                    sh 'nvidia-smi'
+                    unit_test_cugraph('pytorch', 'cugraph')
+                  }
+                }
+              }
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
+                }
+              }
+            }
             stage('MXNet CPU') {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:cu101_v220217"
+                  image "dgllib/dgl-ci-cpu:cu101_v220629"
                   alwaysPull true
                 }
               }
@@ -445,11 +489,6 @@ pipeline {
                     unit_test_linux('mxnet', 'cpu')
                   }
                 }
-              //stage("Tutorial test") {
-              //  steps {
-              //    tutorial_test_linux("mxnet")
-              //  }
-              //}
               }
               post {
                 always {
@@ -461,7 +500,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-gpu-node"
-                  image "dgllib/dgl-ci-gpu:cu101_v220217"
+                  image "dgllib/dgl-ci-gpu:cu101_v220629"
                   args "--runtime nvidia"
                   alwaysPull true
                 }
@@ -471,6 +510,27 @@ pipeline {
                   steps {
                     sh 'nvidia-smi'
                     unit_test_linux('mxnet', 'gpu')
+                  }
+                }
+              }
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
+                }
+              }
+            }
+            stage('DGL-Go') {
+              agent {
+                docker {
+                  label "linux-cpu-node"
+                  image "dgllib/dgl-ci-cpu:cu101_v220629"
+                  alwaysPull true
+                }
+              }
+              stages {
+                stage('DGL-Go CPU test') {
+                  steps {
+                    go_test_linux()
                   }
                 }
               }

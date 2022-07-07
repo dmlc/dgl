@@ -12,11 +12,9 @@ from torch.utils import dlpack
 from ... import ndarray as nd
 from ..._deprecate import kernel as K
 from ...function.base import TargetCode
-from ...base import dgl_warning
 
-if LooseVersion(th.__version__) < LooseVersion("1.8.0"):
-    raise Exception("Detected an old version of PyTorch. Please update torch>=1.8.0 "
-                    "for the best experience.")
+if LooseVersion(th.__version__) < LooseVersion("1.9.0"):
+    raise RuntimeError("DGL requires PyTorch >= 1.9.0")
 
 def data_type_dict():
     return {'float16' : th.float16,
