@@ -3,7 +3,6 @@ import types
 
 import dgl  # for holding the environment.
 import torch
-import torch
 from torch.fx import GraphModule, Graph
 
 from ..fx import dgl_symbolic_trace
