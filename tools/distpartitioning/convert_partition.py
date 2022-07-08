@@ -173,18 +173,20 @@ def create_dgl_object(graph_name, num_parts, \
     compact_g1.edata['inner_edge'] = compact_g.edata['inner_edge'][compact_g1.edata[dgl.EID]]
 
     # reshuffle edges on ETYPE as node_subgraph relabels edges
+    # and create object with appropriate datatypes as needed by the distdgl
+    distdgl_dtypes = dgl.distributed.dist_graph.FIELD_DICT
     idx = th.argsort(compact_g1.edata[dgl.ETYPE])
     u, v = compact_g1.edges()
     u = u[idx]
     v = v[idx]
     compact_g2 = dgl.graph((u, v))
     compact_g2.ndata['orig_id'] = compact_g1.ndata['orig_id']
-    compact_g2.ndata[dgl.NTYPE] = compact_g1.ndata[dgl.NTYPE]
-    compact_g2.ndata[dgl.NID] = compact_g1.ndata[dgl.NID]
-    compact_g2.ndata['inner_node'] = compact_g1.ndata['inner_node']
+    compact_g2.ndata[dgl.NTYPE] = compact_g1.ndata[dgl.NTYPE].type(distdgl_dtypes[dgl.NTYPE])
+    compact_g2.ndata[dgl.NID] = compact_g1.ndata[dgl.NID].type(distdgl_dtypes[dgl.NID])
+    compact_g2.ndata['inner_node'] = compact_g1.ndata['inner_node'].type(distdgl_dtypes['inner_node'])
     compact_g2.edata['orig_id'] = compact_g1.edata['orig_id'][idx]
-    compact_g2.edata[dgl.ETYPE] = compact_g1.edata[dgl.ETYPE][idx]
-    compact_g2.edata['inner_edge'] = compact_g1.edata['inner_edge'][idx]
+    compact_g2.edata[dgl.ETYPE] = compact_g1.edata[dgl.ETYPE][idx].type(distdgl_dtypes[dgl.ETYPE])
+    compact_g2.edata['inner_edge'] = compact_g1.edata['inner_edge'][idx].type(distdgl_dtypes['inner_edge'])
     compact_g2.edata[dgl.EID] = th.arange(
         edgeid_offset, edgeid_offset + compact_g2.number_of_edges(), dtype=th.int64)
     edgeid_offset += compact_g2.number_of_edges()
