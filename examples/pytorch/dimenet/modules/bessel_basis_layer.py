@@ -17,7 +17,9 @@ class BesselBasisLayer(nn.Module):
         self.reset_params()
 
     def reset_params(self):
-        torch.arange(1, self.frequencies.numel() + 1, out=self.frequencies).mul_(np.pi)
+        with torch.no_grad():
+            torch.arange(1, self.frequencies.numel() + 1, out=self.frequencies).mul_(np.pi)
+        self.frequencies.requires_grad_()
 
     def forward(self, g):
         d_scaled = g.edata['d'] / self.cutoff

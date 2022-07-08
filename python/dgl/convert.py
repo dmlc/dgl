@@ -29,6 +29,8 @@ __all__ = [
     'from_networkx',
     'bipartite_from_networkx',
     'to_networkx',
+    'from_cugraph',
+    'to_cugraph'
 ]
 
 def graph(data,
@@ -1619,6 +1621,110 @@ def to_networkx(g, node_attrs=None, edge_attrs=None):
     return nx_graph
 
 DGLHeteroGraph.to_networkx = to_networkx
+
+def to_cugraph(g):
+    """Convert a DGL graph to a :class:`cugraph.Graph` and return.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        A homogeneous graph.
+
+    Returns
+    -------
+    cugraph.Graph
+        The converted cugraph graph.
+
+    Notes
+    -----
+    The function only supports GPU graph input.
+
+    Examples
+    --------
+    The following example uses PyTorch backend.
+
+    >>> import dgl
+    >>> import cugraph
+    >>> import torch
+
+    >>> g = dgl.graph((torch.tensor([1, 2]), torch.tensor([1, 3]))).to('cuda')
+    >>> cugraph_g = g.to_cugraph()
+    >>> cugraph_g.edges()
+        src  dst
+    0    2    3
+    1    1    1
+    """
+
+    if g.device.type != 'cuda':
+        raise DGLError(f"Cannot convert a {g.device.type} graph to cugraph." +
+                        "Call g.to('cuda') first.")
+    if not g.is_homogeneous:
+        raise DGLError("dgl.to_cugraph only supports homogeneous graphs.")
+
+    try:
+        import cugraph
+        import cudf
+    except ModuleNotFoundError:
+        raise ModuleNotFoundError("to_cugraph requires cugraph which could not be imported")
+
+    edgelist = g.edges()
+    src_ser = cudf.from_dlpack(F.zerocopy_to_dlpack(edgelist[0]))
+    dst_ser = cudf.from_dlpack(F.zerocopy_to_dlpack(edgelist[1]))
+    cudf_data = cudf.DataFrame({'source':src_ser, 'destination':dst_ser})
+    g_cugraph = cugraph.Graph(directed=True)
+    g_cugraph.from_cudf_edgelist(cudf_data,
+                                 source='source',
+                                 destination='destination')
+    return g_cugraph
+
+DGLHeteroGraph.to_cugraph = to_cugraph
+
+def from_cugraph(cugraph_graph):
+    """Create a graph from a :class:`cugraph.Graph` object.
+
+    Parameters
+    ----------
+    cugraph_graph : cugraph.Graph
+        The cugraph graph object holding the graph structure. Node and edge attributes are
+        dropped.
+
+        If the input graph is undirected, DGL converts it to a directed graph
+        by :func:`cugraph.Graph.to_directed`.
+
+    Returns
+    -------
+    DGLGraph
+        The created graph.
+
+    Examples
+    --------
+
+    The following example uses PyTorch backend.
+
+    >>> import dgl
+    >>> import cugraph
+    >>> import cudf
+
+    Create a cugraph graph.
+    >>> cugraph_g = cugraph.Graph(directed=True)
+    >>> df = cudf.DataFrame({"source":[0, 1, 2, 3],
+                     "destination":[1, 2, 3, 0]})
+    >>> cugraph_g.from_cudf_edgelist(df)
+
+    Convert it into a DGLGraph
+    >>> g = dgl.from_cugraph(cugraph_g)
+    >>> g.edges()
+    (tensor([1, 2, 3, 0], device='cuda:0'), tensor([2, 3, 0, 1], device='cuda:0'))
+    """
+    if not cugraph_graph.is_directed():
+        cugraph_graph = cugraph_graph.to_directed()
+
+    edges = cugraph_graph.edges()
+    src_t = F.zerocopy_from_dlpack(edges['src'].to_dlpack())
+    dst_t = F.zerocopy_from_dlpack(edges['dst'].to_dlpack())
+    g = graph((src_t,dst_t))
+
+    return g
 
 ############################################################
 # Internal APIs
