@@ -1,22 +1,18 @@
 /*!
  *  Copyright (c) 2021 by Contributors
  * \file array/cuda/rowwise_sampling.cu
- * \brief rowwise sampling
+ * \brief uniform rowwise sampling
  */
 
 #include <dgl/random.h>
 #include <dgl/runtime/device_api.h>
 #include <curand_kernel.h>
-#include <thrust/binary_search.h>
-#include <thrust/execution_policy.h>
 #include <numeric>
 
 #include "./dgl_cub.cuh"
 #include "../../array/cuda/atomic.cuh"
 #include "../../runtime/cuda/cuda_common.h"
 
-static_assert(THRUST_MAJOR_VERSION == 1 && THRUST_MINOR_VERSION >= 14,
-    "Thrust version is too old. Please update to 1.14 or later.");
 
 using namespace dgl::aten::cuda;
 
@@ -240,362 +236,16 @@ __global__ void _CSRRowWiseSampleUniformReplaceKernel(
     out_row += 1;
   }
 }
-
-/**
-* @brief Equivalent to numpy expression: array[idx[off:off + len]]
-*
-* @tparam IdType The ID type used for indices.
-* @tparam FloatType The float type used for array values.
-* @param array The array to be selected.
-* @param idx_data The index mapping array.
-* @param index The index of value to be selected.
-* @param offset The offset to start.
-* @param out The selected value (output).
-*/
-template<typename IdType, typename FloatType>
-__device__ void _DoubleSlice(
-    const FloatType * const array,
-    const IdType * const idx_data,
-    const IdType idx,
-    const IdType offset,
-    FloatType* const out) {
-  if (idx_data) {
-    *out = array[idx_data[offset + idx]];
-  } else {
-    *out = array[offset + idx];
-  }
-}
-
-/**
-* @brief Perform row-wise sampling on a CSR matrix, and generate a COO matrix,
-* without replacement. We implement the Algorithm A-Chao described in
-* https://en.wikipedia.org/wiki/Reservoir_sampling#Algorithm_A-Chao.
-* 1. Fill the reservoir array with the first num_picks elements.
-* 2. For each element in the remaining array, check if it can replace.
-* To parallelize this, we use a moving window to calculate the prefix sum.
-*
-* @tparam IdType The ID type used for matrices.
-* @tparam FloatType The float type used for probability.
-* @tparam TILE_SIZE The number of rows covered by each threadblock.
-* @param rand_seed The random seed to use.
-* @param num_picks The number of non-zeros to pick per row.
-* @param num_rows The number of rows to pick.
-* @param in_rows The set of rows to pick.
-* @param in_ptr The indptr array of the input CSR.
-* @param in_index The indices array of the input CSR.
-* @param data The data array of the input CSR.
-* @param out_ptr The offset to write each row to in the output COO.
-* @param out_rows The rows of the output COO (output).
-* @param out_cols The columns of the output COO (output).
-* @param out_idxs The data array of the output COO (output).
-*/
-template<typename IdType, typename FloatType, int TILE_SIZE>
-__global__ void _CSRRowWiseSampleKernel(
-    const uint64_t rand_seed,
-    const int64_t num_picks,
-    const int64_t num_rows,
-    const IdType * const in_rows,
-    const FloatType * const prob,
-    const IdType * const in_ptr,
-    const IdType * const in_index,
-    const IdType * const data,
-    const IdType * const out_ptr,
-    IdType * const out_rows,
-    IdType * const out_cols,
-    IdType * const out_idxs) {
-  // we assign one warp per row
-  assert(blockDim.x == BLOCK_SIZE);
-
-  int64_t out_row = blockIdx.x * TILE_SIZE + threadIdx.y;
-  const int64_t last_row = min(static_cast<int64_t>(blockIdx.x + 1) * TILE_SIZE, num_rows);
-
-  curandStatePhilox4_32_10_t rng;
-  curand_init(rand_seed * gridDim.x + blockIdx.x, threadIdx.x, 0, &rng);
-
-  while (out_row < last_row) {
-    const int64_t row = in_rows[out_row];
-    const int64_t in_row_start = in_ptr[row];
-    const int64_t deg = in_ptr[row + 1] - in_row_start;
-    const int64_t out_row_start = out_ptr[out_row];
-
-    if (deg <= num_picks) {
-      // just copy row when there is no enough nodes to sample.
-      for (int idx = threadIdx.x; idx < deg; idx += BLOCK_SIZE) {
-        const IdType in_idx = in_row_start + idx;
-        out_rows[out_row_start + idx] = row;
-        out_cols[out_row_start + idx] = in_index[in_idx];
-        out_idxs[out_row_start + idx] = data ? data[in_idx] : in_idx;
-      }
-    } else {
-      using BlockScanT = cub::BlockScan<FloatType, BLOCK_SIZE>;
-      // Allocate shared memory for BlockScan
-      __shared__ typename BlockScanT::TempStorage temp_storage;
-
-      FloatType weights_sum = static_cast<FloatType>(0.0);
-      // For the following two loops, we use a block scan window of size BLOCK_SIZE
-      // 1. Fill the reservoir array and compute the sum of their weights
-      for (int i = 0; i < (num_picks + BLOCK_SIZE - 1) / BLOCK_SIZE; i++) {
-        // Obtain input item for each thread
-        IdType idx = threadIdx.x + i * BLOCK_SIZE;
-        FloatType thread_prob;
-        if (idx < num_picks) {
-          _DoubleSlice<IdType, FloatType>(prob, data, idx, in_row_start, &thread_prob);
-          out_idxs[out_row_start + idx] = idx;
-        } else {
-          thread_prob = static_cast<FloatType>(0.0);
-        }
-        __syncthreads();
-
-        // Collectively compute the block-wide inclusive prefix sum
-        FloatType block_aggregate;
-        BlockScanT(temp_storage).InclusiveSum(thread_prob, thread_prob, block_aggregate);
-
-        weights_sum += block_aggregate;
-      }
-
-      // 2. For items in [num_picks, deg), check if they can replace
-      for (int i = 0; i < (deg - num_picks + BLOCK_SIZE - 1) / BLOCK_SIZE; i++) {
-        // Obtain input item for each thread
-        IdType idx = num_picks + threadIdx.x + i * BLOCK_SIZE;
-        FloatType thread_prob, thread_sum;
-        if (idx < deg) {
-          _DoubleSlice<IdType, FloatType>(prob, data, idx, in_row_start, &thread_prob);
-        } else {
-          thread_prob = static_cast<FloatType>(0.0);
-        }
-        __syncthreads();
-
-        // Collectively compute the block-wide inclusive prefix sum
-        FloatType block_aggregate;
-        BlockScanT(temp_storage).InclusiveSum(thread_prob, thread_sum, block_aggregate);
-
-        if (idx < deg) {
-          thread_prob /= (thread_sum + weights_sum);
-          if (curand_uniform(&rng) < thread_prob) {
-            const int num = curand(&rng) % num_picks;
-            // use max so as to achieve the replacement order the serial
-            // algorithm would have
-            AtomicMax(out_idxs + out_row_start + num, idx);
-          }
-        }
-        __syncthreads();
-
-        weights_sum += block_aggregate;
-      }
-
-      // copy permutation over
-      for (int idx = threadIdx.x; idx < num_picks; idx += BLOCK_SIZE) {
-        const IdType perm_idx = out_idxs[out_row_start + idx] + in_row_start;
-        out_rows[out_row_start + idx] = row;
-        out_cols[out_row_start + idx] = in_index[perm_idx];
-        out_idxs[out_row_start + idx] = data ? data[perm_idx] : perm_idx;
-      }
-    }
-
-    out_row += 1;
-  }
-}
-
-/**
-* @brief Perform row-wise sampling on a CSR matrix, and generate a COO matrix,
-* with replacement.
-* The algorithm implemented here is a simple sorted inverse transform sampling.
-* 1. Generate num_picks random numbers in [0, 1) and sort
-* 2. Calculate the CDF (prefix sum) of the normalized weights of rows to be sampled
-* 3. Get the inverse CDF of the random numbers via binary search
-* To parallelize it, we use moving windows for both the random number array
-* and the prefix sum array.
-*
-* @tparam IdType The ID type used for matrices.
-* @tparam FloatType The float type used for probability.
-* @tparam TILE_SIZE The number of rows covered by each threadblock.
-* @tparam MAX_FANOUT Max fanout allowed.
-* @param rand_seed The random seed to use.
-* @param num_picks The number of non-zeros to pick per row.
-* @param num_rows The number of rows to pick.
-* @param in_rows The set of rows to pick.
-* @param in_ptr The indptr array of the input CSR.
-* @param in_index The indices array of the input CSR.
-* @param data The data array of the input CSR.
-* @param out_ptr The offset to write each row to in the output COO.
-* @param out_rows The rows of the output COO (output).
-* @param out_cols The columns of the output COO (output).
-* @param out_idxs The data array of the output COO (output).
-*/
-template<typename IdType, typename FloatType, int TILE_SIZE, int MAX_FANOUT>
-__global__ void _CSRRowWiseSampleReplaceKernel(
-    const uint64_t rand_seed,
-    const int64_t num_picks,
-    const int64_t num_rows,
-    const IdType * const in_rows,
-    const FloatType * const prob,
-    const IdType * const in_ptr,
-    const IdType * const in_index,
-    const IdType * const data,
-    const IdType * const out_ptr,
-    IdType * const out_rows,
-    IdType * const out_cols,
-    IdType * const out_idxs) {
-  // we assign one warp per row
-  assert(blockDim.x == BLOCK_SIZE);
-
-  int64_t out_row = blockIdx.x * TILE_SIZE + threadIdx.y;
-  const int64_t last_row = min(static_cast<int64_t>(blockIdx.x + 1) * TILE_SIZE, num_rows);
-
-  curandStatePhilox4_32_10_t rng;
-  curand_init(rand_seed * gridDim.x + blockIdx.x, threadIdx.x, 0, &rng);
-
-  while (out_row < last_row) {
-    const int64_t row = in_rows[out_row];
-    const int64_t in_row_start = in_ptr[row];
-    const int64_t out_row_start = out_ptr[out_row];
-    const int64_t deg = in_ptr[row + 1] - in_row_start;
-
-    if (deg > 0) {
-      constexpr int ITEMS_PER_THREAD = MAX_FANOUT / BLOCK_SIZE;
-      using BlockRadixSortT = cub::BlockRadixSort<float, BLOCK_SIZE, ITEMS_PER_THREAD>;
-      using BlockScanT = cub::BlockScan<FloatType, BLOCK_SIZE>;
-      using BlockReduceI = cub::BlockReduce<int, BLOCK_SIZE>;
-      using BlockReduceT = cub::BlockReduce<FloatType, BLOCK_SIZE>;
-
-      __shared__ FloatType prefix_sum[BLOCK_SIZE];
-      __shared__ typename BlockRadixSortT::TempStorage sort_storage;
-      __shared__ typename BlockScanT::TempStorage scan_storage;
-      __shared__ typename BlockReduceI::TempStorage reduce_storage_i;
-      __shared__ typename BlockReduceT::TempStorage reduce_storage_t;
-
-      // 1.1 Initialize random numbers for each thread
-      // using float for random numbers is enough
-      float thread_rn[ITEMS_PER_THREAD];
-      for (int idx = 0; idx < ITEMS_PER_THREAD; idx++) {
-        if (idx * BLOCK_SIZE + threadIdx.x < num_picks) {
-          // TODO(Xin): This is a workaround for that 1.0f is inclusive in curand_uniform
-          // while the sum of normalized probabilities is usually a bit smaller than 1.0
-          // Therefore the binary search usually reaches the end of the array
-          // Also, 1 - curand_uniform(&rng) doesn't work
-          thread_rn[idx] = curand_uniform(&rng) - 1e-6f;
-        } else {
-          thread_rn[idx] = 1.0f;
-        }
-      }
-      __syncthreads();
-      // 1.2 Sort thread_rn.
-      BlockRadixSortT(sort_storage).SortBlockedToStriped(thread_rn);
-
-      // 2.1 Get the sum of probs for normalization
-      __shared__ FloatType weights_sum;
-      if (threadIdx.x == 0) {
-        weights_sum = static_cast<FloatType>(0.0);
-      }
-      for (int i = 0; i < (deg + BLOCK_SIZE - 1) / BLOCK_SIZE; i++) {
-        // Obtain input item for each thread
-        IdType idx = threadIdx.x + i * BLOCK_SIZE;
-        FloatType thread_prob;
-        if (idx < deg) {
-          _DoubleSlice<IdType, FloatType>(prob, data, idx, in_row_start, &thread_prob);
-        } else {
-          thread_prob = static_cast<FloatType>(0.0);
-        }
-        __syncthreads();
-
-        auto window_sum = BlockReduceT(reduce_storage_t).Sum(thread_prob);
-        if (threadIdx.x == 0) {
-          weights_sum += window_sum;
-        }
-      }
-      __syncthreads();
-
-      FloatType moving_sum = static_cast<FloatType>(0.0);
-      __shared__ int64_t num_selected;
-      if (threadIdx.x == 0) {
-        num_selected = 0;
-      }  // we don't need to sync here because there will be a sync before the first use
-      // 2.2 Use a moving window to compute the inclusive prefix sum
-      // of [i * BLOCK_SIZE, (i + 1) * BLOCK_SIZE)
-      for (int i = 0; i < (deg + BLOCK_SIZE - 1) / BLOCK_SIZE; i++) {
-        // Obtain input item for each thread
-        IdType idx = threadIdx.x + i * BLOCK_SIZE;
-        FloatType thread_prob;
-        if (idx < deg) {
-          _DoubleSlice<IdType, FloatType>(prob, data, idx, in_row_start, &thread_prob);
-        } else {
-          thread_prob = static_cast<FloatType>(0.0);
-        }
-        thread_prob /= weights_sum;
-        __syncthreads();
-
-        // Collectively compute the block-wide inclusive prefix sum
-        FloatType block_aggregate;
-        BlockScanT(scan_storage).InclusiveSum(thread_prob, thread_prob, block_aggregate);
-        // Store the block-wide inclusive prefix sum in shared memory
-        prefix_sum[threadIdx.x] = moving_sum + thread_prob;
-        __syncthreads();
-
-        // 3. Binary search to find the idx
-        for (int j = num_selected / BLOCK_SIZE; j < ITEMS_PER_THREAD; j++) {
-          IdType out_offset = j * BLOCK_SIZE + threadIdx.x;
-          // selected if out_offset is in [num_selected, num_picks)
-          // and its random number is found in this prefix sum window
-          int flag_selected = 0;
-          if (out_offset >= num_selected && out_offset < num_picks) {
-            auto rn_val = thread_rn[j];
-            // (Xin): there could be bank conflicts here
-            auto ptr = thrust::lower_bound(thrust::seq,
-                prefix_sum, prefix_sum + BLOCK_SIZE, rn_val);
-            auto idx_offset = thrust::distance(prefix_sum, ptr);
-            if (idx_offset < BLOCK_SIZE) {
-              flag_selected = 1;
-              // this should always be true since we use lower_bound
-              assert(idx_offset + i * BLOCK_SIZE < deg);
-              out_idxs[out_row_start + out_offset] = idx_offset + i * BLOCK_SIZE;
-            }
-          }
-          __syncthreads();
-
-          auto flag_sum = BlockReduceI(reduce_storage_i).Sum(flag_selected);
-          // Reduced sum is stored in thread 0 only. Let other threads see the result.
-          if (threadIdx.x == 0) {
-            num_selected += flag_sum;
-          }
-          __syncthreads();
-
-          // Case 1: Move to the next window of prefix sum
-          if (num_selected % BLOCK_SIZE != 0) break;
-          // Case 2: when num_selected % BLOCK_SIZE == 0, we move the window of
-          // random numbers to make full use of the current window of prefix sum
-        }
-        moving_sum += block_aggregate;
-        // if we have selected enough edges, skip the subsequent window
-        if (num_selected == num_picks) break;
-      }
-
-      // check if we have selected enough edges when stop natually
-      assert(num_selected == num_picks);
-
-      // copy permutation over
-      for (int idx = threadIdx.x; idx < num_picks; idx += BLOCK_SIZE) {
-        const IdType perm_idx = out_idxs[out_row_start + idx] + in_row_start;
-        out_rows[out_row_start + idx] = row;
-        out_cols[out_row_start + idx] = in_index[perm_idx];
-        out_idxs[out_row_start + idx] = data ? data[perm_idx] : perm_idx;
-      }
-    }
-
-    out_row += 1;
-  }
-}
-
 }  // namespace
 
 
 ///////////////////////////// CSR sampling //////////////////////////
 
-template <DLDeviceType XPU, typename IdType, typename FloatType>
-COOMatrix CSRRowWiseSampling(CSRMatrix mat,
-                             IdArray rows,
-                             const int64_t num_picks,
-                             FloatArray prob,
-                             const bool replace) {
+template <DLDeviceType XPU, typename IdType>
+COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
+                                    IdArray rows,
+                                    const int64_t num_picks,
+                                    const bool replace) {
   const auto& ctx = rows->ctx;
   auto device = runtime::DeviceAPI::Get(ctx);
 
@@ -662,11 +312,11 @@ COOMatrix CSRRowWiseSampling(CSRMatrix mat,
   // a cudaevent
   IdType new_len;
   device->CopyDataFromTo(out_ptr, num_rows * sizeof(new_len), &new_len, 0,
-        sizeof(new_len),
-        ctx,
-        DGLContext{kDLCPU, 0},
-        mat.indptr->dtype,
-        stream);
+      sizeof(new_len),
+      ctx,
+      DGLContext{kDLCPU, 0},
+      mat.indptr->dtype,
+      stream);
   CUDA_CALL(cudaEventRecord(copyEvent, stream));
 
   const uint64_t random_seed = RandomEngine::ThreadLocal()->RandInt(1000000000);
@@ -674,81 +324,40 @@ COOMatrix CSRRowWiseSampling(CSRMatrix mat,
   // select edges
   // the number of rows each thread block will cover
   constexpr int TILE_SIZE = 128 / BLOCK_SIZE;
-  const dim3 block(BLOCK_SIZE);
-  const dim3 grid((num_rows + TILE_SIZE - 1) / TILE_SIZE);
-  if (!prob.defined() || IsNullArray(prob)) {  // uniform sampling
-    if (replace) {  // with replacement
-      CUDA_KERNEL_CALL(
-          (_CSRRowWiseSampleUniformReplaceKernel<IdType, TILE_SIZE>),
-          grid, block, 0, stream,
-          random_seed,
-          num_picks,
-          num_rows,
-          slice_rows,
-          in_ptr,
-          in_cols,
-          data,
-          out_ptr,
-          out_rows,
-          out_cols,
-          out_idxs);
-    } else {  // without replacement
-      CUDA_KERNEL_CALL(
-          (_CSRRowWiseSampleUniformKernel<IdType, TILE_SIZE>),
-          grid, block, 0, stream,
-          random_seed,
-          num_picks,
-          num_rows,
-          slice_rows,
-          in_ptr,
-          in_cols,
-          data,
-          out_ptr,
-          out_rows,
-          out_cols,
-          out_idxs);
-    }
-  } else {  // weighted sampling
-    CHECK_EQ(prob->shape[0], mat.indices->shape[0]);
-    const FloatType* const prob_data = static_cast<const FloatType*>(prob->data);
-    if (replace) {  // with replacement
-      // (Xin): we need a constant array of random numbers for sorting
-      // and 1024 should be enough for any reasonable use case
-      constexpr int MAX_FANOUT = 1024;
-      CHECK_LE(num_picks, MAX_FANOUT)
-          << "GPU weighted sampling with replacement is not supported for fanout > 1024";
-      CUDA_KERNEL_CALL(
-          (_CSRRowWiseSampleReplaceKernel<IdType, FloatType, TILE_SIZE, MAX_FANOUT>),
-          grid, block, 0, stream,
-          random_seed,
-          num_picks,
-          num_rows,
-          slice_rows,
-          prob_data,
-          in_ptr,
-          in_cols,
-          data,
-          out_ptr,
-          out_rows,
-          out_cols,
-          out_idxs);
-    } else {  // without replacement
-      CUDA_KERNEL_CALL(
-          (_CSRRowWiseSampleKernel<IdType, FloatType, TILE_SIZE>),
-          grid, block, 0, stream,
-          random_seed,
-          num_picks,
-          num_rows,
-          slice_rows,
-          prob_data,
-          in_ptr,
-          in_cols,
-          data,
-          out_ptr,
-          out_rows,
-          out_cols,
-          out_idxs);
-    }
+  if (replace) {  // with replacement
+    const dim3 block(BLOCK_SIZE);
+    const dim3 grid((num_rows + TILE_SIZE - 1) / TILE_SIZE);
+    CUDA_KERNEL_CALL(
+        (_CSRRowWiseSampleUniformReplaceKernel<IdType, TILE_SIZE>),
+        grid, block, 0, stream,
+        random_seed,
+        num_picks,
+        num_rows,
+        slice_rows,
+        in_ptr,
+        in_cols,
+        data,
+        out_ptr,
+        out_rows,
+        out_cols,
+        out_idxs);
+  } else {  // without replacement
+    const dim3 block(BLOCK_SIZE);
+    const dim3 grid((num_rows + TILE_SIZE - 1) / TILE_SIZE);
+    CUDA_KERNEL_CALL(
+        (_CSRRowWiseSampleUniformKernel<IdType, TILE_SIZE>),
+        grid, block, 0, stream,
+        random_seed,
+        num_picks,
+        num_rows,
+        slice_rows,
+        in_ptr,
+        in_cols,
+        data,
+        out_ptr,
+        out_rows,
+        out_cols,
+        out_idxs);
   }
   device->FreeWorkspace(ctx, out_ptr);
 
@@ -762,26 +371,6 @@ COOMatrix CSRRowWiseSampling(CSRMatrix mat,
 
   return COOMatrix(mat.num_rows, mat.num_cols, picked_row,
       picked_col, picked_idx);
-}
-
-template COOMatrix CSRRowWiseSampling<kDLGPU, int32_t, float>(
-    CSRMatrix, IdArray, int64_t, FloatArray, bool);
-template COOMatrix CSRRowWiseSampling<kDLGPU, int64_t, float>(
-    CSRMatrix, IdArray, int64_t, FloatArray, bool);
-template COOMatrix CSRRowWiseSampling<kDLGPU, int32_t, double>(
-    CSRMatrix, IdArray, int64_t, FloatArray, bool);
-template COOMatrix CSRRowWiseSampling<kDLGPU, int64_t, double>(
-    CSRMatrix, IdArray, int64_t, FloatArray, bool);
-
-template <DLDeviceType XPU, typename IdType>
-COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
-                                    IdArray rows,
-                                    const int64_t num_picks,
-                                    const bool replace) {
-  // don't need FloatType here, use either float/double is OK
-  // we don't use NullArray() because it involves a call to torch allocator
-  return CSRRowWiseSampling<XPU, IdType, float>(
-    mat, rows, num_picks, FloatArray(), replace);
 }
 
 template COOMatrix CSRRowWiseSamplingUniform<kDLGPU, int32_t>(
