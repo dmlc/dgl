@@ -227,7 +227,7 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows, IdArray etypes,
   }
 
   runtime::parallel_for(0, num_rows, [&](size_t b, size_t e) {
-    for (int64_t i = b; i < e; ++i) {
+    for (size_t i = b; i < e; ++i) {
       const IdxType rid = rows_data[i];
       CHECK_LT(rid, mat.num_rows);
       const IdxType off = indptr[rid];
@@ -277,7 +277,10 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows, IdArray etypes,
         int64_t et_offset = 0;
         int64_t et_len = 1;
         for (int64_t j = 0; j < len; ++j) {
-          if ((j+1 == len) || cur_et != et[et_idx[j+1]]) {
+          CHECK((j + 1 == len) || (et[et_idx[j]] <= et[et_idx[j + 1]]))
+              << "Edge type is not sorted. Please sort in advance or specify "
+                 "'etype_sorted' as false.";
+          if ((j + 1 == len) || cur_et != et[et_idx[j + 1]]) {
             // 1 end of the current etype
             // 2 end of the row
             // random pick for current etype

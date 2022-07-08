@@ -3,7 +3,7 @@ import torch
 class EarlyStopping:
     def __init__(self,
                  patience: int = -1,
-                 checkpoint_path: str = 'checkpoint.pt'):
+                 checkpoint_path: str = 'checkpoint.pth'):
         self.patience = patience
         self.checkpoint_path = checkpoint_path
         self.counter = 0

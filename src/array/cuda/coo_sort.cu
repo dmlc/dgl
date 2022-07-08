@@ -74,7 +74,7 @@ int _NumberOfBits(const T& range) {
   }
 
   int bits = 1;
-  while (bits < sizeof(T)*8 && (1 << bits) < range) {
+  while (bits < static_cast<int>(sizeof(T)*8) && (1 << bits) < range) {
     ++bits;
   }
 

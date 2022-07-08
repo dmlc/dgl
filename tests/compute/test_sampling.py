@@ -855,6 +855,32 @@ def test_sample_neighbors_etype_homogeneous(format_, direction, replace):
             h_g, seeds, dgl.ETYPE, fanouts, replace=replace, edge_dir=direction)
         check_num(h_g, all_src, all_dst, subg, replace, fanouts, direction)
 
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
+@pytest.mark.parametrize('format_', ['csr', 'csc'])
+@pytest.mark.parametrize('direction', ['in', 'out'])
+def test_sample_neighbors_etype_sorted_homogeneous(format_, direction):
+    rare_cnt = 4
+    g = create_etype_test_graph(100, 30, rare_cnt)
+    h_g = dgl.to_homogeneous(g)
+    seed_ntype = g.get_ntype_id("u")
+    seeds = F.nonzero_1d(h_g.ndata[dgl.NTYPE] == seed_ntype)
+    fanouts = F.tensor([6, 5, 4, 3, 2], dtype=F.int64)
+    h_g = h_g.formats(format_)
+    if (direction, format_) in [('in', 'csr'), ('out', 'csc')]:
+        h_g = h_g.formats(['csc', 'csr', 'coo'])
+    orig_etype = F.asnumpy(h_g.edata[dgl.ETYPE])
+    h_g.edata[dgl.ETYPE] = F.tensor(
+        np.sort(orig_etype)[::-1].tolist(), dtype=F.int64)
+
+    try:
+        dgl.sampling.sample_etype_neighbors(
+            h_g, seeds, dgl.ETYPE, fanouts, edge_dir=direction, etype_sorted=True)
+        fail = False
+    except dgl.DGLError:
+        fail = True
+    assert fail
+
 @pytest.mark.parametrize('dtype', ['int32', 'int64'])
 def test_sample_neighbors_exclude_edges_heteroG(dtype):
     d_i_d_u_nodes = F.zerocopy_from_numpy(np.unique(np.random.randint(300, size=100, dtype=dtype)))
