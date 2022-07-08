@@ -8,6 +8,8 @@ import numbers
 import itertools
 import networkx as nx
 import numpy as np
+import torch as th
+from typing import Dict, NamedTuple
 
 from ._ffi.function import _init_api
 from .ops import segment
@@ -6460,5 +6462,27 @@ def _create_compute_graph(graph, u, v, eid, recv_nodes=None):
     return DGLHeteroGraph(hgidx, ([srctype], [dsttype]), [etype],
                           node_frames=[srcframe, dstframe],
                           edge_frames=[eframe]), unique_src, unique_dst, eid
+
+
+class DGLHeteroGraphData(NamedTuple):
+    """Class for storing both graph structure with node/edge feature data and
+    graph-level features.
+
+    TODO (Krzysztof): Describe how it can be used for dataloading etc.
+
+    Parameters
+    ----------
+    graph : DGLGraph
+        Graph structure with node/edge feature data.
+    labels : Dict[str, Tensor]
+        Graph-level features.
+
+    Examples
+    --------
+    TODO (Krzysztof): Write some examples with dataloading.
+    """
+    graph: DGLHeteroGraph
+    labels: Dict[str, th.Tensor]
+
 
 _init_api("dgl.heterograph")
