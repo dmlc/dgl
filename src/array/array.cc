@@ -553,10 +553,9 @@ COOMatrix CSRRowWiseSampling(
       ret = impl::CSRRowWiseSamplingUniform<XPU, IdType>(mat, rows, num_samples, replace);
     });
   } else {
-    ATEN_CSR_SWITCH(mat, XPU, IdType, "CSRRowWiseSampling", {
+    ATEN_CSR_SWITCH_CUDA_UVA(mat, rows, XPU, IdType, "CSRRowWiseSampling", {
       ATEN_FLOAT_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
-        ret = impl::CSRRowWiseSampling<XPU, IdType, FloatType>(
-            mat, rows, num_samples, prob, replace);
+        ret = impl::CSRRowWiseSampling<XPU, IdType, FloatType>(mat, rows, num_samples, prob, replace);
       });
     });
   }
