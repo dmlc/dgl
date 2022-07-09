@@ -29,13 +29,15 @@ DGL_REGISTER_GLOBAL("rng._CAPI_SetSeed")
       }
     });
 #ifdef DGL_USE_CUDA
-    auto* thr_entry = CUDAThreadEntry::ThreadLocal();
-    if (!thr_entry->curand_gen) {
-      CURAND_CALL(curandCreateGenerator(&thr_entry->curand_gen, CURAND_RNG_PSEUDO_DEFAULT));
+    if (DeviceAPI::Get(kDLGPU)->IsAvailable()) {
+      auto* thr_entry = CUDAThreadEntry::ThreadLocal();
+      if (!thr_entry->curand_gen) {
+        CURAND_CALL(curandCreateGenerator(&thr_entry->curand_gen, CURAND_RNG_PSEUDO_DEFAULT));
+      }
+      CURAND_CALL(curandSetPseudoRandomGeneratorSeed(
+          thr_entry->curand_gen,
+          static_cast<uint64_t>(seed)));
     }
-    CURAND_CALL(curandSetPseudoRandomGeneratorSeed(
-        thr_entry->curand_gen,
-        static_cast<uint64_t>(seed)));
 #endif  // DGL_USE_CUDA
   });
 

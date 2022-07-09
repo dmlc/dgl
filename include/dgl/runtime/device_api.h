@@ -45,6 +45,12 @@ class DeviceAPI {
   /*! \brief virtual destructor */
   virtual ~DeviceAPI() {}
   /*!
+   * \brief Check whether the device is available.
+   */
+  virtual bool IsAvailable() {
+    return true;
+  }
+  /*!
    * \brief Set the environment device id to ctx
    * \param ctx The context to be set.
    */
