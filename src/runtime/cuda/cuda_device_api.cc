@@ -15,6 +15,23 @@ namespace runtime {
 
 class CUDADeviceAPI final : public DeviceAPI {
  public:
+  CUDADeviceAPI() {
+    int count;
+    auto err = cudaGetDeviceCount(&count);
+    switch (err) {
+      case cudaSuccess:
+        break;
+      default:
+        count = 0;
+        cudaGetLastError();
+    }
+    is_available_ = count > 0;
+  }
+
+  bool IsAvailable() final {
+    return is_available_;
+  }
+
   void SetDevice(DGLContext ctx) final {
     CUDA_CALL(cudaSetDevice(ctx.device_id));
   }
