@@ -1,4 +1,4 @@
---find-links https://download.pytorch.org/whl/lts/1.8/torch_lts.html
+--find-links https://download.pytorch.org/whl/torch
 torch==1.9.0+cu111
 torchvision==0.10.0+cu111
 pytest
