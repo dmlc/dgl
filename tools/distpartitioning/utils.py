@@ -8,7 +8,7 @@ import constants
 import pyarrow
 from pyarrow import csv
 
-def read_partitions_file(part_file):
+def read_partitions_file(part_file, cimode):
     """
     Utility method to read metis partitions, which is the output of 
     pm_dglpart2
@@ -27,12 +27,18 @@ def read_partitions_file(part_file):
     numpy array
         array of part_ids and the idx is the <global_nid>
     """
+    if(cimode):
+        np.random.seed(0)
+        arr = np.random.random_integers(0, 1, size=(constants.CI_GRAPH_NUM_NODES))
+        print(arr)
+        return arr
+
     partitions_map = np.loadtxt(part_file, delimiter=' ', dtype=np.int64)
     #as a precaution sort the lines based on the <global_nid>
     partitions_map = partitions_map[partitions_map[:,0].argsort()]
     return partitions_map[:,1]
 
-def read_json(json_file):
+def read_json(json_file, cimode):
     """
     Utility method to read a json file schema
     
@@ -45,6 +51,9 @@ def read_json(json_file):
     --------
     dictionary, as serialized in the json_file
     """
+    if(cimode):
+        return json.loads(constants.CI_JSON_STRING)
+
     with open(json_file) as schema:
         val = json.load(schema)
 
@@ -169,7 +178,7 @@ def get_ntypes_map(node_tids):
 
     return ntypes_gid_range, node_type_id_count
 
-def write_metadata_json(metadata_list, output_dir, graph_name):
+def write_metadata_json(metadata_list, output_dir, graph_name, cimode):
     """
     Merge json schema's from each of the rank's on rank-0. 
     This utility function, to be used on rank-0, to create aggregated json file.
@@ -217,8 +226,13 @@ def write_metadata_json(metadata_list, output_dir, graph_name):
     for i in range(len(metadata_list)):
         graph_metadata["part-{}".format(i)] = metadata_list[i]["part-{}".format(i)]
 
-    with open('{}/{}.json'.format(output_dir, graph_name), 'w') as outfile: 
-        json.dump(graph_metadata, outfile, sort_keys=True, indent=4)
+    if (cimode == False):
+        with open('{}/{}.json'.format(output_dir, graph_name), 'w') as outfile:
+            json.dump(graph_metadata, outfile, sort_keys=True, indent=4)
+        return None
+    else:
+        return graph_metadata
+
 
 def augment_edge_data(edge_data, part_ids, edge_tids, rank, world_size):
     """

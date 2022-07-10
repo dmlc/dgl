@@ -19,6 +19,7 @@ from gloo_wrapper import alltoall_cpu_object_lst, alltoallv_cpu, \
 from globalids import assign_shuffle_global_nids_nodes, \
                     assign_shuffle_global_nids_edges, get_shuffle_global_nids_edges
 from convert_partition import create_dgl_object, create_metadata_json, validateDGLObjects
+from verify_ci_tests import verify_ci_partitions
 
 def gen_node_data(rank, world_size, node_part_ids, ntid_cnt_map, ntid_ntype_map, nid_schema_map):
     '''
@@ -359,7 +360,7 @@ def read_dataset(rank, world_size, node_part_ids, params):
     """
     edge_features = {}
     node_tids, node_features, node_feat_tids, edge_data, edge_tids = \
-        get_dataset(params.input_dir, params.graph_name, rank, world_size, schema_map)
+        get_dataset(params.input_dir, params.graph_name, rank, world_size, schema_map, params.ci_mode)
 
     augment_edge_data(edge_data, node_part_ids, prefix_sum_edges[rank])
     print('[Rank: ', rank, '] Done augmenting edge_data: ', len(edge_data), edge_data[constants.GLOBAL_SRC_ID].shape)
@@ -414,8 +415,8 @@ def gen_dist_partitions(rank, world_size, params):
     print('[Rank: ', rank, '] Starting distributed data processing pipeline...')
 
     #init processing
-    node_part_ids = read_partitions_file(params.input_dir+'/'+params.partitions_file)
-    schema_map = read_json(params.input_dir+'/'+params.schema)
+    node_part_ids = read_partitions_file(params.input_dir+'/'+params.partitions_file, params.ci_mode)
+    schema_map = read_json(params.input_dir+'/'+params.schema, params.ci_mode)
     ntypes_map, ntypes, ntypeid_ntypes_map = get_node_types(schema_map)
     print('[Rank: ', rank, '] Initialized metis partitions and node_types map...')
 
@@ -486,7 +487,8 @@ def gen_dist_partitions(rank, world_size, params):
         #get meta-data from all partitions and merge them on rank-0
         metadata_list = gather_metadata_json(json_metadata, rank, world_size)
         metadata_list[0] = json_metadata
-        write_metadata_json(metadata_list, params.output, params.graph_name)
+        json_metadata = write_metadata_json(metadata_list, params.output, params.graph_name, params.ci_mode)
+        verify_ci_partitions(graph_obj, rcvd_node_features, edge_features, json_metadata, rank, world_size)
     else:
         #send meta-data to Rank-0 process
         gather_metadata_json(json_metadata, rank, world_size)

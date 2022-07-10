@@ -18,6 +18,7 @@ def log_params(params):
     print('Output Dir: ', params.output)
     print('WorldSize: ', params.world_size)
     print('Metis partitions: ', params.partitions_file)
+    print('CI-Mode: ', params.ci_mode)
 
 if __name__ == "__main__":
     """ 
@@ -42,6 +43,10 @@ if __name__ == "__main__":
                     default=1, type=int, required=True)
     parser.add_argument('--partitions-file', help='filename of the output of dgl_part2 (metis partitions)',
                     default=None, type=str)
+
+    #argument for ci test cases
+    parser.add_argument('--ci-mode', help='Support for CI framework', default=False, type=bool, required=False)
+
     params = parser.parse_args()
 
     #invoke the pipeline function
