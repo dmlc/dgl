@@ -141,7 +141,6 @@ def get_ntypes_map(node_tids):
         are the node_type and value is a list of lists. Each individual entry in this list has
         three items: file-name, starting type_nid and ending type_nid
 
-
     Returns:
     --------
     dictionary : 
@@ -157,17 +156,7 @@ def get_ntypes_map(node_tids):
         ntypes_gid_range[k] = [offset + int(v[0][0]), offset + int(v[-1][1])]
         offset += int(v[-1][1])
 
-    node_type_id_count = {}
-    ntypes = []
-    for k in node_tids.keys(): 
-        ntypes.append(k)
-
-    idx = 0
-    for k, v in node_tids.items(): 
-        node_type_id_count[ str(idx) ] = int(v[-1][1])
-        idx += 1
-
-    return ntypes_gid_range, node_type_id_count
+    return ntypes_gid_range
 
 def write_metadata_json(metadata_list, output_dir, graph_name):
     """
@@ -375,7 +364,6 @@ def write_dgl_objects(graph_obj, node_features, edge_features, output_dir, part_
 
     part_dir = output_dir + '/part' + str(part_id)
     os.makedirs(part_dir, exist_ok=True)
-    #write_graph_dgl(os.path.join(part_dir ,'part'+str(part_id)), graph_obj)
     write_graph_dgl(os.path.join(part_dir ,'graph.dgl'), graph_obj)
 
     if node_features != None:

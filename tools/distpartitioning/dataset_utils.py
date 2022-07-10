@@ -3,7 +3,7 @@ import numpy as np
 import constants
 import torch
 
-def get_dataset(input_dir, graph_name, rank, num_node_weights):
+def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
     """
     Function to read the multiple file formatted dataset. 
 

@@ -18,6 +18,36 @@ def create_dgl_object(graph_name, num_parts, \
     This function creates dgl objects for a given graph partition, as in function
     arguments. 
 
+    The input schema object is structure as follows: 
+    1. "nid" is a dictionary, which has the following structure. 
+        "ntype-name" : {
+            "format" : "csv", 
+            "data" : [
+                    [ <path-to-file>/ntype0-name-0, start_id, end_id], 
+                    [ <path-to-file>/ntype0-name-1 start_id, end_id)
+            ]
+        }
+
+    2. "eid" is a dictionary, which has the following structure
+        "etype-name" : {
+            "format" : "csv", 
+            "data" : [
+                    [ <path-to-file>/ntype0-name-0, start_id, end_id], 
+                    [ <path-to-file>/ntype0-name-1 start_id, end_id)
+            ]
+        }
+
+    The "nid" value is a dictionary, which described the type_nid that
+    should be assigned to nodes which are read from the corresponding nodes file. 
+
+    Similarly, compared to "nid" dictionary, "eid" dictionary is structure as well. 
+
+    Now, we can easily extract the type_nid's for the nodes in the associated entry.
+    global_ranges dictionary is built by using the type_nid's for a given node-type 
+    and by using type_eids for a given edge_type we can construct global_eid_ranges, 
+    as shown in this function. 
+
+
     Parameters:
     -----------
     graph_name : string
@@ -38,8 +68,6 @@ def create_dgl_object(graph_name, num_parts, \
         offset to be used when assigning node global ids in the current partition
     edgeid_offset : int
         offset to be used when assigning edge global ids in the current partition
-
-    return compact_g2, node_map_val, edge_map_val, ntypes_map, etypes_map
 
     Returns: 
     --------
