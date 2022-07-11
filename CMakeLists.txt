@@ -47,17 +47,9 @@ if(USE_CUDA)
   message(STATUS "Build with CUDA support")
   project(dgl C CXX)
   include(cmake/modules/CUDA.cmake)
-  if ((CUDA_VERSION_MAJOR LESS 11) OR
-      ((CUDA_VERSION_MAJOR EQUAL 11) AND (CUDA_VERSION_MINOR EQUAL 0)))
-    # For cuda<11, use external CUB/Thrust library because CUB is not part of CUDA.
-    # For cuda==11.0, use external CUB/Thrust library because there is a bug in the
-    #   official CUB library which causes invalid device ordinal error for DGL. The bug
-    #   is fixed by https://github.com/NVIDIA/cub/commit/9143e47e048641aa0e6ddfd645bcd54ff1059939
-    #   in 11.1.
-    message(STATUS "Detected CUDA of version ${CUDA_VERSION}. Use external CUB/Thrust library.")
-    cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/thrust")
-    cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/cub")
-  endif()
+  message(STATUS "Use external CUB/Thrust library for a consistent API and performance.")
+  cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/thrust")
+  cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/cub")
 endif(USE_CUDA)
 
 # initial variables

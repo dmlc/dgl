@@ -13,6 +13,9 @@
 #include "../../array/cuda/atomic.cuh"
 #include "../../runtime/cuda/cuda_common.h"
 
+// require CUB 1.17 to use DeviceSegmentedSort
+static_assert(CUB_VERSION == 101700);
+
 using namespace dgl::aten::cuda;
 
 namespace dgl {
@@ -582,7 +585,7 @@ COOMatrix CSRRowWiseSampling(CSRMatrix mat,
 
     void *d_temp_storage = nullptr;
     size_t temp_storage_bytes = 0;
-    CUDA_CALL(cub::DeviceSegmentedRadixSort::SortPairsDescending(
+    CUDA_CALL(cub::DeviceSegmentedSort::SortPairsDescending(
       d_temp_storage,
       temp_storage_bytes,
       sort_keys,
@@ -592,7 +595,7 @@ COOMatrix CSRRowWiseSampling(CSRMatrix mat,
       temp_ptr,
       temp_ptr + 1));
     d_temp_storage = device->AllocWorkspace(ctx, temp_storage_bytes);
-    CUDA_CALL(cub::DeviceSegmentedRadixSort::SortPairsDescending(
+    CUDA_CALL(cub::DeviceSegmentedSort::SortPairsDescending(
       d_temp_storage,
       temp_storage_bytes,
       sort_keys,
@@ -604,7 +607,6 @@ COOMatrix CSRRowWiseSampling(CSRMatrix mat,
     device->FreeWorkspace(ctx, d_temp_storage);
     device->FreeWorkspace(ctx, temp);
     device->FreeWorkspace(ctx, sort_temp);
-    device->FreeWorkspace(ctx, temp_idxs);
 
     // select tok-num_picks as results
     CUDA_KERNEL_CALL(
@@ -618,10 +620,11 @@ COOMatrix CSRRowWiseSampling(CSRMatrix mat,
         data,
         out_ptr,
         temp_ptr,
-        sort_temp_idxs,
+        sort_values.Current(),
         out_rows,
         out_cols,
         out_idxs);
+    device->FreeWorkspace(ctx, temp_idxs);
     device->FreeWorkspace(ctx, sort_temp_idxs);
   }
 
