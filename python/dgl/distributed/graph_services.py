@@ -1,6 +1,7 @@
 """A set of graph services of getting subgraphs from DistGraph"""
 from collections import namedtuple
 import numpy as np
+
 from .rpc import Request, Response, send_requests_to_machine, recv_responses
 from ..sampling import sample_neighbors as local_sample_neighbors
 from ..sampling import sample_etype_neighbors as local_sample_etype_neighbors
@@ -79,6 +80,7 @@ def _sample_etype_neighbors(local_g, partition_book, seed_nodes, etype_field,
     """
     local_ids = partition_book.nid2localnid(seed_nodes, partition_book.partid)
     local_ids = F.astype(local_ids, local_g.idtype)
+
     sampled_graph = local_sample_etype_neighbors(
         local_g, local_ids, etype_field, fan_out, edge_dir, prob, replace,
         etype_sorted=etype_sorted, _dist_training=True)
@@ -163,7 +165,7 @@ class SamplingRequestEtype(Request):
     """Sampling Request"""
 
     def __init__(self, nodes, etype_field, fan_out, edge_dir='in',
-                    prob=None, replace=False, etype_sorted=False):
+                    prob=None, replace=False, etype_sorted=True):
         self.seed_nodes = nodes
         self.edge_dir = edge_dir
         self.prob = prob
@@ -420,7 +422,7 @@ def _frontier_to_heterogeneous_graph(g, frontier, gpb):
     return hg
 
 def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in',
-                            prob=None, replace=False, etype_sorted=False):
+                            prob=None, replace=False, etype_sorted=True):
     """Sample from the neighbors of the given nodes from a distributed graph.
 
     For each node, a number of inbound (or outbound when ``edge_dir == 'out'``) edges

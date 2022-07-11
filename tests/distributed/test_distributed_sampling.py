@@ -19,10 +19,10 @@ from dgl.distributed import DistGraphServer, DistGraph
 
 
 def start_server(rank, tmpdir, disable_shared_mem, graph_name, graph_format=['csc', 'coo'],
-                 sort_etypes=None, keep_alive=False):
+                 keep_alive=False):
     g = DistGraphServer(rank, "rpc_ip_config.txt", 1, 1,
                         tmpdir / (graph_name + '.json'), disable_shared_mem=disable_shared_mem,
-                        graph_format=graph_format, sort_etypes=sort_etypes, keep_alive=keep_alive)
+                        graph_format=graph_format, keep_alive=keep_alive)
     g.start()
 
 
@@ -462,7 +462,7 @@ def check_rpc_hetero_sampling_empty_shuffle(tmpdir, num_server):
     assert block.number_of_edges() == 0
     assert len(block.etypes) == len(g.etypes)
 
-def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server, sort_etypes=None):
+def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server, etype_sorted=False):
     generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
     g = create_random_hetero(dense=True)
@@ -475,7 +475,7 @@ def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server, sort_etypes=None
     pserver_list = []
     ctx = mp.get_context('spawn')
     for i in range(num_server):
-        p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1, 'test_sampling', ['csc', 'coo'], sort_etypes))
+        p = ctx.Process(target=start_server, args=(i, tmpdir, num_server > 1, 'test_sampling', ['csc', 'coo']))
         p.start()
         time.sleep(1)
         pserver_list.append(p)
@@ -483,7 +483,7 @@ def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server, sort_etypes=None
     fanout = 3
     block, gpb = start_hetero_etype_sample_client(0, tmpdir, num_server > 1, fanout,
                                                   nodes={'n3': [0, 10, 99, 66, 124, 208]},
-                                                  etype_sorted=sort_etypes == 'csc')
+                                                  etype_sorted=etype_sorted)
     print("Done sampling")
     for p in pserver_list:
         p.join()
@@ -834,7 +834,7 @@ def test_rpc_sampling_shuffle(num_server):
         check_rpc_hetero_sampling_shuffle(Path(tmpdirname), num_server)
         check_rpc_hetero_sampling_empty_shuffle(Path(tmpdirname), num_server)
         check_rpc_hetero_etype_sampling_shuffle(Path(tmpdirname), num_server)
-        check_rpc_hetero_etype_sampling_shuffle(Path(tmpdirname), num_server, sort_etypes='csc')
+        check_rpc_hetero_etype_sampling_shuffle(Path(tmpdirname), num_server, etype_sorted=True)
         check_rpc_hetero_etype_sampling_empty_shuffle(Path(tmpdirname), num_server)
         check_rpc_bipartite_sampling_empty(Path(tmpdirname), num_server)
         check_rpc_bipartite_sampling_shuffle(Path(tmpdirname), num_server)

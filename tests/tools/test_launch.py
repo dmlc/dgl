@@ -180,7 +180,6 @@ def test_submit_jobs():
         args.keep_alive = False
         args.num_server_threads = 1
         args.graph_format = 'csc'
-        args.sort_etypes = 'csc'
         args.extra_envs = ["NCCL_DEBUG=INFO"]
         args.num_omp_threads = 1
         udf_command = "python3 train_dist.py --num_epochs 10"
@@ -210,7 +209,6 @@ def test_submit_jobs():
             assert 'DGL_ROLE=server' in cmd
             assert 'DGL_KEEP_ALIVE=0' in cmd
             assert 'DGL_SERVER_ID=' in cmd
-            assert f'DGL_SORT_ETYPES={args.sort_etypes}' in cmd
 
 
 if __name__ == '__main__':

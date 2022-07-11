@@ -4,7 +4,6 @@ from collections.abc import MutableMapping
 from collections import namedtuple
 
 import os
-import time
 import numpy as np
 
 from ..heterograph import DGLHeteroGraph
@@ -310,11 +309,6 @@ class DistGraphServer(KVServer):
         Disable shared memory.
     graph_format : str or list of str
         The graph formats.
-    sort_etypes : str, optional
-        If specified, sort the internal CSR or CSC format of the loaded
-        graph by edge type. Valid choices: ``"csr"``, ``"csc"``.
-        See :func:`dgl.sort_csr_by_tag` or :func:`dgl.sort_csc_by_tag`.
-        Default is ``None``.
     keep_alive : bool
         Whether to keep server alive when clients exit
     net_type : str
@@ -322,8 +316,8 @@ class DistGraphServer(KVServer):
     '''
     def __init__(self, server_id, ip_config, num_servers,
                  num_clients, part_config, disable_shared_mem=False,
-                 graph_format=('csc', 'coo'), sort_etypes=None,
-                 keep_alive=False, net_type='socket'):
+                 graph_format=('csc', 'coo'), keep_alive=False,
+                 net_type='socket'):
         super(DistGraphServer, self).__init__(server_id=server_id,
                                               ip_config=ip_config,
                                               num_servers=num_servers,
@@ -338,26 +332,23 @@ class DistGraphServer(KVServer):
             self.gpb, graph_name, ntypes, etypes = load_partition_book(part_config, self.part_id)
             self.client_g = None
         else:
-            tic = time.time()
             # Loading of node/edge_feats are deferred to lower the peak memory consumption.
             self.client_g, _, _, self.gpb, graph_name, \
                     ntypes, etypes = load_partition(part_config, self.part_id, load_feats=False)
             print('load ' + graph_name)
-            print("Loading part~{} takes {} seconds whose num_nodes~{} and num_edges~{}.".format(
-                self.part_id, time.time()-tic, self.client_g.num_nodes(), self.client_g.num_edges()))
             # Create the graph formats specified the users.
-            tic = time.time()
             self.client_g = self.client_g.formats(graph_format)
             self.client_g.create_formats_()
-            print("Creating formats takes {} seconds".format(time.time() - tic))
-            tic = time.time()
-            if sort_etypes == 'csr':
-                self.client_g = sort_csr_by_tag(
-                    self.client_g, tag=self.client_g.edata[ETYPE], tag_type='edge')
-            elif sort_etypes == 'csc':
-                self.client_g = sort_csc_by_tag(
-                    self.client_g, tag=self.client_g.edata[ETYPE], tag_type='edge')
-            print("Sorting takes {} seconds.".format(time.time() - tic))
+            # Sort underlying matrix beforehand to avoid runtime overhead during sampling.
+            '''
+            if len(etypes) > 1:
+                if 'csr' in graph_format:
+                    self.client_g = sort_csr_by_tag(
+                        self.client_g, tag=self.client_g.edata[ETYPE], tag_type='edge')
+                if 'csc' in graph_format:
+                    self.client_g = sort_csc_by_tag(
+                        self.client_g, tag=self.client_g.edata[ETYPE], tag_type='edge')
+            '''
             if not disable_shared_mem:
                 self.client_g = _copy_graph_to_shared_mem(self.client_g, graph_name, graph_format)
 
@@ -1263,10 +1254,8 @@ class DistGraph:
         self._client.barrier()
 
     def sample_neighbors(self, seed_nodes, fanout, edge_dir='in', prob=None,
-                         exclude_edges=None, replace=False,
+                         exclude_edges=None, replace=False, etype_sorted=True,
                          output_device=None):
-        # For debug only
-        etype_sorted = 'RYING_TEST' in os.environ and (self._gpb.partid == 0)
         # pylint: disable=unused-argument
         """Sample neighbors from a distributed graph."""
         # Currently prob, exclude_edges, output_device, and edge_dir are ignored.
