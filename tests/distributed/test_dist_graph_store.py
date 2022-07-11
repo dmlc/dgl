@@ -35,6 +35,15 @@ def run_server(graph_name, server_id, server_count, num_clients, shared_mem, kee
                         disable_shared_mem=not shared_mem,
                         graph_format=['csc', 'coo'], keep_alive=keep_alive)
     print('start server', server_id)
+    # verify dtype of underlying graph
+    cg = g.client_g
+    for k, dtype in dgl.distributed.dist_graph.FIELD_DICT.items():
+        if k in cg.ndata:
+            assert F.dtype(
+                cg.ndata[k]) == dtype, "Data type of {} in ndata should be {}.".format(k, dtype)
+        if k in cg.edata:
+            assert F.dtype(
+                cg.edata[k]) == dtype, "Data type of {} in edata should be {}.".format(k, dtype)
     g.start()
 
 def emb_init(shape, dtype):
