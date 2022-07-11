@@ -69,14 +69,48 @@ class TensorDispatcher {
 
   /*!
    * \brief Allocate an empty tensor.
-   *
    * Used in NDArray::Empty().
+
+   * \param shape The shape
+   * \param dtype The data type
+   * \param ctx The device
+   * \return An empty NDArray.
    */
   inline NDArray Empty(std::vector<int64_t> shape, DLDataType dtype, DLContext ctx) const {
     auto entry = entrypoints_[Op::kEmpty];
     auto result = FUNCCAST(tensoradapter::TAempty, entry)(shape, dtype, ctx);
     return NDArray::FromDLPack(result);
   }
+
+#ifdef DGL_USE_CUDA
+  /*!
+  * \brief Allocate a piece of GPU memory via
+  * PyTorch's THCCachingAllocator.
+  * Used in CUDADeviceAPI::AllocWorkspace().
+  * 
+  * \note THCCachingAllocator specify the device to allocate on
+  * via cudaGetDevice(). Make sure to call cudaSetDevice()
+  * before invoking this function.
+  *
+  * \param nbytes The size to be allocated.
+  * \return Pointer to the allocated memory.
+  */
+  inline void* AllocWorkspace(size_t nbytes) {
+    auto entry = entrypoints_[Op::kRawAlloc];
+    return FUNCCAST(tensoradapter::RawAlloc, entry)(nbytes);
+  }
+
+  /*!
+  * \brief Free the GPU memory.
+  * Used in CUDADeviceAPI::FreeWorkspace().
+  *
+  * \param ptr Pointer to the memory to be freed.
+  */
+  inline void FreeWorkspace(void* ptr) {
+    auto entry = entrypoints_[Op::kRawDelete];
+    FUNCCAST(tensoradapter::RawDelete, entry)(ptr);
+  }
+#endif  // DGL_USE_CUDA
 
  private:
   /*! \brief ctor */
@@ -91,19 +125,33 @@ class TensorDispatcher {
    */
   static constexpr const char *names_[] = {
     "TAempty",
+#ifdef DGL_USE_CUDA
+    "RawAlloc",
+    "RawDelete",
+#endif  // DGL_USE_CUDA
   };
 
   /*! \brief Index of each function to the symbol list */
   class Op {
    public:
     static constexpr int kEmpty = 0;
+#ifdef DGL_USE_CUDA
+    static constexpr int kRawAlloc = 1;
+    static constexpr int kRawDelete = 2;
+#endif  // DGL_USE_CUDA
   };
 
   /*! \brief Number of functions */
   static constexpr int num_entries_ = sizeof(names_) / sizeof(names_[0]);
 
   /*! \brief Entrypoints of each function */
-  void* entrypoints_[num_entries_] = {nullptr};
+  void* entrypoints_[num_entries_] = {
+    nullptr,
+#ifdef DGL_USE_CUDA
+    nullptr,
+    nullptr,
+#endif  // DGL_USE_CUDA
+  };
 
   bool available_ = false;
 #if defined(WIN32) || defined(_WIN32)

@@ -4,7 +4,7 @@
  * \brief GPU specific API
  */
 #include <dgl/runtime/device_api.h>
-
+#include <dgl/runtime/tensordispatch.h>
 #include <dmlc/thread_local.h>
 #include <dgl/runtime/registry.h>
 #include <cuda_runtime.h>
@@ -15,6 +15,23 @@ namespace runtime {
 
 class CUDADeviceAPI final : public DeviceAPI {
  public:
+  CUDADeviceAPI() {
+    int count;
+    auto err = cudaGetDeviceCount(&count);
+    switch (err) {
+      case cudaSuccess:
+        break;
+      default:
+        count = 0;
+        cudaGetLastError();
+    }
+    is_available_ = count > 0;
+  }
+
+  bool IsAvailable() final {
+    return is_available_;
+  }
+
   void SetDevice(DGLContext ctx) final {
     CUDA_CALL(cudaSetDevice(ctx.device_id));
   }
@@ -224,11 +241,21 @@ class CUDADeviceAPI final : public DeviceAPI {
   }
 
   void* AllocWorkspace(DGLContext ctx, size_t size, DGLType type_hint) final {
-    return CUDAThreadEntry::ThreadLocal()->pool.AllocWorkspace(ctx, size);
+    // Redirect to PyTorch's allocator when available.
+    SetDevice(ctx);
+    TensorDispatcher* td = TensorDispatcher::Global();
+    if (td->IsAvailable())
+      return td->AllocWorkspace(size);
+    else
+      return CUDAThreadEntry::ThreadLocal()->pool.AllocWorkspace(ctx, size);
   }
 
   void FreeWorkspace(DGLContext ctx, void* data) final {
-    CUDAThreadEntry::ThreadLocal()->pool.FreeWorkspace(ctx, data);
+    TensorDispatcher* td = TensorDispatcher::Global();
+    if (td->IsAvailable())
+      td->FreeWorkspace(data);
+    else
+      CUDAThreadEntry::ThreadLocal()->pool.FreeWorkspace(ctx, data);
   }
 
   static const std::shared_ptr<CUDADeviceAPI>& Global() {
