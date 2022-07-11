@@ -336,6 +336,17 @@ class DistGraphServer(KVServer):
             self.client_g, _, _, self.gpb, graph_name, \
                     ntypes, etypes = load_partition(part_config, self.part_id, load_feats=False)
             print('load ' + graph_name)
+            # formatting dtype
+            # TODO(Rui) Formatting forcely is not a perfect solution.
+            #   We'd better store all dtypes when mapping to shared memory
+            #   and map back with original dtypes.
+            for k, dtype in FIELD_DICT.items():
+                if k in self.client_g.ndata:
+                    self.client_g.ndata[k] = F.astype(
+                        self.client_g.ndata[k], dtype)
+                if k in self.client_g.edata:
+                    self.client_g.edata[k] = F.astype(
+                        self.client_g.edata[k], dtype)
             # Create the graph formats specified the users.
             self.client_g = self.client_g.formats(graph_format)
             self.client_g.create_formats_()
