@@ -29,7 +29,7 @@ def _save_partitioned(arr, num_partitions, output_path):
         logging.info('Saving %d-%d to %s' % (start, end, part_path))
         with logging_redirect_tqdm():
             for j in tqdm.trange(0, end - start, 100000):
-                j_end = min(end, j + 100000)
+                j_end = min(end - start, j + 100000)
                 outbuf[j:j_end] = arr[j + start:j_end + start]
         new_offsets.append((os.path.abspath(part_path), start, end))
     return new_offsets
