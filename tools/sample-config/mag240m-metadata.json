@@ -27,5 +27,17 @@
 				"path": "mag240m_kddcup2021/processed/paper/node_year.npy"
 			}
 		}
+	},
+	"edge_data": {
+		"cites": {
+			"count": {
+				"path": "mag240m_kddcup2021/processed/paper___cites___paper/count.npy"
+			}
+		},
+		"writes": {
+			"year": {
+				"path": "mag240m_kddcup2021/processed/author___writes___paper/year.npy"
+			}
+		}
 	}
 }

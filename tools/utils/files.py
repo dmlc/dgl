@@ -1,5 +1,10 @@
 import copy
+import os
 import numpy as np
+import shutil
+import pathlib
+from contextlib import contextmanager
+import logging
 
 def get_partitioned_numpy_file_list(path):
     numpy_file_list = {}
@@ -37,20 +42,36 @@ def is_partitioned_numpy(meta):
     """Check whether a metadata properly describes a partitioned numpy array."""
     return meta.get('fmt', '') == 'partitioned-numpy'
 
-def absolutify(meta, basedir=None):
-    """Translates all path entries to absolute paths."""
-    new_meta = copy.deepcopy(meta)
-    if basedir is not None:
-        cwd = os.getcwd()
-        os.chdir(basedir)
-
-    if basedir is not None:
-        os.chdir(cwd)
-    return new_meta
-
 def np_load(path):
     if os.path.getsize(path) >= 1000000000:
         # Use mmap for files larger than 1GB
         return np.load(path, mmap_mode='r')
     else:
         return np.load(path)
+
+@contextmanager
+def setdir(path):
+    try:
+        cwd = os.getcwd()
+        logging.info('Changing directory to %s' % path)
+        logging.info('Previously: %s' % cwd)
+        os.chdir(path)
+        yield
+    finally:
+        logging.info('Restoring directory to %s' % cwd)
+        os.chdir(cwd)
+
+def copypath(src, dst):
+    logging.info('Copying from %s to %s' % (src, dst))
+    if os.path.isdir(src):
+        shutil.copytree(src, dst, dirs_exist_ok=True)
+    else:
+        dst_dir = os.path.dirname(dst)
+        os.makedirs(dst_dir, exist_ok=True)
+        shutil.copy(src, dst)
+
+def copypath_with_suffix(src, dst):
+    src_path = pathlib.Path(src)
+    dst_path = pathlib.Path(dst).with_suffix(src_path.suffix)
+    copypath(str(src_path), str(dst_path))
+    return str(dst_path)
