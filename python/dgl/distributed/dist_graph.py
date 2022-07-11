@@ -339,11 +339,11 @@ class DistGraphServer(KVServer):
             # formatting dtype
             for k, dtype in FIELD_DICT.items():
                 if k in self.client_g.ndata:
-                    self.client_g.ndata[k] = F.tensor(
-                        self.client_g.ndata[k], dtype=dtype)
+                    self.client_g.ndata[k] = F.astype(
+                        self.client_g.ndata[k], dtype)
                 if k in self.client_g.edata:
-                    self.client_g.edata[k] = F.tensor(
-                        self.client_g.edata[k], dtype=dtype)
+                    self.client_g.edata[k] = F.astype(
+                        self.client_g.edata[k], dtype)
             # Create the graph formats specified the users.
             self.client_g = self.client_g.formats(graph_format)
             self.client_g.create_formats_()
