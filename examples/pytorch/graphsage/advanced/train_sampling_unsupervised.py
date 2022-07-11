@@ -133,6 +133,7 @@ def run(proc_id, n_gpus, args, devices, data):
         # blocks.
         tic_step = time.time()
         for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(dataloader):
+            input_nodes = input_nodes.to(nfeat.device)
             batch_inputs = nfeat[input_nodes].to(device)
             pos_graph = pos_graph.to(device)
             neg_graph = neg_graph.to(device)

@@ -60,6 +60,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, queue=None):
                  ns_mode=True)
     labels = labels.to(device)
     model = model.to(device)
+    inv_target = inv_target.to(device)
     model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
 
     optimizer = th.optim.Adam(model.parameters(), lr=1e-2, weight_decay=args.wd)
