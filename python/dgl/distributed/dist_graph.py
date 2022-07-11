@@ -9,7 +9,7 @@ import numpy as np
 from ..heterograph import DGLHeteroGraph
 from ..convert import heterograph as dgl_heterograph
 from ..convert import graph as dgl_graph
-from ..transforms import compact_graphs
+from ..transforms import compact_graphs, sort_csr_by_tag, sort_csc_by_tag
 from .. import heterograph_index
 from .. import backend as F
 from ..base import NID, EID, NTYPE, ETYPE, ALL, is_all
@@ -350,6 +350,14 @@ class DistGraphServer(KVServer):
             # Create the graph formats specified the users.
             self.client_g = self.client_g.formats(graph_format)
             self.client_g.create_formats_()
+            # Sort underlying matrix beforehand to avoid runtime overhead during sampling.
+            if len(etypes) > 1:
+                if 'csr' in graph_format:
+                    self.client_g = sort_csr_by_tag(
+                        self.client_g, tag=self.client_g.edata[ETYPE], tag_type='edge')
+                if 'csc' in graph_format:
+                    self.client_g = sort_csc_by_tag(
+                        self.client_g, tag=self.client_g.edata[ETYPE], tag_type='edge')
             if not disable_shared_mem:
                 self.client_g = _copy_graph_to_shared_mem(self.client_g, graph_name, graph_format)
 
@@ -1255,14 +1263,14 @@ class DistGraph:
         self._client.barrier()
 
     def sample_neighbors(self, seed_nodes, fanout, edge_dir='in', prob=None,
-                         exclude_edges=None, replace=False,
+                         exclude_edges=None, replace=False, etype_sorted=True,
                          output_device=None):
         # pylint: disable=unused-argument
         """Sample neighbors from a distributed graph."""
         # Currently prob, exclude_edges, output_device, and edge_dir are ignored.
         if len(self.etypes) > 1:
             frontier = graph_services.sample_etype_neighbors(
-                self, seed_nodes, ETYPE, fanout, replace=replace)
+                self, seed_nodes, ETYPE, fanout, replace=replace, etype_sorted=etype_sorted)
         else:
             frontier = graph_services.sample_neighbors(
                 self, seed_nodes, fanout, replace=replace)
