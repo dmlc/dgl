@@ -91,9 +91,12 @@ def get_node_types(schema):
 
     Returns:
     --------
-    dictionary, list 
-        dictionary with ntype <-> type_nid mappings
-        list of ntype strings
+    dictionary
+        with keys as node type names and values as ids (integers)
+    list
+        list of ntype name strings
+    dictionary
+        with keys as ntype ids (integers) and values as node type names
     """
     ntype_info = schema["nid"]
     ntypes = []
@@ -103,32 +106,7 @@ def get_node_types(schema):
     ntypeid_ntype_map = {str(i): e for i, e in enumerate(ntypes)}
     return ntype_ntypeid_map, ntypes, ntypeid_ntype_map
 
-def get_edge_types(schema): 
-    """
-    schema : dictionary
-        metadata json object as a dictionary which is part of the input dataset
-        to this pipeline
-
-    Returns:
-    --------
-    dictionary: 
-        a dictionary where keys are edgetype names and values are edgetype_ids
-    list : 
-        a list of edge type names
-    """
-
-    global_eid_ranges = schema['eid']
-    global_eid_ranges = {key: np.array(global_eid_ranges[key]).reshape(1,2)
-                    for key in global_eid_ranges}
-    etypes = [(key, global_eid_ranges[key][0, 0]) for key in global_eid_ranges]
-    etypes.sort(key=lambda e: e[1])
-
-    etypes = [e[0] for e in etypes]
-    etypes_map = {e: i for i, e in enumerate(etypes)}
-
-    return etypes_map, etypes
-
-def get_ntypes_map(node_tids): 
+def get_gnid_range_map(node_tids): 
     """
     Retrieves auxiliary dictionaries from the metadata json object
 
@@ -145,9 +123,6 @@ def get_ntypes_map(node_tids):
     --------
     dictionary : 
         a dictionary where keys are node_type names and values are global_nid range, which is a tuple.
-    dictionary : 
-        a dictionary where kesy are node_type names and values are total count of nodes for this 
-        node_type
 
     """
     ntypes_gid_range = {} 
@@ -221,8 +196,6 @@ def augment_edge_data(edge_data, part_ids, edge_tids, rank, world_size):
         array of part_ids indexed by global_nid
     """
     #add global_nids to the node_data
-    #global_eids = np.arange(id_offset, id_offset + len(edge_data[constants.GLOBAL_TYPE_EID]), dtype=np.int64)
-    #edge_data[constants.GLOBAL_EID] = global_eids
     etype_offset = {}
     offset = 0
     for etype_name, tid_range in edge_tids.items(): 
@@ -231,12 +204,13 @@ def augment_edge_data(edge_data, part_ids, edge_tids, rank, world_size):
         etype_offset[etype_name] = offset + int(tid_range[0][0])
         offset += int(tid_range[-1][1])
 
-    global_eids = np.array([], dtype=np.int64)
+    global_eids = []
     for etype_name, tid_range in edge_tids.items(): 
         global_eid_start = etype_offset[etype_name]
         begin = global_eid_start + int(tid_range[rank][0])
         end = global_eid_start + int(tid_range[rank][1])
-        global_eids = np.concatenate((global_eids, np.arange(begin, end)))
+        global_eids.append(np.arange(begin, end, dtype=np.int64))
+    global_eids = np.concatenate(global_eids)
     assert global_eids.shape[0] == edge_data[constants.ETYPE_ID].shape[0]
     edge_data[constants.GLOBAL_EID] = global_eids
 

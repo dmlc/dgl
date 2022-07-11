@@ -18,35 +18,47 @@ def create_dgl_object(graph_name, num_parts, \
     This function creates dgl objects for a given graph partition, as in function
     arguments. 
 
-    The input schema object is structure as follows: 
-    1. "nid" is a dictionary, which has the following structure. 
+    The "schema" argument is a dictionary, which contains the metadata related to node ids
+    and edge ids. It contains two keys: "nid" and "eid", whose value is also a dictionary
+    with the following structure. 
+
+    1. The key-value pairs in the "nid" dictionary has the following format.
+       "ntype-name" is the user assigned name to this node type. "format" describes the 
+       format of the contents of the files. and "data" is a list of lists, each list has
+       3 elements: file-name, start_id and end_id. File-name can be either absolute or
+       relative path to this file and starting and ending ids are type ids of the nodes 
+       which are contained in this file. These type ids are later used to compute global ids
+       of these nodes which are used throughout the processing of this pipeline. 
         "ntype-name" : {
             "format" : "csv", 
             "data" : [
-                    [ <path-to-file>/ntype0-name-0, start_id, end_id], 
-                    [ <path-to-file>/ntype0-name-1 start_id, end_id)
+                    [ <path-to-file>/ntype0-name-0.csv, start_id0, end_id0], 
+                    [ <path-to-file>/ntype0-name-1.csv, start_id1, end_id1],
+                    ...
+                    [ <path-to-file>/ntype0-name-<p-1>.csv, start_id<p-1>, end_id<p-1>],
             ]
         }
 
-    2. "eid" is a dictionary, which has the following structure
+    2. The key-value pairs in the "eid" dictionary has the following format.
+       As described for the "nid" dictionary the "eid" dictionary is similarly structured
+       except that these entries are for edges. 
         "etype-name" : {
             "format" : "csv", 
             "data" : [
-                    [ <path-to-file>/ntype0-name-0, start_id, end_id], 
-                    [ <path-to-file>/ntype0-name-1 start_id, end_id)
+                    [ <path-to-file>/etype0-name-0, start_id0, end_id0], 
+                    [ <path-to-file>/etype0-name-1 start_id1, end_id1],
+                    ...
+                    [ <path-to-file>/etype0-name-1 start_id<p-1>, end_id<p-1>]
             ]
         }
 
-    The "nid" value is a dictionary, which described the type_nid that
+    In "nid" dictionary, the type_nids are specified that
     should be assigned to nodes which are read from the corresponding nodes file. 
+    Along the same lines dictionary for the key "eid" is used for edges in the 
+    input graph.
 
-    Similarly, compared to "nid" dictionary, "eid" dictionary is structure as well. 
-
-    Now, we can easily extract the type_nid's for the nodes in the associated entry.
-    global_ranges dictionary is built by using the type_nid's for a given node-type 
-    and by using type_eids for a given edge_type we can construct global_eid_ranges, 
-    as shown in this function. 
-
+    These type ids, for nodes and edges, are used to compute global ids for nodes
+    and edges which are stored in the graph object.
 
     Parameters:
     -----------

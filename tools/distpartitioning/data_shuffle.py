@@ -12,12 +12,13 @@ from timeit import default_timer as timer
 from datetime import timedelta
 from dataset_utils import get_dataset
 from utils import read_partitions_file, read_json, get_node_types, \
-                    augment_edge_data, get_ntypes_map, \
+                    augment_edge_data, get_gnid_range_map, \
                     write_dgl_objects, write_metadata_json
 from gloo_wrapper import alltoall_cpu_object_lst, alltoallv_cpu, \
                     alltoall_cpu, allgather_sizes, gather_metadata_json
 from globalids import assign_shuffle_global_nids_nodes, \
-                    assign_shuffle_global_nids_edges, get_shuffle_global_nids_edges
+                    assign_shuffle_global_nids_edges, \
+                    get_shuffle_global_nids_edges
 from convert_partition import create_dgl_object, create_metadata_json
 
 def gen_node_data(rank, world_size, node_part_ids, ntid_ntype_map, nid_schema_map):
@@ -35,15 +36,24 @@ def gen_node_data(rank, world_size, node_part_ids, ntid_ntype_map, nid_schema_ma
     node_part_ids : 
         numpy array, whose length is same as no. of nodes in the graph. Index in this array is the global_nid
         and value is the partition-id which owns the node
+        TODO: For large graphs, this mapping function can be memory intensive. This needs to be changed to 
+        processes owning a set of global-nids, per partitioning algorithm, and messaging will be used to 
+        identify the ownership instead of mem. lookups. 
     ntid_ntype_map : 
         a dictionary where keys are node_type ids and values are node_type names
     nid_schema_map: 
         a dictionary, which is extracted from the input graph metadata json file for node information, 
-        key is `nid`, which is a string. And value is a dictionary which has information about all the node types. 
+        using the key is "nid". This dictionary, as described below, has information about all the node types
+        present in the input graph.
+
         Please note that, it is assumed that for the input graph files, the nodes of a particular node-type are
         split into `p` files (because of `p` partitions to be generated). On a similar node, edges of a particular
         edge-type are split into `p` files as well. 
-        for instance, it may be something like this... 
+        For instance, a generic dictionaries for "nid" keys are as follows:
+        "ntype0-name", "ntype1-name" etc... are the user supplied names for the node types present in the input graph.
+        "format" specifies the structure of the files' content. And "data" has a value which is a list of lists. 
+        Each list has 3 entries which are file-name (including either an absolute path or relative), start and end ids
+        which are type ids of the nodes read from the corresponding files. 
 
 
             "nid" : { #m : no. of node types
@@ -55,19 +65,20 @@ def gen_node_data(rank, world_size, node_part_ids, ntid_ntype_map, nid_schema_ma
                             ...,
                             ["<path>/ntype0-name-<p-1>.txt", id_start<p-1>, id_end<p-1>]
                         ]
-                },
+                 },
 
-                ....,
-                "ntype<m-1>-name" : {
+                 ....,
+
+                 "ntype<m-1>-name" : {
                     "format" : "csv",
                     "data" : [
-                        ["<path>/user-sup-ntype<m-1>-name-0.txt", 0, id_end0],
-                        ["<path>/user-sup-ntype<m-1>-name-1.txt", id_start1, id_end1],
+                        ["<path>/ntype<m-1>-name-0.txt", 0, id_end0],
+                        ["<path>/ntype<m-1>-name-1.txt", id_start1, id_end1],
                         ...
-                        ["<path>/user-sup-ntype<m-1>-name-<p-1>.txt", id_start<p-1>, id_end<p-1>]
+                        ["<path>/ntype<m-1>-name-<p-1>.txt", id_start<p-1>, id_end<p-1>]
                     ]
-                }
-            }
+                  }
+              }
 
 
     Returns:
@@ -77,7 +88,10 @@ def gen_node_data(rank, world_size, node_part_ids, ntid_ntype_map, nid_schema_ma
         using information present in the metadata json file
 
     '''
-    local_node_data = {}
+    local_node_data = { constants.GLOBAL_NID : [], 
+                        constants.NTYPE_ID : [], 
+                        constants.GLOBAL_TYPE_NID : []
+                        }
     gnid_start = 0
     gnid_end = 0
     for ntypeid in range(len(ntid_ntype_map)):
@@ -95,24 +109,14 @@ def gen_node_data(rank, world_size, node_part_ids, ntid_ntype_map, nid_schema_ma
 
         own_tnids = np.arange(type_start, type_end, dtype=np.int64)
         own_tnids = own_tnids[cond]
-        if constants.NTYPE_ID in local_node_data:
-            local_node_data[constants.NTYPE_ID].append(np.ones(own_gnids.shape, dtype=np.int64)*ntypeid)
-        else:
-            local_node_data[constants.NTYPE_ID] = [np.ones(own_gnids.shape, dtype=np.int64)*ntypeid]
-        if constants.GLOBAL_NID in local_node_data:
-            local_node_data[constants.GLOBAL_NID].append(own_gnids)
-        else:
-            local_node_data[constants.GLOBAL_NID] = [own_gnids]
-        if constants.GLOBAL_TYPE_NID in local_node_data:
-            local_node_data[constants.GLOBAL_TYPE_NID].append(own_tnids)
-        else:
-            local_node_data[constants.GLOBAL_TYPE_NID] = [own_tnids]
+
+        local_node_data[constants.NTYPE_ID].append(np.ones(own_gnids.shape, dtype=np.int64)*ntypeid)
+        local_node_data[constants.GLOBAL_NID].append(own_gnids)
+        local_node_data[constants.GLOBAL_TYPE_NID].append(own_tnids)
         gnid_start = gnid_end
 
-    for k in [constants.NTYPE_ID, constants.GLOBAL_NID, constants.GLOBAL_TYPE_NID]:
+    for k in local_node_data.keys():
         local_node_data[k] = np.concatenate(local_node_data[k])
-
-    local_node_data[constants.OWNER_PROCESS] = np.ones(local_node_data[constants.GLOBAL_NID].shape)*rank
 
     return local_node_data
 
@@ -288,22 +292,21 @@ def exchange_node_features(rank, world_size, node_feature_tids, ntype_gnid_map, 
             output_nid_list[rank] = global_nid_per_rank[rank]
 
             #stitch node_features together to form one large feature tensor
+            own_node_features[feat_key] = []
+            own_global_nids[feat_key] = []
             for idx, x in enumerate(output_feat_list):
-                if feat_key in own_node_features:
-                    t = own_node_features[feat_key]
-                    own_node_features[feat_key] = torch.cat([t, x[feat_key]])
-                    t = own_global_nids[feat_key]
-                    own_global_nids[feat_key] = np.concatenate([t, output_nid_list[idx][feat_key]])
-                else:
-                    own_node_features[feat_key] = x[feat_key]
-                    own_global_nids[feat_key] = output_nid_list[idx][feat_key]
+                own_node_features.append(x[feat_key])
+                own_global_nids[feat_key].append(output_nid_list[idx][feat_key])
+            for k in own_node_features.keys(): 
+                own_node_features[k] = th.cat(own_node_features[k])
+                own_global_nids[k] = np.concatenate(own_global_nids[k])
 
     end = timer()
     print('[Rank: ', rank, '] Total time for node feature exchange: ', timedelta(seconds = end - start))
     return own_node_features, own_global_nids
 
 def exchange_graph_data(rank, world_size, node_features, node_feat_tids, edge_data,
-        node_part_ids, ntypes_map, ntypes_gnid_range_map, ntid_ntype_map, node_tids, schema_map):
+        node_part_ids, ntypes_map, ntypes_gnid_range_map, ntid_ntype_map, schema_map):
     """
     Wrapper function which is used to shuffle graph data on all the processes. 
 
@@ -313,12 +316,14 @@ def exchange_graph_data(rank, world_size, node_features, node_feat_tids, edge_da
         rank of the current process
     world_size : int
         total no. of participating processes. 
-    node_data : dictionary
-        dictionary where node data is stored, which is initially read from the nodes txt file mapped
-        to the current process
     node_feautres: dicitonary
         dictionry where node_features are stored and this information is read from the appropriate
         node features file which belongs to the current process
+    node_feat_tids: dictionary
+        in which keys are node-type names and values are triplets. Each triplet has node-feature name
+        and the starting and ending type ids of the node-feature data read from the corresponding
+        node feature data file read by current process. Each node type may have several features and
+        hence each key may have several triplets.
     edge_data : dictionary
         dictionary which is used to store edge information as read from the edges.txt file assigned
         to each process.
@@ -326,10 +331,12 @@ def exchange_graph_data(rank, world_size, node_features, node_feat_tids, edge_da
         numpy array which store the partition-ids and indexed by global_nids
     ntypes_map : dictionary
         mappings between node type names and node type ids
-    ntypes_nid_map : dictionary
+    ntypes_gnid_range_map : dictionary
         mapping between node type names and global_nids which belong to the keys in this dictionary
-    ntype_id_count : dictionary
+    ntid_ntype_map : dictionary
         mapping between node type id and no of nodes which belong to each node_type_id
+    schema_map : dictionary
+        is the data structure read from the metadata json file for the input graph
 
     Returns:
     --------
@@ -378,11 +385,16 @@ def read_dataset(rank, world_size, node_part_ids, params, schema_map):
     Returns : 
     ---------
     dictionary
-        node data information is read from nodes.txt and additionnal columns are added such as 
-        owner process for each node.
+        in which keys are node-type names and values are are tuples representing the range of ids
+        for nodes to be read by the current process
     dictionary
         node features which is a dictionary where keys are feature names and values are feature
         data as multi-dimensional tensors 
+    dictionary
+        in which keys are node-type names and values are triplets. Each triplet has node-feature name
+        and the starting and ending type ids of the node-feature data read from the corresponding
+        node feature data file read by current process. Each node type may have several features and
+        hence each key may have several triplets.
     dictionary
         edge data information is read from edges.txt and additional columns are added such as 
         owner process for each edge. 
@@ -400,9 +412,8 @@ def read_dataset(rank, world_size, node_part_ids, params, schema_map):
 
 def gen_dist_partitions(rank, world_size, params):
     """
-    Function which will be executed by all Gloo processes to
-    begin execution of the pipeline. This function expects the input dataset is split
-    across multiple file format. 
+    Function which will be executed by all Gloo processes to begin execution of the pipeline. 
+    This function expects the input dataset is split across multiple file format. 
 
     Input dataset and its file structure is described in metadata json file which is also part of the 
     input dataset. On a high-level, this metadata json file contains information about the following items
@@ -417,10 +428,20 @@ def gen_dist_partitions(rank, world_size, params):
      we have two features namely feat0-name and feat1-name. Please note that the node-features are also split into 
      `p` files. This will help in load-balancing during data-shuffling phase).
 
+    Terminology used to identify any particular "id" assigned to nodes, edges or node features. Prefix "global" is
+    used to indicate that this information is either read from the input dataset or autogenerated based on the information
+    read from input dataset files. Prefix "type" is used to indicate a unique id assigned to either nodes or edges. 
+    For instance, type_node_id means that a unique id, with a given node type,  assigned to a node. And prefix "shuffle" 
+    will be used to indicate a unique id, across entire graph, assigned to either a node or an edge. For instance, 
+    SHUFFLE_GLOBAL_NID means a unique id which is assigned to a node after the data shuffle is completed. 
+
     Some high-level notes on the structure of the metadata json file. 
     1. path(s) mentioned in the entries for nodes, edges and node-features files can be either absolute or relative. 
        if these paths are relative, then it is assumed that they are relative to the folder from which the execution is
        launched. 
+    2. The id_startx and id_endx represent the type_node_id and type_edge_id respectively for nodes and edge data. This 
+       means that these ids should match the no. of nodes/edges read from any given file. Since these are type_ids for 
+       the nodes and edges in any given file, their global_ids can be easily computed as well. 
 
     {
         "nid" : { #m : no. of node types
@@ -529,11 +550,11 @@ def gen_dist_partitions(rank, world_size, params):
     #send out node and edge data --- and appropriate features. 
     #this function will also stitch the data recvd from other processes
     #and return the aggregated data
-    ntypes_gnid_range_map, _ = get_ntypes_map(node_tids)
+    ntypes_gnid_range_map = get_gnid_range_map(node_tids)
     node_data, rcvd_node_features, rcvd_global_nids  = \
                     exchange_graph_data(rank, world_size, node_features, node_feat_tids, \
                                         edge_data, node_part_ids, ntypes_map, ntypes_gnid_range_map, \
-                                        ntypeid_ntypes_map, node_tids, schema_map)
+                                        ntypeid_ntypes_map, schema_map)
     print('[Rank: ', rank, '] Done with data shuffling...')
 
     #sort node_data by ntype
@@ -550,13 +571,15 @@ def gen_dist_partitions(rank, world_size, params):
     for ntype_name in ntypes:
         featnames = get_ntype_featnames(ntype_name, schema_map)
         for featname in featnames:
-            if (ntype_name+'/'+featname in rcvd_global_nids):
-                global_nids = rcvd_global_nids[ntype_name+'/'+featname]
+            #if a feature name exists for a node-type, then it should also have 
+            #feature data as well. Hence using the assert statement.
+            assert(ntype_name+'/'+featname in rcvd_global_nids)
+            global_nids = rcvd_global_nids[ntype_name+'/'+featname]
 
-                common, idx1, idx2 = np.intersect1d(node_data[constants.GLOBAL_NID], global_nids, return_indices=True)
-                shuffle_global_ids = node_data[constants.SHUFFLE_GLOBAL_NID][idx1]
-                feature_idx = shuffle_global_ids.argsort()
-                rcvd_node_features[ntype_name+'/'+featname] = rcvd_node_features[ntype_name+'/'+featname][feature_idx]
+            common, idx1, idx2 = np.intersect1d(node_data[constants.GLOBAL_NID], global_nids, return_indices=True)
+            shuffle_global_ids = node_data[constants.SHUFFLE_GLOBAL_NID][idx1]
+            feature_idx = shuffle_global_ids.argsort()
+            rcvd_node_features[ntype_name+'/'+featname] = rcvd_node_features[ntype_name+'/'+featname][feature_idx]
 
     #sort edge_data by etype
     sorted_idx = edge_data[constants.ETYPE_ID].argsort()
