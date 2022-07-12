@@ -20,8 +20,9 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
         rank of the current process
     world_size : int
         total number of process in the current execution
-    num_node_weights : int
-        integer indicating the no. of weights each node is attributed with
+    schema_map : dictionary
+        this is the dictionary created by reading the graph metadata json file
+        for the input graph dataset
 
     Return:
     -------

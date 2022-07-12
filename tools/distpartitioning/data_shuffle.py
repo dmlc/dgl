@@ -36,9 +36,6 @@ def gen_node_data(rank, world_size, node_part_ids, ntid_ntype_map, nid_schema_ma
     node_part_ids : 
         numpy array, whose length is same as no. of nodes in the graph. Index in this array is the global_nid
         and value is the partition-id which owns the node
-        TODO: For large graphs, this mapping function can be memory intensive. This needs to be changed to 
-        processes owning a set of global-nids, per partitioning algorithm, and messaging will be used to 
-        identify the ownership instead of mem. lookups. 
     ntid_ntype_map : 
         a dictionary where keys are node_type ids and values are node_type names
     nid_schema_map: 
@@ -537,6 +534,9 @@ def gen_dist_partitions(rank, world_size, params):
     print('[Rank: ', rank, '] Starting distributed data processing pipeline...')
 
     #init processing
+    #TODO: For large graphs, this mapping function can be memory intensive. This needs to be changed to 
+    #processes owning a set of global-nids, per partitioning algorithm, and messaging will be used to 
+    #identify the ownership instead of mem. lookups. 
     node_part_ids = read_partitions_file(params.input_dir+'/'+params.partitions_file)
     schema_map = read_json(params.input_dir+'/'+params.schema)
     ntypes_map, ntypes, ntypeid_ntypes_map = get_node_types(schema_map)
