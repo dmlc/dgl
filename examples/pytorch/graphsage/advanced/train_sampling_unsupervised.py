@@ -135,9 +135,7 @@ def run(proc_id, n_gpus, args, devices, data):
         for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(dataloader):
             input_nodes = input_nodes.to(nfeat.device)
             batch_inputs = nfeat[input_nodes].to(device)
-            pos_graph = pos_graph.to(device)
-            neg_graph = neg_graph.to(device)
-            blocks = [block.int().to(device) for block in blocks]
+            blocks = [block.int() for block in blocks]
             d_step = time.time()
 
             # Compute loss and prediction
