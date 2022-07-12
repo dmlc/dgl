@@ -28,7 +28,7 @@ class FlickrDataset(DGLBuiltinDataset):
     ----------
     raw_dir : str
         Raw file directory to download/contains the input data directory.
-        Default: ~/.dgl/
+        Default: ~/.dgl_vx/, where x is the version number like 0.9.0.
     force_reload : bool
         Whether to reload the dataset.
         Default: False
@@ -50,6 +50,7 @@ class FlickrDataset(DGLBuiltinDataset):
 
     Examples
     --------
+    >>> from dgl.data import FlickrDataset
     >>> dataset = FlickrDataset()
     >>> dataset.num_classes
     7
@@ -151,9 +152,9 @@ class FlickrDataset(DGLBuiltinDataset):
 
             - ``ndata['label']``: node label
             - ``ndata['feat']``: node feature
-            - ``ndata['train_mask']``： mask for training node set
+            - ``ndata['train_mask']``: mask for training node set
             - ``ndata['val_mask']``: mask for validation node set
-            - ``ndata['test_mask']:`` mask for test node set
+            - ``ndata['test_mask']``: mask for test node set
 
         """
         assert idx == 0, "This dataset has only one graph"

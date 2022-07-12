@@ -37,7 +37,7 @@ class DGLDataset(object):
         Specifying the directory that will store the
         downloaded data or the directory that
         already stores the input data.
-        Default: ~/.dgl/
+        Default: ~/.dgl_vx/, where x is the version number like 0.9.0.
     save_dir : str
         Directory to save the processed dataset.
         Default: same as raw_dir
@@ -290,7 +290,7 @@ class DGLBuiltinDataset(DGLDataset):
         Specifying the directory that will store the
         downloaded data or the directory that
         already stores the input data.
-        Default: ~/.dgl/
+        Default: ~/.dgl_vx/, where x is the version number like 0.9.0.
     hash_key : tuple
         A tuple of values as the input for the hash function.
         Users can distinguish instances (and their caches on the disk)

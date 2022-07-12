@@ -34,7 +34,7 @@ class GDELTDataset(DGLBuiltinDataset):
         Must be one of ('train', 'valid', 'test'). Default: 'train'
     raw_dir : str
         Raw file directory to download/contains the input data directory.
-        Default: ~/.dgl/
+        Default: ~/.dgl_vx/, where x is the version number like 0.9.0.
     force_reload : bool
         Whether to reload the dataset. Default: False
     verbose : bool
