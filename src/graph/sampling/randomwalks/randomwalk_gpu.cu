@@ -269,8 +269,8 @@ std::pair<IdArray, IdArray> RandomWalkBiased(
   assert(num_etypes == static_cast<int64_t>(prob.size()));
   std::unique_ptr<FloatType *[]> probs(new FloatType *[prob.size()]);
   std::unique_ptr<FloatType *[]> prob_sums(new FloatType *[prob.size()]);
-  std::vector<FloatArray> prob_sums_arr;
-  prob_sums_arr.reserve(prob.size());
+  std::vector<FloatArray> prob_sums_arr;
+  prob_sums_arr.reserve(prob.size());
 
   // graphs
   std::vector<GraphKernelData<IdType>> h_graphs(num_etypes);
@@ -282,8 +282,8 @@ std::pair<IdArray, IdArray> RandomWalkBiased(
 
     int64_t num_segments = csr.indptr->shape[0] - 1;
     probs[etype] = prob[etype].Ptr<FloatType>();
-    prob_sums_arr.push_back(FloatArray::Empty({num_segments}, prob[etype]->dtype, ctx));
-    prob_sums[etype] = prob_sums_arr[etype].Ptr<FloatType>();
+    prob_sums_arr.push_back(FloatArray::Empty({num_segments}, prob[etype]->dtype, ctx));
+    prob_sums[etype] = prob_sums_arr[etype].Ptr<FloatType>();
 
     // calculate the sum of the neighbor weights
     const IdType *d_offsets = static_cast<const IdType*>(csr.indptr->data);
