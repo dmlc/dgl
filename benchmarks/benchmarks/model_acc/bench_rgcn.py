@@ -4,134 +4,138 @@ from dgl.nn.pytorch import RelGraphConv
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+from torchmetrics.functional import accuracy
 from .. import utils
 
+
 class RGCN(nn.Module):
-    def __init__(self,
-                 num_nodes,
-                 n_hidden,
-                 num_classes,
-                 num_rels,
-                 num_bases,
-                 num_hidden_layers,
-                 dropout,
-                 low_mem):
+    def __init__(self, num_nodes, h_dim, out_dim, num_rels,
+                 regularizer="basis", num_bases=-1, dropout=0.,
+                 self_loop=False,
+                 ns_mode=False):
         super(RGCN, self).__init__()
-        self.layers = nn.ModuleList()
-        # i2h
-        self.layers.append(RelGraphConv(num_nodes, n_hidden, num_rels, "basis",
-                                        num_bases, activation=F.relu, dropout=dropout,
-                                        low_mem=low_mem))
-        # h2h
-        for i in range(num_hidden_layers):
-            self.layers.append(RelGraphConv(n_hidden, n_hidden, num_rels, "basis",
-                                            num_bases, activation=F.relu, dropout=dropout,
-                                            low_mem=low_mem))
-        # o2h
-        self.layers.append(RelGraphConv(n_hidden, num_classes, num_rels, "basis",
-                                        num_bases, activation=None, low_mem=low_mem))
 
-    def forward(self, g, h, r, norm):
-        for layer in self.layers:
-            h = layer(g, h, r, norm)
-        return h
+        if num_bases == -1:
+            num_bases = num_rels
+        self.emb = nn.Embedding(num_nodes, h_dim)
+        self.conv1 = RelGraphConv(h_dim, h_dim, num_rels, regularizer,
+                                  num_bases, self_loop=self_loop)
+        self.conv2 = RelGraphConv(
+            h_dim, out_dim, num_rels, regularizer, num_bases, self_loop=self_loop)
+        self.dropout = nn.Dropout(dropout)
+        self.ns_mode = ns_mode
 
-def evaluate(model, g, feats, edge_type, edge_norm, labels, idx):
-    model.eval()
-    with torch.no_grad():
-        logits = model(g, feats, edge_type, edge_norm)
-        logits = logits[idx]
-        _, indices = torch.max(logits, dim=1)
-        correct = torch.sum(indices == labels)
-        return correct.item() * 1.0 / len(labels) * 100
+    def forward(self, g, nids=None):
+        if self.ns_mode:
+            # forward for neighbor sampling
+            x = self.emb(g[0].srcdata[dgl.NID])
+            h = self.conv1(g[0], x, g[0].edata[dgl.ETYPE], g[0].edata['norm'])
+            h = self.dropout(F.relu(h))
+            h = self.conv2(g[1], h, g[1].edata[dgl.ETYPE], g[1].edata['norm'])
+            return h
+        else:
+            x = self.emb.weight if nids is None else self.emb(nids)
+            h = self.conv1(g, x, g.edata[dgl.ETYPE], g.edata['norm'])
+            h = self.dropout(F.relu(h))
+            h = self.conv2(g, h, g.edata[dgl.ETYPE], g.edata['norm'])
+            return h
 
-@utils.benchmark('acc')
-@utils.parametrize('data', ['aifb', 'mutag'])
-@utils.parametrize('lowmem', [True, False])
-@utils.parametrize('use_type_count', [True, False])
-def track_acc(data, lowmem, use_type_count):
-    # args
-    if data == 'aifb':
+
+def load_data(data_name, get_norm=False, inv_target=False):
+    dataset = utils.process_data(data_name)
+
+    # Load hetero-graph
+    hg = dataset[0]
+
+    num_rels = len(hg.canonical_etypes)
+    category = dataset.predict_category
+    num_classes = dataset.num_classes
+    labels = hg.nodes[category].data.pop('labels')
+    train_mask = hg.nodes[category].data.pop('train_mask')
+    test_mask = hg.nodes[category].data.pop('test_mask')
+    train_idx = torch.nonzero(train_mask, as_tuple=False).squeeze()
+    test_idx = torch.nonzero(test_mask, as_tuple=False).squeeze()
+
+    if get_norm:
+        # Calculate normalization weight for each edge,
+        # 1. / d, d is the degree of the destination node
+        for cetype in hg.canonical_etypes:
+            hg.edges[cetype].data['norm'] = dgl.norm_by_dst(
+                hg, cetype).unsqueeze(1)
+        edata = ['norm']
+    else:
+        edata = None
+
+    # get target category id
+    category_id = hg.ntypes.index(category)
+
+    g = dgl.to_homogeneous(hg, edata=edata)
+    # Rename the fields as they can be changed by for example DataLoader
+    g.ndata['ntype'] = g.ndata.pop(dgl.NTYPE)
+    g.ndata['type_id'] = g.ndata.pop(dgl.NID)
+    node_ids = torch.arange(g.num_nodes())
+
+    # find out the target node ids in g
+    loc = (g.ndata['ntype'] == category_id)
+    target_idx = node_ids[loc]
+
+    if inv_target:
+        # Map global node IDs to type-specific node IDs. This is required for
+        # looking up type-specific labels in a minibatch
+        inv_target = torch.empty((g.num_nodes(),), dtype=torch.int64)
+        inv_target[target_idx] = torch.arange(0, target_idx.shape[0],
+                                              dtype=inv_target.dtype)
+        return g, num_rels, num_classes, labels, train_idx, test_idx, target_idx, inv_target
+    else:
+        return g, num_rels, num_classes, labels, train_idx, test_idx, target_idx
+
+
+@utils.benchmark('acc', timeout=1200)
+@utils.parametrize('dataset', ['aifb', 'mutag'])
+@utils.parametrize('ns_mode', [False])
+def track_acc(dataset, ns_mode):
+    g, num_rels, num_classes, labels, train_idx, test_idx, target_idx = load_data(
+        dataset, get_norm=True)
+    num_hidden = 16
+    if dataset == 'aifb':
         num_bases = -1
         l2norm = 0.
-    elif data == 'mutag':
+    elif dataset == 'mutag':
         num_bases = 30
         l2norm = 5e-4
-    elif data == 'am':
+    elif dataset == 'am':
         num_bases = 40
         l2norm = 5e-4
     else:
         raise ValueError()
-
-    data = utils.process_data(data)
-    device = utils.get_bench_device()
-
-    g = data[0]
-
-    num_rels = len(g.canonical_etypes)
-    category = data.predict_category
-    num_classes = data.num_classes
-    train_mask = g.nodes[category].data.pop('train_mask').bool().to(device)
-    test_mask = g.nodes[category].data.pop('test_mask').bool().to(device)
-    labels = g.nodes[category].data.pop('labels').to(device)
-    
-    # calculate norm for each edge type and store in edge
-    for canonical_etype in g.canonical_etypes:
-        u, v, eid = g.all_edges(form='all', etype=canonical_etype)
-        _, inverse_index, count = torch.unique(v, return_inverse=True, return_counts=True)
-        degrees = count[inverse_index]
-        norm = 1. / degrees.float()
-        norm = norm.unsqueeze(1)
-        g.edges[canonical_etype].data['norm'] = norm
-
-    # get target category id
-    category_id = len(g.ntypes)
-    for i, ntype in enumerate(g.ntypes):
-        if ntype == category:
-            category_id = i
-
-    if use_type_count:
-        g, _, edge_type = dgl.to_homogeneous(g, edata=['norm'], return_count=True)
-        g = g.to(device)
-    else:
-        g = dgl.to_homogeneous(g, edata=['norm']).to(device)
-        edge_type = g.edata.pop(dgl.ETYPE).long()
-
-    num_nodes = g.number_of_nodes()
-    edge_norm = g.edata['norm']
-
-    # find out the target node ids in g
-    target_idx = torch.where(g.ndata[dgl.NTYPE] == category_id)[0]
-    train_idx = target_idx[train_mask]
-    test_idx = target_idx[test_mask]
-    train_labels = labels[train_mask]
-    test_labels = labels[test_mask]
-
-    # since the nodes are featureless, the input feature is then the node id.
-    feats = torch.arange(num_nodes, device=device)
-
-    # create model
-    model = RGCN(num_nodes, 
-                 16,
+    model = RGCN(g.num_nodes(),
+                 num_hidden,
                  num_classes,
                  num_rels,
-                 num_bases,
-                 0,
-                 0,
-                 lowmem).to(device)
+                 num_bases=num_bases,
+                 ns_mode=ns_mode)
+    device = utils.get_bench_device()
+    labels = labels.to(device)
+    model = model.to(device)
+    g = g.int().to(device)
 
-    optimizer = torch.optim.Adam(model.parameters(),
-                                 lr=1e-2,
-                                 weight_decay=l2norm)
+    optimizer = torch.optim.Adam(
+        model.parameters(), lr=1e-2, weight_decay=l2norm)
 
     model.train()
     for epoch in range(30):
-        logits = model(g, feats, edge_type, edge_norm)
-        loss = F.cross_entropy(logits[train_idx], train_labels)
+        logits = model(g)
+        logits = logits[target_idx]
+        loss = F.cross_entropy(logits[train_idx], labels[train_idx])
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-    acc = evaluate(model, g, feats, edge_type, edge_norm, test_labels, test_idx)
-    return acc
+    model.eval()
+    with torch.no_grad():
+        logits = model(g)
+    logits = logits[target_idx]
+    test_acc = accuracy(logits[test_idx].argmax(
+        dim=1), labels[test_idx]).item()
+
+    return test_acc
