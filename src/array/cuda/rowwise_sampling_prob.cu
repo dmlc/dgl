@@ -28,6 +28,8 @@ constexpr int BLOCK_SIZE = 128;
 
 /**
 * @brief Compute the size of each row in the sampled CSR, without replacement.
+* temp_deg is calculated for rows with deg > num_picks.
+* For these rows, we will calculate their A-Res values and sort them to get top-num_picks.
 *
 * @tparam IdType The type of node and edge indexes.
 * @param num_picks The number of non-zero entries to pick per row.
@@ -65,6 +67,7 @@ __global__ void _CSRRowWiseSampleDegreeKernel(
 
 /**
 * @brief Compute the size of each row in the sampled CSR, with replacement.
+* We need the actual in degree of each row to store CDF values.
 *
 * @tparam IdType The type of node and edge indexes.
 * @param num_picks The number of non-zero entries to pick per row.
@@ -188,7 +191,7 @@ __global__ void _CSRAResValueKernel(
 
 /**
 * @brief Perform weighted row-wise sampling on a CSR matrix, and generate a COO matrix,
-* without replacement.
+* without replacement. After sorting, we select top-num_picks items.
 *
 * @tparam IdType The ID type used for matrices.
 * @tparam FloatType The Float type used for matrices.
@@ -282,7 +285,8 @@ struct BlockPrefixCallbackOp {
 
 /**
 * @brief Perform weighted row-wise sampling on a CSR matrix, and generate a COO matrix,
-* with replacement.
+* with replacement. We store the CDF (unnormalized) of all neighbors of a row
+* in global memory and use binary search to find inverse indices as selected items.
 *
 * @tparam IdType The ID type used for matrices.
 * @tparam FloatType The Float type used for matrices.
@@ -394,7 +398,13 @@ __global__ void _CSRRowWiseSampleReplaceKernel(
 
 /**
 * @brief Perform weighted row-wise sampling on a CSR matrix, and generate a COO matrix.
-* Use CDF sampling algorithm with replacement and A-Res sampling algorithm without replacement
+* Use CDF sampling algorithm for with replacement:
+*   1) Calculate the CDF of all neighbor's prob.
+*   2) For each [0, num_picks), generate a rand ~ U(0, 1).
+*      Use binary search to find its index the CDF array as a chosen item.
+* Use A-Res sampling algorithm for without replacement:
+*   1) For rows with deg > num_picks, calculate A-Res values for all neighbors.
+*   2) Sort the A-Res array and select top-num_picks as chosen items.
 *
 * @tparam XPU The device type used for matrices.
 * @tparam IdType The ID type used for matrices.
@@ -606,7 +616,9 @@ COOMatrix CSRRowWiseSampling(CSRMatrix mat,
       temp_ptr + 1));
     device->FreeWorkspace(ctx, d_temp_storage);
     device->FreeWorkspace(ctx, temp);
+    device->FreeWorkspace(ctx, temp_idxs);
     device->FreeWorkspace(ctx, sort_temp);
+    device->FreeWorkspace(ctx, sort_temp_idxs);
 
     // select tok-num_picks as results
     CUDA_KERNEL_CALL(
@@ -624,8 +636,6 @@ COOMatrix CSRRowWiseSampling(CSRMatrix mat,
         out_rows,
         out_cols,
         out_idxs);
-    device->FreeWorkspace(ctx, temp_idxs);
-    device->FreeWorkspace(ctx, sort_temp_idxs);
   }
 
   device->FreeWorkspace(ctx, temp_ptr);
