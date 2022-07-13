@@ -305,6 +305,16 @@ def _await_or_return(x):
     else:
         return x
 
+def _record_stream(x, stream):
+    if isinstance(x, torch.Tensor):
+        x.record_stream(stream)
+        return x
+    elif isinstance(x, _PrefetchedGraphFeatures):
+        node_feats = recursive_apply(x.node_feats, _record_stream, stream)
+        edge_feats = recursive_apply(x.edge_feats, _record_stream, stream)
+        return _PrefetchedGraphFeatures(node_feats, edge_feats)
+    else:
+        return x
 
 def _prefetch(batch, dataloader, stream):
     # feats has the same nested structure of batch, except that
@@ -316,12 +326,18 @@ def _prefetch(batch, dataloader, stream):
     #
     # Once the futures are fetched, this function waits for them to complete by
     # calling its wait() method.
-    with torch.cuda.stream(stream), dgl_stream(stream):
+    current_stream = torch.cuda.current_stream()
+    current_stream.wait_stream(stream)
+    with torch.cuda.stream(stream):
         # fetch node/edge features
         feats = recursive_apply(batch, _prefetch_for, dataloader)
         feats = recursive_apply(feats, _await_or_return)
-        # transfer input nodes/seed nodes/sampled subgraph
+        feats = recursive_apply(feats, _record_stream, current_stream)
+        # transfer input nodes/seed nodes
+        # TODO(Xin): sampled subgraph is transferred in the default stream
+        # because heterograph doesn't support .record_stream() for now
         batch = recursive_apply(batch, lambda x: x.to(dataloader.device, non_blocking=True))
+        batch = recursive_apply(batch, _record_stream, current_stream)
     stream_event = stream.record_event() if stream is not None else None
     return batch, feats, stream_event
 
