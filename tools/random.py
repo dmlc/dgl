@@ -28,8 +28,8 @@ def _save_partitioned(arr, num_partitions, output_path):
                 part_path, mode='w+', dtype=arr.dtype, shape=(end - start, *arr.shape[1:]))
         logging.info('Saving %d-%d to %s' % (start, end, part_path))
         with logging_redirect_tqdm():
-            for j in tqdm.trange(0, end - start, 100000):
-                j_end = min(end - start, j + 100000)
+            for j in tqdm.trange(0, end - start, 1000000):
+                j_end = min(end - start, j + 1000000)
                 outbuf[j:j_end] = arr[j + start:j_end + start]
         new_offsets.append((os.path.abspath(part_path), start, end))
     return new_offsets
@@ -79,21 +79,24 @@ def _(meta, num_partitions, output_path):
     with tqdm.tqdm(total=num_rows) as tq:
         for i in range(0, num_partitions):
             start = i * num_rows_per_partition
-            end = min(num_rows, (i + 1) * num_partitions)
+            end = min(num_rows, (i + 1) * num_rows_per_partition)
             part_path = os.path.join(output_path, '%d.npy' % i)
             outbuf = open_memmap(
                     part_path, mode='w+', dtype=part.dtype, shape=(end - start, *part.shape[1:]))
             logging.info('Saving tensor to partition %d in %s (%d-%d)' %
                     (i, part_path, start, end))
             new_offsets.append((os.path.abspath(part_path), start, end))
+            j = 0
+            j_end = end - start
 
-            while end - start > 0:
-                copysize = min(end - start, part_remaining)
-                outbuf[start:start + copysize] = part[part_offset:part_offset + copysize]
+            while j < j_end:
+                copysize = min(j_end - j, part_remaining)
+                outbuf[j:j + copysize] = part[part_offset:part_offset + copysize]
                 tq.update(copysize)
                 part_remaining -= copysize
+                j += copysize
                 start += copysize
-                if part_remaining == 0 and start < end:
+                if part_remaining == 0 and start < num_rows:
                     part_id += 1
                     logging.info('Loading next input partition in %s' % partition_paths[part_id])
                     part = files.np_load(partition_paths[part_id])
