@@ -228,7 +228,7 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
                 np.random.shuffle(self._indices[:self.num_indices].numpy())
             else:
                 self._indices[:self.num_indices] = self._indices[
-                    torch.randperm(self.num_indices, device=self._device)]
+                    torch.randperm(self.num_indices, device=self._indices.device)]
 
             if not self.drop_last:
                 # pad extra
