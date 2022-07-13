@@ -305,6 +305,8 @@ def _await_or_return(x):
         return x
 
 def _record_stream(x, stream):
+    if stream is None:
+        return x
     if isinstance(x, torch.Tensor):
         x.record_stream(stream)
         return x
@@ -325,8 +327,11 @@ def _prefetch(batch, dataloader, stream):
     #
     # Once the futures are fetched, this function waits for them to complete by
     # calling its wait() method.
-    current_stream = torch.cuda.current_stream()
-    current_stream.wait_stream(stream)
+    if stream is not None:
+        current_stream = torch.cuda.current_stream()
+        current_stream.wait_stream(stream)
+    else:
+        current_stream = None
     with torch.cuda.stream(stream):
         # fetch node/edge features
         feats = recursive_apply(batch, _prefetch_for, dataloader)
