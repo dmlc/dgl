@@ -18,6 +18,48 @@ def create_dgl_object(graph_name, num_parts, \
     This function creates dgl objects for a given graph partition, as in function
     arguments. 
 
+    The "schema" argument is a dictionary, which contains the metadata related to node ids
+    and edge ids. It contains two keys: "nid" and "eid", whose value is also a dictionary
+    with the following structure. 
+
+    1. The key-value pairs in the "nid" dictionary has the following format.
+       "ntype-name" is the user assigned name to this node type. "format" describes the 
+       format of the contents of the files. and "data" is a list of lists, each list has
+       3 elements: file-name, start_id and end_id. File-name can be either absolute or
+       relative path to this file and starting and ending ids are type ids of the nodes 
+       which are contained in this file. These type ids are later used to compute global ids
+       of these nodes which are used throughout the processing of this pipeline. 
+        "ntype-name" : {
+            "format" : "csv", 
+            "data" : [
+                    [ <path-to-file>/ntype0-name-0.csv, start_id0, end_id0], 
+                    [ <path-to-file>/ntype0-name-1.csv, start_id1, end_id1],
+                    ...
+                    [ <path-to-file>/ntype0-name-<p-1>.csv, start_id<p-1>, end_id<p-1>],
+            ]
+        }
+
+    2. The key-value pairs in the "eid" dictionary has the following format.
+       As described for the "nid" dictionary the "eid" dictionary is similarly structured
+       except that these entries are for edges. 
+        "etype-name" : {
+            "format" : "csv", 
+            "data" : [
+                    [ <path-to-file>/etype0-name-0, start_id0, end_id0], 
+                    [ <path-to-file>/etype0-name-1 start_id1, end_id1],
+                    ...
+                    [ <path-to-file>/etype0-name-1 start_id<p-1>, end_id<p-1>]
+            ]
+        }
+
+    In "nid" dictionary, the type_nids are specified that
+    should be assigned to nodes which are read from the corresponding nodes file. 
+    Along the same lines dictionary for the key "eid" is used for edges in the 
+    input graph.
+
+    These type ids, for nodes and edges, are used to compute global ids for nodes
+    and edges which are stored in the graph object.
+
     Parameters:
     -----------
     graph_name : string
@@ -39,8 +81,6 @@ def create_dgl_object(graph_name, num_parts, \
     edgeid_offset : int
         offset to be used when assigning edge global ids in the current partition
 
-    return compact_g2, node_map_val, edge_map_val, ntypes_map, etypes_map
-
     Returns: 
     --------
     dgl object
@@ -54,14 +94,21 @@ def create_dgl_object(graph_name, num_parts, \
     dictionary
         map between edge type(string)  and edge_type_id(int)
     """
-
     #create auxiliary data structures from the schema object
-    global_nid_ranges = schema['nid']
-    global_eid_ranges = schema['eid']
-    global_nid_ranges = {key: np.array(global_nid_ranges[key]).reshape(
-        1, 2) for key in global_nid_ranges}
-    global_eid_ranges = {key: np.array(global_eid_ranges[key]).reshape(
-        1, 2) for key in global_eid_ranges}
+    node_info = schema["nid"]
+    offset = 0
+    global_nid_ranges = {}
+    for k, v in node_info.items():
+        global_nid_ranges[k] = np.array([offset + int(v["data"][0][1]), offset + int(v["data"][-1][2])]).reshape(1,2)
+        offset += int(v["data"][-1][2])
+
+    edge_info = schema["eid"]
+    offset = 0
+    global_eid_ranges = {}
+    for k, v in edge_info.items():
+        global_eid_ranges[k] = np.array([offset + int(v["data"][0][1]), offset + int(v["data"][-1][2])]).reshape(1,2)
+        offset += int(v["data"][-1][2])
+
     id_map = dgl.distributed.id_map.IdMap(global_nid_ranges)
 
     ntypes = [(key, global_nid_ranges[key][0, 0]) for key in global_nid_ranges]

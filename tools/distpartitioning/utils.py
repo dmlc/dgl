@@ -5,6 +5,9 @@ import json
 import dgl
 import constants
 
+import pyarrow
+from pyarrow import csv
+
 def read_partitions_file(part_file):
     """
     Utility method to read metis partitions, which is the output of 
@@ -47,6 +50,34 @@ def read_json(json_file):
 
     return val
 
+def get_ntype_featnames(ntype_name, schema): 
+    """
+    Retrieves node feature names for a given node_type
+
+    Parameters:
+    -----------
+    ntype_name : string
+        a string specifying a node_type name
+
+    schema : dictionary
+        metadata json object as a dictionary, which is read from the input
+        metadata file from the input dataset
+
+    Returns:
+    --------
+    list : 
+        a list of feature names for a given node_type
+    """
+    ntype_dict = schema["node_data"]
+    if (ntype_name in ntype_dict):
+        featnames = []
+        ntype_info = ntype_dict[ntype_name]
+        for k, v in ntype_info.items(): 
+            featnames.append(k)
+        return featnames
+    else: 
+        return []
+
 def get_node_types(schema):
     """ 
     Utility method to extract node_typename -> node_type mappings
@@ -60,72 +91,47 @@ def get_node_types(schema):
 
     Returns:
     --------
-    dictionary, list 
-        dictionary with ntype <-> type_nid mappings
-        list of ntype strings
+    dictionary
+        with keys as node type names and values as ids (integers)
+    list
+        list of ntype name strings
+    dictionary
+        with keys as ntype ids (integers) and values as node type names
     """
-    #Get the node_id ranges from the schema
-    global_nid_ranges = schema['nid']
-    global_nid_ranges = {key: np.array(global_nid_ranges[key]).reshape(1,2)
-                    for key in global_nid_ranges}
+    ntype_info = schema["nid"]
+    ntypes = []
+    for k in ntype_info.keys(): 
+        ntypes.append(k)
+    ntype_ntypeid_map = {e: i for i, e in enumerate(ntypes)}
+    ntypeid_ntype_map = {str(i): e for i, e in enumerate(ntypes)}
+    return ntype_ntypeid_map, ntypes, ntypeid_ntype_map
 
-    #Create an array with the starting id for each node_type and sort
-    ntypes = [(key, global_nid_ranges[key][0,0]) for key in global_nid_ranges]
-    ntypes.sort(key=lambda e: e[1])
-
-    #Create node_typename -> node_type dictionary
-    ntypes = [e[0] for e in ntypes]
-    ntypes_map = {e: i for i, e in enumerate(ntypes)}
-
-    return ntypes_map, ntypes
-
-def get_edge_types(schema): 
+def get_gnid_range_map(node_tids): 
     """
-    Utility function to form edges dictionary between edge_type names and ids
-
-    Parameters
-    ----------
-    schema : dictionary
-        Input schema from which the edge_typename -> edge_type
-        dictionary is defined
-
-    Returns
-    -------
-    dictionary:
-        a map between edgetype_names and ids
-    list: 
-        list of edgetype_names
-    """
-
-    global_eid_ranges = schema['eid']
-    global_eid_ranges = {key: np.array(global_eid_ranges[key]).reshape(1,2)
-                    for key in global_eid_ranges}
-    etypes = [(key, global_eid_ranges[key][0, 0]) for key in global_eid_ranges]
-    etypes.sort(key=lambda e: e[1])
-
-    etypes = [e[0] for e in etypes]
-    etypes_map = {e: i for i, e in enumerate(etypes)}
-
-    return etypes_map, etypes
-
-def get_ntypes_map(schema): 
-    """
-    Utility function to return nodes global id range from the input schema
-    as well as node count per each node type
+    Retrieves auxiliary dictionaries from the metadata json object
 
     Parameters:
     -----------
-    schema : dictionary
-        Input schema where the requested dictionaries are defined
+    node_tids: dictionary
+        This dictionary contains the information about nodes for each node_type.
+        Typically this information contains p-entries, where each entry has a file-name, 
+        starting and ending type_node_ids for the nodes in this file. Keys in this dictionary
+        are the node_type and value is a list of lists. Each individual entry in this list has
+        three items: file-name, starting type_nid and ending type_nid
 
     Returns:
     --------
     dictionary : 
-        map between the node_types and global_id ranges for each node_type
-    dictionary : 
-        map between the node_type and total node count for that type
+        a dictionary where keys are node_type names and values are global_nid range, which is a tuple.
+
     """
-    return schema["nid"], schema["node_type_id_count"]
+    ntypes_gid_range = {} 
+    offset = 0
+    for k, v in node_tids.items(): 
+        ntypes_gid_range[k] = [offset + int(v[0][0]), offset + int(v[-1][1])]
+        offset += int(v[-1][1])
+
+    return ntypes_gid_range
 
 def write_metadata_json(metadata_list, output_dir, graph_name):
     """
@@ -178,7 +184,7 @@ def write_metadata_json(metadata_list, output_dir, graph_name):
     with open('{}/{}.json'.format(output_dir, graph_name), 'w') as outfile: 
         json.dump(graph_metadata, outfile, sort_keys=True, indent=4)
 
-def augment_edge_data(edge_data, part_ids, id_offset):
+def augment_edge_data(edge_data, part_ids, edge_tids, rank, world_size):
     """
     Add partition-id (rank which owns an edge) column to the edge_data.
     
@@ -190,60 +196,26 @@ def augment_edge_data(edge_data, part_ids, id_offset):
         array of part_ids indexed by global_nid
     """
     #add global_nids to the node_data
-    global_eids = np.arange(id_offset, id_offset + len(edge_data[constants.GLOBAL_TYPE_EID]), dtype=np.int64)
+    etype_offset = {}
+    offset = 0
+    for etype_name, tid_range in edge_tids.items(): 
+        assert int(tid_range[0][0]) == 0
+        assert len(tid_range) == world_size
+        etype_offset[etype_name] = offset + int(tid_range[0][0])
+        offset += int(tid_range[-1][1])
+
+    global_eids = []
+    for etype_name, tid_range in edge_tids.items(): 
+        global_eid_start = etype_offset[etype_name]
+        begin = global_eid_start + int(tid_range[rank][0])
+        end = global_eid_start + int(tid_range[rank][1])
+        global_eids.append(np.arange(begin, end, dtype=np.int64))
+    global_eids = np.concatenate(global_eids)
+    assert global_eids.shape[0] == edge_data[constants.ETYPE_ID].shape[0]
     edge_data[constants.GLOBAL_EID] = global_eids
 
+    #assign the owner process/rank for each edge 
     edge_data[constants.OWNER_PROCESS] = part_ids[edge_data[constants.GLOBAL_DST_ID]]
-
-def augment_node_data(node_data, part_ids, offset): 
-    """
-    Utility function to add auxilary columns to the node_data numpy ndarray.
-
-    Parameters:
-    -----------
-    node_data : dictionary
-        Node information as read from xxx_nodes.txt file and a dictionary is built using this data
-        using keys as column names and values as column data from the csv txt file.
-    part_ids : numpy array 
-        array of part_ids indexed by global_nid
-    """
-    #add global_nids to the node_data
-    global_nids = np.arange(offset, offset + len(node_data[constants.GLOBAL_TYPE_NID]), dtype=np.int64)
-    node_data[constants.GLOBAL_NID] = global_nids
-
-    #add owner proc_ids to the node_data
-    proc_ids = part_ids[node_data[constants.GLOBAL_NID]]
-    node_data[constants.OWNER_PROCESS] = proc_ids
-
-def read_nodes_file(nodes_file):
-    """
-    Utility function to read xxx_nodes.txt file
-    
-    Parameters:
-    -----------
-    nodesfile : string
-        Graph file for nodes in the input graph
-    
-    Returns:
-    --------
-    dictionary
-        Nodes data stored in dictionary where keys are column names
-        and values are the columns from the numpy ndarray as read from the
-        xxx_nodes.txt file
-    """
-    if nodes_file == "" or nodes_file == None:
-        return None
-
-    # Read the file from here.
-    # Assuming the nodes file is a numpy file
-    # nodes.txt file is of the following format
-    # <node_type> <weight1> <weight2> <weight3> <weight4> <global_type_nid> <attributes>
-    # For the ogb-mag dataset, nodes.txt is of the above format.
-    nodes_data = np.loadtxt(nodes_file, delimiter=' ', dtype='int64')
-    nodes_datadict = {}
-    nodes_datadict[constants.NTYPE_ID] = nodes_data[:,0]
-    nodes_datadict[constants.GLOBAL_TYPE_NID] = nodes_data[:,5]
-    return nodes_datadict
 
 def read_edges_file(edge_file, edge_data_dict):
     """ 
@@ -268,23 +240,13 @@ def read_edges_file(edge_file, edge_data_dict):
     # global_src_id -- global idx for the source node ... line # in the graph_nodes.txt
     # global_dst_id -- global idx for the destination id node ... line # in the graph_nodes.txt
 
-    edge_data = np.loadtxt(edge_file , delimiter=' ', dtype = 'int64')
-
-    if (edge_data_dict == None): 
-        edge_data_dict = {}
-        edge_data_dict[constants.GLOBAL_SRC_ID] = edge_data[:,0]
-        edge_data_dict[constants.GLOBAL_DST_ID] = edge_data[:,1]
-        edge_data_dict[constants.GLOBAL_TYPE_EID] = edge_data[:,2]
-        edge_data_dict[constants.ETYPE_ID] = edge_data[:,3]
-    else: 
-        edge_data_dict[constants.GLOBAL_SRC_ID] = \
-            np.concatenate((edge_data_dict[constants.GLOBAL_SRC_ID], edge_data[:,0]))
-        edge_data_dict[constants.GLOBAL_DST_ID] = \
-            np.concatenate((edge_data_dict[constants.GLOBAL_DST_ID], edge_data[:,1]))
-        edge_data_dict[constants.GLOBAL_TYPE_EID] = \
-            np.concatenate((edge_data_dict[constants.GLOBAL_TYPE_EID], edge_data[:,2]))
-        edge_data_dict[constants.ETYPE_ID] = \
-            np.concatenate((edge_data_dict[constants.ETYPE_ID], edge_data[:,3]))
+    edge_data_df = csv.read_csv(edge_file, read_options=pyarrow.csv.ReadOptions(autogenerate_column_names=True), 
+                                    parse_options=pyarrow.csv.ParseOptions(delimiter=' '))
+    edge_data_dict = {}
+    edge_data_dict[constants.GLOBAL_SRC_ID] = edge_data_df['f0'].to_numpy()
+    edge_data_dict[constants.GLOBAL_DST_ID] = edge_data_df['f1'].to_numpy()
+    edge_data_dict[constants.GLOBAL_TYPE_EID] = edge_data_df['f2'].to_numpy()
+    edge_data_dict[constants.ETYPE_ID] = edge_data_df['f3'].to_numpy()
     return edge_data_dict
 
 def read_node_features_file(nodes_features_file):
