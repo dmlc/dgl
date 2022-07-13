@@ -28,7 +28,6 @@ from .base import BlockSampler, as_edge_prediction_sampler
 from .. import backend as F
 from ..distributed import DistGraph
 from ..multiprocessing import call_once_and_share
-from ..cuda import stream as dgl_stream
 
 PYTORCH_VER = LooseVersion(torch.__version__)
 PYTHON_EXIT_STATUS = False
