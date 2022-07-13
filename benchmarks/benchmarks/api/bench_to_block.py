@@ -8,7 +8,7 @@ from .. import utils
 
 @utils.skip_if_gpu()
 @utils.benchmark('time', timeout=1200)
-@utils.parametrize('graph_name', ['reddit', "ogbn-product"])
+@utils.parametrize('graph_name', ['reddit', "ogbn-products"])
 @utils.parametrize('num_seed_nodes', [32, 256, 1024, 2048])
 @utils.parametrize('fanout', [5, 10, 20])
 def track_time(graph_name, num_seed_nodes, fanout):
