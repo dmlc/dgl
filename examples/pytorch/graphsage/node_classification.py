@@ -72,7 +72,7 @@ def evaluate(model, graph, dataloader):
 def layerwise_infer(device, graph, nid, model, batch_size):
     model.eval()
     with torch.no_grad():
-        pred = model.inference(graph, device, batch_size)
+        pred = model.inference(graph, device, batch_size).to(device)
         pred = pred[nid]
         label = graph.ndata['label'][nid]
         return MF.accuracy(pred, label)
