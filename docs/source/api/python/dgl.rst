@@ -18,6 +18,7 @@ Operators for constructing :class:`DGLGraph` from raw data formats.
 
     graph
     heterograph
+    from_cugraph
     from_scipy
     from_networkx
     bipartite_from_scipy
@@ -93,6 +94,7 @@ Operators for generating new graphs by manipulating the structure of the existin
     to_bidirected
     to_bidirected_stale
     to_block
+    to_cugraph
     to_double
     to_float
     to_half

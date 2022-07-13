@@ -121,6 +121,7 @@ def main(args):
                  ns_mode=True)
     labels = labels.to(device)
     model = model.to(device)
+    inv_target = inv_target.to(device)
 
     optimizer = th.optim.Adam(model.parameters(), lr=1e-2, weight_decay=args.wd)
 
