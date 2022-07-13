@@ -3,6 +3,7 @@
 from ..base import DGLError
 from .. import backend as F
 
+__all__ = ['segment_reduce', 'segment_softmax', 'segment_mm']
 
 def segment_reduce(seglen, value, reducer='sum'):
     """Segment reduction operator.
@@ -98,3 +99,29 @@ def segment_softmax(seglen, value):
     value = F.exp(value - F.repeat(value_max, seglen, dim=0))
     value_sum = segment_reduce(seglen, value, reducer='sum')
     return value / F.repeat(value_sum, seglen, dim=0)
+
+def segment_mm(a, b, seglen_a):
+    r""" Performs matrix multiplication according to segments.
+
+    Suppose ``seglen_a == [10, 5, 0, 3]``, the operator will perform
+    four matrix multiplications::
+
+        a[0:10] @ b[0], a[10:15] @ b[1],
+        a[15:15] @ b[2], a[15:18] @ b[3]
+
+    Parameters
+    ----------
+    a : Tensor
+        The left operand, 2-D tensor of shape ``(N, D1)``
+    b : Tensor
+        The right operand, 3-D tensor of shape ``(R, D1, D2)``
+    seglen_a : Tensor
+        An integer tensor of shape ``(R,)``. Each element is the length of segments
+        of input ``a``. The summation of all elements must be equal to ``N``.
+
+    Returns
+    -------
+    Tensor
+        The output dense matrix of shape ``(N, D2)``
+    """
+    return F.segment_mm(a, b, seglen_a)

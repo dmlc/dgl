@@ -173,13 +173,7 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDataType")
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroContext")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
-    // The Python side only recognizes CPU and GPU device type.
-    // Use is_pinned() to checked whether the object is
-    // on page-locked memory
-    if (hg->Context().device_type == kDLCPUPinned)
-      *rv = DLContext{kDLCPU, 0};
-    else
-      *rv = hg->Context();
+    *rv = hg->Context();
   });
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroIsPinned")

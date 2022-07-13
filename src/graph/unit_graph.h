@@ -214,16 +214,16 @@ class UnitGraph : public BaseHeteroGraph {
   * \brief Pin the in_csr_, out_scr_ and coo_ of the current graph.
   * \note The graph will be pinned inplace. Behavior depends on the current context,
   *       kDLCPU: will be pinned;
-  *       kDLCPUPinned: directly return;
+  *       IsPinned: directly return;
   *       kDLGPU: invalid, will throw an error.
   *       The context check is deferred to pinning the NDArray.
   */
-  void PinMemory_();
+  void PinMemory_() override;
 
   /*!
   * \brief Unpin the in_csr_, out_scr_ and coo_ of the current graph.
   * \note The graph will be unpinned inplace. Behavior depends on the current context,
-  *       kDLCPUPinned: will be unpinned;
+  *       IsPinned: will be unpinned;
   *       others: directly return.
   *       The context check is deferred to unpinning the NDArray.
   */
@@ -309,6 +309,7 @@ class UnitGraph : public BaseHeteroGraph {
   friend class Serializer;
   friend class HeteroGraph;
   friend class ImmutableGraph;
+  friend HeteroGraphPtr HeteroForkingUnpickle(const HeteroPickleStates& states);
 
   // private empty constructor
   UnitGraph() {}
@@ -325,6 +326,7 @@ class UnitGraph : public BaseHeteroGraph {
 
   /*!
    * \brief constructor
+   * \param num_vtypes number of vertex types (1 or 2)
    * \param metagraph metagraph
    * \param in_csr in edge csr
    * \param out_csr out edge csr
@@ -333,7 +335,8 @@ class UnitGraph : public BaseHeteroGraph {
    * \param has_out_csr whether out_csr is valid
    * \param has_coo whether coo is valid
    */
-  static HeteroGraphPtr CreateHomographFrom(
+  static HeteroGraphPtr CreateUnitGraphFrom(
+      int num_vtypes,
       const aten::CSRMatrix &in_csr,
       const aten::CSRMatrix &out_csr,
       const aten::COOMatrix &coo,

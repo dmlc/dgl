@@ -13,7 +13,7 @@ class LegacyTUDataset(DGLBuiltinDataset):
     Parameters
     ----------
     name : str
-        Dataset Name, such as ``ENZYMES``, ``DD``, ``COLLAB``, ``MUTAG``, can be the 
+        Dataset Name, such as ``ENZYMES``, ``DD``, ``COLLAB``, ``MUTAG``, can be the
         datasets name on `<https://chrsmrrs.github.io/datasets/docs/datasets/>`_.
     use_pandas : bool
         Numpy's file read function has performance issue when file is large,
@@ -26,20 +26,26 @@ class LegacyTUDataset(DGLBuiltinDataset):
     max_allow_node : int
         Remove graphs that contains more nodes than ``max_allow_node``.
         Default : None
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
     max_num_node : int
         Maximum number of nodes
-    num_labels : int
+    num_classes : int
         Number of classes
+    num_labels : numpy.int64
+        (DEPRECATED, use num_classes instead) Number of classes
 
     Notes
     -----
     LegacyTUDataset uses provided node feature by default. If no feature provided, it uses one-hot node label instead.
     If neither labels provided, it uses constant for node feature.
 
-    The dataset sorts graphs by their labels. 
+    The dataset sorts graphs by their labels.
     Shuffle is preferred before manual train/val split.
 
     Examples
@@ -73,7 +79,7 @@ class LegacyTUDataset(DGLBuiltinDataset):
 
     def __init__(self, name, use_pandas=False,
                  hidden_size=10, max_allow_node=None,
-                 raw_dir=None, force_reload=False, verbose=False):
+                 raw_dir=None, force_reload=False, verbose=False, transform=None):
 
         url = self._url.format(name)
         self.hidden_size = hidden_size
@@ -81,7 +87,7 @@ class LegacyTUDataset(DGLBuiltinDataset):
         self.use_pandas = use_pandas
         super(LegacyTUDataset, self).__init__(name=name, url=url, raw_dir=raw_dir,
                                               hash_key=(name, use_pandas, hidden_size, max_allow_node),
-                                              force_reload=force_reload, verbose=verbose)
+                                              force_reload=force_reload, verbose=verbose, transform=transform)
 
     def process(self):
         self.data_mode = None
@@ -100,7 +106,7 @@ class LegacyTUDataset(DGLBuiltinDataset):
             DS_graph_labels = self._idx_from_zero(
                 np.genfromtxt(self._file_path("graph_labels"), dtype=int))
             self.num_labels = max(DS_graph_labels) + 1
-            self.graph_labels = DS_graph_labels 
+            self.graph_labels = DS_graph_labels
         elif os.path.exists(self._file_path("graph_attributes")):
             DS_graph_labels = np.genfromtxt(self._file_path("graph_attributes"), dtype=float)
             self.num_labels = None
@@ -211,6 +217,8 @@ class LegacyTUDataset(DGLBuiltinDataset):
             And its label.
         """
         g = self.graph_lists[idx]
+        if self._transform is not None:
+            g = self._transform(g)
         return g, self.graph_labels[idx]
 
     def __len__(self):
@@ -238,6 +246,10 @@ class LegacyTUDataset(DGLBuiltinDataset):
             self.num_labels,\
             self.max_num_node
 
+    @property
+    def num_classes(self):
+        return int(self.num_labels)
+
 class TUDataset(DGLBuiltinDataset):
     r"""
     TUDataset contains lots of graph kernel datasets for graph classification.
@@ -245,15 +257,21 @@ class TUDataset(DGLBuiltinDataset):
     Parameters
     ----------
     name : str
-        Dataset Name, such as ``ENZYMES``, ``DD``, ``COLLAB``, ``MUTAG``, can be the 
+        Dataset Name, such as ``ENZYMES``, ``DD``, ``COLLAB``, ``MUTAG``, can be the
         datasets name on `<https://chrsmrrs.github.io/datasets/docs/datasets/>`_.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
     max_num_node : int
         Maximum number of nodes
-    num_labels : int
+    num_classes : int
         Number of classes
+    num_labels : int
+        (DEPRECATED, use num_classes instead) Number of classes
 
     Notes
     -----
@@ -271,7 +289,7 @@ class TUDataset(DGLBuiltinDataset):
     label was added so that :math:`\lbrace -1, 1 \rbrace` was mapped to
     :math:`\lbrace 0, 2 \rbrace`.
 
-    The dataset sorts graphs by their labels. 
+    The dataset sorts graphs by their labels.
     Shuffle is preferred before manual train/val split.
 
     Examples
@@ -299,32 +317,32 @@ class TUDataset(DGLBuiltinDataset):
     Graph(num_nodes=9539, num_edges=47382,
           ndata_schemes={'node_labels': Scheme(shape=(1,), dtype=torch.int64), '_ID': Scheme(shape=(), dtype=torch.int64)}
           edata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64)})
-    
+
     """
 
     _url = r"https://www.chrsmrrs.com/graphkerneldatasets/{}.zip"
 
-    def __init__(self, name, raw_dir=None, force_reload=False, verbose=False):
+    def __init__(self, name, raw_dir=None, force_reload=False, verbose=False, transform=None):
         url = self._url.format(name)
         super(TUDataset, self).__init__(name=name, url=url,
                                         raw_dir=raw_dir, force_reload=force_reload,
-                                        verbose=verbose)
-    
+                                        verbose=verbose, transform=transform)
+
     def process(self):
         DS_edge_list = self._idx_from_zero(
             loadtxt(self._file_path("A"), delimiter=",").astype(int))
         DS_indicator = self._idx_from_zero(
             loadtxt(self._file_path("graph_indicator"), delimiter=",").astype(int))
-        
+
         if os.path.exists(self._file_path("graph_labels")):
             DS_graph_labels = self._idx_reset(
-                loadtxt(self._file_path("graph_labels"), delimiter=",").astype(int))               
-            self.num_labels = max(DS_graph_labels) + 1
-            self.graph_labels = F.tensor(DS_graph_labels)     
+                loadtxt(self._file_path("graph_labels"), delimiter=",").astype(int))
+            self.num_labels = int(max(DS_graph_labels) + 1)
+            self.graph_labels = F.tensor(DS_graph_labels)
         elif os.path.exists(self._file_path("graph_attributes")):
             DS_graph_labels = loadtxt(self._file_path("graph_attributes"), delimiter=",").astype(float)
             self.num_labels = None
-            self.graph_labels = F.tensor(DS_graph_labels)     
+            self.graph_labels = F.tensor(DS_graph_labels)
         else:
             raise Exception("Unknown graph label or graph attributes")
 
@@ -400,10 +418,12 @@ class TUDataset(DGLBuiltinDataset):
         Returns
         -------
         (:class:`dgl.DGLGraph`, Tensor)
-            Graph with node feature stored in ``feat`` field and node label in ``node_label`` if available.
+            Graph with node feature stored in ``feat`` field and node label in ``node_labels`` if available.
             And its label.
         """
         g = self.graph_lists[idx]
+        if self._transform is not None:
+            g = self._transform(g)
         return g, self.graph_labels[idx]
 
     def __len__(self):
@@ -430,3 +450,7 @@ class TUDataset(DGLBuiltinDataset):
         return self.graph_lists[0].ndata['feat'].shape[1], \
             self.num_labels, \
             self.max_num_node
+
+    @property
+    def num_classes(self):
+        return self.num_labels

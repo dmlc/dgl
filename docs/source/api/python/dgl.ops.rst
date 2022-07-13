@@ -246,6 +246,19 @@ DGL provide operators to reduce value tensor along the first dimension by segmen
 
    segment_reduce
 
+GatherMM and SegmentMM Module
+-----------------------------
+
+SegmentMM: DGL provide operators to perform matrix multiplication according to segments.
+
+GatherMM: DGL provide operators to gather data according to the given indices and perform matrix multiplication.
+
+.. autosummary::
+   :toctree: ../../generated/
+
+   gather_mm
+   segment_mm
+
 Supported Data types
 --------------------
 Operators defined in ``dgl.ops`` support floating point data types, i.e. the operands

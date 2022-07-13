@@ -9,12 +9,8 @@ from .graphconv import EdgeWeightNorm
 
 
 class SGConv(nn.Module):
-    r"""
-
-    Description
-    -----------
-    Simplifying Graph Convolution layer from paper `Simplifying Graph
-    Convolutional Networks <https://arxiv.org/pdf/1902.07153.pdf>`__.
+    r"""SGC layer from `Simplifying Graph
+    Convolutional Networks <https://arxiv.org/pdf/1902.07153.pdf>`__
 
     .. math::
         H^{K} = (\tilde{D}^{-1/2} \tilde{A} \tilde{D}^{-1/2})^K X \Theta
@@ -75,7 +71,7 @@ class SGConv(nn.Module):
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> g = dgl.add_self_loop(g)
     >>> feat = th.ones(6, 10)
-    >>> conv = SGConv(10, 2, k=2, cached=True)
+    >>> conv = SGConv(10, 2, k=2)
     >>> res = conv(g, feat)
     >>> res
     tensor([[-1.9441, -0.9343],
@@ -150,7 +146,7 @@ class SGConv(nn.Module):
         edge_weight: torch.Tensor, optional
             edge_weight to use in the message passing process. This is equivalent to
             using weighted adjacency matrix in the equation above, and
-            :math:\tilde{D}^{-1/2}\tilde{A} \tilde{D}^{-1/2}
+            :math:`\tilde{D}^{-1/2}\tilde{A} \tilde{D}^{-1/2}`
             is based on :class:`dgl.nn.pytorch.conv.graphconv.EdgeWeightNorm`.
 
         Returns

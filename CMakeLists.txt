@@ -26,7 +26,7 @@ dgl_option(USE_CUDA "Build with CUDA" OFF)
 dgl_option(USE_NCCL "Build with NCCL support" OFF)
 dgl_option(USE_SYSTEM_NCCL "Build using system's NCCL library" OFF)
 dgl_option(USE_OPENMP "Build with OpenMP" ON)
-dgl_option(USE_AVX "Build with AVX optimization" ON)
+dgl_option(USE_AVX "Build with AVX optimization" OFF)
 dgl_option(USE_LIBXSMM "Build with LIBXSMM library optimization" ON)
 dgl_option(USE_FP16 "Build with fp16 support to enable mixed precision training" OFF)
 dgl_option(USE_TVM "Build with TVM kernels" OFF)
@@ -35,7 +35,7 @@ dgl_option(LIBCXX_ENABLE_PARALLEL_ALGORITHMS "Enable the parallel algorithms lib
 dgl_option(USE_S3 "Build with S3 support" OFF)
 dgl_option(USE_HDFS "Build with HDFS support" OFF) # Set env HADOOP_HDFS_HOME if needed
 dgl_option(REBUILD_LIBXSMM "Clean LIBXSMM build cache at every build" OFF) # Set env HADOOP_HDFS_HOME if needed
-dgl_option(USE_EPOLL "Build with epoll for socket communicator" OFF)
+dgl_option(USE_EPOLL "Build with epoll for socket communicator" ON)
 dgl_option(TP_BUILD_LIBUV "Build libuv together with tensorpipe (only impacts Linux)" ON)
 
 # Set debug compile option for gdb, only happens when -DCMAKE_BUILD_TYPE=DEBUG
@@ -92,11 +92,10 @@ if(MSVC)
   endif()
 else(MSVC)
   include(CheckCXXCompilerFlag)
-  check_cxx_compiler_flag("-std=c++11"    SUPPORT_CXX11)
+  # tensorpipe's dependencies require C++14
+  check_cxx_compiler_flag("-std=c++14"    SUPPORT_CXX14)
   set(CMAKE_C_FLAGS "-O2 -Wall -fPIC ${CMAKE_C_FLAGS}")
-  # We still use c++11 flag in CPU build because gcc5.4 (our default compiler) is
-  # not fully compatible with c++14 feature.
-  set(CMAKE_CXX_FLAGS "-O2 -Wall -fPIC -std=c++11 ${CMAKE_CXX_FLAGS}")
+  set(CMAKE_CXX_FLAGS "-O2 -Wall -fPIC -std=c++14 ${CMAKE_CXX_FLAGS}")
   if(NOT APPLE)
     set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--warn-common ${CMAKE_SHARED_LINKER_FLAGS}")
   endif(NOT APPLE)
@@ -123,11 +122,14 @@ if(USE_AVX)
   endif(USE_LIBXSMM)
 endif(USE_AVX)
 
-if (USE_EPOLL)
-  check_include_file("sys/epoll.h" USE_EPOLL)
-  if (USE_EPOLL)
+if ((NOT MSVC) AND USE_EPOLL)
+  INCLUDE(CheckIncludeFile)
+  check_include_file("sys/epoll.h" EPOLL_AVAILABLE)
+  if (EPOLL_AVAILABLE)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUSE_EPOLL")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_EPOLL")
+  else()
+    message(WARNING "EPOLL is not available on this platform...")
   endif()
 endif ()
 
@@ -302,6 +304,7 @@ if(BUILD_TORCH)
       ${CMAKE_COMMAND} -E env
       CMAKE_COMMAND=${CMAKE_CMD}
       CUDA_TOOLKIT_ROOT_DIR=${CUDA_TOOLKIT_ROOT_DIR}
+      USE_CUDA=${USE_CUDA}
       BINDIR=${BINDIR}
       cmd /e:on /c ${BUILD_SCRIPT} ${TORCH_PYTHON_INTERPS}
       DEPENDS ${BUILD_SCRIPT}
@@ -313,6 +316,7 @@ if(BUILD_TORCH)
       ${CMAKE_COMMAND} -E env
       CMAKE_COMMAND=${CMAKE_CMD}
       CUDA_TOOLKIT_ROOT_DIR=${CUDA_TOOLKIT_ROOT_DIR}
+      USE_CUDA=${USE_CUDA}
       BINDIR=${CMAKE_CURRENT_BINARY_DIR}
       bash ${BUILD_SCRIPT} ${TORCH_PYTHON_INTERPS}
       DEPENDS ${BUILD_SCRIPT}
@@ -341,4 +345,14 @@ if(BUILD_CPP_TEST)
   target_link_libraries(runUnitTests gtest gtest_main)
   target_link_libraries(runUnitTests dgl)
   add_test(UnitTests runUnitTests)
+
+  if(NOT MSVC)
+    message(STATUS "Building dist/rpc tests")
+    file(GLOB_RECURSE TEST_SRC_FILES ${PROJECT_SOURCE_DIR}/tests/dist/cpp/rpc_client.cc)
+    add_executable(rpc_client ${TEST_SRC_FILES})
+    target_link_libraries(rpc_client dgl)
+    file(GLOB_RECURSE TEST_SRC_FILES ${PROJECT_SOURCE_DIR}/tests/dist/cpp/rpc_server.cc)
+    add_executable(rpc_server ${TEST_SRC_FILES})
+    target_link_libraries(rpc_server dgl)
+  endif(NOT MSVC)
 endif(BUILD_CPP_TEST)

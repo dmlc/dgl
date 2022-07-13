@@ -18,9 +18,9 @@ from ..convert import graph as dgl_graph
 
 class GINDataset(DGLBuiltinDataset):
     """Dataset Class for `How Powerful Are Graph Neural Networks? <https://arxiv.org/abs/1810.00826>`_.
-    
+
     This is adapted from `<https://github.com/weihua916/powerful-gnns/blob/master/dataset.zip>`_.
-    
+
     The class provides an interface for nine datasets used in the paper along with the paper-specific
     settings. The datasets are ``'MUTAG'``, ``'COLLAB'``, ``'IMDBBINARY'``, ``'IMDBMULTI'``,
     ``'NCI1'``, ``'PROTEINS'``, ``'PTC'``, ``'REDDITBINARY'``, ``'REDDITMULTI5K'``.
@@ -44,6 +44,15 @@ class GINDataset(DGLBuiltinDataset):
         add self to self edge if true
     degree_as_nlabel: bool
         take node degree as label and feature if true
+    transform: callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
+
+    Attributes
+    ----------
+    num_classes : int
+        Number of classes for multiclass classification
 
     Examples
     --------
@@ -73,7 +82,7 @@ class GINDataset(DGLBuiltinDataset):
     """
 
     def __init__(self, name, self_loop, degree_as_nlabel=False,
-                 raw_dir=None, force_reload=False, verbose=False):
+                 raw_dir=None, force_reload=False, verbose=False, transform=None):
 
         self._name = name  # MUTAG
         gin_url = 'https://raw.githubusercontent.com/weihua916/powerful-gnns/master/dataset.zip'
@@ -106,7 +115,8 @@ class GINDataset(DGLBuiltinDataset):
         self.nlabels_flag = False
 
         super(GINDataset, self).__init__(name=name, url=gin_url, hash_key=(name, self_loop, degree_as_nlabel),
-                                         raw_dir=raw_dir, force_reload=force_reload, verbose=verbose)
+                                         raw_dir=raw_dir, force_reload=force_reload,
+                                         verbose=verbose, transform=transform)
 
     @property
     def raw_path(self):
@@ -136,7 +146,11 @@ class GINDataset(DGLBuiltinDataset):
         (:class:`dgl.Graph`, Tensor)
             The graph and its label.
         """
-        return self.graphs[idx], self.labels[idx]
+        if self._transform is None:
+            g = self.graphs[idx]
+        else:
+            g = self._transform(self.graphs[idx])
+        return g, self.labels[idx]
 
     def _file_path(self):
         return os.path.join(self.raw_dir, "GINDataset", 'dataset', self.name, "{}.txt".format(self.name))
@@ -353,3 +367,7 @@ class GINDataset(DGLBuiltinDataset):
         if os.path.exists(graph_path) and os.path.exists(info_path):
             return True
         return False
+
+    @property
+    def num_classes(self):
+        return self.gclasses

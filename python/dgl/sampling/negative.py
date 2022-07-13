@@ -3,6 +3,8 @@
 from numpy.polynomial import polynomial
 from .._ffi.function import _init_api
 from .. import backend as F
+from .. import utils
+from ..heterograph import DGLHeteroGraph
 
 __all__ = [
     'global_uniform_negative_sampling']
@@ -99,5 +101,7 @@ def global_uniform_negative_sampling(
     src, dst = _CAPI_DGLGlobalUniformNegativeSampling(
         g._graph, etype_id, num_samples, 3, exclude_self_loops, replace, redundancy)
     return F.from_dgl_nd(src), F.from_dgl_nd(dst)
+DGLHeteroGraph.global_uniform_negative_sampling = utils.alias_func(
+    global_uniform_negative_sampling)
 
 _init_api('dgl.sampling.negative', __name__)

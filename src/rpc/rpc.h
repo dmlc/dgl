@@ -16,9 +16,12 @@
 #include <vector>
 #include <string>
 #include <mutex>
+#include <unordered_map>
 
 #include "./rpc_msg.h"
-#include "./tensorpipe/tp_communicator.h"
+#include "net_type.h"
+#include "network/socket_communicator.h"
+#include "tensorpipe/tp_communicator.h"
 #include "./network/common.h"
 #include "./server_state.h"
 
@@ -68,7 +71,7 @@ struct RPCContext {
   /*!
    * \brief Current barrier count
    */
-  int32_t barrier_count = 0;
+  std::unordered_map<int32_t, int32_t> barrier_count;
 
   /*!
    * \brief Total number of server per machine.
@@ -78,12 +81,12 @@ struct RPCContext {
   /*!
    * \brief Sender communicator.
    */
-  std::shared_ptr<TPSender> sender;
+  std::shared_ptr<RPCSender> sender;
 
   /*!
    * \brief Receiver communicator.
    */
-  std::shared_ptr<TPReceiver> receiver;
+  std::shared_ptr<RPCReceiver> receiver;
 
   /*!
    * \brief Tensorpipe global context
@@ -101,6 +104,13 @@ struct RPCContext {
    */
   std::shared_ptr<ServerState> server_state;
 
+  /*!
+   * \brief Cuurent group ID
+   */
+  int32_t group_id = -1;
+  int32_t curr_client_id = -1;
+  std::unordered_map<int32_t, std::unordered_map<int32_t, int32_t>> clients_;
+
   /*! \brief Get the RPC context singleton */
   static RPCContext* getInstance() {
     static RPCContext ctx;
@@ -116,19 +126,36 @@ struct RPCContext {
     t->msg_seq = 0;
     t->num_servers = 0;
     t->num_clients = 0;
-    t->barrier_count = 0;
+    t->barrier_count.clear();
     t->num_servers_per_machine = 0;
     t->sender.reset();
     t->receiver.reset();
     t->ctx.reset();
     t->server_state.reset();
+    t->group_id = -1;
+    t->curr_client_id = -1;
+    t->clients_.clear();
   }
-};
 
-/*! \brief RPC status flag */
-enum RPCStatus {
-  kRPCSuccess = 0,
-  kRPCTimeOut,
+  int32_t RegisterClient(int32_t client_id, int32_t group_id) {
+    auto &&m = clients_[group_id];
+    if (m.find(client_id) != m.end()) {
+      return -1;
+    }
+    m[client_id] = ++curr_client_id;
+    return curr_client_id;
+  }
+
+  int32_t GetClient(int32_t client_id, int32_t group_id) const {
+    if (clients_.find(group_id) == clients_.end()) {
+      return -1;
+    }
+    const auto &m = clients_.at(group_id);
+    if (m.find(client_id) == m.end()) {
+      return -1;
+    }
+    return m.at(client_id);
+  }
 };
 
 /*!
@@ -162,9 +189,5 @@ RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout = 0);
 
 }  // namespace rpc
 }  // namespace dgl
-
-namespace dmlc {
-DMLC_DECLARE_TRAITS(has_saveload, dgl::rpc::RPCMessage, true);
-}  // namespace dmlc
 
 #endif  // DGL_RPC_RPC_H_

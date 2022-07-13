@@ -6,6 +6,7 @@ from __future__ import absolute_import
 import sys
 import os
 import ctypes
+import logging
 import numpy as np
 from . import libinfo
 
@@ -136,3 +137,6 @@ def load_tensor_adapter(backend, version):
         raise NotImplementedError('Unsupported system: %s' % sys.platform)
     path = os.path.join(_DIR_NAME, 'tensoradapter', backend, basename)
     tensor_adapter_loaded = (_LIB.DGLLoadTensorAdapter(path.encode('utf-8')) == 0)
+    if not tensor_adapter_loaded:
+        logger = logging.getLogger("dgl-core")
+        logger.debug("Memory optimization with PyTorch is not enabled.")

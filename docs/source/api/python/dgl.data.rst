@@ -6,232 +6,111 @@ dgl.data
 .. currentmodule:: dgl.data
 .. automodule:: dgl.data
 
-Quick links:
+Base Class
+---------------------------------------
 
-* `Node Prediction Datasets`_
-* `Edge Prediction Datasets`_
-* `Graph Prediction Datasets`_
+.. autosummary::
+    :toctree: ../../generated/
+    :nosignatures:
+    :template: classtemplate.rst
 
-Base Dataset Class
----------------------------
-
-.. autoclass:: DGLDataset
-    :members: download, save, load, process, has_cache, __getitem__, __len__
-
+    DGLDataset
+    CSVDataset
 
 Node Prediction Datasets
 ---------------------------------------
 
-DGL hosted datasets for node classification/regression tasks.
+Datasets for node classification/regression tasks
 
-.. _sstdata:
+.. autosummary::
+    :toctree: ../../generated/
+    :nosignatures:
+    :template: classtemplate.rst
 
-Stanford sentiment treebank dataset
-```````````````````````````````````
-.. autoclass:: SSTDataset
-    :members: __getitem__, __len__
-
-
-.. _karateclubdata:
-
-Karate club dataset
-```````````````````````````````````
-.. autoclass:: KarateClubDataset
-    :members: __getitem__, __len__
-
-.. _citationdata:
-
-Citation network dataset
-```````````````````````````````````
-.. autoclass:: CoraGraphDataset
-    :members: __getitem__, __len__
-
-.. autoclass:: CiteseerGraphDataset
-    :members: __getitem__, __len__
-
-.. autoclass:: PubmedGraphDataset
-    :members: __getitem__, __len__
-
-.. _corafulldata:
-
-CoraFull dataset
-```````````````````````````````````
-.. autoclass:: CoraFullDataset
-    :members: __getitem__, __len__
-
-.. _rdfdata:
-
-RDF datasets
-```````````````````````````````````
-
-.. autoclass:: AIFBDataset
-    :members: __getitem__, __len__
-
-.. autoclass:: MUTAGDataset
-    :members: __getitem__, __len__
-
-.. autoclass:: BGSDataset
-    :members: __getitem__, __len__
-
-.. autoclass:: AMDataset
-    :members: __getitem__, __len__
-
-.. _amazoncobuydata:
-
-Amazon Co-Purchase dataset
-```````````````````````````````````
-.. autoclass:: AmazonCoBuyComputerDataset
-    :members: __getitem__, __len__
-
-.. autoclass:: AmazonCoBuyPhotoDataset
-    :members: __getitem__, __len__
-
-.. _coauthordata:
-
-Coauthor dataset
-```````````````````````````````````
-.. autoclass:: CoauthorCSDataset
-    :members: __getitem__, __len__
-
-.. autoclass:: CoauthorPhysicsDataset
-    :members: __getitem__, __len__
-
-.. _ppidata:
-
-Protein-Protein Interaction dataset
-```````````````````````````````````
-.. autoclass:: PPIDataset
-    :members: __getitem__, __len__
-
-.. _redditdata:
-
-Reddit dataset
-``````````````
-.. autoclass:: RedditDataset
-    :members: __getitem__, __len__
-
-.. _sbmdata:
-
-Symmetric Stochastic Block Model Mixture dataset
-````````````````````````````````````````````````
-.. autoclass:: SBMMixtureDataset
-    :members: __getitem__, __len__, collate_fn
-
-.. _frauddata:
-
-Fraud dataset
-``````````````
-.. autoclass:: FraudDataset
-    :members: __getitem__, __len__
-
-.. autoclass:: FraudYelpDataset
-    :members: __getitem__, __len__
-
-.. autoclass:: FraudAmazonDataset
-    :members: __getitem__, __len__
-
+    SSTDataset
+    KarateClubDataset
+    CoraGraphDataset
+    CiteseerGraphDataset
+    PubmedGraphDataset
+    CoraFullDataset
+    AIFBDataset
+    MUTAGDataset
+    BGSDataset
+    AMDataset
+    AmazonCoBuyComputerDataset
+    AmazonCoBuyPhotoDataset
+    CoauthorCSDataset
+    CoauthorPhysicsDataset
+    PPIDataset
+    RedditDataset
+    SBMMixtureDataset
+    FraudDataset
+    FraudYelpDataset
+    FraudAmazonDataset
+    BAShapeDataset
+    BACommunityDataset
+    TreeCycleDataset
+    TreeGridDataset
+    WikiCSDataset
+    FlickrDataset
+    YelpDataset
 
 Edge Prediction Datasets
 ---------------------------------------
 
-DGL hosted datasets for edge classification/regression and link prediction tasks.
+Datasets for edge classification/regression and link prediction
 
-.. _kgdata:
+.. autosummary::
+    :toctree: ../../generated/
+    :nosignatures:
+    :template: classtemplate.rst
 
-Knowlege graph dataset
-```````````````````````````````````
-
-.. autoclass:: FB15k237Dataset
-    :members: __getitem__, __len__
-
-.. autoclass:: FB15kDataset
-    :members: __getitem__, __len__
-
-.. autoclass:: WN18Dataset
-    :members: __getitem__, __len__
-
-.. _bitcoinotcdata:
-
-BitcoinOTC dataset
-```````````````````````````````````
-.. autoclass:: BitcoinOTCDataset
-    :members: __getitem__, __len__
-
-ICEWS18 dataset
-```````````````````````````````````
-.. autoclass:: ICEWS18Dataset
-    :members: __getitem__, __len__
-
-GDELT dataset
-```````````````````````````````````
-.. autoclass:: GDELTDataset
-    :members: __getitem__, __len__
-
+    FB15k237Dataset
+    FB15kDataset
+    WN18Dataset
+    BitcoinOTCDataset
+    ICEWS18Dataset
+    GDELTDataset
 
 Graph Prediction Datasets
 ---------------------------------------
 
-DGL hosted datasets for graph classification/regression tasks.
+Datasets for graph classification/regression tasks
 
+.. autosummary::
+    :toctree: ../../generated/
+    :nosignatures:
+    :template: classtemplate.rst
 
-.. _qm7bdata:
+    QM7bDataset
+    QM9Dataset
+    QM9EdgeDataset
+    MiniGCDataset
+    TUDataset
+    LegacyTUDataset
+    GINDataset
+    FakeNewsDataset
+    BA2MotifDataset
 
-QM7b dataset
-```````````````````````````````````
-.. autoclass:: QM7bDataset
-    :members: __getitem__, __len__
+Dataset adapters
+-------------------
 
-.. _qm9data:
+.. autosummary::
+    :toctree: ../../generated/
+    :nosignatures:
+    :template: classtemplate.rst
 
-QM9 dataset
-```````````````````````````````````
-.. autoclass:: QM9Dataset
-    :members: __getitem__, __len__
-
-.. _qm9edgedata:
-
-QM9Edge dataset
-```````````````````````````````````
-.. autoclass:: QM9EdgeDataset
-    :members: __getitem__, __len__
-
-.. _minigcdataset:
-
-Mini graph classification dataset
-`````````````````````````````````
-.. autoclass:: MiniGCDataset
-    :members: __getitem__, __len__
-
-.. _tudata:
-
-TU dataset
-``````````
-.. autoclass:: TUDataset
-    :members: __getitem__, __len__
-
-.. autoclass:: LegacyTUDataset
-    :members: __getitem__, __len__
-
-.. _gindataset:
-
-Graph isomorphism network dataset
-```````````````````````````````````
-
-.. autoclass:: GINDataset
-    :members: __getitem__, __len__
-
-.. _fakenewsdata:
-
-Fake news dataset
-```````````````````````````````````
-.. autoclass:: FakeNewsDataset
-    :members: __getitem__, __len__
+    AsNodePredDataset
+    AsLinkPredDataset
+    AsGraphPredDataset
 
 Utilities
 -----------------
 
 .. autosummary::
     :toctree: ../../generated/
+    :nosignatures:
+    :template: classtemplate.rst
 
     utils.get_download_dir
     utils.download
@@ -241,6 +120,5 @@ Utilities
     utils.load_labels
     utils.save_info
     utils.load_info
-
-.. autoclass:: dgl.data.utils.Subset
-    :members: __getitem__, __len__
+    utils.add_nodepred_split
+    utils.Subset

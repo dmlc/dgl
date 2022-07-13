@@ -222,6 +222,16 @@ dataset = SyntheticDataset()
 graph, label = dataset[0]
 print(graph, label)
 
+######################################################################
+# Creating Dataset from CSV via :class:`~dgl.data.CSVDataset`
+# ------------------------------------------------------------
+#
+# The previous examples describe how to create a dataset from CSV files
+# step-by-step. DGL also provides a utility class :class:`~dgl.data.CSVDataset`
+# for reading and parsing data from CSV files. See :ref:`guide-data-pipeline-loadcsv`
+# for more details.
+#
+
 
 # Thumbnail credits: (Un)common Use Cases for Graph Databases, Michal Bachman
 # sphinx_gallery_thumbnail_path = '_static/blitz_6_load_data.png'

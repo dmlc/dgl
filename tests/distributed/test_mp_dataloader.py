@@ -38,18 +38,19 @@ class NeighborSampler(object):
         return blocks
 
 
-def start_server(rank, tmpdir, disable_shared_mem, num_clients):
+def start_server(rank, tmpdir, disable_shared_mem, num_clients, keep_alive=False):
     import dgl
     print('server: #clients=' + str(num_clients))
     g = DistGraphServer(rank, "mp_ip_config.txt", 1, num_clients,
                         tmpdir / 'test_sampling.json', disable_shared_mem=disable_shared_mem,
-                        graph_format=['csc', 'coo'])
+                        graph_format=['csc', 'coo'], keep_alive=keep_alive)
     g.start()
 
 
-def start_dist_dataloader(rank, tmpdir, num_server, drop_last, orig_nid, orig_eid):
+def start_dist_dataloader(rank, tmpdir, num_server, drop_last, orig_nid, orig_eid, group_id=0):
     import dgl
     import torch as th
+    os.environ['DGL_GROUP_ID'] = str(group_id)
     dgl.distributed.initialize("mp_ip_config.txt")
     gpb = None
     disable_shared_mem = num_server > 0
@@ -120,7 +121,6 @@ def test_standalone(tmpdir):
         start_dist_dataloader(0, tmpdir, 1, True, orig_nid, orig_eid)
     except Exception as e:
         print(e)
-    dgl.distributed.exit_client() # this is needed since there's two test here in one process
 
 def start_dist_neg_dataloader(rank, tmpdir, num_server, num_workers, orig_nid, groundtruth_g):
     import dgl
@@ -146,14 +146,14 @@ def start_dist_neg_dataloader(rank, tmpdir, num_server, num_workers, orig_nid, g
     num_negs = 5
     sampler = dgl.dataloading.MultiLayerNeighborSampler([5,10])
     negative_sampler=dgl.dataloading.negative_sampler.Uniform(num_negs)
-    dataloader = dgl.dataloading.EdgeDataLoader(dist_graph,
-                                                train_eid,
-                                                sampler,
-                                                batch_size=batch_size,
-                                                negative_sampler=negative_sampler,
-                                                shuffle=True,
-                                                drop_last=False,
-                                                num_workers=num_workers)
+    dataloader = dgl.dataloading.DistEdgeDataLoader(dist_graph,
+                                                    train_eid,
+                                                    sampler,
+                                                    batch_size=batch_size,
+                                                    negative_sampler=negative_sampler,
+                                                    shuffle=True,
+                                                    drop_last=False,
+                                                    num_workers=num_workers)
     for _ in range(2):
         for _, (_, pos_graph, neg_graph, blocks) in zip(range(0, num_edges_to_sample, batch_size), dataloader):
             block = blocks[-1]
@@ -213,8 +213,13 @@ def check_neg_dataloader(g, tmpdir, num_server, num_workers):
 @pytest.mark.parametrize("num_workers", [0, 4])
 @pytest.mark.parametrize("drop_last", [True, False])
 @pytest.mark.parametrize("reshuffle", [True, False])
-def test_dist_dataloader(tmpdir, num_server, num_workers, drop_last, reshuffle):
+@pytest.mark.parametrize("num_groups", [1])
+def test_dist_dataloader(tmpdir, num_server, num_workers, drop_last, reshuffle, num_groups):
     reset_envs()
+    # No multiple partitions on single machine for
+    # multiple client groups in case of race condition.
+    if num_groups > 1:
+        num_server = 1
     generate_ip_config("mp_ip_config.txt", num_server, num_server)
 
     g = CitationGraphDataset("cora")[0]
@@ -228,22 +233,35 @@ def test_dist_dataloader(tmpdir, num_server, num_workers, drop_last, reshuffle):
 
     pserver_list = []
     ctx = mp.get_context('spawn')
+    keep_alive = num_groups > 1
     for i in range(num_server):
         p = ctx.Process(target=start_server, args=(
-            i, tmpdir, num_server > 1, num_workers+1))
+            i, tmpdir, num_server > 1, num_workers+1, keep_alive))
         p.start()
         time.sleep(1)
         pserver_list.append(p)
 
     os.environ['DGL_DIST_MODE'] = 'distributed'
     os.environ['DGL_NUM_SAMPLER'] = str(num_workers)
-    ptrainer = ctx.Process(target=start_dist_dataloader, args=(
-        0, tmpdir, num_server, drop_last, orig_nid, orig_eid))
-    ptrainer.start()
+    ptrainer_list = []
+    num_trainers = 1
+    for trainer_id in range(num_trainers):
+        for group_id in range(num_groups):
+            p = ctx.Process(target=start_dist_dataloader, args=(
+                trainer_id, tmpdir, num_server, drop_last, orig_nid, orig_eid, group_id))
+            p.start()
+            time.sleep(1) # avoid race condition when instantiating DistGraph
+            ptrainer_list.append(p)
 
+    for p in ptrainer_list:
+        p.join()
+    if keep_alive:
+        for p in pserver_list:
+            assert p.is_alive()
+        # force shutdown server
+        dgl.distributed.shutdown_servers("mp_ip_config.txt", 1)
     for p in pserver_list:
         p.join()
-    ptrainer.join()
 
 def start_node_dataloader(rank, tmpdir, num_server, num_workers, orig_nid, orig_eid, groundtruth_g):
     import dgl
@@ -275,7 +293,7 @@ def start_node_dataloader(rank, tmpdir, num_server, num_workers, orig_nid, orig_
     # We need to test creating DistDataLoader multiple times.
     for i in range(2):
         # Create DataLoader for constructing blocks
-        dataloader = dgl.dataloading.NodeDataLoader(
+        dataloader = dgl.dataloading.DistNodeDataLoader(
             dist_graph,
             train_nid,
             sampler,
@@ -326,7 +344,7 @@ def start_edge_dataloader(rank, tmpdir, num_server, num_workers, orig_nid, orig_
     # We need to test creating DistDataLoader multiple times.
     for i in range(2):
         # Create DataLoader for constructing blocks
-        dataloader = dgl.dataloading.EdgeDataLoader(
+        dataloader = dgl.dataloading.DistEdgeDataLoader(
             dist_graph,
             train_eid,
             sampler,
@@ -438,7 +456,8 @@ if __name__ == "__main__":
         test_dataloader(Path(tmpdirname), 3, 4, 'node')
         test_dataloader(Path(tmpdirname), 3, 4, 'edge')
         test_neg_dataloader(Path(tmpdirname), 3, 4)
-        test_dist_dataloader(Path(tmpdirname), 3, 0, True, True)
-        test_dist_dataloader(Path(tmpdirname), 3, 4, True, True)
-        test_dist_dataloader(Path(tmpdirname), 3, 0, True, False)
-        test_dist_dataloader(Path(tmpdirname), 3, 4, True, False)
+        for num_groups in [1]:
+            test_dist_dataloader(Path(tmpdirname), 3, 0, True, True, num_groups)
+            test_dist_dataloader(Path(tmpdirname), 3, 4, True, True, num_groups)
+            test_dist_dataloader(Path(tmpdirname), 3, 0, True, False, num_groups)
+            test_dist_dataloader(Path(tmpdirname), 3, 4, True, False, num_groups)

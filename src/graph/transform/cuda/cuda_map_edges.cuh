@@ -117,13 +117,11 @@ class DeviceNodeMap {
       cudaStream_t stream) :
     num_types_(num_nodes.size()),
     rhs_offset_(offset),
-    workspaces_(),
     hash_tables_(),
     ctx_(ctx) {
     auto device = runtime::DeviceAPI::Get(ctx);
 
     hash_tables_.reserve(num_types_);
-    workspaces_.reserve(num_types_);
     for (int64_t i = 0; i < num_types_; ++i) {
       hash_tables_.emplace_back(
           new OrderedHashTable<IdType>(
@@ -170,7 +168,6 @@ class DeviceNodeMap {
  private:
   int64_t num_types_;
   size_t rhs_offset_;
-  std::vector<void*> workspaces_;
   std::vector<std::unique_ptr<OrderedHashTable<IdType>>> hash_tables_;
   DGLContext ctx_;
 
@@ -242,11 +239,8 @@ MapEdges(
       const dim3 block(BLOCK_SIZE);
 
       // map the srcs
-      map_edge_ids<IdType, BLOCK_SIZE, TILE_SIZE><<<
-        grid,
-        block,
-        0,
-        stream>>>(
+      CUDA_KERNEL_CALL((map_edge_ids<IdType, BLOCK_SIZE, TILE_SIZE>),
+        grid, block, 0, stream,
         edges.src.Ptr<IdType>(),
         new_lhs.back().Ptr<IdType>(),
         edges.dst.Ptr<IdType>(),
@@ -254,7 +248,6 @@ MapEdges(
         num_edges,
         node_map.LhsHashTable(src_type).DeviceHandle(),
         node_map.RhsHashTable(dst_type).DeviceHandle());
-      CUDA_CALL(cudaGetLastError());
     } else {
       new_lhs.emplace_back(
           aten::NullArray(DLDataType{kDLInt, sizeof(IdType)*8, 1}, ctx));

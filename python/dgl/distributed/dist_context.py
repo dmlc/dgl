@@ -8,12 +8,13 @@ import time
 import os
 import sys
 import queue
+import gc
 from enum import Enum
 
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
 from .kvstore import init_kvstore, close_kvstore
-from .rpc_client import connect_to_server, shutdown_servers
+from .rpc_client import connect_to_server
 from .role import init_role
 from .. import utils
 
@@ -33,13 +34,13 @@ def get_sampler_pool():
     return SAMPLER_POOL, NUM_SAMPLER_WORKERS
 
 
-def _init_rpc(ip_config, num_servers, max_queue_size, net_type, role, num_threads):
+def _init_rpc(ip_config, num_servers, max_queue_size, net_type, role, num_threads, group_id):
     ''' This init function is called in the worker processes.
     '''
     try:
         utils.set_num_threads(num_threads)
         if os.environ.get('DGL_DIST_MODE', 'standalone') != 'standalone':
-            connect_to_server(ip_config, num_servers, max_queue_size, net_type)
+            connect_to_server(ip_config, num_servers, max_queue_size, net_type, group_id)
         init_role(role)
         init_kvstore(ip_config, num_servers, role)
     except Exception as e:
@@ -200,7 +201,7 @@ def initialize(ip_config, num_servers=1, num_workers=0,
         Note that the 20 GB is just an upper-bound and DGL uses zero-copy and
         it will not allocate 20GB memory at once.
     net_type : str, optional
-        Networking type. Currently the only valid option is ``'socket'``.
+        Networking type. Valid options are: ``'socket'``, ``'tensorpipe'``.
 
         Default: ``'socket'``
     num_worker_threads: int
@@ -227,12 +228,15 @@ def initialize(ip_config, num_servers=1, num_workers=0,
         formats = os.environ.get('DGL_GRAPH_FORMAT', 'csc').split(',')
         formats = [f.strip() for f in formats]
         rpc.reset()
+        keep_alive = bool(int(os.environ.get('DGL_KEEP_ALIVE', 0)))
         serv = DistGraphServer(int(os.environ.get('DGL_SERVER_ID')),
                                os.environ.get('DGL_IP_CONFIG'),
                                int(os.environ.get('DGL_NUM_SERVER')),
                                int(os.environ.get('DGL_NUM_CLIENT')),
                                os.environ.get('DGL_CONF_PATH'),
-                               graph_format=formats)
+                               graph_format=formats,
+                               keep_alive=keep_alive,
+                               net_type=net_type)
         serv.start()
         sys.exit()
     else:
@@ -244,7 +248,7 @@ def initialize(ip_config, num_servers=1, num_workers=0,
             num_servers = int(os.environ.get('DGL_NUM_SERVER'))
         else:
             num_servers = 1
-
+        group_id = int(os.environ.get('DGL_GROUP_ID', 0))
         rpc.reset()
         global SAMPLER_POOL
         global NUM_SAMPLER_WORKERS
@@ -252,14 +256,15 @@ def initialize(ip_config, num_servers=1, num_workers=0,
             'DGL_DIST_MODE', 'standalone') == 'standalone'
         if num_workers > 0 and not is_standalone:
             SAMPLER_POOL = CustomPool(num_workers, (ip_config, num_servers, max_queue_size,
-                                                    net_type, 'sampler', num_worker_threads))
+                                                    net_type, 'sampler', num_worker_threads,
+                                                    group_id))
         else:
             SAMPLER_POOL = None
         NUM_SAMPLER_WORKERS = num_workers
         if not is_standalone:
             assert num_servers is not None and num_servers > 0, \
                 'The number of servers per machine must be specified with a positive number.'
-            connect_to_server(ip_config, num_servers, max_queue_size, net_type)
+            connect_to_server(ip_config, num_servers, max_queue_size, net_type, group_id=group_id)
         init_role('default')
         init_kvstore(ip_config, num_servers, 'default')
 
@@ -299,6 +304,14 @@ def is_initialized():
     return INITIALIZED
 
 
+def _shutdown_servers():
+    set_initialized(False)
+    # send ShutDownRequest to servers
+    if rpc.get_rank() == 0:  # Only client_0 issue this command
+        req = rpc.ShutDownRequest(rpc.get_rank())
+        for server_id in range(rpc.get_num_server()):
+            rpc.send_request(server_id, req)
+
 def exit_client():
     """Trainer exits
 
@@ -310,10 +323,14 @@ def exit_client():
     needs to call `exit_client` before calling `initialize` again.
     """
     # Only client with rank_0 will send shutdown request to servers.
+    print("Client[{}] in group[{}] is exiting...".format(
+        rpc.get_rank(), rpc.get_group_id()))
     finalize_worker()  # finalize workers should be earilier than barrier, and non-blocking
+    # collect data such as DistTensor before exit
+    gc.collect()
     if os.environ.get('DGL_DIST_MODE', 'standalone') != 'standalone':
         rpc.client_barrier()
-        shutdown_servers()
+        _shutdown_servers()
     finalize_client()
     join_finalize_worker()
     close_kvstore()

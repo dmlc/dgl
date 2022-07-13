@@ -2,10 +2,11 @@ import numpy as np
 import networkx as nx
 import unittest
 import scipy.sparse as ssp
+import pytest
 
 import dgl
 import backend as F
-from test_utils import parametrize_dtype
+from test_utils import parametrize_idtype
 
 D = 5
 
@@ -32,7 +33,18 @@ def test_edge_subgraph():
     # Test when the graph has no node data and edge data.
     g = generate_graph(add_data=False)
     eid = [0, 2, 3, 6, 7, 9]
+
+    # relabel=True
     sg = g.edge_subgraph(eid)
+    assert F.array_equal(sg.ndata[dgl.NID], F.tensor([0, 2, 4, 5, 1, 9], g.idtype))
+    assert F.array_equal(sg.edata[dgl.EID], F.tensor(eid, g.idtype))
+    sg.ndata['h'] = F.arange(0, sg.number_of_nodes())
+    sg.edata['h'] = F.arange(0, sg.number_of_edges())
+
+    # relabel=False
+    sg = g.edge_subgraph(eid, relabel_nodes=False)
+    assert g.number_of_nodes() == sg.number_of_nodes()
+    assert F.array_equal(sg.edata[dgl.EID], F.tensor(eid, g.idtype))
     sg.ndata['h'] = F.arange(0, sg.number_of_nodes())
     sg.edata['h'] = F.arange(0, sg.number_of_edges())
 
@@ -99,12 +111,14 @@ def create_test_heterograph(idtype):
         ('user', 'wishes', 'game'): ([0, 2], [1, 0]),
         ('developer', 'develops', 'game'): ([0, 1], [0, 1])
     }, idtype=idtype, device=F.ctx())
+    for etype in g.etypes:
+        g.edges[etype].data['weight'] = F.randn((g.num_edges(etype),))
     assert g.idtype == idtype
     assert g.device == F.ctx()
     return g
 
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="MXNet doesn't support bool tensor")
-@parametrize_dtype
+@parametrize_idtype
 def test_subgraph_mask(idtype):
     g = create_test_heterograph(idtype)
     g_graph = g['follows']
@@ -144,7 +158,7 @@ def test_subgraph_mask(idtype):
                            'wishes': F.tensor([False, True], dtype=F.bool)})
     _check_subgraph(g, sg2)
 
-@parametrize_dtype
+@parametrize_idtype
 def test_subgraph1(idtype):
     g = create_test_heterograph(idtype)
     g_graph = g['follows']
@@ -296,7 +310,7 @@ def test_subgraph1(idtype):
         dst = F.asnumpy(dst)
         assert np.array_equal(src, np.array([1]))
 
-@parametrize_dtype
+@parametrize_idtype
 def test_in_subgraph(idtype):
     hg = dgl.heterograph({
         ('user', 'follow', 'user'): ([1, 2, 3, 0, 2, 3, 0], [0, 0, 0, 1, 1, 1, 2]),
@@ -363,7 +377,7 @@ def test_in_subgraph(idtype):
     assert subg.num_nodes('coin') == 0
     assert subg.num_edges('flips') == 0
 
-@parametrize_dtype
+@parametrize_idtype
 def test_out_subgraph(idtype):
     hg = dgl.heterograph({
         ('user', 'follow', 'user'): ([1, 2, 3, 0, 2, 3, 0], [0, 0, 0, 1, 1, 1, 2]),
@@ -445,7 +459,7 @@ def test_subgraph_message_passing():
     sg = g.subgraph([1, 2, 3]).to(F.ctx())
     sg.update_all(lambda edges: {'x': edges.src['x']}, lambda nodes: {'y': F.sum(nodes.mailbox['x'], 1)})
 
-@parametrize_dtype
+@parametrize_idtype
 def test_khop_in_subgraph(idtype):
     g = dgl.graph(([1, 1, 2, 3, 4], [0, 2, 0, 4, 2]), idtype=idtype, device=F.ctx())
     g.edata['w'] = F.tensor([
@@ -521,7 +535,7 @@ def test_khop_in_subgraph(idtype):
     assert F.array_equal(F.astype(inv['user'], idtype), F.tensor([0, 1], idtype))
     assert F.array_equal(F.astype(inv['game'], idtype), F.tensor([0], idtype))
 
-@parametrize_dtype
+@parametrize_idtype
 def test_khop_out_subgraph(idtype):
     g = dgl.graph(([0, 2, 0, 4, 2], [1, 1, 2, 3, 4]), idtype=idtype, device=F.ctx())
     g.edata['w'] = F.tensor([
@@ -594,3 +608,65 @@ def test_khop_out_subgraph(idtype):
     assert edge_set == {(0, 1)}
     assert F.array_equal(F.astype(inv['user'], idtype), F.tensor([0], idtype))
     assert F.array_equal(F.astype(inv['game'], idtype), F.tensor([0], idtype))
+
+@unittest.skipIf(not F.gpu_ctx(), 'only necessary with GPU')
+@pytest.mark.parametrize(
+    'parent_idx_device', [('cpu', F.cpu()), ('cuda', F.cuda()), ('uva', F.cpu()), ('uva', F.cuda())])
+@pytest.mark.parametrize('child_device', [F.cpu(), F.cuda()])
+def test_subframes(parent_idx_device, child_device):
+    parent_device, idx_device = parent_idx_device
+    g = dgl.graph((F.tensor([1,2,3], dtype=F.int64), F.tensor([2,3,4], dtype=F.int64)))
+    print(g.device)
+    g.ndata['x'] = F.randn((5, 4))
+    g.edata['a'] = F.randn((3, 6))
+    idx = F.tensor([1, 2], dtype=F.int64)
+    if parent_device == 'cuda':
+        g = g.to(F.cuda())
+    elif parent_device == 'uva':
+        if F.backend_name != 'pytorch':
+            pytest.skip("UVA only supported for PyTorch")
+        g = g.to(F.cpu())
+        g.create_formats_()
+        g.pin_memory_()
+    elif parent_device == 'cpu':
+        g = g.to(F.cpu())
+    idx = F.copy_to(idx, idx_device)
+    sg = g.sample_neighbors(idx, 2).to(child_device)
+    assert sg.device == F.context(sg.ndata['x'])
+    assert sg.device == F.context(sg.edata['a'])
+    assert sg.device == child_device
+    if parent_device != 'uva':
+        sg = g.to(child_device).sample_neighbors(F.copy_to(idx, child_device), 2)
+        assert sg.device == F.context(sg.ndata['x'])
+        assert sg.device == F.context(sg.edata['a'])
+        assert sg.device == child_device
+    if parent_device == 'uva':
+        g.unpin_memory_()
+
+@unittest.skipIf(F._default_context_str != "gpu", reason="UVA only available on GPU")
+@pytest.mark.parametrize('device', [F.cpu(), F.cuda()])
+@unittest.skipIf(dgl.backend.backend_name != "pytorch", reason="UVA only supported for PyTorch")
+@parametrize_idtype
+def test_uva_subgraph(idtype, device):
+    g = create_test_heterograph(idtype)
+    g = g.to(F.cpu())
+    g.create_formats_()
+    g.pin_memory_()
+    indices = {'user': F.copy_to(F.tensor([0], idtype), device)}
+    edge_indices = {'follows': F.copy_to(F.tensor([0], idtype), device)}
+    assert g.subgraph(indices).device == device
+    assert g.edge_subgraph(edge_indices).device == device
+    assert g.in_subgraph(indices).device == device
+    assert g.out_subgraph(indices).device == device
+    if dgl.backend.backend_name != 'tensorflow':
+        # (BarclayII) Most of Tensorflow functions somehow do not preserve device: a CPU tensor
+        # becomes a GPU tensor after operations such as concat(), unique() or even sin().
+        # Not sure what should be the best fix.
+        assert g.khop_in_subgraph(indices, 1)[0].device == device
+        assert g.khop_out_subgraph(indices, 1)[0].device == device
+    assert g.sample_neighbors(indices, 1).device == device
+    g.unpin_memory_()
+
+if __name__ == '__main__':
+    test_edge_subgraph()
+    # test_uva_subgraph(F.int64, F.cpu())

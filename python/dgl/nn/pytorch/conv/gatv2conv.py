@@ -11,13 +11,8 @@ from ....utils import expand_as_pair
 
 # pylint: enable=W0235
 class GATv2Conv(nn.Module):
-    r"""
-
-    Description
-    -----------
-    Apply GATv2 from
-    `How Attentive are Graph Attention Networks? <https://arxiv.org/pdf/2105.14491.pdf>`__
-    over an input signal.
+    r"""GATv2 from `How Attentive are Graph Attention Networks?
+    <https://arxiv.org/pdf/2105.14491.pdf>`__
 
     .. math::
         h_i^{(l+1)} = \sum_{j\in \mathcal{N}(i)} \alpha_{ij}^{(l)} W^{(l)}_{right} h_j^{(l)}

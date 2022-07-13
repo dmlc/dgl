@@ -15,11 +15,7 @@ __all__ = ['SumPooling', 'AvgPooling', 'MaxPooling', 'SortPooling',
            'SetTransformerEncoder', 'SetTransformerDecoder', 'WeightAndSum']
 
 class SumPooling(nn.Module):
-    r"""
-
-    Description
-    -----------
-    Apply sum pooling over the nodes in a graph .
+    r"""Apply sum pooling over the nodes in a graph.
 
     .. math::
         r^{(i)} = \sum_{k=1}^{N_i} x^{(i)}_k
@@ -100,11 +96,7 @@ class SumPooling(nn.Module):
 
 
 class AvgPooling(nn.Module):
-    r"""
-
-    Description
-    -----------
-    Apply average pooling over the nodes in a graph.
+    r"""Apply average pooling over the nodes in a graph.
 
     .. math::
         r^{(i)} = \frac{1}{N_i}\sum_{k=1}^{N_i} x^{(i)}_k
@@ -185,11 +177,7 @@ class AvgPooling(nn.Module):
 
 
 class MaxPooling(nn.Module):
-    r"""
-
-    Description
-    -----------
-    Apply max pooling over the nodes in a graph.
+    r"""Apply max pooling over the nodes in a graph.
 
     .. math::
         r^{(i)} = \max_{k=1}^{N_i}\left( x^{(i)}_k \right)
@@ -268,13 +256,10 @@ class MaxPooling(nn.Module):
 
 
 class SortPooling(nn.Module):
-    r"""
+    r"""Sort Pooling from `An End-to-End Deep Learning Architecture for Graph Classification
+    <https://www.cse.wustl.edu/~ychen/public/DGCNN.pdf>`__
 
-    Description
-    -----------
-    Apply Sort Pooling (`An End-to-End Deep Learning Architecture for Graph Classification
-    <https://www.cse.wustl.edu/~ychen/public/DGCNN.pdf>`__) over the nodes in a graph.
-    Sort Pooling first sorts the node features in ascending order along the feature dimension,
+    It first sorts the node features in ascending order along the feature dimension,
     and selects the sorted features of top-k nodes (ranked by the largest value of each node).
 
     Parameters
@@ -345,7 +330,7 @@ class SortPooling(nn.Module):
         graph : DGLGraph
             A DGLGraph or a batch of DGLGraphs.
         feat : torch.Tensor
-            The input feature with shape :math:`(N, D)`, where :math:`N` is the
+            The input node feature with shape :math:`(N, D)`, where :math:`N` is the
             number of nodes in the graph, and :math:`D` means the size of features.
 
         Returns
@@ -365,12 +350,8 @@ class SortPooling(nn.Module):
 
 
 class GlobalAttentionPooling(nn.Module):
-    r"""
-
-    Description
-    -----------
-    Apply Global Attention Pooling (`Gated Graph Sequence Neural Networks
-    <https://arxiv.org/abs/1511.05493.pdf>`__) over the nodes in a graph.
+    r"""Global Attention Pooling from `Gated Graph Sequence Neural Networks
+    <https://arxiv.org/abs/1511.05493>`__
 
     .. math::
         r^{(i)} = \sum_{k=1}^{N_i}\mathrm{softmax}\left(f_{gate}
@@ -438,7 +419,7 @@ class GlobalAttentionPooling(nn.Module):
         self.gate_nn = gate_nn
         self.feat_nn = feat_nn
 
-    def forward(self, graph, feat):
+    def forward(self, graph, feat, get_attention=False):
         r"""
 
         Compute global attention pooling.
@@ -448,14 +429,19 @@ class GlobalAttentionPooling(nn.Module):
         graph : DGLGraph
             A DGLGraph or a batch of DGLGraphs.
         feat : torch.Tensor
-            The input feature with shape :math:`(N, D)` where :math:`N` is the
+            The input node feature with shape :math:`(N, D)` where :math:`N` is the
             number of nodes in the graph, and :math:`D` means the size of features.
+        get_attention : bool, optional
+            Whether to return the attention values from gate_nn. Default to False.
 
         Returns
         -------
         torch.Tensor
             The output feature with shape :math:`(B, D)`, where :math:`B` refers
             to the batch size.
+        torch.Tensor, optional
+            The attention values of shape :math:`(N, 1)`, where :math:`N` is the number of
+            nodes in the graph. This is returned only when :attr:`get_attention` is ``True``.
         """
         with graph.local_scope():
             gate = self.gate_nn(feat)
@@ -470,14 +456,16 @@ class GlobalAttentionPooling(nn.Module):
             readout = sum_nodes(graph, 'r')
             graph.ndata.pop('r')
 
-            return readout
+            if get_attention:
+                return readout, gate
+            else:
+                return readout
 
 
 class Set2Set(nn.Module):
-    r"""
+    r"""Set2Set operator from `Order Matters: Sequence to sequence for sets
+    <https://arxiv.org/pdf/1511.06391.pdf>`__
 
-    Description
-    -----------
     For each individual graph in the batch, set2set computes
 
     .. math::
@@ -641,7 +629,7 @@ def _gen_mask(lengths_x, lengths_y, max_len_x, max_len_y):
 
 
 class MultiHeadAttention(nn.Module):
-    r"""Multi-Head Attention block, used in Transformer, Set Transformer and so on.
+    r"""Multi-Head Attention block, used in Transformer, Set Transformer and so on
 
     Parameters
     ----------
@@ -754,7 +742,8 @@ class MultiHeadAttention(nn.Module):
 
 
 class SetAttentionBlock(nn.Module):
-    r"""SAB block introduced in Set-Transformer paper.
+    r"""SAB block from `Set Transformer: A Framework for Attention-based
+    Permutation-Invariant Neural Networks <https://arxiv.org/abs/1810.00825>`__
 
     Parameters
     ----------
@@ -795,7 +784,8 @@ class SetAttentionBlock(nn.Module):
 
 
 class InducedSetAttentionBlock(nn.Module):
-    r"""ISAB block introduced in Set-Transformer paper.
+    r"""ISAB block from `Set Transformer: A Framework for Attention-based
+    Permutation-Invariant Neural Networks <https://arxiv.org/abs/1810.00825>`__
 
     Parameters
     ----------
@@ -867,7 +857,8 @@ class InducedSetAttentionBlock(nn.Module):
 
 
 class PMALayer(nn.Module):
-    r"""Pooling by Multihead Attention, used as the Decoder Module in Set Transformer.
+    r"""Pooling by Multihead Attention from `Set Transformer: A Framework for Attention-based
+    Permutation-Invariant Neural Networks <https://arxiv.org/abs/1810.00825>`__
 
     Parameters
     ----------
@@ -943,12 +934,8 @@ class PMALayer(nn.Module):
 
 
 class SetTransformerEncoder(nn.Module):
-    r"""
-
-    Description
-    -----------
-    The Encoder module in `Set Transformer: A Framework for Attention-based
-    Permutation-Invariant Neural Networks <https://arxiv.org/pdf/1810.00825.pdf>`__.
+    r"""The Encoder module from `Set Transformer: A Framework for Attention-based
+    Permutation-Invariant Neural Networks <https://arxiv.org/pdf/1810.00825.pdf>`__
 
     Parameters
     ----------
@@ -1079,12 +1066,8 @@ class SetTransformerEncoder(nn.Module):
 
 
 class SetTransformerDecoder(nn.Module):
-    r"""
-
-    Description
-    -----------
-    The Decoder module in `Set Transformer: A Framework for Attention-based
-    Permutation-Invariant Neural Networks <https://arxiv.org/pdf/1810.00825.pdf>`__.
+    r"""The Decoder module from `Set Transformer: A Framework for Attention-based
+    Permutation-Invariant Neural Networks <https://arxiv.org/pdf/1810.00825.pdf>`__
 
     Parameters
     ----------

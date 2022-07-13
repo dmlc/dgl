@@ -27,7 +27,8 @@ NDArray IndexSelect(NDArray array, IdArray index) {
     shape.emplace_back(array->shape[d]);
   }
 
-  NDArray ret = NDArray::Empty(shape, array->dtype, array->ctx);
+  // use index->ctx for pinned array
+  NDArray ret = NDArray::Empty(shape, array->dtype, index->ctx);
   if (len == 0)
     return ret;
   DType* ret_data = static_cast<DType*>(ret->data);
@@ -54,6 +55,10 @@ template NDArray IndexSelect<kDLGPU, int32_t, int32_t>(NDArray, IdArray);
 template NDArray IndexSelect<kDLGPU, int32_t, int64_t>(NDArray, IdArray);
 template NDArray IndexSelect<kDLGPU, int64_t, int32_t>(NDArray, IdArray);
 template NDArray IndexSelect<kDLGPU, int64_t, int64_t>(NDArray, IdArray);
+#ifdef USE_FP16
+template NDArray IndexSelect<kDLGPU, __half, int32_t>(NDArray, IdArray);
+template NDArray IndexSelect<kDLGPU, __half, int64_t>(NDArray, IdArray);
+#endif
 template NDArray IndexSelect<kDLGPU, float, int32_t>(NDArray, IdArray);
 template NDArray IndexSelect<kDLGPU, float, int64_t>(NDArray, IdArray);
 template NDArray IndexSelect<kDLGPU, double, int32_t>(NDArray, IdArray);
@@ -62,18 +67,30 @@ template NDArray IndexSelect<kDLGPU, double, int64_t>(NDArray, IdArray);
 template <DLDeviceType XPU, typename DType>
 DType IndexSelect(NDArray array, int64_t index) {
   auto device = runtime::DeviceAPI::Get(array->ctx);
+#ifdef USE_FP16
+  // The initialization constructor for __half is apparently a device-
+  // only function in some setups, but the current function, IndexSelect,
+  // isn't run on the device, so it doesn't have access to that constructor.
+  using SafeDType = typename std::conditional<
+      std::is_same<DType, __half>::value, uint16_t, DType>::type;
+  SafeDType ret = 0;
+#else
   DType ret = 0;
+#endif
   device->CopyDataFromTo(
-      static_cast<DType*>(array->data) + index, 0, &ret, 0,
+      static_cast<DType*>(array->data) + index, 0, reinterpret_cast<DType*>(&ret), 0,
       sizeof(DType), array->ctx, DLContext{kDLCPU, 0},
       array->dtype, nullptr);
-  return ret;
+  return reinterpret_cast<DType&>(ret);
 }
 
 template int32_t IndexSelect<kDLGPU, int32_t>(NDArray array, int64_t index);
 template int64_t IndexSelect<kDLGPU, int64_t>(NDArray array, int64_t index);
 template uint32_t IndexSelect<kDLGPU, uint32_t>(NDArray array, int64_t index);
 template uint64_t IndexSelect<kDLGPU, uint64_t>(NDArray array, int64_t index);
+#ifdef USE_FP16
+template __half IndexSelect<kDLGPU, __half>(NDArray array, int64_t index);
+#endif
 template float IndexSelect<kDLGPU, float>(NDArray array, int64_t index);
 template double IndexSelect<kDLGPU, double>(NDArray array, int64_t index);
 

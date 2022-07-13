@@ -4,7 +4,7 @@ import torch as th
 import torch.nn as nn
 from ...base import DGLError
 
-__all__ = ['HeteroGraphConv']
+__all__ = ['HeteroGraphConv', 'HeteroLinear', 'HeteroEmbedding']
 
 class HeteroGraphConv(nn.Module):
     r"""A generic module for computing convolution on heterogeneous graphs.
@@ -250,3 +250,131 @@ def get_aggregate_fn(agg):
         return _stack_agg_func
     else:
         return partial(_agg_func, fn=fn)
+
+class HeteroLinear(nn.Module):
+    """Apply linear transformations on heterogeneous inputs.
+
+    Parameters
+    ----------
+    in_size : dict[key, int]
+        Input feature size for heterogeneous inputs. A key can be a string or a tuple of strings.
+    out_size : int
+        Output feature size.
+    bias : bool, optional
+        If True, learns a bias term. Defaults: ``True``.
+
+    Examples
+    --------
+
+    >>> import dgl
+    >>> import torch
+    >>> from dgl.nn import HeteroLinear
+
+    >>> layer = HeteroLinear({'user': 1, ('user', 'follows', 'user'): 2}, 3)
+    >>> in_feats = {'user': torch.randn(2, 1), ('user', 'follows', 'user'): torch.randn(3, 2)}
+    >>> out_feats = layer(in_feats)
+    >>> print(out_feats['user'].shape)
+    torch.Size([2, 3])
+    >>> print(out_feats[('user', 'follows', 'user')].shape)
+    torch.Size([3, 3])
+    """
+    def __init__(self, in_size, out_size, bias=True):
+        super(HeteroLinear, self).__init__()
+
+        self.linears = nn.ModuleDict()
+        for typ, typ_in_size in in_size.items():
+            self.linears[str(typ)] = nn.Linear(typ_in_size, out_size, bias=bias)
+
+    def forward(self, feat):
+        """Forward function
+
+        Parameters
+        ----------
+        feat : dict[key, Tensor]
+            Heterogeneous input features. It maps keys to features.
+
+        Returns
+        -------
+        dict[key, Tensor]
+            Transformed features.
+        """
+        out_feat = dict()
+        for typ, typ_feat in feat.items():
+            out_feat[typ] = self.linears[str(typ)](typ_feat)
+
+        return out_feat
+
+class HeteroEmbedding(nn.Module):
+    """Create a heterogeneous embedding table.
+
+    It internally contains multiple ``torch.nn.Embedding`` with different dictionary sizes.
+
+    Parameters
+    ----------
+    num_embeddings : dict[key, int]
+        Size of the dictionaries. A key can be a string or a tuple of strings.
+    embedding_dim : int
+        Size of each embedding vector.
+
+    Examples
+    --------
+
+    >>> import dgl
+    >>> import torch
+    >>> from dgl.nn import HeteroEmbedding
+
+    >>> layer = HeteroEmbedding({'user': 2, ('user', 'follows', 'user'): 3}, 4)
+    >>> # Get the heterogeneous embedding table
+    >>> embeds = layer.weight
+    >>> print(embeds['user'].shape)
+    torch.Size([2, 4])
+    >>> print(embeds[('user', 'follows', 'user')].shape)
+    torch.Size([3, 4])
+
+    >>> # Get the embeddings for a subset
+    >>> input_ids = {'user': torch.LongTensor([0]),
+    ...              ('user', 'follows', 'user'): torch.LongTensor([0, 2])}
+    >>> embeds = layer(input_ids)
+    >>> print(embeds['user'].shape)
+    torch.Size([1, 4])
+    >>> print(embeds[('user', 'follows', 'user')].shape)
+    torch.Size([2, 4])
+    """
+    def __init__(self, num_embeddings, embedding_dim):
+        super(HeteroEmbedding, self).__init__()
+
+        self.embeds = nn.ModuleDict()
+        self.raw_keys = dict()
+        for typ, typ_num_rows in num_embeddings.items():
+            self.embeds[str(typ)] = nn.Embedding(typ_num_rows, embedding_dim)
+            self.raw_keys[str(typ)] = typ
+
+    @property
+    def weight(self):
+        """Get the heterogeneous embedding table
+
+        Returns
+        -------
+        dict[key, Tensor]
+            Heterogeneous embedding table
+        """
+        return {self.raw_keys[typ]: emb.weight for typ, emb in self.embeds.items()}
+
+    def forward(self, input_ids):
+        """Forward function
+
+        Parameters
+        ----------
+        input_ids : dict[key, Tensor]
+            The row IDs to retrieve embeddings. It maps a key to key-specific IDs.
+
+        Returns
+        -------
+        dict[key, Tensor]
+            The retrieved embeddings.
+        """
+        embeds = dict()
+        for typ, typ_ids in input_ids.items():
+            embeds[typ] = self.embeds[str(typ)](typ_ids)
+
+        return embeds

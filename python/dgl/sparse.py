@@ -83,6 +83,67 @@ target_mapping = {
     'dst': 2
 }
 
+def _edge_softmax_backward(gidx, out, sds):
+    r""" Edge_softmax backward interface.
+
+    Parameters
+    ----------
+    gidx : HeteroGraphIndex
+        The input graph index.
+    out : tensor
+        The result of Edge_softmax during forward.
+    sds : tensor
+        The result of out * gradient.
+
+    Returns
+    -------
+    The result of Edge_softmax during backward
+
+    Notes
+    -----
+    This function does not support gpu op.
+    """
+    op = 'copy_rhs'
+    back_out = F.zeros_like(out)
+    _CAPI_DGLKernelEdge_softmax_backward(gidx, op,
+                                         to_dgl_nd(out),
+                                         to_dgl_nd(sds),
+                                         to_dgl_nd_for_write(back_out),
+                                         to_dgl_nd(None))
+    return back_out
+
+def _edge_softmax_forward(gidx, e, op):
+    r""" Edge_softmax forward interface.
+
+    Parameters
+    ----------
+    gidx : HeteroGraphIndex
+        The input graph index.
+    op : str
+        The binary op's name, default as ``copy_rhs``.
+    e : tensor or None
+        The feature on edges.
+
+    Returns
+    -------
+    The result of Edge_softmax during forward
+
+    Notes
+    -----
+    This function does not support gpu op.
+    """
+    if F.ndim(e) == 1:
+        e = F.unsqueeze(e, -1)
+        expand = True
+    else:
+        expand = False
+    myout = F.zeros_like(e)
+    _CAPI_DGLKernelEdge_softmax_forward(gidx, op,
+                                        to_dgl_nd(None),
+                                        to_dgl_nd(e),
+                                        to_dgl_nd_for_write(myout))
+    myout = F.squeeze(myout, -1) if expand else myout
+    return myout
 
 def _gspmm(gidx, op, reduce_op, u, e):
     r""" Generalized Sparse Matrix Multiplication interface. It takes the result of
@@ -326,6 +387,46 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
         list_v[l] = v
     out = tuple(list_v)
     return out, (list_arg_u, list_arg_e, list_arg_u_ntype, list_arg_e_etype)
+
+
+def _segment_mm(A, B, out, seglen_A, b_trans=False):
+    """Invoke the C API of segment_mm."""
+    _CAPI_DGLKernelSEGMENTMM(to_dgl_nd(A),
+                            to_dgl_nd(B),
+                            to_dgl_nd_for_write(out),
+                            to_dgl_nd(seglen_A),
+                            False, b_trans)
+    return out
+
+def _segment_mm_backward_B(A, dC, dB, seglen):
+    """Invoke the C API of the backward of segment_mm on B."""
+    _CAPI_DGLKernelSEGMENTMMBackwardB(
+            to_dgl_nd(A),
+            to_dgl_nd(dC),
+            to_dgl_nd_for_write(dB),
+            to_dgl_nd(seglen))
+    return dB
+
+def _gather_mm(A, B, out, idx_a=None, idx_b=None):
+    r"""Invoke the C API of the gather_mm operator."""
+    _CAPI_DGLKernelGATHERMM(to_dgl_nd(A),
+                            to_dgl_nd(B),
+                            to_dgl_nd_for_write(out),
+                            to_dgl_nd(idx_a),
+                            to_dgl_nd(idx_b))
+    return out
+
+
+def _gather_mm_scatter(A, B, out, idx_a=None, idx_b=None, idx_c=None):
+    r"""Invoke the C API of the gather_mm_scatter operator."""
+    _CAPI_DGLKernelGATHERMMSCATTER(
+        to_dgl_nd(A),
+        to_dgl_nd(B),
+        to_dgl_nd_for_write(out),
+        to_dgl_nd(idx_a),
+        to_dgl_nd(idx_b),
+        to_dgl_nd(idx_c))
+    return out
 
 
 def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):

@@ -48,8 +48,12 @@ class FraudDataset(DGLBuiltinDataset):
         Default: 0.1
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
+    verbose : bool
         Whether to print out progress information. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
@@ -88,9 +92,9 @@ class FraudDataset(DGLBuiltinDataset):
         'yelp': 'review',
         'amazon': 'user'
     }
-    
+
     def __init__(self, name, raw_dir=None, random_seed=717, train_size=0.7,
-                 val_size=0.1, force_reload=False, verbose=True):
+                 val_size=0.1, force_reload=False, verbose=True, transform=None):
         assert name in ['yelp', 'amazon'], "only supports 'yelp', or 'amazon'"
         url = _get_dgl_url(self.file_urls[name])
         self.seed = random_seed
@@ -101,30 +105,31 @@ class FraudDataset(DGLBuiltinDataset):
                                            raw_dir=raw_dir,
                                            hash_key=(random_seed, train_size, val_size),
                                            force_reload=force_reload,
-                                           verbose=verbose)
-    
+                                           verbose=verbose,
+                                           transform=transform)
+
     def process(self):
         """process raw data to graph, labels, splitting masks"""
         file_path = os.path.join(self.raw_path, self.file_names[self.name])
-        
+
         data = io.loadmat(file_path)
         node_features = data['features'].todense()
         # remove additional dimension of length 1 in raw .mat file
         node_labels = data['label'].squeeze()
-        
+
         graph_data = {}
         for relation in self.relations[self.name]:
             adj = data[relation].tocoo()
             row, col = adj.row, adj.col
             graph_data[(self.node_name[self.name], relation, self.node_name[self.name])] = (row, col)
         g = heterograph(graph_data)
-        
+
         g.ndata['feature'] = F.tensor(node_features, dtype=F.data_type_dict['float32'])
         g.ndata['label'] = F.tensor(node_labels, dtype=F.data_type_dict['int64'])
         self.graph = g
-        
+
         self._random_split(g.ndata['feature'], self.seed, self.train_size, self.val_size)
-    
+
     def __getitem__(self, idx):
         r""" Get graph object
 
@@ -145,12 +150,15 @@ class FraudDataset(DGLBuiltinDataset):
             - ``ndata['test_mask']``: mask of testing set
         """
         assert idx == 0, "This dataset has only one graph"
-        return self.graph
-    
+        if self._transform is None:
+            return self.graph
+        else:
+            return self._transform(self.graph)
+
     def __len__(self):
         """number of data examples"""
         return len(self.graph)
-    
+
     @property
     def num_classes(self):
         """Number of classes.
@@ -160,37 +168,37 @@ class FraudDataset(DGLBuiltinDataset):
         int
         """
         return 2
-    
+
     def save(self):
         """save processed data to directory `self.save_path`"""
         graph_path = os.path.join(self.save_path, self.name + '_dgl_graph_{}.bin'.format(self.hash))
         save_graphs(str(graph_path), self.graph)
-    
+
     def load(self):
         """load processed data from directory `self.save_path`"""
         graph_path = os.path.join(self.save_path, self.name + '_dgl_graph_{}.bin'.format(self.hash))
         graph_list, _ = load_graphs(str(graph_path))
         g = graph_list[0]
         self.graph = g
-    
+
     def has_cache(self):
         """check whether there are processed data in `self.save_path`"""
         graph_path = os.path.join(self.save_path, self.name + '_dgl_graph_{}.bin'.format(self.hash))
         return os.path.exists(graph_path)
-    
+
     def _random_split(self, x, seed=717, train_size=0.7, val_size=0.1):
         """split the dataset into training set, validation set and testing set"""
-        
+
         assert 0 <= train_size + val_size <= 1, \
             "The sum of valid training set size and validation set size " \
             "must between 0 and 1 (inclusive)."
-        
+
         N = x.shape[0]
         index = np.arange(N)
         if self.name == 'amazon':
             # 0-3304 are unlabeled nodes
             index = np.arange(3305, N)
-        
+
         index = np.random.RandomState(seed).permutation(index)
         train_idx = index[:int(train_size * len(index))]
         val_idx = index[len(index) - int(val_size * len(index)):]
@@ -254,8 +262,12 @@ class FraudYelpDataset(FraudDataset):
         Default: 0.1
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
+    verbose : bool
         Whether to print out progress information. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Examples
     --------
@@ -265,16 +277,17 @@ class FraudYelpDataset(FraudDataset):
     >>> feat = graph.ndata['feature']
     >>> label = graph.ndata['label']
     """
-    
+
     def __init__(self, raw_dir=None, random_seed=717, train_size=0.7,
-                 val_size=0.1, force_reload=False, verbose=True):
+                 val_size=0.1, force_reload=False, verbose=True, transform=None):
         super(FraudYelpDataset, self).__init__(name='yelp',
                                                raw_dir=raw_dir,
                                                random_seed=random_seed,
                                                train_size=train_size,
                                                val_size=val_size,
                                                force_reload=force_reload,
-                                               verbose=verbose)
+                                               verbose=verbose,
+                                               transform=transform)
 
 
 class FraudAmazonDataset(FraudDataset):
@@ -330,8 +343,12 @@ class FraudAmazonDataset(FraudDataset):
         Default: 0.1
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
+    verbose : bool
         Whether to print out progress information. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Examples
     --------
@@ -341,13 +358,14 @@ class FraudAmazonDataset(FraudDataset):
     >>> feat = graph.ndata['feature']
     >>> label = graph.ndata['label']
     """
-    
+
     def __init__(self, raw_dir=None, random_seed=717, train_size=0.7,
-                 val_size=0.1, force_reload=False, verbose=True):
+                 val_size=0.1, force_reload=False, verbose=True, transform=None):
         super(FraudAmazonDataset, self).__init__(name='amazon',
                                                  raw_dir=raw_dir,
                                                  random_seed=random_seed,
                                                  train_size=train_size,
                                                  val_size=val_size,
                                                  force_reload=force_reload,
-                                                 verbose=verbose)
+                                                 verbose=verbose,
+                                                 transform=transform)

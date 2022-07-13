@@ -109,7 +109,7 @@ class ExternalEmbedding:
 
     def update(self, gpu_id=-1):
         """ Update embeddings in a sparse manner
-        Sparse embeddings are updated in mini batches. we maintains gradient states for 
+        Sparse embeddings are updated in mini batches. We maintain gradient states for
         each embedding so they can be updated separately.
 
         Parameters

@@ -17,10 +17,13 @@ from .graph_serialize import save_graphs, load_graphs, load_labels
 from .tensor_serialize import save_tensors, load_tensors
 
 from .. import backend as F
+from .._ffi.base import __version__
 
 __all__ = ['loadtxt','download', 'check_sha1', 'extract_archive',
-           'get_download_dir', 'Subset', 'split_dataset',
-           'save_graphs', "load_graphs", "load_labels", "save_tensors", "load_tensors"]
+        'get_download_dir', 'Subset', 'split_dataset', 'save_graphs',
+        'load_graphs', 'load_labels', 'save_tensors', 'load_tensors',
+        'add_nodepred_split',
+]
 
 def loadtxt(path, delimiter, dtype=None):
     try:
@@ -238,7 +241,7 @@ def get_download_dir():
     dirname : str
         Path to the download directory
     """
-    default_dir = os.path.join(os.path.expanduser('~'), '.dgl')
+    default_dir = os.path.join(os.path.expanduser('~'), '.dgl_v{}'.format(__version__))
     dirname = os.environ.get('DGL_DOWNLOAD_DIR', default_dir)
     if not os.path.exists(dirname):
         os.makedirs(dirname)
@@ -351,3 +354,47 @@ class Subset(object):
             Number of datapoints in the subset
         """
         return len(self.indices)
+
+def add_nodepred_split(dataset, ratio, ntype=None):
+    """Split the given dataset into training, validation and test sets for
+    transductive node predction task.
+
+    It adds three node mask arrays ``'train_mask'``, ``'val_mask'`` and ``'test_mask'``,
+    to each graph in the dataset. Each sample in the dataset thus must be a :class:`DGLGraph`.
+
+    Fix the random seed of NumPy to make the result deterministic::
+
+        numpy.random.seed(42)
+
+    Parameters
+    ----------
+    dataset : DGLDataset
+        The dataset to modify.
+    ratio : (float, float, float)
+        Split ratios for training, validation and test sets. Must sum to one.
+    ntype : str, optional
+        The node type to add mask for.
+
+    Examples
+    --------
+    >>> dataset = dgl.data.AmazonCoBuyComputerDataset()
+    >>> print('train_mask' in dataset[0].ndata)
+    False
+    >>> dgl.data.utils.add_nodepred_split(dataset, [0.8, 0.1, 0.1])
+    >>> print('train_mask' in dataset[0].ndata)
+    True
+    """
+    if len(ratio) != 3:
+        raise ValueError(f'Split ratio must be a float triplet but got {ratio}.')
+    for i in range(len(dataset)):
+        g = dataset[i]
+        n = g.num_nodes(ntype)
+        idx = np.arange(0, n)
+        np.random.shuffle(idx)
+        n_train, n_val, n_test = int(n * ratio[0]), int(n * ratio[1]), int(n * ratio[2])
+        train_mask = generate_mask_tensor(idx2mask(idx[:n_train], n))
+        val_mask = generate_mask_tensor(idx2mask(idx[n_train:n_train + n_val], n))
+        test_mask = generate_mask_tensor(idx2mask(idx[n_train + n_val:], n))
+        g.nodes[ntype].data['train_mask'] = train_mask
+        g.nodes[ntype].data['val_mask'] = val_mask
+        g.nodes[ntype].data['test_mask'] = test_mask

@@ -1,33 +1,16 @@
 import torch as th
-from distutils.version import LooseVersion
+from torch.cuda.amp import custom_fwd, custom_bwd
 from ...base import is_all, ALL
 from ...sparse import _gspmm, _gspmm_hetero, _gsddmm, _gsddmm_hetero, _segment_reduce, _bwd_segment_cmp
 from ...sparse import _csrmm, _csrsum, _csrmask, _scatter_add, _update_grad_minmax_hetero
+from ...sparse import _gather_mm, _gather_mm_scatter, _segment_mm, _segment_mm_backward_B
+from ...sparse import _gspmm, _gspmm_hetero, _gsddmm, _gsddmm_hetero, _segment_reduce, _bwd_segment_cmp, _edge_softmax_forward, _edge_softmax_backward
+from ...sparse import _csrmm, _csrsum, _csrmask, _scatter_add, _update_grad_minmax_hetero
 from ...heterograph_index import create_unitgraph_from_csr
 
-if LooseVersion(th.__version__) >= LooseVersion("1.6.0"):
-    from torch.cuda.amp import custom_fwd, custom_bwd
-else:
-    import functools
-    """PyTorch natively supports automatic mixed precision in DGL 1.6, we redefine
-    the custom_fwd and custom_bwd function to be compatible with DGL 1.5.
-    """
-    def custom_fwd(**kwargs):
-        def custom_fwd_inner(fwd):
-            @functools.wraps(fwd)
-            def decorate_fwd(*args, **kwargs):
-                return fwd(*args, **kwargs)
-            return decorate_fwd
-        return custom_fwd_inner
-
-    def custom_bwd(bwd):
-        @functools.wraps(bwd)
-        def decorate_bwd(*args, **kwargs):
-            return bwd(*args, **kwargs)
-        return decorate_bwd
 
 __all__ = ['gspmm', 'gsddmm', 'gspmm_hetero', 'gsddmm_hetero', 'edge_softmax', 'edge_softmax_hetero',
-           'segment_reduce', 'scatter_add', 'csrmm', 'csrsum', 'csrmask']
+           'segment_reduce', 'scatter_add', 'csrmm', 'csrsum', 'csrmask', 'gather_mm', 'segment_mm']
 
 
 def _reduce_grad(grad, shape):
@@ -470,10 +453,15 @@ class EdgeSoftmax(th.autograd.Function):
             gidx = gidx.edge_subgraph([eids], True).graph
         if norm_by == 'src':
             gidx = gidx.reverse()
-        score_max = _gspmm(gidx, 'copy_rhs', 'max', None, score)[0]
-        score = th.exp(_gsddmm(gidx, 'sub', score, score_max, 'e', 'v'))
-        score_sum = _gspmm(gidx, 'copy_rhs', 'sum', None, score)[0]
-        out = _gsddmm(gidx, 'div', score, score_sum, 'e', 'v')
+        #Note: Now _edge_softmax_forward op only supports CPU
+        #TODO(Zhejiang): We will support GPU in the future
+        if(score.is_cuda):
+            score_max = _gspmm(gidx, 'copy_rhs', 'max', None, score)[0]
+            score = th.exp(_gsddmm(gidx, 'sub', score, score_max, 'e', 'v'))
+            score_sum = _gspmm(gidx, 'copy_rhs', 'sum', None, score)[0]
+            out = _gsddmm(gidx, 'div', score, score_sum, 'e', 'v')
+        else:
+            out = _edge_softmax_forward(gidx, score, 'copy_rhs')
         ctx.backward_cache = gidx
         ctx.save_for_backward(out)
         return out
@@ -500,9 +488,14 @@ class EdgeSoftmax(th.autograd.Function):
         ctx.backward_cache = None
         out, = ctx.saved_tensors
         sds = out * grad_out
-        accum = gspmm(gidx, 'copy_rhs', 'sum', None, sds)
+        #Note: Now _edge_softmax_backward op only supports CPU
+        #TODO(Zhejiang): We will support GPU in the future
+        if(out.is_cuda):
+            accum = gspmm(gidx, 'copy_rhs', 'sum', None, sds)
 
-        grad_score = sds - gsddmm(gidx, 'mul', out, accum, 'e', 'v')
+            grad_score = sds - gsddmm(gidx, 'mul', out, accum, 'e', 'v')
+        else:
+            grad_score = _edge_softmax_backward(gidx, out, sds)
         return None, grad_score, None, None
 
 
@@ -681,6 +674,59 @@ class CSRMask(th.autograd.Function):
         return None, csrmask(gidxB, dB_weights, gidxA), None
 
 
+class SEGMENTMM(th.autograd.Function):
+    @staticmethod
+    @custom_fwd(cast_inputs=th.float16)
+    def forward(ctx, A, B, seglen_A):
+        if B.dim() != 3:
+            raise ValueError("segment_mm expects B to be a 3D tensor.")
+        C = th.zeros((A.shape[0], B.shape[2]), device=A.device, dtype=A.dtype)
+        C = _segment_mm(A, B, C, seglen_A)
+        ctx.backward_cache = A, B, seglen_A
+        return C
+
+    @staticmethod
+    def backward(ctx, dZ):
+        A, B, seglen_A = ctx.backward_cache
+        A_grad = B_grad = None
+        if ctx.needs_input_grad[0]:
+            #  Compute A_grad = Out_grad * B^T
+            A_grad = th.zeros(A.shape, device=A.device, dtype=A.dtype)
+            A_grad = _segment_mm(dZ, B, A_grad, seglen_A, b_trans=True)
+        if ctx.needs_input_grad[1]:
+            #  Compute B_grad = A^T * Out_grad
+            B_grad = th.zeros(B.shape, device=B.device, dtype=B.dtype)
+            B_grad = _segment_mm_backward_B(A, dZ, B_grad, seglen_A)
+        return A_grad, B_grad, None
+
+
+class GATHERMM(th.autograd.Function):
+    @staticmethod
+    @custom_fwd(cast_inputs=th.float16)
+    def forward(ctx, A, B, idx_a, idx_b):
+        if B.dim() != 3:
+            raise ValueError("Expected dimension of B is 3. Got " + str(B.dim()))
+        N = len(idx_b) if idx_a is None else len(idx_a)
+        C = th.zeros((N, B.shape[2]), device=A.device, dtype=A.dtype)
+        C = _gather_mm(A, B, C, idx_a, idx_b)
+        ctx.backward_cache = A, B, idx_a, idx_b
+        return C
+
+    @staticmethod
+    def backward(ctx, dZ):
+        A, B, idx_a, idx_b = ctx.backward_cache
+        A_grad = B_grad = None
+        if ctx.needs_input_grad[0]:
+            #  Compute A_grad = Out_grad * B^T
+            A_grad = th.zeros(A.shape, device=A.device, dtype=A.dtype)
+            A_grad = _gather_mm_scatter(dZ, B.transpose(1, 2), A_grad,
+                idx_b=idx_b, idx_c=idx_a)
+        if ctx.needs_input_grad[1]:
+            #  Compute B_grad = A^T * Out_grad
+            B_grad = th.zeros(B.shape, device=B.device, dtype=B.dtype)
+            B_grad = _gather_mm_scatter(A, dZ, B_grad, idx_a=idx_a, idx_c=idx_b)
+        return A_grad, B_grad, None, None
+
 def gspmm(gidx, op, reduce_op, lhs_data, rhs_data):
     if op == 'sub':
         op = 'add'
@@ -756,3 +802,22 @@ def csrsum(gidxs, weights):
 
 def csrmask(gidxA, A_weights, gidxB):
     return CSRMask.apply(gidxA, A_weights, gidxB)
+
+def segment_mm(A, B, seglen_A):
+    if A.device.type == 'cpu':
+        C = []
+        off = 0
+        for i in range(B.shape[0]):
+            C.append(A[off:off+seglen_A[i]] @ B[i])
+            off += seglen_A[i]
+        return th.cat(C)
+    else:
+        return SEGMENTMM.apply(A, B, seglen_A)
+
+def gather_mm(A, B, idx_A=None, idx_B=None):
+    if A.device.type == 'cpu':
+        A = A[idx_A] if idx_A is not None else A
+        B = B[idx_B] if idx_B is not None else B
+        return th.bmm(A.unsqueeze(1), B).squeeze(1)
+    else:
+        return GATHERMM.apply(A, B, idx_A, idx_B)

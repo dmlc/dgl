@@ -13,6 +13,10 @@ torch 1.7.0
 ogb 1.3.0
 ```
 
+### Limitations
+
+Spectral and Diffusion Embeddings used by the authors for feature augmentation are not currently implemented. Without these feature augmentations only the "Plain" (without feature augmentations) results from the authors can be replicated.
+
 ### The graph datasets used in this example
 
 Open Graph Benchmark(OGB). Dataset summary:
@@ -28,23 +32,23 @@ Training a **Base predictor** and using **Correct&Smooth** which follows the ori
 
 ##### ogbn-arxiv
 
-* **MLP + C&S**
+* **Plain MLP + C&S**
 
 ```bash
 python main.py --dropout 0.5
 python main.py --pretrain --correction-adj DA --smoothing-adj AD --autoscale
 ```
 
-* **Linear + C&S**
+* **Plain Linear + C&S**
 
 ```bash
 python main.py --model linear --dropout 0.5 --epochs 1000
-python main.py --model linear --pretrain --correction-alpha 0.8 --smoothing-alpha 0.6 --correction-adj AD --autoscale
+python main.py --model linear --pretrain --correction-alpha 0.87 --smoothing-alpha 0.81 --correction-adj AD --autoscale
 ```
 
 ##### ogbn-products
 
-* **Linear + C&S**
+* **Plain Linear + C&S**
 
 ```bash
 python main.py --dataset ogbn-products --model linear --dropout 0.5 --epochs 1000 --lr 0.1
@@ -55,14 +59,14 @@ python main.py --dataset ogbn-products --model linear --pretrain --correction-al
 
 #### ogbn-arxiv
 
-|                 |  MLP  | MLP + C&S | Linear | Linear + C&S |
-| :-------------: | :---: | :-------: | :----: | :----------: |
-| Results(Author) | 55.58 |   68.72   | 51.06  |    70.24     |
-|  Results(DGL)   | 56.55 |   70.93   | 52.48  |    72.60     |
+|                 | Linear | Plain Linear + C&S |
+| :-------------: | :----: |    :----------:    |
+| Results(Author) | 52.5   |       71.26        |
+|  Results(DGL)   | 52.48  |       71.26        |
 
 #### ogbn-products
 
-|                 | Linear | Linear + C&S |
+|                 | Plain Linear | Plain Linear + C&S |
 | :-------------: | :----: | :----------: |
 | Results(Author) | 47.67  |    82.34     |
 |  Results(DGL)   | 47.65  |    82.86     |
@@ -71,5 +75,5 @@ python main.py --dataset ogbn-products --model linear --pretrain --correction-al
 
 |      ogb-arxiv       |      Time     | GPU Memory | Params  |
 | :------------------: | :-----------: | :--------: | :-----: |
-| Author, Linear + C&S | 6.3 * 10 ^ -3 |   1,248M   |  5,160  |
-|   DGL, Linear + C&S  | 5.6 * 10 ^ -3 |   1,252M   |  5,160  |
+| Author, Plain Linear + C&S | 6.3 * 10 ^ -3 |   1,248M   |  5,160  |
+|   DGL, Plain Linear + C&S  | 5.6 * 10 ^ -3 |   1,252M   |  5,160  |

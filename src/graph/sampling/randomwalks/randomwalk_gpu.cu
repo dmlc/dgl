@@ -13,6 +13,7 @@
 #include <utility>
 #include <tuple>
 
+#include "../../../runtime/cuda/cuda_common.h"
 #include "frequency_hashmap.cuh"
 
 namespace dgl {
@@ -40,6 +41,7 @@ __global__ void _RandomWalkKernel(
     const GraphKernelData<IdType>* graphs,
     const FloatType* restart_prob_data,
     const int64_t restart_prob_size,
+    const int64_t max_nodes,
     IdType *out_traces_data,
     IdType *out_eids_data) {
   assert(BLOCK_SIZE == blockDim.x);
@@ -53,6 +55,7 @@ __global__ void _RandomWalkKernel(
 
   while (idx < last_idx) {
     IdType curr = seed_data[idx];
+    assert(curr < max_nodes);
     IdType *traces_data_ptr = &out_traces_data[idx * trace_length];
     IdType *eids_data_ptr = &out_eids_data[idx * max_num_steps];
     *(traces_data_ptr++) = curr;
@@ -97,25 +100,23 @@ std::pair<IdArray, IdArray> RandomWalkUniform(
     FloatArray restart_prob) {
   const int64_t max_num_steps = metapath->shape[0];
   const IdType *metapath_data = static_cast<IdType *>(metapath->data);
+  const int64_t begin_ntype = hg->meta_graph()->FindEdge(metapath_data[0]).first;
+  const int64_t max_nodes = hg->NumVertices(begin_ntype);
   int64_t num_etypes = hg->NumEdgeTypes();
+  auto ctx = seeds->ctx;
 
-  CHECK(seeds->ctx.device_type == kDLGPU) << "seeds should be in GPU.";
-  CHECK(metapath->ctx.device_type == kDLGPU) << "metapath should be in GPU.";
   const IdType *seed_data = static_cast<const IdType*>(seeds->data);
   CHECK(seeds->ndim == 1) << "seeds shape is not one dimension.";
   const int64_t num_seeds = seeds->shape[0];
   int64_t trace_length = max_num_steps + 1;
-  IdArray traces = IdArray::Empty({num_seeds, trace_length}, seeds->dtype, seeds->ctx);
-  IdArray eids = IdArray::Empty({num_seeds, max_num_steps}, seeds->dtype, seeds->ctx);
+  IdArray traces = IdArray::Empty({num_seeds, trace_length}, seeds->dtype, ctx);
+  IdArray eids = IdArray::Empty({num_seeds, max_num_steps}, seeds->dtype, ctx);
   IdType *traces_data = traces.Ptr<IdType>();
   IdType *eids_data = eids.Ptr<IdType>();
 
-  GraphKernelData<IdType> h_graphs[num_etypes];
-  DGLContext ctx;
+  std::vector<GraphKernelData<IdType>> h_graphs(num_etypes);
   for (int64_t etype = 0; etype < num_etypes; ++etype) {
     const CSRMatrix &csr = hg->GetCSRMatrix(etype);
-    ctx = csr.indptr->ctx;
-    CHECK(ctx.device_type == kDLGPU) << "graph should be in GPU.";
     h_graphs[etype].in_ptr  = static_cast<const IdType*>(csr.indptr->data);
     h_graphs[etype].in_cols = static_cast<const IdType*>(csr.indices->data);
     h_graphs[etype].data = (CSRHasData(csr) ? static_cast<const IdType*>(csr.data->data) : nullptr);
@@ -125,14 +126,16 @@ std::pair<IdArray, IdArray> RandomWalkUniform(
   auto device = DeviceAPI::Get(ctx);
   auto d_graphs = static_cast<GraphKernelData<IdType>*>(
       device->AllocWorkspace(ctx, (num_etypes) * sizeof(GraphKernelData<IdType>)));
-  auto d_metapath_data = metapath_data;
   // copy graph metadata pointers to GPU
-  device->CopyDataFromTo(h_graphs, 0, d_graphs, 0,
+  device->CopyDataFromTo(h_graphs.data(), 0, d_graphs, 0,
       (num_etypes) * sizeof(GraphKernelData<IdType>),
       DGLContext{kDLCPU, 0},
       ctx,
       hg->GetCSRMatrix(0).indptr->dtype,
       stream);
+  // copy metapath to GPU
+  auto d_metapath = metapath.CopyTo(ctx);
+  const IdType *d_metapath_data = static_cast<IdType *>(d_metapath->data);
 
   constexpr int BLOCK_SIZE = 256;
   constexpr int TILE_SIZE = BLOCK_SIZE * 4;
@@ -144,17 +147,20 @@ std::pair<IdArray, IdArray> RandomWalkUniform(
     CHECK(restart_prob->ndim == 1) << "restart prob dimension should be 1.";
     const FloatType *restart_prob_data = restart_prob.Ptr<FloatType>();
     const int64_t restart_prob_size = restart_prob->shape[0];
-    _RandomWalkKernel<IdType, FloatType, BLOCK_SIZE, TILE_SIZE> <<<grid, block, 0, stream>>>(
-        random_seed,
-        seed_data,
-        num_seeds,
-        d_metapath_data,
-        max_num_steps,
-        d_graphs,
-        restart_prob_data,
-        restart_prob_size,
-        traces_data,
-        eids_data);
+    CUDA_KERNEL_CALL(
+      (_RandomWalkKernel<IdType, FloatType, BLOCK_SIZE, TILE_SIZE>),
+      grid, block, 0, stream,
+      random_seed,
+      seed_data,
+      num_seeds,
+      d_metapath_data,
+      max_num_steps,
+      d_graphs,
+      restart_prob_data,
+      restart_prob_size,
+      max_nodes,
+      traces_data,
+      eids_data);
   });
 
   device->FreeWorkspace(ctx, d_graphs);
@@ -194,9 +200,9 @@ std::pair<IdArray, IdArray> RandomWalkWithRestart(
       LOG(FATAL) << "Non-uniform choice is not supported in GPU.";
     }
   }
+  auto device_ctx = seeds->ctx;
   auto restart_prob_array = NDArray::Empty(
-      {1}, DLDataType{kDLFloat, 64, 1}, seeds->ctx);
-  auto device_ctx = restart_prob_array->ctx;
+      {1}, DLDataType{kDLFloat, 64, 1}, device_ctx);
   auto device = dgl::runtime::DeviceAPI::Get(device_ctx);
 
   // use default stream

@@ -9,13 +9,9 @@ from .... import broadcast_nodes, function as fn
 
 
 class ChebConv(nn.Module):
-    r"""
-
-    Description
-    -----------
-    Chebyshev Spectral Graph Convolution layer from paper `Convolutional
+    r"""Chebyshev Spectral Graph Convolution layer from `Convolutional
     Neural Networks on Graphs with Fast Localized Spectral Filtering
-    <https://arxiv.org/pdf/1606.09375.pdf>`__.
+    <https://arxiv.org/pdf/1606.09375.pdf>`__
 
     .. math::
         h_i^{l+1} &= \sum_{k=0}^{K-1} W^{k, l}z_i^{k, l}
@@ -78,11 +74,7 @@ class ChebConv(nn.Module):
         self.linear = nn.Linear(k * in_feats, out_feats, bias)
 
     def forward(self, graph, feat, lambda_max=None):
-        r"""
-
-        Description
-        -----------
-        Compute ChebNet layer.
+        r"""Compute ChebNet layer.
 
         Parameters
         ----------

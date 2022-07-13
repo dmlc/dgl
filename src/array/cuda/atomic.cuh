@@ -80,12 +80,18 @@ static __device__ __forceinline__ unsigned short int atomicCASshort(
     unsigned short int *address,
     unsigned short int compare,
     unsigned short int val) {
-#if (defined(CUDART_VERSION) && (CUDART_VERSION > 10000))
+  static_assert(CUDART_VERSION >= 10000, "Requires at least CUDA 10");
 #if (defined(__CUDA_ARCH__) && (__CUDA_ARCH__) >= 700)
   return atomicCAS(address, compare, val);
-#endif  // (defined(__CUDA_ARCH__) && (__CUDA_ARCH__) >= 700)
-#endif  // (defined(CUDART_VERSION) && (CUDART_VERSION > 10000))
+#else
+  (void)address;
+  (void)compare;
+  (void)val;
+  printf("Atomic operations are not supported for half precision (FP16) "
+      "on this GPU.\n");
+  __trap();
   return val;
+#endif  // (defined(__CUDA_ARCH__) && (__CUDA_ARCH__) >= 700)
 }
 
 #define DEFINE_ATOMIC(NAME) \
@@ -219,7 +225,17 @@ __device__ __forceinline__ float AtomicAdd<float>(float* addr, float val) {
 #if __CUDA_ARCH__ >= 200
   return atomicAdd(addr, val);
 #else
-  return *addr + val;
+  typedef float T;
+  typedef typename Cast<T>::Type CT;
+  CT* addr_as_ui = reinterpret_cast<CT*>(addr);
+  CT old = *addr_as_ui;
+  CT assumed = old;
+  do {
+    assumed = old;
+    old = atomicCAS(addr_as_ui, assumed,
+        Cast<T>::Encode(Cast<T>::Decode(old) + val));
+  } while (assumed != old);
+  return Cast<T>::Decode(old);
 #endif  // __CUDA_ARCH__
 }
 
@@ -228,7 +244,17 @@ __device__ __forceinline__ double AtomicAdd<double>(double* addr, double val) {
 #if __CUDA_ARCH__ >= 600
   return atomicAdd(addr, val);
 #else
-  return *addr + val;
+  typedef double T;
+  typedef typename Cast<T>::Type CT;
+  CT* addr_as_ui = reinterpret_cast<CT*>(addr);
+  CT old = *addr_as_ui;
+  CT assumed = old;
+  do {
+    assumed = old;
+    old = atomicCAS(addr_as_ui, assumed,
+        Cast<T>::Encode(Cast<T>::Decode(old) + val));
+  } while (assumed != old);
+  return Cast<T>::Decode(old);
 #endif
 }
 
@@ -236,11 +262,17 @@ __device__ __forceinline__ double AtomicAdd<double>(double* addr, double val) {
 #if defined(CUDART_VERSION) && CUDART_VERSION >= 10000
 template <>
 __device__ __forceinline__ half AtomicAdd<half>(half* addr, half val) {
+// half make sure we have half support
 #if __CUDA_ARCH__ >= 700
   return atomicAdd(addr, val);
 #else
-  return *addr + val;
-#endif  // __CUDA_ARCH__
+  (void)addr;
+  (void)val;
+  printf("Atomic operations are not supported for half precision (FP16) "
+      "on this GPU.\n");
+  __trap();
+  return val;
+#endif  // __CUDA_ARCH__ >= 700
 }
 #endif  // defined(CUDART_VERSION) && CUDART_VERSION >= 10000
 #endif  // USE_FP16

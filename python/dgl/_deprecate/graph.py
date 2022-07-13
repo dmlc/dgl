@@ -3692,14 +3692,14 @@ class DGLGraph(DGLBaseGraph):
     def line_graph(self, backtracking=True, shared=False):
         """Return the line graph of this graph.
 
-        See :func:`~dgl.transform.line_graph`.
+        See :func:`~dgl.transforms.line_graph`.
         """
         return dgl.line_graph(self, backtracking, shared)
 
     def reverse(self, share_ndata=False, share_edata=False):
         """Return the reverse of this graph.
 
-        See :func:`~dgl.transform.reverse`.
+        See :func:`~dgl.transforms.reverse`.
         """
         return dgl.reverse(self, share_ndata, share_edata)
 

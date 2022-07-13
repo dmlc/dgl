@@ -45,6 +45,8 @@ Distributed embedding optimizer
 Distributed workload split
 --------------------------
 
+.. currentmodule:: dgl.distributed.dist_graph
+
 .. autosummary::
     :toctree: ../../generated/
 
@@ -96,6 +98,7 @@ Split and Load Graphs
     :toctree: ../../generated/
 
     load_partition
+    load_partition_feats
     load_partition_book
     partition_graph
 

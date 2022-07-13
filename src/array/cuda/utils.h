@@ -166,10 +166,19 @@ __global__ void _LinearSearchKernel(
         break;
       }
     }
-    if (v == -1)
+    if (v == -1) {
       out[tx] = filler;
-    else
-      out[tx] = weights ? weights[v] : v;
+    } else {
+      // The casts here are to be able to handle DType being __half.
+      // GCC treats int64_t as a distinct type from long long, so
+      // without the explcit cast to long long, it errors out saying
+      // that the implicit cast results in an ambiguous choice of
+      // constructor for __half.
+      // The using statement is to avoid a linter error about using
+      // long or long long.
+      using LongLong = long long; // NOLINT
+      out[tx] = weights ? weights[v] : DType(LongLong(v));
+    }
     tx += stride_x;
   }
 }
@@ -190,6 +199,58 @@ inline DType GetCUDAScalar(
       DLDataTypeTraits<DType>::dtype,
       stream);
   return result;
+}
+
+/*!
+ * \brief Given a sorted array and a value this function returns the index
+ * of the first element which compares greater than value.
+ *
+ * This function assumes 0-based index
+ * @param A: ascending sorted array
+ * @param n: size of the A
+ * @param x: value to search in A
+ * @return index, i, of the first element st. A[i]>x. If x>=A[n-1] returns n.
+ * if x<A[0] then it returns 0.
+ */
+template <typename IdType>
+__device__ IdType _UpperBound(const IdType *A, int64_t n, IdType x) {
+  IdType l = 0, r = n, m = 0;
+  while (l < r) {
+    m = l + (r-l)/2;
+    if (x >= A[m]) {
+      l = m+1;
+    } else {
+      r = m;
+    }
+  }
+  return l;
+}
+
+/*!
+ * \brief Given a sorted array and a value this function returns the index
+ * of the element who is equal to val. If not exist returns n+1
+ *
+ * This function assumes 0-based index
+ * @param A: ascending sorted array
+ * @param n: size of the A
+ * @param x: value to search in A
+ * @return index, i, st. A[i]==x. If such an index not exists returns 'n'.
+ */
+template <typename IdType>
+__device__ IdType _BinarySearch(const IdType *A, int64_t n, IdType x) {
+  IdType l = 0, r = n-1, m = 0;
+  while (l <= r) {
+    m = l + (r-l)/2;
+    if (A[m] == x) {
+      return m;
+    }
+    if (A[m] < x) {
+      l = m+1;
+    } else {
+      r = m-1;
+    }
+  }
+  return n;  // not found
 }
 
 }  // namespace cuda

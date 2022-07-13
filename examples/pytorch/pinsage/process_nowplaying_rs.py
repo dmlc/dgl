@@ -5,6 +5,7 @@ file a heterogeneous graph with categorical and numeric features.
 
 import os
 import argparse
+import dgl
 import pandas as pd
 import scipy.sparse as ssp
 import pickle
@@ -14,10 +15,11 @@ from builder import PandasGraphBuilder
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('directory', type=str)
-    parser.add_argument('output_path', type=str)
+    parser.add_argument('out_directory', type=str)
     args = parser.parse_args()
     directory = args.directory
-    output_path = args.output_path
+    out_directory = args.out_directory
+    os.makedirs(out_directory, exist_ok=True)
 
     data = pd.read_csv(os.path.join(directory, 'context_content_features.csv'))
     track_feature_cols = list(data.columns[1:13])
@@ -52,15 +54,16 @@ if __name__ == '__main__':
     g.edges['listened'].data['created_at'] = torch.LongTensor(events['created_at'].values)
     g.edges['listened-by'].data['created_at'] = torch.LongTensor(events['created_at'].values)
 
-    n_edges = g.number_of_edges('listened')
+    n_edges = g.num_edges('listened')
     train_indices, val_indices, test_indices = train_test_split_by_time(events, 'created_at', 'user_id')
     train_g = build_train_graph(g, train_indices, 'user', 'track', 'listened', 'listened-by')
     assert train_g.out_degrees(etype='listened').min() > 0
     val_matrix, test_matrix = build_val_test_matrix(
         g, val_indices, test_indices, 'user', 'track', 'listened')
 
+    dgl.save_graphs(os.path.join(out_directory, 'train_g.bin'), train_g)
+
     dataset = {
-        'train-graph': train_g,
         'val-matrix': val_matrix,
         'test-matrix': test_matrix,
         'item-texts': {},
@@ -71,5 +74,5 @@ if __name__ == '__main__':
         'item-to-user-type': 'listened-by',
         'timestamp-edge-column': 'created_at'}
 
-    with open(output_path, 'wb') as f:
+    with open(os.path.join(out_directory, 'data.pkl'), 'wb') as f:
         pickle.dump(dataset, f)

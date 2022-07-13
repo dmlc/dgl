@@ -92,9 +92,10 @@ def main(args):
             graph.ndata['nd'] = th.tanh(model.layers[i].MLP(layers_feat[i]))
             for etype in graph.canonical_etypes:
                 graph.apply_edges(_l1_dist, etype=etype)
-                dist[etype] = graph.edges[etype].data['ed']
+                dist[etype] = graph.edges[etype].data.pop('ed').detach().cpu()
             dists.append(dist)
             p.append(model.layers[i].p)
+        graph.ndata.pop('nd')
         sampler = CARESampler(p, dists, args.num_layers)
 
         # train
@@ -103,14 +104,9 @@ def main(args):
         tr_recall = 0
         tr_auc = 0
         tr_blk = 0
-        train_dataloader = dgl.dataloading.NodeDataLoader(graph,
-                                                          train_idx,
-                                                          sampler,
-                                                          batch_size=args.batch_size,
-                                                          shuffle=True,
-                                                          drop_last=False,
-                                                          num_workers=args.num_workers
-                                                          )
+        train_dataloader = dgl.dataloading.DataLoader(
+            graph, train_idx, sampler, batch_size=args.batch_size,
+            shuffle=True,  drop_last=False, num_workers=args.num_workers)
 
         for input_nodes, output_nodes, blocks in train_dataloader:
             blocks = [b.to(device) for b in blocks]
@@ -135,14 +131,9 @@ def main(args):
 
         # validation
         model.eval()
-        val_dataloader = dgl.dataloading.NodeDataLoader(graph,
-                                                        val_idx,
-                                                        sampler,
-                                                        batch_size=args.batch_size,
-                                                        shuffle=True,
-                                                        drop_last=False,
-                                                        num_workers=args.num_workers
-                                                        )
+        val_dataloader = dgl.dataloading.DataLoader(
+            graph, val_idx, sampler, batch_size=args.batch_size,
+            shuffle=True, drop_last=False, num_workers=args.num_workers)
 
         val_recall, val_auc, val_loss = evaluate(model, loss_fn, val_dataloader, device)
 
@@ -159,14 +150,9 @@ def main(args):
     model.eval()
     if args.early_stop:
         model.load_state_dict(th.load('es_checkpoint.pt'))
-    test_dataloader = dgl.dataloading.NodeDataLoader(graph,
-                                                     test_idx,
-                                                     sampler,
-                                                     batch_size=args.batch_size,
-                                                     shuffle=True,
-                                                     drop_last=False,
-                                                     num_workers=args.num_workers
-                                                     )
+    test_dataloader = dgl.dataloading.DataLoader(
+        graph, test_idx, sampler, batch_size=args.batch_size,
+        shuffle=True, drop_last=False, num_workers=args.num_workers)
 
     test_recall, test_auc, test_loss = evaluate(model, loss_fn, test_dataloader, device)
 

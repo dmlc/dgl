@@ -2,7 +2,7 @@ import dgl
 import backend as F
 import numpy as np
 import unittest
-from test_utils import parametrize_dtype
+from test_utils import parametrize_idtype
 from dgl.utils import Filter
 
 def test_graph_filter():
@@ -41,7 +41,7 @@ def test_graph_filter():
 
 @unittest.skipIf(F._default_context_str == 'cpu',
                  reason="CPU not yet supported")
-@parametrize_dtype
+@parametrize_idtype
 def test_array_filter(idtype):
     f = Filter(F.copy_to(F.tensor([0,1,9,4,6,5,7], dtype=idtype), F.ctx()))
     x = F.copy_to(F.tensor([0,3,9,11], dtype=idtype), F.ctx())

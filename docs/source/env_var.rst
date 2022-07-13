@@ -7,6 +7,10 @@ Global Configurations
     * Values: String (default=``"${HOME}/.dgl"``)
     * The directory to save the DGL configuration files.
 
+* ``DGL_LOG_DEBUG``:
+    * Values: Set to ``"1"`` to enable debug level logging for DGL
+    * Enable debug level logging for DGL
+
 Backend Options
 ---------------
 * ``DGLBACKEND``:

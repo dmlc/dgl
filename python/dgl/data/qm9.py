@@ -6,7 +6,7 @@ import scipy.sparse as sp
 from .dgl_dataset import DGLDataset
 from .utils import download, _get_dgl_url
 from ..convert import graph as dgl_graph
-from ..transform import to_bidirected
+from ..transforms import to_bidirected
 from .. import backend as F
 
 class QM9Dataset(DGLDataset):
@@ -20,11 +20,11 @@ class QM9Dataset(DGLDataset):
         2. It only provides atoms' coordinates and atomic numbers as node features
         3. It only provides 12 regression targets.
 
-    Reference: 
-    
+    Reference:
+
     - `"Quantum-Machine.org" <http://quantum-machine.org/datasets/>`_,
     - `"Directional Message Passing for Molecular Graphs" <https://arxiv.org/abs/2003.03123>`_
-    
+
     Statistics:
 
     - Number of graphs: 130,831
@@ -60,9 +60,9 @@ class QM9Dataset(DGLDataset):
 
     Parameters
     ----------
-    label_keys: list
+    label_keys : list
         Names of the regression property, which should be a subset of the keys in the table above.
-    cutoff: float
+    cutoff : float
         Cutoff distance for interatomic interactions, i.e. two atoms are connected in the corresponding graph if the distance between them is no larger than this.
         Default: 5.0 Angstrom
     raw_dir : str
@@ -70,23 +70,29 @@ class QM9Dataset(DGLDataset):
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
+    verbose : bool
         Whether to print out progress information. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
+    num_tasks : int
+        Number of prediction tasks
     num_labels : int
-        Number of labels for each graph, i.e. number of prediction tasks
+        (DEPRECATED, use num_tasks instead) Number of prediction tasks
 
     Raises
     ------
     UserWarning
         If the raw data is changed in the remote server by the author.
-    
+
     Examples
     --------
     >>> data = QM9Dataset(label_keys=['mu', 'gap'], cutoff=5.0)
-    >>> data.num_labels
+    >>> data.num_tasks
     2
     >>>
     >>> # iterate over the dataset
@@ -102,8 +108,9 @@ class QM9Dataset(DGLDataset):
                  cutoff=5.0,
                  raw_dir=None,
                  force_reload=False,
-                 verbose=False):
-    
+                 verbose=False,
+                 transform=None):
+
         self.cutoff = cutoff
         self.label_keys = label_keys
         self._url = _get_dgl_url('dataset/qm9_eV.npz')
@@ -112,7 +119,8 @@ class QM9Dataset(DGLDataset):
                                          url=self._url,
                                          raw_dir=raw_dir,
                                          force_reload=force_reload,
-                                         verbose=verbose)
+                                         verbose=verbose,
+                                         transform=transform)
 
     def process(self):
         npz_path = f'{self.raw_dir}/qm9_eV.npz'
@@ -137,7 +145,17 @@ class QM9Dataset(DGLDataset):
         Returns
         --------
         int
-            Number of labels for each graph, i.e. number of prediction tasks.
+            Number of prediction tasks.
+        """
+        return self.label.shape[1]
+
+    @property
+    def num_tasks(self):
+        r"""
+        Returns
+        --------
+        int
+            Number of prediction tasks.
         """
         return self.label.shape[1]
 
@@ -148,7 +166,7 @@ class QM9Dataset(DGLDataset):
         ----------
         idx : int
             Item index
-        
+
         Returns
         -------
         dgl.DGLGraph
@@ -170,8 +188,12 @@ class QM9Dataset(DGLDataset):
         g = dgl_graph((u, v))
         g = to_bidirected(g)
         g.ndata['R'] = F.tensor(R, dtype=F.data_type_dict['float32'])
-        g.ndata['Z'] = F.tensor(self.Z[self.N_cumsum[idx]:self.N_cumsum[idx + 1]], 
+        g.ndata['Z'] = F.tensor(self.Z[self.N_cumsum[idx]:self.N_cumsum[idx + 1]],
                                 dtype=F.data_type_dict['int64'])
+
+        if self._transform is not None:
+            g = self._transform(g)
+
         return g, label
 
     def __len__(self):

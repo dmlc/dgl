@@ -66,19 +66,11 @@ template <typename DType, typename IdType>
 __global__ void _RepeatKernel(
     const DType* val, const IdType* pos,
     DType* out, int64_t n_row, int64_t length) {
-  int tx = blockIdx.x * blockDim.x + threadIdx.x;
+  IdType tx = static_cast<IdType>(blockIdx.x) * blockDim.x + threadIdx.x;
   const int stride_x = gridDim.x * blockDim.x;
   while (tx < length) {
-    IdType l = 0, r = n_row, m = 0;
-    while (l < r) {
-      m = l + (r-l)/2;
-      if (tx >= pos[m]) {
-        l = m+1;
-      } else {
-        r = m;
-      }
-    }
-    out[tx] = val[l-1];
+    IdType i = dgl::cuda::_UpperBound(pos, n_row, tx) - 1;
+    out[tx] = val[i];
     tx += stride_x;
   }
 }

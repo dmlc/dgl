@@ -113,8 +113,8 @@ class MaxPooling(layers.Layer):
 
 
 class SortPooling(layers.Layer):
-    r"""Apply Sort Pooling (`An End-to-End Deep Learning Architecture for Graph Classification
-    <https://www.cse.wustl.edu/~ychen/public/DGCNN.pdf>`__) over the nodes in the graph.
+    r"""Sort Pooling from `An End-to-End Deep Learning Architecture for Graph Classification
+    <https://www.cse.wustl.edu/~ychen/public/DGCNN.pdf>`__
 
     Parameters
     ----------
@@ -134,7 +134,7 @@ class SortPooling(layers.Layer):
         graph : DGLGraph
             The graph.
         feat : tf.Tensor
-            The input feature with shape :math:`(N, D)` where
+            The input node feature with shape :math:`(N, D)` where
             :math:`N` is the number of nodes in the graph.
 
         Returns
@@ -154,8 +154,8 @@ class SortPooling(layers.Layer):
 
 
 class GlobalAttentionPooling(layers.Layer):
-    r"""Apply Global Attention Pooling (`Gated Graph Sequence Neural Networks
-    <https://arxiv.org/abs/1511.05493.pdf>`__) over the nodes in the graph.
+    r"""Global Attention Pooling from `Gated Graph Sequence Neural Networks
+    <https://arxiv.org/abs/1511.05493.pdf>`__
 
     .. math::
         r^{(i)} = \sum_{k=1}^{N_i}\mathrm{softmax}\left(f_{gate}
@@ -183,7 +183,7 @@ class GlobalAttentionPooling(layers.Layer):
         graph : DGLGraph
             The graph.
         feat : tf.Tensor
-            The input feature with shape :math:`(N, D)` where
+            The input node feature with shape :math:`(N, D)` where
             :math:`N` is the number of nodes in the graph.
 
         Returns

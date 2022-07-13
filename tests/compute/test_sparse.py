@@ -1,12 +1,13 @@
 from dgl.ops import gspmm, gsddmm, edge_softmax, segment_reduce
 from test_utils.graph_cases import get_cases
-from utils import parametrize_dtype
+from test_utils import parametrize_idtype
 import dgl
 import random
-import pytest
+import pytest, unittest
 import networkx as nx
 import backend as F
 import numpy as np 
+import torch
 
 random.seed(42)
 np.random.seed(42)
@@ -99,7 +100,7 @@ edge_softmax_shapes = [
 @pytest.mark.parametrize('shp', spmm_shapes)
 @pytest.mark.parametrize('msg', ['add', 'sub', 'mul', 'div', 'copy_lhs', 'copy_rhs'])
 @pytest.mark.parametrize('reducer', ['sum', 'min', 'max'])
-@parametrize_dtype
+@parametrize_idtype
 def test_spmm(idtype, g, shp, msg, reducer):
     g = g.astype(idtype).to(F.ctx())
     print(g)
@@ -159,7 +160,7 @@ def test_spmm(idtype, g, shp, msg, reducer):
 @pytest.mark.parametrize('lhs_target', ['u', 'v', 'e'])
 @pytest.mark.parametrize('rhs_target', ['u', 'v', 'e'])
 @pytest.mark.parametrize('msg', ['add', 'sub', 'mul', 'div', 'dot', 'copy_lhs', 'copy_rhs'])
-@parametrize_dtype
+@parametrize_idtype
 def test_sddmm(g, shp, lhs_target, rhs_target, msg, idtype):
     if lhs_target == rhs_target:
         return
@@ -229,7 +230,7 @@ def test_sddmm(g, shp, lhs_target, rhs_target, msg, idtype):
 @pytest.mark.parametrize('g', get_cases(['clique']))
 @pytest.mark.parametrize('norm_by', ['src', 'dst'])
 @pytest.mark.parametrize('shp', edge_softmax_shapes)
-@parametrize_dtype
+@parametrize_idtype
 def test_edge_softmax(g, norm_by, shp, idtype):
     g = g.astype(idtype).to(F.ctx())
     edata = F.tensor(np.random.rand(g.number_of_edges(), *shp))
@@ -287,5 +288,98 @@ def test_segment_reduce(reducer):
         assert F.allclose(grad1, grad2)
         print('backward passed')
 
-if __name__ == '__main__':
-    test_spmm(F.int32, graphs[0], spmm_shapes[0], 'mul', 'sum')
+@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
+@parametrize_idtype
+@pytest.mark.parametrize('feat_size', [1, 8, 16, 64, 256])
+@pytest.mark.parametrize('dtype,tol', [(torch.float16,1e-2),(torch.float32,3e-3),(torch.float64,1e-4)])
+def test_segment_mm(idtype, feat_size, dtype, tol):
+    dev = F.ctx()
+    # input
+    a = torch.tensor(np.random.rand(100, feat_size)).to(dev).to(dtype)
+    a.requires_grad_()
+    b = torch.tensor(np.random.rand(10, feat_size, feat_size + 1)).to(dev).to(dtype)
+    b.requires_grad_()
+    seglen_a = torch.tensor([10, 15, 8, 0, 1, 9, 18, 24, 15, 0])
+    dc = torch.tensor(np.random.rand(100, feat_size + 1)).to(dev).to(dtype)
+    # compute
+    c = dgl.ops.segment_mm(a, b, seglen_a)
+    c.backward(dc)
+    da = a.grad.clone()
+    db = b.grad.clone()
+    # ground truth
+    c_t = []
+    off = 0
+    for i, l in enumerate(seglen_a):
+        c_t.append(a[off:off+l] @ b[i])
+        off += l
+    c_t = torch.cat(c_t).to(dtype)
+    a.grad.zero_()
+    b.grad.zero_()
+    c_t.backward(dc)
+    da_t = a.grad
+    db_t = b.grad
+
+    assert torch.allclose(c, c_t, atol=tol, rtol=tol)
+    assert torch.allclose(da, da_t, atol=tol, rtol=tol)
+    assert torch.allclose(db, db_t, atol=tol, rtol=tol)
+
+@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
+@parametrize_idtype
+@pytest.mark.parametrize('feat_size', [1, 8, 16, 64, 256])
+def test_gather_mm_idx_b(idtype, feat_size):
+    import torch
+    dev = F.ctx()
+    # input
+    a = torch.tensor(np.random.rand(100, feat_size)).to(dev)
+    a.requires_grad_()
+    b = torch.tensor(np.random.rand(10, feat_size, feat_size + 1)).to(dev)
+    b.requires_grad_()
+    idx = torch.tensor(np.random.randint(0, 10, 100)).to(dev).long()
+    dc = torch.tensor(np.random.rand(100, feat_size + 1)).to(dev)
+    # compute
+    c = dgl.ops.gather_mm(a, b, idx_b=idx)
+    c.backward(dc)
+    da = a.grad.clone()
+    db = b.grad.clone()
+    # ground truth
+    c_t = torch.bmm(a.unsqueeze(1), b[idx]).squeeze(1)
+    a.grad.zero_()
+    b.grad.zero_()
+    c_t.backward(dc)
+    da_t = a.grad
+    db_t = b.grad
+
+    assert torch.allclose(c, c_t, atol=1e-4, rtol=1e-4)
+    assert torch.allclose(da, da_t, atol=1e-4, rtol=1e-4)
+    assert torch.allclose(db, db_t, atol=1e-4, rtol=1e-4)
+
+@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
+@parametrize_idtype
+@pytest.mark.parametrize('feat_size', [1, 8, 16, 64, 256])
+def _test_gather_mm_idx_a(idtype, feat_size):
+    # TODO(minjie): currently disabled due to bugs in the CUDA kernel. Need to fix it later.
+    import torch
+    dev = F.ctx()
+    # input
+    a = torch.tensor(np.random.rand(10, feat_size)).to(dev)
+    a.requires_grad_()
+    b = torch.tensor(np.random.rand(100, feat_size, feat_size + 1)).to(dev)
+    b.requires_grad_()
+    idx = torch.tensor(np.random.randint(0, 10, 100)).to(dev)
+    dc = torch.tensor(np.random.rand(100, feat_size + 1)).to(dev)
+    # compute
+    c = dgl.ops.gather_mm(a, b, idx_a=idx)
+    c.backward(dc)
+    da = a.grad.clone()
+    db = b.grad.clone()
+    # ground truth
+    c_t = torch.bmm(a[idx].unsqueeze(1), b).squeeze(1)
+    a.grad.zero_()
+    b.grad.zero_()
+    c_t.backward(dc)
+    da_t = a.grad
+    db_t = b.grad
+
+    assert torch.allclose(c, c_t, atol=1e-4, rtol=1e-4)
+    assert torch.allclose(da, da_t, atol=1e-4, rtol=1e-4)
+    assert torch.allclose(db, db_t, atol=1e-4, rtol=1e-4)

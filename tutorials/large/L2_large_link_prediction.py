@@ -91,7 +91,7 @@ test_nids = idx_split['test']
 # in a similar fashion introduced in the :doc:`large-scale node classification
 # tutorial <L1_large_node_classification>`.
 #
-# DGL provides ``dgl.dataloading.EdgeDataLoader`` to
+# DGL provides ``dgl.dataloading.as_edge_prediction_sampler`` to
 # iterate over edges for edge classification or link prediction tasks.
 #
 # To perform link prediction, you need to specify a negative sampler. DGL
@@ -105,18 +105,19 @@ negative_sampler = dgl.dataloading.negative_sampler.Uniform(5)
 
 ######################################################################
 # After defining the negative sampler, one can then define the edge data
-# loader with neighbor sampling.  To create an ``EdgeDataLoader`` for
+# loader with neighbor sampling.  To create an ``DataLoader`` for
 # link prediction, provide a neighbor sampler object as well as the negative
 # sampler object created above.
 #
 
-sampler = dgl.dataloading.MultiLayerNeighborSampler([4, 4])
-train_dataloader = dgl.dataloading.EdgeDataLoader(
-    # The following arguments are specific to EdgeDataLoader.
+sampler = dgl.dataloading.NeighborSampler([4, 4])
+sampler = dgl.dataloading.as_edge_prediction_sampler(
+    sampler, negative_sampler=negative_sampler)
+train_dataloader = dgl.dataloading.DataLoader(
+    # The following arguments are specific to DataLoader.
     graph,                                  # The graph
     torch.arange(graph.number_of_edges()),  # The edges to iterate over
     sampler,                                # The neighbor sampler
-    negative_sampler=negative_sampler,      # The negative sampler
     device=device,                          # Put the MFGs on CPU or GPU
     # The following arguments are inherited from PyTorch DataLoader.
     batch_size=1024,    # Batch size
@@ -247,8 +248,8 @@ def inference(model, graph, node_features):
     with torch.no_grad():
         nodes = torch.arange(graph.number_of_nodes())
 
-        sampler = dgl.dataloading.MultiLayerNeighborSampler([4, 4])
-        train_dataloader = dgl.dataloading.NodeDataLoader(
+        sampler = dgl.dataloading.NeighborSampler([4, 4])
+        train_dataloader = dgl.dataloading.DataLoader(
             graph, torch.arange(graph.number_of_nodes()), sampler,
             batch_size=1024,
             shuffle=False,
@@ -369,12 +370,6 @@ for epoch in range(1):
 # Ultimately, they require the model to predict one scalar score given
 # a node pair among a set of node pairs.
 #
-# ``dgl.dataloading.EdgeDataLoader`` allows you to iterate over
-# the edges of a new graph with the same nodes, while performing
-# neighbor sampling on the original graph with ``g_sampling`` argument.
-# This functionality enables convenient evaluation of a link prediction
-# model.
-#
 # Assuming that you have the following test set with labels, where
 # ``test_pos_src`` and ``test_pos_dst`` are ground truth node pairs
 # with edges in between (or *positive* pairs), and ``test_neg_src``
@@ -383,74 +378,40 @@ for epoch in range(1):
 #
 
 # Positive pairs
-test_pos_src, test_pos_dst = graph.edges()
-# Negative pairs
+# These are randomly generated as an example.  You will need to
+# replace them with your own ground truth.
+n_test_pos = 1000
+test_pos_src, test_pos_dst = (
+    torch.randint(0, graph.num_nodes(), (n_test_pos,)),
+    torch.randint(0, graph.num_nodes(), (n_test_pos,)))
+# Negative pairs.  Likewise, you will need to replace them with your
+# own ground truth.
 test_neg_src = test_pos_src
-test_neg_dst = torch.randint(0, graph.num_nodes(), (graph.num_edges(),))
+test_neg_dst = torch.randint(0, graph.num_nodes(), (n_test_pos,))
 
 
 ######################################################################
-# First you need to construct a graph for ``dgl.dataloading.EdgeDataLoader``
-# to iterate on, i.e. with the testing node pairs as edges.
-# You also need to label the edges, 1 if positive and 0 if negative.
+# First you need to compute the node representations for all the nodes
+# with the ``inference`` method above:
 #
 
-test_src = torch.cat([test_pos_src, test_pos_dst])
-test_dst = torch.cat([test_neg_src, test_neg_dst])
-test_graph = dgl.graph((test_src, test_dst), num_nodes=graph.num_nodes())
-test_graph.edata['label'] = torch.cat(
-        [torch.ones_like(test_pos_src), torch.zeros_like(test_neg_src)])
-
+node_reprs = inference(model, graph, node_features)
 
 ######################################################################
-# Then you could create a new ``EdgeDataLoader`` instance that
-# iterates on the new ``test_graph``, but uses the original ``graph``
-# for neighbor sampling.
+# Since the predictor is a dot product, you can now easily compute the
+# score of positive and negative test pairs to compute metrics such
+# as AUC:
 #
-# Note that you do not need negative sampling in this dataloader: the
-# negative pairs are already in the new test graph.
-#
-test_dataloader = dgl.dataloading.EdgeDataLoader(
-    # The following arguments are specific to EdgeDataLoader.
-    test_graph,                             # The graph to iterate edges over
-    torch.arange(test_graph.number_of_edges()),  # The edges to iterate over
-    sampler,                                # The neighbor sampler
-    device=device,                          # Put the MFGs on CPU or GPU
-    g_sampling=graph,                       # Graph to sample neighbors
-    # The following arguments are inherited from PyTorch DataLoader.
-    batch_size=1024,    # Batch size
-    shuffle=True,       # Whether to shuffle the nodes for every epoch
-    drop_last=False,    # Whether to drop the last incomplete batch
-    num_workers=0       # Number of sampler processes
-)
 
+h_pos_src = node_reprs[test_pos_src]
+h_pos_dst = node_reprs[test_pos_dst]
+h_neg_src = node_reprs[test_neg_src]
+h_neg_dst = node_reprs[test_neg_dst]
+score_pos = (h_pos_src * h_pos_dst).sum(1)
+score_neg = (h_neg_src * h_neg_dst).sum(1)
+test_preds = torch.cat([score_pos, score_neg]).cpu().numpy()
+test_labels = torch.cat([torch.ones_like(score_pos), torch.zeros_like(score_neg)]).cpu().numpy()
 
-######################################################################
-# The rest is similar to training except that you no longer compute
-# the gradients, and you collect all the scores and ground truth
-# labels for final metric calculation.
-#
-# .. note::
-#
-#    If the graph does not change, you can also precompute all the
-#    node representations beforehand with ``inference`` function.
-#    You can then feed the precomputed results directly into the
-#    predictor without passing the MFGs into the model.
-#
-test_preds = []
-test_labels = []
-
-with tqdm.tqdm(test_dataloader) as tq, torch.no_grad():
-    for step, (input_nodes, pair_graph, mfgs) in enumerate(tq):
-        # feature copy from CPU to GPU takes place here
-        inputs = mfgs[0].srcdata['feat']
-
-        outputs = model(mfgs, inputs)
-        test_preds.append(predictor(pair_graph, outputs))
-        test_labels.append(pair_graph.edata['label'])
-
-test_preds = torch.cat(test_preds).cpu().numpy()
-test_labels = torch.cat(test_labels).cpu().numpy()
 auc = sklearn.metrics.roc_auc_score(test_labels, test_preds)
 print('Link Prediction AUC:', auc)
 

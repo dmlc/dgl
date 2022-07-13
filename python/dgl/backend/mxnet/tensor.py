@@ -12,9 +12,8 @@ from ... import ndarray as dglnd
 from ..._deprecate import kernel as K
 from ...function.base import TargetCode
 
-MX_VERSION = LooseVersion(mx.__version__)
-if MX_VERSION.version[0] == 1 and MX_VERSION.version[1] < 5:
-    raise RuntimeError("DGL requires mxnet >= 1.5")
+if LooseVersion(mx.__version__) < LooseVersion("1.6.0"):
+    raise RuntimeError("DGL requires MXNet >= 1.6")
 
 # After MXNet 1.5, empty tensors aren't supprted by default.
 # After we turn on the numpy compatible flag, MXNet supports empty NDArray.
@@ -144,6 +143,9 @@ def asnumpy(input):
 def copy_to(input, ctx, **kwargs):
     return input.as_in_context(ctx)
 
+def is_pinned(input):
+    return input.context == mx.cpu_pinned()
+
 def sum(input, dim, keepdims=False):
     if len(input) == 0:
         return nd.array([0.], dtype=input.dtype, ctx=input.context)
@@ -191,6 +193,9 @@ def argsort(input, dim, descending):
 def exp(input):
     return nd.exp(input)
 
+def inverse(input):
+    return nd.linalg_inverse(input)
+
 def sqrt(input):
     return nd.sqrt(input)
 
@@ -208,19 +213,9 @@ def split(x, sizes_or_sections, dim):
         assert len(x) == sizes_or_sections[0]
         return [x]
 
-    if MX_VERSION.version[0] == 1 and MX_VERSION.version[1] >= 5:
-        if isinstance(sizes_or_sections, (np.ndarray, list)):
-            sizes_or_sections1 = tuple(np.cumsum(sizes_or_sections)[:-1])
-        return nd.split_v2(x, sizes_or_sections1, axis=dim)
-
-    if isinstance(sizes_or_sections, list) or isinstance(sizes_or_sections, np.ndarray):
-        # Old MXNet doesn't support split with different section sizes.
-        np_arr = x.asnumpy()
-        indices = np.cumsum(sizes_or_sections)[:-1]
-        res = np.split(np_arr, indices, axis=dim)
-        return [tensor(arr, dtype=x.dtype) for arr in res]
-    else:
-        return nd.split(x, sizes_or_sections, axis=dim)
+    if isinstance(sizes_or_sections, (np.ndarray, list)):
+        sizes_or_sections1 = tuple(np.cumsum(sizes_or_sections)[:-1])
+    return nd.split_v2(x, sizes_or_sections1, axis=dim)
 
 def repeat(input, repeats, dim):
     if isinstance(repeats, nd.NDArray):
@@ -327,6 +322,9 @@ def boolean_mask(input, mask):
 def equal(x, y):
     return x == y
 
+def allclose(x, y, rtol=1e-4, atol=1e-4):
+    return np.allclose(x.asnumpy(), y.asnumpy(), rtol=rtol, atol=atol)
+
 def logical_not(input):
     return nd.logical_not(input)
 
@@ -347,14 +345,20 @@ def count_nonzero(input):
     tmp = input.asnumpy()
     return np.count_nonzero(tmp)
 
-def unique(input, return_inverse=False):
+def unique(input, return_inverse=False, return_counts=False):
     # TODO: fallback to numpy is unfortunate
     tmp = input.asnumpy()
-    if return_inverse:
-        tmp, inv = np.unique(tmp, return_inverse=True)
+    if return_inverse and return_counts:
+        tmp, inv, count = np.unique(tmp, return_inverse=True, return_counts=True)
         tmp = nd.array(tmp, ctx=input.context, dtype=input.dtype)
         inv = nd.array(inv, ctx=input.context)
-        return tmp, inv
+        count = nd.array(count, ctx=input.context)
+        return tmp, inv, count
+    elif return_inverse or return_counts:
+        tmp, tmp2 = np.unique(tmp, return_inverse=return_inverse, return_counts=return_counts)
+        tmp = nd.array(tmp, ctx=input.context, dtype=input.dtype)
+        tmp2 = nd.array(tmp2, ctx=input.context)
+        return tmp, tmp2
     else:
         tmp = np.unique(tmp)
         return nd.array(tmp, ctx=input.context, dtype=input.dtype)

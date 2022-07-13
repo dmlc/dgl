@@ -7,7 +7,9 @@ The folder contains example implementations of selected research papers related 
 To quickly locate the examples of your interest, search for the tagged keywords or use the search tool on [dgl.ai](https://www.dgl.ai/).
 
 ## 2021
-
+- <a name="rnaglib"></a> Mallet et al. Learning Protein and Small Molecule binding sites in RNA molecules with 2.5D graphs. [Paper link](https://academic.oup.com/bioinformatics/article/38/5/1458/6462185?login=true)
+    - Example code: [PyTorch](https://jwgitlab.cs.mcgill.ca/cgoliver/rnaglib)
+    - Tags: semi-supervised node classification
 - <a name="hilander"></a> Xing et al. Learning Hierarchical Graph Neural Networks for Image Clustering.
     - Example code: [PyTorch](../examples/pytorch/hilander)
     - Tags: clustering
@@ -26,6 +28,9 @@ To quickly locate the examples of your interest, search for the tagged keywords 
 - <a name='gatv2'></a> Brody et al. How Attentive are Graph Attention Networks? [Paper link](https://arxiv.org/abs/2105.14491).
     - Example code: [PyTorch](../examples/pytorch/gatv2)
     - Tags: graph attention, gat, gatv2, attention
+- <a name='bgrl'></a> Thakoor et al. Large-Scale Representation Learning on Graphs via Bootstrapping. [Paper link](https://arxiv.org/abs/2102.06514).
+    - Example code: [PyTorch](../examples/pytorch/bgrl)
+    - Tags: contrastive learning for node classification.
 
 ## 2020
 - <a name="eeg-gcnn"></a> Wagh et al. EEG-GCNN: Augmenting Electroencephalogram-based Neurological Disease Diagnosis using a Domain-guided Graph Convolutional Neural Network. [Paper link](http://proceedings.mlr.press/v136/wagh20a.html). 
@@ -179,6 +184,9 @@ To quickly locate the examples of your interest, search for the tagged keywords 
 - <a name='geniepath'></a> Liu Z, et al. Geniepath: Graph neural networks with adaptive receptive paths. [Paper link](https://arxiv.org/abs/1802.00910).
     - Example code: [PyTorch](../examples/pytorch/geniepath)
     - Tags:  Fraud detection, Node classification, Graph attention, LSTM, Adaptive receptive fields
+- <a name='pgnn'></a> You J, et al. Position-aware graph neural networks. [Paper link](https://arxiv.org/abs/1906.04817).
+    - Example code: [PyTorch](../examples/pytorch/P-GNN)
+    - Tags:  Positional encoding, Link prediction, Link-pair prediction
 
 ## 2018
 

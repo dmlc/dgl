@@ -345,8 +345,8 @@ def test_empty_data_initialized():
     assert len(g.ndata["ha"]) == 1
 
 def test_is_sorted():
-   u_src, u_dst = edge_pair_input(False) 
-   s_src, s_dst = edge_pair_input(True) 
+   u_src, u_dst = edge_pair_input(False)
+   s_src, s_dst = edge_pair_input(True)
 
    u_src = F.tensor(u_src, dtype=F.int32)
    u_dst = F.tensor(u_dst, dtype=F.int32)
@@ -409,7 +409,7 @@ def test_formats():
         fail = False
     finally:
         assert not fail
-    
+
 if __name__ == '__main__':
     test_query()
     test_mutation()

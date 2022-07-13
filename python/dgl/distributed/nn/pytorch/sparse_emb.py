@@ -77,8 +77,10 @@ class DistEmbedding:
         if th.distributed.is_initialized():
             self._rank = th.distributed.get_rank()
             self._world_size = th.distributed.get_world_size()
-        else:
-            assert 'th.distributed shoud be initialized'
+        # [TODO] The following code is clearly wrong but changing it to "raise DGLError"
+        # actually fails unit test.  ???
+        # else:
+        #     assert 'th.distributed should be initialized'
         self._optm_state = None # track optimizer state
         self._part_policy = part_policy
 
@@ -127,6 +129,17 @@ class DistEmbedding:
             The name of the embeddings
         """
         return self._tensor.tensor_name
+
+    @property
+    def data_name(self):
+        """Return the data name of the embeddings
+
+        Returns
+        -------
+        str
+            The data name of the embeddings
+        """
+        return self._tensor._name
 
     @property
     def kvstore(self):

@@ -2,7 +2,7 @@ import argparse
 import torch
 import dgl
 from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
-from model import LabelPropagation
+from dgl.nn import LabelPropagation
 
 
 def main():

@@ -1,7 +1,6 @@
 """Negative samplers"""
 from collections.abc import Mapping
 from .. import backend as F
-from ..sampling import global_uniform_negative_sampling
 
 class _BaseNegativeSampler(object):
     def _generate(self, g, eids, canonical_etype):
@@ -26,7 +25,7 @@ class _BaseNegativeSampler(object):
             eids = {g.to_canonical_etype(k): v for k, v in eids.items()}
             neg_pair = {k: self._generate(g, v, k) for k, v in eids.items()}
         else:
-            assert len(g.etypes) == 1, \
+            assert len(g.canonical_etypes) == 1, \
                 'please specify a dict of etypes and ids for graphs with multiple edge types'
             neg_pair = self._generate(g, eids, g.canonical_etypes[0])
 
@@ -64,7 +63,7 @@ class PerSourceUniform(_BaseNegativeSampler):
         shape = (shape[0] * self.k,)
         src, _ = g.find_edges(eids, etype=canonical_etype)
         src = F.repeat(src, self.k, 0)
-        dst = F.randint(shape, dtype, ctx, 0, g.number_of_nodes(vtype))
+        dst = F.randint(shape, dtype, ctx, 0, g.num_nodes(vtype))
         return src, dst
 
 # Alias
@@ -89,15 +88,7 @@ class GlobalUniform(_BaseNegativeSampler):
         Whether to exclude self-loops from negative samples.  (Default: True)
     replace : bool, optional
         Whether to sample with replacement.  Setting it to True will make things
-        faster.  (Default: True)
-    redundancy : float, optional
-        Indicates how much more negative samples to actually generate during rejection sampling
-        before finding the unique pairs.
-
-        Increasing it will increase the likelihood of getting :attr:`k` negative samples
-        per edge, but will also take more time and memory.
-
-        (Default: automatically determined by the density of graph)
+        faster.  (Default: False)
 
     Notes
     -----
@@ -113,13 +104,11 @@ class GlobalUniform(_BaseNegativeSampler):
     >>> neg_sampler(g, torch.LongTensor([0, 1]))
     (tensor([0, 1, 3, 2]), tensor([2, 0, 2, 1]))
     """
-    def __init__(self, k, exclude_self_loops=True, replace=False, redundancy=None):
+    def __init__(self, k, exclude_self_loops=True, replace=False):
         self.k = k
         self.exclude_self_loops = exclude_self_loops
         self.replace = replace
-        self.redundancy = redundancy
 
     def _generate(self, g, eids, canonical_etype):
-        return global_uniform_negative_sampling(
-            g, len(eids) * self.k, self.exclude_self_loops, self.replace,
-            canonical_etype, self.redundancy)
+        return g.global_uniform_negative_sampling(
+            len(eids) * self.k, self.exclude_self_loops, self.replace, canonical_etype)

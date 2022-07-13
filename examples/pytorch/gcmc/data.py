@@ -504,6 +504,7 @@ class MovieLens(object):
 
         """
         import torchtext
+        from torchtext.data.utils import get_tokenizer
 
         if self._name == 'ml-100k':
             GENRES = GENRES_ML_100K
@@ -514,7 +515,9 @@ class MovieLens(object):
         else:
             raise NotImplementedError
 
-        TEXT = torchtext.legacy.data.Field(tokenize='spacy', tokenizer_language='en_core_web_sm')
+        # Old torchtext-legacy API commented below
+        # TEXT = torchtext.legacy.data.Field(tokenize='spacy', tokenizer_language='en_core_web_sm')
+        tokenizer = get_tokenizer('spacy', language='en_core_web_sm') # new API (torchtext 0.9+)
         embedding = torchtext.vocab.GloVe(name='840B', dim=300)
 
         title_embedding = np.zeros(shape=(self.movie_info.shape[0], 300), dtype=np.float32)
@@ -528,7 +531,8 @@ class MovieLens(object):
             else:
                 title_context, year = match_res.groups()
             # We use average of glove
-            title_embedding[i, :] = embedding.get_vecs_by_tokens(TEXT.tokenize(title_context)).numpy().mean(axis=0)
+            # Upgraded torchtext API:  TEXT.tokenize(title_context) --> tokenizer(title_context)            
+            title_embedding[i, :] = embedding.get_vecs_by_tokens(tokenizer(title_context)).numpy().mean(axis=0)
             release_years[i] = float(year)
         movie_features = np.concatenate((title_embedding,
                                          (release_years - 1950.0) / 100.0,

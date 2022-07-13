@@ -45,6 +45,12 @@ class DeviceAPI {
   /*! \brief virtual destructor */
   virtual ~DeviceAPI() {}
   /*!
+   * \brief Check whether the device is available.
+   */
+  virtual bool IsAvailable() {
+    return true;
+  }
+  /*!
    * \brief Set the environment device id to ctx
    * \param ctx The context to be set.
    */
@@ -159,6 +165,13 @@ class DeviceAPI {
    * \param ptr The host memory pointer to be unpinned.   
    */ 
   DGL_DLL virtual void UnpinData(void* ptr);
+
+  /*!
+   * \brief Check whether the memory is in pinned memory.
+   */
+  DGL_DLL virtual bool IsPinned(const void* ptr) {
+    return false;
+  }
 
   /*!
    * \brief Allocate temporal workspace for backend execution.

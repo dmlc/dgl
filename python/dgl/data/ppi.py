@@ -6,31 +6,13 @@ from networkx.readwrite import json_graph
 import os
 
 from .dgl_dataset import DGLBuiltinDataset
-from .utils import _get_dgl_url, save_graphs, save_info, load_info, load_graphs, deprecate_property
+from .utils import _get_dgl_url, save_graphs, save_info, load_info, load_graphs
 from .. import backend as F
 from ..convert import from_networkx
 
 
 class PPIDataset(DGLBuiltinDataset):
     r""" Protein-Protein Interaction dataset for inductive node classification
-
-    .. deprecated:: 0.5.0
-
-        - ``lables`` is deprecated, it is replaced by:
-
-            >>> dataset = PPIDataset()
-            >>> for g in dataset:
-            ....    labels = g.ndata['label']
-            ....
-            >>>
-
-        - ``features`` is deprecated, it is replaced by:
-
-            >>> dataset = PPIDataset()
-            >>> for g in dataset:
-            ....    features = g.ndata['feat']
-            ....
-            >>>
 
     A toy Protein-Protein Interaction network dataset. The dataset contains
     24 graphs. The average number of nodes per graph is 2372. Each node has
@@ -56,9 +38,13 @@ class PPIDataset(DGLBuiltinDataset):
     force_reload : bool
         Whether to reload the dataset.
         Default: False
-    verbose: bool
+    verbose : bool
         Whether to print out progress information.
         Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
@@ -79,7 +65,8 @@ class PPIDataset(DGLBuiltinDataset):
     ....    # your code here
     >>>
     """
-    def __init__(self, mode='train', raw_dir=None, force_reload=False, verbose=False):
+    def __init__(self, mode='train', raw_dir=None, force_reload=False,
+                 verbose=False, transform=None):
         assert mode in ['train', 'valid', 'test']
         self.mode = mode
         _url = _get_dgl_url('dataset/ppi.zip')
@@ -87,7 +74,8 @@ class PPIDataset(DGLBuiltinDataset):
                                          url=_url,
                                          raw_dir=raw_dir,
                                          force_reload=force_reload,
-                                         verbose=verbose)
+                                         verbose=verbose,
+                                         transform=transform)
 
     def process(self):
         graph_file = os.path.join(self.save_path, '{}_graph.json'.format(self.mode))
@@ -148,16 +136,6 @@ class PPIDataset(DGLBuiltinDataset):
     def num_labels(self):
         return 121
 
-    @property
-    def labels(self):
-        deprecate_property('dataset.labels', 'dataset.graphs[i].ndata[\'label\']')
-        return self._labels
-
-    @property
-    def features(self):
-        deprecate_property('dataset.features', 'dataset.graphs[i].ndata[\'feat\']')
-        return self._feats
-
     def __len__(self):
         """Return number of samples in this dataset."""
         return len(self.graphs)
@@ -178,7 +156,10 @@ class PPIDataset(DGLBuiltinDataset):
             - ``ndata['feat']``: node features
             - ``ndata['label']``: node labels
         """
-        return self.graphs[item]
+        if self._transform is None:
+            return self.graphs[item]
+        else:
+            return self._transform(self.graphs[item])
 
 
 class LegacyPPIDataset(PPIDataset):
@@ -198,5 +179,8 @@ class LegacyPPIDataset(PPIDataset):
         (dgl.DGLGraph, Tensor, Tensor)
             The graph, features and its label.
         """
-
-        return self.graphs[item], self.graphs[item].ndata['feat'], self.graphs[item].ndata['label']
+        if self._transform is None:
+            g = self.graphs[item]
+        else:
+            g = self._transform(self.graphs[item])
+        return g, g.ndata['feat'], g.ndata['label']
