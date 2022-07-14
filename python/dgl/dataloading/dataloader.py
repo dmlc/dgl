@@ -941,7 +941,7 @@ class EdgeDataLoader(DataLoader):
             if use_uva:
                 device = torch.cuda.current_device()
             else:
-                device = self.graph.device
+                device = graph.device
         device = _get_device(device)
 
         if isinstance(graph_sampler, BlockSampler):
