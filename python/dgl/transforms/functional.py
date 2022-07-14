@@ -2872,6 +2872,8 @@ def sort_csr_by_tag(g, tag, tag_offset_name='_TAG_OFFSET', tag_type='node'):
     ``tag_type`` is ``node``.
 
     >>> import dgl
+    >>> import torch
+
     >>> g = dgl.graph(([0,0,0,0,0,1,1,1],[0,1,2,3,4,0,1,2]))
     >>> g.adjacency_matrix(scipy_fmt='csr').nonzero()
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
@@ -2890,11 +2892,10 @@ def sort_csr_by_tag(g, tag, tag_offset_name='_TAG_OFFSET', tag_type='node'):
 
     ``tag_type`` is ``edge``.
 
-    >>> from dgl import backend as F
     >>> g = dgl.graph(([0,0,0,0,0,1,1,1],[0,1,2,3,4,0,1,2]))
     >>> g.edges()
     (tensor([0, 0, 0, 0, 0, 1, 1, 1]), tensor([0, 1, 2, 3, 4, 0, 1, 2]))
-    >>> tag = F.tensor([1, 1, 0, 2, 0, 1, 1, 0])
+    >>> tag = torch.tensor([1, 1, 0, 2, 0, 1, 1, 0])
     >>> g_sorted = dgl.sort_csr_by_tag(g, tag, tag_type='edge')
     >>> g_sorted.adj(scipy_fmt='csr').nonzero()
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32), array([2, 4, 0, 1, 3, 2, 0, 1], dtype=int32))
@@ -2995,6 +2996,7 @@ def sort_csc_by_tag(g, tag, tag_offset_name='_TAG_OFFSET', tag_type='node'):
     ``tag_type`` is ``node``.
 
     >>> import dgl
+    >>> import torch
     >>> g = dgl.graph(([0,1,2,3,4,0,1,2],[0,0,0,0,0,1,1,1]))
     >>> g.adjacency_matrix(scipy_fmt='csr', transpose=True).nonzero()
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
@@ -3013,9 +3015,8 @@ def sort_csc_by_tag(g, tag, tag_offset_name='_TAG_OFFSET', tag_type='node'):
 
     ``tag_type`` is ``edge``.
 
-    >>> from dgl import backend as F
     >>> g = dgl.graph(([0,1,2,3,4,0,1,2],[0,0,0,0,0,1,1,1]))
-    >>> tag = F.tensor([1, 1, 0, 2, 0, 1, 1, 0])
+    >>> tag = torch.tensor([1, 1, 0, 2, 0, 1, 1, 0])
     >>> g_sorted = dgl.sort_csc_by_tag(g, tag, tag_type='edge')
     >>> g_sorted.adj(scipy_fmt='csr', transpose=True).nonzero()
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32), array([2, 4, 0, 1, 3, 2, 0, 1], dtype=int32))
