@@ -158,11 +158,11 @@ def main():
     valid_loader = DataLoader(dataset[split_idx["valid"]], batch_size=args.batch_size, shuffle=False,
                               num_workers=args.num_workers, collate_fn=collate_dgl)
 
-    if args.save_test_dir is not '':
+    if args.save_test_dir != '':
         test_loader = DataLoader(dataset[split_idx["test"]], batch_size=args.batch_size, shuffle=False,
                                  num_workers=args.num_workers, collate_fn=collate_dgl)
 
-    if args.checkpoint_dir is not '':
+    if args.checkpoint_dir != '':
         os.makedirs(args.checkpoint_dir, exist_ok=True)
 
     shared_params = {
@@ -188,7 +188,7 @@ def main():
 
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-    if args.log_dir is not '':
+    if args.log_dir != '':
         writer = SummaryWriter(log_dir=args.log_dir)
 
     best_valid_mae = 1000
@@ -209,13 +209,13 @@ def main():
 
         print({'Train': train_mae, 'Validation': valid_mae})
 
-        if args.log_dir is not '':
+        if args.log_dir != '':
             writer.add_scalar('valid/mae', valid_mae, epoch)
             writer.add_scalar('train/mae', train_mae, epoch)
 
         if valid_mae < best_valid_mae:
             best_valid_mae = valid_mae
-            if args.checkpoint_dir is not '':
+            if args.checkpoint_dir != '':
                 print('Saving checkpoint...')
                 checkpoint = {'epoch': epoch, 'model_state_dict': model.state_dict(),
                               'optimizer_state_dict': optimizer.state_dict(),
@@ -223,7 +223,7 @@ def main():
                               'num_params': num_params}
                 torch.save(checkpoint, os.path.join(args.checkpoint_dir, 'checkpoint.pt'))
 
-            if args.save_test_dir is not '':
+            if args.save_test_dir != '':
                 print('Predicting on test data...')
                 y_pred = test(model, device, test_loader)
                 print('Saving test submission file...')
@@ -233,7 +233,7 @@ def main():
 
         print(f'Best validation MAE so far: {best_valid_mae}')
 
-    if args.log_dir is not '':
+    if args.log_dir != '':
         writer.close()
 
 if __name__ == "__main__":

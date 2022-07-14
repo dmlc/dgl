@@ -502,14 +502,14 @@ class BaseGraphStore(DGLGraph):
     def line_graph(self, backtracking=True, shared=False):
         """Return the line graph of this graph.
 
-        See :func:`~dgl.transform.line_graph`.
+        See :func:`~dgl.transforms.line_graph`.
         """
         raise Exception("Graph store doesn't support creating an line matrix.")
 
     def reverse(self, share_ndata=False, share_edata=False):
         """Return the reverse of this graph.
 
-        See :func:`~dgl.transform.reverse`.
+        See :func:`~dgl.transforms.reverse`.
         """
         raise Exception("Graph store doesn't support reversing a matrix.")
 

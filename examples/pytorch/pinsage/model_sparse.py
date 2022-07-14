@@ -6,11 +6,14 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 import torchtext
 import dgl
+import os
 import tqdm
 
 import layers
 import sampler as sampler_module
 import evaluation
+from torchtext.data.utils import get_tokenizer
+from torchtext.vocab import build_vocab_from_iterator
 
 class PinSAGEModel(nn.Module):
     def __init__(self, full_graph, ntype, textsets, hidden_dims, n_layers):
@@ -50,19 +53,19 @@ def train(dataset, args):
     device = torch.device(args.device)
 
     # Prepare torchtext dataset and vocabulary
-    fields = {}
-    examples = []
-    for key, texts in item_texts.items():
-        fields[key] = torchtext.data.Field(include_lengths=True, lower=True, batch_first=True)
-    for i in range(g.number_of_nodes(item_ntype)):
-        example = torchtext.data.Example.fromlist(
-            [item_texts[key][i] for key in item_texts.keys()],
-            [(key, fields[key]) for key in item_texts.keys()])
-        examples.append(example)
-    textset = torchtext.data.Dataset(examples, fields)
-    for key, field in fields.items():
-        field.build_vocab(getattr(textset, key))
-        #field.build_vocab(getattr(textset, key), vectors='fasttext.simple.300d')
+    textset = {}
+    tokenizer = get_tokenizer(None)
+
+    textlist = []
+    batch_first = True
+
+    for i in range(g.num_nodes(item_ntype)):
+        for key in item_texts.keys():
+            l = tokenizer(item_texts[key][i].lower())
+            textlist.append(l)
+    for key, field in item_texts.items():
+        vocab2 = build_vocab_from_iterator(textlist, specials=["<unk>","<pad>"])
+        textset[key] = (textlist, vocab2, vocab2.get_stoi()['<pad>'], batch_first)
 
     # Sampler
     batch_sampler = sampler_module.ItemToItemBatchSampler(
@@ -77,7 +80,7 @@ def train(dataset, args):
         collate_fn=collator.collate_train,
         num_workers=args.num_workers)
     dataloader_test = DataLoader(
-        torch.arange(g.number_of_nodes(item_ntype)),
+        torch.arange(g.num_nodes(item_ntype)),
         batch_size=args.batch_size,
         collate_fn=collator.collate_test,
         num_workers=args.num_workers)
@@ -85,7 +88,7 @@ def train(dataset, args):
 
     # Model
     model = PinSAGEModel(g, item_ntype, textset, args.hidden_dims, args.num_layers).to(device)
-    item_emb = nn.Embedding(g.number_of_nodes(item_ntype), args.hidden_dims, sparse=True)
+    item_emb = nn.Embedding(g.num_nodes(item_ntype), args.hidden_dims, sparse=True)
     # Optimizer
     opt = torch.optim.Adam(model.parameters(), lr=args.lr)
     opt_emb = torch.optim.SparseAdam(item_emb.parameters(), lr=args.lr)
@@ -111,7 +114,7 @@ def train(dataset, args):
         # Evaluate
         model.eval()
         with torch.no_grad():
-            item_batches = torch.arange(g.number_of_nodes(item_ntype)).split(args.batch_size)
+            item_batches = torch.arange(g.num_nodes(item_ntype)).split(args.batch_size)
             h_item_batches = []
             for blocks in tqdm.tqdm(dataloader_test):
                 for i in range(len(blocks)):
@@ -142,6 +145,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Load dataset
-    with open(args.dataset_path, 'rb') as f:
+    data_info_path = os.path.join(args.dataset_path, 'data.pkl')
+    with open(data_info_path, 'rb') as f:
         dataset = pickle.load(f)
+    train_g_path = os.path.join(args.dataset_path, 'train_g.bin')
+    g_list, _ = dgl.load_graphs(train_g_path)
+    dataset['train-graph'] = g_list[0]
     train(dataset, args)

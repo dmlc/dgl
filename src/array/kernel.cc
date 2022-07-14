@@ -52,33 +52,164 @@ void SpMM(const std::string& op, const std::string& reduce,
   });
 }
 
+
+/*! \brief Generalized segmented dense Matrix-Matrix Multiplication. */
+void SegmentMM(const NDArray A,
+               const NDArray B,
+               NDArray C,
+               const NDArray seglen_A,
+               bool A_trans, bool B_trans) {
+  CHECK_EQ(A->ndim, 2) << "segment_mm expects a 2D tensor for the first input.";
+  CHECK_EQ(B->ndim, 3) << "segment_mm expects a 3D tensor for the second input.";
+  CHECK(!A_trans);
+  if (B_trans) {
+    CHECK_EQ(A->shape[1], B->shape[2])
+      << "segment_mm expects A.shape[1] == B.shape[2] when B_trans=True";
+  } else {
+    CHECK_EQ(A->shape[1], B->shape[1]) << "segment_mm expects A.shape[1] == B.shape[1]";
+  }
+  CHECK_EQ(B->shape[0], seglen_A.NumElements())
+    << "segment_mm expects len(seglen_A) == B.shape[0]";
+  CHECK_EQ(seglen_A->ctx.device_type, kDLCPU)
+    << "segment_mm expects seglen_A to be on CPU.";
+  CHECK(A->ctx == B->ctx) << "segment_mm expects A and B to be of the same device";
+  ATEN_XPU_SWITCH_CUDA(A->ctx.device_type, XPU, "SegmentMM", {
+    ATEN_ID_TYPE_SWITCH(seglen_A->dtype, IdType, {
+      ATEN_FLOAT_BITS_SWITCH(A->dtype, bits, "Feature data", {
+        SegmentMM<XPU, IdType, bits>(A, B, C, seglen_A, A_trans, B_trans);
+      });
+    });
+  });
+}
+
+void SegmentMMBackwardB(const NDArray A,
+                        const NDArray dC,
+                        NDArray dB,
+                        const NDArray seglen) {
+  CHECK_EQ(A->ndim, 2) << "segment_mm_backward operator expects a 2D tensor for the first input.";
+  CHECK_EQ(dC->ndim, 2)
+    << "segment_mm_backward operator expects a 2D tensor for the second input.";
+  CHECK_EQ(seglen->ctx.device_type, kDLCPU)
+    << "segment_mm expects seglen to be on CPU.";
+  ATEN_XPU_SWITCH_CUDA(A->ctx.device_type, XPU, "SegmentMMBackwardB", {
+    ATEN_ID_TYPE_SWITCH(seglen->dtype, IdType, {
+      ATEN_FLOAT_BITS_SWITCH(A->dtype, bits, "Feature data", {
+        SegmentMMBackwardB<XPU, IdType, bits>(A, dC, dB, seglen);
+      });
+    });
+  });
+}
+
+
+/*! \brief Generalized Dense Matrix-Matrix Multiplication according to relation types. */
+void GatherMM(const NDArray A,
+              const NDArray B,
+              NDArray C,
+              const NDArray idx_a,
+              const NDArray idx_b) {
+  CHECK_EQ(A->ndim, 2) << "gather_mm operator expects a 2D tensor for the first input.";
+  CHECK_EQ(B->ndim, 3) << "gather_mm operator expects a 3D tensor for the second input.";
+  CHECK(A->ctx == B->ctx)
+    << "gather_mm expects all arguments to be on the same device.";
+  if (aten::IsNullArray(idx_a)) {
+    CHECK_EQ(A->shape[0], idx_b->shape[0])
+      << "gather_mm expects len(idx_b) == A.shape[0] when idx_a is None.";
+    CHECK(A->ctx == idx_b->ctx)
+      << "gather_mm expects all arguments to be on the same device.";
+  } else if (aten::IsNullArray(idx_b)) {
+    CHECK_EQ(B->shape[0], idx_a->shape[0])
+      << "gather_mm expects len(idx_a) == B.shape[0] when idx_b is None.";
+    CHECK(A->ctx == idx_a->ctx)
+      << "gather_mm expects all arguments to be on the same device.";
+  } else {
+    CHECK_EQ(idx_a->shape[0], idx_b->shape[0])
+      << "gather_mm expects len(idx_a) == len(idx_b) when both idx_a and idx_b are given.";
+    CHECK(A->ctx == idx_a->ctx && A->ctx == idx_b->ctx)
+      << "gather_mm expects all arguments to be on the same device.";
+  }
+  const auto idtype = aten::IsNullArray(idx_a)? idx_b->dtype : idx_a->dtype;
+  ATEN_XPU_SWITCH_CUDA(A->ctx.device_type, XPU, "GatherMM", {
+    ATEN_ID_TYPE_SWITCH(idtype, IdType, {
+      ATEN_FLOAT_BITS_SWITCH(A->dtype, bits, "Feature data", {
+        GatherMM<XPU, IdType, bits>(A, B, C, idx_a, idx_b);
+      });
+    });
+  });
+}
+
+
+/*! \brief Generalized Dense Matrix-Matrix Multiplication according to relation types. */
+void GatherMMScatter(const NDArray A,
+                     const NDArray B,
+                     NDArray C,
+                     const NDArray idx_a,
+                     const NDArray idx_b,
+                     const NDArray idx_c) {
+  CHECK_EQ(A->ndim, 2) << "gather_mm_scatter expects a 2D tensor for the first input.";
+  CHECK(A->ctx == B->ctx)
+    << "gather_mm_scatter expects all arguments to be on the same device.";
+  if (!aten::IsNullArray(idx_c))
+    CHECK(A->ctx == idx_c->ctx)
+      << "gather_mm_scatter expects all arguments to be on the same device.";
+  if (aten::IsNullArray(idx_a) && !aten::IsNullArray(idx_b)) {
+    CHECK_EQ(A->shape[0], idx_b->shape[0])
+      << "gather_mm_scatter expects len(idx_b) == A.shape[0] when idx_a is None.";
+    CHECK(A->ctx == idx_b->ctx)
+      << "gather_mm_scatter expects all arguments to be on the same device.";
+  } else if (aten::IsNullArray(idx_b) && !aten::IsNullArray(idx_a)) {
+    CHECK_EQ(B->shape[0], idx_a->shape[0])
+      << "gather_mm_scatter expects len(idx_a) == B.shape[0] when idx_b is None.";
+    CHECK(A->ctx == idx_a->ctx)
+      << "gather_mm_scatter expects all arguments to be on the same device.";
+  } else if (!aten::IsNullArray(idx_b) && !aten::IsNullArray(idx_a)) {
+    CHECK_EQ(idx_a->shape[0], idx_b->shape[0])
+      << "gather_mm_scatter expects len(idx_a) == len(idx_b) "
+      << "when both idx_a and idx_b are given.";
+    CHECK(A->ctx == idx_a->ctx && A->ctx == idx_b->ctx)
+      << "gather_mm_scatter expects all arguments to be on the same device.";
+  }
+  ATEN_XPU_SWITCH_CUDA(A->ctx.device_type, XPU, "GatherMM", {
+    ATEN_ID_TYPE_SWITCH(idx_c->dtype, IdType, {
+      ATEN_FLOAT_BITS_SWITCH(A->dtype, bits, "Feature data", {
+        GatherMMScatter<XPU, IdType, bits>(A, B, C, idx_a, idx_b, idx_c);
+      });
+    });
+  });
+}
+
+
 /*! \brief Generalized Sparse Matrix-Matrix Multiplication with hetero-graph support. */
 void SpMMHetero(const std::string& op, const std::string& reduce,
           HeteroGraphPtr graph,
-          std::vector<NDArray> ufeat_vec,
-          std::vector<NDArray> efeat_vec,
-          std::vector<NDArray> out,
-          std::vector<NDArray> out_aux) {
+          const std::vector<NDArray>& ufeat_vec,
+          const std::vector<NDArray>& efeat_vec,
+          std::vector<NDArray>* out,
+          std::vector<std::vector<NDArray>>* out_aux) {
   SparseFormat format = graph->SelectFormat(0, CSC_CODE);
 
   std::vector<CSRMatrix> vec_graph;
   std::vector<dgl_type_t> ufeat_eid;
   std::vector<dgl_type_t> efeat_eid;
   std::vector<dgl_type_t> out_eid;
+  auto pair = graph->meta_graph()->FindEdge(0);  // first etype
+  NDArray ufeat_etype0 = (ufeat_vec.size() == 0) ? NullArray() : ufeat_vec[pair.first];
+  NDArray efeat_etype0 = (efeat_vec.size() == 0) ? NullArray() : efeat_vec[0];
   for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
     vec_graph.push_back(graph->GetCSCMatrix(etype));
     auto pair = graph->meta_graph()->FindEdge(etype);
     ufeat_eid.push_back(pair.first);
     efeat_eid.push_back(etype);
     out_eid.push_back(pair.second);
+    if (ufeat_etype0->shape[1] != ufeat_vec[pair.first]->shape[1])
+      LOG(FATAL) << "Column width of the input node features of all etypes must be same.";
+    if (efeat_etype0->shape[1] != efeat_vec[etype]->shape[1])
+      LOG(FATAL) << "Column width of the input edge features of all etypes must be same.";
   }
-  NDArray efeat = (efeat_vec.size() == 0) ? NullArray() : efeat_vec[efeat_eid[0]];
-  NDArray ufeat = (ufeat_vec.size() == 0) ? NullArray() : ufeat_vec[ufeat_eid[0]];
-  const auto& bcast = CalcBcastOff(op, ufeat, efeat);
+  const auto& bcast = CalcBcastOff(op, ufeat_etype0, efeat_etype0);
 
   ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, "SpMM", {
     ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
-      ATEN_FLOAT_BITS_SWITCH(out[out_eid[0]]->dtype, bits, "Feature data", {
+      ATEN_FLOAT_BITS_SWITCH((*out)[out_eid[0]]->dtype, bits, "Feature data", {
         if (format == SparseFormat::kCSC) {
           SpMMCsrHetero<XPU, IdType, bits>(
               op, reduce, bcast, vec_graph,
@@ -126,7 +257,6 @@ void SDDMM(const std::string& op,
   });
 }
 
-
 /*!
  * \brief Find the src/dst/etype id based on the target 'u', 'v' or 'e'.
  *
@@ -143,7 +273,6 @@ int get_typeid_by_target(HeteroGraphPtr graph, int target, dgl_type_t etype) {
   return etype;
 }
 
-
 /*! \brief Generalized Sampled Dense-Dense Matrix Multiplication. */
 void SDDMMHetero(const std::string& op,
            HeteroGraphPtr graph,
@@ -152,14 +281,11 @@ void SDDMMHetero(const std::string& op,
            std::vector<NDArray> out,
            int lhs_target,
            int rhs_target) {
-  // TODO(Israt): change it to COO_CODE
-  SparseFormat format = graph->SelectFormat(0, CSR_CODE);
+  SparseFormat format = graph->SelectFormat(0, COO_CODE);
 
-  std::vector<CSRMatrix> vec_csr;
   std::vector<dgl_type_t> lhs_eid;
   std::vector<dgl_type_t> rhs_eid;
   for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
-    vec_csr.push_back(graph->GetCSRMatrix(etype));
     lhs_eid.push_back(get_typeid_by_target(graph, lhs_target, etype));
     rhs_eid.push_back(get_typeid_by_target(graph, rhs_target, etype));
   }
@@ -169,19 +295,74 @@ void SDDMMHetero(const std::string& op,
     ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
       ATEN_FLOAT_BITS_SWITCH(out[rhs_eid[0]]->dtype, bits, "Feature data", {
         if (format == SparseFormat::kCSR) {
+          std::vector<CSRMatrix> vec_csr;
+          for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
+            vec_csr.push_back(graph->GetCSRMatrix(etype));
+          }
           SDDMMCsrHetero<XPU, IdType, bits>(
               op, bcast, vec_csr,
               lhs, rhs, out, lhs_target, rhs_target,
               lhs_eid, rhs_eid);
+        } else if (format == SparseFormat::kCOO) {
+          std::vector<COOMatrix> vec_coo;
+          for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
+            vec_coo.push_back(graph->GetCOOMatrix(etype));
+          }
+          SDDMMCooHetero<XPU, IdType, bits>(
+              op, bcast, vec_coo,
+              lhs, rhs, out, lhs_target, rhs_target,
+              lhs_eid, rhs_eid);
         } else {
-          // TODO(Israt): Add support for COO format
-          LOG(FATAL) << "SDDMM only supports CSC format for graphs with number "
-                     << "of relation types > 1";
+          LOG(FATAL) << "SDDMM only supports CSR and COO formats";
         }
       });
     });
   });
 }
+
+
+/*! \brief Generalized Edge_softmax op for forward */
+void Edge_softmax_forward(const std::string& op,
+          HeteroGraphPtr graph,
+          NDArray ufeat,
+          NDArray efeat,
+          NDArray out) {
+  // TODO(zhejiang): add gpu op for edge_softmax
+  SparseFormat format = graph->SelectFormat(0, CSC_CODE);
+  const auto& bcast = CalcBcastOff(op, ufeat, efeat);
+
+  ATEN_XPU_SWITCH(graph->Context().device_type, XPU, "edge_softmax", {
+    ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
+      ATEN_FLOAT_BITS_SWITCH(out->dtype, bits, "edge_softmax out data", {
+        Edge_softmax_csr_forward<XPU, IdType, bits>(
+          op, bcast, graph->GetCSCMatrix(0), ufeat, efeat, out);
+      });
+    });
+  });
+}
+
+
+/*! \brief Generalized Edge_softmax op for backward */
+void Edge_softmax_backward(const std::string& op,
+          HeteroGraphPtr graph,
+          NDArray out,
+          NDArray sds,
+          NDArray back_out,
+          NDArray ufeat) {
+  // TODO(zhejiang): add gpu op for edge_softmax
+  SparseFormat format = graph->SelectFormat(0, CSC_CODE);
+  const auto& bcast = CalcBcastOff(op, ufeat, sds);
+
+  ATEN_XPU_SWITCH(graph->Context().device_type, XPU, "edge_softmax_back", {
+    ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
+      ATEN_FLOAT_BITS_SWITCH(out->dtype, bits, "edge_softmax out data_back", {
+        Edge_softmax_csr_backward<XPU, IdType, bits>(
+          op, bcast, graph->GetCSCMatrix(0), out, sds, back_out);
+      });
+    });
+  });
+}
+
 
 NDArray GetEdgeMapping(HeteroGraphRef graph) {
   SparseFormat format = graph->SelectFormat(0, CSC_CODE);
@@ -213,6 +394,24 @@ void ScatterAddDispatch(NDArray feat, NDArray idx, NDArray out) {
     ATEN_ID_TYPE_SWITCH(idx->dtype, IdType, {
       ATEN_FLOAT_BITS_SWITCH(feat->dtype, bits, "Feature data", {
         ScatterAdd<XPU, IdType, bits>(feat, idx, out);
+      });
+    });
+  });
+}
+
+/*! \brief Update gradients (reduce op max/min) dispatch function on heterogeneous graph. */
+void UpdateGradMinMaxDispatchHetero(const HeteroGraphPtr& graph,
+                        const std::string& op,
+                        const std::vector<NDArray>& feat,
+                        const std::vector<NDArray>& idx,
+                        const std::vector<NDArray>& idx_etype,
+                        std::vector<NDArray>* out) {
+  auto pair = graph->meta_graph()->FindEdge(0);  // checking the first etype
+  auto src_id = pair.first;
+  ATEN_XPU_SWITCH_CUDA(feat[src_id]->ctx.device_type, XPU, "ScatterAdd", {
+    ATEN_ID_TYPE_SWITCH(idx[src_id]->dtype, IdType, {
+      ATEN_FLOAT_BITS_SWITCH(feat[src_id]->dtype, bits, "Feature data", {
+        UpdateGradMinMax_hetero<XPU, IdType, bits>(graph, op, feat, idx, idx_etype, out);
       });
     });
   });
@@ -317,6 +516,68 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMM")
     SpMM(op, reduce_op, graph.sptr(), U, E, V, {ArgU, ArgE});
   });
 
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelGATHERMM")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    NDArray A = args[0];
+    NDArray B = args[1];
+    NDArray C = args[2];
+    NDArray idx_a = args[3];
+    NDArray idx_b = args[4];
+    GatherMM(A, B, C, idx_a, idx_b);
+  });
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelGATHERMMSCATTER")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    NDArray A = args[0];
+    NDArray B = args[1];
+    NDArray C = args[2];
+    NDArray idx_a = args[3];
+    NDArray idx_b = args[4];
+    NDArray idx_c = args[5];
+    GatherMMScatter(A, B, C, idx_a, idx_b, idx_c);
+  });
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSEGMENTMM")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    NDArray A = args[0];
+    NDArray B = args[1];
+    NDArray C = args[2];
+    NDArray seglen_A = args[3];
+    bool A_trans = args[4];
+    bool B_trans = args[5];
+    SegmentMM(A, B, C, seglen_A, A_trans, B_trans);
+  });
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSEGMENTMMBackwardB")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    NDArray A = args[0];
+    NDArray dC = args[1];
+    NDArray dB = args[2];
+    NDArray seglen = args[3];
+    SegmentMMBackwardB(A, dC, dB, seglen);
+  });
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelEdge_softmax_forward")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef graph = args[0];
+    const std::string op = args[1];
+    NDArray U = args[2];
+    NDArray E = args[3];
+    NDArray V = args[4];
+    Edge_softmax_forward(op, graph.sptr(), U, E, V);
+});
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelEdge_softmax_backward")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef graph = args[0];
+    const std::string op = args[1];
+    NDArray out = args[2];
+    NDArray sds = args[3];
+    NDArray back_out = args[4];
+    NDArray ufeat = args[5];
+    Edge_softmax_backward(op, graph.sptr(), out, sds, back_out, ufeat);
+});
+
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMMHetero")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef graph = args[0];
@@ -325,35 +586,33 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMMHetero")
     List<Value> list_U = args[3];
     List<Value> list_E = args[4];
     List<Value> list_V = args[5];
-    NDArray ArgU = args[6];
-    NDArray ArgE = args[7];
-    std::vector<NDArray> U_vec;
-    std::vector<NDArray> V_vec;
-    std::vector<NDArray> E_vec;
-    U_vec.reserve(list_U.size());
-    V_vec.reserve(list_V.size());
-    E_vec.reserve(list_E.size());
-    for (Value val : list_U) {
-      U_vec.push_back(val->data);
+    List<Value> list_ArgU = args[6];
+    List<Value> list_ArgE = args[7];
+    List<Value> list_ArgU_ntype = args[8];
+    List<Value> list_ArgE_etype = args[9];
+    std::vector<std::vector<NDArray>> Arg_vec;  // ArgU + ArgE
+    for (int i = 0; i < 4; ++i) {  // ArgU + ArgE + ArgU_ntype + ArgE_etype
+      Arg_vec.push_back(std::vector<NDArray>());
     }
-    for (Value val : list_V) {
-      V_vec.push_back(val->data);
-    }
-    for (Value val : list_E) {
-      E_vec.push_back(val->data);
-    }
+    std::vector<NDArray> U_vec = ListValueToVector<NDArray>(list_U);
+    std::vector<NDArray> V_vec = ListValueToVector<NDArray>(list_V);
+    std::vector<NDArray> E_vec = ListValueToVector<NDArray>(list_E);
+    Arg_vec[0] = ListValueToVector<NDArray>(list_ArgU);
+    Arg_vec[1] = ListValueToVector<NDArray>(list_ArgE);
+    Arg_vec[2] = ListValueToVector<NDArray>(list_ArgU_ntype);
+    Arg_vec[3] = ListValueToVector<NDArray>(list_ArgE_etype);
     for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
       auto pair = graph->meta_graph()->FindEdge(etype);
       const dgl_id_t src_id = pair.first;
       const dgl_id_t dst_id = pair.second;
       NDArray U = (U_vec.size() == 0) ? NullArray() : U_vec[src_id];
       NDArray E = (E_vec.size() == 0) ? NullArray() : E_vec[etype];
-      CheckCtx(graph->Context(), {U, E, V_vec[dst_id], ArgU, ArgE},
+      CheckCtx(graph->Context(), {U, E, V_vec[dst_id], Arg_vec[0][dst_id], Arg_vec[1][dst_id]},
           {"U_data", "E_data", "out", "Arg_U", "Arg_E"});
-      CheckContiguous({U, E, V_vec[dst_id], ArgU, ArgE},
+      CheckContiguous({U, E, V_vec[dst_id], Arg_vec[0][dst_id], Arg_vec[1][dst_id]},
           {"U_data", "E_data", "out", "Arg_U", "Arg_E"});
     }
-    SpMMHetero(op, reduce_op, graph.sptr(), U_vec, E_vec, V_vec, {ArgU, ArgE});
+    SpMMHetero(op, reduce_op, graph.sptr(), U_vec, E_vec, &V_vec, &Arg_vec);
   });
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSDDMM")
@@ -430,6 +689,23 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelScatterAdd")
     CheckCtx(feat->ctx, {feat, idx, out}, {"feat", "idx", "out"});
     CheckContiguous({feat, idx, out}, {"feat", "idx", "out"});
     ScatterAddDispatch(feat, idx, out);
+  });
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelUpdateGradMinMaxHetero")
+.set_body([](DGLArgs args, DGLRetValue *rv) {
+    HeteroGraphRef graph = args[0];
+    const std::string op = args[1];
+    List<Value> list_feat = args[2];
+    List<Value> list_idx = args[3];
+    List<Value> list_idx_etype = args[4];
+    List<Value> list_out = args[5];
+    std::vector<NDArray> vec_feat = ListValueToVector<NDArray>(list_feat);
+    std::vector<NDArray> vec_idx = ListValueToVector<NDArray>(list_idx);
+    std::vector<NDArray> vec_idx_etype = ListValueToVector<NDArray>(list_idx_etype);
+    std::vector<NDArray> vec_out = ListValueToVector<NDArray>(list_out);
+    // CheckCtx(feat->ctx, {feat, idx, out}, {"feat", "idx", "out"});
+    // CheckContiguous({feat, idx, out}, {"feat", "idx", "out"});
+    UpdateGradMinMaxDispatchHetero(graph.sptr(), op, vec_feat, vec_idx, vec_idx_etype, &vec_out);
   });
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelBwdSegmentCmp")
@@ -557,7 +833,6 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_FG_SDDMMTreeReduction")
                                        lhs.ToDLPack(), rhs.ToDLPack(), out.ToDLPack());
   });
 #endif  // USE_TVM
-
 
 }  // namespace aten
 }  // namespace dgl

@@ -23,6 +23,7 @@ namespace dgl {
 
 // Forward declaration
 class BaseHeteroGraph;
+class HeteroPickleStates;
 typedef std::shared_ptr<BaseHeteroGraph> HeteroGraphPtr;
 
 struct FlattenedHeteroGraph;
@@ -109,6 +110,16 @@ class BaseHeteroGraph : public runtime::Object {
    * \brief Get the device context of this graph.
    */
   virtual DLContext Context() const = 0;
+
+  /*!
+   * \brief Pin graph.
+   */
+  virtual void PinMemory_() = 0;
+
+  /*!
+   * \brief Check if this graph is pinned.
+   */
+  virtual bool IsPinned() const = 0;
 
   /*!
    * \brief Get the number of integer bits used to store node/edge ids (32 or 64).
@@ -858,6 +869,25 @@ HeteroPickleStates HeteroPickle(HeteroGraphPtr graph);
  * \return A heterograph pointer
  */
 HeteroGraphPtr HeteroUnpickleOld(const HeteroPickleStates& states);
+
+/*!
+ * \brief Create heterograph from pickling states pickled by ForkingPickler.
+ *
+ * This is different from HeteroUnpickle where
+ * (1) Backward compatibility is not required,
+ * (2) All graph formats are pickled instead of only one.
+ */
+HeteroGraphPtr HeteroForkingUnpickle(const HeteroPickleStates& states);
+
+/*!
+ * \brief Get the pickling states of the relation graph structure in backend tensors for
+ * ForkingPickler.
+ *
+ * This is different from HeteroPickle where
+ * (1) Backward compatibility is not required,
+ * (2) All graph formats are pickled instead of only one.
+ */
+HeteroPickleStates HeteroForkingPickle(HeteroGraphPtr graph);
 
 #define FORMAT_HAS_CSC(format) \
   ((format) & CSC_CODE)

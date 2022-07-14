@@ -177,9 +177,9 @@ DGL提供了一个稀疏的Adagrad优化器 :class:`~dgl.distributed.SparseAdagr
 DGL提供了两个级别的API，用于对节点和边进行采样以生成小批次训练数据(请参阅小批次训练的章节)。
 底层API要求用户编写代码以明确定义如何对节点层进行采样(例如，使用 :func:`dgl.sampling.sample_neighbors` )。
 高层采样API为节点分类和链接预测任务实现了一些流行的采样算法（例如
-:class:`~dgl.dataloading.pytorch.NodeDataloader`
+:class:`~dgl.dataloading.pytorch.NodeDataLoader`
 和
-:class:`~dgl.dataloading.pytorch.EdgeDataloader` )。
+:class:`~dgl.dataloading.pytorch.EdgeDataLoader` )。
 
 分布式采样模块遵循相同的设计，也提供两个级别的采样API。对于底层的采样API，它为
 :class:`~dgl.distributed.DistGraph` 上的分布式邻居采样提供了
@@ -188,7 +188,7 @@ DGL提供了两个级别的API，用于对节点和边进行采样以生成小�
 分布式数据加载器具有与PyTorch DataLoader相同的接口。其中的工作进程(worker)在 :func:`dgl.distributed.initialize` 中创建。
 
 **Note**: 在 :class:`~dgl.distributed.DistGraph` 上运行 :func:`dgl.distributed.sample_neighbors` 时，
-采样器无法在具有多个工作进程的PyTorch Dataloader中运行。主要原因是PyTorch Dataloader在每个训练周期都会创建新的采样工作进程，
+采样器无法在具有多个工作进程的PyTorch DataLoader中运行。主要原因是PyTorch DataLoader在每个训练周期都会创建新的采样工作进程，
 从而导致多次创建和删除 :class:`~dgl.distributed.DistGraph` 对象。
 
 使用底层API时，采样代码类似于单进程采样。唯一的区别是用户需要使用
@@ -214,19 +214,19 @@ DGL提供了两个级别的API，用于对节点和边进行采样以生成小�
         for batch in dataloader:
             ...
 
-:class:`~dgl.DGLGraph` 和 :class:`~dgl.distributed.DistGraph` 都可以使用相同的高级采样API(
-:class:`~dgl.dataloading.pytorch.NodeDataloader`
+:class:`~dgl.dataloading.pytorch.NodeDataLoader`
 和
-:class:`~dgl.dataloading.pytorch.EdgeDataloader`)。使用
-:class:`~dgl.dataloading.pytorch.NodeDataloader`
+:class:`~dgl.dataloading.pytorch.EdgeDataLoader` 有分布式的版本
+:class:`~dgl.dataloading.pytorch.DistNodeDataLoader`
 和
-:class:`~dgl.dataloading.pytorch.EdgeDataloader` 时，分布式采样代码与单进程采样完全相同。
+:class:`~dgl.dataloading.pytorch.DistEdgeDataLoader` 。使用
+时分布式采样代码与单进程采样几乎完全相同。
 
 .. code:: python
 
     sampler = dgl.sampling.MultiLayerNeighborSampler([10, 25])
-    dataloader = dgl.sampling.NodeDataLoader(g, train_nid, sampler,
-                                             batch_size=batch_size, shuffle=True)
+    dataloader = dgl.sampling.DistNodeDataLoader(g, train_nid, sampler,
+                                                 batch_size=batch_size, shuffle=True)
     for batch in dataloader:
         ...
 

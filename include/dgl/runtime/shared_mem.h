@@ -6,6 +6,9 @@
 #ifndef DGL_RUNTIME_SHARED_MEM_H_
 #define DGL_RUNTIME_SHARED_MEM_H_
 
+#ifdef _WIN32
+#include <windows.h>
+#endif  // _WIN32
 #include <string>
 
 namespace dgl {
@@ -28,7 +31,11 @@ class SharedMemory {
   bool own_;
 
   /* \brief the file descripter of the shared memory. */
+#ifndef _WIN32
   int fd_;
+#else   // !_WIN32
+  HANDLE handle_;
+#endif  // _WIN32
   /* \brief the address of the shared memory. */
   void *ptr_;
   /* \brief the size of the shared memory. */

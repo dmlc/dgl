@@ -62,7 +62,7 @@ def main(args):
     test_mask = g.ndata['test_mask']
     num_feats = features.shape[1]
     n_classes = data.num_labels
-    n_edges = data.graph.number_of_edges()
+    n_edges = g.number_of_edges()
     print("""----Data statistics------'
       #Edges %d
       #Classes %d
@@ -79,7 +79,7 @@ def main(args):
     g = dgl.add_self_loop(g)
     n_edges = g.number_of_edges()
     # create model
-    heads = ([args.num_heads] * args.num_layers) + [args.num_out_heads]
+    heads = ([args.num_heads] * (args.num_layers-1)) + [args.num_out_heads]
     model = GAT(g,
                 args.num_layers,
                 num_feats,
@@ -107,6 +107,8 @@ def main(args):
     for epoch in range(args.epochs):
         model.train()
         if epoch >= 3:
+            if cuda:
+                torch.cuda.synchronize()
             t0 = time.time()
         # forward
         logits = model(features)
@@ -117,6 +119,8 @@ def main(args):
         optimizer.step()
 
         if epoch >= 3:
+            if cuda:
+                torch.cuda.synchronize()
             dur.append(time.time() - t0)
 
         train_acc = accuracy(logits[train_mask], labels[train_mask])
@@ -153,7 +157,7 @@ if __name__ == '__main__':
                         help="number of hidden attention heads")
     parser.add_argument("--num-out-heads", type=int, default=1,
                         help="number of output attention heads")
-    parser.add_argument("--num-layers", type=int, default=1,
+    parser.add_argument("--num-layers", type=int, default=2,
                         help="number of hidden layers")
     parser.add_argument("--num-hidden", type=int, default=8,
                         help="number of hidden units")

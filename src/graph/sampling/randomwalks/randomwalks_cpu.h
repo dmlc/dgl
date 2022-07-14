@@ -59,7 +59,7 @@ std::pair<IdArray, IdArray> GenericRandomWalk(
       CHECK_LT(curr, max_nodes) << "Seed node ID exceeds the maximum number of nodes.";
 
       for (i = 0; i < max_num_steps; ++i) {
-        const auto &succ = step(traces_data + seed_id * max_num_steps, curr, i);
+        const auto &succ = step(traces_data + seed_id * trace_length, curr, i);
         traces_data[seed_id * trace_length + i + 1] = curr = std::get<0>(succ);
         eids_data[seed_id * max_num_steps + i] = std::get<1>(succ);
         if (std::get<2>(succ))

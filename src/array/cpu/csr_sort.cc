@@ -18,19 +18,17 @@ template <DLDeviceType XPU, typename IdType>
 bool CSRIsSorted(CSRMatrix csr) {
   const IdType* indptr = csr.indptr.Ptr<IdType>();
   const IdType* indices = csr.indices.Ptr<IdType>();
-  bool ret = true;
-
-  for (int64_t row = 0; row < csr.num_rows; ++row) {
-    if (!ret)
-      continue;
-    for (IdType i = indptr[row] + 1; i < indptr[row + 1]; ++i) {
-      if (indices[i - 1] > indices[i]) {
-        ret = false;
-        break;
+  return runtime::parallel_reduce(0, csr.num_rows, 1, 1,
+    [indptr, indices](size_t b, size_t e, bool ident) {
+      for (size_t row = b; row < e; ++row) {
+        for (IdType i = indptr[row] + 1; i < indptr[row + 1]; ++i) {
+          if (indices[i - 1] > indices[i])
+            return false;
+        }
       }
-    }
-  }
-  return ret;
+      return ident;
+    },
+    [](bool a, bool b) { return a && b; });
 }
 
 template bool CSRIsSorted<kDLCPU, int64_t>(CSRMatrix csr);
@@ -45,6 +43,12 @@ void CSRSort_(CSRMatrix* csr) {
   const int64_t nnz = csr->indices->shape[0];
   const IdType* indptr_data = static_cast<IdType*>(csr->indptr->data);
   IdType* indices_data = static_cast<IdType*>(csr->indices->data);
+
+  if (CSRIsSorted(*csr)) {
+    csr->sorted = true;
+    return;
+  }
+
   if (!CSRHasData(*csr)) {
     csr->data = aten::Range(0, nnz, csr->indptr->dtype.bits, csr->indptr->ctx);
   }
@@ -83,9 +87,9 @@ std::pair<CSRMatrix, NDArray> CSRSortByTag(
     const CSRMatrix &csr, const IdArray tag_array, int64_t num_tags) {
   const auto indptr_data = static_cast<const IdType *>(csr.indptr->data);
   const auto indices_data = static_cast<const IdType *>(csr.indices->data);
-  const auto eid_array = aten::CSRHasData(csr) ? csr.data :
-    aten::Range(0, csr.indices->shape[0], csr.indptr->dtype.bits, csr.indptr->ctx);
-  const auto eid_data = static_cast<const IdType *>(csr.data->data);
+  const auto eid_data = aten::CSRHasData(csr)
+                            ? static_cast<const IdType *>(csr.data->data)
+                            : nullptr;
   const auto tag_data = static_cast<const TagType *>(tag_array->data);
   const int64_t num_rows = csr.num_rows;
 
@@ -94,9 +98,11 @@ std::pair<CSRMatrix, NDArray> CSRSortByTag(
   auto tag_pos_data = static_cast<IdType *>(tag_pos->data);
   std::fill(tag_pos_data, tag_pos_data + csr.num_rows * (num_tags + 1), 0);
 
-  aten::CSRMatrix output(csr.num_rows, csr.num_cols,
-                         csr.indptr.Clone(), csr.indices.Clone(),
-                         eid_array.Clone(), csr.sorted);
+  aten::CSRMatrix output(csr.num_rows, csr.num_cols, csr.indptr.Clone(),
+                         csr.indices.Clone(),
+                         NDArray::Empty({csr.indices->shape[0]},
+                                        csr.indices->dtype, csr.indices->ctx),
+                         csr.sorted);
 
   auto out_indices_data = static_cast<IdType *>(output.indices->data);
   auto out_eid_data = static_cast<IdType *>(output.data->data);
@@ -110,8 +116,8 @@ std::pair<CSRMatrix, NDArray> CSRSortByTag(
       std::vector<IdType> pointer(num_tags, 0);
 
       for (IdType ptr = start ; ptr < end ; ++ptr) {
-        const IdType dst = indices_data[ptr];
-        const TagType tag = tag_data[dst];
+        const IdType eid = eid_data ? eid_data[ptr] : ptr;
+        const TagType tag = tag_data[eid];
         CHECK_LT(tag, num_tags);
         ++tag_pos_row[tag + 1];
       }  // count
@@ -122,8 +128,8 @@ std::pair<CSRMatrix, NDArray> CSRSortByTag(
 
       for (IdType ptr = start ; ptr < end ; ++ptr) {
         const IdType dst = indices_data[ptr];
-        const IdType eid = eid_data[ptr];
-        const TagType tag = tag_data[dst];
+        const IdType eid = eid_data ? eid_data[ptr] : ptr;
+        const TagType tag = tag_data[eid];
         const IdType offset = tag_pos_row[tag] + pointer[tag];
         CHECK_LT(offset, tag_pos_row[tag + 1]);
         ++pointer[tag];

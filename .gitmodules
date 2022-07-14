@@ -7,9 +7,6 @@
 [submodule "third_party/googletest"]
 	path = third_party/googletest
 	url = https://github.com/google/googletest.git
-[submodule "third_party/minigun"]
-	path = third_party/minigun
-	url = https://github.com/jermainewang/minigun.git
 [submodule "third_party/METIS"]
 	path = third_party/METIS
 	url = https://github.com/KarypisLab/METIS.git
@@ -20,9 +17,6 @@
 [submodule "third_party/phmap"]
 	path = third_party/phmap
 	url = https://github.com/greg7mdp/parallel-hashmap.git
-[submodule "third_party/thrust"]
-	path = third_party/thrust
-	url = https://github.com/NVIDIA/thrust.git
 [submodule "third_party/xbyak"]
 	path = third_party/xbyak
 	url = https://github.com/herumi/xbyak
@@ -38,3 +32,9 @@
 [submodule "third_party/libxsmm"]
 	path = third_party/libxsmm
 	url = https://github.com/hfp/libxsmm.git
+[submodule "third_party/tensorpipe"]
+	path = third_party/tensorpipe
+	url = https://github.com/pytorch/tensorpipe
+[submodule "third_party/thrust"]
+	path = third_party/thrust
+	url = https://github.com/NVIDIA/thrust.git

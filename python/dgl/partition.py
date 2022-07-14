@@ -1,4 +1,6 @@
 """Module for graph partition utilities."""
+import os
+import re
 import time
 import numpy as np
 
@@ -230,8 +232,24 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
     else:
         return subg_dict, None, None
 
+def get_peak_mem():
+    ''' Get the peak memory size.
 
-def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False, mode="k-way"):
+    Returns
+    -------
+    float
+        The peak memory size in GB.
+    '''
+    if not os.path.exists('/proc/self/status'):
+        return 0.0
+    for line in open('/proc/self/status', 'r'):
+        if 'VmPeak' in line:
+            mem = re.findall(r'\d+', line)[0]
+            return int(mem) / 1024 / 1024
+    return 0.0
+
+def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False,
+                               mode="k-way", objtype='cut'):
     ''' This assigns nodes to different partitions with Metis partitioning algorithm.
 
     When performing Metis partitioning, we can put some constraint on the partitioning.
@@ -258,6 +276,9 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False, m
         Indicate whether to balance the edges.
     mode : str, "k-way" or "recursive"
         Whether use multilevel recursive bisection or multilevel k-way paritioning.
+    objtype : str, "cut" or "vol"
+        Set the objective as edge-cut minimization or communication volume minimization. This
+        argument is used by the Metis algorithm.
 
     Returns
     -------
@@ -271,8 +292,8 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False, m
     start = time.time()
     sym_gidx = _CAPI_DGLMakeSymmetric_Hetero(g._graph)
     sym_g = DGLHeteroGraph(gidx=sym_gidx)
-    print('Convert a graph into a bidirected graph: {:.3f} seconds'.format(
-        time.time() - start))
+    print('Convert a graph into a bidirected graph: {:.3f} seconds, peak memory: {:.3f} GB'.format(
+        time.time() - start, get_peak_mem()))
     vwgt = []
     # To balance the node types in each partition, we can take advantage of the vertex weights
     # in Metis. When vertex weights are provided, Metis will tries to generate partitions with
@@ -310,15 +331,16 @@ def metis_partition_assignment(g, k, balance_ntypes=None, balance_edges=False, m
         shape = (np.prod(F.shape(vwgt),),)
         vwgt = F.reshape(vwgt, shape)
         vwgt = F.to_dgl_nd(vwgt)
-        print(
-            'Construct multi-constraint weights: {:.3f} seconds'.format(time.time() - start))
     else:
         vwgt = F.zeros((0,), F.int64, F.cpu())
         vwgt = F.to_dgl_nd(vwgt)
+    print('Construct multi-constraint weights: {:.3f} seconds, peak memory: {:.3f} GB'.format(
+        time.time() - start, get_peak_mem()))
 
     start = time.time()
-    node_part = _CAPI_DGLMetisPartition_Hetero(sym_g._graph, k, vwgt, mode)
-    print('Metis partitioning: {:.3f} seconds'.format(time.time() - start))
+    node_part = _CAPI_DGLMetisPartition_Hetero(sym_g._graph, k, vwgt, mode, (objtype == 'cut'))
+    print('Metis partitioning: {:.3f} seconds, peak memory: {:.3f} GB'.format(
+        time.time() - start, get_peak_mem()))
     if len(node_part) == 0:
         return None
     else:

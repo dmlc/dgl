@@ -4,44 +4,25 @@ from __future__ import absolute_import
 from distutils.version import LooseVersion
 
 import tensorflow as tf
-from tensorflow.python.eager import context
 import builtins
 import numbers
 import numpy as np
-import os
 
 from ... import ndarray as nd
 from ..._deprecate import kernel as K
 from ...function.base import TargetCode
 
-if not os.getenv("USE_TFDLPACK", False):
-    if LooseVersion(tf.__version__) < LooseVersion("2.2.0"):
-        raise RuntimeError("DGL requires tensorflow>=2.2.0 for the official DLPack support.")
+if LooseVersion(tf.__version__) < LooseVersion("2.3.0"):
+    raise RuntimeError("DGL requires TensorFlow>=2.3.0 for the official DLPack support.")
 
-    def zerocopy_to_dlpack(data):
-        return tf.experimental.dlpack.to_dlpack(data)
+def zerocopy_to_dlpack(data):
+    return tf.experimental.dlpack.to_dlpack(data)
 
-    def zerocopy_from_dlpack(dlpack_tensor):
-        # TODO(Jinjing): Tensorflow requires memory to be 64-bytes aligned. We check the
-        #   alignment and make a copy if needed. The functionality is better in TF's main repo.
-        aligned = nd.from_dlpack(dlpack_tensor).to_dlpack(64)
-        return tf.experimental.dlpack.from_dlpack(aligned)
-else:
-    # Use our own DLPack solution
-    try:
-        import tfdlpack
-    except ImportError:
-        raise ImportError('Cannot find tfdlpack, which is required by the Tensorflow backend. '
-                          'Please follow https://github.com/VoVAllen/tf-dlpack for installation.')
-
-    if LooseVersion(tf.__version__) < LooseVersion("2.1.0"):
-        raise RuntimeError("DGL requires tensorflow>=2.1.0.")
-
-    def zerocopy_to_dlpack(input):
-        return tfdlpack.to_dlpack(input)
-
-    def zerocopy_from_dlpack(input):
-        return tfdlpack.from_dlpack(input)
+def zerocopy_from_dlpack(dlpack_tensor):
+    # TODO(Jinjing): Tensorflow requires memory to be 64-bytes aligned. We check the
+    #   alignment and make a copy if needed. The functionality is better in TF's main repo.
+    aligned = nd.from_dlpack(dlpack_tensor).to_dlpack(64)
+    return tf.experimental.dlpack.from_dlpack(aligned)
 
 
 def data_type_dict():
@@ -162,6 +143,8 @@ def copy_to(input, ctx, **kwargs):
         new_tensor = tf.identity(input)
     return new_tensor
 
+def is_pinned(input):
+    return False        # not sure how to do this
 
 def sum(input, dim, keepdims=False):
     if input.dtype == tf.bool:
@@ -244,6 +227,10 @@ def exp(input):
     return tf.exp(input)
 
 
+def inverse(input):
+    return tf.linalg.inv(input)
+
+
 def sqrt(input):
     return tf.sqrt(input)
 
@@ -320,7 +307,10 @@ def reshape(input, shape):
 
 
 def swapaxes(input, axis1, axis2):
-    return tf.transpose(input, perm=[axis1, axis2])
+    ndim = input.ndim
+    t = list(range(ndim))
+    t[axis1], t[axis2] = axis2 % ndim, axis1 % ndim
+    return tf.transpose(input, perm=t)
 
 
 def zeros(shape, dtype, ctx):
@@ -393,6 +383,11 @@ def equal(x, y):
     return x == y
 
 
+def allclose(x, y, rtol=1e-4, atol=1e-4):
+    return np.allclose(tf.convert_to_tensor(x).numpy(),
+                       tf.convert_to_tensor(y).numpy(), rtol=rtol, atol=atol)
+
+
 def logical_not(input):
     return ~input
 
@@ -413,8 +408,16 @@ def count_nonzero(input):
     return int(tf.math.count_nonzero(input))
 
 
-def unique(input):
-    return tf.unique(input).y
+def unique(input, return_inverse=False, return_counts=False):
+    if return_inverse and return_counts:
+        return tf.unique_with_counts(input)
+    elif return_counts:
+        result = tf.unique_with_counts(input)
+        return result.y, result.count
+    elif return_inverse:
+        return tf.unique(input)
+    else:
+        return tf.unique(input).y
 
 
 def full_1d(length, fill_value, dtype, ctx):

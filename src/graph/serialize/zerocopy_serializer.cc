@@ -21,7 +21,7 @@ struct RawDataTensorCtx {
 
 void RawDataTensoDLPackDeleter(DLManagedTensor* tensor) {
   auto ctx = static_cast<RawDataTensorCtx*>(tensor->manager_ctx);
-  free(ctx->tensor.dl_tensor.data);
+  delete[] ctx->tensor.dl_tensor.data;
   delete ctx;
 }
 

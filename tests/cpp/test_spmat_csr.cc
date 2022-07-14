@@ -410,6 +410,64 @@ void _TestCSRSliceRows(DLContext ctx) {
   ASSERT_TRUE(ArrayEQ<IDX>(x.indptr, tp));
   ASSERT_TRUE(ArrayEQ<IDX>(x.indices, ti));
   ASSERT_TRUE(ArrayEQ<IDX>(x.data, td));
+
+  // Testing non-increasing row id based slicing
+  r = aten::VecToIdArray(std::vector<IDX>({3, 2, 1}), sizeof(IDX)*8, ctx);
+  x = aten::CSRSliceRows(csr, r);
+  // [[0, 0, 0, 0, 0],
+  //  [0, 0, 1, 1, 0],
+  //  [1, 0, 0, 0, 0]]
+  // data: [1, 4, 3]
+  tp = aten::VecToIdArray(std::vector<IDX>({0, 0, 2, 3}), sizeof(IDX)*8, ctx);
+  ti = aten::VecToIdArray(std::vector<IDX>({2, 3, 0}), sizeof(IDX)*8, ctx);
+  td = aten::VecToIdArray(std::vector<IDX>({1, 4, 3}), sizeof(IDX)*8, ctx);
+  ASSERT_TRUE(ArrayEQ<IDX>(x.indptr, tp));
+  ASSERT_TRUE(ArrayEQ<IDX>(x.indices, ti));
+  ASSERT_TRUE(ArrayEQ<IDX>(x.data, td));
+
+  // Testing zero-degree row slicing with different rows
+  r = aten::VecToIdArray(std::vector<IDX>({1, 3, 0, 3, 2}), sizeof(IDX)*8, ctx);
+  x = aten::CSRSliceRows(csr, r);
+  // [[1, 0, 0, 0, 0],
+  //  [0, 0, 0, 0, 0],
+  //  [0, 1, 2, 0, 0],
+  //  [0, 0, 0, 0, 0],
+  //  [0, 0, 1, 1, 0]]
+  // data: [3, 0, 2, 5, 1, 4]
+  tp = aten::VecToIdArray(std::vector<IDX>({0, 1, 1, 4, 4, 6}), sizeof(IDX)*8, ctx);
+  ti = aten::VecToIdArray(std::vector<IDX>({0, 1, 2, 2, 2, 3}), sizeof(IDX)*8, ctx);
+  td = aten::VecToIdArray(std::vector<IDX>({3, 0, 2, 5, 1, 4}), sizeof(IDX)*8, ctx);
+  ASSERT_TRUE(ArrayEQ<IDX>(x.indptr, tp));
+  ASSERT_TRUE(ArrayEQ<IDX>(x.indices, ti));
+  ASSERT_TRUE(ArrayEQ<IDX>(x.data, td));
+
+  // Testing empty output (i.e. sliced rows will be zero-degree)
+  r = aten::VecToIdArray(std::vector<IDX>({3,3,3}), sizeof(IDX)*8, ctx);
+  x = aten::CSRSliceRows(csr, r);
+  // [[0, 0, 0, 0, 0],
+  //  [0, 0, 0, 0, 0],
+  //  [0, 0, 0, 0, 0]]
+  // data: []
+  tp = aten::VecToIdArray(std::vector<IDX>({0, 0, 0, 0}), sizeof(IDX)*8, ctx);
+  ti = aten::VecToIdArray(std::vector<IDX>({}), sizeof(IDX)*8, ctx);
+  td = aten::VecToIdArray(std::vector<IDX>({}), sizeof(IDX)*8, ctx);
+  ASSERT_TRUE(ArrayEQ<IDX>(x.indptr, tp));
+  ASSERT_TRUE(ArrayEQ<IDX>(x.indices, ti));
+  ASSERT_TRUE(ArrayEQ<IDX>(x.data, td));
+
+  // Testing constant output: we pick last row with at least one nnz
+  r = aten::VecToIdArray(std::vector<IDX>({2,2,2}), sizeof(IDX)*8, ctx);
+  x = aten::CSRSliceRows(csr, r);
+  // [[0, 0, 1, 1, 0],
+  //  [0, 0, 1, 1, 0],
+  //  [0, 0, 1, 1, 0]]
+  // data: [1, 4, 1, 4, 1, 4]
+  tp = aten::VecToIdArray(std::vector<IDX>({0, 2, 4, 6}), sizeof(IDX)*8, ctx);
+  ti = aten::VecToIdArray(std::vector<IDX>({2, 3, 2, 3, 2, 3}), sizeof(IDX)*8, ctx);
+  td = aten::VecToIdArray(std::vector<IDX>({1, 4, 1, 4, 1, 4}), sizeof(IDX)*8, ctx);
+  ASSERT_TRUE(ArrayEQ<IDX>(x.indptr, tp));
+  ASSERT_TRUE(ArrayEQ<IDX>(x.indices, ti));
+  ASSERT_TRUE(ArrayEQ<IDX>(x.data, td));
 }
 
 TEST(SpmatTest, TestCSRSliceRows) {

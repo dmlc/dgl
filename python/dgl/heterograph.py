@@ -5,6 +5,7 @@ from collections.abc import Mapping, Iterable
 from contextlib import contextmanager
 import copy
 import numbers
+import itertools
 import networkx as nx
 import numpy as np
 
@@ -1599,6 +1600,14 @@ class DGLHeteroGraph(object):
     #################################################################
     # View
     #################################################################
+
+    def get_node_storage(self, key, ntype=None):
+        """Get storage object of node feature of type :attr:`ntype` and name :attr:`key`."""
+        return self._node_frames[self.get_ntype_id(ntype)]._columns[key]
+
+    def get_edge_storage(self, key, etype=None):
+        """Get storage object of edge feature of type :attr:`etype` and name :attr:`key`."""
+        return self._edge_frames[self.get_etype_id(etype)]._columns[key]
 
     @property
     def nodes(self):
@@ -4113,6 +4122,15 @@ class DGLHeteroGraph(object):
                 raise DGLError('Cannot assign node feature "{}" on device {} to a graph on'
                                ' device {}. Call DGLGraph.to() to copy the graph to the'
                                ' same device.'.format(key, F.context(val), self.device))
+            # To prevent users from doing things like:
+            #
+            #     g.pin_memory_()
+            #     g.ndata['x'] = torch.randn(...)
+            #     sg = g.sample_neighbors(torch.LongTensor([...]).cuda())
+            #     sg.ndata['x']    # Becomes a CPU tensor even if sg is on GPU due to lazy slicing
+            if self.is_pinned() and F.context(val) == 'cpu' and not F.is_pinned(val):
+                raise DGLError('Pinned graph requires the node data to be pinned as well. '
+                               'Please pin the node data before assignment.')
 
         if is_all(u):
             self._node_frames[ntid].update(data)
@@ -4205,6 +4223,15 @@ class DGLHeteroGraph(object):
                 raise DGLError('Cannot assign edge feature "{}" on device {} to a graph on'
                                ' device {}. Call DGLGraph.to() to copy the graph to the'
                                ' same device.'.format(key, F.context(val), self.device))
+            # To prevent users from doing things like:
+            #
+            #     g.pin_memory_()
+            #     g.edata['x'] = torch.randn(...)
+            #     sg = g.sample_neighbors(torch.LongTensor([...]).cuda())
+            #     sg.edata['x']    # Becomes a CPU tensor even if sg is on GPU due to lazy slicing
+            if self.is_pinned() and F.context(val) == 'cpu' and not F.is_pinned(val):
+                raise DGLError('Pinned graph requires the edge data to be pinned as well. '
+                               'Please pin the edge data before assignment.')
 
         # set
         if is_all(edges):
@@ -4230,7 +4257,7 @@ class DGLHeteroGraph(object):
         """
         # parse argument
         if is_all(edges):
-            return dict(self._edge_frames[etid])
+            return self._edge_frames[etid]
         else:
             eid = utils.parse_edges_arg_to_eid(self, edges, etid, 'edges')
             return self._edge_frames[etid].subframe(eid)
@@ -4866,16 +4893,16 @@ class DGLHeteroGraph(object):
             _, dtid = self._graph.metagraph.find_edge(etid)
             g = self if etype is None else self[etype]
             ndata = core.message_passing(g, message_func, reduce_func, apply_node_func)
+            if core.is_builtin(reduce_func) and reduce_func.name in ['min', 'max'] and ndata:
+                # Replace infinity with zero for isolated nodes
+                key = list(ndata.keys())[0]
+                ndata[key] = F.replace_inf_with_zero(ndata[key])
             self._set_n_repr(dtid, ALL, ndata)
         else:   # heterogeneous graph with number of relation types > 1
             if not core.is_builtin(message_func) or not core.is_builtin(reduce_func):
                 raise DGLError("User defined functions are not yet "
                                "supported in update_all for heterogeneous graphs. "
                                "Please use multi_update_all instead.")
-            if reduce_func.name in ['max', 'min']:
-                raise NotImplementedError("Reduce op \'" + reduce_func.name + "\' is not yet "
-                                          "supported in update_all for heterogeneous graphs. "
-                                          "Please use multi_update_all instead.")
             if reduce_func.name in ['mean']:
                 raise NotImplementedError("Cannot set both intra-type and inter-type reduce "
                                           "operators as 'mean' using update_all. Please use "
@@ -4889,6 +4916,8 @@ class DGLHeteroGraph(object):
             for _, _, dsttype in g.canonical_etypes:
                 dtid = g.get_ntype_id(dsttype)
                 dst_tensor[key] = out_tensor_tuples[dtid]
+                if core.is_builtin(reduce_func) and reduce_func.name in ['min', 'max']:
+                    dst_tensor[key] = F.replace_inf_with_zero(dst_tensor[key])
                 self._node_frames[dtid].update(dst_tensor)
 
     #################################################################
@@ -4982,6 +5011,7 @@ class DGLHeteroGraph(object):
         all_out = defaultdict(list)
         merge_order = defaultdict(list)
         for etype, args in etype_dict.items():
+
             etid = self.get_etype_id(etype)
             _, dtid = self._graph.metagraph.find_edge(etid)
             args = pad_tuple(args, 3)
@@ -4994,11 +5024,16 @@ class DGLHeteroGraph(object):
             merge_order[dtid].append(etid)  # use edge type id as merge order hint
         for dtid, frames in all_out.items():
             # merge by cross_reducer
-            self._node_frames[dtid].update(
-                reduce_dict_data(frames, cross_reducer, merge_order[dtid]))
+            out = reduce_dict_data(frames, cross_reducer, merge_order[dtid])
+            # Replace infinity with zero for isolated nodes when reducer is min/max
+            if  core.is_builtin(rfunc) and rfunc.name in ['min', 'max']:
+                key = list(out.keys())[0]
+                out[key] = F.replace_inf_with_zero(out[key]) if out[key] is not None else None
+            self._node_frames[dtid].update(out)
             # apply
             if apply_node_func is not None:
                 self.apply_nodes(apply_node_func, ALL, self.ntypes[dtid])
+
 
 
     #################################################################
@@ -5449,6 +5484,105 @@ class DGLHeteroGraph(object):
         to
         """
         return self.to(F.cpu())
+
+    def pin_memory_(self):
+        """Pin the graph structure and node/edge data to the page-locked memory for
+        GPU zero-copy access.
+
+        This is an **inplace** method. The graph structure must be on CPU to be pinned.
+        If the graph struture is already pinned, the function directly returns it.
+
+        Materialization of new sparse formats for pinned graphs is not allowed.
+        To avoid implicit formats materialization during training,
+        you should create all the needed formats before pinning.
+        But cloning and materialization is fine. See the examples below.
+
+        Returns
+        -------
+        DGLGraph
+            The pinned graph.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        >>> g = dgl.graph((torch.tensor([1, 0]), torch.tensor([1, 2])))
+        >>> g.pin_memory_()
+
+        Materialization of new sparse formats is not allowed for pinned graphs.
+
+        >>> g.create_formats_()  # This would raise an error! You should do this before pinning.
+
+        Cloning and materializing new formats is allowed. The returned graph is **not** pinned.
+
+        >>> g1 = g.formats(['csc'])
+        >>> assert not g1.is_pinned()
+
+        The pinned graph can be access from both CPU and GPU. The concrete device depends
+        on the context of ``query``. For example, ``eid`` in ``find_edges()`` is a query.
+        When ``eid`` is on CPU, ``find_edges()`` is executed on CPU, and the returned
+        values are CPU tensors
+
+        >>> g.unpin_memory_()
+        >>> g.create_formats_()
+        >>> g.pin_memory_()
+        >>> eid = torch.tensor([1])
+        >>> g.find_edges(eids)
+        (tensor([0]), tensor([2]))
+
+        Moving ``eid`` to GPU, ``find_edges()`` will be executed on GPU, and the returned
+        values are GPU tensors.
+
+        >>> eid = eid.to('cuda:0')
+        >>> g.find_edges(eids)
+        (tensor([0], device='cuda:0'), tensor([2], device='cuda:0'))
+
+        If you don't provide a ``query``, methods will be executed on CPU by default.
+
+        >>> g.in_degrees()
+        tensor([0, 1, 1])
+        """
+        if not self._graph.is_pinned():
+            if F.device_type(self.device) != 'cpu':
+                raise DGLError("The graph structure must be on CPU to be pinned.")
+            self._graph.pin_memory_()
+        for frame in itertools.chain(self._node_frames, self._edge_frames):
+            for col in frame._columns.values():
+                col.pin_memory_()
+
+        return self
+
+    def unpin_memory_(self):
+        """Unpin the graph structure and node/edge data from the page-locked memory.
+
+        This is an **inplace** method. If the graph struture is not pinned,
+        e.g., on CPU or GPU, the function directly returns it.
+
+        Returns
+        -------
+        DGLGraph
+            The unpinned graph.
+        """
+        if self._graph.is_pinned():
+            self._graph.unpin_memory_()
+        for frame in itertools.chain(self._node_frames, self._edge_frames):
+            for col in frame._columns.values():
+                col.unpin_memory_()
+
+        return self
+
+    def is_pinned(self):
+        """Check if the graph structure is pinned to the page-locked memory.
+
+        Returns
+        -------
+        bool
+            True if the graph structure is pinned.
+        """
+        return self._graph.is_pinned()
 
     def clone(self):
         """Return a heterograph object that is a clone of current graph.

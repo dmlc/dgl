@@ -1,10 +1,22 @@
 /*!
- *  Copyright (c) 2021 by Contributors
- * \file nccl_api.cc
+ *  Copyright (c) 2021-2022 by Contributors
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ * \file nccl_api.cu
  * \brief Implementation of wrapper around NCCL routines.
  */
 
-#ifdef DGL_USE_NCCL
 
 #include "nccl_api.h"
 
@@ -24,6 +36,7 @@
 #include <vector>
 #include <memory>
 #include <string>
+#include <algorithm>
 #include <limits>
 
 #include "cuda_common.h"
@@ -50,10 +63,7 @@ namespace cuda {
 
 namespace {
 
-enum class AllToAllMode : int {
-  REMAINDER = 0
-};
-
+#ifdef DGL_USE_NCCL
 
 template<typename T> ncclDataType_t NCCLType();
 template<> ncclDataType_t NCCLType<int32_t>() {
@@ -72,6 +82,7 @@ template<> ncclDataType_t NCCLType<double>() {
     return ncclFloat64;
 }
 
+#endif  // DGL_USE_NCCL
 
 template<typename IdType, typename DType>
 __global__ void _DualPermKernel(
@@ -179,7 +190,8 @@ std::pair<IdArray, NDArray> SparsePush(
     const dim3 block(256);
     const dim3 grid((num_in+block.x-1)/block.x);
 
-    _DualPermKernel<<<grid, block, 0, stream>>>(
+    CUDA_KERNEL_CALL(_DualPermKernel,
+        grid, block, 0, stream,
         static_cast<const IdType*>(in_idx->data),
         static_cast<const DType*>(in_value->data),
         perm,
@@ -187,7 +199,6 @@ std::pair<IdArray, NDArray> SparsePush(
         num_feat,
         send_idx.get(),
         send_value.get());
-    CUDA_CALL(cudaGetLastError());
   }
 
   // compute the prefix sum of the send values
@@ -225,7 +236,7 @@ std::pair<IdArray, NDArray> SparsePush(
   comm->AllToAll(send_sum, recv_sum.get(), 1, stream);
 
   cudaEvent_t d2h;
-  cudaEventCreate(&d2h);
+  CUDA_CALL(cudaEventCreate(&d2h));
 
   // compute the prefix sum of the recv values
   Workspace<int64_t> recv_prefix(device, ctx, comm_size+1);
@@ -255,11 +266,11 @@ std::pair<IdArray, NDArray> SparsePush(
   recv_prefix.free();
 
   // use an event to track when copying is done
-  cudaEventRecord(d2h, stream);
+  CUDA_CALL(cudaEventRecord(d2h, stream));
 
   // allocate output space
-  cudaEventSynchronize(d2h);
-  cudaEventDestroy(d2h);
+  CUDA_CALL(cudaEventSynchronize(d2h));
+  CUDA_CALL(cudaEventDestroy(d2h));
 
   IdArray recv_idx = aten::NewIdArray(
       recv_prefix_host.back(), ctx, sizeof(IdType)*8);
@@ -332,12 +343,13 @@ NDArray SparsePull(
     const dim3 block(256);
     const dim3 grid((num_in+block.x-1)/block.x);
 
-    aten::impl::IndexSelectSingleKernel<<<grid, block, 0, stream>>>(
+    CUDA_KERNEL_CALL(aten::impl::IndexSelectSingleKernel,
+        grid, block, 0, stream,
         static_cast<const IdType*>(req_idx->data),
         perm,
         num_in,
+        req_idx->shape[0],
         send_idx.get());
-    CUDA_CALL(cudaGetLastError());
   }
 
   // compute the prefix sum of the indexes this process is requesting
@@ -354,7 +366,7 @@ NDArray SparsePull(
   }
 
   cudaEvent_t d2h;
-  cudaEventCreate(&d2h);
+  CUDA_CALL(cudaEventCreate(&d2h));
 
   std::vector<int64_t> request_prefix_host(comm_size+1);
   device->CopyDataFromTo(
@@ -405,11 +417,11 @@ NDArray SparsePull(
   response_prefix.free();
 
   // use an event to track when copying is done
-  cudaEventRecord(d2h, stream);
+  CUDA_CALL(cudaEventRecord(d2h, stream));
 
   // allocate output space
-  cudaEventSynchronize(d2h);
-  cudaEventDestroy(d2h);
+  CUDA_CALL(cudaEventSynchronize(d2h));
+  CUDA_CALL(cudaEventDestroy(d2h));
 
   // gather requested indexes
   IdArray recv_idx = aten::NewIdArray(
@@ -430,21 +442,22 @@ NDArray SparsePull(
   // and then index select them into place
   Workspace<DType> filled_response_value(device, ctx,
       response_prefix_host.back()*num_feat);
-  if (request_prefix_host.back() > 0) {
+  if (response_prefix_host.back() > 0) {
     dim3 block(256, 1);
     while (block.x >= 2*num_feat) {
         block.x /= 2;
         block.y *= 2;
     }
-    const dim3 grid((request_prefix_host.back()+block.y-1)/block.y);
+    const dim3 grid((response_prefix_host.back()+block.y-1)/block.y);
 
-    aten::impl::IndexSelectMultiKernel<<<grid, block, 0, stream>>>(
+    CUDA_KERNEL_CALL(aten::impl::IndexSelectMultiKernel,
+        grid, block, 0, stream,
         static_cast<const DType*>(local_tensor->data),
         num_feat,
         static_cast<IdType*>(recv_idx->data),
         response_prefix_host.back(),
+        local_tensor->shape[0],
         filled_response_value.get());
-    CUDA_CALL(cudaGetLastError());
   }
 
   // we will collect recieved values in this array
@@ -483,13 +496,13 @@ NDArray SparsePull(
     }
     const dim3 grid((num_in+block.y-1)/block.y);
 
-    _InversePermKernel<<<grid, block, 0, stream>>>(
+    CUDA_KERNEL_CALL(_InversePermKernel,
+        grid, block, 0, stream,
         filled_request_value.get(),
         num_feat,
         num_in,
         perm,
         static_cast<DType*>(result->data));
-    CUDA_CALL(cudaGetLastError());
   }
 
   return result;
@@ -501,8 +514,14 @@ NDArray SparsePull(
 
 NCCLUniqueId::NCCLUniqueId() :
   id_() {
+  #ifdef DGL_USE_NCCL
   // this ID is unique to the process, not to each call of this function
   NCCL_CALL(ncclGetUniqueId(&id_));
+  #else
+  // when NCCL isn't enabled, use all zeros
+  std::fill(id_.internal, id_.internal + NCCL_UNIQUE_ID_BYTES,
+      static_cast<char>(0));
+  #endif
 }
 
 ncclUniqueId NCCLUniqueId::Get() const {
@@ -538,7 +557,6 @@ void NCCLUniqueId::FromString(
 }
 
 
-
 /* NCCLCommunicator **********************************************************/
 
 NCCLCommunicator::NCCLCommunicator(
@@ -553,11 +571,19 @@ NCCLCommunicator::NCCLCommunicator(
   CHECK_GE(rank, 0) << "The rank (" << rank << ") must be greater than or "
       "equal to 0.";
 
+  #ifdef DGL_USE_NCCL
   NCCL_CALL(ncclCommInitRank(&comm_, size_, id, rank_));
+  #else
+  CHECK_EQ(size, 1) << "Cannot create a communicator of size " << size << ". "
+      "To use a communicator size greater than 1, compile DGL with NCCL "
+      "support.";
+  #endif
 }
 
 NCCLCommunicator::~NCCLCommunicator() {
+  #ifdef DGL_USE_NCCL
   ncclCommDestroy(comm_);
+  #endif
 }
 
 ncclComm_t NCCLCommunicator::Get() {
@@ -571,6 +597,7 @@ void NCCLCommunicator::AllToAllV(
     DType * const recv,
     const int64_t * const recv_prefix,
     cudaStream_t stream) {
+  #ifdef DGL_USE_NCCL
   const ncclDataType_t type = NCCLType<DType>();
 
   NCCL_CALL(ncclGroupStart());
@@ -585,6 +612,24 @@ void NCCLCommunicator::AllToAllV(
     }
   }
   NCCL_CALL(ncclGroupEnd());
+  #else
+  CHECK_EQ(send_prefix[1]-send_prefix[0], recv_prefix[1]-recv_prefix[0]) <<
+      "Send message size must equal receive message size.";
+
+  int dev_id;
+  CUDA_CALL(cudaGetDevice(&dev_id));
+  DGLContext ctx{kDLGPU, dev_id};
+
+  auto device = runtime::DeviceAPI::Get(ctx);
+  auto dtype = DLDataTypeTraits<DType>::dtype;
+
+  device->CopyDataFromTo(send, send_prefix[0],
+      recv, recv_prefix[0],
+      sizeof(DType)*send_prefix[1]-send_prefix[0],
+      ctx, ctx,
+      dtype,
+      stream);
+  #endif
 }
 
 template
@@ -623,14 +668,25 @@ void NCCLCommunicator::AllToAll(
     IdType * const recv,
     const int64_t count,
     cudaStream_t stream) {
+  #ifdef DGL_USE_NCCL
   const ncclDataType_t type = NCCLType<IdType>();
 
-  ncclGroupStart();
+  NCCL_CALL(ncclGroupStart());
   for (int r = 0; r < size_; ++r) {
-    ncclSend(send+(r*count), count, type, r, comm_, stream);
-    ncclRecv(recv+(r*count), count, type, r, comm_, stream);
+    NCCL_CALL(ncclSend(send+(r*count), count, type, r, comm_, stream));
+    NCCL_CALL(ncclRecv(recv+(r*count), count, type, r, comm_, stream));
   }
-  ncclGroupEnd();
+  NCCL_CALL(ncclGroupEnd());
+  #else
+  int dev_id;
+  CUDA_CALL(cudaGetDevice(&dev_id));
+  DGLContext ctx{kDLGPU, dev_id};
+
+  auto device = runtime::DeviceAPI::Get(ctx);
+  auto dtype = DLDataTypeTraits<IdType>::dtype;
+
+  device->CopyDataFromTo(send, 0, recv, 0, count, ctx, ctx, dtype, stream);
+  #endif
 }
 
 template
@@ -657,26 +713,22 @@ void NCCLCommunicator::SparseAllToAll(
       DType * const recv_value,
       const int64_t * const recv_prefix,
       cudaStream_t stream) {
-  const ncclDataType_t idx_type = NCCLType<IdType>();
-  const ncclDataType_t value_type = NCCLType<DType>();
+  // idxs
+  AllToAllV(send_idx, send_prefix, recv_idx, recv_prefix, stream);
 
-  ncclGroupStart();
-  for (int r = 0; r < size_; ++r) {
-    const int64_t send_size = send_prefix[r+1]-send_prefix[r];
-    if (send_size > 0) {
-      ncclSend(send_idx+send_prefix[r], send_size, idx_type, r, comm_, stream);
-      ncclSend(send_value+send_prefix[r]*num_feat, send_size*num_feat,
-               value_type, r, comm_, stream);
-    }
-    const int64_t recv_size = recv_prefix[r+1]-recv_prefix[r];
-    if (recv_size > 0) {
-      ncclRecv(recv_idx+recv_prefix[r], recv_size, idx_type, r, comm_, stream);
-      ncclRecv(recv_value+recv_prefix[r]*num_feat, recv_size*num_feat,
-               value_type, r, comm_, stream);
-    }
+  // scale prefixes by number of features
+  std::vector<int64_t> value_send_prefix(size_+1);
+  for (int r = 0; r < size_+1; ++r) {
+    value_send_prefix[r] = send_prefix[r]*num_feat;
   }
-  ncclGroupEnd();
+  std::vector<int64_t> value_recv_prefix(size_+1);
+  for (int r = 0; r < size_+1; ++r) {
+    value_recv_prefix[r] = recv_prefix[r]*num_feat;
+  }
+  AllToAllV(send_value, value_send_prefix.data(),
+      recv_value, value_recv_prefix.data(), stream);
 }
+
 
 template
 void NCCLCommunicator::SparseAllToAll<int32_t, __half>(
@@ -776,10 +828,15 @@ DGL_REGISTER_GLOBAL("cuda.nccl._CAPI_DGLNCCLSparseAllToAllPull")
   });
 });
 
+DGL_REGISTER_GLOBAL("cuda.nccl._CAPI_DGLNCCLHasSupport")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  #ifndef DGL_USE_NCCL
+  return false;
+  #else
+  return true;
+  #endif
+});
 
 }  // namespace cuda
 }  // namespace runtime
 }  // namespace dgl
-
-#endif
-

@@ -28,7 +28,6 @@
 * :ref:`guide_cn-message-passing-api`
 * :ref:`guide_cn-message-passing-efficient`
 * :ref:`guide_cn-message-passing-part`
-* :ref:`guide_cn-message-passing-edge`
 * :ref:`guide_cn-message-passing-heterograph`
 
 .. toctree::
@@ -39,5 +38,4 @@
     message-api
     message-efficient
     message-part
-    message-edge
     message-heterograph

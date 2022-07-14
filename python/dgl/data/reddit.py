@@ -9,7 +9,7 @@ from .dgl_dataset import DGLBuiltinDataset
 from .utils import _get_dgl_url, generate_mask_tensor, load_graphs, save_graphs, deprecate_property
 from .. import backend as F
 from ..convert import from_scipy
-from ..transform import reorder_graph
+from ..transforms import reorder_graph
 
 
 class RedditDataset(DGLBuiltinDataset):
@@ -84,8 +84,12 @@ class RedditDataset(DGLBuiltinDataset):
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
+    verbose : bool
         Whether to print out progress information. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
@@ -125,7 +129,8 @@ class RedditDataset(DGLBuiltinDataset):
     >>>
     >>> # Train, Validation and Test
     """
-    def __init__(self, self_loop=False, raw_dir=None, force_reload=False, verbose=False):
+    def __init__(self, self_loop=False, raw_dir=None, force_reload=False,
+                 verbose=False, transform=None):
         self_loop_str = ""
         if self_loop:
             self_loop_str = "_self_loop"
@@ -135,7 +140,8 @@ class RedditDataset(DGLBuiltinDataset):
                                             url=_url,
                                             raw_dir=raw_dir,
                                             force_reload=force_reload,
-                                            verbose=verbose)
+                                            verbose=verbose,
+                                            transform=transform)
 
     def process(self):
         # graph
@@ -251,7 +257,10 @@ class RedditDataset(DGLBuiltinDataset):
             - ``ndata['test_mask']:`` mask for test node set
         """
         assert idx == 0, "Reddit Dataset only has one graph"
-        return self._graph
+        if self._transform is None:
+            return self._graph
+        else:
+            return self._transform(self._graph)
 
     def __len__(self):
         r"""Number of graphs in the dataset"""

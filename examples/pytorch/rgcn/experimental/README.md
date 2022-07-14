@@ -156,6 +156,10 @@ More details about the four steps are explained in our
 The graph structure should be written as a node file and an edge file. The node features and edge features
 can be written as DGL tensors. `write_mag.py` shows an example of writing the OGB MAG graph into files.
 
+As `pm_dglpart` cannot handle self-loops and duplicate edges correctly, these edges are removed and stored
+into `mag_removed_edges.txt` when calling `write_mag.py`. When converting ParMETIS outputs into DGLGraph
+in next steps, `mag_removed_edges.txt` should be passed in. Refer to Step 3 for more details.
+
 ```bash
 python3 write_mag.py
 ```
@@ -186,10 +190,11 @@ write the files on NFS.
 ### Step 3: Convert the ParMETIS partitions into DGLGraph
 
 DGL provides a tool called `convert_partition.py` to load one partition at a time and convert it into a DGLGraph
-and save it into a file.
+and save it into a file. As mentioned in Step 1, please pass `mag_removed_edges.txt` if any self-loops and
+duplicate edges are removed.
 
 ```bash
-python3 ~/workspace/dgl/tools/convert_partition.py --input-dir . --graph-name mag --schema mag.json --num-parts 2 --num-node-weights 4 --output outputs
+python3 ~/workspace/dgl/tools/convert_partition.py --input-dir . --graph-name mag --schema mag.json --num-parts 2 --num-node-weights 4 --output outputs --removed-edges mag_removed_edges.txt
 ```
 
 ### Step 4: Read node data and edge data for each partition

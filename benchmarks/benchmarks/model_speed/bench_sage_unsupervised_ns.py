@@ -4,12 +4,9 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import torch.multiprocessing as mp
-from torch.utils.data import DataLoader
 import dgl.nn.pytorch as dglnn
 import dgl.function as fn
 import time
-import traceback
 
 from .. import utils
 
@@ -114,6 +111,8 @@ def track_time(data, num_negs, batch_size):
     dropout = 0.5
     num_workers = 4
     num_negs = 2
+    iter_start = 3
+    iter_count = 10
 
     n_edges = g.number_of_edges()
     train_seeds = np.arange(n_edges)
@@ -121,17 +120,19 @@ def track_time(data, num_negs, batch_size):
     # Create PyTorch DataLoader for constructing blocks
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
         [int(fanout) for fanout in fan_out.split(',')])
-    dataloader = dgl.dataloading.EdgeDataLoader(
-        g, train_seeds, sampler, exclude='reverse_id',
+    sampler = dgl.dataloading.as_edge_prediction_sampler(
+        sampler, exclude='reverse_id',
         # For each edge with ID e in Reddit dataset, the reverse edge is e ± |E|/2.
         reverse_eids=th.cat([
-            th.arange(n_edges // 2, n_edges),
-            th.arange(0, n_edges // 2)]),
-        negative_sampler=NegativeSampler(g, num_negs),
+                            th.arange(
+                                n_edges // 2, n_edges),
+                            th.arange(0, n_edges // 2)]),
+        negative_sampler=NegativeSampler(g, num_negs))
+    dataloader = dgl.dataloading.DataLoader(
+        g, train_seeds, sampler,
         batch_size=batch_size,
         shuffle=True,
         drop_last=False,
-        pin_memory=True,
         num_workers=num_workers)
 
     # Define model and optimizer
@@ -141,28 +142,9 @@ def track_time(data, num_negs, batch_size):
     loss_fcn = loss_fcn.to(device)
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
-    # dry run
-    for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(dataloader):
-        # Load the input features as well as output labels
-        batch_inputs = load_subtensor(g, input_nodes, device)
-
-        pos_graph = pos_graph.to(device)
-        neg_graph = neg_graph.to(device)
-        blocks = [block.int().to(device) for block in blocks]
-        # Compute loss and prediction
-        batch_pred = model(blocks, batch_inputs)
-        loss = loss_fcn(batch_pred, pos_graph, neg_graph)
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-        if step >= 3:
-            break
-
     # Training loop
     avg = 0
     iter_tput = []
-    t0 = time.time()
     for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(dataloader):
         # Load the input features as well as output labels
         batch_inputs = load_subtensor(g, input_nodes, device)
@@ -177,9 +159,12 @@ def track_time(data, num_negs, batch_size):
         loss.backward()
         optimizer.step()
 
-        if step >= 9:  # time 10 loops
+        # start timer at before iter_start
+        if step == iter_start - 1:
+            t0 = time.time()
+        elif step == iter_count + iter_start - 1:  # time iter_count iterations
             break
 
     t1 = time.time()
 
-    return (t1 - t0) / (step + 1)
+    return (t1 - t0) / iter_count

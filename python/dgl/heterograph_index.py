@@ -1,6 +1,7 @@
 """Module for heterogeneous graph index class definition."""
 from __future__ import absolute_import
 
+import sys
 import itertools
 import numpy as np
 import scipy
@@ -233,6 +234,44 @@ class HeteroGraphIndex(ObjectBase):
             The graph index on the given device context.
         """
         return _CAPI_DGLHeteroCopyTo(self, ctx.device_type, ctx.device_id)
+
+    def pin_memory_(self):
+        """Pin this graph to the page-locked memory.
+
+        NOTE: This is an inplace method.
+              The graph structure must be on CPU to be pinned.
+              If the graph struture is already pinned, the function directly returns it.
+
+        Returns
+        -------
+        HeteroGraphIndex
+            The pinned graph index.
+        """
+        return _CAPI_DGLHeteroPinMemory_(self)
+
+    def unpin_memory_(self):
+        """Unpin this graph from the page-locked memory.
+
+        NOTE: this is an inplace method.
+              If the graph struture is not pinned, e.g., on CPU or GPU,
+              the function directly returns it.
+
+        Returns
+        -------
+        HeteroGraphIndex
+            The unpinned graph index.
+        """
+        return _CAPI_DGLHeteroUnpinMemory_(self)
+
+    def is_pinned(self):
+        """Check if this graph is pinned to the page-locked memory.
+
+        Returns
+        -------
+        bool
+            True if the graph is pinned.
+        """
+        return bool(_CAPI_DGLHeteroIsPinned(self))
 
     def shared_memory(self, name, ntypes=None, etypes=None, formats=('coo', 'csr', 'csc')):
         """Return a copy of this graph in shared memory
@@ -1317,14 +1356,49 @@ class HeteroPickleStates(ObjectBase):
 
     def __setstate__(self, state):
         if isinstance(state[0], int):
-            _, meta, arrays = state
+            version, meta, arrays = state
             arrays = [F.zerocopy_to_dgl_ndarray(arr) for arr in arrays]
             self.__init_handle_by_constructor__(
-                _CAPI_DGLCreateHeteroPickleStates, meta, arrays)
+                _CAPI_DGLCreateHeteroPickleStates, version, meta, arrays)
         else:
             metagraph, num_nodes_per_type, adjs = state
             num_nodes_per_type = F.zerocopy_to_dgl_ndarray(num_nodes_per_type)
             self.__init_handle_by_constructor__(
                 _CAPI_DGLCreateHeteroPickleStatesOld, metagraph, num_nodes_per_type, adjs)
+
+def _forking_rebuild(pk_state):
+    version, meta, arrays = pk_state
+    arrays = [F.to_dgl_nd(arr) for arr in arrays]
+    states = _CAPI_DGLCreateHeteroPickleStates(version, meta, arrays)
+    graph_index = _CAPI_DGLHeteroForkingUnpickle(states)
+    graph_index._forking_pk_state = pk_state
+    return graph_index
+
+def _forking_reduce(graph_index):
+    # Because F.from_dgl_nd(F.to_dgl_nd(x)) loses the information of shared memory
+    # file descriptor (because DLPack does not keep it), without caching the tensors
+    # PyTorch will allocate one shared memory region for every single worker.
+    # The downside is that if a graph_index is shared by forking and new formats are created
+    # afterwards, then sharing it again will not bring together the new formats.  This case
+    # should be rare though because (1) DataLoader will create all the formats if num_workers > 0
+    # anyway, and (2) we require the users to explicitly create all formats before calling
+    # mp.spawn().
+    if hasattr(graph_index, '_forking_pk_state'):
+        return _forking_rebuild, (graph_index._forking_pk_state,)
+    states = _CAPI_DGLHeteroForkingPickle(graph_index)
+    arrays = [F.from_dgl_nd(arr) for arr in states.arrays]
+    # Similar to what being mentioned in HeteroGraphIndex.__getstate__, we need to save
+    # the tensors as an attribute of the original graph index object.  Otherwise
+    # PyTorch will throw weird errors like bad value(s) in fds_to_keep or unable to
+    # resize file.
+    graph_index._forking_pk_state = (states.version, states.meta, arrays)
+    return _forking_rebuild, (graph_index._forking_pk_state,)
+
+
+if not (F.get_preferred_backend() == 'mxnet' and sys.version_info.minor <= 6):
+    # Python 3.6 MXNet crashes with the following statement; remove until we no longer support
+    # 3.6 (which is EOL anyway).
+    from multiprocessing.reduction import ForkingPickler
+    ForkingPickler.register(HeteroGraphIndex, _forking_reduce)
 
 _init_api("dgl.heterograph_index")

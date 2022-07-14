@@ -202,20 +202,20 @@ DGL provides two levels of APIs for sampling nodes and edges to generate mini-ba
 (see the section of mini-batch training). The low-level APIs require users to write code
 to explicitly define how a layer of nodes are sampled (e.g., using :func:`dgl.sampling.sample_neighbors` ).
 The high-level sampling APIs implement a few popular sampling algorithms for node classification
-and link prediction tasks (e.g., :class:`~dgl.dataloading.pytorch.NodeDataloader` and
-:class:`~dgl.dataloading.pytorch.EdgeDataloader` ).
+and link prediction tasks (e.g., :class:`~dgl.dataloading.NodeDataLoader` and
+:class:`~dgl.dataloading.EdgeDataLoader` ).
 
 The distributed sampling module follows the same design and provides two levels of sampling APIs.
 For the lower-level sampling API, it provides :func:`~dgl.distributed.sample_neighbors` for
 distributed neighborhood sampling on :class:`~dgl.distributed.DistGraph`. In addition, DGL provides
-a distributed Dataloader (:class:`~dgl.distributed.DistDataLoader` ) for distributed sampling.
-The distributed Dataloader has the same interface as Pytorch DataLoader except that users cannot
+a distributed DataLoader (:class:`~dgl.distributed.DistDataLoader` ) for distributed sampling.
+The distributed DataLoader has the same interface as Pytorch DataLoader except that users cannot
 specify the number of worker processes when creating a dataloader. The worker processes are created
 in :func:`dgl.distributed.initialize`.
 
 **Note**: When running :func:`dgl.distributed.sample_neighbors` on :class:`~dgl.distributed.DistGraph`,
-the sampler cannot run in Pytorch Dataloader with multiple worker processes. The main reason is that
-Pytorch Dataloader creates new sampling worker processes in every epoch, which leads to creating and
+the sampler cannot run in Pytorch DataLoader with multiple worker processes. The main reason is that
+Pytorch DataLoader creates new sampling worker processes in every epoch, which leads to creating and
 destroying :class:`~dgl.distributed.DistGraph` objects many times.
 
 When using the low-level API, the sampling code is similar to single-process sampling. The only
@@ -240,17 +240,17 @@ difference is that users need to use :func:`dgl.distributed.sample_neighbors` an
         for batch in dataloader:
             ...
 
-The same high-level sampling APIs (:class:`~dgl.dataloading.pytorch.NodeDataloader` and
-:class:`~dgl.dataloading.pytorch.EdgeDataloader` ) work for both :class:`~dgl.DGLGraph`
-and :class:`~dgl.distributed.DistGraph`. When using :class:`~dgl.dataloading.pytorch.NodeDataloader`
-and :class:`~dgl.dataloading.pytorch.EdgeDataloader`, the distributed sampling code is exactly
-the same as single-process sampling.
+The high-level sampling APIs (:class:`~dgl.dataloading.NodeDataLoader` and
+:class:`~dgl.dataloading.EdgeDataLoader` ) has distributed counterparts
+(:class:`~dgl.dataloading.DistNodeDataLoader` and
+:class:`~dgl.dataloading.DistEdgeDataLoader`).  The code is exactly the
+same as single-process sampling otherwise.
 
 .. code:: python
 
     sampler = dgl.sampling.MultiLayerNeighborSampler([10, 25])
-    dataloader = dgl.sampling.NodeDataLoader(g, train_nid, sampler,
-                                             batch_size=batch_size, shuffle=True)
+    dataloader = dgl.sampling.DistNodeDataLoader(g, train_nid, sampler,
+                                                 batch_size=batch_size, shuffle=True)
     for batch in dataloader:
         ...
 

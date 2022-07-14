@@ -330,6 +330,21 @@ def copy_to(input, ctx, **kwargs):
     """
     pass
 
+def is_pinned(input):
+    """Check whether the tensor is in pinned memory.
+
+    Parameters
+    ----------
+    input : Tensor
+        The tensor.
+
+    Returns
+    -------
+    bool
+        Whether the tensor is in pinned memory.
+    """
+    pass
+
 ###############################################################################
 # Tensor functions on feature data
 # --------------------------------
@@ -562,6 +577,21 @@ def exp(input):
     ----------
     input : Tensor
         The input tensor.
+
+    Returns
+    -------
+    Tensor
+        The output tensor.
+    """
+    pass
+
+def inverse(input):
+    """Returns the inverse matrix of a square matrix if it exists.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input square matrix.
 
     Returns
     -------
@@ -1057,6 +1087,21 @@ def equal(x, y):
     """
     pass
 
+def allclose(x, y, rtol=1e-4, atol=1e-4):
+    """Compares whether all elements are close.
+
+    Parameters
+    ----------
+    x : Tensor
+        First tensor
+    y : Tensor
+        Second tensor
+    rtol : float, optional
+        Relative tolerance
+    atol : float, optional
+        Absolute tolerance
+    """
+
 def logical_not(input):
     """Perform a logical not operation.  Equivalent to np.logical_not
 
@@ -1148,18 +1193,29 @@ def count_nonzero(input):
 # DGL should contain all the operations on index, so this set of operators
 # should be gradually removed.
 
-def unique(input):
+def unique(input, return_inverse=False, return_counts=False):
     """Returns the unique scalar elements in a tensor.
 
     Parameters
     ----------
     input : Tensor
         Must be a 1-D tensor.
+    return_inverse : bool, optional
+        Whether to also return the indices for where elements in the original
+        input ended up in the returned unique list.
+    return_counts : bool, optional
+        Whether to also return the counts for each unique element.
 
     Returns
     -------
     Tensor
         A 1-D tensor containing unique elements.
+    Tensor, optional
+        A 1-D tensor containing the new positions of the elements in the input.
+        It is returned if return_inverse is True.
+    Tensor, optional
+        A 1-D tensor containing the number of occurrences for each unique value or tensor.
+        It is returned if return_counts is True.
     """
     pass
 
@@ -1620,6 +1676,43 @@ def edge_softmax(gidx, logits, eids, norm_by):
     """
     pass
 
+def edge_softmax_hetero(gidx, eids, norm_by, *logits):
+    r"""Compute edge softmax.
+
+    For a node :math:`i`, edge softmax is an operation of computing
+
+    .. math::
+      a_{ij} = \frac{\exp(z_{ij})}{\sum_{j\in\mathcal{N}(i)}\exp(z_{ij})}
+
+    where :math:`z_{ij}` is a signal of edge :math:`j\rightarrow i`, also
+    called logits in the context of softmax. :math:`\mathcal{N}(i)` is
+    the set of nodes that have an edge to :math:`i`.
+
+    By default edge softmax is normalized by destination nodes(i.e. :math:`ij`
+    are incoming edges of `i` in the formula above). We also support edge
+    softmax normalized by source nodes(i.e. :math:`ij` are outgoing edges of
+    `i` in the formula). The previous case correspond to softmax in GAT and
+    Transformer, and the later case correspond to softmax in Capsule network.
+
+    Parameters
+    ----------
+    gidx : HeteroGraphIndex
+        The graph to perfor edge softmax on.
+    eids : dict of tensors
+        Each tensor has the edges on which to apply edge softmax for a
+        corresponsing relation type.
+    logits : tuple of tensors
+        The input edge features of different relation types.
+    norm_by : str, could be `src` or `dst`
+        Normalized by source nodes or destination nodes. Default: `dst`.
+
+    Returns
+    -------
+    Tensor
+        Softmax value
+    """
+    pass
+
 def segment_reduce(op, x, offsets):
     """Segment reduction operator.
 
@@ -1752,6 +1845,51 @@ def csrmask(A, A_weights, B):
     -------
     Tensor
         The output tensor.
+    """
+    pass
+
+def gather_mm(A, B, idx_a, idx_b):
+    r""" Dense Matrix Multiplication interface. It multiplies 2D dense tensor A
+    and 3D dense tensor B according to their relation types. A is unsorted and
+    the relation type is fetched from idx_b.
+
+    Parameters
+    ----------
+    A : tensor
+        2-D tensor of shape (N, D1)
+    B : tensor
+        3-D tensor of shape (R, D1, D2)
+    idx_a : Tensor, optional
+        If specified, must be a 1-D integer tensor of shape (K,).
+    idx_b : Tensor, optional
+        If specified, must be a 1-D integer tensor of shape (K,).
+
+    Returns
+    -------
+    Tensor
+        The output dense matrix of shape (N, D2)
+    """
+    pass
+
+def segment_mm(A, B, seglen_A):
+    r""" Dense Matrix Multiplication interface. It multiplies dense tensor A
+    and dense tensor B according to relation types. A is sorted and concatenated
+    according to relation types.
+
+    Parameters
+    ----------
+    A : tensor
+        2-D tensor of shape (N, D1)
+    B : tensor
+        3-D tensor of shape (R, D1, D2)
+    seglen_A : Tensor
+        An integer tensor of shape (R,). Each element is the length of segments
+        of input ``A``. The summation of all elements must be equal to N.
+
+    Returns
+    -------
+    Tensor
+        The output dense matrix of shape (N, D2)
     """
     pass
 

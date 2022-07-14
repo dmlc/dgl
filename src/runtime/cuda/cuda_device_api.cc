@@ -4,7 +4,7 @@
  * \brief GPU specific API
  */
 #include <dgl/runtime/device_api.h>
-
+#include <dgl/runtime/tensordispatch.h>
 #include <dmlc/thread_local.h>
 #include <dgl/runtime/registry.h>
 #include <cuda_runtime.h>
@@ -15,6 +15,23 @@ namespace runtime {
 
 class CUDADeviceAPI final : public DeviceAPI {
  public:
+  CUDADeviceAPI() {
+    int count;
+    auto err = cudaGetDeviceCount(&count);
+    switch (err) {
+      case cudaSuccess:
+        break;
+      default:
+        count = 0;
+        cudaGetLastError();
+    }
+    is_available_ = count > 0;
+  }
+
+  bool IsAvailable() final {
+    return is_available_;
+  }
+
   void SetDevice(DGLContext ctx) final {
     CUDA_CALL(cudaSetDevice(ctx.device_id));
   }
@@ -120,9 +137,9 @@ class CUDADeviceAPI final : public DeviceAPI {
       if (ctx_from.device_id == ctx_to.device_id) {
         GPUCopy(from, to, size, cudaMemcpyDeviceToDevice, cu_stream);
       } else {
-        cudaMemcpyPeerAsync(to, ctx_to.device_id,
-                            from, ctx_from.device_id,
-                            size, cu_stream);
+        CUDA_CALL(cudaMemcpyPeerAsync(to, ctx_to.device_id,
+                                      from, ctx_from.device_id,
+                                      size, cu_stream));
       }
     } else if (ctx_from.device_type == kDLGPU && ctx_to.device_type == kDLCPU) {
       CUDA_CALL(cudaSetDevice(ctx_from.device_id));
@@ -174,22 +191,71 @@ class CUDADeviceAPI final : public DeviceAPI {
     return static_cast<DGLStreamHandle>(CUDAThreadEntry::ThreadLocal()->stream);
   }
 
-  void PinData(DGLContext ctx, void* ptr, size_t nbytes) {
-    CUDA_CALL(cudaSetDevice(ctx.device_id));
+  /*! NOTE: cudaHostRegister can be called from an arbitrary GPU device,
+   *        so we don't need to specify a ctx.
+   *        The pinned memory can be seen by all CUDA contexts,
+   *        not just the one that performed the allocation
+   */
+  void PinData(void* ptr, size_t nbytes) {
     CUDA_CALL(cudaHostRegister(ptr, nbytes, cudaHostRegisterDefault));
   }
 
-  void UnpinData(DGLContext ctx, void* ptr) {
-    CUDA_CALL(cudaSetDevice(ctx.device_id));
+  void UnpinData(void* ptr) {
     CUDA_CALL(cudaHostUnregister(ptr));
   }
 
+  bool IsPinned(const void* ptr) override {
+    // can't be a pinned tensor if CUDA context is unavailable.
+    if (!is_available_)
+      return false;
+
+    cudaPointerAttributes attr;
+    cudaError_t status = cudaPointerGetAttributes(&attr, ptr);
+    bool result = false;
+
+    switch (status) {
+    case cudaErrorInvalidValue:
+      // might be a normal CPU tensor in CUDA 10.2-
+      cudaGetLastError();   // clear error
+      break;
+    case cudaSuccess:
+      result = (attr.type == cudaMemoryTypeHost);
+      break;
+    case cudaErrorInitializationError:
+    case cudaErrorNoDevice:
+    case cudaErrorInsufficientDriver:
+    case cudaErrorInvalidDevice:
+      // We don't want to fail in these particular cases since this function can be called
+      // when users only want to run on CPU even if CUDA API is enabled, or in a forked
+      // subprocess where CUDA context cannot be initialized.  So we just mark the CUDA
+      // context to unavailable and return.
+      is_available_ = false;
+      cudaGetLastError();   // clear error
+      break;
+    default:
+      LOG(FATAL) << "error while determining memory status: " << cudaGetErrorString(status);
+      break;
+    }
+
+    return result;
+  }
+
   void* AllocWorkspace(DGLContext ctx, size_t size, DGLType type_hint) final {
-    return CUDAThreadEntry::ThreadLocal()->pool.AllocWorkspace(ctx, size);
+    // Redirect to PyTorch's allocator when available.
+    SetDevice(ctx);
+    TensorDispatcher* td = TensorDispatcher::Global();
+    if (td->IsAvailable())
+      return td->AllocWorkspace(size);
+    else
+      return CUDAThreadEntry::ThreadLocal()->pool.AllocWorkspace(ctx, size);
   }
 
   void FreeWorkspace(DGLContext ctx, void* data) final {
-    CUDAThreadEntry::ThreadLocal()->pool.FreeWorkspace(ctx, data);
+    TensorDispatcher* td = TensorDispatcher::Global();
+    if (td->IsAvailable())
+      td->FreeWorkspace(data);
+    else
+      CUDAThreadEntry::ThreadLocal()->pool.FreeWorkspace(ctx, data);
   }
 
   static const std::shared_ptr<CUDADeviceAPI>& Global() {
@@ -210,6 +276,8 @@ class CUDADeviceAPI final : public DeviceAPI {
       CUDA_CALL(cudaStreamSynchronize(stream));
     }
   }
+
+  bool is_available_ = true;
 };
 
 typedef dmlc::ThreadLocalStore<CUDAThreadEntry> CUDAThreadStore;

@@ -103,7 +103,7 @@ print()
 
 print("Training dgl-lda model...")
 t0 = time()
-model = LDAModel(G, n_components)
+model = LDAModel(G.num_nodes('word'), n_components)
 model.fit(G)
 print("done in %0.3fs." % (time() - t0))
 print()
@@ -111,8 +111,9 @@ print()
 print(f"dgl-lda training perplexity {model.perplexity(G):.3f}")
 print(f"dgl-lda testing perplexity {model.perplexity(Gt):.3f}")
 
+word_nphi = np.vstack([nphi.tolist() for nphi in model.word_data.nphi])
 plot_top_words(
-    type('dummy', (object,), {'components_': G.ndata['z']['word'].cpu().numpy().T}),
+    type('dummy', (object,), {'components_': word_nphi}),
     tf_feature_names, n_top_words, 'Topics in LDA model')
 
 print("Training scikit-learn model...")

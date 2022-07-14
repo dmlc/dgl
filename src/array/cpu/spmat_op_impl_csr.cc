@@ -8,6 +8,7 @@
 #include <vector>
 #include <unordered_set>
 #include <numeric>
+#include <atomic>
 #include "array_utils.h"
 
 namespace dgl {
@@ -52,9 +53,12 @@ NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col) {
   const IdType* col_data = static_cast<IdType*>(col->data);
   const int64_t row_stride = (rowlen == 1 && collen != 1) ? 0 : 1;
   const int64_t col_stride = (collen == 1 && rowlen != 1) ? 0 : 1;
-  for (int64_t i = 0, j = 0; i < rowlen && j < collen; i += row_stride, j += col_stride) {
-    *(rst_data++) = CSRIsNonZero<XPU, IdType>(csr, row_data[i], col_data[j])? 1 : 0;
-  }
+  runtime::parallel_for(0, std::max(rowlen, collen), 1, [=](int64_t b, int64_t e) {
+    int64_t i = (row_stride == 0) ? 0 : b;
+    int64_t j = (col_stride == 0) ? 0 : b;
+    for (int64_t k = b; i < e && j < e; i += row_stride, j += col_stride, ++k)
+      rst_data[k] = CSRIsNonZero<XPU, IdType>(csr, row_data[i], col_data[j]) ? 1 : 0;
+  });
   return rst;
 }
 
@@ -287,11 +291,13 @@ COOMatrix CSRToCOO(CSRMatrix csr) {
   const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
   NDArray ret_row = NDArray::Empty({nnz}, csr.indices->dtype, csr.indices->ctx);
   IdType* ret_row_data = static_cast<IdType*>(ret_row->data);
-  for (IdType i = 0; i < csr.indptr->shape[0] - 1; ++i) {
-    std::fill(ret_row_data + indptr_data[i],
-              ret_row_data + indptr_data[i + 1],
-              i);
-  }
+  parallel_for(0, csr.indptr->shape[0] - 1, 10000, [=](int64_t b, int64_t e) {
+    for (auto i = b; i < e; ++i) {
+      std::fill(ret_row_data + indptr_data[i],
+                ret_row_data + indptr_data[i + 1],
+                i);
+    }
+  });
   return COOMatrix(csr.num_rows, csr.num_cols,
                    ret_row, csr.indices, csr.data,
                    true, csr.sorted);
@@ -315,13 +321,15 @@ COOMatrix CSRToCOODataAsOrder(CSRMatrix csr) {
   IdType* ret_row_data = static_cast<IdType*>(ret_row->data);
   IdType* ret_col_data = static_cast<IdType*>(ret_col->data);
   // scatter using the indices in the data array
-  for (IdType row = 0; row < N; ++row) {
-    for (IdType j = indptr_data[row]; j < indptr_data[row + 1]; ++j) {
-      const IdType col = indices_data[j];
-      ret_row_data[data ? data[j] : j] = row;
-      ret_col_data[data ? data[j] : j] = col;
+  parallel_for(0, N, 10000, [=](int64_t b, int64_t e) {
+    for (auto row = b; row < e; ++row) {
+      for (IdType j = indptr_data[row]; j < indptr_data[row + 1]; ++j) {
+        const IdType col = indices_data[j];
+        ret_row_data[data ? data[j] : j] = row;
+        ret_col_data[data ? data[j] : j] = col;
+      }
     }
-  }
+  });
   return COOMatrix(N, M, ret_row, ret_col);
 }
 
@@ -366,36 +374,96 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
   const auto len = rows->shape[0];
   const IdType* rows_data = static_cast<IdType*>(rows->data);
   int64_t nnz = 0;
-  for (int64_t i = 0; i < len; ++i) {
-    IdType vid = rows_data[i];
-    nnz += impl::CSRGetRowNNZ<XPU, IdType>(csr, vid);
-  }
 
   CSRMatrix ret;
   ret.num_rows = len;
   ret.num_cols = csr.num_cols;
   ret.indptr = NDArray::Empty({len + 1}, csr.indptr->dtype, csr.indices->ctx);
+
+  IdType* ret_indptr_data = static_cast<IdType*>(ret.indptr->data);
+  ret_indptr_data[0] = 0;
+
+  std::vector<IdType> sums;
+
+  std::atomic_flag err_flag = ATOMIC_FLAG_INIT;
+  bool err = false;
+  std::stringstream err_msg_stream;
+
+  // Perform two-round parallel prefix sum using OpenMP
+  #pragma omp parallel
+  {
+    int64_t tid = omp_get_thread_num();
+    int64_t num_threads = omp_get_num_threads();
+
+    #pragma omp single
+    {
+        sums.resize(num_threads + 1);
+        sums[0] = 0;
+    }
+
+    int64_t sum = 0;
+
+    // First round of parallel prefix sum. All threads perform local prefix sums.
+    #pragma omp for schedule(static) nowait
+    for (int64_t i = 0; i < len; ++i) {
+      int64_t rid = rows_data[i];
+      if (rid >= csr.num_rows) {
+        if (!err_flag.test_and_set()) {
+          err_msg_stream << "expect row ID " << rid << " to be less than number of rows "
+            << csr.num_rows;
+          err = true;
+        }
+      } else {
+        sum += indptr_data[rid + 1] - indptr_data[rid];
+        ret_indptr_data[i + 1] = sum;
+      }
+    }
+    sums[tid + 1] = sum;
+    #pragma omp barrier
+
+    #pragma omp single
+    {
+      for (int64_t i = 1; i < num_threads; ++i)
+        sums[i] += sums[i - 1];
+    }
+
+    int64_t offset = sums[tid];
+
+    // Second round of parallel prefix sum. Update the local prefix sums.
+    #pragma omp for schedule(static)
+    for (int64_t i = 0; i < len; ++i)
+      ret_indptr_data[i + 1] += offset;
+  }
+  if (err) {
+    LOG(FATAL) << err_msg_stream.str();
+    return ret;
+  }
+
+  // After the prefix sum, the last element of ret_indptr_data holds the
+  // sum of all elements
+  nnz = ret_indptr_data[len];
+
   ret.indices = NDArray::Empty({nnz}, csr.indices->dtype, csr.indices->ctx);
   ret.data = NDArray::Empty({nnz}, csr.indptr->dtype, csr.indptr->ctx);
   ret.sorted = csr.sorted;
 
-  IdType* ret_indptr_data = static_cast<IdType*>(ret.indptr->data);
   IdType* ret_indices_data = static_cast<IdType*>(ret.indices->data);
   IdType* ret_data = static_cast<IdType*>(ret.data->data);
-  ret_indptr_data[0] = 0;
-  for (int64_t i = 0; i < len; ++i) {
-    const IdType rid = rows_data[i];
-    // note: zero is allowed
-    ret_indptr_data[i + 1] = ret_indptr_data[i] + indptr_data[rid + 1] - indptr_data[rid];
-    std::copy(indices_data + indptr_data[rid], indices_data + indptr_data[rid + 1],
-              ret_indices_data + ret_indptr_data[i]);
-    if (data)
-      std::copy(data + indptr_data[rid], data + indptr_data[rid + 1],
-                ret_data + ret_indptr_data[i]);
-    else
-      std::iota(ret_data + ret_indptr_data[i], ret_data + ret_indptr_data[i + 1],
-                indptr_data[rid]);
-  }
+
+  parallel_for(0, len, [=](int64_t b, int64_t e) {
+    for (auto i = b; i < e; ++i) {
+      const IdType rid = rows_data[i];
+      // note: zero is allowed
+      std::copy(indices_data + indptr_data[rid], indices_data + indptr_data[rid + 1],
+                ret_indices_data + ret_indptr_data[i]);
+      if (data)
+        std::copy(data + indptr_data[rid], data + indptr_data[rid + 1],
+                  ret_data + ret_indptr_data[i]);
+      else
+        std::iota(ret_data + ret_indptr_data[i], ret_data + ret_indptr_data[i + 1],
+                  indptr_data[rid]);
+    }
+  });
   return ret;
 }
 

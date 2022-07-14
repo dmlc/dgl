@@ -16,6 +16,10 @@ if [[ $DEVICE == "cpu" ]]; then
 else
     CMAKE_VARS="-DUSE_CUDA=ON"
 fi
+arch=`uname -m`
+if [[ $arch == *"x86"* ]]; then
+  CMAKE_VARS="-DUSE_AVX=ON $CMAKE_VARS"
+fi
 mkdir -p build
 pushd build
 cmake -DCUDA_TOOLKIT_ROOT_DIR=/usr/local/cuda -DBUILD_TORCH=ON $CMAKE_VARS ..

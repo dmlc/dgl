@@ -189,6 +189,34 @@ void SDDMMCoo(const std::string& op,
   });
 }
 
+/*! \brief Generalized SDDMM on Coo format with Heterograph support. */
+template <int XPU, typename IdType, int bits>
+void SDDMMCooHetero(const std::string& op,
+              const BcastOff& bcast,
+              const std::vector<COOMatrix>& vec_coo,
+              const std::vector<NDArray>& vec_lhs,
+              const std::vector<NDArray>& vec_rhs,
+              std::vector<NDArray> vec_out,
+              int lhs_target,
+              int rhs_target,
+              const std::vector<dgl_type_t>& lhs_nid,
+              const std::vector<dgl_type_t>& rhs_nid) {
+  SWITCH_BITS(bits, DType, {
+    SWITCH_OP(op, Op, {
+      SWITCH_TARGET(lhs_target, rhs_target, LhsTarget, RhsTarget, {
+        /* Call  SDDMM for each relation type */
+        for (dgl_type_t etype = 0; etype < lhs_nid.size(); ++etype) {
+          COOMatrix coo = vec_coo[etype];
+          NDArray lhs = vec_lhs[lhs_nid[etype]];
+          NDArray rhs = vec_rhs[rhs_nid[etype]];
+          NDArray out = vec_out[etype];
+          cpu::SDDMMCoo<IdType, DType, Op, LhsTarget, RhsTarget>(bcast, coo, lhs, rhs, out);
+        }
+      });
+    });
+  });
+}
+
 template void SDDMMCoo<kDLCPU, int32_t, 16>(
     const std::string& op, const BcastOff& bcast, const COOMatrix& coo,
     NDArray lhs, NDArray rhs, NDArray out,
@@ -213,6 +241,49 @@ template void SDDMMCoo<kDLCPU, int64_t, 64>(
     const std::string& op, const BcastOff& bcast, const COOMatrix& coo,
     NDArray lhs, NDArray rhs, NDArray out,
     int lhs_target, int rhs_target);
+
+template void SDDMMCooHetero<kDLCPU, int32_t, 16>(
+    const std::string& op, const BcastOff& bcast,
+    const std::vector<COOMatrix>& vec_coo,
+    const std::vector<NDArray>& lhs, const std::vector<NDArray>& rhs,
+    std::vector<NDArray> out, int lhs_target, int rhs_target,
+    const std::vector<dgl_type_t>& in_eid,
+    const std::vector<dgl_type_t>& out_eid);
+template void SDDMMCooHetero<kDLCPU, int64_t, 16>(
+    const std::string& op, const BcastOff& bcast,
+    const std::vector<COOMatrix>& vec_coo,
+    const std::vector<NDArray>& lhs, const std::vector<NDArray>& rhs,
+    std::vector<NDArray> out, int lhs_target, int rhs_target,
+    const std::vector<dgl_type_t>& in_eid,
+    const std::vector<dgl_type_t>& out_eid);
+template void SDDMMCooHetero<kDLCPU, int32_t, 32>(
+    const std::string& op, const BcastOff& bcast,
+    const std::vector<COOMatrix>& vec_coo,
+    const std::vector<NDArray>& lhs, const std::vector<NDArray>& rhs,
+    std::vector<NDArray> out, int lhs_target, int rhs_target,
+    const std::vector<dgl_type_t>& in_eid,
+    const std::vector<dgl_type_t>& out_eid);
+template void SDDMMCooHetero<kDLCPU, int64_t, 32>(
+    const std::string& op, const BcastOff& bcast,
+    const std::vector<COOMatrix>& vec_coo,
+    const std::vector<NDArray>& lhs, const std::vector<NDArray>& rhs,
+    std::vector<NDArray> out, int lhs_target, int rhs_target,
+    const std::vector<dgl_type_t>& in_eid,
+    const std::vector<dgl_type_t>& out_eid);
+template void SDDMMCooHetero<kDLCPU, int32_t, 64>(
+    const std::string& op, const BcastOff& bcast,
+    const std::vector<COOMatrix>& vec_coo,
+    const std::vector<NDArray>& lhs, const std::vector<NDArray>& rhs,
+    std::vector<NDArray> out, int lhs_target, int rhs_target,
+    const std::vector<dgl_type_t>& in_eid,
+    const std::vector<dgl_type_t>& out_eid);
+template void SDDMMCooHetero<kDLCPU, int64_t, 64>(
+    const std::string& op, const BcastOff& bcast,
+    const std::vector<COOMatrix>& vec_coo,
+    const std::vector<NDArray>& lhs, const std::vector<NDArray>& rhs,
+    std::vector<NDArray> out, int lhs_target, int rhs_target,
+    const std::vector<dgl_type_t>& in_eid,
+    const std::vector<dgl_type_t>& out_eid);
 
 
 }  // namespace aten

@@ -64,7 +64,7 @@ class ARMAConv(nn.Module):
             # assume that the graphs are undirected and graph.in_degrees() is the same as graph.out_degrees()
             degs = g.in_degrees().float().clamp(min=1)
             norm = torch.pow(degs, -0.5).to(feats.device).unsqueeze(1)
-            output = None
+            output = [] 
 
             for k in range(self.K):
                 feats = init_feats
@@ -88,13 +88,9 @@ class ARMAConv(nn.Module):
                     
                     if self.activation is not None:
                         feats = self.activation(feats)
-                    
-                if output is None:
-                    output = feats
-                else:
-                    output += feats
-                
-            return output / self.K 
+                output.append(feats)
+
+            return torch.stack(output).mean(dim=0)
 
 class ARMA4NC(nn.Module):
     def __init__(self,

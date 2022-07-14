@@ -8,7 +8,7 @@ import backend as F
 import networkx as nx
 import unittest, pytest
 from dgl import DGLError
-from utils import parametrize_dtype
+from test_utils import parametrize_idtype
 
 def create_test_heterograph(num_nodes, num_adj, idtype):
     if isinstance(num_adj, int):
@@ -49,26 +49,33 @@ def check_sort(spm, tag_arr=None, tag_pos=None):
 
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sorting by tag not implemented")
-@parametrize_dtype
+@parametrize_idtype
 def test_sort_with_tag(idtype):
     num_nodes, num_adj, num_tags = 200, [20, 50], 5
     g = create_test_heterograph(num_nodes, num_adj, idtype=idtype)
     tag = F.tensor(np.random.choice(num_tags, g.number_of_nodes()))
+    src, dst = g.edges()
+    edge_tag_dst = F.gather_row(tag, F.tensor(dst))
+    edge_tag_src = F.gather_row(tag, F.tensor(src))
 
-    new_g = dgl.sort_csr_by_tag(g, tag)
-    old_csr = g.adjacency_matrix(scipy_fmt='csr')
-    new_csr = new_g.adjacency_matrix(scipy_fmt='csr')
-    assert(check_sort(new_csr, tag, new_g.ndata["_TAG_OFFSET"]))
-    assert(not check_sort(old_csr, tag))  # Check the original csr is not modified.
+    for tag_type in ['node', 'edge']:
+        new_g = dgl.sort_csr_by_tag(
+            g, tag if tag_type == 'node' else edge_tag_dst, tag_type=tag_type)
+        old_csr = g.adjacency_matrix(scipy_fmt='csr')
+        new_csr = new_g.adjacency_matrix(scipy_fmt='csr')
+        assert(check_sort(new_csr, tag, new_g.dstdata["_TAG_OFFSET"]))
+        assert(not check_sort(old_csr, tag))  # Check the original csr is not modified.
 
-    new_g = dgl.sort_csc_by_tag(g, tag)
-    old_csc = g.adjacency_matrix(transpose=True, scipy_fmt='csr')
-    new_csc = new_g.adjacency_matrix(transpose=True, scipy_fmt='csr')
-    assert(check_sort(new_csc, tag, new_g.ndata["_TAG_OFFSET"]))
-    assert(not check_sort(old_csc, tag))
+    for tag_type in ['node', 'edge']:
+        new_g = dgl.sort_csc_by_tag(
+            g, tag if tag_type == 'node' else edge_tag_src, tag_type=tag_type)
+        old_csc = g.adjacency_matrix(transpose=True, scipy_fmt='csr')
+        new_csc = new_g.adjacency_matrix(transpose=True, scipy_fmt='csr')
+        assert(check_sort(new_csc, tag, new_g.srcdata["_TAG_OFFSET"]))
+        assert(not check_sort(old_csc, tag))
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sorting by tag not implemented")
-@parametrize_dtype
+@parametrize_idtype
 def test_sort_with_tag_bipartite(idtype):
     num_nodes, num_adj, num_tags = 200, [20, 50], 5
     g = create_test_heterograph(num_nodes, num_adj, idtype=idtype)

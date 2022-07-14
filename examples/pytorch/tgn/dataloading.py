@@ -1,9 +1,9 @@
 import torch
 import dgl
 
-from dgl.dataloading.dataloader import EdgeCollator, assign_block_eids
-from dgl.dataloading import BlockSampler
-from dgl.dataloading.pytorch import _pop_subgraph_storage, _pop_blocks_storage
+from dgl._dataloading.dataloader import EdgeCollator
+from dgl._dataloading import BlockSampler
+from dgl._dataloading.pytorch import _pop_subgraph_storage, _pop_storages, EdgeDataLoader
 from dgl.base import DGLError
 
 from functools import partial
@@ -19,7 +19,7 @@ class TemporalSampler(BlockSampler):
     """ Temporal Sampler builds computational and temporal dependency of node representations via
     temporal neighbors selection and screening.
 
-    The sampler expects input node to have same time stamps, in the case of TGN, it should be 
+    The sampler expects input node to have same time stamps, in the case of TGN, it should be
     either positive [src,dst] pair or negative samples. It will first take in-subgraph of seed
     nodes and then screening out edges which happen after that timestamp. Finally it will sample
     a fixed number of neighbor edges using random or topk sampling.
@@ -91,7 +91,7 @@ class TemporalSampler(BlockSampler):
         #block = transform.to_block(frontier,seed_nodes)
         block = frontier
         if self.return_eids:
-            assign_block_eids(block, frontier)
+            self.assign_block_eids(block, frontier)
         blocks.append(block)
         return blocks
 
@@ -113,7 +113,7 @@ class TemporalEdgeCollator(EdgeCollator):
     eids : Tensor or dict[etype, Tensor]
         The edge set in graph :attr:`g` to compute outputs.
 
-    block_sampler : dgl.dataloading.BlockSampler
+    graph_sampler : dgl.dataloading.BlockSampler
         The neighborhood sampler.
 
     g_sampling : DGLGraph, optional
@@ -187,7 +187,7 @@ class TemporalEdgeCollator(EdgeCollator):
 
         neg_pair_graph = dgl.heterograph(
             neg_edges, {ntype: self.g.number_of_nodes(ntype) for ntype in self.g.ntypes})
-        pair_graph, neg_pair_graph = dgl.transform.compact_graphs(
+        pair_graph, neg_pair_graph = dgl.transforms.compact_graphs(
             [pair_graph, neg_pair_graph])
         # Need to remap id
         pair_graph.ndata[dgl.NID] = self.g.nodes()[pair_graph.ndata[dgl.NID]]
@@ -203,7 +203,7 @@ class TemporalEdgeCollator(EdgeCollator):
         for i, edge in enumerate(zip(self.g.edges()[0][items], self.g.edges()[1][items])):
             ts = pair_graph.edata['timestamp'][i]
             timestamps.append(ts)
-            subg = self.block_sampler.sample_blocks(self.g_sampling,
+            subg = self.graph_sampler.sample_blocks(self.g_sampling,
                                                     list(edge),
                                                     timestamp=ts)[0]
             subg.ndata['timestamp'] = ts.repeat(subg.num_nodes())
@@ -213,7 +213,7 @@ class TemporalEdgeCollator(EdgeCollator):
             self.negative_sampler.k)
         for i, neg_edge in enumerate(zip(neg_srcdst_raw[0].tolist(), neg_srcdst_raw[1].tolist())):
             ts = timestamps[i]
-            subg = self.block_sampler.sample_blocks(self.g_sampling,
+            subg = self.graph_sampler.sample_blocks(self.g_sampling,
                                                     [neg_edge[1]],
                                                     timestamp=ts)[0]
             subg.ndata['timestamp'] = ts.repeat(subg.num_nodes())
@@ -230,11 +230,11 @@ class TemporalEdgeCollator(EdgeCollator):
         # Copy the feature from parent graph
         _pop_subgraph_storage(result[1], self.g)
         _pop_subgraph_storage(result[2], self.g)
-        _pop_blocks_storage(result[-1], self.g_sampling)
+        _pop_storages(result[-1], self.g_sampling)
         return result
 
 
-class TemporalEdgeDataLoader(dgl.dataloading.EdgeDataLoader):
+class TemporalEdgeDataLoader(EdgeDataLoader):
     """ TemporalEdgeDataLoader is an iteratable object to generate blocks for temporal embedding
     as well as pos and neg pair graph for memory update.
 
@@ -248,7 +248,7 @@ class TemporalEdgeDataLoader(dgl.dataloading.EdgeDataLoader):
     eids : torch.tensor() or numpy array
         eids range which to be batched, it is useful to split training validation test dataset
 
-    block_sampler : dgl.dataloading.BlockSampler
+    graph_sampler : dgl.dataloading.BlockSampler
         temporal neighbor sampler which sample temporal and computationally depend blocks for computation
 
     device : str
@@ -264,7 +264,8 @@ class TemporalEdgeDataLoader(dgl.dataloading.EdgeDataLoader):
 
     """
 
-    def __init__(self, g, eids, block_sampler, device='cpu', collator=TemporalEdgeCollator, **kwargs):
+    def __init__(self, g, eids, graph_sampler, device='cpu', collator=TemporalEdgeCollator, **kwargs):
+        super().__init__(g, eids, graph_sampler, device, **kwargs)
         collator_kwargs = {}
         dataloader_kwargs = {}
         for k, v in kwargs.items():
@@ -272,7 +273,7 @@ class TemporalEdgeDataLoader(dgl.dataloading.EdgeDataLoader):
                 collator_kwargs[k] = v
             else:
                 dataloader_kwargs[k] = v
-        self.collator = collator(g, eids, block_sampler, **collator_kwargs)
+        self.collator = collator(g, eids, graph_sampler, **collator_kwargs)
 
         assert not isinstance(g, dgl.distributed.DistGraph), \
             'EdgeDataLoader does not support DistGraph for now. ' \
@@ -285,6 +286,9 @@ class TemporalEdgeDataLoader(dgl.dataloading.EdgeDataLoader):
         # duplicate.
         if dataloader_kwargs.get('num_workers', 0) > 0:
             g.create_formats_()
+
+    def __iter__(self):
+        return iter(self.dataloader)
 
 # ====== Fast Mode ======
 
@@ -311,7 +315,7 @@ class FastTemporalSampler(BlockSampler):
     device : str
         indication str which represent where the data will be stored
         'cpu' store the intermediate data on cpu memory
-        'cuda' store the intermediate data on gpu memory 
+        'cuda' store the intermediate data on gpu memory
 
     Example
     ----------
@@ -455,7 +459,7 @@ class FastTemporalSampler(BlockSampler):
 
         This method is useful run the test dataset with new node,
         when test new node dataset the lookup table's state should
-        be restored from the sampler just after validation 
+        be restored from the sampler just after validation
 
         Parameters
         ----------
@@ -485,7 +489,7 @@ class FastTemporalEdgeCollator(EdgeCollator):
     eids : Tensor or dict[etype, Tensor]
         The edge set in graph :attr:`g` to compute outputs.
 
-    block_sampler : dgl.dataloading.BlockSampler
+    graph_sampler : dgl.dataloading.BlockSampler
         The neighborhood sampler.
 
     g_sampling : DGLGraph, optional
@@ -559,7 +563,7 @@ class FastTemporalEdgeCollator(EdgeCollator):
 
         neg_pair_graph = dgl.heterograph(
             neg_edges, {ntype: self.g.number_of_nodes(ntype) for ntype in self.g.ntypes})
-        pair_graph, neg_pair_graph = dgl.transform.compact_graphs(
+        pair_graph, neg_pair_graph = dgl.transforms.compact_graphs(
             [pair_graph, neg_pair_graph])
         # Need to remap id
 
@@ -570,7 +574,7 @@ class FastTemporalEdgeCollator(EdgeCollator):
         pair_graph.edata[dgl.EID] = induced_edges
 
         seed_nodes = pair_graph.ndata[dgl.NID]
-        blocks = self.block_sampler.sample_blocks(self.g_sampling, seed_nodes)
+        blocks = self.graph_sampler.sample_blocks(self.g_sampling, seed_nodes)
         blocks[0].ndata['timestamp'] = torch.zeros(
             blocks[0].num_nodes()).double()
         input_nodes = blocks[0].edges()[1]
@@ -578,7 +582,7 @@ class FastTemporalEdgeCollator(EdgeCollator):
         # update sampler
         _src = self.g.nodes()[self.g.edges()[0][items]]
         _dst = self.g.nodes()[self.g.edges()[1][items]]
-        self.block_sampler.add_edges(_src, _dst)
+        self.graph_sampler.add_edges(_src, _dst)
         return input_nodes, pair_graph, neg_pair_graph, blocks
 
     def collator(self, items):
@@ -586,7 +590,7 @@ class FastTemporalEdgeCollator(EdgeCollator):
         # Copy the feature from parent graph
         _pop_subgraph_storage(result[1], self.g)
         _pop_subgraph_storage(result[2], self.g)
-        _pop_blocks_storage(result[-1], self.g_sampling)
+        _pop_storages(result[-1], self.g_sampling)
         return result
 
 
@@ -596,23 +600,23 @@ class FastTemporalEdgeCollator(EdgeCollator):
 # "APAN: Asynchronous Propagation Attention Network for Real-time Temporal Graph Embedding"
 # that will be appeared in SIGMOD 21, code repo https://github.com/WangXuhongCN/APAN
 
-class SimpleTemporalSampler(dgl.dataloading.BlockSampler):
+class SimpleTemporalSampler(BlockSampler):
     '''
-    Simple Temporal Sampler just choose the edges that happen before the current timestamp, to build the subgraph of the corresponding nodes. 
+    Simple Temporal Sampler just choose the edges that happen before the current timestamp, to build the subgraph of the corresponding nodes.
     And then the sampler uses the simplest static graph neighborhood sampling methods.
 
     Parameters
     ----------
 
     fanouts : [int, ..., int] int list
-        The neighbors sampling strategy 
+        The neighbors sampling strategy
 
     '''
 
     def __init__(self, g, fanouts, return_eids=False):
         super().__init__(len(fanouts), return_eids)
 
-        self.fanouts = fanouts  
+        self.fanouts = fanouts
         self.ts = 0
         self.frontiers = [None for _ in range(len(fanouts))]
 
@@ -622,7 +626,7 @@ class SimpleTemporalSampler(dgl.dataloading.BlockSampler):
         '''
         fanout = self.fanouts[block_id]
         # List of neighbors to sample per edge type for each GNN layer, starting from the first layer.
-        g = dgl.in_subgraph(g, seed_nodes)  
+        g = dgl.in_subgraph(g, seed_nodes)
         g.remove_edges(torch.where(g.edata['timestamp'] > self.ts)[0])  # Deleting the the edges that happen after the current timestamp
 
         if fanout is None:  # full neighborhood sampling
@@ -633,11 +637,11 @@ class SimpleTemporalSampler(dgl.dataloading.BlockSampler):
         return frontier
 
 
-class SimpleTemporalEdgeCollator(dgl.dataloading.EdgeCollator):
+class SimpleTemporalEdgeCollator(EdgeCollator):
     '''
     Temporal Edge collator merge the edges specified by eid: items
 
-    
+
 
     Parameters
     ----------
@@ -649,7 +653,7 @@ class SimpleTemporalEdgeCollator(dgl.dataloading.EdgeCollator):
     eids : Tensor or dict[etype, Tensor]
         The edge set in graph :attr:`g` to compute outputs.
 
-    block_sampler : dgl.dataloading.BlockSampler
+    graph_sampler : dgl.dataloading.BlockSampler
         The neighborhood sampler.
 
     g_sampling : DGLGraph, optional
@@ -701,19 +705,19 @@ class SimpleTemporalEdgeCollator(dgl.dataloading.EdgeCollator):
         A set of builtin negative samplers are provided in
         :ref:`the negative sampling module <api-dataloading-negative-sampling>`.
     '''
-    def __init__(self, g, eids, block_sampler, g_sampling=None, exclude=None,
+    def __init__(self, g, eids, graph_sampler, g_sampling=None, exclude=None,
                 reverse_eids=None, reverse_etypes=None, negative_sampler=None):
-        super(SimpleTemporalEdgeCollator,self).__init__(g,eids,block_sampler,
-                                                 g_sampling,exclude,reverse_eids,reverse_etypes,negative_sampler)
-        self.n_layer = len(self.block_sampler.fanouts)
+        super(SimpleTemporalEdgeCollator, self).__init__(g, eids, graph_sampler,
+                                                         g_sampling, exclude, reverse_eids, reverse_etypes, negative_sampler)
+        self.n_layer = len(self.graph_sampler.fanouts)
 
-    def collate(self,items): 
+    def collate(self,items):
         '''
         items: edge id in graph g.
         We sample iteratively k-times and batch them into one single subgraph.
         '''
         current_ts = self.g.edata['timestamp'][items[0]]     #only sample edges before current timestamp
-        self.block_sampler.ts = current_ts    # restore the current timestamp to the graph sampler.
+        self.graph_sampler.ts = current_ts    # restore the current timestamp to the graph sampler.
 
         # if link prefiction, we use a negative_sampler to generate neg-graph for loss computing.
         if self.negative_sampler is None:
@@ -724,11 +728,11 @@ class SimpleTemporalEdgeCollator(dgl.dataloading.EdgeCollator):
 
         # we sampling k-hop subgraph and batch them into one graph
         for i in range(self.n_layer-1):
-            self.block_sampler.frontiers[0].add_edges(*self.block_sampler.frontiers[i+1].edges())
-        frontier = self.block_sampler.frontiers[0]
+            self.graph_sampler.frontiers[0].add_edges(*self.graph_sampler.frontiers[i+1].edges())
+        frontier = self.graph_sampler.frontiers[0]
         # computing node last-update timestamp
         frontier.update_all(fn.copy_e('timestamp','ts'), fn.max('ts','timestamp'))
-    
+
         return input_nodes, pair_graph, neg_pair_graph, [frontier]
 
 

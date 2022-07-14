@@ -37,8 +37,12 @@ class GDELTDataset(DGLBuiltinDataset):
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
+    verbose : bool
         Whether to print out progress information. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
@@ -65,7 +69,8 @@ class GDELTDataset(DGLBuiltinDataset):
     ....
     >>>
     """
-    def __init__(self, mode='train', raw_dir=None, force_reload=False, verbose=False):
+    def __init__(self, mode='train', raw_dir=None,
+                 force_reload=False, verbose=False, transform=None):
         mode = mode.lower()
         assert mode in ['train', 'valid', 'test'], "Mode not valid."
         self.mode = mode
@@ -75,7 +80,8 @@ class GDELTDataset(DGLBuiltinDataset):
                                            url=_url,
                                            raw_dir=raw_dir,
                                            force_reload=force_reload,
-                                           verbose=verbose)
+                                           verbose=verbose,
+                                           transform=transform)
 
     def process(self):
         file_path = os.path.join(self.raw_path, self.mode + '.txt')
@@ -148,6 +154,8 @@ class GDELTDataset(DGLBuiltinDataset):
         rate = self.data[row_mask][:, 1]
         g = dgl_graph((edges[:, 0], edges[:, 1]))
         g.edata['rel_type'] = F.tensor(rate.reshape(-1, 1), dtype=F.data_type_dict['int64'])
+        if self._transform is not None:
+            g = self._transform(g)
         return g
 
     def __len__(self):

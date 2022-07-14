@@ -10,6 +10,7 @@ contributor to the DGL project.  We will put your name in the list below.
 
 Contributors
 ------------
+
 * [Minjie Wang](https://github.com/jermainewang) from AWS
 * [Da Zheng](https://github.com/zheng-da) from AWS
 * [Quan Gan](https://github.com/BarclayII) from AWS
@@ -57,3 +58,9 @@ Contributors
 * [@mori97](https://github.com/mori97)
 * [@xnuohz](https://github.com/xnuohz)
 * [Hao Jin](https://github.com/haojin2) from Amazon
+* [Xin Yao](https://github.com/yaox12) from Nvidia
+* [Abdurrahman Yasar](https://github.com/ayasar70) from Nvidia
+* [Shaked Brody](https://github.com/shakedbr) from Technion
+* [Jiahui Liu](https://github.com/paoxiaode) from Nvidia
+* [Neil Dickson](https://github.com/ndickson-nvidia) from Nvidia
+* [Chang Liu](https://github.com/chang-l) from Nvidia

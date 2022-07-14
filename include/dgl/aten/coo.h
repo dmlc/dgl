@@ -47,6 +47,8 @@ struct COOMatrix {
   bool row_sorted = false;
   /*! \brief whether the column indices per row are sorted */
   bool col_sorted = false;
+  /*! \brief whether the matrix is in pinned memory */
+  bool is_pinned = false;
   /*! \brief default constructor */
   COOMatrix() = default;
   /*! \brief constructor */
@@ -128,6 +130,43 @@ struct COOMatrix {
                      col.CopyTo(ctx, stream),
                      aten::IsNullArray(data) ? data : data.CopyTo(ctx, stream),
                      row_sorted, col_sorted);
+  }
+
+  /*!
+  * \brief Pin the row, col and data (if not Null) of the matrix.
+  * \note This is an in-place method. Behavior depends on the current context,
+  *       kDLCPU: will be pinned;
+  *       IsPinned: directly return;
+  *       kDLGPU: invalid, will throw an error.
+  *       The context check is deferred to pinning the NDArray.
+  */
+  inline void PinMemory_() {
+    if (is_pinned)
+      return;
+    row.PinMemory_();
+    col.PinMemory_();
+    if (!aten::IsNullArray(data)) {
+      data.PinMemory_();
+    }
+    is_pinned = true;
+  }
+
+  /*!
+  * \brief Unpin the row, col and data (if not Null) of the matrix.
+  * \note This is an in-place method. Behavior depends on the current context,
+  *       IsPinned: will be unpinned;
+  *       others: directly return.
+  *       The context check is deferred to unpinning the NDArray.
+  */
+  inline void UnpinMemory_() {
+    if (!is_pinned)
+      return;
+    row.UnpinMemory_();
+    col.UnpinMemory_();
+    if (!aten::IsNullArray(data)) {
+      data.UnpinMemory_();
+    }
+    is_pinned = false;
   }
 };
 
@@ -382,7 +421,9 @@ COOMatrix COORowWiseSampling(
  * // etype = [0, 0, 0, 2, 1]
  * COOMatrix coo = ...;
  * IdArray rows = ... ; // [0, 3]
- * COOMatrix sampled = COORowWisePerEtypeSampling(coo, rows, etype, 2, FloatArray(), false);
+ * std::vector<int64_t> num_samples = {2, 2, 2};
+ * COOMatrix sampled = COORowWisePerEtypeSampling(coo, rows, etype, num_samples,
+ *                                                FloatArray(), false);
  * // possible sampled coo matrix:
  * // sampled.num_rows = 4
  * // sampled.num_cols = 4
@@ -405,7 +446,7 @@ COOMatrix COORowWisePerEtypeSampling(
     COOMatrix mat,
     IdArray rows,
     IdArray etypes,
-    int64_t num_samples,
+    const std::vector<int64_t>& num_samples,
     FloatArray prob = FloatArray(),
     bool replace = true,
     bool etype_sorted = false);

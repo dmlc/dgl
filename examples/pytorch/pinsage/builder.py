@@ -55,9 +55,9 @@ class PandasGraphBuilder(object):
     >>> builder.add_binary_relations(plays, 'user_id', 'game_id', 'plays')
     >>> builder.add_binary_relations(plays, 'game_id', 'user_id', 'played-by')
     >>> g = builder.build()
-    >>> g.number_of_nodes('user')
+    >>> g.num_nodes('user')
     3
-    >>> g.number_of_edges('plays')
+    >>> g.num_edges('plays')
     4
     """
     def __init__(self):

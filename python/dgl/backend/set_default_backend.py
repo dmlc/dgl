@@ -3,8 +3,7 @@ import os
 import json
 
 def set_default_backend(default_dir, backend_name):
-    if not os.path.exists(default_dir):
-        os.makedirs(default_dir)
+    os.makedirs(default_dir, exist_ok=True)
     config_path = os.path.join(default_dir, 'config.json')
     with open(config_path, "w") as config_file: 
         json.dump({'backend': backend_name.lower()}, config_file)

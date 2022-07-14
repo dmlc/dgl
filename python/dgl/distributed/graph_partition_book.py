@@ -367,6 +367,12 @@ class GraphPartitionBook(ABC):
         """Get the list of edge types
         """
 
+    @property
+    def is_homogeneous(self):
+        """check if homogeneous
+        """
+        return not(len(self.etypes) > 1 or len(self.ntypes) > 1)
+
     def map_to_per_ntype(self, ids):
         """Map homogeneous node IDs to type-wise IDs and node types.
 
@@ -661,12 +667,12 @@ class RangePartitionBook(GraphPartitionBook):
         for ntype in ntypes:
             ntype_id = ntypes[ntype]
             self._ntypes[ntype_id] = ntype
-        assert all([ntype is not None for ntype in self._ntypes]), \
+        assert all(ntype is not None for ntype in self._ntypes), \
                 "The node types have invalid IDs."
         for etype in etypes:
             etype_id = etypes[etype]
             self._etypes[etype_id] = etype
-        assert all([etype is not None for etype in self._etypes]), \
+        assert all(etype is not None for etype in self._etypes), \
                 "The edge types have invalid IDs."
 
         # This stores the node ID ranges for each node type in each partition.
@@ -740,14 +746,12 @@ class RangePartitionBook(GraphPartitionBook):
         nid_range = [None] * len(self.ntypes)
         for i, ntype in enumerate(self.ntypes):
             nid_range[i] = (ntype, self._typed_nid_range[ntype])
-        nid_range_pickle = pickle.dumps(nid_range)
-        nid_range_pickle = [e for e in nid_range_pickle]
+        nid_range_pickle = list(pickle.dumps(nid_range))
 
         eid_range = [None] * len(self.etypes)
         for i, etype in enumerate(self.etypes):
             eid_range[i] = (etype, self._typed_eid_range[etype])
-        eid_range_pickle = pickle.dumps(eid_range)
-        eid_range_pickle = [e for e in eid_range_pickle]
+        eid_range_pickle = list(pickle.dumps(eid_range))
 
         self._meta = _move_metadata_to_shared_mem(graph_name,
                                                   0, # We don't need to provide the number of nodes

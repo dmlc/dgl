@@ -10,9 +10,9 @@ from dgl.nn import NodeEmbedding
 from dgl.optim import SparseAdam, SparseAdagrad
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
-def test_sparse_adam():
+@pytest.mark.parametrize('emb_dim', [1, 4, 101, 1024])
+def test_sparse_adam(emb_dim):
     num_embs = 10
-    emb_dim = 4
     device=F.ctx()
     dgl_emb = NodeEmbedding(num_embs, emb_dim, 'test')
     torch_emb = th.nn.Embedding(num_embs, emb_dim, sparse=True)
@@ -28,7 +28,9 @@ def test_sparse_adam():
     idx = th.randint(0, num_embs, size=(4,))
     dgl_value = dgl_emb(idx, device).to(th.device('cpu'))
     torch_value = torch_emb(idx)
-    labels = th.ones((4,)).long()
+    labels = th.zeros((4,)).long()
+    print("dgl_value = {}".format(dgl_value))
+    print("labels = {}".format(labels))
 
     dgl_adam.zero_grad()
     torch_adam.zero_grad()
@@ -44,6 +46,86 @@ def test_sparse_adam():
     # Can not test second step
     # Pytorch sparseAdam maintains a global step
     # DGL sparseAdam use a per embedding step
+
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
+@pytest.mark.parametrize('use_uva', [False, True, None])
+@pytest.mark.parametrize('emb_dim', [1, 4, 101, 1024])
+def test_sparse_adam_uva(use_uva, emb_dim):
+    if F.ctx().type == 'cpu' and use_uva == True:
+        # we want to only test values of False and None when not using GPU
+        pytest.skip("UVA cannot be used without GPUs.")
+
+    num_embs = 10
+    device=F.ctx()
+    dgl_emb = NodeEmbedding(num_embs, emb_dim, 'test_uva{}'.format(use_uva))
+    torch_emb = th.nn.Embedding(num_embs, emb_dim, sparse=True)
+    th.manual_seed(0)
+    th.nn.init.uniform_(torch_emb.weight, 0, 1.0)
+    th.manual_seed(0)
+    th.nn.init.uniform_(dgl_emb.weight, 0, 1.0)
+
+    dgl_adam = SparseAdam(params=[dgl_emb], lr=0.01, use_uva=use_uva)
+    torch_adam = th.optim.SparseAdam(list(torch_emb.parameters()), lr=0.01)
+
+    # first step
+    idx = th.randint(0, num_embs, size=(4,))
+    dgl_value = dgl_emb(idx, device).to(th.device('cpu'))
+    torch_value = torch_emb(idx)
+    labels = th.zeros((4,)).long()
+
+    dgl_adam.zero_grad()
+    torch_adam.zero_grad()
+    dgl_loss = th.nn.functional.cross_entropy(dgl_value, labels)
+    torch_loss = th.nn.functional.cross_entropy(torch_value, labels)
+    dgl_loss.backward()
+    torch_loss.backward()
+
+    dgl_adam.step()
+    torch_adam.step()
+    assert F.allclose(dgl_emb.weight, torch_emb.weight)
+
+    # Can not test second step
+    # Pytorch sparseAdam maintains a global step
+    # DGL sparseAdam use a per embedding step
+
+@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
+@pytest.mark.parametrize('dtype', [th.float32, th.float16])
+@pytest.mark.parametrize('emb_dim', [1, 4, 101, 1024])
+def test_sparse_adam_dtype(dtype, emb_dim):
+    num_embs = 10
+    device=F.ctx()
+    dgl_emb = NodeEmbedding(num_embs, emb_dim, 'test_dtype{}'.format(dtype))
+    torch_emb = th.nn.Embedding(num_embs, emb_dim, sparse=True)
+    th.manual_seed(0)
+    th.nn.init.uniform_(torch_emb.weight, 0, 1.0)
+    th.manual_seed(0)
+    th.nn.init.uniform_(dgl_emb.weight, 0, 1.0)
+
+    dgl_adam = SparseAdam(params=[dgl_emb], lr=0.01, dtype=dtype)
+    torch_adam = th.optim.SparseAdam(list(torch_emb.parameters()), lr=0.01)
+
+    # first step
+    idx = th.randint(0, num_embs, size=(4,))
+    dgl_value = dgl_emb(idx, device).to(th.device('cpu'))
+    torch_value = torch_emb(idx)
+    labels = th.zeros((4,)).long()
+
+    dgl_adam.zero_grad()
+    torch_adam.zero_grad()
+    dgl_loss = th.nn.functional.cross_entropy(dgl_value, labels)
+    torch_loss = th.nn.functional.cross_entropy(torch_value, labels)
+    dgl_loss.backward()
+    torch_loss.backward()
+
+    dgl_adam.step()
+    torch_adam.step()
+    assert F.allclose(dgl_emb.weight, torch_emb.weight)
+
+    # Can not test second step
+    # Pytorch sparseAdam maintains a global step
+    # DGL sparseAdam use a per embedding step
+
+
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_sparse_adam_zero_step():
@@ -178,7 +260,7 @@ def start_torch_adam_worker(rank, world_size, weight, has_zero_grad=False,
     th.distributed.barrier()
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
-@unittest.skipIf(F.ctx().type == 'gpu', reason='cpu only test')
+@unittest.skipIf(F.ctx().type != 'cpu', reason='cpu only test')
 @pytest.mark.parametrize("num_workers", [2, 4])
 def test_multiprocess_cpu_sparse_adam(num_workers):
     backend = 'gloo'
@@ -282,7 +364,7 @@ def test_multiprocess_sparse_adam_cuda_tensor(num_workers):
     assert F.allclose(dgl_weight, torch_weight)
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
-@unittest.skipIf(F.ctx().type == 'gpu', reason='cpu only test')
+@unittest.skipIf(F.ctx().type != 'cpu', reason='cpu only test')
 @pytest.mark.parametrize("num_workers", [2, 4])
 def test_multiprocess_sparse_adam_cpu_zero_step(num_workers):
     backend = 'gloo'
@@ -385,7 +467,10 @@ def test_multiprocess_sparse_adam_zero_step_cuda_tensor(num_workers):
     assert F.allclose(dgl_weight, torch_weight)
 
 if __name__ == '__main__':
-    test_sparse_adam()
+    test_sparse_adam(1)
+    test_sparse_adam(4)
+    test_sparse_adam(101)
+    test_sparse_adam(1024)
     test_sparse_adam_zero_step()
 
     test_multiprocess_cpu_sparse_adam(2)

@@ -12,7 +12,7 @@ Dependencies
 ----------------------
 - Python 3.7.10
 - PyTorch 1.8.1
-- dgl 0.7.0
+- dgl 0.7.1
 - scikit-learn 0.23.2
 
 Dataset
@@ -48,9 +48,9 @@ The datasets used for node classification are DGL's built-in FraudDataset. The s
 
 How to run
 --------------------------------
-To run the full graph version, in the care-gnn folder, run
+To run the full graph version and use early stopping, in the care-gnn folder, run
 ```
-python main.py
+python main.py --early-stop
 ```
 
 If want to use a GPU, run
@@ -70,50 +70,57 @@ python main_sampling.py
 
 Performance
 -------------------------
-The result reported by the paper is the best validation results within 30 epochs, while ours are testing results after the max epoch specified in the table. Early stopping with patience value of 100 is applied.
+The result reported by the paper is the best validation results within 30 epochs, and the table below reports the val and test results (same setting in the paper except for the random seed, here `seed=717`). 
 
 <table>
-	<tr>
-	    <th colspan="2">Dataset</th>
-	    <th>Amazon</th>
-	    <th>Yelp</th>
-	</tr >
-	<tr>
-        <td>Metric</td>
-        <td>Max Epoch</td>
-	    <td>30 / 1000</td>
-	    <td>30 / 1000</td>
-	</tr>
-	<tr >
-	    <td rowspan="3">AUC</td>
-	    <td>paper reported</td>
-	    <td>89.73 / -</td>
-        <td>75.70 / -</td>
-	</tr>
-	<tr>
-	    <td>DGL full graph</td>
-	    <td>89.50 / 92.35</td>
-	    <td>69.16 / 79.91</td>
-	</tr>
-	<tr>
-	    <td>DGL sampling</td>
-	    <td>93.27 / 92.94</td>
-        <td>79.38 / 80.53</td>
-	</tr>
-	<tr >
-	    <td rowspan="3">Recall</td>
-	    <td>paper reported</td>
-	    <td>88.48 / -</td>
-        <td>71.92 / -</td>
-	</tr>
-	<tr>
-	    <td>DGL full graph</td>
-	    <td>85.54 / 84.47</td>
-	    <td>69.91 / 73.47</td>
-	</tr>
-	<tr>
-	    <td>DGL sampling</td>
-	    <td>85.83 / 87.46</td>
-        <td>77.26 / 64.34</td>
-	</tr>
+<thead>
+  <tr>
+    <th colspan="2">Dataset</th>
+    <th>Amazon</th>
+    <th>Yelp</th>
+  </tr>
+</thead>
+<tbody>
+  <tr>
+    <td>Metric (val / test)</td>
+    <td>Max Epoch</td>
+    <td>30</td>
+    <td>30 </td>
+  </tr>
+  <tr>
+    <td rowspan="3">AUC (val/test)</td>
+    <td>paper reported</td>
+    <td>0.8973 / -</td>
+    <td>0.7570 / -</td>
+  </tr>
+  <tr>
+    <td>DGL full graph</td>
+    <td>0.8849 / 0.8922</td>
+    <td>0.6856 / 0.6867</td>
+  </tr>
+  <tr>
+    <td>DGL sampling</td>
+    <td>0.9350 / 0.9331</td>
+    <td>0.7857 / 0.7890</td>
+  </tr>
+  <tr>
+    <td rowspan="3">Recall (val/test)</td>
+    <td>paper reported</td>
+    <td>0.8848 / -</td>
+    <td>0.7192 / -</td>
+  </tr>
+  <tr>
+    <td>DGL full graph</td>
+    <td>0.8615 / 0.8544</td>
+    <td>0.6667/ 0.6619</td>
+  </tr>
+  <tr>
+    <td>DGL sampling</td>
+    <td>0.9130 / 0.9045</td>
+    <td>0.7537 / 0.7540</td>
+  </tr>
+</tbody>
 </table>
+
+
+

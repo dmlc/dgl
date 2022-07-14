@@ -118,8 +118,8 @@ class MaxPooling(nn.Block):
 
 
 class SortPooling(nn.Block):
-    r"""Apply Sort Pooling (`An End-to-End Deep Learning Architecture for Graph Classification
-    <https://www.cse.wustl.edu/~ychen/public/DGCNN.pdf>`__) over the nodes in the graph.
+    r"""Pooling layer from `An End-to-End Deep Learning Architecture for Graph Classification
+    <https://www.cse.wustl.edu/~ychen/public/DGCNN.pdf>`__
 
     Parameters
     ----------
@@ -138,7 +138,7 @@ class SortPooling(nn.Block):
         graph : DGLGraph
             The graph.
         feat : mxnet.NDArray
-            The input feature with shape :math:`(N, D)` where
+            The input node feature with shape :math:`(N, D)` where
             :math:`N` is the number of nodes in the graph.
 
         Returns
@@ -161,8 +161,8 @@ class SortPooling(nn.Block):
 
 
 class GlobalAttentionPooling(nn.Block):
-    r"""Apply Global Attention Pooling (`Gated Graph Sequence Neural Networks
-    <https://arxiv.org/abs/1511.05493.pdf>`__) over the nodes in the graph.
+    r"""Global Attention Pooling layer from `Gated Graph Sequence Neural Networks
+    <https://arxiv.org/abs/1511.05493.pdf>`__
 
     .. math::
         r^{(i)} = \sum_{k=1}^{N_i}\mathrm{softmax}\left(f_{gate}
@@ -190,7 +190,7 @@ class GlobalAttentionPooling(nn.Block):
         graph : DGLGraph
             The graph.
         feat : mxnet.NDArray
-            The input feature with shape :math:`(N, D)` where
+            The input node feature with shape :math:`(N, D)` where
             :math:`N` is the number of nodes in the graph.
 
         Returns
@@ -214,8 +214,8 @@ class GlobalAttentionPooling(nn.Block):
 
 
 class Set2Set(nn.Block):
-    r"""Apply Set2Set (`Order Matters: Sequence to sequence for sets
-    <https://arxiv.org/pdf/1511.06391.pdf>`__) over the nodes in the graph.
+    r"""Set2Set operator from `Order Matters: Sequence to sequence for sets
+    <https://arxiv.org/pdf/1511.06391.pdf>`__
 
     For each individual graph in the batch, set2set computes
 
@@ -257,7 +257,7 @@ class Set2Set(nn.Block):
         graph : DGLGraph
             The graph.
         feat : mxnet.NDArray
-            The input feature with shape :math:`(N, D)` where
+            The input node feature with shape :math:`(N, D)` where
             :math:`N` is the number of nodes in the graph.
 
         Returns

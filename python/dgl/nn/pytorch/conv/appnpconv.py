@@ -4,15 +4,13 @@ import torch as th
 from torch import nn
 
 from .... import function as fn
+from .graphconv import EdgeWeightNorm
+
 
 class APPNPConv(nn.Module):
-    r"""
-
-    Description
-    -----------
-    Approximate Personalized Propagation of Neural Predictions
-    layer from paper `Predict then Propagate: Graph Neural Networks
-    meet Personalized PageRank <https://arxiv.org/pdf/1810.05997.pdf>`__.
+    r"""Approximate Personalized Propagation of Neural Predictions layer from `Predict then
+    Propagate: Graph Neural Networks meet Personalized PageRank
+    <https://arxiv.org/pdf/1810.05997.pdf>`__
 
     .. math::
         H^{0} &= X
@@ -43,20 +41,21 @@ class APPNPConv(nn.Module):
     >>> feat = th.ones(6, 10)
     >>> conv = APPNPConv(k=3, alpha=0.5)
     >>> res = conv(g, feat)
-    >>> res
-    tensor([[1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000,
-            1.0000],
-            [1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000,
-            1.0000],
-            [1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000,
-            1.0000],
-            [1.0303, 1.0303, 1.0303, 1.0303, 1.0303, 1.0303, 1.0303, 1.0303, 1.0303,
-            1.0303],
-            [0.8643, 0.8643, 0.8643, 0.8643, 0.8643, 0.8643, 0.8643, 0.8643, 0.8643,
-            0.8643],
+    >>> print(res)
+    tensor([[0.8536, 0.8536, 0.8536, 0.8536, 0.8536, 0.8536, 0.8536, 0.8536, 0.8536,
+            0.8536],
+            [0.9268, 0.9268, 0.9268, 0.9268, 0.9268, 0.9268, 0.9268, 0.9268, 0.9268,
+            0.9268],
+            [0.9634, 0.9634, 0.9634, 0.9634, 0.9634, 0.9634, 0.9634, 0.9634, 0.9634,
+            0.9634],
+            [0.9268, 0.9268, 0.9268, 0.9268, 0.9268, 0.9268, 0.9268, 0.9268, 0.9268,
+            0.9268],
+            [0.9634, 0.9634, 0.9634, 0.9634, 0.9634, 0.9634, 0.9634, 0.9634, 0.9634,
+            0.9634],
             [0.5000, 0.5000, 0.5000, 0.5000, 0.5000, 0.5000, 0.5000, 0.5000, 0.5000,
             0.5000]])
     """
+
     def __init__(self,
                  k,
                  alpha,
@@ -66,7 +65,7 @@ class APPNPConv(nn.Module):
         self._alpha = alpha
         self.edge_drop = nn.Dropout(edge_drop)
 
-    def forward(self, graph, feat):
+    def forward(self, graph, feat, edge_weight=None):
         r"""
 
         Description
@@ -80,6 +79,11 @@ class APPNPConv(nn.Module):
         feat : torch.Tensor
             The input feature of shape :math:`(N, *)`. :math:`N` is the
             number of nodes, and :math:`*` could be of any shape.
+        edge_weight: torch.Tensor, optional
+            edge_weight to use in the message passing process. This is equivalent to
+            using weighted adjacency matrix in the equation above, and
+            :math:`\tilde{D}^{-1/2}\tilde{A} \tilde{D}^{-1/2}`
+            is based on :class:`dgl.nn.pytorch.conv.graphconv.EdgeWeightNorm`.
 
         Returns
         -------
@@ -88,23 +92,32 @@ class APPNPConv(nn.Module):
             should be the same as input shape.
         """
         with graph.local_scope():
-            src_norm = th.pow(graph.out_degrees().float().clamp(min=1), -0.5)
-            shp = src_norm.shape + (1,) * (feat.dim() - 1)
-            src_norm = th.reshape(src_norm, shp).to(feat.device)
-            dst_norm = th.pow(graph.in_degrees().float().clamp(min=1), -0.5)
-            shp = dst_norm.shape + (1,) * (feat.dim() - 1)
-            dst_norm = th.reshape(dst_norm, shp).to(feat.device)
+            if edge_weight is None:
+                src_norm = th.pow(
+                    graph.out_degrees().float().clamp(min=1), -0.5)
+                shp = src_norm.shape + (1,) * (feat.dim() - 1)
+                src_norm = th.reshape(src_norm, shp).to(feat.device)
+                dst_norm = th.pow(
+                    graph.in_degrees().float().clamp(min=1), -0.5)
+                shp = dst_norm.shape + (1,) * (feat.dim() - 1)
+                dst_norm = th.reshape(dst_norm, shp).to(feat.device)
+            else:
+                edge_weight = EdgeWeightNorm(
+                    'both')(graph, edge_weight)
             feat_0 = feat
             for _ in range(self._k):
                 # normalization by src node
-                feat = feat * src_norm
+                if edge_weight is None:
+                    feat = feat * src_norm
                 graph.ndata['h'] = feat
-                graph.edata['w'] = self.edge_drop(
-                    th.ones(graph.number_of_edges(), 1).to(feat.device))
+                w = th.ones(graph.number_of_edges(),
+                            1) if edge_weight is None else edge_weight
+                graph.edata['w'] = self.edge_drop(w).to(feat.device)
                 graph.update_all(fn.u_mul_e('h', 'w', 'm'),
                                  fn.sum('m', 'h'))
                 feat = graph.ndata.pop('h')
                 # normalization by dst node
-                feat = feat * dst_norm
+                if edge_weight is None:
+                    feat = feat * dst_norm
                 feat = (1 - self._alpha) * feat + self._alpha * feat_0
             return feat

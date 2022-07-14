@@ -86,8 +86,7 @@ def main(args):
     else:
         args.device = torch.device("cpu")
 
-    dataset = GINDataset(args.dataset, not args.learn_eps)
-
+    dataset = GINDataset(args.dataset, not args.learn_eps, args.degree_as_nlabel)
     trainloader, validloader = GINDataLoader(
         dataset, batch_size=args.batch_size, device=args.device,
         seed=args.seed, shuffle=True,
@@ -129,11 +128,12 @@ def main(args):
 
         if not args.filename == "":
             with open(args.filename, 'a') as f:
-                f.write('%s %s %s %s' % (
+                f.write('%s %s %s %s %s' % (
                     args.dataset,
                     args.learn_eps,
                     args.neighbor_pooling_type,
-                    args.graph_pooling_type
+                    args.graph_pooling_type,
+                    epoch
                 ))
                 f.write("\n")
                 f.write("%f %f %f %f" % (

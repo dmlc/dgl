@@ -3,8 +3,10 @@
 
 import torch as th
 from torch import nn
+import torch.nn.functional as F
 from ... import DGLGraph
 from ...base import dgl_warning
+from ... import function as fn
 
 def matmul_maybe_select(A, B):
     """Perform Matrix multiplication C = A * B but A could be an integer id vector.
@@ -104,11 +106,7 @@ class Identity(nn.Module):
         return x
 
 class Sequential(nn.Sequential):
-    r"""
-
-    Description
-    -----------
-    A sequential container for stacking graph neural network modules.
+    r"""A sequential container for stacking graph neural network modules
 
     DGL supports two modes: sequentially apply GNN modules on 1) the same graph or
     2) a list of given graphs. In the second case, the number of graphs equals the
@@ -227,11 +225,10 @@ class Sequential(nn.Sequential):
         return feats
 
 class WeightBasis(nn.Module):
-    r"""Basis decomposition module.
+    r"""Basis decomposition from `Modeling Relational Data with Graph
+    Convolutional Networks <https://arxiv.org/abs/1703.06103>`__
 
-    Basis decomposition is introduced in "`Modeling Relational Data with Graph
-    Convolutional Networks <https://arxiv.org/abs/1703.06103>`__"
-    and can be described as below:
+    It can be described as below:
 
     .. math::
 
@@ -282,3 +279,243 @@ class WeightBasis(nn.Module):
         # generate all weights from bases
         weight = th.matmul(self.w_comp, self.weight.view(self.num_bases, -1))
         return weight.view(self.num_outputs, *self.shape)
+
+class JumpingKnowledge(nn.Module):
+    r"""The Jumping Knowledge aggregation module from `Representation Learning on
+    Graphs with Jumping Knowledge Networks <https://arxiv.org/abs/1806.03536>`__
+
+    It aggregates the output representations of multiple GNN layers with
+
+    **concatenation**
+
+    .. math::
+
+        h_i^{(1)} \, \Vert \, \ldots \, \Vert \, h_i^{(T)}
+
+    or **max pooling**
+
+    .. math::
+
+        \max \left( h_i^{(1)}, \ldots, h_i^{(T)} \right)
+
+    or **LSTM**
+
+    .. math::
+
+        \sum_{t=1}^T \alpha_i^{(t)} h_i^{(t)}
+
+    with attention scores :math:`\alpha_i^{(t)}` obtained from a BiLSTM
+
+    Parameters
+    ----------
+    mode : str
+        The aggregation to apply. It can be 'cat', 'max', or 'lstm',
+        corresponding to the equations above in order.
+    in_feats : int, optional
+        This argument is only required if :attr:`mode` is ``'lstm'``.
+        The output representation size of a single GNN layer. Note that
+        all GNN layers need to have the same output representation size.
+    num_layers : int, optional
+        This argument is only required if :attr:`mode` is ``'lstm'``.
+        The number of GNN layers for output aggregation.
+
+    Examples
+    --------
+    >>> import dgl
+    >>> import torch as th
+    >>> from dgl.nn import JumpingKnowledge
+
+    >>> # Output representations of two GNN layers
+    >>> num_nodes = 3
+    >>> in_feats = 4
+    >>> feat_list = [th.zeros(num_nodes, in_feats), th.ones(num_nodes, in_feats)]
+
+    >>> # Case1
+    >>> model = JumpingKnowledge()
+    >>> model(feat_list).shape
+    torch.Size([3, 8])
+
+    >>> # Case2
+    >>> model = JumpingKnowledge(mode='max')
+    >>> model(feat_list).shape
+    torch.Size([3, 4])
+
+    >>> # Case3
+    >>> model = JumpingKnowledge(mode='max', in_feats=in_feats, num_layers=len(feat_list))
+    >>> model(feat_list).shape
+    torch.Size([3, 4])
+    """
+    def __init__(self, mode='cat', in_feats=None, num_layers=None):
+        super(JumpingKnowledge, self).__init__()
+        assert mode in ['cat', 'max', 'lstm'], \
+            "Expect mode to be 'cat', or 'max' or 'lstm', got {}".format(mode)
+        self.mode = mode
+
+        if mode == 'lstm':
+            assert in_feats is not None, 'in_feats is required for lstm mode'
+            assert num_layers is not None, 'num_layers is required for lstm mode'
+            hidden_size = (num_layers * in_feats) // 2
+            self.lstm = nn.LSTM(in_feats, hidden_size, bidirectional=True, batch_first=True)
+            self.att = nn.Linear(2 * hidden_size, 1)
+
+    def reset_parameters(self):
+        r"""
+
+        Description
+        -----------
+        Reinitialize learnable parameters. This comes into effect only for the lstm mode.
+        """
+        if self.mode == 'lstm':
+            self.lstm.reset_parameters()
+            self.att.reset_parameters()
+
+    def forward(self, feat_list):
+        r"""
+
+        Description
+        -----------
+        Aggregate output representations across multiple GNN layers.
+
+        Parameters
+        ----------
+        feat_list : list[Tensor]
+            feat_list[i] is the output representations of a GNN layer.
+
+        Returns
+        -------
+        Tensor
+            The aggregated representations.
+        """
+        if self.mode == 'cat':
+            return th.cat(feat_list, dim=-1)
+        elif self.mode == 'max':
+            return th.stack(feat_list, dim=-1).max(dim=-1)[0]
+        else:
+            # LSTM
+            stacked_feat_list = th.stack(feat_list, dim=1) # (N, num_layers, in_feats)
+            alpha, _ = self.lstm(stacked_feat_list)
+            alpha = self.att(alpha).squeeze(-1)            # (N, num_layers)
+            alpha = th.softmax(alpha, dim=-1)
+            return (stacked_feat_list * alpha.unsqueeze(-1)).sum(dim=1)
+
+class LabelPropagation(nn.Module):
+    r"""Label Propagation from `Learning from Labeled and Unlabeled Data with Label
+    Propagation <http://mlg.eng.cam.ac.uk/zoubin/papers/CMU-CALD-02-107.pdf>`__
+
+    .. math::
+
+        \mathbf{Y}^{(t+1)} = \alpha \tilde{A} \mathbf{Y}^{(t)} + (1 - \alpha) \mathbf{Y}^{(0)}
+
+    where unlabeled data is initially set to zero and inferred from labeled data via
+    propagation. :math:`\alpha` is a weight parameter for balancing between updated labels
+    and initial labels. :math:`\tilde{A}` denotes the normalized adjacency matrix.
+
+    Parameters
+    ----------
+    k: int
+        The number of propagation steps.
+    alpha : float
+        The :math:`\alpha` coefficient in range [0, 1].
+    norm_type : str, optional
+        The type of normalization applied to the adjacency matrix, must be one of the
+        following choices:
+
+        * ``row``: row-normalized adjacency as :math:`D^{-1}A`
+
+        * ``sym``: symmetrically normalized adjacency as :math:`D^{-1/2}AD^{-1/2}`
+
+        Default: 'sym'.
+    clamp : bool, optional
+        A bool flag to indicate whether to clamp the labels to [0, 1] after propagation.
+        Default: True.
+    normalize: bool, optional
+        A bool flag to indicate whether to apply row-normalization after propagation.
+        Default: False.
+    reset : bool, optional
+        A bool flag to indicate whether to reset the known labels after each
+        propagation step. Default: False.
+
+    Examples
+    --------
+    >>> import torch
+    >>> import dgl
+    >>> from dgl.nn import LabelPropagation
+
+    >>> label_propagation = LabelPropagation(k=5, alpha=0.5, clamp=False, normalize=True)
+    >>> g = dgl.rand_graph(5, 10)
+    >>> labels = torch.tensor([0, 2, 1, 3, 0]).long()
+    >>> mask = torch.tensor([0, 1, 1, 1, 0]).bool()
+    >>> new_labels = label_propagation(g, labels, mask)
+    """
+    def __init__(self, k, alpha, norm_type='sym', clamp=True, normalize=False, reset=False):
+        super(LabelPropagation, self).__init__()
+        self.k = k
+        self.alpha = alpha
+        self.norm_type = norm_type
+        self.clamp = clamp
+        self.normalize = normalize
+        self.reset = reset
+
+    def forward(self, g, labels, mask=None):
+        r"""Compute the label propagation process.
+
+        Parameters
+        ----------
+        g : DGLGraph
+            The input graph.
+        labels : torch.Tensor
+            The input node labels. There are three cases supported.
+
+            * A LongTensor of shape :math:`(N, 1)` or :math:`(N,)` for node class labels in
+              multiclass classification, where :math:`N` is the number of nodes.
+            * A LongTensor of shape :math:`(N, C)` for one-hot encoding of node class labels
+              in multiclass classification, where :math:`C` is the number of classes.
+            * A LongTensor of shape :math:`(N, L)` for node labels in multilabel binary
+              classification, where :math:`L` is the number of labels.
+        mask : torch.Tensor
+            The bool indicators of shape :math:`(N,)` with True denoting labeled nodes.
+            Default: None, indicating all nodes are labeled.
+
+        Returns
+        -------
+        torch.Tensor
+            The propagated node labels of shape :math:`(N, D)` with float type, where :math:`D`
+            is the number of classes or labels.
+        """
+        with g.local_scope():
+            # multi-label / multi-class
+            if len(labels.size()) > 1 and labels.size(1) > 1:
+                labels = labels.to(th.float32)
+            # single-label multi-class
+            else:
+                labels = F.one_hot(labels.view(-1)).to(th.float32)
+
+            y = labels
+            if mask is not None:
+                y = th.zeros_like(labels)
+                y[mask] = labels[mask]
+
+            init = (1 - self.alpha) * y
+            in_degs = g.in_degrees().float().clamp(min=1)
+            out_degs = g.out_degrees().float().clamp(min=1)
+            if self.norm_type == 'sym':
+                norm_i = th.pow(in_degs, -0.5).to(labels.device).unsqueeze(1)
+                norm_j = th.pow(out_degs, -0.5).to(labels.device).unsqueeze(1)
+            elif self.norm_type == 'row':
+                norm_i = th.pow(in_degs, -1.).to(labels.device).unsqueeze(1)
+            else:
+                raise ValueError(f"Expect norm_type to be 'sym' or 'row', got {self.norm_type}")
+
+            for _ in range(self.k):
+                g.ndata['h'] = y * norm_j if self.norm_type == 'sym' else y
+                g.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
+                y = init + self.alpha * g.ndata['h'] * norm_i
+
+                if self.clamp:
+                    y = y.clamp_(0., 1.)
+                if self.normalize:
+                    y = F.normalize(y, p=1)
+                if self.reset:
+                    y[mask] = labels[mask]
+
+            return y

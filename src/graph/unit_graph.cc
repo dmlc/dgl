@@ -133,6 +133,10 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return adj_.row->ctx;
   }
 
+  bool IsPinned() const override {
+    return adj_.is_pinned;
+  }
+
   uint8_t NumBits() const override {
     return adj_.row->dtype.bits;
   }
@@ -154,6 +158,17 @@ class UnitGraph::COO : public BaseHeteroGraph {
     if (Context() == ctx)
       return *this;
     return COO(meta_graph_, adj_.CopyTo(ctx, stream));
+  }
+
+
+  /*! \brief Pin the adj_: COOMatrix of the COO graph. */
+  void PinMemory_() {
+    adj_.PinMemory_();
+  }
+
+  /*! \brief Unpin the adj_: COOMatrix of the COO graph. */
+  void UnpinMemory_() {
+    adj_.UnpinMemory_();
   }
 
   bool IsMultigraph() const override {
@@ -366,7 +381,8 @@ class UnitGraph::COO : public BaseHeteroGraph {
     CHECK(aten::IsValidIdArray(dstvids)) << "Invalid vertex id array.";
     HeteroSubgraph subg;
     const auto& submat = aten::COOSliceMatrix(adj_, srcvids, dstvids);
-    IdArray sub_eids = aten::Range(0, submat.data->shape[0], NumBits(), Context());
+    DLContext ctx = aten::GetContextOf(vids);
+    IdArray sub_eids = aten::Range(0, submat.data->shape[0], NumBits(), ctx);
     subg.graph = std::make_shared<COO>(meta_graph(), submat.num_rows, submat.num_cols,
         submat.row, submat.col);
     subg.induced_vertices = vids;
@@ -392,9 +408,9 @@ class UnitGraph::COO : public BaseHeteroGraph {
       IdArray new_src = aten::IndexSelect(adj_.row, eids[0]);
       IdArray new_dst = aten::IndexSelect(adj_.col, eids[0]);
       subg.induced_vertices.emplace_back(
-          aten::Range(0, NumVertices(SrcType()), NumBits(), Context()));
+          aten::NullArray(DLDataType{kDLInt, NumBits(), 1}, Context()));
       subg.induced_vertices.emplace_back(
-          aten::Range(0, NumVertices(DstType()), NumBits(), Context()));
+          aten::NullArray(DLDataType{kDLInt, NumBits(), 1}, Context()));
       subg.graph = std::make_shared<COO>(
           meta_graph(), NumVertices(SrcType()), NumVertices(DstType()), new_src, new_dst);
       subg.induced_edges = eids;
@@ -520,6 +536,10 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     return adj_.indices->ctx;
   }
 
+  bool IsPinned() const override {
+    return adj_.is_pinned;
+  }
+
   uint8_t NumBits() const override {
     return adj_.indices->dtype.bits;
   }
@@ -545,6 +565,16 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     } else {
       return CSR(meta_graph_, adj_.CopyTo(ctx, stream));
     }
+  }
+
+  /*! \brief Pin the adj_: CSRMatrix of the CSR graph. */
+  void PinMemory_() {
+    adj_.PinMemory_();
+  }
+
+  /*! \brief Unpin the adj_: CSRMatrix of the CSR graph. */
+  void UnpinMemory_() {
+    adj_.UnpinMemory_();
   }
 
   bool IsMultigraph() const override {
@@ -772,7 +802,8 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     CHECK(aten::IsValidIdArray(dstvids)) << "Invalid vertex id array.";
     HeteroSubgraph subg;
     const auto& submat = aten::CSRSliceMatrix(adj_, srcvids, dstvids);
-    IdArray sub_eids = aten::Range(0, submat.data->shape[0], NumBits(), Context());
+    DLContext ctx = aten::GetContextOf(vids);
+    IdArray sub_eids = aten::Range(0, submat.data->shape[0], NumBits(), ctx);
     subg.graph = std::make_shared<CSR>(meta_graph(), submat.num_rows, submat.num_cols,
         submat.indptr, submat.indices, sub_eids);
     subg.induced_vertices = vids;
@@ -827,6 +858,10 @@ DLDataType UnitGraph::DataType() const {
 
 DLContext UnitGraph::Context() const {
   return GetAny()->Context();
+}
+
+bool UnitGraph::IsPinned() const {
+  return GetAny()->IsPinned();
 }
 
 uint8_t UnitGraph::NumBits() const {
@@ -1000,30 +1035,38 @@ EdgeArray UnitGraph::Edges(dgl_type_t etype, const std::string &order) const {
 uint64_t UnitGraph::InDegree(dgl_type_t etype, dgl_id_t vid) const {
   SparseFormat fmt = SelectFormat(CSC_CODE);
   const auto ptr = GetFormat(fmt);
-  if (fmt == SparseFormat::kCSC)
-    return ptr->OutDegree(etype, vid);
-  else
-    return ptr->InDegree(etype, vid);
+  CHECK(fmt == SparseFormat::kCSC || fmt == SparseFormat::kCOO)
+      << "In degree cannot be computed as neither CSC nor COO format is "
+         "allowed for this graph. Please enable one of them at least.";
+  return fmt == SparseFormat::kCSC ? ptr->OutDegree(etype, vid)
+                                   : ptr->InDegree(etype, vid);
 }
 
 DegreeArray UnitGraph::InDegrees(dgl_type_t etype, IdArray vids) const {
   SparseFormat fmt = SelectFormat(CSC_CODE);
   const auto ptr = GetFormat(fmt);
-  if (fmt == SparseFormat::kCSC)
-    return ptr->OutDegrees(etype, vids);
-  else
-    return ptr->InDegrees(etype, vids);
+  CHECK(fmt == SparseFormat::kCSC || fmt == SparseFormat::kCOO)
+      << "In degree cannot be computed as neither CSC nor COO format is "
+         "allowed for this graph. Please enable one of them at least.";
+  return fmt == SparseFormat::kCSC ? ptr->OutDegrees(etype, vids)
+                                   : ptr->InDegrees(etype, vids);
 }
 
 uint64_t UnitGraph::OutDegree(dgl_type_t etype, dgl_id_t vid) const {
   SparseFormat fmt = SelectFormat(CSR_CODE);
   const auto ptr = GetFormat(fmt);
+  CHECK(fmt == SparseFormat::kCSR || fmt == SparseFormat::kCOO)
+      << "Out degree cannot be computed as neither CSR nor COO format is "
+         "allowed for this graph. Please enable one of them at least.";
   return ptr->OutDegree(etype, vid);
 }
 
 DegreeArray UnitGraph::OutDegrees(dgl_type_t etype, IdArray vids) const {
   SparseFormat fmt = SelectFormat(CSR_CODE);
   const auto ptr = GetFormat(fmt);
+  CHECK(fmt == SparseFormat::kCSR || fmt == SparseFormat::kCOO)
+      << "Out degree cannot be computed as neither CSR nor COO format is "
+         "allowed for this graph. Please enable one of them at least.";
   return ptr->OutDegrees(etype, vids);
 }
 
@@ -1202,7 +1245,7 @@ HeteroGraphPtr UnitGraph::CreateFromCSC(
   if (num_vtypes == 1)
     CHECK_EQ(num_src, num_dst);
   auto mg = CreateUnitGraphMetaGraph(num_vtypes);
-  CSRPtr csc(new CSR(mg, num_src, num_dst, indptr, indices, edge_ids));
+  CSRPtr csc(new CSR(mg, num_dst, num_src, indptr, indices, edge_ids));
   return HeteroGraphPtr(new UnitGraph(mg, csc, nullptr, nullptr, formats));
 }
 
@@ -1255,6 +1298,24 @@ HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext &ctx,
   }
 }
 
+void UnitGraph::PinMemory_() {
+  if (this->in_csr_->defined())
+    this->in_csr_->PinMemory_();
+  if (this->out_csr_->defined())
+    this->out_csr_->PinMemory_();
+  if (this->coo_->defined())
+    this->coo_->PinMemory_();
+}
+
+void UnitGraph::UnpinMemory_() {
+  if (this->in_csr_->defined())
+    this->in_csr_->UnpinMemory_();
+  if (this->out_csr_->defined())
+    this->out_csr_->UnpinMemory_();
+  if (this->coo_->defined())
+    this->coo_->UnpinMemory_();
+}
+
 void UnitGraph::InvalidateCSR() {
   this->out_csr_ = CSRPtr(new CSR());
 }
@@ -1287,7 +1348,8 @@ UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr c
   CHECK(GetAny()) << "At least one graph structure should exist.";
 }
 
-HeteroGraphPtr UnitGraph::CreateHomographFrom(
+HeteroGraphPtr UnitGraph::CreateUnitGraphFrom(
+    int num_vtypes,
     const aten::CSRMatrix &in_csr,
     const aten::CSRMatrix &out_csr,
     const aten::COOMatrix &coo,
@@ -1295,7 +1357,7 @@ HeteroGraphPtr UnitGraph::CreateHomographFrom(
     bool has_out_csr,
     bool has_coo,
     dgl_format_code_t formats) {
-  auto mg = CreateUnitGraphMetaGraph1();
+  auto mg = CreateUnitGraphMetaGraph(num_vtypes);
 
   CSRPtr in_csr_ptr = nullptr;
   CSRPtr out_csr_ptr = nullptr;
@@ -1343,6 +1405,8 @@ UnitGraph::CSRPtr UnitGraph::GetInCSR(bool inplace) const {
       else
         ret = std::make_shared<CSR>(meta_graph(), newadj);
     }
+    if (inplace && IsPinned())
+      in_csr_->PinMemory_();
   }
   return ret;
 }
@@ -1373,6 +1437,8 @@ UnitGraph::CSRPtr UnitGraph::GetOutCSR(bool inplace) const {
       else
         ret = std::make_shared<CSR>(meta_graph(), newadj);
     }
+    if (inplace && IsPinned())
+      out_csr_->PinMemory_();
   }
   return ret;
 }
@@ -1401,6 +1467,8 @@ UnitGraph::COOPtr UnitGraph::GetCOO(bool inplace) const {
       else
         ret = std::make_shared<COO>(meta_graph(), newadj);
     }
+    if (inplace && IsPinned())
+      coo_->PinMemory_();
   }
   return ret;
 }

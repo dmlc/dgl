@@ -39,8 +39,12 @@ class ICEWS18Dataset(DGLBuiltinDataset):
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
+    verbose : bool
         Whether to print out progress information. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     -------
@@ -61,7 +65,7 @@ class ICEWS18Dataset(DGLBuiltinDataset):
     ....
     >>>
     """
-    def __init__(self, mode='train', raw_dir=None, force_reload=False, verbose=False):
+    def __init__(self, mode='train', raw_dir=None, force_reload=False, verbose=False, transform=None):
         mode = mode.lower()
         assert mode in ['train', 'valid', 'test'], "Mode not valid"
         self.mode = mode
@@ -70,7 +74,8 @@ class ICEWS18Dataset(DGLBuiltinDataset):
                                              url=_url,
                                              raw_dir=raw_dir,
                                              force_reload=force_reload,
-                                             verbose=verbose)
+                                             verbose=verbose,
+                                             transform=transform)
 
     def process(self):
         data = loadtxt(os.path.join(self.save_path, '{}.txt'.format(self.mode)),
@@ -118,7 +123,10 @@ class ICEWS18Dataset(DGLBuiltinDataset):
 
             - ``edata['rel_type']``: edge type
         """
-        return self._graphs[idx]
+        if self._transform is None:
+            return self._graphs[idx]
+        else:
+            return self._transform(self._graphs[idx])
 
     def __len__(self):
         r"""Number of graphs in the dataset.

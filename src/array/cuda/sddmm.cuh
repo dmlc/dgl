@@ -12,6 +12,7 @@
 #include "functor.cuh"
 #include "fp16.cuh"
 #include "./utils.h"
+#include "./functor.cuh"
 #include "../selector.h"
 #include "../../runtime/cuda/cuda_common.h"
 
@@ -21,6 +22,66 @@ using namespace cuda;
 
 namespace aten {
 namespace cuda {
+
+#define SWITCH_OP(op, Op, ...)                                      \
+  do {                                                              \
+    if ((op) == "add") {                                            \
+      typedef cuda::binary::Add<DType> Op;                          \
+      { __VA_ARGS__ }                                               \
+    } else if ((op) == "sub") {                                     \
+      typedef cuda::binary::Sub<DType> Op;                          \
+      { __VA_ARGS__ }                                               \
+    } else if ((op) == "mul") {                                     \
+      typedef cuda::binary::Mul<DType> Op;                          \
+      { __VA_ARGS__ }                                               \
+    } else if ((op) == "div") {                                     \
+      typedef cuda::binary::Div<DType> Op;                          \
+      { __VA_ARGS__ }                                               \
+    } else if ((op) == "copy_lhs") {                                \
+      typedef cuda::binary::CopyLhs<DType> Op;                      \
+      { __VA_ARGS__ }                                               \
+    } else if ((op) == "copy_rhs") {                                \
+      typedef cuda::binary::CopyRhs<DType> Op;                      \
+      { __VA_ARGS__ }                                               \
+    } else if ((op) == "dot") {                                     \
+      typedef cuda::binary::Dot<DType> Op;                          \
+      { __VA_ARGS__ }                                               \
+    } else {                                                        \
+      LOG(FATAL) << "Unsupported SpMM/SDDMM binary operator: " << op;     \
+    }                                                               \
+  } while (0)
+
+#define SWITCH_RHS(rhs_target, RhsTarget, ...)                        \
+  do {                                                                \
+    if ((rhs_target) == 0) {                                          \
+      constexpr int RhsTarget = 0;                                    \
+      { __VA_ARGS__ }                                                 \
+    } else if ((rhs_target) == 1) {                                   \
+      constexpr int RhsTarget = 1;                                    \
+      { __VA_ARGS__ }                                                 \
+    } else if ((rhs_target) == 2) {                                   \
+      constexpr int RhsTarget = 2;                                    \
+      { __VA_ARGS__ }                                                 \
+    } else {                                                          \
+      LOG(INFO) << "Invalid rhs target: " << (rhs_target);            \
+    }                                                                 \
+  } while (0)
+
+#define SWITCH_TARGET(lhs_target, rhs_target, LhsTarget, RhsTarget, ...)\
+  do {                                                                  \
+    if ((lhs_target) == 0) {                                            \
+      constexpr int LhsTarget = 0;                                      \
+      SWITCH_RHS(rhs_target, RhsTarget, __VA_ARGS__);                   \
+    } else if ((lhs_target) == 1) {                                     \
+      constexpr int LhsTarget = 1;                                      \
+      SWITCH_RHS(rhs_target, RhsTarget, __VA_ARGS__);                   \
+    } else if ((lhs_target) == 2) {                                     \
+      constexpr int LhsTarget = 2;                                      \
+      SWITCH_RHS(rhs_target, RhsTarget, __VA_ARGS__);                   \
+    } else {                                                            \
+      LOG(INFO) << "Invalid lhs target: " << (lhs_target);              \
+    }                                                                   \
+  } while (0)
 
 constexpr unsigned int full_mask = 0xffffffff;
 
@@ -302,57 +363,6 @@ void SDDMMCsr(
   BCAST_IDX_CTX_SWITCH(bcast, use_idx, out->ctx, lhs_off, rhs_off, {
     CUDA_KERNEL_CALL((SDDMMCsrKernel<Idx, DType, Op, UseBcast, UseIdx, LhsTarget, RhsTarget>),
         nblks, nthrs, 0, thr_entry->stream,
-        lhs_data, rhs_data, out_data,
-        indptr, indices, edge_map,
-        N, M, E, reduce_dim,
-        lhs_off, rhs_off,
-        lhs_len, rhs_len, len);
-  });
-}
-
-/*!
- * \brief CUDA implementation of g-SDDMM on heterograph using Csr format.
- * \param bcast Broadcast information.
- * \param csr The Csr matrix.
- * \param lhs The left hand side operand feature.
- * \param rhs The right hand size operand feature.
- * \param out The result feature on edges.
- * \param stream cudaStream id.
- */
-template <typename Idx, typename DType, typename Op,
-          int LhsTarget = 0, int RhsTarget = 2>
-void SDDMMCsrHetero(
-    const BcastOff& bcast,
-    const CSRMatrix& csr,
-    NDArray lhs,
-    NDArray rhs,
-    NDArray out,
-    cudaStream_t strm_id) {
-  const Idx *indptr = csr.indptr.Ptr<Idx>();
-  const Idx *indices = csr.indices.Ptr<Idx>();
-  const Idx *edge_map = csr.data.Ptr<Idx>();
-  const DType *lhs_data = lhs.Ptr<DType>();
-  const DType *rhs_data = rhs.Ptr<DType>();
-  DType *out_data = out.Ptr<DType>();
-  int64_t N = csr.num_rows, M = csr.num_cols, E = csr.indices->shape[0];
-
-  int64_t *lhs_off = nullptr, *rhs_off = nullptr;
-  int64_t len = bcast.out_len,
-          lhs_len = bcast.lhs_len,
-          rhs_len = bcast.rhs_len;
-  int64_t reduce_dim = bcast.reduce_size;
-
-  const int ntx = FindNumThreads(len);
-  const int nty = CUDA_MAX_NUM_THREADS / ntx;
-  const int nbx = (len + ntx - 1) / ntx;
-  const int nby = FindNumBlocks<'y'>((E + nty - 1) / nty);
-  const dim3 nblks(nbx, nby);
-  const dim3 nthrs(ntx, nty);
-  const bool use_idx = !IsNullArray(csr.data);
-
-  BCAST_IDX_CTX_SWITCH(bcast, use_idx, out->ctx, lhs_off, rhs_off, {
-    CUDA_KERNEL_CALL((SDDMMCsrKernel<Idx, DType, Op, UseBcast, UseIdx, LhsTarget, RhsTarget>),
-        nblks, nthrs, 0, strm_id,
         lhs_data, rhs_data, out_data,
         indptr, indices, edge_map,
         N, M, E, reduce_dim,

@@ -82,7 +82,7 @@ example：
 
 .. code::
 
-    def updata_all_example(graph):
+    def update_all_example(graph):
         # store the result in graph.ndata['ft']
         graph.update_all(fn.u_mul_e('ft', 'a', 'm'),
                          fn.sum('m', 'ft'))
@@ -96,7 +96,7 @@ features ``ft``, and finally multiply ``ft`` by 2 to get the result
 ``final_ft``. After the call, DGL will clean the intermediate messages ``m``.
 The math formula for the above function is:
 
-.. math::  {final\_ft}_i = 2 * \sum_{j\in\mathcal{N}(i)} ({ft}_j * a_{ij})
+.. math::  {final\_ft}_i = 2 * \sum_{j\in\mathcal{N}(i)} ({ft}_j * a_{ji})
 
 DGL's built-in functions support floating point data types, i.e. the feature must
 be ``half`` (``float16``) /``float``/``double`` tensors.

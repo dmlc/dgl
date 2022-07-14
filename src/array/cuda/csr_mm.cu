@@ -16,7 +16,7 @@ using namespace dgl::runtime;
 namespace aten {
 namespace cusparse {
 
-#if __CUDACC_VER_MAJOR__ == 11
+#if 0   // disabling CUDA 11.0+ implementation for now because of problems on bigger graphs
 
 /*! \brief Cusparse implementation of SpGEMM on Csr format for CUDA 11.0+ */
 template <typename DType, typename IdType>
@@ -253,6 +253,12 @@ std::pair<CSRMatrix, NDArray> CSRMM(
   }
 }
 
+#ifdef USE_FP16
+template std::pair<CSRMatrix, NDArray> CSRMM<kDLGPU, int32_t, __half>(
+    const CSRMatrix&, NDArray, const CSRMatrix&, NDArray);
+template std::pair<CSRMatrix, NDArray> CSRMM<kDLGPU, int64_t, __half>(
+    const CSRMatrix&, NDArray, const CSRMatrix&, NDArray);
+#endif
 template std::pair<CSRMatrix, NDArray> CSRMM<kDLGPU, int32_t, float>(
     const CSRMatrix&, NDArray, const CSRMatrix&, NDArray);
 template std::pair<CSRMatrix, NDArray> CSRMM<kDLGPU, int64_t, float>(

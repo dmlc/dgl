@@ -9,7 +9,7 @@ import numpy as np
 from ..heterograph import DGLHeteroGraph
 from ..convert import heterograph as dgl_heterograph
 from ..convert import graph as dgl_graph
-from ..transform import compact_graphs
+from ..transforms import compact_graphs, sort_csr_by_tag, sort_csc_by_tag
 from .. import heterograph_index
 from .. import backend as F
 from ..base import NID, EID, NTYPE, ETYPE, ALL, is_all
@@ -17,7 +17,7 @@ from .kvstore import KVServer, get_kvstore
 from .._ffi.ndarray import empty_shared_mem
 from ..ndarray import exist_shared_mem_array
 from ..frame import infer_scheme
-from .partition import load_partition, load_partition_book
+from .partition import load_partition, load_partition_feats, load_partition_book
 from .graph_partition_book import PartitionPolicy, get_shared_mem_partition_book
 from .graph_partition_book import HeteroDataName, parse_hetero_data_name
 from .graph_partition_book import NodePartitionPolicy, EdgePartitionPolicy
@@ -26,6 +26,7 @@ from . import rpc
 from . import role
 from .server_state import ServerState
 from .rpc_server import start_server
+from . import graph_services
 from .graph_services import find_edges as dist_find_edges
 from .graph_services import out_degrees as dist_out_degrees
 from .graph_services import in_degrees as dist_in_degrees
@@ -191,7 +192,7 @@ class NodeDataView(MutableMapping):
             dtype, shape, _ = g._client.get_data_meta(str(name))
             # We create a wrapper on the existing tensor in the kvstore.
             self._data[name.get_name()] = DistTensor(shape, dtype, name.get_name(),
-                                                     part_policy=policy)
+                                                     part_policy=policy, attach=False)
 
     def _get_names(self):
         return list(self._data.keys())
@@ -245,7 +246,7 @@ class EdgeDataView(MutableMapping):
             dtype, shape, _ = g._client.get_data_meta(str(name))
             # We create a wrapper on the existing tensor in the kvstore.
             self._data[name.get_name()] = DistTensor(shape, dtype, name.get_name(),
-                                                     part_policy=policy)
+                                                     part_policy=policy, attach=False)
 
     def _get_names(self):
         return list(self._data.keys())
@@ -308,28 +309,55 @@ class DistGraphServer(KVServer):
         Disable shared memory.
     graph_format : str or list of str
         The graph formats.
+    keep_alive : bool
+        Whether to keep server alive when clients exit
+    net_type : str
+        Backend rpc type: ``'socket'`` or ``'tensorpipe'``
     '''
     def __init__(self, server_id, ip_config, num_servers,
                  num_clients, part_config, disable_shared_mem=False,
-                 graph_format=('csc', 'coo')):
+                 graph_format=('csc', 'coo'), keep_alive=False,
+                 net_type='socket'):
         super(DistGraphServer, self).__init__(server_id=server_id,
                                               ip_config=ip_config,
                                               num_servers=num_servers,
                                               num_clients=num_clients)
         self.ip_config = ip_config
         self.num_servers = num_servers
+        self.keep_alive = keep_alive
+        self.net_type = net_type
         # Load graph partition data.
         if self.is_backup_server():
             # The backup server doesn't load the graph partition. It'll initialized afterwards.
             self.gpb, graph_name, ntypes, etypes = load_partition_book(part_config, self.part_id)
             self.client_g = None
         else:
-            self.client_g, node_feats, edge_feats, self.gpb, graph_name, \
-                    ntypes, etypes = load_partition(part_config, self.part_id)
+            # Loading of node/edge_feats are deferred to lower the peak memory consumption.
+            self.client_g, _, _, self.gpb, graph_name, \
+                    ntypes, etypes = load_partition(part_config, self.part_id, load_feats=False)
             print('load ' + graph_name)
+            # formatting dtype
+            # TODO(Rui) Formatting forcely is not a perfect solution.
+            #   We'd better store all dtypes when mapping to shared memory
+            #   and map back with original dtypes.
+            for k, dtype in FIELD_DICT.items():
+                if k in self.client_g.ndata:
+                    self.client_g.ndata[k] = F.astype(
+                        self.client_g.ndata[k], dtype)
+                if k in self.client_g.edata:
+                    self.client_g.edata[k] = F.astype(
+                        self.client_g.edata[k], dtype)
             # Create the graph formats specified the users.
             self.client_g = self.client_g.formats(graph_format)
             self.client_g.create_formats_()
+            # Sort underlying matrix beforehand to avoid runtime overhead during sampling.
+            if len(etypes) > 1:
+                if 'csr' in graph_format:
+                    self.client_g = sort_csr_by_tag(
+                        self.client_g, tag=self.client_g.edata[ETYPE], tag_type='edge')
+                if 'csc' in graph_format:
+                    self.client_g = sort_csc_by_tag(
+                        self.client_g, tag=self.client_g.edata[ETYPE], tag_type='edge')
             if not disable_shared_mem:
                 self.client_g = _copy_graph_to_shared_mem(self.client_g, graph_name, graph_format)
 
@@ -344,6 +372,7 @@ class DistGraphServer(KVServer):
             self.add_part_policy(PartitionPolicy(edge_name.policy_str, self.gpb))
 
         if not self.is_backup_server():
+            node_feats, edge_feats = load_partition_feats(part_config, self.part_id)
             for name in node_feats:
                 # The feature name has the following format: node_type + "/" + feature_name to avoid
                 # feature name collision for different node types.
@@ -351,6 +380,7 @@ class DistGraphServer(KVServer):
                 data_name = HeteroDataName(True, ntype, feat_name)
                 self.init_data(name=str(data_name), policy_str=data_name.policy_str,
                                data_tensor=node_feats[name])
+                self.orig_data.add(str(data_name))
             for name in edge_feats:
                 # The feature name has the following format: edge_type + "/" + feature_name to avoid
                 # feature name collision for different edge types.
@@ -358,17 +388,22 @@ class DistGraphServer(KVServer):
                 data_name = HeteroDataName(False, etype, feat_name)
                 self.init_data(name=str(data_name), policy_str=data_name.policy_str,
                                data_tensor=edge_feats[name])
+                self.orig_data.add(str(data_name))
 
     def start(self):
         """ Start graph store server.
         """
         # start server
-        server_state = ServerState(kv_store=self, local_g=self.client_g, partition_book=self.gpb)
-        print('start graph service on server {} for part {}'.format(self.server_id, self.part_id))
+        server_state = ServerState(kv_store=self, local_g=self.client_g,
+                                   partition_book=self.gpb, keep_alive=self.keep_alive)
+        print('start graph service on server {} for part {}'.format(
+            self.server_id, self.part_id))
         start_server(server_id=self.server_id,
                      ip_config=self.ip_config,
                      num_servers=self.num_servers,
-                     num_clients=self.num_clients, server_state=server_state)
+                     num_clients=self.num_clients,
+                     server_state=server_state,
+                     net_type=self.net_type)
 
 class DistGraph:
     '''The class for accessing a distributed graph.
@@ -645,6 +680,17 @@ class DistGraph:
         """
         # TODO(da?): describe when self._g is None and device shouldn't be called.
         return F.cpu()
+
+    def is_pinned(self):
+        """Check if the graph structure is pinned to the page-locked memory.
+
+        Returns
+        -------
+        bool
+            True if the graph structure is pinned.
+        """
+        # (Xin Yao): Currently we don't support pinning a DistGraph.
+        return False
 
     @property
     def ntypes(self):
@@ -1216,6 +1262,20 @@ class DistGraph:
         '''
         self._client.barrier()
 
+    def sample_neighbors(self, seed_nodes, fanout, edge_dir='in', prob=None,
+                         exclude_edges=None, replace=False, etype_sorted=True,
+                         output_device=None):
+        # pylint: disable=unused-argument
+        """Sample neighbors from a distributed graph."""
+        # Currently prob, exclude_edges, output_device, and edge_dir are ignored.
+        if len(self.etypes) > 1:
+            frontier = graph_services.sample_etype_neighbors(
+                self, seed_nodes, ETYPE, fanout, replace=replace, etype_sorted=etype_sorted)
+        else:
+            frontier = graph_services.sample_neighbors(
+                self, seed_nodes, fanout, replace=replace)
+        return frontier
+
     def _get_ndata_names(self, ntype=None):
         ''' Get the names of all node data.
         '''
@@ -1478,7 +1538,7 @@ def node_split(nodes, partition_book=None, ntype='_N', rank=None, force_even=Tru
                                         num_client_per_part, client_id_in_part)
     else:
         # Get all nodes that belong to the rank.
-        local_nids = partition_book.partid2nids(partition_book.partid)
+        local_nids = partition_book.partid2nids(partition_book.partid, ntype=ntype)
         return _split_local(partition_book, rank, nodes, local_nids)
 
 def edge_split(edges, partition_book=None, etype='_E', rank=None, force_even=True,
@@ -1558,7 +1618,7 @@ def edge_split(edges, partition_book=None, etype='_E', rank=None, force_even=Tru
                                         num_client_per_part, client_id_in_part)
     else:
         # Get all edges that belong to the rank.
-        local_eids = partition_book.partid2eids(partition_book.partid)
+        local_eids = partition_book.partid2eids(partition_book.partid, etype=etype)
         return _split_local(partition_book, rank, edges, local_eids)
 
 rpc.register_service(INIT_GRAPH, InitGraphRequest, InitGraphResponse)

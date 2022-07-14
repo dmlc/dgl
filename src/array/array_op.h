@@ -168,7 +168,8 @@ COOMatrix CSRRowWiseSampling(
 template <DLDeviceType XPU, typename IdType, typename FloatType>
 COOMatrix CSRRowWisePerEtypeSampling(
     CSRMatrix mat, IdArray rows, IdArray etypes,
-    int64_t num_samples, FloatArray prob, bool replace, bool etype_sorted);
+    const std::vector<int64_t>& num_samples, FloatArray prob, bool replace,
+    bool etype_sorted);
 
 template <DLDeviceType XPU, typename IdType>
 COOMatrix CSRRowWiseSamplingUniform(
@@ -176,7 +177,7 @@ COOMatrix CSRRowWiseSamplingUniform(
 
 template <DLDeviceType XPU, typename IdType>
 COOMatrix CSRRowWisePerEtypeSamplingUniform(
-    CSRMatrix mat, IdArray rows, IdArray etypes, int64_t num_samples,
+    CSRMatrix mat, IdArray rows, IdArray etypes, const std::vector<int64_t>& num_samples,
     bool replace, bool etype_sorted);
 
 // FloatType is the type of weight data.
@@ -191,8 +192,16 @@ COOMatrix CSRRowWiseSamplingBiased(
     int64_t num_samples,
     NDArray tag_offset,
     FloatArray bias,
-    bool replace
-);
+    bool replace);
+
+template <DLDeviceType XPU, typename IdType>
+std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
+    const CSRMatrix& csr,
+    int64_t num_samples,
+    int num_trials,
+    bool exclude_self_loops,
+    bool replace,
+    double redundancy);
 
 // Union CSRMatrixes
 template <DLDeviceType XPU, typename IdType>
@@ -248,6 +257,9 @@ template <DLDeviceType XPU, typename IdType>
 std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo);
 
 template <DLDeviceType XPU, typename IdType>
+COOMatrix DisjointUnionCoo(const std::vector<COOMatrix>& coos);
+
+template <DLDeviceType XPU, typename IdType>
 void COOSort_(COOMatrix* mat, bool sort_column);
 
 template <DLDeviceType XPU, typename IdType>
@@ -265,7 +277,7 @@ COOMatrix COORowWiseSampling(
 template <DLDeviceType XPU, typename IdType, typename FloatType>
 COOMatrix COORowWisePerEtypeSampling(
     COOMatrix mat, IdArray rows, IdArray etypes,
-    int64_t num_samples, FloatArray prob, bool replace, bool etype_sorted);
+    const std::vector<int64_t>& num_samples, FloatArray prob, bool replace, bool etype_sorted);
 
 template <DLDeviceType XPU, typename IdType>
 COOMatrix COORowWiseSamplingUniform(
@@ -273,7 +285,7 @@ COOMatrix COORowWiseSamplingUniform(
 
 template <DLDeviceType XPU, typename IdType>
 COOMatrix COORowWisePerEtypeSamplingUniform(
-    COOMatrix mat, IdArray rows, IdArray etypes, int64_t num_samples,
+    COOMatrix mat, IdArray rows, IdArray etypes, const std::vector<int64_t>& num_samples,
     bool replace, bool etype_sorted);
 
 // FloatType is the type of weight data.

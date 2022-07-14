@@ -8,12 +8,8 @@ from ....utils import expand_as_pair
 
 
 class GINConv(layers.Layer):
-    r"""
-
-    Description
-    -----------
-    Graph Isomorphism Network layer from paper `How Powerful are Graph
-    Neural Networks? <https://arxiv.org/pdf/1810.00826.pdf>`__.
+    r"""Graph Isomorphism Network layer from `How Powerful are Graph
+    Neural Networks? <https://arxiv.org/pdf/1810.00826.pdf>`__
 
     .. math::
         h_i^{(l+1)} = f_\Theta \left((1 + \epsilon) h_i^{l} +
@@ -80,11 +76,7 @@ class GINConv(layers.Layer):
         self.eps = tf.Variable(initial_value=[init_eps], dtype=tf.float32, trainable=learn_eps)
 
     def call(self, graph, feat):
-        r"""
-
-        Description
-        -----------
-        Compute Graph Isomorphism Network layer.
+        r"""Compute Graph Isomorphism Network layer.
 
         Parameters
         ----------

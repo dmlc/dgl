@@ -19,7 +19,7 @@ class GraphConvLayer(nn.Module):
             srcfeat, dstfeat = feat
         else:
             srcfeat = feat
-            dstfeat = feat[:graph.num_dst_nodes()]
+            dstfeat = feat[:bipartite.num_dst_nodes()]
         graph = bipartite.local_var()
 
         graph.srcdata['h'] = srcfeat

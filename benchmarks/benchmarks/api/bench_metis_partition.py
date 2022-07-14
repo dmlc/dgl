@@ -15,11 +15,11 @@ def track_time(graph_name, k):
     data = utils.process_data(graph_name)
     graph = data[0]
     # dry run
-    gg = dgl.transform.metis_partition(graph, k)
+    gg = dgl.transforms.metis_partition(graph, k)
 
     # timing
     with utils.Timer() as t:
         for i in range(3):
-            gg = dgl.transform.metis_partition(graph, k)
+            gg = dgl.transforms.metis_partition(graph, k)
 
-    return t.elapsed_secs / 3 
+    return t.elapsed_secs / 3

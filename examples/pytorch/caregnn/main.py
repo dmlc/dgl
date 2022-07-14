@@ -3,8 +3,10 @@ import argparse
 import torch as th
 from model import CAREGNN
 import torch.optim as optim
-from utils import EarlyStopping
+from torch.nn.functional import softmax
 from sklearn.metrics import recall_score, roc_auc_score
+
+from utils import EarlyStopping
 
 
 def main(args):
@@ -21,10 +23,10 @@ def main(args):
         device = 'cpu'
 
     # retrieve labels of ground truth
-    labels = graph.ndata['label'].to(device).squeeze().long()
+    labels = graph.ndata['label'].to(device)
 
     # Extract node features
-    feat = graph.ndata['feature'].to(device).float()
+    feat = graph.ndata['feature'].to(device)
 
     # retrieve masks for train/validation/test
     train_mask = graph.ndata['train_mask']
@@ -69,13 +71,13 @@ def main(args):
                   args.sim_weight * loss_fn(logits_sim[train_idx], labels[train_idx])
 
         tr_recall = recall_score(labels[train_idx].cpu(), logits_gnn.data[train_idx].argmax(dim=1).cpu())
-        tr_auc = roc_auc_score(labels[train_idx].cpu(), logits_gnn.data[train_idx][:, 1].cpu())
+        tr_auc = roc_auc_score(labels[train_idx].cpu(), softmax(logits_gnn, dim=1).data[train_idx][:, 1].cpu())
 
         # validation
         val_loss = loss_fn(logits_gnn[val_idx], labels[val_idx]) + \
                    args.sim_weight * loss_fn(logits_sim[val_idx], labels[val_idx])
         val_recall = recall_score(labels[val_idx].cpu(), logits_gnn.data[val_idx].argmax(dim=1).cpu())
-        val_auc = roc_auc_score(labels[val_idx].cpu(), logits_gnn.data[val_idx][:, 1].cpu())
+        val_auc = roc_auc_score(labels[val_idx].cpu(), softmax(logits_gnn, dim=1).data[val_idx][:, 1].cpu())
 
         # backward
         optimizer.zero_grad()
@@ -105,7 +107,7 @@ def main(args):
     test_loss = loss_fn(logits_gnn[test_idx], labels[test_idx]) + \
                 args.sim_weight * loss_fn(logits_sim[test_idx], labels[test_idx])
     test_recall = recall_score(labels[test_idx].cpu(), logits_gnn[test_idx].argmax(dim=1).cpu())
-    test_auc = roc_auc_score(labels[test_idx].cpu(), logits_gnn.data[test_idx][:, 1].cpu())
+    test_auc = roc_auc_score(labels[test_idx].cpu(), softmax(logits_gnn, dim=1).data[test_idx][:, 1].cpu())
 
     print("Test Recall: {:.4f} AUC: {:.4f} Loss: {:.4f}".format(test_recall, test_auc, test_loss.item()))
 
@@ -121,7 +123,7 @@ if __name__ == '__main__':
     parser.add_argument("--weight_decay", type=float, default=0.001, help="Weight decay. Default: 0.001")
     parser.add_argument("--step_size", type=float, default=0.02, help="RL action step size (lambda 2). Default: 0.02")
     parser.add_argument("--sim_weight", type=float, default=2, help="Similarity loss weight (lambda 1). Default: 2")
-    parser.add_argument('--early-stop', action='store_true', default=True, help="indicates whether to use early stop")
+    parser.add_argument('--early-stop', action='store_true', default=False, help="indicates whether to use early stop")
 
     args = parser.parse_args()
     print(args)

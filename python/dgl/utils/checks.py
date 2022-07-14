@@ -1,6 +1,7 @@
 """Checking and logging utilities."""
 # pylint: disable=invalid-name
 from __future__ import absolute_import, division
+from collections.abc import Mapping
 
 from ..base import DGLError
 from .._ffi.function import _init_api
@@ -29,10 +30,12 @@ def prepare_tensor(g, data, name):
         Data in tensor object.
     """
     if F.is_tensor(data):
-        if F.dtype(data) != g.idtype or F.context(data) != g.device:
-            raise DGLError('Expect argument "{}" to have data type {} and device '
-                           'context {}. But got {} and {}.'.format(
-                               name, g.idtype, g.device, F.dtype(data), F.context(data)))
+        if F.dtype(data) != g.idtype:
+            raise DGLError(f'Expect argument "{name}" to have data type {g.idtype}. '
+                           f'But got {F.dtype(data)}.')
+        if F.context(data) != g.device and not g.is_pinned():
+            raise DGLError(f'Expect argument "{name}" to have device {g.device}. '
+                           f'But got {F.context(data)}.')
         ret = data
     else:
         data = F.tensor(data)
@@ -52,7 +55,7 @@ def prepare_tensor(g, data, name):
 def prepare_tensor_dict(g, data, name):
     """Convert a dictionary of data to a dictionary of ID tensors.
 
-    If calls ``prepare_tensor`` on each key-value pair.
+    Calls ``prepare_tensor`` on each key-value pair.
 
     Parameters
     ----------
@@ -69,6 +72,25 @@ def prepare_tensor_dict(g, data, name):
     """
     return {key : prepare_tensor(g, val, '{}["{}"]'.format(name, key))
             for key, val in data.items()}
+
+def prepare_tensor_or_dict(g, data, name):
+    """Convert data to either a tensor or a dictionary depending on input type.
+
+    Parameters
+    ----------
+    g : DGLHeteroGraph
+        Graph.
+    data : dict[str, (int, iterable of int, tensor)]
+        Data dict.
+    name : str
+        Name of the data.
+
+    Returns
+    -------
+    tensor or dict[str, tensor]
+    """
+    return prepare_tensor_dict(g, data, name) if isinstance(data, Mapping) \
+            else prepare_tensor(g, data, name)
 
 def parse_edges_arg_to_eid(g, edges, etid, argname='edges'):
     """Parse the :attr:`edges` argument and return an edge ID tensor.
@@ -109,6 +131,26 @@ def check_all_same_idtype(glist, name):
         if g.idtype != idtype:
             raise DGLError('Expect {}[{}] to have {} type ID, but got {}.'.format(
                 name, i, idtype, g.idtype))
+
+def check_device(data, device):
+    """Check if data is on the target device.
+
+    Parameters
+    ----------
+    data : Tensor or dict[str, Tensor]
+    device: Backend device.
+
+    Returns
+    -------
+    Bool: True if the data is on the target device.
+    """
+    if isinstance(data, dict):
+        for v in data.values():
+            if v.device != device:
+                return False
+    elif data.device != device:
+        return False
+    return True
 
 def check_all_same_device(glist, name):
     """Check all the graphs have the same device."""

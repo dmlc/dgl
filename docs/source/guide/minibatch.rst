@@ -75,3 +75,4 @@ sampling:
     minibatch-nn
     minibatch-inference
     minibatch-gpu-sampling
+    minibatch-prefetching

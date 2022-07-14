@@ -58,6 +58,10 @@ class HeteroGraph : public BaseHeteroGraph {
     return relation_graphs_[0]->Context();
   }
 
+  bool IsPinned() const override {
+    return relation_graphs_[0]->IsPinned();
+  }
+
   uint8_t NumBits() const override {
     return relation_graphs_[0]->NumBits();
   }
@@ -227,6 +231,25 @@ class HeteroGraph : public BaseHeteroGraph {
   /*! \brief Copy the data to another context */
   static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DLContext &ctx,
                                const DGLStreamHandle &stream = nullptr);
+
+  /*!
+  * \brief Pin all relation graphs of the current graph.
+  * \note The graph will be pinned inplace. Behavior depends on the current context,
+  *       kDLCPU: will be pinned;
+  *       IsPinned: directly return;
+  *       kDLGPU: invalid, will throw an error.
+  *       The context check is deferred to pinning the NDArray.
+  */
+  void PinMemory_() override;
+
+  /*!
+  * \brief Unpin all relation graphs of the current graph.
+  * \note The graph will be unpinned inplace. Behavior depends on the current context,
+  *       IsPinned: will be unpinned;
+  *       others: directly return.
+  *       The context check is deferred to unpinning the NDArray.
+  */
+  void UnpinMemory_();
 
   /*! \brief Copy the data to shared memory.
   *

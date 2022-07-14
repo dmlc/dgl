@@ -12,11 +12,9 @@ from torch.utils import dlpack
 from ... import ndarray as nd
 from ..._deprecate import kernel as K
 from ...function.base import TargetCode
-from ...base import dgl_warning
 
-if LooseVersion(th.__version__) < LooseVersion("1.5.0"):
-    raise Exception("Detected an old version of PyTorch. Please update torch>=1.5.0 "
-                    "for the best experience.")
+if LooseVersion(th.__version__) < LooseVersion("1.9.0"):
+    raise RuntimeError("DGL requires PyTorch >= 1.9.0")
 
 def data_type_dict():
     return {'float16' : th.float16,
@@ -120,6 +118,9 @@ def copy_to(input, ctx, **kwargs):
     else:
         raise RuntimeError('Invalid context', ctx)
 
+def is_pinned(input):
+    return input.is_pinned()
+
 def sum(input, dim, keepdims=False):
     return th.sum(input, dim=dim, keepdim=keepdims)
 
@@ -163,6 +164,9 @@ def argtopk(input, k, dim, descending=True):
 
 def exp(input):
     return th.exp(input)
+
+def inverse(input):
+    return th.inverse(input)
 
 def sqrt(input):
     return th.sqrt(input)
@@ -276,6 +280,9 @@ def boolean_mask(input, mask):
 def equal(x, y):
     return x == y
 
+def allclose(x, y, rtol=1e-4, atol=1e-4):
+    return th.allclose(x, y, rtol=rtol, atol=atol)
+
 def logical_not(input):
     return ~input
 
@@ -295,10 +302,10 @@ def count_nonzero(input):
     # TODO: fallback to numpy for backward compatibility
     return np.count_nonzero(input)
 
-def unique(input):
+def unique(input, return_inverse=False, return_counts=False):
     if input.dtype == th.bool:
         input = input.type(th.int8)
-    return th.unique(input)
+    return th.unique(input, return_inverse=return_inverse, return_counts=return_counts)
 
 def full_1d(length, fill_value, dtype, ctx):
     return th.full((length,), fill_value, dtype=dtype, device=ctx)
@@ -330,10 +337,20 @@ def zerocopy_to_numpy(input):
 def zerocopy_from_numpy(np_array):
     return th.as_tensor(np_array)
 
-def zerocopy_to_dgl_ndarray(data):
-    return nd.from_dlpack(dlpack.to_dlpack(data.contiguous()))
+if LooseVersion(th.__version__) >= LooseVersion("1.10.0"):
+    def zerocopy_to_dgl_ndarray(data):
+        if data.dtype == th.bool:
+            data = data.byte()
+        return nd.from_dlpack(dlpack.to_dlpack(data.contiguous()))
+else:
+    def zerocopy_to_dgl_ndarray(data):
+        return nd.from_dlpack(dlpack.to_dlpack(data.contiguous()))
 
 def zerocopy_to_dgl_ndarray_for_write(input):
+    assert input.is_contiguous(), "Cannot convert non-contiguous tensors " \
+        "to dgl ndarray for write. Call .to_contiguous() first."
+    assert input.numel() == input.storage().size(), "Cannot convert view " \
+        "tensors to dgl ndarray for write."
     return zerocopy_to_dgl_ndarray(input)
 
 def zerocopy_from_dgl_ndarray(data):

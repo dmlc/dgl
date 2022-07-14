@@ -169,7 +169,7 @@ function(dgl_select_nvcc_arch_flags out_variable)
 endfunction()
 
 ################################################################################################
-# Short command for cuda comnpilation
+# Short command for cuda compilation
 # Usage:
 #   dgl_cuda_compile(<objlist_variable> <cuda_files>)
 macro(dgl_cuda_compile objlist_variable)
@@ -247,6 +247,7 @@ macro(dgl_config_cuda out_variable)
     src/runtime/cuda/*.cu
     src/geometry/cuda/*.cu
     src/graph/transform/cuda/*.cu
+    src/graph/sampling/randomwalks/*.cu
   )
 
   # NVCC flags

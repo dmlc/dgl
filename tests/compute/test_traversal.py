@@ -10,7 +10,7 @@ import scipy.sparse as sp
 import backend as F
 
 import itertools
-from utils import parametrize_dtype
+from test_utils import parametrize_idtype
 
 np.random.seed(42)
 
@@ -18,7 +18,7 @@ def toset(x):
     # F.zerocopy_to_numpy may return a int
     return set(F.zerocopy_to_numpy(x).tolist())
 
-@parametrize_dtype
+@parametrize_idtype
 def test_bfs(idtype, n=100):
     def _bfs_nx(g_nx, src):
         edges = nx.bfs_edges(g_nx, src)
@@ -59,7 +59,7 @@ def test_bfs(idtype, n=100):
     assert len(edges_dgl) == len(edges_nx)
     assert all(toset(x) == y for x, y in zip(edges_dgl, edges_nx))
 
-@parametrize_dtype
+@parametrize_idtype
 def test_topological_nodes(idtype, n=100):
     a = sp.random(n, n, 3 / n, data_rvs=lambda n: np.ones(n))
     b = sp.tril(a, -1).tocoo()
@@ -86,7 +86,7 @@ def test_topological_nodes(idtype, n=100):
     assert all(toset(x) == toset(y) for x, y in zip(layers_dgl, layers_spmv))
 
 DFS_LABEL_NAMES = ['forward', 'reverse', 'nontree']
-@parametrize_dtype
+@parametrize_idtype
 def test_dfs_labeled_edges(idtype, example=False):
     dgl_g = dgl.DGLGraph().astype(idtype)
     dgl_g.add_nodes(6)

@@ -2,10 +2,11 @@ import numpy as np
 import networkx as nx
 import unittest
 import scipy.sparse as ssp
+import pytest
 
 import dgl
 import backend as F
-from test_utils import parametrize_dtype
+from test_utils import parametrize_idtype
 
 D = 5
 
@@ -28,12 +29,22 @@ def generate_graph(grad=False, add_data=True):
         g.edata['l'] = ecol
     return g
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_edge_subgraph():
     # Test when the graph has no node data and edge data.
     g = generate_graph(add_data=False)
     eid = [0, 2, 3, 6, 7, 9]
+
+    # relabel=True
     sg = g.edge_subgraph(eid)
+    assert F.array_equal(sg.ndata[dgl.NID], F.tensor([0, 2, 4, 5, 1, 9], g.idtype))
+    assert F.array_equal(sg.edata[dgl.EID], F.tensor(eid, g.idtype))
+    sg.ndata['h'] = F.arange(0, sg.number_of_nodes())
+    sg.edata['h'] = F.arange(0, sg.number_of_edges())
+
+    # relabel=False
+    sg = g.edge_subgraph(eid, relabel_nodes=False)
+    assert g.number_of_nodes() == sg.number_of_nodes()
+    assert F.array_equal(sg.edata[dgl.EID], F.tensor(eid, g.idtype))
     sg.ndata['h'] = F.arange(0, sg.number_of_nodes())
     sg.edata['h'] = F.arange(0, sg.number_of_edges())
 
@@ -100,12 +111,14 @@ def create_test_heterograph(idtype):
         ('user', 'wishes', 'game'): ([0, 2], [1, 0]),
         ('developer', 'develops', 'game'): ([0, 1], [0, 1])
     }, idtype=idtype, device=F.ctx())
+    for etype in g.etypes:
+        g.edges[etype].data['weight'] = F.randn((g.num_edges(etype),))
     assert g.idtype == idtype
     assert g.device == F.ctx()
     return g
 
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="MXNet doesn't support bool tensor")
-@parametrize_dtype
+@parametrize_idtype
 def test_subgraph_mask(idtype):
     g = create_test_heterograph(idtype)
     g_graph = g['follows']
@@ -140,14 +153,12 @@ def test_subgraph_mask(idtype):
     sg1 = g.subgraph({'user': F.tensor([False, True, True], dtype=F.bool),
                       'game': F.tensor([True, False, False, False], dtype=F.bool)})
     _check_subgraph(g, sg1)
-    if F._default_context_str != 'gpu':
-        # TODO(minjie): enable this later
-        sg2 = g.edge_subgraph({'follows': F.tensor([False, True], dtype=F.bool),
-                               'plays': F.tensor([False, True, False, False], dtype=F.bool),
-                               'wishes': F.tensor([False, True], dtype=F.bool)})
-        _check_subgraph(g, sg2)
+    sg2 = g.edge_subgraph({'follows': F.tensor([False, True], dtype=F.bool),
+                           'plays': F.tensor([False, True, False, False], dtype=F.bool),
+                           'wishes': F.tensor([False, True], dtype=F.bool)})
+    _check_subgraph(g, sg2)
 
-@parametrize_dtype
+@parametrize_idtype
 def test_subgraph1(idtype):
     g = create_test_heterograph(idtype)
     g_graph = g['follows']
@@ -181,32 +192,26 @@ def test_subgraph1(idtype):
 
     sg1 = g.subgraph({'user': [1, 2], 'game': [0]})
     _check_subgraph(g, sg1)
-    if F._default_context_str != 'gpu':
-        # TODO(minjie): enable this later
-        sg2 = g.edge_subgraph({'follows': [1], 'plays': [1], 'wishes': [1]})
-        _check_subgraph(g, sg2)
+    sg2 = g.edge_subgraph({'follows': [1], 'plays': [1], 'wishes': [1]})
+    _check_subgraph(g, sg2)
 
     # backend tensor input
     sg1 = g.subgraph({'user': F.tensor([1, 2], dtype=idtype),
                       'game': F.tensor([0], dtype=idtype)})
     _check_subgraph(g, sg1)
-    if F._default_context_str != 'gpu':
-        # TODO(minjie): enable this later
-        sg2 = g.edge_subgraph({'follows': F.tensor([1], dtype=idtype),
-                               'plays': F.tensor([1], dtype=idtype),
-                               'wishes': F.tensor([1], dtype=idtype)})
-        _check_subgraph(g, sg2)
+    sg2 = g.edge_subgraph({'follows': F.tensor([1], dtype=idtype),
+                           'plays': F.tensor([1], dtype=idtype),
+                           'wishes': F.tensor([1], dtype=idtype)})
+    _check_subgraph(g, sg2)
 
     # numpy input
     sg1 = g.subgraph({'user': np.array([1, 2]),
                       'game': np.array([0])})
     _check_subgraph(g, sg1)
-    if F._default_context_str != 'gpu':
-        # TODO(minjie): enable this later
-        sg2 = g.edge_subgraph({'follows': np.array([1]),
-                               'plays': np.array([1]),
-                               'wishes': np.array([1])})
-        _check_subgraph(g, sg2)
+    sg2 = g.edge_subgraph({'follows': np.array([1]),
+                           'plays': np.array([1]),
+                           'wishes': np.array([1])})
+    _check_subgraph(g, sg2)
 
     def _check_subgraph_single_ntype(g, sg, preserve_nodes=False):
         assert sg.idtype == g.idtype
@@ -248,16 +253,14 @@ def test_subgraph1(idtype):
 
     sg1_graph = g_graph.subgraph([1, 2])
     _check_subgraph_single_ntype(g_graph, sg1_graph)
-    if F._default_context_str != 'gpu':
-        # TODO(minjie): enable this later
-        sg1_graph = g_graph.edge_subgraph([1])
-        _check_subgraph_single_ntype(g_graph, sg1_graph)
-        sg1_graph = g_graph.edge_subgraph([1], relabel_nodes=False)
-        _check_subgraph_single_ntype(g_graph, sg1_graph, True)
-        sg2_bipartite = g_bipartite.edge_subgraph([0, 1])
-        _check_subgraph_single_etype(g_bipartite, sg2_bipartite)
-        sg2_bipartite = g_bipartite.edge_subgraph([0, 1], relabel_nodes=False)
-        _check_subgraph_single_etype(g_bipartite, sg2_bipartite, True)
+    sg1_graph = g_graph.edge_subgraph([1])
+    _check_subgraph_single_ntype(g_graph, sg1_graph)
+    sg1_graph = g_graph.edge_subgraph([1], relabel_nodes=False)
+    _check_subgraph_single_ntype(g_graph, sg1_graph, True)
+    sg2_bipartite = g_bipartite.edge_subgraph([0, 1])
+    _check_subgraph_single_etype(g_bipartite, sg2_bipartite)
+    sg2_bipartite = g_bipartite.edge_subgraph([0, 1], relabel_nodes=False)
+    _check_subgraph_single_etype(g_bipartite, sg2_bipartite, True)
 
     def _check_typed_subgraph1(g, sg):
         assert g.idtype == sg.idtype
@@ -297,28 +300,24 @@ def test_subgraph1(idtype):
     _check_typed_subgraph1(g, sg5)
 
     # Test for restricted format
-    if F._default_context_str != 'gpu':
-        # TODO(minjie): enable this later
-        for fmt in ['csr', 'csc', 'coo']:
-            g = dgl.graph(([0, 1], [1, 2])).formats(fmt)
-            sg = g.subgraph({g.ntypes[0]: [1, 0]})
-            nids = F.asnumpy(sg.ndata[dgl.NID])
-            assert np.array_equal(nids, np.array([1, 0]))
-            src, dst = sg.edges(order='eid')
-            src = F.asnumpy(src)
-            dst = F.asnumpy(dst)
-            assert np.array_equal(src, np.array([1]))
+    for fmt in ['csr', 'csc', 'coo']:
+        g = dgl.graph(([0, 1], [1, 2])).formats(fmt)
+        sg = g.subgraph({g.ntypes[0]: [1, 0]})
+        nids = F.asnumpy(sg.ndata[dgl.NID])
+        assert np.array_equal(nids, np.array([1, 0]))
+        src, dst = sg.edges(order='eid')
+        src = F.asnumpy(src)
+        dst = F.asnumpy(dst)
+        assert np.array_equal(src, np.array([1]))
 
-
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
-@parametrize_dtype
+@parametrize_idtype
 def test_in_subgraph(idtype):
     hg = dgl.heterograph({
         ('user', 'follow', 'user'): ([1, 2, 3, 0, 2, 3, 0], [0, 0, 0, 1, 1, 1, 2]),
         ('user', 'play', 'game'): ([0, 0, 1, 3], [0, 1, 2, 2]),
         ('game', 'liked-by', 'user'): ([2, 2, 2, 1, 1, 0], [0, 1, 2, 0, 3, 0]),
         ('user', 'flips', 'coin'): ([0, 1, 2, 3], [0, 0, 0, 0])
-    }, idtype=idtype, num_nodes_dict={'user': 5, 'game': 10, 'coin': 8})
+    }, idtype=idtype, num_nodes_dict={'user': 5, 'game': 10, 'coin': 8}).to(F.ctx())
     subg = dgl.in_subgraph(hg, {'user' : [0,1], 'game' : 0})
     assert subg.idtype == idtype
     assert len(subg.ntypes) == 3
@@ -378,15 +377,14 @@ def test_in_subgraph(idtype):
     assert subg.num_nodes('coin') == 0
     assert subg.num_edges('flips') == 0
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
-@parametrize_dtype
+@parametrize_idtype
 def test_out_subgraph(idtype):
     hg = dgl.heterograph({
         ('user', 'follow', 'user'): ([1, 2, 3, 0, 2, 3, 0], [0, 0, 0, 1, 1, 1, 2]),
         ('user', 'play', 'game'): ([0, 0, 1, 3], [0, 1, 2, 2]),
         ('game', 'liked-by', 'user'): ([2, 2, 2, 1, 1, 0], [0, 1, 2, 0, 3, 0]),
         ('user', 'flips', 'coin'): ([0, 1, 2, 3], [0, 0, 0, 0])
-    }, idtype=idtype)
+    }, idtype=idtype).to(F.ctx())
     subg = dgl.out_subgraph(hg, {'user' : [0,1], 'game' : 0})
     assert subg.idtype == idtype
     assert len(subg.ntypes) == 3
@@ -460,3 +458,215 @@ def test_subgraph_message_passing():
     g.ndata['x'] = F.copy_to(F.randn((5, 6)), F.cpu())
     sg = g.subgraph([1, 2, 3]).to(F.ctx())
     sg.update_all(lambda edges: {'x': edges.src['x']}, lambda nodes: {'y': F.sum(nodes.mailbox['x'], 1)})
+
+@parametrize_idtype
+def test_khop_in_subgraph(idtype):
+    g = dgl.graph(([1, 1, 2, 3, 4], [0, 2, 0, 4, 2]), idtype=idtype, device=F.ctx())
+    g.edata['w'] = F.tensor([
+        [0, 1],
+        [2, 3],
+        [4, 5],
+        [6, 7],
+        [8, 9]
+    ])
+    sg, inv = dgl.khop_in_subgraph(g, 0, k=2)
+    assert sg.idtype == g.idtype
+    u, v = sg.edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(1,0), (1,2), (2,0), (3,2)}
+    assert F.array_equal(sg.edata[dgl.EID], F.tensor([0, 1, 2, 4], dtype=idtype))
+    assert F.array_equal(sg.edata['w'], F.tensor([
+        [0, 1],
+        [2, 3],
+        [4, 5],
+        [8, 9]
+    ]))
+    assert F.array_equal(F.astype(inv, idtype), F.tensor([0], idtype))
+
+    # Test multiple nodes
+    sg, inv = dgl.khop_in_subgraph(g, [0, 2], k=1)
+    assert sg.num_edges() == 4
+
+    sg, inv = dgl.khop_in_subgraph(g, F.tensor([0, 2], idtype), k=1)
+    assert sg.num_edges() == 4
+
+    # Test isolated node
+    sg, inv = dgl.khop_in_subgraph(g, 1, k=2)
+    assert sg.idtype == g.idtype
+    assert sg.num_nodes() == 1
+    assert sg.num_edges() == 0
+    assert F.array_equal(F.astype(inv, idtype), F.tensor([0], idtype))
+
+    g = dgl.heterograph({
+        ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
+        ('user', 'follows', 'user'): ([0, 1, 1], [1, 2, 2]),
+    }, idtype=idtype, device=F.ctx())
+    sg, inv = dgl.khop_in_subgraph(g, {'game': 0}, k=2)
+    assert sg.idtype == idtype
+    assert sg.num_nodes('game') == 1
+    assert sg.num_nodes('user') == 2
+    assert len(sg.ntypes) == 2
+    assert len(sg.etypes) == 2
+    u, v = sg['follows'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(0, 1)}
+    u, v = sg['plays'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(0, 0), (1, 0)}
+    assert F.array_equal(F.astype(inv['game'], idtype), F.tensor([0], idtype))
+
+    # Test isolated node
+    sg, inv = dgl.khop_in_subgraph(g, {'user': 0}, k=2)
+    assert sg.idtype == idtype
+    assert sg.num_nodes('game') == 0
+    assert sg.num_nodes('user') == 1
+    assert sg.num_edges('follows') == 0
+    assert sg.num_edges('plays') == 0
+    assert F.array_equal(F.astype(inv['user'], idtype), F.tensor([0], idtype))
+
+    # Test multiple nodes
+    sg, inv = dgl.khop_in_subgraph(g, {'user': F.tensor([0, 1], idtype), 'game': 0}, k=1)
+    u, v = sg['follows'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(0, 1)}
+    u, v = sg['plays'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(0, 0), (1, 0)}
+    assert F.array_equal(F.astype(inv['user'], idtype), F.tensor([0, 1], idtype))
+    assert F.array_equal(F.astype(inv['game'], idtype), F.tensor([0], idtype))
+
+@parametrize_idtype
+def test_khop_out_subgraph(idtype):
+    g = dgl.graph(([0, 2, 0, 4, 2], [1, 1, 2, 3, 4]), idtype=idtype, device=F.ctx())
+    g.edata['w'] = F.tensor([
+        [0, 1],
+        [2, 3],
+        [4, 5],
+        [6, 7],
+        [8, 9]
+    ])
+    sg, inv = dgl.khop_out_subgraph(g, 0, k=2)
+    assert sg.idtype == g.idtype
+    u, v = sg.edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(0,1), (2,1), (0,2), (2,3)}
+    assert F.array_equal(sg.edata[dgl.EID], F.tensor([0, 2, 1, 4], dtype=idtype))
+    assert F.array_equal(sg.edata['w'], F.tensor([
+        [0, 1],
+        [4, 5],
+        [2, 3],
+        [8, 9]
+    ]))
+    assert F.array_equal(F.astype(inv, idtype), F.tensor([0], idtype))
+
+    # Test multiple nodes
+    sg, inv = dgl.khop_out_subgraph(g, [0, 2], k=1)
+    assert sg.num_edges() == 4
+
+    sg, inv = dgl.khop_out_subgraph(g, F.tensor([0, 2], idtype), k=1)
+    assert sg.num_edges() == 4
+
+    # Test isolated node
+    sg, inv = dgl.khop_out_subgraph(g, 1, k=2)
+    assert sg.idtype == g.idtype
+    assert sg.num_nodes() == 1
+    assert sg.num_edges() == 0
+    assert F.array_equal(F.astype(inv, idtype), F.tensor([0], idtype))
+
+    g = dgl.heterograph({
+        ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1]),
+        ('user', 'follows', 'user'): ([0, 1], [1, 3]),
+    }, idtype=idtype, device=F.ctx())
+    sg, inv = dgl.khop_out_subgraph(g, {'user': 0}, k=2)
+    assert sg.idtype == idtype
+    assert sg.num_nodes('game') == 2
+    assert sg.num_nodes('user') == 3
+    assert len(sg.ntypes) == 2
+    assert len(sg.etypes) == 2
+    u, v = sg['follows'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(0, 1), (1, 2)}
+    u, v = sg['plays'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(0,0), (1,0), (1,1)}
+    assert F.array_equal(F.astype(inv['user'], idtype), F.tensor([0], idtype))
+
+    # Test isolated node
+    sg, inv = dgl.khop_out_subgraph(g, {'user': 3}, k=2)
+    assert sg.idtype == idtype
+    assert sg.num_nodes('game') == 0
+    assert sg.num_nodes('user') == 1
+    assert sg.num_edges('follows') == 0
+    assert sg.num_edges('plays') == 0
+    assert F.array_equal(F.astype(inv['user'], idtype), F.tensor([0], idtype))
+
+    # Test multiple nodes
+    sg, inv = dgl.khop_out_subgraph(g, {'user': F.tensor([2], idtype), 'game': 0}, k=1)
+    assert sg.num_edges('follows') == 0
+    u, v = sg['plays'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(0, 1)}
+    assert F.array_equal(F.astype(inv['user'], idtype), F.tensor([0], idtype))
+    assert F.array_equal(F.astype(inv['game'], idtype), F.tensor([0], idtype))
+
+@unittest.skipIf(not F.gpu_ctx(), 'only necessary with GPU')
+@pytest.mark.parametrize(
+    'parent_idx_device', [('cpu', F.cpu()), ('cuda', F.cuda()), ('uva', F.cpu()), ('uva', F.cuda())])
+@pytest.mark.parametrize('child_device', [F.cpu(), F.cuda()])
+def test_subframes(parent_idx_device, child_device):
+    parent_device, idx_device = parent_idx_device
+    g = dgl.graph((F.tensor([1,2,3], dtype=F.int64), F.tensor([2,3,4], dtype=F.int64)))
+    print(g.device)
+    g.ndata['x'] = F.randn((5, 4))
+    g.edata['a'] = F.randn((3, 6))
+    idx = F.tensor([1, 2], dtype=F.int64)
+    if parent_device == 'cuda':
+        g = g.to(F.cuda())
+    elif parent_device == 'uva':
+        if F.backend_name != 'pytorch':
+            pytest.skip("UVA only supported for PyTorch")
+        g = g.to(F.cpu())
+        g.create_formats_()
+        g.pin_memory_()
+    elif parent_device == 'cpu':
+        g = g.to(F.cpu())
+    idx = F.copy_to(idx, idx_device)
+    sg = g.sample_neighbors(idx, 2).to(child_device)
+    assert sg.device == F.context(sg.ndata['x'])
+    assert sg.device == F.context(sg.edata['a'])
+    assert sg.device == child_device
+    if parent_device != 'uva':
+        sg = g.to(child_device).sample_neighbors(F.copy_to(idx, child_device), 2)
+        assert sg.device == F.context(sg.ndata['x'])
+        assert sg.device == F.context(sg.edata['a'])
+        assert sg.device == child_device
+    if parent_device == 'uva':
+        g.unpin_memory_()
+
+@unittest.skipIf(F._default_context_str != "gpu", reason="UVA only available on GPU")
+@pytest.mark.parametrize('device', [F.cpu(), F.cuda()])
+@unittest.skipIf(dgl.backend.backend_name != "pytorch", reason="UVA only supported for PyTorch")
+@parametrize_idtype
+def test_uva_subgraph(idtype, device):
+    g = create_test_heterograph(idtype)
+    g = g.to(F.cpu())
+    g.create_formats_()
+    g.pin_memory_()
+    indices = {'user': F.copy_to(F.tensor([0], idtype), device)}
+    edge_indices = {'follows': F.copy_to(F.tensor([0], idtype), device)}
+    assert g.subgraph(indices).device == device
+    assert g.edge_subgraph(edge_indices).device == device
+    assert g.in_subgraph(indices).device == device
+    assert g.out_subgraph(indices).device == device
+    if dgl.backend.backend_name != 'tensorflow':
+        # (BarclayII) Most of Tensorflow functions somehow do not preserve device: a CPU tensor
+        # becomes a GPU tensor after operations such as concat(), unique() or even sin().
+        # Not sure what should be the best fix.
+        assert g.khop_in_subgraph(indices, 1)[0].device == device
+        assert g.khop_out_subgraph(indices, 1)[0].device == device
+    assert g.sample_neighbors(indices, 1).device == device
+    g.unpin_memory_()
+
+if __name__ == '__main__':
+    test_edge_subgraph()
+    # test_uva_subgraph(F.int64, F.cpu())
