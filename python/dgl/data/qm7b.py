@@ -31,7 +31,7 @@ class QM7bDataset(DGLDataset):
     ----------
     raw_dir : str
         Raw file directory to download/contains the input data directory.
-        Default: ~/.dgl_vx/, where x is the version number like 0.9.0.
+        Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
     verbose : bool

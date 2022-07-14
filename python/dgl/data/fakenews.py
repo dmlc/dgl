@@ -75,7 +75,7 @@ class FakeNewsDataset(DGLBuiltinDataset):
         Specifying the directory that will store the
         downloaded data or the directory that
         already stores the input data.
-        Default: ~/.dgl_vx/, where x is the version number like 0.9.0.
+        Default: ~/.dgl/
     transform : callable, optional
         A transform that takes in a :class:`~dgl.DGLGraph` object and returns
         a transformed version. The :class:`~dgl.DGLGraph` object will be

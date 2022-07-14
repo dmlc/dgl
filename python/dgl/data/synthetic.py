@@ -44,7 +44,7 @@ class BAShapeDataset(DGLBuiltinDataset):
         Indicator of random number generation state. Default: None
     raw_dir : str, optional
         Raw file directory to store the processed data.
-        Default: ~/.dgl_vx/, where x is the version number like 0.9.0.
+        Default: ~/.dgl/
     force_reload : bool, optional
         Whether to always generate the data from scratch rather than load a cached version.
         Default: False
@@ -216,7 +216,7 @@ class BACommunityDataset(DGLBuiltinDataset):
         Indicator of random number generation state. Default: None
     raw_dir : str, optional
         Raw file directory to store the processed data.
-        Default: ~/.dgl_vx/, where x is the version number like 0.9.0.
+        Default: ~/.dgl/
     force_reload : bool, optional
         Whether to always generate the data from scratch rather than load a cached version.
         Default: False
@@ -368,7 +368,7 @@ class TreeCycleDataset(DGLBuiltinDataset):
         Indicator of random number generation state. Default: None
     raw_dir : str, optional
         Raw file directory to store the processed data.
-        Default: ~/.dgl_vx/, where x is the version number like 0.9.0.
+        Default: ~/.dgl/
     force_reload : bool, optional
         Whether to always generate the data from scratch rather than load a cached version.
         Default: False
@@ -534,7 +534,7 @@ class TreeGridDataset(DGLBuiltinDataset):
         Indicator of random number generation state. Default: None
     raw_dir : str, optional
         Raw file directory to store the processed data.
-        Default: ~/.dgl_vx/, where x is the version number like 0.9.0.
+        Default: ~/.dgl/
     force_reload : bool, optional
         Whether to always generate the data from scratch rather than load a cached version.
         Default: False
@@ -684,7 +684,7 @@ class BA2MotifDataset(DGLBuiltinDataset):
     ----------
     raw_dir : str, optional
         Raw file directory to download and store the data.
-        Default: ~/.dgl_vx/, where x is the version number like 0.9.0.
+        Default: ~/.dgl/
     force_reload : bool, optional
         Whether to reload the dataset. Default: False
     verbose : bool, optional

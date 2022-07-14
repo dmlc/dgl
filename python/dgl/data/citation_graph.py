@@ -40,7 +40,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
       name can be 'cora', 'citeseer' or 'pubmed'.
     raw_dir : str
         Raw file directory to download/contains the input data directory.
-        Default: ~/.dgl_vx/, where x is the version number like 0.9.0.
+        Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
     verbose : bool
@@ -365,7 +365,7 @@ class CoraGraphDataset(CitationGraphDataset):
     ----------
     raw_dir : str
         Raw file directory to download/contains the input data directory.
-        Default: ~/.dgl_vx/, where x is the version number like 0.9.0.
+        Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
     verbose : bool
@@ -513,7 +513,7 @@ class CiteseerGraphDataset(CitationGraphDataset):
     -----------
     raw_dir : str
         Raw file directory to download/contains the input data directory.
-        Default: ~/.dgl_vx/, where x is the version number like 0.9.0.
+        Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
     verbose : bool
@@ -664,7 +664,7 @@ class PubmedGraphDataset(CitationGraphDataset):
     -----------
     raw_dir : str
         Raw file directory to download/contains the input data directory.
-        Default: ~/.dgl_vx/, where x is the version number like 0.9.0.
+        Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
     verbose : bool
@@ -757,7 +757,7 @@ def load_cora(raw_dir=None, force_reload=False, verbose=True, reverse_edge=True,
     -----------
     raw_dir : str
         Raw file directory to download/contains the input data directory.
-        Default: ~/.dgl_vx/, where x is the version number like 0.9.0.
+        Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
     verbose : bool
@@ -784,7 +784,7 @@ def load_citeseer(raw_dir=None, force_reload=False, verbose=True,
     -----------
     raw_dir : str
         Raw file directory to download/contains the input data directory.
-        Default: ~/.dgl_vx/, where x is the version number like 0.9.0.
+        Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
     verbose : bool
@@ -811,7 +811,7 @@ def load_pubmed(raw_dir=None, force_reload=False, verbose=True,
     -----------
     raw_dir : str
         Raw file directory to download/contains the input data directory.
-        Default: ~/.dgl_vx/, where x is the version number like 0.9.0.
+        Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
     verbose : bool
@@ -843,7 +843,7 @@ class CoraBinary(DGLBuiltinDataset):
     -----------
     raw_dir : str
         Raw file directory to download/contains the input data directory.
-        Default: ~/.dgl_vx/, where x is the version number like 0.9.0.
+        Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
     verbose: bool

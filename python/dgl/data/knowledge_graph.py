@@ -31,7 +31,7 @@ class KnowledgeGraphDataset(DGLBuiltinDataset):
         Whether add reverse edges. Default: True.
     raw_dir : str
         Raw file directory to download/contains the input data directory.
-        Default: ~/.dgl_vx/, where x is the version number like 0.9.0.
+        Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
     verbose : bool
@@ -395,7 +395,7 @@ class FB15k237Dataset(KnowledgeGraphDataset):
         Whether to add reverse edge. Default True.
     raw_dir : str
         Raw file directory to download/contains the input data directory.
-        Default: ~/.dgl_vx/, where x is the version number like 0.9.0.
+        Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
     verbose : bool
@@ -538,7 +538,7 @@ class FB15kDataset(KnowledgeGraphDataset):
         Whether to add reverse edge. Default True.
     raw_dir : str
         Raw file directory to download/contains the input data directory.
-        Default: ~/.dgl_vx/, where x is the version number like 0.9.0.
+        Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
     verbose : bool
@@ -680,7 +680,7 @@ class WN18Dataset(KnowledgeGraphDataset):
         Whether to add reverse edge. Default True.
     raw_dir : str
         Raw file directory to download/contains the input data directory.
-        Default: ~/.dgl_vx/, where x is the version number like 0.9.0.
+        Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
     verbose : bool

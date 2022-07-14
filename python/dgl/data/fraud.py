@@ -35,7 +35,7 @@ class FraudDataset(DGLBuiltinDataset):
         Specifying the directory that will store the
         downloaded data or the directory that
         already stores the input data.
-        Default: ~/.dgl_vx/, where x is the version number like 0.9.0.
+        Default: ~/.dgl/
     random_seed : int
         Specifying the random seed in splitting the dataset.
         Default: 717
@@ -249,7 +249,7 @@ class FraudYelpDataset(FraudDataset):
         Specifying the directory that will store the
         downloaded data or the directory that
         already stores the input data.
-        Default: ~/.dgl_vx/, where x is the version number like 0.9.0.
+        Default: ~/.dgl/
     random_seed : int
         Specifying the random seed in splitting the dataset.
         Default: 717
@@ -330,7 +330,7 @@ class FraudAmazonDataset(FraudDataset):
         Specifying the directory that will store the
         downloaded data or the directory that
         already stores the input data.
-        Default: ~/.dgl_vx/, where x is the version number like 0.9.0.
+        Default: ~/.dgl/
     random_seed : int
         Specifying the random seed in splitting the dataset.
         Default: 717

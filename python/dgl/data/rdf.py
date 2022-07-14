@@ -91,7 +91,7 @@ class RDFGraphDataset(DGLBuiltinDataset):
         If true, add reverse edge and reverse relations to the final graph.
     raw_dir : str
         Raw file directory to download/contains the input data directory.
-        Default: ~/.dgl_vx/, where x is the version number like 0.9.0.
+        Default: ~/.dgl/
     force_reload : bool, optional
         If true, force load and process from raw data. Ignore cached pre-processed data.
     verbose : bool
@@ -537,7 +537,7 @@ class AIFBDataset(RDFGraphDataset):
         If true, add reverse edge and reverse relations to the final graph. Default: True.
     raw_dir : str
         Raw file directory to download/contains the input data directory.
-        Default: ~/.dgl_vx/, where x is the version number like 0.9.0.
+        Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
     verbose : bool
@@ -673,7 +673,7 @@ class MUTAGDataset(RDFGraphDataset):
         If true, add reverse edge and reverse relations to the final graph. Default: True.
     raw_dir : str
         Raw file directory to download/contains the input data directory.
-        Default: ~/.dgl_vx/, where x is the version number like 0.9.0.
+        Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
     verbose : bool
@@ -840,7 +840,7 @@ class BGSDataset(RDFGraphDataset):
         If true, add reverse edge and reverse relations to the final graph. Default: True.
     raw_dir : str
         Raw file directory to download/contains the input data directory.
-        Default: ~/.dgl_vx/, where x is the version number like 0.9.0.
+        Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
     verbose : bool
@@ -996,7 +996,7 @@ class AMDataset(RDFGraphDataset):
         If true, add reverse edge and reverse relations to the final graph. Default: True.
     raw_dir : str
         Raw file directory to download/contains the input data directory.
-        Default: ~/.dgl_vx/, where x is the version number like 0.9.0.
+        Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
     verbose : bool
