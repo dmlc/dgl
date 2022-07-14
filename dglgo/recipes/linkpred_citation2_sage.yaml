@@ -1,4 +1,4 @@
-version: 0.0.1
+version: 0.0.2
 pipeline_name: linkpred
 pipeline_mode: train
 device: cpu

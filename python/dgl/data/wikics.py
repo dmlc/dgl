@@ -50,6 +50,7 @@ class WikiCSDataset(DGLBuiltinDataset):
 
     Examples
     --------
+    >>> from dgl.data import WikiCSDataset
     >>> dataset = WikiCSDataset()
     >>> dataset.num_classes
     10
