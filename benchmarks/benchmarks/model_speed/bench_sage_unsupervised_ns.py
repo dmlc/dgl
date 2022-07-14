@@ -4,12 +4,9 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import torch.multiprocessing as mp
-from torch.utils.data import DataLoader
 import dgl.nn.pytorch as dglnn
 import dgl.function as fn
 import time
-import traceback
 
 from .. import utils
 
@@ -123,17 +120,19 @@ def track_time(data, num_negs, batch_size):
     # Create PyTorch DataLoader for constructing blocks
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
         [int(fanout) for fanout in fan_out.split(',')])
-    dataloader = dgl.dataloading.EdgeDataLoader(
-        g, train_seeds, sampler, exclude='reverse_id',
+    sampler = dgl.dataloading.as_edge_prediction_sampler(
+        sampler, exclude='reverse_id',
         # For each edge with ID e in Reddit dataset, the reverse edge is e ± |E|/2.
         reverse_eids=th.cat([
-            th.arange(n_edges // 2, n_edges),
-            th.arange(0, n_edges // 2)]),
-        negative_sampler=NegativeSampler(g, num_negs),
+                            th.arange(
+                                n_edges // 2, n_edges),
+                            th.arange(0, n_edges // 2)]),
+        negative_sampler=NegativeSampler(g, num_negs))
+    dataloader = dgl.dataloading.DataLoader(
+        g, train_seeds, sampler,
         batch_size=batch_size,
         shuffle=True,
         drop_last=False,
-        pin_memory=True,
         num_workers=num_workers)
 
     # Define model and optimizer
