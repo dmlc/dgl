@@ -43,8 +43,7 @@ class BAShapeDataset(DGLBuiltinDataset):
     seed : integer, random_state, or None, optional
         Indicator of random number generation state. Default: None
     raw_dir : str, optional
-        Raw file directory to store the processed data.
-        Default: ~/.dgl/
+        Raw file directory to store the processed data. Default: ~/.dgl/
     force_reload : bool, optional
         Whether to always generate the data from scratch rather than load a cached version.
         Default: False
@@ -215,8 +214,7 @@ class BACommunityDataset(DGLBuiltinDataset):
     seed : integer, random_state, or None, optional
         Indicator of random number generation state. Default: None
     raw_dir : str, optional
-        Raw file directory to store the processed data.
-        Default: ~/.dgl/
+        Raw file directory to store the processed data. Default: ~/.dgl/
     force_reload : bool, optional
         Whether to always generate the data from scratch rather than load a cached version.
         Default: False
@@ -367,8 +365,7 @@ class TreeCycleDataset(DGLBuiltinDataset):
     seed : integer, random_state, or None, optional
         Indicator of random number generation state. Default: None
     raw_dir : str, optional
-        Raw file directory to store the processed data.
-        Default: ~/.dgl/
+        Raw file directory to store the processed data. Default: ~/.dgl/
     force_reload : bool, optional
         Whether to always generate the data from scratch rather than load a cached version.
         Default: False
@@ -533,8 +530,7 @@ class TreeGridDataset(DGLBuiltinDataset):
     seed : integer, random_state, or None, optional
         Indicator of random number generation state. Default: None
     raw_dir : str, optional
-        Raw file directory to store the processed data.
-        Default: ~/.dgl/
+        Raw file directory to store the processed data. Default: ~/.dgl/
     force_reload : bool, optional
         Whether to always generate the data from scratch rather than load a cached version.
         Default: False
@@ -683,8 +679,7 @@ class BA2MotifDataset(DGLBuiltinDataset):
     Parameters
     ----------
     raw_dir : str, optional
-        Raw file directory to download and store the data.
-        Default: ~/.dgl/
+        Raw file directory to download and store the data. Default: ~/.dgl/
     force_reload : bool, optional
         Whether to reload the dataset. Default: False
     verbose : bool, optional
