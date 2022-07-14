@@ -5,6 +5,10 @@ import dgl
 from test_utils import parametrize_idtype
 import backend as F
 
+if F.backend_name == 'pytorch':
+    import torch
+    torch.backends.cuda.matmul.allow_tf32 = False
+
 def _random_simple_graph(idtype, dtype, ctx, M, N, max_nnz, srctype, dsttype, etype):
     src = np.random.randint(0, M, (max_nnz,))
     dst = np.random.randint(0, N, (max_nnz,))
