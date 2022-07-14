@@ -85,7 +85,7 @@ Take the survey [here](https://forms.gle/Ej3jHCocACmb49Gp8) and leave any feedba
 * TGL: A graph learning framework for large-scale temporal graphs. https://github.com/amazon-research/tgl
 * gtrick: Bag of Tricks for Graph Neural Networks. https://github.com/sangyx/gtrick
 * ArangoDB-DGL Adapter: Import [ArangoDB](https://github.com/arangodb/arangodb) graphs into DGL and vice-versa. https://github.com/arangoml/dgl-adapter
-
+* DGLD: [DGLD](https://github.com/EagleLab-ZJU/DGLD) is an open-source library for Deep Graph Anomaly Detection based on pytorch and DGL.
 ### Awesome Papers Using DGL
 
 1. [**Benchmarking Graph Neural Networks**](https://arxiv.org/pdf/2003.00982.pdf), *Vijay Prakash Dwivedi, Chaitanya K. Joshi, Thomas Laurent, Yoshua Bengio, Xavier Bresson*
