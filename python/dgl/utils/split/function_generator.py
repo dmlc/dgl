@@ -1,8 +1,7 @@
 """Function Generator."""
-# pylint: disable=unused-import, exec-used
+# pylint: disable=exec-used
 import types
 
-import dgl  # for holding the environment.
 import torch
 from torch.fx import GraphModule, Graph
 

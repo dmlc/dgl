@@ -45,7 +45,7 @@ class GraphRearranger():
                 e = e.dst.out_edges[0]
 
     def generate_new_graphs(self, nodes):
-        """Generate new sub-graphs according too message degrees."""
+        """Generate new sub-graphs according to message degrees."""
         message_layers = [[] for _ in range(self.ggraph.max_message + 1)]
         layers_inputs = [set() for _ in range(self.ggraph.max_message + 1)]
         layers_outputs = [set() for _ in range(self.ggraph.max_message + 1)]
