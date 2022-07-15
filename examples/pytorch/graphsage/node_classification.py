@@ -97,7 +97,7 @@ def train(args, device, g, dataset, model):
 
     opt = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=5e-4)
     
-    for epoch in range(3):
+    for epoch in range(10):
         model.train()
         total_loss = 0
         for it, (input_nodes, output_nodes, blocks) in enumerate(train_dataloader):
