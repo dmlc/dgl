@@ -151,9 +151,9 @@ class YelpDataset(DGLBuiltinDataset):
 
             - ``ndata['label']``: node label
             - ``ndata['feat']``: node feature
-            - ``ndata['train_mask']``： mask for training node set
+            - ``ndata['train_mask']``: mask for training node set
             - ``ndata['val_mask']``: mask for validation node set
-            - ``ndata['test_mask']:`` mask for test node set
+            - ``ndata['test_mask']``: mask for test node set
 
         """
         assert idx == 0, "This dataset has only one graph"
