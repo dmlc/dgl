@@ -1890,7 +1890,10 @@ def add_self_loop(g, edge_feat_names=None, fill_data=1., etype=None):
                 data[feat_name] = g.nodes[etype[0]].data['h']
 
     nodes = g.nodes(etype[0])
-    new_g = add_edges(g, nodes, nodes, data=data, etype=etype)
+    if len(data):
+        new_g = add_edges(g, nodes, nodes, data=data, etype=etype)
+    else:
+        new_g = add_edges(g, nodes, nodes, etype=etype)
     return new_g
 
 DGLHeteroGraph.add_self_loop = utils.alias_func(add_self_loop)
