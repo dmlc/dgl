@@ -1628,13 +1628,13 @@ def test_add_selfloop(idtype):
     g = dgl.graph(([0, 0, 2], [2, 1, 0]), idtype=idtype, device=F.ctx())
     g.edata['he'] = F.copy_to(F.tensor([1, 2, 3], dtype=idtype), ctx=F.ctx())
     g.ndata['hn'] = F.copy_to(F.tensor([1, 2, 3], dtype=idtype), ctx=F.ctx())
-    g = dgl.add_self_loop(g)
+    g = dgl.add_self_loop(g, edge_feat_names=['he'], fill_data='sum')
     assert g.number_of_nodes() == 3
     assert g.number_of_edges() == 6
     u, v = g.edges(form='uv', order='eid')
     assert F.array_equal(u, F.tensor([0, 0, 2, 0, 1, 2], dtype=idtype))
     assert F.array_equal(v, F.tensor([2, 1, 0, 0, 1, 2], dtype=idtype))
-    assert F.array_equal(g.edata['he'], F.tensor([1, 2, 3, 0, 0, 0], dtype=idtype))
+    assert F.array_equal(g.edata['he'], F.tensor([1, 2, 3, 3, 2, 1], dtype=idtype))
 
     # bipartite graph
     g = dgl.heterograph(
@@ -1642,13 +1642,13 @@ def test_add_selfloop(idtype):
     # nothing will happend
     raise_error = False
     try:
-        g = dgl.add_self_loop(g)
+        g = dgl.add_self_loop(g, edge_feat_names=[], fill_data='sum')
     except:
         raise_error = True
     assert raise_error
 
     g = create_test_heterograph5(idtype)
-    g = dgl.add_self_loop(g, etype='follows')
+    g = dgl.add_self_loop(g, edge_feat_names=['h'], fill_data='mean', etype='follows')
     assert g.number_of_nodes('user') == 3
     assert g.number_of_nodes('game') == 2
     assert g.number_of_edges('follows') == 5
@@ -1656,12 +1656,12 @@ def test_add_selfloop(idtype):
     u, v = g.edges(form='uv', order='eid', etype='follows')
     assert F.array_equal(u, F.tensor([1, 2, 0, 1, 2], dtype=idtype))
     assert F.array_equal(v, F.tensor([0, 1, 0, 1, 2], dtype=idtype))
-    assert F.array_equal(g.edges['follows'].data['h'], F.tensor([1, 2, 0, 0, 0], dtype=idtype))
+    assert F.array_equal(g.edges['follows'].data['h'], F.tensor([1, 2, 1, 2, 0], dtype=idtype))
     assert F.array_equal(g.edges['plays'].data['h'], F.tensor([1, 2], dtype=idtype))
 
     raise_error = False
     try:
-        g = dgl.add_self_loop(g, etype='plays')
+        g = dgl.add_self_loop(g, edge_feat_names=['h'], fill_data='mean', etype='plays')
     except:
         raise_error = True
     assert raise_error

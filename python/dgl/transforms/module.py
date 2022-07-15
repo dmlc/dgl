@@ -415,6 +415,9 @@ class AddSelfLoop(BaseTransform):
         If False, it will first remove self-loops to prevent duplicate self-loops.
     new_etypes : bool, optional
         If True, it will add an edge type 'self' per node type, which holds self-loops.
+    fill_data : float, dict or str, optional
+        The value to fill the self-loop edge features or reducer to generate the self-loop edge
+        features. Default is 1.0.
 
     Example
     -------
@@ -424,38 +427,72 @@ class AddSelfLoop(BaseTransform):
 
     Case1: Add self-loops for a homogeneous graph
 
-    >>> transform = AddSelfLoop()
-    >>> g = dgl.graph(([1, 1], [1, 2]))
+    >>> transform = AddSelfLoop(fill_data='sum')
+    >>> g = dgl.graph(([0, 0, 2], [2, 1, 0]))
+    >>> g.edata['he'] = torch.arange(3).float().reshape(-1, 1)
     >>> new_g = transform(g)
     >>> print(new_g.edges())
     (tensor([1, 0, 1, 2]), tensor([2, 0, 1, 2]))
+    >>> print(new_g.edata('he'))
+    tensor([[0.],
+            [1.],
+            [2.],
+            [2.],
+            [1.],
+            [0.]])
 
     Case2: Add self-loops for a heterogeneous graph
 
     >>> g = dgl.heterograph({
-    ...     ('user', 'plays', 'game'): ([0], [1]),
-    ...     ('user', 'follows', 'user'): ([1], [2])
-    ... })
+   ...     ('user', 'follows', 'user'): (torch.tensor([1, 2]),
+   ...                                   torch.tensor([0, 1])),
+   ...     ('user', 'plays', 'game'): (torch.tensor([0, 1]),
+   ...                                 torch.tensor([0, 1]))})
+   >>> g.edata['feat'] = {('user', 'follows', 'user'): torch.randn(2, 5),
+   ...                    ('user', 'plays', 'game'): torch.randn(2, 5)}
+   >>> g.edata['feat1'] = {('user', 'follows', 'user'): torch.randn(2, 15),
+     ...                   ('user', 'plays', 'game'): torch.randn(2, 15)}
     >>> new_g = transform(g)
     >>> print(new_g.edges(etype='plays'))
-    (tensor([0]), tensor([1]))
+    (tensor([0, 1]), tensor([0, 1]))
     >>> print(new_g.edges(etype='follows'))
-    (tensor([1, 0, 1, 2]), tensor([2, 0, 1, 2]))
+    (tensor([1, 2]), tensor([0, 1]))
+    >>> print(new_g.edata['feat'])
+    {('user', 'follows', 'user'): tensor([[ 0.8192,  0.2264, -0.2929,  0.6282, -1.3874],
+                                          [-0.6422, -1.3716, -1.0100,  0.1607, -0.5984],
+                                          [ 0.8192,  0.2264, -0.2929,  0.6282, -1.3874],
+                                          [-0.6422, -1.3716, -1.0100,  0.1607, -0.5984],
+                                          [ 0.0000,  0.0000,  0.0000,  0.0000,  0.0000]]),
+     ('user', 'plays', 'game'): tensor([[ 0.1937, -0.5451, -0.4166,  0.6469, -0.4816],
+                                        [-2.0849, -1.6483, -0.3876, -0.1233, -0.5964]])}
 
     Case3: Add self-etypes for a heterogeneous graph
 
-    >>> transform = AddSelfLoop(new_etypes=True)
+    >>> transform = AddSelfLoop(new_etypes=True, fill_data='sum')
     >>> new_g = transform(g)
     >>> print(new_g.edges(etype='follows'))
     (tensor([1, 0, 1, 2]), tensor([2, 0, 1, 2]))
     >>> print(new_g.edges(etype=('game', 'self', 'game')))
     (tensor([0, 1]), tensor([0, 1]))
+    >>> print(new_g.edata['feat'])
+    {('user', 'follows', 'user'): tensor([[ 0.3126, -0.6453,  0.5670,  1.2923,  0.1456],
+                                          [ 0.6168, -1.4346,  0.8557,  1.4584, -0.0834],
+                                          [ 0.3126, -0.6453,  0.5670,  1.2923,  0.1456],
+                                          [ 0.6168, -1.4346,  0.8557,  1.4584, -0.0834],
+                                          [ 0.0000,  0.0000,  0.0000,  0.0000,  0.0000]]),
+     ('user', 'plays', 'game'): tensor([[ 0.1650,  0.5025,  0.2166,  0.2894,  1.5770],
+                                        [ 1.5289, -1.4585,  0.3651,  0.8101, -0.6235]]),
+     ('user', 'self', 'user'): tensor([[ 0.3126, -0.6453,  0.5670,  1.2923,  0.1456],
+                                       [ 0.6168, -1.4346,  0.8557,  1.4584, -0.0834],
+                                       [ 0.0000,  0.0000,  0.0000,  0.0000,  0.0000]])}
     """
-    def __init__(self, allow_duplicate=False, new_etypes=False):
+
+    def __init__(self, allow_duplicate=False, new_etypes=False, fill_data=1.):
         self.allow_duplicate = allow_duplicate
         self.new_etypes = new_etypes
+        self.fill_data = fill_data
 
-    def transform_etype(self, c_etype, g):
+    def transform_etype(self, c_etype, edge_feat_names, g):
         r"""
 
         Description
@@ -466,6 +503,8 @@ class AddSelfLoop(BaseTransform):
         ----------
         c_etype : tuple of str
             A canonical edge type.
+        edge_feat_names : list of str
+            A list of edge feature names.
         g : DGLGraph
             The graph.
 
@@ -480,11 +519,13 @@ class AddSelfLoop(BaseTransform):
 
         if not self.allow_duplicate:
             g = functional.remove_self_loop(g, etype=c_etype)
-        return functional.add_self_loop(g, etype=c_etype)
+        return functional.add_self_loop(g, edge_feat_names=edge_feat_names,
+                                        fill_data=self.fill_data, etype=c_etype)
 
     def __call__(self, g):
         for c_etype in g.canonical_etypes:
-            g = self.transform_etype(c_etype, g)
+            edge_feat_names = [i[0] for i in g.edata.items() if c_etype in i[1].keys()]
+            g = self.transform_etype(c_etype, edge_feat_names, g)
 
         if self.new_etypes:
             device = g.device
@@ -501,6 +542,13 @@ class AddSelfLoop(BaseTransform):
                 data_dict[c_etype] = g.edges(etype=c_etype)
 
             g = update_graph_structure(g, data_dict)
+
+            for c_etype in g.canonical_etypes:
+                if c_etype[0] == c_etype[2] and c_etype[1] != 'self':
+                    fill_data = {k: v[-g.num_nodes(c_etype[0]):, :] for k, v in
+                                 g.edges[c_etype].data.items()}
+                    g.edges[(c_etype[0], 'self', c_etype[2])].data.update(fill_data)
+
         return g
 
 class RemoveSelfLoop(BaseTransform):
