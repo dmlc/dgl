@@ -72,9 +72,9 @@ def evaluate(model, graph, dataloader):
 def layerwise_infer(device, graph, nid, model, batch_size):
     model.eval()
     with torch.no_grad():
-        pred = model.inference(graph, device, batch_size).to(device)
+        pred = model.inference(graph, device, batch_size) # pred in buffer_device
         pred = pred[nid]
-        label = graph.ndata['label'][nid]
+        label = graph.ndata['label'][nid].to(pred.device)
         return MF.accuracy(pred, label)
 
 def train(args, device, g, dataset, model):
@@ -97,7 +97,7 @@ def train(args, device, g, dataset, model):
 
     opt = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=5e-4)
     
-    for epoch in range(10):
+    for epoch in range(3):
         model.train()
         total_loss = 0
         for it, (input_nodes, output_nodes, blocks) in enumerate(train_dataloader):
@@ -141,5 +141,5 @@ if __name__ == '__main__':
 
     # test the model
     print('Testing...')
-    acc = layerwise_infer(device, g, dataset.test_idx.to(device), model, batch_size=4096)
+    acc = layerwise_infer(device, g, dataset.test_idx, model, batch_size=4096)
     print("Test Accuracy {:.4f}".format(acc.item()))
