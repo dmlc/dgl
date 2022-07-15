@@ -23,7 +23,7 @@ class PipelineConfig(DGLBaseModel):
     loss: str = "CrossEntropyLoss"
 
 class UserConfig(DGLBaseModel):
-    version: Optional[str] = "0.0.1"
+    version: Optional[str] = "0.0.2"
     pipeline_name: PipelineFactory.get_pipeline_enum()
     pipeline_mode: str
     device: str = "cpu"
