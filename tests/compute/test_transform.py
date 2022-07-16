@@ -1642,7 +1642,7 @@ def test_add_selfloop(idtype):
     # nothing will happend
     raise_error = False
     try:
-        g = dgl.add_self_loop(g, edge_feat_names=[], fill_data='sum')
+        g = dgl.add_self_loop(g)
     except:
         raise_error = True
     assert raise_error
@@ -1661,7 +1661,7 @@ def test_add_selfloop(idtype):
 
     raise_error = False
     try:
-        g = dgl.add_self_loop(g, edge_feat_names=['h'], fill_data='mean', etype='plays')
+        g = dgl.add_self_loop(g, etype='plays')
     except:
         raise_error = True
     assert raise_error
