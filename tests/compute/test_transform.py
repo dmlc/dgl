@@ -1626,7 +1626,7 @@ def test_remove_nodes(idtype):
 def test_add_selfloop(idtype):
     # homogeneous graph
     g = dgl.graph(([0, 0, 2], [2, 1, 0]), idtype=idtype, device=F.ctx())
-    g.edata['he'] = F.copy_to(F.tensor([1, 2, 3], dtype=idtype), ctx=F.ctx())
+    g.edata['he'] = F.copy_to(F.tensor([1., 2., 3.]), ctx=F.ctx())
     g.ndata['hn'] = F.copy_to(F.tensor([1, 2, 3], dtype=idtype), ctx=F.ctx())
     g = dgl.add_self_loop(g, edge_feat_names=['he'], fill_data='sum')
     assert g.number_of_nodes() == 3
@@ -1634,7 +1634,7 @@ def test_add_selfloop(idtype):
     u, v = g.edges(form='uv', order='eid')
     assert F.array_equal(u, F.tensor([0, 0, 2, 0, 1, 2], dtype=idtype))
     assert F.array_equal(v, F.tensor([2, 1, 0, 0, 1, 2], dtype=idtype))
-    assert F.array_equal(g.edata['he'], F.tensor([1, 2, 3, 3, 2, 1], dtype=idtype))
+    assert F.array_equal(g.edata['he'], F.tensor([1., 2., 3., 3., 2., 1.]))
 
     # bipartite graph
     g = dgl.heterograph(
@@ -1647,7 +1647,17 @@ def test_add_selfloop(idtype):
         raise_error = True
     assert raise_error
 
-    g = create_test_heterograph5(idtype)
+    # g = create_test_heterograph5(idtype)
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): (F.tensor([1, 2], dtype=idtype),
+                                      F.tensor([0, 1], dtype=idtype)),
+        ('user', 'plays', 'game'): (F.tensor([0, 1], dtype=idtype),
+                                    F.tensor([0, 1], dtype=idtype))},
+        idtype=idtype, device=F.ctx())
+    g.nodes['user'].data['h'] = F.copy_to(F.tensor([1, 1, 1], dtype=idtype), ctx=F.ctx())
+    g.nodes['game'].data['h'] = F.copy_to(F.tensor([2, 2], dtype=idtype), ctx=F.ctx())
+    g.edges['follows'].data['h'] = F.copy_to(F.tensor([1., 2.]), ctx=F.ctx())
+    g.edges['plays'].data['h'] = F.copy_to(F.tensor([1., 2.]), ctx=F.ctx())
     g = dgl.add_self_loop(g, edge_feat_names=['h'], fill_data='mean', etype='follows')
     assert g.number_of_nodes('user') == 3
     assert g.number_of_nodes('game') == 2
@@ -1656,8 +1666,8 @@ def test_add_selfloop(idtype):
     u, v = g.edges(form='uv', order='eid', etype='follows')
     assert F.array_equal(u, F.tensor([1, 2, 0, 1, 2], dtype=idtype))
     assert F.array_equal(v, F.tensor([0, 1, 0, 1, 2], dtype=idtype))
-    assert F.array_equal(g.edges['follows'].data['h'], F.tensor([1, 2, 1, 2, 0], dtype=idtype))
-    assert F.array_equal(g.edges['plays'].data['h'], F.tensor([1, 2], dtype=idtype))
+    assert F.array_equal(g.edges['follows'].data['h'], F.tensor([1., 2., 1., 2., 0.]))
+    assert F.array_equal(g.edges['plays'].data['h'], F.tensor([1., 2.]))
 
     raise_error = False
     try:
