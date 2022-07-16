@@ -107,8 +107,10 @@ class EdgeWeightNorm(nn.Module):
                                'This leads to square root of zero or negative values.')
 
             dev = graph.device
-            graph.srcdata['_src_out_w'] = th.ones((graph.number_of_src_nodes())).float().to(dev)
-            graph.dstdata['_dst_in_w'] = th.ones((graph.number_of_dst_nodes())).float().to(dev)
+            graph.srcdata['_src_out_w'] = th.ones(
+                    graph.number_of_src_nodes(), dtype=edge_weight.dtype, device=dev)
+            graph.dstdata['_dst_in_w'] = th.ones(
+                    graph.number_of_dst_nodes(), dtype=edge_weight.dtype, device=dev)
             graph.edata['_edge_w'] = edge_weight
 
             if self._norm == 'both':
@@ -398,7 +400,7 @@ class GraphConv(nn.Module):
             # (BarclayII) For RGCN on heterogeneous graphs we need to support GCN on bipartite.
             feat_src, feat_dst = expand_as_pair(feat, graph)
             if self._norm in ['left', 'both']:
-                degs = graph.out_degrees().float().clamp(min=1)
+                degs = graph.out_degrees().to(feat_src).clamp(min=1)
                 if self._norm == 'both':
                     norm = th.pow(degs, -0.5)
                 else:
@@ -431,7 +433,7 @@ class GraphConv(nn.Module):
                     rst = th.matmul(rst, weight)
 
             if self._norm in ['right', 'both']:
-                degs = graph.in_degrees().float().clamp(min=1)
+                degs = graph.in_degrees().to(feat_dst).clamp(min=1)
                 if self._norm == 'both':
                     norm = th.pow(degs, -0.5)
                 else:
