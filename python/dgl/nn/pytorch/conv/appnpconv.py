@@ -91,11 +91,13 @@ class APPNPConv(nn.Module):
         with graph.local_scope():
             if edge_weight is None:
                 src_norm = th.pow(
-                    graph.out_degrees().float().clamp(min=1), -0.5
+                    graph.out_degrees().to(feat).clamp(min=1), -0.5
                 )
                 shp = src_norm.shape + (1,) * (feat.dim() - 1)
                 src_norm = th.reshape(src_norm, shp).to(feat.device)
-                dst_norm = th.pow(graph.in_degrees().float().clamp(min=1), -0.5)
+                dst_norm = th.pow(
+                    graph.in_degrees().to(feat).clamp(min=1), -0.5
+                )
                 shp = dst_norm.shape + (1,) * (feat.dim() - 1)
                 dst_norm = th.reshape(dst_norm, shp).to(feat.device)
             else:
