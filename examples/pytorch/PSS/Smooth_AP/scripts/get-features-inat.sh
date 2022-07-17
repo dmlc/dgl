@@ -1,0 +1,12 @@
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python src/get_features.py \
+--dataset Inaturalist --lr 1e-5 --fc_lr_mul 1 \
+--n_epochs 400 --bs 384 \
+--source_path ~/code/Smooth_AP/data/ --embed_dim 128 \
+--resume INATURALIST_RESNET50_2021-9-2-4-21-21/checkpoint.pth.tar \
+--finetune false --onehead ture --get_features true --iter 0 \
+--class_num 948 --loss smoothap \
+--trainset lin_train_set1.txt \
+--all_trainset train_set1.txt \
+--testset test_set1.txt \
+--linsize 29011 --uinsize 18403 \
+--cluster_path /home/ubuntu/code/hilander/hilander/data/inat_hilander_l_smoothap_train_selectbydensity_0.8_0.9_iter0.pkl
