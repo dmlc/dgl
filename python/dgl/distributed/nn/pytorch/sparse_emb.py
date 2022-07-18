@@ -16,8 +16,8 @@ class DistEmbedding:
 
     To support efficient training on a graph with many nodes, the embeddings support sparse
     updates. That is, only the embeddings involved in a mini-batch computation are updated.
-    Currently, DGL provides two optimizer: :class:`dgl.distributed.optim.SparseAdagrad` and
-    :class:`dgl.distributed.optim.SparseAdam`. DGL will provide more optimizers in the future.
+    Please refer to `Distributed Optimizers <https://docs.dgl.ai/api/python/dgl.distributed.html#
+    distributed-embedding-optimizer>`__ for available optimizers in DGL.
 
     Distributed embeddings are sharded and stored in a cluster of machines in the same way as
     :class:`dgl.distributed.DistTensor`, except that distributed embeddings are trainable.
