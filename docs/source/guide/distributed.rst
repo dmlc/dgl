@@ -100,16 +100,21 @@ Specifically, DGL's distributed training has three types of interacting processe
   with samplers to get mini-batches. Trainers communicate gradients among each other
   using PyTorch's native ``DistributedDataParallel`` paradigm.
 
-Besides Python APIs, DGL also provides `tools <https://github.com/dmlc/dgl/tree/master/tools>`_
+Besides Python APIs, DGL also provides `tools <https://github.com/dmlc/dgl/tree/master/tools>`__
 for provisioning graph data and processes to the entire cluster.
 
 Having the distributed components in mind, the rest of the section will cover
 the following distributed components:
 
 * :ref:`guide-distributed-preprocessing`
-* :ref:`guide-distributed-apis`
-* :ref:`guide-distributed-hetero`
 * :ref:`guide-distributed-tools`
+* :ref:`guide-distributed-apis`
+
+For more advanced users who are interested in more details:
+
+* :ref:`guide-distributed-partition-format`
+* :ref:`guide-distributed-hetero`
+* :ref:`guide-distributed-parmetis`
 
 .. toctree::
     :maxdepth: 1
@@ -117,6 +122,8 @@ the following distributed components:
     :glob:
 
     distributed-preprocessing
-    distributed-apis
-    distributed-hetero
     distributed-tools
+    distributed-apis
+    distributed-partition-format
+    distributed-hetero
+    distributed-parmetis

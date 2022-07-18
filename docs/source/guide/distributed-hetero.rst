@@ -1,6 +1,6 @@
 .. _guide-distributed-hetero:
 
-7.3 Distributed Heterogeneous graph training
+7.3 Distributed heterogeneous graph
 --------------------------------------------
 
 DGL v0.6.0 provides an experimental support for distributed training on heterogeneous graphs.

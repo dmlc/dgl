@@ -3,7 +3,20 @@
 dgl.distributed
 =================================
 
-.. automodule:: dgl.distributed
+.. currentmodule:: dgl.distributed
+
+DGL distributed module contains classes and functions to support
+distributed Graph Neural Network training and inference on a cluster of
+machines.
+
+This includes a few submodules:
+
+* distributed data structures including distributed graph, distributed tensor
+  and distributed embeddings.
+* distributed sampling.
+* distributed workload split at runtime.
+* graph partition.
+
 
 Initialization
 ---------------
@@ -27,25 +40,21 @@ Distributed Tensor
 
 Distributed Node Embedding
 ---------------------
-.. currentmodule:: dgl.distributed
 
 .. autoclass:: DistEmbedding
 
 
 Distributed embedding optimizer
 -------------------------
-.. currentmodule:: dgl.distributed.optim.pytorch
 
-.. autoclass:: SparseAdagrad
+.. autoclass:: optim.SparseAdagrad
     :members: step
 
-.. autoclass:: SparseAdam
+.. autoclass:: optim.SparseAdam
     :members: step
 
 Distributed workload split
 --------------------------
-
-.. currentmodule:: dgl.distributed.dist_graph
 
 .. autosummary::
     :toctree: ../../generated/
@@ -59,14 +68,10 @@ Distributed Sampling
 Distributed DataLoader
 ``````````````````````
 
-.. currentmodule:: dgl.distributed.dist_dataloader
-
 .. autoclass:: DistDataLoader
 
 Distributed Neighbor Sampling
 `````````````````````````````
-
-.. currentmodule:: dgl.distributed.graph_services
 
 .. autosummary::
     :toctree: ../../generated/
@@ -81,8 +86,6 @@ Partition
 Graph partition book
 ````````````````````
 
-.. currentmodule:: dgl.distributed.graph_partition_book
-
 .. autoclass:: GraphPartitionBook
     :members: shared_memory, num_partitions, metadata, nid2partid, eid2partid, partid2nids, partid2eids, nid2localnid, eid2localeid, partid, map_to_per_ntype, map_to_per_etype, map_to_homo_nid, map_to_homo_eid
 
@@ -92,8 +95,6 @@ Graph partition book
 Split and Load Graphs
 `````````````````````
 
-.. currentmodule:: dgl.distributed.partition
-
 .. autosummary::
     :toctree: ../../generated/
 
@@ -101,4 +102,3 @@ Split and Load Graphs
     load_partition_feats
     load_partition_book
     partition_graph
-

@@ -1,19 +1,4 @@
-"""DGL distributed module contains classes and functions to support
-distributed graph neural network training and inference in a cluster of
-machines.
-
-This includes a few submodules:
-
-* distributed data structures including distributed graph, distributed tensor
-  and distributed embeddings.
-* distributed sampling.
-* distributed workload split at runtime.
-* graph partition.
-
-"""
-import os
-import sys
-
+"""DGL distributed module"""
 from .dist_graph import DistGraphServer, DistGraph, node_split, edge_split
 from .dist_tensor import DistTensor
 from .partition import partition_graph, load_partition, load_partition_feats, load_partition_book
