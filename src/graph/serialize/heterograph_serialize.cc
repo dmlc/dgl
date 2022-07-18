@@ -62,7 +62,8 @@ using dmlc::io::FileSystem;
 using dmlc::io::URI;
 
 bool SaveHeteroGraphs(std::string filename, List<HeteroGraphData> hdata,
-                      const std::vector<NamedTensor> &nd_list) {
+                      const std::vector<NamedTensor> &nd_list,
+                      dgl_format_code_t formats) {
   auto fs = std::unique_ptr<StreamWithCount>(
     StreamWithCount::Create(filename.c_str(), "w", false));
   CHECK(fs->IsValid()) << "File name " << filename << " is not a valid name";
@@ -102,8 +103,10 @@ bool SaveHeteroGraphs(std::string filename, List<HeteroGraphData> hdata,
   // Write HeteroGraphData
   for (uint64_t i = 0; i < num_graph; ++i) {
     graph_indices[i] = fs->Count();
+    hdata[i].sptr()->gptr->SetFormatsWhenSave(formats);
     auto gdata = hdata[i].sptr();
     fs->Write(gdata);
+    hdata[i].sptr()->gptr->ResetFormatsWhenSave();
   }
 
   // Write indptr into string to count size
@@ -221,12 +224,18 @@ DGL_REGISTER_GLOBAL("data.heterograph_serialize._CAPI_SaveHeteroGraphData")
     std::string filename = args[0];
     List<HeteroGraphData> hgdata = args[1];
     Map<std::string, Value> nd_map = args[2];
+    List<Value> formats = args[3];
+    std::vector<SparseFormat> formats_vec;
+    for (const auto& val : formats) {
+      formats_vec.push_back(ParseSparseFormat(val->data));
+    }
+    const auto formats_code = SparseFormatsToCode(formats_vec);
     std::vector<NamedTensor> nd_list;
     for (auto kv : nd_map) {
       NDArray ndarray = static_cast<NDArray>(kv.second->data);
       nd_list.emplace_back(kv.first, ndarray);
     }
-    *rv = dgl::serialize::SaveHeteroGraphs(filename, hgdata, nd_list);
+    *rv = dgl::serialize::SaveHeteroGraphs(filename, hgdata, nd_list, formats_code);
   });
 
 DGL_REGISTER_GLOBAL(

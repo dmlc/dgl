@@ -359,6 +359,20 @@ class UnitGraph : public BaseHeteroGraph {
    */
   SparseFormat SelectFormat(dgl_format_code_t preferred_formats) const;
 
+  /*!
+   * \brief Set which formats to be saved when serialize.
+   */
+  void SetFormatsWhenSave(dgl_format_code_t formats) {
+    save_formats_ = formats;
+  }
+
+  /*!
+   * \brief Reset which formats to be saved when serialize.
+   */
+  void ResetFormatsWhenSave() {
+    save_formats_ = NONE_CODE;
+  }
+
   /*! \return Whether the graph is hypersparse */
   bool IsHypersparse() const;
 
@@ -376,6 +390,10 @@ class UnitGraph : public BaseHeteroGraph {
    * \brief Storage format restriction.
    */
   dgl_format_code_t formats_;
+  /*!
+   * \brief Formats to be saved.
+   */
+  dgl_format_code_t save_formats_{NONE_CODE};
 };
 
 };  // namespace dgl

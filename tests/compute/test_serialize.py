@@ -335,6 +335,78 @@ def test_serialize_heterograph_s3():
     assert np.allclose(F.asnumpy(edges[1]), np.array([1, 2, 3]))
 
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
+@pytest.mark.parametrize('is_hetero', [True, False])
+@pytest.mark.parametrize('formats', ['coo', 'csr', 'csc', ['coo', 'csc'], ['coo', 'csr'], ['csc', 'csr'], ['coo', 'csr', 'csc']])
+def test_graph_serialize_with_formats(is_hetero, formats):
+    num_graphs = 100
+    g_list = [generate_rand_graph(30, is_hetero) for _ in range(num_graphs)]
+
+    # create a temporary file and immediately release it so DGL can open it.
+    f = tempfile.NamedTemporaryFile(delete=False)
+    path = f.name
+    f.close()
+
+    dgl.save_graphs(path, g_list, formats=formats)
+
+    idx_list = np.random.permutation(np.arange(num_graphs)).tolist()
+    loadg_list, _ = dgl.load_graphs(path, idx_list)
+
+    idx = idx_list[0]
+    load_g = loadg_list[0]
+    g_formats = load_g.formats()
+
+    # verify formats
+    if not isinstance(formats, list):
+        formats = [formats]
+    for fmt in formats:
+        assert fmt in g_formats['created']
+
+    assert F.allclose(load_g.nodes(), g_list[idx].nodes())
+
+    load_edges = load_g.all_edges('uv', 'eid')
+    g_edges = g_list[idx].all_edges('uv', 'eid')
+    assert F.allclose(load_edges[0], g_edges[0])
+    assert F.allclose(load_edges[1], g_edges[1])
+
+    os.unlink(path)
+
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
+def test_graph_serialize_with_restricted_formats():
+    g = dgl.rand_graph(100, 200)
+    g = g.formats(['coo'])
+    g_list = [g]
+
+    # create a temporary file and immediately release it so DGL can open it.
+    f = tempfile.NamedTemporaryFile(delete=False)
+    path = f.name
+    f.close()
+
+    expect_except = False
+    try:
+        dgl.save_graphs(path, g_list, formats=['csr'])
+    except:
+        expect_except = True
+    assert expect_except
+
+    os.unlink(path)
+
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
+def test_deserialize_old_graph():
+    num_nodes = 100
+    num_edges = 200
+    path = os.path.join(
+        os.path.dirname(__file__), "data/graph_0.9a220622.dgl")
+    g_list, _ = dgl.load_graphs(path)
+    g = g_list[0]
+    assert 'coo' in g.formats()['created']
+    assert 'csr' in g.formats()['not created']
+    assert 'csc' in g.formats()['not created']
+    assert num_nodes == g.num_nodes()
+    assert num_edges == g.num_edges()
+
 
 if __name__ == "__main__":
     pass

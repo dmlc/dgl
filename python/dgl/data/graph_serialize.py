@@ -75,7 +75,7 @@ class GraphData(ObjectBase):
         return g
 
 
-def save_graphs(filename, g_list, labels=None):
+def save_graphs(filename, g_list, labels=None, formats=None):
     r"""Save graphs and optionally their labels to file.
 
     Besides saving to local files, DGL supports writing the graphs directly
@@ -94,6 +94,9 @@ def save_graphs(filename, g_list, labels=None):
         The graphs to be saved.
     labels: dict[str, Tensor]
         labels should be dict of tensors, with str as keys
+    formats: str or list of str
+        Indicates which formats to be saved. If not specified, one appropriate
+        format is saved only.
 
     Examples
     ----------
@@ -127,7 +130,7 @@ def save_graphs(filename, g_list, labels=None):
 
     g_sample = g_list[0] if isinstance(g_list, list) else g_list
     if type(g_sample) == DGLHeteroGraph:  # Doesn't support DGLHeteroGraph's derived class
-        save_heterographs(filename, g_list, labels)
+        save_heterographs(filename, g_list, labels, formats)
     else:
         raise DGLError(
             "Invalid argument g_list. Must be a DGLGraph or a list of DGLGraphs.")
