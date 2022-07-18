@@ -55,7 +55,7 @@ def train(train_dataloader, valid_dataloader, features, device, model):
     for epoch in range(400):
         model.train()
         logits = []
-        total_loss = 0.0
+        total_loss = 0
         # mini-batches loop
         for batch_id, subgraph in enumerate(train_dataloader):
             subgraph = subgraph.to(device)
@@ -100,5 +100,5 @@ if __name__ == '__main__':
     # test the model
     print('Testing...')
     test_dataloader = GraphDataLoader(test_dataset, batch_size=2)
-    avg_score = evaluate_in_batches(test_dataloader, device, model) # evaluate in F1-Score instead of loss
+    avg_score = evaluate_in_batches(test_dataloader, device, model)  
     print("Test Accuracy (F1-score) {:.4f}".format(avg_score))
