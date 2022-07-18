@@ -10,9 +10,14 @@ Graph Attention Networks (GAT)
 How to run
 -------
 
-Run with the following (available dataset: "cora", "citeseer", "pubmed")
+Run with the following for node classification (available datasets: "cora", "citeseer", "pubmed")
 ```bash
 python3 train.py --dataset cora
+```
+
+Run with the following for graph classification with PPI dataset
+```bash
+python3 train_ppi.py
 ```
 
 Summary
@@ -20,3 +25,4 @@ Summary
 * cora: ~0.821
 * citeseer: ~0.710
 * pubmed: ~0.780
+* ppi: ~0.9744

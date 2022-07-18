@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import dgl
 import dgl.nn as dglnn
 from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
 from dgl import AddSelfLoop
@@ -10,7 +9,6 @@ import argparse
 class GAT(nn.Module):
     def __init__(self,in_size, hid_size, out_size, heads):
         super().__init__()
-        self.g = g
         self.gat_layers = nn.ModuleList()
         # two-layer GAT
         self.gat_layers.append(dglnn.GATConv(in_size, hid_size, heads[0], feat_drop=0.6, attn_drop=0.6, activation=F.elu))
