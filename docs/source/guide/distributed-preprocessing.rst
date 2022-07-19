@@ -18,22 +18,29 @@ in a format that is easy to load during the training.
 .. code-block:: none
 
     data_root_dir/
-      |-- mygraph.json              # partition configuration file in JSON
-      |-- node_map.npy              # partition ID of each node stored in a numpy array (optional)
-      |-- edge_map.npy              # partition ID of each edge stored in a numpy array (optional)
-      |-- part0/                    # data for partition 0
-      |  |-- node_feats.dgl         # node features stored in binary format
-      |  |-- edge_feats.dgl         # edge features stored in binary format
-      |  |-- graph.dgl              # graph structure of this partition stored in binary format
+      |-- mygraph.json          # partition configuration file in JSON
+      |-- part0/                # data for partition 0
+      |  |-- node_feats.dgl     # node features stored in binary format
+      |  |-- edge_feats.dgl     # edge features stored in binary format
+      |  |-- graph.dgl          # graph structure of this partition stored in binary format
       |
-      |-- part1/
+      |-- part1/                # data for partition 1
          |-- node_feats.dgl
          |-- edge_feats.dgl
          |-- graph.dgl
 
+Chapter :ref:`guide-distributed-partition-format` covers more details about the
+partition format. To distribute the partitions to a cluster, users can either save
+the data in some shared folder accessible by all machines, or copy the metadata
+JSON as well as the corresponding partition folder `partX` to the X^th machine.
 
-For more details, check out chapter :ref:`guide-distributed-partition-format`
-for an in-depth explanation.
+Using :func:`~dgl.distributed.partition_graph` requires an instance with large enough
+CPU RAM to hold the entire graph structure and features, which may not be viable for
+graphs with hundreds of billions of edges or large features. We describe how to use
+the *parallel preprocessing pipeline* for such cases next.
+
+Parallel Preprocessing Pipeline
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 To handle massive graph data that cannot fit in the CPU RAM of a
 single machine, DGL utilizes data chunking and parallel processing to reduce
