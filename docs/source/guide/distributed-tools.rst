@@ -49,12 +49,12 @@ paths to the workspace.
 The launch script creates a specified number of training jobs (``--num_trainers``) on each machine.
 In addition, users need to specify the number of sampler processes for each trainer
 (``--num_samplers``). The number of sampler processes has to match with the number of worker processes
-specified in :func:`~dgl.distributed.initialize`.
+specified in :func:`dgl.distributed.initialize`.
 
 .. warning::
 
     The number of sampler processes has to match with the number of worker processes
-    specified in :func:`~dgl.distributed.initialize`. <--------- what does this mean?
+    specified in :func:`dgl.distributed.initialize`. <--------- what does this mean?
 
 Launching a Persistent Graph Server
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -95,7 +95,7 @@ the server which will be referred when launching new training jobs.
 Then launch trainers as normal which will automatically connect to the existing
 persistent server.
 
-.. code:: none
+.. code:: bash
 
     python3 tools/launch.py               \
       --workspace /my/workspace/          \

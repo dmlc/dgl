@@ -1,9 +1,8 @@
 .. _guide-distributed-hetero:
 
-7.3 Distributed heterogeneous graph
+7.5 Distributed heterogeneous graph
 --------------------------------------------
 
-DGL v0.6.0 provides an experimental support for distributed training on heterogeneous graphs.
 In DGL, a node or edge in a heterogeneous graph has a unique ID in its own node type or edge type.
 DGL identifies a node or edge with a tuple: node/edge type and type-wise ID. In distributed training,
 a node or edge can be identified by a homogeneous ID, in addition to the tuple of node/edge type

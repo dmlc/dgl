@@ -9,16 +9,26 @@ provides a partitioning API :func:`~dgl.distributed.partition_graph` that
 partitions an in-memory :class:`~dgl.DGLGraph` object. It supports
 multiple partitioning algorithms such as random partitioning and
 `Metis <http://glaros.dtc.umn.edu/gkhome/views/metis>`__.
-The benefit of Metis partitioning is that it can generate
-partitions with minimal edge cuts to reduce network communication for distributed training
-and inference. DGL uses the latest version of Metis with the options optimized for the real-world
-graphs with power-law distribution. After partitioning, the API constructs the partitioned results
-in a format that is easy to load during the training.
+The benefit of Metis partitioning is that it can generate partitions with
+minimal edge cuts to reduce network communication for distributed training and
+inference. DGL uses the latest version of Metis with the options optimized for
+the real-world graphs with power-law distribution. After partitioning, the API
+constructs the partitioned results in a format that is easy to load during the
+training. For example,
+
+.. code-block:: python
+
+    import dgl
+
+    g = ...  # create or load an DGLGraph object
+    dgl.distributed.partition_graph(g, 'mygraph', 2, 'data_root_dir')
+
+will outputs the following data file.
 
 .. code-block:: none
 
     data_root_dir/
-      |-- mygraph.json          # partition configuration file in JSON
+      |-- mygraph.json          # metadata JSON. File name is the given graph name.
       |-- part0/                # data for partition 0
       |  |-- node_feats.dgl     # node features stored in binary format
       |  |-- edge_feats.dgl     # edge features stored in binary format
@@ -29,10 +39,10 @@ in a format that is easy to load during the training.
          |-- edge_feats.dgl
          |-- graph.dgl
 
-Chapter :ref:`guide-distributed-partition-format` covers more details about the
+Chapter :ref:`guide-distributed-partition` covers more details about the
 partition format. To distribute the partitions to a cluster, users can either save
 the data in some shared folder accessible by all machines, or copy the metadata
-JSON as well as the corresponding partition folder `partX` to the X^th machine.
+JSON as well as the corresponding partition folder ``partX`` to the X^th machine.
 
 Using :func:`~dgl.distributed.partition_graph` requires an instance with large enough
 CPU RAM to hold the entire graph structure and features, which may not be viable for
@@ -102,12 +112,12 @@ Its data files are organized as following:
 
 
 Step.1 Partition Preparation
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 TBD
 
 Chunked Graph Data Format
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 After step.1, the graph data will be chunked into multiple data files so that
 each piece could be loaded to CPU RAM easily. As an example, we have chunked
@@ -139,8 +149,6 @@ each type (e.g., author, institution, paper), edge ID data of each relation
 (e.g., writes, affiliates, cites) and node features. All ID data are stored in
 CSV (we will illustrate the contents soon) while node features are stored in
 numpy arrays.
-
-**Metadata JSON**
 
 The ``meta.json`` stores all the metadata information such as the file names
 and the chunk sizes.
@@ -226,7 +234,7 @@ Example edge index file:
 
 
 Step.2 Graph Partitioning
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 This step reads the chunked graph data and calculates which partition each node
 should belong to. The results are saved in a set of *partition assignment files*.
@@ -271,10 +279,10 @@ the partition ID of node i).
     DGL currently requires the number of data chunks and the number of partitions to be the same.
 
 Despite its simplicity, random partitioning may cause frequent cross machine communication.
-Check out chapter :ref:`guide-distributed-parmetis` for more advanced options.
+Check out chapter :ref:`guide-distributed-partition` for more advanced options.
 
 Step.3 Data Dispatching
-~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 DGL provides a ``dispatch_data.py`` script to physically partition the data and
 dispatch partitions to each training machines. It will also convert the data

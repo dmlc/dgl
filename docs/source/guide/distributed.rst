@@ -112,9 +112,8 @@ the following distributed components:
 
 For more advanced users who are interested in more details:
 
-* :ref:`guide-distributed-partition-format`
+* :ref:`guide-distributed-partition`
 * :ref:`guide-distributed-hetero`
-* :ref:`guide-distributed-parmetis`
 
 .. toctree::
     :maxdepth: 1
@@ -124,6 +123,5 @@ For more advanced users who are interested in more details:
     distributed-preprocessing
     distributed-tools
     distributed-apis
-    distributed-partition-format
+    distributed-partition
     distributed-hetero
-    distributed-parmetis
