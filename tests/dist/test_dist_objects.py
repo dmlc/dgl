@@ -10,6 +10,7 @@ import dgl.backend as F
 from dgl.distributed import partition_graph
 
 graph_name = os.environ.get('DIST_DGL_TEST_GRAPH_NAME', 'random_test_graph')
+target = os.environ.get('DIST_DGL_TEST_OBJECT_TYPE', '')
 shared_workspace = os.environ.get('DIST_DGL_TEST_WORKSPACE')
 
 def create_graph(num_part, dist_graph_path, hetero):
@@ -37,13 +38,12 @@ def create_graph(num_part, dist_graph_path, hetero):
 
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
-@pytest.mark.parametrize("target", ['DistTensor'])
 @pytest.mark.parametrize("net_type", ['tensorpipe', 'socket'])
 @pytest.mark.parametrize("num_servers", [1, 4])
 @pytest.mark.parametrize("num_clients", [1, 4])
 @pytest.mark.parametrize("hetero", [False, True])
 @pytest.mark.parametrize("shared_mem", [False, True])
-def test_dist_objects(target, net_type, num_servers, num_clients, hetero, shared_mem):
+def test_dist_objects(net_type, num_servers, num_clients, hetero, shared_mem):
     if not shared_mem and num_servers > 1:
         pytest.skip(f"Backup servers are not supported when shared memory is disabled")
     ip_config = os.environ.get('DIST_DGL_TEST_IP_CONFIG', 'ip_config.txt')
