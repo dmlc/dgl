@@ -1,8 +1,10 @@
 /*!
  *  Copyright (c) 2022 by Contributors
  * \file array/cuda/rowwise_sampling_prob.cu
- * \brief weighted rowwise sampling
- * \author pengqirong (OPPO)
+ * \brief weighted rowwise sampling. The degree computing kernels and
+ * host-side functions are partily borrowed from the uniform rowwise
+ * sampling code rowwise_sampling.cu.
+ * \author pengqirong (OPPO), dlasalle and Xin from Nvidia.
  */
 #include <dgl/random.h>
 #include <dgl/runtime/device_api.h>
@@ -14,7 +16,7 @@
 #include "../../runtime/cuda/cuda_common.h"
 
 // require CUB 1.17 to use DeviceSegmentedSort
-static_assert(CUB_VERSION == 101700);
+static_assert(CUB_VERSION >= 101700);
 
 using namespace dgl::aten::cuda;
 
@@ -159,7 +161,7 @@ __global__ void _CSRAResValueKernel(
     IdType * const ares_idxs,
     FloatType * const ares) {
 
-  int64_t out_row = blockIdx.x * TILE_SIZE + threadIdx.y;
+  int64_t out_row = blockIdx.x * TILE_SIZE;
   const int64_t last_row = min(static_cast<int64_t>(blockIdx.x + 1) * TILE_SIZE, num_rows);
 
   curandStatePhilox4_32_10_t rng;
@@ -227,7 +229,7 @@ __global__ void _CSRRowWiseSampleKernel(
   // we assign one warp per row
   assert(blockDim.x == BLOCK_SIZE);
 
-  int64_t out_row = blockIdx.x * TILE_SIZE + threadIdx.y;
+  int64_t out_row = blockIdx.x * TILE_SIZE;
   const int64_t last_row = min(static_cast<int64_t>(blockIdx.x + 1) * TILE_SIZE, num_rows);
 
   while (out_row < last_row) {
@@ -327,7 +329,7 @@ __global__ void _CSRRowWiseSampleReplaceKernel(
   // we assign one warp per row
   assert(blockDim.x == BLOCK_SIZE);
 
-  int64_t out_row = blockIdx.x * TILE_SIZE + threadIdx.y;
+  int64_t out_row = blockIdx.x * TILE_SIZE;
   const int64_t last_row = min(static_cast<int64_t>(blockIdx.x + 1) * TILE_SIZE, num_rows);
 
   curandStatePhilox4_32_10_t rng;
@@ -414,7 +416,7 @@ __global__ void _CSRRowWiseSampleReplaceKernel(
 * @param num_picks The number of non-zeros to pick per row.
 * @param prob The probability array of the input CSR.
 * @param replace Is replacement sampling?
-* @author pengqirong (OPPO)
+* @author pengqirong (OPPO), dlasalle and Xin from Nvidia.
 */
 template <DLDeviceType XPU, typename IdType, typename FloatType>
 COOMatrix CSRRowWiseSampling(CSRMatrix mat,
@@ -488,7 +490,8 @@ COOMatrix CSRRowWiseSampling(CSRMatrix mat,
   device->FreeWorkspace(ctx, prefix_temp);
   device->FreeWorkspace(ctx, temp_deg);
 
-  // (Xin): The copy here is too small, and the overhead of creating cuda events cannot be ignored
+  // (Xin): The copy here is too small, and the overhead of creating cuda events
+  // cannot be ignored. Just use synchronized copy.
   IdType temp_len;
   device->CopyDataFromTo(temp_ptr, num_rows * sizeof(temp_len), &temp_len, 0,
       sizeof(temp_len),
@@ -596,24 +599,24 @@ COOMatrix CSRRowWiseSampling(CSRMatrix mat,
     void *d_temp_storage = nullptr;
     size_t temp_storage_bytes = 0;
     CUDA_CALL(cub::DeviceSegmentedSort::SortPairsDescending(
-      d_temp_storage,
-      temp_storage_bytes,
-      sort_keys,
-      sort_values,
-      temp_len,
-      num_rows,
-      temp_ptr,
-      temp_ptr + 1));
+        d_temp_storage,
+        temp_storage_bytes,
+        sort_keys,
+        sort_values,
+        temp_len,
+        num_rows,
+        temp_ptr,
+        temp_ptr + 1));
     d_temp_storage = device->AllocWorkspace(ctx, temp_storage_bytes);
     CUDA_CALL(cub::DeviceSegmentedSort::SortPairsDescending(
-      d_temp_storage,
-      temp_storage_bytes,
-      sort_keys,
-      sort_values,
-      temp_len,
-      num_rows,
-      temp_ptr,
-      temp_ptr + 1));
+        d_temp_storage,
+        temp_storage_bytes,
+        sort_keys,
+        sort_values,
+        temp_len,
+        num_rows,
+        temp_ptr,
+        temp_ptr + 1));
     device->FreeWorkspace(ctx, d_temp_storage);
     device->FreeWorkspace(ctx, temp);
     device->FreeWorkspace(ctx, temp_idxs);

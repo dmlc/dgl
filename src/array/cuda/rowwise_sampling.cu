@@ -127,7 +127,7 @@ __global__ void _CSRRowWiseSampleUniformKernel(
   // we assign one warp per row
   assert(blockDim.x == BLOCK_SIZE);
 
-  int64_t out_row = blockIdx.x * TILE_SIZE + threadIdx.y;
+  int64_t out_row = blockIdx.x * TILE_SIZE;
   const int64_t last_row = min(static_cast<int64_t>(blockIdx.x + 1) * TILE_SIZE, num_rows);
 
   curandStatePhilox4_32_10_t rng;
@@ -211,7 +211,7 @@ __global__ void _CSRRowWiseSampleUniformReplaceKernel(
   // we assign one warp per row
   assert(blockDim.x == BLOCK_SIZE);
 
-  int64_t out_row = blockIdx.x * TILE_SIZE + threadIdx.y;
+  int64_t out_row = blockIdx.x * TILE_SIZE;
   const int64_t last_row = min(static_cast<int64_t>(blockIdx.x + 1) * TILE_SIZE, num_rows);
 
   curandStatePhilox4_32_10_t rng;
