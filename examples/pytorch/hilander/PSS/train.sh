@@ -43,13 +43,15 @@ python test_subg_inat.py \
 
 
 for i in {1..4} ; do
+  last_iter=`expr $i - 1`
+  echo ${last_iter}
   # iter i - train Smooth-AP
   python Smooth_AP/src/finetune_1head.py \
   --dataset Inaturalist --lr 1e-5 --fc_lr_mul 1 \
   --n_epochs 400 --bs 384 --class_num 1024 \
   --source_path "../../data/" --embed_dim 128 \
   --trainset lin_train_set1.txt --testset Inaturalist_test_set1.txt \
-  --cluster_path "../../data/inat_hilander_l_smoothap_train_selectbydensity_iter${i-1}.pkl" \
+  --cluster_path "../../data/inat_hilander_l_smoothap_train_selectbydensity_iter${last_iter}.pkl" \
   --finetune true --onehead true --loss smoothap --infrequent_eval 1 --iter ${i}
 
   # iter i - get feature
@@ -57,17 +59,17 @@ for i in {1..4} ; do
   --dataset Inaturalist --lr 1e-5 --fc_lr_mul 1 \
   --n_epochs 400 --bs 384 \
   --source_path "../../data/" --embed_dim 128 \
-  --resume "${i}/checkpoint${i}.pth.tar" \
+  --resume "${i}/checkpoint_${i}.pth.tar" \
   --finetune false --onehead ture --get_features true --iter ${i} \
   --class_num 948 --loss smoothap \
   --trainset lin_train_set1.txt \
   --all_trainset train_set1.txt \
-  --testset test_set1.txt \
+  --testset Inaturalist_test_set1.txt \
   --linsize 29011 --uinsize 18403 \
-  --cluster_path "./PSS/data/inat_hilander_l_smoothap_train_selectbydensity_iter${i-1}.pkl"
+  --cluster_path "../../data/inat_hilander_l_smoothap_train_selectbydensity_iter${last_iter}.pkl"
 
   # iter i - train hi-lander
-  python ../train_subg.py \
+  python train_subg_inat.py \
   --data_path "/home/ubuntu/code/dgl/examples/pytorch/hilander/PSS/data/Inaturalist/T_train_iter${i}_smoothap_inat_features.pkl" \
   --model_filename "/home/ubuntu/code/dgl/examples/pytorch/hilander/PSS/hilander_checkpoint/inat_l_smoothap_iter${i}.pth" \
   --knn_k 10,5,3 --levels 2,3,4 \

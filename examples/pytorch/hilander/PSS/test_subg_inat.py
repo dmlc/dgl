@@ -379,10 +379,6 @@ print("##################### L+U ########################")
 luidx = np.where(global_pred_labels != -1)[0]
 print(len(luidx))
 evaluation(global_pred_labels[luidx], global_gt_labels[luidx], args.metrics)
-selectedlinfile = open("/home/ubuntu/code/Smooth_AP/data/Inaturalist/" + "lin_train_set12.txt", 'w')
-for s in luidx:
-    selectedlinfile.write(idx2path[s] + '\n')
-selectedlinfile.close()
 print("##################### new selected samples ########################")
 sidx = np.where(global_masks == 1)[0]
 print(len(sidx))
