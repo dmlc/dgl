@@ -2,7 +2,7 @@
  *  Copyright (c) 2022 by Contributors
  * \file array/cuda/rowwise_sampling_prob.cu
  * \brief weighted rowwise sampling. The degree computing kernels and
- * host-side functions are partily borrowed from the uniform rowwise
+ * host-side functions are partially borrowed from the uniform rowwise
  * sampling code rowwise_sampling.cu.
  * \author pengqirong (OPPO), dlasalle and Xin from Nvidia.
  */
