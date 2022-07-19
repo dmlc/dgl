@@ -32,7 +32,7 @@ cd ../PSS
 We use the iNaturalist 2018 dataset. 
 - download link: https://www.kaggle.com/c/inaturalist-2018/data;
 - annotations are in `Smooth_AP/data/Inaturalist`;
-- annotation txt files for different data splits are in [S3 link]|[Google Drive]|[[Baidu Netdisk](https://pan.baidu.com/s/14S0Fns29a4o7kFDlNyyPjA?pwd=uwsg)] (password:uwsg).
+- annotation txt files for different data splits are in [S3 link]|[[Google Drive](https://drive.google.com/drive/folders/1xrWogJGef4Ex5OGjiImgA06bAnk2MDrK?usp=sharing)]|[[Baidu Netdisk](https://pan.baidu.com/s/14S0Fns29a4o7kFDlNyyPjA?pwd=uwsg)] (password:uwsg).
 
 Download `train_val2018.tar.gz` and the data split txt files to `data/Inaturalist/` folder. Extract the `tar.gz` files.
 The data folder has the following structure:
@@ -48,7 +48,6 @@ PSS
 |    |  |- ...
 |    |- lin_train_set1.txt
 |    |- train_set1.txt
-|    |- u_train_set1.txt
 |    |- uin_train_set1.txt
 |    |- uout_train_set1.txt
 |    |- in_train_set1.txt
