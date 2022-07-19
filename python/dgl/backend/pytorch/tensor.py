@@ -12,11 +12,9 @@ from torch.utils import dlpack
 from ... import ndarray as nd
 from ..._deprecate import kernel as K
 from ...function.base import TargetCode
-from ...base import dgl_warning
 
-if LooseVersion(th.__version__) < LooseVersion("1.8.0"):
-    raise Exception("Detected an old version of PyTorch. Please update torch>=1.8.0 "
-                    "for the best experience.")
+if LooseVersion(th.__version__) < LooseVersion("1.9.0"):
+    raise RuntimeError("DGL requires PyTorch >= 1.9.0")
 
 def data_type_dict():
     return {'float16' : th.float16,
@@ -420,8 +418,6 @@ class BinaryReduce(th.autograd.Function):
     def backward(ctx, grad_out):
         reducer, binary_op, graph, lhs, rhs, lhs_map, rhs_map, out_map, \
             feat_shape, degs = ctx.backward_cache
-        # See https://github.com/dmlc/dgl/pull/3386
-        ctx.backward_cache = None
         lhs_data, rhs_data, out_data = ctx.saved_tensors
         lhs_data_nd = zerocopy_to_dgl_ndarray(lhs_data)
         rhs_data_nd = zerocopy_to_dgl_ndarray(rhs_data)
@@ -499,8 +495,6 @@ class CopyReduce(th.autograd.Function):
     @staticmethod
     def backward(ctx, grad_out):
         reducer, graph, target, in_map, out_map, degs = ctx.backward_cache
-        # See https://github.com/dmlc/dgl/pull/3386
-        ctx.backward_cache = None
         in_data, out_data = ctx.saved_tensors
         in_data_nd = zerocopy_to_dgl_ndarray(in_data)
         out_data_nd = zerocopy_to_dgl_ndarray(out_data)

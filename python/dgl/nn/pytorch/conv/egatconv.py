@@ -45,7 +45,7 @@ class EGATConv(nn.Module):
     num_heads : int
         Number of attention heads.
     bias : bool, optional
-        If True, add bias term to :math: `f_{ij}^{\prime}`. Defaults: ``True``.
+        If True, add bias term to :math:`f_{ij}^{\prime}`. Defaults: ``True``.
 
     Examples
     ----------
@@ -170,16 +170,16 @@ class EGATConv(nn.Module):
         Returns
         -------
         pair of torch.Tensor
-            node output features followed by edge output features
-            The node output feature of shape :math:`(N, H, D_{out})`
-            The edge output feature of shape :math:`(F, H, F_{out})`
+            node output features followed by edge output features.
+            The node output feature is of shape :math:`(N, H, D_{out})`
+            The edge output feature is of shape :math:`(F, H, F_{out})`
             where:
                 :math:`H` is the number of heads,
                 :math:`D_{out}` is size of output node feature,
                 :math:`F_{out}` is size of output edge feature.
         torch.Tensor, optional
             The attention values of shape :math:`(E, H, 1)`.
-            This is returned only when :attr: `get_attention` is ``True``.
+            This is returned only when :attr:`get_attention` is ``True``.
         """
 
         with graph.local_scope():

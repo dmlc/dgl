@@ -500,8 +500,12 @@ def get_available_port(ip):
             return port
     raise RuntimeError("Failed to get available port for ip~{}".format(ip))
 
-def submit_jobs(args, udf_command):
+def submit_jobs(args, udf_command, dry_run=False):
     """Submit distributed jobs (server and client processes) via ssh"""
+    if dry_run:
+        print("Currently it's in dry run mode which means no jobs will be launched.")
+    servers_cmd = []
+    clients_cmd = []
     hosts = []
     thread_list = []
     server_count_per_machine = 0
@@ -551,7 +555,9 @@ def submit_jobs(args, udf_command):
             cmd = wrap_cmd_with_local_envvars(udf_command, server_env_vars_cur)
             cmd = wrap_cmd_with_extra_envvars(cmd, args.extra_envs) if len(args.extra_envs) > 0 else cmd
             cmd = 'cd ' + str(args.workspace) + '; ' + cmd
-            thread_list.append(execute_remote(cmd, ip, args.ssh_port, username=args.ssh_username))
+            servers_cmd.append(cmd)
+            if not dry_run:
+                thread_list.append(execute_remote(cmd, ip, args.ssh_port, username=args.ssh_username))
     else:
         print(f"Use running server {args.server_name}.")
 
@@ -568,6 +574,8 @@ def submit_jobs(args, udf_command):
         pythonpath=os.environ.get("PYTHONPATH", ""),
     )
 
+    master_addr = hosts[0][0]
+    master_port = get_available_port(master_addr)
     for node_id, host in enumerate(hosts):
         ip, _ = host
         # Transform udf_command to follow torch's dist launcher format: `PYTHON_BIN -m torch.distributed.launch ... UDF`
@@ -576,13 +584,19 @@ def submit_jobs(args, udf_command):
             num_trainers=args.num_trainers,
             num_nodes=len(hosts),
             node_rank=node_id,
-            master_addr=hosts[0][0],
-            master_port=get_available_port(hosts[0][0]),
+            master_addr=master_addr,
+            master_port=master_port
         )
         cmd = wrap_cmd_with_local_envvars(torch_dist_udf_command, client_env_vars)
         cmd = wrap_cmd_with_extra_envvars(cmd, args.extra_envs) if len(args.extra_envs) > 0 else cmd
         cmd = 'cd ' + str(args.workspace) + '; ' + cmd
-        thread_list.append(execute_remote(cmd, ip, args.ssh_port, username=args.ssh_username))
+        clients_cmd.append(cmd)
+        if not dry_run:
+            thread_list.append(execute_remote(cmd, ip, args.ssh_port, username=args.ssh_username))
+
+    # return commands of clients/servers directly if in dry run mode
+    if dry_run:
+        return clients_cmd, servers_cmd
 
     # Start a cleanup process dedicated for cleaning up remote training jobs.
     conn1,conn2 = multiprocessing.Pipe()

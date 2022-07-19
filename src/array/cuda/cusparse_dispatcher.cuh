@@ -34,6 +34,32 @@ struct CSRGEMM {
   }
 };
 
+#ifdef USE_FP16
+template <>
+struct CSRGEMM<__half> {
+  template <typename... Args>
+  static inline cusparseStatus_t bufferSizeExt(Args... args) {
+    // TODO(ndickson): There is no cusparseHcsrgemm2_bufferSizeExt, so a different
+    // implementation would be required.
+    LOG(FATAL) << "CSRGEMM::bufferSizeExt does not support dtype half (FP16).";
+    return static_cast<cusparseStatus_t>(0);
+  }
+
+  template <typename... Args>
+  static inline cusparseStatus_t nnz(Args... args) {
+    return cusparseXcsrgemm2Nnz(args...);
+  }
+
+  template <typename... Args>
+  static inline cusparseStatus_t compute(Args... args) {
+    // TODO(ndickson): There is no cusparseHcsrgemm2, so a different
+    // implementation would be required.
+    LOG(FATAL) << "CSRGEMM::compute does not support dtype half (FP16).";
+    return static_cast<cusparseStatus_t>(0);
+  }
+};
+#endif
+
 template <>
 struct CSRGEMM<float> {
   template <typename... Args>
@@ -90,6 +116,32 @@ struct CSRGEAM {
     return static_cast<cusparseStatus_t>(0);
   }
 };
+
+#ifdef USE_FP16
+template <>
+struct CSRGEAM<__half> {
+  template <typename... Args>
+  static inline cusparseStatus_t bufferSizeExt(Args... args) {
+    // TODO(ndickson): There is no cusparseHcsrgeam2_bufferSizeExt, so a different
+    // implementation would be required.
+    LOG(FATAL) << "CSRGEAM::bufferSizeExt does not support dtype half (FP16).";
+    return static_cast<cusparseStatus_t>(0);
+  }
+
+  template <typename... Args>
+  static inline cusparseStatus_t nnz(Args... args) {
+    return cusparseXcsrgeam2Nnz(args...);
+  }
+
+  template <typename... Args>
+  static inline cusparseStatus_t compute(Args... args) {
+    // TODO(ndickson): There is no cusparseHcsrgeam2, so a different
+    // implementation would be required.
+    LOG(FATAL) << "CSRGEAM::compute does not support dtype half (FP16).";
+    return static_cast<cusparseStatus_t>(0);
+  }
+};
+#endif
 
 template <>
 struct CSRGEAM<float> {

@@ -4,7 +4,7 @@ from setuptools import find_packages
 from distutils.core import setup
 
 setup(name='dglgo',
-      version='0.0.1',
+      version='0.0.2',
       description='DGL',
       author='DGL Team',
       author_email='wmjlyjemaine@gmail.com',

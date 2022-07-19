@@ -24,11 +24,13 @@ API that is exposed to python is only a few lines of codes:
    #include <dgl/runtime/packed_func.h>
    #include <dgl/runtime/registry.h>
 
+   using namespace dgl::runtime;
+
    DGL_REGISTER_GLOBAL("calculator.MyAdd")
    .set_body([] (DGLArgs args, DGLRetValue* rv) {
        int a = args[0];
        int b = args[1];
-       *rv = a * b;
+       *rv = a + b;
      });
 
 Compile and build the library. On the python side, create a

@@ -2802,7 +2802,7 @@ def as_immutable_graph(hg):
                 '\tdgl.as_immutable_graph will do nothing and can be removed safely in all cases.')
     return hg
 
-def sort_csr_by_tag(g, tag, tag_offset_name='_TAG_OFFSET'):
+def sort_csr_by_tag(g, tag, tag_offset_name='_TAG_OFFSET', tag_type='node'):
     r"""Return a new graph whose CSR matrix is sorted by the given tag.
 
     Sort the internal CSR matrix of the graph so that the adjacency list of each node
@@ -2820,6 +2820,9 @@ def sort_csr_by_tag(g, tag, tag_offset_name='_TAG_OFFSET'):
 
             0 -> 2, 4, 0, 1, 3
             1 -> 2, 0, 1
+
+        Given edge tags ``[1, 1, 0, 2, 0, 1, 1, 0]`` has the same effect
+        as above node tags.
 
     The function will also returns the starting offsets of the tag
     segments in a tensor of shape :math:`(N, max\_tag+2)`. For node ``i``,
@@ -2847,9 +2850,12 @@ def sort_csr_by_tag(g, tag, tag_offset_name='_TAG_OFFSET'):
     g : DGLGraph
         The input graph.
     tag : Tensor
-        Integer tensor of shape :math:`(N,)`, :math:`N` being the number of (destination) nodes.
+        Integer tensor of shape :math:`(N,)`, :math:`N` being the number
+        of (destination) nodes or edges.
     tag_offset_name : str
         The name of the node feature to store tag offsets.
+    tag_type : str
+        Tag type which could be ``node`` or ``edge``.
 
     Returns
     -------
@@ -2862,6 +2868,11 @@ def sort_csr_by_tag(g, tag, tag_offset_name='_TAG_OFFSET'):
 
     Examples
     -----------
+
+    ``tag_type`` is ``node``.
+
+    >>> import dgl
+    >>> import torch
 
     >>> g = dgl.graph(([0,0,0,0,0,1,1,1],[0,1,2,3,4,0,1,2]))
     >>> g.adjacency_matrix(scipy_fmt='csr').nonzero()
@@ -2879,12 +2890,33 @@ def sort_csr_by_tag(g, tag, tag_offset_name='_TAG_OFFSET'):
             [0, 0, 0, 0],
             [0, 0, 0, 0]])
 
+    ``tag_type`` is ``edge``.
+
+    >>> g = dgl.graph(([0,0,0,0,0,1,1,1],[0,1,2,3,4,0,1,2]))
+    >>> g.edges()
+    (tensor([0, 0, 0, 0, 0, 1, 1, 1]), tensor([0, 1, 2, 3, 4, 0, 1, 2]))
+    >>> tag = torch.tensor([1, 1, 0, 2, 0, 1, 1, 0])
+    >>> g_sorted = dgl.sort_csr_by_tag(g, tag, tag_type='edge')
+    >>> g_sorted.adj(scipy_fmt='csr').nonzero()
+    (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32), array([2, 4, 0, 1, 3, 2, 0, 1], dtype=int32))
+    >>> g_sorted.srcdata['_TAG_OFFSET']
+    tensor([[0, 2, 4, 5],
+            [0, 1, 3, 3],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0]])
+
     See Also
     --------
     dgl.sampling.sample_neighbors_biased
     """
     if len(g.etypes) > 1:
         raise DGLError("Only support homograph and bipartite graph")
+    assert tag_type in ['node', 'edge'], "tag_type should be either 'node' or 'edge'."
+    if tag_type == 'node':
+        _, dst = g.edges()
+        tag = F.gather_row(tag, F.tensor(dst))
+    assert len(tag) == g.num_edges()
     num_tags = int(F.asnumpy(F.max(tag, 0))) + 1
     tag_arr = F.zerocopy_to_dgl_ndarray(tag)
     new_g = g.clone()
@@ -2893,7 +2925,7 @@ def sort_csr_by_tag(g, tag, tag_offset_name='_TAG_OFFSET'):
     return new_g
 
 
-def sort_csc_by_tag(g, tag, tag_offset_name='_TAG_OFFSET'):
+def sort_csc_by_tag(g, tag, tag_offset_name='_TAG_OFFSET', tag_type='node'):
     r"""Return a new graph whose CSC matrix is sorted by the given tag.
 
     Sort the internal CSC matrix of the graph so that the adjacency list of each node
@@ -2912,6 +2944,9 @@ def sort_csc_by_tag(g, tag, tag_offset_name='_TAG_OFFSET'):
 
             0 <- 2, 4, 0, 1, 3
             1 <- 2, 0, 1
+
+        Given edge tags ``[1, 1, 0, 2, 0, 1, 1, 0]`` has the same effect
+        as above node tags.
 
     The function will also return the starting offsets of the tag
     segments in a tensor of shape :math:`(N, max\_tag+2)`. For a node ``i``,
@@ -2939,9 +2974,12 @@ def sort_csc_by_tag(g, tag, tag_offset_name='_TAG_OFFSET'):
     g : DGLGraph
         The input graph.
     tag : Tensor
-        Integer tensor of shape :math:`(N,)`, :math:`N` being the number of (source) nodes.
+        Integer tensor of shape :math:`(N,)`, :math:`N` being the number
+        of (source) nodes or edges.
     tag_offset_name : str
         The name of the node feature to store tag offsets.
+    tag_type : str
+        Tag type which could be ``node`` or ``edge``.
 
     Returns
     -------
@@ -2955,6 +2993,10 @@ def sort_csc_by_tag(g, tag, tag_offset_name='_TAG_OFFSET'):
     Examples
     -----------
 
+    ``tag_type`` is ``node``.
+
+    >>> import dgl
+    >>> import torch
     >>> g = dgl.graph(([0,1,2,3,4,0,1,2],[0,0,0,0,0,1,1,1]))
     >>> g.adjacency_matrix(scipy_fmt='csr', transpose=True).nonzero()
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
@@ -2971,12 +3013,31 @@ def sort_csc_by_tag(g, tag, tag_offset_name='_TAG_OFFSET'):
             [0, 0, 0, 0],
             [0, 0, 0, 0]])
 
+    ``tag_type`` is ``edge``.
+
+    >>> g = dgl.graph(([0,1,2,3,4,0,1,2],[0,0,0,0,0,1,1,1]))
+    >>> tag = torch.tensor([1, 1, 0, 2, 0, 1, 1, 0])
+    >>> g_sorted = dgl.sort_csc_by_tag(g, tag, tag_type='edge')
+    >>> g_sorted.adj(scipy_fmt='csr', transpose=True).nonzero()
+    (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32), array([2, 4, 0, 1, 3, 2, 0, 1], dtype=int32))
+    >>> g_sorted.dstdata['_TAG_OFFSET']
+    tensor([[0, 2, 4, 5],
+            [0, 1, 3, 3],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0]])
+
     See Also
     --------
     dgl.sampling.sample_neighbors_biased
     """
     if len(g.etypes) > 1:
         raise DGLError("Only support homograph and bipartite graph")
+    assert tag_type in ['node', 'edge'], "tag_type should be either 'node' or 'edge'."
+    if tag_type == 'node':
+        src, _ = g.edges()
+        tag = F.gather_row(tag, F.tensor(src))
+    assert len(tag) == g.num_edges()
     num_tags = int(F.asnumpy(F.max(tag, 0))) + 1
     tag_arr = F.zerocopy_to_dgl_ndarray(tag)
     new_g = g.clone()

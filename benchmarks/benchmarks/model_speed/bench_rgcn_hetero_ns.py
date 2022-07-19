@@ -228,15 +228,12 @@ class EntityClassify(nn.Module):
         return h
 
 @utils.benchmark('time', 600)
-@utils.parametrize('data', ['am', 'ogbn-mag'])
+@utils.parametrize('data', ['ogbn-mag'])
 def track_time(data):
     dataset = utils.process_data(data)
     device = utils.get_bench_device()
 
-    if data == 'am':
-        n_bases = 40
-        l2norm = 5e-4
-    elif data == 'ogbn-mag':
+    if data == 'ogbn-mag':
         n_bases = 2
         l2norm = 0
     else:

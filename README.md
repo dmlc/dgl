@@ -23,7 +23,7 @@ DGL is an easy-to-use, high performance and scalable Python package for deep lea
 
 ### A GPU-ready graph library
 
-DGL provides a powerful graph object that can reside on either CPU or GPU. It bundles structural data as well as features for a better control. We provide a variety of functions for computing with graph objects including efficient and customizable message passing primitives for Graph Neural Networks.
+DGL provides a powerful graph object that can reside on either CPU or GPU. It bundles structural data as well as features for better control. We provide a variety of functions for computing with graph objects including efficient and customizable message passing primitives for Graph Neural Networks.
 
 ### A versatile tool for GNN researchers and practitioners
 
@@ -32,7 +32,7 @@ DGL collects a rich set of [example implementations](https://github.com/dmlc/dgl
 
 ### Easy to learn and use
 
-DGL provides a plenty of learning materials for all kinds of users from ML researcher to domain experts. The [Blitz Introduction to DGL](https://docs.dgl.ai/tutorials/blitz/index.html) is a 120-minute tour of the basics of graph machine learning. The [User Guide](https://docs.dgl.ai/guide/index.html) explains in more details the concepts of graphs as well as the training methodology. All of them include code snippets in DGL that are runnable and ready to be plugged into one’s own pipeline.
+DGL provides plenty of learning materials for all kinds of users from ML researchers to domain experts. The [Blitz Introduction to DGL](https://docs.dgl.ai/tutorials/blitz/index.html) is a 120-minute tour of the basics of graph machine learning. The [User Guide](https://docs.dgl.ai/guide/index.html) explains in more details the concepts of graphs as well as the training methodology. All of them include code snippets in DGL that are runnable and ready to be plugged into one’s own pipeline.
 
 ### Scalable and efficient
 
@@ -80,8 +80,12 @@ Take the survey [here](https://forms.gle/Ej3jHCocACmb49Gp8) and leave any feedba
 * GNN-RecSys: https://github.com/je-dbl/GNN-RecSys
 * Amazon Neptune ML: a new capability of Neptune that uses Graph Neural Networks (GNNs), a machine learning technique purpose-built for graphs, to make easy, fast, and more accurate predictions using graph data. https://aws.amazon.com/cn/neptune/machine-learning/
 * GNNLens2: Visualization tool for Graph Neural Networks. https://github.com/dmlc/GNNLens2
-* RNAGlib: A package to facilitate construction, analysis, visualization and machine learning on RNA 2.5D Graphs. Includes a pre-built dataset: https://rnaglib.cs.mcgill.ca 
-
+* RNAGlib: A package to facilitate construction, analysis, visualization and machine learning on RNA 2.5D Graphs. Includes a pre-built dataset: https://rnaglib.cs.mcgill.ca
+* OpenHGNN: Model zoo and benchmarks for Heterogeneous Graph Neural Networks. https://github.com/BUPT-GAMMA/OpenHGNN
+* TGL: A graph learning framework for large-scale temporal graphs. https://github.com/amazon-research/tgl
+* gtrick: Bag of Tricks for Graph Neural Networks. https://github.com/sangyx/gtrick
+* ArangoDB-DGL Adapter: Import [ArangoDB](https://github.com/arangodb/arangodb) graphs into DGL and vice-versa. https://github.com/arangoml/dgl-adapter
+* DGLD: [DGLD](https://github.com/EagleLab-ZJU/DGLD) is an open-source library for Deep Graph Anomaly Detection based on pytorch and DGL.
 ### Awesome Papers Using DGL
 
 1. [**Benchmarking Graph Neural Networks**](https://arxiv.org/pdf/2003.00982.pdf), *Vijay Prakash Dwivedi, Chaitanya K. Joshi, Thomas Laurent, Yoshua Bengio, Xavier Bresson*

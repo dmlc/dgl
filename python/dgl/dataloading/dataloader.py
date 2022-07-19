@@ -17,7 +17,7 @@ import torch
 import torch.distributed as dist
 from torch.utils.data.distributed import DistributedSampler
 
-from ..base import NID, EID, dgl_warning
+from ..base import NID, EID, dgl_warning, DGLError
 from ..batch import batch as batch_graphs
 from ..heterograph import DGLHeteroGraph
 from ..utils import (
@@ -30,6 +30,7 @@ from .. import backend as F
 from ..distributed import DistGraph
 from ..multiprocessing import call_once_and_share
 
+PYTORCH_VER = LooseVersion(torch.__version__)
 PYTHON_EXIT_STATUS = False
 def _set_python_exit_flag():
     global PYTHON_EXIT_STATUS
@@ -39,12 +40,13 @@ atexit.register(_set_python_exit_flag)
 prefetcher_timeout = int(os.environ.get('DGL_PREFETCHER_TIMEOUT', '30'))
 
 class _TensorizedDatasetIter(object):
-    def __init__(self, dataset, batch_size, drop_last, mapping_keys):
+    def __init__(self, dataset, batch_size, drop_last, mapping_keys, shuffle):
         self.dataset = dataset
         self.batch_size = batch_size
         self.drop_last = drop_last
         self.mapping_keys = mapping_keys
         self.index = 0
+        self.shuffle = shuffle
 
     # For PyTorch Lightning compatibility
     def __iter__(self):
@@ -73,7 +75,16 @@ class _TensorizedDatasetIter(object):
         # convert the type-ID pairs to dictionary
         type_ids = batch[:, 0]
         indices = batch[:, 1]
-        type_ids_sortidx = torch.argsort(type_ids)
+        if PYTORCH_VER >= LooseVersion("1.10.0"):
+            _, type_ids_sortidx = torch.sort(type_ids, stable=True)
+        else:
+            if not self.shuffle:
+                dgl_warning(
+                    'The current output_nodes are out of order even if set shuffle '
+                    'to False in Dataloader, the reason is that the current version '
+                    'of torch dose not support stable sort. '
+                    'Please update torch to 1.10.0 or higher to fix it.')
+            type_ids_sortidx = torch.argsort(type_ids)
         type_ids = type_ids[type_ids_sortidx]
         indices = indices[type_ids_sortidx]
         type_id_uniq, type_id_count = torch.unique_consecutive(type_ids, return_counts=True)
@@ -123,7 +134,7 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
     """Custom Dataset wrapper that returns a minibatch as tensors or dicts of tensors.
     When the dataset is on the GPU, this significantly reduces the overhead.
     """
-    def __init__(self, indices, batch_size, drop_last):
+    def __init__(self, indices, batch_size, drop_last, shuffle):
         if isinstance(indices, Mapping):
             self._mapping_keys = list(indices.keys())
             self._device = next(iter(indices.values())).device
@@ -139,6 +150,7 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
         self._indices = torch.arange(self._id_tensor.shape[0], dtype=torch.int64).share_memory_()
         self.batch_size = batch_size
         self.drop_last = drop_last
+        self._shuffle = shuffle
 
     def shuffle(self):
         """Shuffle the dataset."""
@@ -148,7 +160,7 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
         indices = _divide_by_worker(self._indices, self.batch_size, self.drop_last)
         id_tensor = self._id_tensor[indices.to(self._device)]
         return _TensorizedDatasetIter(
-            id_tensor, self.batch_size, self.drop_last, self._mapping_keys)
+            id_tensor, self.batch_size, self.drop_last, self._mapping_keys, self._shuffle)
 
     def __len__(self):
         num_samples = self._id_tensor.shape[0]
@@ -161,7 +173,7 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
     This class additionally saves the index tensor in shared memory and therefore
     avoids duplicating the same index tensor during shuffling.
     """
-    def __init__(self, indices, batch_size, drop_last, ddp_seed):
+    def __init__(self, indices, batch_size, drop_last, ddp_seed, shuffle):
         if isinstance(indices, Mapping):
             self._mapping_keys = list(indices.keys())
             len_indices = sum(len(v) for v in indices.values())
@@ -175,6 +187,7 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
         self.epoch = 0
         self.batch_size = batch_size
         self.drop_last = drop_last
+        self._shuffle = shuffle
 
         if self.drop_last and len_indices % self.num_replicas != 0:
             self.num_samples = math.ceil((len_indices - self.num_replicas) / self.num_replicas)
@@ -215,7 +228,7 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
                 np.random.shuffle(self._indices[:self.num_indices].numpy())
             else:
                 self._indices[:self.num_indices] = self._indices[
-                    torch.randperm(self.num_indices, device=self._device)]
+                    torch.randperm(self.num_indices, device=self._indices.device)]
 
             if not self.drop_last:
                 # pad extra
@@ -229,7 +242,7 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
         indices = _divide_by_worker(self._indices[start:end], self.batch_size, self.drop_last)
         id_tensor = self._id_tensor[indices.to(self._device)]
         return _TensorizedDatasetIter(
-            id_tensor, self.batch_size, self.drop_last, self._mapping_keys)
+            id_tensor, self.batch_size, self.drop_last, self._mapping_keys, self._shuffle)
 
     def __len__(self):
         return (self.num_samples + (0 if self.drop_last else (self.batch_size - 1))) // \
@@ -292,6 +305,18 @@ def _await_or_return(x):
     else:
         return x
 
+def _record_stream(x, stream):
+    if stream is None:
+        return x
+    if isinstance(x, torch.Tensor):
+        x.record_stream(stream)
+        return x
+    elif isinstance(x, _PrefetchedGraphFeatures):
+        node_feats = recursive_apply(x.node_feats, _record_stream, stream)
+        edge_feats = recursive_apply(x.edge_feats, _record_stream, stream)
+        return _PrefetchedGraphFeatures(node_feats, edge_feats)
+    else:
+        return x
 
 def _prefetch(batch, dataloader, stream):
     # feats has the same nested structure of batch, except that
@@ -303,10 +328,23 @@ def _prefetch(batch, dataloader, stream):
     #
     # Once the futures are fetched, this function waits for them to complete by
     # calling its wait() method.
+    if stream is not None:
+        current_stream = torch.cuda.current_stream()
+        current_stream.wait_stream(stream)
+    else:
+        current_stream = None
     with torch.cuda.stream(stream):
+        # fetch node/edge features
         feats = recursive_apply(batch, _prefetch_for, dataloader)
         feats = recursive_apply(feats, _await_or_return)
-    return feats
+        feats = recursive_apply(feats, _record_stream, current_stream)
+        # transfer input nodes/seed nodes
+        # TODO(Xin): sampled subgraph is transferred in the default stream
+        # because heterograph doesn't support .record_stream() for now
+        batch = recursive_apply(batch, lambda x: x.to(dataloader.device, non_blocking=True))
+        batch = recursive_apply(batch, _record_stream, current_stream)
+    stream_event = stream.record_event() if stream is not None else None
+    return batch, feats, stream_event
 
 
 def _assign_for(item, feat):
@@ -333,18 +371,11 @@ def _put_if_event_not_set(queue, result, event):
             continue
 
 def _prefetcher_entry(
-        dataloader_it, dataloader, queue, num_threads, use_alternate_streams,
-        done_event):
+        dataloader_it, dataloader, queue, num_threads, stream, done_event):
     # PyTorch will set the number of threads to 1 which slows down pin_memory() calls
     # in main process if a prefetching thread is created.
     if num_threads is not None:
         torch.set_num_threads(num_threads)
-    if use_alternate_streams:
-        stream = (
-                torch.cuda.Stream(device=dataloader.device)
-                if dataloader.device.type == 'cuda' else None)
-    else:
-        stream = None
 
     try:
         while not done_event.is_set():
@@ -353,17 +384,8 @@ def _prefetcher_entry(
             except StopIteration:
                 break
             batch = recursive_apply(batch, restore_parent_storage_columns, dataloader.graph)
-            feats = _prefetch(batch, dataloader, stream)
-
-            _put_if_event_not_set(queue, (
-                # batch will be already in pinned memory as per the behavior of
-                # PyTorch DataLoader.
-                recursive_apply(
-                    batch, lambda x: x.to(dataloader.device, non_blocking=True)),
-                feats,
-                stream.record_event() if stream is not None else None,
-                None),
-                done_event)
+            batch, feats, stream_event = _prefetch(batch, dataloader, stream)
+            _put_if_event_not_set(queue, (batch, feats, stream_event, None), done_event)
         _put_if_event_not_set(queue, (None, None, None, None), done_event)
     except:     # pylint: disable=bare-except
         _put_if_event_not_set(
@@ -421,24 +443,26 @@ def restore_parent_storage_columns(item, g):
 
 
 class _PrefetchingIter(object):
-    def __init__(self, dataloader, dataloader_it, use_thread=False, use_alternate_streams=True,
-                 num_threads=None):
+    def __init__(self, dataloader, dataloader_it, num_threads=None):
         self.queue = Queue(1)
         self.dataloader_it = dataloader_it
         self.dataloader = dataloader
-        self.graph_sampler = self.dataloader.graph_sampler
-        self.pin_prefetcher = self.dataloader.pin_prefetcher
         self.num_threads = num_threads
 
-        self.use_thread = use_thread
-        self.use_alternate_streams = use_alternate_streams
+        self.use_thread = dataloader.use_prefetch_thread
+        self.use_alternate_streams = dataloader.use_alternate_streams
+        self.device = self.dataloader.device
+        if self.use_alternate_streams and self.device.type == 'cuda':
+            self.stream = torch.cuda.Stream(device=self.device)
+        else:
+            self.stream = None
         self._shutting_down = False
-        if use_thread:
+        if self.use_thread:
             self._done_event = threading.Event()
             thread = threading.Thread(
                 target=_prefetcher_entry,
                 args=(dataloader_it, dataloader, self.queue, num_threads,
-                      use_alternate_streams, self._done_event),
+                      self.stream, self._done_event),
                 daemon=True)
             thread.start()
             self.thread = thread
@@ -474,14 +498,7 @@ class _PrefetchingIter(object):
     def _next_non_threaded(self):
         batch = next(self.dataloader_it)
         batch = recursive_apply(batch, restore_parent_storage_columns, self.dataloader.graph)
-        device = self.dataloader.device
-        if self.use_alternate_streams:
-            stream = torch.cuda.Stream(device=device) if device.type == 'cuda' else None
-        else:
-            stream = None
-        feats = _prefetch(batch, self.dataloader, stream)
-        batch = recursive_apply(batch, lambda x: x.to(device, non_blocking=True))
-        stream_event = stream.record_event() if stream is not None else None
+        batch, feats, stream_event = _prefetch(batch, self.dataloader, self.stream)
         return batch, feats, stream_event
 
     def _next_threaded(self):
@@ -540,15 +557,16 @@ class WorkerInitWrapper(object):
             self.func(worker_id)
 
 
-def create_tensorized_dataset(indices, batch_size, drop_last, use_ddp, ddp_seed):
+def create_tensorized_dataset(indices, batch_size, drop_last, use_ddp, ddp_seed,
+                              shuffle):
     """Converts a given indices tensor to a TensorizedDataset, an IterableDataset
     that returns views of the original tensor, to reduce overhead from having
     a list of scalar tensors in default PyTorch DataLoader implementation.
     """
     if use_ddp:
-        return DDPTensorizedDataset(indices, batch_size, drop_last, ddp_seed)
+        return DDPTensorizedDataset(indices, batch_size, drop_last, ddp_seed, shuffle)
     else:
-        return TensorizedDataset(indices, batch_size, drop_last)
+        return TensorizedDataset(indices, batch_size, drop_last, shuffle)
 
 
 def _get_device(device):
@@ -634,7 +652,8 @@ class DataLoader(torch.utils.data.DataLoader):
     Examples
     --------
     To train a 3-layer GNN for node classification on a set of nodes ``train_nid`` on
-    a homogeneous graph where each node takes messages from all neighbors (assume
+    a homogeneous graph where each node takes messages from 15 neighbors on the
+    first layer, 10 neighbors on the second, and 5 neighbors on the third (assume
     the backend is PyTorch):
 
     >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
@@ -774,8 +793,7 @@ class DataLoader(torch.utils.data.DataLoader):
             else:
                 if self.graph.device != indices_device:
                     raise ValueError(
-                        'Expect graph and indices to be on the same device. '
-                        'If you wish to use UVA sampling, please set use_uva=True.')
+                        'Expect graph and indices to be on the same device when use_uva=False. ')
                 if self.graph.device.type == 'cuda' and num_workers > 0:
                     raise ValueError('num_workers must be 0 if graph and indices are on CUDA.')
                 if self.graph.device.type == 'cpu' and num_workers > 0:
@@ -814,7 +832,7 @@ class DataLoader(torch.utils.data.DataLoader):
                 isinstance(indices, Mapping) and
                 all(torch.is_tensor(v) for v in indices.values()))):
             self.dataset = create_tensorized_dataset(
-                indices, batch_size, drop_last, use_ddp, ddp_seed)
+                indices, batch_size, drop_last, use_ddp, ddp_seed, shuffle)
         else:
             self.dataset = indices
 
@@ -838,6 +856,7 @@ class DataLoader(torch.utils.data.DataLoader):
             collate_fn=CollateWrapper(
                 self.graph_sampler.sample, graph, self.use_uva, self.device),
             batch_size=None,
+            pin_memory=self.pin_prefetcher,
             worker_init_fn=worker_init_fn,
             **kwargs)
 
@@ -852,9 +871,7 @@ class DataLoader(torch.utils.data.DataLoader):
         # When using multiprocessing PyTorch sometimes set the number of PyTorch threads to 1
         # when spawning new Python threads.  This drastically slows down pinning features.
         num_threads = torch.get_num_threads() if self.num_workers > 0 else None
-        return _PrefetchingIter(
-            self, super().__iter__(), use_thread=self.use_prefetch_thread,
-            use_alternate_streams=self.use_alternate_streams, num_threads=num_threads)
+        return _PrefetchingIter(self, super().__iter__(), num_threads=num_threads)
 
     @contextmanager
     def enable_cpu_affinity(self, loader_cores=None, compute_cores=None, verbose=True):
@@ -999,7 +1016,7 @@ class EdgeDataLoader(DataLoader):
             if use_uva:
                 device = torch.cuda.current_device()
             else:
-                device = self.graph.device
+                device = graph.device
         device = _get_device(device)
 
         if isinstance(graph_sampler, BlockSampler):
@@ -1031,19 +1048,13 @@ class EdgeDataLoader(DataLoader):
 # GraphDataLoader loads a set of graphs so it's not relevant to the above.  They are currently
 # copied from the old DataLoader implementation.
 
-PYTORCH_VER = LooseVersion(torch.__version__)
-PYTORCH_16 = PYTORCH_VER >= LooseVersion("1.6.0")
-PYTORCH_17 = PYTORCH_VER >= LooseVersion("1.7.0")
-
 def _create_dist_sampler(dataset, dataloader_kwargs, ddp_seed):
     # Note: will change the content of dataloader_kwargs
     dist_sampler_kwargs = {'shuffle': dataloader_kwargs.get('shuffle', False)}
     dataloader_kwargs['shuffle'] = False
-    if PYTORCH_16:
-        dist_sampler_kwargs['seed'] = ddp_seed
-    if PYTORCH_17:
-        dist_sampler_kwargs['drop_last'] = dataloader_kwargs.get('drop_last', False)
-        dataloader_kwargs['drop_last'] = False
+    dist_sampler_kwargs['seed'] = ddp_seed
+    dist_sampler_kwargs['drop_last'] = dataloader_kwargs.get('drop_last', False)
+    dataloader_kwargs['drop_last'] = False
 
     return DistributedSampler(dataset, **dist_sampler_kwargs)
 
