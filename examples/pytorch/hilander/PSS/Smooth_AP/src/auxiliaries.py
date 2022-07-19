@@ -974,7 +974,6 @@ def vis(model, test_dataloader, device, split, opt):
             target_labels_new = np.zeros_like(target_labels)
             for i in range(len(paths)):
                 path = paths[i]
-                print(path2ids[0])
                 idxx = path2ids[opt.source_path+'/'+path]
                 path2ids_new[opt.source_path+'/'+path] = i
                 predicted_features[i] = feature_coll[idxx]
