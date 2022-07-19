@@ -284,7 +284,7 @@ def track_time(data):
     embed_layer.train()
 
     # Enable dataloader cpu affinitization for cpu devices (no effect on gpu)
-    with dataloader.enable_cpu_affinity():
+    with loader.enable_cpu_affinity():
         for step, sample_data in enumerate(loader):
             input_nodes, output_nodes, blocks = sample_data
             feats = embed_layer(input_nodes,

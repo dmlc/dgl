@@ -289,7 +289,7 @@ def track_time(data):
     sparse_optimizer.zero_grad()
 
     # Enable dataloader cpu affinitization for cpu devices (no effect on gpu)
-    with dataloader.enable_cpu_affinity():
+    with loader.enable_cpu_affinity():
         for step, (input_nodes, seeds, blocks) in enumerate(loader):
             blocks = [blk.to(device) for blk in blocks]
             seeds = seeds[category]     # we only predict the nodes with type "category"
