@@ -4,6 +4,8 @@ from __future__ import absolute_import, division
 from collections.abc import Mapping, Iterable, Sequence
 from collections import defaultdict
 from functools import wraps
+import glob
+import os
 import numpy as np
 
 from ..base import DGLError, dgl_warning, NID, EID
@@ -917,6 +919,42 @@ def set_num_threads(num_threads):
 def get_num_threads():
     """Get the number of OMP threads in the process"""
     return _CAPI_DGLGetOMPThreads()
+
+def get_numa_nodes_cores():
+    """ Returns numa nodes info, format:
+        {<node_id>: [(<core_id>, [<sibling_thread_id_0>, <sibling_thread_id_1>, ...]), ...], ...}
+        E.g.: {0: [(0, [0, 4]), (1, [1, 5])], 1: [(2, [2, 6]), (3, [3, 7])]}
+
+        If not available, returns {}
+    """
+    numa_node_paths = glob.glob('/sys/devices/system/node/node[0-9]*')
+
+    if not numa_node_paths:
+        return {}
+    
+    nodes = {}
+    try:
+        for node_path in numa_node_paths:
+            numa_node_id = int(os.path.basename(node_path)[4:])
+            
+            thread_siblings = {}
+            for cpu_dir in glob.glob(os.path.join(node_path, 'cpu[0-9]*')):
+                cpu_id = int(os.path.basename(cpu_dir)[3:])
+
+                with open(os.path.join(cpu_dir, 'topology', 'core_id')) as core_id_file:
+                    core_id = int(core_id_file.read().strip())
+                    if core_id in thread_siblings:
+                        thread_siblings[core_id].append(cpu_id)
+                    else:
+                        thread_siblings[core_id] = [cpu_id]
+
+            nodes[numa_node_id] = sorted([(k, sorted(v)) for k, v in thread_siblings.items()])
+
+    except Exception as e:
+        dgl_warning('Failed to read NUMA info')
+        return {}
+
+    return nodes
 
 def alias_func(func):
     """Return an alias function with proper docstring."""
