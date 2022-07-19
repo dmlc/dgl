@@ -865,7 +865,7 @@ class DataLoader(torch.utils.data.DataLoader):
             link = 'https://docs.dgl.ai/tutorials/cpu/cpu_best_practises.html'
             dgl_warning(f'Dataloader CPU affinity opt is not enabled, consider switching it on '
                         f'(see enable_cpu_affinity() or CPU best practices for DGL [{link}])')
-        
+
         if self.shuffle:
             self.dataset.shuffle()
         # When using multiprocessing PyTorch sometimes set the number of PyTorch threads to 1
@@ -891,7 +891,7 @@ class DataLoader(torch.utils.data.DataLoader):
 
         verbose : bool (optional)
             If True, affinity information will be printed to the console
-        
+
         Usage
         -----
         with dataloader.enable_cpu_affinity():
@@ -940,7 +940,7 @@ class DataLoader(torch.utils.data.DataLoader):
                 psutil.Process().cpu_affinity(compute_cores)
                 set_num_threads(len(compute_cores))
                 self.worker_init_fn = init_fn
-                
+
                 self.cpu_affinity_enabled = True
                 if verbose:
                     print('{} DL workers are assigned to cpus {}, main process will use cpus {}'

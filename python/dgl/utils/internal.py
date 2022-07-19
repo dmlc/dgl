@@ -931,12 +931,12 @@ def get_numa_nodes_cores():
 
     if not numa_node_paths:
         return {}
-    
+
     nodes = {}
     try:
         for node_path in numa_node_paths:
             numa_node_id = int(os.path.basename(node_path)[4:])
-            
+
             thread_siblings = {}
             for cpu_dir in glob.glob(os.path.join(node_path, 'cpu[0-9]*')):
                 cpu_id = int(os.path.basename(cpu_dir)[3:])
@@ -950,7 +950,7 @@ def get_numa_nodes_cores():
 
             nodes[numa_node_id] = sorted([(k, sorted(v)) for k, v in thread_siblings.items()])
 
-    except Exception as e:
+    except (OSError, ValueError, IndexError, IOError):
         dgl_warning('Failed to read NUMA info')
         return {}
 
