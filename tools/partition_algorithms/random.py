@@ -5,7 +5,7 @@ import os
 import numpy as np
 
 from utils import setdir
-import array_readwriter
+from utils import array_readwriter
 
 def _random_partition(metadata, num_parts):
     num_nodes_per_type = [sum(_) for _ in metadata['num_nodes_per_chunk']]
@@ -28,6 +28,8 @@ def random_partition(metadata, num_parts, output_path):
     with setdir(output_path):
         _random_partition(metadata, num_parts)
 
+# Run with PYTHONPATH=${GIT_ROOT_DIR}/tools
+# where ${GIT_ROOT_DIR} is the directory to the DGL git repository.
 if __name__ == '__main__':
     logging.basicConfig(level='INFO')
     with open(sys.argv[1]) as f:

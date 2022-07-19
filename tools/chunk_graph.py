@@ -9,7 +9,7 @@ import torch
 import dgl
 
 from utils import setdir
-import array_readwriter
+from utils import array_readwriter
 
 def chunk_numpy_array(arr, fmt_meta, chunk_sizes, path_fmt):
     paths = []
