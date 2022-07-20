@@ -44,7 +44,7 @@ def evaluate_in_batches(dataloader, device, model):
         total_score += score
     return total_score / (batch_id + 1) # return average score
     
-def train(train_dataloader, valid_dataloader, device, model):
+def train(train_dataloader, val_dataloader, device, model):
     # define loss function and optimizer
     loss_fcn = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=5e-3, weight_decay=0)
@@ -68,7 +68,7 @@ def train(train_dataloader, valid_dataloader, device, model):
         print("Epoch {:05d} | Loss {:.4f} |". format(epoch, total_loss / (batch_id + 1) ))
         
         if (epoch + 1) % 5 == 0:
-            avg_score = evaluate_in_batches(valid_dataloader, device, model) # evaluate F1-score instead of loss
+            avg_score = evaluate_in_batches(val_dataloader, device, model) # evaluate F1-score instead of loss
             print("                            Acc. (F1-score) {:.4f} ". format(avg_score))
 
         
@@ -78,7 +78,7 @@ if __name__ == '__main__':
     
     # load and preprocess datasets
     train_dataset = PPIDataset(mode='train')
-    valid_dataset = PPIDataset(mode='valid')
+    val_dataset = PPIDataset(mode='valid')
     test_dataset = PPIDataset(mode='test')
     features = train_dataset[0].ndata['feat']
     
@@ -90,8 +90,8 @@ if __name__ == '__main__':
     # model training
     print('Training...')
     train_dataloader = GraphDataLoader(train_dataset, batch_size=2)
-    valid_dataloader = GraphDataLoader(valid_dataset, batch_size=2)
-    train(train_dataloader, valid_dataloader, device, model)
+    val_dataloader = GraphDataLoader(val_dataset, batch_size=2)
+    train(train_dataloader, val_dataloader, device, model)
 
     # test the model
     print('Testing...')
