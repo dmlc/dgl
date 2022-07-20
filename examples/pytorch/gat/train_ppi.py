@@ -8,7 +8,7 @@ from dgl.dataloading import GraphDataLoader
 from sklearn.metrics import f1_score
 
 class GAT(nn.Module):
-    def __init__(self,in_size, hid_size, out_size, heads):
+    def __init__(self, in_size, hid_size, out_size, heads):
         super().__init__()
         self.gat_layers = nn.ModuleList()
         # three-layer GAT
@@ -29,8 +29,6 @@ class GAT(nn.Module):
 def evaluate(g, features, labels, model):
     model.eval()
     with torch.no_grad():
-        for layer in model.gat_layers:
-            layer.g = g
         output = model(g, features)
         pred = np.where(output.data.cpu().numpy() >= 0, 1, 0)
         score = f1_score(labels.data.cpu().numpy(), pred, average='micro')
@@ -46,8 +44,8 @@ def evaluate_in_batches(dataloader, device, model):
         total_score += score
     return total_score / (batch_id + 1) # return average score
     
-def train(train_dataloader, valid_dataloader, features, device, model):
-    # define train/val samples, loss function and optimizer
+def train(train_dataloader, valid_dataloader, device, model):
+    # define loss function and optimizer
     loss_fcn = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=5e-3, weight_decay=0)
 
@@ -61,8 +59,6 @@ def train(train_dataloader, valid_dataloader, features, device, model):
             subgraph = subgraph.to(device)
             features = subgraph.ndata['feat'].float()
             labels = subgraph.ndata['label'].float()
-            for layer in model.gat_layers:
-                layer.g = subgraph
             logits = model(subgraph, features)
             loss = loss_fcn(logits, labels)
             optimizer.zero_grad()
@@ -95,10 +91,10 @@ if __name__ == '__main__':
     print('Training...')
     train_dataloader = GraphDataLoader(train_dataset, batch_size=2)
     valid_dataloader = GraphDataLoader(valid_dataset, batch_size=2)
-    train(train_dataloader, valid_dataloader, features, device, model)
+    train(train_dataloader, valid_dataloader, device, model)
 
     # test the model
     print('Testing...')
     test_dataloader = GraphDataLoader(test_dataset, batch_size=2)
-    avg_score = evaluate_in_batches(test_dataloader, device, model)  
+    avg_score = evaluate_in_batches(test_dataloader, device, model)
     print("Test Accuracy (F1-score) {:.4f}".format(avg_score))

@@ -10,12 +10,12 @@ Graph Attention Networks (GAT)
 How to run
 -------
 
-Run with the following for node classification (available datasets: "cora", "citeseer", "pubmed")
+Run with the following for multiclass node classification (available datasets: "cora", "citeseer", "pubmed")
 ```bash
 python3 train.py --dataset cora
 ```
 
-Run with the following for graph classification with PPI dataset
+Run with the following for multilabel classification with PPI dataset
 ```bash
 python3 train_ppi.py
 ```
