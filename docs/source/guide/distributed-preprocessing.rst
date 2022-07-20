@@ -1,6 +1,6 @@
 .. _guide-distributed-preprocessing:
 
-7.1 Preprocessing for Distributed Training
+7.1 Data Preprocessing
 ------------------------------------------
 
 Before launching training jobs, DGL requires the input data to be partitioned
@@ -156,11 +156,12 @@ and the chunk sizes.
 .. code-block:: python
 
     {
+       "graph_name" : "MAG240M-LSC",  # given graph name
        "node_type": ["author", "paper", "institution"],
        "num_nodes_per_chunk": [
-           [61191556, 61191556],   # number of author nodes per chunk
-           [61191553, 61191552],   # number of paper nodes per chunk
-           [12861, 12860]          # number of institution nodes per chunk
+           [61191556, 61191556],      # number of author nodes per chunk
+           [61191553, 61191552],      # number of paper nodes per chunk
+           [12861, 12860]             # number of institution nodes per chunk
        ],
        # The edge type name is a colon-joined string of source, edge, and destination type.
        "edge_type": [
@@ -169,9 +170,9 @@ and the chunk sizes.
            "paper:cites:paper"
        ],
        "num_edges_per_chunk": [
-           [193011360, 193011360],  # number of author:writes:paper edges
-           [22296293, 22296293],    # number of author:affiliated_with:institution edges
-           [648874463, 648874463]   # number of paper:cites:paper edges
+           [193011360, 193011360],    # number of author:writes:paper edges
+           [22296293, 22296293],      # number of author:affiliated_with:institution edges
+           [648874463, 648874463]     # number of paper:cites:paper edges
        ],
        "edges" : {
             "author:write:paper" : {  # edge type
@@ -214,7 +215,7 @@ There are three parts in ``meta.json``:
 * Node/edge feature data under keys ``"node_data"`` and ``"edge_data"``. Currently only
   support numpy arrays. More supports will be added in the future.
 
-Example edge index file:
+The edge index files contain edges in the form of node ID pairs:
 
 .. code-block:: bash
 
@@ -243,7 +244,7 @@ For example, to randomly partition MAG240M-LSC to two parts, run the
 
 .. code-block:: bash
 
-    python /my/repo/dgl/tools/partition_algo/random_partition.py
+    python /my/repo/dgl/tools/partition_algo/random.py
         --in-dir=/mydata/MAG240M-LSC_chunked/
         --out-dir=/mydata/MAG240M-LSC_2parts/
         --num-parts=2
@@ -265,13 +266,12 @@ the partition ID of node i).
 
     # paper.txt
     0
-    0
-    0
-    0
-    ...
     1
     1
+    0
+    0
     1
+    0
     ...
 
 .. note::

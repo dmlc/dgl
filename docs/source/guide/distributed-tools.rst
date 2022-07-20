@@ -41,20 +41,14 @@ A typical example is as follows:
     172.31.29.175
     172.31.16.98
 
-The workspace specified in the launch script is the working directory in the machines,
-which contains the training script, the IP configuration file, the partition configuration
-file as well as the graph partitions. All paths of the files should be specified as relative
-paths to the workspace.
+The workspace specified in the launch script is the working directory in the
+machines, which contains the training script, the IP configuration file, the
+partition configuration file as well as the graph partitions. All paths of the
+files should be specified as relative paths to the workspace.
 
-The launch script creates a specified number of training jobs (``--num_trainers``) on each machine.
-In addition, users need to specify the number of sampler processes for each trainer
-(``--num_samplers``). The number of sampler processes has to match with the number of worker processes
-specified in :func:`dgl.distributed.initialize`.
-
-.. warning::
-
-    The number of sampler processes has to match with the number of worker processes
-    specified in :func:`dgl.distributed.initialize`. <--------- what does this mean?
+The launch script creates a specified number of training jobs
+(``--num_trainers``) on each machine.  In addition, users need to specify the
+number of sampler processes for each trainer (``--num_samplers``).
 
 Launching a Persistent Graph Server
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

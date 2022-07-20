@@ -1,7 +1,7 @@
 .. _guide-distributed-partition:
 
-7.4 Graph Partitioning
----------------------------
+7.4 Advanced Graph Partitioning
+---------------------------------------
 
 The chapter covers some of the advanced topics for graph partitioning.
 
@@ -69,7 +69,7 @@ second dictionary contains the mapping for each edge type.
     orig_node_emb = th.zeros(node_emb.shape, dtype=node_emb.dtype)
     orig_node_emb[node_map] = node_emb
 
-Output Format
+Output format
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Regardless of the partitioning algorithm in use, the partitioned results are stored
@@ -78,7 +78,7 @@ in data files organized as follows:
 .. code-block:: none
 
     data_root_dir/
-      |-- mygraph.json          # partition configuration file in JSON
+      |-- graph_name.json       # partition configuration file in JSON
       |-- part0/                # data for partition 0
       |  |-- node_feats.dgl     # node features stored in binary format
       |  |-- edge_feats.dgl     # edge features stored in binary format
@@ -94,11 +94,38 @@ in data files organized as follows:
 When distributed to a cluster, the metadata JSON should be copied to all the machines
 while the ``partX`` folders should be dispatched accordingly.
 
-.. warning::
+DGL provides a :func:`dgl.distributed.load_partition` function to load one partition
+for inspection.
 
-    TBD: some tips for inspecting the data
+.. code:: python
 
-Parallel METIS Partitioning
+  >>> import dgl
+  >>> # load partition 0
+  >>> part_data = dgl.distributed.load_partition('data_root_dir/graph_name.json', 0)
+  >>> g, nfeat, efeat, partition_book, graph_name, ntypes, etypes = part_data  # unpack
+  >>> print(g)
+  Graph(num_nodes=966043, num_edges=34270118,
+        ndata_schemes={'orig_id': Scheme(shape=(), dtype=torch.int64),
+                       'part_id': Scheme(shape=(), dtype=torch.int64),
+                       '_ID': Scheme(shape=(), dtype=torch.int64),
+                       'inner_node': Scheme(shape=(), dtype=torch.int32)}
+        edata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64),
+                       'inner_edge': Scheme(shape=(), dtype=torch.int8),
+                       'orig_id': Scheme(shape=(), dtype=torch.int64)})
+
+As mentioned in the `ID mapping`_ section, each partition carries auxiliary information
+saved as ndata or edata such as original node/edge IDs, partition IDs, etc. Each partition
+not only saves nodes/edges it owns, but also includes node/edges that are adjacent to
+the partition (called **HALO** nodes/edges). The ``inner_node`` and ``inner_edge``
+indicate whether a node/edge truely belongs to the partition (value is ``True``)
+or is a HALO node/edge (value is ``False``).
+
+The :func:`~dgl.distributed.load_partition` function loads all data at once. Users can
+load features or the partition book using the :func:`dgl.distributed.load_partition_feats`
+and :func:`dgl.distributed.load_partition_book` APIs respectively.
+
+
+Parallel METIS partitioning
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 For massive graphs where parallel preprocessing is desired, DGL supports

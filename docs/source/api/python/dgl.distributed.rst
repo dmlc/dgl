@@ -47,10 +47,10 @@ Distributed Node Embedding
 Distributed embedding optimizer
 -------------------------
 
-.. autoclass:: optim.SparseAdagrad
+.. autoclass:: dgl.distributed.optim.SparseAdagrad
     :members: step
 
-.. autoclass:: optim.SparseAdam
+.. autoclass:: dgl.distributed.optim.SparseAdam
     :members: step
 
 Distributed workload split
@@ -70,13 +70,15 @@ Distributed DataLoader
 
 .. autoclass:: DistDataLoader
 
-Distributed Neighbor Sampling
-`````````````````````````````
+.. _api-distributed-sampling-ops:
+Distributed Graph Sampling Operators
+```````````````````````````````````````
 
 .. autosummary::
     :toctree: ../../generated/
 
     sample_neighbors
+    sample_etype_neighbors
     find_edges
     in_subgraph
 
@@ -92,8 +94,8 @@ Graph partition book
 .. autoclass:: PartitionPolicy
     :members: policy_str, part_id, partition_book, to_local, to_partid, get_part_size, get_size
 
-Split and Load Graphs
-`````````````````````
+Split and Load Partitions
+````````````````````````````
 
 .. autosummary::
     :toctree: ../../generated/

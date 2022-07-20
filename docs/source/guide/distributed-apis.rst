@@ -1,6 +1,6 @@
 .. _guide-distributed-apis:
 
-7.3 Core Python Components
+7.3 Programming APIs
 -----------------------------------
 
 :ref:`(中文版) <guide_cn-distributed-apis>`
