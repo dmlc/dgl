@@ -1,5 +1,7 @@
 #!/bin/bash
 
+mkdir hilander_checkpoint
+
 ####################### ITER 0 #######################
 # iter 0 (supervised baseline) - train Smooth-AP
 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7

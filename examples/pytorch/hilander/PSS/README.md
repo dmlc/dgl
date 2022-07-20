@@ -55,31 +55,8 @@ PSS
 |-...
 ```
 
-## Pretrained Models
-We support ResNet-50 and ViT-Base/16 backbones. For ViT-Base/16 backbone, download [DINO pretrained model](https://dl.fbaipublicfiles.com/dino/dino_vitbase16_pretrain/dino_vitbase16_pretrain.pth) and use `--pretrained_weights` in training Smooth_AP.
-
 ## Training
-We provide training scripts for feature extractor Smooth_AP and clustering model Hi-LANDER.
-```commandline
-# iteration 0
-cd Smooth_AP
-bash scripts/train_inat.sh # train iter 0 feature extractor
-bash scripts/get-features-inat.sh # iter 0 generate features for hilander
-cd ../hilander
-bash scripts/train_inat.sh # train iter 0 hilander model
-bash scripts/test_inat.sh # get iter 0 selected samples and pseudo labels
-
-# iteration 1
-cd ../Smooth_AP
-bash scripts/finetune_1head_inat.sh # train iter 1 feature extractor
-bash scripts/get-features-inat.sh # iter 1 generate features for hilander
-cd ../hilander
-bash scripts/train_inat.sh # train iter 1 hilander model
-bash scripts/test_inat.sh # get iter 1 selected samples and pseudo labels
-
-......
-```
-Please carefully modify the script files to fit different iteration training. Details of the script file are in the readme files in Smooth_AP and hilander folder.
+Run `bash train.sh` to train the model.
 
 ## Test
-Run `bash scripts/test_inat.sh` in Smooth_AP folder.
+Run `bash test.sh` to evaluate on the test set.
