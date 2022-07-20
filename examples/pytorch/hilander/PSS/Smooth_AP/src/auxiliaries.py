@@ -454,75 +454,6 @@ class CSV_Writer():
             writer.writerow(inputs)
 
 
-
-################## PLOT SUMMARY IMAGE #####################
-class InfoPlotter():
-    """
-    Plotter class to visualize training progression by showing
-    different metrics.
-    """
-    def __init__(self, save_path, title='Training Log', figsize=(20,15)):
-        """
-        Args:
-            save_path: str, where to store the create plot.
-            title:     placeholder title of plot
-            figsize:   base size of saved figure
-        Returns:
-            Nothing!
-        """
-        self.save_path = save_path
-        self.title     = title
-        self.figsize   = figsize
-        #Colors for validation lines
-        self.v_colors    = ['r','g','b','y','m','k','c']
-        #Colors for training lines
-        self.t_colors    = ['k','b','r','g']
-
-    def make_plot(self, t_epochs, v_epochs, t_metrics, v_metrics, t_labels, v_labels, appendix=None):
-        """
-        Given a list of iterated epochs, visualize the progression of various training/testing metrics.
-
-        Args:
-            t_epochs:  [list of int/float], list of epochs for which training metrics were collected (e.g. Training Loss)
-            v_epochs:  [list of int/float], list of epochs for which validation metrics were collected (e.g. Recall @ k)
-            t_metrics: [list of float], list of training metrics per epoch
-            v_metrics: [list of list of int/float], contains all computed validation metrics
-            t_labels, v_labels: [list of str], names for each metric that is plotted.
-        Returns:
-            Nothing!
-        """
-        plt.style.use('ggplot')
-
-        f,axes = plt.subplots(1,2)
-
-        #Visualize Training Loss
-        for i in range(len(t_metrics)):
-            axes[0].plot(t_epochs, t_metrics[i], '-{}'.format(self.t_colors[i]), linewidth=1, label=t_labels[i])
-        axes[0].set_title('Training Performance', fontsize=19)
-
-        axes[0].legend(fontsize=16)
-
-        axes[0].tick_params(axis='both', which='major', labelsize=16)
-        axes[0].tick_params(axis='both', which='minor', labelsize=16)
-
-        #Visualize Validation metrics
-        for i in range(len(v_metrics)):
-            axes[1].plot(v_epochs, v_metrics[i], '-{}'.format(self.v_colors[i]), linewidth=1, label=v_labels[i])
-        axes[1].set_title(self.title, fontsize=19)
-
-        axes[1].legend(fontsize=16)
-
-        axes[1].tick_params(axis='both', which='major', labelsize=16)
-        axes[1].tick_params(axis='both', which='minor', labelsize=16)
-
-        f.set_size_inches(2*self.figsize[0], self.figsize[1])
-
-        savepath = self.save_path
-        f.savefig(self.save_path, bbox_inches='tight')
-
-        plt.close()
-
-
 ################## GENERATE LOGGING FOLDER/FILES #######################
 def set_logging(opt):
     """
@@ -586,12 +517,6 @@ class LOGGER():
 
         ### Make Logging Directories
         if start_new: set_logging(opt)
-
-        ### Set INFO-PLOTS
-        if self.prop.dataset != 'vehicle_id':
-            self.info_plot = InfoPlotter(opt.save_path+'/InfoPlot_{}.svg'.format(name))
-        else:
-            self.info_plot = {'Set {}'.format(i): InfoPlotter(opt.save_path+'/InfoPlot_{}_Set{}.svg'.format(name,i+1)) for i in range(3)}
 
         ### Set Progress Saver Dict
         self.progress_saver = self.provide_progress_saver(metrics_to_log)
