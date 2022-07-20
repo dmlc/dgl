@@ -66,18 +66,13 @@ parser.add_argument('--resume', default='', type=str,
 ##### Network parameters
 parser.add_argument('--embed_dim', default=512, type=int, help='Embedding dimensionality of the network')
 parser.add_argument('--arch', default='resnet50', type=str,
-                    help='Network backend choice: resnet50, googlenet, BNinception, vit_base')
-parser.add_argument('--patch_size', default=16, type=int, help='vit patch size')
+                    help='Network backend choice: resnet50')
 parser.add_argument('--pretrained_weights', default="", type=str, help='pretrained weight path')
 parser.add_argument('--use_bn_in_head', default=False, type=aux.bool_flag,
                     help="Whether to use batch normalizations in projection head (Default: False)")
 parser.add_argument("--checkpoint_key", default="teacher", type=str,
                     help='Key to use in the checkpoint (example: "teacher")')
 parser.add_argument('--drop_path_rate', default=0.1, type=float, help="stochastic depth rate")
-parser.add_argument('--norm_last_layer', default=True, type=aux.bool_flag,
-                    help="""Whether or not to weight normalize the last layer of the DINO head.
-    Not normalizing leads to better performance but can make the training unstable.
-    In our experiments, we typically set this paramater to False with vit_small and True with vit_base.""")
 parser.add_argument('--grad_measure', action='store_true',
                     help='If added, gradients passed from embedding layer to the last conv-layer are stored in each iteration.')
 parser.add_argument('--dist_measure', action='store_true',
@@ -97,7 +92,6 @@ parser.add_argument('--trainset', default="lin_train_set1.txt", type=str)
 parser.add_argument('--testset', default="Inaturalist_test_set1.txt", type=str)
 parser.add_argument('--cluster_path', default="", type=str)
 parser.add_argument('--finetune', default="false", type=str)
-parser.add_argument('--onehead', default="true", type=str)
 parser.add_argument('--class_num', default=948, type=int)
 parser.add_argument('--get_features', default="false", type=str)
 parser.add_argument('--linsize', default=29011, type=int, help="Lin data size.")
@@ -134,11 +128,6 @@ if opt.finetune == 'true':
     opt.finetune = True
 elif opt.finetune == 'false':
     opt.finetune = False
-
-if opt.onehead == 'true':
-    opt.onehead = True
-elif opt.onehead == 'false':
-    opt.onehead = False
 
 if opt.get_features == 'true':
     opt.get_features = True

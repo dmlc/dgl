@@ -203,6 +203,7 @@ def eval_metrics_one_dataset(model, test_dataloader, device, k_vals, opt):
         ### Compute NMI
         NMI = metrics.cluster.normalized_mutual_info_score(model_generated_cluster_labels.reshape(-1), target_labels.reshape(-1))
 
+
         ### Recover max(k_vals) nehbours to use for recall computation
         faiss_search_index  = faiss.IndexFlatL2(feature_coll.shape[-1])
         faiss_search_index.add(feature_coll)
@@ -212,9 +213,6 @@ def eval_metrics_one_dataset(model, test_dataloader, device, k_vals, opt):
         ### Compute Recall
         recall_all_k = []
         for k in k_vals:
-            # if k == 1:
-            #     print(target_labels)
-            #     print(k_closest_classes)
             recall_at_k = np.sum([1 for target, recalled_predictions in zip(target_labels, k_closest_classes) if target in recalled_predictions[:k]])/len(target_labels)
             recall_all_k.append(recall_at_k)
         print('finished recalls')
@@ -691,185 +689,6 @@ def metrics_to_examine(dataset, k_vals):
     return metric_dict
 
 
-
-"""================================================================================================="""
-def run_kmeans(features, n_cluster):
-    """
-    Run kmeans on a set of features to find <n_cluster> cluster.
-
-    Args:
-        features:  np.ndarrary [n_samples x embed_dim], embedding training/testing samples for which kmeans should be performed.
-        n_cluster: int, number of cluster.
-    Returns:
-        cluster_assignments: np.ndarray [n_samples x 1], per sample provide the respective cluster label it belongs to.
-    """
-    n_samples, dim = features.shape
-    kmeans = faiss.Kmeans(dim, n_cluster)
-    kmeans.n_iter, kmeans.min_points_per_centroid, kmeans.max_points_per_centroid = 20,5,1000000000
-    kmeans.train(features)
-    _, cluster_assignments = kmeans.index.search(features,1)
-    return cluster_assignments
-
-
-
-"""============================================================================================================="""
-def save_graph(opt, model):
-    """
-    Generate Network Graph.
-    NOTE: Requires the installation of the graphviz library on you system.
-
-    Args:
-        opt:   argparse.Namespace, contains all training-specific parameters.
-        model: PyTorch Network, network for which the computational graph should be visualized.
-    Returns:
-        Nothing!
-    """
-    inp = torch.randn((1,3,224,224)).to(opt.device)
-    network_output = model(inp)
-    if isinstance(network_output, dict): network_output = network_output['Class']
-
-    from graphviz import Digraph
-    def make_dot(var, savename, params=None):
-        """
-        Generate a symbolic representation of the network graph.
-        """
-        if params is not None:
-            assert all(isinstance(p, Variable) for p in params.values())
-            param_map = {id(v): k for k, v in params.items()}
-
-        node_attr = dict(style='filled',
-                         shape='box',
-                         align='left',
-                         fontsize='6',
-                         ranksep='0.1',
-                         height='0.6',
-                         width='1')
-        dot  = Digraph(node_attr=node_attr, format='svg', graph_attr=dict(size="40,10", rankdir='LR', rank='same'))
-        seen = set()
-
-        def size_to_str(size):
-            return '('+(', ').join(['%d' % v for v in size])+')'
-
-        def add_nodes(var):
-            replacements  = ['Backward', 'Th', 'Cudnn']
-            color_assigns = {'Convolution':'orange',
-                             'ConvolutionTranspose': 'lightblue',
-                             'Add': 'red',
-                             'Cat': 'green',
-                             'Softmax': 'yellow',
-                             'Sigmoid': 'yellow',
-                             'Copys':   'yellow'}
-            if var not in seen:
-                op1 = torch.is_tensor(var)
-                op2 = not torch.is_tensor(var) and str(type(var).__name__)!='AccumulateGrad'
-
-                text = str(type(var).__name__)
-                for rep in replacements:
-                    text = text.replace(rep, '')
-                color = color_assigns[text] if text in color_assigns.keys() else 'gray'
-
-                if 'Pool' in text: color = 'lightblue'
-
-                if op1 or op2:
-                    if hasattr(var, 'next_functions'):
-                        count = 0
-                        for i, u in enumerate(var.next_functions):
-                            if str(type(u[0]).__name__)=='AccumulateGrad':
-                                if count==0: attr_text = '\nParameter Sizes:\n'
-                                attr_text += size_to_str(u[0].variable.size())
-                                count += 1
-                                attr_text += ' '
-                        if count>0: text += attr_text
-
-
-                if op1:
-                    dot.node(str(id(var)), size_to_str(var.size()), fillcolor='orange')
-                if op2:
-                    dot.node(str(id(var)), text, fillcolor=color)
-
-                seen.add(var)
-
-                if op1 or op2:
-                    if hasattr(var, 'next_functions'):
-                        for u in var.next_functions:
-                            if u[0] is not None:
-                                if str(type(u[0]).__name__)!='AccumulateGrad':
-                                    dot.edge(str(id(u[0])), str(id(var)))
-                                    add_nodes(u[0])
-                    if hasattr(var, 'saved_tensors'):
-                        for t in var.saved_tensors:
-                            dot.edge(str(id(t)), str(id(var)))
-                            add_nodes(t)
-
-        add_nodes(var.grad_fn)
-        dot.save(savename)
-        return dot
-
-    if not os.path.exists(opt.save_path):
-        raise Exception('No save folder {} available!'.format(opt.save_path))
-
-    viz_graph = make_dot(network_output, opt.save_path+"/Network_Graphs"+"/{}_network_graph".format(opt.arch))
-    viz_graph.format = 'svg'
-    viz_graph.render()
-
-    torch.cuda.empty_cache()
-
-
-
-
-class MultiCropWrapper(nn.Module):
-    """
-    Perform forward pass separately on each resolution input.
-    The inputs corresponding to a single resolution are clubbed and single
-    forward is run on the same resolution inputs. Hence we do several
-    forward passes = number of different resolutions used. We then
-    concatenate all the output features and run the head forward on these
-    concatenated features.
-    """
-    def __init__(self, backbone, head):
-        super(MultiCropWrapper, self).__init__()
-        # disable layers dedicated to ImageNet labels classification
-        backbone.fc, backbone.head = nn.Identity(), nn.Identity()
-        self.backbone = backbone
-        self.head = head
-
-    def forward(self, x, feature=False):
-        # convert to list
-        if not isinstance(x, list):
-            x = [x]
-        idx_crops = torch.cumsum(torch.unique_consecutive(
-            torch.tensor([inp.shape[-1] for inp in x]),
-            return_counts=True,
-        )[1], 0)
-        start_idx, output = 0, torch.empty(0).to(x[0].device)
-        for end_idx in idx_crops:
-            _out = self.backbone(torch.cat(x[start_idx: end_idx]))
-            # The output is a tuple with XCiT model. See:
-            # https://github.com/facebookresearch/xcit/blob/master/xcit.py#L404-L405
-            if isinstance(_out, tuple):
-                _out = _out[0]
-            # accumulate outputs
-            output = torch.cat((output, _out))
-            start_idx = end_idx
-        # Run the head forward on the concatenated features.
-        if self.head == None:
-            feat = torch.nn.functional.normalize(output, dim=-1)
-            return feat
-        else:
-            if feature:
-                return self.head(output)
-            else:
-                return self.head(output)
-
-
-def has_batchnorms(model):
-    bn_types = (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d, nn.SyncBatchNorm)
-    for name, module in model.named_modules():
-        if isinstance(module, bn_types):
-            return True
-    return False
-
-
 def bool_flag(s):
     """
     Parse boolean arguments from the command line.
@@ -884,21 +703,9 @@ def bool_flag(s):
         raise argparse.ArgumentTypeError("invalid value for a boolean flag")
 
 
-
-
-
-
 def vis(model, test_dataloader, device, split, opt):
     linsize = opt.linsize
     torch.cuda.empty_cache()
-    if opt.dataset == "semi_fungi":
-        with open(os.path.join(opt.source_path, "all_train_oracle_new.txt")) as f:
-            filelines = f.readlines()
-            paths = [' '.join(x.strip().split(' ')[:-1]) for x in filelines]
-            Lin_paths = paths[:4141]
-            Uin_paths = paths[4141:4141+13166]
-            Uout_paths = paths[4141+13166:]
-    
     if opt.dataset == "Inaturalist":
         if opt.iter > 0:
             with open(opt.cluster_path, 'rb') as clusterf:
@@ -915,7 +722,6 @@ def vis(model, test_dataloader, device, split, opt):
                 masks[len(Lin_paths):] = 2
 
     _ = model.eval()
-    n_classes = len(test_dataloader.dataset.avail_classes)
     path2ids = {}
 
     with torch.no_grad():
@@ -934,21 +740,6 @@ def vis(model, test_dataloader, device, split, opt):
         target_labels = np.hstack(target_labels).reshape(-1)
         feature_coll  = np.vstack(feature_coll).astype('float32')
 
-    if opt.dataset == "semi_fungi" and opt.testset == "all_train_oracle_new.txt":
-        predicted_features = np.zeros_like(feature_coll)
-        path2ids_new = {}
-        target_labels_new = np.zeros_like(target_labels)
-        for i in range(len(paths)):
-            path = paths[i]
-            idxx = path2ids["/home/ubuntu/data//semi_fungi/"+path]
-            path2ids_new["/home/ubuntu/data//semi_fungi/"+path] = i
-            predicted_features[i] = feature_coll[idxx]
-            target_labels_new[i] = target_labels[idxx]
-        
-        path2ids = path2ids_new
-        feature_coll = predicted_features
-        target_labels = target_labels_new
-    
     if (opt.dataset == "Inaturalist") and "all_train" in split:
         if opt.iter > 0:
             predicted_features = np.zeros_like(feature_coll)

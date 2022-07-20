@@ -73,19 +73,13 @@ parser.add_argument('--trainset',     default="lin_train_set1.txt", type=str)
 parser.add_argument('--testset',      default="Inaturalist_test_set1.txt", type=str)
 parser.add_argument('--cluster_path', default="", type=str)
 parser.add_argument('--finetune',     default='true', type=str)
-parser.add_argument('--onehead',      default="false", type=str)
 parser.add_argument('--class_num',    default=948, type=int)
-parser.add_argument('--patch_size', default=16, type=int, help='vit patch size')
 parser.add_argument('--pretrained_weights', default="", type=str, help='pretrained weight path')
 parser.add_argument('--use_bn_in_head', default=False, type=aux.bool_flag,
                     help="Whether to use batch normalizations in projection head (Default: False)")
 parser.add_argument("--checkpoint_key", default="teacher", type=str,
                     help='Key to use in the checkpoint (example: "teacher")')
 parser.add_argument('--drop_path_rate', default=0.1, type=float, help="stochastic depth rate")
-parser.add_argument('--norm_last_layer', default=True, type=aux.bool_flag,
-                    help="""Whether or not to weight normalize the last layer of the DINO head.
-    Not normalizing leads to better performance but can make the training unstable.
-    In our experiments, we typically set this paramater to False with vit_small and True with vit_base.""")
 parser.add_argument('--iter', default=1, type=int)
 
 opt = parser.parse_args()
@@ -106,11 +100,6 @@ if opt.finetune == 'true':
     opt.finetune = True
 elif opt.finetune == 'false':
     opt.finetune = False
-
-if opt.onehead == 'true':
-    opt.onehead = True
-elif opt.onehead == 'false':
-    opt.onehead = False
 
 """==========================================================================="""
 ################### TensorBoard Settings ##################

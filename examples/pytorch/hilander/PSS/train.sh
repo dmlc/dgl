@@ -16,7 +16,7 @@ python Smooth_AP/src/get_features.py \
 --n_epochs 400 --bs 384 \
 --source_path "../../data/" --embed_dim 128 \
 --resume "0/checkpoint_0.pth.tar" \
---finetune false --onehead ture --get_features true --iter 0 \
+--finetune false --get_features true --iter 0 \
 --class_num 948 --loss smoothap \
 --trainset lin_train_set1.txt \
 --all_trainset train_set1.txt \
@@ -52,7 +52,7 @@ for i in {1..4} ; do
   --source_path "../../data/" --embed_dim 128 \
   --trainset lin_train_set1.txt --testset Inaturalist_test_set1.txt \
   --cluster_path "../../data/inat_hilander_l_smoothap_train_selectbydensity_iter${last_iter}.pkl" \
-  --finetune true --onehead true --loss smoothap --infrequent_eval 1 --iter ${i}
+  --finetune true --loss smoothap --infrequent_eval 1 --iter ${i}
 
   # iter i - get feature
   python Smooth_AP/src/get_features.py \
@@ -60,7 +60,7 @@ for i in {1..4} ; do
   --n_epochs 400 --bs 384 \
   --source_path "../../data/" --embed_dim 128 \
   --resume "${i}/checkpoint_${i}.pth.tar" \
-  --finetune false --onehead ture --get_features true --iter ${i} \
+  --finetune false --get_features true --iter ${i} \
   --class_num 948 --loss smoothap \
   --trainset lin_train_set1.txt \
   --all_trainset train_set1.txt \

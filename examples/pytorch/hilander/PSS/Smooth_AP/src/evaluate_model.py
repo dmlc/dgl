@@ -40,7 +40,6 @@ if __name__ == '__main__':
     parser.add_argument('--testset', default="Inaturalist_test_set1.txt", type=str)
     parser.add_argument('--cluster_path', default="", type=str)
     parser.add_argument('--finetune', default="false", type=str)
-    parser.add_argument('--onehead', default="true", type=str)
     parser.add_argument('--class_num', default=948, type=int)
     parser.add_argument('--get_features', default="false", type=str)
     parser.add_argument('--patch_size', default=16, type=int, help='vit patch size')
@@ -73,11 +72,6 @@ if __name__ == '__main__':
         opt.finetune = True
     elif opt.finetune == 'false':
         opt.finetune = False
-
-    if opt.onehead == 'true':
-        opt.onehead = True
-    elif opt.onehead == 'false':
-        opt.onehead = False
 
     if opt.get_features == 'true':
         opt.get_features = True
