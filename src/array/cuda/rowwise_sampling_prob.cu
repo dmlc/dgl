@@ -262,7 +262,6 @@ __global__ void _CSRRowWiseSampleKernel(
         out_idxs[out_idx] = static_cast<IdType>(data ? data[in_idx] : in_idx);
       }
     }
-
     out_row += 1;
   }
 }
@@ -389,7 +388,6 @@ __global__ void _CSRRowWiseSampleReplaceKernel(
         out_idxs[out_idx] = static_cast<IdType>(data ? data[in_idx] : in_idx);
       }
     }
-
     out_row += 1;
   }
 }
@@ -403,7 +401,7 @@ __global__ void _CSRRowWiseSampleReplaceKernel(
 * Use CDF sampling algorithm for with replacement:
 *   1) Calculate the CDF of all neighbor's prob.
 *   2) For each [0, num_picks), generate a rand ~ U(0, 1).
-*      Use binary search to find its index the CDF array as a chosen item.
+*      Use binary search to find its index in the CDF array as a chosen item.
 * Use A-Res sampling algorithm for without replacement:
 *   1) For rows with deg > num_picks, calculate A-Res values for all neighbors.
 *   2) Sort the A-Res array and select top-num_picks as chosen items.
@@ -490,8 +488,8 @@ COOMatrix CSRRowWiseSampling(CSRMatrix mat,
   device->FreeWorkspace(ctx, prefix_temp);
   device->FreeWorkspace(ctx, temp_deg);
 
-  // (Xin): The copy here is too small, and the overhead of creating cuda events
-  // cannot be ignored. Just use synchronized copy.
+  // TODO(Xin): The copy here is too small, and the overhead of creating
+  // cuda events cannot be ignored. Just use synchronized copy.
   IdType temp_len;
   device->CopyDataFromTo(temp_ptr, num_rows * sizeof(temp_len), &temp_len, 0,
       sizeof(temp_len),

@@ -140,7 +140,7 @@ __global__ void _CSRRowWiseSampleUniformKernel(
     const int64_t out_row_start = out_ptr[out_row];
 
     if (deg <= num_picks) {
-      // just copy row when there is no enough nodes to sample.
+      // just copy row when there is not enough nodes to sample.
       for (int idx = threadIdx.x; idx < deg; idx += BLOCK_SIZE) {
         const IdType in_idx = in_row_start + idx;
         out_rows[out_row_start + idx] = row;
@@ -172,7 +172,6 @@ __global__ void _CSRRowWiseSampleUniformKernel(
         out_idxs[out_row_start + idx] = data ? data[perm_idx] : perm_idx;
       }
     }
-
     out_row += 1;
   }
 }
