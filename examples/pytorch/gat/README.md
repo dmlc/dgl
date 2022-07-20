@@ -20,6 +20,8 @@ Run with the following for multilabel classification with PPI dataset
 python3 train_ppi.py
 ```
 
+> **_NOTE:_**  Users may occasionally run into low accuracy issue (e.g., test accuracy < 0.8) due to the instablity of overtraining/overfitting the model. This can be resolved by adding Early Stopping or reducing maximum number of training epochs.
+
 Summary
 -------
 * cora: ~0.821
