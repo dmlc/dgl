@@ -25,7 +25,7 @@ def chunk_numpy_array(arr, fmt_meta, chunk_sizes, path_fmt):
 
     return paths
 
-def _chunk_graph(g, ndata_paths, edata_paths, num_chunks, output_path):
+def _chunk_graph(g, name, ndata_paths, edata_paths, num_chunks, output_path):
     # First deal with ndata and edata that are homogeneous (i.e. not a dict-of-dict)
     if len(g.ntypes) == 1 and not isinstance(next(iter(ndata_paths.values())), dict):
         ndata_paths = {g.ntypes[0]: ndata_paths}
@@ -37,6 +37,7 @@ def _chunk_graph(g, ndata_paths, edata_paths, num_chunks, output_path):
 
     metadata = {}
 
+    metadata['graph_name'] = name
     metadata['node_type'] = g.ntypes
 
     # Compute the number of nodes per chunk per node type
@@ -122,7 +123,7 @@ def _chunk_graph(g, ndata_paths, edata_paths, num_chunks, output_path):
         json.dump(metadata, f)
     logging.info('Saved metadata in %s' % os.path.abspath(metadata_path))
 
-def chunk_graph(g, ndata_paths, edata_paths, num_chunks, output_path):
+def chunk_graph(g, name, ndata_paths, edata_paths, num_chunks, output_path):
     """
     Split the graph into multiple chunks.
 
@@ -133,6 +134,8 @@ def chunk_graph(g, ndata_paths, edata_paths, num_chunks, output_path):
     ----------
     g : DGLGraph
         The graph.
+    name : str
+        The name of the graph, to be used later in DistDGL training.
     ndata_paths : dict[str, pathlike] or dict[ntype, dict[str, pathlike]]
         The dictionary of paths pointing to the corresponding numpy array file for each
         node data key.
@@ -145,13 +148,14 @@ def chunk_graph(g, ndata_paths, edata_paths, num_chunks, output_path):
         The output directory saving the chunked graph.
     """
     with setdir(output_path):
-        _chunk_graph(g, ndata_paths, edata_paths, num_chunks, output_path)
+        _chunk_graph(g, name, ndata_paths, edata_paths, num_chunks, output_path)
 
 if __name__ == '__main__':
     logging.basicConfig(level='INFO')
     (g,), _ = dgl.load_graphs('/home/ubuntu/dgl/new-output/graph.dgl')
     chunk_graph(
             g,
+            'mag240m',
             {'paper': {
                 'feat': '/home/ubuntu/dgl/new-output/paper/feat.npy',
                 'label': '/home/ubuntu/dgl/new-output/paper/label.npy',
