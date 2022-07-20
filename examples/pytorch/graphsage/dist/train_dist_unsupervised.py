@@ -1,17 +1,13 @@
 import os
 os.environ['DGLBACKEND']='pytorch'
-from multiprocessing import Process
-import argparse, time, math
+import argparse, time
 import numpy as np
-from functools import wraps
 import tqdm
 import sklearn.linear_model as lm
 import sklearn.metrics as skm
 
 import dgl
-from dgl import DGLGraph
-from dgl.data import register_data_args, load_data
-from dgl.data.utils import load_graphs
+from dgl.data import register_data_args
 import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 
@@ -19,10 +15,8 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import torch.multiprocessing as mp
-from dgl.distributed import DistDataLoader
 
-class SAGE(nn.Module):
+class DistSAGE(nn.Module):
     def __init__(self,
                  in_feats,
                  n_hidden,
@@ -65,133 +59,6 @@ class SAGE(nn.Module):
         # Therefore, we compute the representation of all nodes layer by layer.  The nodes
         # on each layer are of course splitted in batches.
         # TODO: can we standardize this?
-        for l, layer in enumerate(self.layers):
-            y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
-
-            sampler = dgl.dataloading.MultiLayerNeighborSampler([None])
-            dataloader = dgl.dataloading.DistNodeDataLoader(
-                g,
-                th.arange(g.number_of_nodes()),
-                sampler,
-                batch_size=batch_size,
-                shuffle=True,
-                drop_last=False,
-                num_workers=0)
-
-            for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
-                block = blocks[0]
-                block = block.int().to(device)
-                h = x[input_nodes].to(device)
-                h = layer(block, h)
-                if l != len(self.layers) - 1:
-                    h = self.activation(h)
-                    h = self.dropout(h)
-
-                y[output_nodes] = h.cpu()
-
-            x = y
-        return y
-
-class NegativeSampler(object):
-    def __init__(self, g, neg_nseeds):
-        self.neg_nseeds = neg_nseeds
-
-    def __call__(self, num_samples):
-        # select local neg nodes as seeds
-        return self.neg_nseeds[th.randint(self.neg_nseeds.shape[0], (num_samples,))]
-
-class NeighborSampler(object):
-    def __init__(self, g, fanouts, neg_nseeds, sample_neighbors, num_negs, remove_edge):
-        self.g = g
-        self.fanouts = fanouts
-        self.sample_neighbors = sample_neighbors
-        self.neg_sampler = NegativeSampler(g, neg_nseeds)
-        self.num_negs = num_negs
-        self.remove_edge = remove_edge
-
-    def sample_blocks(self, seed_edges):
-        n_edges = len(seed_edges)
-        seed_edges = th.LongTensor(np.asarray(seed_edges))
-        heads, tails = self.g.find_edges(seed_edges)
-
-        neg_tails = self.neg_sampler(self.num_negs * n_edges)
-        neg_heads = heads.view(-1, 1).expand(n_edges, self.num_negs).flatten()
-
-        # Maintain the correspondence between heads, tails and negative tails as two
-        # graphs.
-        # pos_graph contains the correspondence between each head and its positive tail.
-        # neg_graph contains the correspondence between each head and its negative tails.
-        # Both pos_graph and neg_graph are first constructed with the same node space as
-        # the original graph.  Then they are compacted together with dgl.compact_graphs.
-        pos_graph = dgl.graph((heads, tails), num_nodes=self.g.number_of_nodes())
-        neg_graph = dgl.graph((neg_heads, neg_tails), num_nodes=self.g.number_of_nodes())
-        pos_graph, neg_graph = dgl.compact_graphs([pos_graph, neg_graph])
-
-        seeds = pos_graph.ndata[dgl.NID]
-        blocks = []
-        for fanout in self.fanouts:
-            # For each seed node, sample ``fanout`` neighbors.
-            frontier = self.sample_neighbors(self.g, seeds, fanout, replace=True)
-            if self.remove_edge:
-                # Remove all edges between heads and tails, as well as heads and neg_tails.
-                _, _, edge_ids = frontier.edge_ids(
-                    th.cat([heads, tails, neg_heads, neg_tails]),
-                    th.cat([tails, heads, neg_tails, neg_heads]),
-                    return_uv=True)
-                frontier = dgl.remove_edges(frontier, edge_ids)
-            # Then we compact the frontier into a bipartite graph for message passing.
-            block = dgl.to_block(frontier, seeds)
-
-            # Obtain the seed nodes for next layer.
-            seeds = block.srcdata[dgl.NID]
-
-            blocks.insert(0, block)
-
-        input_nodes = blocks[0].srcdata[dgl.NID]
-        blocks[0].srcdata['features'] = load_subtensor(self.g, input_nodes, 'cpu')
-        # Pre-generate CSR format that it can be used in training directly
-        return pos_graph, neg_graph, blocks
-
-class PosNeighborSampler(object):
-    def __init__(self, g, fanouts, sample_neighbors):
-        self.g = g
-        self.fanouts = fanouts
-        self.sample_neighbors = sample_neighbors
-
-    def sample_blocks(self, seeds):
-        seeds = th.LongTensor(np.asarray(seeds))
-        blocks = []
-        for fanout in self.fanouts:
-            # For each seed node, sample ``fanout`` neighbors.
-            frontier = self.sample_neighbors(self.g, seeds, fanout, replace=True)
-            # Then we compact the frontier into a bipartite graph for message passing.
-            block = dgl.to_block(frontier, seeds)
-            # Obtain the seed nodes for next layer.
-            seeds = block.srcdata[dgl.NID]
-
-            blocks.insert(0, block)
-        return blocks
-
-class DistSAGE(SAGE):
-    def __init__(self, in_feats, n_hidden, n_classes, n_layers,
-                 activation, dropout):
-        super(DistSAGE, self).__init__(in_feats, n_hidden, n_classes, n_layers,
-                                       activation, dropout)
-
-    def inference(self, g, x, batch_size, device):
-        """
-        Inference with the GraphSAGE model on full neighbors (i.e. without neighbor sampling).
-        g : the entire graph.
-        x : the input of entire node set.
-
-        The inference code is written in a fashion that it could handle any number of nodes and
-        layers.
-        """
-        # During inference with sampling, multi-layer blocks are very inefficient because
-        # lots of computations in the first few layers are repeated.
-        # Therefore, we compute the representation of all nodes layer by layer.  The nodes
-        # on each layer are of course splitted in batches.
-        # TODO: can we standardize this?
         nodes = dgl.distributed.node_split(np.arange(g.number_of_nodes()),
                                            g.get_partition_book(), force_even=True)
         y = dgl.distributed.DistTensor((g.number_of_nodes(), self.n_hidden), th.float32, 'h',
@@ -200,21 +67,13 @@ class DistSAGE(SAGE):
             if l == len(self.layers) - 1:
                 y = dgl.distributed.DistTensor((g.number_of_nodes(), self.n_classes),
                                                th.float32, 'h_last', persistent=True)
+            # Create sampler
+            sampler = dgl.dataloading.NeighborSampler([-1])
+            # Create dataloader
+            dataloader = dgl.dataloading.DistNodeDataLoader(g, nodes, sampler, batch_size=batch_size, shuffle=False, drop_last=False)
 
-            sampler = PosNeighborSampler(g, [-1], dgl.distributed.sample_neighbors)
-            print('|V|={}, eval batch size: {}'.format(g.number_of_nodes(), batch_size))
-            # Create PyTorch DataLoader for constructing blocks
-            dataloader = DistDataLoader(
-                dataset=nodes,
-                batch_size=batch_size,
-                collate_fn=sampler.sample_blocks,
-                shuffle=False,
-                drop_last=False)
-
-            for blocks in tqdm.tqdm(dataloader):
+            for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
                 block = blocks[0].to(device)
-                input_nodes = block.srcdata[dgl.NID]
-                output_nodes = block.dstdata[dgl.NID]
                 h = x[input_nodes].to(device)
                 h_dst = h[:block.number_of_dst_nodes()]
                 h = layer(block, (h, h_dst))
@@ -300,17 +159,13 @@ def run(args, device, data):
     # Unpack data
     train_eids, train_nids, in_feats, g, global_train_nid, global_valid_nid, global_test_nid, labels = data
     # Create sampler
-    sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')], train_nids,
-                              dgl.distributed.sample_neighbors, args.num_negs, args.remove_edge)
-
-    # Create PyTorch DataLoader for constructing blocks
-    dataloader = dgl.distributed.DistDataLoader(
-        dataset=train_eids.numpy(),
-        batch_size=args.batch_size,
-        collate_fn=sampler.sample_blocks,
-        shuffle=True,
-        drop_last=False)
-
+    neg_sampler = dgl.dataloading.negative_sampler.Uniform(args.num_negs)
+    sampler = dgl.dataloading.NeighborSampler([int(fanout) for fanout in args.fan_out.split(',')])
+    # Create dataloader
+    exclude = 'reverse_id' if args.remove_edge else None
+    reverse_eids = th.arange(g.num_edges()) if args.remove_edge else None
+    dataloader = dgl.dataloading.DistEdgeDataLoader(g, train_eids, sampler, negative_sampler=neg_sampler,
+                                                    exclude=exclude, reverse_eids=reverse_eids, batch_size=args.batch_size, shuffle=True, drop_last=False)
     # Define model and optimizer
     model = DistSAGE(in_feats, args.num_hidden, args.num_hidden, args.num_layers, F.relu, args.dropout)
     model = model.to(device)
@@ -327,16 +182,10 @@ def run(args, device, data):
     # Training loop
     epoch = 0
     for epoch in range(args.num_epochs):
-        sample_time = 0
-        copy_time = 0
-        forward_time = 0
-        backward_time = 0
-        update_time = 0
         num_seeds = 0
         num_inputs = 0
 
         step_time = []
-        iter_t = []
         sample_t = []
         feat_copy_t = []
         forward_t = []
@@ -347,20 +196,19 @@ def run(args, device, data):
         start = time.time()
         # Loop over the dataloader to sample the computation dependency graph as a list of
         # blocks.
-        for step, (pos_graph, neg_graph, blocks) in enumerate(dataloader):
+        for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(dataloader):
+            if step == 10:
+                break
             tic_step = time.time()
             sample_t.append(tic_step - start)
 
+            copy_t = time.time()
             pos_graph = pos_graph.to(device)
             neg_graph = neg_graph.to(device)
             blocks = [block.to(device) for block in blocks]
-            # The nodes for input lies at the LHS side of the first block.
-            # The nodes for output lies at the RHS side of the last block.
-
-            # Load the input features as well as output labels
-            batch_inputs = blocks[0].srcdata['features']
+            batch_inputs = load_subtensor(g, input_nodes, device)
             copy_time = time.time()
-            feat_copy_t.append(copy_time - tic_step)
+            feat_copy_t.append(copy_time - copy_t)
 
             # Compute loss and prediction
             batch_pred = model(blocks, batch_inputs)
@@ -435,7 +283,8 @@ def main(args):
     if args.num_gpus == -1:
         device = th.device('cpu')
     else:
-        device = th.device('cuda:'+str(args.local_rank))
+        dev_id = g.rank() % args.num_gpus
+        device = th.device('cuda:'+str(dev_id))
 
     # Pack data
     in_feats = g.ndata['features'].shape[1]
@@ -472,8 +321,6 @@ if __name__ == '__main__':
     parser.add_argument('--local_rank', type=int, help='get rank of the process')
     parser.add_argument('--standalone', action='store_true', help='run in the standalone mode')
     parser.add_argument('--num_negs', type=int, default=1)
-    parser.add_argument('--neg_share', default=False, action='store_true',
-        help="sharing neg nodes for positive nodes")
     parser.add_argument('--remove_edge', default=False, action='store_true',
         help="whether to remove edges during sampling")
     args = parser.parse_args()
