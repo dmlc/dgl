@@ -4,7 +4,7 @@ Code for the ECCV '22 submission "PSS: Progressive Sample Selection for Open-Wor
 
 ## Dependencies
 
-We use python 3.7. The CUDA version needs to be 10.2. Besides DGL (>=0.5.2), we depend on several packages. To install dependencies using conda:
+We use python 3.7. The CUDA version needs to be 10.2. Besides DGL==0.6.1, we depend on several packages. To install dependencies using conda:
 
 ```commandline
 conda create -n pss python=3.7 # create env
