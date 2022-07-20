@@ -95,19 +95,29 @@ def create_dgl_object(graph_name, num_parts, \
         map between edge type(string)  and edge_type_id(int)
     """
     #create auxiliary data structures from the schema object
-    node_info = schema["nid"]
+    ntype_names = schema[constants.STR_NODE_TYPE]
     offset = 0
     global_nid_ranges = {}
-    for k, v in node_info.items():
-        global_nid_ranges[k] = np.array([offset + int(v["data"][0][1]), offset + int(v["data"][-1][2])]).reshape(1,2)
-        offset += int(v["data"][-1][2])
+    for idx, ntype in enumerate(ntype_names):
+        chunks = schema[constants.STR_NUM_NODES_PER_CHUNK][idx]
+        tid_start = np.cumsum([0] + chunks[:-1])
+        tid_end = np.cumsum(chunks)
+        tid_ranges = list(zip(tid_start, tid_end))
+        global_nid_ranges[ntype] = np.array([offset + tid_ranges[0][0], offset + tid_ranges[-1][1]]).reshape(1,2)
+        offset += tid_ranges[-1][1]
 
-    edge_info = schema["eid"]
+    etype_names = schema[constants.STR_EDGE_TYPE]
     offset = 0
     global_eid_ranges = {}
-    for k, v in edge_info.items():
-        global_eid_ranges[k] = np.array([offset + int(v["data"][0][1]), offset + int(v["data"][-1][2])]).reshape(1,2)
-        offset += int(v["data"][-1][2])
+    for idx, etype in enumerate(etype_names):
+        chunks = schema[constants.STR_NUM_EDGES_PER_CHUNK][idx]
+        tid_start = np.cumsum([0] + chunks[:-1])
+        tid_end = np.cumsum(chunks)
+        tid_ranges = list(zip(tid_start, tid_end))
+        tokens = etype.split(":")
+        assert len(tokens) == 3
+        global_eid_ranges[tokens[1]] = np.array([offset + tid_ranges[0][0], offset + tid_ranges[-1][1]]).reshape(1,2)
+        offset += tid_ranges[-1][1]
 
     id_map = dgl.distributed.id_map.IdMap(global_nid_ranges)
 

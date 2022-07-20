@@ -11,9 +11,9 @@ import dgl
 from timeit import default_timer as timer
 from datetime import timedelta
 from dataset_utils import get_dataset
-from utils import read_partitions_file, read_json, get_node_types, \
+from utils import read_ntype_partition_files, read_json, get_node_types, \
                     augment_edge_data, get_gnid_range_map, \
-                    write_dgl_objects, write_metadata_json
+                    write_dgl_objects, write_metadata_json, get_ntype_featnames
 from gloo_wrapper import alltoall_cpu_object_lst, alltoallv_cpu, \
                     alltoall_cpu, allgather_sizes, gather_metadata_json
 from globalids import assign_shuffle_global_nids_nodes, \
@@ -21,7 +21,7 @@ from globalids import assign_shuffle_global_nids_nodes, \
                     get_shuffle_global_nids_edges
 from convert_partition import create_dgl_object, create_metadata_json
 
-def gen_node_data(rank, world_size, node_part_ids, ntid_ntype_map, nid_schema_map):
+def gen_node_data(rank, world_size, node_part_ids, ntid_ntype_map, schema_map):
     '''
     For this data processing pipeline, reading node files is not needed. All the needed information about
     the nodes can be found in the metadata json file. This function generates the nodes owned by a given
@@ -92,12 +92,19 @@ def gen_node_data(rank, world_size, node_part_ids, ntid_ntype_map, nid_schema_ma
     gnid_start = 0
     gnid_end = 0
     for ntypeid in range(len(ntid_ntype_map)):
-        ntype_name = ntid_ntype_map[str(ntypeid)]
-        ntype_info = nid_schema_map[ntype_name]
-        type_start = int(ntype_info["data"][0][1])
-        type_end = int(ntype_info["data"][-1][2])
+        ntype_name = ntid_ntype_map[ntypeid]
+        ntype_info = schema_map[constants.STR_NUM_NODES_PER_CHUNK]
 
-        gnid_end += type_end
+        tid_info = ntype_info[ntypeid] #array of no.... chunks per partition
+        
+        tid_start = np.cumsum([0] + tid_info[:-1])
+        tid_end = np.cumsum(tid_info)
+        tid_ranges = list(zip(tid_start, tid_end))
+
+        type_start = tid_ranges[0][0]
+        type_end = tid_ranges[-1][1]
+
+        gnid_end += tid_ranges[-1][1]
 
         node_partid_slice = node_part_ids[gnid_start:gnid_end]
         cond = node_partid_slice == rank
@@ -292,10 +299,10 @@ def exchange_node_features(rank, world_size, node_feature_tids, ntype_gnid_map, 
             own_node_features[feat_key] = []
             own_global_nids[feat_key] = []
             for idx, x in enumerate(output_feat_list):
-                own_node_features.append(x[feat_key])
+                own_node_features[feat_key].append(x[feat_key])
                 own_global_nids[feat_key].append(output_nid_list[idx][feat_key])
             for k in own_node_features.keys(): 
-                own_node_features[k] = th.cat(own_node_features[k])
+                own_node_features[k] = torch.cat(own_node_features[k])
                 own_global_nids[k] = np.concatenate(own_global_nids[k])
 
     end = timer()
@@ -303,7 +310,7 @@ def exchange_node_features(rank, world_size, node_feature_tids, ntype_gnid_map, 
     return own_node_features, own_global_nids
 
 def exchange_graph_data(rank, world_size, node_features, node_feat_tids, edge_data,
-        node_part_ids, ntypes_map, ntypes_gnid_range_map, ntid_ntype_map, schema_map):
+        node_part_ids, ntypes_ntypeid_map, ntypes_gnid_range_map, ntid_ntype_map, schema_map):
     """
     Wrapper function which is used to shuffle graph data on all the processes. 
 
@@ -326,7 +333,7 @@ def exchange_graph_data(rank, world_size, node_features, node_feat_tids, edge_da
         to each process.
     node_part_ids : numpy array
         numpy array which store the partition-ids and indexed by global_nids
-    ntypes_map : dictionary
+    ntypes_ntypeid_map : dictionary
         mappings between node type names and node type ids
     ntypes_gnid_range_map : dictionary
         mapping between node type names and global_nids which belong to the keys in this dictionary
@@ -354,7 +361,7 @@ def exchange_graph_data(rank, world_size, node_features, node_feat_tids, edge_da
                                                 ntypes_gnid_range_map, node_part_ids, node_features)
     print( 'Rank: ', rank, ' Done with node features exchange.')
 
-    node_data = gen_node_data(rank, world_size, node_part_ids, ntid_ntype_map, schema_map["nid"])
+    node_data = gen_node_data(rank, world_size, node_part_ids, ntid_ntype_map, schema_map)
     edge_data = exchange_edge_data(rank, world_size, edge_data)
     return node_data, rcvd_node_features, rcvd_global_nids, edge_data
 
@@ -370,7 +377,7 @@ def read_dataset(rank, world_size, node_part_ids, params, schema_map):
     -----------
     rank : int
         rank of the current process
-    worls_size : int
+    world_size : int
         total no. of processes instantiated
     node_part_ids : numpy array
         metis partitions which are the output of partitioning algorithm
@@ -399,10 +406,11 @@ def read_dataset(rank, world_size, node_part_ids, params, schema_map):
         edge features which is also a dictionary, similar to node features dictionary
     """
     edge_features = {}
+    #node_tids, node_features, edge_datadict, edge_tids
     node_tids, node_features, node_feat_tids, edge_data, edge_tids = \
         get_dataset(params.input_dir, params.graph_name, rank, world_size, schema_map)
 
-    augment_edge_data(edge_data, node_part_ids, prefix_sum_edges[rank])
+    augment_edge_data(edge_data, node_part_ids, edge_tids, rank, world_size)
     print('[Rank: ', rank, '] Done augmenting edge_data: ', len(edge_data), edge_data[constants.GLOBAL_SRC_ID].shape)
 
     return node_tids, node_features, node_feat_tids, edge_data, edge_features
@@ -441,46 +449,46 @@ def gen_dist_partitions(rank, world_size, params):
        the nodes and edges in any given file, their global_ids can be easily computed as well. 
 
     {
-        "nid" : { #m : no. of node types
-            "ntype0-name": {
-                "format": "csv",
-                "data" : [ #list of lists
-                    ["<path>/ntype0-name-0.txt", 0, id_end0], # These are type_nids for the nodes
-                    ["<path>/ntype0-name-1.txt", id_start1, id_end1],
-                    ...,
-                    ["<path>/ntype0-name-<p-1>.txt", id_start<p-1>, id_end<p-1>]
-                ]
-            },
-            ....,
-            "ntype<m-1>-name" : {
-                "format" : "csv",
-                "data" : [
-                    ["<path>/user-sup-ntype<m-1>-name-0.txt", 0, id_end0],
-                    ["<path>/user-sup-ntype<m-1>-name-1.txt", id_start1, id_end1],
-                    ...
-                    ["<path>/user-sup-ntype<m-1>-name-<p-1>.txt", id_start<p-1>, id_end<p-1>]
-                ]
-            }        
-        },
+        "graph_name" : xyz,
+        "node_type" : ["ntype0-name", "ntype1-name", ....], #m node types
+        "num_nodes_per_chunk" : [
+            [a0, a1, ...a<p-1>], #p partitions
+            [b0, b1, ... b<p-1>], 
+            ....
+            [c0, c1, ..., c<p-1>] #no, of node types
+        ],
+        "edge_type" : ["src_ntype:edge_type:dst_ntype", ....], #k edge types
+        "num_edges_per_chunk" : [
+            [a0, a1, ...a<p-1>], #p partitions
+            [b0, b1, ... b<p-1>], 
+            ....
+            [c0, c1, ..., c<p-1>] #no, of edge types
+        ],
         "node_data" : {
             "ntype0-name" : {
-                "feat0-name" : [ #list of lists
-                    ["<path>/feat-0.npy", 0, id_end0],
-                    ["<path>/feat-1.npy", id_start1, id_end1],
-                    ....
-                    ["<path>/feat-<p-1>.npy", id_start<p-1>, id_end<p-1>]                
-                ]
-                "feat1-name" : [ #list of lists
-                    ["<path>/feat-0.npy", 0, id_end0],
-                    ["<path>/feat-1.npy", id_start1, id_end1],
-                    ....
-                    ["<path>/feat-<p-1>.npy", id_start<p-1>, id_end<p-1>]                
-                ]
+                "feat0-name" : {
+                    "format" : {"name": "numpy"},
+                    "data" :   [ #list of lists
+                        ["<path>/feat-0.npy", 0, id_end0],
+                        ["<path>/feat-1.npy", id_start1, id_end1],
+                        ....
+                        ["<path>/feat-<p-1>.npy", id_start<p-1>, id_end<p-1>]                
+                    ]
+                },
+                "feat1-name" : {
+                    "format" : {"name": "numpy"}, 
+                    "data" : [ #list of lists
+                        ["<path>/feat-0.npy", 0, id_end0],
+                        ["<path>/feat-1.npy", id_start1, id_end1],
+                        ....
+                        ["<path>/feat-<p-1>.npy", id_start<p-1>, id_end<p-1>]                
+                    ]
+                }
             }
         },
-        "eid": { #k edge types 
+        "edges": { #k edge types 
             "src_ntype:etype0-name:dst_ntype" : {
-                "format": "csv",
+                "format": {"name" : "csv", "delimiter" : " "},
                 "data" : [
                     ["<path>/etype0-name-0.txt", 0, id_end0], #These are type_edge_ids for edges of this type
                     ["<path>/etype0-name-1.txt", id_start1, id_end1],
@@ -490,7 +498,7 @@ def gen_dist_partitions(rank, world_size, params):
             }, 
             ..., 
             "src_ntype:etype<k-1>-name:dst_ntype" : {
-                "format": "csv",
+                "format": {"name" : "csv", "delimiter" : " "},
                 "data" : [
                     ["<path>/etype<k-1>-name-0.txt", 0, id_end0],
                     ["<path>/etype<k-1>-name-1.txt", id_start1, id_end1],
@@ -499,6 +507,7 @@ def gen_dist_partitions(rank, world_size, params):
                 ]
             },         
         }, 
+    }
 
     The function performs the following steps: 
     1. Reads the metis partitions to identify the owner process of all the nodes in the entire graph.
@@ -534,12 +543,14 @@ def gen_dist_partitions(rank, world_size, params):
     print('[Rank: ', rank, '] Starting distributed data processing pipeline...')
 
     #init processing
+    schema_map = read_json(params.input_dir+'/'+params.schema)
+
     #TODO: For large graphs, this mapping function can be memory intensive. This needs to be changed to 
     #processes owning a set of global-nids, per partitioning algorithm, and messaging will be used to 
     #identify the ownership instead of mem. lookups. 
-    node_part_ids = read_partitions_file(params.input_dir+'/'+params.partitions_file)
-    schema_map = read_json(params.input_dir+'/'+params.schema)
-    ntypes_map, ntypes, ntypeid_ntypes_map = get_node_types(schema_map)
+    node_part_ids = read_ntype_partition_files(schema_map, os.path.join(params.input_dir, params.partitions_dir))
+
+    ntypes_ntypeid_map, ntypes, ntypeid_ntypes_map = get_node_types(schema_map)
     print('[Rank: ', rank, '] Initialized metis partitions and node_types map...')
 
     #read input graph files and augment these datastructures with
@@ -551,9 +562,9 @@ def gen_dist_partitions(rank, world_size, params):
     #this function will also stitch the data recvd from other processes
     #and return the aggregated data
     ntypes_gnid_range_map = get_gnid_range_map(node_tids)
-    node_data, rcvd_node_features, rcvd_global_nids  = \
+    node_data, rcvd_node_features, rcvd_global_nids, edge_data  = \
                     exchange_graph_data(rank, world_size, node_features, node_feat_tids, \
-                                        edge_data, node_part_ids, ntypes_map, ntypes_gnid_range_map, \
+                                        edge_data, node_part_ids, ntypes_ntypeid_map, ntypes_gnid_range_map, \
                                         ntypeid_ntypes_map, schema_map)
     print('[Rank: ', rank, '] Done with data shuffling...')
 
@@ -597,7 +608,7 @@ def gen_dist_partitions(rank, world_size, params):
     start = timer()
     num_nodes = 0
     num_edges = shuffle_global_eid_start
-    graph_obj, ntypes_map_val, etypes_map_val, ntypes_map, etypes_map = create_dgl_object(\
+    graph_obj, ntypes_map_val, etypes_map_val, ntypes_ntypeid_map, etypes_map = create_dgl_object(\
             params.graph_name, params.num_parts, \
             schema_map, rank, node_data, edge_data, num_nodes, num_edges)
     write_dgl_objects(graph_obj, rcvd_node_features, edge_features, params.output, rank)
@@ -605,7 +616,7 @@ def gen_dist_partitions(rank, world_size, params):
     #get the meta-data 
     json_metadata = create_metadata_json(params.graph_name, len(node_data[constants.NTYPE_ID]), len(edge_data[constants.ETYPE_ID]), \
                             rank, world_size, ntypes_map_val, \
-                            etypes_map_val, ntypes_map, etypes_map, params.output)
+                            etypes_map_val, ntypes_ntypeid_map, etypes_map, params.output)
 
     if (rank == 0):
         #get meta-data from all partitions and merge them on rank-0
@@ -682,7 +693,7 @@ def multi_machine_run(params):
     rank = int(os.environ["RANK"])
 
     #init the gloo process group here.
-    dist.init_process_group("gloo", rank=rank, world_size=params.world_size, timeout=timedelta(seconds=5*60))
+    dist.init_process_group("gloo", rank=rank, world_size=params.world_size, timeout=timedelta(seconds=constants.GLOO_MESSAGING_TIMEOUT))
     print('[Rank: ', rank, '] Done with process group initialization...')
 
     #invoke the main function here.

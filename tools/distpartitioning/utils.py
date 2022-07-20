@@ -8,29 +8,38 @@ import constants
 import pyarrow
 from pyarrow import csv
 
-def read_partitions_file(part_file):
+def read_ntype_partition_files(schema_map, input_dir):
     """
-    Utility method to read metis partitions, which is the output of 
-    pm_dglpart2
+    Utility method to read the partition id mapping for each node.
+    For each node type, there will be an file, in the input directory argument
+    containing the partition id mapping for a given nodeid. 
 
     Parameters:
     -----------
-    part_file : string
-        file name which is the output of metis partitioning
-        algorithm (pm_dglpart2, in the METIS installation).
-        This function expects each line in `part_file` to be formatted as 
-        <global_nid> <part_id>
-        and the contents of this file are sorted by <global_nid>. 
+    schema_map : dictionary
+        dictionary created by reading the input metadata json file
+    input_dir : string
+        directory in which the node-id to partition-id mappings files are 
+        located for each of the node types in the input graph
 
     Returns:
     --------
-    numpy array
-        array of part_ids and the idx is the <global_nid>
+    numpy array : 
+        array of integers representing mapped partition-ids for a given node-id
+        the line number is used as the type_node_id in each of the files.
     """
-    partitions_map = np.loadtxt(part_file, delimiter=' ', dtype=np.int64)
-    #as a precaution sort the lines based on the <global_nid>
-    partitions_map = partitions_map[partitions_map[:,0].argsort()]
-    return partitions_map[:,1]
+    assert os.path.isdir(input_dir)
+
+    #iterate over the node types and extract the partition id mappings
+    part_ids = []
+    ntype_names = schema_map[constants.STR_NODE_TYPE]
+    for ntype in ntype_names:
+        df = csv.read_csv(os.path.join(input_dir, '{}.txt'.format(ntype)), \
+                read_options=pyarrow.csv.ReadOptions(autogenerate_column_names=True), \
+                parse_options=pyarrow.csv.ParseOptions(delimiter=' '))
+        ntype_partids = df['f0'].to_numpy()
+        part_ids.append(ntype_partids)
+    return np.concatenate(part_ids)
 
 def read_json(json_file):
     """
@@ -50,7 +59,7 @@ def read_json(json_file):
 
     return val
 
-def get_ntype_featnames(ntype_name, schema): 
+def get_ntype_featnames(ntype_name, schema_map): 
     """
     Retrieves node feature names for a given node_type
 
@@ -68,24 +77,24 @@ def get_ntype_featnames(ntype_name, schema):
     list : 
         a list of feature names for a given node_type
     """
-    ntype_dict = schema["node_data"]
-    if (ntype_name in ntype_dict):
+    ntype_featdict = schema_map[constants.STR_NODE_DATA]
+    if (ntype_name in ntype_featdict):
         featnames = []
-        ntype_info = ntype_dict[ntype_name]
+        ntype_info = ntype_featdict[ntype_name]
         for k, v in ntype_info.items(): 
             featnames.append(k)
         return featnames
     else: 
         return []
 
-def get_node_types(schema):
+def get_node_types(schema_map):
     """ 
     Utility method to extract node_typename -> node_type mappings
     as defined by the input schema
 
     Parameters:
     -----------
-    schema : dictionary
+    schema_map : dictionary
         Input schema from which the node_typename -> node_type
         dictionary is created.
 
@@ -98,12 +107,9 @@ def get_node_types(schema):
     dictionary
         with keys as ntype ids (integers) and values as node type names
     """
-    ntype_info = schema["nid"]
-    ntypes = []
-    for k in ntype_info.keys(): 
-        ntypes.append(k)
-    ntype_ntypeid_map = {e: i for i, e in enumerate(ntypes)}
-    ntypeid_ntype_map = {str(i): e for i, e in enumerate(ntypes)}
+    ntypes = schema_map[constants.STR_NODE_TYPE]
+    ntype_ntypeid_map = {e : i for i, e in enumerate(ntypes)}
+    ntypeid_ntype_map = {i : e for i, e in enumerate(ntypes)}
     return ntype_ntypeid_map, ntypes, ntypeid_ntype_map
 
 def get_gnid_range_map(node_tids): 
@@ -182,7 +188,7 @@ def write_metadata_json(metadata_list, output_dir, graph_name):
         graph_metadata["part-{}".format(i)] = metadata_list[i]["part-{}".format(i)]
 
     with open('{}/{}.json'.format(output_dir, graph_name), 'w') as outfile: 
-        json.dump(graph_metadata, outfile, sort_keys=True, indent=4)
+        json.dump(graph_metadata, outfile, sort_keys=False, indent=4)
 
 def augment_edge_data(edge_data, part_ids, edge_tids, rank, world_size):
     """
