@@ -54,7 +54,7 @@ def train(train_dataloader, valid_dataloader, device, model):
         model.train()
         logits = []
         total_loss = 0
-        # mini-batches loop
+        # mini-batch loop
         for batch_id, subgraph in enumerate(train_dataloader):
             subgraph = subgraph.to(device)
             features = subgraph.ndata['feat'].float()
