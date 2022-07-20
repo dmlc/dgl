@@ -134,8 +134,6 @@ def run(args, device, data):
     loss_fcn = loss_fcn.to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
-    train_size = th.sum(g.ndata['train_mask'][0:g.number_of_nodes()])
-
     # Training loop
     iter_tput = []
     epoch = 0
@@ -157,24 +155,16 @@ def run(args, device, data):
             for step, (input_nodes, seeds, blocks) in enumerate(dataloader):
                 tic_step = time.time()
                 sample_time += tic_step - start
-
+                # fetch features/labels
                 batch_inputs, batch_labels = load_subtensor(g, seeds, input_nodes, "cpu")
-                blocks[0].srcdata['features'] = batch_inputs
-                blocks[-1].dstdata['labels'] = batch_labels
-
-                # The nodes for input lies at the LHS side of the first block.
-                # The nodes for output lies at the RHS side of the last block.
-                batch_inputs = blocks[0].srcdata['features']
-                batch_labels = blocks[-1].dstdata['labels']
-                batch_labels = batch_labels.long()
-
                 num_seeds += len(blocks[-1].dstdata[dgl.NID])
                 num_inputs += len(blocks[0].srcdata[dgl.NID])
+                # move to target device
                 blocks = [block.to(device) for block in blocks]
+                batch_inputs = batch_inputs.to(device)
                 batch_labels = batch_labels.to(device)
                 # Compute loss and prediction
                 start = time.time()
-                #print(g.rank(), blocks[0].device, model.module.layers[0].fc_neigh.weight.device, dev_id)
                 batch_pred = model(blocks, batch_inputs)
                 loss = loss_fcn(batch_pred, batch_labels)
                 forward_end = time.time()
