@@ -197,8 +197,6 @@ def run(args, device, data):
         # Loop over the dataloader to sample the computation dependency graph as a list of
         # blocks.
         for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(dataloader):
-            if step == 10:
-                break
             tic_step = time.time()
             sample_t.append(tic_step - start)
 
