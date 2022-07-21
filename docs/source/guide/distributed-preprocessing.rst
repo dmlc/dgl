@@ -50,7 +50,7 @@ graphs with hundreds of billions of edges or large features. We describe how to 
 the *parallel preprocessing pipeline* for such cases next.
 
 Parallel Preprocessing Pipeline
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 To handle massive graph data that cannot fit in the CPU RAM of a
 single machine, DGL utilizes data chunking and parallel processing to reduce
@@ -63,7 +63,7 @@ memory footprint and running time. The figure below illustrates the core steps:
   algorithms like METIS family require extra statistics about the graph.
   Therefore, this step transforms and augments the raw graph data with
   necessary contexts according to the specified partition algorithm.
-  Optionally, it supports chunking the input graph into multiple data files to
+  Optionally, it chunks the input graph into multiple data files to
   ease the subsequent processing steps.
 * **Step.2 Graph Partitioning:** Invoke the specified partitioning algorithm to
   generate a partition assignment for each node in the graph. To speedup the
@@ -114,10 +114,20 @@ Its data files are organized as following:
 Step.1 Partition Preparation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-TBD
+In general, the implementation of this step depends on the format of user inputs.
+Its scope could include:
+
+* Construct graphs out of non-structured data such as texts or tabular data.
+* Augment or transform the input graph struture or features. E.g., adding reverse
+  or self-loop edges, normalizing features, etc.
+* Chunk the input graph structure and features into multiple data files so that
+  each one can fit in CPU RAM for subsequent preprocessing steps.
+
+Regardless of the implementation, the output of this step shall follow the
+Chunked Graph Data Format as we will describe next.
 
 Chunked Graph Data Format
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 After step.1, the graph data will be chunked into multiple data files so that
 each piece could be loaded to CPU RAM easily. As an example, we have chunked
@@ -233,6 +243,15 @@ The edge index files contain edges in the form of node ID pairs:
     of data files. The folder structure in this example is not a strict
     requirement as long as ``meta.json`` contains valid file paths.
 
+Implementation tips
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To avoid running into out-of-memory error, users can process graph structures
+and feature data separately. Processing one chunk at a time can also reduce
+the runtime memory footprint. As an example, DGL provides a
+`tools/chunk_graph.py <https://github.com/dmlc/dgl/blob/master/tools/chunk_graph.py>`_
+script that chunks an in-memory feature-less :class:`~dgl.DGLGraph` and feature
+tensors stored in :class:`numpy.memmap`.
 
 Step.2 Graph Partitioning
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
