@@ -75,7 +75,7 @@ def submit_jobs(args, user_python_exe) -> str:
         elif cmd_arg == "graph-name":
             argslist += "--graph-name {} ".format(graph_name)
         elif cmd_arg == "schema":
-            argslist += "--schema meta.json "
+            argslist += "--schema metadata.json "
         elif cmd_arg == "num-parts":
             argslist += "--num-parts {} ".format(num_parts)
         elif cmd_arg == "output":
