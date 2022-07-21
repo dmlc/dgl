@@ -1,28 +1,16 @@
 import os
 os.environ['DGLBACKEND']='pytorch'
-from multiprocessing import Process
-import argparse, time, math
+import argparse, time
 import numpy as np
-from functools import wraps
-import tqdm
-import sklearn.linear_model as lm
-import sklearn.metrics as skm
 
 import dgl
-from dgl import DGLGraph
-from dgl.data import register_data_args, load_data
-from dgl.data.utils import load_graphs
-import dgl.function as fn
-import dgl.nn.pytorch as dglnn
+from dgl.data import register_data_args
 
 import torch as th
-import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import torch.multiprocessing as mp
-from dgl.distributed import DistDataLoader
 
-from train_dist_unsupervised import SAGE, NeighborSampler, PosNeighborSampler, CrossEntropyLoss, compute_acc
+from train_dist_unsupervised import DistSAGE, CrossEntropyLoss, compute_acc
 from train_dist_transductive import DistEmb, load_embs
 
 def generate_emb(standalone, model, emb_layer, g, batch_size, device):
@@ -46,20 +34,16 @@ def run(args, device, data):
     # Unpack data
     train_eids, train_nids, g, global_train_nid, global_valid_nid, global_test_nid, labels = data
     # Create sampler
-    sampler = NeighborSampler(g, [int(fanout) for fanout in args.fan_out.split(',')], train_nids,
-                              dgl.distributed.sample_neighbors, args.num_negs, args.remove_edge)
-
-    # Create PyTorch DataLoader for constructing blocks
-    dataloader = dgl.distributed.DistDataLoader(
-        dataset=train_eids.numpy(),
-        batch_size=args.batch_size,
-        collate_fn=sampler.sample_blocks,
-        shuffle=True,
-        drop_last=False)
-
+    neg_sampler = dgl.dataloading.negative_sampler.Uniform(args.num_negs)
+    sampler = dgl.dataloading.NeighborSampler([int(fanout) for fanout in args.fan_out.split(',')])
+    # Create dataloader
+    exclude = 'reverse_id' if args.remove_edge else None
+    reverse_eids = th.arange(g.num_edges()) if args.remove_edge else None
+    dataloader = dgl.dataloading.DistEdgeDataLoader(g, train_eids, sampler, negative_sampler=neg_sampler,
+                                                    exclude=exclude, reverse_eids=reverse_eids, batch_size=args.batch_size, shuffle=True, drop_last=False)
     # Define model and optimizer
     emb_layer = DistEmb(g.num_nodes(), args.num_hidden, dgl_sparse_emb=args.dgl_sparse, dev_id=device)
-    model = SAGE(args.num_hidden, args.num_hidden, args.num_hidden, args.num_layers, F.relu, args.dropout)
+    model = DistSAGE(args.num_hidden, args.num_hidden, args.num_hidden, args.num_layers, F.relu, args.dropout)
     model = model.to(device)
     if not args.standalone:
         if args.num_gpus == -1:
@@ -86,16 +70,9 @@ def run(args, device, data):
     # Training loop
     epoch = 0
     for epoch in range(args.num_epochs):
-        sample_time = 0
-        copy_time = 0
-        forward_time = 0
-        backward_time = 0
-        update_time = 0
         num_seeds = 0
         num_inputs = 0
-
         step_time = []
-        iter_t = []
         sample_t = []
         feat_copy_t = []
         forward_t = []
@@ -106,23 +83,19 @@ def run(args, device, data):
         start = time.time()
         # Loop over the dataloader to sample the computation dependency graph as a list of
         # blocks.
-        for step, (pos_graph, neg_graph, blocks) in enumerate(dataloader):
+        for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(dataloader):
             tic_step = time.time()
             sample_t.append(tic_step - start)
 
+            copy_t = time.time()
             pos_graph = pos_graph.to(device)
             neg_graph = neg_graph.to(device)
             blocks = [block.to(device) for block in blocks]
-            # The nodes for input lies at the LHS side of the first block.
-            # The nodes for output lies at the RHS side of the last block.
-
-            # Load the input features as well as output labels
-            batch_inputs = blocks[0].srcdata[dgl.NID]
             copy_time = time.time()
             feat_copy_t.append(copy_time - tic_step)
 
             # Compute loss and prediction
-            batch_inputs = emb_layer(batch_inputs)
+            batch_inputs = emb_layer(input_nodes)
             batch_pred = model(blocks, batch_inputs)
             loss = loss_fcn(batch_pred, pos_graph, neg_graph)
             forward_end = time.time()
@@ -139,7 +112,6 @@ def run(args, device, data):
             update_t.append(time.time() - compute_end)
 
             pos_edges = pos_graph.number_of_edges()
-            neg_edges = neg_graph.number_of_edges()
 
             step_t = time.time() - start
             step_time.append(step_t)
@@ -198,7 +170,8 @@ def main(args):
     if args.num_gpus == -1:
         device = th.device('cpu')
     else:
-        device = th.device('cuda:'+str(args.local_rank))
+        dev_id = g.rank() % args.num_gpus
+        device = th.device('cuda:'+str(dev_id))
 
     # Pack data
     global_train_nid = global_train_nid.squeeze()

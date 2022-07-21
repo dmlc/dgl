@@ -12,7 +12,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-from train_dist import DistSAGE, compute_acc, load_subtensor
+from train_dist import DistSAGE, compute_acc
 
 def initializer(shape, dtype):
     arr = th.zeros(shape, dtype=dtype)

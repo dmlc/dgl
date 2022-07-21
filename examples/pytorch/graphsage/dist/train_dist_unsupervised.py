@@ -223,7 +223,6 @@ def run(args, device, data):
             update_t.append(time.time() - compute_end)
 
             pos_edges = pos_graph.number_of_edges()
-            neg_edges = neg_graph.number_of_edges()
 
             step_t = time.time() - start
             step_time.append(step_t)
