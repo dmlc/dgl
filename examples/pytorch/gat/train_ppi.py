@@ -36,11 +36,11 @@ def evaluate(g, features, labels, model):
 
 def evaluate_in_batches(dataloader, device, model):
     total_score = 0
-    for batch_id, subgraph in enumerate(dataloader):
-        subgraph = subgraph.to(device)
-        features = subgraph.ndata['feat']
-        labels = subgraph.ndata['label']
-        score = evaluate(subgraph, features, labels, model)
+    for batch_id, batched_graph in enumerate(dataloader):
+        batched_graph = batched_graph.to(device)
+        features = batched_graph.ndata['feat']
+        labels = batched_graph.ndata['label']
+        score = evaluate(batched_graph, features, labels, model)
         total_score += score
     return total_score / (batch_id + 1) # return average score
     
@@ -55,11 +55,11 @@ def train(train_dataloader, val_dataloader, device, model):
         logits = []
         total_loss = 0
         # mini-batch loop
-        for batch_id, subgraph in enumerate(train_dataloader):
-            subgraph = subgraph.to(device)
-            features = subgraph.ndata['feat'].float()
-            labels = subgraph.ndata['label'].float()
-            logits = model(subgraph, features)
+        for batch_id, batched_graph in enumerate(train_dataloader):
+            batched_graph = batched_graph.to(device)
+            features = batched_graph.ndata['feat'].float()
+            labels = batched_graph.ndata['label'].float()
+            logits = model(batched_graph, features)
             loss = loss_fcn(logits, labels)
             optimizer.zero_grad()
             loss.backward()
