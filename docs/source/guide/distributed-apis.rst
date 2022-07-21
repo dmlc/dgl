@@ -23,7 +23,7 @@ Initialization of the DGL distributed module
 by a trainer, this API creates sampler processes and builds connections with graph
 servers; if invoked by graph server, this API starts a service loop to listen to
 trainer/sampler requests. The API *must* be called before
-``torch.distributed.init_process_group`` and any other ``dgl.distributed`` APIs
+:func:`torch.distributed.init_process_group` and any other ``dgl.distributed`` APIs
 as shown in the order below:
 
 .. code:: python

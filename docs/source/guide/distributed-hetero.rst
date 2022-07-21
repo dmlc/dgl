@@ -53,7 +53,7 @@ type B as node type 1 and assigns all its nodes with IDs in range
 
     class IDConverter:
         def __init__(self, meta):
-            # meta is the JSON object loaded from meta.json
+            # meta is the JSON object loaded from metadata.json
             self.node_type = meta['node_type']
             self.edge_type = meta['edge_type']
             self.ntype2id_map = {ntype : i for i, ntype in enumerate(self.node_type)}

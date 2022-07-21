@@ -132,6 +132,17 @@ For massive graphs where parallel preprocessing is desired, DGL supports
 `ParMETIS <http://glaros.dtc.umn.edu/gkhome/metis/parmetis/overview>`__ as one
 of the choices of partitioning algorithms.
 
+.. note::
+
+    Because ParMETIS does not support heterogeneous graph, users need to
+    conduct ID conversion before and after running ParMETIS.
+    Check out chapter :ref:`guide-distributed-hetero` for explanation.
+
+.. note::
+
+    Please make sure that the input graph to ParMETIS does not have
+    duplicate edges (or parallel edges) or self-loop edges.
+
 ParMETIS Installation
 ^^^^^^^^^^^^^^^^^^^^^^
 ParMETIS requires METIS and GKLib. Please follow the instructions `here
@@ -139,7 +150,7 @@ ParMETIS requires METIS and GKLib. Please follow the instructions `here
 compiling and install METIS, please follow the instructions below to clone
 METIS with GIT and compile it with int64 support.
 
-.. code-block:: none
+.. code-block:: bash
 
     git clone https://github.com/KarypisLab/METIS.git
     make config shared=1 cc=gcc prefix=~/local i64=1
@@ -148,24 +159,149 @@ METIS with GIT and compile it with int64 support.
 
 For now, we need to compile and install ParMETIS manually. We clone the DGL branch of ParMETIS as follows:
 
-.. code-block:: none
+.. code-block:: bash
 
     git clone --branch dgl https://github.com/KarypisLab/ParMETIS.git
 
 Then compile and install ParMETIS.
 
-.. code-block:: none
+.. code-block:: bash
 
     make config cc=mpicc prefix=~/local
     make install
 
-Before running ParMETIS, we need to set two environment variables: `PATH` and `LD_LIBRARY_PATH`.
+Before running ParMETIS, we need to set two environment variables: ``PATH`` and ``LD_LIBRARY_PATH``.
 
-.. code-block:: none
+.. code-block:: bash
 
     export PATH=$PATH:$HOME/local/bin
     export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/local/lib/
 
-.. warning::
+Input format
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+The input graph for ParMETIS is stored in three files with the following names:
+``xxx_nodes.txt``, ``xxx_edges.txt`` and ``xxx_stats.txt``, where ``xxx`` is a
+graph name.
 
-    TBD: Shall we go ahead explain the input/output of ParMETIS?
+Each row in ``xxx_nodes.txt`` stores the information of a node with the following format:
+
+.. code-block:: none
+
+    <node_type> <weight1> ... <orig_type_node_id>
+
+All fields are separated by whitespace:
+
+* ``<node_type>`` is an integer. For a homogeneous graph, its value is always
+  0. For heterogeneous graphs, its value indicates the type of each node.
+* ``<weight1>``, ``<weight2>``, etc. are integers that indicate the node weights
+  used by ParMETIS to balance graph partitions. If a user does not provide node
+  weights, ParMETIS partitions a graph and balance the number of nodes in each
+  partition (it is important to balance graph partitions in order to achieve
+  good training speed). However, this default strategy may not be sufficient
+  for many use cases.  For example, in a heterogeneous graph, we want to
+  partition the graph so that all partitions have roughly the same number of
+  nodes for each node type. The toy example below shows how we can use node
+  weights to balance the number of nodes of different types.
+* ``<orig_type_node_id>`` is an integer representing the node ID in its own
+  type. In DGL, nodes of each type are assigned with IDs starting from 0. For a
+  homogeneous graph, this field is the same as the node ID.
+* The row ID indicates the *homogeneous* node IDs.  All nodes of the same type
+  should be assigned with contiguous IDs. That is, nodes of the same type
+  should be stored together in ``xxx_nodes.txt``.
+
+Below shows an example of a node file for a heterogeneous graph with two node
+types. Node type 0 has three nodes; node type 1 has four nodes. It uses two
+node weights to ensure that ParMETIS will generate partitions with roughly the
+same number of nodes for type 0 and the same number of nodes for type 1.
+
+.. code-block:: none
+
+    0 1 0 0
+    0 1 0 1
+    0 1 0 2
+    1 0 1 0
+    1 0 1 1
+    1 0 1 2
+    1 0 1 3
+
+Similarly, each row in ``xxx_edges.txt`` stores the information of an edge with the following format:
+
+.. code-block:: none
+
+    <src_id> <dst_id> <type_edge_id> <edge_type>
+
+All fields are separated by whitespace:
+
+* ``<src_id>`` is the *homogeneous* ID of the source node.
+* ``<dst_id>`` is the *homogeneous* ID of the destination node.
+* ``<type_edge_id>`` is the edge ID for the edge type.
+* ``<edge_type>`` is the edge type.
+
+``xxx_stats.txt`` stores some basic statistics of the graph. It has only one line with three fields
+separated by whitespace:
+
+.. code-block:: none
+
+    <num_nodes> <num_edges> <num_node_weights>
+
+* ``num_nodes`` stores the total number of nodes regardless of node types.
+* ``num_edges`` stores the total number of edges regardless of edge types.
+* ``num_node_weights`` stores the number of node weights in the node file.
+
+Run ParMETIS and output format
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+ParMETIS contains a command called ``pm_dglpart``, which loads the graph stored
+in the three files from the machine where ``pm_dglpart`` is invoked, distributes
+data to all machines in the cluster and invokes ParMETIS to partition the
+graph. When it completes, it generates three files for each partition:
+``p<part_id>-xxx_nodes.txt``, ``p<part_id>-xxx_edges.txt``,
+``p<part_id>-xxx_stats.txt``.
+
+.. note::
+
+    ParMETIS reassigns IDs to nodes during the partitioning. After ID reassignment,
+    the nodes in a partition are assigned with contiguous IDs; furthermore, the nodes of
+    the same type are assigned with contiguous IDs.
+
+``p<part_id>-xxx_nodes.txt`` stores the node data of the partition. Each row represents
+a node with the following fields:
+
+.. code-block:: none
+
+    <node_id> <node_type> <weight1> ... <orig_type_node_id>
+
+* ``<node_id>`` is the *homogeneous* node IDs after ID reassignment.
+* ``<node_type>`` is the node type.
+* ``<weight1>`` is the node weight used by ParMETIS.
+* ``<orig_type_node_id>`` is the original node ID for a specific node type in the input heterogeneous graph.
+* ``<attributes>`` are optional fields that contain any node attributes in the input node file.
+
+``p<part_id>-xxx_edges.txt`` stores the edge data of the partition. Each row represents
+an edge with the following fields:
+
+.. code-block:: none
+
+    <src_id> <dst_id> <orig_src_id> <orig_dst_id> <orig_type_edge_id> <edge_type>
+
+* ``<src_id>`` is the *homogeneous* ID of the source node after ID reassignment.
+* ``<dst_id>`` is the *homogeneous* ID of the destination node after ID reassignment.
+* ``<orig_src_id>`` is the *homogeneous* ID of the source node in the input graph.
+* ``<orig_dst_id>`` is the *homogeneous* ID of the destination node in the input graph.
+* ``<orig_type_edge_id>`` is the edge ID for the specific edge type in the input graph.
+* ``<edge_type>`` is the edge type.
+* ``<attributes>`` are optional fields that contain any edge attributes in the input edge file.
+
+When invoking ``pm_dglpart``, the three input files: ``xxx_nodes.txt``,
+``xxx_edges.txt``, ``xxx_stats.txt`` should be located in the directory where
+``pm_dglpart`` runs. The following command run four ParMETIS processes to
+partition the graph named ``xxx`` into eight partitions (each process handles
+two partitions).
+
+.. code-block:: bash
+
+    mpirun -np 4 pm_dglpart xxx 2
+
+The output files from ParMETIS then need to be converted to the
+:ref:`partition assignment format <guide-distributed-prep-partition>` to in
+order to run subsequent preprocessing steps.

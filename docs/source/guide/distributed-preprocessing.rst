@@ -114,7 +114,7 @@ Its data files are organized as following:
 Step.1 Partition Preparation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-In general, the implementation of this step depends on the format of user inputs.
+In general, the implementation of this step depends on the format of user's inputs.
 Its scope could include:
 
 * Construct graphs out of non-structured data such as texts or tabular data.
@@ -126,18 +126,19 @@ Its scope could include:
 Regardless of the implementation, the output of this step shall follow the
 Chunked Graph Data Format as we will describe next.
 
+.. _guide-distributed-prep-chunk:
 Chunked Graph Data Format
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-After step.1, the graph data will be chunked into multiple data files so that
-each piece could be loaded to CPU RAM easily. As an example, we have chunked
+After step.1, the graph data can be chunked into multiple data files so that
+each piece can be loaded to CPU RAM easily. As an example, we have chunked
 the MAG240M-LSC graph into 2 parts, creating a data folder as follows:
 
 
 .. code-block:: none
 
     /mydata/MAG240M-LSC_chunked/
-      |-- meta.json                # metadata json file
+      |-- metadata.json            # metadata json file
       |-- edges/                   # stores edge ID data
       |  |-- writes-part1.csv
       |  |-- writes-part2.csv
@@ -154,13 +155,13 @@ the MAG240M-LSC graph into 2 parts, creating a data folder as follows:
          |-- paper-year-part1.npy
          |-- paper-year-part2.npy
 
-All the data files are chunked into two parts, including the node ID data of
-each type (e.g., author, institution, paper), edge ID data of each relation
-(e.g., writes, affiliates, cites) and node features. All ID data are stored in
+All the data files are chunked into two parts, including the edge data of each relation
+(e.g., writes, affiliates, cites) and node features. If the graph has edge features,
+they will be chunked into multiple files too. All ID data are stored in
 CSV (we will illustrate the contents soon) while node features are stored in
 numpy arrays.
 
-The ``meta.json`` stores all the metadata information such as the file names
+The ``metadata.json`` stores all the metadata information such as the file names
 and the chunk sizes.
 
 .. code-block:: python
@@ -218,7 +219,7 @@ and the chunk sizes.
        "edge_data" : {}  # MAG240M-LSC does not have edge features
     }
 
-There are three parts in ``meta.json``:
+There are three parts in ``metadata.json``:
 
 * Graph schema information and chunk sizes, e.g., ``"node_type"`` , ``"num_nodes_per_chunk"``, etc.
 * Edge index data under key ``"edges"``.
@@ -239,9 +240,9 @@ The edge index files contain edges in the form of node ID pairs:
 
 .. note::
 
-    In general, a chunked graph data folder just needs a ``meta.json`` and a bunch
+    In general, a chunked graph data folder just needs a ``metadata.json`` and a bunch
     of data files. The folder structure in this example is not a strict
-    requirement as long as ``meta.json`` contains valid file paths.
+    requirement as long as ``metadata.json`` contains valid file paths.
 
 Implementation tips
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -253,6 +254,7 @@ the runtime memory footprint. As an example, DGL provides a
 script that chunks an in-memory feature-less :class:`~dgl.DGLGraph` and feature
 tensors stored in :class:`numpy.memmap`.
 
+.. _guide-distributed-prep-partition:
 Step.2 Graph Partitioning
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -277,9 +279,9 @@ For example, to randomly partition MAG240M-LSC to two parts, run the
       |-- author.txt
       |-- institution.txt
 
-Partition assignments of different node types are stored in the file of the
-same name whose contents are the partition IDs each node assigned to (row i is
-the partition ID of node i).
+Each file stores the partition assignment of the corresponding node type.
+The contents are the partition ID of each node stored in lines, i.e., line i is
+the partition ID of node i.
 
 .. code-block:: bash
 
@@ -297,8 +299,9 @@ the partition ID of node i).
 
     DGL currently requires the number of data chunks and the number of partitions to be the same.
 
-Despite its simplicity, random partitioning may cause frequent cross machine communication.
-Check out chapter :ref:`guide-distributed-partition` for more advanced options.
+Despite its simplicity, random partitioning may result in frequent
+cross-machine communication.  Check out chapter
+:ref:`guide-distributed-partition` for more advanced options.
 
 Step.3 Data Dispatching
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

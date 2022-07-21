@@ -23,7 +23,7 @@ Below shows an example of launching a distributed training job in a cluster.
       --num_servers 1                     \
       --part_config data/mygraph.json     \
       --ip_config ip_config.txt           \
-      "python3 code/my_train_script.py"
+      "python3 my_train_script.py"
 
 The argument specifies the workspace path, where to find the partition metadata JSON
 and machine IP configurations, how many trainer, sampler, and server processes to be launched
@@ -80,7 +80,7 @@ We first launch the graph server together with the first group of training worke
       --ip_config ip_config.txt           \
       --keep_alive                        \
       --server_name long_live             \
-      "python3 code/my_train_script.py"
+      "python3 my_train_script.py"
 
 Pay attention to the ``--keep_alive`` option, which indicates the server should
 stay alive after workers have finished. ``--server_name`` is the given name of
@@ -98,7 +98,7 @@ persistent server.
       --num_servers 1                     \
       --part_config data/mygraph.json     \
       --ip_config ip_config.txt           \
-      "python3 code/my_train_script.py"
+      "python3 my_train_script.py"
 
 There are several restrictions when using persistent graph servers:
 
