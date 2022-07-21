@@ -9,7 +9,7 @@ import pyarrow
 import pandas as pd
 import constants
 from pyarrow import csv
-from utils import read_json
+from utils import read_json, get_idranges
 
 def create_dgl_object(graph_name, num_parts, \
                         schema, part_id, node_data, \
@@ -95,29 +95,11 @@ def create_dgl_object(graph_name, num_parts, \
         map between edge type(string)  and edge_type_id(int)
     """
     #create auxiliary data structures from the schema object
-    ntype_names = schema[constants.STR_NODE_TYPE]
-    offset = 0
-    global_nid_ranges = {}
-    for idx, ntype in enumerate(ntype_names):
-        chunks = schema[constants.STR_NUM_NODES_PER_CHUNK][idx]
-        tid_start = np.cumsum([0] + chunks[:-1])
-        tid_end = np.cumsum(chunks)
-        tid_ranges = list(zip(tid_start, tid_end))
-        global_nid_ranges[ntype] = np.array([offset + tid_ranges[0][0], offset + tid_ranges[-1][1]]).reshape(1,2)
-        offset += tid_ranges[-1][1]
+    ntid_dict, global_nid_ranges = get_idranges(schema[constants.STR_NODE_TYPE], 
+                                    schema[constants.STR_NUM_NODES_PER_CHUNK])
 
-    etype_names = schema[constants.STR_EDGE_TYPE]
-    offset = 0
-    global_eid_ranges = {}
-    for idx, etype in enumerate(etype_names):
-        chunks = schema[constants.STR_NUM_EDGES_PER_CHUNK][idx]
-        tid_start = np.cumsum([0] + chunks[:-1])
-        tid_end = np.cumsum(chunks)
-        tid_ranges = list(zip(tid_start, tid_end))
-        tokens = etype.split(":")
-        assert len(tokens) == 3
-        global_eid_ranges[tokens[1]] = np.array([offset + tid_ranges[0][0], offset + tid_ranges[-1][1]]).reshape(1,2)
-        offset += tid_ranges[-1][1]
+    etid_dict, global_eid_ranges = get_idranges(schema[constants.STR_EDGE_TYPE], 
+                                    schema[constants.STR_NUM_EDGES_PER_CHUNK])
 
     id_map = dgl.distributed.id_map.IdMap(global_nid_ranges)
 
@@ -130,10 +112,10 @@ def create_dgl_object(graph_name, num_parts, \
     etypes.sort(key=lambda e: e[1])
     etype_offset_np = np.array([e[1] for e in etypes])
     etypes = [e[0] for e in etypes]
-    etypes_map = {e: i for i, e in enumerate(etypes)}
+    etypes_map = {e.split(":")[1]: i for i, e in enumerate(etypes)}
 
     node_map_val = {ntype: [] for ntype in ntypes}
-    edge_map_val = {etype: [] for etype in etypes}
+    edge_map_val = {etype.split(":")[1]: [] for etype in etypes}
 
     shuffle_global_nids, ntype_ids, global_type_nid = node_data[constants.SHUFFLE_GLOBAL_NID], \
             node_data[constants.NTYPE_ID], node_data[constants.GLOBAL_TYPE_NID]
@@ -168,8 +150,10 @@ def create_dgl_object(graph_name, num_parts, \
     # Determine the edge ID range of different edge types.
     edge_id_start = edgeid_offset 
     for etype_name in global_eid_ranges:
-        etype_id = etypes_map[etype_name]
-        edge_map_val[etype_name].append([edge_id_start,
+        tokens = etype_name.split(":")
+        assert len(tokens) == 3
+        etype_id = etypes_map[tokens[1]]
+        edge_map_val[tokens[1]].append([edge_id_start,
                                          edge_id_start + np.sum(etype_ids == etype_id)])
         edge_id_start += np.sum(etype_ids == etype_id)
 

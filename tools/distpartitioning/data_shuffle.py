@@ -13,7 +13,8 @@ from datetime import timedelta
 from dataset_utils import get_dataset
 from utils import read_ntype_partition_files, read_json, get_node_types, \
                     augment_edge_data, get_gnid_range_map, \
-                    write_dgl_objects, write_metadata_json, get_ntype_featnames
+                    write_dgl_objects, write_metadata_json, get_ntype_featnames, \
+                    get_idranges
 from gloo_wrapper import alltoall_cpu_object_lst, alltoallv_cpu, \
                     alltoall_cpu, allgather_sizes, gather_metadata_json
 from globalids import assign_shuffle_global_nids_nodes, \
@@ -37,46 +38,47 @@ def gen_node_data(rank, world_size, node_part_ids, ntid_ntype_map, schema_map):
         numpy array, whose length is same as no. of nodes in the graph. Index in this array is the global_nid
         and value is the partition-id which owns the node
     ntid_ntype_map : 
-        a dictionary where keys are node_type ids and values are node_type names
-    nid_schema_map: 
-        a dictionary, which is extracted from the input graph metadata json file for node information, 
-        using the key is "nid". This dictionary, as described below, has information about all the node types
-        present in the input graph.
+        a dictionary where keys are node_type ids(integers) and values are node_type names(strings).
+    schema_map: 
+        dictionary formed by reading the input metadata json file for the input dataset.
 
         Please note that, it is assumed that for the input graph files, the nodes of a particular node-type are
         split into `p` files (because of `p` partitions to be generated). On a similar node, edges of a particular
         edge-type are split into `p` files as well. 
-        For instance, a generic dictionaries for "nid" keys are as follows:
-        "ntype0-name", "ntype1-name" etc... are the user supplied names for the node types present in the input graph.
-        "format" specifies the structure of the files' content. And "data" has a value which is a list of lists. 
-        Each list has 3 entries which are file-name (including either an absolute path or relative), start and end ids
-        which are type ids of the nodes read from the corresponding files. 
 
+        #assuming m nodetypes present in the input graph
+        "num_nodes_per_chunk" : [
+            [a0, a1, a2, ... a<p-1>], 
+            [b0, b1, b2, ... b<p-1>], 
+            ...
+            [m0, m1, m2, ... m<p-1>]
+        ]
+        Here, each sub-list, corresponding a nodetype in the input graph, has `p` elements. For instance [a0, a1, ... a<p-1>] 
+        where each element represents the number of nodes which are to be processed by a process during distributed partitioning.
 
-            "nid" : { #m : no. of node types
-                "ntype0-name": {
-                "format": "csv",
-                "data" : [ #list of lists
-                            ["<path>/ntype0-name-0.txt", 0, id_end0], # These are type_nids for the nodes
-                            ["<path>/ntype0-name-1.txt", id_start1, id_end1],
-                            ...,
-                            ["<path>/ntype0-name-<p-1>.txt", id_start<p-1>, id_end<p-1>]
-                        ]
-                 },
+        In addition to the above key-value pair for the nodes in the graph, the node-features are captured in the
+        "node_data" key-value pair. In this dictionary the keys will be nodetype names and value will be a dictionary which 
+        is used to capture all the features present for that particular node-type. This is shown in the following example:
 
-                 ....,
-
-                 "ntype<m-1>-name" : {
-                    "format" : "csv",
-                    "data" : [
-                        ["<path>/ntype<m-1>-name-0.txt", 0, id_end0],
-                        ["<path>/ntype<m-1>-name-1.txt", id_start1, id_end1],
-                        ...
-                        ["<path>/ntype<m-1>-name-<p-1>.txt", id_start<p-1>, id_end<p-1>]
-                    ]
-                  }
-              }
-
+        "node_data" : {
+            "paper": {       # node type
+                "feat": {   # feature key
+                    "format": {"name": "numpy"},
+                    "data": ["node_data/paper-feat-part1.npy", "node_data/paper-feat-part2.npy"]
+                },
+                "label": {   # feature key
+                    "format": {"name": "numpy"},
+                    "data": ["node_data/paper-label-part1.npy", "node_data/paper-label-part2.npy"]
+                },
+                "year": {   # feature key
+                    "format": {"name": "numpy"},
+                    "data": ["node_data/paper-year-part1.npy", "node_data/paper-year-part2.npy"]
+                }
+            }
+        }
+        In the above textual description we have a node-type, which is paper, and it has 3 features namely feat, label and year. 
+        Each feature has `p` files whose location in the filesystem is the list for the key "data" and "foramt" is used to 
+        describe storage format. 
 
     Returns:
     --------
@@ -89,22 +91,13 @@ def gen_node_data(rank, world_size, node_part_ids, ntid_ntype_map, schema_map):
                         constants.NTYPE_ID : [], 
                         constants.GLOBAL_TYPE_NID : []
                         }
-    gnid_start = 0
-    gnid_end = 0
-    for ntypeid in range(len(ntid_ntype_map)):
-        ntype_name = ntid_ntype_map[ntypeid]
-        ntype_info = schema_map[constants.STR_NUM_NODES_PER_CHUNK]
 
-        tid_info = ntype_info[ntypeid] #array of no.... chunks per partition
-        
-        tid_start = np.cumsum([0] + tid_info[:-1])
-        tid_end = np.cumsum(tid_info)
-        tid_ranges = list(zip(tid_start, tid_end))
+    type_nid_dict, global_nid_dict = get_idranges(schema_map[constants.STR_NODE_TYPE], 
+                                        schema_map[constants.STR_NUM_NODES_PER_CHUNK])
 
-        type_start = tid_ranges[0][0]
-        type_end = tid_ranges[-1][1]
-
-        gnid_end += tid_ranges[-1][1]
+    for ntype_id, ntype_name in ntid_ntype_map.items(): 
+        type_start, type_end = type_nid_dict[ntype_name][0][0], type_nid_dict[ntype_name][-1][1]
+        gnid_start, gnid_end = global_nid_dict[ntype_name][0, 0], global_nid_dict[ntype_name][0, 1]
 
         node_partid_slice = node_part_ids[gnid_start:gnid_end]
         cond = node_partid_slice == rank
@@ -114,10 +107,9 @@ def gen_node_data(rank, world_size, node_part_ids, ntid_ntype_map, schema_map):
         own_tnids = np.arange(type_start, type_end, dtype=np.int64)
         own_tnids = own_tnids[cond]
 
-        local_node_data[constants.NTYPE_ID].append(np.ones(own_gnids.shape, dtype=np.int64)*ntypeid)
+        local_node_data[constants.NTYPE_ID].append(np.ones(own_gnids.shape, dtype=np.int64)*ntype_id)
         local_node_data[constants.GLOBAL_NID].append(own_gnids)
         local_node_data[constants.GLOBAL_TYPE_NID].append(own_tnids)
-        gnid_start = gnid_end
 
     for k in local_node_data.keys():
         local_node_data[k] = np.concatenate(local_node_data[k])
@@ -543,7 +535,7 @@ def gen_dist_partitions(rank, world_size, params):
     print('[Rank: ', rank, '] Starting distributed data processing pipeline...')
 
     #init processing
-    schema_map = read_json(params.input_dir+'/'+params.schema)
+    schema_map = read_json(os.path.join(params.input_dir, params.schema))
 
     #TODO: For large graphs, this mapping function can be memory intensive. This needs to be changed to 
     #processes owning a set of global-nids, per partitioning algorithm, and messaging will be used to 
