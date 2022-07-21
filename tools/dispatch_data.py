@@ -21,16 +21,16 @@ LARG_PROCS_MACHINE = "num_proc_per_machine"
 LARG_IPCONF = "ip_config"
 LARG_MASTER_PORT = "master_port"
 
-def get_launch_cmd(args) -> str: 
+def get_launch_cmd(args, user_python_exe) -> str: 
 
-    cmd = pythonpath=os.environ.get("PYTHONPATH", "") + get_python_path() + " " + os.path.join(INSTALL_DIR, LAUNCH_SCRIPT)
+    cmd = pythonpath=os.environ.get("PYTHONPATH", "") + get_python_path(user_python_exe) + " " + os.path.join(INSTALL_DIR, LAUNCH_SCRIPT)
     cmd = f"{cmd} --{LARG_PROCS_MACHINE} 1 "
     cmd = f"{cmd} --{LARG_IPCONF} {args.ip_config} "
     cmd = f"{cmd} --{LARG_MASTER_PORT} {args.master_port} "
 
     return cmd
 
-def get_python_path() -> str:
+def get_python_path(user_python_exe) -> str:
 
     # Auto-detect the python binary that kicks off the distributed trainer code.
     # Note: This allowlist order matters, this will match with the FIRST matching entry. Thus, please add names to this
@@ -42,41 +42,54 @@ def get_python_path() -> str:
         "python2.7", "python2",
         "python3.6", "python3.7", "python3.8", "python3.9", "python3",
     )
-    return python_bin_allowlist[-1]
+
+    # If none of the candidate python bins match, then we go with the default `python`
+    python_bin = "python"
+    for candidate_python_bin in python_bin_allowlist:
+        if candidate_python_bin == user_python_exe :
+            python_bin = candidate_python_bin
+            break
+    return python_bin
 
 
-def submit_jobs(args) -> str:
+def submit_jobs(args, user_python_exe) -> str:
     wrapper_command = os.path.join(INSTALL_DIR, LAUNCH_SCRIPT)
 
     UDF_ARGS = [UDF_WORLD_SIZE, UDF_PART_DIR, UDF_INPUT_DIR, UDF_GRAPH_NAME, UDF_SCHEMA, UDF_NUM_PARTS, UDF_OUT_DIR]
+
+    #read the json file and get the remaining argument here. 
+    with open(os.path.join(args.in_dir, "meta.json")) as schema:
+        schema_map = json.load(schema)
+
+    num_parts = len(schema_map["num_nodes_per_chunk"][0])
+    graph_name = schema_map["graph_name"]
+
     argslist = ""
     for cmd_arg in UDF_ARGS: 
         if cmd_arg == "world-size": 
-            argslist += "--world-size 4 "
+            argslist += "--world-size 4 ".format(num_parts)
         elif cmd_arg == "partitions-dir":
             argslist += "--partitions-dir {} ".format(args.partitions_dir)
         elif cmd_arg == "input-dir":
             argslist += "--input-dir {} ".format(args.in_dir)
         elif cmd_arg == "graph-name":
-            argslist += "--graph-name mag "
+            argslist += "--graph-name {} ".format(graph_name)
         elif cmd_arg == "schema":
-            argslist += "--schema mag.json "
+            argslist += "--schema meta.json "
         elif cmd_arg == "num-parts":
-            argslist += "--num-parts 4 "
+            argslist += "--num-parts {} ".format(num_parts)
         elif cmd_arg == "output":
             argslist += "--output {} ".format(args.out_dir)
         
-    pythonpath=os.environ.get("PYTHONPATH", "")+get_python_path()
+    pythonpath=os.environ.get("PYTHONPATH", "")+get_python_path(user_python_exe)
     pipeline_cmd = os.path.join(INSTALL_DIR, PIPELINE_SCRIPT)
     udf_cmd = f"{pythonpath} {pipeline_cmd} {argslist}"
 
-    launch_cmd = get_launch_cmd(args)
+    launch_cmd = get_launch_cmd(args, user_python_exe)
     launch_cmd += '\"'+udf_cmd+'\"'
 
     print(launch_cmd)
     os.system(launch_cmd)
-
-
 
 def main():
     parser = argparse.ArgumentParser(description='Launch a distributed job')
@@ -94,7 +107,8 @@ def main():
     assert os.path.isfile(args.ip_config)
     assert isinstance(args.master_port, int)
 
-    submit_jobs(args)
+    tokens = sys.executable.split(os.sep)
+    submit_jobs(args, tokens[-1])
 
 if __name__ == '__main__':
     fmt = '%(asctime)s %(levelname)s %(message)s'
