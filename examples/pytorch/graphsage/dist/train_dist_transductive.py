@@ -72,6 +72,8 @@ def evaluate(standalone, model, emb_layer, g, labels, val_nid, test_nid, batch_s
     batch_size : Number of nodes to compute at the same time.
     device : The GPU device to evaluate on.
     """
+    if not standalone:
+        model = model.module
     model.eval()
     emb_layer.eval()
     with th.no_grad():
@@ -112,9 +114,6 @@ def run(args, device, data):
         emb_optimizer = th.optim.SparseAdam(list(emb_layer.module.sparse_emb.parameters()), lr=args.sparse_lr)
         print('optimize Pytorch sparse embedding:', emb_layer.module.sparse_emb)
 
-
-    train_size = th.sum(g.ndata['train_mask'][0:g.number_of_nodes()])
-
     # Training loop
     iter_tput = []
     epoch = 0
@@ -128,42 +127,43 @@ def run(args, device, data):
         num_seeds = 0
         num_inputs = 0
         start = time.time()
-        # Loop over the dataloader to sample the computation dependency graph as a list of
-        # blocks.
-        step_time = []
-        for step, (input_nodes, seeds, blocks) in enumerate(dataloader):
-            tic_step = time.time()
-            sample_time += tic_step - start
-            num_seeds += len(blocks[-1].dstdata[dgl.NID])
-            num_inputs += len(blocks[0].srcdata[dgl.NID])
-            blocks = [block.to(device) for block in blocks]
-            batch_labels = g.ndata['labels'][seeds].to(device)
-            # Compute loss and prediction
-            start = time.time()
-            batch_inputs = emb_layer(input_nodes)
-            batch_pred = model(blocks, batch_inputs)
-            loss = loss_fcn(batch_pred, batch_labels)
-            forward_end = time.time()
-            emb_optimizer.zero_grad()
-            optimizer.zero_grad()
-            loss.backward()
-            compute_end = time.time()
-            forward_time += forward_end - start
-            backward_time += compute_end - forward_end
+        with model.join():
+            # Loop over the dataloader to sample the computation dependency graph as a list of
+            # blocks.
+            step_time = []
+            for step, (input_nodes, seeds, blocks) in enumerate(dataloader):
+                tic_step = time.time()
+                sample_time += tic_step - start
+                num_seeds += len(blocks[-1].dstdata[dgl.NID])
+                num_inputs += len(blocks[0].srcdata[dgl.NID])
+                blocks = [block.to(device) for block in blocks]
+                batch_labels = g.ndata['labels'][seeds].to(device)
+                # Compute loss and prediction
+                start = time.time()
+                batch_inputs = emb_layer(input_nodes)
+                batch_pred = model(blocks, batch_inputs)
+                loss = loss_fcn(batch_pred, batch_labels)
+                forward_end = time.time()
+                emb_optimizer.zero_grad()
+                optimizer.zero_grad()
+                loss.backward()
+                compute_end = time.time()
+                forward_time += forward_end - start
+                backward_time += compute_end - forward_end
 
-            emb_optimizer.step()
-            optimizer.step()
-            update_time += time.time() - compute_end
+                emb_optimizer.step()
+                optimizer.step()
+                update_time += time.time() - compute_end
 
-            step_t = time.time() - tic_step
-            step_time.append(step_t)
-            iter_tput.append(len(blocks[-1].dstdata[dgl.NID]) / step_t)
-            if step % args.log_every == 0:
-                acc = compute_acc(batch_pred, batch_labels)
-                gpu_mem_alloc = th.cuda.max_memory_allocated() / 1000000 if th.cuda.is_available() else 0
-                print('Part {} | Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MB | time {:.3f} s'.format(
-                    g.rank(), epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:]), gpu_mem_alloc, np.sum(step_time[-args.log_every:])))
-            start = time.time()
+                step_t = time.time() - tic_step
+                step_time.append(step_t)
+                iter_tput.append(len(blocks[-1].dstdata[dgl.NID]) / step_t)
+                if step % args.log_every == 0:
+                    acc = compute_acc(batch_pred, batch_labels)
+                    gpu_mem_alloc = th.cuda.max_memory_allocated() / 1000000 if th.cuda.is_available() else 0
+                    print('Part {} | Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MB | time {:.3f} s'.format(
+                        g.rank(), epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:]), gpu_mem_alloc, np.sum(step_time[-args.log_every:])))
+                start = time.time()
 
         toc = time.time()
         print('Part {}, Epoch Time(s): {:.4f}, sample+data_copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #seeds: {}, #inputs: {}'.format(
@@ -172,7 +172,7 @@ def run(args, device, data):
 
         if epoch % args.eval_every == 0 and epoch != 0:
             start = time.time()
-            val_acc, test_acc = evaluate(args.standalone, model.module, emb_layer, g,
+            val_acc, test_acc = evaluate(args.standalone, model, emb_layer, g,
                                          g.ndata['labels'], val_nid, test_nid, args.batch_size_eval, device)
             print('Part {}, Val Acc {:.4f}, Test Acc {:.4f}, time: {:.4f}'.format(g.rank(), val_acc, test_acc, time.time()-start))
 

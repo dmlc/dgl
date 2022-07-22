@@ -14,6 +14,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import socket
+from contextlib import contextmanager
 
 def load_subtensor(g, seeds, input_nodes, device, load_feat=True):
     """
@@ -89,6 +90,11 @@ class DistSAGE(nn.Module):
             x = y
             g.barrier()
         return y
+
+    @contextmanager
+    def join(self):
+        """dummy join for standalone"""
+        yield
 
 def compute_acc(pred, labels):
     """
@@ -195,7 +201,7 @@ def run(args, device, data):
 
         if epoch % args.eval_every == 0 and epoch != 0:
             start = time.time()
-            val_acc, test_acc = evaluate(model.module, g, g.ndata['features'],
+            val_acc, test_acc = evaluate(model if args.standalone else model.module, g, g.ndata['features'],
                                          g.ndata['labels'], val_nid, test_nid, args.batch_size_eval, device)
             print('Part {}, Val Acc {:.4f}, Test Acc {:.4f}, time: {:.4f}'.format(g.rank(), val_acc, test_acc,
                                                                                   time.time() - start))

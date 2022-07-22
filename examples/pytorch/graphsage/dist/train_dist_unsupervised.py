@@ -15,6 +15,7 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from contextlib import contextmanager
 
 class DistSAGE(nn.Module):
     def __init__(self,
@@ -86,6 +87,11 @@ class DistSAGE(nn.Module):
             x = y
             g.barrier()
         return y
+
+    @contextmanager
+    def join(self):
+        """dummy join for standalone"""
+        yield
 
 def load_subtensor(g, input_nodes, device):
     """
@@ -194,57 +200,56 @@ def run(args, device, data):
         iter_tput = []
 
         start = time.time()
-        # Loop over the dataloader to sample the computation dependency graph as a list of
-        # blocks.
-        for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(dataloader):
-            tic_step = time.time()
-            sample_t.append(tic_step - start)
+        with model.join():
+            # Loop over the dataloader to sample the computation dependency graph as a list of
+            # blocks.
+            for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(dataloader):
+                tic_step = time.time()
+                sample_t.append(tic_step - start)
 
-            copy_t = time.time()
-            pos_graph = pos_graph.to(device)
-            neg_graph = neg_graph.to(device)
-            blocks = [block.to(device) for block in blocks]
-            batch_inputs = load_subtensor(g, input_nodes, device)
-            copy_time = time.time()
-            feat_copy_t.append(copy_time - copy_t)
+                copy_t = time.time()
+                pos_graph = pos_graph.to(device)
+                neg_graph = neg_graph.to(device)
+                blocks = [block.to(device) for block in blocks]
+                batch_inputs = load_subtensor(g, input_nodes, device)
+                copy_time = time.time()
+                feat_copy_t.append(copy_time - copy_t)
 
-            # Compute loss and prediction
-            batch_pred = model(blocks, batch_inputs)
-            loss = loss_fcn(batch_pred, pos_graph, neg_graph)
-            forward_end = time.time()
-            optimizer.zero_grad()
-            loss.backward()
-            compute_end = time.time()
-            forward_t.append(forward_end - copy_time)
-            backward_t.append(compute_end - forward_end)
+                # Compute loss and prediction
+                batch_pred = model(blocks, batch_inputs)
+                loss = loss_fcn(batch_pred, pos_graph, neg_graph)
+                forward_end = time.time()
+                optimizer.zero_grad()
+                loss.backward()
+                compute_end = time.time()
+                forward_t.append(forward_end - copy_time)
+                backward_t.append(compute_end - forward_end)
 
-            # Aggregate gradients in multiple nodes.
-            optimizer.step()
-            update_t.append(time.time() - compute_end)
+                # Aggregate gradients in multiple nodes.
+                optimizer.step()
+                update_t.append(time.time() - compute_end)
 
-            pos_edges = pos_graph.number_of_edges()
+                pos_edges = pos_graph.number_of_edges()
 
-            step_t = time.time() - start
-            step_time.append(step_t)
-            iter_tput.append(pos_edges / step_t)
-            num_seeds += pos_edges
-            if step % args.log_every == 0:
-                print('[{}] Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f} | time {:.3f} s' \
-                        '| sample {:.3f} | copy {:.3f} | forward {:.3f} | backward {:.3f} | update {:.3f}'.format(
-                    g.rank(), epoch, step, loss.item(), np.mean(iter_tput[3:]), np.sum(step_time[-args.log_every:]),
-                    np.sum(sample_t[-args.log_every:]), np.sum(feat_copy_t[-args.log_every:]), np.sum(forward_t[-args.log_every:]),
-                    np.sum(backward_t[-args.log_every:]), np.sum(update_t[-args.log_every:])))
-            start = time.time()
+                step_t = time.time() - start
+                step_time.append(step_t)
+                iter_tput.append(pos_edges / step_t)
+                num_seeds += pos_edges
+                if step % args.log_every == 0:
+                    print('[{}] Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f} | time {:.3f} s' \
+                            '| sample {:.3f} | copy {:.3f} | forward {:.3f} | backward {:.3f} | update {:.3f}'.format(
+                        g.rank(), epoch, step, loss.item(), np.mean(iter_tput[3:]), np.sum(step_time[-args.log_every:]),
+                        np.sum(sample_t[-args.log_every:]), np.sum(feat_copy_t[-args.log_every:]), np.sum(forward_t[-args.log_every:]),
+                        np.sum(backward_t[-args.log_every:]), np.sum(update_t[-args.log_every:])))
+                start = time.time()
 
         print('[{}]Epoch Time(s): {:.4f}, sample: {:.4f}, data copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #seeds: {}, #inputs: {}'.format(
             g.rank(), np.sum(step_time), np.sum(sample_t), np.sum(feat_copy_t), np.sum(forward_t), np.sum(backward_t), np.sum(update_t), num_seeds, num_inputs))
         epoch += 1
 
     # evaluate the embedding using LogisticRegression
-    if args.standalone:
-        pred = generate_emb(model,g, g.ndata['features'], args.batch_size_eval, device)
-    else:
-        pred = generate_emb(model.module, g, g.ndata['features'], args.batch_size_eval, device)
+    pred = generate_emb(model if args.standalone else model.module,
+                        g, g.ndata['features'], args.batch_size_eval, device)
     if g.rank() == 0:
         eval_acc, test_acc = compute_acc(pred, labels, global_train_nid, global_valid_nid, global_test_nid)
         print('eval acc {:.4f}; test acc {:.4f}'.format(eval_acc, test_acc))
