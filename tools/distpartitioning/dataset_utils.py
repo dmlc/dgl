@@ -51,6 +51,12 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
     """
 
     #node features dictionary
+    #TODO: With the new file format, It is guaranteed that the input dataset will have 
+    #no. of nodes with features (node-features) files and nodes metadata will always be the same.
+    #This means the dimension indicating the no. of nodes in any node-feature files and the no. of
+    #nodes in the corresponding nodes metadata file will always be the same. With this guarantee, 
+    #we can eliminate the `node_feature_tids` dictionary since the same information is also populated
+    #in the `node_tids` dictionary. This will be remnoved in the next iteration of code changes.
     node_features = {}
     node_feature_tids = {}
     
