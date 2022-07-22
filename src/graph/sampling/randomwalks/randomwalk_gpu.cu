@@ -133,12 +133,16 @@ __global__ void _RandomWalkBiasedKernel(
       // randomly select by weight
       const FloatType *prob_sum = prob_sums[metapath_id];
       const FloatType *prob = probs[metapath_id];
-      auto rnd_sum_w = prob_sum[curr] * curand_uniform(&rng);
       int64_t num;
-      FloatType sum_w{0.};
-      for (num = 0; num < deg; ++num) {
-        sum_w += prob[in_row_start + num];
-        if (sum_w >= rnd_sum_w) break;
+      if (prob == nullptr) {
+        num = curand(&rng) % deg;
+      } else {
+        auto rnd_sum_w = prob_sum[curr] * curand_uniform(&rng);
+        FloatType sum_w{0.};
+        for (num = 0; num < deg; ++num) {
+          sum_w += prob[in_row_start + num];
+          if (sum_w >= rnd_sum_w) break;
+        }
       }
 
       IdType pick = graph.in_cols[in_row_start + num];
@@ -281,6 +285,12 @@ std::pair<IdArray, IdArray> RandomWalkBiased(
     h_graphs[etype].data = (CSRHasData(csr) ? static_cast<const IdType*>(csr.data->data) : nullptr);
 
     int64_t num_segments = csr.indptr->shape[0] - 1;
+    // will handle empty probs in the kernel
+    if (IsNullArray(prob[etype])) {
+      probs[etype] = nullptr;
+      prob_sums[etype] = nullptr;
+      continue;
+    }
     probs[etype] = prob[etype].Ptr<FloatType>();
     prob_sums_arr.push_back(FloatArray::Empty({num_segments}, prob[etype]->dtype, ctx));
     prob_sums[etype] = prob_sums_arr[etype].Ptr<FloatType>();
@@ -386,7 +396,7 @@ std::pair<IdArray, IdArray> RandomWalk(
       {0}, DLDataType{kDLFloat, 32, 1}, DGLContext{XPU, 0});
   if (!isUniform) {
     std::pair<IdArray, IdArray> ret;
-    ATEN_FLOAT_TYPE_SWITCH(prob[0]->dtype, FloatType, "biased random work in GPU", {
+    ATEN_FLOAT_TYPE_SWITCH(prob[0]->dtype, FloatType, "probability", {
       CHECK(prob[0]->ctx.device_type == kDLGPU) << "prob should be in GPU.";
       ret = RandomWalkBiased<XPU, FloatType, IdType>(hg, seeds, metapath, prob, restart_prob);
     });
@@ -404,12 +414,14 @@ std::pair<IdArray, IdArray> RandomWalkWithRestart(
     const std::vector<FloatArray> &prob,
     double restart_prob) {
 
-  // not support no-uniform choice now
+  bool isUniform = true;
   for (const auto &etype_prob : prob) {
     if (!IsNullArray(etype_prob)) {
-      LOG(FATAL) << "Non-uniform choice is not supported in GPU.";
+      isUniform = false;
+      break;
     }
   }
+
   auto device_ctx = seeds->ctx;
   auto restart_prob_array = NDArray::Empty(
       {1}, DLDataType{kDLFloat, 64, 1}, device_ctx);
@@ -424,7 +436,17 @@ std::pair<IdArray, IdArray> RandomWalkWithRestart(
       restart_prob_array->dtype, stream);
   device->StreamSync(device_ctx, stream);
 
-  return RandomWalkUniform<XPU, IdType>(hg, seeds, metapath, restart_prob_array);
+  if (!isUniform) {
+    std::pair<IdArray, IdArray> ret;
+    ATEN_FLOAT_TYPE_SWITCH(prob[0]->dtype, FloatType, "probability", {
+      CHECK(prob[0]->ctx.device_type == kDLGPU) << "prob should be in GPU.";
+      ret = RandomWalkBiased<XPU, FloatType, IdType>(
+          hg, seeds, metapath, prob, restart_prob_array);
+    });
+    return ret;
+  } else {
+    return RandomWalkUniform<XPU, IdType>(hg, seeds, metapath, restart_prob_array);
+  }
 }
 
 template<DLDeviceType XPU, typename IdType>
@@ -435,14 +457,24 @@ std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart(
     const std::vector<FloatArray> &prob,
     FloatArray restart_prob) {
 
-  // not support no-uniform choice now
+  bool isUniform = true;
   for (const auto &etype_prob : prob) {
     if (!IsNullArray(etype_prob)) {
-      LOG(FATAL) << "Non-uniform choice is not supported in GPU.";
+      isUniform = false;
+      break;
     }
   }
 
-  return RandomWalkUniform<XPU, IdType>(hg, seeds, metapath, restart_prob);
+  if (!isUniform) {
+    std::pair<IdArray, IdArray> ret;
+    ATEN_FLOAT_TYPE_SWITCH(prob[0]->dtype, FloatType, "probability", {
+      CHECK(prob[0]->ctx.device_type == kDLGPU) << "prob should be in GPU.";
+      ret = RandomWalkBiased<XPU, FloatType, IdType>(hg, seeds, metapath, prob, restart_prob);
+    });
+    return ret;
+  } else {
+    return RandomWalkUniform<XPU, IdType>(hg, seeds, metapath, restart_prob);
+  }
 }
 
 template<DLDeviceType XPU, typename IdxType>
