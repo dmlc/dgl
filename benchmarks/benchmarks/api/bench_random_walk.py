@@ -10,8 +10,9 @@ def _random_walk(g, seeds, length):
 def _node2vec(g, seeds, length):
     return dgl.sampling.node2vec_random_walk(g, seeds, 1, 1, length)
 
+@utils.skip_if_gpu()
 @utils.benchmark('time')
-@utils.parametrize_cpu('graph_name', ['cora', 'livejournal', 'friendster'])
+@utils.parametrize('graph_name', ['cora', 'livejournal', 'friendster'])
 @utils.parametrize('num_seeds', [10, 100, 1000])
 @utils.parametrize('length', [2, 5, 10, 20])
 @utils.parametrize('algorithm', ['_random_walk', '_node2vec'])

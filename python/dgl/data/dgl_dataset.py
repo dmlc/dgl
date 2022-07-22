@@ -8,7 +8,6 @@ import traceback
 import abc
 from .utils import download, extract_archive, get_download_dir, makedirs
 from ..utils import retry_method_with_fix
-from .._ffi.base import __version__
 
 class DGLDataset(object):
     r"""The basic DGL dataset for creating graph datasets.
@@ -238,17 +237,13 @@ class DGLDataset(object):
     def save_dir(self):
         r"""Directory to save the processed dataset.
         """
-        return self._save_dir + "_v{}".format(__version__)
+        return self._save_dir
 
     @property
     def save_path(self):
         r"""Path to save the processed dataset.
         """
-        if hasattr(self, '_reorder'):
-            path = 'reordered' if self._reorder else 'un_reordered'
-            return os.path.join(self._save_dir, self.name, path)
-        else:
-            return os.path.join(self._save_dir, self.name)
+        return os.path.join(self._save_dir, self.name)
 
     @property
     def verbose(self):
