@@ -36,12 +36,12 @@ if __name__ == "__main__":
                      help='The number of partitions')
     parser.add_argument('--output', required=True, type=str,
                     help='The output directory of the partitioned results')
+    parser.add_argument('--partitions-dir', help='directory of the partition-ids for each node type',
+                    default=None, type=str)
 
     #arguments needed for the distributed implementation
     parser.add_argument('--world-size', help='no. of processes to spawn',
                     default=1, type=int, required=True)
-    parser.add_argument('--partitions-file', help='filename of the output of dgl_part2 (metis partitions)',
-                    default=None, type=str)
     params = parser.parse_args()
 
     #invoke the pipeline function

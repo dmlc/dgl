@@ -5,6 +5,7 @@ import torch
 
 import pyarrow
 from pyarrow import csv
+from utils import get_idranges
 
 def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
     """
@@ -48,60 +49,204 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
         edge-type may have several edge features and associated tensor data.
 
     """
+
     #node features dictionary
+    #TODO: With the new file format, It is guaranteed that the input dataset will have 
+    #no. of nodes with features (node-features) files and nodes metadata will always be the same.
+    #This means the dimension indicating the no. of nodes in any node-feature files and the no. of
+    #nodes in the corresponding nodes metadata file will always be the same. With this guarantee, 
+    #we can eliminate the `node_feature_tids` dictionary since the same information is also populated
+    #in the `node_tids` dictionary. This will be remnoved in the next iteration of code changes.
     node_features = {}
     node_feature_tids = {}
+    
+    '''
+    The structure of the node_data is as follows, which is present in the input metadata json file. 
+       "node_data" : {
+            "ntype0-name" : {
+                "feat0-name" : {
+                    "format" : {"name": "numpy"},
+                    "data" :   [ #list
+                        "<path>/feat-0.npy",
+                        "<path>/feat-1.npy",
+                        ....
+                        "<path>/feat-<p-1>.npy"
+                    ]
+                },
+                "feat1-name" : {
+                    "format" : {"name": "numpy"}, 
+                    "data" : [ #list 
+                        "<path>/feat-0.npy",
+                        "<path>/feat-1.npy",
+                        ....
+                        "<path>/feat-<p-1>.npy"
+                    ]
+                }
+            }
+       }
+
+    As shown above, the value for the key "node_data" is a dictionary object, which is 
+    used to describe the feature data for each of the node-type names. Keys in this top-level
+    dictionary are node-type names and value is a dictionary which captures all the features
+    for the current node-type. Feature data is captured with keys being the feature-names and
+    value is a dictionary object which has 2 keys namely format and data. Format entry is used
+    to mention the format of the storage used by the node features themselves and "data" is used
+    to mention all the files present for this given node feature.
+
+    Data read from each of the node features file is a multi-dimensional tensor data and is read
+    in numpy format, which is also the storage format of node features on the permanent storage.
+    '''
 
     #iterate over the "node_data" dictionary in the schema_map
     #read the node features if exists
     #also keep track of the type_nids for which the node_features are read.
-    dataset_features = schema_map["node_data"]
-    for ntype_name, ntype_feature_data in dataset_features.items():
-        #ntype_feature_data is a dictionary
-        #where key: feature_name, value: list of lists
-        node_feature_tids[ntype_name] = []
-        for feat_name, feat_data in ntype_feature_data.items():
-            assert len(feat_data) == world_size
-            my_feat_data = feat_data[rank]
-            if (os.path.isabs(my_feat_data[0])):
-                node_features[ntype_name+'/'+feat_name] = torch.from_numpy(np.load(my_feat_data[0]))
-            else:
-                node_features[ntype_name+'/'+feat_name] = torch.from_numpy(np.load(input_dir+my_feat_data[0]))
+    dataset_features = schema_map[constants.STR_NODE_DATA]
+    if((dataset_features is not None) and (len(dataset_features) > 0)):
+        for ntype_name, ntype_feature_data in dataset_features.items():
+            #ntype_feature_data is a dictionary
+            #where key: feature_name, value: dictionary in which keys are "format", "data"
+            node_feature_tids[ntype_name] = []
+            for feat_name, feat_data in ntype_feature_data.items():
+                assert len(feat_data[constants.STR_DATA]) == world_size
+                assert feat_data[constants.STR_FORMAT][constants.STR_NAME] == constants.STR_NUMPY
+                my_feat_data_fname = feat_data[constants.STR_DATA][rank] #this will be just the file name
+                if (os.path.isabs(my_feat_data_fname)):
+                    node_features[ntype_name+'/'+feat_name] = \
+                            torch.from_numpy(np.load(my_feat_data_fname))
+                else:
+                    node_features[ntype_name+'/'+feat_name] = \
+                            torch.from_numpy(np.load(os.path.join(input_dir, my_feat_data_fname)))
 
-            node_feature_tids[ntype_name].append([feat_name, my_feat_data[1], my_feat_data[2]])
+                node_feature_tids[ntype_name].append([feat_name, -1, -1])
+
+    '''
+        "node_type" : ["ntype0-name", "ntype1-name", ....], #m node types
+        "num_nodes_per_chunk" : [
+            [a0, a1, ...a<p-1>], #p partitions
+            [b0, b1, ... b<p-1>], 
+            ....
+            [c0, c1, ..., c<p-1>] #no, of node types
+        ],
+
+    The "node_type" points to a list of all the node names present in the graph
+    And "num_nodes_per_chunk" is used to mention no. of nodes present in each of the
+    input nodes files. These node counters are used to compute the type_node_ids as
+    well as global node-ids by using a simple cumulative summation and maitaining an
+    offset counter to store the end of the current.
+
+    Since nodes are NOT actually associated with any additional metadata, w.r.t to the processing
+    involved in this pipeline this information is not needed to be stored in files. This optimization
+    saves a considerable amount of time when loading massively large datasets for paritioning. 
+    As opposed to reading from files and performing shuffling process each process/rank generates nodes
+    which are owned by that particular rank. And using the "num_nodes_per_chunk" information each
+    process can easily compute any nodes per-type node_id and global node_id.
+    The node-ids are treated as int64's in order to support billions of nodes in the input graph.
+
+    '''
 
     #read my nodes for each node type
-    node_tids = {}
-    node_data = schema_map["nid"]
-    for ntype_name, ntype_info in node_data.items():
-        v = []
-        node_file_info = ntype_info["data"]
-        for idx in range(len(node_file_info)):
-            v.append((node_file_info[idx][1], node_file_info[idx][2]))
-        node_tids[ntype_name] = v
+    node_tids, ntype_gnid_offset = get_idranges(schema_map[constants.STR_NODE_TYPE], 
+                                    schema_map[constants.STR_NUM_NODES_PER_CHUNK])
+    for ntype_name in schema_map[constants.STR_NODE_TYPE]: 
+        if ntype_name in node_feature_tids: 
+            for item in node_feature_tids[ntype_name]:
+                item[1] = node_tids[ntype_name][rank][0]
+                item[2] = node_tids[ntype_name][rank][1]
+
+    #done build node_features locally. 
+    if len(node_features) <= 0:
+        print('[Rank: ', rank, '] This dataset does not have any node features')
+    else:
+        for k, v in node_features.items():
+            print('[Rank: ', rank, '] node feature name: ', k, ', feature data shape: ', v.size())
+
+    '''
+    Code below is used to read edges from the input dataset with the help of the metadata json file
+    for the input graph dataset. 
+    In the metadata json file, we expect the following key-value pairs to help read the edges of the 
+    input graph. 
+
+    "edge_type" : [ # a total of n edge types
+        canonical_etype_0, 
+        canonical_etype_1, 
+        ..., 
+        canonical_etype_n-1
+    ]
+
+    The value for the key is a list of strings, each string is associated with an edgetype in the input graph.
+    Note that these strings are in canonical edgetypes format. This means, these edge type strings follow the
+    following naming convention: src_ntype:etype:dst_ntype. src_ntype and dst_ntype are node type names of the 
+    src and dst end points of this edge type, and etype is the relation name between src and dst ntypes. 
+
+    The files in which edges are present and their storage format are present in the following key-value pair: 
+    
+    "edges" : {
+        "canonical_etype_0" : {
+            "format" : { "name" : "csv", "delimiter" : " " }, 
+            "data" : [
+                filename_0, 
+                filename_1, 
+                filename_2, 
+                ....
+                filename_<p-1>
+            ]
+        },
+    }
+
+    As shown above the "edges" dictionary value has canonical edgetypes as keys and for each canonical edgetype
+    we have "format" and "data" which describe the storage format of the edge files and actual filenames respectively. 
+    Please note that each edgetype data is split in to `p` files, where p is the no. of partitions to be made of
+    the input graph.
+
+    Each edge file contains two columns representing the source per-type node_ids and destination per-type node_ids
+    of any given edge. Since these are node-ids as well they are read in as int64's.
+    '''
 
     #read my edges for each edge type
-    edge_tids = {}
-    edge_datadict = {}
-    edge_data = schema_map["eid"]
-    for etype_name, etype_info in edge_data.items():
-        assert etype_info["format"] == "csv"
+    etype_names = schema_map[constants.STR_EDGE_TYPE]
+    etype_name_idmap = {e : idx for idx, e in enumerate(etype_names)}
+    edge_tids, _ = get_idranges(schema_map[constants.STR_EDGE_TYPE], 
+                                    schema_map[constants.STR_NUM_EDGES_PER_CHUNK])
 
-        edge_info = etype_info["data"]
+    edge_datadict = {}
+    edge_data = schema_map[constants.STR_EDGES]
+
+    #read the edges files and store this data in memory.
+    for col in [constants.GLOBAL_SRC_ID, constants.GLOBAL_DST_ID, \
+            constants.GLOBAL_TYPE_EID, constants.ETYPE_ID]:
+        edge_datadict[col] = []
+
+    for etype_name, etype_info in edge_data.items():
+        assert etype_info[constants.STR_FORMAT][constants.STR_NAME] == constants.STR_CSV
+
+        edge_info = etype_info[constants.STR_DATA]
         assert len(edge_info) == world_size
 
-        data_df = csv.read_csv(edge_info[rank][0], read_options=pyarrow.csv.ReadOptions(autogenerate_column_names=True), 
-                                    parse_options=pyarrow.csv.ParseOptions(delimiter=' '))
-        edge_datadict[constants.GLOBAL_SRC_ID] = data_df['f0'].to_numpy()
-        edge_datadict[constants.GLOBAL_DST_ID] = data_df['f1'].to_numpy()
-        edge_datadict[constants.GLOBAL_TYPE_EID] = data_df['f2'].to_numpy()
-        edge_datadict[constants.ETYPE_ID] = data_df['f3'].to_numpy()
+        #edgetype strings are in canonical format, src_node_type:edge_type:dst_node_type
+        tokens = etype_name.split(":")
+        assert len(tokens) == 3
 
-        v = []
-        edge_file_info = etype_info["data"]
-        for idx in range(len(edge_file_info)):
-            v.append((edge_file_info[idx][1], edge_file_info[idx][2]))
-        edge_tids[etype_name] = v
+        src_ntype_name = tokens[0]
+        rel_name = tokens[1]
+        dst_ntype_name = tokens[2]
+
+        data_df = csv.read_csv(edge_info[rank], read_options=pyarrow.csv.ReadOptions(autogenerate_column_names=True), 
+                                    parse_options=pyarrow.csv.ParseOptions(delimiter=' '))
+        #currently these are just type_edge_ids... which will be converted to global ids
+        edge_datadict[constants.GLOBAL_SRC_ID].append(data_df['f0'].to_numpy() + ntype_gnid_offset[src_ntype_name][0, 0])
+        edge_datadict[constants.GLOBAL_DST_ID].append(data_df['f1'].to_numpy() + ntype_gnid_offset[dst_ntype_name][0, 0])
+        edge_datadict[constants.GLOBAL_TYPE_EID].append(np.arange(edge_tids[etype_name][rank][0],\
+                edge_tids[etype_name][rank][1] ,dtype=np.int64))
+        edge_datadict[constants.ETYPE_ID].append(etype_name_idmap[etype_name] * \
+                np.ones(shape=(data_df['f0'].to_numpy().shape), dtype=np.int64))
+
+    #stitch together to create the final data on the local machine
+    for col in [constants.GLOBAL_SRC_ID, constants.GLOBAL_DST_ID, constants.GLOBAL_TYPE_EID, constants.ETYPE_ID]:
+        edge_datadict[col] = np.concatenate(edge_datadict[col])
+
+    assert edge_datadict[constants.GLOBAL_SRC_ID].shape == edge_datadict[constants.GLOBAL_DST_ID].shape
+    assert edge_datadict[constants.GLOBAL_DST_ID].shape == edge_datadict[constants.GLOBAL_TYPE_EID].shape
+    assert edge_datadict[constants.GLOBAL_TYPE_EID].shape == edge_datadict[constants.ETYPE_ID].shape
     print('[Rank: ', rank, '] Done reading edge_file: ', len(edge_datadict), edge_datadict[constants.GLOBAL_SRC_ID].shape)
 
     return node_tids, node_features, node_feature_tids, edge_datadict, edge_tids

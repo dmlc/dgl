@@ -18,3 +18,19 @@ SHUFFLE_GLOBAL_DST_ID = "shuffle_global_dst_id"
 OWNER_PROCESS = "owner_proc_id"
 
 PART_LOCAL_NID = "part_local_nid"
+
+GLOO_MESSAGING_TIMEOUT = 60*60 #seconds
+
+STR_NODE_TYPE = "node_type"
+STR_NUM_NODES_PER_CHUNK = "num_nodes_per_chunk"
+STR_EDGE_TYPE = "edge_type"
+STR_NUM_EDGES_PER_CHUNK = "num_edges_per_chunk"
+STR_EDGES = "edges"
+STR_FORMAT = "format"
+STR_DATA = "data"
+STR_NODE_DATA = "node_data"
+STR_EDGE_DATA = "edge_data"
+
+STR_NUMPY = "numpy"
+STR_CSV = "csv"
+STR_NAME = "name"
