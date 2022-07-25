@@ -1,6 +1,6 @@
---find-links https://download.pytorch.org/whl/lts/1.8/torch_lts.html
-torch==1.8.1+cu111
-torchvision==0.9.1+cu111
+--find-links https://download.pytorch.org/whl/torch
+torch==1.9.0+cu111
+torchvision
 pytest
 nose
 numpy
@@ -12,7 +12,8 @@ nltk
 requests[security]
 tqdm
 awscli
-torchtext==0.9.1
+torchtext
 pandas
 rdflib
 ogb==1.3.1
+torchmetrics
