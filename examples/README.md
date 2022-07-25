@@ -94,6 +94,9 @@ To quickly locate the examples of your interest, search for the tagged keywords 
 - <a name="caregnn"></a> Dou Y, Liu Z, et al. Enhancing Graph Neural Network-based Fraud Detectors against Camouflaged Fraudsters. [Paper link](https://arxiv.org/abs/2008.08692).
     - Example code: [PyTorch](../examples/pytorch/caregnn)
     - Tags: Multi-relational graph, Graph neural network, Fraud detection, Reinforcement learning, Node classification
+- <a name="seal"></a>  Zhang et al. Labeling Trick: A Theory of Using Graph Neural Networks for Multi-Node Representation Learning. [Paper link](https://arxiv.org/pdf/2010.16103.pdf).
+    - Example code: [PyTorch](../examples/pytorch/seal_ogbl)
+    - Tags: link prediction, labeling trick, OGB
 
 ## 2019
 
