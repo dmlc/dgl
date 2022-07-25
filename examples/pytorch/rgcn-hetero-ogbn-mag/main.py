@@ -7,7 +7,6 @@ import dgl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.distributed as dist
 
 import utils
 from model import EntityClassify, RelGraphEmbedding
@@ -157,7 +156,6 @@ def validate(
 
 
 def run(args: argparse.ArgumentParser) -> None:
-    dist.init_process_group('nccl', 'tcp://127.0.0.1:12347', world_size=1, rank=0)
     torch.manual_seed(args.seed)
 
     dataset, hg, train_idx, valid_idx, test_idx = utils.process_dataset(
@@ -174,7 +172,6 @@ def run(args: argparse.ArgumentParser) -> None:
 
     fanouts = [int(fanout) for fanout in args.fanouts.split(',')]
 
-    train_idx = train_idx.to('cuda:0')
     train_sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts)
     train_dataloader = dgl.dataloading.DataLoader(
         hg,
@@ -184,8 +181,6 @@ def run(args: argparse.ArgumentParser) -> None:
         shuffle=True,
         drop_last=False,
         num_workers=args.num_workers,
-        use_uva = True,
-        use_ddp = True
     )
 
     if inferfence_mode == 'neighbor_sampler':

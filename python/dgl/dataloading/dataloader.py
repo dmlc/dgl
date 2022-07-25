@@ -239,8 +239,7 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
         start = self.num_samples * self.rank
         end = self.num_samples * (self.rank + 1)
         indices = _divide_by_worker(self._indices[start:end], self.batch_size, self.drop_last)
-        id_tensor = self._id_tensor[indices.to(self._device)]
-        #id_tensor = self._id_tensor[indices.to(self._id_tensor.device)]
+        id_tensor = self._id_tensor[indices.to(self._id_tensor.device)]
         return _TensorizedDatasetIter(
             id_tensor, self.batch_size, self.drop_last, self._mapping_keys, self._shuffle)
 
