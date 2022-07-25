@@ -1,0 +1,14 @@
+python main.py \
+    --dataset ogbl-citation2 \
+    --num_hops 1 \
+    --use_feature \
+    --use_edge_weight \
+    --eval_steps 1 \
+    --epochs 10 \
+    --dynamic_train \
+    --dynamic_val \
+    --dynamic_test \
+    --train_percent 2 \
+    --val_percent 1 \
+    --test_percent 1 \
+    --runs 10
