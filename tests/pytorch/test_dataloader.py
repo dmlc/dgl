@@ -132,7 +132,7 @@ def _check_device(data):
 @pytest.mark.parametrize('use_ddp', [False, True])
 def test_node_dataloader(idtype, sampler_name, mode, use_ddp):
     if mode != 'cpu' and F.ctx() == F.cpu():
-        pytest.skip('UVA and GPU sampling requires a GPU.')
+        pytest.skip('UVA and GPU sampling require a GPU.')
     if use_ddp:
         if dist.is_initialized():
             dist.destroy_process_group()
@@ -178,9 +178,9 @@ def test_node_dataloader(idtype, sampler_name, mode, use_ddp):
     for ntype in g2.ntypes:
         g2.nodes[ntype].data['feat'] = F.copy_to(F.randn((g2.num_nodes(ntype), 8)), F.cpu())
     if mode in ('cpu', 'uva_cpu_indices'):
-        indices = {nty: F.copy_to(F.arange(0, g2.num_nodes(nty)), F.cpu()) for nty in g2.ntypes}
+        indices = {nty: F.copy_to(g2.nodes(nty), F.cpu()) for nty in g2.ntypes}
     else:
-        indices = {nty: F.copy_to(F.arange(0, g2.num_nodes(nty)), F.cuda()) for nty in g2.ntypes}
+        indices = {nty: F.copy_to(g2.nodes(nty), F.cuda()) for nty in g2.ntypes}
     if mode == 'pure_gpu':
         g2 = g2.to(F.cuda())
 
@@ -191,8 +191,8 @@ def test_node_dataloader(idtype, sampler_name, mode, use_ddp):
         'neighbor2': dgl.dataloading.MultiLayerNeighborSampler([3, 3])}[sampler_name]
     for num_workers in [0, 1, 2] if mode == 'cpu' else [0]:
         dataloader = dgl.dataloading.DataLoader(
-            g2, {nty: g2.nodes(nty) for nty in g2.ntypes},
-            sampler, device=F.ctx(), batch_size=batch_size,
+            g2, indices, sampler,
+            device=F.ctx(), batch_size=batch_size,
             num_workers=num_workers,
             use_uva=use_uva,
             use_ddp=use_ddp)
@@ -212,14 +212,13 @@ def test_node_dataloader(idtype, sampler_name, mode, use_ddp):
     dgl.dataloading.negative_sampler.Uniform(2),
     dgl.dataloading.negative_sampler.GlobalUniform(15, False, 3),
     dgl.dataloading.negative_sampler.GlobalUniform(15, True, 3)])
-@pytest.mark.parametrize('use_uva', [False, True])
+@pytest.mark.parametrize('mode', ['cpu', 'uva', 'pure_gpu'])
 @pytest.mark.parametrize('use_ddp', [False, True])
-def test_edge_dataloader(idtype, sampler_name, neg_sampler, use_uva, use_ddp):
-    if use_uva:
-        if F.ctx() == F.cpu():
-            pytest.skip('use_uva requires a GPU.')
-        if isinstance(neg_sampler, dgl.dataloading.negative_sampler.GlobalUniform):
-            pytest.skip("GlobalUniform don't support UVA yet.")
+def test_edge_dataloader(idtype, sampler_name, neg_sampler, mode, use_ddp):
+    if mode != 'cpu' and F.ctx() == F.cpu():
+        pytest.skip('UVA and GPU sampling require a GPU.')
+    if mode == 'uva' and isinstance(neg_sampler, dgl.dataloading.negative_sampler.GlobalUniform):
+        pytest.skip("GlobalUniform don't support UVA yet.")
     if use_ddp:
         if dist.is_initialized():
             dist.destroy_process_group()
@@ -227,6 +226,8 @@ def test_edge_dataloader(idtype, sampler_name, neg_sampler, use_uva, use_ddp):
             'tcp://127.0.0.1:12347', world_size=1, rank=0)
     g1 = dgl.graph(([0, 0, 0, 1, 1], [1, 2, 3, 3, 4])).astype(idtype)
     g1.ndata['feat'] = F.copy_to(F.randn((5, 8)), F.cpu())
+    if mode == 'pure_gpu':
+        g1 = g1.to(F.cuda())
 
     sampler = {
         'full': dgl.dataloading.MultiLayerFullNeighborSampler(2),
@@ -237,7 +238,7 @@ def test_edge_dataloader(idtype, sampler_name, neg_sampler, use_uva, use_ddp):
     dataloader = dgl.dataloading.DataLoader(
         g1, g1.edges(form='eid'), edge_sampler,
         device=F.ctx(), batch_size=g1.num_edges(),
-        use_uva=use_uva, use_ddp=use_ddp)
+        use_uva=(mode == 'uva'), use_ddp=use_ddp)
     for input_nodes, pos_pair_graph, blocks in dataloader:
         _check_device(input_nodes)
         _check_device(pos_pair_graph)
@@ -247,8 +248,9 @@ def test_edge_dataloader(idtype, sampler_name, neg_sampler, use_uva, use_ddp):
     edge_sampler = dgl.dataloading.as_edge_prediction_sampler(
         sampler, negative_sampler=neg_sampler)
     dataloader = dgl.dataloading.DataLoader(
-        g1, g1.edges(form='eid'), edge_sampler, device=F.ctx(),
-        batch_size=g1.num_edges(), use_uva=use_uva, use_ddp=use_ddp)
+        g1, g1.edges(form='eid'), edge_sampler,
+        device=F.ctx(), batch_size=g1.num_edges(),
+        use_uva=(mode == 'uva'), use_ddp=use_ddp)
     for input_nodes, pos_pair_graph, neg_pair_graph, blocks in dataloader:
         _check_device(input_nodes)
         _check_device(pos_pair_graph)
@@ -263,6 +265,9 @@ def test_edge_dataloader(idtype, sampler_name, neg_sampler, use_uva, use_ddp):
     }).astype(idtype)
     for ntype in g2.ntypes:
         g2.nodes[ntype].data['feat'] = F.copy_to(F.randn((g2.num_nodes(ntype), 8)), F.cpu())
+    if mode == 'pure_gpu':
+        g2 = g2.to(F.cuda())
+
     batch_size = max(g2.num_edges(ety) for ety in g2.canonical_etypes)
     sampler = {
         'full': dgl.dataloading.MultiLayerFullNeighborSampler(2),
@@ -274,7 +279,7 @@ def test_edge_dataloader(idtype, sampler_name, neg_sampler, use_uva, use_ddp):
     dataloader = dgl.dataloading.DataLoader(
         g2, {ety: g2.edges(form='eid', etype=ety) for ety in g2.canonical_etypes},
         edge_sampler, device=F.ctx(), batch_size=batch_size,
-        use_uva=use_uva, use_ddp=use_ddp)
+        use_uva=(mode == 'uva'), use_ddp=use_ddp)
     for input_nodes, pos_pair_graph, blocks in dataloader:
         _check_device(input_nodes)
         _check_device(pos_pair_graph)
@@ -286,7 +291,7 @@ def test_edge_dataloader(idtype, sampler_name, neg_sampler, use_uva, use_ddp):
     dataloader = dgl.dataloading.DataLoader(
         g2, {ety: g2.edges(form='eid', etype=ety) for ety in g2.canonical_etypes},
         edge_sampler, device=F.ctx(),batch_size=batch_size,
-        use_uva=use_uva, use_ddp=use_ddp)
+        use_uva=(mode == 'uva'), use_ddp=use_ddp)
 
     assert isinstance(iter(dataloader), Iterator)
     for input_nodes, pos_pair_graph, neg_pair_graph, blocks in dataloader:
