@@ -471,7 +471,7 @@ class AddSelfLoop(BaseTransform):
 
     Case3: Add self-etypes for a heterogeneous graph
 
-    >>> transform = AddSelfLoop(new_etypes=True, fill_data='sum')
+    >>> transform = AddSelfLoop(new_etypes=True)
     >>> new_g = transform(g)
     >>> print(new_g.edges(etype='follows'))
     (tensor([1, 0, 1, 2]), tensor([2, 0, 1, 2]))
