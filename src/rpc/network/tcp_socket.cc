@@ -64,14 +64,22 @@ bool TCPSocket::Bind(const char * ip, int port) {
   SAI sa_server;
   sa_server.sin_family      = AF_INET;
   sa_server.sin_port        = htons(port);
-  int retval = 0;
-  do {  // retry if EINTR failure appears
-    if (0 < inet_pton(AF_INET, ip, &sa_server.sin_addr) &&
-        0 <= (retval = bind(socket_, reinterpret_cast<SA*>(&sa_server),
-                  sizeof(sa_server)))) {
+  int ret = 0;
+  ret = inet_pton(AF_INET, ip, &sa_server.sin_addr);
+  if (ret == 0) {
+    LOG(ERROR) << "Invalid IP: " << ip;
+    return false;
+  } else if (ret < 0) {
+    LOG(ERROR) << "Failed to convert [" << ip
+               << "] to binary form, error: " << strerror(errno);
+    return false;
+  }
+  do { // retry if EINTR failure appears
+    if (0 <= (ret = bind(socket_, reinterpret_cast<SA *>(&sa_server),
+                         sizeof(sa_server)))) {
       return true;
     }
-  } while (retval == -1 && errno == EINTR);
+  } while (ret == -1 && errno == EINTR);
 
   LOG(ERROR) << "Failed bind on " << ip << ":" << port << " , error: " << strerror(errno);
   return false;
