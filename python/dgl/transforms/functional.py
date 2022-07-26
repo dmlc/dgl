@@ -1853,7 +1853,7 @@ def add_self_loop(g, edge_feat_names=None, fill_data=1., etype=None):
                     'min': function.min}
 
     if edge_feat_names is None:
-        edge_feat_names = [g.edges[etype].data.keys()]
+        edge_feat_names = [i for i in g.edges[etype].data.keys()]
 
     if etype[0] != etype[2]:
         raise DGLError(
