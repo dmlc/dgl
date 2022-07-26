@@ -74,7 +74,7 @@ bool TCPSocket::Bind(const char * ip, int port) {
                << "] to binary form, error: " << strerror(errno);
     return false;
   }
-  do { // retry if EINTR failure appears
+  do {  // retry if EINTR failure appears
     if (0 <= (ret = bind(socket_, reinterpret_cast<SA *>(&sa_server),
                          sizeof(sa_server)))) {
       return true;
