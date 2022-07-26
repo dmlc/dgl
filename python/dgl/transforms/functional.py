@@ -1865,7 +1865,7 @@ def add_self_loop(g, edge_feat_names=None, fill_data=1., etype=None):
         if isinstance(fill_data, (int, float)):
             dtype = g.edges[etype].data[feat_name].dtype
             dshape = g.edges[etype].data[feat_name].shape
-            tmp_fill_data = F.copy_to(F.tensor([fill_data]).astype(dtype), g.device)
+            tmp_fill_data = F.copy_to(F.astype(F.tensor([fill_data]), dtype), g.device)
             if len(dshape) > 1:
                 data[feat_name] = F.zeros((g.num_nodes(etype[0]), *dshape[1:]), dtype,
                                           g.device) + tmp_fill_data
