@@ -158,7 +158,7 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
 
     def __iter__(self):
         indices = _divide_by_worker(self._indices, self.batch_size, self.drop_last)
-        id_tensor = self._id_tensor[indices.to(self._device)]
+        id_tensor = self._id_tensor[indices]
         return _TensorizedDatasetIter(
             id_tensor, self.batch_size, self.drop_last, self._mapping_keys, self._shuffle)
 
@@ -224,12 +224,7 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
         """Shuffles the dataset."""
         # Only rank 0 does the actual shuffling.  The other ranks wait for it.
         if self.rank == 0:
-            if self._device == torch.device('cpu'):
-                np.random.shuffle(self._indices[:self.num_indices].numpy())
-            else:
-                self._indices[:self.num_indices] = self._indices[
-                    torch.randperm(self.num_indices, device=self._indices.device)]
-
+            np.random.shuffle(self._indices[:self.num_indices].numpy())
             if not self.drop_last:
                 # pad extra
                 self._indices[self.num_indices:] = \
@@ -240,7 +235,7 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
         start = self.num_samples * self.rank
         end = self.num_samples * (self.rank + 1)
         indices = _divide_by_worker(self._indices[start:end], self.batch_size, self.drop_last)
-        id_tensor = self._id_tensor[indices.to(self._device)]
+        id_tensor = self._id_tensor[indices]
         return _TensorizedDatasetIter(
             id_tensor, self.batch_size, self.drop_last, self._mapping_keys, self._shuffle)
 
