@@ -1636,7 +1636,7 @@ def test_add_selfloop(idtype):
     u, v = g.edges(form='uv', order='eid')
     assert F.array_equal(u, F.tensor([0, 0, 2, 0, 1, 2], dtype=idtype))
     assert F.array_equal(v, F.tensor([2, 1, 0, 0, 1, 2], dtype=idtype))
-    assert F.array_equal(g.edata['he'], F.tensor([1, 2, 3, 0, 0, 0], dtype=idtype))
+    assert F.array_equal(g.edata['he'], F.tensor([1, 2, 3, 1, 1, 1], dtype=idtype))
 
     # test for fill_data is int
     g = dgl.graph(([0, 0, 2], [2, 1, 0]), idtype=idtype, device=F.ctx())
@@ -1648,7 +1648,7 @@ def test_add_selfloop(idtype):
     u, v = g.edges(form='uv', order='eid')
     assert F.array_equal(u, F.tensor([0, 0, 2, 0, 1, 2], dtype=idtype))
     assert F.array_equal(v, F.tensor([2, 1, 0, 0, 1, 2], dtype=idtype))
-    assert F.array_equal(g.edata['he'], F.tensor([1., 2., 3., 3., 2., 1.]))
+    assert F.array_equal(g.edata['he'], F.tensor([1, 2, 3, 1, 1, 1]))
 
     # test for fill_data is str
     g = dgl.graph(([0, 0, 2], [2, 1, 0]), idtype=idtype, device=F.ctx())
