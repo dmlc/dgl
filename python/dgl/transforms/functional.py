@@ -1775,7 +1775,7 @@ def add_self_loop(g, edge_feat_names=None, fill_data=1., etype=None):
     edge_feat_names : list[str], optional
         The names of the self-loop features to apply `fill_data`. If None, it will apply `fill_data`
         to all self-loop features. Default: None.
-    fill_data : float, dict or str, optional
+    fill_data : int, float or str, optional
         The value to fill the self-loop features. Default: 1.
 
         * If ``fill_data`` is ``int`` or ``float``, self-loop features will be directly given by
@@ -1819,7 +1819,7 @@ def add_self_loop(g, edge_feat_names=None, fill_data=1., etype=None):
     >>> g = dgl.graph((torch.tensor([0, 0, 2]), torch.tensor([2, 1, 0])))
     >>> g.ndata['hv'] = torch.arange(3).float().reshape(-1, 1)
     >>> g.edata['he'] = torch.arange(3).float().reshape(-1, 1)
-    >>> g = dgl.add_self_loop(g, edge_feat_names=['he'], fill_data='sum')
+    >>> g = dgl.add_self_loop(g, fill_data='sum')
     >>> g
     Graph(num_nodes=3, num_edges=6,
         ndata_schemes={'hv': Scheme(shape=(1,), dtype=torch.float32)}
@@ -1864,12 +1864,12 @@ def add_self_loop(g, edge_feat_names=None, fill_data=1., etype=None):
     for feat_name in edge_feat_names:
         if isinstance(fill_data, (int, float)):
             dtype = g.edges[etype].data[feat_name].dtype
-            tmp_fill_data = F.copy_to(F.tensor([fill_data], dtype), g.device)
-            try:
-                data[feat_name] = F.zeros(
-                    (g.num_nodes(etype[0]), g.edges[etype].data[feat_name].shape[1]), dtype,
-                    g.device) + tmp_fill_data
-            except IndexError:
+            dshape = g.edges[etype].data[feat_name].shape
+            tmp_fill_data = F.copy_to(F.tensor(np.array(fill_data, dtype=dtype)), g.device)
+            if len(dshape) > 1:
+                data[feat_name] = F.zeros((g.num_nodes(etype[0]), *dshape[1:]), dtype,
+                                          g.device) + tmp_fill_data
+            else:
                 data[feat_name] = F.zeros((g.num_nodes(etype[0]),), dtype, g.device) + tmp_fill_data
 
         elif isinstance(fill_data, str):
