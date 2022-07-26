@@ -1864,10 +1864,13 @@ def add_self_loop(g, edge_feat_names=None, fill_data=1., etype=None):
     for feat_name in edge_feat_names:
         if isinstance(fill_data, (int, float)):
             dtype = g.edges[etype].data[feat_name].dtype
-            tmp_fill_data = F.copy_to(F.tensor([fill_data], dtype), g.device())
-            data[feat_name] = F.zeros(
-                (g.num_nodes(etype[0]), g.edges[etype].data[feat_name].shape[1]), dtype,
-                g.device) + tmp_fill_data
+            tmp_fill_data = F.copy_to(F.tensor([fill_data], dtype), g.device)
+            try:
+                data[feat_name] = F.zeros(
+                    (g.num_nodes(etype[0]), g.edges[etype].data[feat_name].shape[1]), dtype,
+                    g.device) + tmp_fill_data
+            except IndexError:
+                data[feat_name] = F.zeros((g.num_nodes(etype[0]),), dtype, g.device) + tmp_fill_data
 
         elif isinstance(fill_data, str):
             if fill_data not in reduce_funcs.keys():
