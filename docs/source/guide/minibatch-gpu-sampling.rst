@@ -140,8 +140,6 @@ operating on GPU:
 * :func:`dgl.sampling.sample_neighbors`
 * :func:`dgl.sampling.random_walk`
 
-* :func:`dgl.sampling.random_walk`
-
 Subgraph extraction ops:
 
 * :func:`dgl.node_subgraph`
