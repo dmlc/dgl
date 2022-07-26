@@ -413,7 +413,10 @@ def broadcast_nodes(graph, graph_feat, *, ntype=None):
     --------
     broadcast_edges
     """
-    if len(F.shape(graph_feat)) == 1:
+    if graph.batch_size == 1:
+        # The dimension of graph_feat should be batch_size x feat_dimension,
+        # therefore graph_feat.dim() = feat_dim() + 1, where the extra dimension is from graph batching
+        # so a better check condition is: if (graph_feat.dim() == feat_dim()): then we add another dimension
         graph_feat = F.unsqueeze(graph_feat, dim=0)
     return F.repeat(graph_feat, graph.batch_num_nodes(ntype), dim=0)
 
@@ -480,7 +483,10 @@ def broadcast_edges(graph, graph_feat, *, etype=None):
     --------
     broadcast_nodes
     """
-    if len(F.shape(graph_feat)) == 1:
+    if graph.batch_size == 1:
+        # The dimension of graph_feat should be batch_size x feat_dimension,
+        # therefore graph_feat.dim() = feat_dim() + 1, where the extra dimension is from graph batching
+        # so a better check condition is: if (graph_feat.dim() == feat_dim()): then we add another dimension
         graph_feat = F.unsqueeze(graph_feat, dim=0)
     return F.repeat(graph_feat, graph.batch_num_edges(etype), dim=0)
 
