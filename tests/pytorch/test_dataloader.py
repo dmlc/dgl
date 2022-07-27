@@ -134,8 +134,6 @@ def test_node_dataloader(idtype, sampler_name, mode, use_ddp):
     if mode != 'cpu' and F.ctx() == F.cpu():
         pytest.skip('UVA and GPU sampling require a GPU.')
     if use_ddp:
-        if dist.is_initialized():
-            dist.destroy_process_group()
         dist.init_process_group('gloo' if F.ctx() == F.cpu() else 'nccl',
             'tcp://127.0.0.1:12347', world_size=1, rank=0)
     g1 = dgl.graph(([0, 0, 0, 1, 1], [1, 2, 3, 3, 4])).astype(idtype)
@@ -205,6 +203,8 @@ def test_node_dataloader(idtype, sampler_name, mode, use_ddp):
             _check_dtype(output_nodes, idtype, 'dtype')
             _check_dtype(blocks, idtype, 'idtype')
 
+    if use_ddp:
+        dist.destroy_process_group()
 
 @parametrize_idtype
 @pytest.mark.parametrize('sampler_name', ['full', 'neighbor'])
@@ -220,8 +220,6 @@ def test_edge_dataloader(idtype, sampler_name, neg_sampler, mode, use_ddp):
     if mode == 'uva' and isinstance(neg_sampler, dgl.dataloading.negative_sampler.GlobalUniform):
         pytest.skip("GlobalUniform don't support UVA yet.")
     if use_ddp:
-        if dist.is_initialized():
-            dist.destroy_process_group()
         dist.init_process_group('gloo' if F.ctx() == F.cpu() else 'nccl',
             'tcp://127.0.0.1:12347', world_size=1, rank=0)
     g1 = dgl.graph(([0, 0, 0, 1, 1], [1, 2, 3, 3, 4])).astype(idtype)
@@ -300,6 +298,8 @@ def test_edge_dataloader(idtype, sampler_name, neg_sampler, mode, use_ddp):
         _check_device(neg_pair_graph)
         _check_device(blocks)
 
+    if use_ddp:
+        dist.destroy_process_group()
 
 def _create_homogeneous():
     s = torch.randint(0, 200, (1000,), device=F.ctx())
