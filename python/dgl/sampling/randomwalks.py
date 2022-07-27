@@ -30,6 +30,8 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
     If a random walk stops in advance, DGL pads the trace with -1 to have the same
     length.
 
+    This function supports the graph on GPU.
+
     Parameters
     ----------
     g : DGLGraph
@@ -37,7 +39,7 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
     nodes : Tensor
         Node ID tensor from which the random walk traces starts.
 
-        The tensor must have the same dtype as the ID type
+        The tensor must be on the same device as the graph and have the same dtype as the ID type
         of the graph.
     metapath : list[str or tuple of str], optional
         Metapath, specified as a list of edge types.
@@ -60,12 +62,14 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
         must be positive for the outbound edges of all nodes (although they don't have
         to sum up to one).  The result will be undefined otherwise.
 
+        The feature tensor must be on the same device as the graph.
+
         If omitted, DGL assumes that the neighbors are picked uniformly.
     restart_prob : float or Tensor, optional
         Probability to terminate the current trace before each transition.
 
-        If a tensor is given, :attr:`restart_prob` should have the same length as
-        :attr:`metapath` or :attr:`length`.
+        If a tensor is given, :attr:`restart_prob` should be on the same device as the graph
+        and have the same length as :attr:`metapath` or :attr:`length`.
     return_eids : bool, optional
         If True, additionally return the edge IDs traversed.
 
