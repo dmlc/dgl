@@ -15,7 +15,7 @@ class MLP(nn.Module):
     """Construct two-layer MLP-type aggreator for GIN model"""
     def __init__(self, input_dim, hidden_dim, output_dim):
         super().__init__()
-        self.linears = torch.nn.ModuleList()
+        self.linears = nn.ModuleList()
         # two-layer MLP    
         self.linears.append(nn.Linear(input_dim, hidden_dim, bias=False))
         self.linears.append(nn.Linear(hidden_dim, output_dim, bias=False))
@@ -29,10 +29,11 @@ class MLP(nn.Module):
 class GIN(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim):
         super().__init__()
-        self.ginlayers = torch.nn.ModuleList()
-        self.batch_norms = torch.nn.ModuleList()
+        self.ginlayers = nn.ModuleList()
+        self.batch_norms = nn.ModuleList()
+        num_layers = 5
         # five-layer GCN with two-layer MLP aggregator and sum-neighbor-pooling scheme
-        for layer in range(5 - 1): # excluding the input layer
+        for layer in range(num_layers - 1): # excluding the input layer
             if layer == 0:
                 mlp = MLP(input_dim, hidden_dim, hidden_dim)
             else:
@@ -40,14 +41,14 @@ class GIN(nn.Module):
             self.ginlayers.append(GINConv(mlp, learn_eps=False)) # set to True if learning epsilon
             self.batch_norms.append(nn.BatchNorm1d(hidden_dim))
         # linear functions for graph sum poolings of output of each layer
-        self.linear_prediction = torch.nn.ModuleList()
-        for layer in range(5):
+        self.linear_prediction = nn.ModuleList()
+        for layer in range(num_layers):
             if layer == 0:
                 self.linear_prediction.append(nn.Linear(input_dim, output_dim))
             else:
                 self.linear_prediction.append(nn.Linear(hidden_dim, output_dim))
         self.drop = nn.Dropout(0.5)
-        self.pool = SumPooling() # change to mean readout (AvgPooling) on social datasets
+        self.pool = SumPooling() # change to mean readout (AvgPooling) on social network datasets
 
     def forward(self, g, h):
         # list of hidden representation at each layer (including the input layer)
@@ -64,8 +65,8 @@ class GIN(nn.Module):
             score_over_layer += self.drop(self.linear_prediction[i](pooled_h))
         return score_over_layer
     
-def split_fold10(labels, fold_idx=0, seed=0, shuffle=True):
-    skf = StratifiedKFold(n_splits=10, shuffle=shuffle, random_state=seed)
+def split_fold10(labels, fold_idx=0):
+    skf = StratifiedKFold(n_splits=10, shuffle=True, random_state=0)
     idx_list = []
     for idx in skf.split(np.zeros(len(labels)), labels):
         idx_list.append(idx)
@@ -76,14 +77,14 @@ def evaluate(dataloader, device, model):
     model.eval()
     total = 0
     total_correct = 0
-    for batched_graph, labels  in dataloader:
+    for batched_graph, labels in dataloader:
         batched_graph = batched_graph.to(device)
         labels = labels.to(device)
         feat = batched_graph.ndata.pop('attr')
         total += len(labels)
         logits = model(batched_graph, feat)
-        _, predicted = torch.max(logits.data, 1)
-        total_correct += (predicted == labels.data).sum().item()
+        _, predicted = torch.max(logits, 1)
+        total_correct += (predicted == labels).sum().item()
     acc = 1.0 * total_correct / total
     return acc
 
@@ -123,7 +124,7 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     # load and split dataset
-    dataset = GINDataset(args.dataset, True, False) #  self_loop and disable one-hot encoding for input features
+    dataset = GINDataset(args.dataset, self_loop=True, degree_as_nlabel=False) # add self_loop and disable one-hot encoding for input features
     labels = [l for _, l in dataset]
     train_idx, val_idx = split_fold10(labels)
     
@@ -131,7 +132,7 @@ if __name__ == '__main__':
     train_loader = GraphDataLoader(dataset, sampler=SubsetRandomSampler(train_idx),
                                    batch_size=128, pin_memory=torch.cuda.is_available())
     val_loader = GraphDataLoader(dataset, sampler=SubsetRandomSampler(val_idx),
-                                 batch_size=128, pin_memory=torch.cuda.is_available(), shuffle=False)
+                                 batch_size=128, pin_memory=torch.cuda.is_available())
     
     # create GIN model
     in_size = dataset.dim_nfeats
