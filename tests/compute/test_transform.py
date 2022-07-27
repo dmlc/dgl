@@ -1652,7 +1652,7 @@ def test_add_selfloop(idtype):
     u, v = g.edges(form='uv', order='eid')
     assert F.array_equal(u, F.tensor([0, 0, 2, 0, 1, 2], dtype=idtype))
     assert F.array_equal(v, F.tensor([2, 1, 0, 0, 1, 2], dtype=idtype))
-    assert F.array_equal(g.edata['he'], F.tensor([1, 2, 3, 1, 1, 1]))
+    assert F.array_equal(g.edata['he'], F.tensor([1, 2, 3, 1, 1, 1], dtype=idtype))
     assert F.array_equal(g.edata['he1'], F.tensor([[0, 1], [2, 3], [4, 5],
                                                    [1, 1], [1, 1], [1, 1]], dtype=idtype))
 
