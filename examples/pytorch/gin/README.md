@@ -4,6 +4,14 @@ Graph Isomorphism Network (GIN)
 - Paper link: [arXiv](https://arxiv.org/abs/1810.00826) [OpenReview](https://openreview.net/forum?id=ryGs6iA5Km) 
 - Author's code repo: [https://github.com/weihua916/powerful-gnns](https://github.com/weihua916/powerful-gnns).
 
+Dependencies
+------------
+- sklearn
+
+Install as follows:
+```bash
+pip install sklearn
+```
 
 How to run
 -------
@@ -14,7 +22,6 @@ python3 train.py --dataset MUTAG
 ```
 
 > **_NOTE:_**  Users may observe results fluctuate due to the randomness with relatively small dataset.  In consistence with the original [paper](https://arxiv.org/abs/1810.00826), five social network datasets, 'COLLAB', 'IMDBBINARY' 'IMDBMULTI' 'REDDITBINARY' and 'REDDITMULTI5K', are also available as the input. Users are encouraged to update the script slightly for social network applications, for example, replacing sum readout on bioinformatics datasets to mean readout on social network datasets and using one-hot encodings of node degrees by setting "degree_as_nlabel=True".
-
 
 Summary
 -------
