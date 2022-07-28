@@ -99,6 +99,38 @@ especially for multi-GPU training.
   Refer to our `GraphSAGE example <https://github.com/dmlc/dgl/blob/master/examples/pytorch/graphsage/multi_gpu_node_classification.py>`_ for more details.
 
 
+UVA and GPU support for PinSAGESampler/RandomWalkNeighborSampler
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+PinSAGESampler and RandomWalkNeighborSampler support UVA and GPU sampling.
+You can enable them via:
+
+* Pin the graph (for UVA sampling) or put the graph onto GPU (for GPU sampling).
+
+* Put the ``train_nid`` onto GPU.
+
+.. code:: python
+
+  g = dgl.heterograph({
+      ('item', 'bought-by', 'user'): ([0, 0, 1, 1, 2, 2, 3, 3], [0, 1, 0, 1, 2, 3, 2, 3]),
+      ('user', 'bought', 'item'): ([0, 1, 0, 1, 2, 3, 2, 3], [0, 0, 1, 1, 2, 2, 3, 3])})
+
+  # UVA setup
+  # g.create_formats_()
+  # g.pin_memory_()
+
+  # GPU setup
+  device = torch.device('cuda:0')
+  g = g.to(device)
+
+  sampler1 = dgl.sampling.PinSAGESampler(g, 'item', 'user', 4, 0.5, 3, 2)
+  sampler2 = dgl.sampling.RandomWalkNeighborSampler(g, 4, 0.5, 3, 2, ['bought-by', 'bought'])
+
+  train_nid = torch.tensor([0, 2], dtype=g.idtype, device=device)
+  sampler1(train_nid)
+  sampler2(train_nid)
+
+
 Using GPU-based neighbor sampling with DGL functions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -108,6 +140,8 @@ operating on GPU:
 * :func:`dgl.sampling.sample_neighbors`
 
   * Only has support for uniform sampling; non-uniform sampling can only run on CPU.
+
+* :func:`dgl.sampling.random_walk`
 
 Subgraph extraction ops:
 

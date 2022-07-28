@@ -24,7 +24,6 @@ def check_random_walk(g, metapath, traces, ntypes, prob=None, trace_eids=None):
                 u, v = g.find_edges(trace_eids[i, j], etype=metapath[j])
                 assert (u == traces[i, j]) and (v == traces[i, j + 1])
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="Random walk with non-uniform prob is not supported in GPU.")
 def test_non_uniform_random_walk():
     g2 = dgl.heterograph({
             ('user', 'follow', 'user'): ([0, 1, 1, 2, 3], [1, 2, 3, 0, 0])
@@ -61,7 +60,7 @@ def test_non_uniform_random_walk():
     check_random_walk(g4, metapath, traces, ntypes, 'p', trace_eids=eids)
     traces, eids, ntypes = dgl.sampling.random_walk(
         g4, [0, 1, 2, 3, 0, 1, 2, 3], metapath=metapath, prob='p',
-        restart_prob=F.zeros((6,), F.float32, F.cpu()), return_eids=True)
+        restart_prob=F.zeros((6,), F.float32, F.ctx()), return_eids=True)
     check_random_walk(g4, metapath, traces, ntypes, 'p', trace_eids=eids)
     traces, eids, ntypes = dgl.sampling.random_walk(
         g4, [0, 1, 2, 3, 0, 1, 2, 3], metapath=metapath + ['follow'], prob='p',
