@@ -21,7 +21,7 @@ Run with the following for bioinformatics graph classification (available datase
 python3 train.py --dataset MUTAG
 ```
 
-> **_NOTE:_**  Users may observe results fluctuate due to the randomness with relatively small dataset.  In consistence with the original [paper](https://arxiv.org/abs/1810.00826), five social network datasets, 'COLLAB', 'IMDBBINARY' 'IMDBMULTI' 'REDDITBINARY' and 'REDDITMULTI5K', are also available as the input. Users are encouraged to update the script slightly for social network applications, for example, replacing sum readout on bioinformatics datasets to mean readout on social network datasets and using one-hot encodings of node degrees by setting "degree_as_nlabel=True".
+> **_NOTE:_**  Users may observe results fluctuate due to the randomness with relatively small dataset.  In consistence with the original [paper](https://arxiv.org/abs/1810.00826), five social network datasets, 'COLLAB', 'IMDBBINARY' 'IMDBMULTI' 'REDDITBINARY' and 'REDDITMULTI5K', are also available as the input. Users are encouraged to update the script slightly for social network applications, for example, replacing sum readout on bioinformatics datasets with mean readout on social network datasets and using one-hot encodings of node degrees by setting "degree_as_nlabel=True" in GINDataset.
 
 Summary (10-fold cross-validation)
 -------
