@@ -3,7 +3,7 @@ import torch
 import operator
 import itertools
 import constants
-from gloo_wrapper import allgather_sizes, alltoall_cpu, alltoallv_cpu
+from gloo_wrapper import allgather_sizes, alltoall_cpu, alltoallv_cpu, alltoallv_cpu_data, alltoall_cpu_object_lst
 
 def get_shuffle_global_nids(rank, world_size, global_nids_ranks, node_data):
     """ 
@@ -29,41 +29,18 @@ def get_shuffle_global_nids(rank, world_size, global_nids_ranks, node_data):
         from other processes. 
     """
     #build a list of sizes (lengths of lists)
-    sizes = [len(x) for x in global_nids_ranks]
-
-    #compute total_nodes whose mappings should be resolved, between orig-node-id <-> global-id
-    total_nodes = np.sum(sizes)
-    if (total_nodes == 0):
-        print('Rank: ', rank, ' -- All mappings are present locally... No need for to send any info.')
-        return None
-
-    #determine the no. of global_node_ids to send and receive and perform alltoall
-    send_counts = list(torch.Tensor(sizes).type(dtype=torch.int64).chunk(world_size))
-    recv_counts = list(torch.zeros([world_size], dtype=torch.int64).chunk(world_size))
-    alltoall_cpu(rank, world_size, recv_counts, send_counts)
-
-    #allocate buffers to receive node-ids
-    recv_nodes = []
-    for i in recv_counts:
-        recv_nodes.append(torch.zeros(i.tolist(), dtype=torch.int64))
-
-    #form the outgoing message
-    send_nodes = []
-    for i in range(world_size):
-        send_nodes.append(torch.from_numpy(global_nids_ranks[i]).type(dtype=torch.int64))
-
-    #send-recieve messages
-    alltoallv_cpu(rank, world_size, recv_nodes, send_nodes)
-
-    # allocate buffers to receive global-ids
-    recv_shuffle_global_nids = []
-    for i in sizes: 
-        recv_shuffle_global_nids.append(torch.zeros((i), dtype=torch.int64))
+    sizes = [x.shape for x in global_nids_ranks]
+    global_nids_ranks = [torch.from_numpy(x) for x in global_nids_ranks]
+    recv_nodes = alltoallv_cpu_data(rank, world_size, global_nids_ranks, torch.int64)
 
     # Use node_data to lookup global id to send over.
     send_nodes = []
     for proc_i_nodes in recv_nodes:
         #list of node-ids to lookup
+        if proc_i_nodes == None: 
+            send_nodes.append(torch.empty((0), dtype=torch.int64))
+            continue
+
         global_nids = proc_i_nodes.numpy()
         if (len(global_nids) != 0):
             common, ind1, ind2 = np.intersect1d(node_data[constants.GLOBAL_NID], global_nids, return_indices=True)
@@ -73,9 +50,8 @@ def get_shuffle_global_nids(rank, world_size, global_nids_ranks, node_data):
             send_nodes.append(torch.empty((0), dtype=torch.int64))
 
     #send receive global-ids
-    alltoallv_cpu(rank, world_size, recv_shuffle_global_nids, send_nodes)
-
-    shuffle_global_nids = np.concatenate([x.numpy() for x in recv_shuffle_global_nids])
+    recv_shuffle_global_nids = alltoallv_cpu_data(rank, world_size, send_nodes, torch.int64)
+    shuffle_global_nids = np.concatenate([x.numpy() if x != None else [] for x in recv_shuffle_global_nids])
     global_nids = np.concatenate([x for x in global_nids_ranks])
     ret_val = np.column_stack([global_nids, shuffle_global_nids])
     return ret_val
@@ -111,13 +87,13 @@ def get_shuffle_global_nids_edges(rank, world_size, edge_data, node_part_ids, no
     global_nids_ranks = []
     for i in range(world_size):
         if (i == rank):
-            global_nids_ranks.append(np.empty(shape=(0)))
+            global_nids_ranks.append(np.empty(shape=(0), dtype=np.int64))
             continue
 
         #not_owned_nodes = part_ids[:,0][part_ids[:,1] == i]
         not_owned_node_ids = np.where(part_ids == i)[0] 
         if not_owned_node_ids.shape[0] == 0: 
-            not_owned_nodes = np.empty(shape=(0))
+            not_owned_nodes = np.empty(shape=(0), dtype=np.int64)
         else: 
             not_owned_nodes = global_nids[not_owned_node_ids]
         global_nids_ranks.append(not_owned_nodes)

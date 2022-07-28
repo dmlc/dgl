@@ -59,6 +59,74 @@ def alltoall_cpu(rank, world_size, output_tensor_list, input_tensor_list):
     for i in range(world_size):
         dist.scatter(output_tensor_list[i], input_tensor_list if i == rank else [], src=i)
 
+def alltoallv_cpu_data(rank, world_size, input_tensor_list, val_dtype):
+    """
+    Wrapper function to providing the alltoallv functionality by using underlying alltoall
+    messaging primitive
+
+    Parameters:
+    -----------
+    rank : int
+        The rank of current worker
+    world_size : int
+        The size of the entire
+    input_tensor_list : List of tensor
+        The tensors to exchange
+    val_dtype : torch dtype
+        torch dtype which is used to create buffer for receiving messages
+
+    Returns:
+    --------
+    list : 
+        list of tensors received from other processes during alltoall message
+
+    """
+    sizes = [list(x.size()) for x in input_tensor_list]
+    for idx in range(1,len(sizes)):
+        assert len(sizes[idx-1]) == len(sizes[idx])
+
+    #decide how much to pad. 
+    #always use the first-dimension for padding. 
+    ll = [ x[0] for x in sizes ]
+
+    #dims of the outgoing messages
+    out_dims = [ [np.amax(ll)] + l[1:] for idx, l in enumerate(sizes) ]
+
+    #dims of the padding needed, if any
+    diff_dims = [ [np.amax(ll) - l[0]] + l[1:] for l in sizes ]
+
+    #pad the actual message
+    input_tensor_list = [torch.cat((x, torch.zeros(diff_dims[idx]).type(x.dtype))) for idx, x in enumerate(input_tensor_list)]
+
+    #send useful message sizes to all
+    send_counts = []
+    recv_counts = []
+    for idx in range(world_size):
+        #send a 3 element triplet, [a, b, ....] where 
+        #a = useful message dim, b = amount of padding and remaining elements are
+        #the remaining dimensions of the tensor
+        send_counts.append(torch.from_numpy(np.array([sizes[idx][0]] + out_dims[idx])).type(torch.int64))
+        recv_counts.append(torch.zeros((1 + len(sizes[idx])), dtype=torch.int64))
+    alltoall_cpu(rank, world_size, recv_counts, send_counts)
+
+    #allocate buffers for receiving message
+    output_tensor_list = []
+    recv_counts = [ tsize.numpy() for tsize in recv_counts]
+    for tsize in recv_counts:
+        output_tensor_list.append(torch.zeros(tuple(tsize[1:])).type(val_dtype))
+
+    #send actual message itself. 
+    alltoall_cpu(rank, world_size, output_tensor_list, input_tensor_list)
+
+    #extract un-padded message from the output_tensor_list and return it
+    return_vals = []
+    for s, t in zip(recv_counts, output_tensor_list):
+        if s[0] == 0:
+            return_vals.append(None)
+        else:
+            return_vals.append(t[0:s[0]])
+    return return_vals
+
 def alltoall_cpu_object_lst(rank, world_size, input_list):
     """
     Each process scatters list of input objects to all processes in a cluster
