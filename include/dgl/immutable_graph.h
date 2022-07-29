@@ -273,19 +273,19 @@ class COO : public GraphInterface {
   // TODO(da): add constructor for creating COO from shared memory
 
   void AddVertices(uint64_t num_vertices) override {
-    LOG(FATAL) << "CSR graph does not allow mutation.";
+    LOG(FATAL) << "COO graph does not allow mutation.";
   }
 
   void AddEdge(dgl_id_t src, dgl_id_t dst) override {
-    LOG(FATAL) << "CSR graph does not allow mutation.";
+    LOG(FATAL) << "COO graph does not allow mutation.";
   }
 
   void AddEdges(IdArray src_ids, IdArray dst_ids) override {
-    LOG(FATAL) << "CSR graph does not allow mutation.";
+    LOG(FATAL) << "COO graph does not allow mutation.";
   }
 
   void Clear() override {
-    LOG(FATAL) << "CSR graph does not allow mutation.";
+    LOG(FATAL) << "COO graph does not allow mutation.";
   }
 
   DLContext Context() const override {

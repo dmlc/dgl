@@ -39,7 +39,7 @@ def train(
         model_optimizer.zero_grad()
 
         in_nodes = {rel: nid.to(device) for rel, nid in in_nodes.items()}
-        out_nodes = out_nodes[predict_category].to(device)
+        out_nodes = out_nodes[predict_category].to(labels.device)
         blocks = [block.to(device) for block in blocks]
 
         batch_labels = labels[out_nodes].to(device)
@@ -102,7 +102,7 @@ def validate(
             for step, (in_nodes, out_nodes, blocks) in enumerate(dataloader):
                 in_nodes = {rel: nid.to(device)
                             for rel, nid in in_nodes.items()}
-                out_nodes = out_nodes[predict_category].to(device)
+                out_nodes = out_nodes[predict_category].to(labels.device)
                 blocks = [block.to(device) for block in blocks]
 
                 batch_labels = labels[out_nodes].to(device)
