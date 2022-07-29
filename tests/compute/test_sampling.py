@@ -24,14 +24,13 @@ def check_random_walk(g, metapath, traces, ntypes, prob=None, trace_eids=None):
                 u, v = g.find_edges(trace_eids[i, j], etype=metapath[j])
                 assert (u == traces[i, j]) and (v == traces[i, j + 1])
 
-def _use_uva():
-    if F._default_context_str == 'cpu':
-        return [False]
-    else:
-        return [True, False]
-
-@pytest.mark.parametrize('use_uva', _use_uva())
+@pytest.mark.parametrize('use_uva', [True, False])
 def test_non_uniform_random_walk(use_uva):
+    if use_uva:
+        if F.ctx() == F.cpu():
+            pytest.skip('UVA biased random walk requires a GPU.')
+        if dgl.backend.backend_name != 'pytorch':
+            pytest.skip('UVA biased random walk is only supported with PyTorch.')
     g2 = dgl.heterograph({
             ('user', 'follow', 'user'): ([0, 1, 1, 2, 3], [1, 2, 3, 0, 0])
         })
@@ -89,8 +88,10 @@ def test_non_uniform_random_walk(use_uva):
         for g in (g2, g4):
             g.unpin_memory_()
 
-@pytest.mark.parametrize('use_uva', _use_uva())
+@pytest.mark.parametrize('use_uva', [True, False])
 def test_uniform_random_walk(use_uva):
+    if use_uva and F.ctx() == F.cpu():
+        pytest.skip('UVA random walk requires a GPU.')
     g1 = dgl.heterograph({
             ('user', 'follow', 'user'): ([0, 1, 2], [1, 2, 0])
         })
