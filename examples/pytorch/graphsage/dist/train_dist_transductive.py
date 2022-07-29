@@ -137,7 +137,7 @@ def run(args, device, data):
                 num_seeds += len(blocks[-1].dstdata[dgl.NID])
                 num_inputs += len(blocks[0].srcdata[dgl.NID])
                 blocks = [block.to(device) for block in blocks]
-                batch_labels = g.ndata['labels'][seeds].to(device)
+                batch_labels = g.ndata['labels'][seeds].long().to(device)
                 # Compute loss and prediction
                 start = time.time()
                 batch_inputs = emb_layer(input_nodes)

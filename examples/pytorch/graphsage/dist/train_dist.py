@@ -163,6 +163,7 @@ def run(args, device, data):
                 sample_time += tic_step - start
                 # fetch features/labels
                 batch_inputs, batch_labels = load_subtensor(g, seeds, input_nodes, "cpu")
+                batch_labels = batch_labels.long()
                 num_seeds += len(blocks[-1].dstdata[dgl.NID])
                 num_inputs += len(blocks[0].srcdata[dgl.NID])
                 # move to target device
