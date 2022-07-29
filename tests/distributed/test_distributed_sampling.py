@@ -84,7 +84,7 @@ def start_get_degrees_client(rank, tmpdir, disable_shared_mem, nids=None):
     gpb = None
     if disable_shared_mem:
         _, _, _, gpb, _, _, _ = load_partition(tmpdir / 'test_get_degrees.json', rank)
-    dgl.distributed.initialize("rpc_ip_config.txt", 1)
+    dgl.distributed.initialize("rpc_ip_config.txt")
     dist_graph = DistGraph("test_get_degrees", gpb=gpb)
     try:
         in_deg = dist_graph.in_degrees(nids)
