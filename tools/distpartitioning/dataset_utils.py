@@ -2,6 +2,7 @@ import os
 import numpy as np
 import constants
 import torch
+import torch.distributed as dist
 
 import pyarrow
 from pyarrow import csv
@@ -100,24 +101,27 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
     #iterate over the "node_data" dictionary in the schema_map
     #read the node features if exists
     #also keep track of the type_nids for which the node_features are read.
-    dataset_features = schema_map[constants.STR_NODE_DATA]
-    if((dataset_features is not None) and (len(dataset_features) > 0)):
-        for ntype_name, ntype_feature_data in dataset_features.items():
-            #ntype_feature_data is a dictionary
-            #where key: feature_name, value: dictionary in which keys are "format", "data"
-            node_feature_tids[ntype_name] = []
-            for feat_name, feat_data in ntype_feature_data.items():
-                assert len(feat_data[constants.STR_DATA]) == world_size
-                assert feat_data[constants.STR_FORMAT][constants.STR_NAME] == constants.STR_NUMPY
-                my_feat_data_fname = feat_data[constants.STR_DATA][rank] #this will be just the file name
-                if (os.path.isabs(my_feat_data_fname)):
-                    node_features[ntype_name+'/'+feat_name] = \
+    #check if the key "node_data" exists in the schema json file. Sometimes users specify None, {}, 
+    #and valid values. Need to check for all these cases. 
+    if constants.STR_NODE_DATA in schema_map:
+        dataset_features = schema_map[constants.STR_NODE_DATA]
+        if((dataset_features is not None) and (len(dataset_features) > 0)):
+            for ntype_name, ntype_feature_data in dataset_features.items():
+                #ntype_feature_data is a dictionary
+                #where key: feature_name, value: dictionary in which keys are "format", "data"
+                node_feature_tids[ntype_name] = []
+                for feat_name, feat_data in ntype_feature_data.items():
+                    assert len(feat_data[constants.STR_DATA]) == world_size
+                    assert feat_data[constants.STR_FORMAT][constants.STR_NAME] == constants.STR_NUMPY
+                    my_feat_data_fname = feat_data[constants.STR_DATA][rank] #this will be just the file name
+                    if (os.path.isabs(my_feat_data_fname)):
+                        node_features[ntype_name+'/'+feat_name] = \
                             torch.from_numpy(np.load(my_feat_data_fname))
-                else:
-                    node_features[ntype_name+'/'+feat_name] = \
+                    else:
+                        node_features[ntype_name+'/'+feat_name] = \
                             torch.from_numpy(np.load(os.path.join(input_dir, my_feat_data_fname)))
 
-                node_feature_tids[ntype_name].append([feat_name, -1, -1])
+                    node_feature_tids[ntype_name].append([feat_name, -1, -1])
 
     '''
         "node_type" : ["ntype0-name", "ntype1-name", ....], #m node types
