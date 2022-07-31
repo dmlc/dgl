@@ -15,8 +15,7 @@ from utils import read_ntype_partition_files, read_json, get_node_types, \
                     augment_edge_data, get_gnid_range_map, \
                     write_dgl_objects, write_metadata_json, get_ntype_featnames, \
                     get_idranges
-from gloo_wrapper import alltoall_cpu_object_lst, alltoallv_cpu, \
-                    alltoall_cpu, allgather_sizes, gather_metadata_json,\
+from gloo_wrapper import alltoall_cpu, allgather_sizes, gather_metadata_json,\
                     alltoallv_cpu_data
 from globalids import assign_shuffle_global_nids_nodes, \
                     assign_shuffle_global_nids_edges, \
@@ -157,7 +156,7 @@ def exchange_edge_data(rank, world_size, edge_data):
     end = timer()
     
     dist.barrier ()
-    output_list = alltoallv_cpu_data(rank, world_size, input_list,torch.int64)
+    output_list = alltoallv_cpu_data(rank, world_size, input_list)
     end = timer()
     print('[Rank: ', rank, '] Time to send/rcv edge data: ', timedelta(seconds=end-start))
 
@@ -266,18 +265,13 @@ def exchange_node_features(rank, world_size, node_feature_tids, ntype_gnid_map, 
                     node_feats_per_rank.append(torch.empty((0,1), dtype=torch.float))
                     global_nid_per_rank.append(np.empty((0,1), dtype=np.int64))
                 else:
-                    if (len(list(node_feats[local_idx_partid].size())) == 1):
-                        node_feats_per_rank.append(node_feats[local_idx_partid])
-                    else:
-                        node_feats_per_rank.append(node_feats[local_idx_partid])
+                    node_feats_per_rank.append(node_feats[local_idx_partid])
                     global_nid_per_rank.append(torch.from_numpy(gnids_per_partid).type(torch.int64))
 
             #features (and global nids) per rank to be sent out are ready
             #for transmission, perform alltoallv here.
-            output_feat_list = alltoallv_cpu_data(rank, world_size, node_feats_per_rank, node_feats.dtype)
-
-            #output_nid_list = alltoall_cpu_object_lst(rank, world_size, global_nid_per_rank)
-            output_nid_list = alltoallv_cpu_data(rank, world_size, global_nid_per_rank, torch.int64)
+            output_feat_list = alltoallv_cpu_data(rank, world_size, node_feats_per_rank)
+            output_nid_list = alltoallv_cpu_data(rank, world_size, global_nid_per_rank)
 
             #stitch node_features together to form one large feature tensor
             own_node_features[feat_key] = torch.cat(output_feat_list)

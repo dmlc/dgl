@@ -59,10 +59,18 @@ def alltoall_cpu(rank, world_size, output_tensor_list, input_tensor_list):
     for i in range(world_size):
         dist.scatter(output_tensor_list[i], input_tensor_list if i == rank else [], src=i)
 
-def alltoallv_cpu_data(rank, world_size, input_tensor_list, val_dtype):
+def alltoallv_cpu_data(rank, world_size, input_tensor_list):
     """
     Wrapper function to providing the alltoallv functionality by using underlying alltoall
-    messaging primitive
+    messaging primitive. 
+
+    This function pads all input tensors, except one, so that all the messages are of the same
+    size. Once the messages are padded, It first sends a vector whose first two elements are 
+    1) actual message size along first dimension, and 2) Message size along first dimension 
+    which is used for communication. The rest of the dimensions are assumed to be same across
+    all the input tensors. After receiving the message sizes, the receiving end will create buffers
+    of appropriate sizes. And then slices the received messages to remove the added padding, if any, 
+    and returns to the caller. 
 
     Parameters:
     -----------
@@ -72,8 +80,6 @@ def alltoallv_cpu_data(rank, world_size, input_tensor_list, val_dtype):
         The size of the entire
     input_tensor_list : List of tensor
         The tensors to exchange
-    val_dtype : torch dtype
-        torch dtype which is used to create buffer for receiving messages
 
     Returns:
     --------
@@ -81,18 +87,23 @@ def alltoallv_cpu_data(rank, world_size, input_tensor_list, val_dtype):
         list of tensors received from other processes during alltoall message
 
     """
+    #ensure len of input_tensor_list is same as the world_size.
+    assert input_tensor_list != None
+    assert len(input_tensor_list) == world_size
+
+    #ensure that all the tensors in the input_tensor_list are of same size.
     sizes = [list(x.size()) for x in input_tensor_list]
     for idx in range(1,len(sizes)):
-        assert len(sizes[idx-1]) == len(sizes[idx])
+        assert len(sizes[idx-1]) == len(sizes[idx]) #no. of dimensions should be same
+        assert input_tensor_list[idx-1].dtype == input_tensor_list[idx].dtype # dtype should be same 
+        assert sizes[idx-1][1:] == sizes[idx][1:] #except first dimension remaining dimensions should all be the same
 
     #decide how much to pad. 
     #always use the first-dimension for padding. 
     ll = [ x[0] for x in sizes ]
 
-    #dims of the outgoing messages
-    out_dims = [ [np.amax(ll)] + l[1:] for idx, l in enumerate(sizes) ]
-
     #dims of the padding needed, if any
+    #these dims are used for padding purposes.
     diff_dims = [ [np.amax(ll) - l[0]] + l[1:] for l in sizes ]
 
     #pad the actual message
@@ -102,18 +113,18 @@ def alltoallv_cpu_data(rank, world_size, input_tensor_list, val_dtype):
     send_counts = []
     recv_counts = []
     for idx in range(world_size):
-        #send a 3 element triplet, [a, b, ....] where 
-        #a = useful message dim, b = amount of padding and remaining elements are
-        #the remaining dimensions of the tensor
-        send_counts.append(torch.from_numpy(np.array([sizes[idx][0]] + out_dims[idx])).type(torch.int64))
+        #send a vector, of atleast 3 elements, [a, b, ....] where 
+        #a = useful message dim, b = actual message outgoing message size along the first dimension
+        #and remaining elements are the remaining dimensions of the tensor
+        send_counts.append(torch.from_numpy(np.array([sizes[idx][0]] + [np.amax(ll)] + sizes[idx][1:] )).type(torch.int64))
         recv_counts.append(torch.zeros((1 + len(sizes[idx])), dtype=torch.int64))
     alltoall_cpu(rank, world_size, recv_counts, send_counts)
 
     #allocate buffers for receiving message
     output_tensor_list = []
     recv_counts = [ tsize.numpy() for tsize in recv_counts]
-    for tsize in recv_counts:
-        output_tensor_list.append(torch.zeros(tuple(tsize[1:])).type(val_dtype))
+    for idx, tsize in enumerate(recv_counts):
+        output_tensor_list.append(torch.zeros(tuple(tsize[1:])).type(input_tensor_list[idx].dtype))
 
     #send actual message itself. 
     alltoall_cpu(rank, world_size, output_tensor_list, input_tensor_list)
@@ -126,72 +137,6 @@ def alltoallv_cpu_data(rank, world_size, input_tensor_list, val_dtype):
         else:
             return_vals.append(t[0:s[0]])
     return return_vals
-
-def alltoall_cpu_object_lst(rank, world_size, input_list):
-    """
-    Each process scatters list of input objects to all processes in a cluster
-    and return gathered list of objects in output list. 
-
-    Parameters
-    ----------
-    rank : int
-        The rank of current worker
-    world_size : int
-        The size of the entire
-    input_tensor_list : List of tensor
-        The tensors to exchange
-
-    Returns
-    -------
-    list: list of objects are received from other processes
-       This is the list of objects which are sent to the current process by
-       other processes as part of this exchange
-    """
-    rcv_list = []
-    output_list = [None] * world_size
-    for i in range(world_size):
-        rcv_list.clear()
-        rcv_list.append(None)
-        if (i == rank):
-            dist.scatter_object_list(rcv_list, input_list, src = rank)
-        else:
-            send_list = [None] * world_size
-            dist.scatter_object_list(rcv_list, send_list, src = i)
-        output_list[i] = rcv_list[0]
-
-    return output_list
-
-def alltoallv_cpu(rank, world_size, output_tensor_list, input_tensor_list):
-    """
-    Each process scatters list of input tensors to all processes in a cluster
-    and return gathered list of tensors in output list.
-
-    Parameters
-    ----------
-    rank : int
-        The rank of current worker
-    world_size : int
-        The size of the entire
-    output_tensor_list : List of tensor
-        The received tensors
-    input_tensor_list : List of tensor
-        The tensors to exchange
-    """
-    # send tensor to each target trainer using torch.distributed.isend
-    # isend is async
-    senders = []
-    for i in range(world_size):
-        if i == rank:
-            output_tensor_list[i] = input_tensor_list[i].to(torch.device('cpu'))
-        else:
-            sender = dist.isend(input_tensor_list[i].to(torch.device('cpu')), dst=i)
-            senders.append(sender)
-
-    for i in range(world_size):
-        if i != rank:
-            dist.recv(output_tensor_list[i], src=i)
-
-    torch.distributed.barrier()
 
 def gather_metadata_json(metadata, rank, world_size): 
     """ 
