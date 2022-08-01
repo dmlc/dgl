@@ -24,58 +24,74 @@ def check_random_walk(g, metapath, traces, ntypes, prob=None, trace_eids=None):
                 u, v = g.find_edges(trace_eids[i, j], etype=metapath[j])
                 assert (u == traces[i, j]) and (v == traces[i, j + 1])
 
-def test_non_uniform_random_walk():
+@pytest.mark.parametrize('use_uva', [True, False])
+def test_non_uniform_random_walk(use_uva):
+    if use_uva:
+        if F.ctx() == F.cpu():
+            pytest.skip('UVA biased random walk requires a GPU.')
+        if dgl.backend.backend_name != 'pytorch':
+            pytest.skip('UVA biased random walk is only supported with PyTorch.')
     g2 = dgl.heterograph({
             ('user', 'follow', 'user'): ([0, 1, 1, 2, 3], [1, 2, 3, 0, 0])
-        }).to(F.ctx())
+        })
     g4 = dgl.heterograph({
             ('user', 'follow', 'user'): ([0, 1, 1, 2, 3], [1, 2, 3, 0, 0]),
             ('user', 'view', 'item'): ([0, 0, 1, 2, 3, 3], [0, 1, 1, 2, 2, 1]),
             ('item', 'viewed-by', 'user'): ([0, 1, 1, 2, 2, 1], [0, 0, 1, 2, 3, 3])
-        }).to(F.ctx())
+        })
 
-    g2.edata['p'] = F.tensor([3, 0, 3, 3, 3], dtype=F.float32)
-    g2.edata['p2'] = F.tensor([[3], [0], [3], [3], [3]], dtype=F.float32)
-    g4.edges['follow'].data['p'] = F.tensor([3, 0, 3, 3, 3], dtype=F.float32)
-    g4.edges['viewed-by'].data['p'] = F.tensor([1, 1, 1, 1, 1, 1], dtype=F.float32)
+    g2.edata['p'] = F.copy_to(F.tensor([3, 0, 3, 3, 3], dtype=F.float32), F.cpu())
+    g2.edata['p2'] = F.copy_to(F.tensor([[3], [0], [3], [3], [3]], dtype=F.float32), F.cpu())
+    g4.edges['follow'].data['p'] = F.copy_to(F.tensor([3, 0, 3, 3, 3], dtype=F.float32), F.cpu())
+    g4.edges['viewed-by'].data['p'] = F.copy_to(F.tensor([1, 1, 1, 1, 1, 1], dtype=F.float32), F.cpu())
 
-    traces, eids, ntypes = dgl.sampling.random_walk(
-        g2, [0, 1, 2, 3, 0, 1, 2, 3], length=4, prob='p', return_eids=True)
-    check_random_walk(g2, ['follow'] * 4, traces, ntypes, 'p', trace_eids=eids)
+    if use_uva:
+        for g in (g2, g4):
+            g.create_formats_()
+            g.pin_memory_()
+    elif F._default_context_str == 'gpu':
+        g2 = g2.to(F.ctx())
+        g4 = g4.to(F.ctx())
 
     try:
-        traces, ntypes = dgl.sampling.random_walk(
-            g2, [0, 1, 2, 3, 0, 1, 2, 3], length=4, prob='p2')
-        fail = False
-    except dgl.DGLError:
-        fail = True
-    assert fail
+        traces, eids, ntypes = dgl.sampling.random_walk(
+            g2, F.tensor([0, 1, 2, 3, 0, 1, 2, 3], dtype=g2.idtype),
+            length=4, prob='p', return_eids=True)
+        check_random_walk(g2, ['follow'] * 4, traces, ntypes, 'p', trace_eids=eids)
 
-    metapath = ['follow', 'view', 'viewed-by'] * 2
-    traces, eids, ntypes = dgl.sampling.random_walk(
-        g4, [0, 1, 2, 3, 0, 1, 2, 3], metapath=metapath, prob='p', return_eids=True)
-    check_random_walk(g4, metapath, traces, ntypes, 'p', trace_eids=eids)
-    traces, eids, ntypes = dgl.sampling.random_walk(
-        g4, [0, 1, 2, 3, 0, 1, 2, 3], metapath=metapath, prob='p', restart_prob=0., return_eids=True)
-    check_random_walk(g4, metapath, traces, ntypes, 'p', trace_eids=eids)
-    traces, eids, ntypes = dgl.sampling.random_walk(
-        g4, [0, 1, 2, 3, 0, 1, 2, 3], metapath=metapath, prob='p',
-        restart_prob=F.zeros((6,), F.float32, F.ctx()), return_eids=True)
-    check_random_walk(g4, metapath, traces, ntypes, 'p', trace_eids=eids)
-    traces, eids, ntypes = dgl.sampling.random_walk(
-        g4, [0, 1, 2, 3, 0, 1, 2, 3], metapath=metapath + ['follow'], prob='p',
-        restart_prob=F.tensor([0, 0, 0, 0, 0, 0, 1], F.float32), return_eids=True)
-    check_random_walk(g4, metapath, traces[:, :7], ntypes[:7], 'p', trace_eids=eids)
-    assert (F.asnumpy(traces[:, 7]) == -1).all()
+        with pytest.raises(dgl.DGLError):
+            traces, ntypes = dgl.sampling.random_walk(
+                g2, F.tensor([0, 1, 2, 3, 0, 1, 2, 3], dtype=g2.idtype),
+                length=4, prob='p2')
 
-def _use_uva():
-    if F._default_context_str == 'cpu':
-        return [False]
-    else:
-        return [True, False]
+        metapath = ['follow', 'view', 'viewed-by'] * 2
+        traces, eids, ntypes = dgl.sampling.random_walk(
+            g4, F.tensor([0, 1, 2, 3, 0, 1, 2, 3], dtype=g4.idtype),
+            metapath=metapath, prob='p', return_eids=True)
+        check_random_walk(g4, metapath, traces, ntypes, 'p', trace_eids=eids)
+        traces, eids, ntypes = dgl.sampling.random_walk(
+            g4, F.tensor([0, 1, 2, 3, 0, 1, 2, 3], dtype=g4.idtype),
+            metapath=metapath, prob='p', restart_prob=0., return_eids=True)
+        check_random_walk(g4, metapath, traces, ntypes, 'p', trace_eids=eids)
+        traces, eids, ntypes = dgl.sampling.random_walk(
+            g4, F.tensor([0, 1, 2, 3, 0, 1, 2, 3], dtype=g4.idtype),
+            metapath=metapath, prob='p',
+            restart_prob=F.zeros((6,), F.float32, F.ctx()), return_eids=True)
+        check_random_walk(g4, metapath, traces, ntypes, 'p', trace_eids=eids)
+        traces, eids, ntypes = dgl.sampling.random_walk(
+            g4, F.tensor([0, 1, 2, 3, 0, 1, 2, 3], dtype=g4.idtype),
+            metapath=metapath + ['follow'], prob='p',
+            restart_prob=F.tensor([0, 0, 0, 0, 0, 0, 1], F.float32), return_eids=True)
+        check_random_walk(g4, metapath, traces[:, :7], ntypes[:7], 'p', trace_eids=eids)
+        assert (F.asnumpy(traces[:, 7]) == -1).all()
+    finally:
+        for g in (g2, g4):
+            g.unpin_memory_()
 
-@pytest.mark.parametrize('use_uva', _use_uva())
+@pytest.mark.parametrize('use_uva', [True, False])
 def test_uniform_random_walk(use_uva):
+    if use_uva and F.ctx() == F.cpu():
+        pytest.skip('UVA random walk requires a GPU.')
     g1 = dgl.heterograph({
             ('user', 'follow', 'user'): ([0, 1, 2], [1, 2, 0])
         })
@@ -178,8 +194,10 @@ def test_pack_traces():
     assert F.array_equal(result[2], F.tensor([2, 7], dtype=F.int64))
     assert F.array_equal(result[3], F.tensor([0, 2], dtype=F.int64))
 
-@pytest.mark.parametrize('use_uva', _use_uva())
+@pytest.mark.parametrize('use_uva', [True, False])
 def test_pinsage_sampling(use_uva):
+    if use_uva and F.ctx() == F.cpu():
+        pytest.skip('UVA sampling requires a GPU.')
     def _test_sampler(g, sampler, ntype):
         seeds = F.copy_to(F.tensor([0, 2], dtype=g.idtype), F.ctx())
         neighbor_g = sampler(seeds)

@@ -5,6 +5,7 @@ import dgl.ops as OPS
 import backend as F
 import unittest
 import torch
+import torch.distributed as dist
 from functools import partial
 from torch.utils.data import DataLoader
 from collections import defaultdict
@@ -70,43 +71,73 @@ def test_saint(num_workers, mode):
     for sg in dataloader:
         pass
 
-@pytest.mark.parametrize('num_workers', [0, 4])
-def test_neighbor_nonuniform(num_workers):
-    g = dgl.graph(([1, 2, 3, 4, 5, 6, 7, 8], [0, 0, 0, 0, 1, 1, 1, 1]))
+@parametrize_idtype
+@pytest.mark.parametrize('mode', ['cpu', 'uva_cuda_indices', 'uva_cpu_indices', 'pure_gpu'])
+@pytest.mark.parametrize('use_ddp', [False, True])
+def test_neighbor_nonuniform(idtype, mode, use_ddp):
+    if mode != 'cpu' and F.ctx() == F.cpu():
+        pytest.skip('UVA and GPU sampling require a GPU.')
+    if use_ddp:
+        dist.init_process_group('gloo' if F.ctx() == F.cpu() else 'nccl',
+            'tcp://127.0.0.1:12347', world_size=1, rank=0)
+    g = dgl.graph(([1, 2, 3, 4, 5, 6, 7, 8], [0, 0, 0, 0, 1, 1, 1, 1])).astype(idtype)
     g.edata['p'] = torch.FloatTensor([1, 1, 0, 0, 1, 1, 0, 0])
+    if mode in ('cpu', 'uva_cpu_indices'):
+        indices = F.copy_to(F.tensor([0, 1], idtype), F.cpu())
+    else:
+        indices = F.copy_to(F.tensor([0, 1], idtype), F.cuda())
+    if mode == 'pure_gpu':
+        g = g.to(F.cuda())
+    use_uva = mode.startswith('uva')
+
     sampler = dgl.dataloading.MultiLayerNeighborSampler([2], prob='p')
-    dataloader = dgl.dataloading.NodeDataLoader(g, [0, 1], sampler, batch_size=1, device=F.ctx())
-    for input_nodes, output_nodes, blocks in dataloader:
-        seed = output_nodes.item()
-        neighbors = set(input_nodes[1:].cpu().numpy())
-        if seed == 1:
-            assert neighbors == {5, 6}
-        elif seed == 0:
-            assert neighbors == {1, 2}
+    for num_workers in [0, 1, 2] if mode == 'cpu' else [0]:
+        dataloader = dgl.dataloading.NodeDataLoader(
+            g, indices, sampler,
+            batch_size=1, device=F.ctx(),
+            num_workers=num_workers,
+            use_uva=use_uva,
+            use_ddp=use_ddp)
+        for input_nodes, output_nodes, blocks in dataloader:
+            seed = output_nodes.item()
+            neighbors = set(input_nodes[1:].cpu().numpy())
+            if seed == 1:
+                assert neighbors == {5, 6}
+            elif seed == 0:
+                assert neighbors == {1, 2}
 
     g = dgl.heterograph({
         ('B', 'BA', 'A'): ([1, 2, 3, 4, 5, 6, 7, 8], [0, 0, 0, 0, 1, 1, 1, 1]),
         ('C', 'CA', 'A'): ([1, 2, 3, 4, 5, 6, 7, 8], [0, 0, 0, 0, 1, 1, 1, 1]),
-        })
+        }).astype(idtype)
     g.edges['BA'].data['p'] = torch.FloatTensor([1, 1, 0, 0, 1, 1, 0, 0])
     g.edges['CA'].data['p'] = torch.FloatTensor([0, 0, 1, 1, 0, 0, 1, 1])
-    sampler = dgl.dataloading.MultiLayerNeighborSampler([2], prob='p')
-    dataloader = dgl.dataloading.NodeDataLoader(
-        g, {'A': [0, 1]}, sampler, batch_size=1, device=F.ctx())
-    for input_nodes, output_nodes, blocks in dataloader:
-        seed = output_nodes['A'].item()
-        # Seed and neighbors are of different node types so slicing is not necessary here.
-        neighbors = set(input_nodes['B'].cpu().numpy())
-        if seed == 1:
-            assert neighbors == {5, 6}
-        elif seed == 0:
-            assert neighbors == {1, 2}
+    if mode == 'pure_gpu':
+        g = g.to(F.cuda())
+    for num_workers in [0, 1, 2] if mode == 'cpu' else [0]:
+        dataloader = dgl.dataloading.NodeDataLoader(
+            g, {'A': indices}, sampler,
+            batch_size=1, device=F.ctx(),
+            num_workers=num_workers,
+            use_uva=use_uva,
+            use_ddp=use_ddp)
+        for input_nodes, output_nodes, blocks in dataloader:
+            seed = output_nodes['A'].item()
+            # Seed and neighbors are of different node types so slicing is not necessary here.
+            neighbors = set(input_nodes['B'].cpu().numpy())
+            if seed == 1:
+                assert neighbors == {5, 6}
+            elif seed == 0:
+                assert neighbors == {1, 2}
 
-        neighbors = set(input_nodes['C'].cpu().numpy())
-        if seed == 1:
-            assert neighbors == {7, 8}
-        elif seed == 0:
-            assert neighbors == {3, 4}
+            neighbors = set(input_nodes['C'].cpu().numpy())
+            if seed == 1:
+                assert neighbors == {7, 8}
+            elif seed == 0:
+                assert neighbors == {3, 4}
+
+    if use_ddp:
+        dist.destroy_process_group()
 
 def _check_dtype(data, dtype, attr_name):
     if isinstance(data, dict):
