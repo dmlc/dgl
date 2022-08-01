@@ -1,7 +1,7 @@
 """Classes and functions for batching multiple graphs together."""
 from __future__ import absolute_import
 
-from .base import DGLError
+from .base import DGLError, dgl_warning
 from . import backend as F
 from .ops import segment
 
@@ -403,7 +403,7 @@ def broadcast_nodes(graph, graph_feat, *, ntype=None):
             [0.2721, 0.4629, 0.7269, 0.0724, 0.1014],
             [0.2721, 0.4629, 0.7269, 0.0724, 0.1014]])
 
-    Broadcast feature to all nodes in the single graph.
+    Broadcast feature to all nodes in the single graph (the feature tensor shape to broadcast should be :math:`(1, *)`).
     
     >>> feat0 = th.unsqueeze(feat[0], 0)
     >>> dgl.broadcast_nodes(g1, feat0)
@@ -414,6 +414,9 @@ def broadcast_nodes(graph, graph_feat, *, ntype=None):
     --------
     broadcast_edges
     """
+    if (F.shape(graph_feat)[0] != graph.batch_size and graph.batch_size == 1):
+        dgl_warning('When single graph, please make sure the batching dimension is added and the tensor shape of graph_feat is (1, *).')
+        graph_feat = F.unsqueeze(graph_feat, dim=0)
     return F.repeat(graph_feat, graph.batch_num_nodes(ntype), dim=0)
 
 def broadcast_edges(graph, graph_feat, *, etype=None):
@@ -468,7 +471,7 @@ def broadcast_edges(graph, graph_feat, *, etype=None):
             [0.2721, 0.4629, 0.7269, 0.0724, 0.1014],
             [0.2721, 0.4629, 0.7269, 0.0724, 0.1014]])
 
-    Broadcast feature to all edges in the single graph.
+    Broadcast feature to all edges in the single graph (the feature tensor shape to broadcast should be :math:`(1, *)`).
 
     >>> feat1 = th.unsqueeze(feat[1], 0)
     >>> dgl.broadcast_edges(g2, feat1)
@@ -479,6 +482,9 @@ def broadcast_edges(graph, graph_feat, *, etype=None):
     --------
     broadcast_nodes
     """
+    if (F.shape(graph_feat)[0] != graph.batch_size and graph.batch_size == 1):
+        dgl_warning('When single graph, please make sure the batching dimension is added and the tensor shape of graph_feat is (1, *).')
+        graph_feat = F.unsqueeze(graph_feat, dim=0)
     return F.repeat(graph_feat, graph.batch_num_edges(etype), dim=0)
 
 READOUT_ON_ATTRS = {
