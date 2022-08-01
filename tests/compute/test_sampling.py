@@ -194,8 +194,10 @@ def test_pack_traces():
     assert F.array_equal(result[2], F.tensor([2, 7], dtype=F.int64))
     assert F.array_equal(result[3], F.tensor([0, 2], dtype=F.int64))
 
-@pytest.mark.parametrize('use_uva', _use_uva())
+@pytest.mark.parametrize('use_uva', [True, False])
 def test_pinsage_sampling(use_uva):
+    if use_uva and F.ctx() == F.cpu():
+        pytest.skip('UVA sampling requires a GPU.')
     def _test_sampler(g, sampler, ntype):
         seeds = F.copy_to(F.tensor([0, 2], dtype=g.idtype), F.ctx())
         neighbor_g = sampler(seeds)
