@@ -1132,7 +1132,8 @@ class DistGraph:
         gpb = self.get_partition_book()
         if len(gpb.etypes) > 1:
             # if etype is a canonical edge type (str, str, str), extract the edge type
-            if len(etype) == 3:
+            if isinstance(etype, tuple):
+                assert len(etype) == 3, 'Invalid canonical etype: {}'.format(etype)
                 etype = etype[1]
             edges = gpb.map_to_homo_eid(edges, etype)
         src, dst = dist_find_edges(self, edges)
