@@ -54,8 +54,6 @@ def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=No
         The features must be non-negative floats, and the sum of the features of
         inbound/outbound edges for every node must be positive (though they don't have
         to sum up to one).  Otherwise, the result will be undefined.
-
-        If :attr:`prob` is not None, GPU sampling is not supported.
     replace : bool, optional
         If True, sample with replacement.
     copy_ndata: bool, optional
@@ -163,6 +161,9 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
     Node/edge features are not preserved. The original IDs of
     the sampled edges are stored as the `dgl.EID` feature in the returned graph.
 
+    GPU sampling is supported for this function. Refer to :ref:`guide-minibatch-gpu-sampling`
+    for more details.
+
     Parameters
     ----------
     g : DGLGraph
@@ -193,8 +194,6 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
         The features must be non-negative floats, and the sum of the features of
         inbound/outbound edges for every node must be positive (though they don't have
         to sum up to one).  Otherwise, the result will be undefined.
-
-        If :attr:`prob` is not None, GPU sampling is not supported.
     exclude_edges: tensor or dict
         Edge IDs to exclude during sampling neighbors for the seed nodes.
 

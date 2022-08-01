@@ -154,6 +154,14 @@ void start_server(int id) {
   receiver.Finalize();
 }
 
+TEST(SocketCommunicatorTest, TCPSocketBind) {
+  dgl::network::TCPSocket socket;
+  testing::internal::CaptureStderr();
+  EXPECT_EQ(socket.Bind("127.0.0", 50001), false);
+  const std::string stderr = testing::internal::GetCapturedStderr();
+  EXPECT_NE(stderr.find("Invalid IP: 127.0.0"), std::string::npos);
+}
+
 #else
 
 #include <windows.h>

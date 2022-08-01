@@ -24,7 +24,6 @@ def check_random_walk(g, metapath, traces, ntypes, prob=None, trace_eids=None):
                 u, v = g.find_edges(trace_eids[i, j], etype=metapath[j])
                 assert (u == traces[i, j]) and (v == traces[i, j + 1])
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="Random walk with non-uniform prob is not supported in GPU.")
 def test_non_uniform_random_walk():
     g2 = dgl.heterograph({
             ('user', 'follow', 'user'): ([0, 1, 1, 2, 3], [1, 2, 3, 0, 0])
@@ -61,7 +60,7 @@ def test_non_uniform_random_walk():
     check_random_walk(g4, metapath, traces, ntypes, 'p', trace_eids=eids)
     traces, eids, ntypes = dgl.sampling.random_walk(
         g4, [0, 1, 2, 3, 0, 1, 2, 3], metapath=metapath, prob='p',
-        restart_prob=F.zeros((6,), F.float32, F.cpu()), return_eids=True)
+        restart_prob=F.zeros((6,), F.float32, F.ctx()), return_eids=True)
     check_random_walk(g4, metapath, traces, ntypes, 'p', trace_eids=eids)
     traces, eids, ntypes = dgl.sampling.random_walk(
         g4, [0, 1, 2, 3, 0, 1, 2, 3], metapath=metapath + ['follow'], prob='p',
@@ -626,12 +625,10 @@ def test_sample_neighbors_noprob():
     _test_sample_neighbors(False, None)
     #_test_sample_neighbors(True)
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors with probability is not implemented")
 def test_sample_neighbors_prob():
     _test_sample_neighbors(False, 'prob')
     #_test_sample_neighbors(True)
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
 def test_sample_neighbors_outedge():
     _test_sample_neighbors_outedge(False)
     #_test_sample_neighbors_outedge(True)
@@ -646,9 +643,8 @@ def test_sample_neighbors_topk_outedge():
     _test_sample_neighbors_topk_outedge(False)
     #_test_sample_neighbors_topk_outedge(True)
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
 def test_sample_neighbors_with_0deg():
-    g = dgl.graph(([], []), num_nodes=5)
+    g = dgl.graph(([], []), num_nodes=5).to(F.ctx())
     sg = dgl.sampling.sample_neighbors(g, F.tensor([1, 2], dtype=F.int64), 2, edge_dir='in', replace=False)
     assert sg.number_of_edges() == 0
     sg = dgl.sampling.sample_neighbors(g, F.tensor([1, 2], dtype=F.int64), 2, edge_dir='in', replace=True)
@@ -885,7 +881,6 @@ def test_sample_neighbors_etype_sorted_homogeneous(format_, direction):
     assert fail
 
 @pytest.mark.parametrize('dtype', ['int32', 'int64'])
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
 def test_sample_neighbors_exclude_edges_heteroG(dtype):
     d_i_d_u_nodes = F.zerocopy_from_numpy(np.unique(np.random.randint(300, size=100, dtype=dtype)))
     d_i_d_v_nodes = F.zerocopy_from_numpy(np.random.randint(25, size=d_i_d_u_nodes.shape, dtype=dtype))
@@ -898,7 +893,7 @@ def test_sample_neighbors_exclude_edges_heteroG(dtype):
         ('drug', 'interacts', 'drug'): (d_i_d_u_nodes, d_i_d_v_nodes),
         ('drug', 'interacts', 'gene'): (d_i_g_u_nodes, d_i_g_v_nodes),
         ('drug', 'treats', 'disease'): (d_t_d_u_nodes, d_t_d_v_nodes)
-    })
+    }).to(F.ctx())
 
     (U, V, EID) = (0, 1, 2)
 
@@ -951,11 +946,10 @@ def test_sample_neighbors_exclude_edges_heteroG(dtype):
                                                      etype=('drug','treats','disease'))))
 
 @pytest.mark.parametrize('dtype', ['int32', 'int64'])
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
 def test_sample_neighbors_exclude_edges_homoG(dtype):
     u_nodes = F.zerocopy_from_numpy(np.unique(np.random.randint(300,size=100, dtype=dtype)))
     v_nodes = F.zerocopy_from_numpy(np.random.randint(25, size=u_nodes.shape, dtype=dtype))
-    g = dgl.graph((u_nodes, v_nodes))
+    g = dgl.graph((u_nodes, v_nodes)).to(F.ctx())
 
     (U, V, EID) = (0, 1, 2)
 
