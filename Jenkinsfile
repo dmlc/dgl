@@ -62,6 +62,14 @@ def unit_test_linux(backend, dev) {
   }
 }
 
+def unit_distributed_linux(backend, dev) {
+  init_git()
+  unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
+  timeout(time: 30, unit: 'MINUTES') {
+    sh "bash tests/scripts/task_distributed_test.sh ${backend} ${dev}"
+  }
+}
+
 def unit_test_cugraph(backend, dev) {
   init_git()
   unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
@@ -443,6 +451,28 @@ pipeline {
                 stage('Torch GPU Example test') {
                   steps {
                     example_test_linux('pytorch', 'gpu')
+                  }
+                }
+              }
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
+                }
+              }
+            }
+            stage('Distributed') {
+              agent {
+                docker {
+                  label "linux-cpu-node"
+                  image "dgllib/dgl-ci-cpu:cu101_v220629"
+                  args "--shm-size=4gb"
+                  alwaysPull true
+                }
+              }
+              stages {
+                stage('Distributed Torch CPU Unit test') {
+                  steps {
+                    unit_distributed_linux('pytorch', 'cpu')
                   }
                 }
               }

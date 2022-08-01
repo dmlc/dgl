@@ -38,6 +38,9 @@ class RandomWalkNeighborSampler(object):
     This is a generalization of PinSAGE sampler which only works on bidirectional bipartite
     graphs.
 
+    UVA and GPU sampling is supported for this sampler.
+    Refer to :ref:`guide-minibatch-gpu-sampling` for more details.
+
     Parameters
     ----------
     G : DGLGraph
@@ -104,13 +107,14 @@ class RandomWalkNeighborSampler(object):
             A tensor of given node IDs of node type ``ntype`` to generate neighbors from.  The
             node type ``ntype`` is the beginning and ending node type of the given metapath.
 
-            It must be on CPU and have the same dtype as the ID type of the graph.
+            It must be on the same device as the graph and have the same dtype
+            as the ID type of the graph.
 
         Returns
         -------
         g : DGLGraph
             A homogeneous graph constructed by selecting neighbors for each given node according
-            to the algorithm above.  The returned graph is on CPU.
+            to the algorithm above.
         """
         seed_nodes = utils.prepare_tensor(self.G, seed_nodes, 'seed_nodes')
         self.restart_prob = F.copy_to(self.restart_prob, F.context(seed_nodes))
@@ -146,6 +150,9 @@ class PinSAGESampler(RandomWalkNeighborSampler):
 
     The edges of the returned homogeneous graph will connect to the given nodes from their most
     commonly visited nodes, with a feature indicating the number of visits.
+
+    UVA and GPU sampling is supported for this sampler.
+    Refer to :ref:`guide-minibatch-gpu-sampling` for more details.
 
     Parameters
     ----------
