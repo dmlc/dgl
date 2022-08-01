@@ -14,7 +14,7 @@ Run the scripts in `./scripts` folder, e.g.
 ```bash
 bash scripts/run_ppa.sh
 ```
-Use other scripts `run_collabi.sh`, `run_ddi.sh`, `run_citation2.sh` in the same folder for experiments on other benchmarks. Note that you may set larger values for the argument `--num_workers` to accelerate data loading in dynamic mode if your machine has sufficient cpu capacity.
+Use other scripts `run_collab.sh`, `run_ddi.sh`, `run_citation2.sh` in the same folder for experiments on other benchmarks. Note that you may set larger values for the argument `--num_workers` to accelerate data loading in dynamic mode if your machine has sufficient cpu capacity.
 
 Results
 -------
@@ -24,7 +24,7 @@ Results
 | Paper Test Results |  48.80%&plusmn;3.16% |    64.74%&plusmn;0.43% | 30.56%&plusmn;3.86%* |   87.67%&plusmn;0.32r% |
 | Our Test Results |  49.48%&plusmn;2.52% |    64.23%&plusmn;0.57% | 27.93%&plusmn;4.19% |   86.29%&plusmn;0.47% |
 
-\* Note that the relative large gap on ogbl-ddi may come from the high varience of results on this dataset. We get 28.77%&plusmn;3.43% by only changing the sampling seed.
+\* Note that the relatively large gap on ogbl-ddi may come from the high variance of results on this dataset. We get 28.77%&plusmn;3.43% by only changing the sampling seed.
 
 Reference
 ---------
