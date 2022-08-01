@@ -46,4 +46,4 @@ class GpuCache(object):
     def hit_rate(self):
         return 1 - self.total_miss / self.total_queries
 
-_init_api("dgl.cuda.gpu_cache")
+_init_api("dgl.cuda", __name__)

@@ -101,7 +101,7 @@ DGL_DEFINE_OBJECT_REF(GpuCacheRef64, GpuCache<long long>);
 
 using namespace dgl::runtime;
 
-DGL_REGISTER_GLOBAL("cuda.gpu_cache._CAPI_DGLGpuCacheCreate")
+DGL_REGISTER_GLOBAL("cuda._CAPI_DGLGpuCacheCreate")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   const size_t num_items = args[0];
   const size_t num_feats = args[1];
@@ -113,7 +113,7 @@ DGL_REGISTER_GLOBAL("cuda.gpu_cache._CAPI_DGLGpuCacheCreate")
     *rv = GpuCacheRef64(std::make_shared<GpuCache<long long>>(num_items, num_feats));
 });
 
-DGL_REGISTER_GLOBAL("cuda.gpu_cache._CAPI_DGLGpuCacheQuery")
+DGL_REGISTER_GLOBAL("cuda._CAPI_DGLGpuCacheQuery")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     IdArray keys = args[1];
 
@@ -138,7 +138,7 @@ DGL_REGISTER_GLOBAL("cuda.gpu_cache._CAPI_DGLGpuCacheQuery")
     *rv = ret;
 });
 
-DGL_REGISTER_GLOBAL("cuda.gpu_cache._CAPI_DGLGpuCacheReplace")
+DGL_REGISTER_GLOBAL("cuda._CAPI_DGLGpuCacheReplace")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     IdArray keys = args[1];
     NDArray values = args[2];
