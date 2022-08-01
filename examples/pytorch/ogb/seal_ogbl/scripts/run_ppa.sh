@@ -1,6 +1,5 @@
 python main.py \
     --dataset ogbl-ppa \
-    --num_hops 1 \
     --use_feature \
     --use_edge_weight \
     --eval_steps 5 \
@@ -9,4 +8,4 @@ python main.py \
     --dynamic_val \
     --dynamic_test \
     --train_percent 5 \
-    --runs 10
+    --num_workers 10

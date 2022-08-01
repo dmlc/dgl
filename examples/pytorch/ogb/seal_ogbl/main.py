@@ -2,25 +2,25 @@ import argparse
 import time
 import os, sys
 from tqdm import tqdm
-from sklearn.metrics import roc_auc_score
 import torch
 import dgl
 from torch.nn import BCEWithLogitsLoss
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
+from dgl.dataloading import GraphDataLoader
+from dgl.data.utils import save_graphs, load_graphs
 from ogb.linkproppred import DglLinkPropPredDataset, Evaluator
 from utils import *
 from models import *
 
 
 class SEALOGBLDataset(Dataset):
-    def __init__(self, root, graph, split_edge, num_hops, percent=100, split='train',
+    def __init__(self, root, graph, split_edge, percent=100, split='train',
                  ratio_per_hop=1.0, directed=False, dynamic=True) -> None:
         super().__init__()
         self.root = root
         self.graph = graph
         self.split = split
         self.split_edge = split_edge
-        self.num_hops = num_hops
         self.percent = percent
         self.ratio_per_hop = ratio_per_hop
         self.directed = directed
@@ -36,7 +36,8 @@ class SEALOGBLDataset(Dataset):
             self.node_features = None
 
         if not self.dynamic:
-            self.examples = self.load_cached()
+            self.g_list, tensor_dict = self.load_cached()
+            self.labels = tensor_dict['y']
             return
 
         pos_edge, neg_edge = get_pos_neg_edges(split, self.split_edge, self.graph, self.percent)
@@ -44,22 +45,28 @@ class SEALOGBLDataset(Dataset):
         self.labels = [1] * len(pos_edge) + [0] * len(neg_edge)
 
     def __len__(self):
-        return len(self.links)
+        return len(self.labels)
 
     def __getitem__(self, idx):
         if not self.dynamic:
-            return self.examples[idx]
+            g, y = self.g_list[idx], self.labels[idx]
+            x = None if 'x' not in g.ndata else g.ndata['x']
+            w = None if 'w' not in g.edata else g.eata['w']
+            return g, g.ndata['z'], x, w, y
 
         src, dst = self.links[idx]
         y = self.labels[idx]
-        subg = k_hop_subgraph(src, dst, self.num_hops, self.graph,
+        subg = k_hop_subgraph(src, dst, 1, self.graph,
             self.ratio_per_hop, self.directed)
 
         # remove the link between src and dst
-        if subg.has_edges_between(0, 1):
-            subg.remove_edges(subg.edge_ids(0, 1))
-        if subg.has_edges_between(1, 0):
-            subg.remove_edges(subg.edge_ids(1, 0))
+        direct_links = [[], []]
+        for s, t in [(0, 1), (1, 0)]:
+            if subg.has_edges_between(s, t):
+                direct_links[0].append(s)
+                direct_links[1].append(t)
+        if len(direct_links[0]):
+            subg.remove_edges(subg.edge_ids(*direct_links))
 
         NIDs, EIDs = subg.ndata[dgl.NID], subg.edata[dgl.EID]
 
@@ -78,17 +85,24 @@ class SEALOGBLDataset(Dataset):
         return 'SEAL_{}_data_{}.pt'.format(self.split, self.percent)
 
     def process(self):
-        examples = []
+        g_list, labels = [], []
         self.dynamic = True
         for i in range(len(self)):
-            examples.append(self[i])
+            g, z, x, weights, y = self[i]
+            g.ndata['z'] = z
+            if x is not None:
+                g.ndata['x'] = x
+            if weights is not None:
+                g.edata['w'] = weights
+            g_list.append(g)
+            labels.append(y)
         self.dynamic = False
-        return examples
+        return g_list, {'y': torch.tensor(labels)}
 
     def load_cached(self):
         path = os.path.join(self.root, self.cached_name)
         if os.path.exists(path):
-            return torch.load(path)
+            return load_graphs(path)
 
         if not os.path.exists(self.root):
             os.makedirs(self.root)
@@ -98,9 +112,9 @@ class SEALOGBLDataset(Dataset):
         self.links = torch.cat([pos_edge, neg_edge], 0).tolist() # [Np + Nn, 2]
         self.labels = [1] * len(pos_edge) + [0] * len(neg_edge)
 
-        examples = self.process()
-        torch.save(examples, path)
-        return examples
+        g_list, labels = self.process()
+        save_graphs(path, g_list, labels)
+        return g_list, labels
 
 
 def ogbl_collate_fn(batch):
@@ -168,8 +182,6 @@ def test():
         results = evaluate_hits(pos_val_pred, neg_val_pred, pos_test_pred, neg_test_pred)
     elif args.eval_metric == 'mrr':
         results = evaluate_mrr(pos_val_pred, neg_val_pred, pos_test_pred, neg_test_pred)
-    elif args.eval_metric == 'auc':
-        results = evaluate_auc(val_pred, val_true, test_pred, test_true)
 
     return results
 
@@ -212,27 +224,16 @@ def evaluate_mrr(pos_val_pred, neg_val_pred, pos_test_pred, neg_test_pred):
     return results
 
 
-def evaluate_auc(val_pred, val_true, test_pred, test_true):
-    valid_auc = roc_auc_score(val_true, val_pred)
-    test_auc = roc_auc_score(test_true, test_pred)
-    results = {}
-    results['AUC'] = (valid_auc, test_auc)
-
-    return results
-
-
 if __name__ == '__main__':
     # Data settings
     parser = argparse.ArgumentParser(description='OGBL (SEAL)')
     parser.add_argument('--dataset', type=str, default='ogbl-collab')
     # GNN settings
-    parser.add_argument('--model', type=str, default='DGCNN')
     parser.add_argument('--sortpool_k', type=float, default=0.6)
     parser.add_argument('--num_layers', type=int, default=3)
     parser.add_argument('--hidden_channels', type=int, default=32)
     parser.add_argument('--batch_size', type=int, default=32)
     # Subgraph extraction settings
-    parser.add_argument('--num_hops', type=int, default=1)
     parser.add_argument('--ratio_per_hop', type=float, default=1.0)
     parser.add_argument('--use_feature', action='store_true', 
                         help="whether to use raw node features as GNN input")
@@ -241,7 +242,7 @@ if __name__ == '__main__':
     # Training settings
     parser.add_argument('--lr', type=float, default=0.0001)
     parser.add_argument('--epochs', type=int, default=50)
-    parser.add_argument('--runs', type=int, default=1)
+    parser.add_argument('--runs', type=int, default=10)
     parser.add_argument('--train_percent', type=float, default=100)
     parser.add_argument('--val_percent', type=float, default=100)
     parser.add_argument('--test_percent', type=float, default=100)
@@ -249,15 +250,15 @@ if __name__ == '__main__':
                         help="dynamically extract enclosing subgraphs on the fly")
     parser.add_argument('--dynamic_val', action='store_true')
     parser.add_argument('--dynamic_test', action='store_true')
-    parser.add_argument('--num_workers', type=int, default=16, 
-                        help="number of workers for dynamic mode; will be set to 0 if not dynamic")
+    parser.add_argument('--num_workers', type=int, default=0, 
+                        help="number of workers for dynamic dataloaders; using a larger"
+                        + " value for dynamic dataloading is recommended")
     # Testing settings
     parser.add_argument('--use_valedges_as_input', action='store_true')
     parser.add_argument('--eval_steps', type=int, default=1)
     args = parser.parse_args()
 
-    data_appendix = '_h{}_rph{}'.format(
-        args.num_hops, ''.join(str(args.ratio_per_hop).split('.')))
+    data_appendix = '_rph{}'.format(''.join(str(args.ratio_per_hop).split('.')))
     if args.use_valedges_as_input:
         data_appendix += '_uvai'
 
@@ -339,20 +340,16 @@ if __name__ == '__main__':
         loggers = {
             'MRR': Logger(args.runs, args),
         }
-    elif args.eval_metric == 'auc':
-        loggers = {
-            'AUC': Logger(args.runs, args),
-        }
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     path = dataset.root + '_seal{}'.format(data_appendix)
 
-    if not args.dynamic_train and not args.dynamic_val and not args.dynamic_test:
+    if not (args.dynamic_train or args.dynamic_val or args.dynamic_test):
         args.num_workers = 0
 
     train_dataset, val_dataset, test_dataset = [
-        SEALOGBLDataset(path, graph, split_edge, num_hops=args.num_hops, percent=percent,
-            split=split, ratio_per_hop=args.ratio_per_hop, directed=directed, dynamic=dynamic)
+        SEALOGBLDataset(path, graph, split_edge, percent=percent, split=split,
+            ratio_per_hop=args.ratio_per_hop, directed=directed, dynamic=dynamic)
         for percent, split, dynamic in zip(
             [args.train_percent, args.val_percent, args.test_percent],
             ['train', 'valid', 'test'],
@@ -361,17 +358,17 @@ if __name__ == '__main__':
     ]
 
     max_z = 1000  # set a large max_z so that every z has embeddings to look up
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, 
+    train_loader = GraphDataLoader(train_dataset, batch_size=args.batch_size, 
                             shuffle=True, collate_fn=ogbl_collate_fn,
                             num_workers=args.num_workers)
-    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, 
+    val_loader = GraphDataLoader(val_dataset, batch_size=args.batch_size, 
                             collate_fn=ogbl_collate_fn, num_workers=args.num_workers)
-    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, 
+    test_loader = GraphDataLoader(test_dataset, batch_size=args.batch_size, 
                             collate_fn=ogbl_collate_fn, num_workers=args.num_workers)
 
     for run in range(args.runs):
         model = DGCNN(args.hidden_channels, args.num_layers, max_z, args.sortpool_k, 
-                        train_dataset, args.dynamic_train, use_feature=args.use_feature).to(device)
+            train_dataset, args.dynamic_train, use_feature=args.use_feature).to(device)
         parameters = list(model.parameters())
         optimizer = torch.optim.Adam(params=parameters, lr=args.lr)
         total_params = sum(p.numel() for param in parameters for p in param)

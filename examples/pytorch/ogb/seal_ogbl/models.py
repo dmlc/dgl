@@ -14,16 +14,13 @@ class DGCNN(torch.nn.Module):
         self.use_feature = use_feature
 
         if k <= 1:  # Transform percentile to number.
-            if train_dataset is None:
-                k = 30
+            if dynamic_train:
+                sampled_indices = range(1000)
             else:
-                if dynamic_train:
-                    sampled_indices = range(1000)
-                else:
-                    sampled_indices = range(len(train_dataset))
-                num_nodes = sorted([train_dataset[i][0].num_nodes() for i in sampled_indices])
-                k = num_nodes[int(math.ceil(k * len(num_nodes))) - 1]
-                k = max(10, k)
+                sampled_indices = range(len(train_dataset))
+            num_nodes = sorted([train_dataset[i][0].num_nodes() for i in sampled_indices])
+            k = num_nodes[int(math.ceil(k * len(num_nodes))) - 1]
+            k = max(10, k)
         self.k = int(k)
         self.sort_pool = SortPooling(k=self.k)
 
