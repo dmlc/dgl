@@ -59,7 +59,7 @@ def alltoall_cpu(rank, world_size, output_tensor_list, input_tensor_list):
     for i in range(world_size):
         dist.scatter(output_tensor_list[i], input_tensor_list if i == rank else [], src=i)
 
-def alltoallv_cpu_data(rank, world_size, input_tensor_list):
+def alltoallv_cpu(rank, world_size, input_tensor_list):
     """
     Wrapper function to providing the alltoallv functionality by using underlying alltoall
     messaging primitive. 

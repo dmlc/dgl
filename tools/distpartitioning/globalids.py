@@ -3,7 +3,7 @@ import torch
 import operator
 import itertools
 import constants
-from gloo_wrapper import allgather_sizes, alltoall_cpu, alltoallv_cpu_data
+from gloo_wrapper import allgather_sizes, alltoallv_cpu
 
 def get_shuffle_global_nids(rank, world_size, global_nids_ranks, node_data):
     """ 
@@ -30,7 +30,7 @@ def get_shuffle_global_nids(rank, world_size, global_nids_ranks, node_data):
     """
     #build a list of sizes (lengths of lists)
     global_nids_ranks = [torch.from_numpy(x) for x in global_nids_ranks]
-    recv_nodes = alltoallv_cpu_data(rank, world_size, global_nids_ranks)
+    recv_nodes = alltoallv_cpu(rank, world_size, global_nids_ranks)
 
     # Use node_data to lookup global id to send over.
     send_nodes = []
@@ -48,7 +48,7 @@ def get_shuffle_global_nids(rank, world_size, global_nids_ranks, node_data):
             send_nodes.append(torch.empty((0), dtype=torch.int64))
 
     #send receive global-ids
-    recv_shuffle_global_nids = alltoallv_cpu_data(rank, world_size, send_nodes)
+    recv_shuffle_global_nids = alltoallv_cpu(rank, world_size, send_nodes)
     shuffle_global_nids = np.concatenate([x.numpy() if x != None else [] for x in recv_shuffle_global_nids])
     global_nids = np.concatenate([x for x in global_nids_ranks])
     ret_val = np.column_stack([global_nids, shuffle_global_nids])

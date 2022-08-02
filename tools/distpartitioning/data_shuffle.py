@@ -16,7 +16,7 @@ from utils import read_ntype_partition_files, read_json, get_node_types, \
                     write_dgl_objects, write_metadata_json, get_ntype_featnames, \
                     get_idranges
 from gloo_wrapper import alltoall_cpu, allgather_sizes, gather_metadata_json,\
-                    alltoallv_cpu_data
+                    alltoallv_cpu
 from globalids import assign_shuffle_global_nids_nodes, \
                     assign_shuffle_global_nids_edges, \
                     get_shuffle_global_nids_edges
@@ -156,7 +156,7 @@ def exchange_edge_data(rank, world_size, edge_data):
     end = timer()
     
     dist.barrier ()
-    output_list = alltoallv_cpu_data(rank, world_size, input_list)
+    output_list = alltoallv_cpu(rank, world_size, input_list)
     end = timer()
     print('[Rank: ', rank, '] Time to send/rcv edge data: ', timedelta(seconds=end-start))
 
@@ -270,8 +270,8 @@ def exchange_node_features(rank, world_size, node_feature_tids, ntype_gnid_map, 
 
             #features (and global nids) per rank to be sent out are ready
             #for transmission, perform alltoallv here.
-            output_feat_list = alltoallv_cpu_data(rank, world_size, node_feats_per_rank)
-            output_nid_list = alltoallv_cpu_data(rank, world_size, global_nid_per_rank)
+            output_feat_list = alltoallv_cpu(rank, world_size, node_feats_per_rank)
+            output_nid_list = alltoallv_cpu(rank, world_size, global_nid_per_rank)
 
             #stitch node_features together to form one large feature tensor
             own_node_features[feat_key] = torch.cat(output_feat_list)
