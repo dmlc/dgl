@@ -56,10 +56,12 @@ class RelGraphConv(nn.Module):
          - "basis" is for basis-decomposition.
          - "bdd" is for block-diagonal-decomposition.
          - ``None`` applies no regularization.
-    
+
         Default: ``None``.
     num_bases : int, optional
-        Number of bases. Needed when a regularization is applied. If ``None``, uses number of relations (``num_rels``). Default: ``None``.
+        Number of bases. It comes into effect when a regularizer is applied.
+        If ``None``, it uses number of relations (``num_rels``). Default: ``None``.
+        Note that ``in_feat`` and ``out_feat`` must be divisible by ``num_bases`` when applying "bdd" regularizer.
     bias : bool, optional
         True if bias is added. Default: ``True``.
     activation : callable, optional
