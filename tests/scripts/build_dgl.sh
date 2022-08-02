@@ -11,7 +11,10 @@ CMAKE_VARS="-DBUILD_CPP_TEST=ON -DUSE_OPENMP=ON -DBUILD_TORCH=ON"
 # This is a semicolon-separated list of Python interpreters containing PyTorch.
 # The value here is for CI.  Replace it with your own or comment this whole
 # statement for default Python interpreter.
-if [ "$1" != "cugraph" ]; then
+if [ "$1" == "cugraph" ];
+then
+    CMAKE_VARS="$CMAKE_VARS -DTORCH_PYTHON_INTERPS=/opt/conda/envs/rapids/bin/python"
+else
     CMAKE_VARS="$CMAKE_VARS -DTORCH_PYTHON_INTERPS=/opt/conda/envs/pytorch-ci/bin/python"
 fi
 
