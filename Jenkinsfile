@@ -488,7 +488,7 @@ pipeline {
                   label "linux-gpu-node"
                   image "rapidsai/rapidsai-core-nightly:22.08-cuda11.5-runtime-ubuntu20.04-py3.9"
                   args "--runtime nvidia --shm-size=8gb"
-                  alwaysPull True
+                  alwaysPull true
                 }
               }
               stages {
