@@ -259,9 +259,9 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "nvcr.io/nvidia/pytorch:22.04-py3"
+                  image "rapidsai/rapidsai-core-nightly:22.08-cuda11.5-runtime-ubuntu20.04-py3.9"
                   args "-u root"
-                  alwaysPull false
+                  alwaysPull true
                 }
               }
               steps {
@@ -486,9 +486,9 @@ pipeline {
               agent {
                 docker {
                   label "linux-gpu-node"
-                  image "nvcr.io/nvidia/pytorch:22.04-py3"
+                  image "rapidsai/rapidsai-core-nightly:22.08-cuda11.5-runtime-ubuntu20.04-py3.9"
                   args "--runtime nvidia --shm-size=8gb"
-                  alwaysPull false
+                  alwaysPull True
                 }
               }
               stages {

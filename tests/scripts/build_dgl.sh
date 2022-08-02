@@ -39,6 +39,8 @@ popd
 
 pushd python
 if [[ $1 == "cugraph" ]]; then
+    conda activate "rapids"
+    conda install pytorch=1.11.0 cudatoolkit=11.3 -c rapidsai-nightly -c pytorch-nightly -c conda-forge -y
     rm -rf build *.egg-info dist
     pip uninstall -y dgl
     # test install
