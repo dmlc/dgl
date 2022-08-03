@@ -20,8 +20,7 @@ class RGCN(nn.Module):
         
     def forward(self, g):
         x = self.emb(g[0].srcdata[dgl.NID])
-        h = self.conv1(g[0], x, g[0].edata[dgl.ETYPE], g[0].edata['norm'])
-        h = F.relu(h)
+        h = F.relu(self.conv1(g[0], x, g[0].edata[dgl.ETYPE], g[0].edata['norm']))
         h = self.conv2(g[1], h, g[1].edata[dgl.ETYPE], g[1].edata['norm'])
         return h
     
