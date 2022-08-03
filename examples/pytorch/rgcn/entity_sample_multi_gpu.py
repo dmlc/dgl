@@ -7,14 +7,99 @@ import gc
 import torch as th
 import torch.nn.functional as F
 import dgl
+from dgl.dataloading import MultiLayerNeighborSampler, DataLoader
 import torch.multiprocessing as mp
+from tqdm import tqdm
 
 from torchmetrics.functional import accuracy
 from torch.nn.parallel import DistributedDataParallel
 
 from entity_utils import load_data
-from entity_sample import init_dataloaders, train, evaluate
 from model import RGCN
+
+def init_dataloaders(args, g, train_idx, test_idx, target_idx, device, use_ddp=False):
+    fanouts = [int(fanout) for fanout in args.fanout.split(',')]
+    sampler = MultiLayerNeighborSampler(fanouts)
+
+    train_loader = DataLoader(
+        g,
+        target_idx[train_idx],
+        sampler,
+        use_ddp=use_ddp,
+        device=device,
+        batch_size=args.batch_size,
+        shuffle=True,
+        drop_last=False)
+
+    # The datasets do not have a validation subset, use the train subset
+    val_loader = DataLoader(
+        g,
+        target_idx[train_idx],
+        sampler,
+        use_ddp=use_ddp,
+        device=device,
+        batch_size=args.batch_size,
+        shuffle=False,
+        drop_last=False)
+
+    # -1 for sampling all neighbors
+    test_sampler = MultiLayerNeighborSampler([-1] * len(fanouts))
+    test_loader = DataLoader(
+        g,
+        target_idx[test_idx],
+        test_sampler,
+        use_ddp=use_ddp,
+        device=device,
+        batch_size=32,
+        shuffle=False,
+        drop_last=False)
+
+    return train_loader, val_loader, test_loader
+
+def process_batch(inv_target, batch):
+    _, seeds, blocks = batch
+    # map the seed nodes back to their type-specific ids,
+    # in order to get the target node labels
+    seeds = inv_target[seeds]
+
+    for blc in blocks:
+        blc.edata['norm'] = dgl.norm_by_dst(blc).unsqueeze(1)
+
+    return seeds, blocks
+
+def train(model, train_loader, inv_target,
+          labels, optimizer):
+    model.train()
+
+    for sample_data in train_loader:
+        seeds, blocks = process_batch(inv_target, sample_data)
+        logits = model.forward(blocks)
+        loss = F.cross_entropy(logits, labels[seeds])
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        train_acc = accuracy(logits.argmax(dim=1), labels[seeds]).item()
+
+    return train_acc, loss.item()
+
+def evaluate(model, eval_loader, inv_target):
+    model.eval()
+    eval_logits = []
+    eval_seeds = []
+
+    with th.no_grad():
+        for sample_data in tqdm(eval_loader):
+            seeds, blocks = process_batch(inv_target, sample_data)
+            logits = model.forward(blocks)
+            eval_logits.append(logits.cpu().detach())
+            eval_seeds.append(seeds.cpu().detach())
+
+    eval_logits = th.cat(eval_logits)
+    eval_seeds = th.cat(eval_seeds)
+    
+    return eval_logits, eval_seeds
 
 def collect_eval(n_gpus, queue, labels):
     eval_logits = []

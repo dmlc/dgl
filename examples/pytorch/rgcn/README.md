@@ -5,42 +5,34 @@
 * Author's code for link prediction: [https://github.com/MichSchli/RelationPrediction](https://github.com/MichSchli/RelationPrediction)
 
 ### Dependencies
-* PyTorch 1.10
-* rdflib
-* pandas
-* tqdm
-* TorchMetrics
+- rdflib
+- torchmetrics
 
-```
-pip install rdflib pandas
+Install as follows:
+```bash
+pip install rdflib
+pip install torchmetrics
 ```
 
-Example code was tested with rdflib 4.2.2 and pandas 0.23.4
+How to run
+-------
 
 ### Entity Classification
 
-For AIFB, MUTAG, BGS and AM,
-```
-python entity.py -d aifb --wd 0 --gpu 0
-python entity.py -d mutag --n-bases 30 --gpu 0
-python entity.py -d bgs --n-bases 40 --gpu 0
-python entity.py -d am --n-bases 40 --n-hidden 10 --gpu 0
+Run with the following for entity classification (available datasets: aifb (default), mutag, bgs, and am)
+```bash
+python3 entity.py --dataset aifb
 ```
 
-### Entity Classification with minibatch
-
-For AIFB, MUTAG, BGS and AM,
+For minibatch training, run with the following (available datasets are the same as above)
+```bash
+python3 entity_sample.py --dataset aifb
 ```
-python entity_sample.py -d aifb --wd 0 --gpu 0 --fanout='20,20' --batch-size 128
-python entity_sample.py -d mutag --n-bases 30 --gpu 0 --batch-size 64 --fanout='-1,-1' --use-self-loop --n-epochs 20 --dropout 0.5
-python entity_sample.py -d bgs --n-bases 40 --gpu 0 --fanout='-1,-1'  --n-epochs=16 --batch-size=16 --dropout 0.3
-python entity_sample.py -d am --n-bases 40 --gpu 0 --fanout='35,35' --batch-size 64 --n-hidden 16 --use-self-loop --n-epochs=20 --dropout 0.7
+For multi-gpu training (with sampling), run with the following (same datasets and GPU IDs separated by comma) 
+```bash
+python3 entity_sample_multi_gpu.py --dataset aifb --gpu 0,1
 ```
 
-### Entity Classification on multiple GPUs
-
-To use multiple GPUs, replace `entity_sample.py` with `entity_sample_multi_gpu.py` and specify
-multiple GPU IDs separated by comma, e.g., `--gpu 0,1`.
 
 ### Link Prediction
 FB15k-237 in RAW-MRR
@@ -51,3 +43,14 @@ FB15k-237 in Filtered-MRR
 ```
 python link.py --gpu 0 --eval-protocol filtered
 ```
+
+Summary 
+-------
+### Entity Classification
+
+| Dataset       | Result 
+| ------------- | -------
+| aifb        | ~84.3    
+| mutag       | ~69.7   
+| bgs         | ~91.4    
+| am          | ~78.5
