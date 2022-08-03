@@ -147,6 +147,12 @@ def chunk_graph(g, name, ndata_paths, edata_paths, num_chunks, output_path):
     output_path : pathlike
         The output directory saving the chunked graph.
     """
+    for ntype, ndata in ndata_paths.items():
+        for key in ndata.keys():
+            ndata[key] = os.path.abspath(ndata[key])
+    for etype, edata in edata_paths.items():
+        for key in edata.keys():
+            edata[key] = os.path.abspath(edata[key])
     with setdir(output_path):
         _chunk_graph(g, name, ndata_paths, edata_paths, num_chunks, output_path)
 
