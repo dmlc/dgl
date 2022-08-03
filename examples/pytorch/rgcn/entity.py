@@ -34,7 +34,7 @@ def train(g, target_idx, labels, train_mask, model):
     # define train idx, loss function and optimizer
     train_idx = torch.nonzero(train_mask, as_tuple=False).squeeze()
     loss_fcn = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-2, weight_decay=5e-4)
 
     model.train()
     for epoch in range(50):
@@ -74,7 +74,7 @@ if __name__ == '__main__':
     labels = g.nodes[category].data.pop('labels')
     train_mask = g.nodes[category].data.pop('train_mask')
     test_mask = g.nodes[category].data.pop('test_mask')
-    # calculate normalization weight for each edge,
+    # calculate normalization weight for each edge, and find target category and node id
     for cetype in g.canonical_etypes:
         g.edges[cetype].data['norm'] = dgl.norm_by_dst(g, cetype).unsqueeze(1)
     edata = ['norm']
@@ -82,9 +82,6 @@ if __name__ == '__main__':
     g = dgl.to_homogeneous(g, edata=edata)
     node_ids = torch.arange(g.num_nodes()).to(device)
     target_idx = node_ids[g.ndata[dgl.NTYPE] == category_id]
-    # rename the fields as they can be changed by for example DataLoader
-    g.ndata['ntype'] = g.ndata.pop(dgl.NTYPE)
-    g.ndata['type_id'] = g.ndata.pop(dgl.NID)
 
     # create RGCN model    
     in_size = g.num_nodes() # featureless with one-hot encoding
