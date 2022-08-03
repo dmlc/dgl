@@ -3,6 +3,7 @@ import logging
 import sys
 import os
 import numpy as np
+import argparse
 
 from utils import setdir
 from utils import array_readwriter
@@ -31,9 +32,17 @@ def random_partition(metadata, num_parts, output_path):
 # Run with PYTHONPATH=${GIT_ROOT_DIR}/tools
 # where ${GIT_ROOT_DIR} is the directory to the DGL git repository.
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+            'metadata', type=str, help='input metadata file of the chunked graph format')
+    parser.add_argument(
+            'output_path', type=str, help='output directory')
+    parser.add_argument(
+            'num_partitions', type=int, help='number of partitions')
     logging.basicConfig(level='INFO')
-    with open(sys.argv[1]) as f:
+    args = parser.parse_args()
+    with open(args.metadata) as f:
         metadata = json.load(f)
-    output_path = sys.argv[2]
-    num_parts = int(sys.argv[3])
+    output_path = args.output_path
+    num_parts = args.num_partitions
     random_partition(metadata, num_parts, output_path)
