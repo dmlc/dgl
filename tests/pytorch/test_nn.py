@@ -647,10 +647,11 @@ def test_appnp_conv_e_weight(g, idtype):
 
 @parametrize_idtype
 @pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
-def test_gcn2conv_e_weight(g, idtype):
+@pytest.mark.parametrize("bias", [True, False])
+def test_gcn2conv_e_weight(g, idtype, bias):
     ctx = F.ctx()
     g = g.astype(idtype).to(ctx)
-    gcn2conv = nn.GCN2Conv(5, layer=2, alpha=0.5,
+    gcn2conv = nn.GCN2Conv(5, layer=2, alpha=0.5, bias=bias,
                            project_initial_features=True)
     feat = F.randn((g.number_of_nodes(), 5))
     eweight = F.ones((g.num_edges(), ))

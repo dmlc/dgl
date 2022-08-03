@@ -39,7 +39,7 @@ class SAGE(nn.Module):
                 g, torch.arange(g.num_nodes()).to(g.device), sampler, device=device,
                 batch_size=batch_size, shuffle=False, drop_last=False,
                 num_workers=0)
-        buffer_device = 'cpu'
+        buffer_device = torch.device('cpu')
         pin_memory = (buffer_device != device)
 
         for l, layer in enumerate(self.layers):
