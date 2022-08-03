@@ -51,6 +51,7 @@ class DGLTracer(Tracer):
 
     @compatibility(is_backward_compatible=True)
     def call_module(self, m: torch.nn.Module, forward, args, kwargs):
+        """Call modules."""
         def tag_conv_fn(node):
             node.is_conv = True
             return Proxy(node)

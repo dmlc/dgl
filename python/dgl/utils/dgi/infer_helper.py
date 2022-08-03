@@ -40,6 +40,7 @@ class InferenceHelperBase():
         self._wrap_conv_blocks()
 
     def _get_mock_graph(self, graph):
+        """Get the mock graph."""
         if self._mock_graph is None:
             self._input_graph = graph
             if graph.is_homogeneous:
@@ -52,6 +53,7 @@ class InferenceHelperBase():
         return self._mock_graph
 
     def _trace_output_shape(self, func, *args):
+        """Trace the output shape."""
         mock_input = ()
         for arg in args:
             if isinstance(arg, dgl.DGLHeteroGraph):
@@ -75,6 +77,7 @@ class InferenceHelperBase():
         return ret_shapes
 
     def _wrap_conv_blocks(self):
+        """Wrap Conv blocks to calls."""
         def _warped_call(self, *args):
             torch.cuda.empty_cache()
             ret_shapes = self.helper._trace_output_shape(self, *args)

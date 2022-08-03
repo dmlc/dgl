@@ -78,7 +78,7 @@ def update_out_in_chunks(ret, idx, val):
     for dim in range(1, len(val.shape)):
         memory_comsuption *= val.shape[dim]
     num_nodes = val.shape[0]
-    num_node_in_chunks = 33000000 // memory_comsuption
+    num_node_in_chunks = (2^25) // memory_comsuption
     start, end = 0, 0
     while start < num_nodes:
         end = min(start + num_node_in_chunks, num_nodes)
