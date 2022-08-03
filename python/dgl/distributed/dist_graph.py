@@ -1180,7 +1180,7 @@ class DistGraph:
         if isinstance(edges, dict):
             # TODO(zhengda) we need to directly generate subgraph of all relations with
             # one invocation.
-            if isinstance(edges, tuple):
+            if isinstance(list(edges.keys())[0], tuple):
                 subg = {etype: self.find_edges(edges[etype], etype[1]) for etype in edges}
             else:
                 subg = {}
