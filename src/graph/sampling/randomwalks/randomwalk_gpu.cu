@@ -400,7 +400,6 @@ std::pair<IdArray, IdArray> RandomWalk(
   if (!isUniform) {
     std::pair<IdArray, IdArray> ret;
     ATEN_FLOAT_TYPE_SWITCH(prob[0]->dtype, FloatType, "probability", {
-      CHECK(prob[0]->ctx.device_type == kDLGPU) << "prob should be in GPU.";
       ret = RandomWalkBiased<XPU, FloatType, IdType>(hg, seeds, metapath, prob, restart_prob);
     });
     return ret;
@@ -442,7 +441,6 @@ std::pair<IdArray, IdArray> RandomWalkWithRestart(
   if (!isUniform) {
     std::pair<IdArray, IdArray> ret;
     ATEN_FLOAT_TYPE_SWITCH(prob[0]->dtype, FloatType, "probability", {
-      CHECK(prob[0]->ctx.device_type == kDLGPU) << "prob should be in GPU.";
       ret = RandomWalkBiased<XPU, FloatType, IdType>(
           hg, seeds, metapath, prob, restart_prob_array);
     });
@@ -471,7 +469,6 @@ std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart(
   if (!isUniform) {
     std::pair<IdArray, IdArray> ret;
     ATEN_FLOAT_TYPE_SWITCH(prob[0]->dtype, FloatType, "probability", {
-      CHECK(prob[0]->ctx.device_type == kDLGPU) << "prob should be in GPU.";
       ret = RandomWalkBiased<XPU, FloatType, IdType>(hg, seeds, metapath, prob, restart_prob);
     });
     return ret;
