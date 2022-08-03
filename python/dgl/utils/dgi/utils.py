@@ -1,6 +1,4 @@
 """Utilization functions."""
-from torch.fx import Node
-
 import torch
 from dgl import DGLHeteroGraph
 from dgl.utils import gather_pinned_tensor_rows

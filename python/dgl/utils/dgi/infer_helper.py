@@ -1,4 +1,5 @@
 """Inference helper."""
+# pylint: disable=unnecessary-pass
 import dgl
 import torch
 import torch.nn as nn
@@ -29,7 +30,7 @@ class InferenceHelperBase():
     debug : bool
         Whether display debug messages.
     """
-    def __init__(self, root: nn.Module, conv_modules = [], device = "cpu", \
+    def __init__(self, root: nn.Module, conv_modules = (), device = "cpu", \
                  use_uva = False, debug = False):
         # add a '_' in order not crash with the origin one.
         self._device = device
@@ -63,7 +64,7 @@ class InferenceHelperBase():
             else:
                 raise Exception("Input type not supported yet.")
 
-        assert (self._input_graph is not None)
+        assert self._input_graph is not None
         mock_rets = func(*mock_input)
 
         if not isinstance(mock_rets, tuple):
@@ -196,7 +197,8 @@ class InferenceHelper(InferenceHelperBase):
     debug : bool
         Whether display debug messages.
     """
-    def __init__(self, root: nn.Module, conv_modules, batch_size, device, num_workers = 4, debug = False):
+    def __init__(self, root: nn.Module, conv_modules, batch_size, device,\
+                 num_workers = 4, debug = False):
         super().__init__(root, conv_modules, device, debug=debug)
         self._batch_size = batch_size
         self._num_workers = num_workers

@@ -98,7 +98,7 @@ def train(args):
             break
 
     with torch.no_grad():
-        helper = InferenceHelper(model, [], 2000, torch.device(device), debug = True)
+        helper = InferenceHelper(model, (), 2000, torch.device(device), debug = True)
         torch.cuda.synchronize()
         st = time.time()
         helper_pred = helper.inference(g, feat)

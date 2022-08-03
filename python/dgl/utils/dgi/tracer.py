@@ -1,3 +1,5 @@
+"""Tracer class."""
+# pylint: disable=no-member
 import math
 
 import torch

@@ -1,4 +1,5 @@
 """Function Generator."""
+# pylint: disable=comparison-with-callable
 import operator
 from torch.fx import GraphModule, Graph
 from torch.fx.passes.split_utils import split_by_tags
