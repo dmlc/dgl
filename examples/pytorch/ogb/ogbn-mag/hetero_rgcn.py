@@ -4,6 +4,8 @@ from tqdm import tqdm
 
 import dgl
 import dgl.nn as dglnn
+from dgl.nn import HeteroEmbedding
+from dgl import AddReverse
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
@@ -14,44 +16,20 @@ def extract_embed(node_embed, input_nodes):
     emb = {}
     for ntype, nid in input_nodes.items():
         nid = input_nodes[ntype]
-        if ntype in node_embed:
-            emb[ntype] = node_embed[ntype][nid]
+        if ntype in node_embed.embeds:
+            emb[ntype] = node_embed.embeds.pop(ntype)(nid)
     return emb
 
-class RelGraphEmbed(nn.Module):
-    r"""Embedding layer for featureless heterograph.
-    
-    Parameters
-    ----------
-    g : DGLGraph
-        Input graph.
-    embed_size : int
-        The length of each embedding vector
-    exclude : list[str]
-        The list of node-types to exclude (e.g., because they have natural features)
-    """
-    def __init__(self, g, embed_size, exclude=list()):
-        
-        super(RelGraphEmbed, self).__init__()
-        self.g = g
-        self.embed_size = embed_size
-
-        # create learnable embeddings for all nodes, except those with a node-type in the "exclude" list
-        self.embeds = nn.ParameterDict()
-        for ntype in g.ntypes:
-            if ntype in exclude:
-                continue
-            embed = nn.Parameter(th.Tensor(g.number_of_nodes(ntype), self.embed_size))
-            self.embeds[ntype] = embed
-
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        for emb in self.embeds.values():
-            nn.init.xavier_uniform_(emb)
-
-    def forward(self, block=None):
-        return self.embeds
+def RelGraphEmbed(graph,embed_size,exclude):
+    node_num={}
+    for ntype in graph.ntypes:
+        if ntype in exclude:
+            continue
+        node_num[ntype] = graph.number_of_nodes(ntype)
+    embeds = HeteroEmbedding(node_num,embed_size)
+    for node_type in embeds.embeds.keys():
+        nn.init.xavier_uniform_(embeds.embeds[node_type].weight)  
+    return embeds
 
 
 class RelGraphConvLayer(nn.Module):
@@ -308,45 +286,9 @@ def prepare_data(args):
     g, labels = dataset[0] # graph: dgl graph object, label: torch tensor of shape (num_nodes, num_tasks)
     labels = labels['paper'].flatten()
 
-    def add_reverse_hetero(g, combine_like=True):
-        r"""
-        Parameters
-        ----------
-        g : DGLGraph
-            The heterogenous graph where reverse edges should be added
-        combine_like : bool, optional
-            Whether reverse-edges that have identical source/destination 
-            node types should be combined with the existing edge-type, 
-            rather than creating a new edge type.  Default: True.
-        """
-        relations = {}
-        num_nodes_dict = {ntype: g.num_nodes(ntype) for ntype in g.ntypes}
-        for metapath in g.canonical_etypes:
-            src_ntype, rel_type, dst_ntype = metapath
-            src, dst = g.all_edges(etype=rel_type)
-
-            if src_ntype==dst_ntype and combine_like:
-                # Make edges un-directed instead of making a reverse edge type
-                relations[metapath] = (th.cat([src, dst], dim=0), th.cat([dst, src], dim=0))
-            else:
-                # Original edges
-                relations[metapath] = (src, dst)
-
-                reverse_metapath = (dst_ntype, 'rev-' + rel_type, src_ntype)
-                relations[reverse_metapath] = (dst, src)           # Reverse edges
-
-        new_g = dgl.heterograph(relations, num_nodes_dict=num_nodes_dict)
-        # Remove duplicate edges
-        new_g = dgl.to_simple(new_g, return_counts=None, writeback_mapping=False, copy_ndata=True)
-
-        # copy_ndata:
-        for ntype in g.ntypes:
-            for k, v in g.nodes[ntype].data.items():
-                new_g.nodes[ntype].data[k] = v.detach().clone()
-
-        return new_g
-
-    g = add_reverse_hetero(g)
+    transform = AddReverse()
+    g = transform(g)
+    
     print("Loaded graph: {}".format(g))
 
     logger = Logger(args['runs'], args)
