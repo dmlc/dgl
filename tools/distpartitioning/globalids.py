@@ -49,7 +49,7 @@ def get_shuffle_global_nids(rank, world_size, global_nids_ranks, node_data):
 
     #send receive global-ids
     recv_shuffle_global_nids = alltoallv_cpu(rank, world_size, send_nodes)
-    shuffle_global_nids = np.concatenate([x.numpy() if x != None else [] for x in recv_shuffle_global_nids])
+    shuffle_global_nids = np.concatenate([x.numpy() if x is not None else [] for x in recv_shuffle_global_nids])
     global_nids = np.concatenate([x for x in global_nids_ranks])
     ret_val = np.column_stack([global_nids, shuffle_global_nids])
     return ret_val

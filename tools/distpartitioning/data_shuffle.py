@@ -185,6 +185,9 @@ def exchange_node_features(rank, world_size, node_feature_tids, ntype_gnid_map, 
         retrieved. 
     d. After receiving the corresponding shuffle_global_nids these ids are added to the 
         node_data and edge_data dictionaries
+    
+    This pipeline assumes all the input data in numpy format, except node/edge features which
+    are maintained as tensors throughout the various stages of the pipeline execution.
 
     Parameters: 
     -----------

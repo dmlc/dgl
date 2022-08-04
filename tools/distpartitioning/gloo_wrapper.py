@@ -39,7 +39,7 @@ def allgather_sizes(send_data, world_size):
 
     return rank_sizes
 
-def alltoall_cpu(rank, world_size, output_tensor_list, input_tensor_list):
+def __alltoall_cpu(rank, world_size, output_tensor_list, input_tensor_list):
     """
     Each process scatters list of input tensors to all processes in a cluster
     and return gathered list of tensors in output list. The tensors should have the same shape.
@@ -62,7 +62,8 @@ def alltoall_cpu(rank, world_size, output_tensor_list, input_tensor_list):
 def alltoallv_cpu(rank, world_size, input_tensor_list):
     """
     Wrapper function to providing the alltoallv functionality by using underlying alltoall
-    messaging primitive. 
+    messaging primitive. This function, in its current implementation, supports exchanging 
+    messages of arbitrary dimensions and is not tied to the user of this function.
 
     This function pads all input tensors, except one, so that all the messages are of the same
     size. Once the messages are padded, It first sends a vector whose first two elements are 
@@ -118,7 +119,7 @@ def alltoallv_cpu(rank, world_size, input_tensor_list):
         #and remaining elements are the remaining dimensions of the tensor
         send_counts.append(torch.from_numpy(np.array([sizes[idx][0]] + [np.amax(ll)] + sizes[idx][1:] )).type(torch.int64))
         recv_counts.append(torch.zeros((1 + len(sizes[idx])), dtype=torch.int64))
-    alltoall_cpu(rank, world_size, recv_counts, send_counts)
+    __alltoall_cpu(rank, world_size, recv_counts, send_counts)
 
     #allocate buffers for receiving message
     output_tensor_list = []
@@ -127,7 +128,7 @@ def alltoallv_cpu(rank, world_size, input_tensor_list):
         output_tensor_list.append(torch.zeros(tuple(tsize[1:])).type(input_tensor_list[idx].dtype))
 
     #send actual message itself. 
-    alltoall_cpu(rank, world_size, output_tensor_list, input_tensor_list)
+    __alltoall_cpu(rank, world_size, output_tensor_list, input_tensor_list)
 
     #extract un-padded message from the output_tensor_list and return it
     return_vals = []
