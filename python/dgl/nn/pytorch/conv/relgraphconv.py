@@ -61,7 +61,8 @@ class RelGraphConv(nn.Module):
     num_bases : int, optional
         Number of bases. It comes into effect when a regularizer is applied.
         If ``None``, it uses number of relations (``num_rels``). Default: ``None``.
-        Note that ``in_feat`` and ``out_feat`` must be divisible by ``num_bases`` when applying "bdd" regularizer.
+        Note that ``in_feat`` and ``out_feat`` must be divisible by ``num_bases``
+        when applying "bdd" regularizer.
     bias : bool, optional
         True if bias is added. Default: ``True``.
     activation : callable, optional
