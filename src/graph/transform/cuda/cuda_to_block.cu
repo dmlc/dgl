@@ -1,5 +1,5 @@
 /**
- *  Copyright 2020-2021 Contributors
+ *  Copyright 2020-2022 Contributors
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -26,6 +26,8 @@
 #include <memory>
 #include <utility>
 
+#include "../../../array/cuda/dgl_cub.cuh"
+
 #include "../../../runtime/cuda/cuda_common.h"
 #include "../../heterograph.h"
 #include "../to_bipartite.h"
@@ -43,8 +45,8 @@ namespace {
 template <typename IdType>
 class DeviceNodeMapMaker {
  public:
-  explicit DeviceNodeMapMaker(const std::vector<int64_t>& maxNodesPerType)
-      : max_num_nodes_(0) {
+  explicit DeviceNodeMapMaker(const std::vector<int64_t>& maxNodesPerType,
+    DGLContext ctx_) : max_num_nodes_(0), ctx_(ctx_) {
     max_num_nodes_ =
         *std::max_element(maxNodesPerType.begin(), maxNodesPerType.end());
   }
@@ -59,13 +61,14 @@ class DeviceNodeMapMaker {
    * @param node_maps The node maps to be constructed.
    * @param count_lhs_device The number of unique source nodes (on the GPU).
    * @param lhs_device The unique source nodes (on the GPU).
+   * @param sort Flag to ensure ids preserve their order
    * @param stream The stream to operate on.
    */
   void Make(
       const std::vector<IdArray>& lhs_nodes,
       const std::vector<IdArray>& rhs_nodes,
       DeviceNodeMap<IdType>* const node_maps, int64_t* const count_lhs_device,
-      std::vector<IdArray>* const lhs_device, cudaStream_t stream) {
+      std::vector<IdArray>* const lhs_device, bool sort, cudaStream_t stream) {
     const int64_t num_ntypes = lhs_nodes.size() + rhs_nodes.size();
 
     CUDA_CALL(cudaMemsetAsync(
@@ -77,10 +80,68 @@ class DeviceNodeMapMaker {
       const IdArray& nodes = lhs_nodes[ntype];
       if (nodes->shape[0] > 0) {
         CHECK_EQ(nodes->ctx.device_type, kDGLCUDA);
+        auto unique = (*lhs_device)[ntype].Ptr<IdType>();
         node_maps->LhsHashTable(ntype).FillWithDuplicates(
             nodes.Ptr<IdType>(), nodes->shape[0],
-            (*lhs_device)[ntype].Ptr<IdType>(), count_lhs_device + ntype,
+            unique, count_lhs_device + ntype,
             stream);
+        
+        if (sort) {
+          int64_t num_uniq;
+          auto device = runtime::DeviceAPI::Get(ctx_);
+          device->CopyDataFromTo(
+            count_lhs_device, ntype,
+            &num_uniq, 0,
+            sizeof(*count_lhs_device),
+            ctx_,
+            DGLContext{kDLCPU, 0},
+            DGLType{kDLInt, 64, 1},
+            stream);
+      
+          IdType * unique_2 = static_cast<IdType*>(
+            device->AllocWorkspace(ctx_, sizeof(IdType) * (num_uniq)));
+      
+          size_t workspace_bytes;
+
+          CUDA_CALL(cub::DeviceRadixSort::SortKeys(
+              nullptr,
+              workspace_bytes,
+              static_cast<IdType*>(nullptr),
+              static_cast<IdType*>(nullptr),
+              num_uniq,
+              0,
+              sizeof(IdType) * 8,
+              stream));
+          
+          void * workspace = device->AllocWorkspace(ctx_, workspace_bytes);
+      
+          CUDA_CALL(cub::DeviceRadixSort::SortKeys(
+            workspace,
+            workspace_bytes,
+            unique,
+            unique_2,
+            num_uniq,
+            0,
+            sizeof(IdType) * 8,
+            stream));
+      
+          device->FreeWorkspace(ctx_, workspace);
+      
+          node_maps->LhsHashTable(ntype).Clear(stream);
+      
+          device->CopyDataFromTo(
+            unique_2, 0,
+            unique, 0,
+            sizeof(*unique) * num_uniq,
+            ctx_,
+            ctx_,
+            DGLType{kDLInt, sizeof(IdType) * 8, 1},
+            stream);
+      
+          node_maps->LhsHashTable(ntype).FillWithUnique(unique_2, num_uniq, stream);
+      
+          device->FreeWorkspace(ctx_, unique_2);
+        }
       }
     }
 
@@ -135,6 +196,7 @@ class DeviceNodeMapMaker {
 
  private:
   IdType max_num_nodes_;
+  DGLContext ctx_;
 };
 
 // Since partial specialization is not allowed for functions, use this as an
@@ -142,7 +204,8 @@ class DeviceNodeMapMaker {
 template <typename IdType>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockGPU(
     HeteroGraphPtr graph, const std::vector<IdArray>& rhs_nodes,
-    const bool include_rhs_in_lhs, std::vector<IdArray>* const lhs_nodes_ptr) {
+    const bool include_rhs_in_lhs, std::vector<IdArray>* const lhs_nodes_ptr,
+    const bool sort_lhs) {
   std::vector<IdArray>& lhs_nodes = *lhs_nodes_ptr;
   const bool generate_lhs_nodes = lhs_nodes.empty();
 
@@ -241,7 +304,7 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockGPU(
   }
 
   // allocate space for map creation process
-  DeviceNodeMapMaker<IdType> maker(maxNodesPerType);
+  DeviceNodeMapMaker<IdType> maker(maxNodesPerType, ctx);
   DeviceNodeMap<IdType> node_maps(maxNodesPerType, num_ntypes, ctx, stream);
 
   if (generate_lhs_nodes) {
@@ -263,8 +326,8 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockGPU(
     int64_t* count_lhs_device = static_cast<int64_t*>(
         device->AllocWorkspace(ctx, sizeof(int64_t) * num_ntypes * 2));
 
-    maker.Make(
-        src_nodes, rhs_nodes, &node_maps, count_lhs_device, &lhs_nodes, stream);
+    maker.Make(src_nodes, rhs_nodes, &node_maps, count_lhs_device, &lhs_nodes,
+        sort_lhs, stream);
 
     device->CopyDataFromTo(
         count_lhs_device, 0, num_nodes_per_type.data(), 0,
@@ -351,16 +414,20 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>>
 // ToBlock<kDGLCUDA, int32_t>
 ToBlockGPU32(
     HeteroGraphPtr graph, const std::vector<IdArray>& rhs_nodes,
-    bool include_rhs_in_lhs, std::vector<IdArray>* const lhs_nodes) {
-  return ToBlockGPU<int32_t>(graph, rhs_nodes, include_rhs_in_lhs, lhs_nodes);
+    bool include_rhs_in_lhs, std::vector<IdArray>* const lhs_nodes,
+    bool sort_lhs) {
+  return ToBlockGPU<int32_t>(graph, rhs_nodes, include_rhs_in_lhs, lhs_nodes,
+      sort_lhs);
 }
 
 std::tuple<HeteroGraphPtr, std::vector<IdArray>>
 // ToBlock<kDGLCUDA, int64_t>
 ToBlockGPU64(
     HeteroGraphPtr graph, const std::vector<IdArray>& rhs_nodes,
-    bool include_rhs_in_lhs, std::vector<IdArray>* const lhs_nodes) {
-  return ToBlockGPU<int64_t>(graph, rhs_nodes, include_rhs_in_lhs, lhs_nodes);
+    bool include_rhs_in_lhs, std::vector<IdArray>* const lhs_nodes,
+    bool sort_lhs) {
+  return ToBlockGPU<int64_t>(graph, rhs_nodes, include_rhs_in_lhs, lhs_nodes,
+      sort_lhs);
 }
 
 }  // namespace transform

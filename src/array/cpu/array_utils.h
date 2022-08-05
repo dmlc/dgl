@@ -1,5 +1,5 @@
 /**
- *  Copyright (c) 2019 by Contributors
+ *  Copyright (c) 2019-2022 by Contributors
  * @file dgl/array_utils.h
  * @brief Utility classes and functions for DGL arrays.
  */
@@ -45,6 +45,11 @@ class IdHashMap {
   IdHashMap(const IdHashMap& other) = default;
 
   void Reserve(const int64_t size) { oldv2newv_.reserve(size); }
+
+  void Clear() {
+    filter_.assign(kFilterSize, false);
+    oldv2newv_.clear();
+  }
 
   // Update the hashmap with given id array.
   // The id array could contain duplicates.

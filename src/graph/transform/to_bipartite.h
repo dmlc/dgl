@@ -1,5 +1,5 @@
 /**
- *  Copyright 2021 Contributors
+ *  Copyright 2021-2022 Contributors
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -41,13 +41,14 @@ namespace transform {
  * @param include_rhs_in_lhs Whether or not to include the
  * destination nodes of the block in the sources nodes.
  * @param [in/out] lhs_nodes The source nodes of the block.
+ * @param sort_lhs Flag to ensure lhs_nodes is sorted
  *
  * @return The block and the induced edges.
  */
 template <DGLDeviceType XPU, typename IdType>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlock(
     HeteroGraphPtr graph, const std::vector<IdArray>& rhs_nodes,
-    bool include_rhs_in_lhs, std::vector<IdArray>* lhs_nodes);
+    bool include_rhs_in_lhs, std::vector<IdArray>* lhs_nodes, bool sort_lhs);
 
 }  // namespace transform
 }  // namespace dgl

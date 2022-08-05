@@ -108,8 +108,8 @@ class NeighborSampler(BlockSampler):
     :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
     """
     def __init__(self, fanouts, edge_dir='in', prob=None, mask=None, replace=False,
-                 prefetch_node_feats=None, prefetch_labels=None, prefetch_edge_feats=None,
-                 output_device=None):
+                 sort_src=False, prefetch_node_feats=None, prefetch_labels=None,
+                 prefetch_edge_feats=None, output_device=None):
         super().__init__(prefetch_node_feats=prefetch_node_feats,
                          prefetch_labels=prefetch_labels,
                          prefetch_edge_feats=prefetch_edge_feats,
@@ -123,6 +123,7 @@ class NeighborSampler(BlockSampler):
                     'to achieve the same goal.')
         self.prob = prob or mask
         self.replace = replace
+        self.sorted_src = sort_src
 
     def sample_blocks(self, g, seed_nodes, exclude_eids=None):
         output_nodes = seed_nodes
@@ -133,7 +134,7 @@ class NeighborSampler(BlockSampler):
                 replace=self.replace, output_device=self.output_device,
                 exclude_edges=exclude_eids)
             eid = frontier.edata[EID]
-            block = to_block(frontier, seed_nodes)
+            block = to_block(frontier, seed_nodes, include_dst_in_src=True, src_nodes=None, sort_src=self.sorted_src)
             block.edata[EID] = eid
             seed_nodes = block.srcdata[NID]
             blocks.insert(0, block)

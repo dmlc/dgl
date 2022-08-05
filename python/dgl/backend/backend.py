@@ -563,6 +563,21 @@ def argsort(input, dim, descending):
         A framework-specific tensor.
     """
 
+def searchsorted(input, values):
+    """Return the indices of values inside input
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor.
+    values : Tensor
+        The values to search for.
+
+    Returns
+    -------
+    Tensor
+        A framework-specific tensor.
+    """
 
 def topk(input, k, dim, descending=True):
     """Return the k largest elements of the given input tensor along the given dimension.

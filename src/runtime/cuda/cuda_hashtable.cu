@@ -1,5 +1,5 @@
 /**
- *  Copyright (c) 2021 by Contributors
+ *  Copyright (c) 2021-2022 by Contributors
  * @file runtime/cuda/cuda_device_common.cuh
  * @brief Device level functions for within cuda kernels.
  */
@@ -271,9 +271,6 @@ __global__ void count_hashmap(
 
   if (threadIdx.x == 0) {
     num_unique[blockIdx.x] = count;
-    if (blockIdx.x == 0) {
-      num_unique[gridDim.x] = 0;
-    }
   }
 }
 
@@ -368,9 +365,7 @@ OrderedHashTable<IdType>::OrderedHashTable(
   table_ = static_cast<Mapping*>(
       device->AllocWorkspace(ctx_, sizeof(Mapping) * size_));
 
-  CUDA_CALL(cudaMemsetAsync(
-      table_, DeviceOrderedHashTable<IdType>::kEmptyKey,
-      sizeof(Mapping) * size_, stream));
+  Clear(stream);
 }
 
 template <typename IdType>
@@ -380,6 +375,13 @@ OrderedHashTable<IdType>::~OrderedHashTable() {
 }
 
 template <typename IdType>
+void OrderedHashTable<IdType>::Clear(cudaStream_t stream) {
+  CUDA_CALL(cudaMemsetAsync(
+    table_, DeviceOrderedHashTable<IdType>::kEmptyKey,
+    sizeof(Mapping) * size_, stream));
+}
+
+template<typename IdType>
 void OrderedHashTable<IdType>::FillWithDuplicates(
     const IdType* const input, const size_t num_input, IdType* const unique,
     int64_t* const num_unique, cudaStream_t stream) {
@@ -397,7 +399,7 @@ void OrderedHashTable<IdType>::FillWithDuplicates(
       0, stream, input, num_input, device_table);
 
   IdType* item_prefix = static_cast<IdType*>(
-      device->AllocWorkspace(ctx_, sizeof(IdType) * (num_input + 1)));
+      device->AllocWorkspace(ctx_, sizeof(IdType) * (num_tiles + 1)));
 
   CUDA_KERNEL_CALL(
       (count_hashmap<IdType, BLOCK_SIZE, TILE_SIZE>), grid, block, 0, stream,
