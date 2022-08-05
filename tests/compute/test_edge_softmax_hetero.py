@@ -2,6 +2,7 @@ import dgl
 from dgl.ops import edge_softmax
 import dgl.function as fn
 from collections import Counter
+import math
 import numpy as np
 import scipy.sparse as ssp
 import itertools
@@ -38,6 +39,20 @@ def create_test_heterograph(idtype):
     assert g.device == F.ctx()
     return g
 
+def test_edge_softmax_unidirectional():
+    g = dgl.heterograph({
+        ('A', 'AB', 'B'): ([1,2,3,1,2,3,1,2,3],[0,0,0,1,1,1,2,2,2]),
+        ('B', 'BB', 'B'): ([0,1,2,0,1,2,0,1,2], [0,0,0,1,1,1,2,2,2])})
+    g.edges['AB'].data['x'] = F.ones(9) * 2
+    g.edges['BB'].data['x'] = F.ones(9)
+    result = dgl.ops.edge_softmax(g, {'AB': g.edges['AB'].data['x'], 'BB': g.edges['BB'].data['x']})
+
+    ab = result['A', 'AB', 'B']
+    bb = result['B', 'BB', 'B']
+    e2 = F.zeros_like(ab) + math.exp(2) / ((math.exp(2) + math.exp(1)) * 3)
+    e1 = F.zeros_like(bb) + math.exp(1) / ((math.exp(2) + math.exp(1)) * 3)
+    assert F.allclose(ab, e2)
+    assert F.allclose(bb, e1)
 
 @pytest.mark.parametrize('g', get_cases(['clique']))
 @pytest.mark.parametrize('norm_by', ['src', 'dst'])
@@ -109,5 +124,4 @@ def test_edge_softmax(g, norm_by, idtype):
         assert F.allclose(grad_edata_hm, grad_edata_ht)
 
 if __name__ == '__main__':
-    test_edge_softmax()
-
+    test_edge_softmax_unidirectional()
