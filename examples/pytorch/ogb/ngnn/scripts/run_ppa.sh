@@ -1,4 +1,5 @@
-python dgl__gnn.py \
+python main.py \
+    --dataset ogbl-ppa \
     --device 1 \
     --ngnn_type input \
     --use_sage \
@@ -8,4 +9,4 @@ python dgl__gnn.py \
     --lr 0.001 \
     --batch_size 65536 \
     --runs 10 \
-    | tee ppa-input-SAGE-epoch_50-dropout_0.25-layers_3-lr_0.001-batch_65536
+    | tee results/ppa-input-SAGE-epoch_50-dropout_0.25-layers_3-lr_0.001-batch_65536

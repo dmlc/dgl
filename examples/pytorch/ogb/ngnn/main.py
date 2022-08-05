@@ -57,7 +57,7 @@ class Logger(object):
 class NGNN_GCNConv(torch.nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels):
         super(NGNN_GCNConv, self).__init__()
-        self.conv = GraphConv(in_channels,  hidden_channels)
+        self.conv = GraphConv(in_channels, hidden_channels)
         self.fc_adj = Linear(hidden_channels, hidden_channels)
         self.fc_adj2 = Linear(hidden_channels, out_channels)
         self.reset_parameters()
@@ -75,8 +75,12 @@ class NGNN_GCNConv(torch.nn.Module):
 
     def forward(self, g, x):
         x = self.conv(g, x)
-        x = F.relu(x)
-        x = self.fc_adj(x)
+
+        global args
+        if args.dataset != 'ogbl-ddi':
+            x = F.relu(x)
+            x = self.fc_adj(x)
+        
         x = F.relu(x)
         x = self.fc_adj2(x)
         return x
@@ -127,6 +131,7 @@ class NGNN_SAGEConv(torch.nn.Module):
         self.conv = SAGEConv(in_channels, hidden_channels, reduce)
         self.fc_adj = Linear(hidden_channels, hidden_channels)
         self.fc_adj2 = Linear(hidden_channels, out_channels)
+        self.reset_parameters()
 
     def reset_parameters(self):
         self.conv.reset_parameters()
@@ -141,14 +146,18 @@ class NGNN_SAGEConv(torch.nn.Module):
 
     def forward(self, g, x):
         x = self.conv(g, x)
-        x = F.relu(x)
-        x = self.fc_adj(x)
+
+        global args
+        if args.dataset != 'ogbl-ddi':
+            x = F.relu(x)
+            x = self.fc_adj(x)
+        
         x = F.relu(x)
         x = self.fc_adj2(x)
         return x
 
 class SAGE(torch.nn.Module):
-    def __init__(self, in_channels, hidden_channels, out_channels, num_layers, dropout, ngnn_type, reduce = 'mean'):
+    def __init__(self, in_channels, hidden_channels, out_channels, num_layers, dropout, ngnn_type, reduce='mean'):
         super(SAGE, self).__init__()
 
         self.convs = torch.nn.ModuleList()
@@ -214,6 +223,7 @@ class LinkPredictor(torch.nn.Module):
 
 
 def train(model, predictor, g, x, split_edge, optimizer, batch_size):
+    global args
     model.train()
     predictor.train()
 
@@ -239,6 +249,8 @@ def train(model, predictor, g, x, split_edge, optimizer, batch_size):
         loss = pos_loss + neg_loss
         loss.backward()
 
+        if args.dataset == 'ogbl-ddi':
+            torch.nn.utils.clip_grad_norm_(x, 1.0)
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         torch.nn.utils.clip_grad_norm_(predictor.parameters(), 1.0)
 
@@ -282,7 +294,7 @@ def test(model, predictor, g, valg, x, split_edge, evaluator, batch_size):
     neg_test_pred = get_pred(neg_test_edge, h)
 
     results = {}
-    for K in [10, 50, 100]:
+    for K in [20, 50, 100]:
         evaluator.K = K
         train_hits = evaluator.eval({
             'y_pred_pos': pos_train_pred,
@@ -303,9 +315,12 @@ def test(model, predictor, g, valg, x, split_edge, evaluator, batch_size):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='OGBL-COLLAB (GNN)')
+    parser = argparse.ArgumentParser(description='OGBL(Full Batch GCN/GraphSage + NGNN)')
 
-    # device settings
+    # dataset setting
+    parser.add_argument('--dataset', type=str, default='ogbl-ddi', choices=['ogbl-ddi', 'ogbl-collab', 'ogbl-ppa'])
+
+    # device setting
     parser.add_argument('--device', type=int, default=0, help='GPU device ID. Use -1 for CPU training.')
 
     # model structure settings
@@ -323,50 +338,54 @@ def main():
     parser.add_argument('--log_steps', type=int, default=1)
     parser.add_argument('--eval_steps', type=int, default=1)
     parser.add_argument('--runs', type=int, default=10)
-    args = parser.parse_args()
+    global args; args = parser.parse_args()
     print(args)
 
     device = f'cuda:{args.device}' if args.device != -1 and torch.cuda.is_available() else 'cpu'
     device = torch.device(device)
 
-    dataset = DglLinkPropPredDataset(name='ogbl-collab')
+    dataset = DglLinkPropPredDataset(name=args.dataset)
     data = dataset[0]
     split_edge = dataset.get_edge_split()
 
-    n_feat = data.ndata['feat'].size(-1)
-    
     # We randomly pick some training samples that we want to evaluate on:
     idx = torch.randperm(split_edge['train']['edge'].size(0))
     idx = idx[:split_edge['valid']['edge'].size(0)]
     split_edge['eval_train'] = {'edge': split_edge['train']['edge'][idx]}
 
+    if args.dataset == 'ogbl-ppa':
+        data.ndata['feat'] = data.ndata['feat'].to(torch.float)
+
+    if args.dataset == 'ogbl-ddi':
+        emb = torch.nn.Embedding(data.num_nodes(), args.hidden_channels).to(device)
+        in_channels = args.hidden_channels
+    else: # ogbl-collab, ogbl-ppa
+        in_channels = data.ndata['feat'].size(-1)
+    
+    # select model
     if args.use_sage:
-        model = SAGE(n_feat, args.hidden_channels,
+        model = SAGE(in_channels, args.hidden_channels,
                      args.hidden_channels, args.num_layers,
-                     args.dropout, args.ngnn_type).to(device)
+                     args.dropout, args.ngnn_type)
     else: # GCN
         data = dgl.add_self_loop(data)
-        model = GCN(n_feat, args.hidden_channels,
+        model = GCN(in_channels, args.hidden_channels,
                     args.hidden_channels, args.num_layers,
-                    args.dropout, args.ngnn_type).to(device)
+                    args.dropout, args.ngnn_type)
 
-
-    # Use training + validation edges for inference on test set.
-    if args.use_valedges_as_input:
+    valdata = data
+    if args.use_valedges_as_input: # Use training + validation edges for inference on test set.
         val_edges = split_edge['valid']['edge'].T
         valdata = dgl.add_edges(data, val_edges[0], val_edges[1], {key: split_edge['valid'][key].view(-1, 1) for key in ['weight', 'year']})
         valdata = dgl.add_edges(valdata, val_edges[1], val_edges[0], {key: split_edge['valid'][key].view(-1, 1) for key in ['weight', 'year']})
-    else:
-        valdata = data
 
-    data = data.to(device)
-    valdata = valdata.to(device)
+    predictor = LinkPredictor(args.hidden_channels, args.hidden_channels, 1, 3, args.dropout)
 
-    predictor = LinkPredictor(args.hidden_channels, args.hidden_channels, 1, 3, args.dropout).to(device)
+    data, valdata, model, predictor = map(lambda x: x.to(device), (data, valdata, model, predictor))
 
-    evaluator = Evaluator(name='ogbl-collab')
+    evaluator = Evaluator(name=args.dataset)
     loggers = {
-        'Hits@10': Logger(args.runs, args),
+        'Hits@20': Logger(args.runs, args),
         'Hits@50': Logger(args.runs, args),
         'Hits@100': Logger(args.runs, args),
     }
@@ -375,10 +394,14 @@ def main():
         torch.cuda.empty_cache()
         model.reset_parameters()
         predictor.reset_parameters()
+        if args.dataset == 'ogbl-ddi':
+            torch.nn.init.xavier_uniform_(emb.weight)
+            data.ndata['feat'] = emb.weight
         optimizer = torch.optim.Adam(
-            list(model.parameters()) + list(predictor.parameters()),
+            list(model.parameters()) + list(predictor.parameters()) + (
+                list(emb.parameters()) if args.dataset == 'ogbl-ddi' else []
+            ),
             lr=args.lr)
-
         for epoch in range(1, 1 + args.epochs):
             loss = train(model, predictor, data, data.ndata['feat'], split_edge, optimizer,
                          args.batch_size)

@@ -1,4 +1,5 @@
 python main.py \
+    --dataset ogbl-collab \
     --device 0 \
     --ngnn_type hidden \
     --use_sage \
@@ -8,4 +9,4 @@ python main.py \
     --lr 0.001 \
     --batch_size 32768 \
     --runs 10 \
-    | tee results/ddi-hidden-SAGE-epoch_600-dropout_0.2-layers_3-lr_0.001-batch_32768
+    | tee results/collab-hidden-SAGE-epoch_600-dropout_0.2-layers_3-lr_0.001-batch_32768

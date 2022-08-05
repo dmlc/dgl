@@ -1,4 +1,5 @@
 python main.py \
+    --dataset ogbl-ddi \
     --device 3 \
     --ngnn_type input \
     --use_sage \
