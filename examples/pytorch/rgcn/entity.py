@@ -13,9 +13,9 @@ class RGCN(nn.Module):
         self.emb = nn.Embedding(num_nodes, h_dim)
         # two-layer RGCN
         self.conv1 = RelGraphConv(h_dim, h_dim, num_rels, regularizer='basis',
-                                  num_bases=num_rels)
+                                  num_bases=num_rels, self_loop=False)
         self.conv2 = RelGraphConv(h_dim, out_dim, num_rels, regularizer='basis',
-                                  num_bases=num_rels)
+                                  num_bases=num_rels, self_loop=False)
         
     def forward(self, g):
         x = self.emb.weight
