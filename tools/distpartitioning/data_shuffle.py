@@ -15,7 +15,7 @@ from utils import read_ntype_partition_files, read_json, get_node_types, \
                     augment_edge_data, get_gnid_range_map, \
                     write_dgl_objects, write_metadata_json, get_ntype_featnames, \
                     get_idranges
-from gloo_wrapper import alltoall_cpu, allgather_sizes, gather_metadata_json,\
+from gloo_wrapper import allgather_sizes, gather_metadata_json,\
                     alltoallv_cpu
 from globalids import assign_shuffle_global_nids_nodes, \
                     assign_shuffle_global_nids_edges, \
