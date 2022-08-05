@@ -33,7 +33,7 @@ def generate_graph(idtype, grad=False, add_data=True):
 @parametrize_idtype
 def test_gpu_cache(idtype):
     g = generate_graph(idtype)
-    cache = dgl.contrib.GpuCache(5, D, 32 if idtype == F.int32 else 64)
+    cache = dgl.contrib.GpuCache(5, D, idtype)
     h = g.ndata['h']
 
     t = 5

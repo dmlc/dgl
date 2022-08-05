@@ -23,22 +23,22 @@ from .._ffi.function import _init_api
 
 class GpuCache(object):
     """High-level wrapper for GPU embedding cache"""
-    def __init__(self, num_items, num_feats, num_bits):
-        assert num_bits == 32 or num_bits == 64
-        self._cache = _CAPI_DGLGpuCacheCreate(num_items, num_feats, num_bits)
-        self.num_bits = num_bits
+    def __init__(self, num_items, num_feats, idtype):
+        assert idtype == F.int32 or idtype == F.int64
+        self._cache = _CAPI_DGLGpuCacheCreate(num_items, num_feats, 32 if idtype == F.int32 else 64)
+        self.idtype = idtype
         self.total_miss = 0
         self.total_queries = 0
     
     def query(self, keys):
         self.total_queries += keys.shape[0]
-        keys = F.astype(keys, F.int32 if self.num_bits == 32 else F.int64)
+        keys = F.astype(keys, self.idtype)
         values, missing_index, missing_keys = _CAPI_DGLGpuCacheQuery(self._cache, F.to_dgl_nd(keys))
         self.total_miss += missing_keys.shape[0]
         return F.from_dgl_nd(values), F.from_dgl_nd(missing_index), F.from_dgl_nd(missing_keys)
     
     def replace(self, keys, values):
-        keys = F.astype(keys, F.int32 if self.num_bits == 32 else F.int64)
+        keys = F.astype(keys, self.idtype)
         values = F.astype(values, F.float32)
         _CAPI_DGLGpuCacheReplace(self._cache, F.to_dgl_nd(keys), F.to_dgl_nd(values))
     
