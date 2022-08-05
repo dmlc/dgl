@@ -97,7 +97,7 @@ def pairwise_squared_distance(x):
     return x2s + F.swapaxes(x2s, -1, -2) - 2 * x @ F.swapaxes(x, -1, -2)
 
 #pylint: disable=invalid-name
-def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean'):
+def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean', exclude_self=True, output_batch=True):
     r"""Construct a graph from a set of points according to k-nearest-neighbor (KNN)
     and return.
 
@@ -205,6 +205,10 @@ def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean'):
     (tensor([0, 1, 2, 2, 2, 3, 3, 3, 4, 5, 5, 5, 6, 6, 7, 7]),
      tensor([0, 1, 1, 2, 3, 0, 2, 3, 4, 5, 6, 7, 4, 6, 5, 7]))
     """
+    if exclude_self:
+        # add 1 to k, for the self edge, since it will be removed
+        k = k + 1
+
     # check invalid k
     if k <= 0:
         raise DGLError("Invalid k value. expect k > 0, got k = {}".format(k))
@@ -214,7 +218,8 @@ def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean'):
         raise DGLError("Find empty point set")
 
     if algorithm == 'bruteforce-blas':
-        return _knn_graph_blas(x, k, dist=dist)
+        result = _knn_graph_blas(x, k, dist=dist)
+        x_seg = [result.num_nodes()]
     else:
         if F.ndim(x) == 3:
             x_size = tuple(F.shape(x))
@@ -224,7 +229,17 @@ def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean'):
             x_seg = [F.shape(x)[0]]
         out = knn(k, x, x_seg, algorithm=algorithm, dist=dist)
         row, col = out[1], out[0]
-        return convert.graph((row, col))
+        result = convert.graph((row, col))
+
+    if output_batch:
+        result.set_batch_num_nodes(x_seg)
+        result.set_batch_num_edges(k*x_seg)
+
+    if exclude_self:
+        # remove_self_loop will update batch_num_edges as needed
+        result = remove_self_loop(result)
+
+    return result
 
 def _knn_graph_blas(x, k, dist='euclidean'):
     r"""Construct a graph from a set of points according to k-nearest-neighbor (KNN).
@@ -279,7 +294,7 @@ def _knn_graph_blas(x, k, dist='euclidean'):
     return convert.graph((F.reshape(src, (-1,)), F.reshape(dst, (-1,))))
 
 #pylint: disable=invalid-name
-def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas', dist='euclidean'):
+def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas', dist='euclidean', exclude_self=True, output_batch=True):
     r"""Construct multiple graphs from multiple sets of points according to
     k-nearest-neighbor (KNN) and return.
 
@@ -372,6 +387,10 @@ def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas', dist='euclidean
     (tensor([0, 0, 1, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6, 6]),
      tensor([0, 1, 0, 1, 2, 2, 3, 5, 4, 6, 3, 5, 4, 6]))
     """
+    if exclude_self:
+        # add 1 to k, for the self edge, since it will be removed
+        k = k + 1
+
     # check invalid k
     if k <= 0:
         raise DGLError("Invalid k value. expect k > 0, got k = {}".format(k))
@@ -381,11 +400,21 @@ def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas', dist='euclidean
         raise DGLError("Find empty point set")
 
     if algorithm == 'bruteforce-blas':
-        return _segmented_knn_graph_blas(x, k, segs, dist=dist)
+        result = _segmented_knn_graph_blas(x, k, segs, dist=dist)
     else:
         out = knn(k, x, segs, algorithm=algorithm, dist=dist)
         row, col = out[1], out[0]
-        return convert.graph((row, col))
+        result = convert.graph((row, col))
+
+    if output_batch:
+        result.set_batch_num_nodes(segs)
+        result.set_batch_num_edges(k*segs)
+
+    if exclude_self:
+        # remove_self_loop will update batch_num_edges as needed
+        result = remove_self_loop(result)
+
+    return result
 
 def _segmented_knn_graph_blas(x, k, segs, dist='euclidean'):
     r"""Construct multiple graphs from multiple sets of points according to
@@ -1638,11 +1667,7 @@ def remove_edges(g, eids, etype=None, store_ids=False):
 
     Notes
     -----
-
-    This function discards the batch information. Please use
-    :func:`dgl.DGLGraph.set_batch_num_nodes`
-    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
-    to maintain the information.
+    This function preserves the batch information.
 
     Examples
     --------
@@ -1910,10 +1935,7 @@ def remove_self_loop(g, etype=None):
     If a node has multiple self-loops, remove them all. Do nothing for nodes without
     self-loops.
 
-    This function discards the batch information. Please use
-    :func:`dgl.DGLGraph.set_batch_num_nodes`
-    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
-    to maintain the information.
+    This function preserves the batch information.
 
     Examples
     ---------
