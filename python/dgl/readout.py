@@ -365,7 +365,8 @@ def broadcast_nodes(graph, graph_feat, *, ntype=None):
     graph : DGLGraph
         The graph.
     graph_feat : tensor
-        The feature to broadcast. Tensor shape is :math:`(B, *)` for batched graph, where :math:`B` is the batch size.
+        The feature to broadcast. Tensor shape is :math:`(B, *)` for batched graph,
+        where :math:`B` is the batch size.
 
     ntype : str, optional
         Node type. Can be omitted if there is only one node type.
@@ -403,8 +404,9 @@ def broadcast_nodes(graph, graph_feat, *, ntype=None):
             [0.2721, 0.4629, 0.7269, 0.0724, 0.1014],
             [0.2721, 0.4629, 0.7269, 0.0724, 0.1014]])
 
-    Broadcast feature to all nodes in the single graph (the feature tensor shape to broadcast should be :math:`(1, *)`).
-    
+    Broadcast feature to all nodes in the single graph (the feature tensor shape
+    to broadcast should be :math:`(1, *)`).
+
     >>> feat0 = th.unsqueeze(feat[0], 0)
     >>> dgl.broadcast_nodes(g1, feat0)
     tensor([[0.4325, 0.7710, 0.5541, 0.0544, 0.9368],
@@ -415,7 +417,8 @@ def broadcast_nodes(graph, graph_feat, *, ntype=None):
     broadcast_edges
     """
     if (F.shape(graph_feat)[0] != graph.batch_size and graph.batch_size == 1):
-        dgl_warning('When single graph, please make sure the batching dimension is added and the tensor shape of graph_feat is (1, *).')
+        dgl_warning('If single graph, please make sure the batching dimension is added'
+                    ' and the tensor shape of graph_feat is (1, *).')
         graph_feat = F.unsqueeze(graph_feat, dim=0)
     return F.repeat(graph_feat, graph.batch_num_nodes(ntype), dim=0)
 
@@ -436,7 +439,8 @@ def broadcast_edges(graph, graph_feat, *, etype=None):
     graph : DGLGraph
         The graph.
     graph_feat : tensor
-        The feature to broadcast. Tensor shape is :math:`(B, *)` for batched graph, where :math:`B` is the batch size.
+        The feature to broadcast. Tensor shape is :math:`(B, *)` for batched graph,
+        where :math:`B` is the batch size.
     etype : str, typle of str, optional
         Edge type. Can be omitted if there is only one edge type in the graph.
 
@@ -471,7 +475,8 @@ def broadcast_edges(graph, graph_feat, *, etype=None):
             [0.2721, 0.4629, 0.7269, 0.0724, 0.1014],
             [0.2721, 0.4629, 0.7269, 0.0724, 0.1014]])
 
-    Broadcast feature to all edges in the single graph (the feature tensor shape to broadcast should be :math:`(1, *)`).
+    Broadcast feature to all edges in the single graph (the feature tensor shape
+    to broadcast should be :math:`(1, *)`).
 
     >>> feat1 = th.unsqueeze(feat[1], 0)
     >>> dgl.broadcast_edges(g2, feat1)
@@ -483,7 +488,8 @@ def broadcast_edges(graph, graph_feat, *, etype=None):
     broadcast_nodes
     """
     if (F.shape(graph_feat)[0] != graph.batch_size and graph.batch_size == 1):
-        dgl_warning('When single graph, please make sure the batching dimension is added and the tensor shape of graph_feat is (1, *).')
+        dgl_warning('If single graph, please make sure the batching dimension is added'
+                    ' and the tensor shape of graph_feat is (1, *).')
         graph_feat = F.unsqueeze(graph_feat, dim=0)
     return F.repeat(graph_feat, graph.batch_num_edges(etype), dim=0)
 
