@@ -157,73 +157,121 @@ def create_dgl_object(graph_name, num_parts, \
                                          edge_id_start + np.sum(etype_ids == etype_id)])
         edge_id_start += np.sum(etype_ids == etype_id)
 
-    # Here we want to compute the unique IDs in the edge list.
-    # It is possible that a node that belongs to the partition but it doesn't appear
-    # in the edge list. That is, the node is assigned to this partition, but its neighbor
-    # belongs to another partition so that the edge is assigned to another partition.
-    # This happens in a directed graph.
-    # To avoid this kind of nodes being removed from the graph, we add node IDs that
-    # belong to this partition.
+    # get the edge list in some order and then reshuffle.
+    # Here the order of nodes is defined by the `np.unique` function
+    # node order is as listed in the uniq_ids array
     ids = np.concatenate(
-        [shuffle_global_src_id, shuffle_global_dst_id, np.arange(shuffle_global_nid_range[0], shuffle_global_nid_range[1] + 1)])
+        [shuffle_global_src_id, shuffle_global_dst_id,▒
+            np.arange(shuffle_global_nid_range[0], shuffle_global_nid_range[1] + 1)])
     uniq_ids, idx, inverse_idx = np.unique(
         ids, return_index=True, return_inverse=True)
     assert len(uniq_ids) == len(idx)
+
     # We get the edge list with their node IDs mapped to a contiguous ID range.
     part_local_src_id, part_local_dst_id = np.split(inverse_idx[:len(shuffle_global_src_id) * 2], 2)
-    compact_g = dgl.graph(data=(part_local_src_id, part_local_dst_id), num_nodes=len(idx))
-    compact_g.edata['orig_id'] = th.as_tensor(global_edge_id)
-    compact_g.edata[dgl.ETYPE] = th.as_tensor(etype_ids)
-    compact_g.edata['inner_edge'] = th.ones(
-        compact_g.number_of_edges(), dtype=th.bool)
+    inner_nodes = th.as_tensor(np.logical_and(
+            uniq_ids >= shuffle_global_nid_range[0],
+            uniq_ids <= shuffle_global_nid_range[1]))
 
-    # The original IDs are homogeneous IDs.
-    # Similarly, we need to add the original homogeneous node IDs
-    global_nids = np.concatenate([global_src_id, global_dst_id, global_homo_nid])
-    global_homo_ids = global_nids[idx]
-    ntype, per_type_ids = id_map(global_homo_ids)
-    compact_g.ndata['orig_id'] = th.as_tensor(per_type_ids)
-    compact_g.ndata[dgl.NTYPE] = th.as_tensor(ntype)
-    compact_g.ndata[dgl.NID] = th.as_tensor(uniq_ids)
-    compact_g.ndata['inner_node'] = th.as_tensor(np.logical_and(
-        uniq_ids >= shuffle_global_nid_range[0], uniq_ids <= shuffle_global_nid_range[1]))
-    part_local_nids = compact_g.ndata[dgl.NID][compact_g.ndata['inner_node'].bool()]
-    assert np.all((part_local_nids == th.arange(
-        part_local_nids[0], part_local_nids[-1] + 1)).numpy())
-    print('|V|={}'.format(compact_g.number_of_nodes()))
-    print('|E|={}'.format(compact_g.number_of_edges()))
+    #get the list of indices, from inner_nodes, which will sort inner_nodes as [True, True, ...., False, False, ...]
+    #essentially local nodes will be placed before non-local nodes.
+    reshuffle_nodes = th.arange(len(uniq_ids))
+    reshuffle_nodes = th.cat([reshuffle_nodes[inner_nodes.bool()],
+                              reshuffle_nodes[inner_nodes == 0]])
 
-    # We need to reshuffle nodes in a partition so that all local nodes are labelled starting from 0.
-    reshuffle_nodes = th.arange(compact_g.number_of_nodes())
-    reshuffle_nodes = th.cat([reshuffle_nodes[compact_g.ndata['inner_node'].bool()],
-                              reshuffle_nodes[compact_g.ndata['inner_node'] == 0]])
-    compact_g1 = dgl.node_subgraph(compact_g, reshuffle_nodes)
-    compact_g1.ndata['orig_id'] = compact_g.ndata['orig_id'][reshuffle_nodes]
-    compact_g1.ndata[dgl.NTYPE] = compact_g.ndata[dgl.NTYPE][reshuffle_nodes]
-    compact_g1.ndata[dgl.NID] = compact_g.ndata[dgl.NID][reshuffle_nodes]
-    compact_g1.ndata['inner_node'] = compact_g.ndata['inner_node'][reshuffle_nodes]
-    compact_g1.edata['orig_id'] = compact_g.edata['orig_id'][compact_g1.edata[dgl.EID]]
-    compact_g1.edata[dgl.ETYPE] = compact_g.edata[dgl.ETYPE][compact_g1.edata[dgl.EID]]
-    compact_g1.edata['inner_edge'] = compact_g.edata['inner_edge'][compact_g1.edata[dgl.EID]]
+    '''
+    Following procedure is used to map the part_local_src_id, part_local_dst_id to account for
+    reshuffling of nodes (to order localy owned nodes prior to non-local nodes in a partition)
+    1. Place side-by-side reshuffle_nodes and corresponding index value.▒
+        Basically (reshuffle_node[idx], idx) will form the key-value pair which we have to use
+        for mapping part_local_src_ids, and part_local_dst_ids.
+        Below we use column_stack to generate this mapping, call the resultant map as `node_map`
 
-    # reshuffle edges on ETYPE as node_subgraph relabels edges
-    idx = th.argsort(compact_g1.edata[dgl.ETYPE])
-    u, v = compact_g1.edges()
-    u = u[idx]
-    v = v[idx]
-    compact_g2 = dgl.graph((u, v))
-    compact_g2.ndata['orig_id'] = compact_g1.ndata['orig_id']
-    compact_g2.ndata[dgl.NTYPE] = compact_g1.ndata[dgl.NTYPE]
-    compact_g2.ndata[dgl.NID] = compact_g1.ndata[dgl.NID]
-    compact_g2.ndata['inner_node'] = compact_g1.ndata['inner_node']
-    compact_g2.edata['orig_id'] = compact_g1.edata['orig_id'][idx]
-    compact_g2.edata[dgl.ETYPE] = compact_g1.edata[dgl.ETYPE][idx]
-    compact_g2.edata['inner_edge'] = compact_g1.edata['inner_edge'][idx]
-    compact_g2.edata[dgl.EID] = th.arange(
-        edgeid_offset, edgeid_offset + compact_g2.number_of_edges(), dtype=th.int64)
-    edgeid_offset += compact_g2.number_of_edges()
+    2. Sort the node_map array, so that the reshuffle_nodes column are sorted. This is needed because
+        `uniq_ids` are sorted as a result of np.unique operation.
 
-    return compact_g2, node_map_val, edge_map_val, ntypes_map, etypes_map
+    3. Now, at this time the map is ready to map pre-node-reordering node-ids.▒
+
+    4. Now, concatenate [part_local_src_id, part_local_dst_id, np.arange(len(uniq_ids))] so that we have
+        the same sized array which is used to generate part_local_src_id and part_local_dst_id▒
+        which is the code above this comment section.
+
+    5. Now perform np.unique operation on the resultant list from step (4). This set of uniq_values
+        should follow the same order as `idx (uniq_ids)` above.▒
+
+    6. Now after this step, uniq_mapped_vals and uniq_ids should be the mapping between shuffle_global_nids
+        and part_local_nids
+
+    7. Now use the `node_map` array to map part_local_nids to their appropriate values to account for
+        node reordering in the `reshuffle_nodes` array.
+
+    Here is a  simple example to understand the above flow better.
+
+    part_local_nids = [0, 1, 2, 3, 4, 5]
+    part_local_src_ids = [0, 0, 0, 0, 2, 3, 4]
+    part_local_dst_ids = [1, 2, 3, 4, 4, 4, 5]
+
+    Assume that nodes {1, 5} are halo-nodes, which are not owned by this partition.
+
+    reshuffle_nodes = [0, 2, 3, 4, 1, 5]
+
+    node_map = [[0, 0],
+                [2, 1],
+                [3, 2],
+                [4, 3],
+                [1, 4],
+                [5, 5]]
+    and after sorting this becomes as follows:▒
+    node_map = [[0, 0],
+                [1, 4],
+                [2, 1],▒
+                [3, 2],▒
+                [4, 3],
+                [5, 5]]
+
+    Using the above map, we have mapped part_local_src_ids and part_local_dst_ids as follows:
+    part_local_src_ids = [0, 0, 0, 0, 1, 2, 3]
+    part_local_dst_ids = [4, 1, 2, 3, 3, 3, 5]
+
+    In this graph above, note that nodes {0, 1, 2, 3} are inner_nodes and {4, 5} are NON-inner-nodes
+
+    Since the edge are re-ordered in any way, there is no reordering required for edge related data
+    during the DGL object creation.
+    '''
+    #create the mappings to generate mapped part_local_src_id and part_local_dst_id
+    node_map = np.column_stack((reshuffle_nodes.clone().numpy(), np.arange(len(uniq_ids))))
+    node_map = node_map[np.argsort(node_map[:,0])]
+
+    #node_map, which is sorted should be the same as idx, which is used along with uniq_ids.
+    #Use this to map the part_local_src_ids and part_local_dst_ids
+    unmapped_vals = np.concatenate([part_local_src_id, part_local_dst_id, np.arange(len(uniq_ids))])
+    uniq_unmapped_vals, midx, minverse = np.unique(unmapped_vals, return_index=True, return_inverse=True)
+
+    #Now map the edge end points to reshuffled_values.
+    part_local_src_id, part_local_dst_id = np.split(node_map[:,1][minverse][:len(part_local_src_id)*2], 2)
+
+    #create the graph here now.
+    part_graph = dgl.graph(data=(part_local_src_id, part_local_dst_id), num_nodes=len(uniq_ids))
+    part_graph.edata[dgl.EID] = th.arange(
+        edgeid_offset, edgeid_offset + part_graph.number_of_edges(), dtype=th.int64)
+    part_graph.edata['orig_id'] = th.as_tensor(global_edge_id)
+    part_graph.edata[dgl.ETYPE] = th.as_tensor(etype_ids)
+    part_graph.edata['inner_edge'] = th.ones(part_graph.number_of_edges(), dtype=th.bool)
+
+    #compute per_type_ids and ntype for all the nodes in the graph.
+    global_ids = np.concatenate(
+            [global_src_id, global_dst_id, global_homo_nid])
+    part_global_ids = global_ids[idx]
+    part_global_ids = part_global_ids[reshuffle_nodes]
+    ntype, per_type_ids = id_map(part_global_ids)
+
+    #continue with the graph creation
+    part_graph.ndata['orig_id'] = th.as_tensor(per_type_ids)
+    part_graph.ndata[dgl.NTYPE] = th.as_tensor(ntype)
+    part_graph.ndata[dgl.NID] = th.as_tensor(uniq_ids[reshuffle_nodes])
+    part_graph.ndata['inner_node'] = inner_nodes[reshuffle_nodes]
+
+    return part_graph, node_map_val, edge_map_val, ntypes_map, etypes_map
 
 def create_metadata_json(graph_name, num_nodes, num_edges, part_id, num_parts, node_map_val, \
                             edge_map_val, ntypes_map, etypes_map, output_dir ):
