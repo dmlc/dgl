@@ -37,7 +37,7 @@ import argparse
 import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from load_graph import load_dataset
+from load_graph import load_reddit
 
 import nvtx
     
@@ -185,7 +185,7 @@ def main(args):
     if args.replication <= 0:
         args.replication = world_size
 
-    g, n_classes, multilabel = load_dataset(args.dataset)
+    g, n_classes = load_reddit()
 
     if args.undirected:
         g, reverse_eids = to_bidirected_with_reverse_mapping(remove_self_loop(g))

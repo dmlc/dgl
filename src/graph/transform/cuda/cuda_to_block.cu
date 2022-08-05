@@ -94,9 +94,8 @@ class DeviceNodeMapMaker {
             &num_uniq, 0,
             sizeof(*count_lhs_device),
             ctx_,
-            DGLContext{kDLCPU, 0},
-            DGLType{kDLInt, 64, 1},
-            stream);
+            DGLContext{kDGLCPU, 0},
+            DGLDataType{kDGLInt, 64, 1});
       
           IdType * unique_2 = static_cast<IdType*>(
             device->AllocWorkspace(ctx_, sizeof(IdType) * (num_uniq)));
@@ -135,8 +134,7 @@ class DeviceNodeMapMaker {
             sizeof(*unique) * num_uniq,
             ctx_,
             ctx_,
-            DGLType{kDLInt, sizeof(IdType) * 8, 1},
-            stream);
+            DGLDataType{kDGLInt, sizeof(IdType) * 8, 1});
       
           node_maps->LhsHashTable(ntype).FillWithUnique(unique_2, num_uniq, stream);
       

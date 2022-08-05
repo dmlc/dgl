@@ -196,12 +196,12 @@ class DistGraph(object):
         
         for k, v in list(g.ndata.items()):
             if k != NID:
-                self.dstdata[k] = v[g_NID].to(self.device)
+                self.dstdata[k] = v[g_NID.to(v.device)].to(self.device)
                 g.ndata.pop(k)
         
         for k, v in list(g.edata.items()):
             if k != EID:
-                self.g.edata[k] = v[g_EID].to(self.device)
+                self.g.edata[k] = v[g_EID.to(v.device)].to(self.device)
                 g.edata.pop(k)
         
         print(self.rank, self.g.num_nodes(), self.pr, self.g_pr, self.l_offset, self.node_ranges, self.g_node_ranges, self.permute, self.inv_permute)
