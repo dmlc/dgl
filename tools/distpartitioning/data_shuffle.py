@@ -15,8 +15,8 @@ from utils import read_ntype_partition_files, read_json, get_node_types, \
                     augment_edge_data, get_gnid_range_map, \
                     write_dgl_objects, write_metadata_json, get_ntype_featnames, \
                     get_idranges
-from gloo_wrapper import alltoall_cpu_object_lst, alltoallv_cpu, \
-                    alltoall_cpu, allgather_sizes, gather_metadata_json
+from gloo_wrapper import allgather_sizes, gather_metadata_json,\
+                    alltoallv_cpu
 from globalids import assign_shuffle_global_nids_nodes, \
                     assign_shuffle_global_nids_edges, \
                     get_shuffle_global_nids_edges
@@ -140,8 +140,6 @@ def exchange_edge_data(rank, world_size, edge_data):
     """
 
     input_list = []
-    send_sizes = []
-    recv_sizes = []
     start = timer()
     for i in np.arange(world_size):
         send_idx = (edge_data[constants.OWNER_PROCESS] == i)
@@ -152,23 +150,13 @@ def exchange_edge_data(rank, world_size, edge_data):
                                     edge_data[constants.ETYPE_ID][send_idx == 1], \
                                     edge_data[constants.GLOBAL_EID][send_idx == 1]))
         if(filt_data.shape[0] <= 0):
-            input_list.append(torch.empty((0,), dtype=torch.int64))
-            send_sizes.append(torch.empty((0,), dtype=torch.int64))
+            input_list.append(torch.empty((0,5), dtype=torch.int64))
         else:
             input_list.append(torch.from_numpy(filt_data))
-            send_sizes.append(torch.tensor(filt_data.shape, dtype=torch.int64))
-        recv_sizes.append(torch.zeros((2,), dtype=torch.int64))
     end = timer()
     
     dist.barrier ()
-    start = timer()
-    alltoall_cpu(rank, world_size, recv_sizes, send_sizes)
-    output_list = []
-    for s in recv_sizes: 
-        output_list.append(torch.zeros(s.tolist(), dtype=torch.int64))
-
-    dist.barrier ()
-    alltoallv_cpu(rank, world_size, output_list, input_list)
+    output_list = alltoallv_cpu(rank, world_size, input_list)
     end = timer()
     print('[Rank: ', rank, '] Time to send/rcv edge data: ', timedelta(seconds=end-start))
 
@@ -197,6 +185,9 @@ def exchange_node_features(rank, world_size, node_feature_tids, ntype_gnid_map, 
         retrieved. 
     d. After receiving the corresponding shuffle_global_nids these ids are added to the 
         node_data and edge_data dictionaries
+    
+    This pipeline assumes all the input data in numpy format, except node/edge features which
+    are maintained as tensors throughout the various stages of the pipeline execution.
 
     Parameters: 
     -----------
@@ -246,6 +237,7 @@ def exchange_node_features(rank, world_size, node_feature_tids, ntype_gnid_map, 
             global_nid_per_rank = []
             feat_name = feat_info[0]
             feat_key = ntype_name+'/'+feat_name
+            print('[Rank: ', rank, '] processing node feature: ', feat_key)
 
             #compute the global_nid range for this node features
             type_nid_start = int(feat_info[1])
@@ -273,29 +265,20 @@ def exchange_node_features(rank, world_size, node_feature_tids, ntype_gnid_map, 
                 local_idx_partid = local_idx[cond]
 
                 if (gnids_per_partid.shape[0] == 0):
-                    node_feats_per_rank.append({feat_key : torch.empty((0,), dtype=torch.float)})
-                    global_nid_per_rank.append({feat_key : torch.empty((0,), dtype=torch.int64)})
+                    node_feats_per_rank.append(torch.empty((0,1), dtype=torch.float))
+                    global_nid_per_rank.append(np.empty((0,1), dtype=np.int64))
                 else:
-                    node_feats_per_rank.append({feat_key : node_feats[local_idx_partid]})
-                    global_nid_per_rank.append({feat_key : gnids_per_partid})
+                    node_feats_per_rank.append(node_feats[local_idx_partid])
+                    global_nid_per_rank.append(torch.from_numpy(gnids_per_partid).type(torch.int64))
 
             #features (and global nids) per rank to be sent out are ready
             #for transmission, perform alltoallv here.
-            output_feat_list = alltoall_cpu_object_lst(rank, world_size, node_feats_per_rank)
-            output_feat_list[rank] = node_feats_per_rank[rank]
-
-            output_nid_list = alltoall_cpu_object_lst(rank, world_size, global_nid_per_rank)
-            output_nid_list[rank] = global_nid_per_rank[rank]
+            output_feat_list = alltoallv_cpu(rank, world_size, node_feats_per_rank)
+            output_nid_list = alltoallv_cpu(rank, world_size, global_nid_per_rank)
 
             #stitch node_features together to form one large feature tensor
-            own_node_features[feat_key] = []
-            own_global_nids[feat_key] = []
-            for idx, x in enumerate(output_feat_list):
-                own_node_features[feat_key].append(x[feat_key])
-                own_global_nids[feat_key].append(output_nid_list[idx][feat_key])
-            for k in own_node_features.keys(): 
-                own_node_features[k] = torch.cat(own_node_features[k])
-                own_global_nids[k] = np.concatenate(own_global_nids[k])
+            own_node_features[feat_key] = torch.cat(output_feat_list)
+            own_global_nids[feat_key] = torch.cat(output_nid_list).numpy()
 
     end = timer()
     print('[Rank: ', rank, '] Total time for node feature exchange: ', timedelta(seconds = end - start))
