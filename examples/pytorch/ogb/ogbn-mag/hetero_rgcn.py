@@ -5,7 +5,7 @@ from tqdm import tqdm
 import dgl
 import dgl.nn as dglnn
 from dgl.nn import HeteroEmbedding
-from dgl import AddReverse
+from dgl import AddReverse, ToSimple
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
@@ -17,18 +17,16 @@ def extract_embed(node_embed, input_nodes):
     for ntype, nid in input_nodes.items():
         nid = input_nodes[ntype]
         if ntype in node_embed.embeds:
-            emb[ntype] = node_embed.embeds.pop(ntype)(nid)
+            emb[ntype] = node_embed.embeds[ntype](nid)
     return emb
 
-def RelGraphEmbed(graph,embed_size,exclude):
-    node_num={}
+def relgraphembed(graph, embed_size):
+    node_num = {}
     for ntype in graph.ntypes:
-        if ntype in exclude:
+        if ntype == 'paper':
             continue
-        node_num[ntype] = graph.number_of_nodes(ntype)
-    embeds = HeteroEmbedding(node_num,embed_size)
-    for node_type in embeds.embeds.keys():
-        nn.init.xavier_uniform_(embeds.embeds[node_type].weight)  
+        node_num[ntype] = graph.num_nodes(ntype)
+    embeds = HeteroEmbedding(node_num, embed_size)
     return embeds
 
 
@@ -286,8 +284,10 @@ def prepare_data(args):
     g, labels = dataset[0] # graph: dgl graph object, label: torch tensor of shape (num_nodes, num_tasks)
     labels = labels['paper'].flatten()
 
-    transform = AddReverse()
-    g = transform(g)
+    transform1 = ToSimple()
+    g = transform1(g)
+    transform2 = AddReverse()
+    g = transform2(g)
     
     print("Loaded graph: {}".format(g))
 
@@ -303,7 +303,7 @@ def prepare_data(args):
             logger, train_loader)
 
 def get_model(g, num_classes, args):
-    embed_layer = RelGraphEmbed(g, 128, exclude=['paper'])
+    embed_layer = relgraphembed(g, 128)
     
     model = EntityClassify(
         g, 128, args['n_hidden'], num_classes,
