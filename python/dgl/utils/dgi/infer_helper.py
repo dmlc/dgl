@@ -79,7 +79,7 @@ class InferenceHelperBase():
 
     def _wrap_conv_blocks(self):
         """Wrap Conv blocks to calls."""
-        def _warped_call(self, *args):
+        def _warpped_call(self, *args):
             torch.cuda.empty_cache()
             ret_shapes = self.helper._trace_output_shape(self, *args)
             rets = ()
@@ -91,7 +91,7 @@ class InferenceHelperBase():
                 return outputs[0]
             return outputs
 
-        GraphModule.wraped_call = _warped_call
+        GraphModule.wraped_call = _warpped_call
         for tag in self._tags:
             sub_gm = getattr(self._splitted, tag)
             sub_gm.helper = self
