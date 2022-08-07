@@ -182,29 +182,15 @@ def create_dgl_object(graph_name, num_parts, \
     '''
     Following procedure is used to map the part_local_src_id, part_local_dst_id to account for
     reshuffling of nodes (to order localy owned nodes prior to non-local nodes in a partition)
-    1. Place side-by-side reshuffle_nodes and corresponding index value.▒
-        Basically (reshuffle_node[idx], idx) will form the key-value pair which we have to use
-        for mapping part_local_src_ids, and part_local_dst_ids.
-        Below we use column_stack to generate this mapping, call the resultant map as `node_map`
-
-    2. Sort the node_map array, so that the reshuffle_nodes column are sorted. This is needed because
-        `uniq_ids` are sorted as a result of np.unique operation.
-
-    3. Now, at this time the map is ready to map pre-node-reordering node-ids.▒
-
-    4. Now, concatenate [part_local_src_id, part_local_dst_id, np.arange(len(uniq_ids))] so that we have
-        the same sized array which is used to generate part_local_src_id and part_local_dst_id▒
-        which is the code above this comment section.
-
-    5. Now perform np.unique operation on the resultant list from step (4). This set of uniq_values
-        should follow the same order as `idx (uniq_ids)` above.▒
-
-    6. Now after this step, uniq_mapped_vals and uniq_ids should be the mapping between shuffle_global_nids
-        and part_local_nids
-
-    7. Now use the `node_map` array to map part_local_nids to their appropriate values to account for
-        node reordering in the `reshuffle_nodes` array.
-
+    1. Form a node_map, in this case a numpy array, which will be used to map old node-ids (pre-reshuffling)
+    to post-reshuffling ids.
+    2. Once the map is created, use this map to map all the node-ids in the part_local_src_id 
+    and part_local_dst_id list to their appropriate `new` node-ids (post-reshuffle order).
+    3. Since only the node's order is changed, we will have to re-order nodes related information when
+    creating dgl object: this includes orig_id, dgl.NTYPE, dgl.NID and inner_node.
+    4. Edge's order is not changed. At this point in the execution path edges are still ordered by their etype-ids.
+    5. Create the dgl object appropriately and return the dgl object.
+    
     Here is a  simple example to understand the above flow better.
 
     part_local_nids = [0, 1, 2, 3, 4, 5]
@@ -231,11 +217,11 @@ def create_dgl_object(graph_name, num_parts, \
     #create the mappings to generate mapped part_local_src_id and part_local_dst_id
     #This map will map from unshuffled node-ids to reshuffled-node-ids (which are ordered to prioritize 
     #locally owned nodes).
-    old2New = np.zeros((len(reshuffle_nodes,)))
-    old2New[reshuffle_nodes] = np.arange(len(reshuffle_nodes))
+    nid_map = np.zeros((len(reshuffle_nodes,)))
+    nid_map[reshuffle_nodes] = np.arange(len(reshuffle_nodes))
 
     #Now map the edge end points to reshuffled_values.
-    part_local_src_id, part_local_dst_id = old2New[part_local_src_id], old2New[part_local_dst_id]
+    part_local_src_id, part_local_dst_id = nid_map[part_local_src_id], nid_map[part_local_dst_id]
 
     #create the graph here now.
     part_graph = dgl.graph(data=(part_local_src_id, part_local_dst_id), num_nodes=len(uniq_ids))
