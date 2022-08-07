@@ -75,12 +75,11 @@ def split_module(traced: GraphModule, debug=False):
     Split the forward function of the input module.
 
     Parameters
-    ----------    
+    ----------
     traced : GraphModule
         Module or function to be spiltted.
     debug : bool
         Whether display the debug messages.
-    
 
     Returns
     ----------
