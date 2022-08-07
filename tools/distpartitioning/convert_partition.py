@@ -161,7 +161,7 @@ def create_dgl_object(graph_name, num_parts, \
     # Here the order of nodes is defined by the `np.unique` function
     # node order is as listed in the uniq_ids array
     ids = np.concatenate(
-        [shuffle_global_src_id, shuffle_global_dst_id,▒
+        [shuffle_global_src_id, shuffle_global_dst_id,
             np.arange(shuffle_global_nid_range[0], shuffle_global_nid_range[1] + 1)])
     uniq_ids, idx, inverse_idx = np.unique(
         ids, return_index=True, return_inverse=True)
@@ -215,19 +215,9 @@ def create_dgl_object(graph_name, num_parts, \
 
     reshuffle_nodes = [0, 2, 3, 4, 1, 5]
 
-    node_map = [[0, 0],
-                [2, 1],
-                [3, 2],
-                [4, 3],
-                [1, 4],
-                [5, 5]]
-    and after sorting this becomes as follows:▒
-    node_map = [[0, 0],
-                [1, 4],
-                [2, 1],▒
-                [3, 2],▒
-                [4, 3],
-                [5, 5]]
+    A node_map, which maps node-ids from old to reshuffled order is as follows:
+    node_map = np.zeros((len(reshuffle_nodes,)))
+    node_map[reshuffle_nodes] = np.arange(len(reshuffle_nodes))
 
     Using the above map, we have mapped part_local_src_ids and part_local_dst_ids as follows:
     part_local_src_ids = [0, 0, 0, 0, 1, 2, 3]
@@ -239,16 +229,13 @@ def create_dgl_object(graph_name, num_parts, \
     during the DGL object creation.
     '''
     #create the mappings to generate mapped part_local_src_id and part_local_dst_id
-    node_map = np.column_stack((reshuffle_nodes.clone().numpy(), np.arange(len(uniq_ids))))
-    node_map = node_map[np.argsort(node_map[:,0])]
-
-    #node_map, which is sorted should be the same as idx, which is used along with uniq_ids.
-    #Use this to map the part_local_src_ids and part_local_dst_ids
-    unmapped_vals = np.concatenate([part_local_src_id, part_local_dst_id, np.arange(len(uniq_ids))])
-    uniq_unmapped_vals, midx, minverse = np.unique(unmapped_vals, return_index=True, return_inverse=True)
+    #This map will map from unshuffled node-ids to reshuffled-node-ids (which are ordered to prioritize 
+    #locally owned nodes).
+    old2New = np.zeros((len(reshuffle_nodes,)))
+    old2New[reshuffle_nodes] = np.arange(len(reshuffle_nodes))
 
     #Now map the edge end points to reshuffled_values.
-    part_local_src_id, part_local_dst_id = np.split(node_map[:,1][minverse][:len(part_local_src_id)*2], 2)
+    part_local_src_id, part_local_dst_id = old2New[part_local_src_id], old2New[part_local_dst_id]
 
     #create the graph here now.
     part_graph = dgl.graph(data=(part_local_src_id, part_local_dst_id), num_nodes=len(uniq_ids))
