@@ -12,6 +12,7 @@ class DGLTracer(Tracer):
     """The DGL Tracer Class. Extended from torch.fx.tracer.
     The DGL Tracer can trace a nn.module forward function to a computation graph.
     Arguments are the same as `torch.fx.tracer`.
+
     Parameters
     ----------
     autowrap_modules : Tuple[ModuleType]
@@ -53,7 +54,7 @@ class DGLTracer(Tracer):
 
     @compatibility(is_backward_compatible=True)
     def call_module(self, m: torch.nn.Module, forward, args, kwargs):
-        """Call modules."""
+        """Overwrite Call module function. We tag conv operators here."""
         def tag_conv_fn(node):
             node.is_conv = True
             return Proxy(node)
@@ -79,6 +80,7 @@ def dgl_symbolic_trace(root, conv_modules = (), concrete_args=None):
         The conv modules that we do not enter.
     concrete_args : Optional[Dict[str, any]]
         Inputs to be partially specialized.
+
     Returns
     -------
     GraphModule

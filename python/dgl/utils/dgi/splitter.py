@@ -8,7 +8,7 @@ from .constants import CONV_BLOCK, CALL_FUNCTION, OUTPUT, PLACEHOLDER
 
 
 class Splitter():
-    """The function generator class.
+    """The splitter class.
 
     Can split the forward function to layer-wise sub-functions.
     """
@@ -73,6 +73,19 @@ def split_module(traced: GraphModule, debug=False):
     """The module split function.
 
     Split the forward function of the input module.
+
+    Parameters
+    ----------    
+    traced : GraphModule
+        Module or function to be spiltted.
+    debug : bool
+        Whether display the debug messages.
+    
+
+    Returns
+    ----------
+    GraphModule
+        The splitted graph module.
     """
     if debug:
         print("-------- Origin forward function -------")

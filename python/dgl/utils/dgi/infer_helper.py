@@ -25,6 +25,8 @@ class InferenceHelperBase():
         The root model to conduct inference.
     device : torch.device
         The device to conduct inference computation.
+    conv_modules : Tuple(class)
+        The conv modules' classes.
     use_uva : bool
         Whether store graph and tensors in UVA.
     debug : bool
@@ -107,14 +109,17 @@ class InferenceHelperBase():
 
         Parameters
         ----------
-        inference_graph : DGLHeteroGraph
-            The graph object for computation.
         rets : Tuple[Tensors]
             The predefined output tensors for this layer.
-        layer : dgl.utils.split.schema.GraphLayer
-            The layer information in the schema.
         func : Callable
             The function for computation.
+        *args : Tuple
+            The arguments for computing.
+
+        Returns
+        ----------
+        Tuple[Tensors] or Tensor
+            Output tensors.
         """
         raise NotImplementedError()
 
@@ -145,7 +150,9 @@ class InferenceHelperBase():
             The shape of output tensors.
 
         Returns
-        Tensor : Output tensor (empty).
+        ----------
+        Tensor
+            Output tensor (empty).
         """
         return torch.zeros(shape)
 
@@ -190,6 +197,8 @@ class InferenceHelper(InferenceHelperBase):
         The batch size for dataloader.
     device : torch.device
         The device to conduct inference computation.
+    conv_modules : Tuple(class)
+        The conv modules' classes.
     num_workers : int
         Number of workers for dataloader.
     use_uva : bool
@@ -197,7 +206,7 @@ class InferenceHelper(InferenceHelperBase):
     debug : bool
         Whether display debug messages.
     """
-    def __init__(self, root: nn.Module, conv_modules, batch_size, device,\
+    def __init__(self, root: nn.Module, batch_size, device, conv_modules = (), \
                  num_workers = 4, debug = False):
         super().__init__(root, conv_modules, device, debug=debug)
         self._batch_size = batch_size
@@ -209,9 +218,19 @@ class InferenceHelper(InferenceHelperBase):
         The basic compute function inside the inference helper. Users should not call this
         function on their own.
 
+        Parameters
+        ----------
+        rets : Tuple[Tensors]
+            The predefined output tensors for this layer.
+        func : Callable
+            The function for computation.
+        *args : Tuple
+            The arguments for computing.
+
         Returns
         ----------
-        Tuple[Tensors] : Output tensors.
+        Tuple[Tensors] or Tensor
+            Output tensors.
         """
         sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
         dataloader = dgl.dataloading.NodeDataLoader(

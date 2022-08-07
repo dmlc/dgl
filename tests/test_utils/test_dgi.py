@@ -35,7 +35,7 @@ def test_dgi():
     # test inference
     g = dgl.graph(([1, 2, 3, 4, 0, 3, 0, 3, 0, 0, 0, 0], [0, 0, 0, 0, 1, 1, 2, 2, 3, 4, 5, 6]))
     feat = torch.zeros((7, 5))
-    helper = InferenceHelper(model, (), 2, torch.device("cpu"))
+    helper = InferenceHelper(model, 2, torch.device("cpu"))
     helper_pred = helper.inference(g, feat)
     assert helper_pred.shape == (7, 5)
 
