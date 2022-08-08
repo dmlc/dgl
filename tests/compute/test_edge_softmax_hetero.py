@@ -43,6 +43,7 @@ def test_edge_softmax_unidirectional():
     g = dgl.heterograph({
         ('A', 'AB', 'B'): ([1,2,3,1,2,3,1,2,3],[0,0,0,1,1,1,2,2,2]),
         ('B', 'BB', 'B'): ([0,1,2,0,1,2,0,1,2], [0,0,0,1,1,1,2,2,2])})
+    g = g.to(F.ctx())
     g.edges['AB'].data['x'] = F.ones(9) * 2
     g.edges['BB'].data['x'] = F.ones(9)
     result = dgl.ops.edge_softmax(g, {'AB': g.edges['AB'].data['x'], 'BB': g.edges['BB'].data['x']})
