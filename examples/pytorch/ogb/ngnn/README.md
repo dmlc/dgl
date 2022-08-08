@@ -1,4 +1,4 @@
-# GraphSage/GCN (FULL)
+# NGNN + GraphSage/GCN
 
 ## Introduction
 
@@ -6,7 +6,7 @@ This is an example of implementing [NGNN](https://arxiv.org/abs/2111.11638) for 
 
 We use a model-agnostic methodology, namely Network In Graph Neural Network (NGNN), which allows arbitrary GNN models to increase their model capacity.
 
-The script in this folder experiments full-batch GCN/GraphSage (with/without NGNN) on the dataset: ogbl-ddi, ogbl-collab and ogbl-ppa.
+The script in this folder experiments full-batch GCN/GraphSage (with/without NGNN) on the datasets: ogbl-ddi, ogbl-collab and ogbl-ppa.
 
 ## Installation requirements
 ```
@@ -49,26 +49,6 @@ We do not fix random seeds at all, and take over 10 runs for all models. All mod
       <td></td>
    </tr>
    <tr>
-      <td>GCN(ogb)</td>
-      <td>37.07% ± 5.07%</td>
-      <td>\</td>
-      <td>\</td>
-      <td>55.50% ± 2.08%</td>
-      <td>\</td>
-      <td>\</td>
-      <td rowspan=1>1,289,985</td>
-   </tr>
-   <tr>
-      <td>GCN(paper)</td>
-      <td>47.82% ± 5.90%</td>
-      <td>79.56% ± 3.83%</td>
-      <td>87.58% ± 1.33%</td>
-      <td>63.19% ± 0.97%</td>
-      <td>68.31% ± 0.18%</td>
-      <td>70.89% ± 0.12%</td>
-      <td>1,355,777</td>
-   </tr>
-   <tr>
       <td>GCN+NGNN(paper)</td>
       <td>48.22% ± 7.00%</td>
       <td>82.56% ± 4.03%</td>
@@ -86,26 +66,6 @@ We do not fix random seeds at all, and take over 10 runs for all models. All mod
       <td>71.21% ± 0.38%</td>
       <td>73.55% ± 0.25%</td>
       <td>76.24% ± 1.33%</td>
-   </tr>
-   <tr>
-      <td>GraphSage(ogb)</td>
-      <td>53.90% ± 4.74%</td>
-      <td>\</td>
-      <td>\</td>
-      <td>62.62% ± 0.37%</td>
-      <td>\</td>
-      <td>\</td>
-      <td rowspan=1>1,421,057</td>
-   </tr>
-   <tr>
-      <td>GraphSage(paper)</td>
-      <td>54.27% ± 9.86%</td>
-      <td>82.18% ± 4.00%</td>
-      <td>91.94% ± 0.64%</td>
-      <td>67.54% ± 0.75%</td>
-      <td>71.07% ± 0.22%</td>
-      <td>72.82% ± 0.23%</td>
-      <td>1,486,849</td>
    </tr>
    <tr>
       <td>GraphSage+NGNN(paper)</td>
@@ -127,6 +87,8 @@ We do not fix random seeds at all, and take over 10 runs for all models. All mod
       <td>98.71% ± 0.22%</td>
    </tr>
 </table>
+
+A 3-layer MLP is used as LinkPredictor here, while a 2-layer one is used by the NGNN paper. This is the main reason for the better performance.
 
 #### Reproduction of performance
 
@@ -162,25 +124,6 @@ python main.py --dataset ogbl-ddi --device 1 --ngnn_type input --use_sage --epoc
       <td></td>
    </tr>
    <tr>
-      <td>GCN(ogb)</td>
-      <td>\</td>
-      <td>44.75% ± 1.07%</td>
-      <td>\</td>
-      <td>\</td>
-      <td>52.63% ± 1.15%</td>
-      <td>\</td>
-      <td rowspan=2>296,449</td>
-   </tr>
-   <tr>
-      <td>GCN(paper)</td>
-      <td>35.94% ± 1.60%</td>
-      <td>49.52% ± 0.70%</td>
-      <td>55.74% ± 0.44%</td>
-      <td>43.64% ± 1.97%</td>
-      <td>57.90% ± 0.57%</td>
-      <td>63.93% ± 0.33%</td>
-   </tr>
-   <tr>
       <td>GCN+NGNN(paper)</td>
       <td>36.69% ± 0.82%</td>
       <td>51.83% ± 0.50%</td>
@@ -198,25 +141,6 @@ python main.py --dataset ogbl-ddi --device 1 --ngnn_type input --use_sage --epoc
       <td>48.28% ± 1.39%</td>
       <td>62.73% ± 0.40%</td>
       <td>67.13% ± 0.39%</td>
-   </tr>
-   <tr>
-      <td>GraphSage(ogb)</td>
-      <td>\</td>
-      <td>48.10% ± 0.81%</td>
-      <td>\</td>
-      <td>\</td>
-      <td>56.88% ± 0.77%</td>
-      <td>\</td>
-      <td rowspan=2>460,289</td>
-   </tr>
-   <tr>
-      <td>GraphSage(paper)</td>
-      <td>32.59% ± 3.56%</td>
-      <td>51.66% ± 0.35%</td>
-      <td>56.91% ± 0.72%</td>
-      <td>41.36% ± 3.88%</td>
-      <td>60.52% ± 0.52%</td>
-      <td>65.55% ± 0.67%</td>
    </tr>
    <tr>
       <td>GraphSage+NGNN(paper)</td>
@@ -273,25 +197,6 @@ python main.py --dataset ogbl-collab --device 3 --ngnn_type input --use_sage --e
       <td></td>
    </tr>
    <tr>
-      <td>GCN(ogb)</td>
-      <td>\</td>
-      <td>\</td>
-      <td>18.67% ± 1.32%</td>
-      <td>\</td>
-      <td>\</td>
-      <td>18.45% ± 1.40%</td>
-      <td rowspan=2>278,529</td>
-   </tr>
-   <tr>
-      <td>GCN(paper)</td>
-      <td>4.00% ± 1.46%</td>
-      <td>14.23% ± 1.81%</td>
-      <td>20.21% ± 1.9%</td>
-      <td>5.12% ± 0.56%</td>
-      <td>14.37% ± 1.05%</td>
-      <td>20.92% ± 1.01%</td>
-   </tr>
-   <tr>
       <td>GCN+NGNN(paper)</td>
       <td>5.64% ± 0.93%</td>
       <td>18.44% ± 1.88%</td>
@@ -310,25 +215,6 @@ python main.py --dataset ogbl-collab --device 3 --ngnn_type input --use_sage --e
       <td>30.56% ± 0.72%</td>
       <td>38.34% ± 0.82%</td>
       <td>410,113</td>
-   </tr>
-   <tr>
-      <td>GraphSage(ogb)</td>
-      <td>\</td>
-      <td>\</td>
-      <td>6.55% ± 2.40%</td>
-      <td>\</td>
-      <td>\</td>
-      <td>7.24% ± 2.64%</td>
-      <td rowspan=2>424,449</td>
-   </tr>
-   <tr>
-      <td>GraphSage(paper)</td>
-      <td>3.68% ± 1.02%</td>
-      <td>15.02% ± 1.69%</td>
-      <td>23.56% ± 1.58%</td>
-      <td>4.94% ± 0.54%</td>
-      <td>16.15% ± 1.14%</td>
-      <td>23.43% ± 1.39%</td>
    </tr>
    <tr>
       <td>GraphSage+NGNN(paper)</td>
@@ -351,6 +237,8 @@ python main.py --dataset ogbl-collab --device 3 --ngnn_type input --use_sage --e
       <td>556,033</td>
    </tr>
 </table>
+
+The main difference between this implementation and NGNN paper is the position of NGNN (all -> input).
 
 #### Reproduction of performance
 

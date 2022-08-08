@@ -1,4 +1,5 @@
 import argparse
+import math
 
 import torch
 import torch.nn.functional as F
@@ -55,58 +56,51 @@ class Logger(object):
 
 
 class NGNN_GCNConv(torch.nn.Module):
-    def __init__(self, in_channels, hidden_channels, out_channels):
+    def __init__(self, in_channels, hidden_channels, out_channels, dataset):
         super(NGNN_GCNConv, self).__init__()
+        self.dataset = dataset
         self.conv = GraphConv(in_channels, hidden_channels)
-        self.fc_adj = Linear(hidden_channels, hidden_channels)
-        self.fc_adj2 = Linear(hidden_channels, out_channels)
+        self.fc = Linear(hidden_channels, hidden_channels)
+        self.fc2 = Linear(hidden_channels, out_channels)
         self.reset_parameters()
 
     def reset_parameters(self):
         self.conv.reset_parameters()
         gain = torch.nn.init.calculate_gain('relu')
-        torch.nn.init.xavier_uniform_(self.fc_adj.weight, gain=gain)
-        torch.nn.init.xavier_uniform_(self.fc_adj2.weight, gain=gain)
-        for bias in [self.fc_adj.bias, self.fc_adj2.bias]:
-            if bias is not None:
-                import math
-                stdv = 1.0 / math.sqrt(bias.size(0))
-                bias.data.uniform_(-stdv, stdv)
+        torch.nn.init.xavier_uniform_(self.fc.weight, gain=gain)
+        torch.nn.init.xavier_uniform_(self.fc2.weight, gain=gain)
+        for bias in [self.fc.bias, self.fc2.bias]:
+            stdv = 1.0 / math.sqrt(bias.size(0))
+            bias.data.uniform_(-stdv, stdv)
 
     def forward(self, g, x):
         x = self.conv(g, x)
 
-        global args
-        if args.dataset != 'ogbl-ddi':
+        if self.dataset != 'ogbl-ddi':
             x = F.relu(x)
-            x = self.fc_adj(x)
+            x = self.fc(x)
         
         x = F.relu(x)
-        x = self.fc_adj2(x)
+        x = self.fc2(x)
         return x
 
 class GCN(torch.nn.Module):
-    def __init__(self, in_channels, hidden_channels, out_channels, num_layers, dropout, ngnn_type):
+    def __init__(self, in_channels, hidden_channels, out_channels, num_layers, dropout, ngnn_type, dataset):
         super(GCN, self).__init__()
 
+        self.dataset = dataset
         self.convs = torch.nn.ModuleList()
 
-        if ngnn_type in ['input', 'all']:
-            self.convs.append(NGNN_GCNConv(in_channels, hidden_channels, hidden_channels))
-        else:
-            self.convs.append(GraphConv(in_channels, hidden_channels))
-            
-        if ngnn_type in ['hidden', 'all']:
-            for _ in range(num_layers - 2):
-                self.convs.append(NGNN_GCNConv(hidden_channels, hidden_channels, hidden_channels))
-        else:
+        if ngnn_type == 'input':
+            self.convs.append(NGNN_GCNConv(in_channels, hidden_channels, hidden_channels, dataset))
             for _ in range(num_layers - 2):
                 self.convs.append(GraphConv(hidden_channels, hidden_channels))
+        elif ngnn_type == 'hidden':
+            self.convs.append(GraphConv(in_channels, hidden_channels))
+            for _ in range(num_layers - 2):
+                self.convs.append(NGNN_GCNConv(hidden_channels, hidden_channels, hidden_channels, dataset))
         
-        if ngnn_type in ['output', 'all']:
-            self.convs.append(NGNN_GCNConv(hidden_channels, hidden_channels, out_channels))
-        else:
-            self.convs.append(GraphConv(hidden_channels, out_channels))
+        self.convs.append(GraphConv(hidden_channels, out_channels))
 
         self.dropout = dropout
         self.reset_parameters()
@@ -125,59 +119,52 @@ class GCN(torch.nn.Module):
 
 
 class NGNN_SAGEConv(torch.nn.Module):
-    def __init__(self, in_channels, hidden_channels, out_channels,
+    def __init__(self, in_channels, hidden_channels, out_channels, dataset, 
                  *, reduce):
         super(NGNN_SAGEConv, self).__init__()
+        self.dataset = dataset
         self.conv = SAGEConv(in_channels, hidden_channels, reduce)
-        self.fc_adj = Linear(hidden_channels, hidden_channels)
-        self.fc_adj2 = Linear(hidden_channels, out_channels)
+        self.fc = Linear(hidden_channels, hidden_channels)
+        self.fc2 = Linear(hidden_channels, out_channels)
         self.reset_parameters()
 
     def reset_parameters(self):
         self.conv.reset_parameters()
         gain = torch.nn.init.calculate_gain('relu')
-        torch.nn.init.xavier_uniform_(self.fc_adj.weight, gain=gain)
-        torch.nn.init.xavier_uniform_(self.fc_adj2.weight, gain=gain)
-        for bias in [self.fc_adj.bias, self.fc_adj2.bias]:
-            if bias is not None:
-                import math
-                stdv = 1.0 / math.sqrt(bias.size(0))
-                bias.data.uniform_(-stdv, stdv)
+        torch.nn.init.xavier_uniform_(self.fc.weight, gain=gain)
+        torch.nn.init.xavier_uniform_(self.fc2.weight, gain=gain)
+        for bias in [self.fc.bias, self.fc2.bias]:
+            stdv = 1.0 / math.sqrt(bias.size(0))
+            bias.data.uniform_(-stdv, stdv)
 
     def forward(self, g, x):
         x = self.conv(g, x)
 
-        global args
-        if args.dataset != 'ogbl-ddi':
+        if self.dataset != 'ogbl-ddi':
             x = F.relu(x)
-            x = self.fc_adj(x)
+            x = self.fc(x)
         
         x = F.relu(x)
-        x = self.fc_adj2(x)
+        x = self.fc2(x)
         return x
 
 class SAGE(torch.nn.Module):
-    def __init__(self, in_channels, hidden_channels, out_channels, num_layers, dropout, ngnn_type, reduce='mean'):
+    def __init__(self, in_channels, hidden_channels, out_channels, num_layers, dropout, ngnn_type, dataset, reduce='mean'):
         super(SAGE, self).__init__()
 
+        self.dataset = dataset
         self.convs = torch.nn.ModuleList()
 
-        if ngnn_type in ['input', 'all']:
-            self.convs.append(NGNN_SAGEConv(in_channels, hidden_channels, hidden_channels, reduce=reduce))
-        else:
-            self.convs.append(SAGEConv(in_channels, hidden_channels, reduce))
-        
-        if ngnn_type in ['hidden', 'all']:
-            for _ in range(num_layers - 2):
-                self.convs.append(NGNN_SAGEConv(hidden_channels, hidden_channels, hidden_channels, reduce=reduce))
-        else:
+        if ngnn_type == 'input':
+            self.convs.append(NGNN_SAGEConv(in_channels, hidden_channels, hidden_channels, dataset, reduce=reduce))
             for _ in range(num_layers - 2):
                 self.convs.append(SAGEConv(hidden_channels, hidden_channels, reduce))
+        elif ngnn_type == 'hidden':
+            self.convs.append(SAGEConv(in_channels, hidden_channels, reduce))
+            for _ in range(num_layers - 2):
+                self.convs.append(NGNN_SAGEConv(hidden_channels, hidden_channels, hidden_channels, dataset, reduce=reduce))
         
-        if ngnn_type in ['output', 'all']:
-            self.convs.append(NGNN_SAGEConv(hidden_channels, hidden_channels, out_channels, reduce=reduce))
-        else:
-            self.convs.append(SAGEConv(hidden_channels, out_channels, reduce))
+        self.convs.append(SAGEConv(hidden_channels, out_channels, reduce))
 
         self.dropout = dropout
         self.reset_parameters()
@@ -223,7 +210,6 @@ class LinkPredictor(torch.nn.Module):
 
 
 def train(model, predictor, g, x, split_edge, optimizer, batch_size):
-    global args
     model.train()
     predictor.train()
 
@@ -249,7 +235,7 @@ def train(model, predictor, g, x, split_edge, optimizer, batch_size):
         loss = pos_loss + neg_loss
         loss.backward()
 
-        if args.dataset == 'ogbl-ddi':
+        if model.dataset == 'ogbl-ddi':
             torch.nn.utils.clip_grad_norm_(x, 1.0)
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         torch.nn.utils.clip_grad_norm_(predictor.parameters(), 1.0)
@@ -264,7 +250,7 @@ def train(model, predictor, g, x, split_edge, optimizer, batch_size):
 
 
 @torch.no_grad()
-def test(model, predictor, g, valg, x, split_edge, evaluator, batch_size):
+def test(model, predictor, g, x, split_edge, evaluator, batch_size):
     model.eval()
     predictor.eval()
 
@@ -287,9 +273,6 @@ def test(model, predictor, g, valg, x, split_edge, evaluator, batch_size):
     pos_train_pred = get_pred(pos_train_edge, h)
     pos_valid_pred = get_pred(pos_valid_edge, h)
     neg_valid_pred = get_pred(neg_valid_edge, h)
-
-    h = model(valg, x)
-
     pos_test_pred = get_pred(pos_test_edge, h)
     neg_test_pred = get_pred(neg_test_edge, h)
 
@@ -325,7 +308,7 @@ def main():
 
     # model structure settings
     parser.add_argument('--use_sage', action='store_true', help='If not set, use GCN by default.')
-    parser.add_argument('--ngnn_type', type=str, default="none", choices=['none', 'input', 'hidden', 'output', 'all'], help="You can set this value from 'none', 'input', 'hidden' or 'all' to apply NGNN to different GNN layers.")
+    parser.add_argument('--ngnn_type', type=str, default="input", choices=['input', 'hidden'], help="You can set this value from 'input' or 'hidden' to apply NGNN to different GNN layers.")
     parser.add_argument('--num_layers', type=int, default=3, help='number of GNN layers')
     parser.add_argument('--hidden_channels', type=int, default=256)
     parser.add_argument('--dropout', type=float, default=0.0)
@@ -334,18 +317,16 @@ def main():
     parser.add_argument('--epochs', type=int, default=400)
 
     # training settings
-    parser.add_argument('--use_valedges_as_input', action='store_true', help='Use training + validation edges for inference on test set.')
-    parser.add_argument('--log_steps', type=int, default=1)
     parser.add_argument('--eval_steps', type=int, default=1)
     parser.add_argument('--runs', type=int, default=10)
-    global args; args = parser.parse_args()
+    args = parser.parse_args()
     print(args)
 
     device = f'cuda:{args.device}' if args.device != -1 and torch.cuda.is_available() else 'cpu'
     device = torch.device(device)
 
     dataset = DglLinkPropPredDataset(name=args.dataset)
-    data = dataset[0]
+    g = dataset[0]
     split_edge = dataset.get_edge_split()
 
     # We randomly pick some training samples that we want to evaluate on:
@@ -353,37 +334,31 @@ def main():
     idx = idx[:split_edge['valid']['edge'].size(0)]
     split_edge['eval_train'] = {'edge': split_edge['train']['edge'][idx]}
 
-    if args.dataset == 'ogbl-ppa':
-        data.ndata['feat'] = data.ndata['feat'].to(torch.float)
+    if dataset.name == 'ogbl-ppa':
+        g.ndata['feat'] = g.ndata['feat'].to(torch.float)
 
-    if args.dataset == 'ogbl-ddi':
-        emb = torch.nn.Embedding(data.num_nodes(), args.hidden_channels).to(device)
+    if dataset.name == 'ogbl-ddi':
+        emb = torch.nn.Embedding(g.num_nodes(), args.hidden_channels).to(device)
         in_channels = args.hidden_channels
     else: # ogbl-collab, ogbl-ppa
-        in_channels = data.ndata['feat'].size(-1)
+        in_channels = g.ndata['feat'].size(-1)
     
     # select model
     if args.use_sage:
         model = SAGE(in_channels, args.hidden_channels,
                      args.hidden_channels, args.num_layers,
-                     args.dropout, args.ngnn_type)
+                     args.dropout, args.ngnn_type, dataset.name)
     else: # GCN
-        data = dgl.add_self_loop(data)
+        g = dgl.add_self_loop(g)
         model = GCN(in_channels, args.hidden_channels,
                     args.hidden_channels, args.num_layers,
-                    args.dropout, args.ngnn_type)
-
-    valdata = data
-    if args.use_valedges_as_input: # Use training + validation edges for inference on test set.
-        val_edges = split_edge['valid']['edge'].T
-        valdata = dgl.add_edges(data, val_edges[0], val_edges[1], {key: split_edge['valid'][key].view(-1, 1) for key in ['weight', 'year']})
-        valdata = dgl.add_edges(valdata, val_edges[1], val_edges[0], {key: split_edge['valid'][key].view(-1, 1) for key in ['weight', 'year']})
+                    args.dropout, args.ngnn_type, dataset.name)
 
     predictor = LinkPredictor(args.hidden_channels, args.hidden_channels, 1, 3, args.dropout)
 
-    data, valdata, model, predictor = map(lambda x: x.to(device), (data, valdata, model, predictor))
+    g, model, predictor = map(lambda x: x.to(device), (g, model, predictor))
 
-    evaluator = Evaluator(name=args.dataset)
+    evaluator = Evaluator(name=dataset.name)
     loggers = {
         'Hits@20': Logger(args.runs, args),
         'Hits@50': Logger(args.runs, args),
@@ -391,38 +366,34 @@ def main():
     }
 
     for run in range(args.runs):
-        torch.cuda.empty_cache()
         model.reset_parameters()
         predictor.reset_parameters()
-        if args.dataset == 'ogbl-ddi':
+        if dataset.name == 'ogbl-ddi':
             torch.nn.init.xavier_uniform_(emb.weight)
-            data.ndata['feat'] = emb.weight
+            g.ndata['feat'] = emb.weight
         optimizer = torch.optim.Adam(
             list(model.parameters()) + list(predictor.parameters()) + (
-                list(emb.parameters()) if args.dataset == 'ogbl-ddi' else []
+                list(emb.parameters()) if dataset.name == 'ogbl-ddi' else []
             ),
             lr=args.lr)
         for epoch in range(1, 1 + args.epochs):
-            loss = train(model, predictor, data, data.ndata['feat'], split_edge, optimizer,
+            loss = train(model, predictor, g, g.ndata['feat'], split_edge, optimizer,
                          args.batch_size)
 
             if epoch % args.eval_steps == 0:
-                results = test(model, predictor, data, valdata, data.ndata['feat'], split_edge, evaluator,
+                results = test(model, predictor, g, g.ndata['feat'], split_edge, evaluator,
                                args.batch_size)
                 for key, result in results.items():
                     loggers[key].add_result(run, result)
-
-                if epoch % args.log_steps == 0:
-                    for key, result in results.items():
-                        train_hits, valid_hits, test_hits = result
-                        print(key)
-                        print(f'Run: {run + 1:02d}, '
-                              f'Epoch: {epoch:02d}, '
-                              f'Loss: {loss:.4f}, '
-                              f'Train: {100 * train_hits:.2f}%, '
-                              f'Valid: {100 * valid_hits:.2f}%, '
-                              f'Test: {100 * test_hits:.2f}%')
-                    print('---')
+                    train_hits, valid_hits, test_hits = result
+                    print(key)
+                    print(f'Run: {run + 1:02d}, '
+                          f'Epoch: {epoch:02d}, '
+                          f'Loss: {loss:.4f}, '
+                          f'Train: {100 * train_hits:.2f}%, '
+                          f'Valid: {100 * valid_hits:.2f}%, '
+                          f'Test: {100 * test_hits:.2f}%')
+                print('---')
 
         for key in loggers.keys():
             print(key)
