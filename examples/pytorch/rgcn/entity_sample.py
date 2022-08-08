@@ -66,7 +66,7 @@ def train(device, g, target_idx, labels, train_mask, model):
             optimizer.step()
             total_loss += loss.item()
         acc = evaluate(model, labels, val_loader, inv_target)
-        print("Epoch {:05d} | Loss {:.4f} | Accuracy {:.4f} "
+        print("Epoch {:05d} | Loss {:.4f} | Val. Accuracy {:.4f} "
               . format(epoch, total_loss / (it+1), acc))
         
 if __name__ == '__main__':
@@ -96,7 +96,7 @@ if __name__ == '__main__':
     test_mask = g.nodes[category].data.pop('test_mask')
     # find target category and node id
     category_id = g.ntypes.index(category)
-    g = dgl.to_homogeneous(g, edata=None)
+    g = dgl.to_homogeneous(g)
     node_ids = torch.arange(g.num_nodes())
     target_idx = node_ids[g.ndata[dgl.NTYPE] == category_id]
     # rename the fields as they can be changed by DataLoader
@@ -111,15 +111,10 @@ if __name__ == '__main__':
     out_size = data.num_classes
     model = RGCN(in_size, 16, out_size, num_rels).to(device)
     
-    # model training
-    print('Training...')
     train(device, g, target_idx, labels, train_mask, model)
-    
-    # test the model
-    print('Testing...')
     test_idx = torch.nonzero(test_mask, as_tuple=False).squeeze()
     test_sampler = MultiLayerNeighborSampler([-1, -1]) # -1 for sampling all neighbors
     test_loader = DataLoader(g, target_idx[test_idx], test_sampler, device=device, 
-                              batch_size=32, shuffle=False)
+                             batch_size=32, shuffle=False)
     acc = evaluate(model, labels, test_loader, inv_target)
     print("Test accuracy {:.4f}".format(acc))

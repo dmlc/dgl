@@ -46,7 +46,7 @@ def train(g, target_idx, labels, train_mask, model):
         loss.backward()
         optimizer.step()
         acc = accuracy(logits[train_idx].argmax(dim=1), labels[train_idx]).item()
-        print("Epoch {:05d} | Loss {:.4f} | Accuracy {:.4f} "
+        print("Epoch {:05d} | Loss {:.4f} | Train Accuracy {:.4f} "
               . format(epoch, loss.item(), acc))
         
 if __name__ == '__main__':
@@ -78,22 +78,15 @@ if __name__ == '__main__':
     # calculate normalization weight for each edge, and find target category and node id
     for cetype in g.canonical_etypes:
         g.edges[cetype].data['norm'] = dgl.norm_by_dst(g, cetype).unsqueeze(1)
-    edata = ['norm']
     category_id = g.ntypes.index(category)
-    g = dgl.to_homogeneous(g, edata=edata)
+    g = dgl.to_homogeneous(g, edata=['norm'])
     node_ids = torch.arange(g.num_nodes()).to(device)
     target_idx = node_ids[g.ndata[dgl.NTYPE] == category_id]
-
     # create RGCN model    
     in_size = g.num_nodes() # featureless with one-hot encoding
     out_size = data.num_classes
     model = RGCN(in_size, 16, out_size, num_rels).to(device)
     
-    # model training
-    print('Training...')
     train(g, target_idx, labels, train_mask, model)
-    
-    # test the model
-    print('Testing...')
     acc = evaluate(g, target_idx, labels, test_mask, model)
     print("Test accuracy {:.4f}".format(acc))
