@@ -18,8 +18,6 @@ rfuncs = {'sum': fn.sum, 'max': fn.max, 'min': fn.min, 'mean': fn.mean}
 fill_value = {'sum': 0, 'max': float("-inf")}
 feat_size = 2
 
-@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
-
 def create_test_heterograph(idtype):
     # test heterograph from the docstring, plus a user -- wishes -- game relation
     # 3 users, 2 games, 2 developers
@@ -38,7 +36,8 @@ def create_test_heterograph(idtype):
     assert g.idtype == idtype
     assert g.device == F.ctx()
     return g
-
+    
+@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
 def test_edge_softmax_unidirectional():
     g = dgl.heterograph({
         ('A', 'AB', 'B'): ([1,2,3,1,2,3,1,2,3],[0,0,0,1,1,1,2,2,2]),
@@ -55,6 +54,8 @@ def test_edge_softmax_unidirectional():
     assert F.allclose(ab, e2)
     assert F.allclose(bb, e1)
 
+
+@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
 @pytest.mark.parametrize('g', get_cases(['clique']))
 @pytest.mark.parametrize('norm_by', ['src', 'dst'])
 # @pytest.mark.parametrize('shp', edge_softmax_shapes)
