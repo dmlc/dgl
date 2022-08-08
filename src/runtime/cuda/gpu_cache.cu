@@ -101,7 +101,7 @@ constexpr static int bucket_size = WARP_SIZE * set_associativity;
 };
 
 DGL_DEFINE_OBJECT_REF(GpuCacheRef32, GpuCache<unsigned int>);
-DGL_DEFINE_OBJECT_REF(GpuCacheRef64, GpuCache<int64_t>);
+DGL_DEFINE_OBJECT_REF(GpuCacheRef64, GpuCache<long long>); // NOLINT
 
 /* CAPI **********************************************************************/
 
@@ -116,7 +116,7 @@ DGL_REGISTER_GLOBAL("cuda._CAPI_DGLGpuCacheCreate")
   if (num_bits == 32)
     *rv = GpuCacheRef32(std::make_shared<GpuCache<unsigned int>>(num_items, num_feats));
   else
-    *rv = GpuCacheRef64(std::make_shared<GpuCache<int64_t>>(num_items, num_feats));
+    *rv = GpuCacheRef64(std::make_shared<GpuCache<long long>>(num_items, num_feats)); // NOLINT
 });
 
 DGL_REGISTER_GLOBAL("cuda._CAPI_DGLGpuCacheQuery")
