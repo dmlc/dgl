@@ -50,7 +50,7 @@ Summary
 
 | Dataset       | Result 
 | ------------- | -------
-| aifb        | ~93.1    
+| aifb        | ~86.1    
 | mutag       | ~69.7   
 | bgs         | ~91.4    
 | am          | ~78.5
