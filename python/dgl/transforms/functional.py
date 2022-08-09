@@ -410,8 +410,9 @@ def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas', dist='euclidean
         result = convert.graph((row, col))
 
     if output_batch:
-        result.set_batch_num_nodes(segs)
-        result.set_batch_num_edges(k*segs)
+        num_nodes = F.tensor(segs, dtype=F.int64)
+        result.set_batch_num_nodes(num_nodes)
+        result.set_batch_num_edges(k*num_nodes)
 
     if exclude_self:
         # remove_self_loop will update batch_num_edges as needed
