@@ -18,7 +18,7 @@ from .constants import DEFAULT_NTYPE, DEFAULT_ETYPE
 def _str_to_tuple(s):
     try:
         ret = literal_eval(s)
-    except:
+    except Exception as e:
         ret = s
     return ret
 
@@ -555,7 +555,7 @@ class BasicPartitionBook(GraphPartitionBook):
     def _num_edges(self, etype=DEFAULT_ETYPE):
         """ The total number of edges
         """
-        assert etype == DEFAULT_ETYPE or etype == DEFAULT_ETYPE[1], \
+        assert etype in (DEFAULT_ETYPE, DEFAULT_ETYPE[1]), \
             'Base partition book only supports homogeneous graph.'
         return len(self._eid2partid)
 
@@ -582,7 +582,7 @@ class BasicPartitionBook(GraphPartitionBook):
     def map_to_homo_eid(self, ids, etype=DEFAULT_ETYPE):
         """Map per-edge-type IDs to global edge IDs in the homoenegeous format.
         """
-        assert etype == DEFAULT_ETYPE or etype == DEFAULT_ETYPE[1], \
+        assert etype in (DEFAULT_ETYPE, DEFAULT_ETYPE[1]), \
             'Base partition book only supports homogeneous graph.'
         return ids
 
@@ -595,7 +595,7 @@ class BasicPartitionBook(GraphPartitionBook):
     def eid2partid(self, eids, etype=DEFAULT_ETYPE):
         """From global edge IDs to partition IDs
         """
-        assert etype == DEFAULT_ETYPE or etype == DEFAULT_ETYPE[1], \
+        assert etype in (DEFAULT_ETYPE, DEFAULT_ETYPE[1]), \
             'Base partition book only supports homogeneous graph.'
         return F.gather_row(self._eid2partid, eids)
 
@@ -608,7 +608,7 @@ class BasicPartitionBook(GraphPartitionBook):
     def partid2eids(self, partid, etype=DEFAULT_ETYPE):
         """From partition id to global edge IDs
         """
-        assert etype == DEFAULT_ETYPE or etype == DEFAULT_ETYPE[1], \
+        assert etype in (DEFAULT_ETYPE, DEFAULT_ETYPE[1]), \
             'Base partition book only supports homogeneous graph.'
         return self._partid2eids[partid]
 
@@ -624,7 +624,7 @@ class BasicPartitionBook(GraphPartitionBook):
     def eid2localeid(self, eids, partid, etype=DEFAULT_ETYPE):
         """Get the local edge ids within the given partition.
         """
-        assert etype == DEFAULT_ETYPE or etype == DEFAULT_ETYPE[1], \
+        assert etype in (DEFAULT_ETYPE, DEFAULT_ETYPE[1]), \
             'Base partition book only supports homogeneous graph.'
         if partid != self._part_id:
             raise RuntimeError('Now GraphPartitionBook does not support \
@@ -658,7 +658,7 @@ class BasicPartitionBook(GraphPartitionBook):
     def to_canonical_etype(self, etype):
         """Convert an edge type to the corresponding canonical edge type.
         """
-        assert etype == DEFAULT_ETYPE or etype == DEFAULT_ETYPE[1], \
+        assert etype in (DEFAULT_ETYPE, DEFAULT_ETYPE[1]), \
             'Base partition book only supports homogeneous graph.'
         return DEFAULT_ETYPE
 
@@ -831,7 +831,7 @@ class RangePartitionBook(GraphPartitionBook):
     def _num_edges(self, etype=DEFAULT_ETYPE):
         """ The total number of edges
         """
-        if etype == DEFAULT_ETYPE or etype == DEFAULT_ETYPE[1]:
+        if etype in (DEFAULT_ETYPE, DEFAULT_ETYPE[1]):
             return int(self._max_edge_ids[-1])
         else:
             c_etype = self.to_canonical_etype(etype)
@@ -892,7 +892,7 @@ class RangePartitionBook(GraphPartitionBook):
         """From global edge IDs to partition IDs
         """
         eids = utils.toindex(eids)
-        if etype == DEFAULT_ETYPE or etype == DEFAULT_ETYPE[1]:
+        if etype in (DEFAULT_ETYPE, DEFAULT_ETYPE[1]):
             ret = np.searchsorted(self._max_edge_ids, eids.tonumpy(), side='right')
         else:
             c_etype = self.to_canonical_etype(etype)
@@ -919,7 +919,7 @@ class RangePartitionBook(GraphPartitionBook):
         """From partition ID to global edge IDs
         """
         # TODO do we need to cache it?
-        if etype == DEFAULT_ETYPE or etype == DEFAULT_ETYPE[1]:
+        if etype in (DEFAULT_ETYPE, DEFAULT_ETYPE[1]):
             start = self._max_edge_ids[partid - 1] if partid > 0 else 0
             end = self._max_edge_ids[partid]
             return F.arange(start, end)
@@ -955,7 +955,7 @@ class RangePartitionBook(GraphPartitionBook):
 
         eids = utils.toindex(eids)
         eids = eids.tousertensor()
-        if etype == DEFAULT_ETYPE or etype == DEFAULT_ETYPE[1]:
+        if etype in (DEFAULT_ETYPE, DEFAULT_ETYPE[1]):
             start = self._max_edge_ids[partid - 1] if partid > 0 else 0
         else:
             c_etype = self.to_canonical_etype(etype)
@@ -1177,7 +1177,8 @@ class EdgePartitionPolicy(PartitionPolicy):
     '''Partition policy for edges.
     '''
     def __init__(self, partition_book, etype=DEFAULT_ETYPE):
-        super(EdgePartitionPolicy, self).__init__(EDGE_PART_POLICY + ':' + str(etype), partition_book)
+        super(EdgePartitionPolicy, self).__init__(
+            EDGE_PART_POLICY + ':' + str(etype), partition_book)
 
 class HeteroDataName(object):
     ''' The data name in a heterogeneous graph.
