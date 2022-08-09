@@ -151,7 +151,7 @@ class GCN2Conv(nn.Module):
         nn.init.normal_(self.weight1)
         if not self._project_initial_features:
             nn.init.normal_(self.weight2)
-        if self._bias is not None:
+        if self._bias:
             nn.init.zeros_(self.bias)
 
     def set_allow_zero_in_degree(self, set_value):
@@ -265,8 +265,8 @@ class GCN2Conv(nn.Module):
                     feat_0, feat_0, self.weight2, beta=(1 - self.beta), alpha=self.beta
                 )
 
-            if self._bias is not None:
-                rst = rst + self._bias
+            if self._bias:
+                rst = rst + self.bias
 
             if self._activation is not None:
                 rst = self._activation(rst)

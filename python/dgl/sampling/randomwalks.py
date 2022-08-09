@@ -30,7 +30,7 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
     If a random walk stops in advance, DGL pads the trace with -1 to have the same
     length.
 
-    This function supports the graph on GPU.
+    This function supports the graph on GPU and UVA sampling.
 
     Parameters
     ----------
@@ -39,8 +39,9 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
     nodes : Tensor
         Node ID tensor from which the random walk traces starts.
 
-        The tensor must be on the same device as the graph and have the same dtype as the ID type
-        of the graph.
+        The tensor must have the same dtype as the ID type of the graph.
+        The tensor must be on the same device as the graph or
+        on the GPU when the graph is pinned (UVA sampling).
     metapath : list[str or tuple of str], optional
         Metapath, specified as a list of edge types.
 
@@ -69,6 +70,7 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
         Probability to terminate the current trace before each transition.
 
         If a tensor is given, :attr:`restart_prob` should be on the same device as the graph
+        or on the GPU when the graph is pinned (UVA sampling),
         and have the same length as :attr:`metapath` or :attr:`length`.
     return_eids : bool, optional
         If True, additionally return the edge IDs traversed.
@@ -180,19 +182,16 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
     metapath = F.to_dgl_nd(F.astype(F.tensor(metapath), g.idtype))
 
     # Load the probability tensor from the edge frames
+    ctx = utils.to_dgl_context(g.device)
     if prob is None:
-        p_nd = [nd.array([], ctx=nodes.ctx) for _ in g.canonical_etypes]
+        p_nd = [nd.array([], ctx=ctx) for _ in g.canonical_etypes]
     else:
         p_nd = []
         for etype in g.canonical_etypes:
             if prob in g.edges[etype].data:
                 prob_nd = F.to_dgl_nd(g.edges[etype].data[prob])
-                if prob_nd.ctx != nodes.ctx:
-                    raise ValueError(
-                        'context of seed node array and edges[%s].data[%s] are different' %
-                        (etype, prob))
             else:
-                prob_nd = nd.array([], ctx=nodes.ctx)
+                prob_nd = nd.array([], ctx=ctx)
             p_nd.append(prob_nd)
 
     # Actual random walk
@@ -202,9 +201,11 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
         restart_prob = F.to_dgl_nd(restart_prob)
         traces, eids, types = _CAPI_DGLSamplingRandomWalkWithStepwiseRestart(
             gidx, nodes, metapath, p_nd, restart_prob)
-    else:
+    elif isinstance(restart_prob, float):
         traces, eids, types = _CAPI_DGLSamplingRandomWalkWithRestart(
             gidx, nodes, metapath, p_nd, restart_prob)
+    else:
+        raise TypeError("restart_prob should be float or Tensor.")
 
     traces = F.from_dgl_nd(traces)
     types = F.from_dgl_nd(types)

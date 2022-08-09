@@ -44,9 +44,14 @@ void CheckRandomWalkInputs(
   }
   for (uint64_t i = 0; i < prob.size(); ++i) {
     FloatArray p = prob[i];
+    CHECK_EQ(hg->Context(), p->ctx) << "Expected prob (" << p->ctx << ")" << " to have the same " \
+      << "context as graph (" << hg->Context() << ").";
     CHECK_FLOAT(p, "probability");
-    if (p.GetSize() != 0)
+    if (p.GetSize() != 0) {
+      CHECK_EQ(hg->IsPinned(), p.IsPinned())
+        << "The prob array should have the same pinning status as the graph";
       CHECK_NDIM(p, 1, "probability");
+    }
   }
 }
 

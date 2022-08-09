@@ -228,6 +228,11 @@ def check_dist_graph(g, num_clients, num_nodes, num_edges):
     feats = F.squeeze(feats1, 1)
     assert np.all(F.asnumpy(feats == eids))
 
+    # Test edge_subgraph
+    sg = g.edge_subgraph(eids)
+    assert sg.num_edges() == len(eids)
+    assert F.array_equal(sg.edata[dgl.EID], eids)
+
     # Test init node data
     new_shape = (g.number_of_nodes(), 2)
     test1 = dgl.distributed.DistTensor(new_shape, F.int32)
@@ -493,6 +498,14 @@ def check_dist_graph_hetero(g, num_clients, num_nodes, num_edges):
     feats1 = g.edges['r1'].data['feat'][eids]
     feats = F.squeeze(feats1, 1)
     assert np.all(F.asnumpy(feats == eids))
+
+    # Test edge_subgraph
+    sg = g.edge_subgraph({'r1': eids})
+    assert sg.num_edges() == len(eids)
+    assert F.array_equal(sg.edata[dgl.EID], eids)
+    sg = g.edge_subgraph({('n1', 'r1', 'n2'): eids})
+    assert sg.num_edges() == len(eids)
+    assert F.array_equal(sg.edata[dgl.EID], eids)
 
     # Test init node data
     new_shape = (g.number_of_nodes('n1'), 2)
