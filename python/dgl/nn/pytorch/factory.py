@@ -63,7 +63,8 @@ class KNNGraph(nn.Module):
         self.k = k
 
     #pylint: disable=invalid-name
-    def forward(self, x, algorithm='bruteforce-blas', dist='euclidean'):
+    def forward(self, x, algorithm='bruteforce-blas', dist='euclidean',
+                exclude_self=False, output_batch=False):
         r"""
 
         Forward computation.
@@ -119,7 +120,8 @@ class KNNGraph(nn.Module):
         DGLGraph
             A DGLGraph without features.
         """
-        return knn_graph(x, self.k, algorithm=algorithm, dist=dist)
+        return knn_graph(x, self.k, algorithm=algorithm, dist=dist,
+                         exclude_self=exclude_self, output_batch=output_batch)
 
 
 class SegmentedKNNGraph(nn.Module):
@@ -171,7 +173,8 @@ class SegmentedKNNGraph(nn.Module):
         self.k = k
 
     #pylint: disable=invalid-name
-    def forward(self, x, segs, algorithm='bruteforce-blas', dist='euclidean'):
+    def forward(self, x, segs, algorithm='bruteforce-blas', dist='euclidean',
+                exclude_self=False, output_batch=False):
         r"""Forward computation.
 
         Parameters
@@ -229,7 +232,8 @@ class SegmentedKNNGraph(nn.Module):
             A DGLGraph without features.
         """
 
-        return segmented_knn_graph(x, self.k, segs, algorithm=algorithm, dist=dist)
+        return segmented_knn_graph(x, self.k, segs, algorithm=algorithm, dist=dist,
+                                   exclude_self=exclude_self, output_batch=output_batch)
 
 
 class RadiusGraph(nn.Module):
