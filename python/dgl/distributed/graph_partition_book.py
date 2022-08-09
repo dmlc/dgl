@@ -18,7 +18,7 @@ from .constants import DEFAULT_NTYPE, DEFAULT_ETYPE
 def _str_to_tuple(s):
     try:
         ret = literal_eval(s)
-    except Exception as e:
+    except ValueError:
         ret = s
     return ret
 
