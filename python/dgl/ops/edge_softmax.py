@@ -135,6 +135,7 @@ def edge_softmax(graph, logits, eids=ALL, norm_by='dst'):
                                      eids=eids, norm_by=norm_by)
     else:
         logits_list = [None] * graph._graph.number_of_etypes()
+        logits = {graph.to_canonical_etype(k): v for k, v in logits.items()}
         for rel in graph.canonical_etypes:
             etid = graph.get_etype_id(rel)
             logits_list[etid] = logits[rel]
