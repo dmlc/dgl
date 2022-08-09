@@ -97,7 +97,7 @@ def pairwise_squared_distance(x):
     return x2s + F.swapaxes(x2s, -1, -2) - 2 * x @ F.swapaxes(x, -1, -2)
 
 #pylint: disable=invalid-name
-def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean', exclude_self=True, output_batch=True):
+def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean', exclude_self=False, output_batch=False):
     r"""Construct a graph from a set of points according to k-nearest-neighbor (KNN)
     and return.
 
@@ -232,8 +232,9 @@ def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean', exclude_self=
         result = convert.graph((row, col))
 
     if output_batch:
-        result.set_batch_num_nodes(x_seg)
-        result.set_batch_num_edges(k*x_seg)
+        num_nodes = F.tensor(x_seg, dtype=F.int64)
+        result.set_batch_num_nodes(num_nodes)
+        result.set_batch_num_edges(k*num_nodes)
 
     if exclude_self:
         # remove_self_loop will update batch_num_edges as needed
@@ -294,7 +295,7 @@ def _knn_graph_blas(x, k, dist='euclidean'):
     return convert.graph((F.reshape(src, (-1,)), F.reshape(dst, (-1,))))
 
 #pylint: disable=invalid-name
-def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas', dist='euclidean', exclude_self=True, output_batch=True):
+def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas', dist='euclidean', exclude_self=False, output_batch=False):
     r"""Construct multiple graphs from multiple sets of points according to
     k-nearest-neighbor (KNN) and return.
 
