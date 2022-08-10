@@ -2,10 +2,10 @@ import logging
 import pandas as pd
 import pyarrow
 import pyarrow.csv
-from .registry import register
+from .registry import register_array_parser
 
-@register("csv")
-class CSV(object):
+@register_array_parser("csv")
+class CSVArrayParser(object):
     def __init__(self, delimiter=','):
         self.delimiter = delimiter
 

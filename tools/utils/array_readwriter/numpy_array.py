@@ -1,10 +1,10 @@
 import logging
 import numpy as np
 from numpy.lib.format import open_memmap
-from .registry import register
+from .registry import register_array_parser
 
-@register("numpy")
-class Numpy(object):
+@register_array_parser("numpy")
+class NumpyArrayParser(object):
     def __init__(self):
         pass
 
