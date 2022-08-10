@@ -1,3 +1,4 @@
+# Requires setting PYTHONPATH=${GITROOT}/tools
 import json
 import logging
 import sys
