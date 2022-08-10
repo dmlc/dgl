@@ -64,7 +64,7 @@ def main():
     parser = argparse.ArgumentParser(description='Dispatch edge index and data to partitions', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument('--in-dir', type=str, help='Location of the input directory where the dataset is located')
-    parser.add_argument('--partitions-dir', type=str, help='Location of the partition-id mapping files which define node-ids and their respective partition-ids')
+    parser.add_argument('--partitions-dir', type=str, help='Location of the partition-id mapping files which define node-ids and their respective partition-ids, relative to the input directory')
     parser.add_argument('--out-dir', type=str, help='Location of the output directory where the graph partitions will be created by this pipeline')
     parser.add_argument('--ip-config', type=str, help='File location of IP configuration for server processes')
     parser.add_argument('--master-port', type=int, default=12345, help='port used by gloo group to create randezvous point')
