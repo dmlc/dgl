@@ -456,7 +456,7 @@ def main(args):
         all_params = itertools.chain(model.parameters(), embed_layer.parameters())
         optimizer = th.optim.Adam(all_params, lr=hyperparameters['lr'])
 
-        logger = train(g, model, embed_layer(), optimizer, train_loader, split_idx,
+        logger = train(g, model, embed_layer, optimizer, train_loader, split_idx,
               labels, logger, device, run, hyperparameters)
 
         logger.print_statistics(run)
