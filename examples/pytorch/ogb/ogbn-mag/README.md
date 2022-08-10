@@ -5,11 +5,6 @@ The following options can be specified via command line arguments:
 ```
 optional arguments:
   -h, --help            show this help message and exit
-  --dropout DROPOUT     dropout probability
-  --n-hidden N_HIDDEN   number of hidden units
-  --lr LR               learning rate
-  -e N_EPOCHS, --n-epochs N_EPOCHS
-                        number of training epochs
   --runs RUNS
 ```
 
@@ -36,12 +31,12 @@ Some examples of such differences:
 - Instead of reversing `(paper, cites, paper)` into a new relation like `(paper, rev-cites, paper)`, the PyG implementation instead just made these into undirected edges ([code](https://github.com/snap-stanford/ogb/blob/master/examples/nodeproppred/mag/sampler.py#L54))
 - In the PyG implementation there's a separate "self" linear projection matrix for each _node-type_ ([code](https://github.com/snap-stanford/ogb/blob/master/examples/nodeproppred/mag/sampler.py#L106)).  This is different from the R-GCN [paper](https://arxiv.org/abs/1703.06103), which has a single "self" linear projection matrix for each R-GCN layer, not a different one for each node-type.
 
-### Neighborhood sampling differences 
-Although the model architectures, hyperparameter values and initialization methods are identical between the implementation here and the PyG one as of this writing, there is still a significant difference in the way neighbors are sampled, which results in the DGL implementation achieving significantly faster overfitting to the training dataset and slightly improved performance on the Test dataset.  
+### Neighborhood sampling differences
+Although the model architectures, hyperparameter values and initialization methods are identical between the implementation here and the PyG one as of this writing, there is still a significant difference in the way neighbors are sampled, which results in the DGL implementation achieving significantly faster overfitting to the training dataset and slightly improved performance on the Test dataset.
 
 In DGL, sampling on heterogeneous graphs with a `fanout = N` parameter means there are N samples _per incoming relation type_.  In the PyG implementation, the heterogeneous graph is represented as a homogeneous graph and there are N samples total, regardless of relation type.  This effectively means that given the same `fanout` value, there are R times as many neighbors sampled for DGL than PyG, where R is the number of edge-types that are directed inward to a node.  Since there are significantly more nodes involved in the computation, there are likewise more nodes receiving gradient updates and therefore more significant overfitting given the same number of epochs.
 
-An effort was made to mitigate this increase by reducing the fanout from `[25, 20]` to `[6, 5]`, which gives roughly the same number of neighbors between PyG and DGL and similar final training performance.  However, the DGL implementation has significantly worse Test performance in this case.  This is likely due to the fact that sampling e.g., 5 nodes from 4 different edge types is not the same as sampling 20 nodes by ignoring edge type unless the edge types are uniformly distributed.  
+An effort was made to mitigate this increase by reducing the fanout from `[25, 20]` to `[6, 5]`, which gives roughly the same number of neighbors between PyG and DGL and similar final training performance.  However, the DGL implementation has significantly worse Test performance in this case.  This is likely due to the fact that sampling e.g., 5 nodes from 4 different edge types is not the same as sampling 20 nodes by ignoring edge type unless the edge types are uniformly distributed.
 
 ### Input features
 The `paper` nodes have 128-dimensional features that are derived from word embeddings of the words found in the title and abstract of the papers.  Following the PyG implementation, all node types except `paper` receive 128-dimensional learnable embeddings as node features.  This results in 154,029,312 learnable parameters for just the node features.
@@ -55,71 +50,6 @@ ParameterDict(
 ```
 
 ### Model architecture
-The input features are passed to a modified version of the R-GCN architecture.  As in the R-GCN paper, each _edge-type_ has its own linear projection matrix (the "weight" ModuleDict below).  Different from the original paper, however, each _node-type_ has its own "self" linear projection matrix (the "loop_weights" ModuleDict below).  There are 7 edge-types:  4 natural edge-types ("cites", "affiliated_with", "has_topic" and "writes") and 3 manufactured reverse edge-types ("rev-affiliated_with", "rev-has_topic", "rev-writes").  As mentioned above, note that there is _not_ a reverse edge type like "rev-cites", and instead the reverse edges are given the same type of "cites".  This exception was presumably made because the source and destinate nodes are of type "paper".  Whereas the 7 "relation" linear layers do not have a bias, the 4 "self" linear layers do.  
+The input features are passed to a modified version of the R-GCN architecture.  As in the R-GCN paper, each _edge-type_ has its own linear projection matrix (the "weight" ModuleDict below).  Different from the original paper, however, each _node-type_ has its own "self" linear projection matrix (the "loop_weights" ModuleDict below).  There are 7 edge-types:  4 natural edge-types ("cites", "affiliated_with", "has_topic" and "writes") and 3 manufactured reverse edge-types ("rev-affiliated_with", "rev-has_topic", "rev-writes").  As mentioned above, note that there is _not_ a reverse edge type like "rev-cites", and instead the reverse edges are given the same type of "cites".  This exception was presumably made because the source and destinate nodes are of type "paper".  Whereas the 7 "relation" linear layers do not have a bias, the 4 "self" linear layers do.
 
 With two of these layers, a hidden dimension size of 64 and 349 output classes, we end up with 337,460 R-GCN model parameters.
-
-```
-EntityClassify(
-  (layers): ModuleList(
-    (0): RelGraphConvLayer(
-      (conv): HeteroGraphConv(
-        (mods): ModuleDict(
-          (affiliated_with): GraphConv(in=128, out=64, normalization=right, activation=None)
-          (cites): GraphConv(in=128, out=64, normalization=right, activation=None)
-          (has_topic): GraphConv(in=128, out=64, normalization=right, activation=None)
-          (rev-affiliated_with): GraphConv(in=128, out=64, normalization=right, activation=None)
-          (rev-has_topic): GraphConv(in=128, out=64, normalization=right, activation=None)
-          (rev-writes): GraphConv(in=128, out=64, normalization=right, activation=None)
-          (writes): GraphConv(in=128, out=64, normalization=right, activation=None)
-        )
-      )
-      (weight): ModuleDict(
-        (affiliated_with): Linear(in_features=128, out_features=64, bias=False)
-        (cites): Linear(in_features=128, out_features=64, bias=False)
-        (has_topic): Linear(in_features=128, out_features=64, bias=False)
-        (rev-affiliated_with): Linear(in_features=128, out_features=64, bias=False)
-        (rev-has_topic): Linear(in_features=128, out_features=64, bias=False)
-        (rev-writes): Linear(in_features=128, out_features=64, bias=False)
-        (writes): Linear(in_features=128, out_features=64, bias=False)
-      )
-      (loop_weights): ModuleDict(
-        (author): Linear(in_features=128, out_features=64, bias=True)
-        (field_of_study): Linear(in_features=128, out_features=64, bias=True)
-        (institution): Linear(in_features=128, out_features=64, bias=True)
-        (paper): Linear(in_features=128, out_features=64, bias=True)
-      )
-      (dropout): Dropout(p=0.5, inplace=False)
-    )
-    (1): RelGraphConvLayer(
-      (conv): HeteroGraphConv(
-        (mods): ModuleDict(
-          (affiliated_with): GraphConv(in=64, out=349, normalization=right, activation=None)
-          (cites): GraphConv(in=64, out=349, normalization=right, activation=None)
-          (has_topic): GraphConv(in=64, out=349, normalization=right, activation=None)
-          (rev-affiliated_with): GraphConv(in=64, out=349, normalization=right, activation=None)
-          (rev-has_topic): GraphConv(in=64, out=349, normalization=right, activation=None)
-          (rev-writes): GraphConv(in=64, out=349, normalization=right, activation=None)
-          (writes): GraphConv(in=64, out=349, normalization=right, activation=None)
-        )
-      )
-      (weight): ModuleDict(
-        (affiliated_with): Linear(in_features=64, out_features=349, bias=False)
-        (cites): Linear(in_features=64, out_features=349, bias=False)
-        (has_topic): Linear(in_features=64, out_features=349, bias=False)
-        (rev-affiliated_with): Linear(in_features=64, out_features=349, bias=False)
-        (rev-has_topic): Linear(in_features=64, out_features=349, bias=False)
-        (rev-writes): Linear(in_features=64, out_features=349, bias=False)
-        (writes): Linear(in_features=64, out_features=349, bias=False)
-      )
-      (loop_weights): ModuleDict(
-        (author): Linear(in_features=64, out_features=349, bias=True)
-        (field_of_study): Linear(in_features=64, out_features=349, bias=True)
-        (institution): Linear(in_features=64, out_features=349, bias=True)
-        (paper): Linear(in_features=64, out_features=349, bias=True)
-      )
-      (dropout): Dropout(p=0.0, inplace=False)
-    )
-  )
-)
-```
