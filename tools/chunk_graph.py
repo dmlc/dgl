@@ -19,7 +19,7 @@ def chunk_numpy_array(arr, fmt_meta, chunk_sizes, path_fmt):
         path = os.path.abspath(path_fmt % j)
         arr_chunk = arr[offset:offset + n]
         logging.info('Chunking %d-%d' % (offset, offset + n))
-        array_readwriter.write(path, arr_chunk, **fmt_meta)
+        array_readwriter.get_array_parser(**fmt_meta).write(path)
         offset += n
         paths.append(path)
 
@@ -90,7 +90,7 @@ def _chunk_graph(g, name, ndata_paths, edata_paths, num_chunks, output_path):
                     logging.info('Chunking node data for type %s key %s' % (ntype, key))
                     ndata_key_meta = {}
                     reader_fmt_meta = writer_fmt_meta = {"name": "numpy"}
-                    arr = array_readwriter.read(path, **reader_fmt_meta)
+                    arr = array_readwriter.get_array_parser(**reader_fmt_meta).read(path)
                     ndata_key_meta['format'] = writer_fmt_meta
                     ndata_key_meta['data'] = chunk_numpy_array(
                             arr, writer_fmt_meta, num_nodes_per_chunk_dict[ntype],
@@ -109,7 +109,7 @@ def _chunk_graph(g, name, ndata_paths, edata_paths, num_chunks, output_path):
                     logging.info('Chunking edge data for type %s key %s' % (etypestr, key))
                     edata_key_meta = {}
                     reader_fmt_meta = writer_fmt_meta = {"name": "numpy"}
-                    arr = array_readwriter.read(path, **reader_fmt_meta)
+                    arr = array_readwriter.get_array_parser(**reader_fmt_meta).read(path)
                     edata_key_meta['format'] = writer_fmt_meta
                     edata_key_meta['data'] = chunk_numpy_array(
                             arr, writer_fmt_meta, num_edges_per_chunk_dict[etype],
@@ -158,18 +158,18 @@ def chunk_graph(g, name, ndata_paths, edata_paths, num_chunks, output_path):
 
 if __name__ == '__main__':
     logging.basicConfig(level='INFO')
-    (g,), _ = dgl.load_graphs('/home/ubuntu/dgl/new-output/graph.dgl')
+    (g,), _ = dgl.load_graphs('/data/graph.dgl')
     chunk_graph(
             g,
             'mag240m',
             {'paper': {
-                'feat': '/home/ubuntu/dgl/new-output/paper/feat.npy',
-                'label': '/home/ubuntu/dgl/new-output/paper/label.npy',
-                'year': '/home/ubuntu/dgl/new-output/paper/year.npy'}},
-            {'cites': {'count': '/home/ubuntu/dgl/new-output/cites/count.npy'},
-             'writes': {'year': '/home/ubuntu/dgl/new-output/writes/year.npy'},
+                'feat': '/data/paper/feat.npy',
+                'label': '/data/paper/label.npy',
+                'year': '/data/paper/year.npy'}},
+            {'cites': {'count': '/data/cites/count.npy'},
+             'writes': {'year': '/data/writes/year.npy'},
              # you can put the same data file if they indeed share the features.
-             'rev_writes': {'year': '/home/ubuntu/dgl/new-output/writes/year.npy'}},
+             'rev_writes': {'year': '/data/writes/year.npy'}},
             4,
-            '/home/ubuntu/dgl/random-parts')
+            '/chunked-data')
 # The generated metadata goes as in tools/sample-config/mag240m-metadata.json.

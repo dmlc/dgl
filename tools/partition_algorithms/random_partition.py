@@ -14,7 +14,7 @@ def _random_partition(metadata, num_parts):
     for ntype, n in zip(ntypes, num_nodes_per_type):
         logging.info('Generating partition for node type %s' % ntype)
         parts = np.random.randint(0, num_parts, (n,))
-        array_readwriter.write(ntype + '.txt', parts, name='csv')
+        array_readwriter.get_array_parser(name='csv').write(ntype + '.txt', parts)
 
 def random_partition(metadata, num_parts, output_path):
     """

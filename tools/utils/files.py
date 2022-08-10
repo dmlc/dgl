@@ -1,6 +1,7 @@
 import os
 from contextlib import contextmanager
 import logging
+from numpy.lib.format import open_memmap
 
 @contextmanager
 def setdir(path):
