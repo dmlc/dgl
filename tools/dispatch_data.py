@@ -5,7 +5,7 @@ import argparse
 import logging
 import json
 
-INSTALL_DIR = os.path.join(__file__, '..')
+INSTALL_DIR = os.path.abspath(os.path.join(__file__, '..'))
 LAUNCH_SCRIPT = "distgraphlaunch.py"
 PIPELINE_SCRIPT = "distpartitioning/data_proc_pipeline.py"
 
@@ -22,8 +22,7 @@ LARG_IPCONF = "ip_config"
 LARG_MASTER_PORT = "master_port"
 
 def get_launch_cmd(args) -> str: 
-    # (BarclayII) Is it safe to assume all the workers have the Python executable at the same path?
-    cmd = args.python_exe + " " + os.path.join(INSTALL_DIR, LAUNCH_SCRIPT)
+    cmd = sys.executable + " " + os.path.join(INSTALL_DIR, LAUNCH_SCRIPT)
     cmd = f"{cmd} --{LARG_PROCS_MACHINE} 1 "
     cmd = f"{cmd} --{LARG_IPCONF} {args.ip_config} "
     cmd = f"{cmd} --{LARG_MASTER_PORT} {args.master_port} "
@@ -51,8 +50,9 @@ def submit_jobs(args) -> str:
     argslist += "--num-parts {} ".format(num_parts)
     argslist += "--output {} ".format(args.out_dir)
         
+    # (BarclayII) Is it safe to assume all the workers have the Python executable at the same path?
     pipeline_cmd = os.path.join(INSTALL_DIR, PIPELINE_SCRIPT)
-    udf_cmd = f"{sys.executable} {pipeline_cmd} {argslist}"
+    udf_cmd = f"{args.python_exe} {pipeline_cmd} {argslist}"
 
     launch_cmd = get_launch_cmd(args)
     launch_cmd += '\"'+udf_cmd+'\"'
