@@ -417,9 +417,8 @@ def broadcast_nodes(graph, graph_feat, *, ntype=None):
     broadcast_edges
     """
     if (F.shape(graph_feat)[0] != graph.batch_size and graph.batch_size == 1):
-        dgl_warning(':func:`broadcast_nodes` directly taking one node feature tensor as `feat[i]`'
-                    ' to broadcast to all nodes in a single graph will be deprecated in future,'
-                    ' please make sure the feature tensor shape is :math:`(1, *).`')
+        dgl_warning('For a single graph, use a tensor of shape (1, *) for graph_feat.'
+                    ' The support of shape (*) will be deprecated.')
         graph_feat = F.unsqueeze(graph_feat, dim=0)
     return F.repeat(graph_feat, graph.batch_num_nodes(ntype), dim=0)
 
@@ -489,9 +488,8 @@ def broadcast_edges(graph, graph_feat, *, etype=None):
     broadcast_nodes
     """
     if (F.shape(graph_feat)[0] != graph.batch_size and graph.batch_size == 1):
-        dgl_warning(':func:`broadcast_edges` directly taking one edge feature tensor as `feat[i]`'
-                    ' to broadcast to all edges in a single graph will be deprecated in future,'
-                    ' please make sure the feature tensor shape is :math:`(1, *).`')
+        dgl_warning('For a single graph, use a tensor of shape (1, *) for graph_feat.'
+                    ' The support of shape (*) will be deprecated.')
         graph_feat = F.unsqueeze(graph_feat, dim=0)
     return F.repeat(graph_feat, graph.batch_num_edges(etype), dim=0)
 
