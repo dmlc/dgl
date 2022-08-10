@@ -23,7 +23,7 @@ from .._ffi.function import _init_api
 
 class GpuCache(object):
     """High-level wrapper for GPU embedding cache"""
-    def __init__(self, num_items, num_feats, idtype):
+    def __init__(self, num_items, num_feats, idtype=F.int64):
         assert idtype == F.int32 or idtype == F.int64
         self._cache = _CAPI_DGLGpuCacheCreate(num_items, num_feats, 32 if idtype == F.int32 else 64)
         self.idtype = idtype
