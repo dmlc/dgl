@@ -19,7 +19,7 @@ def chunk_numpy_array(arr, fmt_meta, chunk_sizes, path_fmt):
         path = os.path.abspath(path_fmt % j)
         arr_chunk = arr[offset:offset + n]
         logging.info('Chunking %d-%d' % (offset, offset + n))
-        array_readwriter.get_array_parser(**fmt_meta).write(path)
+        array_readwriter.get_array_parser(**fmt_meta).write(path, arr_chunk)
         offset += n
         paths.append(path)
 
@@ -158,18 +158,20 @@ def chunk_graph(g, name, ndata_paths, edata_paths, num_chunks, output_path):
 
 if __name__ == '__main__':
     logging.basicConfig(level='INFO')
-    (g,), _ = dgl.load_graphs('/data/graph.dgl')
+    input_dir = '/data'
+    output_dir = '/chunked-data'
+    (g,), _ = dgl.load_graphs(os.path.join(input_dir, 'graph.dgl'))
     chunk_graph(
             g,
             'mag240m',
             {'paper': {
-                'feat': '/data/paper/feat.npy',
-                'label': '/data/paper/label.npy',
-                'year': '/data/paper/year.npy'}},
-            {'cites': {'count': '/data/cites/count.npy'},
-             'writes': {'year': '/data/writes/year.npy'},
+                'feat': os.path.join(input_dir, 'paper/feat.npy'),
+                'label': os.path.join(input_dir, 'paper/label.npy'),
+                'year': os.path.join(input_dir, 'paper/year.npy')}},
+            {'cites': {'count': os.path.join(input_dir, 'cites/count.npy')},
+             'writes': {'year': os.path.join(input_dir, 'writes/year.npy')},
              # you can put the same data file if they indeed share the features.
-             'rev_writes': {'year': '/data/writes/year.npy'}},
+             'rev_writes': {'year': os.path.join(input_dir, 'writes/year.npy')}},
             4,
-            '/chunked-data')
+            output_dir)
 # The generated metadata goes as in tools/sample-config/mag240m-metadata.json.
