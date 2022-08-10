@@ -47,48 +47,55 @@ JSON as well as the corresponding partition folder ``partX`` to the X^th machine
 Using :func:`~dgl.distributed.partition_graph` requires an instance with large enough
 CPU RAM to hold the entire graph structure and features, which may not be viable for
 graphs with hundreds of billions of edges or large features. We describe how to use
-the *parallel preprocessing pipeline* for such cases next.
+the *parallel data preparation pipeline* for such cases next.
 
-Parallel Preprocessing Pipeline
+Parallel Data Preparation Pipeline
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 To handle massive graph data that cannot fit in the CPU RAM of a
 single machine, DGL utilizes data chunking and parallel processing to reduce
-memory footprint and running time. The figure below illustrates the core steps:
+memory footprint and running time. The figure below illustrates the
+pipeline:
 
 .. figure:: https://data.dgl.ai/asset/image/guide_7_distdataprep.png
 
-* **Step.1 Partition Preparation:** The input raw graph data may not be
-  immediately ready for data partitioning. Moreover, some partitioning
-  algorithms like METIS family require extra statistics about the graph.
-  Therefore, this step transforms and augments the raw graph data with
-  necessary contexts according to the specified partition algorithm.
-  Optionally, it chunks the input graph into multiple data files to
-  ease the subsequent processing steps.
-* **Step.2 Graph Partitioning:** Invoke the specified partitioning algorithm to
-  generate a partition assignment for each node in the graph. To speedup the
-  step, some algorithms (e.g., ParMETIS) support parallel computing using
-  multiple machines.
-* **Step.3 Data Dispatching:** Given the partition assignment, the step then
+* The pipeline takes input data stored in *Chunked Graph Format* and
+  produces and dispatches data partitions to the target machines.
+* **Step.1 Graph Partitioning:** It calculates the ownership of each partition
+  and saves the results as a set of files called *partition assignment*.
+  To speedup the step, some algorithms (e.g., ParMETIS) support parallel computing
+  using multiple machines.
+* **Step.2 Data Dispatching:** Given the partition assignment, the step then
   physically partitions the graph data and dispatches them to the machines user
   specified. It also converts the graph data into formats that are suitable for
   distributed training and evaluation.
 
 The whole pipeline is modularized so that each step can be invoked
-individually. For example, users can by-pass Step.1 and Step.2 to invoke Step.3
-as long as they prepare chunked graph data and partition assignment file
-correctly. This enables more advanced customization such as custom partitioning
-algorithms.
+individually. For example, users can replace Step.1 with some custom graph partition
+algorithm as long as it produces partition assignment files
+correctly.
 
-In the document below, we use the MAG240M-LSC data from `Open Graph Benchmark
-<https://ogb.stanford.edu/docs/lsc/mag240m/>`__  as an example to describe the
-technical details. The MAG240M-LSC graph is a heterogeneous academic graph
+.. _guide-distributed-prep-chunk:
+Chunked Graph Format
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+To run the pipeline, DGL requires the input graph to be stored in multiple data
+chunks.  Each data chunk is the unit of data preprocessing and thus should fit
+into CPU RAM.  In this section, we use the MAG240M-LSC data from `Open Graph
+Benchmark <https://ogb.stanford.edu/docs/lsc/mag240m/>`__  as an example to
+describe the overall design, followed by a formal specification and
+tips for creating data in such format.
+
+Example: MAG240M-LSC
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The MAG240M-LSC graph is a heterogeneous academic graph
 extracted from the Microsoft Academic Graph (MAG), whose schema diagram is
 illustrated below:
 
 .. figure:: https://data.dgl.ai/asset/image/guide_7_mag240m.png
 
-Its data files are organized as following:
+Its raw data files are organized as follows:
 
 .. code-block:: none
 
@@ -110,30 +117,11 @@ Its data files are organized as following:
         |-- author___writes___paper/
            |-- edge_index.npy            # graph, 6GB
 
-
-Step.1 Partition Preparation
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-In general, the implementation of this step depends on the format of user's inputs.
-Its scope could include:
-
-* Construct graphs out of non-structured data such as texts or tabular data.
-* Augment or transform the input graph struture or features. E.g., adding reverse
-  or self-loop edges, normalizing features, etc.
-* Chunk the input graph structure and features into multiple data files so that
-  each one can fit in CPU RAM for subsequent preprocessing steps.
-
-Regardless of the implementation, the output of this step shall follow the
-Chunked Graph Data Format as we will describe next.
-
-.. _guide-distributed-prep-chunk:
-Chunked Graph Data Format
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-After step.1, the graph data can be chunked into multiple data files so that
-each piece can be loaded to CPU RAM easily. As an example, we have chunked
-the MAG240M-LSC graph into 2 parts, creating a data folder as follows:
-
+The graph has three node types (``"paper"``, ``"author"`` and ``"institution"``),
+three edge types/relations (``"cites"``, ``"writes"`` and ``"affiliated_with"``). The
+``"paper"`` nodes have three attributes (``"feat"``, ``"label"``, ``"year"'``), while
+other types of nodes and edges are featureless. Below shows the data files when
+it is stored in DGL Chunked Graph Format:
 
 .. code-block:: none
 
@@ -155,14 +143,14 @@ the MAG240M-LSC graph into 2 parts, creating a data folder as follows:
          |-- paper-year-part1.npy
          |-- paper-year-part2.npy
 
-All the data files are chunked into two parts, including the edge data of each relation
+All the data files are chunked into two parts, including the edges of each relation
 (e.g., writes, affiliates, cites) and node features. If the graph has edge features,
 they will be chunked into multiple files too. All ID data are stored in
 CSV (we will illustrate the contents soon) while node features are stored in
 numpy arrays.
 
-The ``metadata.json`` stores all the metadata information such as the file names
-and the chunk sizes.
+The ``metadata.json`` stores all the metadata information such as file names
+and chunk sizes (e.g., number of nodes, number of edges).
 
 .. code-block:: python
 
@@ -181,9 +169,9 @@ and the chunk sizes.
            "paper:cites:paper"
        ],
        "num_edges_per_chunk": [
-           [193011360, 193011360],    # number of author:writes:paper edges
-           [22296293, 22296293],      # number of author:affiliated_with:institution edges
-           [648874463, 648874463]     # number of paper:cites:paper edges
+           [193011360, 193011360],    # number of author:writes:paper edges per chunk
+           [22296293, 22296293],      # number of author:affiliated_with:institution edges per chunk
+           [648874463, 648874463]     # number of paper:cites:paper edges per chunk
        ],
        "edges" : {
             "author:write:paper" : {  # edge type
@@ -223,8 +211,7 @@ There are three parts in ``metadata.json``:
 
 * Graph schema information and chunk sizes, e.g., ``"node_type"`` , ``"num_nodes_per_chunk"``, etc.
 * Edge index data under key ``"edges"``.
-* Node/edge feature data under keys ``"node_data"`` and ``"edge_data"``. Currently only
-  support numpy arrays. More supports will be added in the future.
+* Node/edge feature data under keys ``"node_data"`` and ``"edge_data"``.
 
 The edge index files contain edges in the form of node ID pairs:
 
@@ -238,24 +225,68 @@ The edge index files contain edges in the form of node ID pairs:
     0 1203
     ...
 
-.. note::
+Specification
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    In general, a chunked graph data folder just needs a ``metadata.json`` and a bunch
-    of data files. The folder structure in this example is not a strict
-    requirement as long as ``metadata.json`` contains valid file paths.
+In general, a chunked graph data folder just needs a ``metadata.json`` and a
+bunch of data files. The folder structure in the MAG240M-LSC example is not a
+strict requirement as long as ``metadata.json`` contains valid file paths.
 
-Implementation tips
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``metadata.json`` top-level keys:
 
-To avoid running into out-of-memory error, users can process graph structures
-and feature data separately. Processing one chunk at a time can also reduce
-the runtime memory footprint. As an example, DGL provides a
-`tools/chunk_graph.py <https://github.com/dmlc/dgl/blob/master/tools/chunk_graph.py>`_
-script that chunks an in-memory feature-less :class:`~dgl.DGLGraph` and feature
-tensors stored in :class:`numpy.memmap`.
+* ``graph_name``: String. Unique name used by :class:`dgl.distributed.DistGraph`
+  to load graph.
+* ``node_type``: List of string. Node type names.
+* ``num_nodes_per_chunk``: List of list of integer. For graphs with :math:`T` node
+  types stored in :math:`P` chunks, the value contains :math:`T` integer lists.
+  Each list contains :math:`P` integers, which specify the number of nodes
+  in each chunk.
+* ``edge_type``: List of string. Edge type names in the form of
+  ``<source node type>:<relation>:<destination node type>``.
+* ``num_edges_per_chunk``: List of list of integer. For graphs with :math:`R` edge 
+  types stored in :math:`P` chunks, the value contains :math:`R` integer lists.
+  Each list contains :math:`P` integers, which specify the number of edges
+  in each chunk.
+* ``edges``: Dict of ``ChunkFileSpec``. Edge index files.
+  Dictionary keys are edge type names in the form of
+  ``<source node type>:<relation>:<destination node type>``.
+* ``node_data``: Dict of ``ChunkFileSpec``. Data files that store node attributes.
+  Dictionary keys are node type names.
+* ``edge_data``: Dict of ``ChunkFileSpec``. Data files that store edge attributes.
+  Dictionary keys are edge type names in the form of
+  ``<source node type>:<relation>:<destination node type>``.
+
+``ChunkFileSpec`` has two keys:
+
+* ``format``: File format. Depending on the format ``name``, users can configure more
+  details about how to parse each data file.
+    - ``"csv"``: CSV file. Use the ``delimiter`` key to specify delimiter in use.
+    - ``"numpy"``: NumPy array binary file created by :func:`numpy.save`.
+* ``data``: List of string. File path to each data chunk. Support absolute path
+  or path relative to the location of ``metadata.json``.
+
+Tips for making chunked graph data
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Depending on the raw data, the implementation could include:
+
+* Construct graphs out of non-structured data such as texts or tabular data.
+* Augment or transform the input graph struture or features. E.g., adding reverse
+  or self-loop edges, normalizing features, etc.
+* Chunk the input graph structure and features into multiple data files so that
+  each one can fit in CPU RAM for subsequent preprocessing steps.
+
+To avoid running into out-of-memory error, it is recommended to process graph
+structures and feature data separately. Processing one chunk at a time can also
+reduce the maximal runtime memory footprint. As an example, DGL provides a
+`tools/chunk_graph.py
+<https://github.com/dmlc/dgl/blob/master/tools/chunk_graph.py>`_ script that
+chunks an in-memory feature-less :class:`~dgl.DGLGraph` and feature tensors
+stored in :class:`numpy.memmap`.
+
 
 .. _guide-distributed-prep-partition:
-Step.2 Graph Partitioning
+Step.1 Graph Partitioning
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 This step reads the chunked graph data and calculates which partition each node
@@ -303,7 +334,7 @@ Despite its simplicity, random partitioning may result in frequent
 cross-machine communication.  Check out chapter
 :ref:`guide-distributed-partition` for more advanced options.
 
-Step.3 Data Dispatching
+Step.2 Data Dispatching
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 DGL provides a ``dispatch_data.py`` script to physically partition the data and
