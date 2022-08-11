@@ -19,7 +19,7 @@ OWNER_PROCESS = "owner_proc_id"
 
 PART_LOCAL_NID = "part_local_nid"
 
-GLOO_MESSAGING_TIMEOUT = 60*60 #seconds
+GLOO_MESSAGING_TIMEOUT = 60 #seconds
 
 STR_NODE_TYPE = "node_type"
 STR_NUM_NODES_PER_CHUNK = "num_nodes_per_chunk"
