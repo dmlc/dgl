@@ -11,6 +11,7 @@ Dependencies
 Install as follows:
 ```bash
 pip install sklearn
+pip install ogb
 ```
 
 How to run
@@ -23,11 +24,25 @@ python3 train.py --dataset MUTAG
 
 > **_NOTE:_**  Users may observe results fluctuate due to the randomness with relatively small dataset.  In consistence with the original [paper](https://arxiv.org/abs/1810.00826), five social network datasets, 'COLLAB', 'IMDBBINARY' 'IMDBMULTI' 'REDDITBINARY' and 'REDDITMULTI5K', are also available as the input. Users are encouraged to update the script slightly for social network applications, for example, replacing sum readout on bioinformatics datasets with mean readout on social network datasets and using one-hot encodings of node degrees by setting "degree_as_nlabel=True" in GINDataset.
 
-Summary (10-fold cross-validation)
+### Summary (10-fold cross-validation)
 -------
 | Dataset       | Result 
 | ------------- | -------
 | MUTAG         | ~89.4    
 | PTC           | ~68.5   
 | NCI1          | ~82.9    
-| PROTEINS      | ~74.1   
+| PROTEINS      | ~74.1
+
+Multi GPU training for graph predication
+------
+
+Run with following (available dataset: "ogbg-molhiv", "ogbg-molpcba")
+```bash
+python3 multi_gpu_graph_prediction.py --dataset ogbg-molhiv
+```
+
+Results:
+```
+* ogbg-molhiv: ~0.7480
+* ogbg-molpcba: ~0.2024
+```
