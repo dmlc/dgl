@@ -2,6 +2,7 @@ import os
 import numpy as np
 import constants
 import torch
+import logging
 
 import pyarrow
 from pyarrow import csv
@@ -111,11 +112,14 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
                 assert feat_data[constants.STR_FORMAT][constants.STR_NAME] == constants.STR_NUMPY
                 my_feat_data_fname = feat_data[constants.STR_DATA][rank] #this will be just the file name
                 if (os.path.isabs(my_feat_data_fname)):
+                    logging.info(f'Loading numpy from {my_feat_data_fname}')
                     node_features[ntype_name+'/'+feat_name] = \
                             torch.from_numpy(np.load(my_feat_data_fname))
                 else:
+                    numpy_path = os.path.join(input_dir, my_feat_data_fname)
+                    logging.info(f'Loading numpy from {numpy_path}')
                     node_features[ntype_name+'/'+feat_name] = \
-                            torch.from_numpy(np.load(os.path.join(input_dir, my_feat_data_fname)))
+                            torch.from_numpy(np.load(numpy_path))
 
                 node_feature_tids[ntype_name].append([feat_name, -1, -1])
 
@@ -155,10 +159,10 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
 
     #done build node_features locally. 
     if len(node_features) <= 0:
-        print('[Rank: ', rank, '] This dataset does not have any node features')
+        logging.info(f'[Rank: {rank}] This dataset does not have any node features')
     else:
         for k, v in node_features.items():
-            print('[Rank: ', rank, '] node feature name: ', k, ', feature data shape: ', v.size())
+            logging.info(f'[Rank: {rank}] node feature name: {k}, feature data shape: {v.size()}')
 
     '''
     Code below is used to read edges from the input dataset with the help of the metadata json file
@@ -230,6 +234,7 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
         rel_name = tokens[1]
         dst_ntype_name = tokens[2]
 
+        logging.info(f'Reading csv files from {edge_info[rank]}')
         data_df = csv.read_csv(edge_info[rank], read_options=pyarrow.csv.ReadOptions(autogenerate_column_names=True), 
                                     parse_options=pyarrow.csv.ParseOptions(delimiter=' '))
         #currently these are just type_edge_ids... which will be converted to global ids
@@ -247,7 +252,7 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
     assert edge_datadict[constants.GLOBAL_SRC_ID].shape == edge_datadict[constants.GLOBAL_DST_ID].shape
     assert edge_datadict[constants.GLOBAL_DST_ID].shape == edge_datadict[constants.GLOBAL_TYPE_EID].shape
     assert edge_datadict[constants.GLOBAL_TYPE_EID].shape == edge_datadict[constants.ETYPE_ID].shape
-    print('[Rank: ', rank, '] Done reading edge_file: ', len(edge_datadict), edge_datadict[constants.GLOBAL_SRC_ID].shape)
+    logging.info(f'[Rank: {rank}] Done reading edge_file: {len(edge_datadict)}, {edge_datadict[constants.GLOBAL_SRC_ID].shape}')
 
     return node_tids, node_features, node_feature_tids, edge_datadict, edge_tids
 

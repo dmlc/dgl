@@ -2,6 +2,8 @@ import argparse
 import numpy as np
 import torch.multiprocessing as mp
 import logging
+import platform
+import os
 from data_shuffle import single_machine_run, multi_machine_run 
 
 def log_params(params): 
@@ -46,5 +48,5 @@ if __name__ == "__main__":
     params = parser.parse_args()
 
     #invoke the pipeline function
-    logging.basicConfig(level='INFO', format="[%(levelname)s %(asctime)s PID:%(process)d] %(message)s")
+    logging.basicConfig(level='INFO', format=f"[{platform.node()} %(levelname)s %(asctime)s PID:%(process)d] %(message)s")
     multi_machine_run(params)

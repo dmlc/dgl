@@ -385,6 +385,7 @@ def read_dataset(rank, world_size, node_part_ids, params, schema_map):
     #node_tids, node_features, edge_datadict, edge_tids
     node_tids, node_features, node_feat_tids, edge_data, edge_tids = \
         get_dataset(params.input_dir, params.graph_name, rank, world_size, schema_map)
+    logging.info(f'[Rank: {rank}] Done reading dataset deom {params.input_dir}')
 
     augment_edge_data(edge_data, node_part_ids, edge_tids, rank, world_size)
     logging.info(f'[Rank: {rank}] Done augmenting edge_data: {len(edge_data)}, {edge_data[constants.GLOBAL_SRC_ID].shape}')
