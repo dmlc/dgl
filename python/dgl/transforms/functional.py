@@ -215,19 +215,16 @@ def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean',
         raise DGLError("Invalid k value. expect k > 0, got k = {}".format(k))
 
     # check empty point set
-    if F.shape(x)[0] == 0:
+    x_size = tuple(F.shape(x))
+    if x_size[0] == 0:
         raise DGLError("Find empty point set")
 
+    x_seg = x_size[0] * [x_size[1]] if F.ndim(x) == 3 else [x_size[0]]
     if algorithm == 'bruteforce-blas':
         result = _knn_graph_blas(x, k, dist=dist)
-        x_seg = [result.num_nodes()]
     else:
         if F.ndim(x) == 3:
-            x_size = tuple(F.shape(x))
             x = F.reshape(x, (x_size[0] * x_size[1], x_size[2]))
-            x_seg = x_size[0] * [x_size[1]]
-        else:
-            x_seg = [F.shape(x)[0]]
         out = knn(k, x, x_seg, algorithm=algorithm, dist=dist)
         row, col = out[1], out[0]
         result = convert.graph((row, col))
