@@ -52,7 +52,7 @@ def submit_jobs(args) -> str:
         
     # (BarclayII) Is it safe to assume all the workers have the Python executable at the same path?
     pipeline_cmd = os.path.join(INSTALL_DIR, PIPELINE_SCRIPT)
-    udf_cmd = f"{args.python_exe} {pipeline_cmd} {argslist}"
+    udf_cmd = f"{args.python_path} {pipeline_cmd} {argslist}"
 
     launch_cmd = get_launch_cmd(args)
     launch_cmd += '\"'+udf_cmd+'\"'
