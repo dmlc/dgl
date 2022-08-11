@@ -114,6 +114,13 @@ class KNNGraph(nn.Module):
               :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
             * 'cosine': Use cosine distance.
             (default: 'euclidean')
+        exclude_self : bool, optional
+            If True, the output graph will not contain self loop edges, and each node will not
+            be counted as one of its own k neighbors.  If False, the output graph will contain
+            self loop edges, and a node will be counted as one of its own k neighbors.
+        output_batch : bool, optional
+            If True, the output graph will have batch information set according to the
+            shape of ``x``. If False, the output graph will not have batch information set.
 
         Returns
         -------
@@ -225,6 +232,13 @@ class SegmentedKNNGraph(nn.Module):
               :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
             * 'cosine': Use cosine distance.
             (default: 'euclidean')
+        exclude_self : bool, optional
+            If True, the output graph will not contain self loop edges, and each node will not
+            be counted as one of its own k neighbors.  If False, the output graph will contain
+            self loop edges, and a node will be counted as one of its own k neighbors.
+        output_batch : bool, optional
+            If True, the output graph will have batch information set according to ``segs``.
+            If False, the output graph will not have batch information set.
 
         Returns
         -------
