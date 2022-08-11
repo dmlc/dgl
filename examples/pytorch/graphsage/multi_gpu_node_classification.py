@@ -104,7 +104,6 @@ def train(rank, world_size, graph, num_classes, split_idx):
     # move ids to GPU
     train_idx = train_idx.to('cuda')
     valid_idx = valid_idx.to('cuda')
-    test_idx = test_idx.to('cuda')
 
     # For training, each process/GPU will get a subset of the
     # train_idx/valid_idx, and generate mini-batches indepednetly. This allows

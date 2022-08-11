@@ -365,11 +365,11 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
     for l, arg_u_nd in enumerate(list_arg_u_nd):
         # TODO(Israt): l or src_id as index of lhs
         list_arg_u[l] = None if list_arg_u[l] is None else F.zerocopy_from_dgl_ndarray(arg_u_nd)
-        if expand_u and use_cmp:
+        if list_arg_u[l] is not None and expand_u and use_cmp:
             list_arg_u[l] = F.squeeze(list_arg_u[l], -1)
     for l, arg_e_nd in enumerate(list_arg_e_nd):
         list_arg_e[l] = None if list_arg_e[l] is None else F.zerocopy_from_dgl_ndarray(arg_e_nd)
-        if expand_e and use_cmp:
+        if list_arg_e[l] is not None and expand_e and use_cmp:
             list_arg_e[l] = F.squeeze(list_arg_e[l], -1)
     for l, arg_u_ntype_nd in enumerate(list_arg_u_ntype_nd):
         list_arg_u_ntype[l] = None if arg_u_ntype_nd is None \
@@ -562,7 +562,7 @@ def _gsddmm_hetero(gidx, op, lhs_len, lhs_target='u', rhs_target='v', lhs_and_rh
         e = out_list[l]
         e = F.tensor([]) if e is None else e
         if (expand_lhs or not use_lhs) and (expand_rhs or not use_rhs):
-            e = F.squeeze(v, -1)
+            e = F.squeeze(e, -1)
         out_list[l] = e
     out = tuple(out_list)
     return out

@@ -255,7 +255,7 @@ class SparseAdagrad(DistSparseGradOptimizer):
             update_event.record()
 
         # update emb
-        std_values = grad_state.add_(eps).sqrt_()
+        std_values = grad_state.sqrt_().add_(eps)
         tmp = clr * grad_values / std_values
         tmp_dst = tmp.to(state_dev, non_blocking=True)
 
