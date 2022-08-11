@@ -68,7 +68,7 @@ def main():
     parser.add_argument('--out-dir', type=str, help='Location of the output directory where the graph partitions will be created by this pipeline')
     parser.add_argument('--ip-config', type=str, help='File location of IP configuration for server processes')
     parser.add_argument('--master-port', type=int, default=12345, help='port used by gloo group to create randezvous point')
-    parser.add_argument('--python-exe', type=str, default=sys.executable, help='Path to the Python executable on all workers')
+    parser.add_argument('--python-path', type=str, default=sys.executable, help='Path to the Python executable on all workers')
 
     args, udf_command = parser.parse_known_args()
 
