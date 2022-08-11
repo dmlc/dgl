@@ -109,7 +109,9 @@ def test_knn_cpu(algorithm, dist):
 
 @pytest.mark.parametrize('algorithm', ['bruteforce-blas', 'bruteforce', 'bruteforce-sharemem'])
 @pytest.mark.parametrize('dist', ['euclidean', 'cosine'])
-def test_knn_cuda(algorithm, dist):
+@pytest.mark.parametrize('exclude_self', [False, True])
+@pytest.mark.parametrize('output_batch', [False, True])
+def test_knn_cuda(algorithm, dist, exclude_self, output_batch):
     if not th.cuda.is_available():
         return
     x = th.randn(8, 3).to(F.cuda())
@@ -121,64 +123,96 @@ def test_knn_cuda(algorithm, dist):
         tmp_x = x / (1e-5 + F.sqrt(F.sum(x * x, dim=1, keepdims=True)))
         d = 1 - F.matmul(tmp_x, tmp_x.T).to(F.cpu())
 
-    def check_knn(g, x, start, end, k):
+    def check_knn(g, x, start, end, k, exclude_self):
         assert g.device == x.device
         g = g.to(F.cpu())
         for v in range(start, end):
             src, _ = g.in_edges(v)
             src = set(src.numpy())
+            assert len(src) == k
             i = v - start
-            src_ans = set(th.topk(d[start:end, start:end][i], k, largest=False)[1].numpy() + start)
+            src_ans = set(th.topk(d[start:end, start:end][i], k + (1 if exclude_self else 0), largest=False)[1].numpy() + start)
+            if exclude_self:
+                # remove self
+                src_ans.remove(v)
             assert src == src_ans
 
+    def check_batch(g, k, output_batch, expected_batch_info):
+        if output_batch:
+            assert F.array_equal(g.batch_num_nodes(), F.tensor(expected_batch_info))
+            assert F.array_equal(g.batch_num_edges(), k*F.tensor(expected_batch_info))
+        else:
+            assert F.array_equal(g.batch_num_nodes(), F.sum(F.tensor(expected_batch_info), 0, keepdims=True))
+            assert F.array_equal(g.batch_num_edges(), k*F.sum(F.tensor(expected_batch_info), 0, keepdims=True))
+        return
+
     # check knn with 2d input
-    g = kg(x, algorithm, dist)
-    check_knn(g, x, 0, 8, 3)
+    g = kg(x, algorithm, dist, exclude_self, output_batch)
+    check_knn(g, x, 0, 8, 3, exclude_self)
+    check_batch(g, 3, output_batch, [8])
 
     # check knn with 3d input
-    g = kg(x.view(2, 4, 3), algorithm, dist)
-    check_knn(g, x, 0, 4, 3)
-    check_knn(g, x, 4, 8, 3)
+    g = kg(x.view(2, 4, 3), algorithm, dist, exclude_self, output_batch)
+    check_knn(g, x, 0, 4, 3, exclude_self)
+    check_knn(g, x, 4, 8, 3, exclude_self)
+    check_batch(g, 3, output_batch, [4, 4])
 
     # check segmented knn
-    kg = dgl.nn.SegmentedKNNGraph(3)
-    g = kg(x, [3, 5], algorithm, dist)
-    check_knn(g, x, 0, 3, 3)
-    check_knn(g, x, 3, 8, 3)
+    # there are only 2 edges per node possible when exclude_self with 3 nodes in the segment
+    # and this test case isn't supposed to warn, so limit it when exclude_self is True
+    adjusted_k = 3 - (1 if exclude_self else 0)
+    kg = dgl.nn.SegmentedKNNGraph(adjusted_k)
+    g = kg(x, [3, 5], algorithm, dist, exclude_self, output_batch)
+    check_knn(g, x, 0, 3, adjusted_k, exclude_self)
+    check_knn(g, x, 3, 8, adjusted_k, exclude_self)
+    check_batch(g, adjusted_k, output_batch, [3, 5])
 
     # check k > num_points
     kg = dgl.nn.KNNGraph(10)
     with pytest.warns(DGLWarning):
-        g = kg(x, algorithm, dist)
-    check_knn(g, x, 0, 8, 8)
+        g = kg(x, algorithm, dist, exclude_self, output_batch)
+    # there are only 7 edges per node possible when exclude_self with 8 nodes total
+    adjusted_k = 8 - (1 if exclude_self else 0)
+    check_knn(g, x, 0, 8, adjusted_k, exclude_self)
+    check_batch(g, adjusted_k, output_batch, [8])
 
     with pytest.warns(DGLWarning):
-        g = kg(x.view(2, 4, 3), algorithm, dist)
-    check_knn(g, x, 0, 4, 4)
-    check_knn(g, x, 4, 8, 4)
+        g = kg(x.view(2, 4, 3), algorithm, dist, exclude_self, output_batch)
+    # there are only 3 edges per node possible when exclude_self with 4 nodes per segment
+    adjusted_k = 4 - (1 if exclude_self else 0)
+    check_knn(g, x, 0, 4, adjusted_k, exclude_self)
+    check_knn(g, x, 4, 8, adjusted_k, exclude_self)
+    check_batch(g, adjusted_k, output_batch, [4, 4])
 
     kg = dgl.nn.SegmentedKNNGraph(5)
     with pytest.warns(DGLWarning):
-        g = kg(x, [3, 5], algorithm, dist)
-    check_knn(g, x, 0, 3, 3)
-    check_knn(g, x, 3, 8, 3)
+        g = kg(x, [3, 5], algorithm, dist, exclude_self, output_batch)
+    # there are only 2 edges per node possible when exclude_self in the segment with
+    # only 3 nodes, and the current implementation reduces k for all segments
+    # in that case
+    adjusted_k = 3 - (1 if exclude_self else 0)
+    check_knn(g, x, 0, 3, adjusted_k, exclude_self)
+    check_knn(g, x, 3, 8, adjusted_k, exclude_self)
+    check_batch(g, adjusted_k, output_batch, [3, 5])
 
     # check k == 0
-    kg = dgl.nn.KNNGraph(0)
+    # that's valid for exclude_self, but -1 is not, so check -1 instead for exclude_self
+    adjusted_k = 0 - (1 if exclude_self else 0)
+    kg = dgl.nn.KNNGraph(adjusted_k)
     with pytest.raises(DGLError):
-        g = kg(x, algorithm, dist)
-    kg = dgl.nn.SegmentedKNNGraph(0)
+        g = kg(x, algorithm, dist, exclude_self, output_batch)
+    kg = dgl.nn.SegmentedKNNGraph(adjusted_k)
     with pytest.raises(DGLError):
-        g = kg(x, [3, 5], algorithm, dist)
+        g = kg(x, [3, 5], algorithm, dist, exclude_self, output_batch)
 
     # check empty
     x_empty = th.tensor([])
     kg = dgl.nn.KNNGraph(3)
     with pytest.raises(DGLError):
-        g = kg(x_empty, algorithm, dist)
+        g = kg(x_empty, algorithm, dist, exclude_self, output_batch)
     kg = dgl.nn.SegmentedKNNGraph(3)
     with pytest.raises(DGLError):
-        g = kg(x_empty, [3, 5], algorithm, dist)
+        g = kg(x_empty, [3, 5], algorithm, dist, exclude_self, output_batch)
 
 
 @parametrize_idtype
