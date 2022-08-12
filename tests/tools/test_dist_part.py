@@ -1,11 +1,18 @@
+import argparse
 import dgl
+import json
 import numpy as np
 import os
+import sys
 import torch
 
 from chunk_graph import chunk_graph
+from random_partition import random_partition
+from dispatch_data import submit_jobs
 
 def test_chunk_graph():
+    # Step0: prepare chunked graph data format
+
     # A synthetic mini MAG240
     num_institutions = 20
     num_authors = 100
@@ -44,19 +51,32 @@ def test_chunk_graph():
     write_year = np.random.choice(2022, num_write_edges)
 
     # Save features
-    input_dir = '/data_test'
+    input_dir = 'data_test'
     os.makedirs(input_dir)
     for sub_d in ['paper', 'cites', 'writes']:
         os.makedirs(os.path.join(input_dir, sub_d))
 
-    for fname, feat in {
-        'paper/feat.npy': paper_feat,
-        'paper/label.npy': paper_label,
-        'paper/year.npy': paper_year,
-        'cites/count.npy': cite_count,
-        'writes/year.npy': write_year}.items():
-        np.save(os.path.join(input_dir, fname), feat)
+    paper_feat_path = os.path.join(input_dir, 'paper/feat.npy')
+    with open(paper_feat_path, 'wb') as f:
+        np.save(f, paper_feat)
 
+    paper_label_path = os.path.join(input_dir, 'paper/label.npy')
+    with open(paper_label_path, 'wb') as f:
+        np.save(f, paper_label)
+
+    paper_year_path = os.path.join(input_dir, 'paper/year.npy')
+    with open(paper_year_path, 'wb') as f:
+        np.save(f, paper_year)
+
+    cite_count_path = os.path.join(input_dir, 'cites/count.npy')
+    with open(cite_count_path, 'wb') as f:
+        np.save(f, cite_count)
+
+    write_year_path = os.path.join(input_dir, 'writes/year.npy')
+    with open(write_year_path, 'wb') as f:
+        np.save(f, write_year)
+
+    output_dir = 'chunked-data'
     chunk_graph(
         g,
         'mag240m',
@@ -75,3 +95,30 @@ def test_chunk_graph():
         },
         4,
         output_dir)
+
+def test_partition():
+    # Step1: graph partition
+
+    with open('chunked-data/metadata.json') as f:
+        metadata = json.load(f)
+    output_path = '2parts'
+    random_partition(metadata, num_parts=2, output_path=output_path)
+
+def test_dispatch():
+    # Step2: data dispatch
+    parser = argparse.ArgumentParser(description='Dispatch edge index and data to partitions',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('--in-dir', type=str, default='chunked-data')
+    parser.add_argument('--partitions-dir', type=str, default='2parts')
+    parser.add_argument('--out-dir', type=str, default='partitioned')
+    parser.add_argument('--ip-config', type=str, default='ip_config.txt')
+    parser.add_argument('--master-port', type=int, default=12345)
+    parser.add_argument('--python-path', type=str, default=sys.executable)
+    args, udf_command = parser.parse_known_args()
+
+    with open(args.ip_config, 'w') as f:
+        f.write('127.0.0.0\n')
+        f.write('127.0.0.1\n')
+
+    tokens = sys.executable.split(os.sep)
+    submit_jobs(args)
