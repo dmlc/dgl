@@ -17,7 +17,7 @@ dgl>=0.8
 
 ## Usage
 
-run the scripts in `./scripts` folder, e.g.
+run the command-line scripts, e.g.
 ```{.bash}
 scripts/run_ddi.sh
 ```

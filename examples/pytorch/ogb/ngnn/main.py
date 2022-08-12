@@ -56,9 +56,9 @@ class Logger(object):
 
 
 class NGNN_GCNConv(torch.nn.Module):
-    def __init__(self, in_channels, hidden_channels, out_channels, dataset):
+    def __init__(self, in_channels, hidden_channels, out_channels, num_nonl_layers):
         super(NGNN_GCNConv, self).__init__()
-        self.dataset = dataset
+        self.num_nonl_layers = num_nonl_layers # number of nonlinear layers in each conv layer
         self.conv = GraphConv(in_channels, hidden_channels)
         self.fc = Linear(hidden_channels, hidden_channels)
         self.fc2 = Linear(hidden_channels, out_channels)
@@ -76,7 +76,7 @@ class NGNN_GCNConv(torch.nn.Module):
     def forward(self, g, x):
         x = self.conv(g, x)
 
-        if self.dataset != 'ogbl-ddi':
+        if self.num_nonl_layers == 2:
             x = F.relu(x)
             x = self.fc(x)
         
@@ -91,14 +91,15 @@ class GCN(torch.nn.Module):
         self.dataset = dataset
         self.convs = torch.nn.ModuleList()
 
+        num_nonl_layers = 1 if num_layers <= 2 else 2 # number of nonlinear layers in each conv layer
         if ngnn_type == 'input':
-            self.convs.append(NGNN_GCNConv(in_channels, hidden_channels, hidden_channels, dataset))
+            self.convs.append(NGNN_GCNConv(in_channels, hidden_channels, hidden_channels, num_nonl_layers))
             for _ in range(num_layers - 2):
                 self.convs.append(GraphConv(hidden_channels, hidden_channels))
         elif ngnn_type == 'hidden':
             self.convs.append(GraphConv(in_channels, hidden_channels))
             for _ in range(num_layers - 2):
-                self.convs.append(NGNN_GCNConv(hidden_channels, hidden_channels, hidden_channels, dataset))
+                self.convs.append(NGNN_GCNConv(hidden_channels, hidden_channels, hidden_channels, num_nonl_layers))
         
         self.convs.append(GraphConv(hidden_channels, out_channels))
 
@@ -119,10 +120,10 @@ class GCN(torch.nn.Module):
 
 
 class NGNN_SAGEConv(torch.nn.Module):
-    def __init__(self, in_channels, hidden_channels, out_channels, dataset, 
+    def __init__(self, in_channels, hidden_channels, out_channels, num_nonl_layers, 
                  *, reduce):
         super(NGNN_SAGEConv, self).__init__()
-        self.dataset = dataset
+        self.num_nonl_layers = num_nonl_layers # number of nonlinear layers in each conv layer
         self.conv = SAGEConv(in_channels, hidden_channels, reduce)
         self.fc = Linear(hidden_channels, hidden_channels)
         self.fc2 = Linear(hidden_channels, out_channels)
@@ -140,7 +141,7 @@ class NGNN_SAGEConv(torch.nn.Module):
     def forward(self, g, x):
         x = self.conv(g, x)
 
-        if self.dataset != 'ogbl-ddi':
+        if self.num_nonl_layers == 2:
             x = F.relu(x)
             x = self.fc(x)
         
@@ -154,15 +155,16 @@ class SAGE(torch.nn.Module):
 
         self.dataset = dataset
         self.convs = torch.nn.ModuleList()
-
+        
+        num_nonl_layers = 1 if num_layers <= 2 else 2 # number of nonlinear layers in each conv layer
         if ngnn_type == 'input':
-            self.convs.append(NGNN_SAGEConv(in_channels, hidden_channels, hidden_channels, dataset, reduce=reduce))
+            self.convs.append(NGNN_SAGEConv(in_channels, hidden_channels, hidden_channels, num_nonl_layers, reduce=reduce))
             for _ in range(num_layers - 2):
                 self.convs.append(SAGEConv(hidden_channels, hidden_channels, reduce))
         elif ngnn_type == 'hidden':
             self.convs.append(SAGEConv(in_channels, hidden_channels, reduce))
             for _ in range(num_layers - 2):
-                self.convs.append(NGNN_SAGEConv(hidden_channels, hidden_channels, hidden_channels, dataset, reduce=reduce))
+                self.convs.append(NGNN_SAGEConv(hidden_channels, hidden_channels, hidden_channels, num_nonl_layers, reduce=reduce))
         
         self.convs.append(SAGEConv(hidden_channels, out_channels, reduce))
 
