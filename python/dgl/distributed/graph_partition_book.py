@@ -1034,6 +1034,7 @@ class PartitionPolicy(object):
         A graph partition book
     """
     def __init__(self, policy_str, partition_book):
+        # TODO
         splits = policy_str.split(':')
         if len(splits) == 1:
             assert policy_str in (EDGE_PART_POLICY, NODE_PART_POLICY), \
