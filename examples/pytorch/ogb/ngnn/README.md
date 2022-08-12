@@ -15,14 +15,6 @@ torch>=1.11.0
 dgl>=0.8
 ```
 
-## Usage
-
-run the command-line scripts, e.g.
-```{.bash}
-scripts/run_ddi.sh
-```
-and you can modify the arguments of the scripts.
-
 ## Experiments
 
 We do not fix random seeds at all, and take over 10 runs for all models. All models are trained on a single V100 GPU with 16GB memory.
