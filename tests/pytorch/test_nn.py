@@ -412,6 +412,60 @@ def test_rgcn(idtype, O):
         h_new = rgc_bdd(g, h, r, norm)
         assert h_new.shape == (100, O)
 
+@parametrize_idtype
+@pytest.mark.parametrize('O', [1, 10, 40])
+def test_rgcn_default_nbasis(idtype, O):
+    ctx = F.ctx()
+    etype = []
+    g = dgl.from_scipy(sp.sparse.random(100, 100, density=0.1))
+    g = g.astype(idtype).to(F.ctx())
+    # 5 etypes
+    R = 5
+    for i in range(g.number_of_edges()):
+        etype.append(i % 5)
+    I = 10
+
+    h = th.randn((100, I)).to(ctx)
+    r = th.tensor(etype).to(ctx)
+    norm = th.rand((g.number_of_edges(), 1)).to(ctx)
+    sorted_r, idx = th.sort(r)
+    sorted_g = dgl.reorder_graph(g, edge_permute_algo='custom', permute_config={'edges_perm' : idx.to(idtype)})
+    sorted_norm = norm[idx]
+
+    rgc = nn.RelGraphConv(I, O, R).to(ctx)
+    th.save(rgc, tmp_buffer)  # test pickle
+    rgc_basis = nn.RelGraphConv(I, O, R, "basis").to(ctx)
+    th.save(rgc_basis, tmp_buffer)  # test pickle
+    if O % R == 0:
+        rgc_bdd = nn.RelGraphConv(I, O, R, "bdd").to(ctx)
+        th.save(rgc_bdd, tmp_buffer)  # test pickle
+
+    # basic usage
+    h_new = rgc(g, h, r)
+    assert h_new.shape == (100, O)
+    h_new_basis = rgc_basis(g, h, r)
+    assert h_new_basis.shape == (100, O)
+    if O % R == 0:
+        h_new_bdd = rgc_bdd(g, h, r)
+        assert h_new_bdd.shape == (100, O)
+
+    # sorted input
+    h_new_sorted = rgc(sorted_g, h, sorted_r, presorted=True)
+    assert th.allclose(h_new, h_new_sorted, atol=1e-4, rtol=1e-4)
+    h_new_basis_sorted = rgc_basis(sorted_g, h, sorted_r, presorted=True)
+    assert th.allclose(h_new_basis, h_new_basis_sorted, atol=1e-4, rtol=1e-4)
+    if O % R == 0:
+        h_new_bdd_sorted = rgc_bdd(sorted_g, h, sorted_r, presorted=True)
+        assert th.allclose(h_new_bdd, h_new_bdd_sorted, atol=1e-4, rtol=1e-4)
+
+    # norm input
+    h_new = rgc(g, h, r, norm)
+    assert h_new.shape == (100, O)
+    h_new = rgc_basis(g, h, r, norm)
+    assert h_new.shape == (100, O)
+    if O % R == 0:
+        h_new = rgc_bdd(g, h, r, norm)
+        assert h_new.shape == (100, O)
 
 @parametrize_idtype
 @pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
@@ -1204,6 +1258,11 @@ def test_hetero_embedding(out_dim):
     layer = nn.HeteroEmbedding({'user': 2, ('user', 'follows', 'user'): 3}, out_dim)
     layer = layer.to(F.ctx())
 
+    embeds = layer.weight
+    assert embeds['user'].shape == (2, out_dim)
+    assert embeds[('user', 'follows', 'user')].shape == (3, out_dim)
+
+    layer.reset_parameters()
     embeds = layer.weight
     assert embeds['user'].shape == (2, out_dim)
     assert embeds[('user', 'follows', 'user')].shape == (3, out_dim)
