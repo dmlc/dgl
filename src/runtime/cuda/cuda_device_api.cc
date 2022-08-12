@@ -197,10 +197,15 @@ class CUDADeviceAPI final : public DeviceAPI {
    *        not just the one that performed the allocation
    */
   void PinData(void* ptr, size_t nbytes) {
+    // prevent users from pinning empty tensors or graphs
+    if (ptr == nullptr || nbytes == 0)
+      return;
     CUDA_CALL(cudaHostRegister(ptr, nbytes, cudaHostRegisterDefault));
   }
 
   void UnpinData(void* ptr) {
+    if (ptr == nullptr)
+      return;
     CUDA_CALL(cudaHostUnregister(ptr));
   }
 
