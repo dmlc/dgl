@@ -138,8 +138,9 @@ class Metapath2vec(nn.Module):
         words_pow = sum(pow_frequency)
         ratio = pow_frequency / words_pow
         count = np.round(ratio * self.NEGATIVE_TABLE_SIZE)
+        word_list = list(self.word_frequency.keys())
         for wid, c in enumerate(count):
-            self.negatives += [wid] * int(c)
+            self.negatives += [word_list[wid]] * int(c)
         self.negatives = np.array(self.negatives)
         np.random.shuffle(self.negatives)
         self.sampling_prob = ratio
@@ -160,27 +161,29 @@ class Metapath2vec(nn.Module):
         return response
 
     def _generate_sample(self, batches):
-        if not isinstance(batches, Tensor):
-            pair_catch = []
-            for batch in batches:
-                word_ids = [w for w in batch if w in self.word_frequency and np.random.rand() < self.discards[w]]
+        pair_catch = []
+        for batch in batches:
+            if len(batch) < 0:
+                continue
+            word_ids = [w for w in batch if w in self.word_frequency and np.random.rand() < self.discards[w]]
 
-                for i, u in enumerate(word_ids):
-                    for j, v in enumerate(
-                            word_ids[max(i - self.window_size, 0):i + self.window_size]):
-                        assert u < self.word_count
-                        assert v < self.word_count
-                        if i == j:
-                            continue
-                        pair_catch.append((u, v, self._getNegatives(v, self.negative_samples_size)))
+            for i, u in enumerate(word_ids):
+                for j, v in enumerate(
+                        word_ids[max(i - self.window_size, 0):i + self.window_size]):
+                    assert u < self.word_count
+                    assert v < self.word_count
+                    if i == j:
+                        continue
+                    pair_catch.append((u, v, self._getNegatives(v, self.negative_samples_size)))
 
-            collate_u, collate_v, collate_ne = [x for x in zip(*pair_catch)]
+        all_u = [u for u, _, _ in pair_catch]
+        all_v = [v for _, v, _ in pair_catch]
+        all_neg_v = [neg_v for _, _, neg_v in pair_catch]
 
-        return torch.LongTensor(collate_u), torch.LongTensor(collate_v), torch.LongTensor(collate_ne)
+        return torch.LongTensor(all_u), torch.LongTensor(all_v), torch.LongTensor(all_neg_v)
 
     def loader(self, **kwargs):
         r"""Returns the data loader that contains center node ，positive context node，and negative samples on the heterogeneous graph random walk.
-
         Args:
             **kwargs (optional): Arguments of
                 :class:`torch.utils.data.DataLoader`, such as

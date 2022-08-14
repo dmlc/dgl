@@ -126,9 +126,10 @@ def main():
 	metapath = ['ca', 'ac'] * 100
     #采用和example文件训练同样的参数，为了输出label对应的embedding方便test所以传入nid2word
 	model = Metapath2vec(hg, 128, metapath, 7,node_repeat=1000,nid2word=nid2word)
+	model.initParameters()
 	model = model.to(device)
 	print("initial ok")
-	dataloader = model.loader(batch_size=50, num_workers=16)
+	dataloader = model.loader(batch_size=50, num_workers=8)
 	print("step2")
 	optimizer = optim.SparseAdam(list(model.parameters()), lr=initial_lr)
 	scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(dataloader))
@@ -168,7 +169,7 @@ def main():
 
 def save_embedding(model,id2word, file_name, num):
 	embedding = model.u_embeddings.weight.cpu().data.numpy()
-	with open(file_name + "/" + "my"+ file_name + str(num) + ".txt", 'w') as f:
+	with open(file_name + "/" + "my"+ file_name + str(num) +strftime("%y%m%d-%H%M", localtime()) +".txt", 'w') as f:
 		f.write('%d %d\n' % (len(id2word), model.emb_dimension))
 		for wid, w in id2word.items():
 			e = ' '.join(map(lambda x: str(x), embedding[wid]))
