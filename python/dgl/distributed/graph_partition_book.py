@@ -1039,7 +1039,7 @@ class PartitionPolicy(object):
             if NODE_PART_POLICY == policy_str:
                 self._type_name = DEFAULT_NTYPE
             else:
-                self._type_name = DEFAULT_ETYPE[1] 
+                self._type_name = DEFAULT_ETYPE[1]
         else:
             self._type_name = type_name
         self._policy_str = policy_str
