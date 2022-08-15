@@ -167,3 +167,5 @@ config.cmake
 
 # model file
 *.pth
+
+dataset/
