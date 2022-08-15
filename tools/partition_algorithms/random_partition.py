@@ -35,11 +35,11 @@ def random_partition(metadata, num_parts, output_path):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
-            'metadata', type=str, help='input metadata file of the chunked graph format')
+            '--metadata', type=str, help='input metadata file of the chunked graph format')
     parser.add_argument(
-            'output_path', type=str, help='output directory')
+            '--output_path', type=str, help='output directory')
     parser.add_argument(
-            'num_partitions', type=int, help='number of partitions')
+            '--num_partitions', type=int, help='number of partitions')
     logging.basicConfig(level='INFO')
     args = parser.parse_args()
     with open(args.metadata) as f:

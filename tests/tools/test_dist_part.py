@@ -7,8 +7,6 @@ import sys
 import torch
 
 from chunk_graph import chunk_graph
-from random_partition import random_partition
-from dispatch_data import submit_jobs
 
 def test_chunk_graph():
     # Step0: prepare chunked graph data format
@@ -93,32 +91,24 @@ def test_chunk_graph():
             # you can put the same data file if they indeed share the features.
             'rev_writes': {'year': write_year_path}
         },
-        4,
-        output_dir)
+        num_chunks=4,
+        output_path=output_dir)
 
 def test_partition():
     # Step1: graph partition
-
-    with open('chunked-data/metadata.json') as f:
-        metadata = json.load(f)
-    output_path = '2parts'
-    random_partition(metadata, num_parts=2, output_path=output_path)
+    os.system('python tools/partition_algorithms/random_partition.py '\
+              '--metadata chunked-data/metadata.json --output_path 2parts --num_partitions 2')
 
 def test_dispatch():
     # Step2: data dispatch
-    parser = argparse.ArgumentParser(description='Dispatch edge index and data to partitions',
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--in-dir', type=str, default='chunked-data')
-    parser.add_argument('--partitions-dir', type=str, default='2parts')
-    parser.add_argument('--out-dir', type=str, default='partitioned')
-    parser.add_argument('--ip-config', type=str, default='ip_config.txt')
-    parser.add_argument('--master-port', type=int, default=12345)
-    parser.add_argument('--python-path', type=str, default=sys.executable)
-    args, udf_command = parser.parse_known_args()
-
-    with open(args.ip_config, 'w') as f:
+    with open('ip_config.txt', 'w') as f:
         f.write('127.0.0.0\n')
         f.write('127.0.0.1\n')
 
-    tokens = sys.executable.split(os.sep)
-    submit_jobs(args)
+    os.system('python tools/dispatch_data.py --in-dir chunked-data '\
+              '--partitions-dir 2parts --out-dir partitioned --ip-config ip_config.txt')
+
+if __name__ == '__main__':
+    test_chunk_graph()
+    test_partition()
+    test_dispatch()
