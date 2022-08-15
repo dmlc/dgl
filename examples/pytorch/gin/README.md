@@ -33,7 +33,7 @@ python3 train.py --dataset MUTAG
 | NCI1          | ~82.9    
 | PROTEINS      | ~74.1
 
-Multi GPU training for graph predication
+Multi GPU training for graph property predication
 ------
 
 Run with following (available dataset: "ogbg-molhiv", "ogbg-molpcba")
@@ -43,6 +43,6 @@ python3 multi_gpu_graph_prediction.py --dataset ogbg-molhiv
 
 Results:
 ```
-* ogbg-molhiv: ~0.7480
-* ogbg-molpcba: ~0.2024
+* ogbg-molhiv: ~0.7965
+* ogbg-molpcba: ~0.2239
 ```

@@ -10,7 +10,6 @@ from dgl.dataloading import GraphDataLoader as DataLoader
 from ogb.graphproppred import DglGraphPropPredDataset, Evaluator
 from ogb.graphproppred.mol_encoder import AtomEncoder, BondEncoder
 from tqdm import tqdm
-import time
 import argparse
 
 class MLP(nn.Module):
@@ -27,7 +26,7 @@ class MLP(nn.Module):
     def forward(self, h):
         return self.mlp(h)
 
-class GIN(torch.nn.Module):
+class GIN(nn.Module):
     def __init__(self, n_hidden, n_output, n_layers=5):
         super().__init__()
         self.node_encoder = AtomEncoder(n_hidden)
@@ -49,20 +48,19 @@ class GIN(torch.nn.Module):
             self.virtual_layers.append(MLP(n_hidden))
         self.virtual_pool = dglnn.SumPooling()
 
-    def forward(self, g, x, adj_t):
+    def forward(self, g, x, x_e):
         v_emb = self.virtual_emb.weight.expand(g.batch_size, -1)
         hn = self.node_encoder(x)
-        for layer in range(len(self.layers)):
+        for i in range(len(self.layers)):
             v_hn = dgl.broadcast_nodes(g, v_emb)
             hn = hn + v_hn
-            he = self.edge_encoders[layer](adj_t)
-            hn = self.layers[layer](g, hn, he)
-            if layer != len(self.layers) - 1:
-                hn = F.relu(hn)
+            he = self.edge_encoders[i](x_e)
+            hn = self.layers[i](g, hn, he)
+            hn = F.relu(hn)
             hn = self.dropout(hn)
-            if layer != len(self.layers) - 1:
+            if i != len(self.layers) - 1:
                 v_emb_tmp = self.virtual_pool(g, hn) + v_emb
-                v_emb = self.virtual_layers[layer](v_emb_tmp)
+                v_emb = self.virtual_layers[i](v_emb_tmp)
                 v_emb = self.dropout(F.relu(v_emb))
         hn = self.pool(g, hn)
         return self.predictor(hn)
@@ -103,11 +101,9 @@ def train(rank, world_size, dataset_name, root):
     test_dataloader = DataLoader(
             dataset[dataset.test_idx], batch_size=32)
 
-    durations = []
     for epoch in range(50):
         model.train()
         train_dataloader.set_epoch(epoch)
-        t0 = time.time()
         for batched_graph, labels in train_dataloader:
             batched_graph, labels = batched_graph.to(rank), labels.to(rank)
             node_feat, edge_feat = batched_graph.ndata['feat'], batched_graph.edata['feat']
@@ -118,20 +114,13 @@ def train(rank, world_size, dataset_name, root):
             loss.backward()
             optimizer.step()
         scheduler.step()
-        tt = time.time()
 
         if rank == 0:
-            print(tt - t0)
-        durations.append(tt - t0)
-
-        if rank == 0:
-            val_metric = evaluate(valid_dataloader, rank, model, evaluator)[evaluator.eval_metric]
-            test_metric = evaluate(test_dataloader, rank, model, evaluator)[evaluator.eval_metric]
+            val_metric = evaluate(valid_dataloader, rank, model.module, evaluator)[evaluator.eval_metric]
+            test_metric = evaluate(test_dataloader, rank, model.module, evaluator)[evaluator.eval_metric]
 
             print(f'Epoch: {epoch:03d}, Loss: {loss:.4f}, '
                   f'Val: {val_metric:.4f}, Test: {test_metric:.4f}')
-
-        dist.barrier()
 
     dist.destroy_process_group()
 
@@ -143,6 +132,7 @@ if __name__ == '__main__':
                         help='name of dataset (default: ogbg-molhiv)')
     dataset_name = parser.parse_args().dataset
     root = './data/OGB'
+    DglGraphPropPredDataset(dataset_name, root)
 
     world_size = torch.cuda.device_count()
     print('Let\'s use', world_size, 'GPUs!')
