@@ -1025,26 +1025,24 @@ class PartitionPolicy(object):
 
     Parameters
     ----------
-    policy : str
-        Partition policy name, e.g., 'edge' or 'node'.
+    policy_str : str
+        Partition policy name, e.g., 'edge:_E' or 'node:_N'.
     partition_book : GraphPartitionBook
         A graph partition book
-    type_name : str or (str, str, str)
-        ntype or etype
     """
-    def __init__(self, policy, partition_book, type_name=None):
-        if type_name is None:
-            assert policy in (EDGE_PART_POLICY, NODE_PART_POLICY), \
+    def __init__(self, policy_str, partition_book):
+        splits = policy_str.split(':')
+        if len(splits) == 1:
+            assert policy_str in (EDGE_PART_POLICY, NODE_PART_POLICY), \
                     'policy_str must contain \'edge\' or \'node\'.'
-            if NODE_PART_POLICY == policy:
-                self._type_name = DEFAULT_NTYPE
+            if NODE_PART_POLICY == policy_str:
+                policy_str = NODE_PART_POLICY + ":" + DEFAULT_NTYPE
             else:
-                self._type_name = DEFAULT_ETYPE[1]
-        else:
-            self._type_name = type_name
-        self._policy = policy
+                policy_str = EDGE_PART_POLICY + ":" + DEFAULT_ETYPE[1]
+        self._policy_str = policy_str
         self._part_id = partition_book.partid
         self._partition_book = partition_book
+        self._type_name = _str_to_tuple(self.policy_str[5:])
 
     @property
     def policy_str(self):
@@ -1055,7 +1053,7 @@ class PartitionPolicy(object):
         str
             The name of the partition policy.
         """
-        return self._policy + ":" + str(self.type_name)
+        return self._policy_str
 
     @property
     def type_name(self):
@@ -1170,14 +1168,15 @@ class NodePartitionPolicy(PartitionPolicy):
     '''Partition policy for nodes.
     '''
     def __init__(self, partition_book, ntype=DEFAULT_NTYPE):
-        super(NodePartitionPolicy, self).__init__(NODE_PART_POLICY, partition_book, ntype)
+        super(NodePartitionPolicy, self).__init__(
+            NODE_PART_POLICY + ':' + ntype, partition_book)
 
 class EdgePartitionPolicy(PartitionPolicy):
     '''Partition policy for edges.
     '''
     def __init__(self, partition_book, etype=DEFAULT_ETYPE):
         super(EdgePartitionPolicy, self).__init__(
-            EDGE_PART_POLICY, partition_book, etype)
+            EDGE_PART_POLICY + ':' + str(etype), partition_book)
 
 class HeteroDataName(object):
     ''' The data name in a heterogeneous graph.
@@ -1191,21 +1190,21 @@ class HeteroDataName(object):
     ----------
     is_node : bool
         Indicate whether it's node data or edge data.
-    type_name : str or (str, str, str)
+    entity_type : str or (str, str, str)
         The type of the node/edge.
     data_name : str
         The name of the data.
     '''
-    def __init__(self, is_node, type_name, data_name):
+    def __init__(self, is_node, entity_type, data_name):
         self._policy = NODE_PART_POLICY if is_node else EDGE_PART_POLICY
-        self._type_name = type_name
+        self._entity_type = entity_type
         self.data_name = data_name
 
     @property
     def policy_str(self):
-        ''' concatenate policy and type name into string
+        ''' concatenate policy and entity type into string
         '''
-        return self._policy + ":" + str(self.get_type())
+        return self._policy + ':' + str(self.get_type())
 
     def is_node(self):
         ''' Is this the name of node data
@@ -1222,7 +1221,7 @@ class HeteroDataName(object):
         This is only meaningful in a heterogeneous graph.
         In homogeneous graph, type is '_N' for a node and '_E' for an edge.
         '''
-        return self._type_name
+        return self._entity_type
 
     def get_name(self):
         ''' The name of the data.
