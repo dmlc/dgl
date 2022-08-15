@@ -1025,24 +1025,24 @@ class PartitionPolicy(object):
 
     Parameters
     ----------
-    policy_str : str
+    policy : str
         Partition policy name, e.g., 'edge' or 'node'.
     partition_book : GraphPartitionBook
         A graph partition book
     type_name : str or (str, str, str)
         ntype or etype
     """
-    def __init__(self, policy_str, partition_book, type_name=None):
+    def __init__(self, policy, partition_book, type_name=None):
         if type_name is None:
-            assert policy_str in (EDGE_PART_POLICY, NODE_PART_POLICY), \
+            assert policy in (EDGE_PART_POLICY, NODE_PART_POLICY), \
                     'policy_str must contain \'edge\' or \'node\'.'
-            if NODE_PART_POLICY == policy_str:
+            if NODE_PART_POLICY == policy:
                 self._type_name = DEFAULT_NTYPE
             else:
                 self._type_name = DEFAULT_ETYPE[1]
         else:
             self._type_name = type_name
-        self._policy_str = policy_str
+        self._policy = policy
         self._part_id = partition_book.partid
         self._partition_book = partition_book
 
@@ -1055,7 +1055,7 @@ class PartitionPolicy(object):
         str
             The name of the partition policy.
         """
-        return self._policy_str + ":" + str(self.type_name)
+        return self._policy + ":" + str(self.type_name)
 
     @property
     def type_name(self):
