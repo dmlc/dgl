@@ -1262,6 +1262,11 @@ def test_hetero_embedding(out_dim):
     assert embeds['user'].shape == (2, out_dim)
     assert embeds[('user', 'follows', 'user')].shape == (3, out_dim)
 
+    layer.reset_parameters()
+    embeds = layer.weight
+    assert embeds['user'].shape == (2, out_dim)
+    assert embeds[('user', 'follows', 'user')].shape == (3, out_dim)
+
     embeds = layer({
         'user': F.tensor([0], dtype=F.int64),
         ('user', 'follows', 'user'): F.tensor([0, 2], dtype=F.int64)
