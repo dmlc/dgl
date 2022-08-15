@@ -6,7 +6,7 @@ from ast import literal_eval
 import numpy as np
 
 from .. import backend as F
-from ..base import NID, EID, DGLError
+from ..base import NID, EID, DGLError, dgl_warning
 from .. import utils
 from .shared_mem_utils import _to_shared_mem, _get_ndata_path, _get_edata_path, DTYPE_DICT
 from .._ffi.ndarray import empty_shared_mem
@@ -379,10 +379,11 @@ class GraphPartitionBook(ABC):
     @property
     def canonical_etypes(self):
         """Get the list of canonical edge types
-        """
 
-    def to_canonical_etype(self, etype):
-        """Convert an edge type to the corresponding canonical edge type.
+        Returns
+        -------
+        list[(str, str, str)]
+            A list of canonical etypes
         """
 
     @property
@@ -652,15 +653,14 @@ class BasicPartitionBook(GraphPartitionBook):
     @property
     def canonical_etypes(self):
         """Get the list of canonical edge types
+
+        Returns
+        -------
+        list[(str, str, str)]
+            A list of canonical etypes
         """
         return [DEFAULT_ETYPE]
 
-    def to_canonical_etype(self, etype):
-        """Convert an edge type to the corresponding canonical edge type.
-        """
-        assert etype in (DEFAULT_ETYPE, DEFAULT_ETYPE[1]), \
-            'Base partition book only supports homogeneous graph.'
-        return DEFAULT_ETYPE
 
 class RangePartitionBook(GraphPartitionBook):
     """This partition book supports more efficient storage of partition information.
@@ -692,6 +692,12 @@ class RangePartitionBook(GraphPartitionBook):
         map ntype strings to ntype IDs.
     etypes : dict[str, int] or dict[(str, str, str), int]
         map etype strings to etype IDs.
+
+    Deprecations
+    ------------
+
+    * Single string format for keys of ``edge_map`` and ``etypes`` is deprecated.
+      ``(str, str, str)`` will be the only format supported in the future.
     """
     def __init__(self, part_id, num_parts, node_map, edge_map, ntypes, etypes):
         assert part_id >= 0, 'part_id cannot be a negative number.'
@@ -717,10 +723,15 @@ class RangePartitionBook(GraphPartitionBook):
                 self._etypes[etype_id] = etype
                 self._canonical_etypes[etype_id] = c_etype
                 if etype in self._etype2canonical:
+                    # If one etype maps to multiple canonical etypes, empty
+                    # tuple is used to indicate such ambiguity casued by etype.
+                    # See more details in self._to_canonical_etype().
                     self._etype2canonical[etype] = tuple()
                 else:
                     self._etype2canonical[etype] = c_etype
             else:
+                dgl_warning(
+                    "Etype with 'str' format is deprecated. Please use '(str, str, str)'.")
                 self._etypes[etype_id] = etype
                 self._canonical_etypes[etype_id] = None
         assert all(etype is not None for etype in self._etypes), \
@@ -803,7 +814,7 @@ class RangePartitionBook(GraphPartitionBook):
 
         eid_range = [None] * len(self.etypes)
         for i, etype in enumerate(self.etypes):
-            c_etype = self.to_canonical_etype(etype)
+            c_etype = self._to_canonical_etype(etype)
             eid_range[i] = (c_etype, self._typed_eid_range[c_etype])
         eid_range_pickle = list(pickle.dumps(eid_range))
 
@@ -835,7 +846,7 @@ class RangePartitionBook(GraphPartitionBook):
         if etype in (DEFAULT_ETYPE, DEFAULT_ETYPE[1]):
             return int(self._max_edge_ids[-1])
         else:
-            c_etype = self.to_canonical_etype(etype)
+            c_etype = self._to_canonical_etype(etype)
             return int(self._typed_max_edge_ids[c_etype][-1])
 
     def metadata(self):
@@ -871,7 +882,7 @@ class RangePartitionBook(GraphPartitionBook):
         """Map per-edge-type IDs to global edge IDs in the homoenegeous format.
         """
         ids = utils.toindex(ids).tousertensor()
-        c_etype = self.to_canonical_etype(etype)
+        c_etype = self._to_canonical_etype(etype)
         partids = self.eid2partid(ids, c_etype)
         typed_max_eids = F.zerocopy_from_numpy(self._typed_max_edge_ids[c_etype])
         end_diff = F.gather_row(typed_max_eids, partids) - ids
@@ -896,7 +907,7 @@ class RangePartitionBook(GraphPartitionBook):
         if etype in (DEFAULT_ETYPE, DEFAULT_ETYPE[1]):
             ret = np.searchsorted(self._max_edge_ids, eids.tonumpy(), side='right')
         else:
-            c_etype = self.to_canonical_etype(etype)
+            c_etype = self._to_canonical_etype(etype)
             ret = np.searchsorted(self._typed_max_edge_ids[c_etype], eids.tonumpy(), side='right')
         ret = utils.toindex(ret)
         return ret.tousertensor()
@@ -925,7 +936,7 @@ class RangePartitionBook(GraphPartitionBook):
             end = self._max_edge_ids[partid]
             return F.arange(start, end)
         else:
-            c_etype = self.to_canonical_etype(etype)
+            c_etype = self._to_canonical_etype(etype)
             start = self._typed_max_edge_ids[c_etype][partid - 1] if partid > 0 else 0
             end = self._typed_max_edge_ids[c_etype][partid]
             return F.arange(start, end)
@@ -959,7 +970,7 @@ class RangePartitionBook(GraphPartitionBook):
         if etype in (DEFAULT_ETYPE, DEFAULT_ETYPE[1]):
             start = self._max_edge_ids[partid - 1] if partid > 0 else 0
         else:
-            c_etype = self.to_canonical_etype(etype)
+            c_etype = self._to_canonical_etype(etype)
             start = self._typed_max_edge_ids[c_etype][partid - 1] if partid > 0 else 0
         return eids - int(start)
 
@@ -985,10 +996,17 @@ class RangePartitionBook(GraphPartitionBook):
     @property
     def canonical_etypes(self):
         """Get the list of canonical edge types
+
+        Returns
+        -------
+        list[(str, str, str)] or list[None]
+            A list of canonical etypes. If keys of ``edge_map`` and ``etypes``
+            are strings, a list of ``None`` is returned as canonical etypes
+            are not available.
         """
         return self._canonical_etypes
 
-    def to_canonical_etype(self, etype):
+    def _to_canonical_etype(self, etype):
         """Convert an edge type to the corresponding canonical edge type.
         If canonical etype is not available, no conversion is applied.
         """
