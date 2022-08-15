@@ -4,6 +4,9 @@ import numpy as np
 import json
 import dgl
 import constants
+import logging
+import platform
+from pathlib import Path
 
 import pyarrow
 from pyarrow import csv
@@ -404,3 +407,75 @@ def get_idranges(names, counts):
 
     return tid_dict, gid_dict
 
+def validate_json_file(rank, fname, num_parts):
+
+    ff = Path(fname)
+    assert ff.is_file()
+    assert rank < num_parts
+
+    metadata = read_json(fname)
+
+    #node_type
+    assert constants.STR_NODE_TYPE in metadata
+    ntype_names = list(metadata[constants.STR_NODE_TYPE])
+
+    #num_nodes_per_chunk
+    assert constants.STR_NUM_NODES_PER_CHUNK in metadata
+
+    #check for each node type chunks_per_nodetype are defined
+    assert len(metadata[constants.STR_NUM_NODES_PER_CHUNK]) == len(ntype_names)
+
+    #edge_type
+    assert constants.STR_EDGE_TYPE in metadata
+    etype_names = list(metadata[constants.STR_EDGE_TYPE])
+
+    #verify the canonocal edge_types, with `:` as the separator
+    for ename in etype_names:
+        assert len(ename.split(':')) == 3
+
+    #num_edges_per_chunk
+    assert constants.STR_NUM_EDGES_PER_CHUNK in metadata
+    assert len(metadata[constants.STR_NUM_EDGES_PER_CHUNK]) == len(etype_names)
+
+    assert constants.STR_EDGES in metadata
+    for etype, etype_val in metadata[constants.STR_EDGES].items():
+        #etype_name and etype_val is a dictionary
+        assert etype in etype_names
+        assert constants.STR_DATA in etype_val
+        my_edges_file = etype_val[constants.STR_DATA][rank]
+        ff = Path(my_edges_file)
+        assert ff.is_file()
+
+        assert constants.STR_FORMAT in etype_val
+        assert constants.STR_DELIMITER in etype_val[constants.STR_FORMAT]
+        assert constants.STR_NAME in etype_val[constants.STR_FORMAT]
+
+        assert ff.suffix in [
+                            '{}{}'.format('.', constants.STR_CSV),
+                            '{}{}'.format('.', constants.STR_TXT)
+                            ]
+        assert etype_val[constants.STR_FORMAT][constants.STR_NAME] in [
+                            constants.STR_CSV, constants.STR_TXT
+                            ]
+
+
+    #assert node_data
+    #Node features are optional
+    if constants.STR_NODE_DATA in metadata:
+        featinfo = metadata[constants.STR_NODE_DATA]
+        featinfo_dict = {}
+
+        for node_type, node_type_val in featinfo.items():
+            for feat_name, feat_val in node_type_val.items():
+                for k, v in feat_val.items():
+                    if k == constants.STR_DATA:
+                        my_node_features_file = v[rank]
+                        assert isinstance(my_node_features_file, str)
+                        file_path = Path(my_node_features_file)
+                        assert file_path.is_file()
+                        assert file_path.suffix in ['{}{}'.format('.', constants.STR_NUMPY)]
+    logging.info(f'Validated the input json file successfully !!!')
+
+if __name__ == "__main__":
+    logging.basicConfig(level='INFO', format=f"[{platform.node()} %(levelname)s %(asctime)s PID:%(process)d] %(message)s")
+    validate_json_file(15, "/fsx-dev/m5gnn/data/core_graph/metadata-0808.json", 16)

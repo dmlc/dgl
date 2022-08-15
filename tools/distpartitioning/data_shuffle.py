@@ -15,7 +15,7 @@ from dataset_utils import get_dataset
 from utils import read_ntype_partition_files, read_json, get_node_types, \
                     augment_edge_data, get_gnid_range_map, \
                     write_dgl_objects, write_metadata_json, get_ntype_featnames, \
-                    get_idranges
+                    get_idranges, validate_json_file
 from gloo_wrapper import allgather_sizes, gather_metadata_json,\
                     alltoallv_cpu
 from globalids import assign_shuffle_global_nids_nodes, \
@@ -520,6 +520,7 @@ def gen_dist_partitions(rank, world_size, params):
     logging.info(f'[Rank: {rank}] Starting distributed data processing pipeline...')
 
     #init processing
+    validate_json_file(os.path.join(params.input_dir, params.schema))
     schema_map = read_json(os.path.join(params.input_dir, params.schema))
 
     #TODO: For large graphs, this mapping function can be memory intensive. This needs to be changed to 
