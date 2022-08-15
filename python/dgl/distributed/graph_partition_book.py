@@ -676,7 +676,7 @@ class RangePartitionBook(GraphPartitionBook):
         partition ID of current partition book
     num_parts : int
         number of total partitions
-    node_map : dict[str, Tensor] or dict[(str, str, str), Tensor]
+    node_map : dict[str, Tensor]
         Global node ID ranges within partitions for each node type. The key is the node type
         name in string. The value is a tensor of shape :math:`(K, 2)`, where :math:`K` is
         the number of partitions. Each row has two integers: the starting and the ending IDs
@@ -701,27 +701,28 @@ class RangePartitionBook(GraphPartitionBook):
         self._ntypes = [None] * len(ntypes)
         self._etypes = [None] * len(etypes)
         self._canonical_etypes = [None] * len(etypes)
+        # map etypes to canonical ones
         self._etype2canonical = {}
         for ntype in ntypes:
             ntype_id = ntypes[ntype]
             self._ntypes[ntype_id] = ntype
         assert all(ntype is not None for ntype in self._ntypes), \
                 "The node types have invalid IDs."
-        for etype in etypes:
-            etype_id = etypes[etype]
-            c_etype = None
+        for etype, etype_id in etypes.items():
             if isinstance(etype, tuple):
                 assert len(etype) == 3, \
                     'Canonical etype should be in format of (str, str, str).'
                 c_etype = etype
                 etype = etype[1]
-            self._etypes[etype_id] = etype
-            self._canonical_etypes[etype_id] = c_etype
-            if c_etype is not None:
+                self._etypes[etype_id] = etype
+                self._canonical_etypes[etype_id] = c_etype
                 if etype in self._etype2canonical:
                     self._etype2canonical[etype] = tuple()
                 else:
                     self._etype2canonical[etype] = c_etype
+            else:
+                self._etypes[etype_id] = etype
+                self._canonical_etypes[etype_id] = None
         assert all(etype is not None for etype in self._etypes), \
                 "The edge types have invalid IDs."
 
@@ -991,11 +992,6 @@ class RangePartitionBook(GraphPartitionBook):
         """Convert an edge type to the corresponding canonical edge type.
         If canonical etype is not available, no conversion is applied.
         """
-        if etype is None:
-            if len(self.etypes) != 1:
-                raise DGLError('Edge type name must be specified if there are more than one '
-                               'edge types.')
-            etype = self.etypes[0]
         if isinstance(etype, tuple):
             if etype not in self.canonical_etypes:
                 raise DGLError('Edge type "{}" does not exist.'.format(etype))
@@ -1004,6 +1000,7 @@ class RangePartitionBook(GraphPartitionBook):
             # canonical etype is not available, no conversion is applied.
             # This is the case that 'etypes' passed in when instantiating
             # are in format of str instead of (str, str, str).
+            # [TODO] Deprecate support for str etypes.
             return etype
         ret = self._etype2canonical.get(etype, None)
         if ret is None:
@@ -1029,20 +1026,22 @@ class PartitionPolicy(object):
     Parameters
     ----------
     policy_str : str
-        Partition policy name, e.g., 'edge:_E' or 'node:_N'.
+        Partition policy name, e.g., 'edge' or 'node'.
     partition_book : GraphPartitionBook
         A graph partition book
+    type_name : str or (str, str, str)
+        ntype or etype
     """
-    def __init__(self, policy_str, partition_book):
-        # TODO
-        splits = policy_str.split(':')
-        if len(splits) == 1:
+    def __init__(self, policy_str, partition_book, type_name=None):
+        if type_name is None:
             assert policy_str in (EDGE_PART_POLICY, NODE_PART_POLICY), \
                     'policy_str must contain \'edge\' or \'node\'.'
             if NODE_PART_POLICY == policy_str:
-                policy_str = NODE_PART_POLICY + ":" + DEFAULT_NTYPE
+                self._type_name = DEFAULT_NTYPE
             else:
-                policy_str = EDGE_PART_POLICY + ":" + DEFAULT_ETYPE[1]
+                self._type_name = DEFAULT_ETYPE[1] 
+        else:
+            self._type_name = type_name
         self._policy_str = policy_str
         self._part_id = partition_book.partid
         self._partition_book = partition_book
@@ -1056,19 +1055,18 @@ class PartitionPolicy(object):
         str
             The name of the partition policy.
         """
-        return self._policy_str
+        return self._policy_str + ":" + str(self.type_name)
 
     @property
-    def entity_type(self):
-        """Get the entity type: ntype or etype
+    def type_name(self):
+        """Get the type name: ntype or etype
 
         Returns
         -------
         str or (str, str, str)
             The ntype or etype.
         """
-        entity_type = self._policy_str[5:]
-        return _str_to_tuple(entity_type)
+        return self._type_name
 
     @property
     def part_id(self):
@@ -1095,8 +1093,8 @@ class PartitionPolicy(object):
     def get_data_name(self, name):
         """Get HeteroDataName
         """
-        is_node = NODE_PART_POLICY in self._policy_str
-        return HeteroDataName(is_node, self.entity_type, name)
+        is_node = NODE_PART_POLICY in self.policy_str
+        return HeteroDataName(is_node, self.type_name, name)
 
     def to_local(self, id_tensor):
         """Mapping global ID to local ID.
@@ -1111,12 +1109,12 @@ class PartitionPolicy(object):
         tensor
             local ID tensor
         """
-        if EDGE_PART_POLICY in self._policy_str:
-            return self._partition_book.eid2localeid(id_tensor, self._part_id, self.entity_type)
-        elif NODE_PART_POLICY in self._policy_str:
-            return self._partition_book.nid2localnid(id_tensor, self._part_id, self.entity_type)
+        if EDGE_PART_POLICY in self.policy_str:
+            return self._partition_book.eid2localeid(id_tensor, self._part_id, self.type_name)
+        elif NODE_PART_POLICY in self.policy_str:
+            return self._partition_book.nid2localnid(id_tensor, self._part_id, self.type_name)
         else:
-            raise RuntimeError('Cannot support policy: %s ' % self._policy_str)
+            raise RuntimeError('Cannot support policy: %s ' % self.policy_str)
 
     def to_partid(self, id_tensor):
         """Mapping global ID to partition ID.
@@ -1131,12 +1129,12 @@ class PartitionPolicy(object):
         tensor
             partition ID
         """
-        if EDGE_PART_POLICY in self._policy_str:
-            return self._partition_book.eid2partid(id_tensor, self.entity_type)
-        elif NODE_PART_POLICY in self._policy_str:
-            return self._partition_book.nid2partid(id_tensor, self.entity_type)
+        if EDGE_PART_POLICY in self.policy_str:
+            return self._partition_book.eid2partid(id_tensor, self.type_name)
+        elif NODE_PART_POLICY in self.policy_str:
+            return self._partition_book.nid2partid(id_tensor, self.type_name)
         else:
-            raise RuntimeError('Cannot support policy: %s ' % self._policy_str)
+            raise RuntimeError('Cannot support policy: %s ' % self.policy_str)
 
     def get_part_size(self):
         """Get data size of current partition.
@@ -1146,12 +1144,12 @@ class PartitionPolicy(object):
         int
             data size
         """
-        if EDGE_PART_POLICY in self._policy_str:
-            return len(self._partition_book.partid2eids(self._part_id, self.entity_type))
-        elif NODE_PART_POLICY in self._policy_str:
-            return len(self._partition_book.partid2nids(self._part_id, self.entity_type))
+        if EDGE_PART_POLICY in self.policy_str:
+            return len(self._partition_book.partid2eids(self._part_id, self.type_name))
+        elif NODE_PART_POLICY in self.policy_str:
+            return len(self._partition_book.partid2nids(self._part_id, self.type_name))
         else:
-            raise RuntimeError('Cannot support policy: %s ' % self._policy_str)
+            raise RuntimeError('Cannot support policy: %s ' % self.policy_str)
 
     def get_size(self):
         """Get the full size of the data.
@@ -1161,25 +1159,25 @@ class PartitionPolicy(object):
         int
             data size
         """
-        if EDGE_PART_POLICY in self._policy_str:
-            return self._partition_book._num_edges(self.entity_type)
-        elif NODE_PART_POLICY in self._policy_str:
-            return self._partition_book._num_nodes(self.entity_type)
+        if EDGE_PART_POLICY in self.policy_str:
+            return self._partition_book._num_edges(self.type_name)
+        elif NODE_PART_POLICY in self.policy_str:
+            return self._partition_book._num_nodes(self.type_name)
         else:
-            raise RuntimeError('Cannot support policy: %s ' % self._policy_str)
+            raise RuntimeError('Cannot support policy: %s ' % self.policy_str)
 
 class NodePartitionPolicy(PartitionPolicy):
     '''Partition policy for nodes.
     '''
     def __init__(self, partition_book, ntype=DEFAULT_NTYPE):
-        super(NodePartitionPolicy, self).__init__(NODE_PART_POLICY + ':' + ntype, partition_book)
+        super(NodePartitionPolicy, self).__init__(NODE_PART_POLICY, partition_book, ntype)
 
 class EdgePartitionPolicy(PartitionPolicy):
     '''Partition policy for edges.
     '''
     def __init__(self, partition_book, etype=DEFAULT_ETYPE):
         super(EdgePartitionPolicy, self).__init__(
-            EDGE_PART_POLICY + ':' + str(etype), partition_book)
+            EDGE_PART_POLICY, partition_book, etype)
 
 class HeteroDataName(object):
     ''' The data name in a heterogeneous graph.
@@ -1193,15 +1191,21 @@ class HeteroDataName(object):
     ----------
     is_node : bool
         Indicate whether it's node data or edge data.
-    entity_type : str or (str, str, str)
+    type_name : str or (str, str, str)
         The type of the node/edge.
     data_name : str
         The name of the data.
     '''
-    def __init__(self, is_node, entity_type, data_name):
-        self.policy_str = NODE_PART_POLICY if is_node else EDGE_PART_POLICY
-        self.policy_str = self.policy_str + ':' + str(entity_type)
+    def __init__(self, is_node, type_name, data_name):
+        self._policy = NODE_PART_POLICY if is_node else EDGE_PART_POLICY
+        self._type_name = type_name
         self.data_name = data_name
+
+    @property
+    def policy_str(self):
+        ''' concatenate policy and type name into string
+        '''
+        return self._policy + ":" + str(self.get_type())
 
     def is_node(self):
         ''' Is this the name of node data
@@ -1218,7 +1222,7 @@ class HeteroDataName(object):
         This is only meaningful in a heterogeneous graph.
         In homogeneous graph, type is '_N' for a node and '_E' for an edge.
         '''
-        return _str_to_tuple(self.policy_str[5:])
+        return self._type_name
 
     def get_name(self):
         ''' The name of the data.
@@ -1252,4 +1256,4 @@ def parse_hetero_data_name(name):
     assert len(names) == 3, '{} is not a valid heterograph data name'.format(name)
     assert names[0] in (NODE_PART_POLICY, EDGE_PART_POLICY), \
             '{} is not a valid heterograph data name'.format(name)
-    return HeteroDataName(names[0] == NODE_PART_POLICY, names[1], names[2])
+    return HeteroDataName(names[0] == NODE_PART_POLICY, _str_to_tuple(names[1]), names[2])
