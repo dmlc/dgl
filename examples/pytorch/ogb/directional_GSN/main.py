@@ -583,8 +583,6 @@ if __name__ == '__main__':
 
     # dgn params
     parser.add_argument('--aggregators', default="mean sum max dir1-dx", type=str, help='Aggregators to use.')
-    parser.add_argument('--divide_input_first', default=False, type=bool, help='Whether to divide the input in first layer.')
-    parser.add_argument('--divide_input_last', default=True, type=bool, help='Whether to divide the input in last layers.')
     parser.add_argument('--root_folder', type=str, default='./')
 
     args = parser.parse_args()
@@ -623,7 +621,7 @@ if __name__ == '__main__':
     net_params['L'] = int(args.L)
     net_params['hidden_dim'] = int(args.hidden_dim)
     net_params['out_dim'] = int(args.out_dim)
-    net_params['residual'] = True
+    net_params['residual'] = False
     net_params['in_feat_dropout'] = float(args.in_feat_dropout)
     net_params['dropout'] = float(args.dropout)
     net_params['graph_norm'] = True if args.graph_norm == 'True' else False

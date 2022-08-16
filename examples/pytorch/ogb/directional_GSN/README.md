@@ -4,7 +4,7 @@
 
 This is an example of implementing [directional_GSN](https://arxiv.org/abs/2006.09252) for graph classification in DGL.
 
-directional_GSN is a combination of GSN with DGN, where we defined a vector field based on structural features instead o f eigenvectors.
+directional_GSN is a combination of GSN with DGN, where we defined a vector field based on structural features instead of eigenvectors.
 
 The script in this folder experiments directional_GSN on ogbg-molpcba dataset.
 
@@ -39,13 +39,14 @@ We fix the random seed to 41, and take over 10 runs for the model. The model is 
 
 |                 | train_AP | valid_AP | test_AP | #parameters |
 | --------------- | ---------| -------- | ------- | ----------- |
-| directional_GSN |                               | 5142713     |
+| directional_GSN  | ||                               | 5142713     |
 
 
 #### Reproduction of performance
 
 ```{.bash}
-python main.py --device 0 --epochs 450 --dropout 0.2
+python preprocessing.py
+python main.py --epochs 450 --hidden_dim 420 --out_dim 420 --dropout 0.2
 ```
 
 
