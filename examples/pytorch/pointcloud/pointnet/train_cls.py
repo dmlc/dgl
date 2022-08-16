@@ -1,5 +1,7 @@
 from pointnet2 import PointNet2SSGCls, PointNet2MSGCls
 from pointnet_cls import PointNetCls
+from bipointnet_cls import BiPointNetCls
+from bipointnet2 import BiPointNet2SSGCls
 from ModelNetDataLoader import ModelNetDataLoader
 import provider
 import argparse
@@ -25,25 +27,28 @@ parser.add_argument('--dataset-path', type=str, default='')
 parser.add_argument('--load-model-path', type=str, default='')
 parser.add_argument('--save-model-path', type=str, default='')
 parser.add_argument('--num-epochs', type=int, default=200)
-parser.add_argument('--num-workers', type=int, default=8)
+parser.add_argument('--num-workers', type=int, default=0)
 parser.add_argument('--batch-size', type=int, default=32)
 args = parser.parse_args()
 
 num_workers = args.num_workers
 batch_size = args.batch_size
+print("batch_size",batch_size)
 
 data_filename = 'modelnet40_normal_resampled.zip'
 download_path = os.path.join(get_download_dir(), data_filename)
 local_path = args.dataset_path or os.path.join(
     get_download_dir(), 'modelnet40_normal_resampled')
-
 if not os.path.exists(local_path):
     download('https://shapenet.cs.stanford.edu/media/modelnet40_normal_resampled.zip',
              download_path, verify_ssl=False)
+    print("download success")
     from zipfile import ZipFile
     with ZipFile(download_path) as z:
         z.extractall(path=get_download_dir())
+    print("zip success")
 
+print("init success")
 CustomDataLoader = partial(
     DataLoader,
     num_workers=num_workers,
@@ -73,7 +78,7 @@ def train(net, opt, scheduler, train_loader, dev):
             label = label[:, 0]
 
             num_examples = label.shape[0]
-            data, label = data.to(dev), label.to(dev).squeeze().long()
+            data, label = data.to(dev), label.to(dev).squeeze().long()    
             opt.zero_grad()
             logits = net(data)
             loss = loss_f(logits, label)
@@ -128,6 +133,10 @@ elif args.model == 'pointnet2_ssg':
     net = PointNet2SSGCls(40, batch_size, input_dims=6)
 elif args.model == 'pointnet2_msg':
     net = PointNet2MSGCls(40, batch_size, input_dims=6)
+elif args.model == 'bipointnet':
+    net = BiPointNetCls(40, input_dims=6)
+elif args.model == 'bipointnet2_ssg':
+    net = BiPointNet2SSGCls(40, batch_size, input_dims=6)
 
 net = net.to(dev)
 if args.load_model_path:
@@ -145,7 +154,10 @@ test_loader = torch.utils.data.DataLoader(
     test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, drop_last=True)
 
 best_test_acc = 0
+save_filename = 'result_save.pt'
+args.save_model_path = os.path.join(get_download_dir(), save_filename)
 
+print(args.save_model_path)
 for epoch in range(args.num_epochs):
     train(net, opt, scheduler, train_loader, dev)
     if (epoch + 1) % 1 == 0:
