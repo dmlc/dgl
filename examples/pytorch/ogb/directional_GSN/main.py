@@ -601,7 +601,7 @@ if __name__ == '__main__':
             print('cuda not available')
             device = torch.device("cpu")
 
-    path = os.path.join('../', 'dataset', "ogbg-molpcba")
+    path = os.path.join('./', 'dataset', "ogbg-molpcba")
     dataset = pcbaDataset("ogbg-molpcba", path=path, verbose=True)
 
     # parameters

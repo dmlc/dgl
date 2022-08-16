@@ -281,5 +281,5 @@ class pcbaDataset(Dataset):
         return batched_graph, labels, snorm_n, snorm_e
 
 if __name__ == '__main__':
-    path = os.path.join('../', 'dataset', "ogbg-molpcba")
+    path = os.path.join('./', 'dataset', "ogbg-molpcba")
     dataset = pcbaDataset("ogbg-molpcba", path=path, verbose=True)

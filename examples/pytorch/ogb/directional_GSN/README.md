@@ -23,7 +23,7 @@ pip install dgl-cu102 -f https://data.dgl.ai/wheels/repo.html
 ## Usage
 
 
-run the scripts in `./scripts` folder, e.g.
+run the scripts in `./scripts` folder
 ```{.bash}
 scripts/run_molpcba.sh
 ```
