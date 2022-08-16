@@ -693,11 +693,10 @@ class RangePartitionBook(GraphPartitionBook):
     etypes : dict[str, int] or dict[(str, str, str), int]
         map etype strings to etype IDs.
 
-    Deprecations
-    ------------
+    .. deprecated:: 0.9.1
 
-    * Single string format for keys of ``edge_map`` and ``etypes`` is deprecated.
-      ``(str, str, str)`` will be the only format supported in the future.
+        Single string format for keys of ``edge_map`` and ``etypes`` is deprecated.
+        ``(str, str, str)`` will be the only format supported in the future.
     """
     def __init__(self, part_id, num_parts, node_map, edge_map, ntypes, etypes):
         assert part_id >= 0, 'part_id cannot be a negative number.'
