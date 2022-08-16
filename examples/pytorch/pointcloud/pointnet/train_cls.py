@@ -33,7 +33,6 @@ args = parser.parse_args()
 
 num_workers = args.num_workers
 batch_size = args.batch_size
-print("batch_size",batch_size)
 
 data_filename = 'modelnet40_normal_resampled.zip'
 download_path = os.path.join(get_download_dir(), data_filename)
