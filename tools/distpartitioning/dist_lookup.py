@@ -6,24 +6,24 @@ import torch
 from pyarrow import csv
 from gloo_wrapper import alltoallv_cpu
 
-'''
-This is an implementation of a Distributed Lookup Service to provide the following
-services to its users. Map 1) Global Node-ids to partition-ids, and 2) Global Node-ids
-to Shuffle Global Node-ids (contiguous, within each node for a give node_type and across 
-all the partitions)
-
-This services initializes itself with the node-id to partition-id mappings, which are inputs 
-to this service. The node-id to partition-id  mappings are assumed to be in one file for each
-node type. These node-id-to-partition-id mappings are split within the service processes so that
-each process ends up with a contiguous chunk. It first divides the no of mappings (node-id to 
-partition-id) for each node type into equal chunks across all the service processes. So each
-service process will be thse owner of a set of node-id-to-partition-id mappings. This class 
-has two functions which are as follows:
-
-1) `get_partition_ids` function which returns the node-id to partition-id mappings to the user
-2) `get_shuffle_nids` function which returns the node-id to shuffle-node-id mapping to the user
-'''
 class DistLookupService:
+    '''
+    This is an implementation of a Distributed Lookup Service to provide the following
+    services to its users. Map 1) Global Node-ids to partition-ids, and 2) Global Node-ids
+    to Shuffle Global Node-ids (contiguous, within each node for a give node_type and across 
+    all the partitions)
+
+    This services initializes itself with the node-id to partition-id mappings, which are inputs
+    to this service. The node-id to partition-id  mappings are assumed to be in one file for each
+    node type. These node-id-to-partition-id mappings are split within the service processes so that
+    each process ends up with a contiguous chunk. It first divides the no of mappings (node-id to
+    partition-id) for each node type into equal chunks across all the service processes. So each
+    service process will be thse owner of a set of node-id-to-partition-id mappings. This class
+    has two functions which are as follows:
+
+    1) `get_partition_ids` function which returns the node-id to partition-id mappings to the user
+    2) `get_shuffle_nids` function which returns the node-id to shuffle-node-id mapping to the user
+    '''
 
     def __init__(self, input_dir, ntype_names, id_map, rank, world_size):
         '''
@@ -32,7 +32,7 @@ class DistLookupService:
         Parameters:
         -----------
         input_dir : string
-            string representing the input directory where the node-type partition-id 
+            string representing the input directory where the node-type partition-id
             files are located
         ntype_names : list of strings
             list of strings which are used to read files located within the input_dir
@@ -129,9 +129,9 @@ class DistLookupService:
         #stored as contiguous chunks by this lookup service. 
         #The no. of these mappings stored by each process, in the lookup service, are
         #equally split among all the processes in the lookup service, deterministically
-        service_owners = self.ntype_count[ntype_ids]
-        service_owners = np.ceil(service_owners/self.world_size).astype(np.int64)
-        service_owners = np.floor_divide(type_nids, service_owners).astype(np.int64)
+        typeid_counts = self.ntype_count[ntype_ids]
+        chunk_sizes = np.ceil(typeid_counts/self.world_size).astype(np.int64)
+        service_owners = np.floor_divide(type_nids, chunk_sizes).astype(np.int64)
 
         #now `service_owners` is a list of ranks (process-ids) which own the corresponding
         #global-nid <-> partition-id mapping.
