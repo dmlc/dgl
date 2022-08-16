@@ -4,9 +4,9 @@ import torch.multiprocessing as mp
 import logging
 import platform
 import os
-from data_shuffle import single_machine_run, multi_machine_run
+from data_shuffle import single_machine_run, multi_machine_run 
 
-def log_params(params):
+def log_params(params): 
     """ Print all the command line arguments for debugging purposes.
 
     Parameters:
@@ -23,8 +23,8 @@ def log_params(params):
     print('Metis partitions: ', params.partitions_file)
 
 if __name__ == "__main__":
-    """
-    Start of execution from this point.
+    """ 
+    Start of execution from this point. 
     Invoke the appropriate function to begin execution
     """
     #arguments which are already needed by the existing implementation of convert_partition.py
