@@ -94,12 +94,12 @@ def train(rank, world_size, dataset_name, root):
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
 
     train_dataloader = DataLoader(
-            dataset[dataset.train_idx], batch_size=32,
+            dataset[dataset.train_idx], batch_size=256,
             use_ddp=True, shuffle=True)
     valid_dataloader = DataLoader(
-            dataset[dataset.val_idx], batch_size=32)
+            dataset[dataset.val_idx], batch_size=256)
     test_dataloader = DataLoader(
-            dataset[dataset.test_idx], batch_size=32)
+            dataset[dataset.test_idx], batch_size=256)
 
     for epoch in range(50):
         model.train()
