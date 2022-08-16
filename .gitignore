@@ -167,6 +167,3 @@ config.cmake
 
 # model file
 *.pth
-
-dataset/
-nohup.out
