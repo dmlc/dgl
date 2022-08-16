@@ -6,6 +6,23 @@ import torch
 from pyarrow import csv
 from gloo_wrapper import alltoallv_cpu
 
+'''
+This is an implementation of a Distributed Lookup Service to provide the following
+services to its users. Map 1) Global Node-ids to partition-ids, and 2) Global Node-ids
+to Shuffle Global Node-ids (contiguous, within each node for a give node_type and across 
+all the partitions)
+
+This services initializes itself with the node-id to partition-id mappings, which are inputs 
+to this service. The node-id to partition-id  mappings are assumed to be in one file for each
+node type. These node-id-to-partition-id mappings are split within the service processes so that
+each process ends up with a contiguous chunk. It first divides the no of mappings (node-id to 
+partition-id) for each node type into equal chunks across all the service processes. So each
+service process will be thse owner of a set of node-id-to-partition-id mappings. This class 
+has two functions which are as follows:
+
+1) `get_partition_ids` function which returns the node-id to partition-id mappings to the user
+2) `get_shuffle_nids` function which returns the node-id to shuffle-node-id mapping to the user
+'''
 class DistLookupService:
 
     def __init__(self, input_dir, ntype_names, id_map, rank, world_size):
@@ -14,8 +31,6 @@ class DistLookupService:
 
         Parameters:
         -----------
-        self : instance of this class
-            instance of this class which is implicitly passed in every function call
         input_dir : string
             string representing the input directory where the node-type partition-id 
             files are located
@@ -49,15 +64,15 @@ class DistLookupService:
                 read_options=pyarrow.csv.ReadOptions(autogenerate_column_names=True), \
                 parse_options=pyarrow.csv.ParseOptions(delimiter=' '))
             ntype_partids = df['f0'].to_numpy()
-            count = np.int64(len(ntype_partids))
+            count = len(ntype_partids)
             ntype_count.append(count)
 
             #each rank assumes a contiguous set of partition-ids which are equally split
             #across all the processes.
-            split_size = np.int64(np.ceil(count/np.int64(world_size)))
-            start, end = np.int64(rank * split_size), np.int64((rank+1)*split_size)
+            split_size = np.ceil(count/np.int64(world_size)).astype(np.int64)
+            start, end = np.int64(rank)*split_size, np.int64(rank+1)*split_size
             if rank == (world_size-1):
-                end = np.int64(count)
+                end = count
             type_nid_begin.append(start)
             type_nid_end.append(end)
             #slice the partition-ids which belong to the current instance
@@ -128,8 +143,7 @@ class DistLookupService:
         send_list = []
         indices_list = []
         for idx in range(self.world_size):
-            cond = service_owners == idx
-            idxes = np.where(cond)
+            idxes = np.where(service_owners == idx)
             ll = global_nids[idxes[0]]
             send_list.append(torch.from_numpy(ll))
             indices_list.append(idxes[0])
@@ -157,6 +171,10 @@ class DistLookupService:
             #lists to store partition-ids for the incoming global-nids
             type_id_lookups = []
             local_order_idx = []
+
+            #Now iterate over all the node_types and acculumulate all the partition-ids
+            #since all the partition-ids are based on the node_type order... they
+            #must be re-ordered as per the order of the input, which may be different.
             for tid in range(len(self.partid_list)):
                 cond = ntype_ids == tid
                 local_order_idx.append(np.where(cond)[0])
@@ -172,6 +190,8 @@ class DistLookupService:
                 cur_owners = self.partid_list[tid][local_type_nids]
                 type_id_lookups.append(cur_owners)
 
+            #Reorder the partition-ids, so that it agrees with the input order -- 
+            #which is the order in which the incoming message is received.
             if len(type_id_lookups) <= 0:
                 out_list.append(torch.empty((0,), dtype=torch.int64))
             else:
