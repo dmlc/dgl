@@ -141,7 +141,7 @@ of the choices of partitioning algorithms.
 .. note::
 
     Please make sure that the input graph to ParMETIS does not have
-    duplicate edges (or parallel edges) or self-loop edges.
+    duplicate edges (or parallel edges) and self-loop edges.
 
 ParMETIS Installation
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -179,35 +179,39 @@ Before running ParMETIS, we need to set two environment variables: ``PATH`` and 
 
 Input format
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. note::
+
+    As a prerequisite, read chapter :doc:`guide-distributed-hetero` to understand
+    how DGL organize heterogeneous graph for distributed training.
+
 The input graph for ParMETIS is stored in three files with the following names:
 ``xxx_nodes.txt``, ``xxx_edges.txt`` and ``xxx_stats.txt``, where ``xxx`` is a
 graph name.
 
-Each row in ``xxx_nodes.txt`` stores the information of a node with the following format:
+Each row in ``xxx_nodes.txt`` stores the information of a node. Row ID is
+also the *homogeneous* ID of a node, e.g., row 0 is for node 0; row 1 is for
+node 1, etc. Each row has the following format:
 
 .. code-block:: none
 
-    <node_type> <weight1> ... <orig_type_node_id>
+    <node_type_id> <node_weight_list> <type_wise_node_id>
 
 All fields are separated by whitespace:
 
-* ``<node_type>`` is an integer. For a homogeneous graph, its value is always
-  0. For heterogeneous graphs, its value indicates the type of each node.
-* ``<weight1>``, ``<weight2>``, etc. are integers that indicate the node weights
-  used by ParMETIS to balance graph partitions. If a user does not provide node
-  weights, ParMETIS partitions a graph and balance the number of nodes in each
-  partition (it is important to balance graph partitions in order to achieve
-  good training speed). However, this default strategy may not be sufficient
-  for many use cases.  For example, in a heterogeneous graph, we want to
-  partition the graph so that all partitions have roughly the same number of
-  nodes for each node type. The toy example below shows how we can use node
-  weights to balance the number of nodes of different types.
-* ``<orig_type_node_id>`` is an integer representing the node ID in its own
-  type. In DGL, nodes of each type are assigned with IDs starting from 0. For a
-  homogeneous graph, this field is the same as the node ID.
-* The row ID indicates the *homogeneous* node IDs.  All nodes of the same type
-  should be assigned with contiguous IDs. That is, nodes of the same type
-  should be stored together in ``xxx_nodes.txt``.
+* ``<node_type_id>`` is an integer starting from 0. Each node type is mapped to
+  an integer. For a homogeneous graph, its value is always 0.
+* ``<node_weight_list>`` are integers (separated by whitespace) that indicate
+  the node weights used by ParMETIS to balance graph partitions. For homogeneous
+  graphs, the list has only one integer while for heterogeneous graphs with
+  :math:`T` node types, the list should has :math:`T` integers. If the node
+  belongs to node type :math:`t`, then all the integers except the :math:`t^{th}`
+  one are zero; the :math:`t^{th}` integer is the weight of that node. ParMETIS
+  will try to balance the total node weight of each partition. For heterogeneous
+  graph, it will try to distribute nodes of the same type to all partitions.
+  The recommended node weights are 1 for balancing the number of nodes in each
+  partition or node degrees for balancing the number of edges in each partition.
+* ``<type_wise_node_id>`` is an integer representing the node ID in its own type.
 
 Below shows an example of a node file for a heterogeneous graph with two node
 types. Node type 0 has three nodes; node type 1 has four nodes. It uses two
@@ -224,29 +228,32 @@ same number of nodes for type 0 and the same number of nodes for type 1.
     1 0 1 2
     1 0 1 3
 
-Similarly, each row in ``xxx_edges.txt`` stores the information of an edge with the following format:
+Similarly, each row in ``xxx_edges.txt`` stores the information of an edge. Row ID is
+also the *homogeneous* ID of an edge, e.g., row 0 is for edge 0; row 1 is for
+edge 1, etc. Each row has the following format:
 
 .. code-block:: none
 
-    <src_id> <dst_id> <type_edge_id> <edge_type>
+    <src_node_id> <dst_node_id> <type_wise_edge_id> <edge_type_id>
 
 All fields are separated by whitespace:
 
-* ``<src_id>`` is the *homogeneous* ID of the source node.
-* ``<dst_id>`` is the *homogeneous* ID of the destination node.
-* ``<type_edge_id>`` is the edge ID for the edge type.
-* ``<edge_type>`` is the edge type.
+* ``<src_node_id>`` is the *homogeneous* ID of the source node.
+* ``<dst_node_id>`` is the *homogeneous* ID of the destination node.
+* ``<type_wise_edge_id>`` is the edge ID for the edge type.
+* ``<edge_type_id>`` is an integer starting from 0. Each edge type is mapped to
+  an integer. For a homogeneous graph, its value is always 0.
 
 ``xxx_stats.txt`` stores some basic statistics of the graph. It has only one line with three fields
 separated by whitespace:
 
 .. code-block:: none
 
-    <num_nodes> <num_edges> <num_node_weights>
+    <num_nodes> <num_edges> <total_node_weights>
 
 * ``num_nodes`` stores the total number of nodes regardless of node types.
 * ``num_edges`` stores the total number of edges regardless of edge types.
-* ``num_node_weights`` stores the number of node weights in the node file.
+* ``total_node_weights`` stores the number of node weights in the node file.
 
 Run ParMETIS and output format
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -269,28 +276,26 @@ a node with the following fields:
 
 .. code-block:: none
 
-    <node_id> <node_type> <weight1> ... <orig_type_node_id>
+    <node_id> <node_type_id> <node_weight_list> <type_wise_node_id>
 
-* ``<node_id>`` is the *homogeneous* node IDs after ID reassignment.
-* ``<node_type>`` is the node type.
-* ``<weight1>`` is the node weight used by ParMETIS.
-* ``<orig_type_node_id>`` is the original node ID for a specific node type in the input heterogeneous graph.
-* ``<attributes>`` are optional fields that contain any node attributes in the input node file.
+* ``<node_id>`` is the *homogeneous* node ID after ID reassignment.
+* ``<node_type_id>`` is the node type ID.
+* ``<node_weight_list>`` is the node weight used by ParMETIS (copied from the input file).
+* ``<type_wise_node_id>`` is an integer representing the node ID in its own type.
 
 ``p<part_id>-xxx_edges.txt`` stores the edge data of the partition. Each row represents
 an edge with the following fields:
 
 .. code-block:: none
 
-    <src_id> <dst_id> <orig_src_id> <orig_dst_id> <orig_type_edge_id> <edge_type>
+    <src_id> <dst_id> <orig_src_id> <orig_dst_id> <type_wise_edge_id> <edge_type_id>
 
 * ``<src_id>`` is the *homogeneous* ID of the source node after ID reassignment.
 * ``<dst_id>`` is the *homogeneous* ID of the destination node after ID reassignment.
 * ``<orig_src_id>`` is the *homogeneous* ID of the source node in the input graph.
 * ``<orig_dst_id>`` is the *homogeneous* ID of the destination node in the input graph.
-* ``<orig_type_edge_id>`` is the edge ID for the specific edge type in the input graph.
-* ``<edge_type>`` is the edge type.
-* ``<attributes>`` are optional fields that contain any edge attributes in the input edge file.
+* ``<type_wise_edge_id>`` is the edge ID in its own type.
+* ``<edge_type_id>`` is the edge type ID.
 
 When invoking ``pm_dglpart``, the three input files: ``xxx_nodes.txt``,
 ``xxx_edges.txt``, ``xxx_stats.txt`` should be located in the directory where
