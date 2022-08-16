@@ -41,13 +41,10 @@ local_path = args.dataset_path or os.path.join(
 if not os.path.exists(local_path):
     download('https://shapenet.cs.stanford.edu/media/modelnet40_normal_resampled.zip',
              download_path, verify_ssl=False)
-    print("download success")
     from zipfile import ZipFile
     with ZipFile(download_path) as z:
         z.extractall(path=get_download_dir())
-    print("zip success")
 
-print("init success")
 CustomDataLoader = partial(
     DataLoader,
     num_workers=num_workers,
@@ -77,7 +74,7 @@ def train(net, opt, scheduler, train_loader, dev):
             label = label[:, 0]
 
             num_examples = label.shape[0]
-            data, label = data.to(dev), label.to(dev).squeeze().long()    
+            data, label = data.to(dev), label.to(dev).squeeze().long()
             opt.zero_grad()
             logits = net(data)
             loss = loss_f(logits, label)
