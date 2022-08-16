@@ -12,25 +12,25 @@ def read_ntype_partition_files(schema_map, input_dir):
     """
     Utility method to read the partition id mapping for each node.
     For each node type, there will be an file, in the input directory argument
-    containing the partition id mapping for a given nodeid. 
+    containing the partition id mapping for a given nodeid.
 
     Parameters:
     -----------
     schema_map : dictionary
         dictionary created by reading the input metadata json file
     input_dir : string
-        directory in which the node-id to partition-id mappings files are 
+        directory in which the node-id to partition-id mappings files are
         located for each of the node types in the input graph
 
     Returns:
     --------
-    numpy array : 
+    numpy array :
         array of integers representing mapped partition-ids for a given node-id.
-        The line number, in these files, are used as the type_node_id in each of 
-        the files. The index into this array will be the homogenized node-id and 
-        value will be the partition-id for that node-id (index). Please note that 
-        the partition-ids of each node-type are stacked together vertically and 
-        in this way heterogenous node-ids are converted to homogenous node-ids. 
+        The line number, in these files, are used as the type_node_id in each of
+        the files. The index into this array will be the homogenized node-id and
+        value will be the partition-id for that node-id (index). Please note that
+        the partition-ids of each node-type are stacked together vertically and
+        in this way heterogenous node-ids are converted to homogenous node-ids.
     """
     assert os.path.isdir(input_dir)
 
@@ -48,7 +48,7 @@ def read_ntype_partition_files(schema_map, input_dir):
 def read_json(json_file):
     """
     Utility method to read a json file schema
-    
+
     Parameters:
     -----------
     json_file : string
@@ -63,7 +63,7 @@ def read_json(json_file):
 
     return val
 
-def get_ntype_featnames(ntype_name, schema_map): 
+def get_ntype_featnames(ntype_name, schema_map):
     """
     Retrieves node feature names for a given node_type
 
@@ -78,21 +78,21 @@ def get_ntype_featnames(ntype_name, schema_map):
 
     Returns:
     --------
-    list : 
+    list :
         a list of feature names for a given node_type
     """
     ntype_featdict = schema_map[constants.STR_NODE_DATA]
     if (ntype_name in ntype_featdict):
         featnames = []
         ntype_info = ntype_featdict[ntype_name]
-        for k, v in ntype_info.items(): 
+        for k, v in ntype_info.items():
             featnames.append(k)
         return featnames
-    else: 
+    else:
         return []
 
 def get_node_types(schema_map):
-    """ 
+    """
     Utility method to extract node_typename -> node_type mappings
     as defined by the input schema
 
@@ -116,7 +116,7 @@ def get_node_types(schema_map):
     ntypeid_ntype_map = {i : e for i, e in enumerate(ntypes)}
     return ntype_ntypeid_map, ntypes, ntypeid_ntype_map
 
-def get_gnid_range_map(node_tids): 
+def get_gnid_range_map(node_tids):
     """
     Retrieves auxiliary dictionaries from the metadata json object
 
@@ -124,20 +124,20 @@ def get_gnid_range_map(node_tids):
     -----------
     node_tids: dictionary
         This dictionary contains the information about nodes for each node_type.
-        Typically this information contains p-entries, where each entry has a file-name, 
+        Typically this information contains p-entries, where each entry has a file-name,
         starting and ending type_node_ids for the nodes in this file. Keys in this dictionary
         are the node_type and value is a list of lists. Each individual entry in this list has
         three items: file-name, starting type_nid and ending type_nid
 
     Returns:
     --------
-    dictionary : 
+    dictionary :
         a dictionary where keys are node_type names and values are global_nid range, which is a tuple.
 
     """
-    ntypes_gid_range = {} 
+    ntypes_gid_range = {}
     offset = 0
-    for k, v in node_tids.items(): 
+    for k, v in node_tids.items():
         ntypes_gid_range[k] = [offset + int(v[0][0]), offset + int(v[-1][1])]
         offset += int(v[-1][1])
 
@@ -145,7 +145,7 @@ def get_gnid_range_map(node_tids):
 
 def write_metadata_json(metadata_list, output_dir, graph_name):
     """
-    Merge json schema's from each of the rank's on rank-0. 
+    Merge json schema's from each of the rank's on rank-0.
     This utility function, to be used on rank-0, to create aggregated json file.
 
     Parameters:
@@ -191,13 +191,13 @@ def write_metadata_json(metadata_list, output_dir, graph_name):
     for i in range(len(metadata_list)):
         graph_metadata["part-{}".format(i)] = metadata_list[i]["part-{}".format(i)]
 
-    with open('{}/metadata.json'.format(output_dir), 'w') as outfile: 
+    with open('{}/metadata.json'.format(output_dir), 'w') as outfile:
         json.dump(graph_metadata, outfile, sort_keys=False, indent=4)
 
 def augment_edge_data(edge_data, part_ids, edge_tids, rank, world_size):
     """
     Add partition-id (rank which owns an edge) column to the edge_data.
-    
+
     Parameters:
     -----------
     edge_data : numpy ndarray
@@ -208,14 +208,14 @@ def augment_edge_data(edge_data, part_ids, edge_tids, rank, world_size):
     #add global_nids to the node_data
     etype_offset = {}
     offset = 0
-    for etype_name, tid_range in edge_tids.items(): 
+    for etype_name, tid_range in edge_tids.items():
         assert int(tid_range[0][0]) == 0
         assert len(tid_range) == world_size
         etype_offset[etype_name] = offset + int(tid_range[0][0])
         offset += int(tid_range[-1][1])
 
     global_eids = []
-    for etype_name, tid_range in edge_tids.items(): 
+    for etype_name, tid_range in edge_tids.items():
         global_eid_start = etype_offset[etype_name]
         begin = global_eid_start + int(tid_range[rank][0])
         end = global_eid_start + int(tid_range[rank][1])
@@ -224,11 +224,11 @@ def augment_edge_data(edge_data, part_ids, edge_tids, rank, world_size):
     assert global_eids.shape[0] == edge_data[constants.ETYPE_ID].shape[0]
     edge_data[constants.GLOBAL_EID] = global_eids
 
-    #assign the owner process/rank for each edge 
+    #assign the owner process/rank for each edge
     edge_data[constants.OWNER_PROCESS] = part_ids[edge_data[constants.GLOBAL_DST_ID]]
 
 def read_edges_file(edge_file, edge_data_dict):
-    """ 
+    """
     Utility function to read xxx_edges.txt file
 
     Parameters:
@@ -240,7 +240,7 @@ def read_edges_file(edge_file, edge_data_dict):
     --------
     dictionary
         edge data as read from xxx_edges.txt file and columns are stored
-        in a dictionary with key-value pairs as column-names and column-data. 
+        in a dictionary with key-value pairs as column-names and column-data.
     """
     if edge_file == "" or edge_file == None:
         return None
@@ -250,7 +250,7 @@ def read_edges_file(edge_file, edge_data_dict):
     # global_src_id -- global idx for the source node ... line # in the graph_nodes.txt
     # global_dst_id -- global idx for the destination id node ... line # in the graph_nodes.txt
 
-    edge_data_df = csv.read_csv(edge_file, read_options=pyarrow.csv.ReadOptions(autogenerate_column_names=True), 
+    edge_data_df = csv.read_csv(edge_file, read_options=pyarrow.csv.ReadOptions(autogenerate_column_names=True),
                                     parse_options=pyarrow.csv.ParseOptions(delimiter=' '))
     edge_data_dict = {}
     edge_data_dict[constants.GLOBAL_SRC_ID] = edge_data_df['f0'].to_numpy()
@@ -278,7 +278,7 @@ def read_node_features_file(nodes_features_file):
     return node_features
 
 def read_edge_features_file(edge_features_file):
-    """ 
+    """
     Utility function to load tensors from a file
 
     Parameters:
@@ -302,12 +302,12 @@ def write_node_features(node_features, node_file):
     -----------
     node_features : dictionary
         dictionary storing ntype <-> list of features
-    node_file     : string 
+    node_file     : string
         File in which the node information is serialized
     """
     dgl.data.utils.save_tensors(node_file, node_features)
 
-def write_edge_features(edge_features, edge_file): 
+def write_edge_features(edge_features, edge_file):
     """
     Utility function to serialize edge_features in edge_file file
 
@@ -315,12 +315,12 @@ def write_edge_features(edge_features, edge_file):
     -----------
     edge_features : dictionary
         dictionary storing etype <-> list of features
-    edge_file     : string 
+    edge_file     : string
         File in which the edge information is serialized
     """
     dgl.data.utils.save_tensors(edge_file, edge_features)
 
-def write_graph_dgl(graph_file, graph_obj): 
+def write_graph_dgl(graph_file, graph_obj):
     """
     Utility function to serialize graph dgl objects
 
@@ -333,7 +333,7 @@ def write_graph_dgl(graph_file, graph_obj):
     """
     dgl.save_graphs(graph_file, [graph_obj])
 
-def write_dgl_objects(graph_obj, node_features, edge_features, output_dir, part_id): 
+def write_dgl_objects(graph_obj, node_features, edge_features, output_dir, part_id):
     """
     Wrapper function to create dgl objects for graph, node-features and edge-features
 
@@ -361,9 +361,9 @@ def write_dgl_objects(graph_obj, node_features, edge_features, output_dir, part_
     if (edge_features != None):
         write_edge_features(edge_features, os.path.join(part_dir, "edge_feat.dgl"))
 
-def get_idranges(names, counts): 
+def get_idranges(names, counts):
     """
-    Utility function to compute typd_id/global_id ranges for both nodes and edges. 
+    Utility function to compute typd_id/global_id ranges for both nodes and edges.
 
     Parameters:
     -----------
@@ -376,8 +376,8 @@ def get_idranges(names, counts):
     --------
     dictionary
         dictionary where the keys are node-/edge-type names and values are
-        list of tuples where each tuple indicates the range of values for 
-        corresponding type-ids. 
+        list of tuples where each tuple indicates the range of values for
+        corresponding type-ids.
     dictionary
         dictionary where the keys are node-/edge-type names and value is a tuple.
         This tuple indicates the global-ids for the associated node-/edge-type.
@@ -386,7 +386,7 @@ def get_idranges(names, counts):
     gnid_end = gnid_start
     tid_dict = {}
     gid_dict = {}
-    for idx, typename in enumerate(names): 
+    for idx, typename in enumerate(names):
         type_counts = counts[idx]
         tid_start = np.cumsum([0] + type_counts[:-1])
         tid_end = np.cumsum(type_counts)

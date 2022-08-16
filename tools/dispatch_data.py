@@ -21,7 +21,7 @@ LARG_PROCS_MACHINE = "num_proc_per_machine"
 LARG_IPCONF = "ip_config"
 LARG_MASTER_PORT = "master_port"
 
-def get_launch_cmd(args) -> str: 
+def get_launch_cmd(args) -> str:
     cmd = sys.executable + " " + os.path.join(INSTALL_DIR, LAUNCH_SCRIPT)
     cmd = f"{cmd} --{LARG_PROCS_MACHINE} 1 "
     cmd = f"{cmd} --{LARG_IPCONF} {args.ip_config} "
@@ -33,9 +33,9 @@ def get_launch_cmd(args) -> str:
 def submit_jobs(args) -> str:
     wrapper_command = os.path.join(INSTALL_DIR, LAUNCH_SCRIPT)
 
-    #read the json file and get the remaining argument here. 
-    schema_path = os.path.join(args.in_dir, "metadata.json")
-    with open(schema_path) as schema:
+    #read the json file and get the remaining argument here.
+    schema_path = "metadata.json"
+    with open(os.path.join(args.in_dir, schema_path)) as schema:
         schema_map = json.load(schema)
 
     num_parts = len(schema_map["num_nodes_per_chunk"][0])
@@ -43,13 +43,13 @@ def submit_jobs(args) -> str:
 
     argslist = ""
     argslist += "--world-size {} ".format(num_parts)
-    argslist += "--partitions-dir {} ".format(args.partitions_dir)
-    argslist += "--input-dir {} ".format(args.in_dir)
+    argslist += "--partitions-dir {} ".format(os.path.abspath(args.partitions_dir))
+    argslist += "--input-dir {} ".format(os.path.abspath(args.in_dir))
     argslist += "--graph-name {} ".format(graph_name)
     argslist += "--schema {} ".format(schema_path)
     argslist += "--num-parts {} ".format(num_parts)
     argslist += "--output {} ".format(args.out_dir)
-        
+
     # (BarclayII) Is it safe to assume all the workers have the Python executable at the same path?
     pipeline_cmd = os.path.join(INSTALL_DIR, PIPELINE_SCRIPT)
     udf_cmd = f"{args.python_path} {pipeline_cmd} {argslist}"
