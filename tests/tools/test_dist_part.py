@@ -91,7 +91,7 @@ def test_chunk_graph():
             # you can put the same data file if they indeed share the features.
             'rev_writes': {'year': write_year_path}
         },
-        num_chunks=4,
+        num_chunks=2,
         output_path=output_dir)
 
 def test_partition():
@@ -102,8 +102,8 @@ def test_partition():
 def test_dispatch():
     # Step2: data dispatch
     with open('ip_config.txt', 'w') as f:
-        f.write('127.0.0.0\n')
         f.write('127.0.0.1\n')
+        f.write('127.0.0.2\n')
 
     os.system('python tools/dispatch_data.py --in-dir chunked-data '\
               '--partitions-dir 2parts --out-dir partitioned --ip-config ip_config.txt')
