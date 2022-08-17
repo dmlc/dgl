@@ -39,7 +39,7 @@ def _load_part_config(part_config):
 def _dump_part_config(part_config, part_metadata):
     ''' Format and dump part config
     '''
-    part_metadata = _format_part_metadata(part_metadata, lambda data: str(data))
+    part_metadata = _format_part_metadata(part_metadata, str)
     with open(part_config, 'w') as outfile:
         json.dump(part_metadata, outfile, sort_keys=True, indent=4)
 
@@ -894,8 +894,8 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                     if name in [EID, 'inner_edge']:
                         continue
                     if reshuffle:
-                        edge_feats[str(etype) + '/' + name] = F.gather_row(g.edges[etype].data[name],
-                                                                      local_edges)
+                        edge_feats[str(etype) + '/' + name] = \
+                            F.gather_row(g.edges[etype].data[name], local_edges)
                     else:
                         edge_feats[str(etype) + '/' + name] = g.edges[etype].data[name]
         # Some adjustment for heterogeneous graphs.

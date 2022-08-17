@@ -403,7 +403,7 @@ def check_rpc_hetero_sampling_shuffle(tmpdir, num_server):
         p.join()
 
     orig_nid_map = {ntype: F.zeros((g.number_of_nodes(ntype),), dtype=F.int64) for ntype in g.ntypes}
-    orig_eid_map = {etype: F.zeros((g.number_of_edges(etype),), dtype=F.int64) for etype in g.etypes}
+    orig_eid_map = {etype: F.zeros((g.number_of_edges(etype),), dtype=F.int64) for etype in g.canonical_etypes}
     for i in range(num_server):
         part, _, _, _, _, _, _ = load_partition(tmpdir / 'test_sampling.json', i)
         ntype_ids, type_nids = gpb.map_to_per_ntype(part.ndata[dgl.NID])
