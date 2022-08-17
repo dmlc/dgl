@@ -20,36 +20,25 @@ pip install ogb
 pip install dgl-cu102 -f https://data.dgl.ai/wheels/repo.html
 ```
 
-## Usage
-
-
-run the scripts in `./scripts` folder
-```{.bash}
-scripts/run_molpcba.sh
-```
-and you can modify the arguments of the scripts.
-
 ## Experiments
 
-We fix the random seed to 41, and take over 10 runs for the model. The model is trained on a single Tesla T4 GPU with 16GB memory.
+We fix the random seed to 41, and train the model on a single Tesla T4 GPU with 16GB memory.
 
 ### ogbg-molpcba
 
 #### performance
 
-|                 | train_AP | valid_AP | test_AP | #parameters |
-| --------------- | ---------| -------- | ------- | ----------- |
-| directional_GSN  | ||                               | 5142713     |
+|                  | train_AP | valid_AP | test_AP | #parameters |
+| ---------------- | ---------| -------- | ------- | ----------- |
+| directional_GSN  | 0.4301   | 0.2598   | 0.2438  | 5142713     |
 
 
 #### Reproduction of performance
 
 ```{.bash}
 python preprocessing.py
-python main.py --epochs 450 --hidden_dim 420 --out_dim 420 --dropout 0.2
+python main.py --seed 41 --epochs 450 --hidden_dim 420 --out_dim 420 --dropout 0.2
 ```
-
-
 
 ## References
 
