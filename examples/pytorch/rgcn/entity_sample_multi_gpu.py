@@ -70,8 +70,8 @@ def train(proc_id, device, g, target_idx, labels, train_idx, inv_target, model):
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
-        # torchmetric accuracy defined as num_of_correct_labels / local_num_of_seeds
-        # loc_acc_split returns [local_num_of_seeds, num_of_correct_labels]
+        # torchmetric accuracy defined as num_correct_labels / num_train_nodes
+        # loc_acc_split = [loc_accuracy * loc_num_train_nodes, loc_num_train_nodes] 
         loc_acc_split = evaluate(model, labels, val_loader, inv_target).to(device)
         dist.reduce(loc_acc_split, 0)
         if (proc_id == 0):
@@ -79,13 +79,13 @@ def train(proc_id, device, g, target_idx, labels, train_idx, inv_target, model):
             print("Epoch {:05d} | Loss {:.4f} | Val. Accuracy {:.4f} "
                   . format(epoch, total_loss / (it+1), acc.item()))
             
-def run(proc_id, nprocs, devices, g, dist_data):
+def run(proc_id, nprocs, devices, g, data):
     # find corresponding device for my rank
     device = devices[proc_id]
     torch.cuda.set_device(device)
     # initialize process group and unpack data for sub-processes
     dist.init_process_group(backend="nccl", init_method='tcp://127.0.0.1:12345', world_size=nprocs, rank=proc_id)
-    num_rels, num_classes, labels, train_idx, test_idx, target_idx, inv_target = dist_data
+    num_rels, num_classes, labels, train_idx, test_idx, target_idx, inv_target = data
     labels = labels.to(device)
     inv_target = inv_target.to(device)
     # create RGCN model (distributed)
@@ -153,7 +153,7 @@ if __name__ == '__main__':
     # thread limiting to avoid resource competition
     os.environ['OMP_NUM_THREADS'] = str(mp.cpu_count() // 2 // nprocs)
 
-    dist_data = num_rels, data.num_classes, labels, train_idx, test_idx, target_idx, inv_target
-    mp.spawn(run, args=(nprocs, devices, g, dist_data), nprocs=nprocs)
+    data = num_rels, data.num_classes, labels, train_idx, test_idx, target_idx, inv_target
+    mp.spawn(run, args=(nprocs, devices, g, data), nprocs=nprocs)
 
 
