@@ -161,6 +161,11 @@ def test_partition():
 
 def test_dispatch():
     # Step2: data dispatch
+
+    # generate key for ssh
+    os.system('ssh-keygen -f ~/.ssh/id_rsa -N ""')
+    os.system('cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys')
+
     out_dir = 'partitioned'
     num_parts = 2
     with open('ip_config.txt', 'w') as f:
