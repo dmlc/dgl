@@ -163,6 +163,7 @@ def test_dispatch():
     # Step2: data dispatch
 
     # generate key for ssh
+    os.system('apt-get -y install openssh-client')
     os.system('ssh-keygen -f ~/.ssh/id_rsa -N ""')
     os.system('cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys')
 
