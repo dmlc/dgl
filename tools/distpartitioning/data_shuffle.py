@@ -7,6 +7,7 @@ import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
 import dgl
+import logging
 
 from timeit import default_timer as timer
 from datetime import timedelta
@@ -159,7 +160,7 @@ def exchange_edge_data(rank, world_size, edge_data):
     dist.barrier ()
     output_list = alltoallv_cpu(rank, world_size, input_list)
     end = timer()
-    print('[Rank: ', rank, '] Time to send/rcv edge data: ', timedelta(seconds=end-start))
+    logging.info(f'[Rank: {rank}] Time to send/rcv edge data: {timedelta(seconds=end-start)}')
 
     #Replace the values of the edge_data, with the received data from all the other processes.
     rcvd_edge_data = torch.cat(output_list).numpy()
@@ -239,7 +240,7 @@ def exchange_node_features(rank, world_size, node_feature_tids, ntype_gnid_map, 
             global_nid_per_rank = []
             feat_name = feat_info[0]
             feat_key = ntype_name+'/'+feat_name
-            print('[Rank: ', rank, '] processing node feature: ', feat_key)
+            logging.info(f'[Rank: {rank}] processing node feature: {feat_key}')
 
             #compute the global_nid range for this node features
             type_nid_start = int(feat_info[1])
@@ -283,7 +284,7 @@ def exchange_node_features(rank, world_size, node_feature_tids, ntype_gnid_map, 
             own_global_nids[feat_key] = torch.cat(output_nid_list).numpy()
 
     end = timer()
-    print('[Rank: ', rank, '] Total time for node feature exchange: ', timedelta(seconds = end - start))
+    logging.info(f'[Rank: {rank}] Total time for node feature exchange: {timedelta(seconds = end - start)}')
     return own_node_features, own_global_nids
 
 def exchange_graph_data(rank, world_size, node_features, node_feat_tids, edge_data,
@@ -337,7 +338,7 @@ def exchange_graph_data(rank, world_size, node_features, node_feat_tids, edge_da
     """
     rcvd_node_features, rcvd_global_nids = exchange_node_features(rank, world_size, node_feat_tids, \
                                                 ntypes_gnid_range_map, id_lookup, node_features)
-    print( 'Rank: ', rank, ' Done with node features exchange.')
+    logging.info(f'[Rank: {rank}] Done with node features exchange.')
 
     node_data = gen_node_data(rank, world_size, id_lookup, ntid_ntype_map, schema_map)
     edge_data = exchange_edge_data(rank, world_size, edge_data)
@@ -388,9 +389,10 @@ def read_dataset(rank, world_size, id_lookup, params, schema_map):
     #node_tids, node_features, edge_datadict, edge_tids
     node_tids, node_features, node_feat_tids, edge_data, edge_tids = \
         get_dataset(params.input_dir, params.graph_name, rank, world_size, schema_map)
+    logging.info(f'[Rank: {rank}] Done reading dataset deom {params.input_dir}')
 
     edge_data = augment_edge_data(edge_data, id_lookup, edge_tids, rank, world_size)
-    print('[Rank: ', rank, '] Done augmenting edge_data: ', len(edge_data), edge_data[constants.GLOBAL_SRC_ID].shape)
+    logging.info(f'[Rank: {rank}] Done augmenting edge_data: {len(edge_data)}, {edge_data[constants.GLOBAL_SRC_ID].shape}')
 
     return node_tids, node_features, node_feat_tids, edge_data, edge_features
 
@@ -519,7 +521,7 @@ def gen_dist_partitions(rank, world_size, params):
         this object, key value pairs, provides access to the command line arguments from the runtime environment
     """
     global_start = timer()
-    print('[Rank: ', rank, '] Starting distributed data processing pipeline...')
+    logging.info(f'[Rank: {rank}] Starting distributed data processing pipeline...')
 
     #init processing
     schema_map = read_json(os.path.join(params.input_dir, params.schema))
@@ -534,12 +536,12 @@ def gen_dist_partitions(rank, world_size, params):
                                     id_map, rank, world_size)
 
     ntypes_ntypeid_map, ntypes, ntypeid_ntypes_map = get_node_types(schema_map)
-    print('[Rank: ', rank, '] Initialized metis partitions and node_types map...')
+    logging.info(f'[Rank: {rank}] Initialized metis partitions and node_types map...')
 
     #read input graph files and augment these datastructures with
     #appropriate information (global_nid and owner process) for node and edge data
     node_tids, node_features, node_feat_tids, edge_data, edge_features = read_dataset(rank, world_size, id_lookup, params, schema_map)
-    print('[Rank: ', rank, '] Done augmenting file input data with auxilary columns')
+    logging.info(f'[Rank: {rank}] Done augmenting file input data with auxilary columns')
 
     #send out node and edge data --- and appropriate features. 
     #this function will also stitch the data recvd from other processes
@@ -549,17 +551,17 @@ def gen_dist_partitions(rank, world_size, params):
                     exchange_graph_data(rank, world_size, node_features, node_feat_tids, \
                                         edge_data, id_lookup, ntypes_ntypeid_map, ntypes_gnid_range_map, \
                                         ntypeid_ntypes_map, schema_map)
-    print('[Rank: ', rank, '] Done with data shuffling...')
+    logging.info(f'[Rank: {rank}] Done with data shuffling...')
 
     #sort node_data by ntype
     idx = node_data[constants.NTYPE_ID].argsort()
     for k, v in node_data.items():
         node_data[k] = v[idx]
-    print('[Rank: ', rank, '] Sorted node_data by node_type')
+    logging.info(f'[Rank: {rank}] Sorted node_data by node_type')
 
     #resolve global_ids for nodes
     assign_shuffle_global_nids_nodes(rank, world_size, node_data)
-    print('[Rank: ', rank, '] Done assigning global-ids to nodes...')
+    logging.info(f'[Rank: {rank}] Done assigning global-ids to nodes...')
 
     #shuffle node feature according to the node order on each rank. 
     for ntype_name in ntypes:
@@ -581,11 +583,11 @@ def gen_dist_partitions(rank, world_size, params):
         edge_data[k] = v[sorted_idx]
 
     shuffle_global_eid_start = assign_shuffle_global_nids_edges(rank, world_size, edge_data)
-    print('[Rank: ', rank, '] Done assigning global_ids to edges ...')
+    logging.info(f'[Rank: {rank}] Done assigning global_ids to edges ...')
 
     #determine global-ids for edge end-points
     edge_data = lookup_shuffle_global_nids_edges(rank, world_size, edge_data, id_lookup, node_data)
-    print('[Rank: ', rank, '] Done resolving orig_node_id for local node_ids...')
+    logging.info(f'[Rank: {rank}] Done resolving orig_node_id for local node_ids...')
 
     #create dgl objects here
     start = timer()
@@ -610,10 +612,10 @@ def gen_dist_partitions(rank, world_size, params):
         #send meta-data to Rank-0 process
         gather_metadata_json(json_metadata, rank, world_size)
     end = timer()
-    print('[Rank: ', rank, '] Time to create dgl objects: ', timedelta(seconds = end - start))
+    logging.info(f'[Rank: {rank}] Time to create dgl objects: {timedelta(seconds = end - start)}')
 
     global_end = timer()
-    print('[Rank: ', rank, '] Total execution time of the program: ', timedelta(seconds = global_end - global_start))
+    logging.info(f'[Rank: {rank}] Total execution time of the program: {timedelta(seconds = global_end - global_start)}')
 
 def single_machine_run(params):
     """ Main function for distributed implementation on a single machine
@@ -676,9 +678,13 @@ def multi_machine_run(params):
     rank = int(os.environ["RANK"])
 
     #init the gloo process group here.
-    dist.init_process_group("gloo", rank=rank, world_size=params.world_size, timeout=timedelta(seconds=constants.GLOO_MESSAGING_TIMEOUT))
-    print('[Rank: ', rank, '] Done with process group initialization...')
+    dist.init_process_group(
+            backend="gloo",
+            rank=rank,
+            world_size=params.world_size,
+            timeout=timedelta(seconds=constants.GLOO_MESSAGING_TIMEOUT))
+    logging.info(f'[Rank: {rank}] Done with process group initialization...')
 
     #invoke the main function here.
     gen_dist_partitions(rank, params.world_size, params)
-    print('[Rank: ', rank, '] Done with Distributed data processing pipeline processing.')
+    logging.info(f'[Rank: {rank}] Done with Distributed data processing pipeline processing.')

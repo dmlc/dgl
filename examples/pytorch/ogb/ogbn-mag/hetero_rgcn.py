@@ -4,136 +4,93 @@ from tqdm import tqdm
 
 import dgl
 import dgl.nn as dglnn
+from dgl.nn import HeteroEmbedding
+from dgl import Compose, AddReverse, ToSimple
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 from ogb.nodeproppred import DglNodePropPredDataset, Evaluator
 
+def prepare_data(args):
+    dataset = DglNodePropPredDataset(name="ogbn-mag")
+    split_idx = dataset.get_idx_split()
+    # graph: dgl graph object, label: torch tensor of shape (num_nodes, num_tasks)
+    g, labels = dataset[0]
+    labels = labels['paper'].flatten()
+
+    transform = Compose([ToSimple(), AddReverse()])
+    g = transform(g)
+
+    print("Loaded graph: {}".format(g))
+
+    logger = Logger(args.runs)
+
+    # train sampler
+    sampler = dgl.dataloading.MultiLayerNeighborSampler([25, 20])
+    train_loader = dgl.dataloading.DataLoader(
+        g, split_idx['train'], sampler,
+        batch_size=1024, shuffle=True, num_workers=0)
+
+    return g, labels, dataset.num_classes, split_idx, logger, train_loader
 
 def extract_embed(node_embed, input_nodes):
-    emb = {}
-    for ntype, nid in input_nodes.items():
-        nid = input_nodes[ntype]
-        if ntype in node_embed:
-            emb[ntype] = node_embed[ntype][nid]
+    emb = node_embed({
+        ntype: input_nodes[ntype] for ntype in input_nodes if ntype != 'paper'
+    })
     return emb
 
-class RelGraphEmbed(nn.Module):
-    r"""Embedding layer for featureless heterograph.
-    
-    Parameters
-    ----------
-    g : DGLGraph
-        Input graph.
-    embed_size : int
-        The length of each embedding vector
-    exclude : list[str]
-        The list of node-types to exclude (e.g., because they have natural features)
-    """
-    def __init__(self, g, embed_size, exclude=list()):
-        
-        super(RelGraphEmbed, self).__init__()
-        self.g = g
-        self.embed_size = embed_size
-
-        # create learnable embeddings for all nodes, except those with a node-type in the "exclude" list
-        self.embeds = nn.ParameterDict()
-        for ntype in g.ntypes:
-            if ntype in exclude:
-                continue
-            embed = nn.Parameter(th.Tensor(g.number_of_nodes(ntype), self.embed_size))
-            self.embeds[ntype] = embed
-
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        for emb in self.embeds.values():
-            nn.init.xavier_uniform_(emb)
-
-    def forward(self, block=None):
-        return self.embeds
-
+def rel_graph_embed(graph, embed_size):
+    node_num = {}
+    for ntype in graph.ntypes:
+        if ntype == 'paper':
+            continue
+        node_num[ntype] = graph.num_nodes(ntype)
+    embeds = HeteroEmbedding(node_num, embed_size)
+    return embeds
 
 class RelGraphConvLayer(nn.Module):
-    r"""Relational graph convolution layer.
-
-    Parameters
-    ----------
-    in_feat : int
-        Input feature size.
-    out_feat : int
-        Output feature size.
-    ntypes : list[str]
-        Node type names
-    rel_names : list[str]
-        Relation names.
-    weight : bool, optional
-        True if a linear layer is applied after message passing. Default: True
-    bias : bool, optional
-        True if bias is added. Default: True
-    activation : callable, optional
-        Activation function. Default: None
-    self_loop : bool, optional
-        True to include self loop message. Default: False
-    dropout : float, optional
-        Dropout rate. Default: 0.0
-    """
     def __init__(self,
                  in_feat,
                  out_feat,
                  ntypes,
                  rel_names,
-                 *,
-                 weight=True,
-                 bias=True,
                  activation=None,
-                 self_loop=False,
                  dropout=0.0):
         super(RelGraphConvLayer, self).__init__()
         self.in_feat = in_feat
         self.out_feat = out_feat
         self.ntypes = ntypes
         self.rel_names = rel_names
-        self.bias = bias
         self.activation = activation
-        self.self_loop = self_loop
 
         self.conv = dglnn.HeteroGraphConv({
                 rel : dglnn.GraphConv(in_feat, out_feat, norm='right', weight=False, bias=False)
                 for rel in rel_names
             })
 
-        self.use_weight = weight
-        if self.use_weight:
-            self.weight = nn.ModuleDict({
-                rel_name: nn.Linear(in_feat, out_feat, bias=False)
-                for rel_name in self.rel_names
-            })
+        self.weight = nn.ModuleDict({
+            rel_name: nn.Linear(in_feat, out_feat, bias=False)
+            for rel_name in self.rel_names
+        })
 
         # weight for self loop
-        if self.self_loop:
-            self.loop_weights = nn.ModuleDict({
-                ntype: nn.Linear(in_feat, out_feat, bias=bias)
-                for ntype in self.ntypes
-            })
+        self.loop_weights = nn.ModuleDict({
+            ntype: nn.Linear(in_feat, out_feat, bias=True)
+            for ntype in self.ntypes
+        })
 
         self.dropout = nn.Dropout(dropout)
-
         self.reset_parameters()
 
-    
     def reset_parameters(self):
-        if self.use_weight:
-            for layer in self.weight.values():
-                layer.reset_parameters()
+        for layer in self.weight.values():
+            layer.reset_parameters()
 
-        if self.self_loop:
-            for layer in self.loop_weights.values():
-                layer.reset_parameters()
+        for layer in self.loop_weights.values():
+            layer.reset_parameters()
 
     def forward(self, g, inputs):
-        """Forward computation
-
+        """
         Parameters
         ----------
         g : DGLHeteroGraph
@@ -147,83 +104,41 @@ class RelGraphConvLayer(nn.Module):
             New node features for each node type.
         """
         g = g.local_var()
-        if self.use_weight:
-            wdict = {rel_name: {'weight': self.weight[rel_name].weight.T}
-                     for rel_name in self.rel_names}
-        else:
-            wdict = {}
+        wdict = {rel_name: {'weight': self.weight[rel_name].weight.T}
+                 for rel_name in self.rel_names}
 
-        if g.is_block:
-            inputs_dst = {k: v[:g.number_of_dst_nodes(k)] for k, v in inputs.items()}
-        else:
-            inputs_dst = inputs
+        inputs_dst = {k: v[:g.number_of_dst_nodes(k)] for k, v in inputs.items()}
 
         hs = self.conv(g, inputs, mod_kwargs=wdict)
 
         def _apply(ntype, h):
-            if self.self_loop:
-                h = h + self.loop_weights[ntype](inputs_dst[ntype])
+            h = h + self.loop_weights[ntype](inputs_dst[ntype])
             if self.activation:
                 h = self.activation(h)
             return self.dropout(h)
+
         return {ntype : _apply(ntype, h) for ntype, h in hs.items()}
 
-
 class EntityClassify(nn.Module):
-    r"""
-    R-GCN node classification model
-
-    Parameters
-    ----------
-    g : DGLGraph
-        The heterogenous graph used for message passing
-    in_dim : int
-        Input feature size.
-    h_dim : int
-        Hidden dimension size.
-    out_dim : int
-        Output dimension size.
-    num_hidden_layers : int, optional
-        Number of RelGraphConvLayers. Default: 1
-    dropout : float, optional
-        Dropout rate. Default: 0.0
-    use_self_loop : bool, optional
-        True to include self loop message in RelGraphConvLayers. Default: True
-    """
-    def __init__(self,
-                 g, in_dim,
-                 h_dim, out_dim,
-                 num_hidden_layers=1,
-                 dropout=0,
-                 use_self_loop=True):
+    def __init__(self, g, in_dim, out_dim):
         super(EntityClassify, self).__init__()
-        self.g = g
         self.in_dim = in_dim
-        self.h_dim = h_dim
+        self.h_dim = 64
         self.out_dim = out_dim
         self.rel_names = list(set(g.etypes))
         self.rel_names.sort()
-        self.num_hidden_layers = num_hidden_layers
-        self.dropout = dropout
-        self.use_self_loop = use_self_loop
+        self.dropout = 0.5
 
         self.layers = nn.ModuleList()
         # i2h
         self.layers.append(RelGraphConvLayer(
             self.in_dim, self.h_dim, g.ntypes, self.rel_names,
-            activation=F.relu, self_loop=self.use_self_loop,
-            dropout=self.dropout))
-        # h2h
-        for _ in range(self.num_hidden_layers):
-            self.layers.append(RelGraphConvLayer(
-                self.h_dim, self.h_dim, g.ntypes, self.rel_names,
-                activation=F.relu, self_loop=self.use_self_loop,
-                dropout=self.dropout))
+            activation=F.relu, dropout=self.dropout))
+
         # h2o
         self.layers.append(RelGraphConvLayer(
             self.h_dim, self.out_dim, g.ntypes, self.rel_names,
-            activation=None,
-            self_loop=self.use_self_loop))
+            activation=None))
 
     def reset_parameters(self):
         for layer in self.layers:
@@ -234,7 +149,6 @@ class EntityClassify(nn.Module):
             h = layer(block, h)
         return h
 
-
 class Logger(object):
     r"""
     This class was taken directly from the PyG implementation and can be found
@@ -242,8 +156,7 @@ class Logger(object):
 
     This was done to ensure that performance was measured in precisely the same way
     """
-    def __init__(self, runs, info=None):
-        self.info = info
+    def __init__(self, runs):
         self.results = [[] for _ in range(runs)]
 
     def add_result(self, run, result):
@@ -283,113 +196,17 @@ class Logger(object):
             r = best_result[:, 3]
             print(f'   Final Test: {r.mean():.2f} ± {r.std():.2f}')
 
-
-def parse_args():
-    # DGL
-    parser = argparse.ArgumentParser(description='RGCN')
-    parser.add_argument("--dropout", type=float, default=0.5,
-            help="dropout probability")
-    parser.add_argument("--n-hidden", type=int, default=64,
-            help="number of hidden units")
-    parser.add_argument("--lr", type=float, default=0.01,
-            help="learning rate")
-    parser.add_argument("-e", "--n-epochs", type=int, default=3,
-            help="number of training epochs")
-
-    # OGB
-    parser.add_argument('--runs', type=int, default=10)
-
-    args = parser.parse_args()
-    return args
-
-def prepare_data(args):
-    dataset = DglNodePropPredDataset(name="ogbn-mag")
-    split_idx = dataset.get_idx_split()
-    g, labels = dataset[0] # graph: dgl graph object, label: torch tensor of shape (num_nodes, num_tasks)
-    labels = labels['paper'].flatten()
-
-    def add_reverse_hetero(g, combine_like=True):
-        r"""
-        Parameters
-        ----------
-        g : DGLGraph
-            The heterogenous graph where reverse edges should be added
-        combine_like : bool, optional
-            Whether reverse-edges that have identical source/destination 
-            node types should be combined with the existing edge-type, 
-            rather than creating a new edge type.  Default: True.
-        """
-        relations = {}
-        num_nodes_dict = {ntype: g.num_nodes(ntype) for ntype in g.ntypes}
-        for metapath in g.canonical_etypes:
-            src_ntype, rel_type, dst_ntype = metapath
-            src, dst = g.all_edges(etype=rel_type)
-
-            if src_ntype==dst_ntype and combine_like:
-                # Make edges un-directed instead of making a reverse edge type
-                relations[metapath] = (th.cat([src, dst], dim=0), th.cat([dst, src], dim=0))
-            else:
-                # Original edges
-                relations[metapath] = (src, dst)
-
-                reverse_metapath = (dst_ntype, 'rev-' + rel_type, src_ntype)
-                relations[reverse_metapath] = (dst, src)           # Reverse edges
-
-        new_g = dgl.heterograph(relations, num_nodes_dict=num_nodes_dict)
-        # Remove duplicate edges
-        new_g = dgl.to_simple(new_g, return_counts=None, writeback_mapping=False, copy_ndata=True)
-
-        # copy_ndata:
-        for ntype in g.ntypes:
-            for k, v in g.nodes[ntype].data.items():
-                new_g.nodes[ntype].data[k] = v.detach().clone()
-
-        return new_g
-
-    g = add_reverse_hetero(g)
-    print("Loaded graph: {}".format(g))
-
-    logger = Logger(args['runs'], args)
-
-    # train sampler
-    sampler = dgl.dataloading.MultiLayerNeighborSampler(args['fanout'])
-    train_loader = dgl.dataloading.DataLoader(
-        g, split_idx['train'], sampler,
-        batch_size=args['batch_size'], shuffle=True, num_workers=0)
-    
-    return (g, labels, dataset.num_classes, split_idx,  
-            logger, train_loader)
-
-def get_model(g, num_classes, args):
-    embed_layer = RelGraphEmbed(g, 128, exclude=['paper'])
-    
-    model = EntityClassify(
-        g, 128, args['n_hidden'], num_classes,
-        num_hidden_layers=args['num_layers'] - 2,
-        dropout=args['dropout'],
-        use_self_loop=True,
-    )
-
-    print(embed_layer)
-    print(f"Number of embedding parameters: {sum(p.numel() for p in embed_layer.parameters())}")
-    print(model)
-    print(f"Number of model parameters: {sum(p.numel() for p in model.parameters())}")
-
-    return embed_layer, model
-
-def train(g, model, node_embed, optimizer, train_loader, split_idx,  
-          labels, logger, device, run, args):
-    
-    # training loop
+def train(g, model, node_embed, optimizer, train_loader, split_idx,
+          labels, logger, device, run):
     print("start training...")
     category = 'paper'
 
-    for epoch in range(args['n_epochs']):
-        N_train= split_idx['train'][category].shape[0]
-        pbar = tqdm(total=N_train)
+    for epoch in range(3):
+        num_train = split_idx['train'][category].shape[0]
+        pbar = tqdm(total=num_train)
         pbar.set_description(f'Epoch {epoch:02d}')
         model.train()
-        
+
         total_loss = 0
 
         for input_nodes, seeds, blocks in train_loader:
@@ -400,27 +217,25 @@ def train(g, model, node_embed, optimizer, train_loader, split_idx,
             emb = extract_embed(node_embed, input_nodes)
             # Add the batch's raw "paper" features
             emb.update({'paper': g.ndata['feat']['paper'][input_nodes['paper']]})
-            lbl = labels[seeds]
-            
-            if th.cuda.is_available():
-                emb = {k : e.cuda() for k, e in emb.items()}
-                lbl = lbl.cuda()
-            
+
+            emb = {k : e.to(device) for k, e in emb.items()}
+            lbl = labels[seeds].to(device)
+
             optimizer.zero_grad()
             logits = model(emb, blocks)[category]
-            
+
             y_hat = logits.log_softmax(dim=-1)
             loss = F.nll_loss(y_hat, lbl)
             loss.backward()
             optimizer.step()
-            
+
             total_loss += loss.item() * batch_size
             pbar.update(batch_size)
-        
+
         pbar.close()
-        loss = total_loss / N_train
-        
-        result = test(g, model, node_embed, labels, device, split_idx, args)
+        loss = total_loss / num_train
+
+        result = test(g, model, node_embed, labels, device, split_idx)
         logger.add_result(run, result)
         train_acc, valid_acc, test_acc = result
         print(f'Run: {run + 1:02d}, '
@@ -429,24 +244,24 @@ def train(g, model, node_embed, optimizer, train_loader, split_idx,
               f'Train: {100 * train_acc:.2f}%, '
               f'Valid: {100 * valid_acc:.2f}%, '
               f'Test: {100 * test_acc:.2f}%')
-    
+
     return logger
 
 @th.no_grad()
-def test(g, model, node_embed, y_true, device, split_idx, args):
+def test(g, model, node_embed, y_true, device, split_idx):
     model.eval()
     category = 'paper'
     evaluator = Evaluator(name='ogbn-mag')
 
-    sampler = dgl.dataloading.MultiLayerFullNeighborSampler(args['num_layers'])
+    # 2 GNN layers
+    sampler = dgl.dataloading.MultiLayerFullNeighborSampler(2)
     loader = dgl.dataloading.DataLoader(
         g, {'paper': th.arange(g.num_nodes('paper'))}, sampler,
         batch_size=16384, shuffle=False, num_workers=0)
-    
-    N = y_true.size(0)
-    pbar = tqdm(total=N)
-    pbar.set_description(f'Full Inference')
-    
+
+    pbar = tqdm(total=y_true.size(0))
+    pbar.set_description(f'Inference')
+
     y_hats = list()
 
     for input_nodes, seeds, blocks in loader:
@@ -457,16 +272,14 @@ def test(g, model, node_embed, y_true, device, split_idx, args):
         emb = extract_embed(node_embed, input_nodes)
         # Get the batch's raw "paper" features
         emb.update({'paper': g.ndata['feat']['paper'][input_nodes['paper']]})
-        
-        if th.cuda.is_available():
-            emb = {k : e.cuda() for k, e in emb.items()}
-        
+        emb = {k : e.to(device) for k, e in emb.items()}
+
         logits = model(emb, blocks)[category]
         y_hat = logits.log_softmax(dim=-1).argmax(dim=1, keepdims=True)
         y_hats.append(y_hat.cpu())
-        
+
         pbar.update(batch_size)
-    
+
     pbar.close()
 
     y_pred = th.cat(y_hats, dim=0)
@@ -488,40 +301,36 @@ def test(g, model, node_embed, y_true, device, split_idx, args):
     return train_acc, valid_acc, test_acc
 
 def main(args):
-    # Static parameters
-    hyperparameters = dict(
-        num_layers=2,
-        fanout=[25, 20], 
-        batch_size=1024,
-    )
-    hyperparameters.update(vars(args))
-    print(hyperparameters)
-
     device = f'cuda:0' if th.cuda.is_available() else 'cpu'
 
-    (g, labels, num_classes, split_idx, 
-        logger, train_loader) = prepare_data(hyperparameters)
+    g, labels, num_classes, split_idx, logger, train_loader = prepare_data(args)
 
-    embed_layer, model = get_model(g, num_classes, hyperparameters)
-    model = model.to(device)
-    
-    for run in range(hyperparameters['runs']):
+    embed_layer = rel_graph_embed(g, 128)
+    model = EntityClassify(g, 128, num_classes).to(device)
+
+    print(f"Number of embedding parameters: {sum(p.numel() for p in embed_layer.parameters())}")
+    print(f"Number of model parameters: {sum(p.numel() for p in model.parameters())}")
+
+    for run in range(args.runs):
 
         embed_layer.reset_parameters()
         model.reset_parameters()
 
         # optimizer
         all_params = itertools.chain(model.parameters(), embed_layer.parameters())
-        optimizer = th.optim.Adam(all_params, lr=hyperparameters['lr'])
+        optimizer = th.optim.Adam(all_params, lr=0.01)
 
-        logger = train(g, model, embed_layer(), optimizer, train_loader, split_idx,
-              labels, logger, device, run, hyperparameters)
-
+        logger = train(g, model, embed_layer, optimizer, train_loader, split_idx,
+              labels, logger, device, run)
         logger.print_statistics(run)
-    
+
     print("Final performance: ")
     logger.print_statistics()
 
 if __name__ == '__main__':
-    args = parse_args()
+    parser = argparse.ArgumentParser(description='RGCN')
+    parser.add_argument('--runs', type=int, default=10)
+
+    args = parser.parse_args()
+
     main(args)

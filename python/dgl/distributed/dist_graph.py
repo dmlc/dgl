@@ -9,7 +9,7 @@ import numpy as np
 from ..heterograph import DGLHeteroGraph
 from ..convert import heterograph as dgl_heterograph
 from ..convert import graph as dgl_graph
-from ..transforms import compact_graphs
+from ..transforms import compact_graphs, sort_csr_by_tag, sort_csc_by_tag
 from .. import heterograph_index
 from .. import backend as F
 from ..base import NID, EID, NTYPE, ETYPE, ALL, is_all
@@ -336,9 +336,28 @@ class DistGraphServer(KVServer):
             self.client_g, _, _, self.gpb, graph_name, \
                     ntypes, etypes = load_partition(part_config, self.part_id, load_feats=False)
             print('load ' + graph_name)
+            # formatting dtype
+            # TODO(Rui) Formatting forcely is not a perfect solution.
+            #   We'd better store all dtypes when mapping to shared memory
+            #   and map back with original dtypes.
+            for k, dtype in FIELD_DICT.items():
+                if k in self.client_g.ndata:
+                    self.client_g.ndata[k] = F.astype(
+                        self.client_g.ndata[k], dtype)
+                if k in self.client_g.edata:
+                    self.client_g.edata[k] = F.astype(
+                        self.client_g.edata[k], dtype)
             # Create the graph formats specified the users.
             self.client_g = self.client_g.formats(graph_format)
             self.client_g.create_formats_()
+            # Sort underlying matrix beforehand to avoid runtime overhead during sampling.
+            if len(etypes) > 1:
+                if 'csr' in graph_format:
+                    self.client_g = sort_csr_by_tag(
+                        self.client_g, tag=self.client_g.edata[ETYPE], tag_type='edge')
+                if 'csc' in graph_format:
+                    self.client_g = sort_csc_by_tag(
+                        self.client_g, tag=self.client_g.edata[ETYPE], tag_type='edge')
             if not disable_shared_mem:
                 self.client_g = _copy_graph_to_shared_mem(self.client_g, graph_name, graph_format)
 
@@ -1113,7 +1132,8 @@ class DistGraph:
         gpb = self.get_partition_book()
         if len(gpb.etypes) > 1:
             # if etype is a canonical edge type (str, str, str), extract the edge type
-            if len(etype) == 3:
+            if isinstance(etype, tuple):
+                assert len(etype) == 3, 'Invalid canonical etype: {}'.format(etype)
                 etype = etype[1]
             edges = gpb.map_to_homo_eid(edges, etype)
         src, dst = dist_find_edges(self, edges)
@@ -1160,7 +1180,7 @@ class DistGraph:
         if isinstance(edges, dict):
             # TODO(zhengda) we need to directly generate subgraph of all relations with
             # one invocation.
-            if isinstance(edges, tuple):
+            if isinstance(list(edges.keys())[0], tuple):
                 subg = {etype: self.find_edges(edges[etype], etype[1]) for etype in edges}
             else:
                 subg = {}
@@ -1244,14 +1264,14 @@ class DistGraph:
         self._client.barrier()
 
     def sample_neighbors(self, seed_nodes, fanout, edge_dir='in', prob=None,
-                         exclude_edges=None, replace=False,
+                         exclude_edges=None, replace=False, etype_sorted=True,
                          output_device=None):
         # pylint: disable=unused-argument
         """Sample neighbors from a distributed graph."""
         # Currently prob, exclude_edges, output_device, and edge_dir are ignored.
         if len(self.etypes) > 1:
             frontier = graph_services.sample_etype_neighbors(
-                self, seed_nodes, ETYPE, fanout, replace=replace)
+                self, seed_nodes, ETYPE, fanout, replace=replace, etype_sorted=etype_sorted)
         else:
             frontier = graph_services.sample_neighbors(
                 self, seed_nodes, fanout, replace=replace)

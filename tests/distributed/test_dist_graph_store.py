@@ -35,6 +35,15 @@ def run_server(graph_name, server_id, server_count, num_clients, shared_mem, kee
                         disable_shared_mem=not shared_mem,
                         graph_format=['csc', 'coo'], keep_alive=keep_alive)
     print('start server', server_id)
+    # verify dtype of underlying graph
+    cg = g.client_g
+    for k, dtype in dgl.distributed.dist_graph.FIELD_DICT.items():
+        if k in cg.ndata:
+            assert F.dtype(
+                cg.ndata[k]) == dtype, "Data type of {} in ndata should be {}.".format(k, dtype)
+        if k in cg.edata:
+            assert F.dtype(
+                cg.edata[k]) == dtype, "Data type of {} in edata should be {}.".format(k, dtype)
     g.start()
 
 def emb_init(shape, dtype):
@@ -218,6 +227,11 @@ def check_dist_graph(g, num_clients, num_nodes, num_edges):
     feats1 = g.edata['features'][eids]
     feats = F.squeeze(feats1, 1)
     assert np.all(F.asnumpy(feats == eids))
+
+    # Test edge_subgraph
+    sg = g.edge_subgraph(eids)
+    assert sg.num_edges() == len(eids)
+    assert F.array_equal(sg.edata[dgl.EID], eids)
 
     # Test init node data
     new_shape = (g.number_of_nodes(), 2)
@@ -484,6 +498,14 @@ def check_dist_graph_hetero(g, num_clients, num_nodes, num_edges):
     feats1 = g.edges['r1'].data['feat'][eids]
     feats = F.squeeze(feats1, 1)
     assert np.all(F.asnumpy(feats == eids))
+
+    # Test edge_subgraph
+    sg = g.edge_subgraph({'r1': eids})
+    assert sg.num_edges() == len(eids)
+    assert F.array_equal(sg.edata[dgl.EID], eids)
+    sg = g.edge_subgraph({('n1', 'r1', 'n2'): eids})
+    assert sg.num_edges() == len(eids)
+    assert F.array_equal(sg.edata[dgl.EID], eids)
 
     # Test init node data
     new_shape = (g.number_of_nodes('n1'), 2)
