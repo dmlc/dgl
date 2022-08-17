@@ -82,7 +82,7 @@ def layerwise_infer(proc_id, device, g, nid, model, use_uva, batch_size):
         labels = g.ndata['label'][nid].to(pred.device)
     if proc_id == 0:
         acc = MF.accuracy(pred, labels)
-        print('Test acc:', acc.item())
+        print("Test Accuracy {:.4f}".format(acc.item()))
 
 def train(proc_id, nprocs, device, g, train_idx, val_idx, model, use_uva):
     sampler = NeighborSampler([10, 10, 10],
