@@ -43,7 +43,6 @@ class DistLookupService:
     '''
 
     def __init__(self, input_dir, ntype_names, id_map, rank, world_size):
-
         assert os.path.isdir(input_dir)
         assert ntype_names is not None
         assert len(ntype_names) > 0

@@ -540,7 +540,8 @@ def gen_dist_partitions(rank, world_size, params):
 
     #read input graph files and augment these datastructures with
     #appropriate information (global_nid and owner process) for node and edge data
-    node_tids, node_features, node_feat_tids, edge_data, edge_features = read_dataset(rank, world_size, id_lookup, params, schema_map)
+    node_tids, node_features, node_feat_tids, edge_data, edge_features = \
+        read_dataset(rank, world_size, id_lookup, params, schema_map)
     logging.info(f'[Rank: {rank}] Done augmenting file input data with auxilary columns')
 
     #send out node and edge data --- and appropriate features. 
