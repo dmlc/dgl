@@ -111,6 +111,7 @@ def _chunk_graph(g, name, ndata_paths, edata_paths, num_chunks, output_path):
                     reader_fmt_meta = writer_fmt_meta = {"name": "numpy"}
                     arr = array_readwriter.get_array_parser(**reader_fmt_meta).read(path)
                     edata_key_meta['format'] = writer_fmt_meta
+                    etype = tuple(etypestr.split(':'))
                     edata_key_meta['data'] = chunk_numpy_array(
                             arr, writer_fmt_meta, num_edges_per_chunk_dict[etype],
                             key + '-%d.npy')
