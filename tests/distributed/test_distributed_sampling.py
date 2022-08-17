@@ -195,15 +195,16 @@ def check_rpc_hetero_find_edges_shuffle(tmpdir, num_server):
         time.sleep(1)
         pserver_list.append(p)
 
-    eids = F.tensor(np.random.randint(g.num_edges('r12'), size=100))
+    test_etype = g.to_canonical_etype('r12')
+    eids = F.tensor(np.random.randint(g.num_edges(test_etype), size=100))
     expect_except = False
     try:
-        _, _ = g.find_edges(orig_eid['r12'][eids], etype=('n1', 'r12'))
+        _, _ = g.find_edges(orig_eid[test_etype][eids], etype=('n1', 'r12'))
     except:
         expect_except = True
     assert expect_except
-    u, v = g.find_edges(orig_eid['r12'][eids], etype='r12')
-    u1, v1 = g.find_edges(orig_eid['r12'][eids], etype=('n1', 'r12', 'n2'))
+    u, v = g.find_edges(orig_eid[test_etype][eids], etype='r12')
+    u1, v1 = g.find_edges(orig_eid[test_etype][eids], etype=('n1', 'r12', 'n2'))
     assert F.array_equal(u, u1)
     assert F.array_equal(v, v1)
     du, dv = start_find_edges_client(0, tmpdir, num_server > 1, eids, etype='r12')
@@ -411,12 +412,14 @@ def check_rpc_hetero_sampling_shuffle(tmpdir, num_server):
             F.scatter_row_inplace(orig_nid_map[ntype], F.boolean_mask(type_nids, idx),
                                   F.boolean_mask(part.ndata['orig_id'], idx))
         etype_ids, type_eids = gpb.map_to_per_etype(part.edata[dgl.EID])
-        for etype_id, etype in enumerate(g.etypes):
+        for etype_id, etype in enumerate(g.canonical_etypes):
             idx = etype_ids == etype_id
             F.scatter_row_inplace(orig_eid_map[etype], F.boolean_mask(type_eids, idx),
                                   F.boolean_mask(part.edata['orig_id'], idx))
 
-    for src_type, etype, dst_type in block.canonical_etypes:
+    for etype in block.canonical_etypes:
+        src_type = etype[0]
+        dst_type = etype[2]
         src, dst = block.edges(etype=etype)
         # These are global Ids after shuffling.
         shuffled_src = F.gather_row(block.srcnodes[src_type].data[dgl.NID], src)
@@ -503,7 +506,7 @@ def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server, etype_sorted=Fal
     assert len(src) == 18
 
     orig_nid_map = {ntype: F.zeros((g.number_of_nodes(ntype),), dtype=F.int64) for ntype in g.ntypes}
-    orig_eid_map = {etype: F.zeros((g.number_of_edges(etype),), dtype=F.int64) for etype in g.etypes}
+    orig_eid_map = {etype: F.zeros((g.number_of_edges(etype),), dtype=F.int64) for etype in g.canonical_etypes}
     for i in range(num_server):
         part, _, _, _, _, _, _ = load_partition(tmpdir / 'test_sampling.json', i)
         ntype_ids, type_nids = gpb.map_to_per_ntype(part.ndata[dgl.NID])
@@ -512,12 +515,14 @@ def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server, etype_sorted=Fal
             F.scatter_row_inplace(orig_nid_map[ntype], F.boolean_mask(type_nids, idx),
                                   F.boolean_mask(part.ndata['orig_id'], idx))
         etype_ids, type_eids = gpb.map_to_per_etype(part.edata[dgl.EID])
-        for etype_id, etype in enumerate(g.etypes):
+        for etype_id, etype in enumerate(g.canonical_etypes):
             idx = etype_ids == etype_id
             F.scatter_row_inplace(orig_eid_map[etype], F.boolean_mask(type_eids, idx),
                                   F.boolean_mask(part.edata['orig_id'], idx))
 
-    for src_type, etype, dst_type in block.canonical_etypes:
+    for etype in block.canonical_etypes:
+        src_type = etype[0]
+        dst_type = etype[2]
         src, dst = block.edges(etype=etype)
         # These are global Ids after shuffling.
         shuffled_src = F.gather_row(block.srcnodes[src_type].data[dgl.NID], src)
@@ -689,7 +694,7 @@ def check_rpc_bipartite_sampling_shuffle(tmpdir, num_server):
     orig_nid_map = {ntype: F.zeros(
         (g.number_of_nodes(ntype),), dtype=F.int64) for ntype in g.ntypes}
     orig_eid_map = {etype: F.zeros(
-        (g.number_of_edges(etype),), dtype=F.int64) for etype in g.etypes}
+        (g.number_of_edges(etype),), dtype=F.int64) for etype in g.canonical_etypes}
     for i in range(num_server):
         part, _, _, _, _, _, _ = load_partition(
             tmpdir / 'test_sampling.json', i)
@@ -699,12 +704,14 @@ def check_rpc_bipartite_sampling_shuffle(tmpdir, num_server):
             F.scatter_row_inplace(orig_nid_map[ntype], F.boolean_mask(type_nids, idx),
                                   F.boolean_mask(part.ndata['orig_id'], idx))
         etype_ids, type_eids = gpb.map_to_per_etype(part.edata[dgl.EID])
-        for etype_id, etype in enumerate(g.etypes):
+        for etype_id, etype in enumerate(g.canonical_etypes):
             idx = etype_ids == etype_id
             F.scatter_row_inplace(orig_eid_map[etype], F.boolean_mask(type_eids, idx),
                                   F.boolean_mask(part.edata['orig_id'], idx))
 
-    for src_type, etype, dst_type in block.canonical_etypes:
+    for etype in block.canonical_etypes:
+        src_type = etype[0]
+        dst_type = etype[2]
         src, dst = block.edges(etype=etype)
         # These are global Ids after shuffling.
         shuffled_src = F.gather_row(
@@ -791,7 +798,7 @@ def check_rpc_bipartite_etype_sampling_shuffle(tmpdir, num_server):
     orig_nid_map = {ntype: F.zeros(
         (g.number_of_nodes(ntype),), dtype=F.int64) for ntype in g.ntypes}
     orig_eid_map = {etype: F.zeros(
-        (g.number_of_edges(etype),), dtype=F.int64) for etype in g.etypes}
+        (g.number_of_edges(etype),), dtype=F.int64) for etype in g.canonical_etypes}
     for i in range(num_server):
         part, _, _, _, _, _, _ = load_partition(
             tmpdir / 'test_sampling.json', i)
@@ -801,12 +808,14 @@ def check_rpc_bipartite_etype_sampling_shuffle(tmpdir, num_server):
             F.scatter_row_inplace(orig_nid_map[ntype], F.boolean_mask(type_nids, idx),
                                   F.boolean_mask(part.ndata['orig_id'], idx))
         etype_ids, type_eids = gpb.map_to_per_etype(part.edata[dgl.EID])
-        for etype_id, etype in enumerate(g.etypes):
+        for etype_id, etype in enumerate(g.canonical_etypes):
             idx = etype_ids == etype_id
             F.scatter_row_inplace(orig_eid_map[etype], F.boolean_mask(type_eids, idx),
                                   F.boolean_mask(part.edata['orig_id'], idx))
 
-    for src_type, etype, dst_type in block.canonical_etypes:
+    for etype in block.canonical_etypes:
+        src_type = etype[0]
+        dst_type = etype[2]
         src, dst = block.edges(etype=etype)
         # These are global Ids after shuffling.
         shuffled_src = F.gather_row(

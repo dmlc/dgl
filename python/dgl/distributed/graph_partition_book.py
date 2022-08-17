@@ -392,6 +392,17 @@ class GraphPartitionBook(ABC):
         """
         return not(len(self.etypes) > 1 or len(self.ntypes) > 1)
 
+    @property
+    def has_canonical_etypes(self):
+        """check if has valid canonical etypes
+
+        .. deprecated:: 0.9.1
+
+            This function is deprecated as canonical etypes are always availale
+            for partitions generated since ``0.9.1``.
+        """
+        return all(etype is not None for etype in self.canonical_etypes)
+
     def map_to_per_ntype(self, ids):
         """Map homogeneous node IDs to type-wise IDs and node types.
 
