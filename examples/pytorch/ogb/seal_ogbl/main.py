@@ -1,137 +1,218 @@
 import argparse
 import time
-import os, sys
+import os
+import sys
+import math
+import random
 from tqdm import tqdm
+import numpy as np
 import torch
+from torch.nn import ModuleList, Linear, Conv1d, MaxPool1d, Embedding, BCEWithLogitsLoss
+import torch.nn.functional as F
 import dgl
-from torch.nn import BCEWithLogitsLoss
-from torch.utils.data import Dataset
-from dgl.dataloading import GraphDataLoader
-from dgl.data.utils import save_graphs, load_graphs
+from dgl.nn import GraphConv, SortPooling
+from dgl.sampling import global_uniform_negative_sampling
+from dgl.dataloading import Sampler, DataLoader
 from ogb.linkproppred import DglLinkPropPredDataset, Evaluator
-from utils import *
-from models import *
+from scipy.sparse.csgraph import shortest_path
 
 
-class SEALOGBLDataset(Dataset):
-    def __init__(self, root, graph, split_edge, percent=100, split='train',
-                 ratio_per_hop=1.0, directed=False, dynamic=True) -> None:
+class Logger(object):
+    def __init__(self, runs, info=None):
+        self.info = info
+        self.results = [[] for _ in range(runs)]
+
+    def add_result(self, run, result):
+        # result is in the format of (val_score, test_score)
+        assert len(result) == 2
+        assert run >= 0 and run < len(self.results)
+        self.results[run].append(result)
+
+    def print_statistics(self, run=None, f=sys.stdout):
+        if run is not None:
+            result = 100 * torch.tensor(self.results[run])
+            argmax = result[:, 0].argmax().item()
+            print(f'Run {run + 1:02d}:', file=f)
+            print(f'Highest Valid: {result[:, 0].max():.2f}', file=f)
+            print(f'Highest Eval Point: {argmax + 1}', file=f)
+            print(f'   Final Test: {result[argmax, 1]:.2f}', file=f)
+        else:
+            result = 100 * torch.tensor(self.results)
+
+            best_results = []
+            for r in result:
+                valid = r[:, 0].max().item()
+                test = r[r[:, 0].argmax(), 1].item()
+                best_results.append((valid, test))
+
+            best_result = torch.tensor(best_results)
+
+            print(f'All runs:', file=f)
+            r = best_result[:, 0]
+            print(f'Highest Valid: {r.mean():.2f} ± {r.std():.2f}', file=f)
+            r = best_result[:, 1]
+            print(f'   Final Test: {r.mean():.2f} ± {r.std():.2f}', file=f)
+
+
+class SealSampler(Sampler):
+    def __init__(self, num_hops=1, sample_ratio=1., directed=False,
+                 output_device=None):
         super().__init__()
-        self.root = root
-        self.graph = graph
-        self.split = split
-        self.split_edge = split_edge
-        self.percent = percent
-        self.ratio_per_hop = ratio_per_hop
+        self.num_hops = num_hops
+        self.sample_ratio = sample_ratio
         self.directed = directed
-        self.dynamic = dynamic
+        self.output_device = output_device
 
-        if 'weights' in self.graph.edata:
-            self.edge_weights = self.graph.edata['weights']
+    def _double_radius_node_labeling(self, adj):
+        N = adj.shape[0]
+        adj_wo_src = adj[range(1, N), :][:, range(1, N)]
+        idx = list(range(1)) + list(range(2, N))
+        adj_wo_dst = adj[idx, :][:, idx]
+
+        dist2src = shortest_path(adj_wo_dst, directed=False, unweighted=True, indices=0)
+        dist2src = np.insert(dist2src, 1, 0, axis=0)
+        dist2src = torch.from_numpy(dist2src)
+
+        dist2dst = shortest_path(adj_wo_src, directed=False, unweighted=True, indices=0)
+        dist2dst = np.insert(dist2dst, 0, 0, axis=0)
+        dist2dst = torch.from_numpy(dist2dst)
+
+        dist = dist2src + dist2dst
+        dist_over_2, dist_mod_2 = torch.div(dist, 2, rounding_mode='floor'), dist % 2
+
+        z = 1 + torch.min(dist2src, dist2dst)
+        z += dist_over_2 * (dist_over_2 + dist_mod_2 - 1)
+        z[0: 2] = 1.
+        # shortest path may include inf values
+        z[torch.isnan(z)] = 0.
+
+        return z.to(torch.long)
+
+    def sample(self, g, seed_edges):
+        graphs = []
+        indices = seed_edges[:, 0]
+        # construct k-hop enclosing graph for each link
+        for eid in seed_edges:
+            i, src, dst = map(int, eid)
+            # construct the enclosing graph
+            visited, nodes, fringe = [set([src, dst]) for _ in range(3)]
+            for _ in range(self.num_hops):
+                if not self.directed:
+                    _, fringe = g.out_edges(list(fringe))
+                    fringe = fringe.tolist()
+                else:
+                    _, out_neighbors = g.out_edges(list(fringe))
+                    in_neighbors, _ = g.in_edges(list(fringe))
+                    fringe = in_neighbors.tolist() + out_neighbors.tolist()
+                fringe = set(fringe) - visited
+                visited = visited.union(fringe)
+                if self.sample_ratio < 1.:
+                    fringe = random.sample(fringe, int(self.sample_ratio * len(fringe)))
+                if len(fringe) == 0:
+                    break
+                nodes = list(nodes) + list(fringe)
+            subg = g.subgraph(nodes, store_ids=True)
+
+            # remove edges to predict
+            edges_to_remove = [
+                subg.edge_ids(s, t) for s, t in [(0, 1), (1, 0)] if subg.has_edges_between(s, t)]
+            subg.remove_edges(edges_to_remove)
+            # add double radius node labeling
+            subg.ndata['z'] = self._double_radius_node_labeling(subg.adj(scipy_fmt='csr'))
+            graphs.append(subg)
+
+        return indices, graphs
+
+
+# An end-to-end deep learning architecture for graph classification, AAAI-18.
+class DGCNN(torch.nn.Module):
+    def __init__(self, hidden_channels, num_layers, k, GNN=GraphConv, feature_dim=0):
+        super(DGCNN, self).__init__()
+        self.feature_dim = feature_dim
+        self.k = k
+        self.sort_pool = SortPooling(k=k)
+
+        self.max_z = 1000
+        self.z_embedding = Embedding(self.max_z, hidden_channels)
+
+        self.convs = ModuleList()
+        initial_channels = hidden_channels + self.feature_dim
+
+        self.convs.append(GNN(initial_channels, hidden_channels))
+        for _ in range(0, num_layers-1):
+            self.convs.append(GNN(hidden_channels, hidden_channels))
+        self.convs.append(GNN(hidden_channels, 1))
+
+        conv1d_channels = [16, 32]
+        total_latent_dim = hidden_channels * num_layers + 1
+        conv1d_kws = [total_latent_dim, 5]
+        self.conv1 = Conv1d(1, conv1d_channels[0], conv1d_kws[0],
+                            conv1d_kws[0])
+        self.maxpool1d = MaxPool1d(2, 2)
+        self.conv2 = Conv1d(conv1d_channels[0], conv1d_channels[1],
+                            conv1d_kws[1], 1)
+        dense_dim = int((self.k - 2) / 2 + 1)
+        dense_dim = (dense_dim - conv1d_kws[1] + 1) * conv1d_channels[1]
+        self.lin1 = Linear(dense_dim, 128)
+        self.lin2 = Linear(128, 1)
+
+    def forward(self, g, z, x=None, edge_weight=None):
+        z_emb = self.z_embedding(z)
+        if z_emb.ndim == 3:  # in case z has multiple integer labels
+            z_emb = z_emb.sum(dim=1)
+        if x is not None:
+            x = torch.cat([z_emb, x.to(torch.float)], 1)
         else:
-            self.edge_weights = None
-        if 'feat' in self.graph.ndata:
-            self.node_features = self.graph.ndata['feat']
-        else:
-            self.node_features = None
+            x = z_emb
+        xs = [x]
 
-        if not self.dynamic:
-            self.g_list, tensor_dict = self.load_cached()
-            self.labels = tensor_dict['y']
-            return
+        for conv in self.convs:
+            xs += [torch.tanh(conv(g, xs[-1], edge_weight=edge_weight))]
+        x = torch.cat(xs[1:], dim=-1)
 
-        pos_edge, neg_edge = get_pos_neg_edges(split, self.split_edge, self.graph, self.percent)
-        self.links = torch.cat([pos_edge, neg_edge], 0).tolist() # [Np + Nn, 2]
-        self.labels = [1] * len(pos_edge) + [0] * len(neg_edge)
+        # global pooling
+        x = self.sort_pool(g, x)
+        x = x.unsqueeze(1)  # [num_graphs, 1, k * hidden]
+        x = F.relu(self.conv1(x))
+        x = self.maxpool1d(x)
+        x = F.relu(self.conv2(x))
+        x = x.view(x.size(0), -1)  # [num_graphs, dense_dim]
 
-    def __len__(self):
-        return len(self.labels)
-
-    def __getitem__(self, idx):
-        if not self.dynamic:
-            g, y = self.g_list[idx], self.labels[idx]
-            x = None if 'x' not in g.ndata else g.ndata['x']
-            w = None if 'w' not in g.edata else g.eata['w']
-            return g, g.ndata['z'], x, w, y
-
-        src, dst = self.links[idx]
-        y = self.labels[idx]
-        subg = k_hop_subgraph(src, dst, 1, self.graph,
-            self.ratio_per_hop, self.directed)
-
-        # remove the link between src and dst
-        direct_links = [[], []]
-        for s, t in [(0, 1), (1, 0)]:
-            if subg.has_edges_between(s, t):
-                direct_links[0].append(s)
-                direct_links[1].append(t)
-        if len(direct_links[0]):
-            subg.remove_edges(subg.edge_ids(*direct_links))
-
-        NIDs, EIDs = subg.ndata[dgl.NID], subg.edata[dgl.EID]
-
-        z = drnl_node_labeling(subg.adj(scipy_fmt='csr'), 0, 1)
-        edge_weights = self.edge_weights[EIDs] if self.edge_weights is not None else None
-        x = self.node_features[NIDs] if self.node_features is not None else None
-
-        subg_aug = subg.add_self_loop()
-        if edge_weights is not None:
-            edge_weights = torch.cat([
-                edge_weights, torch.ones(subg_aug.num_edges() - subg.num_edges())])
-        return subg_aug, z, x, edge_weights, y
-
-    @property
-    def cached_name(self):
-        return 'SEAL_{}_data_{}.pt'.format(self.split, self.percent)
-
-    def process(self):
-        g_list, labels = [], []
-        self.dynamic = True
-        for i in range(len(self)):
-            g, z, x, weights, y = self[i]
-            g.ndata['z'] = z
-            if x is not None:
-                g.ndata['x'] = x
-            if weights is not None:
-                g.edata['w'] = weights
-            g_list.append(g)
-            labels.append(y)
-        self.dynamic = False
-        return g_list, {'y': torch.tensor(labels)}
-
-    def load_cached(self):
-        path = os.path.join(self.root, self.cached_name)
-        if os.path.exists(path):
-            return load_graphs(path)
-
-        if not os.path.exists(self.root):
-            os.makedirs(self.root)
-
-        pos_edge, neg_edge = get_pos_neg_edges(
-            self.split, self.split_edge, self.graph, self.percent)
-        self.links = torch.cat([pos_edge, neg_edge], 0).tolist() # [Np + Nn, 2]
-        self.labels = [1] * len(pos_edge) + [0] * len(neg_edge)
-
-        g_list, labels = self.process()
-        save_graphs(path, g_list, labels)
-        return g_list, labels
+        # MLP.
+        x = F.relu(self.lin1(x))
+        x = F.dropout(x, p=0.5, training=self.training)
+        x = self.lin2(x)
+        return x
 
 
-def ogbl_collate_fn(batch):
-    gs, zs, xs, ws, ys = zip(*batch)
-    batched_g = dgl.batch(gs)
-    z = torch.cat(zs, dim=0)
-    if xs[0] is not None:
-        x = torch.cat(xs, dim=0)
+def get_pos_neg_edges(split, split_edge, g, percent=100):
+    pos_edge = split_edge[split]['edge']
+    if split == 'train':
+        neg_edge = torch.stack(global_uniform_negative_sampling(
+            g, num_samples=pos_edge.size(0),
+            exclude_self_loops=True
+        ), dim=1)
     else:
-        x = None
-    if ws[0] is not None:
-        edge_weights = torch.cat(ws, dim=0)
-    else:
-        edge_weights = None
-    y = torch.tensor(ys)
+        neg_edge = split_edge[split]['edge_neg']
 
-    return batched_g, z, x, edge_weights, y
+    # sampling according to the percent param
+    np.random.seed(123)
+    # pos sampling
+    num_pos = pos_edge.size(0)
+    perm = np.random.permutation(num_pos)
+    perm = perm[:int(percent / 100 * num_pos)]
+    pos_edge = pos_edge[perm]
+    # neg sampling
+    if neg_edge.dim() > 2: # [Np, Nn, 2]
+        neg_edge = neg_edge[perm].view(-1, 2)
+    else:
+        np.random.seed(123)
+        num_neg = neg_edge.size(0)
+        perm = np.random.permutation(num_neg)
+        perm = perm[:int(percent / 100 * num_neg)]
+        neg_edge = neg_edge[perm]
+
+    return pos_edge, neg_edge # ([2, Np], [2, Nn]) -> ([Np, 2], [Nn, 2])
 
 
 def train():
@@ -139,17 +220,17 @@ def train():
     loss_fnt = BCEWithLogitsLoss()
     total_loss = 0
     pbar = tqdm(train_loader, ncols=70)
-    for batch in pbar:
-        g, z, x, edge_weights, y = [
-            item.to(device) if item is not None else None for item in batch]
+    for indices, subgs in pbar:
+        g, y = dgl.batch(subgs), train_labels[indices]
         optimizer.zero_grad()
-        logits = model(g, z, x, edge_weight=edge_weights)
+        logits = model(g, g.ndata['z'], g.ndata.get('feat', None), 
+            edge_weight=g.edata.get('weight', None))
         loss = loss_fnt(logits.view(-1), y.to(torch.float))
         loss.backward()
         optimizer.step()
         total_loss += loss.item() * g.batch_size
 
-    return total_loss / len(train_dataset)
+    return total_loss / len(train_labels)
 
 
 @torch.no_grad()
@@ -157,10 +238,10 @@ def test():
     model.eval()
 
     y_pred, y_true = [], []
-    for batch in tqdm(val_loader, ncols=70):
-        g, z, x, edge_weights, y = [
-            item.to(device) if item is not None else None for item in batch]
-        logits = model(g, z, x, edge_weight=edge_weights)
+    for indices, subgs in tqdm(val_loader, ncols=70):
+        g, y = dgl.batch(subgs), val_labels[indices]
+        logits = model(g, g.ndata['z'], g.ndata.get('feat', None), 
+            edge_weight=g.edata.get('weight', None))
         y_pred.append(logits.view(-1).cpu())
         y_true.append(y.view(-1).cpu().to(torch.float))
     val_pred, val_true = torch.cat(y_pred), torch.cat(y_true)
@@ -168,10 +249,10 @@ def test():
     neg_val_pred = val_pred[val_true==0]
 
     y_pred, y_true = [], []
-    for batch in tqdm(test_loader, ncols=70):
-        g, z, x, edge_weights, y = [
-            item.to(device) if item is not None else None for item in batch]
-        logits = model(g, z, x, edge_weight=edge_weights)
+    for indices, subgs in tqdm(test_loader, ncols=70):
+        g, y = dgl.batch(subgs), test_labels[indices]
+        logits = model(g, g.ndata['z'], g.ndata.get('feat', None), 
+            edge_weight=g.edata.get('weight', None))
         y_pred.append(logits.view(-1).cpu())
         y_true.append(y.view(-1).cpu().to(torch.float))
     test_pred, test_true = torch.cat(y_pred), torch.cat(y_true)
@@ -246,13 +327,8 @@ if __name__ == '__main__':
     parser.add_argument('--train_percent', type=float, default=100)
     parser.add_argument('--val_percent', type=float, default=100)
     parser.add_argument('--test_percent', type=float, default=100)
-    parser.add_argument('--dynamic_train', action='store_true', 
-                        help="dynamically extract enclosing subgraphs on the fly")
-    parser.add_argument('--dynamic_val', action='store_true')
-    parser.add_argument('--dynamic_test', action='store_true')
-    parser.add_argument('--num_workers', type=int, default=0, 
-                        help="number of workers for dynamic dataloaders; using a larger"
-                        + " value for dynamic dataloading is recommended")
+    parser.add_argument('--num_workers', type=int, default=16, 
+                        help="number of workers for dynamic dataloaders")
     # Testing settings
     parser.add_argument('--use_valedges_as_input', action='store_true')
     parser.add_argument('--eval_steps', type=int, default=1)
@@ -295,27 +371,12 @@ if __name__ == '__main__':
 
     # reconstruct the graph for ogbl-collab data for validation edge augmentation and coalesce
     if args.dataset == 'ogbl-collab':
-        edges = torch.stack(graph.edges(), dim=1)  # [L, 2]
-        weights = graph.edata['weight'].squeeze()
-
-        # use valid edges as input for ogbl-collab
         if args.use_valedges_as_input:
             val_edges = split_edge['valid']['edge']
-            # to undirected
             row, col = val_edges.t()
-            val_edges = torch.stack([
-                torch.cat([row, col], dim=0),
-                torch.cat([col, row], dim=0)
-            ], dim=1)  # [2*L, 2]
             val_weights = torch.ones(size=(val_edges.size(0),), dtype=int)
-            edges = torch.cat([edges, val_edges], dim=0)
-            weights = torch.cat([weights, val_weights])
-
-        # coalesce
-        coo_m = torch.sparse_coo_tensor(edges.t(), weights).coalesce()
-        coo_m = coo_m.coalesce()  # [2, L]
-        graph = dgl.graph(tuple(coo_m.indices()))
-        graph.edata['weight'] = coo_m.values()
+            graph.add_edges(torch.cat([row, col]), torch.cat([col, row]), {'weight': val_weights})
+        graph = graph.to_simple(copy_edata=True, aggregator='sum')
 
     if not args.use_edge_weight and 'weight' in graph.edata:
         del graph.edata['weight']
@@ -344,39 +405,51 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     path = dataset.root + '_seal{}'.format(data_appendix)
 
-    if not (args.dynamic_train or args.dynamic_val or args.dynamic_test):
-        args.num_workers = 0
+    sampler = SealSampler(1, args.ratio_per_hop, directed, output_device=device)
+    loaders = []
+    label_lists = []
+    # force to be dynamic for consistent dataloading
+    for split, shuffle, percent in zip(
+        ['train', 'valid', 'test'],
+        [True, False, False],
+        [args.train_percent, args.val_percent, args.test_percent],
+        # [args.dynamic_train, args.dynamic_val, args.dynamic_test]
+    ):
+        pos_edge, neg_edge = get_pos_neg_edges(split, split_edge, graph, percent)
+        links = torch.cat([pos_edge, neg_edge], 0) # [Np + Nn, 2]
+        eids = torch.cat([torch.arange(len(links)).unsqueeze(-1), links], dim=1)
+        labels = torch.tensor([1] * len(pos_edge) + [0] * len(neg_edge)).to(device)
+        label_lists.append(labels)
+        sampler = SealSampler(1, args.ratio_per_hop, directed, output_device=device)
+        data_loader = DataLoader(graph, eids, sampler, device=device, shuffle=shuffle,
+            batch_size=args.batch_size, num_workers=args.num_workers)
+        loaders.append(data_loader)
 
-    train_dataset, val_dataset, test_dataset = [
-        SEALOGBLDataset(path, graph, split_edge, percent=percent, split=split,
-            ratio_per_hop=args.ratio_per_hop, directed=directed, dynamic=dynamic)
-        for percent, split, dynamic in zip(
-            [args.train_percent, args.val_percent, args.test_percent],
-            ['train', 'valid', 'test'],
-            [args.dynamic_train, args.dynamic_val, args.dynamic_test]
-        )
-    ]
+    train_loader, val_loader, test_loader = loaders
+    train_labels, val_labels, test_labels = label_lists
 
-    max_z = 1000  # set a large max_z so that every z has embeddings to look up
-    train_loader = GraphDataLoader(train_dataset, batch_size=args.batch_size, 
-                            shuffle=True, collate_fn=ogbl_collate_fn,
-                            num_workers=args.num_workers)
-    val_loader = GraphDataLoader(val_dataset, batch_size=args.batch_size, 
-                            collate_fn=ogbl_collate_fn, num_workers=args.num_workers)
-    test_loader = GraphDataLoader(test_dataset, batch_size=args.batch_size, 
-                            collate_fn=ogbl_collate_fn, num_workers=args.num_workers)
+    # convert sortpool_k from percentile to number.
+    num_nodes = []
+    for eids, subgs in train_loader:
+        if len(num_nodes) > 1000:
+            break
+        for subg in subgs:
+            num_nodes.append(subg.num_nodes())
+    num_nodes = sorted(num_nodes)
+    k = num_nodes[int(math.ceil(args.sortpool_k * len(num_nodes))) - 1]
+    k = max(k, 10)
 
     for run in range(args.runs):
-        model = DGCNN(args.hidden_channels, args.num_layers, max_z, args.sortpool_k, 
-            train_dataset, args.dynamic_train, use_feature=args.use_feature).to(device)
+        model = DGCNN(args.hidden_channels, args.num_layers, k, 
+            feature_dim=graph.ndata['feat'].size(1) if args.use_feature else 0).to(device)
         parameters = list(model.parameters())
         optimizer = torch.optim.Adam(params=parameters, lr=args.lr)
         total_params = sum(p.numel() for param in parameters for p in param)
         print(f'Total number of parameters is {total_params}')
-        print(f'SortPooling k is set to {model.k}')
+        print(f'SortPooling k is set to {k}')
         with open(log_file, 'a') as f:
             print(f'Total number of parameters is {total_params}', file=f)
-            print(f'SortPooling k is set to {model.k}', file=f)
+            print(f'SortPooling k is set to {k}', file=f)
 
         start_epoch = 1
         # Training starts

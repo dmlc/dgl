@@ -10,11 +10,44 @@ Requirements
 
 Usages
 ------
-Run the scripts in `./scripts` folder, e.g.
+Run the following command for results on each benchmark
 ```bash
-bash scripts/run_ppa.sh
+# ogbl-ppa
+python main.py \
+    --dataset ogbl-ppa \
+    --use_feature \
+    --use_edge_weight \
+    --eval_steps 5 \
+    --epochs 20 \
+    --train_percent 5 
+
+# ogbl-collab
+python main.py \
+    --dataset ogbl-collab \
+    --train_percent 15 \
+    --hidden_channels 256 \
+    --use_valedges_as_input
+
+# ogbl-ddi
+python main.py \
+    --dataset ogbl-ddi \
+    --ratio_per_hop 0.2 \
+    --use_edge_weight \
+    --eval_steps 1 \
+    --epochs 10 \
+    --train_percent 5
+
+# ogbl-citation2
+python main.py \
+    --dataset ogbl-citation2 \
+    --use_feature \
+    --use_edge_weight \
+    --eval_steps 1 \
+    --epochs 10 \
+    --train_percent 2 \
+    --val_percent 1 \
+    --test_percent 1
 ```
-Use other scripts `run_collab.sh`, `run_ddi.sh`, `run_citation2.sh` in the same folder for experiments on other benchmarks. Note that you may set larger values for the argument `--num_workers` to accelerate data loading in dynamic mode if your machine has sufficient cpu capacity.
 
 Results
 -------
