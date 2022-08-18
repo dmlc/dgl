@@ -11,7 +11,7 @@ pip install torchmetrics
 How to run
 -------
 
-### Graph property predication
+### Graph property prediction
 
 
 Run with following (available dataset: "ogbg-molhiv", "ogbg-molpcba")
@@ -35,7 +35,7 @@ We test scalability of the code with dataset "ogbg-molhiv" in a machine of type 
 | 1 | x | 32 | 0.7765| 45.0s|
 | 2 | 3.7x |64 | 0.7761|12.1s|
 | 4 | 5.9x| 128 |  0.7854|7.6s|
-| 8 | 9.5x| 256 |  0.0.7751|4.7s|
+| 8 | 9.5x| 256 |  0.7751|4.7s|
 
 
 ### Node classification
