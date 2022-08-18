@@ -16,7 +16,7 @@
 #include "../../runtime/cuda/cuda_common.h"
 
 // require CUB 1.17 to use DeviceSegmentedSort
-static_assert(CUB_VERSION >= 101700);
+static_assert(CUB_VERSION >= 101700, "Require CUB >= 1.17 to use DeviceSegmentedSort");
 
 using namespace dgl::aten::cuda;
 

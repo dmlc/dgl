@@ -57,6 +57,17 @@ def test_pin_unpin_column():
         assert col._data_nd is None
     assert not g.ndata['x'].is_pinned()
 
+@pytest.mark.skipif(F._default_context_str == 'cpu', reason='Need gpu for this test.')
+def test_pin_empty():
+    t = torch.tensor([])
+    assert not t.is_pinned()
+
+    # Empty tensors will not be pinned or unpinned. It's a no-op.
+    # This is also the default behavior in PyTorch.
+    # We just check that it won't raise an error.
+    nd = dgl.utils.pin_memory_inplace(t)
+    assert not t.is_pinned()
+
 if __name__ == "__main__":
     test_pin_noncontiguous()
     test_pin_view()
