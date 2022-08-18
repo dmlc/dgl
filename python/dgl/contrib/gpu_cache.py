@@ -20,8 +20,6 @@
 
 from .. import backend as F
 from .._ffi.function import _init_api
-from ..storages import FeatureStorage
-from .unified_tensor import UnifiedTensor
 
 class GPUCache(object):
     """High-level wrapper for GPU embedding cache"""
@@ -47,67 +45,5 @@ class GPUCache(object):
     @property
     def hit_rate(self):
         return 1 - self.total_miss / self.total_queries
-
-class GPUCachedTensorStorage(FeatureStorage):
-    """FeatureStorage that slices features from a cached tensor and transfers it to a device."""
-    def __init__(self, tensor, cache_size):
-        flat_tensor = F.reshape(tensor, (tensor.shape[0], -1))
-        self.storage = UnifiedTensor(flat_tensor, 'cuda')
-        self.item_shape = tensor.shape[1:]
-        self.cache = GPUCache(cache_size, self.storage.shape[1])
-
-    def fetch(self, indices, device, pin_memory=False, **kwargs): # pylint: disable=unused-argument
-        keys = indices.to('cuda')
-        values, missing_index, missing_keys = self.cache.query(keys)
-        missing_values = self.storage[missing_keys]
-        values[missing_index] = missing_values
-        self.cache.replace(missing_keys, missing_values)
-        return F.copy_to(F.reshape(values, (values.shape[0],) + self.item_shape),
-                        device, **kwargs)
-
-class GPUCachedTensor: #GPUCachedTensor
-    def __init__(self, input, cache_size):
-        self.storage = GPUCachedTensorStorage(input, cache_size)
-
-    def __len__(self):
-        return len(self.storage.storage)
-
-    def __repr__(self):
-        return self.storage.storage.__repr__()
-
-    def __getitem__(self, key):
-        '''Perform zero-copy access from GPU if the context of
-        the key is cuda. Otherwise, just safely fallback to the
-        backend specific indexing scheme.
-
-        Parameters
-        ----------
-        key : Tensor
-            Tensor which contains the index ids
-        '''
-        return self.storage.fetch(key, F.context(key))
-
-    def __setitem__(self, key, val):
-        self.storage.storage[key] = val
-        self.storage.cache.replace(key, val)
-
-    @property
-    def shape(self):
-        """Shape of this tensor"""
-        return self.storage.storage.shape
-
-    @property
-    def dtype(self):
-        """Type of this tensor"""
-        return self.storage.storage.dtype
-
-    @property
-    def device(self):
-        """Device of this tensor"""
-        return self.storage.storage.device
-    
-    @property
-    def hit_rate(self):
-        return self.storage.cache.hit_rate
 
 _init_api("dgl.cuda", __name__)

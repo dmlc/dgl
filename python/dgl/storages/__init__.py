@@ -8,3 +8,4 @@ if F.get_preferred_backend() == "pytorch":
     from .pytorch_tensor import PyTorchTensorStorage as TensorStorage
 else:
     from .tensor import BaseTensorStorage as TensorStorage
+from .gpu_cache import GPUCachedTensorStorage
