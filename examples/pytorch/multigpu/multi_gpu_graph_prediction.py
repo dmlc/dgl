@@ -6,7 +6,7 @@ import torch.optim as optim
 import dgl
 import dgl.nn as dglnn
 from dgl.data import AsGraphPredDataset
-from dgl.dataloading import GraphDataLoader as DataLoader
+from dgl.dataloading import GraphDataLoader
 from ogb.graphproppred import DglGraphPropPredDataset, Evaluator
 from ogb.graphproppred.mol_encoder import AtomEncoder, BondEncoder
 from tqdm import tqdm
@@ -93,12 +93,12 @@ def train(rank, world_size, dataset_name, root):
     optimizer = optim.Adam(model.parameters(), lr=0.001)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
 
-    train_dataloader = DataLoader(
+    train_dataloader = GraphDataLoader(
             dataset[dataset.train_idx], batch_size=256,
             use_ddp=True, shuffle=True)
-    valid_dataloader = DataLoader(
+    valid_dataloader = GraphDataLoader(
             dataset[dataset.val_idx], batch_size=256)
-    test_dataloader = DataLoader(
+    test_dataloader = GraphDataLoader(
             dataset[dataset.test_idx], batch_size=256)
 
     for epoch in range(50):

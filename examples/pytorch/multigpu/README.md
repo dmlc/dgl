@@ -19,11 +19,24 @@ Run with following (available dataset: "ogbg-molhiv", "ogbg-molpcba")
 python3 multi_gpu_graph_prediction.py --dataset ogbg-molhiv
 ```
 
-Results:
+#### __Results__
 ```
 * ogbg-molhiv: ~0.7965
 * ogbg-molpcba: ~0.2239
 ```
+
+#### __Scalability__
+We test scalability of the code with dataset "ogbg-molhiv" in a machine of type <a href="https://aws.amazon.com/blogs/aws/now-available-ec2-instances-g4-with-nvidia-t4-tensor-core-gpus/">Amazon EC2 g4dn.metal</a>
+, which has **8 Nvidia T4 Tensor Core GPUs**.
+
+
+|GPU number |Speed Up |Batch size |Test accuracy |Average epoch Time|
+| --- | ----------- | ----------- | -----------|-----------|
+| 1 | x | 32 | 0.7765| 45.0s|
+| 2 | 3.7x |64 | 0.7761|12.1s|
+| 4 | 5.9x| 128 |  0.7854|7.6s|
+| 8 | 9.5x| 256 |  0.0.7751|4.7s|
+
 
 ### Node classification
 Run with following on dataset "ogbn-products"
@@ -32,7 +45,7 @@ Run with following on dataset "ogbn-products"
 python3 multi_gpu_node_classification.py
 ```
 
-Results:
+#### __Results__
 ```
 Test Accuracy: ~0.7632
 ```
