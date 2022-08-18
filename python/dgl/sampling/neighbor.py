@@ -381,6 +381,9 @@ def _sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
         if copy_edata:
             edge_frames = utils.extract_edge_subframes(g, induced_edges)
             utils.set_new_frames(ret, edge_frames=edge_frames)
+        else:
+            for i, etype in enumerate(ret.canonical_etypes):
+                ret.edges[etype].data[EID] = induced_edges[i]
     else:
         for i, etype in enumerate(ret.canonical_etypes):
             ret.edges[etype].data[EID] = induced_edges[i]

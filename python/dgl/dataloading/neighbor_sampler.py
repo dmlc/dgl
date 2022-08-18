@@ -103,14 +103,16 @@ class NeighborSampler(BlockSampler):
         self.prob = prob
         self.replace = replace
 
-    def sample_blocks(self, g, seed_nodes, exclude_eids=None):
+    def sample_blocks(self, g, seed_nodes, exclude_eids=None, copy_ndata=True,
+                      copy_edata=True):
         output_nodes = seed_nodes
         blocks = []
         for fanout in reversed(self.fanouts):
             frontier = g.sample_neighbors(
                 seed_nodes, fanout, edge_dir=self.edge_dir, prob=self.prob,
                 replace=self.replace, output_device=self.output_device,
-                exclude_edges=exclude_eids)
+                exclude_edges=exclude_eids, copy_ndata=copy_ndata,
+                copy_edata=copy_edata)
             eid = frontier.edata[EID]
             block = to_block(frontier, seed_nodes)
             block.edata[EID] = eid
