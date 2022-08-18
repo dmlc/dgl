@@ -3,6 +3,7 @@ import dgl
 import json
 import numpy as np
 import os
+import pytest
 import sys
 import torch
 
@@ -10,7 +11,8 @@ from dgl.data.utils import load_tensors, load_graphs
 
 from chunk_graph import chunk_graph
 
-def test_chunk_graph():
+@pytest.fixture
+def chunk_graph():
     # Step0: prepare chunked graph data format
 
     # A synthetic mini MAG240
@@ -148,18 +150,27 @@ def test_chunk_graph():
             feat_array = np.load(chunk_f_name)
             assert feat_array.shape[0] == num_edges[etype] // num_chunks
 
-def test_partition():
+    return [output_dir, num_chunks]
+
+@pytest.fixture
+def partition(chunk_graph):
+    in_dir, num_partitions = chunk_graph
+
     # Step1: graph partition
     output_dir = '2parts'
-    os.system('python tools/partition_algorithms/random_partition.py '\
-              '--metadata chunked-data/metadata.json --output_path {} --num_partitions 2'.format(output_dir))
+    os.system('python tools/partition_algo/random.py '\
+              '--metadata {}/metadata.json --output_path {} --num_partitions {}'.format(in_dir, output_dir, num_partitions))
     for ntype in ['author', 'institution', 'paper']:
         fname = os.path.join(output_dir, '{}.txt'.format(ntype))
         with open(fname, 'r') as f:
             header = f.readline().rstrip()
             assert isinstance(int(header), int)
 
-def test_dispatch():
+    return [in_dir, output_dir]
+
+def dispatch(partition):
+    in_dir, partition_dir = partition
+
     # Step2: data dispatch
     out_dir = 'partitioned'
     num_parts = 2
@@ -167,8 +178,8 @@ def test_dispatch():
         f.write('127.0.0.1\n')
         f.write('127.0.0.2\n')
 
-    os.system('python tools/dispatch_data.py --in-dir chunked-data '\
-              '--partitions-dir 2parts --out-dir {} --ip-config ip_config.txt'.format(out_dir))
+    os.system('python tools/dispatch_data.py --in-dir {} '.format(in_dir)\
+              '--partitions-dir {} --out-dir {} --ip-config ip_config.txt'.format(partition_dir, out_dir))
 
     # check metadata.json
     meta_fname = os.path.join(out_dir, 'metadata.json')
@@ -188,7 +199,6 @@ def test_dispatch():
     assert meta_data['num_edges'] == 4200
     assert meta_data['num_nodes'] == 720
     assert meta_data['num_parts'] == num_parts
-    assert meta_data['part_method'] == 'metis'
 
     for i in range(num_parts):
         sub_dir = 'part-' + str(i)
@@ -219,8 +229,3 @@ def test_dispatch():
         fname = os.path.join(sub_dir, 'edge_feat.dgl')
         assert os.path.isfile(fname)
         tensor_dict = load_tensors(fname)
-
-if __name__ == '__main__':
-    test_chunk_graph()
-    test_partition()
-    test_dispatch()
