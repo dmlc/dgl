@@ -17,6 +17,19 @@ from negative_sampler import NegativeSampler
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from load_graph import load_reddit, load_ogb
+from dgl.storages import GPUCachedTensorStorage
+
+class CachedDGLGraph(dgl.DGLGraph):
+    def __init__(self, g, node_feats, edge_feats={}):
+        super().__init__(g._graph, g._ntypes, g._etypes, g._node_frames, g._edge_frames)
+        self.node_feats = {(ntype, feat): GPUCachedTensorStorage(g.ndata[ntype][feat] if len(self.ntypes) > 1 else g.ndata[feat], size) for ntype, d in node_feats.items() for feat, size in d.items()}
+        self.edge_feats = {(etype, feat): GPUCachedTensorStorage(g.edata[etype][feat] if len(self.ntypes) > 1 else g.edata[feat], size) for etype, d in edge_feats.items() for feat, size in d.items()}
+    
+    def get_node_storage(self, key, ntype):
+        return self.node_feats.get((ntype, key), super().get_node_storage(key, ntype))
+    
+    def get_edge_storage(self, key, etype):
+        return self.edge_feats.get((etype, key), super().get_edge_storage(key, etype))
 
 class CrossEntropyLoss(nn.Module):
     def forward(self, block_outputs, pos_graph, neg_graph):
@@ -69,14 +82,9 @@ def run(proc_id, n_gpus, args, devices, data):
                                           world_size=world_size,
                                           rank=proc_id)
     train_nid, val_nid, test_nid, n_classes, g, nfeat, labels = data
+    g.ndata['features'] = nfeat
+    g = CachedDGLGraph(g, {g._ntypes[0]: {'features': 1000000}})
 
-    if args.data_device == 'gpu':
-        nfeat = nfeat.to(device)
-    elif args.data_device == 'uva':
-        if args.cache_size <= 0:
-            nfeat = dgl.contrib.UnifiedTensor(nfeat, device=device)
-        else:
-            nfeat = dgl.contrib.GPUCachedTensor(nfeat, args.cache_size)
     in_feats = nfeat.shape[1]
 
     # Create PyTorch DataLoader for constructing blocks
@@ -94,7 +102,7 @@ def run(proc_id, n_gpus, args, devices, data):
 
     # Create sampler
     sampler = dgl.dataloading.NeighborSampler(
-        [int(fanout) for fanout in args.fan_out.split(',')])
+        [int(fanout) for fanout in args.fan_out.split(',')], prefetch_node_feats=['features'])
     sampler = dgl.dataloading.as_edge_prediction_sampler(
         sampler, exclude='reverse_id',
         # For each edge with ID e in Reddit dataset, the reverse edge is e ± |E|/2.
@@ -136,9 +144,8 @@ def run(proc_id, n_gpus, args, devices, data):
         # blocks.
         tic_step = time.time()
         for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(dataloader):
-            input_nodes = input_nodes.to(nfeat.device)
-            batch_inputs = nfeat[input_nodes].to(device)
-            cache_hit_rate = nfeat.hit_rate if hasattr(nfeat, 'hit_rate') else 0
+            input_nodes = input_nodes.to(device)
+            batch_inputs = blocks[0].srcdata['features']
             blocks = [block.int() for block in blocks]
             d_step = time.time()
 
@@ -158,8 +165,8 @@ def run(proc_id, n_gpus, args, devices, data):
             iter_t.append(t - d_step)
             if step % args.log_every == 0 and proc_id == 0:
                 gpu_mem_alloc = th.cuda.max_memory_allocated() / 1000000 if th.cuda.is_available() else 0
-                print('[{}]Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f}|{:.4f} | Load {:.4f}| train {:.4f} | GPU {:.1f} MB | Hit Rate {:.4f}'.format(
-                    proc_id, epoch, step, loss.item(), np.mean(iter_pos[3:]), np.mean(iter_neg[3:]), np.mean(iter_d[3:]), np.mean(iter_t[3:]), gpu_mem_alloc, cache_hit_rate))
+                print('[{}]Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f}|{:.4f} | Load {:.4f}| train {:.4f} | GPU {:.1f} MB'.format(
+                    proc_id, epoch, step, loss.item(), np.mean(iter_pos[3:]), np.mean(iter_neg[3:]), np.mean(iter_d[3:]), np.mean(iter_t[3:]), gpu_mem_alloc))
             tic_step = time.time()
 
         toc = time.time()
