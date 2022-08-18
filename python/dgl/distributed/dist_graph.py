@@ -1195,7 +1195,10 @@ class DistGraph:
         if isinstance(edges, dict):
             # TODO(zhengda) we need to directly generate subgraph of all relations with
             # one invocation.
-            subg = {etype: self.find_edges(edges[etype], etype) for etype in edges}
+            subg = {}
+            for etype, edge in edges.items():
+                etype = self.to_canonical_etype(etype)
+                subg[etype] = self.find_edges(edge, etype)
             num_nodes = {ntype: self.number_of_nodes(ntype) for ntype in self.ntypes}
             subg = dgl_heterograph(subg, num_nodes_dict=num_nodes)
             for etype in edges:
