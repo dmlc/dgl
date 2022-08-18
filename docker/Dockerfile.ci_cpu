@@ -30,3 +30,8 @@ COPY install/conda_env/mxnet_cpu.yml /install/conda_env/mxnet_cpu.yml
 RUN ["/bin/bash", "-i", "-c", "conda env create -f /install/conda_env/mxnet_cpu.yml"]
 
 ENV CONDA_ALWAYS_YES=
+
+# SSH
+RUN ["/bin/bash", "-i", "-c", "ssh-keygen -f ~/.ssh/id_rsa -N ''"]
+RUN ["/bin/bash", "-i", "-c", "cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys"]
+ENTRYPOINT service ssh restart && bash
