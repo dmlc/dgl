@@ -464,7 +464,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:v220816"
+                  image "dgllib/dgl-ci-cpu:ssh_v220818"
                   args "--shm-size=4gb"
                   alwaysPull true
                 }
