@@ -283,27 +283,29 @@ def track_time(data):
     model.train()
     embed_layer.train()
 
-    for step, sample_data in enumerate(loader):
-        input_nodes, output_nodes, blocks = sample_data
-        feats = embed_layer(input_nodes,
-                            blocks[0].srcdata['ntype'],
-                            blocks[0].srcdata['type_id'],
-                            node_feats)
-        logits = model(blocks, feats)
-        seed_idx = blocks[-1].dstdata['type_id']
-        loss = F.cross_entropy(logits, labels[seed_idx])
-        optimizer.zero_grad()
-        emb_optimizer.zero_grad()
+    # Enable dataloader cpu affinitization for cpu devices (no effect on gpu)
+    with loader.enable_cpu_affinity():
+        for step, sample_data in enumerate(loader):
+            input_nodes, output_nodes, blocks = sample_data
+            feats = embed_layer(input_nodes,
+                                blocks[0].srcdata['ntype'],
+                                blocks[0].srcdata['type_id'],
+                                node_feats)
+            logits = model(blocks, feats)
+            seed_idx = blocks[-1].dstdata['type_id']
+            loss = F.cross_entropy(logits, labels[seed_idx])
+            optimizer.zero_grad()
+            emb_optimizer.zero_grad()
 
-        loss.backward()
-        optimizer.step()
-        emb_optimizer.step()
-        
-        # start timer at before iter_start
-        if step == iter_start - 1:
-            t0 = time.time()
-        elif step == iter_count + iter_start - 1:  # time iter_count iterations
-            break
+            loss.backward()
+            optimizer.step()
+            emb_optimizer.step()
+            
+            # start timer at before iter_start
+            if step == iter_start - 1:
+                t0 = time.time()
+            elif step == iter_count + iter_start - 1:  # time iter_count iterations
+                break
 
     t1 = time.time()
 
