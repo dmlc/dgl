@@ -23,7 +23,7 @@ from .._ffi.function import _init_api
 from ..storages import FeatureStorage
 from .unified_tensor import UnifiedTensor
 
-class GpuCache(object):
+class GPUCache(object):
     """High-level wrapper for GPU embedding cache"""
     def __init__(self, num_items, num_feats, idtype=F.int64):
         assert idtype == F.int32 or idtype == F.int64
@@ -48,13 +48,13 @@ class GpuCache(object):
     def hit_rate(self):
         return 1 - self.total_miss / self.total_queries
 
-class GpuCachedTensorStorage(FeatureStorage):
+class GPUCachedTensorStorage(FeatureStorage):
     """FeatureStorage that slices features from a cached tensor and transfers it to a device."""
     def __init__(self, tensor, cache_size):
         flat_tensor = F.reshape(tensor, (tensor.shape[0], -1))
         self.storage = UnifiedTensor(flat_tensor, 'cuda')
         self.item_shape = tensor.shape[1:]
-        self.cache = GpuCache(cache_size, self.storage.shape[1])
+        self.cache = GPUCache(cache_size, self.storage.shape[1])
 
     def fetch(self, indices, device, pin_memory=False, **kwargs): # pylint: disable=unused-argument
         keys = indices.to('cuda')
@@ -65,9 +65,9 @@ class GpuCachedTensorStorage(FeatureStorage):
         return F.copy_to(F.reshape(values, (values.shape[0],) + self.item_shape),
                         device, **kwargs)
 
-class CachedTensor: #CachedTensor
+class GPUCachedTensor: #GPUCachedTensor
     def __init__(self, input, cache_size):
-        self.storage = GpuCachedTensorStorage(input, cache_size)
+        self.storage = GPUCachedTensorStorage(input, cache_size)
 
     def __len__(self):
         return len(self.storage.storage)
