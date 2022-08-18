@@ -20,10 +20,11 @@ from gloo_wrapper import allgather_sizes, gather_metadata_json,\
                     alltoallv_cpu
 from globalids import assign_shuffle_global_nids_nodes, \
                     assign_shuffle_global_nids_edges, \
-                    get_shuffle_global_nids_edges
+                    lookup_shuffle_global_nids_edges
 from convert_partition import create_dgl_object, create_metadata_json
+from dist_lookup import DistLookupService
 
-def gen_node_data(rank, world_size, node_part_ids, ntid_ntype_map, schema_map):
+def gen_node_data(rank, world_size, id_lookup, ntid_ntype_map, schema_map):
     '''
     For this data processing pipeline, reading node files is not needed. All the needed information about
     the nodes can be found in the metadata json file. This function generates the nodes owned by a given
@@ -35,10 +36,10 @@ def gen_node_data(rank, world_size, node_part_ids, ntid_ntype_map, schema_map):
         rank of the process
     world_size : int
         total no. of processes
-    node_part_ids :
-        numpy array, whose length is same as no. of nodes in the graph. Index in this array is the global_nid
-        and value is the partition-id which owns the node
-    ntid_ntype_map :
+    id_lookup : instance of class DistLookupService
+       Distributed lookup service used to map global-nids to respective partition-ids and 
+       shuffle-global-nids
+    ntid_ntype_map : 
         a dictionary where keys are node_type ids(integers) and values are node_type names(strings).
     schema_map:
         dictionary formed by reading the input metadata json file for the input dataset.
@@ -100,7 +101,7 @@ def gen_node_data(rank, world_size, node_part_ids, ntid_ntype_map, schema_map):
         type_start, type_end = type_nid_dict[ntype_name][0][0], type_nid_dict[ntype_name][-1][1]
         gnid_start, gnid_end = global_nid_dict[ntype_name][0, 0], global_nid_dict[ntype_name][0, 1]
 
-        node_partid_slice = node_part_ids[gnid_start:gnid_end]
+        node_partid_slice = id_lookup.get_partition_ids(np.arange(gnid_start, gnid_end, dtype=np.int64)) #exclusive
         cond = node_partid_slice == rank
         own_gnids = np.arange(gnid_start, gnid_end, dtype=np.int64)
         own_gnids = own_gnids[cond]
@@ -171,7 +172,7 @@ def exchange_edge_data(rank, world_size, edge_data):
     edge_data.pop(constants.OWNER_PROCESS)
     return edge_data
 
-def exchange_node_features(rank, world_size, node_feature_tids, ntype_gnid_map, node_part_ids, node_features):
+def exchange_node_features(rank, world_size, node_feature_tids, ntype_gnid_map, id_lookup, node_features):
     """
     This function is used to shuffle node features so that each process will receive
     all the node features whose corresponding nodes are owned by the same process.
@@ -203,8 +204,9 @@ def exchange_node_features(rank, world_size, node_feature_tids, ntype_gnid_map, 
         can be used to index into the node feature tensors read from corresponding input files.
     ntypes_gnid_map : dictionary
         mapping between node type names and global_nids which belong to the keys in this dictionary
-    node_part_ids : numpy array
-        numpy array which store the partition-ids and indexed by global_nids
+    id_lookup : instance of class DistLookupService
+       Distributed lookup service used to map global-nids to respective partition-ids and 
+       shuffle-global-nids
     node_feautres: dicitonary
         dictionry where node_features are stored and this information is read from the appropriate
         node features file which belongs to the current process
@@ -259,7 +261,7 @@ def exchange_node_features(rank, world_size, node_feature_tids, ntype_gnid_map, 
 
             node_feats = node_features[feat_key]
             for part_id in range(world_size):
-                partid_slice = node_part_ids[gnid_start:gnid_end]
+                partid_slice = id_lookup.get_partition_ids(np.arange(gnid_start, gnid_end, dtype=np.int64))
                 cond = (partid_slice == part_id)
                 gnids_per_partid = gnids_feat[cond]
                 tnids_per_partid = tnids_feat[cond]
@@ -286,7 +288,7 @@ def exchange_node_features(rank, world_size, node_feature_tids, ntype_gnid_map, 
     return own_node_features, own_global_nids
 
 def exchange_graph_data(rank, world_size, node_features, node_feat_tids, edge_data,
-        node_part_ids, ntypes_ntypeid_map, ntypes_gnid_range_map, ntid_ntype_map, schema_map):
+        id_lookup, ntypes_ntypeid_map, ntypes_gnid_range_map, ntid_ntype_map, schema_map):
     """
     Wrapper function which is used to shuffle graph data on all the processes.
 
@@ -307,8 +309,9 @@ def exchange_graph_data(rank, world_size, node_features, node_feat_tids, edge_da
     edge_data : dictionary
         dictionary which is used to store edge information as read from the edges.txt file assigned
         to each process.
-    node_part_ids : numpy array
-        numpy array which store the partition-ids and indexed by global_nids
+    id_lookup : instance of class DistLookupService
+       Distributed lookup service used to map global-nids to respective partition-ids and 
+       shuffle-global-nids
     ntypes_ntypeid_map : dictionary
         mappings between node type names and node type ids
     ntypes_gnid_range_map : dictionary
@@ -334,14 +337,14 @@ def exchange_graph_data(rank, world_size, node_features, node_feat_tids, edge_da
         in the world. The edge data is received by each rank in the process of data shuffling.
     """
     rcvd_node_features, rcvd_global_nids = exchange_node_features(rank, world_size, node_feat_tids, \
-                                                ntypes_gnid_range_map, node_part_ids, node_features)
+                                                ntypes_gnid_range_map, id_lookup, node_features)
     logging.info(f'[Rank: {rank}] Done with node features exchange.')
 
-    node_data = gen_node_data(rank, world_size, node_part_ids, ntid_ntype_map, schema_map)
+    node_data = gen_node_data(rank, world_size, id_lookup, ntid_ntype_map, schema_map)
     edge_data = exchange_edge_data(rank, world_size, edge_data)
     return node_data, rcvd_node_features, rcvd_global_nids, edge_data
 
-def read_dataset(rank, world_size, node_part_ids, params, schema_map):
+def read_dataset(rank, world_size, id_lookup, params, schema_map):
     """
     This function gets the dataset and performs post-processing on the data which is read from files.
     Additional information(columns) are added to nodes metadata like owner_process, global_nid which
@@ -355,8 +358,9 @@ def read_dataset(rank, world_size, node_part_ids, params, schema_map):
         rank of the current process
     world_size : int
         total no. of processes instantiated
-    node_part_ids : numpy array
-        metis partitions which are the output of partitioning algorithm
+    id_lookup : instance of class DistLookupService
+       Distributed lookup service used to map global-nids to respective partition-ids and 
+       shuffle-global-nids
     params : argparser object
         argument parser object to access command line arguments
     schema_map : dictionary
@@ -387,7 +391,7 @@ def read_dataset(rank, world_size, node_part_ids, params, schema_map):
         get_dataset(params.input_dir, params.graph_name, rank, world_size, schema_map)
     logging.info(f'[Rank: {rank}] Done reading dataset deom {params.input_dir}')
 
-    augment_edge_data(edge_data, node_part_ids, edge_tids, rank, world_size)
+    edge_data = augment_edge_data(edge_data, id_lookup, edge_tids, rank, world_size)
     logging.info(f'[Rank: {rank}] Done augmenting edge_data: {len(edge_data)}, {edge_data[constants.GLOBAL_SRC_ID].shape}')
 
     return node_tids, node_features, node_feat_tids, edge_data, edge_features
@@ -522,17 +526,22 @@ def gen_dist_partitions(rank, world_size, params):
     #init processing
     schema_map = read_json(os.path.join(params.input_dir, params.schema))
 
-    #TODO: For large graphs, this mapping function can be memory intensive. This needs to be changed to
-    #processes owning a set of global-nids, per partitioning algorithm, and messaging will be used to
-    #identify the ownership instead of mem. lookups.
-    node_part_ids = read_ntype_partition_files(schema_map, params.partitions_dir)
+    #Initialize distributed lookup service for partition-id and shuffle-global-nids mappings
+    #for global-nids
+    _, global_nid_ranges = get_idranges(schema_map[constants.STR_NODE_TYPE], 
+                                        schema_map[constants.STR_NUM_NODES_PER_CHUNK])
+    id_map = dgl.distributed.id_map.IdMap(global_nid_ranges)
+    id_lookup = DistLookupService(os.path.join(params.input_dir, params.partitions_dir),\
+                                    schema_map[constants.STR_NODE_TYPE],\
+                                    id_map, rank, world_size)
 
     ntypes_ntypeid_map, ntypes, ntypeid_ntypes_map = get_node_types(schema_map)
     logging.info(f'[Rank: {rank}] Initialized metis partitions and node_types map...')
 
     #read input graph files and augment these datastructures with
     #appropriate information (global_nid and owner process) for node and edge data
-    node_tids, node_features, node_feat_tids, edge_data, edge_features = read_dataset(rank, world_size, node_part_ids, params, schema_map)
+    node_tids, node_features, node_feat_tids, edge_data, edge_features = \
+        read_dataset(rank, world_size, id_lookup, params, schema_map)
     logging.info(f'[Rank: {rank}] Done augmenting file input data with auxilary columns')
 
     #send out node and edge data --- and appropriate features.
@@ -541,7 +550,7 @@ def gen_dist_partitions(rank, world_size, params):
     ntypes_gnid_range_map = get_gnid_range_map(node_tids)
     node_data, rcvd_node_features, rcvd_global_nids, edge_data  = \
                     exchange_graph_data(rank, world_size, node_features, node_feat_tids, \
-                                        edge_data, node_part_ids, ntypes_ntypeid_map, ntypes_gnid_range_map, \
+                                        edge_data, id_lookup, ntypes_ntypeid_map, ntypes_gnid_range_map, \
                                         ntypeid_ntypes_map, schema_map)
     logging.info(f'[Rank: {rank}] Done with data shuffling...')
 
@@ -578,7 +587,7 @@ def gen_dist_partitions(rank, world_size, params):
     logging.info(f'[Rank: {rank}] Done assigning global_ids to edges ...')
 
     #determine global-ids for edge end-points
-    get_shuffle_global_nids_edges(rank, world_size, edge_data, node_part_ids, node_data)
+    edge_data = lookup_shuffle_global_nids_edges(rank, world_size, edge_data, id_lookup, node_data)
     logging.info(f'[Rank: {rank}] Done resolving orig_node_id for local node_ids...')
 
     #create dgl objects here
