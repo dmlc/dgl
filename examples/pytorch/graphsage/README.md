@@ -59,3 +59,9 @@ Train w/ mini-batch sampling for link prediction on OGB-Citation2:
 ```bash
 python3 link_pred.py
 ```
+
+Results:
+```
+Test Accuracy: 0.8600
+```
+
