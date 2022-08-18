@@ -17,8 +17,8 @@
 from collections.abc import Sequence
 import torch
 import torch.multiprocessing as mp
-from .dataloader import create_tensorized_dataset
-from ..base import NID, EID, DGLError
+from ...dataloading import create_tensorized_dataset
+from ...base import NID, EID, DGLError
 
 
 class _LoaderInstance:

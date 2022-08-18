@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+# Based on link_pred.py
 
 import argparse
 import torch
@@ -20,6 +21,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchmetrics.functional as MF
 import dgl
+from dgl.contrib import DataLoader2, SampledGraphSource, GraphFeatureSource
 import dgl.nn as dglnn
 import time
 import numpy as np
@@ -160,12 +162,11 @@ if not args.pure_gpu:
     graph.create_formats_()
     graph.pin_memory_()
 
-graph_source = dgl.dataloading.SampledGraphSource(graph, sampler)
-feature_source = dgl.dataloading.GraphFeatureSource(graph, input_feats=['feat'])
-dataloader = dgl.dataloading.DataLoader2(
-        graph_source, feature_source, seed_edges,
-        output_device=device, batch_size=512, shuffle=True,
-        drop_last=False, num_workers=0)
+graph_source = SampledGraphSource(graph, sampler)
+feature_source = GraphFeatureSource(graph, input_feats=['feat'])
+dataloader = DataLoader2(graph_source, feature_source, seed_edges,
+                         output_device=device, batch_size=512, shuffle=True,
+                         drop_last=False, num_workers=0)
 
 durations = []
 for epoch in range(10):

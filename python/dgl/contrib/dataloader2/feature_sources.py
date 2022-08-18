@@ -16,9 +16,9 @@
 
 import torch
 from collections.abc import Mapping
-from .. import backend as F
-from ..base import DGLError
-from ..utils import gather_pinned_tensor_rows
+from ... import backend as F
+from ...base import DGLError
+from ...utils import gather_pinned_tensor_rows
 
 def feat_as_mapping(feat, types):
     if feat is None:

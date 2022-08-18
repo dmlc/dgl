@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+# based on node_classification.py
 
 import torch
 import torch.nn as nn
@@ -22,7 +23,7 @@ import dgl
 import time
 import dgl.nn as dglnn
 from dgl.data import AsNodePredDataset
-from dgl.dataloading import DataLoader2, SampledGraphSource, TensorFeatureSource
+from dgl.contrib import DataLoader2, SampledGraphSource, TensorFeatureSource
 from dgl.dataloading import NeighborSampler, MultiLayerFullNeighborSampler
 from ogb.nodeproppred import DglNodePropPredDataset
 import tqdm

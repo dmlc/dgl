@@ -16,8 +16,8 @@
 
 import torch
 from collections.abc import Sequence
-from ..base import NID, EID, DGLError
-from . import GraphCollator
+from ...base import NID, EID, DGLError
+from ...dataloading import GraphCollator
 
 class GraphSource:
     def fetch_graph(self, ids, output_device):

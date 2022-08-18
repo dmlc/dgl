@@ -23,7 +23,7 @@ import torch.nn.functional as F
 from torch.utils.data.sampler import SubsetRandomSampler
 from sklearn.model_selection import StratifiedKFold
 from dgl.data import GINDataset
-from dgl.dataloading import DataLoader2, DatasetGraphSource
+from dgl.contrib import DataLoader2, DatasetGraphSource
 from dgl.nn.pytorch.conv import GINConv
 from dgl.nn.pytorch.glob import SumPooling
 import argparse
