@@ -14,11 +14,14 @@
 # limitations under the License.
 #
 
+import sys
 import torch
+import numpy
 from collections.abc import Mapping
 from ... import backend as F
 from ...base import DGLError
 from ...utils import gather_pinned_tensor_rows
+
 
 def feat_as_mapping(feat, types):
     if feat is None:
@@ -29,6 +32,7 @@ def feat_as_mapping(feat, types):
     if len(types) != 1:
         raise ValueError("feat must be mapping for heterogenous graphs.")
     return {types[0]: feat}
+
 
 class FeatureSource:
     def get_featured_entities(self):
@@ -248,5 +252,111 @@ class GraphFeatureSource:
         )
         self.get_featured_entities = self._source.get_featured_entities
         self.fetch_features = self._source.fetch_features
+
+
+class RedisFeatureSource:
+    def __init__(self, client, node_feats=None, edge_feats=None, input_feats=None,
+            output_feats=None):
+        self._db = client
+        self._node_feats = feat_as_mapping(node_feats, ['_N'])
+        self._edge_feats = feat_as_mapping(edge_feats, [('_N', '_E', '_N')])
+        self._input_feats = feat_as_mapping(input_feats, ['_N'])
+        self._output_feats = feat_as_mapping(output_feats, ['_N'])
+        self._table_types = {}
+
+
+    def get_featured_entities(self):
+        feats = {}
+        if len(self._node_feats) > 0:
+            feats["nodes"] = list(self._node_feats.keys())
+        if len(self._input_feats) > 0:
+            feats["nodes:input"] = list(self._input_feats.keys())
+        if len(self._output_feats) > 0:
+            feats["nodes:output"] = list(self._output_feats.keys())
+        if len(self._edge_feats) > 0:
+            feats["edges"] = list(self._edge_feats.keys())
+        return feats
+
+    def set_table(self, item, item_type, feat_name, tensor):
+        # to have any kind of performance, we would need to go from dlpack to
+        # redis in C++ rather than python.
+        table_name = self._get_table_name(item, item_type, feat_name)
+
+        np_tensor = tensor.numpy()
+
+        self._table_types[table_name] = np_tensor.dtype
+
+        # insert smaller batches at a time
+        chunk_size = 4096
+        for chunk in range(0, len(tensor), chunk_size):
+            chunk_end = min(chunk+chunk_size, len(tensor))
+            batch = {
+                idx.numpy().tobytes(): np_tensor[idx].tobytes() \
+                for idx in torch.arange(chunk, chunk_end) \
+            }
+            self._db.hmset(table_name, batch)
+
+    def _get_table_name(self, item, item_type, feat_name):
+        if item == 'edges':
+            item_type = item_type[0] + "_" + item_type[1] + "_" + item_type[2]
+        table_name = item + ":" + item_type + ":" + feat_name
+        return table_name
+
+    def _get_tensor(self, table_name, ids):
+        # to have any kind of performance, we would need to go from redis to
+        # dlpack in C++ rather than python.
+        table_keys = [idx.numpy().tobytes() for idx in ids.cpu()]
+        table_values = self._db.hmget(table_name, table_keys)
+        tensor = torch.stack([ \
+            torch.from_numpy(numpy.frombuffer(row, \
+                dtype=self._table_types[table_name])) \
+            for row in table_values])
+        if tensor.shape[1] == 1:
+            tensor = tensor.squeeze(-1)
+        return tensor
+
+
+    def fetch_features(self, req, output_device):
+        # convert from a string if need be
+        output_device = torch.device(output_device)
+
+        resp = {}
+        for comp, tree in req.items():
+            if comp == 'nodes' or comp == 'nodes:input' or comp == 'nodes:output':
+                resp[comp] = {}
+                for ntype, ids in tree.items():
+                    resp[comp][ntype] = {}
+                    if comp == 'nodes':
+                        feats = self._node_feats
+                    elif comp == 'nodes:input':
+                        feats = self._input_feats
+                    else:
+                        assert comp == 'nodes:output'
+                        feats = self._output_feats
+                    if ntype not in feats:
+                        # this ntype has no features
+                        continue
+                    feat_names = feats[ntype]
+                    for feat_name in feat_names:
+                        table_name = self._get_table_name("nodes", ntype, feat_name)
+                        tensor = self._get_tensor(table_name, ids)
+                        resp[comp][ntype][feat_name] = tensor.to(output_device)
+            elif comp == 'edges':
+                resp[comp] = {}
+                for etype, ids in tree.items():
+                    resp[comp][etype] = {}
+                    if etype in self._edge_feats:
+                        feat_names = self._edge_feats[etype].keys()
+                    else:
+                        # this etype has no features
+                        continue
+                    for feat_name in feat_names:
+                        table_name = self._get_table_name("edges", etype, feat_name)
+                        tensor = self._get_tensor(table_name, ids)
+                        resp[comp][etype][feat_name] = tensor.to(output_device)
+            else:
+                raise DGLError("Unknown component '{}'".format(comp))
+
+        return resp
 
 
