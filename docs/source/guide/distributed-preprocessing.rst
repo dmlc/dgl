@@ -291,11 +291,11 @@ Step.1 Graph Partitioning
 This step reads the chunked graph data and calculates which partition each node
 should belong to. The results are saved in a set of *partition assignment files*.
 For example, to randomly partition MAG240M-LSC to two parts, run the
-``partition_algo/random.py`` script in the ``tools`` folder:
+``partition_algo/random_partition.py`` script in the ``tools`` folder:
 
 .. code-block:: bash
 
-    python /my/repo/dgl/tools/partition_algo/random.py
+    python /my/repo/dgl/tools/partition_algo/random_partition.py
         --metadata /mydata/MAG240M-LSC_chunked/metadata.json
         --output_path /mydata/MAG240M-LSC_2parts/
         --num_partitions 2
