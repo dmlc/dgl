@@ -148,6 +148,7 @@ class HeteroGraphConv(nn.Module):
             # etype is canonical
             _, etype, _ = etype
             return self.mod_dict[etype]
+        raise KeyError('Cannot find module with edge type %s' % etype)
 
     def forward(self, g, inputs, mod_args=None, mod_kwargs=None):
         """Forward computation
