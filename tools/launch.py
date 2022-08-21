@@ -111,12 +111,12 @@ def execute_remote(
     def run(ssh_cmd, state_q):
         try:
             subprocess.check_call(ssh_cmd, shell=True)
+            state_q.put(0)
         except subprocess.CalledProcessError as err:
             print(f"Called process error {err}")
             state_q.put(err.returncode)
         except Exception:
             state_q.put(-1)
-        state_q.put(0)
 
     thread = Thread(target=run, args=(ssh_cmd, state_q,))
     thread.setDaemon(True)
