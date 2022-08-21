@@ -376,6 +376,13 @@ class HeteroEmbedding(nn.Module):
         """
         return {self.raw_keys[typ]: emb.weight for typ, emb in self.embeds.items()}
 
+    def reset_parameters(self):
+        """
+        Use the xavier method in nn.init module to make the parameters uniformly distributed
+        """
+        for typ in self.embeds.keys():
+            nn.init.xavier_uniform_(self.embeds[typ].weight)
+
     def forward(self, input_ids):
         """Forward function
 
