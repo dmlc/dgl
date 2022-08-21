@@ -623,15 +623,19 @@ def submit_jobs(args, udf_command, dry_run=False):
         sys.exit(0)
     signal.signal(signal.SIGINT, signal_handler)
 
-    errs = 0
+    err = 0
     for thread in thread_list:
         thread.join()
         err_code = state_q.get()
-        errs += err_code
+        if err_code != 0:
+            # Record err_code
+            # We record one of the error if there are multiple
+            err = err_code
+
     # The training processes complete. We should tell the cleanup process to exit.
     conn2.send('exit')
     process.join()
-    if errs != 0:
+    if err != 0:
         print("Task failed")
         sys.exit(-1)
 
