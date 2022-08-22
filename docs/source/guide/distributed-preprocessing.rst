@@ -296,8 +296,8 @@ For example, to randomly partition MAG240M-LSC to two parts, run the
 .. code-block:: bash
 
     python /my/repo/dgl/tools/partition_algo/random_partition.py
-        --metadata /mydata/MAG240M-LSC_chunked/metadata.json
-        --output_path /mydata/MAG240M-LSC_2parts/
+        --in_dir /mydata/MAG240M-LSC_chunked
+        --out_dir /mydata/MAG240M-LSC_2parts
         --num_partitions 2
 
 , which outputs files as follows:
