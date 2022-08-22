@@ -250,7 +250,7 @@ class CUDADeviceAPI final : public DeviceAPI {
     SetDevice(ctx);
     TensorDispatcher* td = TensorDispatcher::Global();
     if (td->IsAvailable())
-      return td->AllocWorkspace(size);
+      return td->AllocWorkspace(size, CUDAThreadEntry::ThreadLocal()->stream);
     else
       return CUDAThreadEntry::ThreadLocal()->pool.AllocWorkspace(ctx, size);
   }

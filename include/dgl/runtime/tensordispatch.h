@@ -38,6 +38,9 @@
 #include <windows.h>
 #endif  // WIN32
 #include <vector>
+#ifdef DGL_USE_CUDA
+#include <cuda_runtime.h>
+#endif  // DGL_USE_CUDA
 #include "ndarray.h"
 
 /*! \brief Casts a pointer \c entry to a function pointer with signature of \c func */
@@ -95,9 +98,9 @@ class TensorDispatcher {
   * \param nbytes The size to be allocated.
   * \return Pointer to the allocated memory.
   */
-  inline void* AllocWorkspace(size_t nbytes) {
+  inline void* AllocWorkspace(size_t nbytes, cudaStream_t stream) {
     auto entry = entrypoints_[Op::kRawAlloc];
-    return FUNCCAST(tensoradapter::RawAlloc, entry)(nbytes);
+    return FUNCCAST(tensoradapter::RawAlloc, entry)(nbytes, stream);
   }
 
   /*!

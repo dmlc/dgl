@@ -12,6 +12,9 @@
 
 #include <dlpack/dlpack.h>
 #include <vector>
+#ifdef DGL_USE_CUDA
+#include <cuda_runtime.h>
+#endif  // DGL_USE_CUDA
 
 namespace tensoradapter {
 
@@ -34,9 +37,10 @@ DLManagedTensor* TAempty(
  * PyTorch's THCCachingAllocator.
  *
  * \param nbytes The size to be allocated.
+ * \param stream The stream to be allocated in.
  * \return Pointer to the allocated memory.
  */
-void* RawAlloc(size_t nbytes);
+void* RawAlloc(size_t nbytes, cudaStream_t stream);
 
 /*!
  * \brief Free the GPU memory.

@@ -51,8 +51,8 @@ TA_EXPORTS DLManagedTensor* TAempty(
 }
 
 #ifdef DGL_USE_CUDA
-TA_EXPORTS void* RawAlloc(size_t nbytes) {
-  return c10::cuda::CUDACachingAllocator::raw_alloc(nbytes);
+TA_EXPORTS void* RawAlloc(size_t nbytes, cudaStream_t stream) {
+  return c10::cuda::CUDACachingAllocator::raw_alloc_with_stream(nbytes, stream);
 }
 
 TA_EXPORTS void RawDelete(void* ptr) {
