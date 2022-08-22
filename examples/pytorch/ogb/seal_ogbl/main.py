@@ -95,22 +95,22 @@ class SealSampler(Sampler):
         for eid in seed_edges:
             i, src, dst = map(int, eid)
             # construct the enclosing graph
-            visited, nodes, fringe = [set([src, dst]) for _ in range(3)]
+            visited, nodes, fringe = [np.unique([src, dst]) for _ in range(3)]
             for _ in range(self.num_hops):
                 if not self.directed:
                     _, fringe = g.out_edges(list(fringe))
-                    fringe = fringe.tolist()
                 else:
                     _, out_neighbors = g.out_edges(list(fringe))
                     in_neighbors, _ = g.in_edges(list(fringe))
-                    fringe = in_neighbors.tolist() + out_neighbors.tolist()
-                fringe = set(fringe) - visited
-                visited = visited.union(fringe)
+                    fringe = np.union1d(in_neighbors, out_neighbors)
+                fringe = np.setdiff1d(fringe, visited)
+                visited = np.union1d(visited, fringe)
                 if self.sample_ratio < 1.:
-                    fringe = random.sample(fringe, int(self.sample_ratio * len(fringe)))
+                    fringe = np.random.choice(fringe, 
+                        int(self.sample_ratio * len(fringe)), replace=False)
                 if len(fringe) == 0:
                     break
-                nodes = list(nodes) + list(fringe)
+                nodes = np.union1d(nodes, fringe)
             subg = g.subgraph(nodes, store_ids=True)
 
             # remove edges to predict
@@ -119,6 +119,13 @@ class SealSampler(Sampler):
             subg.remove_edges(edges_to_remove)
             # add double radius node labeling
             subg.ndata['z'] = self._double_radius_node_labeling(subg.adj(scipy_fmt='csr'))
+            
+            subg_aug = subg.add_self_loop()
+            if 'weight' in subg.edata:
+                assert len(edge_weights) == subg.num_edges()
+                edge_weights = torch.cat([edge_weights, torch.ones(subg_aug.num_edges() - subg.num_edges())])
+            return subg_aug, z, x, edge_weights, y
+
             graphs.append(subg)
 
         return indices, graphs
