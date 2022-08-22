@@ -56,12 +56,13 @@ class Logger(object):
 
 class SealSampler(Sampler):
     def __init__(self, num_hops=1, sample_ratio=1., directed=False,
-                 output_device=None):
+        prefetch_node_feats=None, prefetch_edge_feats=None):
         super().__init__()
         self.num_hops = num_hops
         self.sample_ratio = sample_ratio
         self.directed = directed
-        self.output_device = output_device
+        self.prefetch_node_feats = prefetch_node_feats
+        self.prefetch_edge_feats = prefetch_edge_feats
 
     def _double_radius_node_labeling(self, adj):
         N = adj.shape[0]
@@ -119,14 +120,14 @@ class SealSampler(Sampler):
             subg.remove_edges(edges_to_remove)
             # add double radius node labeling
             subg.ndata['z'] = self._double_radius_node_labeling(subg.adj(scipy_fmt='csr'))
-            
             subg_aug = subg.add_self_loop()
-            if 'weight' in subg.edata:
-                assert len(edge_weights) == subg.num_edges()
-                edge_weights = torch.cat([edge_weights, torch.ones(subg_aug.num_edges() - subg.num_edges())])
-            return subg_aug, z, x, edge_weights, y
+            if 'w' in subg.edata:
+                subg_aug.edata['w'][subg.num_edges():] = torch.ones(
+                    subg_aug.num_edges() - subg.num_edges())
+            graphs.append(subg_aug)
 
-            graphs.append(subg)
+            dgl.set_src_lazy_features(subg_aug, self.prefetch_node_feats)
+            dgl.set_edge_lazy_features(subg_aug, self.prefetch_edge_feats)
 
         return indices, graphs
 
@@ -412,9 +413,10 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     path = dataset.root + '_seal{}'.format(data_appendix)
 
-    sampler = SealSampler(1, args.ratio_per_hop, directed, output_device=device)
     loaders = []
     label_lists = []
+    prefetch_node_feats = ['feat'] if 'feat' in graph.ndata else None
+    prefetch_edge_feats = ['weight'] if 'weight' in graph.edata else None
     # force to be dynamic for consistent dataloading
     for split, shuffle, percent in zip(
         ['train', 'valid', 'test'],
@@ -427,7 +429,8 @@ if __name__ == '__main__':
         eids = torch.cat([torch.arange(len(links)).unsqueeze(-1), links], dim=1)
         labels = torch.tensor([1] * len(pos_edge) + [0] * len(neg_edge)).to(device)
         label_lists.append(labels)
-        sampler = SealSampler(1, args.ratio_per_hop, directed, output_device=device)
+        sampler = SealSampler(1, args.ratio_per_hop, directed, prefetch_node_feats,
+            prefetch_edge_feats)
         data_loader = DataLoader(graph, eids, sampler, device=device, shuffle=shuffle,
             batch_size=args.batch_size, num_workers=args.num_workers)
         loaders.append(data_loader)
