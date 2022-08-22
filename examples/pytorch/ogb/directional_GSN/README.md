@@ -4,7 +4,7 @@
 
 This is an example of implementing [directional_GSN](https://arxiv.org/abs/2006.09252) for graph classification in DGL.
 
-directional_GSN is a combination of GSN with DGN, where we defined a vector field based on structural features instead of eigenvectors.
+directional_GSN is a combination of Graph Substructure Networks ([GSN](https://arxiv.org/abs/2006.09252)) with Directional Graph Networks ([DGN](https://arxiv.org/pdf/2010.02863.pdf)), where we defined a vector field based on substructure encoding instead of Laplacian eigenvectors.
 
 The script in this folder experiments directional_GSN on ogbg-molpcba dataset.
 
