@@ -99,10 +99,10 @@ class SealSampler(Sampler):
             visited, nodes, fringe = [np.unique([src, dst]) for _ in range(3)]
             for _ in range(self.num_hops):
                 if not self.directed:
-                    _, fringe = g.out_edges(list(fringe))
+                    _, fringe = g.out_edges(fringe)
                 else:
-                    _, out_neighbors = g.out_edges(list(fringe))
-                    in_neighbors, _ = g.in_edges(list(fringe))
+                    _, out_neighbors = g.out_edges(fringe)
+                    in_neighbors, _ = g.in_edges(fringe)
                     fringe = np.union1d(in_neighbors, out_neighbors)
                 fringe = np.setdiff1d(fringe, visited)
                 visited = np.union1d(visited, fringe)
