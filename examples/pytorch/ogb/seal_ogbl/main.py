@@ -335,7 +335,7 @@ if __name__ == '__main__':
     parser.add_argument('--train_percent', type=float, default=100)
     parser.add_argument('--val_percent', type=float, default=100)
     parser.add_argument('--test_percent', type=float, default=100)
-    parser.add_argument('--num_workers', type=int, default=16, 
+    parser.add_argument('--num_workers', type=int, default=8, 
                         help="number of workers for dynamic dataloaders")
     # Testing settings
     parser.add_argument('--use_valedges_as_input', action='store_true')
