@@ -143,7 +143,8 @@ void SpMMSumCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
 #ifdef USE_LIBXSMM
   const bool no_libxsmm =
        bcast.use_bcast || std::is_same<DType, double>::value;
-  if (!no_libxsmm) {
+  const bool use_libxsmm = globalContext().libxsmm();
+  if (!no_libxsmm && use_libxsmm) {
     SpMMSumCsrLibxsmm<IdType, DType, Op>(bcast, csr, ufeat, efeat, out);
   } else {
 #endif  // USE_LIBXSMM
@@ -270,7 +271,8 @@ void SpMMCmpCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
 
   const bool no_libxsmm =
        bcast.use_bcast || std::is_same<DType, double>::value;
-  if (!no_libxsmm) {
+  const bool use_libxsmm = globalContext().libxsmm();
+  if (!no_libxsmm && use_libxsmm) {
     SpMMCmpCsrLibxsmm<IdType, DType, Op, Cmp>(bcast, csr, ufeat, efeat, out, argu, arge);
   } else {
 #endif  // USE_LIBXSMM

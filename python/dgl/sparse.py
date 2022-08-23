@@ -53,6 +53,14 @@ def infer_broadcast_shape(op, shp1, shp2):
     rst = tuple(max(d1, d2) for d1, d2 in zip(pad_shp1, pad_shp2))
     return rst[:-1] + (1,) if op == "dot" else rst
 
+def use_libxsmm(flag):
+     """Determine whether to use libxsmm or not."""
+     _CAPI_DGLKernel_use_libxsmm(flag)
+
+def is_libxsmm_enabled():
+    """Return True if the libxsmm is enabled."""
+    return _CAPI_DGLKernel_get_libxsmm()
+
 
 def to_dgl_nd(x):
     """Convert framework-specific tensor/None to dgl ndarray."""

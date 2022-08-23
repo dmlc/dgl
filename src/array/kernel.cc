@@ -13,6 +13,7 @@
 #include "kernel_decl.h"
 #include "../c_api_common.h"
 #include "./check.h"
+#include "./context.h"
 
 using namespace dgl::runtime;
 
@@ -21,6 +22,8 @@ namespace aten {
 namespace {
 
 }  // namespace
+
+initContext();
 
 /*! \brief Generalized Sparse Matrix-Matrix Multiplication. */
 void SpMM(const std::string& op, const std::string& reduce,
@@ -546,6 +549,17 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSEGMENTMM")
     bool A_trans = args[4];
     bool B_trans = args[5];
     SegmentMM(A, B, C, seglen_A, A_trans, B_trans);
+  });
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernel_set_libxsmm")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    bool use_libxsmm = args[0];
+    globalContext().setLibxsmm(use_libxsmm);
+  });
+
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernel_get_libxsmm")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    return globalContext().libxsmm();
   });
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSEGMENTMMBackwardB")
