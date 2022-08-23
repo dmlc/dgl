@@ -37,21 +37,20 @@ class SAGE(nn.Module):
         return h
     
     def inference(self, g, device, batch_size, use_uva):
-        feat = g.ndata['feat']
-        sampler = MultiLayerFullNeighborSampler(1, prefetch_node_feats=['feat'])
-        dataloader = DataLoader(
-            g, torch.arange(g.num_nodes(), device=device), sampler, device=device,
-            batch_size=batch_size, shuffle=False, drop_last=False,
-            num_workers=0, use_ddp=True, use_uva=use_uva)
-        feat = feat.to(device)            
+        g.ndata['h'] = g.ndata['feat']
+        sampler = MultiLayerFullNeighborSampler(1, prefetch_node_feats=['h'])
         for l, layer in enumerate(self.layers):
+            dataloader = DataLoader(
+                g, torch.arange(g.num_nodes(), device=device), sampler, device=device,
+                batch_size=batch_size, shuffle=False, drop_last=False,
+                num_workers=0, use_ddp=True, use_uva=use_uva)
             # in order to prevent running out of GPU memory, allocate a
             # shared output tensor 'y' in host memory
             y = shared_tensor(
                     (g.num_nodes(), self.hid_size if l != len(self.layers) - 1 else self.out_size))
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader) \
                     if dist.get_rank() == 0 else dataloader:
-                x = feat[input_nodes]
+                x = blocks[0].srcdata['h']
                 h = layer(blocks[0], x) # len(blocks) = 1
                 if l != len(self.layers) - 1:
                     h = F.relu(h)
@@ -60,7 +59,9 @@ class SAGE(nn.Module):
                 y[output_nodes] = h.to(y.device)
             # make sure all GPUs are done writing to 'y'
             dist.barrier()
-            feat = y.to(feat.device)
+            g.ndata['h'] = y if use_uva else y.to(device)
+
+        g.ndata.pop('h')
         return y
 
 def evaluate(model, g, dataloader):
@@ -148,7 +149,8 @@ if __name__ == '__main__':
     devices = list(map(int, args.gpu.split(',')))
     nprocs = len(devices)
     assert torch.cuda.is_available(), f"Must have GPUs to enable multi-gpu training."
-    print(f'Training in {args.mode} mode.')
+    print(f'Training in {args.mode} mode using {nprocs} GPU(s)')
+    
     # load and preprocess dataset
     print('Loading data')
     dataset = AsNodePredDataset(DglNodePropPredDataset('ogbn-products'))
