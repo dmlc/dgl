@@ -553,7 +553,8 @@ COOMatrix CSRRowWiseSampling(
       ret = impl::CSRRowWiseSamplingUniform<XPU, IdType>(mat, rows, num_samples, replace);
     });
   } else {
-    CHECK_SAME_CONTEXT(rows, prob);
+    // prob is pinned and rows on GPU is valid
+    CHECK_VALID_CONTEXT(prob, rows);
     ATEN_CSR_SWITCH_CUDA_UVA(mat, rows, XPU, IdType, "CSRRowWiseSampling", {
       ATEN_FLOAT_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
         ret = impl::CSRRowWiseSampling<XPU, IdType, FloatType>(

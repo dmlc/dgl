@@ -83,8 +83,9 @@ class SealSampler(Sampler):
                     subg_aug.num_edges() - subg.num_edges())
             graphs.append(subg_aug)
 
-            dgl.set_src_lazy_features(subg_aug, self.prefetch_node_feats)
-            dgl.set_edge_lazy_features(subg_aug, self.prefetch_edge_feats)
+        graphs = dgl.batch(graphs)
+        dgl.set_src_lazy_features(graphs, self.prefetch_node_feats)
+        dgl.set_edge_lazy_features(graphs, self.prefetch_edge_feats)
 
         return indices, graphs
 
@@ -181,11 +182,10 @@ eids = torch.cat([indices, edges], dim=1) # [Np + Nn, 3]
 graph = dataset[0]
 sampler = SealSampler(num_hops=1, sample_ratio=0.6, directed=False, prefetch_node_feats=['feat'])
 data_loader = DataLoader(graph, eids, sampler, batch_size=32, num_workers=16, device=0)
-N = 1000
+N = 5000
 start = time.time()
 for _, (indices, graphs) in tqdm(zip(range(N), data_loader)):
-    graphs = dgl.batch(graphs)
-    ...
+    pass
 end = time.time()
 print(f'DGL Loading {N} examples with the speed {N/(end-start):.2f} examples/sec')
 

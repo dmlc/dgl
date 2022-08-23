@@ -548,11 +548,11 @@ __global__ void SpMMCsrKernel(
   const int64_t* __restrict__ ebcast_off,
   int64_t ufeat_len, int64_t efeat_len, int64_t out_len) {
   // SPMM with CSR.
-  int ty = blockIdx.y * blockDim.y + threadIdx.y;
-  const Idx stride_y = blockDim.y * gridDim.y;
-  const int stride_x = blockDim.x * gridDim.x;
+  int ty = blockIdx.x * blockDim.y + threadIdx.y;
+  const Idx stride_y = blockDim.y * gridDim.x;
+  const int stride_x = blockDim.x * gridDim.y;
   while (ty < num_rows) {
-    int tx = blockIdx.x * blockDim.x + threadIdx.x;
+    int tx = blockIdx.y * blockDim.x + threadIdx.x;
     while (tx < out_len) {
       DType local_accum = ReduceOp::zero();
       Idx local_argu = 0, local_arge = 0;
@@ -759,8 +759,8 @@ void SpMMCsr(
           rhs_len = bcast.rhs_len;
   const int ntx = FindNumThreads(len);
   const int nty = CUDA_MAX_NUM_THREADS / ntx;
-  const int nbx = (len + ntx - 1) / ntx;
-  const int nby = FindNumBlocks<'y'>((csr.num_rows + nty - 1) / nty);
+  const int nby= (len + ntx - 1) / ntx;
+  const int nbx = FindNumBlocks<'x'>((csr.num_rows + nty - 1) / nty);
   //LOG(INFO) << "nblks=(" << nbx << ", " << nby << ") nthrs=(" << ntx << ", " << nty << ")";
   const dim3 nblks(nbx, nby);
   const dim3 nthrs(ntx, nty);
