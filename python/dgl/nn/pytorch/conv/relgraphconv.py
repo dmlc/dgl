@@ -49,16 +49,20 @@ class RelGraphConv(nn.Module):
     out_feat : int
         Output feature size; i.e., the number of dimensions of :math:`h_i^{(l+1)}`.
     num_rels : int
-        Number of relations. .
+        Number of relations.
     regularizer : str, optional
-        Which weight regularizer to use "basis" or "bdd":
+        Which weight regularizer to use ("basis", "bdd" or ``None``):
 
-         - "basis" is short for basis-decomposition.
-         - "bdd" is short for block-diagonal-decomposition.
+         - "basis" is for basis-decomposition.
+         - "bdd" is for block-diagonal-decomposition.
+         - ``None`` applies no regularization.
 
-        Default applies no regularization.
+        Default: ``None``.
     num_bases : int, optional
-        Number of bases. Needed when ``regularizer`` is specified. Default: ``None``.
+        Number of bases. It comes into effect when a regularizer is applied.
+        If ``None``, it uses number of relations (``num_rels``). Default: ``None``.
+        Note that ``in_feat`` and ``out_feat`` must be divisible by ``num_bases``
+        when applying "bdd" regularizer.
     bias : bool, optional
         True if bias is added. Default: ``True``.
     activation : callable, optional
@@ -67,8 +71,8 @@ class RelGraphConv(nn.Module):
         True to include self loop message. Default: ``True``.
     dropout : float, optional
         Dropout rate. Default: ``0.0``
-    layer_norm: float, optional
-        Add layer norm. Default: ``False``
+    layer_norm: bool, optional
+        True to add layer norm. Default: ``False``
 
     Examples
     --------
@@ -102,6 +106,8 @@ class RelGraphConv(nn.Module):
                  dropout=0.0,
                  layer_norm=False):
         super().__init__()
+        if regularizer is not None and num_bases is None:
+            num_bases = num_rels
         self.linear_r = TypedLinear(in_feat, out_feat, num_rels, regularizer, num_bases)
         self.bias = bias
         self.activation = activation

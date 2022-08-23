@@ -173,7 +173,7 @@ def load_partition_feats(part_config, part_id):
     return node_feats, edge_feats
 
 def load_partition_book(part_config, part_id, graph=None):
-    ''' Load a graph partition book from the partition config file.
+    '''Load a graph partition book from the partition config file.
 
     Parameters
     ----------
