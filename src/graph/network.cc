@@ -62,7 +62,7 @@ NDArray CreateNDArrayFromRaw(std::vector<int64_t> shape,
   if (auto_free) {
     managed_tensor->deleter = NaiveDeleter;
   }
-  // TODO: Bypass FromDLPack
+  // TODO(?): Bypass FromDLPack
   return NDArray::FromDLPack(managed_tensor);
 }
 

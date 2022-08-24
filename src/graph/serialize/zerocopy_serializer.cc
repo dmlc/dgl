@@ -44,7 +44,7 @@ NDArray CreateNDArrayFromRawData(std::vector<int64_t> shape, DLDataType dtype,
   dlm_tensor->dl_tensor.strides = dmlc::BeginPtr(dlm_tensor_ctx->stride);
   dlm_tensor->dl_tensor.data = raw;
   dlm_tensor->deleter = RawDataTensoDLPackDeleter;
-  // TODO: Bypass FromDLPack
+  // TODO(?): Bypass FromDLPack
   return NDArray::FromDLPack(dlm_tensor);
 }
 
