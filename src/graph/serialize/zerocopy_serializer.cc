@@ -32,7 +32,7 @@ NDArray CreateNDArrayFromRawData(std::vector<int64_t> shape, DLDataType dtype,
   dlm_tensor_ctx->shape = shape;
   dlm_tensor->manager_ctx = dlm_tensor_ctx;
   dlm_tensor->dl_tensor.shape = dmlc::BeginPtr(dlm_tensor_ctx->shape);
-  dlm_tensor->dl_tensor.ctx = ctx;
+  dlm_tensor->dl_tensor.device = ctx;
   dlm_tensor->dl_tensor.ndim = static_cast<int>(shape.size());
   dlm_tensor->dl_tensor.dtype = dtype;
 
@@ -44,6 +44,7 @@ NDArray CreateNDArrayFromRawData(std::vector<int64_t> shape, DLDataType dtype,
   dlm_tensor->dl_tensor.strides = dmlc::BeginPtr(dlm_tensor_ctx->stride);
   dlm_tensor->dl_tensor.data = raw;
   dlm_tensor->deleter = RawDataTensoDLPackDeleter;
+  // TODO: Bypass FromDLPack
   return NDArray::FromDLPack(dlm_tensor);
 }
 
@@ -91,12 +92,12 @@ NDArray StreamWithBuffer::PopNDArray() {
   int ndim;
   DLDataType dtype;
 
-  CHECK(this->Read(&ndim)) << "Invalid DLTensor file format";
-  CHECK(this->Read(&dtype)) << "Invalid DLTensor file format";
+  CHECK(this->Read(&ndim)) << "Invalid DGLArray file format";
+  CHECK(this->Read(&dtype)) << "Invalid DGLArray file format";
 
   std::vector<int64_t> shape(ndim);
   if (ndim != 0) {
-    CHECK(this->ReadArray(&shape[0], ndim)) << "Invalid DLTensor file format";
+    CHECK(this->ReadArray(&shape[0], ndim)) << "Invalid DGLArray file format";
   }
 
   DGLContext cpu_ctx;

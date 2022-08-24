@@ -42,7 +42,7 @@ NDArray CreateNDArrayFromRaw(std::vector<int64_t> shape,
                              void* raw,
                              bool auto_free) {
   DLTensor tensor;
-  tensor.ctx = ctx;
+  tensor.device = ctx;
   tensor.ndim = static_cast<int>(shape.size());
   tensor.dtype = dtype;
   tensor.shape = new int64_t[tensor.ndim];
@@ -62,6 +62,7 @@ NDArray CreateNDArrayFromRaw(std::vector<int64_t> shape,
   if (auto_free) {
     managed_tensor->deleter = NaiveDeleter;
   }
+  // TODO: Bypass FromDLPack
   return NDArray::FromDLPack(managed_tensor);
 }
 

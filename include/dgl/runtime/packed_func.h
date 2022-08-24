@@ -380,14 +380,14 @@ class DGLPODValue_ {
     DGL_CHECK_TYPE_CODE(type_code_, kHandle);
     return value_.v_handle;
   }
-  operator DLTensor*() const {
+  operator DGLArray*() const {
     if (type_code_ == kArrayHandle ||
         type_code_ == kNDArrayContainer) {
-      return static_cast<DLTensor*>(value_.v_handle);
+      return static_cast<DGLArray*>(value_.v_handle);
     } else {
       if (type_code_ == kNull) return nullptr;
       LOG(FATAL) << "Expected "
-                 << "DLTensor* or NDArray but get "
+                 << "DGLArray* or NDArray but get "
                  << TypeCode2Str(type_code_);
       return nullptr;
     }
@@ -457,7 +457,7 @@ class DGLArgValue : public DGLPODValue_ {
   using DGLPODValue_::operator int;
   using DGLPODValue_::operator bool;
   using DGLPODValue_::operator void*;
-  using DGLPODValue_::operator DLTensor*;
+  using DGLPODValue_::operator DGLArray*;
   using DGLPODValue_::operator NDArray;
   using DGLPODValue_::operator DGLContext;
 
@@ -549,7 +549,7 @@ class DGLRetValue : public DGLPODValue_ {
   using DGLPODValue_::operator int;
   using DGLPODValue_::operator bool;
   using DGLPODValue_::operator void*;
-  using DGLPODValue_::operator DLTensor*;
+  using DGLPODValue_::operator DGLArray*;
   using DGLPODValue_::operator DGLContext;
   using DGLPODValue_::operator NDArray;
   // Disable copy and assign from another value, but allow move.
@@ -883,7 +883,7 @@ class DGLArgsSetter {
     values_[i].v_handle = value;
     type_codes_[i] = kHandle;
   }
-  void operator()(size_t i, DLTensor* value) const {
+  void operator()(size_t i, DGLArray* value) const {
     values_[i].v_handle = value;
     type_codes_[i] = kArrayHandle;
   }

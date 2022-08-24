@@ -135,8 +135,8 @@ class NDArray {
    * \note this number is approximate in multi-threaded setting.
    */
   inline int use_count() const;
-  /*! \return Pointer to content of DLTensor */
-  inline const DLTensor* operator->() const;
+  /*! \return Pointer to content of DGLArray */
+  inline const DGLArray* operator->() const;
   /*! \return True if the ndarray is contiguous. */
   bool IsContiguous() const;
   /*! \return the data pointer with type. */
@@ -155,7 +155,7 @@ class NDArray {
    * \note The copy may happen asynchrously if it involves a GPU context.
    *       DGLSynchronize is necessary.
    */
-  inline void CopyFrom(DLTensor* other,
+  inline void CopyFrom(DGLArray* other,
       DGLStreamHandle stream = nullptr);
   inline void CopyFrom(const NDArray& other,
       DGLStreamHandle stream = nullptr);
@@ -165,7 +165,7 @@ class NDArray {
    * \note The copy may happen asynchrously if it involves a GPU context.
    *       DGLSynchronize is necessary.
    */
-  inline void CopyTo(DLTensor *other,
+  inline void CopyTo(DGLArray *other,
                      const DGLStreamHandle &stream = nullptr) const;
   inline void CopyTo(const NDArray &other,
                      const DGLStreamHandle &stream = nullptr) const;
@@ -300,10 +300,10 @@ class NDArray {
    * \param stream The stream used in copy.
    */
   DGL_DLL static void CopyFromTo(
-      DLTensor* from, DLTensor* to, DGLStreamHandle stream = nullptr);
+      DGLArray* from, DGLArray* to, DGLStreamHandle stream = nullptr);
 
   /*!
-   * \brief Function to pin the DLTensor of a Container.
+   * \brief Function to pin the DGLArray of a Container.
    * \param ptr The container to be pinned.
    * \note Data of the given array will be pinned inplace.
    *       Behavior depends on the current context,
@@ -314,7 +314,7 @@ class NDArray {
   DGL_DLL static void PinContainer(Container* ptr);
 
   /*!
-   * \brief Function to unpin the DLTensor of a Container.
+   * \brief Function to unpin the DGLArray of a Container.
    * \param ptr The container to be unpinned.
    * \note Data of the given array will be unpinned inplace.
    *       Behavior depends on the current context,
@@ -324,7 +324,7 @@ class NDArray {
   DGL_DLL static void UnpinContainer(Container* ptr);
 
   /*!
-   * \brief Function check if the DLTensor of a Container is pinned.
+   * \brief Function check if the DGLArray of a Container is pinned.
    * \param ptr The container to be checked.
    * \return true if pinned.
    */
@@ -342,19 +342,19 @@ class NDArray {
 };
 
 /*!
- * \brief Save a DLTensor to stream
+ * \brief Save a DGLArray to stream
  * \param strm The outpu stream
  * \param tensor The tensor to be saved.
  */
-inline bool SaveDLTensor(dmlc::Stream* strm, const DLTensor* tensor);
+inline bool SaveDGLArray(dmlc::Stream* strm, const DGLArray* tensor);
 
 
 /*!
  * \brief Reference counted Container object used to back NDArray.
  *
- *  This object is DLTensor compatible:
+ *  This object is DGLArray compatible:
  *    the pointer to the NDArrayContainer can be directly
- *    interpreted as a DLTensor*
+ *    interpreted as a DGLArray*
  *
  * \note: do not use this function directly, use NDArray.
  */
@@ -365,11 +365,11 @@ struct NDArray::Container {
   // is only called when the reference counter goes to 0
   /*!
    * \brief The corresponding dl_tensor field.
-   * \note it is important that the first field is DLTensor
-   *  So that this data structure is DLTensor compatible.
-   *  The head ptr of this struct can be viewed as DLTensor*.
+   * \note it is important that the first field is DGLArray
+   *  So that this data structure is DGLArray compatible.
+   *  The head ptr of this struct can be viewed as DGLArray*.
    */
-  DLTensor dl_tensor;
+  DGLArray dl_tensor;
   /*!
    * \brief addtional context, reserved for recycling
    * \note We can attach additional content here
@@ -449,7 +449,7 @@ inline void NDArray::reset() {
   }
 }
 
-inline void NDArray::CopyFrom(DLTensor* other,
+inline void NDArray::CopyFrom(DGLArray* other,
                               DGLStreamHandle stream) {
   CHECK(data_ != nullptr);
   CopyFromTo(other, &(data_->dl_tensor), stream);
@@ -462,7 +462,7 @@ inline void NDArray::CopyFrom(const NDArray& other,
   CopyFromTo(&(other.data_->dl_tensor), &(data_->dl_tensor), stream);
 }
 
-inline void NDArray::CopyTo(DLTensor *other,
+inline void NDArray::CopyTo(DGLArray *other,
                             const DGLStreamHandle &stream) const {
   CHECK(data_ != nullptr);
   CopyFromTo(&(data_->dl_tensor), other, stream);
@@ -478,7 +478,7 @@ inline void NDArray::CopyTo(const NDArray &other,
 inline NDArray NDArray::CopyTo(const DGLContext &ctx,
                                const DGLStreamHandle &stream) const {
   CHECK(data_ != nullptr);
-  const DLTensor* dptr = operator->();
+  const DGLArray* dptr = operator->();
   NDArray ret = Empty(std::vector<int64_t>(dptr->shape, dptr->shape + dptr->ndim),
                       dptr->dtype, ctx);
   this->CopyTo(ret, stream);
@@ -487,7 +487,7 @@ inline NDArray NDArray::CopyTo(const DGLContext &ctx,
 
 inline NDArray NDArray::Clone(const DGLStreamHandle &stream) const {
   CHECK(data_ != nullptr);
-  const DLTensor* dptr = operator->();
+  const DGLArray* dptr = operator->();
   return this->CopyTo(dptr->ctx, stream);
 }
 
@@ -511,15 +511,15 @@ inline int NDArray::use_count() const {
   return data_->ref_counter_.load(std::memory_order_relaxed);
 }
 
-inline const DLTensor* NDArray::operator->() const {
+inline const DGLArray* NDArray::operator->() const {
   return &(data_->dl_tensor);
 }
 
 /*! \brief Magic number for NDArray file */
 constexpr uint64_t kDGLNDArrayMagic = 0xDD5E40F096B4A13F;
 
-inline bool SaveDLTensor(dmlc::Stream* strm,
-                         DLTensor* tensor) {
+inline bool SaveDGLArray(dmlc::Stream* strm,
+                         DGLArray* tensor) {
   uint64_t header = kDGLNDArrayMagic, reserved = 0;
   strm->Write(header);
   strm->Write(reserved);

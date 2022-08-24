@@ -109,8 +109,52 @@ typedef DLDevice DGLContext;
 
 /*!
  * \brief The tensor array stucture to DGL API.
+ * Borrowed from DLTensor but has DGLContext ctx as device.
  */
-typedef DLTensor DGLArray;
+typedef struct {
+  /*!
+   * \brief The data pointer points to the allocated data. This will be CUDA
+   * device pointer or cl_mem handle in OpenCL. It may be opaque on some device
+   * types. This pointer is always aligned to 256 bytes as in CUDA. The
+   * `byte_offset` field should be used to point to the beginning of the data.
+   *
+   * Note that as of Nov 2021, multiply libraries (CuPy, PyTorch, TensorFlow,
+   * TVM, perhaps others) do not adhere to this 256 byte aligment requirement
+   * on CPU/CUDA/ROCm, and always use `byte_offset=0`.  This must be fixed
+   * (after which this note will be updated); at the moment it is recommended
+   * to not rely on the data pointer being correctly aligned.
+   *
+   * For given DGLArray, the size of memory required to store the contents of
+   * data is calculated as follows:
+   *
+   * \code{.c}
+   * static inline size_t GetDataSize(const DGLArray* t) {
+   *   size_t size = 1;
+   *   for (tvm_index_t i = 0; i < t->ndim; ++i) {
+   *     size *= t->shape[i];
+   *   }
+   *   size *= (t->dtype.bits * t->dtype.lanes + 7) / 8;
+   *   return size;
+   * }
+   * \endcode
+   */
+  void* data;
+  /*! \brief The device of the tensor */
+  DGLContext ctx;
+  /*! \brief Number of dimensions */
+  int32_t ndim;
+  /*! \brief The data type of the pointer*/
+  DLDataType dtype;
+  /*! \brief The shape of the tensor */
+  int64_t* shape;
+  /*!
+   * \brief strides of the tensor (in number of elements, not bytes)
+   *  can be NULL, indicating tensor is compact and row-majored.
+   */
+  int64_t* strides;
+  /*! \brief The offset in bytes to the beginning pointer to data */
+  uint64_t byte_offset;
+} DGLArray;
 
 /*! \brief the array handle */
 typedef DGLArray* DGLArrayHandle;

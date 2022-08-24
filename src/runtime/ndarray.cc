@@ -42,7 +42,7 @@ inline void VerifyDataType(DLDataType dtype) {
   CHECK_EQ(dtype.bits & (dtype.bits - 1), 0);
 }
 
-inline size_t GetDataSize(const DLTensor& arr) {
+inline size_t GetDataSize(const DGLArray& arr) {
   size_t size = 1;
   for (dgl_index_t i = 0; i < arr.ndim; ++i) {
     size *= arr.shape[i];
@@ -51,7 +51,7 @@ inline size_t GetDataSize(const DLTensor& arr) {
   return size;
 }
 
-inline size_t GetDataAlignment(const DLTensor& arr) {
+inline size_t GetDataAlignment(const DGLArray& arr) {
   size_t align = (arr.dtype.bits / 8) * arr.dtype.lanes;
   if (align < kAllocAlignment) return kAllocAlignment;
   return align;
@@ -119,9 +119,9 @@ struct NDArray::Internal {
     return ret;
   }
   // Implementation of API function
-  static DLTensor* MoveAsDLTensor(NDArray arr) {
-    DLTensor* tensor = reinterpret_cast<DLTensor*>(arr.data_);
-    CHECK(tensor == const_cast<DLTensor*>(arr.operator->()));
+  static DGLArray* MoveAsDGLArray(NDArray arr) {
+    DGLArray* tensor = reinterpret_cast<DGLArray*>(arr.data_);
+    CHECK(tensor == const_cast<DGLArray*>(arr.operator->()));
     arr.data_ = nullptr;
     return tensor;
   }
@@ -129,7 +129,14 @@ struct NDArray::Internal {
   static DLManagedTensor* ToDLPack(NDArray::Container* from) {
     CHECK(from != nullptr);
     DLManagedTensor* ret = new DLManagedTensor();
-    ret->dl_tensor = from->dl_tensor;
+    ret->dl_tensor.data = from->dl_tensor.data;
+    ret->dl_tensor.device = from->dl_tensor.ctx;
+    ret->dl_tensor.ndim = from->dl_tensor.ndim;
+    ret->dl_tensor.dtype = from->dl_tensor.dtype;
+    ret->dl_tensor.shape = from->dl_tensor.shape;
+    ret->dl_tensor.strides = from->dl_tensor.strides;
+    ret->dl_tensor.byte_offset = from->dl_tensor.byte_offset;
+
     ret->manager_ctx = from;
     from->IncRef();
     ret->deleter = NDArrayDLPackDeleter;
@@ -233,13 +240,19 @@ NDArray NDArray::FromDLPack(DLManagedTensor* tensor) {
   NDArray::Container* data = new NDArray::Container();
   data->deleter = Internal::DLPackDeleter;
   data->manager_ctx = tensor;
-  data->dl_tensor = tensor->dl_tensor;
+  data->dl_tensor.data = tensor->dl_tensor.data;
+  data->dl_tensor.ctx = tensor->dl_tensor.device;
+  data->dl_tensor.ndim = tensor->dl_tensor.ndim;
+  data->dl_tensor.dtype = tensor->dl_tensor.dtype;
+  data->dl_tensor.shape = tensor->dl_tensor.shape;
+  data->dl_tensor.strides = tensor->dl_tensor.strides;
+  data->dl_tensor.byte_offset = tensor->dl_tensor.byte_offset;
 
   return NDArray(data);
 }
 
-void NDArray::CopyFromTo(DLTensor* from,
-                         DLTensor* to,
+void NDArray::CopyFromTo(DGLArray* from,
+                         DGLArray* to,
                          DGLStreamHandle stream) {
   size_t from_size = GetDataSize(*from);
   size_t to_size = GetDataSize(*to);
@@ -360,7 +373,7 @@ void NDArray::Save(dmlc::Stream* strm) const {
     zc_strm->PushNDArray(*this);
     return;
   }
-  SaveDLTensor(strm, const_cast<DLTensor*>(operator->()));
+  SaveDGLArray(strm, const_cast<DGLArray*>(operator->()));
 }
 
 bool NDArray::Load(dmlc::Stream* strm) {
@@ -371,26 +384,26 @@ bool NDArray::Load(dmlc::Stream* strm) {
   }
   uint64_t header, reserved;
   CHECK(strm->Read(&header))
-      << "Invalid DLTensor file format";
+      << "Invalid DGLArray file format";
   CHECK(strm->Read(&reserved))
-      << "Invalid DLTensor file format";
+      << "Invalid DGLArray file format";
   CHECK(header == kDGLNDArrayMagic)
-      << "Invalid DLTensor file format";
+      << "Invalid DGLArray file format";
   DGLContext ctx;
   int ndim;
   DLDataType dtype;
   CHECK(strm->Read(&ctx))
-      << "Invalid DLTensor file format";
+      << "Invalid DGLArray file format";
   CHECK(strm->Read(&ndim))
-      << "Invalid DLTensor file format";
+      << "Invalid DGLArray file format";
   CHECK(strm->Read(&dtype))
-      << "Invalid DLTensor file format";
+      << "Invalid DGLArray file format";
   CHECK_EQ(ctx.device_type, kDLCPU)
-      << "Invalid DLTensor context: can only save as CPU tensor";
+      << "Invalid DGLArray context: can only save as CPU tensor";
   std::vector<int64_t> shape(ndim);
   if (ndim != 0) {
     CHECK(strm->ReadArray(&shape[0], ndim))
-        << "Invalid DLTensor file format";
+        << "Invalid DGLArray file format";
   }
   NDArray ret = NDArray::Empty(shape, dtype, ctx);
   int64_t num_elems = 1;
@@ -400,14 +413,14 @@ bool NDArray::Load(dmlc::Stream* strm) {
   }
   int64_t data_byte_size;
   CHECK(strm->Read(&data_byte_size))
-      << "Invalid DLTensor file format";
+      << "Invalid DGLArray file format";
   CHECK(data_byte_size == num_elems * elem_bytes)
-      << "Invalid DLTensor file format";
+      << "Invalid DGLArray file format";
   if (data_byte_size != 0)  {
     // strm->Read will return the total number of elements successfully read.
     // Therefore if data_byte_size is zero, the CHECK below would fail.
     CHECK(strm->Read(ret->data, data_byte_size))
-        << "Invalid DLTensor file format";
+        << "Invalid DGLArray file format";
   }
   if (!DMLC_IO_NO_ENDIAN_SWAP) {
     dmlc::ByteSwap(ret->data, elem_bytes, num_elems);
@@ -443,7 +456,7 @@ int DGLArrayAlloc(const dgl_index_t* shape,
   DGLContext ctx;
   ctx.device_type = static_cast<DLDeviceType>(device_type);
   ctx.device_id = device_id;
-  *out = NDArray::Internal::MoveAsDLTensor(
+  *out = NDArray::Internal::MoveAsDGLArray(
       NDArray::Empty(std::vector<int64_t>(shape, shape + ndim), dtype, ctx));
   API_END();
 }
@@ -464,7 +477,7 @@ int DGLArrayAllocSharedMem(const char *mem_name,
   std::vector<int64_t> shape_vec(shape, shape + ndim);
   NDArray arr = NDArray::EmptyShared(mem_name, shape_vec, dtype,
                                      DGLContext{kDLCPU, 0}, is_create);
-  *out = NDArray::Internal::MoveAsDLTensor(arr);
+  *out = NDArray::Internal::MoveAsDGLArray(arr);
   API_END();
 }
 
@@ -485,7 +498,7 @@ int DGLArrayCopyFromTo(DGLArrayHandle from,
 int DGLArrayFromDLPack(DLManagedTensor* from,
                        DGLArrayHandle* out) {
   API_BEGIN();
-  *out = NDArray::Internal::MoveAsDLTensor(NDArray::FromDLPack(from));
+  *out = NDArray::Internal::MoveAsDGLArray(NDArray::FromDLPack(from));
   API_END();
 }
 
@@ -498,7 +511,7 @@ int DGLArrayToDLPack(DGLArrayHandle from, DLManagedTensor** out,
                      int alignment) {
   API_BEGIN();
   auto* nd_container = reinterpret_cast<NDArray::Container*>(from);
-  DLTensor* nd = &(nd_container->dl_tensor);
+  DGLArray* nd = &(nd_container->dl_tensor);
   if (alignment != 0 && !is_aligned(nd->data, alignment)) {
     std::vector<int64_t> shape_vec(nd->shape, nd->shape + nd->ndim);
     NDArray copy_ndarray = NDArray::Empty(shape_vec, nd->dtype, nd->ctx);

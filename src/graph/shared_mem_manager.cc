@@ -86,12 +86,12 @@ bool SharedMemManager::CreateFromSharedMem<NDArray>(NDArray *nd,
   DGLContext ctx = {kDLCPU, 0};
   DLDataType dtype;
 
-  CHECK(this->Read(&ndim)) << "Invalid DLTensor file format";
-  CHECK(this->Read(&dtype)) << "Invalid DLTensor file format";
+  CHECK(this->Read(&ndim)) << "Invalid DGLArray file format";
+  CHECK(this->Read(&dtype)) << "Invalid DGLArray file format";
 
   std::vector<int64_t> shape(ndim);
   if (ndim != 0) {
-    CHECK(this->ReadArray(&shape[0], ndim)) << "Invalid DLTensor file format";
+    CHECK(this->ReadArray(&shape[0], ndim)) << "Invalid DGLArray file format";
   }
   bool is_null;
   this->Read(&is_null);
