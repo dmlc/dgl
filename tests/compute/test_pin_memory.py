@@ -25,7 +25,7 @@ def test_pin_unpin():
             F.to_dgl_nd(t_pin).unpin_memory_()
     else:
         with pytest.raises(dgl.DGLError):
-            # tensorflow and mxnet should throw an erro
+            # tensorflow and mxnet should throw an error
             dgl.utils.pin_memory_inplace(t)
 
 if __name__ == "__main__":
