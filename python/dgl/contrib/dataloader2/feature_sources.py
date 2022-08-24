@@ -19,9 +19,10 @@ import torch
 import numpy
 from collections.abc import Mapping
 from ... import backend as F
+from ...storages import FeatureStorage, TensorStorage
 from ...base import DGLError
 from ...utils import gather_pinned_tensor_rows
-
+from .dataloader2 import NODES_TAG, INPUT_NODES_TAG, OUTPUT_NODES_TAG, EDGES_TAG
 
 def feat_as_mapping(feat, types):
     if feat is None:
@@ -44,9 +45,9 @@ class FeatureSource:
         dict of lists
             The tree has entity classes at the top level, then edge/node
             types. Valid entity classes are:
-            * 'nodes': All nodes in all graphs.
-            * 'nodes:input': Source nodes in the first graph of an MFG.
-            * 'nodes:output': Destination nodes in the last graph of an MFG.
+            * NODES_TAG: All nodes in all graphs.
+            * INPUT_NODES_TAG: Source nodes in the first graph of an MFG.
+            * OUTPUT_NODES_TAG: Destination nodes in the last graph of an MFG.
             * 'edges': All edges in all graphs.
 
             For example a typical feature descriptor for a graph convolution
@@ -60,6 +61,7 @@ class FeatureSource:
             valid features. The dataloader does not need to request features
             for other ids.
         """
+        return {}
 
 
     def fetch_features(self, req, output_device):
@@ -127,6 +129,82 @@ class FeatureSource:
         pass
 
 
+class FeatureRequestHandler:
+    def __init__(self):
+        self._storages = {}
+        self._features = {}
+
+
+    def set_storage(self, graph_object, object_type, feat_name, storage):
+        if F.is_tensor(storage):
+            storage = TensorStorage(storage)
+
+        if graph_object not in self._features:
+            self._features[graph_object] = {}
+        if object_type not in self._features[graph_object]:
+            self._features[graph_object][object_type] = []
+        if feat_name in self._features[graph_object][object_type]:
+            raise DGLError("Duplicate feature name for {} of type {} " \
+                "with name {}".format(graph_object, object_type, feat_name))
+        self._features[graph_object][object_type].append(feat_name)
+
+        if graph_object == NODES_TAG or \
+                graph_object == INPUT_NODES_TAG or \
+                graph_object == OUTPUT_NODES_TAG:
+            base_graph_object = NODES_TAG
+        else:
+            base_graph_object = graph_object
+        if base_graph_object not in self._storages:
+            self._storages[base_graph_object] = {}
+        if object_type not in self._storages[base_graph_object]:
+            self._storages[base_graph_object][object_type] = {}
+        if feat_name in self._storages[base_graph_object][object_type]:
+            raise DGLError("Duplicate feature storage for {} of type {} " \
+                "with name {}".format(base_graph_object, object_type, feat_name))
+        self._storages[base_graph_object][object_type][feat_name] = storage
+
+
+    def get_featured_entities(self):
+        return self._features
+
+
+    def fetch_features(self, req, output_device):
+        resp = {}
+        for graph_object, tree in req.items():
+            if graph_object not in self._features:
+                continue
+            resp[graph_object] = {}
+            if graph_object == NODES_TAG or \
+                    graph_object == INPUT_NODES_TAG or \
+                    graph_object == OUTPUT_NODES_TAG:
+                base_graph_object = NODES_TAG
+                for ntype, ids in tree.items():
+                    if ntype not in self._features[graph_object]:
+                        # this ntype has no features
+                        continue
+                    resp[graph_object][ntype] = {}
+                    base_storage = self._storages[base_graph_object]
+                    feat_names = self._features[graph_object][ntype]
+                    for feat_name in feat_names:
+                        tensor = base_storage[ntype][feat_name].fetch( \
+                            ids, output_device)
+                        resp[graph_object][ntype][feat_name] = tensor
+            elif graph_object == EDGES_TAG:
+                for etype, ids in tree.items():
+                    if etype not in self._features[graph_object]:
+                        # this etype has no features
+                        continue
+                    resp[graph_object][etype] = {}
+                    feat_names = self._features[graph_object][etype]
+                    for feat_name in feat_names:
+                        tensor = self._storages[EDGES_TAG][ntype][feat_name].fetch( \
+                            ids, output_device)
+                        resp[graph_object][etype][feat_name] = tensor
+            else:
+                raise DGLError("Unknown component '{}'".format(comp))
+        return resp
+
+
 def _feat_mapping_of_mapping(feat_tree, types):
     if feat_tree is None:
         return {}
@@ -148,75 +226,33 @@ def _feat_mapping_of_mapping(feat_tree, types):
 class TensorFeatureSource:
     def __init__(self, node_feats=None, edge_feats=None, input_feats=None,
             output_feats=None):
-        self._node_feats =  _feat_mapping_of_mapping(node_feats, ['_N'])
-        self._edge_feats =  _feat_mapping_of_mapping(edge_feats, \
-                                                     [('_N', '_E', '_N')])
-        self._input_feats =  _feat_mapping_of_mapping(input_feats, ['_N'])
-        self._output_feats =  _feat_mapping_of_mapping(output_feats, ['_N'])
+        self._handler = FeatureRequestHandler()
 
+        for ntype, tree in _feat_mapping_of_mapping(node_feats, ['_N']).items():
+            for feat_name, tensor in tree.items():
+                self._handler.set_storage(NODES_TAG, ntype, feat_name, tensor)
 
-    def get_featured_entities(self):
-        feats = {}
-        if len(self._node_feats) > 0:
-            feats["nodes"] = list(self._node_feats.keys())
-        if len(self._input_feats) > 0:
-            feats["nodes:input"] = list(self._input_feats.keys())
-        if len(self._output_feats) > 0:
-            feats["nodes:output"] = list(self._output_feats.keys())
-        if len(self._edge_feats) > 0:
-            feats["edges"] = list(self._edge_feats.keys())
-        return feats
+        for etype, tree in _feat_mapping_of_mapping( \
+                edge_feats, [('_N', '_E', '_N')]).items():
+            for feat_name, tensor in tree.items():
+                self._handler.set_storage(EDGES_TAG, etype, feat_name, tensor)
+
+        for ntype, tree in _feat_mapping_of_mapping(input_feats, ['_N']).items():
+            for feat_name, tensor in tree.items():
+                self._handler.set_storage(INPUT_NODES_TAG, ntype, feat_name, tensor)
+
+        for ntype, tree in _feat_mapping_of_mapping(output_feats, ['_N']).items():
+            for feat_name, tensor in tree.items():
+                self._handler.set_storage(OUTPUT_NODES_TAG, ntype, feat_name, tensor)
+
+        self.get_featured_entities = self._handler.get_featured_entities
+
 
     def fetch_features(self, req, output_device):
         # convert from a string if need be
         output_device = torch.device(output_device)
 
-        resp = {}
-        for comp, tree in req.items():
-            if comp == 'nodes' or comp == 'nodes:input' or comp == 'nodes:output':
-                resp[comp] = {}
-                for ntype, ids in tree.items():
-                    resp[comp][ntype] = {}
-                    if comp == 'nodes':
-                        feats = self._node_feats
-                    elif comp == 'nodes:input':
-                        feats = self._input_feats
-                    else:
-                        assert comp == 'nodes:output'
-                        feats = self._output_feats
-                    if ntype not in feats:
-                        # this ntype has no features
-                        continue
-                    feat_names = feats[ntype].keys()
-                    for feat_name in feat_names:
-                        tensor = feats[ntype][feat_name]
-                        if output_device.type == 'cuda' and F.is_pinned(tensor):
-                            resp[comp][ntype][feat_name] = \
-                                gather_pinned_tensor_rows(tensor, ids)
-                        else:
-                            resp[comp][ntype][feat_name] = \
-                                tensor[ids].to(output_device)
-            elif comp == 'edges':
-                resp[comp] = {}
-                for etype, ids in tree.items():
-                    resp[comp][etype] = {}
-                    if etype in self._edge_feats:
-                        feat_names = self._edge_feats[etype].keys()
-                    else:
-                        # this etype has no features
-                        continue
-                    for feat_name in feat_names:
-                        tensor = self._edge_feats[etype][feat_name]
-                        if output_device.type == 'cuda' and F.is_pinned(tensor):
-                            resp[comp][etype][feat_name] = \
-                                gather_pinned_tensor_rows(tensor, ids)
-                        else:
-                            resp[comp][etype][feat_name] = \
-                                tensor[ids].to(output_device)
-            else:
-                raise DGLError("Unknown component '{}'".format(comp))
-
-        return resp
+        return self._handler.fetch_features(req, output_device)
 
 
 class GraphFeatureSource:
@@ -254,28 +290,71 @@ class GraphFeatureSource:
         self.fetch_features = self._source.fetch_features
 
 
+class _RedisStorage(FeatureStorage):
+    def __init__(self, source, table_name):
+        self._source = source
+        self._name = table_name
+
+    def fetch(self, indices, device):
+        db = self._source._db
+        table_types = self._source._table_types
+
+        # to have any kind of performance, we would need to go from redis to
+        # dlpack in C++ rather than python.
+        table_keys = [idx.numpy().tobytes() for idx in indices.cpu()]
+        table_values = db.hmget(self._name, table_keys)
+        tensor = torch.stack([ \
+            torch.from_numpy(numpy.frombuffer(row, \
+                dtype=table_types[self._name])) \
+            for row in table_values])
+        if tensor.shape[1] == 1:
+            tensor = tensor.squeeze(-1)
+        return tensor.to(device)
+
+
+
 class RedisFeatureSource:
+    @staticmethod
+    def _get_table_name(item, item_type, feat_name):
+        if item == EDGES_TAG:
+            item_type = item_type[0] + "_" + item_type[1] + "_" + item_type[2]
+        table_name = item + ":" + item_type + ":" + feat_name
+        return table_name
+
     def __init__(self, client, node_feats=None, edge_feats=None, input_feats=None,
             output_feats=None):
         self._db = client
-        self._node_feats = feat_as_mapping(node_feats, ['_N'])
-        self._edge_feats = feat_as_mapping(edge_feats, [('_N', '_E', '_N')])
-        self._input_feats = feat_as_mapping(input_feats, ['_N'])
-        self._output_feats = feat_as_mapping(output_feats, ['_N'])
         self._table_types = {}
+        self._handler = FeatureRequestHandler()
 
+        for ntype, feat_names in feat_as_mapping(node_feats, ['_N']).items():
+            for feat_name in feat_names:
+                storage = _RedisStorage(self, self._get_table_name( \
+                    NODES_TAG, ntype, feat_name))
+                self._handler.set_storage(NODES_TAG, ntype, feat_name, storage)
 
-    def get_featured_entities(self):
-        feats = {}
-        if len(self._node_feats) > 0:
-            feats["nodes"] = list(self._node_feats.keys())
-        if len(self._input_feats) > 0:
-            feats["nodes:input"] = list(self._input_feats.keys())
-        if len(self._output_feats) > 0:
-            feats["nodes:output"] = list(self._output_feats.keys())
-        if len(self._edge_feats) > 0:
-            feats["edges"] = list(self._edge_feats.keys())
-        return feats
+        for etype, feat_names in feat_as_mapping( \
+                edge_feats, [('_N', '_E', '_N')]).items():
+            for feat_name in feat_names:
+                storage = _RedisStorage(self, self._get_table_name( \
+                    EDGES_TAG, etype, feat_name))
+                self._handler.set_storage(EDGES_TAG, etype, feat_name, storage)
+
+        for ntype, feat_names in feat_as_mapping(input_feats, ['_N']).items():
+            for feat_name in feat_names:
+                storage = _RedisStorage(self, self._get_table_name( \
+                    NODES_TAG, ntype, feat_name))
+                self._handler.set_storage(INPUT_NODES_TAG, ntype, feat_name, storage)
+
+        for ntype, feat_names in feat_as_mapping(output_feats, ['_N']).items():
+            for feat_name in feat_names:
+                storage = _RedisStorage(self, self._get_table_name( \
+                    NODES_TAG, ntype, feat_name))
+                self._handler.set_storage(OUTPUT_NODES_TAG, ntype, feat_name, storage)
+
+        self.get_featured_entities = self._handler.get_featured_entities
+        self.fetch_features = self._handler.fetch_features
+
 
     def set_table(self, item, item_type, feat_name, tensor):
         # to have any kind of performance, we would need to go from dlpack to
@@ -295,68 +374,3 @@ class RedisFeatureSource:
                 for idx in torch.arange(chunk, chunk_end) \
             }
             self._db.hmset(table_name, batch)
-
-    def _get_table_name(self, item, item_type, feat_name):
-        if item == 'edges':
-            item_type = item_type[0] + "_" + item_type[1] + "_" + item_type[2]
-        table_name = item + ":" + item_type + ":" + feat_name
-        return table_name
-
-    def _get_tensor(self, table_name, ids):
-        # to have any kind of performance, we would need to go from redis to
-        # dlpack in C++ rather than python.
-        table_keys = [idx.numpy().tobytes() for idx in ids.cpu()]
-        table_values = self._db.hmget(table_name, table_keys)
-        tensor = torch.stack([ \
-            torch.from_numpy(numpy.frombuffer(row, \
-                dtype=self._table_types[table_name])) \
-            for row in table_values])
-        if tensor.shape[1] == 1:
-            tensor = tensor.squeeze(-1)
-        return tensor
-
-
-    def fetch_features(self, req, output_device):
-        # convert from a string if need be
-        output_device = torch.device(output_device)
-
-        resp = {}
-        for comp, tree in req.items():
-            if comp == 'nodes' or comp == 'nodes:input' or comp == 'nodes:output':
-                resp[comp] = {}
-                for ntype, ids in tree.items():
-                    resp[comp][ntype] = {}
-                    if comp == 'nodes':
-                        feats = self._node_feats
-                    elif comp == 'nodes:input':
-                        feats = self._input_feats
-                    else:
-                        assert comp == 'nodes:output'
-                        feats = self._output_feats
-                    if ntype not in feats:
-                        # this ntype has no features
-                        continue
-                    feat_names = feats[ntype]
-                    for feat_name in feat_names:
-                        table_name = self._get_table_name("nodes", ntype, feat_name)
-                        tensor = self._get_tensor(table_name, ids)
-                        resp[comp][ntype][feat_name] = tensor.to(output_device)
-            elif comp == 'edges':
-                resp[comp] = {}
-                for etype, ids in tree.items():
-                    resp[comp][etype] = {}
-                    if etype in self._edge_feats:
-                        feat_names = self._edge_feats[etype].keys()
-                    else:
-                        # this etype has no features
-                        continue
-                    for feat_name in feat_names:
-                        table_name = self._get_table_name("edges", etype, feat_name)
-                        tensor = self._get_tensor(table_name, ids)
-                        resp[comp][etype][feat_name] = tensor.to(output_device)
-            else:
-                raise DGLError("Unknown component '{}'".format(comp))
-
-        return resp
-
-

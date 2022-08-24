@@ -20,6 +20,11 @@ import torch.multiprocessing as mp
 from ...dataloading import create_tensorized_dataset
 from ...base import NID, EID, DGLError
 
+NODES_TAG = "nodes"
+INPUT_NODES_TAG = NODES_TAG + ":input"
+OUTPUT_NODES_TAG = NODES_TAG + ":output"
+EDGES_TAG = "edges"
+
 
 class _LoaderInstance:
     def __init__(self, graph_source, feature_source, output_device):
@@ -57,12 +62,12 @@ class _LoaderInstance:
                 if graph.is_block:
                     # dgl blocks treat src types and dst types as distinct
                     for ntype in graph.srctypes:
-                        if 'nodes' in self._featured_entities and \
-                                ntype in self._featured_entities['nodes']:
-                            key = 'nodes'
-                        elif layer == 0 and 'nodes:input' in self._featured_entities and \
-                                ntype in self._featured_entities['nodes:input']:
-                            key = 'nodes:input'
+                        if NODES_TAG in self._featured_entities and \
+                                ntype in self._featured_entities[NODES_TAG]:
+                            key = NODES_TAG
+                        elif layer == 0 and INPUT_NODES_TAG in self._featured_entities and \
+                                ntype in self._featured_entities[INPUT_NODES_TAG]:
+                            key = INPUT_NODES_TAG
                         else:
                             continue
 
@@ -72,13 +77,13 @@ class _LoaderInstance:
                         for feat_name, tensor in resp[key][ntype].items():
                             graph.srcnodes[ntype].data[feat_name] = tensor
                     for ntype in graph.dsttypes:
-                        if 'nodes' in self._featured_entities and \
-                                ntype in self._featured_entities['nodes']:
-                            key = 'nodes'
+                        if NODES_TAG in self._featured_entities and \
+                                ntype in self._featured_entities[NODES_TAG]:
+                            key = NODES_TAG
                         elif layer == len(graphs) - 1 and \
-                                'nodes:output' in self._featured_entities and \
-                                ntype in self._featured_entities['nodes:output']:
-                            key = 'nodes:output'
+                                OUTPUT_NODES_TAG in self._featured_entities and \
+                                ntype in self._featured_entities[OUTPUT_NODES_TAG]:
+                            key = OUTPUT_NODES_TAG
                         else:
                             continue
 
@@ -88,21 +93,21 @@ class _LoaderInstance:
                         for feat_name, tensor in resp[key][ntype].items():
                             graph.dstnodes[ntype].data[feat_name] = tensor
                 else:
-                    if 'nodes' in self._featured_entities:
+                    if NODES_TAG in self._featured_entities:
                         for ntype in graph.ntypes:
-                            if ntype in self._featured_entities['nodes']:
+                            if ntype in self._featured_entities[NODES_TAG]:
                                 node_ids = graph.ndata[NID]
                                 resp = self._feature_source.fetch_features(
-                                        {'nodes': {ntype: node_ids}}, self._output_device)
-                                for feat_name, tensor in resp['nodes'][ntype].items():
+                                        {NODES_TAG: {ntype: node_ids}}, self._output_device)
+                                for feat_name, tensor in resp[NODES_TAG][ntype].items():
                                     graph.nodes[ntype].data[feat_name] = tensor
-                if 'edges' in self._featured_entities:
+                if EDGES_TAG in self._featured_entities:
                     for etype in graph.canonical_etypes:
-                        if etype in self._featured_entities['edges']:
+                        if etype in self._featured_entities[EDGES_TAG]:
                             edge_ids = graph.edges[etype].data[EID]
                             resp = self._feature_source.fetch_features(
-                                    {'edges': {etype: edge_ids}}, self._output_device)
-                            for feat_name, tensor in resp['edges'][etype].items():
+                                    {EDGES_TAG: {etype: edge_ids}}, self._output_device)
+                            for feat_name, tensor in resp[EDGES_TAG][etype].items():
                                 graph.edges[etype].data[feat_name] = tensor
 
         return graphs
