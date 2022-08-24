@@ -14,7 +14,7 @@ else
 		echo Copying prebuilt CPU binary...
 		cp $CACHEDIR/libdgl.dylib build
 		if [[ -e $CACHEDIR/tensoradapter_pytorch_cpu ]]; then
-			cp -v $CACHEDIR/tensoradapter_pytorch_cpu/*.so build/tensoradapter/pytorch
+			cp -v $CACHEDIR/tensoradapter_pytorch_cpu/*.dylib build/tensoradapter/pytorch
 		fi
 	else
 		if [[ $USE_CUDA = 'ON' ]]; then
