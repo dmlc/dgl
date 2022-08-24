@@ -1,3 +1,7 @@
+"""Implements a wrapper around Unified Tensor and GPUCache
+to use with a modified DGLGraph object with GPUCached node or edge
+data storage"""
+
 from .. import backend as F
 from .base import FeatureStorage
 from ..contrib.unified_tensor import UnifiedTensor
