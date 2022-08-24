@@ -55,9 +55,10 @@ class Logger(object):
 
 
 class SealSampler(Sampler):
-    def __init__(self, num_hops=1, sample_ratio=1., directed=False,
+    def __init__(self, g, num_hops=1, sample_ratio=1., directed=False,
         prefetch_node_feats=None, prefetch_edge_feats=None):
         super().__init__()
+        self.g = g
         self.num_hops = num_hops
         self.sample_ratio = sample_ratio
         self.directed = directed
@@ -89,12 +90,12 @@ class SealSampler(Sampler):
 
         return z.to(torch.long)
 
-    def sample(self, g, seed_edges):
-        graphs = []
-        indices = seed_edges[:, 0]
+    def sample(self, aug_g, seed_edges):
+        g = self.g
+        subgraphs = []
         # construct k-hop enclosing graph for each link
         for eid in seed_edges:
-            i, src, dst = map(int, eid)
+            src, dst = map(int, aug_g.find_edges(eid))
             # construct the enclosing graph
             visited, nodes, fringe = [np.unique([src, dst]) for _ in range(3)]
             for _ in range(self.num_hops):
@@ -121,15 +122,16 @@ class SealSampler(Sampler):
             # add double radius node labeling
             subg.ndata['z'] = self._double_radius_node_labeling(subg.adj(scipy_fmt='csr'))
             subg_aug = subg.add_self_loop()
-            if 'w' in subg.edata:
-                subg_aug.edata['w'][subg.num_edges():] = torch.ones(
+            if 'weight' in subg.edata:
+                subg_aug.edata['weight'][subg.num_edges():] = torch.ones(
                     subg_aug.num_edges() - subg.num_edges())
-            graphs.append(subg_aug)
+            subgraphs.append(subg_aug)
 
-            dgl.set_src_lazy_features(subg_aug, self.prefetch_node_feats)
-            dgl.set_edge_lazy_features(subg_aug, self.prefetch_edge_feats)
+        subgraphs = dgl.batch(subgraphs)
+        dgl.set_src_lazy_features(subg_aug, self.prefetch_node_feats)
+        dgl.set_edge_lazy_features(subg_aug, self.prefetch_edge_feats)
 
-        return indices, graphs
+        return subgraphs, aug_g.edata['y'][seed_edges]
 
 
 # An end-to-end deep learning architecture for graph classification, AAAI-18.
@@ -227,18 +229,19 @@ def train():
     model.train()
     loss_fnt = BCEWithLogitsLoss()
     total_loss = 0
+    total = 0
     pbar = tqdm(train_loader, ncols=70)
-    for indices, subgs in pbar:
-        g, y = dgl.batch(subgs), train_labels[indices]
+    for gs, y in pbar:
         optimizer.zero_grad()
-        logits = model(g, g.ndata['z'], g.ndata.get('feat', None), 
-            edge_weight=g.edata.get('weight', None))
+        logits = model(gs, gs.ndata['z'], gs.ndata.get('feat', None), 
+            edge_weight=gs.edata.get('weight', None))
         loss = loss_fnt(logits.view(-1), y.to(torch.float))
         loss.backward()
         optimizer.step()
-        total_loss += loss.item() * g.batch_size
+        total_loss += loss.item() * gs.batch_size
+        total += gs.batch_size
 
-    return total_loss / len(train_labels)
+    return total_loss / total
 
 
 @torch.no_grad()
@@ -246,10 +249,9 @@ def test():
     model.eval()
 
     y_pred, y_true = [], []
-    for indices, subgs in tqdm(val_loader, ncols=70):
-        g, y = dgl.batch(subgs), val_labels[indices]
-        logits = model(g, g.ndata['z'], g.ndata.get('feat', None), 
-            edge_weight=g.edata.get('weight', None))
+    for gs, y in tqdm(val_loader, ncols=70):
+        logits = model(gs, gs.ndata['z'], gs.ndata.get('feat', None), 
+            edge_weight=gs.edata.get('weight', None))
         y_pred.append(logits.view(-1).cpu())
         y_true.append(y.view(-1).cpu().to(torch.float))
     val_pred, val_true = torch.cat(y_pred), torch.cat(y_true)
@@ -257,10 +259,9 @@ def test():
     neg_val_pred = val_pred[val_true==0]
 
     y_pred, y_true = [], []
-    for indices, subgs in tqdm(test_loader, ncols=70):
-        g, y = dgl.batch(subgs), test_labels[indices]
-        logits = model(g, g.ndata['z'], g.ndata.get('feat', None), 
-            edge_weight=g.edata.get('weight', None))
+    for gs, y in tqdm(test_loader, ncols=70):
+        logits = model(gs, gs.ndata['z'], gs.ndata.get('feat', None), 
+            edge_weight=gs.edata.get('weight', None))
         y_pred.append(logits.view(-1).cpu())
         y_true.append(y.view(-1).cpu().to(torch.float))
     test_pred, test_true = torch.cat(y_pred), torch.cat(y_true)
@@ -382,6 +383,7 @@ if __name__ == '__main__':
         if args.use_valedges_as_input:
             val_edges = split_edge['valid']['edge']
             row, col = val_edges.t()
+            # float edata for to_simple transform
             del graph.edata['year']
             graph.edata['weight'] = graph.edata['weight'].to(torch.float)
             val_weights = torch.ones(size=(val_edges.size(0), 1))
@@ -416,33 +418,53 @@ if __name__ == '__main__':
     path = dataset.root + '_seal{}'.format(data_appendix)
 
     loaders = []
-    label_lists = []
     prefetch_node_feats = ['feat'] if 'feat' in graph.ndata else None
     prefetch_edge_feats = ['weight'] if 'weight' in graph.edata else None
+
+    train_edge, train_edge_neg = get_pos_neg_edges('train', split_edge, graph, args.train_percent)
+    val_edge, val_edge_neg = get_pos_neg_edges('valid', split_edge, graph, args.val_percent)
+    test_edge, test_edge_neg = get_pos_neg_edges('test', split_edge, graph, args.test_percent)
+    # create an augmented graph for sampling
+    aug_g = dgl.graph(graph.edges())
+    aug_g.edata['y'] = torch.ones(aug_g.num_edges())
+    aug_edges = torch.cat([val_edge, test_edge, train_edge_neg, val_edge_neg, test_edge_neg])
+    aug_labels = torch.cat([
+        torch.ones(len(val_edge) + len(test_edge)),
+        torch.zeros(len(train_edge_neg) + len(val_edge_neg) + len(test_edge_neg))
+    ])
+    aug_g.add_edges(aug_edges[:, 0], aug_edges[:, 1], {'y': aug_labels})
+    # eids for sampling
+    split_len = [graph.num_edges()] + \
+        list(map(len, [val_edge, test_edge, train_edge_neg, val_edge_neg, test_edge_neg]))
+    train_eids = torch.cat([
+        graph.edge_ids(train_edge[:, 0], train_edge[:, 1]),
+        torch.arange(sum(split_len[:3]), sum(split_len[:4]))
+    ])
+    val_eids = torch.cat([
+        torch.arange(sum(split_len[:1]), sum(split_len[:2])),
+        torch.arange(sum(split_len[:4]), sum(split_len[:5]))
+    ])
+    test_eids = torch.cat([
+        torch.arange(sum(split_len[:2]), sum(split_len[:3])),
+        torch.arange(sum(split_len[:5]), sum(split_len[:6]))
+    ])
+    sampler = SealSampler(graph, 1, args.ratio_per_hop, directed,
+        prefetch_node_feats, prefetch_edge_feats)
     # force to be dynamic for consistent dataloading
-    for split, shuffle, percent in zip(
+    for split, shuffle, eids in zip(
         ['train', 'valid', 'test'],
         [True, False, False],
-        [args.train_percent, args.val_percent, args.test_percent],
-        # [args.dynamic_train, args.dynamic_val, args.dynamic_test]
+        [train_eids, val_eids, test_eids]
     ):
-        pos_edge, neg_edge = get_pos_neg_edges(split, split_edge, graph, percent)
-        links = torch.cat([pos_edge, neg_edge], 0) # [Np + Nn, 2]
-        eids = torch.cat([torch.arange(len(links)).unsqueeze(-1), links], dim=1)
-        labels = torch.tensor([1] * len(pos_edge) + [0] * len(neg_edge)).to(device)
-        label_lists.append(labels)
-        sampler = SealSampler(1, args.ratio_per_hop, directed, prefetch_node_feats,
-            prefetch_edge_feats)
-        data_loader = DataLoader(graph, eids, sampler, device=device, shuffle=shuffle,
+        data_loader = DataLoader(aug_g, eids, sampler, shuffle=shuffle, device=device,
             batch_size=args.batch_size, num_workers=args.num_workers)
         loaders.append(data_loader)
-
     train_loader, val_loader, test_loader = loaders
-    train_labels, val_labels, test_labels = label_lists
 
     # convert sortpool_k from percentile to number.
     num_nodes = []
-    for eids, subgs in train_loader:
+    for subgs, _ in train_loader:
+        subgs = dgl.unbatch(subgs)
         if len(num_nodes) > 1000:
             break
         for subg in subgs:
