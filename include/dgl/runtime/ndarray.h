@@ -174,7 +174,7 @@ class NDArray {
    * \param ctx The target context.
    * \return The array under another context.
    */
-  inline NDArray CopyTo(const DLContext &ctx,
+  inline NDArray CopyTo(const DGLContext &ctx,
                         const DGLStreamHandle &stream = nullptr) const;
   /*!
    * \brief Return a new array with a copy of the content.
@@ -236,7 +236,7 @@ class NDArray {
    */
   DGL_DLL static NDArray Empty(std::vector<int64_t> shape,
                                DLDataType dtype,
-                               DLContext ctx);
+                               DGLContext ctx);
   /*!
    * \brief Create an empty NDArray with shared memory.
    * \param name The name of shared memory.
@@ -249,7 +249,7 @@ class NDArray {
   DGL_DLL static NDArray EmptyShared(const std::string &name,
                                      std::vector<int64_t> shape,
                                      DLDataType dtype,
-                                     DLContext ctx,
+                                     DGLContext ctx,
                                      bool is_create);
   /*!
    * \brief Get the size of the array in the number of bytes.
@@ -280,7 +280,7 @@ class NDArray {
    */
   template<typename T>
   DGL_DLL static NDArray FromVector(
-      const std::vector<T>& vec, DLContext ctx = DLContext{kDLCPU, 0});
+      const std::vector<T>& vec, DGLContext ctx = DGLContext{kDLCPU, 0});
 
   /*!
    * \brief Create a std::vector from a 1D NDArray.
@@ -475,7 +475,7 @@ inline void NDArray::CopyTo(const NDArray &other,
   CopyFromTo(&(data_->dl_tensor), &(other.data_->dl_tensor), stream);
 }
 
-inline NDArray NDArray::CopyTo(const DLContext &ctx,
+inline NDArray NDArray::CopyTo(const DGLContext &ctx,
                                const DGLStreamHandle &stream) const {
   CHECK(data_ != nullptr);
   const DLTensor* dptr = operator->();
@@ -532,7 +532,7 @@ inline bool SaveDLTensor(dmlc::Stream* strm,
   //
   // We can always do array.CopyTo(target_ctx) to get a corresponding
   // array in the target context.
-  DLContext cpu_ctx;
+  DGLContext cpu_ctx;
   cpu_ctx.device_type = kDLCPU;
   cpu_ctx.device_id = 0;
   strm->Write(cpu_ctx);
@@ -753,20 +753,20 @@ inline std::ostream& operator << (std::ostream& os, DGLType t) {
 }
 #endif
 
-///////////////// Operator overloading for DLContext /////////////////
+///////////////// Operator overloading for DGLContext /////////////////
 
 /*! \brief Check whether two device contexts are the same.*/
-inline bool operator == (const DLContext& ctx1, const DLContext& ctx2) {
+inline bool operator == (const DGLContext& ctx1, const DGLContext& ctx2) {
   return ctx1.device_type == ctx2.device_type && ctx1.device_id == ctx2.device_id;
 }
 
 /*! \brief Check whether two device contexts are different.*/
-inline bool operator != (const DLContext& ctx1, const DLContext& ctx2) {
+inline bool operator != (const DGLContext& ctx1, const DGLContext& ctx2) {
   return !(ctx1 == ctx2);
 }
 
 #ifndef _LIBCPP_SGX_NO_IOSTREAMS
-inline std::ostream& operator << (std::ostream& os, const DLContext& ctx) {
+inline std::ostream& operator << (std::ostream& os, const DGLContext& ctx) {
   return os << dgl::runtime::DeviceTypeCode2Str(ctx.device_type) << ":" << ctx.device_id;
 }
 #endif

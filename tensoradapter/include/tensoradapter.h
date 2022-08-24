@@ -22,11 +22,11 @@ extern "C" {
  *
  * \param shape The shape
  * \param dtype The data type
- * \param ctx The device
+ * \param device The device
  * \return The allocated tensor
  */
 DLManagedTensor* TAempty(
-    std::vector<int64_t> shape, DLDataType dtype, DLContext ctx);
+    std::vector<int64_t> shape, DLDataType dtype, DLDevice device);
 
 #ifdef DGL_USE_CUDA
 /*!

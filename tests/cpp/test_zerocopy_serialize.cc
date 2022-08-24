@@ -19,7 +19,7 @@ using namespace dgl::aten;
 using namespace dmlc;
 // Function to convert an idarray to string
 std::string IdArrayToStr(IdArray arr) {
-  arr = arr.CopyTo(DLContext{kDLCPU, 0});
+  arr = arr.CopyTo(DGLContext{kDLCPU, 0});
   int64_t len = arr->shape[0];
   std::ostringstream oss;
   oss << "(" << len << ")[";
@@ -101,7 +101,7 @@ TEST(ZeroCopySerialize, SharedMem) {
   auto tensor1 = VecToIdArray<int64_t>({1, 2, 5, 3});
   DLDataType dtype = {kDLInt, 64, 1};
   std::vector<int64_t> shape{4};
-  DLContext cpu_ctx = {kDLCPU, 0};
+  DGLContext cpu_ctx = {kDLCPU, 0};
   auto shared_tensor =
     NDArray::EmptyShared("test", shape, dtype, cpu_ctx, true);
   shared_tensor.CopyFrom(tensor1);

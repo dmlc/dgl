@@ -122,7 +122,7 @@ struct COOMatrix {
   }
 
   /*! \brief Return a copy of this matrix on the give device context. */
-  inline COOMatrix CopyTo(const DLContext &ctx,
+  inline COOMatrix CopyTo(const DGLContext &ctx,
                           const DGLStreamHandle &stream = nullptr) const {
     if (ctx == row->ctx)
       return *this;

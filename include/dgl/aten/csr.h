@@ -115,7 +115,7 @@ struct CSRMatrix {
   }
 
   /*! \brief Return a copy of this matrix on the give device context. */
-  inline CSRMatrix CopyTo(const DLContext &ctx,
+  inline CSRMatrix CopyTo(const DGLContext &ctx,
                           const DGLStreamHandle &stream = nullptr) const {
     if (ctx == indptr->ctx)
       return *this;

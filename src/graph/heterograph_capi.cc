@@ -470,7 +470,7 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCopyTo")
     HeteroGraphRef hg = args[0];
     int device_type = args[1];
     int device_id = args[2];
-    DLContext ctx;
+    DGLContext ctx;
     ctx.device_type = static_cast<DLDeviceType>(device_type);
     ctx.device_id = device_id;
     DGLStreamHandle stream = nullptr;
@@ -543,7 +543,7 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroJointUnion")
     std::vector<HeteroGraphPtr> component_ptrs;
     component_ptrs.reserve(component_graphs.size());
     const int64_t bits = component_graphs[0]->NumBits();
-    const DLContext ctx = component_graphs[0]->Context();
+    const DGLContext ctx = component_graphs[0]->Context();
     for (const auto& component : component_graphs) {
       component_ptrs.push_back(component.sptr());
       CHECK_EQ(component->NumBits(), bits)
@@ -567,7 +567,7 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointUnion_v2")
     std::vector<HeteroGraphPtr> component_ptrs;
     component_ptrs.reserve(component_graphs.size());
     const int64_t bits = component_graphs[0]->NumBits();
-    const DLContext ctx = component_graphs[0]->Context();
+    const DGLContext ctx = component_graphs[0]->Context();
     for (const auto& component : component_graphs) {
       component_ptrs.push_back(component.sptr());
       CHECK_EQ(component->NumBits(), bits)

@@ -180,7 +180,7 @@ class RandomEngine {
   IdArray UniformChoice(IdxType num, IdxType population, bool replace = true) {
     const DLDataType dtype{kDLInt, sizeof(IdxType) * 8, 1};
     // TODO(minjie): only CPU implementation right now
-    IdArray ret = IdArray::Empty({num}, dtype, DLContext{kDLCPU, 0});
+    IdArray ret = IdArray::Empty({num}, dtype, DGLContext{kDLCPU, 0});
     UniformChoice<IdxType>(num, population, static_cast<IdxType*>(ret->data), replace);
     return ret;
   }
@@ -231,7 +231,7 @@ class RandomEngine {
   IdArray BiasedChoice(
       IdxType num, const IdxType *split, FloatArray bias, bool replace = true) {
     const DLDataType dtype{kDLInt, sizeof(IdxType) * 8, 1};
-    IdArray ret = IdArray::Empty({num}, dtype, DLContext{kDLCPU, 0});
+    IdArray ret = IdArray::Empty({num}, dtype, DGLContext{kDLCPU, 0});
     BiasedChoice<IdxType, FloatType>(num, split, bias, static_cast<IdxType*>(ret->data), replace);
     return ret;
   }

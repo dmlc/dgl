@@ -109,7 +109,7 @@ class BaseHeteroGraph : public runtime::Object {
   /*!
    * \brief Get the device context of this graph.
    */
-  virtual DLContext Context() const = 0;
+  virtual DGLContext Context() const = 0;
 
   /*!
    * \brief Pin graph.

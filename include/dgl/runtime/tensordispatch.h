@@ -76,7 +76,7 @@ class TensorDispatcher {
    * \param ctx The device
    * \return An empty NDArray.
    */
-  inline NDArray Empty(std::vector<int64_t> shape, DLDataType dtype, DLContext ctx) const {
+  inline NDArray Empty(std::vector<int64_t> shape, DLDataType dtype, DGLContext ctx) const {
     auto entry = entrypoints_[Op::kEmpty];
     auto result = FUNCCAST(tensoradapter::TAempty, entry)(shape, dtype, ctx);
     return NDArray::FromDLPack(result);

@@ -38,7 +38,7 @@ static void NaiveDeleter(DLManagedTensor* managed_tensor) {
 
 NDArray CreateNDArrayFromRaw(std::vector<int64_t> shape,
                              DLDataType dtype,
-                             DLContext ctx,
+                             DGLContext ctx,
                              void* raw,
                              bool auto_free) {
   DLTensor tensor;
@@ -406,7 +406,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
       nf->node_mapping = CreateNDArrayFromRaw(
         {meta.data_shape_[1]},
         DLDataType{kDLInt, 64, 1},
-        DLContext{kDLCPU, 0},
+        DGLContext{kDLCPU, 0},
         array_0.data,
         AUTO_FREE);
       // edge_mapping
@@ -416,7 +416,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
       nf->edge_mapping = CreateNDArrayFromRaw(
         {meta.data_shape_[3]},
         DLDataType{kDLInt, 64, 1},
-        DLContext{kDLCPU, 0},
+        DGLContext{kDLCPU, 0},
         array_1.data,
         AUTO_FREE);
       // layer_offset
@@ -426,7 +426,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
       nf->layer_offsets = CreateNDArrayFromRaw(
         {meta.data_shape_[5]},
         DLDataType{kDLInt, 64, 1},
-        DLContext{kDLCPU, 0},
+        DGLContext{kDLCPU, 0},
         array_2.data,
         AUTO_FREE);
       // flow_offset
@@ -436,7 +436,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
       nf->flow_offsets = CreateNDArrayFromRaw(
         {meta.data_shape_[7]},
         DLDataType{kDLInt, 64, 1},
-        DLContext{kDLCPU, 0},
+        DGLContext{kDLCPU, 0},
         array_3.data,
         AUTO_FREE);
       // CSR indptr
@@ -446,7 +446,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
       NDArray indptr = CreateNDArrayFromRaw(
         {meta.data_shape_[9]},
         DLDataType{kDLInt, 64, 1},
-        DLContext{kDLCPU, 0},
+        DGLContext{kDLCPU, 0},
         array_4.data,
         AUTO_FREE);
       // CSR indice
@@ -456,7 +456,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
       NDArray indice = CreateNDArrayFromRaw(
         {meta.data_shape_[11]},
         DLDataType{kDLInt, 64, 1},
-        DLContext{kDLCPU, 0},
+        DGLContext{kDLCPU, 0},
         array_5.data,
         AUTO_FREE);
       // CSR edge_ids
@@ -466,7 +466,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
       NDArray edge_ids = CreateNDArrayFromRaw(
         {meta.data_shape_[13]},
         DLDataType{kDLInt, 64, 1},
-        DLContext{kDLCPU, 0},
+        DGLContext{kDLCPU, 0},
         array_6.data,
         AUTO_FREE);
       // Create CSR
@@ -598,7 +598,7 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
     kv_msg->id = CreateNDArrayFromRaw(
       {meta.data_shape_[1]},
       meta.data_type_[0],
-      DLContext{kDLCPU, 0},
+      DGLContext{kDLCPU, 0},
       recv_id_msg.data,
       AUTO_FREE);
   }
@@ -617,7 +617,7 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
     kv_msg->data = CreateNDArrayFromRaw(
       vec_shape,
       meta.data_type_[1],
-      DLContext{kDLCPU, 0},
+      DGLContext{kDLCPU, 0},
       recv_data_msg.data,
       AUTO_FREE);
   }
@@ -636,7 +636,7 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
     kv_msg->shape = CreateNDArrayFromRaw(
       vec_shape,
       meta.data_type_[0],
-      DLContext{kDLCPU, 0},
+      DGLContext{kDLCPU, 0},
       recv_shape_msg.data,
       AUTO_FREE);
   }
@@ -814,7 +814,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
         kv_msg.name = name;
         kv_msg.id = CreateNDArrayFromRaw({static_cast<int64_t>(remote_ids[i].size())},
                                          ID->dtype,
-                                         DLContext{kDLCPU, 0},
+                                         DGLContext{kDLCPU, 0},
                                          remote_ids[i].data(),
                                          !AUTO_FREE);
         int lower = i*group_count;
@@ -859,7 +859,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     NDArray res_tensor = CreateNDArrayFromRaw(
                           local_data_shape,
                           local_data->dtype,
-                          DLContext{kDLCPU, 0},
+                          DGLContext{kDLCPU, 0},
                           return_data,
                           AUTO_FREE);
     *rv = res_tensor;

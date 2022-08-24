@@ -115,7 +115,7 @@ __device__ __forceinline__ T _ldg(T* addr) {
  * \param ctx Device context.
  * \return True if all the flags are true.
  */
-bool AllTrue(int8_t* flags, int64_t length, const DLContext& ctx);
+bool AllTrue(int8_t* flags, int64_t length, const DGLContext& ctx);
 
 /*!
  * \brief CUDA Kernel of filling the vector started from ptr of size length
@@ -187,7 +187,7 @@ __global__ void _LinearSearchKernel(
 template <typename DType>
 inline DType GetCUDAScalar(
     runtime::DeviceAPI* device_api,
-    DLContext ctx,
+    DGLContext ctx,
     const DType* cuda_ptr,
     cudaStream_t stream) {
   DType result;
@@ -196,7 +196,7 @@ inline DType GetCUDAScalar(
       &result, 0,
       sizeof(result),
       ctx,
-      DLContext{kDLCPU, 0},
+      DGLContext{kDLCPU, 0},
       DLDataTypeTraits<DType>::dtype,
       stream);
   return result;

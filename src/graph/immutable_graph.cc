@@ -52,7 +52,7 @@ NDArray SerializeMetadata(ImmutableGraphPtr gidx, const std::string &name) {
   meta.has_coo = false;
 
   NDArray meta_arr = NDArray::EmptyShared(name, {sizeof(meta)}, DLDataType{kDLInt, 8, 1},
-                                          DLContext{kDLCPU, 0}, true);
+                                          DGLContext{kDLCPU, 0}, true);
   memcpy(meta_arr->data, &meta, sizeof(meta));
   return meta_arr;
 #else
@@ -68,7 +68,7 @@ GraphIndexMetadata DeserializeMetadata(const std::string &name) {
   GraphIndexMetadata meta;
 #ifndef _WIN32
   NDArray meta_arr = NDArray::EmptyShared(name, {sizeof(meta)}, DLDataType{kDLInt, 8, 1},
-                                          DLContext{kDLCPU, 0}, false);
+                                          DGLContext{kDLCPU, 0}, false);
   memcpy(&meta, meta_arr->data, sizeof(meta));
 #else
   LOG(FATAL) << "CSR graph doesn't support shared memory in Windows yet";
@@ -82,7 +82,7 @@ std::tuple<IdArray, IdArray, IdArray> MapFromSharedMemory(
   const int64_t file_size = (num_verts + 1 + num_edges * 2) * sizeof(dgl_id_t);
 
   IdArray sm_array = IdArray::EmptyShared(
-      shared_mem_name, {file_size}, DLDataType{kDLInt, 8, 1}, DLContext{kDLCPU, 0}, is_create);
+      shared_mem_name, {file_size}, DLDataType{kDLInt, 8, 1}, DGLContext{kDLCPU, 0}, is_create);
   // Create views from the shared memory array. Note that we don't need to save
   //   the sm_array because the refcount is maintained by the view arrays.
   IdArray indptr = sm_array.CreateView({num_verts + 1}, DLDataType{kDLInt, 64, 1});
@@ -239,7 +239,7 @@ COOPtr CSR::ToCOO() const {
   return COOPtr(new COO(NumVertices(), coo.row, coo.col));
 }
 
-CSR CSR::CopyTo(const DLContext& ctx) const {
+CSR CSR::CopyTo(const DGLContext& ctx) const {
   if (Context() == ctx) {
     return *this;
   } else {
@@ -370,7 +370,7 @@ CSRPtr COO::ToCSR() const {
   return CSRPtr(new CSR(csr.indptr, csr.indices, csr.data));
 }
 
-COO COO::CopyTo(const DLContext& ctx) const {
+COO COO::CopyTo(const DGLContext& ctx) const {
   if (Context() == ctx) {
     return *this;
   } else {
@@ -556,7 +556,7 @@ ImmutableGraphPtr ImmutableGraph::ToImmutable(GraphPtr graph) {
   }
 }
 
-ImmutableGraphPtr ImmutableGraph::CopyTo(ImmutableGraphPtr g, const DLContext& ctx) {
+ImmutableGraphPtr ImmutableGraph::CopyTo(ImmutableGraphPtr g, const DGLContext& ctx) {
   if (ctx == g->Context()) {
     return g;
   }
@@ -656,7 +656,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLImmutableGraphCopyTo")
     GraphRef g = args[0];
     const int device_type = args[1];
     const int device_id = args[2];
-    DLContext ctx;
+    DGLContext ctx;
     ctx.device_type = static_cast<DLDeviceType>(device_type);
     ctx.device_id = device_id;
     ImmutableGraphPtr ig = CHECK_NOTNULL(std::dynamic_pointer_cast<ImmutableGraph>(g.sptr()));

@@ -211,7 +211,7 @@ __global__ void _FullKernel(
 }
 
 template <DLDeviceType XPU, typename DType>
-NDArray Full(DType val, int64_t length, DLContext ctx) {
+NDArray Full(DType val, int64_t length, DGLContext ctx) {
   NDArray ret = NDArray::Empty({length}, DLDataTypeTraits<DType>::dtype, ctx);
   DType* ret_data = static_cast<DType*>(ret->data);
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
@@ -222,13 +222,13 @@ NDArray Full(DType val, int64_t length, DLContext ctx) {
   return ret;
 }
 
-template IdArray Full<kDLGPU, int32_t>(int32_t val, int64_t length, DLContext ctx);
-template IdArray Full<kDLGPU, int64_t>(int64_t val, int64_t length, DLContext ctx);
+template IdArray Full<kDLGPU, int32_t>(int32_t val, int64_t length, DGLContext ctx);
+template IdArray Full<kDLGPU, int64_t>(int64_t val, int64_t length, DGLContext ctx);
 #ifdef USE_FP16
-template IdArray Full<kDLGPU, __half>(__half val, int64_t length, DLContext ctx);
+template IdArray Full<kDLGPU, __half>(__half val, int64_t length, DGLContext ctx);
 #endif
-template IdArray Full<kDLGPU, float>(float val, int64_t length, DLContext ctx);
-template IdArray Full<kDLGPU, double>(double val, int64_t length, DLContext ctx);
+template IdArray Full<kDLGPU, float>(float val, int64_t length, DGLContext ctx);
+template IdArray Full<kDLGPU, double>(double val, int64_t length, DGLContext ctx);
 
 
 ///////////////////////////// Range /////////////////////////////
@@ -244,7 +244,7 @@ __global__ void _RangeKernel(IdType* out, IdType low, IdType length) {
 }
 
 template <DLDeviceType XPU, typename IdType>
-IdArray Range(IdType low, IdType high, DLContext ctx) {
+IdArray Range(IdType low, IdType high, DGLContext ctx) {
   CHECK(high >= low) << "high must be bigger than low";
   const IdType length = high - low;
   IdArray ret = NewIdArray(length, ctx, sizeof(IdType) * 8);
@@ -260,8 +260,8 @@ IdArray Range(IdType low, IdType high, DLContext ctx) {
   return ret;
 }
 
-template IdArray Range<kDLGPU, int32_t>(int32_t, int32_t, DLContext);
-template IdArray Range<kDLGPU, int64_t>(int64_t, int64_t, DLContext);
+template IdArray Range<kDLGPU, int32_t>(int32_t, int32_t, DGLContext);
+template IdArray Range<kDLGPU, int64_t>(int64_t, int64_t, DGLContext);
 
 ///////////////////////////// Relabel_ //////////////////////////////
 

@@ -81,7 +81,7 @@ class UnitGraph : public BaseHeteroGraph {
 
   DLDataType DataType() const override;
 
-  DLContext Context() const override;
+  DGLContext Context() const override;
 
   bool IsPinned() const override;
 
@@ -167,7 +167,7 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \brief Create a graph with no edges */
   static HeteroGraphPtr Empty(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,
-      DLDataType dtype, DLContext ctx) {
+      DLDataType dtype, DGLContext ctx) {
     IdArray row = IdArray::Empty({0}, dtype, ctx);
     IdArray col = IdArray::Empty({0}, dtype, ctx);
     return CreateFromCOO(num_vtypes, num_src, num_dst, row, col);
@@ -207,7 +207,7 @@ class UnitGraph : public BaseHeteroGraph {
   static HeteroGraphPtr AsNumBits(HeteroGraphPtr g, uint8_t bits);
 
   /*! \brief Copy the data to another context */
-  static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DLContext &ctx,
+  static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DGLContext &ctx,
                                const DGLStreamHandle &stream = nullptr);
 
   /*!

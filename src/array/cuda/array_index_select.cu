@@ -79,7 +79,7 @@ DType IndexSelect(NDArray array, int64_t index) {
 #endif
   device->CopyDataFromTo(
       static_cast<DType*>(array->data) + index, 0, reinterpret_cast<DType*>(&ret), 0,
-      sizeof(DType), array->ctx, DLContext{kDLCPU, 0},
+      sizeof(DType), array->ctx, DGLContext{kDLCPU, 0},
       array->dtype, nullptr);
   return reinterpret_cast<DType&>(ret);
 }

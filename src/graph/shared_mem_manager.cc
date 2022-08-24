@@ -33,7 +33,7 @@ namespace dgl {
 template <>
 NDArray SharedMemManager::CopyToSharedMem<NDArray>(const NDArray &data,
                                                    std::string name) {
-  DLContext ctx = {kDLCPU, 0};
+  DGLContext ctx = {kDLCPU, 0};
   std::vector<int64_t> shape(data->shape, data->shape + data->ndim);
   strm_->Write(data->ndim);
   strm_->Write(data->dtype);
@@ -83,7 +83,7 @@ template <>
 bool SharedMemManager::CreateFromSharedMem<NDArray>(NDArray *nd,
                                                     std::string name) {
   int ndim;
-  DLContext ctx = {kDLCPU, 0};
+  DGLContext ctx = {kDLCPU, 0};
   DLDataType dtype;
 
   CHECK(this->Read(&ndim)) << "Invalid DLTensor file format";

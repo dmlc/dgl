@@ -173,22 +173,22 @@ template IdArray UnaryElewise<kDLCPU, int64_t, arith::Neg>(IdArray lhs);
 ///////////////////////////// Full /////////////////////////////
 
 template <DLDeviceType XPU, typename DType>
-NDArray Full(DType val, int64_t length, DLContext ctx) {
+NDArray Full(DType val, int64_t length, DGLContext ctx) {
   NDArray ret = NDArray::Empty({length}, DLDataTypeTraits<DType>::dtype, ctx);
   DType* ret_data = static_cast<DType*>(ret->data);
   std::fill(ret_data, ret_data + length, val);
   return ret;
 }
 
-template NDArray Full<kDLCPU, int32_t>(int32_t val, int64_t length, DLContext ctx);
-template NDArray Full<kDLCPU, int64_t>(int64_t val, int64_t length, DLContext ctx);
-template NDArray Full<kDLCPU, float>(float val, int64_t length, DLContext ctx);
-template NDArray Full<kDLCPU, double>(double val, int64_t length, DLContext ctx);
+template NDArray Full<kDLCPU, int32_t>(int32_t val, int64_t length, DGLContext ctx);
+template NDArray Full<kDLCPU, int64_t>(int64_t val, int64_t length, DGLContext ctx);
+template NDArray Full<kDLCPU, float>(float val, int64_t length, DGLContext ctx);
+template NDArray Full<kDLCPU, double>(double val, int64_t length, DGLContext ctx);
 
 ///////////////////////////// Range /////////////////////////////
 
 template <DLDeviceType XPU, typename IdType>
-IdArray Range(IdType low, IdType high, DLContext ctx) {
+IdArray Range(IdType low, IdType high, DGLContext ctx) {
   CHECK(high >= low) << "high must be bigger than low";
   IdArray ret = NewIdArray(high - low, ctx, sizeof(IdType) * 8);
   IdType* ret_data = static_cast<IdType*>(ret->data);
@@ -196,8 +196,8 @@ IdArray Range(IdType low, IdType high, DLContext ctx) {
   return ret;
 }
 
-template IdArray Range<kDLCPU, int32_t>(int32_t, int32_t, DLContext);
-template IdArray Range<kDLCPU, int64_t>(int64_t, int64_t, DLContext);
+template IdArray Range<kDLCPU, int32_t>(int32_t, int32_t, DGLContext);
+template IdArray Range<kDLCPU, int64_t>(int64_t, int64_t, DGLContext);
 
 ///////////////////////////// Relabel_ /////////////////////////////
 
@@ -216,7 +216,7 @@ IdArray Relabel_(const std::vector<IdArray>& arrays) {
     }
   }
   // map array
-  IdArray maparr = NewIdArray(newid, DLContext{kDLCPU, 0}, sizeof(IdType) * 8);
+  IdArray maparr = NewIdArray(newid, DGLContext{kDLCPU, 0}, sizeof(IdType) * 8);
   IdType* maparr_data = static_cast<IdType*>(maparr->data);
   for (const auto& kv : oldv2newv) {
     maparr_data[kv.second] = kv.first;

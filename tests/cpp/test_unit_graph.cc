@@ -17,7 +17,7 @@ using namespace dgl;
 using namespace dgl::runtime;
 
 template <typename IdType>
-aten::CSRMatrix CSR1(DLContext ctx) {
+aten::CSRMatrix CSR1(DGLContext ctx) {
   /*
    * G = [[0, 0, 1],
    *      [1, 0, 1],
@@ -39,11 +39,11 @@ aten::CSRMatrix CSR1(DLContext ctx) {
   return csr_a;
 }
 
-template aten::CSRMatrix CSR1<int32_t>(DLContext ctx);
-template aten::CSRMatrix CSR1<int64_t>(DLContext ctx);
+template aten::CSRMatrix CSR1<int32_t>(DGLContext ctx);
+template aten::CSRMatrix CSR1<int64_t>(DGLContext ctx);
 
 template <typename IdType>
-aten::COOMatrix COO1(DLContext ctx) {
+aten::COOMatrix COO1(DGLContext ctx) {
   /*
    * G = [[1, 1, 0],
    *      [0, 1, 0]]
@@ -64,10 +64,10 @@ aten::COOMatrix COO1(DLContext ctx) {
   return coo;
 }
 
-template aten::COOMatrix COO1<int32_t>(DLContext ctx);
-template aten::COOMatrix COO1<int64_t>(DLContext ctx);
+template aten::COOMatrix COO1<int32_t>(DGLContext ctx);
+template aten::COOMatrix COO1<int64_t>(DGLContext ctx);
 
-template <typename IdType> void _TestUnitGraph_InOutDegrees(DLContext ctx) {
+template <typename IdType> void _TestUnitGraph_InOutDegrees(DGLContext ctx) {
   /*
   InDegree(s) is available only if COO or CSC formats permitted.
   OutDegree(s) is available only if COO or CSR formats permitted.
@@ -114,7 +114,7 @@ template <typename IdType> void _TestUnitGraph_InOutDegrees(DLContext ctx) {
 }
 
 template <typename IdType>
-void _TestUnitGraph(DLContext ctx) {
+void _TestUnitGraph(DGLContext ctx) {
   const aten::CSRMatrix &csr = CSR1<IdType>(ctx);
   const aten::COOMatrix &coo = COO1<IdType>(ctx);
 
@@ -156,7 +156,7 @@ void _TestUnitGraph(DLContext ctx) {
 }
 
 template <typename IdType>
-void _TestUnitGraph_GetInCSR(DLContext ctx) {
+void _TestUnitGraph_GetInCSR(DGLContext ctx) {
   const aten::CSRMatrix &csr = CSR1<IdType>(ctx);
   const aten::COOMatrix &coo = COO1<IdType>(ctx);
 
@@ -193,7 +193,7 @@ void _TestUnitGraph_GetInCSR(DLContext ctx) {
 }
 
 template <typename IdType>
-void _TestUnitGraph_GetOutCSR(DLContext ctx) {
+void _TestUnitGraph_GetOutCSR(DGLContext ctx) {
   const aten::CSRMatrix &csr = CSR1<IdType>(ctx);
   const aten::COOMatrix &coo = COO1<IdType>(ctx);
 
@@ -230,7 +230,7 @@ void _TestUnitGraph_GetOutCSR(DLContext ctx) {
 }
 
 template <typename IdType>
-void _TestUnitGraph_GetCOO(DLContext ctx) {
+void _TestUnitGraph_GetCOO(DGLContext ctx) {
   const aten::CSRMatrix &csr = CSR1<IdType>(ctx);
   const aten::COOMatrix &coo = COO1<IdType>(ctx);
 
@@ -266,7 +266,7 @@ void _TestUnitGraph_GetCOO(DLContext ctx) {
 }
 
 template <typename IdType>
-void _TestUnitGraph_Reserve(DLContext ctx) {
+void _TestUnitGraph_Reserve(DGLContext ctx) {
   const aten::CSRMatrix &csr = CSR1<IdType>(ctx);
   const aten::COOMatrix &coo = COO1<IdType>(ctx);
 
@@ -346,7 +346,7 @@ void _TestUnitGraph_Reserve(DLContext ctx) {
 }
 
 template <typename IdType>
-void _TestUnitGraph_CopyTo(const DLContext &src_ctx,
+void _TestUnitGraph_CopyTo(const DGLContext &src_ctx,
                            const DGLContext &dst_ctx) {
   const aten::CSRMatrix &csr = CSR1<IdType>(src_ctx);
   const aten::COOMatrix &coo = COO1<IdType>(src_ctx);

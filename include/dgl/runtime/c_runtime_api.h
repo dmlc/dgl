@@ -105,7 +105,7 @@ typedef DLDataType DGLType;
 /*!
  * \brief The Device information, abstract away common device types.
  */
-typedef DLContext DGLContext;
+typedef DLDevice DGLContext;
 
 /*!
  * \brief The tensor array stucture to DGL API.
@@ -559,12 +559,12 @@ DGL_DLL int DGLLoadTensorAdapter(const char *path);
 /*!
  * \brief Pin host memory.
  */
-int DGLArrayPinData(DGLArrayHandle handle, DLContext ctx);
+int DGLArrayPinData(DGLArrayHandle handle, DGLContext ctx);
 
 /*!
  * \brief Unpin host memory.
  */
-int DGLArrayUnpinData(DGLArrayHandle handle, DLContext ctx);
+int DGLArrayUnpinData(DGLArrayHandle handle, DGLContext ctx);
 
 /*!
  * \brief Bug report macro.

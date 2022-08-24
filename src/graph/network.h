@@ -26,7 +26,7 @@ namespace network {
  */
 NDArray CreateNDArrayFromRaw(std::vector<int64_t> shape,
                              DLDataType dtype,
-                             DLContext ctx,
+                             DGLContext ctx,
                              void* raw);
 
 /*!

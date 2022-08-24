@@ -129,7 +129,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return adj_.row->dtype;
   }
 
-  DLContext Context() const override {
+  DGLContext Context() const override {
     return adj_.row->ctx;
   }
 
@@ -153,7 +153,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return ret;
   }
 
-  COO CopyTo(const DLContext &ctx,
+  COO CopyTo(const DGLContext &ctx,
              const DGLStreamHandle &stream = nullptr) const {
     if (Context() == ctx)
       return *this;
@@ -381,7 +381,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
     CHECK(aten::IsValidIdArray(dstvids)) << "Invalid vertex id array.";
     HeteroSubgraph subg;
     const auto& submat = aten::COOSliceMatrix(adj_, srcvids, dstvids);
-    DLContext ctx = aten::GetContextOf(vids);
+    DGLContext ctx = aten::GetContextOf(vids);
     IdArray sub_eids = aten::Range(0, submat.data->shape[0], NumBits(), ctx);
     subg.graph = std::make_shared<COO>(meta_graph(), submat.num_rows, submat.num_cols,
         submat.row, submat.col);
@@ -532,7 +532,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     return adj_.indices->dtype;
   }
 
-  DLContext Context() const override {
+  DGLContext Context() const override {
     return adj_.indices->ctx;
   }
 
@@ -558,7 +558,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     }
   }
 
-  CSR CopyTo(const DLContext &ctx,
+  CSR CopyTo(const DGLContext &ctx,
              const DGLStreamHandle &stream = nullptr) const {
     if (Context() == ctx) {
       return *this;
@@ -802,7 +802,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     CHECK(aten::IsValidIdArray(dstvids)) << "Invalid vertex id array.";
     HeteroSubgraph subg;
     const auto& submat = aten::CSRSliceMatrix(adj_, srcvids, dstvids);
-    DLContext ctx = aten::GetContextOf(vids);
+    DGLContext ctx = aten::GetContextOf(vids);
     IdArray sub_eids = aten::Range(0, submat.data->shape[0], NumBits(), ctx);
     subg.graph = std::make_shared<CSR>(meta_graph(), submat.num_rows, submat.num_cols,
         submat.indptr, submat.indices, sub_eids);
@@ -856,7 +856,7 @@ DLDataType UnitGraph::DataType() const {
   return GetAny()->DataType();
 }
 
-DLContext UnitGraph::Context() const {
+DGLContext UnitGraph::Context() const {
   return GetAny()->Context();
 }
 
@@ -1277,7 +1277,7 @@ HeteroGraphPtr UnitGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
   }
 }
 
-HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext &ctx,
+HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DGLContext &ctx,
                                  const DGLStreamHandle &stream) {
   if (ctx == g->Context()) {
     return g;

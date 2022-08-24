@@ -19,7 +19,7 @@ using namespace dgl::runtime;
 namespace dgl {
 namespace aten {
 
-IdArray NewIdArray(int64_t length, DLContext ctx, uint8_t nbits) {
+IdArray NewIdArray(int64_t length, DGLContext ctx, uint8_t nbits) {
   return IdArray::Empty({length}, DLDataType{kDLInt, nbits, 1}, ctx);
 }
 
@@ -29,7 +29,7 @@ IdArray Clone(IdArray arr) {
   return ret;
 }
 
-IdArray Range(int64_t low, int64_t high, uint8_t nbits, DLContext ctx) {
+IdArray Range(int64_t low, int64_t high, uint8_t nbits, DGLContext ctx) {
   IdArray ret;
   ATEN_XPU_SWITCH_CUDA(ctx.device_type, XPU, "Range", {
     if (nbits == 32) {
@@ -43,7 +43,7 @@ IdArray Range(int64_t low, int64_t high, uint8_t nbits, DLContext ctx) {
   return ret;
 }
 
-IdArray Full(int64_t val, int64_t length, uint8_t nbits, DLContext ctx) {
+IdArray Full(int64_t val, int64_t length, uint8_t nbits, DGLContext ctx) {
   IdArray ret;
   ATEN_XPU_SWITCH_CUDA(ctx.device_type, XPU, "Full", {
     if (nbits == 32) {
@@ -58,7 +58,7 @@ IdArray Full(int64_t val, int64_t length, uint8_t nbits, DLContext ctx) {
 }
 
 template <typename DType>
-NDArray Full(DType val, int64_t length, DLContext ctx) {
+NDArray Full(DType val, int64_t length, DGLContext ctx) {
   NDArray ret;
   ATEN_XPU_SWITCH_CUDA(ctx.device_type, XPU, "Full", {
     ret = impl::Full<XPU, DType>(val, length, ctx);
@@ -66,10 +66,10 @@ NDArray Full(DType val, int64_t length, DLContext ctx) {
   return ret;
 }
 
-template NDArray Full<int32_t>(int32_t val, int64_t length, DLContext ctx);
-template NDArray Full<int64_t>(int64_t val, int64_t length, DLContext ctx);
-template NDArray Full<float>(float val, int64_t length, DLContext ctx);
-template NDArray Full<double>(double val, int64_t length, DLContext ctx);
+template NDArray Full<int32_t>(int32_t val, int64_t length, DGLContext ctx);
+template NDArray Full<int64_t>(int64_t val, int64_t length, DGLContext ctx);
+template NDArray Full<float>(float val, int64_t length, DGLContext ctx);
+template NDArray Full<double>(double val, int64_t length, DGLContext ctx);
 
 IdArray AsNumBits(IdArray arr, uint8_t bits) {
   CHECK(bits == 32 || bits == 64)
@@ -316,7 +316,7 @@ std::pair<IdArray, IdArray> Sort(IdArray array, const int num_bits) {
 
 std::string ToDebugString(NDArray array) {
   std::ostringstream oss;
-  NDArray a = array.CopyTo(DLContext{kDLCPU, 0});
+  NDArray a = array.CopyTo(DGLContext{kDLCPU, 0});
   oss << "array([";
   ATEN_DTYPE_SWITCH(a->dtype, DType, "array", {
     for (int64_t i = 0; i < std::min<int64_t>(a.NumElements(), 10L); ++i) {

@@ -17,10 +17,10 @@ namespace aten {
 namespace impl {
 
 template <DLDeviceType XPU, typename IdType>
-IdArray Full(IdType val, int64_t length, DLContext ctx);
+IdArray Full(IdType val, int64_t length, DGLContext ctx);
 
 template <DLDeviceType XPU, typename IdType>
-IdArray Range(IdType low, IdType high, DLContext ctx);
+IdArray Range(IdType low, IdType high, DGLContext ctx);
 
 template <DLDeviceType XPU, typename IdType>
 IdArray AsNumBits(IdArray arr, uint8_t bits);

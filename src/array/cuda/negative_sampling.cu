@@ -93,7 +93,7 @@ struct IsNotMinusOne {
 template <typename IdType>
 void SortOrderedPairs(
     runtime::DeviceAPI* device,
-    DLContext ctx,
+    DGLContext ctx,
     IdType* major,
     IdType* minor,
     IdType* tmp_major,

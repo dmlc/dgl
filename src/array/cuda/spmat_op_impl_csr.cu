@@ -38,7 +38,7 @@ bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col) {
       rows.Ptr<IdType>(), cols.Ptr<IdType>(),
       1, 1, 1,
       static_cast<IdType*>(nullptr), static_cast<IdType>(-1), out.Ptr<IdType>());
-  out = out.CopyTo(DLContext{kDLCPU, 0});
+  out = out.CopyTo(DGLContext{kDLCPU, 0});
   return *out.Ptr<IdType>() != -1;
 }
 

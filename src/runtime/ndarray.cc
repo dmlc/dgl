@@ -93,7 +93,7 @@ struct NDArray::Internal {
   // but does not allocate space for the data.
   static NDArray Create(std::vector<int64_t> shape,
                         DLDataType dtype,
-                        DLContext ctx) {
+                        DGLContext ctx) {
     VerifyDataType(dtype);
     // critical zone
     NDArray::Container* data = new NDArray::Container();
@@ -196,7 +196,7 @@ DLManagedTensor* NDArray::ToDLPack() const {
 NDArray NDArray::EmptyShared(const std::string &name,
                        std::vector<int64_t> shape,
                        DLDataType dtype,
-                       DLContext ctx, bool is_create) {
+                       DGLContext ctx, bool is_create) {
   NDArray ret = Internal::Create(shape, dtype, ctx);
   // setup memory content
   size_t size = GetDataSize(ret.data_->dl_tensor);
@@ -213,7 +213,7 @@ NDArray NDArray::EmptyShared(const std::string &name,
 
 NDArray NDArray::Empty(std::vector<int64_t> shape,
                        DLDataType dtype,
-                       DLContext ctx) {
+                       DGLContext ctx) {
   TensorDispatcher* td = TensorDispatcher::Global();
   if (td->IsAvailable())
     return td->Empty(shape, dtype, ctx);
@@ -284,7 +284,7 @@ void NDArray::UnpinContainer(NDArray::Container* ptr) {
 }
 
 template<typename T>
-NDArray NDArray::FromVector(const std::vector<T>& vec, DLContext ctx) {
+NDArray NDArray::FromVector(const std::vector<T>& vec, DGLContext ctx) {
   const DLDataType dtype = DLDataTypeTraits<T>::dtype;
   int64_t size = static_cast<int64_t>(vec.size());
   NDArray ret = NDArray::Empty({size}, dtype, ctx);
@@ -294,7 +294,7 @@ NDArray NDArray::FromVector(const std::vector<T>& vec, DLContext ctx) {
       static_cast<T*>(ret->data),
       0,
       size * sizeof(T),
-      DLContext{kDLCPU, 0},
+      DGLContext{kDLCPU, 0},
       ctx,
       dtype,
       nullptr);
@@ -302,12 +302,12 @@ NDArray NDArray::FromVector(const std::vector<T>& vec, DLContext ctx) {
 }
 
 // export specializations
-template NDArray NDArray::FromVector<int32_t>(const std::vector<int32_t>&, DLContext);
-template NDArray NDArray::FromVector<int64_t>(const std::vector<int64_t>&, DLContext);
-template NDArray NDArray::FromVector<uint32_t>(const std::vector<uint32_t>&, DLContext);
-template NDArray NDArray::FromVector<uint64_t>(const std::vector<uint64_t>&, DLContext);
-template NDArray NDArray::FromVector<float>(const std::vector<float>&, DLContext);
-template NDArray NDArray::FromVector<double>(const std::vector<double>&, DLContext);
+template NDArray NDArray::FromVector<int32_t>(const std::vector<int32_t>&, DGLContext);
+template NDArray NDArray::FromVector<int64_t>(const std::vector<int64_t>&, DGLContext);
+template NDArray NDArray::FromVector<uint32_t>(const std::vector<uint32_t>&, DGLContext);
+template NDArray NDArray::FromVector<uint64_t>(const std::vector<uint64_t>&, DGLContext);
+template NDArray NDArray::FromVector<float>(const std::vector<float>&, DGLContext);
+template NDArray NDArray::FromVector<double>(const std::vector<double>&, DGLContext);
 
 template<typename T>
 std::vector<T> NDArray::ToVector() const {
@@ -317,7 +317,7 @@ std::vector<T> NDArray::ToVector() const {
 
   int64_t size = data_->dl_tensor.shape[0];
   std::vector<T> vec(size);
-  const DLContext &ctx = data_->dl_tensor.ctx;
+  const DGLContext &ctx = data_->dl_tensor.ctx;
   DeviceAPI::Get(ctx)->CopyDataFromTo(
       static_cast<T*>(data_->dl_tensor.data),
       0,
@@ -325,7 +325,7 @@ std::vector<T> NDArray::ToVector() const {
       0,
       size * sizeof(T),
       ctx,
-      DLContext{kDLCPU, 0},
+      DGLContext{kDLCPU, 0},
       dtype,
       nullptr);
   return vec;
@@ -376,7 +376,7 @@ bool NDArray::Load(dmlc::Stream* strm) {
       << "Invalid DLTensor file format";
   CHECK(header == kDGLNDArrayMagic)
       << "Invalid DLTensor file format";
-  DLContext ctx;
+  DGLContext ctx;
   int ndim;
   DLDataType dtype;
   CHECK(strm->Read(&ctx))
@@ -440,7 +440,7 @@ int DGLArrayAlloc(const dgl_index_t* shape,
   dtype.code = static_cast<uint8_t>(dtype_code);
   dtype.bits = static_cast<uint8_t>(dtype_bits);
   dtype.lanes = static_cast<uint16_t>(dtype_lanes);
-  DLContext ctx;
+  DGLContext ctx;
   ctx.device_type = static_cast<DLDeviceType>(device_type);
   ctx.device_id = device_id;
   *out = NDArray::Internal::MoveAsDLTensor(
@@ -463,7 +463,7 @@ int DGLArrayAllocSharedMem(const char *mem_name,
   dtype.lanes = static_cast<uint16_t>(dtype_lanes);
   std::vector<int64_t> shape_vec(shape, shape + ndim);
   NDArray arr = NDArray::EmptyShared(mem_name, shape_vec, dtype,
-                                     DLContext{kDLCPU, 0}, is_create);
+                                     DGLContext{kDLCPU, 0}, is_create);
   *out = NDArray::Internal::MoveAsDLTensor(arr);
   API_END();
 }
@@ -549,7 +549,7 @@ int DGLArrayCopyToBytes(DGLArrayHandle handle,
 }
 
 int DGLArrayPinData(DGLArrayHandle handle,
-                    DLContext ctx) {
+                    DGLContext ctx) {
   API_BEGIN();
   auto* nd_container = reinterpret_cast<NDArray::Container*>(handle);
   NDArray::PinContainer(nd_container);
@@ -557,7 +557,7 @@ int DGLArrayPinData(DGLArrayHandle handle,
 }
 
 int DGLArrayUnpinData(DGLArrayHandle handle,
-                      DLContext ctx) {
+                      DGLContext ctx) {
   API_BEGIN();
   auto* nd_container = reinterpret_cast<NDArray::Container*>(handle);
   NDArray::UnpinContainer(nd_container);

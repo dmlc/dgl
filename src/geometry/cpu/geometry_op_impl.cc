@@ -50,7 +50,7 @@ template void GroupIndexShuffle<int64_t>(
 
 template <typename IdType>
 IdArray RandomPerm(int64_t num_nodes) {
-  IdArray perm = aten::NewIdArray(num_nodes, DLContext{kDLCPU, 0}, sizeof(IdType) * 8);
+  IdArray perm = aten::NewIdArray(num_nodes, DGLContext{kDLCPU, 0}, sizeof(IdType) * 8);
   IdType* perm_data = static_cast<IdType*>(perm->data);
   std::iota(perm_data, perm_data + num_nodes, 0);
   IndexShuffle(perm_data, num_nodes);
@@ -59,7 +59,7 @@ IdArray RandomPerm(int64_t num_nodes) {
 
 template <typename IdType>
 IdArray GroupRandomPerm(const IdType *group_idxs, int64_t num_group_idxs, int64_t num_nodes) {
-  IdArray perm = aten::NewIdArray(num_nodes, DLContext{kDLCPU, 0}, sizeof(IdType) * 8);
+  IdArray perm = aten::NewIdArray(num_nodes, DGLContext{kDLCPU, 0}, sizeof(IdType) * 8);
   IdType* perm_data = static_cast<IdType*>(perm->data);
   std::iota(perm_data, perm_data + num_nodes, 0);
   GroupIndexShuffle(group_idxs, perm_data, num_group_idxs, num_nodes);

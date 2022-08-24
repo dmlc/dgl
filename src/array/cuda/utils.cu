@@ -11,7 +11,7 @@
 namespace dgl {
 namespace cuda {
 
-bool AllTrue(int8_t* flags, int64_t length, const DLContext& ctx) {
+bool AllTrue(int8_t* flags, int64_t length, const DGLContext& ctx) {
   auto device = runtime::DeviceAPI::Get(ctx);
   int8_t* rst = static_cast<int8_t*>(device->AllocWorkspace(ctx, 1));
   // Call CUB's reduction

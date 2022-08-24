@@ -528,11 +528,11 @@ void BruteForceKNNSharedCuda(const NDArray& data_points, const IdArray& data_off
   int64_t num_blocks = 0, final_elem = 0, copyoffset = (batch_size - 1) * sizeof(IdType);
   device->CopyDataFromTo(
     num_block_prefixsum, copyoffset, &num_blocks, 0,
-    sizeof(IdType), ctx, DLContext{kDLCPU, 0},
+    sizeof(IdType), ctx, DGLContext{kDLCPU, 0},
     query_offsets->dtype, thr_entry->stream);
   device->CopyDataFromTo(
     num_block_per_segment, copyoffset, &final_elem, 0,
-    sizeof(IdType), ctx, DLContext{kDLCPU, 0},
+    sizeof(IdType), ctx, DGLContext{kDLCPU, 0},
     query_offsets->dtype, thr_entry->stream);
   num_blocks += final_elem;
   device->FreeWorkspace(ctx, num_block_per_segment);
@@ -904,7 +904,7 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
       sum_temp_storage, sum_temp_size, num_updates, total_num_updates_d, num_nodes));
     device->CopyDataFromTo(
       total_num_updates_d, 0, &total_num_updates, 0,
-      sizeof(IdType), ctx, DLContext{kDLCPU, 0},
+      sizeof(IdType), ctx, DGLContext{kDLCPU, 0},
       offsets->dtype, thr_entry->stream);
 
     if (total_num_updates <= static_cast<IdType>(delta * k * num_nodes)) {

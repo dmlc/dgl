@@ -54,7 +54,7 @@ class HeteroGraph : public BaseHeteroGraph {
     return relation_graphs_[0]->DataType();
   }
 
-  DLContext Context() const override {
+  DGLContext Context() const override {
     return relation_graphs_[0]->Context();
   }
 
@@ -229,7 +229,7 @@ class HeteroGraph : public BaseHeteroGraph {
   static HeteroGraphPtr AsNumBits(HeteroGraphPtr g, uint8_t bits);
 
   /*! \brief Copy the data to another context */
-  static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DLContext &ctx,
+  static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DGLContext &ctx,
                                const DGLStreamHandle &stream = nullptr);
 
   /*!
