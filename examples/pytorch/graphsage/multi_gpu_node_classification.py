@@ -55,8 +55,8 @@ class SAGE(nn.Module):
                 if l != len(self.layers) - 1:
                     h = F.relu(h)
                     h = self.dropout(h)
-                # by design, our output nodes are contiguous
-                y[output_nodes] = h.to(y.device)
+                # non_blocking to accelerate data transfer
+                y[output_nodes] = h.to(y.device, non_blocking=True)
             # make sure all GPUs are done writing to 'y'
             dist.barrier()
             g.ndata['h'] = y if use_uva else y.to(device)
