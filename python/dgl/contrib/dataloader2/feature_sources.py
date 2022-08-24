@@ -72,7 +72,7 @@ class FeatureSource:
         ----------
         req : dict of dict of tensors
             This should be a dictionary with two levels, the first being the
-            graph component (nodes or edges), and the second being
+            graph object (nodes or edges), and the second being
             type (ntype or etype). The values in the second level dictionary
             should be 1-d tensors of the requested IDs. Edge types should be
             specified by their canonical names.
@@ -131,11 +131,33 @@ class FeatureSource:
 
 class FeatureRequestHandler:
     def __init__(self):
+        """ Create a new FeatureRequestHandler for facilitating communication
+        with a dataloader in requesting feaures.
+        """
         self._storages = {}
         self._features = {}
 
 
     def set_storage(self, graph_object, object_type, feat_name, storage):
+        """ Set the FeatureStore assocaited with the given graph component.
+
+        Parameters
+        ----------
+            graph_object : String
+                The graph object this storage is associated with. Valid
+                values are 'nodes', 'nodes:input', 'nodes:output', and 'edges'.
+
+            object_type : String
+                The type of graph object this storage is associated with. For
+                nodes this should be the ntype and for edges this should be the
+                etype.
+
+            feat_name : String
+                The name of the feature this storage is associated with.
+
+            storage : FeatureStorage or Tensor
+                The FeatureStorage/Tensor containing the features.
+        """
         if F.is_tensor(storage):
             storage = TensorStorage(storage)
 
@@ -169,6 +191,31 @@ class FeatureRequestHandler:
 
 
     def fetch_features(self, req, output_device):
+        """
+        Get all of the features corresponding to the given dictionary.
+
+        Parameters
+        ----------
+        req : dict of dict of tensors
+            This should be a dictionary with two levels, the first being the
+            graph object (nodes or edges), and the second being
+            type (ntype or etype). The values in the second level dictionary
+            should be 1-d tensors of the requested IDs. Edge types should be
+            specified by their canonical names.
+
+        output_device : torch.device
+            The device the returned tensors should be on.
+
+        Returns
+        -------
+        dict of dicts of dicts of tensors
+            The response to the request should match its structure, but in
+            place of the requested ids, there should be a dictionary of feature
+            names to feature tensors. When node/edge types are requested for
+            which there are no features, they should not be included in the
+            response tensor.
+        """
+
         resp = {}
         for graph_object, tree in req.items():
             if graph_object not in self._features:
