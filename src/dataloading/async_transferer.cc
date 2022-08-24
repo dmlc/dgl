@@ -43,7 +43,7 @@ AsyncTransferer::AsyncTransferer(
   next_id_(0),
   transfers_(),
   stream_(nullptr) {
-  if (ctx_.device_type == kDLGPU) {
+  if (ctx_.device_type == kDLCUDA) {
     stream_ = DeviceAPI::Get(ctx_)->CreateStream(ctx_);
   }
 }

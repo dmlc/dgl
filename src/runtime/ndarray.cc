@@ -266,7 +266,7 @@ void NDArray::PinContainer(NDArray::Container* ptr) {
   auto* tensor = &(ptr->dl_tensor);
   CHECK_EQ(tensor->ctx.device_type, kDLCPU)
     << "Only NDArray on CPU can be pinned";
-  DeviceAPI::Get(kDLGPU)->PinData(tensor->data, GetDataSize(*tensor));
+  DeviceAPI::Get(kDLCUDA)->PinData(tensor->data, GetDataSize(*tensor));
   ptr->pinned_by_dgl_ = true;
 }
 
@@ -279,7 +279,7 @@ void NDArray::UnpinContainer(NDArray::Container* ptr) {
   // 1. not pinned, do nothing
   if (!container_is_pinned) return;
   // 2. pinned by DGL, unpin it
-  DeviceAPI::Get(kDLGPU)->UnpinData(ptr->dl_tensor.data);
+  DeviceAPI::Get(kDLCUDA)->UnpinData(ptr->dl_tensor.data);
   ptr->pinned_by_dgl_ = false;
 }
 
@@ -350,7 +350,7 @@ bool NDArray::IsContainerPinned(NDArray::Container* ptr) {
   if (tensor->ctx.device_type != kDLCPU)
     return false;
   // ... and CUDA device API is enabled, and the tensor is indeed in pinned memory.
-  auto device = DeviceAPI::Get(kDLGPU, true);
+  auto device = DeviceAPI::Get(kDLCUDA, true);
   return device && device->IsPinned(tensor->data);
 }
 

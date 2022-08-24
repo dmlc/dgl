@@ -186,7 +186,7 @@ class NDArray {
    * \note This is an in-place method. Behavior depends on the current context,
    *       kDLCPU: will be pinned;
    *       IsPinned: directly return;
-   *       kDLGPU: invalid, will throw an error.
+   *       kDLCUDA: invalid, will throw an error.
    */
   inline void PinMemory_();
   /*!
@@ -309,7 +309,7 @@ class NDArray {
    *       Behavior depends on the current context,
    *       kDLCPU: will be pinned;
    *       IsPinned: directly return;
-   *       kDLGPU: invalid, will throw an error.
+   *       kDLCUDA: invalid, will throw an error.
    */
   DGL_DLL static void PinContainer(Container* ptr);
 
@@ -601,8 +601,8 @@ inline const char* TypeCode2Str(int type_code) {
 inline const char* DeviceTypeCode2Str(DLDeviceType device_type) {
   switch (device_type) {
     case kDLCPU: return "cpu";
-    case kDLGPU: return "cuda";
-    case kDLCPUPinned: return "cpu_pinned";
+    case kDLCUDA: return "cuda";
+    case kDLCUDAHost: return "cuda_host";
     case kDLOpenCL: return "opencl";
     case kDLVulkan: return "vulkan";
     case kDLMetal: return "metal";

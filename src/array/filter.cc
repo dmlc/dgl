@@ -23,10 +23,10 @@ DGL_REGISTER_GLOBAL("utils.filter._CAPI_DGLFilterCreateFromSet")
   IdArray array = args[0];
   auto ctx = array->ctx;
   // TODO(nv-dlasalle): Implement CPU version.
-  if (ctx.device_type == kDLGPU) {
+  if (ctx.device_type == kDLCUDA) {
     #ifdef DGL_USE_CUDA
     ATEN_ID_TYPE_SWITCH(array->dtype, IdType, {
-      *rv = CreateSetFilter<kDLGPU, IdType>(array);
+      *rv = CreateSetFilter<kDLCUDA, IdType>(array);
     });
     #else
     LOG(FATAL) << "GPU support not compiled.";

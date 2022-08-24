@@ -160,8 +160,8 @@ FilterRef CreateSetFilter(IdArray set) {
   return FilterRef(std::make_shared<CudaFilterSet<IdType>>(set));
 }
 
-template FilterRef CreateSetFilter<kDLGPU, int32_t>(IdArray set);
-template FilterRef CreateSetFilter<kDLGPU, int64_t>(IdArray set);
+template FilterRef CreateSetFilter<kDLCUDA, int32_t>(IdArray set);
+template FilterRef CreateSetFilter<kDLCUDA, int64_t>(IdArray set);
 
 }  // namespace array
 }  // namespace dgl

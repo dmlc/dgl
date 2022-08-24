@@ -654,13 +654,13 @@ COOMatrix CSRRowWiseSampling(CSRMatrix mat,
       picked_col, picked_idx);
 }
 
-template COOMatrix CSRRowWiseSampling<kDLGPU, int32_t, float>(
+template COOMatrix CSRRowWiseSampling<kDLCUDA, int32_t, float>(
   CSRMatrix, IdArray, int64_t, FloatArray, bool);
-template COOMatrix CSRRowWiseSampling<kDLGPU, int64_t, float>(
+template COOMatrix CSRRowWiseSampling<kDLCUDA, int64_t, float>(
   CSRMatrix, IdArray, int64_t, FloatArray, bool);
-template COOMatrix CSRRowWiseSampling<kDLGPU, int32_t, double>(
+template COOMatrix CSRRowWiseSampling<kDLCUDA, int32_t, double>(
   CSRMatrix, IdArray, int64_t, FloatArray, bool);
-template COOMatrix CSRRowWiseSampling<kDLGPU, int64_t, double>(
+template COOMatrix CSRRowWiseSampling<kDLCUDA, int64_t, double>(
   CSRMatrix, IdArray, int64_t, FloatArray, bool);
 
 }  // namespace impl

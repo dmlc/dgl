@@ -21,7 +21,7 @@ CSRMatrix COOToCSR(COOMatrix coo) {
 }
 
 template <>
-CSRMatrix COOToCSR<kDLGPU, int32_t>(COOMatrix coo) {
+CSRMatrix COOToCSR<kDLCUDA, int32_t>(COOMatrix coo) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   // allocate cusparse handle if needed
   if (!thr_entry->cusparse_handle) {
@@ -99,7 +99,7 @@ __global__ void _SortedSearchKernelUpperBound(
 }
 
 template <>
-CSRMatrix COOToCSR<kDLGPU, int64_t>(COOMatrix coo) {
+CSRMatrix COOToCSR<kDLCUDA, int64_t>(COOMatrix coo) {
   const auto& ctx = coo.row->ctx;
   const auto nbits = coo.row->dtype.bits;
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
@@ -132,8 +132,8 @@ CSRMatrix COOToCSR<kDLGPU, int64_t>(COOMatrix coo) {
                    indptr, coo.col, coo.data, col_sorted);
 }
 
-template CSRMatrix COOToCSR<kDLGPU, int32_t>(COOMatrix coo);
-template CSRMatrix COOToCSR<kDLGPU, int64_t>(COOMatrix coo);
+template CSRMatrix COOToCSR<kDLCUDA, int32_t>(COOMatrix coo);
+template CSRMatrix COOToCSR<kDLCUDA, int64_t>(COOMatrix coo);
 
 }  // namespace impl
 }  // namespace aten

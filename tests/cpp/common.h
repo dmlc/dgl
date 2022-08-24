@@ -6,7 +6,7 @@
 static constexpr DGLContext CTX = DGLContext{kDLCPU, 0};
 static constexpr DGLContext CPU = DGLContext{kDLCPU, 0};
 #ifdef DGL_USE_CUDA
-static constexpr DGLContext GPU = DGLContext{kDLGPU, 0};
+static constexpr DGLContext GPU = DGLContext{kDLCUDA, 0};
 #endif
 
 template <typename T>

@@ -15,7 +15,7 @@
 
 #if DLPACK_VERSION > 040
 // Compatibility across DLPack - note that this assumes that the ABI stays the same.
-#define kDLGPU kDLCUDA
+#define kDLCUDA kDLCUDA
 #endif
 
 namespace tensoradapter {
@@ -25,7 +25,7 @@ static at::Device get_device(DLDevice device) {
    case kDLCPU:
     return at::Device(torch::kCPU);
     break;
-   case kDLGPU:
+   case kDLCUDA:
     return at::Device(torch::kCUDA, device.device_id);
     break;
    default:

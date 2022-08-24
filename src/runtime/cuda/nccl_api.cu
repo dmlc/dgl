@@ -618,7 +618,7 @@ void NCCLCommunicator::AllToAllV(
 
   int dev_id;
   CUDA_CALL(cudaGetDevice(&dev_id));
-  DGLContext ctx{kDLGPU, dev_id};
+  DGLContext ctx{kDLCUDA, dev_id};
 
   auto device = runtime::DeviceAPI::Get(ctx);
   auto dtype = DLDataTypeTraits<DType>::dtype;
@@ -680,7 +680,7 @@ void NCCLCommunicator::AllToAll(
   #else
   int dev_id;
   CUDA_CALL(cudaGetDevice(&dev_id));
-  DGLContext ctx{kDLGPU, dev_id};
+  DGLContext ctx{kDLCUDA, dev_id};
 
   auto device = runtime::DeviceAPI::Get(ctx);
   auto dtype = DLDataTypeTraits<IdType>::dtype;

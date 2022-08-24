@@ -219,7 +219,7 @@ std::pair<IdArray, IdArray> RandomWalkUniform(
   dim3 grid((num_seeds + TILE_SIZE - 1) / TILE_SIZE);
   const uint64_t random_seed = RandomEngine::ThreadLocal()->RandInt(1000000000);
   ATEN_FLOAT_TYPE_SWITCH(restart_prob->dtype, FloatType, "random walk GPU kernel", {
-    CHECK(restart_prob->ctx.device_type == kDLGPU) << "restart prob should be in GPU.";
+    CHECK(restart_prob->ctx.device_type == kDLCUDA) << "restart prob should be in GPU.";
     CHECK(restart_prob->ndim == 1) << "restart prob dimension should be 1.";
     const FloatType *restart_prob_data = restart_prob.Ptr<FloatType>();
     const int64_t restart_prob_size = restart_prob->shape[0];
@@ -353,7 +353,7 @@ std::pair<IdArray, IdArray> RandomWalkBiased(
   dim3 block(256);
   dim3 grid((num_seeds + TILE_SIZE - 1) / TILE_SIZE);
   const uint64_t random_seed = RandomEngine::ThreadLocal()->RandInt(1000000000);
-  CHECK(restart_prob->ctx.device_type == kDLGPU) << "restart prob should be in GPU.";
+  CHECK(restart_prob->ctx.device_type == kDLCUDA) << "restart prob should be in GPU.";
   CHECK(restart_prob->ndim == 1) << "restart prob dimension should be 1.";
   const FloatType *restart_prob_data = restart_prob.Ptr<FloatType>();
   const int64_t restart_prob_size = restart_prob->shape[0];
@@ -483,7 +483,7 @@ std::tuple<IdArray, IdArray, IdArray> SelectPinSageNeighbors(
     const IdArray dst,
     const int64_t num_samples_per_node,
     const int64_t k) {
-  CHECK(src->ctx.device_type == kDLGPU) <<
+  CHECK(src->ctx.device_type == kDLCUDA) <<
     "IdArray needs be on GPU!";
   const IdxType* src_data = src.Ptr<IdxType>();
   const IdxType* dst_data = dst.Ptr<IdxType>();
@@ -499,27 +499,27 @@ std::tuple<IdArray, IdArray, IdArray> SelectPinSageNeighbors(
 }
 
 template
-std::pair<IdArray, IdArray> RandomWalk<kDLGPU, int32_t>(
+std::pair<IdArray, IdArray> RandomWalk<kDLCUDA, int32_t>(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
     const std::vector<FloatArray> &prob);
 template
-std::pair<IdArray, IdArray> RandomWalk<kDLGPU, int64_t>(
+std::pair<IdArray, IdArray> RandomWalk<kDLCUDA, int64_t>(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
     const std::vector<FloatArray> &prob);
 
 template
-std::pair<IdArray, IdArray> RandomWalkWithRestart<kDLGPU, int32_t>(
+std::pair<IdArray, IdArray> RandomWalkWithRestart<kDLCUDA, int32_t>(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
     const std::vector<FloatArray> &prob,
     double restart_prob);
 template
-std::pair<IdArray, IdArray> RandomWalkWithRestart<kDLGPU, int64_t>(
+std::pair<IdArray, IdArray> RandomWalkWithRestart<kDLCUDA, int64_t>(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
@@ -527,14 +527,14 @@ std::pair<IdArray, IdArray> RandomWalkWithRestart<kDLGPU, int64_t>(
     double restart_prob);
 
 template
-std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart<kDLGPU, int32_t>(
+std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart<kDLCUDA, int32_t>(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
     const std::vector<FloatArray> &prob,
     FloatArray restart_prob);
 template
-std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart<kDLGPU, int64_t>(
+std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart<kDLCUDA, int64_t>(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
@@ -542,13 +542,13 @@ std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart<kDLGPU, int64_t>(
     FloatArray restart_prob);
 
 template
-std::tuple<IdArray, IdArray, IdArray> SelectPinSageNeighbors<kDLGPU, int32_t>(
+std::tuple<IdArray, IdArray, IdArray> SelectPinSageNeighbors<kDLCUDA, int32_t>(
     const IdArray src,
     const IdArray dst,
     const int64_t num_samples_per_node,
     const int64_t k);
 template
-std::tuple<IdArray, IdArray, IdArray> SelectPinSageNeighbors<kDLGPU, int64_t>(
+std::tuple<IdArray, IdArray, IdArray> SelectPinSageNeighbors<kDLCUDA, int64_t>(
     const IdArray src,
     const IdArray dst,
     const int64_t num_samples_per_node,

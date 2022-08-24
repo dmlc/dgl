@@ -376,12 +376,12 @@ GeneratePermutationFromRemainder(
 
 
 template std::pair<IdArray, IdArray>
-GeneratePermutationFromRemainder<kDLGPU, int32_t>(
+GeneratePermutationFromRemainder<kDLCUDA, int32_t>(
         int64_t array_size,
         int num_parts,
         IdArray in_idx);
 template std::pair<IdArray, IdArray>
-GeneratePermutationFromRemainder<kDLGPU, int64_t>(
+GeneratePermutationFromRemainder<kDLCUDA, int64_t>(
         int64_t array_size,
         int num_parts,
         IdArray in_idx);
@@ -420,11 +420,11 @@ IdArray MapToLocalFromRemainder(
 }
 
 template IdArray
-MapToLocalFromRemainder<kDLGPU, int32_t>(
+MapToLocalFromRemainder<kDLCUDA, int32_t>(
         int num_parts,
         IdArray in_idx);
 template IdArray
-MapToLocalFromRemainder<kDLGPU, int64_t>(
+MapToLocalFromRemainder<kDLCUDA, int64_t>(
         int num_parts,
         IdArray in_idx);
 
@@ -468,12 +468,12 @@ IdArray MapToGlobalFromRemainder(
 }
 
 template IdArray
-MapToGlobalFromRemainder<kDLGPU, int32_t>(
+MapToGlobalFromRemainder<kDLCUDA, int32_t>(
         int num_parts,
         IdArray in_idx,
         int part_id);
 template IdArray
-MapToGlobalFromRemainder<kDLGPU, int64_t>(
+MapToGlobalFromRemainder<kDLCUDA, int64_t>(
         int num_parts,
         IdArray in_idx,
         int part_id);
@@ -598,25 +598,25 @@ GeneratePermutationFromRange(
 
 
 template std::pair<IdArray, IdArray>
-GeneratePermutationFromRange<kDLGPU, int32_t, int32_t>(
+GeneratePermutationFromRange<kDLCUDA, int32_t, int32_t>(
         int64_t array_size,
         int num_parts,
         IdArray range,
         IdArray in_idx);
 template std::pair<IdArray, IdArray>
-GeneratePermutationFromRange<kDLGPU, int64_t, int32_t>(
+GeneratePermutationFromRange<kDLCUDA, int64_t, int32_t>(
         int64_t array_size,
         int num_parts,
         IdArray range,
         IdArray in_idx);
 template std::pair<IdArray, IdArray>
-GeneratePermutationFromRange<kDLGPU, int32_t, int64_t>(
+GeneratePermutationFromRange<kDLCUDA, int32_t, int64_t>(
         int64_t array_size,
         int num_parts,
         IdArray range,
         IdArray in_idx);
 template std::pair<IdArray, IdArray>
-GeneratePermutationFromRange<kDLGPU, int64_t, int64_t>(
+GeneratePermutationFromRange<kDLCUDA, int64_t, int64_t>(
         int64_t array_size,
         int num_parts,
         IdArray range,
@@ -657,22 +657,22 @@ IdArray MapToLocalFromRange(
 }
 
 template IdArray
-MapToLocalFromRange<kDLGPU, int32_t, int32_t>(
+MapToLocalFromRange<kDLCUDA, int32_t, int32_t>(
         int num_parts,
         IdArray range,
         IdArray in_idx);
 template IdArray
-MapToLocalFromRange<kDLGPU, int64_t, int32_t>(
+MapToLocalFromRange<kDLCUDA, int64_t, int32_t>(
         int num_parts,
         IdArray range,
         IdArray in_idx);
 template IdArray
-MapToLocalFromRange<kDLGPU, int32_t, int64_t>(
+MapToLocalFromRange<kDLCUDA, int32_t, int64_t>(
         int num_parts,
         IdArray range,
         IdArray in_idx);
 template IdArray
-MapToLocalFromRange<kDLGPU, int64_t, int64_t>(
+MapToLocalFromRange<kDLCUDA, int64_t, int64_t>(
         int num_parts,
         IdArray range,
         IdArray in_idx);
@@ -720,25 +720,25 @@ IdArray MapToGlobalFromRange(
 }
 
 template IdArray
-MapToGlobalFromRange<kDLGPU, int32_t, int32_t>(
+MapToGlobalFromRange<kDLCUDA, int32_t, int32_t>(
         int num_parts,
         IdArray range,
         IdArray in_idx,
         int part_id);
 template IdArray
-MapToGlobalFromRange<kDLGPU, int64_t, int32_t>(
+MapToGlobalFromRange<kDLCUDA, int64_t, int32_t>(
         int num_parts,
         IdArray range,
         IdArray in_idx,
         int part_id);
 template IdArray
-MapToGlobalFromRange<kDLGPU, int32_t, int64_t>(
+MapToGlobalFromRange<kDLCUDA, int32_t, int64_t>(
         int num_parts,
         IdArray range,
         IdArray in_idx,
         int part_id);
 template IdArray
-MapToGlobalFromRange<kDLGPU, int64_t, int64_t>(
+MapToGlobalFromRange<kDLCUDA, int64_t, int64_t>(
         int num_parts,
         IdArray range,
         IdArray in_idx,

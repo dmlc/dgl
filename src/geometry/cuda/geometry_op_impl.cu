@@ -115,16 +115,16 @@ void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_poin
       point_in_batch, dim, start_idx_data, dist_data, ret_data);
 }
 
-template void FarthestPointSampler<kDLGPU, float, int32_t>(
+template void FarthestPointSampler<kDLCUDA, float, int32_t>(
     NDArray array, int64_t batch_size, int64_t sample_points,
     NDArray dist, IdArray start_idx, IdArray result);
-template void FarthestPointSampler<kDLGPU, float, int64_t>(
+template void FarthestPointSampler<kDLCUDA, float, int64_t>(
     NDArray array, int64_t batch_size, int64_t sample_points,
     NDArray dist, IdArray start_idx, IdArray result);
-template void FarthestPointSampler<kDLGPU, double, int32_t>(
+template void FarthestPointSampler<kDLCUDA, double, int32_t>(
     NDArray array, int64_t batch_size, int64_t sample_points,
     NDArray dist, IdArray start_idx, IdArray result);
-template void FarthestPointSampler<kDLGPU, double, int64_t>(
+template void FarthestPointSampler<kDLCUDA, double, int64_t>(
     NDArray array, int64_t batch_size, int64_t sample_points,
     NDArray dist, IdArray start_idx, IdArray result);
 

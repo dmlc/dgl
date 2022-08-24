@@ -53,24 +53,24 @@ NDArray CSRGetData(
 }
 
 #ifdef USE_FP16
-template NDArray CSRGetData<kDLGPU, int32_t, __half>(
+template NDArray CSRGetData<kDLCUDA, int32_t, __half>(
     CSRMatrix csr, NDArray rows, NDArray cols, bool return_eids, NDArray weights, __half filler);
-template NDArray CSRGetData<kDLGPU, int64_t, __half>(
+template NDArray CSRGetData<kDLCUDA, int64_t, __half>(
     CSRMatrix csr, NDArray rows, NDArray cols, bool return_eids, NDArray weights, __half filler);
 #endif
-template NDArray CSRGetData<kDLGPU, int32_t, float>(
+template NDArray CSRGetData<kDLCUDA, int32_t, float>(
     CSRMatrix csr, NDArray rows, NDArray cols, bool return_eids, NDArray weights, float filler);
-template NDArray CSRGetData<kDLGPU, int64_t, float>(
+template NDArray CSRGetData<kDLCUDA, int64_t, float>(
     CSRMatrix csr, NDArray rows, NDArray cols, bool return_eids, NDArray weights, float filler);
-template NDArray CSRGetData<kDLGPU, int32_t, double>(
+template NDArray CSRGetData<kDLCUDA, int32_t, double>(
     CSRMatrix csr, NDArray rows, NDArray cols, bool return_eids, NDArray weights, double filler);
-template NDArray CSRGetData<kDLGPU, int64_t, double>(
+template NDArray CSRGetData<kDLCUDA, int64_t, double>(
     CSRMatrix csr, NDArray rows, NDArray cols, bool return_eids, NDArray weights, double filler);
 
 // For CSRGetData<XPU, IdType>(CSRMatrix, NDArray, NDArray)
-template NDArray CSRGetData<kDLGPU, int32_t, int32_t>(
+template NDArray CSRGetData<kDLCUDA, int32_t, int32_t>(
     CSRMatrix csr, NDArray rows, NDArray cols, bool return_eids, NDArray weights, int32_t filler);
-template NDArray CSRGetData<kDLGPU, int64_t, int64_t>(
+template NDArray CSRGetData<kDLCUDA, int64_t, int64_t>(
     CSRMatrix csr, NDArray rows, NDArray cols, bool return_eids, NDArray weights, int64_t filler);
 
 }  // namespace impl

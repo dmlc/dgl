@@ -172,7 +172,7 @@ ToBlockGPU64(HeteroGraphPtr, const std::vector<IdArray>&, bool, std::vector<IdAr
 
 template<>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>>
-ToBlock<kDLGPU, int32_t>(HeteroGraphPtr graph,
+ToBlock<kDLCUDA, int32_t>(HeteroGraphPtr graph,
                          const std::vector<IdArray> &rhs_nodes,
                          bool include_rhs_in_lhs,
                          std::vector<IdArray>* const lhs_nodes) {
@@ -181,7 +181,7 @@ ToBlock<kDLGPU, int32_t>(HeteroGraphPtr graph,
 
 template<>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>>
-ToBlock<kDLGPU, int64_t>(HeteroGraphPtr graph,
+ToBlock<kDLCUDA, int64_t>(HeteroGraphPtr graph,
                          const std::vector<IdArray> &rhs_nodes,
                          bool include_rhs_in_lhs,
                          std::vector<IdArray>* const lhs_nodes) {

@@ -46,8 +46,8 @@
   if ((val) == kDLCPU) {                                        \
     constexpr auto XPU = kDLCPU;                                \
     {__VA_ARGS__}                                               \
-  } else if ((val) == kDLGPU) {                                 \
-    constexpr auto XPU = kDLGPU;                                \
+  } else if ((val) == kDLCUDA) {                                 \
+    constexpr auto XPU = kDLCUDA;                                \
     {__VA_ARGS__}                                               \
   } else {                                                      \
     LOG(FATAL) << "Operator " << (op) << " does not support "   \

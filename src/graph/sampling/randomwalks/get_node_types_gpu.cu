@@ -62,11 +62,11 @@ TypeArray GetNodeTypesFromMetapath(
 }
 
 template
-TypeArray GetNodeTypesFromMetapath<kDLGPU, int32_t>(
+TypeArray GetNodeTypesFromMetapath<kDLCUDA, int32_t>(
     const HeteroGraphPtr hg,
     const TypeArray metapath);
 template
-TypeArray GetNodeTypesFromMetapath<kDLGPU, int64_t>(
+TypeArray GetNodeTypesFromMetapath<kDLCUDA, int64_t>(
     const HeteroGraphPtr hg,
     const TypeArray metapath);
 

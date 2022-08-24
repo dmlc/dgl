@@ -42,8 +42,8 @@ bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col) {
   return *out.Ptr<IdType>() != -1;
 }
 
-template bool CSRIsNonZero<kDLGPU, int32_t>(CSRMatrix, int64_t, int64_t);
-template bool CSRIsNonZero<kDLGPU, int64_t>(CSRMatrix, int64_t, int64_t);
+template bool CSRIsNonZero<kDLCUDA, int32_t>(CSRMatrix, int64_t, int64_t);
+template bool CSRIsNonZero<kDLCUDA, int64_t>(CSRMatrix, int64_t, int64_t);
 
 template <DLDeviceType XPU, typename IdType>
 NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col) {
@@ -69,8 +69,8 @@ NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col) {
   return rst != -1;
 }
 
-template NDArray CSRIsNonZero<kDLGPU, int32_t>(CSRMatrix, NDArray, NDArray);
-template NDArray CSRIsNonZero<kDLGPU, int64_t>(CSRMatrix, NDArray, NDArray);
+template NDArray CSRIsNonZero<kDLCUDA, int32_t>(CSRMatrix, NDArray, NDArray);
+template NDArray CSRIsNonZero<kDLCUDA, int64_t>(CSRMatrix, NDArray, NDArray);
 
 ///////////////////////////// CSRHasDuplicate /////////////////////////////
 
@@ -116,8 +116,8 @@ bool CSRHasDuplicate(CSRMatrix csr) {
   return !ret;
 }
 
-template bool CSRHasDuplicate<kDLGPU, int32_t>(CSRMatrix csr);
-template bool CSRHasDuplicate<kDLGPU, int64_t>(CSRMatrix csr);
+template bool CSRHasDuplicate<kDLCUDA, int32_t>(CSRMatrix csr);
+template bool CSRHasDuplicate<kDLCUDA, int64_t>(CSRMatrix csr);
 
 ///////////////////////////// CSRGetRowNNZ /////////////////////////////
 
@@ -128,8 +128,8 @@ int64_t CSRGetRowNNZ(CSRMatrix csr, int64_t row) {
   return next - cur;
 }
 
-template int64_t CSRGetRowNNZ<kDLGPU, int32_t>(CSRMatrix, int64_t);
-template int64_t CSRGetRowNNZ<kDLGPU, int64_t>(CSRMatrix, int64_t);
+template int64_t CSRGetRowNNZ<kDLCUDA, int32_t>(CSRMatrix, int64_t);
+template int64_t CSRGetRowNNZ<kDLCUDA, int64_t>(CSRMatrix, int64_t);
 
 template <typename IdType>
 __global__ void _CSRGetRowNNZKernel(
@@ -162,8 +162,8 @@ NDArray CSRGetRowNNZ(CSRMatrix csr, NDArray rows) {
   return rst;
 }
 
-template NDArray CSRGetRowNNZ<kDLGPU, int32_t>(CSRMatrix, NDArray);
-template NDArray CSRGetRowNNZ<kDLGPU, int64_t>(CSRMatrix, NDArray);
+template NDArray CSRGetRowNNZ<kDLCUDA, int32_t>(CSRMatrix, NDArray);
+template NDArray CSRGetRowNNZ<kDLCUDA, int64_t>(CSRMatrix, NDArray);
 
 ///////////////////////////// CSRGetRowColumnIndices /////////////////////////////
 
@@ -174,8 +174,8 @@ NDArray CSRGetRowColumnIndices(CSRMatrix csr, int64_t row) {
   return csr.indices.CreateView({len}, csr.indices->dtype, offset);
 }
 
-template NDArray CSRGetRowColumnIndices<kDLGPU, int32_t>(CSRMatrix, int64_t);
-template NDArray CSRGetRowColumnIndices<kDLGPU, int64_t>(CSRMatrix, int64_t);
+template NDArray CSRGetRowColumnIndices<kDLCUDA, int32_t>(CSRMatrix, int64_t);
+template NDArray CSRGetRowColumnIndices<kDLCUDA, int64_t>(CSRMatrix, int64_t);
 
 ///////////////////////////// CSRGetRowData /////////////////////////////
 
@@ -189,8 +189,8 @@ NDArray CSRGetRowData(CSRMatrix csr, int64_t row) {
     return aten::Range(offset, offset + len, csr.indptr->dtype.bits, csr.indptr->ctx);
 }
 
-template NDArray CSRGetRowData<kDLGPU, int32_t>(CSRMatrix, int64_t);
-template NDArray CSRGetRowData<kDLGPU, int64_t>(CSRMatrix, int64_t);
+template NDArray CSRGetRowData<kDLCUDA, int32_t>(CSRMatrix, int64_t);
+template NDArray CSRGetRowData<kDLCUDA, int64_t>(CSRMatrix, int64_t);
 
 ///////////////////////////// CSRSliceRows /////////////////////////////
 
@@ -215,8 +215,8 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end) {
                    csr.sorted);
 }
 
-template CSRMatrix CSRSliceRows<kDLGPU, int32_t>(CSRMatrix, int64_t, int64_t);
-template CSRMatrix CSRSliceRows<kDLGPU, int64_t>(CSRMatrix, int64_t, int64_t);
+template CSRMatrix CSRSliceRows<kDLCUDA, int32_t>(CSRMatrix, int64_t, int64_t);
+template CSRMatrix CSRSliceRows<kDLCUDA, int64_t>(CSRMatrix, int64_t, int64_t);
 
 /*!
  * \brief Copy data segment to output buffers
@@ -272,8 +272,8 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
                    csr.sorted);
 }
 
-template CSRMatrix CSRSliceRows<kDLGPU, int32_t>(CSRMatrix , NDArray);
-template CSRMatrix CSRSliceRows<kDLGPU, int64_t>(CSRMatrix , NDArray);
+template CSRMatrix CSRSliceRows<kDLCUDA, int32_t>(CSRMatrix , NDArray);
+template CSRMatrix CSRSliceRows<kDLCUDA, int64_t>(CSRMatrix , NDArray);
 
 ///////////////////////////// CSRGetDataAndIndices /////////////////////////////
 
@@ -392,9 +392,9 @@ std::vector<NDArray> CSRGetDataAndIndices(CSRMatrix csr, NDArray row, NDArray co
   return {ret_row, ret_col, ret_data};
 }
 
-template std::vector<NDArray> CSRGetDataAndIndices<kDLGPU, int32_t>(
+template std::vector<NDArray> CSRGetDataAndIndices<kDLCUDA, int32_t>(
     CSRMatrix csr, NDArray rows, NDArray cols);
-template std::vector<NDArray> CSRGetDataAndIndices<kDLGPU, int64_t>(
+template std::vector<NDArray> CSRGetDataAndIndices<kDLCUDA, int64_t>(
     CSRMatrix csr, NDArray rows, NDArray cols);
 
 ///////////////////////////// CSRSliceMatrix /////////////////////////////
@@ -499,9 +499,9 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray 
                    ret_col, ret_data);
 }
 
-template CSRMatrix CSRSliceMatrix<kDLGPU, int32_t>(
+template CSRMatrix CSRSliceMatrix<kDLCUDA, int32_t>(
     CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
-template CSRMatrix CSRSliceMatrix<kDLGPU, int64_t>(
+template CSRMatrix CSRSliceMatrix<kDLCUDA, int64_t>(
     CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
 
 }  // namespace impl

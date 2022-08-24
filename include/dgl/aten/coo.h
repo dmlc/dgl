@@ -137,7 +137,7 @@ struct COOMatrix {
   * \note This is an in-place method. Behavior depends on the current context,
   *       kDLCPU: will be pinned;
   *       IsPinned: directly return;
-  *       kDLGPU: invalid, will throw an error.
+  *       kDLCUDA: invalid, will throw an error.
   *       The context check is deferred to pinning the NDArray.
   */
   inline void PinMemory_() {

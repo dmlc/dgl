@@ -167,18 +167,18 @@ std::pair<CSRMatrix, NDArray> CSRSum(
 }
 
 #ifdef USE_FP16
-template std::pair<CSRMatrix, NDArray> CSRSum<kDLGPU, int32_t, __half>(
+template std::pair<CSRMatrix, NDArray> CSRSum<kDLCUDA, int32_t, __half>(
     const std::vector<CSRMatrix>&, const std::vector<NDArray>&);
-template std::pair<CSRMatrix, NDArray> CSRSum<kDLGPU, int64_t, __half>(
+template std::pair<CSRMatrix, NDArray> CSRSum<kDLCUDA, int64_t, __half>(
     const std::vector<CSRMatrix>&, const std::vector<NDArray>&);
 #endif
-template std::pair<CSRMatrix, NDArray> CSRSum<kDLGPU, int32_t, float>(
+template std::pair<CSRMatrix, NDArray> CSRSum<kDLCUDA, int32_t, float>(
     const std::vector<CSRMatrix>&, const std::vector<NDArray>&);
-template std::pair<CSRMatrix, NDArray> CSRSum<kDLGPU, int64_t, float>(
+template std::pair<CSRMatrix, NDArray> CSRSum<kDLCUDA, int64_t, float>(
     const std::vector<CSRMatrix>&, const std::vector<NDArray>&);
-template std::pair<CSRMatrix, NDArray> CSRSum<kDLGPU, int32_t, double>(
+template std::pair<CSRMatrix, NDArray> CSRSum<kDLCUDA, int32_t, double>(
     const std::vector<CSRMatrix>&, const std::vector<NDArray>&);
-template std::pair<CSRMatrix, NDArray> CSRSum<kDLGPU, int64_t, double>(
+template std::pair<CSRMatrix, NDArray> CSRSum<kDLCUDA, int64_t, double>(
     const std::vector<CSRMatrix>&, const std::vector<NDArray>&);
 
 }  // namespace aten
