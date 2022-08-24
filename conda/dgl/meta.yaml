@@ -30,6 +30,8 @@ build:
   script_env:
     - USE_CUDA
     - CUDA_VER
+    # internal release pipeline uses this to avoid conda-build rebuilding the binaries
+    - CACHEDIR
 
 about:
   home: https://github.com/dmlc/dgl.git
