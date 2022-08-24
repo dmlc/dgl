@@ -382,7 +382,9 @@ if __name__ == '__main__':
         if args.use_valedges_as_input:
             val_edges = split_edge['valid']['edge']
             row, col = val_edges.t()
-            val_weights = torch.ones(size=(val_edges.size(0),), dtype=int)
+            del graph.edata['year']
+            graph.edata['weight'] = graph.edata['weight'].to(torch.float)
+            val_weights = torch.ones(size=(val_edges.size(0), 1))
             graph.add_edges(torch.cat([row, col]), torch.cat([col, row]), {'weight': val_weights})
         graph = graph.to_simple(copy_edata=True, aggregator='sum')
 
