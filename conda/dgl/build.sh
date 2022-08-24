@@ -3,8 +3,6 @@ git submodule update
 mkdir build
 mkdir -p build/tensoradapter/pytorch
 
-CACHEDIR=$1
-
 if [[ "$CACHEDIR" = "" ]]; then
 	echo No prebuilt binary directory specified, building with default options...
 	cd build
