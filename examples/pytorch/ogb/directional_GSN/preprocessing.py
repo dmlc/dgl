@@ -6,6 +6,7 @@ import graph_tool as gt
 import graph_tool.topology as gt_topology
 from tqdm import tqdm
 import os
+from dgl.data.utils import save_graphs, load_graphs
 
 def to_undirected(edge_index):
     row, col = edge_index.transpose(1,0)
@@ -45,10 +46,6 @@ def induced_edge_automorphism_orbits(edge_list):
 
     orbit_membership = {node: contiguous_orbit_membership[i] for i,node in enumerate(orbit_membership_list[0])}
 
-    orbit_partition = {}
-    for node, orbit in orbit_membership.items():
-        orbit_partition[orbit] = [node] if orbit not in orbit_partition else orbit_partition[orbit]+[node]
-    
     aut_count = len(aut_group)
 
     ##### induced edge automorphism orbits (according to the node automorphism group) #####
@@ -131,24 +128,23 @@ def prepare_dataset(name):
     data_folder = os.path.join(path, 'processed')
     os.makedirs(data_folder, exist_ok=True)
     
-    data_file = os.path.join(data_folder, 'cycle_graph_induced_{}.pt'.format(k))
+    data_file = os.path.join(data_folder, 'cycle_graph_induced_{}.bin'.format(k))
         
     # try to load
     if os.path.exists(data_file):  # load
         print("Loading dataset from {}".format(data_file))
-        graphs_dgl, orbit_partition_sizes, split_idx = torch.load(data_file)
+        g_list, split_idx = load_graphs(data_file)
     else: # generate
-        graphs_dgl, orbit_partition_sizes, split_idx = generate_dataset(path, name)
+        g_list, split_idx = generate_dataset(path, name)
         print("Saving dataset to {}".format(data_file))
-        torch.save((graphs_dgl, orbit_partition_sizes, split_idx), data_file)
+        save_graphs(data_file, g_list, split_idx)
 
-    return graphs_dgl, split_idx
+    return g_list, split_idx
 
 def generate_dataset(path, name):
 
     ### compute the orbits of each substructure in the list, as well as the node automorphism count
     subgraph_dicts = []
-    orbit_partition_sizes = []
 
     edge_lists = []
     for k in range(3, 8 + 1):
@@ -159,7 +155,6 @@ def generate_dataset(path, name):
         subgraph, orbit_partition, orbit_membership, aut_count = induced_edge_automorphism_orbits(edge_list=edge_list)
         subgraph_dicts.append({'subgraph':subgraph, 'orbit_partition': orbit_partition, 
                                'orbit_membership': orbit_membership, 'aut_count': aut_count})
-        orbit_partition_sizes.append(len(orbit_partition))
         
     ### load and preprocess dataset
     dataset = DglGraphPropPredDataset(name=name, root=path)
@@ -167,12 +162,16 @@ def generate_dataset(path, name):
         
     # computation of subgraph isomorphisms & creation of data structure
     graphs_dgl = list()
+    split_idx["label"] = []
     for i, datapoint in tqdm(enumerate(dataset)):
         g, label = datapoint
         g = _prepare(g, subgraph_dicts)
-        graphs_dgl.append((g, label))
+        graphs_dgl.append(g)
+        split_idx["label"].append(label)
 
-    return graphs_dgl, orbit_partition_sizes, split_idx
+    split_idx["label"] = torch.stack(split_idx["label"])
+
+    return graphs_dgl, split_idx
         
 def _prepare(g, subgraph_dicts):
 
