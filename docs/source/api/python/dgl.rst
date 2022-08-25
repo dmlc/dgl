@@ -208,7 +208,7 @@ set at each iteration. ``prop_edges_YYY`` applies traversal algorithm ``YYY`` an
 Utilities
 -----------------------------------------------
 
-Other utilities for controlling randomness, saving and loading graphs, turn on/off libxsmm functions that applies
+Other utilities for controlling randomness, saving and loading graphs, turn on/off libxsmm, functions that applies
 the same function to every elements in a container, etc.
 
 .. autosummary::
