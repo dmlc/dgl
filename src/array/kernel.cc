@@ -551,13 +551,13 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSEGMENTMM")
     SegmentMM(A, B, C, seglen_A, A_trans, B_trans);
   });
 
-DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernel_set_libxsmm")
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernel_SetLibxsmm")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     bool use_libxsmm = args[0];
     globalContext().setLibxsmm(use_libxsmm);
   });
 
-DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernel_get_libxsmm")
+DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernel_GetLibxsmm")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     *rv = globalContext().libxsmm();
   });

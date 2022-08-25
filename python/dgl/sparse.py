@@ -1,6 +1,7 @@
 """Module for sparse matrix operators."""
 # pylint: disable= invalid-name
 from __future__ import absolute_import
+from xmlrpc.client import boolean
 from . import ndarray as nd
 from ._ffi.function import _init_api
 from .base import DGLError
@@ -56,12 +57,24 @@ def infer_broadcast_shape(op, shp1, shp2):
     return rst[:-1] + (1,) if op == "dot" else rst
 
 def use_libxsmm(flag):
-     """Determine whether to use libxsmm or not."""
-     _CAPI_DGLKernel_set_libxsmm(flag)
+    r"""Set whether Dgl use libxsmm for cpu Spmm operation at runtime.
+
+    Parameters
+    ----------
+    val : boolean
+        If True, use libxsmm, otherwise not.
+    """
+    _CAPI_DGLKernel_SetLibxsmm(flag)
 
 def is_libxsmm_enabled():
-    """Return True if the libxsmm is enabled."""
-    return _CAPI_DGLKernel_get_libxsmm()
+    r"""Get whether the use_libxsmm flag is turned on.
+
+    Returns
+    ----------
+    use_libxsmm_flag[boolean]
+        True if the use_libxsmm flag is turned on.
+    """
+    return _CAPI_DGLKernel_GetLibxsmm()
 
 
 def to_dgl_nd(x):
