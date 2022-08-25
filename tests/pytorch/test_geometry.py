@@ -123,19 +123,20 @@ def test_knn_cuda(algorithm, dist, exclude_self, output_batch):
         tmp_x = x / (1e-5 + F.sqrt(F.sum(x * x, dim=1, keepdims=True)))
         d = 1 - F.matmul(tmp_x, tmp_x.T).to(F.cpu())
 
-    def check_knn(g, x, start, end, k, exclude_self):
+    def check_knn(g, x, start, end, k, exclude_self, check_indices=True):
         assert g.device == x.device
         g = g.to(F.cpu())
         for v in range(start, end):
             src, _ = g.in_edges(v)
             src = set(src.numpy())
             assert len(src) == k
-            i = v - start
-            src_ans = set(th.topk(d[start:end, start:end][i], k + (1 if exclude_self else 0), largest=False)[1].numpy() + start)
-            if exclude_self:
-                # remove self
-                src_ans.remove(v)
-            assert src == src_ans
+            if check_indices:
+                i = v - start
+                src_ans = set(th.topk(d[start:end, start:end][i], k + (1 if exclude_self else 0), largest=False)[1].numpy() + start)
+                if exclude_self:
+                    # remove self
+                    src_ans.remove(v)
+                assert src == src_ans
 
     def check_batch(g, k, output_batch, expected_batch_info):
         if output_batch:
@@ -213,6 +214,24 @@ def test_knn_cuda(algorithm, dist, exclude_self, output_batch):
     kg = dgl.nn.SegmentedKNNGraph(3)
     with pytest.raises(DGLError):
         g = kg(x_empty, [3, 5], algorithm, dist, exclude_self, output_batch)
+
+    # check all coincident points
+    x = th.zeros((20, 3)).to(F.cuda())
+    kg = dgl.nn.KNNGraph(3)
+    g = kg(x, algorithm, dist, exclude_self, output_batch)
+    # different algorithms may break the tie differently, so don't check the indices
+    check_knn(g, x, 0, 20, 3, exclude_self, False)
+    check_batch(g, 3, output_batch, [20])
+
+    # check all coincident points
+    kg = dgl.nn.SegmentedKNNGraph(3)
+    g = kg(x, [4, 7, 5, 4], algorithm, dist, exclude_self, output_batch)
+    # different algorithms may break the tie differently, so don't check the indices
+    check_knn(g, x,  0,  4, 3, exclude_self, False)
+    check_knn(g, x,  4, 11, 3, exclude_self, False)
+    check_knn(g, x, 11, 16, 3, exclude_self, False)
+    check_knn(g, x, 16, 20, 3, exclude_self, False)
+    check_batch(g, 3, output_batch, [4, 7, 5, 4])
 
 
 @parametrize_idtype

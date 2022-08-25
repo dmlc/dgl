@@ -41,6 +41,7 @@ from ..partition import partition_graph_with_halo
 from ..partition import metis_partition
 from .. import subgraph
 from .. import function
+from ..sampling.neighbor import sample_neighbors
 
 # TO BE DEPRECATED
 from .._deprecate.graph import DGLGraph as DGLGraphStale
@@ -239,11 +240,28 @@ def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean',
     if output_batch:
         num_nodes = F.tensor(x_seg, dtype=F.int64).to(F.context(x))
         result.set_batch_num_nodes(num_nodes)
-        result.set_batch_num_edges(min(k, np.min(x_seg))*num_nodes)
+        # if any segment is too small for k, all algorithms reduce k for all segments
+        clamped_k = min(k, np.min(x_seg))
+        result.set_batch_num_edges(clamped_k*num_nodes)
 
     if exclude_self:
         # remove_self_loop will update batch_num_edges as needed
         result = remove_self_loop(result)
+
+        # If there were more than k(+1) coincident points, there may not have been self loops on
+        # all nodes, in which case there would still be one too many out edges on some nodes.
+        # However, if every node had a self edge, the common case, every node would still have the
+        # same degree as each other, so we can check that condition easily.
+        # The -1 is for the self edge removal.
+        clamped_k = min(k, np.min(x_seg)) - 1
+        if result.num_edges() != clamped_k*result.num_nodes():
+            # edges on any nodes with too high degree should all be length zero,
+            # so pick an arbitrary one to remove from each such node
+            degrees = result.in_degrees()
+            node_indices = F.nonzero_1d(degrees > clamped_k)
+            edges_to_remove_graph = sample_neighbors(result, node_indices, 1, edge_dir='in')
+            edge_ids = edges_to_remove_graph.edata[EID]
+            result = remove_edges(result, edge_ids)
 
     return result
 
@@ -423,11 +441,28 @@ def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas', dist='euclidean
     if output_batch:
         num_nodes = F.tensor(segs, dtype=F.int64).to(F.context(x))
         result.set_batch_num_nodes(num_nodes)
-        result.set_batch_num_edges(min(k, np.min(segs))*num_nodes)
+        # if any segment is too small for k, all algorithms reduce k for all segments
+        clamped_k = min(k, np.min(segs))
+        result.set_batch_num_edges(clamped_k*num_nodes)
 
     if exclude_self:
         # remove_self_loop will update batch_num_edges as needed
         result = remove_self_loop(result)
+
+        # If there were more than k(+1) coincident points, there may not have been self loops on
+        # all nodes, in which case there would still be one too many out edges on some nodes.
+        # However, if every node had a self edge, the common case, every node would still have the
+        # same degree as each other, so we can check that condition easily.
+        # The -1 is for the self edge removal.
+        clamped_k = min(k, np.min(segs)) - 1
+        if result.num_edges() != clamped_k*result.num_nodes():
+            # edges on any nodes with too high degree should all be length zero,
+            # so pick an arbitrary one to remove from each such node
+            degrees = result.in_degrees()
+            node_indices = F.nonzero_1d(degrees > clamped_k)
+            edges_to_remove_graph = sample_neighbors(result, node_indices, 1, edge_dir='in')
+            edge_ids = edges_to_remove_graph.edata[EID]
+            result = remove_edges(result, edge_ids)
 
     return result
 
