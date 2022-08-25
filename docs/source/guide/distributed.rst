@@ -5,6 +5,10 @@ Chapter 7: Distributed Training
 
 :ref:`(中文版) <guide_cn-distributed>`
 
+.. note::
+
+    Distributed training is only available for PyTorch backend.
+
 DGL adopts a fully distributed approach that distributes both data and computation
 across a collection of computation resources. In the context of this section, we
 will assume a cluster setting (i.e., a group of machines). DGL partitions a graph
@@ -15,8 +19,8 @@ the computation and runs servers on the same machines to serve partitioned data 
 For the training script, DGL provides distributed APIs that are similar to the ones for
 mini-batch training. This makes distributed training require only small code modifications
 from mini-batch training on a single machine. Below shows an example of training GraphSage
-in a distributed fashion. The only code modifications are located on line 4-7:
-1) initialize DGL's distributed module, 2) create a distributed graph object, and
+in a distributed fashion. The notable code modifications are:
+1) initialization of DGL's distributed module, 2) create a distributed graph object, and
 3) split the training set and calculate the nodes for the local process.
 The rest of the code, including sampler creation, model definition, training loops
 are the same as :ref:`mini-batch training <guide-minibatch>`.
@@ -24,13 +28,18 @@ are the same as :ref:`mini-batch training <guide-minibatch>`.
 .. code:: python
 
     import dgl
+    from dgl.dataloading import NeighborSampler
+    from dgl.distributed import DistGraph, DistDataLoader, node_split
     import torch as th
 
+    # initialize distributed contexts
     dgl.distributed.initialize('ip_config.txt')
     th.distributed.init_process_group(backend='gloo')
-    g = dgl.distributed.DistGraph('graph_name', 'part_config.json')
+    # load distributed graph
+    g = DistGraph('graph_name', 'part_config.json')
     pb = g.get_partition_book()
-    train_nid = dgl.distributed.node_split(g.ndata['train_mask'], pb, force_even=True)
+    # get training workload, i.e., training node IDs
+    train_nid = node_split(g.ndata['train_mask'], pb, force_even=True)
 
 
     # Create sampler
@@ -63,11 +72,6 @@ are the same as :ref:`mini-batch training <guide-minibatch>`.
                 loss.backward()
                 optimizer.step()
 
-When running the training script in a cluster of machines, DGL provides tools to copy data
-to the cluster's machines and launch the training job on all machines.
-
-**Note**: The current distributed training API only supports the Pytorch backend.
-
 DGL implements a few distributed components to support distributed training. The figure below
 shows the components and their interactions.
 
@@ -77,28 +81,35 @@ shows the components and their interactions.
 Specifically, DGL's distributed training has three types of interacting processes:
 *server*, *sampler* and *trainer*.
 
-* Server processes run on each machine that stores a graph partition
-  (this includes the graph structure and node/edge features). These servers
-  work together to serve the graph data to trainers. Note that one machine may run
-  multiple server processes simultaneously to parallelize computation as well as
-  network communication.
-* Sampler processes interact with the servers and sample nodes and edges to
+* **Servers** store graph partitions which includes both structure data and node/edge
+  features. They provide services such as sampling, getting or updating node/edge
+  features. Note that each machine may run multiple server processes simultaneously
+  to increase service throughput. One of them is *main server* in charge of data
+  loading and sharing data via shared memory with *backup servers* that provide
+  services.
+* **Sampler processes** interact with the servers and sample nodes and edges to
   generate mini-batches for training.
-* Trainers contain multiple classes to interact with servers. It has
-  :class:`~dgl.distributed.DistGraph` to get access to partitioned graph data and has
+* **Trainers** are in charge of training networks on mini-batches. They utilize
+  APIs such as :class:`~dgl.distributed.DistGraph` to access partitioned graph data,
   :class:`~dgl.distributed.DistEmbedding` and :class:`~dgl.distributed.DistTensor` to access
-  the node/edge features/embeddings. It has
-  :class:`~dgl.distributed.dist_dataloader.DistDataLoader` to
-  interact with samplers to get mini-batches.
+  node/edge features/embeddings and :class:`~dgl.distributed.DistDataLoader` to interact
+  with samplers to get mini-batches. Trainers communicate gradients among each other
+  using PyTorch's native ``DistributedDataParallel`` paradigm.
 
+Besides Python APIs, DGL also provides `tools <https://github.com/dmlc/dgl/tree/master/tools>`__
+for provisioning graph data and processes to the entire cluster.
 
 Having the distributed components in mind, the rest of the section will cover
 the following distributed components:
 
 * :ref:`guide-distributed-preprocessing`
-* :ref:`guide-distributed-apis`
-* :ref:`guide-distributed-hetero`
 * :ref:`guide-distributed-tools`
+* :ref:`guide-distributed-apis`
+
+For more advanced users who are interested in more details:
+
+* :ref:`guide-distributed-partition`
+* :ref:`guide-distributed-hetero`
 
 .. toctree::
     :maxdepth: 1
@@ -106,6 +117,7 @@ the following distributed components:
     :glob:
 
     distributed-preprocessing
-    distributed-apis
-    distributed-hetero
     distributed-tools
+    distributed-apis
+    distributed-partition
+    distributed-hetero
