@@ -23,11 +23,28 @@ import dgl
 import time
 import dgl.nn as dglnn
 from dgl.data import AsNodePredDataset
-from dgl.contrib import DataLoader2, SampledGraphSource, TensorFeatureSource
+from dgl.contrib import DataLoader2, SampledGraphSource, TensorFeatureSource, \
+    EdgeWiseGraphSource
 from dgl.dataloading import NeighborSampler, MultiLayerFullNeighborSampler
 from ogb.nodeproppred import DglNodePropPredDataset
 import tqdm
 import argparse
+
+
+class InferenceLayerGraphSource:
+    def __init__(self, graph):
+        self._graph = graph
+        # get a permutation to sort by destination
+        _, self._perm = torch.sort(self._graph.edges(form='uv')[1])
+
+    def fetch_graph(self, idx, output_device):
+        idx = self._perm[idx]
+        subgraph = self._graph.edge_subgraph(edges=idx, relabel_nodes=False,
+            store_ids=True).to(output_device)
+        block = dgl.to_block(subgraph, include_dst_in_src=True)
+        return [block]
+
+
 
 class SAGE(nn.Module):
     def __init__(self, in_size, hid_size, out_size):
@@ -53,17 +70,16 @@ class SAGE(nn.Module):
     def inference(self, g, device, batch_size):
         """Conduct layer-wise inference to get all the node embeddings."""
         feat = g.ndata['feat']
-        sampler = MultiLayerFullNeighborSampler(1, prefetch_node_feats=['feat'])
-        graph_source = SampledGraphSource(g, sampler)
+        graph_source = InferenceLayerGraphSource(g)
         dataloader = DataLoader2(
-                graph_source, None, torch.arange(g.num_nodes()).to(g.device),
+                graph_source, None, torch.arange(g.num_edges()).to(g.device),
                 output_device=device, batch_size=batch_size, shuffle=False,
                 drop_last=False)
         buffer_device = torch.device('cpu')
         pin_memory = (buffer_device != device)
 
         for l, layer in enumerate(self.layers):
-            y = torch.empty(
+            y = torch.zeros(
                 g.num_nodes(), self.hid_size if l != len(self.layers) - 1 else self.out_size,
                 device=buffer_device, pin_memory=pin_memory)
             feat = feat.to(device)
@@ -75,8 +91,7 @@ class SAGE(nn.Module):
                 if l != len(self.layers) - 1:
                     h = F.relu(h)
                     h = self.dropout(h)
-                # by design, our output nodes are contiguous
-                y[output_nodes[0]:output_nodes[-1]+1] = h.to(buffer_device)
+                y[output_nodes] += h.to(buffer_device)
             feat = y
         return y
 
@@ -172,5 +187,5 @@ if __name__ == '__main__':
 
     # test the model
     print('Testing...')
-    acc = layerwise_infer(device, g, dataset.test_idx, model, batch_size=4096)
+    acc = layerwise_infer(device, g, dataset.test_idx, model, batch_size=131072)
     print("Test Accuracy {:.4f}".format(acc.item()))
