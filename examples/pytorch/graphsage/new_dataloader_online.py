@@ -23,8 +23,7 @@ import dgl
 import time
 import dgl.nn as dglnn
 from dgl.data import AsNodePredDataset
-from dgl.contrib import DataLoader2, SampledGraphSource, TensorFeatureSource, \
-    EdgeWiseGraphSource
+from dgl.contrib import DataLoader2, SampledGraphSource, TensorFeatureSource
 from dgl.dataloading import NeighborSampler, MultiLayerFullNeighborSampler
 from ogb.nodeproppred import DglNodePropPredDataset
 import tqdm
