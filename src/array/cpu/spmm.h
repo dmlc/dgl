@@ -21,6 +21,7 @@
 #include "intel/cpu_support.h"
 #ifdef USE_LIBXSMM
 #include "spmm_blocking_libxsmm.h"
+#include "../context.h"
 #endif  // USE_LIBXSMM
 #endif  // USE_AVX
 #endif  // _WIN32

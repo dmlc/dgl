@@ -14,7 +14,6 @@
 #include "../c_api_common.h"
 #include "./check.h"
 #include "./context.h"
-
 using namespace dgl::runtime;
 
 namespace dgl {
@@ -23,7 +22,6 @@ namespace {
 
 }  // namespace
 
-initContext();
 
 /*! \brief Generalized Sparse Matrix-Matrix Multiplication. */
 void SpMM(const std::string& op, const std::string& reduce,
@@ -493,6 +491,8 @@ std::pair<CSRMatrix, NDArray> CSRSum(
   return ret;
 }
 
+INIT_CONTEXT();
+
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMM")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef graph = args[0];
@@ -559,7 +559,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernel_set_libxsmm")
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernel_get_libxsmm")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    return globalContext().libxsmm();
+    *rv = globalContext().libxsmm();
   });
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSEGMENTMMBackwardB")
