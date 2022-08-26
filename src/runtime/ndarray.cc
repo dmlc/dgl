@@ -69,7 +69,7 @@ struct NDArray::Internal {
       // if the array is still pinned before freeing, unpin it.
       if (ptr->pinned_by_dgl_)
         UnpinContainer(ptr);
-      dgl::runtime::DeviceAPI::Get(ptr->dl_tensor.ctx)->FreeDataSpace(
+      dgl::runtime::DeviceAPI::Get(ptr->dl_tensor.ctx)->FreeWorkspace(
           ptr->dl_tensor.ctx, ptr->dl_tensor.data);
     }
     delete ptr;
@@ -214,18 +214,13 @@ NDArray NDArray::EmptyShared(const std::string &name,
 NDArray NDArray::Empty(std::vector<int64_t> shape,
                        DLDataType dtype,
                        DLContext ctx) {
-  TensorDispatcher* td = TensorDispatcher::Global();
-  if (td->IsAvailable())
-    return td->Empty(shape, dtype, ctx);
-
   NDArray ret = Internal::Create(shape, dtype, ctx);
   // setup memory content
   size_t size = GetDataSize(ret.data_->dl_tensor);
-  size_t alignment = GetDataAlignment(ret.data_->dl_tensor);
   if (size > 0)
     ret.data_->dl_tensor.data =
-        DeviceAPI::Get(ret->ctx)->AllocDataSpace(
-            ret->ctx, size, alignment, ret->dtype);
+        DeviceAPI::Get(ret->ctx)->AllocWorkspace(
+            ret->ctx, size, ret->dtype);
   return ret;
 }
 

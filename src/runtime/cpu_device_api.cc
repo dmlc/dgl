@@ -6,6 +6,7 @@
 #include <dmlc/thread_local.h>
 #include <dgl/runtime/registry.h>
 #include <dgl/runtime/device_api.h>
+#include <dgl/runtime/tensordispatch.h>
 #include <cstdlib>
 #include <cstring>
 #include "workspace_pool.h"
@@ -83,12 +84,19 @@ struct CPUWorkspacePool : public WorkspacePool {
 void* CPUDeviceAPI::AllocWorkspace(DGLContext ctx,
                                    size_t size,
                                    DGLType type_hint) {
-  return dmlc::ThreadLocalStore<CPUWorkspacePool>::Get()
-      ->AllocWorkspace(ctx, size);
+  TensorDispatcher* td = TensorDispatcher::Global();
+  if (td->IsAvailable())
+    return td->CPUAllocWorkspace(size);
+  else
+    return dmlc::ThreadLocalStore<CPUWorkspacePool>::Get()->AllocWorkspace(ctx, size);
 }
 
 void CPUDeviceAPI::FreeWorkspace(DGLContext ctx, void* data) {
-  dmlc::ThreadLocalStore<CPUWorkspacePool>::Get()->FreeWorkspace(ctx, data);
+  TensorDispatcher* td = TensorDispatcher::Global();
+  if (td->IsAvailable())
+    return td->CUDAFreeWorkspace(data);
+  else
+    dmlc::ThreadLocalStore<CPUWorkspacePool>::Get()->FreeWorkspace(ctx, data);
 }
 
 DGL_REGISTER_GLOBAL("device_api.cpu")

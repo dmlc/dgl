@@ -250,7 +250,7 @@ class CUDADeviceAPI final : public DeviceAPI {
     SetDevice(ctx);
     TensorDispatcher* td = TensorDispatcher::Global();
     if (td->IsAvailable())
-      return td->AllocWorkspace(size, GetStream());
+      return td->CUDAAllocWorkspace(size, CUDAThreadEntry::ThreadLocal()->stream);
     else
       return CUDAThreadEntry::ThreadLocal()->pool.AllocWorkspace(ctx, size);
   }
@@ -258,7 +258,7 @@ class CUDADeviceAPI final : public DeviceAPI {
   void FreeWorkspace(DGLContext ctx, void* data) final {
     TensorDispatcher* td = TensorDispatcher::Global();
     if (td->IsAvailable())
-      td->FreeWorkspace(data);
+      td->CUDAFreeWorkspace(data);
     else
       CUDAThreadEntry::ThreadLocal()->pool.FreeWorkspace(ctx, data);
   }

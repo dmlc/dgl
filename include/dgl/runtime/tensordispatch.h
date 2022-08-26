@@ -38,6 +38,9 @@
 #if defined(WIN32) || defined(_WIN32)
 #include <windows.h>
 #endif  // WIN32
+#ifdef DGL_USE_CUDA
+#include <cuda_runtime.h>
+#endif  // DGL_USE_CUDA
 #include <vector>
 #include "ndarray.h"
 
@@ -69,22 +72,27 @@ class TensorDispatcher {
   bool Load(const char *path_cstr);
 
   /*!
-   * \brief Allocate an empty tensor.
-   * Used in NDArray::Empty().
+  * \brief Allocate a piece of CPU memory via
+  * PyTorch's CPUAllocator.
+  * Used in CPUDeviceAPI::AllocWorkspace().
+  *
+  * \param nbytes The size to be allocated.
+  * \return Pointer to the allocated memory.
+  */
+  inline void* CPUAllocWorkspace(size_t nbytes) {
+    auto entry = entrypoints_[Op::kCPURawAlloc];
+    return FUNCCAST(tensoradapter::CPURawAlloc, entry)(nbytes);
+  }
 
-   * \param shape The shape
-   * \param dtype The data type
-   * \param ctx The device
-   * \return An empty NDArray.
-   */
-  inline NDArray Empty(std::vector<int64_t> shape, DLDataType dtype, DLContext ctx) const {
-    void* stream = nullptr;
-    if (ctx.device_type == kDLGPU) {
-      stream = DeviceAPI::Get(ctx)->GetStream();
-    }
-    auto entry = entrypoints_[Op::kEmpty];
-    auto result = FUNCCAST(tensoradapter::TAempty, entry)(shape, dtype, ctx, stream);
-    return NDArray::FromDLPack(result);
+  /*!
+  * \brief Free the CPU memory.
+  * Used in CPUDeviceAPI::FreeWorkspace().
+  *
+  * \param ptr Pointer to the memory to be freed.
+  */
+  inline void CPUFreeWorkspace(void* ptr) {
+    auto entry = entrypoints_[Op::kCPURawDelete];
+    FUNCCAST(tensoradapter::CPURawDelete, entry)(ptr);
   }
 
 #ifdef DGL_USE_CUDA
@@ -98,11 +106,12 @@ class TensorDispatcher {
   * before invoking this function.
   *
   * \param nbytes The size to be allocated.
+ * \param stream The stream to be allocated on.
   * \return Pointer to the allocated memory.
   */
-  inline void* AllocWorkspace(size_t nbytes, DGLStreamHandle stream) {
-    auto entry = entrypoints_[Op::kRawAlloc];
-    return FUNCCAST(tensoradapter::RawAlloc, entry)(nbytes, stream);
+  inline void* CUDAAllocWorkspace(size_t nbytes, cudaStream_t stream) {
+    auto entry = entrypoints_[Op::kCUDARawAlloc];
+    return FUNCCAST(tensoradapter::CUDARawAlloc, entry)(nbytes, stream);
   }
 
   /*!
@@ -111,9 +120,9 @@ class TensorDispatcher {
   *
   * \param ptr Pointer to the memory to be freed.
   */
-  inline void FreeWorkspace(void* ptr) {
-    auto entry = entrypoints_[Op::kRawDelete];
-    FUNCCAST(tensoradapter::RawDelete, entry)(ptr);
+  inline void CUDAFreeWorkspace(void* ptr) {
+    auto entry = entrypoints_[Op::kCUDARawDelete];
+    FUNCCAST(tensoradapter::CUDARawDelete, entry)(ptr);
   }
 #endif  // DGL_USE_CUDA
 
@@ -129,20 +138,22 @@ class TensorDispatcher {
    * Must match the functions in tensoradapter/include/tensoradapter.h.
    */
   static constexpr const char *names_[] = {
-    "TAempty",
+    "CPURawAlloc",
+    "CPURawDelete",
 #ifdef DGL_USE_CUDA
-    "RawAlloc",
-    "RawDelete",
+    "CUDARawAlloc",
+    "CUDARawDelete",
 #endif  // DGL_USE_CUDA
   };
 
   /*! \brief Index of each function to the symbol list */
   class Op {
    public:
-    static constexpr int kEmpty = 0;
+    static constexpr int kCPURawAlloc = 0;
+    static constexpr int kCPURawDelete = 1;
 #ifdef DGL_USE_CUDA
-    static constexpr int kRawAlloc = 1;
-    static constexpr int kRawDelete = 2;
+    static constexpr int kCUDARawAlloc = 2;
+    static constexpr int kCUDARawDelete = 3;
 #endif  // DGL_USE_CUDA
   };
 
@@ -151,6 +162,7 @@ class TensorDispatcher {
 
   /*! \brief Entrypoints of each function */
   void* entrypoints_[num_entries_] = {
+    nullptr,
     nullptr,
 #ifdef DGL_USE_CUDA
     nullptr,
