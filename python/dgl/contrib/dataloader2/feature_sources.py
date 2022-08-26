@@ -128,6 +128,10 @@ class FeatureSource:
         """
         pass
 
+def _move_for_input(indices, contexts):
+    if contexts is None or indices.device in contexts:
+        return indices
+    return indices.to(contexts[0])
 
 class FeatureRequestHandler:
     def __init__(self):
@@ -138,7 +142,8 @@ class FeatureRequestHandler:
         self._features = {}
 
 
-    def set_storage(self, graph_object, object_type, feat_name, storage):
+    def set_storage(self, graph_object, object_type, feat_name, storage, \
+            input_contexts=None):
         """ Set the FeatureStore assocaited with the given graph component.
 
         Parameters
@@ -157,8 +162,17 @@ class FeatureRequestHandler:
 
             storage : FeatureStorage or Tensor
                 The FeatureStorage/Tensor containing the features.
+
+            input_contexts : torch.device or list of torch.device, Optional
+                The acceptable list of locations for inputs to this storage.
+                To be removed once #4473 is addressed.
         """
         if F.is_tensor(storage):
+            if input_contexts is None:
+                input_contexts = []
+                if F.is_pinned(storage):
+                    input_contexts.append(torch.device('cuda'))
+                input_contexts.append(storage.device)
             storage = TensorStorage(storage)
 
         if graph_object not in self._features:
@@ -183,7 +197,8 @@ class FeatureRequestHandler:
         if feat_name in self._storages[base_graph_object][object_type]:
             raise DGLError("Duplicate feature storage for {} of type {} " \
                 "with name {}".format(base_graph_object, object_type, feat_name))
-        self._storages[base_graph_object][object_type][feat_name] = storage
+        self._storages[base_graph_object][object_type][feat_name] = \
+            (storage, input_contexts)
 
 
     def get_featured_entities(self):
@@ -215,6 +230,11 @@ class FeatureRequestHandler:
             which there are no features, they should not be included in the
             response tensor.
         """
+        pin_memory = False
+        if torch.device(output_device).type == 'cuda':
+            # if we're outputting to the GPU, we should set pin_memory true,
+            # as its ignored if its not applicable (i.e., the source is not CPU).
+            pin_memory = True
 
         resp = {}
         for graph_object, tree in req.items():
@@ -233,8 +253,11 @@ class FeatureRequestHandler:
                     base_storage = self._storages[base_graph_object]
                     feat_names = self._features[graph_object][ntype]
                     for feat_name in feat_names:
-                        tensor = base_storage[ntype][feat_name].fetch( \
-                            ids, output_device)
+                        storage, input_contexts = base_storage[ntype][feat_name]
+                        tensor = storage.fetch( \
+                            _move_for_input(ids, input_contexts), \
+                            output_device, \
+                            pin_memory=pin_memory)
                         resp[graph_object][ntype][feat_name] = tensor
             elif graph_object == EDGES_TAG:
                 for etype, ids in tree.items():
@@ -244,8 +267,11 @@ class FeatureRequestHandler:
                     resp[graph_object][etype] = {}
                     feat_names = self._features[graph_object][etype]
                     for feat_name in feat_names:
-                        tensor = self._storages[EDGES_TAG][ntype][feat_name].fetch( \
-                            ids, output_device)
+                        storage, input_contexts = \
+                            self._storages[EDGES_TAG][ntype][feat_name]
+                        tensor = storage.fetch( \
+                            _move_for_input(ids, input_contexts), \
+                            output_device, pin_memory=pin_memory)
                         resp[graph_object][etype][feat_name] = tensor
             else:
                 raise DGLError("Unknown component '{}'".format(comp))
