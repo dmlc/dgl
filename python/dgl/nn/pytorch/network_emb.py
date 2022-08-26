@@ -1,7 +1,7 @@
 import torch
 from torch import nn, Tensor
 import numpy as np
-import dgl
+from ...sampling import random_walk
 from torch.nn import init
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
@@ -23,7 +23,7 @@ class Metapath2vec(nn.Module):
     window_size :int
         The context size which is considered for positive samples.
     min_count :int , optional
-        The number of node counts that occur less than  min_count  value in all meta-paths will be discarded before random walks. (default: 5)
+        The number of node counts that occur less than  min_count  value in all meta-paths will be discarded before random walks. (default: 0)
     negative_samples_size :int , optional
         The number of negative samples need to be extracted for each positive sample.(default: 5)
     node_repeat  :int , optional
@@ -39,7 +39,7 @@ class Metapath2vec(nn.Module):
                  emb_dimension,
                  metapath,
                  window_size,
-                 min_count=5,
+                 min_count=0,
                  negative_samples_size=5,
                  node_repeat=1,
                  nid2word=None,
@@ -102,7 +102,7 @@ class Metapath2vec(nn.Module):
 
         ##start random walk
         for idx in tqdm.trange(self.g.number_of_nodes(nodespath[0])):
-            traces = dgl.sampling.random_walk(g=self.g, nodes=[idx, ] * self.node_repeat, metapath=self.metapath)
+            traces = random_walk(g=self.g, nodes=[idx, ] * self.node_repeat, metapath=self.metapath)
             for tr in traces[0].numpy():
                 line = [self.type2id[nodespath[i]][tr[i]] for i in range(len(tr))]
                 self.walk_dataset.append(line)

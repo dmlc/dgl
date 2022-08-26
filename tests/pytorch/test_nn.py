@@ -1622,3 +1622,26 @@ def test_dgn_conv(in_size, out_size, aggregators, scalers, delta,
     model = nn.DGNConv(in_size, out_size, aggregators_non_eig, scalers, delta, dropout,
         num_towers, edge_feat_size, residual).to(dev)
     model(g, h, edge_feat=e)
+
+
+@parametrize_idtype
+@pytest.mark.parametrize('meta_path', [['uc','cu'],['uc','cp','pc','cu'],['cp','pc','cp','pc']])
+@pytest.mark.parametrize('window_size', [1,3])
+@pytest.mark.parametrize('negative_samples', [1,3])
+@pytest.mark.parametrize('min_count', [0,1])
+@pytest.mark.parametrize('emb_dim', [1,  100])
+@pytest.mark.parametrize('node_repeat', [1,  3])
+def test_Metapath2vec(emb_dim,meta_path,window_size,negative_samples,min_count,node_repeat,idtype):
+
+    g = dgl.heterograph({
+        ('user', 'uc', 'company'): ([0, 0, 2, 1,3], [1, 2, 1, 3,0]),
+        ('company', 'cp', 'product'): ([0, 0, 0, 1, 2,3], [0, 2, 3, 0, 2,1]),
+        ('company', 'cu', 'user'): ([1, 2, 1, 3,0], [0, 0, 2, 1,3]),
+        ('product', 'pc', 'company'): ([0, 2, 3, 0, 2,1], [0, 0, 0, 1, 2,3])
+    },idtype=idtype, device=F.ctx())
+    model = nn.Metapath2vec(g,emb_dim,meta_path,window_size,min_count,negative_samples,node_repeat)
+    model = model.to(F.ctx())
+    embeds=model.u_embeddings.weight
+    emb_size=model.word_count
+    assert embeds.shape==(emb_size,emb_dim)
+
