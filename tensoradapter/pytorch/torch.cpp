@@ -9,6 +9,7 @@
 #include <ATen/DLConvertor.h>
 #ifdef DGL_USE_CUDA
 #include <c10/cuda/CUDACachingAllocator.h>
+#include <cuda_runtime.h>
 #endif  // DGL_USE_CUDA
 #include <vector>
 #include <iostream>
@@ -41,18 +42,30 @@ extern "C" {
 TA_EXPORTS DLManagedTensor* TAempty(
     std::vector<int64_t> shape,
     DLDataType dtype,
-    DLContext ctx) {
+    DLContext ctx,
+    void* stream) {
+#ifdef DGL_USE_CUDA
+  // allocate tensors on DGL's current stream
+  auto alloc_stream = c10::cuda::getStreamFromExternal(
+    static_cast<cudaStream_t>(stream), ctx.device_id);
+  auto prev_stream = c10::cuda::getCurrentCUDAStream(ctx.device_id);
+  c10::cuda::setCurrentCUDAStream(alloc_stream);
+#endif  // DGL_USE_CUDA
   auto options = torch::TensorOptions()
     .layout(torch::kStrided)
     .device(get_device(ctx))
     .dtype(at::toScalarType(dtype));
   torch::Tensor tensor = torch::empty(shape, options);
+#ifdef DGL_USE_CUDA
+  c10::cuda::setCurrentCUDAStream(prev_stream);
+#endif  // DGL_USE_CUDA
   return at::toDLPack(tensor);
 }
 
 #ifdef DGL_USE_CUDA
-TA_EXPORTS void* RawAlloc(size_t nbytes, cudaStream_t stream) {
-  return c10::cuda::CUDACachingAllocator::raw_alloc_with_stream(nbytes, stream);
+TA_EXPORTS void* RawAlloc(size_t nbytes, void* stream) {
+  return c10::cuda::CUDACachingAllocator::raw_alloc_with_stream(
+    nbytes, static_cast<cudaStream_t>(stream));
 }
 
 TA_EXPORTS void RawDelete(void* ptr) {

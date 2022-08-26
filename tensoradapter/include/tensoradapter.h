@@ -12,9 +12,6 @@
 
 #include <dlpack/dlpack.h>
 #include <vector>
-#ifdef DGL_USE_CUDA
-#include <cuda_runtime.h>
-#endif  // DGL_USE_CUDA
 
 namespace tensoradapter {
 
@@ -26,10 +23,11 @@ extern "C" {
  * \param shape The shape
  * \param dtype The data type
  * \param ctx The device
+ * \param stream The stream to be allcated.
  * \return The allocated tensor
  */
 DLManagedTensor* TAempty(
-    std::vector<int64_t> shape, DLDataType dtype, DLContext ctx);
+    std::vector<int64_t> shape, DLDataType dtype, DLContext ctx, void* stream);
 
 #ifdef DGL_USE_CUDA
 /*!
@@ -40,7 +38,7 @@ DLManagedTensor* TAempty(
  * \param stream The stream to be allocated in.
  * \return Pointer to the allocated memory.
  */
-void* RawAlloc(size_t nbytes, cudaStream_t stream);
+void* RawAlloc(size_t nbytes, void* stream);
 
 /*!
  * \brief Free the GPU memory.

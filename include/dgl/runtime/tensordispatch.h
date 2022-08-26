@@ -32,15 +32,13 @@
 #ifndef DGL_RUNTIME_TENSORDISPATCH_H_
 #define DGL_RUNTIME_TENSORDISPATCH_H_
 
+#include <dgl/runtime/device_api.h>
 #include <dlpack/dlpack.h>
 #include <tensoradapter.h>
 #if defined(WIN32) || defined(_WIN32)
 #include <windows.h>
 #endif  // WIN32
 #include <vector>
-#ifdef DGL_USE_CUDA
-#include <cuda_runtime.h>
-#endif  // DGL_USE_CUDA
 #include "ndarray.h"
 
 /*! \brief Casts a pointer \c entry to a function pointer with signature of \c func */
@@ -80,8 +78,12 @@ class TensorDispatcher {
    * \return An empty NDArray.
    */
   inline NDArray Empty(std::vector<int64_t> shape, DLDataType dtype, DLContext ctx) const {
+    void* stream = nullptr;
+    if (ctx.device_type == kDLGPU) {
+      stream = DeviceAPI::Get(ctx)->GetStream();
+    }
     auto entry = entrypoints_[Op::kEmpty];
-    auto result = FUNCCAST(tensoradapter::TAempty, entry)(shape, dtype, ctx);
+    auto result = FUNCCAST(tensoradapter::TAempty, entry)(shape, dtype, ctx, stream);
     return NDArray::FromDLPack(result);
   }
 
@@ -98,7 +100,7 @@ class TensorDispatcher {
   * \param nbytes The size to be allocated.
   * \return Pointer to the allocated memory.
   */
-  inline void* AllocWorkspace(size_t nbytes, cudaStream_t stream) {
+  inline void* AllocWorkspace(size_t nbytes, DGLStreamHandle stream) {
     auto entry = entrypoints_[Op::kRawAlloc];
     return FUNCCAST(tensoradapter::RawAlloc, entry)(nbytes, stream);
   }
