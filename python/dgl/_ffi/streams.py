@@ -63,3 +63,17 @@ def stream(cuda_stream):
         target stream will be set.
     """
     return StreamContext(cuda_stream)
+
+def set_stream(stream):
+    """ Set the current CUDA stream of DGL
+
+    Parameters
+    ----------
+    stream : torch.cuda.Stream.
+    """
+    if stream is None:
+        return
+
+    ctx = to_dgl_context(stream.device)
+    check_call(_LIB.DGLSetStream(
+        ctx.device_type, ctx.device_id, ctypes.c_void_p(stream.cuda_stream)))
