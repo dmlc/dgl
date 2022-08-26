@@ -459,7 +459,7 @@ def test_RangePartitionBook():
         part_id, num_parts, node_map, edge_map, ntypes, etypes)
     assert gpb.etypes == ['_E']
     assert gpb.canonical_etypes == [None]
-    assert gpb._to_canonical_etype('_E') == '_E'
+    assert gpb.to_canonical_etype('_E') == '_E'
 
     node_policy = NodePartitionPolicy(gpb, '_N')
     assert node_policy.type_name == '_N'
@@ -476,7 +476,7 @@ def test_RangePartitionBook():
         part_id, num_parts, node_map, edge_map, ntypes, etypes)
     assert gpb.etypes == ['edge1']
     assert gpb.canonical_etypes == [None]
-    assert gpb._to_canonical_etype('edge1') == 'edge1'
+    assert gpb.to_canonical_etype('edge1') == 'edge1'
 
     node_policy = NodePartitionPolicy(gpb, 'node1')
     assert node_policy.type_name == 'node1'
@@ -494,17 +494,17 @@ def test_RangePartitionBook():
         part_id, num_parts, node_map, edge_map, ntypes, etypes)
     assert gpb.etypes == ['edge1']
     assert gpb.canonical_etypes == [c_etype]
-    assert gpb._to_canonical_etype('edge1') == c_etype
-    assert gpb._to_canonical_etype(c_etype) == c_etype
+    assert gpb.to_canonical_etype('edge1') == c_etype
+    assert gpb.to_canonical_etype(c_etype) == c_etype
     expect_except = False
     try:
-        gpb._to_canonical_etype(('node1', 'edge2', 'node2'))
+        gpb.to_canonical_etype(('node1', 'edge2', 'node2'))
     except:
         expect_except = True
     assert expect_except
     expect_except = False
     try:
-        gpb._to_canonical_etype('edge2')
+        gpb.to_canonical_etype('edge2')
     except:
         expect_except = True
     assert expect_except

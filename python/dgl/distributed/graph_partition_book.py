@@ -386,22 +386,16 @@ class GraphPartitionBook(ABC):
             A list of canonical etypes
         """
 
+    def to_canonical_etype(self, etype):
+        """Convert an edge type to the corresponding canonical edge type.
+            If canonical etype is not available, no conversion is applied.
+        """
+
     @property
     def is_homogeneous(self):
         """check if homogeneous
         """
         return not(len(self.etypes) > 1 or len(self.ntypes) > 1)
-
-    @property
-    def has_canonical_etypes(self):
-        """check if has valid canonical etypes
-
-        .. deprecated:: 0.9.1
-
-            This function is deprecated as canonical etypes are always availale
-            for partitions generated since ``0.9.1``.
-        """
-        return all(etype is not None for etype in self.canonical_etypes)
 
     def map_to_per_ntype(self, ids):
         """Map homogeneous node IDs to type-wise IDs and node types.
@@ -672,14 +666,18 @@ class BasicPartitionBook(GraphPartitionBook):
         """
         return [DEFAULT_ETYPE]
 
+    def to_canonical_etype(self, etype):
+        """Convert an edge type to the corresponding canonical edge type.
+            If canonical etype is not available, no conversion is applied.
+        """
+        return self.canonical_etypes
 
 class RangePartitionBook(GraphPartitionBook):
     """This partition book supports more efficient storage of partition information.
 
     This partition book is used if the nodes and edges of a graph partition are assigned
     with contiguous IDs. It uses very small amount of memory to store the partition
-    information. Canonical etypes are availabe only when the keys of argument ``etypes``
-    are canonical etypes.
+    information.
 
     Parameters
     ----------
@@ -724,22 +722,12 @@ class RangePartitionBook(GraphPartitionBook):
             self._ntypes[ntype_id] = ntype
         assert all(ntype is not None for ntype in self._ntypes), \
                 "The node types have invalid IDs."
-        for etype, etype_id in etypes.items():
-            if isinstance(etype, tuple):
-                assert len(etype) == 3, \
-                    'Canonical etype should be in format of (str, str, str).'
-                c_etype = etype
-                etype = etype[1]
-                self._etypes[etype_id] = etype
-                self._canonical_etypes[etype_id] = c_etype
-                if etype in self._etype2canonical:
-                    # If one etype maps to multiple canonical etypes, empty
-                    # tuple is used to indicate such ambiguity casued by etype.
-                    # See more details in self._to_canonical_etype().
-                    self._etype2canonical[etype] = tuple()
-                else:
-                    self._etype2canonical[etype] = c_etype
-            else:
+        self._init_by_canonical_etypes = True
+        if isinstance(list(etypes.keys())[0], tuple):
+            self.init_canonical_etypes(etypes)
+        else:
+            self._init_by_canonical_etypes = False
+            for etype, etype_id in etypes.items():
                 dgl_warning(
                     "Etype with 'str' format is deprecated. Please use '(str, str, str)'.")
                 self._etypes[etype_id] = etype
@@ -822,10 +810,10 @@ class RangePartitionBook(GraphPartitionBook):
             nid_range[i] = (ntype, self._typed_nid_range[ntype])
         nid_range_pickle = list(pickle.dumps(nid_range))
 
-        eid_range = [None] * len(self.etypes)
-        for i, etype in enumerate(self.etypes):
-            c_etype = self._to_canonical_etype(etype)
-            eid_range[i] = (c_etype, self._typed_eid_range[c_etype])
+        etypes = self.canonical_etypes if self.init_by_canonical_etypes else self.etypes
+        eid_range = [None] * len(etypes)
+        for i, etype in enumerate(etypes):
+            eid_range[i] = (etype, self._typed_eid_range[etype])
         eid_range_pickle = list(pickle.dumps(eid_range))
 
         self._meta = _move_metadata_to_shared_mem(graph_name,
@@ -841,6 +829,43 @@ class RangePartitionBook(GraphPartitionBook):
         """
         return self._num_partitions
 
+    def init_canonical_etypes(self, etypes):
+        ''' initialize canonical etypes and related mapping.
+        '''
+        for etype, etype_id in etypes.items():
+            assert len(etype) == 3, \
+                'Canonical etype should be in format of (str, str, str).'
+            c_etype = etype
+            etype = etype[1]
+            self._etypes[etype_id] = etype
+            self._canonical_etypes[etype_id] = c_etype
+            if etype in self._etype2canonical:
+                # If one etype maps to multiple canonical etypes, empty
+                # tuple is used to indicate such ambiguity casued by etype.
+                # See more details in self.to_canonical_etype().
+                self._etype2canonical[etype] = tuple()
+            else:
+                self._etype2canonical[etype] = c_etype
+
+    @property
+    def init_by_canonical_etypes(self):
+        """ indicates whether partition book is initialized by canonical etypes.
+
+        .. deprecated:: 0.9.1
+            This function is deprecated as canonical etypes are always availale
+            for partitions generated since ``0.9.1``.
+        """
+        return self._init_by_canonical_etypes
+
+    def _etype_to_key(self, etype):
+        ''' obtain the key used in internal dict such as ``_typed_eid_range``.
+        '''
+        if self.init_by_canonical_etypes:
+            return self.to_canonical_etype(etype)
+        else:
+            if isinstance(etype, tuple):
+                return etype[1]
+        return etype
 
     def _num_nodes(self, ntype=DEFAULT_NTYPE):
         """ The total number of nodes
@@ -856,8 +881,8 @@ class RangePartitionBook(GraphPartitionBook):
         if etype in (DEFAULT_ETYPE, DEFAULT_ETYPE[1]):
             return int(self._max_edge_ids[-1])
         else:
-            c_etype = self._to_canonical_etype(etype)
-            return int(self._typed_max_edge_ids[c_etype][-1])
+            key = self._etype_to_key(etype)
+            return int(self._typed_max_edge_ids[key][-1])
 
     def metadata(self):
         """Return the partition meta data.
@@ -892,11 +917,11 @@ class RangePartitionBook(GraphPartitionBook):
         """Map per-edge-type IDs to global edge IDs in the homoenegeous format.
         """
         ids = utils.toindex(ids).tousertensor()
-        c_etype = self._to_canonical_etype(etype)
-        partids = self.eid2partid(ids, c_etype)
-        typed_max_eids = F.zerocopy_from_numpy(self._typed_max_edge_ids[c_etype])
+        key = self._etype_to_key(etype)
+        partids = self.eid2partid(ids, key)
+        typed_max_eids = F.zerocopy_from_numpy(self._typed_max_edge_ids[key])
         end_diff = F.gather_row(typed_max_eids, partids) - ids
-        typed_eid_range = F.zerocopy_from_numpy(self._typed_eid_range[c_etype][:, 1])
+        typed_eid_range = F.zerocopy_from_numpy(self._typed_eid_range[key][:, 1])
         return F.gather_row(typed_eid_range, partids) - end_diff
 
     def nid2partid(self, nids, ntype=DEFAULT_NTYPE):
@@ -917,8 +942,8 @@ class RangePartitionBook(GraphPartitionBook):
         if etype in (DEFAULT_ETYPE, DEFAULT_ETYPE[1]):
             ret = np.searchsorted(self._max_edge_ids, eids.tonumpy(), side='right')
         else:
-            c_etype = self._to_canonical_etype(etype)
-            ret = np.searchsorted(self._typed_max_edge_ids[c_etype], eids.tonumpy(), side='right')
+            key = self._etype_to_key(etype)
+            ret = np.searchsorted(self._typed_max_edge_ids[key], eids.tonumpy(), side='right')
         ret = utils.toindex(ret)
         return ret.tousertensor()
 
@@ -946,9 +971,9 @@ class RangePartitionBook(GraphPartitionBook):
             end = self._max_edge_ids[partid]
             return F.arange(start, end)
         else:
-            c_etype = self._to_canonical_etype(etype)
-            start = self._typed_max_edge_ids[c_etype][partid - 1] if partid > 0 else 0
-            end = self._typed_max_edge_ids[c_etype][partid]
+            key = self._etype_to_key(etype)
+            start = self._typed_max_edge_ids[key][partid - 1] if partid > 0 else 0
+            end = self._typed_max_edge_ids[key][partid]
             return F.arange(start, end)
 
 
@@ -980,8 +1005,8 @@ class RangePartitionBook(GraphPartitionBook):
         if etype in (DEFAULT_ETYPE, DEFAULT_ETYPE[1]):
             start = self._max_edge_ids[partid - 1] if partid > 0 else 0
         else:
-            c_etype = self._to_canonical_etype(etype)
-            start = self._typed_max_edge_ids[c_etype][partid - 1] if partid > 0 else 0
+            key = self._etype_to_key(etype)
+            start = self._typed_max_edge_ids[key][partid - 1] if partid > 0 else 0
         return eids - int(start)
 
 
@@ -1016,7 +1041,7 @@ class RangePartitionBook(GraphPartitionBook):
         """
         return self._canonical_etypes
 
-    def _to_canonical_etype(self, etype):
+    def to_canonical_etype(self, etype):
         """Convert an edge type to the corresponding canonical edge type.
         If canonical etype is not available, no conversion is applied.
         """
@@ -1203,6 +1228,7 @@ class EdgePartitionPolicy(PartitionPolicy):
     '''Partition policy for edges.
     '''
     def __init__(self, partition_book, etype=DEFAULT_ETYPE):
+        etype = partition_book._etype_to_key(etype)
         super(EdgePartitionPolicy, self).__init__(
             EDGE_PART_POLICY + ':' + str(etype), partition_book)
 

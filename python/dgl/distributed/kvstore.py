@@ -1129,21 +1129,20 @@ class KVClient(object):
         del self._push_handlers[name]
         self.barrier()
 
-    def map_shared_data(self, gpb):
+    def map_shared_data(self, partition_book):
         """Mapping shared-memory tensor from server to client.
 
         Parameters
         ----------
-        gpb : GraphPartitionBook
+        partition_book : GraphPartitionBook
             Store the partition information
         """
         # Get all partition policies
-        for ntype in gpb.ntypes:
-            policy = NodePartitionPolicy(gpb, ntype)
+        for ntype in partition_book.ntypes:
+            policy = NodePartitionPolicy(partition_book, ntype)
             self._all_possible_part_policy[policy.policy_str] = policy
-        etypes = gpb.canonical_etypes if gpb.has_canonical_etypes else gpb.etypes
-        for etype in etypes:
-            policy = EdgePartitionPolicy(gpb, etype)
+        for etype in partition_book.etypes:
+            policy = EdgePartitionPolicy(partition_book, etype)
             self._all_possible_part_policy[policy.policy_str] = policy
 
         # Get shared data from server side
@@ -1154,6 +1153,7 @@ class KVClient(object):
         for name, meta in response.meta.items():
             if name not in self._data_name_list:
                 shape, dtype, policy_str = meta
+                assert policy_str in self._all_possible_part_policy
                 shared_data = empty_shared_mem(name+'-kvdata-', False, shape, dtype)
                 dlpack = shared_data.to_dlpack()
                 self._data_store[name] = F.zerocopy_from_dlpack(dlpack)

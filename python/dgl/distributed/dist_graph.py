@@ -535,7 +535,7 @@ class DistGraph:
             self._num_edges += int(part_md['num_edges'])
 
         # Get canonical edge types.
-        if self._gpb.has_canonical_etypes:
+        if self._gpb.init_by_canonical_etypes:
             self._canonical_etypes = self._gpb.canonical_etypes
         else:
             # Deprecated and for backward compatible only.
@@ -556,12 +556,7 @@ class DistGraph:
                 dst_tid = F.as_scalar(dst_tid)
                 self._canonical_etypes.append((self.ntypes[src_tid], self.etypes[etype_id],
                                             self.ntypes[dst_tid]))
-        self._etype2canonical = {}
-        for src_type, etype, dst_type in self._canonical_etypes:
-            if etype in self._etype2canonical:
-                self._etype2canonical[etype] = ()
-            else:
-                self._etype2canonical[etype] = (src_type, etype, dst_type)
+            self._gpb.init_canonical_etypes(self._canonical_etypes)
 
         # When we store node/edge types in a list, they are stored in the order of type IDs.
         self._ntype_map = {ntype:i for i, ntype in enumerate(self.ntypes)}
@@ -584,12 +579,6 @@ class DistGraph:
         self.graph_name, self._gpb_input, self._canonical_etypes = state
         self._init()
 
-        self._etype2canonical = {}
-        for src_type, etype, dst_type in self._canonical_etypes:
-            if etype in self._etype2canonical:
-                self._etype2canonical[etype] = ()
-            else:
-                self._etype2canonical[etype] = (src_type, etype, dst_type)
         self._ndata_store = {}
         self._edata_store = {}
         self._ndata = NodeDataView(self)
@@ -816,21 +805,7 @@ class DistGraph:
         --------
         canonical_etypes
         """
-        if etype is None:
-            if len(self.etypes) != 1:
-                raise DGLError('Edge type name must be specified if there are more than one '
-                               'edge types.')
-            etype = self.etypes[0]
-        if isinstance(etype, tuple):
-            return etype
-        else:
-            ret = self._etype2canonical.get(etype, None)
-            if ret is None:
-                raise DGLError('Edge type "{}" does not exist.'.format(etype))
-            if len(ret) != 3:
-                raise DGLError('Edge type "{}" is ambiguous. Please use canonical edge type '
-                               'in the form of (srctype, etype, dsttype)'.format(etype))
-            return ret
+        return self._gpb.to_canonical_etype(etype)
 
     def get_ntype_id(self, ntype):
         """Return the ID of the given node type.
@@ -938,14 +913,8 @@ class DistGraph:
         >>> print(g.num_edges())
         123718280
         """
-        if self._gpb.has_canonical_etypes:
-            etypes = self.canonical_etypes
-        else:
-            etypes = self.etypes
-            if isinstance(etype, tuple):
-                etype = etype[1]
         if etype is None:
-            return sum([self._gpb._num_edges(etype) for etype in etypes])
+            return sum([self._gpb._num_edges(etype) for etype in self.canonical_etypes])
         return self._gpb._num_edges(etype)
 
     def out_degrees(self, u=ALL):
@@ -1145,11 +1114,6 @@ class DistGraph:
 
         gpb = self.get_partition_book()
         if len(gpb.etypes) > 1:
-            # if etype is a canonical edge type (str, str, str) but gpb
-            # doesn't have such info, extract the edge type
-            if isinstance(etype, tuple) and not gpb.has_canonical_etypes:
-                assert len(etype) == 3, 'Invalid canonical etype: {}'.format(etype)
-                etype = etype[1]
             edges = gpb.map_to_homo_eid(edges, etype)
         src, dst = dist_find_edges(self, edges)
         if len(gpb.ntypes) > 1:
@@ -1265,11 +1229,6 @@ class DistGraph:
             The partition policy for the edge type.
         """
         gpb = self.get_partition_book()
-        if gpb.has_canonical_etypes:
-            etype = self.to_canonical_etype(etype)
-        else:
-            if isinstance(etype, tuple):
-                etype = etype[1]
         return EdgePartitionPolicy(gpb, etype)
 
     def barrier(self):
@@ -1313,8 +1272,7 @@ class DistGraph:
         edata_names = []
         for name in names:
             name = parse_hetero_data_name(name)
-            right_type = (self.to_canonical_etype(name.get_type()) == self.to_canonical_etype(
-                etype)) if etype is not None else True
+            right_type = (name.get_type() == etype) if etype is not None else True
             if name.is_edge() and right_type:
                 edata_names.append(name)
         return edata_names
