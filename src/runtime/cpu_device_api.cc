@@ -94,7 +94,7 @@ void* CPUDeviceAPI::AllocWorkspace(DGLContext ctx,
 void CPUDeviceAPI::FreeWorkspace(DGLContext ctx, void* data) {
   TensorDispatcher* td = TensorDispatcher::Global();
   if (td->IsAvailable())
-    return td->CUDAFreeWorkspace(data);
+    return td->CPUFreeWorkspace(data);
   else
     dmlc::ThreadLocalStore<CPUWorkspacePool>::Get()->FreeWorkspace(ctx, data);
 }
