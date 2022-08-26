@@ -119,9 +119,9 @@ class KNNGraph(nn.Module):
             be counted as one of its own k neighbors.  If False, the output graph will contain
             self loop edges, and a node will be counted as one of its own k neighbors.
         output_batch : bool, optional
-            If True, the output will be a batched graph representing just 1 KNN graph if :attr:`x` is 2D,
-            or representing :math:`shape(x)[0]` KNN graphs if :attr:`x` is 3D, as described above.
-            If False, the output graph will be unbatched.
+            If True, the output will be a batched graph representing just 1 KNN graph if :attr:`x`
+            is 2D, or representing :math:`shape(x)[0]` KNN graphs if :attr:`x` is 3D, as described
+            above.  If False, the output graph will be unbatched.
 
         Returns
         -------
@@ -239,8 +239,7 @@ class SegmentedKNNGraph(nn.Module):
             self loop edges, and a node will be counted as one of its own k neighbors.
         output_batch : bool, optional
             If True, the output will be a batched graph representing :math:`len(segs)` KNN graphs,
-            as described above.
-            If False, the output graph will be unbatched.
+            as described above.  If False, the output graph will be unbatched.
 
         Returns
         -------
