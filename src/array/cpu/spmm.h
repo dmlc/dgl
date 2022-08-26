@@ -21,7 +21,7 @@
 #include "intel/cpu_support.h"
 #ifdef USE_LIBXSMM
 #include "spmm_blocking_libxsmm.h"
-#include "../context.h"
+#include "../config.h"
 #endif  // USE_LIBXSMM
 #endif  // USE_AVX
 #endif  // _WIN32
@@ -143,9 +143,10 @@ void SpMMSumCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
 #ifdef USE_AVX
 #ifdef USE_LIBXSMM
   const bool no_libxsmm =
-       bcast.use_bcast || std::is_same<DType, double>::value;
-  const bool use_libxsmm = globalContext().libxsmm();
-  if (!no_libxsmm && use_libxsmm) {
+       bcast.use_bcast ||
+       std::is_same<DType, double>::value ||
+       !Config::Global()->isLibxsmmAvailable();
+  if (!no_libxsmm) {
     SpMMSumCsrLibxsmm<IdType, DType, Op>(bcast, csr, ufeat, efeat, out);
   } else {
 #endif  // USE_LIBXSMM
@@ -271,9 +272,10 @@ void SpMMCmpCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
 #ifdef USE_LIBXSMM
 
   const bool no_libxsmm =
-       bcast.use_bcast || std::is_same<DType, double>::value;
-  const bool use_libxsmm = globalContext().libxsmm();
-  if (!no_libxsmm && use_libxsmm) {
+       bcast.use_bcast ||
+       std::is_same<DType, double>::value ||
+       !Config::Global()->isLibxsmmAvailable();
+  if (!no_libxsmm) {
     SpMMCmpCsrLibxsmm<IdType, DType, Op, Cmp>(bcast, csr, ufeat, efeat, out, argu, arge);
   } else {
 #endif  // USE_LIBXSMM

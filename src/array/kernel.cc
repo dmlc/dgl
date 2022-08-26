@@ -13,7 +13,7 @@
 #include "kernel_decl.h"
 #include "../c_api_common.h"
 #include "./check.h"
-#include "./context.h"
+#include "./config.h"
 using namespace dgl::runtime;
 
 namespace dgl {
@@ -491,8 +491,6 @@ std::pair<CSRMatrix, NDArray> CSRSum(
   return ret;
 }
 
-INIT_CONTEXT();
-
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSpMM")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef graph = args[0];
@@ -554,12 +552,12 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSEGMENTMM")
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernel_SetLibxsmm")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     bool use_libxsmm = args[0];
-    globalContext().setLibxsmm(use_libxsmm);
+    Config::Global()->enableLibxsmm(use_libxsmm);
   });
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernel_GetLibxsmm")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    *rv = globalContext().libxsmm();
+    *rv = Config::Global()->isLibxsmmAvailable();
   });
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSEGMENTMMBackwardB")
