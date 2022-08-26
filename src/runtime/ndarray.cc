@@ -67,7 +67,8 @@ struct NDArray::Internal {
       ptr->mem = nullptr;
     } else if (ptr->dl_tensor.data != nullptr) {
       // if the array is still pinned before freeing, unpin it.
-      UnpinContainer(ptr);
+      if (ptr->pinned_by_dgl_)
+        UnpinContainer(ptr);
       dgl::runtime::DeviceAPI::Get(ptr->dl_tensor.ctx)->FreeDataSpace(
           ptr->dl_tensor.ctx, ptr->dl_tensor.data);
     }

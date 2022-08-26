@@ -135,7 +135,7 @@ Iterator는 매번 세개의 아이템을 생성한다. ``input_nodes`` 는 ``ou
         opt.step()
 
 DGL에서는 end-to-end stochastic 학습 예제인 `GraphSAGE
-implementation <https://github.com/dmlc/dgl/blob/master/examples/pytorch/graphsage/train_sampling.py>`__ 를 제공한다.
+implementation <https://github.com/dmlc/dgl/blob/master/examples/pytorch/graphsage/node_classification.py>`__ 를 제공한다.
 
 Heterogeneous 그래프의 경우
 ~~~~~~~~~~~~~~~~~~~~~~~~
