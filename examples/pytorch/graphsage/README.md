@@ -36,7 +36,6 @@ Train w/ mini-batch sampling in mixed mode (CPU+GPU) for node classification on 
 
 ```bash
 python3 node_classification.py
-python3 multi_gpu_node_classification.py
 ```
 
 Results:
