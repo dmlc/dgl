@@ -263,7 +263,6 @@ void NDArray::CopyFromTo(DLTensor* from,
         to->data, static_cast<size_t>(to->byte_offset),
         from_size, from->ctx, to->ctx, from->dtype, stream);
   }
-
 }
 
 void NDArray::PinContainer(NDArray::Container* ptr) {
