@@ -569,6 +569,8 @@ class BasicPartitionBook(GraphPartitionBook):
             This function is deprecated as canonical etypes are always used in
             internal dict since ``0.9.1``.
         '''
+        assert etype in (DEFAULT_ETYPE, DEFAULT_ETYPE[1]), \
+            'Base partition book only supports homogeneous graph.'
         return DEFAULT_ETYPE
 
     def _num_nodes(self, ntype=DEFAULT_NTYPE):
