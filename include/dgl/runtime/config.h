@@ -1,15 +1,15 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file array/config.h
- * \brief DGL aten config
+ * \file runtime/config.h
+ * \brief DGL runtime config
  */
 
 
-#ifndef DGL_ARRAY_CONFIG_H_
-#define DGL_ARRAY_CONFIG_H_
+#ifndef DGL_RUNTIME_CONFIG_H_
+#define DGL_RUNTIME_CONFIG_H_
 
 namespace dgl {
-namespace aten {
+namespace runtime {
 
 class Config {
  public:
@@ -27,8 +27,8 @@ class Config {
   bool _libxsmm = true;
 };
 
-}  // namespace aten
+}  // namespace runtime
 }  // namespace dgl
 
-#endif  // DGL_ARRAY_CONFIG_H_
+#endif  // DGL_RUNTIME_CONFIG_H_
 
