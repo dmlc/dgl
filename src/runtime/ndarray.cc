@@ -1,5 +1,5 @@
 /*!
- *  Copyright (c) 2017 by Contributors
+ *  Copyright (c) 2017-2022 by Contributors
  * \file ndarray.cc
  * \brief NDArray container infratructure.
  */
@@ -223,7 +223,6 @@ NDArray NDArray::Empty(std::vector<int64_t> shape,
   NDArray ret = Internal::Create(shape, dtype, ctx);
   // setup memory content
   size_t size = GetDataSize(ret.data_->dl_tensor);
-  size_t alignment = GetDataAlignment(ret.data_->dl_tensor);
   TensorDispatcher* td = TensorDispatcher::Global();
   if (size > 0) {
     if (td->IsAvailable()) {
@@ -232,6 +231,7 @@ NDArray NDArray::Empty(std::vector<int64_t> shape,
           DeviceAPI::Get(ret->ctx)->AllocWorkspace(
               ret->ctx, size, ret->dtype);
     } else {
+      size_t alignment = GetDataAlignment(ret.data_->dl_tensor);
       ret.data_->dl_tensor.data =
           DeviceAPI::Get(ret->ctx)->AllocDataSpace(
               ret->ctx, size, alignment, ret->dtype);

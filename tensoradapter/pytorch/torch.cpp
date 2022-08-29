@@ -1,5 +1,5 @@
 /*!
- *  Copyright (c) 2020 by Contributors
+ *  Copyright (c) 2020-2022 by Contributors
  * \file torch/torch.cpp
  * \brief Implementation of PyTorch adapter library.
  */

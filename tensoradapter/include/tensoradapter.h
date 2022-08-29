@@ -1,5 +1,5 @@
 /*!
- *  Copyright (c) 2020 by Contributors
+ *  Copyright (c) 2020-2022 by Contributors
  * \file tensoradapter.h
  * \brief Header file for functions exposed by the adapter library.
  *
