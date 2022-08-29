@@ -495,6 +495,15 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroUnpinMemory_")
     *rv = hg;
   });
 
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroRecordStream")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    DGLStreamHandle stream = args[1];
+    auto hgindex = std::dynamic_pointer_cast<HeteroGraph>(hg.sptr());
+    hgindex->RecordStream(stream);
+    *rv = hg;
+  });
+
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCopyToSharedMem")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];

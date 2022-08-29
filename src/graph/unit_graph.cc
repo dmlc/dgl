@@ -171,6 +171,11 @@ class UnitGraph::COO : public BaseHeteroGraph {
     adj_.UnpinMemory_();
   }
 
+  /*! \brief Record stream for the adj_: COOMatrix of the COO graph. */
+  void RecordStream(const DGLStreamHandle &stream) const override {
+    adj_.RecordStream(stream);
+  }
+
   bool IsMultigraph() const override {
     return aten::COOHasDuplicate(adj_);
   }
@@ -575,6 +580,11 @@ class UnitGraph::CSR : public BaseHeteroGraph {
   /*! \brief Unpin the adj_: CSRMatrix of the CSR graph. */
   void UnpinMemory_() {
     adj_.UnpinMemory_();
+  }
+
+  /*! \brief Record stream for the adj_: CSRMatrix of the CSR graph. */
+  void RecordStream(const DGLStreamHandle &stream) const override {
+    adj_.RecordStream(stream);
   }
 
   bool IsMultigraph() const override {
@@ -1314,6 +1324,15 @@ void UnitGraph::UnpinMemory_() {
     this->out_csr_->UnpinMemory_();
   if (this->coo_->defined())
     this->coo_->UnpinMemory_();
+}
+
+void UnitGraph::RecordStream(const DGLStreamHandle &stream) const {
+  if (this->in_csr_->defined())
+    this->in_csr_->RecordStream(stream);
+  if (this->out_csr_->defined())
+    this->out_csr_->RecordStream(stream);
+  if (this->coo_->defined())
+    this->coo_->RecordStream(stream);
 }
 
 void UnitGraph::InvalidateCSR() {

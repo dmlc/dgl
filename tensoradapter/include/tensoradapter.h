@@ -12,6 +12,9 @@
 
 #include <dlpack/dlpack.h>
 #include <vector>
+#ifdef DGL_USE_CUDA
+#include <cuda_runtime.h>
+#endif  // DGL_USE_CUDA
 
 namespace tensoradapter {
 
@@ -44,6 +47,15 @@ void* RawAlloc(size_t nbytes);
  * \param ptr Pointer to the memory to be freed.
  */
 void RawDelete(void* ptr);
+
+/*!
+ * \brief Let the caching allocator know which streams are using this tensor.
+ *
+ * \param ptr Pointer of the tensor to be recorded.
+ * \param stream The stream that is using this tensor.
+ * \param device_id Device of the tensor.
+ */
+void RecordStream(void* ptr, cudaStream_t stream, int device_id);
 #endif  // DGL_USE_CUDA
 
 }

@@ -168,6 +168,18 @@ struct COOMatrix {
     }
     is_pinned = false;
   }
+
+  /*!
+   * \brief Record stream for the row, col and data (if not Null) of the matrix.
+   * \param stream The stream that is using the graph
+   */
+  inline void RecordStream(const DGLStreamHandle &stream) const {
+    row.RecordStream(stream);
+    col.RecordStream(stream);
+    if (!aten::IsNullArray(data)) {
+      data.RecordStream(stream);
+    }
+  }
 };
 
 ///////////////////////// COO routines //////////////////////////

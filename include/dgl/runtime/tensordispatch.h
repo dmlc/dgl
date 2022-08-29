@@ -37,6 +37,9 @@
 #if defined(WIN32) || defined(_WIN32)
 #include <windows.h>
 #endif  // WIN32
+#ifdef DGL_USE_CUDA
+#include <cuda_runtime.h>
+#endif  // DGL_USE_CUDA
 #include <vector>
 #include "ndarray.h"
 
@@ -110,6 +113,20 @@ class TensorDispatcher {
     auto entry = entrypoints_[Op::kRawDelete];
     FUNCCAST(tensoradapter::RawDelete, entry)(ptr);
   }
+
+  /*!
+  * \brief Record streams that are using this tensor.
+  * Used in NDArray::RecordStream().
+  *
+  * \param ptr Pointer of the tensor to be recorded.
+  * \param stream The stream that is using this tensor.
+  * \param device_id Device of the tensor.
+  */
+  inline void RecordStream(void* ptr, const DGLStreamHandle &stream, int device_id) {
+    auto entry = entrypoints_[Op::kRecordStream];
+    FUNCCAST(tensoradapter::RecordStream, entry)(
+      ptr, static_cast<cudaStream_t>(stream), device_id);
+  }
 #endif  // DGL_USE_CUDA
 
  private:
@@ -128,6 +145,7 @@ class TensorDispatcher {
 #ifdef DGL_USE_CUDA
     "RawAlloc",
     "RawDelete",
+    "RecordStream",
 #endif  // DGL_USE_CUDA
   };
 
@@ -138,6 +156,7 @@ class TensorDispatcher {
 #ifdef DGL_USE_CUDA
     static constexpr int kRawAlloc = 1;
     static constexpr int kRawDelete = 2;
+    static constexpr int kRecordStream = 3;
 #endif  // DGL_USE_CUDA
   };
 
@@ -148,6 +167,7 @@ class TensorDispatcher {
   void* entrypoints_[num_entries_] = {
     nullptr,
 #ifdef DGL_USE_CUDA
+    nullptr,
     nullptr,
     nullptr,
 #endif  // DGL_USE_CUDA

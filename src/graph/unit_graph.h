@@ -229,6 +229,12 @@ class UnitGraph : public BaseHeteroGraph {
   */
   void UnpinMemory_();
 
+  /*!
+   * \brief Record stream for this graph.
+   * \param stream The stream that is using the graph
+   */
+  void RecordStream(const DGLStreamHandle &stream) const override;
+
   /*! 
    * \brief Create in-edge CSR format of the unit graph.
    * \param inplace if true and the in-edge CSR format does not exist, the created

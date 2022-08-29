@@ -5584,6 +5584,21 @@ class DGLHeteroGraph(object):
         """
         return self._graph.is_pinned()
 
+    def record_stream(self, stream):
+        """Record the stream that is using this graph.
+
+        Parameters
+        ----------
+        stream : torch.cuda.Stream
+            The stream that is using this graph.
+
+        Returns
+        -------
+        DGLGraph
+            self.
+        """
+        return self._graph.record_stream(stream)
+
     def clone(self):
         """Return a heterograph object that is a clone of current graph.
 

@@ -8,6 +8,7 @@
 #include <torch/torch.h>
 #include <ATen/DLConvertor.h>
 #ifdef DGL_USE_CUDA
+#include <c10/cuda/CUDAStream.h>
 #include <c10/cuda/CUDACachingAllocator.h>
 #endif  // DGL_USE_CUDA
 #include <vector>
@@ -57,6 +58,20 @@ TA_EXPORTS void* RawAlloc(size_t nbytes) {
 
 TA_EXPORTS void RawDelete(void* ptr) {
   c10::cuda::CUDACachingAllocator::raw_delete(ptr);
+}
+
+TA_EXPORTS void RecordStream(void* ptr, cudaStream_t stream, int device_id) {
+  c10::cuda::CUDACachingAllocator::recordStream(
+    {ptr, ptr, &c10::cuda::CUDACachingAllocator::raw_delete,
+     c10::Device(c10::DeviceType::CUDA, device_id)},
+    // getStreamFromExternal doesn't exist before PyTorch 1.10, just copy it here
+    c10::cuda::CUDAStream(
+      c10::cuda::CUDAStream::UNCHECKED,
+      c10::Stream(
+          c10::Stream::UNSAFE,
+          c10::Device(c10::DeviceType::CUDA, device_id),
+          reinterpret_cast<int64_t>(stream)))
+  );
 }
 #endif  // DGL_USE_CUDA
 

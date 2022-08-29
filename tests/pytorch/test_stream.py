@@ -1,6 +1,8 @@
+import dgl
 from dgl import rand_graph
 import dgl._ffi.streams as FS
 import dgl.ops as OPS
+from dgl.utils import to_dgl_context, to_dgl_stream_handle
 import unittest
 import backend as F
 import torch
@@ -34,6 +36,12 @@ def test_basics():
     gg = g.to(device=F.ctx())
     OPS.copy_u_sum(gg, xx)
 
+@unittest.skipIf(F._default_context_str == 'cpu', reason="stream only runs on GPU.")
+def test_set_get_stream():
+    s = torch.cuda.Stream(device=F.ctx())
+    dgl.cuda.set_stream(s)
+    assert to_dgl_stream_handle(s).value == dgl.cuda.get_current_stream(to_dgl_context(F.ctx())).value
 
 if __name__ == '__main__':
     test_basics()
+    test_set_get_stream()
