@@ -15,6 +15,7 @@
 
 import dgl
 import dgl.backend as F
+from functools import cached_property
 
 
 class CuGraphStorage:
@@ -189,16 +190,22 @@ class CuGraphStorage:
             prob=prob,
             replace=replace,
         )
-        #TODO: Handle Homogenous case
-        graph_data_d = self._convert_pycap_to_dgl_tensor_d(graph_data_cap_d)        
-        del graph_data_cap_d 
 
-        #FIXME: Return dgl.graph for non hetero graph 
+        if isinstance(graph_data_cap_d, dict):
+            #TODO: Handle Homogenous case
+            graph_data_d = self._convert_pycap_to_dgl_tensor_d(graph_data_cap_d)        
+            del graph_data_cap_d 
+            # FIXME: Figure out if NID is needed
+            # sampled_graph.edata["_ID"] = F.zerocopy_from_dlpack(edge_id_cap)
+            sampled_graph = dgl.heterograph(data_dict=graph_data_d, num_nodes_dict=self.num_nodes_dict)
+        else:
+            src_c, dst_c, edge_id_c = graph_data_cap_d
+            src_ids = F.zerocopy_from_dlpack(src_c)
+            dst_ids = F.zerocopy_from_dlpack(dst_c)
+            edge_id_t = F.zerocopy_from_dlpack(edge_id_c)
 
-        sampled_graph = dgl.heterograph(data_dict=graph_data_d, num_nodes_dict=self.num_nodes_dict)
-        # sampled_graph = sampled_graph.astype(seed_nodes_type.dtype)
-        # FIXME: Figure out if NID is needed
-        # sampled_graph.edata["_ID"] = F.zerocopy_from_dlpack(edge_id_cap)
+            sampled_graph = dgl.graph((src_ids, dst_ids), num_nodes=self.total_number_of_nodes)
+            sampled_graph.edata["_ID"] = edge_id_t
 
         # to device function move the dgl graph to desired devices
         if output_device is not None:
@@ -323,8 +330,12 @@ class CuGraphStorage:
         return self.graphstore.num_nodes(ntype)
 
     
-    def number_of_nodes(self, ntype=None):
+    def number_of_nodes(self, ntype):
         return self.num_nodes(ntype)
+
+    @cached_property
+    def total_number_of_nodes(self):
+        return self.num_nodes()
 
     def num_edges(self, etype=None):
         """
