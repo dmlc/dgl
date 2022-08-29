@@ -552,6 +552,25 @@ class BasicPartitionBook(GraphPartitionBook):
         """
         return self._partition_meta_data
 
+    @property
+    def init_by_canonical_etypes(self):
+        """ indicates whether partition book is initialized by canonical etypes.
+
+        .. deprecated:: 0.9.1
+            This function is deprecated as canonical etypes are always availale
+            for partitions generated since ``0.9.1``.
+        """
+        return True
+
+    def _etype_to_key(self, etype):
+        ''' obtain the key used in internal dict such as ``_typed_eid_range``.
+
+        .. deprecated:: 0.9.1
+            This function is deprecated as canonical etypes are always used in
+            internal dict since ``0.9.1``.
+        '''
+        return DEFAULT_ETYPE
+
     def _num_nodes(self, ntype=DEFAULT_NTYPE):
         """ The total number of nodes
         """
