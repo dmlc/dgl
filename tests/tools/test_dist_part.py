@@ -155,7 +155,7 @@ def test_part_pipeline():
         in_dir = os.path.join(root_dir, 'chunked-data')
         output_dir = os.path.join(root_dir, '2parts')
         os.system('python tools/partition_algo/random_partition.py '\
-                  '--metadata {}/metadata.json --output_path {} --num_partitions {}'.format(
+                  '--in_dir {} --out_dir {} --num_partitions {}'.format(
                     in_dir, output_dir, num_chunks))
         for ntype in ['author', 'institution', 'paper']:
             fname = os.path.join(output_dir, '{}.txt'.format(ntype))
