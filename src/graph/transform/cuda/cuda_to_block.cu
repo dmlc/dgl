@@ -169,7 +169,7 @@ ToBlockGPU(
   const auto& ctx = graph->Context();
   auto device = runtime::DeviceAPI::Get(ctx);
   cudaStream_t stream = runtime::CUDAThreadEntry::ThreadLocal()->stream;
-  
+
   CHECK_EQ(ctx.device_type, kDLGPU);
   for (const auto& nodes : rhs_nodes) {
     CHECK_EQ(ctx.device_type, nodes->ctx.device_type);
