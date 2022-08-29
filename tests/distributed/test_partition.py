@@ -444,7 +444,9 @@ def test_BasicPartitionBook():
     node_policy = NodePartitionPolicy(gpb, '_N')
     assert node_policy.type_name == '_N'
     edge_policy = EdgePartitionPolicy(gpb, '_E')
-    assert edge_policy.type_name == '_E'
+    assert edge_policy.type_name == c_etype
+    edge_policy = EdgePartitionPolicy(gpb, c_etype)
+    assert edge_policy.type_name == c_etype
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_RangePartitionBook():
@@ -465,6 +467,8 @@ def test_RangePartitionBook():
     assert node_policy.type_name == '_N'
     edge_policy = EdgePartitionPolicy(gpb, '_E')
     assert edge_policy.type_name == '_E'
+    edge_policy = EdgePartitionPolicy(gpb, ('_N', '_E', '_N'))
+    assert edge_policy.type_name == '_E'
 
     # heterogeneous, init via etype
     node_map = {'node1': F.tensor([[0, 1000], [1000, 2000]]), 'node2': F.tensor([
@@ -481,6 +485,8 @@ def test_RangePartitionBook():
     node_policy = NodePartitionPolicy(gpb, 'node1')
     assert node_policy.type_name == 'node1'
     edge_policy = EdgePartitionPolicy(gpb, 'edge1')
+    assert edge_policy.type_name == 'edge1'
+    edge_policy = EdgePartitionPolicy(gpb, ('node1', 'edge1', 'node2'))
     assert edge_policy.type_name == 'edge1'
 
     # heterogeneous, init via canonical etype
@@ -511,6 +517,8 @@ def test_RangePartitionBook():
 
     node_policy = NodePartitionPolicy(gpb, 'node1')
     assert node_policy.type_name == 'node1'
+    edge_policy = EdgePartitionPolicy(gpb, c_etype[1])
+    assert edge_policy.type_name == c_etype
     edge_policy = EdgePartitionPolicy(gpb, c_etype)
     assert edge_policy.type_name == c_etype
 
