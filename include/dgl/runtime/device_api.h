@@ -102,9 +102,18 @@ class DeviceAPI {
                               size_t num_bytes,
                               DGLContext ctx_from,
                               DGLContext ctx_to,
+                              DGLType type_hint) = 0;
+  virtual void CopyDataFromTo(const void* from,
+                              size_t from_offset,
+                              void* to,
+                              size_t to_offset,
+                              size_t num_bytes,
+                              DGLContext ctx_from,
+                              DGLContext ctx_to,
                               DGLType type_hint,
                               DGLStreamHandle stream) = 0;
-    /*!
+
+   /*!
    * \brief Create a new stream of execution.
    *
    * \param ctx The context of allocation.

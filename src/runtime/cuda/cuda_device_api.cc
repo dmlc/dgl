@@ -136,6 +136,17 @@ class CUDADeviceAPI final : public DeviceAPI {
                       size_t size,
                       DGLContext ctx_from,
                       DGLContext ctx_to,
+                      DGLType type_hint) final {
+    auto stream = static_cast<DGLStreamHandle>(CUDAThreadEntry::ThreadLocal()->stream);
+    CopyDataFromTo(from, from_offset, to, to_offset, size, ctx_from, ctx_to, type_hint, stream);
+  }
+  void CopyDataFromTo(const void* from,
+                      size_t from_offset,
+                      void* to,
+                      size_t to_offset,
+                      size_t size,
+                      DGLContext ctx_from,
+                      DGLContext ctx_to,
                       DGLType type_hint,
                       DGLStreamHandle stream) final {
     cudaStream_t cu_stream = static_cast<cudaStream_t>(stream);

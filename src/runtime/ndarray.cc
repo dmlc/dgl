@@ -12,7 +12,6 @@
 #include <dgl/zerocopy_serializer.h>
 #include <dgl/runtime/tensordispatch.h>
 #include "runtime_base.h"
-#include "./cuda/cuda_common.h"
 
 // deleter for arrays used by DLPack exporter
 extern "C" void NDArrayDLPackDeleter(DLManagedTensor* tensor);
@@ -252,10 +251,19 @@ void NDArray::CopyFromTo(DLTensor* from,
   // api manager.
   DGLContext ctx = from->ctx.device_type != kDLCPU ? from->ctx : to->ctx;
 
-  DeviceAPI::Get(ctx)->CopyDataFromTo(
-    from->data, static_cast<size_t>(from->byte_offset),
-    to->data, static_cast<size_t>(to->byte_offset),
-    from_size, from->ctx, to->ctx, from->dtype, stream);
+  if (stream == 0) {
+    // default: local cuda stream: CUDAThreadEntry->ThreadLocal()->stream
+    DeviceAPI::Get(ctx)->CopyDataFromTo(
+        from->data, static_cast<size_t>(from->byte_offset),
+        to->data, static_cast<size_t>(to->byte_offset),
+        from_size, from->ctx, to->ctx, from->dtype);
+  } else {
+    DeviceAPI::Get(ctx)->CopyDataFromTo(
+        from->data, static_cast<size_t>(from->byte_offset),
+        to->data, static_cast<size_t>(to->byte_offset),
+        from_size, from->ctx, to->ctx, from->dtype, stream);
+  }
+
 }
 
 void NDArray::PinContainer(NDArray::Container* ptr) {
@@ -285,7 +293,6 @@ NDArray NDArray::FromVector(const std::vector<T>& vec, DLContext ctx) {
   const DLDataType dtype = DLDataTypeTraits<T>::dtype;
   int64_t size = static_cast<int64_t>(vec.size());
   NDArray ret = NDArray::Empty({size}, dtype, ctx);
-  auto stream = CUDAThreadEntry::ThreadLocal()->stream;
   DeviceAPI::Get(ctx)->CopyDataFromTo(
       vec.data(),
       0,
@@ -294,8 +301,7 @@ NDArray NDArray::FromVector(const std::vector<T>& vec, DLContext ctx) {
       size * sizeof(T),
       DLContext{kDLCPU, 0},
       ctx,
-      dtype,
-      stream);
+      dtype);
   return ret;
 }
 
@@ -316,7 +322,6 @@ std::vector<T> NDArray::ToVector() const {
   int64_t size = data_->dl_tensor.shape[0];
   std::vector<T> vec(size);
   const DLContext &ctx = data_->dl_tensor.ctx;
-  auto stream = CUDAThreadEntry::ThreadLocal()->stream;
   DeviceAPI::Get(ctx)->CopyDataFromTo(
       static_cast<T*>(data_->dl_tensor.data),
       0,
@@ -325,8 +330,7 @@ std::vector<T> NDArray::ToVector() const {
       size * sizeof(T),
       ctx,
       DLContext{kDLCPU, 0},
-      dtype,
-      stream);
+      dtype);
   return vec;
 }
 
@@ -474,9 +478,9 @@ int DGLArrayFree(DGLArrayHandle handle) {
 }
 
 int DGLArrayCopyFromTo(DGLArrayHandle from,
-                       DGLArrayHandle to) {
+                       DGLArrayHandle to,
+                       DGLStreamHandle stream) {
   API_BEGIN();
-  auto stream  = CUDAThreadEntry::ThreadLocal()->stream;
   NDArray::CopyFromTo(from, to, stream);
   API_END();
 }
@@ -521,13 +525,12 @@ int DGLArrayCopyFromBytes(DGLArrayHandle handle,
   cpu_ctx.device_type = kDLCPU;
   cpu_ctx.device_id = 0;
   size_t arr_size = GetDataSize(*handle);
-  auto stream  = CUDAThreadEntry::ThreadLocal()->stream;
   CHECK_EQ(arr_size, nbytes)
       << "DGLArrayCopyFromBytes: size mismatch";
   DeviceAPI::Get(handle->ctx)->CopyDataFromTo(
       data, 0,
       handle->data, static_cast<size_t>(handle->byte_offset),
-      nbytes, cpu_ctx, handle->ctx, handle->dtype, stream);
+      nbytes, cpu_ctx, handle->ctx, handle->dtype);
   API_END();
 }
 
@@ -539,13 +542,12 @@ int DGLArrayCopyToBytes(DGLArrayHandle handle,
   cpu_ctx.device_type = kDLCPU;
   cpu_ctx.device_id = 0;
   size_t arr_size = GetDataSize(*handle);
-  auto stream  = CUDAThreadEntry::ThreadLocal()->stream;
   CHECK_EQ(arr_size, nbytes)
       << "DGLArrayCopyToBytes: size mismatch";
   DeviceAPI::Get(handle->ctx)->CopyDataFromTo(
       handle->data, static_cast<size_t>(handle->byte_offset),
       data, 0,
-      nbytes, handle->ctx, cpu_ctx, handle->dtype, stream);
+      nbytes, handle->ctx, cpu_ctx, handle->dtype);
   API_END();
 }
 

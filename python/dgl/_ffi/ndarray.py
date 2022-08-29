@@ -311,7 +311,7 @@ class NDArrayBase(_NDArrayBase):
             target = empty(self.shape, self.dtype, target)
         if isinstance(target, NDArrayBase):
             check_call(_LIB.DGLArrayCopyFromTo(
-                self.handle, target.handle))
+                self.handle, target.handle, None))
         else:
             raise ValueError("Unsupported target type %s" % str(type(target)))
         return target

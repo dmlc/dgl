@@ -107,7 +107,8 @@ cdef extern from "dgl/runtime/c_runtime_api.h":
                                CDGLArrayHandle* out)
     int DGLArrayFree(DLTensorHandle handle)
     int DGLArrayCopyFromTo(DLTensorHandle src,
-                           DLTensorHandle to)
+                           DLTensorHandle to,
+			   DGLStreamHandle stream)
     int DGLArrayFromDLPack(DLManagedTensor* arr_from,
                            DLTensorHandle* out)
     int DGLArrayToDLPack(DLTensorHandle arr_from,
