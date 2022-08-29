@@ -5,6 +5,7 @@
  */
 #include <dgl/packed_func_ext.h>
 #include <dgl/base_heterograph.h>
+#include <dgl/runtime/config.h>
 
 #ifdef USE_TVM
 #include <featgraph.h>
@@ -13,7 +14,6 @@
 #include "kernel_decl.h"
 #include "../c_api_common.h"
 #include "./check.h"
-#include "./config.h"
 using namespace dgl::runtime;
 
 namespace dgl {
@@ -552,12 +552,12 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSEGMENTMM")
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernel_SetLibxsmm")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     bool use_libxsmm = args[0];
-    Config::Global()->enableLibxsmm(use_libxsmm);
+    dgl::runtime::Config::Global()->enableLibxsmm(use_libxsmm);
   });
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernel_GetLibxsmm")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    *rv = Config::Global()->isLibxsmmAvailable();
+    *rv = dgl::runtime::Config::Global()->isLibxsmmAvailable();
   });
 
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelSEGMENTMMBackwardB")

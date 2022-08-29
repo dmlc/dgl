@@ -1,13 +1,13 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file array/config.cc
- * \brief DGL aten config
+ * \file runtime/config.cc
+ * \brief DGL runtime config
  */
 
-#include "./config.h"
+#include <dgl/runtime/config.h>
 
 namespace dgl {
-namespace aten {
+namespace runtime {
 
 void Config::enableLibxsmm(bool b) {
     _libxsmm = b;
@@ -17,5 +17,5 @@ bool Config::isLibxsmmAvailable() const {
     return _libxsmm;
 }
 
-}  // namespace aten
+}  // namespace runtime
 }  // namespace dgl
