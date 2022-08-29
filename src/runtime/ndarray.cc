@@ -12,6 +12,7 @@
 #include <dgl/zerocopy_serializer.h>
 #include <dgl/runtime/tensordispatch.h>
 #include "runtime_base.h"
+#include "./cuda/cuda_common.h"
 
 // deleter for arrays used by DLPack exporter
 extern "C" void NDArrayDLPackDeleter(DLManagedTensor* tensor);
@@ -475,7 +476,7 @@ int DGLArrayFree(DGLArrayHandle handle) {
 int DGLArrayCopyFromTo(DGLArrayHandle from,
                        DGLArrayHandle to) {
   API_BEGIN();
-  auto stream  = runtime::CUDAThreadEntry::ThreadLocal()->stream;
+  auto stream  = CUDAThreadEntry::ThreadLocal()->stream;
   NDArray::CopyFromTo(from, to, stream);
   API_END();
 }
@@ -520,7 +521,7 @@ int DGLArrayCopyFromBytes(DGLArrayHandle handle,
   cpu_ctx.device_type = kDLCPU;
   cpu_ctx.device_id = 0;
   size_t arr_size = GetDataSize(*handle);
-  auto stream  = runtime::CUDAThreadEntry::ThreadLocal()->stream;
+  auto stream  = CUDAThreadEntry::ThreadLocal()->stream;
   CHECK_EQ(arr_size, nbytes)
       << "DGLArrayCopyFromBytes: size mismatch";
   DeviceAPI::Get(handle->ctx)->CopyDataFromTo(
@@ -538,7 +539,7 @@ int DGLArrayCopyToBytes(DGLArrayHandle handle,
   cpu_ctx.device_type = kDLCPU;
   cpu_ctx.device_id = 0;
   size_t arr_size = GetDataSize(*handle);
-  auto stream  = runtime::CUDAThreadEntry::ThreadLocal()->stream;
+  auto stream  = CUDAThreadEntry::ThreadLocal()->stream;
   CHECK_EQ(arr_size, nbytes)
       << "DGLArrayCopyToBytes: size mismatch";
   DeviceAPI::Get(handle->ctx)->CopyDataFromTo(

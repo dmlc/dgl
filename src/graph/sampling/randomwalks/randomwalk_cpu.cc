@@ -14,6 +14,8 @@
 #include "randomwalks_cpu.h"
 #include "metapath_randomwalk.h"
 
+#include "../../../runtime/cuda/cuda_common.h"
+
 namespace dgl {
 
 using namespace dgl::runtime;

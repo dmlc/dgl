@@ -270,7 +270,7 @@ std::pair<IdArray, IdArray> RandomWalkBiased(
   IdType *traces_data = traces.Ptr<IdType>();
   IdType *eids_data = eids.Ptr<IdType>();
 
-  cudaStream_t stream = runda::CUDAThreadEntry::ThreadLocal()->stream;
+  cudaStream_t stream = runtime::CUDAThreadEntry::ThreadLocal()->stream;
   auto device = DeviceAPI::Get(ctx);
   // new probs and prob sums pointers
   assert(num_etypes == static_cast<int64_t>(prob.size()));

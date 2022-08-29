@@ -13,6 +13,7 @@
 #include "../c_api_common.h"
 #include "./array_op.h"
 #include "./arith.h"
+#include "../runtime/cuda/cuda_common.h"
 
 using namespace dgl::runtime;
 

@@ -18,7 +18,7 @@ namespace array {
 
 namespace {
 
-constexpr cudaStream_t cudaStream = runtime::CUDAThreadEntry::ThreadLocal()->stream;
+cudaStream_t cudaStream = runtime::CUDAThreadEntry::ThreadLocal()->stream;
 
 template<typename IdType, bool include>
 __global__ void _IsInKernel(
