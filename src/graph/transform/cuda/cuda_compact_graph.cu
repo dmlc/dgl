@@ -88,10 +88,11 @@ CompactGraphsGPU(
     const std::vector<HeteroGraphPtr> &graphs,
     const std::vector<IdArray> &always_preserve) {
 
-  cudaStream_t stream = 0;
+
   const auto& ctx = graphs[0]->Context();
   auto device = runtime::DeviceAPI::Get(ctx);
-
+  cudaStream_t stream = runtime::CUDAThreadEntry::ThreadLocal()->stream;
+  
   CHECK_EQ(ctx.device_type, kDLGPU);
 
   // Step 1: Collect the nodes that has connections for each type.

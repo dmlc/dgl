@@ -153,8 +153,7 @@ std::pair<IdArray, NDArray> SparsePush(
       "device";
   auto device = DeviceAPI::Get(ctx);
 
-  // TODO(dlasalle): Get the stream from the device context.
-  cudaStream_t stream = 0;
+  cudaStream_t stream = CUDAThreadEntry::ThreadLocal()->stream;
 
   CHECK_LE(in_idx->ndim, 1) << "The tensor of sending indices must be of "
       "dimension one (or empty).";
@@ -243,11 +242,11 @@ std::pair<IdArray, NDArray> SparsePush(
   {
     size_t prefix_workspace_size;
     CUDA_CALL(cub::DeviceScan::ExclusiveSum(nullptr, prefix_workspace_size,
-        recv_sum.get(), recv_prefix.get(), comm_size+1));
+        recv_sum.get(), recv_prefix.get(), comm_size+1, stream));
 
     Workspace<void> prefix_workspace(device, ctx, prefix_workspace_size);
     CUDA_CALL(cub::DeviceScan::ExclusiveSum(prefix_workspace.get(),
-        prefix_workspace_size, recv_sum.get(), recv_prefix.get(), comm_size+1));
+        prefix_workspace_size, recv_sum.get(), recv_prefix.get(), comm_size+1, stream));
   }
   recv_sum.free();
 

@@ -284,6 +284,7 @@ NDArray NDArray::FromVector(const std::vector<T>& vec, DLContext ctx) {
   const DLDataType dtype = DLDataTypeTraits<T>::dtype;
   int64_t size = static_cast<int64_t>(vec.size());
   NDArray ret = NDArray::Empty({size}, dtype, ctx);
+  auto stream = CUDAThreadEntry::ThreadLocal()->stream;
   DeviceAPI::Get(ctx)->CopyDataFromTo(
       vec.data(),
       0,
@@ -293,7 +294,7 @@ NDArray NDArray::FromVector(const std::vector<T>& vec, DLContext ctx) {
       DLContext{kDLCPU, 0},
       ctx,
       dtype,
-      nullptr);
+      stream);
   return ret;
 }
 
@@ -314,6 +315,7 @@ std::vector<T> NDArray::ToVector() const {
   int64_t size = data_->dl_tensor.shape[0];
   std::vector<T> vec(size);
   const DLContext &ctx = data_->dl_tensor.ctx;
+  auto stream = CUDAThreadEntry::ThreadLocal()->stream;
   DeviceAPI::Get(ctx)->CopyDataFromTo(
       static_cast<T*>(data_->dl_tensor.data),
       0,
@@ -323,7 +325,7 @@ std::vector<T> NDArray::ToVector() const {
       ctx,
       DLContext{kDLCPU, 0},
       dtype,
-      nullptr);
+      stream);
   return vec;
 }
 
@@ -471,9 +473,9 @@ int DGLArrayFree(DGLArrayHandle handle) {
 }
 
 int DGLArrayCopyFromTo(DGLArrayHandle from,
-                       DGLArrayHandle to,
-                       DGLStreamHandle stream) {
+                       DGLArrayHandle to) {
   API_BEGIN();
+  auto stream  = runtime::CUDAThreadEntry::ThreadLocal()->stream;
   NDArray::CopyFromTo(from, to, stream);
   API_END();
 }
@@ -518,12 +520,13 @@ int DGLArrayCopyFromBytes(DGLArrayHandle handle,
   cpu_ctx.device_type = kDLCPU;
   cpu_ctx.device_id = 0;
   size_t arr_size = GetDataSize(*handle);
+  auto stream  = runtime::CUDAThreadEntry::ThreadLocal()->stream;
   CHECK_EQ(arr_size, nbytes)
       << "DGLArrayCopyFromBytes: size mismatch";
   DeviceAPI::Get(handle->ctx)->CopyDataFromTo(
       data, 0,
       handle->data, static_cast<size_t>(handle->byte_offset),
-      nbytes, cpu_ctx, handle->ctx, handle->dtype, nullptr);
+      nbytes, cpu_ctx, handle->ctx, handle->dtype, stream);
   API_END();
 }
 
@@ -535,12 +538,13 @@ int DGLArrayCopyToBytes(DGLArrayHandle handle,
   cpu_ctx.device_type = kDLCPU;
   cpu_ctx.device_id = 0;
   size_t arr_size = GetDataSize(*handle);
+  auto stream  = runtime::CUDAThreadEntry::ThreadLocal()->stream;
   CHECK_EQ(arr_size, nbytes)
       << "DGLArrayCopyToBytes: size mismatch";
   DeviceAPI::Get(handle->ctx)->CopyDataFromTo(
       handle->data, static_cast<size_t>(handle->byte_offset),
       data, 0,
-      nbytes, handle->ctx, cpu_ctx, handle->dtype, nullptr);
+      nbytes, handle->ctx, cpu_ctx, handle->dtype, stream);
   API_END();
 }
 

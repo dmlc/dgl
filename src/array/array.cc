@@ -94,6 +94,7 @@ IdArray HStack(IdArray lhs, IdArray rhs) {
   CHECK_SAME_DTYPE(lhs, rhs);
   CHECK_EQ(lhs->shape[0], rhs->shape[0]);
   auto device = runtime::DeviceAPI::Get(lhs->ctx);
+  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   const auto& ctx = lhs->ctx;
   ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {
     const int64_t len = lhs->shape[0];
@@ -101,11 +102,11 @@ IdArray HStack(IdArray lhs, IdArray rhs) {
     device->CopyDataFromTo(lhs.Ptr<IdType>(), 0,
                            ret.Ptr<IdType>(), 0,
                            len * sizeof(IdType),
-                           ctx, ctx, lhs->dtype, nullptr);
+                           ctx, ctx, lhs->dtype, thr_entry->stream);
     device->CopyDataFromTo(rhs.Ptr<IdType>(), 0,
                            ret.Ptr<IdType>(), len * sizeof(IdType),
                            len * sizeof(IdType),
-                           ctx, ctx, lhs->dtype, nullptr);
+                           ctx, ctx, lhs->dtype, thr_entry->stream);
   });
   return ret;
 }
@@ -155,12 +156,13 @@ NDArray IndexSelect(NDArray array, int64_t start, int64_t end) {
     << "Index " << end << " is out of bound.";
   CHECK_LE(start, end);
   auto device = runtime::DeviceAPI::Get(array->ctx);
+  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   const int64_t len = end - start;
   NDArray ret = NDArray::Empty({len}, array->dtype, array->ctx);
   ATEN_DTYPE_SWITCH(array->dtype, DType, "values", {
     device->CopyDataFromTo(array->data, start * sizeof(DType),
                            ret->data, 0, len * sizeof(DType),
-                           array->ctx, ret->ctx, array->dtype, nullptr);
+                           array->ctx, ret->ctx, array->dtype, thr_entry->stream);
   });
   return ret;
 }
@@ -230,6 +232,7 @@ NDArray Concat(const std::vector<IdArray>& arrays) {
                                    arrays[0]->ctx);
 
   auto device = runtime::DeviceAPI::Get(arrays[0]->ctx);
+  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   for (size_t i = 0; i < arrays.size(); ++i) {
     ATEN_DTYPE_SWITCH(arrays[i]->dtype, DType, "array", {
       device->CopyDataFromTo(
@@ -241,7 +244,7 @@ NDArray Concat(const std::vector<IdArray>& arrays) {
         arrays[i]->ctx,
         ret_arr->ctx,
         arrays[i]->dtype,
-        nullptr);
+        thr_entry);
 
         offset += arrays[i]->shape[0] * sizeof(DType);
     });

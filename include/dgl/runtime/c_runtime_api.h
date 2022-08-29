@@ -454,8 +454,7 @@ DGL_DLL int DGLArrayCopyToBytes(DGLArrayHandle handle,
  * \return 0 when success, -1 when failure happens
  */
 DGL_DLL int DGLArrayCopyFromTo(DGLArrayHandle from,
-                               DGLArrayHandle to,
-                               DGLStreamHandle stream);
+                               DGLArrayHandle to);
 
 /*!
  * \brief Produce an array from the DLManagedTensor that shares data memory

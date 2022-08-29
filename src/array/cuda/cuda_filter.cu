@@ -18,9 +18,7 @@ namespace array {
 
 namespace {
 
-// TODO(nv-dlasalle): Replace with getting the stream from the context
-// when it's implemented.
-constexpr cudaStream_t cudaDefaultStream = 0;
+constexpr cudaStream_t cudaStream = runtime::CUDAThreadEntry::ThreadLocal()->stream;
 
 template<typename IdType, bool include>
 __global__ void _IsInKernel(
@@ -59,8 +57,6 @@ IdArray _PerformFilter(
     return test;
   }
 
-  cudaStream_t stream = cudaDefaultStream;
-
   // we need two arrays: 1) to act as a prefixsum
   // for the number of entries that will be inserted, and
   // 2) to collect the included items.
@@ -76,7 +72,7 @@ IdArray _PerformFilter(
     const dim3 grid((size+block.x-1)/block.x);
 
     CUDA_KERNEL_CALL((_IsInKernel<IdType, include>),
-        grid, block, 0, stream,
+        grid, block, 0, cudaStream,
         table.DeviceHandle(),
         static_cast<const IdType*>(test->data),
         size,
@@ -91,7 +87,7 @@ IdArray _PerformFilter(
         workspace_bytes,
         static_cast<IdType*>(nullptr),
         static_cast<IdType*>(nullptr),
-        size+1));
+        size+1, cudaStream));
     void * workspace = device->AllocWorkspace(ctx, workspace_bytes);
 
     CUDA_CALL(cub::DeviceScan::ExclusiveSum(
@@ -99,7 +95,7 @@ IdArray _PerformFilter(
         workspace_bytes,
         prefix,
         prefix,
-        size+1, stream));
+        size+1, cudaStream));
     device->FreeWorkspace(ctx, workspace);
   }
 
@@ -111,7 +107,7 @@ IdArray _PerformFilter(
       ctx,
       DGLContext{kDLCPU, 0},
       test->dtype,
-      stream);
+      cudaStream);
 
   // insert items into set
   {
@@ -119,7 +115,7 @@ IdArray _PerformFilter(
     const dim3 grid((size+block.x-1)/block.x);
 
     CUDA_KERNEL_CALL(_InsertKernel,
-        grid, block, 0, stream,
+        grid, block, 0, cudaStream,
         prefix,
         size,
         static_cast<IdType*>(result->data));
@@ -134,11 +130,11 @@ template<typename IdType>
 class CudaFilterSet : public Filter {
  public:
   explicit CudaFilterSet(IdArray array) :
-      table_(array->shape[0], array->ctx, cudaDefaultStream) {
+      table_(array->shape[0], array->ctx, cudaStream) {
     table_.FillWithUnique(
         static_cast<const IdType*>(array->data),
         array->shape[0],
-        cudaDefaultStream);
+        cudaStream);
   }
 
   IdArray find_included_indices(IdArray test) override {

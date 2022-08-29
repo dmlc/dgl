@@ -248,9 +248,7 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
   const auto& ctx = rows->ctx;
   auto device = runtime::DeviceAPI::Get(ctx);
 
-  // TODO(dlasalle): Once the device api supports getting the stream from the
-  // context, that should be used instead of the default stream here.
-  cudaStream_t stream = 0;
+  cudaStream_t stream = runtime::CUDAThreadEntry::ThreadLocal()->stream;
 
   const int64_t num_rows = rows->shape[0];
   const IdType * const slice_rows = static_cast<const IdType*>(rows->data);
