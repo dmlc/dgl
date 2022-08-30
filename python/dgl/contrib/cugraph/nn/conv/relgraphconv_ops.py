@@ -2,7 +2,7 @@
 # pylint: disable= no-member, arguments-differ, invalid-name
 import torch as th
 from torch import nn
-from pylibcugraphops.aggregators.node_level import agg_hg_basis_post_fwd_int64
+from pylibcugraphops.aggregators.node_level import agg_hg_basis_post_fwd_int64, agg_hg_basis_post_bwd_int64
 from pylibcugraphops.structure.graph_types import message_flow_graph_hg_csr_int64
 
 def test_pylibcugraphops():
@@ -49,9 +49,9 @@ class OPSRGCN(th.autograd.Function):
         in_feat (input_embedding)  : n_in_nodes   * in_dim (in_dim is "dimension" in cugraph-ops)
         agg_out (output_embedding) : n_out_nodes  * leading_dimension
         leading dimension          : (n_bases+1)  * in_dim
+        W                          : leading_dimension * out_feat_dim
+        output                          : n_out_nodes  * out_feat_dim
         """
-        import cupy as _cupy
-
         _n_out_nodes = graph.num_dst_nodes('_N')
         _n_in_nodes = graph.num_src_nodes('_N')
         _sample_size = sample_size
@@ -66,17 +66,36 @@ class OPSRGCN(th.autograd.Function):
         
         _n_bases = coeff.shape[-1]
         leading_dimension = (_n_bases+1) * in_feat.shape[-1]
-        
-        agg_out = _cupy.empty((_n_out_nodes, leading_dimension), dtype=_cupy.float32)
+
+        #import cupy as _cupy
+        #agg_out = _cupy.empty((_n_out_nodes, leading_dimension), dtype=_cupy.float32)
+        agg_out = th.empty(_n_out_nodes, leading_dimension, dtype=th.float32, device='cuda')
         agg_hg_basis_post_fwd_int64(agg_out, in_feat, mfg, weights_combination=coeff)
 
         out_feat_dim = W.shape[-1]
-        h = th.as_tensor(agg_out, device='cuda') @ W.view(leading_dimension, out_feat_dim)
-        ctx.save_for_backward(coeff, in_feat, W, agg_out)
+        output = th.as_tensor(agg_out, device='cuda') @ W.view(leading_dimension, out_feat_dim)
+
+        ctx.backward_cache = mfg
+        ctx.save_for_backward(coeff, in_feat, W, output, agg_out)
         
-        return h
+        return output
 
     @staticmethod
-    def backward(ctx, *grad_outputs):
-        raise NotImplementedError
-        return super().backward(ctx, *grad_outputs)
+    def backward(ctx, grad_output):
+        """
+        grad_output should have the same dimensionality as output in forward pass.
+        """
+        mfg = ctx.backward_cache
+        coeff, in_feat, W, output, agg_out = ctx.saved_tensors
+
+        # dense backward
+        g_W = agg_out @ grad_output
+        agg_out = grad_output @ W   # gradient w.r.t input, reuse buffer
+        
+        # backward aggregation
+        g_in = th.empty_like(in_feat, dtype=th.float32, device='cuda')
+        g_coeff = th.empty_like(coeff, dtype=th.float32, device='cuda')
+        agg_hg_basis_post_bwd_int64(g_in, agg_out, in_feat, mfg,
+            output_weight_gradient=g_coeff, weights_combination=coeff)
+
+        return None, None, None, None, None, None, None, g_coeff, g_in, g_W
