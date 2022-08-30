@@ -13,6 +13,7 @@
 #include "kernel_decl.h"
 #include "../c_api_common.h"
 #include "./check.h"
+
 using namespace dgl::runtime;
 
 namespace dgl {
@@ -20,7 +21,6 @@ namespace aten {
 namespace {
 
 }  // namespace
-
 
 /*! \brief Generalized Sparse Matrix-Matrix Multiplication. */
 void SpMM(const std::string& op, const std::string& reduce,

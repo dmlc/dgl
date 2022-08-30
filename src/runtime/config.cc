@@ -6,6 +6,7 @@
 
 #include <dgl/runtime/registry.h>
 #include <dgl/runtime/config.h>
+
 using namespace dgl::runtime;
 
 namespace dgl {

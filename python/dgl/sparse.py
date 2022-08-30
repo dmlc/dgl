@@ -7,8 +7,6 @@ from .base import DGLError
 from . import backend as F
 
 
-__all__ = ["is_libxsmm_enabled", "use_libxsmm"]
-
 def infer_broadcast_shape(op, shp1, shp2):
     r"""Check the shape validity, and infer the output shape given input shape and operator.
     Note the both :attr:`shp1`, :attr:`shp2` and the returned shape are feature
