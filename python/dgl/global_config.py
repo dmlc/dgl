@@ -14,8 +14,12 @@ def use_libxsmm(flag):
     ----------
     flag : boolean
         If True, use libxsmm, otherwise not.
+
+    See Also
+    --------
+    is_libxsmm_enabled
     """
-    SetLibxsmm(flag)
+    _CAPI_DGLConfigSetLibxsmm(flag)
 
 def is_libxsmm_enabled():
     r"""Get whether the use_libxsmm flag is turned on.
@@ -24,7 +28,11 @@ def is_libxsmm_enabled():
     ----------
     use_libxsmm_flag[boolean]
         True if the use_libxsmm flag is turned on.
+
+    See Also
+    ----------
+    use_libxsmm
     """
-    return GetLibxsmm()
+    return _CAPI_DGLConfigGetLibxsmm()
 
 _init_api("dgl.global_config")

@@ -20,13 +20,13 @@ bool Config::IsLibxsmmAvailable() const {
     return libxsmm_;
 }
 
-DGL_REGISTER_GLOBAL("global_config.SetLibxsmm")
+DGL_REGISTER_GLOBAL("global_config._CAPI_DGLConfigSetLibxsmm")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     bool use_libxsmm = args[0];
     dgl::runtime::Config::Global()->EnableLibxsmm(use_libxsmm);
   });
 
-DGL_REGISTER_GLOBAL("global_config.GetLibxsmm")
+DGL_REGISTER_GLOBAL("global_config._CAPI_DGLConfigGetLibxsmm")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     *rv = dgl::runtime::Config::Global()->IsLibxsmmAvailable();
   });
