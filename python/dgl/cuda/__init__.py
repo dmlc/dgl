@@ -1,3 +1,5 @@
 """ CUDA wrappers """
+from .. import backend as F
 from . import nccl
-from .._ffi.streams import stream, set_stream, get_current_stream
+if F.get_preferred_backend() == 'pytorch':
+    from .streams import *

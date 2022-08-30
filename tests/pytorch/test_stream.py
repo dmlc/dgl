@@ -1,8 +1,7 @@
 import dgl
 from dgl import rand_graph
-import dgl._ffi.streams as FS
 import dgl.ops as OPS
-from dgl.utils import to_dgl_context, to_dgl_stream_handle
+from dgl.cuda import to_dgl_stream_handle
 import unittest
 import backend as F
 import torch
@@ -17,7 +16,7 @@ def test_basics():
     s = torch.cuda.default_stream(device=F.ctx())
     with torch.cuda.stream(s):
         xx = x.to(device=F.ctx(), non_blocking=True)
-    with FS.stream(s):
+    with dgl.cuda.stream(s):
         gg = g.to(device=F.ctx())
     s.synchronize()
     OPS.copy_u_sum(gg, xx)
@@ -26,7 +25,7 @@ def test_basics():
     s = torch.cuda.Stream(device=F.ctx())
     with torch.cuda.stream(s):
         xx = x.to(device=F.ctx(), non_blocking=True)
-    with FS.stream(s):
+    with dgl.cuda.stream(s):
         gg = g.to(device=F.ctx())
     s.synchronize()
     OPS.copy_u_sum(gg, xx)
@@ -40,7 +39,7 @@ def test_basics():
 def test_set_get_stream():
     s = torch.cuda.Stream(device=F.ctx())
     dgl.cuda.set_stream(s)
-    assert to_dgl_stream_handle(s).value == dgl.cuda.get_current_stream(to_dgl_context(F.ctx())).value
+    assert to_dgl_stream_handle(s).value == dgl.cuda.current_stream(F.ctx()).value
 
 if __name__ == '__main__':
     test_basics()
