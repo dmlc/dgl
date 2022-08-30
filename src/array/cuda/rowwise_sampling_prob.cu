@@ -602,7 +602,7 @@ COOMatrix CSRRowWiseSampling(CSRMatrix mat,
         temp_len,
         num_rows,
         temp_ptr,
-        temp_ptr + 1));
+        temp_ptr + 1, stream));
     d_temp_storage = device->AllocWorkspace(ctx, temp_storage_bytes);
     CUDA_CALL(cub::DeviceSegmentedSort::SortPairsDescending(
         d_temp_storage,
@@ -612,7 +612,7 @@ COOMatrix CSRRowWiseSampling(CSRMatrix mat,
         temp_len,
         num_rows,
         temp_ptr,
-        temp_ptr + 1));
+        temp_ptr + 1, stream));
     device->FreeWorkspace(ctx, d_temp_storage);
     device->FreeWorkspace(ctx, temp);
     device->FreeWorkspace(ctx, temp_idxs);

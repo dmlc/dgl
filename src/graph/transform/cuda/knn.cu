@@ -518,7 +518,7 @@ void BruteForceKNNSharedCuda(const NDArray& data_points, const IdArray& data_off
   size_t prefix_temp_size = 0;
   CUDA_CALL(cub::DeviceScan::ExclusiveSum(
     nullptr, prefix_temp_size, num_block_per_segment,
-    num_block_prefixsum, batch_size));
+    num_block_prefixsum, batch_size, thr_entry->stream));
   void* prefix_temp = device->AllocWorkspace(ctx, prefix_temp_size);
   CUDA_CALL(cub::DeviceScan::ExclusiveSum(
     prefix_temp, prefix_temp_size, num_block_per_segment,
@@ -872,7 +872,7 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
     device->AllocWorkspace(ctx, sizeof(IdType)));
 
   CUDA_CALL(cub::DeviceReduce::Sum(
-    nullptr, sum_temp_size, num_updates, total_num_updates_d, num_nodes));
+    nullptr, sum_temp_size, num_updates, total_num_updates_d, num_nodes, thr_entry->stream));
   IdType* sum_temp_storage = static_cast<IdType*>(
     device->AllocWorkspace(ctx, sum_temp_size));
 
@@ -901,7 +901,7 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
 
     total_num_updates = 0;
     CUDA_CALL(cub::DeviceReduce::Sum(
-      sum_temp_storage, sum_temp_size, num_updates, total_num_updates_d, num_nodes));
+      sum_temp_storage, sum_temp_size, num_updates, total_num_updates_d, num_nodes, thr_entry->stream));
     device->CopyDataFromTo(
       total_num_updates_d, 0, &total_num_updates, 0,
       sizeof(IdType), ctx, DLContext{kDLCPU, 0},

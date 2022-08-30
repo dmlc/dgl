@@ -306,14 +306,14 @@ std::pair<IdArray, IdArray> RandomWalkBiased(
         prob_sums[etype],
         num_segments,
         d_offsets,
-        d_offsets + 1));
+        d_offsets + 1, stream));
     void *temp_storage = device->AllocWorkspace(ctx, temp_storage_size);
     CUDA_CALL(cub::DeviceSegmentedReduce::Sum(temp_storage, temp_storage_size,
         probs[etype],
         prob_sums[etype],
         num_segments,
         d_offsets,
-        d_offsets + 1));
+        d_offsets + 1, stream));
     device->FreeWorkspace(ctx, temp_storage);
   }
 
