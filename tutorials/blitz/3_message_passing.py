@@ -123,8 +123,8 @@ class SAGEConv(nn.Module):
 # three concepts here:
 #
 # * Message function ``fn.copy_u('h', 'm')`` that
-#   copies the node feature under name ``'h'`` as *messages* sent to
-#   neighbors.
+#   copies the node feature under name ``'h'`` as *messages* with name
+#   ``'m'`` sent to neighbors.
 #
 # * Reduce function ``fn.mean('m', 'h_N')`` that averages
 #   all the received messages under name ``'m'`` and saves the result as a
