@@ -265,7 +265,7 @@ inline libxsmm_meltwfunction_opreduce_vecs_idx SpMMCreateLibxsmmKernel(
   }
   if (kernel == nullptr) {
     LOG(FATAL) << "Failed to generate libxsmm kernel for the SpMM operation."
-                  "You can use API dgl.use_libxsmm(false) to diable it!";
+                  "To disable libxsmm, use dgl.use_libxsmm(false).";
   }
   return kernel;
 }

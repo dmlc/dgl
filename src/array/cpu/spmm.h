@@ -145,7 +145,7 @@ void SpMMSumCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
   const bool no_libxsmm =
        bcast.use_bcast ||
        std::is_same<DType, double>::value ||
-       !dgl::runtime::Config::Global()->isLibxsmmAvailable();
+       !dgl::runtime::Config::Global()->IsLibxsmmAvailable();
   if (!no_libxsmm) {
     SpMMSumCsrLibxsmm<IdType, DType, Op>(bcast, csr, ufeat, efeat, out);
   } else {
@@ -274,7 +274,7 @@ void SpMMCmpCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
   const bool no_libxsmm =
        bcast.use_bcast ||
        std::is_same<DType, double>::value ||
-       !dgl::runtime::Config::Global()->isLibxsmmAvailable();
+       !dgl::runtime::Config::Global()->IsLibxsmmAvailable();
   if (!no_libxsmm) {
     SpMMCmpCsrLibxsmm<IdType, DType, Op, Cmp>(bcast, csr, ufeat, efeat, out, argu, arge);
   } else {

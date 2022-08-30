@@ -4,18 +4,31 @@
  * \brief DGL runtime config
  */
 
+#include <dgl/runtime/registry.h>
 #include <dgl/runtime/config.h>
+using namespace dgl::runtime;
 
 namespace dgl {
 namespace runtime {
 
-void Config::enableLibxsmm(bool b) {
-    _libxsmm = b;
+void Config::EnableLibxsmm(bool b) {
+    libxsmm_ = b;
 }
 
-bool Config::isLibxsmmAvailable() const {
-    return _libxsmm;
+bool Config::IsLibxsmmAvailable() const {
+    return libxsmm_;
 }
+
+DGL_REGISTER_GLOBAL("global_config.SetLibxsmm")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    bool use_libxsmm = args[0];
+    dgl::runtime::Config::Global()->EnableLibxsmm(use_libxsmm);
+  });
+
+DGL_REGISTER_GLOBAL("global_config.GetLibxsmm")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    *rv = dgl::runtime::Config::Global()->IsLibxsmmAvailable();
+  });
 
 }  // namespace runtime
 }  // namespace dgl

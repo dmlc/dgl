@@ -19,16 +19,15 @@ class Config {
   }
 
   // Enabling or disable use libxsmm for Spmm
-  void enableLibxsmm(bool);
-  bool isLibxsmmAvailable() const;
+  void EnableLibxsmm(bool);
+  bool IsLibxsmmAvailable() const;
 
  private:
   Config() =  default;
-  bool _libxsmm = true;
+  bool libxsmm_ = true;
 };
 
 }  // namespace runtime
 }  // namespace dgl
 
 #endif  // DGL_RUNTIME_CONFIG_H_
-
