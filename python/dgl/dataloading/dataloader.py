@@ -1197,17 +1197,16 @@ class GraphDataLoader(torch.utils.data.DataLoader):
             else:
                 dataloader_kwargs[k] = v
 
-        if collate_fn is None:
-            self.collate = GraphCollator(**collator_kwargs).collate
-        else:
-            self.collate = collate_fn
-
         self.use_ddp = use_ddp
         if use_ddp:
             self.dist_sampler = _create_dist_sampler(dataset, dataloader_kwargs, ddp_seed)
             dataloader_kwargs['sampler'] = self.dist_sampler
 
-        super().__init__(dataset=dataset, collate_fn=self.collate, **dataloader_kwargs)
+        super().__init__(dataset=dataset, collate_fn=collate_fn, **dataloader_kwargs)
+
+        # Overwrite PyTorch's default collator function with ours
+        if self.collate_fn is torch.utils.data.default_collate:
+            self.collate_fn = GraphCollator(**collator_kwargs).collate
 
     def set_epoch(self, epoch):
         """Sets the epoch number for the underlying sampler which ensures all replicas
