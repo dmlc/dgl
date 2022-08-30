@@ -535,10 +535,8 @@ class DistGraph:
             self._num_edges += int(part_md['num_edges'])
 
         # Get canonical edge types.
-        if self._gpb.init_by_canonical_etypes:
-            self._canonical_etypes = self._gpb.canonical_etypes
-        else:
-            # Deprecated and for backward compatible only.
+        if not self._gpb.init_by_canonical_etypes:
+            # Deprecated since 0.9.1 and for backward compatible only.
             # This requires the server to store the graph with coo format.
             eid = []
             for etype in self.etypes:
@@ -548,15 +546,17 @@ class DistGraph:
             src, dst = dist_find_edges(self, eid)
             src_tids, _ = self._gpb.map_to_per_ntype(src)
             dst_tids, _ = self._gpb.map_to_per_ntype(dst)
-            self._canonical_etypes = []
+            self._canonical_etypes = [None] * len(self.etypes)
             etype_ids = F.arange(0, len(self.etypes))
             for src_tid, etype_id, dst_tid in zip(src_tids, etype_ids, dst_tids):
                 src_tid = F.as_scalar(src_tid)
                 etype_id = F.as_scalar(etype_id)
                 dst_tid = F.as_scalar(dst_tid)
-                self._canonical_etypes.append((self.ntypes[src_tid], self.etypes[etype_id],
-                                            self.ntypes[dst_tid]))
-            self._gpb.init_canonical_etypes(self._canonical_etypes)
+                self._canonical_etypes[etype_id] = (self.ntypes[src_tid], self.etypes[etype_id],
+                                            self.ntypes[dst_tid])
+            self._gpb.init_canonical_etypes(
+                {etype: etype_id for etype_id, etype in enumerate(self._canonical_etypes)})
+        self._canonical_etypes = self._gpb.canonical_etypes
 
         # When we store node/edge types in a list, they are stored in the order of type IDs.
         self._ntype_map = {ntype:i for i, ntype in enumerate(self.ntypes)}
