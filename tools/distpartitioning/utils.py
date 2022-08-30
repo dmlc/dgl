@@ -194,16 +194,31 @@ def write_metadata_json(metadata_list, output_dir, graph_name):
     with open('{}/metadata.json'.format(output_dir), 'w') as outfile: 
         json.dump(graph_metadata, outfile, sort_keys=False, indent=4)
 
-def augment_edge_data(edge_data, part_ids, edge_tids, rank, world_size):
+def augment_edge_data(edge_data, lookup_service, edge_tids, rank, world_size):
     """
     Add partition-id (rank which owns an edge) column to the edge_data.
-    
+
     Parameters:
     -----------
     edge_data : numpy ndarray
         Edge information as read from the xxx_edges.txt file
-    part_ids : numpy array
-        array of part_ids indexed by global_nid
+    lookup_service : instance of class DistLookupService
+       Distributed lookup service used to map global-nids to respective partition-ids and▒
+       shuffle-global-nids
+    edge_tids: dictionary
+        dictionary where keys are canonical edge types and values are list of tuples
+        which indicate the range of edges assigned to each of the partitions
+    rank : integer
+        rank of the current process
+    world_size : integer
+        total no. of process participating in the communication primitives
+
+    Returns:
+    --------
+    dictionary : 
+        dictionary with keys as column names and values as numpy arrays and this information is 
+        loaded from input dataset files. In addition to this we include additional columns which
+        aid this pipelines computation, like constants.OWNER_PROCESS
     """
     #add global_nids to the node_data
     etype_offset = {}
@@ -225,7 +240,8 @@ def augment_edge_data(edge_data, part_ids, edge_tids, rank, world_size):
     edge_data[constants.GLOBAL_EID] = global_eids
 
     #assign the owner process/rank for each edge 
-    edge_data[constants.OWNER_PROCESS] = part_ids[edge_data[constants.GLOBAL_DST_ID]]
+    edge_data[constants.OWNER_PROCESS] = lookup_service.get_partition_ids(edge_data[constants.GLOBAL_DST_ID])
+    return edge_data
 
 def read_edges_file(edge_file, edge_data_dict):
     """ 

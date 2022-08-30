@@ -35,15 +35,14 @@ def random_partition(metadata, num_parts, output_path):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
-            'metadata', type=str, help='input metadata file of the chunked graph format')
+            '--in_dir', type=str, help='input directory that contains the metadata file')
     parser.add_argument(
-            'output_path', type=str, help='output directory')
+            '--out_dir', type=str, help='output directory')
     parser.add_argument(
-            'num_partitions', type=int, help='number of partitions')
+            '--num_partitions', type=int, help='number of partitions')
     logging.basicConfig(level='INFO')
     args = parser.parse_args()
-    with open(args.metadata) as f:
+    with open(os.path.join(args.in_dir, 'metadata.json')) as f:
         metadata = json.load(f)
-    output_path = args.output_path
     num_parts = args.num_partitions
-    random_partition(metadata, num_parts, output_path)
+    random_partition(metadata, num_parts, args.out_dir)

@@ -18,7 +18,8 @@ namespace cuda {
 #define CUDA_MAX_NUM_BLOCKS_X 0x7FFFFFFF
 #define CUDA_MAX_NUM_BLOCKS_Y 0xFFFF
 #define CUDA_MAX_NUM_BLOCKS_Z 0xFFFF
-#define CUDA_MAX_NUM_THREADS 1024
+// The max number of threads per block
+#define CUDA_MAX_NUM_THREADS 256
 
 #ifdef USE_FP16
 #define SWITCH_BITS(bits, DType, ...)                           \

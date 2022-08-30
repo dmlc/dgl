@@ -5,6 +5,8 @@ import itertools
 import constants
 from gloo_wrapper import allgather_sizes, alltoallv_cpu
 
+from dist_lookup import DistLookupService
+
 def get_shuffle_global_nids(rank, world_size, global_nids_ranks, node_data):
     """ 
     For nodes which are not owned by the current rank, whose global_nid <-> shuffle_global-nid mapping
@@ -54,69 +56,41 @@ def get_shuffle_global_nids(rank, world_size, global_nids_ranks, node_data):
     ret_val = np.column_stack([global_nids, shuffle_global_nids])
     return ret_val
 
+def lookup_shuffle_global_nids_edges(rank, world_size, edge_data, id_lookup, node_data):
+    '''
+    This function is a helper function used to lookup shuffle-global-nids for a given set of
+    global-nids using a distributed lookup service.
 
-def get_shuffle_global_nids_edges(rank, world_size, edge_data, node_part_ids, node_data):
-    """
-    Edges which are owned by this rank, may have global_nids whose shuffle_global_nids are NOT present locally.
-    This function retrieves shuffle_global_nids for such global_nids.
-
-    Parameters: 
+    Parameters:
     -----------
     rank : integer
         rank of the process
     world_size : integer
-        total no. of processes used
-    edge_data : numpy ndarray
-        edge_data (augmented) as read from the xxx_edges.txt file
-    node_part_ids : numpy array 
-        list of partition ids indexed by global node ids.
+        total number of processes used in the process group
+    edge_data : dictionary
+        edge_data is a dicitonary with keys as column names and values as numpy arrays representing
+        all the edges present in the current graph partition
+    id_lookup : instance of DistLookupService class
+        instance of a distributed lookup service class which is used to retrieve partition-ids and
+        shuffle-global-nids for any given set of global-nids
     node_data : dictionary
-        node_data, is a dictionary with keys as column_names and values as numpy arrays
-    """
+        node_data is a dictionary with keys as column names and values as numpy arrays representing
+        all the nodes owned by the current process
 
-    #determine unique node-ids present locally
-    global_nids = np.sort(np.unique(np.concatenate((edge_data[constants.GLOBAL_SRC_ID], edge_data[constants.GLOBAL_DST_ID], node_data[constants.GLOBAL_NID]))))
+    Returns:
+    --------
+    dictionary :
+        dictionary where keys are column names and values are numpy arrays representing all the
+        edges present in the current graph partition
+    '''
 
-    #determine the rank which owns orig-node-id <-> partition/rank mappings
-    part_ids = node_part_ids[global_nids]
+    node_list = np.concatenate([edge_data[constants.GLOBAL_SRC_ID], edge_data[constants.GLOBAL_DST_ID]])
+    shuffle_ids = id_lookup.get_shuffle_nids(node_list,
+                                            node_data[constants.GLOBAL_NID],
+                                            node_data[constants.SHUFFLE_GLOBAL_NID])
 
-    #form list of lists, each list includes global_nids whose mappings (shuffle_global_nids) needs to be retrieved.
-    #and rank will be the process which owns mappings of these global_nids
-    global_nids_ranks = []
-    for i in range(world_size):
-        if (i == rank):
-            global_nids_ranks.append(np.empty(shape=(0), dtype=np.int64))
-            continue
-
-        #not_owned_nodes = part_ids[:,0][part_ids[:,1] == i]
-        not_owned_node_ids = np.where(part_ids == i)[0] 
-        if not_owned_node_ids.shape[0] == 0: 
-            not_owned_nodes = np.empty(shape=(0), dtype=np.int64)
-        else: 
-            not_owned_nodes = global_nids[not_owned_node_ids]
-        global_nids_ranks.append(not_owned_nodes)
-
-    #Retrieve Global-ids for respective node owners
-    non_local_nids = get_shuffle_global_nids(rank, world_size, global_nids_ranks, node_data)
-
-    #Add global_nid <-> shuffle_global_nid mappings to the received data
-    for i in range(world_size):
-        if (i == rank):
-            own_node_ids = np.where(part_ids == i)[0]
-            own_global_nids = global_nids[own_node_ids]
-            common, ind1, ind2 = np.intersect1d(node_data[constants.GLOBAL_NID], own_global_nids, return_indices=True)
-            my_shuffle_global_nids = node_data[constants.SHUFFLE_GLOBAL_NID][ind1]
-            local_mappings = np.column_stack((own_global_nids, my_shuffle_global_nids))
-            resolved_global_nids = np.concatenate((non_local_nids, local_mappings))
-
-    #form a dictionary of mappings between orig-node-ids and global-ids
-    resolved_mappings = dict(zip(resolved_global_nids[:,0], resolved_global_nids[:,1]))
-
-    #determine global-ids for the orig-src-id and orig-dst-id
-    shuffle_global_src_id = [resolved_mappings[x] for x in edge_data[constants.GLOBAL_SRC_ID]]
-    shuffle_global_dst_id = [resolved_mappings[x] for x in edge_data[constants.GLOBAL_DST_ID]]
-    edge_data[constants.SHUFFLE_GLOBAL_SRC_ID] = np.array(shuffle_global_src_id, dtype=np.int64)
-    edge_data[constants.SHUFFLE_GLOBAL_DST_ID] = np.array(shuffle_global_dst_id, dtype=np.int64)
+    edge_data[constants.SHUFFLE_GLOBAL_SRC_ID], edge_data[constants.SHUFFLE_GLOBAL_DST_ID] = np.split(shuffle_ids, 2)
+    return edge_data
 
 def assign_shuffle_global_nids_nodes(rank, world_size, node_data):
     """
