@@ -75,7 +75,7 @@ class Metapath2VecTrainer:
                         logger.info('time:{} loss: {:.4f}'.format(now_time, running_loss))
                         print(" Loss: " + str(running_loss))
 
-        save_embedding(self.model,self.model.id2word,"out",iteration)
+            save_embedding(self.model,self.model.id2word,"out",iteration)
 
 
 def save_embedding(model,id2word, file_name, num):
