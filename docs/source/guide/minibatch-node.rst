@@ -176,7 +176,7 @@ of MFGs, we:
         opt.step()
 
 DGL provides an end-to-end stochastic training example `GraphSAGE
-implementation <https://github.com/dmlc/dgl/blob/master/examples/pytorch/graphsage/train_sampling.py>`__.
+implementation <https://github.com/dmlc/dgl/blob/master/examples/pytorch/graphsage/node_classification.py>`__.
 
 For heterogeneous graphs
 ~~~~~~~~~~~~~~~~~~~~~~~~
