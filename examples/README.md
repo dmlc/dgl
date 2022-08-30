@@ -31,6 +31,9 @@ To quickly locate the examples of your interest, search for the tagged keywords 
 - <a name='bgrl'></a> Thakoor et al. Large-Scale Representation Learning on Graphs via Bootstrapping. [Paper link](https://arxiv.org/abs/2102.06514).
     - Example code: [PyTorch](../examples/pytorch/bgrl)
     - Tags: contrastive learning for node classification.
+- <a name='directional_gsn'></a> Bouritsas et al. Improving Graph Neural Network Expressivity via Subgraph Isomorphism Counting. [Paper link](https://arxiv.org/abs/2006.09252).
+    - Example code: [PyTorch](../examples/pytorch/ogb/directional_GSN)
+    - Tags: subgraph isomorphism counting, graph classification.
 - <a name='ngnn'></a> Song et al. Network In Graph Neural Network. [Paper link](https://arxiv.org/abs/2111.11638).
     - Example code: [PyTorch](../examples/pytorch/ogb/ngnn)
     - Tags: model-agnostic methodology, link prediction, open graph benchmark.
