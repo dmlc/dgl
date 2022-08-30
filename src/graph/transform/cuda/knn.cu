@@ -901,7 +901,8 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
 
     total_num_updates = 0;
     CUDA_CALL(cub::DeviceReduce::Sum(
-      sum_temp_storage, sum_temp_size, num_updates, total_num_updates_d, num_nodes, thr_entry->stream));
+      sum_temp_storage, sum_temp_size, num_updates, total_num_updates_d, num_nodes,
+      thr_entry->stream));
     device->CopyDataFromTo(
       total_num_updates_d, 0, &total_num_updates, 0,
       sizeof(IdType), ctx, DLContext{kDLCPU, 0},
