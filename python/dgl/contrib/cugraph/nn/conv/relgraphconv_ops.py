@@ -131,12 +131,12 @@ class RgcnConv(nn.Module):
         
         # bias
         if self.bias:
-            self.h_bias = nn.Parameter(th.Tensor(out_feat_dim))
+            self.h_bias = nn.Parameter(th.Tensor(out_feat_dim).cuda())
             nn.init.zeros_(self.h_bias)
         
         # self_loop
         if self.self_loop:
-            self.loop_weight = nn.Parameter(th.Tensor(in_feat_dim, out_feat_dim))
+            self.loop_weight = nn.Parameter(th.Tensor(in_feat_dim, out_feat_dim).cuda())
             nn.init.xavier_uniform_(self.loop_weight, gain=nn.init.calculate_gain('relu'))
         
         # dropout
@@ -164,7 +164,7 @@ class RgcnConv(nn.Module):
             h = graph.dstdata['h']
 
             if self.bias:
-                h = h + self.bias
+                h = h + self.h_bias
             if self.activation:
                 h = h + feat[:graph.num_dst_nodes()] @ self.loop_weight
 
