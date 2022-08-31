@@ -1,6 +1,8 @@
 """Torch Module for Relational graph convolution layer using cugraph"""
 # pylint: disable= no-member, arguments-differ, invalid-name
+import math
 import torch as th
+from torch import nn
 from pylibcugraphops.aggregators.node_level import agg_hg_basis_post_fwd_int64, agg_hg_basis_post_bwd_int64
 from pylibcugraphops.structure.graph_types import message_flow_graph_hg_csr_int64
 
@@ -73,7 +75,13 @@ class RgcnFunction(th.autograd.Function):
     @staticmethod
     def backward(ctx, grad_output):
         """
-        grad_output should have the same dimensionality as output in forward pass.
+        Compute the backward pass of R-GCN.
+        
+        Parameters
+        ----------
+        grad_output : torch.Tensor, dtype=torch.float32, device='cuda'
+            Gradient of loss function w.r.t output.
+
         """
         mfg = ctx.backward_cache
         coeff, in_feat, W, output, agg_out = ctx.saved_tensors
@@ -90,3 +98,76 @@ class RgcnFunction(th.autograd.Function):
             output_weight_gradient=g_coeff, weights_combination=coeff.detach())
 
         return None, None, None, None, None, None, None, g_coeff, g_in, g_W.view_as(W)
+
+class RgcnConv(nn.Module):
+    def __init__(self,
+                 in_feat_dim,
+                 out_feat_dim,
+                 n_node_types,
+                 n_edge_types,
+                 sample_size,
+                 n_bases,
+                 bias=True,
+                 activation=None,
+                 self_loop=True,
+                 dropout=0.0):
+        super().__init__()  
+        self.in_feat_dim = in_feat_dim
+        self.out_feat_dim = out_feat_dim
+        self.n_node_types = n_node_types
+        self.n_edge_types = n_edge_types
+        self.sample_size = sample_size    # fanout
+        self.n_bases = n_bases
+
+        self.W = nn.Parameter(th.Tensor(self.n_bases+1, self.in_feat_dim, self.out_feat_dim).cuda())
+        self.coeff = nn.Parameter(th.Tensor(self.n_edge_types, self.n_bases).cuda())
+
+        self.reset_parameters()
+
+        # others
+        self.bias = bias
+        self.activation = activation
+        self.self_loop = self_loop
+        
+        # bias
+        if self.bias:
+            self.h_bias = nn.Parameter(th.Tensor(out_feat_dim))
+            nn.init.zeros_(self.h_bias)
+        
+        # self_loop
+        if self.self_loop:
+            self.loop_weight = nn.Parameter(th.Tensor(in_feat_dim, out_feat_dim))
+            nn.init.xavier_uniform_(self.loop_weight, gain=nn.init.calculate_gain('relu'))
+        
+        # dropout
+        self.dropout = nn.Dropout(dropout)
+        self.dropout_val = dropout
+
+    def reset_parameters(self):
+        with th.no_grad():
+            nn.init.uniform_(self.W, -1/math.sqrt(self.in_feat_dim), 1/math.sqrt(self.in_feat_dim))
+            nn.init.xavier_uniform_(self.coeff, gain=nn.init.calculate_gain('relu'))
+
+    def forward(self, graph, feat, etypes, norm=None, presorted=False):
+        self.presorted = presorted
+        with graph.local_scope():
+            graph.srcdata['h'] = feat
+            if norm:
+                graph.edata['norm'] = norm
+            _, _, L = graph.adj_sparse("csc")
+            etypes = etypes[L]
+
+            T = RgcnFunction.apply(graph, self.sample_size, self.n_node_types, self.n_edge_types,
+                                   graph.dstdata['ntype'], graph.srcdata['ntype'], etypes,
+                                   self.coeff, feat, self.W)
+            graph.dstdata['h'] = T
+            h = graph.dstdata['h']
+
+            if self.bias:
+                h = h + self.bias
+            if self.activation:
+                h = h + feat[:graph.num_dst_nodes()] @ self.loop_weight
+
+            h = self.dropout(h)
+
+            return h
