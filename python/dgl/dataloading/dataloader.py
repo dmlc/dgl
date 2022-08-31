@@ -1204,7 +1204,9 @@ class GraphDataLoader(torch.utils.data.DataLoader):
 
         super().__init__(dataset=dataset, collate_fn=collate_fn, **dataloader_kwargs)
 
-        # Overwrite PyTorch's default collator function with ours
+        # Overwrite PyTorch's default collator function with ours.
+        # After calling super().__init__() PyTorch should have set the collate_fn attribute.
+        # pylint: disable=access-member-before-definition
         if self.collate_fn is torch.utils.data.default_collate:
             self.collate_fn = GraphCollator(**collator_kwargs).collate
 
