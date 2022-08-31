@@ -2317,7 +2317,7 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True, src_nodes=None):
                 'Graph has more than one node type; please specify a dict for src_nodes.')
         src_nodes = {g.ntypes[0]: src_nodes}
         src_node_ids = [
-            F.copy_to(F.tensor(src_nodes.get(ntype, []), dtype=g._idtype_str), \
+            F.copy_to(F.tensor(src_nodes.get(ntype, []), dtype=g.idtype), \
                 F.to_backend_ctx(g._graph.ctx)) \
             for ntype in g.ntypes]
         src_node_ids_nd = [F.to_dgl_nd(nodes) for nodes in src_node_ids]

@@ -222,7 +222,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:cu101_v220629"
+                  image "dgllib/dgl-ci-cpu:v220816"
                   args "-u root"
                   alwaysPull true
                 }
@@ -240,7 +240,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-gpu:cu101_v220629"
+                  image "dgllib/dgl-ci-gpu:cu101_v220816"
                   args "-u root"
                   alwaysPull true
                 }
@@ -295,7 +295,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:cu101_v220629"
+                  image "dgllib/dgl-ci-cpu:v220816"
                   alwaysPull true
                 }
               }
@@ -312,7 +312,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-gpu-node"
-                  image "dgllib/dgl-ci-gpu:cu101_v220629"
+                  image "dgllib/dgl-ci-gpu:cu101_v220816"
                   args "--runtime nvidia"
                   alwaysPull true
                 }
@@ -341,7 +341,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:cu101_v220629"
+                  image "dgllib/dgl-ci-cpu:v220816"
                   alwaysPull true
                 }
               }
@@ -362,7 +362,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-gpu-node"
-                  image "dgllib/dgl-ci-gpu:cu101_v220629"
+                  image "dgllib/dgl-ci-gpu:cu101_v220816"
                   args "--runtime nvidia"
                   alwaysPull true
                 }
@@ -384,7 +384,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:cu101_v220629"
+                  image "dgllib/dgl-ci-cpu:v220816"
                   args "--shm-size=4gb"
                   alwaysPull true
                 }
@@ -436,7 +436,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-gpu-node"
-                  image "dgllib/dgl-ci-gpu:cu101_v220629"
+                  image "dgllib/dgl-ci-gpu:cu101_v220816"
                   args "--runtime nvidia --shm-size=8gb"
                   alwaysPull true
                 }
@@ -464,7 +464,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:cu101_v220629"
+                  image "dgllib/dgl-ci-cpu:ssh_v220818"
                   args "--shm-size=4gb"
                   alwaysPull true
                 }
@@ -530,7 +530,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-gpu-node"
-                  image "dgllib/dgl-ci-gpu:cu101_v220629"
+                  image "dgllib/dgl-ci-gpu:cu101_v220816"
                   args "--runtime nvidia"
                   alwaysPull true
                 }
@@ -553,7 +553,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:cu101_v220629"
+                  image "dgllib/dgl-ci-cpu:v220816"
                   alwaysPull true
                 }
               }
@@ -582,10 +582,10 @@ pipeline {
           docker.image('dgllib/dgl-ci-awscli:v220418').inside("--pull always --entrypoint=''") {
             sh("rm -rf ci_tmp")
             dir('ci_tmp') {
-              sh("curl -o cireport.log ${BUILD_URL}consoleText")
+              sh("curl -k -o cireport.log ${BUILD_URL}consoleText")
               sh("curl -o report.py https://raw.githubusercontent.com/dmlc/dgl/master/tests/scripts/ci_report/report.py")
               sh("curl -o status.py https://raw.githubusercontent.com/dmlc/dgl/master/tests/scripts/ci_report/status.py")
-              sh("curl -L ${BUILD_URL}wfapi")
+              sh("curl -k -L ${BUILD_URL}wfapi")
               sh("cat status.py")
               sh("pytest --html=report.html --self-contained-html report.py || true")
               sh("aws s3 sync ./ s3://dgl-ci-result/${JOB_NAME}/${BUILD_NUMBER}/${BUILD_ID}/logs/  --exclude '*' --include '*.log' --acl public-read --content-type text/plain")

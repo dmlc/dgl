@@ -1,5 +1,5 @@
 /*!
- *  Copyright (c) 2020 by Contributors
+ *  Copyright (c) 2020-2022 by Contributors
  * \file tensoradapter.h
  * \brief Header file for functions exposed by the adapter library.
  *
@@ -10,23 +10,29 @@
 #ifndef TENSORADAPTER_H_
 #define TENSORADAPTER_H_
 
-#include <dlpack/dlpack.h>
-#include <vector>
+#ifdef DGL_USE_CUDA
+#include <cuda_runtime.h>
+#endif  // DGL_USE_CUDA
 
 namespace tensoradapter {
 
 extern "C" {
 
 /*!
- * \brief Allocate an empty tensor.
+ * \brief Allocate a piece of CPU memory via
+ * PyTorch's CPUAllocator
  *
- * \param shape The shape
- * \param dtype The data type
- * \param ctx The device
- * \return The allocated tensor
+ * \param nbytes The size to be allocated.
+ * \return Pointer to the allocated memory.
  */
-DLManagedTensor* TAempty(
-    std::vector<int64_t> shape, DLDataType dtype, DLContext ctx);
+void* CPURawAlloc(size_t nbytes);
+
+/*!
+ * \brief Free the CPU memory.
+ *
+ * \param ptr Pointer to the memory to be freed.
+ */
+void CPURawDelete(void* ptr);
 
 #ifdef DGL_USE_CUDA
 /*!
@@ -34,16 +40,17 @@ DLManagedTensor* TAempty(
  * PyTorch's THCCachingAllocator.
  *
  * \param nbytes The size to be allocated.
+ * \param stream The stream to be allocated on.
  * \return Pointer to the allocated memory.
  */
-void* RawAlloc(size_t nbytes);
+void* CUDARawAlloc(size_t nbytes, cudaStream_t stream);
 
 /*!
  * \brief Free the GPU memory.
  *
  * \param ptr Pointer to the memory to be freed.
  */
-void RawDelete(void* ptr);
+void CUDARawDelete(void* ptr);
 #endif  // DGL_USE_CUDA
 
 }
