@@ -69,14 +69,8 @@ struct NDArray::Internal {
       // if the array is still pinned before freeing, unpin it.
       if (ptr->pinned_by_dgl_)
         UnpinContainer(ptr);
-      TensorDispatcher* td = TensorDispatcher::Global();
-      if (td->IsAvailable()) {
-        DeviceAPI::Get(ptr->dl_tensor.ctx)->FreeWorkspace(
-            ptr->dl_tensor.ctx, ptr->dl_tensor.data);
-      } else {
-        DeviceAPI::Get(ptr->dl_tensor.ctx)->FreeDataSpace(
-            ptr->dl_tensor.ctx, ptr->dl_tensor.data);
-      }
+      dgl::runtime::DeviceAPI::Get(ptr->dl_tensor.ctx)->FreeDataSpace(
+          ptr->dl_tensor.ctx, ptr->dl_tensor.data);
     }
     delete ptr;
   }
@@ -223,20 +217,11 @@ NDArray NDArray::Empty(std::vector<int64_t> shape,
   NDArray ret = Internal::Create(shape, dtype, ctx);
   // setup memory content
   size_t size = GetDataSize(ret.data_->dl_tensor);
-  TensorDispatcher* td = TensorDispatcher::Global();
-  if (size > 0) {
-    if (td->IsAvailable()) {
-      // when td is avaible, use AllocWorkspace to use PyTorch's allocator
-      ret.data_->dl_tensor.data =
-          DeviceAPI::Get(ret->ctx)->AllocWorkspace(
-              ret->ctx, size, ret->dtype);
-    } else {
-      size_t alignment = GetDataAlignment(ret.data_->dl_tensor);
-      ret.data_->dl_tensor.data =
-          DeviceAPI::Get(ret->ctx)->AllocDataSpace(
-              ret->ctx, size, alignment, ret->dtype);
-    }
-  }
+  size_t alignment = GetDataAlignment(ret.data_->dl_tensor);
+  if (size > 0)
+    ret.data_->dl_tensor.data =
+        DeviceAPI::Get(ret->ctx)->AllocDataSpace(
+            ret->ctx, size, alignment, ret->dtype);
   return ret;
 }
 
