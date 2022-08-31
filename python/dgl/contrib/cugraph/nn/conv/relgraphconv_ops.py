@@ -1,4 +1,4 @@
-"""Torch Module for Relational graph convolution layer"""
+"""Torch Module for Relational graph convolution layer using cugraph"""
 # pylint: disable= no-member, arguments-differ, invalid-name
 import torch as th
 from torch import nn
@@ -89,8 +89,9 @@ class OPSRGCN(th.autograd.Function):
         coeff, in_feat, W, output, agg_out = ctx.saved_tensors
 
         # dense backward
-        g_W = agg_out @ grad_output
-        agg_out = grad_output @ W   # gradient w.r.t input, reuse buffer
+        _out_feat_dim = W.shape[-1]
+        g_W = agg_out.transpose(0,1) @ grad_output
+        agg_out = grad_output @ W.view(-1, _out_feat_dim).transpose(0,1)   # gradient w.r.t input, reuse buffer
         
         # backward aggregation
         g_in = th.empty_like(in_feat, dtype=th.float32, device='cuda')
@@ -98,4 +99,4 @@ class OPSRGCN(th.autograd.Function):
         agg_hg_basis_post_bwd_int64(g_in, agg_out, in_feat, mfg,
             output_weight_gradient=g_coeff, weights_combination=coeff)
 
-        return None, None, None, None, None, None, None, g_coeff, g_in, g_W
+        return None, None, None, None, None, None, None, g_coeff, g_in, g_W.view_as(W)
