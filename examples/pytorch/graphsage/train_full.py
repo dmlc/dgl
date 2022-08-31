@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import dgl
 import dgl.nn as dglnn
 from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
 from dgl import AddSelfLoop
@@ -15,7 +14,7 @@ class SAGE(nn.Module):
         self.layers.append(dglnn.SAGEConv(in_size, hid_size, 'gcn'))
         self.layers.append(dglnn.SAGEConv(hid_size, out_size, 'gcn'))
         self.dropout = nn.Dropout(0.5)
-        
+
     def forward(self, graph, x):
         h = self.dropout(x)
         for l, layer in enumerate(self.layers):
@@ -37,8 +36,7 @@ def evaluate(g, features, labels, mask, model):
 
 def train(g, features, labels, masks, model):
     # define train/val samples, loss function and optimizer
-    train_mask = masks[0]
-    val_mask = masks[1]
+    train_mask, val_mask = masks
     loss_fcn = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-2, weight_decay=5e-4)
 
@@ -57,10 +55,10 @@ def train(g, features, labels, masks, model):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GraphSAGE')
     parser.add_argument("--dataset", type=str, default="cora",
-                        help="Dataset name ('cora', 'citeseer', 'pubmed').")
+                        help="Dataset name ('cora', 'citeseer', 'pubmed')")
     args = parser.parse_args()
-    print(f'Training with DGL built-in GraphSage module.')
-    
+    print(f'Training with DGL built-in GraphSage module')
+
     # load and preprocess dataset
     transform = AddSelfLoop()  # by default, it will first remove self-loops to prevent duplication
     if args.dataset == 'cora':
@@ -76,18 +74,18 @@ if __name__ == '__main__':
     g = g.int().to(device)
     features = g.ndata['feat']
     labels = g.ndata['label']
-    masks = g.ndata['train_mask'], g.ndata['val_mask'], g.ndata['test_mask']
+    masks = g.ndata['train_mask'], g.ndata['val_mask']
 
-    # create GraphSage model    
+    # create GraphSAGE model
     in_size = features.shape[1]
     out_size = data.num_classes
     model = SAGE(in_size, 16, out_size).to(device)
-    
+
     # model training
     print('Training...')
     train(g, features, labels, masks, model)
-    
+
     # test the model
     print('Testing...')
-    acc = evaluate(g, features, labels, masks[2], model)
+    acc = evaluate(g, features, labels, g.ndata['test_mask'], model)
     print("Test accuracy {:.4f}".format(acc))
