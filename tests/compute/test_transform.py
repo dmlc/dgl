@@ -914,8 +914,8 @@ def test_to_block(idtype):
                 check(g, bg, ntype, etype, None, include_dst_in_src)
 
     # homogeneous graph
-    g = dgl.graph(([1, 2], [2, 3]))
-    dst_nodes = F.tensor([3, 2])
+    g = dgl.graph((F.tensor([1, 2], dtype=idtype), F.tensor([2, 3], dtype=idtype)))
+    dst_nodes = F.tensor([3, 2], dtype=idtype)
     bg = dgl.to_block(g, dst_nodes=dst_nodes)
     check(g, bg, '_N', '_E', dst_nodes)
 
