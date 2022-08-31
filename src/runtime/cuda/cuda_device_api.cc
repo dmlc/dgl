@@ -265,6 +265,7 @@ class CUDADeviceAPI final : public DeviceAPI {
   }
 
   void FreeWorkspace(DGLContext ctx, void* data) final {
+    SetDevice(ctx);
     TensorDispatcher* td = TensorDispatcher::Global();
     if (td->IsAvailable())
       return td->CUDAFreeWorkspace(data);

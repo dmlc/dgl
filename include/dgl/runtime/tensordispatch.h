@@ -66,24 +66,24 @@ class TensorDispatcher {
   bool Load(const char *path_cstr);
 
   /*!
-  * \brief Allocate a piece of CPU memory via
-  * PyTorch's CPUAllocator.
-  * Used in CPUDeviceAPI::AllocWorkspace().
-  *
-  * \param nbytes The size to be allocated.
-  * \return Pointer to the allocated memory.
-  */
+   * \brief Allocate a piece of CPU memory via
+   * PyTorch's CPUAllocator.
+   * Used in CPUDeviceAPI::AllocWorkspace().
+   *
+   * \param nbytes The size to be allocated.
+   * \return Pointer to the allocated memory.
+   */
   inline void* CPUAllocWorkspace(size_t nbytes) {
     auto entry = entrypoints_[Op::kCPURawAlloc];
     return FUNCCAST(tensoradapter::CPURawAlloc, entry)(nbytes);
   }
 
   /*!
-  * \brief Free the CPU memory.
-  * Used in CPUDeviceAPI::FreeWorkspace().
-  *
-  * \param ptr Pointer to the memory to be freed.
-  */
+   * \brief Free the CPU memory.
+   * Used in CPUDeviceAPI::FreeWorkspace().
+   *
+   * \param ptr Pointer to the memory to be freed.
+   */
   inline void CPUFreeWorkspace(void* ptr) {
     auto entry = entrypoints_[Op::kCPURawDelete];
     FUNCCAST(tensoradapter::CPURawDelete, entry)(ptr);
@@ -91,29 +91,29 @@ class TensorDispatcher {
 
 #ifdef DGL_USE_CUDA
   /*!
-  * \brief Allocate a piece of GPU memory via
-  * PyTorch's THCCachingAllocator.
-  * Used in CUDADeviceAPI::AllocWorkspace().
-  * 
-  * \note THCCachingAllocator specify the device to allocate on
-  * via cudaGetDevice(). Make sure to call cudaSetDevice()
-  * before invoking this function.
-  *
-  * \param nbytes The size to be allocated.
-  * \param stream The stream to be allocated on.
-  * \return Pointer to the allocated memory.
-  */
+   * \brief Allocate a piece of GPU memory via
+   * PyTorch's THCCachingAllocator.
+   * Used in CUDADeviceAPI::AllocWorkspace().
+   * 
+   * \note THCCachingAllocator specify the device to allocate on
+   * via cudaGetDevice(). Make sure to call cudaSetDevice()
+   * before invoking this function.
+   *
+   * \param nbytes The size to be allocated.
+   * \param stream The stream to be allocated on.
+   * \return Pointer to the allocated memory.
+   */
   inline void* CUDAAllocWorkspace(size_t nbytes, cudaStream_t stream) {
     auto entry = entrypoints_[Op::kCUDARawAlloc];
     return FUNCCAST(tensoradapter::CUDARawAlloc, entry)(nbytes, stream);
   }
 
   /*!
-  * \brief Free the GPU memory.
-  * Used in CUDADeviceAPI::FreeWorkspace().
-  *
-  * \param ptr Pointer to the memory to be freed.
-  */
+   * \brief Free the GPU memory.
+   * Used in CUDADeviceAPI::FreeWorkspace().
+   *
+   * \param ptr Pointer to the memory to be freed.
+   */
   inline void CUDAFreeWorkspace(void* ptr) {
     auto entry = entrypoints_[Op::kCUDARawDelete];
     FUNCCAST(tensoradapter::CUDARawDelete, entry)(ptr);
