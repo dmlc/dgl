@@ -384,16 +384,16 @@ if __name__ == '__main__':
             val_edges = split_edge['valid']['edge']
             row, col = val_edges.t()
             # float edata for to_simple transform
-            del graph.edata['year']
+            graph.edata.pop('year')
             graph.edata['weight'] = graph.edata['weight'].to(torch.float)
             val_weights = torch.ones(size=(val_edges.size(0), 1))
             graph.add_edges(torch.cat([row, col]), torch.cat([col, row]), {'weight': val_weights})
         graph = graph.to_simple(copy_edata=True, aggregator='sum')
 
     if not args.use_edge_weight and 'weight' in graph.edata:
-        del graph.edata['weight']
+        graph.edata.pop('weight')
     if not args.use_feature and 'feat' in graph.ndata:
-        del graph.ndata['feat']
+        graph.ndata.pop('feat')
 
     if args.dataset.startswith('ogbl-citation'):
         args.eval_metric = 'mrr'
