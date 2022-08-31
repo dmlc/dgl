@@ -153,11 +153,12 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return ret;
   }
 
-  COO CopyTo(const DLContext &ctx,
-             const DGLStreamHandle &stream = nullptr) const {
+  // TODO(cliu): make following copy asynchornized with a cuda stream input. CopyToAsync
+  //             should be added when NDArray::Empty can take a non-internal stream.
+  COO CopyTo(const DLContext &ctx) const {
     if (Context() == ctx)
       return *this;
-    return COO(meta_graph_, adj_.CopyTo(ctx, stream));
+    return COO(meta_graph_, adj_.CopyTo(ctx));
   }
 
 
@@ -558,12 +559,13 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     }
   }
 
-  CSR CopyTo(const DLContext &ctx,
-             const DGLStreamHandle &stream = nullptr) const {
+  // TODO(cliu): make following copy asynchornized with a cuda stream input. CopyToAsync
+  //             should be added when NDArray::Empty can take a non-internal stream.
+  CSR CopyTo(const DLContext &ctx) const {
     if (Context() == ctx) {
       return *this;
     } else {
-      return CSR(meta_graph_, adj_.CopyTo(ctx, stream));
+      return CSR(meta_graph_, adj_.CopyTo(ctx));
     }
   }
 
@@ -1277,21 +1279,22 @@ HeteroGraphPtr UnitGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
   }
 }
 
-HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext &ctx,
-                                 const DGLStreamHandle &stream) {
+// TODO(cliu): make following copy asynchornized with a cuda stream input. CopyToAsync
+//             should be added when NDArray::Empty can take a non-internal stream.
+HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext &ctx) {
   if (ctx == g->Context()) {
     return g;
   } else {
     auto bg = std::dynamic_pointer_cast<UnitGraph>(g);
     CHECK_NOTNULL(bg);
     CSRPtr new_incsr = (bg->in_csr_->defined())
-                           ? CSRPtr(new CSR(bg->in_csr_->CopyTo(ctx, stream)))
+                           ? CSRPtr(new CSR(bg->in_csr_->CopyTo(ctx)))
                            : nullptr;
     CSRPtr new_outcsr = (bg->out_csr_->defined())
-                            ? CSRPtr(new CSR(bg->out_csr_->CopyTo(ctx, stream)))
+                            ? CSRPtr(new CSR(bg->out_csr_->CopyTo(ctx)))
                             : nullptr;
     COOPtr new_coo = (bg->coo_->defined())
-                         ? COOPtr(new COO(bg->coo_->CopyTo(ctx, stream)))
+                         ? COOPtr(new COO(bg->coo_->CopyTo(ctx)))
                          : nullptr;
     return HeteroGraphPtr(
         new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, new_coo, bg->formats_));

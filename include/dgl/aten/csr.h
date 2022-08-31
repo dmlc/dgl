@@ -114,14 +114,15 @@ struct CSRMatrix {
     CHECK_EQ(indptr->shape[0], num_rows + 1);
   }
 
+  // TODO(cliu): make following copy asynchornized with a cuda stream input. CopyToAsync
+  //             should be added when NDArray::Empty can take a non-internal stream.
   /*! \brief Return a copy of this matrix on the give device context. */
-  inline CSRMatrix CopyTo(const DLContext &ctx,
-                          const DGLStreamHandle &stream = nullptr) const {
+  inline CSRMatrix CopyTo(const DLContext &ctx) const {
     if (ctx == indptr->ctx)
       return *this;
-    return CSRMatrix(num_rows, num_cols, indptr.CopyTo(ctx, stream),
-                     indices.CopyTo(ctx, stream),
-                     aten::IsNullArray(data) ? data : data.CopyTo(ctx, stream),
+    return CSRMatrix(num_rows, num_cols, indptr.CopyTo(ctx),
+                     indices.CopyTo(ctx),
+                     aten::IsNullArray(data) ? data : data.CopyTo(ctx),
                      sorted);
   }
 
