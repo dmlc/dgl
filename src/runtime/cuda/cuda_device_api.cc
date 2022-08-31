@@ -106,7 +106,7 @@ class CUDADeviceAPI final : public DeviceAPI {
   void* AllocDataSpace(DGLContext ctx,
                        size_t nbytes,
                        size_t alignment,
-                       DGLType type_hint) final {
+                       DGLDataType type_hint) final {
     CUDA_CALL(cudaSetDevice(ctx.device_id));
     CHECK_EQ(256 % alignment, 0U)
         << "CUDA space is aligned at 256 bytes";
@@ -127,7 +127,7 @@ class CUDADeviceAPI final : public DeviceAPI {
                       size_t size,
                       DGLContext ctx_from,
                       DGLContext ctx_to,
-                      DGLType type_hint,
+                      DGLDataType type_hint,
                       DGLStreamHandle stream) final {
     cudaStream_t cu_stream = static_cast<cudaStream_t>(stream);
     from = static_cast<const char*>(from) + from_offset;
@@ -245,7 +245,7 @@ class CUDADeviceAPI final : public DeviceAPI {
     return result;
   }
 
-  void* AllocWorkspace(DGLContext ctx, size_t size, DGLType type_hint) final {
+  void* AllocWorkspace(DGLContext ctx, size_t size, DGLDataType type_hint) final {
     // Redirect to PyTorch's allocator when available.
     SetDevice(ctx);
     TensorDispatcher* td = TensorDispatcher::Global();

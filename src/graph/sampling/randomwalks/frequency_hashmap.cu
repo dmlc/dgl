@@ -274,7 +274,7 @@ FrequencyHashmap<IdxType>::~FrequencyHashmap() {
 
 template <typename IdxType>
 std::tuple<IdArray, IdArray, IdArray> FrequencyHashmap<IdxType>::Topk(
-    const IdxType *src_data, const IdxType *dst_data, DLDataType dtype,
+    const IdxType *src_data, const IdxType *dst_data, DGLDataType dtype,
     const int64_t num_edges, const int64_t num_edges_per_node,
     const int64_t num_pick) {
 

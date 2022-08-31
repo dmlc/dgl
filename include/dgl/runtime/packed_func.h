@@ -463,8 +463,8 @@ class DGLArgValue : public DGLPODValue_ {
 
   // conversion operator.
   operator std::string() const {
-    if (type_code_ == kDGLType) {
-      return DGLType2String(operator DGLType());
+    if (type_code_ == kDGLDataType) {
+      return DGLDataType2String(operator DGLDataType());
     } else if (type_code_ == kBytes) {
       DGLByteArray* arr = static_cast<DGLByteArray*>(value_.v_handle);
       return std::string(arr->data, arr->size);
@@ -473,11 +473,11 @@ class DGLArgValue : public DGLPODValue_ {
       return std::string(value_.v_str);
     }
   }
-  operator DGLType() const {
+  operator DGLDataType() const {
     if (type_code_ == kStr) {
-      return String2DGLType(operator std::string());
+      return String2DGLDataType(operator std::string());
     }
-    DGL_CHECK_TYPE_CODE(type_code_, kDGLType);
+    DGL_CHECK_TYPE_CODE(type_code_, kDGLDataType);
     return value_.v_type;
   }
   operator PackedFunc() const {
@@ -558,19 +558,19 @@ class DGLRetValue : public DGLPODValue_ {
   }
   // conversion operators
   operator std::string() const {
-    if (type_code_ == kDGLType) {
-      return DGLType2String(operator DGLType());
+    if (type_code_ == kDGLDataType) {
+      return DGLDataType2String(operator DGLDataType());
     } else if (type_code_ == kBytes) {
       return *ptr<std::string>();
     }
     DGL_CHECK_TYPE_CODE(type_code_, kStr);
     return *ptr<std::string>();
   }
-  operator DGLType() const {
+  operator DGLDataType() const {
     if (type_code_ == kStr) {
-      return String2DGLType(operator std::string());
+      return String2DGLDataType(operator std::string());
     }
-    DGL_CHECK_TYPE_CODE(type_code_, kDGLType);
+    DGL_CHECK_TYPE_CODE(type_code_, kDGLDataType);
     return value_.v_type;
   }
   operator PackedFunc() const {
@@ -619,8 +619,8 @@ class DGLRetValue : public DGLPODValue_ {
     value_.v_int64 = value;
     return *this;
   }
-  DGLRetValue& operator=(DGLType t) {
-    this->SwitchToPOD(kDGLType);
+  DGLRetValue& operator=(DGLDataType t) {
+    this->SwitchToPOD(kDGLDataType);
     value_.v_type = t;
     return *this;
   }
@@ -891,9 +891,9 @@ class DGLArgsSetter {
     values_[i].v_ctx = value;
     type_codes_[i] = kDGLContext;
   }
-  void operator()(size_t i, DGLType value) const {
+  void operator()(size_t i, DGLDataType value) const {
     values_[i].v_type = value;
-    type_codes_[i] = kDGLType;
+    type_codes_[i] = kDGLDataType;
   }
   void operator()(size_t i, const char* value) const {
     values_[i].v_str = value;

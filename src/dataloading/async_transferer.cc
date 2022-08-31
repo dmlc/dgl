@@ -63,7 +63,7 @@ TransferId AsyncTransferer::StartTransfer(
   Transfer t;
   t.src = src;
 
-  DLDataType dtype = src->dtype;
+  DGLDataType dtype = src->dtype;
   std::vector<int64_t> shape(src->shape, src->shape+src->ndim);
   t.dst = NDArray::Empty(shape, dtype, dst_ctx);
 

@@ -396,7 +396,7 @@ std::pair<IdArray, IdArray> RandomWalk(
   }
 
   auto restart_prob = NDArray::Empty(
-      {0}, DLDataType{kDLFloat, 32, 1}, DGLContext{XPU, 0});
+      {0}, DGLDataType{kDLFloat, 32, 1}, DGLContext{XPU, 0});
   if (!isUniform) {
     std::pair<IdArray, IdArray> ret;
     ATEN_FLOAT_TYPE_SWITCH(prob[0]->dtype, FloatType, "probability", {
@@ -426,7 +426,7 @@ std::pair<IdArray, IdArray> RandomWalkWithRestart(
 
   auto device_ctx = seeds->ctx;
   auto restart_prob_array = NDArray::Empty(
-      {1}, DLDataType{kDLFloat, 64, 1}, device_ctx);
+      {1}, DGLDataType{kDLFloat, 64, 1}, device_ctx);
   auto device = dgl::runtime::DeviceAPI::Get(device_ctx);
 
   // use default stream

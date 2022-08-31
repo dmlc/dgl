@@ -79,7 +79,7 @@ class UnitGraph : public BaseHeteroGraph {
     LOG(FATAL) << "UnitGraph graph is not mutable.";
   }
 
-  DLDataType DataType() const override;
+  DGLDataType DataType() const override;
 
   DGLContext Context() const override;
 
@@ -167,7 +167,7 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \brief Create a graph with no edges */
   static HeteroGraphPtr Empty(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,
-      DLDataType dtype, DGLContext ctx) {
+      DGLDataType dtype, DGLContext ctx) {
     IdArray row = IdArray::Empty({0}, dtype, ctx);
     IdArray col = IdArray::Empty({0}, dtype, ctx);
     return CreateFromCOO(num_vtypes, num_src, num_dst, row, col);

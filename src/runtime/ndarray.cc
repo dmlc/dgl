@@ -18,21 +18,21 @@ extern "C" void NDArrayDLPackDeleter(DLManagedTensor* tensor);
 
 namespace dgl {
 
-constexpr DLDataType DLDataTypeTraits<int8_t>::dtype;
-constexpr DLDataType DLDataTypeTraits<int16_t>::dtype;
-constexpr DLDataType DLDataTypeTraits<int32_t>::dtype;
-constexpr DLDataType DLDataTypeTraits<int64_t>::dtype;
-constexpr DLDataType DLDataTypeTraits<uint32_t>::dtype;
-constexpr DLDataType DLDataTypeTraits<uint64_t>::dtype;
+constexpr DGLDataType DGLDataTypeTraits<int8_t>::dtype;
+constexpr DGLDataType DGLDataTypeTraits<int16_t>::dtype;
+constexpr DGLDataType DGLDataTypeTraits<int32_t>::dtype;
+constexpr DGLDataType DGLDataTypeTraits<int64_t>::dtype;
+constexpr DGLDataType DGLDataTypeTraits<uint32_t>::dtype;
+constexpr DGLDataType DGLDataTypeTraits<uint64_t>::dtype;
 #ifdef USE_FP16
-constexpr DLDataType DLDataTypeTraits<__half>::dtype;
+constexpr DGLDataType DGLDataTypeTraits<__half>::dtype;
 #endif
-constexpr DLDataType DLDataTypeTraits<float>::dtype;
-constexpr DLDataType DLDataTypeTraits<double>::dtype;
+constexpr DGLDataType DGLDataTypeTraits<float>::dtype;
+constexpr DGLDataType DGLDataTypeTraits<double>::dtype;
 
 namespace runtime {
 
-inline void VerifyDataType(DLDataType dtype) {
+inline void VerifyDataType(DGLDataType dtype) {
   CHECK_GE(dtype.lanes, 1);
   if (dtype.code == kDLFloat) {
     CHECK_EQ(dtype.bits % 8, 0);
@@ -92,7 +92,7 @@ struct NDArray::Internal {
   // Local create function which allocates tensor metadata
   // but does not allocate space for the data.
   static NDArray Create(std::vector<int64_t> shape,
-                        DLDataType dtype,
+                        DGLDataType dtype,
                         DGLContext ctx) {
     VerifyDataType(dtype);
     // critical zone
@@ -177,7 +177,7 @@ bool NDArray::IsContiguous() const {
 }
 
 NDArray NDArray::CreateView(std::vector<int64_t> shape,
-                            DLDataType dtype,
+                            DGLDataType dtype,
                             int64_t offset) {
   CHECK(data_ != nullptr);
   CHECK(IsContiguous()) << "Can only create view for compact tensor";
@@ -202,7 +202,7 @@ DLManagedTensor* NDArray::ToDLPack() const {
 
 NDArray NDArray::EmptyShared(const std::string &name,
                        std::vector<int64_t> shape,
-                       DLDataType dtype,
+                       DGLDataType dtype,
                        DGLContext ctx, bool is_create) {
   NDArray ret = Internal::Create(shape, dtype, ctx);
   // setup memory content
@@ -219,7 +219,7 @@ NDArray NDArray::EmptyShared(const std::string &name,
 }
 
 NDArray NDArray::Empty(std::vector<int64_t> shape,
-                       DLDataType dtype,
+                       DGLDataType dtype,
                        DGLContext ctx) {
   TensorDispatcher* td = TensorDispatcher::Global();
   if (td->IsAvailable())
@@ -298,7 +298,7 @@ void NDArray::UnpinContainer(NDArray::Container* ptr) {
 
 template<typename T>
 NDArray NDArray::FromVector(const std::vector<T>& vec, DGLContext ctx) {
-  const DLDataType dtype = DLDataTypeTraits<T>::dtype;
+  const DGLDataType dtype = DGLDataTypeTraits<T>::dtype;
   int64_t size = static_cast<int64_t>(vec.size());
   NDArray ret = NDArray::Empty({size}, dtype, ctx);
   DeviceAPI::Get(ctx)->CopyDataFromTo(
@@ -324,7 +324,7 @@ template NDArray NDArray::FromVector<double>(const std::vector<double>&, DGLCont
 
 template<typename T>
 std::vector<T> NDArray::ToVector() const {
-  const DLDataType dtype = DLDataTypeTraits<T>::dtype;
+  const DGLDataType dtype = DGLDataTypeTraits<T>::dtype;
   CHECK(data_->dl_tensor.ndim == 1) << "ToVector() only supported for 1D arrays";
   CHECK(data_->dl_tensor.dtype == dtype) << "dtype mismatch";
 
@@ -391,7 +391,7 @@ bool NDArray::Load(dmlc::Stream* strm) {
       << "Invalid DGLArray file format";
   DGLContext ctx;
   int ndim;
-  DLDataType dtype;
+  DGLDataType dtype;
   CHECK(strm->Read(&ctx))
       << "Invalid DGLArray file format";
   CHECK(strm->Read(&ndim))
@@ -449,7 +449,7 @@ int DGLArrayAlloc(const dgl_index_t* shape,
                   int device_id,
                   DGLArrayHandle* out) {
   API_BEGIN();
-  DLDataType dtype;
+  DGLDataType dtype;
   dtype.code = static_cast<uint8_t>(dtype_code);
   dtype.bits = static_cast<uint8_t>(dtype_bits);
   dtype.lanes = static_cast<uint16_t>(dtype_lanes);
@@ -470,7 +470,7 @@ int DGLArrayAllocSharedMem(const char *mem_name,
                            bool is_create,
                            DGLArrayHandle* out) {
   API_BEGIN();
-  DLDataType dtype;
+  DGLDataType dtype;
   dtype.code = static_cast<uint8_t>(dtype_code);
   dtype.bits = static_cast<uint8_t>(dtype_bits);
   dtype.lanes = static_cast<uint16_t>(dtype_lanes);

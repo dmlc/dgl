@@ -29,7 +29,7 @@ class WorkspacePool::Pool {
     nbytes = (nbytes + (kWorkspacePageSize - 1)) / kWorkspacePageSize * kWorkspacePageSize;
     if (nbytes == 0) nbytes = kWorkspacePageSize;
     Entry e;
-    DGLType type;
+    DGLDataType type;
     type.code = kDLUInt;
     type.bits = 8;
     type.lanes = 1;

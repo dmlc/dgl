@@ -7,9 +7,9 @@
 #define DGL_ARRAY_CUDA_UTILS_H_
 
 #include <dmlc/logging.h>
+#include <dgl/runtime/c_runtime_api.h>
 #include <dgl/runtime/device_api.h>
 #include <dgl/runtime/ndarray.h>
-#include <dlpack/dlpack.h>
 #include "../../runtime/cuda/cuda_common.h"
 
 namespace dgl {
@@ -197,7 +197,7 @@ inline DType GetCUDAScalar(
       sizeof(result),
       ctx,
       DGLContext{kDLCPU, 0},
-      DLDataTypeTraits<DType>::dtype,
+      DGLDataTypeTraits<DType>::dtype,
       stream);
   return result;
 }

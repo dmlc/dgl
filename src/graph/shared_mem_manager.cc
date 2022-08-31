@@ -84,7 +84,7 @@ bool SharedMemManager::CreateFromSharedMem<NDArray>(NDArray *nd,
                                                     std::string name) {
   int ndim;
   DGLContext ctx = {kDLCPU, 0};
-  DLDataType dtype;
+  DGLDataType dtype;
 
   CHECK(this->Read(&ndim)) << "Invalid DGLArray file format";
   CHECK(this->Read(&dtype)) << "Invalid DGLArray file format";

@@ -174,7 +174,7 @@ template IdArray UnaryElewise<kDLCPU, int64_t, arith::Neg>(IdArray lhs);
 
 template <DLDeviceType XPU, typename DType>
 NDArray Full(DType val, int64_t length, DGLContext ctx) {
-  NDArray ret = NDArray::Empty({length}, DLDataTypeTraits<DType>::dtype, ctx);
+  NDArray ret = NDArray::Empty({length}, DGLDataTypeTraits<DType>::dtype, ctx);
   DType* ret_data = static_cast<DType*>(ret->data);
   std::fill(ret_data, ret_data + length, val);
   return ret;

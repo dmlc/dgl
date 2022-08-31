@@ -99,7 +99,7 @@ TEST(ZeroCopySerialize, ZeroShapeNDArray) {
 
 TEST(ZeroCopySerialize, SharedMem) {
   auto tensor1 = VecToIdArray<int64_t>({1, 2, 5, 3});
-  DLDataType dtype = {kDLInt, 64, 1};
+  DGLDataType dtype = {kDLInt, 64, 1};
   std::vector<int64_t> shape{4};
   DGLContext cpu_ctx = {kDLCPU, 0};
   auto shared_tensor =

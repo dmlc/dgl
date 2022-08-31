@@ -210,7 +210,7 @@ CompactGraphsGPU(
     sizeof(*num_induced_nodes.data())*num_ntypes,
     ctx,
     DGLContext{kDLCPU, 0},
-    DGLType{kDLInt, 64, 1},
+    DGLDataType{kDLInt, 64, 1},
     stream);
   device->StreamSync(ctx, stream);
 

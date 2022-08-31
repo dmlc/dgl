@@ -60,16 +60,15 @@ typedef enum {
 } DGLDeviceExtType;
 
 /*!
- * \brief The type code in DGLType
- * \note DGLType is used in two places.
+ * \brief The argument type code is used and only used in DGL FFI for argument passing.
  */
 typedef enum {
-  // The type code of other types are compatible with DLPack.
-  // The next few fields are extension types
-  // that is used by DGL API calls.
+  kInt = 0U,
+  kUInt = 1U,
+  kFloat = 2U,
   kHandle = 3U,
   kNull = 4U,
-  kDGLType = 5U,
+  kDGLDataType = 5U,
   kDGLContext = 6U,
   kArrayHandle = 7U,
   kObjectHandle = 8U,
@@ -88,7 +87,7 @@ typedef enum {
   // The following section of code is used for non-reserved types.
   kExtReserveEnd = 64U,
   kExtEnd = 128U
-} DGLTypeCode;
+} DGLArgTypeCode;
 
 /*!
  * \brief The data type used in DGL Runtime.
@@ -100,7 +99,7 @@ typedef enum {
  *
  * \note Arguments DGL API function always takes bits=64 and lanes=1
  */
-typedef DLDataType DGLType;
+typedef DLDataType DGLDataType;
 
 /*!
  * \brief The Device information, abstract away common device types.
@@ -168,7 +167,7 @@ typedef union {
   double v_float64;
   void* v_handle;
   const char* v_str;
-  DGLType v_type;
+  DGLDataType v_type;
   DGLContext v_ctx;
 } DGLValue;
 

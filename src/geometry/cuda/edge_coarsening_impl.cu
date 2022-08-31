@@ -211,7 +211,7 @@ void NeighborMatching(const aten::CSRMatrix &csr, IdArray result) {
   // generate random weights
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   NDArray weight = NDArray::Empty(
-    {num_edges}, DLDataType{kDLFloat, sizeof(float) * 8, 1}, ctx);
+    {num_edges}, DGLDataType{kDLFloat, sizeof(float) * 8, 1}, ctx);
   float *weight_data = static_cast<float*>(weight->data);
   uint64_t seed = dgl::RandomEngine::ThreadLocal()->RandInt(UINT64_MAX);
   auto num_threads = cuda::FindNumThreads(num_edges);

@@ -37,7 +37,7 @@ static void NaiveDeleter(DLManagedTensor* managed_tensor) {
 }
 
 NDArray CreateNDArrayFromRaw(std::vector<int64_t> shape,
-                             DLDataType dtype,
+                             DGLDataType dtype,
                              DGLContext ctx,
                              void* raw,
                              bool auto_free) {
@@ -88,7 +88,7 @@ char* ArrayMeta::Serialize(int64_t* size) {
     buffer_size += sizeof(int64_t) * data_shape_.size();
     // we don't need to write data_type_.size()
     // because it equals to ndarray_count_ * 3
-    buffer_size += sizeof(DLDataType) * data_type_.size();
+    buffer_size += sizeof(DGLDataType) * data_type_.size();
   }
   // In the future, we should have a better memory management as
   // allocating a large chunk of memory can be very expensive.
@@ -103,9 +103,9 @@ char* ArrayMeta::Serialize(int64_t* size) {
     pointer += sizeof(ndarray_count_);
     // Write data type
     memcpy(pointer,
-        reinterpret_cast<DLDataType*>(data_type_.data()),
-        sizeof(DLDataType) * data_type_.size());
-    pointer += (sizeof(DLDataType) * data_type_.size());
+        reinterpret_cast<DGLDataType*>(data_type_.data()),
+        sizeof(DGLDataType) * data_type_.size());
+    pointer += (sizeof(DGLDataType) * data_type_.size());
     // Write size of data_shape_
     *(reinterpret_cast<size_t*>(pointer)) = data_shape_.size();
     pointer += sizeof(data_shape_.size());
@@ -132,9 +132,9 @@ void ArrayMeta::Deserialize(char* buffer, int64_t size) {
     // Read data type
     data_type_.resize(ndarray_count_);
     memcpy(data_type_.data(), buffer,
-        ndarray_count_ * sizeof(DLDataType));
-    buffer += ndarray_count_ * sizeof(DLDataType);
-    data_size += ndarray_count_ * sizeof(DLDataType);
+        ndarray_count_ * sizeof(DGLDataType));
+    buffer += ndarray_count_ * sizeof(DGLDataType);
+    data_size += ndarray_count_ * sizeof(DGLDataType);
     // Read size of data_shape_
     size_t count = *(reinterpret_cast<size_t*>(buffer));
     buffer += sizeof(size_t);
@@ -406,7 +406,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
       CHECK_EQ(meta.data_shape_[0], 1);
       nf->node_mapping = CreateNDArrayFromRaw(
         {meta.data_shape_[1]},
-        DLDataType{kDLInt, 64, 1},
+        DGLDataType{kDLInt, 64, 1},
         DGLContext{kDLCPU, 0},
         array_0.data,
         AUTO_FREE);
@@ -416,7 +416,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
       CHECK_EQ(meta.data_shape_[2], 1);
       nf->edge_mapping = CreateNDArrayFromRaw(
         {meta.data_shape_[3]},
-        DLDataType{kDLInt, 64, 1},
+        DGLDataType{kDLInt, 64, 1},
         DGLContext{kDLCPU, 0},
         array_1.data,
         AUTO_FREE);
@@ -426,7 +426,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
       CHECK_EQ(meta.data_shape_[4], 1);
       nf->layer_offsets = CreateNDArrayFromRaw(
         {meta.data_shape_[5]},
-        DLDataType{kDLInt, 64, 1},
+        DGLDataType{kDLInt, 64, 1},
         DGLContext{kDLCPU, 0},
         array_2.data,
         AUTO_FREE);
@@ -436,7 +436,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
       CHECK_EQ(meta.data_shape_[6], 1);
       nf->flow_offsets = CreateNDArrayFromRaw(
         {meta.data_shape_[7]},
-        DLDataType{kDLInt, 64, 1},
+        DGLDataType{kDLInt, 64, 1},
         DGLContext{kDLCPU, 0},
         array_3.data,
         AUTO_FREE);
@@ -446,7 +446,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
       CHECK_EQ(meta.data_shape_[8], 1);
       NDArray indptr = CreateNDArrayFromRaw(
         {meta.data_shape_[9]},
-        DLDataType{kDLInt, 64, 1},
+        DGLDataType{kDLInt, 64, 1},
         DGLContext{kDLCPU, 0},
         array_4.data,
         AUTO_FREE);
@@ -456,7 +456,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
       CHECK_EQ(meta.data_shape_[10], 1);
       NDArray indice = CreateNDArrayFromRaw(
         {meta.data_shape_[11]},
-        DLDataType{kDLInt, 64, 1},
+        DGLDataType{kDLInt, 64, 1},
         DGLContext{kDLCPU, 0},
         array_5.data,
         AUTO_FREE);
@@ -466,7 +466,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
       CHECK_EQ(meta.data_shape_[12], 1);
       NDArray edge_ids = CreateNDArrayFromRaw(
         {meta.data_shape_[13]},
-        DLDataType{kDLInt, 64, 1},
+        DGLDataType{kDLInt, 64, 1},
         DGLContext{kDLCPU, 0},
         array_6.data,
         AUTO_FREE);

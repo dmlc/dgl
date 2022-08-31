@@ -23,7 +23,7 @@ class CPUDeviceAPI final : public DeviceAPI {
   void* AllocDataSpace(DGLContext ctx,
                        size_t nbytes,
                        size_t alignment,
-                       DGLType type_hint) final {
+                       DGLDataType type_hint) final {
     void* ptr;
 #if _MSC_VER || defined(__MINGW32__)
     ptr = _aligned_malloc(nbytes, alignment);
@@ -53,7 +53,7 @@ class CPUDeviceAPI final : public DeviceAPI {
                       size_t size,
                       DGLContext ctx_from,
                       DGLContext ctx_to,
-                      DGLType type_hint,
+                      DGLDataType type_hint,
                       DGLStreamHandle stream) final {
     memcpy(static_cast<char*>(to) + to_offset,
            static_cast<const char*>(from) + from_offset,
@@ -65,7 +65,7 @@ class CPUDeviceAPI final : public DeviceAPI {
   void StreamSync(DGLContext ctx, DGLStreamHandle stream) final {
   }
 
-  void* AllocWorkspace(DGLContext ctx, size_t size, DGLType type_hint) final;
+  void* AllocWorkspace(DGLContext ctx, size_t size, DGLDataType type_hint) final;
   void FreeWorkspace(DGLContext ctx, void* data) final;
 
   static const std::shared_ptr<CPUDeviceAPI>& Global() {
@@ -82,7 +82,7 @@ struct CPUWorkspacePool : public WorkspacePool {
 
 void* CPUDeviceAPI::AllocWorkspace(DGLContext ctx,
                                    size_t size,
-                                   DGLType type_hint) {
+                                   DGLDataType type_hint) {
   return dmlc::ThreadLocalStore<CPUWorkspacePool>::Get()
       ->AllocWorkspace(ctx, size);
 }

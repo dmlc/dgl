@@ -104,7 +104,7 @@ class BaseHeteroGraph : public runtime::Object {
   /*!
    * \brief Get the data type of node and edge IDs of this graph.
    */
-  virtual DLDataType DataType() const = 0;
+  virtual DGLDataType DataType() const = 0;
 
   /*!
    * \brief Get the device context of this graph.

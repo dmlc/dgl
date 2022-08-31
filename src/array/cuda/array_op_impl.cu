@@ -212,7 +212,7 @@ __global__ void _FullKernel(
 
 template <DLDeviceType XPU, typename DType>
 NDArray Full(DType val, int64_t length, DGLContext ctx) {
-  NDArray ret = NDArray::Empty({length}, DLDataTypeTraits<DType>::dtype, ctx);
+  NDArray ret = NDArray::Empty({length}, DGLDataTypeTraits<DType>::dtype, ctx);
   DType* ret_data = static_cast<DType*>(ret->data);
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   int nt = cuda::FindNumThreads(length);
@@ -317,7 +317,7 @@ IdArray Relabel_(const std::vector<IdArray>& arrays) {
     sizeof(num_induced),
     ctx,
     DGLContext{kDLCPU, 0},
-    DGLType{kDLInt, 64, 1},
+    DGLDataType{kDLInt, 64, 1},
     thr_entry->stream);
   device->StreamSync(ctx, thr_entry->stream);
   device->FreeWorkspace(ctx, num_induced_device);
@@ -356,7 +356,7 @@ __global__ void _CastKernel(const InType* in, OutType* out, size_t length) {
 template <DLDeviceType XPU, typename IdType>
 IdArray AsNumBits(IdArray arr, uint8_t bits) {
   const std::vector<int64_t> shape(arr->shape, arr->shape + arr->ndim);
-  IdArray ret = IdArray::Empty(shape, DLDataType{kDLInt, bits, 1}, arr->ctx);
+  IdArray ret = IdArray::Empty(shape, DGLDataType{kDLInt, bits, 1}, arr->ctx);
   const int64_t length = ret.NumElements();
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   int nt = cuda::FindNumThreads(length);

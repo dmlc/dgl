@@ -1477,7 +1477,7 @@ public:
         IdArray worker_seeds;
 
         if (replacement_ == false) {
-          worker_seeds = seed_edges_.CreateView({num_edges}, DLDataType{kDLInt, 64, 1},
+          worker_seeds = seed_edges_.CreateView({num_edges}, DGLDataType{kDLInt, 64, 1},
                                                 sizeof(dgl_id_t) * start);
         } else {
           std::vector<dgl_id_t> seeds;

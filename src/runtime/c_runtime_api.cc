@@ -105,7 +105,7 @@ DeviceAPI* DeviceAPI::Get(DLDeviceType dev_type, bool allow_missing) {
 
 void* DeviceAPI::AllocWorkspace(DGLContext ctx,
                                 size_t size,
-                                DGLType type_hint) {
+                                DGLDataType type_hint) {
   return AllocDataSpace(ctx, size, kTempAllocaAlignment, type_hint);
 }
 
@@ -216,7 +216,7 @@ void* DGLBackendAllocWorkspace(int device_type,
   ctx.device_type = static_cast<DLDeviceType>(device_type);
   ctx.device_id = device_id;
 
-  DGLType type_hint;
+  DGLDataType type_hint;
   type_hint.code = static_cast<decltype(type_hint.code)>(dtype_code_hint);
   type_hint.bits = static_cast<decltype(type_hint.bits)>(dtype_bits_hint);
   type_hint.lanes = 1;
@@ -265,10 +265,10 @@ int DGLFuncCall(DGLFunctionHandle func,
       DGLArgs(args, arg_type_codes, num_args), &rv);
   // handle return string.
   if (rv.type_code() == kStr ||
-     rv.type_code() == kDGLType ||
+     rv.type_code() == kDGLDataType ||
       rv.type_code() == kBytes) {
     DGLRuntimeEntry* e = DGLAPIRuntimeStore::Get();
-    if (rv.type_code() != kDGLType) {
+    if (rv.type_code() != kDGLDataType) {
       e->ret_str = *rv.ptr<std::string>();
     } else {
       e->ret_str = rv.operator std::string();

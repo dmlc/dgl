@@ -125,7 +125,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
     LOG(FATAL) << "UnitGraph graph is not mutable.";
   }
 
-  DLDataType DataType() const override {
+  DGLDataType DataType() const override {
     return adj_.row->dtype;
   }
 
@@ -408,9 +408,9 @@ class UnitGraph::COO : public BaseHeteroGraph {
       IdArray new_src = aten::IndexSelect(adj_.row, eids[0]);
       IdArray new_dst = aten::IndexSelect(adj_.col, eids[0]);
       subg.induced_vertices.emplace_back(
-          aten::NullArray(DLDataType{kDLInt, NumBits(), 1}, Context()));
+          aten::NullArray(DGLDataType{kDLInt, NumBits(), 1}, Context()));
       subg.induced_vertices.emplace_back(
-          aten::NullArray(DLDataType{kDLInt, NumBits(), 1}, Context()));
+          aten::NullArray(DGLDataType{kDLInt, NumBits(), 1}, Context()));
       subg.graph = std::make_shared<COO>(
           meta_graph(), NumVertices(SrcType()), NumVertices(DstType()), new_src, new_dst);
       subg.induced_edges = eids;
@@ -528,7 +528,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     LOG(FATAL) << "UnitGraph graph is not mutable.";
   }
 
-  DLDataType DataType() const override {
+  DGLDataType DataType() const override {
     return adj_.indices->dtype;
   }
 
@@ -852,7 +852,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
 //
 //////////////////////////////////////////////////////////
 
-DLDataType UnitGraph::DataType() const {
+DGLDataType UnitGraph::DataType() const {
   return GetAny()->DataType();
 }
 

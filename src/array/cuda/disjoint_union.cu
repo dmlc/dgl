@@ -74,7 +74,7 @@ std::tuple<IdArray, IdArray, IdArray> _ComputePrefixSums(const std::vector<COOMa
 template <DLDeviceType XPU, typename IdType>
 void _Merge(IdType** arrs, IdType* prefix, IdType* offset, IdType* out,
             int64_t n_arrs, int n_elms,
-            DGLContext ctx, DGLType dtype, cudaStream_t stream) {
+            DGLContext ctx, DGLDataType dtype, cudaStream_t stream) {
   auto device = runtime::DeviceAPI::Get(ctx);
   int nt = 256;
   int nb = (n_elms + nt - 1) / nt;

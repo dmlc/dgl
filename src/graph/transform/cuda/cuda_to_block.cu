@@ -298,7 +298,7 @@ ToBlockGPU(
         sizeof(*num_nodes_per_type.data())*num_ntypes,
         ctx,
         DGLContext{kDLCPU, 0},
-        DGLType{kDLInt, 64, 1},
+        DGLDataType{kDLInt, 64, 1},
         stream);
     device->StreamSync(ctx, stream);
 
@@ -323,7 +323,7 @@ ToBlockGPU(
       induced_edges.push_back(edge_arrays[etype].id);
     } else {
       induced_edges.push_back(
-            aten::NullArray(DLDataType{kDLInt, sizeof(IdType)*8, 1}, ctx));
+            aten::NullArray(DGLDataType{kDLInt, sizeof(IdType)*8, 1}, ctx));
     }
   }
 
@@ -360,8 +360,8 @@ ToBlockGPU(
       // No rhs nodes are given for this edge type. Create an empty graph.
       rel_graphs.push_back(CreateFromCOO(
           2, lhs_nodes[srctype]->shape[0], rhs_nodes[dsttype]->shape[0],
-          aten::NullArray(DLDataType{kDLInt, sizeof(IdType)*8, 1}, ctx),
-          aten::NullArray(DLDataType{kDLInt, sizeof(IdType)*8, 1}, ctx)));
+          aten::NullArray(DGLDataType{kDLInt, sizeof(IdType)*8, 1}, ctx),
+          aten::NullArray(DGLDataType{kDLInt, sizeof(IdType)*8, 1}, ctx)));
     } else {
       rel_graphs.push_back(CreateFromCOO(
           2,

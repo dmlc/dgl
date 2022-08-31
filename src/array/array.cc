@@ -20,7 +20,7 @@ namespace dgl {
 namespace aten {
 
 IdArray NewIdArray(int64_t length, DGLContext ctx, uint8_t nbits) {
-  return IdArray::Empty({length}, DLDataType{kDLInt, nbits, 1}, ctx);
+  return IdArray::Empty({length}, DGLDataType{kDLInt, nbits, 1}, ctx);
 }
 
 IdArray Clone(IdArray arr) {
@@ -1135,7 +1135,7 @@ DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLArrayCastToSigned")
     NDArray array = args[0];
     CHECK_EQ(array->dtype.code, kDLUInt);
     std::vector<int64_t> shape(array->shape, array->shape + array->ndim);
-    DLDataType dtype = array->dtype;
+    DGLDataType dtype = array->dtype;
     dtype.code = kDLInt;
     *rv = array.CreateView(shape, dtype, 0);
   });

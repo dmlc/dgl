@@ -25,7 +25,7 @@ void RawDataTensoDLPackDeleter(DLManagedTensor* tensor) {
   delete ctx;
 }
 
-NDArray CreateNDArrayFromRawData(std::vector<int64_t> shape, DLDataType dtype,
+NDArray CreateNDArrayFromRawData(std::vector<int64_t> shape, DGLDataType dtype,
                                  DGLContext ctx, void* raw) {
   auto dlm_tensor_ctx = new RawDataTensorCtx();
   DLManagedTensor* dlm_tensor = &dlm_tensor_ctx->tensor;
@@ -90,7 +90,7 @@ void StreamWithBuffer::PushNDArray(const NDArray& tensor) {
 NDArray StreamWithBuffer::PopNDArray() {
 #ifndef _WIN32
   int ndim;
-  DLDataType dtype;
+  DGLDataType dtype;
 
   CHECK(this->Read(&ndim)) << "Invalid DGLArray file format";
   CHECK(this->Read(&dtype)) << "Invalid DGLArray file format";

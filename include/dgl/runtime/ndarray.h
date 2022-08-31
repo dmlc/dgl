@@ -23,41 +23,41 @@
 #endif
 
 // forward declaration
-inline std::ostream& operator << (std::ostream& os, DGLType t);
+inline std::ostream& operator << (std::ostream& os, DGLDataType t);
 
 namespace dgl {
 
 /*!
- * \brief Type traits that converts a C type to a DLDataType.
+ * \brief Type traits that converts a C type to a DGLDataType.
  *
  * Usage:
- * DLDataTypeTraits<int>::dtype == dtype
+ * DGLDataTypeTraits<int>::dtype == dtype
  */
 template<typename T>
-struct DLDataTypeTraits {
-  static constexpr DLDataType dtype{0, 0, 0};   // dummy
+struct DGLDataTypeTraits {
+  static constexpr DGLDataType dtype{0, 0, 0};   // dummy
 };
-#define GEN_DLDATATYPETRAITS_FOR(T, code, bits) \
+#define GEN_DGLDATATYPETRAITS_FOR(T, code, bits) \
   template<> \
-  struct DLDataTypeTraits<T> { \
-    static constexpr DLDataType dtype{code, bits, 1}; \
+  struct DGLDataTypeTraits<T> { \
+    static constexpr DGLDataType dtype{code, bits, 1}; \
   }
-GEN_DLDATATYPETRAITS_FOR(int8_t, kDLInt, 8);
-GEN_DLDATATYPETRAITS_FOR(int16_t, kDLInt, 16);
-GEN_DLDATATYPETRAITS_FOR(int32_t, kDLInt, 32);
-GEN_DLDATATYPETRAITS_FOR(int64_t, kDLInt, 64);
+GEN_DGLDATATYPETRAITS_FOR(int8_t, kDLInt, 8);
+GEN_DGLDATATYPETRAITS_FOR(int16_t, kDLInt, 16);
+GEN_DGLDATATYPETRAITS_FOR(int32_t, kDLInt, 32);
+GEN_DGLDATATYPETRAITS_FOR(int64_t, kDLInt, 64);
 // XXX(BarclayII) most DL frameworks do not support unsigned int and long arrays, so I'm just
 // converting uints to signed DTypes.
-GEN_DLDATATYPETRAITS_FOR(uint32_t, kDLInt, 32);
-GEN_DLDATATYPETRAITS_FOR(uint64_t, kDLInt, 64);
+GEN_DGLDATATYPETRAITS_FOR(uint32_t, kDLInt, 32);
+GEN_DGLDATATYPETRAITS_FOR(uint64_t, kDLInt, 64);
 #ifdef DGL_USE_CUDA
 #ifdef USE_FP16
-GEN_DLDATATYPETRAITS_FOR(__half, kDLFloat, 16);
+GEN_DGLDATATYPETRAITS_FOR(__half, kDLFloat, 16);
 #endif
 #endif
-GEN_DLDATATYPETRAITS_FOR(float, kDLFloat, 32);
-GEN_DLDATATYPETRAITS_FOR(double, kDLFloat, 64);
-#undef GEN_DLDATATYPETRAITS_FOR
+GEN_DGLDATATYPETRAITS_FOR(float, kDLFloat, 32);
+GEN_DGLDATATYPETRAITS_FOR(double, kDLFloat, 64);
+#undef GEN_DGLDATATYPETRAITS_FOR
 
 namespace runtime {
 
@@ -220,7 +220,7 @@ class NDArray {
    * \note The memory size of new array must be smaller than the current one.
    */
   DGL_DLL NDArray CreateView(
-      std::vector<int64_t> shape, DLDataType dtype, int64_t offset = 0);
+      std::vector<int64_t> shape, DGLDataType dtype, int64_t offset = 0);
   /*!
    * \brief Create a reference view of NDArray that
    *  represents as DLManagedTensor.
@@ -235,7 +235,7 @@ class NDArray {
    * \return The created Array
    */
   DGL_DLL static NDArray Empty(std::vector<int64_t> shape,
-                               DLDataType dtype,
+                               DGLDataType dtype,
                                DGLContext ctx);
   /*!
    * \brief Create an empty NDArray with shared memory.
@@ -248,7 +248,7 @@ class NDArray {
    */
   DGL_DLL static NDArray EmptyShared(const std::string &name,
                                      std::vector<int64_t> shape,
-                                     DLDataType dtype,
+                                     DGLDataType dtype,
                                      DGLContext ctx,
                                      bool is_create);
   /*!
@@ -583,7 +583,7 @@ inline const char* TypeCode2Str(int type_code) {
     case kNull: return "NULL";
     case kObjectHandle: return "ObjectHandle";
     case kArrayHandle: return "ArrayHandle";
-    case kDGLType: return "DGLType";
+    case kDGLDataType: return "DGLDataType";
     case kDGLContext: return "DGLContext";
     case kFuncHandle: return "FunctionHandle";
     case kModuleHandle: return "ModuleHandle";
@@ -618,8 +618,8 @@ inline const char* DeviceTypeCode2Str(DLDeviceType device_type) {
  * \param s The string to be converted.
  * \return The corresponding dgl type.
  */
-inline DGLType String2DGLType(std::string s) {
-  DGLType t;
+inline DGLDataType String2DGLDataType(std::string s) {
+  DGLDataType t;
   t.bits = 32; t.lanes = 1;
   const char* scan;
   if (s.substr(0, 3) == "int") {
@@ -650,7 +650,7 @@ inline DGLType String2DGLType(std::string s) {
  * \param t The type to be converted.
  * \return The corresponding dgl type in string.
  */
-inline std::string DGLType2String(DGLType t) {
+inline std::string DGLDataType2String(DGLDataType t) {
 #ifndef _LIBCPP_SGX_NO_IOSTREAMS
   std::ostringstream os;
   os << t;
@@ -729,20 +729,20 @@ dgl::runtime::NDArray operator != (int64_t lhs, const dgl::runtime::NDArray& a2)
 
 std::ostream& operator << (std::ostream& os, dgl::runtime::NDArray array);
 
-///////////////// Operator overloading for DLDataType /////////////////
+///////////////// Operator overloading for DGLDataType /////////////////
 
 /*! \brief Check whether two data types are the same.*/
-inline bool operator == (const DLDataType& ty1, const DLDataType& ty2) {
+inline bool operator == (const DGLDataType& ty1, const DGLDataType& ty2) {
   return ty1.code == ty2.code && ty1.bits == ty2.bits && ty1.lanes == ty2.lanes;
 }
 
 /*! \brief Check whether two data types are different.*/
-inline bool operator != (const DLDataType& ty1, const DLDataType& ty2) {
+inline bool operator != (const DGLDataType& ty1, const DGLDataType& ty2) {
   return !(ty1 == ty2);
 }
 
 #ifndef _LIBCPP_SGX_NO_IOSTREAMS
-inline std::ostream& operator << (std::ostream& os, DGLType t) {
+inline std::ostream& operator << (std::ostream& os, DGLDataType t) {
   os << dgl::runtime::TypeCode2Str(t.code);
   if (t.code == kHandle) return os;
   os << static_cast<int>(t.bits);

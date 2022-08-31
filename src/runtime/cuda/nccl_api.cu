@@ -223,7 +223,7 @@ std::pair<IdArray, NDArray> SparsePush(
       send_prefix_host.size()*sizeof(*send_prefix.get()),
       ctx,
       DGLContext{kDLCPU, 0},
-      DGLType{kDLInt, sizeof(*send_prefix.get())*8, 1},
+      DGLDataType{kDLInt, sizeof(*send_prefix.get())*8, 1},
       stream);
   send_prefix.free();
 
@@ -261,7 +261,7 @@ std::pair<IdArray, NDArray> SparsePush(
       recv_prefix_host.size()*sizeof(*recv_prefix.get()),
       ctx,
       DGLContext{kDLCPU, 0},
-      DGLType{kDLInt, sizeof(*recv_prefix.get())*8, 1},
+      DGLDataType{kDLInt, sizeof(*recv_prefix.get())*8, 1},
       stream);
   recv_prefix.free();
 
@@ -377,7 +377,7 @@ NDArray SparsePull(
       request_prefix_host.size()*sizeof(*request_prefix.get()),
       ctx,
       DGLContext{kDLCPU, 0},
-      DGLType{kDLInt, sizeof(*request_prefix.get())*8, 1},
+      DGLDataType{kDLInt, sizeof(*request_prefix.get())*8, 1},
       stream);
   request_prefix.free();
   CHECK_EQ(request_prefix_host.back(), num_in) << "Internal Error: "
@@ -412,7 +412,7 @@ NDArray SparsePull(
       response_prefix_host.size()*sizeof(*response_prefix.get()),
       ctx,
       DGLContext{kDLCPU, 0},
-      DGLType{kDLInt, sizeof(*response_prefix.get())*8, 1},
+      DGLDataType{kDLInt, sizeof(*response_prefix.get())*8, 1},
       stream);
   response_prefix.free();
 
@@ -621,7 +621,7 @@ void NCCLCommunicator::AllToAllV(
   DGLContext ctx{kDLCUDA, dev_id};
 
   auto device = runtime::DeviceAPI::Get(ctx);
-  auto dtype = DLDataTypeTraits<DType>::dtype;
+  auto dtype = DGLDataTypeTraits<DType>::dtype;
 
   device->CopyDataFromTo(send, send_prefix[0],
       recv, recv_prefix[0],
@@ -683,7 +683,7 @@ void NCCLCommunicator::AllToAll(
   DGLContext ctx{kDLCUDA, dev_id};
 
   auto device = runtime::DeviceAPI::Get(ctx);
-  auto dtype = DLDataTypeTraits<IdType>::dtype;
+  auto dtype = DGLDataTypeTraits<IdType>::dtype;
 
   device->CopyDataFromTo(send, 0, recv, 0, count, ctx, ctx, dtype, stream);
   #endif

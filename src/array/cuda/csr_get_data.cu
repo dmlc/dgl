@@ -38,7 +38,7 @@ NDArray CSRGetData(
   const int nt = cuda::FindNumThreads(rstlen);
   const int nb = (rstlen + nt - 1) / nt;
   if (return_eids)
-    BUG_IF_FAIL(DLDataTypeTraits<DType>::dtype == rows->dtype) <<
+    BUG_IF_FAIL(DGLDataTypeTraits<DType>::dtype == rows->dtype) <<
       "DType does not match row's dtype.";
 
   // TODO(minjie): use binary search for sorted csr
