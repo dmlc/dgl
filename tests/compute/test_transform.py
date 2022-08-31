@@ -913,6 +913,17 @@ def test_to_block(idtype):
             else:
                 check(g, bg, ntype, etype, None, include_dst_in_src)
 
+    # homogeneous graph
+    g = dgl.graph(([1, 2], [2, 3]))
+    dst_nodes = F.tensor([3, 2])
+    bg = dgl.to_block(g, dst_nodes=dst_nodes)
+    check(g, bg, '_N', '_E', dst_nodes)
+
+    src_nodes = bg.srcnodes['_N'].data[dgl.NID]
+    bg = dgl.to_block(g, dst_nodes=dst_nodes, src_nodes=src_nodes)
+    check(g, bg, '_N', '_E', dst_nodes)
+
+    # heterogeneous graph
     g = dgl.heterograph({
         ('A', 'AA', 'A'): ([0, 2, 1, 3], [1, 3, 2, 4]),
         ('A', 'AB', 'B'): ([0, 1, 3, 1], [1, 3, 5, 6]),
