@@ -623,18 +623,20 @@ class DataLoader(torch.utils.data.DataLoader):
         Spawns a new Python thread to perform feature slicing
         asynchronously.  Can make things faster at the cost of GPU memory.
 
-        Default: True if the graph is on CPU and :attr:`device` is CUDA.  False otherwise.
+        Default: True if the graph is a DGLGraph on CPU and :attr:`device` is CUDA.  False
+        otherwise.
     use_alternate_streams : bool, optional
         (Advanced option)
         Whether to slice and transfers the features to GPU on a non-default stream.
 
-        Default: True if the graph is on CPU, :attr:`device` is CUDA, and :attr:`use_uva`
-        is False.  False otherwise.
+        Default: True if the graph is a DGLGraph on CPU, :attr:`device` is CUDA, and
+        :attr:`use_uva` is False.  False otherwise.
     pin_prefetcher : bool, optional
         (Advanced option)
         Whether to pin the feature tensors into pinned memory.
 
-        Default: True if the graph is on CPU and :attr:`device` is CUDA.  False otherwise.
+        Default: True if the graph is a DGLGraph on CPU and :attr:`device` is CUDA.
+        False otherwise.
     kwargs : dict
         Key-word arguments to be passed to the parent PyTorch
         :py:class:`torch.utils.data.DataLoader` class. Common arguments are:
@@ -822,6 +824,13 @@ class DataLoader(torch.utils.data.DataLoader):
                 use_alternate_streams = (
                     self.device.type == 'cuda' and self.graph.device.type == 'cpu' and
                     not use_uva)
+        else:
+            if pin_prefetcher is None:
+                pin_prefetcher = False
+            if use_prefetch_thread is None:
+                use_prefetch_thread = False
+            if use_alternate_streams is None:
+                use_alternate_streams = False
 
         if (torch.is_tensor(indices) or (
                 isinstance(indices, Mapping) and
