@@ -326,6 +326,14 @@ class NDArrayBase(_NDArrayBase):
         """
         check_call(_LIB.DGLArrayUnpinData(self.handle))
 
+    def record_stream(self, stream):
+        """Record the stream that is using this tensor.
+
+        Parameters
+        ----------
+        stream : DGLStreamHandle
+        """
+        check_call(_LIB.DGLArrayRecordStream(self.handle, stream))
 
 def free_extension_handle(handle, type_code):
     """Free c++ extension type handle

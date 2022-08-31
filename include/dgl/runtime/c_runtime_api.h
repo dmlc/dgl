@@ -567,6 +567,11 @@ int DGLArrayPinData(DGLArrayHandle handle, DLContext ctx);
 int DGLArrayUnpinData(DGLArrayHandle handle, DLContext ctx);
 
 /*!
+ * \brief Record the stream that's using this tensor.
+ */
+int DGLArrayRecordStream(DGLArrayHandle handle,
+                         const DGLStreamHandle &stream);
+/*!
  * \brief Bug report macro.
  *
  * This serves as a sanity check on system side to make sure the code is correct by

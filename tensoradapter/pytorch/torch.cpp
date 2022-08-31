@@ -61,9 +61,11 @@ TA_EXPORTS void RawDelete(void* ptr) {
 }
 
 TA_EXPORTS void RecordStream(void* ptr, cudaStream_t stream, int device_id) {
+  c10::DataPtr data_ptr{
+    ptr, ptr, &c10::cuda::CUDACachingAllocator::raw_delete,
+    c10::Device(c10::DeviceType::CUDA, device_id)};
   c10::cuda::CUDACachingAllocator::recordStream(
-    {ptr, ptr, &c10::cuda::CUDACachingAllocator::raw_delete,
-     c10::Device(c10::DeviceType::CUDA, device_id)},
+    data_ptr,
     // getStreamFromExternal doesn't exist before PyTorch 1.10, just copy it here
     c10::cuda::CUDAStream(
       c10::cuda::CUDAStream::UNCHECKED,
@@ -72,6 +74,7 @@ TA_EXPORTS void RecordStream(void* ptr, cudaStream_t stream, int device_id) {
           c10::Device(c10::DeviceType::CUDA, device_id),
           reinterpret_cast<int64_t>(stream)))
   );
+  data_ptr.release_context();
 }
 #endif  // DGL_USE_CUDA
 
