@@ -183,7 +183,7 @@ print(sg2.edata['a'])
 # 
 
 newg = dgl.add_reverse_edges(g)
-newg.edges()
+print(newg.edges())
 
 
 ######################################################################
