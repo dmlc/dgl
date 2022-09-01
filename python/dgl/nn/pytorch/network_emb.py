@@ -111,7 +111,7 @@ class Metapath2vec(nn.Module):
         ##start random walk
         for idx in tqdm.trange(self.g.number_of_nodes(nodespath[0])):
             traces = random_walk(g=self.g, nodes=[idx, ] * self.node_repeat, metapath=self.metapath)
-            for tr in traces[0].numpy():
+            for tr in traces[0].cpu().numpy():
                 line = [self.type2id[nodespath[i]][tr[i]] for i in range(len(tr))]
                 self.walk_dataset.append(line)
                 if len(line) > 1:
