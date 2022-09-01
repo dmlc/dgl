@@ -55,7 +55,7 @@ inline PickFn<IdxType> GetTopkPickFn(int64_t k, NDArray weight, bool ascending) 
 
 }  // namespace
 
-template <DLDeviceType XPU, typename IdxType, typename DType>
+template <DGLDeviceType XPU, typename IdxType, typename DType>
 COOMatrix CSRRowWiseTopk(
     CSRMatrix mat, IdArray rows, int64_t k, NDArray weight, bool ascending) {
   auto pick_fn = GetTopkPickFn<IdxType, DType>(k, weight, ascending);
@@ -79,7 +79,7 @@ template COOMatrix CSRRowWiseTopk<kDLCPU, int32_t, double>(
 template COOMatrix CSRRowWiseTopk<kDLCPU, int64_t, double>(
     CSRMatrix, IdArray, int64_t, NDArray, bool);
 
-template <DLDeviceType XPU, typename IdxType, typename DType>
+template <DGLDeviceType XPU, typename IdxType, typename DType>
 COOMatrix COORowWiseTopk(
     COOMatrix mat, IdArray rows, int64_t k, NDArray weight, bool ascending) {
   auto pick_fn = GetTopkPickFn<IdxType, DType>(k, weight, ascending);

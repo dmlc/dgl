@@ -11,7 +11,7 @@ using runtime::NDArray;
 namespace aten {
 namespace impl {
 
-template <DLDeviceType XPU, typename DType, typename IdType>
+template <DGLDeviceType XPU, typename DType, typename IdType>
 NDArray Scatter(NDArray array, IdArray indices) {
   NDArray result = NDArray::Empty({indices->shape[0]}, array->dtype, array->ctx);
 
@@ -34,7 +34,7 @@ template NDArray Scatter<kDLCPU, int64_t, int64_t>(NDArray, IdArray);
 template NDArray Scatter<kDLCPU, float, int64_t>(NDArray, IdArray);
 template NDArray Scatter<kDLCPU, double, int64_t>(NDArray, IdArray);
 
-template <DLDeviceType XPU, typename DType, typename IdType>
+template <DGLDeviceType XPU, typename DType, typename IdType>
 void Scatter_(IdArray index, NDArray value, NDArray out) {
   const int64_t len = index->shape[0];
   const IdType* idx = index.Ptr<IdType>();

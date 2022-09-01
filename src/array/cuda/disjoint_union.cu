@@ -47,7 +47,7 @@ __global__ void _DisjointUnionKernel(
   }
 }
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 std::tuple<IdArray, IdArray, IdArray> _ComputePrefixSums(const std::vector<COOMatrix>& coos) {
   IdType n = coos.size(), nbits = coos[0].row->dtype.bits;
   IdArray n_rows = NewIdArray(n, CPU, nbits);
@@ -71,7 +71,7 @@ std::tuple<IdArray, IdArray, IdArray> _ComputePrefixSums(const std::vector<COOMa
                          CumSum(n_elms.CopyTo(coos[0].row->ctx), true));
 }
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 void _Merge(IdType** arrs, IdType* prefix, IdType* offset, IdType* out,
             int64_t n_arrs, int n_elms,
             DGLContext ctx, DGLDataType dtype, cudaStream_t stream) {
@@ -94,7 +94,7 @@ void _Merge(IdType** arrs, IdType* prefix, IdType* offset, IdType* out,
   device->FreeWorkspace(ctx, arrs_dev);
 }
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 COOMatrix DisjointUnionCoo(const std::vector<COOMatrix>& coos) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   auto device = runtime::DeviceAPI::Get(coos[0].row->ctx);

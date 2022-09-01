@@ -17,7 +17,7 @@ using runtime::NDArray;
 namespace aten {
 namespace impl {
 
-template <DLDeviceType XPU, typename IdType, typename DType>
+template <DGLDeviceType XPU, typename IdType, typename DType>
 NDArray CSRGetData(
     CSRMatrix csr, NDArray rows, NDArray cols, bool return_eids, NDArray weights, DType filler) {
   const int64_t rowlen = rows->shape[0];

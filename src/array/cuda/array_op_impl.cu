@@ -28,7 +28,7 @@ __global__ void _BinaryElewiseKernel(
   }
 }
 
-template <DLDeviceType XPU, typename IdType, typename Op>
+template <DGLDeviceType XPU, typename IdType, typename Op>
 IdArray BinaryElewise(IdArray lhs, IdArray rhs) {
   const int64_t len = lhs->shape[0];
   IdArray ret = NewIdArray(lhs->shape[0], lhs->ctx, lhs->dtype.bits);
@@ -79,7 +79,7 @@ __global__ void _BinaryElewiseKernel(
   }
 }
 
-template <DLDeviceType XPU, typename IdType, typename Op>
+template <DGLDeviceType XPU, typename IdType, typename Op>
 IdArray BinaryElewise(IdArray lhs, IdType rhs) {
   const int64_t len = lhs->shape[0];
   IdArray ret = NewIdArray(lhs->shape[0], lhs->ctx, lhs->dtype.bits);
@@ -130,7 +130,7 @@ __global__ void _BinaryElewiseKernel(
   }
 }
 
-template <DLDeviceType XPU, typename IdType, typename Op>
+template <DGLDeviceType XPU, typename IdType, typename Op>
 IdArray BinaryElewise(IdType lhs, IdArray rhs) {
   const int64_t len = rhs->shape[0];
   IdArray ret = NewIdArray(rhs->shape[0], rhs->ctx, rhs->dtype.bits);
@@ -179,7 +179,7 @@ __global__ void _UnaryElewiseKernel(
   }
 }
 
-template <DLDeviceType XPU, typename IdType, typename Op>
+template <DGLDeviceType XPU, typename IdType, typename Op>
 IdArray UnaryElewise(IdArray lhs) {
   const int64_t len = lhs->shape[0];
   IdArray ret = NewIdArray(lhs->shape[0], lhs->ctx, lhs->dtype.bits);
@@ -210,7 +210,7 @@ __global__ void _FullKernel(
   }
 }
 
-template <DLDeviceType XPU, typename DType>
+template <DGLDeviceType XPU, typename DType>
 NDArray Full(DType val, int64_t length, DGLContext ctx) {
   NDArray ret = NDArray::Empty({length}, DGLDataTypeTraits<DType>::dtype, ctx);
   DType* ret_data = static_cast<DType*>(ret->data);
@@ -243,7 +243,7 @@ __global__ void _RangeKernel(IdType* out, IdType low, IdType length) {
   }
 }
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 IdArray Range(IdType low, IdType high, DGLContext ctx) {
   CHECK(high >= low) << "high must be bigger than low";
   const IdType length = high - low;
@@ -278,7 +278,7 @@ __global__ void _RelabelKernel(
   }
 }
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 IdArray Relabel_(const std::vector<IdArray>& arrays) {
   IdArray all_nodes = Concat(arrays);
   const int64_t total_length = all_nodes->shape[0];
@@ -353,7 +353,7 @@ __global__ void _CastKernel(const InType* in, OutType* out, size_t length) {
   }
 }
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 IdArray AsNumBits(IdArray arr, uint8_t bits) {
   const std::vector<int64_t> shape(arr->shape, arr->shape + arr->ndim);
   IdArray ret = IdArray::Empty(shape, DGLDataType{kDLInt, bits, 1}, arr->ctx);

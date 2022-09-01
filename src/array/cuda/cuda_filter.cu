@@ -155,7 +155,7 @@ class CudaFilterSet : public Filter {
 
 }  // namespace
 
-template<DLDeviceType XPU, typename IdType>
+template<DGLDeviceType XPU, typename IdType>
 FilterRef CreateSetFilter(IdArray set) {
   return FilterRef(std::make_shared<CudaFilterSet<IdType>>(set));
 }

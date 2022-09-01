@@ -40,7 +40,7 @@ struct Handler<DGLContext> {
   inline static bool Read(Stream *strm, DGLContext *ctx) {
     int32_t device_type = 0;
     if (!Handler<int32_t>::Read(strm, &(device_type))) return false;
-    ctx->device_type = static_cast<DLDeviceType>(device_type);
+    ctx->device_type = static_cast<DGLDeviceType>(device_type);
     if (!Handler<int32_t>::Read(strm, &(ctx->device_id))) return false;
     return true;
   }

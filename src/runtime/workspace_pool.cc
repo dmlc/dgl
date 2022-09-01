@@ -113,7 +113,7 @@ class WorkspacePool::Pool {
   std::vector<Entry> allocated_;
 };
 
-WorkspacePool::WorkspacePool(DLDeviceType device_type, std::shared_ptr<DeviceAPI> device)
+WorkspacePool::WorkspacePool(DGLDeviceType device_type, std::shared_ptr<DeviceAPI> device)
     : device_type_(device_type), device_(device) {
 }
 

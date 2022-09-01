@@ -21,7 +21,7 @@ namespace impl {
 
 ///////////////////////////// CSRIsNonZero /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col) {
   const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
   const IdType* indices_data = static_cast<IdType*>(csr.indices->data);
@@ -42,7 +42,7 @@ bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col) {
 template bool CSRIsNonZero<kDLCPU, int32_t>(CSRMatrix, int64_t, int64_t);
 template bool CSRIsNonZero<kDLCPU, int64_t>(CSRMatrix, int64_t, int64_t);
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col) {
   const auto rowlen = row->shape[0];
   const auto collen = col->shape[0];
@@ -67,7 +67,7 @@ template NDArray CSRIsNonZero<kDLCPU, int64_t>(CSRMatrix, NDArray, NDArray);
 
 ///////////////////////////// CSRHasDuplicate /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 bool CSRHasDuplicate(CSRMatrix csr) {
   const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
   const IdType* indices_data = static_cast<IdType*>(csr.indices->data);
@@ -90,7 +90,7 @@ template bool CSRHasDuplicate<kDLCPU, int64_t>(CSRMatrix csr);
 
 ///////////////////////////// CSRGetRowNNZ /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 int64_t CSRGetRowNNZ(CSRMatrix csr, int64_t row) {
   const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
   return indptr_data[row + 1] - indptr_data[row];
@@ -99,7 +99,7 @@ int64_t CSRGetRowNNZ(CSRMatrix csr, int64_t row) {
 template int64_t CSRGetRowNNZ<kDLCPU, int32_t>(CSRMatrix, int64_t);
 template int64_t CSRGetRowNNZ<kDLCPU, int64_t>(CSRMatrix, int64_t);
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 NDArray CSRGetRowNNZ(CSRMatrix csr, NDArray rows) {
   CHECK_SAME_DTYPE(csr.indices, rows);
   const auto len = rows->shape[0];
@@ -119,7 +119,7 @@ template NDArray CSRGetRowNNZ<kDLCPU, int64_t>(CSRMatrix, NDArray);
 
 ///////////////////////////// CSRGetRowColumnIndices /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 NDArray CSRGetRowColumnIndices(CSRMatrix csr, int64_t row) {
   const int64_t len = impl::CSRGetRowNNZ<XPU, IdType>(csr, row);
   const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
@@ -132,7 +132,7 @@ template NDArray CSRGetRowColumnIndices<kDLCPU, int64_t>(CSRMatrix, int64_t);
 
 ///////////////////////////// CSRGetRowData /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 NDArray CSRGetRowData(CSRMatrix csr, int64_t row) {
   const int64_t len = impl::CSRGetRowNNZ<XPU, IdType>(csr, row);
   const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
@@ -149,7 +149,7 @@ template NDArray CSRGetRowData<kDLCPU, int64_t>(CSRMatrix, int64_t);
 ///////////////////////////// CSRGetData /////////////////////////////
 ///////////////////////////// CSRGetDataAndIndices /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 void CollectDataIndicesFromSorted(const IdType *indices_data, const IdType *data,
                                   const IdType start, const IdType end, const IdType col,
                                   std::vector<IdType> *col_vec,
@@ -172,7 +172,7 @@ void CollectDataIndicesFromSorted(const IdType *indices_data, const IdType *data
   }
 }
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 std::vector<NDArray> CSRGetDataAndIndices(CSRMatrix csr, NDArray rows, NDArray cols) {
   // TODO(minjie): more efficient implementation for matrix without duplicate entries
   const int64_t rowlen = rows->shape[0];
@@ -233,7 +233,7 @@ template std::vector<NDArray> CSRGetDataAndIndices<kDLCPU, int64_t>(
 
 // for a matrix of shape (N, M) and NNZ
 // complexity: time O(NNZ + max(N, M)), space O(1)
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 CSRMatrix CSRTranspose(CSRMatrix csr) {
   const int64_t N = csr.num_rows;
   const int64_t M = csr.num_cols;
@@ -285,7 +285,7 @@ template CSRMatrix CSRTranspose<kDLCPU, int32_t>(CSRMatrix csr);
 template CSRMatrix CSRTranspose<kDLCPU, int64_t>(CSRMatrix csr);
 
 ///////////////////////////// CSRToCOO /////////////////////////////
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 COOMatrix CSRToCOO(CSRMatrix csr) {
   const int64_t nnz = csr.indices->shape[0];
   const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
@@ -307,7 +307,7 @@ template COOMatrix CSRToCOO<kDLCPU, int32_t>(CSRMatrix csr);
 template COOMatrix CSRToCOO<kDLCPU, int64_t>(CSRMatrix csr);
 
 // complexity: time O(NNZ), space O(1)
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 COOMatrix CSRToCOODataAsOrder(CSRMatrix csr) {
   const int64_t N = csr.num_rows;
   const int64_t M = csr.num_cols;
@@ -338,7 +338,7 @@ template COOMatrix CSRToCOODataAsOrder<kDLCPU, int64_t>(CSRMatrix csr);
 
 ///////////////////////////// CSRSliceRows /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end) {
   const IdType* indptr = static_cast<IdType*>(csr.indptr->data);
   const int64_t num_rows = end - start;
@@ -365,7 +365,7 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end) {
 template CSRMatrix CSRSliceRows<kDLCPU, int32_t>(CSRMatrix, int64_t, int64_t);
 template CSRMatrix CSRSliceRows<kDLCPU, int64_t>(CSRMatrix, int64_t, int64_t);
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
   CHECK_SAME_DTYPE(csr.indices, rows);
   const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
@@ -472,7 +472,7 @@ template CSRMatrix CSRSliceRows<kDLCPU, int64_t>(CSRMatrix , NDArray);
 
 ///////////////////////////// CSRSliceMatrix /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols) {
   IdHashMap<IdType> hashmap(cols);
   const int64_t new_nrows = rows->shape[0];
@@ -528,7 +528,7 @@ template CSRMatrix CSRSliceMatrix<kDLCPU, int64_t>(
 
 ///////////////////////////// CSRReorder /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 CSRMatrix CSRReorder(CSRMatrix csr, runtime::NDArray new_row_id_arr,
                      runtime::NDArray new_col_id_arr) {
   CHECK_SAME_DTYPE(csr.indices, new_row_id_arr);

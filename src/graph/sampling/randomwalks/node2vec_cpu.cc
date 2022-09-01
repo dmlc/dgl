@@ -19,7 +19,7 @@ namespace sampling {
 
 namespace impl {
 
-template <DLDeviceType XPU, typename IdxType>
+template <DGLDeviceType XPU, typename IdxType>
 std::pair<IdArray, IdArray> Node2vec(
     const HeteroGraphPtr hg, const IdArray seeds, const double p,
     const double q, const int64_t walk_length,

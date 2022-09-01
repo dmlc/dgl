@@ -450,7 +450,7 @@ int DGLArrayAlloc(const dgl_index_t* shape,
   dtype.bits = static_cast<uint8_t>(dtype_bits);
   dtype.lanes = static_cast<uint16_t>(dtype_lanes);
   DGLContext ctx;
-  ctx.device_type = static_cast<DLDeviceType>(device_type);
+  ctx.device_type = static_cast<DGLDeviceType>(device_type);
   ctx.device_id = device_id;
   *out = NDArray::Internal::MoveAsDGLArray(
       NDArray::Empty(std::vector<int64_t>(shape, shape + ndim), dtype, ctx));

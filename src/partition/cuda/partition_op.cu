@@ -251,7 +251,7 @@ __global__ void _MapGlobalIndexByRangeKernel(
 
 // Remainder Based Partition Operations
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 std::pair<IdArray, NDArray>
 GeneratePermutationFromRemainder(
         int64_t array_size,
@@ -387,7 +387,7 @@ GeneratePermutationFromRemainder<kDLCUDA, int64_t>(
         IdArray in_idx);
 
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 IdArray MapToLocalFromRemainder(
     const int num_parts,
     IdArray global_idx) {
@@ -428,7 +428,7 @@ MapToLocalFromRemainder<kDLCUDA, int64_t>(
         int num_parts,
         IdArray in_idx);
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 IdArray MapToGlobalFromRemainder(
     const int num_parts,
     IdArray local_idx,
@@ -481,7 +481,7 @@ MapToGlobalFromRemainder<kDLCUDA, int64_t>(
 
 // Range Based Partition Operations
 
-template <DLDeviceType XPU, typename IdType, typename RangeType>
+template <DGLDeviceType XPU, typename IdType, typename RangeType>
 std::pair<IdArray, NDArray>
 GeneratePermutationFromRange(
         int64_t array_size,
@@ -622,7 +622,7 @@ GeneratePermutationFromRange<kDLCUDA, int64_t, int64_t>(
         IdArray range,
         IdArray in_idx);
 
-template <DLDeviceType XPU, typename IdType, typename RangeType>
+template <DGLDeviceType XPU, typename IdType, typename RangeType>
 IdArray MapToLocalFromRange(
     const int num_parts,
     IdArray range,
@@ -678,7 +678,7 @@ MapToLocalFromRange<kDLCUDA, int64_t, int64_t>(
         IdArray in_idx);
 
 
-template <DLDeviceType XPU, typename IdType, typename RangeType>
+template <DGLDeviceType XPU, typename IdType, typename RangeType>
 IdArray MapToGlobalFromRange(
     const int num_parts,
     IdArray range,

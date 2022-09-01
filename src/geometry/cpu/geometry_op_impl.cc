@@ -77,7 +77,7 @@ IdArray GroupRandomPerm(const IdType *group_idxs, int64_t num_group_idxs, int64_
  * Finally, we pick the point with the maximum such distance.
  * This process will be repeated for ``sample_points`` - 1 times.
  */
-template <DLDeviceType XPU, typename FloatType, typename IdType>
+template <DGLDeviceType XPU, typename FloatType, typename IdType>
 void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_points,
     NDArray dist, IdArray start_idx, IdArray result) {
   const FloatType* array_data = static_cast<FloatType*>(array->data);
@@ -148,7 +148,7 @@ template void FarthestPointSampler<kDLCPU, double, int64_t>(
     NDArray array, int64_t batch_size, int64_t sample_points,
     NDArray dist, IdArray start_idx, IdArray result);
 
-template <DLDeviceType XPU, typename FloatType, typename IdType>
+template <DGLDeviceType XPU, typename FloatType, typename IdType>
 void WeightedNeighborMatching(const aten::CSRMatrix &csr, const NDArray weight, IdArray result) {
   const int64_t num_nodes = result->shape[0];
   const IdType *indptr_data = static_cast<IdType*>(csr.indptr->data);
@@ -190,7 +190,7 @@ template void WeightedNeighborMatching<kDLCPU, double, int32_t>(
 template void WeightedNeighborMatching<kDLCPU, double, int64_t>(
     const aten::CSRMatrix &csr, const NDArray weight, IdArray result);
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 void NeighborMatching(const aten::CSRMatrix &csr, IdArray result) {
   const int64_t num_nodes = result->shape[0];
   const IdType *indptr_data = static_cast<IdType*>(csr.indptr->data);

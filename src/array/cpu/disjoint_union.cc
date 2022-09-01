@@ -26,7 +26,7 @@ using runtime::NDArray;
 namespace aten {
 namespace impl {
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 std::tuple<IdArray, IdArray, IdArray> _ComputePrefixSums(const std::vector<COOMatrix>& coos) {
   IdArray prefix_src_arr = NewIdArray(
     coos.size(), coos[0].row->ctx, coos[0].row->dtype.bits);
@@ -52,7 +52,7 @@ std::tuple<IdArray, IdArray, IdArray> _ComputePrefixSums(const std::vector<COOMa
                          CumSum(prefix_elm_arr, true));
 }
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 COOMatrix DisjointUnionCoo(const std::vector<COOMatrix>& coos) {
   bool has_data = false;
   bool row_sorted = true;

@@ -150,7 +150,7 @@ bool Colorize(IdType * result_data, int64_t num_nodes, float * const prop) {
  * are marked, mark this node with its id. Else match this (BLUE, RED) node
  * pair and mark them with the smaller id between them.
  */
-template <DLDeviceType XPU, typename FloatType, typename IdType>
+template <DGLDeviceType XPU, typename FloatType, typename IdType>
 void WeightedNeighborMatching(const aten::CSRMatrix &csr, const NDArray weight, IdArray result) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   const auto& ctx = result->ctx;
@@ -201,7 +201,7 @@ template void WeightedNeighborMatching<kDLCUDA, double, int64_t>(
  *  2. Graph is sparse, thus neighborhood of each node is small,
  *     which is suitable for GPU implementation.
  */
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 void NeighborMatching(const aten::CSRMatrix &csr, IdArray result) {
   const int64_t num_edges = csr.indices->shape[0];
   const auto& ctx = result->ctx;

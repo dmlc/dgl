@@ -14,7 +14,7 @@ using runtime::parallel_for;
 namespace aten {
 namespace impl {
 
-template<DLDeviceType XPU, typename DType, typename IdType>
+template<DGLDeviceType XPU, typename DType, typename IdType>
 std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths) {
   const int64_t rows = lengths->shape[0];
   const int64_t cols = (array->ndim == 1 ? array->shape[0] : array->shape[1]);
@@ -50,7 +50,7 @@ template std::pair<NDArray, IdArray> ConcatSlices<kDLCPU, int64_t, int64_t>(NDAr
 template std::pair<NDArray, IdArray> ConcatSlices<kDLCPU, float, int64_t>(NDArray, IdArray);
 template std::pair<NDArray, IdArray> ConcatSlices<kDLCPU, double, int64_t>(NDArray, IdArray);
 
-template<DLDeviceType XPU, typename DType>
+template<DGLDeviceType XPU, typename DType>
 std::tuple<NDArray, IdArray, IdArray> Pack(NDArray array, DType pad_value) {
   CHECK_NDIM(array, 2, "array");
   const DType *array_data = static_cast<DType *>(array->data);

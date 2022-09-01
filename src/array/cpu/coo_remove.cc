@@ -16,7 +16,7 @@ namespace impl {
 namespace {
 
 /*! \brief COORemove implementation for COOMatrix with default consecutive edge IDs */
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 void COORemoveConsecutive(
     COOMatrix coo,
     IdArray entries,
@@ -47,7 +47,7 @@ void COORemoveConsecutive(
 }
 
 /*! \brief COORemove implementation for COOMatrix with shuffled edge IDs */
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 void COORemoveShuffled(
     COOMatrix coo,
     IdArray entries,
@@ -73,7 +73,7 @@ void COORemoveShuffled(
 
 };  // namespace
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 COOMatrix COORemove(COOMatrix coo, IdArray entries) {
   const int64_t nnz = coo.row->shape[0];
   const int64_t n_entries = entries->shape[0];

@@ -18,7 +18,7 @@ namespace sampling {
 
 namespace impl {
 
-template<DLDeviceType XPU, typename IdxType>
+template<DGLDeviceType XPU, typename IdxType>
 TypeArray GetNodeTypesFromMetapath(
     const HeteroGraphPtr hg,
     const TypeArray metapath) {

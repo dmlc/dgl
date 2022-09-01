@@ -22,7 +22,7 @@ namespace sampling {
 
 namespace impl {
 
-template<DLDeviceType XPU, typename IdxType>
+template<DGLDeviceType XPU, typename IdxType>
 std::pair<IdArray, IdArray> RandomWalkWithRestart(
     const HeteroGraphPtr hg,
     const IdArray seeds,
@@ -51,7 +51,7 @@ std::pair<IdArray, IdArray> RandomWalkWithRestart<kDLCPU, int64_t>(
     const std::vector<FloatArray> &prob,
     double restart_prob);
 
-template<DLDeviceType XPU, typename IdxType>
+template<DGLDeviceType XPU, typename IdxType>
 std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart(
     const HeteroGraphPtr hg,
     const IdArray seeds,

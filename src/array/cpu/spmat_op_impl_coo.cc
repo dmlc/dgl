@@ -29,7 +29,7 @@ namespace impl {
 
 ///////////////////////////// COOIsNonZero /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 bool COOIsNonZero(COOMatrix coo, int64_t row, int64_t col) {
   CHECK(row >= 0 && row < coo.num_rows) << "Invalid row index: " << row;
   CHECK(col >= 0 && col < coo.num_cols) << "Invalid col index: " << col;
@@ -45,7 +45,7 @@ bool COOIsNonZero(COOMatrix coo, int64_t row, int64_t col) {
 template bool COOIsNonZero<kDLCPU, int32_t>(COOMatrix, int64_t, int64_t);
 template bool COOIsNonZero<kDLCPU, int64_t>(COOMatrix, int64_t, int64_t);
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 NDArray COOIsNonZero(COOMatrix coo, NDArray row, NDArray col) {
   const auto rowlen = row->shape[0];
   const auto collen = col->shape[0];
@@ -72,7 +72,7 @@ template NDArray COOIsNonZero<kDLCPU, int64_t>(COOMatrix, NDArray, NDArray);
 
 ///////////////////////////// COOHasDuplicate /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 bool COOHasDuplicate(COOMatrix coo) {
   std::unordered_set<std::pair<IdType, IdType>, PairHash> hashmap;
   const IdType* src_data = static_cast<IdType*>(coo.row->data);
@@ -94,7 +94,7 @@ template bool COOHasDuplicate<kDLCPU, int64_t>(COOMatrix coo);
 
 ///////////////////////////// COOGetRowNNZ /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 int64_t COOGetRowNNZ(COOMatrix coo, int64_t row) {
   CHECK(row >= 0 && row < coo.num_rows) << "Invalid row index: " << row;
   const IdType* coo_row_data = static_cast<IdType*>(coo.row->data);
@@ -109,7 +109,7 @@ int64_t COOGetRowNNZ(COOMatrix coo, int64_t row) {
 template int64_t COOGetRowNNZ<kDLCPU, int32_t>(COOMatrix, int64_t);
 template int64_t COOGetRowNNZ<kDLCPU, int64_t>(COOMatrix, int64_t);
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 NDArray COOGetRowNNZ(COOMatrix coo, NDArray rows) {
   CHECK_SAME_DTYPE(coo.col, rows);
   const auto len = rows->shape[0];
@@ -128,7 +128,7 @@ template NDArray COOGetRowNNZ<kDLCPU, int64_t>(COOMatrix, NDArray);
 
 ///////////////////////////// COOGetRowDataAndIndices /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 std::pair<NDArray, NDArray> COOGetRowDataAndIndices(
     COOMatrix coo, int64_t row) {
   CHECK(row >= 0 && row < coo.num_rows) << "Invalid row index: " << row;
@@ -157,7 +157,7 @@ COOGetRowDataAndIndices<kDLCPU, int64_t>(COOMatrix, int64_t);
 
 ///////////////////////////// COOGetData /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 IdArray COOGetData(COOMatrix coo, IdArray rows, IdArray cols) {
   const int64_t rowlen = rows->shape[0];
   const int64_t collen = cols->shape[0];
@@ -216,7 +216,7 @@ template IdArray COOGetData<kDLCPU, int64_t>(COOMatrix, IdArray, IdArray);
 
 ///////////////////////////// COOGetDataAndIndices /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 std::vector<NDArray> COOGetDataAndIndices(COOMatrix coo, NDArray rows,
                                           NDArray cols) {
   CHECK_SAME_DTYPE(coo.col, rows);
@@ -293,7 +293,7 @@ template std::vector<NDArray> COOGetDataAndIndices<kDLCPU, int64_t>(
 
 ///////////////////////////// COOTranspose /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 COOMatrix COOTranspose(COOMatrix coo) {
   return COOMatrix{coo.num_cols, coo.num_rows, coo.col, coo.row, coo.data};
 }
@@ -615,7 +615,7 @@ P^2).
 degree), UnSortedDenseCOOToCSR<> is applied. Time: O(NNZ/P + N/P), space O(NNZ +
 N*P).
 */
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 CSRMatrix COOToCSR(COOMatrix coo) {
   if (!coo.row_sorted) {
     const int64_t num_threads = omp_get_num_threads();
@@ -637,7 +637,7 @@ template CSRMatrix COOToCSR<kDLCPU, int64_t>(COOMatrix coo);
 
 ///////////////////////////// COOSliceRows /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 COOMatrix COOSliceRows(COOMatrix coo, int64_t start, int64_t end) {
   // TODO(minjie): use binary search when coo.row_sorted is true
   CHECK(start >= 0 && start < coo.num_rows) << "Invalid start row " << start;
@@ -672,7 +672,7 @@ COOMatrix COOSliceRows(COOMatrix coo, int64_t start, int64_t end) {
 template COOMatrix COOSliceRows<kDLCPU, int32_t>(COOMatrix, int64_t, int64_t);
 template COOMatrix COOSliceRows<kDLCPU, int64_t>(COOMatrix, int64_t, int64_t);
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 COOMatrix COOSliceRows(COOMatrix coo, NDArray rows) {
   const IdType* coo_row_data = static_cast<IdType*>(coo.row->data);
   const IdType* coo_col_data = static_cast<IdType*>(coo.col->data);
@@ -708,7 +708,7 @@ template COOMatrix COOSliceRows<kDLCPU, int64_t>(COOMatrix , NDArray);
 
 ///////////////////////////// COOSliceMatrix /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 COOMatrix COOSliceMatrix(COOMatrix coo, runtime::NDArray rows, runtime::NDArray cols) {
   const IdType* coo_row_data = static_cast<IdType*>(coo.row->data);
   const IdType* coo_col_data = static_cast<IdType*>(coo.col->data);
@@ -748,7 +748,7 @@ template COOMatrix COOSliceMatrix<kDLCPU, int64_t>(
 
 ///////////////////////////// COOReorder /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 COOMatrix COOReorder(COOMatrix coo, runtime::NDArray new_row_id_arr,
                      runtime::NDArray new_col_id_arr) {
   CHECK_SAME_DTYPE(coo.row, new_row_id_arr);

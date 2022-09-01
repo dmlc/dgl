@@ -34,7 +34,7 @@ __global__ void _SegmentIsSorted(
   }
 }
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 bool CSRIsSorted(CSRMatrix csr) {
   const auto& ctx = csr.indptr->ctx;
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
@@ -56,7 +56,7 @@ bool CSRIsSorted(CSRMatrix csr) {
 template bool CSRIsSorted<kDLCUDA, int32_t>(CSRMatrix csr);
 template bool CSRIsSorted<kDLCUDA, int64_t>(CSRMatrix csr);
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 void CSRSort_(CSRMatrix* csr) {
   LOG(FATAL) << "Unreachable codes";
 }

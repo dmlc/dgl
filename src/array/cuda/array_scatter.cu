@@ -23,7 +23,7 @@ __global__ void _ScatterKernel(const IdType* index, const DType* value,
   }
 }
 
-template <DLDeviceType XPU, typename DType, typename IdType>
+template <DGLDeviceType XPU, typename DType, typename IdType>
 void Scatter_(IdArray index, NDArray value, NDArray out) {
   const int64_t len = index->shape[0];
   const IdType* idx = index.Ptr<IdType>();

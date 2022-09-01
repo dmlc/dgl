@@ -14,7 +14,7 @@ namespace aten {
 namespace impl {
 
 ///////////////////////////// CSRIsSorted /////////////////////////////
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 bool CSRIsSorted(CSRMatrix csr) {
   const IdType* indptr = csr.indptr.Ptr<IdType>();
   const IdType* indices = csr.indices.Ptr<IdType>();
@@ -36,7 +36,7 @@ template bool CSRIsSorted<kDLCPU, int32_t>(CSRMatrix csr);
 
 ///////////////////////////// CSRSort /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 void CSRSort_(CSRMatrix* csr) {
   typedef std::pair<IdType, IdType> ShufflePair;
   const int64_t num_rows = csr->num_rows;
@@ -82,7 +82,7 @@ void CSRSort_(CSRMatrix* csr) {
 template void CSRSort_<kDLCPU, int64_t>(CSRMatrix* csr);
 template void CSRSort_<kDLCPU, int32_t>(CSRMatrix* csr);
 
-template <DLDeviceType XPU, typename IdType, typename TagType>
+template <DGLDeviceType XPU, typename IdType, typename TagType>
 std::pair<CSRMatrix, NDArray> CSRSortByTag(
     const CSRMatrix &csr, const IdArray tag_array, int64_t num_tags) {
   const auto indptr_data = static_cast<const IdType *>(csr.indptr->data);

@@ -215,7 +215,7 @@ class DeviceAPI {
    * \param allow_missing Whether allow missing
    * \return The corresponding device API.
    */
-  DGL_DLL static DeviceAPI* Get(DLDeviceType dev_type, bool allow_missing = false);
+  DGL_DLL static DeviceAPI* Get(DGLDeviceType dev_type, bool allow_missing = false);
 };
 
 /*! \brief The device type bigger than this is RPC device */

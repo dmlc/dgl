@@ -168,7 +168,7 @@ __global__ void _RandomWalkBiasedKernel(
 }  // namespace
 
 // random walk for uniform choice
-template<DLDeviceType XPU, typename IdType>
+template<DGLDeviceType XPU, typename IdType>
 std::pair<IdArray, IdArray> RandomWalkUniform(
     const HeteroGraphPtr hg,
     const IdArray seeds,
@@ -247,7 +247,7 @@ std::pair<IdArray, IdArray> RandomWalkUniform(
  * \brief Random walk for biased choice. We use inverse transform sampling to
  * choose the next step.
  */
-template <DLDeviceType XPU, typename FloatType, typename IdType>
+template <DGLDeviceType XPU, typename FloatType, typename IdType>
 std::pair<IdArray, IdArray> RandomWalkBiased(
     const HeteroGraphPtr hg,
     const IdArray seeds,
@@ -380,7 +380,7 @@ std::pair<IdArray, IdArray> RandomWalkBiased(
   return std::make_pair(traces, eids);
 }
 
-template<DLDeviceType XPU, typename IdType>
+template<DGLDeviceType XPU, typename IdType>
 std::pair<IdArray, IdArray> RandomWalk(
     const HeteroGraphPtr hg,
     const IdArray seeds,
@@ -408,7 +408,7 @@ std::pair<IdArray, IdArray> RandomWalk(
   }
 }
 
-template<DLDeviceType XPU, typename IdType>
+template<DGLDeviceType XPU, typename IdType>
 std::pair<IdArray, IdArray> RandomWalkWithRestart(
     const HeteroGraphPtr hg,
     const IdArray seeds,
@@ -450,7 +450,7 @@ std::pair<IdArray, IdArray> RandomWalkWithRestart(
   }
 }
 
-template<DLDeviceType XPU, typename IdType>
+template<DGLDeviceType XPU, typename IdType>
 std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart(
     const HeteroGraphPtr hg,
     const IdArray seeds,
@@ -477,7 +477,7 @@ std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart(
   }
 }
 
-template<DLDeviceType XPU, typename IdxType>
+template<DGLDeviceType XPU, typename IdxType>
 std::tuple<IdArray, IdArray, IdArray> SelectPinSageNeighbors(
     const IdArray src,
     const IdArray dst,

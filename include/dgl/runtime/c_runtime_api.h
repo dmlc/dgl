@@ -90,6 +90,12 @@ typedef enum {
 } DGLArgTypeCode;
 
 /*!
+ * \brief The device type in DGLContext.
+ */
+// TODO(Xin): After decoupling DLPack, remove this typedef and use our own.
+typedef DLDeviceType DGLDeviceType;
+
+/*!
  * \brief The data type used in DGL Runtime.
  *
  *  Examples
@@ -99,11 +105,13 @@ typedef enum {
  *
  * \note Arguments DGL API function always takes bits=64 and lanes=1
  */
+// TODO(Xin): After decoupling DLPack, remove this typedef and use our own.
 typedef DLDataType DGLDataType;
 
 /*!
  * \brief The Device information, abstract away common device types.
  */
+// TODO(Xin): After decoupling DLPack, remove this typedef and use our own.
 typedef DLDevice DGLContext;
 
 /*!
@@ -143,7 +151,7 @@ typedef struct {
   /*! \brief Number of dimensions */
   int32_t ndim;
   /*! \brief The data type of the pointer*/
-  DLDataType dtype;
+  DGLDataType dtype;
   /*! \brief The shape of the tensor */
   int64_t* shape;
   /*!

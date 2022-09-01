@@ -26,7 +26,7 @@ struct IsNonZeroIndex {
   const IdType * array_;
 };
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 IdArray NonZero(IdArray array) {
   const auto& ctx = array->ctx;
   auto device = runtime::DeviceAPI::Get(ctx);

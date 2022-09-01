@@ -13,7 +13,7 @@ using runtime::NDArray;
 namespace aten {
 namespace impl {
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 CSRMatrix CSRTranspose(CSRMatrix csr) {
   LOG(FATAL) << "Unreachable codes";
   return {};

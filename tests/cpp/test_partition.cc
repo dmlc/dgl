@@ -6,7 +6,7 @@
 using namespace dgl;
 using namespace dgl::partition;
 
-template<DLDeviceType XPU, typename IdType>
+template<DGLDeviceType XPU, typename IdType>
 void _TestRemainder_GeneratePermutation() {
   const int64_t size = 160000;
   const int num_parts = 7;
@@ -47,7 +47,7 @@ void _TestRemainder_GeneratePermutation() {
   }
 }
 
-template<DLDeviceType XPU, typename IdType>
+template<DGLDeviceType XPU, typename IdType>
 void _TestRemainder_MapToX() {
   const int64_t size = 160000;
   const int num_parts = 7;
@@ -105,7 +105,7 @@ int _FindPart(
   return -1;
 }
 
-template<DLDeviceType XPU, typename IdType>
+template<DGLDeviceType XPU, typename IdType>
 void _TestRange_GeneratePermutation() {
   const int64_t size = 160000;
   const int num_parts = 7;
@@ -152,7 +152,7 @@ void _TestRange_GeneratePermutation() {
   }
 }
 
-template<DLDeviceType XPU, typename IdType>
+template<DGLDeviceType XPU, typename IdType>
 void _TestRange_MapToX() {
   const int64_t size = 160000;
   const int num_parts = 7;

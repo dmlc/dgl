@@ -598,7 +598,7 @@ inline const char* TypeCode2Str(int type_code) {
  * \param device_type The device type code.
  * \return The name of the device.
  */
-inline const char* DeviceTypeCode2Str(DLDeviceType device_type) {
+inline const char* DeviceTypeCode2Str(DGLDeviceType device_type) {
   switch (device_type) {
     case kDLCPU: return "cpu";
     case kDLCUDA: return "cuda";

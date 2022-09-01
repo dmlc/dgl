@@ -84,7 +84,7 @@ int _NumberOfBits(const T& range) {
   return bits;
 }
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 void COOSort_(COOMatrix* coo, bool sort_column) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   const int row_bits = _NumberOfBits(coo->num_rows);
@@ -155,7 +155,7 @@ __global__ void _COOIsSortedKernel(
   }
 }
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 std::pair<bool, bool> COOIsSorted(COOMatrix coo) {
   const int64_t nnz = coo.row->shape[0];
   const auto& ctx = coo.row->ctx;

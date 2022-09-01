@@ -657,7 +657,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLImmutableGraphCopyTo")
     const int device_type = args[1];
     const int device_id = args[2];
     DGLContext ctx;
-    ctx.device_type = static_cast<DLDeviceType>(device_type);
+    ctx.device_type = static_cast<DGLDeviceType>(device_type);
     ctx.device_id = device_id;
     ImmutableGraphPtr ig = CHECK_NOTNULL(std::dynamic_pointer_cast<ImmutableGraph>(g.sptr()));
     *rv = ImmutableGraph::CopyTo(ig, ctx);

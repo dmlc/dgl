@@ -96,7 +96,7 @@ IdArray ComputeMergedSections(
 
 }  // namespace
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 Frontiers BFSNodesFrontiers(const CSRMatrix& csr, IdArray source) {
   std::vector<IdType> ids;
   std::vector<int64_t> sections;
@@ -119,7 +119,7 @@ Frontiers BFSNodesFrontiers(const CSRMatrix& csr, IdArray source) {
 template Frontiers BFSNodesFrontiers<kDLCPU, int32_t>(const CSRMatrix&, IdArray);
 template Frontiers BFSNodesFrontiers<kDLCPU, int64_t>(const CSRMatrix&, IdArray);
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 Frontiers BFSEdgesFrontiers(const CSRMatrix& csr, IdArray source) {
   std::vector<IdType> ids;
   std::vector<int64_t> sections;
@@ -147,7 +147,7 @@ Frontiers BFSEdgesFrontiers(const CSRMatrix& csr, IdArray source) {
 template Frontiers BFSEdgesFrontiers<kDLCPU, int32_t>(const CSRMatrix&, IdArray);
 template Frontiers BFSEdgesFrontiers<kDLCPU, int64_t>(const CSRMatrix&, IdArray);
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 Frontiers TopologicalNodesFrontiers(const CSRMatrix& csr) {
   std::vector<IdType> ids;
   std::vector<int64_t> sections;
@@ -170,7 +170,7 @@ Frontiers TopologicalNodesFrontiers(const CSRMatrix& csr) {
 template Frontiers TopologicalNodesFrontiers<kDLCPU, int32_t>(const CSRMatrix&);
 template Frontiers TopologicalNodesFrontiers<kDLCPU, int64_t>(const CSRMatrix&);
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 Frontiers DGLDFSEdges(const CSRMatrix& csr, IdArray source) {
   const int64_t len = source->shape[0];
   const IdType* src_data = static_cast<IdType*>(source->data);
@@ -190,7 +190,7 @@ Frontiers DGLDFSEdges(const CSRMatrix& csr, IdArray source) {
 template Frontiers DGLDFSEdges<kDLCPU, int32_t>(const CSRMatrix&, IdArray);
 template Frontiers DGLDFSEdges<kDLCPU, int64_t>(const CSRMatrix&, IdArray);
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 Frontiers DGLDFSLabeledEdges(const CSRMatrix& csr,
                              IdArray source,
                              const bool has_reverse_edge,

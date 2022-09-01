@@ -160,7 +160,7 @@ using runtime::NDArray;
 namespace aten {
 namespace impl {
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 std::pair<IdArray, IdArray> Sort(IdArray array, int /* num_bits */) {
   const int64_t nitem = array->shape[0];
   IdArray val = array.Clone();

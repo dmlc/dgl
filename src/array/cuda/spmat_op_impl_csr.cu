@@ -21,7 +21,7 @@ namespace impl {
 
 ///////////////////////////// CSRIsNonZero /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   const auto& ctx = csr.indptr->ctx;
@@ -45,7 +45,7 @@ bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col) {
 template bool CSRIsNonZero<kDLCUDA, int32_t>(CSRMatrix, int64_t, int64_t);
 template bool CSRIsNonZero<kDLCUDA, int64_t>(CSRMatrix, int64_t, int64_t);
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col) {
   const auto rowlen = row->shape[0];
   const auto collen = col->shape[0];
@@ -95,7 +95,7 @@ __global__ void _SegmentHasNoDuplicate(
 }
 
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 bool CSRHasDuplicate(CSRMatrix csr) {
   if (!csr.sorted)
     csr = CSRSort(csr);
@@ -121,7 +121,7 @@ template bool CSRHasDuplicate<kDLCUDA, int64_t>(CSRMatrix csr);
 
 ///////////////////////////// CSRGetRowNNZ /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 int64_t CSRGetRowNNZ(CSRMatrix csr, int64_t row) {
   const IdType cur = aten::IndexSelect<IdType>(csr.indptr, row);
   const IdType next = aten::IndexSelect<IdType>(csr.indptr, row + 1);
@@ -146,7 +146,7 @@ __global__ void _CSRGetRowNNZKernel(
   }
 }
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 NDArray CSRGetRowNNZ(CSRMatrix csr, NDArray rows) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   const auto len = rows->shape[0];
@@ -167,7 +167,7 @@ template NDArray CSRGetRowNNZ<kDLCUDA, int64_t>(CSRMatrix, NDArray);
 
 ///////////////////////////// CSRGetRowColumnIndices /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 NDArray CSRGetRowColumnIndices(CSRMatrix csr, int64_t row) {
   const int64_t len = impl::CSRGetRowNNZ<XPU, IdType>(csr, row);
   const int64_t offset = aten::IndexSelect<IdType>(csr.indptr, row) * sizeof(IdType);
@@ -179,7 +179,7 @@ template NDArray CSRGetRowColumnIndices<kDLCUDA, int64_t>(CSRMatrix, int64_t);
 
 ///////////////////////////// CSRGetRowData /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 NDArray CSRGetRowData(CSRMatrix csr, int64_t row) {
   const int64_t len = impl::CSRGetRowNNZ<XPU, IdType>(csr, row);
   const int64_t offset = aten::IndexSelect<IdType>(csr.indptr, row) * sizeof(IdType);
@@ -194,7 +194,7 @@ template NDArray CSRGetRowData<kDLCUDA, int64_t>(CSRMatrix, int64_t);
 
 ///////////////////////////// CSRSliceRows /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end) {
   const int64_t num_rows = end - start;
   const IdType st_pos = aten::IndexSelect<IdType>(csr.indptr, start);
@@ -243,7 +243,7 @@ __global__ void _SegmentCopyKernel(
   }
 }
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   const int64_t len = rows->shape[0];
@@ -345,7 +345,7 @@ __global__ void _SortedSearchKernel(
   }
 }
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 std::vector<NDArray> CSRGetDataAndIndices(CSRMatrix csr, NDArray row, NDArray col) {
   const auto rowlen = row->shape[0];
   const auto collen = col->shape[0];
@@ -422,7 +422,7 @@ __global__ void _SegmentMaskColKernel(
   }
 }
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   const auto& ctx = rows->ctx;

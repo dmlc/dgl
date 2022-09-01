@@ -71,7 +71,7 @@ __global__ void _COOGetRowNNZKernel(
   }
 }
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 int64_t COOGetRowNNZ(COOMatrix coo, int64_t row) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   const auto& ctx = coo.row->ctx;
@@ -104,7 +104,7 @@ __global__ void _COOGetAllRowNNZKernel(
   }
 }
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 NDArray COOGetRowNNZ(COOMatrix coo, NDArray rows) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   const auto& ctx = coo.row->ctx;

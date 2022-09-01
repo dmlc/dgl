@@ -14,7 +14,7 @@ using runtime::NDArray;
 namespace aten {
 namespace impl {
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 COOMatrix CSRToCOO(CSRMatrix csr) {
   LOG(FATAL) << "Unreachable codes";
   return {};
@@ -100,7 +100,7 @@ COOMatrix CSRToCOO<kDLCUDA, int64_t>(CSRMatrix csr) {
 template COOMatrix CSRToCOO<kDLCUDA, int32_t>(CSRMatrix csr);
 template COOMatrix CSRToCOO<kDLCUDA, int64_t>(CSRMatrix csr);
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 COOMatrix CSRToCOODataAsOrder(CSRMatrix csr) {
   LOG(FATAL) << "Unreachable codes";
   return {};

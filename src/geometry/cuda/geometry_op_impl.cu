@@ -89,7 +89,7 @@ __global__ void fps_kernel(const FloatType *array_data, const int64_t batch_size
   }
 }
 
-template <DLDeviceType XPU, typename FloatType, typename IdType>
+template <DGLDeviceType XPU, typename FloatType, typename IdType>
 void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_points,
     NDArray dist, IdArray start_idx, IdArray result) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();

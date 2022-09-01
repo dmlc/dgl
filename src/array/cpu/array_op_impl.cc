@@ -17,7 +17,7 @@ namespace impl {
 
 ///////////////////////////// AsNumBits /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 IdArray AsNumBits(IdArray arr, uint8_t bits) {
   CHECK(bits == 32 || bits == 64) << "invalid number of integer bits";
   if (sizeof(IdType) * 8 == bits) {
@@ -45,7 +45,7 @@ template IdArray AsNumBits<kDLCPU, int64_t>(IdArray arr, uint8_t bits);
 
 ///////////////////////////// BinaryElewise /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType, typename Op>
+template <DGLDeviceType XPU, typename IdType, typename Op>
 IdArray BinaryElewise(IdArray lhs, IdArray rhs) {
   IdArray ret = NewIdArray(lhs->shape[0], lhs->ctx, lhs->dtype.bits);
   const IdType* lhs_data = static_cast<IdType*>(lhs->data);
@@ -82,7 +82,7 @@ template IdArray BinaryElewise<kDLCPU, int64_t, arith::LE>(IdArray lhs, IdArray 
 template IdArray BinaryElewise<kDLCPU, int64_t, arith::EQ>(IdArray lhs, IdArray rhs);
 template IdArray BinaryElewise<kDLCPU, int64_t, arith::NE>(IdArray lhs, IdArray rhs);
 
-template <DLDeviceType XPU, typename IdType, typename Op>
+template <DGLDeviceType XPU, typename IdType, typename Op>
 IdArray BinaryElewise(IdArray lhs, IdType rhs) {
   IdArray ret = NewIdArray(lhs->shape[0], lhs->ctx, lhs->dtype.bits);
   const IdType* lhs_data = static_cast<IdType*>(lhs->data);
@@ -118,7 +118,7 @@ template IdArray BinaryElewise<kDLCPU, int64_t, arith::LE>(IdArray lhs, int64_t 
 template IdArray BinaryElewise<kDLCPU, int64_t, arith::EQ>(IdArray lhs, int64_t rhs);
 template IdArray BinaryElewise<kDLCPU, int64_t, arith::NE>(IdArray lhs, int64_t rhs);
 
-template <DLDeviceType XPU, typename IdType, typename Op>
+template <DGLDeviceType XPU, typename IdType, typename Op>
 IdArray BinaryElewise(IdType lhs, IdArray rhs) {
   IdArray ret = NewIdArray(rhs->shape[0], rhs->ctx, rhs->dtype.bits);
   const IdType* rhs_data = static_cast<IdType*>(rhs->data);
@@ -154,7 +154,7 @@ template IdArray BinaryElewise<kDLCPU, int64_t, arith::LE>(int64_t lhs, IdArray 
 template IdArray BinaryElewise<kDLCPU, int64_t, arith::EQ>(int64_t lhs, IdArray rhs);
 template IdArray BinaryElewise<kDLCPU, int64_t, arith::NE>(int64_t lhs, IdArray rhs);
 
-template <DLDeviceType XPU, typename IdType, typename Op>
+template <DGLDeviceType XPU, typename IdType, typename Op>
 IdArray UnaryElewise(IdArray lhs) {
   IdArray ret = NewIdArray(lhs->shape[0], lhs->ctx, lhs->dtype.bits);
   const IdType* lhs_data = static_cast<IdType*>(lhs->data);
@@ -172,7 +172,7 @@ template IdArray UnaryElewise<kDLCPU, int64_t, arith::Neg>(IdArray lhs);
 
 ///////////////////////////// Full /////////////////////////////
 
-template <DLDeviceType XPU, typename DType>
+template <DGLDeviceType XPU, typename DType>
 NDArray Full(DType val, int64_t length, DGLContext ctx) {
   NDArray ret = NDArray::Empty({length}, DGLDataTypeTraits<DType>::dtype, ctx);
   DType* ret_data = static_cast<DType*>(ret->data);
@@ -187,7 +187,7 @@ template NDArray Full<kDLCPU, double>(double val, int64_t length, DGLContext ctx
 
 ///////////////////////////// Range /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 IdArray Range(IdType low, IdType high, DGLContext ctx) {
   CHECK(high >= low) << "high must be bigger than low";
   IdArray ret = NewIdArray(high - low, ctx, sizeof(IdType) * 8);
@@ -201,7 +201,7 @@ template IdArray Range<kDLCPU, int64_t>(int64_t, int64_t, DGLContext);
 
 ///////////////////////////// Relabel_ /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 IdArray Relabel_(const std::vector<IdArray>& arrays) {
   // build map & relabel
   IdType newid = 0;

@@ -17,7 +17,7 @@ namespace dgl {
 namespace aten {
 namespace impl {
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
     const CSRMatrix &csr,
     int64_t num_samples,

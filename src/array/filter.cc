@@ -15,7 +15,7 @@ namespace array {
 
 using namespace dgl::runtime;
 
-template<DLDeviceType XPU, typename IdType>
+template<DGLDeviceType XPU, typename IdType>
 FilterRef CreateSetFilter(IdArray set);
 
 DGL_REGISTER_GLOBAL("utils.filter._CAPI_DGLFilterCreateFromSet")

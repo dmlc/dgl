@@ -13,7 +13,7 @@ using runtime::NDArray;
 namespace aten {
 namespace impl {
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 std::pair<IdArray, IdArray> Sort(IdArray array, int num_bits) {
   const auto& ctx = array->ctx;
   auto device = runtime::DeviceAPI::Get(ctx);

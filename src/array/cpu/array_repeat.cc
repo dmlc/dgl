@@ -11,7 +11,7 @@ using runtime::NDArray;
 namespace aten {
 namespace impl {
 
-template <DLDeviceType XPU, typename DType, typename IdType>
+template <DGLDeviceType XPU, typename DType, typename IdType>
 NDArray Repeat(NDArray array, IdArray repeats) {
   CHECK(array->shape[0] == repeats->shape[0]) << "shape of array and repeats mismatch";
 

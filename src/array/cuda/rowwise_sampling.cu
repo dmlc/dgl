@@ -240,7 +240,7 @@ __global__ void _CSRRowWiseSampleUniformReplaceKernel(
 
 ///////////////////////////// CSR sampling //////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
                                     IdArray rows,
                                     const int64_t num_picks,

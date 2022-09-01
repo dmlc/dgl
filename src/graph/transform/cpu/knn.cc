@@ -304,7 +304,7 @@ void BruteForceKNN(const NDArray& data_points, const IdArray& data_offsets,
 }
 }  // namespace impl
 
-template <DLDeviceType XPU, typename FloatType, typename IdType>
+template <DGLDeviceType XPU, typename FloatType, typename IdType>
 void KNN(const NDArray& data_points, const IdArray& data_offsets,
          const NDArray& query_points, const IdArray& query_offsets,
          const int k, IdArray result, const std::string& algorithm) {
@@ -319,7 +319,7 @@ void KNN(const NDArray& data_points, const IdArray& data_offsets,
   }
 }
 
-template <DLDeviceType XPU, typename FloatType, typename IdType>
+template <DGLDeviceType XPU, typename FloatType, typename IdType>
 void NNDescent(const NDArray& points, const IdArray& offsets,
                IdArray result, const int k, const int num_iters,
                const int num_candidates, const double delta) {

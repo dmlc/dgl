@@ -14,7 +14,7 @@ namespace dgl {
 namespace aten {
 namespace impl {
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 COOMatrix COOLineGraph(const COOMatrix &coo, bool backtracking) {
   const int64_t nnz = coo.row->shape[0];
   IdType* coo_row = coo.row.Ptr<IdType>();

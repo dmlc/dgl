@@ -416,7 +416,7 @@ __global__ void _CSRRowWiseSampleReplaceKernel(
 * @param replace Is replacement sampling?
 * @author pengqirong (OPPO), dlasalle and Xin from Nvidia.
 */
-template <DLDeviceType XPU, typename IdType, typename FloatType>
+template <DGLDeviceType XPU, typename IdType, typename FloatType>
 COOMatrix CSRRowWiseSampling(CSRMatrix mat,
                              IdArray rows,
                              int64_t num_picks,

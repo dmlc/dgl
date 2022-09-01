@@ -17,7 +17,7 @@ using runtime::parallel_for;
 namespace aten {
 namespace impl {
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 void CollectDataFromSorted(const IdType *indices_data, const IdType *data,
                            const IdType start, const IdType end, const IdType col,
                            std::vector<IdType> *ret_vec) {
@@ -38,7 +38,7 @@ void CollectDataFromSorted(const IdType *indices_data, const IdType *data,
   }
 }
 
-template <DLDeviceType XPU, typename IdType, typename DType>
+template <DGLDeviceType XPU, typename IdType, typename DType>
 NDArray CSRGetData(
     CSRMatrix csr, NDArray rows, NDArray cols, bool return_eids, NDArray weights, DType filler) {
   const int64_t rowlen = rows->shape[0];

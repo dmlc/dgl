@@ -35,7 +35,7 @@ namespace {
  * \return A 2D array of shape (len(seeds), max_num_steps + 1) with node IDs.
  * \note The graph itself should be bounded in the closure of \c step.
  */
-template<DLDeviceType XPU, typename IdxType>
+template<DGLDeviceType XPU, typename IdxType>
 std::pair<IdArray, IdArray> GenericRandomWalk(
     const IdArray seeds,
     int64_t max_num_steps,

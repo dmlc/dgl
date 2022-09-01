@@ -471,7 +471,7 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCopyTo")
     int device_type = args[1];
     int device_id = args[2];
     DGLContext ctx;
-    ctx.device_type = static_cast<DLDeviceType>(device_type);
+    ctx.device_type = static_cast<DGLDeviceType>(device_type);
     ctx.device_id = device_id;
     DGLStreamHandle stream = nullptr;
     DGLGetStream(device_type, device_id, &stream);

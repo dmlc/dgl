@@ -23,7 +23,7 @@ namespace sampling {
 
 namespace impl {
 
-template<DLDeviceType XPU, typename IdxType>
+template<DGLDeviceType XPU, typename IdxType>
 std::pair<IdArray, IdArray> RandomWalk(
     const HeteroGraphPtr hg,
     const IdArray seeds,
@@ -37,7 +37,7 @@ std::pair<IdArray, IdArray> RandomWalk(
   return MetapathBasedRandomWalk<XPU, IdxType>(hg, seeds, metapath, prob, terminate);
 }
 
-template<DLDeviceType XPU, typename IdxType>
+template<DGLDeviceType XPU, typename IdxType>
 std::tuple<IdArray, IdArray, IdArray> SelectPinSageNeighbors(
     const IdArray src,
     const IdArray dst,

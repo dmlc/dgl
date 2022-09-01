@@ -10,7 +10,7 @@ using runtime::NDArray;
 namespace aten {
 namespace impl {
 
-template<DLDeviceType XPU, typename DType, typename IdType>
+template<DGLDeviceType XPU, typename DType, typename IdType>
 NDArray IndexSelect(NDArray array, IdArray index) {
   CHECK_EQ(array->shape[0], array.NumElements()) << "Only support tensor"
     << " whose first dimension equals number of elements, e.g. (5,), (5, 1)";
@@ -37,7 +37,7 @@ template NDArray IndexSelect<kDLCPU, float, int64_t>(NDArray, IdArray);
 template NDArray IndexSelect<kDLCPU, double, int32_t>(NDArray, IdArray);
 template NDArray IndexSelect<kDLCPU, double, int64_t>(NDArray, IdArray);
 
-template <DLDeviceType XPU, typename DType>
+template <DGLDeviceType XPU, typename DType>
 DType IndexSelect(NDArray array, int64_t index) {
   const DType* data = static_cast<DType*>(array->data);
   return data[index];
