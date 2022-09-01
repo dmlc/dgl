@@ -72,7 +72,7 @@ TransferId AsyncTransferer::StartTransfer(
     // get tensor information
     t.event.reset(new Event);
     CUDA_CALL(cudaEventCreate(&t.event->id));
-    t.dst.CopyFromAsync(t.src, stream_);
+    t.dst.CopyFrom(t.src);
 
     CUDA_CALL(cudaEventRecord(t.event->id, static_cast<cudaStream_t>(stream_)));
     #else

@@ -34,7 +34,7 @@ TA_EXPORTS void CUDARawDelete(void* ptr) {
   c10::cuda::CUDACachingAllocator::raw_delete(ptr);
 }
 
-TA_EXPORTS cudaStream_t GetTorchCUDAStream() {
+TA_EXPORTS cudaStream_t CUDACurrentStream() {
   return at::cuda::getCurrentCUDAStream();
 }
 #endif  // DGL_USE_CUDA

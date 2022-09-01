@@ -312,7 +312,7 @@ CUDAThreadEntry::CUDAThreadEntry()
     : pool(kDLGPU, CUDADeviceAPI::Global()) {
   TensorDispatcher* td = TensorDispatcher::Global();
   if (td->IsAvailable())
-    stream =
+    stream = td->CUDAGetCurrentStream();
 }
 
 CUDAThreadEntry* CUDAThreadEntry::ThreadLocal() {

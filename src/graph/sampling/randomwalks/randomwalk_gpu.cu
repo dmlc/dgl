@@ -207,7 +207,7 @@ std::pair<IdArray, IdArray> RandomWalkUniform(
       (num_etypes) * sizeof(GraphKernelData<IdType>),
       DGLContext{kDLCPU, 0},
       ctx,
-      hg->GetCSRMatrix(0).indptr->dtype)
+      hg->GetCSRMatrix(0).indptr->dtype, stream);
   // copy metapath to GPU
   auto d_metapath = metapath.CopyTo(ctx);
   const IdType *d_metapath_data = static_cast<IdType *>(d_metapath->data);
