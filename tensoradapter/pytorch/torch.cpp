@@ -1,62 +1,36 @@
 /*!
- *  Copyright (c) 2020 by Contributors
+ *  Copyright (c) 2020-2022 by Contributors
  * \file torch/torch.cpp
  * \brief Implementation of PyTorch adapter library.
  */
 
 #include <tensoradapter_exports.h>
-#include <torch/torch.h>
-#include <ATen/DLConvertor.h>
+#include <c10/core/CPUAllocator.h>
 #ifdef DGL_USE_CUDA
 #include <c10/cuda/CUDAStream.h>
 #include <c10/cuda/CUDACachingAllocator.h>
+#include <cuda_runtime.h>
 #endif  // DGL_USE_CUDA
-#include <vector>
-#include <iostream>
-
-#if DLPACK_VERSION > 040
-// Compatibility across DLPack - note that this assumes that the ABI stays the same.
-#define kDLGPU kDLCUDA
-#define DLContext DLDevice
-#endif
 
 namespace tensoradapter {
 
-static at::Device get_device(DLContext ctx) {
-  switch (ctx.device_type) {
-   case kDLCPU:
-    return at::Device(torch::kCPU);
-    break;
-   case kDLGPU:
-    return at::Device(torch::kCUDA, ctx.device_id);
-    break;
-   default:
-    // fallback to CPU
-    return at::Device(torch::kCPU);
-    break;
-  }
-}
-
 extern "C" {
 
-TA_EXPORTS DLManagedTensor* TAempty(
-    std::vector<int64_t> shape,
-    DLDataType dtype,
-    DLContext ctx) {
-  auto options = torch::TensorOptions()
-    .layout(torch::kStrided)
-    .device(get_device(ctx))
-    .dtype(at::toScalarType(dtype));
-  torch::Tensor tensor = torch::empty(shape, options);
-  return at::toDLPack(tensor);
+TA_EXPORTS void* CPURawAlloc(size_t nbytes) {
+  return c10::GetCPUAllocator()->raw_allocate(nbytes);
+}
+
+TA_EXPORTS void CPURawDelete(void* ptr) {
+  c10::GetCPUAllocator()->raw_deallocate(ptr);
 }
 
 #ifdef DGL_USE_CUDA
-TA_EXPORTS void* RawAlloc(size_t nbytes) {
-  return c10::cuda::CUDACachingAllocator::raw_alloc(nbytes);
+TA_EXPORTS void* CUDARawAlloc(size_t nbytes, cudaStream_t stream) {
+  return c10::cuda::CUDACachingAllocator::raw_alloc_with_stream(
+    nbytes, stream);
 }
 
-TA_EXPORTS void RawDelete(void* ptr) {
+TA_EXPORTS void CUDARawDelete(void* ptr) {
   c10::cuda::CUDACachingAllocator::raw_delete(ptr);
 }
 
