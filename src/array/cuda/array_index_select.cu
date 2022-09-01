@@ -67,7 +67,6 @@ template NDArray IndexSelect<kDLGPU, double, int64_t>(NDArray, IdArray);
 template <DLDeviceType XPU, typename DType>
 DType IndexSelect(NDArray array, int64_t index) {
   auto device = runtime::DeviceAPI::Get(array->ctx);
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
 #ifdef USE_FP16
   // The initialization constructor for __half is apparently a device-
   // only function in some setups, but the current function, IndexSelect,
@@ -81,7 +80,7 @@ DType IndexSelect(NDArray array, int64_t index) {
   device->CopyDataFromTo(
       static_cast<DType*>(array->data) + index, 0, reinterpret_cast<DType*>(&ret), 0,
       sizeof(DType), array->ctx, DLContext{kDLCPU, 0},
-      array->dtype, thr_entry->stream);
+      array->dtype)
   return reinterpret_cast<DType&>(ret);
 }
 

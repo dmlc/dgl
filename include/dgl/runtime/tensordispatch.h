@@ -118,6 +118,22 @@ class TensorDispatcher {
     auto entry = entrypoints_[Op::kCUDARawDelete];
     FUNCCAST(tensoradapter::CUDARawDelete, entry)(ptr);
   }
+
+  /*!
+  * \brief Find the current PyTorch CUDA stream
+  * Used in CUDAThreadEntry::ThreadLocal->stream.
+  * 
+  * \note PyTorch pre-allocates/sets the current CUDA stream
+  * on current device via cudaGetDevice(). Make sure to call cudaSetDevice()
+  * before invoking this function.
+  *
+  * \return cudaStrem_t stream handle
+  */
+  inline cudaStrem_t CUDACurrentStream() {
+    auto entry = entrypoints_[Op::kRawAlloc];
+    return FUNCCAST(tensoradapter::getCurrentCUDAStream, entry)();
+  }
+}
 #endif  // DGL_USE_CUDA
 
  private:
@@ -137,6 +153,7 @@ class TensorDispatcher {
 #ifdef DGL_USE_CUDA
     "CUDARawAlloc",
     "CUDARawDelete",
+    "CUDACurrentStream",
 #endif  // DGL_USE_CUDA
   };
 
@@ -148,6 +165,7 @@ class TensorDispatcher {
 #ifdef DGL_USE_CUDA
     static constexpr int kCUDARawAlloc = 2;
     static constexpr int kCUDARawDelete = 3;
+    static constexpr int kCUDACurrentStream = 4;
 #endif  // DGL_USE_CUDA
   };
 

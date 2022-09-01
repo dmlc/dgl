@@ -252,8 +252,6 @@ HeteroGraphPtr HeteroGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
                                         hgindex->num_verts_per_type_));
 }
 
-// TODO(cliu): make following copy asynchornized with a cuda stream input. CopyToAsync
-//             should be added when NDArray::Empty can take a non-internal stream.
 HeteroGraphPtr HeteroGraph::CopyTo(HeteroGraphPtr g, const DLContext &ctx) {
   if (ctx == g->Context()) {
     return g;

@@ -8,6 +8,7 @@
 #include <c10/core/CPUAllocator.h>
 #ifdef DGL_USE_CUDA
 #include <c10/cuda/CUDACachingAllocator.h>
+#include <c10/cuda/CUDAStream.h>
 #include <cuda_runtime.h>
 #endif  // DGL_USE_CUDA
 
@@ -31,6 +32,10 @@ TA_EXPORTS void* CUDARawAlloc(size_t nbytes, cudaStream_t stream) {
 
 TA_EXPORTS void CUDARawDelete(void* ptr) {
   c10::cuda::CUDACachingAllocator::raw_delete(ptr);
+}
+
+TA_EXPORTS cudaStream_t GetTorchCUDAStream() {
+  return at::cuda::getCurrentCUDAStream();
 }
 #endif  // DGL_USE_CUDA
 

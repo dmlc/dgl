@@ -121,8 +121,6 @@ struct COOMatrix {
     CHECK_NO_OVERFLOW(row->dtype, num_cols);
   }
 
-  // TODO(cliu): make following copy asynchornized with a cuda stream input. CopyToAsync
-  //             should be added when NDArray::Empty can take a non-internal stream.
   /*! \brief Return a copy of this matrix on the give device context. */
   inline COOMatrix CopyTo(const DLContext &ctx) const {
     if (ctx == row->ctx)

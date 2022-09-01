@@ -310,6 +310,9 @@ typedef dmlc::ThreadLocalStore<CUDAThreadEntry> CUDAThreadStore;
 
 CUDAThreadEntry::CUDAThreadEntry()
     : pool(kDLGPU, CUDADeviceAPI::Global()) {
+  TensorDispatcher* td = TensorDispatcher::Global();
+  if (td->IsAvailable())
+    stream =
 }
 
 CUDAThreadEntry* CUDAThreadEntry::ThreadLocal() {

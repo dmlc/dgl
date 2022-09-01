@@ -20,7 +20,7 @@ bool AllTrue(int8_t* flags, int64_t length, const DLContext& ctx) {
   CUDA_CALL(cub::DeviceReduce::Min(nullptr, workspace_size, flags, rst, length, stream));
   void* workspace = device->AllocWorkspace(ctx, workspace_size);
   CUDA_CALL(cub::DeviceReduce::Min(workspace, workspace_size, flags, rst, length, stream));
-  int8_t cpu_rst = GetCUDAScalar(device, ctx, rst, stream);
+  int8_t cpu_rst = GetCUDAScalar(device, ctx, rst);
   device->FreeWorkspace(ctx, workspace);
   device->FreeWorkspace(ctx, rst);
   return cpu_rst == 1;

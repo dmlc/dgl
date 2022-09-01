@@ -158,7 +158,7 @@ class NDArray {
   inline void CopyTo(const NDArray &other) const;
 
   /*!
-   * \brief Asynchronous copy data content from/into another array
+   * \brief Asynchronous copy data content from another array
    *        with a specified stream (GPU only).
    * \param other The source array to be copied from.
    * \param stream The stream to perform the copy context,
@@ -167,12 +167,6 @@ class NDArray {
    */
   inline void CopyFromAsync(DLTensor* other,
                             const DGLStreamHandle &stream);
-  inline void CopyFromAsync(const NDArray& other,
-                            const DGLStreamHandle &stream);
-  inline void CopyToAsync(DLTensor *other,
-                          const DGLStreamHandle &stream) const;
-  inline void CopyToAsync(const NDArray &other,
-                          const DGLStreamHandle &stream) const;
   /*!
    * \brief Copy the data to another context.
    * \param ctx The target context.
@@ -493,42 +487,6 @@ inline void NDArray::CopyFromAsync(DLTensor* other, const DGLStreamHandle &strea
   CHECK(data_ != nullptr);
   CopyFromTo(other, &(data_->dl_tensor), stream);
 }
-
-inline void NDArray::CopyFromAsync(const NDArray& other, const DGLStreamHandle &stream) {
-  CHECK(other.data_ != nullptr);
-  CopyFromAsync(&(other.data_->dl_tensor), stream);
-}
-
-inline void NDArray::CopyToAsync(DLTensor *other, const DGLStreamHandle &stream) const {
-  CHECK(data_ != nullptr);
-  CopyFromTo(&(data_->dl_tensor), other, stream);
-}
-
-inline void NDArray::CopyToAsync(const NDArray &other, const DGLStreamHandle &stream) const {
-  CHECK(other.data_ != nullptr);
-  CopyToAsync(&(other.data_->dl_tensor), stream);
-}
-
-// TODO(cliu): uncomment belows when NDArray::Empty can specify a dedicated stream,
-//             or apply stream sync inside functions
-/*
-inline NDArray NDArray::CopyToAsync(const DLContext &ctx,
-                                    const DGLStreamHandle &stream) const {
-  CHECK(data_ != nullptr);
-  const DLTensor* dptr = operator->();
-  // set to use DGLstream within below Empty function
-  NDArray ret = Empty(std::vector<int64_t>(dptr->shape, dptr->shape + dptr->ndim),
-                      dptr->dtype, ctx);
-  this->CopyToAsync(ret, stream);
-  return ret;
-}
-
-inline NDArray NDArray::CloneAsync(const DGLStreamHandle &stream) const {
-  CHECK(data_ != nullptr);
-  const DLTensor* dptr = operator->();
-  return this->CopyToAsync(dptr->ctx, stream);
-}
-*/
 
 inline void NDArray::PinMemory_() {
   CHECK(data_ != nullptr);

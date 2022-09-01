@@ -207,8 +207,7 @@ std::pair<IdArray, IdArray> RandomWalkUniform(
       (num_etypes) * sizeof(GraphKernelData<IdType>),
       DGLContext{kDLCPU, 0},
       ctx,
-      hg->GetCSRMatrix(0).indptr->dtype,
-      stream);
+      hg->GetCSRMatrix(0).indptr->dtype)
   // copy metapath to GPU
   auto d_metapath = metapath.CopyTo(ctx);
   const IdType *d_metapath_data = static_cast<IdType *>(d_metapath->data);
@@ -324,8 +323,7 @@ std::pair<IdArray, IdArray> RandomWalkBiased(
       (num_etypes) * sizeof(GraphKernelData<IdType>),
       DGLContext{kDLCPU, 0},
       ctx,
-      hg->GetCSRMatrix(0).indptr->dtype,
-      stream);
+      hg->GetCSRMatrix(0).indptr->dtype);
   // copy probs pointers to GPU
   const FloatType **probs_dev = static_cast<const FloatType **>(
       device->AllocWorkspace(ctx, num_etypes * sizeof(FloatType *)));
@@ -333,8 +331,7 @@ std::pair<IdArray, IdArray> RandomWalkBiased(
       (num_etypes) * sizeof(FloatType *),
       DGLContext{kDLCPU, 0},
       ctx,
-      prob[0]->dtype,
-      stream);
+      prob[0]->dtype);
   // copy probs_sum pointers to GPU
   const FloatType **prob_sums_dev = static_cast<const FloatType **>(
       device->AllocWorkspace(ctx, num_etypes * sizeof(FloatType *)));
@@ -342,8 +339,7 @@ std::pair<IdArray, IdArray> RandomWalkBiased(
       (num_etypes) * sizeof(FloatType *),
       DGLContext{kDLCPU, 0},
       ctx,
-      prob[0]->dtype,
-      stream);
+      prob[0]->dtype);
   // copy metapath to GPU
   auto d_metapath = metapath.CopyTo(ctx);
   const IdType *d_metapath_data = static_cast<IdType *>(d_metapath->data);
@@ -435,7 +431,7 @@ std::pair<IdArray, IdArray> RandomWalkWithRestart(
       &restart_prob, 0, restart_prob_array.Ptr<double>(), 0,
       sizeof(double),
       DGLContext{kDLCPU, 0}, device_ctx,
-      restart_prob_array->dtype, stream);
+      restart_prob_array->dtype);
   device->StreamSync(device_ctx, stream);
 
   if (!isUniform) {

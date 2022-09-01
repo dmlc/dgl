@@ -153,8 +153,6 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return ret;
   }
 
-  // TODO(cliu): make following copy asynchornized with a cuda stream input. CopyToAsync
-  //             should be added when NDArray::Empty can take a non-internal stream.
   COO CopyTo(const DLContext &ctx) const {
     if (Context() == ctx)
       return *this;
@@ -559,8 +557,6 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     }
   }
 
-  // TODO(cliu): make following copy asynchornized with a cuda stream input. CopyToAsync
-  //             should be added when NDArray::Empty can take a non-internal stream.
   CSR CopyTo(const DLContext &ctx) const {
     if (Context() == ctx) {
       return *this;
@@ -1279,8 +1275,6 @@ HeteroGraphPtr UnitGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
   }
 }
 
-// TODO(cliu): make following copy asynchornized with a cuda stream input. CopyToAsync
-//             should be added when NDArray::Empty can take a non-internal stream.
 HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext &ctx) {
   if (ctx == g->Context()) {
     return g;
