@@ -13,7 +13,7 @@ def pairwise_squared_distance(x):
 
 class KNNGraph(nn.Module):
     r"""Layer that transforms one point set into a graph, or a batch of
-    point sets with the same number of points into a union of those graphs.
+    point sets with the same number of points into a batched union of those graphs.
 
     The KNNGraph is implemented in the following steps:
 
@@ -64,7 +64,7 @@ class KNNGraph(nn.Module):
 
     #pylint: disable=invalid-name
     def forward(self, x, algorithm='bruteforce-blas', dist='euclidean',
-                exclude_self=False, output_batch=False):
+                exclude_self=False):
         r"""
 
         Forward computation.
@@ -118,11 +118,6 @@ class KNNGraph(nn.Module):
             If True, the output graph will not contain self loop edges, and each node will not
             be counted as one of its own k neighbors.  If False, the output graph will contain
             self loop edges, and a node will be counted as one of its own k neighbors.
-        output_batch : bool, optional
-            If True, the output will be a batched graph representing just 1 KNN graph if :attr:`x`
-            is 2D, or representing :math:`shape(x)[0]` KNN graphs if :attr:`x` is 3D, as described
-            above.  If False, the output graph will still be a single graph with
-            multiple components, but the batch information won't be set.
 
         Returns
         -------
@@ -130,12 +125,12 @@ class KNNGraph(nn.Module):
             A DGLGraph without features.
         """
         return knn_graph(x, self.k, algorithm=algorithm, dist=dist,
-                         exclude_self=exclude_self, output_batch=output_batch)
+                         exclude_self=exclude_self)
 
 
 class SegmentedKNNGraph(nn.Module):
     r"""Layer that transforms one point set into a graph, or a batch of
-    point sets with different number of points into a union of those graphs.
+    point sets with different number of points into a batched union of those graphs.
 
     If a batch of point sets is provided, then the point :math:`j` in the point
     set :math:`i` is mapped to graph node ID:
@@ -183,7 +178,7 @@ class SegmentedKNNGraph(nn.Module):
 
     #pylint: disable=invalid-name
     def forward(self, x, segs, algorithm='bruteforce-blas', dist='euclidean',
-                exclude_self=False, output_batch=False):
+                exclude_self=False):
         r"""Forward computation.
 
         Parameters
@@ -238,19 +233,15 @@ class SegmentedKNNGraph(nn.Module):
             If True, the output graph will not contain self loop edges, and each node will not
             be counted as one of its own k neighbors.  If False, the output graph will contain
             self loop edges, and a node will be counted as one of its own k neighbors.
-        output_batch : bool, optional
-            If True, the output will be a batched graph representing :math:`len(segs)` KNN graphs,
-            as described above.  If False, the output graph will still be a single graph with
-            multiple components, but the batch information won't be set.
 
         Returns
         -------
         DGLGraph
-            A DGLGraph without features.
+            A batched DGLGraph without features.
         """
 
         return segmented_knn_graph(x, self.k, segs, algorithm=algorithm, dist=dist,
-                                   exclude_self=exclude_self, output_batch=output_batch)
+                                   exclude_self=exclude_self)
 
 
 class RadiusGraph(nn.Module):

@@ -99,7 +99,7 @@ def pairwise_squared_distance(x):
 
 #pylint: disable=invalid-name
 def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean',
-              exclude_self=False, output_batch=False):
+              exclude_self=False):
     r"""Construct a graph from a set of points according to k-nearest-neighbor (KNN)
     and return.
 
@@ -112,8 +112,8 @@ def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean',
     of each point are its k-nearest neighbors measured by the chosen distance.
 
     If :attr:`x` is a 3D tensor, then each submatrix will be transformed
-    into a separate graph. DGL then composes the graphs into a large
-    graph of multiple connected components.
+    into a separate graph. DGL then composes the graphs into a large batched
+    graph of multiple (:math:`shape(x)[0]`) connected components.
 
     See :doc:`the benchmark <../api/python/knn_benchmark>` for a complete benchmark result.
 
@@ -170,11 +170,6 @@ def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean',
         If True, the output graph will not contain self loop edges, and each node will not
         be counted as one of its own k neighbors.  If False, the output graph will contain
         self loop edges, and a node will be counted as one of its own k neighbors.
-    output_batch : bool, optional
-        If True, the output will be a batched graph representing just 1 KNN graph if :attr:`x`
-        is 2D, or representing :math:`shape(x)[0]` KNN graphs if :attr:`x` is 3D, as described
-        above.  If False, the output graph will still be a single graph with
-        multiple components, but the batch information won't be set.
 
     Returns
     -------
@@ -229,17 +224,19 @@ def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean',
     if x_size[0] == 0:
         raise DGLError("Find empty point set")
 
-    x_seg = x_size[0] * [x_size[1]] if F.ndim(x) == 3 else [x_size[0]]
+    d = F.ndim(x)
+    x_seg = x_size[0] * [x_size[1]] if d == 3 else [x_size[0]]
     if algorithm == 'bruteforce-blas':
         result = _knn_graph_blas(x, k, dist=dist)
     else:
-        if F.ndim(x) == 3:
+        if d == 3:
             x = F.reshape(x, (x_size[0] * x_size[1], x_size[2]))
         out = knn(k, x, x_seg, algorithm=algorithm, dist=dist)
         row, col = out[1], out[0]
         result = convert.graph((row, col))
 
-    if output_batch:
+    if d == 3:
+        # set batch information if x is 3D
         num_nodes = F.tensor(x_seg, dtype=F.int64).to(F.context(x))
         result.set_batch_num_nodes(num_nodes)
         # if any segment is too small for k, all algorithms reduce k for all segments
@@ -321,7 +318,7 @@ def _knn_graph_blas(x, k, dist='euclidean'):
 
 #pylint: disable=invalid-name
 def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas', dist='euclidean',
-                        exclude_self=False, output_batch=False):
+                        exclude_self=False):
     r"""Construct multiple graphs from multiple sets of points according to
     k-nearest-neighbor (KNN) and return.
 
@@ -332,7 +329,7 @@ def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas', dist='euclidean
     function constructs a KNN graph for each point set, where the predecessors
     of each point are its k-nearest neighbors measured by the Euclidean distance.
     DGL then composes all KNN graphs
-    into a graph with multiple connected components.
+    into a batched graph with multiple (:math:`len(segs)`) connected components.
 
     Parameters
     ----------
@@ -385,15 +382,11 @@ def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas', dist='euclidean
         If True, the output graph will not contain self loop edges, and each node will not
         be counted as one of its own k neighbors.  If False, the output graph will contain
         self loop edges, and a node will be counted as one of its own k neighbors.
-    output_batch : bool, optional
-        If True, the output will be a batched graph representing :math:`len(segs)` KNN graphs,
-        as described above.  If False, the output graph will still be a single graph with
-        multiple components, but the batch information won't be set.
 
     Returns
     -------
     DGLGraph
-        The graph. The node IDs are in the same order as :attr:`x`.
+        The batched graph. The node IDs are in the same order as :attr:`x`.
 
     Examples
     --------
@@ -441,12 +434,11 @@ def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas', dist='euclidean
         row, col = out[1], out[0]
         result = convert.graph((row, col))
 
-    if output_batch:
-        num_nodes = F.tensor(segs, dtype=F.int64).to(F.context(x))
-        result.set_batch_num_nodes(num_nodes)
-        # if any segment is too small for k, all algorithms reduce k for all segments
-        clamped_k = min(k, np.min(segs))
-        result.set_batch_num_edges(clamped_k*num_nodes)
+    num_nodes = F.tensor(segs, dtype=F.int64).to(F.context(x))
+    result.set_batch_num_nodes(num_nodes)
+    # if any segment is too small for k, all algorithms reduce k for all segments
+    clamped_k = min(k, np.min(segs))
+    result.set_batch_num_edges(clamped_k*num_nodes)
 
     if exclude_self:
         # remove_self_loop will update batch_num_edges as needed
