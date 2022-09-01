@@ -298,6 +298,8 @@ class CUDADeviceAPI final : public DeviceAPI {
 
 typedef dmlc::ThreadLocalStore<CUDAThreadEntry> CUDAThreadStore;
 
+// TODO(cliu): cuda streams should depend on the current device, therefore we should set device
+//             before setting stream.
 CUDAThreadEntry::CUDAThreadEntry()
     : pool(kDLGPU, CUDADeviceAPI::Global()) {
   TensorDispatcher* td = TensorDispatcher::Global();
