@@ -1,6 +1,5 @@
 import torch
-import operator
-from sp_matrix import SparseMatrix
+from .sp_matrix import SparseMatrix
 
 def check_sparsity(A, B):
     if not torch.equal(A.indices("COO"), B.indices("COO")):
@@ -27,6 +26,7 @@ def add(A, B):
     >>> col = torch.tensor([2, 4, 3])
     >>> w1 = torch.tensor([3 ,4, 5])
     >>> w2 = torch.tensor([-1, -3, -3])
+    >>> A = SparseMatrix(row, col, w1)
     >>> C = A + A
     >>> C.val
     tensor([ 6,  8, 10])
@@ -36,11 +36,9 @@ def add(A, B):
     if isinstance(A, SparseMatrix) and isinstance(B, SparseMatrix):
         assert A.shape == B.shape, 'The shape of sparse matrix A {} and' \
         'B {} must match'.format(A.shape, B.shape)
-        print("shape", A.shape, B.shape)
         check_sparsity(A, B)
-    else:
-        raise RuntimeError('Elementwise add between sparse and dense matrix is not supported.')
-    return SparseMatrix(A.row, A.col, A.val + B.val)
+        return SparseMatrix(A.row, A.col, A.val + B.val)
+    raise RuntimeError('Elementwise add between sparse and dense matrix is not supported.')
 
 def sub(A, B):
     """Elementwise subtraction.
@@ -69,11 +67,9 @@ def sub(A, B):
     if isinstance(A, SparseMatrix) and isinstance(B, SparseMatrix):
         assert A.shape == B.shape, 'The shape of sparse matrix A {} and' \
         'B {} must match'.format(A.shape, B.shape)
-        print("shape", A.shape, B.shape)
         check_sparsity(A, B)
-    else:
-        raise RuntimeError('Elementwise sub between sparse and dense matrix is not supported.')
-    return SparseMatrix(A.row, A.col, A.val - B.val)
+        return SparseMatrix(A.row, A.col, A.val - B.val)
+    raise RuntimeError('Elementwise sub between sparse and dense matrix is not supported.')
 
 def rsub(A, B):
     """Elementwise subtraction.
@@ -220,47 +216,3 @@ SparseMatrix.__rtruediv__ = rdiv
 SparseMatrix.__pow__ = power
 SparseMatrix.__rpow__ = rpower
 
-if __name__ == '__main__':
-    def test():
-        row = torch.tensor([1, 1, 2])
-        col = torch.tensor([2, 4, 3])
-        w1 = torch.tensor([3 ,4, 5])
-        w2 = torch.tensor([-1, -3, -3])
-        # w1 = torch.tensor([[3, 4], [5, 6], [7, 8]])
-        # w2 = torch.tensor([[1, 1], [2, 2], [-1, -1]])
-        A = SparseMatrix(row, col, w1)
-        v_scalar = 2.5
-
-        # Binary op (sparse_matrix <op> sparse_matrix)
-        ops = {
-            "+": operator.add,
-            "-": operator.sub,
-            "*": operator.mul,
-            "/": operator.truediv,
-        }
-        for op in ops:
-            # ***** sparse_matrix <op> sparse matrix ******
-            comp_torch = "w1 " + op + " w1"
-            comp_torch2 = "w2 " + op + " w1"
-            comp_spMat = "A " + op + " A"
-            comp_spMat2 = "A(w2) " + op + " A(w1)"
-            print("Computing", comp_spMat)  # A + A
-            assert torch.equal(eval(comp_torch), eval(comp_spMat).val)
-            print("Computing", comp_spMat2)  # A(w1) + A(w2)
-            assert torch.equal(eval(comp_torch2), eval(comp_spMat2).val)
-
-        # ***** sparse_matrix <op> scalar (supports '*', '/' and pow op) ******
-        print("Computing A * v_scalar")
-        assert torch.equal(w1 * v_scalar, (A * v_scalar).val)
-        print("Computing A / v_scalar")
-        assert torch.equal(w1 / v_scalar, (A / v_scalar).val)
-        print("Computing pow(A, v_scalar)")
-        assert torch.equal(pow(w1, v_scalar), pow(A, v_scalar).val)
-
-        # ***** scalar <op> sparse_matrix (supports only '*' op)******
-        print("Computing v_scalar * A")
-        assert torch.equal(v_scalar * w1, (v_scalar * A).val)
-        print()
-
-    test()
-    print('-------------------')

@@ -70,6 +70,10 @@ class SparseMatrix:
         i = torch.cat((row.unsqueeze(0), col.unsqueeze(0)), 0)
         self.adj = torch.sparse_coo_tensor(i, val).coalesce()
 
+    def __repr__(self):
+        return f'SparseMatrix(indices={self.indices("COO")}, \nvalues={self.val}, \
+                \nshape={self.shape}, nnz={self.nnz})'
+
     @property
     def shape(self) -> Tuple[int, ...]:
         """Shape of the sparse matrix.
