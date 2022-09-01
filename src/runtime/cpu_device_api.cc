@@ -1,11 +1,12 @@
 /*!
- *  Copyright (c) 2016 by Contributors
+ *  Copyright (c) 2016-2022 by Contributors
  * \file cpu_device_api.cc
  */
 #include <dmlc/logging.h>
 #include <dmlc/thread_local.h>
 #include <dgl/runtime/registry.h>
 #include <dgl/runtime/device_api.h>
+#include <dgl/runtime/tensordispatch.h>
 #include <cstdlib>
 #include <cstring>
 #include "workspace_pool.h"
@@ -24,6 +25,10 @@ class CPUDeviceAPI final : public DeviceAPI {
                        size_t nbytes,
                        size_t alignment,
                        DGLDataType type_hint) final {
+    TensorDispatcher* td = TensorDispatcher::Global();
+    if (td->IsAvailable())
+      return td->CPUAllocWorkspace(nbytes);
+
     void* ptr;
 #if _MSC_VER || defined(__MINGW32__)
     ptr = _aligned_malloc(nbytes, alignment);
@@ -39,6 +44,10 @@ class CPUDeviceAPI final : public DeviceAPI {
   }
 
   void FreeDataSpace(DGLContext ctx, void* ptr) final {
+    TensorDispatcher* td = TensorDispatcher::Global();
+    if (td->IsAvailable())
+      return td->CPUFreeWorkspace(ptr);
+
 #if _MSC_VER || defined(__MINGW32__)
     _aligned_free(ptr);
 #else
@@ -83,11 +92,18 @@ struct CPUWorkspacePool : public WorkspacePool {
 void* CPUDeviceAPI::AllocWorkspace(DGLContext ctx,
                                    size_t size,
                                    DGLDataType type_hint) {
-  return dmlc::ThreadLocalStore<CPUWorkspacePool>::Get()
-      ->AllocWorkspace(ctx, size);
+  TensorDispatcher* td = TensorDispatcher::Global();
+  if (td->IsAvailable())
+    return td->CPUAllocWorkspace(size);
+
+  return dmlc::ThreadLocalStore<CPUWorkspacePool>::Get()->AllocWorkspace(ctx, size);
 }
 
 void CPUDeviceAPI::FreeWorkspace(DGLContext ctx, void* data) {
+  TensorDispatcher* td = TensorDispatcher::Global();
+  if (td->IsAvailable())
+    return td->CPUFreeWorkspace(data);
+
   dmlc::ThreadLocalStore<CPUWorkspacePool>::Get()->FreeWorkspace(ctx, data);
 }
 
