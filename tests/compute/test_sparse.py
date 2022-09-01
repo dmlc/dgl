@@ -386,6 +386,7 @@ def _test_gather_mm_idx_a(idtype, feat_size):
     assert torch.allclose(da, da_t, atol=1e-4, rtol=1e-4)
     assert torch.allclose(db, db_t, atol=1e-4, rtol=1e-4)
 
+@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
 @unittest.skipIf(F._default_context_str == 'gpu', reason="Libxsmm only fit in CPU.")
 def test_use_libxsmm_switch():
     import torch
