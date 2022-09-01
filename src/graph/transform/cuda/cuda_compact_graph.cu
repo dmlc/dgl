@@ -135,8 +135,7 @@ CompactGraphsGPU(
           sizeof(IdType)*always_preserve[ntype]->shape[0],
           always_preserve[ntype]->ctx,
           all_nodes[ntype]->ctx,
-          always_preserve[ntype]->dtype,
-          stream);
+          always_preserve[ntype]->dtype);
       node_offsets[ntype] += sizeof(IdType)*always_preserve[ntype]->shape[0];
     }
   }
@@ -160,8 +159,7 @@ CompactGraphsGPU(
             sizeof(IdType)*edges.src->shape[0],
             edges.src->ctx,
             all_nodes[srctype]->ctx,
-            edges.src->dtype,
-            stream);
+            edges.src->dtype);
         node_offsets[srctype] += sizeof(IdType)*edges.src->shape[0];
       }
       if (edges.dst.defined()) {
@@ -172,8 +170,7 @@ CompactGraphsGPU(
             sizeof(IdType)*edges.dst->shape[0],
             edges.dst->ctx,
             all_nodes[dsttype]->ctx,
-            edges.dst->dtype,
-            stream);
+            edges.dst->dtype);
         node_offsets[dsttype] += sizeof(IdType)*edges.dst->shape[0];
       }
       all_edges[i].push_back(edges);
@@ -211,8 +208,7 @@ CompactGraphsGPU(
     sizeof(*num_induced_nodes.data())*num_ntypes,
     ctx,
     DGLContext{kDLCPU, 0},
-    DGLType{kDLInt, 64, 1},
-    stream);
+    DGLType{kDLInt, 64, 1});
   device->StreamSync(ctx, stream);
 
   // wait for the node counts to finish transferring

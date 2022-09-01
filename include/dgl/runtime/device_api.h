@@ -93,7 +93,6 @@ class DeviceAPI {
    * \param ctx_to The target context
    * \param type_hint The type of elements, only neded by certain backends.
    *                  can be useful for cross device endian converison.
-   * \param stream Optional stream object.
    */
   virtual void CopyDataFromTo(const void* from,
                               size_t from_offset,
@@ -103,16 +102,6 @@ class DeviceAPI {
                               DGLContext ctx_from,
                               DGLContext ctx_to,
                               DGLType type_hint) = 0;
-  virtual void CopyDataFromTo(const void* from,
-                              size_t from_offset,
-                              void* to,
-                              size_t to_offset,
-                              size_t num_bytes,
-                              DGLContext ctx_from,
-                              DGLContext ctx_to,
-                              DGLType type_hint,
-                              DGLStreamHandle stream) = 0;
-
    /*!
    * \brief Create a new stream of execution.
    *

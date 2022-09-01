@@ -99,15 +99,14 @@ IdArray _PerformFilter(
     device->FreeWorkspace(ctx, workspace);
   }
 
-  // copy number
+  // copy number using the internal stream CUDAThreadEntry::ThreadLocal()->stream;
   IdType num_unique;
   device->CopyDataFromTo(prefix+size, 0,
       &num_unique, 0,
       sizeof(num_unique),
       ctx,
       DGLContext{kDLCPU, 0},
-      test->dtype,
-      cudaStream);
+      test->dtype);
 
   // insert items into set
   {

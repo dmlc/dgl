@@ -308,12 +308,12 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
   // TODO(dlasalle): use pinned memory to overlap with the actual sampling, and wait on
   // a cudaevent
   IdType new_len;
+  // copy using the internal stream: CUDAThreadEntry::ThreadLocal->stream
   device->CopyDataFromTo(out_ptr, num_rows * sizeof(new_len), &new_len, 0,
       sizeof(new_len),
       ctx,
       DGLContext{kDLCPU, 0},
-      mat.indptr->dtype,
-      stream);
+      mat.indptr->dtype);
   CUDA_CALL(cudaEventRecord(copyEvent, stream));
 
   const uint64_t random_seed = RandomEngine::ThreadLocal()->RandInt(1000000000);

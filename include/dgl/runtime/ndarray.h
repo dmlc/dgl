@@ -158,16 +158,6 @@ class NDArray {
   inline void CopyTo(const NDArray &other) const;
 
   /*!
-   * \brief Asynchronous copy data content from another array
-   *        with a specified stream (GPU only).
-   * \param other The source array to be copied from.
-   * \param stream The stream to perform the copy context,
-   * \note The copy may happen synchronously if specified stream = dgl internal stream.
-   *       Otherwise, synchronization is necessary.
-   */
-  inline void CopyFromAsync(DLTensor* other,
-                            const DGLStreamHandle &stream);
-  /*!
    * \brief Copy the data to another context.
    * \param ctx The target context.
    * \return The array under another context.
@@ -481,11 +471,6 @@ inline NDArray NDArray::Clone() const {
   CHECK(data_ != nullptr);
   const DLTensor* dptr = operator->();
   return this->CopyTo(dptr->ctx);
-}
-
-inline void NDArray::CopyFromAsync(DLTensor* other, const DGLStreamHandle &stream) {
-  CHECK(data_ != nullptr);
-  CopyFromTo(other, &(data_->dl_tensor), stream);
 }
 
 inline void NDArray::PinMemory_() {
