@@ -279,7 +279,7 @@ void NDArray::UnpinContainer(NDArray::Container* ptr) {
   ptr->pinned_by_dgl_ = false;
 }
 
-void NDArray::RecordStream(DLTensor* tensor, const DGLStreamHandle &stream) {
+void NDArray::RecordStream(DGLArray* tensor, DGLStreamHandle stream) {
   TensorDispatcher* td = TensorDispatcher::Global();
   CHECK(td->IsAvailable()) << "RecordStream only works with the TensorAdaptor.";
   CHECK_EQ(tensor->ctx.device_type, kDLGPU)
@@ -569,8 +569,7 @@ int DGLArrayUnpinData(DGLArrayHandle handle,
   API_END();
 }
 
-int DGLArrayRecordStream(DGLArrayHandle handle,
-                         const DGLStreamHandle &stream) {
+int DGLArrayRecordStream(DGLArrayHandle handle, DGLStreamHandle stream) {
   API_BEGIN();
   NDArray::RecordStream(handle, stream);
   API_END();

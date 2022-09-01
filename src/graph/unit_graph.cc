@@ -172,7 +172,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
   }
 
   /*! \brief Record stream for the adj_: COOMatrix of the COO graph. */
-  void RecordStream(const DGLStreamHandle &stream) const override {
+  void RecordStream(DGLStreamHandle stream) const override {
     adj_.RecordStream(stream);
   }
 
@@ -583,7 +583,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
   }
 
   /*! \brief Record stream for the adj_: CSRMatrix of the CSR graph. */
-  void RecordStream(const DGLStreamHandle &stream) const override {
+  void RecordStream(DGLStreamHandle stream) const override {
     adj_.RecordStream(stream);
   }
 
@@ -1326,7 +1326,7 @@ void UnitGraph::UnpinMemory_() {
     this->coo_->UnpinMemory_();
 }
 
-void UnitGraph::RecordStream(const DGLStreamHandle &stream) const {
+void UnitGraph::RecordStream(DGLStreamHandle stream) const {
   if (this->in_csr_->defined())
     this->in_csr_->RecordStream(stream);
   if (this->out_csr_->defined())

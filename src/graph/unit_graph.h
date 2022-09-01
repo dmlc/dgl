@@ -233,7 +233,7 @@ class UnitGraph : public BaseHeteroGraph {
    * \brief Record stream for this graph.
    * \param stream The stream that is using the graph
    */
-  void RecordStream(const DGLStreamHandle &stream) const override;
+  void RecordStream(DGLStreamHandle stream) const override;
 
   /*! 
    * \brief Create in-edge CSR format of the unit graph.

@@ -70,7 +70,8 @@ def test_set_get_stream():
     assert to_dgl_stream_handle(s).value == dgl.cuda.current_stream(F.ctx()).value
 
 @unittest.skipIf(F._default_context_str == 'cpu', reason="stream only runs on GPU.")
-def test_record_stream():
+def test_record_stream_smoke():
+    # smoke test to ensure it can work
     stream = torch.cuda.Stream()
     with dgl.cuda.stream(stream):
         t = nd.array(np.array([1., 2., 3., 4.]), ctx=nd.gpu(0))
@@ -80,10 +81,11 @@ def test_record_stream():
     g.record_stream(torch.cuda.current_stream())
 
 @unittest.skipIf(F._default_context_str == 'cpu', reason="stream only runs on GPU.")
-def _test_record_stream():
+# borrowed from PyTorch, test/test_cuda.py: test_record_stream()
+def test_record_stream():
     cycles_per_ms = _get_cycles_per_ms()
 
-    t = nd.array(np.array([1., 2., 3., 4.]), ctx=nd.cpu())
+    t = nd.array(np.array([1., 2., 3., 4.], dtype=np.float32), ctx=nd.cpu())
     t.pin_memory_()
     result = nd.empty([4], ctx=nd.gpu(0))
     stream = torch.cuda.Stream()
@@ -102,10 +104,10 @@ def _test_record_stream():
 
     perform_copy()
     with dgl.cuda.stream(stream):
-        tmp2 = nd.array(np.array([1., 2., 3., 4.]), ctx=nd.gpu(0))
+        tmp2 = nd.array(np.array([1., 2., 3., 4.], dtype=np.float32), ctx=nd.gpu(0))
         assert F.from_dgl_nd(tmp2).data_ptr() != ptr[0], 'allocation re-used to soon'
 
-    assert torch.equal(F.from_dgl_nd(result).tolist(), [1, 2, 3, 4])
+    assert torch.equal(F.from_dgl_nd(result).cpu(), torch.tensor([1., 2., 3., 4.]))
 
     # Check that the block will be re-used after the main stream finishes
     torch.cuda.current_stream().synchronize()
@@ -116,4 +118,5 @@ def _test_record_stream():
 if __name__ == '__main__':
     test_basics()
     test_set_get_stream()
+    test_record_stream_smoke()
     test_record_stream()

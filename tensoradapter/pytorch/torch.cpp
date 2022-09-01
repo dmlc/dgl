@@ -7,6 +7,7 @@
 #include <tensoradapter_exports.h>
 #include <c10/core/CPUAllocator.h>
 #ifdef DGL_USE_CUDA
+#include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAStream.h>
 #include <c10/cuda/CUDACachingAllocator.h>
 #include <cuda_runtime.h>
@@ -26,6 +27,7 @@ TA_EXPORTS void CPURawDelete(void* ptr) {
 
 #ifdef DGL_USE_CUDA
 TA_EXPORTS void* CUDARawAlloc(size_t nbytes, cudaStream_t stream) {
+  at::globalContext().lazyInitCUDA();
   return c10::cuda::CUDACachingAllocator::raw_alloc_with_stream(
     nbytes, stream);
 }

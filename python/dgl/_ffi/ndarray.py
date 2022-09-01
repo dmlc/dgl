@@ -329,6 +329,11 @@ class NDArrayBase(_NDArrayBase):
     def record_stream(self, stream):
         """Record the stream that is using this tensor.
 
+        Note
+        ----
+        This API is more for testing. We should call ``record_stream``
+        on torch.Tensor or dgl.graph directly.
+
         Parameters
         ----------
         stream : DGLStreamHandle

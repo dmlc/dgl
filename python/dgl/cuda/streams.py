@@ -35,7 +35,7 @@ def current_stream(ctx):
     ctx : DGLContext or backend context.
 
     Note
-    _________
+    ----
     The returned DGLStreamHandle object cannot be used as an argument for ``set_stream()``.
     Please use ``_dgl_set_stream(DGLContext, DGLStreamHandle)`` instead.
 

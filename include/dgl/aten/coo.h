@@ -173,7 +173,7 @@ struct COOMatrix {
    * \brief Record stream for the row, col and data (if not Null) of the matrix.
    * \param stream The stream that is using the graph
    */
-  inline void RecordStream(const DGLStreamHandle &stream) const {
+  inline void RecordStream(DGLStreamHandle stream) const {
     row.RecordStream(stream);
     col.RecordStream(stream);
     if (!aten::IsNullArray(data)) {

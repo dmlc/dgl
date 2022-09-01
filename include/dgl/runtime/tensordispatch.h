@@ -127,7 +127,7 @@ class TensorDispatcher {
    * \param stream The stream that is using this tensor.
    * \param device_id Device of the tensor.
    */
-  inline void RecordStream(void* ptr, const DGLStreamHandle &stream, int device_id) {
+  inline void RecordStream(void* ptr, DGLStreamHandle stream, int device_id) {
     auto entry = entrypoints_[Op::kRecordStream];
     FUNCCAST(tensoradapter::RecordStream, entry)(
       ptr, static_cast<cudaStream_t>(stream), device_id);

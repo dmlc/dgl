@@ -205,7 +205,7 @@ class NDArray {
    * \brief Record streams that are using the underlying tensor.
    * \param stream The stream that is using the underlying tensor.
    */
-  inline void RecordStream(const DGLStreamHandle &stream) const;
+  inline void RecordStream(DGLStreamHandle stream) const;
   /*!
    * \brief Load NDArray from stream
    * \param stream The input data stream
@@ -340,7 +340,7 @@ class NDArray {
    * \param ptr Pointer of the tensor to be recorded.
    * \param stream The stream that is using this tensor.
    */
-  DGL_DLL static void RecordStream(DLTensor* tensor, const DGLStreamHandle &stream);
+  DGL_DLL static void RecordStream(DGLArray* tensor, DGLStreamHandle stream);
 
   // internal namespace
   struct Internal;
@@ -518,7 +518,7 @@ inline bool NDArray::IsPinned() const {
   return IsContainerPinned(data_);
 }
 
-inline void NDArray::RecordStream(const DGLStreamHandle &stream) const {
+inline void NDArray::RecordStream(DGLStreamHandle stream) const {
   CHECK(data_ != nullptr);
   RecordStream(&(data_->dl_tensor), stream);
 }
