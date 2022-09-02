@@ -20,7 +20,7 @@ namespace dgl {
 namespace aten {
 
 IdArray NewIdArray(int64_t length, DGLContext ctx, uint8_t nbits) {
-  return IdArray::Empty({length}, DGLDataType{kDLInt, nbits, 1}, ctx);
+  return IdArray::Empty({length}, DGLDataType{kDGLInt, nbits, 1}, ctx);
 }
 
 IdArray Clone(IdArray arr) {
@@ -316,7 +316,7 @@ std::pair<IdArray, IdArray> Sort(IdArray array, const int num_bits) {
 
 std::string ToDebugString(NDArray array) {
   std::ostringstream oss;
-  NDArray a = array.CopyTo(DGLContext{kDLCPU, 0});
+  NDArray a = array.CopyTo(DGLContext{kDGLCPU, 0});
   oss << "array([";
   ATEN_DTYPE_SWITCH(a->dtype, DType, "array", {
     for (int64_t i = 0; i < std::min<int64_t>(a.NumElements(), 10L); ++i) {
@@ -1133,10 +1133,10 @@ DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLExistSharedMemArray")
 DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLArrayCastToSigned")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     NDArray array = args[0];
-    CHECK_EQ(array->dtype.code, kDLUInt);
+    CHECK_EQ(array->dtype.code, kDGLUInt);
     std::vector<int64_t> shape(array->shape, array->shape + array->ndim);
     DGLDataType dtype = array->dtype;
-    dtype.code = kDLInt;
+    dtype.code = kDGLInt;
     *rv = array.CreateView(shape, dtype, 0);
   });
 

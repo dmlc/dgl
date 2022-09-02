@@ -128,9 +128,9 @@ struct CSRMatrix {
   /*!
   * \brief Pin the indptr, indices and data (if not Null) of the matrix.
   * \note This is an in-place method. Behavior depends on the current context,
-  *       kDLCPU: will be pinned;
+  *       kDGLCPU: will be pinned;
   *       IsPinned: directly return;
-  *       kDLCUDA: invalid, will throw an error.
+  *       kDGLCUDA: invalid, will throw an error.
   *       The context check is deferred to pinning the NDArray.
   */
   inline void PinMemory_() {

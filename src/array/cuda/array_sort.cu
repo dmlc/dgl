@@ -46,8 +46,8 @@ std::pair<IdArray, IdArray> Sort(IdArray array, int num_bits) {
   return std::make_pair(sorted_array, sorted_idx);
 }
 
-template std::pair<IdArray, IdArray> Sort<kDLCUDA, int32_t>(IdArray, int num_bits);
-template std::pair<IdArray, IdArray> Sort<kDLCUDA, int64_t>(IdArray, int num_bits);
+template std::pair<IdArray, IdArray> Sort<kDGLCUDA, int32_t>(IdArray, int num_bits);
+template std::pair<IdArray, IdArray> Sort<kDGLCUDA, int64_t>(IdArray, int num_bits);
 
 }  // namespace impl
 }  // namespace aten

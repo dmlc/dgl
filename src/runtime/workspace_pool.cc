@@ -30,7 +30,7 @@ class WorkspacePool::Pool {
     if (nbytes == 0) nbytes = kWorkspacePageSize;
     Entry e;
     DGLDataType type;
-    type.code = kDLUInt;
+    type.code = kDGLUInt;
     type.bits = 8;
     type.lanes = 1;
     if (free_list_.size() == 2) {

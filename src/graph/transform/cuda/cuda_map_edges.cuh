@@ -250,9 +250,9 @@ MapEdges(
         node_map.RhsHashTable(dst_type).DeviceHandle());
     } else {
       new_lhs.emplace_back(
-          aten::NullArray(DGLDataType{kDLInt, sizeof(IdType)*8, 1}, ctx));
+          aten::NullArray(DGLDataType{kDGLInt, sizeof(IdType)*8, 1}, ctx));
       new_rhs.emplace_back(
-          aten::NullArray(DGLDataType{kDLInt, sizeof(IdType)*8, 1}, ctx));
+          aten::NullArray(DGLDataType{kDGLInt, sizeof(IdType)*8, 1}, ctx));
     }
   }
 

@@ -34,8 +34,8 @@ IdArray CumSum(IdArray array, bool prepend_zero) {
   }
 }
 
-template IdArray CumSum<kDLCPU, int32_t>(IdArray, bool);
-template IdArray CumSum<kDLCPU, int64_t>(IdArray, bool);
+template IdArray CumSum<kDGLCPU, int32_t>(IdArray, bool);
+template IdArray CumSum<kDGLCPU, int64_t>(IdArray, bool);
 
 }  // namespace impl
 }  // namespace aten

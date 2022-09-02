@@ -27,7 +27,7 @@ TypeArray GetNodeTypesFromMetapath(
 
   uint64_t num_etypes = metapath->shape[0];
 
-  auto cpu_ctx = DGLContext{kDLCPU, 0};
+  auto cpu_ctx = DGLContext{kDGLCPU, 0};
   auto metapath_ctx = metapath->ctx;
   // use default stream
   cudaStream_t stream = 0;
@@ -62,11 +62,11 @@ TypeArray GetNodeTypesFromMetapath(
 }
 
 template
-TypeArray GetNodeTypesFromMetapath<kDLCUDA, int32_t>(
+TypeArray GetNodeTypesFromMetapath<kDGLCUDA, int32_t>(
     const HeteroGraphPtr hg,
     const TypeArray metapath);
 template
-TypeArray GetNodeTypesFromMetapath<kDLCUDA, int64_t>(
+TypeArray GetNodeTypesFromMetapath<kDGLCUDA, int64_t>(
     const HeteroGraphPtr hg,
     const TypeArray metapath);
 

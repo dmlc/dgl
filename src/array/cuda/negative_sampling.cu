@@ -215,9 +215,9 @@ std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
   return result;
 }
 
-template std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling<kDLCUDA, int32_t>(
+template std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling<kDGLCUDA, int32_t>(
     const CSRMatrix&, int64_t, int, bool, bool, double);
-template std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling<kDLCUDA, int64_t>(
+template std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling<kDGLCUDA, int64_t>(
     const CSRMatrix&, int64_t, int, bool, bool, double);
 
 };  // namespace impl

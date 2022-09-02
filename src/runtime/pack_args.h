@@ -105,12 +105,12 @@ enum ArgConvertCode {
 inline ArgConvertCode GetArgConvertCode(DGLDataType t) {
   CHECK_EQ(t.lanes, 1U)
       << "Cannot pass vector type argument to devic function for now";
-  if (t.code == kDLInt) {
+  if (t.code == kDGLInt) {
     if (t.bits == 64U) return INT64_TO_INT64;
     if (t.bits == 32U) return INT64_TO_INT32;
-  } else if (t.code == kDLUInt) {
+  } else if (t.code == kDGLUInt) {
     if (t.bits == 32U) return INT64_TO_UINT32;
-  } else if (t.code == kDLFloat) {
+  } else if (t.code == kDGLFloat) {
     if (t.bits == 64U) return FLOAT64_TO_FLOAT64;
     if (t.bits == 32U) return FLOAT64_TO_FLOAT32;
   } else if (t.code == kHandle) {

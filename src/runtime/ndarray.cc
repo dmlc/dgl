@@ -13,9 +13,6 @@
 #include <dgl/runtime/tensordispatch.h>
 #include "runtime_base.h"
 
-// deleter for arrays used by DLPack exporter
-extern "C" void NDArrayDLPackDeleter(DLManagedTensor* tensor);
-
 namespace dgl {
 
 constexpr DGLDataType DGLDataTypeTraits<int8_t>::dtype;
@@ -34,7 +31,7 @@ namespace runtime {
 
 inline void VerifyDataType(DGLDataType dtype) {
   CHECK_GE(dtype.lanes, 1);
-  if (dtype.code == kDLFloat) {
+  if (dtype.code == kDGLFloat) {
     CHECK_EQ(dtype.bits % 8, 0);
   } else {
     CHECK_EQ(dtype.bits % 8, 0);
@@ -57,92 +54,55 @@ inline size_t GetDataAlignment(const DGLArray& arr) {
   return align;
 }
 
-struct NDArray::Internal {
-  // Default deleter for the container
-  static void DefaultDeleter(NDArray::Container* ptr) {
-    using dgl::runtime::NDArray;
-    if (ptr->manager_ctx != nullptr) {
-      static_cast<NDArray::Container*>(ptr->manager_ctx)->DecRef();
-    } else if (ptr->mem) {
-      ptr->mem = nullptr;
-    } else if (ptr->dl_tensor.data != nullptr) {
-      // if the array is still pinned before freeing, unpin it.
-      if (ptr->pinned_by_dgl_)
-        UnpinContainer(ptr);
-      dgl::runtime::DeviceAPI::Get(ptr->dl_tensor.ctx)->FreeDataSpace(
-          ptr->dl_tensor.ctx, ptr->dl_tensor.data);
-    }
-    delete ptr;
-  }
-  // Deleter for NDArray converted from DLPack
-  // This is used from data which is passed from external DLPack(DLManagedTensor)
-  // that are not allocated inside of DGL.
-  // This enables us to create NDArray from memory allocated by other
-  // frameworks that are DLPack compatible
-  static void DLPackDeleter(NDArray::Container* ptr) {
-    // if the array is pinned by dgl, unpin it before freeing
+void NDArray::Internal::DefaultDeleter(NDArray::Container* ptr) {
+  using dgl::runtime::NDArray;
+  if (ptr->manager_ctx != nullptr) {
+    static_cast<NDArray::Container*>(ptr->manager_ctx)->DecRef();
+  } else if (ptr->mem) {
+    ptr->mem = nullptr;
+  } else if (ptr->dl_tensor.data != nullptr) {
+    // if the array is still pinned before freeing, unpin it.
     if (ptr->pinned_by_dgl_)
       UnpinContainer(ptr);
-    DLManagedTensor* tensor = static_cast<DLManagedTensor*>(ptr->manager_ctx);
-    if (tensor->deleter != nullptr) {
-      (*tensor->deleter)(tensor);
-    }
-    delete ptr;
+    dgl::runtime::DeviceAPI::Get(ptr->dl_tensor.ctx)->FreeDataSpace(
+        ptr->dl_tensor.ctx, ptr->dl_tensor.data);
   }
-  // Local create function which allocates tensor metadata
-  // but does not allocate space for the data.
-  static NDArray Create(std::vector<int64_t> shape,
-                        DGLDataType dtype,
-                        DGLContext ctx) {
-    VerifyDataType(dtype);
-    // critical zone
-    NDArray::Container* data = new NDArray::Container();
-    data->deleter = DefaultDeleter;
-    NDArray ret(data);
-    ret.data_ = data;
-    // RAII now in effect
-    // setup shape
-    data->shape_ = std::move(shape);
-    data->dl_tensor.shape = dmlc::BeginPtr(data->shape_);
-    data->dl_tensor.ndim = static_cast<int>(data->shape_.size());
-    // setup stride (this should be optional, but some framework
-    //   does not support NULL stride and thus will crash the program).
-    data->stride_.resize(data->dl_tensor.ndim, 1);
-    for (int i = data->dl_tensor.ndim - 2; i >= 0; --i) {
-      data->stride_[i] = data->shape_[i+1] * data->stride_[i+1];
-    }
-    data->dl_tensor.strides = dmlc::BeginPtr(data->stride_);
-    // setup dtype
-    data->dl_tensor.dtype = dtype;
-    // setup ctx
-    data->dl_tensor.ctx = ctx;
-    return ret;
-  }
-  // Implementation of API function
-  static DGLArray* MoveAsDGLArray(NDArray arr) {
-    DGLArray* tensor = reinterpret_cast<DGLArray*>(arr.data_);
-    CHECK(tensor == const_cast<DGLArray*>(arr.operator->()));
-    arr.data_ = nullptr;
-    return tensor;
-  }
-  // Container to DLManagedTensor
-  static DLManagedTensor* ToDLPack(NDArray::Container* from) {
-    CHECK(from != nullptr);
-    DLManagedTensor* ret = new DLManagedTensor();
-    ret->dl_tensor.data = from->dl_tensor.data;
-    ret->dl_tensor.device = from->dl_tensor.ctx;
-    ret->dl_tensor.ndim = from->dl_tensor.ndim;
-    ret->dl_tensor.dtype = from->dl_tensor.dtype;
-    ret->dl_tensor.shape = from->dl_tensor.shape;
-    ret->dl_tensor.strides = from->dl_tensor.strides;
-    ret->dl_tensor.byte_offset = from->dl_tensor.byte_offset;
+  delete ptr;
+}
 
-    ret->manager_ctx = from;
-    from->IncRef();
-    ret->deleter = NDArrayDLPackDeleter;
-    return ret;
+NDArray NDArray::Internal::Create(std::vector<int64_t> shape,
+                                  DGLDataType dtype, DGLContext ctx) {
+  VerifyDataType(dtype);
+  // critical zone
+  NDArray::Container* data = new NDArray::Container();
+  data->deleter = DefaultDeleter;
+  NDArray ret(data);
+  ret.data_ = data;
+  // RAII now in effect
+  // setup shape
+  data->shape_ = std::move(shape);
+  data->dl_tensor.shape = dmlc::BeginPtr(data->shape_);
+  data->dl_tensor.ndim = static_cast<int>(data->shape_.size());
+  // setup stride (this should be optional, but some framework
+  //   does not support NULL stride and thus will crash the program).
+  data->stride_.resize(data->dl_tensor.ndim, 1);
+  for (int i = data->dl_tensor.ndim - 2; i >= 0; --i) {
+    data->stride_[i] = data->shape_[i+1] * data->stride_[i+1];
   }
-};
+  data->dl_tensor.strides = dmlc::BeginPtr(data->stride_);
+  // setup dtype
+  data->dl_tensor.dtype = dtype;
+  // setup ctx
+  data->dl_tensor.ctx = ctx;
+  return ret;
+}
+  
+DGLArray* NDArray::Internal::MoveAsDGLArray(NDArray arr) {
+  DGLArray* tensor = reinterpret_cast<DGLArray*>(arr.data_);
+  CHECK(tensor == const_cast<DGLArray*>(arr.operator->()));
+  arr.data_ = nullptr;
+  return tensor;
+}
 
 size_t NDArray::GetSize() const {
   return GetDataSize(data_->dl_tensor);
@@ -196,10 +156,6 @@ NDArray NDArray::CreateView(std::vector<int64_t> shape,
   return ret;
 }
 
-DLManagedTensor* NDArray::ToDLPack() const {
-  return Internal::ToDLPack(data_);
-}
-
 NDArray NDArray::EmptyShared(const std::string &name,
                        std::vector<int64_t> shape,
                        DGLDataType dtype,
@@ -232,21 +188,6 @@ NDArray NDArray::Empty(std::vector<int64_t> shape,
   return ret;
 }
 
-NDArray NDArray::FromDLPack(DLManagedTensor* tensor) {
-  NDArray::Container* data = new NDArray::Container();
-  data->deleter = Internal::DLPackDeleter;
-  data->manager_ctx = tensor;
-  data->dl_tensor.data = tensor->dl_tensor.data;
-  data->dl_tensor.ctx = tensor->dl_tensor.device;
-  data->dl_tensor.ndim = tensor->dl_tensor.ndim;
-  data->dl_tensor.dtype = tensor->dl_tensor.dtype;
-  data->dl_tensor.shape = tensor->dl_tensor.shape;
-  data->dl_tensor.strides = tensor->dl_tensor.strides;
-  data->dl_tensor.byte_offset = tensor->dl_tensor.byte_offset;
-
-  return NDArray(data);
-}
-
 void NDArray::CopyFromTo(DGLArray* from,
                          DGLArray* to,
                          DGLStreamHandle stream) {
@@ -256,13 +197,13 @@ void NDArray::CopyFromTo(DGLArray* from,
     << "DGLArrayCopyFromTo: The size must exactly match";
 
   CHECK(from->ctx.device_type == to->ctx.device_type
-        || from->ctx.device_type == kDLCPU
-        || to->ctx.device_type == kDLCPU)
+        || from->ctx.device_type == kDGLCPU
+        || to->ctx.device_type == kDGLCPU)
     << "Can not copy across different ctx types directly";
 
   // Use the context that is *not* a cpu context to get the correct device
   // api manager.
-  DGLContext ctx = from->ctx.device_type != kDLCPU ? from->ctx : to->ctx;
+  DGLContext ctx = from->ctx.device_type != kDGLCPU ? from->ctx : to->ctx;
 
   DeviceAPI::Get(ctx)->CopyDataFromTo(
     from->data, static_cast<size_t>(from->byte_offset),
@@ -273,9 +214,9 @@ void NDArray::CopyFromTo(DGLArray* from,
 void NDArray::PinContainer(NDArray::Container* ptr) {
   if (IsContainerPinned(ptr)) return;
   auto* tensor = &(ptr->dl_tensor);
-  CHECK_EQ(tensor->ctx.device_type, kDLCPU)
+  CHECK_EQ(tensor->ctx.device_type, kDGLCPU)
     << "Only NDArray on CPU can be pinned";
-  DeviceAPI::Get(kDLCUDA)->PinData(tensor->data, GetDataSize(*tensor));
+  DeviceAPI::Get(kDGLCUDA)->PinData(tensor->data, GetDataSize(*tensor));
   ptr->pinned_by_dgl_ = true;
 }
 
@@ -288,7 +229,7 @@ void NDArray::UnpinContainer(NDArray::Container* ptr) {
   // 1. not pinned, do nothing
   if (!container_is_pinned) return;
   // 2. pinned by DGL, unpin it
-  DeviceAPI::Get(kDLCUDA)->UnpinData(ptr->dl_tensor.data);
+  DeviceAPI::Get(kDGLCUDA)->UnpinData(ptr->dl_tensor.data);
   ptr->pinned_by_dgl_ = false;
 }
 
@@ -303,10 +244,19 @@ NDArray NDArray::FromVector(const std::vector<T>& vec, DGLContext ctx) {
       static_cast<T*>(ret->data),
       0,
       size * sizeof(T),
-      DGLContext{kDLCPU, 0},
+      DGLContext{kDGLCPU, 0},
       ctx,
       dtype,
       nullptr);
+  return ret;
+}
+
+NDArray NDArray::CreateFromRaw(const std::vector<int64_t>& shape,
+    DGLDataType dtype, DGLContext ctx, void* raw, bool auto_free) {
+  NDArray ret = Internal::Create(shape, dtype, ctx);
+  ret.data_->dl_tensor.data = raw;
+  if (!auto_free)
+    ret.data_->deleter = nullptr;
   return ret;
 }
 
@@ -334,7 +284,7 @@ std::vector<T> NDArray::ToVector() const {
       0,
       size * sizeof(T),
       ctx,
-      DGLContext{kDLCPU, 0},
+      DGLContext{kDGLCPU, 0},
       dtype,
       nullptr);
   return vec;
@@ -356,10 +306,10 @@ bool NDArray::IsContainerPinned(NDArray::Container* ptr) {
     return true;
   auto* tensor = &(ptr->dl_tensor);
   // Can only be pinned if on CPU...
-  if (tensor->ctx.device_type != kDLCPU)
+  if (tensor->ctx.device_type != kDGLCPU)
     return false;
   // ... and CUDA device API is enabled, and the tensor is indeed in pinned memory.
-  auto device = DeviceAPI::Get(kDLCUDA, true);
+  auto device = DeviceAPI::Get(kDGLCUDA, true);
   return device && device->IsPinned(tensor->data);
 }
 
@@ -394,7 +344,7 @@ bool NDArray::Load(dmlc::Stream* strm) {
       << "Invalid DGLArray file format";
   CHECK(strm->Read(&dtype))
       << "Invalid DGLArray file format";
-  CHECK_EQ(ctx.device_type, kDLCPU)
+  CHECK_EQ(ctx.device_type, kDGLCPU)
       << "Invalid DGLArray context: can only save as CPU tensor";
   std::vector<int64_t> shape(ndim);
   if (ndim != 0) {
@@ -430,11 +380,6 @@ bool NDArray::Load(dmlc::Stream* strm) {
 }  // namespace dgl
 
 using namespace dgl::runtime;
-
-void NDArrayDLPackDeleter(DLManagedTensor* tensor) {
-  static_cast<NDArray::Container*>(tensor->manager_ctx)->DecRef();
-  delete tensor;
-}
 
 int DGLArrayAlloc(const dgl_index_t* shape,
                   int ndim,
@@ -472,7 +417,7 @@ int DGLArrayAllocSharedMem(const char *mem_name,
   dtype.lanes = static_cast<uint16_t>(dtype_lanes);
   std::vector<int64_t> shape_vec(shape, shape + ndim);
   NDArray arr = NDArray::EmptyShared(mem_name, shape_vec, dtype,
-                                     DGLContext{kDLCPU, 0}, is_create);
+                                     DGLContext{kDGLCPU, 0}, is_create);
   *out = NDArray::Internal::MoveAsDGLArray(arr);
   API_END();
 }
@@ -491,44 +436,12 @@ int DGLArrayCopyFromTo(DGLArrayHandle from,
   API_END();
 }
 
-int DGLArrayFromDLPack(DLManagedTensor* from,
-                       DGLArrayHandle* out) {
-  API_BEGIN();
-  *out = NDArray::Internal::MoveAsDGLArray(NDArray::FromDLPack(from));
-  API_END();
-}
-
-inline bool is_aligned(const void* ptr, std::uintptr_t alignment) noexcept {
-  auto iptr = reinterpret_cast<std::uintptr_t>(ptr);
-  return !(iptr % alignment);
-}
-
-int DGLArrayToDLPack(DGLArrayHandle from, DLManagedTensor** out,
-                     int alignment) {
-  API_BEGIN();
-  auto* nd_container = reinterpret_cast<NDArray::Container*>(from);
-  DGLArray* nd = &(nd_container->dl_tensor);
-  if (alignment != 0 && !is_aligned(nd->data, alignment)) {
-    std::vector<int64_t> shape_vec(nd->shape, nd->shape + nd->ndim);
-    NDArray copy_ndarray = NDArray::Empty(shape_vec, nd->dtype, nd->ctx);
-    copy_ndarray.CopyFrom(nd);
-    *out = copy_ndarray.ToDLPack();
-  } else {
-    *out = NDArray::Internal::ToDLPack(nd_container);
-  }
-  API_END();
-}
-
-void DGLDLManagedTensorCallDeleter(DLManagedTensor* dltensor) {
-  (*(dltensor->deleter))(dltensor);
-}
-
 int DGLArrayCopyFromBytes(DGLArrayHandle handle,
                           void* data,
                           size_t nbytes) {
   API_BEGIN();
   DGLContext cpu_ctx;
-  cpu_ctx.device_type = kDLCPU;
+  cpu_ctx.device_type = kDGLCPU;
   cpu_ctx.device_id = 0;
   size_t arr_size = GetDataSize(*handle);
   CHECK_EQ(arr_size, nbytes)
@@ -545,7 +458,7 @@ int DGLArrayCopyToBytes(DGLArrayHandle handle,
                         size_t nbytes) {
   API_BEGIN();
   DGLContext cpu_ctx;
-  cpu_ctx.device_type = kDLCPU;
+  cpu_ctx.device_type = kDGLCPU;
   cpu_ctx.device_id = 0;
   size_t arr_size = GetDataSize(*handle);
   CHECK_EQ(arr_size, nbytes)

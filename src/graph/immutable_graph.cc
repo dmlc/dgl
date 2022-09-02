@@ -51,8 +51,8 @@ NDArray SerializeMetadata(ImmutableGraphPtr gidx, const std::string &name) {
   meta.has_out_csr = gidx->HasOutCSR();
   meta.has_coo = false;
 
-  NDArray meta_arr = NDArray::EmptyShared(name, {sizeof(meta)}, DGLDataType{kDLInt, 8, 1},
-                                          DGLContext{kDLCPU, 0}, true);
+  NDArray meta_arr = NDArray::EmptyShared(name, {sizeof(meta)}, DGLDataType{kDGLInt, 8, 1},
+                                          DGLContext{kDGLCPU, 0}, true);
   memcpy(meta_arr->data, &meta, sizeof(meta));
   return meta_arr;
 #else
@@ -67,8 +67,8 @@ NDArray SerializeMetadata(ImmutableGraphPtr gidx, const std::string &name) {
 GraphIndexMetadata DeserializeMetadata(const std::string &name) {
   GraphIndexMetadata meta;
 #ifndef _WIN32
-  NDArray meta_arr = NDArray::EmptyShared(name, {sizeof(meta)}, DGLDataType{kDLInt, 8, 1},
-                                          DGLContext{kDLCPU, 0}, false);
+  NDArray meta_arr = NDArray::EmptyShared(name, {sizeof(meta)}, DGLDataType{kDGLInt, 8, 1},
+                                          DGLContext{kDGLCPU, 0}, false);
   memcpy(&meta, meta_arr->data, sizeof(meta));
 #else
   LOG(FATAL) << "CSR graph doesn't support shared memory in Windows yet";
@@ -82,13 +82,13 @@ std::tuple<IdArray, IdArray, IdArray> MapFromSharedMemory(
   const int64_t file_size = (num_verts + 1 + num_edges * 2) * sizeof(dgl_id_t);
 
   IdArray sm_array = IdArray::EmptyShared(
-      shared_mem_name, {file_size}, DGLDataType{kDLInt, 8, 1}, DGLContext{kDLCPU, 0}, is_create);
+      shared_mem_name, {file_size}, DGLDataType{kDGLInt, 8, 1}, DGLContext{kDGLCPU, 0}, is_create);
   // Create views from the shared memory array. Note that we don't need to save
   //   the sm_array because the refcount is maintained by the view arrays.
-  IdArray indptr = sm_array.CreateView({num_verts + 1}, DGLDataType{kDLInt, 64, 1});
-  IdArray indices = sm_array.CreateView({num_edges}, DGLDataType{kDLInt, 64, 1},
+  IdArray indptr = sm_array.CreateView({num_verts + 1}, DGLDataType{kDGLInt, 64, 1});
+  IdArray indices = sm_array.CreateView({num_edges}, DGLDataType{kDGLInt, 64, 1},
       (num_verts + 1) * sizeof(dgl_id_t));
-  IdArray edge_ids = sm_array.CreateView({num_edges}, DGLDataType{kDLInt, 64, 1},
+  IdArray edge_ids = sm_array.CreateView({num_edges}, DGLDataType{kDGLInt, 64, 1},
       (num_verts + 1 + num_edges) * sizeof(dgl_id_t));
   return std::make_tuple(indptr, indices, edge_ids);
 #else

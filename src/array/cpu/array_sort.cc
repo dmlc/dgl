@@ -181,8 +181,8 @@ std::pair<IdArray, IdArray> Sort(IdArray array, int /* num_bits */) {
   return std::make_pair(val, idx);
 }
 
-template std::pair<IdArray, IdArray> Sort<kDLCPU, int32_t>(IdArray, int num_bits);
-template std::pair<IdArray, IdArray> Sort<kDLCPU, int64_t>(IdArray, int num_bits);
+template std::pair<IdArray, IdArray> Sort<kDGLCPU, int32_t>(IdArray, int num_bits);
+template std::pair<IdArray, IdArray> Sort<kDGLCPU, int64_t>(IdArray, int num_bits);
 
 }  // namespace impl
 }  // namespace aten

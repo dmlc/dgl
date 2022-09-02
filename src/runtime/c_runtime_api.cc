@@ -1,5 +1,5 @@
 /*!
- *  Copyright (c) 2016 by Contributors
+ *  Copyright (c) 2016-2022 by Contributors
  * \file c_runtime_api.cc
  * \brief Runtime API implementation
  */
@@ -26,17 +26,9 @@ namespace runtime {
  */
 inline std::string DeviceName(int type) {
   switch (type) {
-    case kDLCPU: return "cpu";
-    case kDLCUDA: return "gpu";
-    case kDLOpenCL: return "opencl";
-    case kDLSDAccel: return "sdaccel";
-    case kDLAOCL: return "aocl";
-    case kDLVulkan: return "vulkan";
-    case kDLMetal: return "metal";
-    case kDLVPI: return "vpi";
-    case kDLROCM: return "rocm";
-    case kOpenGL: return "opengl";
-    case kExtDev: return "ext_dev";
+    case kDGLCPU: return "cpu";
+    case kDGLCUDA: return "gpu";
+    // add more device here once supported
     default: LOG(FATAL) << "unknown type =" << type; return "Unknown";
   }
 }

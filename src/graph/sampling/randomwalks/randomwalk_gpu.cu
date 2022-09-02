@@ -205,7 +205,7 @@ std::pair<IdArray, IdArray> RandomWalkUniform(
   // copy graph metadata pointers to GPU
   device->CopyDataFromTo(h_graphs.data(), 0, d_graphs, 0,
       (num_etypes) * sizeof(GraphKernelData<IdType>),
-      DGLContext{kDLCPU, 0},
+      DGLContext{kDGLCPU, 0},
       ctx,
       hg->GetCSRMatrix(0).indptr->dtype,
       stream);
@@ -219,7 +219,7 @@ std::pair<IdArray, IdArray> RandomWalkUniform(
   dim3 grid((num_seeds + TILE_SIZE - 1) / TILE_SIZE);
   const uint64_t random_seed = RandomEngine::ThreadLocal()->RandInt(1000000000);
   ATEN_FLOAT_TYPE_SWITCH(restart_prob->dtype, FloatType, "random walk GPU kernel", {
-    CHECK(restart_prob->ctx.device_type == kDLCUDA) << "restart prob should be in GPU.";
+    CHECK(restart_prob->ctx.device_type == kDGLCUDA) << "restart prob should be in GPU.";
     CHECK(restart_prob->ndim == 1) << "restart prob dimension should be 1.";
     const FloatType *restart_prob_data = restart_prob.Ptr<FloatType>();
     const int64_t restart_prob_size = restart_prob->shape[0];
@@ -322,7 +322,7 @@ std::pair<IdArray, IdArray> RandomWalkBiased(
       device->AllocWorkspace(ctx, (num_etypes) * sizeof(GraphKernelData<IdType>)));
   device->CopyDataFromTo(h_graphs.data(), 0, d_graphs, 0,
       (num_etypes) * sizeof(GraphKernelData<IdType>),
-      DGLContext{kDLCPU, 0},
+      DGLContext{kDGLCPU, 0},
       ctx,
       hg->GetCSRMatrix(0).indptr->dtype,
       stream);
@@ -331,7 +331,7 @@ std::pair<IdArray, IdArray> RandomWalkBiased(
       device->AllocWorkspace(ctx, num_etypes * sizeof(FloatType *)));
   device->CopyDataFromTo(probs.get(), 0, probs_dev, 0,
       (num_etypes) * sizeof(FloatType *),
-      DGLContext{kDLCPU, 0},
+      DGLContext{kDGLCPU, 0},
       ctx,
       prob[0]->dtype,
       stream);
@@ -340,7 +340,7 @@ std::pair<IdArray, IdArray> RandomWalkBiased(
       device->AllocWorkspace(ctx, num_etypes * sizeof(FloatType *)));
   device->CopyDataFromTo(prob_sums.get(), 0, prob_sums_dev, 0,
       (num_etypes) * sizeof(FloatType *),
-      DGLContext{kDLCPU, 0},
+      DGLContext{kDGLCPU, 0},
       ctx,
       prob[0]->dtype,
       stream);
@@ -353,7 +353,7 @@ std::pair<IdArray, IdArray> RandomWalkBiased(
   dim3 block(256);
   dim3 grid((num_seeds + TILE_SIZE - 1) / TILE_SIZE);
   const uint64_t random_seed = RandomEngine::ThreadLocal()->RandInt(1000000000);
-  CHECK(restart_prob->ctx.device_type == kDLCUDA) << "restart prob should be in GPU.";
+  CHECK(restart_prob->ctx.device_type == kDGLCUDA) << "restart prob should be in GPU.";
   CHECK(restart_prob->ndim == 1) << "restart prob dimension should be 1.";
   const FloatType *restart_prob_data = restart_prob.Ptr<FloatType>();
   const int64_t restart_prob_size = restart_prob->shape[0];
@@ -396,7 +396,7 @@ std::pair<IdArray, IdArray> RandomWalk(
   }
 
   auto restart_prob = NDArray::Empty(
-      {0}, DGLDataType{kDLFloat, 32, 1}, DGLContext{XPU, 0});
+      {0}, DGLDataType{kDGLFloat, 32, 1}, DGLContext{XPU, 0});
   if (!isUniform) {
     std::pair<IdArray, IdArray> ret;
     ATEN_FLOAT_TYPE_SWITCH(prob[0]->dtype, FloatType, "probability", {
@@ -426,7 +426,7 @@ std::pair<IdArray, IdArray> RandomWalkWithRestart(
 
   auto device_ctx = seeds->ctx;
   auto restart_prob_array = NDArray::Empty(
-      {1}, DGLDataType{kDLFloat, 64, 1}, device_ctx);
+      {1}, DGLDataType{kDGLFloat, 64, 1}, device_ctx);
   auto device = dgl::runtime::DeviceAPI::Get(device_ctx);
 
   // use default stream
@@ -434,7 +434,7 @@ std::pair<IdArray, IdArray> RandomWalkWithRestart(
   device->CopyDataFromTo(
       &restart_prob, 0, restart_prob_array.Ptr<double>(), 0,
       sizeof(double),
-      DGLContext{kDLCPU, 0}, device_ctx,
+      DGLContext{kDGLCPU, 0}, device_ctx,
       restart_prob_array->dtype, stream);
   device->StreamSync(device_ctx, stream);
 
@@ -483,7 +483,7 @@ std::tuple<IdArray, IdArray, IdArray> SelectPinSageNeighbors(
     const IdArray dst,
     const int64_t num_samples_per_node,
     const int64_t k) {
-  CHECK(src->ctx.device_type == kDLCUDA) <<
+  CHECK(src->ctx.device_type == kDGLCUDA) <<
     "IdArray needs be on GPU!";
   const IdxType* src_data = src.Ptr<IdxType>();
   const IdxType* dst_data = dst.Ptr<IdxType>();
@@ -499,27 +499,27 @@ std::tuple<IdArray, IdArray, IdArray> SelectPinSageNeighbors(
 }
 
 template
-std::pair<IdArray, IdArray> RandomWalk<kDLCUDA, int32_t>(
+std::pair<IdArray, IdArray> RandomWalk<kDGLCUDA, int32_t>(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
     const std::vector<FloatArray> &prob);
 template
-std::pair<IdArray, IdArray> RandomWalk<kDLCUDA, int64_t>(
+std::pair<IdArray, IdArray> RandomWalk<kDGLCUDA, int64_t>(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
     const std::vector<FloatArray> &prob);
 
 template
-std::pair<IdArray, IdArray> RandomWalkWithRestart<kDLCUDA, int32_t>(
+std::pair<IdArray, IdArray> RandomWalkWithRestart<kDGLCUDA, int32_t>(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
     const std::vector<FloatArray> &prob,
     double restart_prob);
 template
-std::pair<IdArray, IdArray> RandomWalkWithRestart<kDLCUDA, int64_t>(
+std::pair<IdArray, IdArray> RandomWalkWithRestart<kDGLCUDA, int64_t>(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
@@ -527,14 +527,14 @@ std::pair<IdArray, IdArray> RandomWalkWithRestart<kDLCUDA, int64_t>(
     double restart_prob);
 
 template
-std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart<kDLCUDA, int32_t>(
+std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart<kDGLCUDA, int32_t>(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
     const std::vector<FloatArray> &prob,
     FloatArray restart_prob);
 template
-std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart<kDLCUDA, int64_t>(
+std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart<kDGLCUDA, int64_t>(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
@@ -542,13 +542,13 @@ std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart<kDLCUDA, int64_t>(
     FloatArray restart_prob);
 
 template
-std::tuple<IdArray, IdArray, IdArray> SelectPinSageNeighbors<kDLCUDA, int32_t>(
+std::tuple<IdArray, IdArray, IdArray> SelectPinSageNeighbors<kDGLCUDA, int32_t>(
     const IdArray src,
     const IdArray dst,
     const int64_t num_samples_per_node,
     const int64_t k);
 template
-std::tuple<IdArray, IdArray, IdArray> SelectPinSageNeighbors<kDLCUDA, int64_t>(
+std::tuple<IdArray, IdArray, IdArray> SelectPinSageNeighbors<kDGLCUDA, int64_t>(
     const IdArray src,
     const IdArray dst,
     const int64_t num_samples_per_node,

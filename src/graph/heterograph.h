@@ -235,9 +235,9 @@ class HeteroGraph : public BaseHeteroGraph {
   /*!
   * \brief Pin all relation graphs of the current graph.
   * \note The graph will be pinned inplace. Behavior depends on the current context,
-  *       kDLCPU: will be pinned;
+  *       kDGLCPU: will be pinned;
   *       IsPinned: directly return;
-  *       kDLCUDA: invalid, will throw an error.
+  *       kDGLCUDA: invalid, will throw an error.
   *       The context check is deferred to pinning the NDArray.
   */
   void PinMemory_() override;

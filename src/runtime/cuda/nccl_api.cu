@@ -222,8 +222,8 @@ std::pair<IdArray, NDArray> SparsePush(
       0,
       send_prefix_host.size()*sizeof(*send_prefix.get()),
       ctx,
-      DGLContext{kDLCPU, 0},
-      DGLDataType{kDLInt, sizeof(*send_prefix.get())*8, 1},
+      DGLContext{kDGLCPU, 0},
+      DGLDataType{kDGLInt, sizeof(*send_prefix.get())*8, 1},
       stream);
   send_prefix.free();
 
@@ -260,8 +260,8 @@ std::pair<IdArray, NDArray> SparsePush(
       0,
       recv_prefix_host.size()*sizeof(*recv_prefix.get()),
       ctx,
-      DGLContext{kDLCPU, 0},
-      DGLDataType{kDLInt, sizeof(*recv_prefix.get())*8, 1},
+      DGLContext{kDGLCPU, 0},
+      DGLDataType{kDGLInt, sizeof(*recv_prefix.get())*8, 1},
       stream);
   recv_prefix.free();
 
@@ -376,8 +376,8 @@ NDArray SparsePull(
       0,
       request_prefix_host.size()*sizeof(*request_prefix.get()),
       ctx,
-      DGLContext{kDLCPU, 0},
-      DGLDataType{kDLInt, sizeof(*request_prefix.get())*8, 1},
+      DGLContext{kDGLCPU, 0},
+      DGLDataType{kDGLInt, sizeof(*request_prefix.get())*8, 1},
       stream);
   request_prefix.free();
   CHECK_EQ(request_prefix_host.back(), num_in) << "Internal Error: "
@@ -411,8 +411,8 @@ NDArray SparsePull(
       0,
       response_prefix_host.size()*sizeof(*response_prefix.get()),
       ctx,
-      DGLContext{kDLCPU, 0},
-      DGLDataType{kDLInt, sizeof(*response_prefix.get())*8, 1},
+      DGLContext{kDGLCPU, 0},
+      DGLDataType{kDGLInt, sizeof(*response_prefix.get())*8, 1},
       stream);
   response_prefix.free();
 
@@ -618,7 +618,7 @@ void NCCLCommunicator::AllToAllV(
 
   int dev_id;
   CUDA_CALL(cudaGetDevice(&dev_id));
-  DGLContext ctx{kDLCUDA, dev_id};
+  DGLContext ctx{kDGLCUDA, dev_id};
 
   auto device = runtime::DeviceAPI::Get(ctx);
   auto dtype = DGLDataTypeTraits<DType>::dtype;
@@ -680,7 +680,7 @@ void NCCLCommunicator::AllToAll(
   #else
   int dev_id;
   CUDA_CALL(cudaGetDevice(&dev_id));
-  DGLContext ctx{kDLCUDA, dev_id};
+  DGLContext ctx{kDGLCUDA, dev_id};
 
   auto device = runtime::DeviceAPI::Get(ctx);
   auto dtype = DGLDataTypeTraits<IdType>::dtype;

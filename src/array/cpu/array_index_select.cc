@@ -28,14 +28,14 @@ NDArray IndexSelect(NDArray array, IdArray index) {
   return ret;
 }
 
-template NDArray IndexSelect<kDLCPU, int32_t, int32_t>(NDArray, IdArray);
-template NDArray IndexSelect<kDLCPU, int32_t, int64_t>(NDArray, IdArray);
-template NDArray IndexSelect<kDLCPU, int64_t, int32_t>(NDArray, IdArray);
-template NDArray IndexSelect<kDLCPU, int64_t, int64_t>(NDArray, IdArray);
-template NDArray IndexSelect<kDLCPU, float, int32_t>(NDArray, IdArray);
-template NDArray IndexSelect<kDLCPU, float, int64_t>(NDArray, IdArray);
-template NDArray IndexSelect<kDLCPU, double, int32_t>(NDArray, IdArray);
-template NDArray IndexSelect<kDLCPU, double, int64_t>(NDArray, IdArray);
+template NDArray IndexSelect<kDGLCPU, int32_t, int32_t>(NDArray, IdArray);
+template NDArray IndexSelect<kDGLCPU, int32_t, int64_t>(NDArray, IdArray);
+template NDArray IndexSelect<kDGLCPU, int64_t, int32_t>(NDArray, IdArray);
+template NDArray IndexSelect<kDGLCPU, int64_t, int64_t>(NDArray, IdArray);
+template NDArray IndexSelect<kDGLCPU, float, int32_t>(NDArray, IdArray);
+template NDArray IndexSelect<kDGLCPU, float, int64_t>(NDArray, IdArray);
+template NDArray IndexSelect<kDGLCPU, double, int32_t>(NDArray, IdArray);
+template NDArray IndexSelect<kDGLCPU, double, int64_t>(NDArray, IdArray);
 
 template <DGLDeviceType XPU, typename DType>
 DType IndexSelect(NDArray array, int64_t index) {
@@ -43,10 +43,10 @@ DType IndexSelect(NDArray array, int64_t index) {
   return data[index];
 }
 
-template int32_t IndexSelect<kDLCPU, int32_t>(NDArray array, int64_t index);
-template int64_t IndexSelect<kDLCPU, int64_t>(NDArray array, int64_t index);
-template float IndexSelect<kDLCPU, float>(NDArray array, int64_t index);
-template double IndexSelect<kDLCPU, double>(NDArray array, int64_t index);
+template int32_t IndexSelect<kDGLCPU, int32_t>(NDArray array, int64_t index);
+template int64_t IndexSelect<kDGLCPU, int64_t>(NDArray array, int64_t index);
+template float IndexSelect<kDGLCPU, float>(NDArray array, int64_t index);
+template double IndexSelect<kDGLCPU, double>(NDArray array, int64_t index);
 
 }  // namespace impl
 }  // namespace aten

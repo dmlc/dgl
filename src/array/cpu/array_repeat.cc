@@ -34,14 +34,14 @@ NDArray Repeat(NDArray array, IdArray repeats) {
   return result;
 }
 
-template NDArray Repeat<kDLCPU, int32_t, int32_t>(NDArray, IdArray);
-template NDArray Repeat<kDLCPU, int64_t, int32_t>(NDArray, IdArray);
-template NDArray Repeat<kDLCPU, float, int32_t>(NDArray, IdArray);
-template NDArray Repeat<kDLCPU, double, int32_t>(NDArray, IdArray);
-template NDArray Repeat<kDLCPU, int32_t, int64_t>(NDArray, IdArray);
-template NDArray Repeat<kDLCPU, int64_t, int64_t>(NDArray, IdArray);
-template NDArray Repeat<kDLCPU, float, int64_t>(NDArray, IdArray);
-template NDArray Repeat<kDLCPU, double, int64_t>(NDArray, IdArray);
+template NDArray Repeat<kDGLCPU, int32_t, int32_t>(NDArray, IdArray);
+template NDArray Repeat<kDGLCPU, int64_t, int32_t>(NDArray, IdArray);
+template NDArray Repeat<kDGLCPU, float, int32_t>(NDArray, IdArray);
+template NDArray Repeat<kDGLCPU, double, int32_t>(NDArray, IdArray);
+template NDArray Repeat<kDGLCPU, int32_t, int64_t>(NDArray, IdArray);
+template NDArray Repeat<kDGLCPU, int64_t, int64_t>(NDArray, IdArray);
+template NDArray Repeat<kDGLCPU, float, int64_t>(NDArray, IdArray);
+template NDArray Repeat<kDGLCPU, double, int64_t>(NDArray, IdArray);
 
 };  // namespace impl
 };  // namespace aten

@@ -1,5 +1,5 @@
 /*!
- *  Copyright (c) 2018 by Contributors
+ *  Copyright (c) 2018-2022 by Contributors
  * \file graph/network.cc
  * \brief DGL networking related APIs
  */
@@ -29,41 +29,13 @@ const bool AUTO_FREE = true;
 namespace dgl {
 namespace network {
 
-static void NaiveDeleter(DLManagedTensor* managed_tensor) {
-  delete [] managed_tensor->dl_tensor.shape;
-  delete [] managed_tensor->dl_tensor.strides;
-  free(managed_tensor->dl_tensor.data);
-  delete managed_tensor;
-}
 
 NDArray CreateNDArrayFromRaw(std::vector<int64_t> shape,
                              DGLDataType dtype,
                              DGLContext ctx,
                              void* raw,
                              bool auto_free) {
-  DLTensor tensor;
-  tensor.device = ctx;
-  tensor.ndim = static_cast<int>(shape.size());
-  tensor.dtype = dtype;
-  tensor.shape = new int64_t[tensor.ndim];
-  for (int i = 0; i < tensor.ndim; ++i) {
-    tensor.shape[i] = shape[i];
-  }
-  tensor.strides = new int64_t[tensor.ndim];
-  for (int i = 0; i < tensor.ndim; ++i) {
-    tensor.strides[i] = 1;
-  }
-  for (int i = tensor.ndim - 2; i >= 0; --i) {
-    tensor.strides[i] = tensor.shape[i+1] * tensor.strides[i+1];
-  }
-  tensor.data = raw;
-  DLManagedTensor *managed_tensor = new DLManagedTensor();
-  managed_tensor->dl_tensor = tensor;
-  if (auto_free) {
-    managed_tensor->deleter = NaiveDeleter;
-  }
-  // TODO(?): Bypass FromDLPack
-  return NDArray::FromDLPack(managed_tensor);
+  return NDArray::CreateFromRaw(shape, dtype, ctx, raw, auto_free);
 }
 
 void ArrayMeta::AddArray(const NDArray& array) {
@@ -406,8 +378,8 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
       CHECK_EQ(meta.data_shape_[0], 1);
       nf->node_mapping = CreateNDArrayFromRaw(
         {meta.data_shape_[1]},
-        DGLDataType{kDLInt, 64, 1},
-        DGLContext{kDLCPU, 0},
+        DGLDataType{kDGLInt, 64, 1},
+        DGLContext{kDGLCPU, 0},
         array_0.data,
         AUTO_FREE);
       // edge_mapping
@@ -416,8 +388,8 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
       CHECK_EQ(meta.data_shape_[2], 1);
       nf->edge_mapping = CreateNDArrayFromRaw(
         {meta.data_shape_[3]},
-        DGLDataType{kDLInt, 64, 1},
-        DGLContext{kDLCPU, 0},
+        DGLDataType{kDGLInt, 64, 1},
+        DGLContext{kDGLCPU, 0},
         array_1.data,
         AUTO_FREE);
       // layer_offset
@@ -426,8 +398,8 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
       CHECK_EQ(meta.data_shape_[4], 1);
       nf->layer_offsets = CreateNDArrayFromRaw(
         {meta.data_shape_[5]},
-        DGLDataType{kDLInt, 64, 1},
-        DGLContext{kDLCPU, 0},
+        DGLDataType{kDGLInt, 64, 1},
+        DGLContext{kDGLCPU, 0},
         array_2.data,
         AUTO_FREE);
       // flow_offset
@@ -436,8 +408,8 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
       CHECK_EQ(meta.data_shape_[6], 1);
       nf->flow_offsets = CreateNDArrayFromRaw(
         {meta.data_shape_[7]},
-        DGLDataType{kDLInt, 64, 1},
-        DGLContext{kDLCPU, 0},
+        DGLDataType{kDGLInt, 64, 1},
+        DGLContext{kDGLCPU, 0},
         array_3.data,
         AUTO_FREE);
       // CSR indptr
@@ -446,8 +418,8 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
       CHECK_EQ(meta.data_shape_[8], 1);
       NDArray indptr = CreateNDArrayFromRaw(
         {meta.data_shape_[9]},
-        DGLDataType{kDLInt, 64, 1},
-        DGLContext{kDLCPU, 0},
+        DGLDataType{kDGLInt, 64, 1},
+        DGLContext{kDGLCPU, 0},
         array_4.data,
         AUTO_FREE);
       // CSR indice
@@ -456,8 +428,8 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
       CHECK_EQ(meta.data_shape_[10], 1);
       NDArray indice = CreateNDArrayFromRaw(
         {meta.data_shape_[11]},
-        DGLDataType{kDLInt, 64, 1},
-        DGLContext{kDLCPU, 0},
+        DGLDataType{kDGLInt, 64, 1},
+        DGLContext{kDGLCPU, 0},
         array_5.data,
         AUTO_FREE);
       // CSR edge_ids
@@ -466,8 +438,8 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
       CHECK_EQ(meta.data_shape_[12], 1);
       NDArray edge_ids = CreateNDArrayFromRaw(
         {meta.data_shape_[13]},
-        DGLDataType{kDLInt, 64, 1},
-        DGLContext{kDLCPU, 0},
+        DGLDataType{kDGLInt, 64, 1},
+        DGLContext{kDGLCPU, 0},
         array_6.data,
         AUTO_FREE);
       // Create CSR
@@ -599,7 +571,7 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
     kv_msg->id = CreateNDArrayFromRaw(
       {meta.data_shape_[1]},
       meta.data_type_[0],
-      DGLContext{kDLCPU, 0},
+      DGLContext{kDGLCPU, 0},
       recv_id_msg.data,
       AUTO_FREE);
   }
@@ -618,7 +590,7 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
     kv_msg->data = CreateNDArrayFromRaw(
       vec_shape,
       meta.data_type_[1],
-      DGLContext{kDLCPU, 0},
+      DGLContext{kDGLCPU, 0},
       recv_data_msg.data,
       AUTO_FREE);
   }
@@ -637,7 +609,7 @@ static KVStoreMsg* recv_kv_message(network::Receiver* receiver) {
     kv_msg->shape = CreateNDArrayFromRaw(
       vec_shape,
       meta.data_type_[0],
-      DGLContext{kDLCPU, 0},
+      DGLContext{kDGLCPU, 0},
       recv_shape_msg.data,
       AUTO_FREE);
   }
@@ -815,7 +787,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
         kv_msg.name = name;
         kv_msg.id = CreateNDArrayFromRaw({static_cast<int64_t>(remote_ids[i].size())},
                                          ID->dtype,
-                                         DGLContext{kDLCPU, 0},
+                                         DGLContext{kDGLCPU, 0},
                                          remote_ids[i].data(),
                                          !AUTO_FREE);
         int lower = i*group_count;
@@ -860,7 +832,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_FastPull")
     NDArray res_tensor = CreateNDArrayFromRaw(
                           local_data_shape,
                           local_data->dtype,
-                          DGLContext{kDLCPU, 0},
+                          DGLContext{kDGLCPU, 0},
                           return_data,
                           AUTO_FREE);
     *rv = res_tensor;

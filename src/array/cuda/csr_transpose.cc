@@ -20,7 +20,7 @@ CSRMatrix CSRTranspose(CSRMatrix csr) {
 }
 
 template <>
-CSRMatrix CSRTranspose<kDLCUDA, int32_t>(CSRMatrix csr) {
+CSRMatrix CSRTranspose<kDGLCUDA, int32_t>(CSRMatrix csr) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   // allocate cusparse handle if needed
   if (!thr_entry->cusparse_handle) {
@@ -89,12 +89,12 @@ CSRMatrix CSRTranspose<kDLCUDA, int32_t>(CSRMatrix csr) {
 }
 
 template <>
-CSRMatrix CSRTranspose<kDLCUDA, int64_t>(CSRMatrix csr) {
+CSRMatrix CSRTranspose<kDGLCUDA, int64_t>(CSRMatrix csr) {
   return COOToCSR(COOTranspose(CSRToCOO(csr, false)));
 }
 
-template CSRMatrix CSRTranspose<kDLCUDA, int32_t>(CSRMatrix csr);
-template CSRMatrix CSRTranspose<kDLCUDA, int64_t>(CSRMatrix csr);
+template CSRMatrix CSRTranspose<kDGLCUDA, int32_t>(CSRMatrix csr);
+template CSRMatrix CSRTranspose<kDGLCUDA, int64_t>(CSRMatrix csr);
 
 }  // namespace impl
 }  // namespace aten

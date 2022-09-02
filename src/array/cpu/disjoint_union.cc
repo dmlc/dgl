@@ -118,8 +118,8 @@ COOMatrix DisjointUnionCoo(const std::vector<COOMatrix>& coos) {
     col_sorted);
 }
 
-template COOMatrix DisjointUnionCoo<kDLCPU, int32_t>(const std::vector<COOMatrix>& coos);
-template COOMatrix DisjointUnionCoo<kDLCPU, int64_t>(const std::vector<COOMatrix>& coos);
+template COOMatrix DisjointUnionCoo<kDGLCPU, int32_t>(const std::vector<COOMatrix>& coos);
+template COOMatrix DisjointUnionCoo<kDGLCPU, int64_t>(const std::vector<COOMatrix>& coos);
 
 }  // namespace impl
 }  // namespace aten

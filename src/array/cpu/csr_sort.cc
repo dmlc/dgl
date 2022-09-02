@@ -31,8 +31,8 @@ bool CSRIsSorted(CSRMatrix csr) {
     [](bool a, bool b) { return a && b; });
 }
 
-template bool CSRIsSorted<kDLCPU, int64_t>(CSRMatrix csr);
-template bool CSRIsSorted<kDLCPU, int32_t>(CSRMatrix csr);
+template bool CSRIsSorted<kDGLCPU, int64_t>(CSRMatrix csr);
+template bool CSRIsSorted<kDGLCPU, int32_t>(CSRMatrix csr);
 
 ///////////////////////////// CSRSort /////////////////////////////
 
@@ -79,8 +79,8 @@ void CSRSort_(CSRMatrix* csr) {
   csr->sorted = true;
 }
 
-template void CSRSort_<kDLCPU, int64_t>(CSRMatrix* csr);
-template void CSRSort_<kDLCPU, int32_t>(CSRMatrix* csr);
+template void CSRSort_<kDGLCPU, int64_t>(CSRMatrix* csr);
+template void CSRSort_<kDGLCPU, int32_t>(CSRMatrix* csr);
 
 template <DGLDeviceType XPU, typename IdType, typename TagType>
 std::pair<CSRMatrix, NDArray> CSRSortByTag(
@@ -143,13 +143,13 @@ std::pair<CSRMatrix, NDArray> CSRSortByTag(
   return std::make_pair(output, tag_pos);
 }
 
-template std::pair<CSRMatrix, NDArray> CSRSortByTag<kDLCPU, int64_t, int64_t>(
+template std::pair<CSRMatrix, NDArray> CSRSortByTag<kDGLCPU, int64_t, int64_t>(
     const CSRMatrix &csr, const IdArray tag, int64_t num_tags);
-template std::pair<CSRMatrix, NDArray> CSRSortByTag<kDLCPU, int64_t, int32_t>(
+template std::pair<CSRMatrix, NDArray> CSRSortByTag<kDGLCPU, int64_t, int32_t>(
     const CSRMatrix &csr, const IdArray tag, int64_t num_tags);
-template std::pair<CSRMatrix, NDArray> CSRSortByTag<kDLCPU, int32_t, int64_t>(
+template std::pair<CSRMatrix, NDArray> CSRSortByTag<kDGLCPU, int32_t, int64_t>(
     const CSRMatrix &csr, const IdArray tag, int64_t num_tags);
-template std::pair<CSRMatrix, NDArray> CSRSortByTag<kDLCPU, int32_t, int32_t>(
+template std::pair<CSRMatrix, NDArray> CSRSortByTag<kDGLCPU, int32_t, int32_t>(
     const CSRMatrix &csr, const IdArray tag, int64_t num_tags);
 
 }  // namespace impl

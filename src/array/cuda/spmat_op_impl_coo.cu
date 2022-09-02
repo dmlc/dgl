@@ -84,12 +84,12 @@ int64_t COOGetRowNNZ(COOMatrix coo, int64_t row) {
       nb, nt, 0, thr_entry->stream,
       coo.row.Ptr<IdType>(), rst.Ptr<IdType>(),
       row, nnz);
-  rst = rst.CopyTo(DGLContext{kDLCPU, 0});
+  rst = rst.CopyTo(DGLContext{kDGLCPU, 0});
   return *rst.Ptr<IdType>();
 }
 
-template int64_t COOGetRowNNZ<kDLCUDA, int32_t>(COOMatrix, int64_t);
-template int64_t COOGetRowNNZ<kDLCUDA, int64_t>(COOMatrix, int64_t);
+template int64_t COOGetRowNNZ<kDGLCUDA, int32_t>(COOMatrix, int64_t);
+template int64_t COOGetRowNNZ<kDGLCUDA, int64_t>(COOMatrix, int64_t);
 
 template <typename IdType>
 __global__ void _COOGetAllRowNNZKernel(
@@ -112,7 +112,7 @@ NDArray COOGetRowNNZ(COOMatrix coo, NDArray rows) {
   IdType num_rows = coo.num_rows;
   IdType num_queries = rows->shape[0];
   if (num_queries == 1) {
-    auto rows_cpu = rows.CopyTo(DGLContext{kDLCPU, 0});
+    auto rows_cpu = rows.CopyTo(DGLContext{kDGLCPU, 0});
     int64_t row = *rows_cpu.Ptr<IdType>();
     IdType nt = 1024;
     IdType nb = dgl::cuda::FindNumBlocks<'x'>((nnz + nt - 1) / nt);
@@ -136,8 +136,8 @@ NDArray COOGetRowNNZ(COOMatrix coo, NDArray rows) {
   }
 }
 
-template NDArray COOGetRowNNZ<kDLCUDA, int32_t>(COOMatrix, NDArray);
-template NDArray COOGetRowNNZ<kDLCUDA, int64_t>(COOMatrix, NDArray);
+template NDArray COOGetRowNNZ<kDGLCUDA, int32_t>(COOMatrix, NDArray);
+template NDArray COOGetRowNNZ<kDGLCUDA, int64_t>(COOMatrix, NDArray);
 
 }  // namespace impl
 }  // namespace aten

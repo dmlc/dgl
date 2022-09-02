@@ -86,7 +86,7 @@ class CPUDeviceAPI final : public DeviceAPI {
 
 struct CPUWorkspacePool : public WorkspacePool {
   CPUWorkspacePool() :
-      WorkspacePool(kDLCPU, CPUDeviceAPI::Global()) {}
+      WorkspacePool(kDGLCPU, CPUDeviceAPI::Global()) {}
 };
 
 void* CPUDeviceAPI::AllocWorkspace(DGLContext ctx,

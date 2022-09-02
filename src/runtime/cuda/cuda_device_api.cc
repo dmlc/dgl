@@ -141,7 +141,7 @@ class CUDADeviceAPI final : public DeviceAPI {
     cudaStream_t cu_stream = static_cast<cudaStream_t>(stream);
     from = static_cast<const char*>(from) + from_offset;
     to = static_cast<char*>(to) + to_offset;
-    if (ctx_from.device_type == kDLCUDA && ctx_to.device_type == kDLCUDA) {
+    if (ctx_from.device_type == kDGLCUDA && ctx_to.device_type == kDGLCUDA) {
       CUDA_CALL(cudaSetDevice(ctx_from.device_id));
       if (ctx_from.device_id == ctx_to.device_id) {
         GPUCopy(from, to, size, cudaMemcpyDeviceToDevice, cu_stream);
@@ -150,10 +150,10 @@ class CUDADeviceAPI final : public DeviceAPI {
                                       from, ctx_from.device_id,
                                       size, cu_stream));
       }
-    } else if (ctx_from.device_type == kDLCUDA && ctx_to.device_type == kDLCPU) {
+    } else if (ctx_from.device_type == kDGLCUDA && ctx_to.device_type == kDGLCPU) {
       CUDA_CALL(cudaSetDevice(ctx_from.device_id));
       GPUCopy(from, to, size, cudaMemcpyDeviceToHost, cu_stream);
-    } else if (ctx_from.device_type == kDLCPU && ctx_to.device_type == kDLCUDA) {
+    } else if (ctx_from.device_type == kDGLCPU && ctx_to.device_type == kDGLCUDA) {
       CUDA_CALL(cudaSetDevice(ctx_to.device_id));
       GPUCopy(from, to, size, cudaMemcpyHostToDevice, cu_stream);
     } else {
@@ -298,7 +298,7 @@ class CUDADeviceAPI final : public DeviceAPI {
 typedef dmlc::ThreadLocalStore<CUDAThreadEntry> CUDAThreadStore;
 
 CUDAThreadEntry::CUDAThreadEntry()
-    : pool(kDLCUDA, CUDADeviceAPI::Global()) {
+    : pool(kDGLCUDA, CUDADeviceAPI::Global()) {
 }
 
 CUDAThreadEntry* CUDAThreadEntry::ThreadLocal() {

@@ -20,8 +20,8 @@ IdArray NonZero(IdArray array) {
   return NDArray::FromVector(ret, array->ctx);
 }
 
-template IdArray NonZero<kDLCPU, int32_t>(IdArray);
-template IdArray NonZero<kDLCPU, int64_t>(IdArray);
+template IdArray NonZero<kDGLCPU, int32_t>(IdArray);
+template IdArray NonZero<kDGLCPU, int64_t>(IdArray);
 
 }  // namespace impl
 }  // namespace aten

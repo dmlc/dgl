@@ -37,20 +37,20 @@ void Scatter_(IdArray index, NDArray value, NDArray out) {
       idx, val, len, outd);
 }
 
-template void Scatter_<kDLCUDA, int32_t, int32_t>(IdArray, NDArray, NDArray);
-template void Scatter_<kDLCUDA, int64_t, int32_t>(IdArray, NDArray, NDArray);
+template void Scatter_<kDGLCUDA, int32_t, int32_t>(IdArray, NDArray, NDArray);
+template void Scatter_<kDGLCUDA, int64_t, int32_t>(IdArray, NDArray, NDArray);
 #ifdef USE_FP16
-template void Scatter_<kDLCUDA, __half, int32_t>(IdArray, NDArray, NDArray);
+template void Scatter_<kDGLCUDA, __half, int32_t>(IdArray, NDArray, NDArray);
 #endif
-template void Scatter_<kDLCUDA, float, int32_t>(IdArray, NDArray, NDArray);
-template void Scatter_<kDLCUDA, double, int32_t>(IdArray, NDArray, NDArray);
-template void Scatter_<kDLCUDA, int32_t, int64_t>(IdArray, NDArray, NDArray);
-template void Scatter_<kDLCUDA, int64_t, int64_t>(IdArray, NDArray, NDArray);
+template void Scatter_<kDGLCUDA, float, int32_t>(IdArray, NDArray, NDArray);
+template void Scatter_<kDGLCUDA, double, int32_t>(IdArray, NDArray, NDArray);
+template void Scatter_<kDGLCUDA, int32_t, int64_t>(IdArray, NDArray, NDArray);
+template void Scatter_<kDGLCUDA, int64_t, int64_t>(IdArray, NDArray, NDArray);
 #ifdef USE_FP16
-template void Scatter_<kDLCUDA, __half, int64_t>(IdArray, NDArray, NDArray);
+template void Scatter_<kDGLCUDA, __half, int64_t>(IdArray, NDArray, NDArray);
 #endif
-template void Scatter_<kDLCUDA, float, int64_t>(IdArray, NDArray, NDArray);
-template void Scatter_<kDLCUDA, double, int64_t>(IdArray, NDArray, NDArray);
+template void Scatter_<kDGLCUDA, float, int64_t>(IdArray, NDArray, NDArray);
+template void Scatter_<kDGLCUDA, double, int64_t>(IdArray, NDArray, NDArray);
 
 };  // namespace impl
 };  // namespace aten

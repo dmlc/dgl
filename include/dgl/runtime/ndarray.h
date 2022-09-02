@@ -1,5 +1,5 @@
 /*!
- *  Copyright (c) 2017 by Contributors
+ *  Copyright (c) 2017-2022 by Contributors
  * \file dgl/runtime/ndarray.h
  * \brief Abstract device memory management API
  */
@@ -14,7 +14,6 @@
 #include <memory>
 
 #include "c_runtime_api.h"
-#include "dlpack/dlpack.h"
 #include "serializer.h"
 #include "shared_mem.h"
 
@@ -42,24 +41,29 @@ struct DGLDataTypeTraits {
   struct DGLDataTypeTraits<T> { \
     static constexpr DGLDataType dtype{code, bits, 1}; \
   }
-GEN_DGLDATATYPETRAITS_FOR(int8_t, kDLInt, 8);
-GEN_DGLDATATYPETRAITS_FOR(int16_t, kDLInt, 16);
-GEN_DGLDATATYPETRAITS_FOR(int32_t, kDLInt, 32);
-GEN_DGLDATATYPETRAITS_FOR(int64_t, kDLInt, 64);
+GEN_DGLDATATYPETRAITS_FOR(int8_t, kDGLInt, 8);
+GEN_DGLDATATYPETRAITS_FOR(int16_t, kDGLInt, 16);
+GEN_DGLDATATYPETRAITS_FOR(int32_t, kDGLInt, 32);
+GEN_DGLDATATYPETRAITS_FOR(int64_t, kDGLInt, 64);
 // XXX(BarclayII) most DL frameworks do not support unsigned int and long arrays, so I'm just
 // converting uints to signed DTypes.
-GEN_DGLDATATYPETRAITS_FOR(uint32_t, kDLInt, 32);
-GEN_DGLDATATYPETRAITS_FOR(uint64_t, kDLInt, 64);
+GEN_DGLDATATYPETRAITS_FOR(uint32_t, kDGLInt, 32);
+GEN_DGLDATATYPETRAITS_FOR(uint64_t, kDGLInt, 64);
 #ifdef DGL_USE_CUDA
 #ifdef USE_FP16
-GEN_DGLDATATYPETRAITS_FOR(__half, kDLFloat, 16);
+GEN_DGLDATATYPETRAITS_FOR(__half, kDGLFloat, 16);
 #endif
 #endif
-GEN_DGLDATATYPETRAITS_FOR(float, kDLFloat, 32);
-GEN_DGLDATATYPETRAITS_FOR(double, kDLFloat, 64);
+GEN_DGLDATATYPETRAITS_FOR(float, kDGLFloat, 32);
+GEN_DGLDATATYPETRAITS_FOR(double, kDGLFloat, 64);
 #undef GEN_DGLDATATYPETRAITS_FOR
 
 namespace runtime {
+
+/*!
+ * \brief DLPack converter.
+ */
+struct DLConverter;
 
 /*!
  * \brief Managed NDArray.
@@ -184,9 +188,9 @@ class NDArray {
    * \brief In-place method to pin the current array by calling PinContainer
    *        on the underlying NDArray:Container.
    * \note This is an in-place method. Behavior depends on the current context,
-   *       kDLCPU: will be pinned;
+   *       kDGLCPU: will be pinned;
    *       IsPinned: directly return;
-   *       kDLCUDA: invalid, will throw an error.
+   *       kDGLCUDA: invalid, will throw an error.
    */
   inline void PinMemory_();
   /*!
@@ -222,12 +226,6 @@ class NDArray {
   DGL_DLL NDArray CreateView(
       std::vector<int64_t> shape, DGLDataType dtype, int64_t offset = 0);
   /*!
-   * \brief Create a reference view of NDArray that
-   *  represents as DLManagedTensor.
-   * \return A DLManagedTensor
-   */
-  DGL_DLL DLManagedTensor* ToDLPack() const;
-  /*!
    * \brief Create an empty NDArray.
    * \param shape The shape of the new array.
    * \param dtype The data type of the new array.
@@ -262,25 +260,19 @@ class NDArray {
   int64_t NumElements() const;
 
   /*!
-   * \brief Create a NDArray backed by a dlpack tensor.
-   *
-   * This allows us to create a NDArray using the memory
-   * allocated by an external deep learning framework
-   * that is DLPack compatible.
-   *
-   * The memory is retained until the NDArray went out of scope.
-   * \param tensor The DLPack tensor to copy from.
-   * \return The created NDArray view.
-   */
-  DGL_DLL static NDArray FromDLPack(DLManagedTensor* tensor);
-
-  /*!
    * \brief Create a NDArray by copying from std::vector.
    * \tparam T Type of vector data.  Determines the dtype of returned array.
    */
   template<typename T>
   DGL_DLL static NDArray FromVector(
-      const std::vector<T>& vec, DGLContext ctx = DGLContext{kDLCPU, 0});
+      const std::vector<T>& vec, DGLContext ctx = DGLContext{kDGLCPU, 0});
+
+  /*!
+   * \brief Create a NDArray from a raw pointer.
+   * \tparam T Type of vector data.  Determines the dtype of returned array.
+   */
+  DGL_DLL static NDArray CreateFromRaw(const std::vector<int64_t>& shape,
+      DGLDataType dtype, DGLContext ctx, void* raw, bool auto_free);
 
   /*!
    * \brief Create a std::vector from a 1D NDArray.
@@ -307,9 +299,9 @@ class NDArray {
    * \param ptr The container to be pinned.
    * \note Data of the given array will be pinned inplace.
    *       Behavior depends on the current context,
-   *       kDLCPU: will be pinned;
+   *       kDGLCPU: will be pinned;
    *       IsPinned: directly return;
-   *       kDLCUDA: invalid, will throw an error.
+   *       kDGLCUDA: invalid, will throw an error.
    */
   DGL_DLL static void PinContainer(Container* ptr);
 
@@ -331,12 +323,22 @@ class NDArray {
   DGL_DLL static bool IsContainerPinned(Container* ptr);
 
   // internal namespace
-  struct Internal;
+  struct Internal {
+    // Default deleter for the container
+    static void DefaultDeleter(NDArray::Container* ptr);
+    // Local create function which allocates tensor metadata
+    // but does not allocate space for the data.
+    static NDArray Create(std::vector<int64_t> shape,
+                          DGLDataType dtype, DGLContext ctx);
+    // Implementation of API function
+    static DGLArray* MoveAsDGLArray(NDArray arr);
+  };
  private:
   /*! \brief Internal Data content */
   Container* data_{nullptr};
   // enable internal functions
   friend struct Internal;
+  friend struct DLConverter;
   friend class DGLRetValue;
   friend class DGLArgsSetter;
 };
@@ -410,6 +412,7 @@ struct NDArray::Container {
   }
 
  private:
+  friend struct DLConverter;
   friend class NDArray;
   friend class RPCWrappedFunc;
   /*!
@@ -533,7 +536,7 @@ inline bool SaveDGLArray(dmlc::Stream* strm,
   // We can always do array.CopyTo(target_ctx) to get a corresponding
   // array in the target context.
   DGLContext cpu_ctx;
-  cpu_ctx.device_type = kDLCPU;
+  cpu_ctx.device_type = kDGLCPU;
   cpu_ctx.device_id = 0;
   strm->Write(cpu_ctx);
   strm->Write(tensor->ndim);
@@ -549,7 +552,7 @@ inline bool SaveDGLArray(dmlc::Stream* strm,
   strm->Write(data_byte_size);
 
   if (DMLC_IO_NO_ENDIAN_SWAP &&
-      tensor->ctx.device_type == kDLCPU &&
+      tensor->ctx.device_type == kDGLCPU &&
       tensor->strides == nullptr &&
       tensor->byte_offset == 0) {
     // quick path
@@ -574,9 +577,9 @@ inline bool SaveDGLArray(dmlc::Stream* strm,
  */
 inline const char* TypeCode2Str(int type_code) {
   switch (type_code) {
-    case kDLInt: return "int";
-    case kDLUInt: return "uint";
-    case kDLFloat: return "float";
+    case kDGLInt: return "int";
+    case kDGLUInt: return "uint";
+    case kDGLFloat: return "float";
     case kStr: return "str";
     case kBytes: return "bytes";
     case kHandle: return "handle";
@@ -600,15 +603,9 @@ inline const char* TypeCode2Str(int type_code) {
  */
 inline const char* DeviceTypeCode2Str(DGLDeviceType device_type) {
   switch (device_type) {
-    case kDLCPU: return "cpu";
-    case kDLCUDA: return "cuda";
-    case kDLCUDAHost: return "cuda_host";
-    case kDLOpenCL: return "opencl";
-    case kDLVulkan: return "vulkan";
-    case kDLMetal: return "metal";
-    case kDLVPI: return "vpi";
-    case kDLROCM: return "rocm";
-    default: LOG(FATAL) << "Unknown device type code="
+    case kDGLCPU: return "cpu";
+    case kDGLCUDA: return "cuda";
+    default: LOG(FATAL) << "Unsupported device type code="
                         << static_cast<int>(device_type); return "";
   }
 }
@@ -623,11 +620,11 @@ inline DGLDataType String2DGLDataType(std::string s) {
   t.bits = 32; t.lanes = 1;
   const char* scan;
   if (s.substr(0, 3) == "int") {
-    t.code = kDLInt;  scan = s.c_str() + 3;
+    t.code = kDGLInt;  scan = s.c_str() + 3;
   } else if (s.substr(0, 4) == "uint") {
-    t.code = kDLUInt; scan = s.c_str() + 4;
+    t.code = kDGLUInt; scan = s.c_str() + 4;
   } else if (s.substr(0, 5) == "float") {
-    t.code = kDLFloat; scan = s.c_str() + 5;
+    t.code = kDGLFloat; scan = s.c_str() + 5;
   } else if (s.substr(0, 6) == "handle") {
     t.code = kHandle;
     t.bits = 64;  // handle uses 64 bit by default.

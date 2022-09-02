@@ -42,8 +42,8 @@ bool COOIsNonZero(COOMatrix coo, int64_t row, int64_t col) {
   return false;
 }
 
-template bool COOIsNonZero<kDLCPU, int32_t>(COOMatrix, int64_t, int64_t);
-template bool COOIsNonZero<kDLCPU, int64_t>(COOMatrix, int64_t, int64_t);
+template bool COOIsNonZero<kDGLCPU, int32_t>(COOMatrix, int64_t, int64_t);
+template bool COOIsNonZero<kDGLCPU, int64_t>(COOMatrix, int64_t, int64_t);
 
 template <DGLDeviceType XPU, typename IdType>
 NDArray COOIsNonZero(COOMatrix coo, NDArray row, NDArray col) {
@@ -67,8 +67,8 @@ NDArray COOIsNonZero(COOMatrix coo, NDArray row, NDArray col) {
   return rst;
 }
 
-template NDArray COOIsNonZero<kDLCPU, int32_t>(COOMatrix, NDArray, NDArray);
-template NDArray COOIsNonZero<kDLCPU, int64_t>(COOMatrix, NDArray, NDArray);
+template NDArray COOIsNonZero<kDGLCPU, int32_t>(COOMatrix, NDArray, NDArray);
+template NDArray COOIsNonZero<kDGLCPU, int64_t>(COOMatrix, NDArray, NDArray);
 
 ///////////////////////////// COOHasDuplicate /////////////////////////////
 
@@ -89,8 +89,8 @@ bool COOHasDuplicate(COOMatrix coo) {
   return false;
 }
 
-template bool COOHasDuplicate<kDLCPU, int32_t>(COOMatrix coo);
-template bool COOHasDuplicate<kDLCPU, int64_t>(COOMatrix coo);
+template bool COOHasDuplicate<kDGLCPU, int32_t>(COOMatrix coo);
+template bool COOHasDuplicate<kDGLCPU, int64_t>(COOMatrix coo);
 
 ///////////////////////////// COOGetRowNNZ /////////////////////////////
 
@@ -106,8 +106,8 @@ int64_t COOGetRowNNZ(COOMatrix coo, int64_t row) {
   return result;
 }
 
-template int64_t COOGetRowNNZ<kDLCPU, int32_t>(COOMatrix, int64_t);
-template int64_t COOGetRowNNZ<kDLCPU, int64_t>(COOMatrix, int64_t);
+template int64_t COOGetRowNNZ<kDGLCPU, int32_t>(COOMatrix, int64_t);
+template int64_t COOGetRowNNZ<kDGLCPU, int64_t>(COOMatrix, int64_t);
 
 template <DGLDeviceType XPU, typename IdType>
 NDArray COOGetRowNNZ(COOMatrix coo, NDArray rows) {
@@ -123,8 +123,8 @@ NDArray COOGetRowNNZ(COOMatrix coo, NDArray rows) {
   return rst;
 }
 
-template NDArray COOGetRowNNZ<kDLCPU, int32_t>(COOMatrix, NDArray);
-template NDArray COOGetRowNNZ<kDLCPU, int64_t>(COOMatrix, NDArray);
+template NDArray COOGetRowNNZ<kDGLCPU, int32_t>(COOMatrix, NDArray);
+template NDArray COOGetRowNNZ<kDGLCPU, int64_t>(COOMatrix, NDArray);
 
 ///////////////////////////// COOGetRowDataAndIndices /////////////////////////////
 
@@ -151,9 +151,9 @@ std::pair<NDArray, NDArray> COOGetRowDataAndIndices(
 }
 
 template std::pair<NDArray, NDArray>
-COOGetRowDataAndIndices<kDLCPU, int32_t>(COOMatrix, int64_t);
+COOGetRowDataAndIndices<kDGLCPU, int32_t>(COOMatrix, int64_t);
 template std::pair<NDArray, NDArray>
-COOGetRowDataAndIndices<kDLCPU, int64_t>(COOMatrix, int64_t);
+COOGetRowDataAndIndices<kDGLCPU, int64_t>(COOMatrix, int64_t);
 
 ///////////////////////////// COOGetData /////////////////////////////
 
@@ -211,8 +211,8 @@ IdArray COOGetData(COOMatrix coo, IdArray rows, IdArray cols) {
   return ret;
 }
 
-template IdArray COOGetData<kDLCPU, int32_t>(COOMatrix, IdArray, IdArray);
-template IdArray COOGetData<kDLCPU, int64_t>(COOMatrix, IdArray, IdArray);
+template IdArray COOGetData<kDGLCPU, int32_t>(COOMatrix, IdArray, IdArray);
+template IdArray COOGetData<kDGLCPU, int64_t>(COOMatrix, IdArray, IdArray);
 
 ///////////////////////////// COOGetDataAndIndices /////////////////////////////
 
@@ -286,9 +286,9 @@ std::vector<NDArray> COOGetDataAndIndices(COOMatrix coo, NDArray rows,
           NDArray::FromVector(ret_data)};
 }
 
-template std::vector<NDArray> COOGetDataAndIndices<kDLCPU, int32_t>(
+template std::vector<NDArray> COOGetDataAndIndices<kDGLCPU, int32_t>(
     COOMatrix coo, NDArray rows, NDArray cols);
-template std::vector<NDArray> COOGetDataAndIndices<kDLCPU, int64_t>(
+template std::vector<NDArray> COOGetDataAndIndices<kDGLCPU, int64_t>(
     COOMatrix coo, NDArray rows, NDArray cols);
 
 ///////////////////////////// COOTranspose /////////////////////////////
@@ -298,8 +298,8 @@ COOMatrix COOTranspose(COOMatrix coo) {
   return COOMatrix{coo.num_cols, coo.num_rows, coo.col, coo.row, coo.data};
 }
 
-template COOMatrix COOTranspose<kDLCPU, int32_t>(COOMatrix coo);
-template COOMatrix COOTranspose<kDLCPU, int64_t>(COOMatrix coo);
+template COOMatrix COOTranspose<kDGLCPU, int32_t>(COOMatrix coo);
+template COOMatrix COOTranspose<kDGLCPU, int64_t>(COOMatrix coo);
 
 ///////////////////////////// COOToCSR /////////////////////////////
 namespace {
@@ -632,8 +632,8 @@ CSRMatrix COOToCSR(COOMatrix coo) {
   return SortedCOOToCSR<IdType>(coo);
 }
 
-template CSRMatrix COOToCSR<kDLCPU, int32_t>(COOMatrix coo);
-template CSRMatrix COOToCSR<kDLCPU, int64_t>(COOMatrix coo);
+template CSRMatrix COOToCSR<kDGLCPU, int32_t>(COOMatrix coo);
+template CSRMatrix COOToCSR<kDGLCPU, int64_t>(COOMatrix coo);
 
 ///////////////////////////// COOSliceRows /////////////////////////////
 
@@ -669,8 +669,8 @@ COOMatrix COOSliceRows(COOMatrix coo, int64_t start, int64_t end) {
     coo.col_sorted);
 }
 
-template COOMatrix COOSliceRows<kDLCPU, int32_t>(COOMatrix, int64_t, int64_t);
-template COOMatrix COOSliceRows<kDLCPU, int64_t>(COOMatrix, int64_t, int64_t);
+template COOMatrix COOSliceRows<kDGLCPU, int32_t>(COOMatrix, int64_t, int64_t);
+template COOMatrix COOSliceRows<kDGLCPU, int64_t>(COOMatrix, int64_t, int64_t);
 
 template <DGLDeviceType XPU, typename IdType>
 COOMatrix COOSliceRows(COOMatrix coo, NDArray rows) {
@@ -703,8 +703,8 @@ COOMatrix COOSliceRows(COOMatrix coo, NDArray rows) {
     coo.row_sorted, coo.col_sorted};
 }
 
-template COOMatrix COOSliceRows<kDLCPU, int32_t>(COOMatrix , NDArray);
-template COOMatrix COOSliceRows<kDLCPU, int64_t>(COOMatrix , NDArray);
+template COOMatrix COOSliceRows<kDGLCPU, int32_t>(COOMatrix , NDArray);
+template COOMatrix COOSliceRows<kDGLCPU, int64_t>(COOMatrix , NDArray);
 
 ///////////////////////////// COOSliceMatrix /////////////////////////////
 
@@ -740,9 +740,9 @@ COOMatrix COOSliceMatrix(COOMatrix coo, runtime::NDArray rows, runtime::NDArray 
                    coo.row_sorted, coo.col_sorted);
 }
 
-template COOMatrix COOSliceMatrix<kDLCPU, int32_t>(
+template COOMatrix COOSliceMatrix<kDGLCPU, int32_t>(
     COOMatrix coo, runtime::NDArray rows, runtime::NDArray cols);
-template COOMatrix COOSliceMatrix<kDLCPU, int64_t>(
+template COOMatrix COOSliceMatrix<kDGLCPU, int64_t>(
     COOMatrix coo, runtime::NDArray rows, runtime::NDArray cols);
 
 
@@ -785,9 +785,9 @@ COOMatrix COOReorder(COOMatrix coo, runtime::NDArray new_row_id_arr,
   return COOMatrix(num_rows, num_cols, out_row_arr, out_col_arr, out_data_arr);
 }
 
-template COOMatrix COOReorder<kDLCPU, int64_t>(COOMatrix csr, runtime::NDArray new_row_ids,
+template COOMatrix COOReorder<kDGLCPU, int64_t>(COOMatrix csr, runtime::NDArray new_row_ids,
                                                runtime::NDArray new_col_ids);
-template COOMatrix COOReorder<kDLCPU, int32_t>(COOMatrix csr, runtime::NDArray new_row_ids,
+template COOMatrix COOReorder<kDGLCPU, int32_t>(COOMatrix csr, runtime::NDArray new_row_ids,
                                                runtime::NDArray new_col_ids);
 
 }  // namespace impl

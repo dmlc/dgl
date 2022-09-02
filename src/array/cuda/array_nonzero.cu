@@ -63,8 +63,8 @@ IdArray NonZero(IdArray array) {
   return ret.CreateView({num_nonzeros}, ret->dtype, 0);
 }
 
-template IdArray NonZero<kDLCUDA, int32_t>(IdArray);
-template IdArray NonZero<kDLCUDA, int64_t>(IdArray);
+template IdArray NonZero<kDGLCUDA, int32_t>(IdArray);
+template IdArray NonZero<kDGLCUDA, int64_t>(IdArray);
 
 }  // namespace impl
 }  // namespace aten

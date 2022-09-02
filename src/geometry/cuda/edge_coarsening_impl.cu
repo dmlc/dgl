@@ -182,13 +182,13 @@ void WeightedNeighborMatching(const aten::CSRMatrix &csr, const NDArray weight, 
   }
   device->FreeWorkspace(ctx, prop);
 }
-template void WeightedNeighborMatching<kDLCUDA, float, int32_t>(
+template void WeightedNeighborMatching<kDGLCUDA, float, int32_t>(
   const aten::CSRMatrix &csr, const NDArray weight, IdArray result);
-template void WeightedNeighborMatching<kDLCUDA, float, int64_t>(
+template void WeightedNeighborMatching<kDGLCUDA, float, int64_t>(
   const aten::CSRMatrix &csr, const NDArray weight, IdArray result);
-template void WeightedNeighborMatching<kDLCUDA, double, int32_t>(
+template void WeightedNeighborMatching<kDGLCUDA, double, int32_t>(
   const aten::CSRMatrix &csr, const NDArray weight, IdArray result);
-template void WeightedNeighborMatching<kDLCUDA, double, int64_t>(
+template void WeightedNeighborMatching<kDGLCUDA, double, int64_t>(
   const aten::CSRMatrix &csr, const NDArray weight, IdArray result);
 
 /*! \brief Unweighted neighbor matching procedure (GPU version).
@@ -211,7 +211,7 @@ void NeighborMatching(const aten::CSRMatrix &csr, IdArray result) {
   // generate random weights
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   NDArray weight = NDArray::Empty(
-    {num_edges}, DGLDataType{kDLFloat, sizeof(float) * 8, 1}, ctx);
+    {num_edges}, DGLDataType{kDGLFloat, sizeof(float) * 8, 1}, ctx);
   float *weight_data = static_cast<float*>(weight->data);
   uint64_t seed = dgl::RandomEngine::ThreadLocal()->RandInt(UINT64_MAX);
   auto num_threads = cuda::FindNumThreads(num_edges);
@@ -221,8 +221,8 @@ void NeighborMatching(const aten::CSRMatrix &csr, IdArray result) {
 
   WeightedNeighborMatching<XPU, float, IdType>(csr, weight, result);
 }
-template void NeighborMatching<kDLCUDA, int32_t>(const aten::CSRMatrix &csr, IdArray result);
-template void NeighborMatching<kDLCUDA, int64_t>(const aten::CSRMatrix &csr, IdArray result);
+template void NeighborMatching<kDGLCUDA, int32_t>(const aten::CSRMatrix &csr, IdArray result);
+template void NeighborMatching<kDGLCUDA, int64_t>(const aten::CSRMatrix &csr, IdArray result);
 
 }  // namespace impl
 }  // namespace geometry

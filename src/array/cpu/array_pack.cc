@@ -41,14 +41,14 @@ std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths) {
   return std::make_pair(concat, offsets);
 }
 
-template std::pair<NDArray, IdArray> ConcatSlices<kDLCPU, int32_t, int32_t>(NDArray, IdArray);
-template std::pair<NDArray, IdArray> ConcatSlices<kDLCPU, int64_t, int32_t>(NDArray, IdArray);
-template std::pair<NDArray, IdArray> ConcatSlices<kDLCPU, float, int32_t>(NDArray, IdArray);
-template std::pair<NDArray, IdArray> ConcatSlices<kDLCPU, double, int32_t>(NDArray, IdArray);
-template std::pair<NDArray, IdArray> ConcatSlices<kDLCPU, int32_t, int64_t>(NDArray, IdArray);
-template std::pair<NDArray, IdArray> ConcatSlices<kDLCPU, int64_t, int64_t>(NDArray, IdArray);
-template std::pair<NDArray, IdArray> ConcatSlices<kDLCPU, float, int64_t>(NDArray, IdArray);
-template std::pair<NDArray, IdArray> ConcatSlices<kDLCPU, double, int64_t>(NDArray, IdArray);
+template std::pair<NDArray, IdArray> ConcatSlices<kDGLCPU, int32_t, int32_t>(NDArray, IdArray);
+template std::pair<NDArray, IdArray> ConcatSlices<kDGLCPU, int64_t, int32_t>(NDArray, IdArray);
+template std::pair<NDArray, IdArray> ConcatSlices<kDGLCPU, float, int32_t>(NDArray, IdArray);
+template std::pair<NDArray, IdArray> ConcatSlices<kDGLCPU, double, int32_t>(NDArray, IdArray);
+template std::pair<NDArray, IdArray> ConcatSlices<kDGLCPU, int32_t, int64_t>(NDArray, IdArray);
+template std::pair<NDArray, IdArray> ConcatSlices<kDGLCPU, int64_t, int64_t>(NDArray, IdArray);
+template std::pair<NDArray, IdArray> ConcatSlices<kDGLCPU, float, int64_t>(NDArray, IdArray);
+template std::pair<NDArray, IdArray> ConcatSlices<kDGLCPU, double, int64_t>(NDArray, IdArray);
 
 template<DGLDeviceType XPU, typename DType>
 std::tuple<NDArray, IdArray, IdArray> Pack(NDArray array, DType pad_value) {
@@ -75,10 +75,10 @@ std::tuple<NDArray, IdArray, IdArray> Pack(NDArray array, DType pad_value) {
   return std::make_tuple(ret.first, length, ret.second);
 }
 
-template std::tuple<NDArray, IdArray, IdArray> Pack<kDLCPU, int32_t>(NDArray, int32_t);
-template std::tuple<NDArray, IdArray, IdArray> Pack<kDLCPU, int64_t>(NDArray, int64_t);
-template std::tuple<NDArray, IdArray, IdArray> Pack<kDLCPU, float>(NDArray, float);
-template std::tuple<NDArray, IdArray, IdArray> Pack<kDLCPU, double>(NDArray, double);
+template std::tuple<NDArray, IdArray, IdArray> Pack<kDGLCPU, int32_t>(NDArray, int32_t);
+template std::tuple<NDArray, IdArray, IdArray> Pack<kDGLCPU, int64_t>(NDArray, int64_t);
+template std::tuple<NDArray, IdArray, IdArray> Pack<kDGLCPU, float>(NDArray, float);
+template std::tuple<NDArray, IdArray, IdArray> Pack<kDGLCPU, double>(NDArray, double);
 
 }  // namespace impl
 }  // namespace aten

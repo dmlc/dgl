@@ -98,8 +98,8 @@ COOMatrix COORemove(COOMatrix coo, IdArray entries) {
       IdArray::FromVector(new_eids));
 }
 
-template COOMatrix COORemove<kDLCPU, int32_t>(COOMatrix coo, IdArray entries);
-template COOMatrix COORemove<kDLCPU, int64_t>(COOMatrix coo, IdArray entries);
+template COOMatrix COORemove<kDGLCPU, int32_t>(COOMatrix coo, IdArray entries);
+template COOMatrix COORemove<kDGLCPU, int64_t>(COOMatrix coo, IdArray entries);
 
 };  // namespace impl
 };  // namespace aten

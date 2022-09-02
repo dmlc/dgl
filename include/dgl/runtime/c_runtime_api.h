@@ -1,5 +1,5 @@
 /*!
- *  Copyright (c) 2016 by Contributors
+ *  Copyright (c) 2016-2022 by Contributors
  * \file dgl/runtime/c_runtime_api.h
  * \brief DGL runtime library.
  *
@@ -35,10 +35,6 @@
 // DGL version
 #define DGL_VERSION "0.9"
 
-
-// DGL Runtime is DLPack compatible.
-#include <dlpack/dlpack.h>
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -48,16 +44,20 @@ extern "C" {
 /*! \brief type of array index. */
 typedef int64_t dgl_index_t;
 
-/*! \brief Extension device types in DGL */
+/*!
+ * \brief The device type in DGLContext.
+ */
+#ifdef __cplusplus
+typedef enum : int32_t {
+#else
 typedef enum {
-  kDLAOCL = 5,
-  kDLSDAccel = 6,
-  kOpenGL = 11,
-  // Extension DRAM type, used for quickly test extension device
-  // The device api can differ depending on the xpu driver registered.
-  kExtDev = 12,
-  // AddExtraDGLType which is not in DLPack here
-} DGLDeviceExtType;
+#endif
+  /*! \brief CPU device */
+  kDGLCPU = 1,
+  /*! \brief CUDA GPU device */
+  kDGLCUDA = 2,
+  // add more devices once supported
+} DGLDeviceType;
 
 /*!
  * \brief The argument type code is used and only used in DGL FFI for argument passing.
@@ -90,29 +90,57 @@ typedef enum {
 } DGLArgTypeCode;
 
 /*!
- * \brief The device type in DGLContext.
+ * \brief The type code options DGLDataType.
  */
-// TODO(Xin): After decoupling DLPack, remove this typedef and use our own.
-typedef DLDeviceType DGLDeviceType;
+typedef enum {
+  /*! \brief signed integer */
+  kDGLInt = 0U,
+  /*! \brief unsigned integer */
+  kDGLUInt = 1U,
+  /*! \brief IEEE floating point */
+  kDGLFloat = 2U,
+  /*! \brief bfloat16 */
+  kDGLBfloat = 4U,
+} DGLDataTypeCode;
 
 /*!
- * \brief The data type used in DGL Runtime.
+ * \brief The data type the tensor can hold. The data type is assumed to follow the
+ * native endian-ness. An explicit error message should be raised when attempting to
+ * export an array with non-native endianness
  *
  *  Examples
  *   - float: type_code = 2, bits = 32, lanes=1
  *   - float4(vectorized 4 float): type_code = 2, bits = 32, lanes=4
  *   - int8: type_code = 0, bits = 8, lanes=1
- *
- * \note Arguments DGL API function always takes bits=64 and lanes=1
+ *   - std::complex<float>: type_code = 5, bits = 64, lanes = 1
  */
-// TODO(Xin): After decoupling DLPack, remove this typedef and use our own.
-typedef DLDataType DGLDataType;
+typedef struct {
+  /*!
+   * \brief Type code of base types.
+   * We keep it uint8_t instead of DGLDataTypeCode for minimal memory
+   * footprint, but the value should be one of DGLDataTypeCode enum values.
+   * */
+  uint8_t code;
+  /*!
+   * \brief Number of bits, common choices are 8, 16, 32.
+   */
+  uint8_t bits;
+  /*! \brief Number of lanes in the type, used for vector types. */
+  uint16_t lanes;
+} DGLDataType;
 
 /*!
  * \brief The Device information, abstract away common device types.
  */
-// TODO(Xin): After decoupling DLPack, remove this typedef and use our own.
-typedef DLDevice DGLContext;
+typedef struct {
+  /*! \brief The device type used in the device. */
+  DGLDeviceType device_type;
+  /*!
+   * \brief The device index.
+   * For vanilla CPU memory, pinned memory, or managed memory, this is set to 0.
+   */
+  int32_t device_id;
+} DGLContext;
 
 /*!
  * \brief The tensor array stucture to DGL API.
@@ -507,32 +535,6 @@ DGL_DLL int DGLArrayCopyToBytes(DGLArrayHandle handle,
 DGL_DLL int DGLArrayCopyFromTo(DGLArrayHandle from,
                                DGLArrayHandle to,
                                DGLStreamHandle stream);
-
-/*!
- * \brief Produce an array from the DLManagedTensor that shares data memory
- * with the DLManagedTensor.
- * \param from The source DLManagedTensor.
- * \param out The output array handle.
- * \return 0 when success, -1 when failure happens
- */
-DGL_DLL int DGLArrayFromDLPack(DLManagedTensor* from,
-                               DGLArrayHandle* out);
-
-/*!
- * \brief Produce a DLMangedTensor from the array that shares data memory with
- * the array.
- * \param from The source array.
- * \param out The DLManagedTensor handle.
- * \return 0 when success, -1 when failure happens
- */
-DGL_DLL int DGLArrayToDLPack(DGLArrayHandle from, DLManagedTensor** out,
-                             int alignment = 0);
-
-/*!
- * \brief Delete (free) a DLManagedTensor's data.
- * \param dltensor Pointer to the DLManagedTensor.
- */
-DGL_DLL void DGLDLManagedTensorCallDeleter(DLManagedTensor* dltensor);
 
 /*!
  * \brief Create a new runtime stream.

@@ -44,28 +44,28 @@ IdArray BinaryElewise(IdArray lhs, IdArray rhs) {
   return ret;
 }
 
-template IdArray BinaryElewise<kDLCUDA, int32_t, arith::Add>(IdArray lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int32_t, arith::Sub>(IdArray lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int32_t, arith::Mul>(IdArray lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int32_t, arith::Div>(IdArray lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int32_t, arith::Mod>(IdArray lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int32_t, arith::GT>(IdArray lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int32_t, arith::LT>(IdArray lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int32_t, arith::GE>(IdArray lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int32_t, arith::LE>(IdArray lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int32_t, arith::EQ>(IdArray lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int32_t, arith::NE>(IdArray lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int64_t, arith::Add>(IdArray lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int64_t, arith::Sub>(IdArray lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int64_t, arith::Mul>(IdArray lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int64_t, arith::Div>(IdArray lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int64_t, arith::Mod>(IdArray lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int64_t, arith::GT>(IdArray lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int64_t, arith::LT>(IdArray lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int64_t, arith::GE>(IdArray lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int64_t, arith::LE>(IdArray lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int64_t, arith::EQ>(IdArray lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int64_t, arith::NE>(IdArray lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int32_t, arith::Add>(IdArray lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int32_t, arith::Sub>(IdArray lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int32_t, arith::Mul>(IdArray lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int32_t, arith::Div>(IdArray lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int32_t, arith::Mod>(IdArray lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int32_t, arith::GT>(IdArray lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int32_t, arith::LT>(IdArray lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int32_t, arith::GE>(IdArray lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int32_t, arith::LE>(IdArray lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int32_t, arith::EQ>(IdArray lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int32_t, arith::NE>(IdArray lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int64_t, arith::Add>(IdArray lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int64_t, arith::Sub>(IdArray lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int64_t, arith::Mul>(IdArray lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int64_t, arith::Div>(IdArray lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int64_t, arith::Mod>(IdArray lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int64_t, arith::GT>(IdArray lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int64_t, arith::LT>(IdArray lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int64_t, arith::GE>(IdArray lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int64_t, arith::LE>(IdArray lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int64_t, arith::EQ>(IdArray lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int64_t, arith::NE>(IdArray lhs, IdArray rhs);
 
 
 template <typename IdType, typename Op>
@@ -94,28 +94,28 @@ IdArray BinaryElewise(IdArray lhs, IdType rhs) {
   return ret;
 }
 
-template IdArray BinaryElewise<kDLCUDA, int32_t, arith::Add>(IdArray lhs, int32_t rhs);
-template IdArray BinaryElewise<kDLCUDA, int32_t, arith::Sub>(IdArray lhs, int32_t rhs);
-template IdArray BinaryElewise<kDLCUDA, int32_t, arith::Mul>(IdArray lhs, int32_t rhs);
-template IdArray BinaryElewise<kDLCUDA, int32_t, arith::Div>(IdArray lhs, int32_t rhs);
-template IdArray BinaryElewise<kDLCUDA, int32_t, arith::Mod>(IdArray lhs, int32_t rhs);
-template IdArray BinaryElewise<kDLCUDA, int32_t, arith::GT>(IdArray lhs, int32_t rhs);
-template IdArray BinaryElewise<kDLCUDA, int32_t, arith::LT>(IdArray lhs, int32_t rhs);
-template IdArray BinaryElewise<kDLCUDA, int32_t, arith::GE>(IdArray lhs, int32_t rhs);
-template IdArray BinaryElewise<kDLCUDA, int32_t, arith::LE>(IdArray lhs, int32_t rhs);
-template IdArray BinaryElewise<kDLCUDA, int32_t, arith::EQ>(IdArray lhs, int32_t rhs);
-template IdArray BinaryElewise<kDLCUDA, int32_t, arith::NE>(IdArray lhs, int32_t rhs);
-template IdArray BinaryElewise<kDLCUDA, int64_t, arith::Add>(IdArray lhs, int64_t rhs);
-template IdArray BinaryElewise<kDLCUDA, int64_t, arith::Sub>(IdArray lhs, int64_t rhs);
-template IdArray BinaryElewise<kDLCUDA, int64_t, arith::Mul>(IdArray lhs, int64_t rhs);
-template IdArray BinaryElewise<kDLCUDA, int64_t, arith::Div>(IdArray lhs, int64_t rhs);
-template IdArray BinaryElewise<kDLCUDA, int64_t, arith::Mod>(IdArray lhs, int64_t rhs);
-template IdArray BinaryElewise<kDLCUDA, int64_t, arith::GT>(IdArray lhs, int64_t rhs);
-template IdArray BinaryElewise<kDLCUDA, int64_t, arith::LT>(IdArray lhs, int64_t rhs);
-template IdArray BinaryElewise<kDLCUDA, int64_t, arith::GE>(IdArray lhs, int64_t rhs);
-template IdArray BinaryElewise<kDLCUDA, int64_t, arith::LE>(IdArray lhs, int64_t rhs);
-template IdArray BinaryElewise<kDLCUDA, int64_t, arith::EQ>(IdArray lhs, int64_t rhs);
-template IdArray BinaryElewise<kDLCUDA, int64_t, arith::NE>(IdArray lhs, int64_t rhs);
+template IdArray BinaryElewise<kDGLCUDA, int32_t, arith::Add>(IdArray lhs, int32_t rhs);
+template IdArray BinaryElewise<kDGLCUDA, int32_t, arith::Sub>(IdArray lhs, int32_t rhs);
+template IdArray BinaryElewise<kDGLCUDA, int32_t, arith::Mul>(IdArray lhs, int32_t rhs);
+template IdArray BinaryElewise<kDGLCUDA, int32_t, arith::Div>(IdArray lhs, int32_t rhs);
+template IdArray BinaryElewise<kDGLCUDA, int32_t, arith::Mod>(IdArray lhs, int32_t rhs);
+template IdArray BinaryElewise<kDGLCUDA, int32_t, arith::GT>(IdArray lhs, int32_t rhs);
+template IdArray BinaryElewise<kDGLCUDA, int32_t, arith::LT>(IdArray lhs, int32_t rhs);
+template IdArray BinaryElewise<kDGLCUDA, int32_t, arith::GE>(IdArray lhs, int32_t rhs);
+template IdArray BinaryElewise<kDGLCUDA, int32_t, arith::LE>(IdArray lhs, int32_t rhs);
+template IdArray BinaryElewise<kDGLCUDA, int32_t, arith::EQ>(IdArray lhs, int32_t rhs);
+template IdArray BinaryElewise<kDGLCUDA, int32_t, arith::NE>(IdArray lhs, int32_t rhs);
+template IdArray BinaryElewise<kDGLCUDA, int64_t, arith::Add>(IdArray lhs, int64_t rhs);
+template IdArray BinaryElewise<kDGLCUDA, int64_t, arith::Sub>(IdArray lhs, int64_t rhs);
+template IdArray BinaryElewise<kDGLCUDA, int64_t, arith::Mul>(IdArray lhs, int64_t rhs);
+template IdArray BinaryElewise<kDGLCUDA, int64_t, arith::Div>(IdArray lhs, int64_t rhs);
+template IdArray BinaryElewise<kDGLCUDA, int64_t, arith::Mod>(IdArray lhs, int64_t rhs);
+template IdArray BinaryElewise<kDGLCUDA, int64_t, arith::GT>(IdArray lhs, int64_t rhs);
+template IdArray BinaryElewise<kDGLCUDA, int64_t, arith::LT>(IdArray lhs, int64_t rhs);
+template IdArray BinaryElewise<kDGLCUDA, int64_t, arith::GE>(IdArray lhs, int64_t rhs);
+template IdArray BinaryElewise<kDGLCUDA, int64_t, arith::LE>(IdArray lhs, int64_t rhs);
+template IdArray BinaryElewise<kDGLCUDA, int64_t, arith::EQ>(IdArray lhs, int64_t rhs);
+template IdArray BinaryElewise<kDGLCUDA, int64_t, arith::NE>(IdArray lhs, int64_t rhs);
 
 
 
@@ -145,28 +145,28 @@ IdArray BinaryElewise(IdType lhs, IdArray rhs) {
   return ret;
 }
 
-template IdArray BinaryElewise<kDLCUDA, int32_t, arith::Add>(int32_t lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int32_t, arith::Sub>(int32_t lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int32_t, arith::Mul>(int32_t lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int32_t, arith::Div>(int32_t lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int32_t, arith::Mod>(int32_t lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int32_t, arith::GT>(int32_t lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int32_t, arith::LT>(int32_t lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int32_t, arith::GE>(int32_t lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int32_t, arith::LE>(int32_t lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int32_t, arith::EQ>(int32_t lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int32_t, arith::NE>(int32_t lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int64_t, arith::Add>(int64_t lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int64_t, arith::Sub>(int64_t lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int64_t, arith::Mul>(int64_t lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int64_t, arith::Div>(int64_t lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int64_t, arith::Mod>(int64_t lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int64_t, arith::GT>(int64_t lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int64_t, arith::LT>(int64_t lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int64_t, arith::GE>(int64_t lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int64_t, arith::LE>(int64_t lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int64_t, arith::EQ>(int64_t lhs, IdArray rhs);
-template IdArray BinaryElewise<kDLCUDA, int64_t, arith::NE>(int64_t lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int32_t, arith::Add>(int32_t lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int32_t, arith::Sub>(int32_t lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int32_t, arith::Mul>(int32_t lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int32_t, arith::Div>(int32_t lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int32_t, arith::Mod>(int32_t lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int32_t, arith::GT>(int32_t lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int32_t, arith::LT>(int32_t lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int32_t, arith::GE>(int32_t lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int32_t, arith::LE>(int32_t lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int32_t, arith::EQ>(int32_t lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int32_t, arith::NE>(int32_t lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int64_t, arith::Add>(int64_t lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int64_t, arith::Sub>(int64_t lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int64_t, arith::Mul>(int64_t lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int64_t, arith::Div>(int64_t lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int64_t, arith::Mod>(int64_t lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int64_t, arith::GT>(int64_t lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int64_t, arith::LT>(int64_t lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int64_t, arith::GE>(int64_t lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int64_t, arith::LE>(int64_t lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int64_t, arith::EQ>(int64_t lhs, IdArray rhs);
+template IdArray BinaryElewise<kDGLCUDA, int64_t, arith::NE>(int64_t lhs, IdArray rhs);
 
 template <typename IdType, typename Op>
 __global__ void _UnaryElewiseKernel(
@@ -194,8 +194,8 @@ IdArray UnaryElewise(IdArray lhs) {
   return ret;
 }
 
-template IdArray UnaryElewise<kDLCUDA, int32_t, arith::Neg>(IdArray lhs);
-template IdArray UnaryElewise<kDLCUDA, int64_t, arith::Neg>(IdArray lhs);
+template IdArray UnaryElewise<kDGLCUDA, int32_t, arith::Neg>(IdArray lhs);
+template IdArray UnaryElewise<kDGLCUDA, int64_t, arith::Neg>(IdArray lhs);
 
 ///////////////////////////// Full /////////////////////////////
 
@@ -222,13 +222,13 @@ NDArray Full(DType val, int64_t length, DGLContext ctx) {
   return ret;
 }
 
-template IdArray Full<kDLCUDA, int32_t>(int32_t val, int64_t length, DGLContext ctx);
-template IdArray Full<kDLCUDA, int64_t>(int64_t val, int64_t length, DGLContext ctx);
+template IdArray Full<kDGLCUDA, int32_t>(int32_t val, int64_t length, DGLContext ctx);
+template IdArray Full<kDGLCUDA, int64_t>(int64_t val, int64_t length, DGLContext ctx);
 #ifdef USE_FP16
-template IdArray Full<kDLCUDA, __half>(__half val, int64_t length, DGLContext ctx);
+template IdArray Full<kDGLCUDA, __half>(__half val, int64_t length, DGLContext ctx);
 #endif
-template IdArray Full<kDLCUDA, float>(float val, int64_t length, DGLContext ctx);
-template IdArray Full<kDLCUDA, double>(double val, int64_t length, DGLContext ctx);
+template IdArray Full<kDGLCUDA, float>(float val, int64_t length, DGLContext ctx);
+template IdArray Full<kDGLCUDA, double>(double val, int64_t length, DGLContext ctx);
 
 
 ///////////////////////////// Range /////////////////////////////
@@ -260,8 +260,8 @@ IdArray Range(IdType low, IdType high, DGLContext ctx) {
   return ret;
 }
 
-template IdArray Range<kDLCUDA, int32_t>(int32_t, int32_t, DGLContext);
-template IdArray Range<kDLCUDA, int64_t>(int64_t, int64_t, DGLContext);
+template IdArray Range<kDGLCUDA, int32_t>(int32_t, int32_t, DGLContext);
+template IdArray Range<kDGLCUDA, int64_t>(int64_t, int64_t, DGLContext);
 
 ///////////////////////////// Relabel_ //////////////////////////////
 
@@ -316,8 +316,8 @@ IdArray Relabel_(const std::vector<IdArray>& arrays) {
     &num_induced, 0,
     sizeof(num_induced),
     ctx,
-    DGLContext{kDLCPU, 0},
-    DGLDataType{kDLInt, 64, 1},
+    DGLContext{kDGLCPU, 0},
+    DGLDataType{kDGLInt, 64, 1},
     thr_entry->stream);
   device->StreamSync(ctx, thr_entry->stream);
   device->FreeWorkspace(ctx, num_induced_device);
@@ -338,8 +338,8 @@ IdArray Relabel_(const std::vector<IdArray>& arrays) {
   return induced_nodes;
 }
 
-template IdArray Relabel_<kDLCUDA, int32_t>(const std::vector<IdArray>& arrays);
-template IdArray Relabel_<kDLCUDA, int64_t>(const std::vector<IdArray>& arrays);
+template IdArray Relabel_<kDGLCUDA, int32_t>(const std::vector<IdArray>& arrays);
+template IdArray Relabel_<kDGLCUDA, int64_t>(const std::vector<IdArray>& arrays);
 
 ///////////////////////////// AsNumBits /////////////////////////////
 
@@ -356,7 +356,7 @@ __global__ void _CastKernel(const InType* in, OutType* out, size_t length) {
 template <DGLDeviceType XPU, typename IdType>
 IdArray AsNumBits(IdArray arr, uint8_t bits) {
   const std::vector<int64_t> shape(arr->shape, arr->shape + arr->ndim);
-  IdArray ret = IdArray::Empty(shape, DGLDataType{kDLInt, bits, 1}, arr->ctx);
+  IdArray ret = IdArray::Empty(shape, DGLDataType{kDGLInt, bits, 1}, arr->ctx);
   const int64_t length = ret.NumElements();
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   int nt = cuda::FindNumThreads(length);
@@ -374,8 +374,8 @@ IdArray AsNumBits(IdArray arr, uint8_t bits) {
 }
 
 
-template IdArray AsNumBits<kDLCUDA, int32_t>(IdArray arr, uint8_t bits);
-template IdArray AsNumBits<kDLCUDA, int64_t>(IdArray arr, uint8_t bits);
+template IdArray AsNumBits<kDGLCUDA, int32_t>(IdArray arr, uint8_t bits);
+template IdArray AsNumBits<kDGLCUDA, int64_t>(IdArray arr, uint8_t bits);
 
 }  // namespace impl
 }  // namespace aten

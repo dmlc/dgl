@@ -196,7 +196,7 @@ inline DType GetCUDAScalar(
       &result, 0,
       sizeof(result),
       ctx,
-      DGLContext{kDLCPU, 0},
+      DGLContext{kDGLCPU, 0},
       DGLDataTypeTraits<DType>::dtype,
       stream);
   return result;

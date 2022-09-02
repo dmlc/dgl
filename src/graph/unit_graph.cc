@@ -408,9 +408,9 @@ class UnitGraph::COO : public BaseHeteroGraph {
       IdArray new_src = aten::IndexSelect(adj_.row, eids[0]);
       IdArray new_dst = aten::IndexSelect(adj_.col, eids[0]);
       subg.induced_vertices.emplace_back(
-          aten::NullArray(DGLDataType{kDLInt, NumBits(), 1}, Context()));
+          aten::NullArray(DGLDataType{kDGLInt, NumBits(), 1}, Context()));
       subg.induced_vertices.emplace_back(
-          aten::NullArray(DGLDataType{kDLInt, NumBits(), 1}, Context()));
+          aten::NullArray(DGLDataType{kDGLInt, NumBits(), 1}, Context()));
       subg.graph = std::make_shared<COO>(
           meta_graph(), NumVertices(SrcType()), NumVertices(DstType()), new_src, new_dst);
       subg.induced_edges = eids;

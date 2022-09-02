@@ -37,14 +37,14 @@ std::pair<IdArray, IdArray> RandomWalkWithRestart(
 }
 
 template
-std::pair<IdArray, IdArray> RandomWalkWithRestart<kDLCPU, int32_t>(
+std::pair<IdArray, IdArray> RandomWalkWithRestart<kDGLCPU, int32_t>(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
     const std::vector<FloatArray> &prob,
     double restart_prob);
 template
-std::pair<IdArray, IdArray> RandomWalkWithRestart<kDLCPU, int64_t>(
+std::pair<IdArray, IdArray> RandomWalkWithRestart<kDGLCPU, int64_t>(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
@@ -73,14 +73,14 @@ std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart(
 }
 
 template
-std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart<kDLCPU, int32_t>(
+std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart<kDGLCPU, int32_t>(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
     const std::vector<FloatArray> &prob,
     FloatArray restart_prob);
 template
-std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart<kDLCPU, int64_t>(
+std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart<kDGLCPU, int64_t>(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,

@@ -107,12 +107,6 @@ cdef extern from "dgl/runtime/c_runtime_api.h":
     int DGLArrayCopyFromTo(DGLArrayHandle src,
                            DGLArrayHandle to,
                            DGLStreamHandle stream)
-    int DGLArrayFromDLPack(DLManagedTensor* arr_from,
-                           DGLArrayHandle* out)
-    int DGLArrayToDLPack(DGLArrayHandle arr_from,
-                         DLManagedTensor** out,
-                         int alignment)
-    void DGLDLManagedTensorCallDeleter(DLManagedTensor* dltensor)
 
 cdef extern from "dgl/runtime/c_object_api.h":
     int DGLObjectFree(ObjectHandle handle)
@@ -125,6 +119,14 @@ cdef extern from "dgl/runtime/c_object_api.h":
                          DGLValue* out_value,
                          int* out_type_code,
                          int* out_success)
+
+cdef extern from "dgl/runtime/dl_converter.h":
+    int DGLArrayFromDLPack(DLManagedTensor* arr_from,
+                           DGLArrayHandle* out)
+    int DGLArrayToDLPack(DGLArrayHandle arr_from,
+                         DLManagedTensor** out,
+                         int alignment)
+    void DGLDLManagedTensorCallDeleter(DLManagedTensor* dltensor)
 
 cdef inline py_str(const char* x):
     if PY_MAJOR_VERSION < 3:

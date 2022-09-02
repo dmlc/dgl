@@ -106,19 +106,19 @@ NDArray CSRGetData(
   return ret;
 }
 
-template NDArray CSRGetData<kDLCPU, int32_t, float>(
+template NDArray CSRGetData<kDGLCPU, int32_t, float>(
     CSRMatrix csr, NDArray rows, NDArray cols, bool return_eids, NDArray weights, float filler);
-template NDArray CSRGetData<kDLCPU, int64_t, float>(
+template NDArray CSRGetData<kDGLCPU, int64_t, float>(
     CSRMatrix csr, NDArray rows, NDArray cols, bool return_eids, NDArray weights, float filler);
-template NDArray CSRGetData<kDLCPU, int32_t, double>(
+template NDArray CSRGetData<kDGLCPU, int32_t, double>(
     CSRMatrix csr, NDArray rows, NDArray cols, bool return_eids, NDArray weights, double filler);
-template NDArray CSRGetData<kDLCPU, int64_t, double>(
+template NDArray CSRGetData<kDGLCPU, int64_t, double>(
     CSRMatrix csr, NDArray rows, NDArray cols, bool return_eids, NDArray weights, double filler);
 
 // For CSRGetData<XPU, IdType>(CSRMatrix, NDArray, NDArray)
-template NDArray CSRGetData<kDLCPU, int32_t, int32_t>(
+template NDArray CSRGetData<kDGLCPU, int32_t, int32_t>(
     CSRMatrix csr, NDArray rows, NDArray cols, bool return_eids, NDArray weights, int32_t filler);
-template NDArray CSRGetData<kDLCPU, int64_t, int64_t>(
+template NDArray CSRGetData<kDGLCPU, int64_t, int64_t>(
     CSRMatrix csr, NDArray rows, NDArray cols, bool return_eids, NDArray weights, int64_t filler);
 
 }  // namespace impl

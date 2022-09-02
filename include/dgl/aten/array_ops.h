@@ -24,8 +24,8 @@ namespace aten {
 //////////////////////////////////////////////////////////////////////
 
 /*! \return A special array to represent null. */
-inline NDArray NullArray(const DGLDataType& dtype = DGLDataType{kDLInt, 64, 1},
-                         const DGLContext& ctx = DGLContext{kDLCPU, 0}) {
+inline NDArray NullArray(const DGLDataType& dtype = DGLDataType{kDGLInt, 64, 1},
+                         const DGLContext& ctx = DGLContext{kDGLCPU, 0}) {
   return NDArray::Empty({0}, dtype, ctx);
 }
 
@@ -44,7 +44,7 @@ inline bool IsNullArray(NDArray array) {
  * \return id array
  */
 IdArray NewIdArray(int64_t length,
-                   DGLContext ctx = DGLContext{kDLCPU, 0},
+                   DGLContext ctx = DGLContext{kDGLCPU, 0},
                    uint8_t nbits = 64);
 
 /*!
@@ -57,7 +57,7 @@ IdArray NewIdArray(int64_t length,
 template <typename T>
 IdArray VecToIdArray(const std::vector<T>& vec,
                      uint8_t nbits = 64,
-                     DGLContext ctx = DGLContext{kDLCPU, 0});
+                     DGLContext ctx = DGLContext{kDGLCPU, 0});
 
 /*!
  * \brief Return an array representing a 1D range.
@@ -226,7 +226,7 @@ NDArray Concat(const std::vector<IdArray>& arrays);
 
 /*!\brief Return whether the array is a valid 1D int array*/
 inline bool IsValidIdArray(const dgl::runtime::NDArray& arr) {
-  return arr->ndim == 1 && arr->dtype.code == kDLInt;
+  return arr->ndim == 1 && arr->dtype.code == kDGLInt;
 }
 
 /*!
@@ -344,7 +344,7 @@ template <typename T>
 IdArray VecToIdArray(const std::vector<T>& vec,
                      uint8_t nbits,
                      DGLContext ctx) {
-  IdArray ret = NewIdArray(vec.size(), DGLContext{kDLCPU, 0}, nbits);
+  IdArray ret = NewIdArray(vec.size(), DGLContext{kDGLCPU, 0}, nbits);
   if (nbits == 32) {
     std::copy(vec.begin(), vec.end(), static_cast<int32_t*>(ret->data));
   } else if (nbits == 64) {

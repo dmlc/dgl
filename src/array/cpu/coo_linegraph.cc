@@ -50,8 +50,8 @@ COOMatrix COOLineGraph(const COOMatrix &coo, bool backtracking) {
 }
 
 
-template COOMatrix COOLineGraph<kDLCPU, int32_t>(const COOMatrix &coo, bool backtracking);
-template COOMatrix COOLineGraph<kDLCPU, int64_t>(const COOMatrix &coo, bool backtracking);
+template COOMatrix COOLineGraph<kDGLCPU, int32_t>(const COOMatrix &coo, bool backtracking);
+template COOMatrix COOLineGraph<kDGLCPU, int64_t>(const COOMatrix &coo, bool backtracking);
 
 }  // namespace impl
 }  // namespace aten

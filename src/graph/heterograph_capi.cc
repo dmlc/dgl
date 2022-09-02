@@ -716,9 +716,9 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortOutEdges")
     NDArray tag = args[1];
     int64_t num_tag = args[2];
 
-    CHECK_EQ(hg->Context().device_type, kDLCPU) << "Only support sorting by tag on cpu";
+    CHECK_EQ(hg->Context().device_type, kDGLCPU) << "Only support sorting by tag on cpu";
     CHECK(aten::IsValidIdArray(tag));
-    CHECK_EQ(tag->ctx.device_type, kDLCPU) << "Only support sorting by tag on cpu";
+    CHECK_EQ(tag->ctx.device_type, kDGLCPU) << "Only support sorting by tag on cpu";
 
     const auto csr = hg->GetCSRMatrix(0);
 
@@ -738,9 +738,9 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortInEdges")
     NDArray tag = args[1];
     int64_t num_tag = args[2];
 
-    CHECK_EQ(hg->Context().device_type, kDLCPU) << "Only support sorting by tag on cpu";
+    CHECK_EQ(hg->Context().device_type, kDGLCPU) << "Only support sorting by tag on cpu";
     CHECK(aten::IsValidIdArray(tag));
-    CHECK_EQ(tag->ctx.device_type, kDLCPU) << "Only support sorting by tag on cpu";
+    CHECK_EQ(tag->ctx.device_type, kDGLCPU) << "Only support sorting by tag on cpu";
 
     const auto csc = hg->GetCSCMatrix(0);
 

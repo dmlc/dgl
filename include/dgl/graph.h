@@ -90,7 +90,7 @@ class Graph: public GraphInterface {
   }
 
   DGLContext Context() const override {
-    return DGLContext{kDLCPU, 0};
+    return DGLContext{kDGLCPU, 0};
   }
 
   uint8_t NumBits() const override {

@@ -33,7 +33,7 @@ namespace dgl {
 template <>
 NDArray SharedMemManager::CopyToSharedMem<NDArray>(const NDArray &data,
                                                    std::string name) {
-  DGLContext ctx = {kDLCPU, 0};
+  DGLContext ctx = {kDGLCPU, 0};
   std::vector<int64_t> shape(data->shape, data->shape + data->ndim);
   strm_->Write(data->ndim);
   strm_->Write(data->dtype);
@@ -83,7 +83,7 @@ template <>
 bool SharedMemManager::CreateFromSharedMem<NDArray>(NDArray *nd,
                                                     std::string name) {
   int ndim;
-  DGLContext ctx = {kDLCPU, 0};
+  DGLContext ctx = {kDGLCPU, 0};
   DGLDataType dtype;
 
   CHECK(this->Read(&ndim)) << "Invalid DGLArray file format";

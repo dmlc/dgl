@@ -125,13 +125,13 @@ COOMatrix CSRRowWiseSampling(CSRMatrix mat, IdArray rows, int64_t num_samples,
   return CSRRowWisePick(mat, rows, num_samples, replace, pick_fn);
 }
 
-template COOMatrix CSRRowWiseSampling<kDLCPU, int32_t, float>(
+template COOMatrix CSRRowWiseSampling<kDGLCPU, int32_t, float>(
     CSRMatrix, IdArray, int64_t, FloatArray, bool);
-template COOMatrix CSRRowWiseSampling<kDLCPU, int64_t, float>(
+template COOMatrix CSRRowWiseSampling<kDGLCPU, int64_t, float>(
     CSRMatrix, IdArray, int64_t, FloatArray, bool);
-template COOMatrix CSRRowWiseSampling<kDLCPU, int32_t, double>(
+template COOMatrix CSRRowWiseSampling<kDGLCPU, int32_t, double>(
     CSRMatrix, IdArray, int64_t, FloatArray, bool);
-template COOMatrix CSRRowWiseSampling<kDLCPU, int64_t, double>(
+template COOMatrix CSRRowWiseSampling<kDGLCPU, int64_t, double>(
     CSRMatrix, IdArray, int64_t, FloatArray, bool);
 
 template <DGLDeviceType XPU, typename IdxType, typename FloatType>
@@ -143,13 +143,13 @@ COOMatrix CSRRowWisePerEtypeSampling(CSRMatrix mat, IdArray rows, IdArray etypes
   return CSRRowWisePerEtypePick(mat, rows, etypes, num_samples, replace, etype_sorted, pick_fn);
 }
 
-template COOMatrix CSRRowWisePerEtypeSampling<kDLCPU, int32_t, float>(
+template COOMatrix CSRRowWisePerEtypeSampling<kDGLCPU, int32_t, float>(
     CSRMatrix, IdArray, IdArray, const std::vector<int64_t>&, FloatArray, bool, bool);
-template COOMatrix CSRRowWisePerEtypeSampling<kDLCPU, int64_t, float>(
+template COOMatrix CSRRowWisePerEtypeSampling<kDGLCPU, int64_t, float>(
     CSRMatrix, IdArray, IdArray, const std::vector<int64_t>&, FloatArray, bool, bool);
-template COOMatrix CSRRowWisePerEtypeSampling<kDLCPU, int32_t, double>(
+template COOMatrix CSRRowWisePerEtypeSampling<kDGLCPU, int32_t, double>(
     CSRMatrix, IdArray, IdArray, const std::vector<int64_t>&, FloatArray, bool, bool);
-template COOMatrix CSRRowWisePerEtypeSampling<kDLCPU, int64_t, double>(
+template COOMatrix CSRRowWisePerEtypeSampling<kDGLCPU, int64_t, double>(
     CSRMatrix, IdArray, IdArray, const std::vector<int64_t>&, FloatArray, bool, bool);
 
 template <DGLDeviceType XPU, typename IdxType>
@@ -159,9 +159,9 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat, IdArray rows,
   return CSRRowWisePick(mat, rows, num_samples, replace, pick_fn);
 }
 
-template COOMatrix CSRRowWiseSamplingUniform<kDLCPU, int32_t>(
+template COOMatrix CSRRowWiseSamplingUniform<kDGLCPU, int32_t>(
     CSRMatrix, IdArray, int64_t, bool);
-template COOMatrix CSRRowWiseSamplingUniform<kDLCPU, int64_t>(
+template COOMatrix CSRRowWiseSamplingUniform<kDGLCPU, int64_t>(
     CSRMatrix, IdArray, int64_t, bool);
 
 template <DGLDeviceType XPU, typename IdxType>
@@ -172,9 +172,9 @@ COOMatrix CSRRowWisePerEtypeSamplingUniform(CSRMatrix mat, IdArray rows, IdArray
   return CSRRowWisePerEtypePick(mat, rows, etypes, num_samples, replace, etype_sorted, pick_fn);
 }
 
-template COOMatrix CSRRowWisePerEtypeSamplingUniform<kDLCPU, int32_t>(
+template COOMatrix CSRRowWisePerEtypeSamplingUniform<kDGLCPU, int32_t>(
     CSRMatrix, IdArray, IdArray, const std::vector<int64_t>&, bool, bool);
-template COOMatrix CSRRowWisePerEtypeSamplingUniform<kDLCPU, int64_t>(
+template COOMatrix CSRRowWisePerEtypeSamplingUniform<kDGLCPU, int64_t>(
     CSRMatrix, IdArray, IdArray, const std::vector<int64_t>&, bool, bool);
 
 template <DGLDeviceType XPU, typename IdxType, typename FloatType>
@@ -191,16 +191,16 @@ COOMatrix CSRRowWiseSamplingBiased(
   return CSRRowWisePick(mat, rows, num_samples, replace, pick_fn);
 }
 
-template COOMatrix CSRRowWiseSamplingBiased<kDLCPU, int32_t, float>(
+template COOMatrix CSRRowWiseSamplingBiased<kDGLCPU, int32_t, float>(
   CSRMatrix, IdArray, int64_t, NDArray, FloatArray, bool);
 
-template COOMatrix CSRRowWiseSamplingBiased<kDLCPU, int64_t, float>(
+template COOMatrix CSRRowWiseSamplingBiased<kDGLCPU, int64_t, float>(
   CSRMatrix, IdArray, int64_t, NDArray, FloatArray, bool);
 
-template COOMatrix CSRRowWiseSamplingBiased<kDLCPU, int32_t, double>(
+template COOMatrix CSRRowWiseSamplingBiased<kDGLCPU, int32_t, double>(
   CSRMatrix, IdArray, int64_t, NDArray, FloatArray, bool);
 
-template COOMatrix CSRRowWiseSamplingBiased<kDLCPU, int64_t, double>(
+template COOMatrix CSRRowWiseSamplingBiased<kDGLCPU, int64_t, double>(
   CSRMatrix, IdArray, int64_t, NDArray, FloatArray, bool);
 
 
@@ -214,13 +214,13 @@ COOMatrix COORowWiseSampling(COOMatrix mat, IdArray rows, int64_t num_samples,
   return COORowWisePick(mat, rows, num_samples, replace, pick_fn);
 }
 
-template COOMatrix COORowWiseSampling<kDLCPU, int32_t, float>(
+template COOMatrix COORowWiseSampling<kDGLCPU, int32_t, float>(
     COOMatrix, IdArray, int64_t, FloatArray, bool);
-template COOMatrix COORowWiseSampling<kDLCPU, int64_t, float>(
+template COOMatrix COORowWiseSampling<kDGLCPU, int64_t, float>(
     COOMatrix, IdArray, int64_t, FloatArray, bool);
-template COOMatrix COORowWiseSampling<kDLCPU, int32_t, double>(
+template COOMatrix COORowWiseSampling<kDGLCPU, int32_t, double>(
     COOMatrix, IdArray, int64_t, FloatArray, bool);
-template COOMatrix COORowWiseSampling<kDLCPU, int64_t, double>(
+template COOMatrix COORowWiseSampling<kDGLCPU, int64_t, double>(
     COOMatrix, IdArray, int64_t, FloatArray, bool);
 
 template <DGLDeviceType XPU, typename IdxType, typename FloatType>
@@ -232,13 +232,13 @@ COOMatrix COORowWisePerEtypeSampling(COOMatrix mat, IdArray rows, IdArray etypes
   return COORowWisePerEtypePick(mat, rows, etypes, num_samples, replace, etype_sorted, pick_fn);
 }
 
-template COOMatrix COORowWisePerEtypeSampling<kDLCPU, int32_t, float>(
+template COOMatrix COORowWisePerEtypeSampling<kDGLCPU, int32_t, float>(
     COOMatrix, IdArray, IdArray, const std::vector<int64_t>&, FloatArray, bool, bool);
-template COOMatrix COORowWisePerEtypeSampling<kDLCPU, int64_t, float>(
+template COOMatrix COORowWisePerEtypeSampling<kDGLCPU, int64_t, float>(
     COOMatrix, IdArray, IdArray, const std::vector<int64_t>&, FloatArray, bool, bool);
-template COOMatrix COORowWisePerEtypeSampling<kDLCPU, int32_t, double>(
+template COOMatrix COORowWisePerEtypeSampling<kDGLCPU, int32_t, double>(
     COOMatrix, IdArray, IdArray, const std::vector<int64_t>&, FloatArray, bool, bool);
-template COOMatrix COORowWisePerEtypeSampling<kDLCPU, int64_t, double>(
+template COOMatrix COORowWisePerEtypeSampling<kDGLCPU, int64_t, double>(
     COOMatrix, IdArray, IdArray, const std::vector<int64_t>&, FloatArray, bool, bool);
 
 template <DGLDeviceType XPU, typename IdxType>
@@ -248,9 +248,9 @@ COOMatrix COORowWiseSamplingUniform(COOMatrix mat, IdArray rows,
   return COORowWisePick(mat, rows, num_samples, replace, pick_fn);
 }
 
-template COOMatrix COORowWiseSamplingUniform<kDLCPU, int32_t>(
+template COOMatrix COORowWiseSamplingUniform<kDGLCPU, int32_t>(
     COOMatrix, IdArray, int64_t, bool);
-template COOMatrix COORowWiseSamplingUniform<kDLCPU, int64_t>(
+template COOMatrix COORowWiseSamplingUniform<kDGLCPU, int64_t>(
     COOMatrix, IdArray, int64_t, bool);
 
 template <DGLDeviceType XPU, typename IdxType>
@@ -261,9 +261,9 @@ COOMatrix COORowWisePerEtypeSamplingUniform(COOMatrix mat, IdArray rows, IdArray
   return COORowWisePerEtypePick(mat, rows, etypes, num_samples, replace, etype_sorted, pick_fn);
 }
 
-template COOMatrix COORowWisePerEtypeSamplingUniform<kDLCPU, int32_t>(
+template COOMatrix COORowWisePerEtypeSamplingUniform<kDGLCPU, int32_t>(
     COOMatrix, IdArray, IdArray, const std::vector<int64_t>&, bool, bool);
-template COOMatrix COORowWisePerEtypeSamplingUniform<kDLCPU, int64_t>(
+template COOMatrix COORowWisePerEtypeSamplingUniform<kDGLCPU, int64_t>(
     COOMatrix, IdArray, IdArray, const std::vector<int64_t>&, bool, bool);
 
 }  // namespace impl

@@ -51,18 +51,18 @@ NDArray IndexSelect(NDArray array, IdArray index) {
   return ret;
 }
 
-template NDArray IndexSelect<kDLCUDA, int32_t, int32_t>(NDArray, IdArray);
-template NDArray IndexSelect<kDLCUDA, int32_t, int64_t>(NDArray, IdArray);
-template NDArray IndexSelect<kDLCUDA, int64_t, int32_t>(NDArray, IdArray);
-template NDArray IndexSelect<kDLCUDA, int64_t, int64_t>(NDArray, IdArray);
+template NDArray IndexSelect<kDGLCUDA, int32_t, int32_t>(NDArray, IdArray);
+template NDArray IndexSelect<kDGLCUDA, int32_t, int64_t>(NDArray, IdArray);
+template NDArray IndexSelect<kDGLCUDA, int64_t, int32_t>(NDArray, IdArray);
+template NDArray IndexSelect<kDGLCUDA, int64_t, int64_t>(NDArray, IdArray);
 #ifdef USE_FP16
-template NDArray IndexSelect<kDLCUDA, __half, int32_t>(NDArray, IdArray);
-template NDArray IndexSelect<kDLCUDA, __half, int64_t>(NDArray, IdArray);
+template NDArray IndexSelect<kDGLCUDA, __half, int32_t>(NDArray, IdArray);
+template NDArray IndexSelect<kDGLCUDA, __half, int64_t>(NDArray, IdArray);
 #endif
-template NDArray IndexSelect<kDLCUDA, float, int32_t>(NDArray, IdArray);
-template NDArray IndexSelect<kDLCUDA, float, int64_t>(NDArray, IdArray);
-template NDArray IndexSelect<kDLCUDA, double, int32_t>(NDArray, IdArray);
-template NDArray IndexSelect<kDLCUDA, double, int64_t>(NDArray, IdArray);
+template NDArray IndexSelect<kDGLCUDA, float, int32_t>(NDArray, IdArray);
+template NDArray IndexSelect<kDGLCUDA, float, int64_t>(NDArray, IdArray);
+template NDArray IndexSelect<kDGLCUDA, double, int32_t>(NDArray, IdArray);
+template NDArray IndexSelect<kDGLCUDA, double, int64_t>(NDArray, IdArray);
 
 template <DGLDeviceType XPU, typename DType>
 DType IndexSelect(NDArray array, int64_t index) {
@@ -79,20 +79,20 @@ DType IndexSelect(NDArray array, int64_t index) {
 #endif
   device->CopyDataFromTo(
       static_cast<DType*>(array->data) + index, 0, reinterpret_cast<DType*>(&ret), 0,
-      sizeof(DType), array->ctx, DGLContext{kDLCPU, 0},
+      sizeof(DType), array->ctx, DGLContext{kDGLCPU, 0},
       array->dtype, nullptr);
   return reinterpret_cast<DType&>(ret);
 }
 
-template int32_t IndexSelect<kDLCUDA, int32_t>(NDArray array, int64_t index);
-template int64_t IndexSelect<kDLCUDA, int64_t>(NDArray array, int64_t index);
-template uint32_t IndexSelect<kDLCUDA, uint32_t>(NDArray array, int64_t index);
-template uint64_t IndexSelect<kDLCUDA, uint64_t>(NDArray array, int64_t index);
+template int32_t IndexSelect<kDGLCUDA, int32_t>(NDArray array, int64_t index);
+template int64_t IndexSelect<kDGLCUDA, int64_t>(NDArray array, int64_t index);
+template uint32_t IndexSelect<kDGLCUDA, uint32_t>(NDArray array, int64_t index);
+template uint64_t IndexSelect<kDGLCUDA, uint64_t>(NDArray array, int64_t index);
 #ifdef USE_FP16
-template __half IndexSelect<kDLCUDA, __half>(NDArray array, int64_t index);
+template __half IndexSelect<kDGLCUDA, __half>(NDArray array, int64_t index);
 #endif
-template float IndexSelect<kDLCUDA, float>(NDArray array, int64_t index);
-template double IndexSelect<kDLCUDA, double>(NDArray array, int64_t index);
+template float IndexSelect<kDGLCUDA, float>(NDArray array, int64_t index);
+template double IndexSelect<kDGLCUDA, double>(NDArray array, int64_t index);
 
 }  // namespace impl
 }  // namespace aten

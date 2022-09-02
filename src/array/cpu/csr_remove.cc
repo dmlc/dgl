@@ -103,8 +103,8 @@ CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries) {
       IdArray::FromVector(new_eids));
 }
 
-template CSRMatrix CSRRemove<kDLCPU, int32_t>(CSRMatrix csr, IdArray entries);
-template CSRMatrix CSRRemove<kDLCPU, int64_t>(CSRMatrix csr, IdArray entries);
+template CSRMatrix CSRRemove<kDGLCPU, int32_t>(CSRMatrix csr, IdArray entries);
+template CSRMatrix CSRRemove<kDGLCPU, int64_t>(CSRMatrix csr, IdArray entries);
 
 };  // namespace impl
 };  // namespace aten

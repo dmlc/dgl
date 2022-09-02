@@ -350,28 +350,28 @@ class DGLPODValue_ {
     // Allow automatic conversion from int to float
     // This avoids errors when user pass in int from
     // the frontend while the API expects a float.
-    if (type_code_ == kDLInt) {
+    if (type_code_ == kDGLInt) {
       return static_cast<double>(value_.v_int64);
     }
-    DGL_CHECK_TYPE_CODE(type_code_, kDLFloat);
+    DGL_CHECK_TYPE_CODE(type_code_, kDGLFloat);
     return value_.v_float64;
   }
   operator int64_t() const {
-    DGL_CHECK_TYPE_CODE(type_code_, kDLInt);
+    DGL_CHECK_TYPE_CODE(type_code_, kDGLInt);
     return value_.v_int64;
   }
   operator uint64_t() const {
-    DGL_CHECK_TYPE_CODE(type_code_, kDLInt);
+    DGL_CHECK_TYPE_CODE(type_code_, kDGLInt);
     return value_.v_int64;
   }
   operator int() const {
-    DGL_CHECK_TYPE_CODE(type_code_, kDLInt);
+    DGL_CHECK_TYPE_CODE(type_code_, kDGLInt);
     CHECK_LE(value_.v_int64,
              std::numeric_limits<int>::max());
     return static_cast<int>(value_.v_int64);
   }
   operator bool() const {
-    DGL_CHECK_TYPE_CODE(type_code_, kDLInt);
+    DGL_CHECK_TYPE_CODE(type_code_, kDGLInt);
     return value_.v_int64 != 0;
   }
   operator void*() const {
@@ -595,7 +595,7 @@ class DGLRetValue : public DGLPODValue_ {
     return *this;
   }
   DGLRetValue& operator=(double value) {
-    this->SwitchToPOD(kDLFloat);
+    this->SwitchToPOD(kDGLFloat);
     value_.v_float64 = value;
     return *this;
   }
@@ -610,12 +610,12 @@ class DGLRetValue : public DGLPODValue_ {
     return *this;
   }
   DGLRetValue& operator=(int64_t value) {
-    this->SwitchToPOD(kDLInt);
+    this->SwitchToPOD(kDGLInt);
     value_.v_int64 = value;
     return *this;
   }
   DGLRetValue& operator=(int value) {
-    this->SwitchToPOD(kDLInt);
+    this->SwitchToPOD(kDGLInt);
     value_.v_int64 = value;
     return *this;
   }
@@ -630,7 +630,7 @@ class DGLRetValue : public DGLPODValue_ {
     return *this;
   }
   DGLRetValue& operator=(bool value) {
-    this->SwitchToPOD(kDLInt);
+    this->SwitchToPOD(kDGLInt);
     value_.v_int64 = value;
     return *this;
   }
@@ -859,17 +859,17 @@ class DGLArgsSetter {
              std::is_integral<T>::value>::type>
   void operator()(size_t i, T value) const {
     values_[i].v_int64 = static_cast<int64_t>(value);
-    type_codes_[i] = kDLInt;
+    type_codes_[i] = kDGLInt;
   }
   void operator()(size_t i, uint64_t value) const {
     values_[i].v_int64 = static_cast<int64_t>(value);
     CHECK_LE(value,
              static_cast<uint64_t>(std::numeric_limits<int64_t>::max()));
-    type_codes_[i] = kDLInt;
+    type_codes_[i] = kDGLInt;
   }
   void operator()(size_t i, double value) const {
     values_[i].v_float64 = value;
-    type_codes_[i] = kDLFloat;
+    type_codes_[i] = kDGLFloat;
   }
   void operator()(size_t i, std::nullptr_t value) const {
     values_[i].v_handle = value;

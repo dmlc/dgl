@@ -494,7 +494,7 @@ COOMatrix CSRRowWiseSampling(CSRMatrix mat,
   device->CopyDataFromTo(temp_ptr, num_rows * sizeof(temp_len), &temp_len, 0,
       sizeof(temp_len),
       ctx,
-      DGLContext{kDLCPU, 0},
+      DGLContext{kDGLCPU, 0},
       mat.indptr->dtype,
       stream);
   device->StreamSync(ctx, stream);
@@ -525,7 +525,7 @@ COOMatrix CSRRowWiseSampling(CSRMatrix mat,
   device->CopyDataFromTo(out_ptr, num_rows * sizeof(new_len), &new_len, 0,
       sizeof(new_len),
       ctx,
-      DGLContext{kDLCPU, 0},
+      DGLContext{kDGLCPU, 0},
       mat.indptr->dtype,
       stream);
   CUDA_CALL(cudaEventRecord(copyEvent, stream));
@@ -654,13 +654,13 @@ COOMatrix CSRRowWiseSampling(CSRMatrix mat,
       picked_col, picked_idx);
 }
 
-template COOMatrix CSRRowWiseSampling<kDLCUDA, int32_t, float>(
+template COOMatrix CSRRowWiseSampling<kDGLCUDA, int32_t, float>(
   CSRMatrix, IdArray, int64_t, FloatArray, bool);
-template COOMatrix CSRRowWiseSampling<kDLCUDA, int64_t, float>(
+template COOMatrix CSRRowWiseSampling<kDGLCUDA, int64_t, float>(
   CSRMatrix, IdArray, int64_t, FloatArray, bool);
-template COOMatrix CSRRowWiseSampling<kDLCUDA, int32_t, double>(
+template COOMatrix CSRRowWiseSampling<kDGLCUDA, int32_t, double>(
   CSRMatrix, IdArray, int64_t, FloatArray, bool);
-template COOMatrix CSRRowWiseSampling<kDLCUDA, int64_t, double>(
+template COOMatrix CSRRowWiseSampling<kDGLCUDA, int64_t, double>(
   CSRMatrix, IdArray, int64_t, FloatArray, bool);
 
 }  // namespace impl

@@ -324,7 +324,7 @@ std::tuple<IdArray, IdArray, IdArray> FrequencyHashmap<IdxType>::Topk(
   std::swap(edge_blocks_prefix, edge_blocks_prefix_alternate);
   device->CopyDataFromTo(&edge_blocks_prefix[num_edge_blocks], 0, &num_unique_edges, 0,
       sizeof(num_unique_edges),
-      _ctx, DGLContext{kDLCPU, 0},
+      _ctx, DGLContext{kDGLCPU, 0},
       dtype, _stream);
   device->StreamSync(_ctx, _stream);
   // 2.2 Allocate the data of unique edges and frequency
@@ -405,7 +405,7 @@ std::tuple<IdArray, IdArray, IdArray> FrequencyHashmap<IdxType>::Topk(
   IdxType num_output = 0;
   device->CopyDataFromTo(&unique_output_offsets[num_dst_nodes], 0, &num_output, 0,
       sizeof(num_output),
-      _ctx, DGLContext{kDLCPU, 0},
+      _ctx, DGLContext{kDGLCPU, 0},
       dtype, _stream);
   device->StreamSync(_ctx, _stream);
 
