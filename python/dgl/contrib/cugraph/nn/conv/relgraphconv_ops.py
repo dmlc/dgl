@@ -1,5 +1,6 @@
 """Torch Module for Relational graph convolution layer using cugraph"""
 # pylint: disable= no-member, arguments-differ, invalid-name
+import dgl
 import math
 import torch as th
 from torch import nn
@@ -152,7 +153,7 @@ class RgcnConv(nn.Module):
             raise NotImplementedError
         
         if self.layer_norm:
-            raise NotImplementedError
+            self.layer_norm_weight = nn.LayerNorm(out_feat, elementwise_affine=True)
 
     def reset_parameters(self):
         with th.no_grad():
@@ -163,17 +164,19 @@ class RgcnConv(nn.Module):
         self.presorted = presorted
         with g.local_scope():
             g.srcdata['h'] = feat
-            if norm:
+            if norm is not None:
                 g.edata['norm'] = norm
             _, _, L = g.adj_sparse("csc")
             etypes = etypes[L]
 
             T = RgcnFunction.apply(g, self.sample_size, self.n_node_types, self.num_rels,
-                                   g.dstdata['ntype'], g.srcdata['ntype'], etypes,
+                                   g.dstdata[dgl.NTYPE], g.srcdata[dgl.NTYPE], etypes,
                                    self.coeff, feat, self.W)
             g.dstdata['h'] = T
             h = g.dstdata['h']
-
+            
+            if self.layer_norm:
+                h = self.layer_norm_weight(h)
             if self.bias:
                 h = h + self.h_bias
             if self.activation:
