@@ -136,10 +136,9 @@ class CUDADeviceAPI final : public DeviceAPI {
                       size_t size,
                       DGLContext ctx_from,
                       DGLContext ctx_to,
-                      DGLType type_hint) final {
-    auto stream = static_cast<DGLStreamHandle>(CUDAThreadEntry::ThreadLocal()->stream);
+                      DGLType type_hint,
+                      DGLStreamHandle stream) {
     cudaStream_t cu_stream = static_cast<cudaStream_t>(stream);
-
     from = static_cast<const char*>(from) + from_offset;
     to = static_cast<char*>(to) + to_offset;
     if (ctx_from.device_type == kDLGPU && ctx_to.device_type == kDLGPU) {
@@ -160,6 +159,18 @@ class CUDADeviceAPI final : public DeviceAPI {
     } else {
       LOG(FATAL) << "expect copy from/to GPU or between GPU";
     }
+  }
+
+  void CopyDataFromTo(const void* from,
+                      size_t from_offset,
+                      void* to,
+                      size_t to_offset,
+                      size_t size,
+                      DGLContext ctx_from,
+                      DGLContext ctx_to,
+                      DGLType type_hint) final {
+    auto stream = static_cast<DGLStreamHandle>(CUDAThreadEntry::ThreadLocal()->stream);
+    CopyDataFromTo(from, from_offset, to, to_offset, size, ctx_from, ctx_to, type_hint, stream);
   }
 
   DGLStreamHandle CreateStream(DGLContext ctx) {
