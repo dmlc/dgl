@@ -27,7 +27,7 @@ JENKINS_STATUS_MAPPING = {
 
 assert "BUILD_URL" in os.environ, "Are you in the Jenkins environment?"
 job_link = os.environ["BUILD_URL"]
-response = requests.get('{}wfapi'.format(job_link)).json()
+response = requests.get('{}wfapi'.format(job_link), verify=False).json()
 domain = '{uri.scheme}://{uri.netloc}/'.format(uri=urlparse(job_link))
 stages = response["stages"]
 
@@ -37,13 +37,13 @@ nodes_dict = {}
 
 
 def get_jenkins_json(path):
-    return requests.get(urljoin(domain, path)).json()
+    return requests.get(urljoin(domain, path), verify=False).json()
 
 
 for stage in stages:
     link = stage['_links']['self']['href']
     stage_name = stage['name']
-    res = requests.get(urljoin(domain, link)).json()
+    res = requests.get(urljoin(domain, link), verify=False).json()
     nodes = res['stageFlowNodes']
     for node in nodes:
         nodes_dict[node['id']] = node
