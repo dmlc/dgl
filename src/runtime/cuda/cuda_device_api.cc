@@ -1,5 +1,5 @@
 /*!
- *  Copyright (c) 2017 by Contributors
+ *  Copyright (c) 2017-2022 by Contributors
  * \file cuda_device_api.cc
  * \brief GPU specific API
  */
@@ -107,7 +107,12 @@ class CUDADeviceAPI final : public DeviceAPI {
                        size_t nbytes,
                        size_t alignment,
                        DGLType type_hint) final {
-    CUDA_CALL(cudaSetDevice(ctx.device_id));
+    SetDevice(ctx);
+    // Redirect to PyTorch's allocator when available.
+    TensorDispatcher* td = TensorDispatcher::Global();
+    if (td->IsAvailable())
+      return td->CUDAAllocWorkspace(nbytes, CUDAThreadEntry::ThreadLocal()->stream);
+
     CHECK_EQ(256 % alignment, 0U)
         << "CUDA space is aligned at 256 bytes";
     void *ret;
@@ -116,7 +121,11 @@ class CUDADeviceAPI final : public DeviceAPI {
   }
 
   void FreeDataSpace(DGLContext ctx, void* ptr) final {
-    CUDA_CALL(cudaSetDevice(ctx.device_id));
+    SetDevice(ctx);
+    TensorDispatcher* td = TensorDispatcher::Global();
+    if (td->IsAvailable())
+      return td->CUDAFreeWorkspace(ptr);
+
     CUDA_CALL(cudaFree(ptr));
   }
 
@@ -246,21 +255,22 @@ class CUDADeviceAPI final : public DeviceAPI {
   }
 
   void* AllocWorkspace(DGLContext ctx, size_t size, DGLType type_hint) final {
-    // Redirect to PyTorch's allocator when available.
     SetDevice(ctx);
+    // Redirect to PyTorch's allocator when available.
     TensorDispatcher* td = TensorDispatcher::Global();
     if (td->IsAvailable())
-      return td->AllocWorkspace(size);
-    else
-      return CUDAThreadEntry::ThreadLocal()->pool.AllocWorkspace(ctx, size);
+      return td->CUDAAllocWorkspace(size, CUDAThreadEntry::ThreadLocal()->stream);
+
+    return CUDAThreadEntry::ThreadLocal()->pool.AllocWorkspace(ctx, size);
   }
 
   void FreeWorkspace(DGLContext ctx, void* data) final {
+    SetDevice(ctx);
     TensorDispatcher* td = TensorDispatcher::Global();
     if (td->IsAvailable())
-      td->FreeWorkspace(data);
-    else
-      CUDAThreadEntry::ThreadLocal()->pool.FreeWorkspace(ctx, data);
+      return td->CUDAFreeWorkspace(data);
+
+    CUDAThreadEntry::ThreadLocal()->pool.FreeWorkspace(ctx, data);
   }
 
   static const std::shared_ptr<CUDADeviceAPI>& Global() {
