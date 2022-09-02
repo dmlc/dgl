@@ -20,7 +20,7 @@ training. For example,
 
     import dgl
 
-    g = ...  # create or load an DGLGraph object
+    g = ...  # create or load a DGLGraph object
     dgl.distributed.partition_graph(g, 'mygraph', 2, 'data_root_dir')
 
 will outputs the following data file.
@@ -243,7 +243,7 @@ strict requirement as long as ``metadata.json`` contains valid file paths.
   in each chunk.
 * ``edge_type``: List of string. Edge type names in the form of
   ``<source node type>:<relation>:<destination node type>``.
-* ``num_edges_per_chunk``: List of list of integer. For graphs with :math:`R` edge 
+* ``num_edges_per_chunk``: List of list of integer. For graphs with :math:`R` edge
   types stored in :math:`P` chunks, the value contains :math:`R` integer lists.
   Each list contains :math:`P` integers, which specify the number of edges
   in each chunk.
@@ -262,8 +262,7 @@ strict requirement as long as ``metadata.json`` contains valid file paths.
   details about how to parse each data file.
     - ``"csv"``: CSV file. Use the ``delimiter`` key to specify delimiter in use.
     - ``"numpy"``: NumPy array binary file created by :func:`numpy.save`.
-* ``data``: List of string. File path to each data chunk. Support absolute path
-  or path relative to the location of ``metadata.json``.
+* ``data``: List of string. File path to each data chunk. Support absolute path.
 
 Tips for making chunked graph data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -292,14 +291,14 @@ Step.1 Graph Partitioning
 This step reads the chunked graph data and calculates which partition each node
 should belong to. The results are saved in a set of *partition assignment files*.
 For example, to randomly partition MAG240M-LSC to two parts, run the
-``partition_algo/random.py`` script in the ``tools`` folder:
+``partition_algo/random_partition.py`` script in the ``tools`` folder:
 
 .. code-block:: bash
 
-    python /my/repo/dgl/tools/partition_algo/random.py
-        --in-dir=/mydata/MAG240M-LSC_chunked/
-        --out-dir=/mydata/MAG240M-LSC_2parts/
-        --num-parts=2
+    python /my/repo/dgl/tools/partition_algo/random_partition.py
+        --in_dir /mydata/MAG240M-LSC_chunked
+        --out_dir /mydata/MAG240M-LSC_2parts
+        --num_partitions 2
 
 , which outputs files as follows:
 
@@ -345,13 +344,13 @@ efficiently. The entire step can be further accelerated using multi-processing.
 .. code-block:: bash
 
     python /myrepo/dgl/tools/dispatch_data.py         \
-       --in-dir=/mydata/MAG240M-LSC_chunked/          \
-       --partition-file=/mydata/MAG240M-LSC_2parts/   \
-       --out-dir=/data/MAG_LSC_partitioned            \
-       --ip-config=ip_config.txt
+       --in-dir /mydata/MAG240M-LSC_chunked/          \
+       --partitions-dir /mydata/MAG240M-LSC_2parts/   \
+       --out-dir data/MAG_LSC_partitioned            \
+       --ip-config ip_config.txt
 
-* ``--in-dir`` specifies the path to the folder of the input chunked graph data produced by Step.1.
-* ``--partition-file`` specifies the path to the partition assignment file produced by Step.2.
+* ``--in-dir`` specifies the path to the folder of the input chunked graph data produced
+* ``--partitions-dir`` specifies the path to the partition assignment folder produced by Step.1.
 * ``--out-dir`` specifies the path to stored the data partition on each machine.
 * ``--ip-config`` specifies the IP configuration file of the cluster.
 

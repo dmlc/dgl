@@ -1,5 +1,5 @@
 /*!
- *  Copyright (c) 2017 by Contributors
+ *  Copyright (c) 2017-2022 by Contributors
  * \file ndarray.cc
  * \brief NDArray container infratructure.
  */
@@ -67,7 +67,8 @@ struct NDArray::Internal {
       ptr->mem = nullptr;
     } else if (ptr->dl_tensor.data != nullptr) {
       // if the array is still pinned before freeing, unpin it.
-      UnpinContainer(ptr);
+      if (ptr->pinned_by_dgl_)
+        UnpinContainer(ptr);
       dgl::runtime::DeviceAPI::Get(ptr->dl_tensor.ctx)->FreeDataSpace(
           ptr->dl_tensor.ctx, ptr->dl_tensor.data);
     }
@@ -213,10 +214,6 @@ NDArray NDArray::EmptyShared(const std::string &name,
 NDArray NDArray::Empty(std::vector<int64_t> shape,
                        DLDataType dtype,
                        DLContext ctx) {
-  TensorDispatcher* td = TensorDispatcher::Global();
-  if (td->IsAvailable())
-    return td->Empty(shape, dtype, ctx);
-
   NDArray ret = Internal::Create(shape, dtype, ctx);
   // setup memory content
   size_t size = GetDataSize(ret.data_->dl_tensor);
