@@ -26,7 +26,6 @@ class Conv1d(nn.Module):
 class EmaMaxPool(nn.Module):
     def __init__(self, kernel_size, affine=True, Linear=BiLinear, use_bn=True):
         super(EmaMaxPool, self).__init__()
-        self.pool = 'ema-max'
         self.kernel_size = kernel_size
         self.bn3 = nn.BatchNorm1d(1024, affine=affine)
         self.use_bn = use_bn
