@@ -35,8 +35,8 @@ To quickly locate the examples of your interest, search for the tagged keywords 
     - Example code: [PyTorch](../examples/pytorch/ogb/ngnn)
     - Tags: model-agnostic methodology, link prediction, open graph benchmark.
 - <a name='bipointnet'></a>Qin et al. BiPointNet: Binary Neural Network for Point Clouds. [Paper link](https://openreview.net/forum?id=9QLRCVysdlO)
-    - Example code: [PyTorch](../examples/pytorch/pointcloud/pointnet/bipointnet_cls.py)
-    - Tags: model binarization, model compression and acceleration.
+    - Example code: [PyTorch](../examples/pytorch/pointcloud/bipointnet)
+    - Tags: point cloud classification, network binarization.
 
 
 ## 2020
