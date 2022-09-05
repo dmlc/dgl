@@ -2587,6 +2587,15 @@ def test_module_feat_mask(idtype):
     assert g.edata['w'][('user', 'follows', 'user')].shape == (2, 5)
     assert g.edata['w'][('player', 'plays', 'game')].shape == (2, 5)
 
+@parametrize_idtype
+def test_module_double_radius_node_labeling(idtype):
+    transform = dgl.DoubleRadiusNodeLabeling('drnl')
+    g = dgl.graph(([0, 0, 0, 0, 1, 1, 2, 4], [1, 2, 3, 6, 3, 3, 4, 5]),
+        idtype=idtype, device=F.ctx())
+    new_g = transform(g)
+    tgt = F.copy_to(F.tensor([1, 1, 3, 2, 3, 7, 0]), g.device)
+    assert F.array_equal(new_g.ndata['drnl'], tgt, dtype=F.int64)
+
 if __name__ == '__main__':
     test_partition_with_halo()
     test_module_heat_kernel(F.int32)
