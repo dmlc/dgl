@@ -23,7 +23,7 @@ class CustomGraphStorageWrapper(object):
 @pytest.mark.parametrize('use_prefetch_thread', [None, True, False])
 @pytest.mark.parametrize('use_alternate_streams', [None, True, False])
 def test_custom_graph_storage(pin_prefetcher, use_prefetch_thread, use_alternate_streams):
-    if any(v is None for v in [pin_prefetcher, use_prefetch_thread, use_alternate_streams):
+    if any(v is None for v in [pin_prefetcher, use_prefetch_thread, use_alternate_streams]):
         # Do we want to test where not all of them are None?
         pin_prefetcher = use_prefetch_thread = use_alternate_streams = None
     g = dgl.data.CoraFullDataset()[0]
