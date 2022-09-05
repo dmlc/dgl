@@ -9,6 +9,7 @@ import inspect
 import re
 import atexit
 import os
+from contextlib import contextmanager
 import psutil
 
 import numpy as np
@@ -20,8 +21,8 @@ from ..base import NID, EID, dgl_warning, DGLError
 from ..batch import batch as batch_graphs
 from ..heterograph import DGLHeteroGraph
 from ..utils import (
-    recursive_apply, ExceptionWrapper, recursive_apply_pair, set_num_threads,
-    context_of, dtype_of)
+    recursive_apply, ExceptionWrapper, recursive_apply_pair, set_num_threads, get_num_threads,
+    get_numa_nodes_cores, context_of, dtype_of)
 from ..frame import LazyFeature
 from ..storages import wrap_storage
 from .base import BlockSampler, as_edge_prediction_sampler
@@ -697,8 +698,7 @@ class DataLoader(torch.utils.data.DataLoader):
     def __init__(self, graph, indices, graph_sampler, device=None, use_ddp=False,
                  ddp_seed=0, batch_size=1, drop_last=False, shuffle=False,
                  use_prefetch_thread=None, use_alternate_streams=None,
-                 pin_prefetcher=None, use_uva=False,
-                 use_cpu_worker_affinity=False, cpu_worker_affinity_cores=None, **kwargs):
+                 pin_prefetcher=None, use_uva=False, **kwargs):
         # (BarclayII) PyTorch Lightning sometimes will recreate a DataLoader from an existing
         # DataLoader with modifications to the original arguments.  The arguments are retrieved
         # from the attributes with the same name, and because we change certain arguments
@@ -840,30 +840,11 @@ class DataLoader(torch.utils.data.DataLoader):
         self.use_alternate_streams = use_alternate_streams
         self.pin_prefetcher = pin_prefetcher
         self.use_prefetch_thread = use_prefetch_thread
+        self.cpu_affinity_enabled = False
 
         worker_init_fn = WorkerInitWrapper(kwargs.get('worker_init_fn', None))
 
         self.other_storages = {}
-
-        if use_cpu_worker_affinity:
-            nw_work = kwargs.get('num_workers', 0)
-
-            if cpu_worker_affinity_cores is None:
-                cpu_worker_affinity_cores = []
-
-            if not isinstance(cpu_worker_affinity_cores, list):
-                raise Exception('ERROR: cpu_worker_affinity_cores should be a list of cores')
-            if not nw_work > 0:
-                raise Exception('ERROR: affinity should be used with --num_workers=X')
-            if len(cpu_worker_affinity_cores) not in [0, nw_work]:
-                raise Exception('ERROR: cpu_affinity incorrect '
-                                'settings for cores={} num_workers={}'
-                                .format(cpu_worker_affinity_cores, nw_work))
-
-            self.cpu_cores = (cpu_worker_affinity_cores
-                                if len(cpu_worker_affinity_cores)
-                                else range(0, nw_work))
-            worker_init_fn = WorkerInitWrapper(self.worker_init_function)
 
         super().__init__(
             self.dataset,
@@ -875,6 +856,11 @@ class DataLoader(torch.utils.data.DataLoader):
             **kwargs)
 
     def __iter__(self):
+        if self.device.type == 'cpu' and not self.cpu_affinity_enabled:
+            link = 'https://docs.dgl.ai/tutorials/cpu/cpu_best_practises.html'
+            dgl_warning(f'Dataloader CPU affinity opt is not enabled, consider switching it on '
+                        f'(see enable_cpu_affinity() or CPU best practices for DGL [{link}])')
+
         if self.shuffle:
             self.dataset.shuffle()
         # When using multiprocessing PyTorch sometimes set the number of PyTorch threads to 1
@@ -882,20 +868,89 @@ class DataLoader(torch.utils.data.DataLoader):
         num_threads = torch.get_num_threads() if self.num_workers > 0 else None
         return _PrefetchingIter(self, super().__iter__(), num_threads=num_threads)
 
-    def worker_init_function(self, worker_id):
-        """Worker init default function.
-              Parameters
-              ----------
-              worker_id : int
-                  Worker ID.
+    @contextmanager
+    def enable_cpu_affinity(self, loader_cores=None, compute_cores=None, verbose=True):
+        """ Helper method for enabling cpu affinity for compute threads and dataloader workers
+        Only for CPU devices
+        Uses only NUMA node 0 by default for multi-node systems
+
+        Parameters
+        ----------
+        loader_cores : [int] (optional)
+            List of cpu cores to which dataloader workers should affinitize to.
+            default: node0_cores[0:num_workers]
+
+        compute_cores : [int] (optional)
+            List of cpu cores to which compute threads should affinitize to
+            default: node0_cores[num_workers:]
+
+        verbose : bool (optional)
+            If True, affinity information will be printed to the console
+
+        Usage
+        -----
+        with dataloader.enable_cpu_affinity():
+            <training loop>
         """
-        try:
-            psutil.Process().cpu_affinity([self.cpu_cores[worker_id]])
-            print('CPU-affinity worker {} has been assigned to core={}'
-                  .format(worker_id, self.cpu_cores[worker_id]))
-        except:
-            raise Exception('ERROR: cannot use affinity id={} cpu_cores={}'
-                            .format(worker_id, self.cpu_cores))
+        if self.device.type == 'cpu':
+            if not self.num_workers > 0:
+                raise Exception('ERROR: affinity should be used with at least one DL worker')
+            if loader_cores and len(loader_cores) != self.num_workers:
+                raise Exception('ERROR: cpu_affinity incorrect '
+                                'number of loader_cores={} for num_workers={}'
+                                .format(loader_cores, self.num_workers))
+
+            # False positive E0203 (access-member-before-definition) linter warning
+            worker_init_fn_old = self.worker_init_fn # pylint: disable=E0203
+            affinity_old = psutil.Process().cpu_affinity()
+            nthreads_old = get_num_threads()
+
+            compute_cores = compute_cores[:] if compute_cores else []
+            loader_cores = loader_cores[:] if loader_cores else []
+
+            def init_fn(worker_id):
+                try:
+                    psutil.Process().cpu_affinity([loader_cores[worker_id]])
+                except:
+                    raise Exception('ERROR: cannot use affinity id={} cpu={}'
+                                    .format(worker_id, loader_cores))
+
+                worker_init_fn_old(worker_id)
+
+            if not loader_cores or not compute_cores:
+                numa_info = get_numa_nodes_cores()
+                if numa_info and len(numa_info[0]) > self.num_workers:
+                    # take one thread per each node 0 core
+                    node0_cores = [cpus[0] for core_id, cpus in numa_info[0]]
+                else:
+                    node0_cores = list(range(psutil.cpu_count(logical = False)))
+
+                if len(node0_cores) <= self.num_workers:
+                    raise Exception('ERROR: more workers than available cores')
+
+                loader_cores = loader_cores or node0_cores[0:self.num_workers]
+                compute_cores = [cpu for cpu in node0_cores if cpu not in loader_cores]
+
+            try:
+                psutil.Process().cpu_affinity(compute_cores)
+                set_num_threads(len(compute_cores))
+                self.worker_init_fn = init_fn
+
+                self.cpu_affinity_enabled = True
+                if verbose:
+                    print('{} DL workers are assigned to cpus {}, main process will use cpus {}'
+                        .format(self.num_workers, loader_cores, compute_cores))
+
+                yield
+            finally:
+                # restore omp_num_threads and cpu affinity
+                psutil.Process().cpu_affinity(affinity_old)
+                set_num_threads(nthreads_old)
+                self.worker_init_fn = worker_init_fn_old
+
+                self.cpu_affinity_enabled = False
+        else:
+            yield
 
     # To allow data other than node/edge data to be prefetched.
     def attach_data(self, name, data):
