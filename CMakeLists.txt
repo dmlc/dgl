@@ -155,7 +155,6 @@ file(GLOB DGL_SRC
   src/runtime/*.cc
   src/geometry/*.cc
   src/geometry/cpu/*.cc
-  src/dataloading/*.cc
   src/partition/*.cc
 )
 
