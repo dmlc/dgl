@@ -209,7 +209,7 @@ set at each iteration. ``prop_edges_YYY`` applies traversal algorithm ``YYY`` an
 Utilities
 -----------------------------------------------
 
-Other utilities for controlling randomness, saving and loading graphs, functions that applies
+Other utilities for controlling randomness, saving and loading graphs, setting and getting runtime configurations, functions that applies
 the same function to every elements in a container, etc.
 
 .. autosummary::
@@ -219,3 +219,5 @@ the same function to every elements in a container, etc.
     save_graphs
     load_graphs
     apply_each
+    use_libxsmm
+    is_libxsmm_enabled
