@@ -407,7 +407,7 @@ class LaplacianPE(BaseTransform):
 class DoubleRadiusNodeLabeling(BaseTransform):
     r"""Double Radius Node Labeling, as introduced in `Link Prediction
     Based on Graph Neural Networks <https://arxiv.org/abs/1802.09691>`__.
-    
+
     Parameters
     ----------
     feat_name : str, optional
