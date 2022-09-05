@@ -44,6 +44,9 @@ struct DLConverter {
 }  // namespace runtime
 }  // namespace dgl
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 /*!
  * \brief Produce an array from the DLManagedTensor that shares data memory
  * with the DLManagedTensor.
@@ -72,4 +75,7 @@ DGL_DLL void DGLDLManagedTensorCallDeleter(DLManagedTensor* dltensor) {
   (*(dltensor->deleter))(dltensor);
 }
 
+#ifdef __cplusplus
+}  // DGL_EXTERN_C
+#endif
 #endif  // DGL_RUNTIME_DL_CONVERTER_H_

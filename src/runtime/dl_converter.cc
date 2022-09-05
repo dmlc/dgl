@@ -32,7 +32,7 @@ inline DGLContext ToDGLContext(DLDevice device) {
 inline DGLDataType ToDGLDataType(DLDataType src) {
   DGLDataType ret;
   ret.code = src.code;
-  ret.bits = src.code;
+  ret.bits = src.bits;
   ret.lanes = src.lanes;
   return ret;
 }
@@ -47,7 +47,7 @@ inline DLDevice ToDLDevice(DGLContext ctx) {
 inline DLDataType ToDLDataType(DGLDataType src) {
   DLDataType ret;
   ret.code = src.code;
-  ret.bits = src.code;
+  ret.bits = src.bits;
   ret.lanes = src.lanes;
   return ret;
 }
