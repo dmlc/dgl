@@ -6,9 +6,9 @@
 #ifndef DGL_RUNTIME_DL_CONVERTER_H_
 #define DGL_RUNTIME_DL_CONVERTER_H_
 
+#include <dlpack/dlpack.h>
 #include "c_runtime_api.h"
 #include "ndarray.h"
-#include <dlpack/dlpack.h>
 
 namespace dgl {
 namespace runtime {

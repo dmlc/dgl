@@ -96,7 +96,7 @@ NDArray NDArray::Internal::Create(std::vector<int64_t> shape,
   data->dl_tensor.ctx = ctx;
   return ret;
 }
-  
+
 DGLArray* NDArray::Internal::MoveAsDGLArray(NDArray arr) {
   DGLArray* tensor = reinterpret_cast<DGLArray*>(arr.data_);
   CHECK(tensor == const_cast<DGLArray*>(arr.operator->()));

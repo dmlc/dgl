@@ -333,6 +333,7 @@ class NDArray {
     // Implementation of API function
     static DGLArray* MoveAsDGLArray(NDArray arr);
   };
+
  private:
   /*! \brief Internal Data content */
   Container* data_{nullptr};

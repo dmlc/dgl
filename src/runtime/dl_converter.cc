@@ -5,11 +5,11 @@
  */
 #include <dgl/runtime/dl_converter.h>
 
+#include <dlpack/dlpack.h>
 #include <dgl/runtime/ndarray.h>
 #include <dgl/runtime/c_runtime_api.h>
 #include <dgl/runtime/device_api.h>
 #include "runtime_base.h"
-#include <dlpack/dlpack.h>
 
 // deleter for arrays used by DLPack exporter
 extern "C" void NDArrayDLPackDeleter(DLManagedTensor* tensor);
