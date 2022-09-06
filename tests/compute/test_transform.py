@@ -2593,8 +2593,8 @@ def test_module_double_radius_node_labeling(idtype):
     g = dgl.graph(([0, 0, 0, 0, 1, 1, 2, 4], [1, 2, 3, 6, 3, 3, 4, 5]),
         idtype=idtype, device=F.ctx())
     new_g = transform(g, 0, 1)
-    tgt = F.copy_to(F.tensor([1, 1, 3, 2, 3, 7, 0]), g.device)
-    assert F.array_equal(new_g.ndata['drnl'], tgt, dtype=F.int64)
+    tgt = F.copy_to(F.tensor([1, 1, 3, 2, 3, 7, 0], dtype=F.int64), g.device)
+    assert F.array_equal(new_g.ndata['drnl'], tgt)
 
 if __name__ == '__main__':
     test_partition_with_halo()
