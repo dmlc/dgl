@@ -1201,7 +1201,7 @@ class GraphDataLoader(torch.utils.data.DataLoader):
         if use_ddp:
             self.dist_sampler = _create_dist_sampler(dataset, dataloader_kwargs, ddp_seed)
             dataloader_kwargs['sampler'] = self.dist_sampler
-            
+
         if collate_fn is None and kwargs.get('batch_size', 1) is not None:
             collate_fn = GraphCollator(**collator_kwargs).collate
 
