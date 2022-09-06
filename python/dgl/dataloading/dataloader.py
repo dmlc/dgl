@@ -153,7 +153,6 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
         self.batch_size = batch_size
         self.drop_last = drop_last
         self._shuffle = shuffle
-        self._indices.share_memory_()
 
     def shuffle(self):
         """Shuffle the dataset."""
