@@ -310,15 +310,15 @@ IdArray Relabel_(const std::vector<IdArray>& arrays) {
     induced_nodes.Ptr<IdType>(),
     num_induced_device,
     thr_entry->stream);
-
+  // copy using the internal stream: thr_entry->stream
   device->CopyDataFromTo(
     num_induced_device, 0,
     &num_induced, 0,
     sizeof(num_induced),
     ctx,
     DGLContext{kDGLCPU, 0},
-    DGLDataType{kDGLInt, 64, 1},
-    thr_entry->stream);
+    DGLDataType{kDGLInt, 64, 1});
+
   device->StreamSync(ctx, thr_entry->stream);
   device->FreeWorkspace(ctx, num_induced_device);
 

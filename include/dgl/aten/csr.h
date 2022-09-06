@@ -115,14 +115,11 @@ struct CSRMatrix {
   }
 
   /*! \brief Return a copy of this matrix on the give device context. */
-  inline CSRMatrix CopyTo(const DGLContext &ctx,
-                          const DGLStreamHandle &stream = nullptr) const {
+  inline CSRMatrix CopyTo(const DGLContext &ctx) const {
     if (ctx == indptr->ctx)
       return *this;
-    return CSRMatrix(num_rows, num_cols, indptr.CopyTo(ctx, stream),
-                     indices.CopyTo(ctx, stream),
-                     aten::IsNullArray(data) ? data : data.CopyTo(ctx, stream),
-                     sorted);
+    return CSRMatrix(num_rows, num_cols, indptr.CopyTo(ctx), indices.CopyTo(ctx),
+                     aten::IsNullArray(data) ? data : data.CopyTo(ctx), sorted);
   }
 
   /*!

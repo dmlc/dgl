@@ -122,13 +122,11 @@ struct COOMatrix {
   }
 
   /*! \brief Return a copy of this matrix on the give device context. */
-  inline COOMatrix CopyTo(const DGLContext &ctx,
-                          const DGLStreamHandle &stream = nullptr) const {
+  inline COOMatrix CopyTo(const DGLContext &ctx) const {
     if (ctx == row->ctx)
       return *this;
-    return COOMatrix(num_rows, num_cols, row.CopyTo(ctx, stream),
-                     col.CopyTo(ctx, stream),
-                     aten::IsNullArray(data) ? data : data.CopyTo(ctx, stream),
+    return COOMatrix(num_rows, num_cols, row.CopyTo(ctx), col.CopyTo(ctx),
+                     aten::IsNullArray(data) ? data : data.CopyTo(ctx),
                      row_sorted, col_sorted);
   }
 

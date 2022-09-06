@@ -165,9 +165,10 @@ ToBlockGPU(
   std::vector<IdArray>& lhs_nodes = *lhs_nodes_ptr;
   const bool generate_lhs_nodes = lhs_nodes.empty();
 
-  cudaStream_t stream = 0;
+
   const auto& ctx = graph->Context();
   auto device = runtime::DeviceAPI::Get(ctx);
+  cudaStream_t stream = runtime::CUDAThreadEntry::ThreadLocal()->stream;
 
   CHECK_EQ(ctx.device_type, kDGLCUDA);
   for (const auto& nodes : rhs_nodes) {
@@ -233,8 +234,7 @@ ToBlockGPU(
             src_nodes[ntype].Ptr<IdType>(), src_node_offsets[ntype],
             sizeof(IdType)*rhs_nodes[ntype]->shape[0],
             rhs_nodes[ntype]->ctx, src_nodes[ntype]->ctx,
-            rhs_nodes[ntype]->dtype,
-            stream);
+            rhs_nodes[ntype]->dtype);
         src_node_offsets[ntype] += sizeof(IdType)*rhs_nodes[ntype]->shape[0];
       }
     }
@@ -249,8 +249,7 @@ ToBlockGPU(
             sizeof(IdType)*edge_arrays[etype].src->shape[0],
             rhs_nodes[srctype]->ctx,
             src_nodes[srctype]->ctx,
-            rhs_nodes[srctype]->dtype,
-            stream);
+            rhs_nodes[srctype]->dtype);
 
         src_node_offsets[srctype] += sizeof(IdType)*edge_arrays[etype].src->shape[0];
       }
@@ -298,8 +297,7 @@ ToBlockGPU(
         sizeof(*num_nodes_per_type.data())*num_ntypes,
         ctx,
         DGLContext{kDGLCPU, 0},
-        DGLDataType{kDGLInt, 64, 1},
-        stream);
+        DGLDataType{kDGLInt, 64, 1});
     device->StreamSync(ctx, stream);
 
     // wait for the node counts to finish transferring

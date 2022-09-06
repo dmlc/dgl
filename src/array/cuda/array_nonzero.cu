@@ -34,7 +34,7 @@ IdArray NonZero(IdArray array) {
   const int64_t len = array->shape[0];
   IdArray ret = NewIdArray(len, ctx, 64);
 
-  cudaStream_t stream = 0;
+  cudaStream_t stream = runtime::CUDAThreadEntry::ThreadLocal()->stream;
 
   const IdType * const in_data = static_cast<const IdType*>(array->data);
   int64_t * const out_data = static_cast<int64_t*>(ret->data);
@@ -55,7 +55,7 @@ IdArray NonZero(IdArray array) {
   device->FreeWorkspace(ctx, temp);
 
   // copy number of selected elements from GPU to CPU
-  int64_t num_nonzeros = cuda::GetCUDAScalar(device, ctx, d_num_nonzeros, stream);
+  int64_t num_nonzeros = cuda::GetCUDAScalar(device, ctx, d_num_nonzeros);
   device->FreeWorkspace(ctx, d_num_nonzeros);
   device->StreamSync(ctx, stream);
 

@@ -189,8 +189,7 @@ NDArray NDArray::Empty(std::vector<int64_t> shape,
 }
 
 void NDArray::CopyFromTo(DGLArray* from,
-                         DGLArray* to,
-                         DGLStreamHandle stream) {
+                         DGLArray* to) {
   size_t from_size = GetDataSize(*from);
   size_t to_size = GetDataSize(*to);
   CHECK_EQ(from_size, to_size)
@@ -205,10 +204,11 @@ void NDArray::CopyFromTo(DGLArray* from,
   // api manager.
   DGLContext ctx = from->ctx.device_type != kDGLCPU ? from->ctx : to->ctx;
 
+  // default: local cuda stream: CUDAThreadEntry->ThreadLocal()->stream
   DeviceAPI::Get(ctx)->CopyDataFromTo(
-    from->data, static_cast<size_t>(from->byte_offset),
-    to->data, static_cast<size_t>(to->byte_offset),
-    from_size, from->ctx, to->ctx, from->dtype, stream);
+      from->data, static_cast<size_t>(from->byte_offset),
+      to->data, static_cast<size_t>(to->byte_offset),
+      from_size, from->ctx, to->ctx, from->dtype);
 }
 
 void NDArray::PinContainer(NDArray::Container* ptr) {
@@ -246,8 +246,7 @@ NDArray NDArray::FromVector(const std::vector<T>& vec, DGLContext ctx) {
       size * sizeof(T),
       DGLContext{kDGLCPU, 0},
       ctx,
-      dtype,
-      nullptr);
+      dtype);
   return ret;
 }
 
@@ -285,8 +284,7 @@ std::vector<T> NDArray::ToVector() const {
       size * sizeof(T),
       ctx,
       DGLContext{kDGLCPU, 0},
-      dtype,
-      nullptr);
+      dtype);
   return vec;
 }
 
@@ -429,10 +427,9 @@ int DGLArrayFree(DGLArrayHandle handle) {
 }
 
 int DGLArrayCopyFromTo(DGLArrayHandle from,
-                       DGLArrayHandle to,
-                       DGLStreamHandle stream) {
+                       DGLArrayHandle to) {
   API_BEGIN();
-  NDArray::CopyFromTo(from, to, stream);
+  NDArray::CopyFromTo(from, to);
   API_END();
 }
 
@@ -449,7 +446,7 @@ int DGLArrayCopyFromBytes(DGLArrayHandle handle,
   DeviceAPI::Get(handle->ctx)->CopyDataFromTo(
       data, 0,
       handle->data, static_cast<size_t>(handle->byte_offset),
-      nbytes, cpu_ctx, handle->ctx, handle->dtype, nullptr);
+      nbytes, cpu_ctx, handle->ctx, handle->dtype);
   API_END();
 }
 
@@ -466,7 +463,7 @@ int DGLArrayCopyToBytes(DGLArrayHandle handle,
   DeviceAPI::Get(handle->ctx)->CopyDataFromTo(
       handle->data, static_cast<size_t>(handle->byte_offset),
       data, 0,
-      nbytes, handle->ctx, cpu_ctx, handle->dtype, nullptr);
+      nbytes, handle->ctx, cpu_ctx, handle->dtype);
   API_END();
 }
 

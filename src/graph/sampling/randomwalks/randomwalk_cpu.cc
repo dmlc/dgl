@@ -91,17 +91,17 @@ std::tuple<IdArray, IdArray, IdArray> SelectPinSageNeighbors(
       res_src.Ptr<IdxType>(), 0,
       sizeof(IdxType) * res_src_vec.size(),
       DGLContext{kDGLCPU, 0}, res_src->ctx,
-      res_src->dtype, 0);
+      res_src->dtype);
   device->CopyDataFromTo(static_cast<IdxType*>(res_dst_vec.data()), 0,
       res_dst.Ptr<IdxType>(), 0,
       sizeof(IdxType) * res_dst_vec.size(),
       DGLContext{kDGLCPU, 0}, res_dst->ctx,
-      res_dst->dtype, 0);
+      res_dst->dtype);
   device->CopyDataFromTo(static_cast<IdxType*>(res_cnt_vec.data()), 0,
       res_cnt.Ptr<IdxType>(), 0,
       sizeof(IdxType) * res_cnt_vec.size(),
       DGLContext{kDGLCPU, 0}, res_cnt->ctx,
-      res_cnt->dtype, 0);
+      res_cnt->dtype);
 
   return std::make_tuple(res_src, res_dst, res_cnt);
 }

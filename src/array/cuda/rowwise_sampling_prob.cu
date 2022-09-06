@@ -425,9 +425,7 @@ COOMatrix CSRRowWiseSampling(CSRMatrix mat,
   const auto& ctx = rows->ctx;
   auto device = runtime::DeviceAPI::Get(ctx);
 
-  // TODO(dlasalle): Once the device api supports getting the stream from the
-  // context, that should be used instead of the default stream here.
-  cudaStream_t stream = 0;
+  cudaStream_t stream = runtime::CUDAThreadEntry::ThreadLocal()->stream;
 
   const int64_t num_rows = rows->shape[0];
   const IdType * const slice_rows = static_cast<const IdType*>(rows->data);
@@ -491,12 +489,12 @@ COOMatrix CSRRowWiseSampling(CSRMatrix mat,
   // TODO(Xin): The copy here is too small, and the overhead of creating
   // cuda events cannot be ignored. Just use synchronized copy.
   IdType temp_len;
+  // copy using the internal dgl stream: CUDAThreadEntry::ThreadLocal()->stream
   device->CopyDataFromTo(temp_ptr, num_rows * sizeof(temp_len), &temp_len, 0,
       sizeof(temp_len),
       ctx,
       DGLContext{kDGLCPU, 0},
-      mat.indptr->dtype,
-      stream);
+      mat.indptr->dtype);
   device->StreamSync(ctx, stream);
 
   // fill out_ptr
@@ -522,12 +520,12 @@ COOMatrix CSRRowWiseSampling(CSRMatrix mat,
   // TODO(dlasalle): use pinned memory to overlap with the actual sampling, and wait on
   // a cudaevent
   IdType new_len;
+  // copy using the internal dgl stream: CUDAThreadEntry::ThreadLocal()->stream
   device->CopyDataFromTo(out_ptr, num_rows * sizeof(new_len), &new_len, 0,
       sizeof(new_len),
       ctx,
       DGLContext{kDGLCPU, 0},
-      mat.indptr->dtype,
-      stream);
+      mat.indptr->dtype);
   CUDA_CALL(cudaEventRecord(copyEvent, stream));
 
   // allocate workspace
@@ -604,7 +602,7 @@ COOMatrix CSRRowWiseSampling(CSRMatrix mat,
         temp_len,
         num_rows,
         temp_ptr,
-        temp_ptr + 1));
+        temp_ptr + 1, stream));
     d_temp_storage = device->AllocWorkspace(ctx, temp_storage_bytes);
     CUDA_CALL(cub::DeviceSegmentedSort::SortPairsDescending(
         d_temp_storage,
@@ -614,7 +612,7 @@ COOMatrix CSRRowWiseSampling(CSRMatrix mat,
         temp_len,
         num_rows,
         temp_ptr,
-        temp_ptr + 1));
+        temp_ptr + 1, stream));
     device->FreeWorkspace(ctx, d_temp_storage);
     device->FreeWorkspace(ctx, temp);
     device->FreeWorkspace(ctx, temp_idxs);

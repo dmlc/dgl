@@ -174,7 +174,7 @@ std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
   CUDA_CALL(cub::DeviceSelect::If(
         tmp, tmp_size, begin, out_begin, num_out_cuda, num_actual_samples, op,
         thr_entry->stream));
-  num_out = cuda::GetCUDAScalar(device, ctx, num_out_cuda, static_cast<cudaStream_t>(0));
+  num_out = cuda::GetCUDAScalar(device, ctx, num_out_cuda);
 
   if (!replace) {
     IdArray unique_row = IdArray::Empty({num_out}, dtype, ctx);
@@ -198,7 +198,7 @@ std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
     CUDA_CALL(cub::DeviceSelect::Unique(
           tmp_unique, tmp_size_unique, out_begin, unique_begin, num_out_cuda, num_out,
           thr_entry->stream));
-    num_out = cuda::GetCUDAScalar(device, ctx, num_out_cuda, static_cast<cudaStream_t>(0));
+    num_out = cuda::GetCUDAScalar(device, ctx, num_out_cuda);
 
     num_out = std::min(num_samples, num_out);
     result = {unique_row.CreateView({num_out}, dtype), unique_col.CreateView({num_out}, dtype)};

@@ -105,8 +105,7 @@ cdef extern from "dgl/runtime/c_runtime_api.h":
                                DGLArrayHandle* out)
     int DGLArrayFree(DGLArrayHandle handle)
     int DGLArrayCopyFromTo(DGLArrayHandle src,
-                           DGLArrayHandle to,
-                           DGLStreamHandle stream)
+                           DGLArrayHandle to)
 
 cdef extern from "dgl/runtime/c_object_api.h":
     int DGLObjectFree(ObjectHandle handle)

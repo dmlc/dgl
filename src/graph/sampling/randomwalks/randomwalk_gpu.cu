@@ -197,8 +197,8 @@ std::pair<IdArray, IdArray> RandomWalkUniform(
     h_graphs[etype].in_cols = static_cast<const IdType*>(csr.indices->data);
     h_graphs[etype].data = (CSRHasData(csr) ? static_cast<const IdType*>(csr.data->data) : nullptr);
   }
-  // use default stream
-  cudaStream_t stream = 0;
+  // use cuda stream from local thread
+  cudaStream_t stream = runtime::CUDAThreadEntry::ThreadLocal()->stream;
   auto device = DeviceAPI::Get(ctx);
   auto d_graphs = static_cast<GraphKernelData<IdType>*>(
       device->AllocWorkspace(ctx, (num_etypes) * sizeof(GraphKernelData<IdType>)));
@@ -207,8 +207,7 @@ std::pair<IdArray, IdArray> RandomWalkUniform(
       (num_etypes) * sizeof(GraphKernelData<IdType>),
       DGLContext{kDGLCPU, 0},
       ctx,
-      hg->GetCSRMatrix(0).indptr->dtype,
-      stream);
+      hg->GetCSRMatrix(0).indptr->dtype);
   // copy metapath to GPU
   auto d_metapath = metapath.CopyTo(ctx);
   const IdType *d_metapath_data = static_cast<IdType *>(d_metapath->data);
@@ -270,7 +269,7 @@ std::pair<IdArray, IdArray> RandomWalkBiased(
   IdType *traces_data = traces.Ptr<IdType>();
   IdType *eids_data = eids.Ptr<IdType>();
 
-  cudaStream_t stream = 0;
+  cudaStream_t stream = runtime::CUDAThreadEntry::ThreadLocal()->stream;
   auto device = DeviceAPI::Get(ctx);
   // new probs and prob sums pointers
   assert(num_etypes == static_cast<int64_t>(prob.size()));
@@ -306,14 +305,14 @@ std::pair<IdArray, IdArray> RandomWalkBiased(
         prob_sums[etype],
         num_segments,
         d_offsets,
-        d_offsets + 1));
+        d_offsets + 1, stream));
     void *temp_storage = device->AllocWorkspace(ctx, temp_storage_size);
     CUDA_CALL(cub::DeviceSegmentedReduce::Sum(temp_storage, temp_storage_size,
         probs[etype],
         prob_sums[etype],
         num_segments,
         d_offsets,
-        d_offsets + 1));
+        d_offsets + 1, stream));
     device->FreeWorkspace(ctx, temp_storage);
   }
 
@@ -324,8 +323,7 @@ std::pair<IdArray, IdArray> RandomWalkBiased(
       (num_etypes) * sizeof(GraphKernelData<IdType>),
       DGLContext{kDGLCPU, 0},
       ctx,
-      hg->GetCSRMatrix(0).indptr->dtype,
-      stream);
+      hg->GetCSRMatrix(0).indptr->dtype);
   // copy probs pointers to GPU
   const FloatType **probs_dev = static_cast<const FloatType **>(
       device->AllocWorkspace(ctx, num_etypes * sizeof(FloatType *)));
@@ -333,8 +331,7 @@ std::pair<IdArray, IdArray> RandomWalkBiased(
       (num_etypes) * sizeof(FloatType *),
       DGLContext{kDGLCPU, 0},
       ctx,
-      prob[0]->dtype,
-      stream);
+      prob[0]->dtype);
   // copy probs_sum pointers to GPU
   const FloatType **prob_sums_dev = static_cast<const FloatType **>(
       device->AllocWorkspace(ctx, num_etypes * sizeof(FloatType *)));
@@ -342,8 +339,7 @@ std::pair<IdArray, IdArray> RandomWalkBiased(
       (num_etypes) * sizeof(FloatType *),
       DGLContext{kDGLCPU, 0},
       ctx,
-      prob[0]->dtype,
-      stream);
+      prob[0]->dtype);
   // copy metapath to GPU
   auto d_metapath = metapath.CopyTo(ctx);
   const IdType *d_metapath_data = static_cast<IdType *>(d_metapath->data);
@@ -429,13 +425,13 @@ std::pair<IdArray, IdArray> RandomWalkWithRestart(
       {1}, DGLDataType{kDGLFloat, 64, 1}, device_ctx);
   auto device = dgl::runtime::DeviceAPI::Get(device_ctx);
 
-  // use default stream
-  cudaStream_t stream = 0;
+  // use cuda stream from local thread
+  cudaStream_t stream = runtime::CUDAThreadEntry::ThreadLocal()->stream;
   device->CopyDataFromTo(
       &restart_prob, 0, restart_prob_array.Ptr<double>(), 0,
       sizeof(double),
       DGLContext{kDGLCPU, 0}, device_ctx,
-      restart_prob_array->dtype, stream);
+      restart_prob_array->dtype);
   device->StreamSync(device_ctx, stream);
 
   if (!isUniform) {
@@ -489,8 +485,8 @@ std::tuple<IdArray, IdArray, IdArray> SelectPinSageNeighbors(
   const IdxType* dst_data = dst.Ptr<IdxType>();
   const int64_t num_dst_nodes = (dst->shape[0] / num_samples_per_node);
   auto ctx = src->ctx;
-  // use default stream
-  cudaStream_t stream = 0;
+  // use cuda stream from local thread
+  cudaStream_t stream = runtime::CUDAThreadEntry::ThreadLocal()->stream;
   auto frequency_hashmap = FrequencyHashmap<IdxType>(num_dst_nodes,
       num_samples_per_node, ctx, stream);
   auto ret = frequency_hashmap.Topk(src_data, dst_data, src->dtype,

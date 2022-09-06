@@ -62,8 +62,7 @@ class CPUDeviceAPI final : public DeviceAPI {
                       size_t size,
                       DGLContext ctx_from,
                       DGLContext ctx_to,
-                      DGLDataType type_hint,
-                      DGLStreamHandle stream) final {
+                      DGLDataType type_hint) final {
     memcpy(static_cast<char*>(to) + to_offset,
            static_cast<const char*>(from) + from_offset,
            size);

@@ -207,8 +207,7 @@ class UnitGraph : public BaseHeteroGraph {
   static HeteroGraphPtr AsNumBits(HeteroGraphPtr g, uint8_t bits);
 
   /*! \brief Copy the data to another context */
-  static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DGLContext &ctx,
-                               const DGLStreamHandle &stream = nullptr);
+  static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DGLContext &ctx);
 
   /*!
   * \brief Pin the in_csr_, out_scr_ and coo_ of the current graph.

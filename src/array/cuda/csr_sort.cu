@@ -130,13 +130,13 @@ void CSRSort_<kDGLCUDA, int64_t>(CSRMatrix* csr) {
   size_t workspace_size = 0;
   CUDA_CALL(cub::DeviceSegmentedRadixSort::SortPairs(nullptr, workspace_size,
       key_in, key_out, value_in, value_out,
-      nnz, csr->num_rows, offsets, offsets + 1));
+      nnz, csr->num_rows, offsets, offsets + 1, 0, sizeof(int64_t)*8, thr_entry->stream));
   void* workspace = device->AllocWorkspace(ctx, workspace_size);
 
   // Compute
   CUDA_CALL(cub::DeviceSegmentedRadixSort::SortPairs(workspace, workspace_size,
       key_in, key_out, value_in, value_out,
-      nnz, csr->num_rows, offsets, offsets + 1));
+      nnz, csr->num_rows, offsets, offsets + 1, 0, sizeof(int64_t)*8, thr_entry->stream));
 
   csr->sorted = true;
   csr->indices = new_indices;

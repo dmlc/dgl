@@ -101,11 +101,11 @@ IdArray HStack(IdArray lhs, IdArray rhs) {
     device->CopyDataFromTo(lhs.Ptr<IdType>(), 0,
                            ret.Ptr<IdType>(), 0,
                            len * sizeof(IdType),
-                           ctx, ctx, lhs->dtype, nullptr);
+                           ctx, ctx, lhs->dtype);
     device->CopyDataFromTo(rhs.Ptr<IdType>(), 0,
                            ret.Ptr<IdType>(), len * sizeof(IdType),
                            len * sizeof(IdType),
-                           ctx, ctx, lhs->dtype, nullptr);
+                           ctx, ctx, lhs->dtype);
   });
   return ret;
 }
@@ -160,7 +160,7 @@ NDArray IndexSelect(NDArray array, int64_t start, int64_t end) {
   ATEN_DTYPE_SWITCH(array->dtype, DType, "values", {
     device->CopyDataFromTo(array->data, start * sizeof(DType),
                            ret->data, 0, len * sizeof(DType),
-                           array->ctx, ret->ctx, array->dtype, nullptr);
+                           array->ctx, ret->ctx, array->dtype);
   });
   return ret;
 }
@@ -240,8 +240,7 @@ NDArray Concat(const std::vector<IdArray>& arrays) {
         arrays[i]->shape[0] * sizeof(DType),
         arrays[i]->ctx,
         ret_arr->ctx,
-        arrays[i]->dtype,
-        nullptr);
+        arrays[i]->dtype);
 
         offset += arrays[i]->shape[0] * sizeof(DType);
     });

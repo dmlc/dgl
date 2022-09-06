@@ -188,8 +188,7 @@ template <typename DType>
 inline DType GetCUDAScalar(
     runtime::DeviceAPI* device_api,
     DGLContext ctx,
-    const DType* cuda_ptr,
-    cudaStream_t stream) {
+    const DType* cuda_ptr) {
   DType result;
   device_api->CopyDataFromTo(
       cuda_ptr, 0,
@@ -197,8 +196,7 @@ inline DType GetCUDAScalar(
       sizeof(result),
       ctx,
       DGLContext{kDGLCPU, 0},
-      DGLDataTypeTraits<DType>::dtype,
-      stream);
+      DGLDataTypeTraits<DType>::dtype);
   return result;
 }
 
