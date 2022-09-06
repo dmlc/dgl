@@ -111,7 +111,7 @@ class CUDADeviceAPI final : public DeviceAPI {
     // Redirect to PyTorch's allocator when available.
     TensorDispatcher* td = TensorDispatcher::Global();
     if (td->IsAvailable())
-      return td->CUDAAllocWorkspace(nbytes, CUDAThreadEntry::ThreadLocal()->stream);
+      return td->CUDAAllocWorkspace(nbytes, getCurrentCUDAStream());
 
     CHECK_EQ(256 % alignment, 0U)
         << "CUDA space is aligned at 256 bytes";
@@ -169,7 +169,7 @@ class CUDADeviceAPI final : public DeviceAPI {
                       DGLContext ctx_from,
                       DGLContext ctx_to,
                       DGLType type_hint) final {
-    auto stream = static_cast<DGLStreamHandle>(CUDAThreadEntry::ThreadLocal()->stream);
+    auto stream = GetStream();
     CopyDataFromTo(from, from_offset, to, to_offset, size, ctx_from, ctx_to, type_hint, stream);
   }
 
@@ -209,7 +209,7 @@ class CUDADeviceAPI final : public DeviceAPI {
   }
 
   DGLStreamHandle GetStream() const final {
-    return static_cast<DGLStreamHandle>(CUDAThreadEntry::ThreadLocal()->stream);
+    return static_cast<DGLStreamHandle>(getCurrentCUDAStream());
   }
 
   /*! NOTE: cudaHostRegister can be called from an arbitrary GPU device,
@@ -271,7 +271,7 @@ class CUDADeviceAPI final : public DeviceAPI {
     // Redirect to PyTorch's allocator when available.
     TensorDispatcher* td = TensorDispatcher::Global();
     if (td->IsAvailable())
-      return td->CUDAAllocWorkspace(size, CUDAThreadEntry::ThreadLocal()->stream);
+      return td->CUDAAllocWorkspace(size, getCurrentCUDAStream());
 
     return CUDAThreadEntry::ThreadLocal()->pool.AllocWorkspace(ctx, size);
   }
@@ -320,6 +320,14 @@ CUDAThreadEntry::CUDAThreadEntry()
 
 CUDAThreadEntry* CUDAThreadEntry::ThreadLocal() {
   return CUDAThreadStore::Get();
+}
+
+cudaStream_t getCurrentCUDAStream() {
+  TensorDispatcher* td = TensorDispatcher::Global();
+  if (td->IsAvailable())
+    return td->CUDAGetCurrentStream();
+  else
+    return CUDAThreadEntry::ThreadLocal()->stream;
 }
 
 DGL_REGISTER_GLOBAL("device_api.gpu")

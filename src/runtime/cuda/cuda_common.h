@@ -173,6 +173,9 @@ class CUDAThreadEntry {
   // get the threadlocal workspace
   static CUDAThreadEntry* ThreadLocal();
 };
+
+/*! \brief Get the current CUDA stream */
+cudaStream_t getCurrentCUDAStream();
 }  // namespace runtime
 }  // namespace dgl
 #endif  // DGL_RUNTIME_CUDA_CUDA_COMMON_H_

@@ -424,8 +424,7 @@ COOMatrix CSRRowWiseSampling(CSRMatrix mat,
                              bool replace) {
   const auto& ctx = rows->ctx;
   auto device = runtime::DeviceAPI::Get(ctx);
-
-  cudaStream_t stream = runtime::CUDAThreadEntry::ThreadLocal()->stream;
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
 
   const int64_t num_rows = rows->shape[0];
   const IdType * const slice_rows = static_cast<const IdType*>(rows->data);
@@ -489,7 +488,7 @@ COOMatrix CSRRowWiseSampling(CSRMatrix mat,
   // TODO(Xin): The copy here is too small, and the overhead of creating
   // cuda events cannot be ignored. Just use synchronized copy.
   IdType temp_len;
-  // copy using the internal dgl stream: CUDAThreadEntry::ThreadLocal()->stream
+  // copy using the internal current stream.
   device->CopyDataFromTo(temp_ptr, num_rows * sizeof(temp_len), &temp_len, 0,
       sizeof(temp_len),
       ctx,
@@ -520,7 +519,7 @@ COOMatrix CSRRowWiseSampling(CSRMatrix mat,
   // TODO(dlasalle): use pinned memory to overlap with the actual sampling, and wait on
   // a cudaevent
   IdType new_len;
-  // copy using the internal dgl stream: CUDAThreadEntry::ThreadLocal()->stream
+  // copy using the internal current stream.
   device->CopyDataFromTo(out_ptr, num_rows * sizeof(new_len), &new_len, 0,
       sizeof(new_len),
       ctx,

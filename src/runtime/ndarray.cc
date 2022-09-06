@@ -250,7 +250,7 @@ void NDArray::CopyFromTo(DLTensor* from,
   // api manager.
   DGLContext ctx = from->ctx.device_type != kDLCPU ? from->ctx : to->ctx;
 
-  // default: local cuda stream: CUDAThreadEntry->ThreadLocal()->stream
+  // default: local current cuda stream
   DeviceAPI::Get(ctx)->CopyDataFromTo(
       from->data, static_cast<size_t>(from->byte_offset),
       to->data, static_cast<size_t>(to->byte_offset),

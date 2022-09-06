@@ -121,7 +121,7 @@ class TensorDispatcher {
 
   /*!
   * \brief Find the current PyTorch CUDA stream
-  * Used in CUDAThreadEntry::ThreadLocal->stream.
+  * Used in runtime::getCurrentCUDAStream().
   * 
   * \note PyTorch pre-allocates/sets the current CUDA stream
   * on current device via cudaGetDevice(). Make sure to call cudaSetDevice()

@@ -6,10 +6,11 @@ import dgl
 import dgl.ndarray as nd
 from dgl import rand_graph
 import dgl.ops as OPS
-from dgl.cuda import to_dgl_stream_handle
+from dgl._ffi.streams import to_dgl_stream_handle, _dgl_get_stream
+from dgl.utils import to_dgl_context
 import backend as F
 
-# borrowed from PyTorch
+# borrowed from PyTorch, torch/testing/_internal/common_utils.py
 def _get_cycles_per_ms() -> float:
     """Measure and return approximate number of cycles per millisecond for torch.cuda._sleep
     """
@@ -44,7 +45,6 @@ def test_basics():
     s = torch.cuda.default_stream(device=F.ctx())
     with torch.cuda.stream(s):
         xx = x.to(device=F.ctx(), non_blocking=True)
-    with dgl.cuda.stream(s):
         gg = g.to(device=F.ctx())
     s.synchronize()
     OPS.copy_u_sum(gg, xx)
@@ -53,7 +53,6 @@ def test_basics():
     s = torch.cuda.Stream(device=F.ctx())
     with torch.cuda.stream(s):
         xx = x.to(device=F.ctx(), non_blocking=True)
-    with dgl.cuda.stream(s):
         gg = g.to(device=F.ctx())
     s.synchronize()
     OPS.copy_u_sum(gg, xx)
@@ -65,15 +64,19 @@ def test_basics():
 
 @unittest.skipIf(F._default_context_str == 'cpu', reason="stream only runs on GPU.")
 def test_set_get_stream():
+    current_stream = torch.cuda.current_stream()
+    # test setting another stream
     s = torch.cuda.Stream(device=F.ctx())
-    dgl.cuda.set_stream(s)
-    assert to_dgl_stream_handle(s).value == dgl.cuda.current_stream(F.ctx()).value
+    torch.cuda.set_stream(s)
+    assert to_dgl_stream_handle(s).value == _dgl_get_stream(to_dgl_context(F.ctx())).value
+    # revert to default stream
+    torch.cuda.set_stream(current_stream)
 
 @unittest.skipIf(F._default_context_str == 'cpu', reason="stream only runs on GPU.")
 def test_record_stream_smoke():
     # smoke test to ensure it can work
     stream = torch.cuda.Stream()
-    with dgl.cuda.stream(stream):
+    with torch.cuda.stream(stream):
         t = nd.array(np.array([1., 2., 3., 4.]), ctx=nd.gpu(0))
         g = rand_graph(10, 20, device=F.cuda())
     # NDArray is an internal object, just use DGLStreamHandle
@@ -93,7 +96,7 @@ def test_record_stream():
 
     # Performs the CPU->GPU copy in a background stream
     def perform_copy():
-        with dgl.cuda.stream(stream):
+        with torch.cuda.stream(stream):
             tmp = t.copyto(nd.gpu(0))
             ptr[0] = F.from_dgl_nd(tmp).data_ptr()
         torch.cuda.current_stream().wait_stream(stream)
@@ -103,7 +106,7 @@ def test_record_stream():
         result.copyfrom(tmp)
 
     perform_copy()
-    with dgl.cuda.stream(stream):
+    with torch.cuda.stream(stream):
         tmp2 = nd.array(np.array([1., 2., 3., 4.], dtype=np.float32), ctx=nd.gpu(0))
         assert F.from_dgl_nd(tmp2).data_ptr() != ptr[0], 'allocation re-used to soon'
 
@@ -111,7 +114,7 @@ def test_record_stream():
 
     # Check that the block will be re-used after the main stream finishes
     torch.cuda.current_stream().synchronize()
-    with dgl.cuda.stream(stream):
+    with torch.cuda.stream(stream):
         tmp3 = nd.empty([4], ctx=nd.gpu(0))
         assert F.from_dgl_nd(tmp3).data_ptr() == ptr[0], 'allocation not re-used'
 
