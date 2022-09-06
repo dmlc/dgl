@@ -153,8 +153,7 @@ std::pair<IdArray, NDArray> SparsePush(
       "device";
   auto device = DeviceAPI::Get(ctx);
 
-  // TODO(dlasalle): Get the stream from the device context.
-  cudaStream_t stream = 0;
+  cudaStream_t stream = CUDAThreadEntry::ThreadLocal()->stream;
 
   CHECK_LE(in_idx->ndim, 1) << "The tensor of sending indices must be of "
       "dimension one (or empty).";
@@ -215,6 +214,7 @@ std::pair<IdArray, NDArray> SparsePush(
   }
 
   std::vector<int64_t> send_prefix_host(comm_size+1);
+  // copy using the same stream (CUDAThreadEntry->ThreadLocal()->stream), no need to sync
   device->CopyDataFromTo(
       send_prefix.get(),
       0,
@@ -223,8 +223,7 @@ std::pair<IdArray, NDArray> SparsePush(
       send_prefix_host.size()*sizeof(*send_prefix.get()),
       ctx,
       DGLContext{kDLCPU, 0},
-      DGLType{kDLInt, sizeof(*send_prefix.get())*8, 1},
-      stream);
+      DGLType{kDLInt, sizeof(*send_prefix.get())*8, 1});
   send_prefix.free();
 
   CHECK_EQ(send_prefix_host.back(), num_in) << "Internal Error: "
@@ -243,16 +242,17 @@ std::pair<IdArray, NDArray> SparsePush(
   {
     size_t prefix_workspace_size;
     CUDA_CALL(cub::DeviceScan::ExclusiveSum(nullptr, prefix_workspace_size,
-        recv_sum.get(), recv_prefix.get(), comm_size+1));
+        recv_sum.get(), recv_prefix.get(), comm_size+1, stream));
 
     Workspace<void> prefix_workspace(device, ctx, prefix_workspace_size);
     CUDA_CALL(cub::DeviceScan::ExclusiveSum(prefix_workspace.get(),
-        prefix_workspace_size, recv_sum.get(), recv_prefix.get(), comm_size+1));
+        prefix_workspace_size, recv_sum.get(), recv_prefix.get(), comm_size+1, stream));
   }
   recv_sum.free();
 
   // finally copy the prefixsum sum down to the host
   std::vector<int64_t> recv_prefix_host(comm_size+1);
+  // copy using the same stream (CUDAThreadEntry->ThreadLocal()->stream), no need to sync
   device->CopyDataFromTo(
       recv_prefix.get(),
       0,
@@ -261,8 +261,7 @@ std::pair<IdArray, NDArray> SparsePush(
       recv_prefix_host.size()*sizeof(*recv_prefix.get()),
       ctx,
       DGLContext{kDLCPU, 0},
-      DGLType{kDLInt, sizeof(*recv_prefix.get())*8, 1},
-      stream);
+      DGLType{kDLInt, sizeof(*recv_prefix.get())*8, 1});
   recv_prefix.free();
 
   // use an event to track when copying is done
@@ -369,6 +368,7 @@ NDArray SparsePull(
   CUDA_CALL(cudaEventCreate(&d2h));
 
   std::vector<int64_t> request_prefix_host(comm_size+1);
+  // copy using the same stream (CUDAThreadEntry->ThreadLocal()->stream), no need to sync
   device->CopyDataFromTo(
       request_prefix.get(),
       0,
@@ -377,8 +377,7 @@ NDArray SparsePull(
       request_prefix_host.size()*sizeof(*request_prefix.get()),
       ctx,
       DGLContext{kDLCPU, 0},
-      DGLType{kDLInt, sizeof(*request_prefix.get())*8, 1},
-      stream);
+      DGLType{kDLInt, sizeof(*request_prefix.get())*8, 1});
   request_prefix.free();
   CHECK_EQ(request_prefix_host.back(), num_in) << "Internal Error: "
       "request_prefix_host.back() = " << request_prefix_host.back() <<
@@ -404,6 +403,7 @@ NDArray SparsePull(
 
   // finally copy the prefixsum sum down to the host
   std::vector<int64_t> response_prefix_host(comm_size+1);
+  // copy using the same stream (CUDAThreadEntry->ThreadLocal()->stream), no need to sync
   device->CopyDataFromTo(
       response_prefix.get(),
       0,
@@ -412,8 +412,7 @@ NDArray SparsePull(
       response_prefix_host.size()*sizeof(*response_prefix.get()),
       ctx,
       DGLContext{kDLCPU, 0},
-      DGLType{kDLInt, sizeof(*response_prefix.get())*8, 1},
-      stream);
+      DGLType{kDLInt, sizeof(*response_prefix.get())*8, 1});
   response_prefix.free();
 
   // use an event to track when copying is done
@@ -623,12 +622,12 @@ void NCCLCommunicator::AllToAllV(
   auto device = runtime::DeviceAPI::Get(ctx);
   auto dtype = DLDataTypeTraits<DType>::dtype;
 
+  // copy using the same stream (CUDAThreadEntry->ThreadLocal()->stream), no need to sync
   device->CopyDataFromTo(send, send_prefix[0],
       recv, recv_prefix[0],
       sizeof(DType)*send_prefix[1]-send_prefix[0],
       ctx, ctx,
-      dtype,
-      stream);
+      dtype);
   #endif
 }
 
@@ -685,7 +684,8 @@ void NCCLCommunicator::AllToAll(
   auto device = runtime::DeviceAPI::Get(ctx);
   auto dtype = DLDataTypeTraits<IdType>::dtype;
 
-  device->CopyDataFromTo(send, 0, recv, 0, count, ctx, ctx, dtype, stream);
+  // copy using the same stream (CUDAThreadEntry->ThreadLocal()->stream), no need to sync
+  device->CopyDataFromTo(send, 0, recv, 0, count, ctx, ctx, dtype);
   #endif
 }
 
