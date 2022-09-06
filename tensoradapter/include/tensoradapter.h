@@ -53,6 +53,11 @@ void* CUDARawAlloc(size_t nbytes, cudaStream_t stream);
 void CUDARawDelete(void* ptr);
 
 /*!
+ * \brief Get the current CUDA stream.
+ */
+cudaStream_t CUDACurrentStream();
+
+/*!
  * \brief Let the caching allocator know which streams are using this tensor.
  *
  * \param ptr Pointer of the tensor to be recorded.

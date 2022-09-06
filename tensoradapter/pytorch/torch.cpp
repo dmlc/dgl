@@ -10,6 +10,7 @@
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAStream.h>
 #include <c10/cuda/CUDACachingAllocator.h>
+#include <c10/cuda/CUDAStream.h>
 #include <cuda_runtime.h>
 #endif  // DGL_USE_CUDA
 
@@ -34,6 +35,10 @@ TA_EXPORTS void* CUDARawAlloc(size_t nbytes, cudaStream_t stream) {
 
 TA_EXPORTS void CUDARawDelete(void* ptr) {
   c10::cuda::CUDACachingAllocator::raw_delete(ptr);
+}
+
+TA_EXPORTS cudaStream_t CUDACurrentStream() {
+  return at::cuda::getCurrentCUDAStream();
 }
 
 TA_EXPORTS void RecordStream(void* ptr, cudaStream_t stream, int device_id) {

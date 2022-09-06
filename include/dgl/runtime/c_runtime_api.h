@@ -450,12 +450,10 @@ DGL_DLL int DGLArrayCopyToBytes(DGLArrayHandle handle,
  * \brief Copy the array, both from and to must be valid during the copy.
  * \param from The array to be copied from.
  * \param to The target space.
- * \param stream The stream where the copy happens, can be NULL.
  * \return 0 when success, -1 when failure happens
  */
 DGL_DLL int DGLArrayCopyFromTo(DGLArrayHandle from,
-                               DGLArrayHandle to,
-                               DGLStreamHandle stream);
+                               DGLArrayHandle to);
 
 /*!
  * \brief Produce an array from the DLManagedTensor that shares data memory

@@ -9,6 +9,7 @@
 #include <dgl/array.h>
 #include <dgl/bcast.h>
 #include <dgl/runtime/parallel_for.h>
+#include <dgl/runtime/config.h>
 #include <math.h>
 #include <algorithm>
 #include <limits>
@@ -142,7 +143,9 @@ void SpMMSumCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
 #ifdef USE_AVX
 #ifdef USE_LIBXSMM
   const bool no_libxsmm =
-       bcast.use_bcast || std::is_same<DType, double>::value;
+       bcast.use_bcast ||
+       std::is_same<DType, double>::value ||
+       !dgl::runtime::Config::Global()->IsLibxsmmAvailable();
   if (!no_libxsmm) {
     SpMMSumCsrLibxsmm<IdType, DType, Op>(bcast, csr, ufeat, efeat, out);
   } else {
@@ -269,7 +272,9 @@ void SpMMCmpCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
 #ifdef USE_LIBXSMM
 
   const bool no_libxsmm =
-       bcast.use_bcast || std::is_same<DType, double>::value;
+       bcast.use_bcast ||
+       std::is_same<DType, double>::value ||
+       !dgl::runtime::Config::Global()->IsLibxsmmAvailable();
   if (!no_libxsmm) {
     SpMMCmpCsrLibxsmm<IdType, DType, Op, Cmp>(bcast, csr, ufeat, efeat, out, argu, arge);
   } else {

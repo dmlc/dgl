@@ -120,6 +120,21 @@ class TensorDispatcher {
   }
 
   /*!
+  * \brief Find the current PyTorch CUDA stream
+  * Used in CUDAThreadEntry::ThreadLocal->stream.
+  * 
+  * \note PyTorch pre-allocates/sets the current CUDA stream
+  * on current device via cudaGetDevice(). Make sure to call cudaSetDevice()
+  * before invoking this function.
+  *
+  * \return cudaStream_t stream handle
+  */
+  inline cudaStream_t CUDAGetCurrentStream() {
+    auto entry = entrypoints_[Op::kCUDACurrentStream];
+    return FUNCCAST(tensoradapter::CUDACurrentStream, entry)();
+  }
+
+  /*!
    * \brief Record streams that are using this tensor.
    * Used in NDArray::RecordStream().
    *
@@ -151,6 +166,7 @@ class TensorDispatcher {
 #ifdef DGL_USE_CUDA
     "CUDARawAlloc",
     "CUDARawDelete",
+    "CUDACurrentStream",
     "RecordStream",
 #endif  // DGL_USE_CUDA
   };
@@ -163,7 +179,8 @@ class TensorDispatcher {
 #ifdef DGL_USE_CUDA
     static constexpr int kCUDARawAlloc = 2;
     static constexpr int kCUDARawDelete = 3;
-    static constexpr int kRecordStream = 4;
+    static constexpr int kCUDACurrentStream = 4;
+    static constexpr int kRecordStream = 5;
 #endif  // DGL_USE_CUDA
   };
 
@@ -175,6 +192,7 @@ class TensorDispatcher {
     nullptr,
     nullptr,
 #ifdef DGL_USE_CUDA
+    nullptr,
     nullptr,
     nullptr,
     nullptr,
