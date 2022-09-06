@@ -119,8 +119,18 @@ def go_test_linux() {
 }
 
 def is_authorized(name) {
-  def authorized_user = ['VoVAllen', 'BarclayII', 'jermainewang', 'zheng-da', 'mufeili', 'Rhett-Ying', 'isratnisa']
-  return (name in authorized_user)
+  def devs = ['dgl-bot', 'noreply', 'Rhett-Ying', 'BarclayII', 'jermainewang',
+              'mufeili', 'isratnisa', 'ru_dongyu', 'classicsong', 'HuXiangkun',
+              'hetong007', 'kylasa', 'frozenbugs', 'peizhou001', 'zheng-da',
+              'nv-dlasalle', 'yaox12', 'chang-l', 'Kh4L',
+              'VoVAllen',
+              ]
+  return (name in devs)
+}
+
+def is_admin(name) {
+  def admins = ['dgl-bot', 'Rhett-Ying', 'BarclayII', 'jermainewang']
+  return (name in admins)
 }
 
 pipeline {
@@ -129,7 +139,52 @@ pipeline {
         issueCommentTrigger('@dgl-bot .*')
   }
   stages {
-    stage('Regression Test Trigger') {
+    stage('Authentication') {
+      agent {
+        docker {
+            label 'linux-benchmark-node'
+            image 'dgllib/dgl-ci-lint'
+            alwaysPull true
+        }
+      }
+      when { not { triggeredBy 'IssueCommentCause' } }
+      steps {
+        script {
+          def author = env.CHANGE_AUTHOR
+          def prOpenTriggerCause = currentBuild.getBuildCauses('jenkins.branch.BranchEventCause')
+          def first_run = prOpenTriggerCause && env.BUILD_ID == '1'
+          if (!is_authorized(author)) {
+            if (first_run) {
+              pullRequest.comment("Not authorized to trigger CI. Please ask core developer to help trigger via issuing comment: \n - `@dgl-bot`")
+            }
+            error("Authentication failed.")
+          }
+          if (first_run) {
+            pullRequest.comment('To trigger regression tests: \n - `@dgl-bot run [instance-type] [which tests] [compare-with-branch]`; \n For example: `@dgl-bot run g4dn.4xlarge all dmlc/master` or `@dgl-bot run c5.9xlarge kernel,api dmlc/master`')
+          }
+        }
+      }
+    }
+    stage('AuthenticationComment') {
+      agent {
+        docker {
+            label 'linux-benchmark-node'
+            image 'dgllib/dgl-ci-lint'
+            alwaysPull true
+        }
+      }
+      when { triggeredBy 'IssueCommentCause' }
+      steps {
+        script {
+          def author = env.GITHUB_COMMENT_AUTHOR
+          if (!is_authorized(author)) {
+            pullRequest.comment("Not authorized to trigger CI via issuing comment.")
+            error("Authentication failed.")
+          }
+        }
+      }
+    }
+    stage('Regression Test') {
       agent {
         docker {
             label 'linux-benchmark-node'
@@ -146,7 +201,7 @@ pipeline {
               def author = env.GITHUB_COMMENT_AUTHOR
               echo("${env.GIT_URL}")
               echo("${env}")
-              if (!is_authorized(author)) {
+              if (!is_admin(author)) {
                 error('Not authorized to launch regression tests')
               }
               dir('benchmark_scripts_repo') {
@@ -174,28 +229,7 @@ pipeline {
         // }
       }
     }
-    stage('Bot Instruction') {
-      agent {
-        docker {
-            label 'linux-benchmark-node'
-            image 'dgllib/dgl-ci-lint'
-            alwaysPull true
-        }
-      }
-      steps {
-        script {
-          def prOpenTriggerCause = currentBuild.getBuildCauses('jenkins.branch.BranchEventCause')
-          if (prOpenTriggerCause) {
-            if (env.BUILD_ID == '1') {
-              pullRequest.comment('To trigger regression tests: \n - `@dgl-bot run [instance-type] [which tests] [compare-with-branch]`; \n For example: `@dgl-bot run g4dn.4xlarge all dmlc/master` or `@dgl-bot run c5.9xlarge kernel,api dmlc/master`')
-            }
-          }
-          echo('Not the first build')
-        }
-      }
-    }
     stage('CI') {
-      when { not { triggeredBy 'IssueCommentCause' } }
       stages {
         stage('Lint Check') {
           agent {
