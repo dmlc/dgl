@@ -51,6 +51,11 @@ void* CUDARawAlloc(size_t nbytes, cudaStream_t stream);
  * \param ptr Pointer to the memory to be freed.
  */
 void CUDARawDelete(void* ptr);
+
+/*!
+ * \brief Get the current CUDA stream.
+ */
+cudaStream_t CUDACurrentStream();
 #endif  // DGL_USE_CUDA
 
 }
