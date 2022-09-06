@@ -59,7 +59,7 @@ def stream(cuda_stream):
     """
     return StreamContext(cuda_stream)
 
-def to_dgl_stream_handle(stream):
+def to_dgl_stream_handle(cuda_stream):
     """ Convert torch.cuda.Stream to DGL stream handle
 
     Parameters
@@ -70,9 +70,9 @@ def to_dgl_stream_handle(stream):
     -------
     DGLStreamHandle.
     """
-    return ctypes.c_void_p(stream.cuda_stream)
+    return ctypes.c_void_p(cuda_stream.cuda_stream)
 
-def _dgl_set_stream(ctx, stream):
+def _dgl_set_stream(ctx, cuda_stream):
     """ Set the current CUDA stream of the given DGL context.
     Use of this function is discouraged in favor of torch's stream context.
 
@@ -81,7 +81,7 @@ def _dgl_set_stream(ctx, stream):
     ctx: DGLContext
     stream: DGLStreamHandle
     """
-    check_call(_LIB.DGLSetStream(ctx.device_type, ctx.device_id, stream))
+    check_call(_LIB.DGLSetStream(ctx.device_type, ctx.device_id, cuda_stream))
 
 def _dgl_get_stream(ctx):
     """Get the current CUDA stream of the given DGL context.
