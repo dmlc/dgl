@@ -2590,7 +2590,7 @@ def test_module_feat_mask(idtype):
 @parametrize_idtype
 def test_module_double_radius_node_labeling(idtype):
     transform = dgl.DoubleRadiusNodeLabeling('drnl')
-    g = dgl.graph(([0, 0, 0, 0, 1, 1, 2, 4], [1, 2, 3, 6, 3, 3, 4, 5]),
+    g = dgl.graph(([0, 0, 0, 0, 1, 1, 2, 4], [1, 2, 3, 6, 3, 4, 4, 5]),
         idtype=idtype, device=F.ctx())
     new_g = transform(g, 0, 1)
     tgt = F.copy_to(F.tensor([1, 1, 3, 2, 3, 7, 0], dtype=F.int64), g.device)
