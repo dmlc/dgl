@@ -473,7 +473,7 @@ inline NDArray NDArray::CopyTo(const DGLContext &ctx) const {
 
 inline NDArray NDArray::Clone() const {
   CHECK(data_ != nullptr);
-  const DLTensor* dptr = operator->();
+  const DGLArray* dptr = operator->();
   return this->CopyTo(dptr->ctx);
 }
 
