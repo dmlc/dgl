@@ -133,6 +133,7 @@ class TensorDispatcher {
     auto entry = entrypoints_[Op::kCUDACurrentStream];
     return FUNCCAST(tensoradapter::CUDACurrentStream, entry)();
   }
+#endif  // DGL_USE_CUDA
 
   /*!
    * \brief Record streams that are using this tensor.
@@ -143,11 +144,12 @@ class TensorDispatcher {
    * \param device_id Device of the tensor.
    */
   inline void RecordStream(void* ptr, DGLStreamHandle stream, int device_id) {
+#ifdef DGL_USE_CUDA
     auto entry = entrypoints_[Op::kRecordStream];
     FUNCCAST(tensoradapter::RecordStream, entry)(
       ptr, static_cast<cudaStream_t>(stream), device_id);
-  }
 #endif  // DGL_USE_CUDA
+  }
 
  private:
   /*! \brief ctor */
