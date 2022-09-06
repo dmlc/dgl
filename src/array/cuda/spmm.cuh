@@ -644,6 +644,106 @@ __global__ void SpMMCmpCsrHeteroKernel(
 }
 
 /*!
+ * \brief CUDA kernel of Edge Softmax Forward on Csr format.
+ * \note 
+ */
+
+template <typename Idx, typename DType,
+          typename Op,
+          bool UseBcast = false, bool UseIdx = false>
+__global__ void EdgeSoftmaxCsrForwardKernel(
+    const DType* __restrict__ ufeat,
+    const DType* __restrict__ efeat,
+    DType* __restrict__ out,
+    const Idx* __restrict__ indptr,
+    const Idx* __restrict__ indices,
+    const Idx* __restrict__ edge_map,
+    int64_t num_rows, int64_t num_cols,
+    const int64_t* __restrict__ ubcast_off,
+    const int64_t* __restrict__ ebcast_off,
+    int64_t ufeat_len, int64_t efeat_len, int64_t out_len) {
+  int ty = blockIdx.y * blockDim.y + threadIdx.y;
+  const Idx stride_y = blockDim.y * gridDim.y;
+  const int stride_x = blockDim.x * gridDim.x;
+  while (ty < num_rows) {
+    int tx = blockIdx.x * blockDim.x + threadIdx.x;
+    const Idx row_start = indptr[ty], row_end = indptr[ty+1];
+    while (tx < out_len) {
+      const int64_t rhs_add = UseBcast ? ebcast_off[tx] : tx;
+      DType max_v = -std::numeric_limits<DType>::infinity();
+      for (Idx i = row_start; i < row_end; ++i) {
+        const Idx eid = UseIdx ? _ldg(edge_map + i) : i;
+        const DType * eoff = Op::use_rhs ? 
+                          (efeat + eid * efeat_len + rhs_add) : nullptr;
+        max_v = _FindMax<DType>(max_v, _ldg(eoff));
+      }
+      DType exp_sum = 0;
+      for (Idx i = row_start; i < row_end; ++i) {
+        const Idx eid = UseIdx ? _ldg(edge_map + i) : i;
+        const DType * eoff = Op::use_rhs ? 
+                          (efeat + eid * efeat_len + rhs_add) : nullptr; 
+        DType ele = _CalExp<DType>(_ldg(eoff) - max_v);
+        exp_sum += ele;
+        out[eid*out_len + tx] = ele;
+      }
+
+      for (Idx i = row_start; i < row_end; ++i) {
+        const Idx eid = UseIdx ? _ldg(edge_map + i) : i;
+        DType val = out[eid*out_len + tx] / exp_sum;
+        out[eid*out_len + tx] = val;
+      }
+      tx += stride_x;
+    }
+    ty += stride_y;
+  }
+}
+
+/*!
+ * \brief CUDA kernel of Edge Softmax Backward on Csr format.
+ * \note 
+ */
+
+template <typename Idx, typename DType,
+          typename Op,
+          bool UseBcast = false, bool UseIdx = false>
+__global__ void EdgeSoftmaxCsrBackwardKernel(
+    const DType* __restrict__ out,
+    const DType* __restrict__ sds,
+    DType* __restrict__ back_out,
+    const Idx* __restrict__ indptr,
+    const Idx* __restrict__ indices,
+    const Idx* __restrict__ edge_map,
+    int64_t num_rows, int64_t num_cols,
+    const int64_t* __restrict__ lhs_off,
+    const int64_t* __restrict__ rhs_off,
+    int64_t out_len, int64_t sds_len, int64_t back_out_len) {
+  int ty = blockIdx.y * blockDim.y + threadIdx.y;
+  const Idx stride_y = blockDim.y * gridDim.y;
+  const int stride_x = blockDim.x * gridDim.x;
+  while (ty < num_rows) {
+    int tx = blockIdx.x * blockDim.x + threadIdx.x;    
+    const Idx row_start = indptr[ty], row_end = indptr[ty+1];
+    while (tx < out_len) {
+      DType sum_sds = 0.;
+      const int64_t rhs_add = UseBcast ? rhs_off[tx] : tx;
+      for (Idx i = row_start; i < row_end; ++i) {
+        const Idx eid = UseIdx ? edge_map[i] : i;
+        const DType * sds_off = Op::use_rhs ? sds + eid*sds_len + rhs_add : nullptr;
+        sum_sds += _ldg(sds_off);
+      }
+      for (Idx i = row_start; i < row_end; ++i) {
+        const Idx eid = UseIdx ? edge_map[i] : i;
+        const DType * out_off = Op::use_rhs ? out + eid*out_len + rhs_add : nullptr;
+        const DType * sds_off = Op::use_rhs ? sds + eid*sds_len + rhs_add : nullptr;
+        back_out[eid*back_out_len + tx] = _ldg(sds_off) - sum_sds * _ldg(out_off);
+      }
+      tx += stride_x;
+    }
+    ty += stride_y;
+  }
+}
+
+/*!
  * \brief CUDA implementation of g-SpMM on Coo format.
  * \param bcast Broadcast information.
  * \param coo The Coo matrix.
@@ -844,6 +944,93 @@ void SpMMCmpCsrHetero(
   });
 }
 
+/*!
+ * \brief CUDA implementation of Edge_softmax_csr_forward on Csr format.
+ * \param bcast Broadcast information.
+ * \param coo The Csr matrix.
+ * \param ufeat The feature on source nodes.
+ * \param efeat The feature on edges.
+ * \param out The result feature.
+ */
+template <typename Idx, typename DType, typename Op>
+void Edge_softmax_csr_forward(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
+                NDArray efeat, NDArray out) {
+  const Idx *indptr = csr.indptr.Ptr<Idx>();
+  const Idx *indices = csr.indices.Ptr<Idx>();
+  const Idx *edge_map = csr.data.Ptr<Idx>();
+  const DType *ufeat_data = ufeat.Ptr<DType>();
+  const DType *efeat_data = efeat.Ptr<DType>();
+  DType *out_data = out.Ptr<DType>();
+
+  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+
+  int64_t *ubcast_off = nullptr, *ebcast_off = nullptr;
+  int64_t out_len = bcast.out_len,
+          ufeat_len = bcast.lhs_len,
+          efeat_len = bcast.rhs_len;
+  const int ntx = FindNumThreads(out_len);
+  const int nty = CUDA_MAX_NUM_THREADS / ntx;
+  const int nbx = (out_len + ntx - 1) / ntx;
+  const int nby = FindNumBlocks<'y'>((csr.num_rows + nty - 1)/nty);
+  const dim3 nblks(nbx, nby);
+  const dim3 nthrs(ntx, nty);
+  const bool use_idx = !IsNullArray(csr.data);
+
+  BCAST_IDX_CTX_SWITCH(bcast, use_idx, efeat->ctx, ubcast_off, ebcast_off, {
+    CUDA_KERNEL_CALL(
+      (EdgeSoftmaxCsrForwardKernel<Idx, DType, Op, UseBcast, UseIdx>),
+      nblks, nthrs, 0, thr_entry->stream,
+      ufeat_data, efeat_data, out_data,
+      indptr, indices, edge_map,
+      csr.num_rows, csr.num_cols,
+      ubcast_off, ebcast_off,
+      ufeat_len, efeat_len, out_len)
+  });
+} 
+
+/*!
+ * \brief GPU kernel of Edge_softmax_csr_backward on Csr format.
+ * \param bcast Broadcast information.
+ * \param csr The Csr matrix.
+ * \param out The result of forward.
+ * \param sds The result of gradiet * out.
+ * \param back_out The result of edge_softmax_backward.
+ */
+template <typename Idx, typename DType, typename Op>
+void Edge_softmax_csr_backward(const BcastOff& bcast, const CSRMatrix& csr, NDArray out,
+                NDArray sds, NDArray back_out) {
+  const Idx *indptr = csr.indptr.Ptr<Idx>();
+  const Idx *indices = csr.indices.Ptr<Idx>();
+  const Idx *edge_map = csr.data.Ptr<Idx>();
+  const DType *out_data = out.Ptr<DType>();
+  const DType *sds_data = sds.Ptr<DType>();
+  DType *back_out_data = back_out.Ptr<DType>();
+
+  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+
+  int64_t *lhs_off = nullptr, *rhs_off = nullptr;
+  int64_t back_out_len = bcast.out_len,
+          out_len = bcast.rhs_len,
+          sds_len = bcast.rhs_len; 
+  const int ntx = FindNumThreads(back_out_len);
+  const int nty = CUDA_MAX_NUM_THREADS / ntx;
+  const int nbx = (back_out_len + ntx - 1) / ntx;
+  const int nby = FindNumBlocks<'y'>((csr.num_rows + nty - 1)/nty);
+  const dim3 nblks(nbx, nby);
+  const dim3 nthrs(ntx, nty);
+  const bool use_idx = !IsNullArray(csr.data);
+
+  BCAST_IDX_CTX_SWITCH(bcast, use_idx, out->ctx, lhs_off, rhs_off, {
+    CUDA_KERNEL_CALL(
+      (EdgeSoftmaxCsrBackwardKernel<Idx, DType, Op, UseBcast, UseIdx>),
+      nblks, nthrs, 0, thr_entry->stream,
+      out_data, sds_data, back_out_data,
+      indptr, indices, edge_map,
+      csr.num_rows, csr.num_cols,
+      lhs_off, rhs_off,
+      out_len, sds_len, back_out_len)
+  });
+}
 
 }  // namespace cuda
 }  // namespace aten

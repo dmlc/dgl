@@ -327,11 +327,10 @@ void Edge_softmax_forward(const std::string& op,
           NDArray ufeat,
           NDArray efeat,
           NDArray out) {
-  // TODO(zhejiang): add gpu op for edge_softmax
   SparseFormat format = graph->SelectFormat(0, CSC_CODE);
   const auto& bcast = CalcBcastOff(op, ufeat, efeat);
 
-  ATEN_XPU_SWITCH(graph->Context().device_type, XPU, "edge_softmax", {
+  ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, "edge_softmax", {
     ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
       ATEN_FLOAT_BITS_SWITCH(out->dtype, bits, "edge_softmax out data", {
         Edge_softmax_csr_forward<XPU, IdType, bits>(
@@ -349,11 +348,10 @@ void Edge_softmax_backward(const std::string& op,
           NDArray sds,
           NDArray back_out,
           NDArray ufeat) {
-  // TODO(zhejiang): add gpu op for edge_softmax
   SparseFormat format = graph->SelectFormat(0, CSC_CODE);
   const auto& bcast = CalcBcastOff(op, ufeat, sds);
 
-  ATEN_XPU_SWITCH(graph->Context().device_type, XPU, "edge_softmax_back", {
+  ATEN_XPU_SWITCH_CUDA(graph->Context().device_type, XPU, "edge_softmax_back", {
     ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
       ATEN_FLOAT_BITS_SWITCH(out->dtype, bits, "edge_softmax out data_back", {
         Edge_softmax_csr_backward<XPU, IdType, bits>(

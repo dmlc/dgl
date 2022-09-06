@@ -254,6 +254,65 @@ __device__ IdType _BinarySearch(const IdType *A, int64_t n, IdType x) {
   return n;  // not found
 }
 
+/*!
+ * \brief Find the maximum one of two input values.
+ * Specialized for half, float and double types to use cuda math function.
+ * 
+ * @param a: The first value to be compared
+ * @param b: The second value to be compared.
+ * @return the maximum value. 
+ */
+
+template <typename DType>
+__device__ inline DType _FindMax(DType a, DType b) {
+  return a > b ? a : b;
+}
+
+#ifdef USE_FP16
+template <>
+__device__ inline half _FindMax(half a, half b) {
+  return __hmax(a, b);
+}
+#endif
+
+template <>
+__device__ inline float _FindMax(float a, float b) {
+  return fmaxf(a, b);
+}
+
+template <>
+__device__ inline double _FindMax(double a, double b) {
+  return fmax(a, b);
+}
+
+/*!
+ * \brief Calculate the exp of a floating point value.
+ * Specilaized for half, float and double types to use cuda math function.
+ * 
+ * @param f: Input floating point value.
+ * @return The exp(f).
+ */
+
+template <typename DType>
+__device__ inline DType _CalExp(DType f);
+
+#ifdef USE_FP16
+template <>
+__device__ inline half _CalExp(half f) {
+  return hexp(f);
+}
+#endif
+
+template <>
+__device__ inline float _CalExp(float f) {
+  return expf(f);
+}
+
+template <>
+__device__ inline double _CalExp(double f) {
+  return exp(f);
+}
+
 }  // namespace cuda
 }  // namespace dgl
 

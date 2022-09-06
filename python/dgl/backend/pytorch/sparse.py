@@ -449,15 +449,7 @@ class EdgeSoftmax(th.autograd.Function):
             gidx = gidx.edge_subgraph([eids], True).graph
         if norm_by == 'src':
             gidx = gidx.reverse()
-        #Note: Now _edge_softmax_forward op only supports CPU
-        #TODO(Zhejiang): We will support GPU in the future
-        if(score.is_cuda):
-            score_max = _gspmm(gidx, 'copy_rhs', 'max', None, score)[0]
-            score = th.exp(_gsddmm(gidx, 'sub', score, score_max, 'e', 'v'))
-            score_sum = _gspmm(gidx, 'copy_rhs', 'sum', None, score)[0]
-            out = _gsddmm(gidx, 'div', score, score_sum, 'e', 'v')
-        else:
-            out = _edge_softmax_forward(gidx, score, 'copy_rhs')
+        out = _edge_softmax_forward(gidx, score, 'copy_rhs')
         ctx.backward_cache = gidx
         ctx.save_for_backward(out)
         return out
@@ -483,13 +475,8 @@ class EdgeSoftmax(th.autograd.Function):
         out, = ctx.saved_tensors
         sds = out * grad_out
         #Note: Now _edge_softmax_backward op only supports CPU
-        #TODO(Zhejiang): We will support GPU in the future
-        if(out.is_cuda):
-            accum = gspmm(gidx, 'copy_rhs', 'sum', None, sds)
+        grad_score = _edge_softmax_backward(gidx, out, sds)
 
-            grad_score = sds - gsddmm(gidx, 'mul', out, accum, 'e', 'v')
-        else:
-            grad_score = _edge_softmax_backward(gidx, out, sds)
         return None, grad_score, None, None
 
 
