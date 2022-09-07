@@ -31,6 +31,9 @@ To quickly locate the examples of your interest, search for the tagged keywords 
 - <a name='bgrl'></a> Thakoor et al. Large-Scale Representation Learning on Graphs via Bootstrapping. [Paper link](https://arxiv.org/abs/2102.06514).
     - Example code: [PyTorch](../examples/pytorch/bgrl)
     - Tags: contrastive learning for node classification.
+- <a name='directional_gsn'></a> Bouritsas et al. Improving Graph Neural Network Expressivity via Subgraph Isomorphism Counting. [Paper link](https://arxiv.org/abs/2006.09252).
+    - Example code: [PyTorch](../examples/pytorch/ogb/directional_GSN)
+    - Tags: subgraph isomorphism counting, graph classification.
 - <a name='ngnn'></a> Song et al. Network In Graph Neural Network. [Paper link](https://arxiv.org/abs/2111.11638).
     - Example code: [PyTorch](../examples/pytorch/ogb/ngnn)
     - Tags: model-agnostic methodology, link prediction, open graph benchmark.
@@ -97,6 +100,9 @@ To quickly locate the examples of your interest, search for the tagged keywords 
 - <a name="caregnn"></a> Dou Y, Liu Z, et al. Enhancing Graph Neural Network-based Fraud Detectors against Camouflaged Fraudsters. [Paper link](https://arxiv.org/abs/2008.08692).
     - Example code: [PyTorch](../examples/pytorch/caregnn)
     - Tags: Multi-relational graph, Graph neural network, Fraud detection, Reinforcement learning, Node classification
+- <a name="seal_ogbl"></a>  Zhang et al. Labeling Trick: A Theory of Using Graph Neural Networks for Multi-Node Representation Learning. [Paper link](https://arxiv.org/pdf/2010.16103.pdf).
+    - Example code: [PyTorch](../examples/pytorch/ogb/seal_ogbl)
+    - Tags: link prediction, labeling trick, OGB
 
 ## 2019
 

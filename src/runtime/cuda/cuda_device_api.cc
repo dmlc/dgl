@@ -1,5 +1,5 @@
 /*!
- *  Copyright (c) 2017 by Contributors
+ *  Copyright (c) 2017-2022 by Contributors
  * \file cuda_device_api.cc
  * \brief GPU specific API
  */
@@ -107,7 +107,12 @@ class CUDADeviceAPI final : public DeviceAPI {
                        size_t nbytes,
                        size_t alignment,
                        DGLType type_hint) final {
-    CUDA_CALL(cudaSetDevice(ctx.device_id));
+    SetDevice(ctx);
+    // Redirect to PyTorch's allocator when available.
+    TensorDispatcher* td = TensorDispatcher::Global();
+    if (td->IsAvailable())
+      return td->CUDAAllocWorkspace(nbytes, CUDAThreadEntry::ThreadLocal()->stream);
+
     CHECK_EQ(256 % alignment, 0U)
         << "CUDA space is aligned at 256 bytes";
     void *ret;
@@ -116,7 +121,11 @@ class CUDADeviceAPI final : public DeviceAPI {
   }
 
   void FreeDataSpace(DGLContext ctx, void* ptr) final {
-    CUDA_CALL(cudaSetDevice(ctx.device_id));
+    SetDevice(ctx);
+    TensorDispatcher* td = TensorDispatcher::Global();
+    if (td->IsAvailable())
+      return td->CUDAFreeWorkspace(ptr);
+
     CUDA_CALL(cudaFree(ptr));
   }
 
@@ -128,7 +137,7 @@ class CUDADeviceAPI final : public DeviceAPI {
                       DGLContext ctx_from,
                       DGLContext ctx_to,
                       DGLType type_hint,
-                      DGLStreamHandle stream) final {
+                      DGLStreamHandle stream) {
     cudaStream_t cu_stream = static_cast<cudaStream_t>(stream);
     from = static_cast<const char*>(from) + from_offset;
     to = static_cast<char*>(to) + to_offset;
@@ -150,6 +159,18 @@ class CUDADeviceAPI final : public DeviceAPI {
     } else {
       LOG(FATAL) << "expect copy from/to GPU or between GPU";
     }
+  }
+
+  void CopyDataFromTo(const void* from,
+                      size_t from_offset,
+                      void* to,
+                      size_t to_offset,
+                      size_t size,
+                      DGLContext ctx_from,
+                      DGLContext ctx_to,
+                      DGLType type_hint) final {
+    auto stream = static_cast<DGLStreamHandle>(CUDAThreadEntry::ThreadLocal()->stream);
+    CopyDataFromTo(from, from_offset, to, to_offset, size, ctx_from, ctx_to, type_hint, stream);
   }
 
   DGLStreamHandle CreateStream(DGLContext ctx) {
@@ -246,21 +267,22 @@ class CUDADeviceAPI final : public DeviceAPI {
   }
 
   void* AllocWorkspace(DGLContext ctx, size_t size, DGLType type_hint) final {
-    // Redirect to PyTorch's allocator when available.
     SetDevice(ctx);
+    // Redirect to PyTorch's allocator when available.
     TensorDispatcher* td = TensorDispatcher::Global();
     if (td->IsAvailable())
-      return td->AllocWorkspace(size);
-    else
-      return CUDAThreadEntry::ThreadLocal()->pool.AllocWorkspace(ctx, size);
+      return td->CUDAAllocWorkspace(size, CUDAThreadEntry::ThreadLocal()->stream);
+
+    return CUDAThreadEntry::ThreadLocal()->pool.AllocWorkspace(ctx, size);
   }
 
   void FreeWorkspace(DGLContext ctx, void* data) final {
+    SetDevice(ctx);
     TensorDispatcher* td = TensorDispatcher::Global();
     if (td->IsAvailable())
-      td->FreeWorkspace(data);
-    else
-      CUDAThreadEntry::ThreadLocal()->pool.FreeWorkspace(ctx, data);
+      return td->CUDAFreeWorkspace(data);
+
+    CUDAThreadEntry::ThreadLocal()->pool.FreeWorkspace(ctx, data);
   }
 
   static const std::shared_ptr<CUDADeviceAPI>& Global() {
@@ -287,8 +309,13 @@ class CUDADeviceAPI final : public DeviceAPI {
 
 typedef dmlc::ThreadLocalStore<CUDAThreadEntry> CUDAThreadStore;
 
+// TODO(cliu): cuda streams should depend on the current device, therefore we should set device
+//             before setting stream.
 CUDAThreadEntry::CUDAThreadEntry()
     : pool(kDLGPU, CUDADeviceAPI::Global()) {
+  TensorDispatcher* td = TensorDispatcher::Global();
+  if (td->IsAvailable())
+    stream = td->CUDAGetCurrentStream();
 }
 
 CUDAThreadEntry* CUDAThreadEntry::ThreadLocal() {

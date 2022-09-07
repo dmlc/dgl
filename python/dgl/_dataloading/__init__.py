@@ -20,7 +20,6 @@ from .cluster_gcn import *
 from .shadow import *
 
 from . import negative_sampler
-from .async_transferer import AsyncTransferer
 
 from .. import backend as F
 
