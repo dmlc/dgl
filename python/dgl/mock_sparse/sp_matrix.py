@@ -2,7 +2,7 @@ import torch
 from typing import Optional, Tuple
 
 class SparseMatrix:
-    """Class for sparse matrix.
+    r'''Class for sparse matrix.
 
     Parameters
     ----------
@@ -16,27 +16,42 @@ class SparseMatrix:
 
     Attributes
     ----------
-    shape
-    nnz
-    dtype
-    device
-    row
-    col
-    val
+    shape : tuple[int]
+        The shape of the sparse matrix.
+    nnz : int
+        The number of nonzero elements in the sparse matrix.
+    dtype : torch.dtype
+        Data type of the values of the sparse matrix.
+    device : torch.device
+        Device of the sparse matrix.
+    row : tensor
+        Get the row indices of the nonzero elements.
+    col: tensor
+        Get the row indices of the nonzero elements.
+    val: tensor
+        Get the values of the nonzero elements.
 
     Methods
     -------
-    indices
+    indices(format, return_shuffle=False)
+        Get the indices of the nonzero elements.
     coo
+        Get the coordinate (COO) representation of the sparse matrix.
     csr
+        Get the CSR (Compressed Sparse Row) representation of the sparse matrix.
+    csc
+        Get the CSC (Compressed Sparse Column) representation of the sparse matrix.
     dense
+        Get the dense representation of the sparse matrix.
 
     Examples
     --------
-    Case1: Sparse matrix with row and column indices without values.
+    Case1: Sparse matrix with row indices, col indices and values (scalar).
+
     >>> src = torch.tensor([1, 1, 2])
     >>> dst = torch.tensor([2, 4, 3])
-    >>> A = SparseMatrix(src, dst)
+    >>> val = torch.tensor([1, 1, 1])
+    >>> A = SparseMatrix(src, dst, val)
     >>> A.shape
     (3,5)
     >>> A.row
@@ -46,15 +61,16 @@ class SparseMatrix:
     >>> A.nnz
     3
 
-    Case2: Sparse matrix with scalar/vector values. Following example is with
-    vector data.
+    Case2: Sparse matrix with row indices, col indices and values (vector).
+
+    >>> ...
     >>> val = torch.tensor([[1, 1], [2, 2], [3, 3]])
     >>> A = SparseMatrix(src, dst, val)
     >>> A.val
     tensor([[1, 1],
             [2, 2],
             [3, 3]])
-    """
+    '''
     def __init__(self,
         row: torch.Tensor,
         col: torch.Tensor,
