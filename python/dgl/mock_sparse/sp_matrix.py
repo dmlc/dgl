@@ -1,5 +1,6 @@
-import torch
+"""dgl sparse matrix module."""
 from typing import Optional, Tuple
+import torch
 
 class SparseMatrix:
     r'''Class for sparse matrix.
@@ -426,4 +427,3 @@ def create_from_csc(indptr: torch.Tensor,
     col, row = adj_coo.indices()
 
     return SparseMatrix(row, col, val)
-

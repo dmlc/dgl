@@ -1,7 +1,9 @@
+"""dgl elementwise operators for sparse matrix module."""
 import torch
 from .sp_matrix import SparseMatrix
 
 def check_sparsity(A, B):
+    """Checks if two sparse matrices have the same sparsity structure."""
     if not torch.equal(A.indices("COO"), B.indices("COO")):
         raise ValueError('The two input matrices have different sparsity pattern')
 
@@ -215,4 +217,3 @@ SparseMatrix.__truediv__ = div
 SparseMatrix.__rtruediv__ = rdiv
 SparseMatrix.__pow__ = power
 SparseMatrix.__rpow__ = rpower
-

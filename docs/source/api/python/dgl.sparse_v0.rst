@@ -11,3 +11,4 @@ Sparse matrix class
 .. currentmodule:: dgl.mock_sparse
 
 .. autoclass:: SparseMatrix
+	:members:
