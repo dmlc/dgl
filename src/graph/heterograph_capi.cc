@@ -103,7 +103,14 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateHeteroGraphWithNumNo
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetMetaGraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
-    *rv = GraphRef(hg->meta_graph());
+    *rv = hg->meta_graph();
+  });
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroIsUniBipartite")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    GraphPtr mg = hg->meta_graph();
+    *rv = mg->IsUniBipartite();
   });
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetRelationGraph")
