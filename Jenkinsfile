@@ -139,6 +139,9 @@ pipeline {
         issueCommentTrigger('@dgl-bot .*')
   }
   stages {
+    // Below 2 stages are to authenticate the change/comment author.
+    // Only core developers are allowed to trigger CI.
+    // Such authentication protects CI from malicious code which may bring CI instances down.
     stage('Authentication') {
       agent {
         docker {
