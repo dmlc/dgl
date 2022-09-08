@@ -20,7 +20,7 @@ class RGCN(nn.Module):
                               regularizer='basis', num_bases=num_bases, self_loop=False)
         self.conv2 = RgcnConv(h_dim, out_dim, num_node_types, num_rels, SAMPLE_SIZE,
                               regularizer='basis', num_bases=num_bases, self_loop=False)
-        
+
     def forward(self, g):
         x = self.emb.weight
         h = F.relu(self.conv1(g, x, g.edata[dgl.ETYPE], norm=g.edata['norm']))
@@ -64,20 +64,20 @@ if __name__ == '__main__':
     model = model.to(device)
 
     optimizer = th.optim.Adam(model.parameters(), lr=1e-2, weight_decay=5e-4)
-    
+
     # training
     model.train()
-    for epoch in range(30):
+    for epoch in range(50):
         logits = model(g)
         logits = logits[target_idx]
         loss = F.cross_entropy(logits[train_idx], labels[train_idx])
         optimizer.zero_grad()
-        
+
         loss.backward()
         optimizer.step()
         train_acc = accuracy(logits[train_idx].argmax(dim=1), labels[train_idx]).item()
         print("Epoch {:05d} | Loss {:.4f} | Train Accuracy {:.4f} ".format(epoch, loss.item(), train_acc))
-    
+
     # evaluation
     model.eval()
     with th.no_grad():

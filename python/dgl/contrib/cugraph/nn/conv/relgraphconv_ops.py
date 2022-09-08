@@ -18,7 +18,7 @@ class RgcnFunction(th.autograd.Function):
         ----------
         g : dgl.heterograph.DGLHeteroGraph, device='cuda'
             Heterogeneous graph.
-        
+
         sample_size : int64
         n_node_types : int64
         n_edge_types : int64
@@ -28,10 +28,10 @@ class RgcnFunction(th.autograd.Function):
 
         coeff : torch.Tensor, dtype=torch.float32, device='cuda', requires_grad=True
             Coefficient matrix in basis-decomposition for regularization, shape = n_edge_types * n_bases
-        
+
         feat : torch.Tensor, dtype=torch.float32, device='cuda', requires_grad=True
             Input feature, shape = n_in_nodes * in_feat
-        
+
         W : torch.Tensor, dtype=torch.float32, device='cuda', requires_grad=True
             shape = (n_bases+1) * in_feat * out_feat_dim
             leading_dimension = (n_bases+1) * in_feat
@@ -58,7 +58,7 @@ class RgcnFunction(th.autograd.Function):
 
         mfg = message_flow_graph_hg_csr_int64(_sample_size, _out_nodes, _in_nodes, indptr, indices,
             n_node_types, n_edge_types, out_node_types, in_node_types, edge_types)
-        
+
         _n_bases = coeff.shape[-1]
         leading_dimension = (_n_bases+1) * feat.shape[-1]
 
@@ -70,14 +70,14 @@ class RgcnFunction(th.autograd.Function):
 
         ctx.backward_cache = mfg
         ctx.save_for_backward(coeff, feat, W, output, agg_out)
-        
+
         return output
 
     @staticmethod
     def backward(ctx, grad_output):
         """
         Compute the backward pass of R-GCN.
-        
+
         Parameters
         ----------
         grad_output : torch.Tensor, dtype=torch.float32, device='cuda'
@@ -91,7 +91,7 @@ class RgcnFunction(th.autograd.Function):
         _out_feat_dim = W.shape[-1]
         g_W = agg_out.t() @ grad_output
         agg_out = grad_output @ W.view(-1, _out_feat_dim).t()   # gradient w.r.t input, reuse buffer
-        
+
         # backward aggregation
         g_in = th.empty_like(feat, dtype=th.float32, device='cuda')
         g_coeff = th.empty_like(coeff, dtype=th.float32, device='cuda')
@@ -115,7 +115,7 @@ class RgcnConv(nn.Module):
                  self_loop=True,
                  dropout=0.0,
                  layer_norm=False):
-        super().__init__()  
+        super().__init__()
         self.in_feat = in_feat
         self.out_feat = out_feat
         self.n_node_types = n_node_types
@@ -133,17 +133,17 @@ class RgcnConv(nn.Module):
         self.activation = activation
         self.self_loop = self_loop
         self.layer_norm = layer_norm
-        
+
         # bias
         if self.bias:
             self.h_bias = nn.Parameter(th.Tensor(out_feat).cuda())
             nn.init.zeros_(self.h_bias)
-        
+
         # self_loop
         if self.self_loop:
             self.loop_weight = nn.Parameter(th.Tensor(in_feat, out_feat).cuda())
             nn.init.xavier_uniform_(self.loop_weight, gain=nn.init.calculate_gain('relu'))
-        
+
         # dropout
         self.dropout = nn.Dropout(dropout)
         self.dropout_val = dropout
@@ -151,7 +151,7 @@ class RgcnConv(nn.Module):
         # TODO(tingyu66): only support basis regularization for now
         if num_bases is None or regularizer is None:
             raise NotImplementedError
-        
+
         if self.layer_norm:
             self.layer_norm_weight = nn.LayerNorm(out_feat, elementwise_affine=True)
 
@@ -174,7 +174,7 @@ class RgcnConv(nn.Module):
                                    self.coeff, feat, self.W)
             g.dstdata['h'] = T
             h = g.dstdata['h']
-            
+
             if self.layer_norm:
                 h = self.layer_norm_weight(h)
             if self.bias:
