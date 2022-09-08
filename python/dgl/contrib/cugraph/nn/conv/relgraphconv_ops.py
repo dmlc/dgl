@@ -121,11 +121,20 @@ class RgcnConv(nn.Module):
         self.n_node_types = n_node_types
         self.num_rels = num_rels
         self.sample_size = sample_size    # fanout
-        self.num_bases = num_bases
 
-        self.W = nn.Parameter(th.Tensor(self.num_bases+1, self.in_feat, self.out_feat).cuda())
-        self.coeff = nn.Parameter(th.Tensor(self.num_rels, self.num_bases).cuda())
-
+        # regularizer (see dgl.nn.pytorch.linear.TypedLinear)
+        if regularizer is None:
+            raise NotImplementedError
+        elif regularizer == 'basis':
+            if num_bases is None:
+                raise ValueError('Missing "num_bases" for basis regularization.')
+            self.W = nn.Parameter(th.Tensor(num_bases+1, in_feat, out_feat).cuda())
+            self.coeff = nn.Parameter(th.Tensor(num_rels, num_bases).cuda())
+            self.num_bases = num_bases
+        else:
+            raise ValueError(
+                f'Supported regularizer options: "basis", but got {regularizer}')
+        self.regularizer = regularizer
         self.reset_parameters()
 
         # others
@@ -168,20 +177,20 @@ class RgcnConv(nn.Module):
                 g.edata['norm'] = norm
             _, _, L = g.adj_sparse("csc")
             etypes = etypes[L]
-
-            T = RgcnFunction.apply(g, self.sample_size, self.n_node_types, self.num_rels,
-                                   g.dstdata[dgl.NTYPE], g.srcdata[dgl.NTYPE], etypes,
-                                   self.coeff, feat, self.W)
-            g.dstdata['h'] = T
+            # message passing
+            output = RgcnFunction.apply(g, self.sample_size, self.n_node_types, self.num_rels,
+                                        g.dstdata[dgl.NTYPE], g.srcdata[dgl.NTYPE], etypes,
+                                        self.coeff, feat, self.W)
+            g.dstdata['h'] = output
             h = g.dstdata['h']
-
+            # apply bias and activation
             if self.layer_norm:
                 h = self.layer_norm_weight(h)
             if self.bias:
                 h = h + self.h_bias
-            if self.activation:
+            if self.self_loop:
                 h = h + feat[:g.num_dst_nodes()] @ self.loop_weight
-
+            if self.activation:
+                h = self.activation(h)
             h = self.dropout(h)
-
             return h
