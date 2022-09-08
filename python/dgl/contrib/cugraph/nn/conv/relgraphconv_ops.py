@@ -60,7 +60,7 @@ class RgcnFunction(th.autograd.Function):
             n_node_types, n_edge_types, out_node_types, in_node_types, edge_types)
 
         _n_bases = coeff.shape[-1]
-        leading_dimension = (_n_bases+1) * feat.shape[-1]
+        leading_dimension = (_n_bases) * feat.shape[-1]
 
         agg_out = th.empty(_n_out_nodes, leading_dimension, dtype=th.float32, device='cuda')
         agg_hg_basis_post_fwd_int64(agg_out, feat.detach(), mfg, weights_combination=coeff.detach())
@@ -128,7 +128,7 @@ class RgcnConv(nn.Module):
         elif regularizer == 'basis':
             if num_bases is None:
                 raise ValueError('Missing "num_bases" for basis regularization.')
-            self.W = nn.Parameter(th.Tensor(num_bases+1, in_feat, out_feat).cuda())
+            self.W = nn.Parameter(th.Tensor(num_bases, in_feat, out_feat).cuda())
             self.coeff = nn.Parameter(th.Tensor(num_rels, num_bases).cuda())
             self.num_bases = num_bases
         else:
