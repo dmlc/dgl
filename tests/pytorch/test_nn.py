@@ -1316,6 +1316,45 @@ def test_gnnexplainer(g, idtype, out_dim):
     model = model.to(F.ctx())
     explainer = nn.GNNExplainer(model, num_hops=1)
     feat_mask, edge_mask = explainer.explain_graph(g, feat)
+    
+@parametrize_idtype
+@pytest.mark.parametrize('g', get_cases(['hetero'], exclude=['zero-degree']))
+@pytest.mark.parametrize('out_dim', [1, 2])
+def test_heterognnexplainer(g, idtype, out_dim):
+    g = g.astype(idtype).to(F.ctx())
+    feat = {ntype: th.zeros((g.num_nodes(ntype), 5)) for ntype in g.ntypes}
+
+    class Model(th.nn.Module):
+        def __init__(self, in_feats, out_feats, rel_names):
+            super(Model, self).__init__()
+            self.conv = nn.HeteroGraphConv({
+                rel: nn.GraphConv(in_feats, out_feats)
+                for rel in rel_names}, aggregate='sum')
+
+        def forward(self, graph, feat, eweight=None):
+            with graph.local_scope():
+                feat = self.conv(graph, feat)
+                feat = {k: F.relu(v) for k, v in feat.items()}
+                graph.ndata['h'] = feat
+                if eweight is None:
+                    graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
+                else:
+                    graph.edata['w'] = eweight
+                    graph.update_all(fn.u_mul_e(
+                        'h', 'w', 'm'), fn.sum('m', 'h'))
+                return graph.ndata['h']
+
+    # Explain node prediction
+    model = Model(5, out_dim)
+    model = model.to(F.ctx())
+    explainer = nn.HeteroGNNExplainer(model, num_hops=1)
+    new_center, sg, feat_mask, edge_mask = explainer.explain_node(0, g, feat)
+
+    # Explain graph prediction
+    model = Model(5, out_dim)
+    model = model.to(F.ctx())
+    explainer = nn.HeteroGNNExplainer(model, num_hops=1)
+    feat_mask, edge_mask = explainer.explain_graph(g, feat)
 
 def test_jumping_knowledge():
     ctx = F.ctx()
