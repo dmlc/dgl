@@ -15,36 +15,6 @@ class SparseMatrix:
         The values of shape (nnz, *). If None, it will be a tensor of shape (nnz)
         filled by 1.
 
-    Attributes
-    ----------
-    shape : tuple[int]
-        The shape of the sparse matrix.
-    nnz : int
-        The number of nonzero elements in the sparse matrix.
-    dtype : torch.dtype
-        Data type of the values of the sparse matrix.
-    device : torch.device
-        Device of the sparse matrix.
-    row : tensor
-        Get the row indices of the nonzero elements.
-    col: tensor
-        Get the row indices of the nonzero elements.
-    val: tensor
-        Get the values of the nonzero elements.
-
-    Methods
-    -------
-    indices(format, return_shuffle=False)
-        Get the indices of the nonzero elements.
-    coo
-        Get the coordinate (COO) representation of the sparse matrix.
-    csr
-        Get the CSR (Compressed Sparse Row) representation of the sparse matrix.
-    csc
-        Get the CSC (Compressed Sparse Column) representation of the sparse matrix.
-    dense
-        Get the dense representation of the sparse matrix.
-
     Examples
     --------
     Case1: Sparse matrix with row indices, col indices and values (scalar).
