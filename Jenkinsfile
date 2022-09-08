@@ -122,7 +122,7 @@ def is_authorized(name) {
   def devs = ['dgl-bot', 'noreply', 'Rhett-Ying', 'BarclayII', 'jermainewang',
               'mufeili', 'isratnisa', 'ru_dongyu', 'classicsong', 'HuXiangkun',
               'hetong007', 'kylasa', 'frozenbugs', 'peizhou001', 'zheng-da',
-              'nv-dlasalle', 'yaox12', 'chang-l', 'Kh4L',
+              'nv-dlasalle', 'yaox12', 'chang-l', 'Kh4L', 'VibhuJawa',
               'VoVAllen',
               ]
   return (name in devs)
@@ -153,7 +153,7 @@ pipeline {
           def author = env.CHANGE_AUTHOR
           def prOpenTriggerCause = currentBuild.getBuildCauses('jenkins.branch.BranchEventCause')
           def first_run = prOpenTriggerCause && env.BUILD_ID == '1'
-          if (!is_authorized(author)) {
+          if (author && !is_authorized(author)) {
             if (first_run) {
               pullRequest.comment("Not authorized to trigger CI. Please ask core developer to help trigger via issuing comment: \n - `@dgl-bot`")
             }
