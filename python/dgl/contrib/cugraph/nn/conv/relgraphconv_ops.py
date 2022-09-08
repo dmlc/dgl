@@ -1,4 +1,4 @@
-"""Torch Module for Relational graph convolution layer using cugraph"""
+"""Torch Module for Relational graph convolution layer using cugraph-ops"""
 # pylint: disable= no-member, arguments-differ, invalid-name
 import dgl
 import math
@@ -49,23 +49,28 @@ class RgcnFunction(th.autograd.Function):
         """
         _n_out_nodes = g.num_dst_nodes('_N')
         _n_in_nodes = g.num_src_nodes('_N')
-        _sample_size = sample_size
-
         _out_nodes = g.dstnodes()
         _in_nodes = g.srcnodes()
+        _in_feat_dim = feat.shape[-1]
+        out_feat_dim = W.shape[-1]
+        indptr, indices, _ = g.adj_sparse('csc')  # edge_ids not needed here
 
-        indptr, indices, edge_ids = g.adj_sparse('csc')
-
-        mfg = message_flow_graph_hg_csr_int64(_sample_size, _out_nodes, _in_nodes, indptr, indices,
+        mfg = message_flow_graph_hg_csr_int64(sample_size, _out_nodes, _in_nodes, indptr, indices,
             n_node_types, n_edge_types, out_node_types, in_node_types, edge_types)
 
-        _n_bases = coeff.shape[-1]
-        leading_dimension = (_n_bases) * feat.shape[-1]
+        if coeff is None:
+            leading_dimension = n_edge_types * _in_feat_dim
+        else:
+            n_bases = coeff.shape[-1]
+            leading_dimension = n_bases * _in_feat_dim
 
         agg_out = th.empty(_n_out_nodes, leading_dimension, dtype=th.float32, device='cuda')
-        agg_hg_basis_post_fwd_int64(agg_out, feat.detach(), mfg, weights_combination=coeff.detach())
 
-        out_feat_dim = W.shape[-1]
+        if coeff is None:
+            agg_hg_basis_post_fwd_int64(agg_out, feat.detach(), mfg)
+        else:
+            agg_hg_basis_post_fwd_int64(agg_out, feat.detach(), mfg, weights_combination=coeff.detach())
+
         output = th.as_tensor(agg_out, device='cuda') @ W.view(leading_dimension, out_feat_dim)
 
         ctx.backward_cache = mfg
@@ -94,9 +99,14 @@ class RgcnFunction(th.autograd.Function):
 
         # backward aggregation
         g_in = th.empty_like(feat, dtype=th.float32, device='cuda')
-        g_coeff = th.empty_like(coeff, dtype=th.float32, device='cuda')
-        agg_hg_basis_post_bwd_int64(g_in, agg_out, feat.detach(), mfg,
-            output_weight_gradient=g_coeff, weights_combination=coeff.detach())
+
+        if coeff is None:
+            g_coeff = None
+            agg_hg_basis_post_bwd_int64(g_in, agg_out, feat.detach(), mfg)
+        else:
+            g_coeff = th.empty_like(coeff, dtype=th.float32, device='cuda')
+            agg_hg_basis_post_bwd_int64(g_in, agg_out, feat.detach(), mfg,
+                output_weight_gradient=g_coeff, weights_combination=coeff.detach())
 
         return None, None, None, None, None, None, None, g_coeff, g_in, g_W.view_as(W)
 
@@ -120,11 +130,12 @@ class RgcnConv(nn.Module):
         self.out_feat = out_feat
         self.n_node_types = n_node_types
         self.num_rels = num_rels
-        self.sample_size = sample_size    # fanout
+        self.sample_size = sample_size  # fanout
 
         # regularizer (see dgl.nn.pytorch.linear.TypedLinear)
         if regularizer is None:
-            raise NotImplementedError
+            self.W = nn.Parameter(th.Tensor(num_rels, in_feat, out_feat).cuda())
+            self.coeff = None
         elif regularizer == 'basis':
             if num_bases is None:
                 raise ValueError('Missing "num_bases" for basis regularization.')
@@ -148,26 +159,27 @@ class RgcnConv(nn.Module):
             self.h_bias = nn.Parameter(th.Tensor(out_feat).cuda())
             nn.init.zeros_(self.h_bias)
 
-        # self_loop
+        # layer norm
+        if self.layer_norm:
+            self.layer_norm_weight = nn.LayerNorm(out_feat, elementwise_affine=True)
+
+        # weight for self_loop
         if self.self_loop:
             self.loop_weight = nn.Parameter(th.Tensor(in_feat, out_feat).cuda())
             nn.init.xavier_uniform_(self.loop_weight, gain=nn.init.calculate_gain('relu'))
 
-        # dropout
         self.dropout = nn.Dropout(dropout)
-        self.dropout_val = dropout
-
-        # TODO(tingyu66): only support basis regularization for now
-        if num_bases is None or regularizer is None:
-            raise NotImplementedError
-
-        if self.layer_norm:
-            self.layer_norm_weight = nn.LayerNorm(out_feat, elementwise_affine=True)
 
     def reset_parameters(self):
         with th.no_grad():
-            nn.init.uniform_(self.W, -1/math.sqrt(self.in_feat), 1/math.sqrt(self.in_feat))
-            nn.init.xavier_uniform_(self.coeff, gain=nn.init.calculate_gain('relu'))
+            if self.regularizer is None:
+                nn.init.uniform_(self.W, -1/math.sqrt(self.in_feat), 1/math.sqrt(self.in_feat))
+            elif self.regularizer == 'basis':
+                nn.init.uniform_(self.W, -1/math.sqrt(self.in_feat), 1/math.sqrt(self.in_feat))
+                nn.init.xavier_uniform_(self.coeff, gain=nn.init.calculate_gain('relu'))
+            else:
+                raise ValueError(
+                    f'Supported regularizer options: "basis", but got {self.regularizer}')
 
     def forward(self, g, feat, etypes, norm=None, presorted=False):
         self.presorted = presorted
@@ -175,6 +187,7 @@ class RgcnConv(nn.Module):
             g.srcdata['h'] = feat
             if norm is not None:
                 g.edata['norm'] = norm
+            # TODO(tingyu66): do we really need to reorder edges as below
             _, _, L = g.adj_sparse("csc")
             etypes = etypes[L]
             # message passing
