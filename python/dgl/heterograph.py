@@ -97,7 +97,7 @@ class DGLHeteroGraph(object):
                 errmsg = 'Invalid input. Expect a pair (srctypes, dsttypes) but got {}'.format(
                     ntypes)
                 raise TypeError(errmsg)
-            if not is_unibipartite(self._graph.metagraph):
+            if not self._graph.is_unibipartite():
                 raise ValueError('Invalid input. The metagraph must be a uni-directional'
                                  ' bipartite graph.')
             self._ntypes = ntypes[0] + ntypes[1]
