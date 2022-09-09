@@ -85,6 +85,11 @@ def test_record_stream_smoke():
 
 @unittest.skipIf(F._default_context_str == 'cpu', reason="stream only runs on GPU.")
 # borrowed from PyTorch, test/test_cuda.py: test_record_stream()
+# TODO(Xin): Currently we don't have an equivalent API for dgl.graph
+# as tensor.data_ptr() to check if the memory has been reused or not.
+# The underlying sparse matrices or NDArrays of dgl.graph have not 
+# been exposed to Python and we have not way to access them.
+# Therefore, we only test record_stream for NDArray here.
 def test_record_stream():
     cycles_per_ms = _get_cycles_per_ms()
 
@@ -107,7 +112,7 @@ def test_record_stream():
 
     perform_copy()
     with torch.cuda.stream(stream):
-        tmp2 = nd.array(np.array([1., 2., 3., 4.], dtype=np.float32), ctx=nd.gpu(0))
+        tmp2 = nd.empty([4], ctx=nd.gpu(0))
         assert F.from_dgl_nd(tmp2).data_ptr() != ptr[0], 'allocation re-used to soon'
 
     assert torch.equal(F.from_dgl_nd(result).cpu(), torch.tensor([1., 2., 3., 4.]))
