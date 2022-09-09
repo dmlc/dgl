@@ -35,9 +35,7 @@ def get_lib_path():
     libinfo = {'__file__': libinfo_py}
     exec(
         compile(
-            open(
-                libinfo_py,
-                "rb").read(),
+            open(libinfo_py, "rb").read(),
             libinfo_py,
             'exec'),
         libinfo,
