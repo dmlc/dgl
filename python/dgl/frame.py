@@ -492,6 +492,17 @@ class Column(TensorStorage):
             self._data_nd = None
             self.pinned_by_dgl = False
 
+    def record_stream(self, stream):
+        """Record that stream is using the storage.
+        Does nothing if the backend is not PyTorch.
+
+        Parameters
+        ----------
+        stream : torch.cuda.Stream.
+        """
+        if F.get_preferred_backend() == 'pytorch':
+            self.data.record_stream(stream)
+
 class Frame(MutableMapping):
     """The columnar storage for node/edge features.
 

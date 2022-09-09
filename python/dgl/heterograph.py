@@ -5597,7 +5597,12 @@ class DGLHeteroGraph(object):
         DGLGraph
             self.
         """
-        return self._graph.record_stream(stream)
+        self._graph.record_stream(stream)
+        for frame in itertools.chain(self._node_frames, self._edge_frames):
+            for col in frame._columns.values():
+                col.record_stream(stream)
+
+        return self
 
     def clone(self):
         """Return a heterograph object that is a clone of current graph.
