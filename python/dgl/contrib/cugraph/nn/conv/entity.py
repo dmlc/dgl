@@ -32,7 +32,9 @@ class RGCN(nn.Module):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='RGCN for entity classification')
     parser.add_argument("--dataset", type=str, default="aifb",
-                        help="Dataset name ('aifb', 'mutag', 'bgs', 'am').")
+                        help="Dataset name ('aifb', 'mutag', 'bgs', 'am'), default to 'aifb'.")
+    parser.add_argument("--verbose", action="store_true",
+                        help="Print verbose data information.")
     args = parser.parse_args()
 
     # load and preprocess dataset
@@ -50,6 +52,15 @@ if __name__ == '__main__':
     device = th.device('cuda' if th.cuda.is_available() else 'cpu')
     hg = data[0]
     hg = hg.to(device)
+
+    if args.verbose:
+        print(f'# nodes: {hg.num_nodes()}')
+        print(f'# destination nodes: {hg.num_dst_nodes()}')
+        print(f'# source nodes: {hg.num_src_nodes()}')
+        print(f'# edges: {hg.num_edges()}')
+        print(f'# Node types: {len(hg.ntypes)}')
+        print(f'# Canonical edge types: {len(hg.etypes)}')
+        print(f'# Unique edge type names: {len(set(hg.etypes))}')
 
     num_rels = len(hg.canonical_etypes)
     num_node_types = len(hg.ntypes)
