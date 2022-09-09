@@ -189,7 +189,6 @@ class CuGraphStorage:
             only the sampled neighboring edges.  The induced edge IDs will be
             in ``edata[dgl.EID]``.
         """
-
         if prob is not None:
             raise NotImplementedError(
                 "prob is not currently supported",
