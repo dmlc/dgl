@@ -192,7 +192,6 @@ class RgcnConv(nn.Module):
             etypes = etypes[L]
             # message passing
             output = RgcnFunction.apply(g, self.sample_size, self.n_node_types, self.num_rels,
-                                        # TODO(tingyu66): 'ntype' -> dgl.NTYPE when not sampling
                                         g.dstdata['ntype'], g.srcdata['ntype'], etypes,
                                         self.coeff, feat, self.W)
             g.dstdata['h'] = output

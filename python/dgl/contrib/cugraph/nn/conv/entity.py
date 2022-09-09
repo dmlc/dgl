@@ -80,8 +80,7 @@ if __name__ == '__main__':
     target_idx = node_ids[g.ndata[dgl.NTYPE] == category_id]  # target node index
 
     # cugraph-ops requires node/edge type to be int32
-    g.dstdata[dgl.NTYPE] = g.dstdata[dgl.NTYPE].type(th.int32)
-    g.srcdata[dgl.NTYPE] = g.srcdata[dgl.NTYPE].type(th.int32)
+    g.ndata['ntype'] = g.ndata.pop(dgl.NTYPE).type(th.int32)
     g.edata[dgl.ETYPE] = g.edata[dgl.ETYPE].type(th.int32)
     SAMPLE_SIZE = g.in_degrees().max().item()
 
