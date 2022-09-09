@@ -40,13 +40,13 @@ def _get_cycles_per_ms() -> float:
 def test_basics():
     g = rand_graph(10, 20, device=F.cpu())
     x = torch.ones(g.num_nodes(), 10)
-    results = OPS.copy_u_sum(g, x).to(F.ctx())
+    result = OPS.copy_u_sum(g, x).to(F.ctx())
 
     # launch on default stream used in DGL
     xx = x.to(device=F.ctx())
     gg = g.to(device=F.ctx())
     OPS.copy_u_sum(gg, xx)
-    assert torch.equal(OPS.copy_u_sum(gg, xx), results)
+    assert torch.equal(OPS.copy_u_sum(gg, xx), result)
 
     # launch on new stream created via torch.cuda
     s = torch.cuda.Stream(device=F.ctx())
@@ -55,7 +55,7 @@ def test_basics():
         gg = g.to(device=F.ctx())
         OPS.copy_u_sum(gg, xx)
     s.synchronize()
-    assert torch.equal(OPS.copy_u_sum(gg, xx), results)
+    assert torch.equal(OPS.copy_u_sum(gg, xx), result)
 
 @unittest.skipIf(F._default_context_str == 'cpu', reason="stream only runs on GPU.")
 def test_set_get_stream():
@@ -68,24 +68,8 @@ def test_set_get_stream():
     torch.cuda.set_stream(current_stream)
 
 @unittest.skipIf(F._default_context_str == 'cpu', reason="stream only runs on GPU.")
-def test_record_stream_smoke():
-    # smoke test to ensure it can work
-    stream = torch.cuda.Stream()
-    with torch.cuda.stream(stream):
-        t = nd.array(np.array([1., 2., 3., 4.]), ctx=nd.gpu(0))
-        g = rand_graph(10, 20, device=F.cuda())
-    # NDArray is an internal object, just use DGLStreamHandle
-    t.record_stream(to_dgl_stream_handle(torch.cuda.current_stream()))
-    g.record_stream(torch.cuda.current_stream())
-
-@unittest.skipIf(F._default_context_str == 'cpu', reason="stream only runs on GPU.")
 # borrowed from PyTorch, test/test_cuda.py: test_record_stream()
-# TODO(Xin): Currently we don't have an equivalent API for dgl.graph
-# as tensor.data_ptr() to check if the memory has been reused or not.
-# The underlying sparse matrices or NDArrays of dgl.graph have not 
-# been exposed to Python and we have not way to access them.
-# Therefore, we only test record_stream for NDArray here.
-def test_record_stream():
+def test_record_stream_ndarray():
     cycles_per_ms = _get_cycles_per_ms()
 
     t = nd.array(np.array([1., 2., 3., 4.], dtype=np.float32), ctx=nd.cpu())
@@ -118,8 +102,64 @@ def test_record_stream():
         tmp3 = nd.empty([4], ctx=nd.gpu(0))
         assert F.from_dgl_nd(tmp3).data_ptr() == ptr[0], 'allocation not re-used'
 
+@unittest.skipIf(F._default_context_str == 'cpu', reason="stream only runs on GPU.")
+def test_record_stream_graph_positive():
+    cycles_per_ms = _get_cycles_per_ms()
+
+    g = rand_graph(10, 20, device=F.cpu())
+    x = torch.ones(g.num_nodes(), 10)
+    result = OPS.copy_u_sum(g, x).to(F.ctx())
+
+    stream = torch.cuda.Stream()
+    results2 = torch.zeros_like(result)
+    # Performs the computing in a background stream
+    def perform_computing():
+        with torch.cuda.stream(stream):
+            g2 = g.to(F.ctx())
+        torch.cuda.current_stream().wait_stream(stream)
+        g2.record_stream(torch.cuda.current_stream())
+        torch.cuda._sleep(int(50 * cycles_per_ms))  # delay the computing
+        results2.copy_(OPS.copy_u_sum(g2, x))
+
+    x = x.to(F.ctx())
+    perform_computing()
+    with torch.cuda.stream(stream):
+        # since we have called record stream for g2, g3 won't reuse its memory
+        g3 = rand_graph(10, 20, device=F.ctx())
+    torch.cuda.current_stream().synchronize()
+    assert torch.equal(result, results2)
+
+@unittest.skipIf(F._default_context_str == 'cpu', reason="stream only runs on GPU.")
+def test_record_stream_graph_negative():
+    cycles_per_ms = _get_cycles_per_ms()
+
+    g = rand_graph(10, 20, device=F.cpu())
+    x = torch.ones(g.num_nodes(), 10)
+    result = OPS.copy_u_sum(g, x).to(F.ctx())
+
+    stream = torch.cuda.Stream()
+    results2 = torch.zeros_like(result)
+    # Performs the computing in a background stream
+    def perform_computing():
+        with torch.cuda.stream(stream):
+            g2 = g.to(F.ctx())
+        torch.cuda.current_stream().wait_stream(stream)
+        # omit record_stream will produce a wrong result
+        # g2.record_stream(torch.cuda.current_stream())
+        torch.cuda._sleep(int(50 * cycles_per_ms))  # delay the computing
+        results2.copy_(OPS.copy_u_sum(g2, x))
+
+    x = x.to(F.ctx())
+    perform_computing()
+    with torch.cuda.stream(stream):
+        # g3 will reuse g2's memory block, resulting a wrong result
+        g3 = rand_graph(10, 20, device=F.ctx())
+    torch.cuda.current_stream().synchronize()
+    assert not torch.equal(result, results2)
+
 if __name__ == '__main__':
     test_basics()
     test_set_get_stream()
-    test_record_stream_smoke()
-    test_record_stream()
+    test_record_stream_ndarray()
+    test_record_stream_graph_positive()
+    test_record_stream_graph_negative()
