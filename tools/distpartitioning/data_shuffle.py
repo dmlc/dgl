@@ -683,7 +683,7 @@ def multi_machine_run(params):
             backend="gloo",
             rank=rank,
             world_size=params.world_size,
-            timeout=timedelta(seconds=constants.GLOO_MESSAGING_TIMEOUT))
+            timeout=timedelta(seconds=params.timeout))
     logging.info(f'[Rank: {rank}] Done with process group initialization...')
 
     #invoke the main function here.

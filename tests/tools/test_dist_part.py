@@ -171,9 +171,9 @@ def test_part_pipeline():
             f.write('127.0.0.1\n')
             f.write('127.0.0.2\n')
 
-        os.system('python tools/dispatch_data.py '\
-                  '--in-dir {} --partitions-dir {} --out-dir {} --ip-config {}'.format(
-                    in_dir, partition_dir, out_dir, ip_config))
+        os.system('python tools/dispatch_data.py '
+                  '--in-dir {} --partitions-dir {} --out-dir {} --ip-config {} --process-group-timeout 60'.format(
+                      in_dir, partition_dir, out_dir, ip_config))
 
         # check metadata.json
         meta_fname = os.path.join(out_dir, 'metadata.json')

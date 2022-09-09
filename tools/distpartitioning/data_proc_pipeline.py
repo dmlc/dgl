@@ -1,9 +1,6 @@
 import argparse
-import numpy as np
-import torch.multiprocessing as mp
 import logging
 import platform
-import os
 from data_shuffle import single_machine_run, multi_machine_run 
 
 def log_params(params): 
@@ -45,6 +42,8 @@ if __name__ == "__main__":
     #arguments needed for the distributed implementation
     parser.add_argument('--world-size', help='no. of processes to spawn',
                     default=1, type=int, required=True)
+    parser.add_argument('--timeout', required=True, type=int,
+                        help='timeout[seconds] for operations executed agains the process group')
     params = parser.parse_args()
 
     #invoke the pipeline function
