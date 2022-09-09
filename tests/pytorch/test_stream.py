@@ -40,27 +40,22 @@ def _get_cycles_per_ms() -> float:
 def test_basics():
     g = rand_graph(10, 20, device=F.cpu())
     x = torch.ones(g.num_nodes(), 10)
+    results = OPS.copy_u_sum(g, x).to(F.ctx())
 
-    # launch on default stream fetched via torch.cuda
-    s = torch.cuda.default_stream(device=F.ctx())
-    with torch.cuda.stream(s):
-        xx = x.to(device=F.ctx(), non_blocking=True)
-        gg = g.to(device=F.ctx())
-    s.synchronize()
+    # launch on default stream used in DGL
+    xx = x.to(device=F.ctx())
+    gg = g.to(device=F.ctx())
     OPS.copy_u_sum(gg, xx)
+    assert torch.equal(OPS.copy_u_sum(gg, xx), results)
 
     # launch on new stream created via torch.cuda
     s = torch.cuda.Stream(device=F.ctx())
     with torch.cuda.stream(s):
         xx = x.to(device=F.ctx(), non_blocking=True)
         gg = g.to(device=F.ctx())
+        OPS.copy_u_sum(gg, xx)
     s.synchronize()
-    OPS.copy_u_sum(gg, xx)
-
-    # launch on default stream used in DGL
-    xx = x.to(device=F.ctx())
-    gg = g.to(device=F.ctx())
-    OPS.copy_u_sum(gg, xx)
+    assert torch.equal(OPS.copy_u_sum(gg, xx), results)
 
 @unittest.skipIf(F._default_context_str == 'cpu', reason="stream only runs on GPU.")
 def test_set_get_stream():
@@ -113,7 +108,7 @@ def test_record_stream():
     perform_copy()
     with torch.cuda.stream(stream):
         tmp2 = nd.empty([4], ctx=nd.gpu(0))
-        assert F.from_dgl_nd(tmp2).data_ptr() != ptr[0], 'allocation re-used to soon'
+        assert F.from_dgl_nd(tmp2).data_ptr() != ptr[0], 'allocation re-used too soon'
 
     assert torch.equal(F.from_dgl_nd(result).cpu(), torch.tensor([1., 2., 3., 4.]))
 
