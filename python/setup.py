@@ -34,10 +34,7 @@ def get_lib_path():
     libinfo_py = os.path.join(CURRENT_DIR, './dgl/_ffi/libinfo.py')
     libinfo = {'__file__': libinfo_py}
     exec(
-        compile(
-            open(libinfo_py, "rb").read(),
-            libinfo_py,
-            'exec'),
+        compile(open(libinfo_py, "rb").read(), libinfo_py, 'exec'),
         libinfo,
         libinfo)
     version = libinfo['__version__']
