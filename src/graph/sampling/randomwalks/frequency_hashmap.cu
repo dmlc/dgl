@@ -316,16 +316,16 @@ std::tuple<IdArray, IdArray, IdArray> FrequencyHashmap<IdxType>::Topk(
   void *d_temp_storage = nullptr;
   size_t temp_storage_bytes = 0;
   CUDA_CALL(cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes,
-            edge_blocks_prefix, edge_blocks_prefix_alternate, num_edge_blocks + 1));
+            edge_blocks_prefix, edge_blocks_prefix_alternate, num_edge_blocks + 1, _stream));
   d_temp_storage = device->AllocWorkspace(_ctx, temp_storage_bytes);
   CUDA_CALL(cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes,
-            edge_blocks_prefix, edge_blocks_prefix_alternate, num_edge_blocks + 1));
+            edge_blocks_prefix, edge_blocks_prefix_alternate, num_edge_blocks + 1, _stream));
   device->FreeWorkspace(_ctx, d_temp_storage);
   std::swap(edge_blocks_prefix, edge_blocks_prefix_alternate);
   device->CopyDataFromTo(&edge_blocks_prefix[num_edge_blocks], 0, &num_unique_edges, 0,
       sizeof(num_unique_edges),
       _ctx, DGLContext{kDLCPU, 0},
-      dtype, _stream);
+      dtype);
   device->StreamSync(_ctx, _stream);
   // 2.2 Allocate the data of unique edges and frequency
   // double space to use SegmentedRadixSort
@@ -350,10 +350,10 @@ std::tuple<IdArray, IdArray, IdArray> FrequencyHashmap<IdxType>::Topk(
   d_temp_storage = nullptr;
   temp_storage_bytes = 0;
   CUDA_CALL(cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes,
-            num_unique_each_node, num_unique_each_node_alternate, num_dst_nodes + 1));
+            num_unique_each_node, num_unique_each_node_alternate, num_dst_nodes + 1, _stream));
   d_temp_storage = device->AllocWorkspace(_ctx, temp_storage_bytes);
   CUDA_CALL(cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes,
-            num_unique_each_node, num_unique_each_node_alternate, num_dst_nodes + 1));
+            num_unique_each_node, num_unique_each_node_alternate, num_dst_nodes + 1, _stream));
   device->FreeWorkspace(_ctx, d_temp_storage);
   // 3.2 SegmentedRadixSort the unique_src_edges and unique_frequency
   // Create a set of DoubleBuffers to wrap pairs of device pointers
@@ -366,20 +366,24 @@ std::tuple<IdArray, IdArray, IdArray> FrequencyHashmap<IdxType>::Topk(
   // especially when num_dst_nodes is large (about ~10000)
   if (dtype.bits == 32) {
     CUDA_CALL(cub::DeviceRadixSort::SortPairsDescending(d_temp_storage, temp_storage_bytes,
-              d_unique_frequency, d_unique_src_edges, num_unique_edges));
+              d_unique_frequency, d_unique_src_edges, num_unique_edges,
+              0, sizeof(Idx64Type)*8, _stream));
   } else {
     CUDA_CALL(cub::DeviceSegmentedRadixSort::SortPairsDescending(d_temp_storage, temp_storage_bytes,
               d_unique_frequency, d_unique_src_edges, num_unique_edges, num_dst_nodes,
-              num_unique_each_node_alternate, num_unique_each_node_alternate + 1));
+              num_unique_each_node_alternate, num_unique_each_node_alternate + 1,
+              0, sizeof(Idx64Type)*8, _stream));
   }
   d_temp_storage = device->AllocWorkspace(_ctx, temp_storage_bytes);
   if (dtype.bits == 32) {
     CUDA_CALL(cub::DeviceRadixSort::SortPairsDescending(d_temp_storage, temp_storage_bytes,
-              d_unique_frequency, d_unique_src_edges, num_unique_edges));
+              d_unique_frequency, d_unique_src_edges, num_unique_edges,
+              0, sizeof(Idx64Type)*8, _stream));
   } else {
   CUDA_CALL(cub::DeviceSegmentedRadixSort::SortPairsDescending(d_temp_storage, temp_storage_bytes,
             d_unique_frequency, d_unique_src_edges, num_unique_edges, num_dst_nodes,
-            num_unique_each_node_alternate, num_unique_each_node_alternate + 1));
+            num_unique_each_node_alternate, num_unique_each_node_alternate + 1,
+            0, sizeof(Idx64Type)*8, _stream));
   }
   device->FreeWorkspace(_ctx, d_temp_storage);
 
@@ -395,10 +399,10 @@ std::tuple<IdArray, IdArray, IdArray> FrequencyHashmap<IdxType>::Topk(
   d_temp_storage = nullptr;
   temp_storage_bytes = 0;
   CUDA_CALL(cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes,
-            num_unique_each_node, unique_output_offsets, num_dst_nodes + 1));
+            num_unique_each_node, unique_output_offsets, num_dst_nodes + 1, _stream));
   d_temp_storage = device->AllocWorkspace(_ctx, temp_storage_bytes);
   CUDA_CALL(cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes,
-            num_unique_each_node, unique_output_offsets, num_dst_nodes + 1));
+            num_unique_each_node, unique_output_offsets, num_dst_nodes + 1, _stream));
   device->FreeWorkspace(_ctx, d_temp_storage);
 
   // 5. Pick the data to result
@@ -406,7 +410,7 @@ std::tuple<IdArray, IdArray, IdArray> FrequencyHashmap<IdxType>::Topk(
   device->CopyDataFromTo(&unique_output_offsets[num_dst_nodes], 0, &num_output, 0,
       sizeof(num_output),
       _ctx, DGLContext{kDLCPU, 0},
-      dtype, _stream);
+      dtype);
   device->StreamSync(_ctx, _stream);
 
   IdArray res_src = IdArray::Empty({static_cast<int64_t>(num_output)},
