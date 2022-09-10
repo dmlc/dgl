@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 import dgl
 import dgl.function as fn
-
+import pdb
 
 class dummy_layer(nn.Module):
 
@@ -12,16 +12,16 @@ class dummy_layer(nn.Module):
         super(dummy_layer, self).__init__()
         self.layer = nn.Linear(in_dim * 2, out_dim, bias=True)
 
-    def forward(self, graph, n_feats, e_weights=None):
-        graph.ndata['h'] = n_feats
+    def forward(self, graph, feat, eweight=None):
+        graph.ndata['h'] = feat
 
-        if e_weights == None:
+        if eweight == None:
             graph.update_all(fn.copy_u('h', 'm'), fn.mean('m', 'h'))
         else:
-            graph.edata['ew'] = e_weights
+            graph.edata['ew'] = eweight
             graph.update_all(fn.u_mul_e('h', 'ew', 'm'), fn.mean('m', 'h'))
 
-        graph.ndata['h'] = self.layer(th.cat([graph.ndata['h'], n_feats], dim=-1))
+        graph.ndata['h'] = self.layer(th.cat([graph.ndata['h'], feat], dim=-1))
 
         output = graph.ndata['h']
         return output
@@ -46,13 +46,11 @@ class dummy_gnn_model(nn.Module):
         self.hid_layer = dummy_layer(self.hid_dim, self.hid_dim)
         self.out_layer = dummy_layer(self.hid_dim, self.out_dim)
 
-    def forward(self, graph, n_feat, edge_weights=None):
-
-        h = self.in_layer(graph, n_feat, edge_weights)
+    def forward(self, graph, feat, eweight=None):
+        h = self.in_layer(graph, feat, eweight)
         h = F.relu(h)
-        h = self.hid_layer(graph, h, edge_weights)
+        h = self.hid_layer(graph, h, eweight)
         h = F.relu(h)
-        h = self.out_layer(graph, h, edge_weights)
-
+        h = self.out_layer(graph, h, eweight)
         return h
         

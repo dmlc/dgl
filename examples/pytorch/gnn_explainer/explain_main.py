@@ -3,16 +3,12 @@
 import argparse
 import os
 import dgl
-
+from gnnlens import Writer
 import torch as th
-import torch.nn as nn
-import torch.nn.functional as F
 
 from dgl import load_graphs
+from dgl.nn import GNNExplainer
 from models import dummy_gnn_model
-from NodeExplainerModule import NodeExplainerModule
-from utils_graph import extract_subgraph, visualize_sub_graph
-
 
 def main(args):
     # load an exisitng model or ask for training a model
@@ -39,39 +35,24 @@ def main(args):
     # Here just pick the first one of the target class.
     target_list = [i for i, e in enumerate(labels) if e==args.target_class]
     n_idx = th.tensor([target_list[0]])
-
-    # Extract the computation graph within k-hop of target node and use it for explainability
-    sub_graph, ori_n_idxes, new_n_idx = extract_subgraph(graph, n_idx, hops=args.hop)
     
-    #Sub-graph features.
-    sub_feats = feats[ori_n_idxes,:]
+    explainer = GNNExplainer(dummy_model, num_hops=args.hop)
+    new_center, sub_graph, feat_mask, edge_mask = explainer.explain_node(n_idx, graph, feats)
+    
+    #gnnlens2
+    # Specify the path to create a new directory for dumping data files.
+    writer = Writer('gnn_subgraph')
+    writer.add_graph(name=str(args.dataset), graph=graph,
+                     nlabels=labels, num_nlabel_types=num_classes)
+    pdb.set_trace()
+    writer.add_subgraph(graph_name = str(args.dataset), subgraph_name='IntegratedGradients', node_id=n_idx,
+                    subgraph_nids = sub_graph.ndata[dgl.NID],
+                    subgraph_eids = sub_graph.edata[dgl.EID],
+                    subgraph_eweights = sub_graph.edata['ew'])
 
-    # create an explainer
-    explainer = NodeExplainerModule(model=dummy_model,
-                                    num_edges=sub_graph.number_of_edges(),
-                                    node_feat_dim=feat_dim)
-
-    # define optimizer
-    optim = th.optim.Adam([explainer.edge_mask, explainer.node_feat_mask], lr=args.lr, weight_decay=args.wd)
-
-    # train the explainer for the given node
-    dummy_model.eval()
-    model_logits = dummy_model(sub_graph, sub_feats)
-    model_predict = F.one_hot(th.argmax(model_logits, dim=-1), num_classes)
-
-    for epoch in range(args.epochs):
-        explainer.train()
-        exp_logits = explainer(sub_graph, sub_feats)
-        loss = explainer._loss(exp_logits[new_n_idx], model_predict[new_n_idx])
-
-        optim.zero_grad()
-        loss.backward()
-        optim.step()
-
-    # visualize the importance of edges
-    edge_weights = explainer.edge_mask.sigmoid().detach()
-    visualize_sub_graph(sub_graph, edge_weights.numpy(), ori_n_idxes, n_idx)
-
+    # Finish dumping
+    writer.close()
+    
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Demo of GNN explainer in DGL')
