@@ -2,7 +2,7 @@
 import torch
 from .sp_matrix import SparseMatrix
 
-def check_sparsity(A, B):
+def same_sparsity(A, B):
     """Checks if two sparse matrices have the same sparsity structure."""
     if not torch.equal(A.indices("COO"), B.indices("COO")):
         raise ValueError('The two input matrices have different sparsity pattern')
@@ -38,8 +38,8 @@ def add(A, B):
     if isinstance(A, SparseMatrix) and isinstance(B, SparseMatrix):
         assert A.shape == B.shape, 'The shape of sparse matrix A {} and' \
         'B {} must match'.format(A.shape, B.shape)
-        check_sparsity(A, B)
-        return SparseMatrix(A.row, A.col, A.val + B.val)
+        C = A.adj + B.adj
+        return SparseMatrix(C.indices()[0], C.indices()[1], C.values(), C.shape)
     raise RuntimeError('Elementwise add between sparse and dense matrix is not supported.')
 
 def sub(A, B):
@@ -69,8 +69,8 @@ def sub(A, B):
     if isinstance(A, SparseMatrix) and isinstance(B, SparseMatrix):
         assert A.shape == B.shape, 'The shape of sparse matrix A {} and' \
         'B {} must match'.format(A.shape, B.shape)
-        check_sparsity(A, B)
-        return SparseMatrix(A.row, A.col, A.val - B.val)
+        C = A.adj - B.adj
+        return SparseMatrix(C.indices()[0], C.indices()[1], C.values(), C.shape)
     raise RuntimeError('Elementwise sub between sparse and dense matrix is not supported.')
 
 def rsub(A, B):
@@ -117,7 +117,8 @@ def mul(A, B):
     tensor([ 7.5000, 10.0000, 12.5000])
     """
     if isinstance(A, SparseMatrix) and isinstance(B, SparseMatrix):
-        check_sparsity(A, B)
+        C = A.adj * B.adj
+        return SparseMatrix(C.indices()[0], C.indices()[1], C.values(), C.shape)
     a_val = A.val if isinstance(A, SparseMatrix) else A
     b_val = B.val if isinstance(B, SparseMatrix) else B
     return SparseMatrix(A.row, A.col, a_val * b_val)
@@ -151,7 +152,9 @@ def div(A, B):
     tensor([1.2000, 1.6000, 2.0000])
     """
     if isinstance(A, SparseMatrix) and isinstance(B, SparseMatrix):
-        check_sparsity(A, B)
+        # Avoid nan in the resulting matrix
+        if same_sparsity(A, B):
+            return SparseMatrix(A.row, A.col, a_val / b_val)
     a_val = A.val if isinstance(A, SparseMatrix) else A
     b_val = B.val if isinstance(B, SparseMatrix) else B
     return SparseMatrix(A.row, A.col, a_val / b_val)

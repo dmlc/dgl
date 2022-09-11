@@ -14,6 +14,9 @@ class SparseMatrix:
     val : tensor, optional
         The values of shape (nnz, *). If None, it will be a tensor of shape (nnz)
         filled by 1.
+    shape : tuple[int, int], optional
+        Shape or size of the sparse matrix. If not provided the shape will be
+        inferred from the row and column indices.
 
     Examples
     --------
@@ -45,7 +48,8 @@ class SparseMatrix:
     def __init__(self,
         row: torch.Tensor,
         col: torch.Tensor,
-        val: Optional[torch.Tensor] = None
+        val: Optional[torch.Tensor] = None,
+        shape : Optional[Tuple[int, int]] = None
     ):
         self._row = row
         self._col = col
@@ -53,9 +57,11 @@ class SparseMatrix:
         if val is None:
             val = torch.ones(row.shape[0])
         self._val = val
-
         i = torch.cat((row.unsqueeze(0), col.unsqueeze(0)), 0)
-        self.adj = torch.sparse_coo_tensor(i, val).coalesce()
+        if shape is not None:
+            self.adj = torch.sparse_coo_tensor(i, val, shape).coalesce()
+        else:
+            self.adj = torch.sparse_coo_tensor(i, val).coalesce()
 
     def __repr__(self):
         return f'SparseMatrix(indices={self.indices("COO")}, \nvalues={self.val}, \
@@ -159,7 +165,7 @@ class SparseMatrix:
 
         """
         assert len(x) == self.nnz
-        return SparseMatrix(self.row, self.col, x)
+        return SparseMatrix(self.row, self.col, x, shape=self.shape)
 
     def indices(self, format, return_shuffle=False) -> Tuple[torch.tensor, ...]:
         """Get the indices of the nonzero elements.
