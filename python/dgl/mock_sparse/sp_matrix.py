@@ -142,13 +142,18 @@ class SparseMatrix:
         tensor
             Values of the nonzero elements
         """
-        return self._val
+        return self.adj.values()
 
     @val.setter
     def val(self, x) -> torch.tensor:
         """Set the values of the nonzero elements."""
         assert len(x) == self.nnz
         self._val = x
+        if len(x.shape) == 1:
+            shape = self.shape
+        else:
+            shape = self.shape + (x.shape[-1],)
+        self.adj = torch.sparse_coo_tensor(self.adj.indices(), x, shape).coalesce()
 
     def __call__(self, x):
         """Create a new sparse matrix with the same sparsity as self but different values.

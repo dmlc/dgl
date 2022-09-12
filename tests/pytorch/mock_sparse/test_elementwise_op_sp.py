@@ -10,6 +10,11 @@ from dgl.mock_sparse.sp_matrix import SparseMatrix
 parametrize_idtype = pytest.mark.parametrize("idtype", [F.int32, F.int64])
 parametrize_dtype = pytest.mark.parametrize('dtype', [F.float32, F.float64])
 
+def all_close_sparse(A, B):
+    assert torch.allclose(A.indices(), B.indices())
+    assert torch.allclose(A.values(), B.values())
+    assert A.shape == B.shape
+
 @parametrize_idtype
 @parametrize_dtype
 @pytest.mark.parametrize('op', [operator.add, operator.sub, operator.mul, operator.truediv])
@@ -26,16 +31,12 @@ def test_sparse_op_sparse(idtype, dtype, op):
     valB = torch.rand(len(rowB))
     B = SparseMatrix(rowB, colB, valB, shape=(10, 50))
 
-    def all_close_sparse(A, B):
-        assert torch.allclose(A.indices(), B.indices())
-        assert torch.allclose(A.values(), B.values())
-        assert A.shape == B.shape
-
     def _test():
         if op is not operator.truediv:
             all_close_sparse(op(A.adj, A1.adj), op(A, A1).adj)
             all_close_sparse(op(A.adj, B.adj), op(A, B).adj)
         else:
+            # sparse div is not supported in PyTorch
             assert np.allclose(op(A, A1).val, op(A.val, A1.val), rtol=1e-4, atol=1e-4)
     _test()
 
@@ -47,15 +48,9 @@ def test_sparse_op_scalar(idtype, dtype, v_scalar):
     col = torch.randint(1, 500, (100,))
     val = torch.rand(100)
     A = SparseMatrix(row, col, val)
-    out_torch = A.val * v_scalar
-    out_spMat = A * v_scalar
-    assert np.allclose(out_torch, out_spMat.val, rtol=1e-4, atol=1e-4)
-    out_torch = A.val / v_scalar
-    out_spMat = A / v_scalar
-    assert np.allclose(out_torch, out_spMat.val, rtol=1e-4, atol=1e-4)
-    out_torch = pow(A.val, v_scalar)
-    out_spMat = pow(A, v_scalar)
-    assert np.allclose(out_torch, out_spMat.val, rtol=1e-4, atol=1e-4)
+    all_close_sparse(A.adj * v_scalar, (A * v_scalar).adj)
+    all_close_sparse(A.adj / v_scalar, (A / v_scalar).adj)
+    all_close_sparse(pow(A.adj, v_scalar), pow(A, v_scalar).adj)
 
 @parametrize_idtype
 @parametrize_dtype
@@ -65,9 +60,7 @@ def test_scalar_op_sparse(idtype, dtype, v_scalar):
     col = torch.randint(1, 500, (100,))
     val = torch.rand(100)
     A = SparseMatrix(row, col, val)
-    out_torch = v_scalar * A.val
-    out_spMat = v_scalar * A
-    assert np.allclose(out_torch, out_spMat.val, rtol=1e-4, atol=1e-4)
+    all_close_sparse(v_scalar * A.adj, (v_scalar * A).adj)
 
 if __name__ == '__main__':
     test_sparse_op_sparse()
