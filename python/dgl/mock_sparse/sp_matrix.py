@@ -260,24 +260,23 @@ def create_from_coo(row: torch.Tensor,
     >>> src = torch.tensor([1, 1, 2])
     >>> dst = torch.tensor([2, 4, 3])
     >>> A = create_from_coo(src, dst)
-    >>> A.shape
-    (3, 5)
-    >>> A.row
-    tensor([1, 1, 2])
-    >>> A.val
-    tensor([1., 1., 1.])
-    >>> A.nnz
-    3
+    >>> A
+    SparseMatrix(indices=tensor([[1, 1, 2],
+            [2, 4, 3]]),
+    values=tensor([1., 1., 1.]),
+    shape=(3, 5), nnz=3)
 
     Case2: Sparse matrix with scalar/vector values. Following example is with
     vector data.
 
     >>> val = torch.tensor([[1, 1], [2, 2], [3, 3]])
     >>> A = create_from_coo(src, dst, val)
-    >>> A.val
-    tensor([[1, 1],
+    SparseMatrix(indices=tensor([[1, 1, 2],
+            [2, 4, 3]]),
+    values=tensor([[1, 1],
             [2, 2],
-            [3, 3]])
+            [3, 3]]),
+    shape=(3, 5), nnz=3)
     """
     return SparseMatrix(row, col, val)
 
