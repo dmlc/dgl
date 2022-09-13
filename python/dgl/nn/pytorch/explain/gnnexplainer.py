@@ -553,7 +553,7 @@ class HeteroGNNExplainer(nn.Module):
     def explain_node(self, ntype, node_id, graph, feat, **kwargs):
         r"""Learn and return a node feature mask and subgraph that play a
         crucial role to explain the prediction made by the GNN for node
-        :attr:`node_id`.
+        :attr:`node_id` with node type :attr:`ntype`.
         Parameters
         ----------
         ntype: str
