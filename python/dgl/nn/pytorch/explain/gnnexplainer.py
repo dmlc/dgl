@@ -479,7 +479,7 @@ class HeteroGNNExplainer(nn.Module):
         -------
         feat_masks : Dictionary of Tensor
             Dictionary of { ntypes: features }
-            Feature mask of shape :math:`(1, D)`, where :math:`D`
+            Feature mask of shape :math:`(1, D_t)`, where :math:`D_t`
             is the feature size.
         edge_masks : Dictionary of Tensor
             Dictionary of { canonical_etypes: features }
