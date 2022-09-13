@@ -473,7 +473,7 @@ class HeteroGNNExplainer(nn.Module):
         ----------
         graph : DGLHeteroGraph
             Input graph.
-        feat : Dictionary of Tensor
+        feat : dict[str, Tensor]
             Input node features.
         Returns
         -------
