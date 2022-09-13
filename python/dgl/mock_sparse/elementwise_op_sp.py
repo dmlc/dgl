@@ -1,6 +1,8 @@
 """dgl elementwise operators for sparse matrix module."""
 import torch
-from .sp_matrix import SparseMatrix
+from .sp_matrix import *
+
+__all__ = ['add', 'sub', 'mul', 'div', 'rdiv', 'power', 'rpower']
 
 def add(A, B):
     """Elementwise addition.

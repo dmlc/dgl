@@ -2,6 +2,8 @@
 from typing import Optional, Tuple
 import torch
 
+__all__ = ['SparseMatrix', 'create_from_coo', 'create_from_csr', 'create_from_csc']
+
 class SparseMatrix:
     r'''Class for sparse matrix.
 

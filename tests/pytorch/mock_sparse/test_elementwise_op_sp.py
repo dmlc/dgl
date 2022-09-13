@@ -5,8 +5,7 @@ import dgl.backend as F
 import torch
 import numpy
 import operator
-from dgl.mock_sparse import elementwise_op_sp
-from dgl.mock_sparse.sp_matrix import SparseMatrix
+from dgl.mock_sparse import SparseMatrix
 parametrize_idtype = pytest.mark.parametrize("idtype", [F.int32, F.int64])
 parametrize_dtype = pytest.mark.parametrize('dtype', [F.float32, F.float64])
 
@@ -62,7 +61,17 @@ def test_scalar_op_sparse(idtype, dtype, v_scalar):
     A = SparseMatrix(row, col, val)
     all_close_sparse(v_scalar * A.adj, (v_scalar * A).adj)
 
+def test_expose_op():
+    rowA = torch.tensor([1, 0, 2, 7, 1])
+    colA = torch.tensor([0, 49, 2, 1, 7])
+    A = dgl.mock_sparse.SparseMatrix(rowA, colA, shape=(10, 50))
+    dgl.mock_sparse.add(A, A)
+    dgl.mock_sparse.sub(A, A)
+    dgl.mock_sparse.mul(A, A)
+    dgl.mock_sparse.div(A, A)
+
 if __name__ == '__main__':
     test_sparse_op_sparse()
     test_sparse_op_scalar()
     test_scalar_op_sparse()
+    test_expose_op()
