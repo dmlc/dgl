@@ -626,7 +626,7 @@ class HeteroGNNExplainer(nn.Module):
         ...                 graph.update_all(fn.u_mul_e('h', 'w', 'm'), fn.sum('m', 'h'))
         ...             return graph.ndata['h']
         >>> # Train the model
-        >>> model = Model(len(features[predict_ntype][0]), data.num_classes, g.etypes)
+        >>> model = Model(features[predict_ntype].shape[-1], data.num_classes, g.etypes)
         >>> optimizer = torch.optim.Adam(model.parameters())
         >>> for epoch in range(10):
         ...     logits = model(g, features)[predict_ntype]
