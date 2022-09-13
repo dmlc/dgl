@@ -19,9 +19,9 @@ class RGCN(nn.Module):
         super().__init__()
         self.emb = nn.Embedding(num_nodes, h_dim)
         # two-layer RGCN
-        self.conv1 = RgcnConv(h_dim, h_dim, num_rels, FANOUT_1,
+        self.conv1 = RgcnConv(h_dim, h_dim, num_rels,
                               regularizer='basis', num_bases=num_bases, self_loop=False)
-        self.conv2 = RgcnConv(h_dim, out_dim, num_rels, FANOUT_2,
+        self.conv2 = RgcnConv(h_dim, out_dim, num_rels,
                               regularizer='basis', num_bases=num_bases, self_loop=False)
 
     def forward(self, g):
@@ -106,8 +106,8 @@ if __name__ == '__main__':
     inv_target[target_idx] = th.arange(0, target_idx.shape[0], dtype=inv_target.dtype).to(device)
 
     # construct sampler and dataloader
-    FANOUT_1, FANOUT_2 = 4, 4
-    sampler = MultiLayerNeighborSampler([FANOUT_1, FANOUT_2])
+    fanouts = [4, 4]
+    sampler = MultiLayerNeighborSampler(fanouts)
     train_loader = DataLoader(g, target_idx[train_idx], sampler, device=device,
                               batch_size=100, shuffle=True)
     # no separate validation subset, use train index instead for validation
@@ -117,7 +117,7 @@ if __name__ == '__main__':
     # create model
     h_dim = 16  # hidden feature dim
     num_classes = data.num_classes
-    num_bases = 10
+    num_bases = 20
     model = RGCN(g.num_nodes(), h_dim, num_classes, num_rels, num_bases)
     model = model.to(device)
 
@@ -125,7 +125,7 @@ if __name__ == '__main__':
 
     # training
     model.train()
-    for epoch in range(50):
+    for epoch in range(100):
         total_loss = 0
         for it, (input_nodes, output_nodes, blocks) in enumerate(train_loader):
             output_nodes = inv_target[output_nodes]
@@ -140,9 +140,9 @@ if __name__ == '__main__':
         acc = evaluate(model, labels, val_loader, inv_target)
         print("Epoch {:05d} | Loss {:.4f} | Val. Accuracy {:.4f} ".format(epoch, total_loss / (it+1), acc))
 
-    # testing
+    # evaluation
     # TODO(tingyu66): should sample all neighbors for test accuracy
-    test_sampler = MultiLayerNeighborSampler([FANOUT_1, FANOUT_2]) # -1 for sampling all neighbors
+    test_sampler = MultiLayerNeighborSampler([100, 100]) # -1 for sampling all neighbors
     test_loader = DataLoader(g, target_idx[test_idx], test_sampler, device=device,
                              batch_size=32, shuffle=False)
     acc = evaluate(model, labels, test_loader, inv_target)

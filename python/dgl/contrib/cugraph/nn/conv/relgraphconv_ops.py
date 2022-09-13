@@ -1,6 +1,5 @@
 """Torch Module for Relational graph convolution layer using cugraph-ops"""
 # pylint: disable= no-member, arguments-differ, invalid-name
-import dgl
 import math
 import torch as th
 from torch import nn
@@ -9,7 +8,7 @@ from pylibcugraphops.structure.graph_types import message_flow_graph_hg_csr_int6
 
 class RgcnFunction(th.autograd.Function):
     @staticmethod
-    def forward(ctx, g, sample_size, n_edge_types, out_node_types, in_node_types, edge_types,
+    def forward(ctx, g, fanout, n_edge_types, out_node_types, in_node_types, edge_types,
                 coeff, feat, W):
         """
         Compute the forward pass of R-GCN.
@@ -19,8 +18,8 @@ class RgcnFunction(th.autograd.Function):
         g : dgl.heterograph.DGLHeteroGraph
             Heterogeneous graph.
 
-        sample_size : int64
-            Maximum degree of nodes.
+        fanout : int64
+            Maximum in-degree of nodes.
 
         n_edge_types : int64
             Number of edge types in this graph.
@@ -68,7 +67,7 @@ class RgcnFunction(th.autograd.Function):
         # can be passed through graph class members if necessary in the future
         _n_node_types = 0
 
-        mfg = message_flow_graph_hg_csr_int64(sample_size, _out_nodes, _in_nodes, indptr, indices,
+        mfg = message_flow_graph_hg_csr_int64(fanout, _out_nodes, _in_nodes, indptr, indices,
             _n_node_types, n_edge_types, out_node_types, in_node_types, edge_types)
 
         if coeff is None:
@@ -129,7 +128,6 @@ class RgcnConv(nn.Module):
                  in_feat,
                  out_feat,
                  num_rels,
-                 sample_size,
                  regularizer=None,
                  num_bases=None,
                  bias=True,
@@ -141,7 +139,6 @@ class RgcnConv(nn.Module):
         self.in_feat = in_feat
         self.out_feat = out_feat
         self.num_rels = num_rels
-        self.sample_size = sample_size  # fanout
 
         # regularizer (see dgl.nn.pytorch.linear.TypedLinear)
         if regularizer is None:
@@ -198,8 +195,9 @@ class RgcnConv(nn.Module):
             g.srcdata['h'] = feat
             if norm is not None:
                 g.edata['norm'] = norm
+            fanout = g.in_degrees().max().item()
             # message passing
-            h = RgcnFunction.apply(g, self.sample_size, self.num_rels,
+            h = RgcnFunction.apply(g, fanout, self.num_rels,
                                    g.dstdata['ntype'], g.srcdata['ntype'], etypes,
                                    self.coeff, feat, self.W)
             # apply bias and activation

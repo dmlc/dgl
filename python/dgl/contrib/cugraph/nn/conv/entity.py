@@ -18,9 +18,9 @@ class RGCN(nn.Module):
         super().__init__()
         self.emb = nn.Embedding(num_nodes, h_dim)
         # two-layer RGCN
-        self.conv1 = RgcnConv(h_dim, h_dim, num_rels, SAMPLE_SIZE,
+        self.conv1 = RgcnConv(h_dim, h_dim, num_rels,
                               regularizer='basis', num_bases=num_bases, self_loop=False)
-        self.conv2 = RgcnConv(h_dim, out_dim, num_rels, SAMPLE_SIZE,
+        self.conv2 = RgcnConv(h_dim, out_dim, num_rels,
                               regularizer='basis', num_bases=num_bases, self_loop=False)
 
     def forward(self, g):
@@ -81,7 +81,6 @@ if __name__ == '__main__':
     # cugraph-ops requires node/edge type to be int32
     g.ndata['ntype'] = g.ndata.pop(dgl.NTYPE).type(th.int32)
     g.edata[dgl.ETYPE] = g.edata[dgl.ETYPE].type(th.int32)
-    SAMPLE_SIZE = g.in_degrees().max().item()
 
     # create model
     h_dim = 16  # hidden feature dim
