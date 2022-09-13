@@ -7,7 +7,7 @@ import dgl.nn as dglnn
 from dgl.dataloading import DataLoader, NeighborSampler, MultiLayerFullNeighborSampler, as_edge_prediction_sampler, negative_sampler
 import tqdm
 import argparse
-from ogb.linkproppred import DglLinkPropPredDataset
+from ogb.linkproppred import DglLinkPropPredDataset, Evaluator
 
 def to_bidirected_with_reverse_mapping(g):
     """Makes a graph bidirectional, and returns a mapping array ``mapping`` where ``mapping[i]``
@@ -67,12 +67,11 @@ class SAGE(nn.Module):
             num_workers=0)
         buffer_device = torch.device('cpu')
         pin_memory = (buffer_device != device)
-
         for l, layer in enumerate(self.layers):
             y = torch.empty(g.num_nodes(), self.hid_size, device=buffer_device,
                             pin_memory=pin_memory)
             feat = feat.to(device)
-            for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
+            for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader, desc='Inference'):
                 x = feat[input_nodes]
                 h = layer(blocks[0], x)
                 if l != len(self.layers) - 1:
@@ -81,21 +80,21 @@ class SAGE(nn.Module):
             feat = y
         return y
 
-def compute_mrr(model, node_emb, src, dst, neg_dst, device, batch_size=500):
+def compute_mrr(model, evaluator, node_emb, src, dst, neg_dst, device, batch_size=500):
     rr = torch.zeros(src.shape[0])
-    for start in tqdm.trange(0, src.shape[0], batch_size):
+    for start in tqdm.trange(0, src.shape[0], batch_size, desc='Evaluate'):
         end = min(start + batch_size, src.shape[0])
         all_dst = torch.cat([dst[start:end, None], neg_dst[start:end]], 1)
         h_src = node_emb[src[start:end]][:, None, :].to(device)
         h_dst = node_emb[all_dst.view(-1)].view(*all_dst.shape, -1).to(device)
         pred = model.predictor(h_src*h_dst).squeeze(-1)
-        relevance = torch.zeros(*pred.shape, dtype=torch.bool).to(pred.device)
-        relevance[:, 0] = True
-        rr[start:end] = MF.retrieval_reciprocal_rank(pred, relevance)
+        input_dict = {'y_pred_pos': pred[:,0], 'y_pred_neg': pred[:,1:]}
+        rr[start:end] = evaluator.eval(input_dict)['mrr_list']
     return rr.mean()
 
 def evaluate(device, graph, edge_split, model, batch_size):
     model.eval()
+    evaluator = Evaluator(name='ogbl-citation2')
     with torch.no_grad():
         node_emb = model.inference(graph, device, batch_size)
         results = []
@@ -103,7 +102,7 @@ def evaluate(device, graph, edge_split, model, batch_size):
             src = edge_split[split]['source_node'].to(node_emb.device)
             dst = edge_split[split]['target_node'].to(node_emb.device)
             neg_dst = edge_split[split]['target_node_neg'].to(node_emb.device)
-            results.append(compute_mrr(model, node_emb, src, dst, neg_dst, device))
+            results.append(compute_mrr(model, evaluator, node_emb, src, dst, neg_dst, device))
     return results
 
 def train(args, device, g, reverse_eids, seed_edges, model):
@@ -117,7 +116,6 @@ def train(args, device, g, reverse_eids, seed_edges, model):
         g, seed_edges, sampler,
         device=device, batch_size=512, shuffle=True,
         drop_last=False, num_workers=0, use_uva=use_uva)
-
     opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
     for epoch in range(10):
         model.train()
@@ -167,6 +165,6 @@ if __name__ == '__main__':
     train(args, device, g, reverse_eids, seed_edges, model)
 
     # validate/test the model
-    print('Validation/Training...')
+    print('Validation/Testing...')
     valid_mrr, test_mrr = evaluate(device, g, edge_split, model, batch_size=1000)
-    print('Validation Accuracy {:.4f}, Test Accuracy {:.4f}'.format(valid_mrr.item(),test_mrr.item()))
+    print('Validation MRR {:.4f}, Test MRR {:.4f}'.format(valid_mrr.item(),test_mrr.item()))
