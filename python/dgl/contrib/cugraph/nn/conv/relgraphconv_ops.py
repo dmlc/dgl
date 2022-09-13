@@ -181,21 +181,16 @@ class RgcnConv(nn.Module):
                 raise ValueError(
                     f'Supported regularizer options: "basis", but got {self.regularizer}')
 
-    def forward(self, g, feat, etypes, norm=None, presorted=False):
+    def forward(self, g, feat, etypes, norm=None, *, presorted=False):
         self.presorted = presorted
         with g.local_scope():
             g.srcdata['h'] = feat
             if norm is not None:
                 g.edata['norm'] = norm
-            # TODO(tingyu66): do we really need to reorder edges as below
-            _, _, L = g.adj_sparse("csc")
-            etypes = etypes[L]
             # message passing
-            output = RgcnFunction.apply(g, self.sample_size, self.n_node_types, self.num_rels,
-                                        g.dstdata['ntype'], g.srcdata['ntype'], etypes,
-                                        self.coeff, feat, self.W)
-            g.dstdata['h'] = output
-            h = g.dstdata['h']
+            h = RgcnFunction.apply(g, self.sample_size, self.n_node_types, self.num_rels,
+                                   g.dstdata['ntype'], g.srcdata['ntype'], etypes,
+                                   self.coeff, feat, self.W)
             # apply bias and activation
             if self.layer_norm:
                 h = self.layer_norm_weight(h)
