@@ -203,6 +203,10 @@ class CUDADeviceAPI final : public DeviceAPI {
     CUDA_CALL(cudaStreamSynchronize(static_cast<cudaStream_t>(stream)));
   }
 
+  /*! NOTE: If the backend is PyTorch, we will use PyTorch's stream management,
+   *        so just avoid calling our SetStream/CreateStream unless
+   *        you really need advanced stream control.
+   */
   void SetStream(DGLContext ctx, DGLStreamHandle stream) final {
     CUDAThreadEntry::ThreadLocal()
         ->stream = static_cast<cudaStream_t>(stream);

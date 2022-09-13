@@ -5586,6 +5586,7 @@ class DGLHeteroGraph(object):
 
     def record_stream(self, stream):
         """Record the stream that is using this graph.
+        This method works for graphs on the GPU only.
 
         Parameters
         ----------
@@ -5597,6 +5598,8 @@ class DGLHeteroGraph(object):
         DGLGraph
             self.
         """
+        if F.device_type(self.device) != 'cuda':
+            raise DGLError("The graph must be on GPU to be recorded.")
         self._graph.record_stream(stream)
         for frame in itertools.chain(self._node_frames, self._edge_frames):
             for col in frame._columns.values():
