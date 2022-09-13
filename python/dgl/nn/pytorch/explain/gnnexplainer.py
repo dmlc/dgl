@@ -402,7 +402,7 @@ class GNNExplainer(nn.Module):
 
 class HeteroGNNExplainer(nn.Module):
     r"""GNNExplainer model from `GNNExplainer: Generating Explanations for
-    Graph Neural Networks <https://arxiv.org/abs/1903.03894>`__
+    Graph Neural Networks <https://arxiv.org/abs/1903.03894>`__, adapted for heterogeneous graphs
     It identifies compact subgraph structures and small subsets of node features that play a
     critical role in GNN-based node classification and graph classification.
     To generate an explanation, it learns an edge mask :math:`M` and a feature mask :math:`F`
