@@ -575,7 +575,7 @@ class HeteroGNNExplainer(nn.Module):
         new_node_id : Tensor
             The new ID of the input center node.
         sg : DGLHeteroGraph
-            The subgraph induced on the k-hop in-neighborhood of :attr:`node_id`.
+            The subgraph induced on the k-hop in-neighborhood of the center node.
         feat_mask : Dictionary of Tensor
             Dictionary of { ntypes: features }
             Learned feature importance mask of shape :math:`(D)`, where :math:`D` is the
