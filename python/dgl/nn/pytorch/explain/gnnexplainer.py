@@ -556,7 +556,7 @@ class HeteroGNNExplainer(nn.Module):
         :attr:`node_id` with node type :attr:`ntype`.
         Parameters
         ----------
-        ntype: str
+        ntype : str
             The node type of the node to explain.
         node_id : int
             The node to explain.
