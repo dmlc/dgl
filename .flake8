@@ -1,0 +1,6 @@
+[flake8]
+
+max-line-length = 80
+exclude =
+    ./.github,
+    ./build,
