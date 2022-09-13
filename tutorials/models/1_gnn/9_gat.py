@@ -305,8 +305,8 @@ def load_cora_data():
     data = citegrh.load_cora()
     features = torch.FloatTensor(data.features)
     labels = torch.LongTensor(data.labels)
-    mask = torch.BoolTensor(data.train_mask)
     g = data[0]
+    mask = torch.BoolTensor(g.ndata['train_mask'])
     return g, features, labels, mask
 
 ##############################################################################
