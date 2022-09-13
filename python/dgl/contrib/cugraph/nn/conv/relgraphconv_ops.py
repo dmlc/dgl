@@ -9,7 +9,7 @@ from pylibcugraphops.structure.graph_types import message_flow_graph_hg_csr_int6
 
 class RgcnFunction(th.autograd.Function):
     @staticmethod
-    def forward(ctx, g, sample_size, n_node_types, n_edge_types, out_node_types, in_node_types, edge_types,
+    def forward(ctx, g, sample_size, n_edge_types, out_node_types, in_node_types, edge_types,
                 coeff, feat, W):
         """
         Compute the forward pass of R-GCN.
@@ -21,9 +21,6 @@ class RgcnFunction(th.autograd.Function):
 
         sample_size : int64
             Maximum degree of nodes.
-
-        n_node_types : int64
-            Number of node types in this graph.
 
         n_edge_types : int64
             Number of edge types in this graph.
@@ -67,8 +64,12 @@ class RgcnFunction(th.autograd.Function):
         out_feat_dim = W.shape[-1]
         indptr, indices, _ = g.adj_sparse('csc')  # edge_ids not needed here
 
+        # needed for creating MFG but not actually used in cugraph-ops aggregators
+        # can be passed through graph class members if necessary in the future
+        _n_node_types = 0
+
         mfg = message_flow_graph_hg_csr_int64(sample_size, _out_nodes, _in_nodes, indptr, indices,
-            n_node_types, n_edge_types, out_node_types, in_node_types, edge_types)
+            _n_node_types, n_edge_types, out_node_types, in_node_types, edge_types)
 
         if coeff is None:
             leading_dimension = n_edge_types * _in_feat_dim
@@ -120,14 +121,13 @@ class RgcnFunction(th.autograd.Function):
             agg_hg_basis_post_bwd_int64(g_in, agg_out, feat.detach(), mfg,
                 output_weight_gradient=g_coeff, weights_combination=coeff.detach())
 
-        return None, None, None, None, None, None, None, g_coeff, g_in, g_W.view_as(W)
+        return None, None, None, None, None, None, g_coeff, g_in, g_W.view_as(W)
 
 class RgcnConv(nn.Module):
     """ Relational graph convolution layer that provides same interface as `dgl.nn.pytorch.conv.relgraph`. """
     def __init__(self,
                  in_feat,
                  out_feat,
-                 n_node_types,
                  num_rels,
                  sample_size,
                  regularizer=None,
@@ -140,7 +140,6 @@ class RgcnConv(nn.Module):
         super().__init__()
         self.in_feat = in_feat
         self.out_feat = out_feat
-        self.n_node_types = n_node_types
         self.num_rels = num_rels
         self.sample_size = sample_size  # fanout
 
@@ -200,7 +199,7 @@ class RgcnConv(nn.Module):
             if norm is not None:
                 g.edata['norm'] = norm
             # message passing
-            h = RgcnFunction.apply(g, self.sample_size, self.n_node_types, self.num_rels,
+            h = RgcnFunction.apply(g, self.sample_size, self.num_rels,
                                    g.dstdata['ntype'], g.srcdata['ntype'], etypes,
                                    self.coeff, feat, self.W)
             # apply bias and activation

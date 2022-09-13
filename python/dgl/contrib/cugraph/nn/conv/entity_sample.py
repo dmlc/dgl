@@ -15,13 +15,13 @@ import os
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
 class RGCN(nn.Module):
-    def __init__(self, num_nodes, h_dim, out_dim, num_rels, num_node_types, num_bases):
+    def __init__(self, num_nodes, h_dim, out_dim, num_rels, num_bases):
         super().__init__()
         self.emb = nn.Embedding(num_nodes, h_dim)
         # two-layer RGCN
-        self.conv1 = RgcnConv(h_dim, h_dim, num_node_types, num_rels, FANOUT_1,
+        self.conv1 = RgcnConv(h_dim, h_dim, num_rels, FANOUT_1,
                               regularizer='basis', num_bases=num_bases, self_loop=False)
-        self.conv2 = RgcnConv(h_dim, out_dim, num_node_types, num_rels, FANOUT_2,
+        self.conv2 = RgcnConv(h_dim, out_dim, num_rels, FANOUT_2,
                               regularizer='basis', num_bases=num_bases, self_loop=False)
 
     def forward(self, g):
@@ -80,9 +80,8 @@ if __name__ == '__main__':
         print(f'# Unique edge type names: {len(set(hg.etypes))}')
 
     num_rels = len(hg.canonical_etypes)
-    num_node_types = len(hg.ntypes)
     category = data.predict_category
-    labels = hg.nodes[category].data.pop('labels')  # to predict
+    labels = hg.nodes[category].data.pop('labels')
     train_mask = hg.nodes[category].data.pop('train_mask')
     test_mask = hg.nodes[category].data.pop('test_mask')
     train_idx = th.nonzero(train_mask, as_tuple=False).squeeze()
@@ -119,7 +118,7 @@ if __name__ == '__main__':
     h_dim = 16  # hidden feature dim
     num_classes = data.num_classes
     num_bases = 10
-    model = RGCN(g.num_nodes(), h_dim, num_classes, num_rels, num_node_types, num_bases)
+    model = RGCN(g.num_nodes(), h_dim, num_classes, num_rels, num_bases)
     model = model.to(device)
 
     optimizer = th.optim.Adam(model.parameters(), lr=1e-2, weight_decay=5e-4)
