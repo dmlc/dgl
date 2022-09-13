@@ -8,8 +8,8 @@ from pylibcugraphops.structure.graph_types import message_flow_graph_hg_csr_int6
 
 class RgcnFunction(th.autograd.Function):
     @staticmethod
-    def forward(ctx, g, fanout, n_edge_types, out_node_types, in_node_types, edge_types,
-                coeff, feat, W):
+    def forward(ctx, g, fanout, num_rels, out_node_types, in_node_types, edge_types,
+                feat, W, coeff):
         """
         Compute the forward pass of R-GCN.
 
@@ -21,7 +21,7 @@ class RgcnFunction(th.autograd.Function):
         fanout : int64
             Maximum in-degree of nodes.
 
-        n_edge_types : int64
+        num_rels : int64
             Number of edge types in this graph.
 
         out_node_types : torch.Tensor, dtype=torch.int32
@@ -34,56 +34,52 @@ class RgcnFunction(th.autograd.Function):
             Tensor of the edge types.
 
         coeff : torch.Tensor, dtype=torch.float32, requires_grad=True
-            Coefficient matrix in basis-decomposition for regularization, shape: (n_edge_types, n_bases).
+            Coefficient matrix in basis-decomposition for regularization, shape: (num_rels, num_bases).
             It should be set to ``None`` when ``regularizer=None``.
 
         feat : torch.Tensor, dtype=torch.float32, requires_grad=True
-            Input feature, shape: (n_in_nodes, in_feat).
+            Input feature, shape: (num_src_nodes, in_feat).
 
         W : torch.Tensor, dtype=torch.float32, requires_grad=True
-            Weights tensor, shape: (n_bases, in_feat_dim, out_feat_dim) when ``regularizer='basis'``, or
-            (n_edge_types, in_feat_dim, out_feat_dim) when ``regularizer=None``.
+            Weights tensor, shape: (num_bases, in_feat, out_feat) when ``regularizer='basis'``, or
+            (num_rels, in_feat, out_feat) when ``regularizer=None``.
 
         Cached
         ------
         agg_out : torch.Tensor, dtype=torch.float32
-            Aggregation output, shape: (n_out_nodes, W.shape[0]*W.shape[1])
+            Aggregation output, shape: (num_dst_nodes, W.shape[0]*W.shape[1])
 
         Returns
         -------
         output : torch.Tensor, dtype=torch.float32
-            Output feature, shape: (n_out_nodes, out_feat_dim)
+            Output feature, shape: (num_dst_nodes, out_feat)
 
         """
-        _n_out_nodes = g.num_dst_nodes('_N')
-        _n_in_nodes = g.num_src_nodes('_N')
-        _out_nodes = g.dstnodes()
-        _in_nodes = g.srcnodes()
-        _in_feat_dim = feat.shape[-1]
-        out_feat_dim = W.shape[-1]
+        _in_feat = feat.shape[-1]
+        _out_feat = W.shape[-1]
         indptr, indices, _ = g.adj_sparse('csc')  # edge_ids not needed here
 
         # needed for creating MFG but not actually used in cugraph-ops aggregators
         # can be passed through graph class members if necessary in the future
         _n_node_types = 0
 
-        mfg = message_flow_graph_hg_csr_int64(fanout, _out_nodes, _in_nodes, indptr, indices,
-            _n_node_types, n_edge_types, out_node_types, in_node_types, edge_types)
+        mfg = message_flow_graph_hg_csr_int64(fanout, g.dstnodes(), g.srcnodes(), indptr, indices,
+            _n_node_types, num_rels, out_node_types, in_node_types, edge_types)
 
         if coeff is None:
-            leading_dimension = n_edge_types * _in_feat_dim
+            leading_dimension = num_rels * _in_feat
         else:
-            n_bases = coeff.shape[-1]
-            leading_dimension = n_bases * _in_feat_dim
+            _num_bases = coeff.shape[-1]
+            leading_dimension = _num_bases * _in_feat
 
-        agg_out = th.empty(_n_out_nodes, leading_dimension, dtype=th.float32, device='cuda')
+        agg_out = th.empty(g.num_dst_nodes(), leading_dimension, dtype=th.float32, device='cuda')
 
         if coeff is None:
             agg_hg_basis_post_fwd_int64(agg_out, feat.detach(), mfg)
         else:
             agg_hg_basis_post_fwd_int64(agg_out, feat.detach(), mfg, weights_combination=coeff.detach())
 
-        output = th.as_tensor(agg_out, device='cuda') @ W.view(leading_dimension, out_feat_dim)
+        output = th.as_tensor(agg_out, device='cuda') @ W.view(leading_dimension, _out_feat)
 
         ctx.backward_cache = mfg
         ctx.save_for_backward(coeff, feat, W, output, agg_out)
@@ -120,7 +116,7 @@ class RgcnFunction(th.autograd.Function):
             agg_hg_basis_post_bwd_int64(g_in, agg_out, feat.detach(), mfg,
                 output_weight_gradient=g_coeff, weights_combination=coeff.detach())
 
-        return None, None, None, None, None, None, g_coeff, g_in, g_W.view_as(W)
+        return None, None, None, None, None, None, g_in, g_W.view_as(W), g_coeff
 
 class RgcnConv(nn.Module):
     """ Relational graph convolution layer that provides same interface as `dgl.nn.pytorch.conv.relgraph`. """
@@ -199,7 +195,7 @@ class RgcnConv(nn.Module):
             # message passing
             h = RgcnFunction.apply(g, fanout, self.num_rels,
                                    g.dstdata['ntype'], g.srcdata['ntype'], etypes,
-                                   self.coeff, feat, self.W)
+                                   feat, self.W, self.coeff)
             # apply bias and activation
             if self.layer_norm:
                 h = self.layer_norm_weight(h)
