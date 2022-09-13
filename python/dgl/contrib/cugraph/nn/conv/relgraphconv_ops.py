@@ -16,35 +16,47 @@ class RgcnFunction(th.autograd.Function):
 
         Parameters
         ----------
-        g : dgl.heterograph.DGLHeteroGraph, device='cuda'
+        g : dgl.heterograph.DGLHeteroGraph
             Heterogeneous graph.
 
         sample_size : int64
+            Maximum degree of nodes.
+
         n_node_types : int64
+            Number of node types in this graph.
+
         n_edge_types : int64
-        out_node_types : ndarray or torch.Tensor, dtype=int32, device='cuda'
-        in_node_types : ndarray or torch.Tensor, dtype=int32, device='cuda'
-        edge_types : ndarray or torch.Tensor, dtype=int32, device='cuda'
+            Number of edge types in this graph.
 
-        coeff : torch.Tensor, dtype=torch.float32, device='cuda', requires_grad=True
-            Coefficient matrix in basis-decomposition for regularization, shape = n_edge_types * n_bases
+        out_node_types : torch.Tensor, dtype=torch.int32
+            Tensor of the node types of output nodes.
 
-        feat : torch.Tensor, dtype=torch.float32, device='cuda', requires_grad=True
-            Input feature, shape = n_in_nodes * in_feat
+        in_node_types : torch.Tensor, dtype=torch.int32
+            Tensor of the node types of input nodes.
 
-        W : torch.Tensor, dtype=torch.float32, device='cuda', requires_grad=True
-            shape = (n_bases+1) * in_feat * out_feat_dim
-            leading_dimension = (n_bases+1) * in_feat
+        edge_types : torch.Tensor, dtype=int32
+            Tensor of the edge types.
+
+        coeff : torch.Tensor, dtype=torch.float32, requires_grad=True
+            Coefficient matrix in basis-decomposition for regularization, shape: (n_edge_types, n_bases).
+            It should be set to ``None`` when ``regularizer=None``.
+
+        feat : torch.Tensor, dtype=torch.float32, requires_grad=True
+            Input feature, shape: (n_in_nodes, in_feat).
+
+        W : torch.Tensor, dtype=torch.float32, requires_grad=True
+            Weights tensor, shape: (n_bases, in_feat_dim, out_feat_dim) when ``regularizer='basis'``, or
+            (n_edge_types, in_feat_dim, out_feat_dim) when ``regularizer=None``.
 
         Cached
         ------
-        agg_out : torch.Tensor, dtype=torch.float32, device='cuda'
-            Aggregation output, shape = n_out_nodes * leading_dimension
+        agg_out : torch.Tensor, dtype=torch.float32
+            Aggregation output, shape: (n_out_nodes, W.shape[0]*W.shape[1])
 
         Returns
         -------
-        output : torch.Tensor, dtype=torch.float32, device='cuda'
-            Output feature, shape = n_out_nodes * out_feat_dim
+        output : torch.Tensor, dtype=torch.float32
+            Output feature, shape: (n_out_nodes, out_feat_dim)
 
         """
         _n_out_nodes = g.num_dst_nodes('_N')
@@ -85,7 +97,7 @@ class RgcnFunction(th.autograd.Function):
 
         Parameters
         ----------
-        grad_output : torch.Tensor, dtype=torch.float32, device='cuda'
+        grad_output : torch.Tensor, dtype=torch.float32
             Gradient of loss function w.r.t output.
 
         """
