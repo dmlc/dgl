@@ -499,7 +499,7 @@ class HeteroGNNExplainer(nn.Module):
         edge_masks = {}
         for canonical_etype in graph.canonical_etypes:
             src = canonical_etype[0]
-            num_nodes = graph.number_of_nodes(src)
+            num_nodes = graph.num_nodes(src)
             num_edges = graph.number_of_edges(canonical_etype)
             std = nn.init.calculate_gain('relu')
             if num_nodes > 0:
