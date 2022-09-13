@@ -500,7 +500,7 @@ class HeteroGNNExplainer(nn.Module):
         for canonical_etype in graph.canonical_etypes:
             src = canonical_etype[0]
             num_nodes = graph.num_nodes(src)
-            num_edges = graph.number_of_edges(canonical_etype)
+            num_edges = graph.num_edges(canonical_etype)
             std = nn.init.calculate_gain('relu')
             if num_nodes > 0:
                 std *= sqrt((2.0 / (2 * num_nodes)))
