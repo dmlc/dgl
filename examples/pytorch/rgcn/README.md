@@ -54,3 +54,8 @@ Summary
 | mutag         | ~0.70      | ~0.50
 | bgs           | ~0.86      | ~0.64
 | am            | ~0.78      | ~0.42
+
+### Link Prediction
+| Dataset       | Best MRR
+| ------------- | -------
+| FB15k-237     | ~0.2439
