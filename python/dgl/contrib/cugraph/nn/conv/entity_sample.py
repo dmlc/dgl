@@ -66,7 +66,7 @@ if __name__ == '__main__':
     else:
         raise ValueError('Unknown dataset: {}'.format(args.dataset))
 
-    device = th.device('cuda' if th.cuda.is_available() else 'cpu')
+    device = th.device('cuda')
     hg = data[0]
     hg = hg.to(device)
 
@@ -141,7 +141,8 @@ if __name__ == '__main__':
         print("Epoch {:05d} | Loss {:.4f} | Val. Accuracy {:.4f} ".format(epoch, total_loss / (it+1), acc))
 
     # evaluation
-    # TODO(tingyu66): should sample all neighbors for test accuracy
+    # note: when sampling all neighbors on a large graph for the test dataset, the required shared
+    # memory on GPU may exceed the hardware limit. Reduce the fanout numbers if necessary.
     test_sampler = MultiLayerNeighborSampler([100, 100]) # -1 for sampling all neighbors
     test_loader = DataLoader(g, target_idx[test_idx], test_sampler, device=device,
                              batch_size=32, shuffle=False)

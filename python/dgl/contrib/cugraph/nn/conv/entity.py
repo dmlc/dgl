@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from torchmetrics.functional import accuracy
 
 import dgl
-from dgl.data.rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
+from dgl.data.rdf import AIFBDataset
 from dgl.contrib.cugraph.nn.conv.relgraphconv_ops import RgcnConv
 
 # debugging
@@ -31,25 +31,13 @@ class RGCN(nn.Module):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='RGCN for entity classification')
-    parser.add_argument("--dataset", type=str, default="aifb",
-                        help="Dataset name ('aifb', 'mutag', 'bgs', 'am'), default to 'aifb'.")
     parser.add_argument("--verbose", action="store_true",
                         help="Print verbose data information.")
     args = parser.parse_args()
 
     # load and preprocess dataset
-    if args.dataset == 'aifb':
-        data = AIFBDataset()
-    elif args.dataset == 'mutag':
-        data = MUTAGDataset()
-    elif args.dataset == 'bgs':
-        data = BGSDataset()
-    elif args.dataset == 'am':
-        data = AMDataset()
-    else:
-        raise ValueError('Unknown dataset: {}'.format(args.dataset))
-
-    device = th.device('cuda' if th.cuda.is_available() else 'cpu')
+    data = AIFBDataset()
+    device = th.device('cuda')
     hg = data[0]
     hg = hg.to(device)
 
