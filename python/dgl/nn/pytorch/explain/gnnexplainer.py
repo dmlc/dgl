@@ -559,7 +559,7 @@ class HeteroGNNExplainer(nn.Module):
         ntype : str
             The node type of the node to explain.
         node_id : int
-            The node to explain.
+            The ID of the node to explain.
         graph : DGLHeteroGraph
             A heterogeneous graph.
         feat : Dictionary of Tensor
