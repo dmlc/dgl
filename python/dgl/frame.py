@@ -101,6 +101,9 @@ class LazyFeature(object):
     def unpin_memory_(self):
         """No-op.  For compatibility of :meth:`Frame.unpin_memory_` method."""
 
+    def record_stream(self, stream):
+        """No-op.  For compatibility of :meth:`Frame.record_stream` method."""
+
 class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
     """The column scheme.
 
@@ -493,7 +496,7 @@ class Column(TensorStorage):
             self.pinned_by_dgl = False
 
     def record_stream(self, stream):
-        """Record that stream is using the storage.
+        """Record stream that is using the storage.
         Does nothing if the backend is not PyTorch.
 
         Parameters
@@ -887,6 +890,12 @@ class Frame(MutableMapping):
         if necessary."""
         for column in self._columns.values():
             column.unpin_memory_()
+
+    def record_stream(self, stream):
+        """Record stream that is using the data of every column, materializing them
+        if necessary."""
+        for column in self._columns.values():
+            column.record_stream(stream)
 
     def _astype_float(self, new_type):
         assert new_type in [F.float64, F.float32, F.float16], \
