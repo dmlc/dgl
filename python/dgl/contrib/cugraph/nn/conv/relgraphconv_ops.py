@@ -8,7 +8,7 @@ from pylibcugraphops.aggregators.node_level import (agg_hg_basis_post_fwd_int32,
 from pylibcugraphops.structure.graph_types import (message_flow_graph_hg_csr_int32,
     message_flow_graph_hg_csr_int64)
 
-class RgcnFunction(th.autograd.Function):
+class RelGraphConvFunc(th.autograd.Function):
     @staticmethod
     def forward(ctx, g, fanout, num_rels, out_node_types, in_node_types, edge_types,
                 feat, W, coeff):
@@ -20,10 +20,10 @@ class RgcnFunction(th.autograd.Function):
         g : dgl.heterograph.DGLHeteroGraph
             Heterogeneous graph.
 
-        fanout : int64
+        fanout : int
             Maximum in-degree of nodes.
 
-        num_rels : int64
+        num_rels : int
             Number of edge types in this graph.
 
         out_node_types : torch.Tensor, dtype=torch.int32
@@ -32,7 +32,7 @@ class RgcnFunction(th.autograd.Function):
         in_node_types : torch.Tensor, dtype=torch.int32
             Tensor of the node types of input nodes.
 
-        edge_types : torch.Tensor, dtype=int32
+        edge_types : torch.Tensor, dtype=torch.int32
             Tensor of the edge types.
 
         coeff : torch.Tensor, dtype=torch.float32, requires_grad=True
@@ -139,7 +139,7 @@ class RgcnFunction(th.autograd.Function):
 
         return None, None, None, None, None, None, g_in, g_W.view_as(W), g_coeff
 
-class RgcnConv(nn.Module):
+class RelGraphConvOps(nn.Module):
     """ Relational graph convolution layer that provides same interface as `dgl.nn.pytorch.conv.relgraph`. """
     def __init__(self,
                  in_feat,
@@ -214,9 +214,9 @@ class RgcnConv(nn.Module):
                 g.edata['norm'] = norm
             fanout = g.in_degrees().max().item()
             # message passing
-            h = RgcnFunction.apply(g, fanout, self.num_rels,
-                                   g.dstdata['ntype'], g.srcdata['ntype'], etypes,
-                                   feat, self.W, self.coeff)
+            h = RelGraphConvFunc.apply(g, fanout, self.num_rels,
+                                       g.dstdata['ntype'], g.srcdata['ntype'], etypes,
+                                       feat, self.W, self.coeff)
             # apply bias and activation
             if self.layer_norm:
                 h = self.layer_norm_weight(h)

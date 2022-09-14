@@ -8,21 +8,17 @@ from torchmetrics.functional import accuracy
 import dgl
 from dgl.data.rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
 from dgl.dataloading import MultiLayerNeighborSampler, DataLoader
-from dgl.contrib.cugraph.nn.conv.relgraphconv_ops import RgcnConv
-
-# debugging
-import os
-os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
+from dgl.contrib.cugraph.nn.conv.relgraphconv_ops import RelGraphConvOps
 
 class RGCN(nn.Module):
     def __init__(self, num_nodes, h_dim, out_dim, num_rels, num_bases):
         super().__init__()
         self.emb = nn.Embedding(num_nodes, h_dim)
         # two-layer RGCN
-        self.conv1 = RgcnConv(h_dim, h_dim, num_rels,
-                              regularizer='basis', num_bases=num_bases, self_loop=False)
-        self.conv2 = RgcnConv(h_dim, out_dim, num_rels,
-                              regularizer='basis', num_bases=num_bases, self_loop=False)
+        self.conv1 = RelGraphConvOps(h_dim, h_dim, num_rels,
+                                     regularizer='basis', num_bases=num_bases, self_loop=False)
+        self.conv2 = RelGraphConvOps(h_dim, out_dim, num_rels,
+                                     regularizer='basis', num_bases=num_bases, self_loop=False)
 
     def forward(self, g):
         x = self.emb(g[0].srcdata[dgl.NID])
@@ -146,7 +142,7 @@ if __name__ == '__main__':
     # evaluation
     # note: when sampling all neighbors on a large graph for the test dataset, the required shared
     # memory on GPU may exceed the hardware limit. Reduce the fanout numbers if necessary.
-    test_sampler = MultiLayerNeighborSampler([100, 100]) # -1 for sampling all neighbors
+    test_sampler = MultiLayerNeighborSampler([500, 500]) # -1 for sampling all neighbors
     test_loader = DataLoader(g, target_idx[test_idx].type(g.idtype), test_sampler, device=device,
                              batch_size=32, shuffle=False)
     acc = evaluate(model, labels, test_loader, inv_target)
