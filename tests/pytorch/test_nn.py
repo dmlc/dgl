@@ -1347,8 +1347,9 @@ def test_heterognnexplainer(g, idtype, out_dim):
     # Explain node prediction
     model = Model(5, out_dim)
     model = model.to(F.ctx())
+    ntype = g.ntypes[0]
     explainer = nn.HeteroGNNExplainer(model, num_hops=1)
-    new_center, sg, feat_mask, edge_mask = explainer.explain_node(0, g, feat)
+    new_center, sg, feat_mask, edge_mask = explainer.explain_node(ntype, 0, g, feat)
 
     # Explain graph prediction
     model = Model(5, out_dim)
