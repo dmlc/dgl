@@ -23,7 +23,11 @@ def get_proc_info():
     integer :
         rank of the current process
     """
-    local_rank = int(os.environ.get('OMPI_COMM_WORLD_RANK') or 0)
+    env_variables = dict(os.environ)
+    if 'OMPI_COMM_WORLD_RANK' in env_variables:
+        local_rank = int(os.environ.get('OMPI_COMM_WORLD_RANK') or 0)
+    elif 'MPI_LOCALRANKID' in env_variables:
+        local_rank = int(os.environ.get('MPI_LOCALRANKID') or 0)
     #world_size = int(os.environ.get('OMPI_COMM_WORLD_SIZE') or 1)
     return local_rank
 
@@ -103,24 +107,24 @@ def gen_edge_files(schema_map, output):
     return edge_files
 
 def read_node_features(schema_map, tgt_ntype_name, feat_names):
-	"""
-	Helper function to read the node features, if present.
-	Only node features which are requested are read from the input dataset. 
+    """
+    Helper function to read the node features, if present.
+    Only node features which are requested are read from the input dataset. 
 
-	Parameters:
-	-----------
+    Parameters:
+    -----------
     schema_map : json dictionary
         dictionary created by reading the metadata.json file for the input dataset
 	tgt_ntype_name : string
 		node type name, for which node features will be read from the input dataset
-	feat_names : set
-		a set of strings, feature names, which will be read for a given node type	
+    feat_names : set
+	a set of strings, feature names, which will be read for a given node type	
 
-	Returns:
-	--------
-	dictionary : 
-		a dictionary where key is the feature-name and value is the numpy array
-	"""	
+    Returns:
+    --------
+    dictionary : 
+	a dictionary where key is the feature-name and value is the numpy array
+    """	
     rank = get_proc_info()
     node_features = {}
     if constants.STR_NODE_DATA in schema_map:
@@ -283,14 +287,14 @@ def gen_parmetis_input_args(params, schema_map):
 
 
 def run_wrapper(params):
-	"""
-	Main function which will help create graph files for ParMETIS processing
+    """
+    Main function which will help create graph files for ParMETIS processing
 
-	Parameters:
-	-----------
-	params : argparser object
-		an instance of argparser class which stores command line arguments
-	"""
+    Parameters:
+    -----------
+    params : argparser object
+	an instance of argparser class which stores command line arguments
+    """
     logging.info(f'Starting to generate ParMETIS files...')
 
     rank = get_proc_info()
