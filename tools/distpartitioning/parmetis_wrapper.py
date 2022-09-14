@@ -14,25 +14,31 @@ import pyarrow.csv as csv
 
 def get_proc_info():
     """
-    helper function to get the rank, world_size parameters from the
+    helper function to get the rank from the
     environment when `mpirun` is used to run this python program
 
     Returns:
     --------
     integer :
         rank of the current process
-    integer :
-        total no. of process used to run this program
     """
     local_rank = int(os.environ.get('OMPI_COMM_WORLD_RANK') or 0)
-    world_size = int(os.environ.get('OMPI_COMM_WORLD_SIZE') or 1)
-    return local_rank, world_size
+    #world_size = int(os.environ.get('OMPI_COMM_WORLD_SIZE') or 1)
+    return local_rank
 
 
 def gen_edge_files(schema_map, output):
     """
     Function to create edges files to be consumed by ParMETIS
     for partitioning purposes.
+
+    This function creates the edge files and each of these will have the
+    following format (meaning each line of these file is of the following format)
+    <global_src_id> <global_dst_id>
+
+    Here `global` prefix means that globally unique identifier assigned each node
+    in the input graph. In this context globally unique means unique across all the
+    nodes in the input graph.
 
     Parameters:
     -----------
@@ -41,7 +47,7 @@ def gen_edge_files(schema_map, output):
     output : string
         location of storing the node-weights and edge files for ParMETIS
     """
-    rank, world_size = get_proc_info()
+    rank = get_proc_info()
     type_nid_dict, ntype_gnid_offset = get_idranges(schema_map[constants.STR_NODE_TYPE],
                                         schema_map[constants.STR_NUM_NODES_PER_CHUNK])
 
@@ -53,7 +59,7 @@ def gen_edge_files(schema_map, output):
     edge_tids, _ = get_idranges(schema_map[constants.STR_EDGE_TYPE],
                                     schema_map[constants.STR_NUM_EDGES_PER_CHUNK])
 
-    outdir = Path(params.output)
+    outdir = Path(output)
     os.makedirs(outdir, exist_ok=True)
     edge_files = []
     num_parts = len(schema_map[constants.STR_NUM_EDGES_PER_CHUNK][0])
@@ -96,8 +102,25 @@ def gen_edge_files(schema_map, output):
     return edge_files
 
 def read_node_features(schema_map, tgt_ntype_name, feat_names):
+	"""
+	Helper function to read the node features, if present.
+	Only node features which are requested are read from the input dataset. 
 
-    rank, world_size = get_proc_info()
+	Parameters:
+	-----------
+    schema_map : json dictionary
+        dictionary created by reading the metadata.json file for the input dataset
+	tgt_ntype_name : string
+		node type name, for which node features will be read from the input dataset
+	feat_names : set
+		a set of strings, feature names, which will be read for a given node type	
+
+	Returns:
+	--------
+	dictionary : 
+		a dictionary where key is the feature-name and value is the numpy array
+	"""	
+    rank = get_proc_info()
     node_features = {}
     if constants.STR_NODE_DATA in schema_map:
         dataset_features = schema_map[constants.STR_NODE_DATA]
@@ -122,6 +145,19 @@ def gen_node_weights_files(schema_map, output):
     """
     Function to create node weight files for ParMETIS along with the edge files.
 
+    This function generates node-data files, which will be read by the ParMETIS
+    executable for partitioning purposes. Each line in these files will be of the 
+    following format: 
+    <node_type_id> <weight_list> <type_node_id>
+    where 
+    node_type_id -  is id assigned to the node-type to which a given particular
+    node belongs to
+    weight_list - this is a one-hot vector in which the number in the location of
+    the current nodes' node-type will be set to `1` and other will be `0`
+    type_node_id - this is the id assigned to the node (in the context of the current
+    nodes` node-type). Meaning this id is unique across all the nodes which belong to 
+    the current nodes` node-type.
+
     Parameters:
     -----------
     schema_map : json dictionary
@@ -136,13 +172,13 @@ def gen_node_weights_files(schema_map, output):
     list : 
         list o ffilenames for edges of the input graph
     """
-    rank, world_size = get_proc_info()
+    rank = get_proc_info()
     ntypes_ntypeid_map, ntypes, ntid_ntype_map = get_node_types(schema_map)
     type_nid_dict, ntype_gnid_offset = get_idranges(schema_map[constants.STR_NODE_TYPE],
                                         schema_map[constants.STR_NUM_NODES_PER_CHUNK])
 
     node_files = []
-    outdir = Path(params.output)
+    outdir = Path(output)
     os.makedirs(outdir, exist_ok=True)
 
     for ntype_id, ntype_name in ntid_ntype_map.items():
@@ -168,7 +204,7 @@ def gen_node_weights_files(schema_map, output):
         #Add train/test/validation masks if present. node-degree will be added when this file
         #is read by ParMETIS to mimic the exisiting single process pipeline present in dgl
         #
-        node_feats = read_node_features(schema_map,ntype_name, set(["train", "test", "valid"]))
+        node_feats = read_node_features(schema_map,ntype_name, set(["train_mask", "val_mask", "test_mask"]))
         for k, v in node_feats.items():
             assert sz == v.shape
             cols.append(pyarrow.array(v))
@@ -188,16 +224,6 @@ def gen_node_weights_files(schema_map, output):
         csv.write_csv(pyarrow.Table.from_arrays(cols, names=col_names), out_file, options)
         node_files.append((ntype_gnid_offset[ntype_name][0,0] + type_start, \
                                 ntype_gnid_offset[ntype_name][0,0] + type_end, out_file))
-
-    '''
-    edge_files = []
-    edge_data = schema_map[constants.STR_EDGES]
-    for etype_name, etype_info in edge_data.items():
-        files_data = etype_info["data"]
-        for idx, x in enumerate(files_data):
-            if (idx == rank):
-                edge_files.append(x)
-    '''
 
     return node_files
 
@@ -259,45 +285,19 @@ def gen_parmetis_input_args(params, schema_map):
 def run_wrapper(params):
     print("Starting to generate ParMETIS files...")
 
-    rank, world_size = get_proc_info()
+    rank = get_proc_info()
     schema = read_json(params.schema)
     num_nodes_per_chunk = schema[constants.STR_NUM_NODES_PER_CHUNK]
     num_parts = len(num_nodes_per_chunk[0])
-    n = gen_node_weights_files(schema, params.output)
+    gen_node_weights_files(schema, params.output)
     print('Done with node weights....')
 
-    e = gen_edge_files(schema, params.output)
+    gen_edge_files(schema, params.output)
     print('Done with edge weights...')
 
     if rank == 0:
         gen_parmetis_input_args(params, schema)
     print('Done generating files for ParMETIS run ..')
-
-    '''
-    nfiles = []
-    efiles = []
-    for i in range(num_parts):
-        n = gen_node_weights_files(i, schema, params.output)
-        e = gen_edge_files(i, schema, params.output)
-        nfiles.append(n)
-        efiles.append(e)
-
-    nodes = []
-    outer_len = len(nfiles)
-    inner_len = len(nfiles[0])
-    for x in range(inner_len):
-        for y in range(outer_len):
-            nodes.append(nfiles[y][x])
-
-    edges = []
-    outer_len = len(efiles)
-    inner_len = len(efiles[0])
-    for x in range(inner_len):
-        for y in range(outer_len):
-            edges.append(efiles[y][x])
-
-    gen_parmetis_input_args(params, nodes, edges)
-    '''
 
 if __name__ == "__main__":
     """
