@@ -7,7 +7,7 @@ from torchmetrics.functional import accuracy
 
 import dgl
 from dgl.data.rdf import AIFBDataset
-from dgl.contrib.cugraph.nn.conv.relgraphconv_ops import RelGraphConvOps
+from dgl.contrib.cugraph.nn import RelGraphConvOps
 
 class RGCN(nn.Module):
     def __init__(self, num_nodes, h_dim, out_dim, num_rels, num_bases):
