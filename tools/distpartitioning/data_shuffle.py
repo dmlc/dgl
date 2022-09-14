@@ -15,7 +15,7 @@ from dataset_utils import get_dataset
 from utils import read_ntype_partition_files, read_json, get_node_types, \
                     augment_edge_data, get_gnid_range_map, \
                     write_dgl_objects, write_metadata_json, get_ntype_featnames, \
-                    get_idranges
+                    get_idranges, mem_snapshot
 from gloo_wrapper import allgather_sizes, gather_metadata_json,\
                     alltoallv_cpu
 from globalids import assign_shuffle_global_nids_nodes, \
@@ -23,6 +23,8 @@ from globalids import assign_shuffle_global_nids_nodes, \
                     lookup_shuffle_global_nids_edges
 from convert_partition import create_dgl_object, create_metadata_json
 from dist_lookup import DistLookupService
+
+import gc
 
 def gen_node_data(rank, world_size, id_lookup, ntid_ntype_map, schema_map):
     '''
@@ -336,12 +338,16 @@ def exchange_graph_data(rank, world_size, node_features, node_feat_tids, edge_da
         the input argument, edge_data dictionary, is updated with the edge data received from other processes
         in the world. The edge data is received by each rank in the process of data shuffling.
     """
+    mem_snapshot("ShuffleNodeFeaturesBegin: ", rank)
     rcvd_node_features, rcvd_global_nids = exchange_node_features(rank, world_size, node_feat_tids, \
                                                 ntypes_gnid_range_map, id_lookup, node_features)
+    mem_snapshot("ShuffleNodeFeaturesComplete: ", rank)
     logging.info(f'[Rank: {rank}] Done with node features exchange.')
 
     node_data = gen_node_data(rank, world_size, id_lookup, ntid_ntype_map, schema_map)
+    mem_snapshot("NodeDataGenerationComplete: ", rank)
     edge_data = exchange_edge_data(rank, world_size, edge_data)
+    mem_snapshot("ShuffleEdgeDataComplete: ", rank)
     return node_data, rcvd_node_features, rcvd_global_nids, edge_data
 
 def read_dataset(rank, world_size, id_lookup, params, schema_map):
@@ -522,7 +528,7 @@ def gen_dist_partitions(rank, world_size, params):
     """
     global_start = timer()
     logging.info(f'[Rank: {rank}] Starting distributed data processing pipeline...')
-
+    mem_snapshot("Pipeline Begin: ", rank)
     #init processing
     schema_map = read_json(os.path.join(params.input_dir, params.schema))
 
@@ -543,6 +549,7 @@ def gen_dist_partitions(rank, world_size, params):
     node_tids, node_features, node_feat_tids, edge_data, edge_features = \
         read_dataset(rank, world_size, id_lookup, params, schema_map)
     logging.info(f'[Rank: {rank}] Done augmenting file input data with auxilary columns')
+    mem_snapshot("DatasetReadComplete: ", rank)
 
     #send out node and edge data --- and appropriate features.
     #this function will also stitch the data recvd from other processes
@@ -552,17 +559,23 @@ def gen_dist_partitions(rank, world_size, params):
                     exchange_graph_data(rank, world_size, node_features, node_feat_tids, \
                                         edge_data, id_lookup, ntypes_ntypeid_map, ntypes_gnid_range_map, \
                                         ntypeid_ntypes_map, schema_map)
+    gc.collect()
     logging.info(f'[Rank: {rank}] Done with data shuffling...')
+    mem_snapshot("DataShuffleComplete: ", rank)
 
     #sort node_data by ntype
     idx = node_data[constants.NTYPE_ID].argsort()
     for k, v in node_data.items():
         node_data[k] = v[idx]
+    idx = None
+    gc.collect()
     logging.info(f'[Rank: {rank}] Sorted node_data by node_type')
+
 
     #resolve global_ids for nodes
     assign_shuffle_global_nids_nodes(rank, world_size, node_data)
     logging.info(f'[Rank: {rank}] Done assigning global-ids to nodes...')
+    mem_snapshot("ShuffleGlobalID_Nodes_Complete: ", rank)
 
     #shuffle node feature according to the node order on each rank.
     for ntype_name in ntypes:
@@ -577,18 +590,23 @@ def gen_dist_partitions(rank, world_size, params):
             shuffle_global_ids = node_data[constants.SHUFFLE_GLOBAL_NID][idx1]
             feature_idx = shuffle_global_ids.argsort()
             rcvd_node_features[ntype_name+'/'+featname] = rcvd_node_features[ntype_name+'/'+featname][feature_idx]
+    mem_snapshot("ReorderNodeFeaturesComplete: ", rank)
 
     #sort edge_data by etype
     sorted_idx = edge_data[constants.ETYPE_ID].argsort()
     for k, v in edge_data.items():
         edge_data[k] = v[sorted_idx]
+    sorted_idx = None
+    gc.collect()
 
     shuffle_global_eid_start = assign_shuffle_global_nids_edges(rank, world_size, edge_data)
     logging.info(f'[Rank: {rank}] Done assigning global_ids to edges ...')
+    mem_snapshot("ShuffleGlobalID_Edges_Complete: ", rank)
 
     #determine global-ids for edge end-points
     edge_data = lookup_shuffle_global_nids_edges(rank, world_size, edge_data, id_lookup, node_data)
     logging.info(f'[Rank: {rank}] Done resolving orig_node_id for local node_ids...')
+    mem_snapshot("ShuffleGlobalID_Lookup_Complete: ", rank)
 
     #create dgl objects here
     start = timer()
@@ -597,12 +615,15 @@ def gen_dist_partitions(rank, world_size, params):
     graph_obj, ntypes_map_val, etypes_map_val, ntypes_ntypeid_map, etypes_map = create_dgl_object(\
             params.graph_name, params.num_parts, \
             schema_map, rank, node_data, edge_data, num_nodes, num_edges)
+    mem_snapshot("CreateDGLObjectsComplete: ", rank)
     write_dgl_objects(graph_obj, rcvd_node_features, edge_features, params.output, rank)
+    mem_snapshot("DiskWriteDGLObjectsComplete: ", rank)
 
     #get the meta-data
     json_metadata = create_metadata_json(params.graph_name, len(node_data[constants.NTYPE_ID]), len(edge_data[constants.ETYPE_ID]), \
                             rank, world_size, ntypes_map_val, \
                             etypes_map_val, ntypes_ntypeid_map, etypes_map, params.output)
+    mem_snapshot("MetadataCreateComplete: ", rank)
 
     if (rank == 0):
         #get meta-data from all partitions and merge them on rank-0
@@ -614,9 +635,11 @@ def gen_dist_partitions(rank, world_size, params):
         gather_metadata_json(json_metadata, rank, world_size)
     end = timer()
     logging.info(f'[Rank: {rank}] Time to create dgl objects: {timedelta(seconds = end - start)}')
+    mem_snapshot("MetadataWriteComplete: ", rank)
 
     global_end = timer()
     logging.info(f'[Rank: {rank}] Total execution time of the program: {timedelta(seconds = global_end - global_start)}')
+    mem_snapshot("PipelineComplete: ", rank)
 
 def single_machine_run(params):
     """ Main function for distributed implementation on a single machine
