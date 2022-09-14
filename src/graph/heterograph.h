@@ -255,7 +255,7 @@ class HeteroGraph : public BaseHeteroGraph {
    * \brief Record stream for this graph.
    * \param stream The stream that is using the graph
    */
-  void RecordStream(DGLStreamHandle stream) const override;
+  void RecordStream(DGLStreamHandle stream) override;
 
   /*! \brief Copy the data to shared memory.
   *

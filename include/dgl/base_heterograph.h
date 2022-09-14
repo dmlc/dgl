@@ -125,7 +125,7 @@ class BaseHeteroGraph : public runtime::Object {
    * \brief Record stream for this graph.
    * \param stream The stream that is using the graph
    */
-  virtual void RecordStream(DGLStreamHandle stream) const = 0;
+  virtual void RecordStream(DGLStreamHandle stream) = 0;
 
   /*!
    * \brief Get the number of integer bits used to store node/edge ids (32 or 64).

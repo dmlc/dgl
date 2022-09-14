@@ -276,7 +276,7 @@ void HeteroGraph::UnpinMemory_() {
     g->UnpinMemory_();
 }
 
-void HeteroGraph::RecordStream(DGLStreamHandle stream) const {
+void HeteroGraph::RecordStream(DGLStreamHandle stream) {
   for (auto g : relation_graphs_)
     g->RecordStream(stream);
 }
