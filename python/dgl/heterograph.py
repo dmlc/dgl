@@ -5598,7 +5598,7 @@ class DGLHeteroGraph(object):
         DGLGraph
             self.
         """
-        if F.get_preferred_backend != 'pytorch':
+        if F.get_preferred_backend() != 'pytorch':
             raise DGLError("record_stream only support the PyTorch backend.")
         if F.device_type(self.device) != 'cuda':
             raise DGLError("The graph must be on GPU to be recorded.")

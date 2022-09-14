@@ -352,7 +352,11 @@ void _TestUnitGraph_CopyTo(const DLContext &src_ctx,
   const aten::COOMatrix &coo = COO1<IdType>(src_ctx);
 
   auto device = dgl::runtime::DeviceAPI::Get(dst_ctx);
+#ifdef DGL_USE_CUDA
   auto stream = runtime::getCurrentCUDAStream();
+#else
+  auto stream = nullptr;
+#endif
 
   auto g = dgl::UnitGraph::CreateFromCSC(2, csr);
   ASSERT_EQ(g->GetCreatedFormats(), 4);
