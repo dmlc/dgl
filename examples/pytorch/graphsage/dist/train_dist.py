@@ -234,13 +234,17 @@ def main(args):
         g.rank(), len(train_nid), len(np.intersect1d(train_nid.numpy(), local_nid)),
         len(val_nid), len(np.intersect1d(val_nid.numpy(), local_nid)),
         len(test_nid), len(np.intersect1d(test_nid.numpy(), local_nid))))
+    del local_nid
     if args.num_gpus == -1:
         device = th.device('cpu')
     else:
         dev_id = g.rank() % args.num_gpus
         device = th.device('cuda:'+str(dev_id))
-    labels = g.ndata['labels'][np.arange(g.number_of_nodes())]
-    n_classes = len(th.unique(labels[th.logical_not(th.isnan(labels))]))
+    n_classes = args.n_classes
+    if n_classes == 0:
+        labels = g.ndata['labels'][np.arange(g.number_of_nodes())]
+        n_classes = len(th.unique(labels[th.logical_not(th.isnan(labels))]))
+        del labels
     print('#labels:', n_classes)
 
     # Pack data
@@ -257,7 +261,7 @@ if __name__ == '__main__':
     parser.add_argument('--ip_config', type=str, help='The file for IP configuration')
     parser.add_argument('--part_config', type=str, help='The path to the partition config file')
     parser.add_argument('--num_clients', type=int, help='The number of clients')
-    parser.add_argument('--n_classes', type=int, help='the number of classes')
+    parser.add_argument('--n_classes', type=int, default=0, help='the number of classes')
     parser.add_argument('--backend', type=str, default='gloo', help='pytorch distributed backend')
     parser.add_argument('--num_gpus', type=int, default=-1,
                         help="the number of GPU device. Use -1 for CPU training")
