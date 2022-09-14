@@ -158,8 +158,6 @@ struct cusparse_idtype<int64_t> {
 /*! \brief Thread local workspace */
 class CUDAThreadEntry {
  public:
-  /*! \brief The cuda stream */
-  cudaStream_t stream{nullptr};
   /*! \brief The cusparse handler */
   cusparseHandle_t cusparse_handle{nullptr};
   /*! \brief The cublas handler */

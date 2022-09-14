@@ -206,11 +206,10 @@ class CUDADeviceAPI final : public DeviceAPI {
   /*! NOTE: If the backend is PyTorch, we will use PyTorch's stream management,
    *        so just avoid calling our SetStream/CreateStream unless
    *        you really need advanced stream control.
+   * TODO(Xin): Redirect this to PyTorch or remove it.
+   * PyTorch allows external CUDA streams to be set as current since v1.11.
    */
-  void SetStream(DGLContext ctx, DGLStreamHandle stream) final {
-    CUDAThreadEntry::ThreadLocal()
-        ->stream = static_cast<cudaStream_t>(stream);
-  }
+  void SetStream(DGLContext ctx, DGLStreamHandle stream) final {}
 
   DGLStreamHandle GetStream() const final {
     return static_cast<DGLStreamHandle>(getCurrentCUDAStream());
@@ -313,13 +312,8 @@ class CUDADeviceAPI final : public DeviceAPI {
 
 typedef dmlc::ThreadLocalStore<CUDAThreadEntry> CUDAThreadStore;
 
-// TODO(cliu): cuda streams should depend on the current device, therefore we should set device
-//             before setting stream.
 CUDAThreadEntry::CUDAThreadEntry()
     : pool(kDLGPU, CUDADeviceAPI::Global()) {
-  TensorDispatcher* td = TensorDispatcher::Global();
-  if (td->IsAvailable())
-    stream = td->CUDAGetCurrentStream();
 }
 
 CUDAThreadEntry* CUDAThreadEntry::ThreadLocal() {
@@ -330,8 +324,8 @@ cudaStream_t getCurrentCUDAStream() {
   TensorDispatcher* td = TensorDispatcher::Global();
   if (td->IsAvailable())
     return td->CUDAGetCurrentStream();
-  else
-    return CUDAThreadEntry::ThreadLocal()->stream;
+  else  // return the default stream when TA is not available
+    return nullptr;
 }
 
 DGL_REGISTER_GLOBAL("device_api.gpu")
