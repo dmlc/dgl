@@ -471,7 +471,7 @@ class HeteroGNNExplainer(nn.Module):
         r"""Initialize learnable feature and edge mask.
         Parameters
         ----------
-        graph : DGLHeteroGraph
+        graph : DGLGraph
             Input graph.
         feat : dict[str, Tensor]
             Input node features.
@@ -574,7 +574,7 @@ class HeteroGNNExplainer(nn.Module):
         -------
         new_node_id : Tensor
             The new ID of the input center node.
-        sg : DGLHeteroGraph
+        sg : DGLGraph
             The subgraph induced on the k-hop in-neighborhood of the center node.
         feat_mask : Dictionary of Tensor
             Dictionary of { ntypes: features }
@@ -604,6 +604,7 @@ class HeteroGNNExplainer(nn.Module):
         >>> train_mask = g.nodes[predict_ntype].data['train_mask']
         >>> test_mask = g.nodes[predict_ntype].data['test_mask']
         >>> labels = g.nodes[predict_ntype].data['labels']
+        >>> # Initialize zero-valued tensors for demonstration purpose
         >>> features = {}
         >>> for ntype in g.ntypes:
         ...     features[ntype] = torch.zeros((g.num_nodes(ntype), 10))
@@ -675,7 +676,7 @@ class HeteroGNNExplainer(nn.Module):
 
         # Get the initial prediction.
         with torch.no_grad():
-            logits = self.model(sg, sg_feats, **kwargs)[ntype]
+            logits = self.model(graph=sg, feat=sg_feats, **kwargs)[ntype]
             pred_label = logits.argmax(dim=-1)
 
         feat_mask, edge_mask = self._init_masks(sg, sg_feats)
@@ -695,7 +696,7 @@ class HeteroGNNExplainer(nn.Module):
             eweight = {}
             for canonical_etype in edge_mask.keys():
                 eweight[canonical_etype] = edge_mask[canonical_etype].sigmoid()
-            logits = self.model(sg, h, 
+            logits = self.model(graph=sg, feat=h, 
                                 eweight=eweight, **kwargs)[ntype]
             log_probs = logits.log_softmax(dim=-1)
             loss = -log_probs[inverse_indices, pred_label[inverse_indices]]
@@ -721,7 +722,7 @@ class HeteroGNNExplainer(nn.Module):
         crucial role to explain the prediction made by the GNN for a graph.
         Parameters
         ----------
-        graph : DGLHeteroGraph
+        graph : DGLGraph
             A heterogeneous graph.
         feat : Dictionary of Tensor
             Dictionary of { ntypes: features }
