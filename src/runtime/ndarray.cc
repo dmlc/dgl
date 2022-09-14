@@ -281,7 +281,7 @@ void NDArray::UnpinContainer(NDArray::Container* ptr) {
 
 void NDArray::RecordStream(DGLArray* tensor, DGLStreamHandle stream) {
   TensorDispatcher* td = TensorDispatcher::Global();
-  CHECK(td->IsAvailable()) << "RecordStream only works with the TensorAdaptor.";
+  CHECK(td->IsAvailable()) << "RecordStream only works when TensorAdaptor is available.";
   CHECK_EQ(tensor->ctx.device_type, kDLGPU)
     << "RecordStream only works with GPU tensors.";
 

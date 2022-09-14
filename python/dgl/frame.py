@@ -503,8 +503,9 @@ class Column(TensorStorage):
         ----------
         stream : torch.cuda.Stream.
         """
-        if F.get_preferred_backend() == 'pytorch':
-            self.data.record_stream(stream)
+        if F.get_preferred_backend() != 'pytorch':
+            raise DGLError("record_stream only supports the PyTorch backend.")
+        self.data.record_stream(stream)
 
 class Frame(MutableMapping):
     """The columnar storage for node/edge features.

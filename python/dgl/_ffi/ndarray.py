@@ -331,7 +331,7 @@ class NDArrayBase(_NDArrayBase):
 
         Note
         ----
-        This API is more for testing. We should call ``record_stream``
+        This API is more for testing. Users should call ``record_stream``
         on torch.Tensor or dgl.graph directly.
 
         Parameters

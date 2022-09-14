@@ -5586,7 +5586,7 @@ class DGLHeteroGraph(object):
 
     def record_stream(self, stream):
         """Record the stream that is using this graph.
-        This method works for graphs on the GPU only.
+        This method only supports the PyTorch backend and requires graphs on the GPU.
 
         Parameters
         ----------
@@ -5598,6 +5598,8 @@ class DGLHeteroGraph(object):
         DGLGraph
             self.
         """
+        if F.get_preferred_backend != 'pytorch':
+            raise DGLError("record_stream only support the PyTorch backend.")
         if F.device_type(self.device) != 'cuda':
             raise DGLError("The graph must be on GPU to be recorded.")
         self._graph.record_stream(stream)
