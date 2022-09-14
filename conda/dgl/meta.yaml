@@ -1,3 +1,5 @@
+{% set use_cuda = environ.get('USE_CUDA', False) %}
+{% set package_name = 'dgl' + environ.get('DGL_PACKAGE_SUFFIX', '') %}
 package:
   name: dgl{{ environ.get('DGL_PACKAGE_SUFFIX', '') }}
   version: "0.9.1"
@@ -20,10 +22,16 @@ requirements:
     - networkx
     - requests
     - tqdm
+    - vs2015_runtime # [win]
+    - psutil
+    - cudatoolkit {{ CUDA_VER }} # [use_cuda]
 
 build:
   script_env:
     - USE_CUDA
+    - CUDA_VER
+    # internal release pipeline uses this to avoid conda-build rebuilding the binaries
+    - CACHEDIR
 
 about:
   home: https://github.com/dmlc/dgl.git
