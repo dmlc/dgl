@@ -3,8 +3,10 @@
 import math
 import torch as th
 from torch import nn
-from pylibcugraphops.aggregators.node_level import agg_hg_basis_post_fwd_int64, agg_hg_basis_post_bwd_int64
-from pylibcugraphops.structure.graph_types import message_flow_graph_hg_csr_int64
+from pylibcugraphops.aggregators.node_level import (agg_hg_basis_post_fwd_int32,
+    agg_hg_basis_post_bwd_int32, agg_hg_basis_post_fwd_int64, agg_hg_basis_post_bwd_int64)
+from pylibcugraphops.structure.graph_types import (message_flow_graph_hg_csr_int32,
+    message_flow_graph_hg_csr_int64)
 
 class RgcnFunction(th.autograd.Function):
     @staticmethod
@@ -55,6 +57,17 @@ class RgcnFunction(th.autograd.Function):
             Output feature, shape: (num_dst_nodes, out_feat)
 
         """
+        if g.idtype == th.int32:
+            mfg_csr_func = message_flow_graph_hg_csr_int32
+            agg_fwd_func = agg_hg_basis_post_fwd_int32
+        elif g.idtype == th.int64:
+            mfg_csr_func = message_flow_graph_hg_csr_int64
+            agg_fwd_func = agg_hg_basis_post_fwd_int64
+        else:
+            raise TypeError(
+                f'Supported ID type: torch.int32 or torch.int64 , but got {g.idtype}')
+        ctx.graph_idtype = g.idtype
+
         _in_feat = feat.shape[-1]
         _out_feat = W.shape[-1]
         indptr, indices, _ = g.adj_sparse('csc')  # edge_ids not needed here
@@ -63,7 +76,7 @@ class RgcnFunction(th.autograd.Function):
         # can be passed through graph class members if necessary in the future
         _n_node_types = 0
 
-        mfg = message_flow_graph_hg_csr_int64(fanout, g.dstnodes(), g.srcnodes(), indptr, indices,
+        mfg = mfg_csr_func(fanout, g.dstnodes(), g.srcnodes(), indptr, indices,
             _n_node_types, num_rels, out_node_types, in_node_types, edge_types)
 
         if coeff is None:
@@ -75,9 +88,9 @@ class RgcnFunction(th.autograd.Function):
         agg_out = th.empty(g.num_dst_nodes(), leading_dimension, dtype=th.float32, device='cuda')
 
         if coeff is None:
-            agg_hg_basis_post_fwd_int64(agg_out, feat.detach(), mfg)
+            agg_fwd_func(agg_out, feat.detach(), mfg)
         else:
-            agg_hg_basis_post_fwd_int64(agg_out, feat.detach(), mfg, weights_combination=coeff.detach())
+            agg_fwd_func(agg_out, feat.detach(), mfg, weights_combination=coeff.detach())
 
         output = th.as_tensor(agg_out, device='cuda') @ W.view(leading_dimension, _out_feat)
 
@@ -100,20 +113,28 @@ class RgcnFunction(th.autograd.Function):
         mfg = ctx.backward_cache
         coeff, feat, W, output, agg_out = ctx.saved_tensors
 
+        if ctx.graph_idtype == th.int32:
+            agg_bwd_func = agg_hg_basis_post_bwd_int32
+        elif ctx.graph_idtype == th.int64:
+            agg_bwd_func = agg_hg_basis_post_bwd_int64
+        else:
+            raise TypeError(
+                f'Supported ID type: torch.int32 or torch.int64 , but got {g.idtype}')
+
         # dense backward
-        _out_feat_dim = W.shape[-1]
+        _out_feat = W.shape[-1]
         g_W = agg_out.t() @ grad_output
-        agg_out = grad_output @ W.view(-1, _out_feat_dim).t()   # gradient w.r.t input, reuse buffer
+        agg_out = grad_output @ W.view(-1, _out_feat).t()   # gradient w.r.t input, reuse buffer
 
         # backward aggregation
         g_in = th.empty_like(feat, dtype=th.float32, device='cuda')
 
         if coeff is None:
             g_coeff = None
-            agg_hg_basis_post_bwd_int64(g_in, agg_out, feat.detach(), mfg)
+            agg_bwd_func(g_in, agg_out, feat.detach(), mfg)
         else:
             g_coeff = th.empty_like(coeff, dtype=th.float32, device='cuda')
-            agg_hg_basis_post_bwd_int64(g_in, agg_out, feat.detach(), mfg,
+            agg_bwd_func(g_in, agg_out, feat.detach(), mfg,
                 output_weight_gradient=g_coeff, weights_combination=coeff.detach())
 
         return None, None, None, None, None, None, g_in, g_W.view_as(W), g_coeff

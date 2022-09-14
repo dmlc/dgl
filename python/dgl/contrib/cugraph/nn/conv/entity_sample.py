@@ -30,13 +30,13 @@ class RGCN(nn.Module):
         h = self.conv2(g[1], h, g[1].edata[dgl.ETYPE], norm=g[1].edata['norm'])
         return h
 
-def evaluate(model, label, dataloader, inv_target):
+def evaluate(model, labels, dataloader, inv_target):
     model.eval()
     eval_logits = []
     eval_seeds = []
     with th.no_grad():
         for input_nodes, output_nodes, blocks in dataloader:
-            output_nodes = inv_target[output_nodes]
+            output_nodes = inv_target[output_nodes.type(th.int64)]
             for block in blocks:
                 block.edata['norm'] = dgl.norm_by_dst(block).unsqueeze(1)
             logits = model(blocks)
@@ -50,6 +50,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='RGCN for entity classification')
     parser.add_argument("--dataset", type=str, default="aifb",
                         help="Dataset name ('aifb', 'mutag', 'bgs', 'am'), default to 'aifb'.")
+    parser.add_argument("--idtype", type=str, default="int64",
+                        help="Data type for node and edge IDs ('int64', 'int32'), default to 'int64'.")
     parser.add_argument("--verbose", action="store_true",
                         help="Print verbose data information.")
     args = parser.parse_args()
@@ -69,6 +71,7 @@ if __name__ == '__main__':
     device = th.device('cuda')
     hg = data[0]
     hg = hg.to(device)
+    hg = hg.int() if args.idtype == 'int32' else hg.long()
 
     if args.verbose:
         print(f'# nodes: {hg.num_nodes()}')
@@ -108,10 +111,10 @@ if __name__ == '__main__':
     # construct sampler and dataloader
     fanouts = [4, 4]
     sampler = MultiLayerNeighborSampler(fanouts)
-    train_loader = DataLoader(g, target_idx[train_idx], sampler, device=device,
+    train_loader = DataLoader(g, target_idx[train_idx].type(g.idtype), sampler, device=device,
                               batch_size=100, shuffle=True)
     # no separate validation subset, use train index instead for validation
-    val_loader = DataLoader(g, target_idx[train_idx], sampler, device=device,
+    val_loader = DataLoader(g, target_idx[train_idx].type(g.idtype), sampler, device=device,
                             batch_size=100, shuffle=False)
 
     # create model
@@ -128,7 +131,7 @@ if __name__ == '__main__':
     for epoch in range(100):
         total_loss = 0
         for it, (input_nodes, output_nodes, blocks) in enumerate(train_loader):
-            output_nodes = inv_target[output_nodes]
+            output_nodes = inv_target[output_nodes.type(th.int64)]   # tensor indices must be int64
             for block in blocks:
                 block.edata['norm'] = dgl.norm_by_dst(block).unsqueeze(1)
             logits = model(blocks)
@@ -144,7 +147,7 @@ if __name__ == '__main__':
     # note: when sampling all neighbors on a large graph for the test dataset, the required shared
     # memory on GPU may exceed the hardware limit. Reduce the fanout numbers if necessary.
     test_sampler = MultiLayerNeighborSampler([100, 100]) # -1 for sampling all neighbors
-    test_loader = DataLoader(g, target_idx[test_idx], test_sampler, device=device,
+    test_loader = DataLoader(g, target_idx[test_idx].type(g.idtype), test_sampler, device=device,
                              batch_size=32, shuffle=False)
     acc = evaluate(model, labels, test_loader, inv_target)
     print("Test accuracy {:.4f}".format(acc))
