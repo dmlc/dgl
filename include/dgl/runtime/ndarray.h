@@ -147,39 +147,26 @@ class NDArray {
     else
       return static_cast<T*>(operator->()->data);
   }
-  /*!
-   * \brief Copy data content from another array.
+   /*!
+   * \brief Copy data content from/into another array.
    * \param other The source array to be copied from.
-   * \param stream The stream to perform the copy on if it involves a GPU
-   *        context, otherwise this parameter is ignored.
-   * \note The copy may happen asynchrously if it involves a GPU context.
-   *       DGLSynchronize is necessary.
+   * \note The copy runs on the dgl internal stream if it involves a GPU context.
    */
-  inline void CopyFrom(DLTensor* other,
-      DGLStreamHandle stream = nullptr);
-  inline void CopyFrom(const NDArray& other,
-      DGLStreamHandle stream = nullptr);
-  /*!
-   * \brief Copy data content into another array.
-   * \param other The source array to be copied from.
-   * \note The copy may happen asynchrously if it involves a GPU context.
-   *       DGLSynchronize is necessary.
-   */
-  inline void CopyTo(DLTensor *other,
-                     const DGLStreamHandle &stream = nullptr) const;
-  inline void CopyTo(const NDArray &other,
-                     const DGLStreamHandle &stream = nullptr) const;
+  inline void CopyFrom(DLTensor* other);
+  inline void CopyFrom(const NDArray& other);
+  inline void CopyTo(DLTensor *other) const;
+  inline void CopyTo(const NDArray &other) const;
+
   /*!
    * \brief Copy the data to another context.
    * \param ctx The target context.
    * \return The array under another context.
    */
-  inline NDArray CopyTo(const DLContext &ctx,
-                        const DGLStreamHandle &stream = nullptr) const;
+  inline NDArray CopyTo(const DLContext &ctx) const;
   /*!
    * \brief Return a new array with a copy of the content.
    */
-  inline NDArray Clone(const DGLStreamHandle &stream = nullptr) const;
+  inline NDArray Clone() const;
   /*!
    * \brief In-place method to pin the current array by calling PinContainer
    *        on the underlying NDArray:Container.
@@ -297,10 +284,12 @@ class NDArray {
    * \brief Function to copy data from one array to another.
    * \param from The source array.
    * \param to The target array.
-   * \param stream The stream used in copy.
+   * \param (optional) stream The stream used in copy.
    */
   DGL_DLL static void CopyFromTo(
-      DLTensor* from, DLTensor* to, DGLStreamHandle stream = nullptr);
+      DLTensor* from, DLTensor* to);
+  DGL_DLL static void CopyFromTo(
+      DLTensor* from, DLTensor* to, DGLStreamHandle stream);
 
   /*!
    * \brief Function to pin the DLTensor of a Container.
@@ -449,46 +438,39 @@ inline void NDArray::reset() {
   }
 }
 
-inline void NDArray::CopyFrom(DLTensor* other,
-                              DGLStreamHandle stream) {
+inline void NDArray::CopyFrom(DLTensor* other) {
   CHECK(data_ != nullptr);
-  CopyFromTo(other, &(data_->dl_tensor), stream);
+  CopyFromTo(other, &(data_->dl_tensor));
 }
 
-inline void NDArray::CopyFrom(const NDArray& other,
-                              DGLStreamHandle stream) {
-  CHECK(data_ != nullptr);
+inline void NDArray::CopyFrom(const NDArray& other) {
   CHECK(other.data_ != nullptr);
-  CopyFromTo(&(other.data_->dl_tensor), &(data_->dl_tensor), stream);
+  CopyFrom(&(other.data_->dl_tensor));
 }
 
-inline void NDArray::CopyTo(DLTensor *other,
-                            const DGLStreamHandle &stream) const {
+inline void NDArray::CopyTo(DLTensor *other) const {
   CHECK(data_ != nullptr);
-  CopyFromTo(&(data_->dl_tensor), other, stream);
+  CopyFromTo(&(data_->dl_tensor), other);
 }
 
-inline void NDArray::CopyTo(const NDArray &other,
-                            const DGLStreamHandle &stream) const {
-  CHECK(data_ != nullptr);
+inline void NDArray::CopyTo(const NDArray &other) const {
   CHECK(other.data_ != nullptr);
-  CopyFromTo(&(data_->dl_tensor), &(other.data_->dl_tensor), stream);
+  CopyTo(&(other.data_->dl_tensor));
 }
 
-inline NDArray NDArray::CopyTo(const DLContext &ctx,
-                               const DGLStreamHandle &stream) const {
+inline NDArray NDArray::CopyTo(const DLContext &ctx) const {
   CHECK(data_ != nullptr);
   const DLTensor* dptr = operator->();
   NDArray ret = Empty(std::vector<int64_t>(dptr->shape, dptr->shape + dptr->ndim),
                       dptr->dtype, ctx);
-  this->CopyTo(ret, stream);
+  this->CopyTo(ret);
   return ret;
 }
 
-inline NDArray NDArray::Clone(const DGLStreamHandle &stream) const {
+inline NDArray NDArray::Clone() const {
   CHECK(data_ != nullptr);
   const DLTensor* dptr = operator->();
-  return this->CopyTo(dptr->ctx, stream);
+  return this->CopyTo(dptr->ctx);
 }
 
 inline void NDArray::PinMemory_() {
