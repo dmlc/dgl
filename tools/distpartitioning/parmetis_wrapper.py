@@ -5,6 +5,7 @@ import numpy as np
 import torch
 import torch.distributed as dist
 import argparse
+import logging
 from pathlib import Path
 
 from utils import read_json, get_node_types, get_idranges
@@ -133,7 +134,7 @@ def read_node_features(schema_map, tgt_ntype_name, feat_names):
                 for feat_name, feat_data in ntype_feature_data.items():
                     if feat_name in feat_names:
                         my_feat_data_fname = feat_data[constants.STR_DATA][rank]
-                        print('Reading: ', my_feat_data_fname)
+                        logging.info(f'Reading: {my_feat_data_fname}')
                         if (os.path.isabs(my_feat_data_fname)):
                             node_features[feat_name] = np.load(my_feat_data_fname)
                         else:
@@ -209,7 +210,6 @@ def gen_node_weights_files(schema_map, output):
             assert sz == v.shape
             cols.append(pyarrow.array(v))
             col_names.append(k)
-            #print('Adding data for the col: ', k)
 
         #
         #type_nid should be the very last column in the node weights files.
@@ -283,21 +283,29 @@ def gen_parmetis_input_args(params, schema_map):
 
 
 def run_wrapper(params):
-    print("Starting to generate ParMETIS files...")
+	"""
+	Main function which will help create graph files for ParMETIS processing
+
+	Parameters:
+	-----------
+	params : argparser object
+		an instance of argparser class which stores command line arguments
+	"""
+    logging.info(f'Starting to generate ParMETIS files...')
 
     rank = get_proc_info()
     schema = read_json(params.schema)
     num_nodes_per_chunk = schema[constants.STR_NUM_NODES_PER_CHUNK]
     num_parts = len(num_nodes_per_chunk[0])
     gen_node_weights_files(schema, params.output)
-    print('Done with node weights....')
+    logging.info(f'Done with node weights....')
 
     gen_edge_files(schema, params.output)
-    print('Done with edge weights...')
+    logging.info(f'Done with edge weights...')
 
     if rank == 0:
         gen_parmetis_input_args(params, schema)
-    print('Done generating files for ParMETIS run ..')
+    logging.info(f'Done generating files for ParMETIS run ..')
 
 if __name__ == "__main__":
     """
