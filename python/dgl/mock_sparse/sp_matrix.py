@@ -174,12 +174,12 @@ class SparseMatrix:
         assert len(x) == self.nnz
         return SparseMatrix(self.row, self.col, x, shape=self.shape)
 
-    def indices(self, format, return_shuffle=False) -> Tuple[torch.tensor, ...]:
+    def indices(self, fmt, return_shuffle=False) -> Tuple[torch.tensor, ...]:
         """Get the indices of the nonzero elements.
 
         Parameters
         ----------
-        format : str
+        fmt : str
             Sparse matrix storage format. Can be COO or CSR or CSC.
         return_shuffle: bool
             If true, return an extra array of the nonzero value IDs
@@ -189,7 +189,7 @@ class SparseMatrix:
         tensor
             Indices of the nonzero elements
         """
-        if format == 'COO' and not return_shuffle:
+        if fmt == 'COO' and not return_shuffle:
             return self.adj.indices()
         else:
             raise NotImplementedError
