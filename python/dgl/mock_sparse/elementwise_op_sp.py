@@ -267,3 +267,4 @@ SparseMatrix.__truediv__ = div
 SparseMatrix.__rtruediv__ = rdiv
 SparseMatrix.__pow__ = power
 SparseMatrix.__rpow__ = rpower
+

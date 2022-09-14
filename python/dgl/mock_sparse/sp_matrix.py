@@ -409,3 +409,4 @@ def create_from_csc(indptr: torch.Tensor,
     col, row = adj_coo.indices()
 
     return SparseMatrix(row, col, val)
+
