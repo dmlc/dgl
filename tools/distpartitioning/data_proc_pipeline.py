@@ -42,8 +42,8 @@ if __name__ == "__main__":
     #arguments needed for the distributed implementation
     parser.add_argument('--world-size', help='no. of processes to spawn',
                     default=1, type=int, required=True)
-    parser.add_argument('--timeout', required=True, type=int,
-                        help='timeout[seconds] for operations executed agains the process group')
+    parser.add_argument('--process-group-timeout', required=True, type=int,
+                        help='timeout[seconds] for operations executed against the process group')
     params = parser.parse_args()
 
     #invoke the pipeline function

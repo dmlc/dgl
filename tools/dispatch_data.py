@@ -49,7 +49,7 @@ def submit_jobs(args) -> str:
     argslist += "--schema {} ".format(schema_path)
     argslist += "--num-parts {} ".format(num_parts)
     argslist += "--output {} ".format(os.path.abspath(args.out_dir))
-    argslist += "--timeout {} ".format(args.process_group_timeout)
+    argslist += "--process-group-timeout {} ".format(args.process_group_timeout)
 
     # (BarclayII) Is it safe to assume all the workers have the Python executable at the same path?
     pipeline_cmd = os.path.join(INSTALL_DIR, PIPELINE_SCRIPT)
@@ -71,7 +71,7 @@ def main():
     parser.add_argument('--master-port', type=int, default=12345, help='port used by gloo group to create randezvous point')
     parser.add_argument('--python-path', type=str, default=sys.executable, help='Path to the Python executable on all workers')
     parser.add_argument('--process-group-timeout', type=int, default=1800,
-                        help='timeout[seconds] for operations executed agains the process group')
+                        help='timeout[seconds] for operations executed against the process group')
 
     args, udf_command = parser.parse_known_args()
 
