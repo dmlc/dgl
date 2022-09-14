@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import sys, os, platform, sysconfig
+import sys
+import os
+import platform
+import sysconfig
 import shutil
 import glob
 
@@ -15,25 +18,32 @@ else:
     from setuptools import setup
     from setuptools.extension import Extension
 
+
 class BinaryDistribution(Distribution):
     def has_ext_modules(self):
         return True
 
+
 CURRENT_DIR = os.path.dirname(__file__)
+
 
 def get_lib_path():
     """Get library path, name and version"""
-     # We can not import `libinfo.py` in setup.py directly since __init__.py
+    # We can not import `libinfo.py` in setup.py directly since __init__.py
     # Will be invoked which introduces dependences
     libinfo_py = os.path.join(CURRENT_DIR, './dgl/_ffi/libinfo.py')
     libinfo = {'__file__': libinfo_py}
-    exec(compile(open(libinfo_py, "rb").read(), libinfo_py, 'exec'), libinfo, libinfo)
+    exec(
+        compile(open(libinfo_py, "rb").read(), libinfo_py, 'exec'),
+        libinfo,
+        libinfo)
     version = libinfo['__version__']
 
     lib_path = libinfo['find_lib_path']()
     libs = [lib_path[0]]
 
     return libs, version
+
 
 def get_ta_lib_pattern():
     if sys.platform.startswith('linux'):
@@ -46,30 +56,38 @@ def get_ta_lib_pattern():
         raise NotImplementedError('Unsupported system: %s' % sys.platform)
     return ta_lib_pattern
 
+
 LIBS, VERSION = get_lib_path()
 BACKENDS = ['pytorch']
 TA_LIB_PATTERN = get_ta_lib_pattern()
+
 
 def cleanup():
     # Wheel cleanup
     try:
         os.remove("MANIFEST.in")
-    except:
+    except BaseException:
         pass
 
     for path in LIBS:
         _, libname = os.path.split(path)
         try:
             os.remove(os.path.join("dgl", libname))
-        except:
+        except BaseException:
             pass
     for backend in BACKENDS:
         for ta_path in glob.glob(
-            os.path.join(CURRENT_DIR, "dgl", "tensoradapter", backend, TA_LIB_PATTERN)):
+            os.path.join(
+                CURRENT_DIR,
+                "dgl",
+                "tensoradapter",
+                backend,
+                TA_LIB_PATTERN)):
             try:
                 os.remove(ta_path)
-            except:
+            except BaseException:
                 pass
+
 
 def config_cython():
     """Try to configure cython and return cython configuration"""
@@ -79,7 +97,8 @@ def config_cython():
     sys_cflags = sysconfig.get_config_var("CFLAGS")
 
     if "i386" in sys_cflags and "x86_64" in sys_cflags:
-        print("WARNING: Cython library may not be compiled correctly with both i386 and x64")
+        print(
+            "WARNING: Cython library may not be compiled correctly with both i386 and x64")
         return []
     try:
         from Cython.Build import cythonize
@@ -101,7 +120,7 @@ def config_cython():
                 include_dirs=["../include/",
                               "../third_party/dmlc-core/include",
                               "../third_party/dlpack/include",
-                ],
+                              ],
                 library_dirs=library_dirs,
                 libraries=libraries,
                 language="c++"))
@@ -109,6 +128,7 @@ def config_cython():
     except ImportError:
         print("WARNING: Cython is not installed, will compile without cython module")
         return []
+
 
 include_libs = False
 wheel_include_libs = False
@@ -130,13 +150,26 @@ if wheel_include_libs:
             fo.write("include dgl/%s\n" % libname)
 
         for backend in BACKENDS:
-            for ta_path in glob.glob(os.path.join(dir_, "tensoradapter", backend, TA_LIB_PATTERN)):
+            for ta_path in glob.glob(
+                os.path.join(
+                    dir_,
+                    "tensoradapter",
+                    backend,
+                    TA_LIB_PATTERN)):
                 ta_name = os.path.basename(ta_path)
-                os.makedirs(os.path.join(CURRENT_DIR, 'dgl', 'tensoradapter', backend), exist_ok=True)
+                os.makedirs(
+                    os.path.join(
+                        CURRENT_DIR,
+                        'dgl',
+                        'tensoradapter',
+                        backend),
+                    exist_ok=True)
                 shutil.copy(
                     os.path.join(dir_, 'tensoradapter', backend, ta_name),
                     os.path.join(CURRENT_DIR, 'dgl', 'tensoradapter', backend))
-                fo.write("include dgl/tensoradapter/%s/%s\n" % (backend, ta_name))
+                fo.write(
+                    "include dgl/tensoradapter/%s/%s\n" %
+                    (backend, ta_name))
 
     setup_kwargs = {
         "include_package_data": True
