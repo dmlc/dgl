@@ -289,7 +289,7 @@ def main(args):
         dev_id = g.rank() % args.num_gpus
         device = th.device('cuda:'+str(dev_id))
     n_classes = args.n_classes
-    if n_classes == 0:
+    if n_classes == -1:
         labels = g.ndata['labels'][np.arange(g.number_of_nodes())]
         n_classes = len(th.unique(labels[th.logical_not(th.isnan(labels))]))
         del labels
@@ -309,8 +309,11 @@ if __name__ == '__main__':
     parser.add_argument('--ip_config', type=str, help='The file for IP configuration')
     parser.add_argument('--part_config', type=str, help='The path to the partition config file')
     parser.add_argument('--num_clients', type=int, help='The number of clients')
-    parser.add_argument('--n_classes', type=int, default=0, help='the number of classes')
-    parser.add_argument('--backend', type=str, default='gloo', help='pytorch distributed backend')
+    parser.add_argument('--n_classes', type=int, default=-1,
+                        help='the number of classes. If not specified, this value will be calculated'
+                        ' via scaning all the labels in the dataset which probably causes memory burst.')
+    parser.add_argument('--backend', type=str, default='gloo',
+                        help='pytorch distributed backend')
     parser.add_argument('--num_gpus', type=int, default=-1,
                         help="the number of GPU device. Use -1 for CPU training")
     parser.add_argument('--num_epochs', type=int, default=20)
