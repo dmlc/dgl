@@ -310,8 +310,9 @@ if __name__ == '__main__':
     parser.add_argument('--part_config', type=str, help='The path to the partition config file')
     parser.add_argument('--num_clients', type=int, help='The number of clients')
     parser.add_argument('--n_classes', type=int, default=-1,
-                        help='the number of classes. If not specified, this value will be calculated'
-                        ' via scaning all the labels in the dataset which probably causes memory burst.')
+                        help='The number of classes. If not specified, this'
+                        ' value will be calculated via scaning all the labels'
+                        ' in the dataset which probably causes memory burst.')
     parser.add_argument('--backend', type=str, default='gloo',
                         help='pytorch distributed backend')
     parser.add_argument('--num_gpus', type=int, default=-1,
