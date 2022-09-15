@@ -113,3 +113,14 @@ Utility Modules
     ~dgl.nn.pytorch.sparse_emb.NodeEmbedding
     ~dgl.nn.pytorch.explain.GNNExplainer
     ~dgl.nn.pytorch.utils.LabelPropagation
+
+Network Embedding Modules
+----------------------------------------
+
+.. autosummary::
+    :toctree: ../../generated/
+    :nosignatures:
+    :template: classtemplate.rst
+
+    ~dgl.nn.pytorch.MetaPath2Vec
+    ~dgl.nn.pytorch.DeepWalk

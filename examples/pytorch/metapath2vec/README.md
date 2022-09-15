@@ -16,19 +16,14 @@ Run with either of the following procedures:
   1. Directly run the following command:
 
      ```bash
-     python metapath2vec.py --aminer --path "where/you/want/to/download" --output_file "your_model_output_path"
+     python metapath2vec.py --input_path "where/you/store/the/data" --output_file "your_model_output_path"
      ```
 * Running with another AMiner-like dataset
-  1. Prepare the data in the same format as the ones of AMiner and DBIS in Section B of [Author's code repo](https://ericdongyx.github.io/metapath2vec/m2v.html).
-  2. Run `sampler.py` on your graph dataset with, for instance,
+  1. Prepare the data in the format of DGLGraph. You can refer to  `reading_data.py` and construct your own graph and id-label maps if needed.
+  2. Run `metapath2vec.py` with the replaced `MetaPathGenerator` class
 
      ```bash
-     python sampler.py net_dbis
-     ```
-  3. Run the following command:
-
-     ```bash
-     python metapath2vec.py --path net_dbis/output_path.txt --output_file "your_model_output_path"
+     python metapath2vec.py --input_path "where/you/store/the/data" --meta_path [etypeA,etypeB] --output_file "your_model_output_path"
      ```
 
 Tips: Change num_workers based on your GPU instances; Running 3 or 4 epochs is actually enough. 
@@ -57,12 +52,12 @@ Author Classfication Results for Metapath2vec:
 
 Note that: 
 
-Testing files are available in "label 2" file;
+Testing files are available in authorâ€˜s code repo: [https://ericdongyx.github.io/metapath2vec/m2v.html](https://ericdongyx.github.io/metapath2vec/m2v.html) [F] Ground Truth Labeled by Google Scholar Metrics 2016 for Multi-Label Node Classification and Clustering.
 
 The above are results listed in the paper, in real experiments, exact numbers might be slightly different:
 
-1, For venue node classification results, when the size of the training dataset is small (e.g. 5%), the variance of the performance is large since the number of available labeled venues is small. 
+1. For venue node classification results, when the size of the training dataset is small (e.g. 5%), the variance of the performance is large since the number of available labeled venues is small. 
 
-2, For author node classification results, the performance is stable since the number of available labeled authors is huge, so even 5% training data would be sufficient.
+2. For author node classification results, the performance is stable since the number of available labeled authors is huge, so even 5% training data would be sufficient.
 
-3, In the test.py, you could change experiment times you want, especially it is very slow to test author classification so you could only do 1 or 2 times.
+3. In the test.py, you could change experiment times you want, especially it is very slow to test author classification so you could only do 1 or 2 times.

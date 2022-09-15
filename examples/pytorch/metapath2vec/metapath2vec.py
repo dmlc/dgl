@@ -4,14 +4,12 @@ import logging
 import torch
 import argparse
 import torch.optim as optim
-from dgl.nn.pytorch import Metapath2vec
+from dgl.nn.pytorch import MetaPath2Vec
 from tqdm import tqdm
-
 from reading_data import MetaPathGenerator
 
 
-
-class Metapath2VecTrainer:
+class MetaPath2VecTrainer:
     def __init__(self, args):
         mpg = MetaPathGenerator()
         mpg.read_data(args.input_path)
@@ -30,7 +28,7 @@ class Metapath2VecTrainer:
         self.num_workers=args.num_workers
         self.iterations = args.iterations
         self.initial_lr = args.initial_lr
-        self.model = Metapath2vec(self.data,self.emb_dimension,self.metapath,self.window_size,self.min_count,
+        self.model = MetaPath2Vec(self.data,self.emb_dimension,self.metapath,self.window_size,self.min_count,
                                   self.negative_samples,self.node_repeat,nid2word)
 
         self.dataloader= self.model.loader(batch_size=self.batch_size, num_workers=self.num_workers)
@@ -56,38 +54,36 @@ class Metapath2VecTrainer:
             print("\n\n\nIteration: " + str(iteration + 1))
             running_loss = 0.0
             for i, sample_batched in enumerate(tqdm(self.dataloader)):
+                pos_u = sample_batched[0].to(self.device)
+                pos_v = sample_batched[1].to(self.device)
+                neg_v = sample_batched[2].to(self.device)
 
-                if len(sample_batched[0]) > 1:
-                    pos_u = sample_batched[0].to(self.device)
-                    pos_v = sample_batched[1].to(self.device)
-                    neg_v = sample_batched[2].to(self.device)
+                scheduler.step()
+                optimizer.zero_grad()
+                loss = self.model.forward(pos_u, pos_v, neg_v)
+                loss.backward()
+                optimizer.step()
 
-                    scheduler.step()
-                    optimizer.zero_grad()
-                    loss = self.model.forward(pos_u, pos_v, neg_v)
-                    loss.backward()
-                    optimizer.step()
-
-                    running_loss = running_loss * 0.9 + loss.item() * 0.1
-                    if i > 0 and i % 500 == 0:
-                        now = localtime()
-                        now_time = strftime("%Y-%m-%d %H:%M:%S", now)
-                        logger.info('time:{} loss: {:.4f}'.format(now_time, running_loss))
-                        print(" Loss: " + str(running_loss))
+                running_loss = running_loss * 0.9 + loss.item() * 0.1
+                if i > 0 and i % 500 == 0:
+                    now = localtime()
+                    now_time = strftime("%Y-%m-%d %H:%M:%S", now)
+                    logger.info('time:{} loss: {:.4f}'.format(now_time, running_loss))
+                    print(" Loss: " + str(running_loss))
 
             save_embedding(self.model,self.model.id2word,"out",iteration)
 
 
 def save_embedding(model,id2word, file_name, num):
-	embedding = model.u_embeddings.weight.cpu().data.numpy()
-	with open(file_name + "/" + file_name + str(num) +strftime("%y%m%d-%H%M", localtime()) +".txt", 'w') as f:
-		f.write('%d %d\n' % (len(id2word), model.emb_dimension))
-		for wid, w in id2word.items():
-			e = ' '.join(map(lambda x: str(x), embedding[wid]))
-			f.write('%s %s\n' % (w, e))
+    embedding = model.u_embeddings.weight.cpu().data.numpy()
+    with open(file_name + "/" + file_name + str(num) +strftime("%y%m%d-%H%M", localtime()) +".txt", 'w') as f:
+        f.write('%d %d\n' % (len(id2word), model.emb_dimension))
+        for wid, w in id2word.items():
+            e = ' '.join(map(lambda x: str(x), embedding[wid]))
+            f.write('%s %s\n' % (w, e))
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Metapath2vec")
+    parser = argparse.ArgumentParser(description="MetaPath2Vec")
     parser.add_argument('--input_path', type=str, help="input_path")
     parser.add_argument('--meta_path', default=['ca', 'ac'] * 100,type=list, help="metapth composed of edge type sequence")
     parser.add_argument('--node_repeat', default=1000,type=int, help="The number of random walks to sample for each start node")
@@ -101,5 +97,5 @@ if __name__ == '__main__':
     parser.add_argument('--negative_samples', default=5, type=int, help="The number of negative samples need sampling")
     parser.add_argument('--num_workers', default=16, type=int, help="number of workers")
     args = parser.parse_args()
-    m2v = Metapath2VecTrainer(args)
+    m2v = MetaPath2VecTrainer(args)
     m2v.train()
