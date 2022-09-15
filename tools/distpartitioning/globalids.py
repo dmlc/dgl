@@ -4,7 +4,7 @@ import operator
 import itertools
 import constants
 from gloo_wrapper import allgather_sizes, alltoallv_cpu
-from utils import mam_snapshot
+from utils import mem_snapshot
 
 from dist_lookup import DistLookupService
 
