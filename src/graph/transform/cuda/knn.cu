@@ -437,7 +437,7 @@ template <typename FloatType, typename IdType>
 void BruteForceKNNCuda(const NDArray& data_points, const IdArray& data_offsets,
                        const NDArray& query_points, const IdArray& query_offsets,
                        const int k, IdArray result) {
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   const auto& ctx = data_points->ctx;
   auto device = runtime::DeviceAPI::Get(ctx);
   const int64_t batch_size = data_offsets->shape[0] - 1;
@@ -454,7 +454,7 @@ void BruteForceKNNCuda(const NDArray& data_points, const IdArray& data_offsets,
 
   const int64_t block_size = cuda::FindNumThreads(query_points->shape[0]);
   const int64_t num_blocks = (query_points->shape[0] - 1) / block_size + 1;
-  CUDA_KERNEL_CALL(BruteforceKnnKernel, num_blocks, block_size, 0, thr_entry->stream,
+  CUDA_KERNEL_CALL(BruteforceKnnKernel, num_blocks, block_size, 0, stream,
     data_points_data, data_offsets_data, query_points_data, query_offsets_data,
     k, dists, query_out, data_out, batch_size, feature_size);
 
@@ -480,7 +480,7 @@ template <typename FloatType, typename IdType>
 void BruteForceKNNSharedCuda(const NDArray& data_points, const IdArray& data_offsets,
                              const NDArray& query_points, const IdArray& query_offsets,
                              const int k, IdArray result) {
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   const auto& ctx = data_points->ctx;
   auto device = runtime::DeviceAPI::Get(ctx);
   const int64_t batch_size = data_offsets->shape[0] - 1;
@@ -512,17 +512,17 @@ void BruteForceKNNSharedCuda(const NDArray& data_points, const IdArray& data_off
   int64_t temp_block_size = cuda::FindNumThreads(batch_size);
   int64_t temp_num_blocks = (batch_size - 1) / temp_block_size + 1;
   CUDA_KERNEL_CALL(GetNumBlockPerSegment, temp_num_blocks,
-                   temp_block_size, 0, thr_entry->stream,
+                   temp_block_size, 0, stream,
                    query_offsets_data, num_block_per_segment,
                    batch_size, block_size);
   size_t prefix_temp_size = 0;
   CUDA_CALL(cub::DeviceScan::ExclusiveSum(
     nullptr, prefix_temp_size, num_block_per_segment,
-    num_block_prefixsum, batch_size, thr_entry->stream));
+    num_block_prefixsum, batch_size, stream));
   void* prefix_temp = device->AllocWorkspace(ctx, prefix_temp_size);
   CUDA_CALL(cub::DeviceScan::ExclusiveSum(
     prefix_temp, prefix_temp_size, num_block_per_segment,
-    num_block_prefixsum, batch_size, thr_entry->stream));
+    num_block_prefixsum, batch_size, stream));
   device->FreeWorkspace(ctx, prefix_temp);
 
   int64_t num_blocks = 0, final_elem = 0, copyoffset = (batch_size - 1) * sizeof(IdType);
@@ -547,13 +547,13 @@ void BruteForceKNNSharedCuda(const NDArray& data_points, const IdArray& data_off
     ctx, num_blocks * sizeof(IdType)));
   CUDA_KERNEL_CALL(
     GetBlockInfo, temp_num_blocks, temp_block_size, 0,
-    thr_entry->stream, num_block_prefixsum, block_batch_id,
+    stream, num_block_prefixsum, block_batch_id,
     local_block_id, batch_size, num_blocks);
 
   FloatType* dists = static_cast<FloatType*>(device->AllocWorkspace(
     ctx, k * query_points->shape[0] * sizeof(FloatType)));
   CUDA_KERNEL_CALL(BruteforceKnnShareKernel, num_blocks, block_size,
-    single_shared_mem * block_size, thr_entry->stream, data_points_data,
+    single_shared_mem * block_size, stream, data_points_data,
     data_offsets_data, query_points_data, query_offsets_data,
     block_batch_id, local_block_id, k, dists, query_out,
     data_out, batch_size, feature_size);
@@ -834,7 +834,7 @@ template <DLDeviceType XPU, typename FloatType, typename IdType>
 void NNDescent(const NDArray& points, const IdArray& offsets,
                IdArray result, const int k, const int num_iters,
                const int num_candidates, const double delta) {
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   const auto& ctx = points->ctx;
   auto device = runtime::DeviceAPI::Get(ctx);
   const int64_t num_nodes = points->shape[0];
@@ -872,7 +872,7 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
     device->AllocWorkspace(ctx, sizeof(IdType)));
 
   CUDA_CALL(cub::DeviceReduce::Sum(
-    nullptr, sum_temp_size, num_updates, total_num_updates_d, num_nodes, thr_entry->stream));
+    nullptr, sum_temp_size, num_updates, total_num_updates_d, num_nodes, stream));
   IdType* sum_temp_storage = static_cast<IdType*>(
     device->AllocWorkspace(ctx, sum_temp_size));
 
@@ -880,7 +880,7 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
   seed = RandomEngine::ThreadLocal()->RandInt<uint64_t>(
     std::numeric_limits<uint64_t>::max());
   CUDA_KERNEL_CALL(
-    impl::RandomInitNeighborsKernel, num_blocks, block_size, 0, thr_entry->stream,
+    impl::RandomInitNeighborsKernel, num_blocks, block_size, 0, stream,
     points_data, offsets_data, central_nodes, neighbors, distances, flags, k,
     feature_size, batch_size, seed);
 
@@ -890,19 +890,19 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
       std::numeric_limits<uint64_t>::max());
     CUDA_KERNEL_CALL(
       impl::FindCandidatesKernel, num_blocks, block_size, 0,
-      thr_entry->stream, offsets_data, new_candidates, old_candidates, neighbors,
+      stream, offsets_data, new_candidates, old_candidates, neighbors,
       flags, seed, batch_size, num_candidates, k);
 
     // update
     CUDA_KERNEL_CALL(
-      impl::UpdateNeighborsKernel, num_blocks, block_size, 0, thr_entry->stream,
+      impl::UpdateNeighborsKernel, num_blocks, block_size, 0, stream,
       points_data, offsets_data, neighbors, new_candidates, old_candidates, distances,
       flags, num_updates, batch_size, num_candidates, k, feature_size);
 
     total_num_updates = 0;
     CUDA_CALL(cub::DeviceReduce::Sum(
       sum_temp_storage, sum_temp_size, num_updates, total_num_updates_d, num_nodes,
-      thr_entry->stream));
+      stream));
     device->CopyDataFromTo(
       total_num_updates_d, 0, &total_num_updates, 0,
       sizeof(IdType), ctx, DLContext{kDLCPU, 0},

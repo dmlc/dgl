@@ -200,6 +200,7 @@ void SegmentMM(const NDArray A,
                bool a_trans, bool b_trans) {
     SWITCH_BITS(bits, DType, {
         auto device = runtime::DeviceAPI::Get(A->ctx);
+        cudaStream_t stream = runtime::getCurrentCUDAStream();
         const DType *A_data = A.Ptr<DType>();
         const DType *B_data = B.Ptr<DType>();
         const IdType* seglen_A_data = seglen_A.Ptr<IdType>();
@@ -212,8 +213,7 @@ void SegmentMM(const NDArray A,
         auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
         if (!thr_entry->cublas_handle)
             CUBLAS_CALL(cublasCreate(&(thr_entry->cublas_handle)));
-        CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle,
-            thr_entry->stream));
+        CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle, stream));
 
         IdType m_offset = 0;
         for (IdType etype = 0; etype < num_rel; ++etype) {
@@ -254,6 +254,7 @@ void SegmentMMBackwardB(const NDArray A,
                         const NDArray seglen) {
     SWITCH_BITS(bits, DType, {
         auto device = runtime::DeviceAPI::Get(A->ctx);
+        cudaStream_t stream = runtime::getCurrentCUDAStream();
         const DType *A_data = A.Ptr<DType>();
         const DType *dC_data = dC.Ptr<DType>();
         const IdType* seglen_data = seglen.Ptr<IdType>();
@@ -266,8 +267,7 @@ void SegmentMMBackwardB(const NDArray A,
         auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
         if (!thr_entry->cublas_handle)
             CUBLAS_CALL(cublasCreate(&(thr_entry->cublas_handle)));
-        CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle,
-            thr_entry->stream));
+        CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle, stream));
 
         IdType k_offset = 0;
         for (IdType etype = 0; etype < num_rel; ++etype) {
@@ -314,7 +314,7 @@ void GatherMM(const NDArray A,
               const NDArray idx_b) {
   SWITCH_BITS(bits, DType, {
         auto device = runtime::DeviceAPI::Get(A->ctx);
-        auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+        cudaStream_t stream = runtime::getCurrentCUDAStream();
         int64_t out_len = B->shape[2];  // cols of B
         int64_t in_len = A->shape[1];  // cols of A
         const int64_t tot_num_rows = A->shape[0];
@@ -324,7 +324,7 @@ void GatherMM(const NDArray A,
         const dim3 nblks(nbx);
         const dim3 nthrs(ntx);
         CUDA_KERNEL_CALL((cuda::GatherMMScatterKernel<IdType, DType>),
-            nblks, nthrs, 0, thr_entry->stream,
+            nblks, nthrs, 0, stream,
             A.Ptr<DType>(),
             B.Ptr<DType>(),
             C.Ptr<DType>(),
@@ -357,7 +357,7 @@ void GatherMMScatter(const NDArray A,
                      const NDArray idx_c) {
     SWITCH_BITS(bits, DType, {
         auto device = runtime::DeviceAPI::Get(A->ctx);
-        auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+        cudaStream_t stream = runtime::getCurrentCUDAStream();
         const IdType *idx_c_data = idx_c.Ptr<IdType>();
         int64_t out_len = (B->ndim == 2)? B->shape[1] : B->shape[2];  // cols of B
         int64_t in_len = A->shape[1];  // cols of A
@@ -369,7 +369,7 @@ void GatherMMScatter(const NDArray A,
         const dim3 nthrs(ntx);
         if (B->ndim == 3) {
           CUDA_KERNEL_CALL((cuda::GatherMMScatterKernel<IdType, DType>),
-              nblks, nthrs, 0, thr_entry->stream,
+              nblks, nthrs, 0, stream,
               A.Ptr<DType>(),
               B.Ptr<DType>(),
               C.Ptr<DType>(),
@@ -381,7 +381,7 @@ void GatherMMScatter(const NDArray A,
           // Custom kernel for W_grad[idx_c[i]] = H^T[i] * C.grad[i]
           // This kernel accesses rows of A in a transposed way w/o explicitly converting A
           CUDA_KERNEL_CALL((cuda::GatherMMScatterKernel2<IdType, DType>),
-              nblks, nthrs, 0, thr_entry->stream,
+              nblks, nthrs, 0, stream,
               A.Ptr<DType>(),
               B.Ptr<DType>(),
               C.Ptr<DType>(),
