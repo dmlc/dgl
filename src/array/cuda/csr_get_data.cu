@@ -34,7 +34,7 @@ NDArray CSRGetData(
   if (rstlen == 0)
     return rst;
 
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   const int nt = cuda::FindNumThreads(rstlen);
   const int nb = (rstlen + nt - 1) / nt;
   if (return_eids)
@@ -43,7 +43,7 @@ NDArray CSRGetData(
 
   // TODO(minjie): use binary search for sorted csr
   CUDA_KERNEL_CALL(cuda::_LinearSearchKernel,
-      nb, nt, 0, thr_entry->stream,
+      nb, nt, 0, stream,
       csr.indptr.Ptr<IdType>(), csr.indices.Ptr<IdType>(),
       CSRHasData(csr)? csr.data.Ptr<IdType>() : nullptr,
       rows.Ptr<IdType>(), cols.Ptr<IdType>(),
