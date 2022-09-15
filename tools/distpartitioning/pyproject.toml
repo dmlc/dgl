@@ -1,9 +1,0 @@
-[tool.autopep8]
-max_line_length = 80
-in-place = true
-aggressive = 3
-# Add the path to here if you want to exclude them from autopep8 auto reformat.
-exclude = ''' 
-    .github/*,
-    build/*,
-'''
