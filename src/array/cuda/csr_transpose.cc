@@ -22,11 +22,12 @@ CSRMatrix CSRTranspose(CSRMatrix csr) {
 template <>
 CSRMatrix CSRTranspose<kDLGPU, int32_t>(CSRMatrix csr) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   // allocate cusparse handle if needed
   if (!thr_entry->cusparse_handle) {
     CUSPARSE_CALL(cusparseCreate(&(thr_entry->cusparse_handle)));
   }
-  CUSPARSE_CALL(cusparseSetStream(thr_entry->cusparse_handle, thr_entry->stream));
+  CUSPARSE_CALL(cusparseSetStream(thr_entry->cusparse_handle, stream));
 
   NDArray indptr = csr.indptr, indices = csr.indices, data = csr.data;
   const int64_t nnz = indices->shape[0];
