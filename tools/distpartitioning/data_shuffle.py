@@ -1,30 +1,30 @@
+import gc
+import logging
+import math
 import os
 import sys
-import constants
+from datetime import timedelta
+from timeit import default_timer as timer
+
+import dgl
 import numpy as np
-import math
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
-import dgl
-import logging
 
-from timeit import default_timer as timer
-from datetime import timedelta
-from dataset_utils import get_dataset
-from utils import read_ntype_partition_files, read_json, get_node_types, \
-                    augment_edge_data, get_gnid_range_map, \
-                    write_dgl_objects, write_metadata_json, get_ntype_featnames, \
-                    get_idranges, memory_snapshot
-from gloo_wrapper import allgather_sizes, gather_metadata_json,\
-                    alltoallv_cpu
-from globalids import assign_shuffle_global_nids_nodes, \
-                    assign_shuffle_global_nids_edges, \
-                    lookup_shuffle_global_nids_edges
+import constants
 from convert_partition import create_dgl_object, create_metadata_json
+from dataset_utils import get_dataset
 from dist_lookup import DistLookupService
+from globalids import (assign_shuffle_global_nids_edges,
+                       assign_shuffle_global_nids_nodes,
+                       lookup_shuffle_global_nids_edges)
+from gloo_wrapper import allgather_sizes, alltoallv_cpu, gather_metadata_json
+from utils import (augment_edge_data, get_gnid_range_map, get_idranges,
+                   get_node_types, get_ntype_featnames, memory_snapshot,
+                   read_json, read_ntype_partition_files, write_dgl_objects,
+                   write_metadata_json)
 
-import gc
 
 def gen_node_data(rank, world_size, id_lookup, ntid_ntype_map, schema_map):
     '''

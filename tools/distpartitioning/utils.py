@@ -1,15 +1,16 @@
-import os
-import torch
-import numpy as np
 import json
-import dgl
-import constants
+import logging
+import os
 
+import dgl
+import numpy as np
+import psutil
 import pyarrow
+import torch
 from pyarrow import csv
 
-import psutil
-import logging
+import constants
+
 
 def read_ntype_partition_files(schema_map, input_dir):
     """

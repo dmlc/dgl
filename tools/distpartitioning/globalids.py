@@ -1,12 +1,14 @@
+import itertools
+import operator
+
 import numpy as np
 import torch
-import operator
-import itertools
+
 import constants
+from dist_lookup import DistLookupService
 from gloo_wrapper import allgather_sizes, alltoallv_cpu
 from utils import memory_snapshot
 
-from dist_lookup import DistLookupService
 
 def get_shuffle_global_nids(rank, world_size, global_nids_ranks, node_data):
     """ 

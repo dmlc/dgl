@@ -1,18 +1,20 @@
-import os
-import json
-import time
 import argparse
-import numpy as np
-import dgl
-import torch as th
-import pyarrow
-import pandas as pd
-import constants
-import logging
-from pyarrow import csv
-from utils import read_json, get_idranges, memory_snapshot
-
 import gc
+import json
+import logging
+import os
+import time
+
+import dgl
+import numpy as np
+import pandas as pd
+import pyarrow
+import torch as th
+from pyarrow import csv
+
+import constants
+from utils import get_idranges, memory_snapshot, read_json
+
 
 def create_dgl_object(graph_name, num_parts, \
                         schema, part_id, node_data, \

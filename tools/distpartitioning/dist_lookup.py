@@ -1,11 +1,13 @@
-import numpy as np
+import logging
 import os
+
+import numpy as np
 import pyarrow
 import torch
-import logging
-
 from pyarrow import csv
+
 from gloo_wrapper import alltoallv_cpu
+
 
 class DistLookupService:
     '''
