@@ -5584,6 +5584,31 @@ class DGLHeteroGraph(object):
         """
         return self._graph.is_pinned()
 
+    def record_stream(self, stream):
+        """Record the stream that is using this graph.
+        This method only supports the PyTorch backend and requires graphs on the GPU.
+
+        Parameters
+        ----------
+        stream : torch.cuda.Stream
+            The stream that is using this graph.
+
+        Returns
+        -------
+        DGLGraph
+            self.
+        """
+        if F.get_preferred_backend() != 'pytorch':
+            raise DGLError("record_stream only support the PyTorch backend.")
+        if F.device_type(self.device) != 'cuda':
+            raise DGLError("The graph must be on GPU to be recorded.")
+        self._graph.record_stream(stream)
+        for frame in itertools.chain(self._node_frames, self._edge_frames):
+            for col in frame._columns.values():
+                col.record_stream(stream)
+
+        return self
+
     def clone(self):
         """Return a heterograph object that is a clone of current graph.
 

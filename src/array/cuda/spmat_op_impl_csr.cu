@@ -23,7 +23,7 @@ namespace impl {
 
 template <DLDeviceType XPU, typename IdType>
 bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col) {
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   const auto& ctx = csr.indptr->ctx;
   IdArray rows = aten::VecToIdArray<int64_t>({row}, sizeof(IdType) * 8, ctx);
   IdArray cols = aten::VecToIdArray<int64_t>({col}, sizeof(IdType) * 8, ctx);
@@ -33,7 +33,7 @@ bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col) {
   const IdType* data = nullptr;
   // TODO(minjie): use binary search for sorted csr
   CUDA_KERNEL_CALL(dgl::cuda::_LinearSearchKernel,
-      1, 1, 0, thr_entry->stream,
+      1, 1, 0, stream,
       csr.indptr.Ptr<IdType>(), csr.indices.Ptr<IdType>(), data,
       rows.Ptr<IdType>(), cols.Ptr<IdType>(),
       1, 1, 1,
@@ -55,13 +55,13 @@ NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col) {
     return rst;
   const int64_t row_stride = (rowlen == 1 && collen != 1) ? 0 : 1;
   const int64_t col_stride = (collen == 1 && rowlen != 1) ? 0 : 1;
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   const int nt = dgl::cuda::FindNumThreads(rstlen);
   const int nb = (rstlen + nt - 1) / nt;
   const IdType* data = nullptr;
   // TODO(minjie): use binary search for sorted csr
   CUDA_KERNEL_CALL(dgl::cuda::_LinearSearchKernel,
-      nb, nt, 0, thr_entry->stream,
+      nb, nt, 0, stream,
       csr.indptr.Ptr<IdType>(), csr.indices.Ptr<IdType>(), data,
       row.Ptr<IdType>(), col.Ptr<IdType>(),
       row_stride, col_stride, rstlen,
@@ -100,7 +100,7 @@ bool CSRHasDuplicate(CSRMatrix csr) {
   if (!csr.sorted)
     csr = CSRSort(csr);
   const auto& ctx = csr.indptr->ctx;
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   auto device = runtime::DeviceAPI::Get(ctx);
   // We allocate a workspace of num_rows bytes. It wastes a little bit memory but should
   // be fine.
@@ -108,7 +108,7 @@ bool CSRHasDuplicate(CSRMatrix csr) {
   const int nt = dgl::cuda::FindNumThreads(csr.num_rows);
   const int nb = (csr.num_rows + nt - 1) / nt;
   CUDA_KERNEL_CALL(_SegmentHasNoDuplicate,
-      nb, nt, 0, thr_entry->stream,
+      nb, nt, 0, stream,
       csr.indptr.Ptr<IdType>(), csr.indices.Ptr<IdType>(),
       csr.num_rows, flags);
   bool ret = dgl::cuda::AllTrue(flags, csr.num_rows, ctx);
@@ -148,7 +148,7 @@ __global__ void _CSRGetRowNNZKernel(
 
 template <DLDeviceType XPU, typename IdType>
 NDArray CSRGetRowNNZ(CSRMatrix csr, NDArray rows) {
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   const auto len = rows->shape[0];
   const IdType* vid_data = static_cast<IdType*>(rows->data);
   const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
@@ -157,7 +157,7 @@ NDArray CSRGetRowNNZ(CSRMatrix csr, NDArray rows) {
   const int nt = dgl::cuda::FindNumThreads(len);
   const int nb = (len + nt - 1) / nt;
   CUDA_KERNEL_CALL(_CSRGetRowNNZKernel,
-      nb, nt, 0, thr_entry->stream,
+      nb, nt, 0, stream,
       vid_data, indptr_data, rst_data, len);
   return rst;
 }
@@ -245,7 +245,7 @@ __global__ void _SegmentCopyKernel(
 
 template <DLDeviceType XPU, typename IdType>
 CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   const int64_t len = rows->shape[0];
   IdArray ret_indptr = aten::CumSum(aten::CSRGetRowNNZ(csr, rows), true);
   const int64_t nnz = aten::IndexSelect<IdType>(ret_indptr, len);
@@ -256,14 +256,14 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
   // Copy indices.
   IdArray ret_indices = NDArray::Empty({nnz}, csr.indptr->dtype, rows->ctx);
   CUDA_KERNEL_CALL(_SegmentCopyKernel,
-      nb, nt, 0, thr_entry->stream,
+      nb, nt, 0, stream,
       csr.indptr.Ptr<IdType>(), csr.indices.Ptr<IdType>(),
       rows.Ptr<IdType>(), nnz, len,
       ret_indptr.Ptr<IdType>(), ret_indices.Ptr<IdType>());
   // Copy data.
   IdArray ret_data = NDArray::Empty({nnz}, csr.indptr->dtype, rows->ctx);
   CUDA_KERNEL_CALL(_SegmentCopyKernel,
-      nb, nt, 0, thr_entry->stream,
+      nb, nt, 0, stream,
       csr.indptr.Ptr<IdType>(), CSRHasData(csr)? csr.data.Ptr<IdType>() : nullptr,
       rows.Ptr<IdType>(), nnz, len,
       ret_indptr.Ptr<IdType>(), ret_data.Ptr<IdType>());
@@ -358,14 +358,14 @@ std::vector<NDArray> CSRGetDataAndIndices(CSRMatrix csr, NDArray row, NDArray co
   const int64_t nnz = csr.indices->shape[0];
   const int64_t row_stride = (rowlen == 1 && collen != 1) ? 0 : 1;
   const int64_t col_stride = (collen == 1 && rowlen != 1) ? 0 : 1;
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
 
   // Generate a 0-1 mask for matched (row, col) positions.
   IdArray mask = Full(0, nnz, nbits, ctx);
   const int nt = dgl::cuda::FindNumThreads(len);
   const int nb = (len + nt - 1) / nt;
   CUDA_KERNEL_CALL(_SegmentMaskKernel,
-      nb, nt, 0, thr_entry->stream,
+      nb, nt, 0, stream,
       csr.indptr.Ptr<IdType>(), csr.indices.Ptr<IdType>(),
       row.Ptr<IdType>(), col.Ptr<IdType>(),
       row_stride, col_stride, len,
@@ -381,7 +381,7 @@ std::vector<NDArray> CSRGetDataAndIndices(CSRMatrix csr, NDArray row, NDArray co
   const int nt2 = dgl::cuda::FindNumThreads(idx->shape[0]);
   const int nb2 = (idx->shape[0] + nt - 1) / nt;
   CUDA_KERNEL_CALL(_SortedSearchKernel,
-      nb2, nt2, 0, thr_entry->stream,
+      nb2, nt2, 0, stream,
       csr.indptr.Ptr<IdType>(), csr.num_rows,
       idx.Ptr<IdType>(), idx->shape[0],
       ret_row.Ptr<IdType>());
@@ -424,7 +424,7 @@ __global__ void _SegmentMaskColKernel(
 
 template <DLDeviceType XPU, typename IdType>
 CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols) {
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   const auto& ctx = rows->ctx;
   const auto& dtype = rows->dtype;
   const auto nbits = dtype.bits;
@@ -464,17 +464,17 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray 
   size_t workspace_size = 0;
   CUDA_CALL(cub::DeviceRadixSort::SortKeys(
        nullptr, workspace_size, ptr_cols, ptr_sorted_cols, cols->shape[0],
-       0, sizeof(IdType)*8, thr_entry->stream));
+       0, sizeof(IdType)*8, stream));
   void *workspace = device->AllocWorkspace(ctx, workspace_size);
   CUDA_CALL(cub::DeviceRadixSort::SortKeys(
        workspace, workspace_size, ptr_cols, ptr_sorted_cols, cols->shape[0],
-       0, sizeof(IdType)*8, thr_entry->stream));
+       0, sizeof(IdType)*8, stream));
   device->FreeWorkspace(ctx, workspace);
 
   // Execute SegmentMaskColKernel
   int nb = (nnz_csr + nt - 1) / nt;
   CUDA_KERNEL_CALL(_SegmentMaskColKernel,
-      nb, nt, 0, thr_entry->stream,
+      nb, nt, 0, stream,
       csr.indptr.Ptr<IdType>(), csr.indices.Ptr<IdType>(), csr.num_rows, nnz_csr,
       ptr_sorted_cols, cols_size,
       mask.Ptr<IdType>(), count.Ptr<IdType>());
