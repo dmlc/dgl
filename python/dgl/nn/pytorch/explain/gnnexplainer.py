@@ -21,6 +21,7 @@ class GNNExplainer(nn.Module):
 
     .. math::
       l(y, \hat{y}) + \alpha_1 \|M\|_1 + \alpha_2 H(M) + \beta_1 \|F\|_1 + \beta_2 H(F)
+
     where :math:`l` is the loss function, :math:`y` is the original model prediction,
     :math:`\hat{y}` is the model prediction with the edge and feature mask applied, :math:`H` is
     the entropy function.
@@ -187,6 +188,7 @@ class GNNExplainer(nn.Module):
             of shape :math:`(E)`, where :math:`E` is the number of edges in the
             subgraph. The values are within range :math:`(0, 1)`.
             The higher, the more important.
+
         Examples
         --------
 
@@ -309,7 +311,6 @@ class GNNExplainer(nn.Module):
         crucial role to explain the prediction made by the GNN for a graph.
 
         Parameters
-
         ----------
         graph : DGLGraph
             A homogeneous graph.
@@ -332,6 +333,7 @@ class GNNExplainer(nn.Module):
             of shape :math:`(E)`, where :math:`E` is the number of edges in the
             graph. The values are within range :math:`(0, 1)`. The higher,
             the more important.
+
         Examples
         --------
 
@@ -345,6 +347,7 @@ class GNNExplainer(nn.Module):
         >>> # Load dataset
         >>> data = GINDataset('MUTAG', self_loop=True)
         >>> dataloader = GraphDataLoader(data, batch_size=64, shuffle=True)
+
         >>> # Define a model
         >>> class Model(nn.Module):
         ...     def __init__(self, in_feats, out_feats):
@@ -435,6 +438,7 @@ class HeteroGNNExplainer(nn.Module):
 
     .. math::
       l(y, \hat{y}) + \alpha_1 \|M\|_1 + \alpha_2 H(M) + \beta_1 \|F\|_1 + \beta_2 H(F)
+
     where :math:`l` is the loss function, :math:`y` is the original model prediction,
     :math:`\hat{y}` is the model prediction with the edge and feature mask applied, :math:`H` is
     the entropy function.
