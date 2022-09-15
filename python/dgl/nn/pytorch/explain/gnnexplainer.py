@@ -12,25 +12,31 @@ from ....subgraph import khop_in_subgraph
 class GNNExplainer(nn.Module):
     r"""GNNExplainer model from `GNNExplainer: Generating Explanations for
     Graph Neural Networks <https://arxiv.org/abs/1903.03894>`__
+
     It identifies compact subgraph structures and small subsets of node features that play a
     critical role in GNN-based node classification and graph classification.
+
     To generate an explanation, it learns an edge mask :math:`M` and a feature mask :math:`F`
     by optimizing the following objective function.
+
     .. math::
       l(y, \hat{y}) + \alpha_1 \|M\|_1 + \alpha_2 H(M) + \beta_1 \|F\|_1 + \beta_2 H(F)
     where :math:`l` is the loss function, :math:`y` is the original model prediction,
     :math:`\hat{y}` is the model prediction with the edge and feature mask applied, :math:`H` is
     the entropy function.
+
     Parameters
     ----------
     model : nn.Module
         The GNN model to explain.
+
         * The required arguments of its forward function are graph and feat.
           The latter one is for input node features.
         * It should also optionally take an eweight argument for edge weights
           and multiply the messages by it in message passing.
         * The output of its forward function is the logits for the predicted
           node/graph classes.
+
         See also the example in :func:`explain_node` and :func:`explain_graph`.
     num_hops : int
         The number of hops for GNN information aggregation.
@@ -78,12 +84,14 @@ class GNNExplainer(nn.Module):
 
     def _init_masks(self, graph, feat):
         r"""Initialize learnable feature and edge mask.
+
         Parameters
         ----------
         graph : DGLGraph
             Input graph.
         feat : Tensor
             Input node features.
+
         Returns
         -------
         feat_mask : Tensor
@@ -107,6 +115,7 @@ class GNNExplainer(nn.Module):
 
     def _loss_regularize(self, loss, feat_mask, edge_mask):
         r"""Add regularization terms to the loss.
+
         Parameters
         ----------
         loss : Tensor
@@ -117,6 +126,7 @@ class GNNExplainer(nn.Module):
         edge_mask : Tensor
             Edge mask of shape :math:`(E)`, where :math:`E`
             is the number of edges.
+
         Returns
         -------
         Tensor
@@ -147,6 +157,7 @@ class GNNExplainer(nn.Module):
         r"""Learn and return a node feature mask and subgraph that play a
         crucial role to explain the prediction made by the GNN for node
         :attr:`node_id`.
+
         Parameters
         ----------
         node_id : int
@@ -160,6 +171,7 @@ class GNNExplainer(nn.Module):
             Additional arguments passed to the GNN model. Tensors whose
             first dimension is the number of nodes or edges will be
             assumed to be node/edge features.
+
         Returns
         -------
         new_node_id : Tensor
@@ -177,18 +189,21 @@ class GNNExplainer(nn.Module):
             The higher, the more important.
         Examples
         --------
+
         >>> import dgl
         >>> import dgl.function as fn
         >>> import torch
         >>> import torch.nn as nn
         >>> from dgl.data import CoraGraphDataset
         >>> from dgl.nn import GNNExplainer
+
         >>> # Load dataset
         >>> data = CoraGraphDataset()
         >>> g = data[0]
         >>> features = g.ndata['feat']
         >>> labels = g.ndata['label']
         >>> train_mask = g.ndata['train_mask']
+
         >>> # Define a model
         >>> class Model(nn.Module):
         ...     def __init__(self, in_feats, out_feats):
@@ -205,6 +220,7 @@ class GNNExplainer(nn.Module):
         ...                 graph.edata['w'] = eweight
         ...                 graph.update_all(fn.u_mul_e('h', 'w', 'm'), fn.sum('m', 'h'))
         ...             return graph.ndata['h']
+
         >>> # Train the model
         >>> model = Model(features.shape[1], data.num_classes)
         >>> criterion = nn.CrossEntropyLoss()
@@ -215,6 +231,7 @@ class GNNExplainer(nn.Module):
         ...     optimizer.zero_grad()
         ...     loss.backward()
         ...     optimizer.step()
+
         >>> # Explain the prediction for node 10
         >>> explainer = GNNExplainer(model, num_hops=1)
         >>> new_center, sg, feat_mask, edge_mask = explainer.explain_node(10, g, features)
@@ -290,7 +307,9 @@ class GNNExplainer(nn.Module):
     def explain_graph(self, graph, feat, **kwargs):
         r"""Learn and return a node feature mask and an edge mask that play a
         crucial role to explain the prediction made by the GNN for a graph.
+
         Parameters
+
         ----------
         graph : DGLGraph
             A homogeneous graph.
@@ -301,6 +320,7 @@ class GNNExplainer(nn.Module):
             Additional arguments passed to the GNN model. Tensors whose
             first dimension is the number of nodes or edges will be
             assumed to be node/edge features.
+
         Returns
         -------
         feat_mask : Tensor
@@ -314,12 +334,14 @@ class GNNExplainer(nn.Module):
             the more important.
         Examples
         --------
+
         >>> import dgl.function as fn
         >>> import torch
         >>> import torch.nn as nn
         >>> from dgl.data import GINDataset
         >>> from dgl.dataloading import GraphDataLoader
         >>> from dgl.nn import AvgPooling, GNNExplainer
+
         >>> # Load dataset
         >>> data = GINDataset('MUTAG', self_loop=True)
         >>> dataloader = GraphDataLoader(data, batch_size=64, shuffle=True)
@@ -340,6 +362,7 @@ class GNNExplainer(nn.Module):
         ...                 graph.edata['w'] = eweight
         ...                 graph.update_all(fn.u_mul_e('h', 'w', 'm'), fn.sum('m', 'h'))
         ...             return self.pool(graph, graph.ndata['h'])
+
         >>> # Train the model
         >>> feat_size = data[0][0].ndata['attr'].shape[1]
         >>> model = Model(feat_size, data.gclasses)
@@ -351,6 +374,7 @@ class GNNExplainer(nn.Module):
         ...     optimizer.zero_grad()
         ...     loss.backward()
         ...     optimizer.step()
+
         >>> # Explain the prediction for graph 0
         >>> explainer = GNNExplainer(model, num_hops=1)
         >>> g, _ = data[0]
@@ -405,23 +429,28 @@ class HeteroGNNExplainer(nn.Module):
     Graph Neural Networks <https://arxiv.org/abs/1903.03894>`__, adapted for heterogeneous graphs
     It identifies compact subgraph structures and small subsets of node features that play a
     critical role in GNN-based node classification and graph classification.
+
     To generate an explanation, it learns an edge mask :math:`M` and a feature mask :math:`F`
     by optimizing the following objective function.
+
     .. math::
       l(y, \hat{y}) + \alpha_1 \|M\|_1 + \alpha_2 H(M) + \beta_1 \|F\|_1 + \beta_2 H(F)
     where :math:`l` is the loss function, :math:`y` is the original model prediction,
     :math:`\hat{y}` is the model prediction with the edge and feature mask applied, :math:`H` is
     the entropy function.
+
     Parameters
     ----------
     model : nn.Module
         The GNN model to explain.
+
         * The required arguments of its forward function are graph and feat.
           The latter one is for input node features.
         * It should also optionally take an eweight argument for edge weights
           and multiply the messages by it in message passing.
         * The output of its forward function is the logits for the predicted
           node/graph classes.
+
         See also the example in :func:`explain_node` and :func:`explain_graph`.
     num_hops : int
         The number of hops for GNN information aggregation.
@@ -469,12 +498,14 @@ class HeteroGNNExplainer(nn.Module):
 
     def _init_masks(self, graph, feat):
         r"""Initialize learnable feature and edge mask.
+
         Parameters
         ----------
         graph : DGLGraph
             Input graph.
         feat : dict[str, Tensor]
             Input node features.
+
         Returns
         -------
         feat_masks : Dictionary of Tensor
@@ -510,6 +541,7 @@ class HeteroGNNExplainer(nn.Module):
 
     def _loss_regularize(self, loss, feat_masks, edge_masks):
         r"""Add regularization terms to the loss.
+
         Parameters
         ----------
         loss : Tensor
@@ -522,6 +554,7 @@ class HeteroGNNExplainer(nn.Module):
             Dictionary of { canonical_etypes: features }
             Edge mask of shape :math:`(E)`, where :math:`E`
             is the number of edges.
+
         Returns
         -------
         Tensor
@@ -554,6 +587,7 @@ class HeteroGNNExplainer(nn.Module):
         r"""Learn and return a node feature mask and subgraph that play a
         crucial role to explain the prediction made by the GNN for node
         :attr:`node_id` with node type :attr:`ntype`.
+
         Parameters
         ----------
         ntype : str
@@ -570,6 +604,7 @@ class HeteroGNNExplainer(nn.Module):
             Additional arguments passed to the GNN model. Tensors whose
             first dimension is the number of nodes or edges will be
             assumed to be node/edge features.
+
         Returns
         -------
         new_node_id : Tensor
@@ -587,8 +622,10 @@ class HeteroGNNExplainer(nn.Module):
             of shape :math:`(E)`, where :math:`E` is the number of edges in the
             subgraph. The values are within range :math:`(0, 1)`.
             The higher, the more important.
+
         Examples
         --------
+
         >>> import dgl
         >>> import dgl.function as fn
         >>> import torch
@@ -597,6 +634,7 @@ class HeteroGNNExplainer(nn.Module):
         >>> import dgl.nn as dglnn
         >>> from dgl.nn import HeteroGNNExplainer
         >>> from dgl.data import MUTAGDataset
+
         >>> # Load dataset
         >>> data = MUTAGDataset()
         >>> g = data[0]
@@ -604,10 +642,12 @@ class HeteroGNNExplainer(nn.Module):
         >>> train_mask = g.nodes[predict_ntype].data['train_mask']
         >>> test_mask = g.nodes[predict_ntype].data['test_mask']
         >>> labels = g.nodes[predict_ntype].data['labels']
+
         >>> # Initialize zero-valued tensors for demonstration purpose
         >>> features = {}
         >>> for ntype in g.ntypes:
         ...     features[ntype] = torch.zeros((g.num_nodes(ntype), 10))
+
         >>> # Define a model
         >>> class Model(nn.Module):
         ...     def __init__(self, in_feats, out_feats, rel_names):
@@ -626,6 +666,7 @@ class HeteroGNNExplainer(nn.Module):
         ...                 graph.edata['w'] = eweight
         ...                 graph.update_all(fn.u_mul_e('h', 'w', 'm'), fn.sum('m', 'h'))
         ...             return graph.ndata['h']
+
         >>> # Train the model
         >>> model = Model(features[predict_ntype].shape[-1], data.num_classes, g.etypes)
         >>> optimizer = torch.optim.Adam(model.parameters())
@@ -635,6 +676,7 @@ class HeteroGNNExplainer(nn.Module):
         ...     optimizer.zero_grad()
         ...     loss.backward()
         ...     optimizer.step()
+
         >>> # Explain the prediction for node 10
         >>> explainer = HeteroGNNExplainer(model, num_hops=1)
         >>> new_center, sg, feat_mask, edge_mask = explainer.explain_node(predict_ntype, 10, g, features)
@@ -720,6 +762,7 @@ class HeteroGNNExplainer(nn.Module):
     def explain_graph(self, graph, feat, **kwargs):
         r"""Learn and return a node feature mask and an edge mask that play a
         crucial role to explain the prediction made by the GNN for a graph.
+
         Parameters
         ----------
         graph : DGLGraph
@@ -732,6 +775,7 @@ class HeteroGNNExplainer(nn.Module):
             Additional arguments passed to the GNN model. Tensors whose
             first dimension is the number of nodes or edges will be
             assumed to be node/edge features.
+
         Returns
         -------
         feat_mask : Dictionary of Tensor
