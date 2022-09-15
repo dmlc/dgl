@@ -1,3 +1,8 @@
+[tool.black]
+
+line-length = 80
+
+
 [tool.autopep8]
 
 max_line_length = 80
