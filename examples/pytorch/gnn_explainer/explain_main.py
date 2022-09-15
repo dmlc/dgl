@@ -44,7 +44,7 @@ def main(args):
     writer = Writer('gnn_subgraph')
     writer.add_graph(name=str(args.dataset), graph=graph,
                      nlabels=labels, num_nlabel_types=num_classes)
-    writer.add_subgraph(graph_name = str(args.dataset), subgraph_name='IntegratedGradients', node_id=n_idx,
+    writer.add_subgraph(graph_name = str(args.dataset), subgraph_name = 'IntegratedGradients', node_id = n_idx,
                     subgraph_nids = sub_graph.ndata[dgl.NID],
                     subgraph_eids = sub_graph.edata[dgl.EID],
                     subgraph_eweights = sub_graph.edata['ew'])
