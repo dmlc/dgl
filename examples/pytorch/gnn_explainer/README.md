@@ -21,11 +21,10 @@ Dependencies
 Datasets
 ----------------------
 Five synthetic datasets used in the paper are used in this example. The generation codes are referenced from the author implementation.
-- Syn1 (BA-SHAPES): Start with a base Barabasi-Albert (BA) graph on 300 nodes and a set of 80 five-node “house”-structured network motifs, which are attached to randomly selected nodes of the base graph. The resulting graph is further perturbed by adding 0.01N random edges.  Nodes are assigned to 4 classes based on their structural roles. In a house-structured motif, there are 3 types of roles: the top, middle, and bottom node of the house. Therefore there are 4 different classes, corresponding to nodes at the top, middle, bottom of houses, and nodes that do not belong to a house. 
-- Syn2 (BA-COMMUNITY): A union of two BA-SHAPES graphs. Nodes have normally distributed feature vectors and are assigned to one of 8 classes based on their structural roles and community memberships. 
-- Syn3 (BA-GRID): The same as BA-SHAPES except that 3-by-3 grid motifs are attached to the base graph in place of house motifs.
-- Syn4 (TREE-CYCLE): Start with a base 8-level balanced binary tree and 60 six-node cycle motifs, which are attached to random nodes of the base graph. Perturbed by adding 0.01N random edges.
-- Syn5 (TREE-GRID): Start with a base 8-level balanced binary tree and 80 3-by-3 grid motifs, which are attached to random nodes of the base graph. Perturbed by adding 0.1N random edges.
+- Syn1 ([BA-SHAPES](https://docs.dgl.ai/generated/dgl.data.BAShapeDataset.html#dgl.data.BAShapeDataset)): Start with a base Barabasi-Albert (BA) graph on 300 nodes and a set of 80 five-node “house”-structured network motifs, which are attached to randomly selected nodes of the base graph. The resulting graph is further perturbed by adding 0.01N random edges.  Nodes are assigned to 4 classes based on their structural roles. In a house-structured motif, there are 3 types of roles: the top, middle, and bottom node of the house. Therefore there are 4 different classes, corresponding to nodes at the top, middle, bottom of houses, and nodes that do not belong to a house. 
+- Syn2 ([BA-COMMUNITY](https://docs.dgl.ai/generated/dgl.data.BACommunityDataset.html#dgl.data.BACommunityDataset)): A union of two BA-SHAPES graphs. Nodes have normally distributed feature vectors and are assigned to one of 8 classes based on their structural roles and community memberships. 
+- Syn3 ([TREE-CYCLE](https://docs.dgl.ai/generated/dgl.data.TreeCycleDataset.html#dgl.data.TreeCycleDataset)): Start with a base 8-level balanced binary tree and 60 six-node cycle motifs, which are attached to random nodes of the base graph. Perturbed by adding 0.01N random edges.
+- Syn4 ([TREE-GRID](https://docs.dgl.ai/generated/dgl.data.TreeGridDataset.html#dgl.data.TreeGridDataset)): Start with a base 8-level balanced binary tree and 80 3-by-3 grid motifs, which are attached to random nodes of the base graph. Perturbed by adding 0.1N random edges.
 
 Demo Usage
 ----------------------
@@ -33,15 +32,21 @@ Demo Usage
 ``` python
 python train_main.py  --dataset syn1
 ```
-Replace the argument of the --dataset, available options: syn1, syn2, syn3, syn4, syn5
+Replace the argument of the --dataset, available options: syn1, syn2, syn3, syn4
 
 This command trains a GNN model and save it to the "dummy_model_syn1.pth" file.
 
-**Second**, explain the trained model with the same data
+**Second**, explain the trained model with the same data.
 ``` python
 python explain_main.py --dataset syn1 --target_class 1 --hop 2
 ```
-Replace the dataset argument value and the target class you want to explain. The code will pick the first node in the specified class to explain. The --hop argument corresponds to the maximum hop number of the computation sub-graph. (For syn1 and syn2, hop=2. For syn3, syn4, and syn5, hop=4.)
+Replace the dataset argument value and the target class you want to explain. The code will pick the first node in the specified class to explain. The --hop argument corresponds to the maximum hop number of the computation sub-graph. (For syn1 and syn2, hop=2. For syn3, syn4,  hop=4.)
+
+**Third**, use [GNNlens2](https://github.com/dmlc/GNNLens2) to show the results by running the following command line.
+``` python
+gnnlens --logdir tutorial_subgraph
+```
+By entering `localhost:7777` in your web browser address bar, you can see the GNNLens2 interface. `7777` is the default port GNNLens2 uses. You can specify an alternative one by adding `--port xxxx` after the command line and change the address in the web browser accordingly.
 
 Notice
 ----------------------
@@ -60,44 +65,28 @@ NOTE: We do not perform grid search or finetune here, the visualization results 
 
 **Syn1 (BA-SHAPES)**
 <p align="center">
-  <img src="https://github.com/KounianhuaDu/gnn-explainer-dgl-pics/blob/master/imgs/syn1.png"  width="600">
+  <img src=".\pics\syn1.png"  width="600">
   <br>
   <b>Figure</b>: Visualization of syn1 dataset (hop=2).
 </p>
 
 **Syn2 (BA-COMMUNITY)**
 <p align="center">
-  <img src="https://github.com/KounianhuaDu/gnn-explainer-dgl-pics/blob/master/imgs/syn2.png"  width="600">
+  <img src=".\pics\syn2.png"  width="600">
   <br>
   <b>Figure</b>: Visualization of syn2 dataset (hop=2).
 </p>
 
-**Syn3 (BA-GRID)**
-
-For a more explict view, we conduct explaination on both the hop-3 computation sub-graph and the hop-4 computation sub-graph in Syn3 task.
-
+**Syn3 (TREE-CYCLE)**
 <p align="center">
-  <img src="https://github.com/KounianhuaDu/gnn-explainer-dgl-pics/blob/master/imgs/syn3_3hop.png"  width="600">
-  <br>
-  <b>Figure</b>: Visualization of syn3 dataset with hop=3.
-</p>
-
-<p align="center">
-  <img src="https://github.com/KounianhuaDu/gnn-explainer-dgl-pics/blob/master/imgs/syn3_4hop.png"  width="600">
-  <br>
-  <b>Figure</b>: Visualization of syn3 dataset with hop=4.
-</p>
-
-**Syn4 (TREE-CYCLE)**
-<p align="center">
-  <img src="https://github.com/KounianhuaDu/gnn-explainer-dgl-pics/blob/master/imgs/syn4.png"  width="600">
+  <img src=".\pics\syn3.png"  width="600">
   <br>
   <b>Figure</b>: Visualization of syn4 dataset (hop=4).
 </p>
 
-**Syn5 (TREE-GRID)**
+**Syn4 (TREE-GRID)**
 <p align="center">
-  <img src="https://github.com/KounianhuaDu/gnn-explainer-dgl-pics/blob/master/imgs/syn5.png"  width="600">
+  <img src=".\pics\syn4.png"  width="600">
   <br>
   <b>Figure</b>: Visualization of syn5 dataset (hop=4).
 </p>
