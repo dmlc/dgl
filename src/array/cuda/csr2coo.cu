@@ -23,11 +23,12 @@ COOMatrix CSRToCOO(CSRMatrix csr) {
 template <>
 COOMatrix CSRToCOO<kDGLCUDA, int32_t>(CSRMatrix csr) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   // allocate cusparse handle if needed
   if (!thr_entry->cusparse_handle) {
     CUSPARSE_CALL(cusparseCreate(&(thr_entry->cusparse_handle)));
   }
-  CUSPARSE_CALL(cusparseSetStream(thr_entry->cusparse_handle, thr_entry->stream));
+  CUSPARSE_CALL(cusparseSetStream(thr_entry->cusparse_handle, stream));
 
   NDArray indptr = csr.indptr, indices = csr.indices, data = csr.data;
   const int32_t* indptr_ptr = static_cast<int32_t*>(indptr->data);
@@ -78,16 +79,17 @@ __global__ void _RepeatKernel(
 template <>
 COOMatrix CSRToCOO<kDGLCUDA, int64_t>(CSRMatrix csr) {
   const auto& ctx = csr.indptr->ctx;
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
+
   const int64_t nnz = csr.indices->shape[0];
   const auto nbits = csr.indptr->dtype.bits;
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   IdArray rowids = Range(0, csr.num_rows, nbits, ctx);
   IdArray ret_row = NewIdArray(nnz, ctx, nbits);
 
   const int nt = 256;
   const int nb = (nnz + nt - 1) / nt;
   CUDA_KERNEL_CALL(_RepeatKernel,
-      nb, nt, 0, thr_entry->stream,
+      nb, nt, 0, stream,
       rowids.Ptr<int64_t>(),
       csr.indptr.Ptr<int64_t>(), ret_row.Ptr<int64_t>(),
       csr.num_rows, nnz);
@@ -114,11 +116,12 @@ COOMatrix CSRToCOODataAsOrder<kDGLCUDA, int32_t>(CSRMatrix csr) {
 
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   auto device = runtime::DeviceAPI::Get(coo.row->ctx);
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   // allocate cusparse handle if needed
   if (!thr_entry->cusparse_handle) {
     CUSPARSE_CALL(cusparseCreate(&(thr_entry->cusparse_handle)));
   }
-  CUSPARSE_CALL(cusparseSetStream(thr_entry->cusparse_handle, thr_entry->stream));
+  CUSPARSE_CALL(cusparseSetStream(thr_entry->cusparse_handle, stream));
 
   NDArray row = coo.row, col = coo.col, data = coo.data;
   int32_t* row_ptr = static_cast<int32_t*>(row->data);

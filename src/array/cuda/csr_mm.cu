@@ -37,13 +37,14 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
   auto ctx = A.indptr->ctx;
   auto device = runtime::DeviceAPI::Get(ctx);
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   const DType* A_weights = A_weights_array.Ptr<DType>();
   const DType* B_weights = B_weights_array.Ptr<DType>();
   // allocate cusparse handle if needed
   if (!thr_entry->cusparse_handle) {
     CUSPARSE_CALL(cusparseCreate(&(thr_entry->cusparse_handle)));
   }
-  CUSPARSE_CALL(cusparseSetStream(thr_entry->cusparse_handle, thr_entry->stream));
+  CUSPARSE_CALL(cusparseSetStream(thr_entry->cusparse_handle, stream));
   // all one data array
   cusparseSpMatDescr_t matA, matB, matC;
   IdArray dC_csrOffsets = IdArray::Empty({A.num_rows+1}, A.indptr->dtype, A.indptr->ctx);
@@ -145,6 +146,7 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
   auto ctx = A.indptr->ctx;
   auto device = runtime::DeviceAPI::Get(ctx);
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   auto idtype = A.indptr->dtype;
   auto dtype = A_weights_array->dtype;
   const DType* A_weights = A_weights_array.Ptr<DType>();
@@ -152,7 +154,7 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
   if (!thr_entry->cusparse_handle) {
     CUSPARSE_CALL(cusparseCreate(&(thr_entry->cusparse_handle)));
   }
-  CUSPARSE_CALL(cusparseSetStream(thr_entry->cusparse_handle, thr_entry->stream));
+  CUSPARSE_CALL(cusparseSetStream(thr_entry->cusparse_handle, stream));
   CUSPARSE_CALL(cusparseSetPointerMode(
       thr_entry->cusparse_handle, CUSPARSE_POINTER_MODE_HOST));
 

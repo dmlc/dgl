@@ -122,6 +122,12 @@ class BaseHeteroGraph : public runtime::Object {
   virtual bool IsPinned() const = 0;
 
   /*!
+   * \brief Record stream for this graph.
+   * \param stream The stream that is using the graph
+   */
+  virtual void RecordStream(DGLStreamHandle stream) = 0;
+
+  /*!
    * \brief Get the number of integer bits used to store node/edge ids (32 or 64).
    */
   // TODO(BarclayII) replace NumBits() calls to DataType() calls

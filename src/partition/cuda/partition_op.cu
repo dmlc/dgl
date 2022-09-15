@@ -261,7 +261,7 @@ GeneratePermutationFromRemainder(
 
   const auto& ctx = in_idx->ctx;
   auto device = DeviceAPI::Get(ctx);
-  cudaStream_t stream = CUDAThreadEntry::ThreadLocal()->stream;
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
 
   const int64_t num_in = in_idx->shape[0];
 
@@ -392,7 +392,7 @@ IdArray MapToLocalFromRemainder(
     const int num_parts,
     IdArray global_idx) {
   const auto& ctx = global_idx->ctx;
-  cudaStream_t stream = CUDAThreadEntry::ThreadLocal()->stream;
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
 
   if (num_parts > 1) {
     IdArray local_idx = aten::NewIdArray(global_idx->shape[0], ctx,
@@ -439,7 +439,7 @@ IdArray MapToGlobalFromRemainder(
       "/" << num_parts;
 
   const auto& ctx = local_idx->ctx;
-  cudaStream_t stream = CUDAThreadEntry::ThreadLocal()->stream;
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
 
   if (num_parts > 1) {
     IdArray global_idx = aten::NewIdArray(local_idx->shape[0], ctx,
@@ -492,7 +492,7 @@ GeneratePermutationFromRange(
 
   const auto& ctx = in_idx->ctx;
   auto device = DeviceAPI::Get(ctx);
-  cudaStream_t stream = CUDAThreadEntry::ThreadLocal()->stream;
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
 
   const int64_t num_in = in_idx->shape[0];
 
@@ -628,7 +628,7 @@ IdArray MapToLocalFromRange(
     IdArray range,
     IdArray global_idx) {
   const auto& ctx = global_idx->ctx;
-  cudaStream_t stream = CUDAThreadEntry::ThreadLocal()->stream;
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
 
   if (num_parts > 1 && global_idx->shape[0] > 0) {
     IdArray local_idx = aten::NewIdArray(global_idx->shape[0], ctx,
@@ -690,7 +690,7 @@ IdArray MapToGlobalFromRange(
       "/" << num_parts;
 
   const auto& ctx = local_idx->ctx;
-  cudaStream_t stream = CUDAThreadEntry::ThreadLocal()->stream;
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
 
   if (num_parts > 1 && local_idx->shape[0] > 0) {
     IdArray global_idx = aten::NewIdArray(local_idx->shape[0], ctx,

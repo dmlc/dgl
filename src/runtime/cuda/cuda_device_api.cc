@@ -111,7 +111,7 @@ class CUDADeviceAPI final : public DeviceAPI {
     // Redirect to PyTorch's allocator when available.
     TensorDispatcher* td = TensorDispatcher::Global();
     if (td->IsAvailable())
-      return td->CUDAAllocWorkspace(nbytes, CUDAThreadEntry::ThreadLocal()->stream);
+      return td->CUDAAllocWorkspace(nbytes, getCurrentCUDAStream());
 
     CHECK_EQ(256 % alignment, 0U)
         << "CUDA space is aligned at 256 bytes";
@@ -169,7 +169,7 @@ class CUDADeviceAPI final : public DeviceAPI {
                       DGLContext ctx_from,
                       DGLContext ctx_to,
                       DGLDataType type_hint) final {
-    auto stream = static_cast<DGLStreamHandle>(CUDAThreadEntry::ThreadLocal()->stream);
+    auto stream = GetStream();
     CopyDataFromTo(from, from_offset, to, to_offset, size, ctx_from, ctx_to, type_hint, stream);
   }
 
@@ -203,13 +203,16 @@ class CUDADeviceAPI final : public DeviceAPI {
     CUDA_CALL(cudaStreamSynchronize(static_cast<cudaStream_t>(stream)));
   }
 
-  void SetStream(DGLContext ctx, DGLStreamHandle stream) final {
-    CUDAThreadEntry::ThreadLocal()
-        ->stream = static_cast<cudaStream_t>(stream);
-  }
+  /*! NOTE: If the backend is PyTorch, we will use PyTorch's stream management,
+   *        so just avoid calling our SetStream/CreateStream unless
+   *        you really need advanced stream control.
+   * TODO(Xin): Redirect this to PyTorch or remove it.
+   * PyTorch allows external CUDA streams to be set as current since v1.11.
+   */
+  void SetStream(DGLContext ctx, DGLStreamHandle stream) final {}
 
   DGLStreamHandle GetStream() const final {
-    return static_cast<DGLStreamHandle>(CUDAThreadEntry::ThreadLocal()->stream);
+    return static_cast<DGLStreamHandle>(getCurrentCUDAStream());
   }
 
   /*! NOTE: cudaHostRegister can be called from an arbitrary GPU device,
@@ -271,7 +274,7 @@ class CUDADeviceAPI final : public DeviceAPI {
     // Redirect to PyTorch's allocator when available.
     TensorDispatcher* td = TensorDispatcher::Global();
     if (td->IsAvailable())
-      return td->CUDAAllocWorkspace(size, CUDAThreadEntry::ThreadLocal()->stream);
+      return td->CUDAAllocWorkspace(size, getCurrentCUDAStream());
 
     return CUDAThreadEntry::ThreadLocal()->pool.AllocWorkspace(ctx, size);
   }
@@ -309,17 +312,20 @@ class CUDADeviceAPI final : public DeviceAPI {
 
 typedef dmlc::ThreadLocalStore<CUDAThreadEntry> CUDAThreadStore;
 
-// TODO(cliu): cuda streams should depend on the current device, therefore we should set device
-//             before setting stream.
 CUDAThreadEntry::CUDAThreadEntry()
     : pool(kDGLCUDA, CUDADeviceAPI::Global()) {
-  TensorDispatcher* td = TensorDispatcher::Global();
-  if (td->IsAvailable())
-    stream = td->CUDAGetCurrentStream();
 }
 
 CUDAThreadEntry* CUDAThreadEntry::ThreadLocal() {
   return CUDAThreadStore::Get();
+}
+
+cudaStream_t getCurrentCUDAStream() {
+  TensorDispatcher* td = TensorDispatcher::Global();
+  if (td->IsAvailable())
+    return td->CUDAGetCurrentStream();
+  else  // return the default stream when TA is not available
+    return nullptr;
 }
 
 DGL_REGISTER_GLOBAL("device_api.gpu")

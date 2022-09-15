@@ -27,7 +27,7 @@ std::pair<IdArray, IdArray> Sort(IdArray array, int num_bits) {
   IdType* keys_out = sorted_array.Ptr<IdType>();
   int64_t* values_out = sorted_idx.Ptr<int64_t>();
 
-  auto stream = runtime::CUDAThreadEntry::ThreadLocal()->stream;
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   if (num_bits == 0) {
     num_bits = sizeof(IdType)*8;
   }

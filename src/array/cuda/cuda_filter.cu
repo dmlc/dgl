@@ -18,7 +18,7 @@ namespace array {
 
 namespace {
 
-cudaStream_t cudaStream = runtime::CUDAThreadEntry::ThreadLocal()->stream;
+cudaStream_t cudaStream = runtime::getCurrentCUDAStream();
 
 template<typename IdType, bool include>
 __global__ void _IsInKernel(
@@ -99,7 +99,7 @@ IdArray _PerformFilter(
     device->FreeWorkspace(ctx, workspace);
   }
 
-  // copy number using the internal stream CUDAThreadEntry::ThreadLocal()->stream;
+  // copy number using the internal current stream;
   IdType num_unique;
   device->CopyDataFromTo(prefix+size, 0,
       &num_unique, 0,

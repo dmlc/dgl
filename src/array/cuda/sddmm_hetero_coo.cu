@@ -24,7 +24,6 @@ void SDDMMCooHetero(const std::string& op,
               int rhs_target,
               const std::vector<dgl_type_t>& lhs_eid,
               const std::vector<dgl_type_t>& rhs_eid) {
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   SWITCH_BITS(bits, DType, {
     SWITCH_OP(op, Op, {
       SWITCH_TARGET(lhs_target, rhs_target, LhsTarget, RhsTarget, {

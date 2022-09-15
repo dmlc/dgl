@@ -135,10 +135,10 @@ __global__ void _FillKernel(DType* ptr, size_t length, DType val) {
 /*! \brief Fill the vector started from ptr of size length with val */
 template <typename DType>
 void _Fill(DType* ptr, size_t length, DType val) {
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   int nt = FindNumThreads(length);
   int nb = (length + nt - 1) / nt;  // on x-axis, no need to worry about upperbound.
-  CUDA_KERNEL_CALL(cuda::_FillKernel, nb, nt, 0, thr_entry->stream, ptr, length, val);
+  CUDA_KERNEL_CALL(cuda::_FillKernel, nb, nt, 0, stream, ptr, length, val);
 }
 
 /*!

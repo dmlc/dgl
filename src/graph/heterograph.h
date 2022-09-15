@@ -251,6 +251,12 @@ class HeteroGraph : public BaseHeteroGraph {
   */
   void UnpinMemory_();
 
+  /*!
+   * \brief Record stream for this graph.
+   * \param stream The stream that is using the graph
+   */
+  void RecordStream(DGLStreamHandle stream) override;
+
   /*! \brief Copy the data to shared memory.
   *
   * Also save names of node types and edge types of the HeteroGraph object to shared memory

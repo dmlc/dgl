@@ -198,7 +198,7 @@ std::pair<IdArray, IdArray> RandomWalkUniform(
     h_graphs[etype].data = (CSRHasData(csr) ? static_cast<const IdType*>(csr.data->data) : nullptr);
   }
   // use cuda stream from local thread
-  cudaStream_t stream = runtime::CUDAThreadEntry::ThreadLocal()->stream;
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   auto device = DeviceAPI::Get(ctx);
   auto d_graphs = static_cast<GraphKernelData<IdType>*>(
       device->AllocWorkspace(ctx, (num_etypes) * sizeof(GraphKernelData<IdType>)));
@@ -269,7 +269,7 @@ std::pair<IdArray, IdArray> RandomWalkBiased(
   IdType *traces_data = traces.Ptr<IdType>();
   IdType *eids_data = eids.Ptr<IdType>();
 
-  cudaStream_t stream = runtime::CUDAThreadEntry::ThreadLocal()->stream;
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   auto device = DeviceAPI::Get(ctx);
   // new probs and prob sums pointers
   assert(num_etypes == static_cast<int64_t>(prob.size()));
@@ -426,7 +426,7 @@ std::pair<IdArray, IdArray> RandomWalkWithRestart(
   auto device = dgl::runtime::DeviceAPI::Get(device_ctx);
 
   // use cuda stream from local thread
-  cudaStream_t stream = runtime::CUDAThreadEntry::ThreadLocal()->stream;
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   device->CopyDataFromTo(
       &restart_prob, 0, restart_prob_array.Ptr<double>(), 0,
       sizeof(double),
@@ -486,7 +486,7 @@ std::tuple<IdArray, IdArray, IdArray> SelectPinSageNeighbors(
   const int64_t num_dst_nodes = (dst->shape[0] / num_samples_per_node);
   auto ctx = src->ctx;
   // use cuda stream from local thread
-  cudaStream_t stream = runtime::CUDAThreadEntry::ThreadLocal()->stream;
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   auto frequency_hashmap = FrequencyHashmap<IdxType>(num_dst_nodes,
       num_samples_per_node, ctx, stream);
   auto ret = frequency_hashmap.Topk(src_data, dst_data, src->dtype,

@@ -204,7 +204,7 @@ void NDArray::CopyFromTo(DGLArray* from,
   // api manager.
   DGLContext ctx = from->ctx.device_type != kDGLCPU ? from->ctx : to->ctx;
 
-  // default: local cuda stream: CUDAThreadEntry->ThreadLocal()->stream
+  // default: local current cuda stream
   DeviceAPI::Get(ctx)->CopyDataFromTo(
       from->data, static_cast<size_t>(from->byte_offset),
       to->data, static_cast<size_t>(to->byte_offset),
@@ -231,6 +231,15 @@ void NDArray::UnpinContainer(NDArray::Container* ptr) {
   // 2. pinned by DGL, unpin it
   DeviceAPI::Get(kDGLCUDA)->UnpinData(ptr->dl_tensor.data);
   ptr->pinned_by_dgl_ = false;
+}
+
+void NDArray::RecordStream(DGLArray* tensor, DGLStreamHandle stream) {
+  TensorDispatcher* td = TensorDispatcher::Global();
+  CHECK(td->IsAvailable()) << "RecordStream only works when TensorAdaptor is available.";
+  CHECK_EQ(tensor->ctx.device_type, kDLGPU)
+    << "RecordStream only works with GPU tensors.";
+
+  td->RecordStream(tensor->data, stream, tensor->ctx.device_id);
 }
 
 template<typename T>
@@ -480,5 +489,11 @@ int DGLArrayUnpinData(DGLArrayHandle handle,
   API_BEGIN();
   auto* nd_container = reinterpret_cast<NDArray::Container*>(handle);
   NDArray::UnpinContainer(nd_container);
+  API_END();
+}
+
+int DGLArrayRecordStream(DGLArrayHandle handle, DGLStreamHandle stream) {
+  API_BEGIN();
+  NDArray::RecordStream(handle, stream);
   API_END();
 }

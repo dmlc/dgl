@@ -30,10 +30,10 @@ void Scatter_(IdArray index, NDArray value, NDArray out) {
   const DType* val = value.Ptr<DType>();
   DType* outd = out.Ptr<DType>();
 
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   const int nt = cuda::FindNumThreads(len);
   const int nb = (len + nt - 1) / nt;
-  CUDA_KERNEL_CALL(_ScatterKernel, nb, nt, 0, thr_entry->stream,
+  CUDA_KERNEL_CALL(_ScatterKernel, nb, nt, 0, stream,
       idx, val, len, outd);
 }
 

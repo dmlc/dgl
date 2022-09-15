@@ -56,6 +56,15 @@ void CUDARawDelete(void* ptr);
  * \brief Get the current CUDA stream.
  */
 cudaStream_t CUDACurrentStream();
+
+/*!
+ * \brief Let the caching allocator know which streams are using this tensor.
+ *
+ * \param ptr Pointer of the tensor to be recorded.
+ * \param stream The stream that is using this tensor.
+ * \param device_id Device of the tensor.
+ */
+void RecordStream(void* ptr, cudaStream_t stream, int device_id);
 #endif  // DGL_USE_CUDA
 
 }

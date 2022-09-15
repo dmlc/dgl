@@ -96,7 +96,7 @@ void _Merge(IdType** arrs, IdType* prefix, IdType* offset, IdType* out,
 
 template <DGLDeviceType XPU, typename IdType>
 COOMatrix DisjointUnionCoo(const std::vector<COOMatrix>& coos) {
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   auto device = runtime::DeviceAPI::Get(coos[0].row->ctx);
   uint64_t src_offset = 0, dst_offset = 0;
   bool has_data = false;
@@ -129,7 +129,6 @@ COOMatrix DisjointUnionCoo(const std::vector<COOMatrix>& coos) {
 
   auto ctx = coos[0].row->ctx;
   auto dtype = coos[0].row->dtype;
-  auto stream = thr_entry->stream;
 
   IdType n_elements = 0;
   device->CopyDataFromTo(

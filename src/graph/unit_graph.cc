@@ -170,6 +170,11 @@ class UnitGraph::COO : public BaseHeteroGraph {
     adj_.UnpinMemory_();
   }
 
+  /*! \brief Record stream for the adj_: COOMatrix of the COO graph. */
+  void RecordStream(DGLStreamHandle stream) override {
+    adj_.RecordStream(stream);
+  }
+
   bool IsMultigraph() const override {
     return aten::COOHasDuplicate(adj_);
   }
@@ -573,6 +578,11 @@ class UnitGraph::CSR : public BaseHeteroGraph {
   /*! \brief Unpin the adj_: CSRMatrix of the CSR graph. */
   void UnpinMemory_() {
     adj_.UnpinMemory_();
+  }
+
+  /*! \brief Record stream for the adj_: CSRMatrix of the CSR graph. */
+  void RecordStream(DGLStreamHandle stream) override {
+    adj_.RecordStream(stream);
   }
 
   bool IsMultigraph() const override {
@@ -1313,6 +1323,16 @@ void UnitGraph::UnpinMemory_() {
     this->coo_->UnpinMemory_();
 }
 
+void UnitGraph::RecordStream(DGLStreamHandle stream) {
+  if (this->in_csr_->defined())
+    this->in_csr_->RecordStream(stream);
+  if (this->out_csr_->defined())
+    this->out_csr_->RecordStream(stream);
+  if (this->coo_->defined())
+    this->coo_->RecordStream(stream);
+  this->recorded_streams.push_back(stream);
+}
+
 void UnitGraph::InvalidateCSR() {
   this->out_csr_ = CSRPtr(new CSR());
 }
@@ -1402,8 +1422,12 @@ UnitGraph::CSRPtr UnitGraph::GetInCSR(bool inplace) const {
       else
         ret = std::make_shared<CSR>(meta_graph(), newadj);
     }
-    if (inplace && IsPinned())
-      in_csr_->PinMemory_();
+    if (inplace) {
+      if (IsPinned())
+        in_csr_->PinMemory_();
+      for (auto stream : recorded_streams)
+        in_csr_->RecordStream(stream);
+    }
   }
   return ret;
 }
@@ -1434,8 +1458,12 @@ UnitGraph::CSRPtr UnitGraph::GetOutCSR(bool inplace) const {
       else
         ret = std::make_shared<CSR>(meta_graph(), newadj);
     }
-    if (inplace && IsPinned())
-      out_csr_->PinMemory_();
+    if (inplace) {
+      if (IsPinned())
+        out_csr_->PinMemory_();
+      for (auto stream : recorded_streams)
+        out_csr_->RecordStream(stream);
+    }
   }
   return ret;
 }
@@ -1464,8 +1492,12 @@ UnitGraph::COOPtr UnitGraph::GetCOO(bool inplace) const {
       else
         ret = std::make_shared<COO>(meta_graph(), newadj);
     }
-    if (inplace && IsPinned())
-      coo_->PinMemory_();
+    if (inplace) {
+      if (IsPinned())
+        coo_->PinMemory_();
+      for (auto stream : recorded_streams)
+        coo_->RecordStream(stream);
+    }
   }
   return ret;
 }

@@ -33,12 +33,13 @@ std::pair<CSRMatrix, NDArray> CusparseCsrgeam2(
   auto ctx = A.indptr->ctx;
   auto device = runtime::DeviceAPI::Get(ctx);
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   const DType* A_weights = A_weights_array.Ptr<DType>();
   const DType* B_weights = B_weights_array.Ptr<DType>();
   // allocate cusparse handle if needed
   if (!thr_entry->cusparse_handle)
     CUSPARSE_CALL(cusparseCreate(&(thr_entry->cusparse_handle)));
-  CUSPARSE_CALL(cusparseSetStream(thr_entry->cusparse_handle, thr_entry->stream));
+  CUSPARSE_CALL(cusparseSetStream(thr_entry->cusparse_handle, stream));
 
   cusparseMatDescr_t matA, matB, matC;
   CUSPARSE_CALL(cusparseCreateMatDescr(&matA));
