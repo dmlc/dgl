@@ -43,7 +43,8 @@ if __name__ == "__main__":
     parser.add_argument('--world-size', help='no. of processes to spawn',
                     default=1, type=int, required=True)
     parser.add_argument('--process-group-timeout', required=True, type=int,
-                        help='timeout[seconds] for operations executed against the process group')
+                        help='timeout[seconds] for operations executed against the process group '
+                             '(see torch.distributed.init_process_group)')
     params = parser.parse_args()
 
     #invoke the pipeline function
