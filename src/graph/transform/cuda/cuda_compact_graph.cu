@@ -88,10 +88,9 @@ CompactGraphsGPU(
     const std::vector<HeteroGraphPtr> &graphs,
     const std::vector<IdArray> &always_preserve) {
 
-
   const auto& ctx = graphs[0]->Context();
   auto device = runtime::DeviceAPI::Get(ctx);
-  cudaStream_t stream = runtime::CUDAThreadEntry::ThreadLocal()->stream;
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
 
   CHECK_EQ(ctx.device_type, kDLGPU);
 

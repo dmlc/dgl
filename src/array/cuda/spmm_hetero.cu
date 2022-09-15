@@ -118,7 +118,7 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
       }
     }
 
-    auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+    cudaStream_t stream = runtime::getCurrentCUDAStream();
     for (dgl_type_t etype = 0; etype < ufeat_ntids.size(); ++etype) {
       const dgl_type_t src_id = ufeat_ntids[etype];
       const dgl_type_t dst_id = out_ntids[etype];
@@ -135,7 +135,7 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
               static_cast<DType*>(vec_ufeat[src_id]->data),
               nullptr,
               out,
-              x_length, thr_entry->stream);
+              x_length, stream);
         } else if (op == "mul" && is_scalar_efeat &&
             cusparse_available<bits, IdType>(more_nnz)) {  // cusparse
           NDArray efeat = vec_efeat[etype];
@@ -147,7 +147,7 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
               static_cast<DType*>(efeat->data),
               // TODO(Israt): Change (*vec_out) to trans_out to support CUDA version < 11
               static_cast<DType*>((*vec_out)[dst_id]->data),
-              x_length, thr_entry->stream);
+              x_length, stream);
         } else {  // general kernel
           NDArray ufeat = (vec_ufeat.size() == 0) ?
             NullArray() : vec_ufeat[src_id];

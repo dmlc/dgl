@@ -14,7 +14,6 @@ from ...ndarray import NDArray as DGLNDArray
 from ... import backend as F
 from ...base import DGLError, dgl_warning
 from ...utils import to_dgl_context, check_device
-from ..._ffi import streams as FS
 
 __all__ = ['NodeDataLoader', 'EdgeDataLoader', 'GraphDataLoader',
            # Temporary exposure.
@@ -353,9 +352,8 @@ def _next(dl_iter, graph, device, load_input, load_output, stream=None):
     result_ = (input_nodes, output_nodes, blocks, input_data, output_data)
     if stream is not None:
         with th.cuda.stream(stream):
-            with FS.stream(stream):
-                result = [_to_device(data, device)
-                          for data in result_], result_, stream.record_event()
+            result = [_to_device(data, device)
+                      for data in result_], result_, stream.record_event()
     else:
         result = [_to_device(data, device) for data in result_]
     return result
