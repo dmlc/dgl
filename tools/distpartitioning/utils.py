@@ -9,6 +9,7 @@ import pyarrow
 from pyarrow import csv
 
 import psutil
+import logging
 
 def read_ntype_partition_files(schema_map, input_dir):
     """
@@ -423,7 +424,7 @@ def get_idranges(names, counts):
     return tid_dict, gid_dict
 
 
-def mem_snapshot(tag, rank):
+def memory_snapshot(tag, rank):
     """
     Utility function to take a snapshot of the usage of system resources
     at a given point of time.
@@ -443,5 +444,6 @@ def mem_snapshot(tag, rank):
     used = mem.used / MB
     total = mem.total / MB
 
-    mem_string = '{:.0f} (MB) total, {:.0f} (MB) used, {:.0f} (MB) avail'.format(total, used, avail)
+    mem_string = f'{total:.0f} (MB) total, {used:.0f} (MB) used, {avail:.0f} (MB) avail'
     logging.debug(f'[Rank: {rank} MEMORY_SNAPSHOT] {mem_string} - {tag}')
+

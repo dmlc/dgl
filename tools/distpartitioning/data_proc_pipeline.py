@@ -41,6 +41,7 @@ if __name__ == "__main__":
                     help='The output directory of the partitioned results')
     parser.add_argument('--partitions-dir', help='directory of the partition-ids for each node type',
                     default=None, type=str)
+    parser.add_argument('--log', type=str, help='To enable log level for debugging purposes', default="info")
 
     #arguments needed for the distributed implementation
     parser.add_argument('--world-size', help='no. of processes to spawn',
@@ -48,5 +49,6 @@ if __name__ == "__main__":
     params = parser.parse_args()
 
     #invoke the pipeline function
-    logging.basicConfig(level='INFO', format=f"[{platform.node()} %(levelname)s %(asctime)s PID:%(process)d] %(message)s")
+    numeric_level = getattr(logging, params.log.upper(), None)
+    logging.basicConfig(level=numeric_level, format=f"[{platform.node()} %(levelname)s %(asctime)s PID:%(process)d] %(message)s")
     multi_machine_run(params)
