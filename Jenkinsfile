@@ -136,7 +136,7 @@ def is_admin(name) {
 pipeline {
   agent any
   triggers {
-        issueCommentTrigger('@dgl-bot .*')
+        issueCommentTrigger('@dgl-bot.*')
   }
   stages {
     // Below 2 stages are to authenticate the change/comment author.
@@ -157,9 +157,7 @@ pipeline {
           def prOpenTriggerCause = currentBuild.getBuildCauses('jenkins.branch.BranchEventCause')
           def first_run = prOpenTriggerCause && env.BUILD_ID == '1'
           if (author && !is_authorized(author)) {
-            if (first_run) {
-              pullRequest.comment("Not authorized to trigger CI. Please ask core developer to help trigger via issuing comment: \n - `@dgl-bot`")
-            }
+            pullRequest.comment("Not authorized to trigger CI. Please ask core developer to help trigger via issuing comment: \n - `@dgl-bot`")
             error("Authentication failed.")
           }
           if (first_run) {
