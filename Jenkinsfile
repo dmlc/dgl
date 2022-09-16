@@ -213,13 +213,16 @@ pipeline {
               }
               sh('cp benchmark_scripts_repo/benchmark/* benchmarks/scripts/')
               def command_lists = comment.split(' ')
-              def instance_type = command_lists[2].replace('.', '')
-              if (command_lists.size() != 5) {
-              pullRequest.comment('Cannot run the regression test due to unknown command')
-              error('Unknown command')
-              } else {
-              pullRequest.comment("Start the Regression test. View at ${RUN_DISPLAY_URL}")
+              if (command_lists.size() == 1) {
+                // CI command, not for regression
+                return
               }
+              if (command_lists.size() != 5) {
+                pullRequest.comment('Cannot run the regression test due to unknown command')
+                error('Unknown command')
+              }
+              def instance_type = command_lists[2].replace('.', '')
+              pullRequest.comment("Start the Regression test. View at ${RUN_DISPLAY_URL}")
               def prNumber = env.BRANCH_NAME.replace('PR-', '')
               dir('benchmarks/scripts') {
                 sh('python3 -m pip install boto3')
