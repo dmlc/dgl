@@ -281,7 +281,7 @@ def gen_parmetis_input_args(params, schema_map):
     efile.close()
 
 
-def run_wrapper(params):
+def run_preprocess_data(params):
     """
     Main function which will help create graph files for ParMETIS processing
 
@@ -323,4 +323,4 @@ if __name__ == "__main__":
     params = parser.parse_args()
 
     #Invoke the function to generate files for parmetis
-    run_wrapper(params)
+    run_preprocess_data(params)
