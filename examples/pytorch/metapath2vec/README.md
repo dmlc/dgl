@@ -52,7 +52,7 @@ Author Classfication Results for Metapath2vec:
 
 Note that: 
 
-Testing files are available in authorâ€˜s code repo: [https://ericdongyx.github.io/metapath2vec/m2v.html](https://ericdongyx.github.io/metapath2vec/m2v.html) [F] Ground Truth Labeled by Google Scholar Metrics 2016 for Multi-Label Node Classification and Clustering.
+Testing files are available in author's code repo: [https://ericdongyx.github.io/metapath2vec/m2v.html](https://ericdongyx.github.io/metapath2vec/m2v.html) [F] Ground Truth Labeled by Google Scholar Metrics 2016 for Multi-Label Node Classification and Clustering. You need to use `nid2word` parameter to map the node labels with the global embedding index. 
 
 The above are results listed in the paper, in real experiments, exact numbers might be slightly different:
 
@@ -61,3 +61,5 @@ The above are results listed in the paper, in real experiments, exact numbers mi
 2. For author node classification results, the performance is stable since the number of available labeled authors is huge, so even 5% training data would be sufficient.
 
 3. In the test.py, you could change experiment times you want, especially it is very slow to test author classification so you could only do 1 or 2 times.
+
+Set the `min_count` parameter to the appropriate size. Or there would be lots of discarded embeddings as last, which causes waste of resources.

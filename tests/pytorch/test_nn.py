@@ -1644,14 +1644,3 @@ def test_MetaPath2Vec(emb_dim, meta_path, context_size, negative_size, min_count
     embeds = model.u_embeddings.weight
     emb_size = model.word_count
     assert embeds.shape == (emb_size, emb_dim)
-
-@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
-@pytest.mark.parametrize('walk_length', 5)
-@pytest.mark.parametrize('context_size', [1, 3])
-@pytest.mark.parametrize('negative_size', [1, 3])
-@pytest.mark.parametrize('emb_dim', [1, 100])
-@pytest.mark.parametrize('num_random_walk', [1, 3])
-def test_DeepWalk(g, emb_dim, walk_length, context_size, num_random_walk, negative_size):
-    model = nn.DeepWalk(g, emb_dim, walk_length, context_size, num_random_walk, negative_samples_size=negative_size)
-    model = model.to(F.ctx())
-    embeds = model.u_embeddings.weight

@@ -123,4 +123,3 @@ Network Embedding Modules
     :template: classtemplate.rst
 
     ~dgl.nn.pytorch.MetaPath2Vec
-    ~dgl.nn.pytorch.DeepWalk
