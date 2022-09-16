@@ -1,6 +1,9 @@
 name: Pylint
 
-on: [push]
+on:
+  push:
+    paths:
+      - '*.py'
 
 jobs:
   flake8_py3:
