@@ -313,7 +313,7 @@ if __name__ == "__main__":
 
     Example usage:
     --------------
-    mpirun -np 4 python3 parmetis_wrapper --schema <file> --output <target-output-dir>
+    mpirun -np 4 python3 parmetis_preprocess.py --schema <file> --output <target-output-dir>
     """
     parser = argparse.ArgumentParser(description='Generate ParMETIS files for input dataset')
     parser.add_argument('--schema', required=True, type=str,
