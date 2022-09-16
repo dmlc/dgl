@@ -297,7 +297,6 @@ pipeline {
                 docker {
                   label "linux-cpu-node"
                   image "rapidsai/cugraph_nightly_torch-cuda:11.5-base-ubuntu18.04-py3.9-pytorch1.11.0-rapids22.10"
-                  args "-u root"
                   alwaysPull True
                 }
               }
