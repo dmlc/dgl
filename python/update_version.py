@@ -21,7 +21,7 @@ def update(file_name, pattern, repl):
     update = []
     hit_counter = 0
     need_update = False
-    for l in open(file_name):
+    for l in open(file_name)  :
         result = re.findall(pattern, l)
         if result:
             assert len(result) == 1
