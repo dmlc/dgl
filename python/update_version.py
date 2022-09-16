@@ -44,7 +44,7 @@ def update(file_name, pattern, repl):
 
 
 def main():
-    curr_dir = os.path.dirname(os.path.abspath(os.path.expanduser(__file__)))
+    curr_dir   =    os.path.dirname(os.path.abspath(os.path.expanduser(__file__)))
     proj_root = os.path.abspath(os.path.join(curr_dir, ".."))
     # python path
     update(os.path.join(proj_root, "python", "dgl", "_ffi", "libinfo.py"), r"(?<=__version__ = \")[.0-9a-z]+", __version__)
