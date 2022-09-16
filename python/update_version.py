@@ -21,7 +21,7 @@ def update(file_name, pattern, repl):
     update = []
     hit_counter = 0
     need_update = False
-    for l in open(file_name) :
+    for l in open(file_name):
         result = re.findall(pattern, l)
         if result:
             assert len(result) == 1
@@ -51,17 +51,18 @@ def main():
            r"(?<=__version__ = \")[.0-9a-z]+", __version__)
     # C++ header
     update(
-    os.path.join(
-       proj_root,
-       "include",
-       "dgl",
-       "runtime",
-       "c_runtime_api.h"),
+        os.path.join(
+            proj_root,
+            "include",
+            "dgl",
+            "runtime",
+            "c_runtime_api.h"),
         "(?<=DGL_VERSION \")[.0-9a-z]+",
         __version__)
     # conda
     for path in ["dgl"]:
-        update(os.path.join(proj_root, "conda", path, "meta.yaml"),"(?<=version: \")[.0-9a-z]+", __version__)
+        update(os.path.join(proj_root, "conda", path, "meta.yaml"),
+               "(?<=version: \")[.0-9a-z]+", __version__)
 
 
 if __name__ == "__main__":
