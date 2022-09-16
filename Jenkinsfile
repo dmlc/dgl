@@ -201,6 +201,15 @@ pipeline {
           checkout scm
           script {
               def comment = env.GITHUB_COMMENT
+              def command_lists = comment.split(' ')
+              if (command_lists.size() == 1) {
+                // CI command, not for regression
+                return
+              }
+              if (command_lists.size() != 5) {
+                pullRequest.comment('Cannot run the regression test due to unknown command')
+                error('Unknown command')
+              }
               def author = env.GITHUB_COMMENT_AUTHOR
               echo("${env.GIT_URL}")
               echo("${env}")
@@ -212,15 +221,6 @@ pipeline {
                         userRemoteConfigs: [[credentialsId: 'github', url: 'https://github.com/dglai/DGL_scripts.git']]])
               }
               sh('cp benchmark_scripts_repo/benchmark/* benchmarks/scripts/')
-              def command_lists = comment.split(' ')
-              if (command_lists.size() == 1) {
-                // CI command, not for regression
-                return
-              }
-              if (command_lists.size() != 5) {
-                pullRequest.comment('Cannot run the regression test due to unknown command')
-                error('Unknown command')
-              }
               def instance_type = command_lists[2].replace('.', '')
               pullRequest.comment("Start the Regression test. View at ${RUN_DISPLAY_URL}")
               def prNumber = env.BRANCH_NAME.replace('PR-', '')
