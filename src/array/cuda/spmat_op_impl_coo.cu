@@ -73,7 +73,7 @@ __global__ void _COOGetRowNNZKernel(
 
 template <DLDeviceType XPU, typename IdType>
 int64_t COOGetRowNNZ(COOMatrix coo, int64_t row) {
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   const auto& ctx = coo.row->ctx;
   IdType nnz = coo.row->shape[0];
   IdType nt = 1024;
@@ -81,7 +81,7 @@ int64_t COOGetRowNNZ(COOMatrix coo, int64_t row) {
   NDArray rst = NDArray::Empty({1}, coo.row->dtype, coo.row->ctx);
   _Fill(rst.Ptr<IdType>(), 1, IdType(0));
   CUDA_KERNEL_CALL(_COOGetRowNNZKernel,
-      nb, nt, 0, thr_entry->stream,
+      nb, nt, 0, stream,
       coo.row.Ptr<IdType>(), rst.Ptr<IdType>(),
       row, nnz);
   rst = rst.CopyTo(DLContext{kDLCPU, 0});
@@ -106,7 +106,7 @@ __global__ void _COOGetAllRowNNZKernel(
 
 template <DLDeviceType XPU, typename IdType>
 NDArray COOGetRowNNZ(COOMatrix coo, NDArray rows) {
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   const auto& ctx = coo.row->ctx;
   IdType nnz = coo.row->shape[0];
   IdType num_rows = coo.num_rows;
@@ -119,7 +119,7 @@ NDArray COOGetRowNNZ(COOMatrix coo, NDArray rows) {
     NDArray rst = NDArray::Empty({1}, coo.row->dtype, coo.row->ctx);
     _Fill(rst.Ptr<IdType>(), 1, IdType(0));
     CUDA_KERNEL_CALL(_COOGetRowNNZKernel,
-        nb, nt, 0, thr_entry->stream,
+        nb, nt, 0, stream,
         coo.row.Ptr<IdType>(), rst.Ptr<IdType>(),
         row, nnz);
     return rst;
@@ -129,7 +129,7 @@ NDArray COOGetRowNNZ(COOMatrix coo, NDArray rows) {
     NDArray in_degrees = NDArray::Empty({num_rows}, rows->dtype, rows->ctx);
     _Fill(in_degrees.Ptr<IdType>(), num_rows, IdType(0));
     CUDA_KERNEL_CALL(_COOGetAllRowNNZKernel,
-        nb, nt, 0, thr_entry->stream,
+        nb, nt, 0, stream,
         coo.row.Ptr<IdType>(), in_degrees.Ptr<IdType>(),
         nnz);
     return IndexSelect(in_degrees, rows);

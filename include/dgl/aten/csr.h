@@ -160,6 +160,18 @@ struct CSRMatrix {
     }
     is_pinned = false;
   }
+
+  /*!
+   * \brief Record stream for the indptr, indices and data (if not Null) of the matrix.
+   * \param stream The stream that is using the graph
+   */
+  inline void RecordStream(DGLStreamHandle stream) const {
+    indptr.RecordStream(stream);
+    indices.RecordStream(stream);
+    if (!aten::IsNullArray(data)) {
+      data.RecordStream(stream);
+    }
+  }
 };
 
 ///////////////////////// CSR routines //////////////////////////
