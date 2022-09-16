@@ -267,7 +267,8 @@ def test_parmetis_preprocessing():
                 true_node_count += node_per_part[j]
         assert total_node_count == true_node_count
 
-        # Read parmetis_efiles and ensure all files are present
+        # Read parmetis_efiles and ensure all files are present.
+        # This file contains a list of filenames.
         parmetis_edges_file = os.path.join(parmetis_data_dir, 'parmetis_efiles.txt')
         assert os.path.isfile(parmetis_edges_file)
 
