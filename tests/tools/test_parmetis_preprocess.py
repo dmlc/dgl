@@ -10,7 +10,7 @@ import torch
 from dgl.data.utils import load_tensors, load_graphs
 from chunk_graph import chunk_graph
 
-def test_parmetis_wrapper():
+def test_parmetis_preprocessing():
     # Step0: prepare chunked graph data format.
 
     # Create a synthetic mini graph (similar to MAG240 dataset).
@@ -295,4 +295,4 @@ def test_parmetis_wrapper():
         assert true_edge_count == total_edge_count
 
 if __name__ == '__main__':
-    test_parmetis_wrapper()
+    test_parmetis_preprocessing()
