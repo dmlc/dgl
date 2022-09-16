@@ -25,7 +25,7 @@ def update(file_name, pattern, repl):
         result = re.findall(pattern, l)
         if result:
             assert len(result) == 1
-            hit_counter += 1
+            hit_counter+=1
             if result[0] != repl:
                 l = re.sub(pattern, repl, l)
                 need_update = True
