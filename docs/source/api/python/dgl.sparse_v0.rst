@@ -14,3 +14,16 @@ Sparse matrix class
 
 .. autoclass:: SparseMatrix
 	:members:
+
+Diagonal matrix class
+-------------------------
+.. currentmodule:: dgl.mock_sparse
+
+.. autoclass:: DiagMatrix
+	:members:
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    diag
+    identity
