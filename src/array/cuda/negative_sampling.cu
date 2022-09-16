@@ -150,14 +150,14 @@ std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
   IdType* out_row_data = out_row.Ptr<IdType>();
   IdType* out_col_data = out_col.Ptr<IdType>();
   auto device = runtime::DeviceAPI::Get(ctx);
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   const int nt = cuda::FindNumThreads(num_actual_samples);
   const int nb = (num_actual_samples + nt - 1) / nt;
   std::pair<IdArray, IdArray> result;
   int64_t num_out;
 
   CUDA_KERNEL_CALL(_GlobalUniformNegativeSamplingKernel,
-      nb, nt, 0, thr_entry->stream,
+      nb, nt, 0, stream,
       csr.indptr.Ptr<IdType>(), csr.indices.Ptr<IdType>(),
       row_data, col_data, num_row, num_col, num_actual_samples, num_trials,
       exclude_self_loops, RandomEngine::ThreadLocal()->RandInt32());
@@ -168,13 +168,11 @@ std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
   PairIterator<IdType> begin(row_data, col_data);
   PairIterator<IdType> out_begin(out_row_data, out_col_data);
   CUDA_CALL(cub::DeviceSelect::If(
-        nullptr, tmp_size, begin, out_begin, num_out_cuda, num_actual_samples, op,
-        thr_entry->stream));
+        nullptr, tmp_size, begin, out_begin, num_out_cuda, num_actual_samples, op, stream));
   void* tmp = device->AllocWorkspace(ctx, tmp_size);
   CUDA_CALL(cub::DeviceSelect::If(
-        tmp, tmp_size, begin, out_begin, num_out_cuda, num_actual_samples, op,
-        thr_entry->stream));
-  num_out = cuda::GetCUDAScalar(device, ctx, num_out_cuda, static_cast<cudaStream_t>(0));
+        tmp, tmp_size, begin, out_begin, num_out_cuda, num_actual_samples, op, stream));
+  num_out = cuda::GetCUDAScalar(device, ctx, num_out_cuda);
 
   if (!replace) {
     IdArray unique_row = IdArray::Empty({num_out}, dtype, ctx);
@@ -185,20 +183,18 @@ std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
 
     SortOrderedPairs(
         device, ctx, out_row_data, out_col_data, unique_row_data, unique_col_data,
-        num_out, thr_entry->stream);
+        num_out, stream);
 
     size_t tmp_size_unique = 0;
     void* tmp_unique = nullptr;
     CUDA_CALL(cub::DeviceSelect::Unique(
-          nullptr, tmp_size_unique, out_begin, unique_begin, num_out_cuda, num_out,
-          thr_entry->stream));
+          nullptr, tmp_size_unique, out_begin, unique_begin, num_out_cuda, num_out, stream));
     tmp_unique = (tmp_size_unique > tmp_size) ?
       device->AllocWorkspace(ctx, tmp_size_unique) :
       tmp;      // reuse buffer
     CUDA_CALL(cub::DeviceSelect::Unique(
-          tmp_unique, tmp_size_unique, out_begin, unique_begin, num_out_cuda, num_out,
-          thr_entry->stream));
-    num_out = cuda::GetCUDAScalar(device, ctx, num_out_cuda, static_cast<cudaStream_t>(0));
+          tmp_unique, tmp_size_unique, out_begin, unique_begin, num_out_cuda, num_out, stream));
+    num_out = cuda::GetCUDAScalar(device, ctx, num_out_cuda);
 
     num_out = std::min(num_samples, num_out);
     result = {unique_row.CreateView({num_out}, dtype), unique_col.CreateView({num_out}, dtype)};

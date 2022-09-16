@@ -207,8 +207,7 @@ class UnitGraph : public BaseHeteroGraph {
   static HeteroGraphPtr AsNumBits(HeteroGraphPtr g, uint8_t bits);
 
   /*! \brief Copy the data to another context */
-  static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DLContext &ctx,
-                               const DGLStreamHandle &stream = nullptr);
+  static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DLContext &ctx);
 
   /*!
   * \brief Pin the in_csr_, out_scr_ and coo_ of the current graph.
@@ -228,6 +227,12 @@ class UnitGraph : public BaseHeteroGraph {
   *       The context check is deferred to unpinning the NDArray.
   */
   void UnpinMemory_();
+
+  /*!
+   * \brief Record stream for this graph.
+   * \param stream The stream that is using the graph
+   */
+  void RecordStream(DGLStreamHandle stream) override;
 
   /*! 
    * \brief Create in-edge CSR format of the unit graph.
@@ -376,6 +381,8 @@ class UnitGraph : public BaseHeteroGraph {
    * \brief Storage format restriction.
    */
   dgl_format_code_t formats_;
+  /*! \brief which streams have recorded the graph */
+  std::vector<DGLStreamHandle> recorded_streams;
 };
 
 };  // namespace dgl

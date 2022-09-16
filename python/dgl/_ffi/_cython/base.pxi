@@ -107,8 +107,7 @@ cdef extern from "dgl/runtime/c_runtime_api.h":
                                CDGLArrayHandle* out)
     int DGLArrayFree(DLTensorHandle handle)
     int DGLArrayCopyFromTo(DLTensorHandle src,
-                           DLTensorHandle to,
-                           DGLStreamHandle stream)
+                           DLTensorHandle to)
     int DGLArrayFromDLPack(DLManagedTensor* arr_from,
                            DLTensorHandle* out)
     int DGLArrayToDLPack(DLTensorHandle arr_from,
@@ -163,5 +162,8 @@ cdef inline object ctypes_handle(void* chandle):
 cdef inline void* c_handle(object handle):
     """Cast C types handle to c handle."""
     cdef unsigned long long v_ptr
-    v_ptr = handle.value
-    return <void*>(v_ptr)
+    if handle.value is None:
+        return NULL
+    else:
+        v_ptr = handle.value
+        return <void*>(v_ptr)

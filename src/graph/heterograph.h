@@ -229,8 +229,8 @@ class HeteroGraph : public BaseHeteroGraph {
   static HeteroGraphPtr AsNumBits(HeteroGraphPtr g, uint8_t bits);
 
   /*! \brief Copy the data to another context */
-  static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DLContext &ctx,
-                               const DGLStreamHandle &stream = nullptr);
+  static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DLContext &ctx);
+
 
   /*!
   * \brief Pin all relation graphs of the current graph.
@@ -250,6 +250,12 @@ class HeteroGraph : public BaseHeteroGraph {
   *       The context check is deferred to unpinning the NDArray.
   */
   void UnpinMemory_();
+
+  /*!
+   * \brief Record stream for this graph.
+   * \param stream The stream that is using the graph
+   */
+  void RecordStream(DGLStreamHandle stream) override;
 
   /*! \brief Copy the data to shared memory.
   *

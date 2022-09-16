@@ -122,13 +122,12 @@ struct COOMatrix {
   }
 
   /*! \brief Return a copy of this matrix on the give device context. */
-  inline COOMatrix CopyTo(const DLContext &ctx,
-                          const DGLStreamHandle &stream = nullptr) const {
+  inline COOMatrix CopyTo(const DLContext &ctx) const {
     if (ctx == row->ctx)
       return *this;
-    return COOMatrix(num_rows, num_cols, row.CopyTo(ctx, stream),
-                     col.CopyTo(ctx, stream),
-                     aten::IsNullArray(data) ? data : data.CopyTo(ctx, stream),
+    return COOMatrix(num_rows, num_cols, row.CopyTo(ctx),
+                     col.CopyTo(ctx),
+                     aten::IsNullArray(data) ? data : data.CopyTo(ctx),
                      row_sorted, col_sorted);
   }
 
@@ -167,6 +166,18 @@ struct COOMatrix {
       data.UnpinMemory_();
     }
     is_pinned = false;
+  }
+
+  /*!
+   * \brief Record stream for the row, col and data (if not Null) of the matrix.
+   * \param stream The stream that is using the graph
+   */
+  inline void RecordStream(DGLStreamHandle stream) const {
+    row.RecordStream(stream);
+    col.RecordStream(stream);
+    if (!aten::IsNullArray(data)) {
+      data.RecordStream(stream);
+    }
   }
 };
 

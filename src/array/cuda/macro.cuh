@@ -46,6 +46,6 @@
     device->FreeWorkspace(ctx, (LHS_OFF));                                     \
     device->FreeWorkspace(ctx, (RHS_OFF));                                     \
   }                                                                            \
-} while (0)                                                 
+} while (0)
 
 #endif

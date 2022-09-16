@@ -352,23 +352,24 @@ void _TestUnitGraph_CopyTo(const DLContext &src_ctx,
   const aten::COOMatrix &coo = COO1<IdType>(src_ctx);
 
   auto device = dgl::runtime::DeviceAPI::Get(dst_ctx);
-  auto stream = device->CreateStream(dst_ctx);
+  // We don't allow SetStream in DGL for now.
+  auto stream = nullptr;
 
   auto g = dgl::UnitGraph::CreateFromCSC(2, csr);
   ASSERT_EQ(g->GetCreatedFormats(), 4);
-  auto cg = dgl::UnitGraph::CopyTo(g, dst_ctx, stream);
+  auto cg = dgl::UnitGraph::CopyTo(g, dst_ctx);
   device->StreamSync(dst_ctx, stream);
   ASSERT_EQ(cg->GetCreatedFormats(), 4);
 
   g = dgl::UnitGraph::CreateFromCSR(2, csr);
   ASSERT_EQ(g->GetCreatedFormats(), 2);
-  cg = dgl::UnitGraph::CopyTo(g, dst_ctx, stream);
+  cg = dgl::UnitGraph::CopyTo(g, dst_ctx);
   device->StreamSync(dst_ctx, stream);
   ASSERT_EQ(cg->GetCreatedFormats(), 2);
 
   g = dgl::UnitGraph::CreateFromCOO(2, coo);
   ASSERT_EQ(g->GetCreatedFormats(), 1);
-  cg = dgl::UnitGraph::CopyTo(g, dst_ctx, stream);
+  cg = dgl::UnitGraph::CopyTo(g, dst_ctx);
   device->StreamSync(dst_ctx, stream);
   ASSERT_EQ(cg->GetCreatedFormats(), 1);
 }

@@ -115,13 +115,12 @@ struct CSRMatrix {
   }
 
   /*! \brief Return a copy of this matrix on the give device context. */
-  inline CSRMatrix CopyTo(const DLContext &ctx,
-                          const DGLStreamHandle &stream = nullptr) const {
+  inline CSRMatrix CopyTo(const DLContext &ctx) const {
     if (ctx == indptr->ctx)
       return *this;
-    return CSRMatrix(num_rows, num_cols, indptr.CopyTo(ctx, stream),
-                     indices.CopyTo(ctx, stream),
-                     aten::IsNullArray(data) ? data : data.CopyTo(ctx, stream),
+    return CSRMatrix(num_rows, num_cols, indptr.CopyTo(ctx),
+                     indices.CopyTo(ctx),
+                     aten::IsNullArray(data) ? data : data.CopyTo(ctx),
                      sorted);
   }
 
@@ -160,6 +159,18 @@ struct CSRMatrix {
       data.UnpinMemory_();
     }
     is_pinned = false;
+  }
+
+  /*!
+   * \brief Record stream for the indptr, indices and data (if not Null) of the matrix.
+   * \param stream The stream that is using the graph
+   */
+  inline void RecordStream(DGLStreamHandle stream) const {
+    indptr.RecordStream(stream);
+    indices.RecordStream(stream);
+    if (!aten::IsNullArray(data)) {
+      data.RecordStream(stream);
+    }
   }
 };
 

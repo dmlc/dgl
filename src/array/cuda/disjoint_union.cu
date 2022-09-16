@@ -84,7 +84,7 @@ void _Merge(IdType** arrs, IdType* prefix, IdType* offset, IdType* out,
 
   device->CopyDataFromTo(
       arrs, 0, arrs_dev, 0, sizeof(IdType*)*n_arrs,
-      DGLContext{kDLCPU, 0}, ctx, dtype, 0);
+      DGLContext{kDLCPU, 0}, ctx, dtype);
 
   CUDA_KERNEL_CALL(_DisjointUnionKernel,
       nb, nt, 0, stream,
@@ -96,7 +96,7 @@ void _Merge(IdType** arrs, IdType* prefix, IdType* offset, IdType* out,
 
 template <DLDeviceType XPU, typename IdType>
 COOMatrix DisjointUnionCoo(const std::vector<COOMatrix>& coos) {
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   auto device = runtime::DeviceAPI::Get(coos[0].row->ctx);
   uint64_t src_offset = 0, dst_offset = 0;
   bool has_data = false;
@@ -129,23 +129,22 @@ COOMatrix DisjointUnionCoo(const std::vector<COOMatrix>& coos) {
 
   auto ctx = coos[0].row->ctx;
   auto dtype = coos[0].row->dtype;
-  auto stream = thr_entry->stream;
 
   IdType n_elements = 0;
   device->CopyDataFromTo(
       &prefix_elm[coos.size()], 0, &n_elements, 0,
       sizeof(IdType), coos[0].row->ctx, DGLContext{kDLCPU, 0},
-      coos[0].row->dtype, 0);
+      coos[0].row->dtype);
 
   device->CopyDataFromTo(
       &prefix_src[coos.size()], 0, &src_offset, 0,
       sizeof(IdType), coos[0].row->ctx, DGLContext{kDLCPU, 0},
-      coos[0].row->dtype, 0);
+      coos[0].row->dtype);
 
   device->CopyDataFromTo(
       &prefix_dst[coos.size()], 0, &dst_offset, 0,
       sizeof(IdType), coos[0].row->ctx, DGLContext{kDLCPU, 0},
-      coos[0].row->dtype, 0);
+      coos[0].row->dtype);
 
   // Union src array
   IdArray result_src = NewIdArray(

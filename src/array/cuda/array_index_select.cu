@@ -15,7 +15,7 @@ namespace impl {
 
 template<DLDeviceType XPU, typename DType, typename IdType>
 NDArray IndexSelect(NDArray array, IdArray index) {
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   const DType* array_data = static_cast<DType*>(array->data);
   const IdType* idx_data = static_cast<IdType*>(index->data);
   const int64_t arr_len = array->shape[0];
@@ -36,7 +36,7 @@ NDArray IndexSelect(NDArray array, IdArray index) {
   if (num_feat == 1) {
       const int nt = cuda::FindNumThreads(len);
       const int nb = (len + nt - 1) / nt;
-      CUDA_KERNEL_CALL(IndexSelectSingleKernel, nb, nt, 0, thr_entry->stream,
+      CUDA_KERNEL_CALL(IndexSelectSingleKernel, nb, nt, 0, stream,
           array_data, idx_data, len, arr_len, ret_data);
   } else {
       dim3 block(256, 1);
@@ -45,7 +45,7 @@ NDArray IndexSelect(NDArray array, IdArray index) {
           block.y *= 2;
       }
       const dim3 grid((len+block.y-1)/block.y);
-      CUDA_KERNEL_CALL(IndexSelectMultiKernel, grid, block, 0, thr_entry->stream,
+      CUDA_KERNEL_CALL(IndexSelectMultiKernel, grid, block, 0, stream,
           array_data, num_feat, idx_data, len, arr_len, ret_data);
   }
   return ret;
@@ -80,7 +80,7 @@ DType IndexSelect(NDArray array, int64_t index) {
   device->CopyDataFromTo(
       static_cast<DType*>(array->data) + index, 0, reinterpret_cast<DType*>(&ret), 0,
       sizeof(DType), array->ctx, DLContext{kDLCPU, 0},
-      array->dtype, nullptr);
+      array->dtype);
   return reinterpret_cast<DType&>(ret);
 }
 

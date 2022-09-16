@@ -311,7 +311,7 @@ class NDArrayBase(_NDArrayBase):
             target = empty(self.shape, self.dtype, target)
         if isinstance(target, NDArrayBase):
             check_call(_LIB.DGLArrayCopyFromTo(
-                self.handle, target.handle, None))
+                self.handle, target.handle))
         else:
             raise ValueError("Unsupported target type %s" % str(type(target)))
         return target
@@ -326,6 +326,19 @@ class NDArrayBase(_NDArrayBase):
         """
         check_call(_LIB.DGLArrayUnpinData(self.handle))
 
+    def record_stream(self, stream):
+        """Record the stream that is using this tensor.
+
+        Note
+        ----
+        This API is more for testing. Users should call ``record_stream``
+        on torch.Tensor or dgl.graph directly.
+
+        Parameters
+        ----------
+        stream : DGLStreamHandle
+        """
+        check_call(_LIB.DGLArrayRecordStream(self.handle, stream))
 
 def free_extension_handle(handle, type_code):
     """Free c++ extension type handle

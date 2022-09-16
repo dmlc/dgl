@@ -235,8 +235,7 @@ NDArray NDArray::FromDLPack(DLManagedTensor* tensor) {
 }
 
 void NDArray::CopyFromTo(DLTensor* from,
-                         DLTensor* to,
-                         DGLStreamHandle stream) {
+                         DLTensor* to) {
   size_t from_size = GetDataSize(*from);
   size_t to_size = GetDataSize(*to);
   CHECK_EQ(from_size, to_size)
@@ -251,10 +250,11 @@ void NDArray::CopyFromTo(DLTensor* from,
   // api manager.
   DGLContext ctx = from->ctx.device_type != kDLCPU ? from->ctx : to->ctx;
 
+  // default: local current cuda stream
   DeviceAPI::Get(ctx)->CopyDataFromTo(
-    from->data, static_cast<size_t>(from->byte_offset),
-    to->data, static_cast<size_t>(to->byte_offset),
-    from_size, from->ctx, to->ctx, from->dtype, stream);
+      from->data, static_cast<size_t>(from->byte_offset),
+      to->data, static_cast<size_t>(to->byte_offset),
+      from_size, from->ctx, to->ctx, from->dtype);
 }
 
 void NDArray::PinContainer(NDArray::Container* ptr) {
@@ -279,6 +279,15 @@ void NDArray::UnpinContainer(NDArray::Container* ptr) {
   ptr->pinned_by_dgl_ = false;
 }
 
+void NDArray::RecordStream(DGLArray* tensor, DGLStreamHandle stream) {
+  TensorDispatcher* td = TensorDispatcher::Global();
+  CHECK(td->IsAvailable()) << "RecordStream only works when TensorAdaptor is available.";
+  CHECK_EQ(tensor->ctx.device_type, kDLGPU)
+    << "RecordStream only works with GPU tensors.";
+
+  td->RecordStream(tensor->data, stream, tensor->ctx.device_id);
+}
+
 template<typename T>
 NDArray NDArray::FromVector(const std::vector<T>& vec, DLContext ctx) {
   const DLDataType dtype = DLDataTypeTraits<T>::dtype;
@@ -292,8 +301,7 @@ NDArray NDArray::FromVector(const std::vector<T>& vec, DLContext ctx) {
       size * sizeof(T),
       DLContext{kDLCPU, 0},
       ctx,
-      dtype,
-      nullptr);
+      dtype);
   return ret;
 }
 
@@ -322,8 +330,7 @@ std::vector<T> NDArray::ToVector() const {
       size * sizeof(T),
       ctx,
       DLContext{kDLCPU, 0},
-      dtype,
-      nullptr);
+      dtype);
   return vec;
 }
 
@@ -471,10 +478,9 @@ int DGLArrayFree(DGLArrayHandle handle) {
 }
 
 int DGLArrayCopyFromTo(DGLArrayHandle from,
-                       DGLArrayHandle to,
-                       DGLStreamHandle stream) {
+                       DGLArrayHandle to) {
   API_BEGIN();
-  NDArray::CopyFromTo(from, to, stream);
+  NDArray::CopyFromTo(from, to);
   API_END();
 }
 
@@ -523,7 +529,7 @@ int DGLArrayCopyFromBytes(DGLArrayHandle handle,
   DeviceAPI::Get(handle->ctx)->CopyDataFromTo(
       data, 0,
       handle->data, static_cast<size_t>(handle->byte_offset),
-      nbytes, cpu_ctx, handle->ctx, handle->dtype, nullptr);
+      nbytes, cpu_ctx, handle->ctx, handle->dtype);
   API_END();
 }
 
@@ -540,7 +546,7 @@ int DGLArrayCopyToBytes(DGLArrayHandle handle,
   DeviceAPI::Get(handle->ctx)->CopyDataFromTo(
       handle->data, static_cast<size_t>(handle->byte_offset),
       data, 0,
-      nbytes, handle->ctx, cpu_ctx, handle->dtype, nullptr);
+      nbytes, handle->ctx, cpu_ctx, handle->dtype);
   API_END();
 }
 
@@ -557,5 +563,11 @@ int DGLArrayUnpinData(DGLArrayHandle handle,
   API_BEGIN();
   auto* nd_container = reinterpret_cast<NDArray::Container*>(handle);
   NDArray::UnpinContainer(nd_container);
+  API_END();
+}
+
+int DGLArrayRecordStream(DGLArrayHandle handle, DGLStreamHandle stream) {
+  API_BEGIN();
+  NDArray::RecordStream(handle, stream);
   API_END();
 }
