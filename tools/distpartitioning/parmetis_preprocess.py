@@ -15,8 +15,16 @@ import pyarrow.csv as csv
 
 def get_proc_info():
     """
-    helper function to get the rank from the
+    Helper function to get the rank from the
     environment when `mpirun` is used to run this python program
+
+    Please note that for mpi(openmpi) installation the rank is retrieved from the 
+    environment using OMPI_COMM_WORLD_RANK and for mpi(standard installation) it is
+    retrieved from the environment using MPI_LOCALRANKID. 
+
+    For retrieving world_size please use OMPI_COMM_WORLD_SIZE or 
+    MPI_WORLDSIZE appropriately as described above to retrieve total no. of 
+    processes, when needed.
 
     Returns:
     --------
@@ -28,7 +36,6 @@ def get_proc_info():
         local_rank = int(os.environ.get('OMPI_COMM_WORLD_RANK') or 0)
     elif 'MPI_LOCALRANKID' in env_variables:
         local_rank = int(os.environ.get('MPI_LOCALRANKID') or 0)
-    #world_size = int(os.environ.get('OMPI_COMM_WORLD_SIZE') or 1)
     return local_rank
 
 
@@ -56,8 +63,7 @@ def gen_edge_files(schema_map, output):
     type_nid_dict, ntype_gnid_offset = get_idranges(schema_map[constants.STR_NODE_TYPE],
                                         schema_map[constants.STR_NUM_NODES_PER_CHUNK])
 
-    #Regenerate edge files here...▒
-    # in the following format....
+    # Regenerate edge files here.
     edge_data = schema_map[constants.STR_EDGES]
     etype_names = schema_map[constants.STR_EDGE_TYPE]
     etype_name_idmap = {e : idx for idx, e in enumerate(etype_names)}
@@ -72,7 +78,7 @@ def gen_edge_files(schema_map, output):
 
         edge_info = etype_info[constants.STR_DATA]
 
-        #edgetype strings are in canonical format, src_node_type:edge_type:dst_node_type
+        # `edgetype` strings are in canonical format, src_node_type:edge_type:dst_node_type
         tokens = etype_name.split(":")
         assert len(tokens) == 3
 
@@ -90,10 +96,6 @@ def gen_edge_files(schema_map, output):
         global_dst_id = data_f1 + ntype_gnid_offset[dst_ntype_name][0, 0]
         cols = [global_src_id, global_dst_id]
         col_names = ["global_src_id", "global_dst_id"]
-        #global_type_eid = np.arange(edge_tids[etype_name][rank][0],\
-        #     edge_tids[etype_name][rank][1] ,dtype=np.int64)
-        #etype_id = etype_name_idmap[etype_name] * \
-        #        np.ones(shape=(data_df['f0'].to_numpy().shape), dtype=np.int64)
 
         out_file = edge_info[rank].split("/")[-1]
         out_file = os.path.join(outdir, 'edges_{}'.format(out_file))
@@ -101,7 +103,6 @@ def gen_edge_files(schema_map, output):
         options.delimiter = " "
 
         csv.write_csv(pyarrow.Table.from_arrays(cols, names=col_names), out_file, options)
-
         edge_files.append(out_file)
 
     return edge_files
@@ -133,8 +134,8 @@ def read_node_features(schema_map, tgt_ntype_name, feat_names):
             for ntype_name, ntype_feature_data in dataset_features.items():
                 if ntype_name != tgt_ntype_name : 
                     continue
-                #ntype_feature_data is a dictionary
-                #where key: feature_name, value: dictionary in which keys are "format", "data"
+                # ntype_feature_data is a dictionary
+                # where key: feature_name, value: dictionary in which keys are "format", "data".
                 for feat_name, feat_data in ntype_feature_data.items():
                     if feat_name in feat_names:
                         my_feat_data_fname = feat_data[constants.STR_DATA][rank]
@@ -193,7 +194,6 @@ def gen_node_weights_files(schema_map, output):
 
         cols = []
         col_names = []
-
         cols.append(pyarrow.array(np.ones(sz, dtype=np.int64) * np.int64(ntype_id)))
         col_names.append("ntype")
 
@@ -204,20 +204,15 @@ def gen_node_weights_files(schema_map, output):
                 cols.append(pyarrow.array(np.zeros(sz, dtype=np.int64)))
             col_names.append("w{}".format(i))
 
-
-        #
-        #Add train/test/validation masks if present. node-degree will be added when this file
-        #is read by ParMETIS to mimic the exisiting single process pipeline present in dgl
-        #
+        # Add train/test/validation masks if present. node-degree will be added when this file
+        # is read by ParMETIS to mimic the exisiting single process pipeline present in dgl.
         node_feats = read_node_features(schema_map,ntype_name, set(["train_mask", "val_mask", "test_mask"]))
         for k, v in node_feats.items():
             assert sz == v.shape
             cols.append(pyarrow.array(v))
             col_names.append(k)
 
-        #
-        #type_nid should be the very last column in the node weights files.
-        #
+        # `type_nid` should be the very last column in the node weights files.
         cols.append(pyarrow.array(np.arange(count, dtype=np.int64) + np.int64(type_start)))
         col_names.append("type_nid")
 
@@ -266,11 +261,11 @@ def gen_parmetis_input_args(params, schema_map):
 
     nfile = open(os.path.join(params.output, 'parmetis_nfiles.txt'), "w")
     for f in node_files:
-        #filename global_node_id_start global_node_id_end(exclusive)
+        # format: filename global_node_id_start global_node_id_end(exclusive)
         nfile.write('{} {} {}\n'.format(f[0], f[1], f[2]))
     nfile.close()
 
-    #Regenerate edge files here...▒
+    #Regenerate edge files here.
     edge_data = schema_map[constants.STR_EDGES]
     edge_files = []
     for etype_name, etype_info in edge_data.items():
