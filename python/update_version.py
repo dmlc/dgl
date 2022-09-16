@@ -21,7 +21,7 @@ def update(file_name, pattern, repl):
     update = []
     hit_counter = 0
     need_update = False
-    for l in open(file_name):
+    for l in open(file_name) :
         result = re.findall(pattern, l)
         if result:
             assert len(result) == 1
@@ -47,8 +47,7 @@ def main():
     curr_dir = os.path.dirname(os.path.abspath(os.path.expanduser(__file__)))
     proj_root = os.path.abspath(os.path.join(curr_dir, ".."))
     # python path
-    update(os.path.join(proj_root, "python", "dgl", "_ffi", "libinfo.py"),
-           r"(?<=__version__ = \")[.0-9a-z]+", __version__)
+    update(os.path.join(proj_root, "python", "dgl", "_ffi", "libinfo.py"), r"(?<=__version__ = \")[.0-9a-z]+", __version__)
     # C++ header
     update(
         os.path.join(
