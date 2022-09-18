@@ -522,6 +522,7 @@ def gen_dist_partitions(rank, world_size, params):
     """
     global_start = timer()
     logging.info(f'[Rank: {rank}] Starting distributed data processing pipeline...')
+    logging.info(f'[Rank: {rank}] Starting distributed data processing pipeline duplicate line...')
 
     #init processing
     schema_map = read_json(os.path.join(params.input_dir, params.schema))
