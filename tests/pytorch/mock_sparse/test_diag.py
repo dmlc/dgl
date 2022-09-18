@@ -5,7 +5,7 @@ import backend as F
 
 from dgl.mock_sparse import diag, identity
 
-@pytest.mark.parametrize('val_shape', [(3), (3, 2)])
+@pytest.mark.parametrize('val_shape', [(3,), (3, 2)])
 @pytest.mark.parametrize('mat_shape', [None, (3, 5), (5, 3)])
 def test_diag(val_shape, mat_shape):
     # creation
