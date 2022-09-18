@@ -49,6 +49,21 @@ class DiagMatrix:
         -------
         DiagMatrix
             Diagonal matrix
+
+        Examples
+        --------
+
+        >>> import torch
+        >>> val = torch.ones(5)
+        >>> mat = diag(val)
+        >>> print(mat)
+        DiagMatrix(val=tensor([1., 1., 1., 1., 1.]),
+                   shape=(5, 5))
+        >>> val = torch.ones(5) + 1
+        >>> mat = mat(val)
+        >>> print(mat)
+        DiagMatrix(val=tensor([2., 2., 2., 2., 2.]),
+                   shape=(5, 5))
         """
         return diag(x, self.shape)
 
@@ -97,9 +112,14 @@ class DiagMatrix:
         -------
 
         >>> import torch
-        >>> val = torch.randn(5)
+        >>> val = torch.ones(5)
         >>> mat = diag(val)
         >>> sp_mat = mat.as_sparse()
+        >>> print(sp_mat)
+        SparseMatrix(indices=tensor([[0, 1, 2, 3, 4],
+                                     [0, 1, 2, 3, 4]]),
+                     values=tensor([1., 1., 1., 1., 1.]),
+                     shape=(5, 5), nnz=5)
         """
         row = col = torch.arange(len(self.val)).to(self.device)
         return create_from_coo(row, col, self.val, self.shape)
@@ -126,8 +146,11 @@ def diag(val: torch.Tensor, shape: Optional[Tuple[int, int]] = None) -> DiagMatr
     Case1: 5-by-5 diagonal matrix with scaler values on the diagonal
 
     >>> import torch
-    >>> val = torch.randn(5)
+    >>> val = torch.ones(5)
     >>> mat = diag(val)
+    >>> print(mat)
+    DiagMatrix(val=tensor([1., 1., 1., 1., 1.]),
+               shape=(5, 5))
     >>> mat.shape
     (5, 5)
     >>> mat.nnz
@@ -135,8 +158,11 @@ def diag(val: torch.Tensor, shape: Optional[Tuple[int, int]] = None) -> DiagMatr
 
     Case2: 5-by-10 diagonal matrix with scaler values on the diagonal
 
-    >>> val = torch.randn(5)
+    >>> val = torch.ones(5)
     >>> mat = diag(val, shape=(5, 10))
+    >>> print(mat)
+    DiagMatrix(val=tensor([1., 1., 1., 1., 1.]),
+               shape=(5, 10))
     >>> mat.shape
     (5, 10)
     >>> mat.nnz
@@ -187,6 +213,9 @@ def identity(shape: Tuple[int, int],
      [0, 0, 1]]
 
     >>> mat = identity(shape=(3, 3))
+    >>> print(mat)
+    DiagMatrix(val=tensor([1., 1., 1.]),
+               shape=(3, 3))
     >>> mat.val
     tensor([1., 1., 1.])
     >>> mat.shape
@@ -201,6 +230,9 @@ def identity(shape: Tuple[int, int],
      [0, 0, 1, 0, 0]]
 
     >>> mat = identity(shape=(3, 5))
+    >>> print(mat)
+    DiagMatrix(val=tensor([1., 1., 1.]),
+               shape=(3, 5))
     >>> mat.val
     tensor([1., 1., 1.])
     >>> mat.shape
