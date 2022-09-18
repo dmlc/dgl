@@ -254,7 +254,7 @@ def identity(shape: Tuple[int, int],
     """
     len_val = min(shape)
     if d is None:
-        val_shape = (len_val)
+        val_shape = (len_val,)
     else:
         val_shape = (len_val, d)
     val = torch.ones(val_shape, dtype=dtype, device=device)

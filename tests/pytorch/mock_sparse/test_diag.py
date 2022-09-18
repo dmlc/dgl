@@ -3,7 +3,7 @@ import torch
 
 import backend as F
 
-from dgl.mock_sparse import diag, identity
+from dgl.mock_sparse import diag, identity, DiagMatrix
 
 @pytest.mark.parametrize('val_shape', [(3,), (3, 2)])
 @pytest.mark.parametrize('mat_shape', [None, (3, 5), (5, 3)])
@@ -16,7 +16,7 @@ def test_diag(val_shape, mat_shape):
     assert torch.allclose(mat.val, val)
     if mat_shape is None:
         mat_shape = (len(val_shape), len(val_shape))
-    assert torch.allclose(mat.shape, mat_shape)
+    assert mat.shape == mat_shape
 
     # __call__
     val = torch.randn(val_shape).to(F.ctx())
