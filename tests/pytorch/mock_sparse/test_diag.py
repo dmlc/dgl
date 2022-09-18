@@ -15,7 +15,7 @@ def test_diag(val_shape, mat_shape):
     # val, shape attributes
     assert torch.allclose(mat.val, val)
     if mat_shape is None:
-        mat_shape = (len(val_shape), len(val_shape))
+        mat_shape = (val_shape[0], val_shape[0])
     assert mat.shape == mat_shape
 
     # __call__
