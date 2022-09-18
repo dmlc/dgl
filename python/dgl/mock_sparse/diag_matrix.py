@@ -1,7 +1,7 @@
-import math
-import torch
-
+"""dgl diagonal matrix module."""
 from typing import Optional, Tuple
+
+import torch
 
 from .sp_matrix import SparseMatrix, create_from_coo
 
@@ -122,7 +122,7 @@ class DiagMatrix:
                      shape=(5, 5), nnz=5)
         """
         row = col = torch.arange(len(self.val)).to(self.device)
-        return create_from_coo(row, col, self.val, self.shape)
+        return create_from_coo(row=row, col=col, val=self.val, shape=self.shape)
 
 def diag(val: torch.Tensor, shape: Optional[Tuple[int, int]] = None) -> DiagMatrix:
     """Create a diagonal matrix based on the diagonal values
