@@ -149,9 +149,10 @@ def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=No
 
 DGLHeteroGraph.sample_etype_neighbors = utils.alias_func(sample_etype_neighbors)
 
-def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
-                     copy_ndata=True, copy_edata=True, _dist_training=False,
-                     exclude_edges=None, output_device=None):
+def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, mask=None,
+                     replace=False, copy_ndata=True, copy_edata=True,
+                     _dist_training=False, exclude_edges=None,
+                     output_device=None):
     """Sample neighboring edges of the given nodes and return the induced subgraph.
 
     For each node, a number of inbound (or outbound when ``edge_dir == 'out'``) edges
@@ -194,6 +195,11 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
         The features must be non-negative floats, and the sum of the features of
         inbound/outbound edges for every node must be positive (though they don't have
         to sum up to one).  Otherwise, the result will be undefined.
+    mask : str, optional
+        Feature name used as the boolean mask associated with each neighboring
+        edge of a node.  The feature must have only one element for each edge
+        and must be boolean.  An edge will be eligible for picking only if the
+        corresponding mask is True.
     exclude_edges: tensor or dict
         Edge IDs to exclude during sampling neighbors for the seed nodes.
 
@@ -238,9 +244,11 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
 
     >>> g = dgl.graph(([0, 0, 1, 1, 2, 2], [1, 2, 0, 1, 2, 0]))
 
-    And the weights
+    And the weights and masks
 
     >>> g.edata['prob'] = torch.FloatTensor([0., 1., 0., 1., 0., 1.])
+    >>> g.edata['mask'] = torch.FloatTensor(
+    ...     [False, True, False, True, False, True])
 
     To sample one inbound edge for node 0 and node 1:
 
@@ -290,20 +298,36 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
     """
     if F.device_type(g.device) == 'cpu' and not g.is_pinned():
         frontier = _sample_neighbors(
-            g, nodes, fanout, edge_dir=edge_dir, prob=prob, replace=replace,
-            copy_ndata=copy_ndata, copy_edata=copy_edata, exclude_edges=exclude_edges)
+            g, nodes, fanout, edge_dir=edge_dir, prob=prob, mask=mask,
+            replace=replace, copy_ndata=copy_ndata, copy_edata=copy_edata,
+            exclude_edges=exclude_edges)
     else:
         frontier = _sample_neighbors(
-            g, nodes, fanout, edge_dir=edge_dir, prob=prob, replace=replace,
-            copy_ndata=copy_ndata, copy_edata=copy_edata)
+            g, nodes, fanout, edge_dir=edge_dir, prob=prob, mask=mask,
+            replace=replace, copy_ndata=copy_ndata, copy_edata=copy_edata)
         if exclude_edges is not None:
             eid_excluder = EidExcluder(exclude_edges)
             frontier = eid_excluder(frontier)
     return frontier if output_device is None else frontier.to(output_device)
 
-def _sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
-                      copy_ndata=True, copy_edata=True, _dist_training=False,
-                      exclude_edges=None):
+def _prepare_edge_array(g, arg):
+    if isinstance(arg, list) and len(arg) > 0 and \
+            isinstance(arg[0], nd.NDArray):
+        return arg
+    elif arg is None:
+        return [nd.array([], ctx=nd.cpu())] * len(g.etypes)
+    else:
+        arrays = []
+        for etype in g.canonical_etypes:
+            if prob in g.edges[etype].data:
+                arrays.append(F.to_dgl_nd(g.edges[etype].data[arg]))
+            else:
+                arrays.append(ndarray([], ctx=nd.cpu()))
+        return arrays
+
+def _sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, mask=None,
+                      replace=False, copy_ndata=True, copy_edata=True,
+                      _dist_training=False, exclude_edges=None):
     if not isinstance(nodes, dict):
         if len(g.ntypes) > 1:
             raise DGLError("Must specify node type when the graph is not homogeneous.")
@@ -337,18 +361,8 @@ def _sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
                 fanout_array[g.get_etype_id(etype)] = value
         fanout_array = F.to_dgl_nd(F.tensor(fanout_array, dtype=F.int64))
 
-    if isinstance(prob, list) and len(prob) > 0 and \
-            isinstance(prob[0], nd.NDArray):
-        prob_arrays = prob
-    elif prob is None:
-        prob_arrays = [nd.array([], ctx=nd.cpu())] * len(g.etypes)
-    else:
-        prob_arrays = []
-        for etype in g.canonical_etypes:
-            if prob in g.edges[etype].data:
-                prob_arrays.append(F.to_dgl_nd(g.edges[etype].data[prob]))
-            else:
-                prob_arrays.append(nd.array([], ctx=nd.cpu()))
+    prob_arrays = _prepare_edge_array(g, prob)
+    mask_arrays = _prepare_mask_array(g, mask)
 
     excluded_edges_all_t = []
     if exclude_edges is not None:
@@ -363,8 +377,9 @@ def _sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False,
             else:
                 excluded_edges_all_t.append(nd.array([], ctx=ctx))
 
-    subgidx = _CAPI_DGLSampleNeighbors(g._graph, nodes_all_types, fanout_array,
-                                       edge_dir, prob_arrays, excluded_edges_all_t, replace)
+    subgidx = _CAPI_DGLSampleNeighbors(
+            g._graph, nodes_all_types, fanout_array, edge_dir, prob_arrays,
+            mask_arrays, excluded_edges_all_t, replace)
     induced_edges = subgidx.induced_edges
     ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
 
