@@ -158,8 +158,6 @@ struct cusparse_idtype<int64_t> {
 /*! \brief Thread local workspace */
 class CUDAThreadEntry {
  public:
-  /*! \brief The cuda stream */
-  cudaStream_t stream{nullptr};
   /*! \brief The cusparse handler */
   cusparseHandle_t cusparse_handle{nullptr};
   /*! \brief The cublas handler */
@@ -173,6 +171,9 @@ class CUDAThreadEntry {
   // get the threadlocal workspace
   static CUDAThreadEntry* ThreadLocal();
 };
+
+/*! \brief Get the current CUDA stream */
+cudaStream_t getCurrentCUDAStream();
 }  // namespace runtime
 }  // namespace dgl
 #endif  // DGL_RUNTIME_CUDA_CUDA_COMMON_H_

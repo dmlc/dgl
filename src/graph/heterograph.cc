@@ -276,6 +276,11 @@ void HeteroGraph::UnpinMemory_() {
     g->UnpinMemory_();
 }
 
+void HeteroGraph::RecordStream(DGLStreamHandle stream) {
+  for (auto g : relation_graphs_)
+    g->RecordStream(stream);
+}
+
 std::string HeteroGraph::SharedMemName() const {
   return shared_mem_ ? shared_mem_->GetName() : "";
 }

@@ -228,6 +228,12 @@ class UnitGraph : public BaseHeteroGraph {
   */
   void UnpinMemory_();
 
+  /*!
+   * \brief Record stream for this graph.
+   * \param stream The stream that is using the graph
+   */
+  void RecordStream(DGLStreamHandle stream) override;
+
   /*! 
    * \brief Create in-edge CSR format of the unit graph.
    * \param inplace if true and the in-edge CSR format does not exist, the created
@@ -375,6 +381,8 @@ class UnitGraph : public BaseHeteroGraph {
    * \brief Storage format restriction.
    */
   dgl_format_code_t formats_;
+  /*! \brief which streams have recorded the graph */
+  std::vector<DGLStreamHandle> recorded_streams;
 };
 
 };  // namespace dgl
