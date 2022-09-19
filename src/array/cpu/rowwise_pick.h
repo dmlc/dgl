@@ -46,6 +46,10 @@ using PickFn = std::function<void(
 
 // User-defined function for determining the number of picks for one row.
 //
+// The result will be passed as the argument \a num_picks in the picking
+// function with type \a PickFn<IdxType>.  Note that the result has to be
+// non-negative.
+//
 // The column indices of the given row are stored in
 //   [col + off, col + off + len)
 //
@@ -96,7 +100,7 @@ using RangePickFn = std::function<void(
 // OpenMP parallelization on rows because each row performs computation independently.
 template <typename IdxType>
 CSRMatrix CSRRowWisePickPartial(
-    CSRMatrix mat, IdArray rows, int64_t max_num_picks, bool replace,
+    CSRMatrix mat, IdArray rows, int64_t max_num_picks,
     PickFn<IdxType> pick_fn, NumPicksFn<IdxType> num_picks_fn) {
   using namespace aten;
   const IdxType* indptr = mat.indptr.Ptr<IdxType>();
@@ -192,10 +196,10 @@ CSRMatrix CSRRowWisePickPartial(
 
 template <typename IdxType>
 COOMatrix CSRRowWisePick(
-    CSRMatrix mat, IdArray rows, int64_t max_num_picks, bool replace,
+    CSRMatrix mat, IdArray rows, int64_t max_num_picks,
     PickFn<IdxType> pick_fn, NumPicksFn<IdxType> num_picks_fn) {
   CSRMatrix csr = CSRRowWisePickPartial(
-      mat, rows, max_num_picks, replace, pick_fn, num_picks_fn);
+      mat, rows, max_num_picks, pick_fn, num_picks_fn);
   IdArray picked_rows = IdArray::Empty(
       {csr.indices->shape[0]}, csr.indices->dtype, csr.indices->ctx);
   IdxType* picked_rows_data = picked_rows.Ptr<IdxType>();
@@ -364,11 +368,11 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows, IdArray etypes,
 // row-wise pick on the CSR matrix and rectifies the returned results.
 template <typename IdxType>
 COOMatrix COORowWisePick(COOMatrix mat, IdArray rows,
-                         int64_t num_picks, bool replace, PickFn<IdxType> pick_fn) {
+                         int64_t num_picks, PickFn<IdxType> pick_fn) {
   using namespace aten;
   const auto& csr = COOToCSR(COOSliceRows(mat, rows));
   const IdArray new_rows = Range(0, rows->shape[0], rows->dtype.bits, rows->ctx);
-  const auto& picked = CSRRowWisePick<IdxType>(csr, new_rows, num_picks, replace, pick_fn);
+  const auto& picked = CSRRowWisePick<IdxType>(csr, new_rows, num_picks, pick_fn);
   return COOMatrix(mat.num_rows, mat.num_cols,
                    IndexSelect(rows, picked.row),  // map the row index to the correct one
                    picked.col,

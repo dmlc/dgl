@@ -14,9 +14,35 @@ __all__ = [
     'sample_neighbors_biased',
     'select_topk']
 
-def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=None,
-                           replace=False, copy_ndata=True, copy_edata=True, etype_sorted=False,
-                           _dist_training=False, output_device=None):
+def _prepare_edge_array(g, arg):
+    if arg is None:
+        return nd.array([], ctx=nd.cpu())
+    elif isinstance(arg, nd.NDArray):
+        return arg
+    elif arg in g.edata:
+        return F.to_dgl_nd(g.edata[arg])
+    else:
+        return nd.array([], ctx=nd.cpu())
+
+def _prepare_edge_arrays(g, arg):
+    if isinstance(arg, list) and len(arg) > 0 and \
+            isinstance(arg[0], nd.NDArray):
+        return arg
+    elif arg is None:
+        return [nd.array([], ctx=nd.cpu())] * len(g.etypes)
+    else:
+        arrays = []
+        for etype in g.canonical_etypes:
+            if prob in g.edges[etype].data:
+                arrays.append(F.to_dgl_nd(g.edges[etype].data[arg]))
+            else:
+                arrays.append(ndarray([], ctx=nd.cpu()))
+        return arrays
+
+def sample_etype_neighbors(
+        g, nodes, etype_field, fanout, edge_dir='in', prob=None, mask=None,
+        replace=False, copy_ndata=True, copy_edata=True, etype_sorted=False,
+        _dist_training=False, output_device=None):
     """Sample neighboring edges of the given nodes and return the induced subgraph.
 
     For each node, a number of inbound (or outbound when ``edge_dir == 'out'``) edges
@@ -54,6 +80,11 @@ def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=No
         The features must be non-negative floats, and the sum of the features of
         inbound/outbound edges for every node must be positive (though they don't have
         to sum up to one).  Otherwise, the result will be undefined.
+    mask : str, optional
+        Feature name used as the boolean mask associated with each neighboring
+        edge of a node.  The feature must have only one element for each edge
+        and must be boolean.  An edge will be eligible for picking only if the
+        corresponding mask is True.
     replace : bool, optional
         If True, sample with replacement.
     copy_ndata: bool, optional
@@ -113,18 +144,12 @@ def sample_etype_neighbors(g, nodes, etype_field, fanout, edge_dir='in', prob=No
     etypes = F.to_dgl_nd(F.astype(g.edata[etype_field], ty=F.int32))
     fanout = F.to_dgl_nd(fanout)
 
-    if prob is None:
-        prob_array = nd.array([], ctx=nd.cpu())
-    elif isinstance(prob, nd.NDArray):
-        prob_array = prob
-    else:
-        if prob in g.edata:
-            prob_array = F.to_dgl_nd(g.edata[prob])
-        else:
-            prob_array = F.to_dgl_nd(F.tensor(prob, dtype=F.float32))
+    prob_array = _prepare_edge_array(g, prob)
+    mask_array = _prepare_edge_array(g, mask)
 
-    subgidx = _CAPI_DGLSampleNeighborsEType(g._graph, nodes, etypes, fanout,
-                                            edge_dir, prob_array, replace, etype_sorted)
+    subgidx = _CAPI_DGLSampleNeighborsEType(
+            g._graph, nodes, etypes, fanout, edge_dir, prob_array, mask_array,
+            replace, etype_sorted)
     induced_edges = subgidx.induced_edges
     ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
 
@@ -310,21 +335,6 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, mask=None,
             frontier = eid_excluder(frontier)
     return frontier if output_device is None else frontier.to(output_device)
 
-def _prepare_edge_array(g, arg):
-    if isinstance(arg, list) and len(arg) > 0 and \
-            isinstance(arg[0], nd.NDArray):
-        return arg
-    elif arg is None:
-        return [nd.array([], ctx=nd.cpu())] * len(g.etypes)
-    else:
-        arrays = []
-        for etype in g.canonical_etypes:
-            if prob in g.edges[etype].data:
-                arrays.append(F.to_dgl_nd(g.edges[etype].data[arg]))
-            else:
-                arrays.append(ndarray([], ctx=nd.cpu()))
-        return arrays
-
 def _sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, mask=None,
                       replace=False, copy_ndata=True, copy_edata=True,
                       _dist_training=False, exclude_edges=None):
@@ -361,8 +371,8 @@ def _sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, mask=None,
                 fanout_array[g.get_etype_id(etype)] = value
         fanout_array = F.to_dgl_nd(F.tensor(fanout_array, dtype=F.int64))
 
-    prob_arrays = _prepare_edge_array(g, prob)
-    mask_arrays = _prepare_mask_array(g, mask)
+    prob_arrays = _prepare_edge_arrays(g, prob)
+    mask_arrays = _prepare_edge_arrays(g, mask)
 
     excluded_edges_all_t = []
     if exclude_edges is not None:
