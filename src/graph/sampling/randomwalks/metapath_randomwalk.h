@@ -51,7 +51,7 @@ using TerminatePredicate = std::function<bool(IdxType *, dgl_id_t, int64_t)>;
  * \return A tuple of ID of next successor (-1 if not exist), the last traversed edge
  *         ID, as well as whether to terminate.
  */
-template<DLDeviceType XPU, typename IdxType>
+template<DGLDeviceType XPU, typename IdxType>
 std::tuple<dgl_id_t, dgl_id_t, bool> MetapathRandomWalkStep(
     IdxType *data,
     dgl_id_t curr,
@@ -119,7 +119,7 @@ std::tuple<dgl_id_t, dgl_id_t, bool> MetapathRandomWalkStep(
  * \return A pair of ID of next successor (-1 if not exist), as well as whether to terminate.
  * \note This function is called only if all the probability arrays are null.
  */
-template<DLDeviceType XPU, typename IdxType>
+template<DGLDeviceType XPU, typename IdxType>
 std::tuple<dgl_id_t, dgl_id_t, bool> MetapathRandomWalkStepUniform(
     IdxType *data,
     dgl_id_t curr,
@@ -167,7 +167,7 @@ std::tuple<dgl_id_t, dgl_id_t, bool> MetapathRandomWalkStepUniform(
  * \return A 2D array of shape (len(seeds), len(metapath) + 1) with node IDs, and
  *         A 2D array of shape (len(seeds), len(metapath)) with edge IDs.
  */
-template<DLDeviceType XPU, typename IdxType>
+template<DGLDeviceType XPU, typename IdxType>
 std::pair<IdArray, IdArray> MetapathBasedRandomWalk(
     const HeteroGraphPtr hg,
     const IdArray seeds,

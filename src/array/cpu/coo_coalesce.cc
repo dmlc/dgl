@@ -13,7 +13,7 @@ namespace aten {
 
 namespace impl {
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
   const int64_t nnz = coo.row->shape[0];
   const IdType* coo_row_data = static_cast<IdType*>(coo.row->data);
@@ -44,8 +44,8 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
   return std::make_pair(coo_result, NDArray::FromVector(count));
 }
 
-template std::pair<COOMatrix, IdArray> COOCoalesce<kDLCPU, int32_t>(COOMatrix);
-template std::pair<COOMatrix, IdArray> COOCoalesce<kDLCPU, int64_t>(COOMatrix);
+template std::pair<COOMatrix, IdArray> COOCoalesce<kDGLCPU, int32_t>(COOMatrix);
+template std::pair<COOMatrix, IdArray> COOCoalesce<kDGLCPU, int64_t>(COOMatrix);
 
 };  // namespace impl
 };  // namespace aten

@@ -7,9 +7,9 @@
 #define DGL_ARRAY_CUDA_UTILS_H_
 
 #include <dmlc/logging.h>
+#include <dgl/runtime/c_runtime_api.h>
 #include <dgl/runtime/device_api.h>
 #include <dgl/runtime/ndarray.h>
-#include <dlpack/dlpack.h>
 #include "../../runtime/cuda/cuda_common.h"
 
 namespace dgl {
@@ -115,7 +115,7 @@ __device__ __forceinline__ T _ldg(T* addr) {
  * \param ctx Device context.
  * \return True if all the flags are true.
  */
-bool AllTrue(int8_t* flags, int64_t length, const DLContext& ctx);
+bool AllTrue(int8_t* flags, int64_t length, const DGLContext& ctx);
 
 /*!
  * \brief CUDA Kernel of filling the vector started from ptr of size length
@@ -135,10 +135,10 @@ __global__ void _FillKernel(DType* ptr, size_t length, DType val) {
 /*! \brief Fill the vector started from ptr of size length with val */
 template <typename DType>
 void _Fill(DType* ptr, size_t length, DType val) {
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   int nt = FindNumThreads(length);
   int nb = (length + nt - 1) / nt;  // on x-axis, no need to worry about upperbound.
-  CUDA_KERNEL_CALL(cuda::_FillKernel, nb, nt, 0, thr_entry->stream, ptr, length, val);
+  CUDA_KERNEL_CALL(cuda::_FillKernel, nb, nt, 0, stream, ptr, length, val);
 }
 
 /*!
@@ -187,18 +187,16 @@ __global__ void _LinearSearchKernel(
 template <typename DType>
 inline DType GetCUDAScalar(
     runtime::DeviceAPI* device_api,
-    DLContext ctx,
-    const DType* cuda_ptr,
-    cudaStream_t stream) {
+    DGLContext ctx,
+    const DType* cuda_ptr) {
   DType result;
   device_api->CopyDataFromTo(
       cuda_ptr, 0,
       &result, 0,
       sizeof(result),
       ctx,
-      DLContext{kDLCPU, 0},
-      DLDataTypeTraits<DType>::dtype,
-      stream);
+      DGLContext{kDGLCPU, 0},
+      DGLDataTypeTraits<DType>::dtype);
   return result;
 }
 
