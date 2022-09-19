@@ -126,6 +126,10 @@ CSRMatrix CSRRowWisePickPartial(
   const int num_threads = omp_get_max_threads();
   std::vector<int64_t> global_prefix(num_threads+1, 0);
 
+  // NOTE: Not using two runtime::parallel_for to save the overhead of launching two
+  // OpenMP thread groups.
+  // We should benchmark the overhead of launching two OpenMP thread groups and compare
+  // with the implementation here.
 #pragma omp parallel num_threads(num_threads)
   {
     const int thread_id = omp_get_thread_num();
@@ -134,7 +138,7 @@ CSRMatrix CSRRowWisePickPartial(
         std::min(static_cast<int64_t>(thread_id), num_rows % num_threads);
     const int64_t end_i = (thread_id + 1) * (num_rows/num_threads) +
         std::min(static_cast<int64_t>(thread_id + 1), num_rows % num_threads);
-    assert(thread_id + 1 < num_threads || end_i == num_rows);
+    BUG_IF_FAIL(thread_id + 1 < num_threads || end_i == num_rows);
 
     // Part 1: determine the number of picks for each row as well as the indptr to return.
     const int64_t num_local = end_i - start_i;
@@ -395,6 +399,137 @@ COOMatrix COORowWisePerEtypePick(COOMatrix mat, IdArray rows, IdArray etypes,
                    IndexSelect(rows, picked.row),  // map the row index to the correct one
                    picked.col,
                    picked.data);
+}
+
+// Template for picking non-zero values row-wise. The implementation utilizes
+// OpenMP parallelization on rows because each row performs computation independently.
+template <typename IdxType, typename EType>
+CSRMatrix CSRRowWisePerEtypePickUnsorted(
+    CSRMatrix mat, IdArray rows, IdArray etypes,
+    const std::vector<int64_t>& max_num_picks, RangePickFn<IdxType> pick_fn) {
+  using namespace aten;
+  const DLDataType idtype = DLDataTypeTraits<IdxType>::dtype;
+  const DLDataType etype_idtype = DLDataTypeTraits<EType>::dtype;
+  const IdxType* indptr = mat.indptr.Ptr<IdxType>();
+  const IdxType* indices = mat.indices.Ptr<IdxType>();
+  const IdxType* data = CSRHasData(mat)? mat.data.Ptr<IdxType>() : nullptr;
+  const IdxType* rows_data = rows.Ptr<IdxType>();
+  const EType* etype_data = etypes.Ptr<EType>();
+  const int64_t num_rows = rows->shape[0];
+  const auto& ctx = mat.indptr->ctx;
+  const int64_t num_etypes = num_picks.size();
+  const int64_t total_max_num_picks = std::accumulate(
+      max_num_picks.begin(), max_num_picks.end(), 0L);
+  const int num_threads = omp_get_max_threads();
+
+  // preallocate the results
+  IdArray picked_row_indptr = NDArray::Empty({num_rows + 1}, idtype, ctx);
+  IdArray picked_col = NDArray::Empty({num_rows * total_max_num_picks}, idtype, ctx);
+  IdArray picked_idx = NDArray::Empty({num_rows * total_max_num_picks}, idtype, ctx);
+  IdxType* picked_row_indptr_data = picked_row_indptr.Ptr<IdxType>();
+  IdxType* picked_cdata = picked_col.Ptr<IdxType>();
+  IdxType* picked_idata = picked_idx.Ptr<IdxType>();
+
+  // the offset of incident edges with a given type
+  IdArray off_etypes_per_row = NDArray::Empty(
+      {num_rows * num_etypes + 1}, idtype, ctx);
+  IdxType* off_etypes_per_row_data = off_etypes_per_row.Ptr<IdxType>();
+
+  // the number of picks for each edge type at each row
+  IdArray off_picks_per_etype_row = NDArray::Empty(
+      {num_rows * num_etypes + 1}, idtype, ctx);
+  IdxType* off_picks_per_etype_row_data = off_picks_per_etype_row.Ptr<IdxType>();
+
+  // Determine the size of the sorted edge type index array
+  IdArray et_idx_indptr = NDArray::Empty({num_rows + 1}, idtype, ctx);
+  IdxType* et_idx_indptr_data = et_idx_indptr.Ptr<IdxType>();
+  et_idx_indptr[0] = 0;
+  for (IdxType i = 0; i < num_rows; ++i) {
+    const IdxType rid = rows_data[i];
+    const IdxType len = indptr[rid + 1] - indptr[rid];
+    et_idx_indptr[i + 1] = et_idx_indptr[i] + len;
+  }
+  // Pre-allocate the argsort array of the edge type IDs.
+  IdArray et_idx = NDArray::Empty({et_idx_indptr[num_rows]}, idtype, ctx);
+  IdxType* et_idx_data = et_idx.Ptr<IdxType>();
+
+  // NOTE: Not using two runtime::parallel_for to save the overhead of launching two
+  // OpenMP thread groups.
+  // We should benchmark the overhead of launching two OpenMP thread groups and compare
+  // with the implementation here.
+#pragma omp parallel num_threads(num_threads)
+  {
+    const int thread_id = omp_get_thread_num();
+    const int64_t start_i = thread_id * (num_rows/num_threads) +
+        std::min(static_cast<int64_t>(thread_id), num_rows % num_threads);
+    const int64_t end_i = (thread_id + 1) * (num_rows/num_threads) +
+        std::min(static_cast<int64_t>(thread_id + 1), num_rows % num_threads);
+    BUG_IF_FAIL(thread_id + 1 < num_threads || end_i == num_rows);
+
+    // Part 1: sort edge type IDs per node if necessary
+    for (int64_t i = start_i; i < end_i; ++i) {
+      const IdxType rid = rows_data[i];
+      std::iota(
+          et_idx_data + et_idx_indptr_data[i],
+          et_idx_data + et_idx_indptr_data[i + 1],
+          indptr[rid]);
+      std::sort(
+          et_idx_data + et_idx_indptr_data[i],
+          et_idx_data + et_idx_indptr_data[i + 1],
+          [&etype_data](IdxType i1, IdxType i2) {
+            return etype_data[i1] < etype_data[i2];
+          });
+    }
+
+    // Part 2: determine the number of incident edges with the same edge type per node
+    for (int64_t i = start_i; i < end_i; ++i) {
+      const IdxType rid = rows_data[i];
+      for (int64_t j = et_idx_indptr_data[i]; j < et_idx_indptr_data[i + 1]; ++j) {
+        const IdxType et = etype_data[et_idx_data[j]];
+        CHECK_LT(et, num_etypes) << "Length of fanout list is " << num_etypes
+          << " but found edge type ID " << et << " that is larger.";
+        ++off_etypes_per_row_data[i * num_etypes + et + 1];
+      }
+    }
+
+#pragma omp barrier
+#pragma omp master
+    {
+      off_etypes_per_row_data[0] = 0;
+      for (int64_t i = 0; i < num_rows * num_etypes; ++i)
+        off_etypes_per_row_data[i + 1] += off_etypes_per_row_data[i];
+    }
+#pragma omp barrier
+
+    // Part 3: determine the number of picks for each row and each edge type as well
+    // as the indptr to return.
+    const int64_t num_local = end_i - start_i;
+    for (int64_t i = start_i; i < end_i; ++i) {
+      const int64_t local_i = i - start_i;
+      const IdxType rid = rows_data[i];
+      const IdxType off = indptr[rid];
+      const IdxType len = indptr[rid + 1] - off;
+      int64_t prev_j = off;
+      for (int64_t et = 0; et < num_etypes; ++et) {
+        const IdxType num_picks = num_picks_fn(
+            rid, off, len, et, indices, data,
+            et_idx_data + off_etypes_per_row_data[i * num_etypes + et]);
+        off_picks_per_etype_row[i * num_etypes + et + 1] = num_picks;
+      }
+    }
+
+#pragma omp barrier
+#pragma omp master
+    {
+      off_picks_per_etype_row[0] = 0;
+      for (int64_t i = 0; i < num_rows * num_etypes; ++i)
+        off_picks_per_etype_row[i + 1] += off_picks_per_etype_row[i];
+    }
+#pragma omp barrier
+
+    // Part 4: pick the neighbors
+    // TODO
+  }
 }
 
 }  // namespace impl
