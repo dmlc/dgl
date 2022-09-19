@@ -71,9 +71,9 @@ class HeteroGraphIndex(ObjectBase):
         """
         return _CAPI_DGLHeteroGetMetaGraph(self)
 
-    def is_unibipartite(self):
+    def is_metagraph_unibipartite(self):
         """Return whether or not the graph is unibiparite."""
-        return _CAPI_DGLHeteroIsUniBipartite(self)
+        return _CAPI_DGLHeteroIsMetaGraphUniBipartite(self)
 
     def number_of_ntypes(self):
         """Return number of node types."""

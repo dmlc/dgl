@@ -106,7 +106,7 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetMetaGraph")
     *rv = hg->meta_graph();
   });
 
-DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroIsUniBipartite")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroIsMetaGraphUniBipartite")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     GraphPtr mg = hg->meta_graph();

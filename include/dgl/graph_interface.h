@@ -150,7 +150,7 @@ class GraphInterface : public runtime::Object {
   virtual bool IsMultigraph() const = 0;
 
   /*!
-   * \return whetehr the graph is unibipartite
+   * \return whether the graph is unibipartite
    */
   virtual bool IsUniBipartite() const {
     EdgeArray edges = Edges();
