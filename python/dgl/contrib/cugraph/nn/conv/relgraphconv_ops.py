@@ -36,8 +36,8 @@ class RelGraphConvFunc(th.autograd.Function):
             Tensor of the edge types.
 
         coeff : torch.Tensor, dtype=torch.float32, requires_grad=True
-            Coefficient matrix in basis-decomposition for regularization, shape: (num_rels, num_bases).
-            It should be set to ``None`` when ``regularizer=None``.
+            Coefficient matrix in basis-decomposition for regularization,
+            shape: (num_rels, num_bases). It should be set to ``None`` when ``regularizer=None``.
 
         feat : torch.Tensor, dtype=torch.float32, requires_grad=True
             Input feature, shape: (num_src_nodes, in_feat).
@@ -65,7 +65,7 @@ class RelGraphConvFunc(th.autograd.Function):
             agg_fwd_func = agg_hg_basis_post_fwd_int64
         else:
             raise TypeError(
-                f'Supported ID type: torch.int32 or torch.int64 , but got {g.idtype}')
+                f'Supported ID type: torch.int32 or torch.int64, but got {g.idtype}')
         ctx.graph_idtype = g.idtype
 
         _in_feat = feat.shape[-1]
@@ -119,7 +119,7 @@ class RelGraphConvFunc(th.autograd.Function):
             agg_bwd_func = agg_hg_basis_post_bwd_int64
         else:
             raise TypeError(
-                f'Supported ID type: torch.int32 or torch.int64 , but got {g.idtype}')
+                f'Supported ID type: torch.int32 or torch.int64, but got {ctx.graph_idtype}')
 
         # dense backward
         _out_feat = W.shape[-1]
@@ -140,11 +140,12 @@ class RelGraphConvFunc(th.autograd.Function):
         return None, None, None, None, None, None, g_in, g_W.view_as(W), g_coeff
 
 class RelGraphConvOps(nn.Module):
-    """ Relational graph convolution layer that provides same interface as `dgl.nn.pytorch.conv.relgraph`. """
+    """ Relational graph convolution layer. """
     def __init__(self,
                  in_feat,
                  out_feat,
                  num_rels,
+                 fanout,
                  regularizer=None,
                  num_bases=None,
                  bias=True,
@@ -156,6 +157,7 @@ class RelGraphConvOps(nn.Module):
         self.in_feat = in_feat
         self.out_feat = out_feat
         self.num_rels = num_rels
+        self.fanout = fanout
 
         # regularizer (see dgl.nn.pytorch.linear.TypedLinear)
         if regularizer is None:
@@ -212,9 +214,8 @@ class RelGraphConvOps(nn.Module):
             g.srcdata['h'] = feat
             if norm is not None:
                 g.edata['norm'] = norm
-            fanout = g.in_degrees().max().item()
             # message passing
-            h = RelGraphConvFunc.apply(g, fanout, self.num_rels,
+            h = RelGraphConvFunc.apply(g, self.fanout, self.num_rels,
                                        g.dstdata['ntype'], g.srcdata['ntype'], etypes,
                                        feat, self.W, self.coeff)
             # apply bias and activation

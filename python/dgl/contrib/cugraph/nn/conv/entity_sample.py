@@ -11,13 +11,13 @@ from dgl.dataloading import MultiLayerNeighborSampler, DataLoader
 from dgl.contrib.cugraph.nn import RelGraphConvOps
 
 class RGCN(nn.Module):
-    def __init__(self, num_nodes, h_dim, out_dim, num_rels, num_bases):
+    def __init__(self, num_nodes, h_dim, out_dim, num_rels, num_bases, fanouts):
         super().__init__()
         self.emb = nn.Embedding(num_nodes, h_dim)
         # two-layer RGCN
-        self.conv1 = RelGraphConvOps(h_dim, h_dim, num_rels,
+        self.conv1 = RelGraphConvOps(h_dim, h_dim, num_rels, fanouts[0],
                                      regularizer='basis', num_bases=num_bases, self_loop=False)
-        self.conv2 = RelGraphConvOps(h_dim, out_dim, num_rels,
+        self.conv2 = RelGraphConvOps(h_dim, out_dim, num_rels, fanouts[1],
                                      regularizer='basis', num_bases=num_bases, self_loop=False)
 
     def forward(self, g):
@@ -117,7 +117,7 @@ if __name__ == '__main__':
     h_dim = 16  # hidden feature dim
     num_classes = data.num_classes
     num_bases = 20
-    model = RGCN(g.num_nodes(), h_dim, num_classes, num_rels, num_bases)
+    model = RGCN(g.num_nodes(), h_dim, num_classes, num_rels, num_bases, fanouts)
     model = model.to(device)
 
     optimizer = th.optim.Adam(model.parameters(), lr=1e-2, weight_decay=5e-4)
@@ -142,7 +142,8 @@ if __name__ == '__main__':
     # evaluation
     # note: when sampling all neighbors on a large graph for the test dataset, the required shared
     # memory on GPU may exceed the hardware limit. Reduce the fanout numbers if necessary.
-    test_sampler = MultiLayerNeighborSampler([500, 500]) # -1 for sampling all neighbors
+    # test_sampler = MultiLayerNeighborSampler([500, 500]) # -1 for sampling all neighbors
+    test_sampler = MultiLayerNeighborSampler(fanouts)
     test_loader = DataLoader(g, target_idx[test_idx].type(g.idtype), test_sampler, device=device,
                              batch_size=32, shuffle=False)
     acc = evaluate(model, labels, test_loader, inv_target)
