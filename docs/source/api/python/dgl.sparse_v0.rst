@@ -14,3 +14,10 @@ Sparse matrix class
 
 .. autoclass:: SparseMatrix
 	:members:
+
+Sparse operators
+----------------
+dgl.mock_sparse.sddmm
+---------------------
+.. currentmodule:: dgl.mock_sparse
+.. autofunction:: sddmm
