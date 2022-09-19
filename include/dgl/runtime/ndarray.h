@@ -63,7 +63,7 @@ namespace runtime {
 /*!
  * \brief DLPack converter.
  */
-struct DLPackConverter;
+struct DLPackConvert;
 
 /*!
  * \brief Managed NDArray.
@@ -340,7 +340,7 @@ class NDArray {
   Container* data_{nullptr};
   // enable internal functions
   friend struct Internal;
-  friend struct DLPackConverter;
+  friend struct DLPackConvert;
   friend class DGLRetValue;
   friend class DGLArgsSetter;
 };
@@ -415,7 +415,7 @@ struct NDArray::Container {
   }
 
  private:
-  friend struct DLPackConverter;
+  friend struct DLPackConvert;
   friend class NDArray;
   friend class RPCWrappedFunc;
   /*!

@@ -8,7 +8,7 @@
 
 #ifdef USE_TVM
 #include <featgraph.h>
-#include <dgl/runtime/dl_converter.h>
+#include <dgl/runtime/dlpack_convert.h>
 #endif  // USE_TVM
 
 #include "kernel_decl.h"
@@ -831,11 +831,11 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_FG_SDDMMTreeReduction")
     //     {"U_data", "E_data", "V_data"});
     COOMatrix coo = graph.sptr()->GetCOOMatrix(0);
     dgl::featgraph::SDDMMTreeReduction(
-      DLPackConverter::ToDLPack(coo.row),
-      DLPackConverter::ToDLPack(coo.col),
-      DLPackConverter::ToDLPack(lhs),
-      DLPackConverter::ToDLPack(rhs),
-      DLPackConverter::ToDLPack(out));
+      DLPackConvert::ToDLPack(coo.row),
+      DLPackConvert::ToDLPack(coo.col),
+      DLPackConvert::ToDLPack(lhs),
+      DLPackConvert::ToDLPack(rhs),
+      DLPackConvert::ToDLPack(out));
   });
 #endif  // USE_TVM
 

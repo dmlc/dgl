@@ -1,10 +1,10 @@
 /*!
  *  Copyright (c) 2022 by Contributors
- * \file include/dgl/runtime/dl_converter.h
- * \brief DLPack converter.
+ * \file include/dgl/runtime/dlpack_convert.h
+ * \brief Conversion between NDArray and DLPack.
  */
-#ifndef DGL_RUNTIME_DL_CONVERTER_H_
-#define DGL_RUNTIME_DL_CONVERTER_H_
+#ifndef DGL_RUNTIME_DLPACK_CONVERT_H_
+#define DGL_RUNTIME_DLPACK_CONVERT_H_
 
 #include "c_runtime_api.h"
 #include "ndarray.h"
@@ -14,7 +14,7 @@ struct DLManagedTensor;
 namespace dgl {
 namespace runtime {
 
-struct DLPackConverter {
+struct DLPackConvert {
   /*!
    * \brief Create a DGL NDArray from a DLPack tensor.
    *
@@ -82,4 +82,4 @@ DGL_DLL int DGLArrayToDLPack(DGLArrayHandle from, DLManagedTensor** out,
 #ifdef __cplusplus
 }  // DGL_EXTERN_C
 #endif
-#endif  // DGL_RUNTIME_DL_CONVERTER_H_
+#endif  // DGL_RUNTIME_DLPACK_CONVERT_H_

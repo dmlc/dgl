@@ -1,9 +1,9 @@
 /*!
  *  Copyright (c) 2022 by Contributors
- * \file src/runtime/dl_converter.cc
- * \brief DLPack converter.
+ * \file src/runtime/dlpack_convert.cc
+ * \brief Conversion between NDArray and DLPack.
  */
-#include <dgl/runtime/dl_converter.h>
+#include <dgl/runtime/dlpack_convert.h>
 
 #include <dlpack/dlpack.h>
 #include <dgl/runtime/ndarray.h>
@@ -52,9 +52,9 @@ inline DLDataType ToDLDataType(const DGLDataType& src) {
   return ret;
 }
 
-NDArray DLPackConverter::FromDLPack(DLManagedTensor* tensor) {
+NDArray DLPackConvert::FromDLPack(DLManagedTensor* tensor) {
   NDArray::Container* data = new NDArray::Container();
-  data->deleter = DLPackConverter::DLPackDeleter;
+  data->deleter = DLPackConvert::DLPackDeleter;
   data->manager_ctx = tensor;
   data->dl_tensor.data = tensor->dl_tensor.data;
   data->dl_tensor.ctx = ToDGLContext(tensor->dl_tensor.device);
@@ -67,7 +67,7 @@ NDArray DLPackConverter::FromDLPack(DLManagedTensor* tensor) {
   return NDArray(data);
 }
 
-void DLPackConverter::DLPackDeleter(NDArray::Container* ptr) {
+void DLPackConvert::DLPackDeleter(NDArray::Container* ptr) {
   // if the array is pinned by dgl, unpin it before freeing
   if (ptr->pinned_by_dgl_)
     NDArray::UnpinContainer(ptr);
@@ -95,7 +95,7 @@ DLManagedTensor* ContainerToDLPack(NDArray::Container* from) {
   return ret;
 }
 
-DLManagedTensor* DLPackConverter::ToDLPack(const NDArray &from) {
+DLManagedTensor* DLPackConvert::ToDLPack(const NDArray &from) {
   return ContainerToDLPack(from.data_);
 }
 
@@ -116,7 +116,7 @@ inline bool IsAligned(const void* ptr, std::uintptr_t alignment) noexcept {
 int DGLArrayFromDLPack(DLManagedTensor* from,
                        DGLArrayHandle* out) {
   API_BEGIN();
-  *out = NDArray::Internal::MoveAsDGLArray(DLPackConverter::FromDLPack(from));
+  *out = NDArray::Internal::MoveAsDGLArray(DLPackConvert::FromDLPack(from));
   API_END();
 }
 
@@ -130,7 +130,7 @@ int DGLArrayToDLPack(DGLArrayHandle from, DLManagedTensor** out,
     std::vector<int64_t> shape_vec(nd->shape, nd->shape + nd->ndim);
     NDArray copy_ndarray = NDArray::Empty(shape_vec, nd->dtype, nd->ctx);
     copy_ndarray.CopyFrom(nd);
-    *out = DLPackConverter::ToDLPack(copy_ndarray);
+    *out = DLPackConvert::ToDLPack(copy_ndarray);
   } else {
     *out = ContainerToDLPack(nd_container);
   }

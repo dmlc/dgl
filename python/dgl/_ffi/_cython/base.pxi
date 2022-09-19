@@ -119,7 +119,7 @@ cdef extern from "dgl/runtime/c_object_api.h":
                          int* out_type_code,
                          int* out_success)
 
-cdef extern from "dgl/runtime/dl_converter.h":
+cdef extern from "dgl/runtime/dlpack_convert.h":
     int DGLArrayFromDLPack(DLManagedTensor* arr_from,
                            DGLArrayHandle* out)
     int DGLArrayToDLPack(DGLArrayHandle arr_from,
