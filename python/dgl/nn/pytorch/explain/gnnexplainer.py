@@ -430,6 +430,7 @@ class GNNExplainer(nn.Module):
 class HeteroGNNExplainer(nn.Module):
     r"""GNNExplainer model from `GNNExplainer: Generating Explanations for
     Graph Neural Networks <https://arxiv.org/abs/1903.03894>`__, adapted for heterogeneous graphs
+
     It identifies compact subgraph structures and small subsets of node features that play a
     critical role in GNN-based node classification and graph classification.
 
@@ -508,20 +509,20 @@ class HeteroGNNExplainer(nn.Module):
         graph : DGLGraph
             Input graph.
         feat : dict[str, Tensor]
-            The dictionary associates input node features(values) with
+            The dictionary that associates input node features(values) with
             the respective node types(keys) present in the graph.
 
         Returns
         -------
-        feat_masks : Dictionary of Tensor
+        feat_masks : dict[str, Tensor]
             Dictionary of { ntypes: features }
-            The dictionary associates the feature masks(values) with
+            The dictionary that associates the feature masks(values) with
             the respective node types(keys).
             Feature mask of shape :math:`(1, D_t)`, where :math:`D_t`
             is the feature size for node type :math:`t`.
-        edge_masks : Dictionary of Tensor
+        edge_masks : dict[tuple[str], Tensor]
             Dictionary of { canonical_etypes: features }
-            The dictionary associates the edge masks(values) with
+            The dictionary that associates the edge masks(values) with
             the respective canonical edge types(keys).
             Edge mask of shape :math:`(E)`, where :math:`E` is the
             number of edges.
@@ -529,12 +530,9 @@ class HeteroGNNExplainer(nn.Module):
         device = graph.device
         feat_masks = {}
         for node_type, feature in feat.items():
-            if len(feature.size()) == 1:
-                feat_masks[node_type] = nn.Parameter(torch.zeros(1, 1, device=device))
-            else:
-                std = 0.1
-                num_nodes, feat_size = feature.size()
-                feat_masks[node_type] = nn.Parameter(torch.randn(1, feat_size, device=device) * std)
+            std = 0.1
+            num_nodes, feat_size = feature.size()
+            feat_masks[node_type] = nn.Parameter(torch.randn(1, feat_size, device=device) * std)
 
         edge_masks = {}
         for canonical_etype in graph.canonical_etypes:
@@ -555,15 +553,15 @@ class HeteroGNNExplainer(nn.Module):
         ----------
         loss : Tensor
             Loss value.
-        feat_mask : Dictionary of Tensor
+        feat_masks : Dictionary of Tensor
             Dictionary of { ntypes: features }
-            The dictionary associates the feature masks(values) with
+            The dictionary that associates the feature masks(values) with
             the respective node types(keys).
             Feature mask of shape :math:`(1, D)`, where :math:`D`
             is the feature size.
-        edge_mask : Dictionary of Tensor
+        edge_masks : dict[tuple[str], Tensor]
             Dictionary of { canonical_etypes: features }
-            The dictionary associates the edge masks(values) with
+            The dictionary that associates the edge masks(values) with
             the respective canonical edge types(keys).
             Edge mask of shape :math:`(E)`, where :math:`E`
             is the number of edges.
@@ -606,14 +604,13 @@ class HeteroGNNExplainer(nn.Module):
         ntype : str
             The model makes prediction for the nodes with the
             specified node type.
-
         node_id : int
             The ID of the node to explain.
         graph : DGLGraph
             A heterogeneous graph.
-        feat : Dictionary of Tensor
+        feat : dict[str, Tensor]
             Dictionary of { ntypes: features }
-            The dictionary associates input node features(values) with
+            The dictionary that associates input node features(values) with
             the respective node types(keys) present in the graph.
             The input feature of shape :math:`(N, D)`. :math:`N` is the
             number of nodes, and :math:`D` is the feature size.
@@ -628,16 +625,16 @@ class HeteroGNNExplainer(nn.Module):
             The new ID of the input center node.
         sg : DGLGraph
             The subgraph induced on the k-hop in-neighborhood of the center node.
-        feat_mask : Dictionary of Tensor
+        feat_mask : dict[str, Tensor]
             Dictionary of { ntypes: features }
-            The dictionary associates the feature masks(values) with
+            The dictionary that associates the feature masks(values) with
             the respective node types(keys).
             Learned feature importance mask of shape :math:`(D)`, where :math:`D` is the
             feature size. The values are within range :math:`(0, 1)`.
             The higher, the more important.
-        edge_mask : Dictionary of Tensor
+        edge_mask : dict[Tuple[Tensor], Tensor]
             Dictionary of { canonical_etypes: features }
-            The dictionary associates the edge masks(values) with
+            The dictionary that associates the edge masks(values) with
             the respective canonical edge types(keys).
             Learned importance mask of the edges in the subgraph, which is a tensor
             of shape :math:`(E)`, where :math:`E` is the number of edges in the
@@ -789,9 +786,9 @@ class HeteroGNNExplainer(nn.Module):
         ----------
         graph : DGLGraph
             A heterogeneous graph.
-        feat : Dictionary of Tensor
+        feat : dict[str, Tensor]
             Dictionary of { ntypes: features }
-            The dictionary associates input node features(values) with
+            The dictionary that associates input node features(values) with
             the respective node types(keys) present in the graph.
             The input feature of shape :math:`(N, D)`. :math:`N` is the
             number of nodes, and :math:`D` is the feature size.
@@ -802,16 +799,16 @@ class HeteroGNNExplainer(nn.Module):
 
         Returns
         -------
-        feat_mask : Dictionary of Tensor
+        feat_mask : dict[str, Tensor]
             Dictionary of { ntypes: features }
-            The dictionary associates the feature masks(values) with
+            The dictionary that associates the feature masks(values) with
             the respective node types(keys).
             Learned feature importance mask of shape :math:`(D)`, where :math:`D` is the
             feature size. The values are within range :math:`(0, 1)`.
             The higher, the more important.
-        edge_mask : Dictionary of Tensor
+        edge_mask : dict[Tuple[str], Tensor]
             Dictionary of { canonical_etypes: features }
-            The dictionary associates the edge masks(values) with
+            The dictionary that  associates the edge masks(values) with
             the respective canonical edge types(keys).
             Learned importance mask of the edges in the graph, which is a tensor
             of shape :math:`(E)`, where :math:`E` is the number of edges in the
@@ -822,7 +819,7 @@ class HeteroGNNExplainer(nn.Module):
 
         # Get the initial prediction.
         with torch.no_grad():
-            logits = self.model(graph, feat, **kwargs)
+            logits = self.model(graph=graph, feat=feat, **kwargs)
             pred_label = logits.argmax(dim=-1)
 
         feat_mask, edge_mask = self._init_masks(graph, feat)
@@ -842,7 +839,7 @@ class HeteroGNNExplainer(nn.Module):
             eweight = {}
             for canonical_etype in edge_mask.keys():
                 eweight[canonical_etype] = edge_mask[canonical_etype].sigmoid()
-            logits = self.model(graph, h, 
+            logits = self.model(graph=graph, feat=h,
                                 eweight=eweight, **kwargs)
             log_probs = logits.log_softmax(dim=-1)
             loss = -log_probs[0, pred_label[0]]
