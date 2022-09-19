@@ -53,17 +53,17 @@ class EdgeBatch(object):
         >>> # Copy features from source nodes to edges.
         >>> g.apply_edges(edge_udf)
         >>> g.edata['src']
-        >>> tensor([[1.],
-        >>>         [1.],
-        >>>         [1.]])
+        tensor([[1.],
+                [1.],
+                [1.]])
 
         >>> # Use edge UDF in message passing, which is equivalent to
         >>> # dgl.function.copy_u.
         >>> import dgl.function as fn
         >>> g.update_all(edge_udf, fn.sum('src', 'h'))
         >>> g.ndata['h']
-        >>> tensor([[1.],
-        >>>         [2.]])
+        tensor([[1.],
+                [2.]])
         """
         return self._src_data
 
@@ -92,16 +92,16 @@ class EdgeBatch(object):
         >>> # Copy features from destination nodes to edges.
         >>> g.apply_edges(edge_udf)
         >>> g.edata['dst']
-        >>> tensor([[1.],
-        >>>         [1.],
-        >>>         [1.]])
+        tensor([[1.],
+                [1.],
+                [1.]])
 
         >>> # Use edge UDF in message passing.
         >>> import dgl.function as fn
         >>> g.update_all(edge_udf, fn.sum('dst', 'h'))
         >>> g.ndata['h']
-        >>> tensor([[0.],
-        >>>         [2.]])
+        tensor([[0.],
+                [2.]])
         """
         return self._dst_data
 
@@ -129,17 +129,17 @@ class EdgeBatch(object):
         >>> # Make a copy of the feature with name 'data'.
         >>> g.apply_edges(edge_udf)
         >>> g.edata['data']
-        >>> tensor([[1.],
-        >>>         [1.],
-        >>>         [1.]])
+        tensor([[1.],
+                [1.],
+                [1.]])
 
         >>> # Use edge UDF in message passing, which is equivalent to
         >>> # dgl.function.copy_e.
         >>> import dgl.function as fn
         >>> g.update_all(edge_udf, fn.sum('data', 'h'))
         >>> g.ndata['h']
-        >>> tensor([[1.],
-        >>>         [2.]])
+        tensor([[1.],
+                [2.]])
         """
         return self._edge_data
 
@@ -209,16 +209,16 @@ class EdgeBatch(object):
         >>> # Creates a feature 'h'.
         >>> g.apply_edges(edge_udf)
         >>> g.edata['h']
-        >>> tensor([[1.],
-        >>>         [1.],
-        >>>         [1.]])
+        tensor([[1.],
+                [1.],
+                [1.]])
 
         >>> # Use edge UDF in message passing.
         >>> import dgl.function as fn
         >>> g.update_all(edge_udf, fn.sum('h', 'h'))
         >>> g.ndata['h']
-        >>> tensor([[1.],
-        >>>         [2.]])
+        tensor([[1.],
+                [2.]])
         """
         return len(self._eid)
 
@@ -290,8 +290,8 @@ class NodeBatch(object):
         >>> import dgl.function as fn
         >>> g.update_all(fn.copy_u('h', 'm'), node_udf)
         >>> g.ndata['h']
-        >>> tensor([[2.],
-        >>>         [3.]])
+        tensor([[2.],
+                [3.]])
         """
         return self._data
 
@@ -323,8 +323,8 @@ class NodeBatch(object):
         >>> import dgl.function as fn
         >>> g.update_all(fn.copy_u('h', 'm'), node_udf)
         >>> g.ndata['h']
-        >>> tensor([[2.],
-        >>>         [3.]])
+        tensor([[2.],
+                [3.]])
         """
         return self._msgs
 
@@ -362,8 +362,8 @@ class NodeBatch(object):
         >>> import dgl.function as fn
         >>> g.update_all(fn.copy_u('h', 'm'), node_udf)
         >>> g.ndata['h']
-        >>> tensor([[1.],
-        >>>         [3.]])
+        tensor([[1.],
+                [3.]])
         """
         return self._nodes
 
@@ -395,8 +395,8 @@ class NodeBatch(object):
         >>> import dgl.function as fn
         >>> g.update_all(fn.copy_u('h', 'm'), node_udf)
         >>> g.ndata['h']
-        >>> tensor([[2.],
-        >>>         [3.]])
+        tensor([[2.],
+                [3.]])
         """
         return len(self._nodes)
 
