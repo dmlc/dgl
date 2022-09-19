@@ -768,7 +768,7 @@ DGL_REGISTER_GLOBAL("heterograph._CAPI_DGLFindSrcDstNtypes")
     std::unordered_set<int64_t> dst_set;
     std::unordered_set<int64_t> src_set;
 
-    for (int64_t eid = 0; eid < metagraph->NumEdges(); ++eid) {
+    for (uint64_t eid = 0; eid < metagraph->NumEdges(); ++eid) {
       auto edge = metagraph->FindEdge(eid);
       auto src = edge.first;
       auto dst = edge.second;
@@ -778,16 +778,16 @@ DGL_REGISTER_GLOBAL("heterograph._CAPI_DGLFindSrcDstNtypes")
 
     List<Value> srclist, dstlist;
     List<List<Value>> ret_list;
-    for (int64_t nid = 0; nid < metagraph->NumVertices(); ++nid) {
+    for (uint64_t nid = 0; nid < metagraph->NumVertices(); ++nid) {
       auto is_dst = dst_set.count(nid);
       auto is_src = src_set.count(nid);
       if (is_dst && is_src)
         return;
       else if (is_dst)
-        dstlist.push_back(Value(MakeValue(nid)));
+        dstlist.push_back(Value(MakeValue(static_cast<int64_t>(nid))));
       else
         // If a node type is isolated, put it in srctype as defined in the Python docstring.
-        srclist.push_back(Value(MakeValue(nid)));
+        srclist.push_back(Value(MakeValue(static_cast<int64_t>(nid))));
     }
     ret_list.push_back(srclist);
     ret_list.push_back(dstlist);
