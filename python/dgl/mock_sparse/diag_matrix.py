@@ -26,9 +26,8 @@ class DiagMatrix:
     def __init__(self, val: torch.Tensor, shape: Optional[Tuple[int, int]] = None):
         len_val = len(val)
         if shape is not None:
-            assert len_val == min(shape), 'Expect len(val) to be min(shape), got '\
-                                          '{} for len(val) and {} for shape.'.format(
-                                            len_val, shape)
+            assert len_val == min(shape), f'Expect len(val) to be min(shape), got '\
+                                          '{len_val} for len(val) and {shape} for shape.'
         else:
             shape = (len_val, len_val)
         self.val = val
