@@ -18,7 +18,7 @@ namespace array {
 
 namespace {
 
-cudaStream_t cudaStream = runtime::CUDAThreadEntry::ThreadLocal()->stream;
+cudaStream_t cudaStream = runtime::getCurrentCUDAStream();
 
 template<typename IdType, bool include>
 __global__ void _IsInKernel(
@@ -99,13 +99,13 @@ IdArray _PerformFilter(
     device->FreeWorkspace(ctx, workspace);
   }
 
-  // copy number using the internal stream CUDAThreadEntry::ThreadLocal()->stream;
+  // copy number using the internal current stream;
   IdType num_unique;
   device->CopyDataFromTo(prefix+size, 0,
       &num_unique, 0,
       sizeof(num_unique),
       ctx,
-      DGLContext{kDLCPU, 0},
+      DGLContext{kDGLCPU, 0},
       test->dtype);
 
   // insert items into set
@@ -150,13 +150,13 @@ class CudaFilterSet : public Filter {
 
 }  // namespace
 
-template<DLDeviceType XPU, typename IdType>
+template<DGLDeviceType XPU, typename IdType>
 FilterRef CreateSetFilter(IdArray set) {
   return FilterRef(std::make_shared<CudaFilterSet<IdType>>(set));
 }
 
-template FilterRef CreateSetFilter<kDLGPU, int32_t>(IdArray set);
-template FilterRef CreateSetFilter<kDLGPU, int64_t>(IdArray set);
+template FilterRef CreateSetFilter<kDGLCUDA, int32_t>(IdArray set);
+template FilterRef CreateSetFilter<kDGLCUDA, int64_t>(IdArray set);
 
 }  // namespace array
 }  // namespace dgl

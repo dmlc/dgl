@@ -240,15 +240,14 @@ __global__ void _CSRRowWiseSampleUniformReplaceKernel(
 
 ///////////////////////////// CSR sampling //////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
                                     IdArray rows,
                                     const int64_t num_picks,
                                     const bool replace) {
   const auto& ctx = rows->ctx;
   auto device = runtime::DeviceAPI::Get(ctx);
-
-  cudaStream_t stream = runtime::CUDAThreadEntry::ThreadLocal()->stream;
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
 
   const int64_t num_rows = rows->shape[0];
   const IdType * const slice_rows = static_cast<const IdType*>(rows->data);
@@ -308,11 +307,11 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
   // TODO(dlasalle): use pinned memory to overlap with the actual sampling, and wait on
   // a cudaevent
   IdType new_len;
-  // copy using the internal stream: CUDAThreadEntry::ThreadLocal->stream
+  // copy using the internal current stream
   device->CopyDataFromTo(out_ptr, num_rows * sizeof(new_len), &new_len, 0,
       sizeof(new_len),
       ctx,
-      DGLContext{kDLCPU, 0},
+      DGLContext{kDGLCPU, 0},
       mat.indptr->dtype);
   CUDA_CALL(cudaEventRecord(copyEvent, stream));
 
@@ -370,9 +369,9 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
       picked_col, picked_idx);
 }
 
-template COOMatrix CSRRowWiseSamplingUniform<kDLGPU, int32_t>(
+template COOMatrix CSRRowWiseSamplingUniform<kDGLCUDA, int32_t>(
     CSRMatrix, IdArray, int64_t, bool);
-template COOMatrix CSRRowWiseSamplingUniform<kDLGPU, int64_t>(
+template COOMatrix CSRRowWiseSamplingUniform<kDGLCUDA, int64_t>(
     CSRMatrix, IdArray, int64_t, bool);
 
 }  // namespace impl

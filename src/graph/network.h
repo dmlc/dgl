@@ -25,8 +25,8 @@ namespace network {
  * \brief Create NDArray from raw data
  */
 NDArray CreateNDArrayFromRaw(std::vector<int64_t> shape,
-                             DLDataType dtype,
-                             DLContext ctx,
+                             DGLDataType dtype,
+                             DGLContext ctx,
                              void* raw);
 
 /*!
@@ -145,7 +145,7 @@ class ArrayMeta {
   /*!
    * \brief DataType for each NDArray
    */
-  std::vector<DLDataType> data_type_;
+  std::vector<DGLDataType> data_type_;
 
   /*!
    * \brief We first write the ndim to data_shape_ 

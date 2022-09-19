@@ -305,7 +305,7 @@ def _await_or_return(x):
 def _record_stream(x, stream):
     if stream is None:
         return x
-    if isinstance(x, torch.Tensor):
+    if hasattr(x, 'record_stream'):
         x.record_stream(stream)
         return x
     elif isinstance(x, _PrefetchedGraphFeatures):
@@ -335,9 +335,7 @@ def _prefetch(batch, dataloader, stream):
         feats = recursive_apply(batch, _prefetch_for, dataloader)
         feats = recursive_apply(feats, _await_or_return)
         feats = recursive_apply(feats, _record_stream, current_stream)
-        # transfer input nodes/seed nodes
-        # TODO(Xin): sampled subgraph is transferred in the default stream
-        # because heterograph doesn't support .record_stream() for now
+        # transfer input nodes/seed nodes/subgraphs
         batch = recursive_apply(batch, lambda x: x.to(dataloader.device, non_blocking=True))
         batch = recursive_apply(batch, _record_stream, current_stream)
     stream_event = stream.record_event() if stream is not None else None

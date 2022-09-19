@@ -54,7 +54,7 @@ public:
   ~FrequencyHashmap();
   using EdgeItem = typename DeviceEdgeHashmap<IdxType>::EdgeItem;
   std::tuple<IdArray, IdArray, IdArray> Topk(
-      const IdxType *src_data, const IdxType *dst_data, DLDataType dtype,
+      const IdxType *src_data, const IdxType *dst_data, DGLDataType dtype,
       const int64_t num_edges, const int64_t num_edges_per_node,
       const int64_t num_pick);
 private:

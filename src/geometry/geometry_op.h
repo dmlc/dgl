@@ -12,7 +12,7 @@ namespace dgl {
 namespace geometry {
 namespace impl {
 
-template <DLDeviceType XPU, typename FloatType, typename IdType>
+template <DGLDeviceType XPU, typename FloatType, typename IdType>
 void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_points,
     NDArray dist, IdArray start_idx, IdArray result);
 
@@ -21,7 +21,7 @@ void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_poin
  * picking an unmarked vertex and matching it with one its unmarked neighbors
  * (that maximizes its edge weight) until no match can be done.
  */
-template <DLDeviceType XPU, typename FloatType, typename IdType>
+template <DGLDeviceType XPU, typename FloatType, typename IdType>
 void WeightedNeighborMatching(const aten::CSRMatrix &csr, const NDArray weight, IdArray result);
 
 /*! \brief Implementation of neighbor matching process of edge coarsening used
@@ -29,7 +29,7 @@ void WeightedNeighborMatching(const aten::CSRMatrix &csr, const NDArray weight, 
  * picking an unmarked vertex and matching it with one its unmarked neighbors
  * (that maximizes its edge weight) until no match can be done.
  */
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 void NeighborMatching(const aten::CSRMatrix &csr, IdArray result);
 
 }  // namespace impl

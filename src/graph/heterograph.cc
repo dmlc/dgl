@@ -252,7 +252,7 @@ HeteroGraphPtr HeteroGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
                                         hgindex->num_verts_per_type_));
 }
 
-HeteroGraphPtr HeteroGraph::CopyTo(HeteroGraphPtr g, const DLContext &ctx) {
+HeteroGraphPtr HeteroGraph::CopyTo(HeteroGraphPtr g, const DGLContext &ctx) {
   if (ctx == g->Context()) {
     return g;
   }
@@ -274,6 +274,11 @@ void HeteroGraph::PinMemory_() {
 void HeteroGraph::UnpinMemory_() {
   for (auto g : relation_graphs_)
     g->UnpinMemory_();
+}
+
+void HeteroGraph::RecordStream(DGLStreamHandle stream) {
+  for (auto g : relation_graphs_)
+    g->RecordStream(stream);
 }
 
 std::string HeteroGraph::SharedMemName() const {
