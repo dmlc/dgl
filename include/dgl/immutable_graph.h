@@ -69,7 +69,7 @@ class CSR : public GraphInterface {
     LOG(FATAL) << "CSR graph does not allow mutation.";
   }
 
-  DLContext Context() const override {
+  DGLContext Context() const override {
     return adj_.indptr->ctx;
   }
 
@@ -214,7 +214,7 @@ class CSR : public GraphInterface {
    * \param ctx The target context.
    * \return The graph under another context.
    */
-  CSR CopyTo(const DLContext& ctx) const;
+  CSR CopyTo(const DGLContext& ctx) const;
 
   /*!
    * \brief Copy data to shared memory.
@@ -288,7 +288,7 @@ class COO : public GraphInterface {
     LOG(FATAL) << "COO graph does not allow mutation.";
   }
 
-  DLContext Context() const override {
+  DGLContext Context() const override {
     return adj_.row->ctx;
   }
 
@@ -472,7 +472,7 @@ class COO : public GraphInterface {
    * \param ctx The target context.
    * \return The graph under another context.
    */
-  COO CopyTo(const DLContext& ctx) const;
+  COO CopyTo(const DGLContext& ctx) const;
 
   /*!
    * \brief Copy data to shared memory.
@@ -578,7 +578,7 @@ class ImmutableGraph: public GraphInterface {
     LOG(FATAL) << "Clear isn't supported in ImmutableGraph";
   }
 
-  DLContext Context() const override {
+  DGLContext Context() const override {
     return AnyGraph()->Context();
   }
 
@@ -925,7 +925,7 @@ class ImmutableGraph: public GraphInterface {
    * \param ctx The target context.
    * \return The graph under another context.
    */
-  static ImmutableGraphPtr CopyTo(ImmutableGraphPtr g, const DLContext& ctx);
+  static ImmutableGraphPtr CopyTo(ImmutableGraphPtr g, const DGLContext& ctx);
 
   /*!
    * \brief Copy data to shared memory.

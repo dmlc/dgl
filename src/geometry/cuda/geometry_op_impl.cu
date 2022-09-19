@@ -89,10 +89,10 @@ __global__ void fps_kernel(const FloatType *array_data, const int64_t batch_size
   }
 }
 
-template <DLDeviceType XPU, typename FloatType, typename IdType>
+template <DGLDeviceType XPU, typename FloatType, typename IdType>
 void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_points,
     NDArray dist, IdArray start_idx, IdArray result) {
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
 
   const FloatType* array_data = static_cast<FloatType*>(array->data);
 
@@ -110,21 +110,21 @@ void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_poin
   CUDA_CALL(cudaSetDevice(array->ctx.device_id));
 
   CUDA_KERNEL_CALL(fps_kernel,
-      batch_size, THREADS, 0, thr_entry->stream,
+      batch_size, THREADS, 0, stream,
       array_data, batch_size, sample_points,
       point_in_batch, dim, start_idx_data, dist_data, ret_data);
 }
 
-template void FarthestPointSampler<kDLGPU, float, int32_t>(
+template void FarthestPointSampler<kDGLCUDA, float, int32_t>(
     NDArray array, int64_t batch_size, int64_t sample_points,
     NDArray dist, IdArray start_idx, IdArray result);
-template void FarthestPointSampler<kDLGPU, float, int64_t>(
+template void FarthestPointSampler<kDGLCUDA, float, int64_t>(
     NDArray array, int64_t batch_size, int64_t sample_points,
     NDArray dist, IdArray start_idx, IdArray result);
-template void FarthestPointSampler<kDLGPU, double, int32_t>(
+template void FarthestPointSampler<kDGLCUDA, double, int32_t>(
     NDArray array, int64_t batch_size, int64_t sample_points,
     NDArray dist, IdArray start_idx, IdArray result);
-template void FarthestPointSampler<kDLGPU, double, int64_t>(
+template void FarthestPointSampler<kDGLCUDA, double, int64_t>(
     NDArray array, int64_t batch_size, int64_t sample_points,
     NDArray dist, IdArray start_idx, IdArray result);
 
