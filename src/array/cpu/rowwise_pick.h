@@ -34,14 +34,38 @@ namespace impl {
 // \param rowid The row to pick from.
 // \param off Starting offset of this row.
 // \param len NNZ of the row.
+// \param num_picks Number of picks that should be done on the row.
 // \param col Pointer of the column indices.
 // \param data Pointer of the data indices.
 // \param out_idx Picked indices in [off, off + len).
 template <typename IdxType>
 using PickFn = std::function<void(
-    IdxType rowid, IdxType off, IdxType len,
+    IdxType rowid, IdxType off, IdxType len, IdxType num_picks,
     const IdxType* col, const IdxType* data,
     IdxType* out_idx)>;
+
+// User-defined function for determining the number of picks for one row.
+//
+// The column indices of the given row are stored in
+//   [col + off, col + off + len)
+//
+// Similarly, the data indices are stored in
+//   [data + off, data + off + len)
+// Data index pointer could be NULL, which means data[i] == i
+//
+// *ATTENTION*: This function will be invoked concurrently. Please make sure
+// it is thread-safe.
+//
+// \param rowid The row to pick from.
+// \param off Starting offset of this row.
+// \param len NNZ of the row.
+// \param col Pointer of the column indices.
+// \param data Pointer of the data indices.
+template <typename IdxType>
+using NumPicksFn = std::function<IdxType(
+    IdxType rowid, IdxType off, IdxType len,
+    const IdxType* col, const IdxType* data);
+
 
 // User-defined function for picking elements from a range within a row.
 //
@@ -71,41 +95,27 @@ using RangePickFn = std::function<void(
 // Template for picking non-zero values row-wise. The implementation utilizes
 // OpenMP parallelization on rows because each row performs computation independently.
 template <typename IdxType>
-COOMatrix CSRRowWisePick(CSRMatrix mat, IdArray rows,
-                         int64_t num_picks, bool replace, PickFn<IdxType> pick_fn) {
+CSRMatrix CSRRowWisePickPartial(
+    CSRMatrix mat, IdArray rows, int64_t max_num_picks, bool replace,
+    PickFn<IdxType> pick_fn, NumPicksFn<IdxType> num_picks_fn) {
   using namespace aten;
-  const IdxType* indptr = static_cast<IdxType*>(mat.indptr->data);
-  const IdxType* indices = static_cast<IdxType*>(mat.indices->data);
-  const IdxType* data = CSRHasData(mat)? static_cast<IdxType*>(mat.data->data) : nullptr;
-  const IdxType* rows_data = static_cast<IdxType*>(rows->data);
+  const IdxType* indptr = mat.indptr.Ptr<IdxType>();
+  const IdxType* indices = mat.indices.Ptr<IdxType>();
+  const IdxType* data = CSRHasData(mat)? mat.data.Ptr<IdxType>() : nullptr;
+  const IdxType* rows_data = rows.Ptr<IdxType>();
   const int64_t num_rows = rows->shape[0];
   const auto& ctx = mat.indptr->ctx;
 
-  // To leverage OMP parallelization, we create two arrays to store
-  // picked src and dst indices. Each array is of length num_rows * num_picks.
-  // For rows whose nnz < num_picks, the indices are padded with -1.
-  //
-  // We check whether all the given rows
-  // have at least num_picks number of nnz when replace is false.
-  //
-  // If the check holds, remove -1 elements by remove_if operation, which simply
-  // moves valid elements to the head of arrays and create a view of the original
-  // array. The implementation consumes a little extra memory than the actual requirement.
-  //
-  // Otherwise, directly use the row and col arrays to construct the result COO matrix.
-  //
-  // [02/29/2020 update]: OMP is disabled for now since batch-wise parallelism is more
-  //   significant. (minjie)
-  IdArray picked_row = NDArray::Empty({num_rows * num_picks},
-                                      DLDataType{kDLInt, 8*sizeof(IdxType), 1},
+  IdArray picked_row_indptr = NDArray::Empty({num_rows + 1},
+                                              DLDataTypeTraits<IdxType>::dtype,
+                                              ctx);
+  IdArray picked_col = NDArray::Empty({num_rows * max_num_picks},
+                                      DLDataTypeTraits<IdxType>::dtype,
                                       ctx);
-  IdArray picked_col = NDArray::Empty({num_rows * num_picks},
-                                      DLDataType{kDLInt, 8*sizeof(IdxType), 1},
+  IdArray picked_idx = NDArray::Empty({num_rows * max_num_picks},
+                                      DLDataTypeTraits<IdxType>::dtype,
                                       ctx);
-  IdArray picked_idx = NDArray::Empty({num_rows * num_picks},
-                                      DLDataType{kDLInt, 8*sizeof(IdxType), 1},
-                                      ctx);
-  IdxType* picked_rdata = static_cast<IdxType*>(picked_row->data);
+  IdxType* picked_row_indptr_data = static_cast<IdxType*>(picked_row_indptr->data);
   IdxType* picked_cdata = static_cast<IdxType*>(picked_col->data);
   IdxType* picked_idata = static_cast<IdxType*>(picked_idx->data);
 
@@ -122,76 +132,84 @@ COOMatrix CSRRowWisePick(CSRMatrix mat, IdArray rows,
         std::min(static_cast<int64_t>(thread_id + 1), num_rows % num_threads);
     assert(thread_id + 1 < num_threads || end_i == num_rows);
 
+    // Part 1: determine the number of picks for each row as well as the indptr to return.
     const int64_t num_local = end_i - start_i;
-
-    // make sure we don't have to pay initialization cost
-    std::unique_ptr<int64_t[]> local_prefix(new int64_t[num_local + 1]);
-    local_prefix[0] = 0;
     for (int64_t i = start_i; i < end_i; ++i) {
       // build prefix-sum
       const int64_t local_i = i-start_i;
       const IdxType rid = rows_data[i];
-      IdxType len;
-      if (replace) {
-        len = indptr[rid+1] == indptr[rid] ? 0 : num_picks;
-      } else {
-        len = std::min(
-          static_cast<IdxType>(num_picks), indptr[rid + 1] - indptr[rid]);
-      }
-      local_prefix[local_i + 1] = local_prefix[local_i] + len;
+      const IdxType off = indptr[rid];
+      const IdxType len = indptr[rid + 1] - off;
+
+      const IdxType num_picks = num_picks_fn(rid, off, len, indices, data);
+      picked_row_indptr_data[i] = num_picks;
+      global_prefix[thread_id + 1] += num_picks;
     }
-    global_prefix[thread_id + 1] = local_prefix[num_local];
 
     #pragma omp barrier
     #pragma omp master
     {
-      for (int t = 0; t < num_threads; ++t) {
+      for (int t = 0; t < num_threads; ++t)
         global_prefix[t+1] += global_prefix[t];
-      }
+      picked_row_indptr_data[num_rows] = global_prefix[num_threads];
     }
 
     #pragma omp barrier
-    const IdxType thread_offset = global_prefix[thread_id];
+    for (int i = start_i; i < end_i; ++i)
+      picked_row_indptr_data[i] += global_prefix[thread_id];
 
+    // Part 2: pick the neighbors.
+    const IdxType thread_offset = global_prefix[thread_id];
     for (int64_t i = start_i; i < end_i; ++i) {
       const IdxType rid = rows_data[i];
 
       const IdxType off = indptr[rid];
       const IdxType len = indptr[rid + 1] - off;
-      if (len == 0)
+      const int64_t local_i = i - start_i;
+      const int64_t row_offset = picked_row_indptr_data[i];
+      const int64_t num_picks = picked_row_indptr_data[i + 1] - picked_row_indptr_data[i];
+      if (num_picks == 0)
         continue;
 
-      const int64_t local_i = i - start_i;
-      const int64_t row_offset = thread_offset + local_prefix[local_i];
-
-      if (len <= num_picks && !replace) {
-        // nnz <= num_picks and w/o replacement, take all nnz
-        for (int64_t j = 0; j < len; ++j) {
-          picked_rdata[row_offset + j] = rid;
-          picked_cdata[row_offset + j] = indices[off + j];
-          picked_idata[row_offset + j] = data? data[off + j] : off + j;
-        }
-      } else {
-        pick_fn(rid, off, len,
-                indices, data,
-                picked_idata + row_offset);
-        for (int64_t j = 0; j < num_picks; ++j) {
-          const IdxType picked = picked_idata[row_offset + j];
-          picked_rdata[row_offset + j] = rid;
-          picked_cdata[row_offset + j] = indices[picked];
-          picked_idata[row_offset + j] = data? data[picked] : picked;
-        }
+      pick_fn(
+          rid, off, len, static_cast<IdxType>(num_picks),
+          indices, data, picked_idata + row_offset);
+      for (int64_t j = 0; j < num_picks; ++j) {
+        const IdxType picked = picked_idata[row_offset + j];
+        picked_cdata[row_offset + j] = indices[picked];
+        picked_idata[row_offset + j] = data? data[picked] : picked;
       }
     }
   }
 
   const int64_t new_len = global_prefix.back();
-  picked_row = picked_row.CreateView({new_len}, picked_row->dtype);
   picked_col = picked_col.CreateView({new_len}, picked_col->dtype);
   picked_idx = picked_idx.CreateView({new_len}, picked_idx->dtype);
 
-  return COOMatrix(mat.num_rows, mat.num_cols,
-                   picked_row, picked_col, picked_idx);
+  return CSRMatrix(mat.num_rows, mat.num_cols,
+                   picked_row_indptr, picked_col, picked_idx);
+}
+
+template <typename IdxType>
+COOMatrix CSRRowWisePick(
+    CSRMatrix mat, IdArray rows, int64_t max_num_picks, bool replace,
+    PickFn<IdxType> pick_fn, NumPicksFn<IdxType> num_picks_fn) {
+  CSRMatrix csr = CSRRowWisePickPartial(
+      mat, rows, max_num_picks, replace, pick_fn, num_picks_fn);
+  IdArray picked_rows = IdArray::Empty(
+      {csr.indices->shape[0]}, csr.indices->dtype, csr.indices->ctx);
+  IdxType* picked_rows_data = picked_rows.Ptr<IdxType>();
+  const IdxType* indptr_data = csr.indptr.Ptr<IdxType>();
+  const IdxType* rows_data = rows.Ptr<IdxType>();
+  int64_t num_rows = rows->shape[0];
+
+  runtime::parallel_for(0, num_rows, [&](size_t b, size_t e) {
+    for (size_t i = b; i < e; ++i) {
+      for (size_t j = indptr_data[i]; j < indptr_data[i + 1]; ++j)
+        picked_rows_data[j] = rows_data[i];
+    }
+  });
+  return COOMatrix(csr.num_rows, csr.num_cols, picked_rows, csr.indices, csr.data);
 }
 
 // Template for picking non-zero values row-wise. The implementation utilizes
@@ -271,7 +289,7 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows, IdArray etypes,
           std::sort(et_idx.begin(), et_idx.end(),
                     [&et](IdxType i1, IdxType i2) {return et[i1] < et[i2];});
         CHECK(et[et_idx[len - 1]] < num_etypes) <<
-          "etype values exceed the number of fanouts";
+          "etype values exceed the number of fanout elements";
 
         IdxType cur_et = et[et_idx[0]];
         int64_t et_offset = 0;
