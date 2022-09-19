@@ -261,7 +261,6 @@ class NDArray {
 
   /*!
    * \brief Create a NDArray from a raw pointer.
-   * \tparam T Type of vector data.  Determines the dtype of returned array.
    */
   DGL_DLL static NDArray CreateFromRaw(const std::vector<int64_t>& shape,
       DGLDataType dtype, DGLContext ctx, void* raw, bool auto_free);
