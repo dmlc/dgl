@@ -236,6 +236,42 @@ class SparseMatrix:
         """
         return self.adj.to_dense()
 
+    def t(self):
+        """Alias of transpose()
+        """
+        return self.transpose()
+
+    @property
+    def T(self):
+        """Alias of transpose()
+        """
+        return self.transpose()
+
+    def transpose(self):
+        """Return the transpose of this sparse matrix.
+
+        Returns
+        -------
+        SparseMatrix
+            The transpose of this sparse matrix.
+
+        Example
+        -------
+
+        >>> row = torch.tensor([1, 1, 3])
+        >>> col = torch.tensor([2, 1, 3])
+        >>> val = torch.tensor([1, 1, 2])
+        >>> A = SparseMatrix(row, col, val)
+        >>> A = A.transpose()
+        >>> print(A.row)
+        tensor([1, 2, 3])
+        >>> print(A.col)
+        tensor([1, 1, 3])
+        >>> print(A.val)
+        tensor([1, 1, 2])
+        """
+        return SparseMatrix(self.col, self.row, self.val, self.shape[::-1])
+
 def create_from_coo(row: torch.Tensor,
                     col: torch.Tensor,
                     val: Optional[torch.Tensor] = None,

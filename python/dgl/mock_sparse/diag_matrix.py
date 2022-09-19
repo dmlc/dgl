@@ -123,6 +123,38 @@ class DiagMatrix:
         row = col = torch.arange(len(self.val)).to(self.device)
         return create_from_coo(row=row, col=col, val=self.val, shape=self.shape)
 
+    def t(self):
+        """Alias of transpose()
+        """
+        return self.transpose()
+
+    @property
+    def T(self):
+        """Alias of transpose()
+        """
+        return self.transpose()
+
+    def transpose(self):
+        """Return the transpose of the matrix.
+
+        Returns
+        -------
+        DiagMatrix
+            The transpose of the matrix.
+
+        Example
+        --------
+
+        >>> val = torch.arange(1, 5).float()
+        >>> mat = diag(val, shape=(4, 5))
+        >>> mat = mat.transpose()
+        >>> print(mat.val)
+        tensor([1., 2., 3., 4.])
+        >>> print(mat.shape)
+        (5, 4)
+        """
+        return DiagMatrix(self.val, self.shape[::-1])
+
 def diag(val: torch.Tensor, shape: Optional[Tuple[int, int]] = None) -> DiagMatrix:
     """Create a diagonal matrix based on the diagonal values
 
