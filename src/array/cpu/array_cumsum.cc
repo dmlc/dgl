@@ -10,7 +10,7 @@ using runtime::NDArray;
 namespace aten {
 namespace impl {
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 IdArray CumSum(IdArray array, bool prepend_zero) {
   const int64_t len = array.NumElements();
   if (len == 0)
@@ -34,8 +34,8 @@ IdArray CumSum(IdArray array, bool prepend_zero) {
   }
 }
 
-template IdArray CumSum<kDLCPU, int32_t>(IdArray, bool);
-template IdArray CumSum<kDLCPU, int64_t>(IdArray, bool);
+template IdArray CumSum<kDGLCPU, int32_t>(IdArray, bool);
+template IdArray CumSum<kDGLCPU, int64_t>(IdArray, bool);
 
 }  // namespace impl
 }  // namespace aten

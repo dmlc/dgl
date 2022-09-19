@@ -18,8 +18,8 @@
  * });
  */
 #define ATEN_XPU_SWITCH(val, XPU, op, ...) do {                 \
-  if ((val) == kDLCPU) {                                        \
-    constexpr auto XPU = kDLCPU;                                \
+  if ((val) == kDGLCPU) {                                        \
+    constexpr auto XPU = kDGLCPU;                                \
     {__VA_ARGS__}                                               \
   } else {                                                      \
     LOG(FATAL) << "Operator " << (op) << " does not support "   \
@@ -43,11 +43,11 @@
  */
 #ifdef DGL_USE_CUDA
 #define ATEN_XPU_SWITCH_CUDA(val, XPU, op, ...) do {            \
-  if ((val) == kDLCPU) {                                        \
-    constexpr auto XPU = kDLCPU;                                \
+  if ((val) == kDGLCPU) {                                        \
+    constexpr auto XPU = kDGLCPU;                                \
     {__VA_ARGS__}                                               \
-  } else if ((val) == kDLGPU) {                                 \
-    constexpr auto XPU = kDLGPU;                                \
+  } else if ((val) == kDGLCUDA) {                                 \
+    constexpr auto XPU = kDGLCUDA;                                \
     {__VA_ARGS__}                                               \
   } else {                                                      \
     LOG(FATAL) << "Operator " << (op) << " does not support "   \
@@ -69,7 +69,7 @@
  * });
  */
 #define ATEN_ID_TYPE_SWITCH(val, IdType, ...) do {            \
-  CHECK_EQ((val).code, kDLInt) << "ID must be integer type";  \
+  CHECK_EQ((val).code, kDGLInt) << "ID must be integer type";  \
   if ((val).bits == 32) {                                     \
     typedef int32_t IdType;                                   \
     {__VA_ARGS__}                                             \
@@ -114,7 +114,7 @@
  * });
  */
 #define ATEN_FLOAT_TYPE_SWITCH(val, FloatType, val_name, ...) do {  \
-  CHECK_EQ((val).code, kDLFloat)                              \
+  CHECK_EQ((val).code, kDGLFloat)                              \
     << (val_name) << " must be float type";                   \
   if ((val).bits == 32) {                                     \
     typedef float FloatType;                                  \
@@ -128,7 +128,7 @@
 } while (0)
 
 #define ATEN_FLOAT_BITS_SWITCH(val, bits, val_name, ...) do {  \
-  CHECK_EQ((val).code, kDLFloat)                              \
+  CHECK_EQ((val).code, kDGLFloat)                              \
     << (val_name) << " must be float type";                   \
   if ((val).bits == 16) {                                     \
     constexpr int bits = 16;                                  \
@@ -154,16 +154,16 @@
  * });
  */
 #define ATEN_DTYPE_SWITCH(val, DType, val_name, ...) do {     \
-  if ((val).code == kDLInt && (val).bits == 32) {             \
+  if ((val).code == kDGLInt && (val).bits == 32) {             \
     typedef int32_t DType;                                    \
     {__VA_ARGS__}                                             \
-  } else if ((val).code == kDLInt && (val).bits == 64) {      \
+  } else if ((val).code == kDGLInt && (val).bits == 64) {      \
     typedef int64_t DType;                                    \
     {__VA_ARGS__}                                             \
-  } else if ((val).code == kDLFloat && (val).bits == 32) {    \
+  } else if ((val).code == kDGLFloat && (val).bits == 32) {    \
     typedef float DType;                                      \
     {__VA_ARGS__}                                             \
-  } else if ((val).code == kDLFloat && (val).bits == 64) {    \
+  } else if ((val).code == kDGLFloat && (val).bits == 64) {    \
     typedef double DType;                                     \
     {__VA_ARGS__}                                             \
   } else {                                                    \
@@ -205,10 +205,10 @@
  * Identical to ATEN_ID_TYPE_SWITCH except for a different error message.
  */
 #define ATEN_CSR_DTYPE_SWITCH(val, DType, ...) do {         \
-  if ((val).code == kDLInt && (val).bits == 32) {           \
+  if ((val).code == kDGLInt && (val).bits == 32) {           \
     typedef int32_t DType;                                  \
     {__VA_ARGS__}                                           \
-  } else if ((val).code == kDLInt && (val).bits == 64) {    \
+  } else if ((val).code == kDGLInt && (val).bits == 64) {    \
     typedef int64_t DType;                                  \
     {__VA_ARGS__}                                           \
   } else {                                                  \
@@ -278,13 +278,13 @@
 ///////////////////////// Array checks //////////////////////////
 
 #define IS_INT32(a)  \
-  ((a)->dtype.code == kDLInt && (a)->dtype.bits == 32)
+  ((a)->dtype.code == kDGLInt && (a)->dtype.bits == 32)
 #define IS_INT64(a)  \
-  ((a)->dtype.code == kDLInt && (a)->dtype.bits == 64)
+  ((a)->dtype.code == kDGLInt && (a)->dtype.bits == 64)
 #define IS_FLOAT32(a)  \
-  ((a)->dtype.code == kDLFloat && (a)->dtype.bits == 32)
+  ((a)->dtype.code == kDGLFloat && (a)->dtype.bits == 32)
 #define IS_FLOAT64(a)  \
-  ((a)->dtype.code == kDLFloat && (a)->dtype.bits == 64)
+  ((a)->dtype.code == kDGLFloat && (a)->dtype.bits == 64)
 
 #define CHECK_IF(cond, prop, value_name, dtype_name) \
   CHECK(cond) << "Expecting " << (prop) << " of " << (value_name) << " to be " << (dtype_name)

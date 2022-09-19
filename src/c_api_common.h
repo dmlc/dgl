@@ -41,8 +41,8 @@ dgl::runtime::NDArray CopyVectorToNDArray(
     const std::vector<DType>& vec) {
   using dgl::runtime::NDArray;
   const int64_t len = vec.size();
-  NDArray a = NDArray::Empty({len}, DLDataType{kDLInt, sizeof(IdType) * 8, 1},
-                             DLContext{kDLCPU, 0});
+  NDArray a = NDArray::Empty({len}, DGLDataType{kDGLInt, sizeof(IdType) * 8, 1},
+                             DGLContext{kDGLCPU, 0});
   std::copy(vec.begin(), vec.end(), static_cast<IdType*>(a->data));
   return a;
 }
