@@ -765,8 +765,8 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortInEdges")
 DGL_REGISTER_GLOBAL("heterograph._CAPI_DGLFindSrcDstNtypes")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef metagraph = args[0];
-    std::unordered_set<int64_t> dst_set;
-    std::unordered_set<int64_t> src_set;
+    std::unordered_set<uint64_t> dst_set;
+    std::unordered_set<uint64_t> src_set;
 
     for (uint64_t eid = 0; eid < metagraph->NumEdges(); ++eid) {
       auto edge = metagraph->FindEdge(eid);

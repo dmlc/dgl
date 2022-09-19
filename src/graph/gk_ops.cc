@@ -38,15 +38,15 @@ gk_csr_t *Convert2GKCsr(const aten::CSRMatrix mat, bool is_row) {
   if (is_row) {
     num_ptrs = gk_csr->nrows + 1;
     gk_indptr = gk_csr->rowptr = gk_zmalloc(gk_csr->nrows+1,
-        (char*)"gk_csr_ExtractPartition: rowptr");
+        const_cast<char*>("gk_csr_ExtractPartition: rowptr"));
     gk_indices = gk_csr->rowind = gk_imalloc(nnz,
-        (char*)"gk_csr_ExtractPartition: rowind");
+        const_cast<char*>("gk_csr_ExtractPartition: rowind"));
   } else {
     num_ptrs = gk_csr->ncols + 1;
     gk_indptr = gk_csr->colptr = gk_zmalloc(gk_csr->ncols+1,
-        (char*)"gk_csr_ExtractPartition: colptr");
+        const_cast<char*>("gk_csr_ExtractPartition: colptr"));
     gk_indices = gk_csr->colind = gk_imalloc(nnz,
-        (char*)"gk_csr_ExtractPartition: colind");
+        const_cast<char*>("gk_csr_ExtractPartition: colind"));
   }
 
   for (size_t i = 0; i < num_ptrs; i++) {

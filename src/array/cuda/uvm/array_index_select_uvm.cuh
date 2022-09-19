@@ -4,8 +4,8 @@
  * \brief Array index select GPU kernel implementation
  */
 
-#ifndef DGL_ARRAY_CUDA_ARRAY_INDEX_SELECT_UVM_CUH_
-#define DGL_ARRAY_CUDA_ARRAY_INDEX_SELECT_UVM_CUH_
+#ifndef DGL_ARRAY_CUDA_UVM_ARRAY_INDEX_SELECT_UVM_CUH_
+#define DGL_ARRAY_CUDA_UVM_ARRAY_INDEX_SELECT_UVM_CUH_
 
 #define CACHE_LINE_SIZE 128
 
@@ -49,4 +49,4 @@ __global__ void IndexSelectMultiKernelAligned(
 }  // namespace aten
 }  // namespace dgl
 
-#endif
+#endif  // DGL_ARRAY_CUDA_UVM_ARRAY_INDEX_SELECT_UVM_CUH_
