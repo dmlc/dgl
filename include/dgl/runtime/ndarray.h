@@ -63,7 +63,7 @@ namespace runtime {
 /*!
  * \brief DLPack converter.
  */
-struct DLConverter;
+struct DLPackConverter;
 
 /*!
  * \brief Managed NDArray.
@@ -340,7 +340,7 @@ class NDArray {
   Container* data_{nullptr};
   // enable internal functions
   friend struct Internal;
-  friend struct DLConverter;
+  friend struct DLPackConverter;
   friend class DGLRetValue;
   friend class DGLArgsSetter;
 };
@@ -364,11 +364,12 @@ inline bool SaveDGLArray(dmlc::Stream* strm, const DGLArray* tensor);
  */
 struct NDArray::Container {
  public:
-  // NOTE: the first part of this structure is the same as
-  // DLManagedTensor, note that, however, the deleter
-  // is only called when the reference counter goes to 0
+  /*! NOTE: the first part of this structure is the same as
+   * DLManagedTensor, note that, however, the deleter
+   * is only called when the reference counter goes to 0
+   */
   /*!
-   * \brief The corresponding dl_tensor field.
+   * \brief Tensor structure.
    * \note it is important that the first field is DGLArray
    *  So that this data structure is DGLArray compatible.
    *  The head ptr of this struct can be viewed as DGLArray*.
@@ -414,7 +415,7 @@ struct NDArray::Container {
   }
 
  private:
-  friend struct DLConverter;
+  friend struct DLPackConverter;
   friend class NDArray;
   friend class RPCWrappedFunc;
   /*!

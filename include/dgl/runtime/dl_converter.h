@@ -6,16 +6,17 @@
 #ifndef DGL_RUNTIME_DL_CONVERTER_H_
 #define DGL_RUNTIME_DL_CONVERTER_H_
 
-#include <dlpack/dlpack.h>
 #include "c_runtime_api.h"
 #include "ndarray.h"
+
+struct DLManagedTensor;
 
 namespace dgl {
 namespace runtime {
 
-struct DLConverter {
+struct DLPackConverter {
   /*!
-   * \brief Create a NDArray backed by a dlpack tensor.
+   * \brief Create a DGL NDArray from a DLPack tensor.
    *
    * This allows us to create a NDArray using the memory
    * allocated by an external deep learning framework
@@ -25,19 +26,23 @@ struct DLConverter {
    * \param tensor The DLPack tensor to copy from.
    * \return The created NDArray view.
    */
-  DGL_DLL static NDArray FromDLPack(DLManagedTensor* tensor);
+  static NDArray FromDLPack(DLManagedTensor* tensor);
 
-  // Deleter for NDArray converted from DLPack
-  // This is used from data which is passed from external DLPack(DLManagedTensor)
-  // that are not allocated inside of DGL.
-  // This enables us to create NDArray from memory allocated by other
-  // frameworks that are DLPack compatible
+  /*!
+   * \brief Deleter for NDArray converted from DLPack.
+   *
+   * This is used from data which is passed from external DLPack(DLManagedTensor)
+   * that are not allocated inside of DGL.
+   * This enables us to create NDArray from memory allocated by other
+   * frameworks that are DLPack compatible
+   */
   static void DLPackDeleter(NDArray::Container* ptr);
 
-  // Container to DLManagedTensor
-  static DLManagedTensor* ToDLPack(NDArray::Container* from);
-
-  // NDArray to DLManagedTensor
+  /*! \brief Convert a DGL NDArray to a DLPack tensor.
+   *
+   * \param from The DGL NDArray.
+   * \return A DLPack tensor.
+   */
   static DLManagedTensor* ToDLPack(const NDArray &from);
 };
 
@@ -47,6 +52,13 @@ struct DLConverter {
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/*!
+ * \brief Delete (free) a DLManagedTensor's data.
+ * \param dltensor Pointer to the DLManagedTensor.
+ */
+DGL_DLL void DGLDLManagedTensorCallDeleter(DLManagedTensor* dltensor);
+
 /*!
  * \brief Produce an array from the DLManagedTensor that shares data memory
  * with the DLManagedTensor.
@@ -66,14 +78,6 @@ DGL_DLL int DGLArrayFromDLPack(DLManagedTensor* from,
  */
 DGL_DLL int DGLArrayToDLPack(DGLArrayHandle from, DLManagedTensor** out,
                              int alignment = 0);
-
-/*!
- * \brief Delete (free) a DLManagedTensor's data.
- * \param dltensor Pointer to the DLManagedTensor.
- */
-DGL_DLL void DGLDLManagedTensorCallDeleter(DLManagedTensor* dltensor) {
-  (*(dltensor->deleter))(dltensor);
-}
 
 #ifdef __cplusplus
 }  // DGL_EXTERN_C

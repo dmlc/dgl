@@ -831,11 +831,11 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_FG_SDDMMTreeReduction")
     //     {"U_data", "E_data", "V_data"});
     COOMatrix coo = graph.sptr()->GetCOOMatrix(0);
     dgl::featgraph::SDDMMTreeReduction(
-      DLConverter::ToDLPack(coo.row),
-      DLConverter::ToDLPack(coo.col),
-      DLConverter::ToDLPack(lhs),
-      DLConverter::ToDLPack(rhs),
-      DLConverter::ToDLPack(out));
+      DLPackConverter::ToDLPack(coo.row),
+      DLPackConverter::ToDLPack(coo.col),
+      DLPackConverter::ToDLPack(lhs),
+      DLPackConverter::ToDLPack(rhs),
+      DLPackConverter::ToDLPack(out));
   });
 #endif  // USE_TVM
 

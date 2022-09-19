@@ -6,7 +6,7 @@ from cpython cimport pycapsule
 from libc.stdint cimport int32_t, int64_t, uint64_t, uint8_t, uint16_t
 import ctypes
 
-cdef enum DGLArgTypeCode:
+cdef enum DGLObjectTypeCode:
     kInt = 0
     kUInt = 1
     kFloat = 2

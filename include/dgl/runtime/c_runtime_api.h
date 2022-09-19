@@ -60,7 +60,7 @@ typedef enum {
 } DGLDeviceType;
 
 /*!
- * \brief The argument type code is used and only used in DGL FFI for argument passing.
+ * \brief The object type code is used in DGL FFI to indicate the types of objects passed between C and Python.
  */
 typedef enum {
   kInt = 0U,
@@ -87,7 +87,7 @@ typedef enum {
   // The following section of code is used for non-reserved types.
   kExtReserveEnd = 64U,
   kExtEnd = 128U
-} DGLArgTypeCode;
+} DGLObjectTypeCode;
 
 /*!
  * \brief The type code options DGLDataType.
@@ -101,6 +101,7 @@ typedef enum {
   kDGLFloat = 2U,
   /*! \brief bfloat16 */
   kDGLBfloat = 4U,
+  // add more data types if we are going to support them
 } DGLDataTypeCode;
 
 /*!
@@ -112,7 +113,6 @@ typedef enum {
  *   - float: type_code = 2, bits = 32, lanes=1
  *   - float4(vectorized 4 float): type_code = 2, bits = 32, lanes=4
  *   - int8: type_code = 0, bits = 8, lanes=1
- *   - std::complex<float>: type_code = 5, bits = 64, lanes = 1
  */
 typedef struct {
   /*!
@@ -144,28 +144,31 @@ typedef struct {
 
 /*!
  * \brief The tensor array stucture to DGL API.
- * Borrowed from DLTensor but has DGLContext ctx as device.
+ * The structure is heavily inspired by DLTensor from DLPack.
  */
 typedef struct {
   /*!
-   * \brief The data pointer points to the allocated data. This will be CUDA
-   * device pointer or cl_mem handle in OpenCL. It may be opaque on some device
-   * types. This pointer is always aligned to 256 bytes as in CUDA. The
-   * `byte_offset` field should be used to point to the beginning of the data.
+   * \brief The data pointer points to the allocated data.
+   * 
+   * Depending on the device context, it can be a CPU pointer, or a CUDA
+   * device pointer or  acl_mem handle in OpenCL.
+   * This pointer is always aligned to 256 bytes as in CUDA. Use the
+   * `byte_offset` field to mark the beginning of the actual data (if the address
+   * is not 256 byte aligned).
    *
    * Note that as of Nov 2021, multiply libraries (CuPy, PyTorch, TensorFlow,
-   * TVM, perhaps others) do not adhere to this 256 byte aligment requirement
-   * on CPU/CUDA/ROCm, and always use `byte_offset=0`.  This must be fixed
-   * (after which this note will be updated); at the moment it is recommended
+   * TVM, perhaps others) do not adhere to this 256 byte alignment requirement
+   * on CPU/CUDA/ROCm, and always use `byte_offset=0`.  This is likely to be
+   * fixed in the future; at the moment it is recommended
    * to not rely on the data pointer being correctly aligned.
    *
-   * For given DGLArray, the size of memory required to store the contents of
-   * data is calculated as follows:
+   * For a DGLArray, the size of memory required to store the contents of
+   * data can be calculated as follows:
    *
    * \code{.c}
    * static inline size_t GetDataSize(const DGLArray* t) {
    *   size_t size = 1;
-   *   for (tvm_index_t i = 0; i < t->ndim; ++i) {
+   *   for (int32_t i = 0; i < t->ndim; ++i) {
    *     size *= t->shape[i];
    *   }
    *   size *= (t->dtype.bits * t->dtype.lanes + 7) / 8;

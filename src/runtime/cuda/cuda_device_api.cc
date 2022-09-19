@@ -328,7 +328,7 @@ cudaStream_t getCurrentCUDAStream() {
     return nullptr;
 }
 
-DGL_REGISTER_GLOBAL("device_api.gpu")
+DGL_REGISTER_GLOBAL("device_api.cuda")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
     DeviceAPI* ptr = CUDADeviceAPI::Global().get();
     *rv = static_cast<void*>(ptr);

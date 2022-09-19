@@ -27,7 +27,7 @@ namespace runtime {
 inline std::string DeviceName(int type) {
   switch (type) {
     case kDGLCPU: return "cpu";
-    case kDGLCUDA: return "gpu";
+    case kDGLCUDA: return "cuda";
     // add more device here once supported
     default: LOG(FATAL) << "unknown type =" << type; return "Unknown";
   }

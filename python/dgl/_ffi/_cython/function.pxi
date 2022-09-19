@@ -4,8 +4,8 @@ from cpython cimport Py_INCREF, Py_DECREF
 from numbers import Number, Integral
 from ..base import string_types
 from ..object_generic import convert_to_object, ObjectGeneric
-from ..runtime_ctypes import DGLDataType as PyDGLDataType, \
-                             DGLContext as PyDGLContext, \
+from ..runtime_ctypes import DGLDataType as CTypesDGLDataType, \
+                             DGLContext as CTypesDGLContext, \
                              DGLByteArray
 
 
@@ -109,12 +109,12 @@ cdef inline int make_arg(object arg,
     elif isinstance(arg, Number):
         value[0].v_float64 = arg
         tcode[0] = kFloat
-    elif isinstance(arg, PyDGLDataType):
+    elif isinstance(arg, CTypesDGLDataType):
         tstr = c_str(str(arg))
         value[0].v_str = tstr
         tcode[0] = kStr
         temp_args.append(tstr)
-    elif isinstance(arg, PyDGLContext):
+    elif isinstance(arg, CTypesDGLContext):
         value[0].v_ctx = (<DGLContext*>(
             <unsigned long long>ctypes.addressof(arg)))[0]
         tcode[0] = kDGLContext
@@ -185,7 +185,7 @@ cdef inline object make_ret(DGLValue value, int tcode):
     elif tcode == kHandle:
         return ctypes_handle(value.v_handle)
     elif tcode == kDGLContext:
-        return PyDGLContext(value.v_ctx.device_type, value.v_ctx.device_id)
+        return CTypesDGLContext(value.v_ctx.device_type, value.v_ctx.device_id)
     # (minjie): class module are not used in DGL.
     #elif tcode == kModuleHandle:
     #    return _CLASS_MODULE(ctypes_handle(value.v_handle))
