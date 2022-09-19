@@ -1,4 +1,4 @@
-"""dgl sddmm operators for sparse matrix module."""
+"""Sampled Dense-Dense Matrix Multiplication (SDDMM) operator module."""
 import torch
 from .sp_matrix import SparseMatrix
 
