@@ -106,7 +106,7 @@ class CUDADeviceAPI final : public DeviceAPI {
   void* AllocDataSpace(DGLContext ctx,
                        size_t nbytes,
                        size_t alignment,
-                       DGLType type_hint) final {
+                       DGLDataType type_hint) final {
     SetDevice(ctx);
     // Redirect to PyTorch's allocator when available.
     TensorDispatcher* td = TensorDispatcher::Global();
@@ -136,12 +136,12 @@ class CUDADeviceAPI final : public DeviceAPI {
                       size_t size,
                       DGLContext ctx_from,
                       DGLContext ctx_to,
-                      DGLType type_hint,
+                      DGLDataType type_hint,
                       DGLStreamHandle stream) {
     cudaStream_t cu_stream = static_cast<cudaStream_t>(stream);
     from = static_cast<const char*>(from) + from_offset;
     to = static_cast<char*>(to) + to_offset;
-    if (ctx_from.device_type == kDLGPU && ctx_to.device_type == kDLGPU) {
+    if (ctx_from.device_type == kDGLCUDA && ctx_to.device_type == kDGLCUDA) {
       CUDA_CALL(cudaSetDevice(ctx_from.device_id));
       if (ctx_from.device_id == ctx_to.device_id) {
         GPUCopy(from, to, size, cudaMemcpyDeviceToDevice, cu_stream);
@@ -150,10 +150,10 @@ class CUDADeviceAPI final : public DeviceAPI {
                                       from, ctx_from.device_id,
                                       size, cu_stream));
       }
-    } else if (ctx_from.device_type == kDLGPU && ctx_to.device_type == kDLCPU) {
+    } else if (ctx_from.device_type == kDGLCUDA && ctx_to.device_type == kDGLCPU) {
       CUDA_CALL(cudaSetDevice(ctx_from.device_id));
       GPUCopy(from, to, size, cudaMemcpyDeviceToHost, cu_stream);
-    } else if (ctx_from.device_type == kDLCPU && ctx_to.device_type == kDLGPU) {
+    } else if (ctx_from.device_type == kDGLCPU && ctx_to.device_type == kDGLCUDA) {
       CUDA_CALL(cudaSetDevice(ctx_to.device_id));
       GPUCopy(from, to, size, cudaMemcpyHostToDevice, cu_stream);
     } else {
@@ -168,7 +168,7 @@ class CUDADeviceAPI final : public DeviceAPI {
                       size_t size,
                       DGLContext ctx_from,
                       DGLContext ctx_to,
-                      DGLType type_hint) final {
+                      DGLDataType type_hint) final {
     auto stream = GetStream();
     CopyDataFromTo(from, from_offset, to, to_offset, size, ctx_from, ctx_to, type_hint, stream);
   }
@@ -269,7 +269,7 @@ class CUDADeviceAPI final : public DeviceAPI {
     return result;
   }
 
-  void* AllocWorkspace(DGLContext ctx, size_t size, DGLType type_hint) final {
+  void* AllocWorkspace(DGLContext ctx, size_t size, DGLDataType type_hint) final {
     SetDevice(ctx);
     // Redirect to PyTorch's allocator when available.
     TensorDispatcher* td = TensorDispatcher::Global();
@@ -313,7 +313,7 @@ class CUDADeviceAPI final : public DeviceAPI {
 typedef dmlc::ThreadLocalStore<CUDAThreadEntry> CUDAThreadStore;
 
 CUDAThreadEntry::CUDAThreadEntry()
-    : pool(kDLGPU, CUDADeviceAPI::Global()) {
+    : pool(kDGLCUDA, CUDADeviceAPI::Global()) {
 }
 
 CUDAThreadEntry* CUDAThreadEntry::ThreadLocal() {
@@ -328,7 +328,7 @@ cudaStream_t getCurrentCUDAStream() {
     return nullptr;
 }
 
-DGL_REGISTER_GLOBAL("device_api.gpu")
+DGL_REGISTER_GLOBAL("device_api.cuda")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
     DeviceAPI* ptr = CUDADeviceAPI::Global().get();
     *rv = static_cast<void*>(ptr);

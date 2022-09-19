@@ -54,7 +54,7 @@ IdArray MergeMultipleTraversals(
     max_len = std::max(max_len, tracelen);
     total_len += traces[i].size();
   }
-  IdArray ret = IdArray::Empty({total_len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  IdArray ret = IdArray::Empty({total_len}, DGLDataType{kDGLInt, 64, 1}, DGLContext{kDGLCPU, 0});
   int64_t* ret_data = static_cast<int64_t*>(ret->data);
   for (int64_t i = 0; i < max_len; ++i) {
     for (size_t j = 0; j < traces.size(); ++j) {
@@ -78,7 +78,7 @@ IdArray ComputeMergedSections(
     const int64_t tracelen = traces[i].size();
     max_len = std::max(max_len, tracelen);
   }
-  IdArray ret = IdArray::Empty({max_len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  IdArray ret = IdArray::Empty({max_len}, DGLDataType{kDGLInt, 64, 1}, DGLContext{kDGLCPU, 0});
   int64_t* ret_data = static_cast<int64_t*>(ret->data);
   for (int64_t i = 0; i < max_len; ++i) {
     int64_t sec_len = 0;

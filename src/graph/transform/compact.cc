@@ -140,7 +140,7 @@ CompactGraphsCPU(
 
 template<>
 std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>>
-CompactGraphs<kDLCPU, int32_t>(
+CompactGraphs<kDGLCPU, int32_t>(
     const std::vector<HeteroGraphPtr> &graphs,
     const std::vector<IdArray> &always_preserve) {
   return CompactGraphsCPU<int32_t>(graphs, always_preserve);
@@ -148,7 +148,7 @@ CompactGraphs<kDLCPU, int32_t>(
 
 template<>
 std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>>
-CompactGraphs<kDLCPU, int64_t>(
+CompactGraphs<kDGLCPU, int64_t>(
     const std::vector<HeteroGraphPtr> &graphs,
     const std::vector<IdArray> &always_preserve) {
   return CompactGraphsCPU<int64_t>(graphs, always_preserve);

@@ -470,8 +470,8 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCopyTo")
     HeteroGraphRef hg = args[0];
     int device_type = args[1];
     int device_id = args[2];
-    DLContext ctx;
-    ctx.device_type = static_cast<DLDeviceType>(device_type);
+    DGLContext ctx;
+    ctx.device_type = static_cast<DGLDeviceType>(device_type);
     ctx.device_id = device_id;
     HeteroGraphPtr hg_new = HeteroGraph::CopyTo(hg.sptr(), ctx);
     *rv = HeteroGraphRef(hg_new);
@@ -550,7 +550,7 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroJointUnion")
     std::vector<HeteroGraphPtr> component_ptrs;
     component_ptrs.reserve(component_graphs.size());
     const int64_t bits = component_graphs[0]->NumBits();
-    const DLContext ctx = component_graphs[0]->Context();
+    const DGLContext ctx = component_graphs[0]->Context();
     for (const auto& component : component_graphs) {
       component_ptrs.push_back(component.sptr());
       CHECK_EQ(component->NumBits(), bits)
@@ -574,7 +574,7 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointUnion_v2")
     std::vector<HeteroGraphPtr> component_ptrs;
     component_ptrs.reserve(component_graphs.size());
     const int64_t bits = component_graphs[0]->NumBits();
-    const DLContext ctx = component_graphs[0]->Context();
+    const DGLContext ctx = component_graphs[0]->Context();
     for (const auto& component : component_graphs) {
       component_ptrs.push_back(component.sptr());
       CHECK_EQ(component->NumBits(), bits)
@@ -723,9 +723,9 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortOutEdges")
     NDArray tag = args[1];
     int64_t num_tag = args[2];
 
-    CHECK_EQ(hg->Context().device_type, kDLCPU) << "Only support sorting by tag on cpu";
+    CHECK_EQ(hg->Context().device_type, kDGLCPU) << "Only support sorting by tag on cpu";
     CHECK(aten::IsValidIdArray(tag));
-    CHECK_EQ(tag->ctx.device_type, kDLCPU) << "Only support sorting by tag on cpu";
+    CHECK_EQ(tag->ctx.device_type, kDGLCPU) << "Only support sorting by tag on cpu";
 
     const auto csr = hg->GetCSRMatrix(0);
 
@@ -745,9 +745,9 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortInEdges")
     NDArray tag = args[1];
     int64_t num_tag = args[2];
 
-    CHECK_EQ(hg->Context().device_type, kDLCPU) << "Only support sorting by tag on cpu";
+    CHECK_EQ(hg->Context().device_type, kDGLCPU) << "Only support sorting by tag on cpu";
     CHECK(aten::IsValidIdArray(tag));
-    CHECK_EQ(tag->ctx.device_type, kDLCPU) << "Only support sorting by tag on cpu";
+    CHECK_EQ(tag->ctx.device_type, kDGLCPU) << "Only support sorting by tag on cpu";
 
     const auto csc = hg->GetCSCMatrix(0);
 

@@ -93,7 +93,7 @@ struct IsNotMinusOne {
 template <typename IdType>
 void SortOrderedPairs(
     runtime::DeviceAPI* device,
-    DLContext ctx,
+    DGLContext ctx,
     IdType* major,
     IdType* minor,
     IdType* tmp_major,
@@ -128,7 +128,7 @@ void SortOrderedPairs(
 
 };  // namespace
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
     const CSRMatrix& csr,
     int64_t num_samples,
@@ -211,9 +211,9 @@ std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
   return result;
 }
 
-template std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling<kDLGPU, int32_t>(
+template std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling<kDGLCUDA, int32_t>(
     const CSRMatrix&, int64_t, int, bool, bool, double);
-template std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling<kDLGPU, int64_t>(
+template std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling<kDGLCUDA, int64_t>(
     const CSRMatrix&, int64_t, int, bool, bool, double);
 
 };  // namespace impl

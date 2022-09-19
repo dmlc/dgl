@@ -21,7 +21,7 @@ namespace impl {
 
 ///////////////////////////// CSRIsNonZero /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col) {
   cudaStream_t stream = runtime::getCurrentCUDAStream();
   const auto& ctx = csr.indptr->ctx;
@@ -38,14 +38,14 @@ bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col) {
       rows.Ptr<IdType>(), cols.Ptr<IdType>(),
       1, 1, 1,
       static_cast<IdType*>(nullptr), static_cast<IdType>(-1), out.Ptr<IdType>());
-  out = out.CopyTo(DLContext{kDLCPU, 0});
+  out = out.CopyTo(DGLContext{kDGLCPU, 0});
   return *out.Ptr<IdType>() != -1;
 }
 
-template bool CSRIsNonZero<kDLGPU, int32_t>(CSRMatrix, int64_t, int64_t);
-template bool CSRIsNonZero<kDLGPU, int64_t>(CSRMatrix, int64_t, int64_t);
+template bool CSRIsNonZero<kDGLCUDA, int32_t>(CSRMatrix, int64_t, int64_t);
+template bool CSRIsNonZero<kDGLCUDA, int64_t>(CSRMatrix, int64_t, int64_t);
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col) {
   const auto rowlen = row->shape[0];
   const auto collen = col->shape[0];
@@ -69,8 +69,8 @@ NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col) {
   return rst != -1;
 }
 
-template NDArray CSRIsNonZero<kDLGPU, int32_t>(CSRMatrix, NDArray, NDArray);
-template NDArray CSRIsNonZero<kDLGPU, int64_t>(CSRMatrix, NDArray, NDArray);
+template NDArray CSRIsNonZero<kDGLCUDA, int32_t>(CSRMatrix, NDArray, NDArray);
+template NDArray CSRIsNonZero<kDGLCUDA, int64_t>(CSRMatrix, NDArray, NDArray);
 
 ///////////////////////////// CSRHasDuplicate /////////////////////////////
 
@@ -95,7 +95,7 @@ __global__ void _SegmentHasNoDuplicate(
 }
 
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 bool CSRHasDuplicate(CSRMatrix csr) {
   if (!csr.sorted)
     csr = CSRSort(csr);
@@ -116,20 +116,20 @@ bool CSRHasDuplicate(CSRMatrix csr) {
   return !ret;
 }
 
-template bool CSRHasDuplicate<kDLGPU, int32_t>(CSRMatrix csr);
-template bool CSRHasDuplicate<kDLGPU, int64_t>(CSRMatrix csr);
+template bool CSRHasDuplicate<kDGLCUDA, int32_t>(CSRMatrix csr);
+template bool CSRHasDuplicate<kDGLCUDA, int64_t>(CSRMatrix csr);
 
 ///////////////////////////// CSRGetRowNNZ /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 int64_t CSRGetRowNNZ(CSRMatrix csr, int64_t row) {
   const IdType cur = aten::IndexSelect<IdType>(csr.indptr, row);
   const IdType next = aten::IndexSelect<IdType>(csr.indptr, row + 1);
   return next - cur;
 }
 
-template int64_t CSRGetRowNNZ<kDLGPU, int32_t>(CSRMatrix, int64_t);
-template int64_t CSRGetRowNNZ<kDLGPU, int64_t>(CSRMatrix, int64_t);
+template int64_t CSRGetRowNNZ<kDGLCUDA, int32_t>(CSRMatrix, int64_t);
+template int64_t CSRGetRowNNZ<kDGLCUDA, int64_t>(CSRMatrix, int64_t);
 
 template <typename IdType>
 __global__ void _CSRGetRowNNZKernel(
@@ -146,7 +146,7 @@ __global__ void _CSRGetRowNNZKernel(
   }
 }
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 NDArray CSRGetRowNNZ(CSRMatrix csr, NDArray rows) {
   cudaStream_t stream = runtime::getCurrentCUDAStream();
   const auto len = rows->shape[0];
@@ -162,24 +162,24 @@ NDArray CSRGetRowNNZ(CSRMatrix csr, NDArray rows) {
   return rst;
 }
 
-template NDArray CSRGetRowNNZ<kDLGPU, int32_t>(CSRMatrix, NDArray);
-template NDArray CSRGetRowNNZ<kDLGPU, int64_t>(CSRMatrix, NDArray);
+template NDArray CSRGetRowNNZ<kDGLCUDA, int32_t>(CSRMatrix, NDArray);
+template NDArray CSRGetRowNNZ<kDGLCUDA, int64_t>(CSRMatrix, NDArray);
 
 ///////////////////////////// CSRGetRowColumnIndices /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 NDArray CSRGetRowColumnIndices(CSRMatrix csr, int64_t row) {
   const int64_t len = impl::CSRGetRowNNZ<XPU, IdType>(csr, row);
   const int64_t offset = aten::IndexSelect<IdType>(csr.indptr, row) * sizeof(IdType);
   return csr.indices.CreateView({len}, csr.indices->dtype, offset);
 }
 
-template NDArray CSRGetRowColumnIndices<kDLGPU, int32_t>(CSRMatrix, int64_t);
-template NDArray CSRGetRowColumnIndices<kDLGPU, int64_t>(CSRMatrix, int64_t);
+template NDArray CSRGetRowColumnIndices<kDGLCUDA, int32_t>(CSRMatrix, int64_t);
+template NDArray CSRGetRowColumnIndices<kDGLCUDA, int64_t>(CSRMatrix, int64_t);
 
 ///////////////////////////// CSRGetRowData /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 NDArray CSRGetRowData(CSRMatrix csr, int64_t row) {
   const int64_t len = impl::CSRGetRowNNZ<XPU, IdType>(csr, row);
   const int64_t offset = aten::IndexSelect<IdType>(csr.indptr, row) * sizeof(IdType);
@@ -189,12 +189,12 @@ NDArray CSRGetRowData(CSRMatrix csr, int64_t row) {
     return aten::Range(offset, offset + len, csr.indptr->dtype.bits, csr.indptr->ctx);
 }
 
-template NDArray CSRGetRowData<kDLGPU, int32_t>(CSRMatrix, int64_t);
-template NDArray CSRGetRowData<kDLGPU, int64_t>(CSRMatrix, int64_t);
+template NDArray CSRGetRowData<kDGLCUDA, int32_t>(CSRMatrix, int64_t);
+template NDArray CSRGetRowData<kDGLCUDA, int64_t>(CSRMatrix, int64_t);
 
 ///////////////////////////// CSRSliceRows /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end) {
   const int64_t num_rows = end - start;
   const IdType st_pos = aten::IndexSelect<IdType>(csr.indptr, start);
@@ -215,8 +215,8 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end) {
                    csr.sorted);
 }
 
-template CSRMatrix CSRSliceRows<kDLGPU, int32_t>(CSRMatrix, int64_t, int64_t);
-template CSRMatrix CSRSliceRows<kDLGPU, int64_t>(CSRMatrix, int64_t, int64_t);
+template CSRMatrix CSRSliceRows<kDGLCUDA, int32_t>(CSRMatrix, int64_t, int64_t);
+template CSRMatrix CSRSliceRows<kDGLCUDA, int64_t>(CSRMatrix, int64_t, int64_t);
 
 /*!
  * \brief Copy data segment to output buffers
@@ -243,7 +243,7 @@ __global__ void _SegmentCopyKernel(
   }
 }
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
   cudaStream_t stream = runtime::getCurrentCUDAStream();
   const int64_t len = rows->shape[0];
@@ -272,8 +272,8 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
                    csr.sorted);
 }
 
-template CSRMatrix CSRSliceRows<kDLGPU, int32_t>(CSRMatrix , NDArray);
-template CSRMatrix CSRSliceRows<kDLGPU, int64_t>(CSRMatrix , NDArray);
+template CSRMatrix CSRSliceRows<kDGLCUDA, int32_t>(CSRMatrix , NDArray);
+template CSRMatrix CSRSliceRows<kDGLCUDA, int64_t>(CSRMatrix , NDArray);
 
 ///////////////////////////// CSRGetDataAndIndices /////////////////////////////
 
@@ -345,7 +345,7 @@ __global__ void _SortedSearchKernel(
   }
 }
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 std::vector<NDArray> CSRGetDataAndIndices(CSRMatrix csr, NDArray row, NDArray col) {
   const auto rowlen = row->shape[0];
   const auto collen = col->shape[0];
@@ -392,9 +392,9 @@ std::vector<NDArray> CSRGetDataAndIndices(CSRMatrix csr, NDArray row, NDArray co
   return {ret_row, ret_col, ret_data};
 }
 
-template std::vector<NDArray> CSRGetDataAndIndices<kDLGPU, int32_t>(
+template std::vector<NDArray> CSRGetDataAndIndices<kDGLCUDA, int32_t>(
     CSRMatrix csr, NDArray rows, NDArray cols);
-template std::vector<NDArray> CSRGetDataAndIndices<kDLGPU, int64_t>(
+template std::vector<NDArray> CSRGetDataAndIndices<kDGLCUDA, int64_t>(
     CSRMatrix csr, NDArray rows, NDArray cols);
 
 ///////////////////////////// CSRSliceMatrix /////////////////////////////
@@ -422,7 +422,7 @@ __global__ void _SegmentMaskColKernel(
   }
 }
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols) {
   cudaStream_t stream = runtime::getCurrentCUDAStream();
   const auto& ctx = rows->ctx;
@@ -501,9 +501,9 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray 
                    ret_col, ret_data);
 }
 
-template CSRMatrix CSRSliceMatrix<kDLGPU, int32_t>(
+template CSRMatrix CSRSliceMatrix<kDGLCUDA, int32_t>(
     CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
-template CSRMatrix CSRSliceMatrix<kDLGPU, int64_t>(
+template CSRMatrix CSRSliceMatrix<kDGLCUDA, int64_t>(
     CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
 
 }  // namespace impl

@@ -8,7 +8,7 @@ using namespace dgl::runtime;
 namespace {
 
 template <typename IDX>
-aten::CSRMatrix CSR1(DLContext ctx = CTX) {
+aten::CSRMatrix CSR1(DGLContext ctx = CTX) {
   // [[0, 1, 1, 0, 0],
   //  [1, 0, 0, 0, 0],
   //  [0, 0, 1, 1, 0],
@@ -23,7 +23,7 @@ aten::CSRMatrix CSR1(DLContext ctx = CTX) {
 }
 
 template <typename IDX>
-aten::CSRMatrix CSR2(DLContext ctx = CTX) {
+aten::CSRMatrix CSR2(DGLContext ctx = CTX) {
   // has duplicate entries
   // [[0, 1, 2, 0, 0],
   //  [1, 0, 0, 0, 0],
@@ -39,7 +39,7 @@ aten::CSRMatrix CSR2(DLContext ctx = CTX) {
 }
 
 template <typename IDX>
-aten::CSRMatrix CSR3(DLContext ctx = CTX) {
+aten::CSRMatrix CSR3(DGLContext ctx = CTX) {
   // has duplicate entries and the columns are not sorted
   // [[0, 1, 1, 1, 0],
   //  [1, 0, 0, 0, 0],
@@ -63,7 +63,7 @@ aten::CSRMatrix CSR3(DLContext ctx = CTX) {
 }
 
 template <typename IDX>
-aten::COOMatrix COO1(DLContext ctx = CTX) {
+aten::COOMatrix COO1(DGLContext ctx = CTX) {
   // [[0, 1, 1, 0, 0],
   //  [1, 0, 0, 0, 0],
   //  [0, 0, 1, 1, 0],
@@ -78,7 +78,7 @@ aten::COOMatrix COO1(DLContext ctx = CTX) {
 }
 
 template <typename IDX>
-aten::COOMatrix COO2(DLContext ctx = CTX) {
+aten::COOMatrix COO2(DGLContext ctx = CTX) {
   // has duplicate entries
   // [[0, 1, 2, 0, 0],
   //  [1, 0, 0, 0, 0],
@@ -94,7 +94,7 @@ aten::COOMatrix COO2(DLContext ctx = CTX) {
 }
 
 template <typename IDX>
-aten::CSRMatrix SR_CSR3(DLContext ctx) {
+aten::CSRMatrix SR_CSR3(DGLContext ctx) {
   // [[0, 1, 2, 0, 0],
   //  [1, 0, 0, 0, 0],
   //  [0, 0, 1, 1, 0],
@@ -108,7 +108,7 @@ aten::CSRMatrix SR_CSR3(DLContext ctx) {
 }
 
 template <typename IDX>
-aten::CSRMatrix SRC_CSR3(DLContext ctx) {
+aten::CSRMatrix SRC_CSR3(DGLContext ctx) {
   // [[0, 1, 2, 0, 0],
   //  [1, 0, 0, 0, 0],
   //  [0, 0, 1, 1, 0],
@@ -122,7 +122,7 @@ aten::CSRMatrix SRC_CSR3(DLContext ctx) {
 }
 
 template <typename IDX>
-aten::COOMatrix COO3(DLContext ctx) {
+aten::COOMatrix COO3(DGLContext ctx) {
   // has duplicate entries
   // [[0, 1, 2, 0, 0],
   //  [1, 0, 0, 0, 0],
@@ -139,7 +139,7 @@ aten::COOMatrix COO3(DLContext ctx) {
 }  // namespace
 
 template <typename IDX>
-void _TestCSRIsNonZero1(DLContext ctx) {
+void _TestCSRIsNonZero1(DGLContext ctx) {
   auto csr = CSR1<IDX>(ctx);
   ASSERT_TRUE(aten::CSRIsNonZero(csr, 0, 1));
   ASSERT_FALSE(aten::CSRIsNonZero(csr, 0, 0));
@@ -151,7 +151,7 @@ void _TestCSRIsNonZero1(DLContext ctx) {
 }
 
 template <typename IDX>
-void _TestCSRIsNonZero2(DLContext ctx) {
+void _TestCSRIsNonZero2(DGLContext ctx) {
   auto csr = CSR3<IDX>(ctx);
   ASSERT_TRUE(aten::CSRIsNonZero(csr, 0, 1));
   ASSERT_FALSE(aten::CSRIsNonZero(csr, 0, 0));
@@ -176,7 +176,7 @@ TEST(SpmatTest, TestCSRIsNonZero) {
 }
 
 template <typename IDX>
-void _TestCSRGetRowNNZ(DLContext ctx) {
+void _TestCSRGetRowNNZ(DGLContext ctx) {
   auto csr = CSR2<IDX>(ctx);
   ASSERT_EQ(aten::CSRGetRowNNZ(csr, 0), 3);
   ASSERT_EQ(aten::CSRGetRowNNZ(csr, 3), 0);
@@ -196,7 +196,7 @@ TEST(SpmatTest, TestCSRGetRowNNZ) {
 }
 
 template <typename IDX>
-void _TestCSRGetRowColumnIndices(DLContext ctx) {
+void _TestCSRGetRowColumnIndices(DGLContext ctx) {
   auto csr = CSR2<IDX>(ctx);
   auto x = aten::CSRGetRowColumnIndices(csr, 0);
   auto tx = aten::VecToIdArray(std::vector<IDX>({1, 2, 2}), sizeof(IDX)*8, ctx);
@@ -219,7 +219,7 @@ TEST(SpmatTest, TestCSRGetRowColumnIndices) {
 }
 
 template <typename IDX>
-void _TestCSRGetRowData(DLContext ctx) {
+void _TestCSRGetRowData(DGLContext ctx) {
   auto csr = CSR2<IDX>(ctx);
   auto x = aten::CSRGetRowData(csr, 0);
   auto tx = aten::VecToIdArray(std::vector<IDX>({0, 2, 5}), sizeof(IDX)*8, ctx);
@@ -242,7 +242,7 @@ TEST(SpmatTest, TestCSRGetRowData) {
 }
 
 template <typename IDX>
-void _TestCSRGetData(DLContext ctx) {
+void _TestCSRGetData(DGLContext ctx) {
   auto csr = CSR2<IDX>(ctx);
   // test get all data
   auto x = aten::CSRGetAllData(csr, 0, 0);
@@ -286,7 +286,7 @@ TEST(SpmatTest, CSRGetData) {
 }
 
 template <typename IDX>
-void _TestCSRGetDataAndIndices(DLContext ctx) {
+void _TestCSRGetDataAndIndices(DGLContext ctx) {
   auto csr = CSR2<IDX>(ctx);
   auto r = aten::VecToIdArray(std::vector<IDX>({0, 0, 0}), sizeof(IDX)*8, ctx);
   auto c = aten::VecToIdArray(std::vector<IDX>({0, 1, 2}), sizeof(IDX)*8, ctx);
@@ -309,7 +309,7 @@ TEST(SpmatTest, CSRGetDataAndIndices) {
 }
 
 template <typename IDX>
-void _TestCSRTranspose(DLContext ctx) {
+void _TestCSRTranspose(DGLContext ctx) {
   auto csr = CSR2<IDX>(ctx);
   auto csr_t = aten::CSRTranspose(csr);
   // [[0, 1, 0, 0],
@@ -338,7 +338,7 @@ TEST(SpmatTest, CSRTranspose) {
 }
 
 template <typename IDX>
-void _TestCSRToCOO(DLContext ctx) {
+void _TestCSRToCOO(DGLContext ctx) {
   auto csr = CSR2<IDX>(ctx);
   {
   auto coo = CSRToCOO(csr, false);
@@ -382,7 +382,7 @@ TEST(SpmatTest, CSRToCOO) {
 }
 
 template <typename IDX>
-void _TestCSRSliceRows(DLContext ctx) {
+void _TestCSRSliceRows(DGLContext ctx) {
   auto csr = CSR2<IDX>(ctx);
   auto x = aten::CSRSliceRows(csr, 1, 4);
   //  [1, 0, 0, 0, 0],
@@ -480,7 +480,7 @@ TEST(SpmatTest, TestCSRSliceRows) {
 }
 
 template <typename IDX>
-void _TestCSRSliceMatrix1(DLContext ctx) {
+void _TestCSRSliceMatrix1(DGLContext ctx) {
   auto csr = CSR2<IDX>(ctx);
   {
   // square
@@ -538,7 +538,7 @@ void _TestCSRSliceMatrix1(DLContext ctx) {
 }
 
 template <typename IDX>
-void _TestCSRSliceMatrix2(DLContext ctx) {
+void _TestCSRSliceMatrix2(DGLContext ctx) {
   auto csr = CSR3<IDX>(ctx);
   {
   // square
@@ -611,7 +611,7 @@ TEST(SpmatTest, CSRSliceMatrix) {
 }
 
 template <typename IDX>
-void _TestCSRHasDuplicate(DLContext ctx) {
+void _TestCSRHasDuplicate(DGLContext ctx) {
   auto csr = CSR1<IDX>(ctx);
   ASSERT_FALSE(aten::CSRHasDuplicate(csr));
   csr = CSR2<IDX>(ctx);
@@ -628,7 +628,7 @@ TEST(SpmatTest, CSRHasDuplicate) {
 }
 
 template <typename IDX>
-void _TestCSRSort(DLContext ctx) {
+void _TestCSRSort(DGLContext ctx) {
   auto csr = CSR1<IDX>(ctx);
   ASSERT_FALSE(aten::CSRIsSorted(csr));
   auto csr1 = aten::CSRSort(csr);
