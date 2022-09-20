@@ -80,8 +80,10 @@ using ETypeNumPicksFn = std::function<IdxType(
 // OpenMP parallelization on rows because each row performs computation independently.
 template <typename IdxType, typename EType>
 CSRMatrix CSRRowWisePerEtypePickPartial(
-    CSRMatrix mat, IdArray rows, IdArray etypes, bool etype_sorted,
-    const std::vector<int64_t>& max_num_picks, ETypePickFn<IdxType, EType> pick_fn,
+    CSRMatrix mat, IdArray rows, IdArray etypes,
+    const std::vector<int64_t>& max_num_picks,
+    bool etype_sorted,
+    ETypePickFn<IdxType, EType> pick_fn,
     ETypeNumPicksFn<IdxType, EType> num_picks_fn) {
   using namespace aten;
   const DLDataType idtype = DLDataTypeTraits<IdxType>::dtype;
