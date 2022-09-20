@@ -23,7 +23,7 @@ __global__ void _ScatterKernel(const IdType* index, const DType* value,
   }
 }
 
-template <DLDeviceType XPU, typename DType, typename IdType>
+template <DGLDeviceType XPU, typename DType, typename IdType>
 void Scatter_(IdArray index, NDArray value, NDArray out) {
   const int64_t len = index->shape[0];
   const IdType* idx = index.Ptr<IdType>();
@@ -37,20 +37,20 @@ void Scatter_(IdArray index, NDArray value, NDArray out) {
       idx, val, len, outd);
 }
 
-template void Scatter_<kDLGPU, int32_t, int32_t>(IdArray, NDArray, NDArray);
-template void Scatter_<kDLGPU, int64_t, int32_t>(IdArray, NDArray, NDArray);
+template void Scatter_<kDGLCUDA, int32_t, int32_t>(IdArray, NDArray, NDArray);
+template void Scatter_<kDGLCUDA, int64_t, int32_t>(IdArray, NDArray, NDArray);
 #ifdef USE_FP16
-template void Scatter_<kDLGPU, __half, int32_t>(IdArray, NDArray, NDArray);
+template void Scatter_<kDGLCUDA, __half, int32_t>(IdArray, NDArray, NDArray);
 #endif
-template void Scatter_<kDLGPU, float, int32_t>(IdArray, NDArray, NDArray);
-template void Scatter_<kDLGPU, double, int32_t>(IdArray, NDArray, NDArray);
-template void Scatter_<kDLGPU, int32_t, int64_t>(IdArray, NDArray, NDArray);
-template void Scatter_<kDLGPU, int64_t, int64_t>(IdArray, NDArray, NDArray);
+template void Scatter_<kDGLCUDA, float, int32_t>(IdArray, NDArray, NDArray);
+template void Scatter_<kDGLCUDA, double, int32_t>(IdArray, NDArray, NDArray);
+template void Scatter_<kDGLCUDA, int32_t, int64_t>(IdArray, NDArray, NDArray);
+template void Scatter_<kDGLCUDA, int64_t, int64_t>(IdArray, NDArray, NDArray);
 #ifdef USE_FP16
-template void Scatter_<kDLGPU, __half, int64_t>(IdArray, NDArray, NDArray);
+template void Scatter_<kDGLCUDA, __half, int64_t>(IdArray, NDArray, NDArray);
 #endif
-template void Scatter_<kDLGPU, float, int64_t>(IdArray, NDArray, NDArray);
-template void Scatter_<kDLGPU, double, int64_t>(IdArray, NDArray, NDArray);
+template void Scatter_<kDGLCUDA, float, int64_t>(IdArray, NDArray, NDArray);
+template void Scatter_<kDGLCUDA, double, int64_t>(IdArray, NDArray, NDArray);
 
 };  // namespace impl
 };  // namespace aten

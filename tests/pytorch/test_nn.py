@@ -1146,17 +1146,26 @@ def myagg(alist, dsttype):
 
 @parametrize_idtype
 @pytest.mark.parametrize('agg', ['sum', 'max', 'min', 'mean', 'stack', myagg])
-def test_hetero_conv(agg, idtype):
+@pytest.mark.parametrize('canonical_keys', [False, True])
+def test_hetero_conv(agg, idtype, canonical_keys):
     g = dgl.heterograph({
         ('user', 'follows', 'user'): ([0, 0, 2, 1], [1, 2, 1, 3]),
         ('user', 'plays', 'game'): ([0, 0, 0, 1, 2], [0, 2, 3, 0, 2]),
         ('store', 'sells', 'game'): ([0, 0, 1, 1], [0, 3, 1, 2])},
         idtype=idtype, device=F.ctx())
-    conv = nn.HeteroGraphConv({
-        'follows': nn.GraphConv(2, 3, allow_zero_in_degree=True),
-        'plays': nn.GraphConv(2, 4, allow_zero_in_degree=True),
-        'sells': nn.GraphConv(3, 4, allow_zero_in_degree=True)},
-        agg)
+    if not canonical_keys:
+        conv = nn.HeteroGraphConv({
+            'follows': nn.GraphConv(2, 3, allow_zero_in_degree=True),
+            'plays': nn.GraphConv(2, 4, allow_zero_in_degree=True),
+            'sells': nn.GraphConv(3, 4, allow_zero_in_degree=True)},
+            agg)
+    else:
+        conv = nn.HeteroGraphConv({
+            ('user', 'follows', 'user'): nn.GraphConv(2, 3, allow_zero_in_degree=True),
+            ('user', 'plays', 'game'): nn.GraphConv(2, 4, allow_zero_in_degree=True),
+            ('store', 'sells', 'game'): nn.GraphConv(3, 4, allow_zero_in_degree=True)},
+            agg)
+
     conv = conv.to(F.ctx())
 
     # test pickle
@@ -1622,7 +1631,6 @@ def test_dgn_conv(in_size, out_size, aggregators, scalers, delta,
     model = nn.DGNConv(in_size, out_size, aggregators_non_eig, scalers, delta, dropout,
         num_towers, edge_feat_size, residual).to(dev)
     model(g, h, edge_feat=e)
-
 
 @parametrize_idtype
 @pytest.mark.parametrize('meta_path', [['uc','cu'],['uc','cp','pc','cu']])

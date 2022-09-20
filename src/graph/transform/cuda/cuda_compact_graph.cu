@@ -70,7 +70,7 @@ void BuildNodeMaps(
   for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
     const IdArray& nodes = input_nodes[ntype];
     if (nodes->shape[0] > 0) {
-      CHECK_EQ(nodes->ctx.device_type, kDLGPU);
+      CHECK_EQ(nodes->ctx.device_type, kDGLCUDA);
       node_maps->LhsHashTable(ntype).FillWithDuplicates(
           nodes.Ptr<IdType>(),
           nodes->shape[0],
@@ -92,7 +92,7 @@ CompactGraphsGPU(
   auto device = runtime::DeviceAPI::Get(ctx);
   cudaStream_t stream = runtime::getCurrentCUDAStream();
 
-  CHECK_EQ(ctx.device_type, kDLGPU);
+  CHECK_EQ(ctx.device_type, kDGLCUDA);
 
   // Step 1: Collect the nodes that has connections for each type.
   const uint64_t num_ntypes = graphs[0]->NumVertexTypes();
@@ -206,8 +206,8 @@ CompactGraphsGPU(
     num_induced_nodes.data(), 0,
     sizeof(*num_induced_nodes.data())*num_ntypes,
     ctx,
-    DGLContext{kDLCPU, 0},
-    DGLType{kDLInt, 64, 1});
+    DGLContext{kDGLCPU, 0},
+    DGLDataType{kDGLInt, 64, 1});
   device->StreamSync(ctx, stream);
 
   // wait for the node counts to finish transferring
@@ -255,7 +255,7 @@ CompactGraphsGPU(
 
 template<>
 std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>>
-CompactGraphs<kDLGPU, int32_t>(
+CompactGraphs<kDGLCUDA, int32_t>(
     const std::vector<HeteroGraphPtr> &graphs,
     const std::vector<IdArray> &always_preserve) {
   return CompactGraphsGPU<int32_t>(graphs, always_preserve);
@@ -263,7 +263,7 @@ CompactGraphs<kDLGPU, int32_t>(
 
 template<>
 std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>>
-CompactGraphs<kDLGPU, int64_t>(
+CompactGraphs<kDGLCUDA, int64_t>(
     const std::vector<HeteroGraphPtr> &graphs,
     const std::vector<IdArray> &always_preserve) {
   return CompactGraphsGPU<int64_t>(graphs, always_preserve);

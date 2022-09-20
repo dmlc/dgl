@@ -34,7 +34,7 @@ __global__ void _SegmentIsSorted(
   }
 }
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 bool CSRIsSorted(CSRMatrix csr) {
   const auto& ctx = csr.indptr->ctx;
   cudaStream_t stream = runtime::getCurrentCUDAStream();
@@ -53,16 +53,16 @@ bool CSRIsSorted(CSRMatrix csr) {
   return ret;
 }
 
-template bool CSRIsSorted<kDLGPU, int32_t>(CSRMatrix csr);
-template bool CSRIsSorted<kDLGPU, int64_t>(CSRMatrix csr);
+template bool CSRIsSorted<kDGLCUDA, int32_t>(CSRMatrix csr);
+template bool CSRIsSorted<kDGLCUDA, int64_t>(CSRMatrix csr);
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 void CSRSort_(CSRMatrix* csr) {
   LOG(FATAL) << "Unreachable codes";
 }
 
 template <>
-void CSRSort_<kDLGPU, int32_t>(CSRMatrix* csr) {
+void CSRSort_<kDGLCUDA, int32_t>(CSRMatrix* csr) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   auto device = runtime::DeviceAPI::Get(csr->indptr->ctx);
   cudaStream_t stream = runtime::getCurrentCUDAStream();
@@ -108,7 +108,7 @@ void CSRSort_<kDLGPU, int32_t>(CSRMatrix* csr) {
 }
 
 template <>
-void CSRSort_<kDLGPU, int64_t>(CSRMatrix* csr) {
+void CSRSort_<kDGLCUDA, int64_t>(CSRMatrix* csr) {
   cudaStream_t stream = runtime::getCurrentCUDAStream();
   auto device = runtime::DeviceAPI::Get(csr->indptr->ctx);
 
@@ -147,8 +147,8 @@ void CSRSort_<kDLGPU, int64_t>(CSRMatrix* csr) {
   device->FreeWorkspace(ctx, workspace);
 }
 
-template void CSRSort_<kDLGPU, int32_t>(CSRMatrix* csr);
-template void CSRSort_<kDLGPU, int64_t>(CSRMatrix* csr);
+template void CSRSort_<kDGLCUDA, int32_t>(CSRMatrix* csr);
+template void CSRSort_<kDGLCUDA, int64_t>(CSRMatrix* csr);
 
 }  // namespace impl
 }  // namespace aten

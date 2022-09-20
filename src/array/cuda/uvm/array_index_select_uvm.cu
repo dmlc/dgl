@@ -25,7 +25,7 @@ NDArray IndexSelectCPUFromGPU(NDArray array, IdArray index) {
   std::vector<int64_t> shape{len};
 
   CHECK(array.IsPinned());
-  CHECK_EQ(index->ctx.device_type, kDLGPU);
+  CHECK_EQ(index->ctx.device_type, kDGLCUDA);
 
   for (int d = 1; d < array->ndim; ++d) {
     num_feat *= array->shape[d];
@@ -85,8 +85,8 @@ void IndexScatterGPUToCPU(NDArray dest, IdArray index, NDArray source) {
   std::vector<int64_t> shape{len};
 
   CHECK(dest.IsPinned());
-  CHECK_EQ(index->ctx.device_type, kDLGPU);
-  CHECK_EQ(source->ctx.device_type, kDLGPU);
+  CHECK_EQ(index->ctx.device_type, kDGLCUDA);
+  CHECK_EQ(source->ctx.device_type, kDGLCUDA);
 
   for (int d = 1; d < source->ndim; ++d) {
     num_feat *= source->shape[d];

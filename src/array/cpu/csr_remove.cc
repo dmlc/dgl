@@ -15,7 +15,7 @@ namespace impl {
 
 namespace {
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 void CSRRemoveConsecutive(
     CSRMatrix csr,
     IdArray entries,
@@ -48,7 +48,7 @@ void CSRRemoveConsecutive(
   }
 }
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 void CSRRemoveShuffled(
     CSRMatrix csr,
     IdArray entries,
@@ -77,7 +77,7 @@ void CSRRemoveShuffled(
 
 };  // namespace
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries) {
   CHECK_SAME_DTYPE(csr.indices, entries);
   const int64_t nnz = csr.indices->shape[0];
@@ -103,8 +103,8 @@ CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries) {
       IdArray::FromVector(new_eids));
 }
 
-template CSRMatrix CSRRemove<kDLCPU, int32_t>(CSRMatrix csr, IdArray entries);
-template CSRMatrix CSRRemove<kDLCPU, int64_t>(CSRMatrix csr, IdArray entries);
+template CSRMatrix CSRRemove<kDGLCPU, int32_t>(CSRMatrix csr, IdArray entries);
+template CSRMatrix CSRRemove<kDGLCPU, int64_t>(CSRMatrix csr, IdArray entries);
 
 };  // namespace impl
 };  // namespace aten

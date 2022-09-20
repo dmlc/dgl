@@ -7,9 +7,9 @@
 #define DGL_ARRAY_CUDA_UTILS_H_
 
 #include <dmlc/logging.h>
+#include <dgl/runtime/c_runtime_api.h>
 #include <dgl/runtime/device_api.h>
 #include <dgl/runtime/ndarray.h>
-#include <dlpack/dlpack.h>
 #include "../../runtime/cuda/cuda_common.h"
 
 namespace dgl {
@@ -115,7 +115,7 @@ __device__ __forceinline__ T _ldg(T* addr) {
  * \param ctx Device context.
  * \return True if all the flags are true.
  */
-bool AllTrue(int8_t* flags, int64_t length, const DLContext& ctx);
+bool AllTrue(int8_t* flags, int64_t length, const DGLContext& ctx);
 
 /*!
  * \brief CUDA Kernel of filling the vector started from ptr of size length
@@ -187,7 +187,7 @@ __global__ void _LinearSearchKernel(
 template <typename DType>
 inline DType GetCUDAScalar(
     runtime::DeviceAPI* device_api,
-    DLContext ctx,
+    DGLContext ctx,
     const DType* cuda_ptr) {
   DType result;
   device_api->CopyDataFromTo(
@@ -195,8 +195,8 @@ inline DType GetCUDAScalar(
       &result, 0,
       sizeof(result),
       ctx,
-      DLContext{kDLCPU, 0},
-      DLDataTypeTraits<DType>::dtype);
+      DGLContext{kDGLCPU, 0},
+      DGLDataTypeTraits<DType>::dtype);
   return result;
 }
 

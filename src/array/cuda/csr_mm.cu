@@ -256,18 +256,18 @@ std::pair<CSRMatrix, NDArray> CSRMM(
 }
 
 #ifdef USE_FP16
-template std::pair<CSRMatrix, NDArray> CSRMM<kDLGPU, int32_t, __half>(
+template std::pair<CSRMatrix, NDArray> CSRMM<kDGLCUDA, int32_t, __half>(
     const CSRMatrix&, NDArray, const CSRMatrix&, NDArray);
-template std::pair<CSRMatrix, NDArray> CSRMM<kDLGPU, int64_t, __half>(
+template std::pair<CSRMatrix, NDArray> CSRMM<kDGLCUDA, int64_t, __half>(
     const CSRMatrix&, NDArray, const CSRMatrix&, NDArray);
 #endif
-template std::pair<CSRMatrix, NDArray> CSRMM<kDLGPU, int32_t, float>(
+template std::pair<CSRMatrix, NDArray> CSRMM<kDGLCUDA, int32_t, float>(
     const CSRMatrix&, NDArray, const CSRMatrix&, NDArray);
-template std::pair<CSRMatrix, NDArray> CSRMM<kDLGPU, int64_t, float>(
+template std::pair<CSRMatrix, NDArray> CSRMM<kDGLCUDA, int64_t, float>(
     const CSRMatrix&, NDArray, const CSRMatrix&, NDArray);
-template std::pair<CSRMatrix, NDArray> CSRMM<kDLGPU, int32_t, double>(
+template std::pair<CSRMatrix, NDArray> CSRMM<kDGLCUDA, int32_t, double>(
     const CSRMatrix&, NDArray, const CSRMatrix&, NDArray);
-template std::pair<CSRMatrix, NDArray> CSRMM<kDLGPU, int64_t, double>(
+template std::pair<CSRMatrix, NDArray> CSRMM<kDGLCUDA, int64_t, double>(
     const CSRMatrix&, NDArray, const CSRMatrix&, NDArray);
 
 }  // namespace aten

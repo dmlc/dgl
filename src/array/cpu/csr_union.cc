@@ -14,7 +14,7 @@ namespace dgl {
 namespace aten {
 namespace impl {
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 CSRMatrix UnionCsr(const std::vector<CSRMatrix>& csrs) {
   std::vector<IdType> res_indptr;
   std::vector<IdType> res_indices;
@@ -109,8 +109,8 @@ CSRMatrix UnionCsr(const std::vector<CSRMatrix>& csrs) {
     sorted);
 }
 
-template CSRMatrix UnionCsr<kDLCPU, int64_t>(const std::vector<CSRMatrix>&);
-template CSRMatrix UnionCsr<kDLCPU, int32_t>(const std::vector<CSRMatrix>&);
+template CSRMatrix UnionCsr<kDGLCPU, int64_t>(const std::vector<CSRMatrix>&);
+template CSRMatrix UnionCsr<kDGLCPU, int32_t>(const std::vector<CSRMatrix>&);
 
 }  // namespace impl
 }  // namespace aten

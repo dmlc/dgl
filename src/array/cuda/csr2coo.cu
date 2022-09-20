@@ -14,14 +14,14 @@ using runtime::NDArray;
 namespace aten {
 namespace impl {
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 COOMatrix CSRToCOO(CSRMatrix csr) {
   LOG(FATAL) << "Unreachable codes";
   return {};
 }
 
 template <>
-COOMatrix CSRToCOO<kDLGPU, int32_t>(CSRMatrix csr) {
+COOMatrix CSRToCOO<kDGLCUDA, int32_t>(CSRMatrix csr) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   cudaStream_t stream = runtime::getCurrentCUDAStream();
   // allocate cusparse handle if needed
@@ -77,7 +77,7 @@ __global__ void _RepeatKernel(
 }
 
 template <>
-COOMatrix CSRToCOO<kDLGPU, int64_t>(CSRMatrix csr) {
+COOMatrix CSRToCOO<kDGLCUDA, int64_t>(CSRMatrix csr) {
   const auto& ctx = csr.indptr->ctx;
   cudaStream_t stream = runtime::getCurrentCUDAStream();
 
@@ -99,18 +99,18 @@ COOMatrix CSRToCOO<kDLGPU, int64_t>(CSRMatrix csr) {
                    true, csr.sorted);
 }
 
-template COOMatrix CSRToCOO<kDLGPU, int32_t>(CSRMatrix csr);
-template COOMatrix CSRToCOO<kDLGPU, int64_t>(CSRMatrix csr);
+template COOMatrix CSRToCOO<kDGLCUDA, int32_t>(CSRMatrix csr);
+template COOMatrix CSRToCOO<kDGLCUDA, int64_t>(CSRMatrix csr);
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 COOMatrix CSRToCOODataAsOrder(CSRMatrix csr) {
   LOG(FATAL) << "Unreachable codes";
   return {};
 }
 
 template <>
-COOMatrix CSRToCOODataAsOrder<kDLGPU, int32_t>(CSRMatrix csr) {
-  COOMatrix coo = CSRToCOO<kDLGPU, int32_t>(csr);
+COOMatrix CSRToCOODataAsOrder<kDGLCUDA, int32_t>(CSRMatrix csr) {
+  COOMatrix coo = CSRToCOO<kDGLCUDA, int32_t>(csr);
   if (aten::IsNullArray(coo.data))
     return coo;
 
@@ -156,8 +156,8 @@ COOMatrix CSRToCOODataAsOrder<kDLGPU, int32_t>(CSRMatrix csr) {
 }
 
 template <>
-COOMatrix CSRToCOODataAsOrder<kDLGPU, int64_t>(CSRMatrix csr) {
-  COOMatrix coo = CSRToCOO<kDLGPU, int64_t>(csr);
+COOMatrix CSRToCOODataAsOrder<kDGLCUDA, int64_t>(CSRMatrix csr) {
+  COOMatrix coo = CSRToCOO<kDGLCUDA, int64_t>(csr);
   if (aten::IsNullArray(coo.data))
     return coo;
   const auto& sorted = Sort(coo.data);
@@ -173,8 +173,8 @@ COOMatrix CSRToCOODataAsOrder<kDLGPU, int64_t>(CSRMatrix csr) {
   return coo;
 }
 
-template COOMatrix CSRToCOODataAsOrder<kDLGPU, int32_t>(CSRMatrix csr);
-template COOMatrix CSRToCOODataAsOrder<kDLGPU, int64_t>(CSRMatrix csr);
+template COOMatrix CSRToCOODataAsOrder<kDGLCUDA, int32_t>(CSRMatrix csr);
+template COOMatrix CSRToCOODataAsOrder<kDGLCUDA, int64_t>(CSRMatrix csr);
 
 }  // namespace impl
 }  // namespace aten
