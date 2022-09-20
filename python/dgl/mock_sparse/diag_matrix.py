@@ -150,10 +150,6 @@ def diag(val: torch.Tensor, shape: Optional[Tuple[int, int]] = None) -> DiagMatr
     >>> print(mat)
     DiagMatrix(val=tensor([1., 1., 1., 1., 1.]),
                shape=(5, 5))
-    >>> mat.shape
-    (5, 5)
-    >>> mat.nnz
-    5
 
     Case2: 5-by-10 diagonal matrix with scaler values on the diagonal
 
@@ -162,10 +158,6 @@ def diag(val: torch.Tensor, shape: Optional[Tuple[int, int]] = None) -> DiagMatr
     >>> print(mat)
     DiagMatrix(val=tensor([1., 1., 1., 1., 1.]),
                shape=(5, 10))
-    >>> mat.shape
-    (5, 10)
-    >>> mat.nnz
-    5
 
     Case3: 5-by-5 diagonal matrix with tensor values on the diagonal
 
@@ -215,12 +207,6 @@ def identity(shape: Tuple[int, int],
     >>> print(mat)
     DiagMatrix(val=tensor([1., 1., 1.]),
                shape=(3, 3))
-    >>> mat.val
-    tensor([1., 1., 1.])
-    >>> mat.shape
-    (3, 3)
-    >>> mat.nnz
-    3
 
     Case2: 3-by-5 matrix with scaler diagonal values
 
@@ -232,12 +218,6 @@ def identity(shape: Tuple[int, int],
     >>> print(mat)
     DiagMatrix(val=tensor([1., 1., 1.]),
                shape=(3, 5))
-    >>> mat.val
-    tensor([1., 1., 1.])
-    >>> mat.shape
-    (3, 5)
-    >>> mat.nnz
-    3
 
     Case3: 3-by-3 matrix with tensor diagonal values
 
