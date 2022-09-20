@@ -50,6 +50,7 @@ def submit_jobs(args) -> str:
     argslist += "--num-parts {} ".format(num_parts)
     argslist += "--output {} ".format(os.path.abspath(args.out_dir))
     argslist += "--process-group-timeout {} ".format(args.process_group_timeout)
+    argslist += "--log {} ".format(args.log)
 
     # (BarclayII) Is it safe to assume all the workers have the Python executable at the same path?
     pipeline_cmd = os.path.join(INSTALL_DIR, PIPELINE_SCRIPT)
@@ -69,6 +70,7 @@ def main():
     parser.add_argument('--out-dir', type=str, help='Location of the output directory where the graph partitions will be created by this pipeline')
     parser.add_argument('--ip-config', type=str, help='File location of IP configuration for server processes')
     parser.add_argument('--master-port', type=int, default=12345, help='port used by gloo group to create randezvous point')
+    parser.add_argument('--log', type=str, default="info", help='to enable logging at a given level')
     parser.add_argument('--python-path', type=str, default=sys.executable, help='Path to the Python executable on all workers')
     parser.add_argument('--process-group-timeout', type=int, default=1800,
                         help='timeout[seconds] for operations executed against the process group')
@@ -78,6 +80,7 @@ def main():
     assert os.path.isdir(args.in_dir)
     assert os.path.isdir(args.partitions_dir)
     assert os.path.isfile(args.ip_config)
+    assert isinstance(args.log, str)
     assert isinstance(args.master_port, int)
 
     tokens = sys.executable.split(os.sep)
