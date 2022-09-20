@@ -37,8 +37,6 @@ namespace impl {
 // \param col Pointer of the column indices.
 // \param data Pointer of the data indices.
 // \param et The current edge type.
-// \param et_offset Starting offset of this range.
-// \param cur_et The edge type.
 // \param et_off Starting offset of this range.
 // \param et_len Length of the range.
 // \param et_idx A map from local idx to column id.
@@ -47,8 +45,9 @@ namespace impl {
 // \param out_idx Picked indices putting into [et_off, et_off + et_len).
 template <typename IdxType, typename EType>
 using ETypePickFn = std::function<void(
-    IdxType off, IdxType et_offset, IdxType cur_et, IdxType et_len,
-    const std::vector<IdxType> &et_idx, const IdxType* data,
+    IdxType rid, IdxType off, IdxType len, IdxType num_picks,
+    const IdxType* col, const IdxType* data,
+    EType et, IdxType et_off, IdxType et_len, const IdxType* et_idx,
     IdxType* out_idx)>;
 
 

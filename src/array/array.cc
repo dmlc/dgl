@@ -555,10 +555,15 @@ COOMatrix CSRRowWiseSampling(
     // prob is pinned and rows on GPU is valid
     CHECK_VALID_CONTEXT(prob, rows);
     ATEN_CSR_SWITCH_CUDA_UVA(mat, rows, XPU, IdType, "CSRRowWiseSampling", {
-      ATEN_FLOAT_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
-        ret = impl::CSRRowWiseSampling<XPU, IdType, FloatType>(
-            mat, rows, num_samples, prob, replace);
-      });
+      if (XPU == kDLGPU && prob->dtype.code != kDLFloat) {
+        LOG(FATAL) <<
+            "Currently GPU neighbor sampling does not support sampling with edge masks.";
+      } else {
+        ATEN_FLOAT_BOOL_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
+          ret = impl::CSRRowWiseSampling<XPU, IdType, FloatType>(
+              mat, rows, num_samples, prob, replace);
+        });
+      }
     });
   }
   return ret;
@@ -571,11 +576,11 @@ COOMatrix CSRRowWisePerEtypeSampling(
   COOMatrix ret;
   ATEN_CSR_SWITCH(mat, XPU, IdType, "CSRRowWisePerEtypeSampling", {
     if (IsNullArray(prob)) {
-      ret = impl::CSRRowWisePerEtypeSamplingUniform<XPU, IdType>(
+      ret = impl::CSRRowWisePerEtypeSamplingUniform<XPU, IdType, IdType>(
             mat, rows, etypes, num_samples, replace, etype_sorted);
     } else {
-      ATEN_FLOAT_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
-        ret = impl::CSRRowWisePerEtypeSampling<XPU, IdType, FloatType>(
+      ATEN_FLOAT_BOOL_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
+        ret = impl::CSRRowWisePerEtypeSampling<XPU, IdType, FloatType, IdType>(
             mat, rows, etypes, num_samples, prob, replace, etype_sorted);
       });
     }

@@ -51,6 +51,7 @@ inline PickFn<IdxType> GetSamplingUniformPickFn(
      const IdxType* col, const IdxType* data,
      IdxType* out_idx) {
       if (num_samples == -1 || (!replace && len == num_picks)) {
+        // fast path for selecting all
         for (int64_t j = 0; j < len; ++j)
           out_idx[j] = off + j;
       } else {
@@ -97,6 +98,7 @@ inline PickFn<IdxType> GetSamplingPickFn(
       const FloatType* prob_data = prob.Ptr<FloatType>();
 
       if (num_samples == -1 || (!replace && len == num_picks)) {
+        // fast path for selecting all
         for (int64_t i = 0, j = 0; j < len; ++j) {
           const IdxType eid = data ? data[off + j] : off + j;
           if (prob_data[eid] > 0)
