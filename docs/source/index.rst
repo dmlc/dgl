@@ -55,6 +55,7 @@ Welcome to Deep Graph Library Tutorials and Documentation
    api/python/dgl.contrib.UnifiedTensor
    api/python/transforms
    api/python/udf
+   api/python/dgl.sparse_v0
 
 .. toctree::
    :maxdepth: 1
