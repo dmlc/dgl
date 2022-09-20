@@ -143,7 +143,7 @@ GraphPtr GraphOp::DisjointUnion(std::vector<GraphPtr> graphs) {
 std::vector<GraphPtr> GraphOp::DisjointPartitionByNum(GraphPtr graph, int64_t num) {
   CHECK(num != 0 && graph->NumVertices() % num == 0)
     << "Number of partitions must evenly divide the number of nodes.";
-  IdArray sizes = IdArray::Empty({num}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  IdArray sizes = IdArray::Empty({num}, DGLDataType{kDGLInt, 64, 1}, DGLContext{kDGLCPU, 0});
   int64_t* sizes_data = static_cast<int64_t*>(sizes->data);
   std::fill(sizes_data, sizes_data + num, graph->NumVertices() / num);
   return DisjointPartitionBySizes(graph, sizes);
@@ -257,7 +257,7 @@ IdArray GraphOp::MapParentIdToSubgraphId(IdArray parent_vids, IdArray query) {
   const auto query_len = query->shape[0];
   const dgl_id_t* parent_data = static_cast<dgl_id_t*>(parent_vids->data);
   const dgl_id_t* query_data = static_cast<dgl_id_t*>(query->data);
-  IdArray rst = IdArray::Empty({query_len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  IdArray rst = IdArray::Empty({query_len}, DGLDataType{kDGLInt, 64, 1}, DGLContext{kDGLCPU, 0});
   dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
 
   const bool is_sorted = std::is_sorted(parent_data, parent_data + parent_len);
@@ -303,7 +303,7 @@ IdArray GraphOp::ExpandIds(IdArray ids, IdArray offset) {
   const dgl_id_t *id_data = static_cast<dgl_id_t*>(ids->data);
   const dgl_id_t *off_data = static_cast<dgl_id_t*>(offset->data);
   const int64_t len = off_data[off_len - 1];
-  IdArray rst = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  IdArray rst = IdArray::Empty({len}, DGLDataType{kDGLInt, 64, 1}, DGLContext{kDGLCPU, 0});
   dgl_id_t *rst_data = static_cast<dgl_id_t*>(rst->data);
   for (int64_t i = 0; i < id_len; i++) {
     const int64_t local_len = off_data[i + 1] - off_data[i];
@@ -482,8 +482,10 @@ HaloSubgraph GraphOp::GetSubgraphWithHalo(GraphPtr g, IdArray nodes, int num_hop
   }
 
   num_edges = edge_src.size();
-  IdArray new_src = IdArray::Empty({num_edges}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  IdArray new_dst = IdArray::Empty({num_edges}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  IdArray new_src = IdArray::Empty({num_edges}, DGLDataType{kDGLInt, 64, 1},
+      DGLContext{kDGLCPU, 0});
+  IdArray new_dst = IdArray::Empty({num_edges}, DGLDataType{kDGLInt, 64, 1},
+      DGLContext{kDGLCPU, 0});
   dgl_id_t *new_src_data = static_cast<dgl_id_t *>(new_src->data);
   dgl_id_t *new_dst_data = static_cast<dgl_id_t *>(new_dst->data);
   for (size_t i = 0; i < edge_src.size(); i++) {

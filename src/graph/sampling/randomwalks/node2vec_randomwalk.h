@@ -65,7 +65,7 @@ bool has_edge_between(const CSRMatrix &csr, dgl_id_t u,
  *         as well as whether to terminate.
  */
 
-template <DLDeviceType XPU, typename IdxType>
+template <DGLDeviceType XPU, typename IdxType>
 std::tuple<dgl_id_t, dgl_id_t, bool> Node2vecRandomWalkStep(
     IdxType *data, dgl_id_t curr, dgl_id_t pre, const double p, const double q,
     int64_t len, const CSRMatrix &csr, bool csr_has_data, const FloatArray &probs,
@@ -146,7 +146,7 @@ std::tuple<dgl_id_t, dgl_id_t, bool> Node2vecRandomWalkStep(
   return std::make_tuple(next_node, eid, terminate(data, next_node, len));
 }
 
-template <DLDeviceType XPU, typename IdxType>
+template <DGLDeviceType XPU, typename IdxType>
 std::pair<IdArray, IdArray> Node2vecRandomWalk(
     const HeteroGraphPtr g, const IdArray seeds,
     const double p, const double q,

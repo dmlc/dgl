@@ -50,7 +50,7 @@ template void GroupIndexShuffle<int64_t>(
 
 template <typename IdType>
 IdArray RandomPerm(int64_t num_nodes) {
-  IdArray perm = aten::NewIdArray(num_nodes, DLContext{kDLCPU, 0}, sizeof(IdType) * 8);
+  IdArray perm = aten::NewIdArray(num_nodes, DGLContext{kDGLCPU, 0}, sizeof(IdType) * 8);
   IdType* perm_data = static_cast<IdType*>(perm->data);
   std::iota(perm_data, perm_data + num_nodes, 0);
   IndexShuffle(perm_data, num_nodes);
@@ -59,7 +59,7 @@ IdArray RandomPerm(int64_t num_nodes) {
 
 template <typename IdType>
 IdArray GroupRandomPerm(const IdType *group_idxs, int64_t num_group_idxs, int64_t num_nodes) {
-  IdArray perm = aten::NewIdArray(num_nodes, DLContext{kDLCPU, 0}, sizeof(IdType) * 8);
+  IdArray perm = aten::NewIdArray(num_nodes, DGLContext{kDGLCPU, 0}, sizeof(IdType) * 8);
   IdType* perm_data = static_cast<IdType*>(perm->data);
   std::iota(perm_data, perm_data + num_nodes, 0);
   GroupIndexShuffle(group_idxs, perm_data, num_group_idxs, num_nodes);
@@ -77,7 +77,7 @@ IdArray GroupRandomPerm(const IdType *group_idxs, int64_t num_group_idxs, int64_
  * Finally, we pick the point with the maximum such distance.
  * This process will be repeated for ``sample_points`` - 1 times.
  */
-template <DLDeviceType XPU, typename FloatType, typename IdType>
+template <DGLDeviceType XPU, typename FloatType, typename IdType>
 void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_points,
     NDArray dist, IdArray start_idx, IdArray result) {
   const FloatType* array_data = static_cast<FloatType*>(array->data);
@@ -135,20 +135,20 @@ void FarthestPointSampler(NDArray array, int64_t batch_size, int64_t sample_poin
     ret_start += sample_points;
   }
 }
-template void FarthestPointSampler<kDLCPU, float, int32_t>(
+template void FarthestPointSampler<kDGLCPU, float, int32_t>(
     NDArray array, int64_t batch_size, int64_t sample_points,
     NDArray dist, IdArray start_idx, IdArray result);
-template void FarthestPointSampler<kDLCPU, float, int64_t>(
+template void FarthestPointSampler<kDGLCPU, float, int64_t>(
     NDArray array, int64_t batch_size, int64_t sample_points,
     NDArray dist, IdArray start_idx, IdArray result);
-template void FarthestPointSampler<kDLCPU, double, int32_t>(
+template void FarthestPointSampler<kDGLCPU, double, int32_t>(
     NDArray array, int64_t batch_size, int64_t sample_points,
     NDArray dist, IdArray start_idx, IdArray result);
-template void FarthestPointSampler<kDLCPU, double, int64_t>(
+template void FarthestPointSampler<kDGLCPU, double, int64_t>(
     NDArray array, int64_t batch_size, int64_t sample_points,
     NDArray dist, IdArray start_idx, IdArray result);
 
-template <DLDeviceType XPU, typename FloatType, typename IdType>
+template <DGLDeviceType XPU, typename FloatType, typename IdType>
 void WeightedNeighborMatching(const aten::CSRMatrix &csr, const NDArray weight, IdArray result) {
   const int64_t num_nodes = result->shape[0];
   const IdType *indptr_data = static_cast<IdType*>(csr.indptr->data);
@@ -181,16 +181,16 @@ void WeightedNeighborMatching(const aten::CSRMatrix &csr, const NDArray weight, 
     result_data[v_max] = result_data[u];
   }
 }
-template void WeightedNeighborMatching<kDLCPU, float, int32_t>(
+template void WeightedNeighborMatching<kDGLCPU, float, int32_t>(
     const aten::CSRMatrix &csr, const NDArray weight, IdArray result);
-template void WeightedNeighborMatching<kDLCPU, float, int64_t>(
+template void WeightedNeighborMatching<kDGLCPU, float, int64_t>(
     const aten::CSRMatrix &csr, const NDArray weight, IdArray result);
-template void WeightedNeighborMatching<kDLCPU, double, int32_t>(
+template void WeightedNeighborMatching<kDGLCPU, double, int32_t>(
     const aten::CSRMatrix &csr, const NDArray weight, IdArray result);
-template void WeightedNeighborMatching<kDLCPU, double, int64_t>(
+template void WeightedNeighborMatching<kDGLCPU, double, int64_t>(
     const aten::CSRMatrix &csr, const NDArray weight, IdArray result);
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 void NeighborMatching(const aten::CSRMatrix &csr, IdArray result) {
   const int64_t num_nodes = result->shape[0];
   const IdType *indptr_data = static_cast<IdType*>(csr.indptr->data);
@@ -221,8 +221,8 @@ void NeighborMatching(const aten::CSRMatrix &csr, IdArray result) {
     }
   }
 }
-template void NeighborMatching<kDLCPU, int32_t>(const aten::CSRMatrix &csr, IdArray result);
-template void NeighborMatching<kDLCPU, int64_t>(const aten::CSRMatrix &csr, IdArray result);
+template void NeighborMatching<kDGLCPU, int32_t>(const aten::CSRMatrix &csr, IdArray result);
+template void NeighborMatching<kDGLCPU, int64_t>(const aten::CSRMatrix &csr, IdArray result);
 
 }  // namespace impl
 }  // namespace geometry
