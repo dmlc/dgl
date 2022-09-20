@@ -127,13 +127,10 @@ class Logger(object):
             if not self.info.no_test:
                 print(
                     f'   Final Test Point[1]: {self.results["test"][run][0][0]}',
+                    f'   Final Valid: {self.results["test"][run][0][1]}',
+                    f'   Final Test: {self.results["test"][run][0][2]}',
+                    sep='\n',
                     file=f,
-                )
-                print(
-                    f'   Final Valid: {self.results["test"][run][0][1]}', file=f
-                )
-                print(
-                    f'   Final Test: {self.results["test"][run][0][2]}', file=f
                 )
         else:
             best_result = torch.tensor(
