@@ -37,8 +37,7 @@ def main(args):
         if n_label == target_class:
             break
 
-    explainer = GNNExplainer(
-        model, num_hops=2 if args.dataset in ['BAShape', 'BACommunity'] else 4)
+    explainer = GNNExplainer(model, num_hops=3)
     new_center, sub_graph, feat_mask, edge_mask = explainer.explain_node(n_idx, graph, feats)
 
     # gnnlens2

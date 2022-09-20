@@ -45,10 +45,18 @@ pip install gnnlens
 python explain_main.py --dataset $DATASET
 ```
 
-**Fourth**, launch `GNNLens2` to visualize the explanations
+**Finally**, launch `GNNLens2` to visualize the explanations
 
 ```bash
-gnnlens --logdir tutorial_subgraph
+gnnlens --logdir gnn_subgraph
 ```
 
 By entering `localhost:7777` in your web browser address bar, you can see the GNNLens2 interface. `7777` is the default port GNNLens2 uses. You can specify an alternative one by adding `--port xxxx` after the command line and change the address in the web browser accordingly.
+
+A sample visualization is available below. For more details of using `GNNLens2`, check its [tutorials](https://github.com/dmlc/GNNLens2#tutorials).
+
+<p align="center">
+  <img src="https://data.dgl.ai/asset/image/explain_BAShape.png"  width="600">
+  <br>
+  <b>Figure</b>: Explanation for node 41 of BAShape
+</p>
