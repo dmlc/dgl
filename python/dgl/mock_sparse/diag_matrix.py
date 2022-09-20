@@ -168,7 +168,7 @@ def diag(val: torch.Tensor, shape: Optional[Tuple[int, int]] = None) -> DiagMatr
     >>> mat.nnz
     5
     """
-    # Mufei: this may not be needed if DiagMatrix is simple enough
+    # NOTE(Mufei): this may not be needed if DiagMatrix is simple enough
     return DiagMatrix(val, shape)
 
 def identity(shape: Tuple[int, int],
