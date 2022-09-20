@@ -12,29 +12,13 @@ namespace aten {
 namespace impl {
 namespace {
 
-template <typename IdxType>
-inline NumPicksFn<IdxType> GetTopkNumPicksFn(int64_t k) {
-  NumPicksFn<IdxType> num_pick_fn = [k]
-    (IdxType rowid, IdxType off, IdxType len,
-     const IdxType* col, const IdxType* data) {
-      return std::min(k, len);  // works for -1 as well
-    };
-  return num_pick_fn;
-}
-
 template <typename IdxType, typename DType>
 inline PickFn<IdxType> GetTopkPickFn(int64_t k, NDArray weight, bool ascending) {
   const DType* wdata = static_cast<DType*>(weight->data);
-  PickFn<IdxType> pick_fn = [ascending, wdata]
-    (IdxType rowid, IdxType off, IdxType len, IdxType num_picks,
+  PickFn<IdxType> pick_fn = [k, ascending, wdata]
+    (IdxType rowid, IdxType off, IdxType len,
      const IdxType* col, const IdxType* data,
      IdxType* out_idx) {
-      if (k == -1) {
-        for (int64_t j = 0; j < k; ++j)
-          out_idx[j] = off + j;
-        return;
-      }
-
       std::function<bool(IdxType, IdxType)> compare_fn;
       if (ascending) {
         if (data) {
@@ -61,7 +45,7 @@ inline PickFn<IdxType> GetTopkPickFn(int64_t k, NDArray weight, bool ascending) 
       std::vector<IdxType> idx(len);
       std::iota(idx.begin(), idx.end(), off);
       std::sort(idx.begin(), idx.end(), compare_fn);
-      for (int64_t j = 0; j < num_picks; ++j) {
+      for (int64_t j = 0; j < k; ++j) {
         out_idx[j] = idx[j];
       }
     };
@@ -74,9 +58,8 @@ inline PickFn<IdxType> GetTopkPickFn(int64_t k, NDArray weight, bool ascending) 
 template <DLDeviceType XPU, typename IdxType, typename DType>
 COOMatrix CSRRowWiseTopk(
     CSRMatrix mat, IdArray rows, int64_t k, NDArray weight, bool ascending) {
-  auto num_picks_fn = GetTopkNumPicksFn<IdxType>(k);
   auto pick_fn = GetTopkPickFn<IdxType, DType>(k, weight, ascending);
-  return CSRRowWisePick(mat, rows, k, false, pick_fn, num_picks_fn);
+  return CSRRowWisePick(mat, rows, k, false, pick_fn);
 }
 
 template COOMatrix CSRRowWiseTopk<kDLCPU, int32_t, int32_t>(
@@ -99,9 +82,8 @@ template COOMatrix CSRRowWiseTopk<kDLCPU, int64_t, double>(
 template <DLDeviceType XPU, typename IdxType, typename DType>
 COOMatrix COORowWiseTopk(
     COOMatrix mat, IdArray rows, int64_t k, NDArray weight, bool ascending) {
-  auto num_picks_fn = GetTopkNumPicksFn<IdxType>(k);
   auto pick_fn = GetTopkPickFn<IdxType, DType>(k, weight, ascending);
-  return COORowWisePick(mat, rows, k, false, pick_fn, num_picks_fn);
+  return COORowWisePick(mat, rows, k, false, pick_fn);
 }
 
 template COOMatrix COORowWiseTopk<kDLCPU, int32_t, int32_t>(
