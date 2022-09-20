@@ -88,7 +88,7 @@ class IdHashMap {
 
   // Return all the old ids collected so far, ordered by new id.
   IdArray Values() const {
-    IdArray values = NewIdArray(oldv2newv_.size(), DLContext{kDLCPU, 0}, sizeof(IdType) * 8);
+    IdArray values = NewIdArray(oldv2newv_.size(), DGLContext{kDGLCPU, 0}, sizeof(IdType) * 8);
     IdType* values_data = static_cast<IdType*>(values->data);
     for (auto pair : oldv2newv_)
       values_data[pair.second] = pair.first;
