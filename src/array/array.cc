@@ -555,7 +555,7 @@ COOMatrix CSRRowWiseSampling(
     // prob is pinned and rows on GPU is valid
     CHECK_VALID_CONTEXT(prob, rows);
     ATEN_CSR_SWITCH_CUDA_UVA(mat, rows, XPU, IdType, "CSRRowWiseSampling", {
-      if (XPU == kDLGPU && prob->dtype.code != kDLFloat) {
+      if (XPU == kDGLCUDA && prob->dtype.code != kDGLFloat) {
         LOG(FATAL) <<
             "Currently GPU neighbor sampling does not support sampling with edge masks.";
       } else {

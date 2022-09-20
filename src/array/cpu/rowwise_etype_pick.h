@@ -85,7 +85,7 @@ CSRMatrix CSRRowWisePerEtypePickPartial(
     ETypePickFn<IdxType, EType> pick_fn,
     ETypeNumPicksFn<IdxType, EType> num_picks_fn) {
   using namespace aten;
-  const DLDataType idtype = DLDataTypeTraits<IdxType>::dtype;
+  const DGLDataType idtype = DGLDataTypeTraits<IdxType>::dtype;
   const IdxType* indptr = mat.indptr.Ptr<IdxType>();
   const IdxType* indices = mat.indices.Ptr<IdxType>();
   const IdxType* data = CSRHasData(mat)? mat.data.Ptr<IdxType>() : nullptr;
