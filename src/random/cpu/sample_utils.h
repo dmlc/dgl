@@ -262,7 +262,7 @@ class TreeSampler: public BaseSampler<Idx> {
   std::vector<double> weight;    // accumulated likelihood of subtrees.
   int64_t N;
   int64_t num_leafs;
-  const double *decrease;
+  const DType *decrease;
 
  public:
   void ResetState(FloatArray prob) {
@@ -275,7 +275,7 @@ class TreeSampler: public BaseSampler<Idx> {
       weight[i] = weight[i * 2] + weight[i * 2 + 1];
   }
 
-  explicit TreeSampler(RandomEngine *re, FloatArray prob, const double* decrease = nullptr)
+  explicit TreeSampler(RandomEngine *re, FloatArray prob, const DType* decrease = nullptr)
     : re(re), decrease(decrease) {
     num_leafs = 1;
     while (num_leafs < prob->shape[0])
@@ -313,7 +313,8 @@ class TreeSampler: public BaseSampler<Idx> {
     if (!replace) {
       while (cur >= 1) {
         if (cur >= num_leafs)
-          weight[cur] = this->decrease ? weight[cur] - this->decrease[rst] : 0.;
+          weight[cur] = this->decrease ?
+            weight[cur] - static_cast<double>(this->decrease[rst]) : 0.;
         else
           weight[cur] = weight[cur * 2] + weight[cur * 2 + 1];
         cur /= 2;

@@ -67,7 +67,7 @@ def sample_etype_neighbors(
         The number of edges to be sampled for each node per edge type.  Must be a
         1D tensor with the number of elements same as the number of edge types.
 
-        If -1 is given, all of the neighbors will be selected.
+        If -1 is given, all of the neighbors with non-zero probability will be selected.
     edge_dir : str, optional
         Determines whether to sample inbound or outbound edges.
 
@@ -200,7 +200,7 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None,
         every edge type.
 
         If -1 is given for a single edge type, all the neighboring edges with that edge
-        type will be selected.
+        type and non-zero probability will be selected.
     edge_dir : str, optional
         Determines whether to sample inbound or outbound edges.
 
@@ -450,13 +450,12 @@ def sample_neighbors_biased(g, nodes, fanout, bias, edge_dir='in',
     fanout : int
         The number of edges to be sampled for each node on each edge type.
 
-        If -1 is given, all the neighboring edges will be selected.
+        If -1 is given, all the neighboring edges with non-zero probability will be selected.
     bias : tensor or list
         The (unnormalized) probabilities associated with each tag. Its length should be equal
         to the number of tags.
 
-        Entries of this array must be non-negative floats, and the sum of the entries must be
-        positive (though they don't have to sum up to one). Otherwise, the result will be
+        Entries of this array must be non-negative floats. Otherwise, the result will be
         undefined.
     edge_dir : str, optional
         Determines whether to sample inbound or outbound edges.

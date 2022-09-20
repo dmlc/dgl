@@ -36,9 +36,9 @@ inline NumPicksFn<IdxType> GetSamplingUniformNumPicksFn(
       if (num_samples == -1)
         return len;
       else if (replace)
-        return (len == 0) ? 0 : num_samples;
+        return static_cast<IdxType>((len == 0) ? 0 : num_samples);
       else
-        return std::min(len, num_samples);
+        return std::min(len, static_cast<IdxType>(num_samples));
     };
   return num_picks_fn;
 }
@@ -81,9 +81,9 @@ inline NumPicksFn<IdxType> GetSamplingNumPicksFn(
       if (num_samples == -1)
         return num_possible_picks;
       else if (replace)
-        return (len == 0) ? 0 : num_samples;
+        return static_cast<IdxType>((len == 0) ? 0 : num_samples);
       else
-        return std::min(num_samples, num_possible_picks);
+        return std::min(static_cast<IdxType>(num_samples), num_possible_picks);
     };
   return num_picks_fn;
 }
@@ -118,17 +118,56 @@ inline PickFn<IdxType> GetSamplingPickFn(
 }
 
 template <typename IdxType, typename FloatType>
+inline NumPicksFn<IdxType> GetSamplingBiasedNumPicksFn(
+    int64_t num_samples, IdArray split, FloatArray bias, bool replace) {
+  NumPicksFn<IdxType> num_picks_fn = [&]
+    (IdxType rowid, IdxType off, IdxType len,
+     const IdxType* col, const IdxType* data) {
+      const FloatType* bias_data = bias.Ptr<FloatType>();
+      const IdxType* tag_offset = split.Ptr<IdxType>() + rowid * split->shape[1];
+      int64_t num_tags = bias->shape[0];
+      IdxType num_possible_picks = 0;
+      for (int64_t i = 0; i < num_tags; ++i) {
+        if (bias_data[i] > 0)
+          num_possible_picks += tag_offset[i + 1] - tag_offset[i];
+      }
+
+      if (num_samples == -1)
+        return num_possible_picks;
+      else if (replace)
+        return static_cast<IdxType>((len == 0) ? 0 : num_samples);
+      else
+        return std::min(static_cast<IdxType>(num_samples), num_possible_picks);
+    };
+  return num_picks_fn;
+}
+
+template <typename IdxType, typename FloatType>
 inline PickFn<IdxType> GetSamplingBiasedPickFn(
     int64_t num_samples, IdArray split, FloatArray bias, bool replace) {
-  PickFn<IdxType> pick_fn = [num_samples, split, bias, replace]
-    (IdxType rowid, IdxType off, IdxType len,
+  PickFn<IdxType> pick_fn = [&]
+    (IdxType rowid, IdxType off, IdxType len, IdxType num_picks,
      const IdxType* col, const IdxType* data,
      IdxType* out_idx) {
-    const IdxType *tag_offset = static_cast<IdxType *>(split->data) + rowid * split->shape[1];
-    RandomEngine::ThreadLocal()->BiasedChoice<IdxType, FloatType>(
-            num_samples, tag_offset, bias, out_idx, replace);
-    for (int64_t j = 0; j < num_samples; ++j) {
-      out_idx[j] += off;
+    const FloatType* bias_data = bias.Ptr<FloatType>();
+    const IdxType* tag_offset = split.Ptr<IdxType>() + rowid * split->shape[1];
+
+    if (num_samples == -1 || (!replace && len == num_picks)) {
+      // fast path for selecting all
+      int64_t j = 0;
+      for (int64_t i = 0; i < bias->shape[0]; ++i) {
+        if (bias_data[i] > 0) {
+          for (int64_t k = tag_offset[i]; k < tag_offset[i + 1]; ++k)
+            out_idx[j++] = off + k;
+        }
+      }
+      CHECK_EQ(j, num_picks);  // correctness check
+    } else {
+      RandomEngine::ThreadLocal()->BiasedChoice<IdxType, FloatType>(
+              num_picks, tag_offset, bias, out_idx, replace);
+      for (int64_t j = 0; j < num_picks; ++j) {
+        out_idx[j] += off;
+      }
     }
   };
   return pick_fn;
@@ -178,8 +217,8 @@ COOMatrix CSRRowWiseSamplingBiased(
     FloatArray bias,
     bool replace
 ) {
-  // (BarclayII) reusing existing code, but is this correct?
-  auto num_picks_fn = GetSamplingUniformNumPicksFn<IdxType>(num_samples, replace);
+  auto num_picks_fn = GetSamplingBiasedNumPicksFn<IdxType, FloatType>(
+      num_samples, tag_offset, bias, replace);
   auto pick_fn = GetSamplingBiasedPickFn<IdxType, FloatType>(
       num_samples, tag_offset, bias, replace);
   return CSRRowWisePick(mat, rows, num_samples, pick_fn, num_picks_fn);
@@ -223,7 +262,7 @@ COOMatrix COORowWiseSamplingUniform(COOMatrix mat, IdArray rows,
                                     int64_t num_samples, bool replace) {
   auto num_picks_fn = GetSamplingUniformNumPicksFn<IdxType>(num_samples, replace);
   auto pick_fn = GetSamplingUniformPickFn<IdxType>(num_samples, replace);
-  return COORowWisePick(mat, rows, num_samples, pick_fn);
+  return COORowWisePick(mat, rows, num_samples, pick_fn, num_picks_fn);
 }
 
 template COOMatrix COORowWiseSamplingUniform<kDLCPU, int32_t>(

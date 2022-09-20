@@ -119,10 +119,8 @@ CSRMatrix CSRRowWisePickPartial(
     BUG_IF_FAIL(thread_id + 1 < num_threads || end_i == num_rows);
 
     // Part 1: determine the number of picks for each row as well as the indptr to return.
-    const int64_t num_local = end_i - start_i;
     for (int64_t i = start_i; i < end_i; ++i) {
       // build prefix-sum
-      const int64_t local_i = i-start_i;
       const IdxType rid = rows_data[i];
       const IdxType off = indptr[rid];
       const IdxType len = indptr[rid + 1] - off;
@@ -145,13 +143,11 @@ CSRMatrix CSRRowWisePickPartial(
       picked_row_indptr_data[i] += global_prefix[thread_id];
 
     // Part 2: pick the neighbors.
-    const IdxType thread_offset = global_prefix[thread_id];
     for (int64_t i = start_i; i < end_i; ++i) {
       const IdxType rid = rows_data[i];
 
       const IdxType off = indptr[rid];
       const IdxType len = indptr[rid + 1] - off;
-      const int64_t local_i = i - start_i;
       const int64_t row_offset = picked_row_indptr_data[i];
       const int64_t num_picks = picked_row_indptr_data[i + 1] - picked_row_indptr_data[i];
       if (num_picks == 0)
