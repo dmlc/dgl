@@ -71,7 +71,7 @@ using PickFn = std::function<void(
 template <typename IdxType>
 using NumPicksFn = std::function<IdxType(
     IdxType rowid, IdxType off, IdxType len,
-    const IdxType* col, const IdxType* data);
+    const IdxType* col, const IdxType* data)>;
 
 
 // Template for picking non-zero values row-wise. The implementation utilizes
