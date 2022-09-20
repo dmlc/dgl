@@ -274,7 +274,7 @@ COOMatrix COORowWiseSampling(
     COOMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob, bool replace);
 
 // FloatType is the type of probability data.
-template <DGLDeviceType XPU, typename IdType, typename FloatType>
+template <DGLDeviceType XPU, typename IdType, typename FloatType, typename EType>
 COOMatrix COORowWisePerEtypeSampling(
     COOMatrix mat, IdArray rows, IdArray etypes,
     const std::vector<int64_t>& num_samples, FloatArray prob, bool replace, bool etype_sorted);
@@ -283,7 +283,7 @@ template <DGLDeviceType XPU, typename IdType>
 COOMatrix COORowWiseSamplingUniform(
     COOMatrix mat, IdArray rows, int64_t num_samples, bool replace);
 
-template <DGLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType, typename EType>
 COOMatrix COORowWisePerEtypeSamplingUniform(
     COOMatrix mat, IdArray rows, IdArray etypes, const std::vector<int64_t>& num_samples,
     bool replace, bool etype_sorted);

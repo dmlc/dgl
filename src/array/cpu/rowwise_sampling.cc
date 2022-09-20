@@ -186,6 +186,14 @@ COOMatrix CSRRowWiseSampling(CSRMatrix mat, IdArray rows, int64_t num_samples,
   return CSRRowWisePick(mat, rows, num_samples, pick_fn, num_picks_fn);
 }
 
+template COOMatrix CSRRowWiseSampling<kDGLCPU, int32_t, int8_t>(
+    CSRMatrix, IdArray, int64_t, FloatArray, bool);
+template COOMatrix CSRRowWiseSampling<kDGLCPU, int64_t, int8_t>(
+    CSRMatrix, IdArray, int64_t, FloatArray, bool);
+template COOMatrix CSRRowWiseSampling<kDGLCPU, int32_t, uint8_t>(
+    CSRMatrix, IdArray, int64_t, FloatArray, bool);
+template COOMatrix CSRRowWiseSampling<kDGLCPU, int64_t, uint8_t>(
+    CSRMatrix, IdArray, int64_t, FloatArray, bool);
 template COOMatrix CSRRowWiseSampling<kDGLCPU, int32_t, float>(
     CSRMatrix, IdArray, int64_t, FloatArray, bool);
 template COOMatrix CSRRowWiseSampling<kDGLCPU, int64_t, float>(
@@ -226,13 +234,10 @@ COOMatrix CSRRowWiseSamplingBiased(
 
 template COOMatrix CSRRowWiseSamplingBiased<kDGLCPU, int32_t, float>(
   CSRMatrix, IdArray, int64_t, NDArray, FloatArray, bool);
-
 template COOMatrix CSRRowWiseSamplingBiased<kDGLCPU, int64_t, float>(
   CSRMatrix, IdArray, int64_t, NDArray, FloatArray, bool);
-
 template COOMatrix CSRRowWiseSamplingBiased<kDGLCPU, int32_t, double>(
   CSRMatrix, IdArray, int64_t, NDArray, FloatArray, bool);
-
 template COOMatrix CSRRowWiseSamplingBiased<kDGLCPU, int64_t, double>(
   CSRMatrix, IdArray, int64_t, NDArray, FloatArray, bool);
 
@@ -248,6 +253,14 @@ COOMatrix COORowWiseSampling(COOMatrix mat, IdArray rows, int64_t num_samples,
   return COORowWisePick(mat, rows, num_samples, pick_fn, num_picks_fn);
 }
 
+template COOMatrix COORowWiseSampling<kDGLCPU, int32_t, int8_t>(
+    COOMatrix, IdArray, int64_t, FloatArray, bool);
+template COOMatrix COORowWiseSampling<kDGLCPU, int64_t, int8_t>(
+    COOMatrix, IdArray, int64_t, FloatArray, bool);
+template COOMatrix COORowWiseSampling<kDGLCPU, int32_t, uint8_t>(
+    COOMatrix, IdArray, int64_t, FloatArray, bool);
+template COOMatrix COORowWiseSampling<kDGLCPU, int64_t, uint8_t>(
+    COOMatrix, IdArray, int64_t, FloatArray, bool);
 template COOMatrix COORowWiseSampling<kDGLCPU, int32_t, float>(
     COOMatrix, IdArray, int64_t, FloatArray, bool);
 template COOMatrix COORowWiseSampling<kDGLCPU, int64_t, float>(

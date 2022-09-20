@@ -55,6 +55,16 @@ template void RandomEngine::Choice<int32_t, double>(int32_t num,
 template void RandomEngine::Choice<int64_t, double>(int64_t num,
                                                     FloatArray prob,
                                                     int64_t* out, bool replace);
+template void RandomEngine::Choice<int32_t, int8_t>(int32_t num, FloatArray prob,
+                                                    int32_t* out, bool replace);
+template void RandomEngine::Choice<int64_t, int8_t>(int64_t num, FloatArray prob,
+                                                    int64_t* out, bool replace);
+template void RandomEngine::Choice<int32_t, uint8_t>(int32_t num,
+                                                     FloatArray prob,
+                                                     int32_t* out, bool replace);
+template void RandomEngine::Choice<int64_t, uint8_t>(int64_t num,
+                                                     FloatArray prob,
+                                                     int64_t* out, bool replace);
 
 template <typename IdxType>
 void RandomEngine::UniformChoice(IdxType num, IdxType population, IdxType* out,

@@ -815,7 +815,7 @@ COOMatrix COORowWiseSampling(
     if (IsNullArray(prob)) {
       ret = impl::COORowWiseSamplingUniform<XPU, IdType>(mat, rows, num_samples, replace);
     } else {
-      ATEN_FLOAT_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
+      ATEN_FLOAT_BOOL_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
         ret = impl::COORowWiseSampling<XPU, IdType, FloatType>(
             mat, rows, num_samples, prob, replace);
       });
@@ -831,11 +831,11 @@ COOMatrix COORowWisePerEtypeSampling(
   COOMatrix ret;
   ATEN_COO_SWITCH(mat, XPU, IdType, "COORowWisePerEtypeSampling", {
     if (IsNullArray(prob)) {
-      ret = impl::COORowWisePerEtypeSamplingUniform<XPU, IdType>(
+      ret = impl::COORowWisePerEtypeSamplingUniform<XPU, IdType, IdType>(
             mat, rows, etypes, num_samples, replace, etype_sorted);
     } else {
-      ATEN_FLOAT_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
-        ret = impl::COORowWisePerEtypeSampling<XPU, IdType, FloatType>(
+      ATEN_FLOAT_BOOL_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
+        ret = impl::COORowWisePerEtypeSampling<XPU, IdType, FloatType, IdType>(
             mat, rows, etypes, num_samples, prob, replace, etype_sorted);
       });
     }

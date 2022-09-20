@@ -31,7 +31,7 @@ template COOMatrix CSRRowWisePerEtypeSampling<kDGLCPU, int64_t, uint8_t, int64_t
 
 template COOMatrix CSRRowWisePerEtypeSamplingUniform<kDGLCPU, int32_t, int32_t>(
     CSRMatrix, IdArray, IdArray, const std::vector<int64_t>&, bool, bool);
-template COOMatrix CSRRowWisePerEtypeSamplingUniform<kDGLCPU, int64_t, int32_t>(
+template COOMatrix CSRRowWisePerEtypeSamplingUniform<kDGLCPU, int64_t, int64_t>(
     CSRMatrix, IdArray, IdArray, const std::vector<int64_t>&, bool, bool);
 
 template COOMatrix COORowWisePerEtypeSampling<kDGLCPU, int32_t, float, int32_t>(
