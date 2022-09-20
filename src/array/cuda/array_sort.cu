@@ -13,7 +13,7 @@ using runtime::NDArray;
 namespace aten {
 namespace impl {
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 std::pair<IdArray, IdArray> Sort(IdArray array, int num_bits) {
   const auto& ctx = array->ctx;
   auto device = runtime::DeviceAPI::Get(ctx);
@@ -27,7 +27,7 @@ std::pair<IdArray, IdArray> Sort(IdArray array, int num_bits) {
   IdType* keys_out = sorted_array.Ptr<IdType>();
   int64_t* values_out = sorted_idx.Ptr<int64_t>();
 
-  auto stream = runtime::CUDAThreadEntry::ThreadLocal()->stream;
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   if (num_bits == 0) {
     num_bits = sizeof(IdType)*8;
   }
@@ -47,8 +47,8 @@ std::pair<IdArray, IdArray> Sort(IdArray array, int num_bits) {
   return std::make_pair(sorted_array, sorted_idx);
 }
 
-template std::pair<IdArray, IdArray> Sort<kDLGPU, int32_t>(IdArray, int num_bits);
-template std::pair<IdArray, IdArray> Sort<kDLGPU, int64_t>(IdArray, int num_bits);
+template std::pair<IdArray, IdArray> Sort<kDGLCUDA, int32_t>(IdArray, int num_bits);
+template std::pair<IdArray, IdArray> Sort<kDGLCUDA, int64_t>(IdArray, int num_bits);
 
 }  // namespace impl
 }  // namespace aten

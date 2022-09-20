@@ -104,12 +104,12 @@ class BaseHeteroGraph : public runtime::Object {
   /*!
    * \brief Get the data type of node and edge IDs of this graph.
    */
-  virtual DLDataType DataType() const = 0;
+  virtual DGLDataType DataType() const = 0;
 
   /*!
    * \brief Get the device context of this graph.
    */
-  virtual DLContext Context() const = 0;
+  virtual DGLContext Context() const = 0;
 
   /*!
    * \brief Pin graph.
@@ -120,6 +120,12 @@ class BaseHeteroGraph : public runtime::Object {
    * \brief Check if this graph is pinned.
    */
   virtual bool IsPinned() const = 0;
+
+  /*!
+   * \brief Record stream for this graph.
+   * \param stream The stream that is using the graph
+   */
+  virtual void RecordStream(DGLStreamHandle stream) = 0;
 
   /*!
    * \brief Get the number of integer bits used to store node/edge ids (32 or 64).

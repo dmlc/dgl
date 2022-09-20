@@ -20,14 +20,14 @@ namespace sampling {
 
 namespace impl {
 
-template<DLDeviceType XPU, typename IdxType>
+template<DGLDeviceType XPU, typename IdxType>
 TypeArray GetNodeTypesFromMetapath(
     const HeteroGraphPtr hg,
     const TypeArray metapath) {
 
   uint64_t num_etypes = metapath->shape[0];
 
-  auto cpu_ctx = DGLContext{kDLCPU, 0};
+  auto cpu_ctx = DGLContext{kDGLCPU, 0};
   auto metapath_ctx = metapath->ctx;
   auto stream = DeviceAPI::Get(metapath_ctx)->GetStream();
 
@@ -61,11 +61,11 @@ TypeArray GetNodeTypesFromMetapath(
 }
 
 template
-TypeArray GetNodeTypesFromMetapath<kDLGPU, int32_t>(
+TypeArray GetNodeTypesFromMetapath<kDGLCUDA, int32_t>(
     const HeteroGraphPtr hg,
     const TypeArray metapath);
 template
-TypeArray GetNodeTypesFromMetapath<kDLGPU, int64_t>(
+TypeArray GetNodeTypesFromMetapath<kDGLCUDA, int64_t>(
     const HeteroGraphPtr hg,
     const TypeArray metapath);
 

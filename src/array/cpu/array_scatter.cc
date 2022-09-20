@@ -11,7 +11,7 @@ using runtime::NDArray;
 namespace aten {
 namespace impl {
 
-template <DLDeviceType XPU, typename DType, typename IdType>
+template <DGLDeviceType XPU, typename DType, typename IdType>
 NDArray Scatter(NDArray array, IdArray indices) {
   NDArray result = NDArray::Empty({indices->shape[0]}, array->dtype, array->ctx);
 
@@ -25,16 +25,16 @@ NDArray Scatter(NDArray array, IdArray indices) {
   return result;
 }
 
-template NDArray Scatter<kDLCPU, int32_t, int32_t>(NDArray, IdArray);
-template NDArray Scatter<kDLCPU, int64_t, int32_t>(NDArray, IdArray);
-template NDArray Scatter<kDLCPU, float, int32_t>(NDArray, IdArray);
-template NDArray Scatter<kDLCPU, double, int32_t>(NDArray, IdArray);
-template NDArray Scatter<kDLCPU, int32_t, int64_t>(NDArray, IdArray);
-template NDArray Scatter<kDLCPU, int64_t, int64_t>(NDArray, IdArray);
-template NDArray Scatter<kDLCPU, float, int64_t>(NDArray, IdArray);
-template NDArray Scatter<kDLCPU, double, int64_t>(NDArray, IdArray);
+template NDArray Scatter<kDGLCPU, int32_t, int32_t>(NDArray, IdArray);
+template NDArray Scatter<kDGLCPU, int64_t, int32_t>(NDArray, IdArray);
+template NDArray Scatter<kDGLCPU, float, int32_t>(NDArray, IdArray);
+template NDArray Scatter<kDGLCPU, double, int32_t>(NDArray, IdArray);
+template NDArray Scatter<kDGLCPU, int32_t, int64_t>(NDArray, IdArray);
+template NDArray Scatter<kDGLCPU, int64_t, int64_t>(NDArray, IdArray);
+template NDArray Scatter<kDGLCPU, float, int64_t>(NDArray, IdArray);
+template NDArray Scatter<kDGLCPU, double, int64_t>(NDArray, IdArray);
 
-template <DLDeviceType XPU, typename DType, typename IdType>
+template <DGLDeviceType XPU, typename DType, typename IdType>
 void Scatter_(IdArray index, NDArray value, NDArray out) {
   const int64_t len = index->shape[0];
   const IdType* idx = index.Ptr<IdType>();
@@ -47,14 +47,14 @@ void Scatter_(IdArray index, NDArray value, NDArray out) {
   });
 }
 
-template void Scatter_<kDLCPU, int32_t, int32_t>(IdArray, NDArray, NDArray);
-template void Scatter_<kDLCPU, int64_t, int32_t>(IdArray, NDArray, NDArray);
-template void Scatter_<kDLCPU, float, int32_t>(IdArray, NDArray, NDArray);
-template void Scatter_<kDLCPU, double, int32_t>(IdArray, NDArray, NDArray);
-template void Scatter_<kDLCPU, int32_t, int64_t>(IdArray, NDArray, NDArray);
-template void Scatter_<kDLCPU, int64_t, int64_t>(IdArray, NDArray, NDArray);
-template void Scatter_<kDLCPU, float, int64_t>(IdArray, NDArray, NDArray);
-template void Scatter_<kDLCPU, double, int64_t>(IdArray, NDArray, NDArray);
+template void Scatter_<kDGLCPU, int32_t, int32_t>(IdArray, NDArray, NDArray);
+template void Scatter_<kDGLCPU, int64_t, int32_t>(IdArray, NDArray, NDArray);
+template void Scatter_<kDGLCPU, float, int32_t>(IdArray, NDArray, NDArray);
+template void Scatter_<kDGLCPU, double, int32_t>(IdArray, NDArray, NDArray);
+template void Scatter_<kDGLCPU, int32_t, int64_t>(IdArray, NDArray, NDArray);
+template void Scatter_<kDGLCPU, int64_t, int64_t>(IdArray, NDArray, NDArray);
+template void Scatter_<kDGLCPU, float, int64_t>(IdArray, NDArray, NDArray);
+template void Scatter_<kDGLCPU, double, int64_t>(IdArray, NDArray, NDArray);
 
 };  // namespace impl
 };  // namespace aten

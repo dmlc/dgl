@@ -136,7 +136,7 @@ def is_admin(name) {
 pipeline {
   agent any
   triggers {
-        issueCommentTrigger('@dgl-bot .*')
+        issueCommentTrigger('@dgl-bot.*')
   }
   stages {
     // Below 2 stages are to authenticate the change/comment author.
@@ -157,9 +157,7 @@ pipeline {
           def prOpenTriggerCause = currentBuild.getBuildCauses('jenkins.branch.BranchEventCause')
           def first_run = prOpenTriggerCause && env.BUILD_ID == '1'
           if (author && !is_authorized(author)) {
-            if (first_run) {
-              pullRequest.comment("Not authorized to trigger CI. Please ask core developer to help trigger via issuing comment: \n - `@dgl-bot`")
-            }
+            pullRequest.comment("Not authorized to trigger CI. Please ask core developer to help trigger via issuing comment: \n - `@dgl-bot`")
             error("Authentication failed.")
           }
           if (first_run) {
@@ -201,6 +199,15 @@ pipeline {
           checkout scm
           script {
               def comment = env.GITHUB_COMMENT
+              def command_lists = comment.split(' ')
+              if (command_lists.size() == 1) {
+                // CI command, not for regression
+                return
+              }
+              if (command_lists.size() != 5) {
+                pullRequest.comment('Cannot run the regression test due to unknown command')
+                error('Unknown command')
+              }
               def author = env.GITHUB_COMMENT_AUTHOR
               echo("${env.GIT_URL}")
               echo("${env}")
@@ -212,14 +219,8 @@ pipeline {
                         userRemoteConfigs: [[credentialsId: 'github', url: 'https://github.com/dglai/DGL_scripts.git']]])
               }
               sh('cp benchmark_scripts_repo/benchmark/* benchmarks/scripts/')
-              def command_lists = comment.split(' ')
               def instance_type = command_lists[2].replace('.', '')
-              if (command_lists.size() != 5) {
-              pullRequest.comment('Cannot run the regression test due to unknown command')
-              error('Unknown command')
-              } else {
               pullRequest.comment("Start the Regression test. View at ${RUN_DISPLAY_URL}")
-              }
               def prNumber = env.BRANCH_NAME.replace('PR-', '')
               dir('benchmarks/scripts') {
                 sh('python3 -m pip install boto3')

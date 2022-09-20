@@ -34,7 +34,7 @@ typedef NDArray TypeArray;
 
 namespace aten {
 
-static const DLContext CPU{kDLCPU, 0};
+static const DGLContext CPU{kDGLCPU, 0};
 
 }  // namespace aten
 }  // namespace dgl

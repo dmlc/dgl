@@ -54,8 +54,8 @@ IdArray MergeMultipleTraversals(
     total_len += traces[i].size();
   }
   IdArray ret = IdArray::Empty({total_len},
-                               DLDataType{kDLInt, sizeof(DType) * 8, 1},
-                               DLContext{kDLCPU, 0});
+                               DGLDataType{kDGLInt, sizeof(DType) * 8, 1},
+                               DGLContext{kDGLCPU, 0});
   DType* ret_data = static_cast<DType*>(ret->data);
   for (int64_t i = 0; i < max_len; ++i) {
     for (size_t j = 0; j < traces.size(); ++j) {
@@ -79,7 +79,7 @@ IdArray ComputeMergedSections(
     const int64_t tracelen = traces[i].size();
     max_len = std::max(max_len, tracelen);
   }
-  IdArray ret = IdArray::Empty({max_len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  IdArray ret = IdArray::Empty({max_len}, DGLDataType{kDGLInt, 64, 1}, DGLContext{kDGLCPU, 0});
   int64_t* ret_data = static_cast<int64_t*>(ret->data);
   for (int64_t i = 0; i < max_len; ++i) {
     int64_t sec_len = 0;
@@ -96,7 +96,7 @@ IdArray ComputeMergedSections(
 
 }  // namespace
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 Frontiers BFSNodesFrontiers(const CSRMatrix& csr, IdArray source) {
   std::vector<IdType> ids;
   std::vector<int64_t> sections;
@@ -116,10 +116,10 @@ Frontiers BFSNodesFrontiers(const CSRMatrix& csr, IdArray source) {
   return front;
 }
 
-template Frontiers BFSNodesFrontiers<kDLCPU, int32_t>(const CSRMatrix&, IdArray);
-template Frontiers BFSNodesFrontiers<kDLCPU, int64_t>(const CSRMatrix&, IdArray);
+template Frontiers BFSNodesFrontiers<kDGLCPU, int32_t>(const CSRMatrix&, IdArray);
+template Frontiers BFSNodesFrontiers<kDGLCPU, int64_t>(const CSRMatrix&, IdArray);
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 Frontiers BFSEdgesFrontiers(const CSRMatrix& csr, IdArray source) {
   std::vector<IdType> ids;
   std::vector<int64_t> sections;
@@ -144,10 +144,10 @@ Frontiers BFSEdgesFrontiers(const CSRMatrix& csr, IdArray source) {
   return front;
 }
 
-template Frontiers BFSEdgesFrontiers<kDLCPU, int32_t>(const CSRMatrix&, IdArray);
-template Frontiers BFSEdgesFrontiers<kDLCPU, int64_t>(const CSRMatrix&, IdArray);
+template Frontiers BFSEdgesFrontiers<kDGLCPU, int32_t>(const CSRMatrix&, IdArray);
+template Frontiers BFSEdgesFrontiers<kDGLCPU, int64_t>(const CSRMatrix&, IdArray);
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 Frontiers TopologicalNodesFrontiers(const CSRMatrix& csr) {
   std::vector<IdType> ids;
   std::vector<int64_t> sections;
@@ -167,10 +167,10 @@ Frontiers TopologicalNodesFrontiers(const CSRMatrix& csr) {
   return front;
 }
 
-template Frontiers TopologicalNodesFrontiers<kDLCPU, int32_t>(const CSRMatrix&);
-template Frontiers TopologicalNodesFrontiers<kDLCPU, int64_t>(const CSRMatrix&);
+template Frontiers TopologicalNodesFrontiers<kDGLCPU, int32_t>(const CSRMatrix&);
+template Frontiers TopologicalNodesFrontiers<kDGLCPU, int64_t>(const CSRMatrix&);
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 Frontiers DGLDFSEdges(const CSRMatrix& csr, IdArray source) {
   const int64_t len = source->shape[0];
   const IdType* src_data = static_cast<IdType*>(source->data);
@@ -187,10 +187,10 @@ Frontiers DGLDFSEdges(const CSRMatrix& csr, IdArray source) {
   return front;
 }
 
-template Frontiers DGLDFSEdges<kDLCPU, int32_t>(const CSRMatrix&, IdArray);
-template Frontiers DGLDFSEdges<kDLCPU, int64_t>(const CSRMatrix&, IdArray);
+template Frontiers DGLDFSEdges<kDGLCPU, int32_t>(const CSRMatrix&, IdArray);
+template Frontiers DGLDFSEdges<kDGLCPU, int64_t>(const CSRMatrix&, IdArray);
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 Frontiers DGLDFSLabeledEdges(const CSRMatrix& csr,
                              IdArray source,
                              const bool has_reverse_edge,
@@ -226,12 +226,12 @@ Frontiers DGLDFSLabeledEdges(const CSRMatrix& csr,
   return front;
 }
 
-template Frontiers DGLDFSLabeledEdges<kDLCPU, int32_t>(const CSRMatrix&,
+template Frontiers DGLDFSLabeledEdges<kDGLCPU, int32_t>(const CSRMatrix&,
                                                        IdArray,
                                                        const bool,
                                                        const bool,
                                                        const bool);
-template Frontiers DGLDFSLabeledEdges<kDLCPU, int64_t>(const CSRMatrix&,
+template Frontiers DGLDFSLabeledEdges<kDGLCPU, int64_t>(const CSRMatrix&,
                                                        IdArray,
                                                        const bool,
                                                        const bool,
