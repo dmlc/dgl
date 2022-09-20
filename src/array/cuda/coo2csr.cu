@@ -14,14 +14,14 @@ using runtime::NDArray;
 namespace aten {
 namespace impl {
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 CSRMatrix COOToCSR(COOMatrix coo) {
   LOG(FATAL) << "Unreachable code.";
   return {};
 }
 
 template <>
-CSRMatrix COOToCSR<kDLGPU, int32_t>(COOMatrix coo) {
+CSRMatrix COOToCSR<kDGLCUDA, int32_t>(COOMatrix coo) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   cudaStream_t stream = runtime::getCurrentCUDAStream();
   // allocate cusparse handle if needed
@@ -100,7 +100,7 @@ __global__ void _SortedSearchKernelUpperBound(
 }
 
 template <>
-CSRMatrix COOToCSR<kDLGPU, int64_t>(COOMatrix coo) {
+CSRMatrix COOToCSR<kDGLCUDA, int64_t>(COOMatrix coo) {
   const auto& ctx = coo.row->ctx;
   const auto nbits = coo.row->dtype.bits;
   cudaStream_t stream = runtime::getCurrentCUDAStream();
@@ -133,8 +133,8 @@ CSRMatrix COOToCSR<kDLGPU, int64_t>(COOMatrix coo) {
                    indptr, coo.col, coo.data, col_sorted);
 }
 
-template CSRMatrix COOToCSR<kDLGPU, int32_t>(COOMatrix coo);
-template CSRMatrix COOToCSR<kDLGPU, int64_t>(COOMatrix coo);
+template CSRMatrix COOToCSR<kDGLCUDA, int32_t>(COOMatrix coo);
+template CSRMatrix COOToCSR<kDGLCUDA, int64_t>(COOMatrix coo);
 
 }  // namespace impl
 }  // namespace aten

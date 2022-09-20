@@ -1884,6 +1884,35 @@ def test_ismultigraph(idtype):
         {'A': 6, 'C': 6}, idtype=idtype, device=F.ctx())
     assert g.is_multigraph == True
 
+
+@parametrize_idtype
+def test_graph_index_is_unibipartite(idtype):
+    g1 = dgl.heterograph({('A', 'AB', 'B'): ([0, 0, 1], [1, 2, 5])},
+                         idtype=idtype, device=F.ctx())
+    assert g1._graph.is_metagraph_unibipartite()
+
+    # more complicated bipartite
+    g2 = dgl.heterograph({
+        ('A', 'AB', 'B'): ([0, 0, 1], [1, 2, 5]),
+        ('A', 'AC', 'C'): ([1, 0], [0, 0])
+    }, idtype=idtype, device=F.ctx())
+    assert g2._graph.is_metagraph_unibipartite()
+
+    g3 = dgl.heterograph({
+        ('A', 'AB', 'B'): ([0, 0, 1], [1, 2, 5]),
+        ('A', 'AC', 'C'): ([1, 0], [0, 0]),
+        ('A', 'AA', 'A'): ([0, 1], [0, 1])
+    }, idtype=idtype, device=F.ctx())
+    assert not g3._graph.is_metagraph_unibipartite()
+
+    g4 = dgl.heterograph({
+        ('A', 'AB', 'B'): ([0, 0, 1], [1, 2, 5]),
+        ('C', 'CA', 'A'): ([1, 0], [0, 0])
+    }, idtype=idtype, device=F.ctx())
+
+    assert not g4._graph.is_metagraph_unibipartite()
+
+
 @parametrize_idtype
 def test_bipartite(idtype):
     g1 = dgl.heterograph({('A', 'AB', 'B'): ([0, 0, 1], [1, 2, 5])},

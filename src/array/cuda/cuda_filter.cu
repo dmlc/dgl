@@ -105,7 +105,7 @@ IdArray _PerformFilter(
       &num_unique, 0,
       sizeof(num_unique),
       ctx,
-      DGLContext{kDLCPU, 0},
+      DGLContext{kDGLCPU, 0},
       test->dtype);
 
   // insert items into set
@@ -150,13 +150,13 @@ class CudaFilterSet : public Filter {
 
 }  // namespace
 
-template<DLDeviceType XPU, typename IdType>
+template<DGLDeviceType XPU, typename IdType>
 FilterRef CreateSetFilter(IdArray set) {
   return FilterRef(std::make_shared<CudaFilterSet<IdType>>(set));
 }
 
-template FilterRef CreateSetFilter<kDLGPU, int32_t>(IdArray set);
-template FilterRef CreateSetFilter<kDLGPU, int64_t>(IdArray set);
+template FilterRef CreateSetFilter<kDGLCUDA, int32_t>(IdArray set);
+template FilterRef CreateSetFilter<kDGLCUDA, int64_t>(IdArray set);
 
 }  // namespace array
 }  // namespace dgl

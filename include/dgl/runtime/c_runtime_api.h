@@ -1,5 +1,5 @@
 /*!
- *  Copyright (c) 2016 by Contributors
+ *  Copyright (c) 2016-2022 by Contributors
  * \file dgl/runtime/c_runtime_api.h
  * \brief DGL runtime library.
  *
@@ -35,10 +35,6 @@
 // DGL version
 #define DGL_VERSION "0.9"
 
-
-// DGL Runtime is DLPack compatible.
-#include <dlpack/dlpack.h>
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -48,28 +44,31 @@ extern "C" {
 /*! \brief type of array index. */
 typedef int64_t dgl_index_t;
 
-/*! \brief Extension device types in DGL */
+/*!
+ * \brief The device type in DGLContext.
+ */
+#ifdef __cplusplus
+typedef enum : int32_t {
+#else
 typedef enum {
-  kDLAOCL = 5,
-  kDLSDAccel = 6,
-  kOpenGL = 11,
-  // Extension DRAM type, used for quickly test extension device
-  // The device api can differ depending on the xpu driver registered.
-  kExtDev = 12,
-  // AddExtraDGLType which is not in DLPack here
-} DGLDeviceExtType;
+#endif
+  /*! \brief CPU device */
+  kDGLCPU = 1,
+  /*! \brief CUDA GPU device */
+  kDGLCUDA = 2,
+  // add more devices once supported
+} DGLDeviceType;
 
 /*!
- * \brief The type code in DGLType
- * \note DGLType is used in two places.
+ * \brief The object type code is used in DGL FFI to indicate the types of objects passed between C and Python.
  */
 typedef enum {
-  // The type code of other types are compatible with DLPack.
-  // The next few fields are extension types
-  // that is used by DGL API calls.
+  kInt = 0U,
+  kUInt = 1U,
+  kFloat = 2U,
   kHandle = 3U,
   kNull = 4U,
-  kDGLType = 5U,
+  kDGLDataType = 5U,
   kDGLContext = 6U,
   kArrayHandle = 7U,
   kObjectHandle = 8U,
@@ -88,29 +87,112 @@ typedef enum {
   // The following section of code is used for non-reserved types.
   kExtReserveEnd = 64U,
   kExtEnd = 128U
-} DGLTypeCode;
+} DGLObjectTypeCode;
 
 /*!
- * \brief The data type used in DGL Runtime.
+ * \brief The type code options DGLDataType.
+ */
+typedef enum {
+  /*! \brief signed integer */
+  kDGLInt = 0U,
+  /*! \brief unsigned integer */
+  kDGLUInt = 1U,
+  /*! \brief IEEE floating point */
+  kDGLFloat = 2U,
+  /*! \brief bfloat16 */
+  kDGLBfloat = 4U,
+  // add more data types if we are going to support them
+} DGLDataTypeCode;
+
+/*!
+ * \brief The data type the tensor can hold. The data type is assumed to follow the
+ * native endian-ness. An explicit error message should be raised when attempting to
+ * export an array with non-native endianness
  *
  *  Examples
  *   - float: type_code = 2, bits = 32, lanes=1
  *   - float4(vectorized 4 float): type_code = 2, bits = 32, lanes=4
  *   - int8: type_code = 0, bits = 8, lanes=1
- *
- * \note Arguments DGL API function always takes bits=64 and lanes=1
  */
-typedef DLDataType DGLType;
+typedef struct {
+  /*!
+   * \brief Type code of base types.
+   * We keep it uint8_t instead of DGLDataTypeCode for minimal memory
+   * footprint, but the value should be one of DGLDataTypeCode enum values.
+   * */
+  uint8_t code;
+  /*!
+   * \brief Number of bits, common choices are 8, 16, 32.
+   */
+  uint8_t bits;
+  /*! \brief Number of lanes in the type, used for vector types. */
+  uint16_t lanes;
+} DGLDataType;
 
 /*!
  * \brief The Device information, abstract away common device types.
  */
-typedef DLContext DGLContext;
+typedef struct {
+  /*! \brief The device type used in the device. */
+  DGLDeviceType device_type;
+  /*!
+   * \brief The device index.
+   * For vanilla CPU memory, pinned memory, or managed memory, this is set to 0.
+   */
+  int32_t device_id;
+} DGLContext;
 
 /*!
  * \brief The tensor array stucture to DGL API.
+ * The structure is heavily inspired by DLTensor from DLPack.
  */
-typedef DLTensor DGLArray;
+typedef struct {
+  /*!
+   * \brief The data pointer points to the allocated data.
+   * 
+   * Depending on the device context, it can be a CPU pointer, or a CUDA
+   * device pointer or  acl_mem handle in OpenCL.
+   * This pointer is always aligned to 256 bytes as in CUDA. Use the
+   * `byte_offset` field to mark the beginning of the actual data (if the address
+   * is not 256 byte aligned).
+   *
+   * Note that as of Nov 2021, multiply libraries (CuPy, PyTorch, TensorFlow,
+   * TVM, perhaps others) do not adhere to this 256 byte alignment requirement
+   * on CPU/CUDA/ROCm, and always use `byte_offset=0`.  This is likely to be
+   * fixed in the future; at the moment it is recommended
+   * to not rely on the data pointer being correctly aligned.
+   *
+   * For a DGLArray, the size of memory required to store the contents of
+   * data can be calculated as follows:
+   *
+   * \code{.c}
+   * static inline size_t GetDataSize(const DGLArray* t) {
+   *   size_t size = 1;
+   *   for (int32_t i = 0; i < t->ndim; ++i) {
+   *     size *= t->shape[i];
+   *   }
+   *   size *= (t->dtype.bits * t->dtype.lanes + 7) / 8;
+   *   return size;
+   * }
+   * \endcode
+   */
+  void* data;
+  /*! \brief The device of the tensor */
+  DGLContext ctx;
+  /*! \brief Number of dimensions */
+  int32_t ndim;
+  /*! \brief The data type of the pointer*/
+  DGLDataType dtype;
+  /*! \brief The shape of the tensor */
+  int64_t* shape;
+  /*!
+   * \brief strides of the tensor (in number of elements, not bytes)
+   *  can be NULL, indicating tensor is compact and row-majored.
+   */
+  int64_t* strides;
+  /*! \brief The offset in bytes to the beginning pointer to data */
+  uint64_t byte_offset;
+} DGLArray;
 
 /*! \brief the array handle */
 typedef DGLArray* DGLArrayHandle;
@@ -124,7 +206,7 @@ typedef union {
   double v_float64;
   void* v_handle;
   const char* v_str;
-  DGLType v_type;
+  DGLDataType v_type;
   DGLContext v_ctx;
 } DGLValue;
 
@@ -456,32 +538,6 @@ DGL_DLL int DGLArrayCopyFromTo(DGLArrayHandle from,
                                DGLArrayHandle to);
 
 /*!
- * \brief Produce an array from the DLManagedTensor that shares data memory
- * with the DLManagedTensor.
- * \param from The source DLManagedTensor.
- * \param out The output array handle.
- * \return 0 when success, -1 when failure happens
- */
-DGL_DLL int DGLArrayFromDLPack(DLManagedTensor* from,
-                               DGLArrayHandle* out);
-
-/*!
- * \brief Produce a DLMangedTensor from the array that shares data memory with
- * the array.
- * \param from The source array.
- * \param out The DLManagedTensor handle.
- * \return 0 when success, -1 when failure happens
- */
-DGL_DLL int DGLArrayToDLPack(DGLArrayHandle from, DLManagedTensor** out,
-                             int alignment = 0);
-
-/*!
- * \brief Delete (free) a DLManagedTensor's data.
- * \param dltensor Pointer to the DLManagedTensor.
- */
-DGL_DLL void DGLDLManagedTensorCallDeleter(DLManagedTensor* dltensor);
-
-/*!
  * \brief Create a new runtime stream.
  *
  * \param device_type The device type of context
@@ -557,12 +613,12 @@ DGL_DLL int DGLLoadTensorAdapter(const char *path);
 /*!
  * \brief Pin host memory.
  */
-int DGLArrayPinData(DGLArrayHandle handle, DLContext ctx);
+int DGLArrayPinData(DGLArrayHandle handle, DGLContext ctx);
 
 /*!
  * \brief Unpin host memory.
  */
-int DGLArrayUnpinData(DGLArrayHandle handle, DLContext ctx);
+int DGLArrayUnpinData(DGLArrayHandle handle, DGLContext ctx);
 
 /*!
  * \brief Record the stream that's using this tensor.

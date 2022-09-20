@@ -29,8 +29,8 @@ class WorkspacePool::Pool {
     nbytes = (nbytes + (kWorkspacePageSize - 1)) / kWorkspacePageSize * kWorkspacePageSize;
     if (nbytes == 0) nbytes = kWorkspacePageSize;
     Entry e;
-    DGLType type;
-    type.code = kDLUInt;
+    DGLDataType type;
+    type.code = kDGLUInt;
     type.bits = 8;
     type.lanes = 1;
     if (free_list_.size() == 2) {
@@ -113,7 +113,7 @@ class WorkspacePool::Pool {
   std::vector<Entry> allocated_;
 };
 
-WorkspacePool::WorkspacePool(DLDeviceType device_type, std::shared_ptr<DeviceAPI> device)
+WorkspacePool::WorkspacePool(DGLDeviceType device_type, std::shared_ptr<DeviceAPI> device)
     : device_type_(device_type), device_(device) {
 }
 

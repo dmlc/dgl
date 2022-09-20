@@ -97,13 +97,13 @@ COOMatrix CSRRowWisePick(CSRMatrix mat, IdArray rows,
   // [02/29/2020 update]: OMP is disabled for now since batch-wise parallelism is more
   //   significant. (minjie)
   IdArray picked_row = NDArray::Empty({num_rows * num_picks},
-                                      DLDataType{kDLInt, 8*sizeof(IdxType), 1},
+                                      DGLDataType{kDGLInt, 8*sizeof(IdxType), 1},
                                       ctx);
   IdArray picked_col = NDArray::Empty({num_rows * num_picks},
-                                      DLDataType{kDLInt, 8*sizeof(IdxType), 1},
+                                      DGLDataType{kDGLInt, 8*sizeof(IdxType), 1},
                                       ctx);
   IdArray picked_idx = NDArray::Empty({num_rows * num_picks},
-                                      DLDataType{kDLInt, 8*sizeof(IdxType), 1},
+                                      DGLDataType{kDGLInt, 8*sizeof(IdxType), 1},
                                       ctx);
   IdxType* picked_rdata = static_cast<IdxType*>(picked_row->data);
   IdxType* picked_cdata = static_cast<IdxType*>(picked_col->data);

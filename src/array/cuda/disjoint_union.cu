@@ -47,7 +47,7 @@ __global__ void _DisjointUnionKernel(
   }
 }
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 std::tuple<IdArray, IdArray, IdArray> _ComputePrefixSums(const std::vector<COOMatrix>& coos) {
   IdType n = coos.size(), nbits = coos[0].row->dtype.bits;
   IdArray n_rows = NewIdArray(n, CPU, nbits);
@@ -71,10 +71,10 @@ std::tuple<IdArray, IdArray, IdArray> _ComputePrefixSums(const std::vector<COOMa
                          CumSum(n_elms.CopyTo(coos[0].row->ctx), true));
 }
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 void _Merge(IdType** arrs, IdType* prefix, IdType* offset, IdType* out,
             int64_t n_arrs, int n_elms,
-            DGLContext ctx, DGLType dtype, cudaStream_t stream) {
+            DGLContext ctx, DGLDataType dtype, cudaStream_t stream) {
   auto device = runtime::DeviceAPI::Get(ctx);
   int nt = 256;
   int nb = (n_elms + nt - 1) / nt;
@@ -84,7 +84,7 @@ void _Merge(IdType** arrs, IdType* prefix, IdType* offset, IdType* out,
 
   device->CopyDataFromTo(
       arrs, 0, arrs_dev, 0, sizeof(IdType*)*n_arrs,
-      DGLContext{kDLCPU, 0}, ctx, dtype);
+      DGLContext{kDGLCPU, 0}, ctx, dtype);
 
   CUDA_KERNEL_CALL(_DisjointUnionKernel,
       nb, nt, 0, stream,
@@ -94,7 +94,7 @@ void _Merge(IdType** arrs, IdType* prefix, IdType* offset, IdType* out,
   device->FreeWorkspace(ctx, arrs_dev);
 }
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 COOMatrix DisjointUnionCoo(const std::vector<COOMatrix>& coos) {
   cudaStream_t stream = runtime::getCurrentCUDAStream();
   auto device = runtime::DeviceAPI::Get(coos[0].row->ctx);
@@ -133,17 +133,17 @@ COOMatrix DisjointUnionCoo(const std::vector<COOMatrix>& coos) {
   IdType n_elements = 0;
   device->CopyDataFromTo(
       &prefix_elm[coos.size()], 0, &n_elements, 0,
-      sizeof(IdType), coos[0].row->ctx, DGLContext{kDLCPU, 0},
+      sizeof(IdType), coos[0].row->ctx, DGLContext{kDGLCPU, 0},
       coos[0].row->dtype);
 
   device->CopyDataFromTo(
       &prefix_src[coos.size()], 0, &src_offset, 0,
-      sizeof(IdType), coos[0].row->ctx, DGLContext{kDLCPU, 0},
+      sizeof(IdType), coos[0].row->ctx, DGLContext{kDGLCPU, 0},
       coos[0].row->dtype);
 
   device->CopyDataFromTo(
       &prefix_dst[coos.size()], 0, &dst_offset, 0,
-      sizeof(IdType), coos[0].row->ctx, DGLContext{kDLCPU, 0},
+      sizeof(IdType), coos[0].row->ctx, DGLContext{kDGLCPU, 0},
       coos[0].row->dtype);
 
   // Union src array
@@ -176,8 +176,8 @@ COOMatrix DisjointUnionCoo(const std::vector<COOMatrix>& coos) {
     col_sorted);
 }
 
-template COOMatrix DisjointUnionCoo<kDLGPU, int32_t>(const std::vector<COOMatrix>& coos);
-template COOMatrix DisjointUnionCoo<kDLGPU, int64_t>(const std::vector<COOMatrix>& coos);
+template COOMatrix DisjointUnionCoo<kDGLCUDA, int32_t>(const std::vector<COOMatrix>& coos);
+template COOMatrix DisjointUnionCoo<kDGLCUDA, int64_t>(const std::vector<COOMatrix>& coos);
 
 }  // namespace impl
 }  // namespace aten

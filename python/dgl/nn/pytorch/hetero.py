@@ -122,7 +122,13 @@ class HeteroGraphConv(nn.Module):
     """
     def __init__(self, mods, aggregate='sum'):
         super(HeteroGraphConv, self).__init__()
+        self.mod_dict = mods
+        mods = {str(k): v for k, v in mods.items()}
+        # Register as child modules
         self.mods = nn.ModuleDict(mods)
+        # PyTorch ModuleDict doesn't have get() method, so I have to store two
+        # dictionaries so that I can index with both canonical edge type and
+        # edge type with the get() method.
         # Do not break if graph has 0-in-degree nodes.
         # Because there is no general rule to add self-loop for heterograph.
         for _, v in self.mods.items():
@@ -133,6 +139,16 @@ class HeteroGraphConv(nn.Module):
             self.agg_fn = get_aggregate_fn(aggregate)
         else:
             self.agg_fn = aggregate
+
+    def _get_module(self, etype):
+        mod = self.mod_dict.get(etype, None)
+        if mod is not None:
+            return mod
+        if isinstance(etype, tuple):
+            # etype is canonical
+            _, etype, _ = etype
+            return self.mod_dict[etype]
+        raise KeyError('Cannot find module with edge type %s' % etype)
 
     def forward(self, g, inputs, mod_args=None, mod_kwargs=None):
         """Forward computation
@@ -171,7 +187,7 @@ class HeteroGraphConv(nn.Module):
                 rel_graph = g[stype, etype, dtype]
                 if stype not in src_inputs or dtype not in dst_inputs:
                     continue
-                dstdata = self.mods[etype](
+                dstdata = self._get_module((stype, etype, dtype))(
                     rel_graph,
                     (src_inputs[stype], dst_inputs[dtype]),
                     *mod_args.get(etype, ()),
@@ -182,7 +198,7 @@ class HeteroGraphConv(nn.Module):
                 rel_graph = g[stype, etype, dtype]
                 if stype not in inputs:
                     continue
-                dstdata = self.mods[etype](
+                dstdata = self._get_module((stype, etype, dtype))(
                     rel_graph,
                     (inputs[stype], inputs[dtype]),
                     *mod_args.get(etype, ()),
