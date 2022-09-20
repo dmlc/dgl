@@ -30,7 +30,7 @@ class Model(nn.Module):
         self.out_layer = Layer(hid_dim, out_dim)
 
     def forward(self, graph, feat, eweight=None):
-        h = self.in_layer(graph, feat, eweight)
+        h = self.in_layer(graph, feat.float(), eweight)
         h = F.relu(h)
         h = self.hid_layer(graph, h, eweight)
         h = F.relu(h)
