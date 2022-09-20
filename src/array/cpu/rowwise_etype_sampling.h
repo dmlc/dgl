@@ -127,7 +127,7 @@ inline ETypePickFn<IdxType, EType> GetSamplingETypePickFn(
 
 }  // namespace
 
-template <DLDeviceType XPU, typename IdxType, typename FloatType, typename EType>
+template <DGLDeviceType XPU, typename IdxType, typename FloatType, typename EType>
 COOMatrix CSRRowWisePerEtypeSampling(CSRMatrix mat, IdArray rows, IdArray etypes,
                                      const std::vector<int64_t>& num_samples,
                                      FloatArray prob, bool replace, bool etype_sorted) {
@@ -140,7 +140,7 @@ COOMatrix CSRRowWisePerEtypeSampling(CSRMatrix mat, IdArray rows, IdArray etypes
       mat, rows, etypes, num_samples, etype_sorted, pick_fn, num_picks_fn);
 }
 
-template <DLDeviceType XPU, typename IdxType, typename EType>
+template <DGLDeviceType XPU, typename IdxType, typename EType>
 COOMatrix CSRRowWisePerEtypeSamplingUniform(CSRMatrix mat, IdArray rows, IdArray etypes,
                                             const std::vector<int64_t>& num_samples,
                                             bool replace, bool etype_sorted) {
@@ -150,7 +150,7 @@ COOMatrix CSRRowWisePerEtypeSamplingUniform(CSRMatrix mat, IdArray rows, IdArray
       mat, rows, etypes, num_samples, etype_sorted, pick_fn, num_picks_fn);
 }
 
-template <DLDeviceType XPU, typename IdxType, typename FloatType, typename EType>
+template <DGLDeviceType XPU, typename IdxType, typename FloatType, typename EType>
 COOMatrix COORowWisePerEtypeSampling(COOMatrix mat, IdArray rows, IdArray etypes,
                                      const std::vector<int64_t>& num_samples,
                                      FloatArray prob, bool replace, bool etype_sorted) {
@@ -163,7 +163,7 @@ COOMatrix COORowWisePerEtypeSampling(COOMatrix mat, IdArray rows, IdArray etypes
       mat, rows, etypes, num_samples, etype_sorted, pick_fn, num_picks_fn);
 }
 
-template <DLDeviceType XPU, typename IdxType, typename EType>
+template <DGLDeviceType XPU, typename IdxType, typename EType>
 COOMatrix COORowWisePerEtypeSamplingUniform(COOMatrix mat, IdArray rows, IdArray etypes,
                                     const std::vector<int64_t>& num_samples,
                                     bool replace, bool etype_sorted) {

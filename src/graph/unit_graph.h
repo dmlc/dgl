@@ -79,9 +79,9 @@ class UnitGraph : public BaseHeteroGraph {
     LOG(FATAL) << "UnitGraph graph is not mutable.";
   }
 
-  DLDataType DataType() const override;
+  DGLDataType DataType() const override;
 
-  DLContext Context() const override;
+  DGLContext Context() const override;
 
   bool IsPinned() const override;
 
@@ -167,7 +167,7 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \brief Create a graph with no edges */
   static HeteroGraphPtr Empty(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,
-      DLDataType dtype, DLContext ctx) {
+      DGLDataType dtype, DGLContext ctx) {
     IdArray row = IdArray::Empty({0}, dtype, ctx);
     IdArray col = IdArray::Empty({0}, dtype, ctx);
     return CreateFromCOO(num_vtypes, num_src, num_dst, row, col);
@@ -207,14 +207,14 @@ class UnitGraph : public BaseHeteroGraph {
   static HeteroGraphPtr AsNumBits(HeteroGraphPtr g, uint8_t bits);
 
   /*! \brief Copy the data to another context */
-  static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DLContext &ctx);
+  static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DGLContext &ctx);
 
   /*!
   * \brief Pin the in_csr_, out_scr_ and coo_ of the current graph.
   * \note The graph will be pinned inplace. Behavior depends on the current context,
-  *       kDLCPU: will be pinned;
+  *       kDGLCPU: will be pinned;
   *       IsPinned: directly return;
-  *       kDLGPU: invalid, will throw an error.
+  *       kDGLCUDA: invalid, will throw an error.
   *       The context check is deferred to pinning the NDArray.
   */
   void PinMemory_() override;

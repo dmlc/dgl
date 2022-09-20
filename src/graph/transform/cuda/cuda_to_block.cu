@@ -82,7 +82,7 @@ class DeviceNodeMapMaker {
     for (int64_t ntype = 0; ntype < lhs_num_ntypes; ++ntype) {
       const IdArray& nodes = lhs_nodes[ntype];
       if (nodes->shape[0] > 0) {
-        CHECK_EQ(nodes->ctx.device_type, kDLGPU);
+        CHECK_EQ(nodes->ctx.device_type, kDGLCUDA);
         node_maps->LhsHashTable(ntype).FillWithDuplicates(
             nodes.Ptr<IdType>(),
             nodes->shape[0],
@@ -127,7 +127,7 @@ class DeviceNodeMapMaker {
     for (int64_t ntype = 0; ntype < lhs_num_ntypes; ++ntype) {
       const IdArray& nodes = lhs_nodes[ntype];
       if (nodes->shape[0] > 0) {
-        CHECK_EQ(nodes->ctx.device_type, kDLGPU);
+        CHECK_EQ(nodes->ctx.device_type, kDGLCUDA);
         node_maps->LhsHashTable(ntype).FillWithUnique(
             nodes.Ptr<IdType>(),
             nodes->shape[0],
@@ -154,7 +154,7 @@ class DeviceNodeMapMaker {
 
 
 // Since partial specialization is not allowed for functions, use this as an
-// intermediate for ToBlock where XPU = kDLGPU.
+// intermediate for ToBlock where XPU = kDGLCUDA.
 template<typename IdType>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>>
 ToBlockGPU(
@@ -170,7 +170,7 @@ ToBlockGPU(
   auto device = runtime::DeviceAPI::Get(ctx);
   cudaStream_t stream = runtime::getCurrentCUDAStream();
 
-  CHECK_EQ(ctx.device_type, kDLGPU);
+  CHECK_EQ(ctx.device_type, kDGLCUDA);
   for (const auto& nodes : rhs_nodes) {
     CHECK_EQ(ctx.device_type, nodes->ctx.device_type);
   }
@@ -296,8 +296,8 @@ ToBlockGPU(
         num_nodes_per_type.data(), 0,
         sizeof(*num_nodes_per_type.data())*num_ntypes,
         ctx,
-        DGLContext{kDLCPU, 0},
-        DGLType{kDLInt, 64, 1});
+        DGLContext{kDGLCPU, 0},
+        DGLDataType{kDGLInt, 64, 1});
     device->StreamSync(ctx, stream);
 
     // wait for the node counts to finish transferring
@@ -321,7 +321,7 @@ ToBlockGPU(
       induced_edges.push_back(edge_arrays[etype].id);
     } else {
       induced_edges.push_back(
-            aten::NullArray(DLDataType{kDLInt, sizeof(IdType)*8, 1}, ctx));
+            aten::NullArray(DGLDataType{kDGLInt, sizeof(IdType)*8, 1}, ctx));
     }
   }
 
@@ -358,8 +358,8 @@ ToBlockGPU(
       // No rhs nodes are given for this edge type. Create an empty graph.
       rel_graphs.push_back(CreateFromCOO(
           2, lhs_nodes[srctype]->shape[0], rhs_nodes[dsttype]->shape[0],
-          aten::NullArray(DLDataType{kDLInt, sizeof(IdType)*8, 1}, ctx),
-          aten::NullArray(DLDataType{kDLInt, sizeof(IdType)*8, 1}, ctx)));
+          aten::NullArray(DGLDataType{kDGLInt, sizeof(IdType)*8, 1}, ctx),
+          aten::NullArray(DGLDataType{kDGLInt, sizeof(IdType)*8, 1}, ctx)));
     } else {
       rel_graphs.push_back(CreateFromCOO(
           2,
@@ -383,7 +383,7 @@ ToBlockGPU(
 // functions are the same.
 // Using template<> fails to export the symbols.
 std::tuple<HeteroGraphPtr, std::vector<IdArray>>
-// ToBlock<kDLGPU, int32_t>
+// ToBlock<kDGLCUDA, int32_t>
 ToBlockGPU32(
     HeteroGraphPtr graph,
     const std::vector<IdArray> &rhs_nodes,
@@ -393,7 +393,7 @@ ToBlockGPU32(
 }
 
 std::tuple<HeteroGraphPtr, std::vector<IdArray>>
-// ToBlock<kDLGPU, int64_t>
+// ToBlock<kDGLCUDA, int64_t>
 ToBlockGPU64(
     HeteroGraphPtr graph,
     const std::vector<IdArray> &rhs_nodes,

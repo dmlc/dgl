@@ -79,7 +79,7 @@ HeteroSubgraph SampleNeighbors(
   CHECK_EQ(prob.size(), hg->NumEdgeTypes())
     << "Number of probability tensors must match the number of edge types.";
 
-  DLContext ctx = aten::GetContextOf(nodes);
+  DGLContext ctx = aten::GetContextOf(nodes);
 
   std::vector<HeteroGraphPtr> subrels(hg->NumEdgeTypes());
   std::vector<IdArray> induced_edges(hg->NumEdgeTypes());

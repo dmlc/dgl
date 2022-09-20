@@ -89,13 +89,13 @@ CSRMatrix CSRRowWisePickPartial(
   const auto& ctx = mat.indptr->ctx;
 
   IdArray picked_row_indptr = NDArray::Empty({num_rows + 1},
-                                              DLDataTypeTraits<IdxType>::dtype,
+                                              DGLDataTypeTraits<IdxType>::dtype,
                                               ctx);
   IdArray picked_col = NDArray::Empty({num_rows * max_num_picks},
-                                      DLDataTypeTraits<IdxType>::dtype,
+                                      DGLDataTypeTraits<IdxType>::dtype,
                                       ctx);
   IdArray picked_idx = NDArray::Empty({num_rows * max_num_picks},
-                                      DLDataTypeTraits<IdxType>::dtype,
+                                      DGLDataTypeTraits<IdxType>::dtype,
                                       ctx);
   IdxType* picked_row_indptr_data = static_cast<IdxType*>(picked_row_indptr->data);
   IdxType* picked_cdata = static_cast<IdxType*>(picked_col->data);

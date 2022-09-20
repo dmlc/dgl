@@ -164,10 +164,10 @@ HaloHeteroSubgraph GetSubgraphWithHalo(std::shared_ptr<HeteroGraph> hg,
   }
 
   num_edges = edge_src.size();
-  IdArray new_src = IdArray::Empty({num_edges}, DLDataType{kDLInt, 64, 1},
-                                   DLContext{kDLCPU, 0});
-  IdArray new_dst = IdArray::Empty({num_edges}, DLDataType{kDLInt, 64, 1},
-                                   DLContext{kDLCPU, 0});
+  IdArray new_src = IdArray::Empty({num_edges}, DGLDataType{kDGLInt, 64, 1},
+                                   DGLContext{kDGLCPU, 0});
+  IdArray new_dst = IdArray::Empty({num_edges}, DGLDataType{kDGLInt, 64, 1},
+                                   DGLContext{kDGLCPU, 0});
   dgl_id_t *new_src_data = static_cast<dgl_id_t *>(new_src->data);
   dgl_id_t *new_dst_data = static_cast<dgl_id_t *>(new_dst->data);
   for (size_t i = 0; i < edge_src.size(); i++) {

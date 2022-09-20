@@ -177,7 +177,7 @@ inline PickFn<IdxType> GetSamplingBiasedPickFn(
 
 /////////////////////////////// CSR ///////////////////////////////
 
-template <DLDeviceType XPU, typename IdxType, typename FloatType>
+template <DGLDeviceType XPU, typename IdxType, typename FloatType>
 COOMatrix CSRRowWiseSampling(CSRMatrix mat, IdArray rows, int64_t num_samples,
                              FloatArray prob, bool replace) {
   CHECK(prob.defined());
@@ -186,16 +186,16 @@ COOMatrix CSRRowWiseSampling(CSRMatrix mat, IdArray rows, int64_t num_samples,
   return CSRRowWisePick(mat, rows, num_samples, pick_fn, num_picks_fn);
 }
 
-template COOMatrix CSRRowWiseSampling<kDLCPU, int32_t, float>(
+template COOMatrix CSRRowWiseSampling<kDGLCPU, int32_t, float>(
     CSRMatrix, IdArray, int64_t, FloatArray, bool);
-template COOMatrix CSRRowWiseSampling<kDLCPU, int64_t, float>(
+template COOMatrix CSRRowWiseSampling<kDGLCPU, int64_t, float>(
     CSRMatrix, IdArray, int64_t, FloatArray, bool);
-template COOMatrix CSRRowWiseSampling<kDLCPU, int32_t, double>(
+template COOMatrix CSRRowWiseSampling<kDGLCPU, int32_t, double>(
     CSRMatrix, IdArray, int64_t, FloatArray, bool);
-template COOMatrix CSRRowWiseSampling<kDLCPU, int64_t, double>(
+template COOMatrix CSRRowWiseSampling<kDGLCPU, int64_t, double>(
     CSRMatrix, IdArray, int64_t, FloatArray, bool);
 
-template <DLDeviceType XPU, typename IdxType>
+template <DGLDeviceType XPU, typename IdxType>
 COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat, IdArray rows,
                                     int64_t num_samples, bool replace) {
   auto num_picks_fn = GetSamplingUniformNumPicksFn<IdxType>(num_samples, replace);
@@ -203,12 +203,12 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat, IdArray rows,
   return CSRRowWisePick(mat, rows, num_samples, pick_fn, num_picks_fn);
 }
 
-template COOMatrix CSRRowWiseSamplingUniform<kDLCPU, int32_t>(
+template COOMatrix CSRRowWiseSamplingUniform<kDGLCPU, int32_t>(
     CSRMatrix, IdArray, int64_t, bool);
-template COOMatrix CSRRowWiseSamplingUniform<kDLCPU, int64_t>(
+template COOMatrix CSRRowWiseSamplingUniform<kDGLCPU, int64_t>(
     CSRMatrix, IdArray, int64_t, bool);
 
-template <DLDeviceType XPU, typename IdxType, typename FloatType>
+template <DGLDeviceType XPU, typename IdxType, typename FloatType>
 COOMatrix CSRRowWiseSamplingBiased(
     CSRMatrix mat,
     IdArray rows,
@@ -224,22 +224,22 @@ COOMatrix CSRRowWiseSamplingBiased(
   return CSRRowWisePick(mat, rows, num_samples, pick_fn, num_picks_fn);
 }
 
-template COOMatrix CSRRowWiseSamplingBiased<kDLCPU, int32_t, float>(
+template COOMatrix CSRRowWiseSamplingBiased<kDGLCPU, int32_t, float>(
   CSRMatrix, IdArray, int64_t, NDArray, FloatArray, bool);
 
-template COOMatrix CSRRowWiseSamplingBiased<kDLCPU, int64_t, float>(
+template COOMatrix CSRRowWiseSamplingBiased<kDGLCPU, int64_t, float>(
   CSRMatrix, IdArray, int64_t, NDArray, FloatArray, bool);
 
-template COOMatrix CSRRowWiseSamplingBiased<kDLCPU, int32_t, double>(
+template COOMatrix CSRRowWiseSamplingBiased<kDGLCPU, int32_t, double>(
   CSRMatrix, IdArray, int64_t, NDArray, FloatArray, bool);
 
-template COOMatrix CSRRowWiseSamplingBiased<kDLCPU, int64_t, double>(
+template COOMatrix CSRRowWiseSamplingBiased<kDGLCPU, int64_t, double>(
   CSRMatrix, IdArray, int64_t, NDArray, FloatArray, bool);
 
 
 /////////////////////////////// COO ///////////////////////////////
 
-template <DLDeviceType XPU, typename IdxType, typename FloatType>
+template <DGLDeviceType XPU, typename IdxType, typename FloatType>
 COOMatrix COORowWiseSampling(COOMatrix mat, IdArray rows, int64_t num_samples,
                              FloatArray prob, bool replace) {
   CHECK(prob.defined());
@@ -248,16 +248,16 @@ COOMatrix COORowWiseSampling(COOMatrix mat, IdArray rows, int64_t num_samples,
   return COORowWisePick(mat, rows, num_samples, pick_fn, num_picks_fn);
 }
 
-template COOMatrix COORowWiseSampling<kDLCPU, int32_t, float>(
+template COOMatrix COORowWiseSampling<kDGLCPU, int32_t, float>(
     COOMatrix, IdArray, int64_t, FloatArray, bool);
-template COOMatrix COORowWiseSampling<kDLCPU, int64_t, float>(
+template COOMatrix COORowWiseSampling<kDGLCPU, int64_t, float>(
     COOMatrix, IdArray, int64_t, FloatArray, bool);
-template COOMatrix COORowWiseSampling<kDLCPU, int32_t, double>(
+template COOMatrix COORowWiseSampling<kDGLCPU, int32_t, double>(
     COOMatrix, IdArray, int64_t, FloatArray, bool);
-template COOMatrix COORowWiseSampling<kDLCPU, int64_t, double>(
+template COOMatrix COORowWiseSampling<kDGLCPU, int64_t, double>(
     COOMatrix, IdArray, int64_t, FloatArray, bool);
 
-template <DLDeviceType XPU, typename IdxType>
+template <DGLDeviceType XPU, typename IdxType>
 COOMatrix COORowWiseSamplingUniform(COOMatrix mat, IdArray rows,
                                     int64_t num_samples, bool replace) {
   auto num_picks_fn = GetSamplingUniformNumPicksFn<IdxType>(num_samples, replace);
@@ -265,9 +265,9 @@ COOMatrix COORowWiseSamplingUniform(COOMatrix mat, IdArray rows,
   return COORowWisePick(mat, rows, num_samples, pick_fn, num_picks_fn);
 }
 
-template COOMatrix COORowWiseSamplingUniform<kDLCPU, int32_t>(
+template COOMatrix COORowWiseSamplingUniform<kDGLCPU, int32_t>(
     COOMatrix, IdArray, int64_t, bool);
-template COOMatrix COORowWiseSamplingUniform<kDLCPU, int64_t>(
+template COOMatrix COORowWiseSamplingUniform<kDGLCPU, int64_t>(
     COOMatrix, IdArray, int64_t, bool);
 
 }  // namespace impl

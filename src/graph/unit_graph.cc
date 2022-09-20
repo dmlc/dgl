@@ -125,11 +125,11 @@ class UnitGraph::COO : public BaseHeteroGraph {
     LOG(FATAL) << "UnitGraph graph is not mutable.";
   }
 
-  DLDataType DataType() const override {
+  DGLDataType DataType() const override {
     return adj_.row->dtype;
   }
 
-  DLContext Context() const override {
+  DGLContext Context() const override {
     return adj_.row->ctx;
   }
 
@@ -153,7 +153,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return ret;
   }
 
-  COO CopyTo(const DLContext &ctx) const {
+  COO CopyTo(const DGLContext &ctx) const {
     if (Context() == ctx)
       return *this;
     return COO(meta_graph_, adj_.CopyTo(ctx));
@@ -385,7 +385,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
     CHECK(aten::IsValidIdArray(dstvids)) << "Invalid vertex id array.";
     HeteroSubgraph subg;
     const auto& submat = aten::COOSliceMatrix(adj_, srcvids, dstvids);
-    DLContext ctx = aten::GetContextOf(vids);
+    DGLContext ctx = aten::GetContextOf(vids);
     IdArray sub_eids = aten::Range(0, submat.data->shape[0], NumBits(), ctx);
     subg.graph = std::make_shared<COO>(meta_graph(), submat.num_rows, submat.num_cols,
         submat.row, submat.col);
@@ -412,9 +412,9 @@ class UnitGraph::COO : public BaseHeteroGraph {
       IdArray new_src = aten::IndexSelect(adj_.row, eids[0]);
       IdArray new_dst = aten::IndexSelect(adj_.col, eids[0]);
       subg.induced_vertices.emplace_back(
-          aten::NullArray(DLDataType{kDLInt, NumBits(), 1}, Context()));
+          aten::NullArray(DGLDataType{kDGLInt, NumBits(), 1}, Context()));
       subg.induced_vertices.emplace_back(
-          aten::NullArray(DLDataType{kDLInt, NumBits(), 1}, Context()));
+          aten::NullArray(DGLDataType{kDGLInt, NumBits(), 1}, Context()));
       subg.graph = std::make_shared<COO>(
           meta_graph(), NumVertices(SrcType()), NumVertices(DstType()), new_src, new_dst);
       subg.induced_edges = eids;
@@ -532,11 +532,11 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     LOG(FATAL) << "UnitGraph graph is not mutable.";
   }
 
-  DLDataType DataType() const override {
+  DGLDataType DataType() const override {
     return adj_.indices->dtype;
   }
 
-  DLContext Context() const override {
+  DGLContext Context() const override {
     return adj_.indices->ctx;
   }
 
@@ -562,7 +562,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     }
   }
 
-  CSR CopyTo(const DLContext &ctx) const {
+  CSR CopyTo(const DGLContext &ctx) const {
     if (Context() == ctx) {
       return *this;
     } else {
@@ -810,7 +810,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     CHECK(aten::IsValidIdArray(dstvids)) << "Invalid vertex id array.";
     HeteroSubgraph subg;
     const auto& submat = aten::CSRSliceMatrix(adj_, srcvids, dstvids);
-    DLContext ctx = aten::GetContextOf(vids);
+    DGLContext ctx = aten::GetContextOf(vids);
     IdArray sub_eids = aten::Range(0, submat.data->shape[0], NumBits(), ctx);
     subg.graph = std::make_shared<CSR>(meta_graph(), submat.num_rows, submat.num_cols,
         submat.indptr, submat.indices, sub_eids);
@@ -860,11 +860,11 @@ class UnitGraph::CSR : public BaseHeteroGraph {
 //
 //////////////////////////////////////////////////////////
 
-DLDataType UnitGraph::DataType() const {
+DGLDataType UnitGraph::DataType() const {
   return GetAny()->DataType();
 }
 
-DLContext UnitGraph::Context() const {
+DGLContext UnitGraph::Context() const {
   return GetAny()->Context();
 }
 
@@ -1285,7 +1285,7 @@ HeteroGraphPtr UnitGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
   }
 }
 
-HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext &ctx) {
+HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DGLContext &ctx) {
   if (ctx == g->Context()) {
     return g;
   } else {

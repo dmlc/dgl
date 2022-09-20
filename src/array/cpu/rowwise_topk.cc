@@ -68,7 +68,7 @@ inline PickFn<IdxType> GetTopkPickFn(int64_t k, NDArray weight, bool ascending) 
 
 }  // namespace
 
-template <DLDeviceType XPU, typename IdxType, typename DType>
+template <DGLDeviceType XPU, typename IdxType, typename DType>
 COOMatrix CSRRowWiseTopk(
     CSRMatrix mat, IdArray rows, int64_t k, NDArray weight, bool ascending) {
   auto num_picks_fn = GetTopkNumPicksFn<IdxType>(k);
@@ -76,24 +76,24 @@ COOMatrix CSRRowWiseTopk(
   return CSRRowWisePick(mat, rows, k, pick_fn, num_picks_fn);
 }
 
-template COOMatrix CSRRowWiseTopk<kDLCPU, int32_t, int32_t>(
+template COOMatrix CSRRowWiseTopk<kDGLCPU, int32_t, int32_t>(
     CSRMatrix, IdArray, int64_t, NDArray, bool);
-template COOMatrix CSRRowWiseTopk<kDLCPU, int64_t, int32_t>(
+template COOMatrix CSRRowWiseTopk<kDGLCPU, int64_t, int32_t>(
     CSRMatrix, IdArray, int64_t, NDArray, bool);
-template COOMatrix CSRRowWiseTopk<kDLCPU, int32_t, int64_t>(
+template COOMatrix CSRRowWiseTopk<kDGLCPU, int32_t, int64_t>(
     CSRMatrix, IdArray, int64_t, NDArray, bool);
-template COOMatrix CSRRowWiseTopk<kDLCPU, int64_t, int64_t>(
+template COOMatrix CSRRowWiseTopk<kDGLCPU, int64_t, int64_t>(
     CSRMatrix, IdArray, int64_t, NDArray, bool);
-template COOMatrix CSRRowWiseTopk<kDLCPU, int32_t, float>(
+template COOMatrix CSRRowWiseTopk<kDGLCPU, int32_t, float>(
     CSRMatrix, IdArray, int64_t, NDArray, bool);
-template COOMatrix CSRRowWiseTopk<kDLCPU, int64_t, float>(
+template COOMatrix CSRRowWiseTopk<kDGLCPU, int64_t, float>(
     CSRMatrix, IdArray, int64_t, NDArray, bool);
-template COOMatrix CSRRowWiseTopk<kDLCPU, int32_t, double>(
+template COOMatrix CSRRowWiseTopk<kDGLCPU, int32_t, double>(
     CSRMatrix, IdArray, int64_t, NDArray, bool);
-template COOMatrix CSRRowWiseTopk<kDLCPU, int64_t, double>(
+template COOMatrix CSRRowWiseTopk<kDGLCPU, int64_t, double>(
     CSRMatrix, IdArray, int64_t, NDArray, bool);
 
-template <DLDeviceType XPU, typename IdxType, typename DType>
+template <DGLDeviceType XPU, typename IdxType, typename DType>
 COOMatrix COORowWiseTopk(
     COOMatrix mat, IdArray rows, int64_t k, NDArray weight, bool ascending) {
   auto num_picks_fn = GetTopkNumPicksFn<IdxType>(k);
@@ -101,21 +101,21 @@ COOMatrix COORowWiseTopk(
   return COORowWisePick(mat, rows, k, pick_fn, num_picks_fn);
 }
 
-template COOMatrix COORowWiseTopk<kDLCPU, int32_t, int32_t>(
+template COOMatrix COORowWiseTopk<kDGLCPU, int32_t, int32_t>(
     COOMatrix, IdArray, int64_t, NDArray, bool);
-template COOMatrix COORowWiseTopk<kDLCPU, int64_t, int32_t>(
+template COOMatrix COORowWiseTopk<kDGLCPU, int64_t, int32_t>(
     COOMatrix, IdArray, int64_t, NDArray, bool);
-template COOMatrix COORowWiseTopk<kDLCPU, int32_t, int64_t>(
+template COOMatrix COORowWiseTopk<kDGLCPU, int32_t, int64_t>(
     COOMatrix, IdArray, int64_t, NDArray, bool);
-template COOMatrix COORowWiseTopk<kDLCPU, int64_t, int64_t>(
+template COOMatrix COORowWiseTopk<kDGLCPU, int64_t, int64_t>(
     COOMatrix, IdArray, int64_t, NDArray, bool);
-template COOMatrix COORowWiseTopk<kDLCPU, int32_t, float>(
+template COOMatrix COORowWiseTopk<kDGLCPU, int32_t, float>(
     COOMatrix, IdArray, int64_t, NDArray, bool);
-template COOMatrix COORowWiseTopk<kDLCPU, int64_t, float>(
+template COOMatrix COORowWiseTopk<kDGLCPU, int64_t, float>(
     COOMatrix, IdArray, int64_t, NDArray, bool);
-template COOMatrix COORowWiseTopk<kDLCPU, int32_t, double>(
+template COOMatrix COORowWiseTopk<kDGLCPU, int32_t, double>(
     COOMatrix, IdArray, int64_t, NDArray, bool);
-template COOMatrix COORowWiseTopk<kDLCPU, int64_t, double>(
+template COOMatrix COORowWiseTopk<kDGLCPU, int64_t, double>(
     COOMatrix, IdArray, int64_t, NDArray, bool);
 
 }  // namespace impl

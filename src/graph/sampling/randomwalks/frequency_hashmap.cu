@@ -274,7 +274,7 @@ FrequencyHashmap<IdxType>::~FrequencyHashmap() {
 
 template <typename IdxType>
 std::tuple<IdArray, IdArray, IdArray> FrequencyHashmap<IdxType>::Topk(
-    const IdxType *src_data, const IdxType *dst_data, DLDataType dtype,
+    const IdxType *src_data, const IdxType *dst_data, DGLDataType dtype,
     const int64_t num_edges, const int64_t num_edges_per_node,
     const int64_t num_pick) {
 
@@ -323,9 +323,7 @@ std::tuple<IdArray, IdArray, IdArray> FrequencyHashmap<IdxType>::Topk(
   device->FreeWorkspace(_ctx, d_temp_storage);
   std::swap(edge_blocks_prefix, edge_blocks_prefix_alternate);
   device->CopyDataFromTo(&edge_blocks_prefix[num_edge_blocks], 0, &num_unique_edges, 0,
-      sizeof(num_unique_edges),
-      _ctx, DGLContext{kDLCPU, 0},
-      dtype);
+      sizeof(num_unique_edges), _ctx, DGLContext{kDGLCPU, 0}, dtype);
   device->StreamSync(_ctx, _stream);
   // 2.2 Allocate the data of unique edges and frequency
   // double space to use SegmentedRadixSort
@@ -408,9 +406,7 @@ std::tuple<IdArray, IdArray, IdArray> FrequencyHashmap<IdxType>::Topk(
   // 5. Pick the data to result
   IdxType num_output = 0;
   device->CopyDataFromTo(&unique_output_offsets[num_dst_nodes], 0, &num_output, 0,
-      sizeof(num_output),
-      _ctx, DGLContext{kDLCPU, 0},
-      dtype);
+      sizeof(num_output), _ctx, DGLContext{kDGLCPU, 0}, dtype);
   device->StreamSync(_ctx, _stream);
 
   IdArray res_src = IdArray::Empty({static_cast<int64_t>(num_output)},
