@@ -1,0 +1,22 @@
+[tool.black]
+
+line-length = 80
+
+
+[tool.autopep8]
+
+max_line_length = 80
+in-place = true
+aggressive = 3
+# Add the path to here if you want to exclude them from autopep8 auto reformat.
+# When a directory or multiple files are passed to autopep8, it will ignore the
+# following directory and files. It is not recommended to pass a directory to
+# autopep8.
+exclude = '''
+    .github/*,
+    build/*,
+    cmake/*,
+    conda/*,
+    docker/*,
+    third_party/*,
+'''

@@ -46,9 +46,9 @@ class RemainderPartition : public NDArrayPartition {
       IdArray in_idx) const override {
 #ifdef DGL_USE_CUDA
     auto ctx = in_idx->ctx;
-    if (ctx.device_type == kDLGPU) {
+    if (ctx.device_type == kDGLCUDA) {
       ATEN_ID_TYPE_SWITCH(in_idx->dtype, IdType, {
-        return impl::GeneratePermutationFromRemainder<kDLGPU, IdType>(
+        return impl::GeneratePermutationFromRemainder<kDGLCUDA, IdType>(
             ArraySize(), NumParts(), in_idx);
       });
     }
@@ -64,9 +64,9 @@ class RemainderPartition : public NDArrayPartition {
       IdArray in_idx) const override {
 #ifdef DGL_USE_CUDA
     auto ctx = in_idx->ctx;
-    if (ctx.device_type == kDLGPU) {
+    if (ctx.device_type == kDGLCUDA) {
       ATEN_ID_TYPE_SWITCH(in_idx->dtype, IdType, {
-        return impl::MapToLocalFromRemainder<kDLGPU, IdType>(
+        return impl::MapToLocalFromRemainder<kDGLCUDA, IdType>(
             NumParts(), in_idx);
       });
     }
@@ -83,9 +83,9 @@ class RemainderPartition : public NDArrayPartition {
       const int part_id) const override {
 #ifdef DGL_USE_CUDA
     auto ctx = in_idx->ctx;
-    if (ctx.device_type == kDLGPU) {
+    if (ctx.device_type == kDGLCUDA) {
       ATEN_ID_TYPE_SWITCH(in_idx->dtype, IdType, {
-        return impl::MapToGlobalFromRemainder<kDLGPU, IdType>(
+        return impl::MapToGlobalFromRemainder<kDGLCUDA, IdType>(
             NumParts(), in_idx, part_id);
       });
     }
@@ -116,9 +116,9 @@ class RangePartition : public NDArrayPartition {
     // sizes. We require the input range on the GPU, as if we have multiple
     // GPUs, we can't know which is the proper one to copy the array to, but we
     // have only one CPU context, and can safely copy the array to that.
-    range_cpu_(range.CopyTo(DGLContext{kDLCPU, 0})) {
+    range_cpu_(range.CopyTo(DGLContext{kDGLCPU, 0})) {
     auto ctx = range->ctx;
-    if (ctx.device_type != kDLGPU) {
+    if (ctx.device_type != kDGLCUDA) {
         LOG(FATAL) << "The range for an NDArrayPartition is only supported "
             " on GPUs. Transfer the range to the target device before "
             "creating the partition.";
@@ -130,7 +130,7 @@ class RangePartition : public NDArrayPartition {
       IdArray in_idx) const override {
 #ifdef DGL_USE_CUDA
     auto ctx = in_idx->ctx;
-    if (ctx.device_type == kDLGPU) {
+    if (ctx.device_type == kDGLCUDA) {
       if (ctx.device_type != range_->ctx.device_type ||
           ctx.device_id != range_->ctx.device_id) {
         LOG(FATAL) << "The range for the NDArrayPartition and the input "
@@ -138,7 +138,7 @@ class RangePartition : public NDArrayPartition {
       }
       ATEN_ID_TYPE_SWITCH(in_idx->dtype, IdType, {
         ATEN_ID_TYPE_SWITCH(range_->dtype, RangeType, {
-          return impl::GeneratePermutationFromRange<kDLGPU, IdType, RangeType>(
+          return impl::GeneratePermutationFromRange<kDGLCUDA, IdType, RangeType>(
               ArraySize(), NumParts(), range_, in_idx);
         });
       });
@@ -155,10 +155,10 @@ class RangePartition : public NDArrayPartition {
       IdArray in_idx) const override {
 #ifdef DGL_USE_CUDA
     auto ctx = in_idx->ctx;
-    if (ctx.device_type == kDLGPU) {
+    if (ctx.device_type == kDGLCUDA) {
       ATEN_ID_TYPE_SWITCH(in_idx->dtype, IdType, {
         ATEN_ID_TYPE_SWITCH(range_->dtype, RangeType, {
-          return impl::MapToLocalFromRange<kDLGPU, IdType, RangeType>(
+          return impl::MapToLocalFromRange<kDGLCUDA, IdType, RangeType>(
               NumParts(), range_, in_idx);
         });
       });
@@ -176,10 +176,10 @@ class RangePartition : public NDArrayPartition {
       const int part_id) const override {
 #ifdef DGL_USE_CUDA
     auto ctx = in_idx->ctx;
-    if (ctx.device_type == kDLGPU) {
+    if (ctx.device_type == kDGLCUDA) {
       ATEN_ID_TYPE_SWITCH(in_idx->dtype, IdType, {
         ATEN_ID_TYPE_SWITCH(range_->dtype, RangeType, {
-          return impl::MapToGlobalFromRange<kDLGPU, IdType, RangeType>(
+          return impl::MapToGlobalFromRange<kDGLCUDA, IdType, RangeType>(
               NumParts(), range_, in_idx, part_id);
         });
       });

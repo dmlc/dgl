@@ -8,6 +8,7 @@
 
 #ifdef USE_TVM
 #include <featgraph.h>
+#include <dgl/runtime/dlpack_convert.h>
 #endif  // USE_TVM
 
 #include "kernel_decl.h"
@@ -70,7 +71,7 @@ void SegmentMM(const NDArray A,
   }
   CHECK_EQ(B->shape[0], seglen_A.NumElements())
     << "segment_mm expects len(seglen_A) == B.shape[0]";
-  CHECK_EQ(seglen_A->ctx.device_type, kDLCPU)
+  CHECK_EQ(seglen_A->ctx.device_type, kDGLCPU)
     << "segment_mm expects seglen_A to be on CPU.";
   CHECK(A->ctx == B->ctx) << "segment_mm expects A and B to be of the same device";
   ATEN_XPU_SWITCH_CUDA(A->ctx.device_type, XPU, "SegmentMM", {
@@ -89,7 +90,7 @@ void SegmentMMBackwardB(const NDArray A,
   CHECK_EQ(A->ndim, 2) << "segment_mm_backward operator expects a 2D tensor for the first input.";
   CHECK_EQ(dC->ndim, 2)
     << "segment_mm_backward operator expects a 2D tensor for the second input.";
-  CHECK_EQ(seglen->ctx.device_type, kDLCPU)
+  CHECK_EQ(seglen->ctx.device_type, kDGLCPU)
     << "segment_mm expects seglen to be on CPU.";
   ATEN_XPU_SWITCH_CUDA(A->ctx.device_type, XPU, "SegmentMMBackwardB", {
     ATEN_ID_TYPE_SWITCH(seglen->dtype, IdType, {
@@ -829,8 +830,12 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_FG_SDDMMTreeReduction")
     //     {lhs, rhs, out},
     //     {"U_data", "E_data", "V_data"});
     COOMatrix coo = graph.sptr()->GetCOOMatrix(0);
-    dgl::featgraph::SDDMMTreeReduction(coo.row.ToDLPack(), coo.col.ToDLPack(),
-                                       lhs.ToDLPack(), rhs.ToDLPack(), out.ToDLPack());
+    dgl::featgraph::SDDMMTreeReduction(
+      DLPackConvert::ToDLPack(coo.row),
+      DLPackConvert::ToDLPack(coo.col),
+      DLPackConvert::ToDLPack(lhs),
+      DLPackConvert::ToDLPack(rhs),
+      DLPackConvert::ToDLPack(out));
   });
 #endif  // USE_TVM
 

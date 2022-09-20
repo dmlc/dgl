@@ -222,8 +222,8 @@ std::pair<IdArray, NDArray> SparsePush(
       0,
       send_prefix_host.size()*sizeof(*send_prefix.get()),
       ctx,
-      DGLContext{kDLCPU, 0},
-      DGLType{kDLInt, sizeof(*send_prefix.get())*8, 1});
+      DGLContext{kDGLCPU, 0},
+      DGLDataType{kDGLInt, sizeof(*send_prefix.get())*8, 1});
   send_prefix.free();
 
   CHECK_EQ(send_prefix_host.back(), num_in) << "Internal Error: "
@@ -260,8 +260,8 @@ std::pair<IdArray, NDArray> SparsePush(
       0,
       recv_prefix_host.size()*sizeof(*recv_prefix.get()),
       ctx,
-      DGLContext{kDLCPU, 0},
-      DGLType{kDLInt, sizeof(*recv_prefix.get())*8, 1});
+      DGLContext{kDGLCPU, 0},
+      DGLDataType{kDGLInt, sizeof(*recv_prefix.get())*8, 1});
   recv_prefix.free();
 
   // use an event to track when copying is done
@@ -376,8 +376,8 @@ NDArray SparsePull(
       0,
       request_prefix_host.size()*sizeof(*request_prefix.get()),
       ctx,
-      DGLContext{kDLCPU, 0},
-      DGLType{kDLInt, sizeof(*request_prefix.get())*8, 1});
+      DGLContext{kDGLCPU, 0},
+      DGLDataType{kDGLInt, sizeof(*request_prefix.get())*8, 1});
   request_prefix.free();
   CHECK_EQ(request_prefix_host.back(), num_in) << "Internal Error: "
       "request_prefix_host.back() = " << request_prefix_host.back() <<
@@ -411,8 +411,8 @@ NDArray SparsePull(
       0,
       response_prefix_host.size()*sizeof(*response_prefix.get()),
       ctx,
-      DGLContext{kDLCPU, 0},
-      DGLType{kDLInt, sizeof(*response_prefix.get())*8, 1});
+      DGLContext{kDGLCPU, 0},
+      DGLDataType{kDGLInt, sizeof(*response_prefix.get())*8, 1});
   response_prefix.free();
 
   // use an event to track when copying is done
@@ -617,10 +617,10 @@ void NCCLCommunicator::AllToAllV(
 
   int dev_id;
   CUDA_CALL(cudaGetDevice(&dev_id));
-  DGLContext ctx{kDLGPU, dev_id};
+  DGLContext ctx{kDGLCUDA, dev_id};
 
   auto device = runtime::DeviceAPI::Get(ctx);
-  auto dtype = DLDataTypeTraits<DType>::dtype;
+  auto dtype = DGLDataTypeTraits<DType>::dtype;
 
   // copy using the same stream (local current stream), no need to sync
   device->CopyDataFromTo(send, send_prefix[0],
@@ -679,10 +679,10 @@ void NCCLCommunicator::AllToAll(
   #else
   int dev_id;
   CUDA_CALL(cudaGetDevice(&dev_id));
-  DGLContext ctx{kDLGPU, dev_id};
+  DGLContext ctx{kDGLCUDA, dev_id};
 
   auto device = runtime::DeviceAPI::Get(ctx);
-  auto dtype = DLDataTypeTraits<IdType>::dtype;
+  auto dtype = DGLDataTypeTraits<IdType>::dtype;
 
   // copy using the same stream (local current stream), no need to sync
   device->CopyDataFromTo(send, 0, recv, 0, count, ctx, ctx, dtype);

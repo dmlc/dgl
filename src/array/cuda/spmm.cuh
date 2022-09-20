@@ -203,7 +203,7 @@ cusparseStatus_t Xcsrmm2<double>(cusparseHandle_t handle, cusparseOperation_t tr
 /*! Cusparse implementation of SpMM on Csr format. */
 template <typename DType, typename IdType>
 void CusparseCsrmm2(
-    const DLContext& ctx,
+    const DGLContext& ctx,
     const CSRMatrix& csr,
     const DType* B_data, const DType* A_data,
     DType* C_data,
@@ -303,7 +303,7 @@ void CusparseCsrmm2(
 /*! Cusparse implementation of SpMM on Csr format. */
 template <typename DType, typename IdType>
 void CusparseCsrmm2Hetero(
-    const DLContext& ctx,
+    const DGLContext& ctx,
     const CSRMatrix& csr,
     const DType* B_data, const DType* A_data,
     DType* C_data,
