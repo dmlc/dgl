@@ -3,8 +3,8 @@
  * \file array/cpu/rowwise_pick_ut9ils.h
  * \brief Utility functions for row-wise sampling.
  */
-#ifndef DGL_ARRAY_CPU_ROWWISE_PICK_H_
-#define DGL_ARRAY_CPU_ROWWISE_PICK_H_
+#ifndef DGL_ARRAY_CPU_ROWWISE_PICK_UTILS_H_
+#define DGL_ARRAY_CPU_ROWWISE_PICK_UTILS_H_
 
 #include <dgl/array.h>
 #include <dmlc/omp.h>
@@ -25,7 +25,7 @@ COOMatrix RowWisePickPartialCSRToCOO(CSRMatrix csr, IdArray rows) {
 
   runtime::parallel_for(0, num_rows, [&](size_t b, size_t e) {
     for (size_t i = b; i < e; ++i) {
-      for (size_t j = indptr_data[i]; j < indptr_data[i + 1]; ++j)
+      for (int64_t j = indptr_data[i]; j < indptr_data[i + 1]; ++j)
         picked_rows_data[j] = rows_data[i];
     }
   });

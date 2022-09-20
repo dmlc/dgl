@@ -99,7 +99,8 @@ inline PickFn<IdxType> GetSamplingPickFn(
 
       if (num_samples == -1 || (!replace && len == num_picks)) {
         // fast path for selecting all
-        for (int64_t i = 0, j = 0; j < len; ++j) {
+        int64_t i = 0;
+        for (int64_t j = 0; j < len; ++j) {
           const IdxType eid = data ? data[off + j] : off + j;
           if (prob_data[eid] > 0)
             out_idx[i++] = off + j;

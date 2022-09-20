@@ -10,7 +10,7 @@
 #include <dgl/random.h>
 #include <algorithm>
 #include <numeric>
-#include "./rowwise_pick.h"
+#include "./rowwise_etype_pick.h"
 
 namespace dgl {
 namespace aten {
@@ -18,7 +18,7 @@ namespace impl {
 namespace {
 
 template <typename IdxType, typename EType>
-inline ETypePickFn<IdxType, EType> GetSamplingUniformETypeNumPicksFn(
+inline ETypeNumPicksFn<IdxType, EType> GetSamplingUniformETypeNumPicksFn(
     const std::vector<int64_t>& num_samples, bool replace) {
   ETypeNumPicksFn<IdxType, EType> num_picks_fn = [&]
     (IdxType rid, IdxType off, IdxType len, const IdxType* col, const IdxType* data,
@@ -26,9 +26,9 @@ inline ETypePickFn<IdxType, EType> GetSamplingUniformETypeNumPicksFn(
       if (num_samples[et] == -1)
         return et_len;
       else if (replace)
-        return et_len == 0 ? 0 : num_samples[et];
+        return static_cast<IdxType>(et_len == 0 ? 0 : num_samples[et]);
       else
-        return std::min(num_samples[et], et_len);
+        return std::min(static_cast<IdxType>(num_samples[et]), et_len);
     };
   return num_picks_fn;
 }
@@ -59,14 +59,14 @@ inline ETypePickFn<IdxType, EType> GetSamplingUniformETypePickFn(
 }
 
 template <typename IdxType, typename FloatType, typename EType>
-inline ETypeNumPickFn<IdxType, EType> GetSamplingETypePickFn(
+inline ETypeNumPicksFn<IdxType, EType> GetSamplingETypeNumPicksFn(
     const std::vector<int64_t>& num_samples, FloatArray prob, bool replace) {
-  ETypeNumPickFn<IdxType, EType> num_picks_fn = [&]
+  ETypeNumPicksFn<IdxType, EType> num_picks_fn = [&]
     (IdxType rid, IdxType off, IdxType len, const IdxType* col, const IdxType* data,
      EType et, IdxType et_off, IdxType et_len, const IdxType* et_idx) {
       const FloatType* p_data = prob.Ptr<FloatType>();
       int64_t num_possible_picks = 0;
-      for (int64_t i = 0, j = 0; j < et_len; ++j) {
+      for (int64_t j = 0; j < et_len; ++j) {
         const IdxType loc = et_idx ? et_idx[et_off + j] : et_off + j;
         const IdxType eid = data ? data[loc] : loc;
         if (p_data[eid] > 0)
@@ -86,7 +86,7 @@ inline ETypeNumPickFn<IdxType, EType> GetSamplingETypePickFn(
 template <typename IdxType, typename FloatType, typename EType>
 inline ETypePickFn<IdxType, EType> GetSamplingETypePickFn(
     const std::vector<int64_t>& num_samples, FloatArray prob, bool replace) {
-  ETypePickFn<IdxType> pick_fn = [&]
+  ETypePickFn<IdxType, EType> pick_fn = [&]
     (IdxType rid, IdxType off, IdxType len, IdxType num_picks,
      const IdxType* col, const IdxType* data,
      EType et, IdxType et_off, IdxType et_len, const IdxType* et_idx,
@@ -95,13 +95,14 @@ inline ETypePickFn<IdxType, EType> GetSamplingETypePickFn(
 
       if (num_samples[et] == -1 || (!replace && et_len == num_picks)) {
         // fast path for selecting all
-        for (int64_t i = 0, j = 0; j < et_len; ++j) {
+        int64_t i = 0;
+        for (int64_t j = 0; j < et_len; ++j) {
           const IdxType loc = et_idx ? et_idx[et_off + j] : et_off + j;
           const IdxType eid = data ? data[loc] : loc;
           if (p_data[eid] > 0)
             out_idx[i++] = et_idx ? et_idx[et_off + j] : et_off + j;
         }
-        CHECK_EQ(i, num_picks);
+        CHECK_EQ(i, num_picks);  // correctness check
       } else {
         FloatArray probs = FloatArray::Empty({et_len}, prob->dtype, prob->ctx);
         FloatType* probs_data = static_cast<FloatType*>(probs->data);
@@ -115,9 +116,9 @@ inline ETypePickFn<IdxType, EType> GetSamplingETypePickFn(
         RandomEngine::ThreadLocal()->Choice<IdxType, FloatType>(
             num_picks, probs, out_idx, replace);
         for (int64_t i = 0; i < num_picks; ++i) {
-          out_idx[j] += et_off;
+          out_idx[i] += et_off;
           if (et_idx)
-            out_idx[j] = et_idx[out_idx[j]];
+            out_idx[i] = et_idx[out_idx[i]];
         }
       }
     };
@@ -169,7 +170,7 @@ COOMatrix COORowWisePerEtypeSamplingUniform(COOMatrix mat, IdArray rows, IdArray
   auto num_picks_fn = GetSamplingUniformETypeNumPicksFn<IdxType, EType>(num_samples, replace);
   auto pick_fn = GetSamplingUniformETypePickFn<IdxType, EType>(num_samples, replace);
   return COORowWisePerEtypePick<IdxType, EType>(
-      mat, rows, etypes, num_samples, replace, etype_sorted, pick_fn);
+      mat, rows, etypes, num_samples, etype_sorted, pick_fn, num_picks_fn);
 }
 
 }  // namespace impl

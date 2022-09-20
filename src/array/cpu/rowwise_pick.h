@@ -182,7 +182,7 @@ COOMatrix CSRRowWisePick(
     PickFn<IdxType> pick_fn, NumPicksFn<IdxType> num_picks_fn) {
   CSRMatrix csr = CSRRowWisePickPartial(
       mat, rows, max_num_picks, pick_fn, num_picks_fn);
-  return RowWisePickPartialCSRToCOO(csr, rows);
+  return RowWisePickPartialCSRToCOO<IdxType>(csr, rows);
 }
 
 // Template for picking non-zero values row-wise. The implementation first slices

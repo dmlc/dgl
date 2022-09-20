@@ -86,7 +86,6 @@ CSRMatrix CSRRowWisePerEtypePickPartial(
     ETypeNumPicksFn<IdxType, EType> num_picks_fn) {
   using namespace aten;
   const DLDataType idtype = DLDataTypeTraits<IdxType>::dtype;
-  const DLDataType etype_idtype = DLDataTypeTraits<EType>::dtype;
   const IdxType* indptr = mat.indptr.Ptr<IdxType>();
   const IdxType* indices = mat.indices.Ptr<IdxType>();
   const IdxType* data = CSRHasData(mat)? mat.data.Ptr<IdxType>() : nullptr;
@@ -94,7 +93,7 @@ CSRMatrix CSRRowWisePerEtypePickPartial(
   const EType* etype_data = etypes.Ptr<EType>();
   const int64_t num_rows = rows->shape[0];
   const auto& ctx = mat.indptr->ctx;
-  const int64_t num_etypes = num_picks.size();
+  const int64_t num_etypes = max_num_picks.size();
   const int64_t total_max_num_picks = std::accumulate(
       max_num_picks.begin(), max_num_picks.end(), 0L);
   const int num_threads = omp_get_max_threads();
@@ -120,7 +119,8 @@ CSRMatrix CSRRowWisePerEtypePickPartial(
   // Determine the size of the sorted edge type index array
   // NOTE: these variables are only used if etype_sorted is False.
   IdArray et_idx_indptr, et_idx;
-  IdxType* et_idx_indptr_data = nullptr, et_idx_data = nullptr;
+  IdxType* et_idx_indptr_data = nullptr;
+  IdxType* et_idx_data = nullptr;
   if (!etype_sorted) {
     et_idx_indptr = NDArray::Empty({num_rows + 1}, idtype, ctx);
     et_idx_indptr_data = et_idx_indptr.Ptr<IdxType>();
@@ -167,8 +167,8 @@ CSRMatrix CSRRowWisePerEtypePickPartial(
 
     // Step 2: determine the number of incident edges with the same edge type per node
     for (int64_t i = start_i; i < end_i; ++i) {
-      int64_t start_j = !etype_sorted ? et_idx_indptr_data[i] : indptr_data[i];
-      int64_t end_j = !etype_sorted ? et_idx_indptr_data[i + 1] : indptr_data[i + 1];
+      int64_t start_j = !etype_sorted ? et_idx_indptr_data[i] : indptr[i];
+      int64_t end_j = !etype_sorted ? et_idx_indptr_data[i + 1] : indptr[i + 1];
       for (int64_t j = start_j; j < end_j; ++j) {
         const IdxType loc = !etype_sorted ? et_idx_data[j] : j;
         const IdxType nextloc = !etype_sorted ? et_idx_data[j + 1] : j + 1;
@@ -196,7 +196,6 @@ CSRMatrix CSRRowWisePerEtypePickPartial(
     // Step 3: determine the number of picks for each row and each edge type as well
     // as the indptr to return.
     for (int64_t i = start_i; i < end_i; ++i) {
-      const int64_t local_i = i - start_i;
       const IdxType rid = rows_data[i];
       const IdxType off = indptr[rid];
       const IdxType len = indptr[rid + 1] - off;
@@ -255,9 +254,9 @@ COOMatrix CSRRowWisePerEtypePick(
     CSRMatrix mat, IdArray rows, IdArray etypes,
     const std::vector<int64_t>& max_num_picks, bool etype_sorted,
     ETypePickFn<IdxType, EType> pick_fn, ETypeNumPicksFn<IdxType, EType> num_picks_fn) {
-  CSRMatrix csr = CSRRowWisePetEtypePickPartial<IdxType, EType>(
+  CSRMatrix csr = CSRRowWisePerEtypePickPartial<IdxType, EType>(
       mat, rows, etypes, max_num_picks, etype_sorted, pick_fn, num_picks_fn);
-  return RowWisePickPartialCSRToCOO(csr, rows);
+  return RowWisePickPartialCSRToCOO<IdxType>(csr, rows);
 }
 
 // Template for picking non-zero values row-wise. The implementation first slices
@@ -266,8 +265,8 @@ COOMatrix CSRRowWisePerEtypePick(
 template <typename IdxType, typename EType>
 COOMatrix COORowWisePerEtypePick(COOMatrix mat, IdArray rows, IdArray etypes,
                                  const std::vector<int64_t>& max_num_picks,
-                                 bool etype_sorted, RangePickFn<IdxType> pick_fn,
-                                 RangeNumPicksFn<IdxType> num_picks_fn) {
+                                 bool etype_sorted, ETypePickFn<IdxType, EType> pick_fn,
+                                 ETypeNumPicksFn<IdxType, EType> num_picks_fn) {
   using namespace aten;
   const auto& csr = COOToCSR(COOSliceRows(mat, rows));
   const IdArray new_rows = Range(0, rows->shape[0], rows->dtype.bits, rows->ctx);
