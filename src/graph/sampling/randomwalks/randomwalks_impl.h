@@ -38,7 +38,7 @@ using StepFunc = std::function<
  * \brief Get the node types traversed by the metapath.
  * \return A 1D array of shape (len(metapath) + 1,) with node type IDs.
  */
-template<DLDeviceType XPU, typename IdxType>
+template<DGLDeviceType XPU, typename IdxType>
 TypeArray GetNodeTypesFromMetapath(
     const HeteroGraphPtr hg,
     const TypeArray metapath);
@@ -58,7 +58,7 @@ TypeArray GetNodeTypesFromMetapath(
  * \note This function should be called together with GetNodeTypesFromMetapath to
  *       determine the node type of each node in the random walk traces.
  */
-template<DLDeviceType XPU, typename IdxType>
+template<DGLDeviceType XPU, typename IdxType>
 std::pair<IdArray, IdArray> RandomWalk(
     const HeteroGraphPtr hg,
     const IdArray seeds,
@@ -81,7 +81,7 @@ std::pair<IdArray, IdArray> RandomWalk(
  * \note This function should be called together with GetNodeTypesFromMetapath to
  *       determine the node type of each node in the random walk traces.
  */
-template<DLDeviceType XPU, typename IdxType>
+template<DGLDeviceType XPU, typename IdxType>
 std::pair<IdArray, IdArray> RandomWalkWithRestart(
     const HeteroGraphPtr hg,
     const IdArray seeds,
@@ -107,7 +107,7 @@ std::pair<IdArray, IdArray> RandomWalkWithRestart(
  * \note This function should be called together with GetNodeTypesFromMetapath to
  *       determine the node type of each node in the random walk traces.
  */
-template<DLDeviceType XPU, typename IdxType>
+template<DGLDeviceType XPU, typename IdxType>
 std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart(
     const HeteroGraphPtr hg,
     const IdArray seeds,
@@ -115,7 +115,7 @@ std::pair<IdArray, IdArray> RandomWalkWithStepwiseRestart(
     const std::vector<FloatArray> &prob,
     FloatArray restart_prob);
 
-template<DLDeviceType XPU, typename IdxType>
+template<DGLDeviceType XPU, typename IdxType>
 std::tuple<IdArray, IdArray, IdArray> SelectPinSageNeighbors(
     const IdArray src,
     const IdArray dst,

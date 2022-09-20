@@ -27,7 +27,7 @@ namespace transform {
  *  relation between \a query_points and \a data_points.
  * \param algorithm algorithm used to compute the k-nearest neighbors.
  */
-template <DLDeviceType XPU, typename FloatType, typename IdType>
+template <DGLDeviceType XPU, typename FloatType, typename IdType>
 void KNN(const NDArray& data_points, const IdArray& data_offsets,
          const NDArray& query_points, const IdArray& query_offsets,
          const int k, IdArray result, const std::string& algorithm);
@@ -44,7 +44,7 @@ void KNN(const NDArray& data_points, const IdArray& data_offsets,
  * \param num_candidates The maximum number of candidates to be considered during one iteration.
  * \param delta A value controls the early abort.
  */
-template <DLDeviceType XPU, typename FloatType, typename IdType>
+template <DGLDeviceType XPU, typename FloatType, typename IdType>
 void NNDescent(const NDArray& points, const IdArray& offsets,
                IdArray result, const int k, const int num_iters,
                const int num_candidates, const double delta);

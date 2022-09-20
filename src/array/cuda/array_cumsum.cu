@@ -13,14 +13,14 @@ using runtime::NDArray;
 namespace aten {
 namespace impl {
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 IdArray CumSum(IdArray array, bool prepend_zero) {
   const int64_t len = array.NumElements();
   if (len == 0)
     return !prepend_zero ? array : aten::Full(0, 1, array->dtype.bits, array->ctx);
 
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   auto device = runtime::DeviceAPI::Get(array->ctx);
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   const IdType* in_d = array.Ptr<IdType>();
   IdArray ret;
   IdType* out_d = nullptr;
@@ -34,20 +34,20 @@ IdArray CumSum(IdArray array, bool prepend_zero) {
   // Allocate workspace
   size_t workspace_size = 0;
   CUDA_CALL(cub::DeviceScan::InclusiveSum(
-      nullptr, workspace_size, in_d, out_d, len, thr_entry->stream));
+      nullptr, workspace_size, in_d, out_d, len, stream));
   void* workspace = device->AllocWorkspace(array->ctx, workspace_size);
 
   // Compute cumsum
   CUDA_CALL(cub::DeviceScan::InclusiveSum(
-      workspace, workspace_size, in_d, out_d, len, thr_entry->stream));
+      workspace, workspace_size, in_d, out_d, len, stream));
 
   device->FreeWorkspace(array->ctx, workspace);
 
   return ret;
 }
 
-template IdArray CumSum<kDLGPU, int32_t>(IdArray, bool);
-template IdArray CumSum<kDLGPU, int64_t>(IdArray, bool);
+template IdArray CumSum<kDGLCUDA, int32_t>(IdArray, bool);
+template IdArray CumSum<kDGLCUDA, int64_t>(IdArray, bool);
 
 }  // namespace impl
 }  // namespace aten
