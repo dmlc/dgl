@@ -150,6 +150,37 @@ class GraphInterface : public runtime::Object {
   virtual bool IsMultigraph() const = 0;
 
   /*!
+   * \return whether the graph is unibipartite
+   */
+  virtual bool IsUniBipartite() const {
+    EdgeArray edges = Edges();
+    IdArray src = edges.src;
+    IdArray dst = edges.dst;
+
+    bool is_unibipartite = true;
+    const size_t n = edges.src.NumElements();
+    ATEN_ID_TYPE_SWITCH(src->dtype, IdType, {
+      auto src_v = src.ToVector<IdType>();
+      std::sort(src_v.begin(), src_v.end());
+      auto dst_v = dst.ToVector<IdType>();
+      std::sort(dst_v.begin(), dst_v.end());
+      // std::set_intersection() requires output, so this is better
+      for (size_t i = 0, j = 0; i < n && j < n;) {
+        if (src_v[i] < dst_v[j]) {
+          ++i;
+        } else if (src_v[i] == dst_v[j]) {
+          is_unibipartite = false;
+          break;
+        } else {
+          ++j;
+        }
+      }
+    });
+
+    return is_unibipartite;
+  }
+
+  /*!
    * \return whether the graph is read-only
    */
   virtual bool IsReadonly() const = 0;

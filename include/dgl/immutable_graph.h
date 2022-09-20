@@ -601,6 +601,20 @@ class ImmutableGraph: public GraphInterface {
     return true;
   }
 
+  /**
+   * \brief Check if the graph is unibipartite.
+   *
+   * @return True if the graph is unibipartite.
+   */
+  bool IsUniBipartite() const override {
+    if (!is_unibipartite_set_) {
+      is_unibipartite_ = GraphInterface::IsUniBipartite();
+      is_unibipartite_set_ = true;
+    }
+
+    return is_unibipartite_;
+  }
+
   /*! \return the number of vertices in the graph.*/
   uint64_t NumVertices() const override {
     return AnyGraph()->NumVertices();
@@ -1000,6 +1014,12 @@ class ImmutableGraph: public GraphInterface {
   std::string shared_mem_name_;
   // We serialize the metadata of the graph index here for shared memory.
   NDArray serialized_shared_meta_;
+
+  // Whether or not the `is_unibipartite_` property has been set.
+  mutable bool is_unibipartite_set_ = false;
+  // Whether this graph is unibipartite. If `is_unibipartite_set_` is false,
+  // then this flag should be considered in an unititialized state.
+  mutable bool is_unibipartite_ = false;
 };
 
 // inline implementations
