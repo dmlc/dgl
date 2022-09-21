@@ -62,5 +62,5 @@ python3 link_pred.py
 
 Results (10 epochs):
 ```
-Test MRR: 0.6687
+Test MRR: 0.7386
 ```

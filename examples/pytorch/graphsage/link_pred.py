@@ -116,7 +116,7 @@ def train(args, device, g, reverse_eids, seed_edges, model):
         g, seed_edges, sampler,
         device=device, batch_size=512, shuffle=True,
         drop_last=False, num_workers=0, use_uva=use_uva)
-    opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
+    opt = torch.optim.Adam(model.parameters(), lr=0.0005)
     for epoch in range(10):
         model.train()
         total_loss = 0
