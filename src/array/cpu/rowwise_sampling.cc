@@ -30,7 +30,7 @@ inline FloatArray DoubleSlice(FloatArray array, const IdxType* idx_data,
 template <typename IdxType>
 inline NumPicksFn<IdxType> GetSamplingUniformNumPicksFn(
     int64_t num_samples, bool replace) {
-  NumPicksFn<IdxType> num_picks_fn = [&]
+  NumPicksFn<IdxType> num_picks_fn = [=]
     (IdxType rowid, IdxType off, IdxType len,
      const IdxType* col, const IdxType* data) {
       if (num_samples == -1)
@@ -46,7 +46,7 @@ inline NumPicksFn<IdxType> GetSamplingUniformNumPicksFn(
 template <typename IdxType>
 inline PickFn<IdxType> GetSamplingUniformPickFn(
     int64_t num_samples, bool replace) {
-  PickFn<IdxType> pick_fn = [num_samples, replace]
+  PickFn<IdxType> pick_fn = [=]
     (IdxType rowid, IdxType off, IdxType len, IdxType num_picks,
      const IdxType* col, const IdxType* data,
      IdxType* out_idx) {
@@ -67,7 +67,7 @@ inline PickFn<IdxType> GetSamplingUniformPickFn(
 template <typename IdxType, typename FloatType>
 inline NumPicksFn<IdxType> GetSamplingNumPicksFn(
     int64_t num_samples, FloatArray prob, bool replace) {
-  NumPicksFn<IdxType> num_picks_fn = [&]
+  NumPicksFn<IdxType> num_picks_fn = [=]
     (IdxType rowid, IdxType off, IdxType len,
      const IdxType* col, const IdxType* data) {
       const FloatType* prob_data = prob.Ptr<FloatType>();
@@ -91,7 +91,7 @@ inline NumPicksFn<IdxType> GetSamplingNumPicksFn(
 template <typename IdxType, typename FloatType>
 inline PickFn<IdxType> GetSamplingPickFn(
     int64_t num_samples, FloatArray prob, bool replace) {
-  PickFn<IdxType> pick_fn = [&]
+  PickFn<IdxType> pick_fn = [=]
     (IdxType rowid, IdxType off, IdxType len, IdxType num_picks,
      const IdxType* col, const IdxType* data,
      IdxType* out_idx) {
@@ -120,7 +120,7 @@ inline PickFn<IdxType> GetSamplingPickFn(
 template <typename IdxType, typename FloatType>
 inline NumPicksFn<IdxType> GetSamplingBiasedNumPicksFn(
     int64_t num_samples, IdArray split, FloatArray bias, bool replace) {
-  NumPicksFn<IdxType> num_picks_fn = [&]
+  NumPicksFn<IdxType> num_picks_fn = [=]
     (IdxType rowid, IdxType off, IdxType len,
      const IdxType* col, const IdxType* data) {
       const FloatType* bias_data = bias.Ptr<FloatType>();
@@ -145,7 +145,7 @@ inline NumPicksFn<IdxType> GetSamplingBiasedNumPicksFn(
 template <typename IdxType, typename FloatType>
 inline PickFn<IdxType> GetSamplingBiasedPickFn(
     int64_t num_samples, IdArray split, FloatArray bias, bool replace) {
-  PickFn<IdxType> pick_fn = [&]
+  PickFn<IdxType> pick_fn = [=]
     (IdxType rowid, IdxType off, IdxType len, IdxType num_picks,
      const IdxType* col, const IdxType* data,
      IdxType* out_idx) {

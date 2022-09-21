@@ -96,7 +96,10 @@ CSRMatrix CSRRowWisePerEtypePickPartial(
   const int64_t num_etypes = max_num_picks.size();
   const int64_t total_max_num_picks = std::accumulate(
       max_num_picks.begin(), max_num_picks.end(), 0L);
-  const int num_threads = omp_get_max_threads();
+  // (BarclayII) previously this uses omp_get_max_threads(), but it still returns the number of
+  // CPUs even if I disable OpenMP during compilation.  Needs further investigation on why this
+  // is happening.
+  const int num_threads = runtime::compute_num_threads(0, num_rows, 1);
 
   // preallocate the results
   IdArray picked_row_indptr = NDArray::Empty({num_rows + 1}, idtype, ctx);
@@ -107,8 +110,7 @@ CSRMatrix CSRRowWisePerEtypePickPartial(
   IdxType* picked_idata = picked_idx.Ptr<IdxType>();
 
   // the offset of incident edges with a given type at each row
-  IdArray off_etypes_per_row = NDArray::Empty(
-      {num_rows * num_etypes + 1}, idtype, ctx);
+  IdArray off_etypes_per_row = Full(0, num_rows * num_etypes + 1, idtype.bits, ctx);
   IdxType* off_etypes_per_row_data = off_etypes_per_row.Ptr<IdxType>();
 
   // the offset of picks for each edge type at each row
@@ -171,15 +173,17 @@ CSRMatrix CSRRowWisePerEtypePickPartial(
       int64_t end_j = !etype_sorted ? et_idx_indptr_data[i + 1] : indptr[i + 1];
       for (int64_t j = start_j; j < end_j; ++j) {
         const IdxType loc = !etype_sorted ? et_idx_data[j] : j;
-        const IdxType nextloc = !etype_sorted ? et_idx_data[j + 1] : j + 1;
         const IdxType eid = data ? data[loc] : loc;
-        const IdxType next_eid = data ? data[nextloc] : nextloc;
         const EType et = etype_data[eid];
 
         CHECK_LT(et, num_etypes) << "Length of fanout list is " << num_etypes
           << " but found edge type ID " << et << " that is larger.";
-        // Must hold if etype_sorted is False since we sorted it in Step 1.
-        CHECK_LE(et, etype_data[next_eid]) << "Edge type IDs not sorted by row.";
+        if (j != end_j - 1) {
+          const IdxType nextloc = !etype_sorted ? et_idx_data[j + 1] : j + 1;
+          const IdxType next_eid = data ? data[nextloc] : nextloc;
+          // Must hold if etype_sorted is False since we sorted it in Step 1.
+          CHECK_LE(et, etype_data[next_eid]) << "Edge type IDs not sorted by row.";
+        }
         ++off_etypes_per_row_data[i * num_etypes + et + 1];
       }
     }
@@ -246,7 +250,7 @@ CSRMatrix CSRRowWisePerEtypePickPartial(
   picked_col = picked_col.CreateView({new_len}, picked_col->dtype);
   picked_idx = picked_idx.CreateView({new_len}, picked_idx->dtype);
 
-  return CSRMatrix(mat.num_rows, mat.num_cols, picked_row_indptr, picked_col, picked_idx);
+  return CSRMatrix(num_rows, mat.num_cols, picked_row_indptr, picked_col, picked_idx);
 }
 
 template <typename IdxType, typename EType>
@@ -256,7 +260,7 @@ COOMatrix CSRRowWisePerEtypePick(
     ETypePickFn<IdxType, EType> pick_fn, ETypeNumPicksFn<IdxType, EType> num_picks_fn) {
   CSRMatrix csr = CSRRowWisePerEtypePickPartial<IdxType, EType>(
       mat, rows, etypes, max_num_picks, etype_sorted, pick_fn, num_picks_fn);
-  return RowWisePickPartialCSRToCOO<IdxType>(csr, rows);
+  return RowWisePickPartialCSRToCOO<IdxType>(csr, rows, mat.num_rows);
 }
 
 // Template for picking non-zero values row-wise. The implementation first slices

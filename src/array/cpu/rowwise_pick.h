@@ -102,7 +102,10 @@ CSRMatrix CSRRowWisePickPartial(
   IdxType* picked_cdata = static_cast<IdxType*>(picked_col->data);
   IdxType* picked_idata = static_cast<IdxType*>(picked_idx->data);
 
-  const int num_threads = omp_get_max_threads();
+  // (BarclayII) previously this uses omp_get_max_threads(), but it still returns the number of
+  // CPUs even if I disable OpenMP during compilation.  Needs further investigation on why this
+  // is happening.
+  const int num_threads = runtime::compute_num_threads(0, num_rows, 1);
   std::vector<int64_t> global_prefix(num_threads+1, 0);
 
   // NOTE: Not using multiple runtime::parallel_for to save the overhead of launching
@@ -172,7 +175,7 @@ CSRMatrix CSRRowWisePickPartial(
   picked_col = picked_col.CreateView({new_len}, picked_col->dtype);
   picked_idx = picked_idx.CreateView({new_len}, picked_idx->dtype);
 
-  return CSRMatrix(mat.num_rows, mat.num_cols,
+  return CSRMatrix(num_rows, mat.num_cols,
                    picked_row_indptr, picked_col, picked_idx);
 }
 
@@ -182,7 +185,7 @@ COOMatrix CSRRowWisePick(
     PickFn<IdxType> pick_fn, NumPicksFn<IdxType> num_picks_fn) {
   CSRMatrix csr = CSRRowWisePickPartial(
       mat, rows, max_num_picks, pick_fn, num_picks_fn);
-  return RowWisePickPartialCSRToCOO<IdxType>(csr, rows);
+  return RowWisePickPartialCSRToCOO<IdxType>(csr, rows, mat.num_rows);
 }
 
 // Template for picking non-zero values row-wise. The implementation first slices

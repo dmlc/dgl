@@ -13,9 +13,12 @@
 namespace dgl {
 namespace aten {
 namespace impl {
+namespace {
 
+// CSRRowWisePickPartial etc. returns a CSR matrix with seed nodes as rows.  This function
+// restores the number of rows to the original matrix and populates the COO row array.
 template <typename IdxType>
-COOMatrix RowWisePickPartialCSRToCOO(CSRMatrix csr, IdArray rows) {
+COOMatrix RowWisePickPartialCSRToCOO(CSRMatrix csr, IdArray rows, int64_t original_rows) {
   IdArray picked_rows = IdArray::Empty(
       {csr.indices->shape[0]}, csr.indices->dtype, csr.indices->ctx);
   IdxType* picked_rows_data = picked_rows.Ptr<IdxType>();
@@ -29,9 +32,10 @@ COOMatrix RowWisePickPartialCSRToCOO(CSRMatrix csr, IdArray rows) {
         picked_rows_data[j] = rows_data[i];
     }
   });
-  return COOMatrix(csr.num_rows, csr.num_cols, picked_rows, csr.indices, csr.data);
+  return COOMatrix(original_rows, csr.num_cols, picked_rows, csr.indices, csr.data);
 }
 
+}  // namespace
 }  // namespace impl
 }  // namespace aten
 }  // namespace dgl

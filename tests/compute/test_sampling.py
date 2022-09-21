@@ -341,7 +341,9 @@ def _test_sample_neighbors(hypersparse, prob):
     g, hg = _gen_neighbor_sampling_test_graph(hypersparse, False)
 
     def _test1(p, replace):
+        print('AAA')
         subg = dgl.sampling.sample_neighbors(g, [0, 1], -1, prob=p, replace=replace)
+        print('BBB')
         assert subg.number_of_nodes() == g.number_of_nodes()
         u, v = subg.edges()
         u_ans, v_ans = subg.in_edges([0, 1])
@@ -350,7 +352,9 @@ def _test_sample_neighbors(hypersparse, prob):
         assert uv == uv_ans
 
         for i in range(10):
+            print('CCC', i)
             subg = dgl.sampling.sample_neighbors(g, [0, 1], 2, prob=p, replace=replace)
+            print('DDD', i)
             assert subg.number_of_nodes() == g.number_of_nodes()
             assert subg.number_of_edges() == 4
             u, v = subg.edges()
@@ -1026,9 +1030,11 @@ def test_global_uniform_negative_sampling(dtype):
 
 if __name__ == '__main__':
     from itertools import product
+    test_sample_neighbors_noprob()
+    test_sample_neighbors_prob()
     for args in product(['coo', 'csr', 'csc'], ['in', 'out'], [False, True]):
         test_sample_neighbors_etype_homogeneous(*args)
-    test_non_uniform_random_walk()
+    test_non_uniform_random_walk(False)
     test_uniform_random_walk(False)
     test_pack_traces()
     test_pinsage_sampling()

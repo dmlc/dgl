@@ -20,7 +20,9 @@ namespace {
 template <typename IdxType, typename EType>
 inline ETypeNumPicksFn<IdxType, EType> GetSamplingUniformETypeNumPicksFn(
     const std::vector<int64_t>& num_samples, bool replace) {
-  ETypeNumPicksFn<IdxType, EType> num_picks_fn = [&]
+  // num_samples is captured by value.  This may have performance impact but allows
+  // passing in an rvalue (e.g. GetSamplingUniformETypeNumPicksFn({1,2,3}, false)).
+  ETypeNumPicksFn<IdxType, EType> num_picks_fn = [=]
     (IdxType rid, IdxType off, IdxType len, const IdxType* col, const IdxType* data,
      EType et, IdxType et_off, IdxType et_len, const IdxType* et_idx) {
       if (num_samples[et] == -1)
@@ -36,7 +38,7 @@ inline ETypeNumPicksFn<IdxType, EType> GetSamplingUniformETypeNumPicksFn(
 template <typename IdxType, typename EType>
 inline ETypePickFn<IdxType, EType> GetSamplingUniformETypePickFn(
     const std::vector<int64_t>& num_samples, bool replace) {
-  ETypePickFn<IdxType, EType> pick_fn = [&]
+  ETypePickFn<IdxType, EType> pick_fn = [=]
     (IdxType rid, IdxType off, IdxType len, IdxType num_picks,
      const IdxType* col, const IdxType* data,
      EType et, IdxType et_off, IdxType et_len, const IdxType* et_idx,
@@ -61,7 +63,7 @@ inline ETypePickFn<IdxType, EType> GetSamplingUniformETypePickFn(
 template <typename IdxType, typename FloatType, typename EType>
 inline ETypeNumPicksFn<IdxType, EType> GetSamplingETypeNumPicksFn(
     const std::vector<int64_t>& num_samples, FloatArray prob, bool replace) {
-  ETypeNumPicksFn<IdxType, EType> num_picks_fn = [&]
+  ETypeNumPicksFn<IdxType, EType> num_picks_fn = [=]
     (IdxType rid, IdxType off, IdxType len, const IdxType* col, const IdxType* data,
      EType et, IdxType et_off, IdxType et_len, const IdxType* et_idx) {
       const FloatType* p_data = prob.Ptr<FloatType>();
@@ -86,7 +88,7 @@ inline ETypeNumPicksFn<IdxType, EType> GetSamplingETypeNumPicksFn(
 template <typename IdxType, typename FloatType, typename EType>
 inline ETypePickFn<IdxType, EType> GetSamplingETypePickFn(
     const std::vector<int64_t>& num_samples, FloatArray prob, bool replace) {
-  ETypePickFn<IdxType, EType> pick_fn = [&]
+  ETypePickFn<IdxType, EType> pick_fn = [=]
     (IdxType rid, IdxType off, IdxType len, IdxType num_picks,
      const IdxType* col, const IdxType* data,
      EType et, IdxType et_off, IdxType et_len, const IdxType* et_idx,

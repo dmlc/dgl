@@ -33,10 +33,10 @@ def _prepare_edge_arrays(g, arg):
     else:
         arrays = []
         for etype in g.canonical_etypes:
-            if prob in g.edges[etype].data:
+            if arg in g.edges[etype].data:
                 arrays.append(F.to_dgl_nd(g.edges[etype].data[arg]))
             else:
-                arrays.append(ndarray([], ctx=nd.cpu()))
+                arrays.append(nd.array([], ctx=nd.cpu()))
         return arrays
 
 def sample_etype_neighbors(

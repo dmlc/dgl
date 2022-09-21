@@ -14,7 +14,7 @@ namespace {
 
 template <typename IdxType>
 inline NumPicksFn<IdxType> GetTopkNumPicksFn(int64_t num_samples) {
-  NumPicksFn<IdxType> num_picks_fn = [&]
+  NumPicksFn<IdxType> num_picks_fn = [=]
     (IdxType rowid, IdxType off, IdxType len,
      const IdxType* col, const IdxType* data) {
       if (num_samples == -1)
