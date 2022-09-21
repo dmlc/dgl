@@ -69,7 +69,7 @@ CompactGraphsCPU(
   }
 
   // Reserve the space for hash maps before ahead to aoivd rehashing
-  for (size_t i = 0; i < num_ntypes; ++i) {
+  for (size_t i = 0; i < static_cast<size_t>(num_ntypes); ++i) {
     if (i < always_preserve.size())
       hashmaps[i].Reserve(always_preserve[i]->shape[0] + max_vertex_cnt[i]);
     else
