@@ -84,7 +84,7 @@ int _NumberOfBits(const T& range) {
   return bits;
 }
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 void COOSort_(COOMatrix* coo, bool sort_column) {
   cudaStream_t stream = runtime::getCurrentCUDAStream();
   const int row_bits = _NumberOfBits(coo->num_rows);
@@ -131,8 +131,8 @@ void COOSort_(COOMatrix* coo, bool sort_column) {
   }
 }
 
-template void COOSort_<kDLGPU, int32_t>(COOMatrix* coo, bool sort_column);
-template void COOSort_<kDLGPU, int64_t>(COOMatrix* coo, bool sort_column);
+template void COOSort_<kDGLCUDA, int32_t>(COOMatrix* coo, bool sort_column);
+template void COOSort_<kDGLCUDA, int64_t>(COOMatrix* coo, bool sort_column);
 
 ///////////////////////////// COOIsSorted /////////////////////////////
 
@@ -155,7 +155,7 @@ __global__ void _COOIsSortedKernel(
   }
 }
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 std::pair<bool, bool> COOIsSorted(COOMatrix coo) {
   const int64_t nnz = coo.row->shape[0];
   const auto& ctx = coo.row->ctx;
@@ -180,8 +180,8 @@ std::pair<bool, bool> COOIsSorted(COOMatrix coo) {
   return {row_sorted, col_sorted};
 }
 
-template std::pair<bool, bool> COOIsSorted<kDLGPU, int32_t>(COOMatrix coo);
-template std::pair<bool, bool> COOIsSorted<kDLGPU, int64_t>(COOMatrix coo);
+template std::pair<bool, bool> COOIsSorted<kDGLCUDA, int32_t>(COOMatrix coo);
+template std::pair<bool, bool> COOIsSorted<kDGLCUDA, int64_t>(COOMatrix coo);
 
 }  // namespace impl
 }  // namespace aten

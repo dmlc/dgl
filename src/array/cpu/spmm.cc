@@ -124,67 +124,67 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
   }
 }
 
-template void SpMMCsr<kDLCPU, int32_t, 16>(
+template void SpMMCsr<kDGLCPU, int32_t, 16>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
-template void SpMMCsr<kDLCPU, int64_t, 16>(
+template void SpMMCsr<kDGLCPU, int64_t, 16>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
-template void SpMMCsr<kDLCPU, int32_t, 32>(
+template void SpMMCsr<kDGLCPU, int32_t, 32>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
-template void SpMMCsr<kDLCPU, int64_t, 32>(
+template void SpMMCsr<kDGLCPU, int64_t, 32>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
-template void SpMMCsr<kDLCPU, int32_t, 64>(
+template void SpMMCsr<kDGLCPU, int32_t, 64>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
-template void SpMMCsr<kDLCPU, int64_t, 64>(
+template void SpMMCsr<kDGLCPU, int64_t, 64>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 
-template void SpMMCsrHetero<kDLCPU, int32_t, 16>(
+template void SpMMCsrHetero<kDGLCPU, int32_t, 16>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const std::vector<CSRMatrix>& csr,
     const std::vector<NDArray>& ufeat, const std::vector<NDArray>& efeat,
     std::vector<NDArray>* out, std::vector<std::vector<NDArray>>* out_aux,
     const std::vector<dgl_type_t>& ufeat_node_tids,
     const std::vector<dgl_type_t>& out_node_tids);
-template void SpMMCsrHetero<kDLCPU, int64_t, 16>(
+template void SpMMCsrHetero<kDGLCPU, int64_t, 16>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const std::vector<CSRMatrix>& csr,
     const std::vector<NDArray>& ufeat, const std::vector<NDArray>& efeat,
     std::vector<NDArray>* out, std::vector<std::vector<NDArray>>* out_aux,
     const std::vector<dgl_type_t>& ufeat_node_tids,
     const std::vector<dgl_type_t>& out_node_tids);
-template void SpMMCsrHetero<kDLCPU, int32_t, 32>(
+template void SpMMCsrHetero<kDGLCPU, int32_t, 32>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const std::vector<CSRMatrix>& csr,
     const std::vector<NDArray>& ufeat, const std::vector<NDArray>& efeat,
     std::vector<NDArray>* out, std::vector<std::vector<NDArray>>* out_aux,
     const std::vector<dgl_type_t>& ufeat_node_tids,
     const std::vector<dgl_type_t>& out_node_tids);
-template void SpMMCsrHetero<kDLCPU, int64_t, 32>(
+template void SpMMCsrHetero<kDGLCPU, int64_t, 32>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const std::vector<CSRMatrix>& csr,
     const std::vector<NDArray>& ufeat, const std::vector<NDArray>& efeat,
     std::vector<NDArray>* out, std::vector<std::vector<NDArray>>* out_aux,
     const std::vector<dgl_type_t>& ufeat_node_tids,
     const std::vector<dgl_type_t>& out_node_tids);
-template void SpMMCsrHetero<kDLCPU, int32_t, 64>(
+template void SpMMCsrHetero<kDGLCPU, int32_t, 64>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const std::vector<CSRMatrix>& csr,
     const std::vector<NDArray>& ufeat, const std::vector<NDArray>& efeat,
     std::vector<NDArray>* out, std::vector<std::vector<NDArray>>* out_aux,
     const std::vector<dgl_type_t>& ufeat_node_tids,
     const std::vector<dgl_type_t>& out_node_tids);
-template void SpMMCsrHetero<kDLCPU, int64_t, 64>(
+template void SpMMCsrHetero<kDGLCPU, int64_t, 64>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const std::vector<CSRMatrix>& csr,
     const std::vector<NDArray>& ufeat, const std::vector<NDArray>& efeat,
@@ -222,52 +222,52 @@ void Edge_softmax_csr_backward(const std::string& op,
   });
 }
 
-template void Edge_softmax_csr_forward<kDLCPU, int32_t, 16>(
+template void Edge_softmax_csr_forward<kDGLCPU, int32_t, 16>(
     const std::string& op,
     const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out);
-template void Edge_softmax_csr_forward<kDLCPU, int64_t, 16>(
+template void Edge_softmax_csr_forward<kDGLCPU, int64_t, 16>(
     const std::string& op,
     const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out);
-template void Edge_softmax_csr_forward<kDLCPU, int32_t, 32>(
+template void Edge_softmax_csr_forward<kDGLCPU, int32_t, 32>(
     const std::string& op,
     const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out);
-template void Edge_softmax_csr_forward<kDLCPU, int64_t, 32>(
+template void Edge_softmax_csr_forward<kDGLCPU, int64_t, 32>(
     const std::string& op,
     const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out);
-template void Edge_softmax_csr_forward<kDLCPU, int32_t, 64>(
+template void Edge_softmax_csr_forward<kDGLCPU, int32_t, 64>(
     const std::string& op,
     const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out);
-template void Edge_softmax_csr_forward<kDLCPU, int64_t, 64>(
+template void Edge_softmax_csr_forward<kDGLCPU, int64_t, 64>(
     const std::string& op,
     const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out);
 
-template void Edge_softmax_csr_backward<kDLCPU, int32_t, 16>(
+template void Edge_softmax_csr_backward<kDGLCPU, int32_t, 16>(
     const std::string& op,
     const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out);
-template void Edge_softmax_csr_backward<kDLCPU, int64_t, 16>(
+template void Edge_softmax_csr_backward<kDGLCPU, int64_t, 16>(
     const std::string& op,
     const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out);
-template void Edge_softmax_csr_backward<kDLCPU, int32_t, 32>(
+template void Edge_softmax_csr_backward<kDGLCPU, int32_t, 32>(
     const std::string& op,
     const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out);
-template void Edge_softmax_csr_backward<kDLCPU, int64_t, 32>(
+template void Edge_softmax_csr_backward<kDGLCPU, int64_t, 32>(
     const std::string& op,
     const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out);
-template void Edge_softmax_csr_backward<kDLCPU, int32_t, 64>(
+template void Edge_softmax_csr_backward<kDGLCPU, int32_t, 64>(
     const std::string& op,
     const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out);
-template void Edge_softmax_csr_backward<kDLCPU, int64_t, 64>(
+template void Edge_softmax_csr_backward<kDGLCPU, int64_t, 64>(
     const std::string& op,
     const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out);
@@ -303,27 +303,27 @@ void SpMMCoo(const std::string& op, const std::string& reduce,
   }
 }
 
-template void SpMMCoo<kDLCPU, int32_t, 16>(
+template void SpMMCoo<kDGLCPU, int32_t, 16>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const COOMatrix& coo,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
-template void SpMMCoo<kDLCPU, int64_t, 16>(
+template void SpMMCoo<kDGLCPU, int64_t, 16>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const COOMatrix& coo,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
-template void SpMMCoo<kDLCPU, int32_t, 32>(
+template void SpMMCoo<kDGLCPU, int32_t, 32>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const COOMatrix& coo,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
-template void SpMMCoo<kDLCPU, int64_t, 32>(
+template void SpMMCoo<kDGLCPU, int64_t, 32>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const COOMatrix& coo,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
-template void SpMMCoo<kDLCPU, int32_t, 64>(
+template void SpMMCoo<kDGLCPU, int32_t, 64>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const COOMatrix& coo,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
-template void SpMMCoo<kDLCPU, int64_t, 64>(
+template void SpMMCoo<kDGLCPU, int64_t, 64>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const COOMatrix& coo,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
