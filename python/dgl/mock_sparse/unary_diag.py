@@ -1,3 +1,5 @@
+"""Unary ops for DiagMatrix"""
+# pylint: disable=invalid-name
 from .diag_matrix import DiagMatrix
 
 def neg(D):
