@@ -38,4 +38,4 @@ def test_edge_prediction_sampler(idtype):
 
 
 if __name__ == '__main__':
-    test_edge_prediction_sampler()
+    test_edge_prediction_sampler(F.int64)

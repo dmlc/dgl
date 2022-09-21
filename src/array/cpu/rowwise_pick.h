@@ -98,6 +98,7 @@ CSRMatrix CSRRowWisePickPartial(
                                       DGLDataTypeTraits<IdxType>::dtype,
                                       ctx);
   IdxType* picked_row_indptr_data = static_cast<IdxType*>(picked_row_indptr->data);
+  picked_row_indptr_data[0] = 0;
   IdxType* picked_cdata = static_cast<IdxType*>(picked_col->data);
   IdxType* picked_idata = static_cast<IdxType*>(picked_idx->data);
 
@@ -126,7 +127,7 @@ CSRMatrix CSRRowWisePickPartial(
       const IdxType len = indptr[rid + 1] - off;
 
       const IdxType num_picks = num_picks_fn(rid, off, len, indices, data);
-      picked_row_indptr_data[i] = num_picks;
+      picked_row_indptr_data[i + 1] = num_picks;
       global_prefix[thread_id + 1] += num_picks;
     }
 
@@ -135,12 +136,15 @@ CSRMatrix CSRRowWisePickPartial(
     {
       for (int t = 0; t < num_threads; ++t)
         global_prefix[t+1] += global_prefix[t];
-      picked_row_indptr_data[num_rows] = global_prefix[num_threads];
     }
-
     #pragma omp barrier
+
+    // No need to accumulate picked_row_indptr_data[start_i] here as it is handled by
+    // the global prefix in the loop below.
+    for (int64_t i = start_i + 1; i < end_i; ++i)
+      picked_row_indptr_data[i + 1] += picked_row_indptr_data[i];
     for (int64_t i = start_i; i < end_i; ++i)
-      picked_row_indptr_data[i] += global_prefix[thread_id];
+      picked_row_indptr_data[i + 1] += global_prefix[thread_id];
 
     // Part 2: pick the neighbors.
     for (int64_t i = start_i; i < end_i; ++i) {
