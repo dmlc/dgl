@@ -100,7 +100,7 @@ def create_dgl_object(graph_name, num_parts, \
         map between edge type(string)  and edge_type_id(int)
     """
     #create auxiliary data structures from the schema object
-    memory_snapshot("CreateDGLObjBegin", part_id)
+    memory_snapshot("CreateDGLObj_Begin", part_id)
     ntid_dict, global_nid_ranges = get_idranges(schema[constants.STR_NODE_TYPE], 
                                     schema[constants.STR_NUM_NODES_PER_CHUNK])
 
@@ -123,7 +123,7 @@ def create_dgl_object(graph_name, num_parts, \
     node_map_val = {ntype: [] for ntype in ntypes}
     edge_map_val = {etype.split(":")[1]: [] for etype in etypes}
 
-    memory_snapshot("CreateDglObj_AssignNodeData", part_id)
+    memory_snapshot("CreateDGLObj_AssignNodeData", part_id)
     shuffle_global_nids = node_data[constants.SHUFFLE_GLOBAL_NID]
     node_data.pop(constants.SHUFFLE_GLOBAL_NID)
     gc.collect()
@@ -150,7 +150,7 @@ def create_dgl_object(graph_name, num_parts, \
             [int(type_nids[0]), int(type_nids[-1]) + 1])
 
     #process edges
-    memory_snapshot("CreateDglObj_AssignEdgeData: ", part_id)
+    memory_snapshot("CreateDGLObj_AssignEdgeData: ", part_id)
     shuffle_global_src_id = edge_data[constants.SHUFFLE_GLOBAL_SRC_ID]
     edge_data.pop(constants.SHUFFLE_GLOBAL_SRC_ID)
     gc.collect()
@@ -194,7 +194,7 @@ def create_dgl_object(graph_name, num_parts, \
         edge_map_val[tokens[1]].append([edge_id_start,
                                          edge_id_start + np.sum(etype_ids == etype_id)])
         edge_id_start += np.sum(etype_ids == etype_id)
-    memory_snapshot("CreateDglObj_UniqueNodeIds: ", part_id)
+    memory_snapshot("CreateDGLObj_UniqueNodeIds: ", part_id)
 
     # get the edge list in some order and then reshuffle.
     # Here the order of nodes is defined by the `np.unique` function
