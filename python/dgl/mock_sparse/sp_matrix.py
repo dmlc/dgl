@@ -311,7 +311,7 @@ def create_from_csr(indptr: torch.Tensor,
     ----------
     indptr : tensor
         Pointer to the column indices of shape (N + 1), where N is the number of rows.
-    indices : tensor
+    indices : tensor 
         The column indices of shape (nnz).
     val : tensor, optional
         The values of shape (nnz) or (nnz, D). If None, it will be a tensor of shape (nnz)

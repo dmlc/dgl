@@ -5,9 +5,10 @@ import torch
 from scipy.sparse import coo_matrix
 from scipy.sparse.linalg import inv as scipy_inv
 
-from .sp_matrix import SparseMatrix
+from .sp_matrix import SparseMatrix, create_from_coo
+from ..ops.edge_softmax import edge_softmax
 
-def neg(A):
+def neg(A: SparseMatrix) -> SparseMatrix:
     """Return a new sparse matrix with negative elements.
 
     Returns
@@ -29,9 +30,12 @@ def neg(A):
                  values=tensor([-1., -1., -2.]),
                  shape=(4, 4), nnz=3)
     """
-    return SparseMatrix(A._row, A._col, -A._val, A.shape)
+    return create_from_coo(row=A._row,
+                           col=A._col,
+                           val=-A._val,
+                           shape=A.shape)
 
-def inv(A):
+def inv(A: SparseMatrix) -> SparseMatrix:
     """Compute the inverse.
 
     Only non-singular square matrices with values of shape (nnz) are supported.
@@ -76,11 +80,66 @@ def inv(A):
     val = mat_inv[row, col]
     val = np.asarray(val).squeeze(0)
     dev = A.device
-    return SparseMatrix(torch.from_numpy(row).to(dev),
-                        torch.from_numpy(col).to(dev),
-                        torch.from_numpy(val).to(dev),
-                        A.shape)
+
+    return create_from_coo(row=torch.from_numpy(row).to(dev),
+                           col=torch.from_numpy(col).to(dev),
+                           val=torch.from_numpy(val).to(dev),
+                           shape=A.shape)
+
+def softmax(A: SparseMatrix) -> SparseMatrix:
+    """Apply row-wise softmax to the nonzero entries of the sparse matrix.
+
+    If :attr:`A.val` takes shape :attr:`(nnz, D)`, then the output matrix
+    :attr:`A'` and :attr:`A'.val` take the same shape as :attr:`A` and :attr:`A.val`.
+    :attr:`A'.val[:, i]` is calculated based on :attr:`A.val[:, i]`.
+
+    Parameters
+    ----------
+    A : SparseMatrix
+        The input sparse matrix
+
+    Returns
+    -------
+    SparseMatrix
+        The result, whose shape is the same as :attr:`A`
+
+    Examples
+    --------
+
+    Case1: matrix with values of shape (nnz)
+
+    >>> row = torch.tensor([0, 0, 1, 2])
+    >>> col = torch.tensor([1, 2, 2, 0])
+    >>> val = torch.ones(len(row))
+    >>> A = create_from_coo(row, col, val)
+    >>> result = A.softmax()
+    >>> result.val
+    tensor([0.5000, 0.5000, 1.0000, 1.0000])
+    >>> result.shape
+    (3, 3)
+
+    Case2: matrix with values of shape (nnz, D)
+
+    >>> row = torch.tensor([0, 0, 1, 2])
+    >>> col = torch.tensor([1, 2, 2, 0])
+    >>> val = torch.ones(len(row), 2)
+    >>> A = create_from_coo(row, col, val)
+    >>> result = A.softmax()
+    >>> result.val
+    tensor([[0.5000, 0.5000],
+            [0.5000, 0.5000],
+            [1.0000, 1.0000],
+            [1.0000, 1.0000]])
+    >>> result.shape
+    (3, 3)
+    """
+    g = dgl.graph((A.col, A.row))
+    return create_from_coo(A.row,
+                           A.col,
+                           edge_softmax(g, A.val),
+                           A.shape)
 
 SparseMatrix.neg = neg
 SparseMatrix.__neg__ = neg
 SparseMatrix.inv = inv
+SparseMatrix.softmax = softmax

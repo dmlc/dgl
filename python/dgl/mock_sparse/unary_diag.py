@@ -1,8 +1,10 @@
 """Unary ops for DiagMatrix"""
 # pylint: disable=invalid-name
-from .diag_matrix import DiagMatrix
+import torch
 
-def neg(D):
+from .diag_matrix import DiagMatrix, diag
+
+def neg(D: DiagMatrix) -> DiagMatrix:
     """Return a new diagonal matrix with negative elements.
 
     Returns
@@ -20,9 +22,9 @@ def neg(D):
     DiagMatrix(val=tensor([-0., -1., -2.]),
                shape=(3, 3))
     """
-    return DiagMatrix(-D.val, D.shape)
+    return diag(-D.val, D.shape)
 
-def inv(D):
+def inv(D: DiagMatrix) -> DiagMatrix:
     """Compute the inverse.
 
     Only square matrices with values of shape (nnz) are supported.
@@ -46,8 +48,51 @@ def inv(D):
     assert num_rows == num_cols, f'Expect a square matrix, got shape {D.shape}'
     assert len(D.val.shape) == 1, 'inv only supports matrices with 1D val'
 
-    return DiagMatrix(1. / D.val, D.shape)
+    return diag(1. / D.val, D.shape)
+
+def softmax(D: DiagMatrix) -> DiagMatrix:
+    """Apply row-wise softmax to the nonzero entries of the diagonal matrix.
+
+    The result will be a diagonal matrix with one-valued diagonal.
+
+    Parameters
+    ----------
+    D : DiagMatrix
+        The input diagonal matrix
+
+    Returns
+    -------
+    DiagMatrix
+        The result.
+
+    Examples
+    --------
+
+    Case1: matrix with values of shape (nnz)
+
+    >>> val = torch.randn(3)
+    >>> D = diag(val)
+    >>> result = D.softmax()
+    >>> result.val
+    tensor([1., 1., 1.])
+    >>> result.shape
+    (3, 3)
+
+    Case2: matrix with values of shape (nnz, D)
+
+    >>> val = torch.randn(3, 4)
+    >>> D = diag(val)
+    >>> result = D.softmax()
+    >>> result.val
+    tensor([[1., 1., 1., 1.],
+            [1., 1., 1., 1.],
+            [1., 1., 1., 1.]])
+    >>> result.shape
+    (3, 3)
+    """
+    return diag(torch.ones_like(D.val), D.shape)
 
 DiagMatrix.neg = neg
 DiagMatrix.__neg__ = neg
 DiagMatrix.inv = inv
+DiagMatrix.softmax = softmax
