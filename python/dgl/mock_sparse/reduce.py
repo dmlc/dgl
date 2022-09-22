@@ -97,7 +97,7 @@ def reduce(A: SparseMatrix, dim=None, rtype: str = "sum"):
     return reduced
 
 
-def sum(A: SparseMatrix, dim=None): # pylint: disable=W0622
+def sum(A: SparseMatrix, dim=None):  # pylint: disable=W0622
     """Returns the sum of sparse matrix A on the dimension `dim`.
 
     If `dim` is None, it reduces all the elements in the sparse matrix.
