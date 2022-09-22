@@ -259,14 +259,13 @@ class SparseMatrix:
         >>> row = torch.tensor([1, 1, 3])
         >>> col = torch.tensor([2, 1, 3])
         >>> val = torch.tensor([1, 1, 2])
-        >>> A = SparseMatrix(row, col, val)
+        >>> A = create_from_coo(row, col, val)
         >>> A = A.transpose()
-        >>> print(A.row)
-        tensor([1, 2, 3])
-        >>> print(A.col)
-        tensor([1, 1, 3])
-        >>> print(A.val)
-        tensor([1, 1, 2])
+        >>> print(A)
+        SparseMatrix(indices=tensor([[1, 2, 3],
+                [1, 1, 3]]),
+        values=tensor([1, 1, 2]),
+        shape=(4, 4), nnz=3)
         """
         return SparseMatrix(self.col, self.row, self.val, self.shape[::-1])
 
