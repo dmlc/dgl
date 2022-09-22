@@ -80,7 +80,7 @@ def test_part_pipeline():
             np.save(f, write_year)
 
         output_dir = os.path.join(root_dir, 'chunked-data')
-        num_chunks = 2
+        num_chunks = 4
         chunk_graph(
             g,
             'mag240m',
@@ -152,11 +152,12 @@ def test_part_pipeline():
                 assert feat_array.shape[0] == num_edges[etype] // num_chunks
 
         # Step1: graph partition
+        num_parts = 2
         in_dir = os.path.join(root_dir, 'chunked-data')
         output_dir = os.path.join(root_dir, '2parts')
-        os.system('python tools/partition_algo/random_partition.py '\
+        os.system('python3 tools/partition_algo/random_partition.py '\
                   '--in_dir {} --out_dir {} --num_partitions {}'.format(
-                    in_dir, output_dir, num_chunks))
+                    in_dir, output_dir, num_parts))
         for ntype in ['author', 'institution', 'paper']:
             fname = os.path.join(output_dir, '{}.txt'.format(ntype))
             with open(fname, 'r') as f:
@@ -171,13 +172,14 @@ def test_part_pipeline():
             f.write('127.0.0.1\n')
             f.write('127.0.0.2\n')
 
-        cmd = 'python tools/dispatch_data.py'
+        cmd = 'python3 tools/dispatch_data.py'
         cmd += f' --in-dir {in_dir}'
         cmd += f' --partitions-dir {partition_dir}'
         cmd += f' --out-dir {out_dir}'
         cmd += f' --ip-config {ip_config}'
         cmd += ' --ssh-port 22'
         cmd += ' --process-group-timeout 60'
+        cmd += f' --num-parts {num_parts}'
         os.system(cmd)
 
         # check metadata.json
@@ -187,19 +189,19 @@ def test_part_pipeline():
 
         all_etypes = ['affiliated_with', 'writes', 'cites', 'rev_writes']
         for etype in all_etypes:
-            assert len(meta_data['edge_map'][etype]) == num_chunks
+            assert len(meta_data['edge_map'][etype]) == num_parts
         assert meta_data['etypes'].keys() == set(all_etypes)
         assert meta_data['graph_name'] == 'mag240m'
 
         all_ntypes = ['author', 'institution', 'paper']
         for ntype in all_ntypes:
-            assert len(meta_data['node_map'][ntype]) == num_chunks
+            assert len(meta_data['node_map'][ntype]) == num_parts
         assert meta_data['ntypes'].keys() == set(all_ntypes)
         assert meta_data['num_edges'] == 4200
         assert meta_data['num_nodes'] == 720
-        assert meta_data['num_parts'] == num_chunks
+        assert meta_data['num_parts'] == num_parts
 
-        for i in range(num_chunks):
+        for i in range(num_parts):
             sub_dir = 'part-' + str(i)
             assert meta_data[sub_dir]['node_feats'] == 'part{}/node_feat.dgl'.format(i)
             assert meta_data[sub_dir]['edge_feats'] == 'part{}/edge_feat.dgl'.format(i)

@@ -40,7 +40,10 @@ def submit_jobs(args) -> str:
     with open(os.path.join(args.in_dir, schema_path)) as schema:
         schema_map = json.load(schema)
 
-    num_parts = len(schema_map["num_nodes_per_chunk"][0])
+    num_chunks = len(schema_map["num_nodes_per_chunk"][0])
+    if args.num_parts > num_chunks:
+        raise Exception('Number of partitions should be less/equal than number of chunks.')
+    num_parts = num_chunks if args.num_parts <= 0 else args.num_parts
     graph_name = schema_map["graph_name"]
 
     argslist = ""
@@ -75,6 +78,8 @@ def main():
     parser.add_argument('--ssh-port', type=int, default=22, help='SSH Port.') 
     parser.add_argument('--process-group-timeout', type=int, default=1800,
                         help='timeout[seconds] for operations executed against the process group')
+    parser.add_argument('--num-parts', type=int, default=0,
+                        help='number of target partitions. If not specified, number of chunks are used.')
 
     args, udf_command = parser.parse_known_args()
 

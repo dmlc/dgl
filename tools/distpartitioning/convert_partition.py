@@ -11,9 +11,7 @@ import constants
 from pyarrow import csv
 from utils import read_json, get_idranges
 
-def create_dgl_object(graph_name, num_parts, \
-                        schema, part_id, node_data, \
-                        edge_data, nodeid_offset, edgeid_offset):
+def create_dgl_object(num_parts, schema, part_id, node_data, edge_data, edgeid_offset):
     """
     This function creates dgl objects for a given graph partition, as in function
     arguments. 
@@ -62,8 +60,6 @@ def create_dgl_object(graph_name, num_parts, \
 
     Parameters:
     -----------
-    graph_name : string
-        name of the graph
     num_parts : int
         total no. of partitions (of the original graph)
     schame : json object
@@ -76,8 +72,6 @@ def create_dgl_object(graph_name, num_parts, \
     edge_data : numpy ndarray
         edge_data, where each row is of the following format: 
         <global_src_id> <global_dst_id> <etype_id> <global_type_eid>
-    nodeid_offset : int
-        offset to be used when assigning node global ids in the current partition
     edgeid_offset : int
         offset to be used when assigning edge global ids in the current partition
 
@@ -95,11 +89,13 @@ def create_dgl_object(graph_name, num_parts, \
         map between edge type(string)  and edge_type_id(int)
     """
     #create auxiliary data structures from the schema object
-    ntid_dict, global_nid_ranges = get_idranges(schema[constants.STR_NODE_TYPE], 
-                                    schema[constants.STR_NUM_NODES_PER_CHUNK])
+    _, global_nid_ranges = get_idranges(schema[constants.STR_NODE_TYPE],
+                                    schema[constants.STR_NUM_NODES_PER_CHUNK],
+                                    expected_num_chunks=num_parts)
 
-    etid_dict, global_eid_ranges = get_idranges(schema[constants.STR_EDGE_TYPE], 
-                                    schema[constants.STR_NUM_EDGES_PER_CHUNK])
+    _, global_eid_ranges = get_idranges(schema[constants.STR_EDGE_TYPE],
+                                    schema[constants.STR_NUM_EDGES_PER_CHUNK],
+                                    expected_num_chunks=num_parts)
 
     id_map = dgl.distributed.id_map.IdMap(global_nid_ranges)
 
@@ -110,7 +106,6 @@ def create_dgl_object(graph_name, num_parts, \
     ntypes_map = {e: i for i, e in enumerate(ntypes)}
     etypes = [(key, global_eid_ranges[key][0, 0]) for key in global_eid_ranges]
     etypes.sort(key=lambda e: e[1])
-    etype_offset_np = np.array([e[1] for e in etypes])
     etypes = [e[0] for e in etypes]
     etypes_map = {e.split(":")[1]: i for i, e in enumerate(etypes)}
 

@@ -95,7 +95,8 @@ def gen_node_data(rank, world_size, id_lookup, ntid_ntype_map, schema_map):
                         }
 
     type_nid_dict, global_nid_dict = get_idranges(schema_map[constants.STR_NODE_TYPE],
-                                        schema_map[constants.STR_NUM_NODES_PER_CHUNK])
+                                        schema_map[constants.STR_NUM_NODES_PER_CHUNK],
+                                        expected_num_chunks=world_size)
 
     for ntype_id, ntype_name in ntid_ntype_map.items():
         type_start, type_end = type_nid_dict[ntype_name][0][0], type_nid_dict[ntype_name][-1][1]
@@ -288,7 +289,7 @@ def exchange_node_features(rank, world_size, node_feature_tids, ntype_gnid_map, 
     return own_node_features, own_global_nids
 
 def exchange_graph_data(rank, world_size, node_features, node_feat_tids, edge_data,
-        id_lookup, ntypes_ntypeid_map, ntypes_gnid_range_map, ntid_ntype_map, schema_map):
+        id_lookup, ntypes_gnid_range_map, ntid_ntype_map, schema_map):
     """
     Wrapper function which is used to shuffle graph data on all the processes.
 
@@ -529,7 +530,8 @@ def gen_dist_partitions(rank, world_size, params):
     #Initialize distributed lookup service for partition-id and shuffle-global-nids mappings
     #for global-nids
     _, global_nid_ranges = get_idranges(schema_map[constants.STR_NODE_TYPE], 
-                                        schema_map[constants.STR_NUM_NODES_PER_CHUNK])
+                                        schema_map[constants.STR_NUM_NODES_PER_CHUNK],
+                                        expected_num_chunks=world_size)
     id_map = dgl.distributed.id_map.IdMap(global_nid_ranges)
     id_lookup = DistLookupService(os.path.join(params.input_dir, params.partitions_dir),\
                                     schema_map[constants.STR_NODE_TYPE],\
@@ -550,7 +552,7 @@ def gen_dist_partitions(rank, world_size, params):
     ntypes_gnid_range_map = get_gnid_range_map(node_tids)
     node_data, rcvd_node_features, rcvd_global_nids, edge_data  = \
                     exchange_graph_data(rank, world_size, node_features, node_feat_tids, \
-                                        edge_data, id_lookup, ntypes_ntypeid_map, ntypes_gnid_range_map, \
+                                        edge_data, id_lookup, ntypes_gnid_range_map, \
                                         ntypeid_ntypes_map, schema_map)
     logging.info(f'[Rank: {rank}] Done with data shuffling...')
 
@@ -592,11 +594,13 @@ def gen_dist_partitions(rank, world_size, params):
 
     #create dgl objects here
     start = timer()
-    num_nodes = 0
-    num_edges = shuffle_global_eid_start
-    graph_obj, ntypes_map_val, etypes_map_val, ntypes_ntypeid_map, etypes_map = create_dgl_object(\
-            params.graph_name, params.num_parts, \
-            schema_map, rank, node_data, edge_data, num_nodes, num_edges)
+    ret = create_dgl_object(params.num_parts, schema_map, rank, node_data,
+            edge_data, shuffle_global_eid_start)
+    graph_obj = ret[0]
+    ntypes_map_val = ret[1]
+    etypes_map_val = ret[2]
+    ntypes_ntypeid_map = ret[3]
+    etypes_map = ret[4]
     write_dgl_objects(graph_obj, rcvd_node_features, edge_features, params.output, rank)
 
     #get the meta-data

@@ -108,18 +108,18 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
             #where key: feature_name, value: dictionary in which keys are "format", "data"
             node_feature_tids[ntype_name] = []
             for feat_name, feat_data in ntype_feature_data.items():
-                assert len(feat_data[constants.STR_DATA]) == world_size
                 assert feat_data[constants.STR_FORMAT][constants.STR_NAME] == constants.STR_NUMPY
-                my_feat_data_fname = feat_data[constants.STR_DATA][rank] #this will be just the file name
-                if (os.path.isabs(my_feat_data_fname)):
-                    logging.info(f'Loading numpy from {my_feat_data_fname}')
-                    node_features[ntype_name+'/'+feat_name] = \
-                            torch.from_numpy(np.load(my_feat_data_fname))
-                else:
-                    numpy_path = os.path.join(input_dir, my_feat_data_fname)
-                    logging.info(f'Loading numpy from {numpy_path}')
-                    node_features[ntype_name+'/'+feat_name] = \
-                            torch.from_numpy(np.load(numpy_path))
+                num_chunks = len(feat_data[constants.STR_DATA])
+                read_list = np.array_split(np.arange(num_chunks), world_size)
+                nfeat = []
+                for idx in read_list[rank]:
+                    nfeat_file = feat_data[constants.STR_DATA][idx]
+                    if not os.path.isabs(nfeat_file):
+                        nfeat_file = os.path.join(input_dir, nfeat_file)
+                    logging.info(f'Loading node feature[{feat_name}] of ntype[{ntype_name}] from {nfeat_file}')
+                    nfeat.append(np.load(nfeat_file))
+                nfeat = np.concatenate(nfeat)
+                node_features[ntype_name + '/' + feat_name] = torch.from_numpy(nfeat)
 
                 node_feature_tids[ntype_name].append([feat_name, -1, -1])
 
@@ -150,7 +150,8 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
 
     #read my nodes for each node type
     node_tids, ntype_gnid_offset = get_idranges(schema_map[constants.STR_NODE_TYPE], 
-                                    schema_map[constants.STR_NUM_NODES_PER_CHUNK])
+                                    schema_map[constants.STR_NUM_NODES_PER_CHUNK],
+                                    expected_num_chunks=world_size)
     for ntype_name in schema_map[constants.STR_NODE_TYPE]: 
         if ntype_name in node_feature_tids: 
             for item in node_feature_tids[ntype_name]:
@@ -209,8 +210,9 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
     #read my edges for each edge type
     etype_names = schema_map[constants.STR_EDGE_TYPE]
     etype_name_idmap = {e : idx for idx, e in enumerate(etype_names)}
-    edge_tids, _ = get_idranges(schema_map[constants.STR_EDGE_TYPE], 
-                                    schema_map[constants.STR_NUM_EDGES_PER_CHUNK])
+    edge_tids, _ = get_idranges(schema_map[constants.STR_EDGE_TYPE],
+                    schema_map[constants.STR_NUM_EDGES_PER_CHUNK],
+                    expected_num_chunks=world_size)
 
     edge_datadict = {}
     edge_data = schema_map[constants.STR_EDGES]
@@ -224,26 +226,38 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
         assert etype_info[constants.STR_FORMAT][constants.STR_NAME] == constants.STR_CSV
 
         edge_info = etype_info[constants.STR_DATA]
-        assert len(edge_info) == world_size
 
         #edgetype strings are in canonical format, src_node_type:edge_type:dst_node_type
         tokens = etype_name.split(":")
         assert len(tokens) == 3
 
         src_ntype_name = tokens[0]
-        rel_name = tokens[1]
         dst_ntype_name = tokens[2]
 
-        logging.info(f'Reading csv files from {edge_info[rank]}')
-        data_df = csv.read_csv(edge_info[rank], read_options=pyarrow.csv.ReadOptions(autogenerate_column_names=True), 
-                                    parse_options=pyarrow.csv.ParseOptions(delimiter=' '))
+        num_chunks = len(edge_info)
+        read_list = np.array_split(np.arange(num_chunks), world_size)
+        df_0 = []
+        df_1 = []
+        for idx in read_list[rank]:
+            edge_file = edge_info[idx]
+            if not os.path.isabs(edge_file):
+                edge_file = os.path.join(input_dir, edge_file)
+            logging.info(f'Loading edges of etype[{etype_name}] from {edge_file}')
+            data_df = csv.read_csv(edge_file,
+                        read_options=pyarrow.csv.ReadOptions(autogenerate_column_names=True), 
+                        parse_options=pyarrow.csv.ParseOptions(delimiter=' '))
+            df_0.append(data_df['f0'].to_numpy())
+            df_1.append(data_df['f1'].to_numpy())
+        df_0 = np.concatenate(df_0)
+        df_1 = np.concatenate(df_1)
+
         #currently these are just type_edge_ids... which will be converted to global ids
-        edge_datadict[constants.GLOBAL_SRC_ID].append(data_df['f0'].to_numpy() + ntype_gnid_offset[src_ntype_name][0, 0])
-        edge_datadict[constants.GLOBAL_DST_ID].append(data_df['f1'].to_numpy() + ntype_gnid_offset[dst_ntype_name][0, 0])
+        edge_datadict[constants.GLOBAL_SRC_ID].append(df_0 + ntype_gnid_offset[src_ntype_name][0, 0])
+        edge_datadict[constants.GLOBAL_DST_ID].append(df_1 + ntype_gnid_offset[dst_ntype_name][0, 0])
         edge_datadict[constants.GLOBAL_TYPE_EID].append(np.arange(edge_tids[etype_name][rank][0],\
                 edge_tids[etype_name][rank][1] ,dtype=np.int64))
         edge_datadict[constants.ETYPE_ID].append(etype_name_idmap[etype_name] * \
-                np.ones(shape=(data_df['f0'].to_numpy().shape), dtype=np.int64))
+                np.ones(shape=(df_0.shape), dtype=np.int64))
 
     #stitch together to create the final data on the local machine
     for col in [constants.GLOBAL_SRC_ID, constants.GLOBAL_DST_ID, constants.GLOBAL_TYPE_EID, constants.ETYPE_ID]:
