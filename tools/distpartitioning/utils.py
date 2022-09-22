@@ -439,12 +439,14 @@ def memory_snapshot(tag, rank):
     """
     GB = 1024 * 1024 * 1024
     MB = 1024 * 1024
+    KB = 1024
 
+    peak = dgl.partition.get_peak_mem() * KB
     mem = psutil.virtual_memory()
     avail = mem.available / MB
     used = mem.used / MB
     total = mem.total / MB
 
-    mem_string = f'{total:.0f} (MB) total, {used:.0f} (MB) used, {avail:.0f} (MB) avail'
+    mem_string = f'{total:.0f} (MB) total, {peak:.0f} (MB) peak, {used:.0f} (MB) used, {avail:.0f} (MB) avail'
     logging.debug(f'[Rank: {rank} MEMORY_SNAPSHOT] {mem_string} - {tag}')
 
