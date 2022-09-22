@@ -28,6 +28,17 @@ class NeighborSampler(BlockSampler):
         If given, the probability of each neighbor being sampled is proportional
         to the edge feature value with the given name in ``g.edata``.  The feature must be
         a scalar on each edge.
+
+        This argument is mutually exclusive with :attr:`mask`.  If you want to
+        specify both a mask and a probability, consider multiplying the probability
+        with the mask instead.
+    mask : str, optional
+        If given, a neighbor could be picked only if the edge mask with the given
+        name in ``g.edata`` is True.  The data must be boolean on each edge.
+
+        This argument is mutually exclusive with :attr:`prob`.  If you want to
+        specify both a mask and a probability, consider multiplying the probability
+        with the mask instead.
     replace : bool, default False
         Whether to sample with replacement
     prefetch_node_feats : list[str] or dict[ntype, list[str]], optional
