@@ -98,10 +98,14 @@ def spmm_cache_argY(binary_op, reduce_op, req_grad_X, req_grad_Y):
             return True
     return False
 
+def _cast_if_autocast_enabled(*args):
+    if not th.is_autocast_enabled() or not th.cuda.is_available():
+        return args
+    else:
+        return th.cuda.amp.autocast_mode._cast(args, th.get_autocast_gpu_dtype())
 
 class GSpMM(th.autograd.Function):
     @staticmethod
-    @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, gidx, op, reduce_op, X, Y):
         out, (argX, argY) = _gspmm(gidx, op, reduce_op, X, Y)
         reduce_last = _need_reduce_last_dim(X, Y)
@@ -124,7 +128,6 @@ class GSpMM(th.autograd.Function):
         return out
 
     @staticmethod
-    @custom_bwd
     def backward(ctx, dZ):
         gidx, op, reduce_op, X_shape, Y_shape, dtype, device, reduce_last = ctx.backward_cache
         X, Y, argX, argY = ctx.saved_tensors
@@ -174,7 +177,6 @@ class GSpMM(th.autograd.Function):
 
 class GSpMM_hetero(th.autograd.Function):
     @staticmethod
-    @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, gidx, op, reduce_op, X_len, *feats): # feats = lhs_data + rhs_data
         out, (argX, argY, argX_ntype, argY_etype) = _gspmm_hetero(gidx, op, reduce_op, X_len, feats)
         X, Y = feats[:X_len], feats[X_len:]
@@ -203,7 +205,6 @@ class GSpMM_hetero(th.autograd.Function):
         return out
 
     @staticmethod
-    @custom_bwd
     def backward(ctx, *dZ):
         gidx, op, reduce_op, X_shape, Y_shape, dtype, device, reduce_last, X_len = ctx.backward_cache
         num_ntypes = gidx.number_of_ntypes()
@@ -284,7 +285,6 @@ def sddmm_cache_Y(op, req_grad_X, req_grad_Y):
 
 class GSDDMM(th.autograd.Function):
     @staticmethod
-    @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, gidx, op, X, Y, lhs_target, rhs_target):
         out = _gsddmm(gidx, op, X, Y, lhs_target, rhs_target)
         X_shape = X.shape if X is not None else None
@@ -300,7 +300,6 @@ class GSDDMM(th.autograd.Function):
         return out
 
     @staticmethod
-    @custom_bwd
     def backward(ctx, dZ):
         gidx, op, lhs_target, rhs_target, X_shape, Y_shape = ctx.backward_cache
         X, Y = ctx.saved_tensors
@@ -349,7 +348,6 @@ class GSDDMM(th.autograd.Function):
 
 class GSDDMM_hetero(th.autograd.Function):
     @staticmethod
-    @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, gidx, op, X_len, lhs_target, rhs_target, *feats): # feats = X+Y
         out = _gsddmm_hetero(gidx, op, X_len, lhs_target, rhs_target, feats)
         X, Y = feats[:X_len], feats[X_len:]
@@ -366,7 +364,6 @@ class GSDDMM_hetero(th.autograd.Function):
         return out
 
     @staticmethod
-    @custom_bwd
     # TODO(Israt): Implement the complete backward operator
     def backward(ctx, *dZ):
         gidx, op, lhs_target, rhs_target, X_shape, Y_shape, X_len = ctx.backward_cache
@@ -428,7 +425,6 @@ class GSDDMM_hetero(th.autograd.Function):
 
 class EdgeSoftmax(th.autograd.Function):
     @staticmethod
-    @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, gidx, score, eids, norm_by):
         """Forward function.
 
@@ -463,7 +459,6 @@ class EdgeSoftmax(th.autograd.Function):
         return out
 
     @staticmethod
-    @custom_bwd
     def backward(ctx, grad_out):
         """Backward function.
 
@@ -495,7 +490,6 @@ class EdgeSoftmax(th.autograd.Function):
 
 class EdgeSoftmax_hetero(th.autograd.Function):
     @staticmethod
-    @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, gidx, eids, norm_by, *score):
         """Forward function.
 
@@ -531,7 +525,6 @@ class EdgeSoftmax_hetero(th.autograd.Function):
         return out
 
     @staticmethod
-    @custom_bwd
     def backward(ctx, *grad_out):
         """Backward function.
 
@@ -563,7 +556,6 @@ class EdgeSoftmax_hetero(th.autograd.Function):
 
 class SegmentReduce(th.autograd.Function):
     @staticmethod
-    @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, op, x, offsets):
         y, arg = _segment_reduce(op, x, offsets)
         ctx.save_for_backward(arg, offsets)
@@ -571,7 +563,6 @@ class SegmentReduce(th.autograd.Function):
         return y
 
     @staticmethod
-    @custom_bwd
     def backward(ctx, dy):
         op = ctx.backward_cache
         arg, offsets = ctx.saved_tensors
@@ -592,14 +583,12 @@ class SegmentReduce(th.autograd.Function):
 
 class ScatterAdd(th.autograd.Function):
     @staticmethod
-    @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, x, idx, m):
         y = _scatter_add(x, idx, m)
         ctx.save_for_backward(idx)
         return y
 
     @staticmethod
-    @custom_bwd
     def backward(ctx, dy):
         idx = ctx.saved_tensors
         return dy[idx], None, None
@@ -663,7 +652,6 @@ class CSRMask(th.autograd.Function):
 
 class SEGMENTMM(th.autograd.Function):
     @staticmethod
-    @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, A, B, seglen_A):
         if B.dim() != 3:
             raise ValueError("segment_mm expects B to be a 3D tensor.")
@@ -689,7 +677,6 @@ class SEGMENTMM(th.autograd.Function):
 
 class GATHERMM(th.autograd.Function):
     @staticmethod
-    @custom_fwd(cast_inputs=th.float16)
     def forward(ctx, A, B, idx_a, idx_b):
         if B.dim() != 3:
             raise ValueError("Expected dimension of B is 3. Got " + str(B.dim()))
@@ -721,7 +708,9 @@ def gspmm(gidx, op, reduce_op, lhs_data, rhs_data):
     if op == 'div':
         op = 'mul'
         rhs_data = 1. / rhs_data
-    return GSpMM.apply(gidx, op, reduce_op, lhs_data, rhs_data)
+    args = _cast_if_autocast_enabled(gidx, op, reduce_op, lhs_data, rhs_data)
+    with th.amp.autocast(lhs_data.device.type, enabled=False):
+        return GSpMM.apply(*args)
 
 def gsddmm(gidx, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
     if op == 'sub':
@@ -730,7 +719,9 @@ def gsddmm(gidx, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
     if op == 'div':
         op = 'mul'
         rhs_data = 1. / rhs_data
-    return GSDDMM.apply(gidx, op, lhs_data, rhs_data, lhs_target, rhs_target)
+    args = _cast_if_autocast_enabled(gidx, op, lhs_data, rhs_data, lhs_target, rhs_target)
+    with th.amp.autocast(lhs_data.device.type, enabled=False):
+        return GSDDMM.apply(*args)
 
 def gspmm_hetero(g, op, reduce_op, lhs_len, *lhs_and_rhs_tuple):
     lhs_tuple, rhs_tuple = lhs_and_rhs_tuple[:lhs_len], lhs_and_rhs_tuple[lhs_len:]
@@ -744,7 +735,10 @@ def gspmm_hetero(g, op, reduce_op, lhs_len, *lhs_and_rhs_tuple):
             for i in range(len(rhs_tuple))])
     if op in ['add', 'mul']:
         lhs_and_rhs_tuple = tuple(list(lhs_tuple) + list(rhs_tuple))
-    return GSpMM_hetero.apply(g, op, reduce_op, lhs_len, *lhs_and_rhs_tuple)
+
+    args = _cast_if_autocast_enabled(g, op, reduce_op, lhs_len, *lhs_and_rhs_tuple)
+    with th.amp.autocast(lhs_and_rhs_tuple[0].device.type, enabled=False):
+        return GSpMM_hetero.apply(*args)
 
 def gsddmm_hetero(g, op, lhs_len, lhs_target='u', rhs_target='v', *lhs_and_rhs_tuple):
     lhs_tuple, rhs_tuple = lhs_and_rhs_tuple[:lhs_len], lhs_and_rhs_tuple[lhs_len:]
@@ -758,19 +752,30 @@ def gsddmm_hetero(g, op, lhs_len, lhs_target='u', rhs_target='v', *lhs_and_rhs_t
             for i in range(len(rhs_tuple))])
     if op in ['add', 'mul']:
         lhs_and_rhs_tuple = tuple(list(lhs_tuple) + list(rhs_tuple))
-    return GSDDMM_hetero.apply(g, op, lhs_len, lhs_target, rhs_target, *lhs_and_rhs_tuple)
+
+    args = _cast_if_autocast_enabled(g, op, lhs_len, lhs_target, rhs_target, *lhs_and_rhs_tuple)
+    with th.amp.autocast(lhs_and_rhs_tuple[0].device.type, enabled=False):
+        return GSDDMM_hetero.apply(*args)
 
 def edge_softmax(gidx, logits, eids=ALL, norm_by='dst'):
-    return EdgeSoftmax.apply(gidx, logits, eids, norm_by)
+    args = _cast_if_autocast_enabled(gidx, logits, eids, norm_by)
+    with th.amp.autocast(logits.device.type, enabled=False):
+        return EdgeSoftmax.apply(*args)
 
 def edge_softmax_hetero(gidx, eids=ALL, norm_by='dst', *logits):
-    return EdgeSoftmax_hetero.apply(gidx, eids, norm_by, *logits)
+    args = _cast_if_autocast_enabled(gidx, eids, norm_by, *logits)
+    with th.amp.autocast(logits[0].device.type, enabled=False):
+        return EdgeSoftmax_hetero.apply(*args)
 
 def segment_reduce(op, x, offsets):
-    return SegmentReduce.apply(op, x, offsets)
+    args = _cast_if_autocast_enabled(op, x, offsets)
+    with th.amp.autocast(x.device.type, enabled=False):
+        return SegmentReduce.apply(*args)
 
 def scatter_add(x, idx, m):
-    return ScatterAdd.apply(x, idx, m)
+    args = _cast_if_autocast_enabled(x, idx, m)
+    with th.amp.autocast(x.device.type, enabled=False):
+        return ScatterAdd.apply(*args)
 
 def csrmm(gidxA, A_weights, gidxB, B_weights, num_vtypes):
     nrows, ncols, C_indptr, C_indices, C_eids, C_weights = \
@@ -799,7 +804,9 @@ def segment_mm(A, B, seglen_A):
             off += seglen_A[i]
         return th.cat(C)
     else:
-        return SEGMENTMM.apply(A, B, seglen_A)
+        args = _cast_if_autocast_enabled(A, B, seglen_A)
+        with th.amp.autocast('cuda', enabled=False):
+            return SEGMENTMM.apply(*args)
 
 def gather_mm(A, B, idx_A=None, idx_B=None):
     if A.device.type == 'cpu':
@@ -807,4 +814,6 @@ def gather_mm(A, B, idx_A=None, idx_B=None):
         B = B[idx_B] if idx_B is not None else B
         return th.bmm(A.unsqueeze(1), B).squeeze(1)
     else:
-        return GATHERMM.apply(A, B, idx_A, idx_B)
+        args = _cast_if_autocast_enabled(A, B, idx_A, idx_B)
+        with th.amp.autocast('cuda', enabled=False):
+            return GATHERMM.apply(*args)
