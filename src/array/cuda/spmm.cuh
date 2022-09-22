@@ -21,6 +21,24 @@ using namespace cuda;
 
 namespace aten {
 
+/*!
+ * \brief Determine whether cusparse SpMM function is applicable.
+ */
+template <typename DType, typename IdType>
+inline bool cusparse_available(bool more_nnz_than_matrix_size) {
+#if CUDART_VERSION < 11000
+  if (std::is_same<IdType, int>::value &&
+      (std::is_same<DType, float>::value || std::is_same<DType, double>::value))
+    return true;
+  return false;
+#else
+  if (std::is_same<DType, __half>::value || std::is_same<DType, __nv_bfloat16>::value)
+    return false;  // cusparse's SpMM on fp16 is slow, temporally disabled.
+  // If the CSR matrix has more NNZ than matrix size, we should not use cuSPARSE 11.1.
+  return !more_nnz_than_matrix_size;
+#endif
+}
+
 namespace {
 
 /*! \brief Call cuBLAS geam API for transpose operation for float and double. */
@@ -140,6 +158,19 @@ void _Transpose(const DType* in, DType* out,
 template <>
 void _Transpose<half>(const half* in, half* out,
                       int row, int col) {
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
+  int nt = FindNumThreads(row);
+  int nb = col;
+  CUDA_KERNEL_CALL(_TransposeKernel, nb, nt, 0, stream, in, out, col, row);
+}
+
+/*
+ * \brief Tranpose the input matrix for data type half.
+ * \note cuBLAS has no geam API for bf16 data type, fallback to our kernel.
+ */
+template <>
+void _Transpose<__nv_bfloat16>(const __nv_bfloat16* in, __nv_bfloat16* out,
+                               int row, int col) {
   cudaStream_t stream = runtime::getCurrentCUDAStream();
   int nt = FindNumThreads(row);
   int nb = col;

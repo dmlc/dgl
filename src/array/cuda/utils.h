@@ -21,36 +21,6 @@ namespace cuda {
 // The max number of threads per block
 #define CUDA_MAX_NUM_THREADS 256
 
-#ifdef USE_FP16
-#define SWITCH_BITS(bits, DType, ...)                           \
-  do {                                                          \
-    if ((bits) == 16) {                                         \
-      typedef half DType;                                       \
-      { __VA_ARGS__ }                                           \
-    } else if ((bits) == 32) {                                  \
-      typedef float DType;                                      \
-      { __VA_ARGS__ }                                           \
-    } else if ((bits) == 64) {                                  \
-      typedef double DType;                                     \
-      { __VA_ARGS__ }                                           \
-    } else {                                                    \
-      LOG(FATAL) << "Data type not recognized with bits " << bits; \
-    }                                                           \
-  } while (0)
-#else  // USE_FP16
-#define SWITCH_BITS(bits, DType, ...)                           \
-  do {                                                          \
-    if ((bits) == 32) {                                         \
-      typedef float DType;                                      \
-      { __VA_ARGS__ }                                           \
-    } else if ((bits) == 64) {                                  \
-      typedef double DType;                                     \
-      { __VA_ARGS__ }                                           \
-    } else {                                                    \
-      LOG(FATAL) << "Data type not recognized with bits " << bits; \
-    }                                                           \
-  } while (0)
-#endif  // USE_FP16
 
 /*! \brief Calculate the number of threads needed given the dimension length.
  *

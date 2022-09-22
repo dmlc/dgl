@@ -209,108 +209,104 @@ __global__ void GatherMMScatterKernel2(
  * \param a_trans Matrix A to be transposed
  * \param b_trans Matrix B to be transposed
  */
-template <int XPU, typename IdType, int bits>
+template <int XPU, typename IdType, typename DType>
 void SegmentMM(const NDArray A,
                const NDArray B,
                NDArray C,
                const NDArray seglen_A,
                bool a_trans, bool b_trans) {
-    SWITCH_BITS(bits, DType, {
-        auto device = runtime::DeviceAPI::Get(A->ctx);
-        cudaStream_t stream = runtime::getCurrentCUDAStream();
-        const DType *A_data = A.Ptr<DType>();
-        const DType *B_data = B.Ptr<DType>();
-        const IdType* seglen_A_data = seglen_A.Ptr<IdType>();
-        DType *C_data = C.Ptr<DType>();
-        int64_t A_offset = 0, B_offset = 0, C_offset = 0;
-        int64_t m, n, k;
-        int64_t num_rel = seglen_A.NumElements();
-        DType alpha = 1., beta = 0.;
+    auto device = runtime::DeviceAPI::Get(A->ctx);
+    cudaStream_t stream = runtime::getCurrentCUDAStream();
+    const DType *A_data = A.Ptr<DType>();
+    const DType *B_data = B.Ptr<DType>();
+    const IdType* seglen_A_data = seglen_A.Ptr<IdType>();
+    DType *C_data = C.Ptr<DType>();
+    int64_t A_offset = 0, B_offset = 0, C_offset = 0;
+    int64_t m, n, k;
+    int64_t num_rel = seglen_A.NumElements();
+    DType alpha = 1., beta = 0.;
 
-        auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
-        if (!thr_entry->cublas_handle)
-            CUBLAS_CALL(cublasCreate(&(thr_entry->cublas_handle)));
-        CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle, stream));
+    auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+    if (!thr_entry->cublas_handle)
+        CUBLAS_CALL(cublasCreate(&(thr_entry->cublas_handle)));
+    CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle, stream));
 
-        IdType m_offset = 0;
-        for (IdType etype = 0; etype < num_rel; ++etype) {
-            m = seglen_A_data[etype];  // rows of A
-            CHECK_LE(m_offset + m, A->shape[0]) << "Segment index out of bound of A->shape[0].";
-            n = B->shape[2];  // cols of B
-            k = B->shape[1];  // cols of A == rows of B
-            int ldb = n, lda = k, ldc = n;
-            cublasOperation_t transB = CUBLAS_OP_N;
-            cublasOperation_t transA = CUBLAS_OP_N;
-            if (b_trans) {
-                transB = CUBLAS_OP_T;
-                ldb = n, lda = n, ldc = k;
-                std::swap(n, k);
-            }
-            CUBLAS_CALL(cublasGemm<DType>(
-                thr_entry->cublas_handle,
-                transB,
-                transA,
-                n, m, k,
-                &alpha,
-                B_data + B_offset, ldb,
-                A_data + A_offset, lda,
-                &beta,
-                C_data + C_offset, ldc));
-            A_offset += m * k;
-            B_offset += k * n;
-            C_offset += m * n;
-            m_offset += m;
+    IdType m_offset = 0;
+    for (IdType etype = 0; etype < num_rel; ++etype) {
+        m = seglen_A_data[etype];  // rows of A
+        CHECK_LE(m_offset + m, A->shape[0]) << "Segment index out of bound of A->shape[0].";
+        n = B->shape[2];  // cols of B
+        k = B->shape[1];  // cols of A == rows of B
+        int ldb = n, lda = k, ldc = n;
+        cublasOperation_t transB = CUBLAS_OP_N;
+        cublasOperation_t transA = CUBLAS_OP_N;
+        if (b_trans) {
+            transB = CUBLAS_OP_T;
+            ldb = n, lda = n, ldc = k;
+            std::swap(n, k);
         }
-    });
+        CUBLAS_CALL(cublasGemm<DType>(
+            thr_entry->cublas_handle,
+            transB,
+            transA,
+            n, m, k,
+            &alpha,
+            B_data + B_offset, ldb,
+            A_data + A_offset, lda,
+            &beta,
+            C_data + C_offset, ldc));
+        A_offset += m * k;
+        B_offset += k * n;
+        C_offset += m * n;
+        m_offset += m;
+    }
 }
 
-template <int XPU, typename IdType, int bits>
+template <int XPU, typename IdType, typename DType>
 void SegmentMMBackwardB(const NDArray A,
                         const NDArray dC,
                         NDArray dB,
                         const NDArray seglen) {
-    SWITCH_BITS(bits, DType, {
-        auto device = runtime::DeviceAPI::Get(A->ctx);
-        cudaStream_t stream = runtime::getCurrentCUDAStream();
-        const DType *A_data = A.Ptr<DType>();
-        const DType *dC_data = dC.Ptr<DType>();
-        const IdType* seglen_data = seglen.Ptr<IdType>();
-        DType *dB_data = dB.Ptr<DType>();
-        int64_t A_offset = 0, dC_offset = 0, dB_offset = 0;
-        int64_t m, n, k;
-        int64_t num_rel = seglen.NumElements();
-        DType alpha = 1., beta = 1.;
+    auto device = runtime::DeviceAPI::Get(A->ctx);
+    cudaStream_t stream = runtime::getCurrentCUDAStream();
+    const DType *A_data = A.Ptr<DType>();
+    const DType *dC_data = dC.Ptr<DType>();
+    const IdType* seglen_data = seglen.Ptr<IdType>();
+    DType *dB_data = dB.Ptr<DType>();
+    int64_t A_offset = 0, dC_offset = 0, dB_offset = 0;
+    int64_t m, n, k;
+    int64_t num_rel = seglen.NumElements();
+    DType alpha = 1., beta = 1.;
 
-        auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
-        if (!thr_entry->cublas_handle)
-            CUBLAS_CALL(cublasCreate(&(thr_entry->cublas_handle)));
-        CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle, stream));
+    auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+    if (!thr_entry->cublas_handle)
+        CUBLAS_CALL(cublasCreate(&(thr_entry->cublas_handle)));
+    CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle, stream));
 
-        IdType k_offset = 0;
-        for (IdType etype = 0; etype < num_rel; ++etype) {
-            m = dC->shape[1];
-            n = A->shape[1];
-            k = seglen_data[etype];
-            CHECK_LE(k_offset + k, A->shape[0]) << "Segement index out of bound of A->shape[0].";
-            int lddC = m, ldA = n, lddB = m;
-            cublasOperation_t trans_dC = CUBLAS_OP_N;
-            cublasOperation_t trans_A = CUBLAS_OP_T;
-            CUBLAS_CALL(cublasGemm<DType>(
-                thr_entry->cublas_handle,
-                trans_dC,
-                trans_A,
-                m, n, k,
-                &alpha,
-                dC_data + dC_offset, lddC,
-                A_data + A_offset, ldA,
-                &beta,
-                dB_data + dB_offset, lddB));
-            dC_offset += m * k;
-            A_offset += n * k;
-            dB_offset += m * n;
-            k_offset += k;
-        }
-    });
+    IdType k_offset = 0;
+    for (IdType etype = 0; etype < num_rel; ++etype) {
+        m = dC->shape[1];
+        n = A->shape[1];
+        k = seglen_data[etype];
+        CHECK_LE(k_offset + k, A->shape[0]) << "Segement index out of bound of A->shape[0].";
+        int lddC = m, ldA = n, lddB = m;
+        cublasOperation_t trans_dC = CUBLAS_OP_N;
+        cublasOperation_t trans_A = CUBLAS_OP_T;
+        CUBLAS_CALL(cublasGemm<DType>(
+            thr_entry->cublas_handle,
+            trans_dC,
+            trans_A,
+            m, n, k,
+            &alpha,
+            dC_data + dC_offset, lddC,
+            A_data + A_offset, ldA,
+            &beta,
+            dB_data + dB_offset, lddB));
+        dC_offset += m * k;
+        A_offset += n * k;
+        dB_offset += m * n;
+        k_offset += k;
+    }
 }
 
 /*!
@@ -323,33 +319,31 @@ void SegmentMMBackwardB(const NDArray A,
  * \param idx_b The input vector to gather right hand operand on
  */
 
-template <int XPU, typename IdType, int bits>
+template <int XPU, typename IdType, typename DType>
 void GatherMM(const NDArray A,
               const NDArray B,
               NDArray C,
               const NDArray idx_a,
               const NDArray idx_b) {
-  SWITCH_BITS(bits, DType, {
-        auto device = runtime::DeviceAPI::Get(A->ctx);
-        cudaStream_t stream = runtime::getCurrentCUDAStream();
-        int64_t out_len = B->shape[2];  // cols of B
-        int64_t in_len = A->shape[1];  // cols of A
-        const int64_t tot_num_rows = A->shape[0];
-        const int ntx = 128;
-        const int warp_size = 32;
-        const int nbx = ((tot_num_rows * warp_size + ntx - 1) / ntx);
-        const dim3 nblks(nbx);
-        const dim3 nthrs(ntx);
-        CUDA_KERNEL_CALL((cuda::GatherMMScatterKernel<IdType, DType>),
-            nblks, nthrs, 0, stream,
-            A.Ptr<DType>(),
-            B.Ptr<DType>(),
-            C.Ptr<DType>(),
-            idx_a.Ptr<IdType>(),
-            idx_b.Ptr<IdType>(),
-            nullptr,
-            tot_num_rows, in_len, out_len);
-    });
+    auto device = runtime::DeviceAPI::Get(A->ctx);
+    cudaStream_t stream = runtime::getCurrentCUDAStream();
+    int64_t out_len = B->shape[2];  // cols of B
+    int64_t in_len = A->shape[1];  // cols of A
+    const int64_t tot_num_rows = A->shape[0];
+    const int ntx = 128;
+    const int warp_size = 32;
+    const int nbx = ((tot_num_rows * warp_size + ntx - 1) / ntx);
+    const dim3 nblks(nbx);
+    const dim3 nthrs(ntx);
+    CUDA_KERNEL_CALL((cuda::GatherMMScatterKernel<IdType, DType>),
+        nblks, nthrs, 0, stream,
+        A.Ptr<DType>(),
+        B.Ptr<DType>(),
+        C.Ptr<DType>(),
+        idx_a.Ptr<IdType>(),
+        idx_b.Ptr<IdType>(),
+        nullptr,
+        tot_num_rows, in_len, out_len);
 }
 
 /*!
@@ -365,120 +359,155 @@ void GatherMM(const NDArray A,
  * \param a_trans Matrix A to be transposed
  * \param b_trans Matrix B to be transposed
  */
-template <int XPU, typename IdType, int bits>
+template <int XPU, typename IdType, typename DType>
 void GatherMMScatter(const NDArray A,
                      const NDArray B,
                      NDArray C,
                      const NDArray idx_a,
                      const NDArray idx_b,
                      const NDArray idx_c) {
-    SWITCH_BITS(bits, DType, {
-        auto device = runtime::DeviceAPI::Get(A->ctx);
-        cudaStream_t stream = runtime::getCurrentCUDAStream();
-        const IdType *idx_c_data = idx_c.Ptr<IdType>();
-        int64_t out_len = (B->ndim == 2)? B->shape[1] : B->shape[2];  // cols of B
-        int64_t in_len = A->shape[1];  // cols of A
-        int64_t tot_num_rows = A->shape[0];
-        const int ntx = 128;
-        const int warp_size = 32;
-        const int nbx = ((tot_num_rows * warp_size + ntx - 1) / ntx);
-        const dim3 nblks(nbx);
-        const dim3 nthrs(ntx);
-        if (B->ndim == 3) {
-          CUDA_KERNEL_CALL((cuda::GatherMMScatterKernel<IdType, DType>),
-              nblks, nthrs, 0, stream,
-              A.Ptr<DType>(),
-              B.Ptr<DType>(),
-              C.Ptr<DType>(),
-              idx_a.Ptr<IdType>(),
-              idx_b.Ptr<IdType>(),
-              idx_c.Ptr<IdType>(),
-              tot_num_rows, in_len, out_len);
-        } else {
-          // Custom kernel for W_grad[idx_c[i]] = H^T[i] * C.grad[i]
-          // This kernel accesses rows of A in a transposed way w/o explicitly converting A
-          CUDA_KERNEL_CALL((cuda::GatherMMScatterKernel2<IdType, DType>),
-              nblks, nthrs, 0, stream,
-              A.Ptr<DType>(),
-              B.Ptr<DType>(),
-              C.Ptr<DType>(),
-              idx_a.Ptr<IdType>(),
-              idx_b.Ptr<IdType>(),
-              idx_c.Ptr<IdType>(),
-              tot_num_rows, in_len, out_len);
-        }
-    });
+    auto device = runtime::DeviceAPI::Get(A->ctx);
+    cudaStream_t stream = runtime::getCurrentCUDAStream();
+    const IdType *idx_c_data = idx_c.Ptr<IdType>();
+    int64_t out_len = (B->ndim == 2)? B->shape[1] : B->shape[2];  // cols of B
+    int64_t in_len = A->shape[1];  // cols of A
+    int64_t tot_num_rows = A->shape[0];
+    const int ntx = 128;
+    const int warp_size = 32;
+    const int nbx = ((tot_num_rows * warp_size + ntx - 1) / ntx);
+    const dim3 nblks(nbx);
+    const dim3 nthrs(ntx);
+    if (B->ndim == 3) {
+        CUDA_KERNEL_CALL((cuda::GatherMMScatterKernel<IdType, DType>),
+            nblks, nthrs, 0, stream,
+            A.Ptr<DType>(),
+            B.Ptr<DType>(),
+            C.Ptr<DType>(),
+            idx_a.Ptr<IdType>(),
+            idx_b.Ptr<IdType>(),
+            idx_c.Ptr<IdType>(),
+            tot_num_rows, in_len, out_len);
+    } else {
+        // Custom kernel for W_grad[idx_c[i]] = H^T[i] * C.grad[i]
+        // This kernel accesses rows of A in a transposed way w/o explicitly converting A
+        CUDA_KERNEL_CALL((cuda::GatherMMScatterKernel2<IdType, DType>),
+            nblks, nthrs, 0, stream,
+            A.Ptr<DType>(),
+            B.Ptr<DType>(),
+            C.Ptr<DType>(),
+            idx_a.Ptr<IdType>(),
+            idx_b.Ptr<IdType>(),
+            idx_c.Ptr<IdType>(),
+            tot_num_rows, in_len, out_len);
+    }
 }
 
+#ifdef USE_FP16
+template void GatherMM<kDGLCUDA, int32_t, __half>(
+    const NDArray A, const NDArray B, NDArray C,
+    const NDArray idx_a, const NDArray idx_b);
+template void GatherMM<kDGLCUDA, int64_t, __half>(
+    const NDArray A, const NDArray B, NDArray C,
+    const NDArray idx_a, const NDArray idx_b);
+#endif  // USE_FP16
+#ifdef USE_BF16
+template void GatherMM<kDGLCUDA, int32_t, __nv_bfloat16>(
+    const NDArray A, const NDArray B, NDArray C,
+    const NDArray idx_a, const NDArray idx_b);
+template void GatherMM<kDGLCUDA, int64_t, __nv_bfloat16>(
+    const NDArray A, const NDArray B, NDArray C,
+    const NDArray idx_a, const NDArray idx_b);
+#endif  // USE_BF16
+template void GatherMM<kDGLCUDA, int32_t, float>(
+    const NDArray A, const NDArray B, NDArray C,
+    const NDArray idx_a, const NDArray idx_b);
+template void GatherMM<kDGLCUDA, int64_t, float>(
+    const NDArray A, const NDArray B, NDArray C,
+    const NDArray idx_a, const NDArray idx_b);
+template void GatherMM<kDGLCUDA, int32_t, double>(
+    const NDArray A, const NDArray B, NDArray C,
+    const NDArray idx_a, const NDArray idx_b);
+template void GatherMM<kDGLCUDA, int64_t, double>(
+    const NDArray A, const NDArray B, NDArray C,
+    const NDArray idx_a, const NDArray idx_b);
 
-template void GatherMM<kDGLCUDA, int32_t, 16>(
-    const NDArray A, const NDArray B, NDArray C,
-    const NDArray idx_a, const NDArray idx_b);
-template void GatherMM<kDGLCUDA, int64_t, 16>(
-    const NDArray A, const NDArray B, NDArray C,
-    const NDArray idx_a, const NDArray idx_b);
-template void GatherMM<kDGLCUDA, int32_t, 32>(
-    const NDArray A, const NDArray B, NDArray C,
-    const NDArray idx_a, const NDArray idx_b);
-template void GatherMM<kDGLCUDA, int64_t, 32>(
-    const NDArray A, const NDArray B, NDArray C,
-    const NDArray idx_a, const NDArray idx_b);
-template void GatherMM<kDGLCUDA, int32_t, 64>(
-    const NDArray A, const NDArray B, NDArray C,
-    const NDArray idx_a, const NDArray idx_b);
-template void GatherMM<kDGLCUDA, int64_t, 64>(
-    const NDArray A, const NDArray B, NDArray C,
-    const NDArray idx_a, const NDArray idx_b);
-
-template void GatherMMScatter<kDGLCUDA, int32_t, 16>(
+#ifdef USE_FP16
+template void GatherMMScatter<kDGLCUDA, int32_t, __half>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray idx_a, const NDArray idx_b, const NDArray idx_c);
-template void GatherMMScatter<kDGLCUDA, int64_t, 16>(
+template void GatherMMScatter<kDGLCUDA, int64_t, __half>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray idx_a, const NDArray idx_b, const NDArray idx_c);
-template void GatherMMScatter<kDGLCUDA, int32_t, 32>(
+#endif  // USE_FP16
+#ifdef USE_BF16
+template void GatherMMScatter<kDGLCUDA, int32_t, __nv_bfloat16>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray idx_a, const NDArray idx_b, const NDArray idx_c);
-template void GatherMMScatter<kDGLCUDA, int64_t, 32>(
+template void GatherMMScatter<kDGLCUDA, int64_t, __nv_bfloat16>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray idx_a, const NDArray idx_b, const NDArray idx_c);
-template void GatherMMScatter<kDGLCUDA, int32_t, 64>(
+#endif  // USE_BF16
+template void GatherMMScatter<kDGLCUDA, int32_t, float>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray idx_a, const NDArray idx_b, const NDArray idx_c);
-template void GatherMMScatter<kDGLCUDA, int64_t, 64>(
+template void GatherMMScatter<kDGLCUDA, int64_t, float>(
+    const NDArray A, const NDArray B, NDArray C,
+    const NDArray idx_a, const NDArray idx_b, const NDArray idx_c);
+template void GatherMMScatter<kDGLCUDA, int32_t, double>(
+    const NDArray A, const NDArray B, NDArray C,
+    const NDArray idx_a, const NDArray idx_b, const NDArray idx_c);
+template void GatherMMScatter<kDGLCUDA, int64_t, double>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray idx_a, const NDArray idx_b, const NDArray idx_c);
 
-template void SegmentMM<kDGLCUDA, int32_t, 16>(
+#ifdef USE_FP16
+template void SegmentMM<kDGLCUDA, int32_t, __half>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray seglen_A, bool a_trans, bool b_trans);
-template void SegmentMM<kDGLCUDA, int64_t, 16>(
+template void SegmentMM<kDGLCUDA, int64_t, __half>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray seglen_A, bool a_trans, bool b_trans);
-template void SegmentMM<kDGLCUDA, int32_t, 32>(
+#endif  // USE_FP16
+#ifdef USE_BF16
+template void SegmentMM<kDGLCUDA, int32_t, __nv_bfloat16>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray seglen_A, bool a_trans, bool b_trans);
-template void SegmentMM<kDGLCUDA, int64_t, 32>(
+template void SegmentMM<kDGLCUDA, int64_t, __nv_bfloat16>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray seglen_A, bool a_trans, bool b_trans);
-template void SegmentMM<kDGLCUDA, int32_t, 64>(
+#endif  // USE_BF16
+template void SegmentMM<kDGLCUDA, int32_t, float>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray seglen_A, bool a_trans, bool b_trans);
-template void SegmentMM<kDGLCUDA, int64_t, 64>(
+template void SegmentMM<kDGLCUDA, int64_t, float>(
+    const NDArray A, const NDArray B, NDArray C,
+    const NDArray seglen_A, bool a_trans, bool b_trans);
+template void SegmentMM<kDGLCUDA, int32_t, double>(
+    const NDArray A, const NDArray B, NDArray C,
+    const NDArray seglen_A, bool a_trans, bool b_trans);
+template void SegmentMM<kDGLCUDA, int64_t, double>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray seglen_A, bool a_trans, bool b_trans);
 
-template void SegmentMMBackwardB<kDGLCUDA, int32_t, 16>(
+#ifdef USE_FP16
+template void SegmentMMBackwardB<kDGLCUDA, int32_t, __half>(
     const NDArray A, const NDArray dC, NDArray dB, const NDArray seglen);
-template void SegmentMMBackwardB<kDGLCUDA, int64_t, 16>(
+template void SegmentMMBackwardB<kDGLCUDA, int64_t, __half>(
     const NDArray A, const NDArray dC, NDArray dB, const NDArray seglen);
-template void SegmentMMBackwardB<kDGLCUDA, int32_t, 32>(
+#endif  // USE_FP16
+#ifdef USE_BF16
+template void SegmentMMBackwardB<kDGLCUDA, int32_t, __nv_bfloat16>(
     const NDArray A, const NDArray dC, NDArray dB, const NDArray seglen);
-template void SegmentMMBackwardB<kDGLCUDA, int64_t, 32>(
+template void SegmentMMBackwardB<kDGLCUDA, int64_t, __nv_bfloat16>(
     const NDArray A, const NDArray dC, NDArray dB, const NDArray seglen);
-template void SegmentMMBackwardB<kDGLCUDA, int32_t, 64>(
+#endif  // USE_BF16
+template void SegmentMMBackwardB<kDGLCUDA, int32_t, float>(
     const NDArray A, const NDArray dC, NDArray dB, const NDArray seglen);
-template void SegmentMMBackwardB<kDGLCUDA, int64_t, 64>(
+template void SegmentMMBackwardB<kDGLCUDA, int64_t, float>(
+    const NDArray A, const NDArray dC, NDArray dB, const NDArray seglen);
+template void SegmentMMBackwardB<kDGLCUDA, int32_t, double>(
+    const NDArray A, const NDArray dC, NDArray dB, const NDArray seglen);
+template void SegmentMMBackwardB<kDGLCUDA, int64_t, double>(
     const NDArray A, const NDArray dC, NDArray dB, const NDArray seglen);
 
 }  // namespace aten
