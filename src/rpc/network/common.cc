@@ -68,7 +68,7 @@ static void StringAppendV(string* dst, const char* format, va_list ap) {
   int result = vsnprintf(space, sizeof(space), format, backup_ap);
   va_end(backup_ap);
 
-  if ((result >= 0) && (result < sizeof(space))) {
+  if ((result >= 0) && (result < static_cast<int>(sizeof(space)))) {
     // It fit
     dst->append(space, result);
     return;

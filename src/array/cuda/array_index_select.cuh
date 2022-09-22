@@ -93,4 +93,4 @@ __global__ void IndexScatterMultiKernel(
 }  // namespace aten
 }  // namespace dgl
 
-#endif
+#endif  // DGL_ARRAY_CUDA_ARRAY_INDEX_SELECT_CUH_
