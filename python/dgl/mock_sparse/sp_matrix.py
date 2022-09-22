@@ -241,7 +241,7 @@ class SparseMatrix:
         return self.transpose()
 
     @property
-    def T(self):
+    def T(self): # pylint: disable=C0103
         """Alias of :meth:`transpose()`"""
         return self.transpose()
 

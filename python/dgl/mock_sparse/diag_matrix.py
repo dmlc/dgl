@@ -147,7 +147,7 @@ class DiagMatrix:
         >>> mat = diag(val, shape=(4, 5))
         >>> mat = mat.transpose()
         >>> print(mat)
-        DiagMatrix(val=tensor([1., 2., 3., 4.]), 
+        DiagMatrix(val=tensor([1., 2., 3., 4.]),
         shape=(5, 4))
         """
         return DiagMatrix(self.val, self.shape[::-1])
