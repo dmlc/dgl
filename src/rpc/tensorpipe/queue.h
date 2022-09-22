@@ -13,6 +13,7 @@
 #include <deque>
 #include <mutex>
 #include <chrono>
+#include <utility>
 
 namespace dgl {
 namespace rpc {

@@ -14,4 +14,4 @@ static_assert(false, "THRUST_CUB_WRAPPED_NAMESPACE must be defined for DGL.");
 
 #include "cub/cub.cuh"
 
-#endif
+#endif  // DGL_ARRAY_CUDA_DGL_CUB_CUH_

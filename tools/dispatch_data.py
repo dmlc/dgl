@@ -20,9 +20,11 @@ UDF_OUT_DIR = "output"
 LARG_PROCS_MACHINE = "num_proc_per_machine"
 LARG_IPCONF = "ip_config"
 LARG_MASTER_PORT = "master_port"
+LARG_SSH_PORT = "ssh_port"
 
 def get_launch_cmd(args) -> str:
     cmd = sys.executable + " " + os.path.join(INSTALL_DIR, LAUNCH_SCRIPT)
+    cmd = f"{cmd} --{LARG_SSH_PORT} {args.ssh_port} "
     cmd = f"{cmd} --{LARG_PROCS_MACHINE} 1 "
     cmd = f"{cmd} --{LARG_IPCONF} {args.ip_config} "
     cmd = f"{cmd} --{LARG_MASTER_PORT} {args.master_port} "
@@ -72,6 +74,7 @@ def main():
     parser.add_argument('--master-port', type=int, default=12345, help='port used by gloo group to create randezvous point')
     parser.add_argument('--log-level', type=str, default="info", help='To enable log level for debugging purposes. Available options: (Critical, Error, Warning, Info, Debug, Notset)')
     parser.add_argument('--python-path', type=str, default=sys.executable, help='Path to the Python executable on all workers')
+    parser.add_argument('--ssh-port', type=int, default=22, help='SSH Port.') 
     parser.add_argument('--process-group-timeout', type=int, default=1800,
                         help='timeout[seconds] for operations executed against the process group')
 
