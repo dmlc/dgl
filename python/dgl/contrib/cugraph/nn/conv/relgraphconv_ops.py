@@ -8,12 +8,12 @@ from pylibcugraphops.aggregators.node_level import (agg_hg_basis_post_fwd_int32,
 from pylibcugraphops.structure.graph_types import (message_flow_graph_hg_csr_int32,
     message_flow_graph_hg_csr_int64)
 
-class RelGraphConvFunc(th.autograd.Function):
+class RelGraphConvAgg(th.autograd.Function):
     @staticmethod
     def forward(ctx, g, fanout, num_rels, out_node_types, in_node_types, edge_types,
-                feat, W, coeff):
+                feat, coeff):
         """
-        Compute the forward pass of R-GCN.
+        Compute the forward pass of R-GCN aggregation layer.
 
         Parameters
         ----------
@@ -42,19 +42,11 @@ class RelGraphConvFunc(th.autograd.Function):
         feat : torch.Tensor, dtype=torch.float32, requires_grad=True
             Input feature, shape: (num_src_nodes, in_feat).
 
-        W : torch.Tensor, dtype=torch.float32, requires_grad=True
-            Weights tensor, shape: (num_bases, in_feat, out_feat) when ``regularizer='basis'``, or
-            (num_rels, in_feat, out_feat) when ``regularizer=None``.
-
-        Cached
-        ------
-        agg_out : torch.Tensor, dtype=torch.float32
-            Aggregation output, shape: (num_dst_nodes, W.shape[0]*W.shape[1])
-
         Returns
         -------
-        output : torch.Tensor, dtype=torch.float32
-            Output feature, shape: (num_dst_nodes, out_feat)
+        agg_output : torch.Tensor, dtype=torch.float32
+            Aggregation output, shape: (num_dst_nodes, num_rels * in_feat) when ``regularizer=None``,
+            and (num_dst_nodes, num_bases * in_feat) when ``regularizer='basis'``.
 
         """
         if g.idtype == th.int32:
@@ -69,15 +61,13 @@ class RelGraphConvFunc(th.autograd.Function):
         ctx.graph_idtype = g.idtype
 
         _in_feat = feat.shape[-1]
-        _out_feat = W.shape[-1]
         indptr, indices, _ = g.adj_sparse('csc')  # edge_ids not needed here
-
-        # needed for creating MFG but not actually used in cugraph-ops aggregators
-        # can be passed through graph class members if necessary in the future
-        _n_node_types = 0
+        # num_node_types is required for creating MFG
+        # but not actually used in cugraph-ops' aggregators
+        _num_node_types = 0
 
         mfg = mfg_csr_func(fanout, g.dstnodes(), g.srcnodes(), indptr, indices,
-            _n_node_types, num_rels, out_node_types, in_node_types, edge_types)
+            _num_node_types, num_rels, out_node_types, in_node_types, edge_types)
 
         if coeff is None:
             leading_dimension = num_rels * _in_feat
@@ -85,24 +75,20 @@ class RelGraphConvFunc(th.autograd.Function):
             _num_bases = coeff.shape[-1]
             leading_dimension = _num_bases * _in_feat
 
-        agg_out = th.empty(g.num_dst_nodes(), leading_dimension, dtype=th.float32, device='cuda')
-
+        agg_output = th.empty(g.num_dst_nodes(), leading_dimension, dtype=th.float32, device='cuda')
         if coeff is None:
-            agg_fwd_func(agg_out, feat.detach(), mfg)
+            agg_fwd_func(agg_output, feat.detach(), mfg)
         else:
-            agg_fwd_func(agg_out, feat.detach(), mfg, weights_combination=coeff.detach())
-
-        output = th.as_tensor(agg_out, device='cuda') @ W.view(leading_dimension, _out_feat)
+            agg_fwd_func(agg_output, feat.detach(), mfg, weights_combination=coeff.detach())
 
         ctx.backward_cache = mfg
-        ctx.save_for_backward(coeff, feat, W, output, agg_out)
-
-        return output
+        ctx.save_for_backward(feat, coeff)
+        return agg_output
 
     @staticmethod
     def backward(ctx, grad_output):
         """
-        Compute the backward pass of R-GCN.
+        Compute the backward pass of R-GCN aggregation layer.
 
         Parameters
         ----------
@@ -111,7 +97,7 @@ class RelGraphConvFunc(th.autograd.Function):
 
         """
         mfg = ctx.backward_cache
-        coeff, feat, W, output, agg_out = ctx.saved_tensors
+        feat, coeff = ctx.saved_tensors
 
         if ctx.graph_idtype == th.int32:
             agg_bwd_func = agg_hg_basis_post_bwd_int32
@@ -121,23 +107,16 @@ class RelGraphConvFunc(th.autograd.Function):
             raise TypeError(
                 f'Supported ID type: torch.int32 or torch.int64, but got {ctx.graph_idtype}')
 
-        # dense backward
-        _out_feat = W.shape[-1]
-        g_W = agg_out.t() @ grad_output
-        agg_out = grad_output @ W.view(-1, _out_feat).t()   # gradient w.r.t input, reuse buffer
-
-        # backward aggregation
-        g_in = th.empty_like(feat, dtype=th.float32, device='cuda')
-
+        grad_feat = th.empty_like(feat, dtype=th.float32, device='cuda')
         if coeff is None:
-            g_coeff = None
-            agg_bwd_func(g_in, agg_out, feat.detach(), mfg)
+            grad_coeff = None
+            agg_bwd_func(grad_feat, grad_output, feat.detach(), mfg)
         else:
-            g_coeff = th.empty_like(coeff, dtype=th.float32, device='cuda')
-            agg_bwd_func(g_in, agg_out, feat.detach(), mfg,
-                output_weight_gradient=g_coeff, weights_combination=coeff.detach())
+            grad_coeff = th.empty_like(coeff, dtype=th.float32, device='cuda')
+            agg_bwd_func(grad_feat, grad_output, feat.detach(), mfg,
+                output_weight_gradient=grad_coeff, weights_combination=coeff.detach())
 
-        return None, None, None, None, None, None, g_in, g_W.view_as(W), g_coeff
+        return None, None, None, None, None, None, grad_feat, grad_coeff
 
 class RelGraphConvOps(nn.Module):
     """ Relational graph convolution layer. """
@@ -215,9 +194,10 @@ class RelGraphConvOps(nn.Module):
             if norm is not None:
                 g.edata['norm'] = norm
             # message passing
-            h = RelGraphConvFunc.apply(g, self.fanout, self.num_rels,
-                                       g.dstdata['ntype'], g.srcdata['ntype'], etypes,
-                                       feat, self.W, self.coeff)
+            h = RelGraphConvAgg.apply(g, self.fanout, self.num_rels,
+                                      g.dstdata['ntype'], g.srcdata['ntype'], etypes,
+                                      feat, self.coeff)
+            h = h @ self.W.view(-1, self.out_feat)
             # apply bias and activation
             if self.layer_norm:
                 h = self.layer_norm_weight(h)
