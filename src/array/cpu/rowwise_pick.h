@@ -91,25 +91,17 @@ CSRMatrix CSRRowWisePickPartial(
   IdArray picked_row_indptr = NDArray::Empty({num_rows + 1},
                                               DGLDataTypeTraits<IdxType>::dtype,
                                               ctx);
-  IdArray picked_col = NDArray::Empty({num_rows * max_num_picks},
-                                      DGLDataTypeTraits<IdxType>::dtype,
-                                      ctx);
-  IdArray picked_idx = NDArray::Empty({num_rows * max_num_picks},
-                                      DGLDataTypeTraits<IdxType>::dtype,
-                                      ctx);
   IdxType* picked_row_indptr_data = static_cast<IdxType*>(picked_row_indptr->data);
   picked_row_indptr_data[0] = 0;
-  IdxType* picked_cdata = static_cast<IdxType*>(picked_col->data);
-  IdxType* picked_idata = static_cast<IdxType*>(picked_idx->data);
-
   // (BarclayII) previously this uses omp_get_max_threads(), but it still returns the number of
   // CPUs even if I disable OpenMP during compilation.  Needs further investigation on why this
   // is happening.
   const int num_threads = runtime::compute_num_threads(0, num_rows, 1);
   std::vector<int64_t> global_prefix(num_threads+1, 0);
 
-  // (BarclayII) use runtime::parallel_for as it gracefully handles exceptions and
-  // enables GDB to capture the variables.
+  // (BarclayII) use runtime::parallel_for as it gracefully handles CHECKs and
+  // enables GDB to capture the variables.  It incurs a 30% slow down comparing to using a single
+  // parallel block on ogbn-products (using all nodes as seed nodes and a fanout of 5).
   runtime::parallel_for(0, num_rows, [=, &global_prefix] (size_t start_i, size_t end_i) {
     int thread_id = omp_get_thread_num();
 
@@ -128,6 +120,16 @@ CSRMatrix CSRRowWisePickPartial(
 
   for (int t = 0; t < num_threads; ++t)
     global_prefix[t+1] += global_prefix[t];
+  // global_prefix.back() contain the total number of elements to be picked.
+  const int64_t new_len = global_prefix.back();
+  IdArray picked_col = NDArray::Empty({new_len},
+                                      DGLDataTypeTraits<IdxType>::dtype,
+                                      ctx);
+  IdArray picked_idx = NDArray::Empty({new_len},
+                                      DGLDataTypeTraits<IdxType>::dtype,
+                                      ctx);
+  IdxType* picked_cdata = picked_col.Ptr<IdxType>();
+  IdxType* picked_idata = picked_idx.Ptr<IdxType>();
 
   runtime::parallel_for(0, num_rows, [=, &global_prefix] (size_t start_i, size_t end_i) {
     int thread_id = omp_get_thread_num();
@@ -161,10 +163,6 @@ CSRMatrix CSRRowWisePickPartial(
       }
     }
   });
-
-  const int64_t new_len = global_prefix.back();
-  picked_col = picked_col.CreateView({new_len}, picked_col->dtype);
-  picked_idx = picked_idx.CreateView({new_len}, picked_idx->dtype);
 
   return CSRMatrix(num_rows, mat.num_cols,
                    picked_row_indptr, picked_col, picked_idx);

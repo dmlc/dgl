@@ -94,16 +94,10 @@ CSRMatrix CSRRowWisePerEtypePickPartial(
   const int64_t num_rows = rows->shape[0];
   const auto& ctx = mat.indptr->ctx;
   const int64_t num_etypes = max_num_picks.size();
-  const int64_t total_max_num_picks = std::accumulate(
-      max_num_picks.begin(), max_num_picks.end(), 0L);
 
   // preallocate the results
   IdArray picked_row_indptr = NDArray::Empty({num_rows + 1}, idtype, ctx);
-  IdArray picked_col = NDArray::Empty({num_rows * total_max_num_picks}, idtype, ctx);
-  IdArray picked_idx = NDArray::Empty({num_rows * total_max_num_picks}, idtype, ctx);
   IdxType* picked_row_indptr_data = picked_row_indptr.Ptr<IdxType>();
-  IdxType* picked_cdata = picked_col.Ptr<IdxType>();
-  IdxType* picked_idata = picked_idx.Ptr<IdxType>();
 
   // the offset of incident edges with a given type at each row
   IdArray off_etypes_per_row = Full(0, num_rows * num_etypes + 1, idtype.bits, ctx);
@@ -133,7 +127,7 @@ CSRMatrix CSRRowWisePerEtypePickPartial(
     et_idx_data = et_idx.Ptr<IdxType>();
   }
 
-  // (BarclayII) use runtime::parallel_for as it gracefully handles exceptions and
+  // (BarclayII) use runtime::parallel_for as it gracefully handles CHECKs and
   // enables GDB to capture the variables.
   runtime::parallel_for(0, num_rows, [=] (size_t start_i, size_t end_i) {
     // Step 1: sort edge type IDs per node if necessary
@@ -199,7 +193,13 @@ CSRMatrix CSRRowWisePerEtypePickPartial(
   off_picked_per_row_data[0] = 0;
   for (int64_t i = 0; i < num_rows * num_etypes; ++i)
     off_picked_per_row_data[i + 1] += off_picked_per_row_data[i];
+  // This is the total number of elements to be picked.
   picked_row_indptr_data[num_rows] = off_picked_per_row_data[num_rows * num_etypes];
+  const int64_t new_len = picked_row_indptr_data[num_rows];
+  IdArray picked_col = NDArray::Empty({new_len}, idtype, ctx);
+  IdArray picked_idx = NDArray::Empty({new_len}, idtype, ctx);
+  IdxType* picked_cdata = picked_col.Ptr<IdxType>();
+  IdxType* picked_idata = picked_idx.Ptr<IdxType>();
 
   runtime::parallel_for(0, num_rows, [=] (size_t start_i, size_t end_i) {
     for (size_t i = start_i; i < end_i; ++i)
@@ -229,10 +229,6 @@ CSRMatrix CSRRowWisePerEtypePickPartial(
       }
     }
   });
-
-  const int64_t new_len = off_picked_per_row_data[num_rows * num_etypes];
-  picked_col = picked_col.CreateView({new_len}, picked_col->dtype);
-  picked_idx = picked_idx.CreateView({new_len}, picked_idx->dtype);
 
   return CSRMatrix(num_rows, mat.num_cols, picked_row_indptr, picked_col, picked_idx);
 }
