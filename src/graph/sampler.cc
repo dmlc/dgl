@@ -935,7 +935,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_NeighborSampling")
         if (aten::IsNullArray(probability)) {
           prob = nullptr;
         } else {
-          CHECK(probability->shape[0] == gptr->NumEdges())
+          CHECK(probability->shape[0] == static_cast<int64_t>(gptr->NumEdges()))
             << "transition probability must have same number of elements as edges";
           CHECK(probability.IsContiguous())
             << "transition probability must be contiguous tensor";

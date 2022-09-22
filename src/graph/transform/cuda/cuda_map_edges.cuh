@@ -22,6 +22,11 @@
 
 #include <dgl/runtime/c_runtime_api.h>
 #include <cuda_runtime.h>
+#include <algorithm>
+#include <memory>
+#include <tuple>
+#include <vector>
+#include <utility>
 
 #include "../../../runtime/cuda/cuda_common.h"
 #include "../../../runtime/cuda/cuda_hashtable.cuh"
@@ -265,4 +270,4 @@ MapEdges(
 }  // namespace transform
 }  // namespace dgl
 
-#endif
+#endif  // DGL_GRAPH_TRANSFORM_CUDA_CUDA_MAP_EDGES_CUH_
