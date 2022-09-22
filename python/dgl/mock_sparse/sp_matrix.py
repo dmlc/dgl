@@ -53,12 +53,8 @@ class SparseMatrix:
         val: Optional[torch.Tensor] = None,
         shape : Optional[Tuple[int, int]] = None
     ):
-        self._row = row
-        self._col = col
-
         if val is None:
             val = torch.ones(row.shape[0])
-        self._val = val
         i = torch.cat((row.unsqueeze(0), col.unsqueeze(0)), 0)
         if shape is None:
             self.adj = torch.sparse_coo_tensor(i, val).coalesce()
@@ -152,7 +148,6 @@ class SparseMatrix:
     def val(self, x) -> torch.tensor:
         """Set the values of the nonzero elements."""
         assert len(x) == self.nnz
-        self._val = x
         if len(x.shape) == 1:
             shape = self.shape
         else:

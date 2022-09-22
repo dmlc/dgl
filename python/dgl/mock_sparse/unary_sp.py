@@ -1,4 +1,5 @@
 """Unary ops for SparseMatrix"""
+# pylint: disable=invalid-name
 import numpy as np
 import torch
 
@@ -139,7 +140,6 @@ def softmax(A: SparseMatrix) -> SparseMatrix:
                            edge_softmax(g, A.val),
                            A.shape)
 
-SparseMatrix.neg = neg
 SparseMatrix.__neg__ = neg
 SparseMatrix.inv = inv
 SparseMatrix.softmax = softmax

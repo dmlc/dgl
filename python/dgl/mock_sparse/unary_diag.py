@@ -92,7 +92,6 @@ def softmax(D: DiagMatrix) -> DiagMatrix:
     """
     return diag(torch.ones_like(D.val), D.shape)
 
-DiagMatrix.neg = neg
 DiagMatrix.__neg__ = neg
 DiagMatrix.inv = inv
 DiagMatrix.softmax = softmax
