@@ -165,6 +165,54 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
             logging.info(f'[Rank: {rank}] node feature name: {k}, feature data shape: {v.size()}')
 
     '''
+    Reading edge features now.
+    '''
+    edge_features = {}
+    edge_feature_tids = {}
+
+    #iterate over the "edge_data" dictionary in the schema_map
+    #read the edge features if exists
+    #also keep track of the type_eids for which the edge_features are read.
+    dataset_features = schema_map[constants.STR_EDGE_DATA]
+    if((dataset_features is not None) and (len(dataset_features) > 0)):
+        for etype_name, etype_feature_data in dataset_features.items():
+            #etype_feature_data is a dictionary
+            #where key: feature_name, value: dictionary in which keys are "format", "data"
+            edge_feature_tids[etype_name] = []
+            for feat_name, feat_data in etype_feature_data.items():
+                assert len(feat_data[constants.STR_DATA]) == world_size
+                assert feat_data[constants.STR_FORMAT][constants.STR_NAME] == constants.STR_NUMPY
+                my_feat_data_fname = feat_data[constants.STR_DATA][rank] #this will be just the file name
+                if (os.path.isabs(my_feat_data_fname)):
+                    logging.info(f'Loading numpy from {my_feat_data_fname}')
+                    edge_features[etype_name+'/'+feat_name] = \
+                            torch.from_numpy(np.load(my_feat_data_fname))
+                else:
+                    numpy_path = os.path.join(input_dir, my_feat_data_fname)
+                    logging.info(f'Loading numpy from {numpy_path}')
+                    edge_features[etype_name+'/'+feat_name] = \
+                            torch.from_numpy(np.load(numpy_path))
+
+                edge_feature_tids[etype_name].append([feat_name, -1, -1])
+
+    #read my edges for each node type
+    edge_tids, etype_geid_offset = get_idranges(schema_map[constants.STR_EDGE_TYPE], 
+                                    schema_map[constants.STR_NUM_EDGES_PER_CHUNK])
+    for etype_name in schema_map[constants.STR_EDGE_TYPE]: 
+        if etype_name in edge_feature_tids: 
+            for item in edge_feature_tids[etype_name]:
+                item[1] = edge_tids[etype_name][rank][0]
+                item[2] = edge_tids[etype_name][rank][1]
+
+    #done build node_features locally. 
+    if len(edge_features) <= 0:
+        logging.info(f'[Rank: {rank}] This dataset does not have any edge features')
+    else:
+        for k, v in edge_features.items():
+            logging.info(f'[Rank: {rank}] edge feature name: {k}, feature data shape: {v.size()}')
+
+
+    '''
     Code below is used to read edges from the input dataset with the help of the metadata json file
     for the input graph dataset. 
     In the metadata json file, we expect the following key-value pairs to help read the edges of the 
@@ -209,7 +257,7 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
     #read my edges for each edge type
     etype_names = schema_map[constants.STR_EDGE_TYPE]
     etype_name_idmap = {e : idx for idx, e in enumerate(etype_names)}
-    edge_tids, _ = get_idranges(schema_map[constants.STR_EDGE_TYPE], 
+    edge_tids, etype_geid_offset = get_idranges(schema_map[constants.STR_EDGE_TYPE], 
                                     schema_map[constants.STR_NUM_EDGES_PER_CHUNK])
 
     edge_datadict = {}
@@ -254,5 +302,5 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
     assert edge_datadict[constants.GLOBAL_TYPE_EID].shape == edge_datadict[constants.ETYPE_ID].shape
     logging.info(f'[Rank: {rank}] Done reading edge_file: {len(edge_datadict)}, {edge_datadict[constants.GLOBAL_SRC_ID].shape}')
 
-    return node_tids, node_features, node_feature_tids, edge_datadict, edge_tids
+    return node_tids, node_features, node_feature_tids, edge_datadict, edge_tids, edge_features, edge_feature_tids
 
