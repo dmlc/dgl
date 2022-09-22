@@ -59,6 +59,7 @@ class SAGE(nn.Module):
         return h_pos, h_neg
 
     def inference(self, g, device, batch_size):
+        """Layer-wise inference algorithm to compute GNN node embeddings."""
         feat = g.ndata['feat']
         sampler = MultiLayerFullNeighborSampler(1, prefetch_node_feats=['feat'])
         dataloader = DataLoader(
@@ -81,6 +82,7 @@ class SAGE(nn.Module):
         return y
 
 def compute_mrr(model, evaluator, node_emb, src, dst, neg_dst, device, batch_size=500):
+    """Compute Mean Reciprocal Rank (MRR) in batches."""
     rr = torch.zeros(src.shape[0])
     for start in tqdm.trange(0, src.shape[0], batch_size, desc='Evaluate'):
         end = min(start + batch_size, src.shape[0])
