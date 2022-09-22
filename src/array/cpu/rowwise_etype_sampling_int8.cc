@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2022 by Contributors
- * \file array/cpu/rowwise_etype_sampling.cc
+ * \file array/cpu/rowwise_etype_sampling_int8.cc
  * \brief rowwise sampling by edge type.
  */
 #include "rowwise_etype_sampling.h"
