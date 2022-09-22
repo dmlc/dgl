@@ -108,6 +108,8 @@ CSRMatrix CSRRowWisePickPartial(
   const int num_threads = runtime::compute_num_threads(0, num_rows, 1);
   std::vector<int64_t> global_prefix(num_threads+1, 0);
 
+  // (BarclayII) use runtime::parallel_for as it gracefully handles exceptions and
+  // enables GDB to capture the variables.
   runtime::parallel_for(0, num_rows, [=, &global_prefix] (size_t start_i, size_t end_i) {
     int thread_id = omp_get_thread_num();
 
@@ -122,23 +124,22 @@ CSRMatrix CSRRowWisePickPartial(
       picked_row_indptr_data[i + 1] = num_picks;
       global_prefix[thread_id + 1] += num_picks;
     }
+  });
 
-    #pragma omp barrier
-    #pragma omp master
-    {
-      for (int t = 0; t < num_threads; ++t)
-        global_prefix[t+1] += global_prefix[t];
-    }
-    #pragma omp barrier
+  for (int t = 0; t < num_threads; ++t)
+    global_prefix[t+1] += global_prefix[t];
 
+  runtime::parallel_for(0, num_rows, [=, &global_prefix] (size_t start_i, size_t end_i) {
+    int thread_id = omp_get_thread_num();
     // No need to accumulate picked_row_indptr_data[start_i] here as it is handled by
     // the global prefix in the loop below.
     for (size_t i = start_i + 1; i < end_i; ++i)
       picked_row_indptr_data[i + 1] += picked_row_indptr_data[i];
     for (size_t i = start_i; i < end_i; ++i)
       picked_row_indptr_data[i + 1] += global_prefix[thread_id];
-    #pragma omp barrier  // race condition at every start_i
+  });
 
+  runtime::parallel_for(0, num_rows, [=, &global_prefix] (size_t start_i, size_t end_i) {
     // Part 2: pick the neighbors.
     for (size_t i = start_i; i < end_i; ++i) {
       const IdxType rid = rows_data[i];

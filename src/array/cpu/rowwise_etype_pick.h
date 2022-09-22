@@ -133,6 +133,8 @@ CSRMatrix CSRRowWisePerEtypePickPartial(
     et_idx_data = et_idx.Ptr<IdxType>();
   }
 
+  // (BarclayII) use runtime::parallel_for as it gracefully handles exceptions and
+  // enables GDB to capture the variables.
   runtime::parallel_for(0, num_rows, [=] (size_t start_i, size_t end_i) {
     // Step 1: sort edge type IDs per node if necessary
     if (!etype_sorted) {
@@ -171,14 +173,13 @@ CSRMatrix CSRRowWisePerEtypePickPartial(
         ++off_etypes_per_row_data[i * num_etypes + et + 1];
       }
     }
+  });
 
-    #pragma omp master
-    {
-      off_etypes_per_row_data[0] = 0;
-      for (int64_t i = 0; i < num_rows * num_etypes; ++i)
-        off_etypes_per_row_data[i + 1] += off_etypes_per_row_data[i];
-    }
+  off_etypes_per_row_data[0] = 0;
+  for (int64_t i = 0; i < num_rows * num_etypes; ++i)
+    off_etypes_per_row_data[i + 1] += off_etypes_per_row_data[i];
 
+  runtime::parallel_for(0, num_rows, [=] (size_t start_i, size_t end_i) {
     // Step 3: determine the number of picks for each row and each edge type as well
     // as the indptr to return.
     for (size_t i = start_i; i < end_i; ++i) {
@@ -193,15 +194,14 @@ CSRMatrix CSRRowWisePerEtypePickPartial(
         off_picked_per_row_data[i * num_etypes + et + 1] = num_picks;
       }
     }
+  });
 
-    #pragma omp master
-    {
-      off_picked_per_row_data[0] = 0;
-      for (int64_t i = 0; i < num_rows * num_etypes; ++i)
-        off_picked_per_row_data[i + 1] += off_picked_per_row_data[i];
-      picked_row_indptr_data[num_rows] = off_picked_per_row_data[num_rows * num_etypes];
-    }
+  off_picked_per_row_data[0] = 0;
+  for (int64_t i = 0; i < num_rows * num_etypes; ++i)
+    off_picked_per_row_data[i + 1] += off_picked_per_row_data[i];
+  picked_row_indptr_data[num_rows] = off_picked_per_row_data[num_rows * num_etypes];
 
+  runtime::parallel_for(0, num_rows, [=] (size_t start_i, size_t end_i) {
     for (size_t i = start_i; i < end_i; ++i)
       picked_row_indptr_data[i] = off_picked_per_row_data[i * num_etypes];
 
@@ -214,6 +214,10 @@ CSRMatrix CSRRowWisePerEtypePickPartial(
         const IdxType et_len = off_etypes_per_row_data[i * num_etypes + et + 1] - et_off;
         const IdxType pick_off = off_picked_per_row_data[i * num_etypes + et];
         const IdxType num_picks = off_picked_per_row_data[i * num_etypes + et + 1] - pick_off;
+
+        if (num_picks == 0)
+          continue;
+
         pick_fn(
             rid, off, len, num_picks, indices, data, et, et_off, et_len, et_idx_data,
             picked_idata + pick_off);

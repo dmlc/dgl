@@ -69,6 +69,8 @@ template void RandomEngine::Choice<int64_t, uint8_t>(int64_t num,
 template <typename IdxType>
 void RandomEngine::UniformChoice(IdxType num, IdxType population, IdxType* out,
                                  bool replace) {
+  CHECK_GE(num, 0);
+  CHECK_GE(population, 0);
   if (!replace)
     CHECK_LE(num, population)
       << "Cannot take more sample than population when 'replace=false'";

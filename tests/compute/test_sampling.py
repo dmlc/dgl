@@ -810,6 +810,7 @@ def test_sample_neighbors_etype_homogeneous(format_, direction, replace):
     rare_cnt = 4
     g = create_etype_test_graph(100, 30, rare_cnt)
     h_g = dgl.to_homogeneous(g)
+    h_g.edata['prob'] = F.zerocopy_from_numpy(np.random.rand(h_g.num_edges()) + 1)
     seed_ntype = g.get_ntype_id("u")
     seeds = F.nonzero_1d(h_g.ndata[dgl.NTYPE] == seed_ntype)
     fanouts = F.tensor([6, 5, 4, 3, 2], dtype=F.int64)
@@ -871,6 +872,9 @@ def test_sample_neighbors_etype_homogeneous(format_, direction, replace):
         subg = dgl.sampling.sample_etype_neighbors(
             h_g, seeds, dgl.ETYPE, fanouts, replace=replace, edge_dir=direction)
         check_num(h_g, all_src, all_dst, subg, replace, fanouts, direction)
+        subg = dgl.sampling.sample_etype_neighbors(
+            h_g, seeds, dgl.ETYPE, fanouts, replace=replace, edge_dir=direction, prob='prob')
+        check_num(h_g, all_src, all_dst, subg, replace, fanouts, direction)
 
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
@@ -887,11 +891,15 @@ def test_sample_neighbors_etype_sorted_homogeneous(format_, direction):
     if (direction, format_) in [('in', 'csr'), ('out', 'csc')]:
         h_g = h_g.formats(['csc', 'csr', 'coo'])
     orig_etype = F.asnumpy(h_g.edata[dgl.ETYPE])
+    np.random.shuffle(orig_etype)
 
     # Test the case where the edge types are not sorted in ascending order.
     # It should fail with an error.
     for i in range(h_g.num_nodes()):
-        e = F.asnumpy(h_g.in_edges(i, form='eid'))
+        if direction == 'in':
+            e = F.asnumpy(h_g.in_edges(i, form='eid'))
+        else:
+            e = F.asnumpy(h_g.out_edges(i, form='eid'))
         h_g.edata[dgl.ETYPE][e] = F.zerocopy_from_numpy(
                 np.sort(orig_etype[e])[::-1].copy())
     try:
@@ -904,7 +912,10 @@ def test_sample_neighbors_etype_sorted_homogeneous(format_, direction):
 
     # Now test where the edge types are sorted.
     for i in range(h_g.num_nodes()):
-        e = F.asnumpy(h_g.in_edges(i, form='eid'))
+        if direction == 'in':
+            e = F.asnumpy(h_g.in_edges(i, form='eid'))
+        else:
+            e = F.asnumpy(h_g.out_edges(i, form='eid'))
         h_g.edata[dgl.ETYPE][e] = F.zerocopy_from_numpy(np.sort(orig_etype[e]))
     sg = dgl.sampling.sample_etype_neighbors(
         h_g, seeds, dgl.ETYPE, fanouts, edge_dir=direction, etype_sorted=True)

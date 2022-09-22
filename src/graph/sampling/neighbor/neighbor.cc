@@ -214,7 +214,7 @@ HeteroSubgraph SampleNeighborsEType(
         if (dir == EdgeDir::kIn) {
           sampled_coo = aten::COOTranspose(aten::COORowWisePerEtypeSampling(
             aten::COOTranspose(hg->GetCOOMatrix(etype)),
-            nodes, etypes, fanouts, prob, replace));
+            nodes, etypes, fanouts, prob, replace, etype_sorted));
         } else {
           sampled_coo = aten::COORowWisePerEtypeSampling(
             hg->GetCOOMatrix(etype), nodes, etypes, fanouts, prob, replace, etype_sorted);
