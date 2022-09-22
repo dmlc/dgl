@@ -240,7 +240,7 @@ __global__ void _CSRRowWiseSampleUniformReplaceKernel(
 
 ///////////////////////////// CSR sampling //////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
                                     IdArray rows,
                                     const int64_t num_picks,
@@ -311,7 +311,7 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
   device->CopyDataFromTo(out_ptr, num_rows * sizeof(new_len), &new_len, 0,
       sizeof(new_len),
       ctx,
-      DGLContext{kDLCPU, 0},
+      DGLContext{kDGLCPU, 0},
       mat.indptr->dtype);
   CUDA_CALL(cudaEventRecord(copyEvent, stream));
 
@@ -369,9 +369,9 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
       picked_col, picked_idx);
 }
 
-template COOMatrix CSRRowWiseSamplingUniform<kDLGPU, int32_t>(
+template COOMatrix CSRRowWiseSamplingUniform<kDGLCUDA, int32_t>(
     CSRMatrix, IdArray, int64_t, bool);
-template COOMatrix CSRRowWiseSamplingUniform<kDLGPU, int64_t>(
+template COOMatrix CSRRowWiseSamplingUniform<kDGLCUDA, int64_t>(
     CSRMatrix, IdArray, int64_t, bool);
 
 }  // namespace impl

@@ -4,7 +4,7 @@ from __future__ import absolute_import as _abs
 
 import ctypes
 from ..base import py_str, check_call, _LIB
-from ..runtime_ctypes import DGLByteArray, TypeCode, DGLType, DGLContext
+from ..runtime_ctypes import DGLByteArray, TypeCode, DGLDataType, DGLContext
 
 class DGLValue(ctypes.Union):
     """DGLValue in C API"""
@@ -12,7 +12,7 @@ class DGLValue(ctypes.Union):
                 ("v_float64", ctypes.c_double),
                 ("v_handle", ctypes.c_void_p),
                 ("v_str", ctypes.c_char_p),
-                ("v_type", DGLType),
+                ("v_type", DGLDataType),
                 ("v_ctx", DGLContext)]
 
 

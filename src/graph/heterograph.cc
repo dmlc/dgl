@@ -252,7 +252,7 @@ HeteroGraphPtr HeteroGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
                                         hgindex->num_verts_per_type_));
 }
 
-HeteroGraphPtr HeteroGraph::CopyTo(HeteroGraphPtr g, const DLContext &ctx) {
+HeteroGraphPtr HeteroGraph::CopyTo(HeteroGraphPtr g, const DGLContext &ctx) {
   if (ctx == g->Context()) {
     return g;
   }

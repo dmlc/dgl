@@ -145,7 +145,7 @@ class RandomEngine {
    */
   template <typename IdxType, typename FloatType>
   IdArray Choice(IdxType num, FloatArray prob, bool replace = true) {
-    const DLDataType dtype{kDLInt, sizeof(IdxType) * 8, 1};
+    const DGLDataType dtype{kDGLInt, sizeof(IdxType) * 8, 1};
     IdArray ret = IdArray::Empty({num}, dtype, prob->ctx);
     Choice<IdxType, FloatType>(num, prob, static_cast<IdxType*>(ret->data), replace);
     return ret;
@@ -178,9 +178,9 @@ class RandomEngine {
    */
   template <typename IdxType>
   IdArray UniformChoice(IdxType num, IdxType population, bool replace = true) {
-    const DLDataType dtype{kDLInt, sizeof(IdxType) * 8, 1};
+    const DGLDataType dtype{kDGLInt, sizeof(IdxType) * 8, 1};
     // TODO(minjie): only CPU implementation right now
-    IdArray ret = IdArray::Empty({num}, dtype, DLContext{kDLCPU, 0});
+    IdArray ret = IdArray::Empty({num}, dtype, DGLContext{kDGLCPU, 0});
     UniformChoice<IdxType>(num, population, static_cast<IdxType*>(ret->data), replace);
     return ret;
   }
@@ -230,8 +230,8 @@ class RandomEngine {
   template <typename IdxType, typename FloatType>
   IdArray BiasedChoice(
       IdxType num, const IdxType *split, FloatArray bias, bool replace = true) {
-    const DLDataType dtype{kDLInt, sizeof(IdxType) * 8, 1};
-    IdArray ret = IdArray::Empty({num}, dtype, DLContext{kDLCPU, 0});
+    const DGLDataType dtype{kDGLInt, sizeof(IdxType) * 8, 1};
+    IdArray ret = IdArray::Empty({num}, dtype, DGLContext{kDGLCPU, 0});
     BiasedChoice<IdxType, FloatType>(num, split, bias, static_cast<IdxType*>(ret->data), replace);
     return ret;
   }
