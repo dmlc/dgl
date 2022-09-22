@@ -1,3 +1,4 @@
+"""dgl reduce operators for sparse matrix module."""
 import torch
 
 from .sp_matrix import SparseMatrix
@@ -81,11 +82,11 @@ def reduce(A: SparseMatrix, dim=None, rtype: str = "sum"):
         reduced_shape = (A.shape[0],) + A.val.shape[1:]
         reduced = torch.zeros(reduced_shape, dtype=A.val.dtype, device=A.device)
 
-    if rtype == "smax" or rtype == "smin":
+    if rtype in ("smax", "smin"):
         rtype = "a" + rtype[1:]
-    
-    if rtype == 'smean':
-        rtype = 'mean'
+
+    if rtype == "smean":
+        rtype = "mean"
 
     if len(A.val.shape) > 1:
         index = torch.unsqueeze(index, 1)
