@@ -124,14 +124,12 @@ class DiagMatrix:
         return create_from_coo(row=row, col=col, val=self.val, shape=self.shape)
 
     def t(self):
-        """Alias of transpose()
-        """
+        """Alias of :meth:`transpose()`"""
         return self.transpose()
 
     @property
     def T(self):
-        """Alias of transpose()
-        """
+        """Alias of :meth:`transpose()`"""
         return self.transpose()
 
     def transpose(self):
@@ -148,10 +146,9 @@ class DiagMatrix:
         >>> val = torch.arange(1, 5).float()
         >>> mat = diag(val, shape=(4, 5))
         >>> mat = mat.transpose()
-        >>> print(mat.val)
-        tensor([1., 2., 3., 4.])
-        >>> print(mat.shape)
-        (5, 4)
+        >>> print(mat)
+        DiagMatrix(val=tensor([1., 2., 3., 4.]), 
+        shape=(5, 4))
         """
         return DiagMatrix(self.val, self.shape[::-1])
 

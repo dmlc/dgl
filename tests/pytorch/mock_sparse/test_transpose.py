@@ -37,8 +37,3 @@ def test_sparse_matrix_transpose(dense_dim, row, col, mat_shape):
     assert torch.allclose(mat.val, val)
     assert torch.allclose(mat.row, col)
     assert torch.allclose(mat.col, row)
-
-
-if __name__ == "__main__":
-    test_diag_matrix_transpose()
-    test_sparse_matrix_transpose()

@@ -237,14 +237,12 @@ class SparseMatrix:
         return self.adj.to_dense()
 
     def t(self):
-        """Alias of transpose()
-        """
+        """Alias of :meth:`transpose()`"""
         return self.transpose()
 
     @property
     def T(self):
-        """Alias of transpose()
-        """
+        """Alias of :meth:`transpose()`"""
         return self.transpose()
 
     def transpose(self):
