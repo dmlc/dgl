@@ -273,7 +273,7 @@ if __name__ == "__main__":
         default=1000,
         help="max number of labels as embeddings to look up",
     )
-    parser.add_argument("--sortpool_k", type=float, default=0.75)
+    parser.add_argument("--sortpool_k", type=float, default=0.6)
     parser.add_argument("--num_layers", type=int, default=3)
     parser.add_argument("--hidden_channels", type=int, default=32)
     parser.add_argument("--batch_size", type=int, default=32)
@@ -505,9 +505,10 @@ if __name__ == "__main__":
 
     if 0 < args.sortpool_k <= 1:  # Transform percentile to number.
         if args.dynamic_train:
-            _sampled_indices = np.random.choice(
-                len(train_dataset), 1000, replace=False
-            )
+            _sampled_indices = range(1000)
+            #_sampled_indices = np.random.choice(
+            # len(train_dataset), 1000, replace=False
+            # )
         else:
             _sampled_indices = range(len(train_dataset))
         _num_nodes = sorted(

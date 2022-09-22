@@ -2,9 +2,7 @@
 
 ## Introduction
 
-This is an example of implementing [NGNN](https://arxiv.org/abs/2111.11638) + [SEAL](https://arxiv.org/pdf/2010.16103.pdf) for link prediction in DGL. Some parts are migrated from [https://github.com/facebookresearch/SEAL_OGB](https://github.com/facebookresearch/SEAL_OGB).
-
-The script in this folder experiments seal+NGNN on the dataset: ogbl-ppa, and achieves SOTA performance on the corresponding leaderboard.
+This is a submission of implementing [NGNN](https://arxiv.org/abs/2111.11638) + [SEAL](https://arxiv.org/pdf/2010.16103.pdf) to OGB link prediction leaderboards. Some code is migrated from [https://github.com/facebookresearch/SEAL_OGB](https://github.com/facebookresearch/SEAL_OGB).
 
 ## Installation Requirements
 ```
@@ -33,10 +31,10 @@ We do not fix random seeds at all, and take over 10 runs for all models. All mod
 python main.py --dataset ogbl-ppa --ngnn_type input --hidden_channels 48 --epochs 50 --lr 0.00015 --batch_size 128 --num_workers 48  --train_percent 5 --val_percent 8 --eval_hits_K 10 --use_feature --dynamic_train --dynamic_val --dynamic_test --runs 10
 ```
 
-As the model is very costly, we select the best model by evaluation on a subset of the validation edges and using a lower K for Hits@K. Then we do experiments on the full validation and test sets with the best model selected, and get the required metrics.  
+As training is very costly, we select the best model by evaluation on a subset of the validation edges and using a lower K for Hits@K. Then we do experiments on the full validation and test sets with the best model selected, and get the required metrics.  
 
 For all datasets, if you specify `--dynamic_train`, the enclosing subgraphs of the training links will be extracted on the fly instead of preprocessing and saving to disk. Similarly for `--dynamic_val` and `--dynamic_test`. You can increase `--num_workers` to accelerate the dynamic subgraph extraction process.  
-You can also specify the `val_percent` and `eval_hits_K` arguments in the above command to evaluate your model on val_percent% of the validation set.
+You can also specify the `val_percent` and `eval_hits_K` arguments in the above command to adjust the proportion of the validation dataset to use and the K to use for Hits@K.
 
 ## Reference
 
