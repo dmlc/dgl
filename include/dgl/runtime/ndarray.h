@@ -18,7 +18,12 @@
 #include "shared_mem.h"
 
 #ifdef DGL_USE_CUDA
+#ifdef USE_FP16
 #include <cuda_fp16.h>
+#endif  // USE_FP16
+#ifdef USE_BF16
+#include <cuda_bf16.h>
+#endif  // USE_BF16
 #endif
 
 // forward declaration
@@ -52,7 +57,10 @@ GEN_DGLDATATYPETRAITS_FOR(uint64_t, kDGLInt, 64);
 #ifdef DGL_USE_CUDA
 #ifdef USE_FP16
 GEN_DGLDATATYPETRAITS_FOR(__half, kDGLFloat, 16);
-#endif
+#endif  // USE_FP16
+#ifdef USE_BF16
+GEN_DGLDATATYPETRAITS_FOR(__nv_bfloat16, kDGLBfloat, 16);
+#endif  // USE_BF16
 #endif
 GEN_DGLDATATYPETRAITS_FOR(float, kDGLFloat, 32);
 GEN_DGLDATATYPETRAITS_FOR(double, kDGLFloat, 64);

@@ -10,6 +10,7 @@
 #include <limits>
 #include "./atomic.cuh"
 #include "./fp16.cuh"
+#include "bf16.cuh"
 
 namespace dgl {
 namespace aten {
@@ -168,6 +169,15 @@ struct Sum<Idx, half, atomic>: _Sum<Idx, half, atomic> {
 };
 #endif  // USE_FP16
 
+#ifdef USE_BF16
+template <typename Idx, bool atomic>
+struct Sum<Idx, __nv_bfloat16, atomic>: _Sum<Idx, __nv_bfloat16, atomic> {
+  static constexpr __host__ __device__ __forceinline__ __nv_bfloat16 zero() {
+    return __float2bfloat16_rn(0.);
+  }
+};
+#endif  // USE_BF16
+
 template <typename Idx,
           typename DType,
           bool atomic>
@@ -228,7 +238,17 @@ struct Max<Idx, half, atomic> : _Max<Idx, half, atomic> {
     return __float2half_rn(-6.550400e+04f);
   }
 };
-#endif
+#endif  // USE_FP16
+
+#ifdef USE_BF16
+template <typename Idx,
+          bool atomic>
+struct Max<Idx, __nv_bfloat16, atomic> : _Max<Idx, __nv_bfloat16, atomic> {
+  static constexpr __host__ __device__ __forceinline__ __nv_bfloat16 zero() {
+    return __float2bfloat16_rn(-std::numeric_limits<float>::infinity());
+  }
+};
+#endif  // USE_BF16
 
 template <typename Idx,
           typename DType,
@@ -291,6 +311,16 @@ struct Min<Idx, half, atomic> : _Min<Idx, half, atomic> {
   }
 };
 #endif  // USE_FP16
+
+#ifdef USE_BF16
+template <typename Idx,
+          bool atomic>
+struct Min<Idx, __nv_bfloat16, atomic> : _Min<Idx, __nv_bfloat16, atomic> {
+  static constexpr __host__ __device__ __forceinline__ __nv_bfloat16 zero() {
+    return __float2bfloat16_rn(std::numeric_limits<float>::infinity());
+  }
+};
+#endif  // USE_BF16
 
 }  // namespace reduce
 

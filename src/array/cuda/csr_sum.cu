@@ -172,7 +172,13 @@ template std::pair<CSRMatrix, NDArray> CSRSum<kDGLCUDA, int32_t, __half>(
     const std::vector<CSRMatrix>&, const std::vector<NDArray>&);
 template std::pair<CSRMatrix, NDArray> CSRSum<kDGLCUDA, int64_t, __half>(
     const std::vector<CSRMatrix>&, const std::vector<NDArray>&);
-#endif
+#endif  // USE_FP16
+#ifdef USE_BF16
+template std::pair<CSRMatrix, NDArray> CSRSum<kDGLCUDA, int32_t, __nv_bfloat16>(
+    const std::vector<CSRMatrix>&, const std::vector<NDArray>&);
+template std::pair<CSRMatrix, NDArray> CSRSum<kDGLCUDA, int64_t, __nv_bfloat16>(
+    const std::vector<CSRMatrix>&, const std::vector<NDArray>&);
+#endif  // USE_BF16
 template std::pair<CSRMatrix, NDArray> CSRSum<kDGLCUDA, int32_t, float>(
     const std::vector<CSRMatrix>&, const std::vector<NDArray>&);
 template std::pair<CSRMatrix, NDArray> CSRSum<kDGLCUDA, int64_t, float>(

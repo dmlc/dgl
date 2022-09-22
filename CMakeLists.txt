@@ -28,7 +28,8 @@ dgl_option(USE_SYSTEM_NCCL "Build using system's NCCL library" OFF)
 dgl_option(USE_OPENMP "Build with OpenMP" ON)
 dgl_option(USE_AVX "Build with AVX optimization" OFF)
 dgl_option(USE_LIBXSMM "Build with LIBXSMM library optimization" ON)
-dgl_option(USE_FP16 "Build with fp16 support to enable mixed precision training" OFF)
+dgl_option(USE_FP16 "Build with CUDA fp16 support" OFF)
+dgl_option(USE_BF16 "Build with CUDA bf16 support" OFF)
 dgl_option(USE_TVM "Build with TVM kernels" OFF)
 dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" OFF)
 dgl_option(LIBCXX_ENABLE_PARALLEL_ALGORITHMS "Enable the parallel algorithms library. This requires the PSTL to be available." OFF)
@@ -127,12 +128,19 @@ if ((NOT MSVC) AND USE_EPOLL)
   endif()
 endif ()
 
-# Build with fp16 to support mixed precision training.
+# Build with CUDA fp16 support.
 if(USE_FP16)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUSE_FP16")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_FP16")
-  message(STATUS "Build with fp16 to support mixed precision training")
+  message(STATUS "Build with CUDA fp16 support")
 endif(USE_FP16)
+
+# Build with CUDA bf16 support.
+if(USE_BF16)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUSE_BF16")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_BF16")
+  message(STATUS "Build with CUDA bf16 support")
+endif(USE_BF16)
 
 # To compile METIS correct for DGL.
 if(MSVC)

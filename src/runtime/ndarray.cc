@@ -23,7 +23,10 @@ constexpr DGLDataType DGLDataTypeTraits<uint32_t>::dtype;
 constexpr DGLDataType DGLDataTypeTraits<uint64_t>::dtype;
 #ifdef USE_FP16
 constexpr DGLDataType DGLDataTypeTraits<__half>::dtype;
-#endif
+#endif  // USE_FP16
+#ifdef USE_BF16
+constexpr DGLDataType DGLDataTypeTraits<__nv_bfloat16>::dtype;
+#endif  // USE_BF16
 constexpr DGLDataType DGLDataTypeTraits<float>::dtype;
 constexpr DGLDataType DGLDataTypeTraits<double>::dtype;
 

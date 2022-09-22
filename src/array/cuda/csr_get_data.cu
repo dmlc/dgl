@@ -57,7 +57,13 @@ template NDArray CSRGetData<kDGLCUDA, int32_t, __half>(
     CSRMatrix csr, NDArray rows, NDArray cols, bool return_eids, NDArray weights, __half filler);
 template NDArray CSRGetData<kDGLCUDA, int64_t, __half>(
     CSRMatrix csr, NDArray rows, NDArray cols, bool return_eids, NDArray weights, __half filler);
-#endif
+#endif  // USE_FP16
+#ifdef USE_BF16
+template NDArray CSRGetData<kDGLCUDA, int32_t, __nv_bfloat16>(
+    CSRMatrix csr, NDArray rows, NDArray cols, bool return_eids, NDArray weights, __nv_bfloat16 filler);
+template NDArray CSRGetData<kDGLCUDA, int64_t, __nv_bfloat16>(
+    CSRMatrix csr, NDArray rows, NDArray cols, bool return_eids, NDArray weights, __nv_bfloat16 filler);
+#endif  // USE_BF16
 template NDArray CSRGetData<kDGLCUDA, int32_t, float>(
     CSRMatrix csr, NDArray rows, NDArray cols, bool return_eids, NDArray weights, float filler);
 template NDArray CSRGetData<kDGLCUDA, int64_t, float>(

@@ -36,7 +36,24 @@ cublasStatus_t cublasGemm<__half>(cublasHandle_t handle, cublasOperation_t trans
   return cublasHgemm(handle, transa, transb, m, n, k, alpha, A, lda,
       B, ldb, beta, C, ldc);
 }
-#endif
+#endif  // USE_FP16
+
+#ifdef USE_BF16
+template <>
+cublasStatus_t cublasGemm<__nv_bfloat16>(cublasHandle_t handle, cublasOperation_t transa,
+    cublasOperation_t transb, int m, int n, int k,
+    const __nv_bfloat16* alpha, const __nv_bfloat16* A, int lda,
+    const __nv_bfloat16* B, int ldb, const __nv_bfloat16* beta,
+    __nv_bfloat16* C, int ldc) {
+  float alpha_float = __bfloat162float(*alpha);
+  float beta_float = __bfloat162float(*beta);
+  return cublasGemmEx(handle, transa, transb, m, n, k,
+      &alpha_float, A, CUDA_R_16BF, lda,
+      B, CUDA_R_16BF, ldb,
+      &beta_float, C, CUDA_R_16BF, ldc,
+      CUBLAS_COMPUTE_32F, CUBLAS_GEMM_DEFAULT_TENSOR_OP);
+}
+#endif  // USE_BF16
 
 template <>
 cublasStatus_t cublasGemm<float>(cublasHandle_t handle, cublasOperation_t transa,

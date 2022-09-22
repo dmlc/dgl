@@ -10,6 +10,7 @@
 #include <limits>
 #include "macro.cuh"
 #include "fp16.cuh"
+#include "bf16.cuh"
 #include "atomic.cuh"
 #include "../../runtime/cuda/cuda_common.h"
 #include "./utils.h"
@@ -45,7 +46,21 @@ cublasStatus_t Xgeam<__half>(cublasHandle_t handle, cublasOperation_t transa,
   LOG(FATAL) << "Xgeam does not support dtype half (FP16)";
   return CUBLAS_STATUS_EXECUTION_FAILED;
 }
-#endif
+#endif  // USE_FP16
+
+#ifdef USE_BF16
+template <>
+cublasStatus_t Xgeam<__nv_bfloat16>(cublasHandle_t handle, cublasOperation_t transa,
+    cublasOperation_t transb, int m, int n,
+    const __nv_bfloat16* alpha, const __nv_bfloat16* A, int lda,
+    const __nv_bfloat16* beta, const __nv_bfloat16* B, int ldb,
+    __nv_bfloat16* C, int ldc) {
+  // TODO(ndickson): There is no cublasHgeam, so a different
+  // implementation would be required.
+  LOG(FATAL) << "Xgeam does not support dtype bfloat16 (BF16)";
+  return CUBLAS_STATUS_EXECUTION_FAILED;
+}
+#endif  // USE_BF16
 
 template <>
 cublasStatus_t Xgeam<float>(cublasHandle_t handle, cublasOperation_t transa,
