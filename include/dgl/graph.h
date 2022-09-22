@@ -89,8 +89,8 @@ class Graph: public GraphInterface {
     num_edges_ = 0;
   }
 
-  DLContext Context() const override {
-    return DLContext{kDLCPU, 0};
+  DGLContext Context() const override {
+    return DGLContext{kDGLCPU, 0};
   }
 
   uint8_t NumBits() const override {

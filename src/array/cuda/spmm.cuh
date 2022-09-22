@@ -7,6 +7,7 @@
 #define DGL_ARRAY_CUDA_SPMM_CUH_
 
 #include <dgl/bcast.h>
+#include <limits>
 #include "macro.cuh"
 #include "fp16.cuh"
 #include "atomic.cuh"
@@ -203,7 +204,7 @@ cusparseStatus_t Xcsrmm2<double>(cusparseHandle_t handle, cusparseOperation_t tr
 /*! Cusparse implementation of SpMM on Csr format. */
 template <typename DType, typename IdType>
 void CusparseCsrmm2(
-    const DLContext& ctx,
+    const DGLContext& ctx,
     const CSRMatrix& csr,
     const DType* B_data, const DType* A_data,
     DType* C_data,
@@ -303,7 +304,7 @@ void CusparseCsrmm2(
 /*! Cusparse implementation of SpMM on Csr format. */
 template <typename DType, typename IdType>
 void CusparseCsrmm2Hetero(
-    const DLContext& ctx,
+    const DGLContext& ctx,
     const CSRMatrix& csr,
     const DType* B_data, const DType* A_data,
     DType* C_data,
@@ -615,7 +616,7 @@ __global__ void SpMMCmpCsrHeteroKernel(
   while (ty < num_rows) {
     int tx = blockIdx.x * blockDim.x + threadIdx.x;
     while (tx < out_len) {
-      DType new_out = out[ty * out_len + tx];//ReduceOp::zero();
+      DType new_out = out[ty * out_len + tx];  // ReduceOp::zero();
       Idx local_argu = 0, local_arge = 0;
       const int lhs_add = UseBcast ? ubcast_off[tx] : tx;
       const int rhs_add = UseBcast ? ebcast_off[tx] : tx;
@@ -698,7 +699,6 @@ void SpMMCoo(
   const int nty = CUDA_MAX_NUM_THREADS / ntx;
   const int nbx = (len + ntx - 1) / ntx;
   const int nby = FindNumBlocks<'y'>((E + nty - 1) / nty);
-  //LOG(INFO) << "nblks=(" << nbx << ", " << nby << ") nthrs=(" << ntx << ", " << nty << ")";
   const dim3 nblks(nbx, nby);
   const dim3 nthrs(ntx, nty);
   const bool use_idx = !IsNullArray(coo.data);
@@ -761,9 +761,8 @@ void SpMMCsr(
           rhs_len = bcast.rhs_len;
   const int ntx = FindNumThreads(len);
   const int nty = CUDA_MAX_NUM_THREADS / ntx;
-  const int nby= (len + ntx - 1) / ntx;
+  const int nby = (len + ntx - 1) / ntx;
   const int nbx = FindNumBlocks<'x'>((csr.num_rows + nty - 1) / nty);
-  //LOG(INFO) << "nblks=(" << nbx << ", " << nby << ") nthrs=(" << ntx << ", " << nty << ")";
   const dim3 nblks(nbx, nby);
   const dim3 nthrs(ntx, nty);
   const bool use_idx = !IsNullArray(csr.data);
@@ -851,4 +850,4 @@ void SpMMCmpCsrHetero(
 }  // namespace aten
 }  // namespace dgl
 
-#endif
+#endif  // DGL_ARRAY_CUDA_SPMM_CUH_

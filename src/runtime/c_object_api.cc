@@ -137,7 +137,7 @@ int DGLObjectGetAttr(ObjectHandle handle,
     (*tobject)->VisitAttrs(&getter);
     *ret_success = getter.found_object_ref || rv.type_code() != kNull;
     if (rv.type_code() == kStr ||
-        rv.type_code() == kDGLType) {
+        rv.type_code() == kDGLDataType) {
       DGLAPIThreadLocalEntry *e = DGLAPIThreadLocalStore::Get();
       e->ret_str = rv.operator std::string();
       *ret_type_code = kStr;

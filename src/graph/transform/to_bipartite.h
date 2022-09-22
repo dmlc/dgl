@@ -44,7 +44,7 @@ namespace transform {
  *
  * @return The block and the induced edges.
  */
-template<DLDeviceType XPU, typename IdType>
+template<DGLDeviceType XPU, typename IdType>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>>
 ToBlock(HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes,
         bool include_rhs_in_lhs, std::vector<IdArray>* lhs_nodes);

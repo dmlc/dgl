@@ -36,7 +36,7 @@ void CheckRandomWalkInputs(
   // CHECK_SAME_CONTEXT(seeds, metapath);
 
   if (hg->IsPinned()) {
-    CHECK_EQ(seeds->ctx.device_type, kDLGPU) << "Expected seeds (" << seeds->ctx << ")" \
+    CHECK_EQ(seeds->ctx.device_type, kDGLCUDA) << "Expected seeds (" << seeds->ctx << ")" \
       << " to be on the GPU when the graph is pinned.";
   } else if (hg->Context() != seeds->ctx) {
     LOG(FATAL) << "Expected seeds (" << seeds->ctx << ")" << " to have the same " \
