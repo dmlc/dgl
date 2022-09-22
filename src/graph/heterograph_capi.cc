@@ -103,7 +103,14 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateHeteroGraphWithNumNo
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetMetaGraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
-    *rv = GraphRef(hg->meta_graph());
+    *rv = hg->meta_graph();
+  });
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroIsMetaGraphUniBipartite")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    GraphPtr mg = hg->meta_graph();
+    *rv = mg->IsUniBipartite();
   });
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetRelationGraph")
@@ -470,8 +477,8 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCopyTo")
     HeteroGraphRef hg = args[0];
     int device_type = args[1];
     int device_id = args[2];
-    DLContext ctx;
-    ctx.device_type = static_cast<DLDeviceType>(device_type);
+    DGLContext ctx;
+    ctx.device_type = static_cast<DGLDeviceType>(device_type);
     ctx.device_id = device_id;
     HeteroGraphPtr hg_new = HeteroGraph::CopyTo(hg.sptr(), ctx);
     *rv = HeteroGraphRef(hg_new);
@@ -550,7 +557,7 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroJointUnion")
     std::vector<HeteroGraphPtr> component_ptrs;
     component_ptrs.reserve(component_graphs.size());
     const int64_t bits = component_graphs[0]->NumBits();
-    const DLContext ctx = component_graphs[0]->Context();
+    const DGLContext ctx = component_graphs[0]->Context();
     for (const auto& component : component_graphs) {
       component_ptrs.push_back(component.sptr());
       CHECK_EQ(component->NumBits(), bits)
@@ -574,7 +581,7 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDisjointUnion_v2")
     std::vector<HeteroGraphPtr> component_ptrs;
     component_ptrs.reserve(component_graphs.size());
     const int64_t bits = component_graphs[0]->NumBits();
-    const DLContext ctx = component_graphs[0]->Context();
+    const DGLContext ctx = component_graphs[0]->Context();
     for (const auto& component : component_graphs) {
       component_ptrs.push_back(component.sptr());
       CHECK_EQ(component->NumBits(), bits)
@@ -723,9 +730,9 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortOutEdges")
     NDArray tag = args[1];
     int64_t num_tag = args[2];
 
-    CHECK_EQ(hg->Context().device_type, kDLCPU) << "Only support sorting by tag on cpu";
+    CHECK_EQ(hg->Context().device_type, kDGLCPU) << "Only support sorting by tag on cpu";
     CHECK(aten::IsValidIdArray(tag));
-    CHECK_EQ(tag->ctx.device_type, kDLCPU) << "Only support sorting by tag on cpu";
+    CHECK_EQ(tag->ctx.device_type, kDGLCPU) << "Only support sorting by tag on cpu";
 
     const auto csr = hg->GetCSRMatrix(0);
 
@@ -745,9 +752,9 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortInEdges")
     NDArray tag = args[1];
     int64_t num_tag = args[2];
 
-    CHECK_EQ(hg->Context().device_type, kDLCPU) << "Only support sorting by tag on cpu";
+    CHECK_EQ(hg->Context().device_type, kDGLCPU) << "Only support sorting by tag on cpu";
     CHECK(aten::IsValidIdArray(tag));
-    CHECK_EQ(tag->ctx.device_type, kDLCPU) << "Only support sorting by tag on cpu";
+    CHECK_EQ(tag->ctx.device_type, kDGLCPU) << "Only support sorting by tag on cpu";
 
     const auto csc = hg->GetCSCMatrix(0);
 
@@ -765,10 +772,10 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLHeteroSortInEdges")
 DGL_REGISTER_GLOBAL("heterograph._CAPI_DGLFindSrcDstNtypes")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef metagraph = args[0];
-    std::unordered_set<int64_t> dst_set;
-    std::unordered_set<int64_t> src_set;
+    std::unordered_set<uint64_t> dst_set;
+    std::unordered_set<uint64_t> src_set;
 
-    for (int64_t eid = 0; eid < metagraph->NumEdges(); ++eid) {
+    for (uint64_t eid = 0; eid < metagraph->NumEdges(); ++eid) {
       auto edge = metagraph->FindEdge(eid);
       auto src = edge.first;
       auto dst = edge.second;
@@ -778,16 +785,16 @@ DGL_REGISTER_GLOBAL("heterograph._CAPI_DGLFindSrcDstNtypes")
 
     List<Value> srclist, dstlist;
     List<List<Value>> ret_list;
-    for (int64_t nid = 0; nid < metagraph->NumVertices(); ++nid) {
+    for (uint64_t nid = 0; nid < metagraph->NumVertices(); ++nid) {
       auto is_dst = dst_set.count(nid);
       auto is_src = src_set.count(nid);
       if (is_dst && is_src)
         return;
       else if (is_dst)
-        dstlist.push_back(Value(MakeValue(nid)));
+        dstlist.push_back(Value(MakeValue(static_cast<int64_t>(nid))));
       else
         // If a node type is isolated, put it in srctype as defined in the Python docstring.
-        srclist.push_back(Value(MakeValue(nid)));
+        srclist.push_back(Value(MakeValue(static_cast<int64_t>(nid))));
     }
     ret_list.push_back(srclist);
     ret_list.push_back(dstlist);

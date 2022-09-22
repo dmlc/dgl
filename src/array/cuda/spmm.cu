@@ -147,53 +147,53 @@ void SpMMCoo(const std::string& op, const std::string& reduce,
   }
 }
 
-template void SpMMCsr<kDLGPU, int32_t, 16>(
+template void SpMMCsr<kDGLCUDA, int32_t, 16>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
-template void SpMMCsr<kDLGPU, int64_t, 16>(
+template void SpMMCsr<kDGLCUDA, int64_t, 16>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
-template void SpMMCsr<kDLGPU, int32_t, 32>(
+template void SpMMCsr<kDGLCUDA, int32_t, 32>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
-template void SpMMCsr<kDLGPU, int64_t, 32>(
+template void SpMMCsr<kDGLCUDA, int64_t, 32>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
-template void SpMMCsr<kDLGPU, int32_t, 64>(
+template void SpMMCsr<kDGLCUDA, int32_t, 64>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
-template void SpMMCsr<kDLGPU, int64_t, 64>(
+template void SpMMCsr<kDGLCUDA, int64_t, 64>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 
 
-template void SpMMCoo<kDLGPU, int32_t, 16>(
+template void SpMMCoo<kDGLCUDA, int32_t, 16>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const COOMatrix& coo,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
-template void SpMMCoo<kDLGPU, int64_t, 16>(
+template void SpMMCoo<kDGLCUDA, int64_t, 16>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const COOMatrix& coo,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
-template void SpMMCoo<kDLGPU, int32_t, 32>(
+template void SpMMCoo<kDGLCUDA, int32_t, 32>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const COOMatrix& coo,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
-template void SpMMCoo<kDLGPU, int64_t, 32>(
+template void SpMMCoo<kDGLCUDA, int64_t, 32>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const COOMatrix& coo,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
-template void SpMMCoo<kDLGPU, int32_t, 64>(
+template void SpMMCoo<kDGLCUDA, int32_t, 64>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const COOMatrix& coo,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
-template void SpMMCoo<kDLGPU, int64_t, 64>(
+template void SpMMCoo<kDGLCUDA, int64_t, 64>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const COOMatrix& coo,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);

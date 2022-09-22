@@ -26,7 +26,7 @@
     }                                                                          \
   } else {                                                                     \
     constexpr bool UseBcast = true;                                            \
-    const DLContext ctx = (CTX);                                               \
+    const DGLContext ctx = (CTX);                                               \
     const auto device = runtime::DeviceAPI::Get(ctx);                          \
     (LHS_OFF) = static_cast<int64_t*>(                                         \
       device->AllocWorkspace(ctx, sizeof(int64_t) * info.lhs_offset.size()));  \
@@ -48,4 +48,4 @@
   }                                                                            \
 } while (0)
 
-#endif
+#endif  // DGL_ARRAY_CUDA_MACRO_CUH_

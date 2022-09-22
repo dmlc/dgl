@@ -12,7 +12,7 @@ namespace dgl {
 namespace aten {
 namespace impl {
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 std::tuple<CSRMatrix, IdArray, IdArray> CSRToSimple(CSRMatrix csr) {
   if (!csr.sorted)
     csr = CSRSort(csr);
@@ -67,8 +67,8 @@ std::tuple<CSRMatrix, IdArray, IdArray> CSRToSimple(CSRMatrix csr) {
   return std::make_tuple(res_csr, edge_count, eids_remapped);
 }
 
-template std::tuple<CSRMatrix, IdArray, IdArray> CSRToSimple<kDLCPU, int32_t>(CSRMatrix);
-template std::tuple<CSRMatrix, IdArray, IdArray> CSRToSimple<kDLCPU, int64_t>(CSRMatrix);
+template std::tuple<CSRMatrix, IdArray, IdArray> CSRToSimple<kDGLCPU, int32_t>(CSRMatrix);
+template std::tuple<CSRMatrix, IdArray, IdArray> CSRToSimple<kDGLCPU, int64_t>(CSRMatrix);
 
 }  // namespace impl
 }  // namespace aten

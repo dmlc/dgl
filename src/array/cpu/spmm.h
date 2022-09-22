@@ -126,7 +126,7 @@ void SpMMSumCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
   const IdType* edges = csr.data.Ptr<IdType>();
   const DType* X = ufeat.Ptr<DType>();
   const DType* W = efeat.Ptr<DType>();
-  int64_t dim = bcast.out_len, lhs_dim = bcast.lhs_len, rhs_dim = bcast.rhs_len;
+  int64_t dim = bcast.out_len;
   DType* O = out.Ptr<DType>();
   CHECK_NOTNULL(indptr);
   CHECK_NOTNULL(O);

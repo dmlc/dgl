@@ -41,7 +41,7 @@ namespace transform {
  *
  * @return The vector of compacted graphs and the vector of induced nodes.
  */
-template<DLDeviceType XPU, typename IdType>
+template<DGLDeviceType XPU, typename IdType>
 std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>>
 CompactGraphs(
     const std::vector<HeteroGraphPtr> &graphs,

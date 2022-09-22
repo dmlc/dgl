@@ -16,7 +16,7 @@ namespace aten {
 
 // Check whether the given arguments have the same context.
 inline void CheckCtx(
-    const DLContext& ctx,
+    const DGLContext& ctx,
     const std::vector<NDArray>& arrays,
     const std::vector<std::string>& names) {
   for (size_t i = 0; i < arrays.size(); ++i) {
