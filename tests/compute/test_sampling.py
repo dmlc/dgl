@@ -272,6 +272,7 @@ def _gen_neighbor_sampling_test_graph(hypersparse, reverse):
         }, {'user': card if card is not None else 4})
         g = g.to(F.ctx())
         g.edata['prob'] = F.tensor([.5, .5, 0., .5, .5, 0., 1.], dtype=F.float32)
+        g.edata['mask'] = F.tensor([True, True, False, True, True, False, True])
         hg = dgl.heterograph({
             ('user', 'follow', 'user'): ([0, 0, 0, 1, 1, 1, 2],
                                          [1, 2, 3, 0, 2, 3, 0]),
@@ -286,6 +287,7 @@ def _gen_neighbor_sampling_test_graph(hypersparse, reverse):
         }, {'user': card if card is not None else 4})
         g = g.to(F.ctx())
         g.edata['prob'] = F.tensor([.5, .5, 0., .5, .5, 0., 1.], dtype=F.float32)
+        g.edata['mask'] = F.tensor([True, True, False, True, True, False, True])
         hg = dgl.heterograph({
             ('user', 'follow', 'user'): ([1, 2, 3, 0, 2, 3, 0],
                                          [0, 0, 0, 1, 1, 1, 2]),
@@ -295,7 +297,9 @@ def _gen_neighbor_sampling_test_graph(hypersparse, reverse):
         }, num_nodes_dict)
         hg = hg.to(F.ctx())
     hg.edges['follow'].data['prob'] = F.tensor([.5, .5, 0., .5, .5, 0., 1.], dtype=F.float32)
+    hg.edges['follow'].data['mask'] = F.tensor([True, True, False, True, True, False, True])
     hg.edges['play'].data['prob'] = F.tensor([.8, .5, .5, .5], dtype=F.float32)
+    # Leave out the mask of play and liked-by since all of them are True anyway.
     hg.edges['liked-by'].data['prob'] = F.tensor([.3, .5, .2, .5, .1, .1], dtype=F.float32)
 
     return g, hg
@@ -646,6 +650,9 @@ def test_sample_neighbors_noprob():
 def test_sample_neighbors_prob():
     _test_sample_neighbors(False, 'prob')
     #_test_sample_neighbors(True)
+
+def test_sample_neighbors_mask():
+    _test_sample_neighbors(False, 'mask')
 
 def test_sample_neighbors_outedge():
     _test_sample_neighbors_outedge(False)
@@ -1050,6 +1057,7 @@ if __name__ == '__main__':
     from itertools import product
     test_sample_neighbors_noprob()
     test_sample_neighbors_prob()
+    test_sample_neighbors_mask()
     for args in product(['coo', 'csr', 'csc'], ['in', 'out'], [False, True]):
         print(args)
         test_sample_neighbors_etype_sorted_homogeneous(*(args[:2]))
