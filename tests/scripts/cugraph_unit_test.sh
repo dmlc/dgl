@@ -17,4 +17,4 @@ export CUDA_VISIBLE_DEVICES=0
 
 python3 -m pip install pytest psutil pyyaml pydantic pandas rdflib ogb || fail "pip install"
 
-python3 -m pytest -v --junitxml=pytest_cugraph.xml --durations=20 tests/cugraph
+python3 -m pytest -v --junitxml=pytest_cugraph.xml --durations=20 tests/cugraph || fail "cugraph"
