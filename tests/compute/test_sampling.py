@@ -341,9 +341,7 @@ def _test_sample_neighbors(hypersparse, prob):
     g, hg = _gen_neighbor_sampling_test_graph(hypersparse, False)
 
     def _test1(p, replace):
-        print('AAA')
         subg = dgl.sampling.sample_neighbors(g, [0, 1], -1, prob=p, replace=replace)
-        print('BBB')
         assert subg.number_of_nodes() == g.number_of_nodes()
         u, v = subg.edges()
         u_ans, v_ans = subg.in_edges([0, 1])
@@ -352,9 +350,7 @@ def _test_sample_neighbors(hypersparse, prob):
         assert uv == uv_ans
 
         for i in range(10):
-            print('CCC', i)
             subg = dgl.sampling.sample_neighbors(g, [0, 1], 2, prob=p, replace=replace)
-            print('DDD', i)
             assert subg.number_of_nodes() == g.number_of_nodes()
             assert subg.number_of_edges() == 4
             u, v = subg.edges()
@@ -891,16 +887,27 @@ def test_sample_neighbors_etype_sorted_homogeneous(format_, direction):
     if (direction, format_) in [('in', 'csr'), ('out', 'csc')]:
         h_g = h_g.formats(['csc', 'csr', 'coo'])
     orig_etype = F.asnumpy(h_g.edata[dgl.ETYPE])
-    h_g.edata[dgl.ETYPE] = F.tensor(
-        np.sort(orig_etype)[::-1].tolist(), dtype=F.int64)
 
+    # Test the case where the edge types are not sorted in ascending order.
+    # It should fail with an error.
+    for i in range(h_g.num_nodes()):
+        e = F.asnumpy(h_g.in_edges(i, form='eid'))
+        h_g.edata[dgl.ETYPE][e] = F.zerocopy_from_numpy(
+                np.sort(orig_etype[e])[::-1].copy())
     try:
-        dgl.sampling.sample_etype_neighbors(
+        sg = dgl.sampling.sample_etype_neighbors(
             h_g, seeds, dgl.ETYPE, fanouts, edge_dir=direction, etype_sorted=True)
         fail = False
     except dgl.DGLError:
         fail = True
     assert fail
+
+    # Now test where the edge types are sorted.
+    for i in range(h_g.num_nodes()):
+        e = F.asnumpy(h_g.in_edges(i, form='eid'))
+        h_g.edata[dgl.ETYPE][e] = F.zerocopy_from_numpy(np.sort(orig_etype[e]))
+    sg = dgl.sampling.sample_etype_neighbors(
+        h_g, seeds, dgl.ETYPE, fanouts, edge_dir=direction, etype_sorted=True)
 
 @pytest.mark.parametrize('dtype', ['int32', 'int64'])
 def test_sample_neighbors_exclude_edges_heteroG(dtype):
@@ -1033,11 +1040,13 @@ if __name__ == '__main__':
     test_sample_neighbors_noprob()
     test_sample_neighbors_prob()
     for args in product(['coo', 'csr', 'csc'], ['in', 'out'], [False, True]):
+        print(args)
+        test_sample_neighbors_etype_sorted_homogeneous(*(args[:2]))
         test_sample_neighbors_etype_homogeneous(*args)
     test_non_uniform_random_walk(False)
     test_uniform_random_walk(False)
     test_pack_traces()
-    test_pinsage_sampling()
+    test_pinsage_sampling(False)
     test_sample_neighbors_outedge()
     test_sample_neighbors_topk()
     test_sample_neighbors_topk_outedge()

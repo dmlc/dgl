@@ -96,10 +96,6 @@ CSRMatrix CSRRowWisePerEtypePickPartial(
   const int64_t num_etypes = max_num_picks.size();
   const int64_t total_max_num_picks = std::accumulate(
       max_num_picks.begin(), max_num_picks.end(), 0L);
-  // (BarclayII) previously this uses omp_get_max_threads(), but it still returns the number of
-  // CPUs even if I disable OpenMP during compilation.  Needs further investigation on why this
-  // is happening.
-  const int num_threads = runtime::compute_num_threads(0, num_rows, 1);
 
   // preallocate the results
   IdArray picked_row_indptr = NDArray::Empty({num_rows + 1}, idtype, ctx);
@@ -137,22 +133,10 @@ CSRMatrix CSRRowWisePerEtypePickPartial(
     et_idx_data = et_idx.Ptr<IdxType>();
   }
 
-  // NOTE: Not using multiple runtime::parallel_for to save the overhead of launching
-  // OpenMP thread groups.
-  // We should benchmark the overhead of launching separate OpenMP thread groups and compare
-  // with the implementation here.
-#pragma omp parallel num_threads(num_threads)
-  {
-    const int thread_id = omp_get_thread_num();
-    const int64_t start_i = thread_id * (num_rows/num_threads) +
-        std::min(static_cast<int64_t>(thread_id), num_rows % num_threads);
-    const int64_t end_i = (thread_id + 1) * (num_rows/num_threads) +
-        std::min(static_cast<int64_t>(thread_id + 1), num_rows % num_threads);
-    BUG_IF_FAIL(thread_id + 1 < num_threads || end_i == num_rows);
-
+  runtime::parallel_for(0, num_rows, [=] (size_t start_i, size_t end_i) {
     // Step 1: sort edge type IDs per node if necessary
     if (!etype_sorted) {
-      for (int64_t i = start_i; i < end_i; ++i) {
+      for (size_t i = start_i; i < end_i; ++i) {
         const IdxType rid = rows_data[i];
         std::iota(
             et_idx_data + et_idx_indptr_data[i],
@@ -161,14 +145,14 @@ CSRMatrix CSRRowWisePerEtypePickPartial(
         std::sort(
             et_idx_data + et_idx_indptr_data[i],
             et_idx_data + et_idx_indptr_data[i + 1],
-            [&etype_data, &data](IdxType i1, IdxType i2) {
+            [etype_data, data](IdxType i1, IdxType i2) {
               return etype_data[data ? data[i1] : i1] < etype_data[data ? data[i2] : i2];
             });
       }
     }
 
     // Step 2: determine the number of incident edges with the same edge type per node
-    for (int64_t i = start_i; i < end_i; ++i) {
+    for (size_t i = start_i; i < end_i; ++i) {
       int64_t start_j = !etype_sorted ? et_idx_indptr_data[i] : indptr[i];
       int64_t end_j = !etype_sorted ? et_idx_indptr_data[i + 1] : indptr[i + 1];
       for (int64_t j = start_j; j < end_j; ++j) {
@@ -188,18 +172,16 @@ CSRMatrix CSRRowWisePerEtypePickPartial(
       }
     }
 
-#pragma omp barrier
-#pragma omp master
+    #pragma omp master
     {
       off_etypes_per_row_data[0] = 0;
       for (int64_t i = 0; i < num_rows * num_etypes; ++i)
         off_etypes_per_row_data[i + 1] += off_etypes_per_row_data[i];
     }
-#pragma omp barrier
 
     // Step 3: determine the number of picks for each row and each edge type as well
     // as the indptr to return.
-    for (int64_t i = start_i; i < end_i; ++i) {
+    for (size_t i = start_i; i < end_i; ++i) {
       const IdxType rid = rows_data[i];
       const IdxType off = indptr[rid];
       const IdxType len = indptr[rid + 1] - off;
@@ -212,20 +194,18 @@ CSRMatrix CSRRowWisePerEtypePickPartial(
       }
     }
 
-#pragma omp barrier
-#pragma omp master
+    #pragma omp master
     {
       off_picked_per_row_data[0] = 0;
       for (int64_t i = 0; i < num_rows * num_etypes; ++i)
         off_picked_per_row_data[i + 1] += off_picked_per_row_data[i];
       picked_row_indptr_data[num_rows] = off_picked_per_row_data[num_rows * num_etypes];
     }
-#pragma omp barrier
-    for (int64_t i = start_i; i < end_i; ++i)
+
+    for (size_t i = start_i; i < end_i; ++i)
       picked_row_indptr_data[i] = off_picked_per_row_data[i * num_etypes];
 
-    // Step 4: pick the neighbors
-    for (int64_t i = start_i; i < end_i; ++i) {
+    for (size_t i = start_i; i < end_i; ++i) {
       const IdxType rid = rows_data[i];
       const IdxType off = indptr[rid];
       const IdxType len = indptr[rid + 1] - off;
@@ -244,7 +224,7 @@ CSRMatrix CSRRowWisePerEtypePickPartial(
         }
       }
     }
-  }
+  });
 
   const int64_t new_len = off_picked_per_row_data[num_rows * num_etypes];
   picked_col = picked_col.CreateView({new_len}, picked_col->dtype);

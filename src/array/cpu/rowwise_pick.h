@@ -108,22 +108,11 @@ CSRMatrix CSRRowWisePickPartial(
   const int num_threads = runtime::compute_num_threads(0, num_rows, 1);
   std::vector<int64_t> global_prefix(num_threads+1, 0);
 
-  // NOTE: Not using multiple runtime::parallel_for to save the overhead of launching
-  // OpenMP thread groups.
-  // We should benchmark the overhead of launching separate OpenMP thread groups and compare
-  // with the implementation here.
-#pragma omp parallel num_threads(num_threads)
-  {
-    const int thread_id = omp_get_thread_num();
-
-    const int64_t start_i = thread_id * (num_rows/num_threads) +
-        std::min(static_cast<int64_t>(thread_id), num_rows % num_threads);
-    const int64_t end_i = (thread_id + 1) * (num_rows/num_threads) +
-        std::min(static_cast<int64_t>(thread_id + 1), num_rows % num_threads);
-    BUG_IF_FAIL(thread_id + 1 < num_threads || end_i == num_rows);
+  runtime::parallel_for(0, num_rows, [=, &global_prefix] (size_t start_i, size_t end_i) {
+    int thread_id = omp_get_thread_num();
 
     // Part 1: determine the number of picks for each row as well as the indptr to return.
-    for (int64_t i = start_i; i < end_i; ++i) {
+    for (size_t i = start_i; i < end_i; ++i) {
       // build prefix-sum
       const IdxType rid = rows_data[i];
       const IdxType off = indptr[rid];
@@ -144,13 +133,14 @@ CSRMatrix CSRRowWisePickPartial(
 
     // No need to accumulate picked_row_indptr_data[start_i] here as it is handled by
     // the global prefix in the loop below.
-    for (int64_t i = start_i + 1; i < end_i; ++i)
+    for (size_t i = start_i + 1; i < end_i; ++i)
       picked_row_indptr_data[i + 1] += picked_row_indptr_data[i];
-    for (int64_t i = start_i; i < end_i; ++i)
+    for (size_t i = start_i; i < end_i; ++i)
       picked_row_indptr_data[i + 1] += global_prefix[thread_id];
+    #pragma omp barrier  // race condition at every start_i
 
     // Part 2: pick the neighbors.
-    for (int64_t i = start_i; i < end_i; ++i) {
+    for (size_t i = start_i; i < end_i; ++i) {
       const IdxType rid = rows_data[i];
 
       const IdxType off = indptr[rid];
@@ -169,7 +159,7 @@ CSRMatrix CSRRowWisePickPartial(
         picked_idata[row_offset + j] = data? data[picked] : picked;
       }
     }
-  }
+  });
 
   const int64_t new_len = global_prefix.back();
   picked_col = picked_col.CreateView({new_len}, picked_col->dtype);
