@@ -1,5 +1,5 @@
 import argparse
-
+from time import time
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
@@ -46,6 +46,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='RGCN for entity classification')
     parser.add_argument("--dataset", type=str, default="aifb",
                         help="Dataset name ('aifb', 'mutag', 'bgs', 'am'), default to 'aifb'.")
+    parser.add_argument("--batch-size", type=int, default=100,
+                        help="Training batch size, default to 100.")
     parser.add_argument("--idtype", type=str, default="int64",
                         help="Data type for node and edge IDs ('int64', 'int32'), default to 'int64'.")
     parser.add_argument("--verbose", action="store_true",
@@ -108,10 +110,10 @@ if __name__ == '__main__':
     fanouts = [4, 4]
     sampler = MultiLayerNeighborSampler(fanouts)
     train_loader = DataLoader(g, target_idx[train_idx].type(g.idtype), sampler, device=device,
-                              batch_size=100, shuffle=True)
+                              batch_size=args.batch_size, shuffle=True)
     # no separate validation subset, use train index instead for validation
     val_loader = DataLoader(g, target_idx[train_idx].type(g.idtype), sampler, device=device,
-                            batch_size=100, shuffle=False)
+                            batch_size=args.batch_size, shuffle=False)
 
     # create model
     h_dim = 16  # hidden feature dim
@@ -123,6 +125,7 @@ if __name__ == '__main__':
     optimizer = th.optim.Adam(model.parameters(), lr=1e-2, weight_decay=5e-4)
 
     # training
+    start = time()
     model.train()
     for epoch in range(100):
         total_loss = 0
@@ -137,7 +140,11 @@ if __name__ == '__main__':
             optimizer.step()
             total_loss += loss.item()
         acc = evaluate(model, labels, val_loader, inv_target)
-        print("Epoch {:05d} | Loss {:.4f} | Val. Accuracy {:.4f} ".format(epoch, total_loss / (it+1), acc))
+        if args.verbose:
+            print("Epoch {:05d} | Loss {:.4f} | Val. Accuracy {:.4f} "
+                .format(epoch, total_loss / (it+1), acc))
+    stop = time()
+    print(f"Training time (s): {stop-start}")
 
     # evaluation
     # note: when sampling all neighbors on a large graph for the test dataset, the required shared
