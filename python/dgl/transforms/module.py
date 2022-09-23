@@ -366,7 +366,9 @@ class LaplacianPE(BaseTransform):
     r"""Laplacian Positional Encoding, as introduced in
     `Benchmarking Graph Neural Networks
     <https://arxiv.org/abs/2003.00982>`__
+
     This module only works for homogeneous bidirected graphs.
+    
     Parameters
     ----------
     k : int
@@ -381,6 +383,7 @@ class LaplacianPE(BaseTransform):
     return_eigval : bool
         If return_eigval=='True', return laplacian eigenvalues together with eigenvectors.
         Else return laplacian eigenvectors only.
+    
     Example
     -------
     >>> import dgl
@@ -422,6 +425,7 @@ class LaplacianPE(BaseTransform):
         self.feat_name = feat_name
         self.padding = padding
         self.return_eigval = return_eigval
+    
     def __call__(self, g):
         if self.return_eigval:
             eigval, PE = functional.laplacian_pe(g, k=self.k, padding=self.padding, return_eigval=self.return_eigval)
@@ -430,6 +434,7 @@ class LaplacianPE(BaseTransform):
         else:
             PE = functional.laplacian_pe(g, k=self.k, padding=self.padding, return_eigval=self.return_eigval)
         g.ndata[self.feat_name] = F.copy_to(PE, g.device)
+        
         return g
 
 class AddSelfLoop(BaseTransform):
