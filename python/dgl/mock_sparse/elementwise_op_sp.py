@@ -1,7 +1,7 @@
 """dgl elementwise operators for sparse matrix module."""
-import torch
-
 from typing import Union
+
+import torch
 
 from .sp_matrix import SparseMatrix
 from .diag_matrix import DiagMatrix
