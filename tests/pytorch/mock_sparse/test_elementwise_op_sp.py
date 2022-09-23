@@ -52,9 +52,9 @@ def test_sparse_op_sparse(idtype, dtype, op):
 
 @parametrize_idtype
 @parametrize_dtype
-# TODO (Israt): Add div operator or not. Div does not support matrices with
-# diff sparsity pattern
-@pytest.mark.parametrize("op", [operator.add, operator.sub, operator.mul])
+@pytest.mark.parametrize(
+    "op", [operator.add, operator.sub, operator.mul, operator.truediv]
+)
 def test_sparse_op_diag(idtype, dtype, op):
     rowA = torch.tensor([1, 0, 2, 7, 1])
     colA = torch.tensor([0, 49, 2, 1, 7])
@@ -64,7 +64,15 @@ def test_sparse_op_diag(idtype, dtype, op):
     D_sp = D.as_sparse()
 
     def _test():
-        all_close_sparse(op(A.adj, D_sp.adj), op(A, D).adj)
+        if op is not operator.truediv:
+            all_close_sparse(op(A.adj, D_sp.adj), op(A, D).adj)
+        else:
+            # NOTE (Israt): Matrices mush have same sparsity pattern for div
+            D2 = diag(torch.arange(12, 22), shape=A.shape)
+            A_sp2 = D2.as_sparse()
+            assert np.allclose(
+                op(A_sp2, D).val, op(A_sp2.val, D_sp.val), rtol=1e-4, atol=1e-4
+            )
 
     _test()
 
@@ -101,11 +109,3 @@ def test_expose_op():
     dgl.mock_sparse.sub(A, A)
     dgl.mock_sparse.mul(A, A)
     dgl.mock_sparse.div(A, A)
-
-
-if __name__ == "__main__":
-    test_sparse_op_sparse()
-    test_sparse_op_diag()
-    test_sparse_op_scalar()
-    test_scalar_op_sparse()
-    test_expose_op()

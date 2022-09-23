@@ -1,12 +1,17 @@
 """dgl elementwise operators for sparse matrix module."""
 import torch
+
+from typing import Union
+
 from .sp_matrix import SparseMatrix
 from .diag_matrix import DiagMatrix
 
 __all__ = ["add", "sub", "mul", "div", "rdiv", "power", "rpower"]
 
 
-def add(A, B):
+def add(
+    A: Union[SparseMatrix, DiagMatrix], B: Union[SparseMatrix, DiagMatrix]
+) -> SparseMatrix:
     """Elementwise addition.
 
     Parameters
@@ -76,7 +81,9 @@ def add(A, B):
     )
 
 
-def sub(A, B):
+def sub(
+    A: Union[SparseMatrix, DiagMatrix], B: Union[SparseMatrix, DiagMatrix]
+) -> SparseMatrix:
     """Elementwise subtraction.
 
     Parameters
@@ -132,7 +139,10 @@ def sub(A, B):
     )
 
 
-def mul(A, B):
+def mul(
+    A: Union[SparseMatrix, DiagMatrix, float],
+    B: Union[SparseMatrix, DiagMatrix, float],
+) -> SparseMatrix:
     """Elementwise multiplication.
 
     Parameters
@@ -195,7 +205,10 @@ def mul(A, B):
     return SparseMatrix(C.indices()[0], C.indices()[1], C.values(), C.shape)
 
 
-def div(A, B):
+def div(
+    A: Union[SparseMatrix, DiagMatrix],
+    B: Union[SparseMatrix, DiagMatrix, float],
+) -> SparseMatrix:
     """Elementwise division.
 
     Parameters
@@ -247,7 +260,7 @@ def div(A, B):
     return SparseMatrix(C.indices()[0], C.indices()[1], C.values(), C.shape)
 
 
-def rdiv(A, B):
+def rdiv(A: float, B: Union[SparseMatrix, DiagMatrix]):
     """Elementwise division.
 
     Parameters
@@ -263,7 +276,7 @@ def rdiv(A, B):
     )
 
 
-def power(A, B):
+def power(A: SparseMatrix, B: float) -> SparseMatrix:
     """Elementwise power operation.
 
     Parameters
@@ -297,7 +310,7 @@ def power(A, B):
     return SparseMatrix(A.row, A.col, torch.pow(A.val, B), A.shape)
 
 
-def rpower(A, B):
+def rpower(A: float, B: SparseMatrix) -> SparseMatrix:
     """Elementwise power operation.
 
     Parameters
