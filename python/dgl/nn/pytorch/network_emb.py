@@ -139,8 +139,8 @@ class MetaPath2Vec(nn.Module):
         self.id2word = dict()
         if self.nid2word is None:
             for nodetype in set(nodespath):
-                self.local_to_global_id[nodetype] = np.arange(self.g.num_nodes(nodetype)) \
-                                                    + self.node_count
+                self.local_to_global_id[nodetype] = np.arange(
+                    self.g.num_nodes(nodetype)) + self.node_count
                 self.node_count += self.g.num_nodes(nodetype)
         else:
             wid = 0
@@ -150,7 +150,7 @@ class MetaPath2Vec(nn.Module):
                     self.local_to_global_id[nodetype][idx] = wid
                     self.id2word[wid] = self.nid2word[nodetype][idx]
                     wid += 1
-            self.node_count = self.g.num_nodes
+                self.node_count += self.g.num_nodes(nodetype)
 
         # start random walk
         for idx in tqdm.trange(self.g.num_nodes(nodespath[0])):
@@ -178,8 +178,6 @@ class MetaPath2Vec(nn.Module):
         print("Total embeddings: " + str(self.node_count))
         print("Real embeddings: " + str(len(self.node_frequency)))
 
-        import ipdb
-        ipdb.set_trace()
         self.u_emb = nn.Embedding(self.node_count, self.emb_dim, sparse=self.sparse)
         self.v_emb = nn.Embedding(self.node_count, self.emb_dim, sparse=self.sparse)
 
@@ -254,8 +252,8 @@ class MetaPath2Vec(nn.Module):
         return DataLoader(self.walk_dataset, collate_fn=self._generate_sample, **kwargs)
 
     def forward(self, pos_u, pos_v, neg_v):
-        r"""
-        Return the loss score given center nodes, positive context nodes, and negative samples.
+        r"""Return the loss score given center nodes, positive context nodes,
+        and negative samples.
 
         Parameters
         ----------
