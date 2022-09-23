@@ -109,10 +109,8 @@ inline ETypePickFn<IdxType, EType> GetSamplingETypePickFn(
         FloatArray probs = FloatArray::Empty({et_len}, prob->dtype, prob->ctx);
         FloatType* probs_data = static_cast<FloatType*>(probs->data);
         for (int64_t j = 0; j < et_len; ++j) {
-          if (data)
-            probs_data[j] = p_data[data[et_idx[et_off + j]]];
-          else
-            probs_data[j] = p_data[et_idx[et_off + j]];
+          const IdxType loc = et_idx ? et_idx[et_off + j] : et_off + j;
+          probs_data[j] = data ? p_data[data[loc]] : p_data[loc];
         }
 
         RandomEngine::ThreadLocal()->Choice<IdxType, FloatType>(
