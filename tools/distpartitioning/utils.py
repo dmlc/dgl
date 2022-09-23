@@ -441,7 +441,7 @@ def memory_snapshot(tag, rank):
     MB = 1024 * 1024
     KB = 1024
 
-    peak = dgl.partition.get_peak_mem() * KB
+    peak = dgl.partition.get_peak_mem()*KB
     mem = psutil.virtual_memory()
     avail = mem.available / MB
     used = mem.used / MB
