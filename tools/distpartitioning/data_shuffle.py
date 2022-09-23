@@ -8,6 +8,7 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 import dgl
 import logging
+from dgl import backend as F
 
 from timeit import default_timer as timer
 from datetime import timedelta
@@ -594,15 +595,30 @@ def gen_dist_partitions(rank, world_size, params):
     start = timer()
     num_nodes = 0
     num_edges = shuffle_global_eid_start
-    graph_obj, ntypes_map_val, etypes_map_val, ntypes_ntypeid_map, etypes_map = create_dgl_object(\
+    graph_obj, ntypes_map_val, etypes_map_val, ntypes_map, etypes_map = create_dgl_object(\
             params.graph_name, params.num_parts, \
             schema_map, rank, node_data, edge_data, num_nodes, num_edges)
+
+    # save original node/edge IDs
+    if params.save_orig_nids:
+        for ntype, ntype_id in ntypes_map.items():
+            mask = torch.logical_and(graph_obj.ndata[dgl.NTYPE] == ntype_id,
+                                        graph_obj.ndata['inner_node'])
+            orig_nids = F.boolean_mask(graph_obj.ndata['orig_id'], mask)
+            rcvd_node_features[ntype + '/' + dgl.ORIG_NID] = orig_nids
+    if params.save_orig_eids:
+        for etype, etype_id in etypes_map.items():
+            mask = torch.logical_and(graph_obj.edata[dgl.ETYPE] == etype_id,
+                                        graph_obj.edata['inner_edge'])
+            orig_eids = F.boolean_mask(graph_obj.edata['orig_id'], mask)
+            edge_features[etype + '/' + dgl.ORIG_EID] = orig_eids
+
     write_dgl_objects(graph_obj, rcvd_node_features, edge_features, params.output, rank)
 
     #get the meta-data
     json_metadata = create_metadata_json(params.graph_name, len(node_data[constants.NTYPE_ID]), len(edge_data[constants.ETYPE_ID]), \
                             rank, world_size, ntypes_map_val, \
-                            etypes_map_val, ntypes_ntypeid_map, etypes_map, params.output)
+                            etypes_map_val, ntypes_map, etypes_map, params.output)
 
     if (rank == 0):
         #get meta-data from all partitions and merge them on rank-0

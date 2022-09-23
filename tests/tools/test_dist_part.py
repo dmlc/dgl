@@ -1,15 +1,59 @@
-import argparse
 import dgl
 import json
 import numpy as np
 import os
-import sys
 import tempfile
 import torch
-
-from dgl.data.utils import load_tensors, load_graphs
+from dgl import backend as F
+from dgl.distributed.partition import (
+    load_partition, _get_inner_node_mask, _get_inner_edge_mask)
 
 from chunk_graph import chunk_graph
+
+def verify_graph_feats(g, gpb, part, node_feats, edge_feats):
+    for ntype in g.ntypes:
+        ntype_id = g.get_ntype_id(ntype)
+        inner_node_mask = _get_inner_node_mask(part, ntype_id)
+        inner_nids = F.boolean_mask(part.ndata[dgl.NID],inner_node_mask)
+        ntype_ids, inner_type_nids = gpb.map_to_per_ntype(inner_nids)
+        partid = gpb.nid2partid(inner_type_nids, ntype)
+        assert np.all(F.asnumpy(ntype_ids) == ntype_id)
+        assert np.all(F.asnumpy(partid) == gpb.partid)
+
+        orig_id = F.boolean_mask(part.ndata['orig_id'], inner_node_mask)
+        local_nids = gpb.nid2localnid(inner_type_nids, gpb.partid, ntype)
+
+        for name in g.nodes[ntype].data:
+            if name in [dgl.NID, 'inner_node']:
+                continue
+            true_feats = F.gather_row(g.nodes[ntype].data[name], orig_id)
+            ndata = F.gather_row(node_feats[ntype + '/' + name], local_nids)
+            assert np.all(F.asnumpy(ndata == true_feats))
+
+        ndata_orig_ids = F.gather_row(node_feats[ntype + '/' + dgl.ORIG_NID], local_nids)
+        assert np.all(F.asnumpy(ndata_orig_ids == orig_id))
+
+    for etype in g.etypes:
+        etype_id = g.get_etype_id(etype)
+        inner_edge_mask = _get_inner_edge_mask(part, etype_id)
+        inner_eids = F.boolean_mask(part.edata[dgl.EID],inner_edge_mask)
+        etype_ids, inner_type_eids = gpb.map_to_per_etype(inner_eids)
+        partid = gpb.eid2partid(inner_type_eids, etype)
+        assert np.all(F.asnumpy(etype_ids) == etype_id)
+        assert np.all(F.asnumpy(partid) == gpb.partid)
+
+        orig_id = F.boolean_mask(part.edata['orig_id'], inner_edge_mask)
+        local_eids = gpb.eid2localeid(inner_type_eids, gpb.partid, etype)
+
+        for name in g.edges[etype].data:
+            if name in [dgl.EID, 'inner_edge']:
+                continue
+            true_feats = F.gather_row(g.edges[etype].data[name], orig_id)
+            edata = F.gather_row(edge_feats[etype + '/' + name], local_eids)
+            assert np.all(F.asnumpy(edata == true_feats))
+
+        edata_orig_ids = F.gather_row(edge_feats[etype + '/' + dgl.ORIG_EID], local_eids)
+        assert np.all(F.asnumpy(edata_orig_ids == orig_id))
 
 def test_part_pipeline():
     # Step0: prepare chunked graph data format
@@ -154,7 +198,7 @@ def test_part_pipeline():
         # Step1: graph partition
         in_dir = os.path.join(root_dir, 'chunked-data')
         output_dir = os.path.join(root_dir, '2parts')
-        os.system('python tools/partition_algo/random_partition.py '\
+        os.system('python3 tools/partition_algo/random_partition.py '\
                   '--in_dir {} --out_dir {} --num_partitions {}'.format(
                     in_dir, output_dir, num_chunks))
         for ntype in ['author', 'institution', 'paper']:
@@ -171,13 +215,14 @@ def test_part_pipeline():
             f.write('127.0.0.1\n')
             f.write('127.0.0.2\n')
 
-        cmd = 'python tools/dispatch_data.py'
+        cmd = 'python3 tools/dispatch_data.py'
         cmd += f' --in-dir {in_dir}'
         cmd += f' --partitions-dir {partition_dir}'
         cmd += f' --out-dir {out_dir}'
         cmd += f' --ip-config {ip_config}'
         cmd += ' --ssh-port 22'
         cmd += ' --process-group-timeout 60'
+        cmd += ' --save-orig-nids --save-orig-eids'
         os.system(cmd)
 
         # check metadata.json
@@ -199,35 +244,16 @@ def test_part_pipeline():
         assert meta_data['num_nodes'] == 720
         assert meta_data['num_parts'] == num_chunks
 
+        # verify each partition
         for i in range(num_chunks):
             sub_dir = 'part-' + str(i)
             assert meta_data[sub_dir]['node_feats'] == 'part{}/node_feat.dgl'.format(i)
             assert meta_data[sub_dir]['edge_feats'] == 'part{}/edge_feat.dgl'.format(i)
             assert meta_data[sub_dir]['part_graph'] == 'part{}/graph.dgl'.format(i)
 
-            # check data
-            sub_dir = os.path.join(out_dir, 'part' + str(i))
+            part_g, node_feats, edge_feats, gpb, _, _, _ = load_partition(meta_fname, i)
+            verify_graph_feats(g, gpb, part_g, node_feats, edge_feats)
 
-            # graph.dgl
-            fname = os.path.join(sub_dir, 'graph.dgl')
-            assert os.path.isfile(fname)
-            g_list, data_dict = load_graphs(fname)
-            g = g_list[0]
-            assert isinstance(g, dgl.DGLGraph)
-
-            # node_feat.dgl
-            fname = os.path.join(sub_dir, 'node_feat.dgl')
-            assert os.path.isfile(fname)
-            tensor_dict = load_tensors(fname)
-            all_tensors = ['paper/feat', 'paper/label', 'paper/year']
-            assert tensor_dict.keys() == set(all_tensors)
-            for key in all_tensors:
-                assert isinstance(tensor_dict[key], torch.Tensor)
-
-            # edge_feat.dgl
-            fname = os.path.join(sub_dir, 'edge_feat.dgl')
-            assert os.path.isfile(fname)
-            tensor_dict = load_tensors(fname)
 
 if __name__ == '__main__':
     test_part_pipeline()
