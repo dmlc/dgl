@@ -402,7 +402,7 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
 
       // randomly select neighbors as candidates
       int num_threads = omp_get_max_threads();
-      runtime::parallel_for(0, num_threads, [&](size_t b, size_t e) {
+      runtime::parallel_for(0, num_threads, [&](IdType b, IdType e) {
         for (auto tid = b; tid < e; ++tid) {
           for (IdType i = point_idx_start; i < point_idx_end; ++i) {
             IdType local_idx = i - point_idx_start;

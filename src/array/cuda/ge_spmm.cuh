@@ -46,7 +46,7 @@ __global__ void GESpMMKernel(
         if (left + 32 <= high) {
 #pragma unroll
           for (Idx i = 0; i < 32; ++i) {
-            const Idx eid = left + i; 
+            const Idx eid = left + i;
             const Idx cid = __ldg(indices + eid);
             const Idx offset = feat_len * cid + fid;
             if (BinaryOp::use_rhs) {
@@ -59,7 +59,7 @@ __global__ void GESpMMKernel(
           }
         } else {
           for (Idx i = 0; left + i < high; ++i) {
-            const Idx eid = left + i; 
+            const Idx eid = left + i;
             const Idx cid = __ldg(indices + eid);
             const Idx offset = feat_len * cid + fid;
             if (BinaryOp::use_rhs) {
@@ -82,8 +82,8 @@ __global__ void GESpMMKernel(
         if (left + 32 <= high) {
 #pragma unroll
           for (int i = 0; i < 32; ++i) {
-            const Idx eid = left + i; 
-            const Idx cid = __ldg(indices + eid); 
+            const Idx eid = left + i;
+            const Idx cid = __ldg(indices + eid);
             const Idx offset = feat_len * cid;
             if (BinaryOp::use_rhs) {
               accum_0 += BinaryOp::Call(ufeat + offset + fid_0, efeat + eid);
@@ -95,8 +95,8 @@ __global__ void GESpMMKernel(
           }
         } else {
           for (int i = 0; i + left < high; ++i) {
-            const Idx eid = left + i; 
-            const Idx cid = __ldg(indices + eid); 
+            const Idx eid = left + i;
+            const Idx cid = __ldg(indices + eid);
             const Idx offset = feat_len * cid;
             if (BinaryOp::use_rhs) {
               accum_0 += BinaryOp::Call(ufeat + offset + fid_0, efeat + eid);
@@ -129,7 +129,7 @@ void GESpMMCsr(
   DType *out_data = out.Ptr<DType>();
 
   cudaStream_t stream = runtime::getCurrentCUDAStream();
-  
+
   const int ntx = 32;
   const int nty = 32;
   const int nby = (feat_len + (ntx * 2) - 1) / (ntx * 2);
@@ -150,4 +150,4 @@ void GESpMMCsr(
 }  // namespace aten
 }  // namespace dgl
 
-#endif
+#endif  // DGL_ARRAY_CUDA_GE_SPMM_CUH_
