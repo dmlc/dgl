@@ -31,9 +31,9 @@ def neg(A: SparseMatrix) -> SparseMatrix:
                  values=tensor([-1., -1., -2.]),
                  shape=(4, 4), nnz=3)
     """
-    return create_from_coo(row=A._row,
-                           col=A._col,
-                           val=-A._val,
+    return create_from_coo(row=A.row,
+                           col=A.col,
+                           val=-A.val,
                            shape=A.shape)
 
 def inv(A: SparseMatrix) -> SparseMatrix:
@@ -71,9 +71,9 @@ def inv(A: SparseMatrix) -> SparseMatrix:
     assert num_rows == num_cols, 'Expect a square matrix, got shape {}'.format(A.shape)
     assert len(A._val.shape) == 1, 'inv only supports matrices with 1D val'
 
-    val = A._val.cpu().numpy()
-    row = A._row.cpu().numpy()
-    col = A._col.cpu().numpy()
+    val = A.val.cpu().numpy()
+    row = A.row.cpu().numpy()
+    col = A.col.cpu().numpy()
     # The computation is more efficient with CSC format.
     mat = coo_matrix((val, (row, col)), dtype=val.dtype).tocsc()
     mat_inv = scipy_inv(mat)
