@@ -350,8 +350,11 @@ def _test_sample_neighbors(hypersparse, prob):
         u, v = subg.edges()
         u_ans, v_ans, e_ans = g.in_edges([0, 1], form='all')
         if p is not None:
-            u_ans = u_ans[g.edata[p][e_ans] != 0]
-            v_ans = v_ans[g.edata[p][e_ans] != 0]
+            emask = F.gather_row(g.edata[p], e_ans)
+            if p == 'p':
+                emask = (emask != 0)
+            u_ans = F.boolean_mask(u_ans, emask)
+            v_ans = F.boolean_mask(v_ans, emask)
         uv = set(zip(F.asnumpy(u), F.asnumpy(v)))
         uv_ans = set(zip(F.asnumpy(u_ans), F.asnumpy(v_ans)))
         assert uv == uv_ans
@@ -380,8 +383,11 @@ def _test_sample_neighbors(hypersparse, prob):
         u, v = subg.edges()
         u_ans, v_ans, e_ans = g.in_edges([0, 2], form='all')
         if p is not None:
-            u_ans = u_ans[g.edata[p][e_ans] != 0]
-            v_ans = v_ans[g.edata[p][e_ans] != 0]
+            emask = F.gather_row(g.edata[p], e_ans)
+            if p == 'p':
+                emask = (emask != 0)
+            u_ans = F.boolean_mask(u_ans, emask)
+            v_ans = F.boolean_mask(v_ans, emask)
         uv = set(zip(F.asnumpy(u), F.asnumpy(v)))
         uv_ans = set(zip(F.asnumpy(u_ans), F.asnumpy(v_ans)))
         assert uv == uv_ans
@@ -448,8 +454,11 @@ def _test_sample_neighbors_outedge(hypersparse):
         u, v = subg.edges()
         u_ans, v_ans, e_ans = g.out_edges([0, 1], form='all')
         if p is not None:
-            u_ans = u_ans[g.edata[p][e_ans] != 0]
-            v_ans = v_ans[g.edata[p][e_ans] != 0]
+            emask = F.gather_row(g.edata[p], e_ans)
+            if p == 'p':
+                emask = (emask != 0)
+            u_ans = F.boolean_mask(u_ans, emask)
+            v_ans = F.boolean_mask(v_ans, emask)
         uv = set(zip(F.asnumpy(u), F.asnumpy(v)))
         uv_ans = set(zip(F.asnumpy(u_ans), F.asnumpy(v_ans)))
         assert uv == uv_ans
@@ -480,8 +489,11 @@ def _test_sample_neighbors_outedge(hypersparse):
         u, v = subg.edges()
         u_ans, v_ans, e_ans = g.out_edges([0, 2], form='all')
         if p is not None:
-            u_ans = u_ans[g.edata[p][e_ans] != 0]
-            v_ans = v_ans[g.edata[p][e_ans] != 0]
+            emask = F.gather_row(g.edata[p], e_ans)
+            if p == 'p':
+                emask = (emask != 0)
+            u_ans = F.boolean_mask(u_ans, emask)
+            v_ans = F.boolean_mask(v_ans, emask)
         uv = set(zip(F.asnumpy(u), F.asnumpy(v)))
         uv_ans = set(zip(F.asnumpy(u_ans), F.asnumpy(v_ans)))
         assert uv == uv_ans
@@ -663,6 +675,7 @@ def test_sample_neighbors_prob():
     _test_sample_neighbors(False, 'prob')
     #_test_sample_neighbors(True)
 
+@unittest.skipIf(F.backend_name == 'mxnet', reason='MXNet has problem converting bool arrays')
 def test_sample_neighbors_mask():
     _test_sample_neighbors(False, 'mask')
 
@@ -826,6 +839,7 @@ def test_sample_neighbors_biased_bipartite():
         check_num(subg.edges()[1], tag)
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
+@unittest.skipIf(F.backend_name == 'mxnet', reason='MXNet has problem converting bool arrays')
 @pytest.mark.parametrize('format_', ['coo', 'csr', 'csc'])
 @pytest.mark.parametrize('direction', ['in', 'out'])
 @pytest.mark.parametrize('replace', [False, True])
@@ -925,6 +939,7 @@ def test_sample_neighbors_etype_homogeneous(format_, direction, replace):
 
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
+@unittest.skipIf(F.backend_name == 'mxnet', reason='MXNet has problem converting bool arrays')
 @pytest.mark.parametrize('format_', ['csr', 'csc'])
 @pytest.mark.parametrize('direction', ['in', 'out'])
 def test_sample_neighbors_etype_sorted_homogeneous(format_, direction):
@@ -942,13 +957,14 @@ def test_sample_neighbors_etype_sorted_homogeneous(format_, direction):
 
     # Test the case where the edge types are not sorted in ascending order.
     # It should fail with an error.
+    new_etype = orig_etype.copy()
     for i in range(h_g.num_nodes()):
         if direction == 'in':
             e = F.asnumpy(h_g.in_edges(i, form='eid'))
         else:
             e = F.asnumpy(h_g.out_edges(i, form='eid'))
-        h_g.edata[dgl.ETYPE][e] = F.zerocopy_from_numpy(
-                np.sort(orig_etype[e])[::-1].copy())
+        new_etype[e] = np.sort(orig_etype[e])[::-1]
+    h_g.edata[dgl.ETYPE] = F.zerocopy_from_numpy(new_etype)
     try:
         sg = dgl.sampling.sample_etype_neighbors(
             h_g, seeds, dgl.ETYPE, fanouts, edge_dir=direction, etype_sorted=True)
@@ -963,7 +979,8 @@ def test_sample_neighbors_etype_sorted_homogeneous(format_, direction):
             e = F.asnumpy(h_g.in_edges(i, form='eid'))
         else:
             e = F.asnumpy(h_g.out_edges(i, form='eid'))
-        h_g.edata[dgl.ETYPE][e] = F.zerocopy_from_numpy(np.sort(orig_etype[e]))
+        new_etype[e] = np.sort(orig_etype[e])
+    h_g.edata[dgl.ETYPE] = F.zerocopy_from_numpy(new_etype)
     sg = dgl.sampling.sample_etype_neighbors(
         h_g, seeds, dgl.ETYPE, fanouts, edge_dir=direction, etype_sorted=True)
 
@@ -1099,7 +1116,6 @@ if __name__ == '__main__':
     test_sample_neighbors_prob()
     test_sample_neighbors_mask()
     for args in product(['coo', 'csr', 'csc'], ['in', 'out'], [False, True]):
-        print(args)
         test_sample_neighbors_etype_sorted_homogeneous(*(args[:2]))
         test_sample_neighbors_etype_homogeneous(*args)
     test_non_uniform_random_walk(False)
