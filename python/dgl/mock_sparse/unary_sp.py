@@ -7,6 +7,7 @@ from scipy.sparse import coo_matrix
 from scipy.sparse.linalg import inv as scipy_inv
 
 from .sp_matrix import SparseMatrix, create_from_coo
+from ..convert import graph
 from ..ops.edge_softmax import edge_softmax
 
 def neg(A: SparseMatrix) -> SparseMatrix:
@@ -134,7 +135,7 @@ def softmax(A: SparseMatrix) -> SparseMatrix:
     >>> result.shape
     (3, 3)
     """
-    g = dgl.graph((A.col, A.row))
+    g = graph((A.col, A.row))
     return create_from_coo(A.row,
                            A.col,
                            edge_softmax(g, A.val),
