@@ -251,14 +251,11 @@ def identity(shape: Tuple[int, int],
     Case3: 3-by-3 matrix with tensor diagonal values
 
     >>> mat = identity(shape=(3, 3), d=2)
-    >>> mat.val
-    tensor([[1., 1.],
+    >>> print(mat)
+    DiagMatrix(val=tensor([[1., 1.],
             [1., 1.],
-            [1., 1.]])
-    >>> mat.shape
-    (3, 3)
-    >>> mat.nnz
-    3
+            [1., 1.]]),
+    shape=(3, 3))
     """
     len_val = min(shape)
     if d is None:
