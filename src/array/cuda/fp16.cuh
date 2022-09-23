@@ -22,7 +22,6 @@
 #define DGL_ARRAY_CUDA_FP16_CUH_
 
 
-#ifdef USE_FP16
 #include <cuda_fp16.h>
 #include <algorithm>
 
@@ -109,7 +108,5 @@ __device__ __forceinline__ bool operator<=(const __half& lh, const __half& rh) {
 }
 #endif  // __CUDA_ARCH__ < 530
 #endif  // __CUDACC__
-
-#endif  // USE_FP16
 
 #endif  // DGL_ARRAY_CUDA_FP16_CUH_

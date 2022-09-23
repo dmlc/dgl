@@ -39,22 +39,18 @@ void Scatter_(IdArray index, NDArray value, NDArray out) {
 
 template void Scatter_<kDGLCUDA, int32_t, int32_t>(IdArray, NDArray, NDArray);
 template void Scatter_<kDGLCUDA, int64_t, int32_t>(IdArray, NDArray, NDArray);
-#ifdef USE_FP16
 template void Scatter_<kDGLCUDA, __half, int32_t>(IdArray, NDArray, NDArray);
-#endif  // USE_FP16
-#ifdef USE_BF16
+#if BF16_ENABLED
 template void Scatter_<kDGLCUDA, __nv_bfloat16, int32_t>(IdArray, NDArray, NDArray);
-#endif  // USE_BF16
+#endif  // BF16_ENABLED
 template void Scatter_<kDGLCUDA, float, int32_t>(IdArray, NDArray, NDArray);
 template void Scatter_<kDGLCUDA, double, int32_t>(IdArray, NDArray, NDArray);
 template void Scatter_<kDGLCUDA, int32_t, int64_t>(IdArray, NDArray, NDArray);
 template void Scatter_<kDGLCUDA, int64_t, int64_t>(IdArray, NDArray, NDArray);
-#ifdef USE_FP16
 template void Scatter_<kDGLCUDA, __half, int64_t>(IdArray, NDArray, NDArray);
-#endif  // USE_FP16
-#ifdef USE_BF16
+#if BF16_ENABLED
 template void Scatter_<kDGLCUDA, __nv_bfloat16, int64_t>(IdArray, NDArray, NDArray);
-#endif  // USE_BF16
+#endif  // BF16_ENABLED
 template void Scatter_<kDGLCUDA, float, int64_t>(IdArray, NDArray, NDArray);
 template void Scatter_<kDGLCUDA, double, int64_t>(IdArray, NDArray, NDArray);
 

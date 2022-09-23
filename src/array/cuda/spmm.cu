@@ -111,7 +111,6 @@ void SpMMCoo(const std::string& op, const std::string& reduce,
   }
 }
 
-#ifdef USE_FP16
 template void SpMMCsr<kDGLCUDA, int32_t, __half>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const CSRMatrix& csr,
@@ -120,8 +119,7 @@ template void SpMMCsr<kDGLCUDA, int64_t, __half>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
-#endif  // USE_FP16
-#ifdef USE_BF16
+#if BF16_ENABLED
 template void SpMMCsr<kDGLCUDA, int32_t, __nv_bfloat16>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const CSRMatrix& csr,
@@ -130,7 +128,7 @@ template void SpMMCsr<kDGLCUDA, int64_t, __nv_bfloat16>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
-#endif  // USE_BF16
+#endif  // BF16_ENABLED
 template void SpMMCsr<kDGLCUDA, int32_t, float>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const CSRMatrix& csr,
@@ -148,7 +146,6 @@ template void SpMMCsr<kDGLCUDA, int64_t, double>(
     const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 
-#ifdef USE_FP16
 template void SpMMCoo<kDGLCUDA, int32_t, __half>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const COOMatrix& coo,
@@ -157,8 +154,7 @@ template void SpMMCoo<kDGLCUDA, int64_t, __half>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const COOMatrix& coo,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
-#endif  // USE_FP16
-#ifdef USE_BF16
+#if BF16_ENABLED
 template void SpMMCoo<kDGLCUDA, int32_t, __nv_bfloat16>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const COOMatrix& coo,
@@ -167,7 +163,7 @@ template void SpMMCoo<kDGLCUDA, int64_t, __nv_bfloat16>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const COOMatrix& coo,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
-#endif  // USE_BF16
+#endif  // BF16_ENABLED
 template void SpMMCoo<kDGLCUDA, int32_t, float>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const COOMatrix& coo,

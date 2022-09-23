@@ -49,7 +49,6 @@ void SDDMMCoo(const std::string& op,
   });
 }
 
-#ifdef USE_FP16
 template void SDDMMCsr<kDGLCUDA, int32_t, __half>(
     const std::string& op, const BcastOff& bcast, const CSRMatrix& csr,
     NDArray lhs, NDArray rhs, NDArray out,
@@ -58,8 +57,7 @@ template void SDDMMCsr<kDGLCUDA, int64_t, __half>(
     const std::string& op, const BcastOff& bcast, const CSRMatrix& csr,
     NDArray lhs, NDArray rhs, NDArray out,
     int lhs_target, int rhs_target);
-#endif  // USE_FP16
-#ifdef USE_BF16
+#if BF16_ENABLED
 template void SDDMMCsr<kDGLCUDA, int32_t, __nv_bfloat16>(
     const std::string& op, const BcastOff& bcast, const CSRMatrix& csr,
     NDArray lhs, NDArray rhs, NDArray out,
@@ -68,7 +66,7 @@ template void SDDMMCsr<kDGLCUDA, int64_t, __nv_bfloat16>(
     const std::string& op, const BcastOff& bcast, const CSRMatrix& csr,
     NDArray lhs, NDArray rhs, NDArray out,
     int lhs_target, int rhs_target);
-#endif  // USE_BF16
+#endif  // BF16_ENABLED
 template void SDDMMCsr<kDGLCUDA, int32_t, float>(
     const std::string& op, const BcastOff& bcast, const CSRMatrix& csr,
     NDArray lhs, NDArray rhs, NDArray out,
@@ -86,7 +84,6 @@ template void SDDMMCsr<kDGLCUDA, int64_t, double>(
     NDArray lhs, NDArray rhs, NDArray out,
     int lhs_target, int rhs_target);
 
-#ifdef USE_FP16
 template void SDDMMCoo<kDGLCUDA, int32_t, __half>(
     const std::string& op, const BcastOff& bcast, const COOMatrix& coo,
     NDArray lhs, NDArray rhs, NDArray out,
@@ -95,8 +92,7 @@ template void SDDMMCoo<kDGLCUDA, int64_t, __half>(
     const std::string& op, const BcastOff& bcast, const COOMatrix& coo,
     NDArray lhs, NDArray rhs, NDArray out,
     int lhs_target, int rhs_target);
-#endif  // USE_FP16
-#ifdef USE_BF16
+#if BF16_ENABLED
 template void SDDMMCoo<kDGLCUDA, int32_t, __nv_bfloat16>(
     const std::string& op, const BcastOff& bcast, const COOMatrix& coo,
     NDArray lhs, NDArray rhs, NDArray out,
@@ -105,7 +101,7 @@ template void SDDMMCoo<kDGLCUDA, int64_t, __nv_bfloat16>(
     const std::string& op, const BcastOff& bcast, const COOMatrix& coo,
     NDArray lhs, NDArray rhs, NDArray out,
     int lhs_target, int rhs_target);
-#endif  // USE_BF16
+#endif  // BF16_ENABLED
 template void SDDMMCoo<kDGLCUDA, int32_t, float>(
     const std::string& op, const BcastOff& bcast, const COOMatrix& coo,
     NDArray lhs, NDArray rhs, NDArray out,

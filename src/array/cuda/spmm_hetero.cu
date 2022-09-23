@@ -179,7 +179,6 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
   }
 }
 
-#ifdef USE_FP16
 template void SpMMCsrHetero<kDGLCUDA, int32_t, __half>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const std::vector<CSRMatrix>& csr,
@@ -192,8 +191,7 @@ template void SpMMCsrHetero<kDGLCUDA, int64_t, __half>(
     const std::vector<NDArray>& ufeat, const std::vector<NDArray>& efeat,
     std::vector<NDArray>* out, std::vector<std::vector<NDArray>>* out_aux,
     const std::vector<dgl_type_t>& ufeat_ntids, const std::vector<dgl_type_t>& out_ntids);
-#endif  // USE_FP16
-#ifdef USE_BF16
+#if BF16_ENABLED
 template void SpMMCsrHetero<kDGLCUDA, int32_t, __nv_bfloat16>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const std::vector<CSRMatrix>& csr,
@@ -206,7 +204,7 @@ template void SpMMCsrHetero<kDGLCUDA, int64_t, __nv_bfloat16>(
     const std::vector<NDArray>& ufeat, const std::vector<NDArray>& efeat,
     std::vector<NDArray>* out, std::vector<std::vector<NDArray>>* out_aux,
     const std::vector<dgl_type_t>& ufeat_ntids, const std::vector<dgl_type_t>& out_ntids);
-#endif  // USE_BF16
+#endif  // BF16_ENABLED
 template void SpMMCsrHetero<kDGLCUDA, int32_t, float>(
     const std::string& op, const std::string& reduce,
     const BcastOff& bcast, const std::vector<CSRMatrix>& csr,

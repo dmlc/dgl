@@ -9,6 +9,8 @@
 
 #include <cusparse.h>
 #include <dgl/runtime/c_runtime_api.h>
+#include "fp16.cuh"
+#include "bf16.cuh"
 
 namespace dgl {
 namespace aten {
@@ -34,7 +36,6 @@ struct CSRGEMM {
   }
 };
 
-#ifdef USE_FP16
 template <>
 struct CSRGEMM<__half> {
   template <typename... Args>
@@ -58,9 +59,8 @@ struct CSRGEMM<__half> {
     return static_cast<cusparseStatus_t>(0);
   }
 };
-#endif  // USE_FP16
 
-#ifdef USE_BF16
+#if BF16_ENABLED
 template <>
 struct CSRGEMM<__nv_bfloat16> {
   template <typename... Args>
@@ -84,7 +84,7 @@ struct CSRGEMM<__nv_bfloat16> {
     return static_cast<cusparseStatus_t>(0);
   }
 };
-#endif  // USE_BF16
+#endif  // BF16_ENABLED
 
 template <>
 struct CSRGEMM<float> {
@@ -143,7 +143,6 @@ struct CSRGEAM {
   }
 };
 
-#ifdef USE_FP16
 template <>
 struct CSRGEAM<__half> {
   template <typename... Args>
@@ -167,9 +166,8 @@ struct CSRGEAM<__half> {
     return static_cast<cusparseStatus_t>(0);
   }
 };
-#endif  // USE_FP16
 
-#ifdef USE_BF16
+#if BF16_ENABLED
 template <>
 struct CSRGEAM<__nv_bfloat16> {
   template <typename... Args>
@@ -193,7 +191,7 @@ struct CSRGEAM<__nv_bfloat16> {
     return static_cast<cusparseStatus_t>(0);
   }
 };
-#endif  // USE_BF16
+#endif  // BF16_ENABLED
 
 template <>
 struct CSRGEAM<float> {

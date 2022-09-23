@@ -160,23 +160,21 @@ template <typename Idx,
           bool atomic = false>
 struct Sum: _Sum<Idx, DType, atomic> { };
 
-#ifdef USE_FP16
 template <typename Idx, bool atomic>
 struct Sum<Idx, half, atomic>: _Sum<Idx, half, atomic> {
   static constexpr __host__ __device__ __forceinline__ half zero() {
     return __float2half_rn(0.);
   }
 };
-#endif  // USE_FP16
 
-#ifdef USE_BF16
+#if BF16_ENABLED
 template <typename Idx, bool atomic>
 struct Sum<Idx, __nv_bfloat16, atomic>: _Sum<Idx, __nv_bfloat16, atomic> {
   static constexpr __host__ __device__ __forceinline__ __nv_bfloat16 zero() {
     return __float2bfloat16_rn(0.);
   }
 };
-#endif  // USE_BF16
+#endif  // BF16_ENABLED
 
 template <typename Idx,
           typename DType,
@@ -230,7 +228,6 @@ template <typename Idx,
           bool atomic = false>
 struct Max : _Max<Idx, DType, atomic> { };
 
-#ifdef USE_FP16
 template <typename Idx,
           bool atomic>
 struct Max<Idx, half, atomic> : _Max<Idx, half, atomic> {
@@ -238,9 +235,8 @@ struct Max<Idx, half, atomic> : _Max<Idx, half, atomic> {
     return __float2half_rn(-6.550400e+04f);
   }
 };
-#endif  // USE_FP16
 
-#ifdef USE_BF16
+#if BF16_ENABLED
 template <typename Idx,
           bool atomic>
 struct Max<Idx, __nv_bfloat16, atomic> : _Max<Idx, __nv_bfloat16, atomic> {
@@ -248,7 +244,7 @@ struct Max<Idx, __nv_bfloat16, atomic> : _Max<Idx, __nv_bfloat16, atomic> {
     return __float2bfloat16_rn(-std::numeric_limits<float>::infinity());
   }
 };
-#endif  // USE_BF16
+#endif  // BF16_ENABLED
 
 template <typename Idx,
           typename DType,
@@ -302,7 +298,6 @@ template <typename Idx,
           bool atomic = false>
 struct Min : _Min<Idx, DType, atomic> { };
 
-#ifdef USE_FP16
 template <typename Idx,
           bool atomic>
 struct Min<Idx, half, atomic> : _Min<Idx, half, atomic> {
@@ -310,9 +305,8 @@ struct Min<Idx, half, atomic> : _Min<Idx, half, atomic> {
     return __float2half_rn(6.550400e+04f);
   }
 };
-#endif  // USE_FP16
 
-#ifdef USE_BF16
+#if BF16_ENABLED
 template <typename Idx,
           bool atomic>
 struct Min<Idx, __nv_bfloat16, atomic> : _Min<Idx, __nv_bfloat16, atomic> {
@@ -320,7 +314,7 @@ struct Min<Idx, __nv_bfloat16, atomic> : _Min<Idx, __nv_bfloat16, atomic> {
     return __float2bfloat16_rn(std::numeric_limits<float>::infinity());
   }
 };
-#endif  // USE_BF16
+#endif  // BF16_ENABLED
 
 }  // namespace reduce
 

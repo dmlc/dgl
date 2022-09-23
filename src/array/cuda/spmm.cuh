@@ -52,7 +52,6 @@ cublasStatus_t Xgeam(cublasHandle_t handle, cublasOperation_t transa,
   return CUBLAS_STATUS_EXECUTION_FAILED;
 }
 
-#ifdef USE_FP16
 template <>
 cublasStatus_t Xgeam<__half>(cublasHandle_t handle, cublasOperation_t transa,
     cublasOperation_t transb, int m, int n,
@@ -64,9 +63,8 @@ cublasStatus_t Xgeam<__half>(cublasHandle_t handle, cublasOperation_t transa,
   LOG(FATAL) << "Xgeam does not support dtype half (FP16)";
   return CUBLAS_STATUS_EXECUTION_FAILED;
 }
-#endif  // USE_FP16
 
-#ifdef USE_BF16
+#if BF16_ENABLED
 template <>
 cublasStatus_t Xgeam<__nv_bfloat16>(cublasHandle_t handle, cublasOperation_t transa,
     cublasOperation_t transb, int m, int n,
@@ -78,7 +76,7 @@ cublasStatus_t Xgeam<__nv_bfloat16>(cublasHandle_t handle, cublasOperation_t tra
   LOG(FATAL) << "Xgeam does not support dtype bfloat16 (BF16)";
   return CUBLAS_STATUS_EXECUTION_FAILED;
 }
-#endif  // USE_BF16
+#endif  // BF16_ENABLED
 
 template <>
 cublasStatus_t Xgeam<float>(cublasHandle_t handle, cublasOperation_t transa,

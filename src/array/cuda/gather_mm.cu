@@ -26,7 +26,6 @@ cublasStatus_t cublasGemm(cublasHandle_t handle, cublasOperation_t transa,
   return CUBLAS_STATUS_EXECUTION_FAILED;
 }
 
-#ifdef USE_FP16
 template <>
 cublasStatus_t cublasGemm<__half>(cublasHandle_t handle, cublasOperation_t transa,
     cublasOperation_t transb, int m, int n, int k,
@@ -36,9 +35,8 @@ cublasStatus_t cublasGemm<__half>(cublasHandle_t handle, cublasOperation_t trans
   return cublasHgemm(handle, transa, transb, m, n, k, alpha, A, lda,
       B, ldb, beta, C, ldc);
 }
-#endif  // USE_FP16
 
-#ifdef USE_BF16
+#if BF16_ENABLED
 template <>
 cublasStatus_t cublasGemm<__nv_bfloat16>(cublasHandle_t handle, cublasOperation_t transa,
     cublasOperation_t transb, int m, int n, int k,
@@ -53,7 +51,7 @@ cublasStatus_t cublasGemm<__nv_bfloat16>(cublasHandle_t handle, cublasOperation_
       &beta_float, C, CUDA_R_16BF, ldc,
       CUBLAS_COMPUTE_32F, CUBLAS_GEMM_DEFAULT_TENSOR_OP);
 }
-#endif  // USE_BF16
+#endif  // BF16_ENABLED
 
 template <>
 cublasStatus_t cublasGemm<float>(cublasHandle_t handle, cublasOperation_t transa,
@@ -402,22 +400,20 @@ void GatherMMScatter(const NDArray A,
     }
 }
 
-#ifdef USE_FP16
 template void GatherMM<kDGLCUDA, int32_t, __half>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray idx_a, const NDArray idx_b);
 template void GatherMM<kDGLCUDA, int64_t, __half>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray idx_a, const NDArray idx_b);
-#endif  // USE_FP16
-#ifdef USE_BF16
+#if BF16_ENABLED
 template void GatherMM<kDGLCUDA, int32_t, __nv_bfloat16>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray idx_a, const NDArray idx_b);
 template void GatherMM<kDGLCUDA, int64_t, __nv_bfloat16>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray idx_a, const NDArray idx_b);
-#endif  // USE_BF16
+#endif  // BF16_ENABLED
 template void GatherMM<kDGLCUDA, int32_t, float>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray idx_a, const NDArray idx_b);
@@ -431,22 +427,20 @@ template void GatherMM<kDGLCUDA, int64_t, double>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray idx_a, const NDArray idx_b);
 
-#ifdef USE_FP16
 template void GatherMMScatter<kDGLCUDA, int32_t, __half>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray idx_a, const NDArray idx_b, const NDArray idx_c);
 template void GatherMMScatter<kDGLCUDA, int64_t, __half>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray idx_a, const NDArray idx_b, const NDArray idx_c);
-#endif  // USE_FP16
-#ifdef USE_BF16
+#if BF16_ENABLED
 template void GatherMMScatter<kDGLCUDA, int32_t, __nv_bfloat16>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray idx_a, const NDArray idx_b, const NDArray idx_c);
 template void GatherMMScatter<kDGLCUDA, int64_t, __nv_bfloat16>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray idx_a, const NDArray idx_b, const NDArray idx_c);
-#endif  // USE_BF16
+#endif  // BF16_ENABLED
 template void GatherMMScatter<kDGLCUDA, int32_t, float>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray idx_a, const NDArray idx_b, const NDArray idx_c);
@@ -460,22 +454,20 @@ template void GatherMMScatter<kDGLCUDA, int64_t, double>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray idx_a, const NDArray idx_b, const NDArray idx_c);
 
-#ifdef USE_FP16
 template void SegmentMM<kDGLCUDA, int32_t, __half>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray seglen_A, bool a_trans, bool b_trans);
 template void SegmentMM<kDGLCUDA, int64_t, __half>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray seglen_A, bool a_trans, bool b_trans);
-#endif  // USE_FP16
-#ifdef USE_BF16
+#if BF16_ENABLED
 template void SegmentMM<kDGLCUDA, int32_t, __nv_bfloat16>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray seglen_A, bool a_trans, bool b_trans);
 template void SegmentMM<kDGLCUDA, int64_t, __nv_bfloat16>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray seglen_A, bool a_trans, bool b_trans);
-#endif  // USE_BF16
+#endif  // BF16_ENABLED
 template void SegmentMM<kDGLCUDA, int32_t, float>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray seglen_A, bool a_trans, bool b_trans);
@@ -489,18 +481,16 @@ template void SegmentMM<kDGLCUDA, int64_t, double>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray seglen_A, bool a_trans, bool b_trans);
 
-#ifdef USE_FP16
 template void SegmentMMBackwardB<kDGLCUDA, int32_t, __half>(
     const NDArray A, const NDArray dC, NDArray dB, const NDArray seglen);
 template void SegmentMMBackwardB<kDGLCUDA, int64_t, __half>(
     const NDArray A, const NDArray dC, NDArray dB, const NDArray seglen);
-#endif  // USE_FP16
-#ifdef USE_BF16
+#if BF16_ENABLED
 template void SegmentMMBackwardB<kDGLCUDA, int32_t, __nv_bfloat16>(
     const NDArray A, const NDArray dC, NDArray dB, const NDArray seglen);
 template void SegmentMMBackwardB<kDGLCUDA, int64_t, __nv_bfloat16>(
     const NDArray A, const NDArray dC, NDArray dB, const NDArray seglen);
-#endif  // USE_BF16
+#endif  // BF16_ENABLED
 template void SegmentMMBackwardB<kDGLCUDA, int32_t, float>(
     const NDArray A, const NDArray dC, NDArray dB, const NDArray seglen);
 template void SegmentMMBackwardB<kDGLCUDA, int64_t, float>(

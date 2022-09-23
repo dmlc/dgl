@@ -255,18 +255,16 @@ std::pair<CSRMatrix, NDArray> CSRMM(
   }
 }
 
-#ifdef USE_FP16
 template std::pair<CSRMatrix, NDArray> CSRMM<kDGLCUDA, int32_t, __half>(
     const CSRMatrix&, NDArray, const CSRMatrix&, NDArray);
 template std::pair<CSRMatrix, NDArray> CSRMM<kDGLCUDA, int64_t, __half>(
     const CSRMatrix&, NDArray, const CSRMatrix&, NDArray);
-#endif  // USE_FP16
-#ifdef USE_BF16
+#if BF16_ENABLED
 template std::pair<CSRMatrix, NDArray> CSRMM<kDGLCUDA, int32_t, __nv_bfloat16>(
     const CSRMatrix&, NDArray, const CSRMatrix&, NDArray);
 template std::pair<CSRMatrix, NDArray> CSRMM<kDGLCUDA, int64_t, __nv_bfloat16>(
     const CSRMatrix&, NDArray, const CSRMatrix&, NDArray);
-#endif  // USE_BF16
+#endif  // BF16_ENABLED
 template std::pair<CSRMatrix, NDArray> CSRMM<kDGLCUDA, int32_t, float>(
     const CSRMatrix&, NDArray, const CSRMatrix&, NDArray);
 template std::pair<CSRMatrix, NDArray> CSRMM<kDGLCUDA, int64_t, float>(
