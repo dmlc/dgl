@@ -10,6 +10,7 @@
 #include <dgl/random.h>
 #include <algorithm>
 #include <numeric>
+#include <vector>
 #include "./rowwise_etype_pick.h"
 
 namespace dgl {
