@@ -7,12 +7,15 @@ if [ $# -ne 1 ]; then
     exit -1
 fi
 
-CMAKE_VARS="-DBUILD_CPP_TEST=ON -DUSE_OPENMP=ON -DBUILD_TORCH=ON"
+CMAKE_VARS="-DBUILD_CPP_TEST=ON -DUSE_OPENMP=ON"
 # This is a semicolon-separated list of Python interpreters containing PyTorch.
 # The value here is for CI.  Replace it with your own or comment this whole
 # statement for default Python interpreter.
 if [ "$1" != "cugraph" ]; then
-    CMAKE_VARS="$CMAKE_VARS -DTORCH_PYTHON_INTERPS=/opt/conda/envs/pytorch-ci/bin/python"
+    # We do not build pytorch for cugraph because currently building
+    # pytorch against all the supported cugraph versions is not supported
+    # See issue: https://github.com/rapidsai/cudf/issues/8510
+    CMAKE_VARS="$CMAKE_VARS -DBUILD_TORCH=ON -DTORCH_PYTHON_INTERPS=/opt/conda/envs/pytorch-ci/bin/python"
 fi
 
 #This is implemented to detect underlying architecture and enable arch specific optimization.

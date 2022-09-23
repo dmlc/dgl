@@ -1,58 +1,38 @@
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
-
-import dgl
 import dgl.function as fn
 
-
-class dummy_layer(nn.Module):
-
+class Layer(nn.Module):
     def __init__(self, in_dim, out_dim):
-        super(dummy_layer, self).__init__()
+        super().__init__()
         self.layer = nn.Linear(in_dim * 2, out_dim, bias=True)
 
-    def forward(self, graph, n_feats, e_weights=None):
-        graph.ndata['h'] = n_feats
+    def forward(self, graph, feat, eweight=None):
+        with graph.local_scope():
+            graph.ndata['h'] = feat
 
-        if e_weights == None:
-            graph.update_all(fn.copy_u('h', 'm'), fn.mean('m', 'h'))
-        else:
-            graph.edata['ew'] = e_weights
-            graph.update_all(fn.u_mul_e('h', 'ew', 'm'), fn.mean('m', 'h'))
+            if eweight is None:
+                graph.update_all(fn.copy_u('h', 'm'), fn.mean('m', 'h'))
+            else:
+                graph.edata['ew'] = eweight
+                graph.update_all(fn.u_mul_e('h', 'ew', 'm'), fn.mean('m', 'h'))
 
-        graph.ndata['h'] = self.layer(th.cat([graph.ndata['h'], n_feats], dim=-1))
+            h = self.layer(th.cat([graph.ndata['h'], feat], dim=-1))
 
-        output = graph.ndata['h']
-        return output
+            return h
 
+class Model(nn.Module):
+    def __init__(self, in_dim, out_dim, hid_dim=40):
+        super().__init__()
+        self.in_layer = Layer(in_dim, hid_dim)
+        self.hid_layer = Layer(hid_dim, hid_dim)
+        self.out_layer = Layer(hid_dim, out_dim)
 
-class dummy_gnn_model(nn.Module):
-
-    """
-    A dummy gnn model, which is same as graph sage, but could adopt edge mask in forward
-
-    """
-    def __init__(self,
-                 in_dim,
-                 hid_dim,
-                 out_dim):
-        super(dummy_gnn_model, self).__init__()
-        self.in_dim = in_dim
-        self.hid_dim = hid_dim
-        self.out_dim = out_dim
-        
-        self.in_layer = dummy_layer(self.in_dim, self.hid_dim)
-        self.hid_layer = dummy_layer(self.hid_dim, self.hid_dim)
-        self.out_layer = dummy_layer(self.hid_dim, self.out_dim)
-
-    def forward(self, graph, n_feat, edge_weights=None):
-
-        h = self.in_layer(graph, n_feat, edge_weights)
+    def forward(self, graph, feat, eweight=None):
+        h = self.in_layer(graph, feat.float(), eweight)
         h = F.relu(h)
-        h = self.hid_layer(graph, h, edge_weights)
+        h = self.hid_layer(graph, h, eweight)
         h = F.relu(h)
-        h = self.out_layer(graph, h, edge_weights)
-
+        h = self.out_layer(graph, h, eweight)
         return h
-        

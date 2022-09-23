@@ -37,12 +37,16 @@ gk_csr_t *Convert2GKCsr(const aten::CSRMatrix mat, bool is_row) {
   size_t num_ptrs;
   if (is_row) {
     num_ptrs = gk_csr->nrows + 1;
-    gk_indptr = gk_csr->rowptr = gk_zmalloc(gk_csr->nrows+1, "gk_csr_ExtractPartition: rowptr");
-    gk_indices = gk_csr->rowind = gk_imalloc(nnz, "gk_csr_ExtractPartition: rowind");
+    gk_indptr = gk_csr->rowptr = gk_zmalloc(gk_csr->nrows+1,
+        const_cast<char*>("gk_csr_ExtractPartition: rowptr"));
+    gk_indices = gk_csr->rowind = gk_imalloc(nnz,
+        const_cast<char*>("gk_csr_ExtractPartition: rowind"));
   } else {
     num_ptrs = gk_csr->ncols + 1;
-    gk_indptr = gk_csr->colptr = gk_zmalloc(gk_csr->ncols+1, "gk_csr_ExtractPartition: colptr");
-    gk_indices = gk_csr->colind = gk_imalloc(nnz, "gk_csr_ExtractPartition: colind");
+    gk_indptr = gk_csr->colptr = gk_zmalloc(gk_csr->ncols+1,
+        const_cast<char*>("gk_csr_ExtractPartition: colptr"));
+    gk_indices = gk_csr->colind = gk_imalloc(nnz,
+        const_cast<char*>("gk_csr_ExtractPartition: colind"));
   }
 
   for (size_t i = 0; i < num_ptrs; i++) {
