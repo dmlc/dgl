@@ -5,6 +5,7 @@ import backend as F
 
 from dgl.convert import graph
 from dgl.mock_sparse import diag, create_from_coo
+from dgl.ops import edge_softmax
 
 @pytest.mark.parametrize('val_shape', [(3,), (3, 2)])
 @pytest.mark.parametrize('mat_shape', [(3, 3), (5, 3)])

@@ -36,7 +36,7 @@ def test_sparse_sparse_mm():
 
     sparse_result = (A1 @ A2).adj.to_dense()
     dense_result = A1.adj.to_dense() @ A2.adj.to_dense()
-    assert torch.allclose(sparse_result.adj.to_dense(), dense_result)
+    assert torch.allclose(sparse_result, dense_result)
 
 def test_sparse_diag_mm():
     dev = F.ctx()
@@ -56,31 +56,31 @@ def test_sparse_diag_mm():
 def test_diag_dense_mm():
     dev = F.ctx()
     # D: shape (N, N), X: shape (N, F)
-    val = torch.randn(3)
+    val = torch.randn(3).to(dev)
     D = diag(val)
-    X = torch.randn(3, 2)
+    X = torch.randn(3, 2).to(dev)
     sparse_result = D @ X
     dense_result = D.as_sparse().adj.to_dense() @ X
     assert torch.allclose(sparse_result, dense_result)
 
     # D: shape (N, M), N > M, X: shape (M, F)
-    val = torch.randn(3)
+    val = torch.randn(3).to(dev)
     D = diag(val, shape=(4, 3))
     sparse_result = D @ X
     dense_result = D.as_sparse().adj.to_dense() @ X
     assert torch.allclose(sparse_result, dense_result)
 
     # D: shape (N, M), N < M, X: shape (M, F)
-    val = torch.randn(2)
+    val = torch.randn(2).to(dev)
     D = diag(val, shape=(2, 3))
     sparse_result = D @ X
     dense_result = D.as_sparse().adj.to_dense() @ X
     assert torch.allclose(sparse_result, dense_result)
 
     # D: shape (N, M), X: shape (M)
-    val = torch.randn(3)
+    val = torch.randn(3).to(dev)
     D = diag(val)
-    X = torch.randn(3)
+    X = torch.randn(3).to(dev)
     sparse_result = D @ X
     dense_result = D.as_sparse().adj.to_dense() @ X
     assert torch.allclose(sparse_result, dense_result)
@@ -197,9 +197,9 @@ def test_batch_diag_dense_mm():
     H = 4
 
     # X: shape (N, F, H)
-    val = torch.randn(3, H)
+    val = torch.randn(3, H).to(dev)
     D = diag(val)
-    X = torch.randn(3, 2, H)
+    X = torch.randn(3, 2, H).to(dev)
     sparse_result = bspmm(D, X)
     dense_D = D.as_sparse().adj.to_dense()
     dense_result = torch.stack([
@@ -208,7 +208,7 @@ def test_batch_diag_dense_mm():
     assert torch.allclose(sparse_result, dense_result)
 
     # X: shape (N, H)
-    X = torch.randn(3, H)
+    X = torch.randn(3, H).to(dev)
     sparse_result = bspmm(D, X)
     dense_D = D.as_sparse().adj.to_dense()
     dense_result = torch.stack([
