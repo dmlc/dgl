@@ -1,5 +1,7 @@
-"""Network Embedding NN modules"""
+"""Network Embedding NN Modules"""
 # pylint: disable= invalid-name
+from collections import defaultdict
+
 import torch
 from torch import nn
 from torch.nn import init
@@ -7,57 +9,53 @@ from torch.utils.data import DataLoader
 import torch.nn.functional as F
 import numpy as np
 import tqdm
-from collections import defaultdict
+
 from ...sampling import random_walk
 
 __all__ = ['MetaPath2Vec']
 
 class MetaPath2Vec(nn.Module):
-    """metapath2vec module from `metapath2vec: Scalable Representation Learning for
+    r"""metapath2vec module from `metapath2vec: Scalable Representation Learning for
     Heterogeneous Networks <https://dl.acm.org/doi/pdf/10.1145/3097983.3098036>`__
 
     To achieve efficient optimization, we leverage the negative sampling technique for the
-    training process. For each node in meta-path, which can be regarded as the center node,
-    we can sample positive node within context size and draw some negative samples among all
+    training process. Repeatedly for each node in meta-path, we treat it as the center node
+    and sample nearby positive nodes within context size and draw negative samples among all
     types of nodes from all meta-paths. Then we can use the center-context paired nodes and
-    context-negative paired nodes to update the network. The formula is as follows:
+    context-negative paired nodes to update the network.
 
-    .. math::
-        log \sigma(X_{c_t}·X_v) + \sum_{m=1}^M Eu^m \sim P(u)[log \sigma(-X_{u_m}·X_v)] ,
-        where \sigma(x) = \frac{1}{1+e^{-x}}
     Parameters
     ----------
     g : DGLGraph
-        Graph data for generating embedding. Note we cannot have the same edge type across
-        different canonical edge types.
+        Graph data for generating node embeddings. Its different canonical edge types
+        :attr:`(utype, etype, vtype)` are not allowed to have same :attr:`etype`.
     emb_dim : int
-        Size of each embedding vector
+        Node embedding size
     metapath : List[str]
-        A sequence of edge types in the form of string. It defines a new edge type by composing
+        A sequence of edge types in the form of a string. It defines a new edge type by composing
         multiple edge types in order. Note that the start node type and the end one are commonly
         the same.
     context_size : int
-        The context size which is considered for positive samples.
-    min_count : int , optional
+        The context size for getting positive samples.
+    min_count : int, optional
         The nodes that appear less than :attr:`min_count` times in all meta-path instances will
-        be discarded, which means we can not get the their trained embedding at last Default: 0
-    negative_size : int , optional
+        be discarded, which means we can not get their trained embeddings. Default: 0
+    negative_size : int, optional
         The number of negative samples to use for each positive sample. Default: 5
-    num_random_walk : int , optional
+    num_random_walk : int, optional
         The number of random walks to sample for each start node. Default: 1
-    nid2word : Dict[str, Dict[int , str]], optional
-        If set, we can use model.id2word  to get the dict where the key is embedding id and
-        the value is its corresponding name. Default: None
+    nid2word : Dict[str, Dict[int, str]], optional
+        If set, we can use :attr:`.id2word` to get a dict, which maps global node IDs
+        to corresponding strings. Default: None
     sparse : bool, optional
         If set to True, gradients with respect to the learnable weights will be sparse.
         Default: True
     negative_table_size : float, optional
-        This is used with the node frequency to build the table for negative sampling
-    fre_subsampling : bool, optional
-        If set, a subsampling approach is applied to adjust node frequency
+        The corresponding number of negative samples will be sampled offline. Default: 1e8
 
     Examples
     --------
+
     >>> import torch
     >>> from torch import optim
     >>> import dgl
@@ -65,30 +63,28 @@ class MetaPath2Vec(nn.Module):
 
     >>> # Define a model
     >>> g = dgl.heterograph({
-...         ('user', 'uc', 'company'): ([0, 0, 2, 1, 3], [1, 2, 1, 3, 0]),
-...         ('company', 'cp', 'product'): ([0, 0, 0, 1, 2, 3], [0, 2, 3, 0, 2, 1]),
-...         ('company', 'cu', 'user'): ([1, 2, 1, 3, 0], [0, 0, 2, 1, 3]),
-...         ('product', 'pc', 'company'): ([0, 2, 3, 0, 2, 1], [0, 0, 0, 1, 2, 3])
-...     })
-    >>> model = MetaPath2Vec(g, 64, ['uc','cu'], 1, 1, 2, 10, fre_subsampling=False)
+    ...     ('user', 'uc', 'company'): dgl.rand_graph(100, 1000).edges(),
+    ...     ('company', 'cp', 'product'): dgl.rand_graph(100, 1000).edges(),
+    ...     ('company', 'cu', 'user'): dgl.rand_graph(100, 1000).edges(),
+    ...     ('product', 'pc', 'company'): dgl.rand_graph(100, 1000).edges()
+    ... })
+    >>> model = MetaPath2Vec(g, 64, ['uc', 'cu'], 1, 1, 2, 10)
     >>> print(model.local_to_global_id)
     {'company': array([0, 1, 2, 3]), 'user': array([4, 5, 6, 7])}
 
     >>> # Train the model
-    >>> dataloader=model.loader()
+    >>> dataloader = model.loader()
     >>> optimizer = optim.SparseAdam(list(model.parameters()), lr=0.025)
     >>> scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(dataloader))
-    >>> running_loss = 0.0
     >>> for i, sample_batched in enumerate((dataloader)):
-...     pos_u = sample_batched[0]
-...     pos_v = sample_batched[1]
-...     neg_v = sample_batched[2]
-...     scheduler.step()
-...     optimizer.zero_grad()
-...     loss = model(pos_u, pos_v, neg_v)
-...     loss.backward()
-...     optimizer.step()
-...     running_loss = running_loss * 0.9 + loss.item() * 0.1
+    ...     pos_u = sample_batched[0]
+    ...     pos_v = sample_batched[1]
+    ...     neg_v = sample_batched[2]
+    ...     scheduler.step()
+    ...     optimizer.zero_grad()
+    ...     loss = model(pos_u, pos_v, neg_v)
+    ...     loss.backward()
+    ...     optimizer.step()
     """
     def __init__(self,
                  g,
@@ -100,9 +96,7 @@ class MetaPath2Vec(nn.Module):
                  num_random_walk=1,
                  nid2word=None,
                  sparse=True,
-                 negative_table_size=1e8,
-                 fre_subsampling=True
-                 ):
+                 negative_table_size=1e8):
         super().__init__()
         self.g = g
         self.emb_dim = emb_dim
@@ -112,7 +106,6 @@ class MetaPath2Vec(nn.Module):
         self.negative_size = negative_size
         self.nid2word = nid2word
         self.sparse = sparse
-        self.fre_subsampling=fre_subsampling
         self.num_random_walk = num_random_walk
         self.walk_dataset = []
         self.negatives = []
@@ -139,7 +132,7 @@ class MetaPath2Vec(nn.Module):
         for edge in self.metapath:
             nodespath.append(edge2des[edge])
 
-        ##build whole vocab for all nodes
+        ## build whole vocab for all nodes
         self.node_count = 0
         self.token_count = 0
         self.local_to_global_id = dict()
@@ -157,11 +150,12 @@ class MetaPath2Vec(nn.Module):
                     self.local_to_global_id[nodetype][idx] = wid
                     self.id2word[wid] = self.nid2word[nodetype][idx]
                     wid += 1
-            self.node_count=self.g.num_nodes
+            self.node_count = self.g.num_nodes
 
         # start random walk
         for idx in tqdm.trange(self.g.num_nodes(nodespath[0])):
-            traces, _ = random_walk(g=self.g, nodes=[idx] * self.num_random_walk, metapath=self.metapath)
+            traces, _ = random_walk(g=self.g, nodes=[idx] * self.num_random_walk,
+                                    metapath=self.metapath)
             for tr in traces.cpu().numpy():
                 line = [self.local_to_global_id[nodespath[i]][tr[i]] for i in range(len(tr))]
                 self.walk_dataset.append(line)
@@ -172,7 +166,7 @@ class MetaPath2Vec(nn.Module):
 
         # Filter out the nodes whose number of occurrences is smaller than min_count and frequency
         # subsampling
-        t = 0.0001 if self.fre_subsampling else 1
+        t = 0.0001
         for node, freq in node_frequency.items():
             if freq > self.min_count:
                 node_frequency_filtered[node] = freq
@@ -184,6 +178,8 @@ class MetaPath2Vec(nn.Module):
         print("Total embeddings: " + str(self.node_count))
         print("Real embeddings: " + str(len(self.node_frequency)))
 
+        import ipdb
+        ipdb.set_trace()
         self.u_emb = nn.Embedding(self.node_count, self.emb_dim, sparse=self.sparse)
         self.v_emb = nn.Embedding(self.node_count, self.emb_dim, sparse=self.sparse)
 
@@ -202,14 +198,12 @@ class MetaPath2Vec(nn.Module):
         self.sampling_prob = ratio
 
     def reset_parameters(self):
-        """
-        Initialize the embedding parameters
-        """
+        r"""Initialize the embedding parameters"""
         init_range = 1.0 / self.emb_dim
         init.uniform_(self.u_emb.weight.data, -init_range, init_range)
         init.constant_(self.v_emb.weight.data, 0)
 
-    def _getNegatives(self):
+    def _get_negatives(self):
         # TODO online sampling
         response = self.negatives[self.negpos:self.negpos + self.negative_size]
         self.negpos = (self.negpos + self.negative_size) % len(self.negatives)
@@ -229,7 +223,7 @@ class MetaPath2Vec(nn.Module):
                         node_ids[max(i - self.context_size, 0):i + self.context_size]):
                     if i == j:
                         continue
-                    pair_catch.append((u, v, self._getNegatives()))
+                    pair_catch.append((u, v, self._get_negatives()))
 
         all_u = [u for u, _, _ in pair_catch]
         all_v = [v for _, v, _ in pair_catch]
@@ -239,7 +233,7 @@ class MetaPath2Vec(nn.Module):
 
     def loader(self, **kwargs):
         r"""Returns the data loader that yields center node, positive context node,
-            and negative samples on the heterogeneous graph random walk.
+        and negative samples on the heterogeneous graph random walk.
 
         Parameters
         ----------
@@ -247,36 +241,36 @@ class MetaPath2Vec(nn.Module):
             Key-word arguments to be passed to the parent PyTorch
             :py:class:`torch.utils.data.DataLoader` class. Common arguments are:
 
-              - ``batch_size`` (int): The number of indices in each batch.
-              - ``drop_last`` (bool): Whether to drop the last incomplete batch.
-              - ``shuffle`` (bool): Whether to randomly shuffle the indices at each epoch.
+            - ``batch_size`` (int): The number of indices in each batch.
+            - ``drop_last`` (bool): Whether to drop the last incomplete batch.
+            - ``shuffle`` (bool): Whether to randomly shuffle the indices at each epoch.
 
         Returns
         -------
         torch.utils.data.DataLoader (Tensor,Tensor,Tensor)
-        return the data loader that yields batched data: center node, positive context node,
+            The data loader that yields batched data for center node, positive context node,
             and negative samples
         """
-        return DataLoader(self.walk_dataset,
-                          collate_fn=self._generate_sample, **kwargs)
+        return DataLoader(self.walk_dataset, collate_fn=self._generate_sample, **kwargs)
 
     def forward(self, pos_u, pos_v, neg_v):
-        """
+        r"""
         Return the loss score given center nodes, positive context nodes, and negative samples.
 
         Parameters
         ----------
         pos_u : Tensor
-            center nodes embedding id
+            Center node IDs
         pos_v : Tensor
-            positive context nodes embedding id
+            Positive context node IDs
         neg_v : Tensor
-            negative samples embedding id
+            Negative node IDs
+
         Returns
-        ------
+        -------
         torch.Tensor
-        return the SkipGram model loss given center nodes id, positive context nodes id,
-        and negative samples id.
+            The SkipGram model loss given center nodes id, positive context nodes id,
+            and negative samples id.
         """
         emb_u = self.u_emb(pos_u)
         emb_v = self.v_emb(pos_v)
@@ -291,4 +285,3 @@ class MetaPath2Vec(nn.Module):
         neg_score = -torch.sum(F.logsigmoid(-neg_score), dim=1)
 
         return torch.mean(score + neg_score)
-

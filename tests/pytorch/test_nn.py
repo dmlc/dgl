@@ -1640,7 +1640,6 @@ def test_dgn_conv(in_size, out_size, aggregators, scalers, delta,
 @pytest.mark.parametrize('emb_dim', [1, 100])
 @pytest.mark.parametrize('num_random_walk', [1, 3])
 def test_MetaPath2Vec(emb_dim, meta_path, context_size, negative_size, min_count, num_random_walk, idtype):
-
     g = dgl.heterograph({
         ('user', 'uc', 'company'): ([0, 0, 2, 1, 3], [1, 2, 1, 3, 0]),
         ('company', 'cp', 'product'): ([0, 0, 0, 1, 2, 3], [0, 2, 3, 0, 2, 1]),
