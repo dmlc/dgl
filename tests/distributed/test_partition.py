@@ -139,6 +139,9 @@ def verify_graph_feats(g, gpb, part, node_feats, edge_feats):
             ndata = F.gather_row(node_feats[ntype + '/' + name], local_nids)
             assert np.all(F.asnumpy(ndata == true_feats))
 
+        ndata_orig_ids = F.gather_row(node_feats[ntype + '/' + dgl.ORIG_NID], local_nids)
+        assert np.all(F.asnumpy(ndata_orig_ids == orig_id))
+
     for etype in g.etypes:
         etype_id = g.get_etype_id(etype)
         inner_edge_mask = _get_inner_edge_mask(part, etype_id)
@@ -158,6 +161,9 @@ def verify_graph_feats(g, gpb, part, node_feats, edge_feats):
             edata = F.gather_row(edge_feats[etype + '/' + name], local_eids)
             assert np.all(F.asnumpy(edata == true_feats))
 
+        edata_orig_ids = F.gather_row(edge_feats[etype + '/' + dgl.ORIG_EID], local_eids)
+        assert np.all(F.asnumpy(edata_orig_ids == orig_id))
+
 def check_hetero_partition(hg, part_method, num_parts=4, num_trainers_per_machine=1, load_feats=True):
     hg.nodes['n1'].data['labels'] = F.arange(0, hg.number_of_nodes('n1'))
     hg.nodes['n1'].data['feats'] = F.tensor(np.random.randn(hg.number_of_nodes('n1'), 10), F.float32)
@@ -167,6 +173,7 @@ def check_hetero_partition(hg, part_method, num_parts=4, num_trainers_per_machin
 
     orig_nids, orig_eids = partition_graph(hg, 'test', num_parts, '/tmp/partition', num_hops=num_hops,
                                            part_method=part_method, reshuffle=True, return_mapping=True,
+                                           record_orig_ids=True,
                                            num_trainers_per_machine=num_trainers_per_machine)
     assert len(orig_nids) == len(hg.ntypes)
     assert len(orig_eids) == len(hg.etypes)

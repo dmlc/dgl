@@ -31,7 +31,7 @@ from ._ffi.runtime_ctypes import TypeCode
 from ._ffi.function import register_func, get_global_func, list_global_func_names, extract_ext_funcs
 from ._ffi.base import DGLError, __version__
 
-from .base import ALL, NTYPE, NID, ETYPE, EID
+from .base import ALL, NTYPE, NID, ETYPE, EID, ORIG_NID, ORIG_EID
 from .readout import *
 from .batch import *
 from .convert import *
