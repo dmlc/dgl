@@ -20,7 +20,7 @@ namespace aten {
 /*!
  * \brief Generalized Sparse Matrix Dense Matrix Multiplication on Csr format.
  */
-template <int XPU, typename IdType, int bits>
+template <int XPU, typename IdType, typename DType>
 void SpMMCsr(const std::string& op, const std::string& reduce,
              const BcastOff& bcast,
              const aten::CSRMatrix& csr,
@@ -33,7 +33,7 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
  * \brief Generalized Sparse Matrix Dense Matrix Multiplication on Csr format
  with heterograph support.
  */
-template <int XPU, typename IdType, int bits>
+template <int XPU, typename IdType, typename DType>
 void SpMMCsrHetero(const std::string& op, const std::string& reduce,
              const BcastOff& bcast,
              const std::vector<CSRMatrix>& csr,
@@ -46,7 +46,7 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
 /*!
  * \brief Generalized Sparse Matrix Dense Matrix Multiplication on Coo format.
  */
-template <int XPU, typename IdType, int bits>
+template <int XPU, typename IdType, typename DType>
 void SpMMCoo(const std::string& op, const std::string& reduce,
              const BcastOff& bcast,
              const aten::COOMatrix& coo,
@@ -58,7 +58,7 @@ void SpMMCoo(const std::string& op, const std::string& reduce,
 /*!
  * \brief Generalized Sampled Dense-Dense Matrix Multiplication on Csr format.
  */
-template <int XPU, typename IdType, int bits>
+template <int XPU, typename IdType, typename DType>
 void SDDMMCsr(const std::string& op,
               const BcastOff& bcast,
               const aten::CSRMatrix& csr,
@@ -71,7 +71,7 @@ void SDDMMCsr(const std::string& op,
  * \brief Generalized Sampled Dense-Dense Matrix Multiplication on Csr
  format with heterograph support.
   */
-template <int XPU, typename IdType, int bits>
+template <int XPU, typename IdType, typename DType>
 void SDDMMCsrHetero(const std::string& op,
               const BcastOff& bcast,
               const std::vector<CSRMatrix>& vec_csr,
@@ -86,7 +86,7 @@ void SDDMMCsrHetero(const std::string& op,
 /*!
  * \brief Generalized Sampled Dense-Dense Matrix Multiplication on Coo format.
  */
-template <int XPU, typename IdType, int bits>
+template <int XPU, typename IdType, typename DType>
 void SDDMMCoo(const std::string& op,
               const BcastOff& bcast,
               const aten::COOMatrix& coo,
@@ -100,7 +100,7 @@ void SDDMMCoo(const std::string& op,
  * \brief Generalized Sampled Dense-Dense Matrix Multiplication on Coo
  format with heterograph support.
   */
-template <int XPU, typename IdType, int bits>
+template <int XPU, typename IdType, typename DType>
 void SDDMMCooHetero(const std::string& op,
               const BcastOff& bcast,
               const std::vector<COOMatrix>& vec_coo,
@@ -115,7 +115,7 @@ void SDDMMCooHetero(const std::string& op,
 /*!
  * \brief Generalized Dense Matrix-Matrix Multiplication according to relation types.
  */
-template <int XPU, typename IdType, int bits>
+template <int XPU, typename IdType, typename DType>
 void GatherMM(const NDArray A,
               const NDArray B,
               NDArray out,
@@ -125,7 +125,7 @@ void GatherMM(const NDArray A,
 /*!
  * \brief Generalized Dense Matrix-Matrix Multiplication according to relation types.
  */
-template <int XPU, typename IdType, int bits>
+template <int XPU, typename IdType, typename DType>
 void GatherMMScatter(const NDArray A,
           const NDArray B,
           NDArray out,
@@ -136,14 +136,14 @@ void GatherMMScatter(const NDArray A,
 /*!
  * \brief Generalized segmented dense Matrix-Matrix Multiplication.
  */
-template <int XPU, typename IdType, int bits>
+template <int XPU, typename IdType, typename DType>
 void SegmentMM(const NDArray A,
                const NDArray B,
                NDArray out,
                const NDArray seglen_A,
                bool a_trans, bool b_trans);
 
-template <int XPU, typename IdType, int bits>
+template <int XPU, typename IdType, typename DType>
 void SegmentMMBackwardB(const NDArray A,
                         const NDArray dC,
                         NDArray dB,
@@ -152,7 +152,7 @@ void SegmentMMBackwardB(const NDArray A,
 /*!
  * \brief Segment reduce.
  */
-template <int XPU, typename IdType, int bits>
+template <int XPU, typename IdType, typename DType>
 void SegmentReduce(const std::string& op,
                    NDArray feat,
                    NDArray offsets,
@@ -162,7 +162,7 @@ void SegmentReduce(const std::string& op,
 /*!
  * \brief Scatter Add on first dimension.
  */
-template <int XPU, typename IdType, int bits>
+template <int XPU, typename IdType, typename DType>
 void ScatterAdd(NDArray feat,
                 NDArray idx,
                 NDArray out);
@@ -170,7 +170,7 @@ void ScatterAdd(NDArray feat,
 /*!
  * \brief Update gradients for reduce operator max and min on first dimension.
  */
-template <int XPU, typename IdType, int bits>
+template <int XPU, typename IdType, typename DType>
 void UpdateGradMinMax_hetero(const HeteroGraphPtr& g,
                 const std::string& op,
                 const std::vector<NDArray>& feat,
@@ -181,7 +181,7 @@ void UpdateGradMinMax_hetero(const HeteroGraphPtr& g,
 /*!
  * \brief Backward function of segment cmp.
  */
-template <int XPU, typename IdType, int bits>
+template <int XPU, typename IdType, typename DType>
 void BackwardSegmentCmp(NDArray feat,
                         NDArray arg,
                         NDArray out);
@@ -223,7 +223,7 @@ std::pair<CSRMatrix, NDArray> CSRSum(
 /*!
  * \brief Edge_softmax_csr forward function on Csr format.
  */
-template <int XPU, typename IdType, int bits>
+template <int XPU, typename IdType, typename DType>
 void Edge_softmax_csr_forward(const std::string& op,
              const BcastOff& bcast,
              const aten::CSRMatrix& csr,
@@ -233,7 +233,7 @@ void Edge_softmax_csr_forward(const std::string& op,
 /*!
  * \brief Edge_softmax_csr backward function on Csr format.
  */
-template <int XPU, typename IdType, int bits>
+template <int XPU, typename IdType, typename DType>
 void Edge_softmax_csr_backward(const std::string& op,
              const BcastOff& bcast,
              const aten::CSRMatrix& csr,
