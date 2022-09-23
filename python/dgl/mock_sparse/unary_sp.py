@@ -69,7 +69,7 @@ def inv(A: SparseMatrix) -> SparseMatrix:
     """
     num_rows, num_cols = A.shape
     assert num_rows == num_cols, 'Expect a square matrix, got shape {}'.format(A.shape)
-    assert len(A._val.shape) == 1, 'inv only supports matrices with 1D val'
+    assert len(A.val.shape) == 1, 'inv only supports matrices with 1D val'
 
     val = A.val.cpu().numpy()
     row = A.row.cpu().numpy()
