@@ -21,7 +21,6 @@ from torch import nn
 from tqdm import tqdm
 
 from models import MLP
-from utils import BatchSampler, DataLoaderWrapper
 
 epsilon = 1 - math.log(2)
 
@@ -107,6 +106,7 @@ def train(args, model, dataloader, labels, train_idx, criterion, optimizer, eval
         loss_sum += loss.item() * count
         total += count
 
+    preds = preds.to(train_idx.device)
     return (
         loss_sum / total,
         evaluator(preds[train_idx], labels[train_idx]),
@@ -152,14 +152,13 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
 
     train_batch_size = 4096
     train_sampler = MultiLayerNeighborSampler([0 for _ in range(args.n_layers)])  # no not sample neighbors
-    train_dataloader = DataLoaderWrapper(
-        DataLoader(
+    train_dataloader = DataLoader(
             graph.cpu(),
             train_idx.cpu(),
             train_sampler,
-            batch_sampler=BatchSampler(len(train_idx), batch_size=train_batch_size, shuffle=True),
-            num_workers=4,
-        )
+            batch_size=train_batch_size,
+            shuffle=True,
+            num_workers=4
     )
 
     eval_batch_size = 4096
@@ -168,14 +167,13 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
         eval_idx = torch.cat([train_idx.cpu(), val_idx.cpu()])
     else:
         eval_idx = torch.cat([train_idx.cpu(), val_idx.cpu(), test_idx.cpu()])
-    eval_dataloader = DataLoaderWrapper(
-        DataLoader(
+    eval_dataloader = DataLoader(
             graph.cpu(),
             eval_idx,
             eval_sampler,
-            batch_sampler=BatchSampler(len(eval_idx), batch_size=eval_batch_size, shuffle=False),
-            num_workers=4,
-        )
+            batch_size=eval_batch_size,
+            shuffle=False,
+            num_workers=4
     )
 
     model = gen_model(args).to(device)
@@ -195,7 +193,6 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
 
     for epoch in range(1, args.n_epochs + 1):
         tic = time.time()
-
         loss, score = train(args, model, train_dataloader, labels, train_idx, criterion, optimizer, evaluator_wrapper)
 
         toc = time.time()
@@ -233,14 +230,13 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
 
     if args.eval_last:
         model.load_state_dict(best_model_state_dict)
-        eval_dataloader = DataLoaderWrapper(
-            DataLoader(
+        eval_dataloader = DataLoader(
                 graph.cpu(),
                 test_idx.cpu(),
                 eval_sampler,
-                batch_sampler=BatchSampler(len(test_idx), batch_size=eval_batch_size, shuffle=False),
-                num_workers=4,
-            )
+                batch_size=eval_batch_size,
+                shuffle=False,
+                num_workers=4
         )
         final_test_score = evaluate(
             args, model, eval_dataloader, labels, train_idx, val_idx, test_idx, criterion, evaluator_wrapper
