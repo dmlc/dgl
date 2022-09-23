@@ -1,6 +1,6 @@
 """Matmul ops for SparseMatrix"""
 # pylint: disable=invalid-name
-from typing import Union
+from typing import Union, List
 import torch
 
 from .diag_matrix import DiagMatrix, diag
@@ -212,7 +212,7 @@ def spmm(A1: Union[SparseMatrix, DiagMatrix], A2: Union[torch.Tensor, SparseMatr
         raise ValueError(f'Expect A1 to be a SparseMatrix or DiagMatrix, got {type(A1)}')
 
 def unbatch_tensor(A: Union[torch.Tensor, SparseMatrix, DiagMatrix])\
-                   -> Union[list[torch.Tensor], list[SparseMatrix], list[DiagMatrix]]:
+                   -> Union[List[torch.Tensor], List[SparseMatrix], List[DiagMatrix]]:
     """Unbatch a tensor, sparse matrix, or diagonal matrix
 
     Parameters
@@ -234,7 +234,7 @@ def unbatch_tensor(A: Union[torch.Tensor, SparseMatrix, DiagMatrix])\
     else:
         return [diag(A.val[:, i], A.shape) for i in range(A.val.shape[-1])]
 
-def batch_tensor(A_list: Union[list[torch.Tensor], list[SparseMatrix], list[DiagMatrix]])\
+def batch_tensor(A_list: Union[List[torch.Tensor], List[SparseMatrix], List[DiagMatrix]])\
                  -> Union[torch.Tensor, SparseMatrix, DiagMatrix]:
     """Batch a list of tensors, sparse matrices, or diagonal matrices
 
