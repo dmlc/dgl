@@ -294,7 +294,8 @@ void SDDMMCoo(
     const dim3 nblks(nbx, nby);
     const dim3 nthrs(ntx, nty);
     BCAST_IDX_CTX_SWITCH(bcast, use_idx, out->ctx, lhs_off, rhs_off, {
-      CUDA_KERNEL_CALL((SDDMMCooTreeReduceKernel<Idx, DType, UseBcast, UseIdx, LhsTarget, RhsTarget>),
+      CUDA_KERNEL_CALL(
+          (SDDMMCooTreeReduceKernel<Idx, DType, UseBcast, UseIdx, LhsTarget, RhsTarget>),
           nblks, nthrs, 0, stream,
           lhs_data, rhs_data, out_data,
           row, col, edge_map,
@@ -376,4 +377,4 @@ void SDDMMCsr(
 }  // namespace aten
 }  // namespace dgl
 
-#endif
+#endif  // DGL_ARRAY_CUDA_SDDMM_CUH_
