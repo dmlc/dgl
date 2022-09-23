@@ -887,12 +887,14 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
             for ntype in g.ntypes:
                 ntype_id = g.get_ntype_id(ntype)
                 inner_node_mask = _get_inner_node_mask(part, ntype_id)
-                node_feats[ntype + '/' + ORIG_NID] = F.boolean_mask(part.ndata['orig_id'], inner_node_mask)
+                node_feats[ntype + '/' + ORIG_NID] = F.boolean_mask(part.ndata['orig_id'],
+                                                                    inner_node_mask)
         if save_orig_eids:
             for etype in g.etypes:
                 etype_id = g.get_etype_id(etype)
                 inner_edge_mask = _get_inner_edge_mask(part, etype_id)
-                edge_feats[etype + '/' + ORIG_EID] = F.boolean_mask(part.edata['orig_id'], inner_edge_mask)
+                edge_feats[etype + '/' + ORIG_EID] = F.boolean_mask(part.edata['orig_id'],
+                                                                    inner_edge_mask)
 
         part_dir = os.path.join(out_path, "part" + str(part_id))
         node_feat_file = os.path.join(part_dir, "node_feat.dgl")
