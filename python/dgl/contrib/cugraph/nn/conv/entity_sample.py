@@ -26,6 +26,10 @@ class RGCN(nn.Module):
         h = self.conv2(g[1], h, g[1].edata[dgl.ETYPE], norm=g[1].edata['norm'])
         return h
 
+    def update_fanouts(self, fanouts):
+        self.conv1.fanout = fanouts[0]
+        self.conv2.fanout = fanouts[1]
+
 def evaluate(model, labels, dataloader, inv_target):
     model.eval()
     eval_logits = []
@@ -149,9 +153,9 @@ if __name__ == '__main__':
     # evaluation
     # note: when sampling all neighbors on a large graph for the test dataset, the required shared
     # memory on GPU may exceed the hardware limit. Reduce the fanout numbers if necessary.
-    # test_sampler = MultiLayerNeighborSampler([500, 500]) # -1 for sampling all neighbors
-    test_sampler = MultiLayerNeighborSampler(fanouts)
+    test_sampler = MultiLayerNeighborSampler([100,100])
     test_loader = DataLoader(g, target_idx[test_idx].type(g.idtype), test_sampler, device=device,
                              batch_size=32, shuffle=False)
+    model.update_fanouts(test_sampler.fanouts)
     acc = evaluate(model, labels, test_loader, inv_target)
     print("Test accuracy {:.4f}".format(acc))
