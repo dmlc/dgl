@@ -109,7 +109,7 @@ struct Dot {
   static constexpr bool reduce_last_dim = true;
   static __device__ __forceinline__ DType Call(
       const DType *lhs, const DType *rhs, int64_t len = 1) {
-    DType rst = static_cast<DType>(0);
+    DType rst = static_cast<DType>(0.0f);
     for (int64_t i = 0; i < len; ++i) {
       rst += lhs[i] * rhs[i];
     }

@@ -140,15 +140,8 @@ __global__ void _LinearSearchKernel(
     if (v == -1) {
       out[tx] = filler;
     } else {
-      // The casts here are to be able to handle DType being __half.
-      // GCC treats int64_t as a distinct type from long long, so
-      // without the explcit cast to long long, it errors out saying
-      // that the implicit cast results in an ambiguous choice of
-      // constructor for __half.
-      // The using statement is to avoid a linter error about using
-      // long or long long.
-      using LongLong = long long; // NOLINT
-      out[tx] = weights ? weights[v] : DType(LongLong(v));
+      // The casts here are to be able to handle DType being __half or __nv_bfloat16.
+      out[tx] = weights ? weights[v] : static_cast<DType>(static_cast<double>(v));
     }
     tx += stride_x;
   }
