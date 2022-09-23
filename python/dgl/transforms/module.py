@@ -366,41 +366,70 @@ class LaplacianPE(BaseTransform):
     r"""Laplacian Positional Encoding, as introduced in
     `Benchmarking Graph Neural Networks
     <https://arxiv.org/abs/2003.00982>`__
-
     This module only works for homogeneous bidirected graphs.
-
     Parameters
     ----------
     k : int
-        Number of smallest non-trivial eigenvectors to use for positional encoding
-        (smaller than the number of nodes).
+        Number of smallest non-trivial eigenvectors to use for positional encoding.
     feat_name : str, optional
         Name to store the computed positional encodings in ndata.
-
+    padding : bool
+        If padding=='false', raise exception when k>=n.
+        Else return (n-1) laplacian positional encodings and (k-n+1) zero encodings
+        (padding) when k>=n.
+        n is the number of nodes in the given graph.
+    return_eigval : bool
+        If return_eigval=='True', return laplacian eigenvalues together with eigenvectors.
+        Else return laplacian eigenvectors only.
     Example
     -------
-
     >>> import dgl
     >>> from dgl import LaplacianPE
-
-    >>> transform = LaplacianPE(k=3)
+    >>> transform1 = LaplacianPE(k=3)
+    >>> transform2 = LaplacianPE(k=5, padding=True)
+    >>> transform3 = LaplacianPE(k=5, padding=True, return_eigval=True)
     >>> g = dgl.rand_graph(5, 10)
-    >>> g = transform(g)
-    >>> print(g.ndata['PE'])
-    tensor([[ 0.0000, -0.3646,  0.3646],
-            [ 0.0000,  0.2825, -0.2825],
-            [ 1.0000, -0.6315,  0.6315],
-            [ 0.0000,  0.3739, -0.3739],
-            [ 0.0000, -0.1663,  0.1663]])
+    >>> g1 = transform1(g)
+    >>> print(g1.ndata['PE'])
+    tensor([[-0.0697, -0.0697,  0.0131],
+            [ 0.0953,  0.0953, -0.3502],
+            [ 0.3501,  0.3501,  0.5598],
+            [ 0.3929,  0.3929, -0.2883],
+            [-0.5751, -0.5751, -0.2018]])
+    >>> g2 = transform2(g)
+    >>> print(g2.ndata['PE'])
+    tensor([[-0.0697,  0.0697,  0.0131,  0.0131,  0.0000],
+            [ 0.0953, -0.0953, -0.3502, -0.3502,  0.0000],
+            [ 0.3501, -0.3501,  0.5598,  0.5598,  0.0000],
+            [ 0.3929, -0.3929, -0.2883, -0.2883,  0.0000],
+            [-0.5751,  0.5751, -0.2018, -0.2018,  0.0000]])
+    >>> g3 = transform3(g)
+    >>> print(g3.ndata['eigval'])
+    tensor([[0.9158, 0.9158, 1.4175, 1.4175,    nan],
+            [0.9158, 0.9158, 1.4175, 1.4175,    nan],
+            [0.9158, 0.9158, 1.4175, 1.4175,    nan],
+            [0.9158, 0.9158, 1.4175, 1.4175,    nan],
+            [0.9158, 0.9158, 1.4175, 1.4175,    nan]])
+    >>> print(g3.ndata['PE'])
+    tensor([[ 0.0697, -0.0697,  0.0131, -0.0131,  0.0000],
+            [-0.0953,  0.0953, -0.3502,  0.3502,  0.0000],
+            [-0.3501,  0.3501,  0.5598, -0.5598,  0.0000],
+            [-0.3929,  0.3929, -0.2883,  0.2883,  0.0000],
+            [ 0.5751, -0.5751, -0.2018,  0.2018,  0.0000]])
     """
-    def __init__(self, k, feat_name='PE'):
+    def __init__(self, k, feat_name='PE', padding=False, return_eigval=False):
         self.k = k
         self.feat_name = feat_name
-
+        self.padding = padding
+        self.return_eigval = return_eigval
     def __call__(self, g):
-        PE = functional.laplacian_pe(g, k=self.k)
+        if self.return_eigval:
+            eigval, PE = functional.laplacian_pe(g, k=self.k, padding=self.padding, return_eigval=self.return_eigval)
+            eigval = F.repeat(eigval.unsqueeze(0), g.num_nodes(), dim=0)
+            g.ndata['eigval'] = F.copy_to(eigval, g.device)
+        else:
+            PE = functional.laplacian_pe(g, k=self.k, padding=self.padding, return_eigval=self.return_eigval)
         g.ndata[self.feat_name] = F.copy_to(PE, g.device)
-
         return g
 
 class AddSelfLoop(BaseTransform):
