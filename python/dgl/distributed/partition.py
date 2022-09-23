@@ -329,7 +329,8 @@ def _set_trainer_ids(g, sim_g, node_parts):
 
 def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method="metis",
                     reshuffle=True, balance_ntypes=None, balance_edges=False, return_mapping=False,
-                    record_orig_ids=True, num_trainers_per_machine=1, objtype='cut'):
+                    save_orig_nids=False, save_orig_eids=False,
+                    num_trainers_per_machine=1, objtype='cut'):
     ''' Partition a graph for distributed training and store the partitions on files.
 
     The partitioning occurs in three steps: 1) run a partition algorithm (e.g., Metis) to
@@ -503,9 +504,10 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     return_mapping : bool
         If `reshuffle=True`, this indicates to return the mapping between shuffled node/edge IDs
         and the original node/edge IDs.
-    record_orig_ids : bool
-        Indicate whether to record original node/edge IDs. Such info is saved
-        as node/edge data and will be loaded as ``DistTensor` during train.
+    save_orig_nids : bool
+        Indicate whether to save original node IDs as node feature of partitions.
+    save_orig_eids : bool
+        Indicate whether to save original edge IDs as edge feature of partitions.
     num_trainers_per_machine : int, optional
         The number of trainers per machine. If is not 1, the whole graph will be first partitioned
         to each trainer, that is num_parts*num_trainers_per_machine parts. And the trainer ids of
@@ -580,12 +582,6 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     if not reshuffle:
         dgl_warning("The argument reshuffle will be deprecated in the next release. "
                     "For heterogeneous graphs, reshuffle must be enabled.")
-
-    if record_orig_ids:
-        for ntype in g.ntypes:
-            g.nodes[ntype].data[ORIG_NID] = F.arange(0, g.num_nodes(ntype))
-        for etype in g.etypes:
-            g.edges[etype].data[ORIG_EID] = F.arange(0, g.num_edges(etype))
 
     if num_parts == 1:
         start = time.time()
@@ -886,6 +882,17 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         if not g.is_homogeneous:
             part.ndata['orig_id'] = F.gather_row(sim_g.ndata[NID], part.ndata['orig_id'])
             part.edata['orig_id'] = F.gather_row(sim_g.edata[EID], part.edata['orig_id'])
+
+        if save_orig_nids:
+            for ntype in g.ntypes:
+                ntype_id = g.get_ntype_id(ntype)
+                inner_node_mask = _get_inner_node_mask(part, ntype_id)
+                node_feats[ntype + '/' + ORIG_NID] = F.boolean_mask(part.ndata['orig_id'], inner_node_mask)
+        if save_orig_eids:
+            for etype in g.etypes:
+                etype_id = g.get_etype_id(etype)
+                inner_edge_mask = _get_inner_edge_mask(part, etype_id)
+                edge_feats[etype + '/' + ORIG_EID] = F.boolean_mask(part.edata['orig_id'], inner_edge_mask)
 
         part_dir = os.path.join(out_path, "part" + str(part_id))
         node_feat_file = os.path.join(part_dir, "node_feat.dgl")

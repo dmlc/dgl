@@ -173,7 +173,7 @@ def check_hetero_partition(hg, part_method, num_parts=4, num_trainers_per_machin
 
     orig_nids, orig_eids = partition_graph(hg, 'test', num_parts, '/tmp/partition', num_hops=num_hops,
                                            part_method=part_method, reshuffle=True, return_mapping=True,
-                                           record_orig_ids=True,
+                                           save_orig_nids=True, save_orig_eids=True,
                                            num_trainers_per_machine=num_trainers_per_machine)
     assert len(orig_nids) == len(hg.ntypes)
     assert len(orig_eids) == len(hg.etypes)
