@@ -11,7 +11,7 @@ from dgl.mock_sparse import create_from_coo
 @pytest.mark.parametrize("mat_shape", [(3, 5), (5, 3)])
 @pytest.mark.parametrize("reduce_type", ['sum', 'smax', 'smin', 'smean'])
 @pytest.mark.parametrize("dim", [None, 0, 1])
-def test_reduce(dense_dim, row, col, mat_shape, reduce_type, dim):
+def test_reduction(dense_dim, row, col, mat_shape, reduce_type, dim):
     # Skip invalid matrices
     if max(row) >= mat_shape[0] or max(col) >= mat_shape[1]:
         return
