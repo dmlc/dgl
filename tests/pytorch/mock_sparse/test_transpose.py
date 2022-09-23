@@ -19,12 +19,9 @@ def test_diag_matrix_transpose(val_shape, mat_shape):
 @pytest.mark.parametrize("dense_dim", [None, 2])
 @pytest.mark.parametrize("row", [[0, 0, 1, 2], (0, 1, 2, 4)])
 @pytest.mark.parametrize("col", [(0, 1, 2, 2), (1, 3, 3, 4)])
-@pytest.mark.parametrize("mat_shape", [(3, 5), (5, 3)])
-def test_sparse_matrix_transpose(dense_dim, row, col, mat_shape):
-    # Skip invalid matrices
-    if max(row) >= mat_shape[0] or max(col) >= mat_shape[1]:
-        return
-
+@pytest.mark.parametrize("extra_shape", [(0, 1), (2, 1)])
+def test_sparse_matrix_transpose(dense_dim, row, col, extra_shape):
+    mat_shape = (max(row) + 1 + extra_shape[0], max(col) + 1 + extra_shape[1])
     val_shape = (len(row),)
     if dense_dim is not None:
         val_shape += (dense_dim,)
