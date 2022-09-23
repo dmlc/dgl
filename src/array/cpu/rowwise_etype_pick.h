@@ -41,7 +41,6 @@ namespace impl {
 // \param et_len Length of the range.
 // \param et_idx A map from local idx to column id.
 //               etypes[data[et_idx[et_off:et_off + et_len]]] == et.
-//               nullptr represents identity mapping (i.e. et_idx[i] == i).
 // \param out_idx Picked indices putting into [et_off, et_off + et_len).
 template <typename IdxType, typename EType>
 using ETypePickFn = std::function<void(
@@ -68,7 +67,6 @@ using ETypePickFn = std::function<void(
 // \param et_len Length of the range.
 // \param et_idx A map from local idx to column id.
 //               etypes[data[et_idx[et_off:et_off + et_len]]] == et.
-//               nullptr represents identity mapping (i.e. et_idx[i] == i).
 // \return The number of entries to pick.  Must be non-negative.
 template <typename IdxType, typename EType>
 using ETypeNumPicksFn = std::function<IdxType(
@@ -109,35 +107,32 @@ CSRMatrix CSRRowWisePerEtypePickPartial(
   IdxType* off_picked_per_row_data = off_picked_per_row.Ptr<IdxType>();
 
   // Determine the size of the sorted edge type index array
-  // NOTE: these variables are only used if etype_sorted is False.
   IdArray et_idx_indptr, et_idx;
   IdxType* et_idx_indptr_data = nullptr;
   IdxType* et_idx_data = nullptr;
-  if (!etype_sorted) {
-    et_idx_indptr = NDArray::Empty({num_rows + 1}, idtype, ctx);
-    et_idx_indptr_data = et_idx_indptr.Ptr<IdxType>();
-    et_idx_indptr_data[0] = 0;
-    for (IdxType i = 0; i < num_rows; ++i) {
-      const IdxType rid = rows_data[i];
-      const IdxType len = indptr[rid + 1] - indptr[rid];
-      et_idx_indptr_data[i + 1] = et_idx_indptr_data[i] + len;
-    }
-    // Pre-allocate the argsort array of the edge type IDs.
-    et_idx = NDArray::Empty({et_idx_indptr_data[num_rows]}, idtype, ctx);
-    et_idx_data = et_idx.Ptr<IdxType>();
+  et_idx_indptr = NDArray::Empty({num_rows + 1}, idtype, ctx);
+  et_idx_indptr_data = et_idx_indptr.Ptr<IdxType>();
+  et_idx_indptr_data[0] = 0;
+  for (IdxType i = 0; i < num_rows; ++i) {
+    const IdxType rid = rows_data[i];
+    const IdxType len = indptr[rid + 1] - indptr[rid];
+    et_idx_indptr_data[i + 1] = et_idx_indptr_data[i] + len;
   }
+  // Pre-allocate the argsort array of the edge type IDs.
+  et_idx = NDArray::Empty({et_idx_indptr_data[num_rows]}, idtype, ctx);
+  et_idx_data = et_idx.Ptr<IdxType>();
 
   // (BarclayII) use runtime::parallel_for as it gracefully handles CHECKs and
   // enables GDB to capture the variables.
   runtime::parallel_for(0, num_rows, [=] (size_t start_i, size_t end_i) {
     // Step 1: sort edge type IDs per node if necessary
-    if (!etype_sorted) {
-      for (size_t i = start_i; i < end_i; ++i) {
-        const IdxType rid = rows_data[i];
-        std::iota(
-            et_idx_data + et_idx_indptr_data[i],
-            et_idx_data + et_idx_indptr_data[i + 1],
-            indptr[rid]);
+    for (size_t i = start_i; i < end_i; ++i) {
+      const IdxType rid = rows_data[i];
+      std::iota(
+          et_idx_data + et_idx_indptr_data[i],
+          et_idx_data + et_idx_indptr_data[i + 1],
+          indptr[rid]);
+      if (!etype_sorted) {
         std::sort(
             et_idx_data + et_idx_indptr_data[i],
             et_idx_data + et_idx_indptr_data[i + 1],
@@ -149,8 +144,8 @@ CSRMatrix CSRRowWisePerEtypePickPartial(
 
     // Step 2: determine the number of incident edges with the same edge type per node
     for (size_t i = start_i; i < end_i; ++i) {
-      int64_t start_j = !etype_sorted ? et_idx_indptr_data[i] : indptr[i];
-      int64_t end_j = !etype_sorted ? et_idx_indptr_data[i + 1] : indptr[i + 1];
+      int64_t start_j = !etype_sorted ? et_idx_indptr_data[i] : indptr[rows_data[i]];
+      int64_t end_j = !etype_sorted ? et_idx_indptr_data[i + 1] : indptr[rows_data[i] + 1];
       for (int64_t j = start_j; j < end_j; ++j) {
         const IdxType loc = !etype_sorted ? et_idx_data[j] : j;
         const IdxType eid = data ? data[loc] : loc;

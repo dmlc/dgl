@@ -46,15 +46,12 @@ inline ETypePickFn<IdxType, EType> GetSamplingUniformETypePickFn(
       if (num_samples[et] == -1 || (!replace && et_len == num_picks)) {
         // fast path for selecting all
         for (int64_t j = 0; j < num_picks; ++j)
-          out_idx[j] = et_idx ? et_idx[et_off + j] : et_off + j;
+          out_idx[j] = et_idx[et_off + j];
       } else {
         RandomEngine::ThreadLocal()->UniformChoice<IdxType>(
             num_picks, et_len, out_idx, replace);
-        for (int64_t j = 0; j < num_picks; ++j) {
-          out_idx[j] += et_off;
-          if (et_idx)
-            out_idx[j] = et_idx[out_idx[j]];
-        }
+        for (int64_t j = 0; j < num_picks; ++j)
+          out_idx[j] = et_idx[out_idx[j] + et_off];
       }
     };
   return pick_fn;
@@ -69,7 +66,7 @@ inline ETypeNumPicksFn<IdxType, EType> GetSamplingETypeNumPicksFn(
       const FloatType* p_data = prob.Ptr<FloatType>();
       int64_t num_possible_picks = 0;
       for (int64_t j = 0; j < et_len; ++j) {
-        const IdxType loc = et_idx ? et_idx[et_off + j] : et_off + j;
+        const IdxType loc = et_idx[et_off + j];
         const IdxType eid = data ? data[loc] : loc;
         if (p_data[eid] > 0)
           ++num_possible_picks;
@@ -99,26 +96,24 @@ inline ETypePickFn<IdxType, EType> GetSamplingETypePickFn(
         // fast path for selecting all
         int64_t i = 0;
         for (int64_t j = 0; j < et_len; ++j) {
-          const IdxType loc = et_idx ? et_idx[et_off + j] : et_off + j;
+          const IdxType loc = et_idx[et_off + j];
           const IdxType eid = data ? data[loc] : loc;
           if (p_data[eid] > 0)
-            out_idx[i++] = et_idx ? et_idx[et_off + j] : et_off + j;
+            out_idx[i++] = et_idx[et_off + j];
         }
         CHECK_EQ(i, num_picks);  // correctness check
       } else {
         FloatArray probs = FloatArray::Empty({et_len}, prob->dtype, prob->ctx);
         FloatType* probs_data = static_cast<FloatType*>(probs->data);
         for (int64_t j = 0; j < et_len; ++j) {
-          const IdxType loc = et_idx ? et_idx[et_off + j] : et_off + j;
+          const IdxType loc = et_idx[et_off + j];
           probs_data[j] = data ? p_data[data[loc]] : p_data[loc];
         }
 
         RandomEngine::ThreadLocal()->Choice<IdxType, FloatType>(
             num_picks, probs, out_idx, replace);
         for (int64_t i = 0; i < num_picks; ++i) {
-          out_idx[i] += et_off;
-          if (et_idx)
-            out_idx[i] = et_idx[out_idx[i]];
+          out_idx[i] = et_idx[out_idx[i] + et_off];
         }
       }
     };

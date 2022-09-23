@@ -125,16 +125,17 @@ class AliasSampler: public BaseSampler<Idx> {
   ~AliasSampler() {}
 
   Idx Draw() {
-    double avg = accum / N;
     if (!replace) {
       const DType *_prob_data = _prob.Ptr<DType>();
       if (2 * taken >= accum)
         Reconstruct(_prob);
+      // accum changes after Reconstruct(), so avg should be computed after that.
+      double avg = accum / N;
       while (true) {
         double dice = re->Uniform<double>(0, N);
         Idx i = static_cast<Idx>(dice), rst;
         double p = (dice - i) * avg;
-        if (p <= U[Map(i)]) {
+        if (p <= U[i]) {
           rst = Map(i);
         } else {
           rst = Map(K[i]);
@@ -147,6 +148,7 @@ class AliasSampler: public BaseSampler<Idx> {
         }
       }
     }
+    double avg = accum / N;
     double dice = re->Uniform<double>(0, N);
     Idx i = static_cast<Idx>(dice);
     double p = (dice - i) * avg;
@@ -225,13 +227,13 @@ class CDFSampler: public BaseSampler<Idx> {
   Idx Draw() {
     double eps = std::numeric_limits<double>::min();
     if (!replace) {
-      const double *_prob_data = _prob.Ptr<double>();
+      const DType *_prob_data = _prob.Ptr<DType>();
       if (2 * taken >= accum)
         Reconstruct(_prob);
       while (true) {
         double p = std::max(re->Uniform<double>(0., accum), eps);
         Idx rst = Map(std::lower_bound(cdf.begin(), cdf.end(), p) - cdf.begin() - 1);
-        double cap = _prob_data[rst];
+        double cap = static_cast<double>(_prob_data[rst]);
         if (!used[rst]) {
           used[rst] = true;
           taken += cap;
@@ -303,7 +305,7 @@ class TreeSampler: public BaseSampler<Idx> {
     while (cur < num_leafs) {
       double w_l = weight[cur * 2], w_r = weight[cur * 2 + 1];
       double pivot = accum + w_l;
-      // w_r > 0 can depress some numerical problems.
+      // w_r > 0 can suppress some numerical problems.
       Idx shift = static_cast<Idx>(p > pivot && w_r > 0);
       cur = cur * 2 + shift;
       if (shift == 1)
