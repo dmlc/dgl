@@ -75,6 +75,8 @@ def test_saint(num_workers, mode):
 def test_neighbor_nonuniform(idtype, mode, use_ddp, use_mask):
     if mode != 'cpu' and F.ctx() == F.cpu():
         pytest.skip('UVA and GPU sampling require a GPU.')
+    if mode != 'cpu' and use_mask:
+        pytest.skip('Masked sampling only works on CPU.')
     if use_ddp:
         dist.init_process_group('gloo' if F.ctx() == F.cpu() else 'nccl',
             'tcp://127.0.0.1:12347', world_size=1, rank=0)
