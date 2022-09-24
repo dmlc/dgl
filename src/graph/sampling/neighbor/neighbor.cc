@@ -138,6 +138,15 @@ HeteroSubgraph SampleNeighbors(
         default:
           LOG(FATAL) << "Unsupported sparse format.";
       }
+
+      // Exclude all the edges with zero probability
+      if (!aten::IsNullArray(prob[etype])) {
+        ATEN_FLOAT_BOOL_TYPE_SWITCH(prob[etype]->dtype, DType, "prob", {
+          sampled_coo = aten::COORemoveIf(
+              sampled_coo, prob[etype], static_cast<DType>(0));
+        });
+      }
+
       subrels[etype] = UnitGraph::CreateFromCOO(
         hg->GetRelationGraph(etype)->NumVertexTypes(), sampled_coo.num_rows, sampled_coo.num_cols,
         sampled_coo.row, sampled_coo.col);
@@ -233,6 +242,13 @@ HeteroSubgraph SampleNeighborsEType(
         break;
       default:
         LOG(FATAL) << "Unsupported sparse format.";
+    }
+
+    // Exclude all the edges with zero probability
+    if (!aten::IsNullArray(prob)) {
+      ATEN_FLOAT_BOOL_TYPE_SWITCH(prob->dtype, DType, "prob", {
+        sampled_coo = aten::COORemoveIf(sampled_coo, prob, static_cast<DType>(0));
+      });
     }
 
     subrels[etype] = UnitGraph::CreateFromCOO(

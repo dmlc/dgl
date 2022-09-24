@@ -46,6 +46,9 @@ DType IndexSelect(NDArray array, int64_t index);
 template <DGLDeviceType XPU, typename DType>
 IdArray NonZero(BoolArray bool_arr);
 
+template <DGLDeviceType XPU, typename IdType>
+IdArray NonZero(NDArray array);
+
 template <DGLDeviceType XPU, typename DType>
 std::pair<IdArray, IdArray> Sort(IdArray array, int num_bits);
 
@@ -72,9 +75,6 @@ std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths);
 
 template <DGLDeviceType XPU, typename IdType>
 IdArray CumSum(IdArray array, bool prepend_zero);
-
-template <DGLDeviceType XPU, typename IdType>
-IdArray NonZero(NDArray array);
 
 // sparse arrays
 
@@ -267,6 +267,9 @@ std::pair<bool, bool> COOIsSorted(COOMatrix coo);
 
 template <DGLDeviceType XPU, typename IdType>
 COOMatrix COORemove(COOMatrix coo, IdArray entries);
+
+template <DGLDeviceType XPU, typename IdType, typename DType>
+COOMatrix COORemoveIf(COOMatrix coo, NDArray values, DType criteria);
 
 // FloatType is the type of probability data.
 template <DGLDeviceType XPU, typename IdType, typename FloatType>
