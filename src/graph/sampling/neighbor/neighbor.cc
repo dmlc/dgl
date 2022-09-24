@@ -97,6 +97,17 @@ HeteroSubgraph SampleNeighbors(
         hg->NumVertices(dst_vtype),
         hg->DataType(), ctx);
       induced_edges[etype] = aten::NullArray(hg->DataType(), ctx);
+    } else if (fanouts[etype] == -1) {
+      const auto &earr = (dir == EdgeDir::kOut) ?
+        hg->OutEdges(etype, nodes_ntype) :
+        hg->InEdges(etype, nodes_ntype);
+      subrels[etype] = UnitGraph::CreateFromCOO(
+        hg->GetRelationGraph(etype)->NumVertexTypes(),
+        hg->NumVertices(src_vtype),
+        hg->NumVertices(dst_vtype),
+        earr.src,
+        earr.dst);
+      induced_edges[etype] = earr.id;
     } else {
       // sample from one relation graph
       auto req_fmt = (dir == EdgeDir::kOut)? CSR_CODE : CSC_CODE;
@@ -181,6 +192,17 @@ HeteroSubgraph SampleNeighborsEType(
       hg->NumVertices(dst_vtype),
       hg->DataType(), hg->Context());
     induced_edges[etype] = aten::NullArray();
+  } else if (same_fanout && fanout_value == -1) {
+    const auto &earr = (dir == EdgeDir::kOut) ?
+      hg->OutEdges(etype, nodes) :
+      hg->InEdges(etype, nodes);
+    subrels[etype] = UnitGraph::CreateFromCOO(
+      1,
+      hg->NumVertices(src_vtype),
+      hg->NumVertices(dst_vtype),
+      earr.src,
+      earr.dst);
+      induced_edges[etype] = earr.id;
   } else {
     // sample from graph
     // the edge type is stored in etypes
@@ -192,7 +214,7 @@ HeteroSubgraph SampleNeighborsEType(
         if (dir == EdgeDir::kIn) {
           sampled_coo = aten::COOTranspose(aten::COORowWisePerEtypeSampling(
             aten::COOTranspose(hg->GetCOOMatrix(etype)),
-            nodes, etypes, fanouts, prob, replace, etype_sorted));
+            nodes, etypes, fanouts, prob, replace));
         } else {
           sampled_coo = aten::COORowWisePerEtypeSampling(
             hg->GetCOOMatrix(etype), nodes, etypes, fanouts, prob, replace, etype_sorted);
@@ -257,6 +279,17 @@ HeteroSubgraph SampleNeighborsTopk(
         hg->NumVertices(dst_vtype),
         hg->DataType(), hg->Context());
       induced_edges[etype] = aten::NullArray();
+    } else if (k[etype] == -1) {
+      const auto &earr = (dir == EdgeDir::kOut) ?
+        hg->OutEdges(etype, nodes_ntype) :
+        hg->InEdges(etype, nodes_ntype);
+      subrels[etype] = UnitGraph::CreateFromCOO(
+        hg->GetRelationGraph(etype)->NumVertexTypes(),
+        hg->NumVertices(src_vtype),
+        hg->NumVertices(dst_vtype),
+        earr.src,
+        earr.dst);
+      induced_edges[etype] = earr.id;
     } else {
       // sample from one relation graph
       auto req_fmt = (dir == EdgeDir::kOut)? CSR_CODE : CSC_CODE;
@@ -335,6 +368,17 @@ HeteroSubgraph SampleNeighborsBiased(
         hg->NumVertices(dst_vtype),
         hg->DataType(), hg->Context());
       induced_edges = aten::NullArray();
+    } else if (fanout == -1) {
+      const auto &earr = (dir == EdgeDir::kOut) ?
+        hg->OutEdges(etype, nodes_ntype) :
+        hg->InEdges(etype, nodes_ntype);
+      subrel = UnitGraph::CreateFromCOO(
+        hg->GetRelationGraph(etype)->NumVertexTypes(),
+        hg->NumVertices(src_vtype),
+        hg->NumVertices(dst_vtype),
+        earr.src,
+        earr.dst);
+      induced_edges = earr.id;
     } else {
       // sample from one relation graph
       const auto req_fmt = (dir == EdgeDir::kOut)? CSR_CODE : CSC_CODE;
