@@ -351,7 +351,7 @@ def _test_sample_neighbors(hypersparse, prob):
         u_ans, v_ans, e_ans = g.in_edges([0, 1], form='all')
         if p is not None:
             emask = F.gather_row(g.edata[p], e_ans)
-            if p == 'p':
+            if p == 'prob':
                 emask = (emask != 0)
             u_ans = F.boolean_mask(u_ans, emask)
             v_ans = F.boolean_mask(v_ans, emask)
@@ -384,7 +384,7 @@ def _test_sample_neighbors(hypersparse, prob):
         u_ans, v_ans, e_ans = g.in_edges([0, 2], form='all')
         if p is not None:
             emask = F.gather_row(g.edata[p], e_ans)
-            if p == 'p':
+            if p == 'prob':
                 emask = (emask != 0)
             u_ans = F.boolean_mask(u_ans, emask)
             v_ans = F.boolean_mask(v_ans, emask)
@@ -455,7 +455,7 @@ def _test_sample_neighbors_outedge(hypersparse):
         u_ans, v_ans, e_ans = g.out_edges([0, 1], form='all')
         if p is not None:
             emask = F.gather_row(g.edata[p], e_ans)
-            if p == 'p':
+            if p == 'prob':
                 emask = (emask != 0)
             u_ans = F.boolean_mask(u_ans, emask)
             v_ans = F.boolean_mask(v_ans, emask)
@@ -490,7 +490,7 @@ def _test_sample_neighbors_outedge(hypersparse):
         u_ans, v_ans, e_ans = g.out_edges([0, 2], form='all')
         if p is not None:
             emask = F.gather_row(g.edata[p], e_ans)
-            if p == 'p':
+            if p == 'prob':
                 emask = (emask != 0)
             u_ans = F.boolean_mask(u_ans, emask)
             v_ans = F.boolean_mask(v_ans, emask)
