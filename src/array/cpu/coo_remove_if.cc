@@ -31,10 +31,11 @@ COOMatrix COORemoveIf(COOMatrix coo, NDArray values, DType criteria) {
 
   int64_t j = 0;
   for (int64_t i = 0; i < nnz; ++i) {
-    if (val[i] != criteria) {
+    const IdType eid = data ? data[i] : i;
+    if (val[eid] != criteria) {
       new_row_data[j] = row[i];
       new_col_data[j] = col[i];
-      new_eid_data[j] = data ? data[j] : j;
+      new_eid_data[j] = eid;
       ++j;
     }
   }

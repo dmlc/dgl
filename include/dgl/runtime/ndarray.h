@@ -42,6 +42,7 @@ struct DGLDataTypeTraits {
     static constexpr DGLDataType dtype{code, bits, 1}; \
   }
 GEN_DGLDATATYPETRAITS_FOR(int8_t, kDGLInt, 8);
+GEN_DGLDATATYPETRAITS_FOR(uint8_t, kDGLUInt, 8);
 GEN_DGLDATATYPETRAITS_FOR(int16_t, kDGLInt, 16);
 GEN_DGLDATATYPETRAITS_FOR(int32_t, kDGLInt, 32);
 GEN_DGLDATATYPETRAITS_FOR(int64_t, kDGLInt, 64);

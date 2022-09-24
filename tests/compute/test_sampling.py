@@ -676,6 +676,7 @@ def test_sample_neighbors_prob():
     #_test_sample_neighbors(True)
 
 @unittest.skipIf(F.backend_name == 'mxnet', reason='MXNet has problem converting bool arrays')
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors with mask not implemented")
 def test_sample_neighbors_mask():
     _test_sample_neighbors(False, 'mask')
 
@@ -955,25 +956,7 @@ def test_sample_neighbors_etype_sorted_homogeneous(format_, direction):
     orig_etype = F.asnumpy(h_g.edata[dgl.ETYPE])
     np.random.shuffle(orig_etype)
 
-    # Test the case where the edge types are not sorted in ascending order.
-    # It should fail with an error.
     new_etype = orig_etype.copy()
-    for i in range(h_g.num_nodes()):
-        if direction == 'in':
-            e = F.asnumpy(h_g.in_edges(i, form='eid'))
-        else:
-            e = F.asnumpy(h_g.out_edges(i, form='eid'))
-        new_etype[e] = np.sort(orig_etype[e])[::-1]
-    h_g.edata[dgl.ETYPE] = F.zerocopy_from_numpy(new_etype)
-    try:
-        sg = dgl.sampling.sample_etype_neighbors(
-            h_g, seeds, dgl.ETYPE, fanouts, edge_dir=direction, etype_sorted=True)
-        fail = False
-    except dgl.DGLError:
-        fail = True
-    assert fail
-
-    # Now test where the edge types are sorted.
     for i in range(h_g.num_nodes()):
         if direction == 'in':
             e = F.asnumpy(h_g.in_edges(i, form='eid'))

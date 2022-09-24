@@ -665,7 +665,7 @@ TEST(RowwiseTest, TestCOOSamplingUniform) {
 }
 
 template <typename Idx, typename FloatType>
-void _TestCOOPerEtypeSampling(bool has_data) {
+void _TestCOOerEtypeSampling(bool has_data) {
   auto mat = COOEtypes<Idx>(has_data);
   FloatArray prob = NDArray::FromVector(
       std::vector<FloatType>({.5, .5, .5, .5, .5, .5, .5}));
@@ -740,7 +740,7 @@ void _TestCOOPerEtypeSampling(bool has_data) {
 }
 
 template <typename Idx, typename FloatType>
-void _TestCOOPerEtypeSamplingSorted(bool has_data, bool etype_sorted) {
+void _TestCOOerEtypeSamplingSorted(bool has_data, bool etype_sorted) {
   auto mat = COOEtypes<Idx>(has_data);
   FloatArray prob = NDArray::FromVector(
       std::vector<FloatType>({.5, .5, .5, .5, .5, .5, .5}));
@@ -814,31 +814,31 @@ void _TestCOOPerEtypeSamplingSorted(bool has_data, bool etype_sorted) {
   }
 }
 
-TEST(RowwiseTest, TestCOOPerEtypeSampling) {
-  _TestCOOPerEtypeSampling<int32_t, float>(true);
-  _TestCOOPerEtypeSampling<int64_t, float>(true);
-  _TestCOOPerEtypeSampling<int32_t, double>(true);
-  _TestCOOPerEtypeSampling<int64_t, double>(true);
-  _TestCOOPerEtypeSampling<int32_t, float>(false);
-  _TestCOOPerEtypeSampling<int64_t, float>(false);
-  _TestCOOPerEtypeSampling<int32_t, double>(false);
-  _TestCOOPerEtypeSampling<int64_t, double>(false);
-  _TestCOOPerEtypeSamplingSorted<int32_t, float>(true, true);
-  _TestCOOPerEtypeSamplingSorted<int64_t, float>(true, true);
-  _TestCOOPerEtypeSamplingSorted<int32_t, double>(true, true);
-  _TestCOOPerEtypeSamplingSorted<int64_t, double>(true, true);
-  _TestCOOPerEtypeSamplingSorted<int32_t, float>(false, true);
-  _TestCOOPerEtypeSamplingSorted<int64_t, float>(false, true);
-  _TestCOOPerEtypeSamplingSorted<int32_t, double>(false, true);
-  _TestCOOPerEtypeSamplingSorted<int64_t, double>(false, true);
-  _TestCOOPerEtypeSamplingSorted<int32_t, float>(true, false);
-  _TestCOOPerEtypeSamplingSorted<int64_t, float>(true, false);
-  _TestCOOPerEtypeSamplingSorted<int32_t, double>(true, false);
-  _TestCOOPerEtypeSamplingSorted<int64_t, double>(true, false);
-  _TestCOOPerEtypeSamplingSorted<int32_t, float>(false, false);
-  _TestCOOPerEtypeSamplingSorted<int64_t, float>(false, false);
-  _TestCOOPerEtypeSamplingSorted<int32_t, double>(false, false);
-  _TestCOOPerEtypeSamplingSorted<int64_t, double>(false, false);
+TEST(RowwiseTest, TestCOOerEtypeSampling) {
+  _TestCOOerEtypeSampling<int32_t, float>(true);
+  _TestCOOerEtypeSampling<int64_t, float>(true);
+  _TestCOOerEtypeSampling<int32_t, double>(true);
+  _TestCOOerEtypeSampling<int64_t, double>(true);
+  _TestCOOerEtypeSampling<int32_t, float>(false);
+  _TestCOOerEtypeSampling<int64_t, float>(false);
+  _TestCOOerEtypeSampling<int32_t, double>(false);
+  _TestCOOerEtypeSampling<int64_t, double>(false);
+  _TestCOOerEtypeSamplingSorted<int32_t, float>(true, true);
+  _TestCOOerEtypeSamplingSorted<int64_t, float>(true, true);
+  _TestCOOerEtypeSamplingSorted<int32_t, double>(true, true);
+  _TestCOOerEtypeSamplingSorted<int64_t, double>(true, true);
+  _TestCOOerEtypeSamplingSorted<int32_t, float>(false, true);
+  _TestCOOerEtypeSamplingSorted<int64_t, float>(false, true);
+  _TestCOOerEtypeSamplingSorted<int32_t, double>(false, true);
+  _TestCOOerEtypeSamplingSorted<int64_t, double>(false, true);
+  _TestCOOerEtypeSamplingSorted<int32_t, float>(true, false);
+  _TestCOOerEtypeSamplingSorted<int64_t, float>(true, false);
+  _TestCOOerEtypeSamplingSorted<int32_t, double>(true, false);
+  _TestCOOerEtypeSamplingSorted<int64_t, double>(true, false);
+  _TestCOOerEtypeSamplingSorted<int32_t, float>(false, false);
+  _TestCOOerEtypeSamplingSorted<int64_t, float>(false, false);
+  _TestCOOerEtypeSamplingSorted<int32_t, double>(false, false);
+  _TestCOOerEtypeSamplingSorted<int64_t, double>(false, false);
 }
 
 template <typename Idx, typename FloatType>

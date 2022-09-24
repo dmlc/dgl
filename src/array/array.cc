@@ -809,11 +809,15 @@ template <typename DType>
 COOMatrix COORemoveIf(COOMatrix coo, NDArray values, DType criteria) {
   COOMatrix ret;
   CHECK(values->dtype == DGLDataTypeTraits<DType>::dtype);
-  ATEN_COO_SWITCH(coo, XPU, IdType, "COORemoveIf", {
+  ATEN_COO_SWITCH_CUDA(coo, XPU, IdType, "COORemoveIf", {
     ret = impl::COORemoveIf<XPU, IdType, DType>(coo, values, criteria);
   });
   return ret;
 }
+template COOMatrix COORemoveIf<int8_t>(COOMatrix, NDArray, int8_t);
+template COOMatrix COORemoveIf<uint8_t>(COOMatrix, NDArray, uint8_t);
+template COOMatrix COORemoveIf<float>(COOMatrix, NDArray, float);
+template COOMatrix COORemoveIf<double>(COOMatrix, NDArray, double);
 
 COOMatrix COORowWiseSampling(
     COOMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob, bool replace) {
@@ -822,7 +826,7 @@ COOMatrix COORowWiseSampling(
     if (IsNullArray(prob)) {
       ret = impl::COORowWiseSamplingUniform<XPU, IdType>(mat, rows, num_samples, replace);
     } else {
-      ATEN_FLOAT_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
+      ATEN_FLOAT_BOOL_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
         ret = impl::COORowWiseSampling<XPU, IdType, FloatType>(
             mat, rows, num_samples, prob, replace);
       });
@@ -841,7 +845,7 @@ COOMatrix COORowWisePerEtypeSampling(
       ret = impl::COORowWisePerEtypeSamplingUniform<XPU, IdType>(
             mat, rows, etypes, num_samples, replace, etype_sorted);
     } else {
-      ATEN_FLOAT_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
+      ATEN_FLOAT_BOOL_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
         ret = impl::COORowWisePerEtypeSampling<XPU, IdType, FloatType>(
             mat, rows, etypes, num_samples, prob, replace, etype_sorted);
       });
