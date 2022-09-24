@@ -555,15 +555,10 @@ COOMatrix CSRRowWiseSampling(
     // prob is pinned and rows on GPU is valid
     CHECK_VALID_CONTEXT(prob, rows);
     ATEN_CSR_SWITCH_CUDA_UVA(mat, rows, XPU, IdType, "CSRRowWiseSampling", {
-      if (XPU == kDGLCUDA && prob->dtype.code != kDGLFloat) {
-        LOG(FATAL) <<
-            "Currently GPU neighbor sampling does not support sampling with edge masks.";
-      } else {
-        ATEN_FLOAT_BOOL_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
-          ret = impl::CSRRowWiseSampling<XPU, IdType, FloatType>(
-              mat, rows, num_samples, prob, replace);
-        });
-      }
+      ATEN_FLOAT_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
+        ret = impl::CSRRowWiseSampling<XPU, IdType, FloatType>(
+            mat, rows, num_samples, prob, replace);
+      });
     });
   }
   return ret;
@@ -575,17 +570,15 @@ COOMatrix CSRRowWisePerEtypeSampling(
     bool etype_sorted) {
   COOMatrix ret;
   ATEN_CSR_SWITCH(mat, XPU, IdType, "CSRRowWisePerEtypeSampling", {
-    ATEN_DTYPE_BITS_ONLY_SWITCH(etypes->dtype, EType, "etypes", {
-      if (IsNullArray(prob)) {
-        ret = impl::CSRRowWisePerEtypeSamplingUniform<XPU, IdType, EType>(
-              mat, rows, etypes, num_samples, replace, etype_sorted);
-      } else {
-        ATEN_FLOAT_BOOL_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
-          ret = impl::CSRRowWisePerEtypeSampling<XPU, IdType, FloatType, EType>(
-              mat, rows, etypes, num_samples, prob, replace, etype_sorted);
-        });
-      }
-    });
+    if (IsNullArray(prob)) {
+      ret = impl::CSRRowWisePerEtypeSamplingUniform<XPU, IdType>(
+            mat, rows, etypes, num_samples, replace, etype_sorted);
+    } else {
+      ATEN_FLOAT_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
+        ret = impl::CSRRowWisePerEtypeSampling<XPU, IdType, FloatType>(
+            mat, rows, etypes, num_samples, prob, replace, etype_sorted);
+      });
+    }
   });
   return ret;
 }
@@ -817,7 +810,7 @@ COOMatrix COORowWiseSampling(
     if (IsNullArray(prob)) {
       ret = impl::COORowWiseSamplingUniform<XPU, IdType>(mat, rows, num_samples, replace);
     } else {
-      ATEN_FLOAT_BOOL_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
+      ATEN_FLOAT_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
         ret = impl::COORowWiseSampling<XPU, IdType, FloatType>(
             mat, rows, num_samples, prob, replace);
       });
@@ -832,17 +825,15 @@ COOMatrix COORowWisePerEtypeSampling(
     bool etype_sorted) {
   COOMatrix ret;
   ATEN_COO_SWITCH(mat, XPU, IdType, "COORowWisePerEtypeSampling", {
-    ATEN_DTYPE_BITS_ONLY_SWITCH(etypes->dtype, EType, "etypes", {
-      if (IsNullArray(prob)) {
-        ret = impl::COORowWisePerEtypeSamplingUniform<XPU, IdType, EType>(
-              mat, rows, etypes, num_samples, replace, etype_sorted);
-      } else {
-        ATEN_FLOAT_BOOL_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
-          ret = impl::COORowWisePerEtypeSampling<XPU, IdType, FloatType, EType>(
-              mat, rows, etypes, num_samples, prob, replace, etype_sorted);
-        });
-      }
-    });
+    if (IsNullArray(prob)) {
+      ret = impl::COORowWisePerEtypeSamplingUniform<XPU, IdType>(
+            mat, rows, etypes, num_samples, replace, etype_sorted);
+    } else {
+      ATEN_FLOAT_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
+        ret = impl::COORowWisePerEtypeSampling<XPU, IdType, FloatType>(
+            mat, rows, etypes, num_samples, prob, replace, etype_sorted);
+      });
+    }
   });
   return ret;
 }

@@ -659,14 +659,6 @@ template COOMatrix CSRRowWiseSampling<kDGLCUDA, int32_t, double>(
   CSRMatrix, IdArray, int64_t, FloatArray, bool);
 template COOMatrix CSRRowWiseSampling<kDGLCUDA, int64_t, double>(
   CSRMatrix, IdArray, int64_t, FloatArray, bool);
-template COOMatrix CSRRowWiseSampling<kDGLCUDA, int32_t, int8_t>(
-  CSRMatrix, IdArray, int64_t, FloatArray, bool);
-template COOMatrix CSRRowWiseSampling<kDGLCUDA, int64_t, int8_t>(
-  CSRMatrix, IdArray, int64_t, FloatArray, bool);
-template COOMatrix CSRRowWiseSampling<kDGLCUDA, int32_t, uint8_t>(
-  CSRMatrix, IdArray, int64_t, FloatArray, bool);
-template COOMatrix CSRRowWiseSampling<kDGLCUDA, int64_t, uint8_t>(
-  CSRMatrix, IdArray, int64_t, FloatArray, bool);
 
 }  // namespace impl
 }  // namespace aten
