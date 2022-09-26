@@ -122,11 +122,10 @@ struct COOMatrix {
   }
 
   /*! \brief Return a copy of this matrix on the give device context. */
-  inline COOMatrix CopyTo(const DLContext &ctx) const {
+  inline COOMatrix CopyTo(const DGLContext &ctx) const {
     if (ctx == row->ctx)
       return *this;
-    return COOMatrix(num_rows, num_cols, row.CopyTo(ctx),
-                     col.CopyTo(ctx),
+    return COOMatrix(num_rows, num_cols, row.CopyTo(ctx), col.CopyTo(ctx),
                      aten::IsNullArray(data) ? data : data.CopyTo(ctx),
                      row_sorted, col_sorted);
   }
@@ -134,9 +133,9 @@ struct COOMatrix {
   /*!
   * \brief Pin the row, col and data (if not Null) of the matrix.
   * \note This is an in-place method. Behavior depends on the current context,
-  *       kDLCPU: will be pinned;
+  *       kDGLCPU: will be pinned;
   *       IsPinned: directly return;
-  *       kDLGPU: invalid, will throw an error.
+  *       kDGLCUDA: invalid, will throw an error.
   *       The context check is deferred to pinning the NDArray.
   */
   inline void PinMemory_() {

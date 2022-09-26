@@ -3,9 +3,11 @@
  * \file array/cuda/segment_reduce.cuh
  * \brief Segment reduce kernel function header.
  */
-#ifndef DGL_ARRAY_SEGMENT_REDUCE_CUH_
-#define DGL_ARRAY_SEGMENT_REDUCE_CUH_
+#ifndef DGL_ARRAY_CUDA_SEGMENT_REDUCE_CUH_
+#define DGL_ARRAY_CUDA_SEGMENT_REDUCE_CUH_
 
+#include <string>
+#include <vector>
 #include "../../runtime/cuda/cuda_common.h"
 #include "./utils.h"
 #include "./atomic.cuh"
@@ -27,7 +29,7 @@ template <typename IdType, typename DType,
 __global__ void SegmentReduceKernel(
     const DType* feat, const IdType* offsets,
     DType* out, IdType* arg,
-    int64_t n, int64_t dim){
+    int64_t n, int64_t dim) {
   for (int row = blockIdx.x; row < n; row += gridDim.x) {
     int col = blockIdx.y * blockDim.x + threadIdx.x;
     while (col < dim) {
@@ -81,7 +83,7 @@ __global__ void UpdateGradMinMaxHeteroKernel(
   unsigned int row = warpId;
 
   while (row < n) {
-    for(unsigned int col = laneId; col < dim; col += warp_size) {
+    for (unsigned int col = laneId; col < dim; col += warp_size) {
       if (type == idx_type[row * dim + col]) {
         const int write_row = idx[row * dim + col];
         cuda::AtomicAdd(out + write_row * dim + col, feat[row * dim + col]);
@@ -273,4 +275,4 @@ void BackwardSegmentCmp(
 }  // namespace aten
 }  // namespace dgl
 
-#endif
+#endif  // DGL_ARRAY_CUDA_SEGMENT_REDUCE_CUH_

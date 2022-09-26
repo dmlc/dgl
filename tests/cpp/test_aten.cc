@@ -25,7 +25,7 @@ TEST(ArrayTest, TestCreate) {
   ASSERT_EQ(Len(a), 0);
 };
 
-void _TestRange(DLContext ctx) {
+void _TestRange(DGLContext ctx) {
   IdArray a = aten::Range(10, 10, 64, ctx);
   ASSERT_EQ(Len(a), 0);
   a = aten::Range(10, 20, 32, ctx);
@@ -69,7 +69,7 @@ TEST(ArrayTest, TestClone) {
   }
 };
 
-void _TestNumBits(DLContext ctx) {
+void _TestNumBits(DGLContext ctx) {
   IdArray a = aten::Range(0, 10, 32, ctx);
   a = aten::AsNumBits(a, 64);
   ASSERT_EQ(a->dtype.bits, 64);
@@ -86,7 +86,7 @@ TEST(ArrayTest, TestAsNumBits) {
 };
 
 template <typename IDX>
-void _TestArith(DLContext ctx) {
+void _TestArith(DGLContext ctx) {
   const int N = 100;
   IdArray a = aten::Full(-10, N, sizeof(IDX)*8, ctx);
   IdArray b = aten::Full(7, N, sizeof(IDX)*8, ctx);
@@ -202,7 +202,7 @@ TEST(ArrayTest, Arith) {
 };
 
 template <typename IDX>
-void _TestHStack(DLContext ctx) {
+void _TestHStack(DGLContext ctx) {
   IdArray a = aten::Range(0, 100, sizeof(IDX)*8, ctx);
   IdArray b = aten::Range(100, 200, sizeof(IDX)*8, ctx);
   IdArray c = aten::HStack(a, b).CopyTo(aten::CPU);
@@ -222,7 +222,7 @@ TEST(ArrayTest, HStack) {
 }
 
 template <typename IDX>
-void _TestIndexSelect(DLContext ctx) {
+void _TestIndexSelect(DGLContext ctx) {
   IdArray a = aten::Range(0, 100, sizeof(IDX)*8, ctx);
   ASSERT_EQ(aten::IndexSelect<int>(a, 50), 50);
   ASSERT_TRUE(ArrayEQ<IDX>(aten::IndexSelect(a, 10, 20),
@@ -242,7 +242,7 @@ TEST(ArrayTest, TestIndexSelect) {
 }
 
 template <typename IDX>
-void _TestRelabel_(DLContext ctx) {
+void _TestRelabel_(DGLContext ctx) {
   IdArray a = aten::VecToIdArray(std::vector<IDX>({0, 20, 10}), sizeof(IDX)*8, ctx);
   IdArray b = aten::VecToIdArray(std::vector<IDX>({20, 5, 6}), sizeof(IDX)*8, ctx);
   IdArray c = aten::Relabel_({a, b});
@@ -266,7 +266,7 @@ TEST(ArrayTest, TestRelabel_) {
 }
 
 template <typename IDX>
-void _TestConcat(DLContext ctx) {
+void _TestConcat(DGLContext ctx) {
   IdArray a = aten::VecToIdArray(std::vector<IDX>({1, 2, 3}), sizeof(IDX)*8, CTX);
   IdArray b = aten::VecToIdArray(std::vector<IDX>({4, 5, 6}), sizeof(IDX)*8, CTX);
   IdArray tc = aten::VecToIdArray(std::vector<IDX>({1, 2, 3, 4, 5, 6}), sizeof(IDX)*8, CTX);
@@ -279,7 +279,7 @@ void _TestConcat(DLContext ctx) {
 }
 
 template <typename IdType>
-void _TestToSimpleCsr(DLContext ctx) {
+void _TestToSimpleCsr(DGLContext ctx) {
  /* 
   * A = [[0, 0, 0, 0],
   *      [1, 0, 0, 1],
@@ -373,7 +373,7 @@ TEST(MatrixTest, TestToSimpleCsr) {
 }
 
 template <typename IdType>
-void _TestToSimpleCoo(DLContext ctx) {
+void _TestToSimpleCoo(DGLContext ctx) {
  /* 
   * A = [[0, 0, 0, 0],
   *      [1, 0, 0, 1],
@@ -482,7 +482,7 @@ TEST(MatrixTest, TestToSimpleCoo) {
 
 
 template <typename IdType>
-void _TestDisjointUnionPartitionCoo(DLContext ctx) {
+void _TestDisjointUnionPartitionCoo(DGLContext ctx) {
   /*
    * A = [[0, 0, 1],
    *      [1, 0, 1],
@@ -640,7 +640,7 @@ TEST(DisjointUnionTest, TestDisjointUnionPartitionCoo) {
 }
 
 template <typename IdType>
-void _TestDisjointUnionPartitionCsr(DLContext ctx) {
+void _TestDisjointUnionPartitionCsr(DGLContext ctx) {
   /*
    * A = [[0, 0, 1],
    *      [1, 0, 1],
@@ -786,7 +786,7 @@ TEST(DisjointUnionTest, TestDisjointUnionPartitionCsr) {
 }
 
 template <typename IdType>
-void _TestSliceContiguousChunkCoo(DLContext ctx) {
+void _TestSliceContiguousChunkCoo(DGLContext ctx) {
   /*
    * A = [[1, 0, 0, 0],
    *      [0, 0, 1, 0],
@@ -872,7 +872,7 @@ TEST(SliceContiguousChunk, TestSliceContiguousChunkCoo) {
 }
 
 template <typename IdType>
-void _TestSliceContiguousChunkCsr(DLContext ctx) {
+void _TestSliceContiguousChunkCsr(DGLContext ctx) {
   /*
    * A = [[1, 0, 0, 0],
    *      [0, 0, 1, 0],
@@ -955,7 +955,7 @@ TEST(SliceContiguousChunk, TestSliceContiguousChunkCsr) {
 }
 
 template <typename IdType>
-void _TestMatrixUnionCsr(DLContext ctx) {
+void _TestMatrixUnionCsr(DGLContext ctx) {
  /* 
   * A = [[0, 0, 0, 0],
   *      [0, 0, 0, 0],
@@ -1178,7 +1178,7 @@ TEST(MatrixUnionTest, TestMatrixUnionCsr) {
 }
 
 template <typename IdType>
-void _TestMatrixUnionCoo(DLContext ctx) {
+void _TestMatrixUnionCoo(DGLContext ctx) {
  /* 
   * A = [[0, 0, 0, 0],
   *      [0, 0, 0, 0],
@@ -1391,7 +1391,7 @@ TEST(MatrixUnionTest, TestMatrixUnionCoo) {
 }
 
 template <typename IDX>
-void _TestCumSum(DLContext ctx) {
+void _TestCumSum(DGLContext ctx) {
   IdArray a = aten::VecToIdArray(std::vector<IDX>({8, 6, 7, 5, 3, 0, 9}),
       sizeof(IDX)*8, ctx);
   {
@@ -1429,7 +1429,7 @@ TEST(ArrayTest, CumSum) {
 }
 
 template <typename IDX, typename D>
-void _TestScatter_(DLContext ctx) {
+void _TestScatter_(DGLContext ctx) {
   IdArray out = aten::Full(1, 10, 8*sizeof(IDX), ctx);
   IdArray idx = aten::VecToIdArray(std::vector<IDX>({2, 3, 9}), sizeof(IDX)*8, ctx);
   IdArray val = aten::VecToIdArray(std::vector<IDX>({-20, 30, 90}), sizeof(IDX)*8, ctx);
@@ -1452,7 +1452,7 @@ TEST(ArrayTest, Scatter_) {
 }
 
 template <typename IDX>
-void _TestNonZero(DLContext ctx) {
+void _TestNonZero(DGLContext ctx) {
   auto val = aten::VecToIdArray(std::vector<IDX>({0, 1, 2, 0, -10, 0, 0, 23}), sizeof(IDX)*8, ctx);
   auto idx = aten::NonZero(val);
   auto tidx = aten::VecToIdArray(std::vector<int64_t>({1, 2, 4, 7}), 64, ctx);
@@ -1484,7 +1484,7 @@ TEST(ArrayTest, NonZero) {
 }
 
 template <typename IdType>
-void _TestLineGraphCOO(DLContext ctx) {
+void _TestLineGraphCOO(DGLContext ctx) {
   /*
    * A = [[0, 0, 1, 0],
    *      [1, 0, 1, 0],
@@ -1591,7 +1591,7 @@ TEST(LineGraphTest, LineGraphCOO) {
 }
 
 template <typename IDX>
-void _TestSort(DLContext ctx) {
+void _TestSort(DGLContext ctx) {
   // case 1
   IdArray a =
     aten::VecToIdArray(std::vector<IDX>({8, 6, 7, 5, 3, 0, 9}), sizeof(IDX)*8, ctx);

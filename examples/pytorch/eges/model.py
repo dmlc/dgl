@@ -18,12 +18,12 @@ class EGES(th.nn.Module):
         # srcs: sku_id, brand_id, shop_id, cate_id
         srcs = self.query_node_embed(srcs)
         dsts = self.query_node_embed(dsts)
-        
+
         return srcs, dsts
-    
+
     def query_node_embed(self, nodes):
         """
-            @nodes: tensor of shape (batch_size, num_side_info)
+        @nodes: tensor of shape (batch_size, num_side_info)
         """
         batch_size = nodes.shape[0]
         # query side info weights, (batch_size, 4)
@@ -33,21 +33,31 @@ class EGES(th.nn.Module):
         side_info_weights_sum = []
         for i in range(4):
             # weights for i-th side info, (batch_size, ) -> (batch_size, 1)
-            i_th_side_info_weights = side_info_weights[:, i].view((batch_size, 1))
+            i_th_side_info_weights = side_info_weights[:, i].view(
+                (batch_size, 1)
+            )
             # batch of i-th side info embedding * its weight, (batch_size, dim)
-            side_info_weighted_embeds_sum.append(i_th_side_info_weights * self.embeds[i](nodes[:, i]))
+            side_info_weighted_embeds_sum.append(
+                i_th_side_info_weights * self.embeds[i](nodes[:, i])
+            )
             side_info_weights_sum.append(i_th_side_info_weights)
         # stack: (batch_size, 4, dim), sum: (batch_size, dim)
-        side_info_weighted_embeds_sum = th.sum(th.stack(side_info_weighted_embeds_sum, axis=1), axis=1)
+        side_info_weighted_embeds_sum = th.sum(
+            th.stack(side_info_weighted_embeds_sum, axis=1), axis=1
+        )
         # stack: (batch_size, 4), sum: (batch_size, )
-        side_info_weights_sum = th.sum(th.stack(side_info_weights_sum, axis=1), axis=1)
+        side_info_weights_sum = th.sum(
+            th.stack(side_info_weights_sum, axis=1), axis=1
+        )
         # (batch_size, dim)
         H = side_info_weighted_embeds_sum / side_info_weights_sum
 
-        return H       
+        return H
 
     def loss(self, srcs, dsts, labels):
         dots = th.sigmoid(th.sum(srcs * dsts, axis=1))
         dots = th.clamp(dots, min=1e-7, max=1 - 1e-7)
 
-        return th.mean(- (labels * th.log(dots) + (1 - labels) * th.log(1 - dots)))
+        return th.mean(
+            -(labels * th.log(dots) + (1 - labels) * th.log(1 - dots))
+        )

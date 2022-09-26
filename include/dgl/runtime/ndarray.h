@@ -1,5 +1,5 @@
 /*!
- *  Copyright (c) 2017 by Contributors
+ *  Copyright (c) 2017-2022 by Contributors
  * \file dgl/runtime/ndarray.h
  * \brief Abstract device memory management API
  */
@@ -14,7 +14,6 @@
 #include <memory>
 
 #include "c_runtime_api.h"
-#include "dlpack/dlpack.h"
 #include "serializer.h"
 #include "shared_mem.h"
 
@@ -23,43 +22,48 @@
 #endif
 
 // forward declaration
-inline std::ostream& operator << (std::ostream& os, DGLType t);
+inline std::ostream& operator << (std::ostream& os, DGLDataType t);
 
 namespace dgl {
 
 /*!
- * \brief Type traits that converts a C type to a DLDataType.
+ * \brief Type traits that converts a C type to a DGLDataType.
  *
  * Usage:
- * DLDataTypeTraits<int>::dtype == dtype
+ * DGLDataTypeTraits<int>::dtype == dtype
  */
 template<typename T>
-struct DLDataTypeTraits {
-  static constexpr DLDataType dtype{0, 0, 0};   // dummy
+struct DGLDataTypeTraits {
+  static constexpr DGLDataType dtype{0, 0, 0};   // dummy
 };
-#define GEN_DLDATATYPETRAITS_FOR(T, code, bits) \
+#define GEN_DGLDATATYPETRAITS_FOR(T, code, bits) \
   template<> \
-  struct DLDataTypeTraits<T> { \
-    static constexpr DLDataType dtype{code, bits, 1}; \
+  struct DGLDataTypeTraits<T> { \
+    static constexpr DGLDataType dtype{code, bits, 1}; \
   }
-GEN_DLDATATYPETRAITS_FOR(int8_t, kDLInt, 8);
-GEN_DLDATATYPETRAITS_FOR(int16_t, kDLInt, 16);
-GEN_DLDATATYPETRAITS_FOR(int32_t, kDLInt, 32);
-GEN_DLDATATYPETRAITS_FOR(int64_t, kDLInt, 64);
+GEN_DGLDATATYPETRAITS_FOR(int8_t, kDGLInt, 8);
+GEN_DGLDATATYPETRAITS_FOR(int16_t, kDGLInt, 16);
+GEN_DGLDATATYPETRAITS_FOR(int32_t, kDGLInt, 32);
+GEN_DGLDATATYPETRAITS_FOR(int64_t, kDGLInt, 64);
 // XXX(BarclayII) most DL frameworks do not support unsigned int and long arrays, so I'm just
 // converting uints to signed DTypes.
-GEN_DLDATATYPETRAITS_FOR(uint32_t, kDLInt, 32);
-GEN_DLDATATYPETRAITS_FOR(uint64_t, kDLInt, 64);
+GEN_DGLDATATYPETRAITS_FOR(uint32_t, kDGLInt, 32);
+GEN_DGLDATATYPETRAITS_FOR(uint64_t, kDGLInt, 64);
 #ifdef DGL_USE_CUDA
 #ifdef USE_FP16
-GEN_DLDATATYPETRAITS_FOR(__half, kDLFloat, 16);
+GEN_DGLDATATYPETRAITS_FOR(__half, kDGLFloat, 16);
 #endif
 #endif
-GEN_DLDATATYPETRAITS_FOR(float, kDLFloat, 32);
-GEN_DLDATATYPETRAITS_FOR(double, kDLFloat, 64);
-#undef GEN_DLDATATYPETRAITS_FOR
+GEN_DGLDATATYPETRAITS_FOR(float, kDGLFloat, 32);
+GEN_DGLDATATYPETRAITS_FOR(double, kDGLFloat, 64);
+#undef GEN_DGLDATATYPETRAITS_FOR
 
 namespace runtime {
+
+/*!
+ * \brief DLPack converter.
+ */
+struct DLPackConvert;
 
 /*!
  * \brief Managed NDArray.
@@ -135,8 +139,8 @@ class NDArray {
    * \note this number is approximate in multi-threaded setting.
    */
   inline int use_count() const;
-  /*! \return Pointer to content of DLTensor */
-  inline const DLTensor* operator->() const;
+  /*! \return Pointer to content of DGLArray */
+  inline const DGLArray* operator->() const;
   /*! \return True if the ndarray is contiguous. */
   bool IsContiguous() const;
   /*! \return the data pointer with type. */
@@ -152,9 +156,9 @@ class NDArray {
    * \param other The source array to be copied from.
    * \note The copy runs on the dgl internal stream if it involves a GPU context.
    */
-  inline void CopyFrom(DLTensor* other);
+  inline void CopyFrom(DGLArray* other);
   inline void CopyFrom(const NDArray& other);
-  inline void CopyTo(DLTensor *other) const;
+  inline void CopyTo(DGLArray *other) const;
   inline void CopyTo(const NDArray &other) const;
 
   /*!
@@ -162,7 +166,7 @@ class NDArray {
    * \param ctx The target context.
    * \return The array under another context.
    */
-  inline NDArray CopyTo(const DLContext &ctx) const;
+  inline NDArray CopyTo(const DGLContext &ctx) const;
   /*!
    * \brief Return a new array with a copy of the content.
    */
@@ -171,9 +175,9 @@ class NDArray {
    * \brief In-place method to pin the current array by calling PinContainer
    *        on the underlying NDArray:Container.
    * \note This is an in-place method. Behavior depends on the current context,
-   *       kDLCPU: will be pinned;
+   *       kDGLCPU: will be pinned;
    *       IsPinned: directly return;
-   *       kDLGPU: invalid, will throw an error.
+   *       kDGLCUDA: invalid, will throw an error.
    */
   inline void PinMemory_();
   /*!
@@ -212,13 +216,7 @@ class NDArray {
    * \note The memory size of new array must be smaller than the current one.
    */
   DGL_DLL NDArray CreateView(
-      std::vector<int64_t> shape, DLDataType dtype, int64_t offset = 0);
-  /*!
-   * \brief Create a reference view of NDArray that
-   *  represents as DLManagedTensor.
-   * \return A DLManagedTensor
-   */
-  DGL_DLL DLManagedTensor* ToDLPack() const;
+      std::vector<int64_t> shape, DGLDataType dtype, int64_t offset = 0);
   /*!
    * \brief Create an empty NDArray.
    * \param shape The shape of the new array.
@@ -227,8 +225,8 @@ class NDArray {
    * \return The created Array
    */
   DGL_DLL static NDArray Empty(std::vector<int64_t> shape,
-                               DLDataType dtype,
-                               DLContext ctx);
+                               DGLDataType dtype,
+                               DGLContext ctx);
   /*!
    * \brief Create an empty NDArray with shared memory.
    * \param name The name of shared memory.
@@ -240,8 +238,8 @@ class NDArray {
    */
   DGL_DLL static NDArray EmptyShared(const std::string &name,
                                      std::vector<int64_t> shape,
-                                     DLDataType dtype,
-                                     DLContext ctx,
+                                     DGLDataType dtype,
+                                     DGLContext ctx,
                                      bool is_create);
   /*!
    * \brief Get the size of the array in the number of bytes.
@@ -254,25 +252,18 @@ class NDArray {
   int64_t NumElements() const;
 
   /*!
-   * \brief Create a NDArray backed by a dlpack tensor.
-   *
-   * This allows us to create a NDArray using the memory
-   * allocated by an external deep learning framework
-   * that is DLPack compatible.
-   *
-   * The memory is retained until the NDArray went out of scope.
-   * \param tensor The DLPack tensor to copy from.
-   * \return The created NDArray view.
-   */
-  DGL_DLL static NDArray FromDLPack(DLManagedTensor* tensor);
-
-  /*!
    * \brief Create a NDArray by copying from std::vector.
    * \tparam T Type of vector data.  Determines the dtype of returned array.
    */
   template<typename T>
   DGL_DLL static NDArray FromVector(
-      const std::vector<T>& vec, DLContext ctx = DLContext{kDLCPU, 0});
+      const std::vector<T>& vec, DGLContext ctx = DGLContext{kDGLCPU, 0});
+
+  /*!
+   * \brief Create a NDArray from a raw pointer.
+   */
+  DGL_DLL static NDArray CreateFromRaw(const std::vector<int64_t>& shape,
+      DGLDataType dtype, DGLContext ctx, void* raw, bool auto_free);
 
   /*!
    * \brief Create a std::vector from a 1D NDArray.
@@ -292,23 +283,23 @@ class NDArray {
    * \param (optional) stream The stream used in copy.
    */
   DGL_DLL static void CopyFromTo(
-      DLTensor* from, DLTensor* to);
+      DGLArray* from, DGLArray* to);
   DGL_DLL static void CopyFromTo(
-      DLTensor* from, DLTensor* to, DGLStreamHandle stream);
+      DGLArray* from, DGLArray* to, DGLStreamHandle stream);
 
   /*!
-   * \brief Function to pin the DLTensor of a Container.
+   * \brief Function to pin the DGLArray of a Container.
    * \param ptr The container to be pinned.
    * \note Data of the given array will be pinned inplace.
    *       Behavior depends on the current context,
-   *       kDLCPU: will be pinned;
+   *       kDGLCPU: will be pinned;
    *       IsPinned: directly return;
-   *       kDLGPU: invalid, will throw an error.
+   *       kDGLCUDA: invalid, will throw an error.
    */
   DGL_DLL static void PinContainer(Container* ptr);
 
   /*!
-   * \brief Function to unpin the DLTensor of a Container.
+   * \brief Function to unpin the DGLArray of a Container.
    * \param ptr The container to be unpinned.
    * \note Data of the given array will be unpinned inplace.
    *       Behavior depends on the current context,
@@ -318,7 +309,7 @@ class NDArray {
   DGL_DLL static void UnpinContainer(Container* ptr);
 
   /*!
-   * \brief Function check if the DLTensor of a Container is pinned.
+   * \brief Function check if the DGLArray of a Container is pinned.
    * \param ptr The container to be checked.
    * \return true if pinned.
    */
@@ -332,45 +323,57 @@ class NDArray {
   DGL_DLL static void RecordStream(DGLArray* tensor, DGLStreamHandle stream);
 
   // internal namespace
-  struct Internal;
+  struct Internal {
+    // Default deleter for the container
+    static void DefaultDeleter(NDArray::Container* ptr);
+    // Local create function which allocates tensor metadata
+    // but does not allocate space for the data.
+    static NDArray Create(std::vector<int64_t> shape,
+                          DGLDataType dtype, DGLContext ctx);
+    // Implementation of API function
+    static DGLArray* MoveAsDGLArray(NDArray arr);
+  };
+
  private:
   /*! \brief Internal Data content */
   Container* data_{nullptr};
   // enable internal functions
   friend struct Internal;
+  friend struct DLPackConvert;
   friend class DGLRetValue;
   friend class DGLArgsSetter;
 };
 
 /*!
- * \brief Save a DLTensor to stream
+ * \brief Save a DGLArray to stream
  * \param strm The outpu stream
  * \param tensor The tensor to be saved.
  */
-inline bool SaveDLTensor(dmlc::Stream* strm, const DLTensor* tensor);
+inline bool SaveDGLArray(dmlc::Stream* strm, const DGLArray* tensor);
 
 
 /*!
  * \brief Reference counted Container object used to back NDArray.
  *
- *  This object is DLTensor compatible:
+ *  This object is DGLArray compatible:
  *    the pointer to the NDArrayContainer can be directly
- *    interpreted as a DLTensor*
+ *    interpreted as a DGLArray*
  *
  * \note: do not use this function directly, use NDArray.
  */
 struct NDArray::Container {
  public:
-  // NOTE: the first part of this structure is the same as
-  // DLManagedTensor, note that, however, the deleter
-  // is only called when the reference counter goes to 0
-  /*!
-   * \brief The corresponding dl_tensor field.
-   * \note it is important that the first field is DLTensor
-   *  So that this data structure is DLTensor compatible.
-   *  The head ptr of this struct can be viewed as DLTensor*.
+  /*! NOTE: the first part of this structure is the same as
+   * DLManagedTensor, note that, however, the deleter
+   * is only called when the reference counter goes to 0
    */
-  DLTensor dl_tensor;
+  /*!
+   * \brief Tensor structure.
+   * \note it is important that the first field is DGLArray
+   *  So that this data structure is DGLArray compatible.
+   *  The head ptr of this struct can be viewed as DGLArray*.
+   */
+  DGLArray dl_tensor;
   /*!
    * \brief addtional context, reserved for recycling
    * \note We can attach additional content here
@@ -411,6 +414,7 @@ struct NDArray::Container {
   }
 
  private:
+  friend struct DLPackConvert;
   friend class NDArray;
   friend class RPCWrappedFunc;
   /*!
@@ -450,7 +454,7 @@ inline void NDArray::reset() {
   }
 }
 
-inline void NDArray::CopyFrom(DLTensor* other) {
+inline void NDArray::CopyFrom(DGLArray* other) {
   CHECK(data_ != nullptr);
   CopyFromTo(other, &(data_->dl_tensor));
 }
@@ -460,7 +464,7 @@ inline void NDArray::CopyFrom(const NDArray& other) {
   CopyFrom(&(other.data_->dl_tensor));
 }
 
-inline void NDArray::CopyTo(DLTensor *other) const {
+inline void NDArray::CopyTo(DGLArray *other) const {
   CHECK(data_ != nullptr);
   CopyFromTo(&(data_->dl_tensor), other);
 }
@@ -470,9 +474,9 @@ inline void NDArray::CopyTo(const NDArray &other) const {
   CopyTo(&(other.data_->dl_tensor));
 }
 
-inline NDArray NDArray::CopyTo(const DLContext &ctx) const {
+inline NDArray NDArray::CopyTo(const DGLContext &ctx) const {
   CHECK(data_ != nullptr);
-  const DLTensor* dptr = operator->();
+  const DGLArray* dptr = operator->();
   NDArray ret = Empty(std::vector<int64_t>(dptr->shape, dptr->shape + dptr->ndim),
                       dptr->dtype, ctx);
   this->CopyTo(ret);
@@ -481,7 +485,7 @@ inline NDArray NDArray::CopyTo(const DLContext &ctx) const {
 
 inline NDArray NDArray::Clone() const {
   CHECK(data_ != nullptr);
-  const DLTensor* dptr = operator->();
+  const DGLArray* dptr = operator->();
   return this->CopyTo(dptr->ctx);
 }
 
@@ -510,15 +514,15 @@ inline int NDArray::use_count() const {
   return data_->ref_counter_.load(std::memory_order_relaxed);
 }
 
-inline const DLTensor* NDArray::operator->() const {
+inline const DGLArray* NDArray::operator->() const {
   return &(data_->dl_tensor);
 }
 
 /*! \brief Magic number for NDArray file */
 constexpr uint64_t kDGLNDArrayMagic = 0xDD5E40F096B4A13F;
 
-inline bool SaveDLTensor(dmlc::Stream* strm,
-                         DLTensor* tensor) {
+inline bool SaveDGLArray(dmlc::Stream* strm,
+                         DGLArray* tensor) {
   uint64_t header = kDGLNDArrayMagic, reserved = 0;
   strm->Write(header);
   strm->Write(reserved);
@@ -531,8 +535,8 @@ inline bool SaveDLTensor(dmlc::Stream* strm,
   //
   // We can always do array.CopyTo(target_ctx) to get a corresponding
   // array in the target context.
-  DLContext cpu_ctx;
-  cpu_ctx.device_type = kDLCPU;
+  DGLContext cpu_ctx;
+  cpu_ctx.device_type = kDGLCPU;
   cpu_ctx.device_id = 0;
   strm->Write(cpu_ctx);
   strm->Write(tensor->ndim);
@@ -548,7 +552,7 @@ inline bool SaveDLTensor(dmlc::Stream* strm,
   strm->Write(data_byte_size);
 
   if (DMLC_IO_NO_ENDIAN_SWAP &&
-      tensor->ctx.device_type == kDLCPU &&
+      tensor->ctx.device_type == kDGLCPU &&
       tensor->strides == nullptr &&
       tensor->byte_offset == 0) {
     // quick path
@@ -573,16 +577,16 @@ inline bool SaveDLTensor(dmlc::Stream* strm,
  */
 inline const char* TypeCode2Str(int type_code) {
   switch (type_code) {
-    case kDLInt: return "int";
-    case kDLUInt: return "uint";
-    case kDLFloat: return "float";
+    case kDGLInt: return "int";
+    case kDGLUInt: return "uint";
+    case kDGLFloat: return "float";
     case kStr: return "str";
     case kBytes: return "bytes";
     case kHandle: return "handle";
     case kNull: return "NULL";
     case kObjectHandle: return "ObjectHandle";
     case kArrayHandle: return "ArrayHandle";
-    case kDGLType: return "DGLType";
+    case kDGLDataType: return "DGLDataType";
     case kDGLContext: return "DGLContext";
     case kFuncHandle: return "FunctionHandle";
     case kModuleHandle: return "ModuleHandle";
@@ -597,17 +601,11 @@ inline const char* TypeCode2Str(int type_code) {
  * \param device_type The device type code.
  * \return The name of the device.
  */
-inline const char* DeviceTypeCode2Str(DLDeviceType device_type) {
+inline const char* DeviceTypeCode2Str(DGLDeviceType device_type) {
   switch (device_type) {
-    case kDLCPU: return "cpu";
-    case kDLGPU: return "cuda";
-    case kDLCPUPinned: return "cpu_pinned";
-    case kDLOpenCL: return "opencl";
-    case kDLVulkan: return "vulkan";
-    case kDLMetal: return "metal";
-    case kDLVPI: return "vpi";
-    case kDLROCM: return "rocm";
-    default: LOG(FATAL) << "Unknown device type code="
+    case kDGLCPU: return "cpu";
+    case kDGLCUDA: return "cuda";
+    default: LOG(FATAL) << "Unsupported device type code="
                         << static_cast<int>(device_type); return "";
   }
 }
@@ -617,16 +615,16 @@ inline const char* DeviceTypeCode2Str(DLDeviceType device_type) {
  * \param s The string to be converted.
  * \return The corresponding dgl type.
  */
-inline DGLType String2DGLType(std::string s) {
-  DGLType t;
+inline DGLDataType String2DGLDataType(std::string s) {
+  DGLDataType t;
   t.bits = 32; t.lanes = 1;
   const char* scan;
   if (s.substr(0, 3) == "int") {
-    t.code = kDLInt;  scan = s.c_str() + 3;
+    t.code = kDGLInt;  scan = s.c_str() + 3;
   } else if (s.substr(0, 4) == "uint") {
-    t.code = kDLUInt; scan = s.c_str() + 4;
+    t.code = kDGLUInt; scan = s.c_str() + 4;
   } else if (s.substr(0, 5) == "float") {
-    t.code = kDLFloat; scan = s.c_str() + 5;
+    t.code = kDGLFloat; scan = s.c_str() + 5;
   } else if (s.substr(0, 6) == "handle") {
     t.code = kHandle;
     t.bits = 64;  // handle uses 64 bit by default.
@@ -649,7 +647,7 @@ inline DGLType String2DGLType(std::string s) {
  * \param t The type to be converted.
  * \return The corresponding dgl type in string.
  */
-inline std::string DGLType2String(DGLType t) {
+inline std::string DGLDataType2String(DGLDataType t) {
 #ifndef _LIBCPP_SGX_NO_IOSTREAMS
   std::ostringstream os;
   os << t;
@@ -728,20 +726,20 @@ dgl::runtime::NDArray operator != (int64_t lhs, const dgl::runtime::NDArray& a2)
 
 std::ostream& operator << (std::ostream& os, dgl::runtime::NDArray array);
 
-///////////////// Operator overloading for DLDataType /////////////////
+///////////////// Operator overloading for DGLDataType /////////////////
 
 /*! \brief Check whether two data types are the same.*/
-inline bool operator == (const DLDataType& ty1, const DLDataType& ty2) {
+inline bool operator == (const DGLDataType& ty1, const DGLDataType& ty2) {
   return ty1.code == ty2.code && ty1.bits == ty2.bits && ty1.lanes == ty2.lanes;
 }
 
 /*! \brief Check whether two data types are different.*/
-inline bool operator != (const DLDataType& ty1, const DLDataType& ty2) {
+inline bool operator != (const DGLDataType& ty1, const DGLDataType& ty2) {
   return !(ty1 == ty2);
 }
 
 #ifndef _LIBCPP_SGX_NO_IOSTREAMS
-inline std::ostream& operator << (std::ostream& os, DGLType t) {
+inline std::ostream& operator << (std::ostream& os, DGLDataType t) {
   os << dgl::runtime::TypeCode2Str(t.code);
   if (t.code == kHandle) return os;
   os << static_cast<int>(t.bits);
@@ -752,20 +750,20 @@ inline std::ostream& operator << (std::ostream& os, DGLType t) {
 }
 #endif
 
-///////////////// Operator overloading for DLContext /////////////////
+///////////////// Operator overloading for DGLContext /////////////////
 
 /*! \brief Check whether two device contexts are the same.*/
-inline bool operator == (const DLContext& ctx1, const DLContext& ctx2) {
+inline bool operator == (const DGLContext& ctx1, const DGLContext& ctx2) {
   return ctx1.device_type == ctx2.device_type && ctx1.device_id == ctx2.device_id;
 }
 
 /*! \brief Check whether two device contexts are different.*/
-inline bool operator != (const DLContext& ctx1, const DLContext& ctx2) {
+inline bool operator != (const DGLContext& ctx1, const DGLContext& ctx2) {
   return !(ctx1 == ctx2);
 }
 
 #ifndef _LIBCPP_SGX_NO_IOSTREAMS
-inline std::ostream& operator << (std::ostream& os, const DLContext& ctx) {
+inline std::ostream& operator << (std::ostream& os, const DGLContext& ctx) {
   return os << dgl::runtime::DeviceTypeCode2Str(ctx.device_type) << ":" << ctx.device_id;
 }
 #endif
