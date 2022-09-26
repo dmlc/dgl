@@ -43,4 +43,6 @@ Operators
     :toctree: ../../generated/
 
     spmm
+    spspmm
     bspmm
+    bspspmm

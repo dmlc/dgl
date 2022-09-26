@@ -4,6 +4,10 @@ import backend as F
 
 from dgl.mock_sparse import create_from_coo, diag, bspmm
 
+def get_adj(A):
+    edge_index = torch.cat((A.row.unsqueeze(0), A.col.unsqueeze(0)), 0)
+    return torch.sparse_coo_tensor(edge_index, A.val).coalesce().to_dense()
+
 def test_sparse_dense_mm():
     dev = F.ctx()
     # A: shape (N, M), X: shape (M, F)
@@ -13,13 +17,15 @@ def test_sparse_dense_mm():
     A = create_from_coo(row, col, val)
     X = torch.randn(2, 3).to(dev)
     sparse_result = A @ X
-    dense_result = A.adj.to_dense() @ X
+
+    adj = get_adj(A)
+    dense_result = adj @ X
     assert torch.allclose(sparse_result, dense_result)
 
     # X: shape (M)
     X = torch.randn(2).to(dev)
     sparse_result = A @ X
-    dense_result = A.adj.to_dense() @ X
+    dense_result = adj @ X
     assert torch.allclose(sparse_result, dense_result)
 
 def test_sparse_sparse_mm():
@@ -165,7 +171,7 @@ def test_batch_sparse_sparse_mm():
     val2 = torch.randn(len(row2), H).to(dev)
     A2 = create_from_coo(row2, col2, val2)
 
-    sparse_result = bspmm(A1, A2).adj.to_dense()
+    sparse_result = bspspmm(A1, A2).adj.to_dense()
     dense_A1 = A1.adj.to_dense()
     dense_A2 = A2.adj.to_dense()
     dense_result = torch.stack([
@@ -184,7 +190,7 @@ def test_batch_sparse_diag_mm():
     val2 = torch.randn(2, H).to(dev)
     D = diag(val2, (2, 3))
 
-    sparse_result = bspmm(A, D).adj.to_dense()
+    sparse_result = bspspmm(A, D).adj.to_dense()
     dense_A = A.adj.to_dense()
     dense_D = D.as_sparse().adj.to_dense()
     dense_result = torch.stack([
@@ -227,7 +233,7 @@ def test_batch_diag_sparse_mm():
 
     val2 = torch.randn(2, H).to(dev)
     D = diag(val2, (3, 2))
-    sparse_result = bspmm(D, A).adj.to_dense()
+    sparse_result = bspspmm(D, A).adj.to_dense()
     dense_A = A.adj.to_dense()
     dense_D = D.as_sparse().adj.to_dense()
     dense_result = torch.stack([
@@ -244,7 +250,7 @@ def test_batch_diag_diag_mm():
     D1 = diag(val1)
     val2 = torch.randn(3, H).to(dev)
     D2 = diag(val2)
-    M1 = bspmm(D1, D2)
+    M1 = bspspmm(D1, D2)
     assert M1.shape == (3, 3)
     assert torch.allclose(M1.val, val1 * val2)
 
@@ -258,7 +264,7 @@ def test_batch_diag_diag_mm():
     val2 = torch.randn(P, H).to(dev)
     D2 = diag(val2, (M, P))
 
-    sparse_result = bspmm(D1, D2).as_sparse().adj.to_dense()
+    sparse_result = bspspmm(D1, D2).as_sparse().adj.to_dense()
     dense_D1 = D1.as_sparse().adj.to_dense()
     dense_D2 = D2.as_sparse().adj.to_dense()
     dense_result = torch.stack([
