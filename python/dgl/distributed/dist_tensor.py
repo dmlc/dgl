@@ -186,16 +186,17 @@ class DistTensor:
                 self._shape, self._dtype, part_policy=self._part_policy,
                 persistent=self._persistent, is_gdata=self._is_gdata,
                 attach=self._attach)
-        if not (self.kvstore is other.kvstore is new_dist_tensor.kvstore):
+        if not self.kvstore is other.kvstore is new_dist_tensor.kvstore:
             raise DGLError('The underlying KVStores are not the same.')
         # Each trainer computes its own result from its local storage.
-        # (BarclayII) how to do it with KVClient?  It only has pull and push
-        # operations which requires IDs, and I don't think we need IDs.
-        # Using _data_store breaks the encapsulation and I don't really like it.
+        # (BarclayII) how to do it properly with KVClient?  It only has pull
+        # and push operations which requires IDs, and I don't think we need
+        # IDs. Currently I worked around it by adding a local_data_store
+        # property.
         kvstore = self.kvstore
-        kvstore._data_store[new_dist_tensor.name][:] = \
-                kvstore._data_store[self.name] | \
-                kvstore._data_store[other.name]
+        kvstore.local_data_store[new_dist_tensor._name][:] = \
+                kvstore.local_data_store[self._name] | \
+                kvstore.local_data_store[other._name]
         return new_dist_tensor
 
     def __len__(self):

@@ -1385,6 +1385,17 @@ class KVClient(object):
             total += res.num_local_nonzero
         return total
 
+    @property
+    def local_data_store(self):
+        """Return the data store in the local partition.
+
+        Returns
+        -------
+        dict
+            The data store in the local partition.
+        """
+        return self._data_store
+
 KVCLIENT = None
 
 def init_kvstore(ip_config, num_servers, role):

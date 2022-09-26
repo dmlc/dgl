@@ -102,3 +102,8 @@ class KVClient(object):
             the number of nonzero in this data.
         """
         return F.count_nonzero(self._data[name])
+
+    @property
+    def local_data_store(self):
+        """Return the data store in the local partition."""
+        return self._data
