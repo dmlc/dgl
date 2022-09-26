@@ -98,7 +98,7 @@ def gen_node_data(rank, world_size, id_lookup, ntid_ntype_map, schema_map):
 
     type_nid_dict, global_nid_dict = get_idranges(schema_map[constants.STR_NODE_TYPE],
                                         schema_map[constants.STR_NUM_NODES_PER_CHUNK],
-                                        expected_num_chunks=world_size)
+                                        num_chunks=world_size)
 
     for ntype_id, ntype_name in ntid_ntype_map.items():
         type_start, type_end = type_nid_dict[ntype_name][0][0], type_nid_dict[ntype_name][-1][1]
@@ -536,8 +536,7 @@ def gen_dist_partitions(rank, world_size, params):
     #Initialize distributed lookup service for partition-id and shuffle-global-nids mappings
     #for global-nids
     _, global_nid_ranges = get_idranges(schema_map[constants.STR_NODE_TYPE], 
-                                        schema_map[constants.STR_NUM_NODES_PER_CHUNK],
-                                        expected_num_chunks=world_size)
+                                        schema_map[constants.STR_NUM_NODES_PER_CHUNK])
     id_map = dgl.distributed.id_map.IdMap(global_nid_ranges)
     id_lookup = DistLookupService(os.path.join(params.input_dir, params.partitions_dir),\
                                     schema_map[constants.STR_NODE_TYPE],\

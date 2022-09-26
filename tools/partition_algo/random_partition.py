@@ -17,6 +17,15 @@ def _random_partition(metadata, num_parts):
         parts = np.random.randint(0, num_parts, (n,))
         array_readwriter.get_array_parser(name='csv').write(ntype + '.txt', parts)
 
+def _dump_metadata(num_parts):
+    """
+    Dump metadata into file. For now, below metadata are dumped:
+    ``version``, ``num_parts``.
+    """
+    metadata = {'version': '0.0.1', 'num_parts': num_parts}
+    with open('partition.json', 'w') as outfile:
+        json.dump(metadata, outfile, sort_keys=True, indent=4)
+
 def random_partition(metadata, num_parts, output_path):
     """
     Randomly partition the graph described in metadata and generate partition ID mapping
@@ -26,9 +35,11 @@ def random_partition(metadata, num_parts, output_path):
     mapping files named "<node-type>.txt" (e.g. "author.txt", "paper.txt" and
     "institution.txt" for OGB-MAG240M).  Each file contains one line per node representing
     the partition ID the node belongs to.
+    In addition, metadata which includes version, number of partitions is dumped.
     """
     with setdir(output_path):
         _random_partition(metadata, num_parts)
+        _dump_metadata(num_parts)
 
 # Run with PYTHONPATH=${GIT_ROOT_DIR}/tools
 # where ${GIT_ROOT_DIR} is the directory to the DGL git repository.

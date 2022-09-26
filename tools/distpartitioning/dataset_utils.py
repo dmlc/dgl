@@ -153,7 +153,7 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
     #read my nodes for each node type
     node_tids, ntype_gnid_offset = get_idranges(schema_map[constants.STR_NODE_TYPE], 
                                     schema_map[constants.STR_NUM_NODES_PER_CHUNK],
-                                    expected_num_chunks=world_size)
+                                    num_chunks=world_size)
     for ntype_name in schema_map[constants.STR_NODE_TYPE]: 
         if ntype_name in node_feature_tids: 
             for item in node_feature_tids[ntype_name]:
@@ -214,7 +214,7 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
     etype_name_idmap = {e : idx for idx, e in enumerate(etype_names)}
     edge_tids, _ = get_idranges(schema_map[constants.STR_EDGE_TYPE],
                     schema_map[constants.STR_NUM_EDGES_PER_CHUNK],
-                    expected_num_chunks=world_size)
+                    num_chunks=world_size)
 
     edge_datadict = {}
     edge_data = schema_map[constants.STR_EDGES]

@@ -96,13 +96,11 @@ def create_dgl_object(num_parts, schema, part_id, node_data, edge_data, edgeid_o
     #create auxiliary data structures from the schema object
     memory_snapshot("CreateDGLObj_Begin", part_id)
     _, global_nid_ranges = get_idranges(schema[constants.STR_NODE_TYPE],
-        schema[constants.STR_NUM_NODES_PER_CHUNK],
-        expected_num_chunks=num_parts)
+        schema[constants.STR_NUM_NODES_PER_CHUNK])
     memory_snapshot("CreateDGLObj_Begin", part_id)
 
     _, global_eid_ranges = get_idranges(schema[constants.STR_EDGE_TYPE],
-                                    schema[constants.STR_NUM_EDGES_PER_CHUNK],
-                                    expected_num_chunks=num_parts)
+                                    schema[constants.STR_NUM_EDGES_PER_CHUNK])
 
     id_map = dgl.distributed.id_map.IdMap(global_nid_ranges)
 

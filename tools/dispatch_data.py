@@ -33,18 +33,29 @@ def get_launch_cmd(args) -> str:
 
 
 def submit_jobs(args) -> str:
-    wrapper_command = os.path.join(INSTALL_DIR, LAUNCH_SCRIPT)
-
     #read the json file and get the remaining argument here.
     schema_path = "metadata.json"
     with open(os.path.join(args.in_dir, schema_path)) as schema:
         schema_map = json.load(schema)
 
-    num_chunks = len(schema_map["num_nodes_per_chunk"][0])
-    if args.num_parts > num_chunks:
-        raise Exception('Number of partitions should be less/equal than number of chunks.')
-    num_parts = num_chunks if args.num_parts <= 0 else args.num_parts
     graph_name = schema_map["graph_name"]
+
+    # retrieve num_parts
+    partition_path = os.path.join(args.partitions_dir, "partition.json")
+    if os.path.exists(partition_path):
+        with open(partition_path) as part_meta:
+            num_parts = json.load(part_meta)['num_parts']
+    else:
+        num_chunks = len(schema_map["num_nodes_per_chunk"][0])
+        if args.num_parts > num_chunks:
+            raise Exception('Number of partitions should be less/equal than number of chunks.')
+        num_parts = num_chunks if args.num_parts <= 0 else args.num_parts
+
+    # verify ip_config
+    with open(args.ip_config, 'r') as f:
+        num_ips = len(f.readlines())
+        assert num_ips == num_parts, \
+            f'Number of lines in {args.ip_config} should equal num_parts[{num_parts}].'
 
     argslist = ""
     argslist += "--world-size {} ".format(num_parts)
@@ -80,8 +91,6 @@ def main():
     parser.add_argument('--ssh-port', type=int, default=22, help='SSH Port.') 
     parser.add_argument('--process-group-timeout', type=int, default=1800,
                         help='timeout[seconds] for operations executed against the process group')
-    parser.add_argument('--num-parts', type=int, default=0,
-                        help='number of target partitions. If not specified, number of chunks are used.')
 
     args, udf_command = parser.parse_known_args()
 

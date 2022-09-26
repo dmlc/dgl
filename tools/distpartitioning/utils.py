@@ -375,7 +375,7 @@ def write_dgl_objects(graph_obj, node_features, edge_features, output_dir, part_
     if (edge_features != None):
         write_edge_features(edge_features, os.path.join(part_dir, "edge_feat.dgl"))
 
-def get_idranges(names, counts, expected_num_chunks):
+def get_idranges(names, counts, num_chunks=None):
     """
     Utility function to compute typd_id/global_id ranges for both nodes and edges. 
 
@@ -385,8 +385,11 @@ def get_idranges(names, counts, expected_num_chunks):
         list of node/edge types as strings
     counts : list of lists
         each list contains no. of nodes/edges in a given chunk
-    expected_num_chunks : int
-        chunks are collapsed according to expected number of chunks
+    num_chunks : int, optional
+        In distributed partition pipeline, ID ranges are grouped into chunks.
+        In some scenarios, we'd like to merge ID ranges into specific number
+        of chunks. This parameter indicates the expected number of chunks.
+        If not specified, no merge is applied.
 
     Returns:
     --------
@@ -417,16 +420,18 @@ def get_idranges(names, counts, expected_num_chunks):
         gnid_start = gnid_end
         orig_num_chunks = len(tid_start)
 
-    assert expected_num_chunks <= orig_num_chunks, \
-        'expected num_chunks should be less/euqual than original one.'
-    if expected_num_chunks < orig_num_chunks:
-        chunk_list = np.array_split(np.arange(orig_num_chunks), expected_num_chunks)
-        for typename in tid_dict:
-            orig_tid_ranges = tid_dict[typename]
-            tid_ranges = []
-            for idx in chunk_list:
-                tid_ranges.append((orig_tid_ranges[idx[0]][0], orig_tid_ranges[idx[-1]][-1]))
-            tid_dict[typename] = tid_ranges
+    if num_chunks is None:
+        return tid_dict, gid_dict
+
+    assert num_chunks <= orig_num_chunks, \
+        'Specified number of chunks should be less/euqual than original numbers of ID ranges.'
+    chunk_list = np.array_split(np.arange(orig_num_chunks), num_chunks)
+    for typename in tid_dict:
+        orig_tid_ranges = tid_dict[typename]
+        tid_ranges = []
+        for idx in chunk_list:
+            tid_ranges.append((orig_tid_ranges[idx[0]][0], orig_tid_ranges[idx[-1]][-1]))
+        tid_dict[typename] = tid_ranges
 
     return tid_dict, gid_dict
 
