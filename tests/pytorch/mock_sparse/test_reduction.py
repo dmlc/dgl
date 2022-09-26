@@ -5,6 +5,7 @@ import numpy
 from dgl.mock_sparse import create_from_coo
 
 
+@pytest.mark.skip(reason="no way of currently testing this")
 @pytest.mark.parametrize("dense_dim", [None, 2])
 @pytest.mark.parametrize("row", [[0, 0, 1, 2], (0, 1, 2, 4)])
 @pytest.mark.parametrize("col", [(0, 1, 2, 2), (1, 3, 3, 4)])
