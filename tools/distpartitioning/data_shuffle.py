@@ -276,15 +276,8 @@ def exchange_node_features(rank, world_size, node_feature_tids, ntype_gnid_map, 
                     assert common.shape[0] == idx2.shape[0]
 
                     global_dst_nids = data[constants.GLOBAL_DST_ID][idx1]
-                    assert np.all(global_eids == data[constants.GLOBAL_EID][idx1]):
+                    assert np.all(global_eids == data[constants.GLOBAL_EID][idx1])
                     partid_slice = id_lookup.get_partition_ids(global_dst_nids)
-                    '''
-                    if np.all(global_eids == data[constants.GLOBAL_EID][idx1]):
-                        partid_slice = id_lookup.get_partition_ids(global_dst_nids)
-                    else:
-                        logging.error(f'[Rank: {rank}] The order of global_eids does not match of intersection')
-                        assert False
-                    '''
                     
                 cond = (partid_slice == part_id)
                 gnids_per_partid = gnids_feat[cond]
