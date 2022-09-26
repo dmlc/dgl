@@ -41,15 +41,14 @@ def submit_jobs(args) -> str:
     graph_name = schema_map["graph_name"]
 
     # retrieve num_parts
+    num_chunks = len(schema_map["num_nodes_per_chunk"][0])
+    num_parts = num_chunks
     partition_path = os.path.join(args.partitions_dir, "partition.json")
     if os.path.exists(partition_path):
         with open(partition_path) as part_meta:
             num_parts = json.load(part_meta)['num_parts']
-    else:
-        num_chunks = len(schema_map["num_nodes_per_chunk"][0])
-        if args.num_parts > num_chunks:
-            raise Exception('Number of partitions should be less/equal than number of chunks.')
-        num_parts = num_chunks if args.num_parts <= 0 else args.num_parts
+    if num_parts > num_chunks:
+        raise Exception('Number of partitions should be less/equal than number of chunks.')
 
     # verify ip_config
     with open(args.ip_config, 'r') as f:
