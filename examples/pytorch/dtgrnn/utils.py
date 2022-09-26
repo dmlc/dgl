@@ -12,10 +12,10 @@ class NormalizationLayer(nn.Module):
 
     # Here we shall expect mean and std be scaler
     def normalize(self, x):
-        return (x-self.mean)/self.std
+        return (x - self.mean) / self.std
 
     def denormalize(self, x):
-        return x*self.std + self.mean
+        return x * self.std + self.mean
 
 
 def masked_mae_loss(y_pred, y_true):
@@ -30,4 +30,4 @@ def masked_mae_loss(y_pred, y_true):
 
 def get_learning_rate(optimizer):
     for param in optimizer.param_groups:
-        return param['lr']
+        return param["lr"]

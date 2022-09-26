@@ -11,7 +11,9 @@ def evaluate(model, graph, feats, labels, idxs):
         results = ()
         for idx in idxs:
             loss = F.cross_entropy(logits[idx], labels[idx])
-            acc = torch.sum(logits[idx].argmax(dim=1) == labels[idx]).item() / len(idx)
+            acc = torch.sum(
+                logits[idx].argmax(dim=1) == labels[idx]
+            ).item() / len(idx)
             results += (loss, acc)
     return results
 

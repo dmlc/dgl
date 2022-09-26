@@ -12,11 +12,14 @@ import torch.nn as nn
 import math
 from gcn import GCN
 
+
 class Encoder(nn.Module):
     def __init__(self, g, in_feats, n_hidden, n_layers, activation, dropout):
         super(Encoder, self).__init__()
         self.g = g
-        self.conv = GCN(g, in_feats, n_hidden, n_hidden, n_layers, activation, dropout)
+        self.conv = GCN(
+            g, in_feats, n_hidden, n_hidden, n_layers, activation, dropout
+        )
 
     def forward(self, features, corrupt=False):
         if corrupt:
@@ -49,7 +52,9 @@ class Discriminator(nn.Module):
 class DGI(nn.Module):
     def __init__(self, g, in_feats, n_hidden, n_layers, activation, dropout):
         super(DGI, self).__init__()
-        self.encoder = Encoder(g, in_feats, n_hidden, n_layers, activation, dropout)
+        self.encoder = Encoder(
+            g, in_feats, n_hidden, n_layers, activation, dropout
+        )
         self.discriminator = Discriminator(n_hidden)
         self.loss = nn.BCEWithLogitsLoss()
 
