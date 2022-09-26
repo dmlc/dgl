@@ -11,6 +11,8 @@ dist_g = None
 def rand_mask(shape, dtype):
     return F.randn(shape) > 0
 
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Turn off Mxnet support")
 def setup_module():
     global dist_g
 
@@ -46,6 +48,8 @@ def test_op():
     dist_g.edata['mask3'] = dist_g.edata['mask1'] | dist_g.edata['mask2']
     check_binary_op('mask1', 'mask2', 'mask3', operator.or_)
 
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Turn off Mxnet support")
 def teardown_module():
     dgl.distributed.exit_client() # this is needed since there's two test here in one process
 
