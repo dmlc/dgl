@@ -558,8 +558,8 @@ def gen_dist_partitions(rank, world_size, params):
     #and return the aggregated data
     ntypes_gnid_range_map = get_gnid_range_map(node_tids)
     node_data, rcvd_node_features, rcvd_global_nids, edge_data  = \
-                    exchange_graph_data(rank, world_size, node_features, node_feat_tids, \
-                                        edge_data, id_lookup, ntypes_gnid_range_map, \
+                    exchange_graph_data(rank, world_size, node_features, node_feat_tids,
+                                        edge_data, id_lookup, ntypes_gnid_range_map,
                                         ntypeid_ntypes_map, schema_map)
     gc.collect()
     logging.info(f'[Rank: {rank}] Done with data shuffling...')
@@ -616,9 +616,8 @@ def gen_dist_partitions(rank, world_size, params):
     num_edges = shuffle_global_eid_start
     node_count = len(node_data[constants.NTYPE_ID])
     edge_count = len(edge_data[constants.ETYPE_ID])
-    graph_obj, ntypes_map_val, etypes_map_val, ntypes_ntypeid_map, etypes_map = create_dgl_object(\
-            params.graph_name, params.num_parts, \
-            schema_map, rank, node_data, edge_data, num_nodes, num_edges)
+    graph_obj, ntypes_map_val, etypes_map_val, ntypes_ntypeid_map, etypes_map = create_dgl_object(
+            params.num_parts, schema_map, rank, node_data, edge_data, num_edges)
     memory_snapshot("CreateDGLObjectsComplete: ", rank)
     write_dgl_objects(graph_obj, rcvd_node_features, edge_features, params.output, rank)
     memory_snapshot("DiskWriteDGLObjectsComplete: ", rank)

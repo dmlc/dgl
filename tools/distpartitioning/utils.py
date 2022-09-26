@@ -385,7 +385,7 @@ def get_idranges(names, counts, expected_num_chunks):
         list of node/edge types as strings
     counts : list of lists
         each list contains no. of nodes/edges in a given chunk
-    expected_num_chunks : expected number of returned chunks
+    expected_num_chunks : int
         chunks are collapsed according to expected number of chunks
 
     Returns:

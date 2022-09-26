@@ -238,8 +238,8 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
 
         num_chunks = len(edge_info)
         read_list = np.array_split(np.arange(num_chunks), world_size)
-        df_0 = []
-        df_1 = []
+        src_ids = []
+        dst_ids = []
         for idx in read_list[rank]:
             edge_file = edge_info[idx]
             if not os.path.isabs(edge_file):
@@ -248,18 +248,18 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
             data_df = csv.read_csv(edge_file,
                         read_options=pyarrow.csv.ReadOptions(autogenerate_column_names=True), 
                         parse_options=pyarrow.csv.ParseOptions(delimiter=' '))
-            df_0.append(data_df['f0'].to_numpy())
-            df_1.append(data_df['f1'].to_numpy())
-        df_0 = np.concatenate(df_0)
-        df_1 = np.concatenate(df_1)
+            src_ids.append(data_df['f0'].to_numpy())
+            dst_ids.append(data_df['f1'].to_numpy())
+        src_ids = np.concatenate(src_ids)
+        dst_ids = np.concatenate(dst_ids)
 
         #currently these are just type_edge_ids... which will be converted to global ids
-        edge_datadict[constants.GLOBAL_SRC_ID].append(df_0 + ntype_gnid_offset[src_ntype_name][0, 0])
-        edge_datadict[constants.GLOBAL_DST_ID].append(df_1 + ntype_gnid_offset[dst_ntype_name][0, 0])
+        edge_datadict[constants.GLOBAL_SRC_ID].append(src_ids + ntype_gnid_offset[src_ntype_name][0, 0])
+        edge_datadict[constants.GLOBAL_DST_ID].append(dst_ids + ntype_gnid_offset[dst_ntype_name][0, 0])
         edge_datadict[constants.GLOBAL_TYPE_EID].append(np.arange(edge_tids[etype_name][rank][0],\
                 edge_tids[etype_name][rank][1] ,dtype=np.int64))
         edge_datadict[constants.ETYPE_ID].append(etype_name_idmap[etype_name] * \
-                np.ones(shape=(df_0.shape), dtype=np.int64))
+                np.ones(shape=(src_ids.shape), dtype=np.int64))
 
     #stitch together to create the final data on the local machine
     for col in [constants.GLOBAL_SRC_ID, constants.GLOBAL_DST_ID, constants.GLOBAL_TYPE_EID, constants.ETYPE_ID]:
