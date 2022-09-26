@@ -181,7 +181,8 @@
 } while (0)
 #endif  // BF16_ENABLED
 #else  // DGL_USE_CUDA
-#define ATEN_FLOAT_TYPE_SWITCH_16BITS(val, FloatType, XPU, val_name, ...) ATEN_FLOAT_TYPE_SWITCH(val, FloatType, val_name, ...)
+#define ATEN_FLOAT_TYPE_SWITCH_16BITS(val, FloatType, XPU, val_name, ...)  \
+  ATEN_FLOAT_TYPE_SWITCH(val, FloatType, val_name, {__VA_ARGS__})
 #endif  // DGL_USE_CUDA
 
 /*

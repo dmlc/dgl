@@ -71,7 +71,7 @@ DType IndexSelect(NDArray array, int64_t index) {
   auto device = runtime::DeviceAPI::Get(array->ctx);
   DType ret = static_cast<DType>(0.0f);
   device->CopyDataFromTo(
-      static_cast<DType*>(array->data) + index, 0, reinterpret_cast<DType*>(&ret), 0,
+      static_cast<DType*>(array->data) + index, 0, &ret, 0,
       sizeof(DType), array->ctx, DGLContext{kDGLCPU, 0}, array->dtype);
   return ret;
 }

@@ -162,6 +162,7 @@ void _Transpose<half>(const half* in, half* out,
   CUDA_KERNEL_CALL(_TransposeKernel, nb, nt, 0, stream, in, out, col, row);
 }
 
+#if BF16_ENABLED
 /*
  * \brief Tranpose the input matrix for data type half.
  * \note cuBLAS has no geam API for bf16 data type, fallback to our kernel.
@@ -174,6 +175,7 @@ void _Transpose<__nv_bfloat16>(const __nv_bfloat16* in, __nv_bfloat16* out,
   int nb = col;
   CUDA_KERNEL_CALL(_TransposeKernel, nb, nt, 0, stream, in, out, col, row);
 }
+#endif  // BF16_ENABLED
 
 /*
  * \brief
