@@ -30,7 +30,7 @@ def etype2canonical_etypes(part_config, process_num):
                         for pid, seed_edge, seed_edge_type
                         in zip(pids, seed_edges, seed_edge_tids)]
         for c_etype in pool.starmap(_find_c_etypes_in_partition, args):
-            canonical_etypes = canonical_etypes | c_etype
+            canonical_etypes.update(c_etype)
     return canonical_etypes
 
 def _find_c_etypes_in_partition(seed_edges, seed_edge_tids, part_id, part_config):
