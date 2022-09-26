@@ -1,10 +1,12 @@
+import argparse
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 import dgl.nn as dglnn
-from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
 from dgl import AddSelfLoop
-import argparse
+from dgl.data import CiteseerGraphDataset, CoraGraphDataset, PubmedGraphDataset
 
 
 class GAT(nn.Module):

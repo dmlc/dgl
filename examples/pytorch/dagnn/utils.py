@@ -1,7 +1,8 @@
-import numpy as np
 import random
-from torch.nn import functional as F
+
+import numpy as np
 import torch
+from torch.nn import functional as F
 
 
 def evaluate(model, graph, feats, labels, idxs):

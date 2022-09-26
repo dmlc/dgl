@@ -1,10 +1,11 @@
 import numpy as np
 import torch
 import torch.nn as nn
+
 import dgl
+import dgl.function as fn
 import dgl.nn as dglnn
 from dgl.base import DGLError
-import dgl.function as fn
 from dgl.nn.functional import edge_softmax
 
 

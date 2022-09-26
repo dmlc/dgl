@@ -1,15 +1,15 @@
+import os
+from pathlib import Path
+
+import click
+import numpy as np
 import tensorflow as tf
 import torch
 import torch.nn as nn
-import click
-import numpy as np
-import os
-
 from logzero import logger
-from pathlib import Path
-from ruamel.yaml import YAML
-from modules.initializers import GlorotOrthogonal
 from modules.dimenet_pp import DimeNetPP
+from modules.initializers import GlorotOrthogonal
+from ruamel.yaml import YAML
 
 
 @click.command()

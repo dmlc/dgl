@@ -1,15 +1,15 @@
 import itertools
 import time
-import numpy as np
-import torch
-
-from catboost import Pool, CatBoostClassifier, CatBoostRegressor, sum_models
-from tqdm import tqdm
 from collections import defaultdict as ddict
+
+import numpy as np
 import pandas as pd
-from sklearn import preprocessing
+import torch
 import torch.nn.functional as F
+from catboost import CatBoostClassifier, CatBoostRegressor, Pool, sum_models
+from sklearn import preprocessing
 from sklearn.metrics import r2_score
+from tqdm import tqdm
 
 
 class BGNNPredictor:

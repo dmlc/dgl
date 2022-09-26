@@ -1,7 +1,8 @@
 import torch as th
 import torch.nn as nn
-from dgl.nn import GATConv
 from torch.nn import LSTM
+
+from dgl.nn import GATConv
 
 
 class GeniePathConv(nn.Module):

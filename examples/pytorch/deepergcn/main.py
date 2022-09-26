@@ -1,14 +1,13 @@
 import argparse
-import torch
-import torch.nn as nn
-import torch.optim as optim
 import copy
 import time
 
-from ogb.graphproppred import DglGraphPropPredDataset, collate_dgl
-from torch.utils.data import DataLoader
-from ogb.graphproppred import Evaluator
+import torch
+import torch.nn as nn
+import torch.optim as optim
 from models import DeeperGCN
+from ogb.graphproppred import DglGraphPropPredDataset, Evaluator, collate_dgl
+from torch.utils.data import DataLoader
 
 
 def train(model, device, data_loader, opt, loss_fn):

@@ -1,10 +1,12 @@
 import os
 import ssl
-from six.moves import urllib
-import torch
+
 import numpy as np
+import torch
+from six.moves import urllib
+from torch.utils.data import DataLoader, Dataset
+
 import dgl
-from torch.utils.data import Dataset, DataLoader
 
 
 def download_file(dataset):

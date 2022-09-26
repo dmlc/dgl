@@ -1,8 +1,9 @@
-import matplotlib.pyplot as plt
-import networkx as nx
 import os
 import pickle
 import random
+
+import matplotlib.pyplot as plt
+import networkx as nx
 from torch.utils.data import Dataset
 
 

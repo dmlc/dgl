@@ -2,23 +2,20 @@
 
 The script loads the full graph to the training device.
 """
-import os, time
 import argparse
 import logging
+import os
 import random
 import string
+import time
+
 import numpy as np
 import torch as th
 import torch.nn as nn
 from data import MovieLens
 from model import BiDecoder, GCMCLayer
-from utils import (
-    get_activation,
-    get_optimizer,
-    torch_total_param_num,
-    torch_net_info,
-    MetricLogger,
-)
+from utils import (MetricLogger, get_activation, get_optimizer, torch_net_info,
+                   torch_total_param_num)
 
 
 class Net(nn.Module):

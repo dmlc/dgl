@@ -1,12 +1,11 @@
 import torch
 import torch.nn as nn
-
 from modules.activations import swish
 from modules.bessel_basis_layer import BesselBasisLayer
-from modules.spherical_basis_layer import SphericalBasisLayer
 from modules.embedding_block import EmbeddingBlock
-from modules.output_pp_block import OutputPPBlock
 from modules.interaction_pp_block import InteractionPPBlock
+from modules.output_pp_block import OutputPPBlock
+from modules.spherical_basis_layer import SphericalBasisLayer
 
 
 class DimeNetPP(nn.Module):

@@ -4,15 +4,16 @@ Multiple heads are also batched together for faster training.
 """
 
 import argparse
-import numpy as np
 import time
+
+import numpy as np
 import torch
 import torch.nn.functional as F
-import dgl
-from dgl.data import register_data_args
-from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
-
 from gatv2 import GATv2
+
+import dgl
+from dgl.data import (CiteseerGraphDataset, CoraGraphDataset,
+                      PubmedGraphDataset, register_data_args)
 
 
 class EarlyStopping:

@@ -1,9 +1,9 @@
 import argparse
+
 import torch
 import torch.optim as optim
-from torchvision import datasets, transforms
-
 from model import Net
+from torchvision import datasets, transforms
 
 
 def train(args, model, device, train_loader, optimizer, epoch):

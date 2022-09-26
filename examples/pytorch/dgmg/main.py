@@ -7,12 +7,12 @@ This implementation works with a minibatch of size 1 only for both training and 
 import argparse
 import datetime
 import time
+
 import torch
+from model import DGMG
+from torch.nn.utils import clip_grad_norm_
 from torch.optim import Adam
 from torch.utils.data import DataLoader
-from torch.nn.utils import clip_grad_norm_
-
-from model import DGMG
 
 
 def main(opts):

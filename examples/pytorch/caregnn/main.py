@@ -1,12 +1,13 @@
-import dgl
 import argparse
-import torch as th
-from model import CAREGNN
-import torch.optim as optim
-from torch.nn.functional import softmax
-from sklearn.metrics import recall_score, roc_auc_score
 
+import torch as th
+import torch.optim as optim
+from model import CAREGNN
+from sklearn.metrics import recall_score, roc_auc_score
+from torch.nn.functional import softmax
 from utils import EarlyStopping
+
+import dgl
 
 
 def main(args):

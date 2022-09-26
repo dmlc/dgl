@@ -1,22 +1,23 @@
-import click
 import copy
+from pathlib import Path
+
+import click
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.optim as optim
 import torch.nn.functional as F
-import dgl
-
+import torch.optim as optim
 from logzero import logger
-from pathlib import Path
-from ruamel.yaml import YAML
-from torch.utils.data import DataLoader
-from dgl.data.utils import Subset
-from sklearn.metrics import mean_absolute_error
-from qm9 import QM9
-from modules.initializers import GlorotOrthogonal
 from modules.dimenet import DimeNet
 from modules.dimenet_pp import DimeNetPP
+from modules.initializers import GlorotOrthogonal
+from qm9 import QM9
+from ruamel.yaml import YAML
+from sklearn.metrics import mean_absolute_error
+from torch.utils.data import DataLoader
+
+import dgl
+from dgl.data.utils import Subset
 
 
 def split_dataset(

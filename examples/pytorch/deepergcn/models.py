@@ -1,10 +1,10 @@
 import torch.nn as nn
 import torch.nn.functional as F
-import dgl.function as fn
-
-from ogb.graphproppred.mol_encoder import AtomEncoder
-from dgl.nn.pytorch.glob import AvgPooling
 from layers import GENConv
+from ogb.graphproppred.mol_encoder import AtomEncoder
+
+import dgl.function as fn
+from dgl.nn.pytorch.glob import AvgPooling
 
 
 class DeeperGCN(nn.Module):

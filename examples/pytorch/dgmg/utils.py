@@ -1,13 +1,13 @@
 import datetime
-import matplotlib.pyplot as plt
 import os
 import random
+from pprint import pprint
+
+import matplotlib.pyplot as plt
 import torch
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
 import torch.nn.init as init
-from pprint import pprint
-
 
 ########################################################################################################################
 #                                                    configuration                                                     #

@@ -1,8 +1,8 @@
-from collections import defaultdict
 import math
 import os
 import sys
 import time
+from collections import defaultdict
 
 import numpy as np
 import torch
@@ -11,10 +11,10 @@ import torch.nn.functional as F
 import tqdm
 from numpy import random
 from torch.nn.parameter import Parameter
+from utils import *
+
 import dgl
 import dgl.function as fn
-
-from utils import *
 
 
 def get_graph(network_data, vocab):

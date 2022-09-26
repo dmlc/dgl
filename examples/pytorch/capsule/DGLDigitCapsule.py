@@ -1,10 +1,10 @@
-import dgl
 import torch
+from DGLRoutingLayer import DGLRoutingLayer
 from torch import nn
 from torch.nn import functional as F
-import dgl.function as fn
 
-from DGLRoutingLayer import DGLRoutingLayer
+import dgl
+import dgl.function as fn
 
 
 class DGLDigitCapsuleLayer(nn.Module):

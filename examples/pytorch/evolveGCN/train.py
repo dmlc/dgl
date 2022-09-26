@@ -1,12 +1,13 @@
 import argparse
 import time
-import dgl
+
 import torch
 import torch.nn.functional as F
-
 from dataset import EllipticDataset
-from model import EvolveGCNO, EvolveGCNH
+from model import EvolveGCNH, EvolveGCNO
 from utils import Measure
+
+import dgl
 
 
 def train(args, device):

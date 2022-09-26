@@ -7,9 +7,10 @@ Papers: https://arxiv.org/abs/1809.10341
 Author's code: https://github.com/PetarV-/DGI
 """
 
+import math
+
 import torch
 import torch.nn as nn
-import math
 from gcn import GCN
 
 

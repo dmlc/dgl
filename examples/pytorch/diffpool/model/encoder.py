@@ -1,17 +1,17 @@
-import torch
-import torch.nn as nn
-from torch.nn import init
-import torch.nn.functional as F
+import time
 
 import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 from scipy.linalg import block_diag
+from torch.nn import init
 
 import dgl
 
-from .dgl_layers import GraphSage, GraphSageLayer, DiffPoolBatchedGraphLayer
-from .tensorized_layers import *
+from .dgl_layers import DiffPoolBatchedGraphLayer, GraphSage, GraphSageLayer
 from .model_utils import batch2tensor
-import time
+from .tensorized_layers import *
 
 
 class DiffPool(nn.Module):

@@ -3,6 +3,7 @@ This code was copied from the GCN implementation in DGL examples.
 """
 import torch
 import torch.nn as nn
+
 from dgl.nn.pytorch import GraphConv
 
 

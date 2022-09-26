@@ -1,16 +1,13 @@
 import copy
-import torch
+
 import numpy as np
+import torch
+
+from dgl.data import (AmazonCoBuyComputerDataset, AmazonCoBuyPhotoDataset,
+                      CoauthorCSDataset, CoauthorPhysicsDataset, PPIDataset,
+                      WikiCSDataset)
 from dgl.dataloading import GraphDataLoader
 from dgl.transforms import Compose, DropEdge, FeatMask, RowFeatNormalizer
-from dgl.data import (
-    CoauthorCSDataset,
-    CoauthorPhysicsDataset,
-    AmazonCoBuyPhotoDataset,
-    AmazonCoBuyComputerDataset,
-    PPIDataset,
-    WikiCSDataset,
-)
 
 
 class CosineDecayScheduler:

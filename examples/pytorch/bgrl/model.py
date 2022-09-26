@@ -1,9 +1,11 @@
-import dgl
 import copy
+
 import torch
 from torch import nn
-from torch.nn.init import ones_, zeros_
 from torch.nn import BatchNorm1d, Parameter
+from torch.nn.init import ones_, zeros_
+
+import dgl
 from dgl.nn.pytorch.conv import GraphConv, SAGEConv
 
 

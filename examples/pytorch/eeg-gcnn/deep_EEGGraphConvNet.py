@@ -1,7 +1,8 @@
 import torch.nn as nn
 import torch.nn.functional as function
-from dgl.nn import GraphConv, SumPooling
 from torch.nn import BatchNorm1d
+
+from dgl.nn import GraphConv, SumPooling
 
 
 class EEGGraphConvNet(nn.Module):

@@ -1,21 +1,21 @@
-import os
-import numpy as np
-import torch
-import dgl
-import networkx as nx
 import argparse
+import os
 import random
 import time
 
+import networkx as nx
+import numpy as np
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.data
+from data_utils import pre_process
+from model.encoder import DiffPool
+
+import dgl
 import dgl.function as fn
 from dgl import DGLGraph
 from dgl.data import tu
-
-from model.encoder import DiffPool
-from data_utils import pre_process
 
 global_train_time_per_epoch = []
 

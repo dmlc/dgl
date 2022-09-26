@@ -1,10 +1,12 @@
-import dgl
-import random
 import argparse
-import torch as th
-import numpy as np
-import networkx as nx
+import random
 from datetime import datetime
+
+import networkx as nx
+import numpy as np
+import torch as th
+
+import dgl
 
 
 def init_args():

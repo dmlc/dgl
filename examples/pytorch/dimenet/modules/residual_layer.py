@@ -1,5 +1,4 @@
 import torch.nn as nn
-
 from modules.initializers import GlorotOrthogonal
 
 

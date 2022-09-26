@@ -1,8 +1,7 @@
 import torch
-from torch import nn
-
 from DGLDigitCapsule import DGLDigitCapsuleLayer
 from DGLRoutingLayer import squash
+from torch import nn
 
 
 class Net(nn.Module):

@@ -1,6 +1,7 @@
-import torch.nn as nn
-import dgl.function as fn
 import torch as th
+import torch.nn as nn
+
+import dgl.function as fn
 from dgl.nn.functional import edge_softmax
 
 

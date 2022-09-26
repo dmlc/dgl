@@ -1,17 +1,16 @@
 import argparse
+from time import time
+
+import numpy as np
 import torch as th
-import torch.optim as optim
-import torch.nn.functional as F
 import torch.nn as nn
-
-import dgl.function as fn
-
+import torch.nn.functional as F
+import torch.optim as optim
+from data_loader import Data
+from models import CompGCN_ConvE
 from utils import in_out_norm
 
-from models import CompGCN_ConvE
-from data_loader import Data
-import numpy as np
-from time import time
+import dgl.function as fn
 
 
 # predict the tail for (head, rel, -1) or head for (-1, rel, tail)

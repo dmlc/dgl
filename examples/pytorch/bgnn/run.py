@@ -1,21 +1,21 @@
-import torch
-from BGNN import BGNNPredictor
-import pandas as pd
-import numpy as np
 import json
 import os
-from dgl.data.utils import load_graphs
-from dgl.nn.pytorch import (
-    GATConv as GATConvDGL,
-    GraphConv,
-    ChebConv as ChebConvDGL,
-    AGNNConv as AGNNConvDGL,
-    APPNPConv,
-)
-from torch.nn import Dropout, ELU, Sequential, Linear, ReLU
+
+import numpy as np
+import pandas as pd
+import torch
 import torch.nn.functional as F
+from BGNN import BGNNPredictor
 from category_encoders import CatBoostEncoder
 from sklearn import preprocessing
+from torch.nn import ELU, Dropout, Linear, ReLU, Sequential
+
+from dgl.data.utils import load_graphs
+from dgl.nn.pytorch import AGNNConv as AGNNConvDGL
+from dgl.nn.pytorch import APPNPConv
+from dgl.nn.pytorch import ChebConv as ChebConvDGL
+from dgl.nn.pytorch import GATConv as GATConvDGL
+from dgl.nn.pytorch import GraphConv
 
 
 class GNNModelDGL(torch.nn.Module):

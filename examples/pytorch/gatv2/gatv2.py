@@ -8,6 +8,7 @@ Author's code: https://github.com/tech-srl/how_attentive_are_gats
 
 import torch
 import torch.nn as nn
+
 from dgl.nn import GATv2Conv
 
 

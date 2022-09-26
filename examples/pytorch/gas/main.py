@@ -1,10 +1,11 @@
 import argparse
+
 import torch as th
-import torch.optim as optim
 import torch.nn.functional as F
+import torch.optim as optim
 from dataloader import GASDataset
 from model import GAS
-from sklearn.metrics import f1_score, roc_auc_score, precision_recall_curve
+from sklearn.metrics import f1_score, precision_recall_curve, roc_auc_score
 
 
 def main(args):

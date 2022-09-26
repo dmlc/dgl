@@ -1,12 +1,11 @@
 import torch as th
-import torch.optim as optim
-import torch.nn.functional as F
 import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+from utils import ccorr
 
 import dgl
 import dgl.function as fn
-
-from utils import ccorr
 
 
 class CompGraphConv(nn.Module):

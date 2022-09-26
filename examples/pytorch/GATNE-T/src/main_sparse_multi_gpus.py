@@ -1,23 +1,23 @@
-from collections import defaultdict
+import datetime
 import math
 import os
 import sys
 import time
-import datetime
+from collections import defaultdict
 
 import numpy as np
 import torch
+import torch.multiprocessing as mp
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn.parallel import DistributedDataParallel
-from tqdm.auto import tqdm
 from numpy import random
+from torch.nn.parallel import DistributedDataParallel
 from torch.nn.parameter import Parameter
+from tqdm.auto import tqdm
+from utils import *
+
 import dgl
 import dgl.function as fn
-import torch.multiprocessing as mp
-
-from utils import *
 
 
 def setup_seed(seed):

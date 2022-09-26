@@ -1,12 +1,14 @@
 import argparse
 import copy
 import os
+
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
-import dgl
+from model import MLP, CorrectAndSmooth, MLPLinear
 from ogb.nodeproppred import DglNodePropPredDataset, Evaluator
-from model import MLP, MLPLinear, CorrectAndSmooth
+
+import dgl
 
 
 def evaluate(y_pred, y_true, idx, evaluator):

@@ -1,8 +1,7 @@
 import numpy as np
 import sympy as sym
-
-from scipy.optimize import brentq
 from scipy import special as sp
+from scipy.optimize import brentq
 
 
 def Jn(r, n):

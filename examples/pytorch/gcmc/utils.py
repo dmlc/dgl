@@ -1,10 +1,11 @@
 import csv
 import re
-import torch as th
+from collections import OrderedDict
+
 import numpy as np
+import torch as th
 import torch.nn as nn
 import torch.optim as optim
-from collections import OrderedDict
 
 
 class MetricLogger(object):

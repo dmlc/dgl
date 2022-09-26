@@ -1,16 +1,16 @@
 import argparse
+import multiprocessing
+import time
 from collections import defaultdict
+from functools import partial, reduce, wraps
 
 import networkx as nx
 import numpy as np
+import torch
 from gensim.models.keyedvectors import Vocab
 from six import iteritems
-from sklearn.metrics import auc, f1_score, precision_recall_curve, roc_auc_score
-import torch
-
-import time
-import multiprocessing
-from functools import partial, reduce, wraps
+from sklearn.metrics import (auc, f1_score, precision_recall_curve,
+                             roc_auc_score)
 
 
 def parse_args():

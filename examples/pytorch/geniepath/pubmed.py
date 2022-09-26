@@ -2,10 +2,10 @@ import argparse
 
 import torch as th
 import torch.optim as optim
-from dgl.data import PubmedGraphDataset
+from model import GeniePath, GeniePathLazy
 from sklearn.metrics import accuracy_score
 
-from model import GeniePath, GeniePathLazy
+from dgl.data import PubmedGraphDataset
 
 
 def main(args):

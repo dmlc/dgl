@@ -1,10 +1,12 @@
-import torch
-import numpy as np
 import math
+from itertools import product
+
+import numpy as np
 import pandas as pd
+import torch
+
 import dgl
 from dgl.data import DGLDataset
-from itertools import product
 
 
 class EEGGraphDataset(DGLDataset):

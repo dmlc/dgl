@@ -1,7 +1,6 @@
 import sympy as sym
 import torch
 import torch.nn as nn
-
 from modules.basis_utils import bessel_basis, real_sph_harm
 from modules.envelope import Envelope
 

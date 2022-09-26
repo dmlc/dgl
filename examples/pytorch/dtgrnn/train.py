@@ -1,24 +1,20 @@
-from functools import partial
 import argparse
+from functools import partial
+
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
-import dgl
-from model import GraphRNN
+from dataloading import (METR_LAGraphDataset, METR_LATestDataset,
+                         METR_LATrainDataset, METR_LAValidDataset,
+                         PEMS_BAYGraphDataset, PEMS_BAYTestDataset,
+                         PEMS_BAYTrainDataset, PEMS_BAYValidDataset)
 from dcrnn import DiffConv
 from gaan import GatedGAT
-from dataloading import (
-    METR_LAGraphDataset,
-    METR_LATrainDataset,
-    METR_LATestDataset,
-    METR_LAValidDataset,
-    PEMS_BAYGraphDataset,
-    PEMS_BAYTrainDataset,
-    PEMS_BAYValidDataset,
-    PEMS_BAYTestDataset,
-)
-from utils import NormalizationLayer, masked_mae_loss, get_learning_rate
+from model import GraphRNN
+from torch.utils.data import DataLoader
+from utils import NormalizationLayer, get_learning_rate, masked_mae_loss
+
+import dgl
 
 batch_cnt = [0]
 

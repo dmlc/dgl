@@ -1,14 +1,15 @@
 """QM9 dataset for graph property prediction (regression)."""
 import os
+
 import numpy as np
 import scipy.sparse as sp
 import torch
-import dgl
-
 from tqdm import trange
+
+import dgl
+from dgl.convert import graph as dgl_graph
 from dgl.data import QM9Dataset
 from dgl.data.utils import load_graphs, save_graphs
-from dgl.convert import graph as dgl_graph
 
 
 class QM9(QM9Dataset):

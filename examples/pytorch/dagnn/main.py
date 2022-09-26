@@ -1,13 +1,15 @@
 import argparse
-from torch import nn
-from torch.nn import Parameter
-import dgl.function as fn
-from torch.nn import functional as F
-from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
+
 import numpy as np
 import torch
+from torch import nn
+from torch.nn import Parameter
+from torch.nn import functional as F
 from tqdm import trange
-from utils import generate_random_seeds, set_random_state, evaluate
+from utils import evaluate, generate_random_seeds, set_random_state
+
+import dgl.function as fn
+from dgl.data import CiteseerGraphDataset, CoraGraphDataset, PubmedGraphDataset
 
 
 class DAGNNConv(nn.Module):
