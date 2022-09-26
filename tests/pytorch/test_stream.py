@@ -107,6 +107,7 @@ def test_record_stream_graph_positive():
     cycles_per_ms = _get_cycles_per_ms()
 
     g = rand_graph(10, 20, device=F.cpu())
+    g.create_formats_()
     x = torch.ones(g.num_nodes(), 10)
     result = OPS.copy_u_sum(g, x).to(F.ctx())
 
@@ -126,14 +127,18 @@ def test_record_stream_graph_positive():
     with torch.cuda.stream(stream):
         # since we have called record stream for g2, g3 won't reuse its memory
         g3 = rand_graph(10, 20, device=F.ctx())
+        g3.create_formats_()
     torch.cuda.current_stream().synchronize()
     assert torch.equal(result, results2)
 
 @unittest.skipIf(F._default_context_str == 'cpu', reason="stream only runs on GPU.")
+# this test must follow test_record_stream_graph_positive to ensure
+# enough memory blocks have been reserved.
 def test_record_stream_graph_negative():
     cycles_per_ms = _get_cycles_per_ms()
 
     g = rand_graph(10, 20, device=F.cpu())
+    g.create_formats_()
     x = torch.ones(g.num_nodes(), 10)
     result = OPS.copy_u_sum(g, x).to(F.ctx())
 
@@ -154,6 +159,7 @@ def test_record_stream_graph_negative():
     with torch.cuda.stream(stream):
         # g3 will reuse g2's memory block, resulting a wrong result
         g3 = rand_graph(10, 20, device=F.ctx())
+        g3.create_formats_()
     torch.cuda.current_stream().synchronize()
     assert not torch.equal(result, results2)
 
