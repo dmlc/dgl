@@ -1,7 +1,9 @@
 import time
-import dgl
-import torch
+
 import numpy as np
+import torch
+
+import dgl
 import dgl.function as fn
 
 from .. import utils

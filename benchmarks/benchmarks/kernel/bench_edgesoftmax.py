@@ -1,8 +1,11 @@
 import time
-import dgl
+
 import torch
 
+import dgl
+
 from .. import utils
+
 
 # The benchmarks for ops edge_softmax
 @utils.benchmark("time", timeout=600)

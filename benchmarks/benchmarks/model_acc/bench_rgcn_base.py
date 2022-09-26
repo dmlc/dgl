@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchmetrics.functional import accuracy
-from .. import utils
-from .. import rgcn
+
+from .. import rgcn, utils
 
 
 @utils.benchmark("acc", timeout=1200)

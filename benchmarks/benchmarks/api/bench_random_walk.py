@@ -1,6 +1,8 @@
 import time
-import dgl
+
 import torch
+
+import dgl
 
 from .. import utils
 

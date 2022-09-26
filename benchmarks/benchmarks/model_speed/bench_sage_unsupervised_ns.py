@@ -1,12 +1,14 @@
-import dgl
+import time
+
 import numpy as np
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import dgl.nn.pytorch as dglnn
+
+import dgl
 import dgl.function as fn
-import time
+import dgl.nn.pytorch as dglnn
 
 from .. import utils
 

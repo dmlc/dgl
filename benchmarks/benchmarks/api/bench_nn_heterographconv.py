@@ -1,11 +1,14 @@
 import time
-import dgl
-import torch
+
 import numpy as np
-import dgl.function as fn
-from dgl.nn.pytorch import SAGEConv, HeteroGraphConv
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+import dgl
+import dgl.function as fn
+from dgl.nn.pytorch import HeteroGraphConv, SAGEConv
+
 from .. import utils
 
 

@@ -1,9 +1,12 @@
 import time
-import dgl
-import torch
+
 import numpy as np
+import torch
+
+import dgl
 
 from .. import utils
+
 
 # edge_ids is not supported on cuda
 # @utils.skip_if_gpu()
