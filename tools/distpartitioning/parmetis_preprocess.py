@@ -14,8 +14,7 @@ import pyarrow
 import pyarrow.csv as csv
 
 def get_proc_info():
-    """
-    Helper function to get the rank from the
+    """Helper function to get the rank from the
     environment when `mpirun` is used to run this python program
 
     Please note that for mpi(openmpi) installation the rank is retrieved from the 
@@ -40,8 +39,7 @@ def get_proc_info():
 
 
 def gen_edge_files(schema_map, output):
-    """
-    Function to create edges files to be consumed by ParMETIS
+    """Function to create edges files to be consumed by ParMETIS
     for partitioning purposes.
 
     This function creates the edge files and each of these will have the
@@ -108,8 +106,7 @@ def gen_edge_files(schema_map, output):
     return edge_files
 
 def read_node_features(schema_map, tgt_ntype_name, feat_names):
-    """
-    Helper function to read the node features, if present.
+    """Helper function to read the node features, if present.
     Only node features which are requested are read from the input dataset. 
 
     Parameters:
@@ -148,8 +145,7 @@ def read_node_features(schema_map, tgt_ntype_name, feat_names):
 
 
 def gen_node_weights_files(schema_map, output):
-    """
-    Function to create node weight files for ParMETIS along with the edge files.
+    """Function to create node weight files for ParMETIS along with the edge files.
 
     This function generates node-data files, which will be read by the ParMETIS
     executable for partitioning purposes. Each line in these files will be of the 
@@ -228,8 +224,7 @@ def gen_node_weights_files(schema_map, output):
 
 
 def gen_parmetis_input_args(params, schema_map):
-    """
-    Function to create two input arguments which will be passed to the parmetis.
+    """Function to create two input arguments which will be passed to the parmetis.
     first argument is a text file which has a list of node-weights files, and
     second argument is a text file which has a list of edge files. 
     ParMETIS uses these two files to read/load the graph and partition the graph
@@ -282,8 +277,7 @@ def gen_parmetis_input_args(params, schema_map):
 
 
 def run_preprocess_data(params):
-    """
-    Main function which will help create graph files for ParMETIS processing
+    """Main function which will help create graph files for ParMETIS processing
 
     Parameters:
     -----------
@@ -307,8 +301,7 @@ def run_preprocess_data(params):
     logging.info(f'Done generating files for ParMETIS run ..')
 
 if __name__ == "__main__":
-    """
-    Main function used to generate temporary files needed for ParMETIS execution.
+    """Main function used to generate temporary files needed for ParMETIS execution.
     This function generates node-weight files and edges files which are consumed by ParMETIS.
 
     Example usage:

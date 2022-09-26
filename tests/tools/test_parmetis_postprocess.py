@@ -86,11 +86,15 @@ def test_parmetis_preprocessing():
             np.savetxt(f, parmetis_output)
 
         # Check the post processing script here. 
+        env = dict(os.environ)
+        dgl_home = env["DGL_HOME"]
+        if dgl_home[-1] != "/":
+            dgl_home += "/"
         results_dir = os.path.join(output_dir, 'partitions_dir')
         print(json_file)
         print(results_dir)
         print(parmetis_file)
-        os.system(f'python3 tools/distpartitioning/parmetis_postprocess.py '\
+        os.system(f'python3 {dgl_home}tools/distpartitioning/parmetis_postprocess.py '\
                 f'--schema_file {json_file} '\
                 f'--parmetis_output_file {parmetis_file} '\
                 f'--partitions_dir {results_dir}')

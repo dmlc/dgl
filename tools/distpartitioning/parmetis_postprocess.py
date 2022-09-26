@@ -12,8 +12,7 @@ from pathlib import Path
 from utils import read_json, get_node_types, get_idranges
 
 def post_process(params):
-    """
-    Auxiliary function to read the parmetis output file and generate
+    """Auxiliary function to read the parmetis output file and generate
     metis partition-id files, sorted, per node-type. These files are used
     by the dist. graph partitioning pipeline for further processing.
 
@@ -63,8 +62,7 @@ def post_process(params):
 
 
 if __name__ == "__main__":
-    """
-    Main function to convert the output of parmetis into metis partitions
+    """Main function to convert the output of parmetis into metis partitions
     which are accepted by graph partitioning pipeline. 
 
     ParMETIS currently generates one output file, which is in the following format: 
@@ -77,7 +75,7 @@ if __name__ == "__main__":
 
     Example usage:
     --------------
-    python3 parmetis_postprocess.py 
+    python parmetis_postprocess.py 
         --input_file <metis-partitions-file>
         --output-dir <directory where the output files are stored>
         --schema <schema-file-path>

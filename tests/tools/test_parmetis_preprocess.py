@@ -224,9 +224,13 @@ def test_parmetis_preprocessing():
                 assert feat_array.shape[0] == num_edges[etype] // num_chunks
 
         # Trigger ParMETIS pre-processing here. 
+        env = dict(os.environ)
+        dgl_home = env["DGL_HOME"]
+        if dgl_home[-1] != "/":
+            dgl_home += "/"
         schema_path = os.path.join(root_dir, 'chunked-data/metadata.json')
         results_dir = os.path.join(root_dir, 'parmetis-data')
-        os.system('mpirun -np 2 python3 tools/distpartitioning/parmetis_preprocess.py '\
+        os.system('mpirun -np 2 python {dgl_home}tools/distpartitioning/parmetis_preprocess.py '\
                   '--schema {} --output {}'.format(schema_path, results_dir))
 
         # Now add all the tests and check whether the test has passed or failed.

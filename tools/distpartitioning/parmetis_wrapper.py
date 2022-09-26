@@ -7,16 +7,8 @@ import constants
 from pathlib import Path
 from utils import read_json
 
-
-"""
-1. preprocessing --> mpirun -np 4 -hostfile iplist.txt ''
-2. ParMETIS      --> mpirun -np 4 -hostfile iplist.txt
-3. PostProcess   --> python3 <schema> <parmetis_output>
-"""
-
 def run_parmetis_wrapper(params):
-    """
-    Function to execute all the steps needed to run ParMETIS
+    """Function to execute all the steps needed to run ParMETIS
 
     Parameters:
     -----------
@@ -25,6 +17,12 @@ def run_parmetis_wrapper(params):
     """
     assert os.path.isfile(params.schema_file)
     assert os.path.isfile(params.hostfile)
+
+    parmetis_install_path = None
+    if params.parmetis_install_path is not None:
+        parmetis_install_path = params.parmetis_install_path
+        if parmetis_install_path[-1] != "/":
+            parmetis_install_path += "/"
 
     schema = read_json(params.schema_file)
     graph_name = schema[constants.STR_GRAPH_NAME]
@@ -48,12 +46,17 @@ def run_parmetis_wrapper(params):
     logging.info("\n")
 
     #Trigger ParMETIS for creating metis partitions for the input graph
+    parmetis_install_path = ""
+    if params.parmetis_install_path is not None:
+        parmetis_install_path = params.parmetis_install_path
+        if parmetis_install_path[-1] != "/":
+            parmetis_install_path += "/"
     parmetis_nfiles = os.path.join(params.preproc_output_dir, 
                                    'parmetis_nfiles.txt')
     parmetis_efiles = os.path.join(params.preproc_output_dir, 
                                    'parmetis_efiles.txt')
     parmetis_cmd = f'mpirun -np {num_partitions} -hostfile {params.hostfile} '\
-                   f'pm_dglpart3 {graph_name} {num_partitions} '\
+                   f'{parmetis_install_path}pm_dglpart3 {graph_name} {num_partitions} '\
                    f'{parmetis_nfiles} {parmetis_efiles}'
     logging.info(f'Executing ParMETIS: {parmetis_cmd}')
     os.system(parmetis_cmd)
@@ -75,6 +78,8 @@ def run_parmetis_wrapper(params):
     logging.info('Done Executing ParMETIS...')
 
 if __name__ == "__main__":
+    """Main function to invoke the parmetis wrapper function
+    """
     parser = argparse.ArgumentParser(description=\
         'Run ParMETIS as part of the graph partitioning pipeline')
     #Preprocessing step.
@@ -85,6 +90,10 @@ if __name__ == "__main__":
               files for ParMETIS.')
     parser.add_argument('--hostfile', required=True, type=str, 
         help='A text file with a list of ip addresses.')
+
+    #ParMETIS step.
+    parser.add_argument('--parmetis_install_path', required=False, type=str, 
+        help='The directory where ParMETIS is installed')
 
     #Postprocessing step.
     parser.add_argument('--parmetis_output_file', required=True, type=str,
