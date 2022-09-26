@@ -191,7 +191,7 @@ def test_edges_with_features():
         # Step1: graph partition
         in_dir = os.path.join(root_dir, 'chunked-data')
         output_dir = os.path.join(root_dir, '2parts')
-        os.system('python3 tools-parmetis-tests/partition_algo/random_partition.py '\
+        os.system('python tools-parmetis-tests/partition_algo/random_partition.py '\
                   '--metadata {}/metadata.json --output_path {} --num_partitions {}'.format(
                     in_dir, output_dir, num_chunks))
         for ntype in ['author', 'institution', 'paper']:
@@ -208,7 +208,7 @@ def test_edges_with_features():
             f.write('127.0.0.1\n')
             f.write('127.0.0.2\n')
 
-        os.system('python3 tools/dispatch_data.py '\
+        os.system('python tools/dispatch_data.py '\
                   '--in-dir {} --partitions-dir {} --out-dir {} --ip-config {}'.format(
                     in_dir, partition_dir, out_dir, ip_config))
         print('Graph partitioning pipeline complete...')
