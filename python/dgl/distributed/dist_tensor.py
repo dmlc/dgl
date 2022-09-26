@@ -112,6 +112,7 @@ class DistTensor:
         self._shape = shape
         self._dtype = dtype
         self._attach = attach
+        self._is_gdata = is_gdata
 
         part_policies = self.kvstore.all_possible_part_policy
         # If a user doesn't provide a partition policy, we should find one based on
@@ -179,6 +180,23 @@ class DistTensor:
         idx = idx.tousertensor()
         # TODO(zhengda) how do we want to support broadcast (e.g., G.ndata['h'][idx] = 1).
         self.kvstore.push(name=self._name, id_tensor=idx, data_tensor=val)
+
+    def __or__(self, other):
+        new_dist_tensor = self.__class__(
+                self._shape, self._dtype, part_policy=self._part_policy,
+                persistent=self._persistent, is_gdata=self._is_gdata,
+                attach=self._attach)
+        if not (self.kvstore is other.kvstore is new_dist_tensor.kvstore):
+            raise DGLError('The underlying KVStores are not the same.')
+        # Each trainer computes its own result from its local storage.
+        # (BarclayII) how to do it with KVClient?  It only has pull and push
+        # operations which requires IDs, and I don't think we need IDs.
+        # Using _data_store breaks the encapsulation and I don't really like it.
+        kvstore = self.kvstore
+        kvstore._data_store[new_dist_tensor.name][:] = \
+                kvstore._data_store[self.name] | \
+                kvstore._data_store[other.name]
+        return new_dist_tensor
 
     def __len__(self):
         return self._shape[0]
