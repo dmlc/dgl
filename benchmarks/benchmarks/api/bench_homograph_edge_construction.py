@@ -1,4 +1,3 @@
-
 import time
 import dgl
 import torch
@@ -10,12 +9,12 @@ from .. import utils
 
 
 @utils.skip_if_gpu()
-@utils.benchmark('time')
-@utils.parametrize('size', ["small", "large"])
+@utils.benchmark("time")
+@utils.parametrize("size", ["small", "large"])
 def track_time(size):
     edge_list = {
         "small": dgl.data.CiteseerGraphDataset(verbose=False)[0].edges(),
-        "large": utils.get_livejournal().edges()
+        "large": utils.get_livejournal().edges(),
     }
 
     # dry run

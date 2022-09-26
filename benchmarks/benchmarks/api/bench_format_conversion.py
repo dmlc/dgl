@@ -6,13 +6,20 @@ import numpy as np
 from .. import utils
 
 
-@utils.benchmark('time', timeout=600)
-@utils.parametrize_cpu('graph_name', ['cora', 'livejournal', 'friendster'])
-@utils.parametrize_gpu('graph_name', ['cora', 'livejournal'])
-@utils.parametrize('format',
-                   [('coo', 'csc'), ('csc', 'coo'),
-                    ('coo', 'csr'), ('csr', 'coo'),
-                    ('csr', 'csc'), ('csc', 'csr')])
+@utils.benchmark("time", timeout=600)
+@utils.parametrize_cpu("graph_name", ["cora", "livejournal", "friendster"])
+@utils.parametrize_gpu("graph_name", ["cora", "livejournal"])
+@utils.parametrize(
+    "format",
+    [
+        ("coo", "csc"),
+        ("csc", "coo"),
+        ("coo", "csr"),
+        ("csr", "coo"),
+        ("csr", "csc"),
+        ("csc", "csr"),
+    ],
+)
 def track_time(graph_name, format):
     from_format, to_format = format
     device = utils.get_bench_device()

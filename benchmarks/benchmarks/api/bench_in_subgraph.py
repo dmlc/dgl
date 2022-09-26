@@ -8,10 +8,10 @@ import dgl.function as fn
 from .. import utils
 
 
-@utils.benchmark('time')
-@utils.parametrize('graph_name', ['livejournal', 'reddit'])
-@utils.parametrize('format', ['csc'])  # coo is not supported
-@utils.parametrize('seed_nodes_num', [200, 5000, 20000])
+@utils.benchmark("time")
+@utils.parametrize("graph_name", ["livejournal", "reddit"])
+@utils.parametrize("format", ["csc"])  # coo is not supported
+@utils.parametrize("seed_nodes_num", [200, 5000, 20000])
 def track_time(graph_name, format, seed_nodes_num):
     device = utils.get_bench_device()
     graph = utils.get_graph(graph_name, format)
