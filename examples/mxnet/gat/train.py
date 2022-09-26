@@ -9,17 +9,18 @@ Pytorch implementation: https://github.com/Diego999/pyGAT
 """
 
 import argparse
-import networkx as nx
 import time
+
 import mxnet as mx
-from mxnet import gluon
+import networkx as nx
 import numpy as np
+from gat import GAT
+from mxnet import gluon
+from utils import EarlyStopping
 
 import dgl
-from dgl.data import register_data_args
-from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
-from gat import GAT
-from utils import EarlyStopping
+from dgl.data import (CiteseerGraphDataset, CoraGraphDataset,
+                      PubmedGraphDataset, register_data_args)
 
 
 def elu(data):

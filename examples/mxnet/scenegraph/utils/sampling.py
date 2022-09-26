@@ -1,7 +1,8 @@
-import dgl
-from dgl.utils import toindex
 import mxnet as mx
 import numpy as np
+
+import dgl
+from dgl.utils import toindex
 
 
 def l0_sample(g, positive_max=128, negative_ratio=3):

@@ -1,15 +1,16 @@
 """Pascal VOC object detection dataset."""
-from __future__ import absolute_import
-from __future__ import division
-import os
-import logging
-import warnings
+from __future__ import absolute_import, division
+
 import json
+import logging
+import os
 import pickle
-import numpy as np
-import mxnet as mx
-from gluoncv.data import COCODetection
+import warnings
 from collections import Counter
+
+import mxnet as mx
+import numpy as np
+from gluoncv.data import COCODetection
 
 
 class VGObject(COCODetection):

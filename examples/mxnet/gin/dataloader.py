@@ -2,12 +2,13 @@
 MxNet compatible dataloader
 """
 
-from mxnet.gluon.data import DataLoader, Sampler
-
 import math
+
 import numpy as np
 from mxnet import nd
+from mxnet.gluon.data import DataLoader, Sampler
 from sklearn.model_selection import StratifiedKFold
+
 import dgl
 
 

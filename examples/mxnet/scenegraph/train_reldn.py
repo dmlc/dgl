@@ -1,14 +1,17 @@
-import dgl
+import argparse
+import logging
+import time
+
 import mxnet as mx
 import numpy as np
-import logging, time, argparse
-from mxnet import nd, gluon
+from data import *
 from gluoncv.data.batchify import Pad
 from gluoncv.utils import makedirs
-
-from model import faster_rcnn_resnet101_v1d_custom, RelDN
+from model import RelDN, faster_rcnn_resnet101_v1d_custom
+from mxnet import gluon, nd
 from utils import *
-from data import *
+
+import dgl
 
 
 def parse_args():

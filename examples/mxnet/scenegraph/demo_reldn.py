@@ -1,12 +1,14 @@
-import dgl
 import argparse
-import mxnet as mx
+
 import gluoncv as gcv
-from gluoncv.utilz import download
-from gluoncv.data.transforms import presets
-from model import faster_rcnn_resnet101_v1d_custom, RelDN
-from utils import *
+import mxnet as mx
 from data import *
+from gluoncv.data.transforms import presets
+from gluoncv.utilz import download
+from model import RelDN, faster_rcnn_resnet101_v1d_custom
+from utils import *
+
+import dgl
 
 
 def parse_args():

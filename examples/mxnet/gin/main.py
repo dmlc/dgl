@@ -1,15 +1,15 @@
 import sys
-import numpy as np
-from tqdm import tqdm
+from parser import Parser
 
 import mxnet as mx
+import numpy as np
+from dataloader import GraphDataLoader, collate
+from gin import GIN
 from mxnet import gluon, nd
 from mxnet.gluon import nn
+from tqdm import tqdm
 
 from dgl.data.gindt import GINDataset
-from dataloader import GraphDataLoader, collate
-from parser import Parser
-from gin import GIN
 
 
 def train(args, net, trainloader, trainer, criterion, epoch):

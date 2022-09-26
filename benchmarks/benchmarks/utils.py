@@ -1,19 +1,20 @@
-from timeit import default_timer
+import inspect
 import json
 import os
 import pickle
 import shutil
+import time
 import zipfile
-import requests
-import inspect
+from functools import partial, reduce, wraps
+from timeit import default_timer
+
 import numpy as np
 import pandas
-import dgl
+import requests
 import torch
-import time
 from ogb.nodeproppred import DglNodePropPredDataset
 
-from functools import partial, reduce, wraps
+import dgl
 
 
 def _download(url, path, filename):
@@ -31,10 +32,11 @@ def _download(url, path, filename):
     print("Download finished.")
 
 
+import traceback
+from _thread import start_new_thread
+
 # GRAPH_CACHE = {}
 import torch.multiprocessing as mp
-from _thread import start_new_thread
-import traceback
 
 
 def thread_wrapped_func(func):

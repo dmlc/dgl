@@ -1,13 +1,14 @@
-import dgl
+import pickle
+
 import gluoncv as gcv
 import mxnet as mx
 import numpy as np
 from mxnet import nd
 from mxnet.gluon import nn
-from dgl.utils import toindex
-import pickle
 
+import dgl
 from dgl.nn.mxnet import GraphConv
+from dgl.utils import toindex
 
 __all__ = ["RelDN"]
 

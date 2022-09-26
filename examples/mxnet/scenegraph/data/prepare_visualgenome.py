@@ -1,12 +1,13 @@
 """Prepare Visual Genome datasets"""
-import os
-import shutil
 import argparse
-import zipfile
-import random
 import json
-import tqdm
+import os
 import pickle
+import random
+import shutil
+import zipfile
+
+import tqdm
 from gluoncv.utils import download, makedirs
 
 _TARGET_DIR = os.path.expanduser("~/.mxnet/datasets/visualgenome")

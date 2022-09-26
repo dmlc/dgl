@@ -1,13 +1,14 @@
 """Training GCN model on citation graphs."""
-import argparse, time
-import numpy as np
+import argparse
+import time
+
 import mxnet as mx
+import numpy as np
+from gcn import GCN
 from mxnet import gluon
 
 import dgl
-from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
-
-from gcn import GCN
+from dgl.data import CiteseerGraphDataset, CoraGraphDataset, PubmedGraphDataset
 
 # from gcn_mp import GCN
 # from gcn_spmv import GCN

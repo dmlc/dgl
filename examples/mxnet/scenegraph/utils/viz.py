@@ -1,5 +1,5 @@
-import numpy as np
 import gluoncv as gcv
+import numpy as np
 from matplotlib import pyplot as plt
 
 

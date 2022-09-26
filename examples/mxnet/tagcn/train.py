@@ -1,14 +1,15 @@
-import argparse, time
-import numpy as np
-import networkx as nx
+import argparse
+import time
+
 import mxnet as mx
+import networkx as nx
+import numpy as np
 from mxnet import gluon
+from tagcn import TAGCN
 
 import dgl
-from dgl.data import register_data_args
-from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
-
-from tagcn import TAGCN
+from dgl.data import (CiteseerGraphDataset, CoraGraphDataset,
+                      PubmedGraphDataset, register_data_args)
 
 
 def evaluate(model, features, labels, mask):

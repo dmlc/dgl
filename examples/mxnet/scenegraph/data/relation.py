@@ -1,20 +1,20 @@
 """Pascal VOC object detection dataset."""
-from __future__ import absolute_import
-from __future__ import division
-import os
-import logging
-import warnings
+from __future__ import absolute_import, division
+
 import json
-import dgl
+import logging
+import os
 import pickle
-import numpy as np
-import mxnet as mx
-from gluoncv.data.base import VisionDataset
+import warnings
 from collections import Counter
+
+import mxnet as mx
+import numpy as np
+from gluoncv.data.base import VisionDataset
 from gluoncv.data.transforms.presets.rcnn import (
-    FasterRCNNDefaultTrainTransform,
-    FasterRCNNDefaultValTransform,
-)
+    FasterRCNNDefaultTrainTransform, FasterRCNNDefaultValTransform)
+
+import dgl
 
 
 class VGRelation(VisionDataset):

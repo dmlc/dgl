@@ -5,14 +5,18 @@ Paper: https://arxiv.org/abs/1902.07153
 Code: https://github.com/Tiiiger/SGC
 SGC implementation in DGL.
 """
-import argparse, time, math
-import numpy as np
+import argparse
+import math
+import time
+
 import mxnet as mx
-from mxnet import nd, gluon
+import numpy as np
+from mxnet import gluon, nd
 from mxnet.gluon import nn
+
 import dgl
-from dgl.data import register_data_args
-from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
+from dgl.data import (CiteseerGraphDataset, CoraGraphDataset,
+                      PubmedGraphDataset, register_data_args)
 from dgl.nn.mxnet.conv import SGConv
 
 

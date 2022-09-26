@@ -1,7 +1,8 @@
-import pandas as pd
 import json
-from pathlib import Path
 from itertools import product
+from pathlib import Path
+
+import pandas as pd
 
 
 def get_branch_name_from_hash(hash):

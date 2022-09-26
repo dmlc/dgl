@@ -2,14 +2,15 @@
 
 import argparse
 import copy
-import torch
-import torch.optim as optim
-import torch.nn as nn
-import numpy as np
 
-from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
-from tqdm import trange
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.optim as optim
 from model import ARMA4NC
+from tqdm import trange
+
+from dgl.data import CiteseerGraphDataset, CoraGraphDataset, PubmedGraphDataset
 
 
 def main(args):

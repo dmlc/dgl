@@ -1,5 +1,9 @@
+import argparse
+import json
+import os
+import pickle
+
 import numpy as np
-import json, pickle, os, argparse
 
 
 def parse_args():

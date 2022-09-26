@@ -6,35 +6,26 @@ import os
 os.environ["MXNET_CUDNN_AUTOTUNE_DEFAULT"] = "0"
 import logging
 import time
-import numpy as np
-import mxnet as mx
-from mxnet import gluon
-from mxnet import autograd
-from mxnet.contrib import amp
+
 import gluoncv as gcv
+import mxnet as mx
+import numpy as np
+from data import *
 from gluoncv import data as gdata
 from gluoncv import utils as gutils
-from gluoncv.model_zoo import get_model
-from gluoncv.data.batchify import FasterRCNNTrainBatchify, Tuple, Append
+from gluoncv.data.batchify import Append, FasterRCNNTrainBatchify, Tuple
 from gluoncv.data.transforms.presets.rcnn import (
-    FasterRCNNDefaultTrainTransform,
-    FasterRCNNDefaultValTransform,
-)
-from gluoncv.utils.metrics.voc_detection import VOC07MApMetric
+    FasterRCNNDefaultTrainTransform, FasterRCNNDefaultValTransform)
+from gluoncv.model_zoo import get_model
 from gluoncv.utils.metrics.coco_detection import COCODetectionMetric
-from gluoncv.utils.parallel import Parallelizable, Parallel
-from gluoncv.utils.metrics.rcnn import (
-    RPNAccMetric,
-    RPNL1LossMetric,
-    RCNNAccMetric,
-    RCNNL1LossMetric,
-)
-
-from data import *
-from model import (
-    faster_rcnn_resnet101_v1d_custom,
-    faster_rcnn_resnet50_v1b_custom,
-)
+from gluoncv.utils.metrics.rcnn import (RCNNAccMetric, RCNNL1LossMetric,
+                                        RPNAccMetric, RPNL1LossMetric)
+from gluoncv.utils.metrics.voc_detection import VOC07MApMetric
+from gluoncv.utils.parallel import Parallel, Parallelizable
+from model import (faster_rcnn_resnet50_v1b_custom,
+                   faster_rcnn_resnet101_v1d_custom)
+from mxnet import autograd, gluon
+from mxnet.contrib import amp
 
 try:
     import horovod.mxnet as hvd

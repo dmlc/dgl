@@ -2,12 +2,14 @@
 Improved Semantic Representations From Tree-Structured Long Short-Term Memory Networks
 https://arxiv.org/abs/1503.00075
 """
-import time
 import itertools
+import time
+
+import mxnet as mx
 import networkx as nx
 import numpy as np
-import mxnet as mx
 from mxnet import gluon
+
 import dgl
 
 

@@ -1,13 +1,15 @@
 import argparse
 import time
-import numpy as np
-import networkx as nx
+
 import mxnet as mx
+import networkx as nx
+import numpy as np
 from mxnet import gluon, nd
 from mxnet.gluon import nn
+
 import dgl
-from dgl.data import register_data_args
-from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
+from dgl.data import (CiteseerGraphDataset, CoraGraphDataset,
+                      PubmedGraphDataset, register_data_args)
 from dgl.nn.mxnet.conv import GMMConv
 
 

@@ -8,6 +8,7 @@ Pytorch implementation: https://github.com/Diego999/pyGAT
 """
 
 import mxnet.gluon.nn as nn
+
 from dgl.nn.mxnet.conv import GATConv
 
 

@@ -7,6 +7,7 @@ References:
 """
 import mxnet as mx
 from mxnet import gluon
+
 import dgl
 from dgl.nn.mxnet import GraphConv
 

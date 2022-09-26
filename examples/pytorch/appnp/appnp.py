@@ -6,6 +6,7 @@ Paper: https://arxiv.org/abs/1810.05997
 Author's code: https://github.com/klicperajo/ppnp
 """
 import torch.nn as nn
+
 from dgl.nn.pytorch.conv import APPNPConv
 
 

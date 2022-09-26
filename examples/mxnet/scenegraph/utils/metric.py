@@ -1,14 +1,17 @@
-import dgl
+import logging
+import time
+from operator import attrgetter, itemgetter
+
 import mxnet as mx
 import numpy as np
-import logging, time
-from operator import attrgetter, itemgetter
-from mxnet import nd, gluon
-from mxnet.gluon import nn
-from dgl.utils import toindex
-from dgl.nn.mxnet import GraphConv
-from gluoncv.model_zoo import get_model
 from gluoncv.data.batchify import Pad
+from gluoncv.model_zoo import get_model
+from mxnet import gluon, nd
+from mxnet.gluon import nn
+
+import dgl
+from dgl.nn.mxnet import GraphConv
+from dgl.utils import toindex
 
 
 def iou(boxA, boxB):

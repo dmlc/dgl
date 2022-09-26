@@ -9,26 +9,29 @@ Difference compared to tkipf/relation-gcn
 import argparse
 import gc
 import logging
+import time
 from pathlib import Path
 from types import SimpleNamespace
+
 import numpy as np
-import time
 import torch as th
+import torch.multiprocessing as mp
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.multiprocessing as mp
 from torch.multiprocessing import Queue
 from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader
+
 import dgl
 from dgl.nn import RelGraphConv
+
+from .. import utils
 
 # import sys
 # import os
 # dir_path = Path(os.path.dirname(__file__))
 # sys.path.insert(0, dir_path.parent)
 
-from .. import utils
 
 # import utils
 

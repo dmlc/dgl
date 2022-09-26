@@ -1,8 +1,10 @@
-import dgl
-from dgl.nn.pytorch import RelGraphConv
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+import dgl
+from dgl.nn.pytorch import RelGraphConv
+
 from . import utils
 
 
