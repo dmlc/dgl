@@ -54,8 +54,13 @@ python3 lightning/node_classification.py
 
 ### Minibatch training for link prediction
 
-Train w/ mini-batch sampling for link prediction on OGB-Citation2:
+Train w/ mini-batch sampling for link prediction on OGB-citation2:
 
 ```bash
 python3 link_pred.py
+```
+
+Results (10 epochs):
+```
+Test MRR: 0.7386
 ```
