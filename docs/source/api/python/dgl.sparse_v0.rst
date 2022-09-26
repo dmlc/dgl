@@ -13,7 +13,7 @@ Sparse matrix class
 .. currentmodule:: dgl.mock_sparse
 
 .. autoclass:: SparseMatrix
-	:members: shape, nnz, dtype, device, row, col, val, __call__, indices, coo, csr, csc, dense, __neg__, inv, softmax, __matmul__
+	:members: shape, nnz, dtype, device, row, col, val, __call__, indices, coo, csr, csc, dense, t, T, transpose, __neg__, inv, softmax, __matmul__
 
 .. autosummary::
     :toctree: ../../generated/
@@ -27,7 +27,7 @@ Diagonal matrix class
 .. currentmodule:: dgl.mock_sparse
 
 .. autoclass:: DiagMatrix
-	:members: val, shape, __call__, nnz, dtype, device, as_sparse, __neg__, inv, softmax, __matmul__
+	:members: val, shape, __call__, nnz, dtype, device, as_sparse, t, T, transpose, __neg__, inv, softmax, __matmul__
 
 .. autosummary::
     :toctree: ../../generated/
