@@ -261,7 +261,7 @@ def exchange_node_features(rank, world_size, node_feature_tids, ntype_gnid_map, 
 
             node_feats = node_features[feat_key]
             for part_id in range(world_size):
-                logging.info(f'[Rank: {rank}] Requesting ownership for the gid range: {gnid_start}-{gnid_end}')
+                #Get the partition ids for the range of global nids.
                 if feat_type == constants.STR_NODE_FEATURES:
                     partid_slice = id_lookup.get_partition_ids(np.arange(gnid_start, gnid_end, dtype=np.int64))
                 else:
@@ -276,11 +276,15 @@ def exchange_node_features(rank, world_size, node_feature_tids, ntype_gnid_map, 
                     assert common.shape[0] == idx2.shape[0]
 
                     global_dst_nids = data[constants.GLOBAL_DST_ID][idx1]
+                    assert np.all(global_eids == data[constants.GLOBAL_EID][idx1]):
+                    partid_slice = id_lookup.get_partition_ids(global_dst_nids)
+                    '''
                     if np.all(global_eids == data[constants.GLOBAL_EID][idx1]):
                         partid_slice = id_lookup.get_partition_ids(global_dst_nids)
                     else:
                         logging.error(f'[Rank: {rank}] The order of global_eids does not match of intersection')
                         assert False
+                    '''
                     
                 cond = (partid_slice == part_id)
                 gnids_per_partid = gnids_feat[cond]

@@ -139,18 +139,8 @@ def create_dgl_object(graph_name, num_parts, \
                 edge_data[constants.GLOBAL_TYPE_EID], edge_data[constants.ETYPE_ID]
     print('There are {} edges in partition {}'.format(len(shuffle_global_src_id), part_id))
 
-    #DELETE-ME
-    '''
-    uids  = np.bincount(etype_ids)
-    print(uids)
-    for idx in range(len(uids)):
-        data = global_edge_id[ etype_ids == idx ]
-        print(f'[Rank: {part_id} **INITIALIZATION** idx: {idx} orig_type_eids: {data[0:20]}')
-    '''
-
     # It's not guaranteed that the edges are sorted based on edge type.
     # Let's sort edges and all attributes on the edges.
-    print(f'[Rank: {part_id}] **SORTING CHECK** {not np.all(np.diff(etype_ids) >= 0)}')
     if not np.all(np.diff(etype_ids) >= 0):
         sort_idx = np.argsort(etype_ids)
         shuffle_global_src_id, shuffle_global_dst_id, global_src_id, global_dst_id, global_edge_id, etype_ids = \
@@ -159,16 +149,6 @@ def create_dgl_object(graph_name, num_parts, \
         assert np.all(np.diff(etype_ids) >= 0)
     else:
         print(f'[Rank: {part_id} Edge data is already sorted !!!')
-
-    #DELETE-ME
-    '''
-    uids  = np.bincount(etype_ids)
-    print(uids)
-    for idx in range(len(uids)):
-        data = global_edge_id[ etype_ids == idx ]
-        print(f'[Rank: {part_id} **SORTING-ETYPE** idx: {idx} orig_type_eids: {data[0:20]}')
-    '''
-
 
     # Determine the edge ID range of different edge types.
     edge_id_start = edgeid_offset 
@@ -245,14 +225,6 @@ def create_dgl_object(graph_name, num_parts, \
 
     #Now map the edge end points to reshuffled_values.
     part_local_src_id, part_local_dst_id = nid_map[part_local_src_id], nid_map[part_local_dst_id]
-
-    #DELETE-ME
-    '''
-    uids  = np.bincount(etype_ids)
-    for idx in range(len(uids)):
-        data = global_edge_id[ etype_ids == idx ]
-        print(f'[Rank: {part_id} **AFTER STORING** idx: {idx} orig_type_eids: {data[0:20]}')
-    '''
 
     #create the graph here now.
     part_graph = dgl.graph(data=(part_local_src_id, part_local_dst_id), num_nodes=len(uniq_ids))

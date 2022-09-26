@@ -13,7 +13,20 @@ from dgl.data.utils import load_tensors, load_graphs
 
 from chunk_graph import chunk_graph
 
-def test_edge_feature_support():
+def test_edges_with_features():
+    """
+    This function is a unit test for testing edges with features data. 
+    This will be triggered by the CI test framework or can be launched
+    individually as follows: 
+
+    python3 -m pytest tests/tools/test_edges_with_features.py
+
+    Please note that, this is based on the test_dist_part.py unit test. 
+    This file also uses the same dataset, in chunked format. But, while validating
+    the results in this unit test additional checks are made in each of the graph
+    partitions to validate the feature data stored in each partition to make sure
+    that it matches with the data stored in the original graph. 
+    """
     # Step0: prepare chunked graph data format
     print('Starting edge feature tests...')
 
@@ -51,14 +64,12 @@ def test_edge_feature_support():
     paper_year = np.random.choice(2022, num_papers)
 
     # edge features
-    #cite_count = np.arange(num_cite_edges)#np.random.choice(10, num_cite_edges)
-    #write_year = np.arange(num_write_edges)#np.random.choice(2022, num_write_edges)
     cite_count = np.random.choice(10, num_cite_edges)
     write_year = np.random.choice(2022, num_write_edges)
 
     # Save features
     with tempfile.TemporaryDirectory() as root_dir:
-        print('Testing root_dir', root_dir)
+        print('root_dir: ', root_dir)
         input_dir = os.path.join(root_dir, 'data_test')
         os.makedirs(input_dir)
         for sub_d in ['paper', 'cites', 'writes']:
@@ -148,7 +159,6 @@ def test_edge_feature_support():
                 assert os.path.isfile(chunk_f_name)
                 feat_array = np.load(chunk_f_name)
                 assert feat_array.shape[0] == num_papers // num_chunks
-        print("Node data looks good !!!")
 
         # check edge_data
         edge_data_gold = {}
@@ -201,7 +211,7 @@ def test_edge_feature_support():
         os.system('python3 tools/dispatch_data.py '\
                   '--in-dir {} --partitions-dir {} --out-dir {} --ip-config {}'.format(
                     in_dir, partition_dir, out_dir, ip_config))
-        print('Done with the pipeline...')
+        print('Graph partitioning pipeline complete...')
 
         # check metadata.json
         meta_fname = os.path.join(out_dir, 'metadata.json')
@@ -223,7 +233,6 @@ def test_edge_feature_support():
         assert meta_data['num_parts'] == num_chunks
 
         etype_id, type_eid = id_map(np.arange(4200))
-        print(f'MAP_TEST: {np.bincount(etype_id)}')
 
         for i in range(num_chunks):
             sub_dir = 'part-' + str(i)
@@ -237,16 +246,12 @@ def test_edge_feature_support():
 
             # edge_feat.dgl
             fname = os.path.join(sub_dir, 'edge_feat.dgl')
-            print(fname)
             assert os.path.isfile(fname)
             tensor_dict = load_tensors(fname)
 
             # get orig_eids
             orig_type_eids = g.edata['orig_id'].numpy()
             orig_etype_ids = g.edata[dgl.ETYPE].numpy()
-            #etype_id, type_eid = id_map(orig_eids)
-            #print(f'[Rank: {i}] orig_eids: {orig_eids.shape}, min: {np.min(orig_eids)} max: {np.max(orig_eids)}')
-            #print(f'[Rank: {i}] unique etype_ids: {np.bincount(etype_id)}')
             print(f'[Rank: {i}] orig_etype_ids: {np.bincount(orig_etype_ids)}')
 
 
@@ -259,14 +264,14 @@ def test_edge_feature_support():
             # check data
             sub_dir = os.path.join(out_dir, 'part' + str(i))
 
-            # graph.dgl
+            # Read graph.dgl
             fname = os.path.join(sub_dir, 'graph.dgl')
             assert os.path.isfile(fname)
             g_list, data_dict = load_graphs(fname)
             g = g_list[0]
             assert isinstance(g, dgl.DGLGraph)
 
-            # node_feat.dgl
+            # Read node_feat.dgl
             fname = os.path.join(sub_dir, 'node_feat.dgl')
             assert os.path.isfile(fname)
             tensor_dict = load_tensors(fname)
@@ -275,32 +280,24 @@ def test_edge_feature_support():
             for key in all_tensors:
                 assert isinstance(tensor_dict[key], torch.Tensor)
 
-            # edge_feat.dgl
+            # Read edge_feat.dgl
             fname = os.path.join(sub_dir, 'edge_feat.dgl')
-            print(fname)
             assert os.path.isfile(fname)
             tensor_dict = load_tensors(fname)
-            #print(tensor_dict)
             all_tensors = ['paper:cites:paper/count', 
                            'author:writes:paper/year', 
                            'paper:rev_writes:author/year']
-            #print(tensor_dict.keys())
-            for k, v in tensor_dict.items():
-                print(f'[Rank: {i} k: {k} v: {v.numpy().shape}')
             assert tensor_dict.keys() == set(all_tensors)
             for key in all_tensors:
                 assert isinstance(tensor_dict[key], torch.Tensor)
 
-            # get orig_eids
-            #orig_eids = g.edata['orig_id'].numpy()
-            #etype_id, type_eid = id_map(orig_eids)
+            # Get orig_eids
             orig_type_eids = g.edata['orig_id'].numpy()
             orig_etype_ids = g.edata[dgl.ETYPE].numpy()
-            print(f'[Rank: {i}] orig_type_eids: {orig_type_eids.shape}, min: {np.min(orig_type_eids)} max: {np.max(orig_type_eids)}')
-            print(f'[Rank: {i}] unique etype_ids: {np.bincount(orig_etype_ids)}')
 
+            # Compare the data stored as edge features in this partition with the data
+            # from the original graph.
             etype_names = list(edge_dict.keys())
-            comparison = 0
             for idx, etype_name in enumerate(etype_names): 
                 part_data = None
                 key = None
@@ -314,23 +311,10 @@ def test_edge_feature_support():
                 if part_data is None: 
                     continue
 
-                comparison += 1
                 gold_type_ids = orig_type_eids[ orig_etype_ids == idx ]
-                print(f'[Rank: {i}] key: {k}')
-                print(f'[Rank: {i}] gold_data: {edge_data_gold[key].shape}, type_ids: {gold_type_ids.shape}')
-
                 gold_data = edge_data_gold[key][gold_type_ids]
-
-                print(f'[Rank: {i} type_ids: {gold_type_ids.shape}')
-                print(f'[Rank: {i} data: {gold_data.shape}')
-                print(f'[Rank: {i} part_data: {part_data.shape}')
-                #gold_data = np.sort(gold_data)
-                #part_data = np.sort(part_data)
-                print(gold_data[0:10])
-                print(part_data[0:10])
                 assert np.all(gold_data == part_data)
 
 
 if __name__ == '__main__':
-    #logging.basicConfig(level='INFO', format=f"[{platform.node()} %(levelname)s %(asctime)s PID:%(process)d] %(message)s")
-    test_edge_feature_support()
+    test_edges_with_features()
