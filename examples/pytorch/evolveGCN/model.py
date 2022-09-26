@@ -1,8 +1,9 @@
 import torch
 import torch.nn as nn
 from torch.nn import init
-from dgl.nn.pytorch import GraphConv
 from torch.nn.parameter import Parameter
+
+from dgl.nn.pytorch import GraphConv
 
 
 class MatGRUCell(torch.nn.Module):
@@ -13,17 +14,11 @@ class MatGRUCell(torch.nn.Module):
 
     def __init__(self, in_feats, out_feats):
         super().__init__()
-        self.update = MatGRUGate(in_feats,
-                                 out_feats,
-                                 torch.nn.Sigmoid())
+        self.update = MatGRUGate(in_feats, out_feats, torch.nn.Sigmoid())
 
-        self.reset = MatGRUGate(in_feats,
-                                out_feats,
-                                torch.nn.Sigmoid())
+        self.reset = MatGRUGate(in_feats, out_feats, torch.nn.Sigmoid())
 
-        self.htilda = MatGRUGate(in_feats,
-                                 out_feats,
-                                 torch.nn.Tanh())
+        self.htilda = MatGRUGate(in_feats, out_feats, torch.nn.Tanh())
 
     def forward(self, prev_Q, z_topk=None):
         if z_topk is None:
@@ -60,9 +55,9 @@ class MatGRUGate(torch.nn.Module):
         init.zeros_(self.bias)
 
     def forward(self, x, hidden):
-        out = self.activation(self.W.matmul(x) + \
-                              self.U.matmul(hidden) + \
-                              self.bias)
+        out = self.activation(
+            self.W.matmul(x) + self.U.matmul(hidden) + self.bias
+        )
 
         return out
 
@@ -85,15 +80,26 @@ class TopK(torch.nn.Module):
         init.xavier_uniform_(self.scorer)
 
     def forward(self, node_embs):
-        scores = node_embs.matmul(self.scorer) / self.scorer.norm().clamp(min=1e-6)
+        scores = node_embs.matmul(self.scorer) / self.scorer.norm().clamp(
+            min=1e-6
+        )
         vals, topk_indices = scores.view(-1).topk(self.k)
-        out = node_embs[topk_indices] * torch.tanh(scores[topk_indices].view(-1, 1))
+        out = node_embs[topk_indices] * torch.tanh(
+            scores[topk_indices].view(-1, 1)
+        )
         # we need to transpose the output
         return out.t()
 
 
 class EvolveGCNH(nn.Module):
-    def __init__(self, in_feats=166, n_hidden=76, num_layers=2, n_classes=2, classifier_hidden=510):
+    def __init__(
+        self,
+        in_feats=166,
+        n_hidden=76,
+        num_layers=2,
+        n_classes=2,
+        classifier_hidden=510,
+    ):
         # default parameters follow the official config
         super(EvolveGCNH, self).__init__()
         self.num_layers = num_layers
@@ -104,20 +110,44 @@ class EvolveGCNH(nn.Module):
 
         self.pooling_layers.append(TopK(in_feats, n_hidden))
         # similar to EvolveGCNO
-        self.recurrent_layers.append(MatGRUCell(in_feats=in_feats, out_feats=n_hidden))
-        self.gcn_weights_list.append(Parameter(torch.Tensor(in_feats, n_hidden)))
+        self.recurrent_layers.append(
+            MatGRUCell(in_feats=in_feats, out_feats=n_hidden)
+        )
+        self.gcn_weights_list.append(
+            Parameter(torch.Tensor(in_feats, n_hidden))
+        )
         self.gnn_convs.append(
-            GraphConv(in_feats=in_feats, out_feats=n_hidden, bias=False, activation=nn.RReLU(), weight=False))
+            GraphConv(
+                in_feats=in_feats,
+                out_feats=n_hidden,
+                bias=False,
+                activation=nn.RReLU(),
+                weight=False,
+            )
+        )
         for _ in range(num_layers - 1):
             self.pooling_layers.append(TopK(n_hidden, n_hidden))
-            self.recurrent_layers.append(MatGRUCell(in_feats=n_hidden, out_feats=n_hidden))
-            self.gcn_weights_list.append(Parameter(torch.Tensor(n_hidden, n_hidden)))
+            self.recurrent_layers.append(
+                MatGRUCell(in_feats=n_hidden, out_feats=n_hidden)
+            )
+            self.gcn_weights_list.append(
+                Parameter(torch.Tensor(n_hidden, n_hidden))
+            )
             self.gnn_convs.append(
-                GraphConv(in_feats=n_hidden, out_feats=n_hidden, bias=False, activation=nn.RReLU(), weight=False))
+                GraphConv(
+                    in_feats=n_hidden,
+                    out_feats=n_hidden,
+                    bias=False,
+                    activation=nn.RReLU(),
+                    weight=False,
+                )
+            )
 
-        self.mlp = nn.Sequential(nn.Linear(n_hidden, classifier_hidden),
-                                 nn.ReLU(),
-                                 nn.Linear(classifier_hidden, n_classes))
+        self.mlp = nn.Sequential(
+            nn.Linear(n_hidden, classifier_hidden),
+            nn.ReLU(),
+            nn.Linear(classifier_hidden, n_classes),
+        )
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -127,18 +157,27 @@ class EvolveGCNH(nn.Module):
     def forward(self, g_list):
         feature_list = []
         for g in g_list:
-            feature_list.append(g.ndata['feat'])
+            feature_list.append(g.ndata["feat"])
         for i in range(self.num_layers):
             W = self.gcn_weights_list[i]
             for j, g in enumerate(g_list):
                 X_tilde = self.pooling_layers[i](feature_list[j])
                 W = self.recurrent_layers[i](W, X_tilde)
-                feature_list[j] = self.gnn_convs[i](g, feature_list[j], weight=W)
+                feature_list[j] = self.gnn_convs[i](
+                    g, feature_list[j], weight=W
+                )
         return self.mlp(feature_list[-1])
 
 
 class EvolveGCNO(nn.Module):
-    def __init__(self, in_feats=166, n_hidden=256, num_layers=2, n_classes=2, classifier_hidden=307):
+    def __init__(
+        self,
+        in_feats=166,
+        n_hidden=256,
+        num_layers=2,
+        n_classes=2,
+        classifier_hidden=307,
+    ):
         # default parameters follow the official config
         super(EvolveGCNO, self).__init__()
         self.num_layers = num_layers
@@ -154,19 +193,43 @@ class EvolveGCNO(nn.Module):
         #     but the performance is worse than use torch.nn.GRU.
         # PPS: I think torch.nn.GRU can't match the manually implemented GRU cell in the official code,
         #      we follow the official code here.
-        self.recurrent_layers.append(MatGRUCell(in_feats=in_feats, out_feats=n_hidden))
-        self.gcn_weights_list.append(Parameter(torch.Tensor(in_feats, n_hidden)))
+        self.recurrent_layers.append(
+            MatGRUCell(in_feats=in_feats, out_feats=n_hidden)
+        )
+        self.gcn_weights_list.append(
+            Parameter(torch.Tensor(in_feats, n_hidden))
+        )
         self.gnn_convs.append(
-            GraphConv(in_feats=in_feats, out_feats=n_hidden, bias=False, activation=nn.RReLU(), weight=False))
+            GraphConv(
+                in_feats=in_feats,
+                out_feats=n_hidden,
+                bias=False,
+                activation=nn.RReLU(),
+                weight=False,
+            )
+        )
         for _ in range(num_layers - 1):
-            self.recurrent_layers.append(MatGRUCell(in_feats=n_hidden, out_feats=n_hidden))
-            self.gcn_weights_list.append(Parameter(torch.Tensor(n_hidden, n_hidden)))
+            self.recurrent_layers.append(
+                MatGRUCell(in_feats=n_hidden, out_feats=n_hidden)
+            )
+            self.gcn_weights_list.append(
+                Parameter(torch.Tensor(n_hidden, n_hidden))
+            )
             self.gnn_convs.append(
-                GraphConv(in_feats=n_hidden, out_feats=n_hidden, bias=False, activation=nn.RReLU(), weight=False))
+                GraphConv(
+                    in_feats=n_hidden,
+                    out_feats=n_hidden,
+                    bias=False,
+                    activation=nn.RReLU(),
+                    weight=False,
+                )
+            )
 
-        self.mlp = nn.Sequential(nn.Linear(n_hidden, classifier_hidden),
-                                 nn.ReLU(),
-                                 nn.Linear(classifier_hidden, n_classes))
+        self.mlp = nn.Sequential(
+            nn.Linear(n_hidden, classifier_hidden),
+            nn.ReLU(),
+            nn.Linear(classifier_hidden, n_classes),
+        )
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -176,7 +239,7 @@ class EvolveGCNO(nn.Module):
     def forward(self, g_list):
         feature_list = []
         for g in g_list:
-            feature_list.append(g.ndata['feat'])
+            feature_list.append(g.ndata["feat"])
         for i in range(self.num_layers):
             W = self.gcn_weights_list[i]
             for j, g in enumerate(g_list):
@@ -191,5 +254,7 @@ class EvolveGCNO(nn.Module):
 
                 # Remove the following line of code, it will become `GCN`.
                 W = self.recurrent_layers[i](W)
-                feature_list[j] = self.gnn_convs[i](g, feature_list[j], weight=W)
+                feature_list[j] = self.gnn_convs[i](
+                    g, feature_list[j], weight=W
+                )
         return self.mlp(feature_list[-1])
