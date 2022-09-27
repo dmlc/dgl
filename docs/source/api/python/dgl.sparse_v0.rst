@@ -14,7 +14,7 @@ Sparse matrix class
 
 .. autoclass:: SparseMatrix
 	:members: shape, nnz, dtype, device, row, col, val, __call__, indices, coo, csr, csc, dense, t, T, transpose,
-            reduce, sum, smax, smin, smean
+            reduce, sum, smax, smin, smean, __neg__, inv, softmax, __matmul__
 
 .. autosummary::
     :toctree: ../../generated/
@@ -29,10 +29,22 @@ Diagonal matrix class
 
 .. autoclass:: DiagMatrix
 	:members: val, shape, __call__, nnz, dtype, device, as_sparse, t, T, transpose,
-            reduce, sum, smax, smin, smean
+            reduce, sum, smax, smin, smean, __neg__, inv, softmax, __matmul__
 
 .. autosummary::
     :toctree: ../../generated/
 
     diag
     identity
+
+Operators
+---------
+.. currentmodule:: dgl.mock_sparse
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    spmm
+    spspmm
+    bspmm
+    bspspmm
