@@ -3665,23 +3665,22 @@ def laplacian_pe(g, k, padding=False, return_eigval=False):
     k : int
         Number of smallest non-trivial eigenvectors to use for positional encoding.
     padding : bool
-        If padding=='false', raise exception when k>=n.
-        Else return (n-1) laplacian positional encodings and (k-n+1) zero encodings
-        (padding) when k>=n.
+        If False, raise an exception when k>=n.
+        Otherwise, add zero paddings in the end when k>=n.
+        Default: False.
         n is the number of nodes in the given graph.
     return_eigval : bool
-        If return_eigval=='True', return laplacian eigenvalues together with eigenvectors.
-        Else return laplacian eigenvectors only.
+        If True, return laplacian eigenvalues together with eigenvectors.
+        Otherwise, return laplacian eigenvectors only. 
+        Default: False.
 
     Returns
     -------
-    Tensor
-        The laplacian positional encodings of shape :math:`(N, k)`, where :math:`N` is the
-        number of nodes in the input graph.
-    Two tensors
-        The eigenvalues of shape :math:`N` and
-        the laplacian positional encodings of shape :math:`(N, k)`, where :math:`N` is the
-        number of nodes in the input graph.
+    Tensor or (Tensor, Tensor)
+        Return the laplacian positional encodings of shape :math:`(N, k)`, where :math:`N` is the
+        number of nodes in the input graph, when :attr:`return_eigval` is False. The eigenvalues
+        of shape :math:`N` is additionally returned as the first element when :attr:`return_eigval`
+        is True.
 
     Example
     -------
