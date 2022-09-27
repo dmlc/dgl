@@ -1,6 +1,6 @@
 import unittest
 
-# import backend as F
+import backend as F
 import dgl
 import pytest
 import torch
@@ -14,10 +14,10 @@ parametrize_dtype = pytest.mark.parametrize(
 )
 
 
-# @unittest.skipIf(
-#     F.ctx().type == "cpu",
-#     reason="sddmm uses operator from pytorch which only supports CUDA",
-# )
+@unittest.skipIf(
+    F.ctx().type == "cpu",
+    reason="sddmm uses operator from pytorch which only supports CUDA",
+)
 def all_close_sparse(A, B):
     assert torch.allclose(A.indices(), B.indices())
     assert torch.allclose(A.values(), B.values())
