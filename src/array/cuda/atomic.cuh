@@ -63,7 +63,7 @@ template <> struct Cast<__nv_bfloat16> {
     return __bfloat16_as_ushort(val);
 #else
   printf("Atomic operations are not supported for bfloat16 (BF16) "
-      "on this GPU.\n");
+      "on GPUs with compute capability less than 8.0.\n");
   __trap();
   return static_cast<Type>(0);
 #endif
@@ -73,7 +73,7 @@ template <> struct Cast<__nv_bfloat16> {
     return __ushort_as_bfloat16(code);
 #else
   printf("Atomic operations are not supported for bfloat16 (BF16) "
-      "on this GPU.\n");
+      "on GPUs with compute capability less than 8.0.\n");
   __trap();
   return static_cast<__nv_bfloat16>(0.0f);
 #endif
@@ -313,7 +313,7 @@ __device__ __forceinline__ __nv_bfloat16 AtomicAdd<__nv_bfloat16>(
   (void)addr;
   (void)val;
   printf("Atomic operations are not supported for bfloat16 (BF16) "
-      "on this GPU.\n");
+      "on GPUs with compute capability less than 8.0.\n");
   __trap();
   return val;
 #endif  // defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 800
