@@ -15,17 +15,17 @@ from dgl.data.utils import load_graphs, load_tensors
 
 def test_edges_with_features():
     """
-    This function is a unit test for testing edges with features data. 
+    This function is a unit test for testing edges with features data.
     This will be triggered by the CI test framework or can be launched
-    individually as follows: 
+    individually as follows:
 
     python3 -m pytest tests/tools/test_edges_with_features.py
 
-    Please note that, this is based on the test_dist_part.py unit test. 
+    Please note that, this is based on the test_dist_part.py unit test.
     This file also uses the same dataset, in chunked format. But, while validating
     the results in this unit test additional checks are made in each of the graph
     partitions to validate the feature data stored in each partition to make sure
-    that it matches with the data stored in the original graph. 
+    that it matches with the data stored in the original graph.
     """
     # Step0: prepare chunked graph data format
     print('Starting edge feature tests...')
@@ -48,9 +48,15 @@ def test_edges_with_features():
 
     # Structure
     data_dict = {
-        ('paper', 'cites', 'paper'): rand_edges(num_papers, num_papers, num_cite_edges),
-        ('author', 'writes', 'paper'): rand_edges(num_authors, num_papers, num_write_edges),
-        ('author', 'affiliated_with', 'institution'): rand_edges(num_authors, num_institutions, num_affiliate_edges)
+        ('paper', 'cites', 'paper'): rand_edges(
+            num_papers, num_papers, num_cite_edges
+        ),
+        ('author', 'writes', 'paper'): rand_edges(
+            num_authors, num_papers, num_write_edges
+        ),
+        ('author', 'affiliated_with', 'institution'): rand_edges(
+            num_authors, num_institutions, num_affiliate_edges
+        ),
     }
     src, dst = data_dict[('author', 'writes', 'paper')]
     data_dict[('paper', 'rev_writes', 'author')] = (dst, src)
@@ -100,21 +106,22 @@ def test_edges_with_features():
         chunk_graph(
             g,
             'mag240m',
-            {'paper':
-                {
-                'feat': paper_feat_path,
-                'label': paper_label_path,
-                'year': paper_year_path
+            {
+                'paper': {
+                    'feat': paper_feat_path,
+                    'label': paper_label_path,
+                    'year': paper_year_path,
                 }
             },
             {
                 'cites': {'count': cite_count_path},
                 'writes': {'year': write_year_path},
                 # you can put the same data file if they indeed share the features.
-                'rev_writes': {'year': write_year_path}
+                'rev_writes': {'year': write_year_path},
             },
             num_chunks=num_chunks,
-            output_path=output_dir)
+            output_path=output_dir,
+        )
         print('Done with creating chunked graph')
 
         # check metadata.json
@@ -127,22 +134,25 @@ def test_edges_with_features():
 
         print('Metadata Source file: ', meta_data["edge_type"])
 
-        # Create Id Map here. 
+        # Create Id Map here.
         edge_dict = {
-                "author:affiliated_with:institution" : np.array([0, 200]).reshape(1,2), 
-                "author:writes:paper" : np.array([200, 1200]).reshape(1, 2), 
-                "paper:cites:paper" : np.array([1200, 3200]).reshape(1, 2), 
-                "paper:rev_writes:author" : np.array([3200, 4200]).reshape(1, 2)
-                }
+            "author:affiliated_with:institution": np.array([0, 200]).reshape(
+                1, 2
+            ),
+            "author:writes:paper": np.array([200, 1200]).reshape(1, 2),
+            "paper:cites:paper": np.array([1200, 3200]).reshape(1, 2),
+            "paper:rev_writes:author": np.array([3200, 4200]).reshape(1, 2),
+        }
         id_map = dgl.distributed.id_map.IdMap(edge_dict)
-
 
         # check edge_index
         output_edge_index_dir = os.path.join(output_dir, 'edge_index')
         for utype, etype, vtype in data_dict.keys():
             fname = ':'.join([utype, etype, vtype])
             for i in range(num_chunks):
-                chunk_f_name = os.path.join(output_edge_index_dir, fname + str(i) + '.txt')
+                chunk_f_name = os.path.join(
+                    output_edge_index_dir, fname + str(i) + '.txt'
+                )
                 assert os.path.isfile(chunk_f_name)
                 with open(chunk_f_name, 'r') as f:
                     header = f.readline()
@@ -165,13 +175,13 @@ def test_edges_with_features():
         num_edges = {
             'paper:cites:paper': num_cite_edges,
             'author:writes:paper': num_write_edges,
-            'paper:rev_writes:author': num_write_edges
+            'paper:rev_writes:author': num_write_edges,
         }
         output_edge_data_dir = os.path.join(output_dir, 'edge_data')
         for etype, feat in [
             ['paper:cites:paper', 'count'],
             ['author:writes:paper', 'year'],
-            ['paper:rev_writes:author', 'year']
+            ['paper:rev_writes:author', 'year'],
         ]:
             output_edge_sub_dir = os.path.join(output_edge_data_dir, etype)
             features = []
@@ -182,18 +192,23 @@ def test_edges_with_features():
                 feat_array = np.load(chunk_f_name)
                 assert feat_array.shape[0] == num_edges[etype] // num_chunks
                 features.append(feat_array)
-            if len(features) > 0: 
+            if len(features) > 0:
                 if len(features[0].shape) == 1:
-                    edge_data_gold[etype+'/'+feat] = np.concatenate(features)
+                    edge_data_gold[etype + '/' + feat] = np.concatenate(
+                        features
+                    )
                 else:
-                    edge_data_gold[etype+'/'+feat] = np.row_stack(features)
+                    edge_data_gold[etype + '/' + feat] = np.row_stack(features)
 
         # Step1: graph partition
         in_dir = os.path.join(root_dir, 'chunked-data')
         output_dir = os.path.join(root_dir, '2parts')
-        os.system('python tools-parmetis-tests/partition_algo/random_partition.py '\
-                  '--metadata {}/metadata.json --output_path {} --num_partitions {}'.format(
-                    in_dir, output_dir, num_chunks))
+        os.system(
+            'python tools-parmetis-tests/partition_algo/random_partition.py '
+            '--metadata {}/metadata.json --output_path {} --num_partitions {}'.format(
+                in_dir, output_dir, num_chunks
+            )
+        )
         for ntype in ['author', 'institution', 'paper']:
             fname = os.path.join(output_dir, '{}.txt'.format(ntype))
             with open(fname, 'r') as f:
@@ -208,9 +223,12 @@ def test_edges_with_features():
             f.write('127.0.0.1\n')
             f.write('127.0.0.2\n')
 
-        os.system('python tools/dispatch_data.py '\
-                  '--in-dir {} --partitions-dir {} --out-dir {} --ip-config {}'.format(
-                    in_dir, partition_dir, out_dir, ip_config))
+        os.system(
+            'python tools/dispatch_data.py '
+            '--in-dir {} --partitions-dir {} --out-dir {} --ip-config {}'.format(
+                in_dir, partition_dir, out_dir, ip_config
+            )
+        )
         print('Graph partitioning pipeline complete...')
 
         # check metadata.json
@@ -254,12 +272,17 @@ def test_edges_with_features():
             orig_etype_ids = g.edata[dgl.ETYPE].numpy()
             print(f'[Rank: {i}] orig_etype_ids: {np.bincount(orig_etype_ids)}')
 
-
         for i in range(num_chunks):
             sub_dir = 'part-' + str(i)
-            assert meta_data[sub_dir]['node_feats'] == 'part{}/node_feat.dgl'.format(i)
-            assert meta_data[sub_dir]['edge_feats'] == 'part{}/edge_feat.dgl'.format(i)
-            assert meta_data[sub_dir]['part_graph'] == 'part{}/graph.dgl'.format(i)
+            assert meta_data[sub_dir][
+                'node_feats'
+            ] == 'part{}/node_feat.dgl'.format(i)
+            assert meta_data[sub_dir][
+                'edge_feats'
+            ] == 'part{}/edge_feat.dgl'.format(i)
+            assert meta_data[sub_dir][
+                'part_graph'
+            ] == 'part{}/graph.dgl'.format(i)
 
             # check data
             sub_dir = os.path.join(out_dir, 'part' + str(i))
@@ -284,9 +307,11 @@ def test_edges_with_features():
             fname = os.path.join(sub_dir, 'edge_feat.dgl')
             assert os.path.isfile(fname)
             tensor_dict = load_tensors(fname)
-            all_tensors = ['paper:cites:paper/count', 
-                           'author:writes:paper/year', 
-                           'paper:rev_writes:author/year']
+            all_tensors = [
+                'paper:cites:paper/count',
+                'author:writes:paper/year',
+                'paper:rev_writes:author/year',
+            ]
             assert tensor_dict.keys() == set(all_tensors)
             for key in all_tensors:
                 assert isinstance(tensor_dict[key], torch.Tensor)
@@ -298,20 +323,20 @@ def test_edges_with_features():
             # Compare the data stored as edge features in this partition with the data
             # from the original graph.
             etype_names = list(edge_dict.keys())
-            for idx, etype_name in enumerate(etype_names): 
+            for idx, etype_name in enumerate(etype_names):
                 part_data = None
                 key = None
-                if etype_name+'/count' in tensor_dict: 
-                    key = etype_name+'/count' 
-                    part_data = tensor_dict[etype_name+'/count'].numpy()
-                if etype_name+'/year' in tensor_dict: 
-                    key = etype_name+'/year' 
-                    part_data = tensor_dict[etype_name+'/year'].numpy()
+                if etype_name + '/count' in tensor_dict:
+                    key = etype_name + '/count'
+                    part_data = tensor_dict[etype_name + '/count'].numpy()
+                if etype_name + '/year' in tensor_dict:
+                    key = etype_name + '/year'
+                    part_data = tensor_dict[etype_name + '/year'].numpy()
 
-                if part_data is None: 
+                if part_data is None:
                     continue
 
-                gold_type_ids = orig_type_eids[ orig_etype_ids == idx ]
+                gold_type_ids = orig_type_eids[orig_etype_ids == idx]
                 gold_data = edge_data_gold[key][gold_type_ids]
                 assert np.all(gold_data == part_data)
 
