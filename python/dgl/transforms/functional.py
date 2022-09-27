@@ -3671,7 +3671,7 @@ def laplacian_pe(g, k, padding=False, return_eigval=False):
         n is the number of nodes in the given graph.
     return_eigval : bool, optional
         If True, return laplacian eigenvalues together with eigenvectors.
-        Otherwise, return laplacian eigenvectors only. 
+        Otherwise, return laplacian eigenvectors only.
         Default: False.
 
     Returns
@@ -3701,7 +3701,7 @@ def laplacian_pe(g, k, padding=False, return_eigval=False):
             [ 4.6942e-01, -1.5560e-01, -7.4068e-09,  7.4068e-09,  3.3216e-01,  0.0000e+00],
             [-2.8814e-01, -3.6306e-01,  7.0711e-01,  7.0711e-01, -4.3968e-01,  0.0000e+00]])
     >>> dgl.laplacian_pe(g, 6, padding=True, return_eigval=True)
-    (tensor([0.5684, 0.7500, 1.0000, 1.0000, 1.5149,    nan]), 
+    (tensor([0.5684, 0.7500, 1.0000, 1.0000, 1.5149,    nan]),
      tensor([[ 7.2513e-01, -6.2238e-01,  1.8517e-09, -1.8517e-09, -4.3006e-01,  0.0000e+00],
              [-0.0000e+00,  5.3900e-01,  0.0000e+00, -0.0000e+00, -0.0000e+00,  0.0000e+00],
              [-4.0653e-01,  4.0425e-01, -6.4145e-09,  6.4145e-09, -2.8766e-01,  0.0000e+00],

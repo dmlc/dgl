@@ -368,7 +368,7 @@ class LaplacianPE(BaseTransform):
     <https://arxiv.org/abs/2003.00982>`__
 
     This module only works for homogeneous bidirected graphs.
-    
+
     Parameters
     ----------
     k : int
@@ -376,7 +376,7 @@ class LaplacianPE(BaseTransform):
     feat_name : str, optional
         Name to store the computed positional encodings in ndata.
     eigval_name : str, optional
-        If None, store laplacian eigenvectors only. 
+        If None, store laplacian eigenvectors only.
         Otherwise, it's the name to store corresponding laplacian eigenvalues in ndata.
         Default: None.
     padding : bool, optional
@@ -384,7 +384,7 @@ class LaplacianPE(BaseTransform):
         Otherwise, add zero paddings in the end when k>=n.
         Default: False.
         n is the number of nodes in the given graph.
-    
+
     Example
     -------
     >>> import dgl
@@ -426,16 +426,17 @@ class LaplacianPE(BaseTransform):
         self.feat_name = feat_name
         self.eigval_name = eigval_name
         self.padding = padding
-    
+
     def __call__(self, g):
         if self.eigval_name:
-            eigval, PE = functional.laplacian_pe(g, k=self.k, padding=self.padding, return_eigval=True)
+            eigval, PE = functional.laplacian_pe(g, k=self.k, padding=self.padding, 
+                                                 return_eigval=True)
             eigval = F.repeat(eigval.unsqueeze(0), g.num_nodes(), dim=0)
             g.ndata[self.eigval_name] = F.copy_to(eigval, g.device)
         else:
             PE = functional.laplacian_pe(g, k=self.k, padding=self.padding)
         g.ndata[self.feat_name] = F.copy_to(PE, g.device)
-        
+
         return g
 
 class AddSelfLoop(BaseTransform):
