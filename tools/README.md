@@ -167,3 +167,60 @@ The output chunked graph metadata will go as follows (assuming the current direc
     "edge_data": {}
 }
 ```
+
+## Partition Config Conversion
+
+'convert_partition_conf.py' is a tool help you convert old partition config to new version.
+
+### Sample usage like
+
+```
+python tools/convert_partition_conf.py --part-config "{config path}" --process-num 1
+```
+
+### Requirement
+
+The machine run this script should **have access to all partition data under the same folder as part_config**, it can be in one machine or shared accross multiple machines using tools like NFS, refer [Set up distributed training environment](https://docs.dgl.ai/en/latest/tutorials/dist/1_node_classification.html) as instruction.
+
+### Input arguments
+
+1. *part-config*: The path of partition json file. < **Required**>
+2. *process-num*: Max number of processes can be used, each one is for one partition default to 1. <**Optional**>
+
+### Output
+
+The script will override old json config in disk, currently it transform keys in *etypes* and *edge_map* from etype to canonical_etype.
+
+E.g.
+Original config 
+```json
+{
+    "edge_map": {
+        "r1": [ [ 0, 6 ], [ 16, 20 ] ],
+        "r2": [ [ 6, 11 ], [ 20, 25 ] ],
+        "r3": [ [ 11, 16 ], [ 25, 30 ] ]
+    },
+    "etypes": {
+        "r1": 0,
+        "r2": 1,
+        "r3": 2
+    },
+    ...
+}
+```
+
+After conversion
+```json
+{
+    "edge_map": {
+        "n1:r1:n2": [ [ 0, 6 ], [ 16, 20 ] ],
+        "n1:r2:n3": [ [ 6, 11 ], [ 20, 25 ] ],
+        "n2:r3:n3": [ [ 11, 16 ], [ 25, 30 ] ] },
+    "etypes": {
+        "n1:r1:n2": 0,
+        "n1:r2:n3": 1,
+        "n2:r3:n3": 2
+    }
+    ...
+}
+```

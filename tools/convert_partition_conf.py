@@ -8,7 +8,11 @@ import os
 import torch
 from dgl.data.utils import load_graphs
 
-def etype2canonical_etypes(part_config, process_num):
+etypes_key = 'etypes'
+edge_map_key = 'edge_map'
+canonical_etypes_delimiter = ':'
+
+def etype2canonical_etype(part_config, process_num):
     gpb, _, _, etypes =  load_partition_book(part_config=part_config, part_id=0)
     eid = []
     etype_ids = []
@@ -47,8 +51,17 @@ def _find_c_etypes_in_partition(seed_edges, seed_edge_tids, part_id, part_config
         etype_id = F.as_scalar(etype_id)
         dst_tid = F.as_scalar(dst_tid)
         c_etype = (ntypes[src_tid], etypes[etype_id], ntypes[dst_tid])
-        canonical_etypes[','.join(c_etype)] = etype_id
+        canonical_etypes[canonical_etypes_delimiter.join(c_etype)] = etype_id
     return canonical_etypes
+
+def check_if_old_version(config):
+    first_etype = list(config[etypes_key].keys())[0]
+    etype_tuple = first_etype.split(canonical_etypes_delimiter)
+    if len(etype_tuple) == 3:
+        return False
+    else:
+        return True
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Convert etypes in partition json config file, which are \
@@ -68,17 +81,24 @@ if __name__ == '__main__':
             'Process number should be int.'
     
     start = time.time()
-    etypes_key = "etypes"
-    canonical_etypes_key = "canonical_etypes"
+
     with open(args.part_config, 'r+', encoding='utf-8') as f:
         config = json.load(f)
-        if canonical_etypes_key not in config:
-            if etypes_key not in config:
-                raise KeyError("Invalid partition config, it should contain at least of 'etypes' or ''canonical_etypes''")
-            config[canonical_etypes_key] = etype2canonical_etypes(args.part_config, args.process_num)
-            del config[etypes_key]
+        if check_if_old_version(config):
+            canonical_etypes = etype2canonical_etype(args.part_config, args.process_num)
+
+            # convert edge_map key from etype -> c_etype
+            new_edge_map = {}
+            for e_type, range in config[edge_map_key].items():
+                eid = config[etypes_key][e_type]
+                c_etype = [key for key in canonical_etypes if canonical_etypes[key] == eid][0]
+                new_edge_map[c_etype] = range
+            config[edge_map_key] = new_edge_map
+            
+            config[etypes_key] = canonical_etypes
             f.seek(0)
             json.dump(config, f, indent=4)
             f.truncate()
-        end = time.time()
-        print(f'elplased time in seconds: {end - start}')
+
+    end = time.time()
+    print(f'elplased time in seconds: {end - start}')
