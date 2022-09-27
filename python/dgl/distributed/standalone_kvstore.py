@@ -109,4 +109,3 @@ class KVClient(object):
         self._data[output_name][:] = \
                 self._data[operand1_name] | \
                 self._data[operand2_name]
-
