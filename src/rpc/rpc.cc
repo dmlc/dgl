@@ -320,15 +320,6 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateEmptyRPCMessage")
   *rv = rst;
 });
 
-DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateEmptyRPCMessageWithSize")
-.set_body([](DGLArgs args, DGLRetValue* rv) {
-  int64_t message_size = args[0];
-
-  std::shared_ptr<RPCMessage> rst(new RPCMessage);
-  *rv = rst;
-});
-
-
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateRPCMessage")
 .set_body([](DGLArgs args, DGLRetValue* rv) {
   std::shared_ptr<RPCMessage> rst(new RPCMessage);
@@ -482,7 +473,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
   dgl_id_t idx = 0;
   for (dgl_id_t i = 0; i < ID_size; ++i) {
     dgl_id_t p_id = part_id_data[i];
-    if (p_id == local_machine_id) {
+    if (static_cast<int>(p_id) == local_machine_id) {
       dgl_id_t l_id = local_id_data[idx++];
       CHECK_LT(l_id, local_data_shape[0]);
       CHECK_GE(l_id, 0);
@@ -497,7 +488,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
   }
   // Send remote id
   int msg_count = 0;
-  for (int i = 0; i < remote_ids.size(); ++i) {
+  for (size_t i = 0; i < remote_ids.size(); ++i) {
     if (remote_ids[i].size() != 0) {
       RPCMessage msg;
       msg.service_id = service_id;
@@ -517,7 +508,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFastPull")
   local_data_shape[0] = ID_size;
   NDArray res_tensor = NDArray::Empty(local_data_shape,
                                       local_data->dtype,
-                                      DLContext{kDLCPU, 0});
+                                      DGLContext{kDGLCPU, 0});
   char* return_data = static_cast<char*>(res_tensor->data);
   // Copy local data
   parallel_for(0, local_ids.size(), [&](size_t b, size_t e) {

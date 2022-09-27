@@ -176,6 +176,7 @@ def test_part_pipeline():
         cmd += f' --partitions-dir {partition_dir}'
         cmd += f' --out-dir {out_dir}'
         cmd += f' --ip-config {ip_config}'
+        cmd += ' --ssh-port 22'
         cmd += ' --process-group-timeout 60'
         os.system(cmd)
 

@@ -24,8 +24,8 @@ namespace aten {
 //////////////////////////////////////////////////////////////////////
 
 /*! \return A special array to represent null. */
-inline NDArray NullArray(const DLDataType& dtype = DLDataType{kDLInt, 64, 1},
-                         const DLContext& ctx = DLContext{kDLCPU, 0}) {
+inline NDArray NullArray(const DGLDataType& dtype = DGLDataType{kDGLInt, 64, 1},
+                         const DGLContext& ctx = DGLContext{kDGLCPU, 0}) {
   return NDArray::Empty({0}, dtype, ctx);
 }
 
@@ -44,7 +44,7 @@ inline bool IsNullArray(NDArray array) {
  * \return id array
  */
 IdArray NewIdArray(int64_t length,
-                   DLContext ctx = DLContext{kDLCPU, 0},
+                   DGLContext ctx = DGLContext{kDGLCPU, 0},
                    uint8_t nbits = 64);
 
 /*!
@@ -57,7 +57,7 @@ IdArray NewIdArray(int64_t length,
 template <typename T>
 IdArray VecToIdArray(const std::vector<T>& vec,
                      uint8_t nbits = 64,
-                     DLContext ctx = DLContext{kDLCPU, 0});
+                     DGLContext ctx = DGLContext{kDGLCPU, 0});
 
 /*!
  * \brief Return an array representing a 1D range.
@@ -67,7 +67,7 @@ IdArray VecToIdArray(const std::vector<T>& vec,
  * \param ctx Device context
  * \return range array
  */
-IdArray Range(int64_t low, int64_t high, uint8_t nbits, DLContext ctx);
+IdArray Range(int64_t low, int64_t high, uint8_t nbits, DGLContext ctx);
 
 /*!
  * \brief Return an array full of the given value
@@ -77,7 +77,7 @@ IdArray Range(int64_t low, int64_t high, uint8_t nbits, DLContext ctx);
  * \param ctx Device context
  * \return the result array
  */
-IdArray Full(int64_t val, int64_t length, uint8_t nbits, DLContext ctx);
+IdArray Full(int64_t val, int64_t length, uint8_t nbits, DGLContext ctx);
 
 /*!
  * \brief Return an array full of the given value with the given type.
@@ -87,7 +87,7 @@ IdArray Full(int64_t val, int64_t length, uint8_t nbits, DLContext ctx);
  * \return the result array
  */
 template <typename DType>
-NDArray Full(DType val, int64_t length, DLContext ctx);
+NDArray Full(DType val, int64_t length, DGLContext ctx);
 
 /*! \brief Create a deep copy of the given array */
 IdArray Clone(IdArray arr);
@@ -226,7 +226,7 @@ NDArray Concat(const std::vector<IdArray>& arrays);
 
 /*!\brief Return whether the array is a valid 1D int array*/
 inline bool IsValidIdArray(const dgl::runtime::NDArray& arr) {
-  return arr->ndim == 1 && arr->dtype.code == kDLInt;
+  return arr->ndim == 1 && arr->dtype.code == kDGLInt;
 }
 
 /*!
@@ -343,8 +343,8 @@ std::string ToDebugString(NDArray array);
 template <typename T>
 IdArray VecToIdArray(const std::vector<T>& vec,
                      uint8_t nbits,
-                     DLContext ctx) {
-  IdArray ret = NewIdArray(vec.size(), DLContext{kDLCPU, 0}, nbits);
+                     DGLContext ctx) {
+  IdArray ret = NewIdArray(vec.size(), DGLContext{kDGLCPU, 0}, nbits);
   if (nbits == 32) {
     std::copy(vec.begin(), vec.end(), static_cast<int32_t*>(ret->data));
   } else if (nbits == 64) {
@@ -359,9 +359,9 @@ IdArray VecToIdArray(const std::vector<T>& vec,
  * \brief Get the context of the first array, and check if the non-null arrays'
  * contexts are the same.
  */
-inline DLContext GetContextOf(const std::vector<IdArray>& arrays) {
+inline DGLContext GetContextOf(const std::vector<IdArray>& arrays) {
   bool first = true;
-  DLContext result;
+  DGLContext result;
   for (auto& array : arrays) {
     if (first) {
       first = false;

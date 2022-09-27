@@ -130,13 +130,13 @@ std::pair<CSRMatrix, NDArray> CSRSum(
       C_weights};
 }
 
-template std::pair<CSRMatrix, NDArray> CSRSum<kDLCPU, int32_t, float>(
+template std::pair<CSRMatrix, NDArray> CSRSum<kDGLCPU, int32_t, float>(
     const std::vector<CSRMatrix>&, const std::vector<NDArray>&);
-template std::pair<CSRMatrix, NDArray> CSRSum<kDLCPU, int64_t, float>(
+template std::pair<CSRMatrix, NDArray> CSRSum<kDGLCPU, int64_t, float>(
     const std::vector<CSRMatrix>&, const std::vector<NDArray>&);
-template std::pair<CSRMatrix, NDArray> CSRSum<kDLCPU, int32_t, double>(
+template std::pair<CSRMatrix, NDArray> CSRSum<kDGLCPU, int32_t, double>(
     const std::vector<CSRMatrix>&, const std::vector<NDArray>&);
-template std::pair<CSRMatrix, NDArray> CSRSum<kDLCPU, int64_t, double>(
+template std::pair<CSRMatrix, NDArray> CSRSum<kDGLCPU, int64_t, double>(
     const std::vector<CSRMatrix>&, const std::vector<NDArray>&);
 
 };  // namespace aten

@@ -150,7 +150,7 @@ bool Colorize(IdType * result_data, int64_t num_nodes, float * const prop) {
  * are marked, mark this node with its id. Else match this (BLUE, RED) node
  * pair and mark them with the smaller id between them.
  */
-template <DLDeviceType XPU, typename FloatType, typename IdType>
+template <DGLDeviceType XPU, typename FloatType, typename IdType>
 void WeightedNeighborMatching(const aten::CSRMatrix &csr, const NDArray weight, IdArray result) {
   cudaStream_t stream = runtime::getCurrentCUDAStream();
   const auto& ctx = result->ctx;
@@ -182,13 +182,13 @@ void WeightedNeighborMatching(const aten::CSRMatrix &csr, const NDArray weight, 
   }
   device->FreeWorkspace(ctx, prop);
 }
-template void WeightedNeighborMatching<kDLGPU, float, int32_t>(
+template void WeightedNeighborMatching<kDGLCUDA, float, int32_t>(
   const aten::CSRMatrix &csr, const NDArray weight, IdArray result);
-template void WeightedNeighborMatching<kDLGPU, float, int64_t>(
+template void WeightedNeighborMatching<kDGLCUDA, float, int64_t>(
   const aten::CSRMatrix &csr, const NDArray weight, IdArray result);
-template void WeightedNeighborMatching<kDLGPU, double, int32_t>(
+template void WeightedNeighborMatching<kDGLCUDA, double, int32_t>(
   const aten::CSRMatrix &csr, const NDArray weight, IdArray result);
-template void WeightedNeighborMatching<kDLGPU, double, int64_t>(
+template void WeightedNeighborMatching<kDGLCUDA, double, int64_t>(
   const aten::CSRMatrix &csr, const NDArray weight, IdArray result);
 
 /*! \brief Unweighted neighbor matching procedure (GPU version).
@@ -201,7 +201,7 @@ template void WeightedNeighborMatching<kDLGPU, double, int64_t>(
  *  2. Graph is sparse, thus neighborhood of each node is small,
  *     which is suitable for GPU implementation.
  */
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 void NeighborMatching(const aten::CSRMatrix &csr, IdArray result) {
   const int64_t num_edges = csr.indices->shape[0];
   const auto& ctx = result->ctx;
@@ -211,7 +211,7 @@ void NeighborMatching(const aten::CSRMatrix &csr, IdArray result) {
   // generate random weights
   cudaStream_t stream = runtime::getCurrentCUDAStream();
   NDArray weight = NDArray::Empty(
-    {num_edges}, DLDataType{kDLFloat, sizeof(float) * 8, 1}, ctx);
+    {num_edges}, DGLDataType{kDGLFloat, sizeof(float) * 8, 1}, ctx);
   float *weight_data = static_cast<float*>(weight->data);
   uint64_t seed = dgl::RandomEngine::ThreadLocal()->RandInt(UINT64_MAX);
   auto num_threads = cuda::FindNumThreads(num_edges);
@@ -221,8 +221,8 @@ void NeighborMatching(const aten::CSRMatrix &csr, IdArray result) {
 
   WeightedNeighborMatching<XPU, float, IdType>(csr, weight, result);
 }
-template void NeighborMatching<kDLGPU, int32_t>(const aten::CSRMatrix &csr, IdArray result);
-template void NeighborMatching<kDLGPU, int64_t>(const aten::CSRMatrix &csr, IdArray result);
+template void NeighborMatching<kDGLCUDA, int32_t>(const aten::CSRMatrix &csr, IdArray result);
+template void NeighborMatching<kDGLCUDA, int64_t>(const aten::CSRMatrix &csr, IdArray result);
 
 }  // namespace impl
 }  // namespace geometry
