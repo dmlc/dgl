@@ -18,54 +18,13 @@
 #include <vector>
 #include "spmm_binary_ops.h"
 #if !defined(_WIN32)
-#ifdef USE_AVX
-#include "intel/cpu_support.h"
 #ifdef USE_LIBXSMM
 #include "spmm_blocking_libxsmm.h"
 #endif  // USE_LIBXSMM
-#endif  // USE_AVX
 #endif  // _WIN32
 namespace dgl {
 namespace aten {
 namespace cpu {
-
-#if !defined(_WIN32)
-#ifdef USE_AVX
-/*!
- * \brief CPU kernel of SpMM on Csr format using Xbyak.
- * \param cpu_spec JIT'ed kernel
- * \param bcast Broadcast information.
- * \param csr The Csr matrix.
- * \param X The feature on source nodes.
- * \param W The feature on edges.
- * \param O The result feature on destination nodes.
- * \note it uses node parallel strategy, different threads are responsible
- *       for the computation of different nodes. For each edge, it uses the
- *       JIT'ed kernel.
- */
-template <typename IdType, typename DType, typename Op>
-void SpMMSumCsrXbyak(dgl::ElemWiseAddUpdate<Op>* cpu_spec, const BcastOff& bcast,
-                     const CSRMatrix& csr, const DType* X, const DType* W, DType* O) {
-  const bool has_idx = !IsNullArray(csr.data);
-  const IdType* indptr = csr.indptr.Ptr<IdType>();
-  const IdType* indices = csr.indices.Ptr<IdType>();
-  const IdType* edges = csr.data.Ptr<IdType>();
-  int64_t dim = bcast.out_len, lhs_dim = bcast.lhs_len, rhs_dim = bcast.rhs_len;
-
-  runtime::parallel_for(0, csr.num_rows, [&](size_t b, size_t e) {
-    for (auto rid = b; rid < e; ++rid) {
-      const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
-      DType* out_off = O + rid * dim;
-      for (IdType j = row_start; j < row_end; ++j) {
-        const IdType cid = indices[j];
-        const IdType eid = has_idx ? edges[j] : j;
-        cpu_spec->run(out_off, X + cid * lhs_dim, W + eid * rhs_dim, dim);
-      }
-    }
-  });
-}
-#endif  // USE_AVX
-#endif  // _WIN32
 
 /*!
  * \brief Naive CPU kernel of SpMM on Csr format.
@@ -140,7 +99,6 @@ void SpMMSumCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
     CHECK_NOTNULL(W);
   }
 #if !defined(_WIN32)
-#ifdef USE_AVX
 #ifdef USE_LIBXSMM
   const bool no_libxsmm =
        bcast.use_bcast ||
@@ -150,27 +108,12 @@ void SpMMSumCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
     SpMMSumCsrLibxsmm<IdType, DType, Op>(bcast, csr, ufeat, efeat, out);
   } else {
 #endif  // USE_LIBXSMM
-    typedef dgl::ElemWiseAddUpdate<Op> ElemWiseUpd;
-    /* Prepare an assembler kernel */
-    static std::unique_ptr<ElemWiseUpd> asm_kernel_ptr(
-        (dgl::IntelKernel<>::IsEnabled()) ? new ElemWiseUpd() : nullptr);
-    /* Distribute the kernel among OMP threads */
-    ElemWiseUpd* cpu_spec = (asm_kernel_ptr && asm_kernel_ptr->applicable())
-      ? asm_kernel_ptr.get()
-      : nullptr;
-    if (cpu_spec && dim > 16 && !bcast.use_bcast) {
-      SpMMSumCsrXbyak<IdType, DType, Op>(cpu_spec, bcast, csr, X, W, O);
-    } else {
-#endif  // USE_AVX
 #endif  // _WIN32
     SpMMSumCsrNaive<IdType, DType, Op>(bcast, csr, X, W, O);
 #if !defined(_WIN32)
-#ifdef USE_AVX
-    }
 #ifdef USE_LIBXSMM
   }
 #endif  // USE_LIBXSMM
-#endif  // USE_AVX
 #endif  // _WIN32
 }
 
@@ -268,7 +211,6 @@ void SpMMCmpCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
     CHECK_NOTNULL(argW);
   }
 #if !defined(_WIN32)
-#ifdef USE_AVX
 #ifdef USE_LIBXSMM
 
   const bool no_libxsmm =
@@ -279,7 +221,6 @@ void SpMMCmpCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
     SpMMCmpCsrLibxsmm<IdType, DType, Op, Cmp>(bcast, csr, ufeat, efeat, out, argu, arge);
   } else {
 #endif  // USE_LIBXSMM
-#endif  // USE_AVX
 #endif  // _WIN32
 
     runtime::parallel_for(0, csr.num_rows, [&](size_t b, size_t e) {
@@ -309,11 +250,9 @@ void SpMMCmpCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
       }
     });
 #if !defined(_WIN32)
-#ifdef USE_AVX
 #ifdef USE_LIBXSMM
   }
 #endif  // USE_LIBXSMM
-#endif  // USE_AVX
 #endif  // _WIN32
 }
 

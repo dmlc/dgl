@@ -16,7 +16,6 @@
 #include <algorithm>
 
 #if !defined(_WIN32)
-#ifdef USE_AVX
 #ifdef USE_LIBXSMM
 #include <unistd.h>
 #include <libxsmm.h>
@@ -585,7 +584,6 @@ void SpMMCmpCsrLibxsmm(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufea
 }  // namespace dgl
 
 #endif  // USE_LIBXSMM
-#endif  // USE_AVX
 #endif  // _WIN32
 
 #endif  // DGL_ARRAY_CPU_SPMM_BLOCKING_LIBXSMM_H_

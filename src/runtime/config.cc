@@ -6,11 +6,18 @@
 
 #include <dgl/runtime/registry.h>
 #include <dgl/runtime/config.h>
+#include <libxsmm_cpuid.h>
 
 using namespace dgl::runtime;
 
 namespace dgl {
 namespace runtime {
+
+Config::Config() {
+    int cpu_id = libxsmm_cpuid_x86();
+    // Enable libxsmm on AVX machines by default
+    libxsmm_ = LIBXSMM_X86_AVX <= cpu_id && cpu_id <= LIBXSMM_X86_ALLFEAT;
+}
 
 void Config::EnableLibxsmm(bool b) {
     libxsmm_ = b;
