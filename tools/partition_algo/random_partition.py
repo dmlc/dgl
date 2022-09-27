@@ -8,6 +8,7 @@ import argparse
 
 from utils import setdir
 from utils import array_readwriter
+from base import PartitionMeta, dump_partition_meta
 
 def _random_partition(metadata, num_parts):
     num_nodes_per_type = [sum(_) for _ in metadata['num_nodes_per_chunk']]
@@ -16,15 +17,6 @@ def _random_partition(metadata, num_parts):
         logging.info('Generating partition for node type %s' % ntype)
         parts = np.random.randint(0, num_parts, (n,))
         array_readwriter.get_array_parser(name='csv').write(ntype + '.txt', parts)
-
-def _dump_metadata(num_parts):
-    """
-    Dump metadata into file. For now, below metadata are dumped:
-    ``version``, ``num_parts``.
-    """
-    metadata = {'version': '0.0.1', 'num_parts': num_parts}
-    with open('partition.json', 'w') as outfile:
-        json.dump(metadata, outfile, sort_keys=True, indent=4)
 
 def random_partition(metadata, num_parts, output_path):
     """
@@ -39,7 +31,8 @@ def random_partition(metadata, num_parts, output_path):
     """
     with setdir(output_path):
         _random_partition(metadata, num_parts)
-        _dump_metadata(num_parts)
+        part_meta = PartitionMeta(version='1.0.0', num_parts=num_parts)
+        dump_partition_meta(part_meta, 'partition.json')
 
 # Run with PYTHONPATH=${GIT_ROOT_DIR}/tools
 # where ${GIT_ROOT_DIR} is the directory to the DGL git repository.
