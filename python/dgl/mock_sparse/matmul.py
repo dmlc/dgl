@@ -214,7 +214,7 @@ def spspmm(A1: Union[SparseMatrix, DiagMatrix], A2: Union[SparseMatrix, DiagMatr
         if isinstance(A2, SparseMatrix):
             return _sparse_sparse_mm(A1.as_sparse(), A2)
         else:
-            return _diag_diag(A1, A2)
+            return _diag_diag_mm(A1, A2)
 
 def mm_sp(A1: SparseMatrix, A2: Union[torch.Tensor, SparseMatrix, DiagMatrix])\
           -> Union[torch.Tensor, SparseMatrix]:

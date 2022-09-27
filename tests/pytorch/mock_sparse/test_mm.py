@@ -2,7 +2,7 @@ import torch
 
 import backend as F
 
-from dgl.mock_sparse import create_from_coo, diag, bspmm
+from dgl.mock_sparse import create_from_coo, diag, bspmm, bspspmm
 
 def get_adj(A):
     edge_index = torch.cat((A.row.unsqueeze(0), A.col.unsqueeze(0)), 0)
