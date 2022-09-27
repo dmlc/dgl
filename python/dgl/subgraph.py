@@ -34,7 +34,8 @@ def node_subgraph(graph, nodes, *, relabel_nodes=True, store_ids=True, output_de
     graph : DGLGraph
         The graph to extract subgraphs from.
     nodes : nodes or dict[str, nodes]
-        The nodes to form the subgraph. The allowed nodes formats are:
+        The nodes to form the subgraph, which cannot have any duplicate value. The result
+        will be undefined otherwise. The allowed nodes formats are:
 
         * Int Tensor: Each element is a node ID. The tensor must have the same device type
           and ID data type as the graph's.
@@ -333,7 +334,8 @@ def in_subgraph(graph, nodes, *, relabel_nodes=False, store_ids=True, output_dev
     graph : DGLGraph
         The input graph.
     nodes : nodes or dict[str, nodes]
-        The nodes to form the subgraph. The allowed nodes formats are:
+        The nodes to form the subgraph, which cannot have any duplicate value. The result
+        will be undefined otherwise. The allowed nodes formats are:
 
         * Int Tensor: Each element is a node ID. The tensor must have the same device type
           and ID data type as the graph's.
@@ -460,7 +462,8 @@ def out_subgraph(graph, nodes, *, relabel_nodes=False, store_ids=True, output_de
     graph : DGLGraph
         The input graph.
     nodes : nodes or dict[str, nodes]
-        The nodes to form the subgraph. The allowed nodes formats are:
+        The nodes to form the subgraph, which cannot have any duplicate value. The result
+        will be undefined otherwise. The allowed nodes formats are:
 
         * Int Tensor: Each element is a node ID. The tensor must have the same device type
           and ID data type as the graph's.
@@ -588,7 +591,8 @@ def khop_in_subgraph(graph, nodes, k, *, relabel_nodes=True, store_ids=True, out
     graph : DGLGraph
         The input graph.
     nodes : nodes or dict[str, nodes]
-        The starting node(s) to expand. The allowed formats are:
+        The starting node(s) to expand, which cannot have any duplicate value. The result
+        will be undefined otherwise. The allowed formats are:
 
         * Int: ID of a single node.
         * Int Tensor: Each element is a node ID. The tensor must have the same device
@@ -749,7 +753,8 @@ def khop_out_subgraph(graph, nodes, k, *, relabel_nodes=True, store_ids=True, ou
     graph : DGLGraph
         The input graph.
     nodes : nodes or dict[str, nodes]
-        The starting node(s) to expand. The allowed formats are:
+        The starting node(s) to expand, which cannot have any duplicate value. The result
+        will be undefined otherwise. The allowed formats are:
 
         * Int: ID of a single node.
         * Int Tensor: Each element is a node ID. The tensor must have the same device
