@@ -375,15 +375,15 @@ class LaplacianPE(BaseTransform):
         Number of smallest non-trivial eigenvectors to use for positional encoding.
     feat_name : str, optional
         Name to store the computed positional encodings in ndata.
-    padding : bool
+    eigval_name : str, optional
+        If None, store laplacian eigenvectors only. 
+        Otherwise, it's the name to store corresponding laplacian eigenvalues in ndata.
+        Default: None.
+    padding : bool, optional
         If False, raise an exception when k>=n.
         Otherwise, add zero paddings in the end when k>=n.
         Default: False.
         n is the number of nodes in the given graph.
-    return_eigval : bool
-        If True, return laplacian eigenvalues together with eigenvectors.
-        Otherwise, return laplacian eigenvectors only. 
-        Default: False.
     
     Example
     -------
@@ -391,7 +391,7 @@ class LaplacianPE(BaseTransform):
     >>> from dgl import LaplacianPE
     >>> transform1 = LaplacianPE(k=3)
     >>> transform2 = LaplacianPE(k=5, padding=True)
-    >>> transform3 = LaplacianPE(k=5, feat_name='eigvec', eigval_name='eigval', padding=True, return_eigval=True)
+    >>> transform3 = LaplacianPE(k=5, feat_name='eigvec', eigval_name='eigval', padding=True)
     >>> g = dgl.rand_graph(5, 10)
     >>> g1 = transform1(g)
     >>> print(g1.ndata['PE'])
@@ -421,20 +421,19 @@ class LaplacianPE(BaseTransform):
             [-0.3929,  0.3929, -0.2883,  0.2883,  0.0000],
             [ 0.5751, -0.5751, -0.2018,  0.2018,  0.0000]])
     """
-    def __init__(self, k, feat_name='PE', eigval_name=None, padding=False, return_eigval=False):
+    def __init__(self, k, feat_name='PE', eigval_name=None, padding=False):
         self.k = k
         self.feat_name = feat_name
         self.eigval_name = eigval_name
         self.padding = padding
-        self.return_eigval = return_eigval
     
     def __call__(self, g):
-        if self.return_eigval:
-            eigval, PE = functional.laplacian_pe(g, k=self.k, padding=self.padding, return_eigval=self.return_eigval)
+        if self.eigval_name:
+            eigval, PE = functional.laplacian_pe(g, k=self.k, padding=self.padding, return_eigval=True)
             eigval = F.repeat(eigval.unsqueeze(0), g.num_nodes(), dim=0)
             g.ndata[self.eigval_name] = F.copy_to(eigval, g.device)
         else:
-            PE = functional.laplacian_pe(g, k=self.k, padding=self.padding, return_eigval=self.return_eigval)
+            PE = functional.laplacian_pe(g, k=self.k, padding=self.padding)
         g.ndata[self.feat_name] = F.copy_to(PE, g.device)
         
         return g

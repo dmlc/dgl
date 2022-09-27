@@ -3664,12 +3664,12 @@ def laplacian_pe(g, k, padding=False, return_eigval=False):
         The input graph. Must be homogeneous.
     k : int
         Number of smallest non-trivial eigenvectors to use for positional encoding.
-    padding : bool
+    padding : bool, optional
         If False, raise an exception when k>=n.
         Otherwise, add zero paddings in the end when k>=n.
         Default: False.
         n is the number of nodes in the given graph.
-    return_eigval : bool
+    return_eigval : bool, optional
         If True, return laplacian eigenvalues together with eigenvectors.
         Otherwise, return laplacian eigenvectors only. 
         Default: False.
@@ -3722,7 +3722,7 @@ def laplacian_pe(g, k, padding=False, return_eigval=False):
 
     # select eigenvectors with smaller eigenvalues O(n + klogk)
     EigVal, EigVec = np.linalg.eig(L.toarray())
-    max_freqs = min(n-1,k)
+    max_freqs = np.min((n-1,k))
     kpartition_indices = np.argpartition(EigVal, max_freqs)[:max_freqs+1]
     topk_eigvals = EigVal[kpartition_indices]
     topk_indices = kpartition_indices[topk_eigvals.argsort()][1:]
