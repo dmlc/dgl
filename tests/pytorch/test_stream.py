@@ -108,8 +108,11 @@ def test_record_stream_graph_positive():
 
     g = rand_graph(10, 20, device=F.cpu())
     g.create_formats_()
-    x = torch.ones(g.num_nodes(), 10)
-    result = OPS.copy_u_sum(g, x).to(F.ctx())
+    x = torch.ones(g.num_nodes(), 10).to(F.ctx())
+    g1 = g.to(F.ctx())
+    # this is necessary to initialize the cusparse handle
+    result = OPS.copy_u_sum(g1, x)
+    torch.cuda.current_stream().synchronize()
 
     stream = torch.cuda.Stream()
     results2 = torch.zeros_like(result)
@@ -122,7 +125,6 @@ def test_record_stream_graph_positive():
         torch.cuda._sleep(int(50 * cycles_per_ms))  # delay the computing
         results2.copy_(OPS.copy_u_sum(g2, x))
 
-    x = x.to(F.ctx())
     perform_computing()
     with torch.cuda.stream(stream):
         # since we have called record stream for g2, g3 won't reuse its memory
@@ -132,15 +134,16 @@ def test_record_stream_graph_positive():
     assert torch.equal(result, results2)
 
 @unittest.skipIf(F._default_context_str == 'cpu', reason="stream only runs on GPU.")
-# this test must follow test_record_stream_graph_positive to ensure
-# enough memory blocks have been reserved.
 def test_record_stream_graph_negative():
     cycles_per_ms = _get_cycles_per_ms()
 
     g = rand_graph(10, 20, device=F.cpu())
     g.create_formats_()
-    x = torch.ones(g.num_nodes(), 10)
-    result = OPS.copy_u_sum(g, x).to(F.ctx())
+    x = torch.ones(g.num_nodes(), 10).to(F.ctx())
+    g1 = g.to(F.ctx())
+    # this is necessary to initialize the cusparse handle
+    result = OPS.copy_u_sum(g1, x)
+    torch.cuda.current_stream().synchronize()
 
     stream = torch.cuda.Stream()
     results2 = torch.zeros_like(result)
@@ -154,7 +157,6 @@ def test_record_stream_graph_negative():
         torch.cuda._sleep(int(50 * cycles_per_ms))  # delay the computing
         results2.copy_(OPS.copy_u_sum(g2, x))
 
-    x = x.to(F.ctx())
     perform_computing()
     with torch.cuda.stream(stream):
         # g3 will reuse g2's memory block, resulting a wrong result
