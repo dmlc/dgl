@@ -147,6 +147,10 @@ def spmm(A: Union[SparseMatrix, DiagMatrix], X: torch.Tensor) -> torch.Tensor:
     >>> A = create_from_coo(row, col, val)
     >>> X = torch.randn(2, 3)
     >>> result = A @ X
+    >>> print(type(result))
+    <class 'torch.Tensor'>
+    >>> print(result.shape)
+    torch.Size([2, 3])
     """
     assert isinstance(A, (SparseMatrix, DiagMatrix)), \
         f'Expect arg1 to be a SparseMatrix or DiagMatrix object, got {type(A)}'
@@ -185,14 +189,19 @@ def spspmm(A1: Union[SparseMatrix, DiagMatrix], A2: Union[SparseMatrix, DiagMatr
 
     >>> row1 = torch.tensor([0, 1, 1])
     >>> col1 = torch.tensor([1, 0, 1])
-    >>> val1 = torch.randn(len(row1))
+    >>> val1 = torch.ones(len(row1))
     >>> A1 = create_from_coo(row1, col1, val1)
 
     >>> row2 = torch.tensor([0, 1, 1])
     >>> col2 = torch.tensor([0, 2, 1])
-    >>> val2 = torch.randn(len(row2))
+    >>> val2 = torch.ones(len(row2))
     >>> A2 = create_from_coo(row2, col2, val2)
     >>> result = A1 @ A2
+    >>> print(result)
+    SparseMatrix(indices=tensor([[0, 0, 1, 1, 1],
+                                 [1, 2, 0, 1, 2]]),
+                 values=tensor([1., 1., 1., 1., 1.]),
+                 shape=(2, 3), nnz=5)
     """
     assert isinstance(A1, (SparseMatrix, DiagMatrix)), \
         f'Expect A1 to be a SparseMatrix or DiagMatrix object, got {type(A1)}'
@@ -245,6 +254,10 @@ def mm_sp(A1: SparseMatrix, A2: Union[torch.Tensor, SparseMatrix, DiagMatrix])\
     >>> A1 = create_from_coo(row, col, val)
     >>> A2 = torch.randn(2, 3)
     >>> result = A1 @ A2
+    >>> print(type(result))
+    <class 'torch.Tensor'>
+    >>> print(result.shape)
+    torch.Size([2, 3])
     """
     assert isinstance(A2, (torch.Tensor, SparseMatrix, DiagMatrix)), \
         f'Expect arg2 to be a torch Tensor, SparseMatrix, or DiagMatrix object, got {type(A2)}'
@@ -282,6 +295,10 @@ def mm_diag(A1: DiagMatrix, A2: Union[torch.Tensor, SparseMatrix, DiagMatrix])\
     >>> A1 = diag(val)
     >>> A2 = torch.randn(3, 2)
     >>> result = A1 @ A2
+    >>> print(type(result))
+    <class 'torch.Tensor'>
+    >>> print(result.shape)
+    torch.Size([3, 2])
     """
     assert isinstance(A2, (torch.Tensor, SparseMatrix, DiagMatrix)), \
         f'Expect arg2 to be a torch Tensor, SparseMatrix, or DiagMatrix object, got {type(A2)}'
@@ -332,8 +349,10 @@ def bspmm(A: Union[SparseMatrix, DiagMatrix], X: torch.Tensor)\
     >>> A = create_from_coo(row, col, val)
     >>> X = torch.randn(2, 3, H)
     >>> result = bspmm(A, X)
-    >>> result.shape
-    (2, 3, 4)
+    >>> print(type(result))
+    <class 'torch.Tensor'>
+    >>> print(result.shape)
+    torch.Size([2, 3, 4])
     """
     assert isinstance(A, (SparseMatrix, DiagMatrix)), \
         f'Expect A to be a SparseMatrix or DiagMatrix object, got {type(A)}'
@@ -390,15 +409,24 @@ def bspspmm(A1: Union[SparseMatrix, DiagMatrix], A2: Union[SparseMatrix, DiagMat
     >>> H = 4
     >>> row1 = torch.tensor([0, 1, 1])
     >>> col1 = torch.tensor([1, 0, 1])
-    >>> val1 = torch.randn(len(row1), H)
+    >>> val1 = torch.ones(len(row1), H)
     >>> A1 = create_from_coo(row1, col1, val1)
 
     >>> row2 = torch.tensor([0, 1, 1])
     >>> col2 = torch.tensor([0, 2, 1])
-    >>> val2 = torch.randn(len(row2), H)
+    >>> val2 = torch.ones(len(row2), H)
     >>> A2 = create_from_coo(row2, col2, val2)
 
     >>> sparse_result = bspspmm(A1, A2)
+    >>> print(sparse_result)
+    SparseMatrix(indices=tensor([[0, 0, 1, 1, 1],
+                                 [1, 2, 0, 1, 2]]),
+                 values=tensor([[1., 1., 1., 1.],
+                                [1., 1., 1., 1.],
+                                [1., 1., 1., 1.],
+                                [1., 1., 1., 1.],
+                                [1., 1., 1., 1.]]),
+                 shape=(2, 3), nnz=5)
     """
     assert isinstance(A1, (SparseMatrix, DiagMatrix)), \
         f'Expect A1 to be a SparseMatrix or DiagMatrix object, got {type(A1)}'
