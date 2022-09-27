@@ -1,9 +1,11 @@
-import dgl
 import copy
+
 import torch
 from torch import nn
-from torch.nn.init import ones_, zeros_
 from torch.nn import BatchNorm1d, Parameter
+from torch.nn.init import ones_, zeros_
+
+import dgl
 from dgl.nn.pytorch.conv import GraphConv, SAGEConv
 
 
@@ -17,8 +19,8 @@ class LayerNorm(nn.Module):
             self.weight = Parameter(torch.Tensor(in_channels))
             self.bias = Parameter(torch.Tensor(in_channels))
         else:
-            self.register_parameter('weight', None)
-            self.register_parameter('bias', None)
+            self.register_parameter("weight", None)
+            self.register_parameter("bias", None)
 
         self.reset_parameters()
 
@@ -34,13 +36,27 @@ class LayerNorm(nn.Module):
         else:
             batch_size = int(batch.max()) + 1
             batch_idx = [batch == i for i in range(batch_size)]
-            norm = torch.tensor([i.sum() for i in batch_idx], dtype=x.dtype).clamp_(min=1).to(device)
+            norm = (
+                torch.tensor([i.sum() for i in batch_idx], dtype=x.dtype)
+                .clamp_(min=1)
+                .to(device)
+            )
             norm = norm.mul_(x.size(-1)).view(-1, 1)
             tmp_list = [x[i] for i in batch_idx]
-            mean = torch.concat([i.sum(0).unsqueeze(0) for i in tmp_list], dim=0).sum(dim=-1, keepdim=True).to(device)
+            mean = (
+                torch.concat([i.sum(0).unsqueeze(0) for i in tmp_list], dim=0)
+                .sum(dim=-1, keepdim=True)
+                .to(device)
+            )
             mean = mean / norm
             x = x - mean.index_select(0, batch.long())
-            var = torch.concat([(i * i).sum(0).unsqueeze(0) for i in tmp_list], dim=0).sum(dim=-1, keepdim=True).to(device)
+            var = (
+                torch.concat(
+                    [(i * i).sum(0).unsqueeze(0) for i in tmp_list], dim=0
+                )
+                .sum(dim=-1, keepdim=True)
+                .to(device)
+            )
             var = var / norm
             out = x / (var + self.eps).sqrt().index_select(0, batch.long())
 
@@ -50,7 +66,7 @@ class LayerNorm(nn.Module):
         return out
 
     def __repr__(self):
-        return f'{self.__class__.__name__}({self.in_channels})'
+        return f"{self.__class__.__name__}({self.in_channels})"
 
 
 class MLP_Predictor(nn.Module):
@@ -60,13 +76,14 @@ class MLP_Predictor(nn.Module):
         output_size (int): Size of output features.
         hidden_size (int, optional): Size of hidden layer. (default: :obj:`4096`).
     """
+
     def __init__(self, input_size, output_size, hidden_size=512):
         super().__init__()
 
         self.net = nn.Sequential(
             nn.Linear(input_size, hidden_size, bias=True),
             nn.PReLU(1),
-            nn.Linear(hidden_size, output_size, bias=True)
+            nn.Linear(hidden_size, output_size, bias=True),
         )
         self.reset_parameters()
 
@@ -91,7 +108,7 @@ class GCN(nn.Module):
             self.layers.append(nn.PReLU())
 
     def forward(self, g):
-        x = g.ndata['feat']
+        x = g.ndata["feat"]
         for layer in self.layers:
             if isinstance(layer, GraphConv):
                 x = layer(g, x)
@@ -101,7 +118,7 @@ class GCN(nn.Module):
 
     def reset_parameters(self):
         for layer in self.layers:
-            if hasattr(layer, 'reset_parameters'):
+            if hasattr(layer, "reset_parameters"):
                 layer.reset_parameters()
 
 
@@ -111,33 +128,41 @@ class GraphSAGE_GCN(nn.Module):
 
         input_size, hidden_size, embedding_size = layer_sizes
 
-        self.convs = nn.ModuleList([
-            SAGEConv(input_size, hidden_size, 'mean'),
-            SAGEConv(hidden_size, hidden_size, 'mean'),
-            SAGEConv(hidden_size, embedding_size, 'mean')
-        ])
+        self.convs = nn.ModuleList(
+            [
+                SAGEConv(input_size, hidden_size, "mean"),
+                SAGEConv(hidden_size, hidden_size, "mean"),
+                SAGEConv(hidden_size, embedding_size, "mean"),
+            ]
+        )
 
-        self.skip_lins = nn.ModuleList([
-            nn.Linear(input_size, hidden_size, bias=False),
-            nn.Linear(input_size, hidden_size, bias=False),
-        ])
+        self.skip_lins = nn.ModuleList(
+            [
+                nn.Linear(input_size, hidden_size, bias=False),
+                nn.Linear(input_size, hidden_size, bias=False),
+            ]
+        )
 
-        self.layer_norms = nn.ModuleList([
-            LayerNorm(hidden_size),
-            LayerNorm(hidden_size),
-            LayerNorm(embedding_size),
-        ])
+        self.layer_norms = nn.ModuleList(
+            [
+                LayerNorm(hidden_size),
+                LayerNorm(hidden_size),
+                LayerNorm(embedding_size),
+            ]
+        )
 
-        self.activations = nn.ModuleList([
-            nn.PReLU(),
-            nn.PReLU(),
-            nn.PReLU(),
-        ])
+        self.activations = nn.ModuleList(
+            [
+                nn.PReLU(),
+                nn.PReLU(),
+                nn.PReLU(),
+            ]
+        )
 
     def forward(self, g):
-        x = g.ndata['feat']
-        if 'batch' in g.ndata.keys():
-            batch = g.ndata['batch']
+        x = g.ndata["feat"]
+        if "batch" in g.ndata.keys():
+            batch = g.ndata["batch"]
         else:
             batch = None
 
@@ -176,6 +201,7 @@ class BGRL(nn.Module):
         `encoder` must have a `reset_parameters` method, as the weights of the target network will be initialized
         differently from the online network.
     """
+
     def __init__(self, encoder, predictor):
         super(BGRL, self).__init__()
         # online network
@@ -194,7 +220,9 @@ class BGRL(nn.Module):
 
     def trainable_parameters(self):
         r"""Returns the parameters that will be updated via an optimizer."""
-        return list(self.online_encoder.parameters()) + list(self.predictor.parameters())
+        return list(self.online_encoder.parameters()) + list(
+            self.predictor.parameters()
+        )
 
     @torch.no_grad()
     def update_target_network(self, mm):
@@ -202,8 +230,10 @@ class BGRL(nn.Module):
         Args:
             mm (float): Momentum used in moving average update.
         """
-        for param_q, param_k in zip(self.online_encoder.parameters(), self.target_encoder.parameters()):
-            param_k.data.mul_(mm).add_(param_q.data, alpha=1. - mm)
+        for param_q, param_k in zip(
+            self.online_encoder.parameters(), self.target_encoder.parameters()
+        ):
+            param_k.data.mul_(mm).add_(param_q.data, alpha=1.0 - mm)
 
     def forward(self, online_x, target_x):
         # forward online network
@@ -233,16 +263,15 @@ def compute_representations(net, dataset, device):
         g = g.to(device)
         with torch.no_grad():
             reps.append(net(g))
-            labels.append(g.ndata['label'])
+            labels.append(g.ndata["label"])
     else:
         for g in dataset:
             # forward
             g = g.to(device)
             with torch.no_grad():
                 reps.append(net(g))
-                labels.append(g.ndata['label'])
+                labels.append(g.ndata["label"])
 
     reps = torch.cat(reps, dim=0)
     labels = torch.cat(labels, dim=0)
     return [reps, labels]
-
