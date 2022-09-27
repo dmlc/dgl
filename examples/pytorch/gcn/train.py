@@ -1,18 +1,23 @@
+import argparse
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 import dgl
 import dgl.nn as dglnn
-from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
 from dgl import AddSelfLoop
-import argparse
+from dgl.data import CiteseerGraphDataset, CoraGraphDataset, PubmedGraphDataset
+
 
 class GCN(nn.Module):
     def __init__(self, in_size, hid_size, out_size):
         super().__init__()
         self.layers = nn.ModuleList()
         # two-layer GCN
-        self.layers.append(dglnn.GraphConv(in_size, hid_size, activation=F.relu))
+        self.layers.append(
+            dglnn.GraphConv(in_size, hid_size, activation=F.relu)
+        )
         self.layers.append(dglnn.GraphConv(hid_size, out_size))
         self.dropout = nn.Dropout(0.5)
 
@@ -23,7 +28,8 @@ class GCN(nn.Module):
                 h = self.dropout(h)
             h = layer(g, h)
         return h
-    
+
+
 def evaluate(g, features, labels, mask, model):
     model.eval()
     with torch.no_grad():
@@ -51,49 +57,59 @@ def train(g, features, labels, masks, model):
         loss.backward()
         optimizer.step()
         acc = evaluate(g, features, labels, val_mask, model)
-        print("Epoch {:05d} | Loss {:.4f} | Accuracy {:.4f} "
-              . format(epoch, loss.item(), acc))
+        print(
+            "Epoch {:05d} | Loss {:.4f} | Accuracy {:.4f} ".format(
+                epoch, loss.item(), acc
+            )
+        )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset", type=str, default="cora",
-                        help="Dataset name ('cora', 'citeseer', 'pubmed').")
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        default="cora",
+        help="Dataset name ('cora', 'citeseer', 'pubmed').",
+    )
     args = parser.parse_args()
-    print(f'Training with DGL built-in GraphConv module.')
- 
+    print(f"Training with DGL built-in GraphConv module.")
+
     # load and preprocess dataset
-    transform = AddSelfLoop()  # by default, it will first remove self-loops to prevent duplication
-    if args.dataset == 'cora':
+    transform = (
+        AddSelfLoop()
+    )  # by default, it will first remove self-loops to prevent duplication
+    if args.dataset == "cora":
         data = CoraGraphDataset(transform=transform)
-    elif args.dataset == 'citeseer':
+    elif args.dataset == "citeseer":
         data = CiteseerGraphDataset(transform=transform)
-    elif args.dataset == 'pubmed':
+    elif args.dataset == "pubmed":
         data = PubmedGraphDataset(transform=transform)
     else:
-        raise ValueError('Unknown dataset: {}'.format(args.dataset))
+        raise ValueError("Unknown dataset: {}".format(args.dataset))
     g = data[0]
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     g = g.int().to(device)
-    features = g.ndata['feat']
-    labels = g.ndata['label']
-    masks = g.ndata['train_mask'], g.ndata['val_mask'], g.ndata['test_mask']
-        
+    features = g.ndata["feat"]
+    labels = g.ndata["label"]
+    masks = g.ndata["train_mask"], g.ndata["val_mask"], g.ndata["test_mask"]
+
     # normalization
     degs = g.in_degrees().float()
     norm = torch.pow(degs, -0.5).to(device)
     norm[torch.isinf(norm)] = 0
-    g.ndata['norm'] = norm.unsqueeze(1)
+    g.ndata["norm"] = norm.unsqueeze(1)
 
-    # create GCN model    
+    # create GCN model
     in_size = features.shape[1]
     out_size = data.num_classes
     model = GCN(in_size, 16, out_size).to(device)
 
     # model training
-    print('Training...')
+    print("Training...")
     train(g, features, labels, masks, model)
-    
+
     # test the model
-    print('Testing...')
+    print("Testing...")
     acc = evaluate(g, features, labels, masks[2], model)
     print("Test accuracy {:.4f}".format(acc))
