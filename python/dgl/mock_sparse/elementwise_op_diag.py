@@ -1,4 +1,4 @@
-"""dgl elementwise operators for diagonal matrix module."""
+"""DGL elementwise operators for diagonal matrix module."""
 from typing import Union
 
 from .diag_matrix import DiagMatrix
@@ -165,7 +165,8 @@ def rdiv(D1: float, D2: DiagMatrix):
         Diagonal matrix
     """
     raise RuntimeError(
-        "Elementwise div between diagonal and dense matrix is not supported."
+        "Elementwise subtraction between {} and {} is not "
+        "supported.".format(type(D1), type(D2))
     )
 
 
