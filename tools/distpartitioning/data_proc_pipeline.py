@@ -54,6 +54,8 @@ if __name__ == "__main__":
     parser.add_argument('--process-group-timeout', required=True, type=int,
                         help='timeout[seconds] for operations executed against the process group '
                              '(see torch.distributed.init_process_group)')
+    parser.add_argument('--save-orig-ids', action='store_true',
+                        help='Save original node/edge IDs into files')
     params = parser.parse_args()
 
     #invoke the pipeline function
