@@ -9,12 +9,13 @@ __all__ = ["sddmm"]
 def sddmm(
     A: SparseMatrix, mat1: torch.Tensor, mat2: torch.Tensor
 ) -> SparseMatrix:
-    r"""Sampled-Dense-Dense Matrix Multiplication (sddmm). `sddmm` multiplies
-    two dense matrices :attr:`mat1` and :attr:`mat2` at the nonzero locations
-    of sparse matrix :attr:`A`. Values of :attr:`A` is added to the resulting
-    matrix.
+    r"""Sampled-Dense-Dense Matrix Multiplication (SDDMM).
 
-    Mathematically `sddmm` is formulated as:
+    ``sddmm`` multiplies two dense matrices :attr:``mat1`` and :attr:``mat2``
+    at the nonzero locations of sparse matrix :attr:``A``. Values of :attr:``A``
+    is added to the resulting matrix.
+
+    Mathematically ``sddmm`` is formulated as:
 
     .. math::
         out = (mat1 @ mat2) * spy(A) + A
@@ -49,8 +50,8 @@ def sddmm(
     shape=(3, 4), nnz=3)
     """
     assert A.val.dim() == 1, (
-        "Nonzero elements have values of shape ({}). Expects "
-        "scalar values. ".format(A.val.shape[1])
+        f"Nonzero elements have values of shape ({A.val.shape[1]}). Expects "
+        "scalar values. "
     )
     # PyTorch's sddmm operator only supports CSR format.
     res = torch.sparse.sampled_addmm(A.adj.to_sparse_csr(), mat1, mat2)
