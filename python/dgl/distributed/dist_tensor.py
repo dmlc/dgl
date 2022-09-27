@@ -194,9 +194,7 @@ class DistTensor:
         # IDs. Currently I worked around it by adding a local_data_store
         # property.
         kvstore = self.kvstore
-        kvstore.local_data_store[new_dist_tensor._name][:] = \
-                kvstore.local_data_store[self._name] | \
-                kvstore.local_data_store[other._name]
+        kvstore.union(self._name, other._name, new_dist_tensor._name)
         return new_dist_tensor
 
     def __len__(self):
