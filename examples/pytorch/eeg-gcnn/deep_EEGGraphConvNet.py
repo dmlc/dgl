@@ -1,15 +1,17 @@
 import torch.nn as nn
 import torch.nn.functional as function
-from dgl.nn import GraphConv, SumPooling
 from torch.nn import BatchNorm1d
+
+from dgl.nn import GraphConv, SumPooling
 
 
 class EEGGraphConvNet(nn.Module):
-    """ EEGGraph Convolution Net
-        Parameters
-        ----------
-        num_feats: the number of features per node. In our case, it is 6.
+    """EEGGraph Convolution Net
+    Parameters
+    ----------
+    num_feats: the number of features per node. In our case, it is 6.
     """
+
     def __init__(self, num_feats):
         super(EEGGraphConvNet, self).__init__()
 
@@ -17,7 +19,9 @@ class EEGGraphConvNet(nn.Module):
         self.conv2 = GraphConv(16, 32)
         self.conv3 = GraphConv(32, 64)
         self.conv4 = GraphConv(64, 50)
-        self.conv4_bn = BatchNorm1d(50, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        self.conv4_bn = BatchNorm1d(
+            50, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+        )
 
         self.fc_block1 = nn.Linear(50, 30)
         self.fc_block2 = nn.Linear(30, 10)
@@ -31,8 +35,8 @@ class EEGGraphConvNet(nn.Module):
         self.sumpool = SumPooling()
 
     def forward(self, g, return_graph_embedding=False):
-        x = g.ndata['x']
-        edge_weight = g.edata['edge_weights']
+        x = g.ndata["x"]
+        edge_weight = g.edata["edge_weights"]
 
         x = self.conv1(g, x, edge_weight=edge_weight)
         x = function.leaky_relu(x, negative_slope=0.01)

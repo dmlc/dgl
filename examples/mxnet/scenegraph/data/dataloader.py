@@ -1,13 +1,15 @@
 """DataLoader utils."""
-import dgl
-from mxnet import nd
 from gluoncv.data.batchify import Pad
+from mxnet import nd
+
+import dgl
+
 
 def dgl_mp_batchify_fn(data):
     if isinstance(data[0], tuple):
         data = zip(*data)
         return [dgl_mp_batchify_fn(i) for i in data]
-    
+
     for dt in data:
         if dt is not None:
             if isinstance(dt, dgl.DGLGraph):
