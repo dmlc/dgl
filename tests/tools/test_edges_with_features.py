@@ -27,10 +27,10 @@ def test_edges_with_features():
     partitions to validate the feature data stored in each partition to make sure
     that it matches with the data stored in the original graph.
     """
-    # Step0: prepare chunked graph data format
+    # Step0: prepare chunked graph data format.
     print('Starting edge feature tests...')
 
-    # A synthetic mini MAG240
+    # A synthetic mini MAG240.
     num_institutions = 20
     num_authors = 100
     num_papers = 600
@@ -46,7 +46,7 @@ def test_edges_with_features():
     num_write_edges = 1000
     num_affiliate_edges = 200
 
-    # Structure
+    # Structure.
     data_dict = {
         ('paper', 'cites', 'paper'): rand_edges(
             num_papers, num_papers, num_cite_edges
@@ -69,11 +69,11 @@ def test_edges_with_features():
     paper_label = np.random.choice(num_classes, num_papers)
     paper_year = np.random.choice(2022, num_papers)
 
-    # edge features
+    # Edge features.
     cite_count = np.random.choice(10, num_cite_edges)
     write_year = np.random.choice(2022, num_write_edges)
 
-    # Save features
+    # Save features.
     with tempfile.TemporaryDirectory() as root_dir:
         print('root_dir: ', root_dir)
         input_dir = os.path.join(root_dir, 'data_test')
@@ -116,7 +116,6 @@ def test_edges_with_features():
             {
                 'cites': {'count': cite_count_path},
                 'writes': {'year': write_year_path},
-                # you can put the same data file if they indeed share the features.
                 'rev_writes': {'year': write_year_path},
             },
             num_chunks=num_chunks,

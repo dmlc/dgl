@@ -81,14 +81,9 @@ def get_etype_featnames(etype_name, schema_map):
     list : 
         a list of feature names for a given edge_type
     """
-    etype_featdict = schema_map[constants.STR_EDGE_DATA]
-    if etype_name in etype_featdict:
-        featnames = []
-        etype_info = etype_featdict[etype_name]
-        for k, v in etype_info.items():
-            featnames.append(k)
-        return featnames
-    return []
+	edge_data = schema_map[constants.STR_EDGE_DATA]
+	feats = edge_data.get(etype_name, {})
+	return [feat for feat in feats]
 
 def get_ntype_featnames(ntype_name, schema_map): 
     """
@@ -108,15 +103,9 @@ def get_ntype_featnames(ntype_name, schema_map):
     list : 
         a list of feature names for a given node_type
     """
-    ntype_featdict = schema_map[constants.STR_NODE_DATA]
-    if (ntype_name in ntype_featdict):
-        featnames = []
-        ntype_info = ntype_featdict[ntype_name]
-        for k, v in ntype_info.items(): 
-            featnames.append(k)
-        return featnames
-    else: 
-        return []
+	node_data = schema_map[constants.STR_NODE_DATA]
+	feats = node_data.get(ntype_name, {})
+	return [feat for feat in feats]
 
 def get_edge_types(schema_map):
     """

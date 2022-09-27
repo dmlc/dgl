@@ -261,7 +261,7 @@ def exchange_node_features(rank, world_size, node_feature_tids, ntype_gnid_map, 
 
             node_feats = node_features[feat_key]
             for part_id in range(world_size):
-                #Get the partition ids for the range of global nids.
+                # Get the partition ids for the range of global nids.
                 if feat_type == constants.STR_NODE_FEATURES:
                     partid_slice = id_lookup.get_partition_ids(np.arange(gnid_start, gnid_end, dtype=np.int64))
                 else:

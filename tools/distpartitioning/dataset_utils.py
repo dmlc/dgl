@@ -195,7 +195,7 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
 
                 edge_feature_tids[etype_name].append([feat_name, -1, -1])
 
-    #read my edges for each node type
+    # Read edges for each node types that are processed by the currnet process.
     edge_tids, etype_geid_offset = get_idranges(schema_map[constants.STR_EDGE_TYPE], 
                                     schema_map[constants.STR_NUM_EDGES_PER_CHUNK])
     for etype_name in schema_map[constants.STR_EDGE_TYPE]: 
@@ -204,7 +204,7 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
                 item[1] = edge_tids[etype_name][rank][0]
                 item[2] = edge_tids[etype_name][rank][1]
 
-    #done build node_features locally. 
+    # Done with building node_features locally. 
     if len(edge_features) <= 0:
         logging.info(f'[Rank: {rank}] This dataset does not have any edge features')
     else:
