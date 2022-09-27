@@ -1,10 +1,9 @@
-import unittest
-
-import backend as F
 import dgl
 import pytest
 import torch
 from dgl.mock_sparse import SparseMatrix
+
+import backend as F
 
 parametrize_idtype = pytest.mark.parametrize(
     "idtype", [torch.int32, torch.int64]
@@ -14,8 +13,8 @@ parametrize_dtype = pytest.mark.parametrize(
 )
 
 
-@unittest.skipIf(
-    F.ctx().type == "cpu",
+@pytest.mark.skipif(
+    F._default_context_str == "cpu",
     reason="sddmm uses operator from pytorch which only supports CUDA",
 )
 def all_close_sparse(A, B):
