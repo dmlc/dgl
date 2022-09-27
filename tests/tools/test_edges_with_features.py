@@ -1,17 +1,17 @@
 import argparse
-import dgl
 import json
-import numpy as np
+import logging
 import os
+import platform
 import sys
 import tempfile
+
+import dgl
+import numpy as np
 import torch
-import logging
-import platform
-
-from dgl.data.utils import load_tensors, load_graphs
-
 from chunk_graph import chunk_graph
+from dgl.data.utils import load_graphs, load_tensors
+
 
 def test_edges_with_features():
     """
