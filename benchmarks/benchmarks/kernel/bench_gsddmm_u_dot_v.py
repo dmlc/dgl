@@ -1,11 +1,17 @@
 import time
-import dgl
+
 import torch
+
+import dgl
 
 from .. import utils
 
+
 def calc_gflops(graph, feat_size, num_heads, time):
-    return round(2 * graph.num_edges() * feat_size / 1000000000 / time, 2)  # count both mul and add
+    return round(
+        2 * graph.num_edges() * feat_size / 1000000000 / time, 2
+    )  # count both mul and add
+
 
 # The benchmarks include broadcasting cases.
 # Given feat_size = D, num_heads = H, the node feature shape will be (H, D // H)
@@ -14,17 +20,19 @@ def calc_gflops(graph, feat_size, num_heads, time):
 #   matter how many heads are there.
 # If num_heads = 0, it falls back to the normal element-wise operation without
 #   broadcasting.
-@utils.benchmark('flops', timeout=600)
-@utils.parametrize('graph', ['ogbn-arxiv', 'reddit', 'ogbn-proteins'])
-@utils.parametrize('feat_size', [4, 32, 256])
-@utils.parametrize('num_heads', [0, 1, 4])
+@utils.benchmark("flops", timeout=600)
+@utils.parametrize("graph", ["ogbn-arxiv", "reddit", "ogbn-proteins"])
+@utils.parametrize("feat_size", [4, 32, 256])
+@utils.parametrize("num_heads", [0, 1, 4])
 def track_flops(graph, feat_size, num_heads):
     device = utils.get_bench_device()
-    graph = utils.get_graph(graph, format='coo').to(device)
+    graph = utils.get_graph(graph, format="coo").to(device)
     if num_heads == 0:
         x = torch.randn(graph.num_nodes(), feat_size, device=device)
     else:
-        x = torch.randn(graph.num_nodes(), num_heads, feat_size // num_heads, device=device)
+        x = torch.randn(
+            graph.num_nodes(), num_heads, feat_size // num_heads, device=device
+        )
 
     # dry run
     for i in range(3):
