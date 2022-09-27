@@ -11,9 +11,6 @@ from ...heterograph_index import create_unitgraph_from_csr
 __all__ = ['gspmm', 'gsddmm', 'gspmm_hetero', 'gsddmm_hetero', 'edge_softmax', 'edge_softmax_hetero',
            'segment_reduce', 'scatter_add', 'csrmm', 'csrsum', 'csrmask', 'gather_mm', 'segment_mm']
 
-# This is to avoid warnings in cpu-only dgl. We don't enable autocast for CPU ops
-autocast_device = 'cuda' if th.cuda.is_available() else 'cpu'
-
 def _reduce_grad(grad, shape):
     """Reduce gradient on the broadcast dimension
     If there is broadcast in forward pass, gradients need to be reduced on
@@ -98,6 +95,18 @@ def spmm_cache_argY(binary_op, reduce_op, req_grad_X, req_grad_Y):
         if reduce_op in ['min', 'max']:
             return True
     return False
+
+class empty_context():
+    """Empty context that does nothing"""
+    def __init__(self, *args, **kargs):
+        return
+    def __enter__(self, *args, **kargs):
+        return self
+    def __exit__(self, *args, **kargs):
+        return
+
+# This is to avoid warnings in cpu-only dgl. We don't enable autocast for CPU ops
+autocast = th.cuda.amp.autocast if th.cuda.is_available() else empty_context
 
 def _cast_if_autocast_enabled(*args):
     if not th.is_autocast_enabled() or not th.cuda.is_available():
@@ -710,7 +719,7 @@ def gspmm(gidx, op, reduce_op, lhs_data, rhs_data):
         op = 'mul'
         rhs_data = 1. / rhs_data
     args = _cast_if_autocast_enabled(gidx, op, reduce_op, lhs_data, rhs_data)
-    with th.amp.autocast(autocast_device, enabled=False):
+    with autocast(enabled=False):
         return GSpMM.apply(*args)
 
 def gsddmm(gidx, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
@@ -721,7 +730,7 @@ def gsddmm(gidx, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
         op = 'mul'
         rhs_data = 1. / rhs_data
     args = _cast_if_autocast_enabled(gidx, op, lhs_data, rhs_data, lhs_target, rhs_target)
-    with th.amp.autocast(autocast_device, enabled=False):
+    with autocast(enabled=False):
         return GSDDMM.apply(*args)
 
 def gspmm_hetero(g, op, reduce_op, lhs_len, *lhs_and_rhs_tuple):
@@ -738,7 +747,7 @@ def gspmm_hetero(g, op, reduce_op, lhs_len, *lhs_and_rhs_tuple):
         lhs_and_rhs_tuple = tuple(list(lhs_tuple) + list(rhs_tuple))
 
     args = _cast_if_autocast_enabled(g, op, reduce_op, lhs_len, *lhs_and_rhs_tuple)
-    with th.amp.autocast(autocast_device, enabled=False):
+    with autocast(enabled=False):
         return GSpMM_hetero.apply(*args)
 
 def gsddmm_hetero(g, op, lhs_len, lhs_target='u', rhs_target='v', *lhs_and_rhs_tuple):
@@ -755,27 +764,27 @@ def gsddmm_hetero(g, op, lhs_len, lhs_target='u', rhs_target='v', *lhs_and_rhs_t
         lhs_and_rhs_tuple = tuple(list(lhs_tuple) + list(rhs_tuple))
 
     args = _cast_if_autocast_enabled(g, op, lhs_len, lhs_target, rhs_target, *lhs_and_rhs_tuple)
-    with th.amp.autocast(autocast_device, enabled=False):
+    with autocast(enabled=False):
         return GSDDMM_hetero.apply(*args)
 
 def edge_softmax(gidx, logits, eids=ALL, norm_by='dst'):
     args = _cast_if_autocast_enabled(gidx, logits, eids, norm_by)
-    with th.amp.autocast(autocast_device, enabled=False):
+    with autocast(enabled=False):
         return EdgeSoftmax.apply(*args)
 
 def edge_softmax_hetero(gidx, eids=ALL, norm_by='dst', *logits):
     args = _cast_if_autocast_enabled(gidx, eids, norm_by, *logits)
-    with th.amp.autocast(autocast_device, enabled=False):
+    with autocast(enabled=False):
         return EdgeSoftmax_hetero.apply(*args)
 
 def segment_reduce(op, x, offsets):
     args = _cast_if_autocast_enabled(op, x, offsets)
-    with th.amp.autocast(autocast_device, enabled=False):
+    with autocast(enabled=False):
         return SegmentReduce.apply(*args)
 
 def scatter_add(x, idx, m):
     args = _cast_if_autocast_enabled(x, idx, m)
-    with th.amp.autocast(autocast_device, enabled=False):
+    with autocast(enabled=False):
         return ScatterAdd.apply(*args)
 
 def csrmm(gidxA, A_weights, gidxB, B_weights, num_vtypes):
@@ -806,7 +815,7 @@ def segment_mm(A, B, seglen_A):
         return th.cat(C)
     else:
         args = _cast_if_autocast_enabled(A, B, seglen_A)
-        with th.amp.autocast(autocast_device, enabled=False):
+        with autocast(enabled=False):
             return SEGMENTMM.apply(*args)
 
 def gather_mm(A, B, idx_A=None, idx_B=None):
@@ -816,5 +825,5 @@ def gather_mm(A, B, idx_A=None, idx_B=None):
         return th.bmm(A.unsqueeze(1), B).squeeze(1)
     else:
         args = _cast_if_autocast_enabled(A, B, idx_A, idx_B)
-        with th.amp.autocast(autocast_device, enabled=False):
+        with autocast(enabled=False):
             return GATHERMM.apply(*args)

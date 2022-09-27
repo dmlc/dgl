@@ -170,13 +170,13 @@
     typedef __half FloatType;                                       \
     {__VA_ARGS__}                                                   \
   } else if (XPU == kDGLCUDA && (val).bits == 16 && (val).code == kDGLBfloat) {  \
-    LOG(FATAL) << "bfloat16 is not supported on this GPU";          \
+    LOG(FATAL) << "bfloat16 requires CUDA >= 11.0";                 \
   } else if (XPU == kDGLCPU) {                                      \
     LOG(FATAL) << (val_name)                                        \
       << " can only be float32 or float64 on CPU";                  \
   } else {                                                          \
     LOG(FATAL) << (val_name)                                        \
-      << " can only be float16/bfloat16/float32/float64 on GPU";    \
+      << " can only be float16/float32/float64 on GPU";             \
   }                                                                 \
 } while (0)
 #endif  // BF16_ENABLED

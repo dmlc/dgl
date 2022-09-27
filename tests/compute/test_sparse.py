@@ -1,10 +1,10 @@
+from distutils.version import LooseVersion
 from dgl.ops import gspmm, gsddmm, edge_softmax, segment_reduce
 from test_utils.graph_cases import get_cases
 from test_utils import parametrize_idtype
 import dgl
 import random
 import pytest, unittest
-import networkx as nx
 import backend as F
 import numpy as np 
 import torch
@@ -296,6 +296,10 @@ def test_segment_reduce(reducer):
 def test_segment_mm(idtype, feat_size, dtype, tol):
     if F._default_context_str == 'cpu' and dtype in (torch.float16, torch.bfloat16):
         pytest.skip("Only support float32 and float64 on CPU.")
+    if F._default_context_str == 'gpu' \
+        and LooseVersion(torch.version.cuda) < LooseVersion("11.0") \
+        and dtype == torch.bfloat16:
+        pytest.skip("BF16 requires CUDA >= 11.0.")
     dev = F.ctx()
     # input
     a = torch.tensor(np.random.rand(100, feat_size)).to(dev).to(dtype)
@@ -333,7 +337,10 @@ def test_segment_mm(idtype, feat_size, dtype, tol):
 def test_gather_mm_idx_b(feat_size, dtype, tol):
     if F._default_context_str == 'cpu' and dtype in (torch.float16, torch.bfloat16):
         pytest.skip("Only support float32 and float64 on CPU.")
-    import torch
+    if F._default_context_str == 'gpu' \
+        and LooseVersion(torch.version.cuda) < LooseVersion("11.0") \
+        and dtype == torch.bfloat16:
+        pytest.skip("BF16 requires CUDA >= 11.0.")
     dev = F.ctx()
     # input
     a = torch.tensor(np.random.rand(100, feat_size)).to(dev).to(dtype)
