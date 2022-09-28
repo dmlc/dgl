@@ -1,11 +1,14 @@
+import itertools
+import operator
+
 import numpy as np
 import torch
-import operator
-import itertools
-import constants
-from gloo_wrapper import allgather_sizes, alltoallv_cpu
 
+import constants
 from dist_lookup import DistLookupService
+from gloo_wrapper import allgather_sizes, alltoallv_cpu
+from utils import memory_snapshot
+
 
 def get_shuffle_global_nids(rank, world_size, global_nids_ranks, node_data):
     """ 
@@ -83,13 +86,14 @@ def lookup_shuffle_global_nids_edges(rank, world_size, edge_data, id_lookup, nod
         dictionary where keys are column names and values are numpy arrays representing all the
         edges present in the current graph partition
     '''
-
+    memory_snapshot("GlobalToShuffleIDMapBegin: ", rank)
     node_list = np.concatenate([edge_data[constants.GLOBAL_SRC_ID], edge_data[constants.GLOBAL_DST_ID]])
     shuffle_ids = id_lookup.get_shuffle_nids(node_list,
                                             node_data[constants.GLOBAL_NID],
                                             node_data[constants.SHUFFLE_GLOBAL_NID])
 
     edge_data[constants.SHUFFLE_GLOBAL_SRC_ID], edge_data[constants.SHUFFLE_GLOBAL_DST_ID] = np.split(shuffle_ids, 2)
+    memory_snapshot("GlobalToShuffleIDMap_AfterLookupServiceCalls: ", rank)
     return edge_data
 
 def assign_shuffle_global_nids_nodes(rank, world_size, node_data):

@@ -13,7 +13,7 @@ HeteroSubgraph InEdgeGraphRelabelNodes(
   CHECK_EQ(vids.size(), graph->NumVertexTypes())
     << "Invalid input: the input list size must be the same as the number of vertex types.";
   std::vector<IdArray> eids(graph->NumEdgeTypes());
-  DLContext ctx = aten::GetContextOf(vids);
+  DGLContext ctx = aten::GetContextOf(vids);
   for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
     auto pair = graph->meta_graph()->FindEdge(etype);
     const dgl_type_t dst_vtype = pair.second;
@@ -34,7 +34,7 @@ HeteroSubgraph InEdgeGraphNoRelabelNodes(
     << "Invalid input: the input list size must be the same as the number of vertex types.";
   std::vector<HeteroGraphPtr> subrels(graph->NumEdgeTypes());
   std::vector<IdArray> induced_edges(graph->NumEdgeTypes());
-  DLContext ctx = aten::GetContextOf(vids);
+  DGLContext ctx = aten::GetContextOf(vids);
   for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
     auto pair = graph->meta_graph()->FindEdge(etype);
     const dgl_type_t src_vtype = pair.first;
@@ -79,7 +79,7 @@ HeteroSubgraph OutEdgeGraphRelabelNodes(
   CHECK_EQ(vids.size(), graph->NumVertexTypes())
     << "Invalid input: the input list size must be the same as the number of vertex types.";
   std::vector<IdArray> eids(graph->NumEdgeTypes());
-  DLContext ctx = aten::GetContextOf(vids);
+  DGLContext ctx = aten::GetContextOf(vids);
   for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
     auto pair = graph->meta_graph()->FindEdge(etype);
     const dgl_type_t src_vtype = pair.first;
@@ -100,7 +100,7 @@ HeteroSubgraph OutEdgeGraphNoRelabelNodes(
     << "Invalid input: the input list size must be the same as the number of vertex types.";
   std::vector<HeteroGraphPtr> subrels(graph->NumEdgeTypes());
   std::vector<IdArray> induced_edges(graph->NumEdgeTypes());
-  DLContext ctx = aten::GetContextOf(vids);
+  DGLContext ctx = aten::GetContextOf(vids);
   for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
     auto pair = graph->meta_graph()->FindEdge(etype);
     const dgl_type_t src_vtype = pair.first;

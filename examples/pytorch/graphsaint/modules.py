@@ -1,12 +1,21 @@
+import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
-import torch as th
+
 import dgl.function as fn
 
 
 class GCNLayer(nn.Module):
-    def __init__(self, in_dim, out_dim, order=1, act=None,
-                 dropout=0, batch_norm=False, aggr="concat"):
+    def __init__(
+        self,
+        in_dim,
+        out_dim,
+        order=1,
+        act=None,
+        dropout=0,
+        batch_norm=False,
+        aggr="concat",
+    ):
         super(GCNLayer, self).__init__()
         self.lins = nn.ModuleList()
         self.bias = nn.ParameterList()
@@ -32,7 +41,9 @@ class GCNLayer(nn.Module):
         for lin in self.lins:
             nn.init.xavier_normal_(lin.weight)
 
-    def feat_trans(self, features, idx):  # linear transformation + activation + batch normalization
+    def feat_trans(
+        self, features, idx
+    ):  # linear transformation + activation + batch normalization
         h = self.lins[idx](features) + self.bias[idx]
 
         if self.act is not None:
@@ -50,14 +61,17 @@ class GCNLayer(nn.Module):
         h_in = self.dropout(features)
         h_hop = [h_in]
 
-        D_norm = g.ndata['train_D_norm'] if 'train_D_norm' in g.ndata else g.ndata['full_D_norm']
+        D_norm = (
+            g.ndata["train_D_norm"]
+            if "train_D_norm" in g.ndata
+            else g.ndata["full_D_norm"]
+        )
         for _ in range(self.order):  # forward propagation
-            g.ndata['h'] = h_hop[-1]
-            if 'w' not in g.edata:
-                g.edata['w'] = th.ones((g.num_edges(), )).to(features.device)
-            g.update_all(fn.u_mul_e('h', 'w', 'm'),
-                         fn.sum('m', 'h'))
-            h = g.ndata.pop('h')
+            g.ndata["h"] = h_hop[-1]
+            if "w" not in g.edata:
+                g.edata["w"] = th.ones((g.num_edges(),)).to(features.device)
+            g.update_all(fn.u_mul_e("h", "w", "m"), fn.sum("m", "h"))
+            h = g.ndata.pop("h")
             h = h * D_norm
             h_hop.append(h)
 
@@ -75,30 +89,73 @@ class GCNLayer(nn.Module):
 
 
 class GCNNet(nn.Module):
-    def __init__(self, in_dim, hid_dim, out_dim, arch="1-1-0",
-                 act=F.relu, dropout=0, batch_norm=False, aggr="concat"):
+    def __init__(
+        self,
+        in_dim,
+        hid_dim,
+        out_dim,
+        arch="1-1-0",
+        act=F.relu,
+        dropout=0,
+        batch_norm=False,
+        aggr="concat",
+    ):
         super(GCNNet, self).__init__()
         self.gcn = nn.ModuleList()
 
-        orders = list(map(int, arch.split('-')))
-        self.gcn.append(GCNLayer(in_dim=in_dim, out_dim=hid_dim, order=orders[0],
-                                 act=act, dropout=dropout, batch_norm=batch_norm, aggr=aggr))
+        orders = list(map(int, arch.split("-")))
+        self.gcn.append(
+            GCNLayer(
+                in_dim=in_dim,
+                out_dim=hid_dim,
+                order=orders[0],
+                act=act,
+                dropout=dropout,
+                batch_norm=batch_norm,
+                aggr=aggr,
+            )
+        )
         pre_out = ((aggr == "concat") * orders[0] + 1) * hid_dim
 
-        for i in range(1, len(orders)-1):
-            self.gcn.append(GCNLayer(in_dim=pre_out, out_dim=hid_dim, order=orders[i],
-                                     act=act, dropout=dropout, batch_norm=batch_norm, aggr=aggr))
+        for i in range(1, len(orders) - 1):
+            self.gcn.append(
+                GCNLayer(
+                    in_dim=pre_out,
+                    out_dim=hid_dim,
+                    order=orders[i],
+                    act=act,
+                    dropout=dropout,
+                    batch_norm=batch_norm,
+                    aggr=aggr,
+                )
+            )
             pre_out = ((aggr == "concat") * orders[i] + 1) * hid_dim
 
-        self.gcn.append(GCNLayer(in_dim=pre_out, out_dim=hid_dim, order=orders[-1],
-                                 act=act, dropout=dropout, batch_norm=batch_norm, aggr=aggr))
+        self.gcn.append(
+            GCNLayer(
+                in_dim=pre_out,
+                out_dim=hid_dim,
+                order=orders[-1],
+                act=act,
+                dropout=dropout,
+                batch_norm=batch_norm,
+                aggr=aggr,
+            )
+        )
         pre_out = ((aggr == "concat") * orders[-1] + 1) * hid_dim
 
-        self.out_layer = GCNLayer(in_dim=pre_out, out_dim=out_dim, order=0,
-                                  act=None, dropout=dropout, batch_norm=False, aggr=aggr)
+        self.out_layer = GCNLayer(
+            in_dim=pre_out,
+            out_dim=out_dim,
+            order=0,
+            act=None,
+            dropout=dropout,
+            batch_norm=False,
+            aggr=aggr,
+        )
 
     def forward(self, graph):
-        h = graph.ndata['feat']
+        h = graph.ndata["feat"]
 
         for layer in self.gcn:
             h = layer(graph, h)
@@ -107,4 +164,3 @@ class GCNNet(nn.Module):
         h = self.out_layer(graph, h)
 
         return h
-

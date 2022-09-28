@@ -115,22 +115,19 @@ struct CSRMatrix {
   }
 
   /*! \brief Return a copy of this matrix on the give device context. */
-  inline CSRMatrix CopyTo(const DLContext &ctx,
-                          const DGLStreamHandle &stream = nullptr) const {
+  inline CSRMatrix CopyTo(const DGLContext &ctx) const {
     if (ctx == indptr->ctx)
       return *this;
-    return CSRMatrix(num_rows, num_cols, indptr.CopyTo(ctx, stream),
-                     indices.CopyTo(ctx, stream),
-                     aten::IsNullArray(data) ? data : data.CopyTo(ctx, stream),
-                     sorted);
+    return CSRMatrix(num_rows, num_cols, indptr.CopyTo(ctx), indices.CopyTo(ctx),
+                     aten::IsNullArray(data) ? data : data.CopyTo(ctx), sorted);
   }
 
   /*!
   * \brief Pin the indptr, indices and data (if not Null) of the matrix.
   * \note This is an in-place method. Behavior depends on the current context,
-  *       kDLCPU: will be pinned;
+  *       kDGLCPU: will be pinned;
   *       IsPinned: directly return;
-  *       kDLGPU: invalid, will throw an error.
+  *       kDGLCUDA: invalid, will throw an error.
   *       The context check is deferred to pinning the NDArray.
   */
   inline void PinMemory_() {
@@ -160,6 +157,18 @@ struct CSRMatrix {
       data.UnpinMemory_();
     }
     is_pinned = false;
+  }
+
+  /*!
+   * \brief Record stream for the indptr, indices and data (if not Null) of the matrix.
+   * \param stream The stream that is using the graph
+   */
+  inline void RecordStream(DGLStreamHandle stream) const {
+    indptr.RecordStream(stream);
+    indices.RecordStream(stream);
+    if (!aten::IsNullArray(data)) {
+      data.RecordStream(stream);
+    }
   }
 };
 

@@ -134,13 +134,13 @@ std::pair<CSRMatrix, NDArray> CSRMM(
       C_weights};
 }
 
-template std::pair<CSRMatrix, NDArray> CSRMM<kDLCPU, int32_t, float>(
+template std::pair<CSRMatrix, NDArray> CSRMM<kDGLCPU, int32_t, float>(
     const CSRMatrix&, NDArray, const CSRMatrix&, NDArray);
-template std::pair<CSRMatrix, NDArray> CSRMM<kDLCPU, int64_t, float>(
+template std::pair<CSRMatrix, NDArray> CSRMM<kDGLCPU, int64_t, float>(
     const CSRMatrix&, NDArray, const CSRMatrix&, NDArray);
-template std::pair<CSRMatrix, NDArray> CSRMM<kDLCPU, int32_t, double>(
+template std::pair<CSRMatrix, NDArray> CSRMM<kDGLCPU, int32_t, double>(
     const CSRMatrix&, NDArray, const CSRMatrix&, NDArray);
-template std::pair<CSRMatrix, NDArray> CSRMM<kDLCPU, int64_t, double>(
+template std::pair<CSRMatrix, NDArray> CSRMM<kDGLCPU, int64_t, double>(
     const CSRMatrix&, NDArray, const CSRMatrix&, NDArray);
 
 };  // namespace aten

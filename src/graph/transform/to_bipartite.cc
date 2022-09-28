@@ -41,7 +41,7 @@ namespace transform {
 namespace {
 
 // Since partial specialization is not allowed for functions, use this as an
-// intermediate for ToBlock where XPU = kDLCPU.
+// intermediate for ToBlock where XPU = kDGLCPU.
 template<typename IdType>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>>
 ToBlockCPU(HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes,
@@ -143,7 +143,7 @@ ToBlockCPU(HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes,
 
 template<>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>>
-ToBlock<kDLCPU, int32_t>(HeteroGraphPtr graph,
+ToBlock<kDGLCPU, int32_t>(HeteroGraphPtr graph,
                          const std::vector<IdArray> &rhs_nodes,
                          bool include_rhs_in_lhs,
                          std::vector<IdArray>* const lhs_nodes) {
@@ -152,7 +152,7 @@ ToBlock<kDLCPU, int32_t>(HeteroGraphPtr graph,
 
 template<>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>>
-ToBlock<kDLCPU, int64_t>(HeteroGraphPtr graph,
+ToBlock<kDGLCPU, int64_t>(HeteroGraphPtr graph,
                          const std::vector<IdArray> &rhs_nodes,
                          bool include_rhs_in_lhs,
                          std::vector<IdArray>* const lhs_nodes) {
@@ -172,7 +172,7 @@ ToBlockGPU64(HeteroGraphPtr, const std::vector<IdArray>&, bool, std::vector<IdAr
 
 template<>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>>
-ToBlock<kDLGPU, int32_t>(HeteroGraphPtr graph,
+ToBlock<kDGLCUDA, int32_t>(HeteroGraphPtr graph,
                          const std::vector<IdArray> &rhs_nodes,
                          bool include_rhs_in_lhs,
                          std::vector<IdArray>* const lhs_nodes) {
@@ -181,7 +181,7 @@ ToBlock<kDLGPU, int32_t>(HeteroGraphPtr graph,
 
 template<>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>>
-ToBlock<kDLGPU, int64_t>(HeteroGraphPtr graph,
+ToBlock<kDGLCUDA, int64_t>(HeteroGraphPtr graph,
                          const std::vector<IdArray> &rhs_nodes,
                          bool include_rhs_in_lhs,
                          std::vector<IdArray>* const lhs_nodes) {

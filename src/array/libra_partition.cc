@@ -270,7 +270,8 @@ void LibraVertexCut(
 
     for (int64_t i=0; i < N_e; i++) {
       if (out_ptr[i] == c)
-        fprintf(fp, "%ld,%ld,%f\n", u_ptr[i], v_ptr[i], w_ptr[i]);
+        fprintf(fp, "%ld,%ld,%ld\n", static_cast<int64_t>(u_ptr[i]),
+            static_cast<int64_t>(v_ptr[i]), w_ptr[i]);
     }
     fclose(fp);
   }
@@ -283,7 +284,7 @@ void LibraVertexCut(
   printf("\nTotal replication: %ld\n", replication_list.size());
 
   for (uint64_t i=0; i < replication_list.size(); i++)
-    fprintf(fp, "%ld\n", replication_list[i]);
+    fprintf(fp, "%ld\n", static_cast<int64_t>(replication_list[i]));
 
   printf("Community weights:\n");
   for (int64_t c=0; c < nc; c++)
