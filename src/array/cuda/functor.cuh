@@ -6,9 +6,10 @@
 #ifndef DGL_ARRAY_CUDA_FUNCTOR_CUH_
 #define DGL_ARRAY_CUDA_FUNCTOR_CUH_
 
+#include <cmath>
+#include <limits>
 #include "./atomic.cuh"
 #include "./fp16.cuh"
-#include <cmath>
 
 namespace dgl {
 namespace aten {
@@ -128,7 +129,7 @@ template <typename Idx,
 struct _Sum {
   static constexpr __host__ __device__ __forceinline__ DType zero() {
     return 0.;
-  };
+  }
   static constexpr bool require_arg = false;
   static __device__ __forceinline__ void Call(
     DType *out_buf, Idx *arg_u_buf, Idx *arg_e_buf,
@@ -155,7 +156,7 @@ struct _Sum {
 
 template <typename Idx,
           typename DType,
-          bool atomic=false>
+          bool atomic = false>
 struct Sum: _Sum<Idx, DType, atomic> { };
 
 #ifdef USE_FP16
@@ -163,7 +164,7 @@ template <typename Idx, bool atomic>
 struct Sum<Idx, half, atomic>: _Sum<Idx, half, atomic> {
   static constexpr __host__ __device__ __forceinline__ half zero() {
     return __float2half_rn(0.);
-  };
+  }
 };
 #endif  // USE_FP16
 
@@ -173,7 +174,7 @@ template <typename Idx,
 struct _Max {
   static constexpr __host__ __device__ __forceinline__ DType zero() {
     return -std::numeric_limits<DType>::infinity();
-  };
+  }
   static constexpr bool require_arg = true;
   static __device__ __forceinline__ void Call(
     DType *out_buf, Idx *arg_u_buf, Idx *arg_e_buf,
@@ -216,7 +217,7 @@ struct _Max {
 
 template <typename Idx,
           typename DType,
-          bool atomic=false>
+          bool atomic = false>
 struct Max : _Max<Idx, DType, atomic> { };
 
 #ifdef USE_FP16
@@ -225,7 +226,7 @@ template <typename Idx,
 struct Max<Idx, half, atomic> : _Max<Idx, half, atomic> {
   static constexpr __host__ __device__ __forceinline__ half zero() {
     return __float2half_rn(-6.550400e+04f);
-  };
+  }
 };
 #endif
 
@@ -235,7 +236,7 @@ template <typename Idx,
 struct _Min {
   static constexpr __host__ __device__ __forceinline__ DType zero() {
     return std::numeric_limits<DType>::infinity();
-  };
+  }
   static constexpr bool require_arg = true;
   static __device__ __forceinline__ void Call(
     DType *out_buf, Idx *arg_u_buf, Idx *arg_e_buf,
@@ -278,7 +279,7 @@ struct _Min {
 
 template <typename Idx,
           typename DType,
-          bool atomic=false>
+          bool atomic = false>
 struct Min : _Min<Idx, DType, atomic> { };
 
 #ifdef USE_FP16
@@ -287,7 +288,7 @@ template <typename Idx,
 struct Min<Idx, half, atomic> : _Min<Idx, half, atomic> {
   static constexpr __host__ __device__ __forceinline__ half zero() {
     return __float2half_rn(6.550400e+04f);
-  };
+  }
 };
 #endif  // USE_FP16
 

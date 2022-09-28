@@ -1,12 +1,16 @@
-import os
-import torch
-import numpy as np
 import json
+import logging
+import os
+
 import dgl
+import numpy as np
+import psutil
+import pyarrow
+import torch
+from pyarrow import csv
+
 import constants
 
-import pyarrow
-from pyarrow import csv
 
 def read_ntype_partition_files(schema_map, input_dir):
     """
@@ -419,4 +423,30 @@ def get_idranges(names, counts):
         gnid_start = gnid_end
 
     return tid_dict, gid_dict
+
+
+def memory_snapshot(tag, rank):
+    """
+    Utility function to take a snapshot of the usage of system resources
+    at a given point of time.
+    
+    Parameters: 
+    -----------
+    tag : string
+        string provided by the user for bookmarking purposes
+    rank : integer
+        process id of the participating process
+    """
+    GB = 1024 * 1024 * 1024
+    MB = 1024 * 1024
+    KB = 1024
+
+    peak = dgl.partition.get_peak_mem()*KB
+    mem = psutil.virtual_memory()
+    avail = mem.available / MB
+    used = mem.used / MB
+    total = mem.total / MB
+
+    mem_string = f'{total:.0f} (MB) total, {peak:.0f} (MB) peak, {used:.0f} (MB) used, {avail:.0f} (MB) avail'
+    logging.debug(f'[Rank: {rank} MEMORY_SNAPSHOT] {mem_string} - {tag}')
 

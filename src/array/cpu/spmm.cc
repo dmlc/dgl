@@ -29,8 +29,6 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
     SWITCH_BITS(bits, DType, {
       SWITCH_OP(op, Op, {
         DType *out_off = out.Ptr<DType>();
-        IdType* argX = Op::use_lhs ? static_cast<IdType*>(out_aux[0]->data) : nullptr;
-        IdType* argW = Op::use_rhs ? static_cast<IdType*>(out_aux[1]->data) : nullptr;
         if (reduce == "max") {
           std::fill(out_off, out_off + csr.num_rows * dim, cpu::op::Max<DType>::zero);
           cpu::SpMMCmpCsr<IdType, DType, Op, cpu::op::Max<DType>>(
@@ -103,7 +101,6 @@ void SpMMCsrHetero(const std::string& op, const std::string& reduce,
           const dgl_type_t src_id = ufeat_node_tids[etype];
           const dgl_type_t dst_id = out_node_tids[etype];
           CSRMatrix csr = vec_csr[etype];
-          DType *out_off = (*vec_out)[out_node_tids[etype]].Ptr<DType>();
           NDArray ufeat = (vec_ufeat.size() == 0) ? NullArray() : vec_ufeat[src_id];
           NDArray efeat = (vec_efeat.size() == 0) ? NullArray() : vec_efeat[etype];
           NDArray out = (*vec_out)[dst_id];

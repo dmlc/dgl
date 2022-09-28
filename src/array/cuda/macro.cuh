@@ -48,4 +48,4 @@
   }                                                                            \
 } while (0)
 
-#endif
+#endif  // DGL_ARRAY_CUDA_MACRO_CUH_
