@@ -47,7 +47,8 @@ def div(
     return diag_div(A, B)
 
 
-def power(A: SparseMatrix, B: float) -> Union[SparseMatrix, DiagMatrix]:
+def power(A: Union[SparseMatrix, DiagMatrix], B: float) -> Union[SparseMatrix, DiagMatrix]:
+    """Elementwise division"""
     if isinstance(A, SparseMatrix) or isinstance(B, SparseMatrix):
         return sp_power(A, B)
     return diag_power(A, B)
