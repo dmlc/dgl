@@ -50,18 +50,31 @@ class DeepWalk(nn.Module):
     Examples
     --------
 
+    >>> import torch
     >>> from dgl.data import CoraGraphDataset
-    >>> from torch.utils.data import DataLoader
     >>> from dgl.nn import DeepWalk
+    >>> from torch.optim import SparseAdam
+    >>> from torch.utils.data import DataLoader
+    >>> from sklearn.linear_model import LogisticRegression
 
     >>> dataset = CoraGraphDataset()
     >>> g = dataset[0]
     >>> model = DeepWalk(g)
+    >>> optimizer = SparseAdam(model.parameters(), lr=0.01)
     >>> dataloader = DataLoader(torch.arange(g.num_nodes()), batch_size=128,
     ...                         shuffle=True, collate_fn=model.sample)
-    >>> num_epochs = 10
+    >>> num_epochs = 5
     >>> for epoch in range(num_epochs):
     ...     for batch_walk in dataloader:
+    ...         loss = model(batch_walk)
+    ...         loss.backward()
+    ...         optimizer.step()
+    >>> train_mask = g.ndata['train_mask']
+    >>> test_mask = g.ndata['test_mask']
+    >>> X = model.node_embed.weight.detach()
+    >>> y = g.ndata['label']
+    >>> clf = LogisticRegression().fit(X[train_mask].numpy(), y[train_mask].numpy())
+    >>> clf.score(X[test_mask].numpy(), y[test_mask].numpy())
     """
     def __init__(self,
                  g,
@@ -168,9 +181,9 @@ class DeepWalk(nn.Module):
         pos_dst_emb = batch_context_embed[idx_list_dst]
 
         neg_idx_list_src = idx_list_dst.unsqueeze(1) + torch.zeros(
-            self.negative_size).unsqueeze(0)
+            self.negative_size).unsqueeze(0).to(device)
         neg_idx_list_src = neg_idx_list_src.view(-1)
-        neg_src_emb = batch_node_embed[neg_idx_list_src]
+        neg_src_emb = batch_node_embed[neg_idx_list_src.long()]
 
         if self.fast_neg:
             neg_idx_list_dst = list(range(batch_size * self.walk_length)) \
@@ -181,7 +194,7 @@ class DeepWalk(nn.Module):
             neg_dst_emb = batch_context_embed[neg_idx_list_dst]
         else:
             neg_dst = choice(self.g.num_nodes(), size=len(neg_src_emb), prob=self.neg_prob)
-            neg_dst_emb = self.context_embed(neg_dst)
+            neg_dst_emb = self.context_embed(neg_dst.to(device))
 
         pos_score = torch.sum(torch.mul(pos_src_emb, pos_dst_emb), dim=1)
         pos_score = torch.clamp(pos_score, max=6, min=-6)
