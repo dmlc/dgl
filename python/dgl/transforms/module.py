@@ -429,7 +429,7 @@ class LaplacianPE(BaseTransform):
 
     def __call__(self, g):
         if self.eigval_name:
-            eigval, PE = functional.laplacian_pe(g, k=self.k, padding=self.padding, 
+            eigval, PE = functional.laplacian_pe(g, k=self.k, padding=self.padding,
                                                  return_eigval=True)
             eigval = F.repeat(eigval.unsqueeze(0), g.num_nodes(), dim=0)
             g.ndata[self.eigval_name] = F.copy_to(eigval, g.device)
