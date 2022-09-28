@@ -91,9 +91,9 @@ if __name__ == "__main__":
         a node-type in the input graph dataset.')
     params = parser.parse_args()
 
-    #Configure logging.
+    # Configure logging.
     logging.basicConfig(level='INFO', format=f"[{platform.node()} \
         %(levelname)s %(asctime)s PID:%(process)d] %(message)s")
 
-    #Invoke the function for post processing
+    # Invoke the function for post processing
     post_process(params)

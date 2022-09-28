@@ -28,7 +28,7 @@ def run_parmetis_wrapper(params):
     graph_name = schema[constants.STR_GRAPH_NAME]
     num_partitions = len(schema[constants.STR_NUM_NODES_PER_CHUNK][0])
 
-    #Trigger pre-processing step to generate input files for ParMETIS
+    # Trigger pre-processing step to generate input files for ParMETIS.
     env = dict(os.environ)
     dgl_home = env["DGL_HOME"]
     if dgl_home[-1] != "/":
@@ -45,7 +45,7 @@ def run_parmetis_wrapper(params):
     logging.info("\n")
     logging.info("\n")
 
-    #Trigger ParMETIS for creating metis partitions for the input graph
+    # Trigger ParMETIS for creating metis partitions for the input graph.
     parmetis_install_path = ""
     if params.parmetis_install_path is not None:
         parmetis_install_path = params.parmetis_install_path
@@ -61,14 +61,10 @@ def run_parmetis_wrapper(params):
     logging.info(f'Executing ParMETIS: {parmetis_cmd}')
     os.system(parmetis_cmd)
     logging.info(f'Done ParMETIS execution step')
-    logging.info("\n")
-    logging.info("\n")
-    logging.info("\n")
 
-    #Trigger post-processing step to convert parmetis output to the form
-    #acceptable by dist. graph partitioning pipeline.
+    # Trigger post-processing step to convert parmetis output to the form
+    # acceptable by dist. graph partitioning pipeline.
     parmetis_output_file = os.path.join(os.getcwd(), f'{graph_name}_part.{num_partitions}')
-    #assert os.path.isfile(parmetis_output_file)
     postproc_cmd = f'python3 {dgl_home}tools/distpartitioning/parmetis_postprocess.py '\
           f'--schema_file {params.schema_file} '\
           f'--parmetis_output_file {parmetis_output_file} '\
@@ -82,7 +78,7 @@ if __name__ == "__main__":
     """
     parser = argparse.ArgumentParser(description=\
         'Run ParMETIS as part of the graph partitioning pipeline')
-    #Preprocessing step.
+    # Preprocessing step.
     parser.add_argument('--schema_file', required=True, type=str, 
         help='The schema of the input graph')
     parser.add_argument('--preproc_output_dir', required=True, type=str,
@@ -91,11 +87,11 @@ if __name__ == "__main__":
     parser.add_argument('--hostfile', required=True, type=str, 
         help='A text file with a list of ip addresses.')
 
-    #ParMETIS step.
+    # ParMETIS step.
     parser.add_argument('--parmetis_install_path', required=False, type=str, 
         help='The directory where ParMETIS is installed')
 
-    #Postprocessing step.
+    # Postprocessing step.
     parser.add_argument('--parmetis_output_file', required=True, type=str,
         help='ParMETIS output file (global_node_id to partition_id mappings)')
     parser.add_argument('--partitions_dir', required=True, type=str, 
@@ -103,7 +99,7 @@ if __name__ == "__main__":
               by node_types')
     params = parser.parse_args()
 
-    #Configure logging.
+    # Configure logging.
     logging.basicConfig(level='INFO', format=f"[{platform.node()} \
         %(levelname)s %(asctime)s PID:%(process)d] %(message)s")
 

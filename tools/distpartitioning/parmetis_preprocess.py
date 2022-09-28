@@ -260,7 +260,7 @@ def gen_parmetis_input_args(params, schema_map):
         nfile.write('{} {} {}\n'.format(f[0], f[1], f[2]))
     nfile.close()
 
-    #Regenerate edge files here.
+    # Regenerate edge files here.
     edge_data = schema_map[constants.STR_EDGES]
     edge_files = []
     for etype_name, etype_info in edge_data.items():
