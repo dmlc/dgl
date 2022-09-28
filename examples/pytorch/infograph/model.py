@@ -1,18 +1,18 @@
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn import Sequential, ModuleList, Linear, GRU, ReLU, BatchNorm1d
+from torch.nn import GRU, BatchNorm1d, Linear, ModuleList, ReLU, Sequential
+from utils import global_global_loss_, local_global_loss_
 
 from dgl.nn import GINConv, NNConv, Set2Set
 from dgl.nn.pytorch.glob import SumPooling
 
-from utils import global_global_loss_, local_global_loss_
+""" Feedforward neural network"""
 
 
-''' Feedforward neural network'''
 class FeedforwardNetwork(nn.Module):
 
-    '''
+    """
     3-layer feed-forward neural networks with jumping connections
     Parameters
     -----------
@@ -26,18 +26,19 @@ class FeedforwardNetwork(nn.Module):
     forward(feat):
         feat: Tensor
             [N * D], input features
-    '''
+    """
 
     def __init__(self, in_dim, hid_dim):
         super(FeedforwardNetwork, self).__init__()
 
-        self.block = Sequential(Linear(in_dim, hid_dim),
-                                ReLU(),
-                                Linear(hid_dim, hid_dim),
-                                ReLU(),
-                                Linear(hid_dim, hid_dim),
-                                ReLU()
-                                )
+        self.block = Sequential(
+            Linear(in_dim, hid_dim),
+            ReLU(),
+            Linear(hid_dim, hid_dim),
+            ReLU(),
+            Linear(hid_dim, hid_dim),
+            ReLU(),
+        )
 
         self.jump_con = Linear(in_dim, hid_dim)
 
@@ -50,10 +51,11 @@ class FeedforwardNetwork(nn.Module):
         return out
 
 
-''' Unsupervised Setting '''
+""" Unsupervised Setting """
+
 
 class GINEncoder(nn.Module):
-    '''
+    """
     Encoder based on dgl.nn.GINConv &  dgl.nn.SumPooling
     Parameters
     -----------
@@ -61,7 +63,7 @@ class GINEncoder(nn.Module):
         Input feature size.
     hid_dim: int
         Hidden feature size.
-    n_layer: 
+    n_layer:
         Number of GIN layers.
 
     Functions
@@ -70,7 +72,7 @@ class GINEncoder(nn.Module):
         graph: DGLGraph
         feat: Tensor
             [N * D], node features
-    '''
+    """
 
     def __init__(self, in_dim, hid_dim, n_layer):
         super(GINEncoder, self).__init__()
@@ -86,12 +88,11 @@ class GINEncoder(nn.Module):
             else:
                 n_in = hid_dim
             n_out = hid_dim
-            block = Sequential(Linear(n_in, n_out),
-                               ReLU(),
-                               Linear(hid_dim, hid_dim)
-                               )
+            block = Sequential(
+                Linear(n_in, n_out), ReLU(), Linear(hid_dim, hid_dim)
+            )
 
-            conv = GINConv(apply_func = block, aggregator_type = 'sum')
+            conv = GINConv(apply_func=block, aggregator_type="sum")
             bn = BatchNorm1d(hid_dim)
 
             self.convs.append(conv)
@@ -109,8 +110,8 @@ class GINEncoder(nn.Module):
             x = self.bns[i](x)
             xs.append(x)
 
-        local_emb = th.cat(xs, 1)                    # patch-level embedding
-        global_emb = self.pool(graph, local_emb)     # graph-level embedding
+        local_emb = th.cat(xs, 1)  # patch-level embedding
+        global_emb = self.pool(graph, local_emb)  # graph-level embedding
 
         return global_emb, local_emb
 
@@ -125,7 +126,7 @@ class InfoGraph(nn.Module):
         Input feature size.
     hid_dim: int
         Hidden feature size.
-    n_layer: int   
+    n_layer: int
         Number of the GNN encoder layers.
 
     Functions
@@ -146,8 +147,12 @@ class InfoGraph(nn.Module):
 
         self.encoder = GINEncoder(in_dim, hid_dim, n_layer)
 
-        self.local_d = FeedforwardNetwork(embedding_dim, embedding_dim)   # local discriminator (node-level)
-        self.global_d = FeedforwardNetwork(embedding_dim, embedding_dim)  # global discriminator (graph-level)
+        self.local_d = FeedforwardNetwork(
+            embedding_dim, embedding_dim
+        )  # local discriminator (node-level)
+        self.global_d = FeedforwardNetwork(
+            embedding_dim, embedding_dim
+        )  # global discriminator (graph-level)
 
     def get_embedding(self, graph, feat):
         # get_embedding function for evaluation the learned embeddings
@@ -161,19 +166,20 @@ class InfoGraph(nn.Module):
 
         global_emb, local_emb = self.encoder(graph, feat)
 
-        global_h = self.global_d(global_emb)    # global hidden representation
-        local_h = self.local_d(local_emb)       # local hidden representation
+        global_h = self.global_d(global_emb)  # global hidden representation
+        local_h = self.local_d(local_emb)  # local hidden representation
 
         loss = local_global_loss_(local_h, global_h, graph_id)
 
         return loss
 
 
-''' Semisupervised Setting '''
+""" Semisupervised Setting """
+
 
 class NNConvEncoder(nn.Module):
 
-    '''
+    """
     Encoder based on dgl.nn.NNConv & GRU & dgl.nn.set2set pooling
     Parameters
     -----------
@@ -190,7 +196,7 @@ class NNConvEncoder(nn.Module):
             [N * D1], node features
         efeat: Tensor
             [E * D2], edge features
-    '''
+    """
 
     def __init__(self, in_dim, hid_dim):
         super(NNConvEncoder, self).__init__()
@@ -198,9 +204,17 @@ class NNConvEncoder(nn.Module):
         self.lin0 = Linear(in_dim, hid_dim)
 
         # mlp for edge convolution in NNConv
-        block = Sequential(Linear(5, 128), ReLU(), Linear(128, hid_dim * hid_dim))
+        block = Sequential(
+            Linear(5, 128), ReLU(), Linear(128, hid_dim * hid_dim)
+        )
 
-        self.conv = NNConv(hid_dim, hid_dim, edge_func = block, aggregator_type = 'mean', residual = False)
+        self.conv = NNConv(
+            hid_dim,
+            hid_dim,
+            edge_func=block,
+            aggregator_type="mean",
+            residual=False,
+        )
         self.gru = GRU(hid_dim, hid_dim)
 
         # set2set pooling
@@ -228,7 +242,7 @@ class NNConvEncoder(nn.Module):
 
 class InfoGraphS(nn.Module):
 
-    '''
+    """
     InfoGraph* model for semi-supervised setting
     Parameters
     -----------
@@ -244,8 +258,8 @@ class InfoGraphS(nn.Module):
 
     unsupforward(graph):
         graph: DGLGraph
-        
-    '''
+
+    """
 
     def __init__(self, in_dim, hid_dim):
         super(InfoGraphS, self).__init__()
@@ -265,19 +279,21 @@ class InfoGraphS(nn.Module):
         self.unsup_d = FeedforwardNetwork(2 * hid_dim, hid_dim)
 
     def forward(self, graph, nfeat, efeat):
-        
+
         sup_global_emb, sup_local_emb = self.sup_encoder(graph, nfeat, efeat)
 
         sup_global_pred = self.fc2(F.relu(self.fc1(sup_global_emb)))
         sup_global_pred = sup_global_pred.view(-1)
 
         return sup_global_pred
-    
+
     def unsup_forward(self, graph, nfeat, efeat, graph_id):
 
         sup_global_emb, sup_local_emb = self.sup_encoder(graph, nfeat, efeat)
-        unsup_global_emb, unsup_local_emb = self.unsup_encoder(graph, nfeat, efeat)
-        
+        unsup_global_emb, unsup_local_emb = self.unsup_encoder(
+            graph, nfeat, efeat
+        )
+
         g_enc = self.unsup_global_d(unsup_global_emb)
         l_enc = self.unsup_local_d(unsup_local_emb)
 
@@ -287,5 +303,5 @@ class InfoGraphS(nn.Module):
         # Calculate loss
         unsup_loss = local_global_loss_(l_enc, g_enc, graph_id)
         con_loss = global_global_loss_(sup_g_enc, unsup_g_enc)
-        
+
         return unsup_loss, con_loss
