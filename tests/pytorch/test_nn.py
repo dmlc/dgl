@@ -1635,8 +1635,8 @@ def test_dgn_conv(in_size, out_size, aggregators, scalers, delta,
         num_towers, edge_feat_size, residual).to(dev)
     model(g, h, edge_feat=e)
 
-@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
-def test_DeepWalk(g):
+def test_DeepWalk():
+    g = dgl.graph(([0, 1, 2, 1, 2, 0], [1, 2, 0, 0, 1, 2]))
     model = nn.DeepWalk(g, emb_dim=8, walk_length=2, window_size=1, fast_neg=True, sparse=True)
     model = model.to(F.ctx())
     dataloader = DataLoader(torch.arange(g.num_nodes()), batch_size=16, collate_fn=model.sample)
