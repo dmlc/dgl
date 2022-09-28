@@ -6,15 +6,7 @@ import torch
 from .diag_matrix import DiagMatrix
 from .sp_matrix import SparseMatrix
 
-__all__ = [
-    "sp_add",
-    "sp_sub",
-    "sp_mul",
-    "sp_div",
-    "sp_rdiv",
-    "sp_power",
-    "sp_rpower",
-]
+__all__ = ["sp_add", "sp_sub", "sp_mul", "sp_div", "sp_power"]
 
 
 def sp_add(

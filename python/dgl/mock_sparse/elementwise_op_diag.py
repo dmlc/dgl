@@ -3,15 +3,7 @@ from typing import Union
 
 from .diag_matrix import DiagMatrix
 
-__all__ = [
-    "diag_add",
-    "diag_sub",
-    "diag_mul",
-    "diag_div",
-    "diag_rdiv",
-    "diag_power",
-    "diag_rpower",
-]
+__all__ = ["diag_add", "diag_sub", "diag_mul", "diag_div", "diag_power"]
 
 
 def diag_add(D1: DiagMatrix, D2: DiagMatrix) -> DiagMatrix:

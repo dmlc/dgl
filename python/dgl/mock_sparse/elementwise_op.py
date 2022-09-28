@@ -11,7 +11,8 @@ __all__ = ["add", "sub", "mul", "div", "power"]
 
 def add(
     A: Union[SparseMatrix, DiagMatrix], B: Union[SparseMatrix, DiagMatrix]
-) -> SparseMatrix:
+) -> Union[SparseMatrix, DiagMatrix]:
+    """Elementwise addition"""
     if isinstance(A, DiagMatrix) and isinstance(B, DiagMatrix):
         return diag_add(A, B)
     return sp_add(A, B)
@@ -19,7 +20,8 @@ def add(
 
 def sub(
     A: Union[SparseMatrix, DiagMatrix], B: Union[SparseMatrix, DiagMatrix]
-) -> SparseMatrix:
+) -> Union[SparseMatrix, DiagMatrix]:
+    """Elementwise addition"""
     if isinstance(A, DiagMatrix) and isinstance(B, DiagMatrix):
         return diag_sub(A, B)
     return sp_sub(A, B)
@@ -28,7 +30,8 @@ def sub(
 def mul(
     A: Union[SparseMatrix, DiagMatrix, float],
     B: Union[SparseMatrix, DiagMatrix, float],
-) -> SparseMatrix:
+) -> Union[SparseMatrix, DiagMatrix]:
+    """Elementwise multiplication"""
     if isinstance(A, SparseMatrix) or isinstance(B, SparseMatrix):
         return sp_mul(A, B)
     return diag_mul(A, B)
@@ -37,13 +40,14 @@ def mul(
 def div(
     A: Union[SparseMatrix, DiagMatrix],
     B: Union[SparseMatrix, DiagMatrix, float],
-) -> SparseMatrix:
+) -> Union[SparseMatrix, DiagMatrix]:
+    """Elementwise division"""
     if isinstance(A, SparseMatrix) or isinstance(B, SparseMatrix):
         return sp_div(A, B)
     return diag_div(A, B)
 
 
-def power(A: SparseMatrix, B: float) -> SparseMatrix:
+def power(A: SparseMatrix, B: float) -> Union[SparseMatrix, DiagMatrix]:
     if isinstance(A, SparseMatrix) or isinstance(B, SparseMatrix):
         return sp_power(A, B)
     return diag_power(A, B)
