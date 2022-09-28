@@ -4,9 +4,7 @@ import random
 import torch
 from torch import nn
 from torch.nn import init
-from torch.utils.data import DataLoader
 import torch.nn.functional as F
-import numpy as np
 
 from ...random import choice
 from ...sampling import random_walk
