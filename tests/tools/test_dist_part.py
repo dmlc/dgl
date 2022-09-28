@@ -46,6 +46,7 @@ def test_part_pipeline():
     num_classes = 4
     paper_label = np.random.choice(num_classes, num_papers)
     paper_year = np.random.choice(2022, num_papers)
+    paper_orig_ids = np.arange(0, num_papers)
 
     # edge features
     cite_count = np.random.choice(10, num_cite_edges)
@@ -71,6 +72,10 @@ def test_part_pipeline():
         with open(paper_year_path, 'wb') as f:
             np.save(f, paper_year)
 
+        paper_orig_ids_path = os.path.join(input_dir, 'paper/orig_ids.npy')
+        with open(paper_orig_ids_path, 'wb') as f:
+            np.save(f, paper_orig_ids)
+
         cite_count_path = os.path.join(input_dir, 'cites/count.npy')
         with open(cite_count_path, 'wb') as f:
             np.save(f, cite_count)
@@ -88,7 +93,8 @@ def test_part_pipeline():
                 {
                 'feat': paper_feat_path,
                 'label': paper_label_path,
-                'year': paper_year_path
+                'year': paper_year_path,
+                'orig_ids': paper_orig_ids_path
                 }
             },
             {
@@ -123,7 +129,7 @@ def test_part_pipeline():
 
         # check node_data
         output_node_data_dir = os.path.join(output_dir, 'node_data', 'paper')
-        for feat in ['feat', 'label', 'year']:
+        for feat in ['feat', 'label', 'year', 'orig_ids']:
             for i in range(num_chunks):
                 chunk_f_name = '{}-{}.npy'.format(feat, i)
                 chunk_f_name = os.path.join(output_node_data_dir, chunk_f_name)
@@ -154,7 +160,7 @@ def test_part_pipeline():
         # Step1: graph partition
         in_dir = os.path.join(root_dir, 'chunked-data')
         output_dir = os.path.join(root_dir, '2parts')
-        os.system('python tools/partition_algo/random_partition.py '\
+        os.system('python3 tools/partition_algo/random_partition.py '\
                   '--in_dir {} --out_dir {} --num_partitions {}'.format(
                     in_dir, output_dir, num_chunks))
         for ntype in ['author', 'institution', 'paper']:
@@ -171,13 +177,15 @@ def test_part_pipeline():
             f.write('127.0.0.1\n')
             f.write('127.0.0.2\n')
 
-        cmd = 'python tools/dispatch_data.py'
+        cmd = 'python3 tools/dispatch_data.py'
         cmd += f' --in-dir {in_dir}'
         cmd += f' --partitions-dir {partition_dir}'
         cmd += f' --out-dir {out_dir}'
         cmd += f' --ip-config {ip_config}'
         cmd += ' --ssh-port 22'
         cmd += ' --process-group-timeout 60'
+        cmd += ' --save-orig-nids'
+        cmd += ' --save-orig-eids'
         os.system(cmd)
 
         # check metadata.json
@@ -212,22 +220,36 @@ def test_part_pipeline():
             fname = os.path.join(sub_dir, 'graph.dgl')
             assert os.path.isfile(fname)
             g_list, data_dict = load_graphs(fname)
-            g = g_list[0]
-            assert isinstance(g, dgl.DGLGraph)
+            part_g = g_list[0]
+            assert isinstance(part_g, dgl.DGLGraph)
 
             # node_feat.dgl
             fname = os.path.join(sub_dir, 'node_feat.dgl')
             assert os.path.isfile(fname)
             tensor_dict = load_tensors(fname)
-            all_tensors = ['paper/feat', 'paper/label', 'paper/year']
+            all_tensors = ['paper/feat', 'paper/label', 'paper/year', 'paper/orig_ids']
             assert tensor_dict.keys() == set(all_tensors)
             for key in all_tensors:
                 assert isinstance(tensor_dict[key], torch.Tensor)
+            ndata_paper_orig_ids = tensor_dict['paper/orig_ids']
 
             # edge_feat.dgl
             fname = os.path.join(sub_dir, 'edge_feat.dgl')
             assert os.path.isfile(fname)
             tensor_dict = load_tensors(fname)
+
+            # orig_nids.dgl
+            fname = os.path.join(sub_dir, 'orig_nids.dgl')
+            assert os.path.isfile(fname)
+            orig_nids = load_tensors(fname)
+            assert len(orig_nids.keys()) == 3
+            assert torch.equal(ndata_paper_orig_ids, orig_nids['paper'])
+
+            # orig_eids.dgl
+            fname = os.path.join(sub_dir, 'orig_eids.dgl')
+            assert os.path.isfile(fname)
+            orig_eids = load_tensors(fname)
+            assert len(orig_eids.keys()) == 4
 
 if __name__ == '__main__':
     test_part_pipeline()

@@ -53,6 +53,8 @@ def submit_jobs(args) -> str:
     argslist += "--output {} ".format(os.path.abspath(args.out_dir))
     argslist += "--process-group-timeout {} ".format(args.process_group_timeout)
     argslist += "--log-level {} ".format(args.log_level)
+    argslist += "--save-orig-nids " if args.save_orig_nids else ""
+    argslist += "--save-orig-eids " if args.save_orig_eids else ""
 
     # (BarclayII) Is it safe to assume all the workers have the Python executable at the same path?
     pipeline_cmd = os.path.join(INSTALL_DIR, PIPELINE_SCRIPT)
@@ -77,6 +79,10 @@ def main():
     parser.add_argument('--ssh-port', type=int, default=22, help='SSH Port.') 
     parser.add_argument('--process-group-timeout', type=int, default=1800,
                         help='timeout[seconds] for operations executed against the process group')
+    parser.add_argument('--save-orig-nids', action='store_true',
+                        help='Save original node IDs into files')
+    parser.add_argument('--save-orig-eids', action='store_true',
+                        help='Save original edge IDs into files')
 
     args, udf_command = parser.parse_known_args()
 

@@ -614,17 +614,18 @@ def gen_dist_partitions(rank, world_size, params):
     num_edges = shuffle_global_eid_start
     node_count = len(node_data[constants.NTYPE_ID])
     edge_count = len(edge_data[constants.ETYPE_ID])
-    graph_obj, ntypes_map_val, etypes_map_val, ntypes_ntypeid_map, etypes_map = create_dgl_object(\
-            params.graph_name, params.num_parts, \
-            schema_map, rank, node_data, edge_data, num_nodes, num_edges)
+    graph_obj, ntypes_map_val, etypes_map_val, ntypes_map, etypes_map, \
+        orig_nids, orig_eids = create_dgl_object(schema_map, rank, node_data, \
+            edge_data, num_edges, params.save_orig_nids, params.save_orig_eids)
     memory_snapshot("CreateDGLObjectsComplete: ", rank)
-    write_dgl_objects(graph_obj, rcvd_node_features, edge_features, params.output, rank)
+    write_dgl_objects(graph_obj, rcvd_node_features, edge_features, params.output, \
+        rank, orig_nids, orig_eids)
     memory_snapshot("DiskWriteDGLObjectsComplete: ", rank)
 
     #get the meta-data
     json_metadata = create_metadata_json(params.graph_name, node_count, edge_count, \
                             rank, world_size, ntypes_map_val, \
-                            etypes_map_val, ntypes_ntypeid_map, etypes_map, params.output)
+                            etypes_map_val, ntypes_map, etypes_map, params.output)
     memory_snapshot("MetadataCreateComplete: ", rank)
 
     if (rank == 0):
