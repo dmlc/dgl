@@ -616,7 +616,7 @@ def gen_dist_partitions(rank, world_size, params):
     edge_count = len(edge_data[constants.ETYPE_ID])
     graph_obj, ntypes_map_val, etypes_map_val, ntypes_map, etypes_map, \
         orig_nids, orig_eids = create_dgl_object(schema_map, rank, node_data, \
-            edge_data, num_edges, params.save_orig_ids)
+            edge_data, num_edges, params.save_orig_nids, params.save_orig_eids)
     memory_snapshot("CreateDGLObjectsComplete: ", rank)
     write_dgl_objects(graph_obj, rcvd_node_features, edge_features, params.output, \
         rank, orig_nids, orig_eids)

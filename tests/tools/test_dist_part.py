@@ -182,9 +182,10 @@ def test_part_pipeline():
         cmd += f' --partitions-dir {partition_dir}'
         cmd += f' --out-dir {out_dir}'
         cmd += f' --ip-config {ip_config}'
-        cmd += ' --ssh-port 2233'
+        cmd += ' --ssh-port 22'
         cmd += ' --process-group-timeout 60'
-        cmd += ' --save-orig-ids'
+        cmd += ' --save-orig-nids'
+        cmd += ' --save-orig-eids'
         os.system(cmd)
 
         # check metadata.json
@@ -241,6 +242,7 @@ def test_part_pipeline():
             fname = os.path.join(sub_dir, 'orig_nids.dgl')
             assert os.path.isfile(fname)
             orig_nids = load_tensors(fname)
+            assert len(orig_nids.keys()) == 3
             assert torch.equal(ndata_paper_orig_ids, orig_nids['paper'])
 
             # orig_eids.dgl
