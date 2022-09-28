@@ -273,7 +273,6 @@ def test_parmetis_wrapper():
             f"--partitions_dir {partitions_dir} "
         )
         logging.info(f"Executing the following cmd: {parmetis_cmd}")
-        print(parmetis_cmd)
         os.system(parmetis_cmd)
 
         ntype_count = {
