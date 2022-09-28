@@ -238,7 +238,7 @@ def test_parmetis_preprocessing():
         schema_path = os.path.join(root_dir, 'chunked-data/metadata.json')
         results_dir = os.path.join(root_dir, 'parmetis-data')
         os.system(
-            'mpirun -np 2 python {dgl_home}tools/distpartitioning/parmetis_preprocess.py '
+            'mpirun -np 2 python3 {dgl_home}tools/distpartitioning/parmetis_preprocess.py '
             '--schema {} --output {}'.format(schema_path, results_dir)
         )
 
