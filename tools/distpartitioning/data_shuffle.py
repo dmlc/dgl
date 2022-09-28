@@ -97,7 +97,8 @@ def gen_node_data(rank, world_size, id_lookup, ntid_ntype_map, schema_map):
                         }
 
     type_nid_dict, global_nid_dict = get_idranges(schema_map[constants.STR_NODE_TYPE],
-                                        schema_map[constants.STR_NUM_NODES_PER_CHUNK])
+                                        schema_map[constants.STR_NUM_NODES_PER_CHUNK],
+                                        num_chunks=world_size)
 
     for ntype_id, ntype_name in ntid_ntype_map.items():
         type_start, type_end = type_nid_dict[ntype_name][0][0], type_nid_dict[ntype_name][-1][1]
@@ -290,7 +291,7 @@ def exchange_node_features(rank, world_size, node_feature_tids, ntype_gnid_map, 
     return own_node_features, own_global_nids
 
 def exchange_graph_data(rank, world_size, node_features, node_feat_tids, edge_data,
-        id_lookup, ntypes_ntypeid_map, ntypes_gnid_range_map, ntid_ntype_map, schema_map):
+        id_lookup, ntypes_gnid_range_map, ntid_ntype_map, schema_map):
     """
     Wrapper function which is used to shuffle graph data on all the processes.
 
@@ -556,8 +557,8 @@ def gen_dist_partitions(rank, world_size, params):
     #and return the aggregated data
     ntypes_gnid_range_map = get_gnid_range_map(node_tids)
     node_data, rcvd_node_features, rcvd_global_nids, edge_data  = \
-                    exchange_graph_data(rank, world_size, node_features, node_feat_tids, \
-                                        edge_data, id_lookup, ntypes_ntypeid_map, ntypes_gnid_range_map, \
+                    exchange_graph_data(rank, world_size, node_features, node_feat_tids,
+                                        edge_data, id_lookup, ntypes_gnid_range_map,
                                         ntypeid_ntypes_map, schema_map)
     gc.collect()
     logging.info(f'[Rank: {rank}] Done with data shuffling...')

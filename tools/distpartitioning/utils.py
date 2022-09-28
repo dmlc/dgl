@@ -85,15 +85,9 @@ def get_ntype_featnames(ntype_name, schema_map):
     list : 
         a list of feature names for a given node_type
     """
-    ntype_featdict = schema_map[constants.STR_NODE_DATA]
-    if (ntype_name in ntype_featdict):
-        featnames = []
-        ntype_info = ntype_featdict[ntype_name]
-        for k, v in ntype_info.items(): 
-            featnames.append(k)
-        return featnames
-    else: 
-        return []
+    node_data = schema_map[constants.STR_NODE_DATA]
+    feats = node_data.get(ntype_name, {})
+    return [feat for feat in feats]
 
 def get_node_types(schema_map):
     """ 
@@ -393,7 +387,7 @@ def write_dgl_objects(graph_obj, node_features, edge_features,
         orig_eids_file = os.path.join(part_dir, 'orig_eids.dgl')
         dgl.data.utils.save_tensors(orig_eids_file, orig_eids)
 
-def get_idranges(names, counts): 
+def get_idranges(names, counts, num_chunks=None): 
     """
     Utility function to compute typd_id/global_id ranges for both nodes and edges. 
 
@@ -403,6 +397,11 @@ def get_idranges(names, counts):
         list of node/edge types as strings
     counts : list of lists
         each list contains no. of nodes/edges in a given chunk
+    num_chunks : int, optional
+        In distributed partition pipeline, ID ranges are grouped into chunks.
+        In some scenarios, we'd like to merge ID ranges into specific number
+        of chunks. This parameter indicates the expected number of chunks.
+        If not specified, no merge is applied.
 
     Returns:
     --------
@@ -418,14 +417,12 @@ def get_idranges(names, counts):
     gnid_end = gnid_start
     tid_dict = {}
     gid_dict = {}
+    orig_num_chunks = 0
     for idx, typename in enumerate(names): 
         type_counts = counts[idx]
         tid_start = np.cumsum([0] + type_counts[:-1])
         tid_end = np.cumsum(type_counts)
         tid_ranges = list(zip(tid_start, tid_end))
-
-        type_start = tid_ranges[0][0]
-        type_end = tid_ranges[-1][1]
 
         gnid_end += tid_ranges[-1][1]
 
@@ -433,6 +430,20 @@ def get_idranges(names, counts):
         gid_dict[typename] = np.array([gnid_start, gnid_end]).reshape([1,2])
 
         gnid_start = gnid_end
+        orig_num_chunks = len(tid_start)
+
+    if num_chunks is None:
+        return tid_dict, gid_dict
+
+    assert num_chunks <= orig_num_chunks, \
+        'Specified number of chunks should be less/euqual than original numbers of ID ranges.'
+    chunk_list = np.array_split(np.arange(orig_num_chunks), num_chunks)
+    for typename in tid_dict:
+        orig_tid_ranges = tid_dict[typename]
+        tid_ranges = []
+        for idx in chunk_list:
+            tid_ranges.append((orig_tid_ranges[idx[0]][0], orig_tid_ranges[idx[-1]][-1]))
+        tid_dict[typename] = tid_ranges
 
     return tid_dict, gid_dict
 

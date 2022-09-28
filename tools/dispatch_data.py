@@ -4,6 +4,7 @@ import sys
 import argparse
 import logging
 import json
+from partition_algo.base import load_partition_meta
 
 INSTALL_DIR = os.path.abspath(os.path.join(__file__, '..'))
 LAUNCH_SCRIPT = "distgraphlaunch.py"
@@ -33,15 +34,28 @@ def get_launch_cmd(args) -> str:
 
 
 def submit_jobs(args) -> str:
-    wrapper_command = os.path.join(INSTALL_DIR, LAUNCH_SCRIPT)
-
     #read the json file and get the remaining argument here.
     schema_path = "metadata.json"
     with open(os.path.join(args.in_dir, schema_path)) as schema:
         schema_map = json.load(schema)
 
-    num_parts = len(schema_map["num_nodes_per_chunk"][0])
     graph_name = schema_map["graph_name"]
+
+    # retrieve num_parts
+    num_chunks = len(schema_map["num_nodes_per_chunk"][0])
+    num_parts = num_chunks
+    partition_path = os.path.join(args.partitions_dir, "partition_meta.json")
+    if os.path.isfile(partition_path):
+        part_meta = load_partition_meta(partition_path)
+        num_parts = part_meta.num_parts
+    if num_parts > num_chunks:
+        raise Exception('Number of partitions should be less/equal than number of chunks.')
+
+    # verify ip_config
+    with open(args.ip_config, 'r') as f:
+        num_ips = len(f.readlines())
+        assert num_ips == num_parts, \
+            f'The number of lines[{args.ip_config}] should be equal to num_parts[{num_parts}].'
 
     argslist = ""
     argslist += "--world-size {} ".format(num_parts)

@@ -1,23 +1,26 @@
-import argparse
-import dgl
 import json
 import numpy as np
 import os
-import sys
 import tempfile
 import torch
-
+import pytest, unittest
+import dgl
 from dgl.data.utils import load_tensors, load_graphs
-
 from chunk_graph import chunk_graph
 
-def test_part_pipeline():
+@pytest.mark.parametrize("num_chunks", [1, 2, 3, 4, 8])
+@pytest.mark.parametrize("num_parts", [1, 2, 3, 4, 8])
+def test_part_pipeline(num_chunks, num_parts):
+    if num_chunks < num_parts:
+        # num_parts should less/equal than num_chunks
+        return
+
     # Step0: prepare chunked graph data format
 
     # A synthetic mini MAG240
-    num_institutions = 20
-    num_authors = 100
-    num_papers = 600
+    num_institutions = 1200
+    num_authors = 1200
+    num_papers = 1200
 
     def rand_edges(num_src, num_dst, num_edges):
         eids = np.random.choice(num_src * num_dst, num_edges, replace=False)
@@ -26,9 +29,9 @@ def test_part_pipeline():
 
         return src, dst
 
-    num_cite_edges = 2000
-    num_write_edges = 1000
-    num_affiliate_edges = 200
+    num_cite_edges = 24 * 1000
+    num_write_edges = 12 * 1000
+    num_affiliate_edges = 2400
 
     # Structure
     data_dict = {
@@ -85,7 +88,6 @@ def test_part_pipeline():
             np.save(f, write_year)
 
         output_dir = os.path.join(root_dir, 'chunked-data')
-        num_chunks = 2
         chunk_graph(
             g,
             'mag240m',
@@ -159,10 +161,10 @@ def test_part_pipeline():
 
         # Step1: graph partition
         in_dir = os.path.join(root_dir, 'chunked-data')
-        output_dir = os.path.join(root_dir, '2parts')
+        output_dir = os.path.join(root_dir, 'parted_data')
         os.system('python3 tools/partition_algo/random_partition.py '\
                   '--in_dir {} --out_dir {} --num_partitions {}'.format(
-                    in_dir, output_dir, num_chunks))
+                    in_dir, output_dir, num_parts))
         for ntype in ['author', 'institution', 'paper']:
             fname = os.path.join(output_dir, '{}.txt'.format(ntype))
             with open(fname, 'r') as f:
@@ -170,12 +172,12 @@ def test_part_pipeline():
                 assert isinstance(int(header), int)
 
         # Step2: data dispatch
-        partition_dir = os.path.join(root_dir, '2parts')
+        partition_dir = os.path.join(root_dir, 'parted_data')
         out_dir = os.path.join(root_dir, 'partitioned')
         ip_config = os.path.join(root_dir, 'ip_config.txt')
         with open(ip_config, 'w') as f:
-            f.write('127.0.0.1\n')
-            f.write('127.0.0.2\n')
+            for i in range(num_parts):
+                f.write(f'127.0.0.{i + 1}\n')
 
         cmd = 'python3 tools/dispatch_data.py'
         cmd += f' --in-dir {in_dir}'
@@ -195,19 +197,19 @@ def test_part_pipeline():
 
         all_etypes = ['affiliated_with', 'writes', 'cites', 'rev_writes']
         for etype in all_etypes:
-            assert len(meta_data['edge_map'][etype]) == num_chunks
+            assert len(meta_data['edge_map'][etype]) == num_parts
         assert meta_data['etypes'].keys() == set(all_etypes)
         assert meta_data['graph_name'] == 'mag240m'
 
         all_ntypes = ['author', 'institution', 'paper']
         for ntype in all_ntypes:
-            assert len(meta_data['node_map'][ntype]) == num_chunks
+            assert len(meta_data['node_map'][ntype]) == num_parts
         assert meta_data['ntypes'].keys() == set(all_ntypes)
-        assert meta_data['num_edges'] == 4200
-        assert meta_data['num_nodes'] == 720
-        assert meta_data['num_parts'] == num_chunks
+        assert meta_data['num_edges'] == g.num_edges()
+        assert meta_data['num_nodes'] == g.num_nodes()
+        assert meta_data['num_parts'] == num_parts
 
-        for i in range(num_chunks):
+        for i in range(num_parts):
             sub_dir = 'part-' + str(i)
             assert meta_data[sub_dir]['node_feats'] == 'part{}/node_feat.dgl'.format(i)
             assert meta_data[sub_dir]['edge_feats'] == 'part{}/edge_feat.dgl'.format(i)
@@ -251,5 +253,3 @@ def test_part_pipeline():
             orig_eids = load_tensors(fname)
             assert len(orig_eids.keys()) == 4
 
-if __name__ == '__main__':
-    test_part_pipeline()

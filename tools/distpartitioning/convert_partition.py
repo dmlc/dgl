@@ -104,10 +104,11 @@ def create_dgl_object(schema, part_id, node_data, edge_data, edgeid_offset,
     """
     #create auxiliary data structures from the schema object
     memory_snapshot("CreateDGLObj_Begin", part_id)
-    ntid_dict, global_nid_ranges = get_idranges(schema[constants.STR_NODE_TYPE], 
-                                    schema[constants.STR_NUM_NODES_PER_CHUNK])
+    _, global_nid_ranges = get_idranges(schema[constants.STR_NODE_TYPE],
+        schema[constants.STR_NUM_NODES_PER_CHUNK])
+    memory_snapshot("CreateDGLObj_Begin", part_id)
 
-    etid_dict, global_eid_ranges = get_idranges(schema[constants.STR_EDGE_TYPE], 
+    _, global_eid_ranges = get_idranges(schema[constants.STR_EDGE_TYPE],
                                     schema[constants.STR_NUM_EDGES_PER_CHUNK])
 
     id_map = dgl.distributed.id_map.IdMap(global_nid_ranges)
@@ -119,7 +120,6 @@ def create_dgl_object(schema, part_id, node_data, edge_data, edgeid_offset,
     ntypes_map = {e: i for i, e in enumerate(ntypes)}
     etypes = [(key, global_eid_ranges[key][0, 0]) for key in global_eid_ranges]
     etypes.sort(key=lambda e: e[1])
-    etype_offset_np = np.array([e[1] for e in etypes])
     etypes = [e[0] for e in etypes]
     etypes_map = {e.split(":")[1]: i for i, e in enumerate(etypes)}
 
