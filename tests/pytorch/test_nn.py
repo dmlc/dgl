@@ -1325,46 +1325,100 @@ def test_gnnexplainer(g, idtype, out_dim):
     model = model.to(F.ctx())
     explainer = nn.GNNExplainer(model, num_hops=1)
     feat_mask, edge_mask = explainer.explain_graph(g, feat)
-    
+
 @parametrize_idtype
 @pytest.mark.parametrize('g', get_cases(['hetero'], exclude=['zero-degree']))
-@pytest.mark.parametrize('out_dim', [1, 2])
-def test_heterognnexplainer(g, idtype, out_dim):
+@pytest.mark.parametrize('input_dim', [5])
+@pytest.mark.parametrize('hidden_dim', [10])
+@pytest.mark.parametrize('output_dim', [1, 2])
+def test_heterognnexplainer(g, idtype, input_dim, hidden_dim, output_dim):
     g = g.astype(idtype).to(F.ctx())
-    feat = {ntype: th.zeros((g.num_nodes(ntype), 5)) for ntype in g.ntypes}
 
-    class Model(th.nn.Module):
-        def __init__(self, in_feats, out_feats, rel_names):
-            super(Model, self).__init__()
-            self.conv = nn.HeteroGraphConv({
-                rel: nn.GraphConv(in_feats, out_feats)
-                for rel in rel_names}, aggregate='sum')
+    # add self-loop and reverse edges
+    transform1 = dgl.transforms.AddSelfLoop(new_etypes=True)
+    g = transform1(g)
+    transform2 = dgl.transforms.AddReverse(copy_edata=True)
+    g = transform2(g)
+
+    feat = {ntype: th.zeros((g.num_nodes(ntype), input_dim))
+            for ntype in g.ntypes}
+
+    class GCNLayer(th.nn.Module):
+        def __init__(self, in_dim, out_dim, graph_relation_list):
+            super(GCNLayer, self).__init__()
+
+            self.relation_weight_matrix = th.nn.ModuleDict({
+                ''.join(relation): th.nn.Linear(in_dim, out_dim)
+                for relation in graph_relation_list
+            })
+
+        def forward(self, graph, node_feature_dict, eweight=None):
+            rel_func_dict = {}
+            for relation in graph.canonical_etypes:
+                relation_str = ''.join(relation)
+                wh = self.relation_weight_matrix[relation_str](node_feature_dict[relation[0]])
+                graph.nodes[relation[0]].data[f'wh_{relation}'] = wh
+                if eweight is None:
+                    rel_func_dict[relation] = (dgl.function.copy_u(f'wh_{relation}', 'm'),
+                                               dgl.function.mean('m', 'h'))
+                else:
+                    graph.edges[relation].data['w'] = eweight[relation]
+                    rel_func_dict[relation] = (dgl.function.u_mul_e(f'wh_{relation}', 'w', 'm'),
+                                               dgl.function.mean('m', 'h'))
+            graph.multi_update_all(rel_func_dict, 'sum')
+            return {ntype: graph.nodes[ntype].data['h']
+                    for ntype in graph.ntypes}
+
+    class GraphClassficationModel(th.nn.Module):
+        def __init__(self, in_dim, hidden_dim, num_classes, graph_relation_list):
+            super(GraphClassficationModel, self).__init__()
+            self.layer = GCNLayer(in_dim,
+                                  hidden_dim,
+                                  graph_relation_list)
+            self.linear = th.nn.Linear(hidden_dim,
+                                       num_classes)
 
         def forward(self, graph, feat, eweight=None):
-            with graph.local_scope():
-                feat = self.conv(graph, feat)
-                feat = {k: F.relu(v) for k, v in feat.items()}
-                graph.ndata['h'] = feat
-                if eweight is None:
-                    graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
-                else:
-                    graph.edata['w'] = eweight
-                    graph.update_all(fn.u_mul_e(
-                        'h', 'w', 'm'), fn.sum('m', 'h'))
-                return graph.ndata['h']
+            x = self.layer(graph, feat, eweight=eweight)
 
-    # Explain node prediction
-    model = Model(5, out_dim)
-    model = model.to(F.ctx())
-    ntype = g.ntypes[0]
-    explainer = nn.HeteroGNNExplainer(model, num_hops=1)
-    new_center, sg, feat_mask, edge_mask = explainer.explain_node(ntype, 0, g, feat)
+            with graph.local_scope():
+                graph.ndata['x'] = x
+                hg = 0
+                for ntype in graph.ntypes:
+                    if graph.num_nodes(ntype):
+                        hg = hg + dgl.mean_nodes(graph, 'x', ntype=ntype)
+
+                return self.linear(hg)
 
     # Explain graph prediction
-    model = Model(5, out_dim)
+    model = GraphClassficationModel(input_dim, hidden_dim, output_dim, g.canonical_etypes)
     model = model.to(F.ctx())
-    explainer = nn.HeteroGNNExplainer(model, num_hops=1)
+    explainer = nn.explain.HeteroGNNExplainer(model, num_hops=1)
     feat_mask, edge_mask = explainer.explain_graph(g, feat)
+
+    # class NodeClassficationModel(th.nn.Module):
+    #     def __init__(self, in_dim, hidden_dim, num_classes, graph_relation_list):
+    #         super(NodeClassficationModel, self).__init__()
+    #         self.layer1 = GCNLayer(in_dim,
+    #                               hidden_dim,
+    #                               graph_relation_list)
+    #         self.layer2 = GCNLayer(hidden_dim,
+    #                                num_classes,
+    #                                graph_relation_list)
+    #
+    #     def forward(self, graph, feat, eweight=None):
+    #         x = self.layer1(graph, feat, eweight=eweight)
+    #         x = th.nn.functional.relu(x)
+    #         x = self.layer2(g, x)
+    #         return x
+    #
+    # # Explain node prediction
+    # model = NodeClassficationModel(input_dim, hidden_dim, output_dim, g.canonical_etypes)
+    # model = model.to(F.ctx())
+    # ntype = g.ntypes[0]
+    # explainer = nn.explain.HeteroGNNExplainer(model, num_hops=1)
+    # new_center, sg, feat_mask, edge_mask = explainer.explain_node(ntype, 0, g, feat)
+
 
 def test_jumping_knowledge():
     ctx = F.ctx()

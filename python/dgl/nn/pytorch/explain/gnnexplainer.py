@@ -9,6 +9,7 @@ from tqdm import tqdm
 from ....base import NID, EID
 from ....subgraph import khop_in_subgraph
 
+
 class GNNExplainer(nn.Module):
     r"""GNNExplainer model from `GNNExplainer: Generating Explanations for
     Graph Neural Networks <https://arxiv.org/abs/1903.03894>`__
@@ -141,7 +142,7 @@ class GNNExplainer(nn.Module):
         loss = loss + self.alpha1 * torch.sum(edge_mask)
         # Edge mask entropy regularization
         ent = - edge_mask * torch.log(edge_mask + eps) - \
-            (1 - edge_mask) * torch.log(1 - edge_mask + eps)
+              (1 - edge_mask) * torch.log(1 - edge_mask + eps)
         loss = loss + self.alpha2 * ent.mean()
 
         feat_mask = feat_mask.sigmoid()
@@ -149,7 +150,7 @@ class GNNExplainer(nn.Module):
         loss = loss + self.beta1 * torch.mean(feat_mask)
         # Feature mask entropy regularization
         ent = - feat_mask * torch.log(feat_mask + eps) - \
-            (1 - feat_mask) * torch.log(1 - feat_mask + eps)
+              (1 - feat_mask) * torch.log(1 - feat_mask + eps)
         loss = loss + self.beta2 * ent.mean()
 
         return loss
@@ -478,12 +479,12 @@ class HeteroGNNExplainer(nn.Module):
     log : bool, optional
         If True, it will log the computation process, default to True.
     """
-    
-    def __init__(self, 
-                 model, 
-                 num_hops, 
-                 lr=0.01, 
-                 num_epochs=100, 
+
+    def __init__(self,
+                 model,
+                 num_hops,
+                 lr=0.01,
+                 num_epochs=100,
                  *,
                  alpha1=0.005,
                  alpha2=1.0,
@@ -580,7 +581,7 @@ class HeteroGNNExplainer(nn.Module):
             loss = loss + self.alpha1 * torch.sum(edge_mask)
             # Edge mask entropy regularization
             ent = - edge_mask * torch.log(edge_mask + eps) - \
-                (1 - edge_mask) * torch.log(1 - edge_mask + eps)
+                  (1 - edge_mask) * torch.log(1 - edge_mask + eps)
             loss = loss + self.alpha2 * ent.mean()
 
         for feat_mask in feat_masks.values():
@@ -589,7 +590,7 @@ class HeteroGNNExplainer(nn.Module):
             loss = loss + self.beta1 * torch.mean(feat_mask)
             # Feature mask entropy regularization
             ent = -feat_mask * torch.log(feat_mask + eps) - \
-                (1 - feat_mask) * torch.log(1 - feat_mask + eps)
+                  (1 - feat_mask) * torch.log(1 - feat_mask + eps)
             loss = loss + self.beta2 * ent.mean()
 
         return loss
@@ -614,10 +615,12 @@ class HeteroGNNExplainer(nn.Module):
             the respective node types(keys) present in the graph.
             The input feature of shape :math:`(N, D)`. :math:`N` is the
             number of nodes, and :math:`D` is the feature size.
-        kwargs : dict
-            Additional arguments passed to the GNN model. Tensors whose
-            first dimension is the number of nodes or edges will be
-            assumed to be node/edge features.
+        kwargs : dict[str, dict[str, Tensor]]
+            Dictionary of { ntypes/canonical_etypes: features }
+            Additional arguments passed to the GNN model. The additional
+            argument takes dictionaries as values. The dictionary that associates
+            the node/edge features(values) with the respective node/canonical
+            edge types(keys).
 
         Returns
         -------
@@ -716,8 +719,6 @@ class HeteroGNNExplainer(nn.Module):
                     0.2764])}
         """
         self.model.eval()
-        num_nodes = graph.num_nodes()
-        num_edges = graph.num_edges()
 
         # Extract node-centered k-hop subgraph and
         # its associated node and edge features.
@@ -725,26 +726,34 @@ class HeteroGNNExplainer(nn.Module):
         inverse_indices = inverse_indices[ntype]
         sg_nodes = sg.ndata[NID]
         sg_edges = sg.edata[EID]
-        sg_feats = {}
-        for node_type in feat.keys():
-            sg_feats[node_type] = feat[node_type][sg_nodes[node_type]]
-        for key, item in kwargs.items():
-            if torch.is_tensor(item) and item.size(0) == num_nodes:
-                item = item[sg_nodes]
-            elif torch.is_tensor(item) and item.size(0) == num_edges:
-                item = item[sg_edges]
-            kwargs[key] = item
+        sg_feat = {}
+        for node_type in sg_nodes.keys():
+            sg_feat[node_type] = feat[node_type]
+
+        for dict_type, dict in kwargs.items():
+            if dict_type == 'nodes': # give the user the flexibility
+                for ntype, feat in dict:
+                    num_nodes = graph.num_nodes(ntype)
+                    if torch.is_tensor(feat) and feat.size(0) == num_nodes:
+                        feat = feat[sg_nodes]
+                    kwargs[dict_type][ntype] = feat
+            else:
+                for etype, feat in dict:
+                    num_edges = graph.num_nodes(etype)
+                    if torch.is_tensor(feat) and feat.size(0) == num_edges:
+                        feat = feat[sg_edges]
+                    kwargs[dict_type][etype] = feat
 
         # Get the initial prediction.
         with torch.no_grad():
-            logits = self.model(graph=sg, feat=sg_feats, **kwargs)[ntype]
+            logits = self.model(graph=sg, feat=sg_feat, **kwargs)[ntype]
             pred_label = logits.argmax(dim=-1)
 
-        feat_mask, edge_mask = self._init_masks(sg, sg_feats)
+        feat_mask, edge_mask = self._init_masks(sg, sg_feat)
 
         params = [*feat_mask.values(), *edge_mask.values()]
         optimizer = torch.optim.Adam(params, lr=self.lr)
-        
+
         if self.log:
             pbar = tqdm(total=self.num_epochs)
             pbar.set_description(f'Explain node {node_id} with type {ntype}')
@@ -752,22 +761,22 @@ class HeteroGNNExplainer(nn.Module):
         for _ in range(self.num_epochs):
             optimizer.zero_grad()
             h = {}
-            for node_type in sg_feats.keys():
-                h[node_type] = sg_feats[node_type] * feat_mask[node_type].sigmoid()
+            for node_type in sg_feat.keys():
+                h[node_type] = sg_feat[node_type] * feat_mask[node_type].sigmoid()
             eweight = {}
             for canonical_etype in edge_mask.keys():
                 eweight[canonical_etype] = edge_mask[canonical_etype].sigmoid()
-            logits = self.model(graph=sg, feat=h, 
+            logits = self.model(graph=sg, feat=h,
                                 eweight=eweight, **kwargs)[ntype]
             log_probs = logits.log_softmax(dim=-1)
             loss = -log_probs[inverse_indices, pred_label[inverse_indices]]
             loss = self._loss_regularize(loss, feat_mask, edge_mask)
             loss.backward()
             optimizer.step()
-            
+
             if self.log:
                 pbar.update(1)
-                
+
         if self.log:
             pbar.close()
 
@@ -814,6 +823,95 @@ class HeteroGNNExplainer(nn.Module):
             of shape :math:`(E)`, where :math:`E` is the number of edges in the
             graph. The values are within range :math:`(0, 1)`. The higher,
             the more important.
+
+        Examples
+        --------
+
+        >>> import dgl
+        >>> import dgl.function as fn
+        >>> import torch
+        >>> import torch.nn as nn
+        >>> import torch.nn.functional as F
+        >>> import dgl.nn as dglnn
+        >>> from dgl.nn import HeteroGNNExplainer
+        >>> from dgl.data import MUTAGDataset
+
+        >>> # Load dataset
+        >>> data = MUTAGDataset()
+        >>> g = data[0]
+        >>> predict_ntype = data.predict_category
+        >>> train_mask = g.nodes[predict_ntype].data['train_mask']
+        >>> test_mask = g.nodes[predict_ntype].data['test_mask']
+        >>> labels = g.nodes[predict_ntype].data['labels']
+
+        >>> # Initialize zero-valued tensors for the node types
+        >>> # available in the graph for demonstration purpose
+        >>> features = {}
+        >>> for ntype in g.ntypes:
+        ...     features[ntype] = torch.zeros((g.num_nodes(ntype), 5))
+
+        >>> # Define a GCN layer that uses eweight
+        >>> class GCNLayer(nn.Module):
+        ...    def __init__(self, in_dim, out_dim, graph_relation_list):
+        ...        super(GCNLayer, self).__init__()
+        ...
+        ...        self.relation_weight_matrix = nn.ModuleDict({
+        ...            ''.join(relation): nn.Linear(in_dim, out_dim)
+        ...            for relation in graph_relation_list
+        ...        })
+        ...
+        ...    def forward(self, graph, node_feature_dict, eweight=None):
+        ...        rel_func_dict = {}
+        ...        for relation in graph.canonical_etypes:
+        ...            relation_str = ''.join(relation)
+        ...            wh = self.relation_weight_matrix[relation_str](node_feature_dict[relation[0]])
+        ...            graph.nodes[relation[0]].data[f'wh_{relation}'] = wh
+        ...            if eweight is None:
+        ...                rel_func_dict[relation] = (fn.copy_u(f'wh_{relation}', 'm'), fn.mean('m', 'h'))
+        ...            else:
+        ...                graph.edges[relation].data['w'] = eweight[relation]
+        ...                rel_func_dict[relation] = (fn.u_mul_e(f'wh_{relation}', 'w', 'm'),fn.mean('m', 'h'))
+        ...        graph.multi_update_all(rel_func_dict, 'sum')
+        ...        return {ntype: graph.nodes[ntype].data['h'] for ntype in graph.ntypes}
+
+        >>> # Define a model
+        >>> class Model(nn.Module):
+        ...    def __init__(self, in_dim, hidden_dim, num_classes, graph_relation_list):
+        ...        super(Model, self).__init__()
+        ...        self.layer = GCNLayer(in_dim,hidden_dim, graph_relation_list)
+        ...        self.linear = nn.Linear(hidden_dim,num_classes)
+        ...
+        ...    def forward(self, graph, feat, eweight=None):
+        ...        x = self.layer(graph, feat, eweight=eweight)
+        ...
+        ...        with graph.local_scope():
+        ...            graph.ndata['x'] = x
+        ...            hg = 0
+        ...            for ntype in graph.ntypes:
+        ...                if graph.num_nodes(ntype):
+        ...                    hg = hg + dgl.mean_nodes(graph, 'x', ntype=ntype)
+        ...            return self.linear(hg)
+
+        >>> # Train the model
+        >>> model = Model(5, 10, data.num_classes, g.canonical_etypes)
+        >>> optimizer = torch.optim.Adam(model.parameters())
+        >>> for epoch in range(10):
+        ...     h = {}
+        ...     for node_type in feat.keys():
+        ...         h[node_type] = feat[node_type] * feat_mask[node_type].sigmoid()
+        ...     logits = model(g, h)
+        ...     loss = F.cross_entropy(logits[train_mask], labels[train_mask])
+        ...     optimizer.zero_grad()
+        ...     loss.backward()
+        ...     optimizer.step()
+
+        >>> # Explain the prediction for graph 0
+        >>> explainer = HeteroGNNExplainer(model, num_hops=1)
+        >>> feat_mask, edge_mask = explainer.explain_graph(g, features)
+        >>> feat_mask
+        tensor([0.2362, 0.2497, 0.2622, 0.2675, 0.2649, 0.2962, 0.2533])
+        >>> edge_mask
+        tensor([0.2154, 0.2235, 0.8325, ..., 0.7787, 0.1735, 0.1847])
         """
         self.model.eval()
 
@@ -826,7 +924,7 @@ class HeteroGNNExplainer(nn.Module):
 
         params = [*feat_mask.values(), *edge_mask.values()]
         optimizer = torch.optim.Adam(params, lr=self.lr)
-        
+
         if self.log:
             pbar = tqdm(total=self.num_epochs)
             pbar.set_description('Explain graph')
@@ -846,13 +944,13 @@ class HeteroGNNExplainer(nn.Module):
             loss = self._loss_regularize(loss, feat_mask, edge_mask)
             loss.backward()
             optimizer.step()
-            
+
             if self.log:
                 pbar.update(1)
-        
+
         if self.log:
             pbar.close()
-        
+
         for node_type in feat_mask.keys():
             feat_mask[node_type] = feat_mask[node_type].detach().sigmoid().squeeze()
 
