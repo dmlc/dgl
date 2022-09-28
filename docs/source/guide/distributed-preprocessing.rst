@@ -366,3 +366,29 @@ is able to hold the entire graph data. Moreover, the number of machines (IPs) mu
 same as the number of partitions. Node ownership is determined by the result
 of partitioning algorithm where as for edges the owner of the destination node
 also owns the edge as well.
+
+As nodes/edges are shuffuled during partition, original node/edge IDs are needed
+in some scenarios. In order to obtain this, the following 2 parameters are offered:
+
+* ``--save-orig-nids`` save original node IDs into files.
+* ``--save-orig-eids`` save original edge IDs into files.
+
+These files lie under the same path of graph partitions and node/edge feature data.
+An example is shown below:
+
+.. code-block:: bash
+
+    MAG_LSC_partitioned/
+      |-- part0
+        |-- edge_feat.dgl
+        |-- graph.dgl
+        |-- node_feat.dgl
+        |-- orig_eids.dgl
+        |-- orig_nids.dgl
+      |-- part1
+        |-- edge_feat.dgl
+        |-- graph.dgl
+        |-- node_feat.dgl
+        |-- orig_eids.dgl
+        |-- orig_nids.dgl
+
