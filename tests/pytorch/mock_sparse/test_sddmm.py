@@ -1,9 +1,10 @@
+import unittest
+
+import backend as F
 import dgl
 import pytest
 import torch
 from dgl.mock_sparse import SparseMatrix
-
-import backend as F
 
 parametrize_idtype = pytest.mark.parametrize(
     "idtype", [torch.int32, torch.int64]
@@ -13,7 +14,7 @@ parametrize_dtype = pytest.mark.parametrize(
 )
 
 
-@pytest.mark.skipif(
+@unittest.skipIf(
     F._default_context_str == "cpu",
     reason="sddmm uses operator from pytorch which only supports CUDA",
 )
@@ -32,7 +33,6 @@ def test_sddmm(idtype, dtype):
     A = SparseMatrix(row, col, val, shape=(10, 50))
     matB = torch.rand(10, 5)
     matC = torch.rand(5, 50)
-
     dgl_result = dgl.mock_sparse.sddmm(A, matB, matC)
     th_result = torch.sparse.sampled_addmm(A.adj.to_sparse_csr(), matB, matC)
     all_close_sparse(dgl_result.adj, th_result.to_sparse_coo())
