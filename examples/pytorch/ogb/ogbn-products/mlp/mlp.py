@@ -7,21 +7,23 @@ import random
 import time
 from collections import OrderedDict
 
-import dgl.function as fn
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
-from dgl.dataloading import MultiLayerFullNeighborSampler, MultiLayerNeighborSampler
-from dgl.dataloading import DataLoader
 from matplotlib.ticker import AutoMinorLocator, MultipleLocator
+from models import MLP
 from ogb.nodeproppred import DglNodePropPredDataset, Evaluator
 from torch import nn
 from tqdm import tqdm
 
-from models import MLP
-from utils import BatchSampler, DataLoaderWrapper
+import dgl.function as fn
+from dgl.dataloading import (
+    DataLoader,
+    MultiLayerFullNeighborSampler,
+    MultiLayerNeighborSampler,
+)
 
 epsilon = 1 - math.log(2)
 
@@ -45,7 +47,11 @@ def load_data(dataset):
     evaluator = Evaluator(name=dataset)
 
     splitted_idx = data.get_idx_split()
-    train_idx, val_idx, test_idx = splitted_idx["train"], splitted_idx["valid"], splitted_idx["test"]
+    train_idx, val_idx, test_idx = (
+        splitted_idx["train"],
+        splitted_idx["valid"],
+        splitted_idx["test"],
+    )
     graph, labels = data[0]
     graph.ndata["labels"] = labels
 
@@ -84,7 +90,9 @@ def custom_loss_function(x, labels):
     return torch.mean(y)
 
 
-def train(args, model, dataloader, labels, train_idx, criterion, optimizer, evaluator):
+def train(
+    args, model, dataloader, labels, train_idx, criterion, optimizer, evaluator
+):
     model.train()
 
     loss_sum, total = 0, 0
@@ -98,7 +106,9 @@ def train(args, model, dataloader, labels, train_idx, criterion, optimizer, eval
         pred = model(subgraphs[0].srcdata["feat"])
         preds[output_nodes] = pred.cpu().detach()
 
-        loss = criterion(pred[new_train_idx], labels[output_nodes][new_train_idx])
+        loss = criterion(
+            pred[new_train_idx], labels[output_nodes][new_train_idx]
+        )
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -107,6 +117,7 @@ def train(args, model, dataloader, labels, train_idx, criterion, optimizer, eval
         loss_sum += loss.item() * count
         total += count
 
+    preds = preds.to(train_idx.device)
     return (
         loss_sum / total,
         evaluator(preds[train_idx], labels[train_idx]),
@@ -114,7 +125,17 @@ def train(args, model, dataloader, labels, train_idx, criterion, optimizer, eval
 
 
 @torch.no_grad()
-def evaluate(args, model, dataloader, labels, train_idx, val_idx, test_idx, criterion, evaluator):
+def evaluate(
+    args,
+    model,
+    dataloader,
+    labels,
+    train_idx,
+    val_idx,
+    test_idx,
+    criterion,
+    evaluator,
+):
     model.eval()
 
     preds = torch.zeros(labels.shape[0], n_classes, device=device)
@@ -144,45 +165,56 @@ def evaluate(args, model, dataloader, labels, train_idx, val_idx, test_idx, crit
     )
 
 
-def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running):
+def run(
+    args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running
+):
     evaluator_wrapper = lambda pred, labels: evaluator.eval(
         {"y_pred": pred.argmax(dim=-1, keepdim=True), "y_true": labels}
     )["acc"]
     criterion = custom_loss_function
 
     train_batch_size = 4096
-    train_sampler = MultiLayerNeighborSampler([0 for _ in range(args.n_layers)])  # no not sample neighbors
-    train_dataloader = DataLoaderWrapper(
-        DataLoader(
-            graph.cpu(),
-            train_idx.cpu(),
-            train_sampler,
-            batch_sampler=BatchSampler(len(train_idx), batch_size=train_batch_size, shuffle=True),
-            num_workers=4,
-        )
+    train_sampler = MultiLayerNeighborSampler(
+        [0 for _ in range(args.n_layers)]
+    )  # no not sample neighbors
+    train_dataloader = DataLoader(
+        graph.cpu(),
+        train_idx.cpu(),
+        train_sampler,
+        batch_size=train_batch_size,
+        shuffle=True,
+        num_workers=4,
     )
 
     eval_batch_size = 4096
-    eval_sampler = MultiLayerNeighborSampler([0 for _ in range(args.n_layers)])  # no not sample neighbors
+    eval_sampler = MultiLayerNeighborSampler(
+        [0 for _ in range(args.n_layers)]
+    )  # no not sample neighbors
     if args.eval_last:
         eval_idx = torch.cat([train_idx.cpu(), val_idx.cpu()])
     else:
         eval_idx = torch.cat([train_idx.cpu(), val_idx.cpu(), test_idx.cpu()])
-    eval_dataloader = DataLoaderWrapper(
-        DataLoader(
-            graph.cpu(),
-            eval_idx,
-            eval_sampler,
-            batch_sampler=BatchSampler(len(eval_idx), batch_size=eval_batch_size, shuffle=False),
-            num_workers=4,
-        )
+    eval_dataloader = DataLoader(
+        graph.cpu(),
+        eval_idx,
+        eval_sampler,
+        batch_size=eval_batch_size,
+        shuffle=False,
+        num_workers=4,
     )
 
     model = gen_model(args).to(device)
 
-    optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.wd)
+    optimizer = optim.AdamW(
+        model.parameters(), lr=args.lr, weight_decay=args.wd
+    )
     lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode="max", factor=0.7, patience=20, verbose=True, min_lr=1e-4
+        optimizer,
+        mode="max",
+        factor=0.7,
+        patience=20,
+        verbose=True,
+        min_lr=1e-4,
     )
 
     best_model_state_dict = None
@@ -195,22 +227,47 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
 
     for epoch in range(1, args.n_epochs + 1):
         tic = time.time()
-
-        loss, score = train(args, model, train_dataloader, labels, train_idx, criterion, optimizer, evaluator_wrapper)
+        loss, score = train(
+            args,
+            model,
+            train_dataloader,
+            labels,
+            train_idx,
+            criterion,
+            optimizer,
+            evaluator_wrapper,
+        )
 
         toc = time.time()
         total_time += toc - tic
 
         if epoch % args.eval_every == 0 or epoch % args.log_every == 0:
-            train_score, val_score, test_score, train_loss, val_loss, test_loss = evaluate(
-                args, model, eval_dataloader, labels, train_idx, val_idx, test_idx, criterion, evaluator_wrapper
+            (
+                train_score,
+                val_score,
+                test_score,
+                train_loss,
+                val_loss,
+                test_loss,
+            ) = evaluate(
+                args,
+                model,
+                eval_dataloader,
+                labels,
+                train_idx,
+                val_idx,
+                test_idx,
+                criterion,
+                evaluator_wrapper,
             )
 
             if val_score > best_val_score:
                 best_val_score = val_score
                 final_test_score = test_score
                 if args.eval_last:
-                    best_model_state_dict = {k: v.to("cpu") for k, v in model.state_dict().items()}
+                    best_model_state_dict = {
+                        k: v.to("cpu") for k, v in model.state_dict().items()
+                    }
                     best_model_state_dict = OrderedDict(best_model_state_dict)
 
             if epoch % args.log_every == 0:
@@ -224,8 +281,26 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
                 )
 
             for l, e in zip(
-                [scores, train_scores, val_scores, test_scores, losses, train_losses, val_losses, test_losses],
-                [score, train_score, val_score, test_score, loss, train_loss, val_loss, test_loss],
+                [
+                    scores,
+                    train_scores,
+                    val_scores,
+                    test_scores,
+                    losses,
+                    train_losses,
+                    val_losses,
+                    test_losses,
+                ],
+                [
+                    score,
+                    train_score,
+                    val_score,
+                    test_score,
+                    loss,
+                    train_loss,
+                    val_loss,
+                    test_loss,
+                ],
             ):
                 l.append(e)
 
@@ -233,21 +308,30 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
 
     if args.eval_last:
         model.load_state_dict(best_model_state_dict)
-        eval_dataloader = DataLoaderWrapper(
-            DataLoader(
-                graph.cpu(),
-                test_idx.cpu(),
-                eval_sampler,
-                batch_sampler=BatchSampler(len(test_idx), batch_size=eval_batch_size, shuffle=False),
-                num_workers=4,
-            )
+        eval_dataloader = DataLoader(
+            graph.cpu(),
+            test_idx.cpu(),
+            eval_sampler,
+            batch_size=eval_batch_size,
+            shuffle=False,
+            num_workers=4,
         )
         final_test_score = evaluate(
-            args, model, eval_dataloader, labels, train_idx, val_idx, test_idx, criterion, evaluator_wrapper
+            args,
+            model,
+            eval_dataloader,
+            labels,
+            train_idx,
+            val_idx,
+            test_idx,
+            criterion,
+            evaluator_wrapper,
         )[2]
 
     print("*" * 50)
-    print(f"Average epoch time: {total_time / args.n_epochs}, Test score: {final_test_score}")
+    print(
+        f"Average epoch time: {total_time / args.n_epochs}, Test score: {final_test_score}"
+    )
 
     if args.plot_curves:
         fig = plt.figure(figsize=(24, 24))
@@ -255,8 +339,16 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
         ax.set_xticks(np.arange(0, args.n_epochs, 100))
         ax.set_yticks(np.linspace(0, 1.0, 101))
         ax.tick_params(labeltop=True, labelright=True)
-        for y, label in zip([train_scores, val_scores, test_scores], ["train score", "val score", "test score"]):
-            plt.plot(range(1, args.n_epochs + 1, args.log_every), y, label=label, linewidth=1)
+        for y, label in zip(
+            [train_scores, val_scores, test_scores],
+            ["train score", "val score", "test score"],
+        ):
+            plt.plot(
+                range(1, args.n_epochs + 1, args.log_every),
+                y,
+                label=label,
+                linewidth=1,
+            )
         ax.xaxis.set_major_locator(MultipleLocator(20))
         ax.xaxis.set_minor_locator(AutoMinorLocator(1))
         ax.yaxis.set_major_locator(MultipleLocator(0.01))
@@ -272,9 +364,15 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
         ax.set_xticks(np.arange(0, args.n_epochs, 100))
         ax.tick_params(labeltop=True, labelright=True)
         for y, label in zip(
-            [losses, train_losses, val_losses, test_losses], ["loss", "train loss", "val loss", "test loss"]
+            [losses, train_losses, val_losses, test_losses],
+            ["loss", "train loss", "val loss", "test loss"],
         ):
-            plt.plot(range(1, args.n_epochs + 1, args.log_every), y, label=label, linewidth=1)
+            plt.plot(
+                range(1, args.n_epochs + 1, args.log_every),
+                y,
+                label=label,
+                linewidth=1,
+            )
         ax.xaxis.set_major_locator(MultipleLocator(20))
         ax.xaxis.set_minor_locator(AutoMinorLocator(1))
         ax.yaxis.set_major_locator(MultipleLocator(0.1))
@@ -290,14 +388,23 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
 
 def count_parameters(args):
     model = gen_model(args)
-    return sum([np.prod(p.size()) for p in model.parameters() if p.requires_grad])
+    return sum(
+        [np.prod(p.size()) for p in model.parameters() if p.requires_grad]
+    )
 
 
 def main():
     global device
 
-    argparser = argparse.ArgumentParser("GAT on OGBN-Proteins", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    argparser.add_argument("--cpu", action="store_true", help="CPU mode. This option overrides '--gpu'.")
+    argparser = argparse.ArgumentParser(
+        "GAT on OGBN-Proteins",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    argparser.add_argument(
+        "--cpu",
+        action="store_true",
+        help="CPU mode. This option overrides '--gpu'.",
+    )
     argparser.add_argument("--gpu", type=int, default=0, help="GPU device ID.")
     argparser.add_argument("--seed", type=int, help="seed", default=0)
     argparser.add_argument("--n-runs", type=int, default=10)
@@ -308,8 +415,16 @@ def main():
     argparser.add_argument("--dropout", type=float, default=0.2)
     argparser.add_argument("--input-drop", type=float, default=0)
     argparser.add_argument("--wd", type=float, default=0)
-    argparser.add_argument("--estimation-mode", action="store_true", help="Estimate the score of test set for speed.")
-    argparser.add_argument("--eval-last", action="store_true", help="Evaluate the score of test set at last.")
+    argparser.add_argument(
+        "--estimation-mode",
+        action="store_true",
+        help="Estimate the score of test set for speed.",
+    )
+    argparser.add_argument(
+        "--eval-last",
+        action="store_true",
+        help="Evaluate the score of test set at last.",
+    )
     argparser.add_argument("--eval-every", type=int, default=1)
     argparser.add_argument("--log-every", type=int, default=1)
     argparser.add_argument("--plot-curves", action="store_true")
@@ -321,7 +436,9 @@ def main():
         device = torch.device("cuda:%d" % args.gpu)
 
     if args.estimation_mode:
-        print("WARNING: Estimation mode is enabled. The test score is not accurate.")
+        print(
+            "WARNING: Estimation mode is enabled. The test score is not accurate."
+        )
 
     seed(args.seed)
 
@@ -340,7 +457,9 @@ def main():
     val_scores, test_scores = [], []
 
     for i in range(1, args.n_runs + 1):
-        val_score, test_score = run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, i)
+        val_score, test_score = run(
+            args, graph, labels, train_idx, val_idx, test_idx, evaluator, i
+        )
         val_scores.append(val_score)
         test_scores.append(test_score)
 
@@ -353,7 +472,9 @@ def main():
     print(f"Number of params: {count_parameters(args)}")
 
     if args.estimation_mode:
-        print("WARNING: Estimation mode is enabled. The test score is not accurate.")
+        print(
+            "WARNING: Estimation mode is enabled. The test score is not accurate."
+        )
 
 
 if __name__ == "__main__":

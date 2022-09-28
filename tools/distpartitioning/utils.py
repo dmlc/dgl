@@ -347,9 +347,10 @@ def write_graph_dgl(graph_file, graph_obj):
     """
     dgl.save_graphs(graph_file, [graph_obj])
 
-def write_dgl_objects(graph_obj, node_features, edge_features, output_dir, part_id): 
+def write_dgl_objects(graph_obj, node_features, edge_features,
+        output_dir, part_id, orig_nids, orig_eids):
     """
-    Wrapper function to create dgl objects for graph, node-features and edge-features
+    Wrapper function to write graph, node/edge feature, original node/edge IDs.
 
     Parameters:
     -----------
@@ -363,6 +364,10 @@ def write_dgl_objects(graph_obj, node_features, edge_features, output_dir, part_
         location where the output files will be located
     part_id : int
         integer indicating the partition-id
+    orig_nids : dict
+        original node IDs
+    orig_eids : dict
+        original edge IDs
     """
 
     part_dir = output_dir + '/part' + str(part_id)
@@ -375,7 +380,14 @@ def write_dgl_objects(graph_obj, node_features, edge_features, output_dir, part_
     if (edge_features != None):
         write_edge_features(edge_features, os.path.join(part_dir, "edge_feat.dgl"))
 
-def get_idranges(names, counts, num_chunks=None):
+    if orig_nids is not None:
+        orig_nids_file = os.path.join(part_dir, 'orig_nids.dgl')
+        dgl.data.utils.save_tensors(orig_nids_file, orig_nids)
+    if orig_eids is not None:
+        orig_eids_file = os.path.join(part_dir, 'orig_eids.dgl')
+        dgl.data.utils.save_tensors(orig_eids_file, orig_eids)
+
+def get_idranges(names, counts, num_chunks=None): 
     """
     Utility function to compute typd_id/global_id ranges for both nodes and edges. 
 

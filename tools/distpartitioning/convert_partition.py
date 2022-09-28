@@ -16,7 +16,8 @@ import constants
 from utils import get_idranges, memory_snapshot, read_json
 
 
-def create_dgl_object(num_parts, schema, part_id, node_data, edge_data, edgeid_offset):
+def create_dgl_object(schema, part_id, node_data, edge_data, edgeid_offset,
+                        return_orig_nids=False, return_orig_eids=False):
     """
     This function creates dgl objects for a given graph partition, as in function
     arguments. 
@@ -65,8 +66,6 @@ def create_dgl_object(num_parts, schema, part_id, node_data, edge_data, edgeid_o
 
     Parameters:
     -----------
-    num_parts : int
-        total no. of partitions (of the original graph)
     schame : json object
         json object created by reading the graph metadata json file
     part_id : int
@@ -79,6 +78,8 @@ def create_dgl_object(num_parts, schema, part_id, node_data, edge_data, edgeid_o
         <global_src_id> <global_dst_id> <etype_id> <global_type_eid>
     edgeid_offset : int
         offset to be used when assigning edge global ids in the current partition
+    return_orig_ids : bool, optional
+        Indicates whether to return original node/edge IDs.
 
     Returns: 
     --------
@@ -92,6 +93,14 @@ def create_dgl_object(num_parts, schema, part_id, node_data, edge_data, edgeid_o
         map between node type(string)  and node_type_id(int)
     dictionary
         map between edge type(string)  and edge_type_id(int)
+    dict of tensors
+        If `return_orig_nids=True`, return a dict of 1D tensors whose key is the node type
+        and value is a 1D tensor mapping between shuffled node IDs and the original node
+        IDs for each node type. Otherwise, ``None`` is returned.
+    dict of tensors
+        If `return_orig_eids=True`, return a dict of 1D tensors whose key is the edge type
+        and value is a 1D tensor mapping between shuffled edge IDs and the original edge
+        IDs for each edge type. Otherwise, ``None`` is returned.
     """
     #create auxiliary data structures from the schema object
     memory_snapshot("CreateDGLObj_Begin", part_id)
@@ -277,7 +286,24 @@ def create_dgl_object(num_parts, schema, part_id, node_data, edge_data, edgeid_o
     part_graph.ndata[dgl.NID] = th.as_tensor(uniq_ids[reshuffle_nodes])
     part_graph.ndata['inner_node'] = inner_nodes[reshuffle_nodes]
 
-    return part_graph, node_map_val, edge_map_val, ntypes_map, etypes_map
+    orig_nids = None
+    orig_eids = None
+    if return_orig_nids:
+        orig_nids = {}
+        for ntype, ntype_id in ntypes_map.items():
+            mask = th.logical_and(part_graph.ndata[dgl.NTYPE] == ntype_id,
+                                    part_graph.ndata['inner_node'])
+            orig_nids[ntype] = th.as_tensor(per_type_ids[mask])
+    if return_orig_eids:
+        orig_eids = {}
+        for etype, etype_id in etypes_map.items():
+            mask = th.logical_and(part_graph.edata[dgl.ETYPE] == etype_id,
+                                    part_graph.edata['inner_edge'])
+            orig_eids[etype] = th.as_tensor(global_edge_id[mask])
+
+
+    return part_graph, node_map_val, edge_map_val, ntypes_map, etypes_map, \
+        orig_nids, orig_eids
 
 def create_metadata_json(graph_name, num_nodes, num_edges, part_id, num_parts, node_map_val, \
                             edge_map_val, ntypes_map, etypes_map, output_dir ):
