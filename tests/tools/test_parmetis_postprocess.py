@@ -1,16 +1,17 @@
 import argparse
-import dgl
 import json
-import numpy as np
+import logging
 import os
+import platform
 import sys
 import tempfile
-import torch
-import logging
-import platform
 
-from dgl.data.utils import load_tensors, load_graphs
+import dgl
+import numpy as np
+import torch
 from chunk_graph import chunk_graph
+from dgl.data.utils import load_graphs, load_tensors
+
 
 def test_parmetis_preprocessing():
     # Step0: prepare chunked graph data format.
@@ -30,11 +31,17 @@ def test_parmetis_preprocessing():
         dst = torch.from_numpy(eids % num_dst)
         return src, dst
 
-    # Create the no. of edges and build a dictioinary to store them. 
+    # Create the no. of edges and build a dictioinary to store them.
     data_dict = {
-        ('paper', 'cites', 'paper'): rand_edges(num_papers, num_papers, num_cite_edges),
-        ('author', 'writes', 'paper'): rand_edges(num_authors, num_papers, num_write_edges),
-        ('author', 'affiliated_with', 'institution'): rand_edges(num_authors, num_institutions, num_affiliate_edges)
+        ('paper', 'cites', 'paper'): rand_edges(
+            num_papers, num_papers, num_cite_edges
+        ),
+        ('author', 'writes', 'paper'): rand_edges(
+            num_authors, num_papers, num_write_edges
+        ),
+        ('author', 'affiliated_with', 'institution'): rand_edges(
+            num_authors, num_institutions, num_affiliate_edges
+        ),
     }
     src, dst = data_dict[('author', 'writes', 'paper')]
     data_dict[('paper', 'rev_writes', 'author')] = (dst, src)
@@ -53,18 +60,11 @@ def test_parmetis_preprocessing():
         chunk_graph(
             g,
             'mag240m',
-            {
-                'paper': {}, 
-                'author': {},
-                'institution': {}
-            },
-            {
-                'cites': { },
-                'writes': { },
-                'rev_writes': { }
-            },
+            {'paper': {}, 'author': {}, 'institution': {}},
+            {'cites': {}, 'writes': {}, 'rev_writes': {}},
             num_chunks=num_chunks,
-            output_path=output_dir)
+            output_path=output_dir,
+        )
 
         # Check metadata.json.
         json_file = os.path.join(output_dir, 'metadata.json')
@@ -80,12 +80,12 @@ def test_parmetis_preprocessing():
         node_ids = np.arange(num_nodes)
         partition_ids = np.random.randint(0, 2, (num_nodes,))
         parmetis_output = np.column_stack([node_ids, partition_ids])
-        
+
         # Create parmetis output, this is mimicking running actual parmetis.
         with open(parmetis_file, 'w') as f:
             np.savetxt(f, parmetis_output)
 
-        # Check the post processing script here. 
+        # Check the post processing script here.
         env = dict(os.environ)
         dgl_home = env["DGL_HOME"]
         if dgl_home[-1] != "/":
@@ -94,29 +94,35 @@ def test_parmetis_preprocessing():
         print(json_file)
         print(results_dir)
         print(parmetis_file)
-        os.system(f'python3 {dgl_home}tools/distpartitioning/parmetis_postprocess.py '\
-                f'--schema_file {json_file} '\
-                f'--parmetis_output_file {parmetis_file} '\
-                f'--partitions_dir {results_dir}')
+        os.system(
+            f'python3 {dgl_home}tools/distpartitioning/parmetis_postprocess.py '
+            f'--schema_file {json_file} '
+            f'--parmetis_output_file {parmetis_file} '
+            f'--partitions_dir {results_dir}'
+        )
 
         ntype_count = {
-                'author':num_authors, 
-                'paper':num_papers, 
-                'institution':num_institutions
-                }
+            'author': num_authors,
+            'paper': num_papers,
+            'institution': num_institutions,
+        }
         for ntype_name in ['author', 'paper', 'institution']:
             fname = os.path.join(results_dir, f'{ntype_name}.txt')
             print(fname)
             assert os.path.isfile(fname)
-            
+
             # Load and check the partition ids in this file.
             part_ids = np.loadtxt(fname)
             assert part_ids.shape[0] == ntype_count[ntype_name]
             assert np.min(part_ids) == 0
             assert np.max(part_ids) == 1
 
+
 if __name__ == '__main__':
-    #Configure logging.
-    logging.basicConfig(level='INFO', format=f"[{platform.node()} \
-        %(levelname)s %(asctime)s PID:%(process)d] %(message)s")
+    # Configure logging.
+    logging.basicConfig(
+        level='INFO',
+        format=f"[{platform.node()} \
+        %(levelname)s %(asctime)s PID:%(process)d] %(message)s",
+    )
     test_parmetis_preprocessing()

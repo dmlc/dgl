@@ -1,17 +1,18 @@
 import argparse
-import dgl
 import json
-import numpy as np
-import os
-import sys
-from pathlib import Path
-import tempfile
-import torch
 import logging
+import os
 import platform
+import sys
+import tempfile
+from pathlib import Path
 
-from dgl.data.utils import load_tensors, load_graphs
+import dgl
+import numpy as np
+import torch
 from chunk_graph import chunk_graph
+from dgl.data.utils import load_graphs, load_tensors
+
 
 def test_parmetis_wrapper():
     # Step0: prepare chunked graph data format.
@@ -23,7 +24,7 @@ def test_parmetis_wrapper():
     num_cite_edges = 2000
     num_write_edges = 1000
     num_affiliate_edges = 200
-    
+
     num_nodes = num_authors + num_papers + num_institutions
     num_edges = num_cite_edges + num_write_edges + num_affiliate_edges
     num_constraints = 3 + 3
@@ -34,11 +35,17 @@ def test_parmetis_wrapper():
         dst = torch.from_numpy(eids % num_dst)
         return src, dst
 
-    # Create the no. of edges and build a dictioinary to store them. 
+    # Create the no. of edges and build a dictioinary to store them.
     data_dict = {
-        ('paper', 'cites', 'paper'): rand_edges(num_papers, num_papers, num_cite_edges),
-        ('author', 'writes', 'paper'): rand_edges(num_authors, num_papers, num_write_edges),
-        ('author', 'affiliated_with', 'institution'): rand_edges(num_authors, num_institutions, num_affiliate_edges)
+        ('paper', 'cites', 'paper'): rand_edges(
+            num_papers, num_papers, num_cite_edges
+        ),
+        ('author', 'writes', 'paper'): rand_edges(
+            num_authors, num_papers, num_write_edges
+        ),
+        ('author', 'affiliated_with', 'institution'): rand_edges(
+            num_authors, num_institutions, num_affiliate_edges
+        ),
     }
     src, dst = data_dict[('author', 'writes', 'paper')]
     data_dict[('paper', 'rev_writes', 'author')] = (dst, src)
@@ -54,7 +61,7 @@ def test_parmetis_wrapper():
     paper_train_mask = np.random.randint(0, 2, num_papers)
     paper_test_mask = np.random.randint(0, 2, num_papers)
     paper_val_mask = np.random.randint(0, 2, num_papers)
-    
+
     author_train_mask = np.random.randint(0, 2, num_authors)
     author_test_mask = np.random.randint(0, 2, num_authors)
     author_val_mask = np.random.randint(0, 2, num_authors)
@@ -99,7 +106,9 @@ def test_parmetis_wrapper():
         with open(paper_val_mask_path, 'wb') as f:
             np.save(f, paper_val_mask)
 
-        author_train_mask_path = os.path.join(input_dir, 'author/train_mask.npy')
+        author_train_mask_path = os.path.join(
+            input_dir, 'author/train_mask.npy'
+        )
         with open(author_train_mask_path, 'wb') as f:
             np.save(f, author_train_mask)
 
@@ -111,11 +120,15 @@ def test_parmetis_wrapper():
         with open(author_val_mask_path, 'wb') as f:
             np.save(f, author_val_mask)
 
-        inst_train_mask_path = os.path.join(input_dir, 'institution/train_mask.npy')
+        inst_train_mask_path = os.path.join(
+            input_dir, 'institution/train_mask.npy'
+        )
         with open(inst_train_mask_path, 'wb') as f:
             np.save(f, inst_train_mask)
 
-        inst_test_mask_path = os.path.join(input_dir, 'institution/test_mask.npy')
+        inst_test_mask_path = os.path.join(
+            input_dir, 'institution/test_mask.npy'
+        )
         with open(inst_test_mask_path, 'wb') as f:
             np.save(f, inst_test_mask)
 
@@ -137,47 +150,35 @@ def test_parmetis_wrapper():
             g,
             'mag240m',
             {
-                'paper':
-                {
+                'paper': {
                     'feat': paper_feat_path,
                     'train_mask': paper_train_mask_path,
                     'test_mask': paper_test_mask_path,
                     'val_mask': paper_val_mask_path,
                     'label': paper_label_path,
-                    'year': paper_year_path
-                }, 
-                'author':
-                {
-                    'train_mask': author_train_mask_path,
-                    'test_mask': author_test_mask_path, 
-                    'val_mask': author_val_mask_path
-
+                    'year': paper_year_path,
                 },
-                'institution':
-                {
+                'author': {
+                    'train_mask': author_train_mask_path,
+                    'test_mask': author_test_mask_path,
+                    'val_mask': author_val_mask_path,
+                },
+                'institution': {
                     'train_mask': inst_train_mask_path,
-                    'test_mask': inst_test_mask_path, 
-                    'val_mask': inst_val_mask_path
-                }
+                    'test_mask': inst_test_mask_path,
+                    'val_mask': inst_val_mask_path,
+                },
             },
             {
-                'cites':
-                {
-                    'count': cite_count_path
-                },
-                'writes': 
-                {
-                    'year': write_year_path
-                },
-                # Here same data file is used. 
+                'cites': {'count': cite_count_path},
+                'writes': {'year': write_year_path},
+                # Here same data file is used.
                 # Features can be shared if the dimensions agree
-                'rev_writes': 
-                {
-                    'year': write_year_path
-                }
+                'rev_writes': {'year': write_year_path},
             },
             num_chunks=num_chunks,
-            output_path=output_dir)
+            output_path=output_dir,
+        )
 
         # Check metadata.json.
         json_file = os.path.join(output_dir, 'metadata.json')
@@ -193,7 +194,9 @@ def test_parmetis_wrapper():
         for utype, etype, vtype in data_dict.keys():
             filename = ':'.join([utype, etype, vtype])
             for i in range(num_chunks):
-                chunk_filename = os.path.join(output_edge_index_dir, filename + str(i) + '.txt')
+                chunk_filename = os.path.join(
+                    output_edge_index_dir, filename + str(i) + '.txt'
+                )
                 assert os.path.isfile(chunk_filename)
                 with open(chunk_filename, 'r') as f:
                     header = f.readline()
@@ -206,7 +209,9 @@ def test_parmetis_wrapper():
         for feat in ['feat', 'label', 'year']:
             for i in range(num_chunks):
                 chunk_filename = f'{feat}-{i}.npy'.format(feat, i)
-                chunk_filename = os.path.join(output_node_data_dir, chunk_filename)
+                chunk_filename = os.path.join(
+                    output_node_data_dir, chunk_filename
+                )
                 assert os.path.isfile(chunk_filename)
                 feat_array = np.load(chunk_filename)
                 assert feat_array.shape[0] == num_papers // num_chunks
@@ -215,33 +220,41 @@ def test_parmetis_wrapper():
         num_edges = {
             'paper:cites:paper': num_cite_edges,
             'author:writes:paper': num_write_edges,
-            'paper:rev_writes:author': num_write_edges
+            'paper:rev_writes:author': num_write_edges,
         }
         output_edge_data_dir = os.path.join(output_dir, 'edge_data')
         for etype, feat in [
             ['paper:cites:paper', 'count'],
             ['author:writes:paper', 'year'],
-            ['paper:rev_writes:author', 'year']
+            ['paper:rev_writes:author', 'year'],
         ]:
             output_edge_sub_dir = os.path.join(output_edge_data_dir, etype)
             for i in range(num_chunks):
                 chunk_filename = f'{feat}-{i}.npy'
-                chunk_filename = os.path.join(output_edge_sub_dir, chunk_filename)
+                chunk_filename = os.path.join(
+                    output_edge_sub_dir, chunk_filename
+                )
                 assert os.path.isfile(chunk_filename)
                 feat_array = np.load(chunk_filename)
                 assert feat_array.shape[0] == num_edges[etype] // num_chunks
 
         # Trigger ParMETIS.
         schema_file = os.path.join(root_dir, 'chunked-data/metadata.json')
-        preproc_output_dir = os.path.join(root_dir, 'chunked-data/preproc_output_dir')
-        parmetis_output_file = os.path.join(os.getcwd(), f'{graph_name}_part.{num_chunks}')
+        preproc_output_dir = os.path.join(
+            root_dir, 'chunked-data/preproc_output_dir'
+        )
+        parmetis_output_file = os.path.join(
+            os.getcwd(), f'{graph_name}_part.{num_chunks}'
+        )
         partitions_dir = os.path.join(root_dir, 'chunked-data/partitions_dir')
         hostfile = os.path.join(root_dir, 'ip_config.txt')
         with open(hostfile, 'w') as f:
             f.write('127.0.0.1\n')
             f.write('127.0.0.1\n')
 
-        stats_file = os.path.join(root_dir, f'chunked-data/{graph_name}_stats.txt')
+        stats_file = os.path.join(
+            root_dir, f'chunked-data/{graph_name}_stats.txt'
+        )
         with open(stats_file, 'w') as f:
             f.write(f'{num_nodes} {num_edges} {num_constraints}')
 
@@ -249,23 +262,25 @@ def test_parmetis_wrapper():
         os.chdir(os.path.join(root_dir, 'chunked-data'))
         env = dict(os.environ)
         dgl_home = env["DGL_HOME"]
-        if dgl_home[-1] != "/": 
+        if dgl_home[-1] != "/":
             dgl_home += "/"
-        parmetis_cmd = f'python3 {dgl_home}tools/distpartitioning/parmetis_wrapper.py '\
-                       f'--schema_file {schema_file} '\
-                       f'--preproc_output_dir {preproc_output_dir} '\
-                       f'--hostfile {hostfile} '\
-                       f'--parmetis_output_file {parmetis_output_file} '\
-                       f'--partitions_dir {partitions_dir} '
+        parmetis_cmd = (
+            f'python3 {dgl_home}tools/distpartitioning/parmetis_wrapper.py '
+            f'--schema_file {schema_file} '
+            f'--preproc_output_dir {preproc_output_dir} '
+            f'--hostfile {hostfile} '
+            f'--parmetis_output_file {parmetis_output_file} '
+            f'--partitions_dir {partitions_dir} '
+        )
         logging.info(f'Executing the following cmd: {parmetis_cmd}')
         print(parmetis_cmd)
         os.system(parmetis_cmd)
 
         ntype_count = {
-                'author':num_authors,
-                'paper':num_papers,
-                'institution':num_institutions
-                }
+            'author': num_authors,
+            'paper': num_papers,
+            'institution': num_institutions,
+        }
         for ntype_name in ['author', 'paper', 'institution']:
             fname = os.path.join(partitions_dir, f'{ntype_name}.txt')
             print(fname)
@@ -277,8 +292,12 @@ def test_parmetis_wrapper():
             assert np.min(part_ids) == 0
             assert np.max(part_ids) == (num_chunks - 1)
 
+
 if __name__ == '__main__':
-    #Configure logging.
-    logging.basicConfig(level='INFO', format=f"[{platform.node()} \
-        %(levelname)s %(asctime)s PID:%(process)d] %(message)s")
+    # Configure logging.
+    logging.basicConfig(
+        level='INFO',
+        format=f"[{platform.node()} \
+        %(levelname)s %(asctime)s PID:%(process)d] %(message)s",
+    )
     test_parmetis_wrapper()
