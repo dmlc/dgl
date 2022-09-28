@@ -32,10 +32,10 @@ def get_proc_info():
         rank of the current process
     """
     env_variables = dict(os.environ)
-    if 'OMPI_COMM_WORLD_RANK' in env_variables:
-        local_rank = int(os.environ.get('OMPI_COMM_WORLD_RANK') or 0)
-    elif 'MPI_LOCALRANKID' in env_variables:
-        local_rank = int(os.environ.get('MPI_LOCALRANKID') or 0)
+    if "OMPI_COMM_WORLD_RANK" in env_variables:
+        local_rank = int(os.environ.get("OMPI_COMM_WORLD_RANK") or 0)
+    elif "MPI_LOCALRANKID" in env_variables:
+        local_rank = int(os.environ.get("MPI_LOCALRANKID") or 0)
     return local_rank
 
 
@@ -94,10 +94,10 @@ def gen_edge_files(schema_map, output):
             read_options=pyarrow.csv.ReadOptions(
                 autogenerate_column_names=True
             ),
-            parse_options=pyarrow.csv.ParseOptions(delimiter=' '),
+            parse_options=pyarrow.csv.ParseOptions(delimiter=" "),
         )
-        data_f0 = data_df['f0'].to_numpy()
-        data_f1 = data_df['f1'].to_numpy()
+        data_f0 = data_df["f0"].to_numpy()
+        data_f1 = data_df["f1"].to_numpy()
 
         global_src_id = data_f0 + ntype_gnid_offset[src_ntype_name][0, 0]
         global_dst_id = data_f1 + ntype_gnid_offset[dst_ntype_name][0, 0]
@@ -105,7 +105,7 @@ def gen_edge_files(schema_map, output):
         col_names = ["global_src_id", "global_dst_id"]
 
         out_file = edge_info[rank].split("/")[-1]
-        out_file = os.path.join(outdir, 'edges_{}'.format(out_file))
+        out_file = os.path.join(outdir, "edges_{}".format(out_file))
         options = csv.WriteOptions(include_header=False, delimiter=" ")
         options.delimiter = " "
 
@@ -148,7 +148,7 @@ def read_node_features(schema_map, tgt_ntype_name, feat_names):
                 for feat_name, feat_data in ntype_feature_data.items():
                     if feat_name in feat_names:
                         my_feat_data_fname = feat_data[constants.STR_DATA][rank]
-                        logging.info(f'Reading: {my_feat_data_fname}')
+                        logging.info(f"Reading: {my_feat_data_fname}")
                         if os.path.isabs(my_feat_data_fname):
                             node_features[feat_name] = np.load(
                                 my_feat_data_fname
@@ -242,7 +242,7 @@ def gen_node_weights_files(schema_map, output):
         col_names.append("type_nid")
 
         out_file = os.path.join(
-            outdir, 'node_weights_{}_{}.txt'.format(ntype_name, rank)
+            outdir, "node_weights_{}_{}.txt".format(ntype_name, rank)
         )
         options = csv.WriteOptions(include_header=False, delimiter=" ")
         options.delimiter = " "
@@ -295,7 +295,7 @@ def gen_parmetis_input_args(params, schema_map):
                 type_nid_dict[ntype_name][r][1],
             )
             out_file = os.path.join(
-                outdir, 'node_weights_{}_{}.txt'.format(ntype_name, r)
+                outdir, "node_weights_{}_{}.txt".format(ntype_name, r)
             )
             node_files.append(
                 (
@@ -305,10 +305,10 @@ def gen_parmetis_input_args(params, schema_map):
                 )
             )
 
-    nfile = open(os.path.join(params.output_dir, 'parmetis_nfiles.txt'), "w")
+    nfile = open(os.path.join(params.output_dir, "parmetis_nfiles.txt"), "w")
     for f in node_files:
         # format: filename global_node_id_start global_node_id_end(exclusive)
-        nfile.write('{} {} {}\n'.format(f[0], f[1], f[2]))
+        nfile.write("{} {} {}\n".format(f[0], f[1], f[2]))
     nfile.close()
 
     # Regenerate edge files here.
@@ -318,12 +318,12 @@ def gen_parmetis_input_args(params, schema_map):
         edge_info = etype_info[constants.STR_DATA]
         for r in range(num_parts):
             out_file = edge_info[r].split("/")[-1]
-            out_file = os.path.join(outdir, 'edges_{}'.format(out_file))
+            out_file = os.path.join(outdir, "edges_{}".format(out_file))
             edge_files.append(out_file)
 
-    efile = open(os.path.join(params.output_dir, 'parmetis_efiles.txt'), "w")
+    efile = open(os.path.join(params.output_dir, "parmetis_efiles.txt"), "w")
     for f in edge_files:
-        efile.write('{}\n'.format(f))
+        efile.write("{}\n".format(f))
     efile.close()
 
 
@@ -335,21 +335,21 @@ def run_preprocess_data(params):
     params : argparser object
         an instance of argparser class which stores command line arguments
     """
-    logging.info(f'Starting to generate ParMETIS files...')
+    logging.info(f"Starting to generate ParMETIS files...")
 
     rank = get_proc_info()
     schema_map = read_json(params.schema_file)
     num_nodes_per_chunk = schema_map[constants.STR_NUM_NODES_PER_CHUNK]
     num_parts = len(num_nodes_per_chunk[0])
     gen_node_weights_files(schema_map, params.output_dir)
-    logging.info(f'Done with node weights....')
+    logging.info(f"Done with node weights....")
 
     gen_edge_files(schema_map, params.output_dir)
-    logging.info(f'Done with edge weights...')
+    logging.info(f"Done with edge weights...")
 
     if rank == 0:
         gen_parmetis_input_args(params, schema_map)
-    logging.info(f'Done generating files for ParMETIS run ..')
+    logging.info(f"Done generating files for ParMETIS run ..")
 
 
 if __name__ == "__main__":
@@ -361,19 +361,19 @@ if __name__ == "__main__":
     mpirun -np 4 python3 parmetis_preprocess.py --schema <file> --output <target-output-dir>
     """
     parser = argparse.ArgumentParser(
-        description='Generate ParMETIS files for input dataset'
+        description="Generate ParMETIS files for input dataset"
     )
     parser.add_argument(
-        '--schema_file',
+        "--schema_file",
         required=True,
         type=str,
-        help='The schema of the input graph',
+        help="The schema of the input graph",
     )
     parser.add_argument(
-        '--output_dir',
+        "--output_dir",
         required=True,
         type=str,
-        help='The output directory for the node weights files and auxiliary files for ParMETIS.',
+        help="The output directory for the node weights files and auxiliary files for ParMETIS.",
     )
     params = parser.parse_args()
 

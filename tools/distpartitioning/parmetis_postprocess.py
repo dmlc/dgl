@@ -35,10 +35,10 @@ def post_process(params):
     metis_df = csv.read_csv(
         params.parmetis_output_file,
         read_options=pyarrow.csv.ReadOptions(autogenerate_column_names=True),
-        parse_options=pyarrow.csv.ParseOptions(delimiter=' '),
+        parse_options=pyarrow.csv.ParseOptions(delimiter=" "),
     )
-    global_nids = metis_df['f0'].to_numpy()
-    partition_ids = metis_df['f1'].to_numpy()
+    global_nids = metis_df["f0"].to_numpy()
+    partition_ids = metis_df["f1"].to_numpy()
 
     sort_idx = np.argsort(global_nids)
     global_nids = global_nids[sort_idx]
@@ -57,7 +57,7 @@ def post_process(params):
         end = ntype_gnid_offset[ntype_name][0, 1]
         out_data = partition_ids[start:end]
 
-        out_file = os.path.join(outdir, f'{ntype_name}.txt')
+        out_file = os.path.join(outdir, f"{ntype_name}.txt")
         options = csv.WriteOptions(include_header=False, delimiter=" ")
 
         csv.write_csv(
@@ -89,34 +89,34 @@ if __name__ == "__main__":
         --schema <schema-file-path>
     """
     parser = argparse.ArgumentParser(
-        description='PostProcessing the ParMETIS\
-        output for partitioning pipeline'
+        description="PostProcessing the ParMETIS\
+        output for partitioning pipeline"
     )
     parser.add_argument(
-        '--schema_file',
+        "--schema_file",
         required=True,
         type=str,
-        help='The schema of the input graph',
+        help="The schema of the input graph",
     )
     parser.add_argument(
-        '--parmetis_output_file',
+        "--parmetis_output_file",
         required=True,
         type=str,
-        help='ParMETIS output file',
+        help="ParMETIS output file",
     )
     parser.add_argument(
-        '--partitions_dir',
+        "--partitions_dir",
         required=True,
         type=str,
-        help='The output\
+        help="The output\
         will be files (with metis partition ids) and each file corresponds to\
-        a node-type in the input graph dataset.',
+        a node-type in the input graph dataset.",
     )
     params = parser.parse_args()
 
     # Configure logging.
     logging.basicConfig(
-        level='INFO',
+        level="INFO",
         format=f"[{platform.node()} \
         %(levelname)s %(asctime)s PID:%(process)d] %(message)s",
     )
