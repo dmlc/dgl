@@ -20,9 +20,15 @@ def all_close_sparse(A, B):
     assert A.shape == B.shape
 
 
+# TODO (Israt): Implement sddmm. Do not rely on PyTorch.
 @unittest.skipIf(
     F._default_context_str == "cpu",
-    reason="sddmm uses operator from pytorch which only supports CUDA",
+    reason="sddmm uses sampled_addmm from pytorch which supports only CUDA",
+)
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="sddmm uses sampled_addmm from pytorch which requires pytorch "
+    "1.12 or higher. Current CI doesn't support that.",
 )
 @parametrize_idtype
 @parametrize_dtype
