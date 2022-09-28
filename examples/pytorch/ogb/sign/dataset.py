@@ -1,8 +1,9 @@
-import torch
 import numpy as np
+import torch
+from ogb.nodeproppred import DglNodePropPredDataset, Evaluator
+
 import dgl
 import dgl.function as fn
-from ogb.nodeproppred import DglNodePropPredDataset, Evaluator
 
 
 def get_ogb_evaluator(dataset):
@@ -10,10 +11,12 @@ def get_ogb_evaluator(dataset):
     Get evaluator from Open Graph Benchmark based on dataset
     """
     evaluator = Evaluator(name=dataset)
-    return lambda preds, labels: evaluator.eval({
-        "y_true": labels.view(-1, 1),
-        "y_pred": preds.view(-1, 1),
-    })["acc"]
+    return lambda preds, labels: evaluator.eval(
+        {
+            "y_true": labels.view(-1, 1),
+            "y_pred": preds.view(-1, 1),
+        }
+    )["acc"]
 
 
 def convert_mag_to_homograph(g, device):
@@ -25,11 +28,13 @@ def convert_mag_to_homograph(g, device):
     src_writes, dst_writes = g.all_edges(etype="writes")
     src_topic, dst_topic = g.all_edges(etype="has_topic")
     src_aff, dst_aff = g.all_edges(etype="affiliated_with")
-    new_g = dgl.heterograph({
-        ("paper", "written", "author"): (dst_writes, src_writes),
-        ("paper", "has_topic", "field"): (src_topic, dst_topic),
-        ("author", "aff", "inst"): (src_aff, dst_aff)
-    })
+    new_g = dgl.heterograph(
+        {
+            ("paper", "written", "author"): (dst_writes, src_writes),
+            ("paper", "has_topic", "field"): (src_topic, dst_topic),
+            ("author", "aff", "inst"): (src_aff, dst_aff),
+        }
+    )
     new_g = new_g.to(device)
     new_g.nodes["paper"].data["feat"] = g.nodes["paper"].data["feat"]
     new_g["written"].update_all(fn.copy_u("feat", "m"), fn.mean("m", "feat"))
@@ -65,7 +70,7 @@ def load_dataset(name, device):
     if name == "ogbn-arxiv":
         g = dgl.add_reverse_edges(g, copy_ndata=True)
         g = dgl.add_self_loop(g)
-        g.ndata['feat'] = g.ndata['feat'].float()
+        g.ndata["feat"] = g.ndata["feat"].float()
     elif name == "ogbn-mag":
         # MAG is a heterogeneous graph. The task is to make prediction for
         # paper nodes
@@ -75,16 +80,18 @@ def load_dataset(name, device):
         test_nid = test_nid["paper"]
         g = convert_mag_to_homograph(g, device)
     else:
-        g.ndata['feat'] = g.ndata['feat'].float()
+        g.ndata["feat"] = g.ndata["feat"].float()
     n_classes = dataset.num_classes
     labels = labels.squeeze()
     evaluator = get_ogb_evaluator(name)
 
-    print(f"# Nodes: {g.number_of_nodes()}\n"
-          f"# Edges: {g.number_of_edges()}\n"
-          f"# Train: {len(train_nid)}\n"
-          f"# Val: {len(val_nid)}\n"
-          f"# Test: {len(test_nid)}\n"
-          f"# Classes: {n_classes}")
+    print(
+        f"# Nodes: {g.number_of_nodes()}\n"
+        f"# Edges: {g.number_of_edges()}\n"
+        f"# Train: {len(train_nid)}\n"
+        f"# Val: {len(val_nid)}\n"
+        f"# Test: {len(test_nid)}\n"
+        f"# Classes: {n_classes}"
+    )
 
     return g, labels, n_classes, train_nid, val_nid, test_nid, evaluator

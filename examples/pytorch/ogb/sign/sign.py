@@ -1,11 +1,13 @@
 import argparse
 import time
+
 import numpy as np
 import torch
 import torch.nn as nn
+from dataset import load_dataset
+
 import dgl
 import dgl.function as fn
-from dataset import load_dataset
 
 
 class FeedForwardNet(nn.Module):
@@ -40,8 +42,16 @@ class FeedForwardNet(nn.Module):
 
 
 class SIGN(nn.Module):
-    def __init__(self, in_feats, hidden, out_feats, num_hops, n_layers,
-                 dropout, input_drop):
+    def __init__(
+        self,
+        in_feats,
+        hidden,
+        out_feats,
+        num_hops,
+        n_layers,
+        dropout,
+        input_drop,
+    ):
         super(SIGN, self).__init__()
         self.dropout = nn.Dropout(dropout)
         self.prelu = nn.PReLU()
@@ -49,9 +59,11 @@ class SIGN(nn.Module):
         self.input_drop = nn.Dropout(input_drop)
         for hop in range(num_hops):
             self.inception_ffs.append(
-                FeedForwardNet(in_feats, hidden, hidden, n_layers, dropout))
-        self.project = FeedForwardNet(num_hops * hidden, hidden, out_feats,
-                                      n_layers, dropout)
+                FeedForwardNet(in_feats, hidden, hidden, n_layers, dropout)
+            )
+        self.project = FeedForwardNet(
+            num_hops * hidden, hidden, out_feats, n_layers, dropout
+        )
 
     def forward(self, feats):
         feats = [self.input_drop(feat) for feat in feats]
@@ -72,7 +84,7 @@ def get_n_params(model):
     for p in list(model.parameters()):
         nn = 1
         for s in list(p.size()):
-            nn = nn*s
+            nn = nn * s
         pp += nn
     return pp
 
@@ -84,8 +96,9 @@ def neighbor_average_features(g, args):
     print("Compute neighbor-averaged feats")
     g.ndata["feat_0"] = g.ndata["feat"]
     for hop in range(1, args.R + 1):
-        g.update_all(fn.copy_u(f"feat_{hop-1}", "msg"),
-                     fn.mean("msg", f"feat_{hop}"))
+        g.update_all(
+            fn.copy_u(f"feat_{hop-1}", "msg"), fn.mean("msg", f"feat_{hop}")
+        )
     res = []
     for hop in range(args.R + 1):
         res.append(g.ndata.pop(f"feat_{hop}"))
@@ -98,8 +111,9 @@ def neighbor_average_features(g, args):
         num_target = target_mask.sum().item()
         new_res = []
         for x in res:
-            feat = torch.zeros((num_target,) + x.shape[1:],
-                               dtype=x.dtype, device=x.device)
+            feat = torch.zeros(
+                (num_target,) + x.shape[1:], dtype=x.dtype, device=x.device
+            )
             feat[target_ids] = x[target_mask]
             new_res.append(feat)
         res = new_res
@@ -112,15 +126,23 @@ def prepare_data(device, args):
     """
     data = load_dataset(args.dataset, device)
     g, labels, n_classes, train_nid, val_nid, test_nid, evaluator = data
-    in_feats = g.ndata['feat'].shape[1]
+    in_feats = g.ndata["feat"].shape[1]
     feats = neighbor_average_features(g, args)
     labels = labels.to(device)
     # move to device
     train_nid = train_nid.to(device)
     val_nid = val_nid.to(device)
     test_nid = test_nid.to(device)
-    return feats, labels, in_feats, n_classes, \
-        train_nid, val_nid, test_nid, evaluator
+    return (
+        feats,
+        labels,
+        in_feats,
+        n_classes,
+        train_nid,
+        val_nid,
+        test_nid,
+        evaluator,
+    )
 
 
 def train(model, feats, labels, loss_fcn, optimizer, train_loader):
@@ -134,8 +156,9 @@ def train(model, feats, labels, loss_fcn, optimizer, train_loader):
         optimizer.step()
 
 
-def test(model, feats, labels, test_loader, evaluator,
-         train_nid, val_nid, test_nid):
+def test(
+    model, feats, labels, test_loader, evaluator, train_nid, val_nid, test_nid
+):
     model.eval()
     device = labels.device
     preds = []
@@ -151,24 +174,44 @@ def test(model, feats, labels, test_loader, evaluator,
 
 
 def run(args, data, device):
-    feats, labels, in_size, num_classes, \
-        train_nid, val_nid, test_nid, evaluator = data
+    (
+        feats,
+        labels,
+        in_size,
+        num_classes,
+        train_nid,
+        val_nid,
+        test_nid,
+        evaluator,
+    ) = data
     train_loader = torch.utils.data.DataLoader(
-        train_nid, batch_size=args.batch_size, shuffle=True, drop_last=False)
+        train_nid, batch_size=args.batch_size, shuffle=True, drop_last=False
+    )
     test_loader = torch.utils.data.DataLoader(
-        torch.arange(labels.shape[0]), batch_size=args.eval_batch_size,
-        shuffle=False, drop_last=False)
+        torch.arange(labels.shape[0]),
+        batch_size=args.eval_batch_size,
+        shuffle=False,
+        drop_last=False,
+    )
 
     # Initialize model and optimizer for each run
     num_hops = args.R + 1
-    model = SIGN(in_size, args.num_hidden, num_classes, num_hops,
-                 args.ff_layer, args.dropout, args.input_dropout)
+    model = SIGN(
+        in_size,
+        args.num_hidden,
+        num_classes,
+        num_hops,
+        args.ff_layer,
+        args.dropout,
+        args.input_dropout,
+    )
     model = model.to(device)
     print("# Params:", get_n_params(model))
 
     loss_fcn = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr,
-                                 weight_decay=args.weight_decay)
+    optimizer = torch.optim.Adam(
+        model.parameters(), lr=args.lr, weight_decay=args.weight_decay
+    )
 
     # Start training
     best_epoch = 0
@@ -180,8 +223,16 @@ def run(args, data, device):
 
         if epoch % args.eval_every == 0:
             with torch.no_grad():
-                acc = test(model, feats, labels, test_loader, evaluator,
-                           train_nid, val_nid, test_nid)
+                acc = test(
+                    model,
+                    feats,
+                    labels,
+                    test_loader,
+                    evaluator,
+                    train_nid,
+                    val_nid,
+                    test_nid,
+                )
             end = time.time()
             log = "Epoch {}, Time(s): {:.4f}, ".format(epoch, end - start)
             log += "Acc: Train {:.4f}, Val {:.4f}, Test {:.4f}".format(*acc)
@@ -191,8 +242,11 @@ def run(args, data, device):
                 best_val = acc[1]
                 best_test = acc[2]
 
-    print("Best Epoch {}, Val {:.4f}, Test {:.4f}".format(
-        best_epoch, best_val, best_test))
+    print(
+        "Best Epoch {}, Val {:.4f}, Test {:.4f}".format(
+            best_epoch, best_val, best_test
+        )
+    )
     return best_val, best_test
 
 
@@ -212,34 +266,51 @@ def main(args):
         val_accs.append(best_val)
         test_accs.append(best_test)
 
-    print(f"Average val accuracy: {np.mean(val_accs):.4f}, "
-          f"std: {np.std(val_accs):.4f}")
-    print(f"Average test accuracy: {np.mean(test_accs):.4f}, "
-          f"std: {np.std(test_accs):.4f}")
+    print(
+        f"Average val accuracy: {np.mean(val_accs):.4f}, "
+        f"std: {np.std(val_accs):.4f}"
+    )
+    print(
+        f"Average test accuracy: {np.mean(test_accs):.4f}, "
+        f"std: {np.std(test_accs):.4f}"
+    )
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="SIGN")
     parser.add_argument("--num-epochs", type=int, default=1000)
     parser.add_argument("--num-hidden", type=int, default=512)
-    parser.add_argument("--R", type=int, default=5,
-                        help="number of hops")
+    parser.add_argument("--R", type=int, default=5, help="number of hops")
     parser.add_argument("--lr", type=float, default=0.001)
     parser.add_argument("--dataset", type=str, default="ogbn-mag")
-    parser.add_argument("--dropout", type=float, default=0.5,
-                        help="dropout on activation")
+    parser.add_argument(
+        "--dropout", type=float, default=0.5, help="dropout on activation"
+    )
     parser.add_argument("--gpu", type=int, default=0)
     parser.add_argument("--weight-decay", type=float, default=0)
     parser.add_argument("--eval-every", type=int, default=10)
     parser.add_argument("--batch-size", type=int, default=50000)
-    parser.add_argument("--eval-batch-size", type=int, default=100000,
-                        help="evaluation batch size")
-    parser.add_argument("--ff-layer", type=int, default=2,
-                        help="number of feed-forward layers")
-    parser.add_argument("--input-dropout", type=float, default=0,
-                        help="dropout on input features")
-    parser.add_argument("--num-runs", type=int, default=10,
-                        help="number of times to repeat the experiment")
+    parser.add_argument(
+        "--eval-batch-size",
+        type=int,
+        default=100000,
+        help="evaluation batch size",
+    )
+    parser.add_argument(
+        "--ff-layer", type=int, default=2, help="number of feed-forward layers"
+    )
+    parser.add_argument(
+        "--input-dropout",
+        type=float,
+        default=0,
+        help="dropout on input features",
+    )
+    parser.add_argument(
+        "--num-runs",
+        type=int,
+        default=10,
+        help="number of times to repeat the experiment",
+    )
     args = parser.parse_args()
 
     print(args)
