@@ -44,8 +44,8 @@ def submit_jobs(args) -> str:
     # retrieve num_parts
     num_chunks = len(schema_map["num_nodes_per_chunk"][0])
     num_parts = num_chunks
-    partition_path = os.path.join(args.partitions_dir, "partition.json")
-    if os.path.exists(partition_path):
+    partition_path = os.path.join(args.partitions_dir, "partition_meta.json")
+    if os.path.isfile(partition_path):
         part_meta = load_partition_meta(partition_path)
         num_parts = part_meta.num_parts
     if num_parts > num_chunks:

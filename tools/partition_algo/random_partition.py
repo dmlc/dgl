@@ -32,7 +32,7 @@ def random_partition(metadata, num_parts, output_path):
     with setdir(output_path):
         _random_partition(metadata, num_parts)
         part_meta = PartitionMeta(version='1.0.0', num_parts=num_parts, algo_name='random')
-        dump_partition_meta(part_meta, 'partition.json')
+        dump_partition_meta(part_meta, 'partition_meta.json')
 
 # Run with PYTHONPATH=${GIT_ROOT_DIR}/tools
 # where ${GIT_ROOT_DIR} is the directory to the DGL git repository.
