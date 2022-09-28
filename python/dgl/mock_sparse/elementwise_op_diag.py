@@ -3,10 +3,18 @@ from typing import Union
 
 from .diag_matrix import DiagMatrix
 
-__all__ = ["add", "sub", "mul", "div", "rdiv", "power", "rpower"]
+__all__ = [
+    "diag_add",
+    "diag_sub",
+    "diag_mul",
+    "diag_div",
+    "diag_rdiv",
+    "diag_power",
+    "diag_rpower",
+]
 
 
-def add(D1: DiagMatrix, D2: DiagMatrix) -> DiagMatrix:
+def diag_add(D1: DiagMatrix, D2: DiagMatrix) -> DiagMatrix:
     """Elementwise addition.
 
     Parameters
@@ -29,19 +37,15 @@ def add(D1: DiagMatrix, D2: DiagMatrix) -> DiagMatrix:
     DiagMatrix(val=tensor([11, 13, 15]),
     shape=(3, 3))
     """
-    if isinstance(D1, DiagMatrix) and isinstance(D2, DiagMatrix):
-        assert D1.shape == D2.shape, (
-            "The shape of diagonal matrix D1 {} and"
-            " D2 {} must match.".format(D1.shape, D2.shape)
-        )
-        return DiagMatrix(D1.val + D2.val)
-    raise RuntimeError(
-        "Elementwise addition between {} and {} is not "
-        "supported.".format(type(D1), type(D2))
+    assert (
+        D1.shape == D2.shape
+    ), "The shape of diagonal matrix D1 {} and" " D2 {} must match.".format(
+        D1.shape, D2.shape
     )
+    return DiagMatrix(D1.val + D2.val)
 
 
-def sub(D1: DiagMatrix, D2: DiagMatrix) -> DiagMatrix:
+def diag_sub(D1: DiagMatrix, D2: DiagMatrix) -> DiagMatrix:
     """Elementwise subtraction.
 
     Parameters
@@ -64,20 +68,15 @@ def sub(D1: DiagMatrix, D2: DiagMatrix) -> DiagMatrix:
     DiagMatrix(val=tensor([-9, -9, -9]),
     shape=(3, 3))
     """
-    if isinstance(D1, DiagMatrix) and isinstance(D2, DiagMatrix):
-        assert (
-            D1.shape == D2.shape
-        ), "The shape of diagonal matrix D1 {} and" "D2 {} must match".format(
-            D1.shape, D2.shape
-        )
-        return DiagMatrix(D1.val - D2.val)
-    raise RuntimeError(
-        "Elementwise subtraction between {} and {} is not "
-        "supported.".format(type(D1), type(D2))
+    assert (
+        D1.shape == D2.shape
+    ), "The shape of diagonal matrix D1 {} and" "D2 {} must match".format(
+        D1.shape, D2.shape
     )
+    return DiagMatrix(D1.val - D2.val)
 
 
-def mul(
+def diag_mul(
     D1: Union[DiagMatrix, float], D2: Union[DiagMatrix, float]
 ) -> DiagMatrix:
     """Elementwise multiplication.
@@ -117,7 +116,7 @@ def mul(
     return DiagMatrix(D1.val * D2)
 
 
-def div(D1: DiagMatrix, D2: Union[DiagMatrix, float]) -> DiagMatrix:
+def diag_div(D1: DiagMatrix, D2: Union[DiagMatrix, float]) -> DiagMatrix:
     """Elementwise division.
 
     Parameters
@@ -154,7 +153,7 @@ def div(D1: DiagMatrix, D2: Union[DiagMatrix, float]) -> DiagMatrix:
     return DiagMatrix(D1.val / D2)
 
 
-def rdiv(D1: float, D2: DiagMatrix):
+def diag_rdiv(D1: float, D2: DiagMatrix):
     """Elementwise division.
 
     Parameters
@@ -170,7 +169,7 @@ def rdiv(D1: float, D2: DiagMatrix):
     )
 
 
-def power(D1: DiagMatrix, D2: float) -> DiagMatrix:
+def diag_power(D1: DiagMatrix, D2: float) -> DiagMatrix:
     """Elementwise power operation.
 
     Parameters
@@ -202,7 +201,7 @@ def power(D1: DiagMatrix, D2: float) -> DiagMatrix:
     return DiagMatrix(pow(D1.val, D2))
 
 
-def rpower(D1: float, D2: DiagMatrix) -> DiagMatrix:
+def diag_rpower(D1: float, D2: DiagMatrix) -> DiagMatrix:
     """Elementwise power operator.
 
     Parameters
@@ -213,17 +212,18 @@ def rpower(D1: float, D2: DiagMatrix) -> DiagMatrix:
         Diagonal matrix
     """
     raise RuntimeError(
-        "power operation between diagonal and dense matrix is not supported."
+        "Elementwise subtraction between {} and {} is not "
+        "supported.".format(type(D1), type(D2))
     )
 
 
-DiagMatrix.__add__ = add
-DiagMatrix.__radd__ = add
-DiagMatrix.__sub__ = sub
-DiagMatrix.__rsub__ = sub
-DiagMatrix.__mul__ = mul
-DiagMatrix.__rmul__ = mul
-DiagMatrix.__truediv__ = div
-DiagMatrix.__rtruediv__ = rdiv
-DiagMatrix.__pow__ = power
-DiagMatrix.__rpow__ = rpower
+DiagMatrix.__add__ = diag_add
+DiagMatrix.__radd__ = diag_add
+DiagMatrix.__sub__ = diag_sub
+DiagMatrix.__rsub__ = diag_sub
+DiagMatrix.__mul__ = diag_mul
+DiagMatrix.__rmul__ = diag_mul
+DiagMatrix.__truediv__ = diag_div
+DiagMatrix.__rtruediv__ = diag_rdiv
+DiagMatrix.__pow__ = diag_power
+DiagMatrix.__rpow__ = diag_rpower
