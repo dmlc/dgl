@@ -48,3 +48,4 @@ Operators
     spspmm
     bspmm
     bspspmm
+    sddmm
