@@ -18,11 +18,73 @@ def test_part_pipeline(num_chunks, num_parts):
         return
 
     with tempfile.TemporaryDirectory() as root_dir:
-        all_ntypes, all_etypes, edge_data_gold = create_chunked_dataset(root_dir, num_chunks)
+        num_cite_edges = 24 * 1000
+        num_write_edges = 12 * 1000
+        num_affiliate_edges = 2400
+        all_ntypes, all_etypes = create_chunked_dataset(root_dir, num_chunks)
+
+        # check metadata.json
+        json_file = os.path.join(output_dir, 'metadata.json')
+        assert os.path.isfile(json_file)
+        with open(json_file, 'rb') as f:
+            meta_data = json.load(f)
+        assert meta_data['graph_name'] == 'mag240m'
+        assert len(meta_data['num_nodes_per_chunk'][0]) == num_chunks
+
+        print('Metadata Source file: ', meta_data["edge_type"])
+
+        # check edge_index
+        output_edge_index_dir = os.path.join(output_dir, 'edge_index')
+        for utype, etype, vtype in data_dict.keys():
+            fname = ':'.join([utype, etype, vtype])
+            for i in range(num_chunks):
+                chunk_f_name = os.path.join(
+                    output_edge_index_dir, fname + str(i) + '.txt'
+                )   
+                assert os.path.isfile(chunk_f_name)
+                with open(chunk_f_name, 'r') as f:
+                    header = f.readline()
+                    num1, num2 = header.rstrip().split(' ')
+                    assert isinstance(int(num1), int)
+                    assert isinstance(int(num2), int)
+
+        # check node_data
+        output_node_data_dir = os.path.join(output_dir, 'node_data', 'paper')
+        for feat in ['feat', 'label', 'year']:
+            for i in range(num_chunks):
+                chunk_f_name = '{}-{}.npy'.format(feat, i)
+                chunk_f_name = os.path.join(output_node_data_dir, chunk_f_name)
+                assert os.path.isfile(chunk_f_name)
+                feat_array = np.load(chunk_f_name)
+                assert feat_array.shape[0] == num_papers // num_chunks
+
+        # check edge_data
+        edge_data_gold = {}
+        num_edges = {
+            'paper:cites:paper': num_cite_edges,
+            'author:writes:paper': num_write_edges,
+            'paper:rev_writes:author': num_write_edges,
+        }
+        output_edge_data_dir = os.path.join(output_dir, 'edge_data')
+        for etype, feat in [
+            ['paper:cites:paper', 'count'],
+            ['author:writes:paper', 'year'],
+            ['paper:rev_writes:author', 'year'],
+        ]:
+            output_edge_sub_dir = os.path.join(output_edge_data_dir, etype)
+            features = []
+            for i in range(num_chunks):
+                chunk_f_name = '{}-{}.npy'.format(feat, i)
+                chunk_f_name = os.path.join(output_edge_sub_dir, chunk_f_name)
+                assert os.path.isfile(chunk_f_name)
+                feat_array = np.load(chunk_f_name)
+            assert feat_array.shape[0] == num_edges[etype] // num_chunks
+            features.append(feat_array)
+            edge_data_gold[etype + '/' + feat] = np.concatenate(features)
         
         # Step1: graph partition
         in_dir = os.path.join(root_dir, 'chunked-data')
-        output_dir = os.path.join(root_dir, '2parts')
+        output_dir = os.path.join(root_dir, 'parted_data')
         os.system('python3 tools/partition_algo/random_partition.py '\
                   '--in_dir {} --out_dir {} --num_partitions {}'.format(
                     in_dir, output_dir, num_parts))
@@ -55,13 +117,11 @@ def test_part_pipeline(num_chunks, num_parts):
         with open(meta_fname, 'rb') as f:
             meta_data = json.load(f)
 
-        #all_etypes = ['affiliated_with', 'writes', 'cites', 'rev_writes']
         for etype in all_etypes:
             assert len(meta_data['edge_map'][etype]) == num_parts
         assert meta_data['etypes'].keys() == set(all_etypes)
         assert meta_data['graph_name'] == 'mag240m'
 
-        #all_ntypes = ['author', 'institution', 'paper']
         for ntype in all_ntypes:
             assert len(meta_data['node_map'][ntype]) == num_parts
         assert meta_data['ntypes'].keys() == set(all_ntypes)
@@ -71,15 +131,24 @@ def test_part_pipeline(num_chunks, num_parts):
 
         # Create Id Map here.
         edge_dict = {
-            "author:affiliated_with:institution": np.array([0, 2400]).reshape( #2400
+            "author:affiliated_with:institution": np.array([0, num_affiliate_edges]).reshape( #2400
                 1, 2
             ),
-            "author:writes:paper": np.array([2400, 16400]).reshape(1, 2), #12000
-            "paper:cites:paper": np.array([16400, 40400]).reshape(1, 2), #24000
-            "paper:rev_writes:author": np.array([40400, 52400]).reshape(1, 2),#12000
+            "author:writes:paper": np.array([num_affiliate_edges, 
+                num_affiliate_edges + num_write_edges]).reshape(1, 2), #12000
+            "paper:cites:paper": np.array([num_affiliate_edges + num_write_edges, 
+                                            num_affiliate_edges
+                                            + num_write_edges 
+                                            + num_cites_edges]).reshape(1, 2), #24000
+            "paper:rev_writes:author": np.array([num_affiliate_edges + 
+                                                num_write_edges + 
+                                                num_cites_edges, 
+                                                affiliate_edges + 
+                                                2*num_write_edges + 
+                                                num_cite_edges]).reshape(1,2)
         }
         id_map = dgl.distributed.id_map.IdMap(edge_dict)
-        etype_id, type_eid = id_map(np.arange(52400))
+        etype_id, type_eid = id_map(np.arange(num_affiliate_edges + 2*num_write_edges, num_cite_edges))
 
         for i in range(num_parts):
             sub_dir = 'part-' + str(i)
@@ -139,20 +208,9 @@ def test_part_pipeline(num_chunks, num_parts):
 
             # Compare the data stored as edge features in this partition with the data
             # from the original graph.
-            etype_names = list(edge_dict.keys())
-            for idx, etype_name in enumerate(etype_names):
-                part_data = None
-                key = None
-                if etype_name + '/count' in tensor_dict:
-                    key = etype_name + '/count'
-                    part_data = tensor_dict[etype_name + '/count'].numpy()
-                if etype_name + '/year' in tensor_dict:
-                    key = etype_name + '/year'
-                    part_data = tensor_dict[etype_name + '/year'].numpy()
-
-                if part_data is None:
-                    continue
-
+            idx = 0
+            for key, part_data in tensor_dict.items():
                 gold_type_ids = orig_type_eids[orig_etype_ids == idx]
                 gold_data = edge_data_gold[key][gold_type_ids]
                 assert np.all(gold_data == part_data)
+                idx += 1
