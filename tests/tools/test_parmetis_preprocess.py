@@ -1,32 +1,38 @@
 import argparse
-import dgl
 import json
-import numpy as np
 import os
 import sys
 import tempfile
-import torch
 
-from dgl.data.utils import load_tensors, load_graphs
+import dgl
+import numpy as np
+import torch
 from chunk_graph import chunk_graph
+from dgl.data.utils import load_graphs, load_tensors
+
 from create_chunked_dataset import create_chunked_dataset
+
 
 def test_parmetis_preprocessing():
     with tempfile.TemporaryDirectory() as root_dir:
         num_chunks = 2
         create_chunked_dataset(root_dir, num_chunks, include_masks=True)
 
-        # Trigger ParMETIS pre-processing here. 
+        # Trigger ParMETIS pre-processing here.
         schema_path = os.path.join(root_dir, 'chunked-data/metadata.json')
         results_dir = os.path.join(root_dir, 'parmetis-data')
-        os.system(f'mpirun -np 2 python3 tools/distpartitioning/parmetis_preprocess.py '\
-                  f'--schema {schema_path} --output {results_dir}')
+        os.system(
+            f'mpirun -np 2 python3 tools/distpartitioning/parmetis_preprocess.py '
+            f'--schema {schema_path} --output {results_dir}'
+        )
 
         # Now add all the tests and check whether the test has passed or failed.
         # Read parmetis_nfiles and ensure all files are present.
         parmetis_data_dir = os.path.join(root_dir, 'parmetis-data')
         assert os.path.isdir(parmetis_data_dir)
-        parmetis_nodes_file = os.path.join(parmetis_data_dir, 'parmetis_nfiles.txt')
+        parmetis_nodes_file = os.path.join(
+            parmetis_data_dir, 'parmetis_nfiles.txt'
+        )
         assert os.path.isfile(parmetis_nodes_file)
 
         # `parmetis_nfiles.txt` should have each line in the following format.
@@ -40,13 +46,13 @@ def test_parmetis_preprocessing():
                 assert os.path.isfile(tokens[0])
                 assert int(tokens[1]) == total_node_count
 
-                #check contents of each of the nodes files here
+                # check contents of each of the nodes files here
                 with open(tokens[0], 'r') as nodes_file:
                     node_lines = nodes_file.readlines()
                     for line in node_lines:
                         val = line.split(" ")
                         # <ntype_id> <weight_list> <mask_list> <type_node_id>
-                        assert len(val) == 8 
+                        assert len(val) == 8
                     node_count = len(node_lines)
                     total_node_count += node_count
                 assert int(tokens[2]) == total_node_count
@@ -56,8 +62,8 @@ def test_parmetis_preprocessing():
         json_file = os.path.join(output_dir, 'metadata.json')
         assert os.path.isfile(json_file)
         with open(json_file, 'rb') as f:
-            meta_data = json.load(f) 
-        
+            meta_data = json.load(f)
+
         # Count the total no. of nodes.
         true_node_count = 0
         num_nodes_per_chunk = meta_data['num_nodes_per_chunk']
@@ -69,7 +75,9 @@ def test_parmetis_preprocessing():
 
         # Read parmetis_efiles and ensure all files are present.
         # This file contains a list of filenames.
-        parmetis_edges_file = os.path.join(parmetis_data_dir, 'parmetis_efiles.txt')
+        parmetis_edges_file = os.path.join(
+            parmetis_data_dir, 'parmetis_efiles.txt'
+        )
         assert os.path.isfile(parmetis_edges_file)
 
         with open(parmetis_edges_file, 'r') as edges_metafile:
@@ -94,6 +102,7 @@ def test_parmetis_preprocessing():
             for j in range(len(edges_per_part)):
                 true_edge_count += edges_per_part[j]
         assert true_edge_count == total_edge_count
+
 
 if __name__ == '__main__':
     test_parmetis_preprocessing()

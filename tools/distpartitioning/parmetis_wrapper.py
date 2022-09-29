@@ -20,12 +20,6 @@ def run_parmetis_wrapper(params):
     assert os.path.isfile(params.schema_file)
     assert os.path.isfile(params.hostfile)
 
-    parmetis_install_path = None
-    if params.parmetis_install_path is not None:
-        parmetis_install_path = params.parmetis_install_path
-        if parmetis_install_path[-1] != "/":
-            parmetis_install_path += "/"
-
     schema = read_json(params.schema_file)
     graph_name = schema[constants.STR_GRAPH_NAME]
     num_partitions = len(schema[constants.STR_NUM_NODES_PER_CHUNK][0])
@@ -44,8 +38,9 @@ def run_parmetis_wrapper(params):
     # Trigger ParMETIS for creating metis partitions for the input graph.
     parmetis_install_path = "pm_dglpart3"
     if params.parmetis_install_path is not None:
-        parmetis_install_path = os.path.join(params.parmetis_install_path, 
-                parmetis_install_path)
+        parmetis_install_path = os.path.join(
+            params.parmetis_install_path, parmetis_install_path
+        )
     parmetis_nfiles = os.path.join(
         params.preproc_output_dir, "parmetis_nfiles.txt"
     )

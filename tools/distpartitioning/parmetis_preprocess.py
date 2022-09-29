@@ -16,7 +16,7 @@ from utils import get_idranges, get_node_types, read_json
 
 def get_proc_info():
     """Helper function to get the rank from the
-    environment when `mpirun` is used to run this python program
+    environment when `mpirun` is used to run this python program.
 
     Please note that for mpi(openmpi) installation the rank is retrieved from the
     environment using OMPI_COMM_WORLD_RANK and for mpi(standard installation) it is
@@ -29,7 +29,7 @@ def get_proc_info():
     Returns:
     --------
     integer :
-        rank of the current process
+        Rank of the current process.
     """
     env_variables = dict(os.environ)
     if "OMPI_COMM_WORLD_RANK" in env_variables:
@@ -47,16 +47,16 @@ def gen_edge_files(schema_map, output):
     following format (meaning each line of these file is of the following format)
     <global_src_id> <global_dst_id>
 
-    Here `global` prefix means that globally unique identifier assigned each node
+    Here ``global`` prefix means that globally unique identifier assigned each node
     in the input graph. In this context globally unique means unique across all the
     nodes in the input graph.
 
     Parameters:
     -----------
     schema_map : json dictionary
-        dictionary created by reading the metadata.json file for the input dataset
+        Dictionary created by reading the metadata.json file for the input dataset.
     output : string
-        location of storing the node-weights and edge files for ParMETIS
+        Location of storing the node-weights and edge files for ParMETIS.
     """
     rank = get_proc_info()
     type_nid_dict, ntype_gnid_offset = get_idranges(
@@ -81,7 +81,7 @@ def gen_edge_files(schema_map, output):
 
         edge_info = etype_info[constants.STR_DATA]
 
-        # `edgetype` strings are in canonical format, src_node_type:edge_type:dst_node_type
+        # ``edgetype`` strings are in canonical format, src_node_type:edge_type:dst_node_type
         tokens = etype_name.split(":")
         assert len(tokens) == 3
 
@@ -118,22 +118,22 @@ def gen_edge_files(schema_map, output):
 
 
 def read_node_features(schema_map, tgt_ntype_name, feat_names):
-    """Helper function to read the node features, if present.
+    """Helper function to read the node features.
     Only node features which are requested are read from the input dataset.
 
     Parameters:
     -----------
     schema_map : json dictionary
-        dictionary created by reading the metadata.json file for the input dataset
-        tgt_ntype_name : string
-                node type name, for which node features will be read from the input dataset
+        Dictionary created by reading the metadata.json file for the input dataset.
+    tgt_ntype_name : string
+        node-type name, for which node features will be read from the input dataset.
     feat_names : set
-        a set of strings, feature names, which will be read for a given node type
+        A set of strings, feature names, which will be read for a given node type.
 
     Returns:
     --------
     dictionary :
-        a dictionary where key is the feature-name and value is the numpy array
+        A dictionary where key is the feature-name and value is the numpy array.
     """
     rank = get_proc_info()
     node_features = {}
@@ -150,9 +150,7 @@ def read_node_features(schema_map, tgt_ntype_name, feat_names):
                         feat_data_fname = feat_data[constants.STR_DATA][rank]
                         logging.info(f"Reading: {feat_data_fname}")
                         if os.path.isabs(feat_data_fname):
-                            node_features[feat_name] = np.load(
-                                feat_data_fname
-                            )
+                            node_features[feat_name] = np.load(feat_data_fname)
                         else:
                             node_features[feat_name] = np.load(
                                 os.path.join(input_dir, feat_data_fname)
@@ -166,29 +164,28 @@ def gen_node_weights_files(schema_map, output):
     This function generates node-data files, which will be read by the ParMETIS
     executable for partitioning purposes. Each line in these files will be of the
     following format:
-    <node_type_id> <node_weight_list> <type_wise_node_id>
-    where
+        <node_type_id> <node_weight_list> <type_wise_node_id>
     node_type_id -  is id assigned to the node-type to which a given particular
-    node belongs to
+        node belongs to
     weight_list - this is a one-hot vector in which the number in the location of
-    the current nodes' node-type will be set to `1` and other will be `0`
+        the current nodes' node-type will be set to `1` and other will be `0`
     type_node_id - this is the id assigned to the node (in the context of the current
-    nodes` node-type). Meaning this id is unique across all the nodes which belong to
-    the current nodes` node-type.
+        nodes` node-type). Meaning this id is unique across all the nodes which belong to
+        the current nodes` node-type.
 
     Parameters:
     -----------
     schema_map : json dictionary
-        dictionary created by reading the metadata.json file for the input dataset
+        Dictionary created by reading the metadata.json file for the input dataset.
     output : string
-        location of storing the node-weights and edge files for ParMETIS
+        Location of storing the node-weights and edge files for ParMETIS.
 
     Returns:
     --------
     list :
-        list of filenames for nodes of the input graph
+        List of filenames for nodes of the input graph.
     list :
-        list o ffilenames for edges of the input graph
+        List o ffilenames for edges of the input graph.
     """
     rank = get_proc_info()
     ntypes_ntypeid_map, ntypes, ntid_ntype_map = get_node_types(schema_map)
@@ -263,23 +260,22 @@ def gen_node_weights_files(schema_map, output):
 
 def gen_parmetis_input_args(params, schema_map):
     """Function to create two input arguments which will be passed to the parmetis.
-    first argument is a text file which has a list of node-weights files, 
-    namely parmetis-nfiles.txt, and second argument is a text file which has a 
+    first argument is a text file which has a list of node-weights files,
+    namely parmetis-nfiles.txt, and second argument is a text file which has a
     list of edge files, namely parmetis_efiles.txt.
     ParMETIS uses these two files to read/load the graph and partition the graph
     With regards to the file format, parmetis_nfiles.txt uses the following format
-    for each line in that file: 
-    <filename> <global_node_id_start> <global_node_id_end>(exclusive)
+    for each line in that file:
+        <filename> <global_node_id_start> <global_node_id_end>(exclusive)
     While parmetis_efiles.txt just has <filename> in each line.
-
 
     Parameters:
     -----------
     params : argparser instance
-        instance of ArgParser class, which has all the input arguments passed to
-        run this program
+        Instance of ArgParser class, which has all the input arguments passed to
+        run this program.
     schema_map : json dictionary
-        dictionary object created after reading the graph metadata.json file
+        Dictionary object created after reading the graph metadata.json file.
     """
 
     num_nodes_per_chunk = schema_map[constants.STR_NUM_NODES_PER_CHUNK]
@@ -327,9 +323,12 @@ def gen_parmetis_input_args(params, schema_map):
             out_file = os.path.join(outdir, "edges_{}".format(out_file))
             edge_files.append(out_file)
 
-    with open(os.path.join(params.output_dir, "parmetis_efiles.txt"), "w") as efile:
+    with open(
+        os.path.join(params.output_dir, "parmetis_efiles.txt"), "w"
+    ) as efile:
         for f in edge_files:
             efile.write("{}\n".format(f))
+
 
 def run_preprocess_data(params):
     """Main function which will help create graph files for ParMETIS processing
@@ -337,7 +336,7 @@ def run_preprocess_data(params):
     Parameters:
     -----------
     params : argparser object
-        an instance of argparser class which stores command line arguments
+        An instance of argparser class which stores command line arguments.
     """
     logging.info(f"Starting to generate ParMETIS files...")
 
