@@ -144,7 +144,7 @@ class GNNExplainer(nn.Module):
         loss = loss + self.alpha1 * torch.sum(edge_mask)
         # Edge mask entropy regularization
         ent = - edge_mask * torch.log(edge_mask + eps) - \
-              (1 - edge_mask) * torch.log(1 - edge_mask + eps)
+            (1 - edge_mask) * torch.log(1 - edge_mask + eps)
         loss = loss + self.alpha2 * ent.mean()
 
         feat_mask = feat_mask.sigmoid()
@@ -152,7 +152,7 @@ class GNNExplainer(nn.Module):
         loss = loss + self.beta1 * torch.mean(feat_mask)
         # Feature mask entropy regularization
         ent = - feat_mask * torch.log(feat_mask + eps) - \
-              (1 - feat_mask) * torch.log(1 - feat_mask + eps)
+            (1 - feat_mask) * torch.log(1 - feat_mask + eps)
         loss = loss + self.beta2 * ent.mean()
 
         return loss
