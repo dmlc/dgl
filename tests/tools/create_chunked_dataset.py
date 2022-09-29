@@ -24,9 +24,9 @@ def create_chunked_dataset(root_dir, num_chunks, include_masks=False):
     """
     # Step0: prepare chunked graph data format.
     # A synthetic mini MAG240.
-    num_institutions = 20
-    num_authors = 100
-    num_papers = 600
+    num_institutions = 1200
+    num_authors = 1200
+    num_papers = 1200
 
     def rand_edges(num_src, num_dst, num_edges):
         eids = np.random.choice(num_src * num_dst, num_edges, replace=False)
@@ -35,9 +35,9 @@ def create_chunked_dataset(root_dir, num_chunks, include_masks=False):
 
         return src, dst
 
-    num_cite_edges = 2000
-    num_write_edges = 1000
-    num_affiliate_edges = 200
+    num_cite_edges = 24 * 1000
+    num_write_edges = 12 * 1000
+    num_affiliate_edges = 2400
 
     # Structure.
     data_dict = {
