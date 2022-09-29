@@ -1369,6 +1369,24 @@ def test_heterognnexplainer(g, idtype, input_dim, hidden_dim, output_dim):
             return {ntype: graph.nodes[ntype].data['h']
                     for ntype in graph.ntypes}
 
+    class NodeClassficationModel(th.nn.Module):
+        def __init__(self, in_dim, hidden_dim, num_classes, graph_relation_list):
+            super(NodeClassficationModel, self).__init__()
+            self.layer1 = GCNLayer(in_dim,
+                                   hidden_dim,
+                                   graph_relation_list)
+            self.layer2 = GCNLayer(hidden_dim,
+                                   num_classes,
+                                   graph_relation_list)
+
+        def forward(self, graph, feat, eweight=None):
+            x = self.layer1(graph, feat, eweight=eweight)
+
+            for ntype in graph.ntypes:
+                x[ntype] = th.nn.functional.relu(x[ntype])
+            x = self.layer2(graph, x)
+            return x
+
     class GraphClassficationModel(th.nn.Module):
         def __init__(self, in_dim, hidden_dim, num_classes, graph_relation_list):
             super(GraphClassficationModel, self).__init__()
@@ -1396,28 +1414,13 @@ def test_heterognnexplainer(g, idtype, input_dim, hidden_dim, output_dim):
     explainer = nn.explain.HeteroGNNExplainer(model, num_hops=1)
     feat_mask, edge_mask = explainer.explain_graph(g, feat)
 
-    # class NodeClassficationModel(th.nn.Module):
-    #     def __init__(self, in_dim, hidden_dim, num_classes, graph_relation_list):
-    #         super(NodeClassficationModel, self).__init__()
-    #         self.layer1 = GCNLayer(in_dim,
-    #                               hidden_dim,
-    #                               graph_relation_list)
-    #         self.layer2 = GCNLayer(hidden_dim,
-    #                                num_classes,
-    #                                graph_relation_list)
-    #
-    #     def forward(self, graph, feat, eweight=None):
-    #         x = self.layer1(graph, feat, eweight=eweight)
-    #         x = th.nn.functional.relu(x)
-    #         x = self.layer2(g, x)
-    #         return x
-    #
-    # # Explain node prediction
-    # model = NodeClassficationModel(input_dim, hidden_dim, output_dim, g.canonical_etypes)
-    # model = model.to(F.ctx())
-    # ntype = g.ntypes[0]
-    # explainer = nn.explain.HeteroGNNExplainer(model, num_hops=1)
-    # new_center, sg, feat_mask, edge_mask = explainer.explain_node(ntype, 0, g, feat)
+
+    # Explain node prediction
+    model = NodeClassficationModel(input_dim, hidden_dim, output_dim, g.canonical_etypes)
+    model = model.to(F.ctx())
+    ntype = g.ntypes[0]
+    explainer = nn.explain.HeteroGNNExplainer(model, num_hops=1)
+    new_center, sg, feat_mask, edge_mask = explainer.explain_node(ntype, 0, g, feat)
 
 
 def test_jumping_knowledge():

@@ -9,6 +9,8 @@ from tqdm import tqdm
 from ....base import NID, EID
 from ....subgraph import khop_in_subgraph
 
+__all__ = ['GNNExplainer', 'HeteroGNNExplainer']
+
 
 class GNNExplainer(nn.Module):
     r"""GNNExplainer model from `GNNExplainer: Generating Explanations for
@@ -595,7 +597,7 @@ class HeteroGNNExplainer(nn.Module):
 
         return loss
 
-    def explain_node(self, ntype, node_id, graph, feat, **kwargs):
+    def explain_node(self, ntype, node_id, graph, feat, efeat=None, **kwargs):
         r"""Learn and return a node feature mask and subgraph that play a
         crucial role to explain the prediction made by the GNN for node
         :attr:`node_id` with node type :attr:`ntype`.
@@ -615,12 +617,16 @@ class HeteroGNNExplainer(nn.Module):
             the respective node types(keys) present in the graph.
             The input feature of shape :math:`(N, D)`. :math:`N` is the
             number of nodes, and :math:`D` is the feature size.
+        efeat: dict[str, Tensor]
+            Dictionary of { cannonical_etypes: features }
+            The dictionary that associates input edge features(values) with
+            the respective cannonical edge types(keys) present in the graph.
+            The input feature of shape :math:`(E, D)`. :math:`E` is the
+            number of edges, and :math:`D` is the feature size.
         kwargs : dict[str, dict[str, Tensor]]
-            Dictionary of { ntypes/canonical_etypes: features }
-            Additional arguments passed to the GNN model. The additional
-            argument takes dictionaries as values. The dictionary that associates
-            the node/edge features(values) with the respective node/canonical
-            edge types(keys).
+            Dictionary of { str: features }
+            Additional arguments passed to the GNN model. The kwards will
+            be passed to the model.
 
         Returns
         -------
@@ -635,7 +641,7 @@ class HeteroGNNExplainer(nn.Module):
             Learned feature importance mask of shape :math:`(D)`, where :math:`D` is the
             feature size. The values are within range :math:`(0, 1)`.
             The higher, the more important.
-        edge_mask : dict[Tuple[Tensor], Tensor]
+        edge_mask : dict[Tuple[str], Tensor]
             Dictionary of { canonical_etypes: features }
             The dictionary that associates the edge masks(values) with
             the respective canonical edge types(keys).
@@ -727,22 +733,15 @@ class HeteroGNNExplainer(nn.Module):
         sg_nodes = sg.ndata[NID]
         sg_edges = sg.edata[EID]
         sg_feat = {}
-        for node_type in sg_nodes.keys():
-            sg_feat[node_type] = feat[node_type]
+        sg_efeat = {}
 
-        for dict_type, dict in kwargs.items():
-            if dict_type == 'nodes': # give the user the flexibility
-                for ntype, feat in dict:
-                    num_nodes = graph.num_nodes(ntype)
-                    if torch.is_tensor(feat) and feat.size(0) == num_nodes:
-                        feat = feat[sg_nodes]
-                    kwargs[dict_type][ntype] = feat
-            else:
-                for etype, feat in dict:
-                    num_edges = graph.num_nodes(etype)
-                    if torch.is_tensor(feat) and feat.size(0) == num_edges:
-                        feat = feat[sg_edges]
-                    kwargs[dict_type][etype] = feat
+        for node_type in sg_nodes.keys():
+            sg_feat[node_type] = feat[node_type][sg_nodes[node_type].long()]
+
+        if efeat is not None:
+            for edge_type in sg_edges.keys():
+                sg_efeat[edge_type] = efeat[edge_type][sg_edges[edge_type].long()]
+            kwargs['efeat'] = sg_efeat
 
         # Get the initial prediction.
         with torch.no_grad():
