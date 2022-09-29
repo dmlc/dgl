@@ -1,5 +1,4 @@
-"""dgl sparse matrix module."""
-from __future__ import annotations
+"""DGL sparse matrix module."""
 from typing import Optional, Tuple
 import torch
 
@@ -231,16 +230,16 @@ class SparseMatrix:
         """
         return self.adj.to_dense()
 
-    def t(self) -> "SparseMatrix":
+    def t(self):
         """Alias of :meth:`transpose()`"""
         return self.transpose()
 
     @property
-    def T(self) -> "SparseMatrix": # pylint: disable=C0103
+    def T(self): # pylint: disable=C0103
         """Alias of :meth:`transpose()`"""
         return self.transpose()
 
-    def transpose(self) -> "SparseMatrix":
+    def transpose(self):
         """Return the transpose of this sparse matrix.
 
         Returns
