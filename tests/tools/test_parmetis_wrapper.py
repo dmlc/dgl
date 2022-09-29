@@ -42,11 +42,7 @@ def test_parmetis_wrapper():
 
         prev_working_directory = os.getcwd()
         os.chdir(os.path.join(root_dir, 'chunked-data'))
-        env = dict(os.environ)
-        dgl_home = env['DGL_HOME']
-        if dgl_home[-1] != "/": 
-            dgl_home += "/"
-        parmetis_cmd = f'python3 {dgl_home}tools/distpartitioning/parmetis_wrapper.py '\
+        parmetis_cmd = f'python3 tools/distpartitioning/parmetis_wrapper.py '\
                        f'--schema_file {schema_file} '\
                        f'--preproc_output_dir {preproc_output_dir} '\
                        f'--hostfile {hostfile} '\

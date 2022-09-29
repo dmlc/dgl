@@ -139,7 +139,7 @@ def read_node_features(schema_map, tgt_ntype_name, feat_names):
     node_features = {}
     if constants.STR_NODE_DATA in schema_map:
         dataset_features = schema_map[constants.STR_NODE_DATA]
-        if (dataset_features is not None) and (len(dataset_features) > 0):
+        if dataset_features and (len(dataset_features) > 0):
             for ntype_name, ntype_feature_data in dataset_features.items():
                 if ntype_name != tgt_ntype_name:
                     continue
@@ -147,15 +147,15 @@ def read_node_features(schema_map, tgt_ntype_name, feat_names):
                 # where key: feature_name, value: dictionary in which keys are "format", "data".
                 for feat_name, feat_data in ntype_feature_data.items():
                     if feat_name in feat_names:
-                        my_feat_data_fname = feat_data[constants.STR_DATA][rank]
-                        logging.info(f"Reading: {my_feat_data_fname}")
-                        if os.path.isabs(my_feat_data_fname):
+                        feat_data_fname = feat_data[constants.STR_DATA][rank]
+                        logging.info(f"Reading: {feat_data_fname}")
+                        if os.path.isabs(feat_data_fname):
                             node_features[feat_name] = np.load(
-                                my_feat_data_fname
+                                feat_data_fname
                             )
                         else:
                             node_features[feat_name] = np.load(
-                                os.path.join(input_dir, my_feat_data_fname)
+                                os.path.join(input_dir, feat_data_fname)
                             )
     return node_features
 
@@ -166,7 +166,7 @@ def gen_node_weights_files(schema_map, output):
     This function generates node-data files, which will be read by the ParMETIS
     executable for partitioning purposes. Each line in these files will be of the
     following format:
-    <node_type_id> <weight_list> <type_node_id>
+    <node_type_id> <node_weight_list> <type_wise_node_id>
     where
     node_type_id -  is id assigned to the node-type to which a given particular
     node belongs to
@@ -263,9 +263,15 @@ def gen_node_weights_files(schema_map, output):
 
 def gen_parmetis_input_args(params, schema_map):
     """Function to create two input arguments which will be passed to the parmetis.
-    first argument is a text file which has a list of node-weights files, and
-    second argument is a text file which has a list of edge files.
+    first argument is a text file which has a list of node-weights files, 
+    namely parmetis-nfiles.txt, and second argument is a text file which has a 
+    list of edge files, namely parmetis_efiles.txt.
     ParMETIS uses these two files to read/load the graph and partition the graph
+    With regards to the file format, parmetis_nfiles.txt uses the following format
+    for each line in that file: 
+    <filename> <global_node_id_start> <global_node_id_end>(exclusive)
+    While parmetis_efiles.txt just has <filename> in each line.
+
 
     Parameters:
     -----------
@@ -321,11 +327,9 @@ def gen_parmetis_input_args(params, schema_map):
             out_file = os.path.join(outdir, "edges_{}".format(out_file))
             edge_files.append(out_file)
 
-    efile = open(os.path.join(params.output_dir, "parmetis_efiles.txt"), "w")
-    for f in edge_files:
-        efile.write("{}\n".format(f))
-    efile.close()
-
+    with open(os.path.join(params.output_dir, "parmetis_efiles.txt"), "w") as efile:
+        for f in edge_files:
+            efile.write("{}\n".format(f))
 
 def run_preprocess_data(params):
     """Main function which will help create graph files for ParMETIS processing

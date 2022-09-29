@@ -17,14 +17,9 @@ def test_parmetis_preprocessing():
         create_chunked_dataset(root_dir, num_chunks, include_masks=True)
 
         # Trigger ParMETIS pre-processing here. 
-        env = dict(os.environ)
-        dgl_home = env['DGL_HOME']
-        if dgl_home[-1] != "/":
-            dgl_home += "/"
-        print(dgl_home)
         schema_path = os.path.join(root_dir, 'chunked-data/metadata.json')
         results_dir = os.path.join(root_dir, 'parmetis-data')
-        os.system(f'mpirun -np 2 python3 {dgl_home}tools/distpartitioning/parmetis_preprocess.py '\
+        os.system(f'mpirun -np 2 python3 tools/distpartitioning/parmetis_preprocess.py '\
                   f'--schema {schema_path} --output {results_dir}')
 
         # Now add all the tests and check whether the test has passed or failed.

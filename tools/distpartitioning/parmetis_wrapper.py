@@ -31,30 +31,21 @@ def run_parmetis_wrapper(params):
     num_partitions = len(schema[constants.STR_NUM_NODES_PER_CHUNK][0])
 
     # Trigger pre-processing step to generate input files for ParMETIS.
-    env = dict(os.environ)
-    dgl_home = env["DGL_HOME"]
-    if dgl_home[-1] != "/":
-        dgl_home += "/"
-    logging.info(f"DGL Installation directory: {dgl_home}")
     preproc_cmd = (
         f"mpirun -np {num_partitions} -hostfile {params.hostfile} "
-        f"python3 {dgl_home}tools/distpartitioning/parmetis_preprocess.py "
+        f"python3 tools/distpartitioning/parmetis_preprocess.py "
         f"--schema_file {params.schema_file} "
         f"--output_dir {params.preproc_output_dir}"
     )
     logging.info(f"Executing Preprocessing Step: {preproc_cmd}")
     os.system(preproc_cmd)
     logging.info(f"Done Preprocessing Step")
-    logging.info("\n")
-    logging.info("\n")
-    logging.info("\n")
 
     # Trigger ParMETIS for creating metis partitions for the input graph.
-    parmetis_install_path = ""
+    parmetis_install_path = "pm_dglpart3"
     if params.parmetis_install_path is not None:
-        parmetis_install_path = params.parmetis_install_path
-        if parmetis_install_path[-1] != "/":
-            parmetis_install_path += "/"
+        parmetis_install_path = os.path.join(params.parmetis_install_path, 
+                parmetis_install_path)
     parmetis_nfiles = os.path.join(
         params.preproc_output_dir, "parmetis_nfiles.txt"
     )
@@ -63,7 +54,7 @@ def run_parmetis_wrapper(params):
     )
     parmetis_cmd = (
         f"mpirun -np {num_partitions} -hostfile {params.hostfile} "
-        f"{parmetis_install_path}pm_dglpart3 {graph_name} {num_partitions} "
+        f"{parmetis_install_path} {graph_name} {num_partitions} "
         f"{parmetis_nfiles} {parmetis_efiles}"
     )
     logging.info(f"Executing ParMETIS: {parmetis_cmd}")
@@ -76,7 +67,7 @@ def run_parmetis_wrapper(params):
         os.getcwd(), f"{graph_name}_part.{num_partitions}"
     )
     postproc_cmd = (
-        f"python3 {dgl_home}tools/distpartitioning/parmetis_postprocess.py "
+        f"python3 tools/distpartitioning/parmetis_postprocess.py "
         f"--schema_file {params.schema_file} "
         f"--parmetis_output_file {parmetis_output_file} "
         f"--partitions_dir {params.partitions_dir}"
