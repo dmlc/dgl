@@ -18,9 +18,10 @@ def test_parmetis_preprocessing():
     with tempfile.TemporaryDirectory() as root_dir:
         num_chunks = 2
         num_nodes = 720
-        num_institutions = 20
-        num_authors = 100
-        num_papers = 600
+    	num_institutions = 1200
+    	num_authors = 1200
+    	num_papers = 1200
+
         all_ntypes, all_etypes, _ = create_chunked_dataset(root_dir, num_chunks, include_masks=True)
 
         # Generate random parmetis partition ids for the nodes in the graph.

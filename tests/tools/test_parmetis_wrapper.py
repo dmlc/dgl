@@ -18,9 +18,9 @@ def test_parmetis_wrapper():
     with tempfile.TemporaryDirectory() as root_dir:
         num_chunks = 2
         graph_name = "mag240m"
-        num_institutions = 20
-        num_authors = 100
-        num_papers = 600
+    	num_institutions = 1200
+    	num_authors = 1200
+    	num_papers = 1200
         all_ntypes, all_etypes, _ = create_chunked_dataset(root_dir, num_chunks, include_masks=True)
         num_constraints = len(all_ntypes) + 3
 
@@ -34,8 +34,8 @@ def test_parmetis_wrapper():
             f.write('127.0.0.1\n')
             f.write('127.0.0.1\n')
 
-        num_nodes = 720
-        num_edges = 4200
+        num_nodes = 1200 * 3
+        num_edges = 2400 + 12000 + 24000 + 12000
         stats_file = os.path.join(root_dir, f'chunked-data/{graph_name}_stats.txt')
         with open(stats_file, 'w') as f:
             f.write(f'{num_nodes} {num_edges} {num_constraints}')
