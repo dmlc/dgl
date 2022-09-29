@@ -1,4 +1,5 @@
 """dgl diagonal matrix module."""
+from __future__ import annotations
 from typing import Optional, Tuple
 
 import torch
@@ -36,7 +37,7 @@ class DiagMatrix:
     def __repr__(self):
         return f'DiagMatrix(val={self.val}, \nshape={self.shape})'
 
-    def __call__(self, x: torch.Tensor):
+    def __call__(self, x: torch.Tensor) -> DiagMatrix:
         """Create a new diagonal matrix with the same shape as self but different values.
 
         Parameters
@@ -123,16 +124,16 @@ class DiagMatrix:
         row = col = torch.arange(len(self.val)).to(self.device)
         return create_from_coo(row=row, col=col, val=self.val, shape=self.shape)
 
-    def t(self):
+    def t(self) -> DiagMatrix:
         """Alias of :meth:`transpose()`"""
         return self.transpose()
 
     @property
-    def T(self): # pylint: disable=C0103
+    def T(self) -> DiagMatrix: # pylint: disable=C0103
         """Alias of :meth:`transpose()`"""
         return self.transpose()
 
-    def transpose(self):
+    def transpose(self) -> DiagMatrix:
         """Return the transpose of the matrix.
 
         Returns

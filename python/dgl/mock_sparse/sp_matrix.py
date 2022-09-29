@@ -1,4 +1,5 @@
 """dgl sparse matrix module."""
+from __future__ import annotations
 from typing import Optional, Tuple
 import torch
 
@@ -24,9 +25,9 @@ class SparseMatrix:
     --------
     Case1: Sparse matrix with row indices, col indices and values (scalar).
 
-    >>> src = torch.tensor([1, 1, 2])
-    >>> dst = torch.tensor([2, 4, 3])
-    >>> val = torch.tensor([1, 1, 1])
+    >>> src = torch.Tensor([1, 1, 2])
+    >>> dst = torch.Tensor([2, 4, 3])
+    >>> val = torch.Tensor([1, 1, 1])
     >>> A = SparseMatrix(src, dst, val)
     >>> print(A)
     SparseMatrix(indices=tensor([[1, 1, 2],
@@ -36,8 +37,7 @@ class SparseMatrix:
 
     Case2: Sparse matrix with row indices, col indices and values (vector).
 
-    >>> ...
-    >>> val = torch.tensor([[1, 1], [2, 2], [3, 3]])
+    >>> val = torch.Tensor([[1, 1], [2, 2], [3, 3]])
     >>> A = SparseMatrix(src, dst, val)
     >>> print(A)
     SparseMatrix(indices=tensor([[1, 1, 2],
@@ -112,7 +112,7 @@ class SparseMatrix:
         return self.adj.device
 
     @property
-    def row(self) -> torch.tensor:
+    def row(self) -> torch.Tensor:
         """Get the row indices of the nonzero elements.
 
         Returns
@@ -123,7 +123,7 @@ class SparseMatrix:
         return self.adj.indices()[0]
 
     @property
-    def col(self) -> torch.tensor:
+    def col(self) -> torch.Tensor:
         """Get the column indices of the nonzero elements.
 
         Returns
@@ -134,7 +134,7 @@ class SparseMatrix:
         return self.adj.indices()[1]
 
     @property
-    def val(self) -> torch.tensor:
+    def val(self) -> torch.Tensor:
         """Get the values of the nonzero elements.
 
         Returns
@@ -145,7 +145,7 @@ class SparseMatrix:
         return self.adj.values()
 
     @val.setter
-    def val(self, x : torch.Tensor) -> torch.tensor:
+    def val(self, x : torch.Tensor) -> torch.Tensor:
         """Set the values of the nonzero elements."""
         assert len(x) == self.nnz
         if len(x.shape) == 1:
@@ -154,7 +154,7 @@ class SparseMatrix:
             shape = self.shape + (x.shape[-1],)
         self.adj = torch.sparse_coo_tensor(self.adj.indices(), x, shape).coalesce()
 
-    def __call__(self, x):
+    def __call__(self, x: torch.Tensor) -> SparseMatrix:
         """Create a new sparse matrix with the same sparsity as self but different values.
 
         Parameters
@@ -171,7 +171,7 @@ class SparseMatrix:
         assert len(x) == self.nnz
         return SparseMatrix(self.row, self.col, x, shape=self.shape)
 
-    def indices(self, fmt:str, return_shuffle=False) -> Tuple[torch.tensor, ...]:
+    def indices(self, fmt:str, return_shuffle=False) -> Tuple[torch.Tensor, ...]:
         """Get the indices of the nonzero elements.
 
         Parameters
@@ -191,7 +191,7 @@ class SparseMatrix:
         else:
             raise NotImplementedError
 
-    def coo(self) -> Tuple[torch.tensor, ...]:
+    def coo(self) -> Tuple[torch.Tensor, ...]:
         """Get the coordinate (COO) representation of the sparse matrix.
 
         Returns
@@ -201,7 +201,7 @@ class SparseMatrix:
         """
         return self
 
-    def csr(self) -> Tuple[torch.tensor, ...]:
+    def csr(self) -> Tuple[torch.Tensor, ...]:
         """Get the CSR (Compressed Sparse Row) representation of the sparse matrix.
 
         Returns
@@ -211,7 +211,7 @@ class SparseMatrix:
         """
         return self
 
-    def csc(self) -> Tuple[torch.tensor, ...]:
+    def csc(self) -> Tuple[torch.Tensor, ...]:
         """Get the CSC (Compressed Sparse Column) representation of the sparse matrix.
 
         Returns
@@ -221,7 +221,7 @@ class SparseMatrix:
         """
         return self
 
-    def dense(self) -> torch.tensor:
+    def dense(self) -> torch.Tensor:
         """Get the dense representation of the sparse matrix.
 
         Returns
@@ -231,16 +231,16 @@ class SparseMatrix:
         """
         return self.adj.to_dense()
 
-    def t(self):
+    def t(self) -> SparseMatrix:
         """Alias of :meth:`transpose()`"""
         return self.transpose()
 
     @property
-    def T(self): # pylint: disable=C0103
+    def T(self) -> SparseMatrix: # pylint: disable=C0103
         """Alias of :meth:`transpose()`"""
         return self.transpose()
 
-    def transpose(self):
+    def transpose(self) -> SparseMatrix:
         """Return the transpose of this sparse matrix.
 
         Returns
@@ -251,9 +251,9 @@ class SparseMatrix:
         Example
         -------
 
-        >>> row = torch.tensor([1, 1, 3])
-        >>> col = torch.tensor([2, 1, 3])
-        >>> val = torch.tensor([1, 1, 2])
+        >>> row = torch.Tensor([1, 1, 3])
+        >>> col = torch.Tensor([2, 1, 3])
+        >>> val = torch.Tensor([1, 1, 2])
         >>> A = create_from_coo(row, col, val)
         >>> A = A.transpose()
         >>> print(A)
@@ -294,8 +294,8 @@ def create_from_coo(row: torch.Tensor,
 
     Case1: Sparse matrix with row and column indices without values.
 
-    >>> src = torch.tensor([1, 1, 2])
-    >>> dst = torch.tensor([2, 4, 3])
+    >>> src = torch.Tensor([1, 1, 2])
+    >>> dst = torch.Tensor([2, 4, 3])
     >>> A = create_from_coo(src, dst)
     >>> A
     SparseMatrix(indices=tensor([[1, 1, 2],
@@ -313,7 +313,7 @@ def create_from_coo(row: torch.Tensor,
     Case2: Sparse matrix with scalar/vector values. Following example is with
     vector data.
 
-    >>> val = torch.tensor([[1, 1], [2, 2], [3, 3]])
+    >>> val = torch.Tensor([[1, 1], [2, 2], [3, 3]])
     >>> A = create_from_coo(src, dst, val)
     SparseMatrix(indices=tensor([[1, 1, 2],
                                  [2, 4, 3]]),
@@ -363,8 +363,8 @@ def create_from_csr(indptr: torch.Tensor,
      [0, 0, 1],
      [1, 1, 1]]
 
-    >>> indptr = torch.tensor([0, 1, 2, 5])
-    >>> indices = torch.tensor([1, 2, 0, 1, 2])
+    >>> indptr = torch.Tensor([0, 1, 2, 5])
+    >>> indices = torch.Tensor([1, 2, 0, 1, 2])
     >>> A = create_from_csr(indptr, indices)
     >>> print(A)
     SparseMatrix(indices=tensor([[0, 1, 2, 2, 2],
@@ -382,7 +382,7 @@ def create_from_csr(indptr: torch.Tensor,
     Case2: Sparse matrix with scalar/vector values. Following example is with
     vector data.
 
-    >>> val = torch.tensor([[1, 1], [2, 2], [3, 3], [4, 4], [5, 5]])
+    >>> val = torch.Tensor([[1, 1], [2, 2], [3, 3], [4, 4], [5, 5]])
     >>> A = create_from_csr(indptr, indices, val)
     >>> print(A)
     SparseMatrix(indices=tensor([[0, 1, 2, 2, 2],
@@ -439,8 +439,8 @@ def create_from_csc(indptr: torch.Tensor,
      [0, 0, 1],
      [1, 1, 1]]
 
-    >>> indptr = torch.tensor([0, 1, 3, 5])
-    >>> indices = torch.tensor([2, 0, 2, 1, 2])
+    >>> indptr = torch.Tensor([0, 1, 3, 5])
+    >>> indices = torch.Tensor([2, 0, 2, 1, 2])
     >>> A = create_from_csc(indptr, indices)
     >>> print(A)
     SparseMatrix(indices=tensor([[0, 1, 2, 2, 2],
@@ -458,7 +458,7 @@ def create_from_csc(indptr: torch.Tensor,
     Case2: Sparse matrix with scalar/vector values. Following example is with
     vector data.
 
-    >>> val = torch.tensor([[1, 1], [2, 2], [3, 3], [4, 4], [5, 5]])
+    >>> val = torch.Tensor([[1, 1], [2, 2], [3, 3], [4, 4], [5, 5]])
     >>> A = create_from_csc(indptr, indices, val)
     >>> print(A)
     SparseMatrix(indices=tensor([[0, 1, 2, 2, 2],
