@@ -69,6 +69,33 @@ second dictionary contains the mapping for each edge type.
     orig_node_emb = th.zeros(node_emb.shape, dtype=node_emb.dtype)
     orig_node_emb[node_map] = node_emb
 
+As a counterpart of ``return_mapping=True`` in :func:`~dgl.distributed.partition_graph`,
+below 2 arguments are provided for distributed partition pipeline in ``dispatch_data.py``.
+
+* ``--save-orig-nids`` save original node IDs into files.
+* ``--save-orig-eids`` save original edge IDs into files.
+
+Original node/edge IDs are split into the number of partitions. So these
+files lie under the same path of graph partitions and node/edge feature data.
+Below code shows how to obtain the same node/edge mappings of
+:func:`~dgl.distributed.partition_graph` shown above.
+
+.. code:: python
+
+    node_map = []
+    edge_map = []
+    for i in range(num_parts):
+        part_orig_nids = dgl.data.load_tensors(f'/tmp/test/part{i}/orig_nids.dgl'))['_N']
+        node_map.append(part_orig_nids)
+        part_orig_eids = dgl.data.load_tensors(f'/tmp/test/part{i}/orig_eids.dgl'))['_E']
+        edge_map.append(part_orig_eids)
+    node_map = torch.cat(node_map)
+    edge_map = torch.cat(edge_map)
+
+Please note that the saved original node/edge IDs are always in format of dictionary,
+no matter the original graph is homogeneous or heterogeneous. Namely, the keys are
+node/edge types and values are corresponding ID mappings.
+
 Output format
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
