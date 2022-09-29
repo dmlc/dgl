@@ -1,12 +1,13 @@
 # repo originally forked from https://github.com/Confusezius/Deep-Metric-Learning-Baselines
 
 ############################ LIBRARIES ######################################
-from collections import OrderedDict
 import os
+from collections import OrderedDict
+
+import auxiliaries as aux
+import pretrainedmodels as ptm
 import torch
 import torch.nn as nn
-import pretrainedmodels as ptm
-import auxiliaries as aux
 
 """============================================================="""
 
@@ -23,7 +24,9 @@ def initialize_weights(model):
     """
     for idx, module in enumerate(model.modules()):
         if isinstance(module, nn.Conv2d):
-            nn.init.kaiming_normal_(module.weight, mode='fan_out', nonlinearity='relu')
+            nn.init.kaiming_normal_(
+                module.weight, mode="fan_out", nonlinearity="relu"
+            )
         elif isinstance(module, nn.BatchNorm2d):
             nn.init.constant_(module.weight, 1)
             nn.init.constant_(module.bias, 0)
@@ -62,19 +65,19 @@ def networkselect(opt):
     Returns:
         Network of choice
     """
-    if opt.arch == 'resnet50':
+    if opt.arch == "resnet50":
         network = ResNet50(opt)
     else:
-        raise Exception('Network {} not available!'.format(opt.arch))
+        raise Exception("Network {} not available!".format(opt.arch))
 
     if opt.resume:
         weights = torch.load(os.path.join(opt.save_path, opt.resume))
-        weights_state_dict = weights['state_dict']
+        weights_state_dict = weights["state_dict"]
 
         if torch.cuda.device_count() > 1:
             encoder_state_dict = OrderedDict()
             for k, v in weights_state_dict.items():
-                k = k.replace('module.', '')
+                k = k.replace("module.", "")
                 encoder_state_dict[k] = v
 
             network.load_state_dict(encoder_state_dict)
@@ -106,25 +109,42 @@ class ResNet50(nn.Module):
         self.pars = opt
 
         if not opt.not_pretrained:
-            print('Getting pretrained weights...')
-            self.model = ptm.__dict__['resnet50'](num_classes=1000, pretrained='imagenet')
-            print('Done.')
+            print("Getting pretrained weights...")
+            self.model = ptm.__dict__["resnet50"](
+                num_classes=1000, pretrained="imagenet"
+            )
+            print("Done.")
         else:
-            print('Not utilizing pretrained weights!')
-            self.model = ptm.__dict__['resnet50'](num_classes=1000, pretrained=None)
-        for module in filter(lambda m: type(m) == nn.BatchNorm2d, self.model.modules()):
+            print("Not utilizing pretrained weights!")
+            self.model = ptm.__dict__["resnet50"](
+                num_classes=1000, pretrained=None
+            )
+        for module in filter(
+            lambda m: type(m) == nn.BatchNorm2d, self.model.modules()
+        ):
             module.eval()
             module.train = lambda _: None
 
         if opt.embed_dim != 2048:
-            self.model.last_linear = torch.nn.Linear(self.model.last_linear.in_features, opt.embed_dim)
+            self.model.last_linear = torch.nn.Linear(
+                self.model.last_linear.in_features, opt.embed_dim
+            )
 
-        self.layer_blocks = nn.ModuleList([self.model.layer1, self.model.layer2, self.model.layer3, self.model.layer4])
+        self.layer_blocks = nn.ModuleList(
+            [
+                self.model.layer1,
+                self.model.layer2,
+                self.model.layer3,
+                self.model.layer4,
+            ]
+        )
         self.loss = opt.loss
         self.feature = True
 
     def forward(self, x, feature=False, is_init_cluster_generation=False):
-        x = self.model.maxpool(self.model.relu(self.model.bn1(self.model.conv1(x))))
+        x = self.model.maxpool(
+            self.model.relu(self.model.bn1(self.model.conv1(x)))
+        )
 
         for layerblock in self.layer_blocks:
             x = layerblock(x)
@@ -139,7 +159,7 @@ class ResNet50(nn.Module):
 
         feat = torch.nn.functional.normalize(mod_x, dim=-1)
 
-        if feature or self.loss == 'smoothap':
+        if feature or self.loss == "smoothap":
             return feat
         else:
             pred = self.linear(feat)
