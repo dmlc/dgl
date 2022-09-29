@@ -1,10 +1,10 @@
-"""dgl diagonal matrix module."""
-from __future__ import annotations
+"""DGL diagonal matrix module."""
 from typing import Optional, Tuple
 
 import torch
 
 from .sp_matrix import SparseMatrix, create_from_coo
+
 
 class DiagMatrix:
     """Diagonal Matrix Class
@@ -24,21 +24,27 @@ class DiagMatrix:
     shape : tuple[int, int]
         Shape of the matrix.
     """
-    def __init__(self, val: torch.Tensor, shape: Optional[Tuple[int, int]] = None):
+
+    def __init__(
+        self, val: torch.Tensor, shape: Optional[Tuple[int, int]] = None
+    ):
         len_val = len(val)
         if shape is not None:
-            assert len_val == min(shape), \
-            f'Expect len(val) to be min(shape), got {len_val} for len(val) and {shape} for shape.'
+            assert len_val == min(shape), (
+                f"Expect len(val) to be min(shape), got {len_val} for len(val)"
+                "and {shape} for shape."
+            )
         else:
             shape = (len_val, len_val)
         self.val = val
         self.shape = shape
 
     def __repr__(self):
-        return f'DiagMatrix(val={self.val}, \nshape={self.shape})'
+        return f"DiagMatrix(val={self.val}, \nshape={self.shape})"
 
-    def __call__(self, x: torch.Tensor) -> DiagMatrix:
-        """Create a new diagonal matrix with the same shape as self but different values.
+    def __call__(self, x: torch.Tensor):
+        """Create a new diagonal matrix with the same shape as self
+        but different values.
 
         Parameters
         ----------
@@ -124,16 +130,16 @@ class DiagMatrix:
         row = col = torch.arange(len(self.val)).to(self.device)
         return create_from_coo(row=row, col=col, val=self.val, shape=self.shape)
 
-    def t(self) -> DiagMatrix:
+    def t(self):
         """Alias of :meth:`transpose()`"""
         return self.transpose()
 
     @property
-    def T(self) -> DiagMatrix: # pylint: disable=C0103
+    def T(self):  # pylint: disable=C0103
         """Alias of :meth:`transpose()`"""
         return self.transpose()
 
-    def transpose(self) -> DiagMatrix:
+    def transpose(self):
         """Return the transpose of the matrix.
 
         Returns
@@ -153,7 +159,10 @@ class DiagMatrix:
         """
         return DiagMatrix(self.val, self.shape[::-1])
 
-def diag(val: torch.Tensor, shape: Optional[Tuple[int, int]] = None) -> DiagMatrix:
+
+def diag(
+    val: torch.Tensor, shape: Optional[Tuple[int, int]] = None
+) -> DiagMatrix:
     """Create a diagonal matrix based on the diagonal values
 
     Parameters
@@ -201,10 +210,13 @@ def diag(val: torch.Tensor, shape: Optional[Tuple[int, int]] = None) -> DiagMatr
     # NOTE(Mufei): this may not be needed if DiagMatrix is simple enough
     return DiagMatrix(val, shape)
 
-def identity(shape: Tuple[int, int],
-             d: Optional[int] = None,
-             dtype: Optional[torch.dtype] = None,
-             device: Optional[torch.device] = None) -> DiagMatrix:
+
+def identity(
+    shape: Tuple[int, int],
+    d: Optional[int] = None,
+    dtype: Optional[torch.dtype] = None,
+    device: Optional[torch.device] = None,
+) -> DiagMatrix:
     """Create a diagonal matrix with ones on the diagonal and zeros elsewhere
 
     Parameters

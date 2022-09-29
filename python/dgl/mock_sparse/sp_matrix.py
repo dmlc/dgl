@@ -2,10 +2,16 @@
 from typing import Optional, Tuple
 import torch
 
-__all__ = ['SparseMatrix', 'create_from_coo', 'create_from_csr', 'create_from_csc']
+__all__ = [
+    "SparseMatrix",
+    "create_from_coo",
+    "create_from_csr",
+    "create_from_csc",
+]
+
 
 class SparseMatrix:
-    r'''Class for sparse matrix.
+    r"""Class for sparse matrix.
 
     Parameters
     ----------
@@ -45,12 +51,14 @@ class SparseMatrix:
             [2, 2],
             [3, 3]]),
     shape=(3, 5), nnz=3)
-    '''
-    def __init__(self,
+    """
+
+    def __init__(
+        self,
         row: torch.Tensor,
         col: torch.Tensor,
         val: Optional[torch.Tensor] = None,
-        shape : Optional[Tuple[int, int]] = None
+        shape: Optional[Tuple[int, int]] = None,
     ):
         if val is None:
             val = torch.ones(row.shape[0])
@@ -144,16 +152,18 @@ class SparseMatrix:
         return self.adj.values()
 
     @val.setter
-    def val(self, x : torch.Tensor) -> torch.Tensor:
+    def val(self, x: torch.Tensor) -> torch.Tensor:
         """Set the values of the nonzero elements."""
         assert len(x) == self.nnz
         if len(x.shape) == 1:
             shape = self.shape
         else:
             shape = self.shape + (x.shape[-1],)
-        self.adj = torch.sparse_coo_tensor(self.adj.indices(), x, shape).coalesce()
+        self.adj = torch.sparse_coo_tensor(
+            self.adj.indices(), x, shape
+        ).coalesce()
 
-    def __call__(self, x: torch.Tensor) -> SparseMatrix:
+    def __call__(self, x: torch.Tensor):
         """Create a new sparse matrix with the same sparsity as self but different values.
 
         Parameters
@@ -170,7 +180,9 @@ class SparseMatrix:
         assert len(x) == self.nnz
         return SparseMatrix(self.row, self.col, x, shape=self.shape)
 
-    def indices(self, fmt:str, return_shuffle=False) -> Tuple[torch.Tensor, ...]:
+    def indices(
+        self, fmt: str, return_shuffle=False
+    ) -> Tuple[torch.Tensor, ...]:
         """Get the indices of the nonzero elements.
 
         Parameters
@@ -185,7 +197,7 @@ class SparseMatrix:
         tensor
             Indices of the nonzero elements
         """
-        if fmt == 'COO' and not return_shuffle:
+        if fmt == "COO" and not return_shuffle:
             return self.adj.indices()
         else:
             raise NotImplementedError
@@ -235,7 +247,7 @@ class SparseMatrix:
         return self.transpose()
 
     @property
-    def T(self): # pylint: disable=C0103
+    def T(self):  # pylint: disable=C0103
         """Alias of :meth:`transpose()`"""
         return self.transpose()
 
@@ -263,10 +275,13 @@ class SparseMatrix:
         """
         return SparseMatrix(self.col, self.row, self.val, self.shape[::-1])
 
-def create_from_coo(row: torch.Tensor,
-                    col: torch.Tensor,
-                    val: Optional[torch.Tensor] = None,
-                    shape: Optional[Tuple[int, int]] = None) -> SparseMatrix:
+
+def create_from_coo(
+    row: torch.Tensor,
+    col: torch.Tensor,
+    val: Optional[torch.Tensor] = None,
+    shape: Optional[Tuple[int, int]] = None,
+) -> SparseMatrix:
     """Create a sparse matrix from row and column coordinates.
 
     Parameters
@@ -323,10 +338,13 @@ def create_from_coo(row: torch.Tensor,
     """
     return SparseMatrix(row=row, col=col, val=val, shape=shape)
 
-def create_from_csr(indptr: torch.Tensor,
-                    indices: torch.Tensor,
-                    val: Optional[torch.Tensor] = None,
-                    shape: Optional[Tuple[int, int]] = None) -> SparseMatrix:
+
+def create_from_csr(
+    indptr: torch.Tensor,
+    indices: torch.Tensor,
+    val: Optional[torch.Tensor] = None,
+    shape: Optional[Tuple[int, int]] = None,
+) -> SparseMatrix:
     """Create a sparse matrix from CSR indices.
 
     For row i of the sparse matrix
@@ -393,16 +411,21 @@ def create_from_csr(indptr: torch.Tensor,
             [5, 5]]),
     shape=(3, 3), nnz=5)
     """
-    adj_csr = torch.sparse_csr_tensor(indptr, indices, torch.ones(indices.shape[0]))
+    adj_csr = torch.sparse_csr_tensor(
+        indptr, indices, torch.ones(indices.shape[0])
+    )
     adj_coo = adj_csr.to_sparse_coo().coalesce()
     row, col = adj_coo.indices()
 
     return SparseMatrix(row=row, col=col, val=val, shape=shape)
 
-def create_from_csc(indptr: torch.Tensor,
-                    indices: torch.Tensor,
-                    val: Optional[torch.Tensor] = None,
-                    shape: Optional[Tuple[int, int]] = None) -> SparseMatrix:
+
+def create_from_csc(
+    indptr: torch.Tensor,
+    indices: torch.Tensor,
+    val: Optional[torch.Tensor] = None,
+    shape: Optional[Tuple[int, int]] = None,
+) -> SparseMatrix:
     """Create a sparse matrix from CSC indices.
 
     For column i of the sparse matrix
@@ -469,7 +492,9 @@ def create_from_csc(indptr: torch.Tensor,
             [5, 5]]),
     shape=(3, 3), nnz=5)
     """
-    adj_csr = torch.sparse_csr_tensor(indptr, indices, torch.ones(indices.shape[0]))
+    adj_csr = torch.sparse_csr_tensor(
+        indptr, indices, torch.ones(indices.shape[0])
+    )
     adj_coo = adj_csr.to_sparse_coo().coalesce()
     col, row = adj_coo.indices()
 
