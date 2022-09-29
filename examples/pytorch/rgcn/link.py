@@ -6,7 +6,6 @@ import dgl
 from dgl.data.knowledge_graph import FB15k237Dataset
 from dgl.dataloading import GraphDataLoader
 from dgl.nn.pytorch import RelGraphConv
-import argparse
 import tqdm
 
 # for building training/testing graphs
@@ -33,7 +32,7 @@ class GlobalUniform:
         return torch.from_numpy(np.random.choice(self.eids, self.sample_size))
 
 class NegativeSampler:
-    def __init__(self, k=10):
+    def __init__(self, k=10): # negative sampling rate = 10
         self.k = k
 
     def sample(self, pos_samples, num_nodes):
@@ -56,7 +55,7 @@ class NegativeSampler:
         return torch.from_numpy(samples), torch.from_numpy(labels)
 
 class SubgraphIterator:
-    def __init__(self, g, num_rels, pos_sampler, sample_size=30000, num_epochs=6000):
+    def __init__(self, g, num_rels, sample_size=30000, num_epochs=6000):
         self.g = g
         self.num_rels = num_rels
         self.sample_size = sample_size
@@ -117,7 +116,7 @@ class RGCN(nn.Module):
         return self.dropout(h)
 
 class LinkPredict(nn.Module):
-    def __init__(self, num_nodes, h_dim, num_rels, reg_param=0.01):
+    def __init__(self, num_nodes, num_rels, h_dim = 500, reg_param=0.01):
         super().__init__()
         self.rgcn = RGCN(num_nodes, h_dim, num_rels * 2)
         self.reg_param = reg_param
@@ -246,7 +245,7 @@ if __name__ == '__main__':
     test_g.edata['norm'] = dgl.norm_by_dst(test_g).unsqueeze(-1)
     test_nids = torch.arange(0, num_nodes)
     test_mask = g.edata['test_mask']
-    subg_iter = SubgraphIterator(train_g, num_rels, 'uniform')
+    subg_iter = SubgraphIterator(train_g, num_rels) # uniform edge sampling
     dataloader = GraphDataLoader(subg_iter, batch_size=1, collate_fn=lambda x: x[0])
 
     # Prepare data for metric computation
@@ -254,7 +253,7 @@ if __name__ == '__main__':
     triplets = torch.stack([src, g.edata['etype'], dst], dim=1)
 
     # create RGCN model
-    model = LinkPredict(num_nodes, 500, num_rels).to(device)
+    model = LinkPredict(num_nodes, num_rels).to(device)
 
     # train
     model_state_file = 'model_state.pth'
@@ -268,5 +267,5 @@ if __name__ == '__main__':
     model.load_state_dict(checkpoint['state_dict'])
     embed = model(test_g, test_nids)
     best_mrr = calc_mrr(embed, model.w_relation, test_mask, triplets,
-             batch_size=500)
+                        batch_size=500)
     print("Best MRR {:.4f} achieved using the epoch {:04d}".format(best_mrr, checkpoint['epoch']))

@@ -40,7 +40,7 @@ Run with the following for link prediction on dataset FB15k-237 with filtered-MR
 ```bash
 python link.py
 ```
-> **_NOTE:_** By default, we use uniform edge sampling instead of neighbor-based edge sampling as in [author's code](https://github.com/MichSchli/RelationPrediction). In practice, we find it achieves similar MRR.
+> **_NOTE:_** By default, we use uniform edge sampling instead of neighbor-based edge sampling as in [author's code](https://github.com/MichSchli/RelationPrediction). In practice, we find it can achieve similar MRR.
 
 
 Summary
