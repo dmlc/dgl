@@ -13,8 +13,37 @@ Sparse matrix class
 .. currentmodule:: dgl.mock_sparse
 
 .. autoclass:: SparseMatrix
-	:members: shape, nnz, dtype, device, row, col, val, __call__, indices, coo, csr, csc, dense, t, T, transpose,
-            reduce, sum, smax, smin, smean, __neg__, inv, softmax, __matmul__
+
+Sparse matrix class attributes
+------------------------------
+
+.. autosummary::
+
+    SparseMatrix.shape
+    SparseMatrix.nnz
+    SparseMatrix.dtype
+    SparseMatrix.device
+    SparseMatrix.row
+    SparseMatrix.col
+    SparseMatrix.val
+    __call__
+    SparseMatrix.indices
+    SparseMatrix.coo
+    SparseMatrix.csr
+    SparseMatrix.csc
+    SparseMatrix.dense
+    SparseMatrix.t
+    SparseMatrix.T
+    SparseMatrix.transpose
+    SparseMatrix.reduce
+    SparseMatrix.sum
+    SparseMatrix.smax
+    SparseMatrix.smin
+    SparseMatrix.smean
+    SparseMatrix.__neg__
+    SparseMatrix.inv
+    SparseMatrix.softmax
+    SparseMatrix.__matmul__
 
 .. autosummary::
     :toctree: ../../generated/
@@ -28,8 +57,31 @@ Diagonal matrix class
 .. currentmodule:: dgl.mock_sparse
 
 .. autoclass:: DiagMatrix
-	:members: val, shape, __call__, nnz, dtype, device, as_sparse, t, T, transpose,
-            reduce, sum, smax, smin, smean, __neg__, inv, softmax, __matmul__
+
+Diagonal matrix class attributes
+--------------------------------
+
+.. autosummary::
+
+    DiagMatrix.val
+    DiagMatrix.shape
+    DiagMatrix.__call__
+    DiagMatrix.nnz
+    DiagMatrix.dtype
+    DiagMatrix.device
+    DiagMatrix.as_sparse
+    DiagMatrix.t
+    DiagMatrix.T
+    DiagMatrix.transpose
+    DiagMatrix.reduce
+    DiagMatrix.sum
+    DiagMatrix.smax
+    DiagMatrix.smin
+    DiagMatrix.smean
+    DiagMatrix.__neg__
+    DiagMatrix.inv
+    DiagMatrix.softmax
+    DiagMatrix.__matmul__
 
 .. autosummary::
     :toctree: ../../generated/
