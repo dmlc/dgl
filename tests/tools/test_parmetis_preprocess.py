@@ -1,22 +1,21 @@
 import argparse
+import dgl
 import json
+import numpy as np
 import os
 import sys
 import tempfile
-
-import dgl
-import numpy as np
 import torch
-from chunk_graph import chunk_graph
-from dgl.data.utils import load_graphs, load_tensors
 
+from dgl.data.utils import load_tensors, load_graphs
+from chunk_graph import chunk_graph
 from create_chunked_dataset import create_chunked_dataset
 
 
 def test_parmetis_preprocessing():
     with tempfile.TemporaryDirectory() as root_dir:
         num_chunks = 2
-        create_chunked_dataset(root_dir, num_chunks, include_masks=True)
+        g = create_chunked_dataset(root_dir, num_chunks, include_masks=True)
 
         # Trigger ParMETIS pre-processing here.
         schema_path = os.path.join(root_dir, 'chunked-data/metadata.json')

@@ -1,18 +1,17 @@
 import argparse
-import json
-import logging
-import os
-import platform
-import sys
-import tempfile
-from pathlib import Path
-
 import dgl
+import json
 import numpy as np
+import os
+import sys
+from pathlib import Path
+import tempfile
 import torch
-from chunk_graph import chunk_graph
-from dgl.data.utils import load_graphs, load_tensors
+import logging
+import platform
 
+from dgl.data.utils import load_tensors, load_graphs
+from chunk_graph import chunk_graph
 from create_chunked_dataset import create_chunked_dataset
 
 
@@ -20,13 +19,13 @@ def test_parmetis_wrapper():
     with tempfile.TemporaryDirectory() as root_dir:
         num_chunks = 2
         graph_name = "mag240m"
-        num_institutions = 1200
-        num_authors = 1200
-        num_papers = 1200
-        all_ntypes, all_etypes, _ = create_chunked_dataset(
-            root_dir, num_chunks, include_masks=True
-        )
+        g = create_chunked_dataset(root_dir, num_chunks, include_masks=True)
+        all_ntypes = g.ntypes
+        all_etypes = g.etypes
         num_constraints = len(all_ntypes) + 3
+        num_institutions = g.number_of_nodes('institution')
+        num_authors = g.number_of_nodes('author')
+        num_papers = g.number_of_nodes('paper')
 
         # Trigger ParMETIS.
         schema_file = os.path.join(root_dir, 'chunked-data/metadata.json')
@@ -42,16 +41,12 @@ def test_parmetis_wrapper():
             f.write('127.0.0.1\n')
             f.write('127.0.0.1\n')
 
-        num_nodes = 1200 * 3
-        num_edges = 2400 + 12000 + 24000 + 12000
-        stats_file = os.path.join(
-            root_dir, f'chunked-data/{graph_name}_stats.txt'
-        )
+        num_nodes = g.number_of_nodes()
+        num_edges = g.number_of_edges()
+        stats_file = f'{graph_name}_stats.txt'
         with open(stats_file, 'w') as f:
             f.write(f'{num_nodes} {num_edges} {num_constraints}')
 
-        prev_working_directory = os.getcwd()
-        os.chdir(os.path.join(root_dir, 'chunked-data'))
         parmetis_cmd = (
             f'python3 tools/distpartitioning/parmetis_wrapper.py '
             f'--schema_file {schema_file} '

@@ -32,3 +32,5 @@ STR_EDGE_DATA = "edge_data"
 STR_NUMPY = "numpy"
 STR_CSV = "csv"
 STR_NAME = "name"
+
+STR_GRAPH_NAME = "graph_name"

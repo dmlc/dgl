@@ -122,9 +122,7 @@ def create_chunked_dataset(root_dir, num_chunks, include_masks=False):
         with open(paper_val_mask_path, 'wb') as f:
             np.save(f, paper_val_mask)
 
-        author_train_mask_path = os.path.join(
-            input_dir, 'author/train_mask.npy'
-        )
+        author_train_mask_path = os.path.join(input_dir, 'author/train_mask.npy')
         with open(author_train_mask_path, 'wb') as f:
             np.save(f, author_train_mask)
 
@@ -136,15 +134,11 @@ def create_chunked_dataset(root_dir, num_chunks, include_masks=False):
         with open(author_val_mask_path, 'wb') as f:
             np.save(f, author_val_mask)
 
-        inst_train_mask_path = os.path.join(
-            input_dir, 'institution/train_mask.npy'
-        )
+        inst_train_mask_path = os.path.join(input_dir, 'institution/train_mask.npy')
         with open(inst_train_mask_path, 'wb') as f:
             np.save(f, inst_train_mask)
 
-        inst_test_mask_path = os.path.join(
-            input_dir, 'institution/test_mask.npy'
-        )
+        inst_test_mask_path = os.path.join(input_dir, 'institution/test_mask.npy')
         with open(inst_test_mask_path, 'wb') as f:
             np.save(f, inst_test_mask)
 
@@ -153,123 +147,51 @@ def create_chunked_dataset(root_dir, num_chunks, include_masks=False):
             np.save(f, inst_val_mask)
 
         node_data = {
-            'paper': {
-                'feat': paper_feat_path,
-                'train_mask': paper_train_mask_path,
-                'test_mask': paper_test_mask_path,
-                'val_mask': paper_val_mask_path,
-                'label': paper_label_path,
-                'year': paper_year_path,
-            },
-            'author': {
-                'train_mask': author_train_mask_path,
-                'test_mask': author_test_mask_path,
-                'val_mask': author_val_mask_path,
-            },
-            'institution': {
-                'train_mask': inst_train_mask_path,
-                'test_mask': inst_test_mask_path,
-                'val_mask': inst_val_mask_path,
-            },
-        }
+                    'paper':
+                    {
+                        'feat': paper_feat_path,
+                        'train_mask': paper_train_mask_path,
+                        'test_mask': paper_test_mask_path,
+                        'val_mask': paper_val_mask_path,
+                        'label': paper_label_path,
+                        'year': paper_year_path
+                    },
+                    'author':
+                    {
+                        'train_mask': author_train_mask_path,
+                        'test_mask': author_test_mask_path,
+                        'val_mask': author_val_mask_path
+
+                    },
+                    'institution':
+                    {
+                        'train_mask': inst_train_mask_path,
+                        'test_mask': inst_test_mask_path,
+                        'val_mask': inst_val_mask_path
+                    }
+                }
     else:
         node_data = {
-            'paper': {
-                'feat': paper_feat_path,
-                'label': paper_label_path,
-                'year': paper_year_path,
-            }
-        }
+                    'paper': {
+                        'feat': paper_feat_path,
+                        'label': paper_label_path,
+                        'year': paper_year_path,
+                    }
+                }
 
     output_dir = os.path.join(root_dir, 'chunked-data')
     chunk_graph(
-        g,
-        'mag240m',
-        node_data,
-        {
-            'cites': {'count': cite_count_path},
-            'writes': {'year': write_year_path},
-            'rev_writes': {'year': write_year_path},
-        },
-        num_chunks=num_chunks,
-        output_path=output_dir,
+            g,
+            'mag240m',
+            node_data,
+            {
+                'cites': {'count': cite_count_path},
+                'writes': {'year': write_year_path},
+                'rev_writes': {'year': write_year_path},
+            },
+            num_chunks=num_chunks,
+            output_path=output_dir,
     )
     print('Done with creating chunked graph')
 
-    # check metadata.json
-    json_file = os.path.join(output_dir, 'metadata.json')
-    assert os.path.isfile(json_file)
-    with open(json_file, 'rb') as f:
-        meta_data = json.load(f)
-    assert meta_data['graph_name'] == 'mag240m'
-    assert len(meta_data['num_nodes_per_chunk'][0]) == num_chunks
-
-    print('Metadata Source file: ', meta_data["edge_type"])
-
-    # Create Id Map here.
-    edge_dict = {
-        "author:affiliated_with:institution": np.array([0, 200]).reshape(1, 2),
-        "author:writes:paper": np.array([200, 1200]).reshape(1, 2),
-        "paper:cites:paper": np.array([1200, 3200]).reshape(1, 2),
-        "paper:rev_writes:author": np.array([3200, 4200]).reshape(1, 2),
-    }
-    id_map = dgl.distributed.id_map.IdMap(edge_dict)
-
-    # check edge_index
-    output_edge_index_dir = os.path.join(output_dir, 'edge_index')
-    for utype, etype, vtype in data_dict.keys():
-        fname = ':'.join([utype, etype, vtype])
-        for i in range(num_chunks):
-            chunk_f_name = os.path.join(
-                output_edge_index_dir, fname + str(i) + '.txt'
-            )
-            assert os.path.isfile(chunk_f_name)
-            with open(chunk_f_name, 'r') as f:
-                header = f.readline()
-                num1, num2 = header.rstrip().split(' ')
-                assert isinstance(int(num1), int)
-                assert isinstance(int(num2), int)
-
-    # check node_data
-    output_node_data_dir = os.path.join(output_dir, 'node_data', 'paper')
-    for feat in ['feat', 'label', 'year']:
-        for i in range(num_chunks):
-            chunk_f_name = '{}-{}.npy'.format(feat, i)
-            chunk_f_name = os.path.join(output_node_data_dir, chunk_f_name)
-            assert os.path.isfile(chunk_f_name)
-            feat_array = np.load(chunk_f_name)
-            assert feat_array.shape[0] == num_papers // num_chunks
-
-    # check edge_data
-    edge_data_gold = {}
-    num_edges = {
-        'paper:cites:paper': num_cite_edges,
-        'author:writes:paper': num_write_edges,
-        'paper:rev_writes:author': num_write_edges,
-    }
-    output_edge_data_dir = os.path.join(output_dir, 'edge_data')
-    for etype, feat in [
-        ['paper:cites:paper', 'count'],
-        ['author:writes:paper', 'year'],
-        ['paper:rev_writes:author', 'year'],
-    ]:
-        output_edge_sub_dir = os.path.join(output_edge_data_dir, etype)
-        features = []
-        for i in range(num_chunks):
-            chunk_f_name = '{}-{}.npy'.format(feat, i)
-            chunk_f_name = os.path.join(output_edge_sub_dir, chunk_f_name)
-            assert os.path.isfile(chunk_f_name)
-            feat_array = np.load(chunk_f_name)
-            assert feat_array.shape[0] == num_edges[etype] // num_chunks
-            features.append(feat_array)
-        if len(features) > 0:
-            if len(features[0].shape) == 1:
-                edge_data_gold[etype + '/' + feat] = np.concatenate(features)
-            else:
-                edge_data_gold[etype + '/' + feat] = np.row_stack(features)
-
-    return (
-        ['author', 'institution', 'paper'],
-        ['affiliated_with', 'writes', 'cites', 'rev_writes'],
-        edge_data_gold,
-    )
+    return g

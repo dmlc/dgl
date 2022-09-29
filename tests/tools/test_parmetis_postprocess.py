@@ -1,17 +1,16 @@
 import argparse
+import dgl
 import json
-import logging
+import numpy as np
 import os
-import platform
 import sys
 import tempfile
-
-import dgl
-import numpy as np
 import torch
-from chunk_graph import chunk_graph
-from dgl.data.utils import load_graphs, load_tensors
+import logging
+import platform
 
+from dgl.data.utils import load_tensors, load_graphs
+from chunk_graph import chunk_graph
 from create_chunked_dataset import create_chunked_dataset
 
 
@@ -19,14 +18,12 @@ def test_parmetis_preprocessing():
 
     with tempfile.TemporaryDirectory() as root_dir:
         num_chunks = 2
-        num_nodes = 720
-        num_institutions = 1200
-        num_authors = 1200
-        num_papers = 1200
+        g = create_chunked_dataset(root_dir, num_chunks, include_masks=True)
 
-        all_ntypes, all_etypes, _ = create_chunked_dataset(
-            root_dir, num_chunks, include_masks=True
-        )
+        num_nodes = g.number_of_nodes()
+        num_institutions = g.number_of_nodes('institution')
+        num_authors = g.number_of_nodes('author')
+        num_papers = g.number_of_nodes('paper')
 
         # Generate random parmetis partition ids for the nodes in the graph.
         # Replace this code with actual ParMETIS executable when it is ready
