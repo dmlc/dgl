@@ -14,20 +14,12 @@ __all__ = [
     'sample_neighbors_biased',
     'select_topk']
 
-def _prepare_edge_array(g, arg):
-    if arg is None:
-        return nd.array([], ctx=nd.cpu())
-    elif isinstance(arg, nd.NDArray):
-        return arg
-    elif arg in g.edata:
-        return F.to_dgl_nd(g.edata[arg])
-    else:
-        return nd.array([], ctx=nd.cpu())
-
 def _prepare_edge_arrays(g, arg):
-    if isinstance(arg, list) and len(arg) > 0 and \
-            isinstance(arg[0], nd.NDArray):
-        return arg
+    if isinstance(arg, list) and len(arg) > 0:
+        if isinstance(arg[0], nd.NDArray):
+            return arg
+        else:
+            return [F.to_dgl_nd(x) for x in arg]
     elif arg is None:
         return [nd.array([], ctx=nd.cpu())] * len(g.etypes)
     else:
@@ -40,7 +32,7 @@ def _prepare_edge_arrays(g, arg):
         return arrays
 
 def sample_etype_neighbors(
-        g, nodes, etype_field, fanout, edge_dir='in', prob=None,
+        g, nodes, etype_field, eid_field, fanout, edge_dir='in', prob=None,
         replace=False, copy_ndata=True, copy_edata=True, etype_sorted=False,
         _dist_training=False, output_device=None):
     """Sample neighboring edges of the given nodes and return the induced subgraph.
@@ -61,8 +53,10 @@ def sample_etype_neighbors(
 
         This argument can take a single ID tensor or a dictionary of node types and ID tensors.
         If a single tensor is given, the graph must only have one type of nodes.
-    etype_field : string
-        The field in g.edata storing the edge type.
+    etype_field : str
+        The field in ``g.edata`` storing the edge type.
+    eid_field : str
+        The field in ``g.edata`` storing the type-specific edge ID.
     fanout : Tensor
         The number of edges to be sampled for each node per edge type.  Must be a
         1D tensor with the number of elements same as the number of edge types.
@@ -72,13 +66,12 @@ def sample_etype_neighbors(
         Determines whether to sample inbound or outbound edges.
 
         Can take either ``in`` for inbound edges or ``out`` for outbound edges.
-    prob : str, optional
-        Feature name used as the (unnormalized) probabilities associated with each
-        neighboring edge of a node.  The feature must have only one element for each
-        edge.
+    prob : list[Tensor], optional
+        The (unnormalized) probabilities associated with each neighboring edge of
+        a node.
 
-        The features must be non-negative floats or boolean.  Otherwise, the result
-        will be undefined.
+        The features must be non-negative floats or boolean.  Otherwise, the
+        result will be undefined.
     replace : bool, optional
         If True, sample with replacement.
     copy_ndata: bool, optional
@@ -136,12 +129,13 @@ def sample_etype_neighbors(
     # treat etypes as int32, it is much cheaper than int64
     # TODO(xiangsx): int8 can be a better choice.
     etypes = F.to_dgl_nd(F.astype(g.edata[etype_field], ty=F.int32))
+    eids = F.to_dgl_nd(g.edata[eid_field])
     fanout = F.to_dgl_nd(fanout)
 
-    prob_array = _prepare_edge_array(g, prob)
+    prob_array = _prepare_edge_arrays(g, prob)
 
     subgidx = _CAPI_DGLSampleNeighborsEType(
-            g._graph, nodes, etypes, fanout, edge_dir, prob_array,
+            g._graph, nodes, etypes, eids, fanout, edge_dir, prob_array,
             replace, etype_sorted)
     induced_edges = subgidx.induced_edges
     ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)

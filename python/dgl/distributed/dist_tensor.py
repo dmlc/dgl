@@ -180,6 +180,14 @@ class DistTensor:
         # TODO(zhengda) how do we want to support broadcast (e.g., G.ndata['h'][idx] = 1).
         self.kvstore.push(name=self._name, id_tensor=idx, data_tensor=val)
 
+    @property
+    def kvstore_key(self):
+        return self._name
+
+    @property
+    def local_partition(self):
+        return self.kvstore.local_store[self._name]
+
     def __len__(self):
         return self._shape[0]
 

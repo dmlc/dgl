@@ -470,6 +470,7 @@ COOMatrix CSRRowWiseSampling(
  * \param mat Input CSR matrix.
  * \param rows Rows to sample from.
  * \param etypes Edge types of each edge.
+ * \param eids The original edge IDs within each edge type.
  * \param num_samples Number of samples to choose per edge type.
  * \param prob Unnormalized probability array. Should be of the same length as the data array.
  *             If an empty array is provided, assume uniform.
@@ -481,8 +482,9 @@ COOMatrix CSRRowWisePerEtypeSampling(
     CSRMatrix mat,
     IdArray rows,
     IdArray etypes,
+    IdArray eids,
     const std::vector<int64_t>& num_samples,
-    FloatArray prob = FloatArray(),
+    const std::vector<FloatArray>& prob,
     bool replace = true,
     bool etype_sorted = false);
 

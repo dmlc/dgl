@@ -1268,11 +1268,11 @@ class DistGraph:
                          output_device=None):
         # pylint: disable=unused-argument
         """Sample neighbors from a distributed graph."""
-        # Currently prob, exclude_edges, output_device, and edge_dir are ignored.
+        # Currently exclude_edges, output_device, and edge_dir are ignored.
         if len(self.etypes) > 1:
             frontier = graph_services.sample_etype_neighbors(
-                self, seed_nodes, ETYPE, fanout, replace=replace, etype_sorted=etype_sorted,
-                prob=prob)
+                self, seed_nodes, ETYPE, EID, fanout, replace=replace,
+                etype_sorted=etype_sorted, prob=prob)
         else:
             frontier = graph_services.sample_neighbors(
                 self, seed_nodes, fanout, replace=replace, prob=prob)
@@ -1301,6 +1301,11 @@ class DistGraph:
             if name.is_edge() and right_type:
                 edata_names.append(name)
         return edata_names
+
+    @property
+    def client(self):
+        ''' Get the ``KVClient`` object for the underlying KVStore.'''
+        return self._client
 
 def _get_overlap(mask_arr, ids):
     """ Select the IDs given a boolean mask array.

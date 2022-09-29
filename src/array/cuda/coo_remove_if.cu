@@ -27,10 +27,25 @@ __global__ void _GenerateFlagsKernel(
   }
 }
 
-};  // namespace
+template <typename IdType, typename EType, typename DType, typename BoolType>
+__global__ void _GenerateEtypeFlagsKernel(
+    int64_t n, const IdType* idx, const EType* etypes, const IdType* eids,
+    DType** values, DType criteria, BoolType* output) {
+  int tx = blockIdx.x * blockDim.x + threadIdx.x;
+  const int stride_x = gridDim.x * blockDim.x;
+  while (tx < n) {
+    IdType global_eid = idx ? idx[tx] : tx;
+    IdType etype = etypes[global_eid];
+    IdType local_eid = eids[global_eid];
+    output[tx] = (values[etype][local_eid] != criteria);
+    tx += stride_x;
+  }
+}
 
-template <DGLDeviceType XPU, typename IdType, typename DType>
-COOMatrix COORemoveIf(COOMatrix coo, NDArray values, DType criteria) {
+// Combines both COORemoveIf and COOEtypeRemoveIf since the logic is the same except
+// for boolean mask generation.
+template <DGLDeviceType XPU, typename IdType, typename DType, typename MaskGen>
+COOMatrix COOGeneralRemoveIf(COOMatrix coo, MaskGen maskgen) {
   using namespace dgl::cuda;
 
   const auto idtype = coo.row->dtype;
@@ -41,7 +56,6 @@ COOMatrix COORemoveIf(COOMatrix coo, NDArray values, DType criteria) {
   const IdArray& eid = COOHasData(coo) ? coo.data :
     Range(0, nnz, sizeof(IdType) * 8, ctx);
   const IdType* data = coo.data.Ptr<IdType>();
-  const DType* val = values.Ptr<DType>();
   IdArray new_row = IdArray::Empty({nnz}, idtype, ctx);
   IdArray new_col = IdArray::Empty({nnz}, idtype, ctx);
   IdArray new_eid = IdArray::Empty({nnz}, idtype, ctx);
@@ -54,9 +68,8 @@ COOMatrix COORemoveIf(COOMatrix coo, NDArray values, DType criteria) {
   int8_t* flags = static_cast<int8_t*>(device->AllocWorkspace(ctx, nnz));
   int nt = cuda::FindNumThreads(nnz);
   int nb = (nnz + nt - 1) / nt;
-  CUDA_KERNEL_CALL((_GenerateFlagsKernel<IdType, DType, int8_t>),
-      nb, nt, 0, stream,
-      nnz, data, val, criteria, flags);
+
+  maskgen(nb, nt, stream, nnz, data, flags);
 
   int64_t* rst = static_cast<int64_t*>(device->AllocWorkspace(ctx, sizeof(int64_t)));
   MaskSelect(device, ctx, row, flags, new_row_data, nnz, rst, stream);
@@ -75,6 +88,21 @@ COOMatrix COORemoveIf(COOMatrix coo, NDArray values, DType criteria) {
       new_eid.CreateView({new_len}, idtype, 0));
 }
 
+};  // namespace
+
+template <DGLDeviceType XPU, typename IdType, typename DType>
+COOMatrix COORemoveIf(COOMatrix coo, NDArray values, DType criteria) {
+  const DType* val = values.Ptr<DType>();
+  auto maskgen = [val, criteria] (
+      int nb, int nt, cudaStream_t stream, int64_t nnz, const IdType* data,
+      int8_t* flags) {
+    CUDA_KERNEL_CALL((_GenerateFlagsKernel<IdType, DType, int8_t>),
+        nb, nt, 0, stream,
+        nnz, data, val, criteria, flags);
+  };
+  return COOGeneralRemoveIf<XPU, IdType, DType, decltype(maskgen)>(coo, maskgen);
+}
+
 template COOMatrix COORemoveIf<kDGLCUDA, int32_t, int8_t>(COOMatrix, NDArray, int8_t);
 template COOMatrix COORemoveIf<kDGLCUDA, int32_t, uint8_t>(COOMatrix, NDArray, uint8_t);
 template COOMatrix COORemoveIf<kDGLCUDA, int32_t, float>(COOMatrix, NDArray, float);
@@ -83,6 +111,44 @@ template COOMatrix COORemoveIf<kDGLCUDA, int64_t, int8_t>(COOMatrix, NDArray, in
 template COOMatrix COORemoveIf<kDGLCUDA, int64_t, uint8_t>(COOMatrix, NDArray, uint8_t);
 template COOMatrix COORemoveIf<kDGLCUDA, int64_t, float>(COOMatrix, NDArray, float);
 template COOMatrix COORemoveIf<kDGLCUDA, int64_t, double>(COOMatrix, NDArray, double);
+
+template <DGLDeviceType XPU, typename IdType, typename DType>
+COOMatrix COOEtypeRemoveIf(
+    COOMatrix coo, IdArray etypes, IdArray eids, const std::vector<NDArray>& values, 
+    DType criteria) {
+  CHECK_EQ(etypes->dtype, DGLDataTypeTraits<int32_t>::dtype) <<
+    "currently only int32 edge type array is supported.";
+  const int32_t* etype_data = etypes.Ptr<int32_t>();
+  const IdType* eid_data = eids.Ptr<IdType>();
+  std::vector<DType*> val(values.size());
+  for (size_t i = 0; i < values.size(); ++i)
+    val[i] = values[i].Ptr<DType>();
+  auto maskgen = [&val, criteria, etype_data, eid_data] (
+      int nb, int nt, cudaStream_t stream, int64_t nnz, const IdType* data,
+      int8_t* flags) {
+    CUDA_KERNEL_CALL((_GenerateEtypeFlagsKernel<IdType, int32_t, DType, int8_t>),
+        nb, nt, 0, stream,
+        nnz, data, etype_data, eid_data, val.data(), criteria, flags);
+  };
+  return COOGeneralRemoveIf<XPU, IdType, DType, decltype(maskgen)>(coo, maskgen);
+}
+
+template COOMatrix COOEtypeRemoveIf<kDGLCUDA, int32_t, int8_t>(
+    COOMatrix, IdArray, IdArray, const std::vector<NDArray>&, int8_t);
+template COOMatrix COOEtypeRemoveIf<kDGLCUDA, int32_t, uint8_t>(
+    COOMatrix, IdArray, IdArray, const std::vector<NDArray>&, uint8_t);
+template COOMatrix COOEtypeRemoveIf<kDGLCUDA, int32_t, float>(
+    COOMatrix, IdArray, IdArray, const std::vector<NDArray>&, float);
+template COOMatrix COOEtypeRemoveIf<kDGLCUDA, int32_t, double>(
+    COOMatrix, IdArray, IdArray, const std::vector<NDArray>&, double);
+template COOMatrix COOEtypeRemoveIf<kDGLCUDA, int64_t, int8_t>(
+    COOMatrix, IdArray, IdArray, const std::vector<NDArray>&, int8_t);
+template COOMatrix COOEtypeRemoveIf<kDGLCUDA, int64_t, uint8_t>(
+    COOMatrix, IdArray, IdArray, const std::vector<NDArray>&, uint8_t);
+template COOMatrix COOEtypeRemoveIf<kDGLCUDA, int64_t, float>(
+    COOMatrix, IdArray, IdArray, const std::vector<NDArray>&, float);
+template COOMatrix COOEtypeRemoveIf<kDGLCUDA, int64_t, double>(
+    COOMatrix, IdArray, IdArray, const std::vector<NDArray>&, double);
 
 };  // namespace impl
 };  // namespace aten

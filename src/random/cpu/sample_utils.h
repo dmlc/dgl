@@ -265,6 +265,7 @@ class TreeSampler: public BaseSampler<Idx> {
   int64_t N;
   int64_t num_leafs;
   const DType *decrease;
+  FloatArray prob_;
 
  public:
   void ResetState(FloatArray prob) {
@@ -275,6 +276,7 @@ class TreeSampler: public BaseSampler<Idx> {
       weight[num_leafs + i] = prob_data[i];
     for (int64_t i = num_leafs - 1; i >= 1; --i)
       weight[i] = weight[i * 2] + weight[i * 2 + 1];
+    prob_ = prob;
   }
 
   explicit TreeSampler(RandomEngine *re, FloatArray prob, const DType* decrease = nullptr)
@@ -322,6 +324,12 @@ class TreeSampler: public BaseSampler<Idx> {
         cur /= 2;
       }
     }
+    //std::cout << "Pick:" << rst << " ";
+    //if (!aten::IsNullArray(prob_))
+    //  std::cout << prob_.Ptr<DType>()[rst];
+    //else
+    //  std::cout << "~";
+    //std::cout << std::endl;
     return rst;
   }
 };

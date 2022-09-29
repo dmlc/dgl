@@ -372,6 +372,22 @@ template <typename DType>
 COOMatrix COORemoveIf(COOMatrix coo, NDArray values, DType criteria);
 
 /*!
+ * \brief Remove entries from a COO matrix if the values is equal to the given criteria.
+ *        In other words, a COO entry (row, col, data) will be removed if
+ *        (values[etype[data]][eid[data]] == criteria).
+ * \param coo The COO matrix.
+ * \param etypes The edge types.
+ * \param eids The edge IDs within each edge type.
+ * \param values The value arrays.
+ * \param criteria The value to remove.
+ * \return The new COO matrix.
+ */
+template <typename DType>
+COOMatrix COOEtypeRemoveIf(
+    COOMatrix coo, IdArray etypes, IdArray eids, const std::vector<NDArray>& values,
+    DType criteria);
+
+/*!
  * \brief Reorder the rows and colmns according to the new row and column order.
  * \param csr The input coo matrix.
  * \param new_row_ids the new row Ids (the index is the old row Id)
@@ -456,6 +472,7 @@ COOMatrix COORowWiseSampling(
  * \param mat Input coo matrix.
  * \param rows Rows to sample from.
  * \param etypes Edge types of each edge.
+ * \param eids The original edge IDs in each edge type.
  * \param num_samples Number of samples
  * \param prob Unnormalized probability array. Should be of the same length as the data array.
  *             If an empty array is provided, assume uniform.
@@ -468,8 +485,9 @@ COOMatrix COORowWisePerEtypeSampling(
     COOMatrix mat,
     IdArray rows,
     IdArray etypes,
+    IdArray eids,
     const std::vector<int64_t>& num_samples,
-    FloatArray prob = FloatArray(),
+    const std::vector<FloatArray>& prob,
     bool replace = true,
     bool etype_sorted = false);
 
