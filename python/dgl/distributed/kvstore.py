@@ -1387,6 +1387,8 @@ class KVClient(object):
 
     @property
     def local_store(self):
+        """Return the local partition of the data storage.
+        """
         return self._data_store
 
 KVCLIENT = None

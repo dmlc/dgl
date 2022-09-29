@@ -182,10 +182,12 @@ class DistTensor:
 
     @property
     def kvstore_key(self):
+        """Return the key string of this DistTensor in the associated KVStore."""
         return self._name
 
     @property
     def local_partition(self):
+        """Return the local partition of this DistTensor."""
         return self.kvstore.local_store[self._name]
 
     def __len__(self):
