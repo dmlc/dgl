@@ -23,7 +23,7 @@ from gloo_wrapper import allgather_sizes, alltoallv_cpu, gather_metadata_json
 from utils import (augment_edge_data, get_gnid_range_map, get_idranges,
                    get_node_types, get_ntype_featnames, memory_snapshot,
                    read_json, read_ntype_partition_files, write_dgl_objects,
-                   write_metadata_json)
+                   write_metadata_json, get_edge_types, get_etype_featnames)
 
 
 def gen_node_data(rank, world_size, id_lookup, ntid_ntype_map, schema_map):

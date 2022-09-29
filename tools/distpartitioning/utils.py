@@ -68,8 +68,7 @@ def read_json(json_file):
     return val
 
 def get_etype_featnames(etype_name, schema_map):
-    """
-    Retrieves edge feature names for a given edge_type
+    """Retrieves edge feature names for a given edge_type
 
     Parameters:
     -----------
@@ -112,8 +111,7 @@ def get_ntype_featnames(ntype_name, schema_map):
     return [feat for feat in feats]
 
 def get_edge_types(schema_map):
-    """
-    Utility method to extract edge_typename -> edge_type mappings
+    """Utility method to extract edge_typename -> edge_type mappings
     as defined by the input schema
 
     Parameters:

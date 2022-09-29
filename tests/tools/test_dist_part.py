@@ -10,20 +10,34 @@ from chunk_graph import chunk_graph
 
 from create_chunked_dataset import create_chunked_dataset
 
+'''
 @pytest.mark.parametrize("num_chunks", [1, 2, 3, 4, 8])
 @pytest.mark.parametrize("num_parts", [1, 2, 3, 4, 8])
+'''
+@pytest.mark.parametrize("num_chunks", [2])
+@pytest.mark.parametrize("num_parts", [2])
 def test_part_pipeline(num_chunks, num_parts):
     if num_chunks < num_parts:
         # num_parts should less/equal than num_chunks
         return
 
     with tempfile.TemporaryDirectory() as root_dir:
-        num_cite_edges = 24 * 1000
-        num_write_edges = 12 * 1000
-        num_affiliate_edges = 2400
-        all_ntypes, all_etypes = create_chunked_dataset(root_dir, num_chunks)
+
+        g = create_chunked_dataset(root_dir, num_chunks)
+
+        all_ntypes = g.ntypes
+        all_etypes = g.etypes
+
+        num_cite_edges = g.number_of_edges('cites')
+        num_write_edges = g.number_of_edges('writes')
+        num_affiliate_edges = g.number_of_edges('affiliated_with')
+
+        num_institutions = g.number_of_nodes('institution')
+        num_authors = g.number_of_nodes('author')
+        num_papers = g.number_of_nodes('paper')
 
         # check metadata.json
+        output_dir = os.path.join(root_dir, 'chunked-data')
         json_file = os.path.join(output_dir, 'metadata.json')
         assert os.path.isfile(json_file)
         with open(json_file, 'rb') as f:
@@ -35,7 +49,7 @@ def test_part_pipeline(num_chunks, num_parts):
 
         # check edge_index
         output_edge_index_dir = os.path.join(output_dir, 'edge_index')
-        for utype, etype, vtype in data_dict.keys():
+        for utype, etype, vtype in g.canonical_etypes:
             fname = ':'.join([utype, etype, vtype])
             for i in range(num_chunks):
                 chunk_f_name = os.path.join(
@@ -130,25 +144,17 @@ def test_part_pipeline(num_chunks, num_parts):
         assert meta_data['num_parts'] == num_parts
 
         # Create Id Map here.
-        edge_dict = {
-            "author:affiliated_with:institution": np.array([0, num_affiliate_edges]).reshape( #2400
-                1, 2
-            ),
-            "author:writes:paper": np.array([num_affiliate_edges, 
-                num_affiliate_edges + num_write_edges]).reshape(1, 2), #12000
-            "paper:cites:paper": np.array([num_affiliate_edges + num_write_edges, 
-                                            num_affiliate_edges
-                                            + num_write_edges 
-                                            + num_cites_edges]).reshape(1, 2), #24000
-            "paper:rev_writes:author": np.array([num_affiliate_edges + 
-                                                num_write_edges + 
-                                                num_cites_edges, 
-                                                affiliate_edges + 
-                                                2*num_write_edges + 
-                                                num_cite_edges]).reshape(1,2)
-        }
+        edge_dict = {}
+        num_edges = 0
+        for utype, etype, vtype in g.canonical_etypes:
+            fname = ':'.join([utype, etype, vtype])
+            edge_dict[fname] = np.array([num_edges, 
+                num_edges + g.number_of_edges(etype)]).reshape(1,2)
+            num_edges += g.number_of_edges(etype)
+
+        assert num_edges == g.number_of_edges()
         id_map = dgl.distributed.id_map.IdMap(edge_dict)
-        etype_id, type_eid = id_map(np.arange(num_affiliate_edges + 2*num_write_edges, num_cite_edges))
+        etype_id, type_eid = id_map(np.arange(num_edges))
 
         for i in range(num_parts):
             sub_dir = 'part-' + str(i)
@@ -171,6 +177,8 @@ def test_part_pipeline(num_chunks, num_parts):
             assert os.path.isfile(fname)
             tensor_dict = load_tensors(fname)
             all_tensors = ['paper/feat', 'paper/label', 'paper/year', 'paper/orig_ids']
+            print(tensor_dict.keys())
+            print(all_tensors)
             assert tensor_dict.keys() == set(all_tensors)
             for key in all_tensors:
                 assert isinstance(tensor_dict[key], torch.Tensor)

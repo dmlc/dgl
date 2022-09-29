@@ -207,9 +207,9 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
     edge_features = {}
     edge_feature_tids = {}
 
-    #iterate over the "edge_data" dictionary in the schema_map
-    #read the edge features if exists
-    #also keep track of the type_eids for which the edge_features are read.
+    # Iterate over the "edge_data" dictionary in the schema_map.
+    # Read the edge features if exists.
+    # Also keep track of the type_eids for which the edge_features are read.
     dataset_features = schema_map[constants.STR_EDGE_DATA]
     if dataset_features and (len(dataset_features) > 0):
         for etype_name, etype_feature_data in dataset_features.items():

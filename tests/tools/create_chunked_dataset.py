@@ -194,5 +194,4 @@ def create_chunked_dataset(root_dir, num_chunks, include_masks=False):
     )
     print('Done with creating chunked graph')
 
-    return ['author', 'institution', 'paper'], \
-           ['affiliated_with', 'writes', 'cites', 'rev_writes']
+    return g
