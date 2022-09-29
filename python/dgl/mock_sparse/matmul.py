@@ -28,7 +28,14 @@ def _sparse_dense_mm(A: SparseMatrix, X: torch.Tensor) -> torch.Tensor:
     torch.Tensor
         The result of multiplication
     """
-    return torch.matmul(A.adj, X)
+    is_one_dim = False
+    if len(X.shape) == 1:
+        is_one_dim = True
+        X = X.view(-1, 1)
+    ret = torch.sparse.mm(A.adj, X)
+    if is_one_dim:
+        ret = ret.view(-1)
+    return ret
 
 def _sparse_sparse_mm(A1: SparseMatrix, A2: SparseMatrix) -> SparseMatrix:
     """Internal function for multiplying a sparse matrix by a sparse matrix
