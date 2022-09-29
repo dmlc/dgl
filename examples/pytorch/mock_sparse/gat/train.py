@@ -30,14 +30,16 @@ class GATConv(nn.Module):
         )  # |V| x N_h x D_o
         Wh1 = (Wh * self.a_l).sum(2)  # |V| x N_h
         Wh2 = (Wh * self.a_r).sum(2)  # |V| x N_h
-        Wh1 = Wh1[A.row, :]
-        Wh2 = Wh2[A.col, :]
-        e = Wh1 + Wh2
-        e = self.leaky_relu(e)
-        A = create_from_coo(A.row, A.col, e, A.shape)
-        A_hat = softmax(A)
-        Wh = Wh.reshape(-1, self.out_size, self.n_heads)
-        h_prime = bspmm(A_hat, Wh)
+        Wh1 = Wh1[A.row, :]  # |E| x N_h
+        Wh2 = Wh2[A.col, :]  # |E| x N_h
+        e = Wh1 + Wh2  # |E| x N_h
+        e = self.leaky_relu(e)  # |E| x N_h
+        A = create_from_coo(
+            A.row, A.col, e, A.shape
+        )  # |V| x |V| x N_h SparseMatrix
+        A_hat = softmax(A)  # |V| x |V| x N_h SparseMatrix
+        Wh = Wh.reshape(-1, self.out_size, self.n_heads)  # |V| x D_o x N_h
+        h_prime = bspmm(A_hat, Wh)  # |V| x D_o x N_h
 
         return torch.relu(h_prime)
 
