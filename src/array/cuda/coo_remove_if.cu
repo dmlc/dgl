@@ -114,7 +114,7 @@ template COOMatrix COORemoveIf<kDGLCUDA, int64_t, double>(COOMatrix, NDArray, do
 
 template <DGLDeviceType XPU, typename IdType, typename DType>
 COOMatrix COOEtypeRemoveIf(
-    COOMatrix coo, IdArray etypes, IdArray eids, const std::vector<NDArray>& values, 
+    COOMatrix coo, IdArray etypes, IdArray eids, const std::vector<NDArray>& values,
     DType criteria) {
   CHECK_EQ(etypes->dtype, DGLDataTypeTraits<int32_t>::dtype) <<
     "currently only int32 edge type array is supported.";

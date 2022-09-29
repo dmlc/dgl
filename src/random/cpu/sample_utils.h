@@ -324,12 +324,6 @@ class TreeSampler: public BaseSampler<Idx> {
         cur /= 2;
       }
     }
-    //std::cout << "Pick:" << rst << " ";
-    //if (!aten::IsNullArray(prob_))
-    //  std::cout << prob_.Ptr<DType>()[rst];
-    //else
-    //  std::cout << "~";
-    //std::cout << std::endl;
     return rst;
   }
 };

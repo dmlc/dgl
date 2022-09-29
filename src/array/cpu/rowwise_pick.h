@@ -310,15 +310,12 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows, IdArray etypes,
               for (int64_t k = 0; k < num_picks[cur_et]; ++k) {
                 const IdxType picked = picked_idata[k];
                 rows.push_back(rid);
-                //std::cout << rid << " " << indices[off + et_idx[et_offset + picked]] << " " << picked << " ";
                 cols.push_back(indices[off+et_idx[et_offset+picked]]);
                 if (data) {
                   idx.push_back(data[off+et_idx[et_offset+picked]]);
                 } else {
                   idx.push_back(off+et_idx[et_offset+picked]);
                 }
-                //auto res = idx[idx.size() - 1];
-                //std::cout << res << " " << etype_data[res] << " " << eid_data[res] << std::endl;
               }
             }
 

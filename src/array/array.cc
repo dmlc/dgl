@@ -831,7 +831,7 @@ COOMatrix COOEtypeRemoveIf(
     return coo;
 
   COOMatrix ret;
-  CHECK(values.size() > 0);
+  CHECK_GT(values.size(), 0);
   CHECK(values[0]->dtype == DGLDataTypeTraits<DType>::dtype);
   ATEN_COO_SWITCH_CUDA(coo, XPU, IdType, "COOEtypeRemoveIf", {
     ret = impl::COOEtypeRemoveIf<XPU, IdType, DType>(coo, etypes, eids, values, criteria);

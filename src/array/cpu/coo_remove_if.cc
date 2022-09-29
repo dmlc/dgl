@@ -33,8 +33,6 @@ COOMatrix COORemoveIf(COOMatrix coo, NDArray values, DType criteria) {
   for (int64_t i = 0; i < nnz; ++i) {
     const IdType eid = data ? data[i] : i;
     if (val[eid] != criteria) {
-      //std::cout << row[i] << " " << col[i] << " " << eid << " " <<
-      //  val[eid] << std::endl;
       new_row_data[j] = row[i];
       new_col_data[j] = col[i];
       new_eid_data[j] = eid;
@@ -60,7 +58,7 @@ template COOMatrix COORemoveIf<kDGLCPU, int64_t, double>(COOMatrix, NDArray, dou
 
 template <DGLDeviceType XPU, typename IdType, typename DType>
 COOMatrix COOEtypeRemoveIf(
-    COOMatrix coo, IdArray etypes, IdArray eids, const std::vector<NDArray>& values, 
+    COOMatrix coo, IdArray etypes, IdArray eids, const std::vector<NDArray>& values,
     DType criteria) {
   CHECK_EQ(etypes->dtype, DGLDataTypeTraits<int32_t>::dtype) <<
     "currently only int32 edge type array is supported.";
@@ -87,9 +85,6 @@ COOMatrix COOEtypeRemoveIf(
     const IdType global_eid = data ? data[i] : i;
     const int32_t etype = etype_data[global_eid];
     const IdType etype_eid = eid_data[global_eid];
-    //std::cout << row[i] << " " << col[i] << " " << global_eid << " " <<
-    //  etype << " " << etype_eid << " " <<
-    //  (val[etype] ? val[etype][etype_eid] : -1) << std::endl;
     if (!val[etype] ||  // Pass if the value array is nullptr (i.e. doesn't matter).
                         // This can happen if some etypes don't matter while others do.
         val[etype][etype_eid] != criteria) {
