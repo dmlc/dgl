@@ -381,7 +381,8 @@ class LaplacianPE(BaseTransform):
         Default: None.
     padding : bool, optional
         If False, raise an exception when k>=n.
-        Otherwise, add zero paddings in the end when k>=n.
+        Otherwise, add zero paddings in the end of eigenvectors and 'nan' paddings
+        in the end of eigenvalues when k>=n.
         Default: False.
         n is the number of nodes in the given graph.
 
@@ -392,34 +393,34 @@ class LaplacianPE(BaseTransform):
     >>> transform1 = LaplacianPE(k=3)
     >>> transform2 = LaplacianPE(k=5, padding=True)
     >>> transform3 = LaplacianPE(k=5, feat_name='eigvec', eigval_name='eigval', padding=True)
-    >>> g = dgl.rand_graph(5, 10)
+    >>> g = dgl.graph(([0,1,2,3,4,2,3,1,4,0], [2,3,1,4,0,0,1,2,3,4]))
     >>> g1 = transform1(g)
     >>> print(g1.ndata['PE'])
-    tensor([[-0.0697, -0.0697,  0.0131],
-            [ 0.0953,  0.0953, -0.3502],
-            [ 0.3501,  0.3501,  0.5598],
-            [ 0.3929,  0.3929, -0.2883],
-            [-0.5751, -0.5751, -0.2018]])
+    tensor([[ 0.6325,  0.1039,  0.3489],
+            [-0.5117,  0.2826,  0.6095],
+            [ 0.1954,  0.6254, -0.5923],
+            [-0.5117, -0.4508, -0.3938],
+            [ 0.1954, -0.5612,  0.0278]])
     >>> g2 = transform2(g)
     >>> print(g2.ndata['PE'])
-    tensor([[-0.0697,  0.0697,  0.0131,  0.0131,  0.0000],
-            [ 0.0953, -0.0953, -0.3502, -0.3502,  0.0000],
-            [ 0.3501, -0.3501,  0.5598,  0.5598,  0.0000],
-            [ 0.3929, -0.3929, -0.2883, -0.2883,  0.0000],
-            [-0.5751,  0.5751, -0.2018, -0.2018,  0.0000]])
+    tensor([[-0.6325, -0.1039,  0.3489, -0.2530,  0.0000],
+            [ 0.5117, -0.2826,  0.6095,  0.4731,  0.0000],
+            [-0.1954, -0.6254, -0.5923, -0.1361,  0.0000],
+            [ 0.5117,  0.4508, -0.3938, -0.6295,  0.0000],
+            [-0.1954,  0.5612,  0.0278,  0.5454,  0.0000]])
     >>> g3 = transform3(g)
     >>> print(g3.ndata['eigval'])
-    tensor([[0.9158, 0.9158, 1.4175, 1.4175,    nan],
-            [0.9158, 0.9158, 1.4175, 1.4175,    nan],
-            [0.9158, 0.9158, 1.4175, 1.4175,    nan],
-            [0.9158, 0.9158, 1.4175, 1.4175,    nan],
-            [0.9158, 0.9158, 1.4175, 1.4175,    nan]])
+    tensor([[0.6910, 0.6910, 1.8090, 1.8090,    nan],
+            [0.6910, 0.6910, 1.8090, 1.8090,    nan],
+            [0.6910, 0.6910, 1.8090, 1.8090,    nan],
+            [0.6910, 0.6910, 1.8090, 1.8090,    nan],
+            [0.6910, 0.6910, 1.8090, 1.8090,    nan]])
     >>> print(g3.ndata['eigvec'])
-    tensor([[ 0.0697, -0.0697,  0.0131, -0.0131,  0.0000],
-            [-0.0953,  0.0953, -0.3502,  0.3502,  0.0000],
-            [-0.3501,  0.3501,  0.5598, -0.5598,  0.0000],
-            [-0.3929,  0.3929, -0.2883,  0.2883,  0.0000],
-            [ 0.5751, -0.5751, -0.2018,  0.2018,  0.0000]])
+    tensor([[ 0.6325, -0.1039,  0.3489,  0.2530,  0.0000],
+            [-0.5117, -0.2826,  0.6095, -0.4731,  0.0000],
+            [ 0.1954, -0.6254, -0.5923,  0.1361,  0.0000],
+            [-0.5117,  0.4508, -0.3938,  0.6295,  0.0000],
+            [ 0.1954,  0.5612,  0.0278, -0.5454,  0.0000]])
     """
     def __init__(self, k, feat_name='PE', eigval_name=None, padding=False):
         self.k = k
@@ -429,9 +430,9 @@ class LaplacianPE(BaseTransform):
 
     def __call__(self, g):
         if self.eigval_name:
-            eigval, PE = functional.laplacian_pe(g, k=self.k, padding=self.padding, 
+            PE, eigval = functional.laplacian_pe(g, k=self.k, padding=self.padding,
                                                  return_eigval=True)
-            eigval = F.repeat(eigval.unsqueeze(0), g.num_nodes(), dim=0)
+            eigval = F.repeat(F.reshape(eigval, [1,-1]), g.num_nodes(), dim=0)
             g.ndata[self.eigval_name] = F.copy_to(eigval, g.device)
         else:
             PE = functional.laplacian_pe(g, k=self.k, padding=self.padding)

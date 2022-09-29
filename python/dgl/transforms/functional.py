@@ -3661,12 +3661,13 @@ def laplacian_pe(g, k, padding=False, return_eigval=False):
     Parameters
     ----------
     g : DGLGraph
-        The input graph. Must be homogeneous.
+        The input graph. Must be homogeneous and bidirected.
     k : int
         Number of smallest non-trivial eigenvectors to use for positional encoding.
     padding : bool, optional
         If False, raise an exception when k>=n.
-        Otherwise, add zero paddings in the end when k>=n.
+        Otherwise, add zero paddings in the end of eigenvectors and 'nan' paddings
+        in the end of eigenvalues when k>=n.
         Default: False.
         n is the number of nodes in the given graph.
     return_eigval : bool, optional
@@ -3679,35 +3680,29 @@ def laplacian_pe(g, k, padding=False, return_eigval=False):
     Tensor or (Tensor, Tensor)
         Return the laplacian positional encodings of shape :math:`(N, k)`, where :math:`N` is the
         number of nodes in the input graph, when :attr:`return_eigval` is False. The eigenvalues
-        of shape :math:`N` is additionally returned as the first element when :attr:`return_eigval`
+        of shape :math:`N` is additionally returned as the second element when :attr:`return_eigval`
         is True.
 
     Example
     -------
     >>> import dgl
-    >>> g = dgl.rand_graph(6, 20)
+    >>> g = dgl.graph(([0,1,2,3,1,2,3,0], [1,2,3,0,0,1,2,3]))
     >>> dgl.laplacian_pe(g, 2)
-    tensor([[ 0.7251, -0.6224],
-            [-0.0000,  0.5390],
-            [-0.4065,  0.4042],
-            [-0.0744,  0.0519],
-            [-0.4694, -0.1556],
-            [ 0.2881, -0.3631]])
-    >>> dgl.laplacian_pe(g, 6, padding=True)
-    tensor([[-7.2513e-01, -6.2238e-01, -1.8517e-09,  1.8517e-09,  4.3006e-01,  0.0000e+00],
-            [ 0.0000e+00,  5.3900e-01, -0.0000e+00,  0.0000e+00,  0.0000e+00,  0.0000e+00],
-            [ 4.0653e-01,  4.0425e-01,  6.4145e-09, -6.4145e-09,  2.8766e-01,  0.0000e+00],
-            [ 7.4425e-02,  5.1865e-02, -7.0711e-01, -7.0711e-01, -6.5471e-01,  0.0000e+00],
-            [ 4.6942e-01, -1.5560e-01, -7.4068e-09,  7.4068e-09,  3.3216e-01,  0.0000e+00],
-            [-2.8814e-01, -3.6306e-01,  7.0711e-01,  7.0711e-01, -4.3968e-01,  0.0000e+00]])
-    >>> dgl.laplacian_pe(g, 6, padding=True, return_eigval=True)
-    (tensor([0.5684, 0.7500, 1.0000, 1.0000, 1.5149,    nan]),
-     tensor([[ 7.2513e-01, -6.2238e-01,  1.8517e-09, -1.8517e-09, -4.3006e-01,  0.0000e+00],
-             [-0.0000e+00,  5.3900e-01,  0.0000e+00, -0.0000e+00, -0.0000e+00,  0.0000e+00],
-             [-4.0653e-01,  4.0425e-01, -6.4145e-09,  6.4145e-09, -2.8766e-01,  0.0000e+00],
-             [-7.4425e-02,  5.1865e-02,  7.0711e-01,  7.0711e-01,  6.5471e-01,  0.0000e+00],
-             [-4.6942e-01, -1.5560e-01,  7.4068e-09, -7.4068e-09, -3.3216e-01,  0.0000e+00],
-             [ 2.8814e-01, -3.6306e-01, -7.0711e-01, -7.0711e-01,  4.3968e-01,  0.0000e+00]]))
+    tensor([[ 7.0711e-01, -6.4921e-17],
+            [ 3.0483e-16, -7.0711e-01],
+            [-7.0711e-01, -2.4910e-16],
+            [ 9.9288e-17,  7.0711e-01]])
+    >>> dgl.laplacian_pe(g, 5, padding=True)
+    tensor([[ 7.0711e-01, -6.4921e-17,  5.0000e-01,  0.0000e+00,  0.0000e+00],
+            [ 3.0483e-16, -7.0711e-01, -5.0000e-01,  0.0000e+00,  0.0000e+00],
+            [-7.0711e-01, -2.4910e-16,  5.0000e-01,  0.0000e+00,  0.0000e+00],
+            [ 9.9288e-17,  7.0711e-01, -5.0000e-01,  0.0000e+00,  0.0000e+00]])
+    >>> dgl.laplacian_pe(g, 5, padding=True, return_eigval=True)
+    (tensor([[-7.0711e-01,  6.4921e-17, -5.0000e-01,  0.0000e+00,  0.0000e+00],
+             [-3.0483e-16,  7.0711e-01,  5.0000e-01,  0.0000e+00,  0.0000e+00],
+             [ 7.0711e-01,  2.4910e-16, -5.0000e-01,  0.0000e+00,  0.0000e+00],
+             [-9.9288e-17, -7.0711e-01,  5.0000e-01,  0.0000e+00,  0.0000e+00]]),
+     tensor([1., 1., 2., nan, nan]))
     """
     # check for the "k < n" constraint
     n = g.num_nodes()
@@ -3722,12 +3717,12 @@ def laplacian_pe(g, k, padding=False, return_eigval=False):
 
     # select eigenvectors with smaller eigenvalues O(n + klogk)
     EigVal, EigVec = np.linalg.eig(L.toarray())
-    max_freqs = np.min((n-1,k))
+    max_freqs = min(n-1, k)
     kpartition_indices = np.argpartition(EigVal, max_freqs)[:max_freqs+1]
     topk_eigvals = EigVal[kpartition_indices]
     topk_indices = kpartition_indices[topk_eigvals.argsort()][1:]
-    topk_EigVec = np.real(EigVec[:, topk_indices])
-    eigvals = F.tensor(np.real(EigVal[topk_indices]), dtype=F.float32)
+    topk_EigVec = EigVec[:, topk_indices]
+    eigvals = F.tensor(EigVal[topk_indices], dtype=F.float32)
 
     # get random flip signs
     rand_sign = 2 * (np.random.rand(max_freqs) > 0.5) - 1.
@@ -3741,7 +3736,7 @@ def laplacian_pe(g, k, padding=False, return_eigval=False):
         eigvals = F.cat([eigvals, temp_EigVal], dim=0)
 
     if return_eigval:
-        return eigvals, PE
+        return PE, eigvals
     return PE
 
 def to_half(g):
