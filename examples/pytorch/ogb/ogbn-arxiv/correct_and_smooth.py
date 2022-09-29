@@ -4,8 +4,9 @@ import glob
 import numpy as np
 import torch
 import torch.nn.functional as F
-from dgl import function as fn
 from ogb.nodeproppred import DglNodePropPredDataset, Evaluator
+
+from dgl import function as fn
 
 device = None
 
@@ -20,7 +21,11 @@ def load_data(dataset):
     evaluator = Evaluator(name=dataset)
 
     splitted_idx = data.get_idx_split()
-    train_idx, val_idx, test_idx = splitted_idx["train"], splitted_idx["valid"], splitted_idx["test"]
+    train_idx, val_idx, test_idx = (
+        splitted_idx["train"],
+        splitted_idx["valid"],
+        splitted_idx["test"],
+    )
     graph, labels = data[0]
 
     n_node_feats = graph.ndata["feat"].shape[1]
@@ -46,7 +51,9 @@ def preprocess(graph):
     return graph
 
 
-def general_outcome_correlation(graph, y0, n_prop=50, alpha=0.8, use_norm=False, post_step=None):
+def general_outcome_correlation(
+    graph, y0, n_prop=50, alpha=0.8, use_norm=False, post_step=None
+):
     with graph.local_scope():
         y = y0
         for _ in range(n_prop):
@@ -94,7 +101,9 @@ def run(args, graph, labels, pred, train_idx, val_idx, test_idx, evaluator):
     # dy = torch.zeros(graph.number_of_nodes(), n_classes, device=device)
     # dy[train_idx] = F.one_hot(labels[train_idx], n_classes).float().squeeze(1) - pred[train_idx]
 
-    _train_acc, val_acc, test_acc = evaluate(labels, y, train_idx, val_idx, test_idx, evaluator_wrapper)
+    _train_acc, val_acc, test_acc = evaluate(
+        labels, y, train_idx, val_idx, test_idx, evaluator_wrapper
+    )
 
     # print("train acc:", _train_acc)
     print("original val acc:", val_acc)
@@ -110,10 +119,16 @@ def run(args, graph, labels, pred, train_idx, val_idx, test_idx, evaluator):
     # y = y + args.alpha2 * smoothed_dy  # .clamp(0, 1)
 
     smoothed_y = general_outcome_correlation(
-        graph, y, alpha=args.alpha, use_norm=args.use_norm, post_step=lambda x: x.clamp(0, 1)
+        graph,
+        y,
+        alpha=args.alpha,
+        use_norm=args.use_norm,
+        post_step=lambda x: x.clamp(0, 1),
     )
 
-    _train_acc, val_acc, test_acc = evaluate(labels, smoothed_y, train_idx, val_idx, test_idx, evaluator_wrapper)
+    _train_acc, val_acc, test_acc = evaluate(
+        labels, smoothed_y, train_idx, val_idx, test_idx, evaluator_wrapper
+    )
 
     # print("train acc:", _train_acc)
     print("val acc:", val_acc)
@@ -126,11 +141,24 @@ def main():
     global device
 
     argparser = argparse.ArgumentParser(description="implementation of C&S)")
-    argparser.add_argument("--cpu", action="store_true", help="CPU mode. This option overrides --gpu.")
+    argparser.add_argument(
+        "--cpu",
+        action="store_true",
+        help="CPU mode. This option overrides --gpu.",
+    )
     argparser.add_argument("--gpu", type=int, default=0, help="GPU device ID.")
-    argparser.add_argument("--use-norm", action="store_true", help="Use symmetrically normalized adjacency matrix.")
+    argparser.add_argument(
+        "--use-norm",
+        action="store_true",
+        help="Use symmetrically normalized adjacency matrix.",
+    )
     argparser.add_argument("--alpha", type=float, default=0.6, help="alpha")
-    argparser.add_argument("--pred-files", type=str, default="./output/*.pt", help="address of prediction files")
+    argparser.add_argument(
+        "--pred-files",
+        type=str,
+        default="./output/*.pt",
+        help="address of prediction files",
+    )
     args = argparser.parse_args()
 
     if args.cpu:
@@ -152,7 +180,9 @@ def main():
     for pred_file in glob.iglob(args.pred_files):
         print("load:", pred_file)
         pred = torch.load(pred_file)
-        val_acc, test_acc = run(args, graph, labels, pred, train_idx, val_idx, test_idx, evaluator)
+        val_acc, test_acc = run(
+            args, graph, labels, pred, train_idx, val_idx, test_idx, evaluator
+        )
         val_accs.append(val_acc)
         test_accs.append(test_acc)
 

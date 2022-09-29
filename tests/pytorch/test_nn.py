@@ -6,12 +6,15 @@ import dgl.nn.pytorch as nn
 import dgl.function as fn
 import backend as F
 import pytest
+import torch
 from test_utils.graph_cases import get_cases, random_graph, random_bipartite, random_dglgraph
 from test_utils import parametrize_idtype
 from copy import deepcopy
 import pickle
 
 import scipy as sp
+from torch.utils.data import DataLoader
+from torch.optim import SparseAdam, Adam
 
 tmp_buffer = io.BytesIO()
 
@@ -1631,3 +1634,24 @@ def test_dgn_conv(in_size, out_size, aggregators, scalers, delta,
     model = nn.DGNConv(in_size, out_size, aggregators_non_eig, scalers, delta, dropout,
         num_towers, edge_feat_size, residual).to(dev)
     model(g, h, edge_feat=e)
+
+def test_DeepWalk():
+    dev = F.ctx()
+    g = dgl.graph(([0, 1, 2, 1, 2, 0], [1, 2, 0, 0, 1, 2]))
+    model = nn.DeepWalk(g, emb_dim=8, walk_length=2, window_size=1, fast_neg=True, sparse=True)
+    model = model.to(dev)
+    dataloader = DataLoader(torch.arange(g.num_nodes()), batch_size=16, collate_fn=model.sample)
+    optim = SparseAdam(model.parameters(), lr=0.01)
+    walk = next(iter(dataloader)).to(dev)
+    loss = model(walk)
+    loss.backward()
+    optim.step()
+
+    model = nn.DeepWalk(g, emb_dim=8, walk_length=2, window_size=1, fast_neg=False, sparse=False)
+    model = model.to(dev)
+    dataloader = DataLoader(torch.arange(g.num_nodes()), batch_size=16, collate_fn=model.sample)
+    optim = Adam(model.parameters(), lr=0.01)
+    walk = next(iter(dataloader)).to(dev)
+    loss = model(walk)
+    loss.backward()
+    optim.step()

@@ -1,18 +1,17 @@
-import argparse
-import dgl
 import json
 import numpy as np
 import os
-import sys
 import tempfile
 import torch
-
+import pytest, unittest
+import dgl
 from dgl.data.utils import load_tensors, load_graphs
-
 from chunk_graph import chunk_graph
 
 from create_chunked_dataset import create_chunked_dataset
 
+@pytest.mark.parametrize("num_chunks", [1, 2, 3, 4, 8])
+@pytest.mark.parametrize("num_parts", [1, 2, 3, 4, 8])
 def test_part_pipeline():
     with tempfile.TemporaryDirectory() as root_dir:
         num_chunks = 2
@@ -23,7 +22,7 @@ def test_part_pipeline():
         output_dir = os.path.join(root_dir, '2parts')
         os.system('python3 tools/partition_algo/random_partition.py '\
                   '--in_dir {} --out_dir {} --num_partitions {}'.format(
-                    in_dir, output_dir, num_chunks))
+                    in_dir, output_dir, num_parts))
         for ntype in ['author', 'institution', 'paper']:
             fname = os.path.join(output_dir, '{}.txt'.format(ntype))
             with open(fname, 'r') as f:
@@ -31,12 +30,12 @@ def test_part_pipeline():
                 assert isinstance(int(header), int)
 
         # Step2: data dispatch
-        partition_dir = os.path.join(root_dir, '2parts')
+        partition_dir = os.path.join(root_dir, 'parted_data')
         out_dir = os.path.join(root_dir, 'partitioned')
         ip_config = os.path.join(root_dir, 'ip_config.txt')
         with open(ip_config, 'w') as f:
-            f.write('127.0.0.1\n')
-            f.write('127.0.0.2\n')
+            for i in range(num_parts):
+                f.write(f'127.0.0.{i + 1}\n')
 
         cmd = 'python3 tools/dispatch_data.py'
         cmd += f' --in-dir {in_dir}'
@@ -44,6 +43,8 @@ def test_part_pipeline():
         cmd += f' --out-dir {out_dir}'
         cmd += f' --ip-config {ip_config}'
         cmd += ' --process-group-timeout 60'
+        cmd += ' --save-orig-nids'
+        cmd += ' --save-orig-eids'
         os.system(cmd)
 
         # check metadata.json
@@ -53,19 +54,19 @@ def test_part_pipeline():
 
         #all_etypes = ['affiliated_with', 'writes', 'cites', 'rev_writes']
         for etype in all_etypes:
-            assert len(meta_data['edge_map'][etype]) == num_chunks
+            assert len(meta_data['edge_map'][etype]) == num_parts
         assert meta_data['etypes'].keys() == set(all_etypes)
         assert meta_data['graph_name'] == 'mag240m'
 
         #all_ntypes = ['author', 'institution', 'paper']
         for ntype in all_ntypes:
-            assert len(meta_data['node_map'][ntype]) == num_chunks
+            assert len(meta_data['node_map'][ntype]) == num_parts
         assert meta_data['ntypes'].keys() == set(all_ntypes)
-        assert meta_data['num_edges'] == 4200
-        assert meta_data['num_nodes'] == 720
-        assert meta_data['num_parts'] == num_chunks
+        assert meta_data['num_edges'] == g.num_edges()
+        assert meta_data['num_nodes'] == g.num_nodes()
+        assert meta_data['num_parts'] == num_parts
 
-        for i in range(num_chunks):
+        for i in range(num_parts):
             sub_dir = 'part-' + str(i)
             assert meta_data[sub_dir]['node_feats'] == 'part{}/node_feat.dgl'.format(i)
             assert meta_data[sub_dir]['edge_feats'] == 'part{}/edge_feat.dgl'.format(i)
@@ -78,22 +79,34 @@ def test_part_pipeline():
             fname = os.path.join(sub_dir, 'graph.dgl')
             assert os.path.isfile(fname)
             g_list, data_dict = load_graphs(fname)
-            g = g_list[0]
-            assert isinstance(g, dgl.DGLGraph)
+            part_g = g_list[0]
+            assert isinstance(part_g, dgl.DGLGraph)
 
             # node_feat.dgl
             fname = os.path.join(sub_dir, 'node_feat.dgl')
             assert os.path.isfile(fname)
             tensor_dict = load_tensors(fname)
-            all_tensors = ['paper/feat', 'paper/label', 'paper/year']
+            all_tensors = ['paper/feat', 'paper/label', 'paper/year', 'paper/orig_ids']
             assert tensor_dict.keys() == set(all_tensors)
             for key in all_tensors:
                 assert isinstance(tensor_dict[key], torch.Tensor)
+            ndata_paper_orig_ids = tensor_dict['paper/orig_ids']
 
             # edge_feat.dgl
             fname = os.path.join(sub_dir, 'edge_feat.dgl')
             assert os.path.isfile(fname)
             tensor_dict = load_tensors(fname)
 
-if __name__ == '__main__':
-    test_part_pipeline()
+            # orig_nids.dgl
+            fname = os.path.join(sub_dir, 'orig_nids.dgl')
+            assert os.path.isfile(fname)
+            orig_nids = load_tensors(fname)
+            assert len(orig_nids.keys()) == 3
+            assert torch.equal(ndata_paper_orig_ids, orig_nids['paper'])
+
+            # orig_eids.dgl
+            fname = os.path.join(sub_dir, 'orig_eids.dgl')
+            assert os.path.isfile(fname)
+            orig_eids = load_tensors(fname)
+            assert len(orig_eids.keys()) == 4
+
