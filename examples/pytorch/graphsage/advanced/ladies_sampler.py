@@ -1,3 +1,5 @@
+# referenced the following implementation: https://github.com/BarclayII/dgl/blob/ladies/examples/pytorch/ladies/ladies2.py
+
 import dgl
 import torch
 import dgl.function as fn
