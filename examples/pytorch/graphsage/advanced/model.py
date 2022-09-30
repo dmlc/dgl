@@ -36,7 +36,7 @@ class SAGE(nn.Module):
     def forward(self, blocks, x):
         h = x
         for l, (layer, block) in enumerate(zip(self.layers, blocks)):
-            h = layer(block, h)
+            h = layer(block, h, edge_weight=block.edata['edge_weights'] if 'edge_weights' in block.edata else None)
             if l != len(self.layers) - 1:
                 h = self.activation(h)
                 h = self.dropout(h)
@@ -65,7 +65,7 @@ class SAGE(nn.Module):
             sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
             dataloader = dgl.dataloading.DataLoader(
                 g,
-                th.arange(g.num_nodes()).to(g.device),
+                th.arange(g.num_nodes(), dtype=g.idtype, device=g.device),
                 sampler,
                 device=device if num_workers == 0 else None,
                 batch_size=batch_size,
@@ -78,13 +78,13 @@ class SAGE(nn.Module):
                 block = blocks[0]
 
                 block = block.int().to(device)
-                h = x[input_nodes].to(device)
+                h = x[input_nodes.long()].to(device)
                 h = layer(block, h)
                 if l != len(self.layers) - 1:
                     h = self.activation(h)
                     h = self.dropout(h)
 
-                y[output_nodes] = h.cpu()
+                y[output_nodes.long()] = h.cpu()
 
             x = y
         return y

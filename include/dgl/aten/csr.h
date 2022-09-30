@@ -1,5 +1,5 @@
 /**
- *  Copyright (c) 2020 by Contributors
+ *  Copyright (c) 2020-2022 by Contributors
  * @file dgl/aten/csr.h
  * @brief Common CSR operations required by DGL.
  */
@@ -410,6 +410,48 @@ CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries);
 /**
  * @brief Randomly select a fixed number of non-zero entries along each given
  * row independently.
+ *
+ * The function performs random choices along each row independently.
+ * The picked indices are returned in the form of a COO matrix.
+ *
+ * If replace is false and a row has fewer non-zero values than num_samples,
+ * all the values are picked.
+ *
+ * Examples:
+ *
+ * // csr.num_rows = 4;
+ * // csr.num_cols = 4;
+ * // csr.indptr = [0, 2, 3, 3, 5]
+ * // csr.indices = [0, 1, 1, 2, 3]
+ * // csr.data = [2, 3, 0, 1, 4]
+ * CSRMatrix csr = ...;
+ * IdArray rows = ... ; // [1, 3]
+ * COOMatrix sampled = CSRLaborSampling(csr, rows, 2, FloatArray(), false);
+ * // possible sampled coo matrix:
+ * // sampled.num_rows = 4
+ * // sampled.num_cols = 4
+ * // sampled.rows = [1, 3, 3]
+ * // sampled.cols = [1, 2, 3]
+ * // sampled.data = [3, 0, 4]
+ *
+ * @param mat Input CSR matrix.
+ * @param rows Rows to sample from.
+ * @param num_samples Number of samples using neighbor sampling
+ * @param importance_sampling Whether to enable importance sampling
+ * @return A COOMatrix storing the picked row, col and data indices.
+ */
+std::pair<COOMatrix, FloatArray> CSRLaborSampling(
+    CSRMatrix mat,
+    IdArray NIDs,
+    IdArray rows,
+    int64_t num_samples,
+    FloatArray prob,
+    IdArray random_seed,
+    IdArray cnt,
+    int importance_sampling);
+
+/*!
+ * @brief Randomly select a fixed number of non-zero entries along each given row independently.
  *
  * The function performs random choices along each row independently.
  * The picked indices are returned in the form of a COO matrix.

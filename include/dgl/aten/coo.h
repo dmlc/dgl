@@ -1,6 +1,6 @@
 
 /**
- *  Copyright (c) 2020 by Contributors
+ *  Copyright (c) 2020-2022 by Contributors
  * @file dgl/aten/coo.h
  * @brief Common COO operations required by DGL.
  */
@@ -382,6 +382,47 @@ COOMatrix COOReorder(
 /**
  * @brief Randomly select a fixed number of non-zero entries along each given
  * row independently.
+ *
+ * The function performs random choices along each row independently.
+ * The picked indices are returned in the form of a COO matrix.
+ *
+ *
+ * Examples:
+ *
+ * // coo.num_rows = 4;
+ * // coo.num_cols = 4;
+ * // coo.rows = [0, 0, 1, 3, 3]
+ * // coo.cols = [0, 1, 1, 2, 3]
+ * // coo.data = [2, 3, 0, 1, 4]
+ * COOMatrix coo = ...;
+ * IdArray rows = ... ; // [1, 3]
+ * COOMatrix sampled = COORowWiseSampling(coo, rows, 2, FloatArray(), false);
+ * // possible sampled coo matrix:
+ * // sampled.num_rows = 4
+ * // sampled.num_cols = 4
+ * // sampled.rows = [1, 3, 3]
+ * // sampled.cols = [1, 2, 3]
+ * // sampled.data = [3, 0, 4]
+ *
+ * \param mat Input coo matrix.
+ * \param rows Rows to sample from.
+ * \param num_samples Number of samples using neighbor sampling
+ * \param importance_sampling Whether to enable importance sampling
+ * \return A COOMatrix storing the picked row and col indices. Its data field stores the
+ *         the index of the picked elements in the value array.
+ */
+std::pair<COOMatrix, FloatArray> COOLaborSampling(
+    COOMatrix mat,
+    IdArray NIDs,
+    IdArray rows,
+    int64_t num_samples,
+    FloatArray prob,
+    IdArray random_seed,
+    IdArray cnt,
+    int importance_sampling);
+
+/*!
+ * \brief Randomly select a fixed number of non-zero entries along each given row independently.
  *
  * The function performs random choices along each row independently.
  * The picked indices are returned in the form of a COO matrix.
