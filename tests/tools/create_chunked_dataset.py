@@ -61,6 +61,7 @@ def create_chunked_dataset(root_dir, num_chunks, include_masks=False):
     num_classes = 4
     paper_label = np.random.choice(num_classes, num_papers)
     paper_year = np.random.choice(2022, num_papers)
+    paper_orig_ids = np.arange(0, num_papers)
 
     # masks.
     if include_masks:
@@ -98,6 +99,10 @@ def create_chunked_dataset(root_dir, num_chunks, include_masks=False):
     with open(paper_year_path, 'wb') as f:
         np.save(f, paper_year)
 
+    paper_orig_ids_path = os.path.join(input_dir, 'paper/orig_ids.npy')
+    with open(paper_orig_ids_path, 'wb') as f:
+        np.save(f, paper_orig_ids)
+
     cite_count_path = os.path.join(input_dir, 'cites/count.npy')
     with open(cite_count_path, 'wb') as f:
         np.save(f, cite_count)
@@ -122,7 +127,9 @@ def create_chunked_dataset(root_dir, num_chunks, include_masks=False):
         with open(paper_val_mask_path, 'wb') as f:
             np.save(f, paper_val_mask)
 
-        author_train_mask_path = os.path.join(input_dir, 'author/train_mask.npy')
+        author_train_mask_path = os.path.join(
+            input_dir, 'author/train_mask.npy'
+        )
         with open(author_train_mask_path, 'wb') as f:
             np.save(f, author_train_mask)
 
@@ -134,11 +141,15 @@ def create_chunked_dataset(root_dir, num_chunks, include_masks=False):
         with open(author_val_mask_path, 'wb') as f:
             np.save(f, author_val_mask)
 
-        inst_train_mask_path = os.path.join(input_dir, 'institution/train_mask.npy')
+        inst_train_mask_path = os.path.join(
+            input_dir, 'institution/train_mask.npy'
+        )
         with open(inst_train_mask_path, 'wb') as f:
             np.save(f, inst_train_mask)
 
-        inst_test_mask_path = os.path.join(input_dir, 'institution/test_mask.npy')
+        inst_test_mask_path = os.path.join(
+            input_dir, 'institution/test_mask.npy'
+        )
         with open(inst_test_mask_path, 'wb') as f:
             np.save(f, inst_test_mask)
 
@@ -147,50 +158,48 @@ def create_chunked_dataset(root_dir, num_chunks, include_masks=False):
             np.save(f, inst_val_mask)
 
         node_data = {
-                    'paper':
-                    {
-                        'feat': paper_feat_path,
-                        'train_mask': paper_train_mask_path,
-                        'test_mask': paper_test_mask_path,
-                        'val_mask': paper_val_mask_path,
-                        'label': paper_label_path,
-                        'year': paper_year_path
-                    },
-                    'author':
-                    {
-                        'train_mask': author_train_mask_path,
-                        'test_mask': author_test_mask_path,
-                        'val_mask': author_val_mask_path
-
-                    },
-                    'institution':
-                    {
-                        'train_mask': inst_train_mask_path,
-                        'test_mask': inst_test_mask_path,
-                        'val_mask': inst_val_mask_path
-                    }
-                }
+            'paper': {
+                'feat': paper_feat_path,
+                'train_mask': paper_train_mask_path,
+                'test_mask': paper_test_mask_path,
+                'val_mask': paper_val_mask_path,
+                'label': paper_label_path,
+                'year': paper_year_path,
+                'orig_ids': paper_orig_ids_path,
+            },
+            'author': {
+                'train_mask': author_train_mask_path,
+                'test_mask': author_test_mask_path,
+                'val_mask': author_val_mask_path,
+            },
+            'institution': {
+                'train_mask': inst_train_mask_path,
+                'test_mask': inst_test_mask_path,
+                'val_mask': inst_val_mask_path,
+            },
+        }
     else:
         node_data = {
-                    'paper': {
-                        'feat': paper_feat_path,
-                        'label': paper_label_path,
-                        'year': paper_year_path,
-                    }
-                }
+            'paper': {
+                'feat': paper_feat_path,
+                'label': paper_label_path,
+                'year': paper_year_path,
+                'orig_ids': paper_orig_ids_path,
+            }
+        }
 
     output_dir = os.path.join(root_dir, 'chunked-data')
     chunk_graph(
-            g,
-            'mag240m',
-            node_data,
-            {
-                'cites': {'count': cite_count_path},
-                'writes': {'year': write_year_path},
-                'rev_writes': {'year': write_year_path},
-            },
-            num_chunks=num_chunks,
-            output_path=output_dir,
+        g,
+        'mag240m',
+        node_data,
+        {
+            'cites': {'count': cite_count_path},
+            'writes': {'year': write_year_path},
+            'rev_writes': {'year': write_year_path},
+        },
+        num_chunks=num_chunks,
+        output_path=output_dir,
     )
     print('Done with creating chunked graph')
 

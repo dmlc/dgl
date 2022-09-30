@@ -9,6 +9,22 @@ import constants
 from utils import read_json
 
 
+def check_dependencies():
+    """Check if all the dependencies needed for the execution of this file
+    are installed.
+    """
+
+    exec_path = os.get_exec_path()
+    mpi_install = False
+    for x in exec_path:
+        if os.path.isfile(os.path.join(x, "mpirun")):
+            mpi_install = True
+            break
+    assert (
+        mpi_install
+    ), "Could not locate the following dependency: MPI. Please install it and try again."
+
+
 def run_parmetis_wrapper(params):
     """Function to execute all the steps needed to run ParMETIS
 
@@ -23,6 +39,13 @@ def run_parmetis_wrapper(params):
     schema = read_json(params.schema_file)
     graph_name = schema[constants.STR_GRAPH_NAME]
     num_partitions = len(schema[constants.STR_NUM_NODES_PER_CHUNK][0])
+
+    # Check if parmetis_preprocess.py exists.
+    assert os.path.isfile(
+        os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "parmetis_preprocess.py"
+        )
+    ), "Please check DGL Installation, parmetis_preprocess.py file does not exist."
 
     # Trigger pre-processing step to generate input files for ParMETIS.
     preproc_cmd = (
@@ -129,4 +152,5 @@ if __name__ == "__main__":
         %(levelname)s %(asctime)s PID:%(process)d] %(message)s",
     )
 
+    check_dependencies()
     run_parmetis_wrapper(params)

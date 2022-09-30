@@ -1,12 +1,14 @@
 import json
-import numpy as np
 import os
 import tempfile
-import torch
-import pytest, unittest
+import unittest
+
 import dgl
-from dgl.data.utils import load_tensors, load_graphs
+import numpy as np
+import pytest
+import torch
 from chunk_graph import chunk_graph
+from dgl.data.utils import load_graphs, load_tensors
 
 from create_chunked_dataset import create_chunked_dataset
 
@@ -50,7 +52,7 @@ def test_part_pipeline(num_chunks, num_parts):
             for i in range(num_chunks):
                 chunk_f_name = os.path.join(
                     output_edge_index_dir, fname + str(i) + '.txt'
-                )   
+                )
                 assert os.path.isfile(chunk_f_name)
                 with open(chunk_f_name, 'r') as f:
                     header = f.readline()
@@ -60,7 +62,7 @@ def test_part_pipeline(num_chunks, num_parts):
 
         # check node_data
         output_node_data_dir = os.path.join(output_dir, 'node_data', 'paper')
-        for feat in ['feat', 'label', 'year']:
+        for feat in ['feat', 'label', 'year', 'orig_ids']:
             for i in range(num_chunks):
                 chunk_f_name = '{}-{}.npy'.format(feat, i)
                 chunk_f_name = os.path.join(output_node_data_dir, chunk_f_name)
@@ -91,13 +93,16 @@ def test_part_pipeline(num_chunks, num_parts):
             assert feat_array.shape[0] == num_edges[etype] // num_chunks
             features.append(feat_array)
             edge_data_gold[etype + '/' + feat] = np.concatenate(features)
-        
+
         # Step1: graph partition
         in_dir = os.path.join(root_dir, 'chunked-data')
         output_dir = os.path.join(root_dir, 'parted_data')
-        os.system('python3 tools/partition_algo/random_partition.py '\
-                  '--in_dir {} --out_dir {} --num_partitions {}'.format(
-                    in_dir, output_dir, num_parts))
+        os.system(
+            'python3 tools/partition_algo/random_partition.py '
+            '--in_dir {} --out_dir {} --num_partitions {}'.format(
+                in_dir, output_dir, num_parts
+            )
+        )
         for ntype in ['author', 'institution', 'paper']:
             fname = os.path.join(output_dir, '{}.txt'.format(ntype))
             with open(fname, 'r') as f:
@@ -139,24 +144,17 @@ def test_part_pipeline(num_chunks, num_parts):
         assert meta_data['num_nodes'] == g.num_nodes()
         assert meta_data['num_parts'] == num_parts
 
-        # Create Id Map here.
-        edge_dict = {}
-        num_edges = 0
-        for utype, etype, vtype in g.canonical_etypes:
-            fname = ':'.join([utype, etype, vtype])
-            edge_dict[fname] = np.array([num_edges, 
-                num_edges + g.number_of_edges(etype)]).reshape(1,2)
-            num_edges += g.number_of_edges(etype)
-
-        assert num_edges == g.number_of_edges()
-        id_map = dgl.distributed.id_map.IdMap(edge_dict)
-        etype_id, type_eid = id_map(np.arange(num_edges))
-
         for i in range(num_parts):
             sub_dir = 'part-' + str(i)
-            assert meta_data[sub_dir]['node_feats'] == 'part{}/node_feat.dgl'.format(i)
-            assert meta_data[sub_dir]['edge_feats'] == 'part{}/edge_feat.dgl'.format(i)
-            assert meta_data[sub_dir]['part_graph'] == 'part{}/graph.dgl'.format(i)
+            assert meta_data[sub_dir][
+                'node_feats'
+            ] == 'part{}/node_feat.dgl'.format(i)
+            assert meta_data[sub_dir][
+                'edge_feats'
+            ] == 'part{}/edge_feat.dgl'.format(i)
+            assert meta_data[sub_dir][
+                'part_graph'
+            ] == 'part{}/graph.dgl'.format(i)
 
             # check data
             sub_dir = os.path.join(out_dir, 'part' + str(i))
@@ -172,13 +170,21 @@ def test_part_pipeline(num_chunks, num_parts):
             fname = os.path.join(sub_dir, 'node_feat.dgl')
             assert os.path.isfile(fname)
             tensor_dict = load_tensors(fname)
-            all_tensors = ['paper/feat', 'paper/label', 'paper/year', 'paper/orig_ids']
-            print(tensor_dict.keys())
-            print(all_tensors)
+            all_tensors = [
+                'paper/feat',
+                'paper/label',
+                'paper/year',
+                'paper/orig_ids',
+            ]
             assert tensor_dict.keys() == set(all_tensors)
             for key in all_tensors:
                 assert isinstance(tensor_dict[key], torch.Tensor)
             ndata_paper_orig_ids = tensor_dict['paper/orig_ids']
+
+            # edge_feat.dgl
+            fname = os.path.join(sub_dir, 'edge_feat.dgl')
+            assert os.path.isfile(fname)
+            tensor_dict = load_tensors(fname)
 
             # orig_nids.dgl
             fname = os.path.join(sub_dir, 'orig_nids.dgl')
@@ -192,29 +198,3 @@ def test_part_pipeline(num_chunks, num_parts):
             assert os.path.isfile(fname)
             orig_eids = load_tensors(fname)
             assert len(orig_eids.keys()) == 4
-
-            # Read edge_feat.dgl
-            fname = os.path.join(sub_dir, 'edge_feat.dgl')
-            assert os.path.isfile(fname)
-            tensor_dict = load_tensors(fname)
-            all_tensors = [
-                'paper:cites:paper/count',
-                'author:writes:paper/year',
-                'paper:rev_writes:author/year',
-            ]
-            assert tensor_dict.keys() == set(all_tensors)
-            for key in all_tensors:
-                assert isinstance(tensor_dict[key], torch.Tensor)
-
-            # Get orig_eids
-            orig_type_eids = g.edata['orig_id'].numpy()
-            orig_etype_ids = g.edata[dgl.ETYPE].numpy()
-
-            # Compare the data stored as edge features in this partition with the data
-            # from the original graph.
-            idx = 0
-            for key, part_data in tensor_dict.items():
-                gold_type_ids = orig_type_eids[orig_etype_ids == idx]
-                gold_data = edge_data_gold[key][gold_type_ids]
-                assert np.all(gold_data == part_data)
-                idx += 1
