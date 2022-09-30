@@ -1,14 +1,12 @@
-import argparse
-from time import time
-import torch as th
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchmetrics.functional import accuracy
-
 import dgl
 from dgl.data.rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
 from dgl.dataloading import MultiLayerNeighborSampler, DataLoader
 from dgl.contrib.cugraph.nn import RelGraphConv
+import argparse
 
 class RGCN(nn.Module):
     def __init__(self, num_nodes, h_dim, out_dim, num_rels, num_bases, fanouts):
@@ -34,16 +32,16 @@ def evaluate(model, labels, dataloader, inv_target):
     model.eval()
     eval_logits = []
     eval_seeds = []
-    with th.no_grad():
+    with torch.no_grad():
         for input_nodes, output_nodes, blocks in dataloader:
-            output_nodes = inv_target[output_nodes.type(th.int64)]
+            output_nodes = inv_target[output_nodes.type(torch.int64)]
             for block in blocks:
                 block.edata['norm'] = dgl.norm_by_dst(block).unsqueeze(1)
             logits = model(blocks)
             eval_logits.append(logits.cpu().detach())
             eval_seeds.append(output_nodes.cpu().detach())
-    eval_logits = th.cat(eval_logits)
-    eval_seeds = th.cat(eval_seeds)
+    eval_logits = torch.cat(eval_logits)
+    eval_seeds = torch.cat(eval_seeds)
     return accuracy(eval_logits.argmax(dim=1), labels[eval_seeds].cpu()).item()
 
 if __name__ == '__main__':
@@ -54,7 +52,7 @@ if __name__ == '__main__':
                         help="Training batch size, default to 100.")
     parser.add_argument("--idtype", type=str, default="int64",
                         help="Data type for node and edge IDs ('int64', 'int32'), default to 'int64'.")
-    parser.add_argument("--verbose", action="store_true",
+    parser.add_argument("--verbose", action="store_false",
                         help="Print verbose data information.")
     args = parser.parse_args()
 
@@ -70,7 +68,7 @@ if __name__ == '__main__':
     else:
         raise ValueError('Unknown dataset: {}'.format(args.dataset))
 
-    device = th.device('cuda')
+    device = torch.device('cuda')
     hg = data[0]
     hg = hg.to(device)
     hg = hg.int() if args.idtype == 'int32' else hg.long()
@@ -89,26 +87,26 @@ if __name__ == '__main__':
     labels = hg.nodes[category].data.pop('labels')
     train_mask = hg.nodes[category].data.pop('train_mask')
     test_mask = hg.nodes[category].data.pop('test_mask')
-    train_idx = th.nonzero(train_mask, as_tuple=False).squeeze()
-    test_idx = th.nonzero(test_mask, as_tuple=False).squeeze()
+    train_idx = torch.nonzero(train_mask, as_tuple=False).squeeze()
+    test_idx = torch.nonzero(test_mask, as_tuple=False).squeeze()
 
     # calculate normalization weight for each edge, and find target category and node id
     for cetype in hg.canonical_etypes:
         hg.edges[cetype].data['norm'] = dgl.norm_by_dst(hg, cetype).unsqueeze(1)
     category_id = hg.ntypes.index(category)
     g = dgl.to_homogeneous(hg, edata=['norm'])
-    node_ids = th.arange(g.num_nodes()).to(device)
+    node_ids = torch.arange(g.num_nodes()).to(device)
     target_idx = node_ids[g.ndata[dgl.NTYPE] == category_id]  # target node index
 
     # rename the field as they can be changed by DataLoader
     # cugraph-ops requires node/edge type to be int32
-    g.ndata['ntype'] = g.ndata.pop(dgl.NTYPE).type(th.int32)
+    g.ndata['ntype'] = g.ndata.pop(dgl.NTYPE).type(torch.int32)
     g.ndata['type_id'] = g.ndata.pop(dgl.NID)
-    g.edata[dgl.ETYPE] = g.edata[dgl.ETYPE].type(th.int32)
+    g.edata[dgl.ETYPE] = g.edata[dgl.ETYPE].type(torch.int32)
 
     # find the mapping (inv_target) from global node IDs to type-specific node IDs
-    inv_target = th.empty((g.num_nodes(),), dtype=th.int64).to(device)
-    inv_target[target_idx] = th.arange(0, target_idx.shape[0], dtype=inv_target.dtype).to(device)
+    inv_target = torch.empty((g.num_nodes(),), dtype=torch.int64).to(device)
+    inv_target[target_idx] = torch.arange(0, target_idx.shape[0], dtype=inv_target.dtype).to(device)
 
     # construct sampler and dataloader
     fanouts = [4, 4]
@@ -126,15 +124,14 @@ if __name__ == '__main__':
     model = RGCN(g.num_nodes(), h_dim, num_classes, num_rels, num_bases, fanouts)
     model = model.to(device)
 
-    optimizer = th.optim.Adam(model.parameters(), lr=1e-2, weight_decay=5e-4)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-2, weight_decay=5e-4)
 
     # training
-    start = time()
     model.train()
     for epoch in range(100):
         total_loss = 0
         for it, (input_nodes, output_nodes, blocks) in enumerate(train_loader):
-            output_nodes = inv_target[output_nodes.type(th.int64)]   # tensor indices must be int64
+            output_nodes = inv_target[output_nodes.type(torch.int64)]   # tensor indices must be int64
             for block in blocks:
                 block.edata['norm'] = dgl.norm_by_dst(block).unsqueeze(1)
             logits = model(blocks)
@@ -147,8 +144,6 @@ if __name__ == '__main__':
         if args.verbose:
             print("Epoch {:05d} | Loss {:.4f} | Val. Accuracy {:.4f} "
                 .format(epoch, total_loss / (it+1), acc))
-    stop = time()
-    print(f"Training time (s): {stop-start}")
 
     # evaluation
     # note: when sampling all neighbors on a large graph for the test dataset, the required shared
