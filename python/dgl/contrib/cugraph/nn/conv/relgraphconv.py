@@ -118,7 +118,7 @@ class RelGraphConvAgg(th.autograd.Function):
 
         return None, None, None, None, None, None, grad_feat, grad_coeff
 
-class RelGraphConvOps(nn.Module):
+class RelGraphConv(nn.Module):
     """ Relational graph convolution layer. """
     def __init__(self,
                  in_feat,

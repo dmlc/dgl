@@ -1,3 +1,3 @@
-from .relgraphconv_ops import RelGraphConvOps
+from .relgraphconv import RelGraphConv
 
-__all__ = ['RelGraphConvOps']
+__all__ = ['RelGraphConv']

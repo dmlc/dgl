@@ -8,16 +8,16 @@ from torchmetrics.functional import accuracy
 import dgl
 from dgl.data.rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
 from dgl.dataloading import MultiLayerNeighborSampler, DataLoader
-from dgl.contrib.cugraph.nn import RelGraphConvOps
+from dgl.contrib.cugraph.nn import RelGraphConv
 
 class RGCN(nn.Module):
     def __init__(self, num_nodes, h_dim, out_dim, num_rels, num_bases, fanouts):
         super().__init__()
         self.emb = nn.Embedding(num_nodes, h_dim)
         # two-layer RGCN
-        self.conv1 = RelGraphConvOps(h_dim, h_dim, num_rels, fanouts[0],
+        self.conv1 = RelGraphConv(h_dim, h_dim, num_rels, fanouts[0],
                                      regularizer='basis', num_bases=num_bases, self_loop=False)
-        self.conv2 = RelGraphConvOps(h_dim, out_dim, num_rels, fanouts[1],
+        self.conv2 = RelGraphConv(h_dim, out_dim, num_rels, fanouts[1],
                                      regularizer='basis', num_bases=num_bases, self_loop=False)
 
     def forward(self, g):
