@@ -1355,9 +1355,10 @@ class KVClient(object):
         """Compute the union of two mask arrays in the KVStore.
         """
         # Each trainer computes its own result from its local storage.
-        self._data_store[output_name][:] = \
-                self._data_store[operand1_name] | \
+        self._data_store[output_name][:] = (
+                self._data_store[operand1_name] |
                 self._data_store[operand2_name]
+        )
 
     def _take_id(self, elem):
         """Used by sort response list

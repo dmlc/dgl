@@ -183,9 +183,13 @@ class DistTensor:
 
     def __or__(self, other):
         new_dist_tensor = DistTensor(
-                self._shape, self._dtype, part_policy=self._part_policy,
-                persistent=self._persistent, is_gdata=self._is_gdata,
-                attach=self._attach)
+                self._shape,
+                self._dtype,
+                part_policy=self._part_policy,
+                persistent=self._persistent,
+                is_gdata=self._is_gdata,
+                attach=self._attach
+        )
         kvstore = self.kvstore
         kvstore.union(self._name, other._name, new_dist_tensor._name)
         return new_dist_tensor

@@ -106,6 +106,6 @@ class KVClient(object):
     def union(self, operand1_name, operand2_name, output_name):
         """Compute the union of two mask arrays in the KVStore.
         """
-        self._data[output_name][:] = \
-                self._data[operand1_name] | \
-                self._data[operand2_name]
+        self._data[output_name][:] = (
+                self._data[operand1_name] | self._data[operand2_name]
+        )
