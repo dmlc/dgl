@@ -24,7 +24,7 @@ def main(args):
     data = load_data(args)
     g = data[0]
     features = torch.FloatTensor(g.ndata['feat'])
-    labels = torch.LongTensor(g.ndata['labels'])
+    labels = torch.LongTensor(g.ndata['label'])
     if hasattr(torch, 'BoolTensor'):
         train_mask = torch.BoolTensor(g.ndata['train_mask'])
         val_mask = torch.BoolTensor(g.ndata['val_mask'])
