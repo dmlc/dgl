@@ -1,5 +1,7 @@
 import torch as th
+
 import dgl
+
 
 class NegativeSampler(object):
     def __init__(self, g, k, neg_share=False, device=None):
@@ -16,6 +18,6 @@ class NegativeSampler(object):
             dst = self.weights.multinomial(n, replacement=True)
             dst = dst.view(-1, 1, self.k).expand(-1, self.k, -1).flatten()
         else:
-            dst = self.weights.multinomial(n*self.k, replacement=True)
+            dst = self.weights.multinomial(n * self.k, replacement=True)
         src = src.repeat_interleave(self.k)
         return src, dst
