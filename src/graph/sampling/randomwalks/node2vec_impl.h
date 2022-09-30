@@ -40,7 +40,7 @@ namespace impl {
  * \return A 2D array of shape (len(seeds), len(walk_length) + 1)
  *         with node IDs.  The paths that terminated early are padded with -1.
  */
-template <DLDeviceType XPU, typename IdxType>
+template <DGLDeviceType XPU, typename IdxType>
 std::pair<IdArray, IdArray> Node2vec(
     const HeteroGraphPtr hg, const IdArray seeds, const double p,
     const double q, const int64_t walk_length,

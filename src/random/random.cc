@@ -29,7 +29,7 @@ DGL_REGISTER_GLOBAL("rng._CAPI_SetSeed")
       }
     });
 #ifdef DGL_USE_CUDA
-    if (DeviceAPI::Get(kDLGPU)->IsAvailable()) {
+    if (DeviceAPI::Get(kDGLCUDA)->IsAvailable()) {
       auto* thr_entry = CUDAThreadEntry::ThreadLocal();
       if (!thr_entry->curand_gen) {
         CURAND_CALL(curandCreateGenerator(&thr_entry->curand_gen, CURAND_RNG_PSEUDO_DEFAULT));

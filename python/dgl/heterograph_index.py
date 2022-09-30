@@ -8,6 +8,7 @@ import scipy
 
 from ._ffi.object import register_object, ObjectBase
 from ._ffi.function import _init_api
+from ._ffi.streams import to_dgl_stream_handle
 from .base import DGLError, dgl_warning
 from .graph_index import from_coo
 from . import backend as F
@@ -272,6 +273,21 @@ class HeteroGraphIndex(ObjectBase):
             True if the graph is pinned.
         """
         return bool(_CAPI_DGLHeteroIsPinned(self))
+
+    def record_stream(self, stream):
+        """Record the stream that is using this graph.
+
+        Parameters
+        ----------
+        stream : torch.cuda.Stream
+            The stream that is using this graph.
+
+        Returns
+        -------
+        HeteroGraphIndex
+            self.
+        """
+        return _CAPI_DGLHeteroRecordStream(self, to_dgl_stream_handle(stream))
 
     def shared_memory(self, name, ntypes=None, etypes=None, formats=('coo', 'csr', 'csc')):
         """Return a copy of this graph in shared memory

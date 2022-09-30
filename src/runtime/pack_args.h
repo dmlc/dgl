@@ -39,7 +39,7 @@ union ArgUnion {
  * \return The wrapped packed function.
  */
 template<typename F>
-inline PackedFunc PackFuncVoidAddr(F f, const std::vector<DGLType>& arg_types);
+inline PackedFunc PackFuncVoidAddr(F f, const std::vector<DGLDataType>& arg_types);
 /*!
  * \brief Create a packed function that from function only packs buffer arguments.
  *
@@ -50,7 +50,7 @@ inline PackedFunc PackFuncVoidAddr(F f, const std::vector<DGLType>& arg_types);
  * \return The wrapped packed function.
  */
 template<typename F>
-inline PackedFunc PackFuncNonBufferArg(F f, const std::vector<DGLType>& arg_types);
+inline PackedFunc PackFuncNonBufferArg(F f, const std::vector<DGLDataType>& arg_types);
 /*!
  * \brief Create a packed function that from function that takes a packed arguments.
  *
@@ -61,13 +61,13 @@ inline PackedFunc PackFuncNonBufferArg(F f, const std::vector<DGLType>& arg_type
  * \return The wrapped packed function.
  */
 template<typename F>
-inline PackedFunc PackFuncPackedArg(F f, const std::vector<DGLType>& arg_types);
+inline PackedFunc PackFuncPackedArg(F f, const std::vector<DGLDataType>& arg_types);
 /*!
  * \brief Extract number of buffer argument from the argument types.
  * \param arg_types The argument types.
  * \return number of buffer arguments
  */
-inline size_t NumBufferArgs(const std::vector<DGLType>& arg_types);
+inline size_t NumBufferArgs(const std::vector<DGLDataType>& arg_types);
 
 // implementations details
 namespace detail {
@@ -102,15 +102,15 @@ enum ArgConvertCode {
   HANDLE_TO_HANDLE
 };
 
-inline ArgConvertCode GetArgConvertCode(DGLType t) {
+inline ArgConvertCode GetArgConvertCode(DGLDataType t) {
   CHECK_EQ(t.lanes, 1U)
       << "Cannot pass vector type argument to devic function for now";
-  if (t.code == kDLInt) {
+  if (t.code == kDGLInt) {
     if (t.bits == 64U) return INT64_TO_INT64;
     if (t.bits == 32U) return INT64_TO_INT32;
-  } else if (t.code == kDLUInt) {
+  } else if (t.code == kDGLUInt) {
     if (t.bits == 32U) return INT64_TO_UINT32;
-  } else if (t.code == kDLFloat) {
+  } else if (t.code == kDGLFloat) {
     if (t.bits == 64U) return FLOAT64_TO_FLOAT64;
     if (t.bits == 32U) return FLOAT64_TO_FLOAT32;
   } else if (t.code == kHandle) {
@@ -245,7 +245,7 @@ inline PackedFunc PackFuncPackedArg_(
 }  // namespace detail
 
 template<typename F>
-inline PackedFunc PackFuncVoidAddr(F f, const std::vector<DGLType>& arg_types) {
+inline PackedFunc PackFuncVoidAddr(F f, const std::vector<DGLDataType>& arg_types) {
   std::vector<detail::ArgConvertCode> codes(arg_types.size());
   for (size_t i = 0; i < arg_types.size(); ++i) {
     codes[i] = detail::GetArgConvertCode(arg_types[i]);
@@ -261,7 +261,7 @@ inline PackedFunc PackFuncVoidAddr(F f, const std::vector<DGLType>& arg_types) {
   }
 }
 
-inline size_t NumBufferArgs(const std::vector<DGLType>& arg_types) {
+inline size_t NumBufferArgs(const std::vector<DGLDataType>& arg_types) {
   size_t base = arg_types.size();
   for (size_t i = 0; i < arg_types.size(); ++i) {
     if (arg_types[i].code != kHandle) {
@@ -276,7 +276,7 @@ inline size_t NumBufferArgs(const std::vector<DGLType>& arg_types) {
 }
 
 template<typename F>
-inline PackedFunc PackFuncNonBufferArg(F f, const std::vector<DGLType>& arg_types) {
+inline PackedFunc PackFuncNonBufferArg(F f, const std::vector<DGLDataType>& arg_types) {
   size_t num_buffer = NumBufferArgs(arg_types);
   std::vector<detail::ArgConvertCode> codes;
   for (size_t i = num_buffer; i < arg_types.size(); ++i) {
@@ -293,7 +293,7 @@ inline PackedFunc PackFuncNonBufferArg(F f, const std::vector<DGLType>& arg_type
 }
 
 template<typename F>
-inline PackedFunc PackFuncPackedArg(F f, const std::vector<DGLType>& arg_types) {
+inline PackedFunc PackFuncPackedArg(F f, const std::vector<DGLDataType>& arg_types) {
   std::vector<detail::ArgConvertCode> codes;
   for (size_t i = 0; i < arg_types.size(); ++i) {
     codes.push_back(detail::GetArgConvertCode(arg_types[i]));

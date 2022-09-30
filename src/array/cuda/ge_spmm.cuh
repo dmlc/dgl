@@ -128,7 +128,7 @@ void GESpMMCsr(
   const DType *efeat_data = efeat.Ptr<DType>();
   DType *out_data = out.Ptr<DType>();
 
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   
   const int ntx = 32;
   const int nty = 32;
@@ -139,7 +139,7 @@ void GESpMMCsr(
   const int sh_mem_size = 0;
 
   CUDA_KERNEL_CALL((GESpMMKernel<Idx, DType, BinaryOp>),
-      nblks, nthrs, sh_mem_size, thr_entry->stream,
+      nblks, nthrs, sh_mem_size, stream,
       ufeat_data, efeat_data, out_data,
       indptr, indices,
       csr.num_rows, csr.num_cols,

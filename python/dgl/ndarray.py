@@ -13,7 +13,7 @@ import numpy as _np
 
 from ._ffi.object import register_object, ObjectBase
 from ._ffi.function import _init_api
-from ._ffi.ndarray import DGLContext, DGLType, NDArrayBase
+from ._ffi.ndarray import DGLContext, DGLDataType, NDArrayBase
 from ._ffi.ndarray import context, empty, empty_shared_mem, from_dlpack, numpyasarray
 from ._ffi.ndarray import _set_class_ndarray
 from . import backend as F

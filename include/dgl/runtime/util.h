@@ -18,7 +18,7 @@ namespace runtime {
  * \param bits The number of bits to be matched.
  * \param lanes The number of lanes sin the type.
  */
-inline bool TypeMatch(DGLType t, int code, int bits, int lanes = 1) {
+inline bool TypeMatch(DGLDataType t, int code, int bits, int lanes = 1) {
   return t.code == code && t.bits == bits && t.lanes == lanes;
 }
 }  // namespace runtime
