@@ -40,6 +40,8 @@ from pytorch_lightning import LightningDataModule, LightningModule, Trainer
 from pytorch_lightning.loggers import TensorBoardLogger
 from model import SAGE
 
+from ladies_sampler import LadiesSampler, PoissonLadiesSampler, normalized_edata
+
 class SAGELightning(LightningModule):
     def __init__(self,
                  in_feats,
@@ -91,8 +93,8 @@ class SAGELightning(LightningModule):
         batch_pred = self.module(mfgs, batch_inputs)
         loss = self.loss_fn(self.final_activation(batch_pred), batch_labels)
         self.train_acc(self.final_activation(batch_pred), batch_labels.int())
-        self.log('train_acc', self.train_acc, prog_bar=True, on_step=True, on_epoch=False)
-        self.log('train_loss', loss, on_step=True, on_epoch=False)
+        self.log('train_acc', self.train_acc, prog_bar=True, on_step=True, on_epoch=True, batch_size=batch_labels.shape[0])
+        self.log('train_loss', loss, on_step=True, on_epoch=True, batch_size=batch_labels.shape[0])
         t = time.time()
         self.log('iter_time', t - self.pt, prog_bar=True, on_step=True, on_epoch=False)
         self.pt = t
@@ -116,7 +118,7 @@ class SAGELightning(LightningModule):
 
 class DataModule(LightningDataModule):
     def __init__(self, dataset_name, data_cpu=False, graph_cpu=False, use_uva=False, fan_out=[10, 25],
-                 device=th.device('cpu'), batch_size=1000, num_workers=4, labor_sampler=False, importance_sampling=0, layer_dependency=False, batch_dependency=1, cache_size=0):
+                 device=th.device('cpu'), batch_size=1000, num_workers=4, sampler='labor', importance_sampling=0, layer_dependency=False, batch_dependency=1, cache_size=0):
         super().__init__()
 
         g, n_classes, multilabel = load_dataset(dataset_name)
@@ -129,8 +131,12 @@ class DataModule(LightningDataModule):
         test_nid = th.nonzero(~(g.ndata['train_mask'] | g.ndata['val_mask']), as_tuple=True)[0]
 
         fanouts = [int(_) for _ in fan_out]
-        sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts) #, prefetch_node_feats='features', prefetch_labels='labels')
-        if labor_sampler:
+        if sampler == 'neighbor':
+            sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts) #, prefetch_node_feats='features', prefetch_labels='labels')
+        elif 'ladies' in sampler:
+            g.edata['w'] = normalized_edata(g)
+            sampler = (PoissonLadiesSampler if 'poisson' in sampler else LadiesSampler)(fanouts)
+        else:
             sampler = dgl.dataloading.LaborSampler(fanouts, importance_sampling=importance_sampling, layer_dependency=layer_dependency, batch_dependency=batch_dependency) #, prefetch_node_feats='features', prefetch_edge_feats='edge_weights', prefetch_labels='labels')
 
         dataloader_device = th.device('cpu')
@@ -158,6 +164,7 @@ class DataModule(LightningDataModule):
         else:
             self.train_nid, self.val_nid, self.test_nid = train_nid, val_nid, test_nid
         self.sampler = sampler
+        self.val_sampler = sampler # dgl.dataloading.MultiLayerFullNeighborSampler(len(fanouts))
         self.device = dataloader_device
         self.use_uva = use_uva
         self.batch_size = batch_size
@@ -166,7 +173,7 @@ class DataModule(LightningDataModule):
         self.n_classes = n_classes
         self.multilabel = multilabel
         try:
-            self.cache = dgl.contrib.GpuCache(cache_size, self.in_feats, 32) if cache_size > 0 else None
+            self.cache = dgl.contrib.GpuCache(cache_size, self.in_feats, th.int32) if cache_size > 0 else None
         except:
             self.cache = None
 
@@ -185,7 +192,7 @@ class DataModule(LightningDataModule):
         return dgl.dataloading.DataLoader(
             self.g,
             self.val_nid,
-            self.sampler,
+            self.val_sampler,
             device=self.device,
             batch_size=self.batch_size,
             shuffle=False,
@@ -263,7 +270,7 @@ def evaluate(model, g, val_nid, device):
         pred = model.module.inference(g, nfeat, device, args.batch_size, args.num_workers)
     model.train()
     test_acc = Accuracy()
-    return test_acc(th.softmax(pred[val_nid.long()], -1), labels[val_nid.long()].to(pred.device))
+    return test_acc(th.softmax(pred[val_nid.to(device=pred.device, dtype=th.int64)], -1), labels[val_nid.to(device=labels.device, dtype=th.int64)].to(pred.device))
 
 
 if __name__ == '__main__':
@@ -295,7 +302,7 @@ if __name__ == '__main__':
                                 "on GPU when using it to save time for data copy. This may "
                                 "be undesired if they cannot fit in GPU memory at once. "
                                 "This flag disables that.")
-    argparser.add_argument('--labor-sampler', action='store_true')
+    argparser.add_argument('--sampler', type=str, default='labor')
     argparser.add_argument('--importance-sampling', type=int, default=0)
     argparser.add_argument('--layer-dependency', action='store_true')
     argparser.add_argument('--batch-dependency', type=int, default=1)
@@ -313,7 +320,7 @@ if __name__ == '__main__':
     datamodule = DataModule(
         args.dataset, args.data_cpu, args.graph_cpu, args.use_uva,
         [int(_) for _ in args.fan_out.split(',')],
-        device, args.batch_size, args.num_workers, args.labor_sampler, args.importance_sampling, args.layer_dependency, args.batch_dependency, args.cache_size)
+        device, args.batch_size, args.num_workers, args.sampler, args.importance_sampling, args.layer_dependency, args.batch_dependency, args.cache_size)
     model = SAGELightning(
         datamodule.in_feats, args.num_hidden, datamodule.n_classes, args.num_layers,
         F.relu, args.dropout, args.lr, datamodule.multilabel)
@@ -321,7 +328,7 @@ if __name__ == '__main__':
     # Train
     checkpoint_callback = ModelCheckpoint(monitor='val_acc', save_top_k=1)
     batchsize_callback = BatchSizeCallback(args.vertex_limit)
-    subdir = '{}_{}_{}_{}_{}'.format(args.dataset, args.labor_sampler, args.importance_sampling, args.layer_dependency, args.batch_dependency)
+    subdir = '{}_{}_{}_{}_{}'.format(args.dataset, args.sampler, args.importance_sampling, args.layer_dependency, args.batch_dependency)
     logger = TensorBoardLogger(args.logdir, name=subdir)
     trainer = Trainer(gpus=[args.gpu] if args.gpu != -1 else None,
                       max_epochs=args.num_epochs,
