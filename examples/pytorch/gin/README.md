@@ -25,9 +25,9 @@ python3 train.py --dataset MUTAG
 
 Summary (10-fold cross-validation)
 -------
-| Dataset       | Result 
+| Dataset       | Result
 | ------------- | -------
-| MUTAG         | ~89.4    
-| PTC           | ~68.5   
-| NCI1          | ~82.9    
-| PROTEINS      | ~74.1   
+| MUTAG         | ~89.4
+| PTC           | ~68.5
+| NCI1          | ~82.9
+| PROTEINS      | ~74.1

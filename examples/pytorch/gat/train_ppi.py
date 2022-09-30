@@ -15,7 +15,7 @@ class GAT(nn.Module):
         self.gat_layers.append(dglnn.GATConv(in_size, hid_size, heads[0], activation=F.elu))
         self.gat_layers.append(dglnn.GATConv(hid_size*heads[0], hid_size, heads[1], residual=True, activation=F.elu))
         self.gat_layers.append(dglnn.GATConv(hid_size*heads[1], out_size, heads[2], residual=True, activation=None))
-        
+
     def forward(self, g, inputs):
         h = inputs
         for i, layer in enumerate(self.gat_layers):
@@ -43,13 +43,13 @@ def evaluate_in_batches(dataloader, device, model):
         score = evaluate(batched_graph, features, labels, model)
         total_score += score
     return total_score / (batch_id + 1) # return average score
-    
+
 def train(train_dataloader, val_dataloader, device, model):
     # define loss function and optimizer
     loss_fcn = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=5e-3, weight_decay=0)
 
-    # training loop        
+    # training loop
     for epoch in range(400):
         model.train()
         logits = []
@@ -66,27 +66,27 @@ def train(train_dataloader, val_dataloader, device, model):
             optimizer.step()
             total_loss += loss.item()
         print("Epoch {:05d} | Loss {:.4f} |". format(epoch, total_loss / (batch_id + 1) ))
-        
+
         if (epoch + 1) % 5 == 0:
             avg_score = evaluate_in_batches(val_dataloader, device, model) # evaluate F1-score instead of loss
             print("                            Acc. (F1-score) {:.4f} ". format(avg_score))
 
-        
+
 if __name__ == '__main__':
     print(f'Training PPI Dataset with DGL built-in GATConv module.')
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    
+
     # load and preprocess datasets
     train_dataset = PPIDataset(mode='train')
     val_dataset = PPIDataset(mode='valid')
     test_dataset = PPIDataset(mode='test')
     features = train_dataset[0].ndata['feat']
-    
-    # create GAT model    
+
+    # create GAT model
     in_size = features.shape[1]
     out_size = train_dataset.num_labels
     model = GAT(in_size, 256, out_size, heads=[4,4,6]).to(device)
-    
+
     # model training
     print('Training...')
     train_dataloader = GraphDataLoader(train_dataset, batch_size=2)
