@@ -1,8 +1,9 @@
-import matplotlib.pyplot as plt
-import networkx as nx
 import os
 import pickle
 import random
+
+import matplotlib.pyplot as plt
+import networkx as nx
 from torch.utils.data import Dataset
 
 
@@ -53,7 +54,9 @@ def get_decision_sequence(size):
 
         if i != 0:
             decision_sequence.append(0)  # Add edge
-            decision_sequence.append(i - 1)  # Set destination to be previous node.
+            decision_sequence.append(
+                i - 1
+            )  # Set destination to be previous node.
 
         if i == size - 1:
             decision_sequence.append(0)  # Add edge
@@ -72,7 +75,7 @@ def generate_dataset(v_min, v_max, n_samples, fname):
         size = random.randint(v_min, v_max)
         samples.append(get_decision_sequence(size))
 
-    with open(fname, 'wb') as f:
+    with open(fname, "wb") as f:
         pickle.dump(samples, f)
 
 
@@ -80,7 +83,7 @@ class CycleDataset(Dataset):
     def __init__(self, fname):
         super(CycleDataset, self).__init__()
 
-        with open(fname, 'rb') as f:
+        with open(fname, "rb") as f:
             self.dataset = pickle.load(f)
 
     def __len__(self):
@@ -90,7 +93,7 @@ class CycleDataset(Dataset):
         return self.dataset[index]
 
     def collate_single(self, batch):
-        assert len(batch) == 1, 'Currently we do not support batched training'
+        assert len(batch) == 1, "Currently we do not support batched training"
         return batch[0]
 
     def collate_batch(self, batch):
@@ -116,7 +119,7 @@ class CycleModelEvaluation(object):
         self.dir = dir
 
     def rollout_and_examine(self, model, num_samples):
-        assert not model.training, 'You need to call model.eval().'
+        assert not model.training, "You need to call model.eval()."
 
         num_total_size = 0
         num_valid_size = 0
@@ -139,7 +142,7 @@ class CycleModelEvaluation(object):
             adj_lists_to_plot.append(sampled_adj_list)
 
             graph_size = sampled_graph.number_of_nodes()
-            valid_size = (self.v_min <= graph_size <= self.v_max)
+            valid_size = self.v_min <= graph_size <= self.v_max
             cycle = is_cycle(sampled_graph)
 
             num_total_size += graph_size
@@ -158,10 +161,13 @@ class CycleModelEvaluation(object):
                 fig, ((ax0, ax1), (ax2, ax3)) = plt.subplots(2, 2)
                 axes = {0: ax0, 1: ax1, 2: ax2, 3: ax3}
                 for i in range(4):
-                    nx.draw_circular(nx.from_dict_of_lists(adj_lists_to_plot[i]),
-                                     with_labels=True, ax=axes[i])
+                    nx.draw_circular(
+                        nx.from_dict_of_lists(adj_lists_to_plot[i]),
+                        with_labels=True,
+                        ax=axes[i],
+                    )
 
-                plt.savefig(self.dir + '/samples/{:d}'.format(plot_times))
+                plt.savefig(self.dir + "/samples/{:d}".format(plot_times))
                 plt.close()
 
                 adj_lists_to_plot = []
@@ -173,33 +179,32 @@ class CycleModelEvaluation(object):
         self.valid_ratio = num_valid / num_samples
 
     def write_summary(self):
-
         def _format_value(v):
             if isinstance(v, float):
-                return '{:.4f}'.format(v)
+                return "{:.4f}".format(v)
             elif isinstance(v, int):
-                return '{:d}'.format(v)
+                return "{:d}".format(v)
             else:
-                return '{}'.format(v)
+                return "{}".format(v)
 
         statistics = {
-            'num_samples': self.num_samples_examined,
-            'v_min': self.v_min,
-            'v_max': self.v_max,
-            'average_size': self.average_size,
-            'valid_size_ratio': self.valid_size_ratio,
-            'cycle_ratio': self.cycle_ratio,
-            'valid_ratio': self.valid_ratio
+            "num_samples": self.num_samples_examined,
+            "v_min": self.v_min,
+            "v_max": self.v_max,
+            "average_size": self.average_size,
+            "valid_size_ratio": self.valid_size_ratio,
+            "cycle_ratio": self.cycle_ratio,
+            "valid_ratio": self.valid_ratio,
         }
 
-        model_eval_path = os.path.join(self.dir, 'model_eval.txt')
+        model_eval_path = os.path.join(self.dir, "model_eval.txt")
 
-        with open(model_eval_path, 'w') as f:
+        with open(model_eval_path, "w") as f:
             for key, value in statistics.items():
-                msg = '{}\t{}\n'.format(key, _format_value(value))
+                msg = "{}\t{}\n".format(key, _format_value(value))
                 f.write(msg)
 
-        print('Saved model evaluation statistics to {}'.format(model_eval_path))
+        print("Saved model evaluation statistics to {}".format(model_eval_path))
 
 
 class CyclePrinting(object):
@@ -213,8 +218,9 @@ class CyclePrinting(object):
     def update(self, epoch, metrics):
         self.batch_count = (self.batch_count) % self.num_batches + 1
 
-        msg = 'epoch {:d}/{:d}, batch {:d}/{:d}'.format(epoch, self.num_epochs,
-                                                        self.batch_count, self.num_batches)
+        msg = "epoch {:d}/{:d}, batch {:d}/{:d}".format(
+            epoch, self.num_epochs, self.batch_count, self.num_batches
+        )
         for key, value in metrics.items():
-            msg += ', {}: {:4f}'.format(key, value)
+            msg += ", {}: {:4f}".format(key, value)
         print(msg)

@@ -8,6 +8,7 @@ import argparse
 
 from utils import setdir
 from utils import array_readwriter
+from base import PartitionMeta, dump_partition_meta
 
 def _random_partition(metadata, num_parts):
     num_nodes_per_type = [sum(_) for _ in metadata['num_nodes_per_chunk']]
@@ -26,9 +27,12 @@ def random_partition(metadata, num_parts, output_path):
     mapping files named "<node-type>.txt" (e.g. "author.txt", "paper.txt" and
     "institution.txt" for OGB-MAG240M).  Each file contains one line per node representing
     the partition ID the node belongs to.
+    In addition, metadata which includes version, number of partitions is dumped.
     """
     with setdir(output_path):
         _random_partition(metadata, num_parts)
+        part_meta = PartitionMeta(version='1.0.0', num_parts=num_parts, algo_name='random')
+        dump_partition_meta(part_meta, 'partition_meta.json')
 
 # Run with PYTHONPATH=${GIT_ROOT_DIR}/tools
 # where ${GIT_ROOT_DIR} is the directory to the DGL git repository.

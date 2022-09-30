@@ -26,7 +26,7 @@ struct IsNonZeroIndex {
   const IdType * array_;
 };
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 IdArray NonZero(IdArray array) {
   const auto& ctx = array->ctx;
   auto device = runtime::DeviceAPI::Get(ctx);
@@ -34,7 +34,7 @@ IdArray NonZero(IdArray array) {
   const int64_t len = array->shape[0];
   IdArray ret = NewIdArray(len, ctx, 64);
 
-  cudaStream_t stream = runtime::CUDAThreadEntry::ThreadLocal()->stream;
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
 
   const IdType * const in_data = static_cast<const IdType*>(array->data);
   int64_t * const out_data = static_cast<int64_t*>(ret->data);
@@ -63,8 +63,8 @@ IdArray NonZero(IdArray array) {
   return ret.CreateView({num_nonzeros}, ret->dtype, 0);
 }
 
-template IdArray NonZero<kDLGPU, int32_t>(IdArray);
-template IdArray NonZero<kDLGPU, int64_t>(IdArray);
+template IdArray NonZero<kDGLCUDA, int32_t>(IdArray);
+template IdArray NonZero<kDGLCUDA, int64_t>(IdArray);
 
 }  // namespace impl
 }  // namespace aten

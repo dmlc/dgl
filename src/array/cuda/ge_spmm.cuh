@@ -46,7 +46,7 @@ __global__ void GESpMMKernel(
         if (left + 32 <= high) {
 #pragma unroll
           for (Idx i = 0; i < 32; ++i) {
-            const Idx eid = left + i; 
+            const Idx eid = left + i;
             const Idx cid = __ldg(indices + eid);
             const Idx offset = feat_len * cid + fid;
             if (BinaryOp::use_rhs) {
@@ -59,7 +59,7 @@ __global__ void GESpMMKernel(
           }
         } else {
           for (Idx i = 0; left + i < high; ++i) {
-            const Idx eid = left + i; 
+            const Idx eid = left + i;
             const Idx cid = __ldg(indices + eid);
             const Idx offset = feat_len * cid + fid;
             if (BinaryOp::use_rhs) {
@@ -82,8 +82,8 @@ __global__ void GESpMMKernel(
         if (left + 32 <= high) {
 #pragma unroll
           for (int i = 0; i < 32; ++i) {
-            const Idx eid = left + i; 
-            const Idx cid = __ldg(indices + eid); 
+            const Idx eid = left + i;
+            const Idx cid = __ldg(indices + eid);
             const Idx offset = feat_len * cid;
             if (BinaryOp::use_rhs) {
               accum_0 += BinaryOp::Call(ufeat + offset + fid_0, efeat + eid);
@@ -95,8 +95,8 @@ __global__ void GESpMMKernel(
           }
         } else {
           for (int i = 0; i + left < high; ++i) {
-            const Idx eid = left + i; 
-            const Idx cid = __ldg(indices + eid); 
+            const Idx eid = left + i;
+            const Idx cid = __ldg(indices + eid);
             const Idx offset = feat_len * cid;
             if (BinaryOp::use_rhs) {
               accum_0 += BinaryOp::Call(ufeat + offset + fid_0, efeat + eid);
@@ -128,8 +128,8 @@ void GESpMMCsr(
   const DType *efeat_data = efeat.Ptr<DType>();
   DType *out_data = out.Ptr<DType>();
 
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
-  
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
+
   const int ntx = 32;
   const int nty = 32;
   const int nby = (feat_len + (ntx * 2) - 1) / (ntx * 2);
@@ -139,7 +139,7 @@ void GESpMMCsr(
   const int sh_mem_size = 0;
 
   CUDA_KERNEL_CALL((GESpMMKernel<Idx, DType, BinaryOp>),
-      nblks, nthrs, sh_mem_size, thr_entry->stream,
+      nblks, nthrs, sh_mem_size, stream,
       ufeat_data, efeat_data, out_data,
       indptr, indices,
       csr.num_rows, csr.num_cols,
@@ -150,4 +150,4 @@ void GESpMMCsr(
 }  // namespace aten
 }  // namespace dgl
 
-#endif
+#endif  // DGL_ARRAY_CUDA_GE_SPMM_CUH_

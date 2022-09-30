@@ -30,7 +30,7 @@ class WorkspacePool {
    * \param device_type The device type.
    * \param device The device API.
    */
-  WorkspacePool(DLDeviceType device_type, std::shared_ptr<DeviceAPI> device);
+  WorkspacePool(DGLDeviceType device_type, std::shared_ptr<DeviceAPI> device);
   /*! \brief destructor */
   ~WorkspacePool();
   /*!
@@ -52,7 +52,7 @@ class WorkspacePool {
   /*! \brief pool of device local array */
   std::vector<Pool*> array_;
   /*! \brief device type this pool support */
-  DLDeviceType device_type_;
+  DGLDeviceType device_type_;
   /*! \brief The device API */
   std::shared_ptr<DeviceAPI> device_;
 };

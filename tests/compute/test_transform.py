@@ -1797,6 +1797,16 @@ def test_remove_selfloop(idtype):
         raise_error = True
     assert raise_error
 
+    # batch information
+    g = dgl.graph(([0, 0, 0, 1, 3, 3, 4], [1, 0, 0, 2, 3, 4, 4]), idtype=idtype, device=F.ctx())
+    g.set_batch_num_nodes(F.tensor([3, 2], dtype=F.int64))
+    g.set_batch_num_edges(F.tensor([4, 3], dtype=F.int64))
+    g = dgl.remove_self_loop(g)
+    assert g.number_of_nodes() == 5
+    assert g.number_of_edges() == 3
+    assert F.array_equal(g.batch_num_nodes(), F.tensor([3, 2], dtype=F.int64))
+    assert F.array_equal(g.batch_num_edges(), F.tensor([2, 1], dtype=F.int64))
+
 
 @parametrize_idtype
 def test_reorder_graph(idtype):

@@ -1,13 +1,14 @@
 import os
 
 import torch
-
 from partition_utils import *
 
+
 class ClusterIter(object):
-    '''The partition sampler given a DGLGraph and partition number.
+    """The partition sampler given a DGLGraph and partition number.
     The metis is used as the graph partition backend.
-    '''
+    """
+
     def __init__(self, dn, g, psize, batch_size):
         """Initialize the sampler.
 
@@ -26,11 +27,11 @@ class ClusterIter(object):
         self.batch_size = batch_size
         # cache the partitions of known datasets&partition number
         if dn:
-            fn = os.path.join('./datasets/', dn + '_{}.npy'.format(psize))
+            fn = os.path.join("./datasets/", dn + "_{}.npy".format(psize))
             if os.path.exists(fn):
                 self.par_li = np.load(fn, allow_pickle=True)
             else:
-                os.makedirs('./datasets/', exist_ok=True)
+                os.makedirs("./datasets/", exist_ok=True)
                 self.par_li = get_partition_list(g, psize)
                 np.save(fn, self.par_li)
         else:
@@ -46,6 +47,7 @@ class ClusterIter(object):
 
     def __getitem__(self, idx):
         return self.par_li[idx]
+
 
 def subgraph_collate_fn(g, batch):
     nids = np.concatenate(batch).reshape(-1).astype(np.int64)

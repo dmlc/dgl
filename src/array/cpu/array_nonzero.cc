@@ -10,7 +10,7 @@ using runtime::NDArray;
 namespace aten {
 namespace impl {
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 IdArray NonZero(IdArray array) {
   std::vector<int64_t> ret;
   const IdType* data = array.Ptr<IdType>();
@@ -20,8 +20,8 @@ IdArray NonZero(IdArray array) {
   return NDArray::FromVector(ret, array->ctx);
 }
 
-template IdArray NonZero<kDLCPU, int32_t>(IdArray);
-template IdArray NonZero<kDLCPU, int64_t>(IdArray);
+template IdArray NonZero<kDGLCPU, int32_t>(IdArray);
+template IdArray NonZero<kDGLCPU, int64_t>(IdArray);
 
 }  // namespace impl
 }  // namespace aten

@@ -7,6 +7,7 @@
 #define DGL_ARRAY_CUDA_SPMM_CUH_
 
 #include <dgl/bcast.h>
+#include <limits>
 #include "macro.cuh"
 #include "fp16.cuh"
 #include "atomic.cuh"
@@ -103,9 +104,10 @@ void _Transpose(const DType* in, DType* out,
                 int row, int col) {
   DType alpha = 1., beta = 0.;
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   if (!thr_entry->cublas_handle)
     CUBLAS_CALL(cublasCreate(&(thr_entry->cublas_handle)));
-  CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle, thr_entry->stream));
+  CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle, stream));
   CUBLAS_CALL(Xgeam<DType>(
       thr_entry->cublas_handle,
       CUBLAS_OP_T,
@@ -123,10 +125,10 @@ void _Transpose(const DType* in, DType* out,
 template <>
 void _Transpose<half>(const half* in, half* out,
                       int row, int col) {
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   int nt = FindNumThreads(row);
   int nb = col;
-  CUDA_KERNEL_CALL(_TransposeKernel, nb, nt, 0, thr_entry->stream, in, out, col, row);
+  CUDA_KERNEL_CALL(_TransposeKernel, nb, nt, 0, stream, in, out, col, row);
 }
 
 /*
@@ -149,7 +151,7 @@ __global__ void _IndexSelectKernel(const DType* array, const IdType* index,
  */
 template<typename DType, typename IdType>
 NDArray _IndexSelect(NDArray array, NDArray index) {
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   const DType* array_data = static_cast<DType*>(array->data);
   const IdType* idx_data = static_cast<IdType*>(index->data);
   const int64_t arr_len = array->shape[0];
@@ -160,7 +162,7 @@ NDArray _IndexSelect(NDArray array, NDArray index) {
   DType* ret_data = static_cast<DType*>(ret->data);
   const int nt = FindNumThreads(len);
   const int nb = (len + nt - 1) / nt;
-  CUDA_KERNEL_CALL(_IndexSelectKernel, nb, nt, 0, thr_entry->stream,
+  CUDA_KERNEL_CALL(_IndexSelectKernel, nb, nt, 0, stream,
       array_data, idx_data, len, ret_data);
   return ret;
 }
@@ -202,7 +204,7 @@ cusparseStatus_t Xcsrmm2<double>(cusparseHandle_t handle, cusparseOperation_t tr
 /*! Cusparse implementation of SpMM on Csr format. */
 template <typename DType, typename IdType>
 void CusparseCsrmm2(
-    const DLContext& ctx,
+    const DGLContext& ctx,
     const CSRMatrix& csr,
     const DType* B_data, const DType* A_data,
     DType* C_data,
@@ -223,11 +225,12 @@ void CusparseCsrmm2(
   // device
   auto device = runtime::DeviceAPI::Get(ctx);
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   // allocate cusparse handle if needed
   if (!thr_entry->cusparse_handle) {
     CUSPARSE_CALL(cusparseCreate(&(thr_entry->cusparse_handle)));
   }
-  CUSPARSE_CALL(cusparseSetStream(thr_entry->cusparse_handle, thr_entry->stream));
+  CUSPARSE_CALL(cusparseSetStream(thr_entry->cusparse_handle, stream));
   // all one data array
   DType* valptr = nullptr;
   if (!A_data) {
@@ -301,7 +304,7 @@ void CusparseCsrmm2(
 /*! Cusparse implementation of SpMM on Csr format. */
 template <typename DType, typename IdType>
 void CusparseCsrmm2Hetero(
-    const DLContext& ctx,
+    const DGLContext& ctx,
     const CSRMatrix& csr,
     const DType* B_data, const DType* A_data,
     DType* C_data,
@@ -613,7 +616,7 @@ __global__ void SpMMCmpCsrHeteroKernel(
   while (ty < num_rows) {
     int tx = blockIdx.x * blockDim.x + threadIdx.x;
     while (tx < out_len) {
-      DType new_out = out[ty * out_len + tx];//ReduceOp::zero();
+      DType new_out = out[ty * out_len + tx];  // ReduceOp::zero();
       Idx local_argu = 0, local_arge = 0;
       const int lhs_add = UseBcast ? ubcast_off[tx] : tx;
       const int rhs_add = UseBcast ? ebcast_off[tx] : tx;
@@ -678,7 +681,7 @@ void SpMMCoo(
   DType *out_data = out.Ptr<DType>();
   Idx *argu_data = argu.Ptr<Idx>(),
       *arge_data = arge.Ptr<Idx>();
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   const int64_t N = coo.num_rows, M = coo.num_cols, E = coo.row->shape[0];
 
   int64_t *ubcast_off = nullptr, *ebcast_off = nullptr;
@@ -689,21 +692,20 @@ void SpMMCoo(
   int64_t out_size = out.NumElements();
   const int nt = FindNumThreads(out_size);
   const int nb = (out_size + nt - 1) / nt;
-  CUDA_KERNEL_CALL(_FillKernel, nb, nt, 0, thr_entry->stream,
+  CUDA_KERNEL_CALL(_FillKernel, nb, nt, 0, stream,
       out_data, out_size, ReduceOp::zero());
 
   const int ntx = FindNumThreads(len);
   const int nty = CUDA_MAX_NUM_THREADS / ntx;
   const int nbx = (len + ntx - 1) / ntx;
   const int nby = FindNumBlocks<'y'>((E + nty - 1) / nty);
-  //LOG(INFO) << "nblks=(" << nbx << ", " << nby << ") nthrs=(" << ntx << ", " << nty << ")";
   const dim3 nblks(nbx, nby);
   const dim3 nthrs(ntx, nty);
   const bool use_idx = !IsNullArray(coo.data);
 
   BCAST_IDX_CTX_SWITCH(bcast, use_idx, ufeat->ctx, ubcast_off, ebcast_off, {
     CUDA_KERNEL_CALL((SpMMCooKernel<Idx, DType, BinaryOp, ReduceOp, UseBcast, UseIdx>),
-        nblks, nthrs, 0, thr_entry->stream,
+        nblks, nthrs, 0, stream,
         ufeat_data, efeat_data, out_data, argu_data, arge_data,
         row, col, edge_map,
         N, M, E,
@@ -711,7 +713,7 @@ void SpMMCoo(
         lhs_len, rhs_len, len);
     if (ReduceOp::require_arg) {
       CUDA_KERNEL_CALL((ArgSpMMCooKernel<Idx, DType, BinaryOp, ReduceOp, UseBcast, UseIdx>),
-          nblks, nthrs, 0, thr_entry->stream,
+          nblks, nthrs, 0, stream,
           ufeat_data, efeat_data, out_data, argu_data, arge_data,
           row, col, edge_map,
           N, M, E,
@@ -751,7 +753,7 @@ void SpMMCsr(
   Idx* argu_data = argu.Ptr<Idx>();
   Idx* arge_data = arge.Ptr<Idx>();
 
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
 
   int64_t *ubcast_off = nullptr, *ebcast_off = nullptr;
   int64_t len = bcast.out_len,
@@ -759,16 +761,15 @@ void SpMMCsr(
           rhs_len = bcast.rhs_len;
   const int ntx = FindNumThreads(len);
   const int nty = CUDA_MAX_NUM_THREADS / ntx;
-  const int nby= (len + ntx - 1) / ntx;
+  const int nby = (len + ntx - 1) / ntx;
   const int nbx = FindNumBlocks<'x'>((csr.num_rows + nty - 1) / nty);
-  //LOG(INFO) << "nblks=(" << nbx << ", " << nby << ") nthrs=(" << ntx << ", " << nty << ")";
   const dim3 nblks(nbx, nby);
   const dim3 nthrs(ntx, nty);
   const bool use_idx = !IsNullArray(csr.data);
 
   BCAST_IDX_CTX_SWITCH(bcast, use_idx, ufeat->ctx, ubcast_off, ebcast_off, {
     CUDA_KERNEL_CALL((SpMMCsrKernel<Idx, DType, BinaryOp, ReduceOp, UseBcast, UseIdx>),
-        nblks, nthrs, 0, thr_entry->stream,
+        nblks, nthrs, 0, stream,
         ufeat_data, efeat_data, out_data, argu_data, arge_data,
         indptr, indices, edge_map,
         csr.num_rows, csr.num_cols,
@@ -817,7 +818,7 @@ void SpMMCmpCsrHetero(
   Idx* argu_data = argu.Ptr<Idx>();
   Idx* arge_data = arge.Ptr<Idx>();
 
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
 
   int64_t *ubcast_off = nullptr, *ebcast_off = nullptr;
   int64_t len = bcast.out_len,
@@ -833,7 +834,7 @@ void SpMMCmpCsrHetero(
 
   BCAST_IDX_CTX_SWITCH(bcast, use_idx, ufeat->ctx, ubcast_off, ebcast_off, {
     CUDA_KERNEL_CALL((SpMMCmpCsrHeteroKernel<Idx, DType, BinaryOp, ReduceOp, UseBcast, UseIdx>),
-        nblks, nthrs, 0, thr_entry->stream,
+        nblks, nthrs, 0, stream,
         ufeat_data, efeat_data, out_data, argu_data, arge_data,
         static_cast<Idx*>(argu_ntype->data),
         static_cast<Idx*>(arge_etype->data),
@@ -849,4 +850,4 @@ void SpMMCmpCsrHetero(
 }  // namespace aten
 }  // namespace dgl
 
-#endif
+#endif  // DGL_ARRAY_CUDA_SPMM_CUH_

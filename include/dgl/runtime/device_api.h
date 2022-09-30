@@ -75,7 +75,7 @@ class DeviceAPI {
   virtual void* AllocDataSpace(DGLContext ctx,
                                size_t nbytes,
                                size_t alignment,
-                               DGLType type_hint) = 0;
+                               DGLDataType type_hint) = 0;
   /*!
    * \brief Free a data space on device.
    * \param ctx The device context to perform operation.
@@ -101,7 +101,7 @@ class DeviceAPI {
                               size_t num_bytes,
                               DGLContext ctx_from,
                               DGLContext ctx_to,
-                              DGLType type_hint) = 0;
+                              DGLDataType type_hint) = 0;
    /*!
    * \brief Create a new stream of execution.
    *
@@ -189,7 +189,7 @@ class DeviceAPI {
    */
   DGL_DLL virtual void* AllocWorkspace(DGLContext ctx,
                                        size_t nbytes,
-                                       DGLType type_hint = {});
+                                       DGLDataType type_hint = {});
   /*!
    * \brief Free temporal workspace in backend execution.
    *
@@ -213,7 +213,7 @@ class DeviceAPI {
    * \param allow_missing Whether allow missing
    * \return The corresponding device API.
    */
-  DGL_DLL static DeviceAPI* Get(DLDeviceType dev_type, bool allow_missing = false);
+  DGL_DLL static DeviceAPI* Get(DGLDeviceType dev_type, bool allow_missing = false);
 };
 
 /*! \brief The device type bigger than this is RPC device */

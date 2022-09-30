@@ -47,7 +47,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreate")
     const std::string edge_dir = args[2];
 
     IdArray edge_ids = IdArray::Empty({indices->shape[0]},
-                                      DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+                                      DGLDataType{kDGLInt, 64, 1}, DGLContext{kDGLCPU, 0});
     int64_t *edge_data = static_cast<int64_t *>(edge_ids->data);
     for (int64_t i = 0; i < edge_ids->shape[0]; i++)
       edge_data[i] = i;

@@ -23,7 +23,7 @@ namespace sampling {
 
 namespace impl {
 
-template<DLDeviceType XPU, typename IdxType>
+template<DGLDeviceType XPU, typename IdxType>
 std::pair<IdArray, IdArray> RandomWalk(
     const HeteroGraphPtr hg,
     const IdArray seeds,
@@ -37,13 +37,13 @@ std::pair<IdArray, IdArray> RandomWalk(
   return MetapathBasedRandomWalk<XPU, IdxType>(hg, seeds, metapath, prob, terminate);
 }
 
-template<DLDeviceType XPU, typename IdxType>
+template<DGLDeviceType XPU, typename IdxType>
 std::tuple<IdArray, IdArray, IdArray> SelectPinSageNeighbors(
     const IdArray src,
     const IdArray dst,
     const int64_t num_samples_per_node,
     const int64_t k) {
-  CHECK(src->ctx.device_type == kDLCPU) << "IdArray needs be on CPU!";
+  CHECK(src->ctx.device_type == kDGLCPU) << "IdArray needs be on CPU!";
   int64_t len = src->shape[0] / num_samples_per_node;
   IdxType* src_data = src.Ptr<IdxType>();
   const IdxType* dst_data = dst.Ptr<IdxType>();
@@ -90,43 +90,43 @@ std::tuple<IdArray, IdArray, IdArray> SelectPinSageNeighbors(
   device->CopyDataFromTo(static_cast<IdxType*>(res_src_vec.data()), 0,
       res_src.Ptr<IdxType>(), 0,
       sizeof(IdxType) * res_src_vec.size(),
-      DGLContext{kDLCPU, 0}, res_src->ctx,
+      DGLContext{kDGLCPU, 0}, res_src->ctx,
       res_src->dtype);
   device->CopyDataFromTo(static_cast<IdxType*>(res_dst_vec.data()), 0,
       res_dst.Ptr<IdxType>(), 0,
       sizeof(IdxType) * res_dst_vec.size(),
-      DGLContext{kDLCPU, 0}, res_dst->ctx,
+      DGLContext{kDGLCPU, 0}, res_dst->ctx,
       res_dst->dtype);
   device->CopyDataFromTo(static_cast<IdxType*>(res_cnt_vec.data()), 0,
       res_cnt.Ptr<IdxType>(), 0,
       sizeof(IdxType) * res_cnt_vec.size(),
-      DGLContext{kDLCPU, 0}, res_cnt->ctx,
+      DGLContext{kDGLCPU, 0}, res_cnt->ctx,
       res_cnt->dtype);
 
   return std::make_tuple(res_src, res_dst, res_cnt);
 }
 
 template
-std::pair<IdArray, IdArray> RandomWalk<kDLCPU, int32_t>(
+std::pair<IdArray, IdArray> RandomWalk<kDGLCPU, int32_t>(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
     const std::vector<FloatArray> &prob);
 template
-std::pair<IdArray, IdArray> RandomWalk<kDLCPU, int64_t>(
+std::pair<IdArray, IdArray> RandomWalk<kDGLCPU, int64_t>(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
     const std::vector<FloatArray> &prob);
 
 template
-std::tuple<IdArray, IdArray, IdArray> SelectPinSageNeighbors<kDLCPU, int32_t>(
+std::tuple<IdArray, IdArray, IdArray> SelectPinSageNeighbors<kDGLCPU, int32_t>(
     const IdArray src,
     const IdArray dst,
     const int64_t num_samples_per_node,
     const int64_t k);
 template
-std::tuple<IdArray, IdArray, IdArray> SelectPinSageNeighbors<kDLCPU, int64_t>(
+std::tuple<IdArray, IdArray, IdArray> SelectPinSageNeighbors<kDGLCPU, int64_t>(
     const IdArray src,
     const IdArray dst,
     const int64_t num_samples_per_node,

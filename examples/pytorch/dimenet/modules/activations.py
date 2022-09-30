@@ -1,5 +1,6 @@
 import torch
 
+
 def swish(x):
     """
     Swish activation function,

@@ -11,12 +11,12 @@
 namespace dgl {
 namespace cuda {
 
-bool AllTrue(int8_t* flags, int64_t length, const DLContext& ctx) {
+bool AllTrue(int8_t* flags, int64_t length, const DGLContext& ctx) {
   auto device = runtime::DeviceAPI::Get(ctx);
   int8_t* rst = static_cast<int8_t*>(device->AllocWorkspace(ctx, 1));
   // Call CUB's reduction
   size_t workspace_size = 0;
-  cudaStream_t stream = runtime::CUDAThreadEntry::ThreadLocal()->stream;
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   CUDA_CALL(cub::DeviceReduce::Min(nullptr, workspace_size, flags, rst, length, stream));
   void* workspace = device->AllocWorkspace(ctx, workspace_size);
   CUDA_CALL(cub::DeviceReduce::Min(workspace, workspace_size, flags, rst, length, stream));

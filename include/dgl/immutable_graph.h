@@ -69,7 +69,7 @@ class CSR : public GraphInterface {
     LOG(FATAL) << "CSR graph does not allow mutation.";
   }
 
-  DLContext Context() const override {
+  DGLContext Context() const override {
     return adj_.indptr->ctx;
   }
 
@@ -214,7 +214,7 @@ class CSR : public GraphInterface {
    * \param ctx The target context.
    * \return The graph under another context.
    */
-  CSR CopyTo(const DLContext& ctx) const;
+  CSR CopyTo(const DGLContext& ctx) const;
 
   /*!
    * \brief Copy data to shared memory.
@@ -288,7 +288,7 @@ class COO : public GraphInterface {
     LOG(FATAL) << "COO graph does not allow mutation.";
   }
 
-  DLContext Context() const override {
+  DGLContext Context() const override {
     return adj_.row->ctx;
   }
 
@@ -472,7 +472,7 @@ class COO : public GraphInterface {
    * \param ctx The target context.
    * \return The graph under another context.
    */
-  COO CopyTo(const DLContext& ctx) const;
+  COO CopyTo(const DGLContext& ctx) const;
 
   /*!
    * \brief Copy data to shared memory.
@@ -578,7 +578,7 @@ class ImmutableGraph: public GraphInterface {
     LOG(FATAL) << "Clear isn't supported in ImmutableGraph";
   }
 
-  DLContext Context() const override {
+  DGLContext Context() const override {
     return AnyGraph()->Context();
   }
 
@@ -599,6 +599,20 @@ class ImmutableGraph: public GraphInterface {
    */
   bool IsReadonly() const override {
     return true;
+  }
+
+  /**
+   * \brief Check if the graph is unibipartite.
+   *
+   * @return True if the graph is unibipartite.
+   */
+  bool IsUniBipartite() const override {
+    if (!is_unibipartite_set_) {
+      is_unibipartite_ = GraphInterface::IsUniBipartite();
+      is_unibipartite_set_ = true;
+    }
+
+    return is_unibipartite_;
   }
 
   /*! \return the number of vertices in the graph.*/
@@ -911,7 +925,7 @@ class ImmutableGraph: public GraphInterface {
    * \param ctx The target context.
    * \return The graph under another context.
    */
-  static ImmutableGraphPtr CopyTo(ImmutableGraphPtr g, const DLContext& ctx);
+  static ImmutableGraphPtr CopyTo(ImmutableGraphPtr g, const DGLContext& ctx);
 
   /*!
    * \brief Copy data to shared memory.
@@ -1000,6 +1014,12 @@ class ImmutableGraph: public GraphInterface {
   std::string shared_mem_name_;
   // We serialize the metadata of the graph index here for shared memory.
   NDArray serialized_shared_meta_;
+
+  // Whether or not the `is_unibipartite_` property has been set.
+  mutable bool is_unibipartite_set_ = false;
+  // Whether this graph is unibipartite. If `is_unibipartite_set_` is false,
+  // then this flag should be considered in an unititialized state.
+  mutable bool is_unibipartite_ = false;
 };
 
 // inline implementations

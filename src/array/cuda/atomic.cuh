@@ -3,8 +3,8 @@
  * \file array/cuda/atomic.cuh
  * \brief Atomic functions
  */
-#ifndef DGL_ARRAY_CUDA_ATOMIC_H_
-#define DGL_ARRAY_CUDA_ATOMIC_H_
+#ifndef DGL_ARRAY_CUDA_ATOMIC_CUH_
+#define DGL_ARRAY_CUDA_ATOMIC_CUH_
 
 #include <cuda_runtime.h>
 #include <cassert>
@@ -22,15 +22,15 @@ namespace cuda {
 template <int Bytes> struct Code { };
 
 template <> struct Code<2> {
-  typedef unsigned short int Type;
+  typedef unsigned short int Type;  // NOLINT
 };
 
 template <> struct Code<4> {
-  typedef unsigned int Type;
+  typedef unsigned int Type;  // NOLINT
 };
 
 template <> struct Code<8> {
-  typedef unsigned long long int Type;
+  typedef unsigned long long int Type;  // NOLINT
 };
 
 // Helper class for converting to/from atomicCAS compatible types.
@@ -76,10 +76,10 @@ template <> struct Cast<double> {
   }
 };
 
-static __device__ __forceinline__ unsigned short int atomicCASshort(
-    unsigned short int *address,
-    unsigned short int compare,
-    unsigned short int val) {
+static __device__ __forceinline__ unsigned short int atomicCASshort(  // NOLINT
+    unsigned short int *address,                                      // NOLINT
+    unsigned short int compare,                                       // NOLINT
+    unsigned short int val) {                                         // NOLINT
   static_assert(CUDART_VERSION >= 10000, "Requires at least CUDA 10");
 #if (defined(__CUDA_ARCH__) && (__CUDA_ARCH__) >= 700)
   return atomicCAS(address, compare, val);
@@ -112,7 +112,7 @@ static __device__ __forceinline__ unsigned short int atomicCASshort(
 #define DEFINE_ATOMIC_HALF(NAME) \
   template <>                                                    \
   __device__ __forceinline__ half Atomic##NAME<half>(half* addr, half val) {  \
-    typedef unsigned short int CT;                               \
+    typedef uint16_t CT;                                         \
     CT* addr_as_ui = reinterpret_cast<CT*>(addr);                \
     CT old = *addr_as_ui;                                        \
     CT assumed = old;                                            \
@@ -282,4 +282,4 @@ __device__ __forceinline__ half AtomicAdd<half>(half* addr, half val) {
 }  // namespace aten
 }  // namespace dgl
 
-#endif  // DGL_ARRAY_CUDA_ATOMIC_H_
+#endif  // DGL_ARRAY_CUDA_ATOMIC_CUH_

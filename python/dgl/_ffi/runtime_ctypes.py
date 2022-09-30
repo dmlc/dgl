@@ -17,7 +17,7 @@ class TypeCode(object):
     FLOAT = 2
     HANDLE = 3
     NULL = 4
-    DGL_TYPE = 5
+    DGL_DATA_TYPE = 5
     DGL_CONTEXT = 6
     ARRAY_HANDLE = 7
     OBJECT_HANDLE = 8
@@ -33,7 +33,7 @@ class DGLByteArray(ctypes.Structure):
     _fields_ = [("data", ctypes.POINTER(ctypes.c_byte)),
                 ("size", ctypes.c_size_t)]
 
-class DGLType(ctypes.Structure):
+class DGLDataType(ctypes.Structure):
     """DGL datatype structure"""
     _fields_ = [("type_code", ctypes.c_uint8),
                 ("bits", ctypes.c_uint8),
@@ -50,7 +50,7 @@ class DGLType(ctypes.Structure):
         if type_str in cls._cache:
             return cls._cache[type_str]
 
-        inst = super(DGLType, cls).__new__(DGLType)
+        inst = super(DGLDataType, cls).__new__(DGLDataType)
 
         if isinstance(type_str, np.dtype):
             type_str = str(type_str)
@@ -84,7 +84,7 @@ class DGLType(ctypes.Structure):
         pass
 
     def __repr__(self):
-        x = "%s%d" % (DGLType.CODE2STR[self.type_code], self.bits)
+        x = "%s%d" % (DGLDataType.CODE2STR[self.type_code], self.bits)
         if self.lanes != 1:
             x += "x%d" % self.lanes
         return x
@@ -250,7 +250,7 @@ class DGLArray(ctypes.Structure):
     _fields_ = [("data", ctypes.c_void_p),
                 ("ctx", DGLContext),
                 ("ndim", ctypes.c_int),
-                ("dtype", DGLType),
+                ("dtype", DGLDataType),
                 ("shape", ctypes.POINTER(dgl_shape_index_t)),
                 ("strides", ctypes.POINTER(dgl_shape_index_t)),
                 ("byte_offset", ctypes.c_uint64)]
