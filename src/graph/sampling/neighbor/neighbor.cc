@@ -45,7 +45,7 @@ std::pair<HeteroSubgraph, std::vector<FloatArray>> ExcludeCertainEdges(
         continue;
       }
       ATEN_ID_TYPE_SWITCH(hg_view->DataType(), IdType, {
-        ATEN_FLOAT_TYPE_SWITCH((weights ? (*weights)[etype]->dtype : DLDataType{kDLFloat, 8*sizeof(float), 1}), FloatType, "weights", {
+        ATEN_FLOAT_TYPE_SWITCH((weights ? (*weights)[etype]->dtype : DGLDataType{kDGLFloat, 8*sizeof(float), 1}), FloatType, "weights", {
           IdType* idx_data = edge_ids.Ptr<IdType>();
           IdType* induced_edges_data = sg.induced_edges[etype].Ptr<IdType>();
           FloatType* weights_data = weights ? (*weights)[etype].Ptr<FloatType>() : nullptr;

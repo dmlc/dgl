@@ -68,11 +68,11 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(CSRMatrix mat, IdArray NIDs, IdArr
   phmap::flat_hash_map<IdxType, FloatType> hop_map;
 
   FloatArray cs_array = NDArray::Empty({num_rows},
-                                        DLDataType{kDLFloat, 8*sizeof(FloatType), 1},
+                                        DGLDataType{kDGLFloat, 8*sizeof(FloatType), 1},
                                         ctx);
   FloatType* cs = static_cast<FloatType*>(cs_array->data);
   FloatArray ds_array = NDArray::Empty({num_rows},
-                                        DLDataType{kDLFloat, 8*sizeof(FloatType), 1},
+                                        DGLDataType{kDGLFloat, 8*sizeof(FloatType), 1},
                                         ctx);
   FloatType* ds = static_cast<FloatType*>(ds_array->data);
   
@@ -90,7 +90,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(CSRMatrix mat, IdArray NIDs, IdArr
 
   if (importance_sampling) {
     FloatArray ps_array = NDArray::Empty({max_d + 1},
-                                          DLDataType{kDLFloat, 8*sizeof(FloatType), 1},
+                                          DGLDataType{kDGLFloat, 8*sizeof(FloatType), 1},
                                           ctx);
     FloatType* ps = static_cast<FloatType*>(ps_array->data);
 
@@ -208,7 +208,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(CSRMatrix mat, IdArray NIDs, IdArr
   IdxType num_edges = 0;
   phmap::flat_hash_map<IdxType, FloatType> rand_map;
   auto rands_arr = NDArray::Empty({hop_size},
-                                  DLDataType{kDLFloat, 8*sizeof(FloatType), 1},
+                                  DGLDataType{kDGLFloat, 8*sizeof(FloatType), 1},
                                   ctx);
   FloatType* rands = static_cast<FloatType*>(rands_arr->data);
   for (int64_t i = 0, off = 0; i < num_rows; i++) {
@@ -243,16 +243,16 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(CSRMatrix mat, IdArray NIDs, IdArr
   }
 
   IdArray picked_row = NDArray::Empty({num_edges},
-                                      DLDataType{kDLInt, 8*sizeof(IdxType), 1},
+                                      DGLDataType{kDGLInt, 8*sizeof(IdxType), 1},
                                       ctx);
   IdArray picked_col = NDArray::Empty({num_edges},
-                                      DLDataType{kDLInt, 8*sizeof(IdxType), 1},
+                                      DGLDataType{kDGLInt, 8*sizeof(IdxType), 1},
                                       ctx);
   IdArray picked_idx = NDArray::Empty({num_edges},
-                                      DLDataType{kDLInt, 8*sizeof(IdxType), 1},
+                                      DGLDataType{kDGLInt, 8*sizeof(IdxType), 1},
                                       ctx);
   FloatArray importances = NDArray::Empty({importance_sampling ? num_edges : 1},
-                                          DLDataType{kDLFloat, 8*sizeof(FloatType), 1},
+                                          DGLDataType{kDGLFloat, 8*sizeof(FloatType), 1},
                                           ctx);
   IdxType* picked_rdata = static_cast<IdxType*>(picked_row->data);
   IdxType* picked_cdata = static_cast<IdxType*>(picked_col->data);

@@ -55,7 +55,7 @@ IdArray NewIdArray(
  * @return float array
  */
 FloatArray NewFloatArray(int64_t length,
-                   DLContext ctx = DLContext{kDLCPU, 0},
+                   DGLContext ctx = DGLContext{kDGLCPU, 0},
                    uint8_t nbits = 32);
 
 /*!

@@ -360,7 +360,7 @@
  
  /////////////////////////////// CSR ///////////////////////////////
  
- template <DLDeviceType XPU, typename IdType, typename FloatType>
+ template <DGLDeviceType XPU, typename IdType, typename FloatType>
  std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
                                      IdArray NIDs,
                                      IdArray rows_1,
@@ -384,7 +384,7 @@
  
      workspace_memory_alloc<decltype(&ctx)> allocator(&ctx);
  
-     const auto stream = runtime::CUDAThreadEntry::ThreadLocal()->stream;
+     const auto stream = runtime::getCurrentCUDAStream();
      const auto exec_policy = thrust::cuda::par_nosync(allocator).on(stream);
  
      auto device = runtime::DeviceAPI::Get(ctx);
@@ -433,9 +433,8 @@
          device->CopyDataFromTo(subindptr, num_rows * sizeof(hop_size), &hop_size, 0,
              sizeof(hop_size),
              ctx,
-             DGLContext{kDLCPU, 0},
-             mat.indptr->dtype,
-             stream);
+             DGLContext{kDGLCPU, 0},
+             mat.indptr->dtype);
      }
      auto hop_arr = NewIdArray(hop_size, ctx, sizeof(IdType) * 8);
      CSRMatrix smat(num_rows, mat.num_cols, subindptr_arr, hop_arr, NullArray(), mat.sorted);
@@ -495,9 +494,8 @@
                  &hop_uniq_size, 0,
                  sizeof(hop_uniq_size),
                  ctx,
-                 DGLContext{kDLCPU, 0},
-                 DGLType{kDLInt, 64, 1},
-                 stream);
+                 DGLContext{kDGLCPU, 0},
+                 DGLDataType{kDGLInt, 64, 1});
  
              constexpr const size_t TILE_SIZE = 1024;
              
@@ -519,8 +517,7 @@
                      sizeof(IdType) * hop_size,
                      ctx,
                      ctx,
-                     mat.indptr->dtype,
-                     stream);
+                     mat.indptr->dtype);
              
              cub::DoubleBuffer<IdType> hop_b(hop_2.get(), hop_3.get());
  
@@ -547,9 +544,8 @@
                  device->CopyDataFromTo(hop_unique_size.get(), 0, &hop_uniq_size, 0,
                      sizeof(hop_uniq_size),
                      ctx,
-                     DGLContext{kDLCPU, 0},
-                     mat.indptr->dtype,
-                     stream);
+                     DGLContext{kDGLCPU, 0},
+                     mat.indptr->dtype);
              }
              
              thrust::lower_bound(exec_policy, hop_unique.get(), hop_unique.get() + hop_uniq_size, hop_1, hop_1 + hop_size, hop_new);
@@ -691,13 +687,13 @@
              picked_col, picked_idx), picked_imp);
  }
  
- template std::pair<COOMatrix, FloatArray> CSRLaborSampling<kDLGPU, int32_t, float>(
+ template std::pair<COOMatrix, FloatArray> CSRLaborSampling<kDGLCUDA, int32_t, float>(
      CSRMatrix, IdArray, IdArray, int64_t, FloatArray, IdArray, IdArray, int);
- template std::pair<COOMatrix, FloatArray> CSRLaborSampling<kDLGPU, int64_t, float>(
+ template std::pair<COOMatrix, FloatArray> CSRLaborSampling<kDGLCUDA, int64_t, float>(
      CSRMatrix, IdArray, IdArray, int64_t, FloatArray, IdArray, IdArray, int);
- template std::pair<COOMatrix, FloatArray> CSRLaborSampling<kDLGPU, int32_t, double>(
+ template std::pair<COOMatrix, FloatArray> CSRLaborSampling<kDGLCUDA, int32_t, double>(
      CSRMatrix, IdArray, IdArray, int64_t, FloatArray, IdArray, IdArray, int);
- template std::pair<COOMatrix, FloatArray> CSRLaborSampling<kDLGPU, int64_t, double>(
+ template std::pair<COOMatrix, FloatArray> CSRLaborSampling<kDGLCUDA, int64_t, double>(
      CSRMatrix, IdArray, IdArray, int64_t, FloatArray, IdArray, IdArray, int);
  
  }  // namespace impl

@@ -25,8 +25,8 @@ IdArray NewIdArray(int64_t length, DGLContext ctx, uint8_t nbits) {
   return IdArray::Empty({length}, DGLDataType{kDGLInt, nbits, 1}, ctx);
 }
 
-FloatArray NewFloatArray(int64_t length, DLContext ctx, uint8_t nbits) {
-  return FloatArray::Empty({length}, DLDataType{kDLFloat, nbits, 1}, ctx);
+FloatArray NewFloatArray(int64_t length, DGLContext ctx, uint8_t nbits) {
+  return FloatArray::Empty({length}, DGLDataType{kDGLFloat, nbits, 1}, ctx);
 }
 
 IdArray Clone(IdArray arr) {
@@ -544,7 +544,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
     CSRMatrix mat, IdArray NIDs, IdArray rows, int64_t num_samples, FloatArray prob, IdArray random_seed, IdArray cnt, int importance_sampling) {
   std::pair<COOMatrix, FloatArray> ret;
   ATEN_CSR_SWITCH_CUDA_UVA(mat, rows, XPU, IdType, "CSRLaborSampling", {
-    ATEN_FLOAT_TYPE_SWITCH((IsNullArray(prob) ? DLDataType{kDLFloat, 8*sizeof(float), 1} : prob->dtype), FloatType, "probability", {
+    ATEN_FLOAT_TYPE_SWITCH((IsNullArray(prob) ? DGLDataType{kDGLFloat, 8*sizeof(float), 1} : prob->dtype), FloatType, "probability", {
       ret = impl::CSRLaborSampling<XPU, IdType, FloatType>(mat, NIDs, rows, num_samples, prob, random_seed, cnt, importance_sampling);
     });
   });
@@ -813,7 +813,7 @@ std::pair<COOMatrix, FloatArray> COOLaborSampling(
     COOMatrix mat, IdArray NIDs, IdArray rows, int64_t num_samples, FloatArray prob, IdArray random_seed, IdArray cnt, int importance_sampling) {
   std::pair<COOMatrix, FloatArray> ret;
   ATEN_COO_SWITCH(mat, XPU, IdType, "COOLaborSampling", {
-    ATEN_FLOAT_TYPE_SWITCH((IsNullArray(prob) ? DLDataType{kDLFloat, 8*sizeof(float), 1} : prob->dtype), FloatType, "probability", {
+    ATEN_FLOAT_TYPE_SWITCH((IsNullArray(prob) ? DGLDataType{kDGLFloat, 8*sizeof(float), 1} : prob->dtype), FloatType, "probability", {
       ret = impl::COOLaborSampling<XPU, IdType, FloatType>(
           mat, NIDs, rows, num_samples, prob, random_seed, cnt, importance_sampling);
     });
