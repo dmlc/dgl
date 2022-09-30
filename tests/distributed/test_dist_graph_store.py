@@ -18,16 +18,12 @@ import backend as F
 import math
 import unittest
 import pickle
-from utils import reset_envs, generate_ip_config
+from utils import reset_envs, generate_ip_config, create_random_graph
 import pytest
 
 if os.name != 'nt':
     import fcntl
     import struct
-
-def create_random_graph(n):
-    arr = (spsp.random(n, n, density=0.001, format='coo', random_state=100) != 0).astype(np.int64)
-    return dgl.from_scipy(arr)
 
 def run_server(graph_name, server_id, server_count, num_clients, shared_mem, keep_alive=False):
     g = DistGraphServer(server_id, "kv_ip_config.txt", server_count, num_clients,
