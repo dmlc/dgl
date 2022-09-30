@@ -934,7 +934,7 @@ class DistGraph:
                 return sum([self._gpb._num_edges(etype) for etype in self.etypes])
         return self._gpb._num_edges(etype)
 
-    def out_degrees(self, u=ALL):
+    def out_degrees(self, u=ALL, etype=None):
         """Return the out-degree(s) of the given nodes.
 
         It computes the out-degree(s).
@@ -951,6 +951,14 @@ class DistGraph:
             * iterable[int]: Each element is a node ID.
 
             If not given, return the in-degrees of all the nodes.
+        etype : str or (str, str, str), optional
+            The type names of the edges. The allowed type name formats are:
+
+            * ``(str, str, str)`` for source node type, edge type and destination node type.
+            * or one ``str`` edge type name if the name can uniquely identify a
+              triplet format in the graph.
+
+            Can be omitted if the graph has only one type of edges.
 
         Returns
         -------
@@ -979,9 +987,13 @@ class DistGraph:
         --------
         in_degrees
         """
-        if is_all(u):
+        if len(self.ntypes) == 1 and is_all(u):
             u = F.arange(0, self.number_of_nodes())
-        return dist_out_degrees(self, u)
+        elif is_all(u):
+            etype = self.to_canonical_etype(etype)
+            srctype = etype[0]
+            u = F.arange(0, self.number_of_nodes(srctype))
+        return dist_out_degrees(self, u, etype)
 
     def in_degrees(self, v=ALL):
         """Return the in-degree(s) of the given nodes.
