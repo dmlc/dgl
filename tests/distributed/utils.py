@@ -50,5 +50,4 @@ def reset_envs():
 
 
 def create_random_graph(n):
-    arr = (spsp.random(n, n, density=0.001, format='coo', random_state=100) != 0).astype(np.int64)
-    return dgl.from_scipy(arr)
+    return dgl.rand_graph(n, int(n * n * 0.001))

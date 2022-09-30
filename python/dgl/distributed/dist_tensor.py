@@ -182,17 +182,10 @@ class DistTensor:
         self.kvstore.push(name=self._name, id_tensor=idx, data_tensor=val)
 
     def __or__(self, other):
-        new_dist_tensor = self.__class__(
+        new_dist_tensor = DistTensor(
                 self._shape, self._dtype, part_policy=self._part_policy,
                 persistent=self._persistent, is_gdata=self._is_gdata,
                 attach=self._attach)
-        if not self.kvstore is other.kvstore is new_dist_tensor.kvstore:
-            raise DGLError('The underlying KVStores are not the same.')
-        # Each trainer computes its own result from its local storage.
-        # (BarclayII) how to do it properly with KVClient?  It only has pull
-        # and push operations which requires IDs, and I don't think we need
-        # IDs. Currently I worked around it by adding a local_data_store
-        # property.
         kvstore = self.kvstore
         kvstore.union(self._name, other._name, new_dist_tensor._name)
         return new_dist_tensor
