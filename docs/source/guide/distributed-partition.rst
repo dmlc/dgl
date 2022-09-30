@@ -85,9 +85,9 @@ Below code shows how to obtain the same node/edge mappings of
     node_map = []
     edge_map = []
     for i in range(num_parts):
-        part_orig_nids = dgl.data.load_tensors(f'/tmp/test/part{i}/orig_nids.dgl'))['_N']
+        part_orig_nids = dgl.data.load_tensors(f'/tmp/test/part{i}/orig_nids.dgl')['_N']
         node_map.append(part_orig_nids)
-        part_orig_eids = dgl.data.load_tensors(f'/tmp/test/part{i}/orig_eids.dgl'))['_E']
+        part_orig_eids = dgl.data.load_tensors(f'/tmp/test/part{i}/orig_eids.dgl')['_E']
         edge_map.append(part_orig_eids)
     node_map = torch.cat(node_map)
     edge_map = torch.cat(edge_map)
