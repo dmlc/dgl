@@ -12,10 +12,12 @@ parametrize_dtype = pytest.mark.parametrize(
     "dtype", [torch.float32, torch.float64]
 )
 
+
 def all_close_sparse(A, B):
     assert torch.allclose(A.indices(), B.indices())
     assert torch.allclose(A.values(), B.values())
     assert A.shape == B.shape
+
 
 @parametrize_idtype
 @parametrize_dtype
@@ -87,6 +89,7 @@ def test_sparse_op_scalar(idtype, dtype, v_scalar):
     all_close_sparse(A.adj / v_scalar, (A / v_scalar).adj)
     all_close_sparse(pow(A.adj, v_scalar), pow(A, v_scalar).adj)
 
+
 @parametrize_idtype
 @parametrize_dtype
 @pytest.mark.parametrize("v_scalar", [2, 2.5])
@@ -96,6 +99,7 @@ def test_scalar_op_sparse(idtype, dtype, v_scalar):
     val = torch.rand(100)
     A = SparseMatrix(row, col, val)
     all_close_sparse(v_scalar * A.adj, (v_scalar * A).adj)
+
 
 def test_expose_op():
     rowA = torch.tensor([1, 0, 2, 7, 1])

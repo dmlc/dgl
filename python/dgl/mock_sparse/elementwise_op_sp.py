@@ -28,7 +28,6 @@ def sp_add(
 
     Examples
     --------
-
     Case 1: Add two sparse matrices of same sparsity structure
 
     >>> rowA = torch.tensor([1, 0, 2])
@@ -101,7 +100,6 @@ def sp_sub(
 
     Examples
     --------
-
     Case 1: Subtract two sparse matrices
 
     >>> rowA = torch.tensor([1, 0, 2])
@@ -205,6 +203,7 @@ def sp_mul(
     B = B.adj if isinstance(B, SparseMatrix) else B
     C = A * B
     return SparseMatrix(C.indices()[0], C.indices()[1], C.values(), C.shape)
+
 
 def sp_div(
     A: Union[SparseMatrix, DiagMatrix],

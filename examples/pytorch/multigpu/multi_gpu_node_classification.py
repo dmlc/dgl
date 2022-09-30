@@ -20,6 +20,7 @@ from dgl.dataloading import (
 )
 from dgl.multiprocessing import shared_tensor
 
+
 class SAGE(nn.Module):
     def __init__(self, in_size, hid_size, out_size):
         super().__init__()
@@ -109,6 +110,7 @@ def layerwise_infer(
         acc = MF.accuracy(pred, labels)
         print("Test Accuracy {:.4f}".format(acc.item()))
 
+
 def train(proc_id, nprocs, device, g, train_idx, val_idx, model, use_uva):
     sampler = NeighborSampler(
         [10, 10, 10], prefetch_node_feats=["feat"], prefetch_labels=["label"]
@@ -161,6 +163,7 @@ def train(proc_id, nprocs, device, g, train_idx, val_idx, model, use_uva):
                 )
             )
 
+
 def run(proc_id, nprocs, devices, g, data, mode):
     # find corresponding device for my rank
     device = devices[proc_id]
@@ -188,6 +191,7 @@ def run(proc_id, nprocs, devices, g, data, mode):
     layerwise_infer(proc_id, device, g, test_idx, model, use_uva)
     # cleanup process group
     dist.destroy_process_group()
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

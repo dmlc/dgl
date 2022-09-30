@@ -18,7 +18,7 @@ using namespace cuda;
 namespace aten {
 namespace cuda {
 
-/*! 
+/*!
  * \brief CUDA kernel of GE-SpMM on Csr.
  * \note GE-SpMM: https://arxiv.org/pdf/2007.03179.pdf
  *       The grid dimension x and y are reordered for better performance.
@@ -129,6 +129,7 @@ void GESpMMCsr(
   DType *out_data = out.Ptr<DType>();
 
   cudaStream_t stream = runtime::getCurrentCUDAStream();
+
   const int ntx = 32;
   const int nty = 32;
   const int nby = (feat_len + (ntx * 2) - 1) / (ntx * 2);

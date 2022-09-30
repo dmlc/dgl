@@ -8,6 +8,7 @@ import dgl.nn as dglnn
 from dgl import AddSelfLoop
 from dgl.data import CiteseerGraphDataset, CoraGraphDataset, PubmedGraphDataset
 
+
 class SAGE(nn.Module):
     def __init__(self, in_size, hid_size, out_size):
         super().__init__()
@@ -26,6 +27,7 @@ class SAGE(nn.Module):
                 h = self.dropout(h)
         return h
 
+
 def evaluate(g, features, labels, mask, model):
     model.eval()
     with torch.no_grad():
@@ -35,6 +37,7 @@ def evaluate(g, features, labels, mask, model):
         _, indices = torch.max(logits, dim=1)
         correct = torch.sum(indices == labels)
         return correct.item() * 1.0 / len(labels)
+
 
 def train(g, features, labels, masks, model):
     # define train/val samples, loss function and optimizer
