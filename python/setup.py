@@ -123,7 +123,7 @@ def config_cython():
                               ],
                 library_dirs=library_dirs,
                 libraries=libraries,
-                # crashes without this flag with GCC 5.3.1
+                # Crashes without this flag with GCC 5.3.1
                 extra_compile_args=["-std=c++11"],
                 language="c++"))
         return cythonize(ret, force=True)
