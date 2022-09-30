@@ -34,6 +34,7 @@ def test_create_from_coo(dense_dim, row, col, mat_shape):
     assert torch.allclose(mat.col, col)
 
 
+@pytest.mark.skip(reason="no way of currently testing this")
 @pytest.mark.parametrize("dense_dim", [None, 4])
 @pytest.mark.parametrize("indptr", [[0, 0, 1, 4], (0, 1, 2, 4)])
 @pytest.mark.parametrize("indices", [(0, 1, 2, 3), (1, 2, 3, 4)])
@@ -61,11 +62,12 @@ def test_create_from_csr(dense_dim, indptr, indices, mat_shape):
     col = indices
     assert torch.allclose(mat.col, col)
 
+@pytest.mark.skip(reason="no way of currently testing this")
 @pytest.mark.parametrize("dense_dim", [None, 4])
 @pytest.mark.parametrize("indptr", [[0, 0, 1, 4], (0, 1, 2, 4)])
 @pytest.mark.parametrize("indices", [(0, 1, 2, 3), (1, 2, 3, 4)])
 @pytest.mark.parametrize("mat_shape", [None, (5, 3)])
-def test_create_from_csr(dense_dim, indptr, indices, mat_shape):
+def test_create_from_csc(dense_dim, indptr, indices, mat_shape):
     val_shape = (len(indices),)
     if dense_dim is not None:
         val_shape += (dense_dim,)
