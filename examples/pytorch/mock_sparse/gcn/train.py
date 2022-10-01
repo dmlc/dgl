@@ -55,9 +55,8 @@ def gcn_norm(A):
     I = identity(A.shape)  # create an identity matrix
     A_hat = A + I  # add self-loop to A
     D = diag(A_hat.sum(0))  # diagonal degree matrix of A_hat
-    # FIXME DiagMatrix does not have power() method
     D_hat = D
-    D_hat.val = D_hat.val**-0.5
+    D_hat = pow(D_hat, -0.5)
     A_hat = D_hat @ A_hat @ D_hat
 
     return A_hat
