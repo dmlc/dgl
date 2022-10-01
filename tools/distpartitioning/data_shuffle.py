@@ -11,8 +11,8 @@ import numpy as np
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
-import constants
 
+import constants
 from convert_partition import create_dgl_object, create_metadata_json
 from dataset_utils import get_dataset
 from dist_lookup import DistLookupService
@@ -20,10 +20,11 @@ from globalids import (assign_shuffle_global_nids_edges,
                        assign_shuffle_global_nids_nodes,
                        lookup_shuffle_global_nids_edges)
 from gloo_wrapper import allgather_sizes, alltoallv_cpu, gather_metadata_json
-from utils import (augment_edge_data, get_gnid_range_map, get_idranges,
-                   get_node_types, get_ntype_featnames, memory_snapshot,
-                   read_json, read_ntype_partition_files, write_dgl_objects,
-                   write_metadata_json, get_edge_types, get_etype_featnames)
+from utils import (augment_edge_data, get_edge_types, get_etype_featnames,
+                   get_gnid_range_map, get_idranges, get_node_types,
+                   get_ntype_featnames, memory_snapshot, read_json,
+                   read_ntype_partition_files, write_dgl_objects,
+                   write_metadata_json)
 
 
 def gen_node_data(rank, world_size, id_lookup, ntid_ntype_map, schema_map):
@@ -210,7 +211,7 @@ def exchange_features(rank, world_size, feature_tids, ntype_gnid_map, id_lookup,
     id_lookup : instance of class DistLookupService
        Distributed lookup service used to map global-nids to respective partition-ids and 
        shuffle-global-nids
-    feautre_data: dicitonary
+    feature_data: dicitonary
         dictionry in which node or edge features are stored and this information is read from the appropriate
         node features file which belongs to the current process
     feat_type : string

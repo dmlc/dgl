@@ -50,7 +50,14 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
         in which keys are edge-type names and values are triplets. This triplet has edge-feature name, 
         and range of tids for theedge feature data read from the files by the current process. Each
         edge-type may have several edge features and associated tensor data.
-
+    dictionary
+        Data read from numpy files for all the edge features in this dataset. This dictionary's keys
+        are feature names and values are tensors data representing edge feature data.
+    dictionary
+        This dictionary is used for identifying the global-id range for the associated edge features
+        present in the previous return value. The keys are edge-type names and values are triplets.
+        Each triplet consists of edge-feature name and starting and ending points of the range of 
+        tids representing the corresponding edge feautres.
     """
 
     #node features dictionary
