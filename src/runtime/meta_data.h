@@ -19,7 +19,7 @@ namespace runtime {
 /*! \brief function information needed by device */
 struct FunctionInfo {
   std::string name;
-  std::vector<DGLType> arg_types;
+  std::vector<DGLDataType> arg_types;
   std::vector<std::string> thread_axis_tags;
 
   void Save(dmlc::JSONWriter *writer) const;

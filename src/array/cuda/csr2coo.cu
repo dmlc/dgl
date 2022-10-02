@@ -14,20 +14,21 @@ using runtime::NDArray;
 namespace aten {
 namespace impl {
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 COOMatrix CSRToCOO(CSRMatrix csr) {
   LOG(FATAL) << "Unreachable codes";
   return {};
 }
 
 template <>
-COOMatrix CSRToCOO<kDLGPU, int32_t>(CSRMatrix csr) {
+COOMatrix CSRToCOO<kDGLCUDA, int32_t>(CSRMatrix csr) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   // allocate cusparse handle if needed
   if (!thr_entry->cusparse_handle) {
     CUSPARSE_CALL(cusparseCreate(&(thr_entry->cusparse_handle)));
   }
-  CUSPARSE_CALL(cusparseSetStream(thr_entry->cusparse_handle, thr_entry->stream));
+  CUSPARSE_CALL(cusparseSetStream(thr_entry->cusparse_handle, stream));
 
   NDArray indptr = csr.indptr, indices = csr.indices, data = csr.data;
   const int32_t* indptr_ptr = static_cast<int32_t*>(indptr->data);
@@ -76,18 +77,19 @@ __global__ void _RepeatKernel(
 }
 
 template <>
-COOMatrix CSRToCOO<kDLGPU, int64_t>(CSRMatrix csr) {
+COOMatrix CSRToCOO<kDGLCUDA, int64_t>(CSRMatrix csr) {
   const auto& ctx = csr.indptr->ctx;
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
+
   const int64_t nnz = csr.indices->shape[0];
   const auto nbits = csr.indptr->dtype.bits;
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   IdArray rowids = Range(0, csr.num_rows, nbits, ctx);
   IdArray ret_row = NewIdArray(nnz, ctx, nbits);
 
   const int nt = 256;
   const int nb = (nnz + nt - 1) / nt;
   CUDA_KERNEL_CALL(_RepeatKernel,
-      nb, nt, 0, thr_entry->stream,
+      nb, nt, 0, stream,
       rowids.Ptr<int64_t>(),
       csr.indptr.Ptr<int64_t>(), ret_row.Ptr<int64_t>(),
       csr.num_rows, nnz);
@@ -97,28 +99,29 @@ COOMatrix CSRToCOO<kDLGPU, int64_t>(CSRMatrix csr) {
                    true, csr.sorted);
 }
 
-template COOMatrix CSRToCOO<kDLGPU, int32_t>(CSRMatrix csr);
-template COOMatrix CSRToCOO<kDLGPU, int64_t>(CSRMatrix csr);
+template COOMatrix CSRToCOO<kDGLCUDA, int32_t>(CSRMatrix csr);
+template COOMatrix CSRToCOO<kDGLCUDA, int64_t>(CSRMatrix csr);
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 COOMatrix CSRToCOODataAsOrder(CSRMatrix csr) {
   LOG(FATAL) << "Unreachable codes";
   return {};
 }
 
 template <>
-COOMatrix CSRToCOODataAsOrder<kDLGPU, int32_t>(CSRMatrix csr) {
-  COOMatrix coo = CSRToCOO<kDLGPU, int32_t>(csr);
+COOMatrix CSRToCOODataAsOrder<kDGLCUDA, int32_t>(CSRMatrix csr) {
+  COOMatrix coo = CSRToCOO<kDGLCUDA, int32_t>(csr);
   if (aten::IsNullArray(coo.data))
     return coo;
 
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   auto device = runtime::DeviceAPI::Get(coo.row->ctx);
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   // allocate cusparse handle if needed
   if (!thr_entry->cusparse_handle) {
     CUSPARSE_CALL(cusparseCreate(&(thr_entry->cusparse_handle)));
   }
-  CUSPARSE_CALL(cusparseSetStream(thr_entry->cusparse_handle, thr_entry->stream));
+  CUSPARSE_CALL(cusparseSetStream(thr_entry->cusparse_handle, stream));
 
   NDArray row = coo.row, col = coo.col, data = coo.data;
   int32_t* row_ptr = static_cast<int32_t*>(row->data);
@@ -153,8 +156,8 @@ COOMatrix CSRToCOODataAsOrder<kDLGPU, int32_t>(CSRMatrix csr) {
 }
 
 template <>
-COOMatrix CSRToCOODataAsOrder<kDLGPU, int64_t>(CSRMatrix csr) {
-  COOMatrix coo = CSRToCOO<kDLGPU, int64_t>(csr);
+COOMatrix CSRToCOODataAsOrder<kDGLCUDA, int64_t>(CSRMatrix csr) {
+  COOMatrix coo = CSRToCOO<kDGLCUDA, int64_t>(csr);
   if (aten::IsNullArray(coo.data))
     return coo;
   const auto& sorted = Sort(coo.data);
@@ -170,8 +173,8 @@ COOMatrix CSRToCOODataAsOrder<kDLGPU, int64_t>(CSRMatrix csr) {
   return coo;
 }
 
-template COOMatrix CSRToCOODataAsOrder<kDLGPU, int32_t>(CSRMatrix csr);
-template COOMatrix CSRToCOODataAsOrder<kDLGPU, int64_t>(CSRMatrix csr);
+template COOMatrix CSRToCOODataAsOrder<kDGLCUDA, int32_t>(CSRMatrix csr);
+template COOMatrix CSRToCOODataAsOrder<kDGLCUDA, int64_t>(CSRMatrix csr);
 
 }  // namespace impl
 }  // namespace aten

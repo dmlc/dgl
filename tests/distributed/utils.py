@@ -2,6 +2,9 @@
 import socket
 import os
 import random
+import scipy.sparse as spsp
+import numpy as np
+import dgl
 
 
 def generate_ip_config(file_name, num_machines, num_servers):
@@ -44,3 +47,7 @@ def reset_envs():
                 'DGL_DIST_MODE', 'DGL_NUM_CLIENT', 'DGL_DIST_MAX_TRY_TIMES']:
         if key in os.environ:
             os.environ.pop(key)
+
+
+def create_random_graph(n):
+    return dgl.rand_graph(n, int(n * n * 0.001))

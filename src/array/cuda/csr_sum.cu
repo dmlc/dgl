@@ -33,12 +33,13 @@ std::pair<CSRMatrix, NDArray> CusparseCsrgeam2(
   auto ctx = A.indptr->ctx;
   auto device = runtime::DeviceAPI::Get(ctx);
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   const DType* A_weights = A_weights_array.Ptr<DType>();
   const DType* B_weights = B_weights_array.Ptr<DType>();
   // allocate cusparse handle if needed
   if (!thr_entry->cusparse_handle)
     CUSPARSE_CALL(cusparseCreate(&(thr_entry->cusparse_handle)));
-  CUSPARSE_CALL(cusparseSetStream(thr_entry->cusparse_handle, thr_entry->stream));
+  CUSPARSE_CALL(cusparseSetStream(thr_entry->cusparse_handle, stream));
 
   cusparseMatDescr_t matA, matB, matC;
   CUSPARSE_CALL(cusparseCreateMatDescr(&matA));
@@ -167,18 +168,18 @@ std::pair<CSRMatrix, NDArray> CSRSum(
 }
 
 #ifdef USE_FP16
-template std::pair<CSRMatrix, NDArray> CSRSum<kDLGPU, int32_t, __half>(
+template std::pair<CSRMatrix, NDArray> CSRSum<kDGLCUDA, int32_t, __half>(
     const std::vector<CSRMatrix>&, const std::vector<NDArray>&);
-template std::pair<CSRMatrix, NDArray> CSRSum<kDLGPU, int64_t, __half>(
+template std::pair<CSRMatrix, NDArray> CSRSum<kDGLCUDA, int64_t, __half>(
     const std::vector<CSRMatrix>&, const std::vector<NDArray>&);
 #endif
-template std::pair<CSRMatrix, NDArray> CSRSum<kDLGPU, int32_t, float>(
+template std::pair<CSRMatrix, NDArray> CSRSum<kDGLCUDA, int32_t, float>(
     const std::vector<CSRMatrix>&, const std::vector<NDArray>&);
-template std::pair<CSRMatrix, NDArray> CSRSum<kDLGPU, int64_t, float>(
+template std::pair<CSRMatrix, NDArray> CSRSum<kDGLCUDA, int64_t, float>(
     const std::vector<CSRMatrix>&, const std::vector<NDArray>&);
-template std::pair<CSRMatrix, NDArray> CSRSum<kDLGPU, int32_t, double>(
+template std::pair<CSRMatrix, NDArray> CSRSum<kDGLCUDA, int32_t, double>(
     const std::vector<CSRMatrix>&, const std::vector<NDArray>&);
-template std::pair<CSRMatrix, NDArray> CSRSum<kDLGPU, int64_t, double>(
+template std::pair<CSRMatrix, NDArray> CSRSum<kDGLCUDA, int64_t, double>(
     const std::vector<CSRMatrix>&, const std::vector<NDArray>&);
 
 }  // namespace aten

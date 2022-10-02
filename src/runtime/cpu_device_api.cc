@@ -1,11 +1,12 @@
 /*!
- *  Copyright (c) 2016 by Contributors
+ *  Copyright (c) 2016-2022 by Contributors
  * \file cpu_device_api.cc
  */
 #include <dmlc/logging.h>
 #include <dmlc/thread_local.h>
 #include <dgl/runtime/registry.h>
 #include <dgl/runtime/device_api.h>
+#include <dgl/runtime/tensordispatch.h>
 #include <cstdlib>
 #include <cstring>
 #include "workspace_pool.h"
@@ -23,7 +24,11 @@ class CPUDeviceAPI final : public DeviceAPI {
   void* AllocDataSpace(DGLContext ctx,
                        size_t nbytes,
                        size_t alignment,
-                       DGLType type_hint) final {
+                       DGLDataType type_hint) final {
+    TensorDispatcher* td = TensorDispatcher::Global();
+    if (td->IsAvailable())
+      return td->CPUAllocWorkspace(nbytes);
+
     void* ptr;
 #if _MSC_VER || defined(__MINGW32__)
     ptr = _aligned_malloc(nbytes, alignment);
@@ -39,6 +44,10 @@ class CPUDeviceAPI final : public DeviceAPI {
   }
 
   void FreeDataSpace(DGLContext ctx, void* ptr) final {
+    TensorDispatcher* td = TensorDispatcher::Global();
+    if (td->IsAvailable())
+      return td->CPUFreeWorkspace(ptr);
+
 #if _MSC_VER || defined(__MINGW32__)
     _aligned_free(ptr);
 #else
@@ -53,8 +62,7 @@ class CPUDeviceAPI final : public DeviceAPI {
                       size_t size,
                       DGLContext ctx_from,
                       DGLContext ctx_to,
-                      DGLType type_hint,
-                      DGLStreamHandle stream) final {
+                      DGLDataType type_hint) final {
     memcpy(static_cast<char*>(to) + to_offset,
            static_cast<const char*>(from) + from_offset,
            size);
@@ -65,7 +73,7 @@ class CPUDeviceAPI final : public DeviceAPI {
   void StreamSync(DGLContext ctx, DGLStreamHandle stream) final {
   }
 
-  void* AllocWorkspace(DGLContext ctx, size_t size, DGLType type_hint) final;
+  void* AllocWorkspace(DGLContext ctx, size_t size, DGLDataType type_hint) final;
   void FreeWorkspace(DGLContext ctx, void* data) final;
 
   static const std::shared_ptr<CPUDeviceAPI>& Global() {
@@ -77,17 +85,24 @@ class CPUDeviceAPI final : public DeviceAPI {
 
 struct CPUWorkspacePool : public WorkspacePool {
   CPUWorkspacePool() :
-      WorkspacePool(kDLCPU, CPUDeviceAPI::Global()) {}
+      WorkspacePool(kDGLCPU, CPUDeviceAPI::Global()) {}
 };
 
 void* CPUDeviceAPI::AllocWorkspace(DGLContext ctx,
                                    size_t size,
-                                   DGLType type_hint) {
-  return dmlc::ThreadLocalStore<CPUWorkspacePool>::Get()
-      ->AllocWorkspace(ctx, size);
+                                   DGLDataType type_hint) {
+  TensorDispatcher* td = TensorDispatcher::Global();
+  if (td->IsAvailable())
+    return td->CPUAllocWorkspace(size);
+
+  return dmlc::ThreadLocalStore<CPUWorkspacePool>::Get()->AllocWorkspace(ctx, size);
 }
 
 void CPUDeviceAPI::FreeWorkspace(DGLContext ctx, void* data) {
+  TensorDispatcher* td = TensorDispatcher::Global();
+  if (td->IsAvailable())
+    return td->CPUFreeWorkspace(data);
+
   dmlc::ThreadLocalStore<CPUWorkspacePool>::Get()->FreeWorkspace(ctx, data);
 }
 

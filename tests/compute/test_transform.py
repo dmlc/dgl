@@ -913,6 +913,17 @@ def test_to_block(idtype):
             else:
                 check(g, bg, ntype, etype, None, include_dst_in_src)
 
+    # homogeneous graph
+    g = dgl.graph((F.tensor([1, 2], dtype=idtype), F.tensor([2, 3], dtype=idtype)))
+    dst_nodes = F.tensor([3, 2], dtype=idtype)
+    bg = dgl.to_block(g, dst_nodes=dst_nodes)
+    check(g, bg, '_N', '_E', dst_nodes)
+
+    src_nodes = bg.srcnodes['_N'].data[dgl.NID]
+    bg = dgl.to_block(g, dst_nodes=dst_nodes, src_nodes=src_nodes)
+    check(g, bg, '_N', '_E', dst_nodes)
+
+    # heterogeneous graph
     g = dgl.heterograph({
         ('A', 'AA', 'A'): ([0, 2, 1, 3], [1, 3, 2, 4]),
         ('A', 'AB', 'B'): ([0, 1, 3, 1], [1, 3, 5, 6]),
@@ -1785,6 +1796,16 @@ def test_remove_selfloop(idtype):
     except:
         raise_error = True
     assert raise_error
+
+    # batch information
+    g = dgl.graph(([0, 0, 0, 1, 3, 3, 4], [1, 0, 0, 2, 3, 4, 4]), idtype=idtype, device=F.ctx())
+    g.set_batch_num_nodes(F.tensor([3, 2], dtype=F.int64))
+    g.set_batch_num_edges(F.tensor([4, 3], dtype=F.int64))
+    g = dgl.remove_self_loop(g)
+    assert g.number_of_nodes() == 5
+    assert g.number_of_edges() == 3
+    assert F.array_equal(g.batch_num_nodes(), F.tensor([3, 2], dtype=F.int64))
+    assert F.array_equal(g.batch_num_edges(), F.tensor([2, 1], dtype=F.int64))
 
 
 @parametrize_idtype
