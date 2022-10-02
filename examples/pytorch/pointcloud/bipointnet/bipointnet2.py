@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
-from pointnet2 import FixedRadiusNNGraph, RelativePositionMessage
-from basic import BiLinearLSR, BiConv2d
+from basic import BiLinearLSR, BiConv2d, FixedRadiusNNGraph, RelativePositionMessage
 import torch.nn.functional as F
 from dgl.geometry import farthest_point_sampler
 

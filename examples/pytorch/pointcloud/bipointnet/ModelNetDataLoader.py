@@ -102,3 +102,4 @@ class ModelNetDataLoader(Dataset):
 
     def __getitem__(self, index):
         return self._get_item(index)
+        

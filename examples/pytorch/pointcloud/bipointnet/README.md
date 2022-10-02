@@ -11,8 +11,17 @@ This project is the official implementation of our accepted ICLR 2021 paper *BiP
 ### How to Run
 
 ```shell script
-python train_cls.py
+python train_cls.py --model ${MODEL}
 ```
+
+Here, `MODEL` have two choices: `bipointnet`  and  `bipointnet2_ssg`
+
+# Performance
+
+| Task              | Dataset    | Metric   | Score - DGL (Adam) |
+| ----------------- | ---------- | -------- | ------------------ |
+| Classification    | ModelNet40 | Accuracy | 89.4               |
+| Part Segmentation | ShapeNet   | mIoU     | 83.1               |
 
 ### Citation
 
