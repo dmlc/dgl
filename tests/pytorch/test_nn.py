@@ -1411,19 +1411,18 @@ def test_heterognnexplainer(g, idtype, input_dim, hidden_dim, output_dim):
 
                 return self.linear(hg)
 
-    # Explain graph prediction
-    model = GraphClassficationModel(input_dim, hidden_dim, output_dim, g.canonical_etypes)
-    model = model.to(F.ctx())
-    explainer = nn.explain.HeteroGNNExplainer(model, num_hops=1)
-    feat_mask, edge_mask = explainer.explain_graph(g, feat)
-
-
     # Explain node prediction
     model = NodeClassficationModel(input_dim, hidden_dim, output_dim, g.canonical_etypes)
     model = model.to(F.ctx())
     ntype = g.ntypes[0]
     explainer = nn.explain.HeteroGNNExplainer(model, num_hops=1)
     new_center, sg, feat_mask, edge_mask = explainer.explain_node(ntype, 0, g, feat)
+
+    # Explain graph prediction
+    model = GraphClassficationModel(input_dim, hidden_dim, output_dim, g.canonical_etypes)
+    model = model.to(F.ctx())
+    explainer = nn.explain.HeteroGNNExplainer(model, num_hops=1)
+    feat_mask, edge_mask = explainer.explain_graph(g, feat)
 
 
 def test_jumping_knowledge():

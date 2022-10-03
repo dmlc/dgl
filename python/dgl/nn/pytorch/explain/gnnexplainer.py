@@ -617,14 +617,13 @@ class HeteroGNNExplainer(nn.Module):
             the respective node types(keys) present in the graph.
             The input feature of shape :math:`(N, D)`. :math:`N` is the
             number of nodes, and :math:`D` is the feature size.
-        efeat: dict[str, Tensor]
+        efeat : dict[str, Tensor]
             Dictionary of { cannonical_etypes: features }
             The dictionary that associates input edge features(values) with
             the respective cannonical edge types(keys) present in the graph.
             The input feature of shape :math:`(E, D)`. :math:`E` is the
             number of edges, and :math:`D` is the feature size.
-        kwargs : dict[str, dict[str, Tensor]]
-            Dictionary of { str: features }
+        kwargs : dict
             Additional arguments passed to the GNN model. The kwards will
             be passed to the model.
 
@@ -707,7 +706,8 @@ class HeteroGNNExplainer(nn.Module):
 
         >>> # Explain the prediction for node 10
         >>> explainer = HeteroGNNExplainer(model, num_hops=1)
-        >>> new_center, sg, feat_mask, edge_mask = explainer.explain_node(predict_ntype, 10, g, features)
+        >>> new_center, sg, feat_mask, edge_mask =\
+        ...                      explainer.explain_node(predict_ntype, 10, g, features)
         >>> new_center
         tensor([0])
         >>> sg.num_edges()
@@ -721,8 +721,8 @@ class HeteroGNNExplainer(nn.Module):
                     0.2872]),
         'd': tensor([0.2628, 0.2904, 0.2877, 0.2416, 0.2869, 0.2561, 0.2542, 0.2945, 0.2757,
                     0.2786]),
-        'hasStructure': tensor([0.2896, 0.2622, 0.2715, 0.3015, 0.2753, 0.2617, 0.2518, 0.2856, 0.2686,
-                    0.2764])}
+        'hasStructure': tensor([0.2896, 0.2622, 0.2715, 0.3015, 0.2753, 0.2617, 0.2518, 0.2856,
+                    0.2686, 0.2764])}
         """
         self.model.eval()
 
@@ -760,10 +760,10 @@ class HeteroGNNExplainer(nn.Module):
         for _ in range(self.num_epochs):
             optimizer.zero_grad()
             h = {}
-            for node_type in sg_feat.keys():
+            for node_type in sg_feat:
                 h[node_type] = sg_feat[node_type] * feat_mask[node_type].sigmoid()
             eweight = {}
-            for canonical_etype in edge_mask.keys():
+            for canonical_etype in edge_mask:
                 eweight[canonical_etype] = edge_mask[canonical_etype].sigmoid()
             logits = self.model(graph=sg, feat=h,
                                 eweight=eweight, **kwargs)[ntype]
@@ -779,9 +779,9 @@ class HeteroGNNExplainer(nn.Module):
         if self.log:
             pbar.close()
 
-        for node_type in feat_mask.keys():
+        for node_type in feat_mask:
             feat_mask[node_type] = feat_mask[node_type].detach().sigmoid().squeeze()
-        for canonical_etype in edge_mask.keys():
+        for canonical_etype in edge_mask:
             edge_mask[canonical_etype] = edge_mask[canonical_etype].detach().sigmoid()
 
         return inverse_indices, sg, feat_mask, edge_mask
@@ -863,13 +863,16 @@ class HeteroGNNExplainer(nn.Module):
         ...        rel_func_dict = {}
         ...        for relation in graph.canonical_etypes:
         ...            relation_str = ''.join(relation)
-        ...            wh = self.relation_weight_matrix[relation_str](node_feature_dict[relation[0]])
+        ...            wh = self.relation_weight_matrix[relation_str]\
+        ...                 (node_feature_dict[relation[0]])
         ...            graph.nodes[relation[0]].data[f'wh_{relation}'] = wh
         ...            if eweight is None:
-        ...                rel_func_dict[relation] = (fn.copy_u(f'wh_{relation}', 'm'), fn.mean('m', 'h'))
+        ...                rel_func_dict[relation] = (fn.copy_u(f'wh_{relation}', 'm'),
+        ...                                                                      fn.mean('m', 'h'))
         ...            else:
         ...                graph.edges[relation].data['w'] = eweight[relation]
-        ...                rel_func_dict[relation] = (fn.u_mul_e(f'wh_{relation}', 'w', 'm'),fn.mean('m', 'h'))
+        ...                rel_func_dict[relation] = (fn.u_mul_e(f'wh_{relation}', 'w', 'm'),
+        ...                                                                     fn.mean('m', 'h'))
         ...        graph.multi_update_all(rel_func_dict, 'sum')
         ...        return {ntype: graph.nodes[ntype].data['h'] for ntype in graph.ntypes}
 
@@ -931,10 +934,10 @@ class HeteroGNNExplainer(nn.Module):
         for _ in range(self.num_epochs):
             optimizer.zero_grad()
             h = {}
-            for node_type in feat.keys():
+            for node_type in feat:
                 h[node_type] = feat[node_type] * feat_mask[node_type].sigmoid()
             eweight = {}
-            for canonical_etype in edge_mask.keys():
+            for canonical_etype in edge_mask:
                 eweight[canonical_etype] = edge_mask[canonical_etype].sigmoid()
             logits = self.model(graph=graph, feat=h,
                                 eweight=eweight, **kwargs)
@@ -950,10 +953,10 @@ class HeteroGNNExplainer(nn.Module):
         if self.log:
             pbar.close()
 
-        for node_type in feat_mask.keys():
+        for node_type in feat_mask:
             feat_mask[node_type] = feat_mask[node_type].detach().sigmoid().squeeze()
 
-        for canonical_etype in edge_mask.keys():
+        for canonical_etype in edge_mask:
             edge_mask[canonical_etype] = edge_mask[canonical_etype].detach().sigmoid()
 
         return feat_mask, edge_mask
