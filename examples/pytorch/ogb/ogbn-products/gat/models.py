@@ -2,6 +2,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 from dgl import function as fn
 from dgl.ops import edge_softmax
 from dgl.utils import expand_as_pair
@@ -31,7 +32,9 @@ class GATConv(nn.Module):
         self._use_symmetric_norm = use_symmetric_norm
 
         # feat fc
-        self.src_fc = nn.Linear(self._in_src_feats, out_feats * n_heads, bias=False)
+        self.src_fc = nn.Linear(
+            self._in_src_feats, out_feats * n_heads, bias=False
+        )
         if residual:
             self.dst_fc = nn.Linear(self._in_src_feats, out_feats * n_heads)
             self.bias = None
@@ -42,7 +45,9 @@ class GATConv(nn.Module):
         # attn fc
         self.attn_src_fc = nn.Linear(self._in_src_feats, n_heads, bias=False)
         if use_attn_dst:
-            self.attn_dst_fc = nn.Linear(self._in_src_feats, n_heads, bias=False)
+            self.attn_dst_fc = nn.Linear(
+                self._in_src_feats, n_heads, bias=False
+            )
         else:
             self.attn_dst_fc = None
         if edge_feats > 0:
@@ -93,8 +98,12 @@ class GATConv(nn.Module):
                 norm = torch.reshape(norm, shp)
                 feat_src = feat_src * norm
 
-            feat_src_fc = self.src_fc(feat_src).view(-1, self._n_heads, self._out_feats)
-            feat_dst_fc = self.dst_fc(feat_dst).view(-1, self._n_heads, self._out_feats)
+            feat_src_fc = self.src_fc(feat_src).view(
+                -1, self._n_heads, self._out_feats
+            )
+            feat_dst_fc = self.dst_fc(feat_dst).view(
+                -1, self._n_heads, self._out_feats
+            )
             attn_src = self.attn_src_fc(feat_src).view(-1, self._n_heads, 1)
 
             # NOTE: GAT paper uses "first concatenation then linear projection"
@@ -107,18 +116,24 @@ class GATConv(nn.Module):
             # save [Wh_i || Wh_j] on edges, which is not memory-efficient. Plus,
             # addition could be optimized with DGL's built-in function u_add_v,
             # which further speeds up computation and saves memory footprint.
-            graph.srcdata.update({"feat_src_fc": feat_src_fc, "attn_src": attn_src})
+            graph.srcdata.update(
+                {"feat_src_fc": feat_src_fc, "attn_src": attn_src}
+            )
 
             if self.attn_dst_fc is not None:
                 attn_dst = self.attn_dst_fc(feat_dst).view(-1, self._n_heads, 1)
                 graph.dstdata.update({"attn_dst": attn_dst})
-                graph.apply_edges(fn.u_add_v("attn_src", "attn_dst", "attn_node"))
+                graph.apply_edges(
+                    fn.u_add_v("attn_src", "attn_dst", "attn_node")
+                )
             else:
                 graph.apply_edges(fn.copy_u("attn_src", "attn_node"))
 
             e = graph.edata["attn_node"]
             if feat_edge is not None:
-                attn_edge = self.attn_edge_fc(feat_edge).view(-1, self._n_heads, 1)
+                attn_edge = self.attn_edge_fc(feat_edge).view(
+                    -1, self._n_heads, 1
+                )
                 graph.edata.update({"attn_edge": attn_edge})
                 e += graph.edata["attn_edge"]
             e = self.leaky_relu(e)
@@ -128,12 +143,16 @@ class GATConv(nn.Module):
                 bound = int(graph.number_of_edges() * self.edge_drop)
                 eids = perm[bound:]
                 graph.edata["a"] = torch.zeros_like(e)
-                graph.edata["a"][eids] = self.attn_drop(edge_softmax(graph, e[eids], eids=eids))
+                graph.edata["a"][eids] = self.attn_drop(
+                    edge_softmax(graph, e[eids], eids=eids)
+                )
             else:
                 graph.edata["a"] = self.attn_drop(edge_softmax(graph, e))
 
             # message passing
-            graph.update_all(fn.u_mul_e("feat_src_fc", "a", "m"), fn.sum("m", "feat_src_fc"))
+            graph.update_all(
+                fn.u_mul_e("feat_src_fc", "a", "m"), fn.sum("m", "feat_src_fc")
+            )
             rst = graph.dstdata["feat_src_fc"]
 
             if self._use_symmetric_norm:
@@ -257,7 +276,15 @@ class GAT(nn.Module):
 
 class MLP(nn.Module):
     def __init__(
-        self, in_feats, n_classes, n_layers, n_hidden, activation, dropout=0.0, input_drop=0.0, residual=False,
+        self,
+        in_feats,
+        n_classes,
+        n_layers,
+        n_hidden,
+        activation,
+        dropout=0.0,
+        input_drop=0.0,
+        residual=False,
     ):
         super().__init__()
         self.n_layers = n_layers

@@ -1,8 +1,10 @@
 # Data augmentation on graphs via edge dropping and feature masking
 
-import torch as th
 import numpy as np
+import torch as th
+
 import dgl
+
 
 def aug(graph, x, feat_drop_rate, edge_mask_rate):
     n_node = graph.num_nodes()
@@ -21,14 +23,17 @@ def aug(graph, x, feat_drop_rate, edge_mask_rate):
 
     return ng, feat
 
+
 def drop_feature(x, drop_prob):
-    drop_mask = th.empty((x.size(1),),
-                        dtype=th.float32,
-                        device=x.device).uniform_(0, 1) < drop_prob
+    drop_mask = (
+        th.empty((x.size(1),), dtype=th.float32, device=x.device).uniform_(0, 1)
+        < drop_prob
+    )
     x = x.clone()
     x[:, drop_mask] = 0
 
     return x
+
 
 def mask_edge(graph, mask_prob):
     E = graph.num_edges()
