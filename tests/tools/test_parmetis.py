@@ -3,6 +3,7 @@ import json
 import os
 import sys
 import tempfile
+import unittest
 
 import dgl
 import numpy as np
@@ -18,7 +19,8 @@ not yet configured in the CI framework.
 """
 
 
-def _test_parmetis_preprocessing():
+@unittest.skipIf(True, reason="mpi is not available in CI test framework.")
+def test_parmetis_preprocessing():
     with tempfile.TemporaryDirectory() as root_dir:
         num_chunks = 2
         g = create_chunked_dataset(root_dir, num_chunks, include_masks=True)
@@ -167,7 +169,8 @@ which is not yet configured in the CI framework.
 """
 
 
-def _test_parmetis_wrapper():
+@unittest.skipIf(True, reason="mpi is not available in CI test framework.")
+def test_parmetis_wrapper():
     with tempfile.TemporaryDirectory() as root_dir:
         num_chunks = 2
         graph_name = "mag240m"
