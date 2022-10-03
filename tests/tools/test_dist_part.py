@@ -12,10 +12,11 @@ from dgl.data.utils import load_graphs, load_tensors
 
 from create_chunked_dataset import create_chunked_dataset
 
-
 @pytest.mark.parametrize("num_chunks", [1, 8])
 def test_chunk_graph(num_chunks):
+
     with tempfile.TemporaryDirectory() as root_dir:
+
         g = create_chunked_dataset(root_dir, num_chunks, include_edge_data=True)
 
         num_cite_edges = g.number_of_edges('cites')
@@ -61,7 +62,6 @@ def test_chunk_graph(num_chunks):
                 assert feat_array.shape[0] == num_papers // num_chunks
 
         # check edge_data
-        edge_data_gold = {}
         num_edges = {
             'paper:cites:paper': num_cite_edges,
             'author:writes:paper': num_write_edges,
@@ -74,15 +74,12 @@ def test_chunk_graph(num_chunks):
             ['paper:rev_writes:author', 'year'],
         ]:
             output_edge_sub_dir = os.path.join(output_edge_data_dir, etype)
-            features = []
             for i in range(num_chunks):
                 chunk_f_name = '{}-{}.npy'.format(feat, i)
                 chunk_f_name = os.path.join(output_edge_sub_dir, chunk_f_name)
                 assert os.path.isfile(chunk_f_name)
                 feat_array = np.load(chunk_f_name)
             assert feat_array.shape[0] == num_edges[etype] // num_chunks
-            features.append(feat_array)
-            edge_data_gold[etype + '/' + feat] = np.concatenate(features)
 
 
 @pytest.mark.parametrize("num_chunks", [1, 2, 3, 4, 8])
