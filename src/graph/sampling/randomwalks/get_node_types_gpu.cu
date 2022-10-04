@@ -20,23 +20,22 @@ namespace sampling {
 
 namespace impl {
 
-template<DLDeviceType XPU, typename IdxType>
+template<DGLDeviceType XPU, typename IdxType>
 TypeArray GetNodeTypesFromMetapath(
     const HeteroGraphPtr hg,
     const TypeArray metapath) {
 
   uint64_t num_etypes = metapath->shape[0];
 
-  auto cpu_ctx = DGLContext{kDLCPU, 0};
+  auto cpu_ctx = DGLContext{kDGLCPU, 0};
   auto metapath_ctx = metapath->ctx;
-  // use default stream
-  cudaStream_t stream = 0;
+  auto stream = DeviceAPI::Get(metapath_ctx)->GetStream();
 
   TypeArray h_result = TypeArray::Empty(
       {metapath->shape[0] + 1}, metapath->dtype, cpu_ctx);
   auto h_result_data = h_result.Ptr<IdxType>();
 
-  auto h_metapath = metapath.CopyTo(cpu_ctx, stream);
+  auto h_metapath = metapath.CopyTo(cpu_ctx);
   DeviceAPI::Get(metapath_ctx)->StreamSync(metapath_ctx, stream);
   const IdxType *h_metapath_data = h_metapath.Ptr<IdxType>();
 
@@ -56,17 +55,17 @@ TypeArray GetNodeTypesFromMetapath(
     h_result_data[i + 1] = dsttype;
   }
 
-  auto result = h_result.CopyTo(metapath->ctx, stream);
+  auto result = h_result.CopyTo(metapath->ctx);
   DeviceAPI::Get(metapath_ctx)->StreamSync(metapath_ctx, stream);
   return result;
 }
 
 template
-TypeArray GetNodeTypesFromMetapath<kDLGPU, int32_t>(
+TypeArray GetNodeTypesFromMetapath<kDGLCUDA, int32_t>(
     const HeteroGraphPtr hg,
     const TypeArray metapath);
 template
-TypeArray GetNodeTypesFromMetapath<kDLGPU, int64_t>(
+TypeArray GetNodeTypesFromMetapath<kDGLCUDA, int64_t>(
     const HeteroGraphPtr hg,
     const TypeArray metapath);
 

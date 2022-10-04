@@ -439,7 +439,7 @@ void OrderedHashTable<IdType>::FillWithDuplicates(
       workspace_bytes,
       static_cast<IdType*>(nullptr),
       static_cast<IdType*>(nullptr),
-      grid.x+1));
+      grid.x+1, stream));
   void * workspace = device->AllocWorkspace(ctx_, workspace_bytes);
 
   CUDA_CALL(cub::DeviceScan::ExclusiveSum(

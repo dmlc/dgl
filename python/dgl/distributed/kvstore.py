@@ -1351,6 +1351,15 @@ class KVClient(object):
             data_tensor = F.cat(seq=[response.data_tensor for response in response_list], dim=0)
             return data_tensor[back_sorted_id] # return data with original index order
 
+    def union(self, operand1_name, operand2_name, output_name):
+        """Compute the union of two mask arrays in the KVStore.
+        """
+        # Each trainer computes its own result from its local storage.
+        self._data_store[output_name][:] = (
+                self._data_store[operand1_name] |
+                self._data_store[operand2_name]
+        )
+
     def _take_id(self, elem):
         """Used by sort response list
         """

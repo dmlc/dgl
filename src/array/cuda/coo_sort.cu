@@ -84,9 +84,9 @@ int _NumberOfBits(const T& range) {
   return bits;
 }
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 void COOSort_(COOMatrix* coo, bool sort_column) {
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   const int row_bits = _NumberOfBits(coo->num_rows);
 
   const int64_t nnz = coo->row->shape[0];
@@ -100,13 +100,13 @@ void COOSort_(COOMatrix* coo, bool sort_column) {
 
     IdArray pos = aten::NewIdArray(nnz, coo->row->ctx, coo->row->dtype.bits);
 
-    CUDA_KERNEL_CALL(_COOEncodeEdgesKernel, nb, nt, 0, thr_entry->stream,
+    CUDA_KERNEL_CALL(_COOEncodeEdgesKernel, nb, nt, 0, stream,
         coo->row.Ptr<IdType>(), coo->col.Ptr<IdType>(),
         nnz, col_bits, pos.Ptr<IdType>());
 
     auto sorted = Sort(pos, num_bits);
 
-    CUDA_KERNEL_CALL(_COODecodeEdgesKernel, nb, nt, 0, thr_entry->stream,
+    CUDA_KERNEL_CALL(_COODecodeEdgesKernel, nb, nt, 0, stream,
         sorted.first.Ptr<IdType>(), nnz, col_bits,
         coo->row.Ptr<IdType>(), coo->col.Ptr<IdType>());
 
@@ -131,8 +131,8 @@ void COOSort_(COOMatrix* coo, bool sort_column) {
   }
 }
 
-template void COOSort_<kDLGPU, int32_t>(COOMatrix* coo, bool sort_column);
-template void COOSort_<kDLGPU, int64_t>(COOMatrix* coo, bool sort_column);
+template void COOSort_<kDGLCUDA, int32_t>(COOMatrix* coo, bool sort_column);
+template void COOSort_<kDGLCUDA, int64_t>(COOMatrix* coo, bool sort_column);
 
 ///////////////////////////// COOIsSorted /////////////////////////////
 
@@ -155,11 +155,11 @@ __global__ void _COOIsSortedKernel(
   }
 }
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 std::pair<bool, bool> COOIsSorted(COOMatrix coo) {
   const int64_t nnz = coo.row->shape[0];
   const auto& ctx = coo.row->ctx;
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   auto device = runtime::DeviceAPI::Get(ctx);
   // We allocate a workspace of 2*nnz bytes. It wastes a little bit memory but should
   // be fine.
@@ -167,7 +167,7 @@ std::pair<bool, bool> COOIsSorted(COOMatrix coo) {
   int8_t* col_flags = static_cast<int8_t*>(device->AllocWorkspace(ctx, nnz));
   const int nt = cuda::FindNumThreads(nnz);
   const int nb = (nnz + nt - 1) / nt;
-  CUDA_KERNEL_CALL(_COOIsSortedKernel, nb, nt, 0, thr_entry->stream,
+  CUDA_KERNEL_CALL(_COOIsSortedKernel, nb, nt, 0, stream,
       coo.row.Ptr<IdType>(), coo.col.Ptr<IdType>(),
       nnz, row_flags, col_flags);
 
@@ -180,8 +180,8 @@ std::pair<bool, bool> COOIsSorted(COOMatrix coo) {
   return {row_sorted, col_sorted};
 }
 
-template std::pair<bool, bool> COOIsSorted<kDLGPU, int32_t>(COOMatrix coo);
-template std::pair<bool, bool> COOIsSorted<kDLGPU, int64_t>(COOMatrix coo);
+template std::pair<bool, bool> COOIsSorted<kDGLCUDA, int32_t>(COOMatrix coo);
+template std::pair<bool, bool> COOIsSorted<kDGLCUDA, int64_t>(COOMatrix coo);
 
 }  // namespace impl
 }  // namespace aten

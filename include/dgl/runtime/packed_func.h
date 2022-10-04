@@ -350,28 +350,28 @@ class DGLPODValue_ {
     // Allow automatic conversion from int to float
     // This avoids errors when user pass in int from
     // the frontend while the API expects a float.
-    if (type_code_ == kDLInt) {
+    if (type_code_ == kDGLInt) {
       return static_cast<double>(value_.v_int64);
     }
-    DGL_CHECK_TYPE_CODE(type_code_, kDLFloat);
+    DGL_CHECK_TYPE_CODE(type_code_, kDGLFloat);
     return value_.v_float64;
   }
   operator int64_t() const {
-    DGL_CHECK_TYPE_CODE(type_code_, kDLInt);
+    DGL_CHECK_TYPE_CODE(type_code_, kDGLInt);
     return value_.v_int64;
   }
   operator uint64_t() const {
-    DGL_CHECK_TYPE_CODE(type_code_, kDLInt);
+    DGL_CHECK_TYPE_CODE(type_code_, kDGLInt);
     return value_.v_int64;
   }
   operator int() const {
-    DGL_CHECK_TYPE_CODE(type_code_, kDLInt);
+    DGL_CHECK_TYPE_CODE(type_code_, kDGLInt);
     CHECK_LE(value_.v_int64,
              std::numeric_limits<int>::max());
     return static_cast<int>(value_.v_int64);
   }
   operator bool() const {
-    DGL_CHECK_TYPE_CODE(type_code_, kDLInt);
+    DGL_CHECK_TYPE_CODE(type_code_, kDGLInt);
     return value_.v_int64 != 0;
   }
   operator void*() const {
@@ -380,14 +380,14 @@ class DGLPODValue_ {
     DGL_CHECK_TYPE_CODE(type_code_, kHandle);
     return value_.v_handle;
   }
-  operator DLTensor*() const {
+  operator DGLArray*() const {
     if (type_code_ == kArrayHandle ||
         type_code_ == kNDArrayContainer) {
-      return static_cast<DLTensor*>(value_.v_handle);
+      return static_cast<DGLArray*>(value_.v_handle);
     } else {
       if (type_code_ == kNull) return nullptr;
       LOG(FATAL) << "Expected "
-                 << "DLTensor* or NDArray but get "
+                 << "DGLArray* or NDArray but get "
                  << TypeCode2Str(type_code_);
       return nullptr;
     }
@@ -457,14 +457,14 @@ class DGLArgValue : public DGLPODValue_ {
   using DGLPODValue_::operator int;
   using DGLPODValue_::operator bool;
   using DGLPODValue_::operator void*;
-  using DGLPODValue_::operator DLTensor*;
+  using DGLPODValue_::operator DGLArray*;
   using DGLPODValue_::operator NDArray;
   using DGLPODValue_::operator DGLContext;
 
   // conversion operator.
   operator std::string() const {
-    if (type_code_ == kDGLType) {
-      return DGLType2String(operator DGLType());
+    if (type_code_ == kDGLDataType) {
+      return DGLDataType2String(operator DGLDataType());
     } else if (type_code_ == kBytes) {
       DGLByteArray* arr = static_cast<DGLByteArray*>(value_.v_handle);
       return std::string(arr->data, arr->size);
@@ -473,11 +473,11 @@ class DGLArgValue : public DGLPODValue_ {
       return std::string(value_.v_str);
     }
   }
-  operator DGLType() const {
+  operator DGLDataType() const {
     if (type_code_ == kStr) {
-      return String2DGLType(operator std::string());
+      return String2DGLDataType(operator std::string());
     }
-    DGL_CHECK_TYPE_CODE(type_code_, kDGLType);
+    DGL_CHECK_TYPE_CODE(type_code_, kDGLDataType);
     return value_.v_type;
   }
   operator PackedFunc() const {
@@ -549,7 +549,7 @@ class DGLRetValue : public DGLPODValue_ {
   using DGLPODValue_::operator int;
   using DGLPODValue_::operator bool;
   using DGLPODValue_::operator void*;
-  using DGLPODValue_::operator DLTensor*;
+  using DGLPODValue_::operator DGLArray*;
   using DGLPODValue_::operator DGLContext;
   using DGLPODValue_::operator NDArray;
   // Disable copy and assign from another value, but allow move.
@@ -558,19 +558,19 @@ class DGLRetValue : public DGLPODValue_ {
   }
   // conversion operators
   operator std::string() const {
-    if (type_code_ == kDGLType) {
-      return DGLType2String(operator DGLType());
+    if (type_code_ == kDGLDataType) {
+      return DGLDataType2String(operator DGLDataType());
     } else if (type_code_ == kBytes) {
       return *ptr<std::string>();
     }
     DGL_CHECK_TYPE_CODE(type_code_, kStr);
     return *ptr<std::string>();
   }
-  operator DGLType() const {
+  operator DGLDataType() const {
     if (type_code_ == kStr) {
-      return String2DGLType(operator std::string());
+      return String2DGLDataType(operator std::string());
     }
-    DGL_CHECK_TYPE_CODE(type_code_, kDGLType);
+    DGL_CHECK_TYPE_CODE(type_code_, kDGLDataType);
     return value_.v_type;
   }
   operator PackedFunc() const {
@@ -595,7 +595,7 @@ class DGLRetValue : public DGLPODValue_ {
     return *this;
   }
   DGLRetValue& operator=(double value) {
-    this->SwitchToPOD(kDLFloat);
+    this->SwitchToPOD(kDGLFloat);
     value_.v_float64 = value;
     return *this;
   }
@@ -610,17 +610,17 @@ class DGLRetValue : public DGLPODValue_ {
     return *this;
   }
   DGLRetValue& operator=(int64_t value) {
-    this->SwitchToPOD(kDLInt);
+    this->SwitchToPOD(kDGLInt);
     value_.v_int64 = value;
     return *this;
   }
   DGLRetValue& operator=(int value) {
-    this->SwitchToPOD(kDLInt);
+    this->SwitchToPOD(kDGLInt);
     value_.v_int64 = value;
     return *this;
   }
-  DGLRetValue& operator=(DGLType t) {
-    this->SwitchToPOD(kDGLType);
+  DGLRetValue& operator=(DGLDataType t) {
+    this->SwitchToPOD(kDGLDataType);
     value_.v_type = t;
     return *this;
   }
@@ -630,7 +630,7 @@ class DGLRetValue : public DGLPODValue_ {
     return *this;
   }
   DGLRetValue& operator=(bool value) {
-    this->SwitchToPOD(kDLInt);
+    this->SwitchToPOD(kDGLInt);
     value_.v_int64 = value;
     return *this;
   }
@@ -859,17 +859,17 @@ class DGLArgsSetter {
              std::is_integral<T>::value>::type>
   void operator()(size_t i, T value) const {
     values_[i].v_int64 = static_cast<int64_t>(value);
-    type_codes_[i] = kDLInt;
+    type_codes_[i] = kDGLInt;
   }
   void operator()(size_t i, uint64_t value) const {
     values_[i].v_int64 = static_cast<int64_t>(value);
     CHECK_LE(value,
              static_cast<uint64_t>(std::numeric_limits<int64_t>::max()));
-    type_codes_[i] = kDLInt;
+    type_codes_[i] = kDGLInt;
   }
   void operator()(size_t i, double value) const {
     values_[i].v_float64 = value;
-    type_codes_[i] = kDLFloat;
+    type_codes_[i] = kDGLFloat;
   }
   void operator()(size_t i, std::nullptr_t value) const {
     values_[i].v_handle = value;
@@ -883,7 +883,7 @@ class DGLArgsSetter {
     values_[i].v_handle = value;
     type_codes_[i] = kHandle;
   }
-  void operator()(size_t i, DLTensor* value) const {
+  void operator()(size_t i, DGLArray* value) const {
     values_[i].v_handle = value;
     type_codes_[i] = kArrayHandle;
   }
@@ -891,9 +891,9 @@ class DGLArgsSetter {
     values_[i].v_ctx = value;
     type_codes_[i] = kDGLContext;
   }
-  void operator()(size_t i, DGLType value) const {
+  void operator()(size_t i, DGLDataType value) const {
     values_[i].v_type = value;
-    type_codes_[i] = kDGLType;
+    type_codes_[i] = kDGLDataType;
   }
   void operator()(size_t i, const char* value) const {
     values_[i].v_str = value;

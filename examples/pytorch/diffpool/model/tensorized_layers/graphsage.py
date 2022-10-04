@@ -4,8 +4,9 @@ from torch.nn import functional as F
 
 
 class BatchedGraphSAGE(nn.Module):
-    def __init__(self, infeat, outfeat, use_bn=True,
-                 mean=False, add_self=False):
+    def __init__(
+        self, infeat, outfeat, use_bn=True, mean=False, add_self=False
+    ):
         super().__init__()
         self.add_self = add_self
         self.use_bn = use_bn
@@ -13,12 +14,12 @@ class BatchedGraphSAGE(nn.Module):
         self.W = nn.Linear(infeat, outfeat, bias=True)
 
         nn.init.xavier_uniform_(
-            self.W.weight,
-            gain=nn.init.calculate_gain('relu'))
+            self.W.weight, gain=nn.init.calculate_gain("relu")
+        )
 
     def forward(self, x, adj):
         num_node_per_graph = adj.size(1)
-        if self.use_bn and not hasattr(self, 'bn'):
+        if self.use_bn and not hasattr(self, "bn"):
             self.bn = nn.BatchNorm1d(num_node_per_graph).to(adj.device)
 
         if self.add_self:
@@ -37,6 +38,6 @@ class BatchedGraphSAGE(nn.Module):
 
     def __repr__(self):
         if self.use_bn:
-            return 'BN' + super(BatchedGraphSAGE, self).__repr__()
+            return "BN" + super(BatchedGraphSAGE, self).__repr__()
         else:
             return super(BatchedGraphSAGE, self).__repr__()
