@@ -781,6 +781,7 @@ class HeteroGNNExplainer(nn.Module):
         ('user', 'self', 'user'): tensor([])}
         """
         self.model.eval()
+        device = graph.device
 
         # Extract node-centered k-hop subgraph and
         # its associated node and edge features.
@@ -801,6 +802,7 @@ class HeteroGNNExplainer(nn.Module):
 
         # Get the initial prediction.
         with torch.no_grad():
+            self.model = self.model.to(device=device)
             logits = self.model(graph=sg, feat=sg_feat, **kwargs)[ntype]
             pred_label = logits.argmax(dim=-1)
 
@@ -998,9 +1000,11 @@ class HeteroGNNExplainer(nn.Module):
         ('user', 'self', 'user'): tensor([0.1303, 0.1315, 0.1977, 0.9092, 0.9010, 0.8202])}
         """
         self.model.eval()
+        device = graph.device
 
         # Get the initial prediction.
         with torch.no_grad():
+            self.model = self.model.to(device=device)
             logits = self.model(graph=graph, feat=feat, **kwargs)
             pred_label = logits.argmax(dim=-1)
 
