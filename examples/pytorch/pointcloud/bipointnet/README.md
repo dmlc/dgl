@@ -14,14 +14,18 @@ This project is the official implementation of our accepted ICLR 2021 paper *BiP
 python train_cls.py --model ${MODEL}
 ```
 
-Here, `MODEL` have two choices: `bipointnet`  and  `bipointnet2_ssg`
+Here, `MODEL` has two choices: `bipointnet`  and  `bipointnet2_ssg`
 
 # Performance
 
-| Task              | Dataset    | Metric   | Score - DGL (Adam) |
-| ----------------- | ---------- | -------- | ------------------ |
-| Classification    | ModelNet40 | Accuracy | 89.4               |
-| Part Segmentation | ShapeNet   | mIoU     | 83.1               |
+## Classification
+
+| Model           | Dataset    | Metric   | Score |
+| --------------- | ---------- | -------- | ----- |
+| BiPointNet      | ModelNet40 | Accuracy | 88.4  |
+| BiPointNet2_SSG | ModelNet40 | Accuracy | 83.1  |
+
+Because of the difference in implementation brought by the application of DGL, this version is even better than the original paper.
 
 ### Citation
 

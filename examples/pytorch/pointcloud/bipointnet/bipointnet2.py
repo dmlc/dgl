@@ -4,6 +4,7 @@ from basic import BiLinearLSR, BiConv2d, FixedRadiusNNGraph, RelativePositionMes
 import torch.nn.functional as F
 from dgl.geometry import farthest_point_sampler
 
+
 class BiPointNetConv(nn.Module):
     '''
     Feature aggregation

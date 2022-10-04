@@ -39,6 +39,7 @@ def farthest_point_sample(point, npoint):
     point = point[centroids.astype(np.int32)]
     return point
 
+
 class ModelNetDataLoader(Dataset):
     def __init__(self, root, npoint=1024, split='train', fps=False, 
                  normal_channel=True, cache_size=15000):
@@ -99,7 +100,3 @@ class ModelNetDataLoader(Dataset):
                 self.cache[index] = (point_set, cls)
 
         return point_set, cls
-
-    def __getitem__(self, index):
-        return self._get_item(index)
-        
