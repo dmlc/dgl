@@ -1336,6 +1336,7 @@ def test_gnnexplainer(g, idtype, out_dim):
 @pytest.mark.parametrize('output_dim', [1, 2])
 def test_heterognnexplainer(g, idtype, input_dim, hidden_dim, output_dim):
     g = g.astype(idtype).to(F.ctx())
+    device = g.device
 
     # add self-loop and reverse edges
     transform1 = dgl.transforms.AddSelfLoop(new_etypes=True)
@@ -1343,7 +1344,7 @@ def test_heterognnexplainer(g, idtype, input_dim, hidden_dim, output_dim):
     transform2 = dgl.transforms.AddReverse(copy_edata=True)
     g = transform2(g)
 
-    feat = {ntype: th.zeros((g.num_nodes(ntype), input_dim))
+    feat = {ntype: th.zeros((g.num_nodes(ntype), input_dim), device=device)
             for ntype in g.ntypes}
 
     class GCNLayer(th.nn.Module):
@@ -1351,7 +1352,7 @@ def test_heterognnexplainer(g, idtype, input_dim, hidden_dim, output_dim):
             super(GCNLayer, self).__init__()
 
             self.relation_weight_matrix = th.nn.ModuleDict({
-                ''.join(relation): th.nn.Linear(in_dim, out_dim)
+                ''.join(relation): th.nn.Linear(in_dim, out_dim).to(device)
                 for relation in graph_relation_list
             })
 
