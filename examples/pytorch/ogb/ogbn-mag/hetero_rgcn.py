@@ -1,6 +1,7 @@
 import argparse
 import itertools
 
+import os
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
@@ -13,7 +14,7 @@ from dgl import AddReverse, Compose, ToSimple
 from dgl.nn import HeteroEmbedding
 
 
-def prepare_data(args):
+def prepare_data(args, device):
     dataset = DglNodePropPredDataset(name="ogbn-mag")
     split_idx = dataset.get_idx_split()
     # graph: dgl graph object, label: torch tensor of shape (num_nodes, num_tasks)
@@ -29,13 +30,16 @@ def prepare_data(args):
 
     # train sampler
     sampler = dgl.dataloading.MultiLayerNeighborSampler([25, 20])
+    num_workers = 0 if device != "cpu" else int(os.cpu_count() / 2)
+    print(f"num of workers is {num_workers}")
     train_loader = dgl.dataloading.DataLoader(
         g,
         split_idx["train"],
         sampler,
         batch_size=1024,
         shuffle=True,
-        num_workers=0,
+        num_workers=num_workers,
+        device=device
     )
 
     return g, labels, dataset.num_classes, split_idx, logger, train_loader
@@ -314,6 +318,7 @@ def test(g, model, node_embed, y_true, device, split_idx):
         batch_size=16384,
         shuffle=False,
         num_workers=0,
+        device=device
     )
 
     pbar = tqdm(total=y_true.size(0))
@@ -369,9 +374,9 @@ def test(g, model, node_embed, y_true, device, split_idx):
 def main(args):
     device = f"cuda:0" if th.cuda.is_available() else "cpu"
 
-    g, labels, num_classes, split_idx, logger, train_loader = prepare_data(args)
+    g, labels, num_classes, split_idx, logger, train_loader = prepare_data(args, device)
 
-    embed_layer = rel_graph_embed(g, 128)
+    embed_layer = rel_graph_embed(g, 128).to(device)
     model = EntityClassify(g, 128, num_classes).to(device)
 
     print(
@@ -392,18 +397,36 @@ def main(args):
         )
         optimizer = th.optim.Adam(all_params, lr=0.01)
 
-        logger = train(
-            g,
-            model,
-            embed_layer,
-            optimizer,
-            train_loader,
-            split_idx,
-            labels,
-            logger,
-            device,
-            run,
-        )
+        if device == "cpu":
+            cores = list(range(os.cpu_count()))
+            len_cores = len(cores)
+            dl_cores = cores[:int(len_cores / 2)]
+            with train_loader.enable_cpu_affinity(dl_cores, [i for i in cores if i not in dl_cores]):
+                logger = train(
+                    g,
+                    model,
+                    embed_layer,
+                    optimizer,
+                    train_loader,
+                    split_idx,
+                    labels,
+                    logger,
+                    device,
+                    run,
+                )
+        else:
+            logger = train(
+                g,
+                model,
+                embed_layer,
+                optimizer,
+                train_loader,
+                split_idx,
+                labels,
+                logger,
+                device,
+                run,
+            )
         logger.print_statistics(run)
 
     print("Final performance: ")
