@@ -10,8 +10,7 @@ from pylibcugraphops.structure.graph_types import (message_flow_graph_hg_csr_int
 
 class RelGraphConvAgg(th.autograd.Function):
     @staticmethod
-    def forward(ctx, g, fanout, num_rels, out_node_types, in_node_types, edge_types,
-                feat, coeff):
+    def forward(ctx, g, fanout, num_rels, edge_types, feat, coeff):
         """
         Compute the forward pass of R-GCN aggregation layer.
 
@@ -25,12 +24,6 @@ class RelGraphConvAgg(th.autograd.Function):
 
         num_rels : int
             Number of edge types in this graph.
-
-        out_node_types : torch.Tensor, dtype=torch.int32
-            Tensor of the node types of output nodes.
-
-        in_node_types : torch.Tensor, dtype=torch.int32
-            Tensor of the node types of input nodes.
 
         edge_types : torch.Tensor, dtype=torch.int32
             Tensor of the edge types.
@@ -65,9 +58,10 @@ class RelGraphConvAgg(th.autograd.Function):
         # num_node_types is required for creating MFG
         # but not actually used in cugraph-ops' aggregators
         _num_node_types = 0
+        _out_node_types = _in_node_types = None
 
         mfg = mfg_csr_func(fanout, g.dstnodes(), g.srcnodes(), indptr, indices,
-            _num_node_types, num_rels, out_node_types, in_node_types, edge_types)
+            _num_node_types, num_rels, _out_node_types, _in_node_types, edge_types)
 
         if coeff is None:
             leading_dimension = num_rels * _in_feat
@@ -116,7 +110,7 @@ class RelGraphConvAgg(th.autograd.Function):
             agg_bwd_func(grad_feat, grad_output, feat.detach(), mfg,
                 output_weight_gradient=grad_coeff, weights_combination=coeff.detach())
 
-        return None, None, None, None, None, None, grad_feat, grad_coeff
+        return None, None, None, None, grad_feat, grad_coeff
 
 class RelGraphConv(nn.Module):
     """ Relational graph convolution layer. """
@@ -195,8 +189,7 @@ class RelGraphConv(nn.Module):
                 g.edata['norm'] = norm
             # message passing
             h = RelGraphConvAgg.apply(g, self.fanout, self.num_rels,
-                                      g.dstdata['ntype'], g.srcdata['ntype'], etypes,
-                                      feat, self.coeff)
+                                      etypes, feat, self.coeff)
             h = h @ self.W.view(-1, self.out_feat)
             # apply bias and activation
             if self.layer_norm:
