@@ -78,7 +78,7 @@ class SAGE(nn.Module):
                 block = blocks[0]
 
                 block = block.int().to(device)
-                h = x[input_nodes.long()].to(device)
+                h = x[input_nodes.to(x.device, th.int64)].to(device)
                 h = layer(block, h)
                 if l != len(self.layers) - 1:
                     h = self.activation(h)

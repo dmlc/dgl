@@ -51,7 +51,7 @@ class LadiesSampler(dgl.dataloading.BlockSampler):
             prob[insg.out_degrees() == 0] = 0
         return prob, insg
 
-    def select_neighbors(self, seed_nodes, cand_nodes, prob, num):
+    def select_neighbors(self, prob, num):
         """
         seed_nodes : output nodes
         cand_nodes : candidate nodes.  Must contain all output nodes in @seed_nodes

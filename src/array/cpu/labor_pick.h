@@ -58,8 +58,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(CSRMatrix mat, IdArray NIDs, IdArr
 
   constexpr bool linear_c_convergence = false;
 
-  // placeholder for the case when we have weights.
-  constexpr bool weights = false;
+  const bool weights = !IsNullArray(prob);
   auto A_arr = prob;
   FloatType *A = static_cast<FloatType*>(A_arr->data);
   constexpr double eps = 0.0001;
@@ -272,16 +271,17 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(CSRMatrix mat, IdArray NIDs, IdArr
     const auto off_start = off;
     for (auto j = indptr[rid]; j < indptr[rid + 1]; j++) {
       const auto v = indices[j];
-      const auto ct = weights ? c * A[j] : c;
+      const auto w = (weights ? A[j] : 1);
+      const auto ct = c * w;
       const auto ps = std::min(ONE, importance_sampling ? ct * hop_map[v] : ct);
       const auto rnd = rands[idx++];
       if (rnd <= ps) {
-        norm_inv_p += 1 / ps;
+        norm_inv_p += w / ps;
         picked_rdata[off] = rid;
         picked_cdata[off] = indices[j];
         picked_idata[off] = data ? data[j] : j;
         if (importance_sampling)
-          importances_data[off] = 1 / ps;
+          importances_data[off] = w / ps;
         off++;
       }
     }
