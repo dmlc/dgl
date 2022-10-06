@@ -17,6 +17,8 @@ import dgl
 import dgl.backend as F
 from functools import cached_property
 
+# from cugraph_utils import _assert_valid_canonical_etype
+
 
 class CuGraphStorage:
     """
@@ -38,16 +40,6 @@ class CuGraphStorage:
     def get_edge_storage(self, feat_name, etype=None):
         return self.graphstore.get_edge_storage(feat_name, etype)
 
-    #FIXME: Remove Below
-    @property
-    def ndata(self):
-        return self.graphstore.ndata
-
-    #FIXME: Remove Below
-    @property
-    def edata(self):
-        return self.graphstore.edata
-    
     @property
     def num_nodes_dict(self):
         return self.graphstore.num_nodes_dict
@@ -84,16 +76,30 @@ class CuGraphStorage:
     @property
     def canonical_etypes(self):
         can_etypes = self.graphstore.etypes
-        return [convert_can_etype_s_to_tup(s) for s in can_etypes]
+        if len(can_etypes) > 1:
+            return [convert_can_etype_s_to_tup(s) for s in can_etypes]
+        else:
+            return [("#", can_etypes[0], "#")]
 
     def add_node_data(self, df, node_col_name, feat_name, ntype=None):
         self.graphstore.add_node_data(df, node_col_name, feat_name, ntype)
 
-    def add_edge_data(self, df, vertex_col_names, feat_name, etype=None):
-        self.graphstore.add_edge_data(df, vertex_col_names, feat_name, etype)
+        # This will delete cached value
+        self.__dict__.pop("total_number_of_nodes", None)
 
+    def add_edge_data(
+        self, df, vertex_col_names, feat_name, canonical_etype=None
+    ):
+        if canonical_etype:
+            _assert_valid_canonical_etype(canonical_etype)
 
-    ### Index Conversion Utils
+        # Convert to a string because cugraph PG does not support tuple objects
+        canonical_etype = str(canonical_etype)
+        self.graphstore.add_edge_data(
+            df, vertex_col_names, feat_name, canonical_etype
+        )
+
+    # Index Conversion Utils
     def get_node_id_conversion_d(self):
         # dict for node_id_start
         last_st = 0
@@ -102,7 +108,6 @@ class CuGraphStorage:
             node_ind_st_d[ntype] = last_st
             last_st = last_st + self.num_nodes_dict[ntype]
         return node_ind_st_d
-
 
     @property
     def edge_id_conversion_d(self):
@@ -114,27 +119,23 @@ class CuGraphStorage:
             last_st = last_st + self.num_edges_dict[str(etype)]
         return edge_ind_st_d
 
-
     def dgl_n_id_to_cugraph_id(self, index_t, ntype):
         if self.node_id_conversion_d is None:
-            self.node_id_conversion_d == get_node_id_conversion_d()
+            self.node_id_conversion_d = self.get_node_id_conversion_d()
 
         return index_t + self.node_id_conversion_d[ntype]
 
+    def dgl_e_id_to_cugraph_id(self, index_t, etype):
+        return index_t + self.edge_id_conversion_d[etype]
+
     def cugraph_n_id_to_dgl_id(self, index_t, ntype):
         if self.node_id_conversion_d is None:
-            self.node_id_conversion_d == get_node_id_conversion_d()
+            self.node_id_conversion_d == self.get_node_id_conversion_d()
 
         return index_t - self.node_id_conversion_d[ntype]
 
     def cugraph_e_id_to_dgl_id(self, index_t, etype):
         return index_t - self.edge_id_conversion_d[etype]
-
-    def dgl_n_id_to_cugraph_id(self, index_t, ntype):
-        if self.node_id_conversion_d is None:
-            self.node_id_conversion_d == get_node_id_conversion_d()
-
-        return index_t + self.node_id_conversion_d[ntype]
 
     def sample_neighbors(
         self,
@@ -189,6 +190,7 @@ class CuGraphStorage:
             only the sampled neighboring edges.  The induced edge IDs will be
             in ``edata[dgl.EID]``.
         """
+
         if prob is not None:
             raise NotImplementedError(
                 "prob is not currently supported",
@@ -203,15 +205,24 @@ class CuGraphStorage:
 
         if not isinstance(seed_nodes, dict):
             if len(self.ntypes) > 1:
-                raise DGLError("Must specify node type when the graph is not homogeneous.")
+                raise dgl.DGLError(
+                    "Must specify node type when the graph is not homogeneous."
+                )
             else:
                 seed_nodes = F.tensor(seed_nodes)
                 seed_nodes_cap = F.zerocopy_to_dlpack(seed_nodes)
         else:
-            seed_nodes = {k: self.dgl_n_id_to_cugraph_id(F.tensor(n),k) for k,n in seed_nodes.items()}
-            seed_nodes_cap = {k: F.zerocopy_to_dlpack(F.tensor(n)) for k,n in seed_nodes.items()}
+            seed_nodes = {
+                k: self.dgl_n_id_to_cugraph_id(F.tensor(n), k)
+                for k, n in seed_nodes.items()
+            }
 
-        graph_data_cap_d = self.graphstore.sample_neighbors(
+            seed_nodes_cap = {
+                k: F.zerocopy_to_dlpack(F.tensor(n))
+                for k, n in seed_nodes.items()
+            }
+
+        sample_cap_obj = self.graphstore.sample_neighbors(
             seed_nodes_cap,
             fanout,
             edge_dir=edge_dir,
@@ -219,25 +230,32 @@ class CuGraphStorage:
             replace=replace,
         )
 
-        if len(self.etypes)>1:
-            graph_data_d,graph_eid_d = self._convert_pycap_to_dgl_tensor_d(graph_data_cap_d)
-            del graph_data_cap_d 
-            sampled_graph = dgl.heterograph(data_dict=graph_data_d, num_nodes_dict=self.num_nodes_dict, idtype=self.idtype)
+        if len(self.etypes) > 1:
+            graph_data_d, graph_eid_d = self._convert_pycap_to_dgl_tensor_d(
+                sample_cap_obj
+            )
+            sampled_graph = dgl.heterograph(
+                data_dict=graph_data_d,
+                num_nodes_dict=self.num_nodes_dict,
+                idtype=self.idtype,
+            )
             sampled_graph.edata[dgl.EID] = graph_eid_d
         else:
-            src_c, dst_c, edge_id_c = graph_data_cap_d
+            src_c, dst_c, edge_id_c = sample_cap_obj
             src_ids = F.zerocopy_from_dlpack(src_c)
             dst_ids = F.zerocopy_from_dlpack(dst_c)
             edge_id_t = F.zerocopy_from_dlpack(edge_id_c)
 
-            sampled_graph = dgl.graph((src_ids, dst_ids), num_nodes=self.total_number_of_nodes, idtype=self.idtype)
+            sampled_graph = dgl.graph(
+                (src_ids, dst_ids),
+                num_nodes=self.total_number_of_nodes,
+                idtype=self.idtype,
+            )
             sampled_graph.edata[dgl.EID] = edge_id_t
 
         # to device function move the dgl graph to desired devices
         if output_device is not None:
             sampled_graph.to_device(output_device)
-        
-        print("Completed Sampling")
         return sampled_graph
 
     # Required in Cluster-GCN
@@ -354,7 +372,6 @@ class CuGraphStorage:
         # use graphstore function
         return self.graphstore.num_nodes(ntype)
 
-    
     def number_of_nodes(self, ntype):
         return self.num_nodes(ntype)
 
@@ -388,13 +405,18 @@ class CuGraphStorage:
         """
         raise NotImplementedError("canonical not implemented")
 
-    def _convert_pycap_to_dgl_tensor_d(self, graph_data_cap_d, o_dtype=F.int64):
+    def _convert_pycap_to_dgl_tensor_d(
+        self, graph_data_cap_d, o_dtype=F.int64
+    ):
         graph_data_d = {}
         graph_eid_d = {}
-        for canonical_etype_s, (src_cap, dst_cap, edge_id_cap) in graph_data_cap_d.items():
+        for canonical_etype_s, (
+            src_cap,
+            dst_cap,
+            edge_id_cap,
+        ) in graph_data_cap_d.items():
             if isinstance(canonical_etype_s, str):
-                #FIXME: REMOVE ALL string extracting 
-
+                # FIXME: REMOVE ALL string extracting
                 canonical_etype = convert_can_etype_s_to_tup(canonical_etype_s)
                 src_type = canonical_etype[0]
                 dst_type = canonical_etype[2]
@@ -412,22 +434,46 @@ class CuGraphStorage:
 
                 src_t = self.cugraph_n_id_to_dgl_id(src_t, src_type)
                 dst_t = self.cugraph_n_id_to_dgl_id(dst_t, dst_type)
-                edge_id_t = self.cugraph_e_id_to_dgl_id(edge_id_t, canonical_etype)
+                edge_id_t = self.cugraph_e_id_to_dgl_id(
+                    edge_id_t, canonical_etype
+                )
 
-            
-            graph_data_d[canonical_etype] = (src_t.to(o_dtype).to('cuda'),
-                                            dst_t.to(o_dtype).to('cuda'))
-            graph_eid_d[canonical_etype]  = edge_id_t.to(o_dtype).to('cuda')
-            
+            graph_data_d[canonical_etype] = (
+                src_t.to(o_dtype).to("cuda"),
+                dst_t.to(o_dtype).to("cuda"),
+            )
+            graph_eid_d[canonical_etype] = edge_id_t.to(o_dtype).to("cuda")
+
         return graph_data_d, graph_eid_d
 
 
-
 def convert_can_etype_s_to_tup(canonical_etype_s):
-    src_type,etype,dst_type = canonical_etype_s.split(',')
+    src_type, etype, dst_type = canonical_etype_s.split(",")
     src_type = src_type[2:-1]
     dst_type = dst_type[2:-2]
     etype = etype[2:-1]
     return (src_type, etype, dst_type)
 
-   
+
+# TODO: Move to utils
+def _assert_valid_canonical_etype(canonical_etype):
+    if not _is_valid_canonical_etype:
+        error_message = (
+            f"Invalid canonical_etype {canonical_etype} "
+            + "canonical etype should be is a string triplet (str, str, str)"
+            + "for source node type, edge type and destination node type"
+        )
+        raise dgl.DGLError(error_message)
+
+
+def _is_valid_canonical_etype(canonical_etype):
+    if not isinstance(canonical_etype, tuple):
+        return False
+
+    if len(canonical_etype) != 3:
+        return False
+
+    for t in canonical_etype:
+        if not isinstance(t, str):
+            return False
+    return True
