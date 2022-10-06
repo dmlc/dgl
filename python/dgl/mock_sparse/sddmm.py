@@ -5,6 +5,9 @@ from .sp_matrix import SparseMatrix
 
 __all__ = ["sddmm"]
 
+# TODO(Israt): Find a better solution to load the sparse library
+torch.ops.load_library("build/tensoradapter/pytorch/libdgl_sparse.so")
+
 
 def sddmm(
     A: SparseMatrix, mat1: torch.Tensor, mat2: torch.Tensor
@@ -55,4 +58,5 @@ def sddmm(
     )
     # PyTorch's sddmm operator only supports CSR format.
     res = torch.sparse.sampled_addmm(A.adj.to_sparse_csr(), mat1, mat2)
+    # res = torch.ops.dgl_sparse.SDDMM(A.row, A.col)
     return SparseMatrix(A.row, A.col, res.values(), A.adj.shape)

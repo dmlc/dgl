@@ -30,6 +30,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g3 -ggdb")
 set(TORCH_TARGET_NAME "tensoradapter_pytorch_${TORCH_VER}")
 file(GLOB TA_TORCH_SRC *.cpp)
 add_library(${TORCH_TARGET_NAME} SHARED "${TA_TORCH_SRC}")
+add_library(dgl_sparse SHARED ${CMAKE_SOURCE_DIR}/../../src/sparse/sddmm.cc)
 
 # use the library name rather than the path
 set(TENSORADAPTER_TORCH_LIBS torch)
@@ -44,5 +45,6 @@ target_include_directories(
 target_include_directories(
   ${TORCH_TARGET_NAME} PRIVATE "${TORCH_INCLUDE_DIRS}")
 target_link_libraries(${TORCH_TARGET_NAME} PRIVATE "${TENSORADAPTER_TORCH_LIBS}")
+target_link_libraries(dgl_sparse "${TORCH_LIBRARIES}")
 set_property(TARGET ${TORCH_TARGET_NAME} PROPERTY CXX_STANDARD 14)
 message(STATUS "Configured target ${TORCH_TARGET_NAME}")
