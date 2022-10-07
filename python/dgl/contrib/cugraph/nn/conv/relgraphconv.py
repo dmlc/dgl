@@ -25,7 +25,7 @@ class RelGraphConvAgg(th.autograd.Function):
         num_rels : int
             Number of edge types in this graph.
 
-        edge_types : torch.Tensor, dtype=torch.int32
+        edge_types : torch.Tensor
             Tensor of the edge types.
 
         coeff : torch.Tensor, dtype=torch.float32, requires_grad=True
@@ -54,14 +54,16 @@ class RelGraphConvAgg(th.autograd.Function):
         ctx.graph_idtype = g.idtype
 
         _in_feat = feat.shape[-1]
-        indptr, indices, _ = g.adj_sparse('csc')  # edge_ids not needed here
-        # num_node_types is required for creating MFG
-        # but not actually used in cugraph-ops' aggregators
+        indptr, indices, edge_ids = g.adj_sparse('csc')
+        # edge_ids is in a mixed order, need to permutate incoming etypes
+        # and stash the result for backward propagation
+        ctx.edge_types_int32 = edge_types[edge_ids].type(th.int32)
+        # node_types are not needed by the post-variant rgcn aggregators
         _num_node_types = 0
         _out_node_types = _in_node_types = None
 
         mfg = mfg_csr_func(fanout, g.dstnodes(), g.srcnodes(), indptr, indices,
-            _num_node_types, num_rels, _out_node_types, _in_node_types, edge_types)
+            _num_node_types, num_rels, _out_node_types, _in_node_types, ctx.edge_types_int32)
 
         if coeff is None:
             leading_dimension = num_rels * _in_feat

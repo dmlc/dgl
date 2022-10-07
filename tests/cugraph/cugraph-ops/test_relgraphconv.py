@@ -27,10 +27,7 @@ def test_full_graph():
     conv_ops = RelGraphConvOps(in_feat, out_feat, num_rels, fanout, **kwargs)
     conv_ops.W.data = conv.linear_r.W.data
     conv_ops.coeff.data = conv.linear_r.coeff.data
-
-    _, _, edge_ids = g.adj_sparse('csc')
-    etypes = g.edata[dgl.ETYPE][edge_ids].type(torch.int32)
-    res_ops = conv_ops(g, feat, etypes)
+    res_ops = conv_ops(g, feat, g.edata[dgl.ETYPE])
 
     assert torch.allclose(res, res_ops, rtol=1e-03)
 
@@ -48,9 +45,6 @@ def test_mfg():
     conv_ops = RelGraphConvOps(in_feat, out_feat, num_rels, fanout, **kwargs)
     conv_ops.W.data = conv.linear_r.W.data
     conv_ops.coeff.data = conv.linear_r.coeff.data
-
-    _, _, edge_ids = block.adj_sparse('csc')
-    etypes = block.edata[dgl.ETYPE][edge_ids].type(torch.int32)
-    res_ops = conv_ops(block, feat[block.srcdata[dgl.NID]], etypes)
+    res_ops = conv_ops(block, feat[block.srcdata[dgl.NID]], block.edata[dgl.ETYPE])
 
     assert torch.allclose(res, res_ops, rtol=1e-03)
