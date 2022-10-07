@@ -57,7 +57,7 @@ class RelGraphConvAgg(th.autograd.Function):
         indptr, indices, edge_ids = g.adj_sparse('csc')
         # edge_ids is in a mixed order, need to permutate incoming etypes
         # and stash the result for backward propagation
-        ctx.edge_types_int32 = edge_types[edge_ids].type(th.int32)
+        ctx.edge_types_int32 = edge_types[edge_ids.long()].int()
         # node_types are not needed by the post-variant rgcn aggregators
         _num_node_types = 0
         _out_node_types = _in_node_types = None
