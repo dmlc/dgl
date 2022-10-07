@@ -8,6 +8,8 @@ from pylibcugraphops.aggregators.node_level import (agg_hg_basis_post_fwd_int32,
 from pylibcugraphops.structure.graph_types import (message_flow_graph_hg_csr_int32,
     message_flow_graph_hg_csr_int64)
 
+CUDA_SM_PER_BLOCK = 49152
+
 class RelGraphConvAgg(th.autograd.Function):
     @staticmethod
     def forward(ctx, g, fanout, num_rels, edge_types, feat, coeff):
@@ -184,6 +186,14 @@ class RelGraphConv(nn.Module):
                     f'Supported regularizer options: "basis", but got {self.regularizer}')
 
     def forward(self, g, feat, etypes, norm=None, *, presorted=False):
+        _sm_size = self.fanout * 2 + 3 + \
+                   self.num_rels * self.num_bases if self.regularizer == 'basis' else 0
+        _sm_size *= 8 if g.idtype == th.int64 else 4
+        if _sm_size > CUDA_SM_PER_BLOCK:
+            raise MemoryError(
+                f"Failed to allocate {_sm_size} bytes shared memory on CUDA, "
+                f"larger than the limit: {CUDA_SM_PER_BLOCK} bytes. "
+                f"Try reducing fanout or num_bases.")
         self.presorted = presorted
         with g.local_scope():
             g.srcdata['h'] = feat
