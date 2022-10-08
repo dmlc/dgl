@@ -1,65 +1,65 @@
-import argparse
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import dgl
 from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
 from dgl import AddSelfLoop
+import argparse
+
+from dgl.mock_sparse import create_from_coo, softmax, bspmm
 from torch.nn import init
 
-from dgl.mock_sparse import create_from_coo, diag, identity
 
-
-class GraphConv(nn.Module):
-    def __init__(self, in_size, out_size, activation=None):
-        super(GraphConv, self).__init__()
-        self.W = nn.Parameter(torch.Tensor(in_size, out_size))
-        self.activation = activation
-        self.bias = nn.Parameter(torch.Tensor(out_size))
-
-        self.reset_parameters()
-
-    def forward(self, A, x):
-        h = x @ self.W  # Dense mm, pytorch op
-        h = A @ h       # SpMM
-        h += self.bias
-
-        if self.activation:
-            h = self.activation(h)
-        return h
-
-    def reset_parameters(self):
+class GATConv(nn.Module):
+    def __init__(self, in_size, out_size, n_heads):
+        super(GATConv, self).__init__()
+        self.in_size = in_size
+        self.out_size = out_size
+        self.n_heads = n_heads
+        self.W = nn.Parameter(torch.Tensor(in_size, out_size * n_heads))
+        self.a_l = nn.Parameter(torch.Tensor(1, n_heads, out_size))
+        self.a_r = nn.Parameter(torch.Tensor(1, n_heads, out_size))
+        self.leaky_relu = nn.LeakyReLU(0.2)
         init.xavier_uniform_(self.W)
-        init.zeros_(self.bias)
+        init.xavier_uniform_(self.a_l)
+        init.xavier_uniform_(self.a_r)
+
+    def forward(self, A, h):
+        Wh = (h @ self.W).view(
+            -1, self.n_heads, self.out_size
+        )  # |V| x N_h x D_o
+        Wh1 = (Wh * self.a_l).sum(2)  # |V| x N_h
+        Wh2 = (Wh * self.a_r).sum(2)  # |V| x N_h
+        Wh1 = Wh1[A.row, :]  # |E| x N_h
+        Wh2 = Wh2[A.col, :]  # |E| x N_h
+        e = Wh1 + Wh2  # |E| x N_h
+        e = self.leaky_relu(e)  # |E| x N_h
+        A = create_from_coo(
+            A.row, A.col, e, A.shape
+        )  # |V| x |V| x N_h SparseMatrix
+        A_hat = softmax(A)  # |V| x |V| x N_h SparseMatrix
+        Wh = Wh.reshape(-1, self.out_size, self.n_heads)  # |V| x D_o x N_h
+        h_prime = bspmm(A_hat, Wh)  # |V| x D_o x N_h
+
+        return torch.relu(h_prime)
 
 
-class GCN(nn.Module):
-    def __init__(self, in_size, hid_size, out_size):
+class GAT(nn.Module):
+    def __init__(self, in_size, hidden_size, out_size, n_heads):
         super().__init__()
         self.layers = nn.ModuleList()
-        # two-layer GCN
-        self.layers.append(GraphConv(in_size, hid_size, activation=F.relu))
-        self.layers.append(GraphConv(hid_size, out_size))
-        self.dropout = nn.Dropout(0.5)
+        self.layers.append(GATConv(in_size, hidden_size, n_heads))
+        self.layers.append(GATConv(hidden_size * n_heads, out_size, n_heads))
 
     def forward(self, A, features):
         h = features
         for i, layer in enumerate(self.layers):
-            if i != 0:
-                h = self.dropout(h)
             h = layer(A, h)
+            if i == 1:  # last layer
+                h = h.mean(1)
+            else:  # other layer(s)
+                h = h.flatten(1)
         return h
-
-
-def gcn_norm(A):
-    # normalization
-    I = identity(A.shape)  # create an identity matrix
-    A_hat = A + I  # add self-loop to A
-    D = diag(A_hat.sum(0))  # diagonal degree matrix of A_hat
-    D_hat = D
-    D_hat = pow(D_hat, -0.5)
-    A_hat = D_hat @ A_hat @ D_hat
-
-    return A_hat
 
 
 def evaluate(A, features, labels, mask, model):
@@ -81,7 +81,7 @@ def train(A, features, labels, masks, model):
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-2, weight_decay=5e-4)
 
     # training loop
-    for epoch in range(200):
+    for epoch in range(50):
         model.train()
         logits = model(A, features)
         loss = loss_fcn(logits[train_mask], labels[train_mask])
@@ -102,10 +102,10 @@ if __name__ == "__main__":
         "--dataset",
         type=str,
         default="cora",
-        help="Dataset name ('cora', 'citeseer', 'pubmed', 'synthetic).",
+        help="Dataset name ('cora', 'citeseer', 'pubmed').",
     )
     args = parser.parse_args()
-    print(f"Training with DGL SparseMatrix GraphConv module.")
+    print(f"Training with DGL SparseMatrix GATConv module.")
 
     # load and preprocess dataset
     transform = (
@@ -119,7 +119,8 @@ if __name__ == "__main__":
         data = PubmedGraphDataset(transform=transform)
     else:
         raise ValueError("Unknown dataset: {}".format(args.dataset))
-    g = data[0].int()
+    g = data[0]
+    g = g.int()
     features = g.ndata["feat"]
     labels = g.ndata["label"]
     masks = g.ndata["train_mask"], g.ndata["val_mask"], g.ndata["test_mask"]
@@ -128,12 +129,11 @@ if __name__ == "__main__":
     A = create_from_coo(
         row, col, shape=(g.number_of_nodes(), g.number_of_nodes())
     )
-    A = gcn_norm(A)
 
-    # create GCN model
+    # create GAT model
     in_size = features.shape[1]
     out_size = data.num_classes
-    model = GCN(in_size, 16, out_size)
+    model = GAT(in_size, 8, out_size, 8)
 
     # model training
     print("Training...")

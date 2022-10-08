@@ -182,11 +182,14 @@ def create_dgl_object(schema, part_id, node_data, edge_data, edgeid_offset,
 
     # It's not guaranteed that the edges are sorted based on edge type.
     # Let's sort edges and all attributes on the edges.
-    sort_idx = np.argsort(etype_ids)
-    shuffle_global_src_id, shuffle_global_dst_id, global_src_id, global_dst_id, global_edge_id, etype_ids = \
-            shuffle_global_src_id[sort_idx], shuffle_global_dst_id[sort_idx], global_src_id[sort_idx], \
-            global_dst_id[sort_idx], global_edge_id[sort_idx], etype_ids[sort_idx]
-    assert np.all(np.diff(etype_ids) >= 0)
+    if not np.all(np.diff(etype_ids) >= 0):
+        sort_idx = np.argsort(etype_ids)
+        shuffle_global_src_id, shuffle_global_dst_id, global_src_id, global_dst_id, global_edge_id, etype_ids = \
+                shuffle_global_src_id[sort_idx], shuffle_global_dst_id[sort_idx], global_src_id[sort_idx], \
+                global_dst_id[sort_idx], global_edge_id[sort_idx], etype_ids[sort_idx]
+        assert np.all(np.diff(etype_ids) >= 0)
+    else:
+        print(f'[Rank: {part_id} Edge data is already sorted !!!')
 
     # Determine the edge ID range of different edge types.
     edge_id_start = edgeid_offset 
@@ -272,6 +275,7 @@ def create_dgl_object(schema, part_id, node_data, edge_data, edgeid_offset,
     part_graph.edata['orig_id'] = th.as_tensor(global_edge_id)
     part_graph.edata[dgl.ETYPE] = th.as_tensor(etype_ids)
     part_graph.edata['inner_edge'] = th.ones(part_graph.number_of_edges(), dtype=th.bool)
+
 
     #compute per_type_ids and ntype for all the nodes in the graph.
     global_ids = np.concatenate(
