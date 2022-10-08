@@ -12,9 +12,9 @@ namespace aten {
 namespace impl {
 
 template <typename DType, typename IdType>
-__global__ void IndexSelectSingleKernel(const DType* array, const IdType* index,
-                                        const int64_t length,
-                                        const int64_t arr_len, DType* out) {
+__global__ void IndexSelectSingleKernel(
+    const DType* array, const IdType* index, const int64_t length,
+    const int64_t arr_len, DType* out) {
   int tx = blockIdx.x * blockDim.x + threadIdx.x;
   int stride_x = gridDim.x * blockDim.x;
   while (tx < length) {
@@ -45,10 +45,9 @@ __global__ void IndexSelectMultiKernel(
 }
 
 template <typename DType, typename IdType>
-__global__ void IndexScatterSingleKernel(const DType* array,
-                                         const IdType* index,
-                                         const int64_t length,
-                                         const int64_t arr_len, DType* out) {
+__global__ void IndexScatterSingleKernel(
+    const DType* array, const IdType* index, const int64_t length,
+    const int64_t arr_len, DType* out) {
   int tx = blockIdx.x * blockDim.x + threadIdx.x;
   int stride_x = gridDim.x * blockDim.x;
   while (tx < length) {

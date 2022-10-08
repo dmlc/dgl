@@ -36,8 +36,9 @@ NDArray IndexSelect(NDArray array, IdArray index) {
   if (num_feat == 1) {
     const int nt = cuda::FindNumThreads(len);
     const int nb = (len + nt - 1) / nt;
-    CUDA_KERNEL_CALL(IndexSelectSingleKernel, nb, nt, 0, stream, array_data,
-                     idx_data, len, arr_len, ret_data);
+    CUDA_KERNEL_CALL(
+        IndexSelectSingleKernel, nb, nt, 0, stream, array_data, idx_data, len,
+        arr_len, ret_data);
   } else {
     dim3 block(256, 1);
     while (static_cast<int64_t>(block.x) >= 2 * num_feat) {
@@ -45,8 +46,9 @@ NDArray IndexSelect(NDArray array, IdArray index) {
       block.y *= 2;
     }
     const dim3 grid((len + block.y - 1) / block.y);
-    CUDA_KERNEL_CALL(IndexSelectMultiKernel, grid, block, 0, stream, array_data,
-                     num_feat, idx_data, len, arr_len, ret_data);
+    CUDA_KERNEL_CALL(
+        IndexSelectMultiKernel, grid, block, 0, stream, array_data, num_feat,
+        idx_data, len, arr_len, ret_data);
   }
   return ret;
 }
@@ -71,16 +73,16 @@ DType IndexSelect(NDArray array, int64_t index) {
   // The initialization constructor for __half is apparently a device-
   // only function in some setups, but the current function, IndexSelect,
   // isn't run on the device, so it doesn't have access to that constructor.
-  using SafeDType =
-      typename std::conditional<std::is_same<DType, __half>::value, uint16_t,
-                                DType>::type;
+  using SafeDType = typename std::conditional<
+      std::is_same<DType, __half>::value, uint16_t, DType>::type;
   SafeDType ret = 0;
 #else
   DType ret = 0;
 #endif
-  device->CopyDataFromTo(static_cast<DType*>(array->data) + index, 0,
-                         reinterpret_cast<DType*>(&ret), 0, sizeof(DType),
-                         array->ctx, DGLContext{kDGLCPU, 0}, array->dtype);
+  device->CopyDataFromTo(
+      static_cast<DType*>(array->data) + index, 0,
+      reinterpret_cast<DType*>(&ret), 0, sizeof(DType), array->ctx,
+      DGLContext{kDGLCPU, 0}, array->dtype);
   return reinterpret_cast<DType&>(ret);
 }
 
