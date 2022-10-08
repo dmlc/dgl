@@ -185,7 +185,7 @@
     typedef double DType;                                     \
     {__VA_ARGS__}                                             \
   } else {                                                    \
-    LOG(FATAL) << (val_name) << " can only be int32, int64, float32 or float64"; \
+    LOG(FATAL) << (val_name) << " can only be int8, uint8, float32 or float64"; \
   }                                                           \
 } while (0)
 
