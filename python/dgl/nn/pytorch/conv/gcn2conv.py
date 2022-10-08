@@ -104,15 +104,17 @@ class GCN2Conv(nn.Module):
 
     """
 
-    def __init__(self,
-                 in_feats,
-                 layer,
-                 alpha=0.1,
-                 lambda_=1,
-                 project_initial_features=True,
-                 allow_zero_in_degree=False,
-                 bias=True,
-                 activation=None):
+    def __init__(
+        self,
+        in_feats,
+        layer,
+        alpha=0.1,
+        lambda_=1,
+        project_initial_features=True,
+        allow_zero_in_degree=False,
+        bias=True,
+        activation=None,
+    ):
         super().__init__()
 
         self._in_feats = in_feats
@@ -131,7 +133,8 @@ class GCN2Conv(nn.Module):
             self.register_parameter("weight2", None)
         else:
             self.weight2 = nn.Parameter(
-                th.Tensor(self._in_feats, self._in_feats))
+                th.Tensor(self._in_feats, self._in_feats)
+            )
 
         if self._bias:
             self.bias = nn.Parameter(th.Tensor(self._in_feats))
@@ -233,7 +236,7 @@ class GCN2Conv(nn.Module):
                 norm = th.pow(degs, -0.5)
                 norm = norm.to(feat.device).unsqueeze(1)
             else:
-                edge_weight = EdgeWeightNorm('both')(graph, edge_weight)
+                edge_weight = EdgeWeightNorm("both")(graph, edge_weight)
 
             if edge_weight is None:
                 feat = feat * norm
@@ -255,14 +258,26 @@ class GCN2Conv(nn.Module):
             if self._project_initial_features:
                 rst = feat.add_(feat_0)
                 rst = th.addmm(
-                    feat, feat, self.weight1, beta=(1 - self.beta), alpha=self.beta
+                    feat,
+                    feat,
+                    self.weight1,
+                    beta=(1 - self.beta),
+                    alpha=self.beta,
                 )
             else:
                 rst = th.addmm(
-                    feat, feat, self.weight1, beta=(1 - self.beta), alpha=self.beta
+                    feat,
+                    feat,
+                    self.weight1,
+                    beta=(1 - self.beta),
+                    alpha=self.beta,
                 )
                 rst += th.addmm(
-                    feat_0, feat_0, self.weight2, beta=(1 - self.beta), alpha=self.beta
+                    feat_0,
+                    feat_0,
+                    self.weight2,
+                    beta=(1 - self.beta),
+                    alpha=self.beta,
                 )
 
             if self._bias:

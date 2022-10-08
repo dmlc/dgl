@@ -1,9 +1,11 @@
 """MXNet Module for DenseGraphSAGE"""
 # pylint: disable= no-member, arguments-differ, invalid-name
 import math
+
 import mxnet as mx
 from mxnet import nd
 from mxnet.gluon import nn
+
 from ....utils import check_eq_shape
 
 
@@ -35,13 +37,16 @@ class DenseSAGEConv(nn.Block):
     --------
     `SAGEConv <https://docs.dgl.ai/api/python/nn.pytorch.html#sageconv>`__
     """
-    def __init__(self,
-                 in_feats,
-                 out_feats,
-                 feat_drop=0.,
-                 bias=True,
-                 norm=None,
-                 activation=None):
+
+    def __init__(
+        self,
+        in_feats,
+        out_feats,
+        feat_drop=0.0,
+        bias=True,
+        norm=None,
+        activation=None,
+    ):
         super(DenseSAGEConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
@@ -49,8 +54,12 @@ class DenseSAGEConv(nn.Block):
         with self.name_scope():
             self.feat_drop = nn.Dropout(feat_drop)
             self.activation = activation
-            self.fc = nn.Dense(out_feats, in_units=in_feats, use_bias=bias,
-                               weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)))
+            self.fc = nn.Dense(
+                out_feats,
+                in_units=in_feats,
+                use_bias=bias,
+                weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)),
+            )
 
     def forward(self, adj, feat):
         r"""

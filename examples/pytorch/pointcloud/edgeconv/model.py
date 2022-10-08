@@ -1,11 +1,20 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from dgl.nn.pytorch import KNNGraph, EdgeConv
+
+from dgl.nn.pytorch import EdgeConv, KNNGraph
+
 
 class Model(nn.Module):
-    def __init__(self, k, feature_dims, emb_dims, output_classes, input_dims=3,
-                 dropout_prob=0.5):
+    def __init__(
+        self,
+        k,
+        feature_dims,
+        emb_dims,
+        output_classes,
+        input_dims=3,
+        dropout_prob=0.5,
+    ):
         super(Model, self).__init__()
 
         self.nng = KNNGraph(k)
@@ -13,10 +22,13 @@ class Model(nn.Module):
 
         self.num_layers = len(feature_dims)
         for i in range(self.num_layers):
-            self.conv.append(EdgeConv(
-                feature_dims[i - 1] if i > 0 else input_dims,
-                feature_dims[i],
-                batch_norm=True))
+            self.conv.append(
+                EdgeConv(
+                    feature_dims[i - 1] if i > 0 else input_dims,
+                    feature_dims[i],
+                    batch_norm=True,
+                )
+            )
 
         self.proj = nn.Linear(sum(feature_dims), emb_dims[0])
 
@@ -26,10 +38,13 @@ class Model(nn.Module):
 
         self.num_embs = len(emb_dims) - 1
         for i in range(1, self.num_embs + 1):
-            self.embs.append(nn.Linear(
-                # * 2 because of concatenation of max- and mean-pooling
-                emb_dims[i - 1] if i > 1 else (emb_dims[i - 1] * 2),
-                emb_dims[i]))
+            self.embs.append(
+                nn.Linear(
+                    # * 2 because of concatenation of max- and mean-pooling
+                    emb_dims[i - 1] if i > 1 else (emb_dims[i - 1] * 2),
+                    emb_dims[i],
+                )
+            )
             self.bn_embs.append(nn.BatchNorm1d(emb_dims[i]))
             self.dropouts.append(nn.Dropout(dropout_prob))
 
