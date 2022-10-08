@@ -112,7 +112,7 @@ struct TransformOp {
 template <typename IdType, typename FloatType, typename probs_t, typename A_t>
 struct TransformOpImp {
     probs_t probs;
-    A_t A;
+    A_t A_g;
     const IdType * idx_coo;
     const IdType * rows;
     const FloatType * cs;
@@ -123,12 +123,12 @@ struct TransformOpImp {
     __host__ __device__
     auto operator() (IdType idx) {
         const auto ps = probs[idx];
-        const auto w = A[idx];
         const auto in_row = idx_coo[idx];
         const auto c = cs[in_row];
         const auto row = rows[in_row];
         const auto in_idx = indptr[row] + idx - subindptr[in_row];
         const auto u = indices[in_idx];
+        const auto w = A_g[in_idx];
         const auto data = data_arr ? data_arr[in_idx] : in_idx;
         return thrust::make_tuple(in_row, row, u, data, w / min((FloatType)1, c * w * ps));
     }
@@ -151,7 +151,7 @@ struct StencilOpFused {
     const IdType * idx_coo;
     const FloatType * cs;
     const ps_t probs;
-    const A_t A;
+    const A_t A_g;
     const IdType * subindptr;
     const IdType * rows;
     const IdType * indptr;
@@ -180,7 +180,7 @@ struct StencilOpFused {
         }
         else
             rnd = curand_uniform(&rng);
-        return rnd <= cs[in_row] * A[idx] * ps;
+        return rnd <= cs[in_row] * A_g[in_idx] * ps;
     }
 };
 
@@ -390,11 +390,12 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
                                     FloatArray prob_arr,
                                     IdArray random_seed,
                                     IdArray cnt,
-                                    const int importance_sampling) {
+                                    int importance_sampling) {
     constexpr bool use_csr_spmv = false;
     constexpr bool use_hashtable = false;
     const IdType num_picks = num_picks__;
     const bool weights = !IsNullArray(prob_arr);
+    importance_sampling *= !weights;
 
     const unsigned long max_log_num_vertices = [&]() -> int {
         for (int i = 0; i < (int)sizeof(IdType) * 8; i++)
@@ -696,7 +697,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
         if (importance_sampling) {
             auto output = thrust::make_zip_iterator(picked_inrow.get(), picked_row_data, picked_col_data, picked_idx_data, picked_imp_data);
             if (weights) {
-                auto transformed_output = thrust::make_transform_output_iterator(output, TransformOpImp<IdType, FloatType, FloatType *, FloatType *>{probs_found.get(), A, idx_coo, rows, cs, indptr, subindptr, indices, data});
+                auto transformed_output = thrust::make_transform_output_iterator(output, TransformOpImp<IdType, FloatType, FloatType *, FloatType *>{probs_found.get(), A_g, idx_coo, rows, cs, indptr, subindptr, indices, data});
                 auto stencil = thrust::make_zip_iterator(idx_coo, probs_found.get(), A, rands.get());
                 num_edges = thrust::copy_if(exec_policy, iota, iota + hop_size, stencil, transformed_output, thrust::make_zip_function(StencilOp<FloatType>{cs})) - transformed_output;
             }
@@ -716,8 +717,8 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
             const FloatType b = std::sin(pi * l / 2);
             if (weights) {
                 auto output = thrust::make_zip_iterator(picked_inrow.get(), picked_row_data, picked_col_data, picked_idx_data, picked_imp_data);
-                auto transformed_output = thrust::make_transform_output_iterator(output, TransformOpImp<IdType, FloatType, decltype(one), FloatType *>{one, A, idx_coo, rows, cs, indptr, subindptr, indices, data});
-                const auto pred = StencilOpFused<IdType, FloatType, decltype(one), FloatType *>{seeds[0], seeds[num_seeds - 1], a, b, idx_coo, cs, one, A, subindptr, rows, indptr, indices, nids};
+                auto transformed_output = thrust::make_transform_output_iterator(output, TransformOpImp<IdType, FloatType, decltype(one), FloatType *>{one, A_g, idx_coo, rows, cs, indptr, subindptr, indices, data});
+                const auto pred = StencilOpFused<IdType, FloatType, decltype(one), FloatType *>{seeds[0], seeds[num_seeds - 1], a, b, idx_coo, cs, one, A_g, subindptr, rows, indptr, indices, nids};
                 num_edges = thrust::copy_if(exec_policy, iota, iota + hop_size, iota, transformed_output, pred) - transformed_output;
             }
             else {

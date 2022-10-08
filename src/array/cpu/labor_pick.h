@@ -59,6 +59,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(CSRMatrix mat, IdArray NIDs, IdArr
   constexpr bool linear_c_convergence = false;
 
   const bool weights = !IsNullArray(prob);
+  importance_sampling *= !weights;
   auto A_arr = prob;
   FloatType *A = static_cast<FloatType*>(A_arr->data);
   constexpr double eps = 0.0001;
