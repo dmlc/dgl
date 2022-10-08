@@ -1,13 +1,15 @@
 """Wiki-CS Dataset"""
 import itertools
-import os
 import json
+import os
+
 import numpy as np
+
 from .. import backend as F
 from ..convert import graph
+from ..transforms import reorder_graph, to_bidirected
 from .dgl_dataset import DGLBuiltinDataset
-from ..transforms import to_bidirected, reorder_graph
-from .utils import generate_mask_tensor, load_graphs, save_graphs, _get_dgl_url
+from .utils import _get_dgl_url, generate_mask_tensor, load_graphs, save_graphs
 
 
 class WikiCSDataset(DGLBuiltinDataset):
@@ -73,55 +75,64 @@ class WikiCSDataset(DGLBuiltinDataset):
     (11701,)
     """
 
-    def __init__(self, raw_dir=None, force_reload=False, verbose=False, transform=None):
-        _url = _get_dgl_url('dataset/wiki_cs.zip')
-        super(WikiCSDataset, self).__init__(name='wiki_cs',
-                                            raw_dir=raw_dir,
-                                            url=_url,
-                                            force_reload=force_reload,
-                                            verbose=verbose,
-                                            transform=transform)
+    def __init__(
+        self, raw_dir=None, force_reload=False, verbose=False, transform=None
+    ):
+        _url = _get_dgl_url("dataset/wiki_cs.zip")
+        super(WikiCSDataset, self).__init__(
+            name="wiki_cs",
+            raw_dir=raw_dir,
+            url=_url,
+            force_reload=force_reload,
+            verbose=verbose,
+            transform=transform,
+        )
 
     def process(self):
         """process raw data to graph, labels and masks"""
-        with open(os.path.join(self.raw_path, 'data.json')) as f:
+        with open(os.path.join(self.raw_path, "data.json")) as f:
             data = json.load(f)
-        features = F.tensor(np.array(data['features']), dtype=F.float32)
-        labels = F.tensor(np.array(data['labels']), dtype=F.int64)
+        features = F.tensor(np.array(data["features"]), dtype=F.float32)
+        labels = F.tensor(np.array(data["labels"]), dtype=F.int64)
 
-        train_masks = np.array(data['train_masks'], dtype=bool).T
-        val_masks = np.array(data['val_masks'], dtype=bool).T
-        stopping_masks = np.array(data['stopping_masks'], dtype=bool).T
-        test_mask = np.array(data['test_mask'], dtype=bool)
+        train_masks = np.array(data["train_masks"], dtype=bool).T
+        val_masks = np.array(data["val_masks"], dtype=bool).T
+        stopping_masks = np.array(data["stopping_masks"], dtype=bool).T
+        test_mask = np.array(data["test_mask"], dtype=bool)
 
-        edges = [[(i, j) for j in js] for i, js in enumerate(data['links'])]
+        edges = [[(i, j) for j in js] for i, js in enumerate(data["links"])]
         edges = np.array(list(itertools.chain(*edges)))
         src, dst = edges[:, 0], edges[:, 1]
 
         g = graph((src, dst))
         g = to_bidirected(g)
 
-        g.ndata['feat'] = features
-        g.ndata['label'] = labels
-        g.ndata['train_mask'] = generate_mask_tensor(train_masks)
-        g.ndata['val_mask'] = generate_mask_tensor(val_masks)
-        g.ndata['stopping_mask'] = generate_mask_tensor(stopping_masks)
-        g.ndata['test_mask'] = generate_mask_tensor(test_mask)
+        g.ndata["feat"] = features
+        g.ndata["label"] = labels
+        g.ndata["train_mask"] = generate_mask_tensor(train_masks)
+        g.ndata["val_mask"] = generate_mask_tensor(val_masks)
+        g.ndata["stopping_mask"] = generate_mask_tensor(stopping_masks)
+        g.ndata["test_mask"] = generate_mask_tensor(test_mask)
 
-        g = reorder_graph(g, node_permute_algo='rcmk', edge_permute_algo='dst', store_ids=False)
+        g = reorder_graph(
+            g,
+            node_permute_algo="rcmk",
+            edge_permute_algo="dst",
+            store_ids=False,
+        )
 
         self._graph = g
 
     def has_cache(self):
-        graph_path = os.path.join(self.save_path, 'dgl_graph.bin')
+        graph_path = os.path.join(self.save_path, "dgl_graph.bin")
         return os.path.exists(graph_path)
 
     def save(self):
-        graph_path = os.path.join(self.save_path, 'dgl_graph.bin')
+        graph_path = os.path.join(self.save_path, "dgl_graph.bin")
         save_graphs(graph_path, self._graph)
 
     def load(self):
-        graph_path = os.path.join(self.save_path, 'dgl_graph.bin')
+        graph_path = os.path.join(self.save_path, "dgl_graph.bin")
         g, _ = load_graphs(graph_path)
         self._graph = g[0]
 
@@ -134,7 +145,7 @@ class WikiCSDataset(DGLBuiltinDataset):
         return 1
 
     def __getitem__(self, idx):
-        r""" Get graph object
+        r"""Get graph object
 
         Parameters
         ----------
