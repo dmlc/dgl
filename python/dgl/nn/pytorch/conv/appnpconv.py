@@ -56,10 +56,7 @@ class APPNPConv(nn.Module):
             0.5000]])
     """
 
-    def __init__(self,
-                 k,
-                 alpha,
-                 edge_drop=0.):
+    def __init__(self, k, alpha, edge_drop=0.0):
         super(APPNPConv, self).__init__()
         self._k = k
         self._alpha = alpha
@@ -94,28 +91,29 @@ class APPNPConv(nn.Module):
         with graph.local_scope():
             if edge_weight is None:
                 src_norm = th.pow(
-                    graph.out_degrees().float().clamp(min=1), -0.5)
+                    graph.out_degrees().float().clamp(min=1), -0.5
+                )
                 shp = src_norm.shape + (1,) * (feat.dim() - 1)
                 src_norm = th.reshape(src_norm, shp).to(feat.device)
-                dst_norm = th.pow(
-                    graph.in_degrees().float().clamp(min=1), -0.5)
+                dst_norm = th.pow(graph.in_degrees().float().clamp(min=1), -0.5)
                 shp = dst_norm.shape + (1,) * (feat.dim() - 1)
                 dst_norm = th.reshape(dst_norm, shp).to(feat.device)
             else:
-                edge_weight = EdgeWeightNorm(
-                    'both')(graph, edge_weight)
+                edge_weight = EdgeWeightNorm("both")(graph, edge_weight)
             feat_0 = feat
             for _ in range(self._k):
                 # normalization by src node
                 if edge_weight is None:
                     feat = feat * src_norm
-                graph.ndata['h'] = feat
-                w = th.ones(graph.number_of_edges(),
-                            1) if edge_weight is None else edge_weight
-                graph.edata['w'] = self.edge_drop(w).to(feat.device)
-                graph.update_all(fn.u_mul_e('h', 'w', 'm'),
-                                 fn.sum('m', 'h'))
-                feat = graph.ndata.pop('h')
+                graph.ndata["h"] = feat
+                w = (
+                    th.ones(graph.number_of_edges(), 1)
+                    if edge_weight is None
+                    else edge_weight
+                )
+                graph.edata["w"] = self.edge_drop(w).to(feat.device)
+                graph.update_all(fn.u_mul_e("h", "w", "m"), fn.sum("m", "h"))
+                feat = graph.ndata.pop("h")
                 # normalization by dst node
                 if edge_weight is None:
                     feat = feat * dst_norm

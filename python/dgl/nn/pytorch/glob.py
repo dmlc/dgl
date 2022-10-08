@@ -1,18 +1,32 @@
 """Torch modules for graph global pooling."""
 # pylint: disable= no-member, arguments-differ, invalid-name, W0235
+import numpy as np
 import torch as th
 import torch.nn as nn
-import numpy as np
 
 from ...backend import pytorch as F
 from ...base import dgl_warning
-from ...readout import sum_nodes, mean_nodes, max_nodes, broadcast_nodes,\
-    softmax_nodes, topk_nodes
+from ...readout import (
+    broadcast_nodes,
+    max_nodes,
+    mean_nodes,
+    softmax_nodes,
+    sum_nodes,
+    topk_nodes,
+)
 
+__all__ = [
+    "SumPooling",
+    "AvgPooling",
+    "MaxPooling",
+    "SortPooling",
+    "GlobalAttentionPooling",
+    "Set2Set",
+    "SetTransformerEncoder",
+    "SetTransformerDecoder",
+    "WeightAndSum",
+]
 
-__all__ = ['SumPooling', 'AvgPooling', 'MaxPooling', 'SortPooling',
-           'GlobalAttentionPooling', 'Set2Set',
-           'SetTransformerEncoder', 'SetTransformerDecoder', 'WeightAndSum']
 
 class SumPooling(nn.Module):
     r"""Apply sum pooling over the nodes in a graph.
@@ -67,6 +81,7 @@ class SumPooling(nn.Module):
     tensor([[2.2282, 1.8667, 2.4338, 1.7540, 1.4511],
             [1.0608, 1.2080, 2.1780, 2.7849, 2.5420]])
     """
+
     def __init__(self):
         super(SumPooling, self).__init__()
 
@@ -90,8 +105,8 @@ class SumPooling(nn.Module):
             batch size of input graphs.
         """
         with graph.local_scope():
-            graph.ndata['h'] = feat
-            readout = sum_nodes(graph, 'h')
+            graph.ndata["h"] = feat
+            readout = sum_nodes(graph, "h")
             return readout
 
 
@@ -148,6 +163,7 @@ class AvgPooling(nn.Module):
     tensor([[0.7427, 0.6222, 0.8113, 0.5847, 0.4837],
             [0.2652, 0.3020, 0.5445, 0.6962, 0.6355]])
     """
+
     def __init__(self):
         super(AvgPooling, self).__init__()
 
@@ -171,8 +187,8 @@ class AvgPooling(nn.Module):
             :math:`B` refers to the batch size of input graphs.
         """
         with graph.local_scope():
-            graph.ndata['h'] = feat
-            readout = mean_nodes(graph, 'h')
+            graph.ndata["h"] = feat
+            readout = mean_nodes(graph, "h")
             return readout
 
 
@@ -229,6 +245,7 @@ class MaxPooling(nn.Module):
     tensor([[0.8948, 0.9030, 0.9137, 0.7567, 0.6118],
             [0.5278, 0.6365, 0.9990, 0.9028, 0.8945]])
     """
+
     def __init__(self):
         super(MaxPooling, self).__init__()
 
@@ -250,8 +267,8 @@ class MaxPooling(nn.Module):
             :math:`B` refers to the batch size.
         """
         with graph.local_scope():
-            graph.ndata['h'] = feat
-            readout = max_nodes(graph, 'h')
+            graph.ndata["h"] = feat
+            readout = max_nodes(graph, "h")
             return readout
 
 
@@ -316,6 +333,7 @@ class SortPooling(nn.Module):
             [0.2351, 0.5278, 0.6365, 0.8945, 0.9990, 0.2053, 0.2426, 0.4111, 0.5658,
              0.9028]])
     """
+
     def __init__(self, k):
         super(SortPooling, self).__init__()
         self.k = k
@@ -342,10 +360,11 @@ class SortPooling(nn.Module):
         with graph.local_scope():
             # Sort the feature of each node in ascending order.
             feat, _ = feat.sort(dim=-1)
-            graph.ndata['h'] = feat
+            graph.ndata["h"] = feat
             # Sort nodes according to their last features.
-            ret = topk_nodes(graph, 'h', self.k, sortby=-1)[0].view(
-                -1, self.k * feat.shape[-1])
+            ret = topk_nodes(graph, "h", self.k, sortby=-1)[0].view(
+                -1, self.k * feat.shape[-1]
+            )
             return ret
 
 
@@ -414,6 +433,7 @@ class GlobalAttentionPooling(nn.Module):
     on how to use GatedGraphConv and GlobalAttentionPooling layer to build a Graph Neural
     Networks that can solve Soduku.
     """
+
     def __init__(self, gate_nn, feat_nn=None):
         super(GlobalAttentionPooling, self).__init__()
         self.gate_nn = gate_nn
@@ -445,16 +465,18 @@ class GlobalAttentionPooling(nn.Module):
         """
         with graph.local_scope():
             gate = self.gate_nn(feat)
-            assert gate.shape[-1] == 1, "The output of gate_nn should have size 1 at the last axis."
+            assert (
+                gate.shape[-1] == 1
+            ), "The output of gate_nn should have size 1 at the last axis."
             feat = self.feat_nn(feat) if self.feat_nn else feat
 
-            graph.ndata['gate'] = gate
-            gate = softmax_nodes(graph, 'gate')
-            graph.ndata.pop('gate')
+            graph.ndata["gate"] = gate
+            gate = softmax_nodes(graph, "gate")
+            graph.ndata.pop("gate")
 
-            graph.ndata['r'] = feat * gate
-            readout = sum_nodes(graph, 'r')
-            graph.ndata.pop('r')
+            graph.ndata["r"] = feat * gate
+            readout = sum_nodes(graph, "r")
+            graph.ndata.pop("r")
 
             if get_attention:
                 return readout, gate
@@ -540,6 +562,7 @@ class Set2Set(nn.Module):
     mpnn_predictor.py>`__
     on how to use DGL's Set2Set layer in graph property prediction applications.
     """
+
     def __init__(self, input_dim, n_iters, n_layers):
         super(Set2Set, self).__init__()
         self.input_dim = input_dim
@@ -574,8 +597,10 @@ class Set2Set(nn.Module):
         with graph.local_scope():
             batch_size = graph.batch_size
 
-            h = (feat.new_zeros((self.n_layers, batch_size, self.input_dim)),
-                 feat.new_zeros((self.n_layers, batch_size, self.input_dim)))
+            h = (
+                feat.new_zeros((self.n_layers, batch_size, self.input_dim)),
+                feat.new_zeros((self.n_layers, batch_size, self.input_dim)),
+            )
 
             q_star = feat.new_zeros(batch_size, self.output_dim)
 
@@ -583,10 +608,10 @@ class Set2Set(nn.Module):
                 q, h = self.lstm(q_star.unsqueeze(0), h)
                 q = q.view(batch_size, self.input_dim)
                 e = (feat * broadcast_nodes(graph, q)).sum(dim=-1, keepdim=True)
-                graph.ndata['e'] = e
-                alpha = softmax_nodes(graph, 'e')
-                graph.ndata['r'] = feat * alpha
-                readout = sum_nodes(graph, 'r')
+                graph.ndata["e"] = e
+                alpha = softmax_nodes(graph, "e")
+                graph.ndata["r"] = feat * alpha
+                readout = sum_nodes(graph, "r")
                 q_star = th.cat([q, readout], dim=-1)
 
             return q_star
@@ -595,12 +620,12 @@ class Set2Set(nn.Module):
         """Set the extra representation of the module.
         which will come into effect when printing the model.
         """
-        summary = 'n_iters={n_iters}'
+        summary = "n_iters={n_iters}"
         return summary.format(**self.__dict__)
 
 
 def _gen_mask(lengths_x, lengths_y, max_len_x, max_len_y):
-    """ Generate binary mask array for given x and y input pairs.
+    """Generate binary mask array for given x and y input pairs.
 
     Parameters
     ----------
@@ -620,9 +645,13 @@ def _gen_mask(lengths_x, lengths_y, max_len_x, max_len_y):
     """
     device = lengths_x.device
     # x_mask: (batch_size, max_len_x)
-    x_mask = th.arange(max_len_x, device=device).unsqueeze(0) < lengths_x.unsqueeze(1)
+    x_mask = th.arange(max_len_x, device=device).unsqueeze(
+        0
+    ) < lengths_x.unsqueeze(1)
     # y_mask: (batch_size, max_len_y)
-    y_mask = th.arange(max_len_y, device=device).unsqueeze(0) < lengths_y.unsqueeze(1)
+    y_mask = th.arange(max_len_y, device=device).unsqueeze(
+        0
+    ) < lengths_y.unsqueeze(1)
     # mask: (batch_size, 1, max_len_x, max_len_y)
     mask = (x_mask.unsqueeze(-1) & y_mask.unsqueeze(-2)).unsqueeze(1)
     return mask
@@ -650,7 +679,10 @@ class MultiHeadAttention(nn.Module):
     -----
     This module was used in SetTransformer layer.
     """
-    def __init__(self, d_model, num_heads, d_head, d_ff, dropouth=0., dropouta=0.):
+
+    def __init__(
+        self, d_model, num_heads, d_head, d_ff, dropouth=0.0, dropouta=0.0
+    ):
         super(MultiHeadAttention, self).__init__()
         self.d_model = d_model
         self.num_heads = num_heads
@@ -664,7 +696,7 @@ class MultiHeadAttention(nn.Module):
             nn.Linear(d_model, d_ff),
             nn.ReLU(),
             nn.Dropout(dropouth),
-            nn.Linear(d_ff, d_model)
+            nn.Linear(d_ff, d_model),
         )
         self.droph = nn.Dropout(dropouth)
         self.dropa = nn.Dropout(dropouta)
@@ -710,25 +742,28 @@ class MultiHeadAttention(nn.Module):
         values = F.pad_packed_tensor(values, lengths_mem, 0)
 
         # attention score with shape (B, num_heads, max_len_x, max_len_mem)
-        e = th.einsum('bxhd,byhd->bhxy', queries, keys)
+        e = th.einsum("bxhd,byhd->bhxy", queries, keys)
         # normalize
         e = e / np.sqrt(self.d_head)
 
         # generate mask
         mask = _gen_mask(lengths_x, lengths_mem, max_len_x, max_len_mem)
-        e = e.masked_fill(mask == 0, -float('inf'))
+        e = e.masked_fill(mask == 0, -float("inf"))
 
         # apply softmax
         alpha = th.softmax(e, dim=-1)
         # the following line addresses the NaN issue, see
         # https://github.com/dmlc/dgl/issues/2657
-        alpha = alpha.masked_fill(mask == 0, 0.)
+        alpha = alpha.masked_fill(mask == 0, 0.0)
 
         # sum of value weighted by alpha
-        out = th.einsum('bhxy,byhd->bxhd', alpha, values)
+        out = th.einsum("bhxy,byhd->bxhd", alpha, values)
         # project to output
         out = self.proj_o(
-            out.contiguous().view(batch_size, max_len_x, self.num_heads * self.d_head))
+            out.contiguous().view(
+                batch_size, max_len_x, self.num_heads * self.d_head
+            )
+        )
         # pack tensor
         out = F.pack_padded_tensor(out, lengths_x)
 
@@ -764,10 +799,19 @@ class SetAttentionBlock(nn.Module):
     -----
     This module was used in SetTransformer layer.
     """
-    def __init__(self, d_model, num_heads, d_head, d_ff, dropouth=0., dropouta=0.):
+
+    def __init__(
+        self, d_model, num_heads, d_head, d_ff, dropouth=0.0, dropouta=0.0
+    ):
         super(SetAttentionBlock, self).__init__()
-        self.mha = MultiHeadAttention(d_model, num_heads, d_head, d_ff,
-                                      dropouth=dropouth, dropouta=dropouta)
+        self.mha = MultiHeadAttention(
+            d_model,
+            num_heads,
+            d_head,
+            d_ff,
+            dropouth=dropouth,
+            dropouta=dropouta,
+        )
 
     def forward(self, feat, lengths):
         """
@@ -808,19 +852,32 @@ class InducedSetAttentionBlock(nn.Module):
     -----
     This module was used in SetTransformer layer.
     """
-    def __init__(self, m, d_model, num_heads, d_head, d_ff, dropouth=0., dropouta=0.):
+
+    def __init__(
+        self, m, d_model, num_heads, d_head, d_ff, dropouth=0.0, dropouta=0.0
+    ):
         super(InducedSetAttentionBlock, self).__init__()
         self.m = m
         if m == 1:
-            dgl_warning("if m is set to 1, the parameters corresponding to query and key "
-                        "projections would not get updated during training.")
+            dgl_warning(
+                "if m is set to 1, the parameters corresponding to query and key "
+                "projections would not get updated during training."
+            )
         self.d_model = d_model
-        self.inducing_points = nn.Parameter(
-            th.FloatTensor(m, d_model)
+        self.inducing_points = nn.Parameter(th.FloatTensor(m, d_model))
+        self.mha = nn.ModuleList(
+            [
+                MultiHeadAttention(
+                    d_model,
+                    num_heads,
+                    d_head,
+                    d_ff,
+                    dropouth=dropouth,
+                    dropouta=dropouta,
+                )
+                for _ in range(2)
+            ]
         )
-        self.mha = nn.ModuleList([
-            MultiHeadAttention(d_model, num_heads, d_head, d_ff,
-                               dropouth=dropouth, dropouta=dropouta) for _ in range(2)])
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -852,8 +909,10 @@ class InducedSetAttentionBlock(nn.Module):
         """Set the extra representation of the module.
         which will come into effect when printing the model.
         """
-        shape_str = '({}, {})'.format(self.inducing_points.shape[0], self.inducing_points.shape[1])
-        return 'InducedVector: ' + shape_str
+        shape_str = "({}, {})".format(
+            self.inducing_points.shape[0], self.inducing_points.shape[1]
+        )
+        return "InducedVector: " + shape_str
 
 
 class PMALayer(nn.Module):
@@ -881,23 +940,32 @@ class PMALayer(nn.Module):
     -----
     This module was used in SetTransformer layer.
     """
-    def __init__(self, k, d_model, num_heads, d_head, d_ff, dropouth=0., dropouta=0.):
+
+    def __init__(
+        self, k, d_model, num_heads, d_head, d_ff, dropouth=0.0, dropouta=0.0
+    ):
         super(PMALayer, self).__init__()
         self.k = k
         if k == 1:
-            dgl_warning("if k is set to 1, the parameters corresponding to query and key "
-                        "projections would not get updated during training.")
+            dgl_warning(
+                "if k is set to 1, the parameters corresponding to query and key "
+                "projections would not get updated during training."
+            )
         self.d_model = d_model
-        self.seed_vectors = nn.Parameter(
-            th.FloatTensor(k, d_model)
+        self.seed_vectors = nn.Parameter(th.FloatTensor(k, d_model))
+        self.mha = MultiHeadAttention(
+            d_model,
+            num_heads,
+            d_head,
+            d_ff,
+            dropouth=dropouth,
+            dropouta=dropouta,
         )
-        self.mha = MultiHeadAttention(d_model, num_heads, d_head, d_ff,
-                                      dropouth=dropouth, dropouta=dropouta)
         self.ffn = nn.Sequential(
             nn.Linear(d_model, d_ff),
             nn.ReLU(),
             nn.Dropout(dropouth),
-            nn.Linear(d_ff, d_model)
+            nn.Linear(d_ff, d_model),
         )
         self.reset_parameters()
 
@@ -929,8 +997,10 @@ class PMALayer(nn.Module):
         """Set the extra representation of the module.
         which will come into effect when printing the model.
         """
-        shape_str = '({}, {})'.format(self.seed_vectors.shape[0], self.seed_vectors.shape[1])
-        return 'SeedVector: ' + shape_str
+        shape_str = "({}, {})".format(
+            self.seed_vectors.shape[0], self.seed_vectors.shape[1]
+        )
+        return "SeedVector: " + shape_str
 
 
 class SetTransformerEncoder(nn.Module):
@@ -1018,27 +1088,57 @@ class SetTransformerEncoder(nn.Module):
     representation instead out graphwise representation, and the SetTransformerDecoder
     would return a graph readout tensor.
     """
-    def __init__(self, d_model, n_heads, d_head, d_ff,
-                 n_layers=1, block_type='sab', m=None, dropouth=0., dropouta=0.):
+
+    def __init__(
+        self,
+        d_model,
+        n_heads,
+        d_head,
+        d_ff,
+        n_layers=1,
+        block_type="sab",
+        m=None,
+        dropouth=0.0,
+        dropouta=0.0,
+    ):
         super(SetTransformerEncoder, self).__init__()
         self.n_layers = n_layers
         self.block_type = block_type
         self.m = m
         layers = []
-        if block_type == 'isab' and m is None:
-            raise KeyError('The number of inducing points is not specified in ISAB block.')
+        if block_type == "isab" and m is None:
+            raise KeyError(
+                "The number of inducing points is not specified in ISAB block."
+            )
 
         for _ in range(n_layers):
-            if block_type == 'sab':
+            if block_type == "sab":
                 layers.append(
-                    SetAttentionBlock(d_model, n_heads, d_head, d_ff,
-                                      dropouth=dropouth, dropouta=dropouta))
-            elif block_type == 'isab':
+                    SetAttentionBlock(
+                        d_model,
+                        n_heads,
+                        d_head,
+                        d_ff,
+                        dropouth=dropouth,
+                        dropouta=dropouta,
+                    )
+                )
+            elif block_type == "isab":
                 layers.append(
-                    InducedSetAttentionBlock(m, d_model, n_heads, d_head, d_ff,
-                                             dropouth=dropouth, dropouta=dropouta))
+                    InducedSetAttentionBlock(
+                        m,
+                        d_model,
+                        n_heads,
+                        d_head,
+                        d_ff,
+                        dropouth=dropouth,
+                        dropouta=dropouta,
+                    )
+                )
             else:
-                raise KeyError("Unrecognized block type {}: we only support sab/isab")
+                raise KeyError(
+                    "Unrecognized block type {}: we only support sab/isab"
+                )
 
         self.layers = nn.ModuleList(layers)
 
@@ -1136,18 +1236,43 @@ class SetTransformerDecoder(nn.Module):
     --------
     SetTransformerEncoder
     """
-    def __init__(self, d_model, num_heads, d_head, d_ff, n_layers, k, dropouth=0., dropouta=0.):
+
+    def __init__(
+        self,
+        d_model,
+        num_heads,
+        d_head,
+        d_ff,
+        n_layers,
+        k,
+        dropouth=0.0,
+        dropouta=0.0,
+    ):
         super(SetTransformerDecoder, self).__init__()
         self.n_layers = n_layers
         self.k = k
         self.d_model = d_model
-        self.pma = PMALayer(k, d_model, num_heads, d_head, d_ff,
-                            dropouth=dropouth, dropouta=dropouta)
+        self.pma = PMALayer(
+            k,
+            d_model,
+            num_heads,
+            d_head,
+            d_ff,
+            dropouth=dropouth,
+            dropouta=dropouta,
+        )
         layers = []
         for _ in range(n_layers):
             layers.append(
-                SetAttentionBlock(d_model, num_heads, d_head, d_ff,
-                                  dropouth=dropouth, dropouta=dropouta))
+                SetAttentionBlock(
+                    d_model,
+                    num_heads,
+                    d_head,
+                    d_ff,
+                    dropouth=dropouth,
+                    dropouta=dropouta,
+                )
+            )
 
         self.layers = nn.ModuleList(layers)
 
@@ -1236,12 +1361,12 @@ class WeightAndSum(nn.Module):
     gcn_predictor.py>`__
     to understand how to use WeightAndSum layer to get the graph readout output.
     """
+
     def __init__(self, in_feats):
         super(WeightAndSum, self).__init__()
         self.in_feats = in_feats
         self.atom_weighting = nn.Sequential(
-            nn.Linear(in_feats, 1),
-            nn.Sigmoid()
+            nn.Linear(in_feats, 1), nn.Sigmoid()
         )
 
     def forward(self, g, feats):
@@ -1261,8 +1386,8 @@ class WeightAndSum(nn.Module):
             Representations for B molecules
         """
         with g.local_scope():
-            g.ndata['h'] = feats
-            g.ndata['w'] = self.atom_weighting(g.ndata['h'])
-            h_g_sum = sum_nodes(g, 'h', 'w')
+            g.ndata["h"] = feats
+            g.ndata["w"] = self.atom_weighting(g.ndata["h"])
+            h_g_sum = sum_nodes(g, "h", "w")
 
         return h_g_sum

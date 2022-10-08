@@ -1,13 +1,13 @@
 """dgl edge_softmax operator module."""
+from ..backend import astype
 from ..backend import edge_softmax as edge_softmax_internal
 from ..backend import edge_softmax_hetero as edge_softmax_hetero_internal
-from ..backend import astype
 from ..base import ALL, is_all
 
-__all__ = ['edge_softmax']
+__all__ = ["edge_softmax"]
 
 
-def edge_softmax(graph, logits, eids=ALL, norm_by='dst'):
+def edge_softmax(graph, logits, eids=ALL, norm_by="dst"):
     r"""Compute softmax over weights of incoming edges for every node.
 
     For a node :math:`i`, edge softmax is an operation that computes
@@ -131,8 +131,9 @@ def edge_softmax(graph, logits, eids=ALL, norm_by='dst'):
     if not is_all(eids):
         eids = astype(eids, graph.idtype)
     if graph._graph.number_of_etypes() == 1:
-        return edge_softmax_internal(graph._graph, logits,
-                                     eids=eids, norm_by=norm_by)
+        return edge_softmax_internal(
+            graph._graph, logits, eids=eids, norm_by=norm_by
+        )
     else:
         logits_list = [None] * graph._graph.number_of_etypes()
         logits = {graph.to_canonical_etype(k): v for k, v in logits.items()}
@@ -140,8 +141,9 @@ def edge_softmax(graph, logits, eids=ALL, norm_by='dst'):
             etid = graph.get_etype_id(rel)
             logits_list[etid] = logits[rel]
         logits_tuple = tuple(logits_list)
-        score_tuple = edge_softmax_hetero_internal(graph._graph,
-                                                   eids, norm_by, *logits_tuple)
+        score_tuple = edge_softmax_hetero_internal(
+            graph._graph, eids, norm_by, *logits_tuple
+        )
         score = {}
         for rel in graph.canonical_etypes:
             etid = graph.get_etype_id(rel)
