@@ -10,9 +10,8 @@ from ..heterograph import DGLHeteroGraph
 __all__ = ["global_uniform_negative_sampling"]
 
 
-def _calc_redundancy(
-    k_hat, num_edges, num_pairs, r=3
-):  # pylint: disable=invalid-name
+# pylint: disable=invalid-name
+def _calc_redundancy(k_hat, num_edges, num_pairs, r=3):
     # pylint: disable=invalid-name
     # Calculates the number of samples required based on a lower-bound
     # of the expected number of negative samples, based on N draws from
