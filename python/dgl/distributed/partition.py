@@ -96,27 +96,27 @@ def load_partition(part_config, part_id, load_feats=True):
     assert EID in graph.edata, "the partition graph should contain edge mapping to global edge ID"
 
     gpb, graph_name, ntypes, etypes = load_partition_book(part_config, part_id, graph)
-    ntypes_list, etypes_list = [], []
-    for ntype in ntypes:
-        ntype_id = ntypes[ntype]
-        # graph.ndata[NID] are global homogeneous node IDs.
-        nids = F.boolean_mask(graph.ndata[NID], _get_inner_node_mask(graph, ntype_id))
-        partids1 = gpb.nid2partid(nids)
-        _, per_type_nids = gpb.map_to_per_ntype(nids)
-        partids2 = gpb.nid2partid(per_type_nids, ntype)
-        assert np.all(F.asnumpy(partids1 == part_id)), 'load a wrong partition'
-        assert np.all(F.asnumpy(partids2 == part_id)), 'load a wrong partition'
-        ntypes_list.append(ntype)
-    for etype in etypes:
-        etype_id = etypes[etype]
-        # graph.edata[EID] are global homogeneous edge IDs.
-        eids = F.boolean_mask(graph.edata[EID], _get_inner_edge_mask(graph, etype_id))
-        partids1 = gpb.eid2partid(eids)
-        _, per_type_eids = gpb.map_to_per_etype(eids)
-        partids2 = gpb.eid2partid(per_type_eids, etype)
-        assert np.all(F.asnumpy(partids1 == part_id)), 'load a wrong partition'
-        assert np.all(F.asnumpy(partids2 == part_id)), 'load a wrong partition'
-        etypes_list.append(etype)
+    ntypes_list = list(ntypes.keys())
+    etypes_list = list(etypes.keys())
+    if 'DGL_DIST_DEBUG' in os.environ:
+        for ntype in ntypes:
+            ntype_id = ntypes[ntype]
+            # graph.ndata[NID] are global homogeneous node IDs.
+            nids = F.boolean_mask(graph.ndata[NID], _get_inner_node_mask(graph, ntype_id))
+            partids1 = gpb.nid2partid(nids)
+            _, per_type_nids = gpb.map_to_per_ntype(nids)
+            partids2 = gpb.nid2partid(per_type_nids, ntype)
+            assert np.all(F.asnumpy(partids1 == part_id)), 'load a wrong partition'
+            assert np.all(F.asnumpy(partids2 == part_id)), 'load a wrong partition'
+        for etype in etypes:
+            etype_id = etypes[etype]
+            # graph.edata[EID] are global homogeneous edge IDs.
+            eids = F.boolean_mask(graph.edata[EID], _get_inner_edge_mask(graph, etype_id))
+            partids1 = gpb.eid2partid(eids)
+            _, per_type_eids = gpb.map_to_per_etype(eids)
+            partids2 = gpb.eid2partid(per_type_eids, etype)
+            assert np.all(F.asnumpy(partids1 == part_id)), 'load a wrong partition'
+            assert np.all(F.asnumpy(partids2 == part_id)), 'load a wrong partition'
 
     node_feats = {}
     edge_feats = {}
@@ -125,7 +125,7 @@ def load_partition(part_config, part_id, load_feats=True):
 
     return graph, node_feats, edge_feats, gpb, graph_name, ntypes_list, etypes_list
 
-def load_partition_feats(part_config, part_id):
+def load_partition_feats(part_config, part_id, load_nodes=True, load_edges=True):
     '''Load node/edge feature data from a partition.
 
     Parameters
@@ -134,12 +134,16 @@ def load_partition_feats(part_config, part_id):
         The path of the partition config file.
     part_id : int
         The partition ID.
+    load_nodes : bool, optional
+        Whether to load node features. If ``False``, ``None`` is returned.
+    load_edges : bool, optional
+        Whether to load edge features. If ``False``, ``None`` is returned.
 
     Returns
     -------
-    Dict[str, Tensor]
+    Dict[str, Tensor] or None
         Node features.
-    Dict[str, Tensor]
+    Dict[str, Tensor] or None
         Edge features.
     '''
     config_path = os.path.dirname(part_config)
@@ -151,24 +155,30 @@ def load_partition_feats(part_config, part_id):
     part_files = part_metadata['part-{}'.format(part_id)]
     assert 'node_feats' in part_files, "the partition does not contain node features."
     assert 'edge_feats' in part_files, "the partition does not contain edge feature."
-    node_feats = load_tensors(relative_to_config(part_files['node_feats']))
-    edge_feats = load_tensors(relative_to_config(part_files['edge_feats']))
+    node_feats = None
+    if load_nodes:
+        node_feats = load_tensors(relative_to_config(part_files['node_feats']))
+    edge_feats = None
+    if load_edges:
+        edge_feats = load_tensors(relative_to_config(part_files['edge_feats']))
     # In the old format, the feature name doesn't contain node/edge type.
     # For compatibility, let's add node/edge types to the feature names.
-    node_feats1 = {}
-    edge_feats1 = {}
-    for name in node_feats:
-        feat = node_feats[name]
-        if name.find('/') == -1:
-            name = '_N/' + name
-        node_feats1[name] = feat
-    for name in edge_feats:
-        feat = edge_feats[name]
-        if name.find('/') == -1:
-            name = '_E/' + name
-        edge_feats1[name] = feat
-    node_feats = node_feats1
-    edge_feats = edge_feats1
+    if node_feats is not None:
+        new_feats = {}
+        for name in node_feats:
+            feat = node_feats[name]
+            if name.find('/') == -1:
+                name = '_N/' + name
+            new_feats[name] = feat
+        node_feats = new_feats
+    if edge_feats is not None:
+        new_feats = {}
+        for name in edge_feats:
+            feat = edge_feats[name]
+            if name.find('/') == -1:
+                name = '_E/' + name
+            new_feats[name] = feat
+        edge_feats = new_feats
 
     return node_feats, edge_feats
 

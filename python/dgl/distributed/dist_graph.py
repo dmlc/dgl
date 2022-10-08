@@ -4,6 +4,7 @@ from collections.abc import MutableMapping
 from collections import namedtuple
 
 import os
+import gc
 import numpy as np
 
 from ..heterograph import DGLHeteroGraph
@@ -372,7 +373,8 @@ class DistGraphServer(KVServer):
             self.add_part_policy(PartitionPolicy(edge_name.policy_str, self.gpb))
 
         if not self.is_backup_server():
-            node_feats, edge_feats = load_partition_feats(part_config, self.part_id)
+            node_feats, _ = load_partition_feats(part_config, self.part_id,
+                load_nodes=True, load_edges=False)
             for name in node_feats:
                 # The feature name has the following format: node_type + "/" + feature_name to avoid
                 # feature name collision for different node types.
@@ -381,6 +383,10 @@ class DistGraphServer(KVServer):
                 self.init_data(name=str(data_name), policy_str=data_name.policy_str,
                                data_tensor=node_feats[name])
                 self.orig_data.add(str(data_name))
+            del node_feats
+            gc.collect()
+            _, edge_feats = load_partition_feats(part_config, self.part_id,
+                load_nodes=False, load_edges=True)
             for name in edge_feats:
                 # The feature name has the following format: edge_type + "/" + feature_name to avoid
                 # feature name collision for different edge types.
@@ -389,6 +395,8 @@ class DistGraphServer(KVServer):
                 self.init_data(name=str(data_name), policy_str=data_name.policy_str,
                                data_tensor=edge_feats[name])
                 self.orig_data.add(str(data_name))
+            del edge_feats
+            gc.collect()
 
     def start(self):
         """ Start graph store server.

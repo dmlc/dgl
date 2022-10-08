@@ -10,6 +10,7 @@ from dgl import function as fn
 import backend as F
 import unittest
 import tempfile
+from utils import reset_envs
 
 def _get_inner_node_mask(graph, ntype_id):
     if dgl.NTYPE in graph.ndata:
@@ -403,6 +404,7 @@ def check_hetero_partition_single_etype(num_trainers):
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_partition():
+    os.environ['DGL_DIST_DEBUG'] = 1
     g = create_random_graph(1000)
     check_partition(g, 'metis', False)
     check_partition(g, 'metis', True)
@@ -411,10 +413,12 @@ def test_partition():
     check_partition(g, 'random', False)
     check_partition(g, 'random', True)
     check_partition(g, 'metis', True, 4, 8, load_feats=False)
+    reset_envs()
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
 def test_hetero_partition():
+    os.environ['DGL_DIST_DEBUG'] = 1
     check_hetero_partition_single_etype(1)
     check_hetero_partition_single_etype(4)
     hg = create_random_hetero()
@@ -423,6 +427,7 @@ def test_hetero_partition():
     check_hetero_partition(hg, 'metis', 4, 8)
     check_hetero_partition(hg, 'random')
     check_hetero_partition(hg, 'metis', 4, 8, load_feats=False)
+    reset_envs()
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_BasicPartitionBook():
