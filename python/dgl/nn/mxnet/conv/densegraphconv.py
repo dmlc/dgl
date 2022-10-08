@@ -1,6 +1,7 @@
 """MXNet Module for DenseGraphConv"""
 # pylint: disable= no-member, arguments-differ, invalid-name
 import math
+
 import mxnet as mx
 from mxnet import nd
 from mxnet.gluon import nn
@@ -40,22 +41,24 @@ class DenseGraphConv(nn.Block):
     --------
     `GraphConv <https://docs.dgl.ai/api/python/nn.pytorch.html#graphconv>`__
     """
-    def __init__(self,
-                 in_feats,
-                 out_feats,
-                 norm='both',
-                 bias=True,
-                 activation=None):
+
+    def __init__(
+        self, in_feats, out_feats, norm="both", bias=True, activation=None
+    ):
         super(DenseGraphConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
         self._norm = norm
         with self.name_scope():
-            self.weight = self.params.get('weight', shape=(in_feats, out_feats),
-                                          init=mx.init.Xavier(magnitude=math.sqrt(2.0)))
+            self.weight = self.params.get(
+                "weight",
+                shape=(in_feats, out_feats),
+                init=mx.init.Xavier(magnitude=math.sqrt(2.0)),
+            )
             if bias:
-                self.bias = self.params.get('bias', shape=(out_feats,),
-                                            init=mx.init.Zero())
+                self.bias = self.params.get(
+                    "bias", shape=(out_feats,), init=mx.init.Zero()
+                )
             else:
                 self.bias = None
             self._activation = activation
@@ -86,11 +89,11 @@ class DenseGraphConv(nn.Block):
             is size of output feature.
         """
         adj = adj.astype(feat.dtype).as_in_context(feat.context)
-        src_degrees = nd.clip(adj.sum(axis=0), a_min=1, a_max=float('inf'))
-        dst_degrees = nd.clip(adj.sum(axis=1), a_min=1, a_max=float('inf'))
+        src_degrees = nd.clip(adj.sum(axis=0), a_min=1, a_max=float("inf"))
+        dst_degrees = nd.clip(adj.sum(axis=1), a_min=1, a_max=float("inf"))
         feat_src = feat
 
-        if self._norm == 'both':
+        if self._norm == "both":
             norm_src = nd.power(src_degrees, -0.5)
             shp_src = norm_src.shape + (1,) * (feat.ndim - 1)
             norm_src = norm_src.reshape(shp_src).as_in_context(feat.context)
@@ -105,10 +108,10 @@ class DenseGraphConv(nn.Block):
             rst = nd.dot(adj, feat_src)
             rst = nd.dot(rst, self.weight.data(feat_src.context))
 
-        if self._norm != 'none':
-            if self._norm == 'both':
+        if self._norm != "none":
+            if self._norm == "both":
                 norm_dst = nd.power(dst_degrees, -0.5)
-            else: # right
+            else:  # right
                 norm_dst = 1.0 / dst_degrees
             shp_dst = norm_dst.shape + (1,) * (feat.ndim - 1)
             norm_dst = norm_dst.reshape(shp_dst).as_in_context(feat.context)
