@@ -9,8 +9,6 @@ import ctypes
 from .base import _FFI_MODE, _LIB, check_call
 from .runtime_ctypes import DGLStreamHandle
 
-IMPORT_EXCEPT = RuntimeError if _FFI_MODE == "cython" else ImportError
-
 
 def to_dgl_stream_handle(cuda_stream):
     """Convert torch.cuda.Stream to DGL stream handle

@@ -9,9 +9,8 @@ from .. import _api_internal
 from .base import _FFI_MODE, _LIB, c_str, check_call, py_str
 from .object_generic import ObjectGeneric, convert_to_object
 
-IMPORT_EXCEPT = (
-    RuntimeError if _FFI_MODE == "cython" else ImportError
-)  # pylint: disable=invalid-name
+# pylint: disable=invalid-name
+IMPORT_EXCEPT = RuntimeError if _FFI_MODE == "cython" else ImportError
 try:
     # pylint: disable=wrong-import-position
     if _FFI_MODE == "ctypes":
