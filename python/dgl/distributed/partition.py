@@ -458,13 +458,11 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     under name `dgl.EID`. For a heterogeneous graph, the DGLGraph also contains a node
     data `dgl.NTYPE` for node type and an edge data `dgl.ETYPE` for the edge type.
 
-    The partition graph contains additional node data ("inner_node" and "orig_id") and
+    The partition graph contains additional node data ("inner_node") and
     edge data ("inner_edge"):
 
     * "inner_node" indicates whether a node belongs to a partition.
     * "inner_edge" indicates whether an edge belongs to a partition.
-    * "orig_id" exists when reshuffle=True. It indicates the original node IDs in the original
-      graph before reshuffling.
 
     Node and edge features are splitted and stored together with each graph partition.
     All node/edge features in a partition are stored in a file with DGL format. The node/edge
@@ -883,10 +881,10 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                                                                       local_edges)
                     else:
                         edge_feats[etype + '/' + name] = g.edges[etype].data[name]
-        # Some adjustment for heterogeneous graphs.
-        if not g.is_homogeneous:
-            part.ndata['orig_id'] = F.gather_row(sim_g.ndata[NID], part.ndata['orig_id'])
-            part.edata['orig_id'] = F.gather_row(sim_g.edata[EID], part.edata['orig_id'])
+        # delete `orig_id` from ndata/edata
+        if reshuffle:
+            del part.ndata['orig_id']
+            del part.edata['orig_id']
 
         part_dir = os.path.join(out_path, "part" + str(part_id))
         node_feat_file = os.path.join(part_dir, "node_feat.dgl")

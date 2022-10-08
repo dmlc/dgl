@@ -79,21 +79,11 @@ def verify_hetero_graph(g, parts):
     nids = {ntype:[] for ntype in g.ntypes}
     eids = {etype:[] for etype in g.etypes}
     for part in parts:
-        src, dst, eid = part.edges(form='all')
-        orig_src = F.gather_row(part.ndata['orig_id'], src)
-        orig_dst = F.gather_row(part.ndata['orig_id'], dst)
-        orig_eid = F.gather_row(part.edata['orig_id'], eid)
+        _, _, eid = part.edges(form='all')
         etype_arr = F.gather_row(part.edata[dgl.ETYPE], eid)
         eid_type = F.gather_row(part.edata[dgl.EID], eid)
         for etype in g.etypes:
             etype_id = g.get_etype_id(etype)
-            src1 = F.boolean_mask(orig_src, etype_arr == etype_id)
-            dst1 = F.boolean_mask(orig_dst, etype_arr == etype_id)
-            eid1 = F.boolean_mask(orig_eid, etype_arr == etype_id)
-            exist = g.has_edges_between(src1, dst1, etype=etype)
-            assert np.all(F.asnumpy(exist))
-            eid2 = g.edge_ids(src1, dst1, etype=etype)
-            assert np.all(F.asnumpy(eid1 == eid2))
             eids[etype].append(F.boolean_mask(eid_type, etype_arr == etype_id))
             # Make sure edge Ids fall into a range.
             inner_edge_mask = _get_inner_edge_mask(part, etype_id)
@@ -120,7 +110,7 @@ def verify_hetero_graph(g, parts):
         assert len(uniq_ids) == g.number_of_edges(etype)
     # TODO(zhengda) this doesn't check 'part_id'
 
-def verify_graph_feats(g, gpb, part, node_feats, edge_feats):
+def verify_graph_feats(g, gpb, part, node_feats, edge_feats, orig_nids, orig_eids):
     for ntype in g.ntypes:
         ntype_id = g.get_ntype_id(ntype)
         inner_node_mask = _get_inner_node_mask(part, ntype_id)
@@ -130,7 +120,7 @@ def verify_graph_feats(g, gpb, part, node_feats, edge_feats):
         assert np.all(F.asnumpy(ntype_ids) == ntype_id)
         assert np.all(F.asnumpy(partid) == gpb.partid)
 
-        orig_id = F.boolean_mask(part.ndata['orig_id'], inner_node_mask)
+        orig_id = orig_nids[ntype][inner_type_nids]
         local_nids = gpb.nid2localnid(inner_type_nids, gpb.partid, ntype)
 
         for name in g.nodes[ntype].data:
@@ -149,7 +139,7 @@ def verify_graph_feats(g, gpb, part, node_feats, edge_feats):
         assert np.all(F.asnumpy(etype_ids) == etype_id)
         assert np.all(F.asnumpy(partid) == gpb.partid)
 
-        orig_id = F.boolean_mask(part.edata['orig_id'], inner_edge_mask)
+        orig_id = orig_eids[etype][inner_type_eids]
         local_eids = gpb.eid2localeid(inner_type_eids, gpb.partid, etype)
 
         for name in g.edges[etype].data:
@@ -226,7 +216,7 @@ def check_hetero_partition(hg, part_method, num_parts=4, num_trainers_per_machin
             assert len(orig_eids1) == len(orig_eids2)
             assert np.all(F.asnumpy(orig_eids1) == F.asnumpy(orig_eids2))
         parts.append(part_g)
-        verify_graph_feats(hg, gpb, part_g, node_feats, edge_feats)
+        verify_graph_feats(hg, gpb, part_g, node_feats, edge_feats, orig_nids, orig_eids)
 
         shuffled_labels.append(node_feats['n1/labels'])
         shuffled_elabels.append(edge_feats['r1/labels'])
@@ -324,11 +314,12 @@ def check_partition(g, part_method, reshuffle, num_parts=4, num_trainers_per_mac
         assert np.all(F.asnumpy(orig_eids1) == F.asnumpy(orig_eids2))
 
         if reshuffle:
-            part_g.ndata['feats'] = F.gather_row(g.ndata['feats'], part_g.ndata['orig_id'])
-            part_g.edata['feats'] = F.gather_row(g.edata['feats'], part_g.edata['orig_id'])
-            # when we read node data from the original global graph, we should use orig_id.
-            local_nodes = F.boolean_mask(part_g.ndata['orig_id'], part_g.ndata['inner_node'])
-            local_edges = F.boolean_mask(part_g.edata['orig_id'], part_g.edata['inner_edge'])
+            local_orig_nids = orig_nids[part_g.ndata[dgl.NID]]
+            local_orig_eids = orig_eids[part_g.edata[dgl.EID]]
+            part_g.ndata['feats'] = F.gather_row(g.ndata['feats'], local_orig_nids)
+            part_g.edata['feats'] = F.gather_row(g.edata['feats'], local_orig_eids)
+            local_nodes = orig_nids[local_nodes]
+            local_edges = orig_eids[local_edges]
         else:
             part_g.ndata['feats'] = F.gather_row(g.ndata['feats'], part_g.ndata[dgl.NID])
             part_g.edata['feats'] = F.gather_row(g.edata['feats'], part_g.edata[dgl.NID])
@@ -404,7 +395,7 @@ def check_hetero_partition_single_etype(num_trainers):
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 def test_partition():
-    os.environ['DGL_DIST_DEBUG'] = 1
+    os.environ['DGL_DIST_DEBUG'] = '1'
     g = create_random_graph(1000)
     check_partition(g, 'metis', False)
     check_partition(g, 'metis', True)
@@ -418,7 +409,7 @@ def test_partition():
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support some of operations in DistGraph")
 def test_hetero_partition():
-    os.environ['DGL_DIST_DEBUG'] = 1
+    os.environ['DGL_DIST_DEBUG'] = '1'
     check_hetero_partition_single_etype(1)
     check_hetero_partition_single_etype(4)
     hg = create_random_hetero()
