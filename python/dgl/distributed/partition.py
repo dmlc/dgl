@@ -13,6 +13,24 @@ from ..data.utils import load_graphs, save_graphs, load_tensors, save_tensors
 from ..partition import metis_partition_assignment, partition_graph_with_halo, get_peak_mem
 from .graph_partition_book import BasicPartitionBook, RangePartitionBook
 
+FIELD_DICT = {'inner_node': F.uint8,    # A flag indicates whether the node is inside a partition.
+              'inner_edge': F.uint8,    # A flag indicates whether the edge is inside a partition.
+              NID: F.int64,
+              EID: F.int64,
+              NTYPE: F.int16,
+              ETYPE: F.int16}
+
+def _save_graphs(filename, g_list):
+    '''Format data types in graphs before saving
+    '''
+    for g in g_list:
+        for k, dtype in FIELD_DICT.items():
+            if k in g.ndata:
+                g.ndata[k] = F.astype(g.ndata[k], dtype)
+            if k in g.edata:
+                g.edata[k] = F.astype(g.edata[k], dtype)
+    save_graphs(filename , g_list)
+
 def _get_inner_node_mask(graph, ntype_id):
     if NTYPE in graph.ndata:
         dtype = F.dtype(graph.ndata['inner_node'])
@@ -616,8 +634,10 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
             parts[0].edata['orig_id'] = orig_eids
         if return_mapping:
             orig_nids, orig_eids = _get_orig_ids(g, sim_g, False, orig_nids, orig_eids)
-        parts[0].ndata['inner_node'] = F.ones((sim_g.number_of_nodes(),), F.int8, F.cpu())
-        parts[0].edata['inner_edge'] = F.ones((sim_g.number_of_edges(),), F.int8, F.cpu())
+        parts[0].ndata['inner_node'] = F.ones((sim_g.number_of_nodes(),),
+            FIELD_DICT['inner_node'], F.cpu())
+        parts[0].edata['inner_edge'] = F.ones((sim_g.number_of_edges(),),
+            FIELD_DICT['inner_edge'], F.cpu())
     elif part_method in ('metis', 'random'):
         start = time.time()
         sim_g, balance_ntypes = get_homogeneous(g, balance_ntypes)
@@ -668,12 +688,12 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
             for name in parts:
                 orig_ids = parts[name].ndata['orig_id']
                 ntype = F.gather_row(sim_g.ndata[NTYPE], orig_ids)
-                parts[name].ndata[NTYPE] = F.astype(ntype, F.int32)
+                parts[name].ndata[NTYPE] = F.astype(ntype, FIELD_DICT[NTYPE])
                 assert np.all(F.asnumpy(ntype) == F.asnumpy(parts[name].ndata[NTYPE]))
                 # Get the original edge types and original edge IDs.
                 orig_ids = parts[name].edata['orig_id']
                 etype = F.gather_row(sim_g.edata[ETYPE], orig_ids)
-                parts[name].edata[ETYPE] = F.astype(etype, F.int32)
+                parts[name].edata[ETYPE] = F.astype(etype, FIELD_DICT[ETYPE])
                 assert np.all(F.asnumpy(etype) == F.asnumpy(parts[name].edata[ETYPE]))
 
                 # Calculate the global node IDs to per-node IDs mapping.
@@ -898,7 +918,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         save_tensors(node_feat_file, node_feats)
         save_tensors(edge_feat_file, edge_feats)
 
-        save_graphs(part_graph_file, [part])
+        _save_graphs(part_graph_file, [part])
     print('Save partitions: {:.3f} seconds, peak memory: {:.3f} GB'.format(
         time.time() - start, get_peak_mem()))
 

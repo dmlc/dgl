@@ -11,6 +11,14 @@ import backend as F
 import unittest
 import tempfile
 from utils import reset_envs
+from dgl.distributed.partition import FIELD_DICT
+
+def _verify_partition_data_types(part_g):
+    for k, dtype in FIELD_DICT.items():
+        if k in part_g.ndata:
+            assert part_g.ndata[k].dtype == dtype
+        if k in part_g.edata:
+            assert part_g.edata[k].dtype == dtype
 
 def _get_inner_node_mask(graph, ntype_id):
     if dgl.NTYPE in graph.ndata:
@@ -171,6 +179,7 @@ def check_hetero_partition(hg, part_method, num_parts=4, num_trainers_per_machin
     for i in range(num_parts):
         part_g, node_feats, edge_feats, gpb, _, ntypes, etypes = load_partition(
             '/tmp/partition/test.json', i, load_feats=load_feats)
+        _verify_partition_data_types(part_g)
         if not load_feats:
             assert not node_feats
             assert not edge_feats
@@ -248,6 +257,7 @@ def check_partition(g, part_method, reshuffle, num_parts=4, num_trainers_per_mac
     for i in range(num_parts):
         part_g, node_feats, edge_feats, gpb, _, ntypes, etypes = load_partition(
             '/tmp/partition/test.json', i, load_feats=load_feats)
+        _verify_partition_data_types(part_g)
         if not load_feats:
             assert not node_feats
             assert not edge_feats

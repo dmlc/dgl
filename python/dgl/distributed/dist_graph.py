@@ -32,6 +32,7 @@ from .graph_services import find_edges as dist_find_edges
 from .graph_services import out_degrees as dist_out_degrees
 from .graph_services import in_degrees as dist_in_degrees
 from .dist_tensor import DistTensor
+from .partition import FIELD_DICT
 
 INIT_GRAPH = 800001
 
@@ -84,13 +85,6 @@ def _copy_graph_to_shared_mem(g, graph_name, graph_format):
     if ETYPE in g.edata:
         new_g.edata[ETYPE] = _to_shared_mem(g.edata[ETYPE], _get_edata_path(graph_name, ETYPE))
     return new_g
-
-FIELD_DICT = {'inner_node': F.int32,    # A flag indicates whether the node is inside a partition.
-              'inner_edge': F.int32,    # A flag indicates whether the edge is inside a partition.
-              NID: F.int64,
-              EID: F.int64,
-              NTYPE: F.int32,
-              ETYPE: F.int32}
 
 def _get_shared_mem_ndata(g, graph_name, name):
     ''' Get shared-memory node data from DistGraph server.
