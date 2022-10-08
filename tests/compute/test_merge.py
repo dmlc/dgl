@@ -1,19 +1,29 @@
 import backend as F
 from test_utils import parametrize_idtype
+
 import dgl
+
 
 @parametrize_idtype
 def test_heterograph_merge(idtype):
-    g1 = dgl.heterograph({("a", "to", "b"): ([0,1], [1,0])}).astype(idtype).to(F.ctx())
+    g1 = (
+        dgl.heterograph({("a", "to", "b"): ([0, 1], [1, 0])})
+        .astype(idtype)
+        .to(F.ctx())
+    )
     g1_n_edges = g1.num_edges(etype="to")
-    g1.nodes["a"].data["nh"] = F.randn((2,3))
-    g1.nodes["b"].data["nh"] = F.randn((2,3))
-    g1.edges["to"].data["eh"] = F.randn((2,3))
+    g1.nodes["a"].data["nh"] = F.randn((2, 3))
+    g1.nodes["b"].data["nh"] = F.randn((2, 3))
+    g1.edges["to"].data["eh"] = F.randn((2, 3))
 
-    g2 = dgl.heterograph({("a", "to", "b"): ([1,2,3], [2,3,5])}).astype(idtype).to(F.ctx())
-    g2.nodes["a"].data["nh"] = F.randn((4,3))
-    g2.nodes["b"].data["nh"] = F.randn((6,3))
-    g2.edges["to"].data["eh"] = F.randn((3,3))
+    g2 = (
+        dgl.heterograph({("a", "to", "b"): ([1, 2, 3], [2, 3, 5])})
+        .astype(idtype)
+        .to(F.ctx())
+    )
+    g2.nodes["a"].data["nh"] = F.randn((4, 3))
+    g2.nodes["b"].data["nh"] = F.randn((6, 3))
+    g2.edges["to"].data["eh"] = F.randn((3, 3))
     g2.add_nodes(3, ntype="a")
     g2.add_nodes(3, ntype="b")
 
@@ -36,14 +46,10 @@ def test_heterograph_merge(idtype):
             g2_n_nodes = g2.num_nodes(ntype=ntype)
             updated_g1_ndata = F.asnumpy(m.nodes[ntype].data[key][:g2_n_nodes])
             g2_ndata = F.asnumpy(g2.nodes[ntype].data[key])
-            assert all(
-                (updated_g1_ndata == g2_ndata).flatten()
-            )
+            assert all((updated_g1_ndata == g2_ndata).flatten())
 
     # Check g1's edge data was updated with g2's in m.
     for key in m.edges["to"].data:
         updated_g1_edata = F.asnumpy(m.edges["to"].data[key][g1_n_edges:])
         g2_edata = F.asnumpy(g2.edges["to"].data[key])
-        assert all(
-            (updated_g1_edata == g2_edata).flatten()
-        )
+        assert all((updated_g1_edata == g2_edata).flatten())

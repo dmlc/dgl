@@ -1,22 +1,24 @@
+import itertools
 import random
 import sys
 import time
 import unittest
 
-import dgl
+import backend as F
 import networkx as nx
 import numpy as np
 import scipy.sparse as sp
-import backend as F
-
-import itertools
 from test_utils import parametrize_idtype
 
+import dgl
+
 np.random.seed(42)
+
 
 def toset(x):
     # F.zerocopy_to_numpy may return a int
     return set(F.zerocopy_to_numpy(x).tolist())
+
 
 @parametrize_idtype
 def test_bfs(idtype, n=100):
@@ -59,6 +61,7 @@ def test_bfs(idtype, n=100):
     assert len(edges_dgl) == len(edges_nx)
     assert all(toset(x) == y for x, y in zip(edges_dgl, edges_nx))
 
+
 @parametrize_idtype
 def test_topological_nodes(idtype, n=100):
     a = sp.random(n, n, 3 / n, data_rvs=lambda n: np.ones(n))
@@ -68,12 +71,13 @@ def test_topological_nodes(idtype, n=100):
     layers_dgl = dgl.topological_nodes_generator(g)
 
     adjmat = g.adjacency_matrix(transpose=True)
+
     def tensor_topo_traverse():
         n = g.number_of_nodes()
         mask = F.copy_to(F.ones((n, 1)), F.cpu())
         degree = F.spmm(adjmat, mask)
-        while F.reduce_sum(mask) != 0.:
-            v = F.astype((degree == 0.), F.float32)
+        while F.reduce_sum(mask) != 0.0:
+            v = F.astype((degree == 0.0), F.float32)
             v = v * mask
             mask = mask - v
             frontier = F.copy_to(F.nonzero_1d(F.squeeze(v, 1)), F.cpu())
@@ -85,33 +89,41 @@ def test_topological_nodes(idtype, n=100):
     assert len(layers_dgl) == len(layers_spmv)
     assert all(toset(x) == toset(y) for x, y in zip(layers_dgl, layers_spmv))
 
-DFS_LABEL_NAMES = ['forward', 'reverse', 'nontree']
+
+DFS_LABEL_NAMES = ["forward", "reverse", "nontree"]
+
+
 @parametrize_idtype
 def test_dfs_labeled_edges(idtype, example=False):
     dgl_g = dgl.DGLGraph().astype(idtype)
     dgl_g.add_nodes(6)
     dgl_g.add_edges([0, 1, 0, 3, 3], [1, 2, 2, 4, 5])
     dgl_edges, dgl_labels = dgl.dfs_labeled_edges_generator(
-            dgl_g, [0, 3], has_reverse_edge=True, has_nontree_edge=True)
+        dgl_g, [0, 3], has_reverse_edge=True, has_nontree_edge=True
+    )
     dgl_edges = [toset(t) for t in dgl_edges]
     dgl_labels = [toset(t) for t in dgl_labels]
     g1_solutions = [
-            # edges           labels
-            [[0, 1, 1, 0, 2], [0, 0, 1, 1, 2]],
-            [[2, 2, 0, 1, 0], [0, 1, 0, 2, 1]],
+        # edges           labels
+        [[0, 1, 1, 0, 2], [0, 0, 1, 1, 2]],
+        [[2, 2, 0, 1, 0], [0, 1, 0, 2, 1]],
     ]
     g2_solutions = [
-            # edges        labels
-            [[3, 3, 4, 4], [0, 1, 0, 1]],
-            [[4, 4, 3, 3], [0, 1, 0, 1]],
+        # edges        labels
+        [[3, 3, 4, 4], [0, 1, 0, 1]],
+        [[4, 4, 3, 3], [0, 1, 0, 1]],
     ]
 
     def combine_frontiers(sol):
         es, ls = zip(*sol)
-        es = [set(i for i in t if i is not None)
-              for t in itertools.zip_longest(*es)]
-        ls = [set(i for i in t if i is not None)
-              for t in itertools.zip_longest(*ls)]
+        es = [
+            set(i for i in t if i is not None)
+            for t in itertools.zip_longest(*es)
+        ]
+        ls = [
+            set(i for i in t if i is not None)
+            for t in itertools.zip_longest(*ls)
+        ]
         return es, ls
 
     for sol_set in itertools.product(g1_solutions, g2_solutions):
@@ -121,7 +133,8 @@ def test_dfs_labeled_edges(idtype, example=False):
     else:
         assert False
 
-if __name__ == '__main__':
-    test_bfs(idtype='int32')
-    test_topological_nodes(idtype='int32')
-    test_dfs_labeled_edges(idtype='int32')
+
+if __name__ == "__main__":
+    test_bfs(idtype="int32")
+    test_topological_nodes(idtype="int32")
+    test_dfs_labeled_edges(idtype="int32")
