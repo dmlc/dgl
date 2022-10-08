@@ -1,12 +1,14 @@
 """Cluster-GCN samplers."""
 import os
 import pickle
+
 import numpy as np
 
 from .. import backend as F
 from ..base import DGLError
 from ..partition import metis_partition_assignment
-from .base import set_node_lazy_features, set_edge_lazy_features, Sampler
+from .base import Sampler, set_edge_lazy_features, set_node_lazy_features
+
 
 class ClusterGCNSampler(Sampler):
     """Cluster sampler from `Cluster-GCN: An Efficient Algorithm for Training
@@ -59,35 +61,60 @@ class ClusterGCNSampler(Sampler):
     >>> for subg in dataloader:
     ...     train_on(subg)
     """
-    def __init__(self, g, k, cache_path='cluster_gcn.pkl', balance_ntypes=None,
-                 balance_edges=False, mode='k-way', prefetch_ndata=None,
-                 prefetch_edata=None, output_device=None):
+
+    def __init__(
+        self,
+        g,
+        k,
+        cache_path="cluster_gcn.pkl",
+        balance_ntypes=None,
+        balance_edges=False,
+        mode="k-way",
+        prefetch_ndata=None,
+        prefetch_edata=None,
+        output_device=None,
+    ):
         super().__init__()
         if os.path.exists(cache_path):
             try:
-                with open(cache_path, 'rb') as f:
-                    self.partition_offset, self.partition_node_ids = pickle.load(f)
+                with open(cache_path, "rb") as f:
+                    (
+                        self.partition_offset,
+                        self.partition_node_ids,
+                    ) = pickle.load(f)
             except (EOFError, TypeError, ValueError):
                 raise DGLError(
-                    f'The contents in the cache file {cache_path} is invalid. '
-                    f'Please remove the cache file {cache_path} or specify another path.')
+                    f"The contents in the cache file {cache_path} is invalid. "
+                    f"Please remove the cache file {cache_path} or specify another path."
+                )
             if len(self.partition_offset) != k + 1:
                 raise DGLError(
-                    f'Number of partitions in the cache does not match the value of k. '
-                    f'Please remove the cache file {cache_path} or specify another path.')
+                    f"Number of partitions in the cache does not match the value of k. "
+                    f"Please remove the cache file {cache_path} or specify another path."
+                )
             if len(self.partition_node_ids) != g.num_nodes():
                 raise DGLError(
-                    f'Number of nodes in the cache does not match the given graph. '
-                    f'Please remove the cache file {cache_path} or specify another path.')
+                    f"Number of nodes in the cache does not match the given graph. "
+                    f"Please remove the cache file {cache_path} or specify another path."
+                )
         else:
             partition_ids = metis_partition_assignment(
-                g, k, balance_ntypes=balance_ntypes, balance_edges=balance_edges, mode=mode)
+                g,
+                k,
+                balance_ntypes=balance_ntypes,
+                balance_edges=balance_edges,
+                mode=mode,
+            )
             partition_ids = F.asnumpy(partition_ids)
             partition_node_ids = np.argsort(partition_ids)
-            partition_size = F.zerocopy_from_numpy(np.bincount(partition_ids, minlength=k))
-            partition_offset = F.zerocopy_from_numpy(np.insert(np.cumsum(partition_size), 0, 0))
+            partition_size = F.zerocopy_from_numpy(
+                np.bincount(partition_ids, minlength=k)
+            )
+            partition_offset = F.zerocopy_from_numpy(
+                np.insert(np.cumsum(partition_size), 0, 0)
+            )
             partition_node_ids = F.zerocopy_from_numpy(partition_node_ids)
-            with open(cache_path, 'wb') as f:
+            with open(cache_path, "wb") as f:
                 pickle.dump((partition_offset, partition_node_ids), f)
             self.partition_offset = partition_offset
             self.partition_node_ids = partition_node_ids
@@ -96,7 +123,7 @@ class ClusterGCNSampler(Sampler):
         self.prefetch_edata = prefetch_edata or []
         self.output_device = output_device
 
-    def sample(self, g, partition_ids):     # pylint: disable=arguments-differ
+    def sample(self, g, partition_ids):  # pylint: disable=arguments-differ
         """Sampling function.
 
         Parameters
@@ -111,10 +138,18 @@ class ClusterGCNSampler(Sampler):
         DGLGraph
             The sampled subgraph.
         """
-        node_ids = F.cat([
-            self.partition_node_ids[self.partition_offset[i]:self.partition_offset[i+1]]
-            for i in F.asnumpy(partition_ids)], 0)
-        sg = g.subgraph(node_ids, relabel_nodes=True, output_device=self.output_device)
+        node_ids = F.cat(
+            [
+                self.partition_node_ids[
+                    self.partition_offset[i] : self.partition_offset[i + 1]
+                ]
+                for i in F.asnumpy(partition_ids)
+            ],
+            0,
+        )
+        sg = g.subgraph(
+            node_ids, relabel_nodes=True, output_device=self.output_device
+        )
         set_node_lazy_features(sg, self.prefetch_ndata)
         set_edge_lazy_features(sg, self.prefetch_edata)
         return sg
