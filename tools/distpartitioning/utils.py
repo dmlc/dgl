@@ -67,6 +67,27 @@ def read_json(json_file):
 
     return val
 
+def get_etype_featnames(etype_name, schema_map):
+    """Retrieves edge feature names for a given edge_type
+
+    Parameters:
+    -----------
+    eype_name : string
+        a string specifying a edge_type name
+
+    schema : dictionary
+        metadata json object as a dictionary, which is read from the input
+        metadata file from the input dataset
+
+    Returns:
+    --------
+    list : 
+        a list of feature names for a given edge_type
+    """
+    edge_data = schema_map[constants.STR_EDGE_DATA]
+    feats = edge_data.get(etype_name, {})
+    return [feat for feat in feats]
+
 def get_ntype_featnames(ntype_name, schema_map): 
     """
     Retrieves node feature names for a given node_type
@@ -88,6 +109,30 @@ def get_ntype_featnames(ntype_name, schema_map):
     node_data = schema_map[constants.STR_NODE_DATA]
     feats = node_data.get(ntype_name, {})
     return [feat for feat in feats]
+
+def get_edge_types(schema_map):
+    """Utility method to extract edge_typename -> edge_type mappings
+    as defined by the input schema
+
+    Parameters:
+    -----------
+    schema_map : dictionary
+        Input schema from which the edge_typename -> edge_typeid
+        dictionary is created.
+
+    Returns:
+    --------
+    dictionary
+        with keys as edge type names and values as ids (integers)
+    list
+        list of etype name strings
+    dictionary
+        with keys as etype ids (integers) and values as edge type names
+    """
+    etypes = schema_map[constants.STR_EDGE_TYPE]
+    etype_etypeid_map = {e : i for i, e in enumerate(etypes)}
+    etypeid_etype_map = {i : e for i, e in enumerate(etypes)}
+    return etype_etypeid_map, etypes, etypeid_etype_map
 
 def get_node_types(schema_map):
     """ 
