@@ -1,6 +1,6 @@
 package:
   name: dgl{{ environ.get('DGL_PACKAGE_SUFFIX', '') }}
-  version: "0.9"
+  version: "0.10"
 
 source:
   git_rev: 0.8.x

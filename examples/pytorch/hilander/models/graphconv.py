@@ -9,6 +9,7 @@ from torch.nn import init
 import dgl.function as fn
 from dgl.nn.pytorch import GATConv
 
+
 class GraphConvLayer(nn.Module):
     def __init__(self, in_feats, out_feats, bias=True):
         super(GraphConvLayer, self).__init__()
@@ -19,25 +20,29 @@ class GraphConvLayer(nn.Module):
             srcfeat, dstfeat = feat
         else:
             srcfeat = feat
-            dstfeat = feat[:bipartite.num_dst_nodes()]
+            dstfeat = feat[: bipartite.num_dst_nodes()]
         graph = bipartite.local_var()
 
-        graph.srcdata['h'] = srcfeat
-        graph.update_all(fn.u_mul_e('h', 'affine', 'm'),
-                         fn.sum(msg='m', out='h'))
+        graph.srcdata["h"] = srcfeat
+        graph.update_all(
+            fn.u_mul_e("h", "affine", "m"), fn.sum(msg="m", out="h")
+        )
 
-        gcn_feat = torch.cat([dstfeat, graph.dstdata['h']], dim=-1)
+        gcn_feat = torch.cat([dstfeat, graph.dstdata["h"]], dim=-1)
         out = self.mlp(gcn_feat)
         return out
 
+
 class GraphConv(nn.Module):
-    def __init__(self, in_dim, out_dim, dropout=0, use_GAT = False, K = 1):
+    def __init__(self, in_dim, out_dim, dropout=0, use_GAT=False, K=1):
         super(GraphConv, self).__init__()
         self.in_dim = in_dim
         self.out_dim = out_dim
 
         if use_GAT:
-            self.gcn_layer = GATConv(in_dim, out_dim, K, allow_zero_in_degree = True)
+            self.gcn_layer = GATConv(
+                in_dim, out_dim, K, allow_zero_in_degree=True
+            )
             self.bias = nn.Parameter(torch.Tensor(K, out_dim))
             init.constant_(self.bias, 0)
         else:
@@ -50,7 +55,7 @@ class GraphConv(nn.Module):
         out = self.gcn_layer(bipartite, features)
 
         if self.use_GAT:
-            out = torch.mean(out + self.bias, dim = 1)
+            out = torch.mean(out + self.bias, dim=1)
 
         out = out.reshape(out.shape[0], -1)
         out = F.relu(out)

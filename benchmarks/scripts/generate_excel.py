@@ -1,19 +1,23 @@
-import pandas as pd
 import json
-from pathlib import Path
 from itertools import product
+from pathlib import Path
+
+import pandas as pd
 
 
 def get_branch_name_from_hash(hash):
     import subprocess
-    process = subprocess.Popen(['git', 'name-rev', '--name-only', hash],
-                               stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE)
+
+    process = subprocess.Popen(
+        ["git", "name-rev", "--name-only", hash],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
     stdout, stderr = process.communicate()
     if len(stderr) > 0:
         return hash[:10]
     else:
-        return stdout.decode("utf-8") .strip("\n")
+        return stdout.decode("utf-8").strip("\n")
 
 
 def main():
@@ -28,22 +32,30 @@ def main():
         # commit_results_dict = {}
         per_machine_result = {}
         commit_results_json_paths = [
-            f for f in machine.glob("*") if f.name != "machine.json"]
+            f for f in machine.glob("*") if f.name != "machine.json"
+        ]
         for commit in commit_results_json_paths:
             with commit.open() as f:
                 commit_result = json.load(f)
-            commit_hash = commit_result['commit_hash']
+            commit_hash = commit_result["commit_hash"]
             per_commit_result = {}
-            for test_name, result in commit_result['results'].items():
+            for test_name, result in commit_result["results"].items():
                 per_commit_result[test_name] = []
-                if result['result'] is None:
-                    for test_args in product(*result['params']):
+                if result["result"] is None:
+                    for test_args in product(*result["params"]):
                         per_commit_result[test_name].append(
-                            {"params": ", ".join(test_args), "result": None})
+                            {"params": ", ".join(test_args), "result": None}
+                        )
                 else:
-                    for test_args, performance_number in zip(product(*result['params']), result['result']):
+                    for test_args, performance_number in zip(
+                        product(*result["params"]), result["result"]
+                    ):
                         per_commit_result[test_name].append(
-                            {"params": ", ".join(test_args), "result": performance_number})
+                            {
+                                "params": ", ".join(test_args),
+                                "result": performance_number,
+                            }
+                        )
             per_machine_result[commit_hash] = per_commit_result
         output_results_dict[machine.name] = per_machine_result
     return output_results_dict
@@ -54,8 +66,8 @@ def dict_to_csv(output_results_dict):
         benchmark_conf = json.load(f)
     unit_dict = {}
     for k, v in benchmark_conf.items():
-        if k != 'version':
-            unit_dict[k] = v['unit']
+        if k != "version":
+            unit_dict[k] = v["unit"]
     result_list = []
     for machine, per_machine_result in output_results_dict.items():
         for commit, test_cases in per_machine_result.items():
@@ -65,19 +77,34 @@ def dict_to_csv(output_results_dict):
             for test_case_name, results in test_cases.items():
                 for result in results:
                     result_list.append(
-                        {"test_name": test_case_name, 'params': result['params'], 'unit': unit_dict[test_case_name], "number": result['result'], 'commit': branch_name, 'machine': machine})
+                        {
+                            "test_name": test_case_name,
+                            "params": result["params"],
+                            "unit": unit_dict[test_case_name],
+                            "number": result["result"],
+                            "commit": branch_name,
+                            "machine": machine,
+                        }
+                    )
     df = pd.DataFrame(result_list)
     return df
 
 
 def side_by_side_view(df):
-    commits = df['commit'].unique().tolist()
-    full_df = df.loc[df['commit'] == commits[0]]
+    commits = df["commit"].unique().tolist()
+    full_df = df.loc[df["commit"] == commits[0]]
     for commit in commits[1:]:
-        per_commit_df = df.loc[df['commit'] == commit]
+        per_commit_df = df.loc[df["commit"] == commit]
         full_df: pd.DataFrame = full_df.merge(
-            per_commit_df, on=['test_name', 'params', 'machine', 'unit'], how='outer', suffixes=("_{}".format(full_df.iloc[0]["commit"]), "_{}".format(per_commit_df.iloc[0]["commit"])))
-    full_df = full_df.loc[:, ~full_df.columns.str.startswith('commit')]
+            per_commit_df,
+            on=["test_name", "params", "machine", "unit"],
+            how="outer",
+            suffixes=(
+                "_{}".format(full_df.iloc[0]["commit"]),
+                "_{}".format(per_commit_df.iloc[0]["commit"]),
+            ),
+        )
+    full_df = full_df.loc[:, ~full_df.columns.str.startswith("commit")]
     return full_df
 
 
