@@ -19,7 +19,24 @@ def _prepare_edge_arrays(g, arg):
         if isinstance(arg[0], nd.NDArray):
             return arg
         else:
-            return [F.to_dgl_nd(x) for x in arg]
+            # The list can have None as placeholders for empty arrays with
+            # undetermined data type.
+            dtype = None
+            ctx = None
+            result = []
+            for entry in arg:
+                if F.is_tensor(entry):
+                    result.append(F.to_dgl_nd(entry))
+                    dtype = F.dtype(entry)
+                    ctx = F.context(entry)
+                else:
+                    result.append(None)
+
+            result = [
+                    F.to_dgl_nd(F.copy_to(F.tensor([], dtype=dtype), ctx))
+                    if x is None else x
+                    for x in result]
+            return result
     elif arg is None:
         return [nd.array([], ctx=nd.cpu())] * len(g.etypes)
     else:

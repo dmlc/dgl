@@ -11,6 +11,7 @@ from ..convert import graph, heterograph
 from ..base import NID, EID
 from ..utils import toindex
 from .. import backend as F
+from .. import ndarray as nd
 
 __all__ = [
     'sample_neighbors', 'sample_etype_neighbors',
@@ -221,7 +222,10 @@ class SamplingRequestEtype(Request):
         kv_store = server_state.kv_store
         # See NOTE 1
         if self.prob is not None:
-            probs = [kv_store.data_store[key] for key in self.prob]
+            probs = [
+                    kv_store.data_store[key] if key != "" else None
+                    for key in self.prob
+            ]
         else:
             probs = None
         global_src, global_dst, global_eids = _sample_etype_neighbors(
@@ -540,9 +544,11 @@ def sample_etype_neighbors(
     def issue_remote_req(node_ids):
         if prob is not None:
             # See NOTE 1
-            # Is there a better way to get the KVStore key given the name and
-            # node/edge type?
-            _prob = [g.edges[etype].data[prob].kvstore_key for etype in g.etypes]
+            _prob = [
+                    g.edges[etype].data[prob].kvstore_key if
+                        prob in g.edges[etype].data else ""
+                    for etype in g.etypes
+            ]
         else:
             _prob = None
         return SamplingRequestEtype(
@@ -556,7 +562,10 @@ def sample_etype_neighbors(
                     eid_field, fanout, edge_dir, None, replace,
                     etype_sorted=etype_sorted)
         else:
-            _prob = [g.edges[etype].data[prob].local_partition for etype in g.etypes]
+            _prob = [
+                    g.edges[etype].data[prob].local_partition if
+                        prob in g.edges[etype].data else None
+                    for etype in g.etypes]
             return _sample_etype_neighbors(
                     local_g, partition_book, local_nids, etype_field,
                     eid_field, fanout, edge_dir, _prob, replace,

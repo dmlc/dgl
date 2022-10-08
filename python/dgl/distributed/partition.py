@@ -123,6 +123,24 @@ def load_partition(part_config, part_id, load_feats=True):
     if load_feats:
         node_feats, edge_feats = load_partition_feats(part_config, part_id)
 
+    if len(etypes) > 1:
+        # Compute this during loading.  Otherwise there is no way to get the mapping from
+        # the homogenized local edge IDs to the heterogeneous local edge IDs (which are
+        # needed for reading edge features during sampling).
+        global_homogenized_eids = graph.edata[EID]
+        global_etypes, global_eids = gpb.map_to_per_etype(global_homogenized_eids)
+        graph.edata['__LOCAL_ID__'] = F.zeros(
+                (graph.num_edges(),),
+                graph.idtype,
+                graph.device)
+        for etype_id, etype in enumerate(etypes):
+            mask = global_etypes == etype_id
+            graph.edata['__LOCAL_ID__'][mask] = gpb.eid2localeid(
+                    global_eids[mask],
+                    part_id,
+                    etype
+            )
+
     return graph, node_feats, edge_feats, gpb, graph_name, ntypes_list, etypes_list
 
 def load_partition_feats(part_config, part_id):

@@ -80,8 +80,12 @@ def _copy_graph_to_shared_mem(g, graph_name, graph_format):
     new_g.edata[EID] = _to_shared_mem(g.edata[EID], _get_edata_path(graph_name, EID))
     # for heterogeneous graph, we need to put ETYPE into KVStore
     # for homogeneous graph, ETYPE does not exist
-    if ETYPE in g.edata:
-        new_g.edata[ETYPE] = _to_shared_mem(g.edata[ETYPE], _get_edata_path(graph_name, ETYPE))
+    for field in [ETYPE, '__LOCAL_ID__']:
+        if field in g.edata:
+            new_g.edata[field] = _to_shared_mem(
+                    g.edata[field],
+                    _get_edata_path(graph_name, field),
+            )
     return new_g
 
 FIELD_DICT = {'inner_node': F.int32,    # A flag indicates whether the node is inside a partition.
@@ -89,7 +93,8 @@ FIELD_DICT = {'inner_node': F.int32,    # A flag indicates whether the node is i
               NID: F.int64,
               EID: F.int64,
               NTYPE: F.int32,
-              ETYPE: F.int32}
+              ETYPE: F.int32,
+              '__LOCAL_ID__': F.int64}
 
 def _get_shared_mem_ndata(g, graph_name, name):
     ''' Get shared-memory node data from DistGraph server.
@@ -139,8 +144,9 @@ def _get_graph_from_shared_mem(graph_name):
     g.edata[EID] = _get_shared_mem_edata(g, graph_name, EID)
 
     # heterogeneous graph has ETYPE
-    if _exist_shared_mem_array(graph_name, ETYPE):
-        g.edata[ETYPE] = _get_shared_mem_edata(g, graph_name, ETYPE)
+    for field in [ETYPE, '__LOCAL_ID__']:
+        if _exist_shared_mem_array(graph_name, field):
+            g.edata[field] = _get_shared_mem_edata(g, graph_name, field)
     return g
 
 NodeSpace = namedtuple('NodeSpace', ['data'])
@@ -335,7 +341,6 @@ class DistGraphServer(KVServer):
             # Loading of node/edge_feats are deferred to lower the peak memory consumption.
             self.client_g, _, _, self.gpb, graph_name, \
                     ntypes, etypes = load_partition(part_config, self.part_id, load_feats=False)
-            print('load ' + graph_name)
             # formatting dtype
             # TODO(Rui) Formatting forcely is not a perfect solution.
             #   We'd better store all dtypes when mapping to shared memory
@@ -385,6 +390,9 @@ class DistGraphServer(KVServer):
                 # The feature name has the following format: edge_type + "/" + feature_name to avoid
                 # feature name collision for different edge types.
                 etype, feat_name = name.split('/')
+                # Edge features are prefixed with canonical edge types, but the partition policy
+                # is still using a single edge type string.
+                etype = etype.split(':')[1]
                 data_name = HeteroDataName(False, etype, feat_name)
                 self.init_data(name=str(data_name), policy_str=data_name.policy_str,
                                data_tensor=edge_feats[name])
@@ -1271,7 +1279,7 @@ class DistGraph:
         # Currently exclude_edges, output_device, and edge_dir are ignored.
         if len(self.etypes) > 1:
             frontier = graph_services.sample_etype_neighbors(
-                self, seed_nodes, ETYPE, EID, fanout, replace=replace,
+                self, seed_nodes, ETYPE, '__LOCAL_ID__', fanout, replace=replace,
                 etype_sorted=etype_sorted, prob=prob)
         else:
             frontier = graph_services.sample_neighbors(
