@@ -1,15 +1,15 @@
-"""dgl elementwise operators for sparse matrix module."""
+"""DGL elementwise operators for sparse matrix module."""
 from typing import Union
 
 import torch
 
-from .sp_matrix import SparseMatrix
 from .diag_matrix import DiagMatrix
+from .sp_matrix import SparseMatrix
 
-__all__ = ["add", "sub", "mul", "div", "rdiv", "power", "rpower"]
+__all__ = ["sp_add", "sp_sub", "sp_mul", "sp_div", "sp_power"]
 
 
-def add(
+def sp_add(
     A: Union[SparseMatrix, DiagMatrix], B: Union[SparseMatrix, DiagMatrix]
 ) -> SparseMatrix:
     """Elementwise addition.
@@ -81,7 +81,7 @@ def add(
     )
 
 
-def sub(
+def sp_sub(
     A: Union[SparseMatrix, DiagMatrix], B: Union[SparseMatrix, DiagMatrix]
 ) -> SparseMatrix:
     """Elementwise subtraction.
@@ -139,7 +139,7 @@ def sub(
     )
 
 
-def mul(
+def sp_mul(
     A: Union[SparseMatrix, DiagMatrix, float],
     B: Union[SparseMatrix, DiagMatrix, float],
 ) -> SparseMatrix:
@@ -205,7 +205,7 @@ def mul(
     return SparseMatrix(C.indices()[0], C.indices()[1], C.values(), C.shape)
 
 
-def div(
+def sp_div(
     A: Union[SparseMatrix, DiagMatrix],
     B: Union[SparseMatrix, DiagMatrix, float],
 ) -> SparseMatrix:
@@ -260,7 +260,7 @@ def div(
     return SparseMatrix(C.indices()[0], C.indices()[1], C.values(), C.shape)
 
 
-def rdiv(A: float, B: Union[SparseMatrix, DiagMatrix]):
+def sp_rdiv(A: float, B: Union[SparseMatrix, DiagMatrix]):
     """Elementwise division.
 
     Parameters
@@ -276,7 +276,7 @@ def rdiv(A: float, B: Union[SparseMatrix, DiagMatrix]):
     )
 
 
-def power(A: SparseMatrix, B: float) -> SparseMatrix:
+def sp_power(A: SparseMatrix, B: float) -> SparseMatrix:
     """Elementwise power operation.
 
     Parameters
@@ -310,7 +310,7 @@ def power(A: SparseMatrix, B: float) -> SparseMatrix:
     return SparseMatrix(A.row, A.col, torch.pow(A.val, B), A.shape)
 
 
-def rpower(A: float, B: SparseMatrix) -> SparseMatrix:
+def sp_rpower(A: float, B: SparseMatrix) -> SparseMatrix:
     """Elementwise power operation.
 
     Parameters
@@ -326,13 +326,13 @@ def rpower(A: float, B: SparseMatrix) -> SparseMatrix:
     )
 
 
-SparseMatrix.__add__ = add
-SparseMatrix.__radd__ = add
-SparseMatrix.__sub__ = sub
-SparseMatrix.__rsub__ = sub
-SparseMatrix.__mul__ = mul
-SparseMatrix.__rmul__ = mul
-SparseMatrix.__truediv__ = div
-SparseMatrix.__rtruediv__ = rdiv
-SparseMatrix.__pow__ = power
-SparseMatrix.__rpow__ = rpower
+SparseMatrix.__add__ = sp_add
+SparseMatrix.__radd__ = sp_add
+SparseMatrix.__sub__ = sp_sub
+SparseMatrix.__rsub__ = sp_sub
+SparseMatrix.__mul__ = sp_mul
+SparseMatrix.__rmul__ = sp_mul
+SparseMatrix.__truediv__ = sp_div
+SparseMatrix.__rtruediv__ = sp_rdiv
+SparseMatrix.__pow__ = sp_power
+SparseMatrix.__rpow__ = sp_rpower

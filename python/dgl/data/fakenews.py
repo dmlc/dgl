@@ -1,12 +1,12 @@
 import os
+
 import numpy as np
 import scipy.sparse as sp
 
-from .dgl_dataset import DGLBuiltinDataset
-from .utils import save_graphs, load_graphs, _get_dgl_url
-from .utils import save_info, load_info
-from ..convert import graph
 from .. import backend as F
+from ..convert import graph
+from .dgl_dataset import DGLBuiltinDataset
+from .utils import _get_dgl_url, load_graphs, load_info, save_graphs, save_info
 
 
 class FakeNewsDataset(DGLBuiltinDataset):
@@ -113,30 +113,41 @@ class FakeNewsDataset(DGLBuiltinDataset):
     >>> labels = dataset.labels
     """
     file_urls = {
-        'gossipcop': 'dataset/FakeNewsGOS.zip',
-        'politifact': 'dataset/FakeNewsPOL.zip'
+        "gossipcop": "dataset/FakeNewsGOS.zip",
+        "politifact": "dataset/FakeNewsPOL.zip",
     }
 
     def __init__(self, name, feature_name, raw_dir=None, transform=None):
-        assert name in ['gossipcop', 'politifact'], \
-            "Only supports 'gossipcop' or 'politifact'."
+        assert name in [
+            "gossipcop",
+            "politifact",
+        ], "Only supports 'gossipcop' or 'politifact'."
         url = _get_dgl_url(self.file_urls[name])
 
-        assert feature_name in ['bert', 'content', 'profile', 'spacy'], \
-            "Only supports 'bert', 'content', 'profile', or 'spacy'"
+        assert feature_name in [
+            "bert",
+            "content",
+            "profile",
+            "spacy",
+        ], "Only supports 'bert', 'content', 'profile', or 'spacy'"
         self.feature_name = feature_name
-        super(FakeNewsDataset, self).__init__(name=name,
-                                              url=url,
-                                              raw_dir=raw_dir,
-                                              transform=transform)
+        super(FakeNewsDataset, self).__init__(
+            name=name, url=url, raw_dir=raw_dir, transform=transform
+        )
 
     def process(self):
         """process raw data to graph, labels and masks"""
-        self.labels = F.tensor(np.load(os.path.join(self.raw_path, 'graph_labels.npy')))
+        self.labels = F.tensor(
+            np.load(os.path.join(self.raw_path, "graph_labels.npy"))
+        )
         num_graphs = self.labels.shape[0]
 
-        node_graph_id = np.load(os.path.join(self.raw_path, 'node_graph_id.npy'))
-        edges = np.genfromtxt(os.path.join(self.raw_path, 'A.txt'), delimiter=',', dtype=int)
+        node_graph_id = np.load(
+            os.path.join(self.raw_path, "node_graph_id.npy")
+        )
+        edges = np.genfromtxt(
+            os.path.join(self.raw_path, "A.txt"), delimiter=",", dtype=int
+        )
         src = edges[:, 0]
         dst = edges[:, 1]
         g = graph((src, dst))
@@ -148,9 +159,9 @@ class FakeNewsDataset(DGLBuiltinDataset):
 
         self.graphs = [g.subgraph(node_idx) for node_idx in node_idx_list]
 
-        train_idx = np.load(os.path.join(self.raw_path, 'train_idx.npy'))
-        val_idx = np.load(os.path.join(self.raw_path, 'val_idx.npy'))
-        test_idx = np.load(os.path.join(self.raw_path, 'test_idx.npy'))
+        train_idx = np.load(os.path.join(self.raw_path, "train_idx.npy"))
+        val_idx = np.load(os.path.join(self.raw_path, "val_idx.npy"))
+        test_idx = np.load(os.path.join(self.raw_path, "test_idx.npy"))
         train_mask = np.zeros(num_graphs, dtype=np.bool)
         val_mask = np.zeros(num_graphs, dtype=np.bool)
         test_mask = np.zeros(num_graphs, dtype=np.bool)
@@ -161,40 +172,47 @@ class FakeNewsDataset(DGLBuiltinDataset):
         self.val_mask = F.tensor(val_mask)
         self.test_mask = F.tensor(test_mask)
 
-        feature_file = 'new_' + self.feature_name + '_feature.npz'
-        self.feature = F.tensor(sp.load_npz(os.path.join(self.raw_path, feature_file)).todense())
+        feature_file = "new_" + self.feature_name + "_feature.npz"
+        self.feature = F.tensor(
+            sp.load_npz(os.path.join(self.raw_path, feature_file)).todense()
+        )
 
     def save(self):
         """save the graph list and the labels"""
-        graph_path = os.path.join(self.save_path, self.name + '_dgl_graph.bin')
-        info_path = os.path.join(self.save_path, self.name + '_dgl_graph.pkl')
+        graph_path = os.path.join(self.save_path, self.name + "_dgl_graph.bin")
+        info_path = os.path.join(self.save_path, self.name + "_dgl_graph.pkl")
         save_graphs(str(graph_path), self.graphs)
-        save_info(info_path, {'label': self.labels,
-                              'feature': self.feature,
-                              'train_mask': self.train_mask,
-                              'val_mask': self.val_mask,
-                              'test_mask': self.test_mask})
+        save_info(
+            info_path,
+            {
+                "label": self.labels,
+                "feature": self.feature,
+                "train_mask": self.train_mask,
+                "val_mask": self.val_mask,
+                "test_mask": self.test_mask,
+            },
+        )
 
     def has_cache(self):
-        """ check whether there are processed data in `self.save_path` """
-        graph_path = os.path.join(self.save_path, self.name + '_dgl_graph.bin')
-        info_path = os.path.join(self.save_path, self.name + '_dgl_graph.pkl')
+        """check whether there are processed data in `self.save_path`"""
+        graph_path = os.path.join(self.save_path, self.name + "_dgl_graph.bin")
+        info_path = os.path.join(self.save_path, self.name + "_dgl_graph.pkl")
         return os.path.exists(graph_path) and os.path.exists(info_path)
 
     def load(self):
         """load processed data from directory `self.save_path`"""
-        graph_path = os.path.join(self.save_path, self.name + '_dgl_graph.bin')
-        info_path = os.path.join(self.save_path, self.name + '_dgl_graph.pkl')
+        graph_path = os.path.join(self.save_path, self.name + "_dgl_graph.bin")
+        info_path = os.path.join(self.save_path, self.name + "_dgl_graph.pkl")
 
         graphs, _ = load_graphs(str(graph_path))
         info = load_info(str(info_path))
         self.graphs = graphs
-        self.labels = info['label']
-        self.feature = info['feature']
+        self.labels = info["label"]
+        self.feature = info["feature"]
 
-        self.train_mask = info['train_mask']
-        self.val_mask = info['val_mask']
-        self.test_mask = info['test_mask']
+        self.train_mask = info["train_mask"]
+        self.val_mask = info["val_mask"]
+        self.test_mask = info["test_mask"]
 
     @property
     def num_classes(self):
@@ -207,7 +225,7 @@ class FakeNewsDataset(DGLBuiltinDataset):
         return self.labels.shape[0]
 
     def __getitem__(self, i):
-        r""" Get graph and label by index
+        r"""Get graph and label by index
 
         Parameters
         ----------

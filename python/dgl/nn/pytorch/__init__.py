@@ -9,3 +9,4 @@ from .factory import *
 from .hetero import *
 from .utils import Sequential, WeightBasis, JumpingKnowledge, LabelPropagation
 from .sparse_emb import NodeEmbedding
+from .network_emb import *

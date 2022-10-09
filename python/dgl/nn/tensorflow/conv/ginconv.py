@@ -57,23 +57,26 @@ class GINConv(layers.Layer):
             0.55207   ,  1.2442873 , -0.17693758,  0.67841303,  0.8633929 ]],
         dtype=float32)>
     """
-    def __init__(self,
-                 apply_func,
-                 aggregator_type,
-                 init_eps=0,
-                 learn_eps=False):
+
+    def __init__(
+        self, apply_func, aggregator_type, init_eps=0, learn_eps=False
+    ):
         super(GINConv, self).__init__()
         self.apply_func = apply_func
-        if aggregator_type == 'sum':
+        if aggregator_type == "sum":
             self._reducer = fn.sum
-        elif aggregator_type == 'max':
+        elif aggregator_type == "max":
             self._reducer = fn.max
-        elif aggregator_type == 'mean':
+        elif aggregator_type == "mean":
             self._reducer = fn.mean
         else:
-            raise KeyError('Aggregator type {} not recognized.'.format(aggregator_type))
+            raise KeyError(
+                "Aggregator type {} not recognized.".format(aggregator_type)
+            )
         # to specify whether eps is trainable or not.
-        self.eps = tf.Variable(initial_value=[init_eps], dtype=tf.float32, trainable=learn_eps)
+        self.eps = tf.Variable(
+            initial_value=[init_eps], dtype=tf.float32, trainable=learn_eps
+        )
 
     def call(self, graph, feat):
         r"""Compute Graph Isomorphism Network layer.
@@ -100,9 +103,9 @@ class GINConv(layers.Layer):
         """
         with graph.local_scope():
             feat_src, feat_dst = expand_as_pair(feat, graph)
-            graph.srcdata['h'] = feat_src
-            graph.update_all(fn.copy_u('h', 'm'), self._reducer('m', 'neigh'))
-            rst = (1 + self.eps) * feat_dst + graph.dstdata['neigh']
+            graph.srcdata["h"] = feat_src
+            graph.update_all(fn.copy_u("h", "m"), self._reducer("m", "neigh"))
+            rst = (1 + self.eps) * feat_dst + graph.dstdata["neigh"]
             if self.apply_func is not None:
                 rst = self.apply_func(rst)
             return rst

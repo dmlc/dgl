@@ -53,11 +53,8 @@ class DenseChebConv(nn.Module):
     --------
     `ChebConv <https://docs.dgl.ai/api/python/nn.pytorch.html#chebconv>`__
     """
-    def __init__(self,
-                 in_feats,
-                 out_feats,
-                 k,
-                 bias=True):
+
+    def __init__(self, in_feats, out_feats, k, bias=True):
         super(DenseChebConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
@@ -66,7 +63,7 @@ class DenseChebConv(nn.Module):
         if bias:
             self.bias = nn.Parameter(th.Tensor(out_feats))
         else:
-            self.register_buffer('bias', None)
+            self.register_buffer("bias", None)
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -74,7 +71,7 @@ class DenseChebConv(nn.Module):
         if self.bias is not None:
             init.zeros_(self.bias)
         for i in range(self._k):
-            init.xavier_normal_(self.W[i], init.calculate_gain('relu'))
+            init.xavier_normal_(self.W[i], init.calculate_gain("relu"))
 
     def forward(self, adj, feat, lambda_max=None):
         r"""Compute (Dense) Chebyshev Spectral Graph Convolution layer
@@ -120,7 +117,7 @@ class DenseChebConv(nn.Module):
 
         Zs = th.stack(Z, 0)  # (k, n, n)
 
-        Zh = (Zs @ feat.unsqueeze(0) @ self.W)
+        Zh = Zs @ feat.unsqueeze(0) @ self.W
         Zh = Zh.sum(0)
 
         if self.bias is not None:

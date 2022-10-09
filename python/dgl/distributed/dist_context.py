@@ -1,22 +1,22 @@
 """Initialize the distributed services"""
 # pylint: disable=line-too-long
 
-import multiprocessing as mp
-import traceback
 import atexit
-import time
-import os
-import sys
-import queue
 import gc
+import multiprocessing as mp
+import os
+import queue
+import sys
+import time
+import traceback
 from enum import Enum
 
+from .. import utils
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
-from .kvstore import init_kvstore, close_kvstore
-from .rpc_client import connect_to_server
+from .kvstore import close_kvstore, init_kvstore
 from .role import init_role
-from .. import utils
+from .rpc_client import connect_to_server
 
 SAMPLER_POOL = None
 NUM_SAMPLER_WORKERS = 0
@@ -34,13 +34,22 @@ def get_sampler_pool():
     return SAMPLER_POOL, NUM_SAMPLER_WORKERS
 
 
-def _init_rpc(ip_config, num_servers, max_queue_size, net_type, role, num_threads, group_id):
-    ''' This init function is called in the worker processes.
-    '''
+def _init_rpc(
+    ip_config,
+    num_servers,
+    max_queue_size,
+    net_type,
+    role,
+    num_threads,
+    group_id,
+):
+    """This init function is called in the worker processes."""
     try:
         utils.set_num_threads(num_threads)
-        if os.environ.get('DGL_DIST_MODE', 'standalone') != 'standalone':
-            connect_to_server(ip_config, num_servers, max_queue_size, net_type, group_id)
+        if os.environ.get("DGL_DIST_MODE", "standalone") != "standalone":
+            connect_to_server(
+                ip_config, num_servers, max_queue_size, net_type, group_id
+            )
         init_role(role)
         init_kvstore(ip_config, num_servers, role)
     except Exception as e:
@@ -51,6 +60,7 @@ def _init_rpc(ip_config, num_servers, max_queue_size, net_type, role, num_thread
 
 class MpCommand(Enum):
     """Enum class for multiprocessing command"""
+
     INIT_RPC = 0  # Not used in the task queue
     SET_COLLATE_FN = 1
     CALL_BARRIER = 2
@@ -80,12 +90,16 @@ def init_process(rpc_config, mp_contexts):
             elif command == MpCommand.CALL_BARRIER:
                 barrier.wait()
             elif command == MpCommand.DELETE_COLLATE_FN:
-                dataloader_name, = args
+                (dataloader_name,) = args
                 del collate_fn_dict[dataloader_name]
             elif command == MpCommand.CALL_COLLATE_FN:
                 dataloader_name, collate_args = args
                 data_queue.put(
-                    (dataloader_name, collate_fn_dict[dataloader_name](collate_args)))
+                    (
+                        dataloader_name,
+                        collate_fn_dict[dataloader_name](collate_args),
+                    )
+                )
             elif command == MpCommand.CALL_FN_ALL_WORKERS:
                 func, func_args = args
                 func(func_args)
@@ -101,6 +115,7 @@ def init_process(rpc_config, mp_contexts):
 
 class CustomPool:
     """Customized worker pool"""
+
     def __init__(self, num_workers, rpc_config):
         """
         Customized worker pool init function
@@ -117,8 +132,13 @@ class CustomPool:
         for _ in range(num_workers):
             task_queue = ctx.Queue(self.queue_size)
             self.task_queues.append(task_queue)
-            proc = ctx.Process(target=init_process, args=(
-                rpc_config, (self.result_queue, task_queue, self.barrier)))
+            proc = ctx.Process(
+                target=init_process,
+                args=(
+                    rpc_config,
+                    (self.result_queue, task_queue, self.barrier),
+                ),
+            )
             proc.daemon = True
             proc.start()
             self.process_list.append(proc)
@@ -127,20 +147,23 @@ class CustomPool:
         """Set collate function in subprocess"""
         for i in range(self.num_workers):
             self.task_queues[i].put(
-                (MpCommand.SET_COLLATE_FN, (dataloader_name, func)))
+                (MpCommand.SET_COLLATE_FN, (dataloader_name, func))
+            )
 
     def submit_task(self, dataloader_name, args):
         """Submit task to workers"""
         # Round robin
         self.task_queues[self.current_proc_id].put(
-            (MpCommand.CALL_COLLATE_FN, (dataloader_name, args)))
+            (MpCommand.CALL_COLLATE_FN, (dataloader_name, args))
+        )
         self.current_proc_id = (self.current_proc_id + 1) % self.num_workers
 
     def submit_task_to_all_workers(self, func, args):
         """Submit task to all workers"""
         for i in range(self.num_workers):
             self.task_queues[i].put(
-                (MpCommand.CALL_FN_ALL_WORKERS, (func, args)))
+                (MpCommand.CALL_FN_ALL_WORKERS, (func, args))
+            )
 
     def get_result(self, dataloader_name, timeout=1800):
         """Get result from result queue"""
@@ -152,20 +175,21 @@ class CustomPool:
         """Delete collate function"""
         for i in range(self.num_workers):
             self.task_queues[i].put(
-                (MpCommand.DELETE_COLLATE_FN, (dataloader_name, )))
+                (MpCommand.DELETE_COLLATE_FN, (dataloader_name,))
+            )
 
     def call_barrier(self):
         """Call barrier at all workers"""
         for i in range(self.num_workers):
-            self.task_queues[i].put(
-                (MpCommand.CALL_BARRIER, tuple()))
-
+            self.task_queues[i].put((MpCommand.CALL_BARRIER, tuple()))
 
     def close(self):
         """Close worker pool"""
         for i in range(self.num_workers):
-            self.task_queues[i].put((MpCommand.FINALIZE_POOL, tuple()), block=False)
-            time.sleep(0.5) # Fix for early python version
+            self.task_queues[i].put(
+                (MpCommand.FINALIZE_POOL, tuple()), block=False
+            )
+            time.sleep(0.5)  # Fix for early python version
 
     def join(self):
         """Join the close process of worker pool"""
@@ -173,8 +197,12 @@ class CustomPool:
             self.process_list[i].join()
 
 
-def initialize(ip_config, max_queue_size=MAX_QUEUE_SIZE,
-               net_type='socket', num_worker_threads=1):
+def initialize(
+    ip_config,
+    max_queue_size=MAX_QUEUE_SIZE,
+    net_type="socket",
+    num_worker_threads=1,
+):
     """Initialize DGL's distributed module
 
     This function initializes DGL's distributed module. It acts differently in server
@@ -204,59 +232,84 @@ def initialize(ip_config, max_queue_size=MAX_QUEUE_SIZE,
     distributed API. For example, when used with Pytorch, users have to invoke this function
     before Pytorch's `pytorch.distributed.init_process_group`.
     """
-    if os.environ.get('DGL_ROLE', 'client') == 'server':
+    if os.environ.get("DGL_ROLE", "client") == "server":
         from .dist_graph import DistGraphServer
-        assert os.environ.get('DGL_SERVER_ID') is not None, \
-            'Please define DGL_SERVER_ID to run DistGraph server'
-        assert os.environ.get('DGL_IP_CONFIG') is not None, \
-            'Please define DGL_IP_CONFIG to run DistGraph server'
-        assert os.environ.get('DGL_NUM_SERVER') is not None, \
-            'Please define DGL_NUM_SERVER to run DistGraph server'
-        assert os.environ.get('DGL_NUM_CLIENT') is not None, \
-            'Please define DGL_NUM_CLIENT to run DistGraph server'
-        assert os.environ.get('DGL_CONF_PATH') is not None, \
-            'Please define DGL_CONF_PATH to run DistGraph server'
-        formats = os.environ.get('DGL_GRAPH_FORMAT', 'csc').split(',')
+
+        assert (
+            os.environ.get("DGL_SERVER_ID") is not None
+        ), "Please define DGL_SERVER_ID to run DistGraph server"
+        assert (
+            os.environ.get("DGL_IP_CONFIG") is not None
+        ), "Please define DGL_IP_CONFIG to run DistGraph server"
+        assert (
+            os.environ.get("DGL_NUM_SERVER") is not None
+        ), "Please define DGL_NUM_SERVER to run DistGraph server"
+        assert (
+            os.environ.get("DGL_NUM_CLIENT") is not None
+        ), "Please define DGL_NUM_CLIENT to run DistGraph server"
+        assert (
+            os.environ.get("DGL_CONF_PATH") is not None
+        ), "Please define DGL_CONF_PATH to run DistGraph server"
+        formats = os.environ.get("DGL_GRAPH_FORMAT", "csc").split(",")
         formats = [f.strip() for f in formats]
         rpc.reset()
-        keep_alive = bool(int(os.environ.get('DGL_KEEP_ALIVE', 0)))
-        serv = DistGraphServer(int(os.environ.get('DGL_SERVER_ID')),
-                               os.environ.get('DGL_IP_CONFIG'),
-                               int(os.environ.get('DGL_NUM_SERVER')),
-                               int(os.environ.get('DGL_NUM_CLIENT')),
-                               os.environ.get('DGL_CONF_PATH'),
-                               graph_format=formats,
-                               keep_alive=keep_alive,
-                               net_type=net_type)
+        keep_alive = bool(int(os.environ.get("DGL_KEEP_ALIVE", 0)))
+        serv = DistGraphServer(
+            int(os.environ.get("DGL_SERVER_ID")),
+            os.environ.get("DGL_IP_CONFIG"),
+            int(os.environ.get("DGL_NUM_SERVER")),
+            int(os.environ.get("DGL_NUM_CLIENT")),
+            os.environ.get("DGL_CONF_PATH"),
+            graph_format=formats,
+            keep_alive=keep_alive,
+            net_type=net_type,
+        )
         serv.start()
         sys.exit()
     else:
-        num_workers = int(os.environ.get('DGL_NUM_SAMPLER', 0))
-        num_servers = int(os.environ.get('DGL_NUM_SERVER', 1))
-        group_id = int(os.environ.get('DGL_GROUP_ID', 0))
+        num_workers = int(os.environ.get("DGL_NUM_SAMPLER", 0))
+        num_servers = int(os.environ.get("DGL_NUM_SERVER", 1))
+        group_id = int(os.environ.get("DGL_GROUP_ID", 0))
         rpc.reset()
         global SAMPLER_POOL
         global NUM_SAMPLER_WORKERS
-        is_standalone = os.environ.get(
-            'DGL_DIST_MODE', 'standalone') == 'standalone'
+        is_standalone = (
+            os.environ.get("DGL_DIST_MODE", "standalone") == "standalone"
+        )
         if num_workers > 0 and not is_standalone:
-            SAMPLER_POOL = CustomPool(num_workers, (ip_config, num_servers, max_queue_size,
-                                                    net_type, 'sampler', num_worker_threads,
-                                                    group_id))
+            SAMPLER_POOL = CustomPool(
+                num_workers,
+                (
+                    ip_config,
+                    num_servers,
+                    max_queue_size,
+                    net_type,
+                    "sampler",
+                    num_worker_threads,
+                    group_id,
+                ),
+            )
         else:
             SAMPLER_POOL = None
         NUM_SAMPLER_WORKERS = num_workers
         if not is_standalone:
-            assert num_servers is not None and num_servers > 0, \
-                'The number of servers per machine must be specified with a positive number.'
-            connect_to_server(ip_config, num_servers, max_queue_size, net_type, group_id=group_id)
-        init_role('default')
-        init_kvstore(ip_config, num_servers, 'default')
+            assert (
+                num_servers is not None and num_servers > 0
+            ), "The number of servers per machine must be specified with a positive number."
+            connect_to_server(
+                ip_config,
+                num_servers,
+                max_queue_size,
+                net_type,
+                group_id=group_id,
+            )
+        init_role("default")
+        init_kvstore(ip_config, num_servers, "default")
 
 
 def finalize_client():
     """Release resources of this client."""
-    if os.environ.get('DGL_DIST_MODE', 'standalone') != 'standalone':
+    if os.environ.get("DGL_DIST_MODE", "standalone") != "standalone":
         rpc.finalize_sender()
         rpc.finalize_receiver()
 
@@ -268,7 +321,7 @@ def _exit():
 
 def finalize_worker():
     """Finalize workers
-       Python's multiprocessing pool will not call atexit function when close
+    Python's multiprocessing pool will not call atexit function when close
     """
     global SAMPLER_POOL
     if SAMPLER_POOL is not None:
@@ -284,8 +337,7 @@ def join_finalize_worker():
 
 
 def is_initialized():
-    """Is RPC initialized?
-    """
+    """Is RPC initialized?"""
     return INITIALIZED
 
 
@@ -296,6 +348,7 @@ def _shutdown_servers():
         req = rpc.ShutDownRequest(rpc.get_rank())
         for server_id in range(rpc.get_num_server()):
             rpc.send_request(server_id, req)
+
 
 def exit_client():
     """Trainer exits
@@ -308,12 +361,15 @@ def exit_client():
     needs to call `exit_client` before calling `initialize` again.
     """
     # Only client with rank_0 will send shutdown request to servers.
-    print("Client[{}] in group[{}] is exiting...".format(
-        rpc.get_rank(), rpc.get_group_id()))
+    print(
+        "Client[{}] in group[{}] is exiting...".format(
+            rpc.get_rank(), rpc.get_group_id()
+        )
+    )
     finalize_worker()  # finalize workers should be earilier than barrier, and non-blocking
     # collect data such as DistTensor before exit
     gc.collect()
-    if os.environ.get('DGL_DIST_MODE', 'standalone') != 'standalone':
+    if os.environ.get("DGL_DIST_MODE", "standalone") != "standalone":
         rpc.client_barrier()
         _shutdown_servers()
     finalize_client()
