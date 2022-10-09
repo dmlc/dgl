@@ -74,113 +74,113 @@ void BackwardSegmentCmp(
   });
 }
 
-template void SegmentReduce<kDLCPU, int32_t, 16>(
+template void SegmentReduce<kDGLCPU, int32_t, 16>(
     const std::string &op,
     NDArray feat,
     NDArray offsets,
     NDArray out,
     NDArray arg);
-template void SegmentReduce<kDLCPU, int64_t, 16>(
+template void SegmentReduce<kDGLCPU, int64_t, 16>(
     const std::string &op,
     NDArray feat,
     NDArray offsets,
     NDArray out,
     NDArray arg);
-template void SegmentReduce<kDLCPU, int32_t, 32>(
+template void SegmentReduce<kDGLCPU, int32_t, 32>(
     const std::string &op,
     NDArray feat,
     NDArray offsets,
     NDArray out,
     NDArray arg);
-template void SegmentReduce<kDLCPU, int64_t, 32>(
+template void SegmentReduce<kDGLCPU, int64_t, 32>(
     const std::string &op,
     NDArray feat,
     NDArray offsets,
     NDArray out,
     NDArray arg);
-template void SegmentReduce<kDLCPU, int32_t, 64>(
+template void SegmentReduce<kDGLCPU, int32_t, 64>(
     const std::string &op,
     NDArray feat,
     NDArray offsets,
     NDArray out,
     NDArray arg);
-template void SegmentReduce<kDLCPU, int64_t, 64>(
+template void SegmentReduce<kDGLCPU, int64_t, 64>(
     const std::string &op,
     NDArray feat,
     NDArray offsets,
     NDArray out,
     NDArray arg);
-template void ScatterAdd<kDLCPU, int32_t, 16>(
+template void ScatterAdd<kDGLCPU, int32_t, 16>(
     NDArray feat,
     NDArray idx,
     NDArray out);
-template void ScatterAdd<kDLCPU, int64_t, 16>(
+template void ScatterAdd<kDGLCPU, int64_t, 16>(
     NDArray feat,
     NDArray idx,
     NDArray out);
-template void ScatterAdd<kDLCPU, int32_t, 32>(
+template void ScatterAdd<kDGLCPU, int32_t, 32>(
     NDArray feat,
     NDArray idx,
     NDArray out);
-template void ScatterAdd<kDLCPU, int64_t, 32>(
+template void ScatterAdd<kDGLCPU, int64_t, 32>(
     NDArray feat,
     NDArray idx,
     NDArray out);
-template void ScatterAdd<kDLCPU, int32_t, 64>(
+template void ScatterAdd<kDGLCPU, int32_t, 64>(
     NDArray feat,
     NDArray idx,
     NDArray out);
-template void ScatterAdd<kDLCPU, int64_t, 64>(
+template void ScatterAdd<kDGLCPU, int64_t, 64>(
     NDArray feat,
     NDArray arg,
     NDArray out);
 
-template void UpdateGradMinMax_hetero<kDLCPU, int32_t, 16>(
+template void UpdateGradMinMax_hetero<kDGLCPU, int32_t, 16>(
     const HeteroGraphPtr& g, const std::string& op,
     const std::vector<NDArray>& feat, const std::vector<NDArray>& idx,
     const std::vector<NDArray>& idx_etype, std::vector<NDArray>* out);
-template void UpdateGradMinMax_hetero<kDLCPU, int64_t, 16>(
+template void UpdateGradMinMax_hetero<kDGLCPU, int64_t, 16>(
     const HeteroGraphPtr& g, const std::string& op,
     const std::vector<NDArray>& feat, const std::vector<NDArray>& idx,
     const std::vector<NDArray>& idx_etype, std::vector<NDArray>* out);
-template void UpdateGradMinMax_hetero<kDLCPU, int32_t, 32>(
+template void UpdateGradMinMax_hetero<kDGLCPU, int32_t, 32>(
     const HeteroGraphPtr& g, const std::string& op,
     const std::vector<NDArray>& feat, const std::vector<NDArray>& idx,
     const std::vector<NDArray>& idx_etype, std::vector<NDArray>* out);
-template void UpdateGradMinMax_hetero<kDLCPU, int64_t, 32>(
+template void UpdateGradMinMax_hetero<kDGLCPU, int64_t, 32>(
     const HeteroGraphPtr& g, const std::string& op,
     const std::vector<NDArray>& feat, const std::vector<NDArray>& idx,
     const std::vector<NDArray>& idx_etype, std::vector<NDArray>* out);
-template void UpdateGradMinMax_hetero<kDLCPU, int32_t, 64>(
+template void UpdateGradMinMax_hetero<kDGLCPU, int32_t, 64>(
     const HeteroGraphPtr& g, const std::string& op,
     const std::vector<NDArray>& feat, const std::vector<NDArray>& idx,
     const std::vector<NDArray>& idx_etype, std::vector<NDArray>* out);
-template void UpdateGradMinMax_hetero<kDLCPU, int64_t, 64>(
+template void UpdateGradMinMax_hetero<kDGLCPU, int64_t, 64>(
     const HeteroGraphPtr& g, const std::string& op,
     const std::vector<NDArray>& feat, const std::vector<NDArray>& idx,
     const std::vector<NDArray>& idx_etype, std::vector<NDArray>* out);
 
-template void BackwardSegmentCmp<kDLCPU, int32_t, 16>(
+template void BackwardSegmentCmp<kDGLCPU, int32_t, 16>(
     NDArray feat,
     NDArray arg,
     NDArray out);
-template void BackwardSegmentCmp<kDLCPU, int64_t, 16>(
+template void BackwardSegmentCmp<kDGLCPU, int64_t, 16>(
     NDArray feat,
     NDArray arg,
     NDArray out);
-template void BackwardSegmentCmp<kDLCPU, int32_t, 32>(
+template void BackwardSegmentCmp<kDGLCPU, int32_t, 32>(
     NDArray feat,
     NDArray arg,
     NDArray out);
-template void BackwardSegmentCmp<kDLCPU, int64_t, 32>(
+template void BackwardSegmentCmp<kDGLCPU, int64_t, 32>(
     NDArray feat,
     NDArray arg,
     NDArray out);
-template void BackwardSegmentCmp<kDLCPU, int32_t, 64>(
+template void BackwardSegmentCmp<kDGLCPU, int32_t, 64>(
     NDArray feat,
     NDArray arg,
     NDArray out);
-template void BackwardSegmentCmp<kDLCPU, int64_t, 64>(
+template void BackwardSegmentCmp<kDGLCPU, int64_t, 64>(
     NDArray feat,
     NDArray arg,
     NDArray out);

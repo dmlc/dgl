@@ -1008,52 +1008,70 @@ def test_pin_memory_(idtype):
     g = g.to(F.cpu())
     assert not g.is_pinned()
 
-    if F.is_cuda_available():
-        # unpin an unpinned CPU graph, directly return
-        g.unpin_memory_()
-        assert not g.is_pinned()
-        assert g.device == F.cpu()
+    # unpin an unpinned CPU graph, directly return
+    g.unpin_memory_()
+    assert not g.is_pinned()
+    assert g.device == F.cpu()
 
-        # pin a CPU graph
-        g.pin_memory_()
-        assert g.is_pinned()
-        assert g.device == F.cpu()
-        assert F.context(g.nodes['user'].data['h']) == F.cpu()
-        assert F.context(g.nodes['game'].data['i']) == F.cpu()
-        assert F.context(g.edges['plays'].data['e']) == F.cpu()
-        for ntype in g.ntypes:
-            assert F.context(g.batch_num_nodes(ntype)) == F.cpu()
-        for etype in g.canonical_etypes:
-            assert F.context(g.batch_num_edges(etype)) == F.cpu()
+    # pin a CPU graph
+    g.pin_memory_()
+    assert g.is_pinned()
+    assert g.device == F.cpu()
+    assert g.nodes['user'].data['h'].is_pinned()
+    assert g.nodes['game'].data['i'].is_pinned()
+    assert g.edges['plays'].data['e'].is_pinned()
+    assert F.context(g.nodes['user'].data['h']) == F.cpu()
+    assert F.context(g.nodes['game'].data['i']) == F.cpu()
+    assert F.context(g.edges['plays'].data['e']) == F.cpu()
+    for ntype in g.ntypes:
+        assert F.context(g.batch_num_nodes(ntype)) == F.cpu()
+    for etype in g.canonical_etypes:
+        assert F.context(g.batch_num_edges(etype)) == F.cpu()
 
-        # it's fine to clone with new formats, but new graphs are not pinned
-        # >>> g.formats()
-        # {'created': ['coo'], 'not created': ['csr', 'csc']}
-        assert not g.formats('csc').is_pinned()
-        assert not g.formats('csr').is_pinned()
-        # 'coo' formats is already created and thus not cloned
-        assert g.formats('coo').is_pinned()
+    # it's fine to clone with new formats, but new graphs are not pinned
+    # >>> g.formats()
+    # {'created': ['coo'], 'not created': ['csr', 'csc']}
+    assert not g.formats('csc').is_pinned()
+    assert not g.formats('csr').is_pinned()
+    # 'coo' formats is already created and thus not cloned
+    assert g.formats('coo').is_pinned()
 
-        # pin a pinned graph, directly return
-        g.pin_memory_()
-        assert g.is_pinned()
-        assert g.device == F.cpu()
+    # pin a pinned graph, directly return
+    g.pin_memory_()
+    assert g.is_pinned()
+    assert g.device == F.cpu()
 
-        # unpin a pinned graph
-        g.unpin_memory_()
-        assert not g.is_pinned()
-        assert g.device == F.cpu()
+    # unpin a pinned graph
+    g.unpin_memory_()
+    assert not g.is_pinned()
+    assert g.device == F.cpu()
 
-        g1 = g.to(F.cuda())
+    g1 = g.to(F.cuda())
 
-        # unpin an unpinned GPU graph, directly return
-        g1.unpin_memory_()
-        assert not g1.is_pinned()
-        assert g1.device == F.cuda()
+    # unpin an unpinned GPU graph, directly return
+    g1.unpin_memory_()
+    assert not g1.is_pinned()
+    assert g1.device == F.cuda()
 
-        # error pinning a GPU graph
-        with pytest.raises(DGLError):
-            g1.pin_memory_()
+    # error pinning a GPU graph
+    with pytest.raises(DGLError):
+        g1.pin_memory_()
+
+    # test pin empty homograph
+    g2 = dgl.graph(([], []))
+    g2.pin_memory_()
+    assert g2.is_pinned()
+    g2.unpin_memory_()
+    assert not g2.is_pinned()
+
+    # test pin heterograph with 0 edge of one relation type
+    g3 = dgl.heterograph({
+        ('a','b','c'): ([0, 1], [1, 2]),
+        ('c','d','c'): ([], [])}).astype(idtype)
+    g3.pin_memory_()
+    assert g3.is_pinned()
+    g3.unpin_memory_()
+    assert not g3.is_pinned()
 
 @parametrize_idtype
 def test_convert_bound(idtype):
@@ -1865,6 +1883,35 @@ def test_ismultigraph(idtype):
         ('A', 'AA', 'A'): ([0, 1], [1, 2])},
         {'A': 6, 'C': 6}, idtype=idtype, device=F.ctx())
     assert g.is_multigraph == True
+
+
+@parametrize_idtype
+def test_graph_index_is_unibipartite(idtype):
+    g1 = dgl.heterograph({('A', 'AB', 'B'): ([0, 0, 1], [1, 2, 5])},
+                         idtype=idtype, device=F.ctx())
+    assert g1._graph.is_metagraph_unibipartite()
+
+    # more complicated bipartite
+    g2 = dgl.heterograph({
+        ('A', 'AB', 'B'): ([0, 0, 1], [1, 2, 5]),
+        ('A', 'AC', 'C'): ([1, 0], [0, 0])
+    }, idtype=idtype, device=F.ctx())
+    assert g2._graph.is_metagraph_unibipartite()
+
+    g3 = dgl.heterograph({
+        ('A', 'AB', 'B'): ([0, 0, 1], [1, 2, 5]),
+        ('A', 'AC', 'C'): ([1, 0], [0, 0]),
+        ('A', 'AA', 'A'): ([0, 1], [0, 1])
+    }, idtype=idtype, device=F.ctx())
+    assert not g3._graph.is_metagraph_unibipartite()
+
+    g4 = dgl.heterograph({
+        ('A', 'AB', 'B'): ([0, 0, 1], [1, 2, 5]),
+        ('C', 'CA', 'A'): ([1, 0], [0, 0])
+    }, idtype=idtype, device=F.ctx())
+
+    assert not g4._graph.is_metagraph_unibipartite()
+
 
 @parametrize_idtype
 def test_bipartite(idtype):

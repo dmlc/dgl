@@ -46,18 +46,12 @@ endif(NOT MSVC)
 if(USE_CUDA)
   message(STATUS "Build with CUDA support")
   project(dgl C CXX)
+  # see https://github.com/NVIDIA/thrust/issues/1401
+  add_definitions(-DTHRUST_CUB_WRAPPED_NAMESPACE=dgl)
   include(cmake/modules/CUDA.cmake)
-  if ((CUDA_VERSION_MAJOR LESS 11) OR
-      ((CUDA_VERSION_MAJOR EQUAL 11) AND (CUDA_VERSION_MINOR EQUAL 0)))
-    # For cuda<11, use external CUB/Thrust library because CUB is not part of CUDA.
-    # For cuda==11.0, use external CUB/Thrust library because there is a bug in the
-    #   official CUB library which causes invalid device ordinal error for DGL. The bug
-    #   is fixed by https://github.com/NVIDIA/cub/commit/9143e47e048641aa0e6ddfd645bcd54ff1059939
-    #   in 11.1.
-    message(STATUS "Detected CUDA of version ${CUDA_VERSION}. Use external CUB/Thrust library.")
-    cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/thrust")
-    cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/cub")
-  endif()
+  message(STATUS "Use external CUB/Thrust library for a consistent API and performance.")
+  cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/thrust")
+  cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/thrust/dependencies/cub")
 endif(USE_CUDA)
 
 # initial variables
@@ -161,7 +155,6 @@ file(GLOB DGL_SRC
   src/runtime/*.cc
   src/geometry/*.cc
   src/geometry/cpu/*.cc
-  src/dataloading/*.cc
   src/partition/*.cc
 )
 
@@ -257,10 +250,15 @@ endif((NOT MSVC) AND USE_LIBXSMM)
 if(NOT MSVC)
   # Only build tensorpipe on linux
   string(REPLACE "-pedantic" "" CMAKE_C_FLAGS ${CMAKE_C_FLAGS})
+  # Disable -Wall for third-party tensorpipe due to too many warnings
+  string(REPLACE "-Wall" "" CMAKE_C_FLAGS ${CMAKE_C_FLAGS})
+  string(REPLACE "-Wall" "" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
   set(TP_STATIC_OR_SHARED STATIC)
   add_subdirectory(third_party/tensorpipe)
   list(APPEND DGL_LINKER_LIBS tensorpipe)
   target_include_directories(dgl PRIVATE third_party/tensorpipe)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 endif(NOT MSVC)
 
 # Compile TVM Runtime and Featgraph

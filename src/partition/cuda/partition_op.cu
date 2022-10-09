@@ -251,7 +251,7 @@ __global__ void _MapGlobalIndexByRangeKernel(
 
 // Remainder Based Partition Operations
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 std::pair<IdArray, NDArray>
 GeneratePermutationFromRemainder(
         int64_t array_size,
@@ -261,7 +261,7 @@ GeneratePermutationFromRemainder(
 
   const auto& ctx = in_idx->ctx;
   auto device = DeviceAPI::Get(ctx);
-  cudaStream_t stream = CUDAThreadEntry::ThreadLocal()->stream;
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
 
   const int64_t num_in = in_idx->shape[0];
 
@@ -376,23 +376,23 @@ GeneratePermutationFromRemainder(
 
 
 template std::pair<IdArray, IdArray>
-GeneratePermutationFromRemainder<kDLGPU, int32_t>(
+GeneratePermutationFromRemainder<kDGLCUDA, int32_t>(
         int64_t array_size,
         int num_parts,
         IdArray in_idx);
 template std::pair<IdArray, IdArray>
-GeneratePermutationFromRemainder<kDLGPU, int64_t>(
+GeneratePermutationFromRemainder<kDGLCUDA, int64_t>(
         int64_t array_size,
         int num_parts,
         IdArray in_idx);
 
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 IdArray MapToLocalFromRemainder(
     const int num_parts,
     IdArray global_idx) {
   const auto& ctx = global_idx->ctx;
-  cudaStream_t stream = CUDAThreadEntry::ThreadLocal()->stream;
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
 
   if (num_parts > 1) {
     IdArray local_idx = aten::NewIdArray(global_idx->shape[0], ctx,
@@ -420,15 +420,15 @@ IdArray MapToLocalFromRemainder(
 }
 
 template IdArray
-MapToLocalFromRemainder<kDLGPU, int32_t>(
+MapToLocalFromRemainder<kDGLCUDA, int32_t>(
         int num_parts,
         IdArray in_idx);
 template IdArray
-MapToLocalFromRemainder<kDLGPU, int64_t>(
+MapToLocalFromRemainder<kDGLCUDA, int64_t>(
         int num_parts,
         IdArray in_idx);
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 IdArray MapToGlobalFromRemainder(
     const int num_parts,
     IdArray local_idx,
@@ -439,7 +439,7 @@ IdArray MapToGlobalFromRemainder(
       "/" << num_parts;
 
   const auto& ctx = local_idx->ctx;
-  cudaStream_t stream = CUDAThreadEntry::ThreadLocal()->stream;
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
 
   if (num_parts > 1) {
     IdArray global_idx = aten::NewIdArray(local_idx->shape[0], ctx,
@@ -468,12 +468,12 @@ IdArray MapToGlobalFromRemainder(
 }
 
 template IdArray
-MapToGlobalFromRemainder<kDLGPU, int32_t>(
+MapToGlobalFromRemainder<kDGLCUDA, int32_t>(
         int num_parts,
         IdArray in_idx,
         int part_id);
 template IdArray
-MapToGlobalFromRemainder<kDLGPU, int64_t>(
+MapToGlobalFromRemainder<kDGLCUDA, int64_t>(
         int num_parts,
         IdArray in_idx,
         int part_id);
@@ -481,7 +481,7 @@ MapToGlobalFromRemainder<kDLGPU, int64_t>(
 
 // Range Based Partition Operations
 
-template <DLDeviceType XPU, typename IdType, typename RangeType>
+template <DGLDeviceType XPU, typename IdType, typename RangeType>
 std::pair<IdArray, NDArray>
 GeneratePermutationFromRange(
         int64_t array_size,
@@ -492,7 +492,7 @@ GeneratePermutationFromRange(
 
   const auto& ctx = in_idx->ctx;
   auto device = DeviceAPI::Get(ctx);
-  cudaStream_t stream = CUDAThreadEntry::ThreadLocal()->stream;
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
 
   const int64_t num_in = in_idx->shape[0];
 
@@ -598,37 +598,37 @@ GeneratePermutationFromRange(
 
 
 template std::pair<IdArray, IdArray>
-GeneratePermutationFromRange<kDLGPU, int32_t, int32_t>(
+GeneratePermutationFromRange<kDGLCUDA, int32_t, int32_t>(
         int64_t array_size,
         int num_parts,
         IdArray range,
         IdArray in_idx);
 template std::pair<IdArray, IdArray>
-GeneratePermutationFromRange<kDLGPU, int64_t, int32_t>(
+GeneratePermutationFromRange<kDGLCUDA, int64_t, int32_t>(
         int64_t array_size,
         int num_parts,
         IdArray range,
         IdArray in_idx);
 template std::pair<IdArray, IdArray>
-GeneratePermutationFromRange<kDLGPU, int32_t, int64_t>(
+GeneratePermutationFromRange<kDGLCUDA, int32_t, int64_t>(
         int64_t array_size,
         int num_parts,
         IdArray range,
         IdArray in_idx);
 template std::pair<IdArray, IdArray>
-GeneratePermutationFromRange<kDLGPU, int64_t, int64_t>(
+GeneratePermutationFromRange<kDGLCUDA, int64_t, int64_t>(
         int64_t array_size,
         int num_parts,
         IdArray range,
         IdArray in_idx);
 
-template <DLDeviceType XPU, typename IdType, typename RangeType>
+template <DGLDeviceType XPU, typename IdType, typename RangeType>
 IdArray MapToLocalFromRange(
     const int num_parts,
     IdArray range,
     IdArray global_idx) {
   const auto& ctx = global_idx->ctx;
-  cudaStream_t stream = CUDAThreadEntry::ThreadLocal()->stream;
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
 
   if (num_parts > 1 && global_idx->shape[0] > 0) {
     IdArray local_idx = aten::NewIdArray(global_idx->shape[0], ctx,
@@ -657,28 +657,28 @@ IdArray MapToLocalFromRange(
 }
 
 template IdArray
-MapToLocalFromRange<kDLGPU, int32_t, int32_t>(
+MapToLocalFromRange<kDGLCUDA, int32_t, int32_t>(
         int num_parts,
         IdArray range,
         IdArray in_idx);
 template IdArray
-MapToLocalFromRange<kDLGPU, int64_t, int32_t>(
+MapToLocalFromRange<kDGLCUDA, int64_t, int32_t>(
         int num_parts,
         IdArray range,
         IdArray in_idx);
 template IdArray
-MapToLocalFromRange<kDLGPU, int32_t, int64_t>(
+MapToLocalFromRange<kDGLCUDA, int32_t, int64_t>(
         int num_parts,
         IdArray range,
         IdArray in_idx);
 template IdArray
-MapToLocalFromRange<kDLGPU, int64_t, int64_t>(
+MapToLocalFromRange<kDGLCUDA, int64_t, int64_t>(
         int num_parts,
         IdArray range,
         IdArray in_idx);
 
 
-template <DLDeviceType XPU, typename IdType, typename RangeType>
+template <DGLDeviceType XPU, typename IdType, typename RangeType>
 IdArray MapToGlobalFromRange(
     const int num_parts,
     IdArray range,
@@ -690,7 +690,7 @@ IdArray MapToGlobalFromRange(
       "/" << num_parts;
 
   const auto& ctx = local_idx->ctx;
-  cudaStream_t stream = CUDAThreadEntry::ThreadLocal()->stream;
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
 
   if (num_parts > 1 && local_idx->shape[0] > 0) {
     IdArray global_idx = aten::NewIdArray(local_idx->shape[0], ctx,
@@ -720,25 +720,25 @@ IdArray MapToGlobalFromRange(
 }
 
 template IdArray
-MapToGlobalFromRange<kDLGPU, int32_t, int32_t>(
+MapToGlobalFromRange<kDGLCUDA, int32_t, int32_t>(
         int num_parts,
         IdArray range,
         IdArray in_idx,
         int part_id);
 template IdArray
-MapToGlobalFromRange<kDLGPU, int64_t, int32_t>(
+MapToGlobalFromRange<kDGLCUDA, int64_t, int32_t>(
         int num_parts,
         IdArray range,
         IdArray in_idx,
         int part_id);
 template IdArray
-MapToGlobalFromRange<kDLGPU, int32_t, int64_t>(
+MapToGlobalFromRange<kDGLCUDA, int32_t, int64_t>(
         int num_parts,
         IdArray range,
         IdArray in_idx,
         int part_id);
 template IdArray
-MapToGlobalFromRange<kDLGPU, int64_t, int64_t>(
+MapToGlobalFromRange<kDGLCUDA, int64_t, int64_t>(
         int num_parts,
         IdArray range,
         IdArray in_idx,

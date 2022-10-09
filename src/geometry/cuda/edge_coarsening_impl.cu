@@ -117,18 +117,18 @@ __global__ void weighted_respond_kernel(const IdType *indptr, const IdType *indi
 template<typename IdType>
 bool Colorize(IdType * result_data, int64_t num_nodes, float * const prop) {
   // initial done signal
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
-  CUDA_KERNEL_CALL(init_done_kernel, 1, 1, 0, thr_entry->stream);
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
+  CUDA_KERNEL_CALL(init_done_kernel, 1, 1, 0, stream);
 
   // generate color prop for each node
   uint64_t seed = dgl::RandomEngine::ThreadLocal()->RandInt(UINT64_MAX);
   auto num_threads = cuda::FindNumThreads(num_nodes);
   auto num_blocks = cuda::FindNumBlocks<'x'>(BLOCKS(num_nodes, num_threads));
-  CUDA_KERNEL_CALL(generate_uniform_kernel, num_blocks, num_threads, 0, thr_entry->stream,
+  CUDA_KERNEL_CALL(generate_uniform_kernel, num_blocks, num_threads, 0, stream,
                    prop, num_nodes, seed);
 
   // call kernel
-  CUDA_KERNEL_CALL(colorize_kernel, num_blocks, num_threads, 0, thr_entry->stream,
+  CUDA_KERNEL_CALL(colorize_kernel, num_blocks, num_threads, 0, stream,
                    prop, num_nodes, result_data);
   bool done_h = false;
   CUDA_CALL(cudaMemcpyFromSymbol(&done_h, done_d, sizeof(done_h), 0, cudaMemcpyDeviceToHost));
@@ -150,9 +150,9 @@ bool Colorize(IdType * result_data, int64_t num_nodes, float * const prop) {
  * are marked, mark this node with its id. Else match this (BLUE, RED) node
  * pair and mark them with the smaller id between them.
  */
-template <DLDeviceType XPU, typename FloatType, typename IdType>
+template <DGLDeviceType XPU, typename FloatType, typename IdType>
 void WeightedNeighborMatching(const aten::CSRMatrix &csr, const NDArray weight, IdArray result) {
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   const auto& ctx = result->ctx;
   auto device = runtime::DeviceAPI::Get(ctx);
   device->SetDevice(ctx);
@@ -175,20 +175,20 @@ void WeightedNeighborMatching(const aten::CSRMatrix &csr, const NDArray weight, 
   auto num_threads = cuda::FindNumThreads(num_nodes);
   auto num_blocks = cuda::FindNumBlocks<'x'>(BLOCKS(num_nodes, num_threads));
   while (!Colorize<IdType>(result_data, num_nodes, prop)) {
-    CUDA_KERNEL_CALL(weighted_propose_kernel, num_blocks, num_threads, 0, thr_entry->stream,
+    CUDA_KERNEL_CALL(weighted_propose_kernel, num_blocks, num_threads, 0, stream,
                      indptr_data, indices_data, weight_data, num_nodes, proposal_data, result_data);
-    CUDA_KERNEL_CALL(weighted_respond_kernel, num_blocks, num_threads, 0, thr_entry->stream,
+    CUDA_KERNEL_CALL(weighted_respond_kernel, num_blocks, num_threads, 0, stream,
                      indptr_data, indices_data, weight_data, num_nodes, proposal_data, result_data);
   }
   device->FreeWorkspace(ctx, prop);
 }
-template void WeightedNeighborMatching<kDLGPU, float, int32_t>(
+template void WeightedNeighborMatching<kDGLCUDA, float, int32_t>(
   const aten::CSRMatrix &csr, const NDArray weight, IdArray result);
-template void WeightedNeighborMatching<kDLGPU, float, int64_t>(
+template void WeightedNeighborMatching<kDGLCUDA, float, int64_t>(
   const aten::CSRMatrix &csr, const NDArray weight, IdArray result);
-template void WeightedNeighborMatching<kDLGPU, double, int32_t>(
+template void WeightedNeighborMatching<kDGLCUDA, double, int32_t>(
   const aten::CSRMatrix &csr, const NDArray weight, IdArray result);
-template void WeightedNeighborMatching<kDLGPU, double, int64_t>(
+template void WeightedNeighborMatching<kDGLCUDA, double, int64_t>(
   const aten::CSRMatrix &csr, const NDArray weight, IdArray result);
 
 /*! \brief Unweighted neighbor matching procedure (GPU version).
@@ -201,7 +201,7 @@ template void WeightedNeighborMatching<kDLGPU, double, int64_t>(
  *  2. Graph is sparse, thus neighborhood of each node is small,
  *     which is suitable for GPU implementation.
  */
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 void NeighborMatching(const aten::CSRMatrix &csr, IdArray result) {
   const int64_t num_edges = csr.indices->shape[0];
   const auto& ctx = result->ctx;
@@ -209,20 +209,20 @@ void NeighborMatching(const aten::CSRMatrix &csr, IdArray result) {
   device->SetDevice(ctx);
 
   // generate random weights
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   NDArray weight = NDArray::Empty(
-    {num_edges}, DLDataType{kDLFloat, sizeof(float) * 8, 1}, ctx);
+    {num_edges}, DGLDataType{kDGLFloat, sizeof(float) * 8, 1}, ctx);
   float *weight_data = static_cast<float*>(weight->data);
   uint64_t seed = dgl::RandomEngine::ThreadLocal()->RandInt(UINT64_MAX);
   auto num_threads = cuda::FindNumThreads(num_edges);
   auto num_blocks = cuda::FindNumBlocks<'x'>(BLOCKS(num_edges, num_threads));
-  CUDA_KERNEL_CALL(generate_uniform_kernel, num_blocks, num_threads, 0, thr_entry->stream,
+  CUDA_KERNEL_CALL(generate_uniform_kernel, num_blocks, num_threads, 0, stream,
                    weight_data, num_edges, seed);
 
   WeightedNeighborMatching<XPU, float, IdType>(csr, weight, result);
 }
-template void NeighborMatching<kDLGPU, int32_t>(const aten::CSRMatrix &csr, IdArray result);
-template void NeighborMatching<kDLGPU, int64_t>(const aten::CSRMatrix &csr, IdArray result);
+template void NeighborMatching<kDGLCUDA, int32_t>(const aten::CSRMatrix &csr, IdArray result);
+template void NeighborMatching<kDGLCUDA, int64_t>(const aten::CSRMatrix &csr, IdArray result);
 
 }  // namespace impl
 }  // namespace geometry

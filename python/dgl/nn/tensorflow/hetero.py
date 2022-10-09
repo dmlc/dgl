@@ -2,7 +2,8 @@
 import tensorflow as tf
 from tensorflow.keras import layers
 
-__all__ = ['HeteroGraphConv']
+__all__ = ["HeteroGraphConv"]
+
 
 class HeteroGraphConv(layers.Layer):
     r"""A generic module for computing convolution on heterogeneous graphs.
@@ -125,13 +126,16 @@ class HeteroGraphConv(layers.Layer):
     mods : dict[str, nn.Module]
         Modules associated with every edge types.
     """
-    def __init__(self, mods, aggregate='sum'):
+
+    def __init__(self, mods, aggregate="sum"):
         super(HeteroGraphConv, self).__init__()
         self.mods = mods
         # Do not break if graph has 0-in-degree nodes.
         # Because there is no general rule to add self-loop for heterograph.
         for _, v in self.mods.items():
-            set_allow_zero_in_degree_fn = getattr(v, 'set_allow_zero_in_degree', None)
+            set_allow_zero_in_degree_fn = getattr(
+                v, "set_allow_zero_in_degree", None
+            )
             if callable(set_allow_zero_in_degree_fn):
                 set_allow_zero_in_degree_fn(True)
         if isinstance(aggregate, str):
@@ -164,7 +168,7 @@ class HeteroGraphConv(layers.Layer):
             mod_args = {}
         if mod_kwargs is None:
             mod_kwargs = {}
-        outputs = {nty : [] for nty in g.dsttypes}
+        outputs = {nty: [] for nty in g.dsttypes}
         if isinstance(inputs, tuple):
             src_inputs, dst_inputs = inputs
             for stype, etype, dtype in g.canonical_etypes:
@@ -175,7 +179,8 @@ class HeteroGraphConv(layers.Layer):
                     rel_graph,
                     (src_inputs[stype], dst_inputs[dtype]),
                     *mod_args.get(etype, ()),
-                    **mod_kwargs.get(etype, {}))
+                    **mod_kwargs.get(etype, {})
+                )
                 outputs[dtype].append(dstdata)
         else:
             for stype, etype, dtype in g.canonical_etypes:
@@ -186,13 +191,15 @@ class HeteroGraphConv(layers.Layer):
                     rel_graph,
                     (inputs[stype], inputs[dtype]),
                     *mod_args.get(etype, ()),
-                    **mod_kwargs.get(etype, {}))
+                    **mod_kwargs.get(etype, {})
+                )
                 outputs[dtype].append(dstdata)
         rsts = {}
         for nty, alist in outputs.items():
             if len(alist) != 0:
                 rsts[nty] = self.agg_fn(alist, nty)
         return rsts
+
 
 def get_aggregate_fn(agg):
     """Internal function to get the aggregation function for node data
@@ -210,29 +217,35 @@ def get_aggregate_fn(agg):
         Aggregator function that takes a list of tensors to aggregate
         and returns one aggregated tensor.
     """
-    if agg == 'sum':
+    if agg == "sum":
         fn = tf.reduce_sum
-    elif agg == 'max':
+    elif agg == "max":
         fn = tf.reduce_max
-    elif agg == 'min':
+    elif agg == "min":
         fn = tf.reduce_min
-    elif agg == 'mean':
+    elif agg == "mean":
         fn = tf.reduce_mean
-    elif agg == 'stack':
+    elif agg == "stack":
         fn = None  # will not be called
     else:
-        raise DGLError('Invalid cross type aggregator. Must be one of '
-                       '"sum", "max", "min", "mean" or "stack". But got "%s"' % agg)
-    if agg == 'stack':
+        raise DGLError(
+            "Invalid cross type aggregator. Must be one of "
+            '"sum", "max", "min", "mean" or "stack". But got "%s"' % agg
+        )
+    if agg == "stack":
+
         def stack_agg(inputs, dsttype):  # pylint: disable=unused-argument
             if len(inputs) == 0:
                 return None
             return tf.stack(inputs, axis=1)
+
         return stack_agg
     else:
+
         def aggfn(inputs, dsttype):  # pylint: disable=unused-argument
             if len(inputs) == 0:
                 return None
             stacked = tf.stack(inputs, axis=0)
             return fn(stacked, axis=0)
+
         return aggfn

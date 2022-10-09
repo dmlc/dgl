@@ -40,6 +40,8 @@ from ..partition import metis_partition_assignment
 from ..partition import partition_graph_with_halo
 from ..partition import metis_partition
 from .. import subgraph
+from .. import function
+from ..sampling.neighbor import sample_neighbors
 
 # TO BE DEPRECATED
 from .._deprecate.graph import DGLGraph as DGLGraphStale
@@ -96,7 +98,8 @@ def pairwise_squared_distance(x):
     return x2s + F.swapaxes(x2s, -1, -2) - 2 * x @ F.swapaxes(x, -1, -2)
 
 #pylint: disable=invalid-name
-def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean'):
+def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean',
+              exclude_self=False):
     r"""Construct a graph from a set of points according to k-nearest-neighbor (KNN)
     and return.
 
@@ -109,8 +112,8 @@ def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean'):
     of each point are its k-nearest neighbors measured by the chosen distance.
 
     If :attr:`x` is a 3D tensor, then each submatrix will be transformed
-    into a separate graph. DGL then composes the graphs into a large
-    graph of multiple connected components.
+    into a separate graph. DGL then composes the graphs into a large batched
+    graph of multiple (:math:`shape(x)[0]`) connected components.
 
     See :doc:`the benchmark <../api/python/knn_benchmark>` for a complete benchmark result.
 
@@ -163,6 +166,10 @@ def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean'):
         * 'euclidean': Use Euclidean distance (L2 norm) :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
         * 'cosine': Use cosine distance.
         (default: 'euclidean')
+    exclude_self : bool, optional
+        If True, the output graph will not contain self loop edges, and each node will not
+        be counted as one of its own k neighbors.  If False, the output graph will contain
+        self loop edges, and a node will be counted as one of its own k neighbors.
 
     Returns
     -------
@@ -204,26 +211,58 @@ def knn_graph(x, k, algorithm='bruteforce-blas', dist='euclidean'):
     (tensor([0, 1, 2, 2, 2, 3, 3, 3, 4, 5, 5, 5, 6, 6, 7, 7]),
      tensor([0, 1, 1, 2, 3, 0, 2, 3, 4, 5, 6, 7, 4, 6, 5, 7]))
     """
+    if exclude_self:
+        # add 1 to k, for the self edge, since it will be removed
+        k = k + 1
+
     # check invalid k
     if k <= 0:
         raise DGLError("Invalid k value. expect k > 0, got k = {}".format(k))
 
     # check empty point set
-    if F.shape(x)[0] == 0:
+    x_size = tuple(F.shape(x))
+    if x_size[0] == 0:
         raise DGLError("Find empty point set")
 
+    d = F.ndim(x)
+    x_seg = x_size[0] * [x_size[1]] if d == 3 else [x_size[0]]
     if algorithm == 'bruteforce-blas':
-        return _knn_graph_blas(x, k, dist=dist)
+        result = _knn_graph_blas(x, k, dist=dist)
     else:
-        if F.ndim(x) == 3:
-            x_size = tuple(F.shape(x))
+        if d == 3:
             x = F.reshape(x, (x_size[0] * x_size[1], x_size[2]))
-            x_seg = x_size[0] * [x_size[1]]
-        else:
-            x_seg = [F.shape(x)[0]]
         out = knn(k, x, x_seg, algorithm=algorithm, dist=dist)
         row, col = out[1], out[0]
-        return convert.graph((row, col))
+        result = convert.graph((row, col))
+
+    if d == 3:
+        # set batch information if x is 3D
+        num_nodes = F.tensor(x_seg, dtype=F.int64).to(F.context(x))
+        result.set_batch_num_nodes(num_nodes)
+        # if any segment is too small for k, all algorithms reduce k for all segments
+        clamped_k = min(k, np.min(x_seg))
+        result.set_batch_num_edges(clamped_k*num_nodes)
+
+    if exclude_self:
+        # remove_self_loop will update batch_num_edges as needed
+        result = remove_self_loop(result)
+
+        # If there were more than k(+1) coincident points, there may not have been self loops on
+        # all nodes, in which case there would still be one too many out edges on some nodes.
+        # However, if every node had a self edge, the common case, every node would still have the
+        # same degree as each other, so we can check that condition easily.
+        # The -1 is for the self edge removal.
+        clamped_k = min(k, np.min(x_seg)) - 1
+        if result.num_edges() != clamped_k*result.num_nodes():
+            # edges on any nodes with too high degree should all be length zero,
+            # so pick an arbitrary one to remove from each such node
+            degrees = result.in_degrees()
+            node_indices = F.nonzero_1d(degrees > clamped_k)
+            edges_to_remove_graph = sample_neighbors(result, node_indices, 1, edge_dir='in')
+            edge_ids = edges_to_remove_graph.edata[EID]
+            result = remove_edges(result, edge_ids)
+
+    return result
 
 def _knn_graph_blas(x, k, dist='euclidean'):
     r"""Construct a graph from a set of points according to k-nearest-neighbor (KNN).
@@ -278,7 +317,8 @@ def _knn_graph_blas(x, k, dist='euclidean'):
     return convert.graph((F.reshape(src, (-1,)), F.reshape(dst, (-1,))))
 
 #pylint: disable=invalid-name
-def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas', dist='euclidean'):
+def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas', dist='euclidean',
+                        exclude_self=False):
     r"""Construct multiple graphs from multiple sets of points according to
     k-nearest-neighbor (KNN) and return.
 
@@ -289,7 +329,7 @@ def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas', dist='euclidean
     function constructs a KNN graph for each point set, where the predecessors
     of each point are its k-nearest neighbors measured by the Euclidean distance.
     DGL then composes all KNN graphs
-    into a graph with multiple connected components.
+    into a batched graph with multiple (:math:`len(segs)`) connected components.
 
     Parameters
     ----------
@@ -338,11 +378,15 @@ def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas', dist='euclidean
         * 'euclidean': Use Euclidean distance (L2 norm) :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
         * 'cosine': Use cosine distance.
         (default: 'euclidean')
+    exclude_self : bool, optional
+        If True, the output graph will not contain self loop edges, and each node will not
+        be counted as one of its own k neighbors.  If False, the output graph will contain
+        self loop edges, and a node will be counted as one of its own k neighbors.
 
     Returns
     -------
     DGLGraph
-        The graph. The node IDs are in the same order as :attr:`x`.
+        The batched graph. The node IDs are in the same order as :attr:`x`.
 
     Examples
     --------
@@ -371,6 +415,10 @@ def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas', dist='euclidean
     (tensor([0, 0, 1, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6, 6]),
      tensor([0, 1, 0, 1, 2, 2, 3, 5, 4, 6, 3, 5, 4, 6]))
     """
+    if exclude_self:
+        # add 1 to k, for the self edge, since it will be removed
+        k = k + 1
+
     # check invalid k
     if k <= 0:
         raise DGLError("Invalid k value. expect k > 0, got k = {}".format(k))
@@ -380,11 +428,38 @@ def segmented_knn_graph(x, k, segs, algorithm='bruteforce-blas', dist='euclidean
         raise DGLError("Find empty point set")
 
     if algorithm == 'bruteforce-blas':
-        return _segmented_knn_graph_blas(x, k, segs, dist=dist)
+        result = _segmented_knn_graph_blas(x, k, segs, dist=dist)
     else:
         out = knn(k, x, segs, algorithm=algorithm, dist=dist)
         row, col = out[1], out[0]
-        return convert.graph((row, col))
+        result = convert.graph((row, col))
+
+    num_nodes = F.tensor(segs, dtype=F.int64).to(F.context(x))
+    result.set_batch_num_nodes(num_nodes)
+    # if any segment is too small for k, all algorithms reduce k for all segments
+    clamped_k = min(k, np.min(segs))
+    result.set_batch_num_edges(clamped_k*num_nodes)
+
+    if exclude_self:
+        # remove_self_loop will update batch_num_edges as needed
+        result = remove_self_loop(result)
+
+        # If there were more than k(+1) coincident points, there may not have been self loops on
+        # all nodes, in which case there would still be one too many out edges on some nodes.
+        # However, if every node had a self edge, the common case, every node would still have the
+        # same degree as each other, so we can check that condition easily.
+        # The -1 is for the self edge removal.
+        clamped_k = min(k, np.min(segs)) - 1
+        if result.num_edges() != clamped_k*result.num_nodes():
+            # edges on any nodes with too high degree should all be length zero,
+            # so pick an arbitrary one to remove from each such node
+            degrees = result.in_degrees()
+            node_indices = F.nonzero_1d(degrees > clamped_k)
+            edges_to_remove_graph = sample_neighbors(result, node_indices, 1, edge_dir='in')
+            edge_ids = edges_to_remove_graph.edata[EID]
+            result = remove_edges(result, edge_ids)
+
+    return result
 
 def _segmented_knn_graph_blas(x, k, segs, dist='euclidean'):
     r"""Construct multiple graphs from multiple sets of points according to
@@ -1637,11 +1712,7 @@ def remove_edges(g, eids, etype=None, store_ids=False):
 
     Notes
     -----
-
-    This function discards the batch information. Please use
-    :func:`dgl.DGLGraph.set_batch_num_nodes`
-    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
-    to maintain the information.
+    This function preserves the batch information.
 
     Examples
     --------
@@ -1764,13 +1835,24 @@ def remove_nodes(g, nids, ntype=None, store_ids=False):
     g.remove_nodes(nids, ntype=ntype, store_ids=store_ids)
     return g
 
-def add_self_loop(g, etype=None):
+def add_self_loop(g, edge_feat_names=None, fill_data=1., etype=None):
     r"""Add self-loops for each node in the graph and return a new graph.
 
     Parameters
     ----------
     g : DGLGraph
         The graph.
+    edge_feat_names : list[str], optional
+        The names of the self-loop features to apply `fill_data`. If None, it will apply `fill_data`
+        to all self-loop features. Default: None.
+    fill_data : int, float or str, optional
+        The value to fill the self-loop features. Default: 1.
+
+        * If ``fill_data`` is ``int`` or ``float``, self-loop features will be directly given by
+          ``fill_data``.
+        * if ``fill_data`` is ``str``, self-loop features will be generated by aggregating the
+          features of the incoming edges of the corresponding nodes. The supported aggregation are:
+          ``'mean'``, ``'sum'``, ``'max'``, ``'min'``.
     etype : str or (str, str, str), optional
         The type names of the edges. The allowed type name formats are:
 
@@ -1792,7 +1874,6 @@ def add_self_loop(g, etype=None):
     * The function adds self-loops regardless of whether they already exist or not.
       If one wishes to have exactly one self-loop for every node,
       call :func:`remove_self_loop` before invoking :func:`add_self_loop`.
-    * Features of the new edges (self-loop edges) will be filled with zeros.
     * This function discards the batch information. Please use
       :func:`dgl.DGLGraph.set_batch_num_nodes`
       and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
@@ -1808,7 +1889,7 @@ def add_self_loop(g, etype=None):
     >>> g = dgl.graph((torch.tensor([0, 0, 2]), torch.tensor([2, 1, 0])))
     >>> g.ndata['hv'] = torch.arange(3).float().reshape(-1, 1)
     >>> g.edata['he'] = torch.arange(3).float().reshape(-1, 1)
-    >>> g = dgl.add_self_loop(g)
+    >>> g = dgl.add_self_loop(g, fill_data='sum')
     >>> g
     Graph(num_nodes=3, num_edges=6,
         ndata_schemes={'hv': Scheme(shape=(1,), dtype=torch.float32)}
@@ -1817,8 +1898,8 @@ def add_self_loop(g, etype=None):
     tensor([[0.],
             [1.],
             [2.],
-            [0.],
-            [0.],
+            [2.],
+            [1.],
             [0.]])
 
     **Heterogeneous Graphs**
@@ -1831,17 +1912,49 @@ def add_self_loop(g, etype=None):
     >>> g = dgl.add_self_loop(g, etype='follows')
     >>> g
     Graph(num_nodes={'user': 3, 'game': 2},
-        num_edges={('user', 'plays', 'game'): 2, ('user', 'follows', 'user'): 5},
-        metagraph=[('user', 'user'), ('user', 'game')])
+          num_edges={('user', 'plays', 'game'): 2, ('user', 'follows', 'user'): 5},
+          metagraph=[('user', 'user'), ('user', 'game')])
     """
     etype = g.to_canonical_etype(etype)
+    data = {}
+    reduce_funcs = {'sum': function.sum,
+                    'mean': function.mean,
+                    'max': function.max,
+                    'min': function.min}
+
+    if edge_feat_names is None:
+        edge_feat_names = g.edges[etype].data.keys()
+
     if etype[0] != etype[2]:
         raise DGLError(
             'add_self_loop does not support unidirectional bipartite graphs: {}.' \
             'Please make sure the types of head node and tail node are identical.' \
             ''.format(etype))
+
+    for feat_name in edge_feat_names:
+        if isinstance(fill_data, (int, float)):
+            dtype = g.edges[etype].data[feat_name].dtype
+            dshape = g.edges[etype].data[feat_name].shape
+            tmp_fill_data = F.copy_to(F.astype(F.tensor([fill_data]), dtype), g.device)
+            if len(dshape) > 1:
+                data[feat_name] = F.zeros((g.num_nodes(etype[0]), *dshape[1:]), dtype,
+                                          g.device) + tmp_fill_data
+            else:
+                data[feat_name] = F.zeros((g.num_nodes(etype[0]),), dtype, g.device) + tmp_fill_data
+
+        elif isinstance(fill_data, str):
+            if fill_data not in reduce_funcs.keys():
+                raise DGLError('Unsupported aggregation: {}'.format(fill_data))
+            reducer = reduce_funcs[fill_data]
+            with g.local_scope():
+                g.update_all(function.copy_e(feat_name, "h"), reducer('h', 'h'), etype=etype)
+                data[feat_name] = g.nodes[etype[0]].data['h']
+
     nodes = g.nodes(etype[0])
-    new_g = add_edges(g, nodes, nodes, etype=etype)
+    if len(data):
+        new_g = add_edges(g, nodes, nodes, data=data, etype=etype)
+    else:
+        new_g = add_edges(g, nodes, nodes, etype=etype)
     return new_g
 
 DGLHeteroGraph.add_self_loop = utils.alias_func(add_self_loop)
@@ -1867,10 +1980,7 @@ def remove_self_loop(g, etype=None):
     If a node has multiple self-loops, remove them all. Do nothing for nodes without
     self-loops.
 
-    This function discards the batch information. Please use
-    :func:`dgl.DGLGraph.set_batch_num_nodes`
-    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
-    to maintain the information.
+    This function preserves the batch information.
 
     Examples
     ---------
@@ -2274,7 +2384,7 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True, src_nodes=None):
                 'Graph has more than one node type; please specify a dict for src_nodes.')
         src_nodes = {g.ntypes[0]: src_nodes}
         src_node_ids = [
-            F.copy_to(F.tensor(src_nodes.get(ntype, []), dtype=g._idtype_str), \
+            F.copy_to(F.tensor(src_nodes.get(ntype, []), dtype=g.idtype), \
                 F.to_backend_ctx(g._graph.ctx)) \
             for ntype in g.ntypes]
         src_node_ids_nd = [F.to_dgl_nd(nodes) for nodes in src_node_ids]
@@ -2872,6 +2982,8 @@ def sort_csr_by_tag(g, tag, tag_offset_name='_TAG_OFFSET', tag_type='node'):
     ``tag_type`` is ``node``.
 
     >>> import dgl
+    >>> import torch
+
     >>> g = dgl.graph(([0,0,0,0,0,1,1,1],[0,1,2,3,4,0,1,2]))
     >>> g.adjacency_matrix(scipy_fmt='csr').nonzero()
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
@@ -2890,11 +3002,10 @@ def sort_csr_by_tag(g, tag, tag_offset_name='_TAG_OFFSET', tag_type='node'):
 
     ``tag_type`` is ``edge``.
 
-    >>> from dgl import backend as F
     >>> g = dgl.graph(([0,0,0,0,0,1,1,1],[0,1,2,3,4,0,1,2]))
     >>> g.edges()
     (tensor([0, 0, 0, 0, 0, 1, 1, 1]), tensor([0, 1, 2, 3, 4, 0, 1, 2]))
-    >>> tag = F.tensor([1, 1, 0, 2, 0, 1, 1, 0])
+    >>> tag = torch.tensor([1, 1, 0, 2, 0, 1, 1, 0])
     >>> g_sorted = dgl.sort_csr_by_tag(g, tag, tag_type='edge')
     >>> g_sorted.adj(scipy_fmt='csr').nonzero()
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32), array([2, 4, 0, 1, 3, 2, 0, 1], dtype=int32))
@@ -2995,6 +3106,7 @@ def sort_csc_by_tag(g, tag, tag_offset_name='_TAG_OFFSET', tag_type='node'):
     ``tag_type`` is ``node``.
 
     >>> import dgl
+    >>> import torch
     >>> g = dgl.graph(([0,1,2,3,4,0,1,2],[0,0,0,0,0,1,1,1]))
     >>> g.adjacency_matrix(scipy_fmt='csr', transpose=True).nonzero()
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
@@ -3013,9 +3125,8 @@ def sort_csc_by_tag(g, tag, tag_offset_name='_TAG_OFFSET', tag_type='node'):
 
     ``tag_type`` is ``edge``.
 
-    >>> from dgl import backend as F
     >>> g = dgl.graph(([0,1,2,3,4,0,1,2],[0,0,0,0,0,1,1,1]))
-    >>> tag = F.tensor([1, 1, 0, 2, 0, 1, 1, 0])
+    >>> tag = torch.tensor([1, 1, 0, 2, 0, 1, 1, 0])
     >>> g_sorted = dgl.sort_csc_by_tag(g, tag, tag_type='edge')
     >>> g_sorted.adj(scipy_fmt='csr', transpose=True).nonzero()
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32), array([2, 4, 0, 1, 3, 2, 0, 1], dtype=int32))
@@ -3539,44 +3650,63 @@ def random_walk_pe(g, k, eweight_name=None):
 
     return PE
 
-def laplacian_pe(g, k):
+def laplacian_pe(g, k, padding=False, return_eigval=False):
     r"""Laplacian Positional Encoding, as introduced in
     `Benchmarking Graph Neural Networks
     <https://arxiv.org/abs/2003.00982>`__
 
     This function computes the laplacian positional encodings as the
-    k smallest non-trivial eigenvectors (k << n). k and n are the positional
-    encoding dimensions and the number of nodes in the given graph.
+    k smallest non-trivial eigenvectors.
 
     Parameters
     ----------
     g : DGLGraph
-        The input graph. Must be homogeneous.
+        The input graph. Must be homogeneous and bidirected.
     k : int
-        Number of smallest non-trivial eigenvectors to use for positional encoding
-        (smaller than the number of nodes).
+        Number of smallest non-trivial eigenvectors to use for positional encoding.
+    padding : bool, optional
+        If False, raise an exception when k>=n.
+        Otherwise, add zero paddings in the end of eigenvectors and 'nan' paddings
+        in the end of eigenvalues when k>=n.
+        Default: False.
+        n is the number of nodes in the given graph.
+    return_eigval : bool, optional
+        If True, return laplacian eigenvalues together with eigenvectors.
+        Otherwise, return laplacian eigenvectors only.
+        Default: False.
 
     Returns
     -------
-    Tensor
-        The laplacian positional encodings of shape :math:`(N, k)`, where :math:`N` is the
-        number of nodes in the input graph.
+    Tensor or (Tensor, Tensor)
+        Return the laplacian positional encodings of shape :math:`(N, k)`, where :math:`N` is the
+        number of nodes in the input graph, when :attr:`return_eigval` is False. The eigenvalues
+        of shape :math:`N` is additionally returned as the second element when :attr:`return_eigval`
+        is True.
 
     Example
     -------
     >>> import dgl
-    >>> g = dgl.rand_graph(6, 12)
+    >>> g = dgl.graph(([0,1,2,3,1,2,3,0], [1,2,3,0,0,1,2,3]))
     >>> dgl.laplacian_pe(g, 2)
-    tensor([[-0.8931, -0.7713],
-            [-0.0000,  0.6198],
-            [ 0.2704, -0.0138],
-            [-0.0000,  0.0554],
-            [ 0.3595, -0.0477],
-            [-0.0000,  0.1240]])
+    tensor([[ 7.0711e-01, -6.4921e-17],
+            [ 3.0483e-16, -7.0711e-01],
+            [-7.0711e-01, -2.4910e-16],
+            [ 9.9288e-17,  7.0711e-01]])
+    >>> dgl.laplacian_pe(g, 5, padding=True)
+    tensor([[ 7.0711e-01, -6.4921e-17,  5.0000e-01,  0.0000e+00,  0.0000e+00],
+            [ 3.0483e-16, -7.0711e-01, -5.0000e-01,  0.0000e+00,  0.0000e+00],
+            [-7.0711e-01, -2.4910e-16,  5.0000e-01,  0.0000e+00,  0.0000e+00],
+            [ 9.9288e-17,  7.0711e-01, -5.0000e-01,  0.0000e+00,  0.0000e+00]])
+    >>> dgl.laplacian_pe(g, 5, padding=True, return_eigval=True)
+    (tensor([[-7.0711e-01,  6.4921e-17, -5.0000e-01,  0.0000e+00,  0.0000e+00],
+             [-3.0483e-16,  7.0711e-01,  5.0000e-01,  0.0000e+00,  0.0000e+00],
+             [ 7.0711e-01,  2.4910e-16, -5.0000e-01,  0.0000e+00,  0.0000e+00],
+             [-9.9288e-17, -7.0711e-01,  5.0000e-01,  0.0000e+00,  0.0000e+00]]),
+     tensor([1., 1., 2., nan, nan]))
     """
     # check for the "k < n" constraint
     n = g.num_nodes()
-    if n <= k:
+    if not padding and n <= k:
         assert "the number of eigenvectors k must be smaller than the number of nodes n, " + \
             f"{k} and {n} detected."
 
@@ -3587,15 +3717,26 @@ def laplacian_pe(g, k):
 
     # select eigenvectors with smaller eigenvalues O(n + klogk)
     EigVal, EigVec = np.linalg.eig(L.toarray())
-    kpartition_indices = np.argpartition(EigVal, k+1)[:k+1]
+    max_freqs = min(n-1, k)
+    kpartition_indices = np.argpartition(EigVal, max_freqs)[:max_freqs+1]
     topk_eigvals = EigVal[kpartition_indices]
     topk_indices = kpartition_indices[topk_eigvals.argsort()][1:]
-    topk_EigVec = np.real(EigVec[:, topk_indices])
+    topk_EigVec = EigVec[:, topk_indices]
+    eigvals = F.tensor(EigVal[topk_indices], dtype=F.float32)
 
     # get random flip signs
-    rand_sign = 2 * (np.random.rand(k) > 0.5) - 1.
+    rand_sign = 2 * (np.random.rand(max_freqs) > 0.5) - 1.
     PE = F.astype(F.tensor(rand_sign * topk_EigVec), F.float32)
 
+    # add paddings
+    if n <= k:
+        temp_EigVec = F.zeros([n, k-n+1], dtype=F.float32, ctx=F.context(PE))
+        PE = F.cat([PE, temp_EigVec], dim=1)
+        temp_EigVal = F.tensor(np.full(k-n+1, np.nan), F.float32)
+        eigvals = F.cat([eigvals, temp_EigVal], dim=0)
+
+    if return_eigval:
+        return PE, eigvals
     return PE
 
 def to_half(g):

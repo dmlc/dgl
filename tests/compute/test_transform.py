@@ -913,6 +913,17 @@ def test_to_block(idtype):
             else:
                 check(g, bg, ntype, etype, None, include_dst_in_src)
 
+    # homogeneous graph
+    g = dgl.graph((F.tensor([1, 2], dtype=idtype), F.tensor([2, 3], dtype=idtype)))
+    dst_nodes = F.tensor([3, 2], dtype=idtype)
+    bg = dgl.to_block(g, dst_nodes=dst_nodes)
+    check(g, bg, '_N', '_E', dst_nodes)
+
+    src_nodes = bg.srcnodes['_N'].data[dgl.NID]
+    bg = dgl.to_block(g, dst_nodes=dst_nodes, src_nodes=src_nodes)
+    check(g, bg, '_N', '_E', dst_nodes)
+
+    # heterogeneous graph
     g = dgl.heterograph({
         ('A', 'AA', 'A'): ([0, 2, 1, 3], [1, 3, 2, 4]),
         ('A', 'AB', 'B'): ([0, 1, 3, 1], [1, 3, 5, 6]),
@@ -1625,8 +1636,11 @@ def test_remove_nodes(idtype):
 @parametrize_idtype
 def test_add_selfloop(idtype):
     # homogeneous graph
+
+    # test for fill_data is float
     g = dgl.graph(([0, 0, 2], [2, 1, 0]), idtype=idtype, device=F.ctx())
     g.edata['he'] = F.copy_to(F.tensor([1, 2, 3], dtype=idtype), ctx=F.ctx())
+    g.edata['he1'] = F.copy_to(F.tensor([[0., 1.], [2., 3.], [4., 5.]]), ctx=F.ctx())
     g.ndata['hn'] = F.copy_to(F.tensor([1, 2, 3], dtype=idtype), ctx=F.ctx())
     g = dgl.add_self_loop(g)
     assert g.number_of_nodes() == 3
@@ -1634,7 +1648,39 @@ def test_add_selfloop(idtype):
     u, v = g.edges(form='uv', order='eid')
     assert F.array_equal(u, F.tensor([0, 0, 2, 0, 1, 2], dtype=idtype))
     assert F.array_equal(v, F.tensor([2, 1, 0, 0, 1, 2], dtype=idtype))
-    assert F.array_equal(g.edata['he'], F.tensor([1, 2, 3, 0, 0, 0], dtype=idtype))
+    assert F.array_equal(g.edata['he'], F.tensor([1, 2, 3, 1, 1, 1], dtype=idtype))
+    assert F.array_equal(g.edata['he1'], F.tensor([[0., 1.], [2., 3.], [4., 5.],
+                                                   [1., 1.], [1., 1.], [1., 1.]]))
+
+    # test for fill_data is int
+    g = dgl.graph(([0, 0, 2], [2, 1, 0]), idtype=idtype, device=F.ctx())
+    g.edata['he'] = F.copy_to(F.tensor([1, 2, 3], dtype=idtype), ctx=F.ctx())
+    g.edata['he1'] = F.copy_to(F.tensor([[0, 1], [2, 3], [4, 5]], dtype=idtype), ctx=F.ctx())
+    g.ndata['hn'] = F.copy_to(F.tensor([1, 2, 3], dtype=idtype), ctx=F.ctx())
+    g = dgl.add_self_loop(g, fill_data=1)
+    assert g.number_of_nodes() == 3
+    assert g.number_of_edges() == 6
+    u, v = g.edges(form='uv', order='eid')
+    assert F.array_equal(u, F.tensor([0, 0, 2, 0, 1, 2], dtype=idtype))
+    assert F.array_equal(v, F.tensor([2, 1, 0, 0, 1, 2], dtype=idtype))
+    assert F.array_equal(g.edata['he'], F.tensor([1, 2, 3, 1, 1, 1], dtype=idtype))
+    assert F.array_equal(g.edata['he1'], F.tensor([[0, 1], [2, 3], [4, 5],
+                                                   [1, 1], [1, 1], [1, 1]], dtype=idtype))
+
+    # test for fill_data is str
+    g = dgl.graph(([0, 0, 2], [2, 1, 0]), idtype=idtype, device=F.ctx())
+    g.edata['he'] = F.copy_to(F.tensor([1., 2., 3.]), ctx=F.ctx())
+    g.edata['he1'] = F.copy_to(F.tensor([[0., 1.], [2., 3.], [4., 5.]]), ctx=F.ctx())
+    g.ndata['hn'] = F.copy_to(F.tensor([1, 2, 3], dtype=idtype), ctx=F.ctx())
+    g = dgl.add_self_loop(g, fill_data='sum')
+    assert g.number_of_nodes() == 3
+    assert g.number_of_edges() == 6
+    u, v = g.edges(form='uv', order='eid')
+    assert F.array_equal(u, F.tensor([0, 0, 2, 0, 1, 2], dtype=idtype))
+    assert F.array_equal(v, F.tensor([2, 1, 0, 0, 1, 2], dtype=idtype))
+    assert F.array_equal(g.edata['he'], F.tensor([1., 2., 3., 3., 2., 1.]))
+    assert F.array_equal(g.edata['he1'], F.tensor([[0., 1.], [2., 3.], [4., 5.],
+                                                   [4., 5.], [2., 3.], [0., 1.]]))
 
     # bipartite graph
     g = dgl.heterograph(
@@ -1647,7 +1693,9 @@ def test_add_selfloop(idtype):
         raise_error = True
     assert raise_error
 
+    # test for fill_data is float
     g = create_test_heterograph5(idtype)
+    g.edges['follows'].data['h1'] = F.copy_to(F.tensor([[0., 1.], [1., 2.]]), ctx=F.ctx())
     g = dgl.add_self_loop(g, etype='follows')
     assert g.number_of_nodes('user') == 3
     assert g.number_of_nodes('game') == 2
@@ -1656,8 +1704,51 @@ def test_add_selfloop(idtype):
     u, v = g.edges(form='uv', order='eid', etype='follows')
     assert F.array_equal(u, F.tensor([1, 2, 0, 1, 2], dtype=idtype))
     assert F.array_equal(v, F.tensor([0, 1, 0, 1, 2], dtype=idtype))
-    assert F.array_equal(g.edges['follows'].data['h'], F.tensor([1, 2, 0, 0, 0], dtype=idtype))
+    assert F.array_equal(g.edges['follows'].data['h'], F.tensor([1, 2, 1, 1, 1], dtype=idtype))
+    assert F.array_equal(g.edges['follows'].data['h1'], F.tensor([[0., 1.], [1., 2.], [1., 1.],
+                                                                  [1., 1.], [1., 1.]]))
     assert F.array_equal(g.edges['plays'].data['h'], F.tensor([1, 2], dtype=idtype))
+
+    # test for fill_data is int
+    g = create_test_heterograph5(idtype)
+    g.edges['follows'].data['h1'] = F.copy_to(F.tensor([[0, 1], [1, 2]], dtype=idtype), ctx=F.ctx())
+    g = dgl.add_self_loop(g, fill_data=1, etype='follows')
+    assert g.number_of_nodes('user') == 3
+    assert g.number_of_nodes('game') == 2
+    assert g.number_of_edges('follows') == 5
+    assert g.number_of_edges('plays') == 2
+    u, v = g.edges(form='uv', order='eid', etype='follows')
+    assert F.array_equal(u, F.tensor([1, 2, 0, 1, 2], dtype=idtype))
+    assert F.array_equal(v, F.tensor([0, 1, 0, 1, 2], dtype=idtype))
+    assert F.array_equal(g.edges['follows'].data['h'], F.tensor([1, 2, 1, 1, 1], dtype=idtype))
+    assert F.array_equal(g.edges['follows'].data['h1'], F.tensor([[0, 1], [1, 2], [1, 1],
+                                                                  [1, 1], [1, 1]], dtype=idtype))
+    assert F.array_equal(g.edges['plays'].data['h'], F.tensor([1, 2], dtype=idtype))
+
+    # test for fill_data is str
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): (F.tensor([1, 2], dtype=idtype),
+                                      F.tensor([0, 1], dtype=idtype)),
+        ('user', 'plays', 'game'): (F.tensor([0, 1], dtype=idtype),
+                                    F.tensor([0, 1], dtype=idtype))},
+        idtype=idtype, device=F.ctx())
+    g.nodes['user'].data['h'] = F.copy_to(F.tensor([1, 1, 1], dtype=idtype), ctx=F.ctx())
+    g.nodes['game'].data['h'] = F.copy_to(F.tensor([2, 2], dtype=idtype), ctx=F.ctx())
+    g.edges['follows'].data['h'] = F.copy_to(F.tensor([1., 2.]), ctx=F.ctx())
+    g.edges['follows'].data['h1'] = F.copy_to(F.tensor([[0., 1.], [1., 2.]]), ctx=F.ctx())
+    g.edges['plays'].data['h'] = F.copy_to(F.tensor([1., 2.]), ctx=F.ctx())
+    g = dgl.add_self_loop(g, fill_data='mean', etype='follows')
+    assert g.number_of_nodes('user') == 3
+    assert g.number_of_nodes('game') == 2
+    assert g.number_of_edges('follows') == 5
+    assert g.number_of_edges('plays') == 2
+    u, v = g.edges(form='uv', order='eid', etype='follows')
+    assert F.array_equal(u, F.tensor([1, 2, 0, 1, 2], dtype=idtype))
+    assert F.array_equal(v, F.tensor([0, 1, 0, 1, 2], dtype=idtype))
+    assert F.array_equal(g.edges['follows'].data['h'], F.tensor([1., 2., 1., 2., 0.]))
+    assert F.array_equal(g.edges['follows'].data['h1'], F.tensor([[0., 1.], [1., 2.], [0., 1.],
+                                                                  [1., 2.], [0., 0.]]))
+    assert F.array_equal(g.edges['plays'].data['h'], F.tensor([1., 2.]))
 
     raise_error = False
     try:
@@ -1705,6 +1796,16 @@ def test_remove_selfloop(idtype):
     except:
         raise_error = True
     assert raise_error
+
+    # batch information
+    g = dgl.graph(([0, 0, 0, 1, 3, 3, 4], [1, 0, 0, 2, 3, 4, 4]), idtype=idtype, device=F.ctx())
+    g.set_batch_num_nodes(F.tensor([3, 2], dtype=F.int64))
+    g.set_batch_num_edges(F.tensor([4, 3], dtype=F.int64))
+    g = dgl.remove_self_loop(g)
+    assert g.number_of_nodes() == 5
+    assert g.number_of_edges() == 3
+    assert F.array_equal(g.batch_num_nodes(), F.tensor([3, 2], dtype=F.int64))
+    assert F.array_equal(g.batch_num_edges(), F.tensor([2, 1], dtype=F.int64))
 
 
 @parametrize_idtype
@@ -2338,19 +2439,45 @@ def test_module_random_walk_pe(idtype):
 
 @parametrize_idtype
 def test_module_laplacian_pe(idtype):
-    transform = dgl.LaplacianPE(2, 'lappe')
-    g = dgl.graph(([2, 1, 0, 3, 1, 1],[3, 0, 1, 3, 3, 1]), idtype=idtype, device=F.ctx())
+    g = dgl.graph(([2, 1, 0, 3, 1, 1],[3, 1, 1, 2, 1, 0]), idtype=idtype, device=F.ctx())
+    tgt_eigval = F.copy_to(F.repeat(F.tensor([[1.1534e-17, 1.3333e+00, 2., np.nan, np.nan]]),
+        g.num_nodes(), dim=0), g.device)
+    tgt_pe = F.copy_to(F.tensor([[0.5, 0.86602539, 0., 0., 0.],
+        [0.86602539, 0.5, 0., 0., 0.],
+        [0., 0., 0.70710677, 0., 0.],
+        [0., 0., 0.70710677, 0., 0.]]), g.device)
+
+    # without padding (k<n)
+    transform = dgl.LaplacianPE(2, feat_name='lappe')
     new_g = transform(g)
-    tgt = F.copy_to(F.tensor([[ 0.24971116, 0.],
-        [ 0.11771496, 0.],
-        [ 0.83237050, 1.],
-        [ 0.48056933, 0.]]), g.device)
     # tensorflow has no abs() api
     if dgl.backend.backend_name == 'tensorflow':
-        assert F.allclose(new_g.ndata['lappe'].__abs__(), tgt)
+        assert F.allclose(new_g.ndata['lappe'].__abs__(), tgt_pe[:,:2])
     # pytorch & mxnet
     else:
-        assert F.allclose(new_g.ndata['lappe'].abs(), tgt)
+        assert F.allclose(new_g.ndata['lappe'].abs(), tgt_pe[:,:2])
+
+    # with padding (k>=n)
+    transform = dgl.LaplacianPE(5, feat_name='lappe', padding=True)
+    new_g = transform(g)
+    # tensorflow has no abs() api
+    if dgl.backend.backend_name == 'tensorflow':
+        assert F.allclose(new_g.ndata['lappe'].__abs__(), tgt_pe)
+    # pytorch & mxnet
+    else:
+        assert F.allclose(new_g.ndata['lappe'].abs(), tgt_pe)
+
+    # with eigenvalues
+    transform = dgl.LaplacianPE(5, feat_name='lappe', eigval_name='eigval', padding=True)
+    new_g = transform(g)
+    # tensorflow has no abs() api
+    if dgl.backend.backend_name == 'tensorflow':
+        assert F.allclose(new_g.ndata['eigval'][:,:3], tgt_eigval[:,:3])
+        assert F.allclose(new_g.ndata['lappe'].__abs__(), tgt_pe)
+    # pytorch & mxnet
+    else:
+        assert F.allclose(new_g.ndata['eigval'][:,:3], tgt_eigval[:,:3])
+        assert F.allclose(new_g.ndata['lappe'].abs(), tgt_pe)
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
 @pytest.mark.parametrize('g', get_cases(['has_scalar_e_feature']))

@@ -62,74 +62,74 @@ void GatherMMScatter(const NDArray A,
     LOG(FATAL) << "Unsupported CPU kernel for GatherMM.";
 }
 
-template void GatherMM<kDLCPU, int32_t, 16>(
+template void GatherMM<kDGLCPU, int32_t, 16>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray idx_a, const NDArray idx_b);
-template void GatherMM<kDLCPU, int64_t, 16>(
+template void GatherMM<kDGLCPU, int64_t, 16>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray idx_a, const NDArray idx_b);
-template void GatherMM<kDLCPU, int32_t, 32>(
+template void GatherMM<kDGLCPU, int32_t, 32>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray idx_a, const NDArray idx_b);
-template void GatherMM<kDLCPU, int64_t, 32>(
+template void GatherMM<kDGLCPU, int64_t, 32>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray idx_a, const NDArray idx_b);
-template void GatherMM<kDLCPU, int32_t, 64>(
+template void GatherMM<kDGLCPU, int32_t, 64>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray idx_a, const NDArray idx_b);
-template void GatherMM<kDLCPU, int64_t, 64>(
+template void GatherMM<kDGLCPU, int64_t, 64>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray idx_a, const NDArray idx_b);
 
-template void GatherMMScatter<kDLCPU, int32_t, 16>(
+template void GatherMMScatter<kDGLCPU, int32_t, 16>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray idx_a, const NDArray idx_b, const NDArray idx_c);
-template void GatherMMScatter<kDLCPU, int64_t, 16>(
+template void GatherMMScatter<kDGLCPU, int64_t, 16>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray idx_a, const NDArray idx_b, const NDArray idx_c);
-template void GatherMMScatter<kDLCPU, int32_t, 32>(
+template void GatherMMScatter<kDGLCPU, int32_t, 32>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray idx_a, const NDArray idx_b, const NDArray idx_c);
-template void GatherMMScatter<kDLCPU, int64_t, 32>(
+template void GatherMMScatter<kDGLCPU, int64_t, 32>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray idx_a, const NDArray idx_b, const NDArray idx_c);
-template void GatherMMScatter<kDLCPU, int32_t, 64>(
+template void GatherMMScatter<kDGLCPU, int32_t, 64>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray idx_a, const NDArray idx_b, const NDArray idx_c);
-template void GatherMMScatter<kDLCPU, int64_t, 64>(
+template void GatherMMScatter<kDGLCPU, int64_t, 64>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray idx_a, const NDArray idx_b, const NDArray idx_c);
 
-template void SegmentMM<kDLCPU, int32_t, 16>(
+template void SegmentMM<kDGLCPU, int32_t, 16>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray seglen_A, bool a_trans, bool b_trans);
-template void SegmentMM<kDLCPU, int64_t, 16>(
+template void SegmentMM<kDGLCPU, int64_t, 16>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray seglen_A, bool a_trans, bool b_trans);
-template void SegmentMM<kDLCPU, int32_t, 32>(
+template void SegmentMM<kDGLCPU, int32_t, 32>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray seglen_A, bool a_trans, bool b_trans);
-template void SegmentMM<kDLCPU, int64_t, 32>(
+template void SegmentMM<kDGLCPU, int64_t, 32>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray seglen_A, bool a_trans, bool b_trans);
-template void SegmentMM<kDLCPU, int32_t, 64>(
+template void SegmentMM<kDGLCPU, int32_t, 64>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray seglen_A, bool a_trans, bool b_trans);
-template void SegmentMM<kDLCPU, int64_t, 64>(
+template void SegmentMM<kDGLCPU, int64_t, 64>(
     const NDArray A, const NDArray B, NDArray C,
     const NDArray seglen_A, bool a_trans, bool b_trans);
 
-template void SegmentMMBackwardB<kDLCPU, int32_t, 16>(
+template void SegmentMMBackwardB<kDGLCPU, int32_t, 16>(
     const NDArray A, const NDArray dC, NDArray dB, const NDArray seglen);
-template void SegmentMMBackwardB<kDLCPU, int64_t, 16>(
+template void SegmentMMBackwardB<kDGLCPU, int64_t, 16>(
     const NDArray A, const NDArray dC, NDArray dB, const NDArray seglen);
-template void SegmentMMBackwardB<kDLCPU, int32_t, 32>(
+template void SegmentMMBackwardB<kDGLCPU, int32_t, 32>(
     const NDArray A, const NDArray dC, NDArray dB, const NDArray seglen);
-template void SegmentMMBackwardB<kDLCPU, int64_t, 32>(
+template void SegmentMMBackwardB<kDGLCPU, int64_t, 32>(
     const NDArray A, const NDArray dC, NDArray dB, const NDArray seglen);
-template void SegmentMMBackwardB<kDLCPU, int32_t, 64>(
+template void SegmentMMBackwardB<kDGLCPU, int32_t, 64>(
     const NDArray A, const NDArray dC, NDArray dB, const NDArray seglen);
-template void SegmentMMBackwardB<kDLCPU, int64_t, 64>(
+template void SegmentMMBackwardB<kDGLCPU, int64_t, 64>(
     const NDArray A, const NDArray dC, NDArray dB, const NDArray seglen);
 
 }  // namespace aten

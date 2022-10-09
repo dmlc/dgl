@@ -1,14 +1,15 @@
-import dgl
-import torch as th
 import numpy as np
+import torch as th
 import torch.nn as nn
+
+import dgl
 import dgl.function as fn
 
 
 def _l1_dist(edges):
     # formula 2
-    ed = th.norm(edges.src['nd'] - edges.dst['nd'], 1, 1)
-    return {'ed': ed}
+    ed = th.norm(edges.src["nd"] - edges.dst["nd"], 1, 1)
+    return {"ed": ed}
 
 
 class CARESampler(dgl.dataloading.BlockSampler):
@@ -25,11 +26,20 @@ class CARESampler(dgl.dataloading.BlockSampler):
                 edge_mask = th.zeros(g.number_of_edges(etype))
                 # extract each node from dict because of single node type
                 for node in seed_nodes:
-                    edges = g.in_edges(node, form='eid', etype=etype)
-                    num_neigh = th.ceil(g.in_degrees(node, etype=etype) * self.p[block_id][etype]).int().item()
+                    edges = g.in_edges(node, form="eid", etype=etype)
+                    num_neigh = (
+                        th.ceil(
+                            g.in_degrees(node, etype=etype)
+                            * self.p[block_id][etype]
+                        )
+                        .int()
+                        .item()
+                    )
                     neigh_dist = self.dists[block_id][etype][edges]
                     if neigh_dist.shape[0] > num_neigh:
-                        neigh_index = np.argpartition(neigh_dist, num_neigh)[:num_neigh]
+                        neigh_index = np.argpartition(neigh_dist, num_neigh)[
+                            :num_neigh
+                        ]
                     else:
                         neigh_index = np.arange(num_neigh)
                     edge_mask[edges[neigh_index]] = 1
@@ -57,7 +67,15 @@ class CARESampler(dgl.dataloading.BlockSampler):
 class CAREConv(nn.Module):
     """One layer of CARE-GNN."""
 
-    def __init__(self, in_dim, out_dim, num_classes, edges, activation=None, step_size=0.02):
+    def __init__(
+        self,
+        in_dim,
+        out_dim,
+        num_classes,
+        edges,
+        activation=None,
+        step_size=0.02,
+    ):
         super(CAREConv, self).__init__()
 
         self.activation = activation
@@ -82,20 +100,22 @@ class CAREConv(nn.Module):
             self.cvg[etype] = False
 
     def forward(self, g, feat):
-        g.srcdata['h'] = feat
+        g.srcdata["h"] = feat
 
         # formula 8
         hr = {}
         for etype in g.canonical_etypes:
-            g.update_all(fn.copy_u('h', 'm'), fn.mean('m', 'hr'), etype=etype)
-            hr[etype] = g.dstdata['hr']
+            g.update_all(fn.copy_u("h", "m"), fn.mean("m", "hr"), etype=etype)
+            hr[etype] = g.dstdata["hr"]
             if self.activation is not None:
                 hr[etype] = self.activation(hr[etype])
 
         # formula 9 using mean as inter-relation aggregator
-        p_tensor = th.Tensor(list(self.p.values())).view(-1, 1, 1).to(feat.device)
+        p_tensor = (
+            th.Tensor(list(self.p.values())).view(-1, 1, 1).to(feat.device)
+        )
         h_homo = th.sum(th.stack(list(hr.values())) * p_tensor, dim=0)
-        h_homo += feat[:g.number_of_dst_nodes()]
+        h_homo += feat[: g.number_of_dst_nodes()]
         if self.activation is not None:
             h_homo = self.activation(h_homo)
 
@@ -103,14 +123,16 @@ class CAREConv(nn.Module):
 
 
 class CAREGNN(nn.Module):
-    def __init__(self,
-                 in_dim,
-                 num_classes,
-                 hid_dim=64,
-                 edges=None,
-                 num_layers=2,
-                 activation=None,
-                 step_size=0.02):
+    def __init__(
+        self,
+        in_dim,
+        num_classes,
+        hid_dim=64,
+        edges=None,
+        num_layers=2,
+        activation=None,
+        step_size=0.02,
+    ):
         super(CAREGNN, self).__init__()
         self.in_dim = in_dim
         self.hid_dim = hid_dim
@@ -124,42 +146,58 @@ class CAREGNN(nn.Module):
 
         if self.num_layers == 1:
             # Single layer
-            self.layers.append(CAREConv(self.in_dim,
-                                        self.num_classes,
-                                        self.num_classes,
-                                        self.edges,
-                                        activation=self.activation,
-                                        step_size=self.step_size))
+            self.layers.append(
+                CAREConv(
+                    self.in_dim,
+                    self.num_classes,
+                    self.num_classes,
+                    self.edges,
+                    activation=self.activation,
+                    step_size=self.step_size,
+                )
+            )
 
         else:
             # Input layer
-            self.layers.append(CAREConv(self.in_dim,
-                                        self.hid_dim,
-                                        self.num_classes,
-                                        self.edges,
-                                        activation=self.activation,
-                                        step_size=self.step_size))
+            self.layers.append(
+                CAREConv(
+                    self.in_dim,
+                    self.hid_dim,
+                    self.num_classes,
+                    self.edges,
+                    activation=self.activation,
+                    step_size=self.step_size,
+                )
+            )
 
             # Hidden layers with n - 2 layers
             for i in range(self.num_layers - 2):
-                self.layers.append(CAREConv(self.hid_dim,
-                                            self.hid_dim,
-                                            self.num_classes,
-                                            self.edges,
-                                            activation=self.activation,
-                                            step_size=self.step_size))
+                self.layers.append(
+                    CAREConv(
+                        self.hid_dim,
+                        self.hid_dim,
+                        self.num_classes,
+                        self.edges,
+                        activation=self.activation,
+                        step_size=self.step_size,
+                    )
+                )
 
             # Output layer
-            self.layers.append(CAREConv(self.hid_dim,
-                                        self.num_classes,
-                                        self.num_classes,
-                                        self.edges,
-                                        activation=self.activation,
-                                        step_size=self.step_size))
+            self.layers.append(
+                CAREConv(
+                    self.hid_dim,
+                    self.num_classes,
+                    self.num_classes,
+                    self.edges,
+                    activation=self.activation,
+                    step_size=self.step_size,
+                )
+            )
 
     def forward(self, blocks, feat):
         # formula 4
-        sim = th.tanh(self.layers[0].MLP(blocks[-1].dstdata['feature'].float()))
+        sim = th.tanh(self.layers[0].MLP(blocks[-1].dstdata["feature"].float()))
 
         # Forward of n layers of CARE-GNN
         for block, layer in zip(blocks, self.layers):
@@ -171,7 +209,7 @@ class CAREGNN(nn.Module):
             for etype in self.edges:
                 if not layer.cvg[etype]:
                     # formula 5
-                    eid = graph.in_edges(idx, form='eid', etype=etype)
+                    eid = graph.in_edges(idx, form="eid", etype=etype)
                     avg_dist = th.mean(dists[i][etype][eid])
 
                     # formula 6

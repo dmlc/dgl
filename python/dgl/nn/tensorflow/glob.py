@@ -3,13 +3,22 @@
 import tensorflow as tf
 from tensorflow.keras import layers
 
+from ...readout import (
+    max_nodes,
+    mean_nodes,
+    softmax_nodes,
+    sum_nodes,
+    topk_nodes,
+)
 
-from ...readout import sum_nodes, mean_nodes, max_nodes, \
-    softmax_nodes, topk_nodes
-
-
-__all__ = ['SumPooling', 'AvgPooling',
-           'MaxPooling', 'SortPooling', 'WeightAndSum', 'GlobalAttentionPooling']
+__all__ = [
+    "SumPooling",
+    "AvgPooling",
+    "MaxPooling",
+    "SortPooling",
+    "WeightAndSum",
+    "GlobalAttentionPooling",
+]
 
 
 class SumPooling(layers.Layer):
@@ -41,8 +50,8 @@ class SumPooling(layers.Layer):
             :math:`B` refers to the batch size.
         """
         with graph.local_scope():
-            graph.ndata['h'] = feat
-            readout = sum_nodes(graph, 'h')
+            graph.ndata["h"] = feat
+            readout = sum_nodes(graph, "h")
             return readout
 
 
@@ -74,8 +83,8 @@ class AvgPooling(layers.Layer):
             :math:`B` refers to the batch size.
         """
         with graph.local_scope():
-            graph.ndata['h'] = feat
-            readout = mean_nodes(graph, 'h')
+            graph.ndata["h"] = feat
+            readout = mean_nodes(graph, "h")
             return readout
 
 
@@ -107,8 +116,8 @@ class MaxPooling(layers.Layer):
             :math:`B` refers to the batch size.
         """
         with graph.local_scope():
-            graph.ndata['h'] = feat
-            readout = max_nodes(graph, 'h')
+            graph.ndata["h"] = feat
+            readout = max_nodes(graph, "h")
             return readout
 
 
@@ -146,10 +155,12 @@ class SortPooling(layers.Layer):
         with graph.local_scope():
             # Sort the feature of each node in ascending order.
             feat = tf.sort(feat, -1)
-            graph.ndata['h'] = feat
+            graph.ndata["h"] = feat
             # Sort nodes according to their last features.
-            ret = tf.reshape(topk_nodes(graph, 'h', self.k, sortby=-1)[0], (
-                -1, self.k * feat.shape[-1]))
+            ret = tf.reshape(
+                topk_nodes(graph, "h", self.k, sortby=-1)[0],
+                (-1, self.k * feat.shape[-1]),
+            )
             return ret
 
 
@@ -194,16 +205,18 @@ class GlobalAttentionPooling(layers.Layer):
         """
         with graph.local_scope():
             gate = self.gate_nn(feat)
-            assert gate.shape[-1] == 1, "The output of gate_nn should have size 1 at the last axis."
+            assert (
+                gate.shape[-1] == 1
+            ), "The output of gate_nn should have size 1 at the last axis."
             feat = self.feat_nn(feat) if self.feat_nn else feat
 
-            graph.ndata['gate'] = gate
-            gate = softmax_nodes(graph, 'gate')
-            graph.ndata.pop('gate')
+            graph.ndata["gate"] = gate
+            gate = softmax_nodes(graph, "gate")
+            graph.ndata.pop("gate")
 
-            graph.ndata['r'] = feat * gate
-            readout = sum_nodes(graph, 'r')
-            graph.ndata.pop('r')
+            graph.ndata["r"] = feat * gate
+            readout = sum_nodes(graph, "r")
+            graph.ndata.pop("r")
 
             return readout
 
@@ -221,8 +234,7 @@ class WeightAndSum(layers.Layer):
         super(WeightAndSum, self).__init__()
         self.in_feats = in_feats
         self.atom_weighting = tf.keras.Sequential(
-            layers.Dense(1),
-            layers.Activation(tf.nn.sigmoid)
+            layers.Dense(1), layers.Activation(tf.nn.sigmoid)
         )
 
     def call(self, g, feats):
@@ -242,8 +254,8 @@ class WeightAndSum(layers.Layer):
             Representations for B molecules
         """
         with g.local_scope():
-            g.ndata['h'] = feats
-            g.ndata['w'] = self.atom_weighting(g.ndata['h'])
-            h_g_sum = sum_nodes(g, 'h', 'w')
+            g.ndata["h"] = feats
+            g.ndata["w"] = self.atom_weighting(g.ndata["h"])
+            h_g_sum = sum_nodes(g, "h", "w")
 
         return h_g_sum

@@ -55,7 +55,7 @@ bool CSRIsClose(
 }
 
 template <typename IdType, typename DType>
-std::pair<aten::CSRMatrix, NDArray> CSR_A(DLContext ctx = CTX) {
+std::pair<aten::CSRMatrix, NDArray> CSR_A(DGLContext ctx = CTX) {
   // matrix([[0. , 0. , 1. , 0.7, 0. ],
   //         [0. , 0. , 0.5, 0.+, 0. ],
   //         [0.4, 0.7, 0. , 0.2, 0. ],
@@ -72,7 +72,7 @@ std::pair<aten::CSRMatrix, NDArray> CSR_A(DLContext ctx = CTX) {
 }
 
 template <typename IdType, typename DType>
-std::pair<aten::CSRMatrix, NDArray> CSR_B(DLContext ctx = CTX) {
+std::pair<aten::CSRMatrix, NDArray> CSR_B(DGLContext ctx = CTX) {
   // matrix([[0. , 0.9, 0. , 0.6, 0. , 0.3],
   //         [0. , 0. , 0. , 0. , 0. , 0.4],
   //         [0.+, 0. , 0. , 0. , 0. , 0.9],
@@ -89,7 +89,7 @@ std::pair<aten::CSRMatrix, NDArray> CSR_B(DLContext ctx = CTX) {
 }
 
 template <typename IdType, typename DType>
-std::pair<aten::CSRMatrix, NDArray> CSR_C(DLContext ctx = CTX) {
+std::pair<aten::CSRMatrix, NDArray> CSR_C(DGLContext ctx = CTX) {
   // matrix([[0. , 0. , 0. , 0.2, 0. ],
   //         [0. , 0. , 0. , 0.5, 0.4],
   //         [0. , 0.2, 0. , 0.9, 0.2],
@@ -104,7 +104,7 @@ std::pair<aten::CSRMatrix, NDArray> CSR_C(DLContext ctx = CTX) {
 }
 
 template <typename IdType, typename DType>
-std::pair<aten::CSRMatrix, NDArray> CSR_A_mm_B(DLContext ctx = CTX) {
+std::pair<aten::CSRMatrix, NDArray> CSR_A_mm_B(DGLContext ctx = CTX) {
   // matrix([[0.56, 0.14, 0.21, 0.14, 0.  , 0.9 ],
   //         [0.+ , 0.+ , 0.+ , 0.+ , 0.  , 0.45],
   //         [0.16, 0.4 , 0.06, 0.28, 0.  , 0.4 ],
@@ -123,7 +123,7 @@ std::pair<aten::CSRMatrix, NDArray> CSR_A_mm_B(DLContext ctx = CTX) {
 }
 
 template <typename IdType, typename DType>
-std::pair<aten::CSRMatrix, NDArray> CSR_A_plus_C(DLContext ctx = CTX) {
+std::pair<aten::CSRMatrix, NDArray> CSR_A_plus_C(DGLContext ctx = CTX) {
   auto csr = aten::CSRMatrix(
       4, 5,
       NDArray::FromVector(std::vector<IdType>({0,  2,  5,  9, 12}), ctx),
@@ -134,12 +134,12 @@ std::pair<aten::CSRMatrix, NDArray> CSR_A_plus_C(DLContext ctx = CTX) {
 }
 
 template <typename DType>
-NDArray CSR_A_mask_C(DLContext ctx = CTX) {
+NDArray CSR_A_mask_C(DGLContext ctx = CTX) {
   return NDArray::FromVector(std::vector<DType>({0.7, 0.0, 0.0, 0.7, 0.2, 0.0, 0.0, 0.0}), ctx);
 }
 
 template <typename IdType, typename DType>
-void _TestCsrmm(DLContext ctx = CTX) {
+void _TestCsrmm(DGLContext ctx = CTX) {
   auto A = CSR_A<IdType, DType>(ctx);
   auto B = CSR_B<IdType, DType>(ctx);
   auto A_mm_B = aten::CSRMM(A.first, A.second, B.first, B.second);
@@ -149,7 +149,7 @@ void _TestCsrmm(DLContext ctx = CTX) {
 }
 
 template <typename IdType, typename DType>
-void _TestCsrsum(DLContext ctx = CTX) {
+void _TestCsrsum(DGLContext ctx = CTX) {
   auto A = CSR_A<IdType, DType>(ctx);
   auto C = CSR_C<IdType, DType>(ctx);
   auto A_plus_C = aten::CSRSum({A.first, C.first}, {A.second, C.second});
@@ -160,7 +160,7 @@ void _TestCsrsum(DLContext ctx = CTX) {
 }
 
 template <typename IdType, typename DType>
-void _TestCsrmask(DLContext ctx = CTX) {
+void _TestCsrmask(DGLContext ctx = CTX) {
   auto A = CSR_A<IdType, DType>(ctx);
   auto C = CSR_C<IdType, DType>(ctx);
   auto C_coo = CSRToCOO(C.first, false);

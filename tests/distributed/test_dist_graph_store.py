@@ -18,16 +18,12 @@ import backend as F
 import math
 import unittest
 import pickle
-from utils import reset_envs, generate_ip_config
+from utils import reset_envs, generate_ip_config, create_random_graph
 import pytest
 
 if os.name != 'nt':
     import fcntl
     import struct
-
-def create_random_graph(n):
-    arr = (spsp.random(n, n, density=0.001, format='coo', random_state=100) != 0).astype(np.int64)
-    return dgl.from_scipy(arr)
 
 def run_server(graph_name, server_id, server_count, num_clients, shared_mem, keep_alive=False):
     g = DistGraphServer(server_id, "kv_ip_config.txt", server_count, num_clients,
@@ -227,6 +223,11 @@ def check_dist_graph(g, num_clients, num_nodes, num_edges):
     feats1 = g.edata['features'][eids]
     feats = F.squeeze(feats1, 1)
     assert np.all(F.asnumpy(feats == eids))
+
+    # Test edge_subgraph
+    sg = g.edge_subgraph(eids)
+    assert sg.num_edges() == len(eids)
+    assert F.array_equal(sg.edata[dgl.EID], eids)
 
     # Test init node data
     new_shape = (g.number_of_nodes(), 2)
@@ -493,6 +494,14 @@ def check_dist_graph_hetero(g, num_clients, num_nodes, num_edges):
     feats1 = g.edges['r1'].data['feat'][eids]
     feats = F.squeeze(feats1, 1)
     assert np.all(F.asnumpy(feats == eids))
+
+    # Test edge_subgraph
+    sg = g.edge_subgraph({'r1': eids})
+    assert sg.num_edges() == len(eids)
+    assert F.array_equal(sg.edata[dgl.EID], eids)
+    sg = g.edge_subgraph({('n1', 'r1', 'n2'): eids})
+    assert sg.num_edges() == len(eids)
+    assert F.array_equal(sg.edata[dgl.EID], eids)
 
     # Test init node data
     new_shape = (g.number_of_nodes('n1'), 2)

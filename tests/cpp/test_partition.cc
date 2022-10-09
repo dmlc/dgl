@@ -6,7 +6,7 @@
 using namespace dgl;
 using namespace dgl::partition;
 
-template<DLDeviceType XPU, typename IdType>
+template<DGLDeviceType XPU, typename IdType>
 void _TestRemainder_GeneratePermutation() {
   const int64_t size = 160000;
   const int num_parts = 7;
@@ -19,13 +19,13 @@ void _TestRemainder_GeneratePermutation() {
   std::pair<IdArray, IdArray> result = part->GeneratePermutation(idxs);
 
   // first part of result should be the permutation
-  IdArray perm = result.first.CopyTo(DGLContext{kDLCPU, 0});
+  IdArray perm = result.first.CopyTo(DGLContext{kDGLCPU, 0});
   ASSERT_TRUE(perm.Ptr<IdType>() != nullptr);
   ASSERT_EQ(perm->shape[0], idxs->shape[0]);
   const IdType * const perm_cpu = static_cast<const IdType*>(perm->data);
 
   // second part of result should be the counts
-  IdArray counts = result.second.CopyTo(DGLContext{kDLCPU, 0});
+  IdArray counts = result.second.CopyTo(DGLContext{kDGLCPU, 0});
   ASSERT_TRUE(counts.Ptr<int64_t>() != nullptr);
   ASSERT_EQ(counts->shape[0], num_parts);
   const int64_t * const counts_cpu = static_cast<const int64_t*>(counts->data);
@@ -37,7 +37,7 @@ void _TestRemainder_GeneratePermutation() {
   ASSERT_EQ(prefix.back(), idxs->shape[0]);
 
   // copy original indexes to cpu
-  idxs = idxs.CopyTo(DGLContext{kDLCPU, 0});
+  idxs = idxs.CopyTo(DGLContext{kDGLCPU, 0});
   const IdType * const idxs_cpu = static_cast<const IdType*>(idxs->data);
 
   for (int p = 0; p < num_parts; ++p) {
@@ -47,7 +47,7 @@ void _TestRemainder_GeneratePermutation() {
   }
 }
 
-template<DLDeviceType XPU, typename IdType>
+template<DGLDeviceType XPU, typename IdType>
 void _TestRemainder_MapToX() {
   const int64_t size = 160000;
   const int num_parts = 7;
@@ -80,11 +80,11 @@ void _TestRemainder_MapToX() {
 
 TEST(PartitionTest, TestRemainderPartition) {
 #ifdef DGL_USE_CUDA
-  _TestRemainder_GeneratePermutation<kDLGPU, int32_t>();
-  _TestRemainder_GeneratePermutation<kDLGPU, int64_t>();
+  _TestRemainder_GeneratePermutation<kDGLCUDA, int32_t>();
+  _TestRemainder_GeneratePermutation<kDGLCUDA, int64_t>();
 
-  _TestRemainder_MapToX<kDLGPU, int32_t>();
-  _TestRemainder_MapToX<kDLGPU, int64_t>();
+  _TestRemainder_MapToX<kDGLCUDA, int32_t>();
+  _TestRemainder_MapToX<kDGLCUDA, int64_t>();
 #endif
   // CPU is not implemented
 }
@@ -105,11 +105,11 @@ int _FindPart(
   return -1;
 }
 
-template<DLDeviceType XPU, typename IdType>
+template<DGLDeviceType XPU, typename IdType>
 void _TestRange_GeneratePermutation() {
   const int64_t size = 160000;
   const int num_parts = 7;
-  IdArray range = aten::NewIdArray(num_parts+1, DGLContext{kDLCPU, 0},
+  IdArray range = aten::NewIdArray(num_parts+1, DGLContext{kDGLCPU, 0},
         sizeof(IdType)*8);
   for (int i = 0; i < num_parts; ++i) {
     range.Ptr<IdType>()[i] = (size/num_parts)*i;
@@ -124,13 +124,13 @@ void _TestRange_GeneratePermutation() {
   std::pair<IdArray, IdArray> result = part->GeneratePermutation(idxs);
 
   // first part of result should be the permutation
-  IdArray perm = result.first.CopyTo(DGLContext{kDLCPU, 0});
+  IdArray perm = result.first.CopyTo(DGLContext{kDGLCPU, 0});
   ASSERT_TRUE(perm.Ptr<IdType>() != nullptr);
   ASSERT_EQ(perm->shape[0], idxs->shape[0]);
   const IdType * const perm_cpu = static_cast<const IdType*>(perm->data);
 
   // second part of result should be the counts
-  IdArray counts = result.second.CopyTo(DGLContext{kDLCPU, 0});
+  IdArray counts = result.second.CopyTo(DGLContext{kDGLCPU, 0});
   ASSERT_TRUE(counts.Ptr<int64_t>() != nullptr);
   ASSERT_EQ(counts->shape[0], num_parts);
   const int64_t * const counts_cpu = static_cast<const int64_t*>(counts->data);
@@ -142,7 +142,7 @@ void _TestRange_GeneratePermutation() {
   ASSERT_EQ(prefix.back(), idxs->shape[0]);
 
   // copy original indexes to cpu
-  idxs = idxs.CopyTo(DGLContext{kDLCPU, 0});
+  idxs = idxs.CopyTo(DGLContext{kDGLCPU, 0});
   const IdType * const idxs_cpu = static_cast<const IdType*>(idxs->data);
 
   for (int p = 0; p < num_parts; ++p) {
@@ -152,11 +152,11 @@ void _TestRange_GeneratePermutation() {
   }
 }
 
-template<DLDeviceType XPU, typename IdType>
+template<DGLDeviceType XPU, typename IdType>
 void _TestRange_MapToX() {
   const int64_t size = 160000;
   const int num_parts = 7;
-  IdArray range = aten::NewIdArray(num_parts+1, DGLContext{kDLCPU, 0},
+  IdArray range = aten::NewIdArray(num_parts+1, DGLContext{kDGLCPU, 0},
         sizeof(IdType)*8);
   for (int i = 0; i < num_parts; ++i) {
     Ptr<IdType>(range)[i] = (size/num_parts)*i;
@@ -189,11 +189,11 @@ void _TestRange_MapToX() {
 
 TEST(PartitionTest, TestRangePartition) {
 #ifdef DGL_USE_CUDA
-  _TestRange_GeneratePermutation<kDLGPU, int32_t>();
-  _TestRange_GeneratePermutation<kDLGPU, int64_t>();
+  _TestRange_GeneratePermutation<kDGLCUDA, int32_t>();
+  _TestRange_GeneratePermutation<kDGLCUDA, int64_t>();
 
-  _TestRange_MapToX<kDLGPU, int32_t>();
-  _TestRange_MapToX<kDLGPU, int64_t>();
+  _TestRange_MapToX<kDGLCUDA, int32_t>();
+  _TestRange_MapToX<kDGLCUDA, int64_t>();
 #endif
   // CPU is not implemented
 }

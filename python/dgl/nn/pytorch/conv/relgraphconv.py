@@ -6,6 +6,7 @@ from torch import nn
 from .... import function as fn
 from ..linear import TypedLinear
 
+
 class RelGraphConv(nn.Module):
     r"""Relational graph convolution layer from `Modeling Relational Data with Graph
     Convolutional Networks <https://arxiv.org/abs/1703.06103>`__
@@ -49,16 +50,20 @@ class RelGraphConv(nn.Module):
     out_feat : int
         Output feature size; i.e., the number of dimensions of :math:`h_i^{(l+1)}`.
     num_rels : int
-        Number of relations. .
+        Number of relations.
     regularizer : str, optional
-        Which weight regularizer to use "basis" or "bdd":
+        Which weight regularizer to use ("basis", "bdd" or ``None``):
 
-         - "basis" is short for basis-decomposition.
-         - "bdd" is short for block-diagonal-decomposition.
+         - "basis" is for basis-decomposition.
+         - "bdd" is for block-diagonal-decomposition.
+         - ``None`` applies no regularization.
 
-        Default applies no regularization.
+        Default: ``None``.
     num_bases : int, optional
-        Number of bases. Needed when ``regularizer`` is specified. Default: ``None``.
+        Number of bases. It comes into effect when a regularizer is applied.
+        If ``None``, it uses number of relations (``num_rels``). Default: ``None``.
+        Note that ``in_feat`` and ``out_feat`` must be divisible by ``num_bases``
+        when applying "bdd" regularizer.
     bias : bool, optional
         True if bias is added. Default: ``True``.
     activation : callable, optional
@@ -67,8 +72,8 @@ class RelGraphConv(nn.Module):
         True to include self loop message. Default: ``True``.
     dropout : float, optional
         Dropout rate. Default: ``0.0``
-    layer_norm: float, optional
-        Add layer norm. Default: ``False``
+    layer_norm: bool, optional
+        True to add layer norm. Default: ``False``
 
     Examples
     --------
@@ -90,19 +95,26 @@ class RelGraphConv(nn.Module):
             [-0.4323, -0.1440],
             [-0.1309, -1.0000]], grad_fn=<AddBackward0>)
     """
-    def __init__(self,
-                 in_feat,
-                 out_feat,
-                 num_rels,
-                 regularizer=None,
-                 num_bases=None,
-                 bias=True,
-                 activation=None,
-                 self_loop=True,
-                 dropout=0.0,
-                 layer_norm=False):
+
+    def __init__(
+        self,
+        in_feat,
+        out_feat,
+        num_rels,
+        regularizer=None,
+        num_bases=None,
+        bias=True,
+        activation=None,
+        self_loop=True,
+        dropout=0.0,
+        layer_norm=False,
+    ):
         super().__init__()
-        self.linear_r = TypedLinear(in_feat, out_feat, num_rels, regularizer, num_bases)
+        if regularizer is not None and num_bases is None:
+            num_bases = num_rels
+        self.linear_r = TypedLinear(
+            in_feat, out_feat, num_rels, regularizer, num_bases
+        )
         self.bias = bias
         self.activation = activation
         self.self_loop = self_loop
@@ -117,21 +129,25 @@ class RelGraphConv(nn.Module):
         #   the module only about graph convolution.
         # layer norm
         if self.layer_norm:
-            self.layer_norm_weight = nn.LayerNorm(out_feat, elementwise_affine=True)
+            self.layer_norm_weight = nn.LayerNorm(
+                out_feat, elementwise_affine=True
+            )
 
         # weight for self loop
         if self.self_loop:
             self.loop_weight = nn.Parameter(th.Tensor(in_feat, out_feat))
-            nn.init.xavier_uniform_(self.loop_weight, gain=nn.init.calculate_gain('relu'))
+            nn.init.xavier_uniform_(
+                self.loop_weight, gain=nn.init.calculate_gain("relu")
+            )
 
         self.dropout = nn.Dropout(dropout)
 
     def message(self, edges):
         """Message function."""
-        m = self.linear_r(edges.src['h'], edges.data['etype'], self.presorted)
-        if 'norm' in edges.data:
-            m = m * edges.data['norm']
-        return {'m' : m}
+        m = self.linear_r(edges.src["h"], edges.data["etype"], self.presorted)
+        if "norm" in edges.data:
+            m = m * edges.data["norm"]
+        return {"m": m}
 
     def forward(self, g, feat, etypes, norm=None, *, presorted=False):
         """Forward computation.
@@ -159,20 +175,20 @@ class RelGraphConv(nn.Module):
         """
         self.presorted = presorted
         with g.local_scope():
-            g.srcdata['h'] = feat
+            g.srcdata["h"] = feat
             if norm is not None:
-                g.edata['norm'] = norm
-            g.edata['etype'] = etypes
+                g.edata["norm"] = norm
+            g.edata["etype"] = etypes
             # message passing
-            g.update_all(self.message, fn.sum('m', 'h'))
+            g.update_all(self.message, fn.sum("m", "h"))
             # apply bias and activation
-            h = g.dstdata['h']
+            h = g.dstdata["h"]
             if self.layer_norm:
                 h = self.layer_norm_weight(h)
             if self.bias:
                 h = h + self.h_bias
             if self.self_loop:
-                h = h + feat[:g.num_dst_nodes()] @ self.loop_weight
+                h = h + feat[: g.num_dst_nodes()] @ self.loop_weight
             if self.activation:
                 h = self.activation(h)
             h = self.dropout(h)

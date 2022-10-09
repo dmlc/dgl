@@ -50,11 +50,11 @@ class HeteroGraph : public BaseHeteroGraph {
     LOG(FATAL) << "Bipartite graph is not mutable.";
   }
 
-  DLDataType DataType() const override {
+  DGLDataType DataType() const override {
     return relation_graphs_[0]->DataType();
   }
 
-  DLContext Context() const override {
+  DGLContext Context() const override {
     return relation_graphs_[0]->Context();
   }
 
@@ -237,15 +237,15 @@ class HeteroGraph : public BaseHeteroGraph {
   static HeteroGraphPtr AsNumBits(HeteroGraphPtr g, uint8_t bits);
 
   /*! \brief Copy the data to another context */
-  static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DLContext &ctx,
-                               const DGLStreamHandle &stream = nullptr);
+  static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DGLContext &ctx);
+
 
   /*!
   * \brief Pin all relation graphs of the current graph.
   * \note The graph will be pinned inplace. Behavior depends on the current context,
-  *       kDLCPU: will be pinned;
+  *       kDGLCPU: will be pinned;
   *       IsPinned: directly return;
-  *       kDLGPU: invalid, will throw an error.
+  *       kDGLCUDA: invalid, will throw an error.
   *       The context check is deferred to pinning the NDArray.
   */
   void PinMemory_() override;
@@ -258,6 +258,12 @@ class HeteroGraph : public BaseHeteroGraph {
   *       The context check is deferred to unpinning the NDArray.
   */
   void UnpinMemory_();
+
+  /*!
+   * \brief Record stream for this graph.
+   * \param stream The stream that is using the graph
+   */
+  void RecordStream(DGLStreamHandle stream) override;
 
   /*! \brief Copy the data to shared memory.
   *

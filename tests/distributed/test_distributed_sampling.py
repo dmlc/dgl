@@ -84,7 +84,7 @@ def start_get_degrees_client(rank, tmpdir, disable_shared_mem, nids=None):
     gpb = None
     if disable_shared_mem:
         _, _, _, gpb, _, _, _ = load_partition(tmpdir / 'test_get_degrees.json', rank)
-    dgl.distributed.initialize("rpc_ip_config.txt", 1)
+    dgl.distributed.initialize("rpc_ip_config.txt")
     dist_graph = DistGraph("test_get_degrees", gpb=gpb)
     try:
         in_deg = dist_graph.in_degrees(nids)
@@ -160,9 +160,9 @@ def check_rpc_find_edges_shuffle(tmpdir, num_server):
 def create_random_hetero(dense=False, empty=False):
     num_nodes = {'n1': 210, 'n2': 200, 'n3': 220} if dense else \
         {'n1': 1010, 'n2': 1000, 'n3': 1020}
-    etypes = [('n1', 'r1', 'n2'),
-              ('n1', 'r2', 'n3'),
-              ('n2', 'r3', 'n3')]
+    etypes = [('n1', 'r12', 'n2'),
+              ('n1', 'r13', 'n3'),
+              ('n2', 'r23', 'n3')]
     edges = {}
     random.seed(42)
     for etype in etypes:
@@ -195,9 +195,18 @@ def check_rpc_hetero_find_edges_shuffle(tmpdir, num_server):
         time.sleep(1)
         pserver_list.append(p)
 
-    eids = F.tensor(np.random.randint(g.number_of_edges('r1'), size=100))
-    u, v = g.find_edges(orig_eid['r1'][eids], etype='r1')
-    du, dv = start_find_edges_client(0, tmpdir, num_server > 1, eids, etype='r1')
+    eids = F.tensor(np.random.randint(g.num_edges('r12'), size=100))
+    expect_except = False
+    try:
+        _, _ = g.find_edges(orig_eid['r12'][eids], etype=('n1', 'r12'))
+    except:
+        expect_except = True
+    assert expect_except
+    u, v = g.find_edges(orig_eid['r12'][eids], etype='r12')
+    u1, v1 = g.find_edges(orig_eid['r12'][eids], etype=('n1', 'r12', 'n2'))
+    assert F.array_equal(u, u1)
+    assert F.array_equal(v, v1)
+    du, dv = start_find_edges_client(0, tmpdir, num_server > 1, eids, etype='r12')
     du = orig_nid['n1'][du]
     dv = orig_nid['n2'][dv]
     assert F.array_equal(u, du)
@@ -488,9 +497,9 @@ def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server, etype_sorted=Fal
     for p in pserver_list:
         p.join()
 
-    src, dst = block.edges(etype=('n1', 'r2', 'n3'))
+    src, dst = block.edges(etype=('n1', 'r13', 'n3'))
     assert len(src) == 18
-    src, dst = block.edges(etype=('n2', 'r3', 'n3'))
+    src, dst = block.edges(etype=('n2', 'r23', 'n3'))
     assert len(src) == 18
 
     orig_nid_map = {ntype: F.zeros((g.number_of_nodes(ntype),), dtype=F.int64) for ntype in g.ntypes}

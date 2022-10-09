@@ -293,6 +293,8 @@ def test_segment_reduce(reducer):
 @pytest.mark.parametrize('feat_size', [1, 8, 16, 64, 256])
 @pytest.mark.parametrize('dtype,tol', [(torch.float16,1e-2),(torch.float32,3e-3),(torch.float64,1e-4)])
 def test_segment_mm(idtype, feat_size, dtype, tol):
+    if F._default_context_str == 'cpu' and dtype == torch.float16:
+        pytest.skip("fp16 support for CPU linalg functions has been removed in PyTorch.")
     dev = F.ctx()
     # input
     a = torch.tensor(np.random.rand(100, feat_size)).to(dev).to(dtype)
@@ -383,3 +385,20 @@ def _test_gather_mm_idx_a(idtype, feat_size):
     assert torch.allclose(c, c_t, atol=1e-4, rtol=1e-4)
     assert torch.allclose(da, da_t, atol=1e-4, rtol=1e-4)
     assert torch.allclose(db, db_t, atol=1e-4, rtol=1e-4)
+
+@unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
+@unittest.skipIf(F._default_context_str == 'gpu', reason="Libxsmm only fit in CPU.")
+def test_use_libxsmm_switch():
+    import torch
+    g = dgl.graph(([0, 0, 0, 1, 1, 2], [0, 1, 2, 1, 2, 2]))
+    x = torch.ones(3, 2, requires_grad=True)
+    y = torch.arange(1, 13).float().view(6, 2).requires_grad_()
+
+    assert dgl.is_libxsmm_enabled()
+    dgl.ops.u_mul_e_sum(g, x, y)
+    dgl.use_libxsmm(False)
+    assert ~dgl.is_libxsmm_enabled()
+    dgl.ops.u_mul_e_sum(g, x, y)
+    dgl.use_libxsmm(True)
+    assert dgl.is_libxsmm_enabled()
+    dgl.ops.u_mul_e_sum(g, x, y)

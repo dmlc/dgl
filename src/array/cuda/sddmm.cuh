@@ -275,7 +275,7 @@ void SDDMMCoo(
   const DType *lhs_data = lhs.Ptr<DType>();
   const DType *rhs_data = rhs.Ptr<DType>();
   DType *out_data = out.Ptr<DType>();
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
 
   int64_t *lhs_off = nullptr, *rhs_off = nullptr;
   int64_t len = bcast.out_len,
@@ -294,8 +294,9 @@ void SDDMMCoo(
     const dim3 nblks(nbx, nby);
     const dim3 nthrs(ntx, nty);
     BCAST_IDX_CTX_SWITCH(bcast, use_idx, out->ctx, lhs_off, rhs_off, {
-      CUDA_KERNEL_CALL((SDDMMCooTreeReduceKernel<Idx, DType, UseBcast, UseIdx, LhsTarget, RhsTarget>),
-          nblks, nthrs, 0, thr_entry->stream,
+      CUDA_KERNEL_CALL(
+          (SDDMMCooTreeReduceKernel<Idx, DType, UseBcast, UseIdx, LhsTarget, RhsTarget>),
+          nblks, nthrs, 0, stream,
           lhs_data, rhs_data, out_data,
           row, col, edge_map,
           coo.num_rows, coo.num_cols, nnz, reduce_dim,
@@ -311,7 +312,7 @@ void SDDMMCoo(
     const dim3 nthrs(ntx, nty);
     BCAST_IDX_CTX_SWITCH(bcast, use_idx, out->ctx, lhs_off, rhs_off, {
       CUDA_KERNEL_CALL((SDDMMCooKernel<Idx, DType, Op, UseBcast, UseIdx, LhsTarget, RhsTarget>),
-          nblks, nthrs, 0, thr_entry->stream,
+          nblks, nthrs, 0, stream,
           lhs_data, rhs_data, out_data,
           row, col, edge_map,
           coo.num_rows, coo.num_cols, nnz, reduce_dim,
@@ -343,7 +344,7 @@ void SDDMMCsr(
   const DType *lhs_data = lhs.Ptr<DType>();
   const DType *rhs_data = rhs.Ptr<DType>();
   DType *out_data = out.Ptr<DType>();
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   int64_t N = csr.num_rows, M = csr.num_cols, E = csr.indices->shape[0];
 
   int64_t *lhs_off = nullptr, *rhs_off = nullptr;
@@ -362,7 +363,7 @@ void SDDMMCsr(
 
   BCAST_IDX_CTX_SWITCH(bcast, use_idx, out->ctx, lhs_off, rhs_off, {
     CUDA_KERNEL_CALL((SDDMMCsrKernel<Idx, DType, Op, UseBcast, UseIdx, LhsTarget, RhsTarget>),
-        nblks, nthrs, 0, thr_entry->stream,
+        nblks, nthrs, 0, stream,
         lhs_data, rhs_data, out_data,
         indptr, indices, edge_map,
         N, M, E, reduce_dim,
@@ -376,4 +377,4 @@ void SDDMMCsr(
 }  // namespace aten
 }  // namespace dgl
 
-#endif
+#endif  // DGL_ARRAY_CUDA_SDDMM_CUH_

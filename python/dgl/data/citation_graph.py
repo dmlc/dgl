@@ -439,7 +439,7 @@ class CoraGraphDataset(CitationGraphDataset):
 
             graph structure, node features and labels.
 
-            - ``ndata['train_mask']``： mask for training node set
+            - ``ndata['train_mask']``: mask for training node set
             - ``ndata['val_mask']``: mask for validation node set
             - ``ndata['test_mask']``: mask for test node set
             - ``ndata['feat']``: node feature
@@ -590,7 +590,7 @@ class CiteseerGraphDataset(CitationGraphDataset):
 
             graph structure, node features and labels.
 
-            - ``ndata['train_mask']``： mask for training node set
+            - ``ndata['train_mask']``: mask for training node set
             - ``ndata['val_mask']``: mask for validation node set
             - ``ndata['test_mask']``: mask for test node set
             - ``ndata['feat']``: node feature
@@ -738,7 +738,7 @@ class PubmedGraphDataset(CitationGraphDataset):
 
             graph structure, node features and labels.
 
-            - ``ndata['train_mask']``： mask for training node set
+            - ``ndata['train_mask']``: mask for training node set
             - ``ndata['val_mask']``: mask for validation node set
             - ``ndata['test_mask']``: mask for test node set
             - ``ndata['feat']``: node feature
