@@ -18,7 +18,7 @@ FIELD_DICT = {'inner_node': F.uint8,    # A flag indicates whether the node is i
               NID: F.int64,
               EID: F.int64,
               NTYPE: F.int16,
-              ETYPE: F.int16}
+              ETYPE: F.int32}
 
 def _save_graphs(filename, g_list):
     '''Format data types in graphs before saving
