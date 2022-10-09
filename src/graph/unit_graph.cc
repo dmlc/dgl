@@ -1715,7 +1715,6 @@ void UnitGraph::Save(dmlc::Stream* fs) const {
   // sparse matrix
   auto save_formats = SparseFormatsToCode({SelectFormat(ALL_CODE)});
   auto fstream = dynamic_cast<dgl::serialize::StreamWithCount *>(fs);
-  //fstream = reinterpret_cast<dgl::serialize::StreamWithCount *>(fs);
   if (fstream) {
     auto formats = fstream->Formats();
     save_formats = formats == NONE_CODE

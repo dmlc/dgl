@@ -6,10 +6,10 @@
 #ifndef DGL_GRAPH_SERIALIZE_STREAMWITHCOUNT_H_
 #define DGL_GRAPH_SERIALIZE_STREAMWITHCOUNT_H_
 
+#include <dgl/aten/spmat.h>
 #include <dmlc/io.h>
 #include <dmlc/type_traits.h>
 #include <memory>
-#include <dgl/aten/spmat.h>
 
 namespace dgl {
 namespace serialize {
