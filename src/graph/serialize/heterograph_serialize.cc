@@ -65,7 +65,7 @@ bool SaveHeteroGraphs(std::string filename, List<HeteroGraphData> hdata,
                       const std::vector<NamedTensor> &nd_list,
                       dgl_format_code_t formats) {
   auto fs = std::unique_ptr<StreamWithCount>(
-    StreamWithCount::Create(filename.c_str(), "w", false));
+    StreamWithCount::Create(filename.c_str(), "w", false, formats));
   CHECK(fs->IsValid()) << "File name " << filename << " is not a valid name";
 
   // Write DGL MetaData
@@ -103,10 +103,8 @@ bool SaveHeteroGraphs(std::string filename, List<HeteroGraphData> hdata,
   // Write HeteroGraphData
   for (uint64_t i = 0; i < num_graph; ++i) {
     graph_indices[i] = fs->Count();
-    hdata[i].sptr()->gptr->SetFormatsWhenSave(formats);
     auto gdata = hdata[i].sptr();
     fs->Write(gdata);
-    hdata[i].sptr()->gptr->ResetFormatsWhenSave();
   }
 
   // Write indptr into string to count size

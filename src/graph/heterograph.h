@@ -208,14 +208,6 @@ class HeteroGraph : public BaseHeteroGraph {
     return GetRelationGraph(0)->GetCreatedFormats();
   }
 
-  void SetFormatsWhenSave(dgl_format_code_t formats) {
-    relation_graphs_.front()->SetFormatsWhenSave(formats);
-  }
-
-  void ResetFormatsWhenSave() {
-    relation_graphs_.front()->ResetFormatsWhenSave();
-  }
-
   HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const override;
 
   HeteroSubgraph EdgeSubgraph(

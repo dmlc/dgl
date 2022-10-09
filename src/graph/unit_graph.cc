@@ -10,6 +10,7 @@
 
 #include "../c_api_common.h"
 #include "./unit_graph.h"
+#include "./serialize/streamwithcount.h"
 
 namespace dgl {
 
@@ -1712,9 +1713,15 @@ void UnitGraph::Save(dmlc::Stream* fs) const {
   fs->Write(kDGLSerialize_UnitGraphMagic);
   // Didn't write UnitGraph::meta_graph_, since it's included in the underlying
   // sparse matrix
-  auto save_formats = save_formats_ == NONE_CODE
-                          ? SparseFormatsToCode({SelectFormat(ALL_CODE)})
-                          : save_formats_;
+  auto save_formats = SparseFormatsToCode({SelectFormat(ALL_CODE)});
+  auto fstream = dynamic_cast<dgl::serialize::StreamWithCount *>(fs);
+  //fstream = reinterpret_cast<dgl::serialize::StreamWithCount *>(fs);
+  if (fstream) {
+    auto formats = fstream->Formats();
+    save_formats = formats == NONE_CODE
+                       ? SparseFormatsToCode({SelectFormat(ALL_CODE)})
+                       : formats;
+  }
   fs->Write(static_cast<int64_t>(save_formats | 0x100000000));
   fs->Write(static_cast<int64_t>(formats_ | 0x100000000));
   if (save_formats & COO_CODE) {
