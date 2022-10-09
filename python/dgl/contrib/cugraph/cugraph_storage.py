@@ -16,6 +16,8 @@
 import dgl
 import dgl.backend as F
 from functools import cached_property
+from types import MethodType
+
 
 # from cugraph_utils import _assert_valid_canonical_etype
 class CuGraphStorage:
@@ -43,11 +45,55 @@ class CuGraphStorage:
         self._node_id_offset_d = None
         self._edge_id_offset_d = None
 
-    def get_node_storage(self, feat_name, ntype=None):
-        return self.graphstore.get_node_storage(feat_name, ntype)
+    def get_node_storage(self, key, ntype=None):
+        node_storage = self.graphstore.get_node_storage(key, ntype)
+        node_storage_fetch = node_storage.fetch
 
-    def get_edge_storage(self, feat_name, etype=None):
-        return self.graphstore.get_edge_storage(feat_name, etype)
+        # TODO: add a function , get_node_id_offset
+        if len(self.ntypes) > 1:
+            if self._node_id_offset_d is None:
+                self._node_id_offset_d = self.__get_node_id_offset_d(
+                    self.num_nodes_dict
+                )
+            indices_offset = self._node_id_offset_d[ntype]
+        else:
+            indices_offset = 0
+
+        def fetch(
+            node_storage, indices, device=None, pin_memory=False, **kwargs
+        ):
+            indices = indices_offset + indices
+            return node_storage_fetch(
+                indices, device=None, pin_memory=False, **kwargs
+            )
+
+        node_storage.fetch = MethodType(fetch, node_storage)
+        return node_storage
+
+    def get_edge_storage(self, key, etype=None):
+        edge_storage = self.graphstore.get_edge_storage(key, etype)
+        edge_storage_fetch = edge_storage.fetch
+
+        # TODO: add a function , get_edge_id_offset
+        if len(self.canonical_etypes) > 1:
+            if self._node_id_offset_d is None:
+                self._node_id_offset_d = self.__get_edge_id_offset_d(
+                    self.num_canonical_edges_dict
+                )
+            indices_offset = self._node_id_offset_d[etype]
+        else:
+            indices_offset = 0
+
+        def fetch(
+            edge_storage, indices, device=None, pin_memory=False, **kwargs
+        ):
+            indices = indices_offset + indices
+            return edge_storage_fetch(
+                indices, device=None, pin_memory=False, **kwargs
+            )
+
+        edge_storage.fetch = MethodType(fetch, edge_storage)
+        return edge_storage
 
     @property
     def num_nodes_dict(self):
@@ -555,6 +601,3 @@ def _is_valid_canonical_etype(canonical_etype):
         if not isinstance(t, str):
             return False
     return True
-
-
-### def get_ntype_from_range()
