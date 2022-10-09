@@ -175,17 +175,21 @@ The output chunked graph metadata will go as follows (assuming the current direc
 ### Sample usage like
 
 ```
-python tools/convert_partition_conf.py --part-config "{config path}" --process-num 1
+python tools/convert_partition_conf.py --part-config "{config path}"
 ```
 
 ### Requirement
 
-The machine run this script should **have access to all partition data under the same folder as part_config**, it can be in one machine or shared accross multiple machines using tools like NFS, refer [Set up distributed training environment](https://docs.dgl.ai/en/latest/tutorials/dist/1_node_classification.html) as instruction.
+The machine run this script require **part 0 data is accessible under the same folder as part_config**.
+
+### Potential risk
+
+The tool may fail in some extrema unbalanced situation where partition 0 doesn't contain any edges of each edge type and corresponding partition data is in-accessible from 
+current place, which may happen rarely.
 
 ### Input arguments
 
 1. *part-config*: The path of partition json file. < **Required**>
-2. *process-num*: Max number of processes can be used, each one is for one partition default to 1. <**Optional**>
 
 ### Output
 

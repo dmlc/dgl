@@ -44,7 +44,7 @@ def test_get_canonical_etypes(type_n, node_n, num_parts):
         expected_etypes = _convert_config2old_version(part_config)
 
         # Call convert function
-        c_etypes = etype2canonical_etype(part_config, 1)
+        c_etypes = etype2canonical_etype(part_config)
         
         # Check we get all canonical etypes
         assert Counter(expected_c_etypes) == Counter(c_etypes.keys())
