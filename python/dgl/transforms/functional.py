@@ -3812,19 +3812,20 @@ def double_radius_node_labeling(g, src, dst):
     g : DGLGraph
         The input graph.
     src : int
-        The source node id of the target link.
+        The source node ID of the target link.
     dst : int
-        The destination node id of the target link.
+        The destination node ID of the target link.
 
     Returns
     -------
     Tensor
-        The double radius node labeling Tensor of shape :math:`(N,)`, where
+        Labels of all nodes. The tensor is of shape :math:`(N,)`, where
         :math:`N` is the number of nodes in the input graph.
 
     Example
     -------
     >>> import dgl
+    
     >>> g = dgl.graph(([0,0,0,0,1,1,2,4], [1,2,3,6,3,4,4,5]))
     >>> dgl.double_radius_node_labeling(g, 0, 1)
     tensor([1, 1, 3, 2, 3, 7, 0])
@@ -3848,7 +3849,7 @@ def double_radius_node_labeling(g, src, dst):
     d = ds + dt
     # suppress invalid value (nan) warnings
     with np.errstate(invalid='ignore'):
-        z = 1 + np.stack([ds, dt]).min(axis=0) + d//2 * (d//2 + d%2 -1)
+        z = 1 + np.stack([ds, dt]).min(axis=0) + d//2 * (d//2 + d%2 - 1)
     z[src] = 1
     z[dst] = 1
     z[np.isnan(z)] = 0  # unreachable nodes

@@ -33,4 +33,3 @@ dgl.transforms
     FeatMask
     RowFeatNormalizer
     SIGNDiffusion
-    DoubleRadiusNodeLabeling

@@ -36,7 +36,6 @@ __all__ = [
     'FeatMask',
     'RandomWalkPE',
     'LaplacianPE',
-    'DoubleRadiusNodeLabeling',
     'AddSelfLoop',
     'RemoveSelfLoop',
     'AddReverse',
@@ -437,36 +436,6 @@ class LaplacianPE(BaseTransform):
             g.ndata[self.eigval_name] = F.copy_to(eigval, g.device)
         else:
             PE = functional.laplacian_pe(g, k=self.k, padding=self.padding)
-        g.ndata[self.feat_name] = F.copy_to(PE, g.device)
-
-        return g
-
-class DoubleRadiusNodeLabeling(BaseTransform):
-    r"""Double Radius Node Labeling, as introduced in `Link Prediction
-    Based on Graph Neural Networks <https://arxiv.org/abs/1802.09691>`__.
-
-    Parameters
-    ----------
-    feat_name : str, optional
-        Name to store the computed node labels in ndata.
-
-    Example
-    -------
-
-    >>> import dgl
-    >>> from dgl import DoubleRadiusNodeLabeling
-
-    >>> transform = DoubleRadiusNodeLabeling()
-    >>> g = dgl.graph(([0,0,0,0,1,1,2,4], [1,2,3,6,3,4,4,5]))
-    >>> g = transform(g, src=0, dst=1)
-    >>> print(g.ndata['PE'])
-    tensor([1, 1, 3, 2, 3, 7, 0])
-    """
-    def __init__(self, feat_name='PE'):
-        self.feat_name = feat_name
-
-    def __call__(self, g, src, dst):
-        PE = functional.double_radius_node_labeling(g, src, dst)
         g.ndata[self.feat_name] = F.copy_to(PE, g.device)
 
         return g
