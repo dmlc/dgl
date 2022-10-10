@@ -37,6 +37,10 @@ To quickly locate the examples of your interest, search for the tagged keywords 
 - <a name='ngnn'></a> Song et al. Network In Graph Neural Network. [Paper link](https://arxiv.org/abs/2111.11638).
     - Example code: [PyTorch](../examples/pytorch/ogb/ngnn)
     - Tags: model-agnostic methodology, link prediction, open graph benchmark.
+- <a name='bipointnet'></a>Qin et al. BiPointNet: Binary Neural Network for Point Clouds. [Paper link](https://openreview.net/forum?id=9QLRCVysdlO)
+    - Example code: [PyTorch](../examples/pytorch/pointcloud/bipointnet)
+    - Tags: point cloud classification, network binarization.
+
 
 ## 2020
 - <a name="eeg-gcnn"></a> Wagh et al. EEG-GCNN: Augmenting Electroencephalogram-based Neurological Disease Diagnosis using a Domain-guided Graph Convolutional Neural Network. [Paper link](http://proceedings.mlr.press/v136/wagh20a.html). 

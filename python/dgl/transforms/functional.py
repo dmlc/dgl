@@ -3650,44 +3650,63 @@ def random_walk_pe(g, k, eweight_name=None):
 
     return PE
 
-def laplacian_pe(g, k):
+def laplacian_pe(g, k, padding=False, return_eigval=False):
     r"""Laplacian Positional Encoding, as introduced in
     `Benchmarking Graph Neural Networks
     <https://arxiv.org/abs/2003.00982>`__
 
     This function computes the laplacian positional encodings as the
-    k smallest non-trivial eigenvectors (k << n). k and n are the positional
-    encoding dimensions and the number of nodes in the given graph.
+    k smallest non-trivial eigenvectors.
 
     Parameters
     ----------
     g : DGLGraph
-        The input graph. Must be homogeneous.
+        The input graph. Must be homogeneous and bidirected.
     k : int
-        Number of smallest non-trivial eigenvectors to use for positional encoding
-        (smaller than the number of nodes).
+        Number of smallest non-trivial eigenvectors to use for positional encoding.
+    padding : bool, optional
+        If False, raise an exception when k>=n.
+        Otherwise, add zero paddings in the end of eigenvectors and 'nan' paddings
+        in the end of eigenvalues when k>=n.
+        Default: False.
+        n is the number of nodes in the given graph.
+    return_eigval : bool, optional
+        If True, return laplacian eigenvalues together with eigenvectors.
+        Otherwise, return laplacian eigenvectors only.
+        Default: False.
 
     Returns
     -------
-    Tensor
-        The laplacian positional encodings of shape :math:`(N, k)`, where :math:`N` is the
-        number of nodes in the input graph.
+    Tensor or (Tensor, Tensor)
+        Return the laplacian positional encodings of shape :math:`(N, k)`, where :math:`N` is the
+        number of nodes in the input graph, when :attr:`return_eigval` is False. The eigenvalues
+        of shape :math:`N` is additionally returned as the second element when :attr:`return_eigval`
+        is True.
 
     Example
     -------
     >>> import dgl
-    >>> g = dgl.rand_graph(6, 12)
+    >>> g = dgl.graph(([0,1,2,3,1,2,3,0], [1,2,3,0,0,1,2,3]))
     >>> dgl.laplacian_pe(g, 2)
-    tensor([[-0.8931, -0.7713],
-            [-0.0000,  0.6198],
-            [ 0.2704, -0.0138],
-            [-0.0000,  0.0554],
-            [ 0.3595, -0.0477],
-            [-0.0000,  0.1240]])
+    tensor([[ 7.0711e-01, -6.4921e-17],
+            [ 3.0483e-16, -7.0711e-01],
+            [-7.0711e-01, -2.4910e-16],
+            [ 9.9288e-17,  7.0711e-01]])
+    >>> dgl.laplacian_pe(g, 5, padding=True)
+    tensor([[ 7.0711e-01, -6.4921e-17,  5.0000e-01,  0.0000e+00,  0.0000e+00],
+            [ 3.0483e-16, -7.0711e-01, -5.0000e-01,  0.0000e+00,  0.0000e+00],
+            [-7.0711e-01, -2.4910e-16,  5.0000e-01,  0.0000e+00,  0.0000e+00],
+            [ 9.9288e-17,  7.0711e-01, -5.0000e-01,  0.0000e+00,  0.0000e+00]])
+    >>> dgl.laplacian_pe(g, 5, padding=True, return_eigval=True)
+    (tensor([[-7.0711e-01,  6.4921e-17, -5.0000e-01,  0.0000e+00,  0.0000e+00],
+             [-3.0483e-16,  7.0711e-01,  5.0000e-01,  0.0000e+00,  0.0000e+00],
+             [ 7.0711e-01,  2.4910e-16, -5.0000e-01,  0.0000e+00,  0.0000e+00],
+             [-9.9288e-17, -7.0711e-01,  5.0000e-01,  0.0000e+00,  0.0000e+00]]),
+     tensor([1., 1., 2., nan, nan]))
     """
     # check for the "k < n" constraint
     n = g.num_nodes()
-    if n <= k:
+    if not padding and n <= k:
         assert "the number of eigenvectors k must be smaller than the number of nodes n, " + \
             f"{k} and {n} detected."
 
@@ -3698,15 +3717,26 @@ def laplacian_pe(g, k):
 
     # select eigenvectors with smaller eigenvalues O(n + klogk)
     EigVal, EigVec = np.linalg.eig(L.toarray())
-    kpartition_indices = np.argpartition(EigVal, k+1)[:k+1]
+    max_freqs = min(n-1, k)
+    kpartition_indices = np.argpartition(EigVal, max_freqs)[:max_freqs+1]
     topk_eigvals = EigVal[kpartition_indices]
     topk_indices = kpartition_indices[topk_eigvals.argsort()][1:]
-    topk_EigVec = np.real(EigVec[:, topk_indices])
+    topk_EigVec = EigVec[:, topk_indices]
+    eigvals = F.tensor(EigVal[topk_indices], dtype=F.float32)
 
     # get random flip signs
-    rand_sign = 2 * (np.random.rand(k) > 0.5) - 1.
+    rand_sign = 2 * (np.random.rand(max_freqs) > 0.5) - 1.
     PE = F.astype(F.tensor(rand_sign * topk_EigVec), F.float32)
 
+    # add paddings
+    if n <= k:
+        temp_EigVec = F.zeros([n, k-n+1], dtype=F.float32, ctx=F.context(PE))
+        PE = F.cat([PE, temp_EigVec], dim=1)
+        temp_EigVal = F.tensor(np.full(k-n+1, np.nan), F.float32)
+        eigvals = F.cat([eigvals, temp_EigVal], dim=0)
+
+    if return_eigval:
+        return PE, eigvals
     return PE
 
 def to_half(g):

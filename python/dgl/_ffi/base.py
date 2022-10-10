@@ -3,22 +3,24 @@
 """ctypes library and helper functions """
 from __future__ import absolute_import
 
-import sys
-import os
 import ctypes
 import logging
+import os
+import sys
+
 import numpy as np
+
 from . import libinfo
 
-#----------------------------
+# ----------------------------
 # library loading
-#----------------------------
+# ----------------------------
 if sys.version_info[0] == 3:
     string_types = (str,)
     numeric_types = (float, int, np.float32, np.int32)
     # this function is needed for python3
     # to convert ctypes.char_p .value back to python str
-    py_str = lambda x: x.decode('utf-8')
+    py_str = lambda x: x.decode("utf-8")
 else:
     string_types = (basestring,)
     numeric_types = (float, int, long, np.float32, np.int32)
@@ -27,7 +29,9 @@ else:
 
 class DGLError(Exception):
     """Error thrown by DGL function"""
+
     pass  # pylint: disable=unnecessary-pass
+
 
 def _load_lib():
     """Load libary by searching possible path."""
@@ -39,6 +43,7 @@ def _load_lib():
     lib.DGLGetLastError.restype = ctypes.c_char_p
     return lib, basename, dirname
 
+
 # version number
 __version__ = libinfo.__version__
 # library instance of nnvm
@@ -47,9 +52,9 @@ _LIB, _LIB_NAME, _DIR_NAME = _load_lib()
 # The FFI mode of DGL
 _FFI_MODE = os.environ.get("DGL_FFI", "auto")
 
-#----------------------------
+# ----------------------------
 # helper function in ctypes.
-#----------------------------
+# ----------------------------
 def check_call(ret):
     """Check the return value of C API call
 
@@ -77,7 +82,7 @@ def c_str(string):
     str : c_char_p
         A char pointer that can be passed to C API
     """
-    return ctypes.c_char_p(string.encode('utf-8'))
+    return ctypes.c_char_p(string.encode("utf-8"))
 
 
 def c_array(ctype, values):
@@ -111,9 +116,12 @@ def decorate(func, fwrapped):
         The wrapped function
     """
     import decorator
+
     return decorator.decorate(func, fwrapped)
 
+
 tensor_adapter_loaded = False
+
 
 def load_tensor_adapter(backend, version):
     """Tell DGL to load a tensoradapter library for given backend and version.
@@ -126,17 +134,17 @@ def load_tensor_adapter(backend, version):
         The version number of the backend.
     """
     global tensor_adapter_loaded
-    version = version.split('+')[0]
-    if sys.platform.startswith('linux'):
-        basename = 'libtensoradapter_%s_%s.so' % (backend, version)
-    elif sys.platform.startswith('darwin'):
-        basename = 'libtensoradapter_%s_%s.dylib' % (backend, version)
-    elif sys.platform.startswith('win'):
-        basename = 'tensoradapter_%s_%s.dll' % (backend, version)
+    version = version.split("+")[0]
+    if sys.platform.startswith("linux"):
+        basename = "libtensoradapter_%s_%s.so" % (backend, version)
+    elif sys.platform.startswith("darwin"):
+        basename = "libtensoradapter_%s_%s.dylib" % (backend, version)
+    elif sys.platform.startswith("win"):
+        basename = "tensoradapter_%s_%s.dll" % (backend, version)
     else:
-        raise NotImplementedError('Unsupported system: %s' % sys.platform)
-    path = os.path.join(_DIR_NAME, 'tensoradapter', backend, basename)
-    tensor_adapter_loaded = (_LIB.DGLLoadTensorAdapter(path.encode('utf-8')) == 0)
+        raise NotImplementedError("Unsupported system: %s" % sys.platform)
+    path = os.path.join(_DIR_NAME, "tensoradapter", backend, basename)
+    tensor_adapter_loaded = _LIB.DGLLoadTensorAdapter(path.encode("utf-8")) == 0
     if not tensor_adapter_loaded:
         logger = logging.getLogger("dgl-core")
         logger.debug("Memory optimization with PyTorch is not enabled.")

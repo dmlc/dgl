@@ -1,16 +1,18 @@
 """For Graph Serialization"""
 from __future__ import absolute_import
+
 import os
-from ..base import dgl_warning, DGLError
-from ..heterograph import DGLHeteroGraph
-from .._ffi.object import ObjectBase, register_object
-from .._ffi.function import _init_api
+
 from .. import backend as F
+from .._ffi.function import _init_api
+from .._ffi.object import ObjectBase, register_object
+from ..base import DGLError, dgl_warning
+from ..heterograph import DGLHeteroGraph
 from .heterograph_serialize import save_heterographs
 
 _init_api("dgl.data.graph_serialize")
 
-__all__ = ['save_graphs', "load_graphs", "load_labels"]
+__all__ = ["save_graphs", "load_graphs", "load_labels"]
 
 
 @register_object("graph_serialize.StorageMetaData")
@@ -26,14 +28,17 @@ class StorageMetaData(ObjectBase):
 
 
 def is_local_path(filepath):
-    return not (filepath.startswith("hdfs://") or
-                filepath.startswith("viewfs://") or
-                filepath.startswith("s3://"))
+    return not (
+        filepath.startswith("hdfs://")
+        or filepath.startswith("viewfs://")
+        or filepath.startswith("s3://")
+    )
 
 
 def check_local_file_exists(filename):
     if is_local_path(filename) and not os.path.exists(filename):
         raise DGLError("File {} does not exist.".format(filename))
+
 
 @register_object("graph_serialize.GraphData")
 class GraphData(ObjectBase):
@@ -43,7 +48,9 @@ class GraphData(ObjectBase):
     def create(g):
         """Create GraphData"""
         # TODO(zihao): support serialize batched graph in the future.
-        assert g.batch_size == 1, "Batched DGLGraph is not supported for serialization"
+        assert (
+            g.batch_size == 1
+        ), "Batched DGLGraph is not supported for serialization"
         ghandle = g._graph
         if len(g.ndata) != 0:
             node_tensors = dict()
@@ -64,8 +71,8 @@ class GraphData(ObjectBase):
     def get_graph(self):
         """Get DGLHeteroGraph from GraphData"""
         ghandle = _CAPI_GDataGraphHandle(self)
-        hgi =_CAPI_DGLAsHeteroGraph(ghandle)
-        g = DGLHeteroGraph(hgi, ['_U'], ['_E'])
+        hgi = _CAPI_DGLAsHeteroGraph(ghandle)
+        g = DGLHeteroGraph(hgi, ["_U"], ["_E"])
         node_tensors_items = _CAPI_GDataNodeTensors(self).items()
         edge_tensors_items = _CAPI_GDataEdgeTensors(self).items()
         for k, v in node_tensors_items:
@@ -120,18 +127,22 @@ def save_graphs(filename, g_list, labels=None):
     # if it is local file, do some sanity check
     if is_local_path(filename):
         if os.path.isdir(filename):
-            raise DGLError("Filename {} is an existing directory.".format(filename))
+            raise DGLError(
+                "Filename {} is an existing directory.".format(filename)
+            )
         f_path = os.path.dirname(filename)
         if f_path and not os.path.exists(f_path):
             os.makedirs(f_path)
 
     g_sample = g_list[0] if isinstance(g_list, list) else g_list
-    if type(g_sample) == DGLHeteroGraph:  # Doesn't support DGLHeteroGraph's derived class
+    if (
+        type(g_sample) == DGLHeteroGraph
+    ):  # Doesn't support DGLHeteroGraph's derived class
         save_heterographs(filename, g_list, labels)
     else:
         raise DGLError(
-            "Invalid argument g_list. Must be a DGLGraph or a list of DGLGraphs.")
-
+            "Invalid argument g_list. Must be a DGLGraph or a list of DGLGraphs."
+        )
 
 
 def load_graphs(filename, idx_list=None):
@@ -176,7 +187,8 @@ def load_graphs(filename, idx_list=None):
     if version == 1:
         dgl_warning(
             "You are loading a graph file saved by old version of dgl.  \
-            Please consider saving it again with the current format.")
+            Please consider saving it again with the current format."
+        )
         return load_graph_v1(filename, idx_list)
     elif version == 2:
         return load_graph_v2(filename, idx_list)
@@ -195,7 +207,7 @@ def load_graph_v2(filename, idx_list=None):
 
 
 def load_graph_v1(filename, idx_list=None):
-    """"Internal functions for loading DGLGraphs (V0)."""
+    """ "Internal functions for loading DGLGraphs (V0)."""
     if idx_list is None:
         idx_list = []
     assert isinstance(idx_list, list)
@@ -205,6 +217,7 @@ def load_graph_v1(filename, idx_list=None):
         label_dict[k] = F.zerocopy_from_dgl_ndarray(v)
 
     return [gdata.get_graph() for gdata in metadata.graph_data], label_dict
+
 
 def load_labels(filename):
     """

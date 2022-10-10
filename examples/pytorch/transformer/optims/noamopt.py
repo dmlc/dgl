@@ -15,18 +15,19 @@ class NoamOpt(object):
     def rate(self, step=None):
         if step is None:
             step = self._step
-        return self.factor * \
-            (self.model_size ** (-0.5) *
-             min(step ** (-0.5), step * self.warmup ** (-1.5))
-            )
+        return self.factor * (
+            self.model_size ** (-0.5)
+            * min(step ** (-0.5), step * self.warmup ** (-1.5))
+        )
 
     def step(self):
         self._step += 1
         rate = self.rate()
         for p in self.optimizer.param_groups:
-            p['lr'] = rate
+            p["lr"] = rate
         self._rate = rate
         self.optimizer.step()
+
 
 """
 Default setting:
