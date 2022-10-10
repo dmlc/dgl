@@ -1,15 +1,18 @@
 """Negative sampling APIs"""
 
 from numpy.polynomial import polynomial
-from .._ffi.function import _init_api
+
 from .. import backend as F
 from .. import utils
+from .._ffi.function import _init_api
 from ..heterograph import DGLHeteroGraph
 
-__all__ = [
-    'global_uniform_negative_sampling']
+__all__ = ["global_uniform_negative_sampling"]
 
-def _calc_redundancy(k_hat, num_edges, num_pairs, r=3): # pylint: disable=invalid-name
+
+def _calc_redundancy(
+    k_hat, num_edges, num_pairs, r=3
+):  # pylint: disable=invalid-name
     # pylint: disable=invalid-name
     # Calculates the number of samples required based on a lower-bound
     # of the expected number of negative samples, based on N draws from
@@ -24,18 +27,24 @@ def _calc_redundancy(k_hat, num_edges, num_pairs, r=3): # pylint: disable=invali
     p_m = num_edges / num_pairs
     p_k = 1 - p_m
 
-    a = p_k ** 2
-    b = -p_k * (2 * k_hat + r ** 2 * p_m)
-    c = k_hat ** 2
+    a = p_k**2
+    b = -p_k * (2 * k_hat + r**2 * p_m)
+    c = k_hat**2
 
     poly = polynomial.Polynomial([c, b, a])
     N = poly.roots()[-1]
-    redundancy = N / k_hat - 1.
+    redundancy = N / k_hat - 1.0
     return redundancy
 
+
 def global_uniform_negative_sampling(
-        g, num_samples, exclude_self_loops=True, replace=False, etype=None,
-        redundancy=None):
+    g,
+    num_samples,
+    exclude_self_loops=True,
+    replace=False,
+    etype=None,
+    redundancy=None,
+):
     """Performs negative sampling, which generate source-destination pairs such that
     edges with the given type do not exist.
 
@@ -95,13 +104,24 @@ def global_uniform_negative_sampling(
     exclude_self_loops = exclude_self_loops and (utype == vtype)
 
     redundancy = _calc_redundancy(
-        num_samples, g.num_edges(etype), g.num_nodes(utype) * g.num_nodes(vtype))
+        num_samples, g.num_edges(etype), g.num_nodes(utype) * g.num_nodes(vtype)
+    )
 
     etype_id = g.get_etype_id(etype)
     src, dst = _CAPI_DGLGlobalUniformNegativeSampling(
-        g._graph, etype_id, num_samples, 3, exclude_self_loops, replace, redundancy)
+        g._graph,
+        etype_id,
+        num_samples,
+        3,
+        exclude_self_loops,
+        replace,
+        redundancy,
+    )
     return F.from_dgl_nd(src), F.from_dgl_nd(dst)
-DGLHeteroGraph.global_uniform_negative_sampling = utils.alias_func(
-    global_uniform_negative_sampling)
 
-_init_api('dgl.sampling.negative', __name__)
+
+DGLHeteroGraph.global_uniform_negative_sampling = utils.alias_func(
+    global_uniform_negative_sampling
+)
+
+_init_api("dgl.sampling.negative", __name__)

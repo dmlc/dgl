@@ -20,9 +20,10 @@ from globalids import (assign_shuffle_global_nids_edges,
                        assign_shuffle_global_nids_nodes,
                        lookup_shuffle_global_nids_edges)
 from gloo_wrapper import allgather_sizes, alltoallv_cpu, gather_metadata_json
-from utils import (augment_edge_data, get_gnid_range_map, get_idranges,
-                   get_node_types, get_ntype_featnames, memory_snapshot,
-                   read_json, read_ntype_partition_files, write_dgl_objects,
+from utils import (augment_edge_data, get_edge_types, get_etype_featnames,
+                   get_gnid_range_map, get_idranges, get_node_types,
+                   get_ntype_featnames, memory_snapshot, read_json,
+                   read_ntype_partition_files, write_dgl_objects,
                    write_metadata_json)
 
 
@@ -175,7 +176,7 @@ def exchange_edge_data(rank, world_size, edge_data):
     edge_data.pop(constants.OWNER_PROCESS)
     return edge_data
 
-def exchange_node_features(rank, world_size, node_feature_tids, ntype_gnid_map, id_lookup, node_features):
+def exchange_features(rank, world_size, feature_tids, ntype_gnid_map, id_lookup, feature_data, feat_type, data):
     """
     This function is used to shuffle node features so that each process will receive
     all the node features whose corresponding nodes are owned by the same process.
@@ -210,9 +211,14 @@ def exchange_node_features(rank, world_size, node_feature_tids, ntype_gnid_map, 
     id_lookup : instance of class DistLookupService
        Distributed lookup service used to map global-nids to respective partition-ids and 
        shuffle-global-nids
-    node_feautres: dicitonary
-        dictionry where node_features are stored and this information is read from the appropriate
+    feature_data: dicitonary
+        dictionry in which node or edge features are stored and this information is read from the appropriate
         node features file which belongs to the current process
+    feat_type : string
+        this is used to distinguish which features are being exchanged. Please note that
+        for nodes ownership is clearly defined and for edges it is always assumed that
+        destination end point of the edge defines the ownership of that particular 
+        edge
 
     Returns:
     --------
@@ -224,31 +230,31 @@ def exchange_node_features(rank, world_size, node_feature_tids, ntype_gnid_map, 
         process
     """
     start = timer()
-    own_node_features = {}
+    own_features = {}
     own_global_nids = {}
     #To iterate over the node_types and associated node_features
-    for ntype_name, ntype_info in node_feature_tids.items():
+    for type_name, type_info in feature_tids.items():
 
         #To iterate over the node_features, of a given node_type
-        #ntype_info is a list of 3 elements
-        #[node-feature-name, starting-idx, ending-idx]
-        #node-feature-name is the name given to the node-feature, read from the input metadata file
-        #[starting-idx, ending-idx) specifies the range of indexes associated with the node-features read from
-        #the associated input file. Note that the rows of node-features read from the input file should be same
+        #type_info is a list of 3 elements
+        #[feature-name, starting-idx, ending-idx]
+        #feature-name is the name given to the feature-data, read from the input metadata file
+        #[starting-idx, ending-idx) specifies the range of indexes associated with the features read from
+        #the associated input file. Note that the rows of features read from the input file should be same
         #as specified with this range. So no. of rows = ending-idx - starting-idx.
-        for feat_info in ntype_info:
+        for feat_info in type_info:
 
             #determine the owner process for these node features.
-            node_feats_per_rank = []
+            feats_per_rank = []
             global_nid_per_rank = []
             feat_name = feat_info[0]
-            feat_key = ntype_name+'/'+feat_name
+            feat_key = type_name+'/'+feat_name
             logging.info(f'[Rank: {rank}] processing node feature: {feat_key}')
 
             #compute the global_nid range for this node features
             type_nid_start = int(feat_info[1])
             type_nid_end = int(feat_info[2])
-            begin_global_nid = ntype_gnid_map[ntype_name][0]
+            begin_global_nid = ntype_gnid_map[type_name][0]
             gnid_start = begin_global_nid + type_nid_start
             gnid_end = begin_global_nid + type_nid_end
 
@@ -260,38 +266,58 @@ def exchange_node_features(rank, world_size, node_feature_tids, ntype_gnid_map, 
             #check if node features exist for this ntype_name + feat_name
             #this check should always pass, because node_feature_tids are built
             #by reading the input metadata json file for existing node features.
-            assert(feat_key in node_features)
+            assert(feat_key in feature_data)
 
-            node_feats = node_features[feat_key]
+            key_feats = feature_data[feat_key]
             for part_id in range(world_size):
-                partid_slice = id_lookup.get_partition_ids(np.arange(gnid_start, gnid_end, dtype=np.int64))
+                # Get the partition ids for the range of global nids.
+                if feat_type == constants.STR_NODE_FEATURES:
+                    partid_slice = id_lookup.get_partition_ids(np.arange(gnid_start, gnid_end, dtype=np.int64))
+                else:
+                    #Edge data case. 
+                    #Ownership is determined by the destination node.
+                    assert data is not None
+                    global_eids = np.arange(gnid_start, gnid_end, dtype=np.int64)
+
+                    #Now use `data` to extract destination nodes' global id 
+                    #and use that to get the ownership
+                    common, idx1, idx2 = np.intersect1d(data[constants.GLOBAL_EID], global_eids, return_indices=True)
+                    assert common.shape[0] == idx2.shape[0]
+
+                    global_dst_nids = data[constants.GLOBAL_DST_ID][idx1]
+                    assert np.all(global_eids == data[constants.GLOBAL_EID][idx1])
+                    partid_slice = id_lookup.get_partition_ids(global_dst_nids)
+                    
                 cond = (partid_slice == part_id)
                 gnids_per_partid = gnids_feat[cond]
                 tnids_per_partid = tnids_feat[cond]
                 local_idx_partid = local_idx[cond]
 
                 if (gnids_per_partid.shape[0] == 0):
-                    node_feats_per_rank.append(torch.empty((0,1), dtype=torch.float))
+                    feats_per_rank.append(torch.empty((0,1), dtype=torch.float))
                     global_nid_per_rank.append(np.empty((0,1), dtype=np.int64))
                 else:
-                    node_feats_per_rank.append(node_feats[local_idx_partid])
+                    feats_per_rank.append(key_feats[local_idx_partid])
                     global_nid_per_rank.append(torch.from_numpy(gnids_per_partid).type(torch.int64))
 
             #features (and global nids) per rank to be sent out are ready
             #for transmission, perform alltoallv here.
-            output_feat_list = alltoallv_cpu(rank, world_size, node_feats_per_rank)
+            output_feat_list = alltoallv_cpu(rank, world_size, feats_per_rank)
             output_nid_list = alltoallv_cpu(rank, world_size, global_nid_per_rank)
 
             #stitch node_features together to form one large feature tensor
-            own_node_features[feat_key] = torch.cat(output_feat_list)
+            own_features[feat_key] = torch.cat(output_feat_list)
             own_global_nids[feat_key] = torch.cat(output_nid_list).numpy()
 
     end = timer()
     logging.info(f'[Rank: {rank}] Total time for node feature exchange: {timedelta(seconds = end - start)}')
-    return own_node_features, own_global_nids
+    return own_features, own_global_nids
 
-def exchange_graph_data(rank, world_size, node_features, node_feat_tids, edge_data,
-        id_lookup, ntypes_gnid_range_map, ntid_ntype_map, schema_map):
+def exchange_graph_data(rank, world_size, node_features, edge_features, 
+        node_feat_tids, edge_feat_tids, 
+        edge_data, id_lookup, ntypes_ntypeid_map, 
+        ntypes_gnid_range_map, etypes_geid_range_map, 
+        ntid_ntype_map, schema_map):
     """
     Wrapper function which is used to shuffle graph data on all the processes.
 
@@ -301,16 +327,23 @@ def exchange_graph_data(rank, world_size, node_features, node_feat_tids, edge_da
         rank of the current process
     world_size : int
         total no. of participating processes.
-    node_feautres: dicitonary
+    node_feautres : dicitonary
         dictionry where node_features are stored and this information is read from the appropriate
         node features file which belongs to the current process
+    edge_features : dictionary
+        dictionary where edge_features are stored. This information is read from the appropriate
+        edge feature files whose ownership is assigned to the current process
     node_feat_tids: dictionary
         in which keys are node-type names and values are triplets. Each triplet has node-feature name
         and the starting and ending type ids of the node-feature data read from the corresponding
         node feature data file read by current process. Each node type may have several features and
         hence each key may have several triplets.
+    edge_feat_tids : dictionary
+        a dictionary in which keys are edge-type names and values are triplets of the format
+        <feat-name, start-per-type-idx, end-per-type-idx>. This triplet is used to identify 
+        the chunk of feature data for which current process is responsible for
     edge_data : dictionary
-        dictionary which is used to store edge information as read from the edges.txt file assigned
+        dictionary which is used to store edge information as read from appropriate files assigned
         to each process.
     id_lookup : instance of class DistLookupService
        Distributed lookup service used to map global-nids to respective partition-ids and 
@@ -319,6 +352,9 @@ def exchange_graph_data(rank, world_size, node_features, node_feat_tids, edge_da
         mappings between node type names and node type ids
     ntypes_gnid_range_map : dictionary
         mapping between node type names and global_nids which belong to the keys in this dictionary
+    etypes_geid_range_map : dictionary
+        mapping between edge type names and global_eids which are assigned to the edges of this
+        edge_type
     ntid_ntype_map : dictionary
         mapping between node type id and no of nodes which belong to each node_type_id
     schema_map : dictionary
@@ -334,22 +370,35 @@ def exchange_graph_data(rank, world_size, node_features, node_feat_tids, edge_da
         process
     dictionary :
         list of global_nids for the nodes whose node features are received when node features shuffling was
-        performed in the `exchange_node_features` function call
+        performed in the `exchange_features` function call
     dictionary :
         the input argument, edge_data dictionary, is updated with the edge data received from other processes
         in the world. The edge data is received by each rank in the process of data shuffling.
+    dictionary : 
+        edge features dictionary which has edge features. These destination end points of these edges
+        are owned by the current process
+    dictionary :
+        list of global_eids for the edges whose edge features are received when edge features shuffling
+        was performed in the `exchange_features` function call
     """
     memory_snapshot("ShuffleNodeFeaturesBegin: ", rank)
-    rcvd_node_features, rcvd_global_nids = exchange_node_features(rank, world_size, node_feat_tids, \
-                                                ntypes_gnid_range_map, id_lookup, node_features)
+    rcvd_node_features, rcvd_global_nids = exchange_features(rank, world_size, node_feat_tids,
+                                                ntypes_gnid_range_map, id_lookup, node_features,
+                                                constants.STR_NODE_FEATURES, None)
     memory_snapshot("ShuffleNodeFeaturesComplete: ", rank)
     logging.info(f'[Rank: {rank}] Done with node features exchange.')
+
+    rcvd_edge_features, rcvd_global_eids = exchange_features(rank, world_size, edge_feat_tids,
+                                                etypes_geid_range_map, id_lookup, edge_features,
+                                                constants.STR_EDGE_FEATURES, edge_data)
+    logging.info(f'[Rank: {rank}] Done with edge features exchange.')
 
     node_data = gen_node_data(rank, world_size, id_lookup, ntid_ntype_map, schema_map)
     memory_snapshot("NodeDataGenerationComplete: ", rank)
     edge_data = exchange_edge_data(rank, world_size, edge_data)
+
     memory_snapshot("ShuffleEdgeDataComplete: ", rank)
-    return node_data, rcvd_node_features, rcvd_global_nids, edge_data
+    return node_data, rcvd_node_features, rcvd_global_nids, edge_data, rcvd_edge_features, rcvd_global_eids
 
 def read_dataset(rank, world_size, id_lookup, params, schema_map):
     """
@@ -391,17 +440,24 @@ def read_dataset(rank, world_size, id_lookup, params, schema_map):
         owner process for each edge.
     dictionary
         edge features which is also a dictionary, similar to node features dictionary
+    dictionary
+        a dictionary in which keys are edge-type names and values are tuples indicating the range of ids
+        for edges read by the current process.
+    dictionary
+        a dictionary in which keys are edge-type names and values are triplets, 
+        (edge-feature-name, start_type_id, end_type_id). These type_ids are indices in the edge-features
+        read by the current process. Note that each edge-type may have several edge-features.
     """
     edge_features = {}
     #node_tids, node_features, edge_datadict, edge_tids
-    node_tids, node_features, node_feat_tids, edge_data, edge_tids = \
+    node_tids, node_features, node_feat_tids, edge_data, edge_tids, edge_features, edge_feat_tids = \
         get_dataset(params.input_dir, params.graph_name, rank, world_size, schema_map)
     logging.info(f'[Rank: {rank}] Done reading dataset deom {params.input_dir}')
 
     edge_data = augment_edge_data(edge_data, id_lookup, edge_tids, rank, world_size)
     logging.info(f'[Rank: {rank}] Done augmenting edge_data: {len(edge_data)}, {edge_data[constants.GLOBAL_SRC_ID].shape}')
 
-    return node_tids, node_features, node_feat_tids, edge_data, edge_features
+    return node_tids, node_features, node_feat_tids, edge_data, edge_features, edge_tids, edge_feat_tids
 
 def gen_dist_partitions(rank, world_size, params):
     """
@@ -543,11 +599,12 @@ def gen_dist_partitions(rank, world_size, params):
                                     id_map, rank, world_size)
 
     ntypes_ntypeid_map, ntypes, ntypeid_ntypes_map = get_node_types(schema_map)
+    etypes_etypeid_map, etypes, etypeid_etypes_map = get_edge_types(schema_map)
     logging.info(f'[Rank: {rank}] Initialized metis partitions and node_types map...')
 
     #read input graph files and augment these datastructures with
     #appropriate information (global_nid and owner process) for node and edge data
-    node_tids, node_features, node_feat_tids, edge_data, edge_features = \
+    node_tids, node_features, node_feat_tids, edge_data, edge_features, edge_tids, edge_feat_tids = \
         read_dataset(rank, world_size, id_lookup, params, schema_map)
     logging.info(f'[Rank: {rank}] Done augmenting file input data with auxilary columns')
     memory_snapshot("DatasetReadComplete: ", rank)
@@ -556,10 +613,12 @@ def gen_dist_partitions(rank, world_size, params):
     #this function will also stitch the data recvd from other processes
     #and return the aggregated data
     ntypes_gnid_range_map = get_gnid_range_map(node_tids)
-    node_data, rcvd_node_features, rcvd_global_nids, edge_data  = \
-                    exchange_graph_data(rank, world_size, node_features, node_feat_tids,
-                                        edge_data, id_lookup, ntypes_gnid_range_map,
-                                        ntypeid_ntypes_map, schema_map)
+    etypes_geid_range_map = get_gnid_range_map(edge_tids)
+    node_data, rcvd_node_features, rcvd_global_nids, edge_data, rcvd_edge_features, rcvd_global_eids  = \
+                    exchange_graph_data(rank, world_size, node_features, edge_features, \
+                            node_feat_tids, edge_feat_tids, edge_data, id_lookup, ntypes_ntypeid_map, \
+                            ntypes_gnid_range_map, etypes_geid_range_map, \
+                            ntypeid_ntypes_map, schema_map)
     gc.collect()
     logging.info(f'[Rank: {rank}] Done with data shuffling...')
     memory_snapshot("DataShuffleComplete: ", rank)
@@ -584,13 +643,15 @@ def gen_dist_partitions(rank, world_size, params):
         for featname in featnames:
             #if a feature name exists for a node-type, then it should also have
             #feature data as well. Hence using the assert statement.
-            assert(ntype_name+'/'+featname in rcvd_global_nids)
-            global_nids = rcvd_global_nids[ntype_name+'/'+featname]
+            feature_key = ntype_name+'/'+featname
+            assert(feature_key in rcvd_global_nids)
+            global_nids = rcvd_global_nids[feature_key]
 
-            common, idx1, idx2 = np.intersect1d(node_data[constants.GLOBAL_NID], global_nids, return_indices=True)
+            _, idx1, _ = np.intersect1d(node_data[constants.GLOBAL_NID], global_nids, return_indices=True)
             shuffle_global_ids = node_data[constants.SHUFFLE_GLOBAL_NID][idx1]
             feature_idx = shuffle_global_ids.argsort()
-            rcvd_node_features[ntype_name+'/'+featname] = rcvd_node_features[ntype_name+'/'+featname][feature_idx]
+
+            rcvd_node_features[feature_key] = rcvd_node_features[feature_key][feature_idx]
     memory_snapshot("ReorderNodeFeaturesComplete: ", rank)
 
     #sort edge_data by etype
@@ -603,6 +664,23 @@ def gen_dist_partitions(rank, world_size, params):
     shuffle_global_eid_start = assign_shuffle_global_nids_edges(rank, world_size, edge_data)
     logging.info(f'[Rank: {rank}] Done assigning global_ids to edges ...')
     memory_snapshot("ShuffleGlobalID_Edges_Complete: ", rank)
+
+    #Shuffle edge features according to the edge order on each rank.
+    for etype_name in etypes:
+        featnames = get_etype_featnames(etype_name, schema_map)
+        for featname in featnames:
+            feature_key = etype_name+'/'+featname
+            assert feature_key in rcvd_global_eids
+            global_eids = rcvd_global_eids[feature_key]
+
+            _, idx1, _ = np.intersect1d(edge_data[constants.GLOBAL_EID], global_eids, return_indices=True)
+            shuffle_global_ids = edge_data[constants.SHUFFLE_GLOBAL_EID][idx1]
+            feature_idx = shuffle_global_ids.argsort()
+
+            rcvd_edge_features[feature_key] = rcvd_edge_features[feature_key][feature_idx]
+
+    for k, v in rcvd_edge_features.items():
+        logging.info(f'[Rank: {rank}] key: {k} v: {v.shape}')
 
     #determine global-ids for edge end-points
     edge_data = lookup_shuffle_global_nids_edges(rank, world_size, edge_data, id_lookup, node_data)
@@ -619,7 +697,7 @@ def gen_dist_partitions(rank, world_size, params):
         orig_nids, orig_eids = create_dgl_object(schema_map, rank, node_data, \
             edge_data, num_edges, params.save_orig_nids, params.save_orig_eids)
     memory_snapshot("CreateDGLObjectsComplete: ", rank)
-    write_dgl_objects(graph_obj, rcvd_node_features, edge_features, params.output, \
+    write_dgl_objects(graph_obj, rcvd_node_features, rcvd_edge_features, params.output, \
         rank, orig_nids, orig_eids)
     memory_snapshot("DiskWriteDGLObjectsComplete: ", rank)
 

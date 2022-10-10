@@ -1,7 +1,7 @@
 # pylint: disable=global-variable-undefined, invalid-name
 """Multiprocess dataloader for distributed training"""
-from .dist_context import get_sampler_pool
 from .. import backend as F
+from .dist_context import get_sampler_pool
 
 __all__ = ["DistDataLoader"]
 
@@ -61,8 +61,15 @@ class DistDataLoader:
     and [3, 4] is not guaranteed.
     """
 
-    def __init__(self, dataset, batch_size, shuffle=False, collate_fn=None, drop_last=False,
-                 queue_size=None):
+    def __init__(
+        self,
+        dataset,
+        batch_size,
+        shuffle=False,
+        collate_fn=None,
+        drop_last=False,
+        queue_size=None,
+    ):
         self.pool, self.num_workers = get_sampler_pool()
         if queue_size is None:
             queue_size = self.num_workers * 4 if self.num_workers > 0 else 4
@@ -71,7 +78,7 @@ class DistDataLoader:
         self.num_pending = 0
         self.collate_fn = collate_fn
         self.current_pos = 0
-        self.queue = [] # Only used when pool is None
+        self.queue = []  # Only used when pool is None
         self.drop_last = drop_last
         self.recv_idxs = 0
         self.shuffle = shuffle
@@ -153,7 +160,7 @@ class DistDataLoader:
                 end_pos = len(self.dataset)
         else:
             end_pos = self.current_pos + self.batch_size
-        idx = self.data_idx[self.current_pos:end_pos].tolist()
+        idx = self.data_idx[self.current_pos : end_pos].tolist()
         ret = [self.dataset[i] for i in idx]
         # Sharing large number of tensors between processes will consume too many
         # file descriptors, so let's convert each tensor to scalar value beforehand.

@@ -1,2 +1,2 @@
-from .tensor import *
 from .sparse import *
+from .tensor import *

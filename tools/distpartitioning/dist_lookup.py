@@ -1,11 +1,10 @@
 import logging
 import os
-
 import numpy as np
 import pyarrow
 import torch
-from pyarrow import csv
 
+from pyarrow import csv
 from gloo_wrapper import alltoallv_cpu
 
 
@@ -58,8 +57,9 @@ class DistLookupService:
 
         # Iterate over the node types and extract the partition id mappings.
         for ntype in ntype_names:
-            fname = f'{ntype}.txt'
-            logging.info(f'[Rank: {rank}] Reading file: {os.path.join(input_dir, fname)}')
+
+            filename = f'{ntype}.txt'
+            logging.info(f'[Rank: {rank}] Reading file: {os.path.join(input_dir, filename)}')
             df = csv.read_csv(os.path.join(input_dir, '{}.txt'.format(ntype)), \
                 read_options=pyarrow.csv.ReadOptions(autogenerate_column_names=True), \
                 parse_options=pyarrow.csv.ParseOptions(delimiter=' '))
@@ -86,6 +86,7 @@ class DistLookupService:
         self.ntype_count = np.array(ntype_count, dtype=np.int64)
         self.rank = rank
         self.world_size = world_size
+        
 
     def get_partition_ids(self, global_nids):
         '''
