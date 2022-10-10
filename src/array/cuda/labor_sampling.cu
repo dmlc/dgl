@@ -109,10 +109,11 @@ struct TransformOp {
     }
 };
 
-template <typename IdType, typename FloatType, typename probs_t, typename A_t>
+template <typename IdType, typename FloatType, typename probs_t, typename A_t, typename B_t>
 struct TransformOpImp {
     probs_t probs;
-    A_t A_g;
+    A_t A;
+    B_t B;
     const IdType * idx_coo;
     const IdType * rows;
     const FloatType * cs;
@@ -128,9 +129,10 @@ struct TransformOpImp {
         const auto row = rows[in_row];
         const auto in_idx = indptr[row] + idx - subindptr[in_row];
         const auto u = indices[in_idx];
-        const auto w = A_g[in_idx];
+        const auto w = A[in_idx];
+        const auto w2 = B[in_idx];
         const auto data = data_arr ? data_arr[in_idx] : in_idx;
-        return thrust::make_tuple(in_row, row, u, data, w / min((FloatType)1, c * w * ps));
+        return thrust::make_tuple(in_row, row, u, data, w / min((FloatType)1, c * w2 * ps));
     }
 };
 
@@ -139,8 +141,8 @@ struct StencilOp {
     const FloatType * cs;
     template <typename IdType>
     __host__ __device__
-    auto operator() (IdType in_row, FloatType ps, FloatType w, FloatType rnd) {
-        return rnd <= cs[in_row] * w * ps;
+    auto operator() (IdType in_row, FloatType ps, FloatType rnd) {
+        return rnd <= cs[in_row] * ps;
     }
 };
 
@@ -151,7 +153,7 @@ struct StencilOpFused {
     const IdType * idx_coo;
     const FloatType * cs;
     const ps_t probs;
-    const A_t A_g;
+    const A_t A;
     const IdType * subindptr;
     const IdType * rows;
     const IdType * indptr;
@@ -180,7 +182,7 @@ struct StencilOpFused {
         }
         else
             rnd = curand_uniform(&rng);
-        return rnd <= cs[in_row] * A_g[in_idx] * ps;
+        return rnd <= cs[in_row] * A[in_idx] * ps;
     }
 };
 
@@ -247,12 +249,10 @@ __global__ void _CSRRowWiseOneHopExtractorKernel(
     const IdType * const indptr,
     const IdType * const subindptr,
     const IdType * const indices,
-    const FloatType * const A_g,
     const IdType * const idx_coo,
     const IdType * const nids,
     FloatType * const rands,
-    IdType * const hop,
-    FloatType * const A) {
+    IdType * const hop) {
 
     IdType tx = static_cast<IdType>(blockIdx.x) * blockDim.x + threadIdx.x;
     const int stride_x = gridDim.x * blockDim.x;
@@ -268,8 +268,6 @@ __global__ void _CSRRowWiseOneHopExtractorKernel(
         const auto in_idx = indptr[row] + rofs;
         const auto u = indices[in_idx];
         hop[tx] = u;
-        if (A)
-            A[tx] = A_g[in_idx];
         const auto v = nids ? nids[u] : u;
         if (labor)
             curand_init(123123, rand_seed, v, &rng);
@@ -331,11 +329,10 @@ __global__ void _CSRRowWiseLayerSampleDegreeKernel(
             FloatType var_1;
             do {
                 var_1 = 0;
-                if (ds) // weights
+                if (A) // weights first iter
                     for (int idx = threadIdx.x; idx < d; idx += CTA_SIZE) {
-                        const auto ps = probs[out_row_start + idx];
-                        const auto ct = c * A[out_row_start + idx];
-                        var_1 += 1 / min(ONE, ct * ps);
+                        const auto ps = A[in_row_start + idx];
+                        var_1 += 1 / min(ONE, c * ps);
                     }
                 else
                     for (int idx = threadIdx.x; idx < d; idx += CTA_SIZE) {
@@ -395,7 +392,6 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
     constexpr bool use_hashtable = false;
     const IdType num_picks = num_picks__;
     const bool weights = !IsNullArray(prob_arr);
-    importance_sampling *= !weights;
 
     const unsigned long max_log_num_vertices = [&]() -> int {
         for (int i = 0; i < (int)sizeof(IdType) * 8; i++)
@@ -416,7 +412,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
     const IdType num_rows = rows_arr->shape[0];
     IdType * rows = static_cast<IdType*>(rows_arr->data);
     IdType * nids = NIDs->shape[0] == mat.num_cols ? static_cast<IdType*>(NIDs->data) : nullptr;
-    FloatType * A_g = static_cast<FloatType*>(prob_arr->data);
+    FloatType * A = static_cast<FloatType*>(prob_arr->data);
 
     const IdType * const indptr = static_cast<const IdType*>(mat.indptr->data);
     const IdType * const indices = static_cast<const IdType*>(mat.indices->data);
@@ -440,7 +436,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
             size_t prefix_temp_size = 0;
             CUDA_CALL(cub::DeviceSegmentedReduce::Sum(
                 nullptr, prefix_temp_size,
-                A_g,
+                A,
                 ds,
                 num_rows,
                 b_offsets,
@@ -450,17 +446,17 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
             auto temp = allocator.alloc_unique<char>(prefix_temp_size);
             CUDA_CALL(cub::DeviceSegmentedReduce::Sum(
                 temp.get(), prefix_temp_size,
-                A_g,
+                A,
                 ds,
                 num_rows,
                 b_offsets,
                 e_offsets,
                 stream
             ));
-            auto A2_g = thrust::make_transform_iterator(A_g, SquareFunc<FloatType>{});
+            auto A2 = thrust::make_transform_iterator(A, SquareFunc<FloatType>{});
             CUDA_CALL(cub::DeviceSegmentedReduce::Sum(
                 temp.get(), prefix_temp_size,
-                A2_g,
+                A2,
                 d2s,
                 num_rows,
                 b_offsets,
@@ -509,8 +505,6 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
     auto hop_1 = static_cast<IdType*>(hop_arr->data);
     auto rands = allocator.alloc_unique<FloatType>(importance_sampling ? hop_size : 1);
     auto probs_found = allocator.alloc_unique<FloatType>(importance_sampling ? hop_size : 1);
-    auto A_arr = weights ? NewFloatArray(hop_size, ctx, sizeof(FloatType) * 8) : NullArray();
-    auto A = static_cast<FloatType*>(A_arr->data);
 
     if (importance_sampling) {
         { // extracts the onehop neighborhood cols to a contigous range into hop_1
@@ -525,7 +519,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
             const FloatType b = std::sin(pi * l / 2);
             CUDA_KERNEL_CALL((_CSRRowWiseOneHopExtractorKernel<IdType, FloatType>),
                 grid, block, 0, stream,
-                seeds[0], seeds[num_seeds - 1], a, b, hop_size, rows, indptr, subindptr, indices, A_g, idx_coo, nids, rands.get(), hop_1, weights ? A : nullptr
+                seeds[0], seeds[num_seeds - 1], a, b, hop_size, rows, indptr, subindptr, indices, idx_coo, nids, rands.get(), hop_1
             );
         }
         int64_t hop_uniq_size = 0;
@@ -615,11 +609,11 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
         }
 
         // Consider creating a CSC because the SpMV will be done multiple times.
-        COOMatrix rmat(num_rows, hop_uniq_size, idx_coo_arr, hop_new_arr, A_arr, true, mat.sorted);
+        COOMatrix rmat(num_rows, hop_uniq_size, idx_coo_arr, hop_new_arr, NullArray(), true, mat.sorted);
         CSRMatrix rmatcsc;
         if (use_csr_spmv)
             rmatcsc = COOToCSR(COOTranspose(rmat));
-        
+
         BcastOff bcast_off;
         bcast_off.use_bcast = false;
         bcast_off.out_len = 1;
@@ -636,17 +630,19 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
         double prev_ex_nodes = hop_uniq_size;
 
         for (int iters = 0; iters < importance_sampling || importance_sampling < 0; iters++) {
-            if (!use_csr_spmv)
-                cuda::SpMMCoo<IdType, FloatType, cuda::binary::CopyLhs<FloatType>, cuda::reduce::Max<IdType, FloatType, true>>(bcast_off, rmat, cs_arr, A_arr, iters ? probs_arr : probs_arr_2, arg_u, arg_e);
-            else {
-                thrust::fill_n(exec_policy, iters ? probs_1 : probs, hop_uniq_size, 0);
-                cuda::SpMMCsr<IdType, FloatType, cuda::binary::CopyLhs<FloatType>, cuda::reduce::Max<IdType, FloatType, false>>(bcast_off, rmatcsc, cs_arr, A_arr, iters ? probs_arr : probs_arr_2, arg_u, arg_e);
+            if (!weights || iters) {
+                if (!use_csr_spmv)
+                    cuda::SpMMCoo<IdType, FloatType, cuda::binary::CopyLhs<FloatType>, cuda::reduce::Max<IdType, FloatType, true>>(bcast_off, rmat, cs_arr, NullArray(), iters ? probs_arr : probs_arr_2, arg_u, arg_e);
+                else {
+                    thrust::fill_n(exec_policy, iters ? probs_1 : probs, hop_uniq_size, 0);
+                    cuda::SpMMCsr<IdType, FloatType, cuda::binary::CopyLhs<FloatType>, cuda::reduce::Max<IdType, FloatType, false>>(bcast_off, rmatcsc, cs_arr, NullArray(), iters ? probs_arr : probs_arr_2, arg_u, arg_e);
+                }
+
+                if (iters)
+                    thrust::transform(exec_policy, probs_1, probs_1 + hop_uniq_size, probs, probs, thrust::multiplies<FloatType>{});
+
+                thrust::gather(exec_policy, hop_new, hop_new + hop_size, probs, probs_found.get());
             }
-
-            if (iters)
-                thrust::transform(exec_policy, probs_1, probs_1 + hop_uniq_size, probs, probs, thrust::multiplies<FloatType>{});
-
-            thrust::gather(exec_policy, hop_new, hop_new + hop_size, probs, probs_found.get());
             
             {
                 constexpr int BLOCK_CTAS = BLOCK_SIZE / CTA_SIZE;
@@ -664,17 +660,19 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
                     weights ? d2s : nullptr,
                     indptr,
                     probs_found.get(),
-                    A,
+                    iters == 0 ? A : nullptr,
                     subindptr
                 );
             }
 
-            auto probs_min_1 = thrust::make_transform_iterator(probs, TransformOpMinWith1{});
-            double cur_ex_nodes = thrust::reduce(exec_policy, probs_min_1, probs_min_1 + hop_uniq_size, 0.0);
-            // std::cerr << iters << ' ' << cur_ex_nodes << '\n';
-            if (cur_ex_nodes / prev_ex_nodes >= 1 - eps)
-                break;
-            prev_ex_nodes = cur_ex_nodes;
+            if (!weights || iters) {
+                auto probs_min_1 = thrust::make_transform_iterator(probs, TransformOpMinWith1{});
+                double cur_ex_nodes = thrust::reduce(exec_policy, probs_min_1, probs_min_1 + hop_uniq_size, 0.0);
+                // std::cerr << iters << ' ' << cur_ex_nodes << '\n';
+                if (cur_ex_nodes / prev_ex_nodes >= 1 - eps)
+                    break;
+                prev_ex_nodes = cur_ex_nodes;
+            }
         }
     }
 
@@ -697,13 +695,13 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
         if (importance_sampling) {
             auto output = thrust::make_zip_iterator(picked_inrow.get(), picked_row_data, picked_col_data, picked_idx_data, picked_imp_data);
             if (weights) {
-                auto transformed_output = thrust::make_transform_output_iterator(output, TransformOpImp<IdType, FloatType, FloatType *, FloatType *>{probs_found.get(), A_g, idx_coo, rows, cs, indptr, subindptr, indices, data});
-                auto stencil = thrust::make_zip_iterator(idx_coo, probs_found.get(), A, rands.get());
+                auto transformed_output = thrust::make_transform_output_iterator(output, TransformOpImp<IdType, FloatType, FloatType *, FloatType *, decltype(one)>{probs_found.get(), A, one, idx_coo, rows, cs, indptr, subindptr, indices, data});
+                auto stencil = thrust::make_zip_iterator(idx_coo, probs_found.get(), rands.get());
                 num_edges = thrust::copy_if(exec_policy, iota, iota + hop_size, stencil, transformed_output, thrust::make_zip_function(StencilOp<FloatType>{cs})) - transformed_output;
             }
             else {
-                auto transformed_output = thrust::make_transform_output_iterator(output, TransformOpImp<IdType, FloatType, FloatType *, decltype(one)>{probs_found.get(), one, idx_coo, rows, cs, indptr, subindptr, indices, data});
-                auto stencil = thrust::make_zip_iterator(idx_coo, probs_found.get(), one, rands.get());
+                auto transformed_output = thrust::make_transform_output_iterator(output, TransformOpImp<IdType, FloatType, FloatType *, decltype(one), decltype(one)>{probs_found.get(), one, one, idx_coo, rows, cs, indptr, subindptr, indices, data});
+                auto stencil = thrust::make_zip_iterator(idx_coo, probs_found.get(), rands.get());
                 num_edges = thrust::copy_if(exec_policy, iota, iota + hop_size, stencil, transformed_output, thrust::make_zip_function(StencilOp<FloatType>{cs})) - transformed_output;
             }
         }
@@ -717,8 +715,8 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
             const FloatType b = std::sin(pi * l / 2);
             if (weights) {
                 auto output = thrust::make_zip_iterator(picked_inrow.get(), picked_row_data, picked_col_data, picked_idx_data, picked_imp_data);
-                auto transformed_output = thrust::make_transform_output_iterator(output, TransformOpImp<IdType, FloatType, decltype(one), FloatType *>{one, A_g, idx_coo, rows, cs, indptr, subindptr, indices, data});
-                const auto pred = StencilOpFused<IdType, FloatType, decltype(one), FloatType *>{seeds[0], seeds[num_seeds - 1], a, b, idx_coo, cs, one, A_g, subindptr, rows, indptr, indices, nids};
+                auto transformed_output = thrust::make_transform_output_iterator(output, TransformOpImp<IdType, FloatType, decltype(one), FloatType *, FloatType *>{one, A, A, idx_coo, rows, cs, indptr, subindptr, indices, data});
+                const auto pred = StencilOpFused<IdType, FloatType, decltype(one), FloatType *>{seeds[0], seeds[num_seeds - 1], a, b, idx_coo, cs, one, A, subindptr, rows, indptr, indices, nids};
                 num_edges = thrust::copy_if(exec_policy, iota, iota + hop_size, iota, transformed_output, pred) - transformed_output;
             }
             else {

@@ -59,7 +59,6 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(CSRMatrix mat, IdArray NIDs, IdArr
   constexpr bool linear_c_convergence = false;
 
   const bool weights = !IsNullArray(prob);
-  importance_sampling *= !weights;
   auto A_arr = prob;
   FloatType *A = static_cast<FloatType*>(A_arr->data);
   constexpr double eps = 0.0001;
@@ -98,23 +97,25 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(CSRMatrix mat, IdArray NIDs, IdArr
 
     phmap::flat_hash_map<IdxType, FloatType> hop_map2;
     for (int iters = 0; iters < importance_sampling || importance_sampling < 0; iters++) {
-      hop_map2.clear();
-      for (int64_t i = 0; i < num_rows; ++i) {
-        const FloatType c = cs[i];
-        const IdxType rid = rows_data[i];
-        for (auto j = indptr[rid]; j < indptr[rid + 1]; j++) {
-          const auto ct = weights ? c * A[j] : c;
-          auto [it, b] = hop_map2.emplace(indices[j], ct);
-          if (!b)
-            it->second = std::max(ct, it->second);
+      if (!weights || iters) {
+        hop_map2.clear();
+        for (int64_t i = 0; i < num_rows; ++i) {
+          const FloatType c = cs[i];
+          const IdxType rid = rows_data[i];
+          for (auto j = indptr[rid]; j < indptr[rid + 1]; j++) {
+            auto [it, b] = hop_map2.emplace(indices[j], c);
+            if (!b)
+              it->second = std::max(c, it->second);
+          }
         }
+        if (hop_map.empty())
+          hop_map = std::move(hop_map2);
+        else
+          for (auto it: hop_map2)
+            hop_map[it.first] *= it.second;
       }
-
-      if (hop_map.empty())
-        hop_map = hop_map2;
-      else
-        for (auto it: hop_map2)
-          hop_map[it.first] *= it.second;
+      else if (importance_sampling > 0)
+        importance_sampling++;
       
       for (int64_t i = 0; i < num_rows; ++i) {
         const IdxType rid = rows_data[i];
@@ -124,8 +125,12 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(CSRMatrix mat, IdArray NIDs, IdArr
         
         const auto k = std::min(num_picks, d);
 
-        for (auto j = indptr[rid]; j < indptr[rid + 1]; j++)
-          ps[j - indptr[rid]] = hop_map[indices[j]];
+        if (hop_map.empty()) // weights first iter, pi = A
+          for (auto j = indptr[rid]; j < indptr[rid + 1]; j++)
+            ps[j - indptr[rid]] = A[j];
+        else
+          for (auto j = indptr[rid]; j < indptr[rid + 1]; j++)
+            ps[j - indptr[rid]] = hop_map[indices[j]];
 
         double var_target = ds[i] * ds[i] / k;
         if (weights) {
@@ -150,7 +155,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(CSRMatrix mat, IdArray NIDs, IdArr
           c = r / var_target;
           if (weights) {
             double v = A[d - 1] * A[d - 1];
-            for (auto i = d - 1; i > 0 && c * A[i + indptr[rid]] * ps[i] >= 1; i--) {
+            for (auto i = d - 1; i > 0 && c * ps[i] >= 1; i--) {
               // fix this
               r -= ps[i];
               c = r / (var_target - v);
@@ -168,10 +173,8 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(CSRMatrix mat, IdArray NIDs, IdArr
         else do {
           var_1 = 0;
           if (weights)
-            for (auto j = indptr[rid]; j < indptr[rid + 1]; j++) {
-              const auto ct = c * A[j];
-              var_1 += A[j] * A[j] / std::min(ONE, ct * ps[j - indptr[rid]]);
-            }
+            for (auto j = indptr[rid]; j < indptr[rid + 1]; j++)
+              var_1 += A[j] * A[j] / std::min(ONE, c * ps[j - indptr[rid]]);
           else
             for (auto j = indptr[rid]; j < indptr[rid + 1]; j++)
               var_1 += ONE / std::min(ONE, c * ps[j - indptr[rid]]);
@@ -182,12 +185,14 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(CSRMatrix mat, IdArray NIDs, IdArr
         cs[i] = c;
       }
 
-      double cur_ex_nodes = 0;
-      for (auto it: hop_map)
-        cur_ex_nodes += std::min((FloatType)1, it.second);
-      if (cur_ex_nodes / prev_ex_nodes >= 1 - eps)
-        break;
-      prev_ex_nodes = cur_ex_nodes;
+      if (!weights || iters) {
+        double cur_ex_nodes = 0;
+        for (auto it: hop_map)
+          cur_ex_nodes += std::min((FloatType)1, it.second);
+        if (cur_ex_nodes / prev_ex_nodes >= 1 - eps)
+          break;
+        prev_ex_nodes = cur_ex_nodes;
+      }
     }
   }
 
@@ -236,8 +241,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(CSRMatrix mat, IdArray NIDs, IdArr
         }
       }
       const auto rnd = it->second;
-      const auto ct = weights ? c * A[j] : c;
-      num_edges += rnd <= (importance_sampling ? ct * hop_map[v] : ct);
+      num_edges += rnd <= (importance_sampling ? c * hop_map[v] : c * (weights ? A[j] : 1));
       rands[off++] = rnd;
     }
   }
@@ -273,8 +277,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(CSRMatrix mat, IdArray NIDs, IdArr
     for (auto j = indptr[rid]; j < indptr[rid + 1]; j++) {
       const auto v = indices[j];
       const auto w = (weights ? A[j] : 1);
-      const auto ct = c * w;
-      const auto ps = std::min(ONE, importance_sampling ? ct * hop_map[v] : ct);
+      const auto ps = std::min(ONE, importance_sampling ? c * hop_map[v] : c * w);
       const auto rnd = rands[idx++];
       if (rnd <= ps) {
         norm_inv_p += w / ps;
