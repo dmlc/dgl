@@ -1,8 +1,7 @@
-
 """Utilities for finding overlap or missing items in arrays."""
 
-from .._ffi.function import _init_api
 from .. import backend as F
+from .._ffi.function import _init_api
 
 
 class Filter(object):
@@ -20,6 +19,7 @@ class Filter(object):
     >>> f.find_excluded_indices(th.tensor([0,2,8,9], device=th.device('cuda')))
     tensor([0,2], device='cuda')
     """
+
     def __init__(self, ids):
         """Create a new filter from a given set of IDs. This currently is only
         implemented for the GPU.
@@ -30,7 +30,8 @@ class Filter(object):
             The unique set of IDs to keep in the filter.
         """
         self._filter = _CAPI_DGLFilterCreateFromSet(
-            F.zerocopy_to_dgl_ndarray(ids))
+            F.zerocopy_to_dgl_ndarray(ids)
+        )
 
     def find_included_indices(self, test):
         """Find the index of the IDs in `test` that are in this filter.
@@ -45,9 +46,11 @@ class Filter(object):
         IdArray
             The index of IDs in `test` that are also in this filter.
         """
-        return F.zerocopy_from_dgl_ndarray( \
-            _CAPI_DGLFilterFindIncludedIndices( \
-                self._filter, F.zerocopy_to_dgl_ndarray(test)))
+        return F.zerocopy_from_dgl_ndarray(
+            _CAPI_DGLFilterFindIncludedIndices(
+                self._filter, F.zerocopy_to_dgl_ndarray(test)
+            )
+        )
 
     def find_excluded_indices(self, test):
         """Find the index of the IDs in `test` that are not in this filter.
@@ -62,8 +65,11 @@ class Filter(object):
         IdArray
             The index of IDs in `test` that are not in this filter.
         """
-        return F.zerocopy_from_dgl_ndarray( \
-            _CAPI_DGLFilterFindExcludedIndices( \
-                self._filter, F.zerocopy_to_dgl_ndarray(test)))
+        return F.zerocopy_from_dgl_ndarray(
+            _CAPI_DGLFilterFindExcludedIndices(
+                self._filter, F.zerocopy_to_dgl_ndarray(test)
+            )
+        )
+
 
 _init_api("dgl.utils.filter")
