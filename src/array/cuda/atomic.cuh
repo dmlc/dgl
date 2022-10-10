@@ -62,20 +62,20 @@ template <> struct Cast<__nv_bfloat16> {
 #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 800
     return __bfloat16_as_ushort(val);
 #else
-  printf("Atomic operations are not supported for bfloat16 (BF16) "
-      "on GPUs with compute capability less than 8.0.\n");
-  __trap();
-  return static_cast<Type>(0);
+    printf("Atomic operations are not supported for bfloat16 (BF16) "
+        "on GPUs with compute capability less than 8.0.\n");
+    __trap();
+    return static_cast<Type>(0);
 #endif
   }
   static __device__ __forceinline__ __nv_bfloat16 Decode(Type code) {
 #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 800
     return __ushort_as_bfloat16(code);
 #else
-  printf("Atomic operations are not supported for bfloat16 (BF16) "
-      "on GPUs with compute capability less than 8.0.\n");
-  __trap();
-  return static_cast<__nv_bfloat16>(0.0f);
+    printf("Atomic operations are not supported for bfloat16 (BF16) "
+        "on GPUs with compute capability less than 8.0.\n");
+    __trap();
+    return static_cast<__nv_bfloat16>(0.0f);
 #endif
   }
 };
@@ -288,7 +288,7 @@ __device__ __forceinline__ double AtomicAdd<double>(double* addr, double val) {
 #if defined(CUDART_VERSION) && CUDART_VERSION >= 10000
 template <>
 __device__ __forceinline__ half AtomicAdd<half>(half* addr, half val) {
-// half make sure we have half support
+// make sure we have half support
 #if __CUDA_ARCH__ >= 700
   return atomicAdd(addr, val);
 #else
@@ -306,7 +306,7 @@ __device__ __forceinline__ half AtomicAdd<half>(half* addr, half val) {
 template <>
 __device__ __forceinline__ __nv_bfloat16 AtomicAdd<__nv_bfloat16>(
     __nv_bfloat16* addr, __nv_bfloat16 val) {
-// half make sure we have half support
+// make sure we have bfloat16 support
 #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 800
   return atomicAdd(addr, val);
 #else

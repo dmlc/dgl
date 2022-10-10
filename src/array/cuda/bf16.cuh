@@ -24,7 +24,8 @@
 #include <cuda_bf16.h>
 #include <algorithm>
 
-static __device__ __forceinline__ __nv_bfloat16 max(__nv_bfloat16 a, __nv_bfloat16 b) {
+static __device__ __forceinline__ __nv_bfloat16 max(__nv_bfloat16 a,
+    __nv_bfloat16 b) {
 #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 800
   return __hmax(a, b);
 #else
@@ -32,7 +33,8 @@ static __device__ __forceinline__ __nv_bfloat16 max(__nv_bfloat16 a, __nv_bfloat
 #endif
 }
 
-static __device__ __forceinline__ __nv_bfloat16 min(__nv_bfloat16 a, __nv_bfloat16 b) {
+static __device__ __forceinline__ __nv_bfloat16 min(__nv_bfloat16 a,
+    __nv_bfloat16 b) {
 #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 800
   return __hmin(a, b);
 #else
@@ -90,27 +92,35 @@ __device__ __forceinline__ __nv_bfloat16  operator--(__nv_bfloat16& h, int) {  /
   __nv_bfloat16 ret = h; h = __nv_bfloat16(float(h) - 1.0f); return ret;  // NOLINT
 }
 
-__device__ __forceinline__ __nv_bfloat16 operator+(const __nv_bfloat16& h) { return h; }
+__device__ __forceinline__ __nv_bfloat16 operator+(const __nv_bfloat16& h) {
+  return h;
+}
 __device__ __forceinline__ __nv_bfloat16 operator-(const __nv_bfloat16& h) {
   return __nv_bfloat16(-float(h));  // NOLINT
 }
 
-__device__ __forceinline__ bool operator==(const __nv_bfloat16& lh, const __nv_bfloat16& rh) {
+__device__ __forceinline__ bool operator==(const __nv_bfloat16& lh,
+    const __nv_bfloat16& rh) {
   return float(lh) == float(rh);  // NOLINT
 }
-__device__ __forceinline__ bool operator!=(const __nv_bfloat16& lh, const __nv_bfloat16& rh) {
+__device__ __forceinline__ bool operator!=(const __nv_bfloat16& lh,
+    const __nv_bfloat16& rh) {
   return float(lh) != float(rh);  // NOLINT
 }
-__device__ __forceinline__ bool operator> (const __nv_bfloat16& lh, const __nv_bfloat16& rh) {
+__device__ __forceinline__ bool operator> (const __nv_bfloat16& lh,
+    const __nv_bfloat16& rh) {
   return float(lh) >  float(rh);  // NOLINT
 }
-__device__ __forceinline__ bool operator< (const __nv_bfloat16& lh, const __nv_bfloat16& rh) {
+__device__ __forceinline__ bool operator< (const __nv_bfloat16& lh,
+    const __nv_bfloat16& rh) {
   return float(lh) <  float(rh);  // NOLINT
 }
-__device__ __forceinline__ bool operator>=(const __nv_bfloat16& lh, const __nv_bfloat16& rh) {
+__device__ __forceinline__ bool operator>=(const __nv_bfloat16& lh,
+    const __nv_bfloat16& rh) {
   return float(lh) >= float(rh);  // NOLINT
 }
-__device__ __forceinline__ bool operator<=(const __nv_bfloat16& lh, const __nv_bfloat16& rh) {
+__device__ __forceinline__ bool operator<=(const __nv_bfloat16& lh,
+    const __nv_bfloat16& rh) {
   return float(lh) <= float(rh);  // NOLINT
 }
 #endif  // defined(__CUDA_ARCH__) && (__CUDA_ARCH__ < 800)
