@@ -18,7 +18,7 @@ namespace serialize {
  * \brief StreamWithCount counts the bytes that already written into the
  * underlying stream.
  */
-class StreamWithCount : dmlc::Stream {
+class StreamWithCount : public dmlc::Stream {
  public:
   static StreamWithCount *Create(const char *uri, const char *const flag,
                                   bool allow_null, dgl_format_code_t formats) {
