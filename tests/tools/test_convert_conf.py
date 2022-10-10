@@ -27,51 +27,27 @@ def create_random_hetero(type_n, node_n):
         edges[etype] = (arr.row, arr.col)
     return dgl.heterograph(edges, num_nodes), [':'.join(c_etype) for c_etype in c_etypes]
 
-def create_random_graph(node_n):
-    arr = (spsp.random(node_n, node_n, density=0.05, format='coo', random_state=100) != 0).astype(np.int64)
-    return dgl.from_scipy(arr)
-
 @pytest.mark.parametrize("type_n, node_n, num_parts", [[3, 100, 2], [10, 500, 4], [10, 1000, 8]])
 def test_hetero_graph(type_n, node_n, num_parts):
-    # Create random graph
     g, expected_c_etypes = create_random_hetero(type_n, node_n)
+    do_convert_and_check(g, 'convert_conf_test', num_parts, expected_c_etypes)
 
-    # Partition the graph
-    graph_name = 'convert_conf_test'
+@pytest.mark.parametrize("node_n, num_parts", [[100, 2], [500, 4]])
+def test_homo_graph(node_n, num_parts):
+    g = dgl.rand_graph(node_n, node_n // 10)
+    do_convert_and_check(g, 'convert_conf_test', num_parts, ['_N:_E:_N'])
+
+def do_convert_and_check(g, graph_name, num_parts, expected_c_etypes):
     with tempfile.TemporaryDirectory() as root_dir:
         partition_graph(g, graph_name, num_parts, root_dir)
         part_config = os.path.join(root_dir, graph_name + '.json')
         old_config = _get_old_config(part_config)
-
         # Call convert function
-        convert_conf(part_config)
-        
+        convert_conf(part_config) 
         with open(part_config, 'r') as config_f:
             config = json.load(config_f)
             # Check we get all canonical etypes
             assert Counter(expected_c_etypes) == Counter(config['etypes'].keys())
-            # Check the id is match after transform from etypes -> canonical
-            assert old_config['etypes'] == _extract_etypes(config['etypes'])
-
-@pytest.mark.parametrize("node_n, num_parts", [[100, 2], [500, 4]])
-def test_homo_graph(node_n, num_parts):
-    # Create random graph
-    g = create_random_graph(node_n)
-
-    # Partition the graph
-    graph_name = 'convert_conf_test'
-    with tempfile.TemporaryDirectory() as root_dir:
-        partition_graph(g, graph_name, num_parts, root_dir)
-        part_config = os.path.join(root_dir, graph_name + '.json')
-        old_config = _get_old_config(part_config)
-
-        # Call convert function
-        convert_conf(part_config)
-
-        with open(part_config, 'r') as config_f:
-            config = json.load(config_f)
-            # Check we get all canonical etypes
-            assert Counter(config['etypes'].keys()) == Counter(['_N:_E:_N'])
             # Check the id is match after transform from etypes -> canonical
             assert old_config['etypes'] == _extract_etypes(config['etypes'])
 
