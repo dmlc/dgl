@@ -47,7 +47,7 @@ class EdgeWeightNorm(layers.Layer):
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> g = dgl.add_self_loop(g)
     >>> feat = tf.ones((6, 10))
-    >>> edge_weight = th.tensor([0.5, 0.6, 0.4, 0.7, 0.9, 0.1, 1, 1, 1, 1, 1, 1])
+    >>> edge_weight = tf.convert_to_tensor([0.5, 0.6, 0.4, 0.7, 0.9, 0.1, 1, 1, 1, 1, 1, 1])
     >>> norm = EdgeWeightNorm(norm='both')
     >>> norm_edge_weight = norm(g, edge_weight)
     >>> conv = GraphConv(10, 2, norm='none', weight=True, bias=True)
@@ -60,7 +60,8 @@ class EdgeWeightNorm(layers.Layer):
             [-1.3658, -0.8674],
             [-0.8323, -0.5286]], grad_fn=<AddBackward0>)
     """
-    def __init__(self, norm='both', eps=0.):
+
+    def __init__(self, norm="both", eps=0.0):
         super(EdgeWeightNorm, self).__init__()
         self._norm = norm
         self._eps = eps
@@ -100,42 +101,60 @@ class EdgeWeightNorm(layers.Layer):
             if isinstance(graph, DGLBlock):
                 graph = block_to_graph(graph)
             if len(edge_weight.shape) > 1:
-                raise DGLError('Currently the normalization is only defined '
-                               'on scalar edge weight. Please customize the '
-                               'normalization for your high-dimensional weights.')
-            if self._norm == 'both' and tf.math.reduce_any(edge_weight <= 0).numpy().item():
-                raise DGLError('Non-positive edge weight detected with `norm="both"`. '
-                               'This leads to square root of zero or negative values.')
+                raise DGLError(
+                    "Currently the normalization is only defined "
+                    "on scalar edge weight. Please customize the "
+                    "normalization for your high-dimensional weights."
+                )
+            if (
+                self._norm == "both"
+                and tf.math.reduce_any(edge_weight <= 0).numpy().item()
+            ):
+                raise DGLError(
+                    'Non-positive edge weight detected with `norm="both"`. '
+                    "This leads to square root of zero or negative values."
+                )
 
             dev = graph.device
-            graph.srcdata['_src_out_w'] = tf.ones((graph.number_of_src_nodes()), dtype=tf.float32)
-            graph.dstdata['_dst_in_w'] = tf.ones((graph.number_of_dst_nodes()), dtype=tf.float32)
-            graph.edata['_edge_w'] = edge_weight
+            graph.srcdata["_src_out_w"] = tf.ones(
+                (graph.number_of_src_nodes()), dtype=tf.float32
+            )
+            graph.dstdata["_dst_in_w"] = tf.ones(
+                (graph.number_of_dst_nodes()), dtype=tf.float32
+            )
+            graph.edata["_edge_w"] = edge_weight
 
-            if self._norm == 'both':
+            if self._norm == "both":
                 reversed_g = reverse(graph)
-                reversed_g.edata['_edge_w'] = edge_weight
-                reversed_g.update_all(fn.copy_edge('_edge_w', 'm'), fn.sum('m', 'out_weight'))
-                degs = reversed_g.dstdata['out_weight'] + self._eps
+                reversed_g.edata["_edge_w"] = edge_weight
+                reversed_g.update_all(
+                    fn.copy_edge("_edge_w", "m"), fn.sum("m", "out_weight")
+                )
+                degs = reversed_g.dstdata["out_weight"] + self._eps
                 norm = tf.pow(degs, -0.5)
-                graph.srcdata['_src_out_w'] = norm
+                graph.srcdata["_src_out_w"] = norm
 
-            if self._norm != 'none':
-                graph.update_all(fn.copy_edge('_edge_w', 'm'), fn.sum('m', 'in_weight'))
-                degs = graph.dstdata['in_weight'] + self._eps
-                if self._norm == 'both':
+            if self._norm != "none":
+                graph.update_all(
+                    fn.copy_edge("_edge_w", "m"), fn.sum("m", "in_weight")
+                )
+                degs = graph.dstdata["in_weight"] + self._eps
+                if self._norm == "both":
                     norm = tf.pow(degs, -0.5)
                 else:
                     norm = 1.0 / degs
-                graph.dstdata['_dst_in_w'] = norm
+                graph.dstdata["_dst_in_w"] = norm
 
-            graph.apply_edges(lambda e: {'_norm_edge_weights': e.src['_src_out_w'] * \
-                                                               e.dst['_dst_in_w'] * \
-                                                               e.data['_edge_w']})
-            return graph.edata['_norm_edge_weights']
-        
-        
-        
+            graph.apply_edges(
+                lambda e: {
+                    "_norm_edge_weights": e.src["_src_out_w"]
+                    * e.dst["_dst_in_w"]
+                    * e.data["_edge_w"]
+                }
+            )
+            return graph.edata["_norm_edge_weights"]
+
+
 class GraphConv(layers.Layer):
     r"""Graph convolution from `Semi-Supervised Classification with Graph Convolutional Networks
     <https://arxiv.org/abs/1609.02907>`__
@@ -259,18 +278,23 @@ class GraphConv(layers.Layer):
         [ 2.1405895, -0.2574358],
         [ 1.3607183, -0.1636453]], dtype=float32)>
     """
-    def __init__(self,
-                 in_feats,
-                 out_feats,
-                 norm='both',
-                 weight=True,
-                 bias=True,
-                 activation=None,
-                 allow_zero_in_degree=False):
+
+    def __init__(
+        self,
+        in_feats,
+        out_feats,
+        norm="both",
+        weight=True,
+        bias=True,
+        activation=None,
+        allow_zero_in_degree=False,
+    ):
         super(GraphConv, self).__init__()
-        if norm not in ('none', 'both', 'right', 'left'):
-            raise DGLError('Invalid norm value. Must be either "none", "both", "right" or "left".'
-                           ' But got "{}".'.format(norm))
+        if norm not in ("none", "both", "right", "left"):
+            raise DGLError(
+                'Invalid norm value. Must be either "none", "both", "right" or "left".'
+                ' But got "{}".'.format(norm)
+            )
         self._in_feats = in_feats
         self._out_feats = out_feats
         self._norm = norm
@@ -278,15 +302,21 @@ class GraphConv(layers.Layer):
 
         if weight:
             xinit = tf.keras.initializers.glorot_uniform()
-            self.weight = tf.Variable(initial_value=xinit(
-                shape=(in_feats, out_feats), dtype='float32'), trainable=True)
+            self.weight = tf.Variable(
+                initial_value=xinit(
+                    shape=(in_feats, out_feats), dtype="float32"
+                ),
+                trainable=True,
+            )
         else:
             self.weight = None
 
         if bias:
             zeroinit = tf.keras.initializers.zeros()
-            self.bias = tf.Variable(initial_value=zeroinit(
-                shape=(out_feats), dtype='float32'), trainable=True)
+            self.bias = tf.Variable(
+                initial_value=zeroinit(shape=(out_feats), dtype="float32"),
+                trainable=True,
+            )
         else:
             self.bias = None
 
@@ -341,29 +371,33 @@ class GraphConv(layers.Layer):
         """
         with graph.local_scope():
             if not self._allow_zero_in_degree:
-                if  tf.math.count_nonzero(graph.in_degrees() == 0) > 0:
-                    raise DGLError('There are 0-in-degree nodes in the graph, '
-                                   'output for those nodes will be invalid. '
-                                   'This is harmful for some applications, '
-                                   'causing silent performance regression. '
-                                   'Adding self-loop on the input graph by '
-                                   'calling `g = dgl.add_self_loop(g)` will resolve '
-                                   'the issue. Setting ``allow_zero_in_degree`` '
-                                   'to be `True` when constructing this module will '
-                                   'suppress the check and let the code run.')
-            
-            aggregate_fn = fn.copy_src('h', 'm')
+                if tf.math.count_nonzero(graph.in_degrees() == 0) > 0:
+                    raise DGLError(
+                        "There are 0-in-degree nodes in the graph, "
+                        "output for those nodes will be invalid. "
+                        "This is harmful for some applications, "
+                        "causing silent performance regression. "
+                        "Adding self-loop on the input graph by "
+                        "calling `g = dgl.add_self_loop(g)` will resolve "
+                        "the issue. Setting ``allow_zero_in_degree`` "
+                        "to be `True` when constructing this module will "
+                        "suppress the check and let the code run."
+                    )
+
+            aggregate_fn = fn.copy_src("h", "m")
             if edge_weight is not None:
                 assert edge_weight.shape[0] == graph.number_of_edges()
-                graph.edata['_edge_weight'] = edge_weight
-                aggregate_fn = fn.u_mul_e('h', '_edge_weight', 'm')
-            
+                graph.edata["_edge_weight"] = edge_weight
+                aggregate_fn = fn.u_mul_e("h", "_edge_weight", "m")
+
             feat_src, feat_dst = expand_as_pair(feat, graph)
-            if self._norm in ['both', 'left']:
-                degs = tf.clip_by_value(tf.cast(graph.out_degrees(), tf.float32),
-                                        clip_value_min=1,
-                                        clip_value_max=np.inf)
-                if self._norm == 'both':
+            if self._norm in ["both", "left"]:
+                degs = tf.clip_by_value(
+                    tf.cast(graph.out_degrees(), tf.float32),
+                    clip_value_min=1,
+                    clip_value_max=np.inf,
+                )
+                if self._norm == "both":
                     norm = tf.pow(degs, -0.5)
                 else:
                     norm = 1.0 / degs
@@ -373,9 +407,11 @@ class GraphConv(layers.Layer):
 
             if weight is not None:
                 if self.weight is not None:
-                    raise DGLError('External weight is provided while at the same time the'
-                                   ' module has defined its own weight parameter. Please'
-                                   ' create the module with flag weight=False.')
+                    raise DGLError(
+                        "External weight is provided while at the same time the"
+                        " module has defined its own weight parameter. Please"
+                        " create the module with flag weight=False."
+                    )
             else:
                 weight = self.weight
 
@@ -383,24 +419,24 @@ class GraphConv(layers.Layer):
                 # mult W first to reduce the feature size for aggregation.
                 if weight is not None:
                     feat_src = tf.matmul(feat_src, weight)
-                graph.srcdata['h'] = feat_src
-                graph.update_all(aggregate_fn,
-                                 fn.sum(msg='m', out='h'))
-                rst = graph.dstdata['h']
+                graph.srcdata["h"] = feat_src
+                graph.update_all(aggregate_fn, fn.sum(msg="m", out="h"))
+                rst = graph.dstdata["h"]
             else:
                 # aggregate first then mult W
-                graph.srcdata['h'] = feat_src
-                graph.update_all(aggregate_fn,
-                                 fn.sum(msg='m', out='h'))
-                rst = graph.dstdata['h']
+                graph.srcdata["h"] = feat_src
+                graph.update_all(aggregate_fn, fn.sum(msg="m", out="h"))
+                rst = graph.dstdata["h"]
                 if weight is not None:
                     rst = tf.matmul(rst, weight)
 
-            if self._norm in ['both', 'right']:
-                degs = tf.clip_by_value(tf.cast(graph.in_degrees(), tf.float32),
-                                        clip_value_min=1,
-                                        clip_value_max=np.inf)
-                if self._norm == 'both':
+            if self._norm in ["both", "right"]:
+                degs = tf.clip_by_value(
+                    tf.cast(graph.in_degrees(), tf.float32),
+                    clip_value_min=1,
+                    clip_value_max=np.inf,
+                )
+                if self._norm == "both":
                     norm = tf.pow(degs, -0.5)
                 else:
                     norm = 1.0 / degs
@@ -420,8 +456,8 @@ class GraphConv(layers.Layer):
         """Set the extra representation of the module,
         which will come into effect when printing the model.
         """
-        summary = 'in={_in_feats}, out={_out_feats}'
-        summary += ', normalization={_norm}'
-        if '_activation' in self.__dict__:
-            summary += ', activation={_activation}'
+        summary = "in={_in_feats}, out={_out_feats}"
+        summary += ", normalization={_norm}"
+        if "_activation" in self.__dict__:
+            summary += ", activation={_activation}"
         return summary.format(**self.__dict__)
