@@ -1,21 +1,30 @@
 """A set of graph services of getting subgraphs from DistGraph"""
 from collections import namedtuple
+
 import numpy as np
 
-from .rpc import Request, Response, send_requests_to_machine, recv_responses
-from ..sampling import sample_neighbors as local_sample_neighbors
-from ..sampling import sample_etype_neighbors as local_sample_etype_neighbors
-from ..subgraph import in_subgraph as local_in_subgraph
-from .rpc import register_service
+from .. import backend as F
+from ..base import EID, NID
 from ..convert import graph, heterograph
-from ..base import NID, EID
+from ..sampling import sample_etype_neighbors as local_sample_etype_neighbors
+from ..sampling import sample_neighbors as local_sample_neighbors
+from ..subgraph import in_subgraph as local_in_subgraph
 from ..utils import toindex
 from .. import backend as F
 from .. import ndarray as nd
+from .rpc import (
+    Request,
+    Response,
+    recv_responses,
+    register_service,
+    send_requests_to_machine,
+)
 
 __all__ = [
-    'sample_neighbors', 'sample_etype_neighbors',
-    'in_subgraph', 'find_edges'
+    "sample_neighbors",
+    "sample_etype_neighbors",
+    "in_subgraph",
+    "find_edges",
 ]
 
 SAMPLING_SERVICE_ID = 6657
@@ -24,6 +33,7 @@ EDGES_SERVICE_ID = 6659
 OUTDEGREE_SERVICE_ID = 6660
 INDEGREE_SERVICE_ID = 6661
 ETYPE_SAMPLING_SERVICE_ID = 6662
+
 
 class SubgraphResponse(Response):
     """The response for sampling and in_subgraph"""
@@ -39,6 +49,7 @@ class SubgraphResponse(Response):
     def __getstate__(self):
         return self.global_src, self.global_dst, self.global_eids
 
+
 class FindEdgeResponse(Response):
     """The response for sampling and in_subgraph"""
 
@@ -53,8 +64,11 @@ class FindEdgeResponse(Response):
     def __getstate__(self):
         return self.global_src, self.global_dst, self.order_id
 
-def _sample_neighbors(local_g, partition_book, seed_nodes, fan_out, edge_dir, prob, replace):
-    """ Sample from local partition.
+
+def _sample_neighbors(
+    local_g, partition_book, seed_nodes, fan_out, edge_dir, prob, replace
+):
+    """Sample from local partition.
 
     The input nodes use global IDs. We need to map the global node IDs to local node IDs,
     perform sampling and map the sampled results to the global IDs space again.
@@ -65,17 +79,36 @@ def _sample_neighbors(local_g, partition_book, seed_nodes, fan_out, edge_dir, pr
     local_ids = F.astype(local_ids, local_g.idtype)
     # local_ids = self.seed_nodes
     sampled_graph = local_sample_neighbors(
-        local_g, local_ids, fan_out, edge_dir, prob, replace, _dist_training=True)
+        local_g,
+        local_ids,
+        fan_out,
+        edge_dir,
+        prob,
+        replace,
+        _dist_training=True,
+    )
     global_nid_mapping = local_g.ndata[NID]
     src, dst = sampled_graph.edges()
-    global_src, global_dst = F.gather_row(global_nid_mapping, src), \
-            F.gather_row(global_nid_mapping, dst)
+    global_src, global_dst = F.gather_row(
+        global_nid_mapping, src
+    ), F.gather_row(global_nid_mapping, dst)
     global_eids = F.gather_row(local_g.edata[EID], sampled_graph.edata[EID])
     return global_src, global_dst, global_eids
 
-def _sample_etype_neighbors(local_g, partition_book, seed_nodes, etype_field, eid_field,
-                            fan_out, edge_dir, prob, replace, etype_sorted=False):
-    """ Sample from local partition.
+
+def _sample_etype_neighbors(
+    local_g,
+    partition_book,
+    seed_nodes,
+    etype_field,
+    eid_field,
+    fan_out,
+    edge_dir,
+    prob,
+    replace,
+    etype_sorted=False,
+):
+    """Sample from local partition.
 
     The input nodes use global IDs. We need to map the global node IDs to local node IDs,
     perform sampling and map the sampled results to the global IDs space again.
@@ -86,18 +119,29 @@ def _sample_etype_neighbors(local_g, partition_book, seed_nodes, etype_field, ei
     local_ids = F.astype(local_ids, local_g.idtype)
 
     sampled_graph = local_sample_etype_neighbors(
-        local_g, local_ids, etype_field, eid_field, fan_out, edge_dir, prob, replace,
-        etype_sorted=etype_sorted, _dist_training=True)
+        local_g,
+        local_ids,
+        etype_field,
+        eid_field,
+        fan_out,
+        edge_dir,
+        prob,
+        replace,
+        etype_sorted=etype_sorted,
+        _dist_training=True,
+    )
     global_nid_mapping = local_g.ndata[NID]
     src, dst = sampled_graph.edges()
-    global_src, global_dst = F.gather_row(global_nid_mapping, src), \
-            F.gather_row(global_nid_mapping, dst)
+    global_src, global_dst = F.gather_row(
+        global_nid_mapping, src
+    ), F.gather_row(global_nid_mapping, dst)
     global_eids = F.gather_row(local_g.edata[EID], sampled_graph.edata[EID])
     return global_src, global_dst, global_eids
 
+
 def _find_edges(local_g, partition_book, seed_edges):
     """Given an edge ID array, return the source
-        and destination node ID array ``s`` and ``d`` in the local partition.
+    and destination node ID array ``s`` and ``d`` in the local partition.
     """
     local_eids = partition_book.eid2localeid(seed_edges, partition_book.partid)
     local_eids = F.astype(local_eids, local_g.idtype)
@@ -107,22 +151,23 @@ def _find_edges(local_g, partition_book, seed_edges):
     global_dst = global_nid_mapping[local_dst]
     return global_src, global_dst
 
+
 def _in_degrees(local_g, partition_book, n):
-    """Get in-degree of the nodes in the local partition.
-    """
+    """Get in-degree of the nodes in the local partition."""
     local_nids = partition_book.nid2localnid(n, partition_book.partid)
     local_nids = F.astype(local_nids, local_g.idtype)
     return local_g.in_degrees(local_nids)
 
+
 def _out_degrees(local_g, partition_book, n):
-    """Get out-degree of the nodes in the local partition.
-    """
+    """Get out-degree of the nodes in the local partition."""
     local_nids = partition_book.nid2localnid(n, partition_book.partid)
     local_nids = F.astype(local_nids, local_g.idtype)
     return local_g.out_degrees(local_nids)
 
+
 def _in_subgraph(local_g, partition_book, seed_nodes):
-    """ Get in subgraph from local partition.
+    """Get in subgraph from local partition.
 
     The input nodes use global IDs. We need to map the global node IDs to local node IDs,
     get in-subgraph and map the sampled results to the global IDs space again.
@@ -138,6 +183,7 @@ def _in_subgraph(local_g, partition_book, seed_nodes):
     global_src, global_dst = global_nid_mapping[src], global_nid_mapping[dst]
     global_eids = F.gather_row(local_g.edata[EID], sampled_graph.edata[EID])
     return global_src, global_dst, global_eids
+
 
 # --- NOTE 1 ---
 # BIG HACK AHEAD.
@@ -164,10 +210,11 @@ def _in_subgraph(local_g, partition_book, seed_nodes):
 # the halo node features, which (1) incurs a lot more extra memory cost,
 # and (2) needs significant refactor on DistGraph and/or DistTensor.
 
+
 class SamplingRequest(Request):
     """Sampling Request"""
 
-    def __init__(self, nodes, fan_out, edge_dir='in', prob=None, replace=False):
+    def __init__(self, nodes, fan_out, edge_dir="in", prob=None, replace=False):
         self.seed_nodes = nodes
         self.edge_dir = edge_dir
         self.prob = prob
@@ -175,10 +222,22 @@ class SamplingRequest(Request):
         self.fan_out = fan_out
 
     def __setstate__(self, state):
-        self.seed_nodes, self.edge_dir, self.prob, self.replace, self.fan_out = state
+        (
+            self.seed_nodes,
+            self.edge_dir,
+            self.prob,
+            self.replace,
+            self.fan_out,
+        ) = state
 
     def __getstate__(self):
-        return self.seed_nodes, self.edge_dir, self.prob, self.replace, self.fan_out
+        return (
+            self.seed_nodes,
+            self.edge_dir,
+            self.prob,
+            self.replace,
+            self.fan_out,
+        )
 
     def process_request(self, server_state):
         local_g = server_state.graph
@@ -189,15 +248,31 @@ class SamplingRequest(Request):
         else:
             prob = None
         global_src, global_dst, global_eids = _sample_neighbors(
-                local_g, partition_book, self.seed_nodes, self.fan_out, self.edge_dir,
-                prob, self.replace)
+            local_g,
+            partition_book,
+            self.seed_nodes,
+            self.fan_out,
+            self.edge_dir,
+            prob,
+            self.replace,
+        )
         return SubgraphResponse(global_src, global_dst, global_eids)
+
 
 class SamplingRequestEtype(Request):
     """Sampling Request"""
 
-    def __init__(self, nodes, etype_field, eid_field, fan_out, edge_dir='in',
-                 prob=None, replace=False, etype_sorted=True):
+    def __init__(
+        self,
+        nodes,
+        etype_field,
+        eid_field,
+        fan_out,
+        edge_dir="in",
+        prob=None,
+        replace=False,
+        etype_sorted=True,
+    ):
         self.seed_nodes = nodes
         self.edge_dir = edge_dir
         self.prob = prob
@@ -208,13 +283,28 @@ class SamplingRequestEtype(Request):
         self.etype_sorted = etype_sorted
 
     def __setstate__(self, state):
-        self.seed_nodes, self.edge_dir, self.prob, self.replace, \
-            self.fan_out, self.etype_field, self.eid_field, \
-            self.etype_sorted = state
+        (
+            self.seed_nodes,
+            self.edge_dir,
+            self.prob,
+            self.replace,
+            self.fan_out,
+            self.etype_field,
+            self.eid_field,
+            self.etype_sorted,
+        ) = state
 
     def __getstate__(self):
-        return self.seed_nodes, self.edge_dir, self.prob, self.replace, \
-            self.fan_out, self.etype_field, self.eid_field, self.etype_sorted
+        return (
+            self.seed_nodes,
+            self.edge_dir,
+            self.prob,
+            self.replace,
+            self.fan_out,
+            self.etype_field,
+            self.eid_field,
+            self.etype_sorted,
+        )
 
     def process_request(self, server_state):
         local_g = server_state.graph
@@ -223,16 +313,25 @@ class SamplingRequestEtype(Request):
         # See NOTE 1
         if self.prob is not None:
             probs = [
-                    kv_store.data_store[key] if key != "" else None
-                    for key in self.prob
+                kv_store.data_store[key] if key != "" else None
+                for key in self.prob
             ]
         else:
             probs = None
         global_src, global_dst, global_eids = _sample_etype_neighbors(
-                local_g, partition_book, self.seed_nodes, self.etype_field,
-                self.eid_field, self.fan_out, self.edge_dir, probs,
-                self.replace, self.etype_sorted)
+            local_g,
+            partition_book,
+            self.seed_nodes,
+            self.etype_field,
+            self.eid_field,
+            self.fan_out,
+            self.edge_dir,
+            probs,
+            self.replace,
+            self.etype_sorted,
+        )
         return SubgraphResponse(global_src, global_dst, global_eids)
+
 
 class EdgesRequest(Request):
     """Edges Request"""
@@ -250,9 +349,12 @@ class EdgesRequest(Request):
     def process_request(self, server_state):
         local_g = server_state.graph
         partition_book = server_state.partition_book
-        global_src, global_dst = _find_edges(local_g, partition_book, self.edge_ids)
+        global_src, global_dst = _find_edges(
+            local_g, partition_book, self.edge_ids
+        )
 
         return FindEdgeResponse(global_src, global_dst, self.order_id)
+
 
 class InDegreeRequest(Request):
     """In-degree Request"""
@@ -274,6 +376,7 @@ class InDegreeRequest(Request):
 
         return InDegreeResponse(deg, self.order_id)
 
+
 class InDegreeResponse(Response):
     """The response for in-degree"""
 
@@ -286,6 +389,7 @@ class InDegreeResponse(Response):
 
     def __getstate__(self):
         return self.val, self.order_id
+
 
 class OutDegreeRequest(Request):
     """Out-degree Request"""
@@ -307,6 +411,7 @@ class OutDegreeRequest(Request):
 
         return OutDegreeResponse(deg, self.order_id)
 
+
 class OutDegreeResponse(Response):
     """The response for out-degree"""
 
@@ -319,6 +424,7 @@ class OutDegreeResponse(Response):
 
     def __getstate__(self):
         return self.val, self.order_id
+
 
 class InSubgraphRequest(Request):
     """InSubgraph Request"""
@@ -335,8 +441,9 @@ class InSubgraphRequest(Request):
     def process_request(self, server_state):
         local_g = server_state.graph
         partition_book = server_state.partition_book
-        global_src, global_dst, global_eids = _in_subgraph(local_g, partition_book,
-                                                           self.seed_nodes)
+        global_src, global_dst, global_eids = _in_subgraph(
+            local_g, partition_book, self.seed_nodes
+        )
         return SubgraphResponse(global_src, global_dst, global_eids)
 
 
@@ -361,10 +468,14 @@ def merge_graphs(res_list, num_nodes):
     g.edata[EID] = eid_tensor
     return g
 
-LocalSampledGraph = namedtuple('LocalSampledGraph', 'global_src global_dst global_eids')
+
+LocalSampledGraph = namedtuple(
+    "LocalSampledGraph", "global_src global_dst global_eids"
+)
+
 
 def _distributed_access(g, nodes, issue_remote_req, local_access):
-    '''A routine that fetches local neighborhood of nodes from the distributed graph.
+    """A routine that fetches local neighborhood of nodes from the distributed graph.
 
     The local neighborhood of some nodes are stored in the local machine and the other
     nodes have their neighborhood on remote machines. This code will issue remote
@@ -387,7 +498,7 @@ def _distributed_access(g, nodes, issue_remote_req, local_access):
     -------
     DGLHeteroGraph
         The subgraph that contains the neighborhoods of all input nodes.
-    '''
+    """
     req_list = []
     partition_book = g.get_partition_book()
     nodes = toindex(nodes).tousertensor()
@@ -414,7 +525,9 @@ def _distributed_access(g, nodes, issue_remote_req, local_access):
     # sample neighbors for the nodes in the local partition.
     res_list = []
     if local_nids is not None:
-        src, dst, eids = local_access(g.local_partition, partition_book, local_nids)
+        src, dst, eids = local_access(
+            g.local_partition, partition_book, local_nids
+        )
         res_list.append(LocalSampledGraph(src, dst, eids))
 
     # receive responses from remote machines.
@@ -425,13 +538,18 @@ def _distributed_access(g, nodes, issue_remote_req, local_access):
     sampled_graph = merge_graphs(res_list, g.number_of_nodes())
     return sampled_graph
 
+
 def _frontier_to_heterogeneous_graph(g, frontier, gpb):
     # We need to handle empty frontiers correctly.
     if frontier.number_of_edges() == 0:
-        data_dict = {etype: (np.zeros(0), np.zeros(0)) for etype in g.canonical_etypes}
-        return heterograph(data_dict,
-                           {ntype: g.number_of_nodes(ntype) for ntype in g.ntypes},
-                           idtype=g.idtype)
+        data_dict = {
+            etype: (np.zeros(0), np.zeros(0)) for etype in g.canonical_etypes
+        }
+        return heterograph(
+            data_dict,
+            {ntype: g.number_of_nodes(ntype) for ntype in g.ntypes},
+            idtype=g.idtype,
+        )
 
     etype_ids, frontier.edata[EID] = gpb.map_to_per_etype(frontier.edata[EID])
     src, dst = frontier.edges()
@@ -448,20 +566,33 @@ def _frontier_to_heterogeneous_graph(g, frontier, gpb):
         canonical_etype = g.canonical_etypes[etid]
         type_idx = etype_ids == etid
         if F.sum(type_idx, 0) > 0:
-            data_dict[canonical_etype] = (F.boolean_mask(src, type_idx), \
-                    F.boolean_mask(dst, type_idx))
+            data_dict[canonical_etype] = (
+                F.boolean_mask(src, type_idx),
+                F.boolean_mask(dst, type_idx),
+            )
             edge_ids[etype] = F.boolean_mask(eid, type_idx)
-    hg = heterograph(data_dict,
-                     {ntype: g.number_of_nodes(ntype) for ntype in g.ntypes},
-                     idtype=g.idtype)
+    hg = heterograph(
+        data_dict,
+        {ntype: g.number_of_nodes(ntype) for ntype in g.ntypes},
+        idtype=g.idtype,
+    )
 
     for etype in edge_ids:
         hg.edges[etype].data[EID] = edge_ids[etype]
     return hg
 
+
 def sample_etype_neighbors(
-        g, nodes, etype_field, eid_field, fanout, edge_dir='in',
-        prob=None, replace=False, etype_sorted=True):
+    g,
+    nodes,
+    etype_field,
+    eid_field,
+    fanout,
+    edge_dir="in",
+    prob=None,
+    replace=False,
+    etype_sorted=True,
+):
     """Sample from the neighbors of the given nodes from a distributed graph.
 
     For each node, a number of inbound (or outbound when ``edge_dir == 'out'``) edges
@@ -533,50 +664,83 @@ def sample_etype_neighbors(
     if isinstance(nodes, dict):
         homo_nids = []
         for ntype in nodes.keys():
-            assert ntype in g.ntypes, \
-                'The sampled node type {} does not exist in the input graph'.format(ntype)
+            assert (
+                ntype in g.ntypes
+            ), "The sampled node type {} does not exist in the input graph".format(
+                ntype
+            )
             if F.is_tensor(nodes[ntype]):
                 typed_nodes = nodes[ntype]
             else:
                 typed_nodes = toindex(nodes[ntype]).tousertensor()
             homo_nids.append(gpb.map_to_homo_nid(typed_nodes, ntype))
         nodes = F.cat(homo_nids, 0)
+
     def issue_remote_req(node_ids):
         if prob is not None:
             # See NOTE 1
             _prob = [
-                    g.edges[etype].data[prob].kvstore_key if
-                        prob in g.edges[etype].data else ""
-                    for etype in g.etypes
+                g.edges[etype].data[prob].kvstore_key
+                if prob in g.edges[etype].data
+                else ""
+                for etype in g.etypes
             ]
         else:
             _prob = None
         return SamplingRequestEtype(
-                node_ids, etype_field, eid_field, fanout, edge_dir=edge_dir,
-                prob=_prob, replace=replace, etype_sorted=etype_sorted)
+            node_ids,
+            etype_field,
+            eid_field,
+            fanout,
+            edge_dir=edge_dir,
+            prob=_prob,
+            replace=replace,
+            etype_sorted=etype_sorted,
+        )
+
     def local_access(local_g, partition_book, local_nids):
         # See NOTE 1
         if prob is None:
             return _sample_etype_neighbors(
-                    local_g, partition_book, local_nids, etype_field,
-                    eid_field, fanout, edge_dir, None, replace,
-                    etype_sorted=etype_sorted)
+                local_g,
+                partition_book,
+                local_nids,
+                etype_field,
+                eid_field,
+                fanout,
+                edge_dir,
+                None,
+                replace,
+                etype_sorted=etype_sorted,
+            )
         else:
             _prob = [
-                    g.edges[etype].data[prob].local_partition if
-                        prob in g.edges[etype].data else None
-                    for etype in g.etypes]
+                g.edges[etype].data[prob].local_partition
+                if prob in g.edges[etype].data
+                else None
+                for etype in g.etypes
+            ]
             return _sample_etype_neighbors(
-                    local_g, partition_book, local_nids, etype_field,
-                    eid_field, fanout, edge_dir, _prob, replace,
-                    etype_sorted=etype_sorted)
+                local_g,
+                partition_book,
+                local_nids,
+                etype_field,
+                eid_field,
+                fanout,
+                edge_dir,
+                _prob,
+                replace,
+                etype_sorted=etype_sorted,
+            )
+
     frontier = _distributed_access(g, nodes, issue_remote_req, local_access)
     if not gpb.is_homogeneous:
         return _frontier_to_heterogeneous_graph(g, frontier, gpb)
     else:
         return frontier
 
-def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
+
+def sample_neighbors(g, nodes, fanout, edge_dir="in", prob=None, replace=False):
     """Sample from the neighbors of the given nodes from a distributed graph.
 
     For each node, a number of inbound (or outbound when ``edge_dir == 'out'``) edges
@@ -630,7 +794,9 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
         assert isinstance(nodes, dict)
         homo_nids = []
         for ntype in nodes:
-            assert ntype in g.ntypes, 'The sampled node type does not exist in the input graph'
+            assert (
+                ntype in g.ntypes
+            ), "The sampled node type does not exist in the input graph"
             if F.is_tensor(nodes[ntype]):
                 typed_nodes = nodes[ntype]
             else:
@@ -649,22 +815,31 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
             _prob = g.edata[prob].kvstore_key
         else:
             _prob = None
-        return SamplingRequest(node_ids, fanout, edge_dir=edge_dir,
-                               prob=_prob, replace=replace)
+        return SamplingRequest(
+            node_ids, fanout, edge_dir=edge_dir, prob=_prob, replace=replace
+        )
+
     def local_access(local_g, partition_book, local_nids):
         # See NOTE 1
-        if prob is None:
-            return _sample_neighbors(local_g, partition_book, local_nids,
-                                     fanout, edge_dir, None, replace)
-        else:
-            _prob = local_g.edata[prob].local_partition
-            return _sample_neighbors(local_g, partition_book, local_nids,
-                                     fanout, edge_dir, _prob, replace)
+        _prob = (
+            local_g.edata[prob].local_partition if prob is not None else None
+        )
+        return _sample_neighbors(
+            local_g,
+            partition_book,
+            local_nids,
+            fanout,
+            edge_dir,
+            _prob,
+            replace,
+        )
+
     frontier = _distributed_access(g, nodes, issue_remote_req, local_access)
     if not gpb.is_homogeneous:
         return _frontier_to_heterogeneous_graph(g, frontier, gpb)
     else:
         return frontier
+
 
 def _distributed_edge_access(g, edges, issue_remote_req, local_access):
     """A routine that fetches local edges from distributed graph.
@@ -699,7 +874,7 @@ def _distributed_edge_access(g, edges, issue_remote_req, local_access):
     local_eids = None
     reorder_idx = []
     for pid in range(partition_book.num_partitions()):
-        mask = (partition_id == pid)
+        mask = partition_id == pid
         edge_id = F.boolean_mask(edges, mask)
         reorder_idx.append(F.nonzero_1d(mask))
         if pid == partition_book.partid and g.local_partition is not None:
@@ -719,8 +894,12 @@ def _distributed_edge_access(g, edges, issue_remote_req, local_access):
     dst_ids = F.zeros_like(edges)
     if local_eids is not None:
         src, dst = local_access(g.local_partition, partition_book, local_eids)
-        src_ids = F.scatter_row(src_ids, reorder_idx[partition_book.partid], src)
-        dst_ids = F.scatter_row(dst_ids, reorder_idx[partition_book.partid], dst)
+        src_ids = F.scatter_row(
+            src_ids, reorder_idx[partition_book.partid], src
+        )
+        dst_ids = F.scatter_row(
+            dst_ids, reorder_idx[partition_book.partid], dst
+        )
 
     # receive responses from remote machines.
     if msgseq2pos is not None:
@@ -732,8 +911,9 @@ def _distributed_edge_access(g, edges, issue_remote_req, local_access):
             dst_ids = F.scatter_row(dst_ids, reorder_idx[result.order_id], dst)
     return src_ids, dst_ids
 
+
 def find_edges(g, edge_ids):
-    """ Given an edge ID array, return the source and destination
+    """Given an edge ID array, return the source and destination
     node ID array ``s`` and ``d`` from a distributed graph.
     ``s[i]`` and ``d[i]`` are source and destination node ID for
     edge ``eid[i]``.
@@ -752,11 +932,15 @@ def find_edges(g, edge_ids):
     tensor
         The destination node ID array.
     """
+
     def issue_remote_req(edge_ids, order_id):
         return EdgesRequest(edge_ids, order_id)
+
     def local_access(local_g, partition_book, edge_ids):
         return _find_edges(local_g, partition_book, edge_ids)
+
     return _distributed_edge_access(g, edge_ids, issue_remote_req, local_access)
+
 
 def in_subgraph(g, nodes):
     """Return the subgraph induced on the inbound edges of the given nodes.
@@ -786,13 +970,19 @@ def in_subgraph(g, nodes):
         edge ID via ``dgl.EID`` edge features of the subgraph.
     """
     if isinstance(nodes, dict):
-        assert len(nodes) == 1, 'The distributed in_subgraph only supports one node type for now.'
+        assert (
+            len(nodes) == 1
+        ), "The distributed in_subgraph only supports one node type for now."
         nodes = list(nodes.values())[0]
+
     def issue_remote_req(node_ids):
         return InSubgraphRequest(node_ids)
+
     def local_access(local_g, partition_book, local_nids):
         return _in_subgraph(local_g, partition_book, local_nids)
+
     return _distributed_access(g, nodes, issue_remote_req, local_access)
+
 
 def _distributed_get_node_property(g, n, issue_remote_req, local_access):
     req_list = []
@@ -802,7 +992,7 @@ def _distributed_get_node_property(g, n, issue_remote_req, local_access):
     local_nids = None
     reorder_idx = []
     for pid in range(partition_book.num_partitions()):
-        mask = (partition_id == pid)
+        mask = partition_id == pid
         nid = F.boolean_mask(n, mask)
         reorder_idx.append(F.nonzero_1d(mask))
         if pid == partition_book.partid and g.local_partition is not None:
@@ -824,7 +1014,9 @@ def _distributed_get_node_property(g, n, issue_remote_req, local_access):
         shape = list(F.shape(local_vals))
         shape[0] = len(n)
         vals = F.zeros(shape, F.dtype(local_vals), F.cpu())
-        vals = F.scatter_row(vals, reorder_idx[partition_book.partid], local_vals)
+        vals = F.scatter_row(
+            vals, reorder_idx[partition_book.partid], local_vals
+        )
 
     # receive responses from remote machines.
     if msgseq2pos is not None:
@@ -838,27 +1030,36 @@ def _distributed_get_node_property(g, n, issue_remote_req, local_access):
             vals = F.scatter_row(vals, reorder_idx[result.order_id], val)
     return vals
 
+
 def in_degrees(g, v):
-    '''Get in-degrees
-    '''
+    """Get in-degrees"""
+
     def issue_remote_req(v, order_id):
         return InDegreeRequest(v, order_id)
+
     def local_access(local_g, partition_book, v):
         return _in_degrees(local_g, partition_book, v)
+
     return _distributed_get_node_property(g, v, issue_remote_req, local_access)
 
+
 def out_degrees(g, u):
-    '''Get out-degrees
-    '''
+    """Get out-degrees"""
+
     def issue_remote_req(u, order_id):
         return OutDegreeRequest(u, order_id)
+
     def local_access(local_g, partition_book, u):
         return _out_degrees(local_g, partition_book, u)
+
     return _distributed_get_node_property(g, u, issue_remote_req, local_access)
+
 
 register_service(SAMPLING_SERVICE_ID, SamplingRequest, SubgraphResponse)
 register_service(EDGES_SERVICE_ID, EdgesRequest, FindEdgeResponse)
 register_service(INSUBGRAPH_SERVICE_ID, InSubgraphRequest, SubgraphResponse)
 register_service(OUTDEGREE_SERVICE_ID, OutDegreeRequest, OutDegreeResponse)
 register_service(INDEGREE_SERVICE_ID, InDegreeRequest, InDegreeResponse)
-register_service(ETYPE_SAMPLING_SERVICE_ID, SamplingRequestEtype, SubgraphResponse)
+register_service(
+    ETYPE_SAMPLING_SERVICE_ID, SamplingRequestEtype, SubgraphResponse
+)

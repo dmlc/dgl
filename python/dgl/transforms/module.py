@@ -372,33 +372,70 @@ class LaplacianPE(BaseTransform):
     Parameters
     ----------
     k : int
-        Number of smallest non-trivial eigenvectors to use for positional encoding
-        (smaller than the number of nodes).
+        Number of smallest non-trivial eigenvectors to use for positional encoding.
     feat_name : str, optional
         Name to store the computed positional encodings in ndata.
+    eigval_name : str, optional
+        If None, store laplacian eigenvectors only.
+        Otherwise, it's the name to store corresponding laplacian eigenvalues in ndata.
+        Default: None.
+    padding : bool, optional
+        If False, raise an exception when k>=n.
+        Otherwise, add zero paddings in the end of eigenvectors and 'nan' paddings
+        in the end of eigenvalues when k>=n.
+        Default: False.
+        n is the number of nodes in the given graph.
 
     Example
     -------
-
     >>> import dgl
     >>> from dgl import LaplacianPE
-
-    >>> transform = LaplacianPE(k=3)
-    >>> g = dgl.rand_graph(5, 10)
-    >>> g = transform(g)
-    >>> print(g.ndata['PE'])
-    tensor([[ 0.0000, -0.3646,  0.3646],
-            [ 0.0000,  0.2825, -0.2825],
-            [ 1.0000, -0.6315,  0.6315],
-            [ 0.0000,  0.3739, -0.3739],
-            [ 0.0000, -0.1663,  0.1663]])
+    >>> transform1 = LaplacianPE(k=3)
+    >>> transform2 = LaplacianPE(k=5, padding=True)
+    >>> transform3 = LaplacianPE(k=5, feat_name='eigvec', eigval_name='eigval', padding=True)
+    >>> g = dgl.graph(([0,1,2,3,4,2,3,1,4,0], [2,3,1,4,0,0,1,2,3,4]))
+    >>> g1 = transform1(g)
+    >>> print(g1.ndata['PE'])
+    tensor([[ 0.6325,  0.1039,  0.3489],
+            [-0.5117,  0.2826,  0.6095],
+            [ 0.1954,  0.6254, -0.5923],
+            [-0.5117, -0.4508, -0.3938],
+            [ 0.1954, -0.5612,  0.0278]])
+    >>> g2 = transform2(g)
+    >>> print(g2.ndata['PE'])
+    tensor([[-0.6325, -0.1039,  0.3489, -0.2530,  0.0000],
+            [ 0.5117, -0.2826,  0.6095,  0.4731,  0.0000],
+            [-0.1954, -0.6254, -0.5923, -0.1361,  0.0000],
+            [ 0.5117,  0.4508, -0.3938, -0.6295,  0.0000],
+            [-0.1954,  0.5612,  0.0278,  0.5454,  0.0000]])
+    >>> g3 = transform3(g)
+    >>> print(g3.ndata['eigval'])
+    tensor([[0.6910, 0.6910, 1.8090, 1.8090,    nan],
+            [0.6910, 0.6910, 1.8090, 1.8090,    nan],
+            [0.6910, 0.6910, 1.8090, 1.8090,    nan],
+            [0.6910, 0.6910, 1.8090, 1.8090,    nan],
+            [0.6910, 0.6910, 1.8090, 1.8090,    nan]])
+    >>> print(g3.ndata['eigvec'])
+    tensor([[ 0.6325, -0.1039,  0.3489,  0.2530,  0.0000],
+            [-0.5117, -0.2826,  0.6095, -0.4731,  0.0000],
+            [ 0.1954, -0.6254, -0.5923,  0.1361,  0.0000],
+            [-0.5117,  0.4508, -0.3938,  0.6295,  0.0000],
+            [ 0.1954,  0.5612,  0.0278, -0.5454,  0.0000]])
     """
-    def __init__(self, k, feat_name='PE'):
+    def __init__(self, k, feat_name='PE', eigval_name=None, padding=False):
         self.k = k
         self.feat_name = feat_name
+        self.eigval_name = eigval_name
+        self.padding = padding
 
     def __call__(self, g):
-        PE = functional.laplacian_pe(g, k=self.k)
+        if self.eigval_name:
+            PE, eigval = functional.laplacian_pe(g, k=self.k, padding=self.padding,
+                                                 return_eigval=True)
+            eigval = F.repeat(F.reshape(eigval, [1,-1]), g.num_nodes(), dim=0)
+            g.ndata[self.eigval_name] = F.copy_to(eigval, g.device)
+        else:
+            PE = functional.laplacian_pe(g, k=self.k, padding=self.padding)
         g.ndata[self.feat_name] = F.copy_to(PE, g.device)
 
         return g

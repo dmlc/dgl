@@ -3,38 +3,66 @@
 
 from .agnnconv import AGNNConv
 from .appnpconv import APPNPConv
+from .atomicconv import AtomicConv
+from .cfconv import CFConv
 from .chebconv import ChebConv
+from .densechebconv import DenseChebConv
+from .densegraphconv import DenseGraphConv
+from .densesageconv import DenseSAGEConv
+from .dgnconv import DGNConv
+from .dotgatconv import DotGatConv
 from .edgeconv import EdgeConv
-from .gatconv import GATConv
-from .gatv2conv import GATv2Conv
 from .egatconv import EGATConv
+from .egnnconv import EGNNConv
+from .gatconv import GATConv
+from .gatedgraphconv import GatedGraphConv
+from .gatv2conv import GATv2Conv
+from .gcn2conv import GCN2Conv
 from .ginconv import GINConv
 from .gineconv import GINEConv
 from .gmmconv import GMMConv
-from .graphconv import GraphConv, EdgeWeightNorm
+from .graphconv import EdgeWeightNorm, GraphConv
+from .grouprevres import GroupRevRes
+from .hgtconv import HGTConv
 from .nnconv import NNConv
+from .pnaconv import PNAConv
 from .relgraphconv import RelGraphConv
 from .sageconv import SAGEConv
 from .sgconv import SGConv
 from .tagconv import TAGConv
-from .gatedgraphconv import GatedGraphConv
-from .densechebconv import DenseChebConv
-from .densegraphconv import DenseGraphConv
-from .densesageconv import DenseSAGEConv
-from .atomicconv import AtomicConv
-from .cfconv import CFConv
-from .dotgatconv import DotGatConv
 from .twirlsconv import TWIRLSConv, TWIRLSUnfoldingAndAttention
-from .gcn2conv import GCN2Conv
-from .hgtconv import HGTConv
-from .grouprevres import GroupRevRes
-from .egnnconv import EGNNConv
-from .pnaconv import PNAConv
-from .dgnconv import DGNConv
 
-__all__ = ['GraphConv', 'EdgeWeightNorm', 'GATConv', 'GATv2Conv', 'EGATConv', 'TAGConv',
-           'RelGraphConv', 'SAGEConv', 'SGConv', 'APPNPConv', 'GINConv', 'GINEConv',
-           'GatedGraphConv', 'GMMConv', 'ChebConv', 'AGNNConv', 'NNConv', 'DenseGraphConv',
-           'DenseSAGEConv', 'DenseChebConv', 'EdgeConv', 'AtomicConv', 'CFConv', 'DotGatConv',
-           'TWIRLSConv', 'TWIRLSUnfoldingAndAttention', 'GCN2Conv', 'HGTConv', 'GroupRevRes',
-           'EGNNConv', 'PNAConv', 'DGNConv']
+__all__ = [
+    "GraphConv",
+    "EdgeWeightNorm",
+    "GATConv",
+    "GATv2Conv",
+    "EGATConv",
+    "TAGConv",
+    "RelGraphConv",
+    "SAGEConv",
+    "SGConv",
+    "APPNPConv",
+    "GINConv",
+    "GINEConv",
+    "GatedGraphConv",
+    "GMMConv",
+    "ChebConv",
+    "AGNNConv",
+    "NNConv",
+    "DenseGraphConv",
+    "DenseSAGEConv",
+    "DenseChebConv",
+    "EdgeConv",
+    "AtomicConv",
+    "CFConv",
+    "DotGatConv",
+    "TWIRLSConv",
+    "TWIRLSUnfoldingAndAttention",
+    "GCN2Conv",
+    "HGTConv",
+    "GroupRevRes",
+    "EGNNConv",
+    "PNAConv",
+    "DGNConv",
+]

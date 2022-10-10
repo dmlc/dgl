@@ -5,6 +5,7 @@ import torch.nn as nn
 
 from .... import function as fn
 
+
 class ShiftedSoftplus(nn.Module):
     r"""Applies the element-wise function:
 
@@ -18,6 +19,7 @@ class ShiftedSoftplus(nn.Module):
     shift : int
         :math:`\text{shift}` value for the mathematical formulation. Default to 2.
     """
+
     def __init__(self, beta=1, shift=2, threshold=20):
         super(ShiftedSoftplus, self).__init__()
 
@@ -42,6 +44,7 @@ class ShiftedSoftplus(nn.Module):
             Result of applying the activation function to the input.
         """
         return self.softplus(inputs) - np.log(float(self.shift))
+
 
 class CFConv(nn.Module):
     r"""CFConv from `SchNet: A continuous-filter convolutional neural network for
@@ -87,6 +90,7 @@ class CFConv(nn.Module):
             [-0.1209, -0.2289],
             [-0.1283, -0.2240]], grad_fn=<SubBackward0>)
     """
+
     def __init__(self, node_in_feats, edge_in_feats, hidden_feats, out_feats):
         super(CFConv, self).__init__()
 
@@ -94,12 +98,11 @@ class CFConv(nn.Module):
             nn.Linear(edge_in_feats, hidden_feats),
             ShiftedSoftplus(),
             nn.Linear(hidden_feats, hidden_feats),
-            ShiftedSoftplus()
+            ShiftedSoftplus(),
         )
         self.project_node = nn.Linear(node_in_feats, hidden_feats)
         self.project_out = nn.Sequential(
-            nn.Linear(hidden_feats, out_feats),
-            ShiftedSoftplus()
+            nn.Linear(hidden_feats, out_feats), ShiftedSoftplus()
         )
 
     def forward(self, g, node_feats, edge_feats):
@@ -136,7 +139,7 @@ class CFConv(nn.Module):
                 node_feats_src, _ = node_feats
             else:
                 node_feats_src = node_feats
-            g.srcdata['hv'] = self.project_node(node_feats_src)
-            g.edata['he'] = self.project_edge(edge_feats)
-            g.update_all(fn.u_mul_e('hv', 'he', 'm'), fn.sum('m', 'h'))
-            return self.project_out(g.dstdata['h'])
+            g.srcdata["hv"] = self.project_node(node_feats_src)
+            g.edata["he"] = self.project_edge(edge_feats)
+            g.update_all(fn.u_mul_e("hv", "he", "m"), fn.sum("m", "h"))
+            return self.project_out(g.dstdata["h"])

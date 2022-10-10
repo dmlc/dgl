@@ -1,12 +1,14 @@
 """MXNet Module for Chebyshev Spectral Graph Convolution layer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
 import math
+
 import mxnet as mx
 from mxnet import nd
 from mxnet.gluon import nn
 
+from .... import broadcast_nodes
+from .... import function as fn
 from ....base import dgl_warning
-from .... import broadcast_nodes, function as fn
 
 
 class ChebConv(nn.Block):
@@ -60,11 +62,8 @@ class ChebConv(nn.Block):
     [ 1.7954229   0.00196505]]
     <NDArray 6x2 @cpu(0)>
     """
-    def __init__(self,
-                 in_feats,
-                 out_feats,
-                 k,
-                 bias=True):
+
+    def __init__(self, in_feats, out_feats, k, bias=True):
         super(ChebConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
@@ -73,13 +72,19 @@ class ChebConv(nn.Block):
             self.fc = nn.Sequential()
             for _ in range(k):
                 self.fc.add(
-                    nn.Dense(out_feats, use_bias=False,
-                             weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)),
-                             in_units=in_feats)
+                    nn.Dense(
+                        out_feats,
+                        use_bias=False,
+                        weight_initializer=mx.init.Xavier(
+                            magnitude=math.sqrt(2.0)
+                        ),
+                        in_units=in_feats,
+                    )
                 )
             if bias:
-                self.bias = self.params.get('bias', shape=(out_feats,),
-                                            init=mx.init.Zero())
+                self.bias = self.params.get(
+                    "bias", shape=(out_feats,), init=mx.init.Zero()
+                )
             else:
                 self.bias = None
 
@@ -112,14 +117,17 @@ class ChebConv(nn.Block):
             is size of output feature.
         """
         with graph.local_scope():
-            degs = graph.in_degrees().astype('float32')
-            norm = mx.nd.power(mx.nd.clip(degs, a_min=1, a_max=float("inf")), -0.5)
+            degs = graph.in_degrees().astype("float32")
+            norm = mx.nd.power(
+                mx.nd.clip(degs, a_min=1, a_max=float("inf")), -0.5
+            )
             norm = norm.expand_dims(-1).as_in_context(feat.context)
 
             if lambda_max is None:
                 dgl_warning(
                     "lambda_max is not provided, using default value of 2.  "
-                    "Please use dgl.laplacian_lambda_max to compute the eigenvalues.")
+                    "Please use dgl.laplacian_lambda_max to compute the eigenvalues."
+                )
                 lambda_max = [2] * graph.batch_size
 
             if isinstance(lambda_max, list):
@@ -133,23 +141,25 @@ class ChebConv(nn.Block):
             rst = self.fc[0](Tx_0)
             # T1(X)
             if self._k > 1:
-                graph.ndata['h'] = Tx_0 * norm
-                graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
-                h = graph.ndata.pop('h') * norm
+                graph.ndata["h"] = Tx_0 * norm
+                graph.update_all(fn.copy_u("h", "m"), fn.sum("m", "h"))
+                h = graph.ndata.pop("h") * norm
                 # Λ = 2 * (I - D ^ -1/2 A D ^ -1/2) / lambda_max - I
                 #   = - 2(D ^ -1/2 A D ^ -1/2) / lambda_max + (2 / lambda_max - 1) I
-                Tx_1 = -2. * h / lambda_max + Tx_0 * (2. / lambda_max - 1)
+                Tx_1 = -2.0 * h / lambda_max + Tx_0 * (2.0 / lambda_max - 1)
                 rst = rst + self.fc[1](Tx_1)
             # Ti(x), i = 2...k
             for i in range(2, self._k):
-                graph.ndata['h'] = Tx_1 * norm
-                graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
-                h = graph.ndata.pop('h') * norm
+                graph.ndata["h"] = Tx_1 * norm
+                graph.update_all(fn.copy_u("h", "m"), fn.sum("m", "h"))
+                h = graph.ndata.pop("h") * norm
                 # Tx_k = 2 * Λ * Tx_(k-1) - Tx_(k-2)
                 #      = - 4(D ^ -1/2 A D ^ -1/2) / lambda_max Tx_(k-1) +
                 #        (4 / lambda_max - 2) Tx_(k-1) -
                 #        Tx_(k-2)
-                Tx_2 = -4. * h / lambda_max + Tx_1 * (4. / lambda_max - 2) - Tx_0
+                Tx_2 = (
+                    -4.0 * h / lambda_max + Tx_1 * (4.0 / lambda_max - 2) - Tx_0
+                )
                 rst = rst + self.fc[i](Tx_2)
                 Tx_1, Tx_0 = Tx_2, Tx_1
             # add bias
