@@ -28,23 +28,22 @@ For mini-batch training, run with the following (available datasets are the same
 ```bash
 python3 entity_sample.py --dataset aifb
 ```
-For multi-gpu training (with sampling), run with the following (same datasets and GPU IDs separated by comma) 
+For multi-gpu training (with sampling), run with the following (same datasets and GPU IDs separated by comma)
 ```bash
 python3 entity_sample_multi_gpu.py --dataset aifb --gpu 0,1
 ```
 
-
 ### Link Prediction
-FB15k-237 in RAW-MRR
-```
-python link.py --gpu 0 --eval-protocol raw
-```
-FB15k-237 in Filtered-MRR
-```
-python link.py --gpu 0 --eval-protocol filtered
-```
 
-Summary 
+Run with the following for link prediction on dataset FB15k-237 with filtered-MRR
+
+```bash
+python link.py
+```
+> **_NOTE:_** By default, we use uniform edge sampling instead of neighbor-based edge sampling as in [author's code](https://github.com/MichSchli/RelationPrediction). In practice, we find that it can achieve similar MRR.
+
+
+Summary
 -------
 
 ### Entity Classification
@@ -55,3 +54,8 @@ Summary
 | mutag         | ~0.70      | ~0.50
 | bgs           | ~0.86      | ~0.64
 | am            | ~0.78      | ~0.42
+
+### Link Prediction
+| Dataset       | Best MRR
+| ------------- | -------
+| FB15k-237     | ~0.2439

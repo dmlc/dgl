@@ -1,11 +1,12 @@
 """Segment aggregation operators implemented using DGL graph."""
 
-from ..base import DGLError
 from .. import backend as F
+from ..base import DGLError
 
-__all__ = ['segment_reduce', 'segment_softmax', 'segment_mm']
+__all__ = ["segment_reduce", "segment_softmax", "segment_mm"]
 
-def segment_reduce(seglen, value, reducer='sum'):
+
+def segment_reduce(seglen, value, reducer="sum"):
     """Segment reduction operator.
 
     It aggregates the value tensor along the first dimension by segments.
@@ -41,16 +42,17 @@ def segment_reduce(seglen, value, reducer='sum'):
             [4., 4., 4.]])
     """
     offsets = F.cumsum(
-        F.cat([F.zeros((1,), F.dtype(seglen), F.context(seglen)), seglen], 0), 0)
-    if reducer == 'mean':
-        rst = F.segment_reduce('sum', value, offsets)
+        F.cat([F.zeros((1,), F.dtype(seglen), F.context(seglen)), seglen], 0), 0
+    )
+    if reducer == "mean":
+        rst = F.segment_reduce("sum", value, offsets)
         rst_shape = F.shape(rst)
         z = F.astype(F.clamp(seglen, 1, len(value)), F.dtype(rst))
         z_shape = (rst_shape[0],) + (1,) * (len(rst_shape) - 1)
         return rst / F.reshape(z, z_shape)
-    elif reducer in ['min', 'sum', 'max']:
+    elif reducer in ["min", "sum", "max"]:
         rst = F.segment_reduce(reducer, value, offsets)
-        if reducer in ['min', 'max']:
+        if reducer in ["min", "max"]:
             rst = F.replace_inf_with_zero(rst)
         return rst
     else:
@@ -95,13 +97,14 @@ def segment_softmax(seglen, value):
             [0.2500, 0.2500, 0.2500],
             [0.2500, 0.2500, 0.2500]])
     """
-    value_max = segment_reduce(seglen, value, reducer='max')
+    value_max = segment_reduce(seglen, value, reducer="max")
     value = F.exp(value - F.repeat(value_max, seglen, dim=0))
-    value_sum = segment_reduce(seglen, value, reducer='sum')
+    value_sum = segment_reduce(seglen, value, reducer="sum")
     return value / F.repeat(value_sum, seglen, dim=0)
 
+
 def segment_mm(a, b, seglen_a):
-    r""" Performs matrix multiplication according to segments.
+    r"""Performs matrix multiplication according to segments.
 
     Suppose ``seglen_a == [10, 5, 0, 3]``, the operator will perform
     four matrix multiplications::

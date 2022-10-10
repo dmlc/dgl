@@ -1,19 +1,22 @@
 # This file is based on the NGCF author's implementation
 # <https://github.com/xiangwang1223/neural_graph_collaborative_filtering/blob/master/NGCF/utility/load_data.py>.
 # It implements the data processing and graph construction.
-import numpy as np
 import random as rd
+
+import numpy as np
+
 import dgl
+
 
 class Data(object):
     def __init__(self, path, batch_size):
         self.path = path
         self.batch_size = batch_size
 
-        train_file = path + '/train.txt'
-        test_file = path + '/test.txt'
+        train_file = path + "/train.txt"
+        test_file = path + "/test.txt"
 
-        #get number of users and items
+        # get number of users and items
         self.n_users, self.n_items = 0, 0
         self.n_train, self.n_test = 0, 0
         self.exist_users = []
@@ -24,7 +27,7 @@ class Data(object):
         with open(train_file) as f:
             for l in f.readlines():
                 if len(l) > 0:
-                    l = l.strip('\n').split(' ')
+                    l = l.strip("\n").split(" ")
                     items = [int(i) for i in l[1:]]
                     uid = int(l[0])
                     self.exist_users.append(uid)
@@ -38,9 +41,9 @@ class Data(object):
         with open(test_file) as f:
             for l in f.readlines():
                 if len(l) > 0:
-                    l = l.strip('\n')
+                    l = l.strip("\n")
                     try:
-                        items = [int(i) for i in l.split(' ')[1:]]
+                        items = [int(i) for i in l.split(" ")[1:]]
                     except Exception:
                         continue
                     self.n_items = max(self.n_items, max(items))
@@ -50,51 +53,51 @@ class Data(object):
 
         self.print_statistics()
 
-        #training positive items corresponding to each user; testing positive items corresponding to each user
+        # training positive items corresponding to each user; testing positive items corresponding to each user
         self.train_items, self.test_set = {}, {}
         with open(train_file) as f_train:
             with open(test_file) as f_test:
                 for l in f_train.readlines():
                     if len(l) == 0:
                         break
-                    l = l.strip('\n')
-                    items = [int(i) for i in l.split(' ')]
+                    l = l.strip("\n")
+                    items = [int(i) for i in l.split(" ")]
                     uid, train_items = items[0], items[1:]
                     self.train_items[uid] = train_items
 
                 for l in f_test.readlines():
-                    if len(l) == 0: break
-                    l = l.strip('\n')
+                    if len(l) == 0:
+                        break
+                    l = l.strip("\n")
                     try:
-                        items = [int(i) for i in l.split(' ')]
+                        items = [int(i) for i in l.split(" ")]
                     except Exception:
                         continue
 
                     uid, test_items = items[0], items[1:]
                     self.test_set[uid] = test_items
-        
-        #construct graph from the train data and add self-loops
-        user_selfs = [ i for i in range(self.n_users)]
-        item_selfs = [ i for i in range(self.n_items)]
-        
+
+        # construct graph from the train data and add self-loops
+        user_selfs = [i for i in range(self.n_users)]
+        item_selfs = [i for i in range(self.n_items)]
+
         data_dict = {
-                ('user', 'user_self', 'user') : (user_selfs, user_selfs),
-                ('item', 'item_self', 'item') : (item_selfs, item_selfs),
-                ('user', 'ui', 'item') : (user_item_src, user_item_dst),
-                ('item', 'iu', 'user') : (user_item_dst, user_item_src)
-                }
-        num_dict = {
-            'user': self.n_users, 'item': self.n_items
+            ("user", "user_self", "user"): (user_selfs, user_selfs),
+            ("item", "item_self", "item"): (item_selfs, item_selfs),
+            ("user", "ui", "item"): (user_item_src, user_item_dst),
+            ("item", "iu", "user"): (user_item_dst, user_item_src),
         }
+        num_dict = {"user": self.n_users, "item": self.n_items}
 
         self.g = dgl.heterograph(data_dict, num_nodes_dict=num_dict)
-
 
     def sample(self):
         if self.batch_size <= self.n_users:
             users = rd.sample(self.exist_users, self.batch_size)
         else:
-            users = [rd.choice(self.exist_users) for _ in range(self.batch_size)]
+            users = [
+                rd.choice(self.exist_users) for _ in range(self.batch_size)
+            ]
 
         def sample_pos_items_for_u(u, num):
             # sample num pos items for u-th user
@@ -117,11 +120,13 @@ class Data(object):
             while True:
                 if len(neg_items) == num:
                     break
-                neg_id = np.random.randint(low=0, high=self.n_items,size=1)[0]
-                if neg_id not in self.train_items[u] and neg_id not in neg_items:
+                neg_id = np.random.randint(low=0, high=self.n_items, size=1)[0]
+                if (
+                    neg_id not in self.train_items[u]
+                    and neg_id not in neg_items
+                ):
                     neg_items.append(neg_id)
             return neg_items
-
 
         pos_items, neg_items = [], []
         for u in users:
@@ -134,10 +139,13 @@ class Data(object):
         return self.n_users, self.n_items
 
     def print_statistics(self):
-        print('n_users=%d, n_items=%d' % (self.n_users, self.n_items))
-        print('n_interactions=%d' % (self.n_train + self.n_test))
-        print('n_train=%d, n_test=%d, sparsity=%.5f' % (self.n_train, self.n_test, (self.n_train + self.n_test)/(self.n_users * self.n_items)))
-
-    
-
-    
+        print("n_users=%d, n_items=%d" % (self.n_users, self.n_items))
+        print("n_interactions=%d" % (self.n_train + self.n_test))
+        print(
+            "n_train=%d, n_test=%d, sparsity=%.5f"
+            % (
+                self.n_train,
+                self.n_test,
+                (self.n_train + self.n_test) / (self.n_users * self.n_items),
+            )
+        )

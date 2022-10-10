@@ -1,9 +1,11 @@
 import os
+
 import numpy as np
-from .dgl_dataset import DGLDataset
-from .utils import save_graphs, load_graphs, Subset
+
 from .. import backend as F
 from ..base import DGLError
+from .dgl_dataset import DGLDataset
+from .utils import Subset, load_graphs, save_graphs
 
 
 class CSVDataset(DGLDataset):
@@ -65,11 +67,24 @@ class CSVDataset(DGLDataset):
     Please refer to :ref:`guide-data-pipeline-loadcsv`.
 
     """
-    META_YAML_NAME = 'meta.yaml'
 
-    def __init__(self, data_path, force_reload=False, verbose=True, ndata_parser=None,
-                 edata_parser=None, gdata_parser=None, transform=None):
-        from .csv_dataset_base import load_yaml_with_sanity_check, DefaultDataParser
+    META_YAML_NAME = "meta.yaml"
+
+    def __init__(
+        self,
+        data_path,
+        force_reload=False,
+        verbose=True,
+        ndata_parser=None,
+        edata_parser=None,
+        gdata_parser=None,
+        transform=None,
+    ):
+        from .csv_dataset_base import (
+            DefaultDataParser,
+            load_yaml_with_sanity_check,
+        )
+
         self.graphs = None
         self.data = None
         self.ndata_parser = {} if ndata_parser is None else ndata_parser
@@ -79,17 +94,29 @@ class CSVDataset(DGLDataset):
         meta_yaml_path = os.path.join(data_path, CSVDataset.META_YAML_NAME)
         if not os.path.exists(meta_yaml_path):
             raise DGLError(
-                "'{}' cannot be found under {}.".format(CSVDataset.META_YAML_NAME, data_path))
+                "'{}' cannot be found under {}.".format(
+                    CSVDataset.META_YAML_NAME, data_path
+                )
+            )
         self.meta_yaml = load_yaml_with_sanity_check(meta_yaml_path)
         ds_name = self.meta_yaml.dataset_name
-        super().__init__(ds_name, raw_dir=os.path.dirname(
-            meta_yaml_path), force_reload=force_reload, verbose=verbose, transform=transform)
-
+        super().__init__(
+            ds_name,
+            raw_dir=os.path.dirname(meta_yaml_path),
+            force_reload=force_reload,
+            verbose=verbose,
+            transform=transform,
+        )
 
     def process(self):
-        """Parse node/edge data from CSV files and construct DGL.Graphs
-        """
-        from .csv_dataset_base import NodeData, EdgeData, GraphData, DGLGraphConstructor
+        """Parse node/edge data from CSV files and construct DGL.Graphs"""
+        from .csv_dataset_base import (
+            DGLGraphConstructor,
+            EdgeData,
+            GraphData,
+            NodeData,
+        )
+
         meta_yaml = self.meta_yaml
         base_dir = self.raw_dir
         node_data = []
@@ -97,36 +124,58 @@ class CSVDataset(DGLDataset):
             if meta_node is None:
                 continue
             ntype = meta_node.ntype
-            data_parser = self.ndata_parser if callable(
-                self.ndata_parser) else self.ndata_parser.get(ntype, self.default_data_parser)
+            data_parser = (
+                self.ndata_parser
+                if callable(self.ndata_parser)
+                else self.ndata_parser.get(ntype, self.default_data_parser)
+            )
             ndata = NodeData.load_from_csv(
-                meta_node, base_dir=base_dir, separator=meta_yaml.separator, data_parser=data_parser)
+                meta_node,
+                base_dir=base_dir,
+                separator=meta_yaml.separator,
+                data_parser=data_parser,
+            )
             node_data.append(ndata)
         edge_data = []
         for meta_edge in meta_yaml.edge_data:
             if meta_edge is None:
                 continue
             etype = tuple(meta_edge.etype)
-            data_parser = self.edata_parser if callable(
-                self.edata_parser) else self.edata_parser.get(etype, self.default_data_parser)
+            data_parser = (
+                self.edata_parser
+                if callable(self.edata_parser)
+                else self.edata_parser.get(etype, self.default_data_parser)
+            )
             edata = EdgeData.load_from_csv(
-                meta_edge, base_dir=base_dir, separator=meta_yaml.separator, data_parser=data_parser)
+                meta_edge,
+                base_dir=base_dir,
+                separator=meta_yaml.separator,
+                data_parser=data_parser,
+            )
             edge_data.append(edata)
         graph_data = None
         if meta_yaml.graph_data is not None:
             meta_graph = meta_yaml.graph_data
-            data_parser = self.default_data_parser if self.gdata_parser is None else self.gdata_parser
+            data_parser = (
+                self.default_data_parser
+                if self.gdata_parser is None
+                else self.gdata_parser
+            )
             graph_data = GraphData.load_from_csv(
-                meta_graph, base_dir=base_dir, separator=meta_yaml.separator, data_parser=data_parser)
+                meta_graph,
+                base_dir=base_dir,
+                separator=meta_yaml.separator,
+                data_parser=data_parser,
+            )
         # construct graphs
         self.graphs, self.data = DGLGraphConstructor.construct_graphs(
-            node_data, edge_data, graph_data)
+            node_data, edge_data, graph_data
+        )
         if len(self.data) == 1:
             self.labels = list(self.data.values())[0]
 
     def has_cache(self):
-        graph_path = os.path.join(self.save_path,
-                                  self.name + '.bin')
+        graph_path = os.path.join(self.save_path, self.name + ".bin")
         if os.path.exists(graph_path):
             return True
 
@@ -135,14 +184,11 @@ class CSVDataset(DGLDataset):
     def save(self):
         if self.graphs is None:
             raise DGLError("No graphs available in dataset")
-        graph_path = os.path.join(self.save_path,
-                                  self.name + '.bin')
-        save_graphs(graph_path, self.graphs,
-                    labels=self.data)
+        graph_path = os.path.join(self.save_path, self.name + ".bin")
+        save_graphs(graph_path, self.graphs, labels=self.data)
 
     def load(self):
-        graph_path = os.path.join(self.save_path,
-                                  self.name + '.bin')
+        graph_path = os.path.join(self.save_path, self.name + ".bin")
         self.graphs, self.data = load_graphs(graph_path)
         if len(self.data) == 1:
             self.labels = list(self.data.values())[0]

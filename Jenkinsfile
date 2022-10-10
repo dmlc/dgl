@@ -120,7 +120,7 @@ def go_test_linux() {
 
 def is_authorized(name) {
   def devs = ['dgl-bot', 'noreply', 'Rhett-Ying', 'BarclayII', 'jermainewang',
-              'mufeili', 'isratnisa', 'ru_dongyu', 'classicsong', 'HuXiangkun',
+              'mufeili', 'isratnisa', 'rudongyu', 'classicsong', 'HuXiangkun',
               'hetong007', 'kylasa', 'frozenbugs', 'peizhou001', 'zheng-da',
               'czkkkkkk',
               'nv-dlasalle', 'yaox12', 'chang-l', 'Kh4L', 'VibhuJawa',

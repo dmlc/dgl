@@ -16,9 +16,8 @@ import constants
 from utils import get_idranges, memory_snapshot, read_json
 
 
-def create_dgl_object(graph_name, num_parts, \
-                        schema, part_id, node_data, \
-                        edge_data, nodeid_offset, edgeid_offset):
+def create_dgl_object(schema, part_id, node_data, edge_data, edgeid_offset,
+                        return_orig_nids=False, return_orig_eids=False):
     """
     This function creates dgl objects for a given graph partition, as in function
     arguments. 
@@ -67,10 +66,6 @@ def create_dgl_object(graph_name, num_parts, \
 
     Parameters:
     -----------
-    graph_name : string
-        name of the graph
-    num_parts : int
-        total no. of partitions (of the original graph)
     schame : json object
         json object created by reading the graph metadata json file
     part_id : int
@@ -81,10 +76,10 @@ def create_dgl_object(graph_name, num_parts, \
     edge_data : numpy ndarray
         edge_data, where each row is of the following format: 
         <global_src_id> <global_dst_id> <etype_id> <global_type_eid>
-    nodeid_offset : int
-        offset to be used when assigning node global ids in the current partition
     edgeid_offset : int
         offset to be used when assigning edge global ids in the current partition
+    return_orig_ids : bool, optional
+        Indicates whether to return original node/edge IDs.
 
     Returns: 
     --------
@@ -98,13 +93,22 @@ def create_dgl_object(graph_name, num_parts, \
         map between node type(string)  and node_type_id(int)
     dictionary
         map between edge type(string)  and edge_type_id(int)
+    dict of tensors
+        If `return_orig_nids=True`, return a dict of 1D tensors whose key is the node type
+        and value is a 1D tensor mapping between shuffled node IDs and the original node
+        IDs for each node type. Otherwise, ``None`` is returned.
+    dict of tensors
+        If `return_orig_eids=True`, return a dict of 1D tensors whose key is the edge type
+        and value is a 1D tensor mapping between shuffled edge IDs and the original edge
+        IDs for each edge type. Otherwise, ``None`` is returned.
     """
     #create auxiliary data structures from the schema object
     memory_snapshot("CreateDGLObj_Begin", part_id)
-    ntid_dict, global_nid_ranges = get_idranges(schema[constants.STR_NODE_TYPE], 
-                                    schema[constants.STR_NUM_NODES_PER_CHUNK])
+    _, global_nid_ranges = get_idranges(schema[constants.STR_NODE_TYPE],
+        schema[constants.STR_NUM_NODES_PER_CHUNK])
+    memory_snapshot("CreateDGLObj_Begin", part_id)
 
-    etid_dict, global_eid_ranges = get_idranges(schema[constants.STR_EDGE_TYPE], 
+    _, global_eid_ranges = get_idranges(schema[constants.STR_EDGE_TYPE],
                                     schema[constants.STR_NUM_EDGES_PER_CHUNK])
 
     id_map = dgl.distributed.id_map.IdMap(global_nid_ranges)
@@ -116,7 +120,6 @@ def create_dgl_object(graph_name, num_parts, \
     ntypes_map = {e: i for i, e in enumerate(ntypes)}
     etypes = [(key, global_eid_ranges[key][0, 0]) for key in global_eid_ranges]
     etypes.sort(key=lambda e: e[1])
-    etype_offset_np = np.array([e[1] for e in etypes])
     etypes = [e[0] for e in etypes]
     etypes_map = {e.split(":")[1]: i for i, e in enumerate(etypes)}
 
@@ -179,11 +182,14 @@ def create_dgl_object(graph_name, num_parts, \
 
     # It's not guaranteed that the edges are sorted based on edge type.
     # Let's sort edges and all attributes on the edges.
-    sort_idx = np.argsort(etype_ids)
-    shuffle_global_src_id, shuffle_global_dst_id, global_src_id, global_dst_id, global_edge_id, etype_ids = \
-            shuffle_global_src_id[sort_idx], shuffle_global_dst_id[sort_idx], global_src_id[sort_idx], \
-            global_dst_id[sort_idx], global_edge_id[sort_idx], etype_ids[sort_idx]
-    assert np.all(np.diff(etype_ids) >= 0)
+    if not np.all(np.diff(etype_ids) >= 0):
+        sort_idx = np.argsort(etype_ids)
+        shuffle_global_src_id, shuffle_global_dst_id, global_src_id, global_dst_id, global_edge_id, etype_ids = \
+                shuffle_global_src_id[sort_idx], shuffle_global_dst_id[sort_idx], global_src_id[sort_idx], \
+                global_dst_id[sort_idx], global_edge_id[sort_idx], etype_ids[sort_idx]
+        assert np.all(np.diff(etype_ids) >= 0)
+    else:
+        print(f'[Rank: {part_id} Edge data is already sorted !!!')
 
     # Determine the edge ID range of different edge types.
     edge_id_start = edgeid_offset 
@@ -270,6 +276,7 @@ def create_dgl_object(graph_name, num_parts, \
     part_graph.edata[dgl.ETYPE] = th.as_tensor(etype_ids)
     part_graph.edata['inner_edge'] = th.ones(part_graph.number_of_edges(), dtype=th.bool)
 
+
     #compute per_type_ids and ntype for all the nodes in the graph.
     global_ids = np.concatenate(
             [global_src_id, global_dst_id, global_homo_nid])
@@ -283,7 +290,24 @@ def create_dgl_object(graph_name, num_parts, \
     part_graph.ndata[dgl.NID] = th.as_tensor(uniq_ids[reshuffle_nodes])
     part_graph.ndata['inner_node'] = inner_nodes[reshuffle_nodes]
 
-    return part_graph, node_map_val, edge_map_val, ntypes_map, etypes_map
+    orig_nids = None
+    orig_eids = None
+    if return_orig_nids:
+        orig_nids = {}
+        for ntype, ntype_id in ntypes_map.items():
+            mask = th.logical_and(part_graph.ndata[dgl.NTYPE] == ntype_id,
+                                    part_graph.ndata['inner_node'])
+            orig_nids[ntype] = th.as_tensor(per_type_ids[mask])
+    if return_orig_eids:
+        orig_eids = {}
+        for etype, etype_id in etypes_map.items():
+            mask = th.logical_and(part_graph.edata[dgl.ETYPE] == etype_id,
+                                    part_graph.edata['inner_edge'])
+            orig_eids[etype] = th.as_tensor(global_edge_id[mask])
+
+
+    return part_graph, node_map_val, edge_map_val, ntypes_map, etypes_map, \
+        orig_nids, orig_eids
 
 def create_metadata_json(graph_name, num_nodes, num_edges, part_id, num_parts, node_map_val, \
                             edge_map_val, ntypes_map, etypes_map, output_dir ):

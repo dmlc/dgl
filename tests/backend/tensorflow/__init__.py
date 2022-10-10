@@ -6,7 +6,7 @@ from scipy.sparse import coo_matrix
 
 
 def cuda():
-    return '/gpu:0'
+    return "/gpu:0"
 
 
 def is_cuda_available():
@@ -18,8 +18,12 @@ def array_equal(a, b):
 
 
 def allclose(a, b, rtol=1e-4, atol=1e-4):
-    return np.allclose(tf.convert_to_tensor(a).numpy(),
-                       tf.convert_to_tensor(b).numpy(), rtol=rtol, atol=atol)
+    return np.allclose(
+        tf.convert_to_tensor(a).numpy(),
+        tf.convert_to_tensor(b).numpy(),
+        rtol=rtol,
+        atol=atol,
+    )
 
 
 def randn(shape):
@@ -96,6 +100,7 @@ def matmul(a, b):
 
 def dot(a, b):
     return sum(mul(a, b), dim=-1)
+
 
 def abs(a):
     return tf.abs(a)

@@ -2439,19 +2439,45 @@ def test_module_random_walk_pe(idtype):
 
 @parametrize_idtype
 def test_module_laplacian_pe(idtype):
-    transform = dgl.LaplacianPE(2, 'lappe')
-    g = dgl.graph(([2, 1, 0, 3, 1, 1],[3, 0, 1, 3, 3, 1]), idtype=idtype, device=F.ctx())
+    g = dgl.graph(([2, 1, 0, 3, 1, 1],[3, 1, 1, 2, 1, 0]), idtype=idtype, device=F.ctx())
+    tgt_eigval = F.copy_to(F.repeat(F.tensor([[1.1534e-17, 1.3333e+00, 2., np.nan, np.nan]]),
+        g.num_nodes(), dim=0), g.device)
+    tgt_pe = F.copy_to(F.tensor([[0.5, 0.86602539, 0., 0., 0.],
+        [0.86602539, 0.5, 0., 0., 0.],
+        [0., 0., 0.70710677, 0., 0.],
+        [0., 0., 0.70710677, 0., 0.]]), g.device)
+
+    # without padding (k<n)
+    transform = dgl.LaplacianPE(2, feat_name='lappe')
     new_g = transform(g)
-    tgt = F.copy_to(F.tensor([[ 0.24971116, 0.],
-        [ 0.11771496, 0.],
-        [ 0.83237050, 1.],
-        [ 0.48056933, 0.]]), g.device)
     # tensorflow has no abs() api
     if dgl.backend.backend_name == 'tensorflow':
-        assert F.allclose(new_g.ndata['lappe'].__abs__(), tgt)
+        assert F.allclose(new_g.ndata['lappe'].__abs__(), tgt_pe[:,:2])
     # pytorch & mxnet
     else:
-        assert F.allclose(new_g.ndata['lappe'].abs(), tgt)
+        assert F.allclose(new_g.ndata['lappe'].abs(), tgt_pe[:,:2])
+
+    # with padding (k>=n)
+    transform = dgl.LaplacianPE(5, feat_name='lappe', padding=True)
+    new_g = transform(g)
+    # tensorflow has no abs() api
+    if dgl.backend.backend_name == 'tensorflow':
+        assert F.allclose(new_g.ndata['lappe'].__abs__(), tgt_pe)
+    # pytorch & mxnet
+    else:
+        assert F.allclose(new_g.ndata['lappe'].abs(), tgt_pe)
+
+    # with eigenvalues
+    transform = dgl.LaplacianPE(5, feat_name='lappe', eigval_name='eigval', padding=True)
+    new_g = transform(g)
+    # tensorflow has no abs() api
+    if dgl.backend.backend_name == 'tensorflow':
+        assert F.allclose(new_g.ndata['eigval'][:,:3], tgt_eigval[:,:3])
+        assert F.allclose(new_g.ndata['lappe'].__abs__(), tgt_pe)
+    # pytorch & mxnet
+    else:
+        assert F.allclose(new_g.ndata['eigval'][:,:3], tgt_eigval[:,:3])
+        assert F.allclose(new_g.ndata['lappe'].abs(), tgt_pe)
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
 @pytest.mark.parametrize('g', get_cases(['has_scalar_e_feature']))
