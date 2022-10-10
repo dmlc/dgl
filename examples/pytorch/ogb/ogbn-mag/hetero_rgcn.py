@@ -13,6 +13,8 @@ import dgl.nn as dglnn
 from dgl import AddReverse, Compose, ToSimple
 from dgl.nn import HeteroEmbedding
 
+v_t = th.__version__
+print(v_t)
 
 def prepare_data(args, device):
     dataset = DglNodePropPredDataset(name="ogbn-mag")
@@ -30,7 +32,7 @@ def prepare_data(args, device):
 
     # train sampler
     sampler = dgl.dataloading.MultiLayerNeighborSampler([25, 20])
-    num_workers = 0 if device != "cpu" else int(os.cpu_count() / 2)
+    num_workers = args.num_workers
     print(f"num of workers is {num_workers}")
     train_loader = dgl.dataloading.DataLoader(
         g,
@@ -370,9 +372,13 @@ def test(g, model, node_embed, y_true, device, split_idx):
 
     return train_acc, valid_acc, test_acc
 
+def is_support_affinity(v_t):
+    return v_t >= "1.12"
 
 def main(args):
     device = f"cuda:0" if th.cuda.is_available() else "cpu"
+    if device == "cpu":
+        args.num_workers = 0 if not is_support_affinity(v_t) else int(os.cpu_count() / 2)
 
     g, labels, num_classes, split_idx, logger, train_loader = prepare_data(args, device)
 
@@ -388,8 +394,9 @@ def main(args):
 
     for run in range(args.runs):
 
-        embed_layer.reset_parameters()
-        model.reset_parameters()
+        if is_support_affinity(v_t):
+            embed_layer.reset_parameters()
+            model.reset_parameters()
 
         # optimizer
         all_params = itertools.chain(
@@ -397,8 +404,8 @@ def main(args):
         )
         optimizer = th.optim.Adam(all_params, lr=0.01)
 
-        if device == "cpu":
-            cores = list(range(os.cpu_count()))
+        if device == "cpu" and is_support_affinity(v_t):
+            cores = list(range(args.num_workers * 2))
             len_cores = len(cores)
             dl_cores = cores[:int(len_cores / 2)]
             with train_loader.enable_cpu_affinity(dl_cores, [i for i in cores if i not in dl_cores]):
@@ -436,6 +443,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="RGCN")
     parser.add_argument("--runs", type=int, default=10)
+    parser.add_argument("--num_workers", type=int, default=0)
 
     args = parser.parse_args()
 
