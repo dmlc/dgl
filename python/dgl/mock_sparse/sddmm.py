@@ -57,6 +57,6 @@ def sddmm(
         "scalar values. "
     )
     # PyTorch's sddmm operator only supports CSR format.
-    res = torch.sparse.sampled_addmm(A.adj.to_sparse_csr(), mat1, mat2)
-    # res = torch.ops.dgl_sparse.SDDMM(A.row, A.col)
-    return SparseMatrix(A.row, A.col, res.values(), A.adj.shape)
+    # res = torch.sparse.sampled_addmm(A.adj.to_sparse_csr(), mat1, mat2).values()
+    res = torch.ops.dgl_sparse.SDDMM(A.row, A.col, A.val, mat1, mat2)
+    return SparseMatrix(A.row, A.col, res, A.adj.shape)
