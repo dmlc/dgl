@@ -3825,7 +3825,7 @@ def double_radius_node_labeling(g, src, dst):
     Example
     -------
     >>> import dgl
-    
+
     >>> g = dgl.graph(([0,0,0,0,1,1,2,4], [1,2,3,6,3,4,4,5]))
     >>> dgl.double_radius_node_labeling(g, 0, 1)
     tensor([1, 1, 3, 2, 3, 7, 0])
