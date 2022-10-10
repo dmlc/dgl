@@ -1,18 +1,25 @@
 """Random walk routines
 """
 
-from .._ffi.function import _init_api
 from .. import backend as F
-from ..base import DGLError
 from .. import ndarray as nd
 from .. import utils
+from .._ffi.function import _init_api
+from ..base import DGLError
 
-__all__ = [
-    'random_walk',
-    'pack_traces']
+__all__ = ["random_walk", "pack_traces"]
 
-def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob=None,
-                return_eids=False):
+
+def random_walk(
+    g,
+    nodes,
+    *,
+    metapath=None,
+    length=None,
+    prob=None,
+    restart_prob=None,
+    return_eids=False
+):
     """Generate random walk traces from an array of starting nodes based on the given metapath.
 
     Each starting node will have one trace generated, which
@@ -167,15 +174,19 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
 
     if metapath is None:
         if n_etypes > 1 or n_ntypes > 1:
-            raise DGLError("metapath not specified and the graph is not homogeneous.")
+            raise DGLError(
+                "metapath not specified and the graph is not homogeneous."
+            )
         if length is None:
-            raise ValueError("Please specify either the metapath or the random walk length.")
+            raise ValueError(
+                "Please specify either the metapath or the random walk length."
+            )
         metapath = [0] * length
     else:
         metapath = [g.get_etype_id(etype) for etype in metapath]
 
     gidx = g._graph
-    nodes = utils.prepare_tensor(g, nodes, 'nodes')
+    nodes = utils.prepare_tensor(g, nodes, "nodes")
     nodes = F.to_dgl_nd(nodes)
     # (Xin) Since metapath array is created by us, safe to skip the check
     #       and keep it on CPU to make max_nodes sanity check easier.
@@ -196,14 +207,18 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
 
     # Actual random walk
     if restart_prob is None:
-        traces, eids, types = _CAPI_DGLSamplingRandomWalk(gidx, nodes, metapath, p_nd)
+        traces, eids, types = _CAPI_DGLSamplingRandomWalk(
+            gidx, nodes, metapath, p_nd
+        )
     elif F.is_tensor(restart_prob):
         restart_prob = F.to_dgl_nd(restart_prob)
         traces, eids, types = _CAPI_DGLSamplingRandomWalkWithStepwiseRestart(
-            gidx, nodes, metapath, p_nd, restart_prob)
+            gidx, nodes, metapath, p_nd, restart_prob
+        )
     elif isinstance(restart_prob, float):
         traces, eids, types = _CAPI_DGLSamplingRandomWalkWithRestart(
-            gidx, nodes, metapath, p_nd, restart_prob)
+            gidx, nodes, metapath, p_nd, restart_prob
+        )
     else:
         raise TypeError("restart_prob should be float or Tensor.")
 
@@ -211,6 +226,7 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
     types = F.from_dgl_nd(types)
     eids = F.from_dgl_nd(eids)
     return (traces, eids, types) if return_eids else (traces, types)
+
 
 def pack_traces(traces, types):
     """Pack the padded traces returned by ``random_walk()`` into a concatenated array.
@@ -276,12 +292,18 @@ def pack_traces(traces, types):
     >>> vids[1], vtypes[1]
     (tensor([0, 1, 1, 3, 0, 0, 0]), tensor([0, 0, 1, 0, 0, 1, 0]))
     """
-    assert F.is_tensor(traces) and F.context(traces) == F.cpu(), "traces must be a CPU tensor"
-    assert F.is_tensor(types) and F.context(types) == F.cpu(), "types must be a CPU tensor"
+    assert (
+        F.is_tensor(traces) and F.context(traces) == F.cpu()
+    ), "traces must be a CPU tensor"
+    assert (
+        F.is_tensor(types) and F.context(types) == F.cpu()
+    ), "types must be a CPU tensor"
     traces = F.to_dgl_nd(traces)
     types = F.to_dgl_nd(types)
 
-    concat_vids, concat_types, lengths, offsets = _CAPI_DGLSamplingPackTraces(traces, types)
+    concat_vids, concat_types, lengths, offsets = _CAPI_DGLSamplingPackTraces(
+        traces, types
+    )
 
     concat_vids = F.from_dgl_nd(concat_vids)
     concat_types = F.from_dgl_nd(concat_types)
@@ -290,4 +312,5 @@ def pack_traces(traces, types):
 
     return concat_vids, concat_types, lengths, offsets
 
-_init_api('dgl.sampling.randomwalks', __name__)
+
+_init_api("dgl.sampling.randomwalks", __name__)
