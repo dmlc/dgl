@@ -9,11 +9,11 @@ import pytest
 import torch
 from chunk_graph import chunk_graph
 from dgl.data.utils import load_graphs, load_tensors
-from dgl.distributed.partition import FIELD_DICT
+from dgl.distributed.partition import RESERVED_FIELD_DTYPE
 from create_chunked_dataset import create_chunked_dataset
 
 def _verify_partition_data_types(part_g):
-    for k, dtype in FIELD_DICT.items():
+    for k, dtype in RESERVED_FIELD_DTYPE.items():
         if k in part_g.ndata:
             assert part_g.ndata[k].dtype == dtype
         if k in part_g.edata:

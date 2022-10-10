@@ -32,7 +32,7 @@ from .graph_services import find_edges as dist_find_edges
 from .graph_services import out_degrees as dist_out_degrees
 from .graph_services import in_degrees as dist_in_degrees
 from .dist_tensor import DistTensor
-from .partition import FIELD_DICT
+from .partition import RESERVED_FIELD_DTYPE
 
 INIT_GRAPH = 800001
 
@@ -93,7 +93,7 @@ def _get_shared_mem_ndata(g, graph_name, name):
     with shared memory.
     '''
     shape = (g.number_of_nodes(),)
-    dtype = FIELD_DICT[name]
+    dtype = RESERVED_FIELD_DTYPE[name]
     dtype = DTYPE_DICT[dtype]
     data = empty_shared_mem(_get_ndata_path(graph_name, name), False, shape, dtype)
     dlpack = data.to_dlpack()
@@ -106,7 +106,7 @@ def _get_shared_mem_edata(g, graph_name, name):
     with shared memory.
     '''
     shape = (g.number_of_edges(),)
-    dtype = FIELD_DICT[name]
+    dtype = RESERVED_FIELD_DTYPE[name]
     dtype = DTYPE_DICT[dtype]
     data = empty_shared_mem(_get_edata_path(graph_name, name), False, shape, dtype)
     dlpack = data.to_dlpack()
@@ -335,7 +335,7 @@ class DistGraphServer(KVServer):
             # TODO(Rui) Formatting forcely is not a perfect solution.
             #   We'd better store all dtypes when mapping to shared memory
             #   and map back with original dtypes.
-            for k, dtype in FIELD_DICT.items():
+            for k, dtype in RESERVED_FIELD_DTYPE.items():
                 if k in self.client_g.ndata:
                     self.client_g.ndata[k] = F.astype(
                         self.client_g.ndata[k], dtype)
@@ -377,6 +377,7 @@ class DistGraphServer(KVServer):
                 self.init_data(name=str(data_name), policy_str=data_name.policy_str,
                                data_tensor=node_feats[name])
                 self.orig_data.add(str(data_name))
+            # Let's free once node features are copied to shared memory
             del node_feats
             gc.collect()
             _, edge_feats = load_partition_feats(part_config, self.part_id,
@@ -389,6 +390,7 @@ class DistGraphServer(KVServer):
                 self.init_data(name=str(data_name), policy_str=data_name.policy_str,
                                data_tensor=edge_feats[name])
                 self.orig_data.add(str(data_name))
+            # Let's free once edge features are copied to shared memory
             del edge_feats
             gc.collect()
 

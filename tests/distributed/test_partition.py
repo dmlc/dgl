@@ -11,10 +11,10 @@ import backend as F
 import unittest
 import tempfile
 from utils import reset_envs
-from dgl.distributed.partition import FIELD_DICT
+from dgl.distributed.partition import RESERVED_FIELD_DTYPE
 
 def _verify_partition_data_types(part_g):
-    for k, dtype in FIELD_DICT.items():
+    for k, dtype in RESERVED_FIELD_DTYPE.items():
         if k in part_g.ndata:
             assert part_g.ndata[k].dtype == dtype
         if k in part_g.edata:

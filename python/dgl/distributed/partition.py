@@ -13,18 +13,21 @@ from ..data.utils import load_graphs, save_graphs, load_tensors, save_tensors
 from ..partition import metis_partition_assignment, partition_graph_with_halo, get_peak_mem
 from .graph_partition_book import BasicPartitionBook, RangePartitionBook
 
-FIELD_DICT = {'inner_node': F.uint8,    # A flag indicates whether the node is inside a partition.
-              'inner_edge': F.uint8,    # A flag indicates whether the edge is inside a partition.
-              NID: F.int64,
-              EID: F.int64,
-              NTYPE: F.int16,
-              ETYPE: F.int32}
+RESERVED_FIELD_DTYPE = {
+    'inner_node': F.uint8,    # A flag indicates whether the node is inside a partition.
+    'inner_edge': F.uint8,    # A flag indicates whether the edge is inside a partition.
+    NID: F.int64,
+    EID: F.int64,
+    NTYPE: F.int16,
+    # `sort_csr_by_tag` and `sort_csc_by_tag` works on int32/64 only.
+    ETYPE: F.int32
+    }
 
 def _save_graphs(filename, g_list):
     '''Format data types in graphs before saving
     '''
     for g in g_list:
-        for k, dtype in FIELD_DICT.items():
+        for k, dtype in RESERVED_FIELD_DTYPE.items():
             if k in g.ndata:
                 g.ndata[k] = F.astype(g.ndata[k], dtype)
             if k in g.edata:
@@ -124,8 +127,12 @@ def load_partition(part_config, part_id, load_feats=True):
             partids1 = gpb.nid2partid(nids)
             _, per_type_nids = gpb.map_to_per_ntype(nids)
             partids2 = gpb.nid2partid(per_type_nids, ntype)
-            assert np.all(F.asnumpy(partids1 == part_id)), 'load a wrong partition'
-            assert np.all(F.asnumpy(partids2 == part_id)), 'load a wrong partition'
+            assert np.all(F.asnumpy(partids1 == part_id)), \
+                'Unexpected partition IDs are found in the loaded partition ' \
+                'while querying via global homogeneous node IDs.'
+            assert np.all(F.asnumpy(partids2 == part_id)), \
+                'Unexpected partition IDs are found in the loaded partition ' \
+                'while querying via type-wise node IDs.'
         for etype in etypes:
             etype_id = etypes[etype]
             # graph.edata[EID] are global homogeneous edge IDs.
@@ -133,8 +140,12 @@ def load_partition(part_config, part_id, load_feats=True):
             partids1 = gpb.eid2partid(eids)
             _, per_type_eids = gpb.map_to_per_etype(eids)
             partids2 = gpb.eid2partid(per_type_eids, etype)
-            assert np.all(F.asnumpy(partids1 == part_id)), 'load a wrong partition'
-            assert np.all(F.asnumpy(partids2 == part_id)), 'load a wrong partition'
+            assert np.all(F.asnumpy(partids1 == part_id)), \
+                'Unexpected partition IDs are found in the loaded partition ' \
+                'while querying via global homogeneous edge IDs.'
+            assert np.all(F.asnumpy(partids2 == part_id)), \
+                'Unexpected partition IDs are found in the loaded partition ' \
+                'while querying via type-wise edge IDs.'
 
     node_feats = {}
     edge_feats = {}
@@ -635,9 +646,9 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         if return_mapping:
             orig_nids, orig_eids = _get_orig_ids(g, sim_g, False, orig_nids, orig_eids)
         parts[0].ndata['inner_node'] = F.ones((sim_g.number_of_nodes(),),
-            FIELD_DICT['inner_node'], F.cpu())
+            RESERVED_FIELD_DTYPE['inner_node'], F.cpu())
         parts[0].edata['inner_edge'] = F.ones((sim_g.number_of_edges(),),
-            FIELD_DICT['inner_edge'], F.cpu())
+            RESERVED_FIELD_DTYPE['inner_edge'], F.cpu())
     elif part_method in ('metis', 'random'):
         start = time.time()
         sim_g, balance_ntypes = get_homogeneous(g, balance_ntypes)
@@ -688,12 +699,12 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
             for name in parts:
                 orig_ids = parts[name].ndata['orig_id']
                 ntype = F.gather_row(sim_g.ndata[NTYPE], orig_ids)
-                parts[name].ndata[NTYPE] = F.astype(ntype, FIELD_DICT[NTYPE])
+                parts[name].ndata[NTYPE] = F.astype(ntype, RESERVED_FIELD_DTYPE[NTYPE])
                 assert np.all(F.asnumpy(ntype) == F.asnumpy(parts[name].ndata[NTYPE]))
                 # Get the original edge types and original edge IDs.
                 orig_ids = parts[name].edata['orig_id']
                 etype = F.gather_row(sim_g.edata[ETYPE], orig_ids)
-                parts[name].edata[ETYPE] = F.astype(etype, FIELD_DICT[ETYPE])
+                parts[name].edata[ETYPE] = F.astype(etype, RESERVED_FIELD_DTYPE[ETYPE])
                 assert np.all(F.asnumpy(etype) == F.asnumpy(parts[name].edata[ETYPE]))
 
                 # Calculate the global node IDs to per-node IDs mapping.

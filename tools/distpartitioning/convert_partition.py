@@ -14,7 +14,7 @@ from pyarrow import csv
 
 import constants
 from utils import get_idranges, memory_snapshot, read_json
-from dgl.distributed.partition import FIELD_DICT
+from dgl.distributed.partition import RESERVED_FIELD_DTYPE
 
 
 def create_dgl_object(schema, part_id, node_data, edge_data, edgeid_offset,
@@ -273,9 +273,9 @@ def create_dgl_object(schema, part_id, node_data, edge_data, edgeid_offset,
     part_graph = dgl.graph(data=(part_local_src_id, part_local_dst_id), num_nodes=len(uniq_ids))
     part_graph.edata[dgl.EID] = th.arange(
         edgeid_offset, edgeid_offset + part_graph.number_of_edges(), dtype=th.int64)
-    part_graph.edata[dgl.ETYPE] = th.as_tensor(etype_ids, dtype=FIELD_DICT[dgl.ETYPE])
+    part_graph.edata[dgl.ETYPE] = th.as_tensor(etype_ids, dtype=RESERVED_FIELD_DTYPE[dgl.ETYPE])
     part_graph.edata['inner_edge'] = th.ones(part_graph.number_of_edges(),
-        dtype=FIELD_DICT['inner_edge'])
+        dtype=RESERVED_FIELD_DTYPE['inner_edge'])
 
 
     #compute per_type_ids and ntype for all the nodes in the graph.
@@ -286,10 +286,10 @@ def create_dgl_object(schema, part_id, node_data, edge_data, edgeid_offset,
     ntype, per_type_ids = id_map(part_global_ids)
 
     #continue with the graph creation
-    part_graph.ndata[dgl.NTYPE] = th.as_tensor(ntype, dtype=FIELD_DICT[dgl.NTYPE])
+    part_graph.ndata[dgl.NTYPE] = th.as_tensor(ntype, dtype=RESERVED_FIELD_DTYPE[dgl.NTYPE])
     part_graph.ndata[dgl.NID] = th.as_tensor(uniq_ids[reshuffle_nodes])
     part_graph.ndata['inner_node'] = th.as_tensor(inner_nodes[reshuffle_nodes],
-        dtype=FIELD_DICT['inner_node'])
+        dtype=RESERVED_FIELD_DTYPE['inner_node'])
 
     orig_nids = None
     orig_eids = None
