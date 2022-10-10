@@ -5,13 +5,13 @@ This folder contains the official code for [Learning Hierarchical Graph Neural N
 
 ## Setup
 
-We use python 3.7. The CUDA version needs to be 10.2. Besides DGL (>=0.5.2), we depend on several packages. To install dependencies using conda:
+We use python 3.7. The CUDA version needs to be 10.2. Besides DGL (>=0.8), we depend on several packages. To install dependencies using conda:
 ```bash
 conda create -n Hilander # create env
 conda activate Hilander # activate env
 conda install pytorch==1.7.0 torchvision==0.8.0 cudatoolkit=10.2 -c pytorch # install pytorch 1.7 version
 conda install -y cudatoolkit=10.2 faiss-gpu=1.6.5 -c pytorch # install faiss gpu version matching cuda 10.2
-pip install dgl-cu102 # install dgl for cuda 10.2
+pip install dgl-cu102 dglgo -f https://data.dgl.ai/wheels/repo.html # install the latest dgl for cuda 10.2
 pip install tqdm # install tqdm
 git clone https://github.com/yjxiong/clustering-benchmark.git # install clustering-benchmark for evaluation
 cd clustering-benchmark

@@ -1,11 +1,14 @@
 import time
-import dgl
+
 import torch
+
+import dgl
 
 from .. import utils
 
-@utils.benchmark('time')
-@utils.parametrize('batch_size', [4, 32, 256, 1024])
+
+@utils.benchmark("time")
+@utils.parametrize("batch_size", [4, 32, 256, 1024])
 def track_time(batch_size):
     device = utils.get_bench_device()
     ds = dgl.data.QM7bDataset()
@@ -20,7 +23,7 @@ def track_time(batch_size):
         g = dgl.batch(graphs)
 
     # timing
-    
+
     with utils.Timer() as t:
         for i in range(100):
             g = dgl.batch(graphs)

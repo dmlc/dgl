@@ -2,13 +2,14 @@
 from __future__ import absolute_import
 
 import time
-from enum import Enum
 from collections import namedtuple
+from enum import Enum
 
 import dgl.backend as F
-from ._ffi.function import _init_api
-from ._deprecate.nodeflow import NodeFlow
+
 from . import utils
+from ._deprecate.nodeflow import NodeFlow
+from ._ffi.function import _init_api
 
 _init_api("dgl.network")
 
@@ -19,12 +20,11 @@ _WAIT_TIME_SEC = 3  # 3 seconds
 
 
 def _network_wait():
-    """Sleep for a few seconds
-    """
+    """Sleep for a few seconds"""
     time.sleep(_WAIT_TIME_SEC)
 
 
-def _create_sender(net_type, msg_queue_size=2*1024*1024*1024):
+def _create_sender(net_type, msg_queue_size=2 * 1024 * 1024 * 1024):
     """Create a Sender communicator via C api
 
     Parameters
@@ -34,11 +34,11 @@ def _create_sender(net_type, msg_queue_size=2*1024*1024*1024):
     msg_queue_size : int
         message queue size (2GB by default)
     """
-    assert net_type in ('socket', 'mpi'), 'Unknown network type.'
+    assert net_type in ("socket", "mpi"), "Unknown network type."
     return _CAPI_DGLSenderCreate(net_type, msg_queue_size)
 
 
-def _create_receiver(net_type, msg_queue_size=2*1024*1024*1024):
+def _create_receiver(net_type, msg_queue_size=2 * 1024 * 1024 * 1024):
     """Create a Receiver communicator via C api
 
     Parameters
@@ -48,7 +48,7 @@ def _create_receiver(net_type, msg_queue_size=2*1024*1024*1024):
     msg_queue_size : int
         message queue size (2GB by default)
     """
-    assert net_type in ('socket', 'mpi'), 'Unknown network type.'
+    assert net_type in ("socket", "mpi"), "Unknown network type."
     return _CAPI_DGLReceiverCreate(net_type, msg_queue_size)
 
 
@@ -64,8 +64,7 @@ def _finalize_sender(sender):
 
 
 def _finalize_receiver(receiver):
-    """Finalize Receiver Communicator
-    """
+    """Finalize Receiver Communicator"""
     _CAPI_DGLFinalizeReceiver(receiver)
 
 
@@ -83,7 +82,7 @@ def _add_receiver_addr(sender, ip_addr, port, recv_id):
     recv_id : int
         Receiver ID
     """
-    assert recv_id >= 0, 'recv_id cannot be a negative number.'
+    assert recv_id >= 0, "recv_id cannot be a negative number."
     _CAPI_DGLSenderAddReceiver(sender, ip_addr, int(port), int(recv_id))
 
 
@@ -112,7 +111,7 @@ def _receiver_wait(receiver, ip_addr, port, num_sender):
     num_sender : int
         total number of Sender
     """
-    assert num_sender >= 0, 'num_sender cannot be a negative number.'
+    assert num_sender >= 0, "num_sender cannot be a negative number."
     _CAPI_DGLReceiverWait(receiver, ip_addr, int(port), int(num_sender))
 
 
@@ -131,19 +130,22 @@ def _send_nodeflow(sender, nodeflow, recv_id):
     recv_id : int
         Receiver ID
     """
-    assert recv_id >= 0, 'recv_id cannot be a negative number.'
+    assert recv_id >= 0, "recv_id cannot be a negative number."
     gidx = nodeflow._graph
     node_mapping = nodeflow._node_mapping.todgltensor()
     edge_mapping = nodeflow._edge_mapping.todgltensor()
     layers_offsets = utils.toindex(nodeflow._layer_offsets).todgltensor()
     flows_offsets = utils.toindex(nodeflow._block_offsets).todgltensor()
-    _CAPI_SenderSendNodeFlow(sender,
-                             int(recv_id),
-                             gidx,
-                             node_mapping,
-                             edge_mapping,
-                             layers_offsets,
-                             flows_offsets)
+    _CAPI_SenderSendNodeFlow(
+        sender,
+        int(recv_id),
+        gidx,
+        node_mapping,
+        edge_mapping,
+        layers_offsets,
+        flows_offsets,
+    )
+
 
 def _send_sampler_end_signal(sender, recv_id):
     """Send an epoch-end signal to remote Receiver.
@@ -155,8 +157,9 @@ def _send_sampler_end_signal(sender, recv_id):
     recv_id : int
         Receiver ID
     """
-    assert recv_id >= 0, 'recv_id cannot be a negative number.'
+    assert recv_id >= 0, "recv_id cannot be a negative number."
     _CAPI_SenderSendSamplerEndSignal(sender, int(recv_id))
+
 
 def _recv_nodeflow(receiver, graph):
     """Receive sampled subgraph (NodeFlow) from remote sampler.
@@ -183,8 +186,8 @@ def _recv_nodeflow(receiver, graph):
 
 
 class KVMsgType(Enum):
-    """Type of kvstore message
-    """
+    """Type of kvstore message"""
+
     FINAL = 1
     INIT = 2
     PUSH = 3
@@ -215,6 +218,7 @@ c_ptr : void*
     c pointer of message
 """
 
+
 def _send_kv_msg(sender, msg, recv_id):
     """Send kvstore message.
 
@@ -230,12 +234,8 @@ def _send_kv_msg(sender, msg, recv_id):
     if msg.type == KVMsgType.PULL:
         tensor_id = F.zerocopy_to_dgl_ndarray(msg.id)
         _CAPI_SenderSendKVMsg(
-            sender,
-            int(recv_id),
-            msg.type.value,
-            msg.rank,
-            msg.name,
-            tensor_id)
+            sender, int(recv_id), msg.type.value, msg.rank, msg.name, tensor_id
+        )
     elif msg.type in (KVMsgType.INIT, KVMsgType.GET_SHAPE_BACK):
         tensor_shape = F.zerocopy_to_dgl_ndarray(msg.shape)
         _CAPI_SenderSendKVMsg(
@@ -244,20 +244,14 @@ def _send_kv_msg(sender, msg, recv_id):
             msg.type.value,
             msg.rank,
             msg.name,
-            tensor_shape)
+            tensor_shape,
+        )
     elif msg.type in (KVMsgType.IP_ID, KVMsgType.GET_SHAPE):
         _CAPI_SenderSendKVMsg(
-            sender,
-            int(recv_id),
-            msg.type.value,
-            msg.rank,
-            msg.name)
+            sender, int(recv_id), msg.type.value, msg.rank, msg.name
+        )
     elif msg.type in (KVMsgType.FINAL, KVMsgType.BARRIER):
-        _CAPI_SenderSendKVMsg(
-            sender,
-            int(recv_id),
-            msg.type.value,
-            msg.rank)
+        _CAPI_SenderSendKVMsg(sender, int(recv_id), msg.type.value, msg.rank)
     else:
         tensor_id = F.zerocopy_to_dgl_ndarray(msg.id)
         data = F.zerocopy_to_dgl_ndarray(msg.data)
@@ -268,7 +262,8 @@ def _send_kv_msg(sender, msg, recv_id):
             msg.rank,
             msg.name,
             tensor_id,
-            data)
+            data,
+        )
 
 
 def _recv_kv_msg(receiver):
@@ -288,7 +283,9 @@ def _recv_kv_msg(receiver):
     rank = _CAPI_ReceiverGetKVMsgRank(msg_ptr)
     if msg_type == KVMsgType.PULL:
         name = _CAPI_ReceiverGetKVMsgName(msg_ptr)
-        tensor_id = F.zerocopy_from_dgl_ndarray(_CAPI_ReceiverGetKVMsgID(msg_ptr))
+        tensor_id = F.zerocopy_from_dgl_ndarray(
+            _CAPI_ReceiverGetKVMsgID(msg_ptr)
+        )
         msg = KVStoreMsg(
             type=msg_type,
             rank=rank,
@@ -296,11 +293,14 @@ def _recv_kv_msg(receiver):
             id=tensor_id,
             data=None,
             shape=None,
-            c_ptr=msg_ptr)
+            c_ptr=msg_ptr,
+        )
         return msg
     elif msg_type in (KVMsgType.INIT, KVMsgType.GET_SHAPE_BACK):
         name = _CAPI_ReceiverGetKVMsgName(msg_ptr)
-        tensor_shape = F.zerocopy_from_dgl_ndarray(_CAPI_ReceiverGetKVMsgShape(msg_ptr))
+        tensor_shape = F.zerocopy_from_dgl_ndarray(
+            _CAPI_ReceiverGetKVMsgShape(msg_ptr)
+        )
         msg = KVStoreMsg(
             type=msg_type,
             rank=rank,
@@ -308,7 +308,8 @@ def _recv_kv_msg(receiver):
             id=None,
             data=None,
             shape=tensor_shape,
-            c_ptr=msg_ptr)
+            c_ptr=msg_ptr,
+        )
         return msg
     elif msg_type in (KVMsgType.IP_ID, KVMsgType.GET_SHAPE):
         name = _CAPI_ReceiverGetKVMsgName(msg_ptr)
@@ -319,7 +320,8 @@ def _recv_kv_msg(receiver):
             id=None,
             data=None,
             shape=None,
-            c_ptr=msg_ptr)
+            c_ptr=msg_ptr,
+        )
         return msg
     elif msg_type in (KVMsgType.FINAL, KVMsgType.BARRIER):
         msg = KVStoreMsg(
@@ -329,11 +331,14 @@ def _recv_kv_msg(receiver):
             id=None,
             data=None,
             shape=None,
-            c_ptr=msg_ptr)
+            c_ptr=msg_ptr,
+        )
         return msg
     else:
         name = _CAPI_ReceiverGetKVMsgName(msg_ptr)
-        tensor_id = F.zerocopy_from_dgl_ndarray(_CAPI_ReceiverGetKVMsgID(msg_ptr))
+        tensor_id = F.zerocopy_from_dgl_ndarray(
+            _CAPI_ReceiverGetKVMsgID(msg_ptr)
+        )
         data = F.zerocopy_from_dgl_ndarray(_CAPI_ReceiverGetKVMsgData(msg_ptr))
         msg = KVStoreMsg(
             type=msg_type,
@@ -342,25 +347,34 @@ def _recv_kv_msg(receiver):
             id=tensor_id,
             data=data,
             shape=None,
-            c_ptr=msg_ptr)
+            c_ptr=msg_ptr,
+        )
         return msg
 
-    raise RuntimeError('Unknown message type: %d' % msg_type.value)
+    raise RuntimeError("Unknown message type: %d" % msg_type.value)
 
 
 def _clear_kv_msg(msg):
-    """Clear data of kvstore message
-    """
+    """Clear data of kvstore message"""
     F.sync()
     if msg.c_ptr is not None:
         _CAPI_DeleteKVMsg(msg.c_ptr)
 
 
-def _fast_pull(name, id_tensor,
-               machine_count, group_count, machine_id, client_id,
-               partition_book, g2l, local_data,
-               sender, receiver):
-    """ Pull message
+def _fast_pull(
+    name,
+    id_tensor,
+    machine_count,
+    group_count,
+    machine_id,
+    client_id,
+    partition_book,
+    g2l,
+    local_data,
+    sender,
+    receiver,
+):
+    """Pull message
 
     Parameters
     ----------
@@ -393,17 +407,33 @@ def _fast_pull(name, id_tensor,
         target tensor
     """
     if g2l is not None:
-        res_tensor = _CAPI_FastPull(name, machine_id, machine_count, group_count, client_id,
-                                    F.zerocopy_to_dgl_ndarray(id_tensor),
-                                    F.zerocopy_to_dgl_ndarray(partition_book),
-                                    F.zerocopy_to_dgl_ndarray(local_data),
-                                    sender, receiver, 'has_g2l',
-                                    F.zerocopy_to_dgl_ndarray(g2l))
+        res_tensor = _CAPI_FastPull(
+            name,
+            machine_id,
+            machine_count,
+            group_count,
+            client_id,
+            F.zerocopy_to_dgl_ndarray(id_tensor),
+            F.zerocopy_to_dgl_ndarray(partition_book),
+            F.zerocopy_to_dgl_ndarray(local_data),
+            sender,
+            receiver,
+            "has_g2l",
+            F.zerocopy_to_dgl_ndarray(g2l),
+        )
     else:
-        res_tensor = _CAPI_FastPull(name, machine_id, machine_count, group_count, client_id,
-                                    F.zerocopy_to_dgl_ndarray(id_tensor),
-                                    F.zerocopy_to_dgl_ndarray(partition_book),
-                                    F.zerocopy_to_dgl_ndarray(local_data),
-                                    sender, receiver, 'no_g2l')
+        res_tensor = _CAPI_FastPull(
+            name,
+            machine_id,
+            machine_count,
+            group_count,
+            client_id,
+            F.zerocopy_to_dgl_ndarray(id_tensor),
+            F.zerocopy_to_dgl_ndarray(partition_book),
+            F.zerocopy_to_dgl_ndarray(local_data),
+            sender,
+            receiver,
+            "no_g2l",
+        )
 
     return F.zerocopy_from_dgl_ndarray(res_tensor)

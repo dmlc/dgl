@@ -1,27 +1,25 @@
 """
 Gated Graph Neural Network module for graph classification tasks
 """
-from dgl.nn.pytorch import GatedGraphConv, GlobalAttentionPooling
 import torch
 from torch import nn
 
+from dgl.nn.pytorch import GatedGraphConv, GlobalAttentionPooling
+
 
 class GraphClsGGNN(nn.Module):
-    def __init__(self,
-                 annotation_size,
-                 out_feats,
-                 n_steps,
-                 n_etypes,
-                 num_cls):
+    def __init__(self, annotation_size, out_feats, n_steps, n_etypes, num_cls):
         super(GraphClsGGNN, self).__init__()
 
         self.annotation_size = annotation_size
         self.out_feats = out_feats
 
-        self.ggnn = GatedGraphConv(in_feats=out_feats,
-                                   out_feats=out_feats,
-                                   n_steps=n_steps,
-                                   n_etypes=n_etypes)
+        self.ggnn = GatedGraphConv(
+            in_feats=out_feats,
+            out_feats=out_feats,
+            n_steps=n_steps,
+            n_etypes=n_etypes,
+        )
 
         pooling_gate_nn = nn.Linear(annotation_size + out_feats, 1)
         self.pooling = GlobalAttentionPooling(pooling_gate_nn)
@@ -30,16 +28,18 @@ class GraphClsGGNN(nn.Module):
         self.loss_fn = nn.CrossEntropyLoss()
 
     def forward(self, graph, labels=None):
-        etypes = graph.edata.pop('type')
-        annotation = graph.ndata.pop('annotation').float()
+        etypes = graph.edata.pop("type")
+        annotation = graph.ndata.pop("annotation").float()
 
         assert annotation.size()[-1] == self.annotation_size
 
         node_num = graph.number_of_nodes()
 
-        zero_pad = torch.zeros([node_num, self.out_feats - self.annotation_size],
-                               dtype=torch.float,
-                               device=annotation.device)
+        zero_pad = torch.zeros(
+            [node_num, self.out_feats - self.annotation_size],
+            dtype=torch.float,
+            device=annotation.device,
+        )
 
         h1 = torch.cat([annotation, zero_pad], -1)
         out = self.ggnn(graph, h1, etypes)

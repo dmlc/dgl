@@ -2,13 +2,20 @@
 """Runtime NDArray api"""
 from __future__ import absolute_import
 
-import sys
 import ctypes
-import numpy as np
-from .base import _LIB, check_call, c_array, string_types, _FFI_MODE, c_str
-from .runtime_ctypes import DGLType, DGLContext, DGLArray, DGLArrayHandle
-from .runtime_ctypes import TypeCode, dgl_shape_index_t
+import sys
 
+import numpy as np
+
+from .base import _FFI_MODE, _LIB, c_array, c_str, check_call, string_types
+from .runtime_ctypes import (
+    DGLArray,
+    DGLArrayHandle,
+    DGLContext,
+    DGLDataType,
+    TypeCode,
+    dgl_shape_index_t,
+)
 
 IMPORT_EXCEPT = RuntimeError if _FFI_MODE == "cython" else ImportError
 
@@ -17,15 +24,31 @@ try:
     if _FFI_MODE == "ctypes":
         raise ImportError()
     if sys.version_info >= (3, 0):
-        from ._cy3.core import _set_class_ndarray, _reg_extension, _make_array, _from_dlpack
         from ._cy3.core import NDArrayBase as _NDArrayBase
+        from ._cy3.core import (
+            _from_dlpack,
+            _make_array,
+            _reg_extension,
+            _set_class_ndarray,
+        )
     else:
-        from ._cy2.core import _set_class_ndarray, _reg_extension, _make_array, _from_dlpack
         from ._cy2.core import NDArrayBase as _NDArrayBase
+        from ._cy2.core import (
+            _from_dlpack,
+            _make_array,
+            _reg_extension,
+            _set_class_ndarray,
+        )
 except IMPORT_EXCEPT:
     # pylint: disable=wrong-import-position
-    from ._ctypes.ndarray import _set_class_ndarray, _reg_extension, _make_array, _from_dlpack
     from ._ctypes.ndarray import NDArrayBase as _NDArrayBase
+    from ._ctypes.ndarray import (
+        _from_dlpack,
+        _make_array,
+        _reg_extension,
+        _set_class_ndarray,
+    )
+
 
 def context(dev_type, dev_id=0):
     """Construct a DGL context with given device type and id.
@@ -63,16 +86,15 @@ def context(dev_type, dev_id=0):
 
 
 def numpyasarray(np_data):
-    """Return a DGLArray representation of a numpy array.
-    """
+    """Return a DGLArray representation of a numpy array."""
     data = np_data
-    assert data.flags['C_CONTIGUOUS']
+    assert data.flags["C_CONTIGUOUS"]
     arr = DGLArray()
     shape = c_array(dgl_shape_index_t, data.shape)
     arr.data = data.ctypes.data_as(ctypes.c_void_p)
     arr.shape = shape
     arr.strides = None
-    arr.dtype = DGLType(np.dtype(data.dtype).name)
+    arr.dtype = DGLDataType(np.dtype(data.dtype).name)
     arr.ndim = data.ndim
     # CPU device
     arr.ctx = context(1, 0)
@@ -101,15 +123,19 @@ def empty(shape, dtype="float32", ctx=context(1, 0)):
     shape = c_array(dgl_shape_index_t, shape)
     ndim = ctypes.c_int(len(shape))
     handle = DGLArrayHandle()
-    dtype = DGLType(dtype)
-    check_call(_LIB.DGLArrayAlloc(
-        shape, ndim,
-        ctypes.c_int(dtype.type_code),
-        ctypes.c_int(dtype.bits),
-        ctypes.c_int(dtype.lanes),
-        ctx.device_type,
-        ctx.device_id,
-        ctypes.byref(handle)))
+    dtype = DGLDataType(dtype)
+    check_call(
+        _LIB.DGLArrayAlloc(
+            shape,
+            ndim,
+            ctypes.c_int(dtype.type_code),
+            ctypes.c_int(dtype.bits),
+            ctypes.c_int(dtype.lanes),
+            ctx.device_type,
+            ctx.device_id,
+            ctypes.byref(handle),
+        )
+    )
     return _make_array(handle, False)
 
 
@@ -135,18 +161,23 @@ def empty_shared_mem(name, is_create, shape, dtype="float32"):
     arr : dgl.nd.NDArray
         The array dgl supported.
     """
-    name = ctypes.c_char_p(name.encode('utf-8'))
+    name = ctypes.c_char_p(name.encode("utf-8"))
     shape = c_array(dgl_shape_index_t, shape)
     ndim = ctypes.c_int(len(shape))
     handle = DGLArrayHandle()
-    dtype = DGLType(dtype)
-    check_call(_LIB.DGLArrayAllocSharedMem(
-        name, shape, ndim,
-        ctypes.c_int(dtype.type_code),
-        ctypes.c_int(dtype.bits),
-        ctypes.c_int(dtype.lanes),
-        is_create,
-        ctypes.byref(handle)))
+    dtype = DGLDataType(dtype)
+    check_call(
+        _LIB.DGLArrayAllocSharedMem(
+            name,
+            shape,
+            ndim,
+            ctypes.c_int(dtype.type_code),
+            ctypes.c_int(dtype.bits),
+            ctypes.c_int(dtype.lanes),
+            is_create,
+            ctypes.byref(handle),
+        )
+    )
     return _make_array(handle, False)
 
 
@@ -171,10 +202,14 @@ def from_dlpack(dltensor):
 
 class NDArrayBase(_NDArrayBase):
     """A simple Device/CPU Array object in runtime."""
+
     @property
     def shape(self):
         """Shape of this array"""
-        return tuple(self.handle.contents.shape[i] for i in range(self.handle.contents.ndim))
+        return tuple(
+            self.handle.contents.shape[i]
+            for i in range(self.handle.contents.ndim)
+        )
 
     @property
     def dtype(self):
@@ -219,17 +254,19 @@ class NDArrayBase(_NDArrayBase):
 
     def __setitem__(self, in_slice, value):
         """Set ndarray value"""
-        if (not isinstance(in_slice, slice) or
-                in_slice.start is not None
-                or in_slice.stop is not None):
-            raise ValueError('Array only support set from numpy array')
+        if (
+            not isinstance(in_slice, slice)
+            or in_slice.start is not None
+            or in_slice.stop is not None
+        ):
+            raise ValueError("Array only support set from numpy array")
         if isinstance(value, NDArrayBase):
             if value.handle is not self.handle:
                 value.copyto(self)
         elif isinstance(value, (np.ndarray, np.generic)):
             self.copyfrom(value)
         else:
-            raise TypeError('type %s not supported' % str(type(value)))
+            raise TypeError("type %s not supported" % str(type(value)))
 
     def copyfrom(self, source_array):
         """Perform a synchronized copy from the array.
@@ -252,9 +289,11 @@ class NDArrayBase(_NDArrayBase):
             try:
                 source_array = np.asarray(source_array, dtype=self.dtype)
             except:
-                raise TypeError('array must be an array_like data,' +
-                                'type %s is not supported' % str(type(source_array)))
-        t = DGLType(self.dtype)
+                raise TypeError(
+                    "array must be an array_like data,"
+                    + "type %s is not supported" % str(type(source_array))
+                )
+        t = DGLDataType(self.dtype)
         shape, dtype = self.shape, self.dtype
         if t.lanes > 1:
             shape = shape + (t.lanes,)
@@ -262,12 +301,17 @@ class NDArrayBase(_NDArrayBase):
             dtype = str(t)
 
         if source_array.shape != shape:
-            raise ValueError("array shape do not match the shape of NDArray {0} vs {1}".format(
-                source_array.shape, shape))
+            raise ValueError(
+                "array shape do not match the shape of NDArray {0} vs {1}".format(
+                    source_array.shape, shape
+                )
+            )
         source_array = np.ascontiguousarray(source_array, dtype=dtype)
-        assert source_array.flags['C_CONTIGUOUS']
+        assert source_array.flags["C_CONTIGUOUS"]
         data = source_array.ctypes.data_as(ctypes.c_void_p)
-        nbytes = ctypes.c_size_t(source_array.size * source_array.dtype.itemsize)
+        nbytes = ctypes.c_size_t(
+            source_array.size * source_array.dtype.itemsize
+        )
         check_call(_LIB.DGLArrayCopyFromBytes(self.handle, data, nbytes))
         return self
 
@@ -286,14 +330,14 @@ class NDArrayBase(_NDArrayBase):
         np_arr : numpy.ndarray
             The corresponding numpy array.
         """
-        t = DGLType(self.dtype)
+        t = DGLDataType(self.dtype)
         shape, dtype = self.shape, self.dtype
         if t.lanes > 1:
             shape = shape + (t.lanes,)
             t.lanes = 1
             dtype = str(t)
         np_arr = np.empty(shape, dtype=dtype)
-        assert np_arr.flags['C_CONTIGUOUS']
+        assert np_arr.flags["C_CONTIGUOUS"]
         data = np_arr.ctypes.data_as(ctypes.c_void_p)
         nbytes = ctypes.c_size_t(np_arr.size * np_arr.dtype.itemsize)
         check_call(_LIB.DGLArrayCopyToBytes(self.handle, data, nbytes))
@@ -310,21 +354,32 @@ class NDArrayBase(_NDArrayBase):
         if isinstance(target, DGLContext):
             target = empty(self.shape, self.dtype, target)
         if isinstance(target, NDArrayBase):
-            check_call(_LIB.DGLArrayCopyFromTo(
-                self.handle, target.handle, None))
+            check_call(_LIB.DGLArrayCopyFromTo(self.handle, target.handle))
         else:
             raise ValueError("Unsupported target type %s" % str(type(target)))
         return target
 
     def pin_memory_(self):
-        """Pin host memory and map into GPU address space (in-place)
-        """
+        """Pin host memory and map into GPU address space (in-place)"""
         check_call(_LIB.DGLArrayPinData(self.handle))
 
     def unpin_memory_(self):
-        """Unpin host memory pinned by pin_memory_()
-        """
+        """Unpin host memory pinned by pin_memory_()"""
         check_call(_LIB.DGLArrayUnpinData(self.handle))
+
+    def record_stream(self, stream):
+        """Record the stream that is using this tensor.
+
+        Note
+        ----
+        This API is more for testing. Users should call ``record_stream``
+        on torch.Tensor or dgl.graph directly.
+
+        Parameters
+        ----------
+        stream : DGLStreamHandle
+        """
+        check_call(_LIB.DGLArrayRecordStream(self.handle, stream))
 
 
 def free_extension_handle(handle, type_code):
@@ -339,6 +394,7 @@ def free_extension_handle(handle, type_code):
          The tyoe code
     """
     check_call(_LIB.DGLExtTypeFree(handle, ctypes.c_int(type_code)))
+
 
 def register_extension(cls, fcreate=None):
     """Register a extension class to DGL.
@@ -385,6 +441,8 @@ def register_extension(cls, fcreate=None):
                return self.handle.value
     """
     if fcreate and cls._dgl_tcode < TypeCode.EXT_BEGIN:
-        raise ValueError("Cannot register create when extension tcode is same as buildin")
+        raise ValueError(
+            "Cannot register create when extension tcode is same as buildin"
+        )
     _reg_extension(cls, fcreate)
     return cls

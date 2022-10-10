@@ -1,41 +1,48 @@
 import time
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchmetrics.functional import accuracy
-from .. import utils
-from .. import rgcn
+
+from .. import rgcn, utils
 
 
-@utils.benchmark('time', 1200)
-@utils.parametrize('data', ['aifb', 'am'])
+@utils.benchmark("time", 1200)
+@utils.parametrize("data", ["aifb", "am"])
 def track_time(data):
     # args
-    if data == 'aifb':
+    if data == "aifb":
         num_bases = -1
-        l2norm = 0.
-    elif data == 'am':
+        l2norm = 0.0
+    elif data == "am":
         num_bases = 40
         l2norm = 5e-4
     else:
         raise ValueError()
 
-    g, num_rels, num_classes, labels, train_idx, test_idx, target_idx = rgcn.load_data(
-        data, get_norm=True)
+    (
+        g,
+        num_rels,
+        num_classes,
+        labels,
+        train_idx,
+        test_idx,
+        target_idx,
+    ) = rgcn.load_data(data, get_norm=True)
     num_hidden = 16
 
-    model = rgcn.RGCN(g.num_nodes(),
-                 num_hidden,
-                 num_classes,
-                 num_rels,
-                 num_bases=num_bases)
+    model = rgcn.RGCN(
+        g.num_nodes(), num_hidden, num_classes, num_rels, num_bases=num_bases
+    )
     device = utils.get_bench_device()
     labels = labels.to(device)
     model = model.to(device)
     g = g.int().to(device)
 
     optimizer = torch.optim.Adam(
-        model.parameters(), lr=1e-2, weight_decay=l2norm)
+        model.parameters(), lr=1e-2, weight_decay=l2norm
+    )
 
     model.train()
     num_epochs = 30

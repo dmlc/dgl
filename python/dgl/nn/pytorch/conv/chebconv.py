@@ -1,11 +1,12 @@
 """Torch Module for Chebyshev Spectral Graph Convolution layer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
 import torch as th
-from torch import nn
 import torch.nn.functional as F
+from torch import nn
 
+from .... import broadcast_nodes
+from .... import function as fn
 from ....base import dgl_warning
-from .... import broadcast_nodes, function as fn
 
 
 class ChebConv(nn.Module):
@@ -60,12 +61,7 @@ class ChebConv(nn.Module):
             [-0.2370,  3.0164]], grad_fn=<AddBackward0>)
     """
 
-    def __init__(self,
-                 in_feats,
-                 out_feats,
-                 k,
-                 activation=F.relu,
-                 bias=True):
+    def __init__(self, in_feats, out_feats, k, activation=F.relu, bias=True):
         super(ChebConv, self).__init__()
         self._k = k
         self._in_feats = in_feats
@@ -97,20 +93,25 @@ class ChebConv(nn.Module):
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is size of output feature.
         """
+
         def unnLaplacian(feat, D_invsqrt, graph):
-            """ Operation Feat * D^-1/2 A D^-1/2 """
-            graph.ndata['h'] = feat * D_invsqrt
-            graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
-            return graph.ndata.pop('h') * D_invsqrt
+            """Operation Feat * D^-1/2 A D^-1/2"""
+            graph.ndata["h"] = feat * D_invsqrt
+            graph.update_all(fn.copy_u("h", "m"), fn.sum("m", "h"))
+            return graph.ndata.pop("h") * D_invsqrt
 
         with graph.local_scope():
-            D_invsqrt = th.pow(graph.in_degrees().float().clamp(
-                min=1), -0.5).unsqueeze(-1).to(feat.device)
+            D_invsqrt = (
+                th.pow(graph.in_degrees().float().clamp(min=1), -0.5)
+                .unsqueeze(-1)
+                .to(feat.device)
+            )
 
             if lambda_max is None:
                 dgl_warning(
                     "lambda_max is not provided, using default value of 2.  "
-                    "Please use dgl.laplacian_lambda_max to compute the eigenvalues.")
+                    "Please use dgl.laplacian_lambda_max to compute the eigenvalues."
+                )
                 lambda_max = [2] * graph.batch_size
 
             if isinstance(lambda_max, list):
@@ -120,7 +121,7 @@ class ChebConv(nn.Module):
 
             # broadcast from (B, 1) to (N, 1)
             lambda_max = broadcast_nodes(graph, lambda_max)
-            re_norm = 2. / lambda_max
+            re_norm = 2.0 / lambda_max
 
             # X_0 is the raw feature, Xt refers to the concatenation of X_0, X_1, ... X_t
             Xt = X_0 = feat
@@ -128,14 +129,14 @@ class ChebConv(nn.Module):
             # X_1(f)
             if self._k > 1:
                 h = unnLaplacian(X_0, D_invsqrt, graph)
-                X_1 = - re_norm * h + X_0 * (re_norm - 1)
+                X_1 = -re_norm * h + X_0 * (re_norm - 1)
                 # Concatenate Xt and X_1
                 Xt = th.cat((Xt, X_1), 1)
 
             # Xi(x), i = 2...k
             for _ in range(2, self._k):
                 h = unnLaplacian(X_1, D_invsqrt, graph)
-                X_i = - 2 * re_norm * h + X_1 * 2 * (re_norm - 1) - X_0
+                X_i = -2 * re_norm * h + X_1 * 2 * (re_norm - 1) - X_0
                 # Concatenate Xt and X_i
                 Xt = th.cat((Xt, X_i), 1)
                 X_1, X_0 = X_i, X_1

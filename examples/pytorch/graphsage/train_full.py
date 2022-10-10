@@ -1,18 +1,21 @@
+import argparse
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 import dgl.nn as dglnn
-from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
 from dgl import AddSelfLoop
-import argparse
+from dgl.data import CiteseerGraphDataset, CoraGraphDataset, PubmedGraphDataset
+
 
 class SAGE(nn.Module):
     def __init__(self, in_size, hid_size, out_size):
         super().__init__()
         self.layers = nn.ModuleList()
         # two-layer GraphSAGE-mean
-        self.layers.append(dglnn.SAGEConv(in_size, hid_size, 'gcn'))
-        self.layers.append(dglnn.SAGEConv(hid_size, out_size, 'gcn'))
+        self.layers.append(dglnn.SAGEConv(in_size, hid_size, "gcn"))
+        self.layers.append(dglnn.SAGEConv(hid_size, out_size, "gcn"))
         self.dropout = nn.Dropout(0.5)
 
     def forward(self, graph, x):
@@ -24,6 +27,7 @@ class SAGE(nn.Module):
                 h = self.dropout(h)
         return h
 
+
 def evaluate(g, features, labels, mask, model):
     model.eval()
     with torch.no_grad():
@@ -33,6 +37,7 @@ def evaluate(g, features, labels, mask, model):
         _, indices = torch.max(logits, dim=1)
         correct = torch.sum(indices == labels)
         return correct.item() * 1.0 / len(labels)
+
 
 def train(g, features, labels, masks, model):
     # define train/val samples, loss function and optimizer
@@ -49,32 +54,42 @@ def train(g, features, labels, masks, model):
         loss.backward()
         optimizer.step()
         acc = evaluate(g, features, labels, val_mask, model)
-        print("Epoch {:05d} | Loss {:.4f} | Accuracy {:.4f} "
-              . format(epoch, loss.item(), acc))
+        print(
+            "Epoch {:05d} | Loss {:.4f} | Accuracy {:.4f} ".format(
+                epoch, loss.item(), acc
+            )
+        )
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='GraphSAGE')
-    parser.add_argument("--dataset", type=str, default="cora",
-                        help="Dataset name ('cora', 'citeseer', 'pubmed')")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="GraphSAGE")
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        default="cora",
+        help="Dataset name ('cora', 'citeseer', 'pubmed')",
+    )
     args = parser.parse_args()
-    print(f'Training with DGL built-in GraphSage module')
+    print(f"Training with DGL built-in GraphSage module")
 
     # load and preprocess dataset
-    transform = AddSelfLoop()  # by default, it will first remove self-loops to prevent duplication
-    if args.dataset == 'cora':
+    transform = (
+        AddSelfLoop()
+    )  # by default, it will first remove self-loops to prevent duplication
+    if args.dataset == "cora":
         data = CoraGraphDataset(transform=transform)
-    elif args.dataset == 'citeseer':
+    elif args.dataset == "citeseer":
         data = CiteseerGraphDataset(transform=transform)
-    elif args.dataset == 'pubmed':
+    elif args.dataset == "pubmed":
         data = PubmedGraphDataset(transform=transform)
     else:
-        raise ValueError('Unknown dataset: {}'.format(args.dataset))
+        raise ValueError("Unknown dataset: {}".format(args.dataset))
     g = data[0]
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     g = g.int().to(device)
-    features = g.ndata['feat']
-    labels = g.ndata['label']
-    masks = g.ndata['train_mask'], g.ndata['val_mask']
+    features = g.ndata["feat"]
+    labels = g.ndata["label"]
+    masks = g.ndata["train_mask"], g.ndata["val_mask"]
 
     # create GraphSAGE model
     in_size = features.shape[1]
@@ -82,10 +97,10 @@ if __name__ == '__main__':
     model = SAGE(in_size, 16, out_size).to(device)
 
     # model training
-    print('Training...')
+    print("Training...")
     train(g, features, labels, masks, model)
 
     # test the model
-    print('Testing...')
-    acc = evaluate(g, features, labels, g.ndata['test_mask'], model)
+    print("Testing...")
+    acc = evaluate(g, features, labels, g.ndata["test_mask"], model)
     print("Test accuracy {:.4f}".format(acc))

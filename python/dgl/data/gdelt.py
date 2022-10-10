@@ -1,11 +1,12 @@
 """ GDELT dataset for temporal graph """
-import numpy as np
 import os
 
-from .dgl_dataset import DGLBuiltinDataset
-from .utils import loadtxt, save_info, load_info, _get_dgl_url
-from ..convert import graph as dgl_graph
+import numpy as np
+
 from .. import backend as F
+from ..convert import graph as dgl_graph
+from .dgl_dataset import DGLBuiltinDataset
+from .utils import _get_dgl_url, load_info, loadtxt, save_info
 
 
 class GDELTDataset(DGLBuiltinDataset):
@@ -69,23 +70,32 @@ class GDELTDataset(DGLBuiltinDataset):
     ....
     >>>
     """
-    def __init__(self, mode='train', raw_dir=None,
-                 force_reload=False, verbose=False, transform=None):
+
+    def __init__(
+        self,
+        mode="train",
+        raw_dir=None,
+        force_reload=False,
+        verbose=False,
+        transform=None,
+    ):
         mode = mode.lower()
-        assert mode in ['train', 'valid', 'test'], "Mode not valid."
+        assert mode in ["train", "valid", "test"], "Mode not valid."
         self.mode = mode
         self.num_nodes = 23033
-        _url = _get_dgl_url('dataset/gdelt.zip')
-        super(GDELTDataset, self).__init__(name='GDELT',
-                                           url=_url,
-                                           raw_dir=raw_dir,
-                                           force_reload=force_reload,
-                                           verbose=verbose,
-                                           transform=transform)
+        _url = _get_dgl_url("dataset/gdelt.zip")
+        super(GDELTDataset, self).__init__(
+            name="GDELT",
+            url=_url,
+            raw_dir=raw_dir,
+            force_reload=force_reload,
+            verbose=verbose,
+            transform=transform,
+        )
 
     def process(self):
-        file_path = os.path.join(self.raw_path, self.mode + '.txt')
-        self.data = loadtxt(file_path, delimiter='\t').astype(np.int64)
+        file_path = os.path.join(self.raw_path, self.mode + ".txt")
+        self.data = loadtxt(file_path, delimiter="\t").astype(np.int64)
 
         # The source code is not released, but the paper indicates there're
         # totally 137 samples. The cutoff below has exactly 137 samples.
@@ -94,25 +104,34 @@ class GDELTDataset(DGLBuiltinDataset):
         self._end_time = self.time_index.max()
 
     def has_cache(self):
-        info_path = os.path.join(self.save_path, self.mode + '_info.pkl')
+        info_path = os.path.join(self.save_path, self.mode + "_info.pkl")
         return os.path.exists(info_path)
 
     def save(self):
-        info_path = os.path.join(self.save_path, self.mode + '_info.pkl')
-        save_info(info_path, {'data': self.data,
-                              'time_index': self.time_index,
-                              'start_time': self.start_time,
-                              'end_time': self.end_time})
+        info_path = os.path.join(self.save_path, self.mode + "_info.pkl")
+        save_info(
+            info_path,
+            {
+                "data": self.data,
+                "time_index": self.time_index,
+                "start_time": self.start_time,
+                "end_time": self.end_time,
+            },
+        )
 
     def load(self):
-        info_path = os.path.join(self.save_path, self.mode + '_info.pkl')
+        info_path = os.path.join(self.save_path, self.mode + "_info.pkl")
         info = load_info(info_path)
-        self.data, self.time_index, self._start_time, self._end_time = \
-            info['data'], info['time_index'], info['start_time'], info['end_time']
+        self.data, self.time_index, self._start_time, self._end_time = (
+            info["data"],
+            info["time_index"],
+            info["start_time"],
+            info["end_time"],
+        )
 
     @property
     def start_time(self):
-        r""" Start time of events in the temporal graph
+        r"""Start time of events in the temporal graph
 
         Returns
         -------
@@ -122,7 +141,7 @@ class GDELTDataset(DGLBuiltinDataset):
 
     @property
     def end_time(self):
-        r""" End time of events in the temporal graph
+        r"""End time of events in the temporal graph
 
         Returns
         -------
@@ -131,7 +150,7 @@ class GDELTDataset(DGLBuiltinDataset):
         return self._end_time
 
     def __getitem__(self, t):
-        r""" Get graph by with events before time `t + self.start_time`
+        r"""Get graph by with events before time `t + self.start_time`
 
         Parameters
         ----------
@@ -153,7 +172,9 @@ class GDELTDataset(DGLBuiltinDataset):
         edges = self.data[row_mask][:, [0, 2]]
         rate = self.data[row_mask][:, 1]
         g = dgl_graph((edges[:, 0], edges[:, 1]))
-        g.edata['rel_type'] = F.tensor(rate.reshape(-1, 1), dtype=F.data_type_dict['int64'])
+        g.edata["rel_type"] = F.tensor(
+            rate.reshape(-1, 1), dtype=F.data_type_dict["int64"]
+        )
         if self._transform is not None:
             g = self._transform(g)
         return g
@@ -169,7 +190,7 @@ class GDELTDataset(DGLBuiltinDataset):
 
     @property
     def is_temporal(self):
-        r""" Does the dataset contain temporal graphs
+        r"""Does the dataset contain temporal graphs
 
         Returns
         -------

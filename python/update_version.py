@@ -11,10 +11,12 @@ import re
 # current version
 # We use the version of the incoming release for code
 # that is under development
-__version__ = "0.9" + os.getenv('DGL_PRERELEASE', '')
+__version__ = "0.10" + os.getenv('DGL_PRERELEASE', '')
 print(__version__)
 
 # Implementations
+
+
 def update(file_name, pattern, repl):
     update = []
     hit_counter = 0
@@ -48,12 +50,20 @@ def main():
     update(os.path.join(proj_root, "python", "dgl", "_ffi", "libinfo.py"),
            r"(?<=__version__ = \")[.0-9a-z]+", __version__)
     # C++ header
-    update(os.path.join(proj_root, "include", "dgl", "runtime", "c_runtime_api.h"),
-           "(?<=DGL_VERSION \")[.0-9a-z]+", __version__)
+    update(
+        os.path.join(
+            proj_root,
+            "include",
+            "dgl",
+            "runtime",
+            "c_runtime_api.h"),
+        "(?<=DGL_VERSION \")[.0-9a-z]+",
+        __version__)
     # conda
     for path in ["dgl"]:
         update(os.path.join(proj_root, "conda", path, "meta.yaml"),
                "(?<=version: \")[.0-9a-z]+", __version__)
+
 
 if __name__ == "__main__":
     main()
