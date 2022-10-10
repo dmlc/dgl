@@ -170,7 +170,7 @@ The output chunked graph metadata will go as follows (assuming the current direc
 
 ## Partition Config Conversion
 
-'convert_partition_conf.py' is a tool help you convert old partition config to new version.
+`convert_partition_conf.py` is a tool help you convert old partition config to new version.
 
 ### Sample usage like
 
