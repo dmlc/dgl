@@ -140,12 +140,53 @@ __global__ void _LinearSearchKernel(
     if (v == -1) {
       out[tx] = filler;
     } else {
-      // The casts here are to be able to handle DType being __half or __nv_bfloat16.
-      out[tx] = weights ? weights[v] : static_cast<DType>(static_cast<double>(v));
+      // The casts here are to be able to handle DType being __half.
+      // GCC treats int64_t as a distinct type from long long, so
+      // without the explcit cast to long long, it errors out saying
+      // that the implicit cast results in an ambiguous choice of
+      // constructor for __half.
+      // The using statement is to avoid a linter error about using
+      // long or long long.
+      using LongLong = long long; // NOLINT
+      out[tx] = weights ? weights[v] : DType(LongLong(v));
     }
     tx += stride_x;
   }
 }
+
+#if BF16_ENABLED
+/*!
+ * \brief Specialization for bf16 because conversion from long long to bfloat16
+ * doesn't exist before SM80.
+ */
+template <typename IdType>
+__global__ void _LinearSearchKernel(
+    const IdType* indptr, const IdType* indices, const IdType* data,
+    const IdType* row, const IdType* col,
+    int64_t row_stride, int64_t col_stride, int64_t length,
+    const __nv_bfloat16* weights, __nv_bfloat16 filler, __nv_bfloat16* out) {
+  int tx = blockIdx.x * blockDim.x + threadIdx.x;
+  const int stride_x = gridDim.x * blockDim.x;
+  while (tx < length) {
+    int rpos = tx * row_stride, cpos = tx * col_stride;
+    IdType v = -1;
+    const IdType r = row[rpos], c = col[cpos];
+    for (IdType i = indptr[r]; i < indptr[r + 1]; ++i) {
+      if (indices[i] == c) {
+        v = data ? data[i] : i;
+        break;
+      }
+    }
+    if (v == -1) {
+      out[tx] = filler;
+    } else {
+      // If the result is saved in bf16, it should be fine to convert it to float first
+      out[tx] = weights ? weights[v] : __nv_bfloat16(static_cast<float>(v));
+    }
+    tx += stride_x;
+  }
+}
+#endif  // BF16_ENABLED
 
 template <typename DType>
 inline DType GetCUDAScalar(

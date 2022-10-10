@@ -20,7 +20,7 @@
 #ifdef DGL_USE_CUDA
 #include <cuda_runtime.h>
 
-#define BF16_ENABLED defined(CUDART_VERSION) && CUDART_VERSION >= 11000
+#define BF16_ENABLED (defined(CUDART_VERSION) && CUDART_VERSION >= 11000)
 
 #include <cuda_fp16.h>
 #if BF16_ENABLED

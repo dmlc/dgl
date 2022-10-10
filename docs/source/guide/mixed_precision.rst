@@ -63,7 +63,7 @@ efficient, most operators on half precision tensors are faster as they leverage 
     import torch.nn.functional as F
     from torch.cuda.amp import autocast
 
-    def forward(g, feat, label, mask, model, amd_dtype):
+    def forward(g, feat, label, mask, model, amp_dtype):
         amp_enabled = amp_dtype in (torch.float16, torch.bfloat16)
         with autocast(enabled=amp_enabled, dtype=amp_dtype):
             logit = model(g, feat)
