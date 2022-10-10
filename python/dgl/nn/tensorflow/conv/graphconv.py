@@ -4,7 +4,7 @@ import tensorflow as tf
 from tensorflow.keras import layers
 import numpy as np
 
-from ... import function as fn
+from .... import function as fn
 from ....base import DGLError
 from ....utils import expand_as_pair
 from ....transforms import reverse
