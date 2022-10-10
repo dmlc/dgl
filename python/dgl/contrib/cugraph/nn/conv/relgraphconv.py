@@ -20,20 +20,15 @@ class RelGraphConvAgg(th.autograd.Function):
         ----------
         g : dgl.heterograph.DGLHeteroGraph
             Heterogeneous graph.
-
         fanout : int
             Maximum in-degree of nodes.
-
         num_rels : int
             Number of edge types in this graph.
-
         edge_types : torch.Tensor
             Tensor of the edge types.
-
         coeff : torch.Tensor, dtype=torch.float32, requires_grad=True
             Coefficient matrix in basis-decomposition for regularization,
             shape: (num_rels, num_bases). It should be set to ``None`` when ``regularizer=None``.
-
         feat : torch.Tensor, dtype=torch.float32, requires_grad=True
             Input feature, shape: (num_src_nodes, in_feat).
 
@@ -117,7 +112,60 @@ class RelGraphConvAgg(th.autograd.Function):
         return None, None, None, None, grad_feat, grad_coeff
 
 class RelGraphConv(nn.Module):
-    """ Relational graph convolution layer. """
+    """ Relational graph convolution layer using the aggregation functions in cugraph-ops.
+
+    Parameters
+    ----------
+    in_feat : int
+        Input feature size; i.e, the number of dimensions of :math:`h_j^{(l)}`.
+    out_feat : int
+        Output feature size; i.e., the number of dimensions of :math:`h_i^{(l+1)}`.
+    num_rels : int
+        Number of relations.
+    fanout : int
+        Maximum number of sampled neighbors of an destination node;
+        i.e, maximum in degree of destination nodes
+    regularizer : str, optional
+        Which weight regularizer to use ("basis" or ``None``):
+
+         - "basis" is for basis-decomposition.
+         - ``None`` applies no regularization.
+
+        Default: ``None``.
+    num_bases : int, optional
+        Number of bases. It comes into effect when "basis" regularizer is applied.
+        Default: ``None``.
+    bias : bool, optional
+        True if bias is added. Default: ``True``.
+    activation : callable, optional
+        Activation function. Default: ``None``.
+    self_loop : bool, optional
+        True to include self loop message. Default: ``True``.
+    dropout : float, optional
+        Dropout rate. Default: ``0.0``
+    layer_norm: bool, optional
+        True to add layer norm. Default: ``False``
+
+    Examples
+    --------
+    >>> import dgl
+    >>> from dgl.dataloading import NeighborSampler, DataLoader
+    >>> from dgl.contrib.cugraph.nn import RelGraphConv
+    >>> import torch.nn.functional as F
+    >>>
+    >>> device = 'cuda'
+    >>> fanouts = [5, 6]
+    >>> sampler = NeighborSampler(fanouts)
+    >>> dataloader = DataLoader(g, train_nid, sampler, device=device, batch_size=1024)
+    >>> conv1 = RelGraphConv(in_dim, h_dim, num_rels, fanouts[0],
+    ...     regularizer='basis', num_bases=10)
+    >>> conv2 = RelGraphConv(h_dim, out_dim, num_rels, fanouts[1],
+    ...     regularizer='basis', num_bases=10)
+    >>> for input_nodes, output_nodes, blocks in dataloader:
+    ...     h = conv1(blocks[0], x, blocks[0].edata[dgl.ETYPE])
+    ...     h = F.relu(h)
+    ...     h = conv2(blocks[1], h, blocks[1].edata[dgl.ETYPE])
+    """
     def __init__(self,
                  in_feat,
                  out_feat,
@@ -186,6 +234,29 @@ class RelGraphConv(nn.Module):
                     f'Supported regularizer options: "basis", but got {self.regularizer}')
 
     def forward(self, g, feat, etypes, norm=None, *, presorted=False):
+        """Forward computation.
+
+        Parameters
+        ----------
+        g : DGLGraph
+            The graph.
+        feat : torch.Tensor
+            A 2D tensor of node features. Shape: :math:`(|V|, D_{in})`.
+        etypes : torch.Tensor or list[int]
+            An 1D integer tensor of edge types. Shape: :math:`(|E|,)`.
+        norm : torch.Tensor, optional
+            An 1D tensor of edge norm value.  Shape: :math:`(|E|,)`.
+        presorted : bool, optional
+            Whether the edges of the input graph have been sorted by their types.
+            Forward on pre-sorted graph may be faster. Graphs created
+            by :func:`~dgl.to_homogeneous` automatically satisfy the condition.
+            Also see :func:`~dgl.reorder_graph` for sorting edges manually.
+
+        Returns
+        -------
+        torch.Tensor
+            New node features. Shape: :math:`(|V|, D_{out})`.
+        """
         _sm_size = self.fanout * 2 + 3 + \
                    self.num_rels * self.num_bases if self.regularizer == 'basis' else 0
         _sm_size *= 8 if g.idtype == th.int64 else 4
