@@ -1,8 +1,9 @@
 """Library information."""
 from __future__ import absolute_import
-import sys
+
 import os
 import pathlib
+import sys
 
 
 def find_lib_path(name=None, search_path=None, optional=False):
@@ -30,13 +31,21 @@ def find_lib_path(name=None, search_path=None, optional=False):
 
     dll_path = []
 
-    if os.environ.get('DGL_LIBRARY_PATH', None):
-        dll_path.append(os.environ['DGL_LIBRARY_PATH'])
+    if os.environ.get("DGL_LIBRARY_PATH", None):
+        dll_path.append(os.environ["DGL_LIBRARY_PATH"])
 
-    if sys.platform.startswith('linux') and os.environ.get('LD_LIBRARY_PATH', None):
-        dll_path.extend([p.strip() for p in os.environ['LD_LIBRARY_PATH'].split(":")])
-    elif sys.platform.startswith('darwin') and os.environ.get('DYLD_LIBRARY_PATH', None):
-        dll_path.extend([p.strip() for p in os.environ['DYLD_LIBRARY_PATH'].split(":")])
+    if sys.platform.startswith("linux") and os.environ.get(
+        "LD_LIBRARY_PATH", None
+    ):
+        dll_path.extend(
+            [p.strip() for p in os.environ["LD_LIBRARY_PATH"].split(":")]
+        )
+    elif sys.platform.startswith("darwin") and os.environ.get(
+        "DYLD_LIBRARY_PATH", None
+    ):
+        dll_path.extend(
+            [p.strip() for p in os.environ["DYLD_LIBRARY_PATH"].split(":")]
+        )
 
     # Pip lib directory
     dll_path.append(os.path.join(ffi_dir, ".."))
@@ -54,17 +63,21 @@ def find_lib_path(name=None, search_path=None, optional=False):
         elif isinstance(search_path, str):
             dll_path.append(search_path)
         else:
-            raise ValueError("type(search_path)={} is invalid".format(type(search_path)))
-    dll_path = [str(x.absolute()) if isinstance(x, pathlib.Path)
-                else os.path.abspath(x) for x in dll_path]
+            raise ValueError(
+                "type(search_path)={} is invalid".format(type(search_path))
+            )
+    dll_path = [
+        str(x.absolute()) if isinstance(x, pathlib.Path) else os.path.abspath(x)
+        for x in dll_path
+    ]
 
     if name is None:
-        if sys.platform.startswith('win32'):
-            name = ['libdgl.dll', 'dgl.dll']
-        elif sys.platform.startswith('darwin'):
-            name = 'libdgl.dylib'
+        if sys.platform.startswith("win32"):
+            name = ["libdgl.dll", "dgl.dll"]
+        elif sys.platform.startswith("darwin"):
+            name = "libdgl.dylib"
         else:
-            name = 'libdgl.so'
+            name = "libdgl.so"
 
     if isinstance(name, str):
         name = [name]
@@ -76,9 +89,11 @@ def find_lib_path(name=None, search_path=None, optional=False):
     lib_found = [p for p in lib_dll_path if os.path.isfile(p)]
 
     if not lib_found:
-        message = ('Cannot find the files.\n' +
-                   'List of candidates:\n' +
-                   str('\n'.join(lib_dll_path)))
+        message = (
+            "Cannot find the files.\n"
+            + "List of candidates:\n"
+            + str("\n".join(lib_dll_path))
+        )
         if not optional:
             raise RuntimeError(message)
         return None
@@ -90,4 +105,4 @@ def find_lib_path(name=None, search_path=None, optional=False):
 # We use the version of the incoming release for code
 # that is under development.
 # The following line is set by dgl/python/update_version.py
-__version__ = "0.9"
+__version__ = "0.10"

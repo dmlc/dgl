@@ -1,19 +1,33 @@
 import torch
 import torch.nn as nn
-
-from dgl.nn.pytorch import SumPooling, AvgPooling, MaxPooling, GlobalAttentionPooling, Set2Set
-
 from conv import GNN_node, GNN_node_Virtualnode
 
-class GNN(nn.Module):
+from dgl.nn.pytorch import (
+    AvgPooling,
+    GlobalAttentionPooling,
+    MaxPooling,
+    Set2Set,
+    SumPooling,
+)
 
-    def __init__(self, num_tasks = 1, num_layers = 5, emb_dim = 300, gnn_type = 'gin',
-                 virtual_node = True, residual = False, drop_ratio = 0, JK = "last",
-                 graph_pooling = "sum"):
-        '''
-            num_tasks (int): number of labels to be predicted
-            virtual_node (bool): whether to add virtual node or not
-        '''
+
+class GNN(nn.Module):
+    def __init__(
+        self,
+        num_tasks=1,
+        num_layers=5,
+        emb_dim=300,
+        gnn_type="gin",
+        virtual_node=True,
+        residual=False,
+        drop_ratio=0,
+        JK="last",
+        graph_pooling="sum",
+    ):
+        """
+        num_tasks (int): number of labels to be predicted
+        virtual_node (bool): whether to add virtual node or not
+        """
         super(GNN, self).__init__()
 
         self.num_layers = num_layers
@@ -28,14 +42,23 @@ class GNN(nn.Module):
 
         ### GNN to generate node embeddings
         if virtual_node:
-            self.gnn_node = GNN_node_Virtualnode(num_layers, emb_dim, JK = JK,
-                                                 drop_ratio = drop_ratio,
-                                                 residual = residual,
-                                                 gnn_type = gnn_type)
+            self.gnn_node = GNN_node_Virtualnode(
+                num_layers,
+                emb_dim,
+                JK=JK,
+                drop_ratio=drop_ratio,
+                residual=residual,
+                gnn_type=gnn_type,
+            )
         else:
-            self.gnn_node = GNN_node(num_layers, emb_dim, JK = JK, drop_ratio = drop_ratio,
-                                     residual = residual, gnn_type = gnn_type)
-
+            self.gnn_node = GNN_node(
+                num_layers,
+                emb_dim,
+                JK=JK,
+                drop_ratio=drop_ratio,
+                residual=residual,
+                gnn_type=gnn_type,
+            )
 
         ### Pooling function to generate whole-graph embeddings
         if self.graph_pooling == "sum":
@@ -46,18 +69,21 @@ class GNN(nn.Module):
             self.pool = MaxPooling
         elif self.graph_pooling == "attention":
             self.pool = GlobalAttentionPooling(
-                gate_nn = nn.Sequential(nn.Linear(emb_dim, 2*emb_dim),
-                                        nn.BatchNorm1d(2*emb_dim),
-                                        nn.ReLU(),
-                                        nn.Linear(2*emb_dim, 1)))
+                gate_nn=nn.Sequential(
+                    nn.Linear(emb_dim, 2 * emb_dim),
+                    nn.BatchNorm1d(2 * emb_dim),
+                    nn.ReLU(),
+                    nn.Linear(2 * emb_dim, 1),
+                )
+            )
 
         elif self.graph_pooling == "set2set":
-            self.pool = Set2Set(emb_dim, n_iters = 2, n_layers = 2)
+            self.pool = Set2Set(emb_dim, n_iters=2, n_layers=2)
         else:
             raise ValueError("Invalid graph pooling type.")
 
         if graph_pooling == "set2set":
-            self.graph_pred_linear = nn.Linear(2*self.emb_dim, self.num_tasks)
+            self.graph_pred_linear = nn.Linear(2 * self.emb_dim, self.num_tasks)
         else:
             self.graph_pred_linear = nn.Linear(self.emb_dim, self.num_tasks)
 

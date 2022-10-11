@@ -1,13 +1,16 @@
 import torch as th
 import torch.nn as nn
-from dgl.nn import GATConv
 from torch.nn import LSTM
+
+from dgl.nn import GATConv
 
 
 class GeniePathConv(nn.Module):
     def __init__(self, in_dim, hid_dim, out_dim, num_heads=1, residual=False):
         super(GeniePathConv, self).__init__()
-        self.breadth_func = GATConv(in_dim, hid_dim, num_heads=num_heads, residual=residual)
+        self.breadth_func = GATConv(
+            in_dim, hid_dim, num_heads=num_heads, residual=residual
+        )
         self.depth_func = LSTM(hid_dim, out_dim)
 
     def forward(self, graph, x, h, c):
@@ -20,14 +23,30 @@ class GeniePathConv(nn.Module):
 
 
 class GeniePath(nn.Module):
-    def __init__(self, in_dim, out_dim, hid_dim=16, num_layers=2, num_heads=1, residual=False):
+    def __init__(
+        self,
+        in_dim,
+        out_dim,
+        hid_dim=16,
+        num_layers=2,
+        num_heads=1,
+        residual=False,
+    ):
         super(GeniePath, self).__init__()
         self.hid_dim = hid_dim
         self.linear1 = nn.Linear(in_dim, hid_dim)
         self.linear2 = nn.Linear(hid_dim, out_dim)
         self.layers = nn.ModuleList()
         for i in range(num_layers):
-            self.layers.append(GeniePathConv(hid_dim, hid_dim, hid_dim, num_heads=num_heads, residual=residual))
+            self.layers.append(
+                GeniePathConv(
+                    hid_dim,
+                    hid_dim,
+                    hid_dim,
+                    num_heads=num_heads,
+                    residual=residual,
+                )
+            )
 
     def forward(self, graph, x):
         h = th.zeros(1, x.shape[0], self.hid_dim).to(x.device)
@@ -42,7 +61,15 @@ class GeniePath(nn.Module):
 
 
 class GeniePathLazy(nn.Module):
-    def __init__(self, in_dim, out_dim, hid_dim=16, num_layers=2, num_heads=1, residual=False):
+    def __init__(
+        self,
+        in_dim,
+        out_dim,
+        hid_dim=16,
+        num_layers=2,
+        num_heads=1,
+        residual=False,
+    ):
         super(GeniePathLazy, self).__init__()
         self.hid_dim = hid_dim
         self.linear1 = nn.Linear(in_dim, hid_dim)
@@ -50,8 +77,12 @@ class GeniePathLazy(nn.Module):
         self.breaths = nn.ModuleList()
         self.depths = nn.ModuleList()
         for i in range(num_layers):
-            self.breaths.append(GATConv(hid_dim, hid_dim, num_heads=num_heads, residual=residual))
-            self.depths.append(LSTM(hid_dim*2, hid_dim))
+            self.breaths.append(
+                GATConv(
+                    hid_dim, hid_dim, num_heads=num_heads, residual=residual
+                )
+            )
+            self.depths.append(LSTM(hid_dim * 2, hid_dim))
 
     def forward(self, graph, x):
         h = th.zeros(1, x.shape[0], self.hid_dim).to(x.device)

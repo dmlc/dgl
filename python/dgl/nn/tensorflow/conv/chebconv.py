@@ -1,11 +1,12 @@
 """Tensorflow Module for Chebyshev Spectral Graph Convolution layer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
+import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
-import numpy as np
 
+from .... import broadcast_nodes
+from .... import function as fn
 from ....base import dgl_warning
-from .... import broadcast_nodes, function as fn
 
 
 class ChebConv(layers.Layer):
@@ -60,12 +61,9 @@ class ChebConv(layers.Layer):
             [-0.2370,  3.0164]], dtype=float32)>
     """
 
-    def __init__(self,
-                 in_feats,
-                 out_feats,
-                 k,
-                 activation=tf.nn.relu,
-                 bias=True):
+    def __init__(
+        self, in_feats, out_feats, k, activation=tf.nn.relu, bias=True
+    ):
         super(ChebConv, self).__init__()
         self._k = k
         self._in_feats = in_feats
@@ -97,33 +95,38 @@ class ChebConv(layers.Layer):
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is size of output feature.
         """
+
         def unnLaplacian(feat, D_invsqrt, graph):
-            """ Operation Feat * D^-1/2 A D^-1/2 """
-            graph.ndata['h'] = feat * D_invsqrt
-            graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
-            return graph.ndata.pop('h') * D_invsqrt
+            """Operation Feat * D^-1/2 A D^-1/2"""
+            graph.ndata["h"] = feat * D_invsqrt
+            graph.update_all(fn.copy_u("h", "m"), fn.sum("m", "h"))
+            return graph.ndata.pop("h") * D_invsqrt
 
         with graph.local_scope():
-            in_degrees = tf.clip_by_value(tf.cast(graph.in_degrees(), tf.float32),
-                                          clip_value_min=1,
-                                          clip_value_max=np.inf)
+            in_degrees = tf.clip_by_value(
+                tf.cast(graph.in_degrees(), tf.float32),
+                clip_value_min=1,
+                clip_value_max=np.inf,
+            )
             D_invsqrt = tf.expand_dims(tf.pow(in_degrees, -0.5), axis=-1)
 
             if lambda_max is None:
                 dgl_warning(
                     "lambda_max is not provided, using default value of 2.  "
-                    "Please use dgl.laplacian_lambda_max to compute the eigenvalues.")
+                    "Please use dgl.laplacian_lambda_max to compute the eigenvalues."
+                )
                 lambda_max = [2] * graph.batch_size
 
             if isinstance(lambda_max, list):
                 lambda_max = tf.constant(lambda_max, dtype=tf.float32)
             if lambda_max.ndim == 1:
                 lambda_max = tf.expand_dims(
-                    lambda_max, axis=-1)  # (B,) to (B, 1)
+                    lambda_max, axis=-1
+                )  # (B,) to (B, 1)
 
             # broadcast from (B, 1) to (N, 1)
             lambda_max = broadcast_nodes(graph, lambda_max)
-            re_norm = 2. / lambda_max
+            re_norm = 2.0 / lambda_max
 
             # X_0 is the raw feature, Xt refers to the concatenation of X_0, X_1, ... X_t
             Xt = X_0 = feat
@@ -131,14 +134,14 @@ class ChebConv(layers.Layer):
             # X_1(f)
             if self._k > 1:
                 h = unnLaplacian(X_0, D_invsqrt, graph)
-                X_1 = - re_norm * h + X_0 * (re_norm - 1)
+                X_1 = -re_norm * h + X_0 * (re_norm - 1)
                 # Concatenate Xt and X_1
                 Xt = tf.concat((Xt, X_1), 1)
 
             # Xi(x), i = 2...k
             for _ in range(2, self._k):
                 h = unnLaplacian(X_1, D_invsqrt, graph)
-                X_i = - 2 * re_norm * h + X_1 * 2 * (re_norm - 1) - X_0
+                X_i = -2 * re_norm * h + X_1 * 2 * (re_norm - 1) - X_0
                 # Concatenate Xt and X_i
                 Xt = tf.concat((Xt, X_i), 1)
                 X_1, X_0 = X_i, X_1

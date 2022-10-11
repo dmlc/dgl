@@ -122,4 +122,5 @@ Network Embedding Modules
     :nosignatures:
     :template: classtemplate.rst
 
+    ~dgl.nn.pytorch.DeepWalk
     ~dgl.nn.pytorch.MetaPath2Vec

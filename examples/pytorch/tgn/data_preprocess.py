@@ -1,17 +1,18 @@
 import os
 import ssl
+
+import numpy as np
+import pandas as pd
+import torch
 from six.moves import urllib
 
-import pandas as pd
-import numpy as np
-
-import torch
 import dgl
 
 # === Below data preprocessing code are based on
 # https://github.com/twitter-research/tgn
 
 # Preprocess the raw data split each features
+
 
 def preprocess(data_name):
     u_list, i_list, ts_list, label_list = [], [], [], []
@@ -21,7 +22,7 @@ def preprocess(data_name):
     with open(data_name) as f:
         s = next(f)
         for idx, line in enumerate(f):
-            e = line.strip().split(',')
+            e = line.strip().split(",")
             u = int(e[0])
             i = int(e[1])
 
@@ -37,18 +38,23 @@ def preprocess(data_name):
             idx_list.append(idx)
 
             feat_l.append(feat)
-    return pd.DataFrame({'u': u_list,
-                         'i': i_list,
-                         'ts': ts_list,
-                         'label': label_list,
-                         'idx': idx_list}), np.array(feat_l)
+    return pd.DataFrame(
+        {
+            "u": u_list,
+            "i": i_list,
+            "ts": ts_list,
+            "label": label_list,
+            "idx": idx_list,
+        }
+    ), np.array(feat_l)
+
 
 # Re index nodes for DGL convience
 def reindex(df, bipartite=True):
     new_df = df.copy()
     if bipartite:
-        assert (df.u.max() - df.u.min() + 1 == len(df.u.unique()))
-        assert (df.i.max() - df.i.min() + 1 == len(df.i.unique()))
+        assert df.u.max() - df.u.min() + 1 == len(df.u.unique())
+        assert df.i.max() - df.i.min() + 1 == len(df.i.unique())
 
         upper_u = df.u.max() + 1
         new_i = df.i + upper_u
@@ -64,12 +70,13 @@ def reindex(df, bipartite=True):
 
     return new_df
 
+
 # Save edge list, features in different file for data easy process data
 def run(data_name, bipartite=True):
-    PATH = './data/{}.csv'.format(data_name)
-    OUT_DF = './data/ml_{}.csv'.format(data_name)
-    OUT_FEAT = './data/ml_{}.npy'.format(data_name)
-    OUT_NODE_FEAT = './data/ml_{}_node.npy'.format(data_name)
+    PATH = "./data/{}.csv".format(data_name)
+    OUT_DF = "./data/ml_{}.csv".format(data_name)
+    OUT_FEAT = "./data/ml_{}.npy".format(data_name)
+    OUT_NODE_FEAT = "./data/ml_{}_node.npy".format(data_name)
 
     df, feat = preprocess(PATH)
     new_df = reindex(df, bipartite)
@@ -84,18 +91,20 @@ def run(data_name, bipartite=True):
     np.save(OUT_FEAT, feat)
     np.save(OUT_NODE_FEAT, rand_feat)
 
+
 # === code from twitter-research-tgn end ===
 
 # If you have new dataset follow by same format in Jodie,
 # you can directly use name to retrieve dataset
 
-def TemporalDataset(dataset):
-    if not os.path.exists('./data/{}.bin'.format(dataset)):
-        if not os.path.exists('./data/{}.csv'.format(dataset)):
-            if not os.path.exists('./data'):
-                os.mkdir('./data')
 
-            url = 'https://snap.stanford.edu/jodie/{}.csv'.format(dataset)
+def TemporalDataset(dataset):
+    if not os.path.exists("./data/{}.bin".format(dataset)):
+        if not os.path.exists("./data/{}.csv".format(dataset)):
+            if not os.path.exists("./data"):
+                os.mkdir("./data")
+
+            url = "https://snap.stanford.edu/jodie/{}.csv".format(dataset)
             print("Start Downloading File....")
             context = ssl._create_unverified_context()
             data = urllib.request.urlopen(url, context=context)
@@ -104,27 +113,28 @@ def TemporalDataset(dataset):
 
         print("Start Process Data ...")
         run(dataset)
-        raw_connection = pd.read_csv('./data/ml_{}.csv'.format(dataset))
-        raw_feature = np.load('./data/ml_{}.npy'.format(dataset))
+        raw_connection = pd.read_csv("./data/ml_{}.csv".format(dataset))
+        raw_feature = np.load("./data/ml_{}.npy".format(dataset))
         # -1 for re-index the node
-        src = raw_connection['u'].to_numpy()-1
-        dst = raw_connection['i'].to_numpy()-1
+        src = raw_connection["u"].to_numpy() - 1
+        dst = raw_connection["i"].to_numpy() - 1
         # Create directed graph
         g = dgl.graph((src, dst))
-        g.edata['timestamp'] = torch.from_numpy(
-            raw_connection['ts'].to_numpy())
-        g.edata['label'] = torch.from_numpy(raw_connection['label'].to_numpy())
-        g.edata['feats'] = torch.from_numpy(raw_feature[1:, :]).float()
-        dgl.save_graphs('./data/{}.bin'.format(dataset), [g])
+        g.edata["timestamp"] = torch.from_numpy(raw_connection["ts"].to_numpy())
+        g.edata["label"] = torch.from_numpy(raw_connection["label"].to_numpy())
+        g.edata["feats"] = torch.from_numpy(raw_feature[1:, :]).float()
+        dgl.save_graphs("./data/{}.bin".format(dataset), [g])
     else:
         print("Data is exist directly loaded.")
-        gs, _ = dgl.load_graphs('./data/{}.bin'.format(dataset))
+        gs, _ = dgl.load_graphs("./data/{}.bin".format(dataset))
         g = gs[0]
     return g
 
+
 def TemporalWikipediaDataset():
     # Download the dataset
-    return TemporalDataset('wikipedia')
+    return TemporalDataset("wikipedia")
+
 
 def TemporalRedditDataset():
-    return TemporalDataset('reddit')
+    return TemporalDataset("reddit")
