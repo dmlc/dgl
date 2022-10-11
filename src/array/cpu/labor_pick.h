@@ -44,8 +44,15 @@ namespace impl {
 
 // Template for picking non-zero values first layerwise than row-wise.
 template <typename IdxType, typename FloatType>
-std::pair<COOMatrix, FloatArray> CSRLaborPick(CSRMatrix mat, IdArray NIDs, IdArray rows,
-                         int64_t __num_picks, FloatArray prob, IdArray random_seed, IdArray cnt, int importance_sampling) {
+std::pair<COOMatrix, FloatArray> CSRLaborPick(
+    CSRMatrix mat,
+    IdArray NIDs,
+    IdArray rows,
+    int64_t __num_picks,
+    FloatArray prob,
+    IdArray random_seed,
+    IdArray cnt,
+    int importance_sampling) {
   using namespace aten;
   const IdxType* indptr = static_cast<IdxType*>(mat.indptr->data);
   const IdxType* indices = static_cast<IdxType*>(mat.indices->data);
@@ -74,7 +81,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(CSRMatrix mat, IdArray NIDs, IdArr
                                         DGLDataType{kDGLFloat, 8*sizeof(FloatType), 1},
                                         ctx);
   FloatType* ds = static_cast<FloatType*>(ds_array->data);
-  
+
   IdxType max_d = 1;
   IdxType hop_size = 0;
   for (int64_t i = 0; i < num_rows; ++i) {
@@ -111,26 +118,27 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(CSRMatrix mat, IdArray NIDs, IdArr
         if (hop_map.empty())
           hop_map = std::move(hop_map2);
         else
-          for (auto it: hop_map2)
+          for (auto it : hop_map2)
             hop_map[it.first] *= it.second;
-      }
-      else if (importance_sampling > 0)
+      } else if (importance_sampling > 0) {
         importance_sampling++;
-      
+      }
+
       for (int64_t i = 0; i < num_rows; ++i) {
         const IdxType rid = rows_data[i];
         const auto d = indptr[rid + 1] - indptr[rid];
         if (d == 0)
           continue;
-        
+
         const auto k = std::min(num_picks, d);
 
-        if (hop_map.empty()) // weights first iter, pi = A
+        if (hop_map.empty()) {  // weights first iter, pi = A
           for (auto j = indptr[rid]; j < indptr[rid + 1]; j++)
             ps[j - indptr[rid]] = A[j];
-        else
+        } else {
           for (auto j = indptr[rid]; j < indptr[rid + 1]; j++)
             ps[j - indptr[rid]] = hop_map[indices[j]];
+        }
 
         double var_target = ds[i] * ds[i] / k;
         if (weights) {
@@ -144,14 +152,15 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(CSRMatrix mat, IdArray NIDs, IdArr
           // fix weights case
           std::make_heap(ps, ps + d);
           double r = 0;
-          if (weights)
+          if (weights) {
             for (IdxType i = 0; i < d; i++) {
               const auto w = A[i + indptr[rid]];
               r += w / ps[i];
             }
-          else
+          } else {
             for (IdxType i = 0; i < d; i++)
               r += 1 / ps[i];
+          }
           c = r / var_target;
           if (weights) {
             double v = A[d - 1] * A[d - 1];
@@ -161,33 +170,34 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(CSRMatrix mat, IdArray NIDs, IdArr
               c = r / (var_target - v);
               v += A[i - 1 + indptr[rid]];
             }
-          }
-          else {
+          } else {
             for (auto i = d - 1; i > 0 && c * ps[i] >= 1; i--) {
               std::pop_heap(ps, ps + i + 1);
               r -= ps[i];
               c = r / (var_target - (d - i));
             }
           }
-        }
-        else do {
-          var_1 = 0;
-          if (weights)
-            for (auto j = indptr[rid]; j < indptr[rid + 1]; j++)
-              var_1 += A[j] * A[j] / std::min(ONE, c * ps[j - indptr[rid]]);
-          else
-            for (auto j = indptr[rid]; j < indptr[rid + 1]; j++)
-              var_1 += ONE / std::min(ONE, c * ps[j - indptr[rid]]);
+        } else {
+          do {
+            var_1 = 0;
+            if (weights) {
+              for (auto j = indptr[rid]; j < indptr[rid + 1]; j++)
+                var_1 += A[j] * A[j] / std::min(ONE, c * ps[j - indptr[rid]]);
+            } else {
+              for (auto j = indptr[rid]; j < indptr[rid + 1]; j++)
+                var_1 += ONE / std::min(ONE, c * ps[j - indptr[rid]]);
+            }
 
-          c *= var_1 / var_target;
-        } while (std::min(var_1, var_target) / std::max(var_1, var_target) < 1 - eps);
-        
+            c *= var_1 / var_target;
+          } while (std::min(var_1, var_target) / std::max(var_1, var_target) < 1 - eps);
+        }
+
         cs[i] = c;
       }
 
       if (!weights || iters) {
         double cur_ex_nodes = 0;
-        for (auto it: hop_map)
+        for (auto it : hop_map)
           cur_ex_nodes += std::min((FloatType)1, it.second);
         if (cur_ex_nodes / prev_ex_nodes >= 1 - eps)
           break;
@@ -234,8 +244,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(CSRMatrix mat, IdArray NIDs, IdArr
           norm.reset();
           rnd += a1 * norm(ng);
           it->second = std::erfc(-rnd * (FloatType)M_SQRT1_2) / 2;
-        }
-        else {
+        } else {
           uni.reset();
           it->second = uni(ng);
         }
@@ -262,9 +271,9 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(CSRMatrix mat, IdArray NIDs, IdArr
   IdxType* picked_cdata = static_cast<IdxType*>(picked_col->data);
   IdxType* picked_idata = static_cast<IdxType*>(picked_idx->data);
   FloatType* importances_data = static_cast<FloatType*>(importances->data);
-  
+
   std::size_t off = 0, idx = 0;
-  
+
   for (int64_t i = 0; i < num_rows; ++i) {
     const IdxType rid = rows_data[i];
     const auto d = indptr[rid + 1] - indptr[rid];
@@ -289,11 +298,12 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(CSRMatrix mat, IdArray NIDs, IdArr
         off++;
       }
     }
-    
-    if (importance_sampling)
+
+    if (importance_sampling) {
       for (auto i = off_start; i < off; i++)
         // so that fn.mean can be used
         importances_data[i] *= (off - off_start) / norm_inv_p;
+    }
   }
 
   assert((IdxType)off == num_edges);
@@ -306,12 +316,20 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(CSRMatrix mat, IdArray NIDs, IdArr
 // out the corresponding rows and then converts it to CSR format. It then performs
 // row-wise pick on the CSR matrix and rectifies the returned results.
 template <typename IdxType, typename FloatType>
-std::pair<COOMatrix, FloatArray> COOLaborPick(COOMatrix mat, IdArray NIDs, IdArray rows,
-                          int64_t num_picks, FloatArray prob, IdArray random_seed, IdArray cnt, int importance_sampling) {
+std::pair<COOMatrix, FloatArray> COOLaborPick(
+    COOMatrix mat,
+    IdArray NIDs,
+    IdArray rows,
+    int64_t num_picks,
+    FloatArray prob,
+    IdArray random_seed,
+    IdArray cnt,
+    int importance_sampling) {
   using namespace aten;
   const auto& csr = COOToCSR(COOSliceRows(mat, rows));
   const IdArray new_rows = Range(0, rows->shape[0], rows->dtype.bits, rows->ctx);
-  const auto& [picked, importances] = CSRLaborPick<IdxType, FloatType>(csr, NIDs, new_rows, num_picks, prob, random_seed, cnt, importance_sampling);
+  const auto& [picked, importances] = CSRLaborPick<IdxType, FloatType>(
+      csr, NIDs, new_rows, num_picks, prob, random_seed, cnt, importance_sampling);
   return std::make_pair(COOMatrix(mat.num_rows, mat.num_cols,
                    IndexSelect(rows, picked.row),  // map the row index to the correct one
                    picked.col,
@@ -322,4 +340,4 @@ std::pair<COOMatrix, FloatArray> COOLaborPick(COOMatrix mat, IdArray NIDs, IdArr
 }  // namespace aten
 }  // namespace dgl
 
-#endif  // DGL_ARRAY_CPU_ROWWISE_PICK_H_
+#endif  // DGL_ARRAY_CPU_LABOR_PICK_H_

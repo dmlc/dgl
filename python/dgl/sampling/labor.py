@@ -174,7 +174,8 @@ def sample_labors(g, nodes, fanout, random_seed, edge_dir='in', prob=None,
     if F.device_type(g.device) == 'cpu' and not g.is_pinned():
         frontier, importances = _sample_labors(
             g, nodes, fanout, random_seed, edge_dir=edge_dir, prob=prob,
-            importance_sampling=importance_sampling, copy_ndata=copy_ndata, copy_edata=copy_edata, exclude_edges=exclude_edges)
+            importance_sampling=importance_sampling, copy_ndata=copy_ndata,
+            copy_edata=copy_edata, exclude_edges=exclude_edges)
     else:
         frontier, importances = _sample_labors(
             g, nodes, fanout, random_seed, edge_dir=edge_dir, prob=prob,

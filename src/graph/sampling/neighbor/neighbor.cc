@@ -10,11 +10,11 @@
 #include <dgl/runtime/container.h>
 #include <dgl/sampling/neighbor.h>
 
-#include "../../../c_api_common.h"
-#include "../../unit_graph.h"
-
 #include <tuple>
 #include <utility>
+
+#include "../../../c_api_common.h"
+#include "../../unit_graph.h"
 
 using namespace dgl::runtime;
 using namespace dgl::aten;
@@ -45,7 +45,10 @@ std::pair<HeteroSubgraph, std::vector<FloatArray>> ExcludeCertainEdges(
         continue;
       }
       ATEN_ID_TYPE_SWITCH(hg_view->DataType(), IdType, {
-        ATEN_FLOAT_TYPE_SWITCH((weights ? (*weights)[etype]->dtype : DGLDataType{kDGLFloat, 8*sizeof(float), 1}), FloatType, "weights", {
+        const auto dtype = weights ?
+            (*weights)[etype]->dtype
+            : DGLDataType{kDGLFloat, 8*sizeof(float), 1};
+        ATEN_FLOAT_TYPE_SWITCH(dtype, FloatType, "weights", {
           IdType* idx_data = edge_ids.Ptr<IdType>();
           IdType* induced_edges_data = sg.induced_edges[etype].Ptr<IdType>();
           FloatType* weights_data = weights ? (*weights)[etype].Ptr<FloatType>() : nullptr;
@@ -142,18 +145,21 @@ std::pair<HeteroSubgraph, std::vector<FloatArray>> SampleLabors(
             importances = s;
           } else {
             std::tie(sampled_coo, importances) = aten::COOLaborSampling(
-              hg->GetCOOMatrix(etype), NIDs_ntype, nodes_ntype, fanouts[etype], prob[etype], random_seed, cnt, importance_sampling);
+              hg->GetCOOMatrix(etype), NIDs_ntype, nodes_ntype, fanouts[etype],
+              prob[etype], random_seed, cnt, importance_sampling);
           }
           break;
         case SparseFormat::kCSR:
           CHECK(dir == EdgeDir::kOut) << "Cannot sample out edges on CSC matrix.";
           std::tie(sampled_coo, importances) = aten::CSRLaborSampling(
-            hg->GetCSRMatrix(etype), NIDs_ntype, nodes_ntype, fanouts[etype], prob[etype], random_seed, cnt, importance_sampling);
+            hg->GetCSRMatrix(etype), NIDs_ntype, nodes_ntype,
+            fanouts[etype], prob[etype], random_seed, cnt, importance_sampling);
           break;
         case SparseFormat::kCSC:
           CHECK(dir == EdgeDir::kIn) << "Cannot sample in edges on CSR matrix.";
           std::tie(sampled_coo, importances) = aten::CSRLaborSampling(
-            hg->GetCSCMatrix(etype), NIDs_ntype, nodes_ntype, fanouts[etype], prob[etype], random_seed, cnt, importance_sampling);
+            hg->GetCSCMatrix(etype), NIDs_ntype, nodes_ntype,
+            fanouts[etype], prob[etype], random_seed, cnt, importance_sampling);
           sampled_coo = aten::COOTranspose(sampled_coo);
           break;
         default:
@@ -530,13 +536,14 @@ DGL_REGISTER_GLOBAL("sampling.labor._CAPI_DGLSampleLabors")
     EdgeDir dir = (dir_str == "in")? EdgeDir::kIn : EdgeDir::kOut;
 
     std::shared_ptr<HeteroSubgraph> subg_ptr(new HeteroSubgraph);
-    
+
     auto &&[subg, importances] = sampling::SampleLabors(
-        hg.sptr(), NIDs, nodes, fanouts, random_seed, cnt, dir, prob, exclude_edges, importance_sampling);
+        hg.sptr(), NIDs, nodes, fanouts, random_seed,
+        cnt, dir, prob, exclude_edges, importance_sampling);
     *subg_ptr = subg;
     List<Value> ret_val;
     ret_val.push_back(Value(subg_ptr));
-    for (auto &imp: importances)
+    for (auto &imp : importances)
       ret_val.push_back(Value(MakeValue(imp)));
 
     *rv = ret_val;

@@ -27,9 +27,17 @@ namespace impl {
 /////////////////////////////// CSR ///////////////////////////////
 
 template <DGLDeviceType XPU, typename IdxType, typename FloatType>
-std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat, IdArray NIDs, IdArray rows,
-                                  int64_t num_samples, FloatArray prob, IdArray random_seed, IdArray cnt, int importance_sampling) {
-  return CSRLaborPick<IdxType, FloatType>(mat, NIDs, rows, num_samples, prob, random_seed, cnt, importance_sampling);
+std::pair<COOMatrix, FloatArray> CSRLaborSampling(
+    CSRMatrix mat,
+    IdArray NIDs,
+    IdArray rows,
+    int64_t num_samples,
+    FloatArray prob,
+    IdArray random_seed,
+    IdArray cnt,
+    int importance_sampling) {
+  return CSRLaborPick<IdxType, FloatType>(
+      mat, NIDs, rows, num_samples, prob, random_seed, cnt, importance_sampling);
 }
 
 template std::pair<COOMatrix, FloatArray> CSRLaborSampling<kDGLCPU, int32_t, float>(
@@ -44,9 +52,17 @@ template std::pair<COOMatrix, FloatArray> CSRLaborSampling<kDGLCPU, int64_t, dou
 /////////////////////////////// COO ///////////////////////////////
 
 template <DGLDeviceType XPU, typename IdxType, typename FloatType>
-std::pair<COOMatrix, FloatArray> COOLaborSampling(COOMatrix mat, IdArray NIDs, IdArray rows,
-                                    int64_t num_samples, FloatArray prob, IdArray random_seed, IdArray cnt, int importance_sampling) {
-  return COOLaborPick<IdxType, FloatType>(mat, NIDs, rows, num_samples, prob, random_seed, cnt, importance_sampling);
+std::pair<COOMatrix, FloatArray> COOLaborSampling(
+    COOMatrix mat,
+    IdArray NIDs,
+    IdArray rows,
+    int64_t num_samples,
+    FloatArray prob,
+    IdArray random_seed,
+    IdArray cnt,
+    int importance_sampling) {
+  return COOLaborPick<IdxType, FloatType>(
+      mat, NIDs, rows, num_samples, prob, random_seed, cnt, importance_sampling);
 }
 
 template std::pair<COOMatrix, FloatArray> COOLaborSampling<kDGLCPU, int32_t, float>(
