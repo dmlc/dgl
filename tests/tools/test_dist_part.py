@@ -12,6 +12,7 @@ from dgl.data.utils import load_graphs, load_tensors
 
 from create_chunked_dataset import create_chunked_dataset
 
+
 @pytest.mark.parametrize("num_chunks", [1, 8])
 def test_chunk_graph(num_chunks):
 
@@ -260,12 +261,14 @@ def test_part_pipeline(num_chunks, num_parts):
                 tensor_dict = load_tensors(fname)
 
                 all_tensors = [
-                        'author:writes:paper/year',
-                        'paper:cites:paper/count',
-                        'paper:rev_writes:author/year',
+                    'author:writes:paper/year',
+                    'paper:cites:paper/count',
+                    'paper:rev_writes:author/year',
                 ]
 
-                assert tensor_dict.keys() == set([x.split(":")[1] for x in all_tensors])
+                assert tensor_dict.keys() == set(
+                    [x.split(":")[1] for x in all_tensors]
+                )
                 for key in all_tensors:
                     tokens = key.split(":")
                     assert isinstance(tensor_dict[tokens[1]], torch.Tensor)
@@ -277,6 +280,8 @@ def test_part_pipeline(num_chunks, num_parts):
                     assert len(tokens) == 3
 
                     part_data = tensor_dict[tokens[1]]
-                    gold_data = edge_data_gold[can_etype_feat][orig_eids[tokens[1]].numpy()]
+                    gold_data = edge_data_gold[can_etype_feat][
+                        orig_eids[tokens[1]].numpy()
+                    ]
 
                     assert np.all(gold_data == part_data.numpy())
