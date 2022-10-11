@@ -11,7 +11,6 @@ from ..sampling import sample_neighbors as local_sample_neighbors
 from ..subgraph import in_subgraph as local_in_subgraph
 from ..utils import toindex
 from .. import backend as F
-from .. import ndarray as nd
 from .rpc import (
     Request,
     Response,
