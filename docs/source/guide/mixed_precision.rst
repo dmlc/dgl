@@ -75,7 +75,7 @@ PyTorch provides a ``GradScaler`` module to address this issue. It multiplies
 the loss by a factor and invokes backward pass on the scaled loss to prevent
 the underflow problem. It then unscales the computed gradients before the optimizer
 updates the parameters. The scale factor is determined automatically.
-Note that ``bfloat16`` doesn't requires a ``GradScaler``.
+Note that ``bfloat16`` doesn't require a ``GradScaler``.
 
 .. code::
 

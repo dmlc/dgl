@@ -5,6 +5,7 @@
  */
 #include <dgl/bcast.h>
 #include <dmlc/logging.h>
+
 #include <algorithm>
 
 namespace dgl {
@@ -17,11 +18,9 @@ namespace {
 bool UseBcast(const std::string& op, NDArray lhs, NDArray rhs) {
   if (op == "copy_lhs" || op == "copy_rhs")
     return false;  // broadcasting is not required for copy_u/copy_e
-  if (lhs->ndim != rhs->ndim)
-    return true;
+  if (lhs->ndim != rhs->ndim) return true;
   for (int i = 1; i < lhs->ndim; ++i) {
-    if (lhs->shape[i] != rhs->shape[i])
-      return true;
+    if (lhs->shape[i] != rhs->shape[i]) return true;
   }
   return false;
 }
@@ -38,10 +37,8 @@ BcastOff CalcBcastOff(const std::string& op, NDArray lhs, NDArray rhs) {
   BcastOff rst;
   rst.lhs_len = 1;
   rst.rhs_len = 1;
-  for (int i = 1; i < lhs->ndim; ++i)
-    rst.lhs_len *= lhs->shape[i];
-  for (int i = 1; i < rhs->ndim; ++i)
-    rst.rhs_len *= rhs->shape[i];
+  for (int i = 1; i < lhs->ndim; ++i) rst.lhs_len *= lhs->shape[i];
+  for (int i = 1; i < rhs->ndim; ++i) rst.rhs_len *= rhs->shape[i];
   rst.use_bcast = UseBcast(op, lhs, rhs);
   rst.reduce_size = 1;  // defaults to 1, except for the case op == 'dot'.
   if (rst.use_bcast) {
@@ -49,15 +46,19 @@ BcastOff CalcBcastOff(const std::string& op, NDArray lhs, NDArray rhs) {
     int out_len = 1, j = 0;
     if (op == "dot") {
       rst.reduce_size = lhs->shape[lhs->ndim - 1];  // set reduce_size for dot.
-      ++j;  // do not consider reduce axis in computing lhs_offset and rhs_offset.
+      ++j;  // do not consider reduce axis in computing lhs_offset and
+            // rhs_offset.
     }
     int stride_l = 1, stride_r = 1;
     rst.lhs_offset.push_back(0);  // lhs_offset[0] is always 0
     rst.rhs_offset.push_back(0);  // rhs_offset[0] is always 0
-    for (; j < max_ndim; ++j) {  // iterate the axis from back to front.
-      // dl refers to the size of lhs array in the current axis, likewise for dr.
-      const int dl = (lhs->ndim - 1 - j < 1) ? 1 : lhs->shape[lhs->ndim - 1 - j];
-      const int dr = (rhs->ndim - 1 - j < 1) ? 1 : rhs->shape[rhs->ndim - 1 - j];
+    for (; j < max_ndim; ++j) {   // iterate the axis from back to front.
+      // dl refers to the size of lhs array in the current axis, likewise for
+      // dr.
+      const int dl =
+          (lhs->ndim - 1 - j < 1) ? 1 : lhs->shape[lhs->ndim - 1 - j];
+      const int dr =
+          (rhs->ndim - 1 - j < 1) ? 1 : rhs->shape[rhs->ndim - 1 - j];
       for (int i = 1; i < std::max(dl, dr); ++i) {
         for (int k = 0; k < out_len; ++k) {
           /* Explaination:
@@ -79,8 +80,10 @@ BcastOff CalcBcastOff(const std::string& op, NDArray lhs, NDArray rhs) {
   } else {
     rst.out_len = (op == "copy_rhs") ? rst.rhs_len : rst.lhs_len;
     if (op == "dot") {
-      rst.reduce_size = lhs->shape[lhs->ndim - 1];  // set reduce_size for dot.
-      rst.out_len /= rst.reduce_size;  // out_len is divied by reduce_size in dot.
+      // set reduce_size for dot.
+      rst.reduce_size = lhs->shape[lhs->ndim - 1];
+      // out_len is divied by reduce_size in dot.
+      rst.out_len /= rst.reduce_size;
     }
   }
   return rst;
