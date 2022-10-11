@@ -39,6 +39,20 @@ class RelGraphConvAgg(th.autograd.Function):
             and (num_dst_nodes, num_bases * in_feat) when ``regularizer='basis'``.
 
         """
+        if not g.device.type == 'cuda':
+            raise TypeError(
+                f"dgl.contrib.cugraph.nn.RelGraphConv requires "
+                f"DGL graph on device cuda, but got {g.device}")
+        ctx.device = g.device
+        if not ctx.device == edge_types.device:
+            raise RuntimeError(
+                f"Expected graph and etypes tensor on the same device"
+                f"but got {ctx.device} and {edge_types.device}")
+        if not ctx.device == feat.device:
+            raise RuntimeError(
+                f"Expected graph and feature tensor on the same device"
+                f"but got {ctx.device} and {feat.device}")
+
         if g.idtype == th.int32:
             mfg_csr_func = message_flow_graph_hg_csr_int32
             agg_fwd_func = agg_hg_basis_post_fwd_int32
@@ -68,7 +82,8 @@ class RelGraphConvAgg(th.autograd.Function):
             _num_bases = coeff.shape[-1]
             leading_dimension = _num_bases * _in_feat
 
-        agg_output = th.empty(g.num_dst_nodes(), leading_dimension, dtype=th.float32, device='cuda')
+        agg_output = th.empty(g.num_dst_nodes(), leading_dimension,
+                              dtype=th.float32, device=ctx.device)
         if coeff is None:
             agg_fwd_func(agg_output, feat.detach(), mfg)
         else:
@@ -100,12 +115,12 @@ class RelGraphConvAgg(th.autograd.Function):
             raise TypeError(
                 f'Supported ID type: torch.int32 or torch.int64, but got {ctx.graph_idtype}')
 
-        grad_feat = th.empty_like(feat, dtype=th.float32, device='cuda')
+        grad_feat = th.empty_like(feat, dtype=th.float32, device=ctx.device)
         if coeff is None:
             grad_coeff = None
             agg_bwd_func(grad_feat, grad_output, feat.detach(), mfg)
         else:
-            grad_coeff = th.empty_like(coeff, dtype=th.float32, device='cuda')
+            grad_coeff = th.empty_like(coeff, dtype=th.float32, device=ctx.device)
             agg_bwd_func(grad_feat, grad_output, feat.detach(), mfg,
                 output_weight_gradient=grad_coeff, weights_combination=coeff.detach())
 
