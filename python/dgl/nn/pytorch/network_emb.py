@@ -44,9 +44,6 @@ class MetaPath2Vec(nn.Module):
         The number of negative samples to use for each positive sample. Default: 5
     num_random_walk : int, optional
         The number of random walks to sample for each start node. Default: 1
-    nid2word : Dict[str, Dict[int, str]], optional
-        If set, we can use :attr:`.id2word` to get a dict, which maps global node IDs
-        to corresponding strings. Default: None
     sparse : bool, optional
         If set to True, gradients with respect to the learnable weights will be sparse.
         Default: True
@@ -94,7 +91,6 @@ class MetaPath2Vec(nn.Module):
                  min_count=0,
                  negative_size=5,
                  num_random_walk=1,
-                 nid2word=None,
                  sparse=True,
                  negative_table_size=1e8):
         super().__init__()
@@ -104,7 +100,6 @@ class MetaPath2Vec(nn.Module):
         self.min_count = min_count
         self.context_size = context_size
         self.negative_size = negative_size
-        self.nid2word = nid2word
         self.sparse = sparse
         self.num_random_walk = num_random_walk
         self.walk_dataset = []
@@ -136,21 +131,10 @@ class MetaPath2Vec(nn.Module):
         self.node_count = 0
         self.token_count = 0
         self.local_to_global_id = dict()
-        self.id2word = dict()
-        if self.nid2word is None:
-            for nodetype in set(nodespath):
-                self.local_to_global_id[nodetype] = np.arange(
-                    self.g.num_nodes(nodetype)) + self.node_count
-                self.node_count += self.g.num_nodes(nodetype)
-        else:
-            wid = 0
-            for nodetype in set(nodespath):
-                self.local_to_global_id[nodetype] = dict()
-                for idx in range(self.g.num_nodes(nodetype)):
-                    self.local_to_global_id[nodetype][idx] = wid
-                    self.id2word[wid] = self.nid2word[nodetype][idx]
-                    wid += 1
-                self.node_count += self.g.num_nodes(nodetype)
+        for nodetype in set(nodespath):
+            self.local_to_global_id[nodetype] = np.arange(
+                self.g.num_nodes(nodetype)) + self.node_count
+            self.node_count += self.g.num_nodes(nodetype)
 
         # start random walk
         for idx in tqdm.trange(self.g.num_nodes(nodespath[0])):
