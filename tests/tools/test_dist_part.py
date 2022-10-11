@@ -175,7 +175,7 @@ def test_part_pipeline(num_chunks, num_parts):
             id_map = dgl.distributed.id_map.IdMap(edge_dict)
             orig_etype_id, orig_type_eid = id_map(np.arange(num_edges))
 
-            # check edge_data
+            # Load edge data to create ground truth.
             num_edges = {
                 'paper:cites:paper': num_cite_edges,
                 'author:writes:paper': num_write_edges,
@@ -198,7 +198,8 @@ def test_part_pipeline(num_chunks, num_parts):
                     assert os.path.isfile(chunk_f_name)
                     feat_array = np.load(chunk_f_name)
                     assert feat_array.shape[0] == num_edges[etype] // num_chunks
-                features.append(feat_array)
+                    features.append(feat_array)
+
                 edge_data_gold[etype + '/' + feat] = np.concatenate(features)
 
         for i in range(num_parts):
@@ -257,25 +258,25 @@ def test_part_pipeline(num_chunks, num_parts):
                 fname = os.path.join(sub_dir, 'edge_feat.dgl')
                 assert os.path.isfile(fname)
                 tensor_dict = load_tensors(fname)
+
                 all_tensors = [
-                    'paper:cites:paper/count',
-                    'author:writes:paper/year',
-                    'paper:rev_writes:author/year',
+                        'author:writes:paper/year',
+                        'paper:cites:paper/count',
+                        'paper:rev_writes:author/year',
                 ]
-                assert tensor_dict.keys() == set(all_tensors)
+
+                assert tensor_dict.keys() == set([x.split(":")[1] for x in all_tensors])
                 for key in all_tensors:
-                    assert isinstance(tensor_dict[key], torch.Tensor)
+                    tokens = key.split(":")
+                    assert isinstance(tensor_dict[tokens[1]], torch.Tensor)
 
                 # Compare the data stored as edge features in this partition with the data
                 # from the original graph.
-                for idx, etype in enumerate(all_etypes):
-                    if etype != key:
-                        continue
-
-                    # key in canonical form
-                    tokens = key.split(":")
+                for idx, can_etype_feat in enumerate(all_tensors):
+                    tokens = can_etype_feat.split(":")
                     assert len(tokens) == 3
 
-                    gold_type_ids = orig_type_eid[orig_etype_id == idx]
-                    gold_data = edge_data_gold[key][gold_type_ids]
+                    part_data = tensor_dict[tokens[1]]
+                    gold_data = edge_data_gold[can_etype_feat][orig_eids[tokens[1]].numpy()]
+
                     assert np.all(gold_data == part_data.numpy())
