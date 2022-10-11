@@ -1,7 +1,6 @@
 import argparse
 import itertools
 
-import os
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
@@ -13,8 +12,8 @@ import dgl.nn as dglnn
 from dgl import AddReverse, Compose, ToSimple
 from dgl.nn import HeteroEmbedding
 
-v_t = th.__version__
-print(v_t)
+v_t = dgl.__version__
+print(f"dgl version is {v_t}")
 
 def prepare_data(args, device):
     dataset = DglNodePropPredDataset(name="ogbn-mag")
@@ -373,12 +372,10 @@ def test(g, model, node_embed, y_true, device, split_idx):
     return train_acc, valid_acc, test_acc
 
 def is_support_affinity(v_t):
-    return v_t >= "1.12"
+    return v_t >= "0.9.1"
 
 def main(args):
     device = f"cuda:0" if th.cuda.is_available() else "cpu"
-    if device == "cpu":
-        args.num_workers = 0 if not is_support_affinity(v_t) else int(os.cpu_count() / 2)
 
     g, labels, num_classes, split_idx, logger, train_loader = prepare_data(args, device)
 
@@ -394,9 +391,12 @@ def main(args):
 
     for run in range(args.runs):
 
-        if is_support_affinity(v_t):
+        try:
             embed_layer.reset_parameters()
             model.reset_parameters()
+        except:
+            # old pytorch version doesn't support reset_parameters() API
+            pass
 
         # optimizer
         all_params = itertools.chain(
@@ -404,7 +404,7 @@ def main(args):
         )
         optimizer = th.optim.Adam(all_params, lr=0.01)
 
-        if device == "cpu" and is_support_affinity(v_t):
+        if args.num_workers != 0 and device == "cpu" and is_support_affinity(v_t):
             cores = list(range(args.num_workers * 2))
             len_cores = len(cores)
             dl_cores = cores[:int(len_cores / 2)]
