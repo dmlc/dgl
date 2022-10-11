@@ -42,7 +42,7 @@ namespace dgl {
 namespace aten {
 namespace impl {
 
-// Template for picking non-zero values first layerwise than row-wise.
+// Template for picking non-zero values row-wise.
 template <typename IdxType, typename FloatType>
 std::pair<COOMatrix, FloatArray> CSRLaborPick(
     CSRMatrix mat,

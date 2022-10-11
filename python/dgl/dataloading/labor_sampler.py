@@ -26,10 +26,10 @@ from collections import defaultdict
 
 class LaborSampler(BlockSampler):
     """Sampler that builds computational dependency of node representations via
-    neighbor sampling for multilayer GNN.
+    labor sampling for multilayer GNN.
 
     This sampler will make every node gather messages from a fixed number of neighbors
-    per edge type.  The neighbors are picked uniformly.
+    per edge type. The neighbors are picked uniformly with default parameters.
 
     Parameters
     ----------
@@ -45,8 +45,20 @@ class LaborSampler(BlockSampler):
     edge_dir : str, default ``'in'``
         Can be either ``'in' `` where the neighbors will be sampled according to
         incoming edges, or ``'out'`` otherwise, same as :func:`dgl.sampling.sample_neighbors`.
-    importance_sampling : bool
-        Whether to use importance sampling with replacement or uniform sampling without replacement.
+    prob : str, optional
+        If given, the probability of each neighbor being sampled is proportional
+        to the edge feature value with the given name in ``g.edata``.  The feature must be
+        a scalar on each edge.
+    importance_sampling : int, default ``0``
+        Whether to use importance sampling or uniform sampling, use of negative values optimizes
+        importance sampling probabilities until convergence while use of positive values runs
+        optimization steps that many times.
+    layer_dependency : bool, default ``False`` 
+        Specifies whether different layers should use same random variates.
+    batch_dependency : int, default ``1``
+        Makes it so that batch i and batch i + batch_dependency are independent but
+        consecutive batches are dependent. The bigger this parameter, the more dependency between
+        batches.
     prefetch_node_feats : list[str] or dict[ntype, list[str]], optional
         The source node data to prefetch for the first MFG, corresponding to the
         input node features necessary for the first GNN layer.
@@ -68,7 +80,7 @@ class LaborSampler(BlockSampler):
     a homogeneous graph where each node takes messages from 5, 10, 15 neighbors for
     the first, second, and third layer respectively (assuming the backend is PyTorch):
 
-    >>> sampler = dgl.dataloading.NeighborSampler([5, 10, 15])
+    >>> sampler = dgl.dataloading.LaborSampler([5, 10, 15])
     >>> dataloader = dgl.dataloading.DataLoader(
     ...     g, train_nid, sampler,
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
@@ -79,7 +91,7 @@ class LaborSampler(BlockSampler):
     edge type, one should instead provide a list of dicts.  Each dict would specify the
     number of neighbors to pick per edge type.
 
-    >>> sampler = dgl.dataloading.NeighborSampler([
+    >>> sampler = dgl.dataloading.LaborSampler([
     ...     {('user', 'follows', 'user'): 5,
     ...      ('user', 'plays', 'game'): 4,
     ...      ('game', 'played-by', 'user'): 3}] * 3)
@@ -94,7 +106,7 @@ class LaborSampler(BlockSampler):
     This class can also work for edge classification and link prediction together
     with :func:`as_edge_prediction_sampler`.
 
-    >>> sampler = dgl.dataloading.NeighborSampler([5, 10, 15])
+    >>> sampler = dgl.dataloading.LaborSampler([5, 10, 15])
     >>> sampler = dgl.dataloading.as_edge_prediction_sampler(sampler)
     >>> dataloader = dgl.dataloading.DataLoader(
     ...     g, train_eid, sampler,

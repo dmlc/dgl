@@ -435,10 +435,16 @@ CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries);
  * // sampled.data = [3, 0, 4]
  *
  * @param mat Input CSR matrix.
+ * @param NIDs global nids if sampling from a subgraph
  * @param rows Rows to sample from.
- * @param num_samples Number of samples using neighbor sampling
+ * @param num_samples Number of samples using labor sampling
+ * @param prob Probability array for nonuniform sampling
+ * @param random_seed The random seed for the sampler
+ * @param cnt A tensor to keep track of batch dependency
  * @param importance_sampling Whether to enable importance sampling
- * @return A COOMatrix storing the picked row, col and data indices.
+ * @return A pair of COOMatrix storing the picked row and col indices and edge weights
+ *         if importance_sampling != 0 or prob argument was passed.
+ *         Its data field stores the the index of the picked elements in the value array.
  */
 std::pair<COOMatrix, FloatArray> CSRLaborSampling(
     CSRMatrix mat,

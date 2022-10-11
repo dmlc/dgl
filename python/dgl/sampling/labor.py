@@ -61,12 +61,13 @@ def sample_labors(g, nodes, fanout, random_seed, edge_dir='in', prob=None,
 
         If -1 is given for a single edge type, all the neighboring edges with that edge
         type will be selected.
+    random_seed : tensor with 3 or 4 integers
+        The random seed(s) to be used for sampling along with batch dependency count information
+        stores as the last two elements
     edge_dir : str, optional
         Determines whether to sample inbound or outbound edges.
 
         Can take either ``in`` for inbound edges or ``out`` for outbound edges.
-    importance_sampling : bool, optional
-        Whether to use importance sampling with replacement or uniform sampling without replacement.
     prob : str, optional
         Feature name used as the (unnormalized) probabilities associated with each
         neighboring edge of a node.  The feature must have only one element for each
@@ -77,13 +78,8 @@ def sample_labors(g, nodes, fanout, random_seed, edge_dir='in', prob=None,
         to sum up to one).  Otherwise, the result will be undefined.
 
         If :attr:`prob` is not None, GPU sampling is not supported.
-    exclude_edges: tensor or dict
-        Edge IDs to exclude during sampling neighbors for the seed nodes.
-
-        This argument can take a single ID tensor or a dictionary of edge types and ID tensors.
-        If a single tensor is given, the graph must only have one type of nodes.
-    replace : bool, optional
-        If True, sample with replacement.
+    importance_sampling : bool, optional
+        Whether to use importance sampling with replacement or uniform sampling without replacement.
     copy_ndata: bool, optional
         If True, the node features of the new graph are copied from
         the original graph. If False, the new graph will not have any
@@ -96,10 +92,11 @@ def sample_labors(g, nodes, fanout, random_seed, edge_dir='in', prob=None,
         edge features.
 
         (Default: True)
-    _dist_training : bool, optional
-        Internal argument.  Do not use.
+    exclude_edges: tensor or dict
+        Edge IDs to exclude during sampling neighbors for the seed nodes.
 
-        (Default: False)
+        This argument can take a single ID tensor or a dictionary of edge types and ID tensors.
+        If a single tensor is given, the graph must only have one type of nodes.
     output_device : Framework-specific device context object, optional
         The output device.  Default is the same as the input graph.
 
@@ -127,7 +124,7 @@ def sample_labors(g, nodes, fanout, random_seed, edge_dir='in', prob=None,
 
     To sample one inbound edge for node 0 and node 1:
 
-    >>> sg = dgl.sampling.sample_neighbors(g, [0, 1], 1)
+    >>> sg = dgl.sampling.sample_labors(g, [0, 1], 1)
     >>> sg.edges(order='eid')
     (tensor([1, 0]), tensor([0, 1]))
     >>> sg.edata[dgl.EID]
@@ -136,14 +133,14 @@ def sample_labors(g, nodes, fanout, random_seed, edge_dir='in', prob=None,
     To sample one inbound edge for node 0 and node 1 with probability in edge feature
     ``prob``:
 
-    >>> sg = dgl.sampling.sample_neighbors(g, [0, 1], 1, prob='prob')
+    >>> sg = dgl.sampling.sample_labors(g, [0, 1], 1, prob='prob')
     >>> sg.edges(order='eid')
     (tensor([2, 1]), tensor([0, 1]))
 
     With ``fanout`` greater than the number of actual neighbors and without replacement,
     DGL will take all neighbors instead:
 
-    >>> sg = dgl.sampling.sample_neighbors(g, [0, 1], 3)
+    >>> sg = dgl.sampling.sample_labors(g, [0, 1], 3)
     >>> sg.edges(order='eid')
     (tensor([1, 2, 0, 1]), tensor([0, 0, 1, 1]))
 
@@ -152,7 +149,7 @@ def sample_labors(g, nodes, fanout, random_seed, edge_dir='in', prob=None,
     >>> g = dgl.graph(([0, 0, 1, 1, 2, 2], [1, 2, 0, 1, 2, 0]))
     >>> g_edges = g.all_edges(form='all')``
     (tensor([0, 0, 1, 1, 2, 2]), tensor([1, 2, 0, 1, 2, 0]), tensor([0, 1, 2, 3, 4, 5]))
-    >>> sg = dgl.sampling.sample_neighbors(g, [0, 1], 3, exclude_edges=[0, 1, 2])
+    >>> sg = dgl.sampling.sample_labors(g, [0, 1], 3, exclude_edges=[0, 1, 2])
     >>> sg.all_edges(form='all')
     (tensor([2, 1]), tensor([0, 1]), tensor([0, 1]))
     >>> sg.has_edges_between(g_edges[0][:3],g_edges[1][:3])
@@ -164,7 +161,7 @@ def sample_labors(g, nodes, fanout, random_seed, edge_dir='in', prob=None,
     >>> g_edges = g.all_edges(form='all', etype=('drug', 'interacts', 'drug'))
     (tensor([0, 0, 1, 1, 3, 2]), tensor([1, 2, 0, 1, 2, 0]), tensor([0, 1, 2, 3, 4, 5]))
     >>> excluded_edges  = {('drug', 'interacts', 'drug'): g_edges[2][:3]}
-    >>> sg = dgl.sampling.sample_neighbors(g, {'drug':[0, 1]}, 3, exclude_edges=excluded_edges)
+    >>> sg = dgl.sampling.sample_labors(g, {'drug':[0, 1]}, 3, exclude_edges=excluded_edges)
     >>> sg.all_edges(form='all', etype=('drug', 'interacts', 'drug'))
     (tensor([2, 1]), tensor([0, 1]), tensor([0, 1]))
     >>> sg.has_edges_between(g_edges[0][:3],g_edges[1][:3],etype=('drug', 'interacts', 'drug'))
