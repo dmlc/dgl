@@ -31,7 +31,6 @@ import time
 import math
 import itertools
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from load_graph import load_dataset, inductive_split
 
 from torchmetrics import Accuracy
