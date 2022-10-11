@@ -21,11 +21,12 @@ networks with PyTorch.
 
 """
 
-import dgl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+import dgl
+import dgl.data
 
 ######################################################################
 # Overview of Node Classification with GNN
@@ -45,7 +46,7 @@ import torch.nn.functional as F
 # task. With the help of only a small portion of labeled nodes, a graph
 # neural network (GNN) can accurately predict the node category of the
 # others.
-# 
+#
 # This tutorial will show how to build such a GNN for semi-supervised node
 # classification with only a small number of labels on the Cora
 # dataset,
@@ -54,21 +55,20 @@ import torch.nn.functional as F
 # word count vector as its features, normalized so that they sum up to one,
 # as described in Section 5.2 of
 # `the paper <https://arxiv.org/abs/1609.02907>`__.
-# 
+#
 # Loading Cora Dataset
 # --------------------
-# 
+#
 
-import dgl.data
 
 dataset = dgl.data.CoraGraphDataset()
-print('Number of categories:', dataset.num_classes)
+print("Number of categories:", dataset.num_classes)
 
 
 ######################################################################
 # A DGL Dataset object may contain one or multiple graphs. The Cora
 # dataset used in this tutorial only consists of one single graph.
-# 
+#
 
 g = dataset[0]
 
@@ -77,7 +77,7 @@ g = dataset[0]
 # A DGL graph can store node features and edge features in two
 # dictionary-like attributes called ``ndata`` and ``edata``.
 # In the DGL Cora dataset, the graph contains the following node features:
-# 
+#
 # - ``train_mask``: A boolean tensor indicating whether the node is in the
 #   training set.
 #
@@ -90,68 +90,71 @@ g = dataset[0]
 # - ``label``: The ground truth node category.
 #
 # -  ``feat``: The node features.
-# 
+#
 
-print('Node features')
+print("Node features")
 print(g.ndata)
-print('Edge features')
+print("Edge features")
 print(g.edata)
 
 
 ######################################################################
 # Defining a Graph Convolutional Network (GCN)
 # --------------------------------------------
-# 
+#
 # This tutorial will build a two-layer `Graph Convolutional Network
 # (GCN) <http://tkipf.github.io/graph-convolutional-networks/>`__. Each
 # layer computes new node representations by aggregating neighbor
 # information.
-# 
+#
 # To build a multi-layer GCN you can simply stack ``dgl.nn.GraphConv``
 # modules, which inherit ``torch.nn.Module``.
-# 
+#
 
 from dgl.nn import GraphConv
+
 
 class GCN(nn.Module):
     def __init__(self, in_feats, h_feats, num_classes):
         super(GCN, self).__init__()
         self.conv1 = GraphConv(in_feats, h_feats)
         self.conv2 = GraphConv(h_feats, num_classes)
-    
+
     def forward(self, g, in_feat):
         h = self.conv1(g, in_feat)
         h = F.relu(h)
         h = self.conv2(g, h)
         return h
-    
+
+
 # Create the model with given dimensions
-model = GCN(g.ndata['feat'].shape[1], 16, dataset.num_classes)
+model = GCN(g.ndata["feat"].shape[1], 16, dataset.num_classes)
 
 
 ######################################################################
 # DGL provides implementation of many popular neighbor aggregation
 # modules. You can easily invoke them with one line of code.
-# 
+#
 
 
 ######################################################################
 # Training the GCN
 # ----------------
-# 
+#
 # Training this GCN is similar to training other PyTorch neural networks.
-# 
+#
+
 
 def train(g, model):
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
     best_val_acc = 0
     best_test_acc = 0
 
-    features = g.ndata['feat']
-    labels = g.ndata['label']
-    train_mask = g.ndata['train_mask']
-    val_mask = g.ndata['val_mask']
-    test_mask = g.ndata['test_mask']
+    features = g.ndata["feat"]
+    labels = g.ndata["label"]
+    train_mask = g.ndata["train_mask"]
+    val_mask = g.ndata["val_mask"]
+    test_mask = g.ndata["test_mask"]
     for e in range(100):
         # Forward
         logits = model(g, features)
@@ -179,19 +182,24 @@ def train(g, model):
         optimizer.step()
 
         if e % 5 == 0:
-            print('In epoch {}, loss: {:.3f}, val acc: {:.3f} (best {:.3f}), test acc: {:.3f} (best {:.3f})'.format(
-                e, loss, val_acc, best_val_acc, test_acc, best_test_acc))
-model = GCN(g.ndata['feat'].shape[1], 16, dataset.num_classes)
+            print(
+                "In epoch {}, loss: {:.3f}, val acc: {:.3f} (best {:.3f}), test acc: {:.3f} (best {:.3f})".format(
+                    e, loss, val_acc, best_val_acc, test_acc, best_test_acc
+                )
+            )
+
+
+model = GCN(g.ndata["feat"].shape[1], 16, dataset.num_classes)
 train(g, model)
 
 
 ######################################################################
 # Training on GPU
 # ---------------
-# 
+#
 # Training on GPU requires to put both the model and the graph onto GPU
 # with the ``to`` method, similar to what you will do in PyTorch.
-# 
+#
 # .. code:: python
 #
 #    g = g.to('cuda')
@@ -203,7 +211,7 @@ train(g, model)
 ######################################################################
 # What’s next?
 # ------------
-# 
+#
 # -  :doc:`How does DGL represent a graph <2_dglgraph>`?
 # -  :doc:`Write your own GNN module <3_message_passing>`.
 # -  :doc:`Link prediction (predicting existence of edges) on full
@@ -213,7 +221,7 @@ train(g, model)
 # -  :ref:`The list of supported graph convolution
 #    modules <apinn-pytorch>`.
 # -  :ref:`The list of datasets provided by DGL <apidata>`.
-# 
+#
 
 
 # Thumbnail credits: Stanford CS224W Notes
