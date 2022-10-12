@@ -532,7 +532,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     ...                                 out_path='output/', reshuffle=True,
     ...                                 balance_ntypes=g.ndata['train_mask'],
     ...                                 balance_edges=True)
-    >>> g, node_feats, edge_feats, gpb, graph_name = dgl.distributed.load_partition(
+    >>> g, node_feats, edge_feats, gpb, graph_name, ntypes_list, etypes_list = dgl.distributed.load_partition(
     ...                                 'output/test.json', 0)
     '''
     def get_homogeneous(g, balance_ntypes):
