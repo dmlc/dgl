@@ -39,6 +39,8 @@ class CuGraphStorage:
         else:
             pg = MGPropertyGraph()
 
+        self.single_gpu = single_gpu
+
         self.graphstore = CuGraphStore(graph=pg)
         self.idtype = idtype
 
@@ -254,7 +256,7 @@ class CuGraphStorage:
 
         # to device function move the dgl graph to desired devices
         if output_device is not None:
-            sampled_graph.to_device(output_device)
+            sampled_graph.to(output_device)
         return sampled_graph
 
     # Required in Cluster-GCN
@@ -380,47 +382,23 @@ class CuGraphStorage:
         """
         TODO: Add doctring
         """
-        node_storage = self.graphstore.get_node_storage(key, ntype)
-        node_storage_fetch = node_storage.fetch
-
         if len(self.ntypes) > 1:
             indices_offset = self.get_node_id_offset(ntype)
         else:
             indices_offset = 0
 
-        def fetch(
-            node_storage, indices, device=None, pin_memory=False, **kwargs
-        ):
-            indices = indices_offset + indices
-            return node_storage_fetch(
-                indices, device=device, pin_memory=pin_memory, **kwargs
-            )
-
-        node_storage.fetch = MethodType(fetch, node_storage)
-        return node_storage
+        return self.graphstore.get_node_storage(key, ntype, indices_offset)
 
     def get_edge_storage(self, key, etype=None):
         """
         TODO: Add doctring
         """
-        edge_storage = self.graphstore.get_edge_storage(key, etype)
-        edge_storage_fetch = edge_storage.fetch
-
         if len(self.canonical_etypes) > 1:
             indices_offset = self.get_edge_id_offset(etype)
         else:
             indices_offset = 0
 
-        def fetch(
-            edge_storage, indices, device=None, pin_memory=False, **kwargs
-        ):
-            indices = indices_offset + indices
-            return edge_storage_fetch(
-                indices, device=None, pin_memory=False, **kwargs
-            )
-
-        edge_storage.fetch = MethodType(fetch, edge_storage)
-        return edge_storage
+        return self.graphstore.get_edge_storage(key, etype, indices_offset)
 
     # Number of edges/nodes utils
     def num_nodes(self, ntype=None):

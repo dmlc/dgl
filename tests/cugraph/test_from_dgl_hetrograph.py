@@ -186,15 +186,16 @@ def test_heterograph_conversion():
         create_test_heterograph4,
     ]
     for graph_f in graph_fs:
-        g = graph_f(th.int32)
-        gs = cugraph_storage_from_heterograph(g)
-        assert_same_num_nodes(gs, g)
-        try:
-            # TODO: Raise an upstream issue for this
-            # to triage first time failure
-            assert_same_node_feats(gs, g)
-        except ValueError:
-            assert_same_node_feats(gs, g)
-        assert_same_num_edges_can_etypes(gs, g)
-        assert_same_num_edges_etypes(gs, g)
-        assert_same_edge_feats(gs, g)
+        for idxtype in [th.int32, th.int64]:
+            g = graph_f(idxtype)
+            gs = cugraph_storage_from_heterograph(g)
+            assert_same_num_nodes(gs, g)
+            try:
+                # TODO: Raise an upstream issue for this
+                # to triage first time failure
+                assert_same_node_feats(gs, g)
+            except ValueError:
+                assert_same_node_feats(gs, g)
+            assert_same_num_edges_can_etypes(gs, g)
+            assert_same_num_edges_etypes(gs, g)
+            assert_same_edge_feats(gs, g)
