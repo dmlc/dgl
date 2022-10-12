@@ -2,7 +2,7 @@ import dgl
 import pytest
 from scipy import sparse as spsp
 from dgl.distributed import partition_graph
-from convert_partition_conf import convert_conf, is_old_version
+from change_etype_to_canonical_etype import convert_conf, is_old_version
 from collections import Counter
 import json
 import tempfile
