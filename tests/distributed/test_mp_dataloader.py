@@ -680,6 +680,7 @@ def start_multiple_dataloaders(
         train_ids = th.arange(orig_g.num_edges())
         batch_size = orig_g.num_edges() // 100
     sampler = dgl.dataloading.NeighborSampler([-1])
+    dataloaders = []
     dl_iters = []
     for _ in range(num_dataloaders):
         if dataloader_type == "node":
@@ -690,21 +691,24 @@ def start_multiple_dataloaders(
             dataloader = dgl.dataloading.DistEdgeDataLoader(
                 dist_g, train_ids, sampler, batch_size=batch_size
             )
+        dataloaders.append(dataloader)
         dl_iters.append(iter(dataloader))
 
+    # iterate on multiple dataloaders randomly
     while len(dl_iters) > 0:
         next_dl = np.random.choice(len(dl_iters), 1)[0]
         try:
             _ = next(dl_iters[next_dl])
         except StopIteration:
             dl_iters.pop(next_dl)
+            del dataloaders[next_dl]
 
     dgl.distributed.exit_client()
 
 
-@pytest.mark.parametrize("num_dataloaders", [1])
-@pytest.mark.parametrize("num_workers", [1])
-@pytest.mark.parametrize("dataloader_type", ["node"])
+@pytest.mark.parametrize("num_dataloaders", [1, 4])
+@pytest.mark.parametrize("num_workers", [0, 1, 4])
+@pytest.mark.parametrize("dataloader_type", ["node", "edge"])
 def test_multiple_dist_dataloaders(
     num_dataloaders, num_workers, dataloader_type
 ):
@@ -755,3 +759,5 @@ def test_multiple_dist_dataloaders(
         p_client.join()
         for p in p_servers:
             p.join()
+    reset_envs()
+

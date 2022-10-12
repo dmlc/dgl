@@ -17,6 +17,7 @@ from .kvstore import init_kvstore, close_kvstore
 from .rpc_client import connect_to_server
 from .role import init_role
 from .. import utils
+from ..base import DGLError
 
 SAMPLER_POOL = None
 NUM_SAMPLER_WORKERS = 0
@@ -107,8 +108,11 @@ class CustomPool:
         """
         ctx = mp.get_context("spawn")
         self.num_workers = num_workers
-        self.queue_size = num_workers * 4
+        # As pool could be used by any number of dataloaders, queues 
+        # should be able to take infinite elements to avoid dead lock.
+        self.queue_size = 0
         self.result_queue = ctx.Queue(self.queue_size)
+        self.results = {}
         self.task_queues = []
         self.process_list = []
         self.current_proc_id = 0
@@ -128,6 +132,7 @@ class CustomPool:
         for i in range(self.num_workers):
             self.task_queues[i].put(
                 (MpCommand.SET_COLLATE_FN, (dataloader_name, func)))
+        self.results[dataloader_name] = []
 
     def submit_task(self, dataloader_name, args):
         """Submit task to workers"""
@@ -144,15 +149,19 @@ class CustomPool:
 
     def get_result(self, dataloader_name, timeout=1800):
         """Get result from result queue"""
-        result_dataloader_name, result = self.result_queue.get(timeout=timeout)
-        assert result_dataloader_name == dataloader_name
-        return result
+        if dataloader_name not in self.results:
+            raise DGLError(f"{dataloader_name} not found.")
+        while len(self.results[dataloader_name]) == 0:
+            dl_name, data = self.result_queue.get(timeout=timeout)
+            self.results[dl_name].append(data)
+        return self.results[dataloader_name].pop(0)
 
     def delete_collate_fn(self, dataloader_name):
         """Delete collate function"""
         for i in range(self.num_workers):
             self.task_queues[i].put(
                 (MpCommand.DELETE_COLLATE_FN, (dataloader_name, )))
+        del self.results[dataloader_name]
 
     def call_barrier(self):
         """Call barrier at all workers"""
