@@ -114,7 +114,8 @@ def train(local_rank, local_size, group_rank, world_size, g, parts, num_classes,
                 fanouts = [k for _ in range(num_layers)]
                 samplers = [DistSampler(g, dgl.dataloading.NeighborSampler, fanouts)]
                 if args.edge_pred:
-                    samplers = [dgl.dataloading.as_edge_prediction_sampler(sampler, exclude='reverse_id', reverse_eids=reverse_eids) for sampler in samplers]
+                    samplers = [dgl.dataloading.as_edge_prediction_sampler(sampler, exclude='reverse_id', reverse_eids=reverse_eids,
+                    negative_sampler=dgl.dataloading.negative_sampler.Uniform(1)) for sampler in samplers]
                 sampler_names = ['NS']
                 for batch_size in [1000, 2000, 4000, 8000, 16000, 32000, 64000]:
                     num_items = train_idx.shape[0] if not args.edge_pred else g.g.num_edges()
