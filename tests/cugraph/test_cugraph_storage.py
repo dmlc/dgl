@@ -1,14 +1,10 @@
 from dgl.contrib.cugraph.cugraph_storage import CuGraphStorage
-from cugraph.experimental import PropertyGraph
 import cudf
-import cupy as cp
 import numpy as np
 
 
 def create_gs_heterogeneous_dgl_eg():
-    pg = PropertyGraph()
-    gs = CuGraphStorage(pg)
-
+    gs = CuGraphStorage()
     # Add Edge Data
     src_ser = [0, 1, 2, 0, 1, 2, 7, 9, 10, 11]
     dst_ser = [3, 4, 5, 6, 7, 8, 6, 6, 6, 6]
