@@ -4,6 +4,7 @@
  * \brief Array index select GPU implementation
  */
 #include <dgl/array.h>
+
 #include "../../runtime/cuda/cuda_common.h"
 #include "./array_index_select.cuh"
 #include "./utils.h"
@@ -13,7 +14,7 @@ using runtime::NDArray;
 namespace aten {
 namespace impl {
 
-template<DGLDeviceType XPU, typename DType, typename IdType>
+template <DGLDeviceType XPU, typename DType, typename IdType>
 NDArray IndexSelect(NDArray array, IdArray index) {
   cudaStream_t stream = runtime::getCurrentCUDAStream();
   const DType* array_data = static_cast<DType*>(array->data);
@@ -29,24 +30,25 @@ NDArray IndexSelect(NDArray array, IdArray index) {
 
   // use index->ctx for pinned array
   NDArray ret = NDArray::Empty(shape, array->dtype, index->ctx);
-  if (len == 0)
-    return ret;
+  if (len == 0) return ret;
   DType* ret_data = static_cast<DType*>(ret->data);
 
   if (num_feat == 1) {
-      const int nt = cuda::FindNumThreads(len);
-      const int nb = (len + nt - 1) / nt;
-      CUDA_KERNEL_CALL(IndexSelectSingleKernel, nb, nt, 0, stream,
-          array_data, idx_data, len, arr_len, ret_data);
+    const int nt = cuda::FindNumThreads(len);
+    const int nb = (len + nt - 1) / nt;
+    CUDA_KERNEL_CALL(
+        IndexSelectSingleKernel, nb, nt, 0, stream, array_data, idx_data, len,
+        arr_len, ret_data);
   } else {
-      dim3 block(256, 1);
-      while (static_cast<int64_t>(block.x) >= 2*num_feat) {
-          block.x /= 2;
-          block.y *= 2;
-      }
-      const dim3 grid((len+block.y-1)/block.y);
-      CUDA_KERNEL_CALL(IndexSelectMultiKernel, grid, block, 0, stream,
-          array_data, num_feat, idx_data, len, arr_len, ret_data);
+    dim3 block(256, 1);
+    while (static_cast<int64_t>(block.x) >= 2 * num_feat) {
+      block.x /= 2;
+      block.y *= 2;
+    }
+    const dim3 grid((len + block.y - 1) / block.y);
+    CUDA_KERNEL_CALL(
+        IndexSelectMultiKernel, grid, block, 0, stream, array_data, num_feat,
+        idx_data, len, arr_len, ret_data);
   }
   return ret;
 }
@@ -78,8 +80,9 @@ DType IndexSelect(NDArray array, int64_t index) {
   DType ret = 0;
 #endif
   device->CopyDataFromTo(
-      static_cast<DType*>(array->data) + index, 0, reinterpret_cast<DType*>(&ret), 0,
-      sizeof(DType), array->ctx, DGLContext{kDGLCPU, 0}, array->dtype);
+      static_cast<DType*>(array->data) + index, 0,
+      reinterpret_cast<DType*>(&ret), 0, sizeof(DType), array->ctx,
+      DGLContext{kDGLCPU, 0}, array->dtype);
   return reinterpret_cast<DType&>(ret);
 }
 
