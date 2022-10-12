@@ -1657,21 +1657,15 @@ def test_DeepWalk():
     optim.step()
 
 @parametrize_idtype
-@pytest.mark.parametrize('meta_path', [['uc','cu'],['uc','cp','pc','cu']])
-@pytest.mark.parametrize('context_size', [1, 3])
-@pytest.mark.parametrize('negative_size', [1, 3])
-@pytest.mark.parametrize('min_count', [0, 1])
-@pytest.mark.parametrize('emb_dim', [1, 100])
-@pytest.mark.parametrize('num_random_walk', [1, 3])
 def test_MetaPath2Vec(emb_dim, meta_path, context_size, negative_size, min_count, num_random_walk, idtype):
+    dev = F.ctx()
     g = dgl.heterograph({
         ('user', 'uc', 'company'): ([0, 0, 2, 1, 3], [1, 2, 1, 3, 0]),
         ('company', 'cp', 'product'): ([0, 0, 0, 1, 2, 3], [0, 2, 3, 0, 2, 1]),
         ('company', 'cu', 'user'): ([1, 2, 1, 3, 0], [0, 0, 2, 1, 3]),
         ('product', 'pc', 'company'): ([0, 2, 3, 0, 2, 1], [0, 0, 0, 1, 2, 3])
-    }, idtype=idtype, device=F.ctx())
-    model = nn.MetaPath2Vec(g, emb_dim, meta_path, context_size, min_count, negative_size, num_random_walk)
-    model = model.to(F.ctx())
-    embeds = model.u_embeddings.weight
-    emb_size = model.word_count
-    assert embeds.shape == (emb_size, emb_dim)
+    }, idtype=idtype, device=dev)
+    model = nn.MetaPath2Vec(g, ['uc', 'cu'], window_size=1)
+    model = model.to(dev)
+    embeds = model.node_embed.weight
+    assert embeds.shape[0] == g.num_nodes()

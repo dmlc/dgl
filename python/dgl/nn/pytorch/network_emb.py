@@ -11,6 +11,8 @@ import torch.nn.functional as F
 import numpy as np
 import tqdm
 
+from ...base import NID
+from ...convert import to_homogeneous, to_heterogeneous
 from ...random import choice
 from ...sampling import random_walk
 
@@ -38,7 +40,7 @@ class DeepWalk(nn.Module):
     neg_weight : float, optional
         Weight of the loss term for negative samples in the total loss. Default: 1.0
     negative_size : int, optional
-        Number of negative samples to use for each positive sample in an iteration. Default: 1
+        Number of negative samples to use for each positive sample. Default: 1
     fast_neg : bool, optional
         If True, it samples negative node pairs within a batch of random walks. Default: True
     sparse : bool, optional
@@ -63,15 +65,18 @@ class DeepWalk(nn.Module):
     >>> dataset = CoraGraphDataset()
     >>> g = dataset[0]
     >>> model = DeepWalk(g)
-    >>> optimizer = SparseAdam(model.parameters(), lr=0.01)
     >>> dataloader = DataLoader(torch.arange(g.num_nodes()), batch_size=128,
     ...                         shuffle=True, collate_fn=model.sample)
+    >>> optimizer = SparseAdam(model.parameters(), lr=0.01)
     >>> num_epochs = 5
+
     >>> for epoch in range(num_epochs):
     ...     for batch_walk in dataloader:
     ...         loss = model(batch_walk)
+    ...         optimizer.zero_grad()
     ...         loss.backward()
     ...         optimizer.step()
+
     >>> train_mask = g.ndata['train_mask']
     >>> test_mask = g.ndata['test_mask']
     >>> X = model.node_embed.weight.detach()
@@ -105,14 +110,13 @@ class DeepWalk(nn.Module):
 
         # center node embedding
         self.node_embed = nn.Embedding(num_nodes, emb_dim, sparse=sparse)
-        # context embedding
         self.context_embed = nn.Embedding(num_nodes, emb_dim, sparse=sparse)
         self.reset_parameters()
 
         if not fast_neg:
-            node_degree = g.out_degrees().pow(0.75)
+            neg_prob = g.out_degrees().pow(0.75)
             # categorical distribution for true negative sampling
-            self.neg_prob = node_degree / node_degree.sum()
+            self.neg_prob = neg_prob / neg_prob.sum()
 
         # Get list index pairs for positive samples.
         # Given i, positive index pairs are (i - window_size, i), ... ,
@@ -222,35 +226,37 @@ class MetaPath2Vec(nn.Module):
     Parameters
     ----------
     g : DGLGraph
-        Graph data for generating node embeddings. Its different canonical edge types
+        Graph for learning node embeddings. Two different canonical edge types
         :attr:`(utype, etype, vtype)` are not allowed to have same :attr:`etype`.
-    emb_dim : int
-        Node embedding size
-    metapath : List[str]
+    metapath : list[str]
         A sequence of edge types in the form of a string. It defines a new edge type by composing
         multiple edge types in order. Note that the start node type and the end one are commonly
         the same.
-    context_size : int
-        The context size for getting positive samples.
-    min_count : int, optional
-        The nodes that appear less than :attr:`min_count` times in all meta-path instances will
-        be discarded, which means we can not get their trained embeddings. Default: 0
+    window_size : int
+        In a random walk :attr:`w`, a node :attr:`w[j]` is considered close to a node
+        :attr:`w[i]` if :attr:`i - window_size <= j <= i + window_size`.
+    emb_dim : int, optional
+        Size of each embedding vector. Default: 128
     negative_size : int, optional
-        The number of negative samples to use for each positive sample. Default: 5
-    num_random_walk : int, optional
-        The number of random walks to sample for each start node. Default: 1
+        Number of negative samples to use for each positive sample. Default: 5
     sparse : bool, optional
-        If set to True, gradients with respect to the learnable weights will be sparse.
+        If True, gradients with respect to the learnable weights will be sparse.
         Default: True
-    negative_table_size : float, optional
-        The corresponding number of negative samples will be sampled offline. Default: 1e8
+
+    Attributes
+    ----------
+    node_embed : nn.Embedding
+        Embedding table of all nodes
+    local_to_global_nid : dict[str, list]
+        Mapping from type-specific node IDs to global node IDs
 
     Examples
     --------
 
     >>> import torch
-    >>> from torch import optim
     >>> import dgl
+    >>> from torch.optim import SparseAdam
+    >>> from torch.utils.data import DataLoader
     >>> from dgl.nn.pytorch import MetaPath2Vec
 
     >>> # Define a model
@@ -260,198 +266,138 @@ class MetaPath2Vec(nn.Module):
     ...     ('company', 'cu', 'user'): dgl.rand_graph(100, 1000).edges(),
     ...     ('product', 'pc', 'company'): dgl.rand_graph(100, 1000).edges()
     ... })
-    >>> model = MetaPath2Vec(g, 64, ['uc', 'cu'], 1, 1, 2, 10)
-    >>> print(model.local_to_global_id)
-    {'company': array([0, 1, 2, 3]), 'user': array([4, 5, 6, 7])}
+    >>> model = MetaPath2Vec(g, ['uc', 'cu'], window_size=1)
 
-    >>> # Train the model
-    >>> dataloader = model.loader()
-    >>> optimizer = optim.SparseAdam(list(model.parameters()), lr=0.025)
-    >>> scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(dataloader))
-    >>> for i, sample_batched in enumerate((dataloader)):
-    ...     pos_u = sample_batched[0]
-    ...     pos_v = sample_batched[1]
-    ...     neg_v = sample_batched[2]
-    ...     scheduler.step()
-    ...     optimizer.zero_grad()
+    >>> # Use the source node type of etype 'uc'
+    >>> dataloader = DataLoader(torch.arange(g.num_nodes('user')), batch_size=128,
+    ...                         shuffle=True, collate_fn=model.sample)
+    >>> optimizer = SparseAdam(model.parameters(), lr=0.025)
+
+    >>> for (pos_u, pos_v, neg_v) in dataloader:
     ...     loss = model(pos_u, pos_v, neg_v)
+    ...     optimizer.zero_grad()
     ...     loss.backward()
     ...     optimizer.step()
+
+    >>> # Get the embeddings of all user nodes
+    >>> user_nids = torch.LongTensor(model.local_to_global_nid['user'])
+    >>> user_emb = model.node_embed(user_nids)
     """
     def __init__(self,
                  g,
-                 emb_dim,
                  metapath,
-                 context_size,
-                 min_count=0,
+                 window_size,
+                 emb_dim=128,
                  negative_size=5,
-                 num_random_walk=1,
-                 sparse=True,
-                 negative_table_size=1e8):
+                 sparse=True):
         super().__init__()
-        self.g = g
+
+        assert len(metapath) + 1 >= window_size, \
+            f'Expect len(metapath) >= window_size - 1, got {metapath} and {window_size}'
+
+        self.hg = g
         self.emb_dim = emb_dim
         self.metapath = metapath
-        self.min_count = min_count
-        self.context_size = context_size
+        self.window_size = window_size
         self.negative_size = negative_size
-        self.sparse = sparse
-        self.num_random_walk = num_random_walk
-        self.walk_dataset = []
-        self.negatives = []
-        self.discards = dict()
-        self.negpos = 0
-        self.negative_table_size = negative_table_size
-        self._extract()
-        self._init_table_negatives()
 
-    def _extract(self):
-        # The metapath node length must be longer than the context size. Otherwise there are not
-        # enough nodes to sample.
-        assert len(self.metapath) + 1 >= self.context_size
-        node_frequency = defaultdict(int)
-        node_frequency_filtered = dict()
+        # convert edge metapath to node metapath
+        # get initial source node type
+        src_type, _, _ = g.to_canonical_etype(metapath[0])
+        node_metapath = [src_type]
+        for etype in metapath:
+            _, _, dst_type = g.to_canonical_etype(etype)
+            node_metapath.append(dst_type)
+        self.node_metapath = node_metapath
 
-        ## convert the edge metapath to the node metapath
-        nodespath = []
-        edge2des = {}
-        for src_type, etype, dst_type in self.g.canonical_etypes:
-            edge2des[etype] = dst_type
-            if etype == self.metapath[0]:
-                nodespath.append(src_type)
-        for edge in self.metapath:
-            nodespath.append(edge2des[edge])
+        # Convert the graph into a homogeneous one for global to local node ID mapping
+        g = to_homogeneous(g)
+        # Convert it back to the hetero one for local to global node ID mapping
+        hg = to_heterogeneous(g, self.hg.ntypes, self.hg.etypes)
+        local_to_global_nid = hg.ndata[NID]
+        for key, val in local_to_global_nid.items():
+            local_to_global_nid[key] = list(val.cpu().numpy())
+        self.local_to_global_nid = local_to_global_nid
 
-        ## build whole vocab for all nodes
-        self.node_count = 0
-        self.token_count = 0
-        self.local_to_global_id = dict()
-        for nodetype in set(nodespath):
-            self.local_to_global_id[nodetype] = np.arange(
-                self.g.num_nodes(nodetype)) + self.node_count
-            self.node_count += self.g.num_nodes(nodetype)
-
-        # start random walk
-        for idx in tqdm.trange(self.g.num_nodes(nodespath[0])):
-            traces, _ = random_walk(g=self.g, nodes=[idx] * self.num_random_walk,
-                                    metapath=self.metapath)
+        num_nodes_total = hg.num_nodes()
+        node_frequency = torch.zeros(num_nodes_total)
+        # random walk
+        for idx in tqdm.trange(hg.num_nodes(node_metapath[0])):
+            traces, _ = random_walk(g=hg, nodes=[idx], metapath=metapath)
             for tr in traces.cpu().numpy():
-                line = [self.local_to_global_id[nodespath[i]][tr[i]] for i in range(len(tr))]
-                self.walk_dataset.append(line)
-                if len(line) > 1:
-                    self.token_count += len(line)
-                    for node in line:
-                        node_frequency[node] = node_frequency[node] + 1
+                tr_nids = [
+                    self.local_to_global_nid[node_metapath[i]][tr[i]] for i in range(len(tr))]
+                node_frequency[torch.LongTensor(tr_nids)] += 1
 
-        # Filter out the nodes whose number of occurrences is smaller than min_count and frequency
-        # subsampling
-        t = 0.0001
-        for node, freq in node_frequency.items():
-            if freq > self.min_count:
-                node_frequency_filtered[node] = freq
-                f = np.array(freq) / self.token_count
-                self.discards[node] = np.sqrt(t / f) + (t / f)
+        neg_prob = node_frequency.pow(0.75)
+        self.neg_prob = neg_prob / neg_prob.sum()
 
-        self.node_frequency = node_frequency_filtered
-
-        print("Total embeddings: " + str(self.node_count))
-        print("Real embeddings: " + str(len(self.node_frequency)))
-
-        self.u_emb = nn.Embedding(self.node_count, self.emb_dim, sparse=self.sparse)
-        self.v_emb = nn.Embedding(self.node_count, self.emb_dim, sparse=self.sparse)
-
-    def _init_table_negatives(self):
-        # get a table for negative sampling, if node with index 2 appears twice, then 2
-        # will be listed in the table twice.
-        pow_frequency = np.array(list(self.node_frequency.values())) ** 0.75
-        nodes_pow = sum(pow_frequency)
-        ratio = pow_frequency / nodes_pow
-        count = np.round(ratio * self.negative_table_size)
-        node_list = list(self.node_frequency.keys())
-        for wid, c in enumerate(count):
-            self.negatives += [node_list[wid]] * int(c)
-        self.negatives = np.array(self.negatives)
-        np.random.shuffle(self.negatives)
-        self.sampling_prob = ratio
+        # center node embedding
+        self.node_embed = nn.Embedding(num_nodes_total, self.emb_dim, sparse=sparse)
+        self.context_embed = nn.Embedding(num_nodes_total, self.emb_dim, sparse=sparse)
+        self.reset_parameters()
 
     def reset_parameters(self):
-        r"""Initialize the embedding parameters"""
+        """Reinitialize learnable parameters"""
         init_range = 1.0 / self.emb_dim
-        init.uniform_(self.u_emb.weight.data, -init_range, init_range)
-        init.constant_(self.v_emb.weight.data, 0)
+        init.uniform_(self.node_embed.weight.data, -init_range, init_range)
+        init.constant_(self.context_embed.weight.data, 0)
 
-    def _get_negatives(self):
-        # TODO online sampling
-        response = self.negatives[self.negpos:self.negpos + self.negative_size]
-        self.negpos = (self.negpos + self.negative_size) % len(self.negatives)
-        if len(response) != self.negative_size:
-            return np.concatenate((response, self.negatives[0:self.negpos]))
-        return response
-
-    def _generate_sample(self, batches):
-        pair_catch = []
-        for batch in batches:
-            # TODO check whether we should directly update self.walk_dataset at the beginning
-            node_ids = [w for w in batch if w in self.node_frequency
-                        and np.random.rand() < self.discards[w]]
-
-            for i, u in enumerate(node_ids):
-                for j, v in enumerate(
-                        node_ids[max(i - self.context_size, 0):i + self.context_size]):
-                    if i == j:
-                        continue
-                    pair_catch.append((u, v, self._get_negatives()))
-
-        all_u = [u for u, _, _ in pair_catch]
-        all_v = [v for _, v, _ in pair_catch]
-        all_neg_v = [neg_v for _, _, neg_v in pair_catch]
-
-        return torch.LongTensor(all_u), torch.LongTensor(all_v), torch.LongTensor(all_neg_v)
-
-    def loader(self, **kwargs):
-        r"""Returns the data loader that yields center node, positive context node,
-        and negative samples on the heterogeneous graph random walk.
+    def sample(self, indices):
+        """Sample positive and negative samples
 
         Parameters
         ----------
-        kwargs : dict, optional
-            Key-word arguments to be passed to the parent PyTorch
-            :py:class:`torch.utils.data.DataLoader` class. Common arguments are:
-
-            - ``batch_size`` (int): The number of indices in each batch.
-            - ``drop_last`` (bool): Whether to drop the last incomplete batch.
-            - ``shuffle`` (bool): Whether to randomly shuffle the indices at each epoch.
-
-        Returns
-        -------
-        torch.utils.data.DataLoader (Tensor,Tensor,Tensor)
-            The data loader that yields batched data for center node, positive context node,
-            and negative samples
-        """
-        return DataLoader(self.walk_dataset, collate_fn=self._generate_sample, **kwargs)
-
-    def forward(self, pos_u, pos_v, neg_v):
-        r"""Return the loss score given center nodes, positive context nodes,
-        and negative samples.
-
-        Parameters
-        ----------
-        pos_u : Tensor
-            Center node IDs
-        pos_v : Tensor
-            Positive context node IDs
-        neg_v : Tensor
-            Negative node IDs
+        indices : torch.Tensor
+            Node IDs of the source node type from which we perform random walks
 
         Returns
         -------
         torch.Tensor
-            The SkipGram model loss given center nodes id, positive context nodes id,
-            and negative samples id.
+            Positive center nodes
+        torch.Tensor
+            Positive context nodes
+        torch.Tensor
+            Negative context nodes
         """
-        emb_u = self.u_emb(pos_u)
-        emb_v = self.v_emb(pos_v)
-        emb_neg_v = self.v_emb(neg_v)
+        traces, _ = random_walk(g=self.hg, nodes=indices, metapath=self.metapath)
+        u_list = []
+        v_list = []
+        for tr in traces.cpu().numpy():
+            tr_nids = [
+                self.local_to_global_nid[self.node_metapath[i]][tr[i]] for i in range(len(tr))]
+            for i, u in enumerate(tr_nids):
+                for j, v in enumerate(tr_nids[max(i - self.window_size, 0):i + self.window_size]):
+                    if i == j:
+                        continue
+                    u_list.append(u)
+                    v_list.append(v)
+
+        neg_v = choice(self.hg.num_nodes(), size=len(u_list) * self.negative_size,
+                       prob=self.neg_prob).reshape(len(u_list), self.negative_size)
+
+        return torch.LongTensor(u_list), torch.LongTensor(v_list), neg_v
+
+    def forward(self, pos_u, pos_v, neg_v):
+        r"""Compute the loss for the batch of positive and negative samples
+
+        Parameters
+        ----------
+        pos_u : torch.Tensor
+            Positive center nodes
+        pos_v : torch.Tensor
+            Positive context nodes
+        neg_v : torch.Tensor
+            Negative context nodes
+
+        Returns
+        -------
+        torch.Tensor
+            Loss value
+        """
+        emb_u = self.node_embed(pos_u)
+        emb_v = self.context_embed(pos_v)
+        emb_neg_v = self.context_embed(neg_v)
 
         score = torch.sum(torch.mul(emb_u, emb_v), dim=1)
         score = torch.clamp(score, max=10, min=-10)
