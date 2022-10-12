@@ -123,8 +123,12 @@ def train(local_rank, local_size, group_rank, world_size, g, parts, num_classes,
                     for i in range(0, num_items, batch_size):
                         seeds = train_idx[perm[i: i + batch_size]] if not args.edge_pred else perm[i: i + batch_size]
                         for sampler, name in zip(samplers, sampler_names):
-                            input_nodes, output_nodes, blocks = sampler.sample(g.g, seeds)
-                            print("{}-{}-{}-{}".format(name, batch_size, k, global_rank), [(block.num_src_nodes(), block.num_dst_nodes(), block.num_edges()) for block in blocks])
+                            if not args.edge_pred:
+                                input_nodes, output_nodes, blocks = sampler.sample(g.g, seeds)
+                                print("{}-{}-{}-{}".format(name, batch_size, k, global_rank), [(block.num_src_nodes(), block.num_dst_nodes(), block.num_edges()) for block in blocks])
+                            else:
+                                input_nodes, pair_graph, neg_graph, blocks = sampler.sample(g.g, seeds)
+                                print("{}-{}-{}-{}".format(name, batch_size, k, global_rank), [(block.num_src_nodes(), block.num_dst_nodes(), block.num_edges()) for block in blocks])
 
     st, end = th.cuda.Event(enable_timing=True), th.cuda.Event(enable_timing=True)
     st.record()
