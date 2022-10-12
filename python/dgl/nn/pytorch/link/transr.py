@@ -3,6 +3,7 @@
 import torch
 import torch.nn as nn
 
+
 class TransR(nn.Module):
     r"""Similarity measure from
     `Learning entity and relation embeddings for knowledge graph completion
@@ -58,6 +59,7 @@ class TransR(nn.Module):
     >>> scorer(h_head, h_tail, rels).shape
     torch.Size([30])
     """
+
     def __init__(self, num_rels, rfeats, nfeats, p=1):
         super(TransR, self).__init__()
 
@@ -103,4 +105,4 @@ class TransR(nn.Module):
         h_head = (h_head.unsqueeze(1) @ proj_rel).squeeze(1)
         h_tail = (h_tail.unsqueeze(1) @ proj_rel).squeeze(1)
 
-        return - torch.norm(h_head + h_rel - h_tail, p=self.p, dim=-1)
+        return -torch.norm(h_head + h_rel - h_tail, p=self.p, dim=-1)

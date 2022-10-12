@@ -1,4 +1,2 @@
-from .registry import register_array_parser, get_array_parser
-
-from . import csv
-from . import numpy_array
+from . import csv, numpy_array
+from .registry import get_array_parser, register_array_parser

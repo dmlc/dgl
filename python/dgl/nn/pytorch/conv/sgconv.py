@@ -82,14 +82,16 @@ class SGConv(nn.Module):
             [-1.9441, -0.9343]], grad_fn=<AddmmBackward>)
     """
 
-    def __init__(self,
-                 in_feats,
-                 out_feats,
-                 k=1,
-                 cached=False,
-                 bias=True,
-                 norm=None,
-                 allow_zero_in_degree=False):
+    def __init__(
+        self,
+        in_feats,
+        out_feats,
+        k=1,
+        cached=False,
+        bias=True,
+        norm=None,
+        allow_zero_in_degree=False,
+    ):
         super(SGConv, self).__init__()
         self.fc = nn.Linear(in_feats, out_feats, bias=bias)
         self._cached = cached
@@ -170,20 +172,23 @@ class SGConv(nn.Module):
         with graph.local_scope():
             if not self._allow_zero_in_degree:
                 if (graph.in_degrees() == 0).any():
-                    raise DGLError('There are 0-in-degree nodes in the graph, '
-                                   'output for those nodes will be invalid. '
-                                   'This is harmful for some applications, '
-                                   'causing silent performance regression. '
-                                   'Adding self-loop on the input graph by '
-                                   'calling `g = dgl.add_self_loop(g)` will resolve '
-                                   'the issue. Setting ``allow_zero_in_degree`` '
-                                   'to be `True` when constructing this module will '
-                                   'suppress the check and let the code run.')
+                    raise DGLError(
+                        "There are 0-in-degree nodes in the graph, "
+                        "output for those nodes will be invalid. "
+                        "This is harmful for some applications, "
+                        "causing silent performance regression. "
+                        "Adding self-loop on the input graph by "
+                        "calling `g = dgl.add_self_loop(g)` will resolve "
+                        "the issue. Setting ``allow_zero_in_degree`` "
+                        "to be `True` when constructing this module will "
+                        "suppress the check and let the code run."
+                    )
 
             msg_func = fn.copy_u("h", "m")
             if edge_weight is not None:
-                graph.edata["_edge_weight"] = EdgeWeightNorm(
-                    'both')(graph, edge_weight)
+                graph.edata["_edge_weight"] = EdgeWeightNorm("both")(
+                    graph, edge_weight
+                )
                 msg_func = fn.u_mul_e("h", "_edge_weight", "m")
 
             if self._cached_h is not None:
@@ -198,10 +203,9 @@ class SGConv(nn.Module):
                 for _ in range(self._k):
                     if edge_weight is None:
                         feat = feat * norm
-                    graph.ndata['h'] = feat
-                    graph.update_all(msg_func,
-                                     fn.sum('m', 'h'))
-                    feat = graph.ndata.pop('h')
+                    graph.ndata["h"] = feat
+                    graph.update_all(msg_func, fn.sum("m", "h"))
+                    feat = graph.ndata.pop("h")
                     if edge_weight is None:
                         feat = feat * norm
 

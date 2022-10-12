@@ -1,10 +1,13 @@
 """Heterograph NN modules"""
 from functools import partial
+
 import torch as th
 import torch.nn as nn
+
 from ...base import DGLError
 
-__all__ = ['HeteroGraphConv', 'HeteroLinear', 'HeteroEmbedding']
+__all__ = ["HeteroGraphConv", "HeteroLinear", "HeteroEmbedding"]
+
 
 class HeteroGraphConv(nn.Module):
     r"""A generic module for computing convolution on heterogeneous graphs.
@@ -120,7 +123,8 @@ class HeteroGraphConv(nn.Module):
     mods : dict[str, nn.Module]
         Modules associated with every edge types.
     """
-    def __init__(self, mods, aggregate='sum'):
+
+    def __init__(self, mods, aggregate="sum"):
         super(HeteroGraphConv, self).__init__()
         self.mod_dict = mods
         mods = {str(k): v for k, v in mods.items()}
@@ -132,7 +136,9 @@ class HeteroGraphConv(nn.Module):
         # Do not break if graph has 0-in-degree nodes.
         # Because there is no general rule to add self-loop for heterograph.
         for _, v in self.mods.items():
-            set_allow_zero_in_degree_fn = getattr(v, 'set_allow_zero_in_degree', None)
+            set_allow_zero_in_degree_fn = getattr(
+                v, "set_allow_zero_in_degree", None
+            )
             if callable(set_allow_zero_in_degree_fn):
                 set_allow_zero_in_degree_fn(True)
         if isinstance(aggregate, str):
@@ -148,7 +154,7 @@ class HeteroGraphConv(nn.Module):
             # etype is canonical
             _, etype, _ = etype
             return self.mod_dict[etype]
-        raise KeyError('Cannot find module with edge type %s' % etype)
+        raise KeyError("Cannot find module with edge type %s" % etype)
 
     def forward(self, g, inputs, mod_args=None, mod_kwargs=None):
         """Forward computation
@@ -175,13 +181,15 @@ class HeteroGraphConv(nn.Module):
             mod_args = {}
         if mod_kwargs is None:
             mod_kwargs = {}
-        outputs = {nty : [] for nty in g.dsttypes}
+        outputs = {nty: [] for nty in g.dsttypes}
         if isinstance(inputs, tuple) or g.is_block:
             if isinstance(inputs, tuple):
                 src_inputs, dst_inputs = inputs
             else:
                 src_inputs = inputs
-                dst_inputs = {k: v[:g.number_of_dst_nodes(k)] for k, v in inputs.items()}
+                dst_inputs = {
+                    k: v[: g.number_of_dst_nodes(k)] for k, v in inputs.items()
+                }
 
             for stype, etype, dtype in g.canonical_etypes:
                 rel_graph = g[stype, etype, dtype]
@@ -191,7 +199,8 @@ class HeteroGraphConv(nn.Module):
                     rel_graph,
                     (src_inputs[stype], dst_inputs[dtype]),
                     *mod_args.get(etype, ()),
-                    **mod_kwargs.get(etype, {}))
+                    **mod_kwargs.get(etype, {})
+                )
                 outputs[dtype].append(dstdata)
         else:
             for stype, etype, dtype in g.canonical_etypes:
@@ -202,7 +211,8 @@ class HeteroGraphConv(nn.Module):
                     rel_graph,
                     (inputs[stype], inputs[dtype]),
                     *mod_args.get(etype, ()),
-                    **mod_kwargs.get(etype, {}))
+                    **mod_kwargs.get(etype, {})
+                )
                 outputs[dtype].append(dstdata)
         rsts = {}
         for nty, alist in outputs.items():
@@ -210,28 +220,35 @@ class HeteroGraphConv(nn.Module):
                 rsts[nty] = self.agg_fn(alist, nty)
         return rsts
 
+
 def _max_reduce_func(inputs, dim):
     return th.max(inputs, dim=dim)[0]
+
 
 def _min_reduce_func(inputs, dim):
     return th.min(inputs, dim=dim)[0]
 
+
 def _sum_reduce_func(inputs, dim):
     return th.sum(inputs, dim=dim)
+
 
 def _mean_reduce_func(inputs, dim):
     return th.mean(inputs, dim=dim)
 
-def _stack_agg_func(inputs, dsttype): # pylint: disable=unused-argument
+
+def _stack_agg_func(inputs, dsttype):  # pylint: disable=unused-argument
     if len(inputs) == 0:
         return None
     return th.stack(inputs, dim=1)
 
-def _agg_func(inputs, dsttype, fn): # pylint: disable=unused-argument
+
+def _agg_func(inputs, dsttype, fn):  # pylint: disable=unused-argument
     if len(inputs) == 0:
         return None
     stacked = th.stack(inputs, dim=0)
     return fn(stacked, dim=0)
+
 
 def get_aggregate_fn(agg):
     """Internal function to get the aggregation function for node data
@@ -249,23 +266,26 @@ def get_aggregate_fn(agg):
         Aggregator function that takes a list of tensors to aggregate
         and returns one aggregated tensor.
     """
-    if agg == 'sum':
+    if agg == "sum":
         fn = _sum_reduce_func
-    elif agg == 'max':
+    elif agg == "max":
         fn = _max_reduce_func
-    elif agg == 'min':
+    elif agg == "min":
         fn = _min_reduce_func
-    elif agg == 'mean':
+    elif agg == "mean":
         fn = _mean_reduce_func
-    elif agg == 'stack':
+    elif agg == "stack":
         fn = None  # will not be called
     else:
-        raise DGLError('Invalid cross type aggregator. Must be one of '
-                       '"sum", "max", "min", "mean" or "stack". But got "%s"' % agg)
-    if agg == 'stack':
+        raise DGLError(
+            "Invalid cross type aggregator. Must be one of "
+            '"sum", "max", "min", "mean" or "stack". But got "%s"' % agg
+        )
+    if agg == "stack":
         return _stack_agg_func
     else:
         return partial(_agg_func, fn=fn)
+
 
 class HeteroLinear(nn.Module):
     """Apply linear transformations on heterogeneous inputs.
@@ -294,6 +314,7 @@ class HeteroLinear(nn.Module):
     >>> print(out_feats[('user', 'follows', 'user')].shape)
     torch.Size([3, 3])
     """
+
     def __init__(self, in_size, out_size, bias=True):
         super(HeteroLinear, self).__init__()
 
@@ -319,6 +340,7 @@ class HeteroLinear(nn.Module):
             out_feat[typ] = self.linears[str(typ)](typ_feat)
 
         return out_feat
+
 
 class HeteroEmbedding(nn.Module):
     """Create a heterogeneous embedding table.
@@ -356,6 +378,7 @@ class HeteroEmbedding(nn.Module):
     >>> print(embeds[('user', 'follows', 'user')].shape)
     torch.Size([2, 4])
     """
+
     def __init__(self, num_embeddings, embedding_dim):
         super(HeteroEmbedding, self).__init__()
 
@@ -374,7 +397,9 @@ class HeteroEmbedding(nn.Module):
         dict[key, Tensor]
             Heterogeneous embedding table
         """
-        return {self.raw_keys[typ]: emb.weight for typ, emb in self.embeds.items()}
+        return {
+            self.raw_keys[typ]: emb.weight for typ, emb in self.embeds.items()
+        }
 
     def reset_parameters(self):
         """
