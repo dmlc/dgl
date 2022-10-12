@@ -1,13 +1,15 @@
 """Flickr Dataset"""
-import os
 import json
+import os
+
 import numpy as np
 import scipy.sparse as sp
+
 from .. import backend as F
 from ..convert import from_scipy
 from ..transforms import reorder_graph
 from .dgl_dataset import DGLBuiltinDataset
-from .utils import generate_mask_tensor, load_graphs, save_graphs, _get_dgl_url
+from .utils import _get_dgl_url, generate_mask_tensor, load_graphs, save_graphs
 
 
 class FlickrDataset(DGLBuiltinDataset):
@@ -65,66 +67,78 @@ class FlickrDataset(DGLBuiltinDataset):
     >>> test_mask = g.ndata['test_mask']
     """
 
-    def __init__(self, raw_dir=None, force_reload=False, verbose=False, transform=None,
-                 reorder=False):
-        _url = _get_dgl_url('dataset/flickr.zip')
+    def __init__(
+        self,
+        raw_dir=None,
+        force_reload=False,
+        verbose=False,
+        transform=None,
+        reorder=False,
+    ):
+        _url = _get_dgl_url("dataset/flickr.zip")
         self._reorder = reorder
-        super(FlickrDataset, self).__init__(name='flickr',
-                                            raw_dir=raw_dir,
-                                            url=_url,
-                                            force_reload=force_reload,
-                                            verbose=verbose,
-                                            transform=transform)
+        super(FlickrDataset, self).__init__(
+            name="flickr",
+            raw_dir=raw_dir,
+            url=_url,
+            force_reload=force_reload,
+            verbose=verbose,
+            transform=transform,
+        )
 
     def process(self):
         """process raw data to graph, labels and masks"""
         coo_adj = sp.load_npz(os.path.join(self.raw_path, "adj_full.npz"))
         g = from_scipy(coo_adj)
 
-        features = np.load(os.path.join(self.raw_path, 'feats.npy'))
+        features = np.load(os.path.join(self.raw_path, "feats.npy"))
         features = F.tensor(features, dtype=F.float32)
 
         y = [-1] * features.shape[0]
-        with open(os.path.join(self.raw_path, 'class_map.json')) as f:
+        with open(os.path.join(self.raw_path, "class_map.json")) as f:
             class_map = json.load(f)
             for key, item in class_map.items():
                 y[int(key)] = item
         labels = F.tensor(np.array(y), dtype=F.int64)
 
-        with open(os.path.join(self.raw_path, 'role.json')) as f:
+        with open(os.path.join(self.raw_path, "role.json")) as f:
             role = json.load(f)
 
         train_mask = np.zeros(features.shape[0], dtype=bool)
-        train_mask[role['tr']] = True
+        train_mask[role["tr"]] = True
 
         val_mask = np.zeros(features.shape[0], dtype=bool)
-        val_mask[role['va']] = True
+        val_mask[role["va"]] = True
 
         test_mask = np.zeros(features.shape[0], dtype=bool)
-        test_mask[role['te']] = True
+        test_mask[role["te"]] = True
 
-        g.ndata['feat'] = features
-        g.ndata['label'] = labels
-        g.ndata['train_mask'] = generate_mask_tensor(train_mask)
-        g.ndata['val_mask'] = generate_mask_tensor(val_mask)
-        g.ndata['test_mask'] = generate_mask_tensor(test_mask)
+        g.ndata["feat"] = features
+        g.ndata["label"] = labels
+        g.ndata["train_mask"] = generate_mask_tensor(train_mask)
+        g.ndata["val_mask"] = generate_mask_tensor(val_mask)
+        g.ndata["test_mask"] = generate_mask_tensor(test_mask)
 
         if self._reorder:
             self._graph = reorder_graph(
-                g, node_permute_algo='rcmk', edge_permute_algo='dst', store_ids=False)
+                g,
+                node_permute_algo="rcmk",
+                edge_permute_algo="dst",
+                store_ids=False,
+            )
         else:
             self._graph = g
 
     def has_cache(self):
-        graph_path = os.path.join(self.save_path, 'dgl_graph.bin')
+        graph_path = os.path.join(self.save_path, "dgl_graph.bin")
         return os.path.exists(graph_path)
 
     def save(self):
-        graph_path = os.path.join(self.save_path, 'dgl_graph.bin')
+        graph_path = os.path.join(self.save_path, "dgl_graph.bin")
         save_graphs(graph_path, self._graph)
 
     def load(self):
-        graph_path = os.path.join(self.save_path, 'dgl_graph.bin')
+        graph_path = os.path.join(self.save_path, "dgl_graph.bin")
         g, _ = load_graphs(graph_path)
         self._graph = g[0]
 
@@ -137,7 +151,7 @@ class FlickrDataset(DGLBuiltinDataset):
         return 1
 
     def __getitem__(self, idx):
-        r""" Get graph object
+        r"""Get graph object
 
         Parameters
         ----------

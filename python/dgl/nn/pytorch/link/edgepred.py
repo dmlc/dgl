@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 class EdgePredictor(nn.Module):
     r"""Predictor/score function for pairs of node representations
 
@@ -102,20 +103,21 @@ class EdgePredictor(nn.Module):
     >>> predictor(h_src, h_dst).shape
     torch.Size([3, 3])
     """
-    def __init__(self,
-                 op,
-                 in_feats=None,
-                 out_feats=None,
-                 bias=False):
+
+    def __init__(self, op, in_feats=None, out_feats=None, bias=False):
         super(EdgePredictor, self).__init__()
 
-        assert op in ['dot', 'cos', 'ele', 'cat'], \
-            "Expect op to be in ['dot', 'cos', 'ele', 'cat'], got {}".format(op)
+        assert op in [
+            "dot",
+            "cos",
+            "ele",
+            "cat",
+        ], "Expect op to be in ['dot', 'cos', 'ele', 'cat'], got {}".format(op)
         self.op = op
         if (in_feats is not None) and (out_feats is not None):
-            if op in ['dot', 'cos']:
+            if op in ["dot", "cos"]:
                 in_feats = 1
-            elif op == 'cat':
+            elif op == "cat":
                 in_feats = 2 * in_feats
             self.linear = nn.Linear(in_feats, out_feats, bias=bias)
         else:
@@ -154,12 +156,12 @@ class EdgePredictor(nn.Module):
         torch.Tensor
             The output features.
         """
-        if self.op == 'dot':
+        if self.op == "dot":
             N, D = h_src.shape
             h = torch.bmm(h_src.view(N, 1, D), h_dst.view(N, D, 1)).squeeze(-1)
-        elif self.op == 'cos':
+        elif self.op == "cos":
             h = F.cosine_similarity(h_src, h_dst).unsqueeze(-1)
-        elif self.op == 'ele':
+        elif self.op == "ele":
             h = h_src * h_dst
         else:
             h = torch.cat([h_src, h_dst], dim=-1)

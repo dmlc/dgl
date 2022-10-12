@@ -1,10 +1,10 @@
 """Module for various graph generator functions."""
 
 from . import backend as F
-from . import convert
-from . import random
+from . import convert, random
 
-__all__ = ['rand_graph', 'rand_bipartite']
+__all__ = ["rand_graph", "rand_bipartite"]
+
 
 def rand_graph(num_nodes, num_edges, idtype=F.int64, device=F.cpu()):
     """Generate a random graph of the given number of nodes/edges and return.
@@ -46,20 +46,28 @@ def rand_graph(num_nodes, num_edges, idtype=F.int64, device=F.cpu()):
           ndata_schemes={}
           edata_schemes={})
     """
-    #TODO(minjie): support RNG as one of the arguments.
+    # TODO(minjie): support RNG as one of the arguments.
     eids = random.choice(num_nodes * num_nodes, num_edges, replace=False)
     eids = F.zerocopy_to_numpy(eids)
     rows = F.zerocopy_from_numpy(eids // num_nodes)
     cols = F.zerocopy_from_numpy(eids % num_nodes)
     rows = F.copy_to(F.astype(rows, idtype), device)
     cols = F.copy_to(F.astype(cols, idtype), device)
-    return convert.graph((rows, cols),
-                         num_nodes=num_nodes,
-                         idtype=idtype, device=device)
+    return convert.graph(
+        (rows, cols), num_nodes=num_nodes, idtype=idtype, device=device
+    )
 
-def rand_bipartite(utype, etype, vtype,
-                   num_src_nodes, num_dst_nodes, num_edges,
-                   idtype=F.int64, device=F.cpu()):
+
+def rand_bipartite(
+    utype,
+    etype,
+    vtype,
+    num_src_nodes,
+    num_dst_nodes,
+    num_edges,
+    idtype=F.int64,
+    device=F.cpu(),
+):
     """Generate a random uni-directional bipartite graph and return.
 
     It uniformly chooses ``num_edges`` from all possible node pairs and form a graph.
@@ -107,13 +115,18 @@ def rand_bipartite(utype, etype, vtype,
           num_edges={('user', 'buys', 'game'): 10},
           metagraph=[('user', 'game', 'buys')])
     """
-    #TODO(minjie): support RNG as one of the arguments.
-    eids = random.choice(num_src_nodes * num_dst_nodes, num_edges, replace=False)
+    # TODO(minjie): support RNG as one of the arguments.
+    eids = random.choice(
+        num_src_nodes * num_dst_nodes, num_edges, replace=False
+    )
     eids = F.zerocopy_to_numpy(eids)
     rows = F.zerocopy_from_numpy(eids // num_dst_nodes)
     cols = F.zerocopy_from_numpy(eids % num_dst_nodes)
     rows = F.copy_to(F.astype(rows, idtype), device)
     cols = F.copy_to(F.astype(cols, idtype), device)
-    return convert.heterograph({(utype, etype, vtype): (rows, cols)},
-                               {utype: num_src_nodes, vtype: num_dst_nodes},
-                               idtype=idtype, device=device)
+    return convert.heterograph(
+        {(utype, etype, vtype): (rows, cols)},
+        {utype: num_src_nodes, vtype: num_dst_nodes},
+        idtype=idtype,
+        device=device,
+    )

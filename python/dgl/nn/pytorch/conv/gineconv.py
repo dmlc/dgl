@@ -7,6 +7,7 @@ from torch import nn
 from .... import function as fn
 from ....utils import expand_as_pair
 
+
 class GINEConv(nn.Module):
     r"""Graph Isomorphism Network with Edge Features, introduced by
     `Strategies for Pre-training Graph Neural Networks <https://arxiv.org/abs/1905.12265>`__
@@ -45,21 +46,19 @@ class GINEConv(nn.Module):
     >>> print(res.shape)
     torch.Size([4, 20])
     """
-    def __init__(self,
-                 apply_func=None,
-                 init_eps=0,
-                 learn_eps=False):
+
+    def __init__(self, apply_func=None, init_eps=0, learn_eps=False):
         super(GINEConv, self).__init__()
         self.apply_func = apply_func
         # to specify whether eps is trainable or not.
         if learn_eps:
             self.eps = nn.Parameter(th.FloatTensor([init_eps]))
         else:
-            self.register_buffer('eps', th.FloatTensor([init_eps]))
+            self.register_buffer("eps", th.FloatTensor([init_eps]))
 
     def message(self, edges):
         r"""User-defined Message Function"""
-        return {'m': F.relu(edges.src['hn'] + edges.data['he'])}
+        return {"m": F.relu(edges.src["hn"] + edges.data["he"])}
 
     def forward(self, graph, node_feat, edge_feat):
         r"""Forward computation.
@@ -89,10 +88,10 @@ class GINEConv(nn.Module):
         """
         with graph.local_scope():
             feat_src, feat_dst = expand_as_pair(node_feat, graph)
-            graph.srcdata['hn'] = feat_src
-            graph.edata['he'] = edge_feat
-            graph.update_all(self.message, fn.sum('m', 'neigh'))
-            rst = (1 + self.eps) * feat_dst + graph.dstdata['neigh']
+            graph.srcdata["hn"] = feat_src
+            graph.edata["he"] = edge_feat
+            graph.update_all(self.message, fn.sum("m", "neigh"))
+            rst = (1 + self.eps) * feat_dst + graph.dstdata["neigh"]
             if self.apply_func is not None:
                 rst = self.apply_func(rst)
             return rst

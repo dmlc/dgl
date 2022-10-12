@@ -77,4 +77,5 @@ class ServerState:
         """Flag of whether keep alive"""
         return self._keep_alive
 
+
 _init_api("dgl.distributed.server_state")

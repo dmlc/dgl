@@ -3,17 +3,24 @@
 import pickle
 from abc import ABC
 from ast import literal_eval
+
 import numpy as np
 
 from .. import backend as F
-from ..base import NID, EID, DGLError, dgl_warning
 from .. import utils
-from .shared_mem_utils import _to_shared_mem, _get_ndata_path, _get_edata_path, DTYPE_DICT
 from .._ffi.ndarray import empty_shared_mem
+from ..base import EID, NID, DGLError, dgl_warning
 from ..ndarray import exist_shared_mem_array
 from ..partition import NDArrayPartition
+from .constants import DEFAULT_ETYPE, DEFAULT_NTYPE
 from .id_map import IdMap
-from .constants import DEFAULT_NTYPE, DEFAULT_ETYPE
+from .shared_mem_utils import (
+    DTYPE_DICT,
+    _get_edata_path,
+    _get_ndata_path,
+    _to_shared_mem,
+)
+
 
 def _str_to_tuple(s):
     try:
@@ -22,9 +29,18 @@ def _str_to_tuple(s):
         ret = s
     return ret
 
-def _move_metadata_to_shared_mem(graph_name, num_nodes, num_edges, part_id,
-                                 num_partitions, node_map, edge_map, is_range_part):
-    ''' Move all metadata of the partition book to the shared memory.
+
+def _move_metadata_to_shared_mem(
+    graph_name,
+    num_nodes,
+    num_edges,
+    part_id,
+    num_partitions,
+    node_map,
+    edge_map,
+    is_range_part,
+):
+    """Move all metadata of the partition book to the shared memory.
 
     These metadata will be used to construct graph partition book.
 
@@ -56,17 +72,28 @@ def _move_metadata_to_shared_mem(graph_name, num_nodes, num_edges, part_id,
         The first tensor stores the serialized metadata, the second tensor stores the serialized
         node map and the third tensor stores the serialized edge map. All tensors are stored in
         shared memory.
-    '''
-    meta = _to_shared_mem(F.tensor([int(is_range_part), num_nodes, num_edges,
-                                    num_partitions, part_id,
-                                    len(node_map), len(edge_map)]),
-                          _get_ndata_path(graph_name, 'meta'))
-    node_map = _to_shared_mem(node_map, _get_ndata_path(graph_name, 'node_map'))
-    edge_map = _to_shared_mem(edge_map, _get_edata_path(graph_name, 'edge_map'))
+    """
+    meta = _to_shared_mem(
+        F.tensor(
+            [
+                int(is_range_part),
+                num_nodes,
+                num_edges,
+                num_partitions,
+                part_id,
+                len(node_map),
+                len(edge_map),
+            ]
+        ),
+        _get_ndata_path(graph_name, "meta"),
+    )
+    node_map = _to_shared_mem(node_map, _get_ndata_path(graph_name, "node_map"))
+    edge_map = _to_shared_mem(edge_map, _get_edata_path(graph_name, "edge_map"))
     return meta, node_map, edge_map
 
+
 def _get_shared_mem_metadata(graph_name):
-    ''' Get the metadata of the graph from shared memory.
+    """Get the metadata of the graph from shared memory.
 
     The server serializes the metadata of a graph and store them in shared memory.
     The client needs to deserialize the data in shared memory and get the metadata
@@ -85,24 +112,38 @@ def _get_shared_mem_metadata(graph_name):
         the third element is the number of partitions;
         the fourth element is the tensor that stores the serialized result of node maps;
         the fifth element is the tensor that stores the serialized result of edge maps.
-    '''
+    """
     # The metadata has 7 elements: is_range_part, num_nodes, num_edges, num_partitions, part_id,
     # the length of node map and the length of the edge map.
     shape = (7,)
     dtype = F.int64
     dtype = DTYPE_DICT[dtype]
-    data = empty_shared_mem(_get_ndata_path(graph_name, 'meta'), False, shape, dtype)
+    data = empty_shared_mem(
+        _get_ndata_path(graph_name, "meta"), False, shape, dtype
+    )
     dlpack = data.to_dlpack()
     meta = F.asnumpy(F.zerocopy_from_dlpack(dlpack))
-    is_range_part, _, _, num_partitions, part_id, node_map_len, edge_map_len = meta
+    (
+        is_range_part,
+        _,
+        _,
+        num_partitions,
+        part_id,
+        node_map_len,
+        edge_map_len,
+    ) = meta
 
     # Load node map
-    data = empty_shared_mem(_get_ndata_path(graph_name, 'node_map'), False, (node_map_len,), dtype)
+    data = empty_shared_mem(
+        _get_ndata_path(graph_name, "node_map"), False, (node_map_len,), dtype
+    )
     dlpack = data.to_dlpack()
     node_map = F.zerocopy_from_dlpack(dlpack)
 
     # Load edge_map
-    data = empty_shared_mem(_get_edata_path(graph_name, 'edge_map'), False, (edge_map_len,), dtype)
+    data = empty_shared_mem(
+        _get_edata_path(graph_name, "edge_map"), False, (edge_map_len,), dtype
+    )
     dlpack = data.to_dlpack()
     edge_map = F.zerocopy_from_dlpack(dlpack)
 
@@ -110,7 +151,7 @@ def _get_shared_mem_metadata(graph_name):
 
 
 def get_shared_mem_partition_book(graph_name, graph_part):
-    '''Get a graph partition book from shared memory.
+    """Get a graph partition book from shared memory.
 
     A graph partition book of a specific graph can be serialized to shared memory.
     We can reconstruct a graph partition book from shared memory.
@@ -126,11 +167,16 @@ def get_shared_mem_partition_book(graph_name, graph_part):
     -------
     GraphPartitionBook
         A graph partition book for a particular partition.
-    '''
-    if not exist_shared_mem_array(_get_ndata_path(graph_name, 'meta')):
+    """
+    if not exist_shared_mem_array(_get_ndata_path(graph_name, "meta")):
         return None
-    is_range_part, part_id, num_parts, node_map_data, edge_map_data = \
-            _get_shared_mem_metadata(graph_name)
+    (
+        is_range_part,
+        part_id,
+        num_parts,
+        node_map_data,
+        edge_map_data,
+    ) = _get_shared_mem_metadata(graph_name)
     if is_range_part == 1:
         # node ID ranges and edge ID ranges are stored in the order of node type IDs
         # and edge type IDs.
@@ -150,12 +196,17 @@ def get_shared_mem_partition_book(graph_name, graph_part):
         for i, (etype, eid_range) in enumerate(edge_map_data):
             etypes[etype] = i
             edge_map[etype] = eid_range
-        return RangePartitionBook(part_id, num_parts, node_map, edge_map, ntypes, etypes)
+        return RangePartitionBook(
+            part_id, num_parts, node_map, edge_map, ntypes, etypes
+        )
     else:
-        return BasicPartitionBook(part_id, num_parts, node_map_data, edge_map_data, graph_part)
+        return BasicPartitionBook(
+            part_id, num_parts, node_map_data, edge_map_data, graph_part
+        )
+
 
 def get_node_partition_from_book(book, device):
-    """ Get an NDArrayPartition of the nodes from a RangePartitionBook.
+    """Get an NDArrayPartition of the nodes from a RangePartitionBook.
 
     Parameters
     ----------
@@ -169,25 +220,27 @@ def get_node_partition_from_book(book, device):
     NDarrayPartition
         The NDArrayPartition object for the nodes in the graph.
     """
-    assert isinstance(book, RangePartitionBook), "Can only convert " \
-        "RangePartitionBook to NDArrayPartition."
+    assert isinstance(book, RangePartitionBook), (
+        "Can only convert " "RangePartitionBook to NDArrayPartition."
+    )
     # create prefix-sum array on host
     max_node_ids = F.zerocopy_from_numpy(book._max_node_ids)
-    cpu_range = F.cat([F.tensor([0], dtype=F.dtype(max_node_ids)),
-                       max_node_ids+1], dim=0)
+    cpu_range = F.cat(
+        [F.tensor([0], dtype=F.dtype(max_node_ids)), max_node_ids + 1], dim=0
+    )
     gpu_range = F.copy_to(cpu_range, ctx=device)
 
     # convert from numpy
     array_size = int(F.as_scalar(cpu_range[-1]))
     num_parts = book.num_partitions()
 
-    return NDArrayPartition(array_size,
-                            num_parts,
-                            mode='range',
-                            part_ranges=gpu_range)
+    return NDArrayPartition(
+        array_size, num_parts, mode="range", part_ranges=gpu_range
+    )
+
 
 class GraphPartitionBook(ABC):
-    """ The base class of the graph partition book.
+    """The base class of the graph partition book.
 
     For distributed training, a graph is partitioned into multiple parts and is loaded
     in multiple machines. The partition book contains all necessary information to locate
@@ -368,13 +421,11 @@ class GraphPartitionBook(ABC):
 
     @property
     def ntypes(self):
-        """Get the list of node types
-        """
+        """Get the list of node types"""
 
     @property
     def etypes(self):
-        """Get the list of edge types
-        """
+        """Get the list of edge types"""
 
     @property
     def canonical_etypes(self):
@@ -388,9 +439,8 @@ class GraphPartitionBook(ABC):
 
     @property
     def is_homogeneous(self):
-        """check if homogeneous
-        """
-        return not(len(self.etypes) > 1 or len(self.ntypes) > 1)
+        """check if homogeneous"""
+        return not (len(self.etypes) > 1 or len(self.ntypes) > 1)
 
     def map_to_per_ntype(self, ids):
         """Map homogeneous node IDs to type-wise IDs and node types.
@@ -452,6 +502,7 @@ class GraphPartitionBook(ABC):
             Homogeneous edge IDs.
         """
 
+
 class BasicPartitionBook(GraphPartitionBook):
     """This provides the most flexible way to store parition information.
 
@@ -473,33 +524,40 @@ class BasicPartitionBook(GraphPartitionBook):
     part_graph : DGLGraph
         The graph partition structure.
     """
+
     def __init__(self, part_id, num_parts, node_map, edge_map, part_graph):
-        assert part_id >= 0, 'part_id cannot be a negative number.'
-        assert num_parts > 0, 'num_parts must be greater than zero.'
+        assert part_id >= 0, "part_id cannot be a negative number."
+        assert num_parts > 0, "num_parts must be greater than zero."
         self._part_id = int(part_id)
         self._num_partitions = int(num_parts)
         self._nid2partid = F.tensor(node_map)
-        assert F.dtype(self._nid2partid) == F.int64, \
-                'the node map must be stored in an integer array'
+        assert (
+            F.dtype(self._nid2partid) == F.int64
+        ), "the node map must be stored in an integer array"
         self._eid2partid = F.tensor(edge_map)
-        assert F.dtype(self._eid2partid) == F.int64, \
-                'the edge map must be stored in an integer array'
+        assert (
+            F.dtype(self._eid2partid) == F.int64
+        ), "the edge map must be stored in an integer array"
         # Get meta data of the partition book.
         self._partition_meta_data = []
-        _, nid_count = np.unique(F.asnumpy(self._nid2partid), return_counts=True)
-        _, eid_count = np.unique(F.asnumpy(self._eid2partid), return_counts=True)
+        _, nid_count = np.unique(
+            F.asnumpy(self._nid2partid), return_counts=True
+        )
+        _, eid_count = np.unique(
+            F.asnumpy(self._eid2partid), return_counts=True
+        )
         for partid in range(self._num_partitions):
             part_info = {}
-            part_info['machine_id'] = partid
-            part_info['num_nodes'] = int(nid_count[partid])
-            part_info['num_edges'] = int(eid_count[partid])
+            part_info["machine_id"] = partid
+            part_info["num_nodes"] = int(nid_count[partid])
+            part_info["num_edges"] = int(eid_count[partid])
             self._partition_meta_data.append(part_info)
         # Get partid2nids
         self._partid2nids = []
         sorted_nid = F.tensor(np.argsort(F.asnumpy(self._nid2partid)))
         start = 0
         for offset in nid_count:
-            part_nids = sorted_nid[start:start+offset]
+            part_nids = sorted_nid[start : start + offset]
             start += offset
             self._partid2nids.append(part_nids)
         # Get partid2eids
@@ -507,7 +565,7 @@ class BasicPartitionBook(GraphPartitionBook):
         sorted_eid = F.tensor(np.argsort(F.asnumpy(self._eid2partid)))
         start = 0
         for offset in eid_count:
-            part_eids = sorted_eid[start:start+offset]
+            part_eids = sorted_eid[start : start + offset]
             start += offset
             self._partid2eids.append(part_eids)
         # Get nidg2l
@@ -515,7 +573,7 @@ class BasicPartitionBook(GraphPartitionBook):
         global_id = part_graph.ndata[NID]
         max_global_id = np.amax(F.asnumpy(global_id))
         # TODO(chao): support int32 index
-        g2l = F.zeros((max_global_id+1), F.int64, F.context(global_id))
+        g2l = F.zeros((max_global_id + 1), F.int64, F.context(global_id))
         g2l = F.scatter_row(g2l, global_id, F.arange(0, len(global_id)))
         self._nidg2l[self._part_id] = g2l
         # Get eidg2l
@@ -523,7 +581,7 @@ class BasicPartitionBook(GraphPartitionBook):
         global_id = part_graph.edata[EID]
         max_global_id = np.amax(F.asnumpy(global_id))
         # TODO(chao): support int32 index
-        g2l = F.zeros((max_global_id+1), F.int64, F.context(global_id))
+        g2l = F.zeros((max_global_id + 1), F.int64, F.context(global_id))
         g2l = F.scatter_row(g2l, global_id, F.arange(0, len(global_id)))
         self._eidg2l[self._part_id] = g2l
         # node size and edge size
@@ -531,33 +589,43 @@ class BasicPartitionBook(GraphPartitionBook):
         self._node_size = len(self.partid2nids(self._part_id))
 
     def shared_memory(self, graph_name):
-        """Move data to shared memory.
-        """
-        self._meta, self._nid2partid, self._eid2partid = _move_metadata_to_shared_mem(
-            graph_name, self._num_nodes(), self._num_edges(), self._part_id, self._num_partitions,
-            self._nid2partid, self._eid2partid, False)
+        """Move data to shared memory."""
+        (
+            self._meta,
+            self._nid2partid,
+            self._eid2partid,
+        ) = _move_metadata_to_shared_mem(
+            graph_name,
+            self._num_nodes(),
+            self._num_edges(),
+            self._part_id,
+            self._num_partitions,
+            self._nid2partid,
+            self._eid2partid,
+            False,
+        )
 
     def num_partitions(self):
-        """Return the number of partitions.
-        """
+        """Return the number of partitions."""
         return self._num_partitions
 
     def metadata(self):
-        """Return the partition meta data.
-        """
+        """Return the partition meta data."""
         return self._partition_meta_data
 
     def _num_nodes(self, ntype=DEFAULT_NTYPE):
-        """ The total number of nodes
-        """
-        assert ntype == DEFAULT_NTYPE, 'Base partition book only supports homogeneous graph.'
+        """The total number of nodes"""
+        assert (
+            ntype == DEFAULT_NTYPE
+        ), "Base partition book only supports homogeneous graph."
         return len(self._nid2partid)
 
     def _num_edges(self, etype=DEFAULT_ETYPE):
-        """ The total number of edges
-        """
-        assert etype in (DEFAULT_ETYPE, DEFAULT_ETYPE[1]), \
-            'Base partition book only supports homogeneous graph.'
+        """The total number of edges"""
+        assert etype in (
+            DEFAULT_ETYPE,
+            DEFAULT_ETYPE[1],
+        ), "Base partition book only supports homogeneous graph."
         return len(self._eid2partid)
 
     def map_to_per_ntype(self, ids):
@@ -575,79 +643,88 @@ class BasicPartitionBook(GraphPartitionBook):
         return F.zeros((len(ids),), F.int32, F.cpu()), ids
 
     def map_to_homo_nid(self, ids, ntype=DEFAULT_NTYPE):
-        """Map per-node-type IDs to global node IDs in the homogeneous format.
-        """
-        assert ntype == DEFAULT_NTYPE, 'Base partition book only supports homogeneous graph.'
+        """Map per-node-type IDs to global node IDs in the homogeneous format."""
+        assert (
+            ntype == DEFAULT_NTYPE
+        ), "Base partition book only supports homogeneous graph."
         return ids
 
     def map_to_homo_eid(self, ids, etype=DEFAULT_ETYPE):
-        """Map per-edge-type IDs to global edge IDs in the homoenegeous format.
-        """
-        assert etype in (DEFAULT_ETYPE, DEFAULT_ETYPE[1]), \
-            'Base partition book only supports homogeneous graph.'
+        """Map per-edge-type IDs to global edge IDs in the homoenegeous format."""
+        assert etype in (
+            DEFAULT_ETYPE,
+            DEFAULT_ETYPE[1],
+        ), "Base partition book only supports homogeneous graph."
         return ids
 
     def nid2partid(self, nids, ntype=DEFAULT_NTYPE):
-        """From global node IDs to partition IDs
-        """
-        assert ntype == DEFAULT_NTYPE, 'Base partition book only supports homogeneous graph.'
+        """From global node IDs to partition IDs"""
+        assert (
+            ntype == DEFAULT_NTYPE
+        ), "Base partition book only supports homogeneous graph."
         return F.gather_row(self._nid2partid, nids)
 
     def eid2partid(self, eids, etype=DEFAULT_ETYPE):
-        """From global edge IDs to partition IDs
-        """
-        assert etype in (DEFAULT_ETYPE, DEFAULT_ETYPE[1]), \
-            'Base partition book only supports homogeneous graph.'
+        """From global edge IDs to partition IDs"""
+        assert etype in (
+            DEFAULT_ETYPE,
+            DEFAULT_ETYPE[1],
+        ), "Base partition book only supports homogeneous graph."
         return F.gather_row(self._eid2partid, eids)
 
     def partid2nids(self, partid, ntype=DEFAULT_NTYPE):
-        """From partition id to global node IDs
-        """
-        assert ntype == DEFAULT_NTYPE, 'Base partition book only supports homogeneous graph.'
+        """From partition id to global node IDs"""
+        assert (
+            ntype == DEFAULT_NTYPE
+        ), "Base partition book only supports homogeneous graph."
         return self._partid2nids[partid]
 
     def partid2eids(self, partid, etype=DEFAULT_ETYPE):
-        """From partition id to global edge IDs
-        """
-        assert etype in (DEFAULT_ETYPE, DEFAULT_ETYPE[1]), \
-            'Base partition book only supports homogeneous graph.'
+        """From partition id to global edge IDs"""
+        assert etype in (
+            DEFAULT_ETYPE,
+            DEFAULT_ETYPE[1],
+        ), "Base partition book only supports homogeneous graph."
         return self._partid2eids[partid]
 
     def nid2localnid(self, nids, partid, ntype=DEFAULT_NTYPE):
-        """Get local node IDs within the given partition.
-        """
-        assert ntype == DEFAULT_NTYPE, 'Base partition book only supports homogeneous graph.'
+        """Get local node IDs within the given partition."""
+        assert (
+            ntype == DEFAULT_NTYPE
+        ), "Base partition book only supports homogeneous graph."
         if partid != self._part_id:
-            raise RuntimeError('Now GraphPartitionBook does not support \
-                getting remote tensor of nid2localnid.')
+            raise RuntimeError(
+                "Now GraphPartitionBook does not support \
+                getting remote tensor of nid2localnid."
+            )
         return F.gather_row(self._nidg2l[partid], nids)
 
     def eid2localeid(self, eids, partid, etype=DEFAULT_ETYPE):
-        """Get the local edge ids within the given partition.
-        """
-        assert etype in (DEFAULT_ETYPE, DEFAULT_ETYPE[1]), \
-            'Base partition book only supports homogeneous graph.'
+        """Get the local edge ids within the given partition."""
+        assert etype in (
+            DEFAULT_ETYPE,
+            DEFAULT_ETYPE[1],
+        ), "Base partition book only supports homogeneous graph."
         if partid != self._part_id:
-            raise RuntimeError('Now GraphPartitionBook does not support \
-                getting remote tensor of eid2localeid.')
+            raise RuntimeError(
+                "Now GraphPartitionBook does not support \
+                getting remote tensor of eid2localeid."
+            )
         return F.gather_row(self._eidg2l[partid], eids)
 
     @property
     def partid(self):
-        """Get the current partition ID
-        """
+        """Get the current partition ID"""
         return self._part_id
 
     @property
     def ntypes(self):
-        """Get the list of node types
-        """
+        """Get the list of node types"""
         return [DEFAULT_NTYPE]
 
     @property
     def etypes(self):
-        """Get the list of edge types
-        """
+        """Get the list of edge types"""
         return [DEFAULT_ETYPE[1]]
 
     @property
@@ -698,9 +775,10 @@ class RangePartitionBook(GraphPartitionBook):
         Single string format for keys of ``edge_map`` and ``etypes`` is deprecated.
         ``(str, str, str)`` will be the only format supported in the future.
     """
+
     def __init__(self, part_id, num_parts, node_map, edge_map, ntypes, etypes):
-        assert part_id >= 0, 'part_id cannot be a negative number.'
-        assert num_parts > 0, 'num_parts must be greater than zero.'
+        assert part_id >= 0, "part_id cannot be a negative number."
+        assert num_parts > 0, "num_parts must be greater than zero."
         self._partid = part_id
         self._num_partitions = num_parts
         self._ntypes = [None] * len(ntypes)
@@ -711,12 +789,14 @@ class RangePartitionBook(GraphPartitionBook):
         for ntype in ntypes:
             ntype_id = ntypes[ntype]
             self._ntypes[ntype_id] = ntype
-        assert all(ntype is not None for ntype in self._ntypes), \
-                "The node types have invalid IDs."
+        assert all(
+            ntype is not None for ntype in self._ntypes
+        ), "The node types have invalid IDs."
         for etype, etype_id in etypes.items():
             if isinstance(etype, tuple):
-                assert len(etype) == 3, \
-                    'Canonical etype should be in format of (str, str, str).'
+                assert (
+                    len(etype) == 3
+                ), "Canonical etype should be in format of (str, str, str)."
                 c_etype = etype
                 etype = etype[1]
                 self._etypes[etype_id] = etype
@@ -730,11 +810,13 @@ class RangePartitionBook(GraphPartitionBook):
                     self._etype2canonical[etype] = c_etype
             else:
                 dgl_warning(
-                    "Etype with 'str' format is deprecated. Please use '(str, str, str)'.")
+                    "Etype with 'str' format is deprecated. Please use '(str, str, str)'."
+                )
                 self._etypes[etype_id] = etype
                 self._canonical_etypes[etype_id] = None
-        assert all(etype is not None for etype in self._etypes), \
-                "The edge types have invalid IDs."
+        assert all(
+            etype is not None for etype in self._etypes
+        ), "The edge types have invalid IDs."
 
         # This stores the node ID ranges for each node type in each partition.
         # The key is the node type, the value is a NumPy matrix with two columns, in which
@@ -747,16 +829,20 @@ class RangePartitionBook(GraphPartitionBook):
         self._typed_max_node_ids = {}
         max_node_map = np.zeros((num_parts,), dtype=np.int64)
         for key in node_map:
-            assert key in ntypes, 'Unexpected ntype: {}.'.format(key)
+            assert key in ntypes, "Unexpected ntype: {}.".format(key)
             if not isinstance(node_map[key], np.ndarray):
                 node_map[key] = F.asnumpy(node_map[key])
             assert node_map[key].shape == (num_parts, 2)
             self._typed_nid_range[key] = node_map[key]
             # This is used for per-node-type lookup.
-            self._typed_max_node_ids[key] = np.cumsum(self._typed_nid_range[key][:, 1]
-                                                      - self._typed_nid_range[key][:, 0])
+            self._typed_max_node_ids[key] = np.cumsum(
+                self._typed_nid_range[key][:, 1]
+                - self._typed_nid_range[key][:, 0]
+            )
             # This is used for homogeneous node ID lookup.
-            max_node_map = np.maximum(self._typed_nid_range[key][:, 1], max_node_map)
+            max_node_map = np.maximum(
+                self._typed_nid_range[key][:, 1], max_node_map
+            )
         # This is a vector that indicates the last node ID in each partition.
         # The ID is the global ID in the homogeneous representation.
         self._max_node_ids = max_node_map
@@ -767,16 +853,20 @@ class RangePartitionBook(GraphPartitionBook):
         self._typed_max_edge_ids = {}
         max_edge_map = np.zeros((num_parts,), dtype=np.int64)
         for key in edge_map:
-            assert key in etypes, 'Unexpected etype: {}.'.format(key)
+            assert key in etypes, "Unexpected etype: {}.".format(key)
             if not isinstance(edge_map[key], np.ndarray):
                 edge_map[key] = F.asnumpy(edge_map[key])
             assert edge_map[key].shape == (num_parts, 2)
             self._typed_eid_range[key] = edge_map[key]
             # This is used for per-edge-type lookup.
-            self._typed_max_edge_ids[key] = np.cumsum(self._typed_eid_range[key][:, 1]
-                                                      - self._typed_eid_range[key][:, 0])
+            self._typed_max_edge_ids[key] = np.cumsum(
+                self._typed_eid_range[key][:, 1]
+                - self._typed_eid_range[key][:, 0]
+            )
             # This is used for homogeneous edge ID lookup.
-            max_edge_map = np.maximum(self._typed_eid_range[key][:, 1], max_edge_map)
+            max_edge_map = np.maximum(
+                self._typed_eid_range[key][:, 1], max_edge_map
+            )
         # Similar to _max_node_ids
         self._max_edge_ids = max_edge_map
 
@@ -796,14 +886,13 @@ class RangePartitionBook(GraphPartitionBook):
             num_edges = erange_end - erange_start
 
             part_info = {}
-            part_info['machine_id'] = partid
-            part_info['num_nodes'] = int(num_nodes)
-            part_info['num_edges'] = int(num_edges)
+            part_info["machine_id"] = partid
+            part_info["num_nodes"] = int(num_nodes)
+            part_info["num_edges"] = int(num_edges)
             self._partition_meta_data.append(part_info)
 
     def shared_memory(self, graph_name):
-        """Move data to shared memory.
-        """
+        """Move data to shared memory."""
         # we need to store the nid ranges and eid ranges of different types in the order defined
         # by type IDs.
         nid_range = [None] * len(self.ntypes)
@@ -817,31 +906,30 @@ class RangePartitionBook(GraphPartitionBook):
             eid_range[i] = (c_etype, self._typed_eid_range[c_etype])
         eid_range_pickle = list(pickle.dumps(eid_range))
 
-        self._meta = _move_metadata_to_shared_mem(graph_name,
-                                                  0, # We don't need to provide the number of nodes
-                                                  0, # We don't need to provide the number of edges
-                                                  self._partid, self._num_partitions,
-                                                  F.tensor(nid_range_pickle),
-                                                  F.tensor(eid_range_pickle),
-                                                  True)
+        self._meta = _move_metadata_to_shared_mem(
+            graph_name,
+            0,  # We don't need to provide the number of nodes
+            0,  # We don't need to provide the number of edges
+            self._partid,
+            self._num_partitions,
+            F.tensor(nid_range_pickle),
+            F.tensor(eid_range_pickle),
+            True,
+        )
 
     def num_partitions(self):
-        """Return the number of partitions.
-        """
+        """Return the number of partitions."""
         return self._num_partitions
 
-
     def _num_nodes(self, ntype=DEFAULT_NTYPE):
-        """ The total number of nodes
-        """
+        """The total number of nodes"""
         if ntype == DEFAULT_NTYPE:
             return int(self._max_node_ids[-1])
         else:
             return int(self._typed_max_node_ids[ntype][-1])
 
     def _num_edges(self, etype=DEFAULT_ETYPE):
-        """ The total number of edges
-        """
+        """The total number of edges"""
         if etype in (DEFAULT_ETYPE, DEFAULT_ETYPE[1]):
             return int(self._max_edge_ids[-1])
         else:
@@ -849,8 +937,7 @@ class RangePartitionBook(GraphPartitionBook):
             return int(self._typed_max_edge_ids[c_etype][-1])
 
     def metadata(self):
-        """Return the partition meta data.
-        """
+        """Return the partition meta data."""
         return self._partition_meta_data
 
     def map_to_per_ntype(self, ids):
@@ -868,67 +955,75 @@ class RangePartitionBook(GraphPartitionBook):
         return self._eid_map(ids)
 
     def map_to_homo_nid(self, ids, ntype):
-        """Map per-node-type IDs to global node IDs in the homogeneous format.
-        """
+        """Map per-node-type IDs to global node IDs in the homogeneous format."""
         ids = utils.toindex(ids).tousertensor()
         partids = self.nid2partid(ids, ntype)
         typed_max_nids = F.zerocopy_from_numpy(self._typed_max_node_ids[ntype])
         end_diff = F.gather_row(typed_max_nids, partids) - ids
-        typed_nid_range = F.zerocopy_from_numpy(self._typed_nid_range[ntype][:, 1])
+        typed_nid_range = F.zerocopy_from_numpy(
+            self._typed_nid_range[ntype][:, 1]
+        )
         return F.gather_row(typed_nid_range, partids) - end_diff
 
     def map_to_homo_eid(self, ids, etype):
-        """Map per-edge-type IDs to global edge IDs in the homoenegeous format.
-        """
+        """Map per-edge-type IDs to global edge IDs in the homoenegeous format."""
         ids = utils.toindex(ids).tousertensor()
         c_etype = self._to_canonical_etype(etype)
         partids = self.eid2partid(ids, c_etype)
-        typed_max_eids = F.zerocopy_from_numpy(self._typed_max_edge_ids[c_etype])
+        typed_max_eids = F.zerocopy_from_numpy(
+            self._typed_max_edge_ids[c_etype]
+        )
         end_diff = F.gather_row(typed_max_eids, partids) - ids
-        typed_eid_range = F.zerocopy_from_numpy(self._typed_eid_range[c_etype][:, 1])
+        typed_eid_range = F.zerocopy_from_numpy(
+            self._typed_eid_range[c_etype][:, 1]
+        )
         return F.gather_row(typed_eid_range, partids) - end_diff
 
     def nid2partid(self, nids, ntype=DEFAULT_NTYPE):
-        """From global node IDs to partition IDs
-        """
+        """From global node IDs to partition IDs"""
         nids = utils.toindex(nids)
         if ntype == DEFAULT_NTYPE:
-            ret = np.searchsorted(self._max_node_ids, nids.tonumpy(), side='right')
+            ret = np.searchsorted(
+                self._max_node_ids, nids.tonumpy(), side="right"
+            )
         else:
-            ret = np.searchsorted(self._typed_max_node_ids[ntype], nids.tonumpy(), side='right')
+            ret = np.searchsorted(
+                self._typed_max_node_ids[ntype], nids.tonumpy(), side="right"
+            )
         ret = utils.toindex(ret)
         return ret.tousertensor()
 
     def eid2partid(self, eids, etype=DEFAULT_ETYPE):
-        """From global edge IDs to partition IDs
-        """
+        """From global edge IDs to partition IDs"""
         eids = utils.toindex(eids)
         if etype in (DEFAULT_ETYPE, DEFAULT_ETYPE[1]):
-            ret = np.searchsorted(self._max_edge_ids, eids.tonumpy(), side='right')
+            ret = np.searchsorted(
+                self._max_edge_ids, eids.tonumpy(), side="right"
+            )
         else:
             c_etype = self._to_canonical_etype(etype)
-            ret = np.searchsorted(self._typed_max_edge_ids[c_etype], eids.tonumpy(), side='right')
+            ret = np.searchsorted(
+                self._typed_max_edge_ids[c_etype], eids.tonumpy(), side="right"
+            )
         ret = utils.toindex(ret)
         return ret.tousertensor()
 
-
     def partid2nids(self, partid, ntype=DEFAULT_NTYPE):
-        """From partition ID to global node IDs
-        """
+        """From partition ID to global node IDs"""
         # TODO do we need to cache it?
         if ntype == DEFAULT_NTYPE:
             start = self._max_node_ids[partid - 1] if partid > 0 else 0
             end = self._max_node_ids[partid]
             return F.arange(start, end)
         else:
-            start = self._typed_max_node_ids[ntype][partid - 1] if partid > 0 else 0
+            start = (
+                self._typed_max_node_ids[ntype][partid - 1] if partid > 0 else 0
+            )
             end = self._typed_max_node_ids[ntype][partid]
             return F.arange(start, end)
 
-
     def partid2eids(self, partid, etype=DEFAULT_ETYPE):
-        """From partition ID to global edge IDs
-        """
+        """From partition ID to global edge IDs"""
         # TODO do we need to cache it?
         if etype in (DEFAULT_ETYPE, DEFAULT_ETYPE[1]):
             start = self._max_edge_ids[partid - 1] if partid > 0 else 0
@@ -936,33 +1031,39 @@ class RangePartitionBook(GraphPartitionBook):
             return F.arange(start, end)
         else:
             c_etype = self._to_canonical_etype(etype)
-            start = self._typed_max_edge_ids[c_etype][partid - 1] if partid > 0 else 0
+            start = (
+                self._typed_max_edge_ids[c_etype][partid - 1]
+                if partid > 0
+                else 0
+            )
             end = self._typed_max_edge_ids[c_etype][partid]
             return F.arange(start, end)
 
-
     def nid2localnid(self, nids, partid, ntype=DEFAULT_NTYPE):
-        """Get local node IDs within the given partition.
-        """
+        """Get local node IDs within the given partition."""
         if partid != self._partid:
-            raise RuntimeError('Now RangePartitionBook does not support \
-                getting remote tensor of nid2localnid.')
+            raise RuntimeError(
+                "Now RangePartitionBook does not support \
+                getting remote tensor of nid2localnid."
+            )
 
         nids = utils.toindex(nids)
         nids = nids.tousertensor()
         if ntype == DEFAULT_NTYPE:
             start = self._max_node_ids[partid - 1] if partid > 0 else 0
         else:
-            start = self._typed_max_node_ids[ntype][partid - 1] if partid > 0 else 0
+            start = (
+                self._typed_max_node_ids[ntype][partid - 1] if partid > 0 else 0
+            )
         return nids - int(start)
 
-
     def eid2localeid(self, eids, partid, etype=DEFAULT_ETYPE):
-        """Get the local edge IDs within the given partition.
-        """
+        """Get the local edge IDs within the given partition."""
         if partid != self._partid:
-            raise RuntimeError('Now RangePartitionBook does not support \
-                getting remote tensor of eid2localeid.')
+            raise RuntimeError(
+                "Now RangePartitionBook does not support \
+                getting remote tensor of eid2localeid."
+            )
 
         eids = utils.toindex(eids)
         eids = eids.tousertensor()
@@ -970,26 +1071,26 @@ class RangePartitionBook(GraphPartitionBook):
             start = self._max_edge_ids[partid - 1] if partid > 0 else 0
         else:
             c_etype = self._to_canonical_etype(etype)
-            start = self._typed_max_edge_ids[c_etype][partid - 1] if partid > 0 else 0
+            start = (
+                self._typed_max_edge_ids[c_etype][partid - 1]
+                if partid > 0
+                else 0
+            )
         return eids - int(start)
-
 
     @property
     def partid(self):
-        """Get the current partition ID.
-        """
+        """Get the current partition ID."""
         return self._partid
 
     @property
     def ntypes(self):
-        """Get the list of node types
-        """
+        """Get the list of node types"""
         return self._ntypes
 
     @property
     def etypes(self):
-        """Get the list of edge types
-        """
+        """Get the list of edge types"""
         return self._etypes
 
     @property
@@ -1023,12 +1124,16 @@ class RangePartitionBook(GraphPartitionBook):
         if ret is None:
             raise DGLError('Edge type "{}" does not exist.'.format(etype))
         if len(ret) == 0:
-            raise DGLError('Edge type "%s" is ambiguous. Please use canonical edge type '
-                            'in the form of (srctype, etype, dsttype)' % etype)
+            raise DGLError(
+                'Edge type "%s" is ambiguous. Please use canonical edge type '
+                "in the form of (srctype, etype, dsttype)" % etype
+            )
         return ret
 
-NODE_PART_POLICY = 'node'
-EDGE_PART_POLICY = 'edge'
+
+NODE_PART_POLICY = "node"
+EDGE_PART_POLICY = "edge"
+
 
 class PartitionPolicy(object):
     """This defines a partition policy for a distributed tensor or distributed embedding.
@@ -1047,11 +1152,14 @@ class PartitionPolicy(object):
     partition_book : GraphPartitionBook
         A graph partition book
     """
+
     def __init__(self, policy_str, partition_book):
-        splits = policy_str.split(':')
+        splits = policy_str.split(":")
         if len(splits) == 1:
-            assert policy_str in (EDGE_PART_POLICY, NODE_PART_POLICY), \
-                    'policy_str must contain \'edge\' or \'node\'.'
+            assert policy_str in (
+                EDGE_PART_POLICY,
+                NODE_PART_POLICY,
+            ), "policy_str must contain 'edge' or 'node'."
             if NODE_PART_POLICY == policy_str:
                 policy_str = NODE_PART_POLICY + ":" + DEFAULT_NTYPE
             else:
@@ -1106,8 +1214,7 @@ class PartitionPolicy(object):
         return self._partition_book
 
     def get_data_name(self, name):
-        """Get HeteroDataName
-        """
+        """Get HeteroDataName"""
         is_node = NODE_PART_POLICY in self.policy_str
         return HeteroDataName(is_node, self.type_name, name)
 
@@ -1125,11 +1232,15 @@ class PartitionPolicy(object):
             local ID tensor
         """
         if EDGE_PART_POLICY in self.policy_str:
-            return self._partition_book.eid2localeid(id_tensor, self._part_id, self.type_name)
+            return self._partition_book.eid2localeid(
+                id_tensor, self._part_id, self.type_name
+            )
         elif NODE_PART_POLICY in self.policy_str:
-            return self._partition_book.nid2localnid(id_tensor, self._part_id, self.type_name)
+            return self._partition_book.nid2localnid(
+                id_tensor, self._part_id, self.type_name
+            )
         else:
-            raise RuntimeError('Cannot support policy: %s ' % self.policy_str)
+            raise RuntimeError("Cannot support policy: %s " % self.policy_str)
 
     def to_partid(self, id_tensor):
         """Mapping global ID to partition ID.
@@ -1149,7 +1260,7 @@ class PartitionPolicy(object):
         elif NODE_PART_POLICY in self.policy_str:
             return self._partition_book.nid2partid(id_tensor, self.type_name)
         else:
-            raise RuntimeError('Cannot support policy: %s ' % self.policy_str)
+            raise RuntimeError("Cannot support policy: %s " % self.policy_str)
 
     def get_part_size(self):
         """Get data size of current partition.
@@ -1160,11 +1271,15 @@ class PartitionPolicy(object):
             data size
         """
         if EDGE_PART_POLICY in self.policy_str:
-            return len(self._partition_book.partid2eids(self._part_id, self.type_name))
+            return len(
+                self._partition_book.partid2eids(self._part_id, self.type_name)
+            )
         elif NODE_PART_POLICY in self.policy_str:
-            return len(self._partition_book.partid2nids(self._part_id, self.type_name))
+            return len(
+                self._partition_book.partid2nids(self._part_id, self.type_name)
+            )
         else:
-            raise RuntimeError('Cannot support policy: %s ' % self.policy_str)
+            raise RuntimeError("Cannot support policy: %s " % self.policy_str)
 
     def get_size(self):
         """Get the full size of the data.
@@ -1179,24 +1294,29 @@ class PartitionPolicy(object):
         elif NODE_PART_POLICY in self.policy_str:
             return self._partition_book._num_nodes(self.type_name)
         else:
-            raise RuntimeError('Cannot support policy: %s ' % self.policy_str)
+            raise RuntimeError("Cannot support policy: %s " % self.policy_str)
+
 
 class NodePartitionPolicy(PartitionPolicy):
-    '''Partition policy for nodes.
-    '''
+    """Partition policy for nodes."""
+
     def __init__(self, partition_book, ntype=DEFAULT_NTYPE):
         super(NodePartitionPolicy, self).__init__(
-            NODE_PART_POLICY + ':' + ntype, partition_book)
+            NODE_PART_POLICY + ":" + ntype, partition_book
+        )
+
 
 class EdgePartitionPolicy(PartitionPolicy):
-    '''Partition policy for edges.
-    '''
+    """Partition policy for edges."""
+
     def __init__(self, partition_book, etype=DEFAULT_ETYPE):
         super(EdgePartitionPolicy, self).__init__(
-            EDGE_PART_POLICY + ':' + str(etype), partition_book)
+            EDGE_PART_POLICY + ":" + str(etype), partition_book
+        )
+
 
 class HeteroDataName(object):
-    ''' The data name in a heterogeneous graph.
+    """The data name in a heterogeneous graph.
 
     A unique data name has three components:
     * indicate it's node data or edge data.
@@ -1211,7 +1331,8 @@ class HeteroDataName(object):
         The type of the node/edge.
     data_name : str
         The name of the data.
-    '''
+    """
+
     def __init__(self, is_node, entity_type, data_name):
         self._policy = NODE_PART_POLICY if is_node else EDGE_PART_POLICY
         self._entity_type = entity_type
@@ -1219,41 +1340,38 @@ class HeteroDataName(object):
 
     @property
     def policy_str(self):
-        ''' concatenate policy and entity type into string
-        '''
-        return self._policy + ':' + str(self.get_type())
+        """concatenate policy and entity type into string"""
+        return self._policy + ":" + str(self.get_type())
 
     def is_node(self):
-        ''' Is this the name of node data
-        '''
+        """Is this the name of node data"""
         return NODE_PART_POLICY in self.policy_str
 
     def is_edge(self):
-        ''' Is this the name of edge data
-        '''
+        """Is this the name of edge data"""
         return EDGE_PART_POLICY in self.policy_str
 
     def get_type(self):
-        ''' The type of the node/edge.
+        """The type of the node/edge.
         This is only meaningful in a heterogeneous graph.
         In homogeneous graph, type is '_N' for a node and '_E' for an edge.
-        '''
+        """
         return self._entity_type
 
     def get_name(self):
-        ''' The name of the data.
-        '''
+        """The name of the data."""
         return self.data_name
 
     def __str__(self):
-        ''' The full name of the data.
+        """The full name of the data.
 
         The full name is used as the key in the KVStore.
-        '''
-        return self.policy_str + ':' + self.data_name
+        """
+        return self.policy_str + ":" + self.data_name
+
 
 def parse_hetero_data_name(name):
-    '''Parse data name and create HeteroDataName.
+    """Parse data name and create HeteroDataName.
 
     The data name has a specialized format. We can parse the name to determine if
     it's node data or edge data, node/edge type and its actual name. The data name
@@ -1267,9 +1385,15 @@ def parse_hetero_data_name(name):
     Returns
     -------
     HeteroDataName
-    '''
-    names = name.split(':')
-    assert len(names) == 3, '{} is not a valid heterograph data name'.format(name)
-    assert names[0] in (NODE_PART_POLICY, EDGE_PART_POLICY), \
-            '{} is not a valid heterograph data name'.format(name)
-    return HeteroDataName(names[0] == NODE_PART_POLICY, _str_to_tuple(names[1]), names[2])
+    """
+    names = name.split(":")
+    assert len(names) == 3, "{} is not a valid heterograph data name".format(
+        name
+    )
+    assert names[0] in (
+        NODE_PART_POLICY,
+        EDGE_PART_POLICY,
+    ), "{} is not a valid heterograph data name".format(name)
+    return HeteroDataName(
+        names[0] == NODE_PART_POLICY, _str_to_tuple(names[1]), names[2]
+    )
