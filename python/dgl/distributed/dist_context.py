@@ -127,7 +127,7 @@ class CustomPool:
         # should be able to take infinite elements to avoid dead lock.
         self.queue_size = 0
         self.result_queue = ctx.Queue(self.queue_size)
-        self.results = {}
+        self.results = {} # key is dataloader name, value is fetched batch.
         self.task_queues = []
         self.process_list = []
         self.current_proc_id = 0
@@ -173,7 +173,9 @@ class CustomPool:
     def get_result(self, dataloader_name, timeout=1800):
         """Get result from result queue"""
         if dataloader_name not in self.results:
-            raise DGLError(f"{dataloader_name} not found.")
+            raise DGLError(
+                f"Got result from an unknown dataloader {dataloader_name}."
+            )
         while len(self.results[dataloader_name]) == 0:
             dl_name, data = self.result_queue.get(timeout=timeout)
             self.results[dl_name].append(data)
