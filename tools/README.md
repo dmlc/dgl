@@ -168,35 +168,41 @@ The output chunked graph metadata will go as follows (assuming the current direc
 }
 ```
 
-## Partition Config Conversion
+## Change edge type to canonical edge type for partitioned graph data
 
-`convert_partition_conf.py` is a tool help you convert old partition config to new version.
+`change_etype_to_canonical_etype.py` is a tool that helps you convert etypes to canonical_etypes in a partition configuration file, and it overwrites the original file on disk. 
 
-### Sample usage like
+### Sample Usage
 
 ```
-python tools/convert_partition_conf.py --part-config "{config path}"
+python tools/change_etype_to_canonical_etype.py --part-config "{config path}"
 ```
 
 ### Requirement
 
-The machine run this script require **part 0 data is accessible under the same folder as part_config**.
+Partition algorithms produce one configuration file and multiple data folders, and each data folder corresponds to a partition. **This tool requires not only access to the specified config file in input, but also to the data of the first partition.** They can be local files or shared files among network, if you follow this [official tutorial](https://docs.dgl.ai/en/latest/tutorials/dist/1_node_classification.html#sphx-glr-tutorials-dist-1-node-classification-py) for distributed training, you don't need to care about this as all files are shared by every partiticate through NFS.
 
-### Potential risk
+**In short, your folder should look like this:**
+```
+data_root_dir/
+|-- graph_name.json    # specified by part_config
+|-- part0/
+    ...
+    |-- graph.dgl
+...
+```
 
-The tool may fail in some extrema unbalanced situation where partition 0 doesn't contain any edges of each edge type and corresponding partition data is in-accessible from 
-current place, which may happen rarely.
+For more information about partition algorithm, see https://docs.dgl.ai/en/latest/generated/dgl.distributed.partition.partition_graph.html.
 
 ### Input arguments
 
 1. *part-config*: The path of partition json file. < **Required**>
 
-### Output
+### Result
 
-The script will override old json config in disk, currently it transform keys in *etypes* and *edge_map* from etype to canonical_etype.
+This tool changes the key content in `etypes` and `edge_map` from format ``(str)`` to ``(str:str:str)`` and it overwrites the original file instead of creating a new one.
 
-E.g.
-Original config 
+E.g. **File content before in disk**
 ```json
 {
     "edge_map": {
@@ -213,7 +219,7 @@ Original config
 }
 ```
 
-After conversion
+**After calling script**
 ```json
 {
     "edge_map": {
