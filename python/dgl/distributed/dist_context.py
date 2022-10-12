@@ -123,7 +123,7 @@ class CustomPool:
         """
         ctx = mp.get_context("spawn")
         self.num_workers = num_workers
-        # As pool could be used by any number of dataloaders, queues 
+        # As pool could be used by any number of dataloaders, queues
         # should be able to take infinite elements to avoid dead lock.
         self.queue_size = 0
         self.result_queue = ctx.Queue(self.queue_size)
