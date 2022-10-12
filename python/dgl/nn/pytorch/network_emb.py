@@ -1,14 +1,11 @@
 """Network Embedding NN Modules"""
 # pylint: disable= invalid-name
-from collections import defaultdict
 
 import random
 import torch
 from torch import nn
 from torch.nn import init
-from torch.utils.data import DataLoader
 import torch.nn.functional as F
-import numpy as np
 import tqdm
 
 from ...base import NID
