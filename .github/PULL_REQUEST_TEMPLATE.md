@@ -5,7 +5,8 @@ It'll be great if relevant reviewers can be assigned as well.-->
 ## Checklist
 Please feel free to remove inapplicable items for your PR.
 - [ ] The PR title starts with [$CATEGORY] (such as [NN], [Model], [Doc], [Feature]])
-- [ ] Changes are complete (i.e. I finished coding on this PR)
+- [ ] I've leverage the [tools](https://docs.google.com/document/d/1iHyj7zlmygKSk5gBPsqIqL5ASPzJSPREaNT_QdsiYA4/edit) to beautify the python and c++ code.
+- [ ] The PR is minimally complete, and the PR has less than 200 lines of core code change (example, test, documentation could be exempted)，read the [Google eng practice (CL equals to PR)](https://google.github.io/eng-practices/review/developer/small-cls.html) to understand more.
 - [ ] All changes have test coverage
 - [ ] Code is well-documented
 - [ ] To the best of my knowledge, examples are either not affected by this change,
