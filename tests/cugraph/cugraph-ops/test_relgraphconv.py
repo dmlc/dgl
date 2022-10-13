@@ -1,10 +1,10 @@
+import pytest
+import torch
 import dgl
 from dgl.contrib.cugraph.nn import RelGraphConv as RelGraphConvOps
 from dgl.nn import RelGraphConv
-import torch
-import pytest
 
-device = 'cuda'
+device = "cuda"
 
 def generate_graph():
     u = torch.tensor([0, 1, 0, 2, 3, 0, 4, 0, 5, 0, 6, 7, 0, 8, 9])
@@ -14,9 +14,15 @@ def generate_graph():
     g.edata[dgl.ETYPE] = torch.randint(num_rels, (g.num_edges(),))
     return g
 
+
 def test_full_graph():
     in_feat, out_feat, num_rels, num_bases = 10, 2, 3, 2
-    kwargs = {'num_bases': num_bases, 'regularizer': 'basis', 'bias': False, 'self_loop': False}
+    kwargs = {
+        "num_bases": num_bases,
+        "regularizer": "basis",
+        "bias": False,
+        "self_loop": False,
+    }
     g = generate_graph().to(device)
     feat = torch.ones(g.num_nodes(), in_feat).to(device)
 
@@ -31,9 +37,15 @@ def test_full_graph():
 
     assert torch.allclose(res, res_ops, rtol=1e-03)
 
+
 def test_mfg():
     in_feat, out_feat, num_rels, num_bases = 10, 2, 3, 2
-    kwargs = {'num_bases': num_bases, 'regularizer': 'basis', 'bias': False, 'self_loop': False}
+    kwargs = {
+        "num_bases": num_bases,
+        "regularizer": "basis",
+        "bias": False,
+        "self_loop": False,
+    }
     g = generate_graph().to(device)
     block = dgl.to_block(g)
     feat = torch.ones(g.num_nodes(), in_feat).to(device)
@@ -45,6 +57,8 @@ def test_mfg():
     conv_ops = RelGraphConvOps(in_feat, out_feat, num_rels, fanout, **kwargs)
     conv_ops.W.data = conv.linear_r.W.data
     conv_ops.coeff.data = conv.linear_r.coeff.data
-    res_ops = conv_ops(block, feat[block.srcdata[dgl.NID]], block.edata[dgl.ETYPE])
+    res_ops = conv_ops(
+        block, feat[block.srcdata[dgl.NID]], block.edata[dgl.ETYPE]
+    )
 
     assert torch.allclose(res, res_ops, rtol=1e-03)

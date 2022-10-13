@@ -1,14 +1,22 @@
 """Torch Module for Relational graph convolution layer using cugraph-ops"""
 # pylint: disable= no-member, arguments-differ, invalid-name
 import math
+
 import torch as th
+from pylibcugraphops.aggregators.node_level import (
+    agg_hg_basis_post_bwd_int32,
+    agg_hg_basis_post_bwd_int64,
+    agg_hg_basis_post_fwd_int32,
+    agg_hg_basis_post_fwd_int64,
+)
+from pylibcugraphops.structure.graph_types import (
+    message_flow_graph_hg_csr_int32,
+    message_flow_graph_hg_csr_int64,
+)
 from torch import nn
-from pylibcugraphops.aggregators.node_level import (agg_hg_basis_post_fwd_int32,
-    agg_hg_basis_post_bwd_int32, agg_hg_basis_post_fwd_int64, agg_hg_basis_post_bwd_int64)
-from pylibcugraphops.structure.graph_types import (message_flow_graph_hg_csr_int32,
-    message_flow_graph_hg_csr_int64)
 
 CUDA_SM_PER_BLOCK = 49152
+
 
 class RelGraphConvAgg(th.autograd.Function):
     @staticmethod
@@ -26,32 +34,37 @@ class RelGraphConvAgg(th.autograd.Function):
             Number of edge types in this graph.
         edge_types : torch.Tensor
             Tensor of the edge types.
-        coeff : torch.Tensor, dtype=torch.float32, requires_grad=True
-            Coefficient matrix in basis-decomposition for regularization,
-            shape: (num_rels, num_bases). It should be set to ``None`` when ``regularizer=None``.
         feat : torch.Tensor, dtype=torch.float32, requires_grad=True
             Input feature, shape: (num_src_nodes, in_feat).
+        coeff : torch.Tensor, dtype=torch.float32, requires_grad=True
+            Coefficient matrix in basis-decomposition for regularization,
+            shape: (num_rels, num_bases). It should be set to ``None``
+            when ``regularizer=None``.
 
         Returns
         -------
         agg_output : torch.Tensor, dtype=torch.float32
-            Aggregation output, shape: (num_dst_nodes, num_rels * in_feat) when ``regularizer=None``,
-            and (num_dst_nodes, num_bases * in_feat) when ``regularizer='basis'``.
+            Aggregation output, shape: (num_dst_nodes, num_rels * in_feat)
+            when ``regularizer=None``, and (num_dst_nodes, num_bases * in_feat)
+            when ``regularizer='basis'``.
 
         """
-        if not g.device.type == 'cuda':
+        if not g.device.type == "cuda":
             raise TypeError(
                 f"dgl.contrib.cugraph.nn.RelGraphConv requires "
-                f"DGL graph on device cuda, but got {g.device}")
+                f"DGL graph on device cuda, but got {g.device}"
+            )
         ctx.device = g.device
         if not ctx.device == edge_types.device:
             raise RuntimeError(
-                f"Expected graph and etypes tensor on the same device"
-                f"but got {ctx.device} and {edge_types.device}")
+                f"Expected graph and etypes tensor on the same device, "
+                f"but got {ctx.device} and {edge_types.device}"
+            )
         if not ctx.device == feat.device:
             raise RuntimeError(
-                f"Expected graph and feature tensor on the same device"
-                f"but got {ctx.device} and {feat.device}")
+                f"Expected graph and feature tensor on the same device, "
+                f"but got {ctx.device} and {feat.device}"
+            )
 
         if g.idtype == th.int32:
             mfg_csr_func = message_flow_graph_hg_csr_int32
@@ -61,11 +74,13 @@ class RelGraphConvAgg(th.autograd.Function):
             agg_fwd_func = agg_hg_basis_post_fwd_int64
         else:
             raise TypeError(
-                f'Supported ID type: torch.int32 or torch.int64, but got {g.idtype}')
+                f"Supported ID type: torch.int32 or torch.int64, "
+                f"but got {g.idtype}"
+            )
         ctx.graph_idtype = g.idtype
 
         _in_feat = feat.shape[-1]
-        indptr, indices, edge_ids = g.adj_sparse('csc')
+        indptr, indices, edge_ids = g.adj_sparse("csc")
         # edge_ids is in a mixed order, need to permutate incoming etypes
         # and stash the result for backward propagation
         ctx.edge_types_int32 = edge_types[edge_ids.long()].int()
@@ -73,8 +88,18 @@ class RelGraphConvAgg(th.autograd.Function):
         _num_node_types = 0
         _out_node_types = _in_node_types = None
 
-        mfg = mfg_csr_func(fanout, g.dstnodes(), g.srcnodes(), indptr, indices,
-            _num_node_types, num_rels, _out_node_types, _in_node_types, ctx.edge_types_int32)
+        mfg = mfg_csr_func(
+            fanout,
+            g.dstnodes(),
+            g.srcnodes(),
+            indptr,
+            indices,
+            _num_node_types,
+            num_rels,
+            _out_node_types,
+            _in_node_types,
+            ctx.edge_types_int32,
+        )
 
         if coeff is None:
             leading_dimension = num_rels * _in_feat
@@ -82,12 +107,21 @@ class RelGraphConvAgg(th.autograd.Function):
             _num_bases = coeff.shape[-1]
             leading_dimension = _num_bases * _in_feat
 
-        agg_output = th.empty(g.num_dst_nodes(), leading_dimension,
-                              dtype=th.float32, device=ctx.device)
+        agg_output = th.empty(
+            g.num_dst_nodes(),
+            leading_dimension,
+            dtype=th.float32,
+            device=ctx.device,
+        )
         if coeff is None:
             agg_fwd_func(agg_output, feat.detach(), mfg)
         else:
-            agg_fwd_func(agg_output, feat.detach(), mfg, weights_combination=coeff.detach())
+            agg_fwd_func(
+                agg_output,
+                feat.detach(),
+                mfg,
+                weights_combination=coeff.detach(),
+            )
 
         ctx.backward_cache = mfg
         ctx.save_for_backward(feat, coeff)
@@ -113,28 +147,40 @@ class RelGraphConvAgg(th.autograd.Function):
             agg_bwd_func = agg_hg_basis_post_bwd_int64
         else:
             raise TypeError(
-                f'Supported ID type: torch.int32 or torch.int64, but got {ctx.graph_idtype}')
+                f"Supported ID type: torch.int32 or torch.int64, "
+                f"but got {ctx.graph_idtype}"
+            )
 
         grad_feat = th.empty_like(feat, dtype=th.float32, device=ctx.device)
         if coeff is None:
             grad_coeff = None
             agg_bwd_func(grad_feat, grad_output, feat.detach(), mfg)
         else:
-            grad_coeff = th.empty_like(coeff, dtype=th.float32, device=ctx.device)
-            agg_bwd_func(grad_feat, grad_output, feat.detach(), mfg,
-                output_weight_gradient=grad_coeff, weights_combination=coeff.detach())
+            grad_coeff = th.empty_like(
+                coeff, dtype=th.float32, device=ctx.device
+            )
+            agg_bwd_func(
+                grad_feat,
+                grad_output,
+                feat.detach(),
+                mfg,
+                output_weight_gradient=grad_coeff,
+                weights_combination=coeff.detach(),
+            )
 
         return None, None, None, None, grad_feat, grad_coeff
 
+
 class RelGraphConv(nn.Module):
-    """ Relational graph convolution layer using the aggregation functions in cugraph-ops.
+    """Relational graph convolution layer using the aggregation
+    functions in cugraph-ops.
 
     Parameters
     ----------
     in_feat : int
-        Input feature size; i.e, the number of dimensions of :math:`h_j^{(l)}`.
+        Input feature size.
     out_feat : int
-        Output feature size; i.e., the number of dimensions of :math:`h_i^{(l+1)}`.
+        Output feature size.
     num_rels : int
         Number of relations.
     fanout : int
@@ -148,7 +194,7 @@ class RelGraphConv(nn.Module):
 
         Default: ``None``.
     num_bases : int, optional
-        Number of bases. It comes into effect when "basis" regularizer is applied.
+        Number of bases. Only used when "basis" regularizer is applied.
         Default: ``None``.
     bias : bool, optional
         True if bias is added. Default: ``True``.
@@ -171,7 +217,8 @@ class RelGraphConv(nn.Module):
     >>> device = 'cuda'
     >>> fanouts = [5, 6]
     >>> sampler = NeighborSampler(fanouts)
-    >>> dataloader = DataLoader(g, train_nid, sampler, device=device, batch_size=1024)
+    >>> dataloader = DataLoader(g, train_nid, sampler,
+    ...     device=device, batch_size=1024)
     >>> conv1 = RelGraphConv(in_dim, h_dim, num_rels, fanouts[0],
     ...     regularizer='basis', num_bases=10)
     >>> conv2 = RelGraphConv(h_dim, out_dim, num_rels, fanouts[1],
@@ -181,18 +228,21 @@ class RelGraphConv(nn.Module):
     ...     h = F.relu(h)
     ...     h = conv2(blocks[1], h, blocks[1].edata[dgl.ETYPE])
     """
-    def __init__(self,
-                 in_feat,
-                 out_feat,
-                 num_rels,
-                 fanout,
-                 regularizer=None,
-                 num_bases=None,
-                 bias=True,
-                 activation=None,
-                 self_loop=True,
-                 dropout=0.0,
-                 layer_norm=False):
+
+    def __init__(
+        self,
+        in_feat,
+        out_feat,
+        num_rels,
+        fanout,
+        regularizer=None,
+        num_bases=None,
+        bias=True,
+        activation=None,
+        self_loop=True,
+        dropout=0.0,
+        layer_norm=False,
+    ):
         super().__init__()
         self.in_feat = in_feat
         self.out_feat = out_feat
@@ -201,17 +251,25 @@ class RelGraphConv(nn.Module):
 
         # regularizer (see dgl.nn.pytorch.linear.TypedLinear)
         if regularizer is None:
-            self.W = nn.Parameter(th.Tensor(num_rels, in_feat, out_feat).cuda())
+            self.W = nn.Parameter(
+                th.Tensor(num_rels, in_feat, out_feat).cuda()
+            )
             self.coeff = None
-        elif regularizer == 'basis':
+        elif regularizer == "basis":
             if num_bases is None:
-                raise ValueError('Missing "num_bases" for basis regularization.')
-            self.W = nn.Parameter(th.Tensor(num_bases, in_feat, out_feat).cuda())
+                raise ValueError(
+                    'Missing "num_bases" for basis regularization.'
+                )
+            self.W = nn.Parameter(
+                th.Tensor(num_bases, in_feat, out_feat).cuda()
+            )
             self.coeff = nn.Parameter(th.Tensor(num_rels, num_bases).cuda())
             self.num_bases = num_bases
         else:
             raise ValueError(
-                f'Supported regularizer options: "basis", but got {regularizer}')
+                f"Supported regularizer options: 'basis', "
+                f"but got {regularizer}"
+            )
         self.regularizer = regularizer
         self.reset_parameters()
 
@@ -228,25 +286,43 @@ class RelGraphConv(nn.Module):
 
         # layer norm
         if self.layer_norm:
-            self.layer_norm_weight = nn.LayerNorm(out_feat, elementwise_affine=True)
+            self.layer_norm_weight = nn.LayerNorm(
+                out_feat, elementwise_affine=True
+            )
 
         # weight for self_loop
         if self.self_loop:
-            self.loop_weight = nn.Parameter(th.Tensor(in_feat, out_feat).cuda())
-            nn.init.xavier_uniform_(self.loop_weight, gain=nn.init.calculate_gain('relu'))
+            self.loop_weight = nn.Parameter(
+                th.Tensor(in_feat, out_feat).cuda()
+            )
+            nn.init.xavier_uniform_(
+                self.loop_weight, gain=nn.init.calculate_gain("relu")
+            )
 
         self.dropout = nn.Dropout(dropout)
 
     def reset_parameters(self):
         with th.no_grad():
             if self.regularizer is None:
-                nn.init.uniform_(self.W, -1/math.sqrt(self.in_feat), 1/math.sqrt(self.in_feat))
-            elif self.regularizer == 'basis':
-                nn.init.uniform_(self.W, -1/math.sqrt(self.in_feat), 1/math.sqrt(self.in_feat))
-                nn.init.xavier_uniform_(self.coeff, gain=nn.init.calculate_gain('relu'))
+                nn.init.uniform_(
+                    self.W,
+                    -1 / math.sqrt(self.in_feat),
+                    1 / math.sqrt(self.in_feat),
+                )
+            elif self.regularizer == "basis":
+                nn.init.uniform_(
+                    self.W,
+                    -1 / math.sqrt(self.in_feat),
+                    1 / math.sqrt(self.in_feat),
+                )
+                nn.init.xavier_uniform_(
+                    self.coeff, gain=nn.init.calculate_gain("relu")
+                )
             else:
                 raise ValueError(
-                    f'Supported regularizer options: "basis", but got {self.regularizer}')
+                    f"Supported regularizer options: 'basis', "
+                    f"but got {self.regularizer}"
+                )
 
     def forward(self, g, feat, etypes, norm=None, *, presorted=False):
         """Forward computation.
@@ -262,8 +338,8 @@ class RelGraphConv(nn.Module):
         norm : torch.Tensor, optional
             An 1D tensor of edge norm value.  Shape: :math:`(|E|,)`.
         presorted : bool, optional
-            Whether the edges of the input graph have been sorted by their types.
-            Forward on pre-sorted graph may be faster. Graphs created
+            Whether the edges of the input graph have been sorted by their
+            types. Forward on pre-sorted graph may be faster. Graphs created
             by :func:`~dgl.to_homogeneous` automatically satisfy the condition.
             Also see :func:`~dgl.reorder_graph` for sorting edges manually.
 
@@ -272,22 +348,27 @@ class RelGraphConv(nn.Module):
         torch.Tensor
             New node features. Shape: :math:`(|V|, D_{out})`.
         """
-        _sm_size = self.fanout * 2 + 3 + \
-                   self.num_rels * self.num_bases if self.regularizer == 'basis' else 0
+        _sm_size = (
+            self.fanout * 2 + 3 + self.num_rels * self.num_bases
+            if self.regularizer == "basis"
+            else 0
+        )
         _sm_size *= 8 if g.idtype == th.int64 else 4
         if _sm_size > CUDA_SM_PER_BLOCK:
             raise MemoryError(
                 f"Failed to allocate {_sm_size} bytes shared memory on CUDA, "
                 f"larger than the limit: {CUDA_SM_PER_BLOCK} bytes. "
-                f"Try reducing fanout or num_bases.")
+                f"Try reducing fanout or num_bases."
+            )
         self.presorted = presorted
         with g.local_scope():
-            g.srcdata['h'] = feat
+            g.srcdata["h"] = feat
             if norm is not None:
-                g.edata['norm'] = norm
+                g.edata["norm"] = norm
             # message passing
-            h = RelGraphConvAgg.apply(g, self.fanout, self.num_rels,
-                                      etypes, feat, self.coeff)
+            h = RelGraphConvAgg.apply(
+                g, self.fanout, self.num_rels, etypes, feat, self.coeff
+            )
             h = h @ self.W.view(-1, self.out_feat)
             # apply bias and activation
             if self.layer_norm:
@@ -295,7 +376,7 @@ class RelGraphConv(nn.Module):
             if self.bias:
                 h = h + self.h_bias
             if self.self_loop:
-                h = h + feat[:g.num_dst_nodes()] @ self.loop_weight
+                h = h + feat[: g.num_dst_nodes()] @ self.loop_weight
             if self.activation:
                 h = self.activation(h)
             h = self.dropout(h)
