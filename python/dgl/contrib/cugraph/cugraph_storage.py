@@ -73,8 +73,8 @@ class CuGraphStorage:
             If not specified, the type of properties will be added as
             an empty string.
         feat_name : string or dict
-            A map of feature names under which we should save the added properties
-            # {"feat_1":[f1, f2], "feat_2":[f3, f4]}
+            A map of feature names under which we should save the added
+            properties # {"feat_1":[f1, f2], "feat_2":[f3, f4]}
             (ignored if contains_vector_features=False and the col names of
             the dataframe are treated as corresponding feature names)
         contains_vector_features : True
@@ -117,8 +117,8 @@ class CuGraphStorage:
         canonical_etype : Tuple[(str, str, str)]
             The edge type to be added
         feat_name : string or dict
-            A map of feature names under which we should save the added properties
-            # {"feat_1":[f1, f2], "feat_2":[f3, f4]}
+            A map of feature names under which we should save the added
+            properties # {"feat_1":[f1, f2], "feat_2":[f3, f4]}
             (ignored if contains_vector_features=False and the col names of
             the dataframe are treated as corresponding feature names)
         contains_vector_features : True
@@ -383,7 +383,8 @@ class CuGraphStorage:
 
     def get_node_storage(self, key, ntype=None):
         """
-        TODO: Add doctring
+        Get storage object of node feature of
+        type :attr:`ntype` and name :attr:`key`
         """
         if len(self.ntypes) > 1:
             indices_offset = self.get_node_id_offset(ntype)
@@ -394,7 +395,8 @@ class CuGraphStorage:
 
     def get_edge_storage(self, key, etype=None):
         """
-        TODO: Add doctring
+        Get storage object of edge feature of
+        type :attr:`ntype` and name :attr:`key`
         """
         if len(self.canonical_etypes) > 1:
             indices_offset = self.get_edge_id_offset(etype)
@@ -571,7 +573,8 @@ class CuGraphStorage:
         ]
         if len(can_etypes) > 1:
             raise dgl.DGLError(
-                f'Edge type "{etype}" is ambiguous. Please use canonical edge type in the form of (srctype, etype, dsttype)'
+                f'Edge type "{etype}" is ambiguous. Please use canonical'
+                + "edge type in the form of (srctype, etype, dsttype)"
             )
         return can_etypes[0]
 
