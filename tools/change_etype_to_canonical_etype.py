@@ -81,8 +81,7 @@ def _find_c_etypes_in_partition(
         )[0]
     except DGLError as e:
         logging.fatal(
-            f"Partition {part_id} data folder does not exist, "
-            "which is requested by edge types {seed_edge_tids.tolist()}.\n"
+            f"Graph data of partition {part_id} is requested but not found."
         )
         raise e
 

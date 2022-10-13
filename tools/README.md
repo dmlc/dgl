@@ -168,7 +168,7 @@ The output chunked graph metadata will go as follows (assuming the current direc
 }
 ```
 
-## Change edge type to canonical edge type for partitioned graph data
+## Change edge type to canonical edge type for partition config json
 
 `change_etype_to_canonical_etype.py` is a tool that helps you convert etypes to canonical_etypes in a partition configuration file, and it overwrites the original file on disk. 
 
@@ -180,9 +180,9 @@ python tools/change_etype_to_canonical_etype.py --part-config "{config path}"
 
 ### Requirement
 
-Partition algorithms produce one configuration file and multiple data folders, and each data folder corresponds to a partition. **This tool requires not only access to the specified config file in input, but also to the data of the first partition.** They can be local files or shared files among network, if you follow this [official tutorial](https://docs.dgl.ai/en/latest/tutorials/dist/1_node_classification.html#sphx-glr-tutorials-dist-1-node-classification-py) for distributed training, you don't need to care about this as all files are shared by every partiticate through NFS.
+Partition algorithms produce one configuration file and multiple data folders, and each data folder corresponds to a partition. **This tool requires not only access to the specified config file in input, but also the graph data named *graph.dgl* under the folder of the first partition.** They can be local files or shared files among network, if you follow this [official tutorial](https://docs.dgl.ai/en/latest/tutorials/dist/1_node_classification.html#sphx-glr-tutorials-dist-1-node-classification-py) for distributed training, you don't need to care about this as all files are shared by every participant through NFS.
 
-**In short, your folder should look like this:**
+**For example, your folder should look like this:**
 ```
 data_root_dir/
 |-- graph_name.json    # specified by part_config
