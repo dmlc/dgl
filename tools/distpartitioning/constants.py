@@ -19,8 +19,6 @@ OWNER_PROCESS = "owner_proc_id"
 
 PART_LOCAL_NID = "part_local_nid"
 
-GLOO_MESSAGING_TIMEOUT = 60 #seconds
-
 STR_NODE_TYPE = "node_type"
 STR_NUM_NODES_PER_CHUNK = "num_nodes_per_chunk"
 STR_EDGE_TYPE = "edge_type"
@@ -34,3 +32,7 @@ STR_EDGE_DATA = "edge_data"
 STR_NUMPY = "numpy"
 STR_CSV = "csv"
 STR_NAME = "name"
+
+STR_GRAPH_NAME = "graph_name"
+STR_NODE_FEATURES = "node_features"
+STR_EDGE_FEATURES = "edge_features"

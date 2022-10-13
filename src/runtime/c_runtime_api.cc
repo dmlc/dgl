@@ -1,5 +1,5 @@
 /*!
- *  Copyright (c) 2016 by Contributors
+ *  Copyright (c) 2016-2022 by Contributors
  * \file c_runtime_api.cc
  * \brief Runtime API implementation
  */
@@ -26,17 +26,9 @@ namespace runtime {
  */
 inline std::string DeviceName(int type) {
   switch (type) {
-    case kDLCPU: return "cpu";
-    case kDLGPU: return "gpu";
-    case kDLOpenCL: return "opencl";
-    case kDLSDAccel: return "sdaccel";
-    case kDLAOCL: return "aocl";
-    case kDLVulkan: return "vulkan";
-    case kDLMetal: return "metal";
-    case kDLVPI: return "vpi";
-    case kDLROCM: return "rocm";
-    case kOpenGL: return "opengl";
-    case kExtDev: return "ext_dev";
+    case kDGLCPU: return "cpu";
+    case kDGLCUDA: return "cuda";
+    // add more device here once supported
     default: LOG(FATAL) << "unknown type =" << type; return "Unknown";
   }
 }
@@ -99,13 +91,13 @@ DeviceAPI* DeviceAPI::Get(DGLContext ctx, bool allow_missing) {
       static_cast<int>(ctx.device_type), allow_missing);
 }
 
-DeviceAPI* DeviceAPI::Get(DLDeviceType dev_type, bool allow_missing) {
+DeviceAPI* DeviceAPI::Get(DGLDeviceType dev_type, bool allow_missing) {
   return DeviceAPIManager::Get(static_cast<int>(dev_type), allow_missing);
 }
 
 void* DeviceAPI::AllocWorkspace(DGLContext ctx,
                                 size_t size,
-                                DGLType type_hint) {
+                                DGLDataType type_hint) {
   return AllocDataSpace(ctx, size, kTempAllocaAlignment, type_hint);
 }
 
@@ -213,10 +205,10 @@ void* DGLBackendAllocWorkspace(int device_type,
                                int dtype_code_hint,
                                int dtype_bits_hint) {
   DGLContext ctx;
-  ctx.device_type = static_cast<DLDeviceType>(device_type);
+  ctx.device_type = static_cast<DGLDeviceType>(device_type);
   ctx.device_id = device_id;
 
-  DGLType type_hint;
+  DGLDataType type_hint;
   type_hint.code = static_cast<decltype(type_hint.code)>(dtype_code_hint);
   type_hint.bits = static_cast<decltype(type_hint.bits)>(dtype_bits_hint);
   type_hint.lanes = 1;
@@ -230,7 +222,7 @@ int DGLBackendFreeWorkspace(int device_type,
                             int device_id,
                             void* ptr) {
   DGLContext ctx;
-  ctx.device_type = static_cast<DLDeviceType>(device_type);
+  ctx.device_type = static_cast<DGLDeviceType>(device_type);
   ctx.device_id = device_id;
   DeviceAPIManager::Get(ctx)->FreeWorkspace(ctx, ptr);
   return 0;
@@ -265,10 +257,10 @@ int DGLFuncCall(DGLFunctionHandle func,
       DGLArgs(args, arg_type_codes, num_args), &rv);
   // handle return string.
   if (rv.type_code() == kStr ||
-     rv.type_code() == kDGLType ||
+     rv.type_code() == kDGLDataType ||
       rv.type_code() == kBytes) {
     DGLRuntimeEntry* e = DGLAPIRuntimeStore::Get();
-    if (rv.type_code() != kDGLType) {
+    if (rv.type_code() != kDGLDataType) {
       e->ret_str = *rv.ptr<std::string>();
     } else {
       e->ret_str = rv.operator std::string();
@@ -336,7 +328,7 @@ int DGLFuncCreateFromCFunc(DGLPackedCFunc func,
 int DGLStreamCreate(int device_type, int device_id, DGLStreamHandle* out) {
   API_BEGIN();
   DGLContext ctx;
-  ctx.device_type = static_cast<DLDeviceType>(device_type);
+  ctx.device_type = static_cast<DGLDeviceType>(device_type);
   ctx.device_id = device_id;
   *out = DeviceAPIManager::Get(ctx)->CreateStream(ctx);
   API_END();
@@ -345,7 +337,7 @@ int DGLStreamCreate(int device_type, int device_id, DGLStreamHandle* out) {
 int DGLStreamFree(int device_type, int device_id, DGLStreamHandle stream) {
   API_BEGIN();
   DGLContext ctx;
-  ctx.device_type = static_cast<DLDeviceType>(device_type);
+  ctx.device_type = static_cast<DGLDeviceType>(device_type);
   ctx.device_id = device_id;
   DeviceAPIManager::Get(ctx)->FreeStream(ctx, stream);
   API_END();
@@ -354,7 +346,7 @@ int DGLStreamFree(int device_type, int device_id, DGLStreamHandle stream) {
 int DGLSetStream(int device_type, int device_id, DGLStreamHandle stream) {
   API_BEGIN();
   DGLContext ctx;
-  ctx.device_type = static_cast<DLDeviceType>(device_type);
+  ctx.device_type = static_cast<DGLDeviceType>(device_type);
   ctx.device_id = device_id;
   DeviceAPIManager::Get(ctx)->SetStream(ctx, stream);
   API_END();
@@ -363,7 +355,7 @@ int DGLSetStream(int device_type, int device_id, DGLStreamHandle stream) {
 int DGLGetStream(int device_type, int device_id, DGLStreamHandle* stream) {
   API_BEGIN();
   DGLContext ctx;
-  ctx.device_type = static_cast<DLDeviceType>(device_type);
+  ctx.device_type = static_cast<DGLDeviceType>(device_type);
   ctx.device_id = device_id;
   *stream = DeviceAPIManager::Get(ctx)->GetStream();
   API_END();
@@ -372,7 +364,7 @@ int DGLGetStream(int device_type, int device_id, DGLStreamHandle* stream) {
 int DGLSynchronize(int device_type, int device_id, DGLStreamHandle stream) {
   API_BEGIN();
   DGLContext ctx;
-  ctx.device_type = static_cast<DLDeviceType>(device_type);
+  ctx.device_type = static_cast<DGLDeviceType>(device_type);
   ctx.device_id = device_id;
   DeviceAPIManager::Get(ctx)->StreamSync(ctx, stream);
   API_END();
@@ -384,7 +376,7 @@ int DGLStreamStreamSynchronize(int device_type,
                                DGLStreamHandle dst) {
   API_BEGIN();
   DGLContext ctx;
-  ctx.device_type = static_cast<DLDeviceType>(device_type);
+  ctx.device_type = static_cast<DGLDeviceType>(device_type);
   ctx.device_id = device_id;
   DeviceAPIManager::Get(ctx)->SyncStreamFromTo(ctx, src, dst);
   API_END();
@@ -408,7 +400,7 @@ int DGLLoadTensorAdapter(const char *path) {
 DGL_REGISTER_GLOBAL(dgl::runtime::symbol::dgl_set_device)
 .set_body([](DGLArgs args, DGLRetValue *ret) {
     DGLContext ctx;
-    ctx.device_type = static_cast<DLDeviceType>(args[0].operator int());
+    ctx.device_type = static_cast<DGLDeviceType>(args[0].operator int());
     ctx.device_id = args[1];
     DeviceAPIManager::Get(ctx)->SetDevice(ctx);
   });
@@ -417,7 +409,7 @@ DGL_REGISTER_GLOBAL(dgl::runtime::symbol::dgl_set_device)
 DGL_REGISTER_GLOBAL("_GetDeviceAttr")
 .set_body([](DGLArgs args, DGLRetValue *ret) {
     DGLContext ctx;
-    ctx.device_type = static_cast<DLDeviceType>(args[0].operator int());
+    ctx.device_type = static_cast<DGLDeviceType>(args[0].operator int());
     ctx.device_id = args[1];
 
     DeviceAttrKind kind = static_cast<DeviceAttrKind>(args[2].operator int());

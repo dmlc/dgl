@@ -6,12 +6,15 @@ import dgl.nn.pytorch as nn
 import dgl.function as fn
 import backend as F
 import pytest
+import torch
 from test_utils.graph_cases import get_cases, random_graph, random_bipartite, random_dglgraph
 from test_utils import parametrize_idtype
 from copy import deepcopy
 import pickle
 
 import scipy as sp
+from torch.utils.data import DataLoader
+from torch.optim import SparseAdam, Adam
 
 tmp_buffer = io.BytesIO()
 
@@ -1146,17 +1149,26 @@ def myagg(alist, dsttype):
 
 @parametrize_idtype
 @pytest.mark.parametrize('agg', ['sum', 'max', 'min', 'mean', 'stack', myagg])
-def test_hetero_conv(agg, idtype):
+@pytest.mark.parametrize('canonical_keys', [False, True])
+def test_hetero_conv(agg, idtype, canonical_keys):
     g = dgl.heterograph({
         ('user', 'follows', 'user'): ([0, 0, 2, 1], [1, 2, 1, 3]),
         ('user', 'plays', 'game'): ([0, 0, 0, 1, 2], [0, 2, 3, 0, 2]),
         ('store', 'sells', 'game'): ([0, 0, 1, 1], [0, 3, 1, 2])},
         idtype=idtype, device=F.ctx())
-    conv = nn.HeteroGraphConv({
-        'follows': nn.GraphConv(2, 3, allow_zero_in_degree=True),
-        'plays': nn.GraphConv(2, 4, allow_zero_in_degree=True),
-        'sells': nn.GraphConv(3, 4, allow_zero_in_degree=True)},
-        agg)
+    if not canonical_keys:
+        conv = nn.HeteroGraphConv({
+            'follows': nn.GraphConv(2, 3, allow_zero_in_degree=True),
+            'plays': nn.GraphConv(2, 4, allow_zero_in_degree=True),
+            'sells': nn.GraphConv(3, 4, allow_zero_in_degree=True)},
+            agg)
+    else:
+        conv = nn.HeteroGraphConv({
+            ('user', 'follows', 'user'): nn.GraphConv(2, 3, allow_zero_in_degree=True),
+            ('user', 'plays', 'game'): nn.GraphConv(2, 4, allow_zero_in_degree=True),
+            ('store', 'sells', 'game'): nn.GraphConv(3, 4, allow_zero_in_degree=True)},
+            agg)
+
     conv = conv.to(F.ctx())
 
     # test pickle
@@ -1622,3 +1634,24 @@ def test_dgn_conv(in_size, out_size, aggregators, scalers, delta,
     model = nn.DGNConv(in_size, out_size, aggregators_non_eig, scalers, delta, dropout,
         num_towers, edge_feat_size, residual).to(dev)
     model(g, h, edge_feat=e)
+
+def test_DeepWalk():
+    dev = F.ctx()
+    g = dgl.graph(([0, 1, 2, 1, 2, 0], [1, 2, 0, 0, 1, 2]))
+    model = nn.DeepWalk(g, emb_dim=8, walk_length=2, window_size=1, fast_neg=True, sparse=True)
+    model = model.to(dev)
+    dataloader = DataLoader(torch.arange(g.num_nodes()), batch_size=16, collate_fn=model.sample)
+    optim = SparseAdam(model.parameters(), lr=0.01)
+    walk = next(iter(dataloader)).to(dev)
+    loss = model(walk)
+    loss.backward()
+    optim.step()
+
+    model = nn.DeepWalk(g, emb_dim=8, walk_length=2, window_size=1, fast_neg=False, sparse=False)
+    model = model.to(dev)
+    dataloader = DataLoader(torch.arange(g.num_nodes()), batch_size=16, collate_fn=model.sample)
+    optim = Adam(model.parameters(), lr=0.01)
+    walk = next(iter(dataloader)).to(dev)
+    loss = model(walk)
+    loss.backward()
+    optim.step()

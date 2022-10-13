@@ -3,10 +3,10 @@
 
 #include <dgl/runtime/ndarray.h>
 
-static constexpr DLContext CTX = DLContext{kDLCPU, 0};
-static constexpr DLContext CPU = DLContext{kDLCPU, 0};
+static constexpr DGLContext CTX = DGLContext{kDGLCPU, 0};
+static constexpr DGLContext CPU = DGLContext{kDGLCPU, 0};
 #ifdef DGL_USE_CUDA
-static constexpr DLContext GPU = DLContext{kDLGPU, 0};
+static constexpr DGLContext GPU = DGLContext{kDGLCUDA, 0};
 #endif
 
 template <typename T>

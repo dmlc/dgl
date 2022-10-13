@@ -57,7 +57,7 @@ class SAGE(nn.Module):
                 y[output_nodes[0]:output_nodes[-1]+1] = h.to(buffer_device)
             feat = y
         return y
-    
+
 def evaluate(model, graph, dataloader):
     model.eval()
     ys = []
@@ -96,7 +96,7 @@ def train(args, device, g, dataset, model):
                                 use_uva=use_uva)
 
     opt = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=5e-4)
-    
+
     for epoch in range(10):
         model.train()
         total_loss = 0
@@ -122,7 +122,7 @@ if __name__ == '__main__':
     if not torch.cuda.is_available():
         args.mode = 'cpu'
     print(f'Training in {args.mode} mode.')
-    
+
     # load and preprocess dataset
     print('Loading data')
     dataset = AsNodePredDataset(DglNodePropPredDataset('ogbn-products'))

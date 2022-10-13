@@ -9,7 +9,7 @@ using namespace dgl::runtime;
 namespace {
 
 template <typename IDX>
-aten::CSRMatrix CSR1(DLContext ctx = CTX) {
+aten::CSRMatrix CSR1(DGLContext ctx = CTX) {
   // [[0, 1, 1, 0, 0],
   //  [1, 0, 0, 0, 0],
   //  [0, 0, 1, 1, 0],
@@ -24,7 +24,7 @@ aten::CSRMatrix CSR1(DLContext ctx = CTX) {
 }
 
 template <typename IDX>
-aten::CSRMatrix CSR2(DLContext ctx = CTX) {
+aten::CSRMatrix CSR2(DGLContext ctx = CTX) {
   // has duplicate entries
   // [[0, 1, 2, 0, 0],
   //  [1, 0, 0, 0, 0],
@@ -40,7 +40,7 @@ aten::CSRMatrix CSR2(DLContext ctx = CTX) {
 }
 
 template <typename IDX>
-aten::COOMatrix COO1(DLContext ctx = CTX) {
+aten::COOMatrix COO1(DGLContext ctx = CTX) {
   // [[0, 1, 1, 0, 0],
   //  [1, 0, 0, 0, 0],
   //  [0, 0, 1, 1, 0],
@@ -55,7 +55,7 @@ aten::COOMatrix COO1(DLContext ctx = CTX) {
 }
 
 template <typename IDX>
-aten::COOMatrix COO2(DLContext ctx = CTX) {
+aten::COOMatrix COO2(DGLContext ctx = CTX) {
   // has duplicate entries
   // [[0, 1, 2, 0, 0],
   //  [1, 0, 0, 0, 0],
@@ -71,7 +71,7 @@ aten::COOMatrix COO2(DLContext ctx = CTX) {
 }
 
 template <typename IDX>
-aten::CSRMatrix SR_CSR3(DLContext ctx) {
+aten::CSRMatrix SR_CSR3(DGLContext ctx) {
   // [[0, 1, 2, 0, 0],
   //  [1, 0, 0, 0, 0],
   //  [0, 0, 1, 1, 0],
@@ -85,7 +85,7 @@ aten::CSRMatrix SR_CSR3(DLContext ctx) {
 }
 
 template <typename IDX>
-aten::CSRMatrix SRC_CSR3(DLContext ctx) {
+aten::CSRMatrix SRC_CSR3(DGLContext ctx) {
   // [[0, 1, 2, 0, 0],
   //  [1, 0, 0, 0, 0],
   //  [0, 0, 1, 1, 0],
@@ -99,7 +99,7 @@ aten::CSRMatrix SRC_CSR3(DLContext ctx) {
 }
 
 template <typename IDX>
-aten::COOMatrix COO3(DLContext ctx) {
+aten::COOMatrix COO3(DGLContext ctx) {
   // has duplicate entries
   // [[0, 1, 2, 0, 0],
   //  [1, 0, 0, 0, 0],
@@ -118,7 +118,7 @@ struct SparseCOOCSR {
   static constexpr uint64_t NUM_COLS = 150;
   static constexpr uint64_t NUM_NZ = 5;
   template <typename IDX>
-  static aten::COOMatrix COOSparse(const DLContext &ctx = CTX) {
+  static aten::COOMatrix COOSparse(const DGLContext &ctx = CTX) {
     return aten::COOMatrix(NUM_ROWS, NUM_COLS,
                            aten::VecToIdArray(std::vector<IDX>({0, 1, 2, 3, 4}),
                                               sizeof(IDX) * 8, ctx),
@@ -127,7 +127,7 @@ struct SparseCOOCSR {
   }
 
   template <typename IDX>
-  static aten::CSRMatrix CSRSparse(const DLContext &ctx = CTX) {
+  static aten::CSRMatrix CSRSparse(const DGLContext &ctx = CTX) {
     auto &&indptr = std::vector<IDX>(NUM_ROWS + 1, NUM_NZ);
     for (size_t i = 0; i < NUM_NZ; ++i) {
       indptr[i + 1] = static_cast<IDX>(i + 1);
@@ -150,7 +150,7 @@ bool isSparseCOO(const int64_t &num_threads, const int64_t &num_nodes,
 }
 
 template <typename IDX>
-aten::COOMatrix RowSorted_NullData_COO(DLContext ctx = CTX) {
+aten::COOMatrix RowSorted_NullData_COO(DGLContext ctx = CTX) {
   // [[0, 1, 1, 0, 0],
   //  [1, 0, 0, 0, 0],
   //  [0, 0, 1, 1, 0],
@@ -166,7 +166,7 @@ aten::COOMatrix RowSorted_NullData_COO(DLContext ctx = CTX) {
 }
 
 template <typename IDX>
-aten::CSRMatrix RowSorted_NullData_CSR(DLContext ctx = CTX) {
+aten::CSRMatrix RowSorted_NullData_CSR(DGLContext ctx = CTX) {
   // [[0, 1, 1, 0, 0],
   //  [1, 0, 0, 0, 0],
   //  [0, 0, 1, 1, 0],
@@ -184,7 +184,7 @@ aten::CSRMatrix RowSorted_NullData_CSR(DLContext ctx = CTX) {
 }  // namespace
 
 template <typename IDX>
-void _TestCOOToCSR(DLContext ctx) {
+void _TestCOOToCSR(DGLContext ctx) {
   auto coo = COO1<IDX>(ctx);
   auto csr = CSR1<IDX>(ctx);
   auto tcsr = aten::COOToCSR(coo);
@@ -297,7 +297,7 @@ TEST(SpmatTest, TestCOOHasDuplicate) {
 }
 
 template <typename IDX>
-void _TestCOOSort(DLContext ctx) {
+void _TestCOOSort(DGLContext ctx) {
   auto coo = COO3<IDX>(ctx);
   
   auto sr_coo = COOSort(coo, false);
@@ -387,7 +387,7 @@ TEST(SpmatTest, TestCOOReorder) {
 }
 
 template <typename IDX>
-void _TestCOOGetData(DLContext ctx) {
+void _TestCOOGetData(DGLContext ctx) {
   auto coo = COO2<IDX>(ctx);
   // test get all data
   auto x = aten::COOGetAllData(coo, 0, 0);

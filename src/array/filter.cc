@@ -15,7 +15,7 @@ namespace array {
 
 using namespace dgl::runtime;
 
-template<DLDeviceType XPU, typename IdType>
+template<DGLDeviceType XPU, typename IdType>
 FilterRef CreateSetFilter(IdArray set);
 
 DGL_REGISTER_GLOBAL("utils.filter._CAPI_DGLFilterCreateFromSet")
@@ -23,10 +23,10 @@ DGL_REGISTER_GLOBAL("utils.filter._CAPI_DGLFilterCreateFromSet")
   IdArray array = args[0];
   auto ctx = array->ctx;
   // TODO(nv-dlasalle): Implement CPU version.
-  if (ctx.device_type == kDLGPU) {
+  if (ctx.device_type == kDGLCUDA) {
     #ifdef DGL_USE_CUDA
     ATEN_ID_TYPE_SWITCH(array->dtype, IdType, {
-      *rv = CreateSetFilter<kDLGPU, IdType>(array);
+      *rv = CreateSetFilter<kDGLCUDA, IdType>(array);
     });
     #else
     LOG(FATAL) << "GPU support not compiled.";

@@ -125,11 +125,11 @@ class UnitGraph::COO : public BaseHeteroGraph {
     LOG(FATAL) << "UnitGraph graph is not mutable.";
   }
 
-  DLDataType DataType() const override {
+  DGLDataType DataType() const override {
     return adj_.row->dtype;
   }
 
-  DLContext Context() const override {
+  DGLContext Context() const override {
     return adj_.row->ctx;
   }
 
@@ -153,11 +153,10 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return ret;
   }
 
-  COO CopyTo(const DLContext &ctx,
-             const DGLStreamHandle &stream = nullptr) const {
+  COO CopyTo(const DGLContext &ctx) const {
     if (Context() == ctx)
       return *this;
-    return COO(meta_graph_, adj_.CopyTo(ctx, stream));
+    return COO(meta_graph_, adj_.CopyTo(ctx));
   }
 
 
@@ -169,6 +168,11 @@ class UnitGraph::COO : public BaseHeteroGraph {
   /*! \brief Unpin the adj_: COOMatrix of the COO graph. */
   void UnpinMemory_() {
     adj_.UnpinMemory_();
+  }
+
+  /*! \brief Record stream for the adj_: COOMatrix of the COO graph. */
+  void RecordStream(DGLStreamHandle stream) override {
+    adj_.RecordStream(stream);
   }
 
   bool IsMultigraph() const override {
@@ -381,7 +385,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
     CHECK(aten::IsValidIdArray(dstvids)) << "Invalid vertex id array.";
     HeteroSubgraph subg;
     const auto& submat = aten::COOSliceMatrix(adj_, srcvids, dstvids);
-    DLContext ctx = aten::GetContextOf(vids);
+    DGLContext ctx = aten::GetContextOf(vids);
     IdArray sub_eids = aten::Range(0, submat.data->shape[0], NumBits(), ctx);
     subg.graph = std::make_shared<COO>(meta_graph(), submat.num_rows, submat.num_cols,
         submat.row, submat.col);
@@ -408,9 +412,9 @@ class UnitGraph::COO : public BaseHeteroGraph {
       IdArray new_src = aten::IndexSelect(adj_.row, eids[0]);
       IdArray new_dst = aten::IndexSelect(adj_.col, eids[0]);
       subg.induced_vertices.emplace_back(
-          aten::NullArray(DLDataType{kDLInt, NumBits(), 1}, Context()));
+          aten::NullArray(DGLDataType{kDGLInt, NumBits(), 1}, Context()));
       subg.induced_vertices.emplace_back(
-          aten::NullArray(DLDataType{kDLInt, NumBits(), 1}, Context()));
+          aten::NullArray(DGLDataType{kDGLInt, NumBits(), 1}, Context()));
       subg.graph = std::make_shared<COO>(
           meta_graph(), NumVertices(SrcType()), NumVertices(DstType()), new_src, new_dst);
       subg.induced_edges = eids;
@@ -528,11 +532,11 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     LOG(FATAL) << "UnitGraph graph is not mutable.";
   }
 
-  DLDataType DataType() const override {
+  DGLDataType DataType() const override {
     return adj_.indices->dtype;
   }
 
-  DLContext Context() const override {
+  DGLContext Context() const override {
     return adj_.indices->ctx;
   }
 
@@ -558,12 +562,11 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     }
   }
 
-  CSR CopyTo(const DLContext &ctx,
-             const DGLStreamHandle &stream = nullptr) const {
+  CSR CopyTo(const DGLContext &ctx) const {
     if (Context() == ctx) {
       return *this;
     } else {
-      return CSR(meta_graph_, adj_.CopyTo(ctx, stream));
+      return CSR(meta_graph_, adj_.CopyTo(ctx));
     }
   }
 
@@ -575,6 +578,11 @@ class UnitGraph::CSR : public BaseHeteroGraph {
   /*! \brief Unpin the adj_: CSRMatrix of the CSR graph. */
   void UnpinMemory_() {
     adj_.UnpinMemory_();
+  }
+
+  /*! \brief Record stream for the adj_: CSRMatrix of the CSR graph. */
+  void RecordStream(DGLStreamHandle stream) override {
+    adj_.RecordStream(stream);
   }
 
   bool IsMultigraph() const override {
@@ -802,7 +810,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     CHECK(aten::IsValidIdArray(dstvids)) << "Invalid vertex id array.";
     HeteroSubgraph subg;
     const auto& submat = aten::CSRSliceMatrix(adj_, srcvids, dstvids);
-    DLContext ctx = aten::GetContextOf(vids);
+    DGLContext ctx = aten::GetContextOf(vids);
     IdArray sub_eids = aten::Range(0, submat.data->shape[0], NumBits(), ctx);
     subg.graph = std::make_shared<CSR>(meta_graph(), submat.num_rows, submat.num_cols,
         submat.indptr, submat.indices, sub_eids);
@@ -852,11 +860,11 @@ class UnitGraph::CSR : public BaseHeteroGraph {
 //
 //////////////////////////////////////////////////////////
 
-DLDataType UnitGraph::DataType() const {
+DGLDataType UnitGraph::DataType() const {
   return GetAny()->DataType();
 }
 
-DLContext UnitGraph::Context() const {
+DGLContext UnitGraph::Context() const {
   return GetAny()->Context();
 }
 
@@ -1277,21 +1285,20 @@ HeteroGraphPtr UnitGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
   }
 }
 
-HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext &ctx,
-                                 const DGLStreamHandle &stream) {
+HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DGLContext &ctx) {
   if (ctx == g->Context()) {
     return g;
   } else {
     auto bg = std::dynamic_pointer_cast<UnitGraph>(g);
     CHECK_NOTNULL(bg);
     CSRPtr new_incsr = (bg->in_csr_->defined())
-                           ? CSRPtr(new CSR(bg->in_csr_->CopyTo(ctx, stream)))
+                           ? CSRPtr(new CSR(bg->in_csr_->CopyTo(ctx)))
                            : nullptr;
     CSRPtr new_outcsr = (bg->out_csr_->defined())
-                            ? CSRPtr(new CSR(bg->out_csr_->CopyTo(ctx, stream)))
+                            ? CSRPtr(new CSR(bg->out_csr_->CopyTo(ctx)))
                             : nullptr;
     COOPtr new_coo = (bg->coo_->defined())
-                         ? COOPtr(new COO(bg->coo_->CopyTo(ctx, stream)))
+                         ? COOPtr(new COO(bg->coo_->CopyTo(ctx)))
                          : nullptr;
     return HeteroGraphPtr(
         new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, new_coo, bg->formats_));
@@ -1314,6 +1321,16 @@ void UnitGraph::UnpinMemory_() {
     this->out_csr_->UnpinMemory_();
   if (this->coo_->defined())
     this->coo_->UnpinMemory_();
+}
+
+void UnitGraph::RecordStream(DGLStreamHandle stream) {
+  if (this->in_csr_->defined())
+    this->in_csr_->RecordStream(stream);
+  if (this->out_csr_->defined())
+    this->out_csr_->RecordStream(stream);
+  if (this->coo_->defined())
+    this->coo_->RecordStream(stream);
+  this->recorded_streams.push_back(stream);
 }
 
 void UnitGraph::InvalidateCSR() {
@@ -1405,8 +1422,12 @@ UnitGraph::CSRPtr UnitGraph::GetInCSR(bool inplace) const {
       else
         ret = std::make_shared<CSR>(meta_graph(), newadj);
     }
-    if (inplace && IsPinned())
-      in_csr_->PinMemory_();
+    if (inplace) {
+      if (IsPinned())
+        in_csr_->PinMemory_();
+      for (auto stream : recorded_streams)
+        in_csr_->RecordStream(stream);
+    }
   }
   return ret;
 }
@@ -1437,8 +1458,12 @@ UnitGraph::CSRPtr UnitGraph::GetOutCSR(bool inplace) const {
       else
         ret = std::make_shared<CSR>(meta_graph(), newadj);
     }
-    if (inplace && IsPinned())
-      out_csr_->PinMemory_();
+    if (inplace) {
+      if (IsPinned())
+        out_csr_->PinMemory_();
+      for (auto stream : recorded_streams)
+        out_csr_->RecordStream(stream);
+    }
   }
   return ret;
 }
@@ -1467,8 +1492,12 @@ UnitGraph::COOPtr UnitGraph::GetCOO(bool inplace) const {
       else
         ret = std::make_shared<COO>(meta_graph(), newadj);
     }
-    if (inplace && IsPinned())
-      coo_->PinMemory_();
+    if (inplace) {
+      if (IsPinned())
+        coo_->PinMemory_();
+      for (auto stream : recorded_streams)
+        coo_->RecordStream(stream);
+    }
   }
   return ret;
 }
