@@ -16,28 +16,28 @@ Tree-LSTM in DGL
     examples <https://github.com/dmlc/dgl/tree/master/examples>`_.
 
 """
- 
+
 ##############################################################################
 #
-# In this tutorial, you learn to use Tree-LSTM networks for sentiment analysis. 
+# In this tutorial, you learn to use Tree-LSTM networks for sentiment analysis.
 # The Tree-LSTM is a generalization of long short-term memory (LSTM) networks to tree-structured network topologies.
-# 
-# The Tree-LSTM structure was first introduced by Kai et. al in an ACL 2015 
+#
+# The Tree-LSTM structure was first introduced by Kai et. al in an ACL 2015
 # paper: `Improved Semantic Representations From Tree-Structured Long
 # Short-Term Memory Networks <https://arxiv.org/pdf/1503.00075.pdf>`__.
-# The core idea is to introduce syntactic information for language tasks by 
-# extending the chain-structured LSTM to a tree-structured LSTM. The dependency 
+# The core idea is to introduce syntactic information for language tasks by
+# extending the chain-structured LSTM to a tree-structured LSTM. The dependency
 # tree and constituency tree techniques are leveraged to obtain a ''latent tree''.
 #
-# The challenge in training Tree-LSTMs is batching --- a standard 
-# technique in machine learning to accelerate optimization. However, since trees 
-# generally have different shapes by nature, parallization is non-trivial. 
-# DGL offers an alternative. Pool all the trees into one single graph then 
+# The challenge in training Tree-LSTMs is batching --- a standard
+# technique in machine learning to accelerate optimization. However, since trees
+# generally have different shapes by nature, parallization is non-trivial.
+# DGL offers an alternative. Pool all the trees into one single graph then
 # induce the message passing over them, guided by the structure of each tree.
 #
 # The task and the dataset
 # ------------------------
-# 
+#
 # The steps here use the
 # `Stanford Sentiment Treebank <https://nlp.stanford.edu/sentiment/>`__ in
 # ``dgl.data``. The dataset provides a fine-grained, tree-level sentiment
@@ -48,7 +48,7 @@ Tree-LSTM in DGL
 # their embeddings would be masked to all-zero.
 #
 # .. figure:: https://i.loli.net/2018/11/08/5be3d4bfe031b.png
-#    :alt: 
+#    :alt:
 #
 # The figure displays one sample of the SST dataset, which is a
 # constituency parse tree with their nodes labeled with sentiment. To
@@ -69,8 +69,8 @@ SSTBatch = namedtuple('SSTBatch', ['graph', 'mask', 'wordid', 'label'])
 # The non-leaf nodes have a special word PAD_WORD. The sentiment
 # label is stored in the "y" feature field.
 trainset = SSTDataset(mode='tiny')  # the "tiny" set has only five trees
-tiny_sst = trainset.trees
-num_vocabs = trainset.num_vocabs
+tiny_sst = [tr for tr in trainset]
+num_vocabs = trainset.vocab_size
 num_classes = trainset.num_classes
 
 vocab = trainset.vocab # vocabulary dict: key -> id
@@ -108,25 +108,25 @@ plot_tree(graph.to_networkx())
 # .. note::
 #
 #    **Definition**: :func:`~dgl.batch` unions a list of :math:`B`
-#      :class:`~dgl.DGLGraph`\ s and returns a :class:`~dgl.DGLGraph` of batch 
-#      size :math:`B`. 
-#    
+#      :class:`~dgl.DGLGraph`\ s and returns a :class:`~dgl.DGLGraph` of batch
+#      size :math:`B`.
+#
 #    - The union includes all the nodes,
 #      edges, and their features. The order of nodes, edges, and features are
-#      preserved. 
-#     
+#      preserved.
+#
 #        - Given that you have :math:`V_i` nodes for graph
 #          :math:`\mathcal{G}_i`, the node ID :math:`j` in graph
 #          :math:`\mathcal{G}_i` correspond to node ID
-#          :math:`j + \sum_{k=1}^{i-1} V_k` in the batched graph. 
-#    
+#          :math:`j + \sum_{k=1}^{i-1} V_k` in the batched graph.
+#
 #        - Therefore, performing feature transformation and message passing on
 #          the batched graph is equivalent to doing those
-#          on all ``DGLGraph`` constituents in parallel. 
+#          on all ``DGLGraph`` constituents in parallel.
 #
 #    - Duplicate references to the same graph are
 #      treated as deep copies; the nodes, edges, and features are duplicated,
-#      and mutation on one reference does not affect the other. 
+#      and mutation on one reference does not affect the other.
 #    - The batched graph keeps track of the meta
 #      information of the constituents so it can be
 #      :func:`~dgl.batched_graph.unbatch`\ ed to list of ``DGLGraph``\ s.
@@ -135,9 +135,9 @@ plot_tree(graph.to_networkx())
 # ------------------------------------------------
 #
 # Researchers have proposed two types of Tree-LSTMs: Child-Sum
-# Tree-LSTMs, and :math:`N`-ary Tree-LSTMs. In this tutorial you focus 
-# on applying *Binary* Tree-LSTM to binarized constituency trees. This 
-# application is also known as *Constituency Tree-LSTM*. Use PyTorch 
+# Tree-LSTMs, and :math:`N`-ary Tree-LSTMs. In this tutorial you focus
+# on applying *Binary* Tree-LSTM to binarized constituency trees. This
+# application is also known as *Constituency Tree-LSTM*. Use PyTorch
 # as a backend framework to set up the network.
 #
 # In `N`-ary Tree-LSTM, each unit at node :math:`j` maintains a hidden
@@ -145,7 +145,7 @@ plot_tree(graph.to_networkx())
 # :math:`j` takes the input vector :math:`x_j` and the hidden
 # representations of the child units: :math:`h_{jl}, 1\leq l\leq N` as
 # input, then update its new hidden representation :math:`h_j` and memory
-# cell :math:`c_j` by: 
+# cell :math:`c_j` by:
 #
 # .. math::
 #
@@ -164,7 +164,7 @@ plot_tree(graph.to_networkx())
 #    ``apply_node_func``, a user specifies what to do with node features,
 #    without considering edge features and messages. In a Tree-LSTM case,
 #    ``apply_node_func`` is a must, since there exists (leaf) nodes with
-#    :math:`0` incoming edges, which would not be updated with 
+#    :math:`0` incoming edges, which would not be updated with
 #    ``reduce_func``.
 #
 
@@ -337,7 +337,7 @@ weight_decay = 1e-4
 epochs = 10
 
 # create the model
-model = TreeLSTM(trainset.num_vocabs,
+model = TreeLSTM(trainset.vocab_size,
                  x_size,
                  h_size,
                  trainset.num_classes,
@@ -373,7 +373,7 @@ for epoch in range(epochs):
         c = th.zeros((n, h_size))
         logits = model(batch, h, c)
         logp = F.log_softmax(logits, 1)
-        loss = F.nll_loss(logp, batch.label, reduction='sum') 
+        loss = F.nll_loss(logp, batch.label, reduction='sum')
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
