@@ -12,7 +12,6 @@
 # limitations under the License.
 
 # Utils to convert b/w dgl heterograph to cugraph GraphStore
-# TODO: Add upstream
 from typing import Optional
 import cudf
 import cupy as cp
@@ -194,7 +193,8 @@ def add_edges_from_dgl_heteroGraph(
     if len(graph.ntypes) > 1:
         if num_nodes_dict is None:
             raise ValueError(
-                "num_nodes_dict must be provided for adding edges from HeteroGraphs"
+                "num_nodes_dict must be provided for"
+                "adding edges from HeteroGraphs"
             )
         node_id_offset_d = gs._CuGraphStorage__get_node_id_offset_d(
             num_nodes_dict
