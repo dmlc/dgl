@@ -1,4 +1,4 @@
-import backend as F
+import dgl.backend as F
 import dgl
 import numpy as np
 from dgl import DGLGraph

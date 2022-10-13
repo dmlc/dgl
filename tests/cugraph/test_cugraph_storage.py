@@ -33,7 +33,6 @@ def create_gs_heterogeneous_dgl_eg():
         gs.add_edge_data(
             subset_df,
             ["src", "dst"],
-            feat_name="edge_feat",
             canonical_etype=etype_map[e],
         )
 
@@ -47,7 +46,7 @@ def create_gs_heterogeneous_dgl_eg():
 
     for n in df["ntype"].unique().values_host:
         subset_df = df[df["ntype"] == n][["node_id", "node_feat"]]
-        gs.add_node_data(subset_df, "node_id", feat_name="node_feat", ntype=n)
+        gs.add_node_data(subset_df, "node_id", ntype=n)
 
     return gs
 
