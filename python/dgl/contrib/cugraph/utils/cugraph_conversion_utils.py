@@ -68,8 +68,8 @@ def add_ndata_of_single_type(
         gs.add_node_data(
             df,
             "node_id",
-            feat_name_map,
             ntype=ntype,
+            feat_name=feat_name_map,
             contains_vector_features=True,
         )
     else:
@@ -78,7 +78,9 @@ def add_ndata_of_single_type(
         if not gs.single_gpu:
             df = dask_cudf.from_cudf(df, npartitions=16)
 
-        gs.add_node_data(df, "node_id", ntype=ntype, contains_vector_features=False)
+        gs.add_node_data(
+            df, "node_id", ntype=ntype, contains_vector_features=False
+        )
     return gs
 
 
@@ -93,7 +95,9 @@ def add_nodes_from_dgl_heteroGraph(
                 "num_nodes_dict must be provided for adding ndata"
                 "from Heterogeneous Graphs"
             )
-        node_id_offset_d = gs._CuGraphStorage__get_node_id_offset_d(num_nodes_dict)
+        node_id_offset_d = gs._CuGraphStorage__get_node_id_offset_d(
+            num_nodes_dict
+        )
         ntype_feat_d = dict()
         for feat_name in graph.ndata.keys():
             for ntype in graph.ndata[feat_name]:
@@ -153,16 +157,19 @@ def add_edata_of_single_type(
         feat_df, feat_name_map = create_feature_frame(feat_t_d)
         df = cudf.concat([df, feat_df], axis=1)
         if not gs.single_gpu:
-            df = dask_cudf.from_cudf(df, npartitons=16)
+            df = dask_cudf.from_cudf(df, npartitions=16)
 
         gs.add_edge_data(
             df,
             ["src", "dst"],
-            feat_name_map,
             canonical_etype=can_etype,
+            feat_name=feat_name_map,
             contains_vector_features=True,
         )
     else:
+        if not gs.single_gpu:
+            df = dask_cudf.from_cudf(df, npartitions=16)
+
         gs.add_edge_data(
             df,
             ["src", "dst"],
@@ -189,7 +196,9 @@ def add_edges_from_dgl_heteroGraph(
             raise ValueError(
                 "num_nodes_dict must be provided for adding edges from HeteroGraphs"
             )
-        node_id_offset_d = gs._CuGraphStorage__get_node_id_offset_d(num_nodes_dict)
+        node_id_offset_d = gs._CuGraphStorage__get_node_id_offset_d(
+            num_nodes_dict
+        )
     else:
         node_id_offset_d = None
 

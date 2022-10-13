@@ -16,7 +16,6 @@
 import dgl
 import dgl.backend as F
 from functools import cached_property
-from types import MethodType
 
 from .utils.cugraph_utils import _assert_valid_canonical_etype
 from .utils.cugraph_utils import convert_can_etype_s_to_tup
@@ -53,8 +52,8 @@ class CuGraphStorage:
         self,
         df,
         node_col_name,
-        feat_name=None,
         ntype=None,
+        feat_name=None,
         contains_vector_features=False,
     ):
         """
@@ -67,17 +66,17 @@ class CuGraphStorage:
             interface.
         node_col_name : string
             The column name that contains the values to be used as vertex IDs.
-        feat_name : string or dict
-            A map of feature names under which we should save the added properties
-            # {"feat_1":[f1, f2], "feat_2":[f3, f4]}
-            (ignored if contains_vector_features=False and the col names of
-            the dataframe are treated as corresponding feature names)
         ntype : string
             The node type to be added.
             For example, if dataframe contains data about users, ntype
             might be "users".
             If not specified, the type of properties will be added as
             an empty string.
+        feat_name : string or dict
+            A map of feature names under which we should save the added properties
+            # {"feat_1":[f1, f2], "feat_2":[f3, f4]}
+            (ignored if contains_vector_features=False and the col names of
+            the dataframe are treated as corresponding feature names)
         contains_vector_features : True
             Wether to treat the columns of the dataframe being added as
             as 2d features
@@ -86,7 +85,11 @@ class CuGraphStorage:
         None
         """
         self.graphstore.add_node_data(
-            df, node_col_name, feat_name, ntype, contains_vector_features
+            df=df,
+            node_col_name=node_col_name,
+            ntype=ntype,
+            feat_name=feat_name,
+            contains_vector_features=contains_vector_features,
         )
 
         # This will delete cached value
@@ -97,8 +100,8 @@ class CuGraphStorage:
         self,
         df,
         node_col_names,
-        feat_name=None,
         canonical_etype=None,
+        feat_name=None,
         contains_vector_features=False,
     ):
         """
@@ -111,13 +114,13 @@ class CuGraphStorage:
             interface.
         node_col_names : [src_name, dst_name]
             The column names that corresponding to the src_name and dst_name
+        canonical_etype : Tuple[(str, str, str)]
+            The edge type to be added
         feat_name : string or dict
             A map of feature names under which we should save the added properties
             # {"feat_1":[f1, f2], "feat_2":[f3, f4]}
             (ignored if contains_vector_features=False and the col names of
             the dataframe are treated as corresponding feature names)
-        canonical_etype : Tuple[(str, str, str)]
-            The edge type to be added
         contains_vector_features : True
             Wether to treat the columns of the dataframe being added as
             as 2d features
@@ -131,11 +134,11 @@ class CuGraphStorage:
         # Convert to a string because cugraph PG does not support tuple objects
         canonical_etype = str(canonical_etype)
         self.graphstore.add_edge_data(
-            df,
-            node_col_names,
-            feat_name,
-            canonical_etype,
-            contains_vector_features,
+            df=df,
+            node_col_names=node_col_names,
+            canonical_etype=canonical_etype,
+            feat_name=feat_name,
+            contains_vector_features=contains_vector_features,
         )
 
     # Sampling Function
@@ -545,7 +548,7 @@ class CuGraphStorage:
         # dict for edge_id_offset_start
         last_st = 0
         edge_ind_st_d = {}
-        for etype in num_canonical_edges_dict.keys():
+        for etype in sorted(num_canonical_edges_dict.keys()):
             edge_ind_st_d[etype] = last_st
             last_st = last_st + num_canonical_edges_dict[etype]
         return edge_ind_st_d
@@ -555,7 +558,7 @@ class CuGraphStorage:
         # dict for node_id_offset_start
         last_st = 0
         node_ind_st_d = {}
-        for ntype in num_nodes_dict.keys():
+        for ntype in sorted(num_nodes_dict.keys()):
             node_ind_st_d[ntype] = last_st
             last_st = last_st + num_nodes_dict[ntype]
         return node_ind_st_d
