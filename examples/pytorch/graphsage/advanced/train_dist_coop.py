@@ -28,7 +28,7 @@ from torch.multiprocessing import Process, Queue, Lock
 import dgl
 from dgl.base import NID
 import dgl.nn as dglnn
-from dgl.contrib.dist_sampling import DistConv, DistGraph, DistSampler, metis_partition, uniform_partition, reorder_graph_wrapper
+from dgl.contrib.dist_sampling import DistConv, DistConvFunction, DistGraph, DistSampler, metis_partition, uniform_partition, reorder_graph_wrapper
 from dgl.transforms.functional import add_self_loop, remove_self_loop
 import time
 import numpy as np
@@ -57,34 +57,55 @@ class SAGE(nn.Module):
             h = layer(block, h)
         return h
 
-def producer(args, g, train_idx, device):
+def cross_entropy(block_outputs, cached_variables, pos_graph, neg_graph):
+    block_outputs = DistConvFunction.apply(cached_variables, block_outputs)
+    with pos_graph.local_scope():
+        pos_graph.ndata['h'] = block_outputs
+        pos_graph.apply_edges(dgl.function.u_dot_v('h', 'h', 'score'))
+        pos_score = pos_graph.edata['score']
+    with neg_graph.local_scope():
+        neg_graph.ndata['h'] = block_outputs
+        neg_graph.apply_edges(dgl.function.u_dot_v('h', 'h', 'score'))
+        neg_score = neg_graph.edata['score']
+
+    score = th.cat([pos_score, neg_score])
+    label = th.cat([th.ones_like(pos_score), th.zeros_like(neg_score)]).long()
+    loss = F.binary_cross_entropy_with_logits(score, label.float())
+    acc = th.sum((score >= 0.5) == (label >= 0.5)) / score.shape[0]
+    return loss, acc
+
+def producer(args, g, train_idx, reverse_eids, device):
     fanouts = [int(_) for _ in args.fan_out.split(',')]
 
-    sampler = DistSampler(g, dgl.dataloading.NeighborSampler, fanouts, ['features'], ['labels'])
+    sampler = DistSampler(g, dgl.dataloading.NeighborSampler, fanouts, ['features'], [] if args.edge_pred else ['labels'])
+    if args.edge_pred:
+        sampler = dgl.dataloading.as_edge_prediction_sampler(sampler, exclude='reverse_id', reverse_eids=reverse_eids,
+                    negative_sampler=dgl.dataloading.negative_sampler.Uniform(1))
     it = 0
     outputs = [None, None]
     for epoch in range(args.num_epochs):
         with nvtx.annotate("epoch: {}".format(epoch), color="orange"):
-            if args.batch_size < train_idx.shape[0]:
-                perm = th.randperm(train_idx.shape[0], device=device)
+            num_items = train_idx.shape[0] if not args.edge_pred else g.g.num_edges()
+            if args.batch_size < num_items:
+                perm = th.randperm(num_items, device=device)
             elif epoch == 0:
-                perm = th.arange(train_idx.shape[0], device=device)
-            for i in range(0, train_idx.shape[0], args.batch_size):
+                perm = th.arange(num_items, device=device)
+            for i in range(0, num_items, args.batch_size):
                 with nvtx.annotate("iteration: {}".format(it), color="yellow"):
-                    seed_nodes = train_idx[perm[i: i + args.batch_size]].to(device)
-                    input_nodes, output_nodes, blocks = sampler.sample(g, seed_nodes)
-                    wait = blocks[0].slice_features(blocks[0])
-                    blocks[-1].slice_labels(blocks[-1])
-                    outputs[it % 2] = input_nodes, output_nodes, blocks, wait
+                    seeds = train_idx[perm[i: i + args.batch_size]] if not args.edge_pred else perm[i: i + args.batch_size]
+                    out = sampler.sample(g.g, seeds.to(device))
+                    wait = out[-1][0].slice_features(out[-1][0])
+                    out[-1][-1].slice_labels(out[-1][-1])
+                    outputs[it % 2] = out + (wait,)
                     it += 1
                     if it > 1:
-                        input_nodes, output_nodes, blocks, wait = outputs[it % 2]
-                        wait()
-                        yield input_nodes, output_nodes, blocks
+                        out = outputs[it % 2]
+                        out[-1]()
+                        yield out[:-1]
     it += 1
-    input_nodes, output_nodes, blocks, wait = outputs[it % 2]
-    wait()
-    yield input_nodes, output_nodes, blocks
+    out = outputs[it % 2]
+    out[-1]()
+    yield out[:-1]
 
 def train(local_rank, local_size, group_rank, world_size, g, parts, num_classes, args):
     th.set_num_threads(os.cpu_count() // local_size)
@@ -133,19 +154,26 @@ def train(local_rank, local_size, group_rank, world_size, g, parts, num_classes,
     st, end = th.cuda.Event(enable_timing=True), th.cuda.Event(enable_timing=True)
     st.record()
     it = 0
-    for input_nodes, output_nodes, blocks in producer(args, g, train_idx, device):
+    for out in producer(args, g, train_idx, reverse_eids, device):
+        input_nodes = out[0]
+        blocks = out[-1]
         x = blocks[0].srcdata.pop('features')
-        y = blocks[-1].dstdata.pop('labels')
+        if not args.edge_pred:
+            y = blocks[-1].dstdata.pop('labels')
         with nvtx.annotate("forward", color="purple"):
             y_hat = model(blocks, x)
-            loss = F.cross_entropy(y_hat, y)
+            if args.edge_pred:
+                loss, acc = cross_entropy(y_hat, blocks[-1].cached_variables2, out[1], out[2])
+            else:
+                loss = F.cross_entropy(y_hat, y)
         with nvtx.annotate("backward", color="purple"):
             opt.zero_grad()
             loss.backward()
         with nvtx.annotate("optimizer", color="purple"):
             opt.step()
-        with nvtx.annotate("accuracy", color="purple"):
-            acc = MF.accuracy(y_hat, y)
+        if not args.edge_pred:
+            with nvtx.annotate("accuracy", color="purple"):
+                acc = MF.accuracy(y_hat, y)
         end.record()
         mem = th.cuda.max_memory_allocated() >> 20
         block_stats = [(block.num_src_nodes(), block.num_dst_nodes(), block.num_edges()) for block in blocks]

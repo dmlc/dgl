@@ -68,16 +68,21 @@ def metis_partition(g, n_procs):
 
 class DistConvFunction(th.autograd.Function):
     @staticmethod
-    def forward(ctx, block, h):
-        request_counts, requested_nodes, requested_sizes, seed_nodes, inv_ids, distg_handle = ctx.cached_variables = block.cached_variables
+    def forward(ctx, cached_variables, h):
+        request_counts, requested_nodes, requested_sizes, seed_nodes, inv_ids, perm, distg_handle = ctx.cached_variables = cached_variables
         h = distg_handle.pull(h, request_counts, requested_nodes, requested_sizes, seed_nodes, inv_ids)
-        return h
-    
+        if perm == slice(None):
+            return h
+        else:
+            a = th.empty_like(h)
+            a[perm] = h
+            return a
+
     @staticmethod
     def backward(ctx, grad_output):
-        request_counts, requested_nodes, requested_sizes, seed_nodes, inv_ids, distg_handle = ctx.cached_variables
+        request_counts, requested_nodes, requested_sizes, seed_nodes, inv_ids, perm, distg_handle = ctx.cached_variables
         del ctx.cached_variables
-        g_h = distg_handle.rpull(grad_output, request_counts, requested_sizes, seed_nodes, inv_ids)
+        g_h = distg_handle.rpull(grad_output[perm], request_counts, requested_sizes, seed_nodes, inv_ids)
         return None, g_h
 
 class DistConv(th.nn.Module):
@@ -88,7 +93,7 @@ class DistConv(th.nn.Module):
     
     def forward(self, block, h):
         if self.pull:
-            h = DistConvFunction.apply(block, h)
+            h = DistConvFunction.apply(block.cached_variables, h)
         return self.layer(block, h)
 
 class DistSampler(Sampler):
@@ -370,7 +375,13 @@ class DistGraph(object):
         blocks = []
         random_seed = self.get_random_seed(len(samplers))
         if not (th.all(self.pr[self.rank] <= seed_nodes) and th.all(seed_nodes < self.pr[self.rank + 1])):
-            seed_nodes = th.unique(self.exchange_node_ids(th.sort(seed_nodes)[0], False)[0])
+            seed_nodes, seed_nodes_inv = th.sort(seed_nodes)
+            requested_nodes, requested_sizes, request_counts = self.exchange_node_ids(seed_nodes, False)
+            seed_nodes, inv_ids = th.unique(requested_nodes, return_inverse=True)
+            
+            cached_variables = (request_counts, requested_nodes, requested_sizes, seed_nodes, inv_ids, seed_nodes_inv, self)
+        else:
+            cached_variables = None
         output_nodes = seed_nodes
         for i, sampler in enumerate(reversed(samplers)):
             assert th.all(self.pr[self.rank] <= seed_nodes) and th.all(seed_nodes < self.pr[self.rank + 1])
@@ -381,7 +392,7 @@ class DistGraph(object):
             requested_nodes, requested_sizes, request_counts = self.exchange_node_ids(seed_nodes, i == len(samplers) - 1)
             seed_nodes, inv_ids = th.unique(requested_nodes, return_inverse=True)
             
-            blocks_i[0].cached_variables = request_counts, requested_nodes, requested_sizes, seed_nodes, inv_ids, self
+            blocks_i[0].cached_variables = request_counts, requested_nodes, requested_sizes, seed_nodes, inv_ids, slice(None), self
 
             blocks.insert(0, blocks_i[0])
         
@@ -410,5 +421,7 @@ class DistGraph(object):
 
         blocks[0].slice_features = feature_slicer
         blocks[-1].slice_labels = label_slicer
+
+        blocks[-1].cached_variables2 = cached_variables
 
         return seed_nodes, output_nodes, blocks
