@@ -18,7 +18,7 @@ using namespace cuda;
 namespace aten {
 namespace cuda {
 
-/*! 
+/*!
  * \brief CUDA kernel of GE-SpMM on Csr.
  * \note GE-SpMM: https://arxiv.org/pdf/2007.03179.pdf
  *       The grid dimension x and y are reordered for better performance.
