@@ -115,7 +115,6 @@ class EdgeWeightNorm(layers.Layer):
                     "This leads to square root of zero or negative values."
                 )
 
-            dev = graph.device
             graph.srcdata["_src_out_w"] = tf.ones(
                 (graph.number_of_src_nodes()), dtype=tf.float32
             )
@@ -292,8 +291,8 @@ class GraphConv(layers.Layer):
         super(GraphConv, self).__init__()
         if norm not in ("none", "both", "right", "left"):
             raise DGLError(
-                'Invalid norm value. Must be either "none", "both", "right" or "left".'
-                ' But got "{}".'.format(norm)
+                f'Invalid norm value. Must be either "none", \
+                "both", "right" or "left". But got "{norm}".'
             )
         self._in_feats = in_feats
         self._out_feats = out_feats
