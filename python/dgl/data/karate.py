@@ -14,13 +14,6 @@ __all__ = ['KarateClubDataset', 'KarateClub']
 class KarateClubDataset(DGLDataset):
     r""" Karate Club dataset for Node Classification
 
-    .. deprecated:: 0.5.0
-
-        - ``data`` is deprecated, it is replaced by:
-
-            >>> dataset = KarateClubDataset()
-            >>> g = dataset[0]
-
     Zachary's karate club is a social network of a university
     karate club, described in the paper "An Information Flow
     Model for Conflict and Fission in Small Groups" by Wayne W. Zachary.
@@ -45,8 +38,6 @@ class KarateClubDataset(DGLDataset):
     ----------
     num_classes : int
         Number of node classes
-    data : list
-        A list of :class:`dgl.DGLGraph` objects
 
     Examples
     --------
@@ -72,11 +63,6 @@ class KarateClubDataset(DGLDataset):
     def num_classes(self):
         """Number of classes."""
         return 2
-
-    @property
-    def data(self):
-        deprecate_property('dataset.data', 'dataset[0]')
-        return self._data
 
     def __getitem__(self, idx):
         r""" Get graph object
