@@ -361,9 +361,8 @@ def test_sage_conv(idtype, g, aggre_type, out_dim):
 @pytest.mark.parametrize("out_dim", [1, 2])
 def test_graph_conv_e_weight(idtype, g, norm, weight, bias, out_dim):
     g = g.astype(idtype).to(F.ctx())
-    conv = nn.GraphConv(5, out_dim, norm=norm, weight=weight, bias=bias).to(
-        F.ctx()
-    )
+    conv = nn.GraphConv(5, out_dim, norm=norm, weight=weight, bias=bias)
+
     ext_w = F.randn((5, out_dim)).to(F.ctx())
     nsrc = g.number_of_src_nodes()
     ndst = g.number_of_dst_nodes()
@@ -387,9 +386,7 @@ def test_graph_conv_e_weight(idtype, g, norm, weight, bias, out_dim):
 @pytest.mark.parametrize("out_dim", [1, 2])
 def test_graph_conv_e_weight_norm(idtype, g, norm, weight, bias, out_dim):
     g = g.astype(idtype).to(F.ctx())
-    conv = nn.GraphConv(5, out_dim, norm=norm, weight=weight, bias=bias).to(
-        F.ctx()
-    )
+    conv = nn.GraphConv(5, out_dim, norm=norm, weight=weight, bias=bias)
 
     ext_w = F.randn((5, out_dim)).to(F.ctx())
     nsrc = g.number_of_src_nodes()
