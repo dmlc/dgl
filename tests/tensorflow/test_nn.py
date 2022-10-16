@@ -363,10 +363,10 @@ def test_graph_conv_e_weight(idtype, g, norm, weight, bias, out_dim):
     g = g.astype(idtype).to(F.ctx())
     conv = nn.GraphConv(5, out_dim, norm=norm, weight=weight, bias=bias)
 
-    ext_w = F.randn((5, out_dim)).to(F.ctx())
+    ext_w = F.randn((5, out_dim))
     nsrc = g.number_of_src_nodes()
     ndst = g.number_of_dst_nodes()
-    h = F.randn((nsrc, 5)).to(F.ctx())
+    h = F.randn((nsrc, 5))
     e_w = g.edata["scalar_w"]
     if weight:
         h_out = conv(g, h, edge_weight=e_w)
@@ -388,10 +388,10 @@ def test_graph_conv_e_weight_norm(idtype, g, norm, weight, bias, out_dim):
     g = g.astype(idtype).to(F.ctx())
     conv = nn.GraphConv(5, out_dim, norm=norm, weight=weight, bias=bias)
 
-    ext_w = F.randn((5, out_dim)).to(F.ctx())
+    ext_w = F.randn((5, out_dim))
     nsrc = g.number_of_src_nodes()
     ndst = g.number_of_dst_nodes()
-    h = F.randn((nsrc, 5)).to(F.ctx())
+    h = F.randn((nsrc, 5))
     edgenorm = nn.EdgeWeightNorm(norm=norm)
     norm_weight = edgenorm(g, g.edata["scalar_w"])
     if weight:
