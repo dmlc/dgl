@@ -65,4 +65,3 @@ Contributors
 * [Neil Dickson](https://github.com/ndickson-nvidia) from Nvidia
 * [Chang Liu](https://github.com/chang-l) from Nvidia
 * [Muhammed Fatih Balin](https://github.com/mfbalin) from Nvidia and Georgia Tech
-* [Kaan Sancak](https://github.com/kaansancak) from Georgia Tech
