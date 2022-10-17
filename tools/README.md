@@ -172,9 +172,6 @@ The output chunked graph metadata will go as follows (assuming the current direc
 
 `change_etype_to_canonical_etype.py` is a tool that helps you convert etypes to canonical_etypes in a partition configuration file, and it overwrites the original file on disk. 
 
-### When to Use
-While the format of edge type will be changed from single string ``str`` to string triplet ``str:str:str`` in the future, old partition configuration files still have ``str`` as the key of `etypes` and `edge_map`. This change will lead to errors in the process of loading partitions. To fill in the gap, we provide this tool to help users do the conversion. 
-
 ### Sample Usage
 
 ```
@@ -203,7 +200,7 @@ For more information about partition algorithm, see https://docs.dgl.ai/en/lates
 
 ### Result
 
-This tool changes the key of `etypes` and `edge_map` from format ``str`` to ``str:str:str`` and it overwrites the original file instead of creating a new one.
+This tool changes the key of ``etypes`` and ``edge_map`` from format ``str`` to ``str:str:str`` and it overwrites the original file instead of creating a new one.
 
 E.g. **File content before in disk**
 ```json
