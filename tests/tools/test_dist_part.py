@@ -11,6 +11,15 @@ from create_chunked_dataset import create_chunked_dataset
 
 import dgl
 from dgl.data.utils import load_graphs, load_tensors
+from dgl.distributed.partition import RESERVED_FIELD_DTYPE
+
+
+def _verify_partition_data_types(part_g):
+    for k, dtype in RESERVED_FIELD_DTYPE.items():
+        if k in part_g.ndata:
+            assert part_g.ndata[k].dtype == dtype
+        if k in part_g.edata:
+            assert part_g.edata[k].dtype == dtype
 
 
 @pytest.mark.parametrize("num_chunks", [1, 8])
@@ -137,6 +146,7 @@ def test_part_pipeline(num_chunks, num_parts):
         cmd += f" --partitions-dir {partition_dir}"
         cmd += f" --out-dir {out_dir}"
         cmd += f" --ip-config {ip_config}"
+        cmd += " --ssh-port 22"
         cmd += " --process-group-timeout 60"
         cmd += " --save-orig-nids"
         cmd += " --save-orig-eids"
@@ -223,6 +233,7 @@ def test_part_pipeline(num_chunks, num_parts):
             g_list, data_dict = load_graphs(fname)
             part_g = g_list[0]
             assert isinstance(part_g, dgl.DGLGraph)
+            _verify_partition_data_types(part_g)
 
             # node_feat.dgl
             fname = os.path.join(sub_dir, "node_feat.dgl")
