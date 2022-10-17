@@ -115,7 +115,7 @@ class SAGELightning(LightningModule):
 
 class DataModule(LightningDataModule):
     def __init__(self, dataset_name, data_cpu=False, graph_cpu=False, use_uva=False, fan_out=[10, 25],
-                 device=th.device('cpu'), batch_size=1000, num_workers=4, sampler='labor', importance_sampling=0, layer_dependency=False, batch_dependency=1, cache_size=0):
+                 device=th.device('cpu'), batch_size=1000, num_workers=4, sampler='labor', importance_sampling=0, layer_dependency=False, batch_dependency=1):
         super().__init__()
 
         g, n_classes, multilabel = load_dataset(dataset_name)
@@ -166,10 +166,6 @@ class DataModule(LightningDataModule):
         self.in_feats = g.ndata['features'].shape[1]
         self.n_classes = n_classes
         self.multilabel = multilabel
-        try:
-            self.cache = dgl.contrib.GpuCache(cache_size, self.in_feats, th.int32) if cache_size > 0 else None
-        except:
-            self.cache = None
 
     def train_dataloader(self):
         return dgl.dataloading.DataLoader(
@@ -221,23 +217,12 @@ class BatchSizeCallback(Callback):
     
     def on_train_batch_start(self, trainer, datamodule, batch, batch_idx):
         input_nodes, output_nodes, mfgs = batch
-        cache = trainer.datamodule.cache
         feats = trainer.datamodule.g.ndata['features']
-        if cache is not None:
-            values, missing_index, missing_keys = cache.query(input_nodes)
-        else:
-            missing_index = slice(0, input_nodes.shape[0])
-            missing_keys = input_nodes
-            values = th.empty([input_nodes.shape[0], feats.shape[1]], dtype=feats.dtype, device=trainer.datamodule.device)
         if feats.is_pinned():
-            missing_values = dgl.utils.gather_pinned_tensor_rows(feats, missing_keys)
+            values = dgl.utils.gather_pinned_tensor_rows(feats, input_nodes)
         else:
-            missing_values = feats[missing_keys.long()].to(values)
-        values[missing_index] = missing_values
-        mfgs[0].srcdata['features'] = values
-        if cache is not None:
-            cache.replace(missing_keys, missing_values)
-            trainer.strategy.model.log('cache_hit', 1 - missing_keys.shape[0] / input_nodes.shape[0], prog_bar=True, on_step=True, on_epoch=False)
+            values = feats[input_nodes.long()]
+        mfgs[0].srcdata['features'] = values.to(trainer.datamodule.device)
 
     def on_train_batch_end(self, trainer, datamodule, outputs, batch, batch_idx):
         input_nodes, output_nodes, mfgs = batch
@@ -300,7 +285,6 @@ if __name__ == '__main__':
     argparser.add_argument('--importance-sampling', type=int, default=0)
     argparser.add_argument('--layer-dependency', action='store_true')
     argparser.add_argument('--batch-dependency', type=int, default=1)
-    argparser.add_argument('--cache-size', type=int, default=0)
     argparser.add_argument('--logdir', type=str, default='tb_logs')
     argparser.add_argument('--vertex-limit', type=int, default=-1)
     argparser.add_argument('--use-uva', action='store_true')
@@ -314,7 +298,7 @@ if __name__ == '__main__':
     datamodule = DataModule(
         args.dataset, args.data_cpu, args.graph_cpu, args.use_uva,
         [int(_) for _ in args.fan_out.split(',')],
-        device, args.batch_size, args.num_workers, args.sampler, args.importance_sampling, args.layer_dependency, args.batch_dependency, args.cache_size)
+        device, args.batch_size, args.num_workers, args.sampler, args.importance_sampling, args.layer_dependency, args.batch_dependency)
     model = SAGELightning(
         datamodule.in_feats, args.num_hidden, datamodule.n_classes, args.num_layers,
         F.relu, args.dropout, args.lr, datamodule.multilabel)
