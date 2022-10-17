@@ -106,11 +106,6 @@ class GNNBenchmarkDataset(DGLBuiltinDataset):
         """Number of classes."""
         raise NotImplementedError
 
-    @property
-    def data(self):
-        deprecate_property('dataset.data', 'dataset[0]')
-        return self._data
-
     def __getitem__(self, idx):
         r""" Get graph by index
 
@@ -142,13 +137,6 @@ class GNNBenchmarkDataset(DGLBuiltinDataset):
 class CoraFullDataset(GNNBenchmarkDataset):
     r"""CORA-Full dataset for node classification task.
 
-    .. deprecated:: 0.5.0
-
-        - ``data`` is deprecated, it is repalced by:
-
-        >>> dataset = CoraFullDataset()
-        >>> graph = dataset[0]
-
     Extended Cora dataset. Nodes represent paper and edges represent citations.
 
     Reference: `<https://github.com/shchur/gnn-benchmark#datasets>`_
@@ -179,8 +167,6 @@ class CoraFullDataset(GNNBenchmarkDataset):
     ----------
     num_classes : int
         Number of classes for each node.
-    data : list
-        A list of DGLGraph objects
 
     Examples
     --------
@@ -210,13 +196,6 @@ class CoraFullDataset(GNNBenchmarkDataset):
 
 class CoauthorCSDataset(GNNBenchmarkDataset):
     r""" 'Computer Science (CS)' part of the Coauthor dataset for node classification task.
-
-    .. deprecated:: 0.5.0
-
-        - ``data`` is deprecated, it is repalced by:
-
-        >>> dataset = CoauthorCSDataset()
-        >>> graph = dataset[0]
 
     Coauthor CS and Coauthor Physics are co-authorship graphs based on the Microsoft Academic Graph
     from the KDD Cup 2016 challenge. Here, nodes are authors, that are connected by an edge if they
@@ -251,8 +230,6 @@ class CoauthorCSDataset(GNNBenchmarkDataset):
     ----------
     num_classes : int
         Number of classes for each node.
-    data : list
-        A list of DGLGraph objects
 
     Examples
     --------
@@ -282,13 +259,6 @@ class CoauthorCSDataset(GNNBenchmarkDataset):
 
 class CoauthorPhysicsDataset(GNNBenchmarkDataset):
     r""" 'Physics' part of the Coauthor dataset for node classification task.
-
-    .. deprecated:: 0.5.0
-
-        - ``data`` is deprecated, it is repalced by:
-
-        >>> dataset = CoauthorPhysicsDataset()
-        >>> graph = dataset[0]
 
     Coauthor CS and Coauthor Physics are co-authorship graphs based on the Microsoft Academic Graph
     from the KDD Cup 2016 challenge. Here, nodes are authors, that are connected by an edge if they
@@ -323,8 +293,6 @@ class CoauthorPhysicsDataset(GNNBenchmarkDataset):
     ----------
     num_classes : int
         Number of classes for each node.
-    data : list
-        A list of DGLGraph objects
 
     Examples
     --------
@@ -354,13 +322,6 @@ class CoauthorPhysicsDataset(GNNBenchmarkDataset):
 
 class AmazonCoBuyComputerDataset(GNNBenchmarkDataset):
     r""" 'Computer' part of the AmazonCoBuy dataset for node classification task.
-
-    .. deprecated:: 0.5.0
-
-        - ``data`` is deprecated, it is repalced by:
-
-        >>> dataset = AmazonCoBuyComputerDataset()
-        >>> graph = dataset[0]
 
     Amazon Computers and Amazon Photo are segments of the Amazon co-purchase graph [McAuley et al., 2015],
     where nodes represent goods, edges indicate that two goods are frequently bought together, node
@@ -394,8 +355,6 @@ class AmazonCoBuyComputerDataset(GNNBenchmarkDataset):
     ----------
     num_classes : int
         Number of classes for each node.
-    data : list
-        A list of DGLGraph objects
 
     Examples
     --------
@@ -425,13 +384,6 @@ class AmazonCoBuyComputerDataset(GNNBenchmarkDataset):
 
 class AmazonCoBuyPhotoDataset(GNNBenchmarkDataset):
     r"""AmazonCoBuy dataset for node classification task.
-
-    .. deprecated:: 0.5.0
-
-        - ``data`` is deprecated, it is repalced by:
-
-        >>> dataset = AmazonCoBuyPhotoDataset()
-        >>> graph = dataset[0]
 
     Amazon Computers and Amazon Photo are segments of the Amazon co-purchase graph [McAuley et al., 2015],
     where nodes represent goods, edges indicate that two goods are frequently bought together, node
@@ -465,8 +417,6 @@ class AmazonCoBuyPhotoDataset(GNNBenchmarkDataset):
     ----------
     num_classes : int
         Number of classes for each node.
-    data : list
-        A list of DGLGraph objects
 
     Examples
     --------
