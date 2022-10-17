@@ -408,8 +408,8 @@ def main(args):
         optimizer = th.optim.Adam(all_params, lr=0.01)
 
         if args.num_workers != 0 and device == "cpu" and is_support_affinity(v_t):
-            expected_max = int(psutil.cpu_count(logical=False)/2)
-            if args.num_workers > expected_max:
+            expected_max = int(psutil.cpu_count(logical=False))
+            if args.num_workers >= expected_max:
                 print(f"[ERROR] You specified num_workers are larger than physical cores, please set any number less or equal to {expected_max}", file=sys.stderr)
             with train_loader.enable_cpu_affinity():
                 logger = train(
