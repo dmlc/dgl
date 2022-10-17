@@ -410,7 +410,7 @@ def main(args):
         if args.num_workers != 0 and device == "cpu" and is_support_affinity(v_t):
             expected_max = int(psutil.cpu_count(logical=False))
             if args.num_workers >= expected_max:
-                print(f"[ERROR] You specified num_workers are larger than physical cores, please set any number less or equal to {expected_max}", file=sys.stderr)
+                print(f"[ERROR] You specified num_workers are larger than physical cores, please set any number less than {expected_max}", file=sys.stderr)
             with train_loader.enable_cpu_affinity():
                 logger = train(
                     g,
