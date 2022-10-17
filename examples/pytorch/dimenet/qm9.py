@@ -1,14 +1,16 @@
 """QM9 dataset for graph property prediction (regression)."""
 import os
+
 import numpy as np
 import scipy.sparse as sp
 import torch
-import dgl
-
 from tqdm import trange
+
+import dgl
+from dgl.convert import graph as dgl_graph
 from dgl.data import QM9Dataset
 from dgl.data.utils import load_graphs, save_graphs
-from dgl.convert import graph as dgl_graph
+
 
 class QM9(QM9Dataset):
     r"""QM9 dataset for graph property prediction (regression)
@@ -16,11 +18,11 @@ class QM9(QM9Dataset):
     This dataset consists of 130,831 molecules with 12 regression targets.
     Nodes correspond to atoms and edges correspond to bonds.
 
-    Reference: 
-    
+    Reference:
+
     - `"Quantum-Machine.org" <http://quantum-machine.org/datasets/>`_
     - `"Directional Message Passing for Molecular Graphs" <https://arxiv.org/abs/2003.03123>`_
-    
+
     Statistics:
 
     - Number of graphs: 130,831
@@ -53,7 +55,7 @@ class QM9(QM9Dataset):
     +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
     | Cv     | :math:`c_{\textrm{v}}`           | Heat capavity at 298.15K                                                          | :math:`\frac{\textrm{cal}}{\textrm{mol K}}` |
     +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-    
+
     Parameters
     ----------
     label_keys: list
@@ -75,12 +77,12 @@ class QM9(QM9Dataset):
     ----------
     num_labels : int
         Number of labels for each graph, i.e. number of prediction tasks
-    
+
     Raises
     ------
     UserWarning
         If the raw data is changed in the remote server by the author.
-    
+
     Examples
     --------
     >>> data = QM9Dataset(label_keys=['mu', 'gap'], cutoff=5.0)
@@ -95,70 +97,94 @@ class QM9(QM9Dataset):
     >>>
     """
 
-    def __init__(self,
-                 label_keys,
-                 edge_funcs=None,
-                 cutoff=5.0,
-                 raw_dir=None,
-                 force_reload=False,
-                 verbose=False):
+    def __init__(
+        self,
+        label_keys,
+        edge_funcs=None,
+        cutoff=5.0,
+        raw_dir=None,
+        force_reload=False,
+        verbose=False,
+    ):
 
         self.edge_funcs = edge_funcs
-        self._keys = ['mu', 'alpha', 'homo', 'lumo', 'gap', 'r2', 'zpve', 'U0', 'U', 'H', 'G', 'Cv']
+        self._keys = [
+            "mu",
+            "alpha",
+            "homo",
+            "lumo",
+            "gap",
+            "r2",
+            "zpve",
+            "U0",
+            "U",
+            "H",
+            "G",
+            "Cv",
+        ]
 
-        super(QM9, self).__init__(label_keys=label_keys,
-                                  cutoff=cutoff,
-                                  raw_dir=raw_dir,
-                                  force_reload=force_reload,
-                                  verbose=verbose)
+        super(QM9, self).__init__(
+            label_keys=label_keys,
+            cutoff=cutoff,
+            raw_dir=raw_dir,
+            force_reload=force_reload,
+            verbose=verbose,
+        )
 
     def has_cache(self):
-        """ step 1, if True, goto step 5; else goto download(step 2), then step 3"""
-        graph_path = f'{self.save_path}/dgl_graph.bin'
-        line_graph_path = f'{self.save_path}/dgl_line_graph.bin'
+        """step 1, if True, goto step 5; else goto download(step 2), then step 3"""
+        graph_path = f"{self.save_path}/dgl_graph.bin"
+        line_graph_path = f"{self.save_path}/dgl_line_graph.bin"
         return os.path.exists(graph_path) and os.path.exists(line_graph_path)
 
     def process(self):
-        """ step 3 """
-        npz_path = f'{self.raw_dir}/qm9_eV.npz'
+        """step 3"""
+        npz_path = f"{self.raw_dir}/qm9_eV.npz"
         data_dict = np.load(npz_path, allow_pickle=True)
         # data_dict['N'] contains the number of atoms in each molecule,
         # data_dict['R'] consists of the atomic coordinates,
         # data_dict['Z'] consists of the atomic numbers.
         # Atomic properties (Z and R) of all molecules are concatenated as single tensors,
         # so you need this value to select the correct atoms for each molecule.
-        self.N = data_dict['N']
-        self.R = data_dict['R']
-        self.Z = data_dict['Z']
+        self.N = data_dict["N"]
+        self.R = data_dict["R"]
+        self.Z = data_dict["Z"]
         self.N_cumsum = np.concatenate([[0], np.cumsum(self.N)])
         # graph labels
         self.label_dict = {}
         for k in self._keys:
             self.label_dict[k] = torch.tensor(data_dict[k], dtype=torch.float32)
 
-        self.label = torch.stack([self.label_dict[key] for key in self.label_keys], dim=1)
+        self.label = torch.stack(
+            [self.label_dict[key] for key in self.label_keys], dim=1
+        )
         # graphs & features
         self.graphs, self.line_graphs = self._load_graph()
-    
+
     def _load_graph(self):
         num_graphs = self.label.shape[0]
         graphs = []
         line_graphs = []
-        
+
         for idx in trange(num_graphs):
             n_atoms = self.N[idx]
             # get all the atomic coordinates of the idx-th molecular graph
-            R = self.R[self.N_cumsum[idx]:self.N_cumsum[idx + 1]]
+            R = self.R[self.N_cumsum[idx] : self.N_cumsum[idx + 1]]
             # calculate the distance between all atoms
             dist = np.linalg.norm(R[:, None, :] - R[None, :, :], axis=-1)
             # keep all edges that don't exceed the cutoff and delete self-loops
-            adj = sp.csr_matrix(dist <= self.cutoff) - sp.eye(n_atoms, dtype=np.bool)
+            adj = sp.csr_matrix(dist <= self.cutoff) - sp.eye(
+                n_atoms, dtype=np.bool
+            )
             adj = adj.tocoo()
             u, v = torch.tensor(adj.row), torch.tensor(adj.col)
             g = dgl_graph((u, v))
-            g.ndata['R'] = torch.tensor(R, dtype=torch.float32)
-            g.ndata['Z'] = torch.tensor(self.Z[self.N_cumsum[idx]:self.N_cumsum[idx + 1]], dtype=torch.long)
-            
+            g.ndata["R"] = torch.tensor(R, dtype=torch.float32)
+            g.ndata["Z"] = torch.tensor(
+                self.Z[self.N_cumsum[idx] : self.N_cumsum[idx + 1]],
+                dtype=torch.long,
+            )
+
             # add user-defined features
             if self.edge_funcs is not None:
                 for func in self.edge_funcs:
@@ -167,32 +193,34 @@ class QM9(QM9Dataset):
             graphs.append(g)
             l_g = dgl.line_graph(g, backtracking=False)
             line_graphs.append(l_g)
-    
+
         return graphs, line_graphs
 
     def save(self):
-        """ step 4 """
-        graph_path = f'{self.save_path}/dgl_graph.bin'
-        line_graph_path = f'{self.save_path}/dgl_line_graph.bin'
+        """step 4"""
+        graph_path = f"{self.save_path}/dgl_graph.bin"
+        line_graph_path = f"{self.save_path}/dgl_line_graph.bin"
         save_graphs(str(graph_path), self.graphs, self.label_dict)
         save_graphs(str(line_graph_path), self.line_graphs)
 
     def load(self):
-        """ step 5 """
-        graph_path = f'{self.save_path}/dgl_graph.bin'
-        line_graph_path = f'{self.save_path}/dgl_line_graph.bin'
+        """step 5"""
+        graph_path = f"{self.save_path}/dgl_graph.bin"
+        line_graph_path = f"{self.save_path}/dgl_line_graph.bin"
         self.graphs, label_dict = load_graphs(graph_path)
         self.line_graphs, _ = load_graphs(line_graph_path)
-        self.label = torch.stack([label_dict[key] for key in self.label_keys], dim=1)
+        self.label = torch.stack(
+            [label_dict[key] for key in self.label_keys], dim=1
+        )
 
     def __getitem__(self, idx):
-        r""" Get graph and label by index
+        r"""Get graph and label by index
 
         Parameters
         ----------
         idx : int
             Item index
-        
+
         Returns
         -------
         dgl.DGLGraph

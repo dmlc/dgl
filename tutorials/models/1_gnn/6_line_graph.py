@@ -97,7 +97,7 @@ from dgl.data import citation_graph as citegrh
 data = citegrh.load_cora()
 
 G = data[0]
-labels = th.tensor(data.labels)
+labels = th.tensor(G.ndata['label'])
 
 # find all the nodes labeled with class 0
 label0_nodes = th.nonzero(labels == 0, as_tuple=False).squeeze()

@@ -69,6 +69,48 @@ second dictionary contains the mapping for each edge type.
     orig_node_emb = th.zeros(node_emb.shape, dtype=node_emb.dtype)
     orig_node_emb[node_map] = node_emb
 
+As a counterpart of ``return_mapping=True`` in :func:`~dgl.distributed.partition_graph`, the
+:ref:`distributed partitioning pipeline <guide-distributed-preprocessing>`
+provides two arguments in ``dispatch_data.py`` to save the original node/edge IDs to disk.
+
+* ``--save-orig-nids`` save original node IDs into files.
+* ``--save-orig-eids`` save original edge IDs into files.
+
+Specifying the two options will create two files ``orig_nids.dgl`` and ``orig_eids.dgl``
+under each partition folder.
+
+.. code-block:: none
+
+    data_root_dir/
+      |-- graph_name.json       # partition configuration file in JSON
+      |-- part0/                # data for partition 0
+      |  |-- orig_nids.dgl      # original node IDs
+      |  |-- orig_eids.dgl      # original edge IDs
+      |  |-- ...                # other data such as graph and node/edge feats
+      |
+      |-- part1/                # data for partition 1
+      |  |-- orig_nids.dgl
+      |  |-- orig_eids.dgl
+      |  |-- ...
+      |
+      |-- ...                   # data for other partitions
+
+The two files store the original IDs as a dictionary of tensors, where keys are node/edge
+type names and values are ID tensors. Users can use the :func:`dgl.data.load_tensors`
+utility to load them:
+
+.. code:: python
+
+    # Load the original IDs for the nodes in partition 0.
+    orig_nids_0 = dgl.data.load_tensors('/path/to/data/part0/orig_nids.dgl')
+    # Get the original node IDs for node type 'user'
+    user_orig_nids_0 = orig_nids_0['user']
+
+    # Load the original IDs for the edges in partition 0.
+    orig_eids_0 = dgl.data.load_tensors('/path/to/data/part0/orig_eids.dgl')
+    # Get the original edge IDs for edge type 'like'
+    like_orig_eids_0 = orig_nids_0['like']
+
 Output format
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 

@@ -882,7 +882,7 @@ def test_sample_neighbors_etype_sorted_homogeneous(format_, direction):
     h_g = dgl.to_homogeneous(g)
     seed_ntype = g.get_ntype_id("u")
     seeds = F.nonzero_1d(h_g.ndata[dgl.NTYPE] == seed_ntype)
-    fanouts = F.tensor([6, 5, 4, 3, 2], dtype=F.int64)
+    fanouts = F.tensor([6, 5, -1, 3, 2], dtype=F.int64)
     h_g = h_g.formats(format_)
     if (direction, format_) in [('in', 'csr'), ('out', 'csc')]:
         h_g = h_g.formats(['csc', 'csr', 'coo'])
