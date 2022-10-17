@@ -74,17 +74,16 @@ def train(train_loader, val_loader, test_loader, model):
         model.eval()
         val_acc = evaluate(model, val_dataloader, 'Val. ')
         test_acc = evaluate(model, test_dataloader, 'Test ')
-        print("Epoch {:05d} | Loss {:.4f} | Validation Acc. {:.4f} | Test Acc. {:.4f} "
-              . format(epoch, total_loss / (it + 1), val_acc.item(), test_acc.item()))
+        print(f'Epoch {epoch:05d} | Loss {total_loss/(it+1):.4f} | Validation Acc. {val_acc.item():.4f} | Test Acc. {test_acc.item():.4f}')
 
 if __name__ == '__main__':
     print(f'Training with DGL built-in HeteroGraphConv using GATConv as its convolution sub-modules')
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # load and preprocess dataset
     print('Loading data')
     dataset = DglNodePropPredDataset('ogbn-mag')
     graph, labels = dataset[0]
     graph.ndata['label'] = labels
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # add reverse edges in "cites" relation, and add reverse edge types for the rest etypes
     graph = dgl.AddReverse()(graph)
     # precompute the author, topic, and institution features
