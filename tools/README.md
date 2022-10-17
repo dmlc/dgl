@@ -168,19 +168,22 @@ The output chunked graph metadata will go as follows (assuming the current direc
 }
 ```
 
-## Change edge type to canonical edge type for partition config json
+## Change edge type to canonical edge type for partition configuration json
 
 `change_etype_to_canonical_etype.py` is a tool that helps you convert etypes to canonical_etypes in a partition configuration file, and it overwrites the original file on disk. 
+
+### When to Use
+While the format of edge type will be changed from single string ``str`` to string triplet ``str:str:str`` in the future, old partition configuration files still have ``str`` as the key of `etypes` and `edge_map`. This change will lead to errors in the process of loading partitions. To fill in the gap, we provide this tool to help users do the conversion. 
 
 ### Sample Usage
 
 ```
-python tools/change_etype_to_canonical_etype.py --part-config "{config path}"
+python tools/change_etype_to_canonical_etype.py --part-config "{configuration file path}"
 ```
 
 ### Requirement
 
-Partition algorithms produce one configuration file and multiple data folders, and each data folder corresponds to a partition. **This tool requires not only access to the specified config file in input, but also the graph data named *graph.dgl* under the folder of the first partition.** They can be local files or shared files among network, if you follow this [official tutorial](https://docs.dgl.ai/en/latest/tutorials/dist/1_node_classification.html#sphx-glr-tutorials-dist-1-node-classification-py) for distributed training, you don't need to care about this as all files are shared by every participant through NFS.
+Partition algorithms produce one configuration file and multiple data folders, and each data folder corresponds to a partition. **This tool requires not only access to the specified configuration file in input, but also the graph data named *graph.dgl* under the folder of the first partition.** They can be local files or shared files among network, if you follow this [official tutorial](https://docs.dgl.ai/en/latest/tutorials/dist/1_node_classification.html#sphx-glr-tutorials-dist-1-node-classification-py) for distributed training, you don't need to care about this as all files are shared by every participant through NFS.
 
 **For example, your folder should look like this:**
 ```
@@ -200,7 +203,7 @@ For more information about partition algorithm, see https://docs.dgl.ai/en/lates
 
 ### Result
 
-This tool changes the key content in `etypes` and `edge_map` from format ``(str)`` to ``(str:str:str)`` and it overwrites the original file instead of creating a new one.
+This tool changes the key of `etypes` and `edge_map` from format ``str`` to ``str:str:str`` and it overwrites the original file instead of creating a new one.
 
 E.g. **File content before in disk**
 ```json
