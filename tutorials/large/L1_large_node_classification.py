@@ -25,11 +25,7 @@ Sampling for GNN Training <L0_neighbor_sampling_overview>`.
 # OGB already prepared the data as DGL graph.
 #
 
-import numpy as np
-import torch
 from ogb.nodeproppred import DglNodePropPredDataset
-
-import dgl
 
 dataset = DglNodePropPredDataset("ogbn-arxiv")
 device = "cpu"  # change to 'cuda' for GPU
@@ -40,6 +36,8 @@ device = "cpu"  # change to 'cuda' for GPU
 # dataset only contains a single graph. So you can
 # simply get the graph and its node labels like this:
 #
+
+import dgl
 
 graph, node_labels = dataset[0]
 # Add reverse edges since ogbn-arxiv is unidirectional.
@@ -167,6 +165,8 @@ print(
 # the computation of the new features.
 #
 
+import torch
+
 mfg_0_src = mfgs[0].srcdata[dgl.NID]
 mfg_0_dst = mfgs[0].dstdata[dgl.NID]
 print(mfg_0_src)
@@ -289,6 +289,7 @@ valid_dataloader = dgl.dataloading.DataLoader(
 # It also saves the model with the best validation accuracy into a file.
 #
 
+import numpy as np
 import sklearn.metrics
 import tqdm
 
