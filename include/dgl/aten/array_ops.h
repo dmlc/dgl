@@ -41,7 +41,6 @@ inline bool IsNullArray(NDArray array) {
  */
 inline bool IsAllNullArray(const std::vector<NDArray>& arrays) {
   bool all_null = true;
-  CHECK(arrays.size() > 0) << "probability array is empty";
   for (auto& arr : arrays) {
     if (!IsNullArray(arr)) {
       all_null = false;

@@ -112,44 +112,6 @@ template COOMatrix COORemoveIf<kDGLCUDA, int64_t, uint8_t>(COOMatrix, NDArray, u
 template COOMatrix COORemoveIf<kDGLCUDA, int64_t, float>(COOMatrix, NDArray, float);
 template COOMatrix COORemoveIf<kDGLCUDA, int64_t, double>(COOMatrix, NDArray, double);
 
-template <DGLDeviceType XPU, typename IdType, typename DType>
-COOMatrix COOEtypeRemoveIf(
-    COOMatrix coo, IdArray etypes, IdArray eids, const std::vector<NDArray>& values,
-    DType criteria) {
-  CHECK_EQ(etypes->dtype, DGLDataTypeTraits<int32_t>::dtype) <<
-    "currently only int32 edge type array is supported.";
-  const int32_t* etype_data = etypes.Ptr<int32_t>();
-  const IdType* eid_data = eids.Ptr<IdType>();
-  std::vector<DType*> val(values.size());
-  for (size_t i = 0; i < values.size(); ++i)
-    val[i] = values[i].Ptr<DType>();
-  auto maskgen = [&val, criteria, etype_data, eid_data] (
-      int nb, int nt, cudaStream_t stream, int64_t nnz, const IdType* data,
-      int8_t* flags) {
-    CUDA_KERNEL_CALL((_GenerateEtypeFlagsKernel<IdType, int32_t, DType, int8_t>),
-        nb, nt, 0, stream,
-        nnz, data, etype_data, eid_data, val.data(), criteria, flags);
-  };
-  return COOGeneralRemoveIf<XPU, IdType, DType, decltype(maskgen)>(coo, maskgen);
-}
-
-template COOMatrix COOEtypeRemoveIf<kDGLCUDA, int32_t, int8_t>(
-    COOMatrix, IdArray, IdArray, const std::vector<NDArray>&, int8_t);
-template COOMatrix COOEtypeRemoveIf<kDGLCUDA, int32_t, uint8_t>(
-    COOMatrix, IdArray, IdArray, const std::vector<NDArray>&, uint8_t);
-template COOMatrix COOEtypeRemoveIf<kDGLCUDA, int32_t, float>(
-    COOMatrix, IdArray, IdArray, const std::vector<NDArray>&, float);
-template COOMatrix COOEtypeRemoveIf<kDGLCUDA, int32_t, double>(
-    COOMatrix, IdArray, IdArray, const std::vector<NDArray>&, double);
-template COOMatrix COOEtypeRemoveIf<kDGLCUDA, int64_t, int8_t>(
-    COOMatrix, IdArray, IdArray, const std::vector<NDArray>&, int8_t);
-template COOMatrix COOEtypeRemoveIf<kDGLCUDA, int64_t, uint8_t>(
-    COOMatrix, IdArray, IdArray, const std::vector<NDArray>&, uint8_t);
-template COOMatrix COOEtypeRemoveIf<kDGLCUDA, int64_t, float>(
-    COOMatrix, IdArray, IdArray, const std::vector<NDArray>&, float);
-template COOMatrix COOEtypeRemoveIf<kDGLCUDA, int64_t, double>(
-    COOMatrix, IdArray, IdArray, const std::vector<NDArray>&, double);
-
 };  // namespace impl
 };  // namespace aten
 };  // namespace dgl

@@ -49,7 +49,7 @@ def _prepare_edge_arrays(g, arg):
         return arrays
 
 def sample_etype_neighbors(
-        g, nodes, etype_field, eid_field, fanout, edge_dir='in', prob=None,
+        g, nodes, etype_offset, fanout, edge_dir='in', prob=None,
         replace=False, copy_ndata=True, copy_edata=True, etype_sorted=False,
         _dist_training=False, output_device=None):
     """Sample neighboring edges of the given nodes and return the induced subgraph.
@@ -70,10 +70,8 @@ def sample_etype_neighbors(
 
         This argument can take a single ID tensor or a dictionary of node types and ID tensors.
         If a single tensor is given, the graph must only have one type of nodes.
-    etype_field : str
-        The field in ``g.edata`` storing the edge type.
-    eid_field : str
-        The field in ``g.edata`` storing the type-specific edge ID.
+    etype_offset : list[int]
+        The offset of each edge type ID.
     fanout : Tensor
         The number of edges to be sampled for each node per edge type.  Must be a
         1D tensor with the number of elements same as the number of edge types.
@@ -129,9 +127,6 @@ def sample_etype_neighbors(
     """
     if g.device != F.cpu():
         raise DGLError("The graph should be in cpu.")
-    if etype_field not in g.edata:
-        raise DGLError("The graph should have {} in the edge data" \
-                       "representing the edge type.".format(etype_field))
     # (BarclayII) because the homogenized graph no longer contains the *name* of edge
     # types, the fanout argument can no longer be a dict of etypes and ints, as opposed
     # to sample_neighbors.
@@ -145,14 +140,12 @@ def sample_etype_neighbors(
     nodes = F.to_dgl_nd(nodes)
     # treat etypes as int32, it is much cheaper than int64
     # TODO(xiangsx): int8 can be a better choice.
-    etypes = F.to_dgl_nd(F.astype(g.edata[etype_field], ty=F.int32))
-    eids = F.to_dgl_nd(g.edata[eid_field])
     fanout = F.to_dgl_nd(fanout)
 
     prob_array = _prepare_edge_arrays(g, prob)
 
     subgidx = _CAPI_DGLSampleNeighborsEType(
-            g._graph, nodes, etypes, eids, fanout, edge_dir, prob_array,
+            g._graph, nodes, etype_offset, fanout, edge_dir, prob_array,
             replace, etype_sorted)
     induced_edges = subgidx.induced_edges
     ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)

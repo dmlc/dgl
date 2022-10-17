@@ -109,6 +109,11 @@ HeteroSubgraph SampleNeighbors(
             earr.src,
             earr.dst,
             earr.id);
+        // Exclude all the edges with zero probability
+        ATEN_FLOAT_BOOL_TYPE_SWITCH(prob[etype]->dtype, DType, "prob", {
+          sampled_coo = aten::COORemoveIf(
+              sampled_coo, prob[etype], static_cast<DType>(0));
+        });
       } else {
         // sample from one relation graph
         auto req_fmt = (dir == EdgeDir::kOut)? CSR_CODE : CSC_CODE;
@@ -140,12 +145,6 @@ HeteroSubgraph SampleNeighbors(
         }
       }
 
-      // Exclude all the edges with zero probability
-      ATEN_FLOAT_BOOL_TYPE_SWITCH(prob[etype]->dtype, DType, "prob", {
-        sampled_coo = aten::COORemoveIf(
-            sampled_coo, prob[etype], static_cast<DType>(0));
-      });
-
       subrels[etype] = UnitGraph::CreateFromCOO(
         hg->GetRelationGraph(etype)->NumVertexTypes(), sampled_coo.num_rows, sampled_coo.num_cols,
         sampled_coo.row, sampled_coo.col);
@@ -166,8 +165,7 @@ HeteroSubgraph SampleNeighbors(
 HeteroSubgraph SampleNeighborsEType(
     const HeteroGraphPtr hg,
     const IdArray nodes,
-    const IdArray etypes,
-    const IdArray eids,
+    const std::vector<int64_t>& etype_offset,
     const std::vector<int64_t>& fanouts,
     EdgeDir dir,
     const std::vector<FloatArray>& prob,
@@ -213,6 +211,12 @@ HeteroSubgraph SampleNeighborsEType(
           earr.src,
           earr.dst,
           earr.id);
+
+      // Exclude all the edges with zero probability
+      ATEN_FLOAT_BOOL_TYPE_SWITCH(prob[0]->dtype, DType, "prob", {
+        sampled_coo = aten::COOEtypeRemoveIf(
+            sampled_coo, etype_offset, prob, static_cast<DType>(0));
+      });
     } else {
       // sample from graph
       // the edge type is stored in etypes
@@ -223,23 +227,22 @@ HeteroSubgraph SampleNeighborsEType(
           if (dir == EdgeDir::kIn) {
             sampled_coo = aten::COOTranspose(aten::COORowWisePerEtypeSampling(
               aten::COOTranspose(hg->GetCOOMatrix(etype)),
-              nodes, etypes, eids, fanouts, prob, replace));
+              nodes, etype_offset, fanouts, prob, replace));
           } else {
             sampled_coo = aten::COORowWisePerEtypeSampling(
-              hg->GetCOOMatrix(etype), nodes, etypes, eids,
-              fanouts, prob, replace, etype_sorted);
+              hg->GetCOOMatrix(etype), nodes, etype_offset, fanouts, prob, replace);
           }
           break;
         case SparseFormat::kCSR:
           CHECK(dir == EdgeDir::kOut) << "Cannot sample out edges on CSC matrix.";
           sampled_coo = aten::CSRRowWisePerEtypeSampling(
-              hg->GetCSRMatrix(etype), nodes, etypes, eids,
+              hg->GetCSRMatrix(etype), nodes, etype_offset,
               fanouts, prob, replace, etype_sorted);
             break;
         case SparseFormat::kCSC:
           CHECK(dir == EdgeDir::kIn) << "Cannot sample in edges on CSR matrix.";
           sampled_coo = aten::CSRRowWisePerEtypeSampling(
-              hg->GetCSCMatrix(etype), nodes, etypes, eids,
+              hg->GetCSCMatrix(etype), nodes, etype_offset,
               fanouts, prob, replace, etype_sorted);
           sampled_coo = aten::COOTranspose(sampled_coo);
           break;
@@ -247,12 +250,6 @@ HeteroSubgraph SampleNeighborsEType(
           LOG(FATAL) << "Unsupported sparse format.";
       }
     }
-
-    // Exclude all the edges with zero probability
-    ATEN_FLOAT_BOOL_TYPE_SWITCH(prob[0]->dtype, DType, "prob", {
-      sampled_coo = aten::COOEtypeRemoveIf(
-          sampled_coo, etypes, eids, prob, static_cast<DType>(0));
-    });
 
     subrels[etype] = UnitGraph::CreateFromCOO(
       1, sampled_coo.num_rows, sampled_coo.num_cols,
@@ -436,13 +433,12 @@ DGL_REGISTER_GLOBAL("sampling.neighbor._CAPI_DGLSampleNeighborsEType")
 .set_body([] (DGLArgs args, DGLRetValue *rv) {
     HeteroGraphRef hg = args[0];
     IdArray nodes = args[1];
-    IdArray etypes = args[2];
-    IdArray eids = args[3];
-    IdArray fanout = args[4];
-    const std::string dir_str = args[5];
-    const auto& prob = ListValueToVector<FloatArray>(args[6]);
-    const bool replace = args[7];
-    const bool etype_sorted = args[8];
+    const std::vector<int64_t>& etype_offset = ListValueToVector<int64_t>(args[2]);
+    IdArray fanout = args[3];
+    const std::string dir_str = args[4];
+    const auto& prob = ListValueToVector<FloatArray>(args[5]);
+    const bool replace = args[6];
+    const bool etype_sorted = args[7];
 
     CHECK(dir_str == "in" || dir_str == "out")
       << "Invalid edge direction. Must be \"in\" or \"out\".";
@@ -452,8 +448,7 @@ DGL_REGISTER_GLOBAL("sampling.neighbor._CAPI_DGLSampleNeighborsEType")
 
     std::shared_ptr<HeteroSubgraph> subg(new HeteroSubgraph);
     *subg = sampling::SampleNeighborsEType(
-        hg.sptr(), nodes, etypes, eids, fanout_vec, dir, prob, replace, etype_sorted);
-
+        hg.sptr(), nodes, etype_offset, fanout_vec, dir, prob, replace, etype_sorted);
     *rv = HeteroSubgraphRef(subg);
   });
 

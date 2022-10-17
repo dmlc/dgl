@@ -567,7 +567,7 @@ COOMatrix CSRRowWiseSampling(
 }
 
 COOMatrix CSRRowWisePerEtypeSampling(
-    CSRMatrix mat, IdArray rows, IdArray etypes, IdArray eids,
+    CSRMatrix mat, IdArray rows, const std::vector<int64_t>& etype_offset,
     const std::vector<int64_t>& num_samples, const std::vector<FloatArray>& prob,
     bool replace, bool etype_sorted) {
   COOMatrix ret;
@@ -575,11 +575,11 @@ COOMatrix CSRRowWisePerEtypeSampling(
   ATEN_CSR_SWITCH(mat, XPU, IdType, "CSRRowWisePerEtypeSampling", {
     if (IsAllNullArray(prob)) {
       ret = impl::CSRRowWisePerEtypeSamplingUniform<XPU, IdType>(
-            mat, rows, etypes, eids, num_samples, replace, etype_sorted);
+            mat, rows, etype_offset, num_samples, replace, etype_sorted);
     } else {
       ATEN_FLOAT_BOOL_TYPE_SWITCH(prob[0]->dtype, FloatType, "probability", {
         ret = impl::CSRRowWisePerEtypeSampling<XPU, IdType, FloatType>(
-            mat, rows, etypes, eids, num_samples, prob, replace, etype_sorted);
+            mat, rows, etype_offset, num_samples, prob, replace, etype_sorted);
       });
     }
   });
@@ -825,27 +825,28 @@ template COOMatrix COORemoveIf<double>(COOMatrix, NDArray, double);
 
 template <typename DType>
 COOMatrix COOEtypeRemoveIf(
-    COOMatrix coo, IdArray etypes, IdArray eids,
+    COOMatrix coo, const std::vector<int64_t>& etype_offset,
     const std::vector<NDArray>& values, DType criteria) {
+  CHECK(values.size() > 0) << "The list of arrays is empty";
   if (IsAllNullArray(values))
     return coo;
 
   COOMatrix ret;
   CHECK_GT(values.size(), 0);
   CHECK(values[0]->dtype == DGLDataTypeTraits<DType>::dtype);
-  ATEN_COO_SWITCH_CUDA(coo, XPU, IdType, "COOEtypeRemoveIf", {
-    ret = impl::COOEtypeRemoveIf<XPU, IdType, DType>(coo, etypes, eids, values, criteria);
+  ATEN_COO_SWITCH(coo, XPU, IdType, "COOEtypeRemoveIf", {
+    ret = impl::COOEtypeRemoveIf<XPU, IdType, DType>(coo, etype_offset, values, criteria);
   });
   return ret;
 }
 template COOMatrix COOEtypeRemoveIf<int8_t>(
-    COOMatrix, IdArray, IdArray, const std::vector<NDArray>&, int8_t);
+    COOMatrix, const std::vector<int64_t>&, const std::vector<NDArray>&, int8_t);
 template COOMatrix COOEtypeRemoveIf<uint8_t>(
-    COOMatrix, IdArray, IdArray, const std::vector<NDArray>&, uint8_t);
+    COOMatrix, const std::vector<int64_t>&, const std::vector<NDArray>&, uint8_t);
 template COOMatrix COOEtypeRemoveIf<float>(
-    COOMatrix, IdArray, IdArray, const std::vector<NDArray>&, float);
+    COOMatrix, const std::vector<int64_t>&, const std::vector<NDArray>&, float);
 template COOMatrix COOEtypeRemoveIf<double>(
-    COOMatrix, IdArray, IdArray, const std::vector<NDArray>&, double);
+    COOMatrix, const std::vector<int64_t>&, const std::vector<NDArray>&, double);
 
 COOMatrix COORowWiseSampling(
     COOMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob, bool replace) {
@@ -864,19 +865,19 @@ COOMatrix COORowWiseSampling(
 }
 
 COOMatrix COORowWisePerEtypeSampling(
-    COOMatrix mat, IdArray rows, IdArray etypes, IdArray eids,
+    COOMatrix mat, IdArray rows, const std::vector<int64_t>& etype_offset,
     const std::vector<int64_t>& num_samples, const std::vector<FloatArray>& prob,
-    bool replace, bool etype_sorted) {
+    bool replace) {
   COOMatrix ret;
   CHECK(prob.size() > 0) << "probability array is empty";
   ATEN_COO_SWITCH(mat, XPU, IdType, "COORowWisePerEtypeSampling", {
     if (IsAllNullArray(prob)) {
       ret = impl::COORowWisePerEtypeSamplingUniform<XPU, IdType>(
-            mat, rows, etypes, eids, num_samples, replace, etype_sorted);
+            mat, rows, etype_offset, num_samples, replace);
     } else {
       ATEN_FLOAT_BOOL_TYPE_SWITCH(prob[0]->dtype, FloatType, "probability", {
         ret = impl::COORowWisePerEtypeSampling<XPU, IdType, FloatType>(
-            mat, rows, etypes, eids, num_samples, prob, replace, etype_sorted);
+            mat, rows, etype_offset, num_samples, prob, replace);
       });
     }
   });

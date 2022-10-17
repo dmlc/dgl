@@ -384,8 +384,8 @@ COOMatrix COORemoveIf(COOMatrix coo, NDArray values, DType criteria);
  */
 template <typename DType>
 COOMatrix COOEtypeRemoveIf(
-    COOMatrix coo, IdArray etypes, IdArray eids, const std::vector<NDArray>& values,
-    DType criteria);
+    COOMatrix coo, const std::vector<int64_t>& etype_offset,
+    const std::vector<NDArray>& values, DType criteria);
 
 /*!
  * \brief Reorder the rows and colmns according to the new row and column order.
@@ -471,25 +471,22 @@ COOMatrix COORowWiseSampling(
  *
  * \param mat Input coo matrix.
  * \param rows Rows to sample from.
- * \param etypes Edge types of each edge.
- * \param eids The original edge IDs in each edge type.
+ * \param etype_offset The offset to each edge type.
  * \param num_samples Number of samples
  * \param prob Unnormalized probability array. Should be of the same length as the data array.
  *             If an empty array is provided, assume uniform.
  * \param replace True if sample with replacement
- * \param etype_sorted True if the edge types are already sorted
  * \return A COOMatrix storing the picked row and col indices. Its data field stores the
  *         the index of the picked elements in the value array.
+ * \note The edges of the entire graph must be ordered by their edge types.
  */
 COOMatrix COORowWisePerEtypeSampling(
     COOMatrix mat,
     IdArray rows,
-    IdArray etypes,
-    IdArray eids,
+    const std::vector<int64_t>& etype_offset,
     const std::vector<int64_t>& num_samples,
     const std::vector<FloatArray>& prob,
-    bool replace = true,
-    bool etype_sorted = false);
+    bool replace = true);
 
 /*!
  * \brief Select K non-zero entries with the largest weights along each given row.

@@ -21,6 +21,7 @@ from .partition import load_partition, load_partition_feats, load_partition_book
 from .graph_partition_book import PartitionPolicy, get_shared_mem_partition_book
 from .graph_partition_book import HeteroDataName, parse_hetero_data_name
 from .graph_partition_book import NodePartitionPolicy, EdgePartitionPolicy
+from .graph_partition_book import RangePartitionBook
 from .shared_mem_utils import _to_shared_mem, _get_ndata_path, _get_edata_path, DTYPE_DICT
 from . import rpc
 from . import role
@@ -80,12 +81,11 @@ def _copy_graph_to_shared_mem(g, graph_name, graph_format):
     new_g.edata[EID] = _to_shared_mem(g.edata[EID], _get_edata_path(graph_name, EID))
     # for heterogeneous graph, we need to put ETYPE into KVStore
     # for homogeneous graph, ETYPE does not exist
-    for field in [ETYPE, '__LOCAL_ID__']:
-        if field in g.edata:
-            new_g.edata[field] = _to_shared_mem(
-                    g.edata[field],
-                    _get_edata_path(graph_name, field),
-            )
+    if ETYPE in g.edata:
+        new_g.edata[ETYPE] = _to_shared_mem(
+                g.edata[ETYPE],
+                _get_edata_path(graph_name, ETYPE),
+        )
     return new_g
 
 FIELD_DICT = {'inner_node': F.int32,    # A flag indicates whether the node is inside a partition.
@@ -93,8 +93,7 @@ FIELD_DICT = {'inner_node': F.int32,    # A flag indicates whether the node is i
               NID: F.int64,
               EID: F.int64,
               NTYPE: F.int32,
-              ETYPE: F.int32,
-              '__LOCAL_ID__': F.int64}
+              ETYPE: F.int32}
 
 def _get_shared_mem_ndata(g, graph_name, name):
     ''' Get shared-memory node data from DistGraph server.
@@ -144,9 +143,8 @@ def _get_graph_from_shared_mem(graph_name):
     g.edata[EID] = _get_shared_mem_edata(g, graph_name, EID)
 
     # heterogeneous graph has ETYPE
-    for field in [ETYPE, '__LOCAL_ID__']:
-        if _exist_shared_mem_array(graph_name, field):
-            g.edata[field] = _get_shared_mem_edata(g, graph_name, field)
+    if _exist_shared_mem_array(graph_name, ETYPE):
+        g.edata[ETYPE] = _get_shared_mem_edata(g, graph_name, ETYPE)
     return g
 
 NodeSpace = namedtuple('NodeSpace', ['data'])
@@ -1278,8 +1276,11 @@ class DistGraph:
         """Sample neighbors from a distributed graph."""
         # Currently exclude_edges, output_device, and edge_dir are ignored.
         if len(self.etypes) > 1:
+            assert isinstance(self._gpb, RangePartitionBook), \
+                    "Sampling distributed heterogeneous graphs require a RangePartitionBook. "
+            etype_offset = self._gpb._local_etype_offset
             frontier = graph_services.sample_etype_neighbors(
-                self, seed_nodes, ETYPE, '__LOCAL_ID__', fanout, replace=replace,
+                self, seed_nodes, etype_offset, fanout, replace=replace,
                 etype_sorted=etype_sorted, prob=prob)
         else:
             frontier = graph_services.sample_neighbors(

@@ -34,14 +34,37 @@ namespace impl {
 // \param rowid The row to pick from.
 // \param off Starting offset of this row.
 // \param len NNZ of the row.
+// \param num_picks Number of picks on the row.
 // \param col Pointer of the column indices.
 // \param data Pointer of the data indices.
 // \param out_idx Picked indices in [off, off + len).
 template <typename IdxType>
 using PickFn = std::function<void(
-    IdxType rowid, IdxType off, IdxType len,
+    IdxType rowid, IdxType off, IdxType len, IdxType num_picks,
     const IdxType* col, const IdxType* data,
     IdxType* out_idx)>;
+
+// User-defined function for determining the number of elements to pick from one row.
+//
+// The column indices of the given row are stored in
+//   [col + off, col + off + len)
+//
+// Similarly, the data indices are stored in
+//   [data + off, data + off + len)
+// Data index pointer could be NULL, which means data[i] == i
+//
+// *ATTENTION*: This function will be invoked concurrently. Please make sure
+// it is thread-safe.
+//
+// \param rowid The row to pick from.
+// \param off Starting offset of this row.
+// \param len NNZ of the row.
+// \param col Pointer of the column indices.
+// \param data Pointer of the data indices.
+template <typename IdxType>
+using NumPicksFn = std::function<IdxType(
+    IdxType rowid, IdxType off, IdxType len,
+    const IdxType* col, const IdxType* data)>;
 
 // User-defined function for picking elements from a range within a row.
 //
@@ -73,7 +96,8 @@ using RangePickFn = std::function<void(
 // OpenMP parallelization on rows because each row performs computation independently.
 template <typename IdxType>
 COOMatrix CSRRowWisePick(CSRMatrix mat, IdArray rows,
-                         int64_t num_picks, bool replace, PickFn<IdxType> pick_fn) {
+                         int64_t num_picks, bool replace, PickFn<IdxType> pick_fn,
+                         NumPicksFn<IdxType> num_picks_fn) {
   using namespace aten;
   const IdxType* indptr = static_cast<IdxType*>(mat.indptr->data);
   const IdxType* indices = static_cast<IdxType*>(mat.indices->data);
@@ -113,6 +137,10 @@ COOMatrix CSRRowWisePick(CSRMatrix mat, IdArray rows,
   const int num_threads = omp_get_max_threads();
   std::vector<int64_t> global_prefix(num_threads+1, 0);
 
+  // TODO(BarclayII) Using OMP parallel directly instead of using runtime::parallel_for
+  // does not handle exceptions well (directly aborts when an exception pops up).
+  // It runs faster though because there is less scheduling.  Need to handle
+  // exceptions better.
 #pragma omp parallel num_threads(num_threads)
   {
     const int thread_id = omp_get_thread_num();
@@ -132,13 +160,8 @@ COOMatrix CSRRowWisePick(CSRMatrix mat, IdArray rows,
       // build prefix-sum
       const int64_t local_i = i-start_i;
       const IdxType rid = rows_data[i];
-      IdxType len;
-      if (replace) {
-        len = indptr[rid+1] == indptr[rid] ? 0 : num_picks;
-      } else {
-        len = std::min(
-          static_cast<IdxType>(num_picks), indptr[rid + 1] - indptr[rid]);
-      }
+      IdxType len = num_picks_fn(
+          rid, indptr[rid], indptr[rid + 1] - indptr[rid], indices, data);
       local_prefix[local_i + 1] = local_prefix[local_i] + len;
     }
     global_prefix[thread_id + 1] = local_prefix[num_local];
@@ -164,24 +187,14 @@ COOMatrix CSRRowWisePick(CSRMatrix mat, IdArray rows,
 
       const int64_t local_i = i - start_i;
       const int64_t row_offset = thread_offset + local_prefix[local_i];
+      const int64_t num_picks = thread_offset + local_prefix[local_i + 1] - row_offset;
 
-      if (len <= num_picks && !replace) {
-        // nnz <= num_picks and w/o replacement, take all nnz
-        for (int64_t j = 0; j < len; ++j) {
-          picked_rdata[row_offset + j] = rid;
-          picked_cdata[row_offset + j] = indices[off + j];
-          picked_idata[row_offset + j] = data? data[off + j] : off + j;
-        }
-      } else {
-        pick_fn(rid, off, len,
-                indices, data,
-                picked_idata + row_offset);
-        for (int64_t j = 0; j < num_picks; ++j) {
-          const IdxType picked = picked_idata[row_offset + j];
-          picked_rdata[row_offset + j] = rid;
-          picked_cdata[row_offset + j] = indices[picked];
-          picked_idata[row_offset + j] = data? data[picked] : picked;
-        }
+      pick_fn(rid, off, len, num_picks, indices, data, picked_idata + row_offset);
+      for (int64_t j = 0; j < len; ++j) {
+        const IdxType picked = picked_idata[row_offset + j];
+        picked_rdata[row_offset + j] = rid;
+        picked_cdata[row_offset + j] = indices[picked];
+        picked_idata[row_offset + j] = data ? data[picked] : picked;
       }
     }
   }
@@ -197,22 +210,21 @@ COOMatrix CSRRowWisePick(CSRMatrix mat, IdArray rows,
 
 // Template for picking non-zero values row-wise. The implementation utilizes
 // OpenMP parallelization on rows because each row performs computation independently.
-template <typename IdxType>
-COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows, IdArray etypes,
-                                 IdArray eids,
+template <typename IdxType, typename FloatType>
+COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows,
+                                 const std::vector<int64_t>& etype_offset,
                                  const std::vector<int64_t>& num_picks, bool replace,
-                                 bool etype_sorted, RangePickFn<IdxType> pick_fn) {
+                                 bool etype_sorted, RangePickFn<IdxType> pick_fn,
+                                 const std::vector<FloatArray>& probs) {
   using namespace aten;
   const IdxType* indptr = mat.indptr.Ptr<IdxType>();
   const IdxType* indices = mat.indices.Ptr<IdxType>();
   const IdxType* data = CSRHasData(mat)? mat.data.Ptr<IdxType>() : nullptr;
   const IdxType* rows_data = rows.Ptr<IdxType>();
-  const int32_t* etype_data = etypes.Ptr<int32_t>();
-  const IdxType* eid_data = eids.Ptr<IdxType>();
   const int64_t num_rows = rows->shape[0];
   const auto& ctx = mat.indptr->ctx;
   const int64_t num_etypes = num_picks.size();
-  CHECK_EQ(etypes->dtype.bits / 8, sizeof(int32_t)) << "etypes must be int32";
+  const bool has_probs = (probs.size() == 0);
   std::vector<IdArray> picked_rows(rows->shape[0]);
   std::vector<IdArray> picked_cols(rows->shape[0]);
   std::vector<IdArray> picked_idxs(rows->shape[0]);
@@ -251,13 +263,33 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows, IdArray etypes,
         IdArray idx = Full(-1, len, sizeof(IdxType) * 8, ctx);
         IdxType* cdata = cols.Ptr<IdxType>();
         IdxType* idata = idx.Ptr<IdxType>();
+  
+        int64_t k = 0;
         for (int64_t j = 0; j < len; ++j) {
-          cdata[j] = indices[off + j];
-          idata[j] = data ? data[off + j] : off + j;
+          IdxType homogenized_eid = data ? data[off + j] : off + j;
+          IdxType heterogenized_etype = std::lower_bound(
+              etype_offset.begin(), etype_offset.end(), homogenized_eid) - \
+              etype_offset.begin();
+          IdxType heterogenized_eid = homogenized_eid - etype_offset[heterogenized_etype];
+
+          if (!has_probs || IsNullArray(probs[heterogenized_etype])) {
+            cdata[k] = indices[off + j];
+            idata[k] = homogenized_eid;
+            ++k;
+          } else {
+            const FloatArray& prob = probs[heterogenized_etype];
+            const FloatType* prob_data = prob.Ptr<FloatType>();
+            if (prob_data[heterogenized_eid] > 0) {
+              cdata[k] = indices[off + j];
+              idata[k] = homogenized_eid;
+              ++k;
+            }
+          }
         }
-        picked_rows[i] = rows;
-        picked_cols[i] = cols;
-        picked_idxs[i] = idx;
+
+        picked_rows[i] = rows.CreateView({k}, rows->dtype);
+        picked_cols[i] = cols.CreateView({k}, cols->dtype);
+        picked_idxs[i] = idx.CreateView({k}, idx->dtype);
       } else {
         // need to do per edge type sample
         std::vector<IdxType> rows;
@@ -269,8 +301,13 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows, IdArray etypes,
         std::vector<IdxType> et_eid(len);
         std::iota(et_idx.begin(), et_idx.end(), 0);
         for (int64_t j = 0; j < len; ++j) {
-          et[j] = data ? etype_data[data[off + j]] : etype_data[off + j];
-          et_eid[j] = data ? eid_data[data[off + j]] : eid_data[off + j];
+          IdxType homogenized_eid = data ? data[off + j] : off + j;
+          IdxType heterogenized_etype = std::lower_bound(
+              etype_offset.begin(), etype_offset.end(), homogenized_eid) - \
+              etype_offset.begin();
+          IdxType heterogenized_eid = homogenized_eid - etype_offset[heterogenized_etype];
+          et[j] = heterogenized_etype;
+          et_eid[j] = heterogenized_eid;
         }
         if (!etype_sorted)  // the edge type is sorted, not need to sort it
           std::sort(et_idx.begin(), et_idx.end(),
@@ -309,6 +346,8 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows, IdArray etypes,
                       data, picked_idata);
               for (int64_t k = 0; k < num_picks[cur_et]; ++k) {
                 const IdxType picked = picked_idata[k];
+                if (picked == -1)
+                  continue;
                 rows.push_back(rid);
                 cols.push_back(indices[off+et_idx[et_offset+picked]]);
                 if (data) {
@@ -352,11 +391,13 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows, IdArray etypes,
 // row-wise pick on the CSR matrix and rectifies the returned results.
 template <typename IdxType>
 COOMatrix COORowWisePick(COOMatrix mat, IdArray rows,
-                         int64_t num_picks, bool replace, PickFn<IdxType> pick_fn) {
+                         int64_t num_picks, bool replace, PickFn<IdxType> pick_fn,
+                         NumPicksFn<IdxType> num_picks_fn) {
   using namespace aten;
   const auto& csr = COOToCSR(COOSliceRows(mat, rows));
   const IdArray new_rows = Range(0, rows->shape[0], rows->dtype.bits, rows->ctx);
-  const auto& picked = CSRRowWisePick<IdxType>(csr, new_rows, num_picks, replace, pick_fn);
+  const auto& picked = CSRRowWisePick<IdxType>(
+      csr, new_rows, num_picks, replace, pick_fn, num_picks_fn);
   return COOMatrix(mat.num_rows, mat.num_cols,
                    IndexSelect(rows, picked.row),  // map the row index to the correct one
                    picked.col,
@@ -366,16 +407,17 @@ COOMatrix COORowWisePick(COOMatrix mat, IdArray rows,
 // Template for picking non-zero values row-wise. The implementation first slices
 // out the corresponding rows and then converts it to CSR format. It then performs
 // row-wise pick on the CSR matrix and rectifies the returned results.
-template <typename IdxType>
+template <typename IdxType, typename FloatType>
 COOMatrix COORowWisePerEtypePick(
-    COOMatrix mat, IdArray rows, IdArray etypes, IdArray eids,
+    COOMatrix mat, IdArray rows, const std::vector<int64_t>& etype_offset,
     const std::vector<int64_t>& num_picks, bool replace,
-    bool etype_sorted, RangePickFn<IdxType> pick_fn) {
+    RangePickFn<IdxType> pick_fn,
+    const std::vector<FloatArray>& probs) {
   using namespace aten;
   const auto& csr = COOToCSR(COOSliceRows(mat, rows));
   const IdArray new_rows = Range(0, rows->shape[0], rows->dtype.bits, rows->ctx);
-  const auto& picked = CSRRowWisePerEtypePick<IdxType>(
-    csr, new_rows, etypes, eids, num_picks, replace, etype_sorted, pick_fn);
+  const auto& picked = CSRRowWisePerEtypePick<IdxType, FloatType>(
+    csr, new_rows, etype_offset, num_picks, replace, false, pick_fn, probs);
   return COOMatrix(mat.num_rows, mat.num_cols,
                    IndexSelect(rows, picked.row),  // map the row index to the correct one
                    picked.col,

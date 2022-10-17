@@ -58,16 +58,12 @@ template COOMatrix COORemoveIf<kDGLCPU, int64_t, double>(COOMatrix, NDArray, dou
 
 template <DGLDeviceType XPU, typename IdType, typename DType>
 COOMatrix COOEtypeRemoveIf(
-    COOMatrix coo, IdArray etypes, IdArray eids, const std::vector<NDArray>& values,
-    DType criteria) {
-  CHECK_EQ(etypes->dtype, DGLDataTypeTraits<int32_t>::dtype) <<
-    "currently only int32 edge type array is supported.";
+    COOMatrix coo, const std::vector<int64_t>& etype_offset,
+    const std::vector<NDArray>& values, DType criteria) {
   const IdType* row = coo.row.Ptr<IdType>();
   const IdType* col = coo.col.Ptr<IdType>();
   const IdType* data = COOHasData(coo) ? coo.data.Ptr<IdType>() : nullptr;
-  const int32_t* etype_data = etypes.Ptr<int32_t>();
-  const IdType* eid_data = eids.Ptr<IdType>();
-  std::vector<DType*> val(etypes->shape[0]);
+  std::vector<DType*> val(etype_offset.size() - 1);
   for (size_t i = 0; i < values.size(); ++i)
     val[i] = IsNullArray(values[i]) ? nullptr : values[i].Ptr<DType>();
   const auto idtype = coo.row->dtype;
@@ -82,15 +78,18 @@ COOMatrix COOEtypeRemoveIf(
 
   int64_t j = 0;
   for (int64_t i = 0; i < nnz; ++i) {
-    const IdType global_eid = data ? data[i] : i;
-    const int32_t etype = etype_data[global_eid];
-    const IdType etype_eid = eid_data[global_eid];
-    if (!val[etype] ||  // Pass if the value array is nullptr (i.e. doesn't matter).
-                        // This can happen if some etypes don't matter while others do.
-        val[etype][etype_eid] != criteria) {
+    const IdType homogenized_eid = data ? data[i] : i;
+    const IdType heterogenized_etype = std::lower_bound(
+        etype_offset.begin(), etype_offset.end(), homogenized_eid) - \
+        etype_offset.begin();
+    const IdType heterogenized_eid = homogenized_eid - etype_offset[heterogenized_etype];
+    if (!val[heterogenized_etype] ||  // Pass if the value array is nullptr.
+                                      // This can happen if some etypes don't matter
+                                      // while others do.
+        val[heterogenized_etype][heterogenized_eid] != criteria) {
       new_row_data[j] = row[i];
       new_col_data[j] = col[i];
-      new_eid_data[j] = global_eid;
+      new_eid_data[j] = homogenized_eid;
       ++j;
     }
   }
@@ -103,21 +102,21 @@ COOMatrix COOEtypeRemoveIf(
 }
 
 template COOMatrix COOEtypeRemoveIf<kDGLCPU, int32_t, int8_t>(
-    COOMatrix, IdArray, IdArray, const std::vector<NDArray>&, int8_t);
+    COOMatrix, const std::vector<int64_t>&, const std::vector<NDArray>&, int8_t);
 template COOMatrix COOEtypeRemoveIf<kDGLCPU, int32_t, uint8_t>(
-    COOMatrix, IdArray, IdArray, const std::vector<NDArray>&, uint8_t);
+    COOMatrix, const std::vector<int64_t>&, const std::vector<NDArray>&, uint8_t);
 template COOMatrix COOEtypeRemoveIf<kDGLCPU, int32_t, float>(
-    COOMatrix, IdArray, IdArray, const std::vector<NDArray>&, float);
+    COOMatrix, const std::vector<int64_t>&, const std::vector<NDArray>&, float);
 template COOMatrix COOEtypeRemoveIf<kDGLCPU, int32_t, double>(
-    COOMatrix, IdArray, IdArray, const std::vector<NDArray>&, double);
+    COOMatrix, const std::vector<int64_t>&, const std::vector<NDArray>&, double);
 template COOMatrix COOEtypeRemoveIf<kDGLCPU, int64_t, int8_t>(
-    COOMatrix, IdArray, IdArray, const std::vector<NDArray>&, int8_t);
+    COOMatrix, const std::vector<int64_t>&, const std::vector<NDArray>&, int8_t);
 template COOMatrix COOEtypeRemoveIf<kDGLCPU, int64_t, uint8_t>(
-    COOMatrix, IdArray, IdArray, const std::vector<NDArray>&, uint8_t);
+    COOMatrix, const std::vector<int64_t>&, const std::vector<NDArray>&, uint8_t);
 template COOMatrix COOEtypeRemoveIf<kDGLCPU, int64_t, float>(
-    COOMatrix, IdArray, IdArray, const std::vector<NDArray>&, float);
+    COOMatrix, const std::vector<int64_t>&, const std::vector<NDArray>&, float);
 template COOMatrix COOEtypeRemoveIf<kDGLCPU, int64_t, double>(
-    COOMatrix, IdArray, IdArray, const std::vector<NDArray>&, double);
+    COOMatrix, const std::vector<int64_t>&, const std::vector<NDArray>&, double);
 
 };  // namespace impl
 };  // namespace aten

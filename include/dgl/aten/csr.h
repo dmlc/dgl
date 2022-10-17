@@ -426,14 +426,17 @@ CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries);
  * \param prob Unnormalized probability array. Should be of the same length as the data array.
  *             If an empty array is provided, assume uniform.
  * \param replace True if sample with replacement
+ * \param etype_sorted whether the CSR column indices per row are ordered by edge type.
  * \return A COOMatrix storing the picked row, col and data indices.
+ * \note The edges of the entire graph must be ordered by their edge types.
  */
 COOMatrix CSRRowWiseSampling(
     CSRMatrix mat,
     IdArray rows,
     int64_t num_samples,
     FloatArray prob = FloatArray(),
-    bool replace = true);
+    bool replace = true,
+    bool etype_sorted = false);
 
 /*!
  * \brief Randomly select a fixed number of non-zero entries for each edge type
@@ -469,20 +472,18 @@ COOMatrix CSRRowWiseSampling(
  *
  * \param mat Input CSR matrix.
  * \param rows Rows to sample from.
- * \param etypes Edge types of each edge.
- * \param eids The original edge IDs within each edge type.
+ * \param etype_offset The offset to each edge type.
  * \param num_samples Number of samples to choose per edge type.
  * \param prob Unnormalized probability array. Should be of the same length as the data array.
  *             If an empty array is provided, assume uniform.
  * \param replace True if sample with replacement
- * \param etype_sorted True if the edge types are already sorted
  * \return A COOMatrix storing the picked row, col and data indices.
+ * \note The edges must be ordered by their edge types.
  */
 COOMatrix CSRRowWisePerEtypeSampling(
     CSRMatrix mat,
     IdArray rows,
-    IdArray etypes,
-    IdArray eids,
+    const std::vector<int64_t>& etype_offset,
     const std::vector<int64_t>& num_samples,
     const std::vector<FloatArray>& prob,
     bool replace = true,

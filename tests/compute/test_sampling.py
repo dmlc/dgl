@@ -849,8 +849,12 @@ def test_sample_neighbors_etype_homogeneous(format_, direction, replace):
     rare_cnt = 4
     g = create_etype_test_graph(100, 30, rare_cnt)
     h_g = dgl.to_homogeneous(g, edata=['p', 'mask'])
+    h_g_etype = F.asnumpy(h_g.edata[dgl.ETYPE])
+    h_g_offset = np.cumsum(np.insert(np.bincount(h_g_etype), 0, 0)).tolist()
     sg = g.edge_subgraph(g.edata['mask'], relabel_nodes=False)
     h_sg = h_g.edge_subgraph(h_g.edata['mask'], relabel_nodes=False)
+    h_sg_etype = F.asnumpy(h_sg.edata[dgl.ETYPE])
+    h_sg_offset = np.cumsum(np.insert(np.bincount(h_sg_etype), 0, 0)).tolist()
 
     seed_ntype = g.get_ntype_id("u")
     seeds = F.nonzero_1d(h_g.ndata[dgl.NTYPE] == seed_ntype)
@@ -926,19 +930,19 @@ def test_sample_neighbors_etype_homogeneous(format_, direction, replace):
         h_g = h_g.formats(['csc', 'csr', 'coo'])
     for _ in range(5):
         subg = dgl.sampling.sample_etype_neighbors(
-            h_g, seeds, dgl.ETYPE, dgl.EID, fanouts, replace=replace,
+            h_g, seeds, h_g_offset, fanouts, replace=replace,
             edge_dir=direction)
         check_num(h_g, all_src, all_dst, subg, replace, fanouts, direction)
 
         p = [g.edges[etype].data['p'] for etype in g.etypes]
         subg = dgl.sampling.sample_etype_neighbors(
-            h_g, seeds, dgl.ETYPE, dgl.EID, fanouts, replace=replace,
+            h_g, seeds, h_g_offset, fanouts, replace=replace,
             edge_dir=direction, prob=p)
         check_num(h_sg, all_sub_src, all_sub_dst, subg, replace, fanouts, direction)
 
         p = [g.edges[etype].data['mask'] for etype in g.etypes]
         subg = dgl.sampling.sample_etype_neighbors(
-            h_g, seeds, dgl.ETYPE, dgl.EID, fanouts, replace=replace,
+            h_g, seeds, h_g_offset, fanouts, replace=replace,
             edge_dir=direction, prob=p)
         check_num(h_sg, all_sub_src, all_sub_dst, subg, replace, fanouts, direction)
 
@@ -958,26 +962,12 @@ def test_sample_neighbors_etype_sorted_homogeneous(format_, direction):
     if (direction, format_) in [('in', 'csr'), ('out', 'csc')]:
         h_g = h_g.formats(['csc', 'csr', 'coo'])
 
+    h_g = dgl.sort_csc_by_tag(h_g, dgl.ETYPE, tag_type='edge')
     # shuffle
-    orig_etype = F.asnumpy(h_g.edata[dgl.ETYPE])
-    idx = np.random.permutation(orig_etype.shape[0])
-    orig_etype = orig_etype[idx]
-    orig_eid = F.asnumpy(h_g.edata[dgl.EID])[idx]
-
-    new_etype = orig_etype.copy()
-    new_eid = orig_eid.copy()
-    for i in range(h_g.num_nodes()):
-        if direction == 'in':
-            e = F.asnumpy(h_g.in_edges(i, form='eid'))
-        else:
-            e = F.asnumpy(h_g.out_edges(i, form='eid'))
-        idx = np.argsort(orig_etype[e])
-        new_etype[e] = orig_etype[e][idx]
-        new_eid[e] = orig_eid[e][idx]
-    h_g.edata[dgl.ETYPE] = F.zerocopy_from_numpy(new_etype)
-    h_g.edata[dgl.EID] = F.zerocopy_from_numpy(new_eid)
+    h_g_etype = F.asnumpy(h_g.edata[dgl.ETYPE])
+    h_g_offset = np.cumsum(np.insert(h_g_etype, 0, 0)).tolist()
     sg = dgl.sampling.sample_etype_neighbors(
-        h_g, seeds, dgl.ETYPE, dgl.EID, fanouts, edge_dir=direction, etype_sorted=True)
+        h_g, seeds, h_g_offset, fanouts, edge_dir=direction, etype_sorted=True)
 
 @pytest.mark.parametrize('dtype', ['int32', 'int64'])
 def test_sample_neighbors_exclude_edges_heteroG(dtype):

@@ -129,6 +129,8 @@ class AliasSampler: public BaseSampler<Idx> {
       const DType *_prob_data = _prob.Ptr<DType>();
       if (2 * taken >= accum)
         Reconstruct(_prob);
+      if (accum <= 0)
+        return -1;
       // accum changes after Reconstruct(), so avg should be computed after that.
       double avg = accum / N;
       while (true) {
@@ -230,6 +232,8 @@ class CDFSampler: public BaseSampler<Idx> {
       const DType *_prob_data = _prob.Ptr<DType>();
       if (2 * taken >= accum)
         Reconstruct(_prob);
+      if (accum <= 0)
+        return -1;
       while (true) {
         double p = std::max(re->Uniform<double>(0., accum), eps);
         Idx rst = Map(std::lower_bound(cdf.begin(), cdf.end(), p) - cdf.begin() - 1);

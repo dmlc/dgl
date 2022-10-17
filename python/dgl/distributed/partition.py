@@ -4,6 +4,7 @@ import json
 import os
 import time
 import numpy as np
+import logging
 
 from .. import backend as F
 from ..base import NID, EID, NTYPE, ETYPE, dgl_warning
@@ -140,6 +141,7 @@ def load_partition(part_config, part_id, load_feats=True):
                     part_id,
                     etype
             )
+        print(graph.edata['__LOCAL_ID__'])
 
     return graph, node_feats, edge_feats, gpb, graph_name, ntypes_list, etypes_list
 

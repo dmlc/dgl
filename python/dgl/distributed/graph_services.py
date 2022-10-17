@@ -99,8 +99,7 @@ def _sample_etype_neighbors(
     local_g,
     partition_book,
     seed_nodes,
-    etype_field,
-    eid_field,
+    etype_offset,
     fan_out,
     edge_dir,
     prob,
@@ -120,8 +119,7 @@ def _sample_etype_neighbors(
     sampled_graph = local_sample_etype_neighbors(
         local_g,
         local_ids,
-        etype_field,
-        eid_field,
+        etype_offset,
         fan_out,
         edge_dir,
         prob,
@@ -264,8 +262,7 @@ class SamplingRequestEtype(Request):
     def __init__(
         self,
         nodes,
-        etype_field,
-        eid_field,
+        etype_offset,
         fan_out,
         edge_dir="in",
         prob=None,
@@ -277,8 +274,7 @@ class SamplingRequestEtype(Request):
         self.prob = prob
         self.replace = replace
         self.fan_out = fan_out
-        self.etype_field = etype_field
-        self.eid_field = eid_field
+        self.etype_offset = etype_offset
         self.etype_sorted = etype_sorted
 
     def __setstate__(self, state):
@@ -288,8 +284,7 @@ class SamplingRequestEtype(Request):
             self.prob,
             self.replace,
             self.fan_out,
-            self.etype_field,
-            self.eid_field,
+            self.etype_offset,
             self.etype_sorted,
         ) = state
 
@@ -300,8 +295,7 @@ class SamplingRequestEtype(Request):
             self.prob,
             self.replace,
             self.fan_out,
-            self.etype_field,
-            self.eid_field,
+            self.etype_offset,
             self.etype_sorted,
         )
 
@@ -321,8 +315,7 @@ class SamplingRequestEtype(Request):
             local_g,
             partition_book,
             self.seed_nodes,
-            self.etype_field,
-            self.eid_field,
+            self.etype_offset,
             self.fan_out,
             self.edge_dir,
             probs,
@@ -584,8 +577,7 @@ def _frontier_to_heterogeneous_graph(g, frontier, gpb):
 def sample_etype_neighbors(
     g,
     nodes,
-    etype_field,
-    eid_field,
+    etype_offset,
     fanout,
     edge_dir="in",
     prob=None,
@@ -601,8 +593,8 @@ def sample_etype_neighbors(
     Node/edge features are not preserved. The original IDs of
     the sampled edges are stored as the `dgl.EID` feature in the returned graph.
 
-    This function assumes the input is a homogeneous ``DGLGraph`` with the TRUE edge type
-    information stored as the edge data in `etype_field`. The sampled subgraph is also
+    This function assumes the input is a homogeneous ``DGLGraph`` with the edges
+    ordered by their edge types. The sampled subgraph is also
     stored in the homogeneous graph format. That is, all nodes and edges are assigned
     with unique IDs (in contrast, we typically use a type name and a node/edge ID to
     identify a node or an edge in ``DGLGraph``). We refer to this type of IDs
@@ -618,10 +610,8 @@ def sample_etype_neighbors(
     nodes : tensor or dict
         Node IDs to sample neighbors from. If it's a dict, it should contain only
         one key-value pair to make this API consistent with dgl.sampling.sample_neighbors.
-    etype_field : str
-        The field in ``g.edata`` storing the edge type.
-    eid_field : str
-        The field in ``g.edata`` storing the type-specific edge ID.
+    etype_offset : list[int]
+        The offset to the starting edge ID of each edge type.
     fanout : int or dict[etype, int]
         The number of edges to be sampled for each node per edge type.  If an integer
         is given, DGL assumes that the same fanout is applied to every edge type.
@@ -688,8 +678,7 @@ def sample_etype_neighbors(
             _prob = None
         return SamplingRequestEtype(
             node_ids,
-            etype_field,
-            eid_field,
+            etype_offset,
             fanout,
             edge_dir=edge_dir,
             prob=_prob,
@@ -704,8 +693,7 @@ def sample_etype_neighbors(
                 local_g,
                 partition_book,
                 local_nids,
-                etype_field,
-                eid_field,
+                etype_offset,
                 fanout,
                 edge_dir,
                 None,
@@ -723,8 +711,7 @@ def sample_etype_neighbors(
                 local_g,
                 partition_book,
                 local_nids,
-                etype_field,
-                eid_field,
+                etype_offset,
                 fanout,
                 edge_dir,
                 _prob,

@@ -17,7 +17,7 @@ IdxType RandomEngine::Choice(FloatArray prob) {
   IdxType ret = 0;
   ATEN_FLOAT_TYPE_SWITCH(prob->dtype, ValueType, "probability", {
     // TODO(minjie): allow choosing different sampling algorithms
-    utils::TreeSampler<IdxType, ValueType, true> sampler(this, prob);
+    utils::AliasSampler<IdxType, ValueType, true> sampler(this, prob);
     ret = sampler.Draw();
   });
   return ret;
@@ -37,9 +37,9 @@ void RandomEngine::Choice(IdxType num, FloatArray prob, IdxType* out,
 
   utils::BaseSampler<IdxType>* sampler = nullptr;
   if (replace) {
-    sampler = new utils::TreeSampler<IdxType, FloatType, true>(this, prob);
+    sampler = new utils::AliasSampler<IdxType, FloatType, true>(this, prob);
   } else {
-    sampler = new utils::TreeSampler<IdxType, FloatType, false>(this, prob);
+    sampler = new utils::AliasSampler<IdxType, FloatType, false>(this, prob);
   }
   for (IdxType i = 0; i < num; ++i) out[i] = sampler->Draw();
   delete sampler;
