@@ -8,10 +8,6 @@
 
 #include <torch/torch.h>
 
-
-
-
-
 namespace cpu {
 
 /*!

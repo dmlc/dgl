@@ -1,5 +1,6 @@
 #include <torch/script.h>
 #include "cpu/sddmm_cpu.h"
+#include "cpu/spmm_cpu.h"
 
 
 struct SDDMM : public torch::autograd::Function<SDDMM> {
@@ -11,13 +12,25 @@ struct SDDMM : public torch::autograd::Function<SDDMM> {
                                  torch::Tensor matB,
                                  torch::Tensor matC) {
         auto ret = cpu::SDDMMCoo<int64_t, float>(row, col, val, matB, matC);
-        return ret;
+        ctx->save_for_backward({row, col, val, matB, matC});
+        return {ret};
     }
     static torch::autograd::variable_list backward(torch::autograd::AutogradContext *ctx,
                                                    torch::autograd::variable_list grad_input) {
-        // TODO(Israt): Add backward operator
+        auto saved = ctx->get_saved_variables();
+        auto row = saved[0];
+        auto rowptr = saved[1];
+        auto col = saved[2];
+        auto val = saved[3];
+        auto matB = saved[4];
+        auto matC = saved[5];
+
+        // TODO(Israt): transpose adj, grad_input[0]
+        auto dX = cpu::SpMMSumCsrNaive<int64_t, float>(rowptr, col, val, matB, grad_input[0]);
+        auto dY = cpu::SpMMSumCsrNaive<int64_t, float>(rowptr, col, val, matC, grad_input[0]);
+
         return {torch::Tensor(), torch::Tensor(), torch::Tensor(),
-            torch::Tensor(), torch::Tensor()};
+                torch::Tensor(), torch::Tensor(), torch::Tensor()};
     }
 };
 
