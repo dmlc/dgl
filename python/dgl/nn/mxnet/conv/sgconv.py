@@ -84,14 +84,17 @@ class SGConv(nn.Block):
     [ 2.2644043  -0.26684904]]
     <NDArray 6x2 @cpu(0)>
     """
-    def __init__(self,
-                 in_feats,
-                 out_feats,
-                 k=1,
-                 cached=False,
-                 bias=True,
-                 norm=None,
-                 allow_zero_in_degree=False):
+
+    def __init__(
+        self,
+        in_feats,
+        out_feats,
+        k=1,
+        cached=False,
+        bias=True,
+        norm=None,
+        allow_zero_in_degree=False,
+    ):
         super(SGConv, self).__init__()
         self._cached = cached
         self._cached_h = None
@@ -99,8 +102,12 @@ class SGConv(nn.Block):
         self._allow_zero_in_degree = allow_zero_in_degree
         with self.name_scope():
             self.norm = norm
-            self.fc = nn.Dense(out_feats, in_units=in_feats, use_bias=bias,
-                               weight_initializer=mx.init.Xavier())
+            self.fc = nn.Dense(
+                out_feats,
+                in_units=in_feats,
+                use_bias=bias,
+                weight_initializer=mx.init.Xavier(),
+            )
 
     def set_allow_zero_in_degree(self, set_value):
         r"""
@@ -152,30 +159,33 @@ class SGConv(nn.Block):
         with graph.local_scope():
             if not self._allow_zero_in_degree:
                 if graph.in_degrees().min() == 0:
-                    raise DGLError('There are 0-in-degree nodes in the graph, '
-                                   'output for those nodes will be invalid. '
-                                   'This is harmful for some applications, '
-                                   'causing silent performance regression. '
-                                   'Adding self-loop on the input graph by '
-                                   'calling `g = dgl.add_self_loop(g)` will resolve '
-                                   'the issue. Setting ``allow_zero_in_degree`` '
-                                   'to be `True` when constructing this module will '
-                                   'suppress the check and let the code run.')
+                    raise DGLError(
+                        "There are 0-in-degree nodes in the graph, "
+                        "output for those nodes will be invalid. "
+                        "This is harmful for some applications, "
+                        "causing silent performance regression. "
+                        "Adding self-loop on the input graph by "
+                        "calling `g = dgl.add_self_loop(g)` will resolve "
+                        "the issue. Setting ``allow_zero_in_degree`` "
+                        "to be `True` when constructing this module will "
+                        "suppress the check and let the code run."
+                    )
 
             if self._cached_h is not None:
                 feat = self._cached_h
             else:
                 # compute normalization
-                degs = nd.clip(graph.in_degrees().astype(feat.dtype), 1, float('inf'))
+                degs = nd.clip(
+                    graph.in_degrees().astype(feat.dtype), 1, float("inf")
+                )
                 norm = nd.power(degs, -0.5).expand_dims(1)
                 norm = norm.as_in_context(feat.context)
                 # compute (D^-1 A D)^k X
                 for _ in range(self._k):
                     feat = feat * norm
-                    graph.ndata['h'] = feat
-                    graph.update_all(fn.copy_u('h', 'm'),
-                                     fn.sum('m', 'h'))
-                    feat = graph.ndata.pop('h')
+                    graph.ndata["h"] = feat
+                    graph.update_all(fn.copy_u("h", "m"), fn.sum("m", "h"))
+                    feat = graph.ndata.pop("h")
                     feat = feat * norm
 
                 if self.norm is not None:

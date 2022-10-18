@@ -13,6 +13,27 @@ from ..data.utils import load_graphs, save_graphs, load_tensors, save_tensors
 from ..partition import metis_partition_assignment, partition_graph_with_halo, get_peak_mem
 from .graph_partition_book import BasicPartitionBook, RangePartitionBook
 
+RESERVED_FIELD_DTYPE = {
+    'inner_node': F.uint8,    # A flag indicates whether the node is inside a partition.
+    'inner_edge': F.uint8,    # A flag indicates whether the edge is inside a partition.
+    NID: F.int64,
+    EID: F.int64,
+    NTYPE: F.int16,
+    # `sort_csr_by_tag` and `sort_csc_by_tag` works on int32/64 only.
+    ETYPE: F.int32
+    }
+
+def _save_graphs(filename, g_list):
+    '''Format data types in graphs before saving
+    '''
+    for g in g_list:
+        for k, dtype in RESERVED_FIELD_DTYPE.items():
+            if k in g.ndata:
+                g.ndata[k] = F.astype(g.ndata[k], dtype)
+            if k in g.edata:
+                g.edata[k] = F.astype(g.edata[k], dtype)
+    save_graphs(filename , g_list)
+
 def _get_inner_node_mask(graph, ntype_id):
     if NTYPE in graph.ndata:
         dtype = F.dtype(graph.ndata['inner_node'])
@@ -96,27 +117,35 @@ def load_partition(part_config, part_id, load_feats=True):
     assert EID in graph.edata, "the partition graph should contain edge mapping to global edge ID"
 
     gpb, graph_name, ntypes, etypes = load_partition_book(part_config, part_id, graph)
-    ntypes_list, etypes_list = [], []
-    for ntype in ntypes:
-        ntype_id = ntypes[ntype]
-        # graph.ndata[NID] are global homogeneous node IDs.
-        nids = F.boolean_mask(graph.ndata[NID], _get_inner_node_mask(graph, ntype_id))
-        partids1 = gpb.nid2partid(nids)
-        _, per_type_nids = gpb.map_to_per_ntype(nids)
-        partids2 = gpb.nid2partid(per_type_nids, ntype)
-        assert np.all(F.asnumpy(partids1 == part_id)), 'load a wrong partition'
-        assert np.all(F.asnumpy(partids2 == part_id)), 'load a wrong partition'
-        ntypes_list.append(ntype)
-    for etype in etypes:
-        etype_id = etypes[etype]
-        # graph.edata[EID] are global homogeneous edge IDs.
-        eids = F.boolean_mask(graph.edata[EID], _get_inner_edge_mask(graph, etype_id))
-        partids1 = gpb.eid2partid(eids)
-        _, per_type_eids = gpb.map_to_per_etype(eids)
-        partids2 = gpb.eid2partid(per_type_eids, etype)
-        assert np.all(F.asnumpy(partids1 == part_id)), 'load a wrong partition'
-        assert np.all(F.asnumpy(partids2 == part_id)), 'load a wrong partition'
-        etypes_list.append(etype)
+    ntypes_list = list(ntypes.keys())
+    etypes_list = list(etypes.keys())
+    if 'DGL_DIST_DEBUG' in os.environ:
+        for ntype in ntypes:
+            ntype_id = ntypes[ntype]
+            # graph.ndata[NID] are global homogeneous node IDs.
+            nids = F.boolean_mask(graph.ndata[NID], _get_inner_node_mask(graph, ntype_id))
+            partids1 = gpb.nid2partid(nids)
+            _, per_type_nids = gpb.map_to_per_ntype(nids)
+            partids2 = gpb.nid2partid(per_type_nids, ntype)
+            assert np.all(F.asnumpy(partids1 == part_id)), \
+                'Unexpected partition IDs are found in the loaded partition ' \
+                'while querying via global homogeneous node IDs.'
+            assert np.all(F.asnumpy(partids2 == part_id)), \
+                'Unexpected partition IDs are found in the loaded partition ' \
+                'while querying via type-wise node IDs.'
+        for etype in etypes:
+            etype_id = etypes[etype]
+            # graph.edata[EID] are global homogeneous edge IDs.
+            eids = F.boolean_mask(graph.edata[EID], _get_inner_edge_mask(graph, etype_id))
+            partids1 = gpb.eid2partid(eids)
+            _, per_type_eids = gpb.map_to_per_etype(eids)
+            partids2 = gpb.eid2partid(per_type_eids, etype)
+            assert np.all(F.asnumpy(partids1 == part_id)), \
+                'Unexpected partition IDs are found in the loaded partition ' \
+                'while querying via global homogeneous edge IDs.'
+            assert np.all(F.asnumpy(partids2 == part_id)), \
+                'Unexpected partition IDs are found in the loaded partition ' \
+                'while querying via type-wise edge IDs.'
 
     node_feats = {}
     edge_feats = {}
@@ -125,7 +154,7 @@ def load_partition(part_config, part_id, load_feats=True):
 
     return graph, node_feats, edge_feats, gpb, graph_name, ntypes_list, etypes_list
 
-def load_partition_feats(part_config, part_id):
+def load_partition_feats(part_config, part_id, load_nodes=True, load_edges=True):
     '''Load node/edge feature data from a partition.
 
     Parameters
@@ -134,12 +163,16 @@ def load_partition_feats(part_config, part_id):
         The path of the partition config file.
     part_id : int
         The partition ID.
+    load_nodes : bool, optional
+        Whether to load node features. If ``False``, ``None`` is returned.
+    load_edges : bool, optional
+        Whether to load edge features. If ``False``, ``None`` is returned.
 
     Returns
     -------
-    Dict[str, Tensor]
+    Dict[str, Tensor] or None
         Node features.
-    Dict[str, Tensor]
+    Dict[str, Tensor] or None
         Edge features.
     '''
     config_path = os.path.dirname(part_config)
@@ -151,24 +184,30 @@ def load_partition_feats(part_config, part_id):
     part_files = part_metadata['part-{}'.format(part_id)]
     assert 'node_feats' in part_files, "the partition does not contain node features."
     assert 'edge_feats' in part_files, "the partition does not contain edge feature."
-    node_feats = load_tensors(relative_to_config(part_files['node_feats']))
-    edge_feats = load_tensors(relative_to_config(part_files['edge_feats']))
+    node_feats = None
+    if load_nodes:
+        node_feats = load_tensors(relative_to_config(part_files['node_feats']))
+    edge_feats = None
+    if load_edges:
+        edge_feats = load_tensors(relative_to_config(part_files['edge_feats']))
     # In the old format, the feature name doesn't contain node/edge type.
     # For compatibility, let's add node/edge types to the feature names.
-    node_feats1 = {}
-    edge_feats1 = {}
-    for name in node_feats:
-        feat = node_feats[name]
-        if name.find('/') == -1:
-            name = '_N/' + name
-        node_feats1[name] = feat
-    for name in edge_feats:
-        feat = edge_feats[name]
-        if name.find('/') == -1:
-            name = '_E/' + name
-        edge_feats1[name] = feat
-    node_feats = node_feats1
-    edge_feats = edge_feats1
+    if node_feats is not None:
+        new_feats = {}
+        for name in node_feats:
+            feat = node_feats[name]
+            if name.find('/') == -1:
+                name = '_N/' + name
+            new_feats[name] = feat
+        node_feats = new_feats
+    if edge_feats is not None:
+        new_feats = {}
+        for name in edge_feats:
+            feat = edge_feats[name]
+            if name.find('/') == -1:
+                name = '_E/' + name
+            new_feats[name] = feat
+        edge_feats = new_feats
 
     return node_feats, edge_feats
 
@@ -448,13 +487,11 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     under name `dgl.EID`. For a heterogeneous graph, the DGLGraph also contains a node
     data `dgl.NTYPE` for node type and an edge data `dgl.ETYPE` for the edge type.
 
-    The partition graph contains additional node data ("inner_node" and "orig_id") and
+    The partition graph contains additional node data ("inner_node") and
     edge data ("inner_edge"):
 
     * "inner_node" indicates whether a node belongs to a partition.
     * "inner_edge" indicates whether an edge belongs to a partition.
-    * "orig_id" exists when reshuffle=True. It indicates the original node IDs in the original
-      graph before reshuffling.
 
     Node and edge features are splitted and stored together with each graph partition.
     All node/edge features in a partition are stored in a file with DGL format. The node/edge
@@ -532,8 +569,9 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     ...                                 out_path='output/', reshuffle=True,
     ...                                 balance_ntypes=g.ndata['train_mask'],
     ...                                 balance_edges=True)
-    >>> g, node_feats, edge_feats, gpb, graph_name = dgl.distributed.load_partition(
-    ...                                 'output/test.json', 0)
+    >>> (
+    ...     g, node_feats, edge_feats, gpb, graph_name, ntypes_list, etypes_list,
+    ... ) = dgl.distributed.load_partition('output/test.json', 0)
     '''
     def get_homogeneous(g, balance_ntypes):
         if g.is_homogeneous:
@@ -608,8 +646,10 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
             parts[0].edata['orig_id'] = orig_eids
         if return_mapping:
             orig_nids, orig_eids = _get_orig_ids(g, sim_g, False, orig_nids, orig_eids)
-        parts[0].ndata['inner_node'] = F.ones((sim_g.number_of_nodes(),), F.int8, F.cpu())
-        parts[0].edata['inner_edge'] = F.ones((sim_g.number_of_edges(),), F.int8, F.cpu())
+        parts[0].ndata['inner_node'] = F.ones((sim_g.number_of_nodes(),),
+            RESERVED_FIELD_DTYPE['inner_node'], F.cpu())
+        parts[0].edata['inner_edge'] = F.ones((sim_g.number_of_edges(),),
+            RESERVED_FIELD_DTYPE['inner_edge'], F.cpu())
     elif part_method in ('metis', 'random'):
         start = time.time()
         sim_g, balance_ntypes = get_homogeneous(g, balance_ntypes)
@@ -660,12 +700,12 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
             for name in parts:
                 orig_ids = parts[name].ndata['orig_id']
                 ntype = F.gather_row(sim_g.ndata[NTYPE], orig_ids)
-                parts[name].ndata[NTYPE] = F.astype(ntype, F.int32)
+                parts[name].ndata[NTYPE] = F.astype(ntype, RESERVED_FIELD_DTYPE[NTYPE])
                 assert np.all(F.asnumpy(ntype) == F.asnumpy(parts[name].ndata[NTYPE]))
                 # Get the original edge types and original edge IDs.
                 orig_ids = parts[name].edata['orig_id']
                 etype = F.gather_row(sim_g.edata[ETYPE], orig_ids)
-                parts[name].edata[ETYPE] = F.astype(etype, F.int32)
+                parts[name].edata[ETYPE] = F.astype(etype, RESERVED_FIELD_DTYPE[ETYPE])
                 assert np.all(F.asnumpy(etype) == F.asnumpy(parts[name].edata[ETYPE]))
 
                 # Calculate the global node IDs to per-node IDs mapping.
@@ -873,10 +913,10 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
                                                                       local_edges)
                     else:
                         edge_feats[etype + '/' + name] = g.edges[etype].data[name]
-        # Some adjustment for heterogeneous graphs.
-        if not g.is_homogeneous:
-            part.ndata['orig_id'] = F.gather_row(sim_g.ndata[NID], part.ndata['orig_id'])
-            part.edata['orig_id'] = F.gather_row(sim_g.edata[EID], part.edata['orig_id'])
+        # delete `orig_id` from ndata/edata
+        if reshuffle:
+            del part.ndata['orig_id']
+            del part.edata['orig_id']
 
         part_dir = os.path.join(out_path, "part" + str(part_id))
         node_feat_file = os.path.join(part_dir, "node_feat.dgl")
@@ -890,7 +930,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         save_tensors(node_feat_file, node_feats)
         save_tensors(edge_feat_file, edge_feats)
 
-        save_graphs(part_graph_file, [part])
+        _save_graphs(part_graph_file, [part])
     print('Save partitions: {:.3f} seconds, peak memory: {:.3f} GB'.format(
         time.time() - start, get_peak_mem()))
 

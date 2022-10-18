@@ -1,11 +1,12 @@
 """MXNet module for RelGraphConv"""
 # pylint: disable= no-member, arguments-differ, invalid-name
 import math
-import numpy as np
 
 import mxnet as mx
+import numpy as np
 from mxnet import gluon, nd
 from mxnet.gluon import nn
+
 from .... import function as fn
 from .. import utils
 
@@ -98,57 +99,78 @@ class RelGraphConv(gluon.Block):
     [ 0.056508   -0.00307822]]
     <NDArray 6x2 @cpu(0)>
     """
-    def __init__(self,
-                 in_feat,
-                 out_feat,
-                 num_rels,
-                 regularizer="basis",
-                 num_bases=None,
-                 bias=True,
-                 activation=None,
-                 self_loop=True,
-                 low_mem=False,
-                 dropout=0.0,
-                 layer_norm=False):
+
+    def __init__(
+        self,
+        in_feat,
+        out_feat,
+        num_rels,
+        regularizer="basis",
+        num_bases=None,
+        bias=True,
+        activation=None,
+        self_loop=True,
+        low_mem=False,
+        dropout=0.0,
+        layer_norm=False,
+    ):
         super(RelGraphConv, self).__init__()
         self.in_feat = in_feat
         self.out_feat = out_feat
         self.num_rels = num_rels
         self.regularizer = regularizer
         self.num_bases = num_bases
-        if self.num_bases is None or self.num_bases > self.num_rels or self.num_bases < 0:
+        if (
+            self.num_bases is None
+            or self.num_bases > self.num_rels
+            or self.num_bases < 0
+        ):
             self.num_bases = self.num_rels
         self.bias = bias
         self.activation = activation
         self.self_loop = self_loop
 
-        assert low_mem is False, 'MXNet currently does not support low-memory implementation.'
-        assert layer_norm is False, 'MXNet currently does not support layer norm.'
+        assert (
+            low_mem is False
+        ), "MXNet currently does not support low-memory implementation."
+        assert (
+            layer_norm is False
+        ), "MXNet currently does not support layer norm."
 
         if regularizer == "basis":
             # add basis weights
             self.weight = self.params.get(
-                'weight', shape=(self.num_bases, self.in_feat, self.out_feat),
-                init=mx.init.Xavier(magnitude=math.sqrt(2.0)))
+                "weight",
+                shape=(self.num_bases, self.in_feat, self.out_feat),
+                init=mx.init.Xavier(magnitude=math.sqrt(2.0)),
+            )
             if self.num_bases < self.num_rels:
                 # linear combination coefficients
                 self.w_comp = self.params.get(
-                    'w_comp', shape=(self.num_rels, self.num_bases),
-                    init=mx.init.Xavier(magnitude=math.sqrt(2.0)))
+                    "w_comp",
+                    shape=(self.num_rels, self.num_bases),
+                    init=mx.init.Xavier(magnitude=math.sqrt(2.0)),
+                )
             # message func
             self.message_func = self.basis_message_func
         elif regularizer == "bdd":
             if in_feat % num_bases != 0 or out_feat % num_bases != 0:
-                raise ValueError('Feature size must be a multiplier of num_bases.')
+                raise ValueError(
+                    "Feature size must be a multiplier of num_bases."
+                )
             # add block diagonal weights
             self.submat_in = in_feat // self.num_bases
             self.submat_out = out_feat // self.num_bases
 
             # assuming in_feat and out_feat are both divisible by num_bases
             self.weight = self.params.get(
-                'weight',
-                shape=(self.num_rels, self.num_bases * self.submat_in * self.submat_out),
-                init=mx.init.Xavier(magnitude=math.sqrt(2.0)))
+                "weight",
+                shape=(
+                    self.num_rels,
+                    self.num_bases * self.submat_in * self.submat_out,
+                ),
+                init=mx.init.Xavier(magnitude=math.sqrt(2.0)),
+            )
             # message func
             self.message_func = self.bdd_message_func
         else:
@@ -156,46 +178,57 @@ class RelGraphConv(gluon.Block):
 
         # bias
         if self.bias:
-            self.h_bias = self.params.get('bias', shape=(out_feat,),
-                                          init=mx.init.Zero())
+            self.h_bias = self.params.get(
+                "bias", shape=(out_feat,), init=mx.init.Zero()
+            )
 
         # weight for self loop
         if self.self_loop:
             self.loop_weight = self.params.get(
-                'W_0', shape=(in_feat, out_feat),
-                init=mx.init.Xavier(magnitude=math.sqrt(2.0)))
+                "W_0",
+                shape=(in_feat, out_feat),
+                init=mx.init.Xavier(magnitude=math.sqrt(2.0)),
+            )
 
         self.dropout = nn.Dropout(dropout)
 
     def basis_message_func(self, edges):
         """Message function for basis regularizer"""
-        ctx = edges.src['h'].context
+        ctx = edges.src["h"].context
         if self.num_bases < self.num_rels:
             # generate all weights from bases
             weight = self.weight.data(ctx).reshape(
-                self.num_bases, self.in_feat * self.out_feat)
+                self.num_bases, self.in_feat * self.out_feat
+            )
             weight = nd.dot(self.w_comp.data(ctx), weight).reshape(
-                self.num_rels, self.in_feat, self.out_feat)
+                self.num_rels, self.in_feat, self.out_feat
+            )
         else:
             weight = self.weight.data(ctx)
 
-        msg = utils.bmm_maybe_select(edges.src['h'], weight, edges.data['type'])
-        if 'norm' in edges.data:
-            msg = msg * edges.data['norm']
-        return {'msg': msg}
+        msg = utils.bmm_maybe_select(edges.src["h"], weight, edges.data["type"])
+        if "norm" in edges.data:
+            msg = msg * edges.data["norm"]
+        return {"msg": msg}
 
     def bdd_message_func(self, edges):
         """Message function for block-diagonal-decomposition regularizer"""
-        ctx = edges.src['h'].context
-        if edges.src['h'].dtype in (np.int32, np.int64) and len(edges.src['h'].shape) == 1:
-            raise TypeError('Block decomposition does not allow integer ID feature.')
-        weight = self.weight.data(ctx)[edges.data['type'], :].reshape(
-            -1, self.submat_in, self.submat_out)
-        node = edges.src['h'].reshape(-1, 1, self.submat_in)
+        ctx = edges.src["h"].context
+        if (
+            edges.src["h"].dtype in (np.int32, np.int64)
+            and len(edges.src["h"].shape) == 1
+        ):
+            raise TypeError(
+                "Block decomposition does not allow integer ID feature."
+            )
+        weight = self.weight.data(ctx)[edges.data["type"], :].reshape(
+            -1, self.submat_in, self.submat_out
+        )
+        node = edges.src["h"].reshape(-1, 1, self.submat_in)
         msg = nd.batch_dot(node, weight).reshape(-1, self.out_feat)
-        if 'norm' in edges.data:
-            msg = msg * edges.data['norm']
-        return {'msg': msg}
+        if "norm" in edges.data:
+            msg = msg * edges.data["norm"]
+        return {"msg": msg}
 
     def forward(self, g, x, etypes, norm=None):
         """
@@ -224,22 +257,25 @@ class RelGraphConv(gluon.Block):
         mx.ndarray.NDArray
             New node features.
         """
-        assert g.is_homogeneous, \
-            "not a homogeneous graph; convert it with to_homogeneous " \
+        assert g.is_homogeneous, (
+            "not a homogeneous graph; convert it with to_homogeneous "
             "and pass in the edge type as argument"
+        )
         with g.local_scope():
-            g.ndata['h'] = x
-            g.edata['type'] = etypes
+            g.ndata["h"] = x
+            g.edata["type"] = etypes
             if norm is not None:
-                g.edata['norm'] = norm
+                g.edata["norm"] = norm
             if self.self_loop:
-                loop_message = utils.matmul_maybe_select(x, self.loop_weight.data(x.context))
+                loop_message = utils.matmul_maybe_select(
+                    x, self.loop_weight.data(x.context)
+                )
 
             # message passing
-            g.update_all(self.message_func, fn.sum(msg='msg', out='h'))
+            g.update_all(self.message_func, fn.sum(msg="msg", out="h"))
 
             # apply bias and activation
-            node_repr = g.ndata['h']
+            node_repr = g.ndata["h"]
             if self.bias:
                 node_repr = node_repr + self.h_bias.data(x.context)
             if self.self_loop:

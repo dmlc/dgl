@@ -1,20 +1,24 @@
 """PyTorch multiprocessing wrapper."""
-from functools import wraps
 import random
 import traceback
 from _thread import start_new_thread
+from functools import wraps
+
 import torch
 import torch.multiprocessing as mp
 
 from ..utils import create_shared_mem_array, get_shared_mem_array
 
+
 def thread_wrapped_func(func):
     """
     Wraps a process entry point to make it work with OpenMP.
     """
+
     @wraps(func)
     def decorated_function(*args, **kwargs):
         queue = mp.Queue()
+
         def _queue_result():
             exception, trace, res = None, None, None
             try:
@@ -31,17 +35,30 @@ def thread_wrapped_func(func):
         else:
             assert isinstance(exception, Exception)
             raise exception.__class__(trace)
+
     return decorated_function
+
 
 # pylint: disable=missing-docstring
 class Process(mp.Process):
     # pylint: disable=dangerous-default-value
-    def __init__(self, group=None, target=None, name=None, args=(), kwargs={}, *, daemon=None):
+    def __init__(
+        self,
+        group=None,
+        target=None,
+        name=None,
+        args=(),
+        kwargs={},
+        *,
+        daemon=None
+    ):
         target = thread_wrapped_func(target)
         super().__init__(group, target, name, args, kwargs, daemon=daemon)
 
+
 def _get_shared_mem_name(id_):
     return "shared" + str(id_)
+
 
 def call_once_and_share(func, shape, dtype, rank=0):
     """Invoke the function in a single process of the PyTorch distributed process group,
@@ -61,7 +78,7 @@ def call_once_and_share(func, shape, dtype, rank=0):
     current_rank = torch.distributed.get_rank()
     dist_buf = torch.LongTensor([1])
 
-    if torch.distributed.get_backend() == 'nccl':
+    if torch.distributed.get_backend() == "nccl":
         # Use .cuda() to transfer it to the correct device.  Should be OK since
         # PyTorch recommends the users to call set_device() after getting inside
         # torch.multiprocessing.spawn()
@@ -88,6 +105,7 @@ def call_once_and_share(func, shape, dtype, rank=0):
 
     return result
 
+
 def shared_tensor(shape, dtype=torch.float32):
     """Create a tensor in shared memory accessible by all processes within the same
     ``torch.distributed`` process group.
@@ -106,4 +124,6 @@ def shared_tensor(shape, dtype=torch.float32):
     Tensor
         The shared tensor.
     """
-    return call_once_and_share(lambda: torch.empty(*shape, dtype=dtype), shape, dtype)
+    return call_once_and_share(
+        lambda: torch.empty(*shape, dtype=dtype), shape, dtype
+    )

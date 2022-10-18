@@ -4,23 +4,27 @@ from __future__ import absolute_import
 
 import ctypes
 import sys
-from .. import _api_internal
-from .object_generic import ObjectGeneric, convert_to_object
-from .base import _LIB, check_call, c_str, py_str, _FFI_MODE
 
-IMPORT_EXCEPT = RuntimeError if _FFI_MODE == "cython" \
-        else ImportError  # pylint: disable=invalid-name
+from .. import _api_internal
+from .base import _FFI_MODE, _LIB, c_str, check_call, py_str
+from .object_generic import ObjectGeneric, convert_to_object
+
+# pylint: disable=invalid-name
+IMPORT_EXCEPT = RuntimeError if _FFI_MODE == "cython" else ImportError
 try:
     # pylint: disable=wrong-import-position
     if _FFI_MODE == "ctypes":
         raise ImportError()
     if sys.version_info >= (3, 0):
-        from ._cy3.core import _register_object, ObjectBase as _ObjectBase
+        from ._cy3.core import ObjectBase as _ObjectBase
+        from ._cy3.core import _register_object
     else:
-        from ._cy2.core import _register_object, ObjectBase as _ObjectBase
+        from ._cy2.core import ObjectBase as _ObjectBase
+        from ._cy2.core import _register_object
 except IMPORT_EXCEPT:
     # pylint: disable=wrong-import-position
-    from ._ctypes.object import _register_object, ObjectBase as _ObjectBase
+    from ._ctypes.object import ObjectBase as _ObjectBase
+    from ._ctypes.object import _register_object
 
 
 def _new_object(cls):
@@ -36,11 +40,15 @@ class ObjectBase(_ObjectBase):
 
     Note that the same handle **CANNOT** be shared across multiple ObjectBase instances.
     """
+
     def __dir__(self):
         plist = ctypes.POINTER(ctypes.c_char_p)()
         size = ctypes.c_uint()
-        check_call(_LIB.DGLObjectListAttrNames(
-            self.handle, ctypes.byref(size), ctypes.byref(plist)))
+        check_call(
+            _LIB.DGLObjectListAttrNames(
+                self.handle, ctypes.byref(size), ctypes.byref(plist)
+            )
+        )
         names = []
         for i in range(size.value):
             names.append(py_str(plist[i]))
@@ -57,7 +65,7 @@ class ObjectBase(_ObjectBase):
 
     def __reduce__(self):
         cls = type(self)
-        return (_new_object, (cls, ), self.__getstate__())
+        return (_new_object, (cls,), self.__getstate__())
 
     def __getstate__(self):
         # TODO(minjie): TVM assumes that a Node (Object in DGL) can be serialized
@@ -100,7 +108,9 @@ def register_object(type_key=None):
     def register(cls):
         """internal register function"""
         tindex = ctypes.c_int()
-        ret = _LIB.DGLObjectTypeKey2Index(c_str(object_name), ctypes.byref(tindex))
+        ret = _LIB.DGLObjectTypeKey2Index(
+            c_str(object_name), ctypes.byref(tindex)
+        )
         if ret == 0:
             _register_object(tindex.value, cls)
         return cls

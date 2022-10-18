@@ -1,15 +1,16 @@
 """dgl sddmm operator module."""
-from itertools import product
 import sys
+from itertools import product
 
+from .. import backend as F
 from ..backend import gsddmm as gsddmm_internal
 from ..backend import gsddmm_hetero as gsddmm_internal_hetero
-from .. import backend as F
 
-__all__ = ['gsddmm', 'copy_u', 'copy_v', 'copy_e']
+__all__ = ["gsddmm", "copy_u", "copy_v", "copy_e"]
+
 
 def reshape_lhs_rhs(lhs_data, rhs_data):
-    r""" Expand dims so that there will be no broadcasting issues with different
+    r"""Expand dims so that there will be no broadcasting issues with different
     number of dimensions. For example, given two shapes (N, 3, 1), (E, 5, 3, 4)
     that are valid broadcastable shapes, change them to (N, 1, 3, 1) and
     (E, 5, 3, 4)
@@ -33,8 +34,9 @@ def reshape_lhs_rhs(lhs_data, rhs_data):
         rhs_data = F.reshape(rhs_data, new_rhs_shape)
     return lhs_data, rhs_data
 
-def gsddmm(g, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
-    r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface.
+
+def gsddmm(g, op, lhs_data, rhs_data, lhs_target="u", rhs_target="v"):
+    r"""Generalized Sampled-Dense-Dense Matrix Multiplication interface.
     It computes edge features by :attr:`op` lhs features and rhs features.
 
     .. math::
@@ -69,30 +71,34 @@ def gsddmm(g, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
         The result tensor.
     """
     if g._graph.number_of_etypes() == 1:
-        if op not in ['copy_lhs', 'copy_rhs']:
+        if op not in ["copy_lhs", "copy_rhs"]:
             lhs_data, rhs_data = reshape_lhs_rhs(lhs_data, rhs_data)
         return gsddmm_internal(
-            g._graph, op, lhs_data, rhs_data, lhs_target, rhs_target)
+            g._graph, op, lhs_data, rhs_data, lhs_target, rhs_target
+        )
     else:
-        if op == 'copy_lhs':
+        if op == "copy_lhs":
             rhs_data = [None] * g._graph.number_of_etypes()
-        elif op == 'copy_rhs':
+        elif op == "copy_rhs":
             lhs_data = [None] * g._graph.number_of_ntypes()
         # TODO (Israt): Call reshape_lhs_rhs() on lhs and rhs data to match their dimension
         # and avoid broadcasting issue. Handle the case where different nodes have
         # different dimensions, and different etypes may need different broadcasting
         # dims for the same node.
         lhs_and_rhs_tuple = tuple(list(lhs_data) + list(rhs_data))
-        return gsddmm_internal_hetero(g._graph, op, len(lhs_data), lhs_target,
-                                      rhs_target, *lhs_and_rhs_tuple)
+        return gsddmm_internal_hetero(
+            g._graph,
+            op,
+            len(lhs_data),
+            lhs_target,
+            rhs_target,
+            *lhs_and_rhs_tuple
+        )
+
 
 def _gen_sddmm_func(lhs_target, rhs_target, binary_op):
     name = "{}_{}_{}".format(lhs_target, binary_op, rhs_target)
-    target_dict = {
-        'u': "source node",
-        'e': "edge",
-        'v': "destination node"
-    }
+    target_dict = {"u": "source node", "e": "edge", "v": "destination node"}
     lhs_str = target_dict[lhs_target]
     rhs_str = target_dict[rhs_target]
     docstring = r"""Generalized SDDMM function.
@@ -121,11 +127,15 @@ def _gen_sddmm_func(lhs_target, rhs_target, binary_op):
     Broadcasting follows NumPy semantics. Please see
     https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html
     for more details about the NumPy broadcasting semantics.
-    """.format(op=binary_op, lhs=lhs_str, rhs=rhs_str)
+    """.format(
+        op=binary_op, lhs=lhs_str, rhs=rhs_str
+    )
 
     def func(g, x, y):
-        return gsddmm(g, binary_op, x, y,
-                      lhs_target=lhs_target, rhs_target=rhs_target)
+        return gsddmm(
+            g, binary_op, x, y, lhs_target=lhs_target, rhs_target=rhs_target
+        )
+
     func.__name__ = name
     func.__doc__ = docstring
     return func
@@ -161,7 +171,7 @@ def copy_u(g, x):
     -----
     This function supports autograd (computing input gradients given the output gradient).
     """
-    return gsddmm(g, 'copy_lhs', x, None)
+    return gsddmm(g, "copy_lhs", x, None)
 
 
 def copy_v(g, x):
@@ -183,7 +193,7 @@ def copy_v(g, x):
     -----
     This function supports autograd (computing input gradients given the output gradient).
     """
-    return gsddmm(g, 'copy_rhs', None, x)
+    return gsddmm(g, "copy_rhs", None, x)
 
 
 # pylint: disable=unused-argument

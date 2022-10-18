@@ -22,16 +22,6 @@ __all__ = ['SST', 'SSTDataset']
 class SSTDataset(DGLBuiltinDataset):
     r"""Stanford Sentiment Treebank dataset.
 
-    .. deprecated:: 0.5.0
-
-        - ``trees`` is deprecated, it is replaced by:
-
-            >>> dataset = SSTDataset()
-            >>> for tree in dataset:
-            ....    # your code here
-
-        - ``num_vocabs`` is deprecated, it is replaced by ``vocab_size``.
-
     Each sample is the constituency tree of a sentence. The leaf nodes
     represent words. The word is a int value stored in the ``x`` feature field.
     The non-leaf node has a special value ``PAD_WORD`` in the ``x`` field.
@@ -74,15 +64,11 @@ class SSTDataset(DGLBuiltinDataset):
     ----------
     vocab : OrderedDict
         Vocabulary of the dataset
-    trees : list
-        A list of DGLGraph objects
     num_classes : int
         Number of classes for each node
     pretrained_emb: Tensor
         Pretrained glove embedding with respect the vocabulary.
     vocab_size : int
-        The size of the vocabulary
-    num_vocabs : int
         The size of the vocabulary
 
     Notes
@@ -225,11 +211,6 @@ class SSTDataset(DGLBuiltinDataset):
             self._pretrained_emb = load_info(emb_path)['embed']
 
     @property
-    def trees(self):
-        deprecate_property('dataset.trees', '[dataset[i] for i in len(dataset)]')
-        return self._trees
-
-    @property
     def vocab(self):
         r""" Vocabulary
 
@@ -269,11 +250,6 @@ class SSTDataset(DGLBuiltinDataset):
     def __len__(self):
         r"""Number of graphs in the dataset."""
         return len(self._trees)
-
-    @property
-    def num_vocabs(self):
-        deprecate_property('dataset.num_vocabs', 'dataset.vocab_size')
-        return self.vocab_size
 
     @property
     def vocab_size(self):
