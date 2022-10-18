@@ -16,7 +16,6 @@ import psutil
 import sys
 
 v_t = dgl.__version__
-print(f"dgl version is {v_t}")
 
 def prepare_data(args, device):
     dataset = DglNodePropPredDataset(name="ogbn-mag")
@@ -35,7 +34,6 @@ def prepare_data(args, device):
     # train sampler
     sampler = dgl.dataloading.MultiLayerNeighborSampler([25, 20])
     num_workers = args.num_workers
-    print(f"num of workers is {num_workers}")
     train_loader = dgl.dataloading.DataLoader(
         g,
         split_idx["train"],
