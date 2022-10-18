@@ -324,7 +324,8 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows,
             // 1 end of the current etype
             // 2 end of the row
             // random pick for current etype
-            if (et_len <= num_picks[cur_et] && !replace) {
+            if ((num_picks[cur_et] == -1) ||
+                (et_len <= num_picks[cur_et] && !replace)) {
               // fast path, select all
               for (int64_t k = 0; k < et_len; ++k) {
                 IdxType eid_offset = off + et_idx[et_offset + k];

@@ -4,6 +4,7 @@ from collections.abc import MutableMapping
 from collections import namedtuple
 
 import os
+import gc
 import numpy as np
 
 from ..heterograph import DGLHeteroGraph
@@ -12,7 +13,7 @@ from ..convert import graph as dgl_graph
 from ..transforms import compact_graphs, sort_csr_by_tag, sort_csc_by_tag
 from .. import heterograph_index
 from .. import backend as F
-from ..base import NID, EID, NTYPE, ETYPE, ALL, is_all
+from ..base import NID, EID, ETYPE, ALL, is_all
 from .kvstore import KVServer, get_kvstore
 from .._ffi.ndarray import empty_shared_mem
 from ..ndarray import exist_shared_mem_array
@@ -32,6 +33,7 @@ from .graph_services import find_edges as dist_find_edges
 from .graph_services import out_degrees as dist_out_degrees
 from .graph_services import in_degrees as dist_in_degrees
 from .dist_tensor import DistTensor
+from .partition import RESERVED_FIELD_DTYPE
 
 INIT_GRAPH = 800001
 
@@ -86,10 +88,6 @@ def _copy_graph_to_shared_mem(g, graph_name, graph_format):
                 g.edata[ETYPE],
                 _get_edata_path(graph_name, ETYPE),
         )
-        new_g.edata['__LOCAL_ID__'] = _to_shared_mem(
-                g.edata['__LOCAL_ID__'],
-                _get_edata_path(graph_name, '__LOCAL_ID__'),
-        )
     return new_g
 
 FIELD_DICT = {'inner_node': F.int32,    # A flag indicates whether the node is inside a partition.
@@ -97,8 +95,7 @@ FIELD_DICT = {'inner_node': F.int32,    # A flag indicates whether the node is i
               NID: F.int64,
               EID: F.int64,
               NTYPE: F.int32,
-              ETYPE: F.int32,
-              '__LOCAL_ID__': F.int64}
+              ETYPE: F.int32}
 
 def _get_shared_mem_ndata(g, graph_name, name):
     ''' Get shared-memory node data from DistGraph server.
@@ -107,7 +104,7 @@ def _get_shared_mem_ndata(g, graph_name, name):
     with shared memory.
     '''
     shape = (g.number_of_nodes(),)
-    dtype = FIELD_DICT[name]
+    dtype = RESERVED_FIELD_DTYPE[name]
     dtype = DTYPE_DICT[dtype]
     data = empty_shared_mem(_get_ndata_path(graph_name, name), False, shape, dtype)
     dlpack = data.to_dlpack()
@@ -120,7 +117,7 @@ def _get_shared_mem_edata(g, graph_name, name):
     with shared memory.
     '''
     shape = (g.number_of_edges(),)
-    dtype = FIELD_DICT[name]
+    dtype = RESERVED_FIELD_DTYPE[name]
     dtype = DTYPE_DICT[dtype]
     data = empty_shared_mem(_get_edata_path(graph_name, name), False, shape, dtype)
     dlpack = data.to_dlpack()
@@ -150,7 +147,6 @@ def _get_graph_from_shared_mem(graph_name):
     # heterogeneous graph has ETYPE
     if _exist_shared_mem_array(graph_name, ETYPE):
         g.edata[ETYPE] = _get_shared_mem_edata(g, graph_name, ETYPE)
-        g.edata['__LOCAL_ID__'] = _get_shared_mem_edata(g, graph_name, '__LOCAL_ID__')
     return g
 
 NodeSpace = namedtuple('NodeSpace', ['data'])
@@ -349,7 +345,7 @@ class DistGraphServer(KVServer):
             # TODO(Rui) Formatting forcely is not a perfect solution.
             #   We'd better store all dtypes when mapping to shared memory
             #   and map back with original dtypes.
-            for k, dtype in FIELD_DICT.items():
+            for k, dtype in RESERVED_FIELD_DTYPE.items():
                 if k in self.client_g.ndata:
                     self.client_g.ndata[k] = F.astype(
                         self.client_g.ndata[k], dtype)
@@ -381,7 +377,8 @@ class DistGraphServer(KVServer):
             self.add_part_policy(PartitionPolicy(edge_name.policy_str, self.gpb))
 
         if not self.is_backup_server():
-            node_feats, edge_feats = load_partition_feats(part_config, self.part_id)
+            node_feats, _ = load_partition_feats(part_config, self.part_id,
+                load_nodes=True, load_edges=False)
             for name in node_feats:
                 # The feature name has the following format: node_type + "/" + feature_name to avoid
                 # feature name collision for different node types.
@@ -390,6 +387,11 @@ class DistGraphServer(KVServer):
                 self.init_data(name=str(data_name), policy_str=data_name.policy_str,
                                data_tensor=node_feats[name])
                 self.orig_data.add(str(data_name))
+            # Let's free once node features are copied to shared memory
+            del node_feats
+            gc.collect()
+            _, edge_feats = load_partition_feats(part_config, self.part_id,
+                load_nodes=False, load_edges=True)
             for name in edge_feats:
                 # The feature name has the following format: edge_type + "/" + feature_name to avoid
                 # feature name collision for different edge types.
@@ -402,6 +404,9 @@ class DistGraphServer(KVServer):
                 self.init_data(name=str(data_name), policy_str=data_name.policy_str,
                                data_tensor=edge_feats[name])
                 self.orig_data.add(str(data_name))
+            # Let's free once edge features are copied to shared memory
+            del edge_feats
+            gc.collect()
 
     def start(self):
         """ Start graph store server.
