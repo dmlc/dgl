@@ -224,24 +224,27 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
             #where key: feature_name, value: dictionary in which keys are "format", "data"
             edge_feature_tids[etype_name] = []
             for feat_name, feat_data in etype_feature_data.items():
-                assert len(feat_data[constants.STR_DATA]) == world_size
                 assert feat_data[constants.STR_FORMAT][constants.STR_NAME] == constants.STR_NUMPY
-                feature_fname = feat_data[constants.STR_DATA][rank] #this will be just the file name
-                if (os.path.isabs(feature_fname)):
-                    logging.info(f'Loading numpy from {feature_fname}')
-                    edge_features[etype_name+'/'+feat_name] = \
-                            torch.from_numpy(np.load(feature_fname))
-                else:
-                    numpy_path = os.path.join(input_dir, feature_fname)
-                    logging.info(f'Loading numpy from {numpy_path}')
-                    edge_features[etype_name+'/'+feat_name] = \
-                            torch.from_numpy(np.load(numpy_path))
+                num_chunks = len(feat_data[constants.STR_DATA])
+                read_list = np.array_split(np.arange(num_chunks), world_size)
+                efeat = []
+                for idx in read_list[rank]:
+                    efeat_file = feat_data[constants.STR_DATA][idx]
+                    if not os.path.isabs(efeat_file):
+                        efeat_file = os.path.join(input_dir, efeat_file)
+                    logging.info(
+                        f'Loading edge feature[{feat_name}] of etype[{etype_name}] from {efeat_file}'
+                    )
+                    efeat.append(np.load(efeat_file))
+                efeat = np.concatenate(efeat)
+                edge_features[etype_name + '/' + feat_name] = torch.from_numpy(efeat)
 
                 edge_feature_tids[etype_name].append([feat_name, -1, -1])
 
     # Read edges for each node types that are processed by the currnet process.
     edge_tids, _ = get_idranges(schema_map[constants.STR_EDGE_TYPE], 
-                                    schema_map[constants.STR_NUM_EDGES_PER_CHUNK])
+                                schema_map[constants.STR_NUM_EDGES_PER_CHUNK],
+                                num_chunks=world_size)
     for etype_name in schema_map[constants.STR_EDGE_TYPE]: 
         if etype_name in edge_feature_tids: 
             for item in edge_feature_tids[etype_name]:
