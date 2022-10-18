@@ -3,4 +3,4 @@
 
 from .gnnexplainer import GNNExplainer
 
-__all__ = ['GNNExplainer']
+__all__ = ["GNNExplainer"]
