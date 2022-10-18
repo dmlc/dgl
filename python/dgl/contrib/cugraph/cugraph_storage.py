@@ -144,7 +144,7 @@ class CuGraphStorage:
     # Sampling Function
     def sample_neighbors(
         self,
-        seed_nodes,
+        nodes,
         fanout,
         edge_dir="in",
         prob=None,
@@ -158,7 +158,7 @@ class CuGraphStorage:
         See ``dgl.sampling.sample_neighbors`` for detailed semantics.
         Parameters
         ----------
-        seed_nodes : Tensor or dict[str, Tensor]
+        nodes : Tensor or dict[str, Tensor]
             Node IDs to sample neighbors from.
             This argument can take a single ID tensor or a dictionary of node
             types and ID tensors. If a single tensor is given, the graph must
@@ -208,27 +208,26 @@ class CuGraphStorage:
                 " for sample_neighbors in CuGraphStorage",
             )
 
-        if not isinstance(seed_nodes, dict):
+        if not isinstance(nodes, dict):
             if len(self.ntypes) > 1:
                 raise dgl.DGLError(
                     "Must specify node type when the graph is not homogeneous."
                 )
             else:
-                seed_nodes = F.tensor(seed_nodes)
-                seed_nodes_cap = F.zerocopy_to_dlpack(seed_nodes)
+                nodes = F.tensor(nodes)
+                nodes_cap = F.zerocopy_to_dlpack(nodes)
         else:
-            seed_nodes = {
+            nodes = {
                 k: self.dgl_n_id_to_cugraph_id(F.tensor(n), k)
-                for k, n in seed_nodes.items()
+                for k, n in nodes.items()
             }
 
-            seed_nodes_cap = {
-                k: F.zerocopy_to_dlpack(F.tensor(n))
-                for k, n in seed_nodes.items()
+            nodes_cap = {
+                k: F.zerocopy_to_dlpack(F.tensor(n)) for k, n in nodes.items()
             }
 
         sample_cap_obj = self.graphstore.sample_neighbors(
-            seed_nodes_cap,
+            nodes_cap,
             fanout,
             edge_dir=edge_dir,
             prob=prob,
@@ -507,6 +506,19 @@ class CuGraphStorage:
     def canonical_etypes(self):
         can_etypes = self.graphstore.etypes
         return [convert_can_etype_s_to_tup(s) for s in can_etypes]
+
+    @property
+    def device(self):
+        """
+        Get the device of the graph.
+        Returns
+        -------
+        device context
+            The device of the graph, which should be a
+            framework-specific device object (e.g., ``torch.device``).
+        """
+        import torch
+        return torch.cuda.current_device()
 
     # Index Conversion Utils
     def get_node_id_offset(self, ntype: str) -> int:
