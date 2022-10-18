@@ -5,6 +5,10 @@ import unittest
 from collections import defaultdict
 import pytest
 
+np.random.seed(100)
+import torch
+torch.random.manual_seed(100)
+
 def check_random_walk(g, metapath, traces, ntypes, prob=None, trace_eids=None):
     traces = F.asnumpy(traces)
     ntypes = F.asnumpy(ntypes)
@@ -962,10 +966,13 @@ def test_sample_neighbors_etype_sorted_homogeneous(format_, direction):
     if (direction, format_) in [('in', 'csr'), ('out', 'csc')]:
         h_g = h_g.formats(['csc', 'csr', 'coo'])
 
-    h_g = dgl.sort_csc_by_tag(h_g, dgl.ETYPE, tag_type='edge')
+    if direction == 'in':
+        h_g = dgl.sort_csc_by_tag(h_g, h_g.edata[dgl.ETYPE], tag_type='edge')
+    else:
+        h_g = dgl.sort_csr_by_tag(h_g, h_g.edata[dgl.ETYPE], tag_type='edge')
     # shuffle
     h_g_etype = F.asnumpy(h_g.edata[dgl.ETYPE])
-    h_g_offset = np.cumsum(np.insert(h_g_etype, 0, 0)).tolist()
+    h_g_offset = np.cumsum(np.insert(np.bincount(h_g_etype), 0, 0)).tolist()
     sg = dgl.sampling.sample_etype_neighbors(
         h_g, seeds, h_g_offset, fanouts, edge_dir=direction, etype_sorted=True)
 
@@ -1097,23 +1104,24 @@ def test_global_uniform_negative_sampling(dtype):
 
 if __name__ == '__main__':
     from itertools import product
-    test_sample_neighbors_noprob()
-    test_sample_neighbors_prob()
-    test_sample_neighbors_mask()
-    for args in product(['coo', 'csr', 'csc'], ['in', 'out'], [False, True]):
-        test_sample_neighbors_etype_sorted_homogeneous(*(args[:2]))
-        test_sample_neighbors_etype_homogeneous(*args)
-    test_non_uniform_random_walk(False)
-    test_uniform_random_walk(False)
-    test_pack_traces()
-    test_pinsage_sampling(False)
-    test_sample_neighbors_outedge()
-    test_sample_neighbors_topk()
-    test_sample_neighbors_topk_outedge()
-    test_sample_neighbors_with_0deg()
-    test_sample_neighbors_biased_homogeneous()
-    test_sample_neighbors_biased_bipartite()
-    test_sample_neighbors_exclude_edges_heteroG('int32')
-    test_sample_neighbors_exclude_edges_homoG('int32')
-    test_global_uniform_negative_sampling('int32')
-    test_global_uniform_negative_sampling('int64')
+    #test_sample_neighbors_noprob()
+    #test_sample_neighbors_prob()
+    #test_sample_neighbors_mask()
+    #for args in product(['coo', 'csr', 'csc'], ['in', 'out'], [False, True]):
+    #    test_sample_neighbors_etype_homogeneous(*args)
+    for args in product(['csr', 'csc'], ['in', 'out']):
+        test_sample_neighbors_etype_sorted_homogeneous(*args)
+    #test_non_uniform_random_walk(False)
+    #test_uniform_random_walk(False)
+    #test_pack_traces()
+    #test_pinsage_sampling(False)
+    #test_sample_neighbors_outedge()
+    #test_sample_neighbors_topk()
+    #test_sample_neighbors_topk_outedge()
+    #test_sample_neighbors_with_0deg()
+    #test_sample_neighbors_biased_homogeneous()
+    #test_sample_neighbors_biased_bipartite()
+    #test_sample_neighbors_exclude_edges_heteroG('int32')
+    #test_sample_neighbors_exclude_edges_homoG('int32')
+    #test_global_uniform_negative_sampling('int32')
+    #test_global_uniform_negative_sampling('int64')

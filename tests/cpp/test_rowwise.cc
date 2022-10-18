@@ -36,12 +36,12 @@ template <typename Idx>
 std::set<ETuple<Idx>> AllEdgePerEtypeSet(bool has_data) {
   if (has_data) {
     std::set<ETuple<Idx>> eset;
-    eset.insert(ETuple<Idx>{0, 0, 2});
-    eset.insert(ETuple<Idx>{0, 1, 3});
-    eset.insert(ETuple<Idx>{0, 2, 5});
+    eset.insert(ETuple<Idx>{0, 0, 0});
+    eset.insert(ETuple<Idx>{0, 1, 1});
+    eset.insert(ETuple<Idx>{0, 2, 4});
     eset.insert(ETuple<Idx>{0, 3, 6});
-    eset.insert(ETuple<Idx>{3, 2, 1});
-    eset.insert(ETuple<Idx>{3, 3, 4});
+    eset.insert(ETuple<Idx>{3, 2, 5});
+    eset.insert(ETuple<Idx>{3, 3, 3});
     return eset;
   } else {
     std::set<ETuple<Idx>> eset;
@@ -49,8 +49,8 @@ std::set<ETuple<Idx>> AllEdgePerEtypeSet(bool has_data) {
     eset.insert(ETuple<Idx>{0, 1, 1});
     eset.insert(ETuple<Idx>{0, 2, 2});
     eset.insert(ETuple<Idx>{0, 3, 3});
-    eset.insert(ETuple<Idx>{3, 2, 5});
-    eset.insert(ETuple<Idx>{3, 3, 6});
+    eset.insert(ETuple<Idx>{3, 3, 5});
+    eset.insert(ETuple<Idx>{3, 2, 6});
     return eset;
   }
 }
@@ -83,20 +83,6 @@ void CheckSampledResult(COOMatrix mat, IdArray rows, bool has_data) {
 }
 
 template <typename Idx>
-void CheckSampledPerEtypeReplaceResult(COOMatrix mat, IdArray rows, bool has_data) {
-  ASSERT_EQ(mat.num_rows, 4);
-  ASSERT_EQ(mat.num_cols, 4);
-  Idx* row = static_cast<Idx*>(mat.row->data);
-  Idx* col = static_cast<Idx*>(mat.col->data);
-  Idx* data = static_cast<Idx*>(mat.data->data);
-  const auto& gt = AllEdgePerEtypeSet<Idx>(has_data);
-  for (int64_t i = 0; i < mat.row->shape[0]; ++i) {
-    ASSERT_TRUE(gt.count(std::make_tuple(row[i], col[i], data[i])));
-    ASSERT_TRUE(IsInArray(rows, row[i]));
-  }
-}
-
-template <typename Idx>
 void CheckSampledPerEtypeResult(COOMatrix mat, IdArray rows, bool has_data) {
   ASSERT_EQ(mat.num_rows, 4);
   ASSERT_EQ(mat.num_cols, 4);
@@ -104,19 +90,11 @@ void CheckSampledPerEtypeResult(COOMatrix mat, IdArray rows, bool has_data) {
   Idx* col = static_cast<Idx*>(mat.col->data);
   Idx* data = static_cast<Idx*>(mat.data->data);
   const auto& gt = AllEdgePerEtypeSet<Idx>(has_data);
-  int cnt_0 = 0;
-  int cnt_3 = 0;
   for (int64_t i = 0; i < mat.row->shape[0]; ++i) {
-    ASSERT_TRUE(gt.count(std::make_tuple(row[i], col[i], data[i])));
+    int64_t count = gt.count(std::make_tuple(row[i], col[i], data[i]));
+    ASSERT_TRUE(count);
     ASSERT_TRUE(IsInArray(rows, row[i]));
-    if (row[i] == 0)
-      cnt_0 += 1;
-    if (row[i] == 3)
-      cnt_3 += 1;
   }
-
-  ASSERT_EQ(cnt_0, 3);
-  ASSERT_EQ(cnt_3, 2);
 }
 
 template <typename Idx>
@@ -144,8 +122,8 @@ COOMatrix COO(bool has_data) {
 template <typename Idx>
 std::pair<CSRMatrix, std::vector<int64_t>> CSREtypes(bool has_data) {
   IdArray indptr = NDArray::FromVector(std::vector<Idx>({0, 4, 5, 5, 7}));
-  IdArray indices = NDArray::FromVector(std::vector<Idx>({0, 1, 2, 3, 1, 2, 3}));
-  IdArray data = NDArray::FromVector(std::vector<Idx>({0, 1, 4, 6, 2, 5, 3}));
+  IdArray indices = NDArray::FromVector(std::vector<Idx>({0, 1, 2, 3, 1, 3, 2}));
+  IdArray data = NDArray::FromVector(std::vector<Idx>({0, 1, 4, 6, 2, 3, 5}));
   auto etype_offsets = std::vector<int64_t>({0, 4, 5, 6, 7});
   if (has_data)
     return {CSRMatrix(4, 4, indptr, indices, data), etype_offsets};
@@ -156,8 +134,8 @@ std::pair<CSRMatrix, std::vector<int64_t>> CSREtypes(bool has_data) {
 template <typename Idx>
 std::pair<COOMatrix, std::vector<int64_t>> COOEtypes(bool has_data) {
   IdArray row = NDArray::FromVector(std::vector<Idx>({0, 0, 0, 0, 1, 3, 3}));
-  IdArray col = NDArray::FromVector(std::vector<Idx>({0, 1, 2, 3, 1, 2, 3}));
-  IdArray data = NDArray::FromVector(std::vector<Idx>({0, 1, 4, 6, 2, 5, 3}));
+  IdArray col = NDArray::FromVector(std::vector<Idx>({0, 1, 2, 3, 1, 3, 2}));
+  IdArray data = NDArray::FromVector(std::vector<Idx>({0, 1, 4, 6, 2, 3, 5}));
   auto etype_offsets = std::vector<int64_t>({0, 4, 5, 6, 7});
   if (has_data)
     return {COOMatrix(4, 4, row, col, data), etype_offsets};
@@ -270,7 +248,7 @@ void _TestCSRPerEtypeSampling(bool has_data) {
   IdArray rows = NDArray::FromVector(std::vector<Idx>({0, 3}));
   for (int k = 0; k < 10; ++k) {
     auto rst = CSRRowWisePerEtypeSampling(mat, rows, etype_offset, {2, 2, 2, 2}, prob, true);
-    CheckSampledPerEtypeReplaceResult<Idx>(rst, rows, has_data);
+    CheckSampledPerEtypeResult<Idx>(rst, rows, has_data);
   }
   for (int k = 0; k < 10; ++k) {
     auto rst = CSRRowWisePerEtypeSampling(mat, rows, etype_offset, {2, 2, 2, 2}, prob, false);
@@ -305,12 +283,12 @@ void _TestCSRPerEtypeSampling(bool has_data) {
       ASSERT_EQ(counts, 2);
       counts = 0;
       counts += eset.count(std::make_tuple(1, 1, 4));
+      ASSERT_EQ(counts, 0);
+      counts = 0;
+      counts += eset.count(std::make_tuple(3, 3, 5));
       ASSERT_EQ(counts, 1);
       counts = 0;
-      counts += eset.count(std::make_tuple(3, 2, 5));
-      ASSERT_EQ(counts, 1);
-      counts = 0;
-      counts += eset.count(std::make_tuple(3, 3, 6));
+      counts += eset.count(std::make_tuple(3, 2, 6));
       ASSERT_EQ(counts, 1);
     }
   }
@@ -323,7 +301,7 @@ void _TestCSRPerEtypeSampling(bool has_data) {
   };
   for (int k = 0; k < 10; ++k) {
     auto rst = CSRRowWisePerEtypeSampling(mat, rows, etype_offset, {2, 2, 2, 2}, prob, true);
-    CheckSampledPerEtypeReplaceResult<Idx>(rst, rows, has_data);
+    CheckSampledPerEtypeResult<Idx>(rst, rows, has_data);
     auto eset = ToEdgeSet<Idx>(rst);
     if (has_data) {
       ASSERT_FALSE(eset.count(std::make_tuple(0, 0, 0)));
@@ -349,11 +327,11 @@ void _TestCSRPerEtypeSamplingSorted() {
   IdArray rows = NDArray::FromVector(std::vector<Idx>({0, 3}));
   for (int k = 0; k < 10; ++k) {
     auto rst = CSRRowWisePerEtypeSampling(mat, rows, etype_offset, {2, 2, 2, 2}, prob, true, true);
-    CheckSampledPerEtypeReplaceResult<Idx>(rst, rows, has_data);
+    CheckSampledPerEtypeResult<Idx>(rst, rows, true);
   }
   for (int k = 0; k < 10; ++k) {
     auto rst = CSRRowWisePerEtypeSampling(mat, rows, etype_offset, {2, 2, 2, 2}, prob, false, true);
-    CheckSampledPerEtypeResult<Idx>(rst, rows, has_data);
+    CheckSampledPerEtypeResult<Idx>(rst, rows, true);
     auto eset = ToEdgeSet<Idx>(rst);
     int counts = 0;
     counts += eset.count(std::make_tuple(0, 0, 0));
@@ -384,7 +362,7 @@ void _TestCSRPerEtypeSamplingSorted() {
   };
   for (int k = 0; k < 10; ++k) {
     auto rst = CSRRowWisePerEtypeSampling(mat, rows, etype_offset, {2, 2, 2, 2}, prob, true, true);
-    CheckSampledPerEtypeReplaceResult<Idx>(rst, rows, true);
+    CheckSampledPerEtypeResult<Idx>(rst, rows, true);
     auto eset = ToEdgeSet<Idx>(rst);
     ASSERT_FALSE(eset.count(std::make_tuple(0, 0, 0)));
   }
@@ -407,7 +385,9 @@ TEST(RowwiseTest, TestCSRPerEtypeSampling) {
 
 template <typename Idx, typename FloatType>
 void _TestCSRPerEtypeSamplingUniform(bool has_data) {
-  auto mat = CSREtypes<Idx>(has_data);
+  auto pair = CSREtypes<Idx>(has_data);
+  auto mat = pair.first;
+  auto etype_offset = pair.second;
   std::vector<FloatArray> prob = {
     aten::NullArray(),
     aten::NullArray(),
@@ -417,7 +397,7 @@ void _TestCSRPerEtypeSamplingUniform(bool has_data) {
   IdArray rows = NDArray::FromVector(std::vector<Idx>({0, 3}));
   for (int k = 0; k < 10; ++k) {
     auto rst = CSRRowWisePerEtypeSampling(mat, rows, etype_offset, {2, 2, 2, 2}, prob, true);
-    CheckSampledPerEtypeReplaceResult<Idx>(rst, rows, has_data);
+    CheckSampledPerEtypeResult<Idx>(rst, rows, has_data);
   }
   for (int k = 0; k < 10; ++k) {
     auto rst = CSRRowWisePerEtypeSampling(mat, rows, etype_offset, {2, 2, 2, 2}, prob, false);
@@ -452,12 +432,12 @@ void _TestCSRPerEtypeSamplingUniform(bool has_data) {
       ASSERT_EQ(counts, 2);
       counts = 0;
       counts += eset.count(std::make_tuple(1, 1, 4));
+      ASSERT_EQ(counts, 0);
+      counts = 0;
+      counts += eset.count(std::make_tuple(3, 3, 5));
       ASSERT_EQ(counts, 1);
       counts = 0;
-      counts += eset.count(std::make_tuple(3, 2, 5));
-      ASSERT_EQ(counts, 1);
-      counts = 0;
-      counts += eset.count(std::make_tuple(3, 3, 6));
+      counts += eset.count(std::make_tuple(3, 2, 6));
       ASSERT_EQ(counts, 1);
     }
   }
@@ -477,11 +457,11 @@ void _TestCSRPerEtypeSamplingUniformSorted() {
   IdArray rows = NDArray::FromVector(std::vector<Idx>({0, 3}));
   for (int k = 0; k < 10; ++k) {
     auto rst = CSRRowWisePerEtypeSampling(mat, rows, etype_offset, {2, 2, 2, 2}, prob, true, true);
-    CheckSampledPerEtypeReplaceResult<Idx>(rst, rows, has_data);
+    CheckSampledPerEtypeResult<Idx>(rst, rows, true);
   }
   for (int k = 0; k < 10; ++k) {
     auto rst = CSRRowWisePerEtypeSampling(mat, rows, etype_offset, {2, 2, 2, 2}, prob, false, true);
-    CheckSampledPerEtypeResult<Idx>(rst, rows, has_data);
+    CheckSampledPerEtypeResult<Idx>(rst, rows, true);
     auto eset = ToEdgeSet<Idx>(rst);
     int counts = 0;
     counts += eset.count(std::make_tuple(0, 0, 0));
@@ -617,7 +597,7 @@ TEST(RowwiseTest, TestCOOSamplingUniform) {
 
 template <typename Idx, typename FloatType>
 void _TestCOOPerEtypeSampling(bool has_data) {
-  auto pair = CSREtypes<Idx>(true);
+  auto pair = COOEtypes<Idx>(has_data);
   auto mat = pair.first;
   auto etype_offset = pair.second;
   std::vector<FloatArray> prob = {
@@ -629,7 +609,7 @@ void _TestCOOPerEtypeSampling(bool has_data) {
   IdArray rows = NDArray::FromVector(std::vector<Idx>({0, 3}));
   for (int k = 0; k < 10; ++k) {
     auto rst = COORowWisePerEtypeSampling(mat, rows, etype_offset, {2, 2, 2, 2}, prob, true);
-    CheckSampledPerEtypeReplaceResult<Idx>(rst, rows, has_data);
+    CheckSampledPerEtypeResult<Idx>(rst, rows, has_data);
   }
   for (int k = 0; k < 10; ++k) {
     auto rst = COORowWisePerEtypeSampling(mat, rows, etype_offset, {2, 2, 2, 2}, prob, false);
@@ -664,12 +644,12 @@ void _TestCOOPerEtypeSampling(bool has_data) {
       ASSERT_EQ(counts, 2);
       counts = 0;
       counts += eset.count(std::make_tuple(1, 1, 4));
+      ASSERT_EQ(counts, 0);
+      counts = 0;
+      counts += eset.count(std::make_tuple(3, 3, 5));
       ASSERT_EQ(counts, 1);
       counts = 0;
-      counts += eset.count(std::make_tuple(3, 2, 5));
-      ASSERT_EQ(counts, 1);
-      counts = 0;
-      counts += eset.count(std::make_tuple(3, 3, 6));
+      counts += eset.count(std::make_tuple(3, 2, 6));
       ASSERT_EQ(counts, 1);
     }
   }
@@ -682,7 +662,7 @@ void _TestCOOPerEtypeSampling(bool has_data) {
   };
   for (int k = 0; k < 10; ++k) {
     auto rst = COORowWisePerEtypeSampling(mat, rows, etype_offset, {2, 2, 2, 2}, prob, true);
-    CheckSampledPerEtypeReplaceResult<Idx>(rst, rows, has_data);
+    CheckSampledPerEtypeResult<Idx>(rst, rows, has_data);
     auto eset = ToEdgeSet<Idx>(rst);
     if (has_data) {
       ASSERT_FALSE(eset.count(std::make_tuple(0, 0, 0)));
@@ -707,7 +687,7 @@ TEST(RowwiseTest, TestCOOPerEtypeSampling) {
 
 template <typename Idx, typename FloatType>
 void _TestCOOPerEtypeSamplingUniform(bool has_data) {
-  auto pair = CSREtypes<Idx>(true);
+  auto pair = COOEtypes<Idx>(has_data);
   auto mat = pair.first;
   auto etype_offset = pair.second;
   std::vector<FloatArray> prob = {
@@ -717,21 +697,9 @@ void _TestCOOPerEtypeSamplingUniform(bool has_data) {
     aten::NullArray()
   };
   IdArray rows = NDArray::FromVector(std::vector<Idx>({0, 3}));
-  IdArray etypes = has_data ?
-      NDArray::FromVector(std::vector<int32_t>({3, 1, 3, 3, 2, 3, 0})) :
-      NDArray::FromVector(std::vector<int32_t>({3, 3, 3, 0, 3, 1, 2}));
-  IdArray eids = has_data ?
-      NDArray::FromVector(std::vector<Idx>({3, 0, 0, 1, 0, 2, 0})) :
-      NDArray::FromVector(std::vector<Idx>({0, 1, 2, 0, 3, 0, 0}));
-  for (int k = 0; k < 10; ++k) {
-    auto rst = COORowWisePerEtypeSampling(mat, rows, etypes, eids, {2, 2, 2, 2}, prob, true);
-    CheckSampledPerEtypeReplaceResult<Idx>(rst, rows, has_data);
-  }
-
-  IdArray rows = NDArray::FromVector(std::vector<Idx>({0, 3}));
   for (int k = 0; k < 10; ++k) {
     auto rst = COORowWisePerEtypeSampling(mat, rows, etype_offset, {2, 2, 2, 2}, prob, true);
-    CheckSampledPerEtypeReplaceResult<Idx>(rst, rows, has_data);
+    CheckSampledPerEtypeResult<Idx>(rst, rows, has_data);
   }
   for (int k = 0; k < 10; ++k) {
     auto rst = COORowWisePerEtypeSampling(mat, rows, etype_offset, {2, 2, 2, 2}, prob, false);
@@ -766,12 +734,12 @@ void _TestCOOPerEtypeSamplingUniform(bool has_data) {
       ASSERT_EQ(counts, 2);
       counts = 0;
       counts += eset.count(std::make_tuple(1, 1, 4));
+      ASSERT_EQ(counts, 0);
+      counts = 0;
+      counts += eset.count(std::make_tuple(3, 3, 5));
       ASSERT_EQ(counts, 1);
       counts = 0;
-      counts += eset.count(std::make_tuple(3, 2, 5));
-      ASSERT_EQ(counts, 1);
-      counts = 0;
-      counts += eset.count(std::make_tuple(3, 3, 6));
+      counts += eset.count(std::make_tuple(3, 2, 6));
       ASSERT_EQ(counts, 1);
     }
   }

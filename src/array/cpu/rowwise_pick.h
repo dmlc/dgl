@@ -134,7 +134,8 @@ COOMatrix CSRRowWisePick(CSRMatrix mat, IdArray rows,
   IdxType* picked_cdata = static_cast<IdxType*>(picked_col->data);
   IdxType* picked_idata = static_cast<IdxType*>(picked_idx->data);
 
-  const int num_threads = omp_get_max_threads();
+  // Do not use omp_get_max_threads() since that doesn't work for compiling without OpenMP.
+  const int num_threads = runtime::compute_num_threads(0, num_rows, 1);
   std::vector<int64_t> global_prefix(num_threads+1, 0);
 
   // TODO(BarclayII) Using OMP parallel directly instead of using runtime::parallel_for
@@ -190,7 +191,7 @@ COOMatrix CSRRowWisePick(CSRMatrix mat, IdArray rows,
       const int64_t num_picks = thread_offset + local_prefix[local_i + 1] - row_offset;
 
       pick_fn(rid, off, len, num_picks, indices, data, picked_idata + row_offset);
-      for (int64_t j = 0; j < len; ++j) {
+      for (int64_t j = 0; j < num_picks; ++j) {
         const IdxType picked = picked_idata[row_offset + j];
         picked_rdata[row_offset + j] = rid;
         picked_cdata[row_offset + j] = indices[picked];
@@ -224,7 +225,7 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows,
   const int64_t num_rows = rows->shape[0];
   const auto& ctx = mat.indptr->ctx;
   const int64_t num_etypes = num_picks.size();
-  const bool has_probs = (probs.size() == 0);
+  const bool has_probs = (probs.size() > 0);
   std::vector<IdArray> picked_rows(rows->shape[0]);
   std::vector<IdArray> picked_cols(rows->shape[0]);
   std::vector<IdArray> picked_idxs(rows->shape[0]);
@@ -267,9 +268,8 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows,
         int64_t k = 0;
         for (int64_t j = 0; j < len; ++j) {
           IdxType homogenized_eid = data ? data[off + j] : off + j;
-          IdxType heterogenized_etype = std::lower_bound(
-              etype_offset.begin(), etype_offset.end(), homogenized_eid) - \
-              etype_offset.begin();
+          auto it = std::upper_bound(etype_offset.begin(), etype_offset.end(), homogenized_eid);
+          IdxType heterogenized_etype = it - etype_offset.begin() - 1;
           IdxType heterogenized_eid = homogenized_eid - etype_offset[heterogenized_etype];
 
           if (!has_probs || IsNullArray(probs[heterogenized_etype])) {
@@ -302,9 +302,8 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows,
         std::iota(et_idx.begin(), et_idx.end(), 0);
         for (int64_t j = 0; j < len; ++j) {
           IdxType homogenized_eid = data ? data[off + j] : off + j;
-          IdxType heterogenized_etype = std::lower_bound(
-              etype_offset.begin(), etype_offset.end(), homogenized_eid) - \
-              etype_offset.begin();
+          auto it = std::upper_bound(etype_offset.begin(), etype_offset.end(), homogenized_eid);
+          IdxType heterogenized_etype = it - etype_offset.begin() - 1;
           IdxType heterogenized_eid = homogenized_eid - etype_offset[heterogenized_etype];
           et[j] = heterogenized_etype;
           et_eid[j] = heterogenized_eid;
@@ -312,8 +311,7 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows,
         if (!etype_sorted)  // the edge type is sorted, not need to sort it
           std::sort(et_idx.begin(), et_idx.end(),
                     [&et](IdxType i1, IdxType i2) {return et[i1] < et[i2];});
-        CHECK(et[et_idx[len - 1]] < num_etypes) <<
-          "etype values exceed the number of fanouts";
+        CHECK_LT(et[et_idx[len - 1]], num_etypes) << "etype values exceed the number of fanouts";
 
         IdxType cur_et = et[et_idx[0]];
         int64_t et_offset = 0;
@@ -329,12 +327,26 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows,
             if (et_len <= num_picks[cur_et] && !replace) {
               // fast path, select all
               for (int64_t k = 0; k < et_len; ++k) {
-                rows.push_back(rid);
-                cols.push_back(indices[off+et_idx[et_offset+k]]);
-                if (data)
-                  idx.push_back(data[off+et_idx[et_offset+k]]);
-                else
-                  idx.push_back(off+et_idx[et_offset+k]);
+                IdxType eid_offset = off + et_idx[et_offset + k];
+                IdxType homogenized_eid = data ? data[eid_offset] : eid_offset;
+                auto it = std::upper_bound(
+                    etype_offset.begin(), etype_offset.end(), homogenized_eid);
+                IdxType heterogenized_etype = it - etype_offset.begin() - 1;
+                IdxType heterogenized_eid = homogenized_eid - etype_offset[heterogenized_etype];
+
+                if (!has_probs || IsNullArray(probs[heterogenized_etype])) {
+                  rows.push_back(rid);
+                  cols.push_back(indices[eid_offset]);
+                  idx.push_back(homogenized_eid);
+                } else {
+                  const FloatArray& prob = probs[heterogenized_etype];
+                  const FloatType* prob_data = prob.Ptr<FloatType>();
+                  if (prob_data[heterogenized_eid] > 0) {
+                    rows.push_back(rid);
+                    cols.push_back(indices[eid_offset]);
+                    idx.push_back(homogenized_eid);
+                  }
+                }
               }
             } else {
               IdArray picked_idx = Full(-1, num_picks[cur_et], sizeof(IdxType) * 8, ctx);

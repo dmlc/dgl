@@ -435,8 +435,7 @@ COOMatrix CSRRowWiseSampling(
     IdArray rows,
     int64_t num_samples,
     FloatArray prob = FloatArray(),
-    bool replace = true,
-    bool etype_sorted = false);
+    bool replace = true);
 
 /*!
  * \brief Randomly select a fixed number of non-zero entries for each edge type

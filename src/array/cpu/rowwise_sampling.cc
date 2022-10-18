@@ -139,8 +139,8 @@ inline NumPicksFn<IdxType> GetSamplingBiasedNumPicksFn(
   NumPicksFn<IdxType> num_picks_fn = [num_samples, split, bias, replace]
     (IdxType rowid, IdxType off, IdxType len,
      const IdxType* col, const IdxType* data) {
-      const int64_t num_tags = split->shape[1];
-      const IdxType* tag_offset = split.Ptr<IdxType>() + rowid * num_tags;
+      const int64_t num_tags = split->shape[1] - 1;
+      const IdxType* tag_offset = split.Ptr<IdxType>() + rowid * split->shape[1];
       const FloatType* bias_data = bias.Ptr<FloatType>();
       IdxType nnz = 0;
       for (int64_t j = 0; j < num_tags; ++j) {

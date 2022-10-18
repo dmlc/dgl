@@ -135,6 +135,13 @@ def sample_etype_neighbors(
     if isinstance(nodes, dict):
         assert len(nodes) == 1, "The input graph should not have node types"
         nodes = list(nodes.values())[0]
+
+    import uuid
+    import pickle
+    import platform
+    f = open('{}-{}.pkl'.format(platform.node(), str(uuid.uuid1())), 'wb')
+    pickle.dump((g, nodes, etype_offset, fanout, edge_dir, prob, replace, etype_sorted), f)
+
     nodes = utils.prepare_tensor(g, nodes, 'nodes')
     device = utils.context_of(nodes)
     nodes = F.to_dgl_nd(nodes)
@@ -166,6 +173,9 @@ def sample_etype_neighbors(
     else:
         for i, etype in enumerate(ret.canonical_etypes):
             ret.edges[etype].data[EID] = induced_edges[i]
+
+    pickle.dump(ret, f)
+    f.close()
 
     return ret if output_device is None else ret.to(output_device)
 

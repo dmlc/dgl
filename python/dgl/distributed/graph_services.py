@@ -262,7 +262,6 @@ class SamplingRequestEtype(Request):
     def __init__(
         self,
         nodes,
-        etype_offset,
         fan_out,
         edge_dir="in",
         prob=None,
@@ -274,7 +273,6 @@ class SamplingRequestEtype(Request):
         self.prob = prob
         self.replace = replace
         self.fan_out = fan_out
-        self.etype_offset = etype_offset
         self.etype_sorted = etype_sorted
 
     def __setstate__(self, state):
@@ -284,7 +282,6 @@ class SamplingRequestEtype(Request):
             self.prob,
             self.replace,
             self.fan_out,
-            self.etype_offset,
             self.etype_sorted,
         ) = state
 
@@ -295,7 +292,6 @@ class SamplingRequestEtype(Request):
             self.prob,
             self.replace,
             self.fan_out,
-            self.etype_offset,
             self.etype_sorted,
         )
 
@@ -303,6 +299,7 @@ class SamplingRequestEtype(Request):
         local_g = server_state.graph
         partition_book = server_state.partition_book
         kv_store = server_state.kv_store
+        etype_offset = partition_book._local_etype_offset
         # See NOTE 1
         if self.prob is not None:
             probs = [
@@ -315,7 +312,7 @@ class SamplingRequestEtype(Request):
             local_g,
             partition_book,
             self.seed_nodes,
-            self.etype_offset,
+            etype_offset,
             self.fan_out,
             self.edge_dir,
             probs,
@@ -577,7 +574,6 @@ def _frontier_to_heterogeneous_graph(g, frontier, gpb):
 def sample_etype_neighbors(
     g,
     nodes,
-    etype_offset,
     fanout,
     edge_dir="in",
     prob=None,
@@ -610,8 +606,6 @@ def sample_etype_neighbors(
     nodes : tensor or dict
         Node IDs to sample neighbors from. If it's a dict, it should contain only
         one key-value pair to make this API consistent with dgl.sampling.sample_neighbors.
-    etype_offset : list[int]
-        The offset to the starting edge ID of each edge type.
     fanout : int or dict[etype, int]
         The number of edges to be sampled for each node per edge type.  If an integer
         is given, DGL assumes that the same fanout is applied to every edge type.
@@ -678,7 +672,6 @@ def sample_etype_neighbors(
             _prob = None
         return SamplingRequestEtype(
             node_ids,
-            etype_offset,
             fanout,
             edge_dir=edge_dir,
             prob=_prob,
@@ -687,6 +680,7 @@ def sample_etype_neighbors(
         )
 
     def local_access(local_g, partition_book, local_nids):
+        etype_offset = gpb._local_etype_offset
         # See NOTE 1
         if prob is None:
             return _sample_etype_neighbors(

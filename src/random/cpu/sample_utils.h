@@ -150,6 +150,8 @@ class AliasSampler: public BaseSampler<Idx> {
         }
       }
     }
+    if (accum <= 0)
+      return -1;
     double avg = accum / N;
     double dice = re->Uniform<double>(0, N);
     Idx i = static_cast<Idx>(dice);
@@ -245,6 +247,8 @@ class CDFSampler: public BaseSampler<Idx> {
         }
       }
     }
+    if (accum <= 0)
+      return -1;
     double p = std::max(re->Uniform<double>(0., accum), eps);
     return Map(std::lower_bound(cdf.begin(), cdf.end(), p) - cdf.begin() - 1);
   }
@@ -305,6 +309,8 @@ class TreeSampler: public BaseSampler<Idx> {
    *
    */
   Idx Draw() {
+    if (weight[1] <= 0)
+      return -1;
     int64_t cur = 1;
     double p = re->Uniform<double>(0, weight[cur]);
     double accum = 0.;
