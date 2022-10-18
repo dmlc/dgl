@@ -264,7 +264,7 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows,
         IdArray idx = Full(-1, len, sizeof(IdxType) * 8, ctx);
         IdxType* cdata = cols.Ptr<IdxType>();
         IdxType* idata = idx.Ptr<IdxType>();
-  
+
         int64_t k = 0;
         for (int64_t j = 0; j < len; ++j) {
           IdxType homogenized_eid = data ? data[off + j] : off + j;

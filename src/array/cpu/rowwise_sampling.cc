@@ -268,7 +268,7 @@ template COOMatrix CSRRowWisePerEtypeSamplingUniform<kDGLCPU, int32_t>(
     CSRMatrix, IdArray, const std::vector<int64_t>&, const std::vector<int64_t>&, bool,
     bool);
 template COOMatrix CSRRowWisePerEtypeSamplingUniform<kDGLCPU, int64_t>(
-    CSRMatrix, IdArray,const std::vector<int64_t>&, const std::vector<int64_t>&, bool,
+    CSRMatrix, IdArray, const std::vector<int64_t>&, const std::vector<int64_t>&, bool,
     bool);
 
 template <DGLDeviceType XPU, typename IdxType, typename FloatType>
