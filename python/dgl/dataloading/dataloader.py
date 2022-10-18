@@ -134,7 +134,7 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
     """Custom Dataset wrapper that returns a minibatch as tensors or dicts of tensors.
     When the dataset is on the GPU, this significantly reduces the overhead.
     """
-    def __init__(self, indices, batch_size, drop_last, shuffle):
+    def __init__(self, indices, batch_size, drop_last, shuffle, use_shared_memory):
         if isinstance(indices, Mapping):
             self._mapping_keys = list(indices.keys())
             self._device = next(iter(indices.values())).device
@@ -147,7 +147,9 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
         # Use a shared memory array to permute indices for shuffling.  This is to make sure that
         # the worker processes can see it when persistent_workers=True, where self._indices
         # would not be duplicated every epoch.
-        self._indices = torch.arange(self._id_tensor.shape[0], dtype=torch.int64).share_memory_()
+        self._indices = torch.arange(self._id_tensor.shape[0], dtype=torch.int64)
+        if use_shared_memory:
+            self._indices.share_memory_()
         self.batch_size = batch_size
         self.drop_last = drop_last
         self._shuffle = shuffle
@@ -303,7 +305,7 @@ def _await_or_return(x):
 def _record_stream(x, stream):
     if stream is None:
         return x
-    if isinstance(x, torch.Tensor):
+    if hasattr(x, 'record_stream'):
         x.record_stream(stream)
         return x
     elif isinstance(x, _PrefetchedGraphFeatures):
@@ -333,9 +335,7 @@ def _prefetch(batch, dataloader, stream):
         feats = recursive_apply(batch, _prefetch_for, dataloader)
         feats = recursive_apply(feats, _await_or_return)
         feats = recursive_apply(feats, _record_stream, current_stream)
-        # transfer input nodes/seed nodes
-        # TODO(Xin): sampled subgraph is transferred in the default stream
-        # because heterograph doesn't support .record_stream() for now
+        # transfer input nodes/seed nodes/subgraphs
         batch = recursive_apply(batch, lambda x: x.to(dataloader.device, non_blocking=True))
         batch = recursive_apply(batch, _record_stream, current_stream)
     stream_event = stream.record_event() if stream is not None else None
@@ -553,15 +553,16 @@ class WorkerInitWrapper(object):
 
 
 def create_tensorized_dataset(indices, batch_size, drop_last, use_ddp, ddp_seed,
-                              shuffle):
+                              shuffle, use_shared_memory):
     """Converts a given indices tensor to a TensorizedDataset, an IterableDataset
     that returns views of the original tensor, to reduce overhead from having
     a list of scalar tensors in default PyTorch DataLoader implementation.
     """
     if use_ddp:
+        # DDP always uses shared memory
         return DDPTensorizedDataset(indices, batch_size, drop_last, ddp_seed, shuffle)
     else:
-        return TensorizedDataset(indices, batch_size, drop_last, shuffle)
+        return TensorizedDataset(indices, batch_size, drop_last, shuffle, use_shared_memory)
 
 
 def _get_device(device):
@@ -827,7 +828,8 @@ class DataLoader(torch.utils.data.DataLoader):
                 isinstance(indices, Mapping) and
                 all(torch.is_tensor(v) for v in indices.values()))):
             self.dataset = create_tensorized_dataset(
-                indices, batch_size, drop_last, use_ddp, ddp_seed, shuffle)
+                indices, batch_size, drop_last, use_ddp, ddp_seed, shuffle,
+                kwargs.get('persistent_workers', False))
         else:
             self.dataset = indices
 

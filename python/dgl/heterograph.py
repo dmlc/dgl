@@ -97,7 +97,7 @@ class DGLHeteroGraph(object):
                 errmsg = 'Invalid input. Expect a pair (srctypes, dsttypes) but got {}'.format(
                     ntypes)
                 raise TypeError(errmsg)
-            if not is_unibipartite(self._graph.metagraph):
+            if not self._graph.is_metagraph_unibipartite():
                 raise ValueError('Invalid input. The metagraph must be a uni-directional'
                                  ' bipartite graph.')
             self._ntypes = ntypes[0] + ntypes[1]
@@ -5584,6 +5584,31 @@ class DGLHeteroGraph(object):
         """
         return self._graph.is_pinned()
 
+    def record_stream(self, stream):
+        """Record the stream that is using this graph.
+        This method only supports the PyTorch backend and requires graphs on the GPU.
+
+        Parameters
+        ----------
+        stream : torch.cuda.Stream
+            The stream that is using this graph.
+
+        Returns
+        -------
+        DGLGraph
+            self.
+        """
+        if F.get_preferred_backend() != 'pytorch':
+            raise DGLError("record_stream only support the PyTorch backend.")
+        if F.device_type(self.device) != 'cuda':
+            raise DGLError("The graph must be on GPU to be recorded.")
+        self._graph.record_stream(stream)
+        for frame in itertools.chain(self._node_frames, self._edge_frames):
+            for col in frame._columns.values():
+                col.record_stream(stream)
+
+        return self
+
     def clone(self):
         """Return a heterograph object that is a clone of current graph.
 
@@ -6178,23 +6203,6 @@ def make_canonical_etypes(etypes, ntypes, metagraph):
     src, dst, eid = metagraph.edges(order="eid")
     rst = [(ntypes[sid], etypes[eid], ntypes[did]) for sid, did, eid in zip(src, dst, eid)]
     return rst
-
-def is_unibipartite(graph):
-    """Internal function that returns whether the given graph is a uni-directional
-    bipartite graph.
-
-    Parameters
-    ----------
-    graph : GraphIndex
-        Input graph
-
-    Returns
-    -------
-    bool
-        True if the graph is a uni-bipartite.
-    """
-    src, dst, _ = graph.edges()
-    return set(src.tonumpy()).isdisjoint(set(dst.tonumpy()))
 
 def find_src_dst_ntypes(ntypes, metagraph):
     """Internal function to split ntypes into SRC and DST categories.

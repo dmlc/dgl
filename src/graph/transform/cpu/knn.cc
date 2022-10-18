@@ -304,7 +304,7 @@ void BruteForceKNN(const NDArray& data_points, const IdArray& data_offsets,
 }
 }  // namespace impl
 
-template <DLDeviceType XPU, typename FloatType, typename IdType>
+template <DGLDeviceType XPU, typename FloatType, typename IdType>
 void KNN(const NDArray& data_points, const IdArray& data_offsets,
          const NDArray& query_points, const IdArray& query_offsets,
          const int k, IdArray result, const std::string& algorithm) {
@@ -319,7 +319,7 @@ void KNN(const NDArray& data_points, const IdArray& data_offsets,
   }
 }
 
-template <DLDeviceType XPU, typename FloatType, typename IdType>
+template <DGLDeviceType XPU, typename FloatType, typename IdType>
 void NNDescent(const NDArray& points, const IdArray& offsets,
                IdArray result, const int k, const int num_iters,
                const int num_candidates, const double delta) {
@@ -402,7 +402,7 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
 
       // randomly select neighbors as candidates
       int num_threads = omp_get_max_threads();
-      runtime::parallel_for(0, num_threads, [&](size_t b, size_t e) {
+      runtime::parallel_for(0, num_threads, [&](IdType b, IdType e) {
         for (auto tid = b; tid < e; ++tid) {
           for (IdType i = point_idx_start; i < point_idx_end; ++i) {
             IdType local_idx = i - point_idx_start;
@@ -567,36 +567,36 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
   device->FreeWorkspace(ctx, flags);
 }
 
-template void KNN<kDLCPU, float, int32_t>(
+template void KNN<kDGLCPU, float, int32_t>(
   const NDArray& data_points, const IdArray& data_offsets,
   const NDArray& query_points, const IdArray& query_offsets,
   const int k, IdArray result, const std::string& algorithm);
-template void KNN<kDLCPU, float, int64_t>(
+template void KNN<kDGLCPU, float, int64_t>(
   const NDArray& data_points, const IdArray& data_offsets,
   const NDArray& query_points, const IdArray& query_offsets,
   const int k, IdArray result, const std::string& algorithm);
-template void KNN<kDLCPU, double, int32_t>(
+template void KNN<kDGLCPU, double, int32_t>(
   const NDArray& data_points, const IdArray& data_offsets,
   const NDArray& query_points, const IdArray& query_offsets,
   const int k, IdArray result, const std::string& algorithm);
-template void KNN<kDLCPU, double, int64_t>(
+template void KNN<kDGLCPU, double, int64_t>(
   const NDArray& data_points, const IdArray& data_offsets,
   const NDArray& query_points, const IdArray& query_offsets,
   const int k, IdArray result, const std::string& algorithm);
 
-template void NNDescent<kDLCPU, float, int32_t>(
+template void NNDescent<kDGLCPU, float, int32_t>(
   const NDArray& points, const IdArray& offsets,
   IdArray result, const int k, const int num_iters,
   const int num_candidates, const double delta);
-template void NNDescent<kDLCPU, float, int64_t>(
+template void NNDescent<kDGLCPU, float, int64_t>(
   const NDArray& points, const IdArray& offsets,
   IdArray result, const int k, const int num_iters,
   const int num_candidates, const double delta);
-template void NNDescent<kDLCPU, double, int32_t>(
+template void NNDescent<kDGLCPU, double, int32_t>(
   const NDArray& points, const IdArray& offsets,
   IdArray result, const int k, const int num_iters,
   const int num_candidates, const double delta);
-template void NNDescent<kDLCPU, double, int64_t>(
+template void NNDescent<kDGLCPU, double, int64_t>(
   const NDArray& points, const IdArray& offsets,
   IdArray result, const int k, const int num_iters,
   const int num_candidates, const double delta);

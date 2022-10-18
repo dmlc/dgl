@@ -2,7 +2,7 @@
  *  Copyright (c) 2017 by Contributors
  * \file dgl/runtime/serializer.h
  * \brief Serializer extension to support DGL data types
- *  Include this file to enable serialization of DLDataType, DLContext
+ *  Include this file to enable serialization of DGLDataType, DGLContext
  */
 #ifndef DGL_RUNTIME_SMART_PTR_SERIALIZER_H_
 #define DGL_RUNTIME_SMART_PTR_SERIALIZER_H_

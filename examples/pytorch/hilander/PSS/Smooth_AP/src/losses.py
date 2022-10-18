@@ -2,12 +2,13 @@
 
 ###################### LIBRARIES #################################################
 import warnings
+
 warnings.filterwarnings("ignore")
 
-import torch, faiss
+import faiss
 import numpy as np
+import torch
 from scipy import sparse
-
 
 """================================================================================================="""
 ############ LOSS SELECTION FUNCTION #####################
@@ -22,19 +23,25 @@ def loss_select(loss, opt, to_optim):
     Returns:
         criterion (torch.nn.Module inherited), to_optim (optionally appended)
     """
-    if loss == 'smoothap':
-        loss_params  = {'anneal':opt.sigmoid_temperature, 'batch_size':opt.bs, "num_id":int(opt.bs / opt.samples_per_class), 'feat_dims':opt.embed_dim}
-        criterion    = SmoothAP(**loss_params)
+    if loss == "smoothap":
+        loss_params = {
+            "anneal": opt.sigmoid_temperature,
+            "batch_size": opt.bs,
+            "num_id": int(opt.bs / opt.samples_per_class),
+            "feat_dims": opt.embed_dim,
+        }
+        criterion = SmoothAP(**loss_params)
     else:
-        raise Exception('Loss {} not available!'.format(loss))
+        raise Exception("Loss {} not available!".format(loss))
 
     return criterion, to_optim
 
 
 """==============================================Smooth-AP========================================"""
 
+
 def sigmoid(tensor, temp=1.0):
-    """ temperature controlled sigmoid
+    """temperature controlled sigmoid
     takes as input a torch tensor (tensor) and passes it through a sigmoid, controlled by temperature: temp
     """
     exponent = -tensor / temp
@@ -58,7 +65,7 @@ class BinarizedF(torch.autograd.Function):
         return output
 
     def backward(self, output_grad):
-        inp, = self.saved_tensors
+        (inp,) = self.saved_tensors
         input_abs = torch.abs(inp)
         ones = torch.ones_like(inp)
         zeros = torch.zeros_like(inp)
@@ -122,7 +129,7 @@ class SmoothAP(torch.nn.Module):
         """
         super(SmoothAP, self).__init__()
 
-        assert(batch_size%num_id==0)
+        assert batch_size % num_id == 0
 
         self.anneal = anneal
         self.batch_size = batch_size
@@ -130,8 +137,7 @@ class SmoothAP(torch.nn.Module):
         self.feat_dims = feat_dims
 
     def forward(self, preds):
-        """Forward pass for all input predictions: preds - (batch_size x feat_dims) """
-
+        """Forward pass for all input predictions: preds - (batch_size x feat_dims)"""
 
         # ------ differentiable ranking of all retrieval set ------
         # compute the mask which ignores the relevance score of the query to itself
@@ -149,12 +155,20 @@ class SmoothAP(torch.nn.Module):
 
         # ------ differentiable ranking of only positive set in retrieval set ------
         # compute the mask which only gives non-zero weights to the positive set
-        xs = preds.view(self.num_id, int(self.batch_size / self.num_id), self.feat_dims)
+        xs = preds.view(
+            self.num_id, int(self.batch_size / self.num_id), self.feat_dims
+        )
         pos_mask = 1.0 - torch.eye(int(self.batch_size / self.num_id))
-        pos_mask = pos_mask.unsqueeze(dim=0).unsqueeze(dim=0).repeat(self.num_id, int(self.batch_size / self.num_id), 1, 1)
+        pos_mask = (
+            pos_mask.unsqueeze(dim=0)
+            .unsqueeze(dim=0)
+            .repeat(self.num_id, int(self.batch_size / self.num_id), 1, 1)
+        )
         # compute the relevance scores
         sim_pos = torch.bmm(xs, xs.permute(0, 2, 1))
-        sim_pos_repeat = sim_pos.unsqueeze(dim=2).repeat(1, 1, int(self.batch_size / self.num_id), 1)
+        sim_pos_repeat = sim_pos.unsqueeze(dim=2).repeat(
+            1, 1, int(self.batch_size / self.num_id), 1
+        )
         # compute the difference matrix
         sim_pos_diff = sim_pos_repeat - sim_pos_repeat.permute(0, 1, 3, 2)
         # pass through the sigmoid
@@ -166,6 +180,14 @@ class SmoothAP(torch.nn.Module):
         ap = torch.zeros(1).cuda()
         group = int(self.batch_size / self.num_id)
         for ind in range(self.num_id):
-            pos_divide = torch.sum(sim_pos_rk[ind] / (sim_all_rk[(ind * group):((ind + 1) * group), (ind * group):((ind + 1) * group)]))
+            pos_divide = torch.sum(
+                sim_pos_rk[ind]
+                / (
+                    sim_all_rk[
+                        (ind * group) : ((ind + 1) * group),
+                        (ind * group) : ((ind + 1) * group),
+                    ]
+                )
+            )
             ap = ap + ((pos_divide / group) / self.batch_size)
-        return (1 - ap)
+        return 1 - ap

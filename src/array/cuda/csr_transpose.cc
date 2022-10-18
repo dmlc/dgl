@@ -13,20 +13,21 @@ using runtime::NDArray;
 namespace aten {
 namespace impl {
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 CSRMatrix CSRTranspose(CSRMatrix csr) {
   LOG(FATAL) << "Unreachable codes";
   return {};
 }
 
 template <>
-CSRMatrix CSRTranspose<kDLGPU, int32_t>(CSRMatrix csr) {
+CSRMatrix CSRTranspose<kDGLCUDA, int32_t>(CSRMatrix csr) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   // allocate cusparse handle if needed
   if (!thr_entry->cusparse_handle) {
     CUSPARSE_CALL(cusparseCreate(&(thr_entry->cusparse_handle)));
   }
-  CUSPARSE_CALL(cusparseSetStream(thr_entry->cusparse_handle, thr_entry->stream));
+  CUSPARSE_CALL(cusparseSetStream(thr_entry->cusparse_handle, stream));
 
   NDArray indptr = csr.indptr, indices = csr.indices, data = csr.data;
   const int64_t nnz = indices->shape[0];
@@ -89,12 +90,12 @@ CSRMatrix CSRTranspose<kDLGPU, int32_t>(CSRMatrix csr) {
 }
 
 template <>
-CSRMatrix CSRTranspose<kDLGPU, int64_t>(CSRMatrix csr) {
+CSRMatrix CSRTranspose<kDGLCUDA, int64_t>(CSRMatrix csr) {
   return COOToCSR(COOTranspose(CSRToCOO(csr, false)));
 }
 
-template CSRMatrix CSRTranspose<kDLGPU, int32_t>(CSRMatrix csr);
-template CSRMatrix CSRTranspose<kDLGPU, int64_t>(CSRMatrix csr);
+template CSRMatrix CSRTranspose<kDGLCUDA, int32_t>(CSRMatrix csr);
+template CSRMatrix CSRTranspose<kDGLCUDA, int64_t>(CSRMatrix csr);
 
 }  // namespace impl
 }  // namespace aten

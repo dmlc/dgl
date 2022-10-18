@@ -14,20 +14,21 @@ using runtime::NDArray;
 namespace aten {
 namespace impl {
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 CSRMatrix COOToCSR(COOMatrix coo) {
   LOG(FATAL) << "Unreachable code.";
   return {};
 }
 
 template <>
-CSRMatrix COOToCSR<kDLGPU, int32_t>(COOMatrix coo) {
+CSRMatrix COOToCSR<kDGLCUDA, int32_t>(COOMatrix coo) {
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   // allocate cusparse handle if needed
   if (!thr_entry->cusparse_handle) {
     CUSPARSE_CALL(cusparseCreate(&(thr_entry->cusparse_handle)));
   }
-  CUSPARSE_CALL(cusparseSetStream(thr_entry->cusparse_handle, thr_entry->stream));
+  CUSPARSE_CALL(cusparseSetStream(thr_entry->cusparse_handle, stream));
 
   bool row_sorted = coo.row_sorted;
   bool col_sorted = coo.col_sorted;
@@ -99,10 +100,10 @@ __global__ void _SortedSearchKernelUpperBound(
 }
 
 template <>
-CSRMatrix COOToCSR<kDLGPU, int64_t>(COOMatrix coo) {
+CSRMatrix COOToCSR<kDGLCUDA, int64_t>(COOMatrix coo) {
   const auto& ctx = coo.row->ctx;
   const auto nbits = coo.row->dtype.bits;
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   bool row_sorted = coo.row_sorted;
   bool col_sorted = coo.col_sorted;
   if (!row_sorted) {
@@ -123,7 +124,7 @@ CSRMatrix COOToCSR<kDLGPU, int64_t>(COOMatrix coo) {
   const int nb = (coo.num_rows + nt - 1) / nt;
   IdArray indptr = Full(0, coo.num_rows + 1, nbits, ctx);
   CUDA_KERNEL_CALL(_SortedSearchKernelUpperBound,
-      nb, nt, 0, thr_entry->stream,
+      nb, nt, 0, stream,
       coo.row.Ptr<int64_t>(), nnz,
       rowids.Ptr<int64_t>(), coo.num_rows,
       indptr.Ptr<int64_t>() + 1);
@@ -132,8 +133,8 @@ CSRMatrix COOToCSR<kDLGPU, int64_t>(COOMatrix coo) {
                    indptr, coo.col, coo.data, col_sorted);
 }
 
-template CSRMatrix COOToCSR<kDLGPU, int32_t>(COOMatrix coo);
-template CSRMatrix COOToCSR<kDLGPU, int64_t>(COOMatrix coo);
+template CSRMatrix COOToCSR<kDGLCUDA, int32_t>(COOMatrix coo);
+template CSRMatrix COOToCSR<kDGLCUDA, int64_t>(COOMatrix coo);
 
 }  // namespace impl
 }  // namespace aten

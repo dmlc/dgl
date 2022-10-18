@@ -1,11 +1,12 @@
-import os
 import copy
+import os
 
+import networkx as nx
 import numpy as np
 import torch
+from torch.utils.data import DataLoader, Dataset
+
 import dgl
-import networkx as nx
-from torch.utils.data import Dataset, DataLoader
 
 
 def build_dense_graph(n_particles):
@@ -17,9 +18,9 @@ class MultiBodyDataset(Dataset):
     def __init__(self, path):
         self.path = path
         self.zipfile = np.load(self.path)
-        self.node_state = self.zipfile['data']
-        self.node_label = self.zipfile['label']
-        self.n_particles = self.zipfile['n_particles']
+        self.node_state = self.zipfile["data"]
+        self.node_label = self.zipfile["label"]
+        self.n_particles = self.zipfile["n_particles"]
 
     def __len__(self):
         return self.node_state.shape[0]
@@ -34,25 +35,30 @@ class MultiBodyDataset(Dataset):
 
 
 class MultiBodyTrainDataset(MultiBodyDataset):
-    def __init__(self, data_path='./data/'):
+    def __init__(self, data_path="./data/"):
         super(MultiBodyTrainDataset, self).__init__(
-            data_path+'n_body_train.npz')
-        self.stat_median = self.zipfile['median']
-        self.stat_max = self.zipfile['max']
-        self.stat_min = self.zipfile['min']
+            data_path + "n_body_train.npz"
+        )
+        self.stat_median = self.zipfile["median"]
+        self.stat_max = self.zipfile["max"]
+        self.stat_min = self.zipfile["min"]
 
 
 class MultiBodyValidDataset(MultiBodyDataset):
-    def __init__(self, data_path='./data/'):
+    def __init__(self, data_path="./data/"):
         super(MultiBodyValidDataset, self).__init__(
-            data_path+'n_body_valid.npz')
+            data_path + "n_body_valid.npz"
+        )
 
 
 class MultiBodyTestDataset(MultiBodyDataset):
-    def __init__(self, data_path='./data/'):
-        super(MultiBodyTestDataset, self).__init__(data_path+'n_body_test.npz')
-        self.test_traj = self.zipfile['test_traj']
-        self.first_frame = torch.from_numpy(self.zipfile['first_frame'])
+    def __init__(self, data_path="./data/"):
+        super(MultiBodyTestDataset, self).__init__(
+            data_path + "n_body_test.npz"
+        )
+        self.test_traj = self.zipfile["test_traj"]
+        self.first_frame = torch.from_numpy(self.zipfile["first_frame"])
+
 
 # Construct fully connected graph
 
