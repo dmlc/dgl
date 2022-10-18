@@ -1,26 +1,30 @@
+import multiprocessing as mp
 import os
-import time
 import socket
+import time
+import unittest
+
+import backend as F
+import pytest
+from numpy.testing import assert_array_equal
+from utils import generate_ip_config, reset_envs
 
 import dgl
-import backend as F
-import unittest, pytest
-import multiprocessing as mp
-from numpy.testing import assert_array_equal
-from utils import reset_envs, generate_ip_config
 
-if os.name != 'nt':
+if os.name != "nt":
     import fcntl
     import struct
 
 INTEGER = 2
-STR = 'hello world!'
+STR = "hello world!"
 HELLO_SERVICE_ID = 901231
 TENSOR = F.zeros((1000, 1000), F.int64, F.cpu())
+
 
 def foo(x, y):
     assert x == 123
     assert y == "abc"
+
 
 class MyRequest(dgl.distributed.Request):
     def __init__(self):
@@ -38,6 +42,7 @@ class MyRequest(dgl.distributed.Request):
     def process_request(self, server_state):
         pass
 
+
 class MyResponse(dgl.distributed.Response):
     def __init__(self):
         self.x = 432
@@ -47,9 +52,11 @@ class MyResponse(dgl.distributed.Response):
 
     def __setstate__(self, state):
         self.x = state
- 
+
+
 def simple_func(tensor):
     return tensor
+
 
 class HelloResponse(dgl.distributed.Response):
     def __init__(self, hello_str, integer, tensor):
@@ -62,6 +69,7 @@ class HelloResponse(dgl.distributed.Response):
 
     def __setstate__(self, state):
         self.hello_str, self.integer, self.tensor = state
+
 
 class HelloRequest(dgl.distributed.Request):
     def __init__(self, hello_str, integer, tensor, func):
@@ -85,7 +93,7 @@ class HelloRequest(dgl.distributed.Request):
 
 
 TIMEOUT_SERVICE_ID = 123456789
-TIMEOUT_META = 'timeout_test'
+TIMEOUT_META = "timeout_test"
 
 
 class TimeoutResponse(dgl.distributed.Response):
@@ -114,33 +122,53 @@ class TimeoutRequest(dgl.distributed.Request):
     def process_request(self, server_state):
         assert self.meta == TIMEOUT_META
         # convert from milliseconds to seconds
-        time.sleep(self.timeout/1000)
+        time.sleep(self.timeout / 1000)
         if not self.response:
             return None
         res = TimeoutResponse(self.meta)
         return res
 
-def start_server(num_clients, ip_config, server_id=0, keep_alive=False, num_servers=1, net_type='tensorpipe'):
+
+def start_server(
+    num_clients,
+    ip_config,
+    server_id=0,
+    keep_alive=False,
+    num_servers=1,
+    net_type="tensorpipe",
+):
     print("Sleep 1 seconds to test client re-connect.")
     time.sleep(1)
     server_state = dgl.distributed.ServerState(
-        None, local_g=None, partition_book=None, keep_alive=keep_alive)
+        None, local_g=None, partition_book=None, keep_alive=keep_alive
+    )
     dgl.distributed.register_service(
-        HELLO_SERVICE_ID, HelloRequest, HelloResponse)
+        HELLO_SERVICE_ID, HelloRequest, HelloResponse
+    )
     dgl.distributed.register_service(
-        TIMEOUT_SERVICE_ID, TimeoutRequest, TimeoutResponse)
+        TIMEOUT_SERVICE_ID, TimeoutRequest, TimeoutResponse
+    )
     print("Start server {}".format(server_id))
-    dgl.distributed.start_server(server_id=server_id, 
-                                 ip_config=ip_config, 
-                                 num_servers=num_servers,
-                                 num_clients=num_clients, 
-                                 server_state=server_state,
-                                 net_type=net_type)
+    dgl.distributed.start_server(
+        server_id=server_id,
+        ip_config=ip_config,
+        num_servers=num_servers,
+        num_clients=num_clients,
+        server_state=server_state,
+        net_type=net_type,
+    )
 
-def start_client(ip_config, group_id=0, num_servers=1, net_type='tensorpipe'):
-    dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
+
+def start_client(ip_config, group_id=0, num_servers=1, net_type="tensorpipe"):
+    dgl.distributed.register_service(
+        HELLO_SERVICE_ID, HelloRequest, HelloResponse
+    )
     dgl.distributed.connect_to_server(
-        ip_config=ip_config, num_servers=num_servers, group_id=group_id, net_type=net_type)
+        ip_config=ip_config,
+        num_servers=num_servers,
+        group_id=group_id,
+        net_type=net_type,
+    )
     req = HelloRequest(STR, INTEGER, TENSOR, simple_func)
     # test send and recv
     dgl.distributed.send_request(0, req)
@@ -174,16 +202,23 @@ def start_client(ip_config, group_id=0, num_servers=1, net_type='tensorpipe'):
         assert_array_equal(F.asnumpy(res.tensor), F.asnumpy(TENSOR))
 
 
-def start_client_timeout(ip_config, group_id=0, num_servers=1, net_type='tensorpipe'):
+def start_client_timeout(
+    ip_config, group_id=0, num_servers=1, net_type="tensorpipe"
+):
     dgl.distributed.register_service(
-        TIMEOUT_SERVICE_ID, TimeoutRequest, TimeoutResponse)
+        TIMEOUT_SERVICE_ID, TimeoutRequest, TimeoutResponse
+    )
     dgl.distributed.connect_to_server(
-        ip_config=ip_config, num_servers=num_servers, group_id=group_id, net_type=net_type)
+        ip_config=ip_config,
+        num_servers=num_servers,
+        group_id=group_id,
+        net_type=net_type,
+    )
     timeout = 1 * 1000  # milliseconds
     req = TimeoutRequest(TIMEOUT_META, timeout)
     # test send and recv
     dgl.distributed.send_request(0, req)
-    res = dgl.distributed.recv_response(timeout=int(timeout/2))
+    res = dgl.distributed.recv_response(timeout=int(timeout / 2))
     assert res is None
     res = dgl.distributed.recv_response()
     assert res.meta == TIMEOUT_META
@@ -195,14 +230,15 @@ def start_client_timeout(ip_config, group_id=0, num_servers=1, net_type='tensorp
     expect_except = False
     try:
         res_list = dgl.distributed.remote_call(
-            target_and_requests, timeout=int(timeout/2))
+            target_and_requests, timeout=int(timeout / 2)
+        )
     except dgl.DGLError:
         expect_except = True
     assert expect_except
     # test send_request_to_machine
     req = TimeoutRequest(TIMEOUT_META, timeout)
     dgl.distributed.send_request_to_machine(0, req)
-    res = dgl.distributed.recv_response(timeout=int(timeout/2))
+    res = dgl.distributed.recv_response(timeout=int(timeout / 2))
     assert res is None
     res = dgl.distributed.recv_response()
     assert res.meta == TIMEOUT_META
@@ -214,30 +250,41 @@ def start_client_timeout(ip_config, group_id=0, num_servers=1, net_type='tensorp
     expect_except = False
     try:
         res_list = dgl.distributed.remote_call_to_machine(
-            target_and_requests, timeout=int(timeout/2))
+            target_and_requests, timeout=int(timeout / 2)
+        )
     except dgl.DGLError:
         expect_except = True
     assert expect_except
 
-@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
-@pytest.mark.parametrize("net_type", ['socket', 'tensorpipe'])
+
+@unittest.skipIf(os.name == "nt", reason="Do not support windows yet")
+@pytest.mark.parametrize("net_type", ["socket", "tensorpipe"])
 def test_rpc_timeout(net_type):
     reset_envs()
-    os.environ['DGL_DIST_MODE'] = 'distributed'
+    os.environ["DGL_DIST_MODE"] = "distributed"
     ip_config = "rpc_ip_config.txt"
     generate_ip_config(ip_config, 1, 1)
-    ctx = mp.get_context('spawn')
-    pserver = ctx.Process(target=start_server, args=(1, ip_config, 0, False, 1, net_type))
-    pclient = ctx.Process(target=start_client_timeout, args=(ip_config, 0, 1, net_type))
+    ctx = mp.get_context("spawn")
+    pserver = ctx.Process(
+        target=start_server, args=(1, ip_config, 0, False, 1, net_type)
+    )
+    pclient = ctx.Process(
+        target=start_client_timeout, args=(ip_config, 0, 1, net_type)
+    )
     pserver.start()
     pclient.start()
     pserver.join()
     pclient.join()
 
+
 def test_serialize():
     reset_envs()
-    os.environ['DGL_DIST_MODE'] = 'distributed'
-    from dgl.distributed.rpc import serialize_to_payload, deserialize_from_payload
+    os.environ["DGL_DIST_MODE"] = "distributed"
+    from dgl.distributed.rpc import (
+        deserialize_from_payload,
+        serialize_to_payload,
+    )
+
     SERVICE_ID = 12345
     dgl.distributed.register_service(SERVICE_ID, MyRequest, MyResponse)
     req = MyRequest()
@@ -253,10 +300,16 @@ def test_serialize():
     res1 = deserialize_from_payload(MyResponse, data, tensors)
     assert res.x == res1.x
 
+
 def test_rpc_msg():
     reset_envs()
-    os.environ['DGL_DIST_MODE'] = 'distributed'
-    from dgl.distributed.rpc import serialize_to_payload, deserialize_from_payload, RPCMessage
+    os.environ["DGL_DIST_MODE"] = "distributed"
+    from dgl.distributed.rpc import (
+        RPCMessage,
+        deserialize_from_payload,
+        serialize_to_payload,
+    )
+
     SERVICE_ID = 32452
     dgl.distributed.register_service(SERVICE_ID, MyRequest, MyResponse)
     req = MyRequest()
@@ -270,33 +323,45 @@ def test_rpc_msg():
     assert len(rpcmsg.tensors) == 1
     assert F.array_equal(rpcmsg.tensors[0], req.z)
 
-@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
-@pytest.mark.parametrize("net_type", ['tensorpipe'])
+
+@unittest.skipIf(os.name == "nt", reason="Do not support windows yet")
+@pytest.mark.parametrize("net_type", ["tensorpipe"])
 def test_rpc(net_type):
     reset_envs()
-    os.environ['DGL_DIST_MODE'] = 'distributed'
+    os.environ["DGL_DIST_MODE"] = "distributed"
     generate_ip_config("rpc_ip_config.txt", 1, 1)
-    ctx = mp.get_context('spawn')
-    pserver = ctx.Process(target=start_server, args=(1, "rpc_ip_config.txt", 0, False, 1, net_type))
-    pclient = ctx.Process(target=start_client, args=("rpc_ip_config.txt", 0, 1, net_type))
+    ctx = mp.get_context("spawn")
+    pserver = ctx.Process(
+        target=start_server,
+        args=(1, "rpc_ip_config.txt", 0, False, 1, net_type),
+    )
+    pclient = ctx.Process(
+        target=start_client, args=("rpc_ip_config.txt", 0, 1, net_type)
+    )
     pserver.start()
     pclient.start()
     pserver.join()
     pclient.join()
 
-@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
-@pytest.mark.parametrize("net_type", ['socket', 'tensorpipe'])
+
+@unittest.skipIf(os.name == "nt", reason="Do not support windows yet")
+@pytest.mark.parametrize("net_type", ["socket", "tensorpipe"])
 def test_multi_client(net_type):
     reset_envs()
-    os.environ['DGL_DIST_MODE'] = 'distributed'
+    os.environ["DGL_DIST_MODE"] = "distributed"
     ip_config = "rpc_ip_config_mul_client.txt"
     generate_ip_config(ip_config, 1, 1)
-    ctx = mp.get_context('spawn')
+    ctx = mp.get_context("spawn")
     num_clients = 20
-    pserver = ctx.Process(target=start_server, args=(num_clients, ip_config, 0, False, 1, net_type))
+    pserver = ctx.Process(
+        target=start_server,
+        args=(num_clients, ip_config, 0, False, 1, net_type),
+    )
     pclient_list = []
     for i in range(num_clients):
-        pclient = ctx.Process(target=start_client, args=(ip_config, 0, 1, net_type))
+        pclient = ctx.Process(
+            target=start_client, args=(ip_config, 0, 1, net_type)
+        )
         pclient_list.append(pclient)
     pserver.start()
     for i in range(num_clients):
@@ -306,37 +371,44 @@ def test_multi_client(net_type):
     pserver.join()
 
 
-@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
-@pytest.mark.parametrize("net_type", ['socket', 'tensorpipe'])
+@unittest.skipIf(os.name == "nt", reason="Do not support windows yet")
+@pytest.mark.parametrize("net_type", ["socket", "tensorpipe"])
 def test_multi_thread_rpc(net_type):
     reset_envs()
-    os.environ['DGL_DIST_MODE'] = 'distributed'
+    os.environ["DGL_DIST_MODE"] = "distributed"
     num_servers = 2
     ip_config = "rpc_ip_config_multithread.txt"
     generate_ip_config(ip_config, num_servers, num_servers)
-    ctx = mp.get_context('spawn')
+    ctx = mp.get_context("spawn")
     pserver_list = []
     for i in range(num_servers):
-        pserver = ctx.Process(target=start_server, args=(1, ip_config, i, False, 1, net_type))
+        pserver = ctx.Process(
+            target=start_server, args=(1, ip_config, i, False, 1, net_type)
+        )
         pserver.start()
         pserver_list.append(pserver)
+
     def start_client_multithread(ip_config):
         import threading
-        dgl.distributed.connect_to_server(ip_config=ip_config, num_servers=1, net_type=net_type)
-        dgl.distributed.register_service(HELLO_SERVICE_ID, HelloRequest, HelloResponse)
-        
+
+        dgl.distributed.connect_to_server(
+            ip_config=ip_config, num_servers=1, net_type=net_type
+        )
+        dgl.distributed.register_service(
+            HELLO_SERVICE_ID, HelloRequest, HelloResponse
+        )
+
         req = HelloRequest(STR, INTEGER, TENSOR, simple_func)
         dgl.distributed.send_request(0, req)
 
-        def subthread_call(server_id):            
+        def subthread_call(server_id):
             req = HelloRequest(STR, INTEGER, TENSOR, simple_func)
             dgl.distributed.send_request(server_id, req)
-        
-        
+
         subthread = threading.Thread(target=subthread_call, args=(1,))
         subthread.start()
         subthread.join()
-        
+
         res0 = dgl.distributed.recv_response()
         res1 = dgl.distributed.recv_response()
         # Order is not guaranteed
@@ -347,11 +419,15 @@ def test_multi_thread_rpc(net_type):
     start_client_multithread(ip_config)
     pserver.join()
 
-@unittest.skipIf(True, reason="Tests of multiple groups may fail and let's disable them for now.")
-@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
+
+@unittest.skipIf(
+    True,
+    reason="Tests of multiple groups may fail and let's disable them for now.",
+)
+@unittest.skipIf(os.name == "nt", reason="Do not support windows yet")
 def test_multi_client_groups():
     reset_envs()
-    os.environ['DGL_DIST_MODE'] = 'distributed'
+    os.environ["DGL_DIST_MODE"] = "distributed"
     ip_config = "rpc_ip_config_mul_client_groups.txt"
     num_machines = 5
     # should test with larger number but due to possible port in-use issue.
@@ -360,16 +436,21 @@ def test_multi_client_groups():
     # presssue test
     num_clients = 2
     num_groups = 2
-    ctx = mp.get_context('spawn')
+    ctx = mp.get_context("spawn")
     pserver_list = []
-    for i in range(num_servers*num_machines):
-        pserver = ctx.Process(target=start_server, args=(num_clients, ip_config, i, True, num_servers))
+    for i in range(num_servers * num_machines):
+        pserver = ctx.Process(
+            target=start_server,
+            args=(num_clients, ip_config, i, True, num_servers),
+        )
         pserver.start()
         pserver_list.append(pserver)
     pclient_list = []
     for i in range(num_clients):
         for group_id in range(num_groups):
-            pclient = ctx.Process(target=start_client, args=(ip_config, group_id, num_servers))
+            pclient = ctx.Process(
+                target=start_client, args=(ip_config, group_id, num_servers)
+            )
             pclient.start()
             pclient_list.append(pclient)
     for p in pclient_list:
@@ -381,19 +462,23 @@ def test_multi_client_groups():
     for p in pserver_list:
         p.join()
 
-@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
-@pytest.mark.parametrize("net_type", ['socket', 'tensorpipe'])
+
+@unittest.skipIf(os.name == "nt", reason="Do not support windows yet")
+@pytest.mark.parametrize("net_type", ["socket", "tensorpipe"])
 def test_multi_client_connect(net_type):
     reset_envs()
-    os.environ['DGL_DIST_MODE'] = 'distributed'
+    os.environ["DGL_DIST_MODE"] = "distributed"
     ip_config = "rpc_ip_config_mul_client.txt"
     generate_ip_config(ip_config, 1, 1)
-    ctx = mp.get_context('spawn')
+    ctx = mp.get_context("spawn")
     num_clients = 1
-    pserver = ctx.Process(target=start_server, args=(num_clients, ip_config, 0, False, 1, net_type))
+    pserver = ctx.Process(
+        target=start_server,
+        args=(num_clients, ip_config, 0, False, 1, net_type),
+    )
 
     # small max try times
-    os.environ['DGL_DIST_MAX_TRY_TIMES'] = '1'
+    os.environ["DGL_DIST_MAX_TRY_TIMES"] = "1"
     expect_except = False
     try:
         start_client(ip_config, 0, 1, net_type)
@@ -403,7 +488,7 @@ def test_multi_client_connect(net_type):
     assert expect_except
 
     # large max try times
-    os.environ['DGL_DIST_MAX_TRY_TIMES'] = '1024'
+    os.environ["DGL_DIST_MAX_TRY_TIMES"] = "1024"
     pclient = ctx.Process(target=start_client, args=(ip_config, 0, 1, net_type))
     pclient.start()
     pserver.start()
@@ -411,12 +496,13 @@ def test_multi_client_connect(net_type):
     pserver.join()
     reset_envs()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     test_serialize()
     test_rpc_msg()
     test_rpc()
-    test_multi_client('socket')
-    test_multi_client('tesnsorpipe')
+    test_multi_client("socket")
+    test_multi_client("tesnsorpipe")
     test_multi_thread_rpc()
-    test_multi_client_connect('socket')
-    test_multi_client_connect('tensorpipe')
+    test_multi_client_connect("socket")
+    test_multi_client_connect("tensorpipe")

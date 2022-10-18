@@ -252,31 +252,6 @@ class CitationGraphDataset(DGLBuiltinDataset):
     """
 
     @property
-    def train_mask(self):
-        deprecate_property('dataset.train_mask', 'g.ndata[\'train_mask\']')
-        return F.asnumpy(self._g.ndata['train_mask'])
-
-    @property
-    def val_mask(self):
-        deprecate_property('dataset.val_mask', 'g.ndata[\'val_mask\']')
-        return F.asnumpy(self._g.ndata['val_mask'])
-
-    @property
-    def test_mask(self):
-        deprecate_property('dataset.test_mask', 'g.ndata[\'test_mask\']')
-        return F.asnumpy(self._g.ndata['test_mask'])
-
-    @property
-    def labels(self):
-        deprecate_property('dataset.label', 'g.ndata[\'label\']')
-        return F.asnumpy(self._g.ndata['label'])
-
-    @property
-    def features(self):
-        deprecate_property('dataset.feat', 'g.ndata[\'feat\']')
-        return self._g.ndata['feat']
-
-    @property
     def reverse_edge(self):
         return self._reverse_edge
 
@@ -305,43 +280,6 @@ def _sample_mask(idx, l):
 
 class CoraGraphDataset(CitationGraphDataset):
     r""" Cora citation network dataset.
-
-    .. deprecated:: 0.5.0
-
-        - ``graph`` is deprecated, it is replaced by:
-
-            >>> dataset = CoraGraphDataset()
-            >>> graph = dataset[0]
-
-        - ``train_mask`` is deprecated, it is replaced by:
-
-            >>> dataset = CoraGraphDataset()
-            >>> graph = dataset[0]
-            >>> train_mask = graph.ndata['train_mask']
-
-        - ``val_mask`` is deprecated, it is replaced by:
-
-            >>> dataset = CoraGraphDataset()
-            >>> graph = dataset[0]
-            >>> val_mask = graph.ndata['val_mask']
-
-        - ``test_mask`` is deprecated, it is replaced by:
-
-            >>> dataset = CoraGraphDataset()
-            >>> graph = dataset[0]
-            >>> test_mask = graph.ndata['test_mask']
-
-        - ``labels`` is deprecated, it is replaced by:
-
-            >>> dataset = CoraGraphDataset()
-            >>> graph = dataset[0]
-            >>> labels = graph.ndata['label']
-
-        - ``feat`` is deprecated, it is replaced by:
-
-            >>> dataset = CoraGraphDataset()
-            >>> graph = dataset[0]
-            >>> feat = graph.ndata['feat']
 
     Nodes mean paper and edges mean citation
     relationships. Each node has a predefined
@@ -383,18 +321,6 @@ class CoraGraphDataset(CitationGraphDataset):
     ----------
     num_classes: int
         Number of label classes
-    graph: networkx.DiGraph
-        Graph structure
-    train_mask: numpy.ndarray
-        Mask of training nodes
-    val_mask: numpy.ndarray
-        Mask of validation nodes
-    test_mask: numpy.ndarray
-        Mask of test nodes
-    labels: numpy.ndarray
-        Ground truth labels of each node
-    features: Tensor
-        Node features
 
     Notes
     -----
@@ -454,43 +380,6 @@ class CoraGraphDataset(CitationGraphDataset):
 class CiteseerGraphDataset(CitationGraphDataset):
     r""" Citeseer citation network dataset.
 
-    .. deprecated:: 0.5.0
-
-        - ``graph`` is deprecated, it is replaced by:
-
-            >>> dataset = CiteseerGraphDataset()
-            >>> graph = dataset[0]
-
-        - ``train_mask`` is deprecated, it is replaced by:
-
-            >>> dataset = CiteseerGraphDataset()
-            >>> graph = dataset[0]
-            >>> train_mask = graph.ndata['train_mask']
-
-        - ``val_mask`` is deprecated, it is replaced by:
-
-            >>> dataset = CiteseerGraphDataset()
-            >>> graph = dataset[0]
-            >>> val_mask = graph.ndata['val_mask']
-
-        - ``test_mask`` is deprecated, it is replaced by:
-
-            >>> dataset = CiteseerGraphDataset()
-            >>> graph = dataset[0]
-            >>> test_mask = graph.ndata['test_mask']
-
-        - ``labels`` is deprecated, it is replaced by:
-
-            >>> dataset = CiteseerGraphDataset()
-            >>> graph = dataset[0]
-            >>> labels = graph.ndata['label']
-
-        - ``feat`` is deprecated, it is replaced by:
-
-            >>> dataset = CiteseerGraphDataset()
-            >>> graph = dataset[0]
-            >>> feat = graph.ndata['feat']
-
     Nodes mean scientific publications and edges
     mean citation relationships. Each node has a
     predefined feature with 3703 dimensions. The
@@ -531,18 +420,6 @@ class CiteseerGraphDataset(CitationGraphDataset):
     ----------
     num_classes: int
         Number of label classes
-    graph: networkx.DiGraph
-        Graph structure
-    train_mask: numpy.ndarray
-        Mask of training nodes
-    val_mask: numpy.ndarray
-        Mask of validation nodes
-    test_mask: numpy.ndarray
-        Mask of test nodes
-    labels: numpy.ndarray
-        Ground truth labels of each node
-    features: Tensor
-        Node features
 
     Notes
     -----
@@ -605,43 +482,6 @@ class CiteseerGraphDataset(CitationGraphDataset):
 class PubmedGraphDataset(CitationGraphDataset):
     r""" Pubmed citation network dataset.
 
-    .. deprecated:: 0.5.0
-
-        - ``graph`` is deprecated, it is replaced by:
-
-            >>> dataset = PubmedGraphDataset()
-            >>> graph = dataset[0]
-
-        - ``train_mask`` is deprecated, it is replaced by:
-
-            >>> dataset = PubmedGraphDataset()
-            >>> graph = dataset[0]
-            >>> train_mask = graph.ndata['train_mask']
-
-        - ``val_mask`` is deprecated, it is replaced by:
-
-            >>> dataset = PubmedGraphDataset()
-            >>> graph = dataset[0]
-            >>> val_mask = graph.ndata['val_mask']
-
-        - ``test_mask`` is deprecated, it is replaced by:
-
-            >>> dataset = PubmedGraphDataset()
-            >>> graph = dataset[0]
-            >>> test_mask = graph.ndata['test_mask']
-
-        - ``labels`` is deprecated, it is replaced by:
-
-            >>> dataset = PubmedGraphDataset()
-            >>> graph = dataset[0]
-            >>> labels = graph.ndata['label']
-
-        - ``feat`` is deprecated, it is replaced by:
-
-            >>> dataset = PubmedGraphDataset()
-            >>> graph = dataset[0]
-            >>> feat = graph.ndata['feat']
-
     Nodes mean scientific publications and edges
     mean citation relationships. Each node has a
     predefined feature with 500 dimensions. The
@@ -682,18 +522,6 @@ class PubmedGraphDataset(CitationGraphDataset):
     ----------
     num_classes: int
         Number of label classes
-    graph: networkx.DiGraph
-        Graph structure
-    train_mask: numpy.ndarray
-        Mask of training nodes
-    val_mask: numpy.ndarray
-        Mask of validation nodes
-    test_mask: numpy.ndarray
-        Mask of test nodes
-    labels: numpy.ndarray
-        Ground truth labels of each node
-    features: Tensor
-        Node features
 
     Notes
     -----

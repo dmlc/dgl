@@ -67,11 +67,12 @@ offers a different perspective. The tutorial describes how to implement a Capsul
 #
 # Here's how we set up the graph and initialize node and edge features.
 
-import torch.nn as nn
-import torch as th
-import torch.nn.functional as F
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+import torch as th
+import torch.nn as nn
+import torch.nn.functional as F
+
 import dgl
 
 
@@ -80,8 +81,8 @@ def init_graph(in_nodes, out_nodes, f_size):
     v = np.tile(np.arange(in_nodes, in_nodes + out_nodes), in_nodes)
     g = dgl.DGLGraph((u, v))
     # init states
-    g.ndata['v'] = th.zeros(in_nodes + out_nodes, f_size)
-    g.edata['b'] = th.zeros(in_nodes * out_nodes, 1)
+    g.ndata["v"] = th.zeros(in_nodes + out_nodes, f_size)
+    g.edata["b"] = th.zeros(in_nodes * out_nodes, 1)
     return g
 
 
@@ -116,6 +117,7 @@ def init_graph(in_nodes, out_nodes, f_size):
 
 import dgl.function as fn
 
+
 class DGLRoutingLayer(nn.Module):
     def __init__(self, in_nodes, out_nodes, f_size):
         super(DGLRoutingLayer, self).__init__()
@@ -126,27 +128,33 @@ class DGLRoutingLayer(nn.Module):
         self.out_indx = list(range(in_nodes, in_nodes + out_nodes))
 
     def forward(self, u_hat, routing_num=1):
-        self.g.edata['u_hat'] = u_hat
+        self.g.edata["u_hat"] = u_hat
 
         for r in range(routing_num):
             # step 1 (line 4): normalize over out edges
-            edges_b = self.g.edata['b'].view(self.in_nodes, self.out_nodes)
-            self.g.edata['c'] = F.softmax(edges_b, dim=1).view(-1, 1)
-            self.g.edata['c u_hat'] = self.g.edata['c'] * self.g.edata['u_hat']
+            edges_b = self.g.edata["b"].view(self.in_nodes, self.out_nodes)
+            self.g.edata["c"] = F.softmax(edges_b, dim=1).view(-1, 1)
+            self.g.edata["c u_hat"] = self.g.edata["c"] * self.g.edata["u_hat"]
 
             # Execute step 1 & 2
-            self.g.update_all(fn.copy_e('c u_hat', 'm'), fn.sum('m', 's'))
+            self.g.update_all(fn.copy_e("c u_hat", "m"), fn.sum("m", "s"))
 
             # step 3 (line 6)
-            self.g.nodes[self.out_indx].data['v'] = self.squash(self.g.nodes[self.out_indx].data['s'], dim=1)
+            self.g.nodes[self.out_indx].data["v"] = self.squash(
+                self.g.nodes[self.out_indx].data["s"], dim=1
+            )
 
             # step 4 (line 7)
-            v = th.cat([self.g.nodes[self.out_indx].data['v']] * self.in_nodes, dim=0)
-            self.g.edata['b'] = self.g.edata['b'] + (self.g.edata['u_hat'] * v).sum(dim=1, keepdim=True)
+            v = th.cat(
+                [self.g.nodes[self.out_indx].data["v"]] * self.in_nodes, dim=0
+            )
+            self.g.edata["b"] = self.g.edata["b"] + (
+                self.g.edata["u_hat"] * v
+            ).sum(dim=1, keepdim=True)
 
     @staticmethod
     def squash(s, dim=1):
-        sq = th.sum(s ** 2, dim=dim, keepdim=True)
+        sq = th.sum(s**2, dim=dim, keepdim=True)
         s_norm = th.sqrt(sq)
         s = (sq / (1.0 + sq)) * (s / s_norm)
         return s
@@ -172,14 +180,14 @@ dist_list = []
 
 for i in range(10):
     routing(u_hat)
-    dist_matrix = routing.g.edata['c'].view(in_nodes, out_nodes)
+    dist_matrix = routing.g.edata["c"].view(in_nodes, out_nodes)
     entropy = (-dist_matrix * th.log(dist_matrix)).sum(dim=1)
     entropy_list.append(entropy.data.numpy())
     dist_list.append(dist_matrix.data.numpy())
 
 stds = np.std(entropy_list, axis=1)
 means = np.mean(entropy_list, axis=1)
-plt.errorbar(np.arange(len(entropy_list)), means, stds, marker='o')
+plt.errorbar(np.arange(len(entropy_list)), means, stds, marker="o")
 plt.ylabel("Entropy of Weight Distribution")
 plt.xlabel("Number of Routing")
 plt.xticks(np.arange(len(entropy_list)))
@@ -189,8 +197,8 @@ plt.close()
 #
 # Alternatively, we can also watch the evolution of histograms.
 
-import seaborn as sns
 import matplotlib.animation as animation
+import seaborn as sns
 
 fig = plt.figure(dpi=150)
 fig.clf()
@@ -204,7 +212,9 @@ def dist_animate(i):
     ax.set_title("Routing: %d" % (i))
 
 
-ani = animation.FuncAnimation(fig, dist_animate, frames=len(entropy_list), interval=500)
+ani = animation.FuncAnimation(
+    fig, dist_animate, frames=len(entropy_list), interval=500
+)
 plt.close()
 
 ############################################################################################################
@@ -226,22 +236,43 @@ pos = dict()
 fig2 = plt.figure(figsize=(8, 3), dpi=150)
 fig2.clf()
 ax = fig2.subplots()
-pos.update((n, (i, 1)) for i, n in zip(height_in_y, X))  # put nodes from X at x=1
-pos.update((n, (i, 2)) for i, n in zip(height_out_y, Y))  # put nodes from Y at x=2
+pos.update(
+    (n, (i, 1)) for i, n in zip(height_in_y, X)
+)  # put nodes from X at x=1
+pos.update(
+    (n, (i, 2)) for i, n in zip(height_out_y, Y)
+)  # put nodes from Y at x=2
 
 
 def weight_animate(i):
     ax.cla()
-    ax.axis('off')
+    ax.axis("off")
     ax.set_title("Routing: %d  " % i)
     dm = dist_list[i]
-    nx.draw_networkx_nodes(g, pos, nodelist=range(in_nodes), node_color='r', node_size=100, ax=ax)
-    nx.draw_networkx_nodes(g, pos, nodelist=range(in_nodes, in_nodes + out_nodes), node_color='b', node_size=100, ax=ax)
+    nx.draw_networkx_nodes(
+        g, pos, nodelist=range(in_nodes), node_color="r", node_size=100, ax=ax
+    )
+    nx.draw_networkx_nodes(
+        g,
+        pos,
+        nodelist=range(in_nodes, in_nodes + out_nodes),
+        node_color="b",
+        node_size=100,
+        ax=ax,
+    )
     for edge in g.edges():
-        nx.draw_networkx_edges(g, pos, edgelist=[edge], width=dm[edge[0], edge[1] - in_nodes] * 1.5, ax=ax)
+        nx.draw_networkx_edges(
+            g,
+            pos,
+            edgelist=[edge],
+            width=dm[edge[0], edge[1] - in_nodes] * 1.5,
+            ax=ax,
+        )
 
 
-ani2 = animation.FuncAnimation(fig2, weight_animate, frames=len(dist_list), interval=500)
+ani2 = animation.FuncAnimation(
+    fig2, weight_animate, frames=len(dist_list), interval=500
+)
 plt.close()
 
 ############################################################################################################
@@ -257,4 +288,3 @@ plt.close()
 # .. |image3| image:: https://i.imgur.com/dMvu7p3.png
 # .. |image4| image:: https://github.com/VoVAllen/DGL_Capsule/raw/master/routing_dist.gif
 # .. |image5| image:: https://github.com/VoVAllen/DGL_Capsule/raw/master/routing_vis.gif
-

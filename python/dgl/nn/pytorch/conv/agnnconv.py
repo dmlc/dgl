@@ -5,9 +5,9 @@ from torch import nn
 from torch.nn import functional as F
 
 from .... import function as fn
-from ...functional import edge_softmax
 from ....base import DGLError
 from ....utils import expand_as_pair
+from ...functional import edge_softmax
 
 
 class AGNNConv(nn.Module):
@@ -74,16 +74,16 @@ class AGNNConv(nn.Module):
             [1., 1., 1., 1., 1., 1., 1., 1., 1., 1.]],
         grad_fn=<BinaryReduceBackward>)
     """
-    def __init__(self,
-                 init_beta=1.,
-                 learn_beta=True,
-                 allow_zero_in_degree=False):
+
+    def __init__(
+        self, init_beta=1.0, learn_beta=True, allow_zero_in_degree=False
+    ):
         super(AGNNConv, self).__init__()
         self._allow_zero_in_degree = allow_zero_in_degree
         if learn_beta:
             self.beta = nn.Parameter(th.Tensor([init_beta]))
         else:
-            self.register_buffer('beta', th.Tensor([init_beta]))
+            self.register_buffer("beta", th.Tensor([init_beta]))
 
     def set_allow_zero_in_degree(self, set_value):
         r"""
@@ -133,26 +133,28 @@ class AGNNConv(nn.Module):
         with graph.local_scope():
             if not self._allow_zero_in_degree:
                 if (graph.in_degrees() == 0).any():
-                    raise DGLError('There are 0-in-degree nodes in the graph, '
-                                   'output for those nodes will be invalid. '
-                                   'This is harmful for some applications, '
-                                   'causing silent performance regression. '
-                                   'Adding self-loop on the input graph by '
-                                   'calling `g = dgl.add_self_loop(g)` will resolve '
-                                   'the issue. Setting ``allow_zero_in_degree`` '
-                                   'to be `True` when constructing this module will '
-                                   'suppress the check and let the code run.')
+                    raise DGLError(
+                        "There are 0-in-degree nodes in the graph, "
+                        "output for those nodes will be invalid. "
+                        "This is harmful for some applications, "
+                        "causing silent performance regression. "
+                        "Adding self-loop on the input graph by "
+                        "calling `g = dgl.add_self_loop(g)` will resolve "
+                        "the issue. Setting ``allow_zero_in_degree`` "
+                        "to be `True` when constructing this module will "
+                        "suppress the check and let the code run."
+                    )
 
             feat_src, feat_dst = expand_as_pair(feat, graph)
 
-            graph.srcdata['h'] = feat_src
-            graph.srcdata['norm_h'] = F.normalize(feat_src, p=2, dim=-1)
+            graph.srcdata["h"] = feat_src
+            graph.srcdata["norm_h"] = F.normalize(feat_src, p=2, dim=-1)
             if isinstance(feat, tuple) or graph.is_block:
-                graph.dstdata['norm_h'] = F.normalize(feat_dst, p=2, dim=-1)
+                graph.dstdata["norm_h"] = F.normalize(feat_dst, p=2, dim=-1)
             # compute cosine distance
-            graph.apply_edges(fn.u_dot_v('norm_h', 'norm_h', 'cos'))
-            cos = graph.edata.pop('cos')
+            graph.apply_edges(fn.u_dot_v("norm_h", "norm_h", "cos"))
+            cos = graph.edata.pop("cos")
             e = self.beta * cos
-            graph.edata['p'] = edge_softmax(graph, e)
-            graph.update_all(fn.u_mul_e('h', 'p', 'm'), fn.sum('m', 'h'))
-            return graph.dstdata.pop('h')
+            graph.edata["p"] = edge_softmax(graph, e)
+            graph.update_all(fn.u_mul_e("h", "p", "m"), fn.sum("m", "h"))
+            return graph.dstdata.pop("h")

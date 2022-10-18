@@ -6,6 +6,7 @@ from mxnet.gluon import nn
 
 from .... import function as fn
 
+
 class GatedGraphConv(nn.Block):
     r"""Gated Graph Convolution layer from `Gated Graph Sequence
     Neural Networks <https://arxiv.org/pdf/1511.05493.pdf>`__
@@ -59,26 +60,24 @@ class GatedGraphConv(nn.Block):
     0.23958017 0.23430146 0.26431587 0.27001363]]
     <NDArray 6x10 @cpu(0)>
     """
-    def __init__(self,
-                 in_feats,
-                 out_feats,
-                 n_steps,
-                 n_etypes,
-                 bias=True):
+
+    def __init__(self, in_feats, out_feats, n_steps, n_etypes, bias=True):
         super(GatedGraphConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
         self._n_steps = n_steps
         self._n_etypes = n_etypes
         if not bias:
-            raise KeyError('MXNet do not support disabling bias in GRUCell.')
+            raise KeyError("MXNet do not support disabling bias in GRUCell.")
         with self.name_scope():
             self.linears = nn.Sequential()
             for _ in range(n_etypes):
                 self.linears.add(
-                    nn.Dense(out_feats,
-                             weight_initializer=mx.init.Xavier(),
-                             in_units=out_feats)
+                    nn.Dense(
+                        out_feats,
+                        weight_initializer=mx.init.Xavier(),
+                        in_units=out_feats,
+                    )
                 )
             self.gru = gluon.rnn.GRUCell(out_feats, input_size=out_feats)
 
@@ -104,25 +103,33 @@ class GatedGraphConv(nn.Block):
             is the output feature size.
         """
         with graph.local_scope():
-            assert graph.is_homogeneous, \
-                "not a homogeneous graph; convert it with to_homogeneous " \
+            assert graph.is_homogeneous, (
+                "not a homogeneous graph; convert it with to_homogeneous "
                 "and pass in the edge type as argument"
-            zero_pad = nd.zeros((feat.shape[0], self._out_feats - feat.shape[1]),
-                                ctx=feat.context)
+            )
+            zero_pad = nd.zeros(
+                (feat.shape[0], self._out_feats - feat.shape[1]),
+                ctx=feat.context,
+            )
             feat = nd.concat(feat, zero_pad, dim=-1)
 
             for _ in range(self._n_steps):
-                graph.ndata['h'] = feat
+                graph.ndata["h"] = feat
                 for i in range(self._n_etypes):
                     eids = (etypes.asnumpy() == i).nonzero()[0]
-                    eids = nd.from_numpy(eids, zero_copy=True).as_in_context(
-                        feat.context).astype(graph.idtype)
+                    eids = (
+                        nd.from_numpy(eids, zero_copy=True)
+                        .as_in_context(feat.context)
+                        .astype(graph.idtype)
+                    )
                     if len(eids) > 0:
                         graph.apply_edges(
-                            lambda edges: {'W_e*h': self.linears[i](edges.src['h'])},
-                            eids
+                            lambda edges: {
+                                "W_e*h": self.linears[i](edges.src["h"])
+                            },
+                            eids,
                         )
-                graph.update_all(fn.copy_e('W_e*h', 'm'), fn.sum('m', 'a'))
-                a = graph.ndata.pop('a')
+                graph.update_all(fn.copy_e("W_e*h", "m"), fn.sum("m", "a"))
+                a = graph.ndata.pop("a")
                 feat = self.gru(a, [feat])[0]
             return feat

@@ -84,7 +84,8 @@ __all__ = [
     'laplacian_pe',
     'to_half',
     'to_float',
-    'to_double'
+    'to_double',
+    'double_radius_node_labeling',
     ]
 
 
@@ -3650,44 +3651,63 @@ def random_walk_pe(g, k, eweight_name=None):
 
     return PE
 
-def laplacian_pe(g, k):
+def laplacian_pe(g, k, padding=False, return_eigval=False):
     r"""Laplacian Positional Encoding, as introduced in
     `Benchmarking Graph Neural Networks
     <https://arxiv.org/abs/2003.00982>`__
 
     This function computes the laplacian positional encodings as the
-    k smallest non-trivial eigenvectors (k << n). k and n are the positional
-    encoding dimensions and the number of nodes in the given graph.
+    k smallest non-trivial eigenvectors.
 
     Parameters
     ----------
     g : DGLGraph
-        The input graph. Must be homogeneous.
+        The input graph. Must be homogeneous and bidirected.
     k : int
-        Number of smallest non-trivial eigenvectors to use for positional encoding
-        (smaller than the number of nodes).
+        Number of smallest non-trivial eigenvectors to use for positional encoding.
+    padding : bool, optional
+        If False, raise an exception when k>=n.
+        Otherwise, add zero paddings in the end of eigenvectors and 'nan' paddings
+        in the end of eigenvalues when k>=n.
+        Default: False.
+        n is the number of nodes in the given graph.
+    return_eigval : bool, optional
+        If True, return laplacian eigenvalues together with eigenvectors.
+        Otherwise, return laplacian eigenvectors only.
+        Default: False.
 
     Returns
     -------
-    Tensor
-        The laplacian positional encodings of shape :math:`(N, k)`, where :math:`N` is the
-        number of nodes in the input graph.
+    Tensor or (Tensor, Tensor)
+        Return the laplacian positional encodings of shape :math:`(N, k)`, where :math:`N` is the
+        number of nodes in the input graph, when :attr:`return_eigval` is False. The eigenvalues
+        of shape :math:`N` is additionally returned as the second element when :attr:`return_eigval`
+        is True.
 
     Example
     -------
     >>> import dgl
-    >>> g = dgl.rand_graph(6, 12)
+    >>> g = dgl.graph(([0,1,2,3,1,2,3,0], [1,2,3,0,0,1,2,3]))
     >>> dgl.laplacian_pe(g, 2)
-    tensor([[-0.8931, -0.7713],
-            [-0.0000,  0.6198],
-            [ 0.2704, -0.0138],
-            [-0.0000,  0.0554],
-            [ 0.3595, -0.0477],
-            [-0.0000,  0.1240]])
+    tensor([[ 7.0711e-01, -6.4921e-17],
+            [ 3.0483e-16, -7.0711e-01],
+            [-7.0711e-01, -2.4910e-16],
+            [ 9.9288e-17,  7.0711e-01]])
+    >>> dgl.laplacian_pe(g, 5, padding=True)
+    tensor([[ 7.0711e-01, -6.4921e-17,  5.0000e-01,  0.0000e+00,  0.0000e+00],
+            [ 3.0483e-16, -7.0711e-01, -5.0000e-01,  0.0000e+00,  0.0000e+00],
+            [-7.0711e-01, -2.4910e-16,  5.0000e-01,  0.0000e+00,  0.0000e+00],
+            [ 9.9288e-17,  7.0711e-01, -5.0000e-01,  0.0000e+00,  0.0000e+00]])
+    >>> dgl.laplacian_pe(g, 5, padding=True, return_eigval=True)
+    (tensor([[-7.0711e-01,  6.4921e-17, -5.0000e-01,  0.0000e+00,  0.0000e+00],
+             [-3.0483e-16,  7.0711e-01,  5.0000e-01,  0.0000e+00,  0.0000e+00],
+             [ 7.0711e-01,  2.4910e-16, -5.0000e-01,  0.0000e+00,  0.0000e+00],
+             [-9.9288e-17, -7.0711e-01,  5.0000e-01,  0.0000e+00,  0.0000e+00]]),
+     tensor([1., 1., 2., nan, nan]))
     """
     # check for the "k < n" constraint
     n = g.num_nodes()
-    if n <= k:
+    if not padding and n <= k:
         assert "the number of eigenvectors k must be smaller than the number of nodes n, " + \
             f"{k} and {n} detected."
 
@@ -3698,15 +3718,26 @@ def laplacian_pe(g, k):
 
     # select eigenvectors with smaller eigenvalues O(n + klogk)
     EigVal, EigVec = np.linalg.eig(L.toarray())
-    kpartition_indices = np.argpartition(EigVal, k+1)[:k+1]
+    max_freqs = min(n-1, k)
+    kpartition_indices = np.argpartition(EigVal, max_freqs)[:max_freqs+1]
     topk_eigvals = EigVal[kpartition_indices]
     topk_indices = kpartition_indices[topk_eigvals.argsort()][1:]
-    topk_EigVec = np.real(EigVec[:, topk_indices])
+    topk_EigVec = EigVec[:, topk_indices]
+    eigvals = F.tensor(EigVal[topk_indices], dtype=F.float32)
 
     # get random flip signs
-    rand_sign = 2 * (np.random.rand(k) > 0.5) - 1.
+    rand_sign = 2 * (np.random.rand(max_freqs) > 0.5) - 1.
     PE = F.astype(F.tensor(rand_sign * topk_EigVec), F.float32)
 
+    # add paddings
+    if n <= k:
+        temp_EigVec = F.zeros([n, k-n+1], dtype=F.float32, ctx=F.context(PE))
+        PE = F.cat([PE, temp_EigVec], dim=1)
+        temp_EigVal = F.tensor(np.full(k-n+1, np.nan), F.float32)
+        eigvals = F.cat([eigvals, temp_EigVal], dim=0)
+
+    if return_eigval:
+        return PE, eigvals
     return PE
 
 def to_half(g):
@@ -3759,5 +3790,70 @@ def to_double(g):
     ret._edge_frames = [frame.double() for frame in ret._edge_frames]
     ret._node_frames = [frame.double() for frame in ret._node_frames]
     return ret
+
+def double_radius_node_labeling(g, src, dst):
+    r"""Double Radius Node Labeling, as introduced in `Link Prediction
+    Based on Graph Neural Networks <https://arxiv.org/abs/1802.09691>`__.
+
+    This function computes the double radius node labeling for each node to mark
+    nodes' different roles in an enclosing subgraph, given a target link.
+
+    The node labels of source :math:`s` and destination :math:`t` are set to 1 and
+    those of unreachable nodes from source or destination are set to 0. The labels
+    of other nodes :math:`l` are defined according to the following hash function:
+
+    :math:`l = 1 + min(d_s, d_t) + (d//2)[(d//2) + (d%2) - 1]`
+
+    where :math:`d_s` and :math:`d_t` denote the shortest distance to the source and
+    the target, respectively. :math:`d = d_s + d_t`.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The input graph.
+    src : int
+        The source node ID of the target link.
+    dst : int
+        The destination node ID of the target link.
+
+    Returns
+    -------
+    Tensor
+        Labels of all nodes. The tensor is of shape :math:`(N,)`, where
+        :math:`N` is the number of nodes in the input graph.
+
+    Example
+    -------
+    >>> import dgl
+
+    >>> g = dgl.graph(([0,0,0,0,1,1,2,4], [1,2,3,6,3,4,4,5]))
+    >>> dgl.double_radius_node_labeling(g, 0, 1)
+    tensor([1, 1, 3, 2, 3, 7, 0])
+    """
+    adj = g.adj(scipy_fmt='csr')
+    src, dst = (dst, src) if src > dst else (src, dst)
+
+    idx = list(range(src)) + list(range(src + 1, adj.shape[0]))
+    adj_wo_src = adj[idx, :][:, idx]
+
+    idx = list(range(dst)) + list(range(dst + 1, adj.shape[0]))
+    adj_wo_dst = adj[idx, :][:, idx]
+
+    # distance to the source node
+    ds = sparse.csgraph.shortest_path(adj_wo_dst, directed=False, unweighted=True, indices=src)
+    ds = np.insert(ds, dst, 0, axis=0)
+    # distance to the destination node
+    dt = sparse.csgraph.shortest_path(adj_wo_src, directed=False, unweighted=True, indices=dst-1)
+    dt = np.insert(dt, src, 0, axis=0)
+
+    d = ds + dt
+    # suppress invalid value (nan) warnings
+    with np.errstate(invalid='ignore'):
+        z = 1 + np.stack([ds, dt]).min(axis=0) + d//2 * (d//2 + d%2 - 1)
+    z[src] = 1
+    z[dst] = 1
+    z[np.isnan(z)] = 0  # unreachable nodes
+
+    return F.tensor(z, F.int64)
 
 _init_api("dgl.transform", __name__)

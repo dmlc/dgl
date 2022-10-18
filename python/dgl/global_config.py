@@ -1,8 +1,8 @@
-
 """Module for global configuration operators."""
 from ._ffi.function import _init_api
 
 __all__ = ["is_libxsmm_enabled", "use_libxsmm"]
+
 
 def use_libxsmm(flag):
     r"""Set whether DGL uses libxsmm at runtime.
@@ -21,6 +21,7 @@ def use_libxsmm(flag):
     """
     _CAPI_DGLConfigSetLibxsmm(flag)
 
+
 def is_libxsmm_enabled():
     r"""Get whether the use_libxsmm flag is turned on.
 
@@ -34,5 +35,6 @@ def is_libxsmm_enabled():
     use_libxsmm
     """
     return _CAPI_DGLConfigGetLibxsmm()
+
 
 _init_api("dgl.global_config")

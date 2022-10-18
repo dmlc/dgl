@@ -1,11 +1,14 @@
-from timeit import default_timer
-import dgl
-import backend as F
-import dgl.function as fn
 import time
+import unittest
+from timeit import default_timer
+
+import backend as F
 import numpy as np
-import unittest, pytest
-from test_utils import parametrize_idtype, get_cases
+import pytest
+from test_utils import get_cases, parametrize_idtype
+
+import dgl
+import dgl.function as fn
 
 iters = 5
 n_edge_scale = 1
