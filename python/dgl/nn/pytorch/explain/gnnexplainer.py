@@ -533,13 +533,15 @@ class HeteroGNNExplainer(nn.Module):
 
         edge_masks = {}
         for canonical_etype in graph.canonical_etypes:
-            src = canonical_etype[0]
-            num_nodes = graph.num_nodes(src)
+            src_num_nodes = graph.num_nodes(canonical_etype[0])
+            dst_num_nodes = graph.num_nodes(canonical_etype[-1])
+            num_nodes_sum = src_num_nodes + dst_num_nodes
             num_edges = graph.num_edges(canonical_etype)
             std = nn.init.calculate_gain('relu')
-            if num_nodes > 0:
-                std *= sqrt(2.0 / (2 * num_nodes))
-            edge_masks[canonical_etype] = nn.Parameter(torch.randn(num_edges, device=device) * std)
+            if num_nodes_sum > 0:
+                std *= sqrt(2.0 / num_nodes_sum)
+            edge_masks[canonical_etype] = nn.Parameter(
+                torch.randn(num_edges, device=device) * std)
 
         return feat_masks, edge_masks
 
