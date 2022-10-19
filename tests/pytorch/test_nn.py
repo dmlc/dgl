@@ -1347,80 +1347,50 @@ def test_heterognnexplainer(g, idtype, input_dim, hidden_dim, output_dim):
     feat = {ntype: th.zeros((g.num_nodes(ntype), input_dim), device=device)
             for ntype in g.ntypes}
 
-    class GCNLayer(th.nn.Module):
-        def __init__(self, in_dim, out_dim, graph_relation_list):
-            super(GCNLayer, self).__init__()
-
-            self.relation_weight_matrix = th.nn.ModuleDict({
-                ''.join(relation): th.nn.Linear(in_dim, out_dim).to(device)
-                for relation in graph_relation_list
+    class Model(th.nn.Module):
+        def __init__(self, in_dim, num_classes, canonical_etypes, graph=False):
+            super(Model, self).__init__()
+            self.graph=graph
+            self.etype_weights = th.nn.ModuleDict({
+                '_'.join(c_etype): th.nn.Linear(in_dim, num_classes)
+                for c_etype in canonical_etypes
             })
 
-        def forward(self, graph, node_feature_dict, eweight=None):
-            rel_func_dict = {}
-            for relation in graph.canonical_etypes:
-                relation_str = ''.join(relation)
-                wh = self.relation_weight_matrix[relation_str](node_feature_dict[relation[0]])
-                graph.nodes[relation[0]].data[f'wh_{relation}'] = wh
-                if eweight is None:
-                    rel_func_dict[relation] = (dgl.function.copy_u(f'wh_{relation}', 'm'),
-                                               dgl.function.mean('m', 'h'))
-                else:
-                    graph.edges[relation].data['w'] = eweight[relation]
-                    rel_func_dict[relation] = (dgl.function.u_mul_e(f'wh_{relation}', 'w', 'm'),
-                                               dgl.function.mean('m', 'h'))
-            graph.multi_update_all(rel_func_dict, 'sum')
-            return {ntype: graph.nodes[ntype].data['h']
-                    for ntype in graph.ntypes}
-
-    class NodeClassficationModel(th.nn.Module):
-        def __init__(self, in_dim, hidden_dim, num_classes, graph_relation_list):
-            super(NodeClassficationModel, self).__init__()
-            self.layer1 = GCNLayer(in_dim,
-                                   hidden_dim,
-                                   graph_relation_list)
-            self.layer2 = GCNLayer(hidden_dim,
-                                   num_classes,
-                                   graph_relation_list)
-
         def forward(self, graph, feat, eweight=None):
-            x = self.layer1(graph, feat, eweight=eweight)
-
-            for ntype in graph.ntypes:
-                x[ntype] = th.nn.functional.relu(x[ntype])
-            x = self.layer2(graph, x)
-            return x
-
-    class GraphClassficationModel(th.nn.Module):
-        def __init__(self, in_dim, hidden_dim, num_classes, graph_relation_list):
-            super(GraphClassficationModel, self).__init__()
-            self.layer = GCNLayer(in_dim,
-                                  hidden_dim,
-                                  graph_relation_list)
-            self.linear = th.nn.Linear(hidden_dim,
-                                       num_classes)
-
-        def forward(self, graph, feat, eweight=None):
-            x = self.layer(graph, feat, eweight=eweight)
-
             with graph.local_scope():
-                graph.ndata['x'] = x
-                hg = 0
-                for ntype in graph.ntypes:
-                    if graph.num_nodes(ntype):
-                        hg = hg + dgl.mean_nodes(graph, 'x', ntype=ntype)
+                c_etype_func_dict = {}
+                for c_etype in graph.canonical_etypes:
+                    src_type, etype, dst_type = c_etype
+                    wh = self.etype_weights['_'.join(c_etype)](feat[src_type])
+                    graph.nodes[src_type].data[f'h_{c_etype}'] = wh
+                    if eweight is None:
+                        c_etype_func_dict[c_etype] = (fn.copy_u(f'h_{c_etype}', 'm'),
+                                                      fn.mean('m', 'h'))
+                    else:
+                        graph.edges[c_etype].data['w'] = eweight[c_etype]
+                        c_etype_func_dict[c_etype] = (
+                            fn.u_mul_e(f'h_{c_etype}', 'w', 'm'), fn.mean('m', 'h'))
+                graph.multi_update_all(c_etype_func_dict, 'sum')
+                if self.graph:
+                    with graph.local_scope():
+                        hg = 0
+                        for ntype in graph.ntypes:
+                            if graph.num_nodes(ntype):
+                                hg = hg + dgl.mean_nodes(graph, 'h', ntype=ntype)
 
-                return self.linear(hg)
+                            return hg
+                else:
+                    return graph.ndata['h']
 
     # Explain node prediction
-    model = NodeClassficationModel(input_dim, hidden_dim, output_dim, g.canonical_etypes)
+    model = Model(input_dim, output_dim, g.canonical_etypes)
     model = model.to(F.ctx())
     ntype = g.ntypes[0]
     explainer = nn.explain.HeteroGNNExplainer(model, num_hops=1)
     new_center, sg, feat_mask, edge_mask = explainer.explain_node(ntype, 0, g, feat)
 
     # Explain graph prediction
-    model = GraphClassficationModel(input_dim, hidden_dim, output_dim, g.canonical_etypes)
+    model = Model(input_dim, output_dim, g.canonical_etypes, graph=True)
     model = model.to(F.ctx())
     explainer = nn.explain.HeteroGNNExplainer(model, num_hops=1)
     feat_mask, edge_mask = explainer.explain_graph(g, feat)

@@ -767,159 +767,105 @@ class HeteroGNNExplainer(nn.Module):
         return inverse_indices, sg, feat_mask, edge_mask
 
     def explain_graph(self, graph, feat, **kwargs):
-        r"""Learn and return a node feature mask and an edge mask that play a
+        r"""Learn and return a node feature masks and an edge masks that play a
         crucial role to explain the prediction made by the GNN for a graph.
 
         Parameters
         ----------
         graph : DGLGraph
-            A heterogeneous graph.
+            A heterogeneous graph that will be explained. :attr:`model` must be trained to
+            make predictions for this graph type.
         feat : dict[str, Tensor]
-            Dictionary of { ntypes: features }
-            The dictionary that associates input node features(values) with
-            the respective node types(keys) present in the graph.
-            The input feature of shape :math:`(N, D)`. :math:`N` is the
-            number of nodes, and :math:`D` is the feature size.
+            The dictionary that associates input node features (values) with
+            the respective node types (keys) present in the graph.
+            The input features are of shape :math:`(N_t, D_t)`. :math:`N_t` is the
+            number of nodes for node type :math:`t`, and :math:`D_t` is the feature size for
+            node type :math:`t`
         kwargs : dict
-            Additional arguments passed to the GNN model. Tensors whose
-            first dimension is the number of nodes or edges will be
-            assumed to be node/edge features.
+            Additional arguments passed to the GNN model.
 
         Returns
         -------
         feat_mask : dict[str, Tensor]
-            Dictionary of { ntypes: features }
-            The dictionary that associates the feature masks(values) with
-            the respective node types(keys).
-            Learned feature importance mask of shape :math:`(D)`, where :math:`D` is the
-            feature size. The values are within range :math:`(0, 1)`.
-            The higher, the more important.
+            The dictionary that associates the learned node feature importance masks (values) with
+            the respective node types (keys). The masks are of shape :math:`(D_t)`, where
+            :math:`D_t` is the node feature size for node type :attr:`t`. The values are within range
+            :math:`(0, 1)`. The higher, the more important.
         edge_mask : dict[Tuple[str], Tensor]
-            Dictionary of { canonical_etypes: features }
-            The dictionary that  associates the edge masks(values) with
-            the respective canonical edge types(keys).
-            Learned importance mask of the edges in the graph, which is a tensor
-            of shape :math:`(E)`, where :math:`E` is the number of edges in the
-            graph. The values are within range :math:`(0, 1)`. The higher,
-            the more important.
+            The dictionary that associates the learned edge importance masks (values) with
+            the respective canonical edge types (keys). The masks are of shape :math:`(E_t)`,
+            where :math:`E_t` is the number of edges for canonical edge type :math:`t` in the
 
         Examples
         --------
 
-        >>> import dgl
+                >>> import dgl
+        >>> import dgl.function as fn
         >>> import torch as th
         >>> import torch.nn as nn
         >>> import torch.nn.functional as F
-        >>> from dgl.backend import copy_to
         >>> from dgl.nn import HeteroGNNExplainer
 
-        >>> # Create an example heterogenous dataset
-        >>> def heterograph0():
-        ...     g = dgl.heterograph({
-        ...         ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1]),
-        ...         ('creator', 'creates', 'game'): ([0, 1], [0, 1])}, device=dgl.backend.cpu())
-        ...     g.nodes['user'].data['h'] = copy_to(th.randn((g.number_of_nodes('user'), 3)),
-        ...                                         dgl.backend.cpu())
-        ...     g.nodes['game'].data['h'] = copy_to(th.randn((g.number_of_nodes('game'), 2)),
-        ...                                         dgl.backend.cpu())
-        ...     g.nodes['creator'].data['h'] = copy_to(th.randn((g.number_of_nodes('creator'), 3)),
-        ...                                              dgl.backend.cpu())
-        ...     g.edges['plays'].data['h'] = copy_to(th.randn((g.number_of_edges('plays'), 1)),
-        ...                                          dgl.backend.cpu())
-        ...     g.edges['creates'].data['h'] = copy_to(th.randn((g.number_of_edges('creates'), 5)),
-        ...                                             dgl.backend.cpu())
-        ...     return g
-
-        >>> # Define a GCN layer that uses eweight
-        >>> class GCNLayer(th.nn.Module):
-        ...     def __init__(self, in_dim, out_dim, graph_relation_list):
-        ...         super(GCNLayer, self).__init__()
-        ...
-        ...         self.relation_weight_matrix = th.nn.ModuleDict({
-        ...             ''.join(relation): th.nn.Linear(in_dim, out_dim)
-        ...             for relation in graph_relation_list
+        >>> class Model(nn.Module):
+        ...     def __init__(self, in_dim, num_classes, canonical_etypes):
+        ...         super(Model, self).__init__()
+        ...         self.etype_weights = nn.ModuleDict({
+        ...             '_'.join(c_etype): nn.Linear(in_dim, num_classes)
+        ...             for c_etype in canonical_etypes
         ...         })
         ...
-        ...     def forward(self, graph, node_feature_dict, eweight=None):
-        ...         rel_func_dict = {}
-        ...         for relation in graph.canonical_etypes:
-        ...             relation_str = ''.join(relation)
-        ...             wh = self.relation_weight_matrix[relation_str]\
-        ...                (node_feature_dict[relation[0]])
-        ...             graph.nodes[relation[0]].data[f'wh_{relation}'] = wh
-        ...             if eweight is None:
-        ...                 rel_func_dict[relation] = (dgl.function.copy_u(
-        ...                     f'wh_{relation}', 'm'), dgl.function.mean('m', 'h'))
-        ...             else:
-        ...                 graph.edges[relation].data['w'] = eweight[relation]
-        ...                 rel_func_dict[relation] = (dgl.function.u_mul_e(
-        ...                     f'wh_{relation}', 'w', 'm'),
-        ...                                            dgl.function.mean('m', 'h'))
-        ...         graph.multi_update_all(rel_func_dict, 'sum')
-        ...         return {ntype: graph.nodes[ntype].data['h']
-        ...                 for ntype in graph.ntypes}
-
-        >>> # Define a model
-        >>> class Model(nn.Module):
-        ...     def __init__(self, in_dim, hidden_dim, num_classes, graph_relation_list):
-        ...         super(Model, self).__init__()
-        ...         self.layer = GCNLayer(in_dim,hidden_dim,graph_relation_list)
-        ...         self.linear = th.nn.Linear(hidden_dim,num_classes)
-        ...
         ...     def forward(self, graph, feat, eweight=None):
-        ...         x = self.layer(graph, feat, eweight=eweight)
-        ...
         ...         with graph.local_scope():
-        ...             graph.ndata['x'] = x
-        ...             hg = 0
-        ...             for ntype in graph.ntypes:
-        ...                 if graph.num_nodes(ntype):
-        ...                     hg = hg + dgl.mean_nodes(graph, 'x', ntype=ntype)
-        ...
-        ...                 return self.linear(hg)
+        ...             c_etype_func_dict = {}
+        ...             for c_etype in graph.canonical_etypes:
+        ...                 src_type, etype, dst_type = c_etype
+        ...                 wh = self.etype_weights['_'.join(c_etype)](feat[src_type])
+        ...                 graph.nodes[src_type].data[f'h_{c_etype}'] = wh
+        ...                 if eweight is None:
+        ...                     c_etype_func_dict[c_etype] = (fn.copy_u(f'h_{c_etype}', 'm'),
+        ...                         fn.mean('m', 'h'))
+        ...                 else:
+        ...                     graph.edges[c_etype].data['w'] = eweight[c_etype]
+        ...                     c_etype_func_dict[c_etype] = (
+        ...                         fn.u_mul_e(f'h_{c_etype}', 'w', 'm'), fn.mean('m', 'h'))
+        ...             graph.multi_update_all(c_etype_func_dict, 'sum')
+        ...             with graph.local_scope():
+        ...                 hg = 0
+        ...                 for ntype in graph.ntypes:
+        ...                     if graph.num_nodes(ntype):
+        ...                         hg = hg + dgl.mean_nodes(graph, 'h', ntype=ntype)
+        ...                     return hg
 
-        >>> # get the hetero-graph
-        >>> g = heterograph0()
-
-        >>> # constants related to GNN
         >>> input_dim = 5
-        >>> hidden_dim = 10
-        >>> output_dim = 1
+        >>> num_classes = 2
+        >>> g = dgl.heterograph({
+        ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1])})
+        >>> g.nodes['user'].data['h'] = th.randn(g.num_nodes('user'), input_dim)
+        >>> g.nodes['game'].data['h'] = th.randn(g.num_nodes('game'), input_dim)
 
-        >>> # add self-loop and backward edges to the heterograph
-        >>> transform1 = dgl.transforms.AddSelfLoop(new_etypes=True)
-        >>> g = transform1(g)
-        >>> transform2 = dgl.transforms.AddReverse(copy_edata=True)
-        >>> g = transform2(g)
-
-        >>> # define random feature for the node types
-        >>> feat = {ntype: th.zeros((g.num_nodes(ntype), input_dim)) for ntype in g.ntypes}
+        >>> transform = dgl.transforms.AddReverse()
+        >>> g = transform(g)
 
         >>> # define and train the model
-        >>> model = Model(input_dim, hidden_dim, output_dim, g.canonical_etypes)
+        >>> model = Model(input_dim, num_classes, g.canonical_etypes)
+        >>> feat = g.ndata['h']
         >>> optimizer = th.optim.Adam(model.parameters())
         >>> for epoch in range(10):
-        ...         logits = model(g, feat)
-        ...         loss = F.cross_entropy(logits, th.tensor([[1.]]))
-        ...         optimizer.zero_grad()
-        ...         loss.backward()
-        ...         optimizer.step()
+        ...     logits = model(g, feat)
+        ...     loss = F.cross_entropy(logits, th.tensor([1]))
+        ...     optimizer.zero_grad()
+        ...     loss.backward()
+        ...     optimizer.step()
 
-        >>> # Explain the prediction for graph
+        >>> # Explain the prediction for node 0 of type 'user'
         >>> explainer = HeteroGNNExplainer(model, num_hops=1)
-        >>> feat_mask, edge_mask = explainer.explain_graph(g, feat)
+        >>> new_center, sg, feat_mask, edge_mask = explainer.explain_graph(g, feat)
         >>> feat_mask
-        {'creator': tensor([0.2783, 0.2653, 0.2823, 0.2693, 0.2606]),
-        'game': tensor([0.2532, 0.2781, 0.2650, 0.2846, 0.2872]),
-        'user': tensor([0.2760, 0.3348, 0.2896, 0.2561, 0.2842])}
+        {'game': tensor([0.2684, 0.2597, 0.3135, 0.2976, 0.2607]),
+         'user': tensor([0.2216, 0.2908, 0.2644, 0.2738, 0.2663])}
         >>> edge_mask
-        {('creator', 'creates', 'game'): tensor([0.1256, 0.8210]),
-        ('creator', 'self', 'creator'): tensor([0.8184, 0.2053, 0.9353, 0.1962]),
-        ('game', 'rev_creates', 'creator'): tensor([0.8273, 0.8215]),
-        ('game', 'rev_plays', 'user'): tensor([0.1637, 0.1762, 0.1447, 0.2001]),
-        ('game', 'self', 'game'): tensor([0.1917, 0.9373, 0.8214, 0.8965]),
-        ('user', 'plays', 'game'): tensor([0.7941, 0.1954, 0.2036, 0.0748]),
-        ('user', 'self', 'user'): tensor([0.1303, 0.1315, 0.1977, 0.9092, 0.9010, 0.8202])}
+        {('game', 'rev_plays', 'user'): tensor([0.8922, 0.1966, 0.8371, 0.1330]),
+         ('user', 'plays', 'game'): tensor([0.1785, 0.1696, 0.8065, 0.2167])}
         """
         self.model.eval()
         device = graph.device
