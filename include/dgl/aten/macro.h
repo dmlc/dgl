@@ -171,6 +171,24 @@
   }                                                           \
 } while (0)
 
+#define ATEN_FLOAT_BOOL_TYPE_SWITCH(val, DType, val_name, ...) do {     \
+  if ((val).code == kDGLInt && (val).bits == 8) {              \
+    typedef int8_t DType;                                     \
+    {__VA_ARGS__}                                             \
+  } else if ((val).code == kDGLUInt && (val).bits == 8) {      \
+    typedef uint8_t DType;                                    \
+    {__VA_ARGS__}                                             \
+  } else if ((val).code == kDGLFloat && (val).bits == 32) {    \
+    typedef float DType;                                      \
+    {__VA_ARGS__}                                             \
+  } else if ((val).code == kDGLFloat && (val).bits == 64) {    \
+    typedef double DType;                                     \
+    {__VA_ARGS__}                                             \
+  } else {                                                    \
+    LOG(FATAL) << (val_name) << " can only be int8, uint8, float32 or float64"; \
+  }                                                           \
+} while (0)
+
 /*
  * Dispatch according to data type (int8, uint8, float32 or float64):
  *
