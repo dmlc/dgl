@@ -359,7 +359,8 @@ def start_hetero_etype_sample_client(rank, tmpdir, disable_shared_mem, fanout=3,
     if gpb is None:
         gpb = dist_graph.get_partition_book()
     try:
-        sampled_graph = sample_etype_neighbors(dist_graph, nodes, dgl.ETYPE, fanout, etype_sorted=etype_sorted)
+        sampled_graph = sample_etype_neighbors(
+                dist_graph, nodes, dgl.ETYPE, dgl.EID, fanout, etype_sorted=etype_sorted)
         block = dgl.to_block(sampled_graph, nodes)
         block.edata[dgl.EID] = sampled_graph.edata[dgl.EID]
     except Exception as e:
@@ -582,7 +583,7 @@ def start_bipartite_etype_sample_client(rank, tmpdir, disable_shared_mem, fanout
     if gpb is None:
         gpb = dist_graph.get_partition_book()
     sampled_graph = sample_etype_neighbors(
-        dist_graph, nodes, dgl.ETYPE, fanout)
+        dist_graph, nodes, dgl.ETYPE, dgl.EID, fanout)
     block = dgl.to_block(sampled_graph, nodes)
     if sampled_graph.num_edges() > 0:
         block.edata[dgl.EID] = sampled_graph.edata[dgl.EID]
@@ -811,7 +812,7 @@ def check_standalone_etype_sampling(tmpdir, reshuffle):
     os.environ['DGL_DIST_MODE'] = 'standalone'
     dgl.distributed.initialize("rpc_ip_config.txt")
     dist_graph = DistGraph("test_sampling", part_config=tmpdir / 'test_sampling.json')
-    sampled_graph = sample_etype_neighbors(dist_graph, [0, 10, 99, 66, 1023], dgl.ETYPE, 3)
+    sampled_graph = sample_etype_neighbors(dist_graph, [0, 10, 99, 66, 1023], dgl.ETYPE, dgl.EID, 3)
 
     src, dst = sampled_graph.edges()
     assert sampled_graph.number_of_nodes() == hg.number_of_nodes()
@@ -834,7 +835,8 @@ def check_standalone_etype_sampling_heterograph(tmpdir, reshuffle):
     os.environ['DGL_DIST_MODE'] = 'standalone'
     dgl.distributed.initialize("rpc_ip_config.txt")
     dist_graph = DistGraph("test_hetero_sampling", part_config=tmpdir / 'test_hetero_sampling.json')
-    sampled_graph = sample_etype_neighbors(dist_graph, [0, 1, 2, 10, 99, 66, 1023, 1024, 2700, 2701], dgl.ETYPE, 1)
+    sampled_graph = sample_etype_neighbors(
+            dist_graph, [0, 1, 2, 10, 99, 66, 1023, 1024, 2700, 2701], dgl.ETYPE, dgl.EID, 1)
     src, dst = sampled_graph.edges(etype=('paper', 'cite', 'paper'))
     assert len(src) == 10
     src, dst = sampled_graph.edges(etype=('paper', 'cite-by', 'paper'))

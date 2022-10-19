@@ -157,7 +157,7 @@ class AliasSampler: public BaseSampler<Idx> {
     double dice = re->Uniform<double>(0, N);
     Idx i = static_cast<Idx>(dice);
     double p = (dice - i) * avg;
-    if (p <= U[i])
+    if (p <= U[Map(i)])
         return Map(i);
     else
         return Map(K[i]);
@@ -274,6 +274,7 @@ class TreeSampler: public BaseSampler<Idx> {
   int64_t N;
   int64_t num_leafs;
   const DType *decrease;
+  FloatArray prob_;
 
  public:
   void ResetState(FloatArray prob) {
@@ -284,6 +285,7 @@ class TreeSampler: public BaseSampler<Idx> {
       weight[num_leafs + i] = prob_data[i];
     for (int64_t i = num_leafs - 1; i >= 1; --i)
       weight[i] = weight[i * 2] + weight[i * 2 + 1];
+    prob_ = prob;
   }
 
   explicit TreeSampler(RandomEngine *re, FloatArray prob, const DType* decrease = nullptr)

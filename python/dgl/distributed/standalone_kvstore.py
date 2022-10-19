@@ -103,6 +103,12 @@ class KVClient(object):
         """
         return F.count_nonzero(self._data[name])
 
+    @property
+    def local_store(self):
+        """Return the local partition of the data storage.
+        """
+        return self._data
+
     def union(self, operand1_name, operand2_name, output_name):
         """Compute the union of two mask arrays in the KVStore.
         """

@@ -28,6 +28,17 @@ class NeighborSampler(BlockSampler):
         If given, the probability of each neighbor being sampled is proportional
         to the edge feature value with the given name in ``g.edata``.  The feature must be
         a scalar on each edge.
+
+        This argument is mutually exclusive with :attr:`mask`.  If you want to
+        specify both a mask and a probability, consider multiplying the probability
+        with the mask instead.
+    mask : str, optional
+        If given, a neighbor could be picked only if the edge mask with the given
+        name in ``g.edata`` is True.  The data must be boolean on each edge.
+
+        This argument is mutually exclusive with :attr:`prob`.  If you want to
+        specify both a mask and a probability, consider multiplying the probability
+        with the mask instead.
     replace : bool, default False
         Whether to sample with replacement
     prefetch_node_feats : list[str] or dict[ntype, list[str]], optional
@@ -91,7 +102,7 @@ class NeighborSampler(BlockSampler):
     :ref:`User Guide Section 6 <guide-minibatch>` and
     :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
     """
-    def __init__(self, fanouts, edge_dir='in', prob=None, replace=False,
+    def __init__(self, fanouts, edge_dir='in', prob=None, mask=None, replace=False,
                  prefetch_node_feats=None, prefetch_labels=None, prefetch_edge_feats=None,
                  output_device=None):
         super().__init__(prefetch_node_feats=prefetch_node_feats,
@@ -100,7 +111,12 @@ class NeighborSampler(BlockSampler):
                          output_device=output_device)
         self.fanouts = fanouts
         self.edge_dir = edge_dir
-        self.prob = prob
+        if mask is not None and prob is not None:
+            raise ValueError(
+                    'Mask and probability arguments are mutually exclusive. '
+                    'Consider multiplying the probability with the mask '
+                    'to achieve the same goal.')
+        self.prob = prob or mask
         self.replace = replace
 
     def sample_blocks(self, g, seed_nodes, exclude_eids=None):

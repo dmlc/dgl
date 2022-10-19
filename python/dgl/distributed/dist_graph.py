@@ -22,6 +22,7 @@ from .partition import load_partition, load_partition_feats, load_partition_book
 from .graph_partition_book import PartitionPolicy, get_shared_mem_partition_book
 from .graph_partition_book import HeteroDataName, parse_hetero_data_name
 from .graph_partition_book import NodePartitionPolicy, EdgePartitionPolicy
+from .graph_partition_book import RangePartitionBook
 from .shared_mem_utils import _to_shared_mem, _get_ndata_path, _get_edata_path, DTYPE_DICT
 from . import rpc
 from . import role
@@ -83,8 +84,18 @@ def _copy_graph_to_shared_mem(g, graph_name, graph_format):
     # for heterogeneous graph, we need to put ETYPE into KVStore
     # for homogeneous graph, ETYPE does not exist
     if ETYPE in g.edata:
-        new_g.edata[ETYPE] = _to_shared_mem(g.edata[ETYPE], _get_edata_path(graph_name, ETYPE))
+        new_g.edata[ETYPE] = _to_shared_mem(
+                g.edata[ETYPE],
+                _get_edata_path(graph_name, ETYPE),
+        )
     return new_g
+
+FIELD_DICT = {'inner_node': F.int32,    # A flag indicates whether the node is inside a partition.
+              'inner_edge': F.int32,    # A flag indicates whether the edge is inside a partition.
+              NID: F.int64,
+              EID: F.int64,
+              NTYPE: F.int32,
+              ETYPE: F.int32}
 
 def _get_shared_mem_ndata(g, graph_name, name):
     ''' Get shared-memory node data from DistGraph server.
@@ -330,7 +341,6 @@ class DistGraphServer(KVServer):
             # Loading of node/edge_feats are deferred to lower the peak memory consumption.
             self.client_g, _, _, self.gpb, graph_name, \
                     ntypes, etypes = load_partition(part_config, self.part_id, load_feats=False)
-            print('load ' + graph_name)
             # formatting dtype
             # TODO(Rui) Formatting forcely is not a perfect solution.
             #   We'd better store all dtypes when mapping to shared memory
@@ -378,6 +388,10 @@ class DistGraphServer(KVServer):
                 # The feature name has the following format: edge_type + "/" + feature_name to avoid
                 # feature name collision for different edge types.
                 etype, feat_name = name.split('/')
+                # Edge features are prefixed with canonical edge types, but the partition policy
+                # is still using a single edge type string.
+                etype = etype.split(':')
+                etype = etype[1 if len(etype) == 3 else 0]
                 data_name = HeteroDataName(False, etype, feat_name)
                 self.init_data(name=str(data_name), policy_str=data_name.policy_str,
                                data_tensor=edge_feats[name])
@@ -1264,13 +1278,17 @@ class DistGraph:
                          output_device=None):
         # pylint: disable=unused-argument
         """Sample neighbors from a distributed graph."""
-        # Currently prob, exclude_edges, output_device, and edge_dir are ignored.
+        # Currently exclude_edges, output_device, and edge_dir are ignored.
         if len(self.etypes) > 1:
+            assert isinstance(self._gpb, RangePartitionBook), \
+                    "Sampling distributed heterogeneous graphs require a RangePartitionBook. "
+
             frontier = graph_services.sample_etype_neighbors(
-                self, seed_nodes, ETYPE, fanout, replace=replace, etype_sorted=etype_sorted)
+                self, seed_nodes, fanout, replace=replace,
+                etype_sorted=etype_sorted, prob=prob)
         else:
             frontier = graph_services.sample_neighbors(
-                self, seed_nodes, fanout, replace=replace)
+                self, seed_nodes, fanout, replace=replace, prob=prob)
         return frontier
 
     def _get_ndata_names(self, ntype=None):
@@ -1296,6 +1314,11 @@ class DistGraph:
             if name.is_edge() and right_type:
                 edata_names.append(name)
         return edata_names
+
+    @property
+    def client(self):
+        ''' Get the ``KVClient`` object for the underlying KVStore.'''
+        return self._client
 
 def _get_overlap(mask_arr, ids):
     """ Select the IDs given a boolean mask array.
