@@ -219,7 +219,7 @@ E.g. **File content before running the script**
 }
 ```
 
-**After calling script**
+**After running**
 ```json
 {
     "edge_map": {
