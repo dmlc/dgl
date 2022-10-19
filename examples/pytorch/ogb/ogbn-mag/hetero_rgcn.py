@@ -373,6 +373,7 @@ def test(g, model, node_embed, y_true, device, split_idx):
     return train_acc, valid_acc, test_acc
 
 def is_support_affinity(v_t):
+    # dgl support enable_cpu_affinity since 0.9.1
     return v_t >= "0.9.1"
 
 def main(args):
