@@ -1,14 +1,9 @@
 # NOTE(vibwu): Currently cugraph must be imported before torch to avoid a resource cleanup issue.
 #    See https://github.com/rapidsai/cugraph/issues/2718
-import unittest
-
-import backend as F
 import cugraph
-import numpy as np
-import pytest
+import backend as F
 
 import dgl
-from dgl import DGLGraph
 
 
 def test_dummy():
