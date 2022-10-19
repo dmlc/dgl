@@ -1291,14 +1291,6 @@ class DistGraph:
             assert isinstance(self._gpb, RangePartitionBook), \
                     "Sampling distributed heterogeneous graphs require a RangePartitionBook. "
 
-            import uuid
-            import pickle
-            import platform
-            f = open('{}-{}.pkl'.format(platform.node(), str(uuid.uuid1())), 'wb')
-            pickle.dump(self._gpb, f)
-            f.close()
-
-            etype_offset = self._gpb._local_etype_offset
             frontier = graph_services.sample_etype_neighbors(
                 self, seed_nodes, fanout, replace=replace,
                 etype_sorted=etype_sorted, prob=prob)
