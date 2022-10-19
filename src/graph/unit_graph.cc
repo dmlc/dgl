@@ -10,6 +10,7 @@
 
 #include "../c_api_common.h"
 #include "./unit_graph.h"
+#include "./serialize/dglstream.h"
 
 namespace dgl {
 
@@ -1648,7 +1649,14 @@ bool UnitGraph::Load(dmlc::Stream* fs) {
   int64_t save_format_code, formats_code;
   CHECK(fs->Read(&save_format_code)) << "Invalid format";
   CHECK(fs->Read(&formats_code)) << "Invalid format";
-  auto save_format = static_cast<SparseFormat>(save_format_code);
+  dgl_format_code_t save_formats = ANY_CODE;
+  if (save_format_code >> 32) {
+    save_formats =
+        static_cast<dgl_format_code_t>(0xffffffff & save_format_code);
+  } else {
+    save_formats =
+        SparseFormatsToCode({static_cast<SparseFormat>(save_format_code)});
+  }
   if (formats_code >> 32) {
     formats_ = static_cast<dgl_format_code_t>(0xffffffff & formats_code);
   } else {
@@ -1672,19 +1680,17 @@ bool UnitGraph::Load(dmlc::Stream* fs) {
     }
   }
 
-  switch (save_format) {
-    case SparseFormat::kCOO:
-      fs->Read(&coo_);
-      break;
-    case SparseFormat::kCSR:
-      fs->Read(&out_csr_);
-      break;
-    case SparseFormat::kCSC:
-      fs->Read(&in_csr_);
-      break;
-    default:
-      LOG(FATAL) << "unsupported format code";
-      break;
+  if (save_formats & COO_CODE) {
+    fs->Read(&coo_);
+  }
+  if (save_formats & CSR_CODE) {
+    fs->Read(&out_csr_);
+  }
+  if (save_formats & CSC_CODE) {
+    fs->Read(&in_csr_);
+  }
+  if (!coo_ && !out_csr_ && !in_csr_) {
+    LOG(FATAL) << "unsupported format code";
   }
 
   if (!in_csr_) {
@@ -1707,22 +1713,24 @@ void UnitGraph::Save(dmlc::Stream* fs) const {
   fs->Write(kDGLSerialize_UnitGraphMagic);
   // Didn't write UnitGraph::meta_graph_, since it's included in the underlying
   // sparse matrix
-  auto avail_fmt = SelectFormat(ALL_CODE);
-  fs->Write(static_cast<int64_t>(avail_fmt));
+  auto save_formats = SparseFormatsToCode({SelectFormat(ALL_CODE)});
+  auto fstream = dynamic_cast<dgl::serialize::DGLStream *>(fs);
+  if (fstream) {
+    auto formats = fstream->FormatsToSave();
+    save_formats = formats == ANY_CODE
+                       ? SparseFormatsToCode({SelectFormat(ALL_CODE)})
+                       : formats;
+  }
+  fs->Write(static_cast<int64_t>(save_formats | 0x100000000));
   fs->Write(static_cast<int64_t>(formats_ | 0x100000000));
-  switch (avail_fmt) {
-    case SparseFormat::kCOO:
-      fs->Write(GetCOO());
-      break;
-    case SparseFormat::kCSR:
-      fs->Write(GetOutCSR());
-      break;
-    case SparseFormat::kCSC:
-      fs->Write(GetInCSR());
-      break;
-    default:
-      LOG(FATAL) << "unsupported format code";
-      break;
+  if (save_formats & COO_CODE) {
+    fs->Write(GetCOO());
+  }
+  if (save_formats & CSR_CODE) {
+    fs->Write(GetOutCSR());
+  }
+  if (save_formats & CSC_CODE) {
+    fs->Write(GetInCSR());
   }
 }
 
