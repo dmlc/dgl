@@ -52,13 +52,12 @@ Sampling for Node Classification <L1_large_node_classification>`.
 # :doc:`previous tutorial <L1_large_node_classification>`.
 #
 
-import dgl
-import torch
-import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
 
 dataset = DglNodePropPredDataset("ogbn-arxiv")
 device = "cpu"  # change to 'cuda' for GPU
+
+import dgl
 
 graph, node_labels = dataset[0]
 # Add reverse edges since ogbn-arxiv is unidirectional.
@@ -109,6 +108,8 @@ negative_sampler = dgl.dataloading.negative_sampler.Uniform(5)
 # link prediction, provide a neighbor sampler object as well as the negative
 # sampler object created above.
 #
+
+import torch
 
 sampler = dgl.dataloading.NeighborSampler([4, 4])
 sampler = dgl.dataloading.as_edge_prediction_sampler(
@@ -183,6 +184,7 @@ print(mfgs)
 
 import torch.nn as nn
 import torch.nn.functional as F
+
 from dgl.nn import SAGEConv
 
 
@@ -284,6 +286,7 @@ def inference(model, graph, node_features):
         return torch.cat(result)
 
 
+import numpy as np
 import sklearn.metrics
 
 
@@ -343,8 +346,8 @@ opt = torch.optim.Adam(list(model.parameters()) + list(predictor.parameters()))
 # validation set:
 #
 
-import tqdm
 import sklearn.metrics
+import tqdm
 
 best_accuracy = 0
 best_model_path = "model.pt"
