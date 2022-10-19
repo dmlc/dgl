@@ -358,6 +358,18 @@ inline COOMatrix COOSort(COOMatrix mat, bool sort_column = false) {
  *         entries.
  */
 COOMatrix COORemove(COOMatrix coo, IdArray entries);
+ 
+/*!
+ * \brief Remove entries from a COO matrix if the values is equal to the given criteria.
+ *        In other words, a COO entry (row, col, data) will be removed if
+ *        (values[data] == criteria).
+ * \param coo The COO matrix.
+ * \param values The values array.
+ * \param criteria The value to remove.
+ * \return The new COO matrix.
+ */
+template <typename DType>
+COOMatrix COORemoveIf(COOMatrix coo, NDArray values, DType criteria);
 
 /*!
  * \brief Reorder the rows and colmns according to the new row and column order.
