@@ -1605,18 +1605,15 @@ def test_label_prop(k, alpha, norm_type, clamp, normalize, reset):
     # multi-label case
     model(g, ml_labels, mask)
 
-@pytest.mark.parametrize('in_size', [16, 32])
+@pytest.mark.parametrize('in_size', [16])
 @pytest.mark.parametrize('out_size', [16, 32])
 @pytest.mark.parametrize('aggregators',
-    [['mean', 'max', 'dir2-av'], ['min', 'std', 'dir1-dx'], ['moment3', 'moment4', 'dir3-av']])
-@pytest.mark.parametrize('scalers', [['identity'], ['amplification', 'attenuation']])
-@pytest.mark.parametrize('delta', [2.5, 7.4])
-@pytest.mark.parametrize('dropout', [0., 0.1])
-@pytest.mark.parametrize('num_towers', [1, 4])
+    [['mean', 'max', 'dir2-av'], ['min', 'std', 'dir1-dx']])
+@pytest.mark.parametrize('scalers', [['amplification', 'attenuation']])
+@pytest.mark.parametrize('delta', [2.5])
 @pytest.mark.parametrize('edge_feat_size', [16, 0])
-@pytest.mark.parametrize('residual', [True, False])
 def test_dgn_conv(in_size, out_size, aggregators, scalers, delta,
-    dropout, num_towers, edge_feat_size, residual):
+    edge_feat_size):
     dev = F.ctx()
     num_nodes = 5
     num_edges = 20
@@ -1626,13 +1623,13 @@ def test_dgn_conv(in_size, out_size, aggregators, scalers, delta,
     transform = dgl.LaplacianPE(k=3, feat_name='eig')
     g = transform(g)
     eig = g.ndata['eig']
-    model = nn.DGNConv(in_size, out_size, aggregators, scalers, delta, dropout,
-        num_towers, edge_feat_size, residual).to(dev)
+    model = nn.DGNConv(in_size, out_size, aggregators, scalers, delta,
+        edge_feat_size=edge_feat_size).to(dev)
     model(g, h, edge_feat=e, eig_vec=eig)
 
     aggregators_non_eig = [aggr for aggr in aggregators if not aggr.startswith('dir')]
-    model = nn.DGNConv(in_size, out_size, aggregators_non_eig, scalers, delta, dropout,
-        num_towers, edge_feat_size, residual).to(dev)
+    model = nn.DGNConv(in_size, out_size, aggregators_non_eig, scalers, delta,
+        edge_feat_size=edge_feat_size).to(dev)
     model(g, h, edge_feat=e)
 
 def test_DeepWalk():
@@ -1655,3 +1652,17 @@ def test_DeepWalk():
     loss = model(walk)
     loss.backward()
     optim.step()
+
+@parametrize_idtype
+def test_MetaPath2Vec(idtype):
+    dev = F.ctx()
+    g = dgl.heterograph({
+        ('user', 'uc', 'company'): ([0, 0, 2, 1, 3], [1, 2, 1, 3, 0]),
+        ('company', 'cp', 'product'): ([0, 0, 0, 1, 2, 3], [0, 2, 3, 0, 2, 1]),
+        ('company', 'cu', 'user'): ([1, 2, 1, 3, 0], [0, 0, 2, 1, 3]),
+        ('product', 'pc', 'company'): ([0, 2, 3, 0, 2, 1], [0, 0, 0, 1, 2, 3])
+    }, idtype=idtype, device=dev)
+    model = nn.MetaPath2Vec(g, ['uc', 'cu'], window_size=1)
+    model = model.to(dev)
+    embeds = model.node_embed.weight
+    assert embeds.shape[0] == g.num_nodes()

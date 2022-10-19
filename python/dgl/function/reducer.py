@@ -4,16 +4,15 @@ from __future__ import absolute_import
 
 import sys
 
-from .base import BuiltinFunction, TargetCode
 from .._deprecate.runtime import ir
 from .._deprecate.runtime.ir import var
+from .base import BuiltinFunction, TargetCode
 
 
 class ReduceFunction(BuiltinFunction):
     """Base builtin reduce function class."""
 
-    def _invoke(self, graph, edge_frame, out_size, edge_map=None,
-                out_map=None):
+    def _invoke(self, graph, edge_frame, out_size, edge_map=None, out_map=None):
         """Symbolic computation of this builtin function to create
         runtime.executor
         """
@@ -28,21 +27,28 @@ class ReduceFunction(BuiltinFunction):
 class SimpleReduceFunction(ReduceFunction):
     """Builtin reduce function that aggregates a single field into another
     single field."""
+
     def __init__(self, name, msg_field, out_field):
         self._name = name
         self.msg_field = msg_field
         self.out_field = out_field
 
-    def _invoke(self, graph, edge_frame, out_size, edge_map=None,
-                out_map=None):
+    def _invoke(self, graph, edge_frame, out_size, edge_map=None, out_map=None):
         """Symbolic execution of this builtin function"""
         reducer = self._name
         graph = var.GRAPH(graph)
         edge_map = var.MAP(edge_map)
         out_map = var.MAP(out_map)
         edge_data = ir.READ_COL(edge_frame, var.STR(self.msg_field))
-        return ir.COPY_REDUCE(reducer, graph, TargetCode.EDGE, edge_data,
-                              out_size, edge_map, out_map)
+        return ir.COPY_REDUCE(
+            reducer,
+            graph,
+            TargetCode.EDGE,
+            edge_data,
+            out_size,
+            edge_map,
+            out_map,
+        )
 
     @property
     def name(self):
@@ -52,6 +58,7 @@ class SimpleReduceFunction(ReduceFunction):
 ###############################################################################
 # Generate all following reducer functions:
 # sum, max, min, mean, prod
+
 
 def _gen_reduce_builtin(reducer):
     docstring = """Builtin reduce function that aggregates messages by {0}.
@@ -73,10 +80,13 @@ def _gen_reduce_builtin(reducer):
     >>> import torch
     >>> def reduce_func(nodes):
     >>>     return {{'h': torch.{0}(nodes.mailbox['m'], dim=1)}}
-    """.format(reducer)
+    """.format(
+        reducer
+    )
 
     def func(msg, out):
         return SimpleReduceFunction(reducer, msg, out)
+
     func.__name__ = str(reducer)
     func.__qualname__ = str(reducer)
     func.__doc__ = docstring

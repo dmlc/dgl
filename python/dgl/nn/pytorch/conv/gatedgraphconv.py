@@ -58,12 +58,7 @@ class GatedGraphConv(nn.Module):
             0.1342,  0.0425]], grad_fn=<AddBackward0>)
     """
 
-    def __init__(self,
-                 in_feats,
-                 out_feats,
-                 n_steps,
-                 n_etypes,
-                 bias=True):
+    def __init__(self, in_feats, out_feats, n_steps, n_etypes, bias=True):
         super(GatedGraphConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
@@ -87,7 +82,7 @@ class GatedGraphConv(nn.Module):
         The model parameters are initialized using Glorot uniform initialization
         and the bias is initialized to be zero.
         """
-        gain = init.calculate_gain('relu')
+        gain = init.calculate_gain("relu")
         self.gru.reset_parameters()
         for linear in self.linears:
             init.xavier_normal_(linear.weight, gain=gain)
@@ -134,36 +129,44 @@ class GatedGraphConv(nn.Module):
             is the output feature size.
         """
         with graph.local_scope():
-            assert graph.is_homogeneous, \
-                "not a homogeneous graph; convert it with to_homogeneous " \
+            assert graph.is_homogeneous, (
+                "not a homogeneous graph; convert it with to_homogeneous "
                 "and pass in the edge type as argument"
+            )
             if self._n_etypes != 1:
-                assert etypes.min() >= 0 and etypes.max() < self._n_etypes, \
-                    "edge type indices out of range [0, {})".format(
-                        self._n_etypes)
+                assert (
+                    etypes.min() >= 0 and etypes.max() < self._n_etypes
+                ), "edge type indices out of range [0, {})".format(
+                    self._n_etypes
+                )
 
             zero_pad = feat.new_zeros(
-                (feat.shape[0], self._out_feats - feat.shape[1]))
+                (feat.shape[0], self._out_feats - feat.shape[1])
+            )
             feat = th.cat([feat, zero_pad], -1)
 
             for _ in range(self._n_steps):
                 if self._n_etypes == 1 and etypes is None:
                     # Fast path when graph has only one edge type
-                    graph.ndata['h'] = self.linears[0](feat)
-                    graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'a'))
-                    a = graph.ndata.pop('a')  # (N, D)
+                    graph.ndata["h"] = self.linears[0](feat)
+                    graph.update_all(fn.copy_u("h", "m"), fn.sum("m", "a"))
+                    a = graph.ndata.pop("a")  # (N, D)
                 else:
-                    graph.ndata['h'] = feat
+                    graph.ndata["h"] = feat
                     for i in range(self._n_etypes):
-                        eids = th.nonzero(
-                            etypes == i, as_tuple=False).view(-1).type(graph.idtype)
+                        eids = (
+                            th.nonzero(etypes == i, as_tuple=False)
+                            .view(-1)
+                            .type(graph.idtype)
+                        )
                         if len(eids) > 0:
                             graph.apply_edges(
                                 lambda edges: {
-                                    'W_e*h': self.linears[i](edges.src['h'])},
-                                eids
+                                    "W_e*h": self.linears[i](edges.src["h"])
+                                },
+                                eids,
                             )
-                    graph.update_all(fn.copy_e('W_e*h', 'm'), fn.sum('m', 'a'))
-                    a = graph.ndata.pop('a')  # (N, D)
+                    graph.update_all(fn.copy_e("W_e*h", "m"), fn.sum("m", "a"))
+                    a = graph.ndata.pop("a")  # (N, D)
                 feat = self.gru(a, feat)
             return feat

@@ -1,18 +1,18 @@
 """Dataset adapters for re-purposing a dataset for a different kind of training task."""
 
-import os
 import json
+import os
+
 import numpy as np
 
 from .. import backend as F
+from ..base import DGLError
 from ..convert import graph as create_dgl_graph
 from ..sampling.negative import _calc_redundancy
-from .dgl_dataset import DGLDataset
 from . import utils
-from ..base import DGLError
-from .. import backend as F
+from .dgl_dataset import DGLDataset
 
-__all__ = ['AsNodePredDataset', 'AsLinkPredDataset', 'AsGraphPredDataset']
+__all__ = ["AsNodePredDataset", "AsLinkPredDataset", "AsGraphPredDataset"]
 
 
 class AsNodePredDataset(DGLDataset):
@@ -77,83 +77,118 @@ class AsNodePredDataset(DGLDataset):
     True
     """
 
-    def __init__(self,
-                 dataset,
-                 split_ratio=None,
-                 target_ntype=None,
-                 **kwargs):
+    def __init__(self, dataset, split_ratio=None, target_ntype=None, **kwargs):
         self.dataset = dataset
         self.split_ratio = split_ratio
         self.target_ntype = target_ntype
-        super().__init__(self.dataset.name + '-as-nodepred',
-                         hash_key=(split_ratio, target_ntype, dataset.name, 'nodepred'), **kwargs)
+        super().__init__(
+            self.dataset.name + "-as-nodepred",
+            hash_key=(split_ratio, target_ntype, dataset.name, "nodepred"),
+            **kwargs
+        )
 
     def process(self):
-        is_ogb = hasattr(self.dataset, 'get_idx_split')
+        is_ogb = hasattr(self.dataset, "get_idx_split")
         if is_ogb:
             g, label = self.dataset[0]
             self.g = g.clone()
-            self.g.ndata['label'] = F.reshape(label, (g.num_nodes(),))
+            self.g.ndata["label"] = F.reshape(label, (g.num_nodes(),))
         else:
             self.g = self.dataset[0].clone()
 
-        if 'label' not in self.g.nodes[self.target_ntype].data:
-            raise ValueError("Missing node labels. Make sure labels are stored "
-                             "under name 'label'.")
+        if "label" not in self.g.nodes[self.target_ntype].data:
+            raise ValueError(
+                "Missing node labels. Make sure labels are stored "
+                "under name 'label'."
+            )
 
         if self.split_ratio is None:
             if is_ogb:
                 split = self.dataset.get_idx_split()
-                train_idx, val_idx, test_idx = split['train'], split['valid'], split['test']
+                train_idx, val_idx, test_idx = (
+                    split["train"],
+                    split["valid"],
+                    split["test"],
+                )
                 n = self.g.num_nodes()
-                train_mask = utils.generate_mask_tensor(utils.idx2mask(train_idx, n))
-                val_mask = utils.generate_mask_tensor(utils.idx2mask(val_idx, n))
-                test_mask = utils.generate_mask_tensor(utils.idx2mask(test_idx, n))
-                self.g.ndata['train_mask'] = train_mask
-                self.g.ndata['val_mask'] = val_mask
-                self.g.ndata['test_mask'] = test_mask
+                train_mask = utils.generate_mask_tensor(
+                    utils.idx2mask(train_idx, n)
+                )
+                val_mask = utils.generate_mask_tensor(
+                    utils.idx2mask(val_idx, n)
+                )
+                test_mask = utils.generate_mask_tensor(
+                    utils.idx2mask(test_idx, n)
+                )
+                self.g.ndata["train_mask"] = train_mask
+                self.g.ndata["val_mask"] = val_mask
+                self.g.ndata["test_mask"] = test_mask
             else:
-                assert "train_mask" in self.g.nodes[self.target_ntype].data, \
-                    "train_mask is not provided, please specify split_ratio to generate the masks"
-                assert "val_mask" in self.g.nodes[self.target_ntype].data, \
-                    "val_mask is not provided, please specify split_ratio to generate the masks"
-                assert "test_mask" in self.g.nodes[self.target_ntype].data, \
-                    "test_mask is not provided, please specify split_ratio to generate the masks"
+                assert (
+                    "train_mask" in self.g.nodes[self.target_ntype].data
+                ), "train_mask is not provided, please specify split_ratio to generate the masks"
+                assert (
+                    "val_mask" in self.g.nodes[self.target_ntype].data
+                ), "val_mask is not provided, please specify split_ratio to generate the masks"
+                assert (
+                    "test_mask" in self.g.nodes[self.target_ntype].data
+                ), "test_mask is not provided, please specify split_ratio to generate the masks"
         else:
             if self.verbose:
-                print('Generating train/val/test masks...')
+                print("Generating train/val/test masks...")
             utils.add_nodepred_split(self, self.split_ratio, self.target_ntype)
 
         self._set_split_index()
 
-        self.num_classes = getattr(self.dataset, 'num_classes', None)
+        self.num_classes = getattr(self.dataset, "num_classes", None)
         if self.num_classes is None:
-            self.num_classes = len(F.unique(self.g.nodes[self.target_ntype].data['label']))
+            self.num_classes = len(
+                F.unique(self.g.nodes[self.target_ntype].data["label"])
+            )
 
     def has_cache(self):
-        return os.path.isfile(os.path.join(self.save_path, 'graph_{}.bin'.format(self.hash)))
+        return os.path.isfile(
+            os.path.join(self.save_path, "graph_{}.bin".format(self.hash))
+        )
 
     def load(self):
-        with open(os.path.join(self.save_path, 'info_{}.json'.format(self.hash)), 'r') as f:
+        with open(
+            os.path.join(self.save_path, "info_{}.json".format(self.hash)), "r"
+        ) as f:
             info = json.load(f)
-            if (info['split_ratio'] != self.split_ratio
-                    or info['target_ntype'] != self.target_ntype):
-                raise ValueError('Provided split ratio is different from the cached file. '
-                                 'Re-process the dataset.')
-            self.split_ratio = info['split_ratio']
-            self.target_ntype = info['target_ntype']
-            self.num_classes = info['num_classes']
-        gs, _ = utils.load_graphs(os.path.join(self.save_path, 'graph_{}.bin'.format(self.hash)))
+            if (
+                info["split_ratio"] != self.split_ratio
+                or info["target_ntype"] != self.target_ntype
+            ):
+                raise ValueError(
+                    "Provided split ratio is different from the cached file. "
+                    "Re-process the dataset."
+                )
+            self.split_ratio = info["split_ratio"]
+            self.target_ntype = info["target_ntype"]
+            self.num_classes = info["num_classes"]
+        gs, _ = utils.load_graphs(
+            os.path.join(self.save_path, "graph_{}.bin".format(self.hash))
+        )
         self.g = gs[0]
         self._set_split_index()
 
     def save(self):
-        utils.save_graphs(os.path.join(self.save_path, 'graph_{}.bin'.format(self.hash)), [self.g])
-        with open(os.path.join(self.save_path, 'info_{}.json'.format(self.hash)), 'w') as f:
-            json.dump({
-                'split_ratio': self.split_ratio,
-                'target_ntype': self.target_ntype,
-                'num_classes': self.num_classes}, f)
+        utils.save_graphs(
+            os.path.join(self.save_path, "graph_{}.bin".format(self.hash)),
+            [self.g],
+        )
+        with open(
+            os.path.join(self.save_path, "info_{}.json".format(self.hash)), "w"
+        ) as f:
+            json.dump(
+                {
+                    "split_ratio": self.split_ratio,
+                    "target_ntype": self.target_ntype,
+                    "num_classes": self.num_classes,
+                },
+                f,
+            )
 
     def __getitem__(self, idx):
         return self.g
@@ -164,19 +199,18 @@ class AsNodePredDataset(DGLDataset):
     def _set_split_index(self):
         """Add train_idx/val_idx/test_idx as dataset attributes according to corresponding mask."""
         ndata = self.g.nodes[self.target_ntype].data
-        self.train_idx = F.nonzero_1d(ndata['train_mask'])
-        self.val_idx = F.nonzero_1d(ndata['val_mask'])
-        self.test_idx = F.nonzero_1d(ndata['test_mask'])
+        self.train_idx = F.nonzero_1d(ndata["train_mask"])
+        self.val_idx = F.nonzero_1d(ndata["val_mask"])
+        self.test_idx = F.nonzero_1d(ndata["test_mask"])
 
 
 def negative_sample(g, num_samples):
     """Random sample negative edges from graph, excluding self-loops,
-       the result samples might be less than num_samples
+    the result samples might be less than num_samples
     """
     num_nodes = g.num_nodes()
-    redundancy = _calc_redundancy(
-        num_samples, g.num_edges(), num_nodes ** 2)
-    sample_size = int(num_samples*(1+redundancy))
+    redundancy = _calc_redundancy(num_samples, g.num_edges(), num_nodes**2)
+    sample_size = int(num_samples * (1 + redundancy))
     edges = np.random.randint(0, num_nodes, size=(2, sample_size))
     edges = np.unique(edges, axis=1)
     # remove self loop
@@ -236,49 +270,71 @@ class AsLinkPredDataset(DGLDataset):
     True
     """
 
-    def __init__(self,
-                 dataset,
-                 split_ratio=None,
-                 neg_ratio=3,
-                 **kwargs):
+    def __init__(self, dataset, split_ratio=None, neg_ratio=3, **kwargs):
         self.g = dataset[0]
         self.num_nodes = self.g.num_nodes()
         self.dataset = dataset
         self.split_ratio = split_ratio
         self.neg_ratio = neg_ratio
-        super().__init__(dataset.name + '-as-linkpred',
-                         hash_key=(neg_ratio, split_ratio, dataset.name, 'linkpred'), **kwargs)
+        super().__init__(
+            dataset.name + "-as-linkpred",
+            hash_key=(neg_ratio, split_ratio, dataset.name, "linkpred"),
+            **kwargs
+        )
 
     def process(self):
         if self.split_ratio is None:
             # Handle logics for OGB link prediction dataset
-            assert hasattr(self.dataset, "get_edge_split"), \
-                "dataset doesn't have get_edge_split method, please specify split_ratio and neg_ratio to generate the split"
+            assert hasattr(
+                self.dataset, "get_edge_split"
+            ), "dataset doesn't have get_edge_split method, please specify split_ratio and neg_ratio to generate the split"
             # This is likely to be an ogb dataset
             self.edge_split = self.dataset.get_edge_split()
             self._train_graph = self.g
-            if 'source_node' in self.edge_split["test"]:
+            if "source_node" in self.edge_split["test"]:
                 # Probably ogbl-citation2
-                pos_e = (self.edge_split["valid"]["source_node"], self.edge_split["valid"]["target_node"])
-                neg_e_size = self.edge_split["valid"]['target_node_neg'].shape[-1]
-                neg_e_src = np.repeat(self.edge_split['valid']['source_node'], neg_e_size)
-                neg_e_dst = np.reshape(self.edge_split["valid"]["target_node_neg"], -1)
+                pos_e = (
+                    self.edge_split["valid"]["source_node"],
+                    self.edge_split["valid"]["target_node"],
+                )
+                neg_e_size = self.edge_split["valid"]["target_node_neg"].shape[
+                    -1
+                ]
+                neg_e_src = np.repeat(
+                    self.edge_split["valid"]["source_node"], neg_e_size
+                )
+                neg_e_dst = np.reshape(
+                    self.edge_split["valid"]["target_node_neg"], -1
+                )
                 self._val_edges = pos_e, (neg_e_src, neg_e_dst)
-                pos_e = (self.edge_split["test"]["source_node"], self.edge_split["test"]["target_node"])
-                neg_e_size = self.edge_split["test"]['target_node_neg'].shape[-1]
-                neg_e_src = np.repeat(self.edge_split['test']['source_node'], neg_e_size)
-                neg_e_dst = np.reshape(self.edge_split["test"]["target_node_neg"], -1)
+                pos_e = (
+                    self.edge_split["test"]["source_node"],
+                    self.edge_split["test"]["target_node"],
+                )
+                neg_e_size = self.edge_split["test"]["target_node_neg"].shape[
+                    -1
+                ]
+                neg_e_src = np.repeat(
+                    self.edge_split["test"]["source_node"], neg_e_size
+                )
+                neg_e_dst = np.reshape(
+                    self.edge_split["test"]["target_node_neg"], -1
+                )
                 self._test_edges = pos_e, (neg_e_src, neg_e_dst)
-            elif 'edge' in self.edge_split["test"]:
+            elif "edge" in self.edge_split["test"]:
                 # Probably ogbl-collab
-                pos_e_tensor, neg_e_tensor = self.edge_split["valid"][
-                    "edge"], self.edge_split["valid"]["edge_neg"]
+                pos_e_tensor, neg_e_tensor = (
+                    self.edge_split["valid"]["edge"],
+                    self.edge_split["valid"]["edge_neg"],
+                )
                 pos_e = (pos_e_tensor[:, 0], pos_e_tensor[:, 1])
                 neg_e = (neg_e_tensor[:, 0], neg_e_tensor[:, 1])
                 self._val_edges = pos_e, neg_e
 
-                pos_e_tensor, neg_e_tensor = self.edge_split["test"][
-                    "edge"], self.edge_split["test"]["edge_neg"]
+                pos_e_tensor, neg_e_tensor = (
+                    self.edge_split["test"]["edge"],
+                    self.edge_split["test"]["edge_neg"],
+                )
                 pos_e = (pos_e_tensor[:, 0], pos_e_tensor[:, 1])
                 neg_e = (neg_e_tensor[:, 0], neg_e_tensor[:, 1])
                 self._test_edges = pos_e, neg_e
@@ -292,40 +348,65 @@ class AsLinkPredDataset(DGLDataset):
             n = graph.num_edges()
             src, dst = graph.edges()
             src, dst = F.asnumpy(src), F.asnumpy(dst)
-            n_train, n_val, n_test = int(
-                n * ratio[0]), int(n * ratio[1]), int(n * ratio[2])
+            n_train, n_val, n_test = (
+                int(n * ratio[0]),
+                int(n * ratio[1]),
+                int(n * ratio[2]),
+            )
 
             idx = np.random.permutation(n)
             train_pos_idx = idx[:n_train]
-            val_pos_idx = idx[n_train:n_train+n_val]
-            test_pos_idx = idx[n_train+n_val:]
+            val_pos_idx = idx[n_train : n_train + n_val]
+            test_pos_idx = idx[n_train + n_val :]
             neg_src, neg_dst = negative_sample(
-                graph, self.neg_ratio*(n_val+n_test))
-            neg_n_val, neg_n_test = self.neg_ratio * n_val, self.neg_ratio * n_test
+                graph, self.neg_ratio * (n_val + n_test)
+            )
+            neg_n_val, neg_n_test = (
+                self.neg_ratio * n_val,
+                self.neg_ratio * n_test,
+            )
             neg_val_src, neg_val_dst = neg_src[:neg_n_val], neg_dst[:neg_n_val]
-            neg_test_src, neg_test_dst = neg_src[neg_n_val:], neg_dst[neg_n_val:]
-            self._val_edges = (F.tensor(src[val_pos_idx]), F.tensor(dst[val_pos_idx])
-                              ), (F.tensor(neg_val_src), F.tensor(neg_val_dst))
-            self._test_edges = (F.tensor(src[test_pos_idx]),
-                               F.tensor(dst[test_pos_idx])), (F.tensor(neg_test_src), F.tensor(neg_test_dst))
+            neg_test_src, neg_test_dst = (
+                neg_src[neg_n_val:],
+                neg_dst[neg_n_val:],
+            )
+            self._val_edges = (
+                F.tensor(src[val_pos_idx]),
+                F.tensor(dst[val_pos_idx]),
+            ), (F.tensor(neg_val_src), F.tensor(neg_val_dst))
+            self._test_edges = (
+                F.tensor(src[test_pos_idx]),
+                F.tensor(dst[test_pos_idx]),
+            ), (F.tensor(neg_test_src), F.tensor(neg_test_dst))
             self._train_graph = create_dgl_graph(
-                (src[train_pos_idx], dst[train_pos_idx]), num_nodes=self.num_nodes)
+                (src[train_pos_idx], dst[train_pos_idx]),
+                num_nodes=self.num_nodes,
+            )
             self._train_graph.ndata["feat"] = graph.ndata["feat"]
 
     def has_cache(self):
-        return os.path.isfile(os.path.join(self.save_path, 'graph_{}.bin'.format(self.hash)))
+        return os.path.isfile(
+            os.path.join(self.save_path, "graph_{}.bin".format(self.hash))
+        )
 
     def load(self):
         gs, tensor_dict = utils.load_graphs(
-            os.path.join(self.save_path, 'graph_{}.bin'.format(self.hash)))
+            os.path.join(self.save_path, "graph_{}.bin".format(self.hash))
+        )
         self.g = gs[0]
         self._train_graph = self.g
-        self._val_edges = (tensor_dict["val_pos_src"], tensor_dict["val_pos_dst"]), (
-            tensor_dict["val_neg_src"], tensor_dict["val_neg_dst"])
-        self._test_edges = (tensor_dict["test_pos_src"], tensor_dict["test_pos_dst"]), (
-            tensor_dict["test_neg_src"], tensor_dict["test_neg_dst"])
+        self._val_edges = (
+            tensor_dict["val_pos_src"],
+            tensor_dict["val_pos_dst"],
+        ), (tensor_dict["val_neg_src"], tensor_dict["val_neg_dst"])
+        self._test_edges = (
+            tensor_dict["test_pos_src"],
+            tensor_dict["test_pos_dst"],
+        ), (tensor_dict["test_neg_src"], tensor_dict["test_neg_dst"])
 
-        with open(os.path.join(self.save_path, 'info_{}.json'.format(self.hash)), 'r') as f:
+        with open(
+            os.path.join(self.save_path, "info_{}.json".format(self.hash)), "r"
+        ) as f:
             info = json.load(f)
             self.split_ratio = info["split_ratio"]
             self.neg_ratio = info["neg_ratio"]
@@ -341,12 +422,18 @@ class AsLinkPredDataset(DGLDataset):
             "test_neg_src": self._test_edges[1][0],
             "test_neg_dst": self._test_edges[1][1],
         }
-        utils.save_graphs(os.path.join(self.save_path, 'graph_{}.bin'.format(self.hash)), [
-                          self._train_graph], tensor_dict)
-        with open(os.path.join(self.save_path, 'info_{}.json'.format(self.hash)), 'w') as f:
-            json.dump({
-                'split_ratio': self.split_ratio,
-                'neg_ratio': self.neg_ratio}, f)
+        utils.save_graphs(
+            os.path.join(self.save_path, "graph_{}.bin".format(self.hash)),
+            [self._train_graph],
+            tensor_dict,
+        )
+        with open(
+            os.path.join(self.save_path, "info_{}.json".format(self.hash)), "w"
+        ) as f:
+            json.dump(
+                {"split_ratio": self.split_ratio, "neg_ratio": self.neg_ratio},
+                f,
+            )
 
     @property
     def feat_size(self):
@@ -369,6 +456,7 @@ class AsLinkPredDataset(DGLDataset):
 
     def __len__(self):
         return 1
+
 
 class AsGraphPredDataset(DGLDataset):
     """Repurpose a dataset for standard graph property prediction task.
@@ -425,23 +513,24 @@ class AsGraphPredDataset(DGLDataset):
            ndata_schemes={'feat': Scheme(shape=(9,), dtype=torch.int64)}
            edata_schemes={'feat': Scheme(shape=(3,), dtype=torch.int64)}), tensor([0]))
     """
-    def __init__(self,
-                 dataset,
-                 split_ratio=None,
-                 **kwargs):
+
+    def __init__(self, dataset, split_ratio=None, **kwargs):
         self.dataset = dataset
         self.split_ratio = split_ratio
-        super().__init__(dataset.name + '-as-graphpred',
-                         hash_key=(split_ratio, dataset.name, 'graphpred'), **kwargs)
+        super().__init__(
+            dataset.name + "-as-graphpred",
+            hash_key=(split_ratio, dataset.name, "graphpred"),
+            **kwargs
+        )
 
     def process(self):
-        is_ogb = hasattr(self.dataset, 'get_idx_split')
+        is_ogb = hasattr(self.dataset, "get_idx_split")
         if self.split_ratio is None:
             if is_ogb:
                 split = self.dataset.get_idx_split()
-                self.train_idx = split['train']
-                self.val_idx = split['valid']
-                self.test_idx = split['test']
+                self.train_idx = split["train"]
+                self.val_idx = split["valid"]
+                self.test_idx = split["test"]
             else:
                 # Handle FakeNewsDataset
                 try:
@@ -449,11 +538,13 @@ class AsGraphPredDataset(DGLDataset):
                     self.val_idx = F.nonzero_1d(self.dataset.val_mask)
                     self.test_idx = F.nonzero_1d(self.dataset.test_mask)
                 except:
-                    raise DGLError('The input dataset does not have default train/val/test\
-                        split. Please specify split_ratio to generate the split.')
+                    raise DGLError(
+                        "The input dataset does not have default train/val/test\
+                        split. Please specify split_ratio to generate the split."
+                    )
         else:
             if self.verbose:
-                print('Generating train/val/test split...')
+                print("Generating train/val/test split...")
             train_ratio, val_ratio, _ = self.split_ratio
             num_graphs = len(self.dataset)
             num_train = int(num_graphs * train_ratio)
@@ -461,10 +552,10 @@ class AsGraphPredDataset(DGLDataset):
 
             idx = np.random.permutation(num_graphs)
             self.train_idx = F.tensor(idx[:num_train])
-            self.val_idx = F.tensor(idx[num_train: num_train + num_val])
-            self.test_idx = F.tensor(idx[num_train + num_val:])
+            self.val_idx = F.tensor(idx[num_train : num_train + num_val])
+            self.test_idx = F.tensor(idx[num_train + num_val :])
 
-        if hasattr(self.dataset, 'num_classes'):
+        if hasattr(self.dataset, "num_classes"):
             # GINDataset, MiniGCDataset, FakeNewsDataset, TUDataset,
             # LegacyTUDataset, BA2MotifDataset
             self.num_classes = self.dataset.num_classes
@@ -472,42 +563,58 @@ class AsGraphPredDataset(DGLDataset):
             # None for multi-label classification and regression
             self.num_classes = None
 
-        if hasattr(self.dataset, 'num_tasks'):
+        if hasattr(self.dataset, "num_tasks"):
             # OGB datasets
             self.num_tasks = self.dataset.num_tasks
         else:
             self.num_tasks = 1
 
     def has_cache(self):
-        return os.path.isfile(os.path.join(self.save_path, 'info_{}.json'.format(self.hash)))
+        return os.path.isfile(
+            os.path.join(self.save_path, "info_{}.json".format(self.hash))
+        )
 
     def load(self):
-        with open(os.path.join(self.save_path, 'info_{}.json'.format(self.hash)), 'r') as f:
+        with open(
+            os.path.join(self.save_path, "info_{}.json".format(self.hash)), "r"
+        ) as f:
             info = json.load(f)
-            if info['split_ratio'] != self.split_ratio:
-                raise ValueError('Provided split ratio is different from the cached file. '
-                                 'Re-process the dataset.')
-            self.split_ratio = info['split_ratio']
-            self.num_tasks = info['num_tasks']
-            self.num_classes = info['num_classes']
+            if info["split_ratio"] != self.split_ratio:
+                raise ValueError(
+                    "Provided split ratio is different from the cached file. "
+                    "Re-process the dataset."
+                )
+            self.split_ratio = info["split_ratio"]
+            self.num_tasks = info["num_tasks"]
+            self.num_classes = info["num_classes"]
 
-        split = np.load(os.path.join(self.save_path, 'split_{}.npz'.format(self.hash)))
-        self.train_idx = F.zerocopy_from_numpy(split['train_idx'])
-        self.val_idx = F.zerocopy_from_numpy(split['val_idx'])
-        self.test_idx = F.zerocopy_from_numpy(split['test_idx'])
+        split = np.load(
+            os.path.join(self.save_path, "split_{}.npz".format(self.hash))
+        )
+        self.train_idx = F.zerocopy_from_numpy(split["train_idx"])
+        self.val_idx = F.zerocopy_from_numpy(split["val_idx"])
+        self.test_idx = F.zerocopy_from_numpy(split["test_idx"])
 
     def save(self):
         if not os.path.exists(self.save_path):
             os.makedirs(self.save_path)
-        with open(os.path.join(self.save_path, 'info_{}.json'.format(self.hash)), 'w') as f:
-            json.dump({
-                'split_ratio': self.split_ratio,
-                'num_tasks': self.num_tasks,
-                'num_classes': self.num_classes}, f)
-        np.savez(os.path.join(self.save_path, 'split_{}.npz'.format(self.hash)),
-                 train_idx=F.zerocopy_to_numpy(self.train_idx),
-                 val_idx=F.zerocopy_to_numpy(self.val_idx),
-                 test_idx=F.zerocopy_to_numpy(self.test_idx))
+        with open(
+            os.path.join(self.save_path, "info_{}.json".format(self.hash)), "w"
+        ) as f:
+            json.dump(
+                {
+                    "split_ratio": self.split_ratio,
+                    "num_tasks": self.num_tasks,
+                    "num_classes": self.num_classes,
+                },
+                f,
+            )
+        np.savez(
+            os.path.join(self.save_path, "split_{}.npz".format(self.hash)),
+            train_idx=F.zerocopy_to_numpy(self.train_idx),
+            val_idx=F.zerocopy_to_numpy(self.val_idx),
+            test_idx=F.zerocopy_to_numpy(self.test_idx),
+        )
 
     def __getitem__(self, idx):
         return self.dataset[idx]
@@ -518,9 +625,9 @@ class AsGraphPredDataset(DGLDataset):
     @property
     def node_feat_size(self):
         g = self[0][0]
-        return g.ndata['feat'].shape[-1] if 'feat' in g.ndata else None
+        return g.ndata["feat"].shape[-1] if "feat" in g.ndata else None
 
     @property
     def edge_feat_size(self):
         g = self[0][0]
-        return g.edata['feat'].shape[-1] if 'feat' in g.edata else None
+        return g.edata["feat"].shape[-1] if "feat" in g.edata else None

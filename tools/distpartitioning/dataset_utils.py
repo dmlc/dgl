@@ -229,14 +229,9 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
     if dataset_features and (len(dataset_features) > 0):
         for etype_name, etype_feature_data in dataset_features.items():
             for feat_name, feat_data in etype_feature_data.items():
-                # No longer needed anymore.
-                # Input files can be of any number and typically more than no. of partitions.
-                #assert len(feat_data[constants.STR_DATA]) == world_size
                 assert feat_data[constants.STR_FORMAT][constants.STR_NAME] == constants.STR_NUMPY
-
                 num_chunks = len(feat_data[constants.STR_DATA])
                 read_list = np.array_split(np.arange(num_chunks), num_parts)
-
                 efeats = []
                 efeat_tids = []
                 for local_part_id in range(num_parts):
@@ -251,7 +246,6 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
                                 logging.info(f'Loading numpy from {numpy_path}')
                                 efeats.append(torch.from_numpy(np.load(numpy_path)))
                         efeat_tids.append(edge_tids[etype_name][local_part_id])
-
                 edge_features[etype_name+'/'+feat_name] = torch.from_numpy(np.concatenate(efeats))
                 edge_feature_tids[etype_name+"/"+feat_name] = efeat_tids
 

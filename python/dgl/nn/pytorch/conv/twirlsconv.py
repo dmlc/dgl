@@ -4,7 +4,9 @@
 import torch as tc
 import torch.nn as nn
 import torch.nn.functional as F
+
 from .... import function as fn
+
 
 class TWIRLSConv(nn.Module):
     r"""Convolution together with iteratively reweighting least squre from
@@ -74,27 +76,28 @@ class TWIRLSConv(nn.Module):
     torch.Size([6, 2])
     """
 
-    def __init__(self,
-                 input_d,
-                 output_d,
-                 hidden_d,
-                 prop_step,
-                 num_mlp_before=1,
-                 num_mlp_after=1,
-                 norm='none',
-                 precond=True,
-                 alp=0,
-                 lam=1,
-                 attention=False,
-                 tau=0.2,
-                 T=-1,
-                 p=1,
-                 use_eta=False,
-                 attn_bef=False,
-                 dropout=0.0,
-                 attn_dropout=0.0,
-                 inp_dropout=0.0,
-                 ):
+    def __init__(
+        self,
+        input_d,
+        output_d,
+        hidden_d,
+        prop_step,
+        num_mlp_before=1,
+        num_mlp_after=1,
+        norm="none",
+        precond=True,
+        alp=0,
+        lam=1,
+        attention=False,
+        tau=0.2,
+        T=-1,
+        p=1,
+        use_eta=False,
+        attn_bef=False,
+        dropout=0.0,
+        attn_dropout=0.0,
+        inp_dropout=0.0,
+    ):
 
         super().__init__()
         self.input_d = input_d
@@ -123,7 +126,10 @@ class TWIRLSConv(nn.Module):
 
         # whether we can cache unfolding result
         self.cacheable = (
-            not self.attention) and self.num_mlp_before == 0 and self.inp_dropout <= 0
+            (not self.attention)
+            and self.num_mlp_before == 0
+            and self.inp_dropout <= 0
+        )
         if self.cacheable:
             self.cached_unfolding = None
 
@@ -136,20 +142,42 @@ class TWIRLSConv(nn.Module):
             self.size_bef_unf = self.output_d  # as the output of mlp_bef
 
         # ----- computational modules -----
-        self.mlp_bef = MLP(self.input_d, self.hidden_d, self.size_bef_unf, self.num_mlp_before,
-                           self.dropout, self.norm, init_activate=False)
+        self.mlp_bef = MLP(
+            self.input_d,
+            self.hidden_d,
+            self.size_bef_unf,
+            self.num_mlp_before,
+            self.dropout,
+            self.norm,
+            init_activate=False,
+        )
 
-        self.unfolding = TWIRLSUnfoldingAndAttention(self.hidden_d, self.alp, self.lam,
-                                                     self.prop_step, self.attn_aft, self.tau,
-                                                     self.T, self.p, self.use_eta, self.init_att,
-                                                     self.attn_dropout, self.precond)
+        self.unfolding = TWIRLSUnfoldingAndAttention(
+            self.hidden_d,
+            self.alp,
+            self.lam,
+            self.prop_step,
+            self.attn_aft,
+            self.tau,
+            self.T,
+            self.p,
+            self.use_eta,
+            self.init_att,
+            self.attn_dropout,
+            self.precond,
+        )
 
         # if there are really transformations before unfolding, then do init_activate in mlp_aft
-        self.mlp_aft = MLP(self.size_aft_unf, self.hidden_d, self.output_d, self.num_mlp_after,
-                           self.dropout, self.norm,
-                           init_activate=(self.num_mlp_before > 0) and (
-                               self.num_mlp_after > 0)
-                           )
+        self.mlp_aft = MLP(
+            self.size_aft_unf,
+            self.hidden_d,
+            self.output_d,
+            self.num_mlp_after,
+            self.dropout,
+            self.norm,
+            init_activate=(self.num_mlp_before > 0)
+            and (self.num_mlp_after > 0),
+        )
 
     def forward(self, graph, feat):
         r"""
@@ -212,8 +240,7 @@ class Propagate(nn.Module):
         super().__init__()
 
     def _prop(self, graph, Y, lam):
-        """propagation part.
-        """
+        """propagation part."""
         Y = D_power_bias_X(graph, Y, -0.5, lam, 1 - lam)
         Y = AX(graph, Y)
         Y = D_power_bias_X(graph, Y, -0.5, lam, 1 - lam)
@@ -245,8 +272,11 @@ class Propagate(nn.Module):
             Propagated feature. :math:`Z^{(k+1)}` in eq.28 in the paper.
         """
 
-        return (1 - alp) * Y + alp * lam * self._prop(graph, Y, lam) \
+        return (
+            (1 - alp) * Y
+            + alp * lam * self._prop(graph, Y, lam)
             + alp * D_power_bias_X(graph, X, -1, lam, 1 - lam)
+        )
 
 
 class PropagateNoPrecond(nn.Module):
@@ -287,7 +317,11 @@ class PropagateNoPrecond(nn.Module):
             Propagated feature. :math:`Y^{(k+1)}` in eq.30 in the paper.
         """
 
-        return (1 - alp * lam - alp) * Y + alp * lam * normalized_AX(graph, Y) + alp * X
+        return (
+            (1 - alp * lam - alp) * Y
+            + alp * lam * normalized_AX(graph, Y)
+            + alp * X
+        )
 
 
 class Attention(nn.Module):
@@ -372,7 +406,7 @@ class Attention(nn.Module):
 
         # computing edge distance
         graph.srcdata["h"] = Y
-        graph.srcdata["h_norm"] = (Y ** 2).sum(-1)
+        graph.srcdata["h_norm"] = (Y**2).sum(-1)
         graph.apply_edges(fn.u_dot_v("h", "h", "dot_"))
         graph.apply_edges(fn.u_add_v("h_norm", "h_norm", "norm_"))
         graph.edata["dot_"] = graph.edata["dot_"].view(-1)
@@ -390,7 +424,8 @@ class Attention(nn.Module):
         # FIXME: consider if there is a better way
         if self.attn_dropout > 0:
             graph.edata["w"] = F.dropout(
-                graph.edata["w"], self.attn_dropout, training=self.training)
+                graph.edata["w"], self.attn_dropout, training=self.training
+            )
 
         return graph
 
@@ -410,7 +445,8 @@ def AX(graph, X):
 
     graph.srcdata["h"] = X
     graph.update_all(
-        fn.u_mul_e("h", "w", "m"), fn.sum("m", "h"),
+        fn.u_mul_e("h", "w", "m"),
+        fn.sum("m", "h"),
     )
     Y = graph.dstdata["h"]
 
@@ -491,20 +527,21 @@ class TWIRLSUnfoldingAndAttention(nn.Module):
 
     """
 
-    def __init__(self,
-                 d,
-                 alp,
-                 lam,
-                 prop_step,
-                 attn_aft=-1,
-                 tau=0.2,
-                 T=-1,
-                 p=1,
-                 use_eta=False,
-                 init_att=False,
-                 attn_dropout=0,
-                 precond=True,
-                 ):
+    def __init__(
+        self,
+        d,
+        alp,
+        lam,
+        prop_step,
+        attn_aft=-1,
+        tau=0.2,
+        T=-1,
+        p=1,
+        use_eta=False,
+        init_att=False,
+        attn_dropout=0,
+        precond=True,
+    ):
 
         super().__init__()
 
@@ -520,12 +557,15 @@ class TWIRLSUnfoldingAndAttention(nn.Module):
 
         prop_method = Propagate if precond else PropagateNoPrecond
         self.prop_layers = nn.ModuleList(
-            [prop_method() for _ in range(prop_step)])
+            [prop_method() for _ in range(prop_step)]
+        )
 
-        self.init_attn = Attention(
-            tau, T, p, attn_dropout) if self.init_att else None
-        self.attn_layer = Attention(
-            tau, T, p, attn_dropout) if self.attn_aft >= 0 else None
+        self.init_attn = (
+            Attention(tau, T, p, attn_dropout) if self.init_att else None
+        )
+        self.attn_layer = (
+            Attention(tau, T, p, attn_dropout) if self.attn_aft >= 0 else None
+        )
         self.etas = nn.Parameter(tc.ones(d)) if self.use_eta else None
 
     def forward(self, g, X):
@@ -593,7 +633,16 @@ class MLP(nn.Module):
 
     """
 
-    def __init__(self, input_d, hidden_d, output_d, num_layers, dropout, norm, init_activate):
+    def __init__(
+        self,
+        input_d,
+        hidden_d,
+        output_d,
+        num_layers,
+        dropout,
+        norm,
+        init_activate,
+    ):
         super().__init__()
 
         self.init_activate = init_activate
@@ -611,13 +660,15 @@ class MLP(nn.Module):
             self.layers.append(nn.Linear(hidden_d, output_d))
 
         # how many norm layers we have
-        self.norm_cnt = num_layers-1+int(init_activate)
+        self.norm_cnt = num_layers - 1 + int(init_activate)
         if norm == "batch":
             self.norms = nn.ModuleList(
-                [nn.BatchNorm1d(hidden_d) for _ in range(self.norm_cnt)])
+                [nn.BatchNorm1d(hidden_d) for _ in range(self.norm_cnt)]
+            )
         elif norm == "layer":
             self.norms = nn.ModuleList(
-                [nn.LayerNorm(hidden_d) for _ in range(self.norm_cnt)])
+                [nn.LayerNorm(hidden_d) for _ in range(self.norm_cnt)]
+            )
 
         self.reset_params()
 
