@@ -52,6 +52,7 @@ def reset_envs():
         "DGL_DIST_MODE",
         "DGL_NUM_CLIENT",
         "DGL_DIST_MAX_TRY_TIMES",
+        "DGL_DIST_DEBUG",
     ]:
         if key in os.environ:
             os.environ.pop(key)
