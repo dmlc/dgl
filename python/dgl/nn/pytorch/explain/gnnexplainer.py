@@ -799,7 +799,7 @@ class HeteroGNNExplainer(nn.Module):
         Examples
         --------
 
-                >>> import dgl
+        >>> import dgl
         >>> import dgl.function as fn
         >>> import torch as th
         >>> import torch.nn as nn
@@ -859,7 +859,7 @@ class HeteroGNNExplainer(nn.Module):
 
         >>> # Explain the prediction for node 0 of type 'user'
         >>> explainer = HeteroGNNExplainer(model, num_hops=1)
-        >>> new_center, sg, feat_mask, edge_mask = explainer.explain_graph(g, feat)
+        >>> feat_mask, edge_mask = explainer.explain_graph(g, feat)
         >>> feat_mask
         {'game': tensor([0.2684, 0.2597, 0.3135, 0.2976, 0.2607]),
          'user': tensor([0.2216, 0.2908, 0.2644, 0.2738, 0.2663])}
