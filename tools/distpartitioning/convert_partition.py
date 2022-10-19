@@ -16,7 +16,7 @@ import constants
 from utils import get_idranges, memory_snapshot, read_json
 
 
-def create_dgl_object(schema, part_id, node_data, edge_data, edgeid_offset,
+def create_dgl_object(schema, part_id, local_part_id, node_data, edge_data, edgeid_offset,
                         return_orig_nids=False, return_orig_eids=False):
     """
     This function creates dgl objects for a given graph partition, as in function
@@ -105,9 +105,7 @@ def create_dgl_object(schema, part_id, node_data, edge_data, edgeid_offset,
     #create auxiliary data structures from the schema object
     memory_snapshot("CreateDGLObj_Begin", part_id)
     _, global_nid_ranges = get_idranges(schema[constants.STR_NODE_TYPE],
-        schema[constants.STR_NUM_NODES_PER_CHUNK])
-    memory_snapshot("CreateDGLObj_Begin", part_id)
-
+                                    schema[constants.STR_NUM_NODES_PER_CHUNK])
     _, global_eid_ranges = get_idranges(schema[constants.STR_EDGE_TYPE],
                                     schema[constants.STR_NUM_EDGES_PER_CHUNK])
 

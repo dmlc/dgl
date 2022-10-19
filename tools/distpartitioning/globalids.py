@@ -59,7 +59,7 @@ def get_shuffle_global_nids(rank, world_size, global_nids_ranks, node_data):
     ret_val = np.column_stack([global_nids, shuffle_global_nids])
     return ret_val
 
-def lookup_shuffle_global_nids_edges(rank, world_size, edge_data, id_lookup, node_data):
+def lookup_shuffle_global_nids_edges(rank, world_size, num_parts, edge_data, id_lookup, node_data):
     '''
     This function is a helper function used to lookup shuffle-global-nids for a given set of
     global-nids using a distributed lookup service.
@@ -70,6 +70,8 @@ def lookup_shuffle_global_nids_edges(rank, world_size, edge_data, id_lookup, nod
         rank of the process
     world_size : integer
         total number of processes used in the process group
+    num_parts : integer
+        total number of output graph partitions
     edge_data : dictionary
         edge_data is a dicitonary with keys as column names and values as numpy arrays representing
         all the edges present in the current graph partition
@@ -87,16 +89,25 @@ def lookup_shuffle_global_nids_edges(rank, world_size, edge_data, id_lookup, nod
         edges present in the current graph partition
     '''
     memory_snapshot("GlobalToShuffleIDMapBegin: ", rank)
-    node_list = np.concatenate([edge_data[constants.GLOBAL_SRC_ID], edge_data[constants.GLOBAL_DST_ID]])
-    shuffle_ids = id_lookup.get_shuffle_nids(node_list,
-                                            node_data[constants.GLOBAL_NID],
-                                            node_data[constants.SHUFFLE_GLOBAL_NID])
+    local_nids = []
+    local_shuffle_nids = []
+    for local_part_id in range(num_parts//world_size):
+        local_nids.append(node_data[constants.GLOBAL_NID+"/"+str(local_part_id)])
+        local_shuffle_nids.append(node_data[constants.SHUFFLE_GLOBAL_NID+"/"+str(local_part_id)])
 
-    edge_data[constants.SHUFFLE_GLOBAL_SRC_ID], edge_data[constants.SHUFFLE_GLOBAL_DST_ID] = np.split(shuffle_ids, 2)
+    local_nids = np.concatenate(local_nids)
+    local_shuffle_nids = np.concatenate(local_shuffle_nids)
+
+    for local_part_id in range(num_parts//world_size):
+        node_list = np.concatenate([edge_data[constants.GLOBAL_SRC_ID+"/"+str(local_part_id)], edge_data[constants.GLOBAL_DST_ID+"/"+str(local_part_id)]])
+        shuffle_ids = id_lookup.get_shuffle_nids(node_list, local_nids, 
+                            local_shuffle_nids, world_size)
+
+        edge_data[constants.SHUFFLE_GLOBAL_SRC_ID+"/"+str(local_part_id)], edge_data[constants.SHUFFLE_GLOBAL_DST_ID+"/"+str(local_part_id)] = np.split(shuffle_ids, 2)
     memory_snapshot("GlobalToShuffleIDMap_AfterLookupServiceCalls: ", rank)
     return edge_data
 
-def assign_shuffle_global_nids_nodes(rank, world_size, node_data):
+def assign_shuffle_global_nids_nodes(rank, world_size, num_parts, node_data):
     """
     Utility function to assign shuffle global ids to nodes at a given rank
     node_data gets converted from [ntype, global_type_nid, global_nid]
@@ -114,25 +125,27 @@ def assign_shuffle_global_nids_nodes(rank, world_size, node_data):
         rank of the process
     world_size : integer
         total number of processes used in the process group
-    ntype_counts: list of tuples
-        list of tuples (x,y), where x=ntype and y=no. of nodes whose shuffle_global_nids are needed
+    num_parts : integer
+        total number of output graph partitions
     node_data : dictionary
         node_data is a dictionary with keys as column names and values as numpy arrays
     """
     # Compute prefix sum to determine node-id offsets
-    prefix_sum_nodes = allgather_sizes([node_data[constants.GLOBAL_NID].shape[0]], world_size)
+    local_row_counts = []
+    for local_part_id in range(num_parts//world_size):
+        local_row_counts.append(node_data[constants.GLOBAL_NID+"/"+str(local_part_id)].shape[0])
 
-    # assigning node-ids from localNodeStartId to (localNodeEndId - 1)
-    # Assuming here that the nodeDataArr is sorted based on the nodeType.
-    shuffle_global_nid_start = prefix_sum_nodes[rank]
-    shuffle_global_nid_end = prefix_sum_nodes[rank + 1]
+    # Perform allgather to compute the local offsets.
+    prefix_sum_nodes = allgather_sizes(local_row_counts, world_size, num_parts)
 
-    # add a column with global-ids (after data shuffle)
-    shuffle_global_nids = np.arange(shuffle_global_nid_start, shuffle_global_nid_end, dtype=np.int64)
-    node_data[constants.SHUFFLE_GLOBAL_NID] = shuffle_global_nids
+    for local_part_id in range(num_parts//world_size):
+        shuffle_global_nid_start = prefix_sum_nodes[rank + (local_part_id*world_size)]
+        shuffle_global_nid_end = prefix_sum_nodes[rank + 1 + (local_part_id*world_size)]
+        shuffle_global_nids = np.arange(shuffle_global_nid_start, shuffle_global_nid_end, dtype=np.int64)
+        node_data[constants.SHUFFLE_GLOBAL_NID+"/"+str(local_part_id)] = shuffle_global_nids
 
 
-def assign_shuffle_global_nids_edges(rank, world_size, edge_data):
+def assign_shuffle_global_nids_edges(rank, world_size, num_parts, edge_data):
     """
     Utility function to assign shuffle_global_eids to edges
     edge_data gets converted from [global_src_nid, global_dst_nid, global_type_eid, etype]
@@ -144,8 +157,6 @@ def assign_shuffle_global_nids_edges(rank, world_size, edge_data):
         rank of the current process
     world_size : integer
         total count of processes in execution
-    etype_counts : list of tuples
-        list of tuples (x,y), x = rank, y = no. of edges
     edge_data : numpy ndarray
         edge data as read from xxx_edges.txt file
 
@@ -157,12 +168,17 @@ def assign_shuffle_global_nids_edges(rank, world_size, edge_data):
     """
     #get prefix sum of edge counts per rank to locate the starting point
     #from which global-ids to edges are assigned in the current rank
-    prefix_sum_edges = allgather_sizes([edge_data[constants.GLOBAL_SRC_ID].shape[0]], world_size)
-    shuffle_global_eid_start = prefix_sum_edges[rank]
-    shuffle_global_eid_end = prefix_sum_edges[rank + 1]
+    local_row_counts = []
+    for local_part_id in range(num_parts//world_size):
+        local_row_counts.append(edge_data[constants.GLOBAL_SRC_ID+"/"+str(local_part_id)].shape[0])
 
-    # assigning edge-ids from localEdgeStart to (localEdgeEndId - 1)
-    # Assuming here that the edge_data is sorted by edge_type
-    shuffle_global_eids = np.arange(shuffle_global_eid_start, shuffle_global_eid_end, dtype=np.int64)
-    edge_data[constants.SHUFFLE_GLOBAL_EID] = shuffle_global_eids
-    return shuffle_global_eid_start
+    shuffle_global_eid_offset = []
+    prefix_sum_edges = allgather_sizes(local_row_counts, world_size, num_parts)
+    for local_part_id in range(num_parts//world_size):
+        shuffle_global_eid_start = prefix_sum_edges[rank + (local_part_id*world_size)]
+        shuffle_global_eid_end = prefix_sum_edges[rank + 1 + (local_part_id*world_size)]
+        shuffle_global_eids = np.arange(shuffle_global_eid_start, shuffle_global_eid_end, dtype=np.int64)
+        edge_data[constants.SHUFFLE_GLOBAL_EID+"/"+str(local_part_id)] = shuffle_global_eids
+        shuffle_global_eid_offset.append(shuffle_global_eid_start)
+
+    return shuffle_global_eid_offset

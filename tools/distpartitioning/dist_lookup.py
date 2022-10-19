@@ -6,6 +6,7 @@ import torch
 
 from pyarrow import csv
 from gloo_wrapper import alltoallv_cpu
+from utils import map_partid_rank
 
 
 class DistLookupService:
@@ -86,7 +87,7 @@ class DistLookupService:
         self.ntype_count = np.array(ntype_count, dtype=np.int64)
         self.rank = rank
         self.world_size = world_size
-        
+
 
     def get_partition_ids(self, global_nids):
         '''
@@ -223,7 +224,7 @@ class DistLookupService:
         # Now the owner_ids (partition-ids) which corresponding to the  global_nids.
         return owner_ids
 
-    def get_shuffle_nids(self, global_nids, my_global_nids, my_shuffle_global_nids):
+    def get_shuffle_nids(self, global_nids, my_global_nids, my_shuffle_global_nids, world_size):
         '''
         This function is used to retrieve shuffle_global_nids for a given set of incoming
         global_nids. Note that global_nids are of random order and will contain duplicates
@@ -253,6 +254,8 @@ class DistLookupService:
             This process has the node <-> partition id mapping
         my_shuffle_global_nids : numpy ndarray
             array of shuffle_global_nids which are assigned by the current process/rank
+        world_size : integer
+            total no. of processes in the MPI_WORLD
 
         Returns:
         --------
@@ -263,6 +266,12 @@ class DistLookupService:
 
         # Get the owner_ids (partition-ids or rank).
         owner_ids = self.get_partition_ids(global_nids)
+
+        # These owner_ids are in the range 0 - (num_partitions - 1).
+        # The resources, in this case, ntype-ids, type_nids are split in 
+        # `num_process` parts.
+        # Note that `num_processes` * k = num_partitions where k = 1, 2, 3...
+        owner_ids = map_partid_rank(owner_ids, world_size)
 
         # Ask these owners to supply for the shuffle_global_nids.
         send_list = []
