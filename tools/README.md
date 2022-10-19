@@ -170,7 +170,7 @@ The output chunked graph metadata will go as follows (assuming the current direc
 
 ## Change edge type to canonical edge type for partition configuration json
 
-In the upcoming DGL v1.0, we will require the partition configuration file to contain only canonical edge type. This tool is designed to help migrating existing data partitions from old style to new one.
+In the upcoming DGL v1.0, we will require the partition configuration file to contain only canonical edge type. This tool is designed to help migrating existing configuration files from old style to new one.
 
 ### Sample Usage
 
@@ -180,7 +180,7 @@ python tools/change_etype_to_canonical_etype.py --part-config "{configuration fi
 
 ### Requirement
 
-Partition algorithms produce one configuration file and multiple data folders, and each data folder corresponds to a partition. **This tool needs to read from the partition configuration file (specified by the commandline argument) *and* the graph structure data (storedin the `graph.dgl` under the data folder) of the first partition.** They can be local files or shared files among network, if you follow this [official tutorial](https://docs.dgl.ai/en/latest/tutorials/dist/1_node_classification.html#sphx-glr-tutorials-dist-1-node-classification-py) for distributed training, you don't need to care about this as all files are shared by every participant through NFS.
+Partition algorithms produce one configuration file and multiple data folders, and each data folder corresponds to a partition. **This tool needs to read from the partition configuration file (specified by the commandline argument) *and* the graph structure data (stored in `graph.dgl` under the data folder) of the first partition.** They can be local files or shared files among network, if you follow this [official tutorial](https://docs.dgl.ai/en/latest/tutorials/dist/1_node_classification.html#sphx-glr-tutorials-dist-1-node-classification-py) for distributed training, you don't need to care about this as all files are shared by every participant through NFS.
 
 **For example, below is a typical data folder expected by this tool:**
 ```
