@@ -1,9 +1,10 @@
-
-import socket
 import os
 import random
-import scipy.sparse as spsp
+import socket
+
 import numpy as np
+import scipy.sparse as spsp
+
 import dgl
 
 
@@ -13,10 +14,10 @@ def generate_ip_config(file_name, num_machines, num_servers):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         # doesn't even have to be reachable
-        sock.connect(('10.255.255.255', 1))
+        sock.connect(("10.255.255.255", 1))
         ip = sock.getsockname()[0]
     except ValueError:
-        ip = '127.0.0.1'
+        ip = "127.0.0.1"
     finally:
         sock.close()
 
@@ -35,16 +36,24 @@ def generate_ip_config(file_name, num_machines, num_servers):
     sock.close()
     if len(ports) < num_machines * num_servers:
         raise RuntimeError(
-            "Failed to get available IP/PORT with required numbers.")
-    with open(file_name, 'w') as f:
+            "Failed to get available IP/PORT with required numbers."
+        )
+    with open(file_name, "w") as f:
         for i in range(num_machines):
-            f.write('{} {}\n'.format(ip, ports[i*num_servers]))  
+            f.write("{} {}\n".format(ip, ports[i * num_servers]))
 
 
 def reset_envs():
-    """Reset common environment variable which are set in tests. """
-    for key in ['DGL_ROLE', 'DGL_NUM_SAMPLER', 'DGL_NUM_SERVER', \
-                'DGL_DIST_MODE', 'DGL_NUM_CLIENT', 'DGL_DIST_MAX_TRY_TIMES']:
+    """Reset common environment variable which are set in tests."""
+    for key in [
+        "DGL_ROLE",
+        "DGL_NUM_SAMPLER",
+        "DGL_NUM_SERVER",
+        "DGL_DIST_MODE",
+        "DGL_NUM_CLIENT",
+        "DGL_DIST_MAX_TRY_TIMES",
+        "DGL_DIST_DEBUG",
+    ]:
         if key in os.environ:
             os.environ.pop(key)
 

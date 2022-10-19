@@ -5,55 +5,74 @@ for downloading, processing, saving and loading data from external resources.
 from __future__ import absolute_import
 
 from . import citation_graph as citegrh
-from .citation_graph import CoraBinary, CitationGraphDataset
-from .minigc import *
-from .tree import SST, SSTDataset
-from .utils import *
-from .sbm import SBMMixture, SBMMixtureDataset
-from .reddit import RedditDataset
-from .ppi import PPIDataset, LegacyPPIDataset
-from .tu import TUDataset, LegacyTUDataset
-from .gnn_benchmark import AmazonCoBuy, CoraFull, Coauthor, AmazonCoBuyComputerDataset, \
-    AmazonCoBuyPhotoDataset, CoauthorPhysicsDataset, CoauthorCSDataset, CoraFullDataset
-from .karate import KarateClub, KarateClubDataset
-from .gindt import GINDataset
+from .adapter import *
 from .bitcoinotc import BitcoinOTC, BitcoinOTCDataset
+from .citation_graph import (
+    CitationGraphDataset,
+    CiteseerGraphDataset,
+    CoraBinary,
+    CoraGraphDataset,
+    PubmedGraphDataset,
+)
+from .csv_dataset import CSVDataset
+from .dgl_dataset import DGLBuiltinDataset, DGLDataset
+from .fakenews import FakeNewsDataset
+from .flickr import FlickrDataset
+from .fraud import FraudAmazonDataset, FraudDataset, FraudYelpDataset
 from .gdelt import GDELT, GDELTDataset
+from .gindt import GINDataset
+from .gnn_benchmark import (
+    AmazonCoBuy,
+    AmazonCoBuyComputerDataset,
+    AmazonCoBuyPhotoDataset,
+    Coauthor,
+    CoauthorCSDataset,
+    CoauthorPhysicsDataset,
+    CoraFull,
+    CoraFullDataset,
+)
 from .icews18 import ICEWS18, ICEWS18Dataset
+from .karate import KarateClub, KarateClubDataset
+from .knowledge_graph import FB15k237Dataset, FB15kDataset, WN18Dataset
+from .minigc import *
+from .ppi import LegacyPPIDataset, PPIDataset
 from .qm7b import QM7b, QM7bDataset
 from .qm9 import QM9, QM9Dataset
 from .qm9_edge import QM9Edge, QM9EdgeDataset
-from .dgl_dataset import DGLDataset, DGLBuiltinDataset
-from .citation_graph import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
-from .knowledge_graph import FB15k237Dataset, FB15kDataset, WN18Dataset
-from .rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
-from .fraud import FraudDataset, FraudYelpDataset, FraudAmazonDataset
-from .fakenews import FakeNewsDataset
-from .csv_dataset import CSVDataset
-from .adapter import *
-from .synthetic import BAShapeDataset, BACommunityDataset, TreeCycleDataset, TreeGridDataset, BA2MotifDataset
+from .rdf import AIFBDataset, AMDataset, BGSDataset, MUTAGDataset
+from .reddit import RedditDataset
+from .sbm import SBMMixture, SBMMixtureDataset
+from .synthetic import (
+    BA2MotifDataset,
+    BACommunityDataset,
+    BAShapeDataset,
+    TreeCycleDataset,
+    TreeGridDataset,
+)
+from .tree import SST, SSTDataset
+from .tu import LegacyTUDataset, TUDataset
+from .utils import *
 from .wikics import WikiCSDataset
-from .flickr import FlickrDataset
 from .yelp import YelpDataset
+
 
 def register_data_args(parser):
     parser.add_argument(
         "--dataset",
         type=str,
         required=False,
-        help=
-        "The input dataset. Can be cora, citeseer, pubmed, syn(synthetic dataset) or reddit"
+        help="The input dataset. Can be cora, citeseer, pubmed, syn(synthetic dataset) or reddit",
     )
 
 
 def load_data(args):
-    if args.dataset == 'cora':
+    if args.dataset == "cora":
         return citegrh.load_cora()
-    elif args.dataset == 'citeseer':
+    elif args.dataset == "citeseer":
         return citegrh.load_citeseer()
-    elif args.dataset == 'pubmed':
+    elif args.dataset == "pubmed":
         return citegrh.load_pubmed()
-    elif args.dataset is not None and args.dataset.startswith('reddit'):
-        return RedditDataset(self_loop=('self-loop' in args.dataset))
+    elif args.dataset is not None and args.dataset.startswith("reddit"):
+        return RedditDataset(self_loop=("self-loop" in args.dataset))
     else:
-        raise ValueError('Unknown dataset: {}'.format(args.dataset))
+        raise ValueError("Unknown dataset: {}".format(args.dataset))

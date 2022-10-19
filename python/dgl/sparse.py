@@ -1,10 +1,11 @@
 """Module for sparse matrix operators."""
 # pylint: disable= invalid-name
 from __future__ import absolute_import
+
+from . import backend as F
 from . import ndarray as nd
 from ._ffi.function import _init_api
 from .base import DGLError
-from . import backend as F
 
 
 def infer_broadcast_shape(op, shp1, shp2):
@@ -34,9 +35,12 @@ def infer_broadcast_shape(op, shp1, shp2):
     pad_shp1, pad_shp2 = shp1, shp2
     if op == "dot":
         if shp1[-1] != shp2[-1]:
-            raise DGLError("Dot operator is only available for arrays with the "
-                           "same size on last dimension, but got {} and {}."
-                           .format(shp1, shp2))
+            raise DGLError(
+                "Dot operator is only available for arrays with the "
+                "same size on last dimension, but got {} and {}.".format(
+                    shp1, shp2
+                )
+            )
     if op == "copy_lhs":
         return shp1
     if op == "copy_rhs":
@@ -48,43 +52,44 @@ def infer_broadcast_shape(op, shp1, shp2):
         pad_shp1 = (1,) * (len(shp2) - len(shp1)) + shp1
     for d1, d2 in zip(pad_shp1, pad_shp2):
         if d1 != d2 and d1 != 1 and d2 != 1:
-            raise DGLError("Feature shapes {} and {} are not valid for broadcasting."
-                           .format(shp1, shp2))
+            raise DGLError(
+                "Feature shapes {} and {} are not valid for broadcasting.".format(
+                    shp1, shp2
+                )
+            )
     rst = tuple(max(d1, d2) for d1, d2 in zip(pad_shp1, pad_shp2))
     return rst[:-1] + (1,) if op == "dot" else rst
 
 
 def to_dgl_nd(x):
     """Convert framework-specific tensor/None to dgl ndarray."""
-    return nd.NULL['int64'] if x is None else F.zerocopy_to_dgl_ndarray(x)
+    return nd.NULL["int64"] if x is None else F.zerocopy_to_dgl_ndarray(x)
 
 
 def to_dgl_nd_for_write(x):
     """Convert framework-specific tensor/None to dgl ndarray for write."""
-    return nd.NULL['int64'] if x is None else F.zerocopy_to_dgl_ndarray_for_write(x)
+    return (
+        nd.NULL["int64"]
+        if x is None
+        else F.zerocopy_to_dgl_ndarray_for_write(x)
+    )
 
 
 def get_typeid_by_target(gidx, etid, target):
     """Find the src/dst/etype id based on the target 'u', 'v' or 'e'."""
     src_id, dst_id = gidx.metagraph.find_edge(etid)
-    if target in [0, 'u']:
+    if target in [0, "u"]:
         return src_id
-    if target in [2, 'v']:
+    if target in [2, "v"]:
         return dst_id
     return etid
 
 
-target_mapping = {
-    'u': 0,
-    'e': 1,
-    'v': 2,
-    'src': 0,
-    'edge': 1,
-    'dst': 2
-}
+target_mapping = {"u": 0, "e": 1, "v": 2, "src": 0, "edge": 1, "dst": 2}
+
 
 def _edge_softmax_backward(gidx, out, sds):
-    r""" Edge_softmax backward interface.
+    r"""Edge_softmax backward interface.
 
     Parameters
     ----------
@@ -103,17 +108,21 @@ def _edge_softmax_backward(gidx, out, sds):
     -----
     This function does not support gpu op.
     """
-    op = 'copy_rhs'
+    op = "copy_rhs"
     back_out = F.zeros_like(out)
-    _CAPI_DGLKernelEdge_softmax_backward(gidx, op,
-                                         to_dgl_nd(out),
-                                         to_dgl_nd(sds),
-                                         to_dgl_nd_for_write(back_out),
-                                         to_dgl_nd(None))
+    _CAPI_DGLKernelEdge_softmax_backward(
+        gidx,
+        op,
+        to_dgl_nd(out),
+        to_dgl_nd(sds),
+        to_dgl_nd_for_write(back_out),
+        to_dgl_nd(None),
+    )
     return back_out
 
+
 def _edge_softmax_forward(gidx, e, op):
-    r""" Edge_softmax forward interface.
+    r"""Edge_softmax forward interface.
 
     Parameters
     ----------
@@ -138,15 +147,15 @@ def _edge_softmax_forward(gidx, e, op):
     else:
         expand = False
     myout = F.zeros_like(e)
-    _CAPI_DGLKernelEdge_softmax_forward(gidx, op,
-                                        to_dgl_nd(None),
-                                        to_dgl_nd(e),
-                                        to_dgl_nd_for_write(myout))
+    _CAPI_DGLKernelEdge_softmax_forward(
+        gidx, op, to_dgl_nd(None), to_dgl_nd(e), to_dgl_nd_for_write(myout)
+    )
     myout = F.squeeze(myout, -1) if expand else myout
     return myout
 
+
 def _gspmm(gidx, op, reduce_op, u, e):
-    r""" Generalized Sparse Matrix Multiplication interface. It takes the result of
+    r"""Generalized Sparse Matrix Multiplication interface. It takes the result of
     :attr:`op` on source node feature and edge feature, leads to a message on edge.
     Then aggregates the message by :attr:`reduce_op` on destination nodes.
 
@@ -188,13 +197,15 @@ def _gspmm(gidx, op, reduce_op, u, e):
     """
     if gidx.number_of_etypes() != 1:
         raise DGLError("We only support gspmm on graph with one edge type")
-    use_u = op != 'copy_rhs'
-    use_e = op != 'copy_lhs'
+    use_u = op != "copy_rhs"
+    use_e = op != "copy_lhs"
     if use_u and use_e:
         if F.dtype(u) != F.dtype(e):
-            raise DGLError("The node features' data type {} doesn't match edge"
-                           " features' data type {}, please convert them to the"
-                           " same type.".format(F.dtype(u), F.dtype(e)))
+            raise DGLError(
+                "The node features' data type {} doesn't match edge"
+                " features' data type {}, please convert them to the"
+                " same type.".format(F.dtype(u), F.dtype(e))
+            )
     # deal with scalar features.
     expand_u, expand_e = False, False
     if use_u:
@@ -211,10 +222,11 @@ def _gspmm(gidx, op, reduce_op, u, e):
     u_shp = F.shape(u) if use_u else (0,)
     e_shp = F.shape(e) if use_e else (0,)
     _, dsttype = gidx.metagraph.find_edge(0)
-    v_shp = (gidx.number_of_nodes(dsttype), ) +\
-        infer_broadcast_shape(op, u_shp[1:], e_shp[1:])
+    v_shp = (gidx.number_of_nodes(dsttype),) + infer_broadcast_shape(
+        op, u_shp[1:], e_shp[1:]
+    )
     v = F.zeros(v_shp, dtype, ctx)
-    use_cmp = reduce_op in ['max', 'min']
+    use_cmp = reduce_op in ["max", "min"]
     arg_u, arg_e = None, None
     idtype = getattr(F, gidx.dtype)
     if use_cmp:
@@ -225,12 +237,16 @@ def _gspmm(gidx, op, reduce_op, u, e):
     arg_u_nd = to_dgl_nd_for_write(arg_u)
     arg_e_nd = to_dgl_nd_for_write(arg_e)
     if gidx.number_of_edges(0) > 0:
-        _CAPI_DGLKernelSpMM(gidx, op, reduce_op,
-                            to_dgl_nd(u if use_u else None),
-                            to_dgl_nd(e if use_e else None),
-                            to_dgl_nd_for_write(v),
-                            arg_u_nd,
-                            arg_e_nd)
+        _CAPI_DGLKernelSpMM(
+            gidx,
+            op,
+            reduce_op,
+            to_dgl_nd(u if use_u else None),
+            to_dgl_nd(e if use_e else None),
+            to_dgl_nd_for_write(v),
+            arg_u_nd,
+            arg_e_nd,
+        )
     # NOTE(zihao): actually we can avoid the following step, because arg_*_nd
     # refers to the data that stores arg_*. After we call _CAPI_DGLKernelSpMM,
     # arg_* should have already been changed. But we found this doesn't work
@@ -251,7 +267,7 @@ def _gspmm(gidx, op, reduce_op, u, e):
 
 
 def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
-    r""" Generalized Sparse Matrix Multiplication interface on heterogeneous graphs.
+    r"""Generalized Sparse Matrix Multiplication interface on heterogeneous graphs.
     It handles multiple node and edge types of the graph. For each edge type, it takes
     the result of :attr:`op` on source node feature and edge feature, and leads to a
     message on edge. Then it aggregates the message by :attr:`reduce_op` on the destination
@@ -298,8 +314,8 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
     This function does not handle gradients.
     """
     u_tuple, e_tuple = u_and_e_tuple[:u_len], u_and_e_tuple[u_len:]
-    use_u = op != 'copy_rhs'
-    use_e = op != 'copy_lhs'
+    use_u = op != "copy_rhs"
+    use_e = op != "copy_lhs"
     # TODO (Israt): Add check - F.dtype(u) != F.dtype(e):
 
     # deal with scalar features.
@@ -319,7 +335,7 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
     list_arg_e_etype_nd = [None] * num_ntypes
     list_arg_e_etype = [None] * num_ntypes
 
-    use_cmp = reduce_op in ['max', 'min']
+    use_cmp = reduce_op in ["max", "min"]
     idtype = getattr(F, gidx.dtype)
 
     for etid in range(num_etypes):
@@ -336,12 +352,17 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
                 e = F.unsqueeze(e, -1)
                 expand_e = True
             list_e[etid] = e if use_e else None
-        ctx = F.context(u) if use_u else F.context(e) # TODO(Israt): Put outside of loop
-        dtype = F.dtype(u) if use_u else F.dtype(e) # TODO(Israt): Put outside of loop
+        ctx = (
+            F.context(u) if use_u else F.context(e)
+        )  # TODO(Israt): Put outside of loop
+        dtype = (
+            F.dtype(u) if use_u else F.dtype(e)
+        )  # TODO(Israt): Put outside of loop
         u_shp = F.shape(u) if use_u else (0,)
         e_shp = F.shape(e) if use_e else (0,)
-        v_shp = (gidx.number_of_nodes(dst_id), ) +\
-            infer_broadcast_shape(op, u_shp[1:], e_shp[1:])
+        v_shp = (gidx.number_of_nodes(dst_id),) + infer_broadcast_shape(
+            op, u_shp[1:], e_shp[1:]
+        )
         list_v[dst_id] = F.zeros(v_shp, dtype, ctx)
         if use_cmp:
             if use_u:
@@ -351,38 +372,62 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
                 list_arg_e[dst_id] = F.zeros(v_shp, idtype, ctx)
                 list_arg_e_etype[dst_id] = F.zeros(v_shp, idtype, ctx)
         list_arg_u_nd[dst_id] = to_dgl_nd_for_write(list_arg_u[dst_id])
-        list_arg_u_ntype_nd[dst_id] = to_dgl_nd_for_write(list_arg_u_ntype[dst_id])
+        list_arg_u_ntype_nd[dst_id] = to_dgl_nd_for_write(
+            list_arg_u_ntype[dst_id]
+        )
         list_arg_e_nd[dst_id] = to_dgl_nd_for_write(list_arg_e[dst_id])
-        list_arg_e_etype_nd[dst_id] = to_dgl_nd_for_write(list_arg_e_etype[dst_id])
+        list_arg_e_etype_nd[dst_id] = to_dgl_nd_for_write(
+            list_arg_e_etype[dst_id]
+        )
 
     if gidx.number_of_edges(0) > 0:
-        _CAPI_DGLKernelSpMMHetero(gidx, op, reduce_op,
-                                  [to_dgl_nd(u_i) for u_i in list_u],
-                                  [to_dgl_nd(e_i) for e_i in list_e],
-                                  [to_dgl_nd_for_write(v_i) for v_i in list_v],
-                                  list_arg_u_nd, list_arg_e_nd,
-                                  list_arg_u_ntype_nd, list_arg_e_etype_nd)
+        _CAPI_DGLKernelSpMMHetero(
+            gidx,
+            op,
+            reduce_op,
+            [to_dgl_nd(u_i) for u_i in list_u],
+            [to_dgl_nd(e_i) for e_i in list_e],
+            [to_dgl_nd_for_write(v_i) for v_i in list_v],
+            list_arg_u_nd,
+            list_arg_e_nd,
+            list_arg_u_ntype_nd,
+            list_arg_e_etype_nd,
+        )
     for l, arg_u_nd in enumerate(list_arg_u_nd):
         # TODO(Israt): l or src_id as index of lhs
-        list_arg_u[l] = None if list_arg_u[l] is None else F.zerocopy_from_dgl_ndarray(arg_u_nd)
+        list_arg_u[l] = (
+            None
+            if list_arg_u[l] is None
+            else F.zerocopy_from_dgl_ndarray(arg_u_nd)
+        )
         if list_arg_u[l] is not None and expand_u and use_cmp:
             list_arg_u[l] = F.squeeze(list_arg_u[l], -1)
     for l, arg_e_nd in enumerate(list_arg_e_nd):
-        list_arg_e[l] = None if list_arg_e[l] is None else F.zerocopy_from_dgl_ndarray(arg_e_nd)
+        list_arg_e[l] = (
+            None
+            if list_arg_e[l] is None
+            else F.zerocopy_from_dgl_ndarray(arg_e_nd)
+        )
         if list_arg_e[l] is not None and expand_e and use_cmp:
             list_arg_e[l] = F.squeeze(list_arg_e[l], -1)
     for l, arg_u_ntype_nd in enumerate(list_arg_u_ntype_nd):
-        list_arg_u_ntype[l] = None if arg_u_ntype_nd is None \
+        list_arg_u_ntype[l] = (
+            None
+            if arg_u_ntype_nd is None
             else F.zerocopy_from_dgl_ndarray(arg_u_ntype_nd)
+        )
     for l, arg_e_etype_nd in enumerate(list_arg_e_etype_nd):
-        list_arg_e_etype[l] = None if arg_e_etype_nd is None \
+        list_arg_e_etype[l] = (
+            None
+            if arg_e_etype_nd is None
             else F.zerocopy_from_dgl_ndarray(arg_e_etype_nd)
+        )
     # To deal with scalar node/edge features.
     for l in range(num_ntypes):
         # replace None by empty tensor. Forward func doesn't accept None in tuple.
         v = list_v[l]
         v = F.tensor([]) if v is None else v
-        if ((expand_u or not use_u) and (expand_e or not use_e)):
+        if (expand_u or not use_u) and (expand_e or not use_e):
             v = F.squeeze(v, -1)  # To deal with scalar node/edge features.
         list_v[l] = v
     out = tuple(list_v)
@@ -391,29 +436,34 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
 
 def _segment_mm(A, B, out, seglen_A, b_trans=False):
     """Invoke the C API of segment_mm."""
-    _CAPI_DGLKernelSEGMENTMM(to_dgl_nd(A),
-                            to_dgl_nd(B),
-                            to_dgl_nd_for_write(out),
-                            to_dgl_nd(seglen_A),
-                            False, b_trans)
+    _CAPI_DGLKernelSEGMENTMM(
+        to_dgl_nd(A),
+        to_dgl_nd(B),
+        to_dgl_nd_for_write(out),
+        to_dgl_nd(seglen_A),
+        False,
+        b_trans,
+    )
     return out
+
 
 def _segment_mm_backward_B(A, dC, dB, seglen):
     """Invoke the C API of the backward of segment_mm on B."""
     _CAPI_DGLKernelSEGMENTMMBackwardB(
-            to_dgl_nd(A),
-            to_dgl_nd(dC),
-            to_dgl_nd_for_write(dB),
-            to_dgl_nd(seglen))
+        to_dgl_nd(A), to_dgl_nd(dC), to_dgl_nd_for_write(dB), to_dgl_nd(seglen)
+    )
     return dB
+
 
 def _gather_mm(A, B, out, idx_a=None, idx_b=None):
     r"""Invoke the C API of the gather_mm operator."""
-    _CAPI_DGLKernelGATHERMM(to_dgl_nd(A),
-                            to_dgl_nd(B),
-                            to_dgl_nd_for_write(out),
-                            to_dgl_nd(idx_a),
-                            to_dgl_nd(idx_b))
+    _CAPI_DGLKernelGATHERMM(
+        to_dgl_nd(A),
+        to_dgl_nd(B),
+        to_dgl_nd_for_write(out),
+        to_dgl_nd(idx_a),
+        to_dgl_nd(idx_b),
+    )
     return out
 
 
@@ -425,12 +475,13 @@ def _gather_mm_scatter(A, B, out, idx_a=None, idx_b=None, idx_c=None):
         to_dgl_nd_for_write(out),
         to_dgl_nd(idx_a),
         to_dgl_nd(idx_b),
-        to_dgl_nd(idx_c))
+        to_dgl_nd(idx_c),
+    )
     return out
 
 
-def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
-    r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface. It
+def _gsddmm(gidx, op, lhs, rhs, lhs_target="u", rhs_target="v"):
+    r"""Generalized Sampled-Dense-Dense Matrix Multiplication interface. It
     takes the result of :attr:`op` on source node feature and destination node
     feature, leads to a feature on edge.
 
@@ -471,12 +522,14 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
     """
     if gidx.number_of_etypes() != 1:
         raise DGLError("We only support gsddmm on graph with one edge type")
-    use_lhs = op != 'copy_rhs'
-    use_rhs = op != 'copy_lhs'
+    use_lhs = op != "copy_rhs"
+    use_rhs = op != "copy_lhs"
     if use_lhs and use_rhs:
         if F.dtype(lhs) != F.dtype(rhs):
-            raise DGLError("The operands data type don't match: {} and {}, please convert them"
-                           " to the same type.".format(F.dtype(lhs), F.dtype(rhs)))
+            raise DGLError(
+                "The operands data type don't match: {} and {}, please convert them"
+                " to the same type.".format(F.dtype(lhs), F.dtype(rhs))
+            )
     # deal with scalar features.
     expand_lhs, expand_rhs = False, False
     if use_lhs:
@@ -494,35 +547,48 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target='u', rhs_target='v'):
     dtype = F.dtype(lhs) if use_lhs else F.dtype(rhs)
     lhs_shp = F.shape(lhs) if use_lhs else (0,)
     rhs_shp = F.shape(rhs) if use_rhs else (0,)
-    out_shp = (gidx.number_of_edges(0), ) +\
-        infer_broadcast_shape(op, lhs_shp[1:], rhs_shp[1:])
+    out_shp = (gidx.number_of_edges(0),) + infer_broadcast_shape(
+        op, lhs_shp[1:], rhs_shp[1:]
+    )
     out = F.zeros(out_shp, dtype, ctx)
     if gidx.number_of_edges(0) > 0:
-        _CAPI_DGLKernelSDDMM(gidx, op,
-                             to_dgl_nd(lhs if use_lhs else None),
-                             to_dgl_nd(rhs if use_rhs else None),
-                             to_dgl_nd_for_write(out),
-                             lhs_target, rhs_target)
+        _CAPI_DGLKernelSDDMM(
+            gidx,
+            op,
+            to_dgl_nd(lhs if use_lhs else None),
+            to_dgl_nd(rhs if use_rhs else None),
+            to_dgl_nd_for_write(out),
+            lhs_target,
+            rhs_target,
+        )
     if (expand_lhs or not use_lhs) and (expand_rhs or not use_rhs):
         out = F.squeeze(out, -1)
     return out
 
 
-def _gsddmm_hetero(gidx, op, lhs_len, lhs_target='u', rhs_target='v', lhs_and_rhs_tuple=None):
-    r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface.
-    """
-    lhs_tuple, rhs_tuple = lhs_and_rhs_tuple[:lhs_len], lhs_and_rhs_tuple[lhs_len:]
+def _gsddmm_hetero(
+    gidx, op, lhs_len, lhs_target="u", rhs_target="v", lhs_and_rhs_tuple=None
+):
+    r"""Generalized Sampled-Dense-Dense Matrix Multiplication interface."""
+    lhs_tuple, rhs_tuple = (
+        lhs_and_rhs_tuple[:lhs_len],
+        lhs_and_rhs_tuple[lhs_len:],
+    )
 
-    use_lhs = op != 'copy_rhs'
-    use_rhs = op != 'copy_lhs'
+    use_lhs = op != "copy_rhs"
+    use_rhs = op != "copy_lhs"
 
     # TODO (Israt): Add check - F.dtype(u) != F.dtype(e):
     # deal with scalar features.
     expand_lhs, expand_rhs = False, False
     num_ntype = gidx.number_of_ntypes()
     num_etype = gidx.number_of_etypes()
-    lhs_list = [None] * num_ntype if lhs_target in ['u', 'v'] else [None] * num_etype
-    rhs_list = [None] * num_ntype if rhs_target in ['u', 'v'] else [None] * num_etype
+    lhs_list = (
+        [None] * num_ntype if lhs_target in ["u", "v"] else [None] * num_etype
+    )
+    rhs_list = (
+        [None] * num_ntype if rhs_target in ["u", "v"] else [None] * num_etype
+    )
     out_list = [None] * gidx.number_of_etypes()
 
     lhs_target = target_mapping[lhs_target]
@@ -547,15 +613,20 @@ def _gsddmm_hetero(gidx, op, lhs_len, lhs_target='u', rhs_target='v', lhs_and_rh
         rhs_shp = F.shape(rhs) if use_rhs else (0,)
         lhs_list[lhs_id] = lhs if use_lhs else None
         rhs_list[rhs_id] = rhs if use_rhs else None
-        out_shp = (gidx.number_of_edges(etid), ) +\
-            infer_broadcast_shape(op, lhs_shp[1:], rhs_shp[1:])
+        out_shp = (gidx.number_of_edges(etid),) + infer_broadcast_shape(
+            op, lhs_shp[1:], rhs_shp[1:]
+        )
         out_list[etid] = F.zeros(out_shp, dtype, ctx)
     if gidx.number_of_edges(0) > 0:
-        _CAPI_DGLKernelSDDMMHetero(gidx, op,
-                                   [to_dgl_nd(lhs) for lhs in lhs_list],
-                                   [to_dgl_nd(rhs) for rhs in rhs_list],
-                                   [to_dgl_nd_for_write(out) for out in out_list],
-                                   lhs_target, rhs_target)
+        _CAPI_DGLKernelSDDMMHetero(
+            gidx,
+            op,
+            [to_dgl_nd(lhs) for lhs in lhs_list],
+            [to_dgl_nd(rhs) for rhs in rhs_list],
+            [to_dgl_nd_for_write(out) for out in out_list],
+            lhs_target,
+            rhs_target,
+        )
 
     for l in range(gidx.number_of_etypes()):
         # Replace None by empty tensor. Forward func doesn't accept None in tuple.
@@ -607,20 +678,22 @@ def _segment_reduce(op, feat, offsets):
     idtype = F.dtype(offsets)
     out = F.zeros(out_shp, dtype, ctx)
     arg = None
-    if op in ['min', 'max']:
+    if op in ["min", "max"]:
         arg = F.zeros(out_shp, idtype, ctx)
     arg_nd = to_dgl_nd_for_write(arg)
-    _CAPI_DGLKernelSegmentReduce(op,
-                                 to_dgl_nd(feat),
-                                 to_dgl_nd(offsets),
-                                 to_dgl_nd_for_write(out),
-                                 arg_nd)
+    _CAPI_DGLKernelSegmentReduce(
+        op,
+        to_dgl_nd(feat),
+        to_dgl_nd(offsets),
+        to_dgl_nd_for_write(out),
+        arg_nd,
+    )
     arg = None if arg is None else F.zerocopy_from_dgl_ndarray(arg_nd)
     return out, arg
 
 
 def _scatter_add(x, idx, m):
-    r""" Scatter add operator (on first dimension) implementation.
+    r"""Scatter add operator (on first dimension) implementation.
 
     Math: y[idx[i], *] += x[i, *]
 
@@ -642,14 +715,16 @@ def _scatter_add(x, idx, m):
     ctx = F.context(x)
     dtype = F.dtype(x)
     out = F.zeros(out_shp, dtype, ctx)
-    _CAPI_DGLKernelScatterAdd(to_dgl_nd(x),
-                              to_dgl_nd(idx),
-                              to_dgl_nd_for_write(out))
+    _CAPI_DGLKernelScatterAdd(
+        to_dgl_nd(x), to_dgl_nd(idx), to_dgl_nd_for_write(out)
+    )
     return out
 
 
-def _update_grad_minmax_hetero(gidx, op, list_x, list_idx, list_idx_etype, list_dX):
-    r""" Update gradients for reduce operator max and min (on first dimension) implementation.
+def _update_grad_minmax_hetero(
+    gidx, op, list_x, list_idx, list_idx_etype, list_dX
+):
+    r"""Update gradients for reduce operator max and min (on first dimension) implementation.
 
     Parameters
     ----------
@@ -669,11 +744,11 @@ def _update_grad_minmax_hetero(gidx, op, list_x, list_idx, list_idx_etype, list_
     Tensor
         The output tensor.
     """
-    use_u = op != 'copy_rhs'
-    use_e = op != 'copy_lhs'
+    use_u = op != "copy_rhs"
+    use_e = op != "copy_lhs"
     list_out = [None] * len(list_dX)
     for etid in range(gidx.number_of_etypes()):
-        src_id, dst_id = gidx.metagraph.find_edge(etid) # gidx is reveresed
+        src_id, dst_id = gidx.metagraph.find_edge(etid)  # gidx is reveresed
         x = list_x[src_id]
         ctx = F.context(x)
         dtype = F.dtype(x)
@@ -684,16 +759,19 @@ def _update_grad_minmax_hetero(gidx, op, list_x, list_idx, list_idx_etype, list_
             out_shp = (len(list_dX[etid]),) + F.shape(x)[1:]
             list_out[etid] = F.zeros(out_shp, dtype, ctx)
 
-    _CAPI_DGLKernelUpdateGradMinMaxHetero(gidx, op,
-                                          [to_dgl_nd(x) for x in list_x],
-                                          [to_dgl_nd(idx) for idx in list_idx],
-                                          [to_dgl_nd(idx_etype) for idx_etype in list_idx_etype],
-                                          [to_dgl_nd_for_write(out) for out in list_out])
+    _CAPI_DGLKernelUpdateGradMinMaxHetero(
+        gidx,
+        op,
+        [to_dgl_nd(x) for x in list_x],
+        [to_dgl_nd(idx) for idx in list_idx],
+        [to_dgl_nd(idx_etype) for idx_etype in list_idx_etype],
+        [to_dgl_nd_for_write(out) for out in list_out],
+    )
     return tuple(list_out)
 
 
 def _bwd_segment_cmp(feat, arg, m):
-    r""" Backward phase of segment reduction (for 'min'/'max' reduction).
+    r"""Backward phase of segment reduction (for 'min'/'max' reduction).
 
     It computes the gradient of input feature given output gradient of
     the segment reduction result.
@@ -716,10 +794,11 @@ def _bwd_segment_cmp(feat, arg, m):
     ctx = F.context(feat)
     dtype = F.dtype(feat)
     out = F.zeros(out_shp, dtype, ctx)
-    _CAPI_DGLKernelBwdSegmentCmp(to_dgl_nd(feat),
-                                 to_dgl_nd(arg),
-                                 to_dgl_nd_for_write(out))
+    _CAPI_DGLKernelBwdSegmentCmp(
+        to_dgl_nd(feat), to_dgl_nd(arg), to_dgl_nd_for_write(out)
+    )
     return out
+
 
 def _csrmm(A, A_weights, B, B_weights, num_vtypes):
     """Return a graph whose adjacency matrix is the sparse matrix multiplication
@@ -749,8 +828,10 @@ def _csrmm(A, A_weights, B, B_weights, num_vtypes):
         The edge weights of the output graph.
     """
     C, C_weights = _CAPI_DGLCSRMM(
-        A, F.to_dgl_nd(A_weights), B, F.to_dgl_nd(B_weights), num_vtypes)
+        A, F.to_dgl_nd(A_weights), B, F.to_dgl_nd(B_weights), num_vtypes
+    )
     return C, F.from_dgl_nd(C_weights)
+
 
 def _csrsum(As, A_weights):
     """Return a graph whose adjacency matrix is the sparse matrix summation
@@ -775,6 +856,7 @@ def _csrsum(As, A_weights):
     """
     C, C_weights = _CAPI_DGLCSRSum(As, [F.to_dgl_nd(w) for w in A_weights])
     return C, F.from_dgl_nd(C_weights)
+
 
 def _csrmask(A, A_weights, B):
     """Return the weights of A at the locations identical to the sparsity pattern
@@ -805,30 +887,54 @@ def _csrmask(A, A_weights, B):
     return F.from_dgl_nd(_CAPI_DGLCSRMask(A, F.to_dgl_nd(A_weights), B))
 
 
-
 ###################################################################################################
 ## Libra Graph Partition
-def libra_vertex_cut(nc, node_degree, edgenum_unassigned,
-                     community_weights, u, v, w, out, N, N_e, dataset):
+def libra_vertex_cut(
+    nc,
+    node_degree,
+    edgenum_unassigned,
+    community_weights,
+    u,
+    v,
+    w,
+    out,
+    N,
+    N_e,
+    dataset,
+):
     """
     This function invokes C/C++ code for Libra based graph partitioning.
     Parameter details are present in dgl/src/array/libra_partition.cc
     """
-    _CAPI_DGLLibraVertexCut(nc,
-                            to_dgl_nd_for_write(node_degree),
-                            to_dgl_nd_for_write(edgenum_unassigned),
-                            to_dgl_nd_for_write(community_weights),
-                            to_dgl_nd(u),
-                            to_dgl_nd(v),
-                            to_dgl_nd(w),
-                            to_dgl_nd_for_write(out),
-                            N,
-                            N_e,
-                            dataset)
+    _CAPI_DGLLibraVertexCut(
+        nc,
+        to_dgl_nd_for_write(node_degree),
+        to_dgl_nd_for_write(edgenum_unassigned),
+        to_dgl_nd_for_write(community_weights),
+        to_dgl_nd(u),
+        to_dgl_nd(v),
+        to_dgl_nd(w),
+        to_dgl_nd_for_write(out),
+        N,
+        N_e,
+        dataset,
+    )
 
 
-def libra2dgl_build_dict(a, b, indices, ldt_key, gdt_key, gdt_value, node_map,
-                         offset, nc, c, fsize, dataset):
+def libra2dgl_build_dict(
+    a,
+    b,
+    indices,
+    ldt_key,
+    gdt_key,
+    gdt_value,
+    node_map,
+    offset,
+    nc,
+    c,
+    fsize,
+    dataset,
+):
     """
     This function invokes C/C++ code for pre-processing Libra output.
     After graph partitioning using Libra, during conversion from Libra output to DGL/DistGNN input,
@@ -836,25 +942,48 @@ def libra2dgl_build_dict(a, b, indices, ldt_key, gdt_key, gdt_value, node_map,
     and also to create a database of the split nodes.
     Parameter details are present in dgl/src/array/libra_partition.cc
     """
-    ret = _CAPI_DGLLibra2dglBuildDict(to_dgl_nd_for_write(a),
-                                      to_dgl_nd_for_write(b),
-                                      to_dgl_nd_for_write(indices),
-                                      to_dgl_nd_for_write(ldt_key),
-                                      to_dgl_nd_for_write(gdt_key),
-                                      to_dgl_nd_for_write(gdt_value),
-                                      to_dgl_nd_for_write(node_map),
-                                      to_dgl_nd_for_write(offset),
-                                      nc,
-                                      c,
-                                      fsize,
-                                      dataset)
+    ret = _CAPI_DGLLibra2dglBuildDict(
+        to_dgl_nd_for_write(a),
+        to_dgl_nd_for_write(b),
+        to_dgl_nd_for_write(indices),
+        to_dgl_nd_for_write(ldt_key),
+        to_dgl_nd_for_write(gdt_key),
+        to_dgl_nd_for_write(gdt_value),
+        to_dgl_nd_for_write(node_map),
+        to_dgl_nd_for_write(offset),
+        nc,
+        c,
+        fsize,
+        dataset,
+    )
     return ret
 
 
-def libra2dgl_build_adjlist(feat, gfeat, adj, inner_node, ldt, gdt_key,
-                            gdt_value, node_map, lr, lrtensor, num_nodes,
-                            nc, c, feat_size, labels, trainm, testm, valm,
-                            glabels, gtrainm, gtestm, gvalm, feat_shape):
+def libra2dgl_build_adjlist(
+    feat,
+    gfeat,
+    adj,
+    inner_node,
+    ldt,
+    gdt_key,
+    gdt_value,
+    node_map,
+    lr,
+    lrtensor,
+    num_nodes,
+    nc,
+    c,
+    feat_size,
+    labels,
+    trainm,
+    testm,
+    valm,
+    glabels,
+    gtrainm,
+    gtestm,
+    gvalm,
+    feat_shape,
+):
     """
     This function invokes C/C++ code for pre-processing Libra output.
     After graph partitioning using Libra, once the local and global dictionaries are built,
@@ -863,30 +992,31 @@ def libra2dgl_build_adjlist(feat, gfeat, adj, inner_node, ldt, gdt_key,
     for each node from the input graph to the corresponding partitions.
     Parameter details are present in dgl/src/array/libra_partition.cc
     """
-    _CAPI_DGLLibra2dglBuildAdjlist(to_dgl_nd(feat),
-                                   to_dgl_nd_for_write(gfeat),
-                                   to_dgl_nd_for_write(adj),
-                                   to_dgl_nd_for_write(inner_node),
-                                   to_dgl_nd(ldt),
-                                   to_dgl_nd(gdt_key),
-                                   to_dgl_nd(gdt_value),
-                                   to_dgl_nd(node_map),
-                                   to_dgl_nd_for_write(lr),
-                                   to_dgl_nd(lrtensor),
-                                   num_nodes,
-                                   nc,
-                                   c,
-                                   feat_size,
-                                   to_dgl_nd(labels),
-                                   to_dgl_nd(trainm),
-                                   to_dgl_nd(testm),
-                                   to_dgl_nd(valm),
-                                   to_dgl_nd_for_write(glabels),
-                                   to_dgl_nd_for_write(gtrainm),
-                                   to_dgl_nd_for_write(gtestm),
-                                   to_dgl_nd_for_write(gvalm),
-                                   feat_shape)
-
+    _CAPI_DGLLibra2dglBuildAdjlist(
+        to_dgl_nd(feat),
+        to_dgl_nd_for_write(gfeat),
+        to_dgl_nd_for_write(adj),
+        to_dgl_nd_for_write(inner_node),
+        to_dgl_nd(ldt),
+        to_dgl_nd(gdt_key),
+        to_dgl_nd(gdt_value),
+        to_dgl_nd(node_map),
+        to_dgl_nd_for_write(lr),
+        to_dgl_nd(lrtensor),
+        num_nodes,
+        nc,
+        c,
+        feat_size,
+        to_dgl_nd(labels),
+        to_dgl_nd(trainm),
+        to_dgl_nd(testm),
+        to_dgl_nd(valm),
+        to_dgl_nd_for_write(glabels),
+        to_dgl_nd_for_write(gtrainm),
+        to_dgl_nd_for_write(gtestm),
+        to_dgl_nd_for_write(gvalm),
+        feat_shape,
+    )
 
 
 def libra2dgl_set_lr(gdt_key, gdt_value, lrtensor, nc, Nn):
@@ -897,11 +1027,13 @@ def libra2dgl_set_lr(gdt_key, gdt_value, lrtensor, nc, Nn):
     of a node from input graph.
     Parameter details are present in dgl/src/array/libra_partition.cc
     """
-    _CAPI_DGLLibra2dglSetLR(to_dgl_nd(gdt_key),
-                            to_dgl_nd(gdt_value),
-                            to_dgl_nd_for_write(lrtensor),
-                            nc,
-                            Nn)
+    _CAPI_DGLLibra2dglSetLR(
+        to_dgl_nd(gdt_key),
+        to_dgl_nd(gdt_value),
+        to_dgl_nd_for_write(lrtensor),
+        nc,
+        Nn,
+    )
 
 
 _init_api("dgl.sparse")

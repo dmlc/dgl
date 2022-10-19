@@ -23,18 +23,18 @@ def main(args):
     # load and preprocess dataset
     data = load_data(args)
     g = data[0]
-    features = torch.FloatTensor(data.features)
-    labels = torch.LongTensor(data.labels)
+    features = torch.FloatTensor(g.ndata['feat'])
+    labels = torch.LongTensor(g.ndata['label'])
     if hasattr(torch, 'BoolTensor'):
-        train_mask = torch.BoolTensor(data.train_mask)
-        val_mask = torch.BoolTensor(data.val_mask)
-        test_mask = torch.BoolTensor(data.test_mask)
+        train_mask = torch.BoolTensor(g.ndata['train_mask'])
+        val_mask = torch.BoolTensor(g.ndata['val_mask'])
+        test_mask = torch.BoolTensor(g.ndata['test_mask'])
     else:
-        train_mask = torch.ByteTensor(data.train_mask)
-        val_mask = torch.ByteTensor(data.val_mask)
-        test_mask = torch.ByteTensor(data.test_mask)
+        train_mask = torch.ByteTensor(g.ndata['train_mask'])
+        val_mask = torch.ByteTensor(g.ndata['val_mask'])
+        test_mask = torch.ByteTensor(g.ndata['test_mask'])
     in_feats = features.shape[1]
-    n_classes = data.num_labels
+    n_classes = data.num_classes
     n_edges = g.number_of_edges()
 
     if args.gpu < 0:
@@ -130,7 +130,7 @@ def main(args):
         loss = F.nll_loss(preds[train_mask], labels[train_mask])
         loss.backward()
         classifier_optimizer.step()
-        
+
         if epoch >= 3:
             dur.append(time.time() - t0)
 
@@ -171,5 +171,5 @@ if __name__ == '__main__':
     parser.set_defaults(self_loop=False)
     args = parser.parse_args()
     print(args)
-    
+
     main(args)

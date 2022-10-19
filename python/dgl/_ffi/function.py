@@ -2,9 +2,10 @@
 """Function namespace."""
 from __future__ import absolute_import
 
-import sys
 import ctypes
-from .base import _LIB, check_call, py_str, c_str, string_types, _FFI_MODE
+import sys
+
+from .base import _FFI_MODE, _LIB, c_str, check_call, py_str, string_types
 
 IMPORT_EXCEPT = RuntimeError if _FFI_MODE == "cython" else ImportError
 
@@ -13,20 +14,30 @@ try:
     if _FFI_MODE == "ctypes":
         raise ImportError()
     if sys.version_info >= (3, 0):
-        from ._cy3.core import _set_class_function, _set_class_module
         from ._cy3.core import FunctionBase as _FunctionBase
-        from ._cy3.core import convert_to_dgl_func
+        from ._cy3.core import (
+            _set_class_function,
+            _set_class_module,
+            convert_to_dgl_func,
+        )
     else:
-        from ._cy2.core import _set_class_function, _set_class_module
         from ._cy2.core import FunctionBase as _FunctionBase
-        from ._cy2.core import convert_to_dgl_func
+        from ._cy2.core import (
+            _set_class_function,
+            _set_class_module,
+            convert_to_dgl_func,
+        )
 except IMPORT_EXCEPT:
     # pylint: disable=wrong-import-position
-    from ._ctypes.function import _set_class_function, _set_class_module
     from ._ctypes.function import FunctionBase as _FunctionBase
-    from ._ctypes.function import convert_to_dgl_func
+    from ._ctypes.function import (
+        _set_class_function,
+        _set_class_module,
+        convert_to_dgl_func,
+    )
 
 FunctionHandle = ctypes.c_void_p
+
 
 class Function(_FunctionBase):
     """The PackedFunc object.
@@ -51,11 +62,13 @@ class Function(_FunctionBase):
     dgl.register_func: How to register global function.
     dgl.get_global_func: How to get global function.
     """
+
     pass  # pylint: disable=unnecessary-pass
 
 
 class ModuleBase(object):
     """Base class for module"""
+
     __slots__ = ["handle", "_entry", "entry_name"]
 
     def __init__(self, handle):
@@ -97,13 +110,16 @@ class ModuleBase(object):
             The result function.
         """
         ret_handle = FunctionHandle()
-        check_call(_LIB.DGLModGetFunction(
-            self.handle, c_str(name),
-            ctypes.c_int(query_imports),
-            ctypes.byref(ret_handle)))
+        check_call(
+            _LIB.DGLModGetFunction(
+                self.handle,
+                c_str(name),
+                ctypes.c_int(query_imports),
+                ctypes.byref(ret_handle),
+            )
+        )
         if not ret_handle.value:
-            raise AttributeError(
-                "Module has no function '%s'" %  name)
+            raise AttributeError("Module has no function '%s'" % name)
         return Function(ret_handle, False)
 
     def import_module(self, module):
@@ -175,13 +191,16 @@ def register_func(func_name, f=None, override=False):
         raise ValueError("expect string function name")
 
     ioverride = ctypes.c_int(override)
+
     def register(myf):
         """internal register function"""
         if not isinstance(myf, Function):
             myf = convert_to_dgl_func(myf)
-        check_call(_LIB.DGLFuncRegisterGlobal(
-            c_str(func_name), myf.handle, ioverride))
+        check_call(
+            _LIB.DGLFuncRegisterGlobal(c_str(func_name), myf.handle, ioverride)
+        )
         return myf
+
     if f:
         return register(f)
     return register
@@ -214,7 +233,6 @@ def get_global_func(name, allow_missing=False):
             raise ValueError("Cannot find global function %s" % name)
 
 
-
 def list_global_func_names():
     """Get list of global functions registered.
 
@@ -226,8 +244,9 @@ def list_global_func_names():
     plist = ctypes.POINTER(ctypes.c_char_p)()
     size = ctypes.c_uint()
 
-    check_call(_LIB.DGLFuncListGlobalNames(ctypes.byref(size),
-                                           ctypes.byref(plist)))
+    check_call(
+        _LIB.DGLFuncListGlobalNames(ctypes.byref(size), ctypes.byref(plist))
+    )
     fnames = []
     for i in range(size.value):
         fnames.append(py_str(plist[i]))
@@ -249,8 +268,10 @@ def extract_ext_funcs(finit):
         The extracted functions
     """
     fdict = {}
+
     def _list(name, func):
         fdict[name] = func
+
     myf = convert_to_dgl_func(_list)
     ret = finit(myf.handle)
     _ = myf
@@ -258,10 +279,12 @@ def extract_ext_funcs(finit):
         raise RuntimeError("cannot initialize with %s" % finit)
     return fdict
 
+
 def _get_api(f):
     flocal = f
     flocal.is_global = True
     return flocal
+
 
 def _init_api(namespace, target_module_name=None):
     """Initialize api for a given module name
@@ -272,8 +295,7 @@ def _init_api(namespace, target_module_name=None):
     target_module_name : str
        The target module name if different from namespace
     """
-    target_module_name = (
-        target_module_name if target_module_name else namespace)
+    target_module_name = target_module_name if target_module_name else namespace
     if namespace.startswith("dgl."):
         _init_api_prefix(target_module_name, namespace[4:])
     else:
@@ -284,10 +306,10 @@ def _init_api_prefix(module_name, prefix):
     module = sys.modules[module_name]
 
     for name in list_global_func_names():
-        if name.startswith("_") and not name.startswith('_deprecate'):
+        if name.startswith("_") and not name.startswith("_deprecate"):
             # internal APIs are ignored
             continue
-        name_split = name.rsplit('.', 1)
+        name_split = name.rsplit(".", 1)
         if name_split[0] != prefix:
             continue
 
@@ -300,12 +322,13 @@ def _init_api_prefix(module_name, prefix):
         f = get_global_func(name)
         ff = _get_api(f)
         ff.__name__ = fname
-        ff.__doc__ = ("DGL PackedFunc %s. " % fname)
+        ff.__doc__ = "DGL PackedFunc %s. " % fname
         setattr(target_module, ff.__name__, ff)
+
 
 def _init_internal_api():
     for name in list_global_func_names():
-        if not name.startswith("_") or name.startswith('_deprecate'):
+        if not name.startswith("_") or name.startswith("_deprecate"):
             # normal APIs are ignored
             continue
         target_module = sys.modules["dgl._api_internal"]
@@ -316,7 +339,8 @@ def _init_internal_api():
         f = get_global_func(name)
         ff = _get_api(f)
         ff.__name__ = fname
-        ff.__doc__ = ("DGL PackedFunc %s. " % fname)
+        ff.__doc__ = "DGL PackedFunc %s. " % fname
         setattr(target_module, ff.__name__, ff)
+
 
 _set_class_function(Function)
