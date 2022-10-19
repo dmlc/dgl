@@ -49,7 +49,7 @@
 
 #include "../heterograph.h"
 #include "./graph_serialize.h"
-#include "./streamwithcount.h"
+#include "./dglstream.h"
 #include "dmlc/memory_io.h"
 
 namespace dgl {
@@ -64,8 +64,8 @@ using dmlc::io::URI;
 bool SaveHeteroGraphs(std::string filename, List<HeteroGraphData> hdata,
                       const std::vector<NamedTensor> &nd_list,
                       dgl_format_code_t formats) {
-  auto fs = std::unique_ptr<StreamWithCount>(
-    StreamWithCount::Create(filename.c_str(), "w", false, formats));
+  auto fs = std::unique_ptr<DGLStream>(
+    DGLStream::Create(filename.c_str(), "w", false, formats));
   CHECK(fs->IsValid()) << "File name " << filename << " is not a valid name";
 
   // Write DGL MetaData

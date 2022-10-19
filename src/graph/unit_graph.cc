@@ -10,7 +10,7 @@
 
 #include "../c_api_common.h"
 #include "./unit_graph.h"
-#include "./serialize/streamwithcount.h"
+#include "./serialize/dglstream.h"
 
 namespace dgl {
 
@@ -1649,7 +1649,7 @@ bool UnitGraph::Load(dmlc::Stream* fs) {
   int64_t save_format_code, formats_code;
   CHECK(fs->Read(&save_format_code)) << "Invalid format";
   CHECK(fs->Read(&formats_code)) << "Invalid format";
-  dgl_format_code_t save_formats = NONE_CODE;
+  dgl_format_code_t save_formats = ANY_CODE;
   if (save_format_code >> 32) {
     save_formats =
         static_cast<dgl_format_code_t>(0xffffffff & save_format_code);
@@ -1714,10 +1714,10 @@ void UnitGraph::Save(dmlc::Stream* fs) const {
   // Didn't write UnitGraph::meta_graph_, since it's included in the underlying
   // sparse matrix
   auto save_formats = SparseFormatsToCode({SelectFormat(ALL_CODE)});
-  auto fstream = dynamic_cast<dgl::serialize::StreamWithCount *>(fs);
+  auto fstream = dynamic_cast<dgl::serialize::DGLStream *>(fs);
   if (fstream) {
-    auto formats = fstream->Formats();
-    save_formats = formats == NONE_CODE
+    auto formats = fstream->FormatsToSave();
+    save_formats = formats == ANY_CODE
                        ? SparseFormatsToCode({SelectFormat(ALL_CODE)})
                        : formats;
   }

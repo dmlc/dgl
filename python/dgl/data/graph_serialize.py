@@ -101,9 +101,9 @@ def save_graphs(filename, g_list, labels=None, formats=None):
         The graphs to be saved.
     labels: dict[str, Tensor]
         labels should be dict of tensors, with str as keys
-    formats: str or list of str
-        Indicates which formats to be saved. If not specified, one appropriate
-        format is saved only.
+    formats: str or list[str]
+        Save graph in specified formats. It could be any combination of
+        ``coo``, ``csc`` and ``csr``.
 
     Examples
     ----------
