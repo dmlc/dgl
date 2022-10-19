@@ -4,7 +4,6 @@ import json
 import os
 import time
 import numpy as np
-import logging
 
 from .. import backend as F
 from ..base import NID, EID, NTYPE, ETYPE, dgl_warning
