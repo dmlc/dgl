@@ -15,7 +15,7 @@ from dgl.data.utils import load_graphs, load_tensors
 
 
 def create_chunked_dataset(
-    root_dir, num_chunks, include_masks=False, include_edge_data=False
+    root_dir, num_chunks, include_masks=False
 ):
     """
     This function creates a sample dataset, based on MAG240 dataset.
@@ -81,9 +81,8 @@ def create_chunked_dataset(
         inst_val_mask = np.random.randint(0, 2, num_institutions)
 
     # Edge features.
-    if include_edge_data:
-        cite_count = np.random.choice(10, num_cite_edges)
-        write_year = np.random.choice(2022, num_write_edges)
+    cite_count = np.random.choice(10, num_cite_edges)
+    write_year = np.random.choice(2022, num_write_edges)
 
     # Save features.
     input_dir = os.path.join(root_dir, 'data_test')
@@ -107,14 +106,13 @@ def create_chunked_dataset(
     with open(paper_orig_ids_path, 'wb') as f:
         np.save(f, paper_orig_ids)
 
-    if include_edge_data:
-        cite_count_path = os.path.join(input_dir, 'cites/count.npy')
-        with open(cite_count_path, 'wb') as f:
-            np.save(f, cite_count)
+    cite_count_path = os.path.join(input_dir, 'cites/count.npy')
+    with open(cite_count_path, 'wb') as f:
+        np.save(f, cite_count)
 
-        write_year_path = os.path.join(input_dir, 'writes/year.npy')
-        with open(write_year_path, 'wb') as f:
-            np.save(f, write_year)
+    write_year_path = os.path.join(input_dir, 'writes/year.npy')
+    with open(write_year_path, 'wb') as f:
+        np.save(f, write_year)
 
     node_data = None
     if include_masks:
@@ -193,13 +191,11 @@ def create_chunked_dataset(
             }
         }
 
-    edge_data = {}
-    if include_edge_data:
-        edge_data = {
-            'cites': {'count': cite_count_path},
-            'writes': {'year': write_year_path},
-            'rev_writes': {'year': write_year_path},
-        }
+    edge_data = {
+        'cites': {'count': cite_count_path},
+        'writes': {'year': write_year_path},
+        'rev_writes': {'year': write_year_path},
+    }
 
     output_dir = os.path.join(root_dir, 'chunked-data')
     chunk_graph(
