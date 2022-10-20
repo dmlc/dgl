@@ -1,11 +1,9 @@
 import dgl
-import torch as th
-from dgl.heterograph import DGLHeteroGraph
-
 from dgl.contrib.cugraph.convert import cugraph_storage_from_heterograph
 from dgl.contrib.cugraph import CuGraphStorage
 
 import dgl.backend as F
+import torch as th
 
 device = "cuda"
 ctx = th.device(device)
@@ -118,7 +116,9 @@ def create_test_heterograph4(idtype):
     g.nodes["user"].data["h"] = F.copy_to(
         F.tensor([1, 1, 1], dtype=idtype), ctx=ctx
     )
-    # g.nodes['game'].data['h'] = F.copy_to(F.tensor([2, 2], dtype=idtype), ctx=ctx)
+    g.nodes["game"].data["h"] = F.copy_to(
+        F.tensor([2, 2], dtype=idtype), ctx=ctx
+    )
     g.edges["follows"].data["h"] = F.copy_to(
         F.tensor([1, 2], dtype=idtype), ctx=ctx
     )
@@ -177,8 +177,7 @@ def assert_same_node_feats(gs, g):
                 assert equal_t == 0
 
 
-### Main Testing function that tests everything
-def test_heterograph_conversion():
+def test_heterograph_conversion_nodes():
     graph_fs = [
         create_test_heterograph1,
         create_test_heterograph2,
@@ -189,13 +188,23 @@ def test_heterograph_conversion():
         for idxtype in [th.int32, th.int64]:
             g = graph_f(idxtype)
             gs = cugraph_storage_from_heterograph(g)
+
             assert_same_num_nodes(gs, g)
-            try:
-                # TODO: Raise an upstream issue for this
-                # to triage first time failure
-                assert_same_node_feats(gs, g)
-            except ValueError:
-                assert_same_node_feats(gs, g)
+            assert_same_node_feats(gs, g)
+
+
+def test_heterograph_conversion_edges():
+    graph_fs = [
+        create_test_heterograph1,
+        create_test_heterograph2,
+        create_test_heterograph3,
+        create_test_heterograph4,
+    ]
+    for graph_f in graph_fs:
+        for idxtype in [th.int32, th.int64]:
+            g = graph_f(idxtype)
+            gs = cugraph_storage_from_heterograph(g)
+
             assert_same_num_edges_can_etypes(gs, g)
             assert_same_num_edges_etypes(gs, g)
             assert_same_edge_feats(gs, g)
