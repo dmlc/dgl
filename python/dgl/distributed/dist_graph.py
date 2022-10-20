@@ -10,7 +10,7 @@ import numpy as np
 from ..heterograph import DGLHeteroGraph
 from ..convert import heterograph as dgl_heterograph
 from ..convert import graph as dgl_graph
-from ..transforms import compact_graphs, sort_csr_by_tag, sort_csc_by_tag
+from ..transforms import compact_graphs
 from .. import heterograph_index
 from .. import backend as F
 from ..base import NID, EID, ETYPE, ALL, is_all
@@ -342,14 +342,6 @@ class DistGraphServer(KVServer):
                 if k in self.client_g.edata:
                     self.client_g.edata[k] = F.astype(
                         self.client_g.edata[k], dtype)
-            # Sort underlying matrix beforehand to avoid runtime overhead during sampling.
-            if len(etypes) > 1:
-                if 'csr' in graph_format:
-                    self.client_g = sort_csr_by_tag(
-                        self.client_g, tag=self.client_g.edata[ETYPE], tag_type='edge')
-                if 'csc' in graph_format:
-                    self.client_g = sort_csc_by_tag(
-                        self.client_g, tag=self.client_g.edata[ETYPE], tag_type='edge')
             # Create the graph formats specified the users.
             self.client_g = self.client_g.formats(graph_format)
             self.client_g.create_formats_()

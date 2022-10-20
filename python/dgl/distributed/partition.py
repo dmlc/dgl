@@ -9,6 +9,7 @@ from .. import backend as F
 from ..base import NID, EID, NTYPE, ETYPE, dgl_warning
 from ..convert import to_homogeneous
 from ..random import choice as random_choice
+from ..transforms import sort_csr_by_tag, sort_csc_by_tag
 from ..data.utils import load_graphs, save_graphs, load_tensors, save_tensors
 from ..partition import metis_partition_assignment, partition_graph_with_halo, get_peak_mem
 from .graph_partition_book import BasicPartitionBook, RangePartitionBook
@@ -24,7 +25,9 @@ RESERVED_FIELD_DTYPE = {
     }
 
 def _save_graphs(filename, g_list, formats=None):
-    '''Format data types in graphs before saving
+    '''Preprocess partitions before saving:
+    1. format data types.
+    2. sort csc/csr by tag.
     '''
     for g in g_list:
         for k, dtype in RESERVED_FIELD_DTYPE.items():
@@ -32,6 +35,13 @@ def _save_graphs(filename, g_list, formats=None):
                 g.ndata[k] = F.astype(g.ndata[k], dtype)
             if k in g.edata:
                 g.edata[k] = F.astype(g.edata[k], dtype)
+    for g in g_list:
+        if formats is None:
+            continue
+        if 'csr' in formats:
+            g = sort_csr_by_tag(g, tag=g.edata[ETYPE], tag_type='edge')
+        if 'csc' in formats:
+            g = sort_csc_by_tag(g, tag=g.edata[ETYPE], tag_type='edge')
     save_graphs(filename , g_list, formats=formats)
 
 def _get_inner_node_mask(graph, ntype_id):
