@@ -213,15 +213,13 @@ class CuGraphStorage:
                 raise dgl.DGLError(
                     "Must specify node type when the graph is not homogeneous."
                 )
-            else:
-                nodes = F.tensor(nodes)
-                nodes_cap = F.zerocopy_to_dlpack(nodes)
+            nodes = F.tensor(nodes)
+            nodes_cap = F.zerocopy_to_dlpack(nodes)
         else:
             nodes = {
                 k: self.dgl_n_id_to_cugraph_id(F.tensor(n), k)
                 for k, n in nodes.items()
             }
-
             nodes_cap = {
                 k: F.zerocopy_to_dlpack(F.tensor(n)) for k, n in nodes.items()
             }
@@ -236,7 +234,7 @@ class CuGraphStorage:
         # heterograph case
         if len(self.etypes) > 1:
             graph_data_d, graph_eid_d = self.__convert_pycap_to_dgl_tensor_d(
-                sample_cap_obj
+                sample_cap_obj, self.idtype
             )
             sampled_graph = dgl.heterograph(
                 data_dict=graph_data_d,
