@@ -24,30 +24,26 @@ import torch.nn.functional as F
 import torch.distributed as thd
 import torch.distributed.optim
 import torchmetrics.functional as MF
-from torch.multiprocessing import Process, Queue, Lock
 import dgl
-from dgl.base import NID
 import dgl.nn as dglnn
 from dgl.contrib.dist_sampling import DistConv, DistConvFunction, DistGraph, DistSampler, metis_partition, uniform_partition, reorder_graph_wrapper
-from dgl.transforms.functional import add_self_loop, remove_self_loop
-import time
+from dgl.transforms.functional import remove_self_loop
 import numpy as np
-import tqdm
 import argparse
 import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from load_graph import load_reddit
+from load_graph import load_reddit, load_ogb
 
 import nvtx
     
 class SAGE(nn.Module):
-    def __init__(self, num_feats, replicated=False):
+    def __init__(self, num_feats, dropout, replicated=False):
         super().__init__()
         self.layers = nn.ModuleList()
         for i in range(len(num_feats) - 1):
             last = i == len(num_feats) - 2
-            conv = dglnn.SAGEConv(num_feats[i], num_feats[i + 1], 'mean', feat_drop=0 if last else 0.5, activation=nn.Identity() if last else nn.ReLU())
+            conv = dglnn.SAGEConv(num_feats[i], num_feats[i + 1], 'mean', feat_drop=0 if last else dropout, activation=nn.Identity() if last else nn.ReLU())
             self.layers.append(DistConv(conv, i != 0 and not replicated))
         self.num_feats = num_feats
     
@@ -125,7 +121,7 @@ def train(local_rank, local_size, group_rank, world_size, g, parts, num_classes,
     num_layers = args.num_layers
     num_hidden = args.num_hidden
 
-    model = SAGE([g.dstdata['features'].shape[1]] + [num_hidden for _ in range(num_layers - 1)] + [num_classes], args.replication == 1).to(device)
+    model = SAGE([g.dstdata['features'].shape[1]] + [num_hidden for _ in range(num_layers - 1)] + [num_classes], args.dropout, args.replication == 1).to(device)
     model = nn.parallel.DistributedDataParallel(model, device_ids=[local_rank], output_device=local_rank)
     opt = th.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
 
@@ -218,7 +214,7 @@ def main(args):
     if args.replication <= 0:
         args.replication = world_size
 
-    g, n_classes = load_reddit()
+    g, n_classes = load_ogb(args.dataset) if args.dataset.startswith("ogbn") else load_reddit()
 
     if args.undirected:
         g, reverse_eids = to_bidirected_with_reverse_mapping(remove_self_loop(g))
@@ -228,6 +224,7 @@ def main(args):
     if args.partition == 'metis':
         parts = metis_partition(g, world_size)
     elif args.partition == 'random':
+        th.manual_seed(0)
         parts = uniform_partition(g, world_size)
     else:
         parts = [th.arange(i * g.num_nodes() // world_size, (i + 1) * g.num_nodes() // world_size) for i in range(world_size)]
@@ -239,8 +236,6 @@ def main(args):
 
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('--gpu', type=int, default=0,
-                           help="GPU device ID. Use -1 for CPU training")
     argparser.add_argument('--dataset', type=str, default='reddit')
     argparser.add_argument('--num-epochs', type=int, default=2)
     argparser.add_argument('--num-steps', type=int, default=5000)
@@ -248,21 +243,9 @@ if __name__ == '__main__':
     argparser.add_argument('--num-layers', type=int, default=3)
     argparser.add_argument('--fan-out', type=str, default='10,10,10')
     argparser.add_argument('--batch-size', type=int, default=1000)
-    argparser.add_argument('--log-every', type=int, default=20)
-    argparser.add_argument('--eval-every', type=int, default=5)
     argparser.add_argument('--lr', type=float, default=0.001)
     argparser.add_argument('--dropout', type=float, default=0.5)
-    argparser.add_argument('--num-workers', type=int, default=0,
-                           help="Number of sampling processes. Use 0 for no extra process.")
-    argparser.add_argument('--inductive', action='store_true',
-                           help="Inductive learning setting")
-    argparser.add_argument('--data-cpu', action='store_true',
-                           help="By default the script puts the graph, node features and labels "
-                                "on GPU when using it to save time for data copy. This may "
-                                "be undesired if they cannot fit in GPU memory at once. "
-                                "This flag disables that.")
     argparser.add_argument('--edge-pred', action='store_true')
-    argparser.add_argument('--logdir', type=str, default='tb_logs')
     argparser.add_argument('--partition', type=str, default='random')
     argparser.add_argument('--undirected', action='store_true')
     argparser.add_argument('--train', action='store_true')
