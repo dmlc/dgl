@@ -516,6 +516,7 @@ class CuGraphStorage:
             framework-specific device object (e.g., ``torch.device``).
         """
         import torch
+
         return torch.cuda.current_device()
 
     # Index Conversion Utils
