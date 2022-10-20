@@ -55,6 +55,21 @@ def producer(g, fanouts, idx, batch_size, device):
     out[-1]()
     yield out[:-1]
 
+def evaluate(model, g, fanouts, idx, batch_size, device):
+    model.eval()
+    ys = []
+    y_hats = []
+    for input_nodes, output_nodes, blocks in producer(g, fanouts, idx, batch_size, device):
+        with torch.no_grad():
+            x = blocks[0].srcdata['feat']
+            ys.append(blocks[-1].dstdata['label'])
+            y_hats.append(model(blocks, x))
+    cnt = torch.tensor(sum(y.shape[0] for y in ys), dtype=torch.int64, device=device)
+    acc = MF.accuracy(torch.cat(y_hats), torch.cat(ys)).to(device) * cnt
+    thd.all_reduce(acc, thd.ReduceOp.SUM, g.comm)
+    thd.all_reduce(cnt, thd.ReduceOp.SUM, g.comm)
+    return acc / cnt
+
 def train(local_rank, local_size, group_rank, world_size, g, parts, dataset, args):
     torch.cuda.set_device(local_rank)
     device = torch.cuda.current_device()
@@ -68,7 +83,8 @@ def train(local_rank, local_size, group_rank, world_size, g, parts, dataset, arg
     test_idx = torch.nonzero(~(g.dstdata['train_mask'] | g.dstdata['val_mask']), as_tuple=True)[0] + g.l_offset
 
     # model training
-    print('Training...')
+    if global_rank == 0:
+        print('Training...')
     # create GraphSAGE model
     in_size = g.dstdata['feat'].shape[1]
     out_size = dataset.num_classes
@@ -80,7 +96,8 @@ def train(local_rank, local_size, group_rank, world_size, g, parts, dataset, arg
     for epoch in range(10):
         model.train()
         total_loss = 0
-        for it, (input_nodes, output_nodes, blocks) in enumerate(producer(g, [10, 10, 10], train_idx, args.batch_size, device)):
+        cnt = 0
+        for input_nodes, output_nodes, blocks in producer(g, [10, 10, 10], train_idx, args.batch_size, device):
             x = blocks[0].srcdata.pop('feat')
             y = blocks[-1].dstdata.pop('label')
             y_hat = model(blocks, x)
@@ -88,34 +105,31 @@ def train(local_rank, local_size, group_rank, world_size, g, parts, dataset, arg
             opt.zero_grad()
             loss.backward()
             opt.step()
-            total_loss += loss.item()
+            total_loss += loss.item() * y.shape[0] if y.shape[0] > 0 else 0
+            cnt += y.shape[0]
+        loss = torch.tensor(total_loss, dtype=torch.int64, device=device)
+        cnt = torch.tensor(cnt, dtype=torch.int64, device=device)
+        thd.all_reduce(loss, thd.ReduceOp.SUM, g.comm)
+        thd.all_reduce(cnt, thd.ReduceOp.SUM, g.comm)
         
-        model.eval()
-        ys = []
-        y_hats = []
-        for input_nodes, output_nodes, blocks in producer(g, [10, 10, 10], val_idx, 100000, device):
-            with torch.no_grad():
-                x = blocks[0].srcdata['feat']
-                ys.append(blocks[-1].dstdata['label'])
-                y_hats.append(model(blocks, x))
-        acc = MF.accuracy(torch.cat(y_hats), torch.cat(ys))
-        print("Epoch {:05d} | Loss {:.4f} | Accuracy {:.4f}"
-              .format(epoch, total_loss / (it+1), acc.item()))
+        acc = evaluate(model, g, [10, 10, 10], val_idx, args.batch_size, device)
+        if global_rank == 0:
+            print("Epoch {:05d} | Loss {:.4f} | Accuracy {:.4f}"
+                  .format(epoch, (loss / cnt).item(), acc.item()))
     
-    print('Testing...')
-    for input_nodes, output_nodes, blocks in producer(g, [-1, -1, -1], test_idx, 100000, device):
-        with torch.no_grad():
-            x = blocks[0].srcdata['feat']
-            ys.append(blocks[-1].dstdata['label'])
-            y_hats.append(model(blocks, x))
-    acc = MF.accuracy(torch.cat(y_hats), torch.cat(ys))
-    print("Test Accuracy {:.4f}".format(acc.item()))
+    if global_rank == 0:
+        print('Testing...')
+    acc = evaluate(model, g, [-1, -1, -1], test_idx, 100000, device)
+    if global_rank == 0:
+        print("Test Accuracy {:.4f}".format(acc.item()))
+
+    thd.barrier()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--replication', type=int, default=0, help="how many gpus should cooperate, \
             default is all")
-    parser.add_argument('--batch-size', type=int, default=1024)
+    parser.add_argument('--batch-size', type=int, default=1024) # per rank
     args = parser.parse_args()
     assert torch.cuda.is_available(), "cuda is required"
 
