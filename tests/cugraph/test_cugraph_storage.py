@@ -1,54 +1,6 @@
-from dgl.contrib.cugraph.cugraph_storage import CuGraphStorage
-import cudf
 import numpy as np
-
-
-def create_gs_heterogeneous_dgl_eg():
-    gs = CuGraphStorage()
-    # Add Edge Data
-    src_ser = [0, 1, 2, 0, 1, 2, 7, 9, 10, 11]
-    dst_ser = [3, 4, 5, 6, 7, 8, 6, 6, 6, 6]
-    etype_ser = [0, 0, 0, 1, 1, 1, 2, 2, 2, 2]
-    edge_feat = [10, 10, 10, 11, 11, 11, 12, 12, 12, 13]
-
-    etype_map = {
-        0: ("nt.a", "connects", "nt.b"),
-        1: ("nt.a", "connects", "nt.c"),
-        2: ("nt.c", "connects", "nt.c"),
-    }
-
-    df = cudf.DataFrame(
-        {
-            "src": src_ser,
-            "dst": dst_ser,
-            "etype": etype_ser,
-            "edge_feat": edge_feat,
-        }
-    )
-    df = df.astype(np.int64)
-    for e in df["etype"].unique().values_host:
-        subset_df = df[df["etype"] == e][
-            ["src", "dst", "edge_feat"]
-        ].reset_index(drop=True)
-        gs.add_edge_data(
-            subset_df,
-            ["src", "dst"],
-            canonical_etype=etype_map[e],
-        )
-
-    node_ser = np.arange(0, 12)
-    node_type = ["nt.a"] * 3 + ["nt.b"] * 3 + ["nt.c"] * 6
-    node_feat = np.arange(0, 12) * 10
-
-    df = cudf.DataFrame(
-        {"node_id": node_ser, "ntype": node_type, "node_feat": node_feat}
-    )
-
-    for n in df["ntype"].unique().values_host:
-        subset_df = df[df["ntype"] == n][["node_id", "node_feat"]]
-        gs.add_node_data(subset_df, "node_id", ntype=n)
-
-    return gs
+import dgl
+from dgl.contrib.cugraph.convert import cugraph_storage_from_heterograph
 
 
 def create_dgl_graph():
@@ -83,11 +35,9 @@ def assert_same_sampling_len(dgl_g, cugraph_gs, nodes, fanout, edge_dir):
         assert dgl_o.num_edges(etype) == cugraph_o.num_edges(etype)
 
 
-def test_sampling_len_cugraph():
+def test_sampling_heterograph():
     dgl_g = create_dgl_graph()
-    cugraph_gs = create_gs_heterogeneous_dgl_eg()
-    # vertex_d = cugraph_gs.graphstore.gdata.renumber_vertices_by_type()
-    # edge_d = cugraph_gs.graphstore.gdata.renumber_edges_by_type()
+    cugraph_gs = cugraph_storage_from_heterograph(dgl_g)
 
     for fanout in [1, 2, 3, -1]:
         for ntype in ["nt.a", "nt.b", "nt.c"]:
@@ -99,3 +49,32 @@ def test_sampling_len_cugraph():
                     fanout=fanout,
                     edge_dir=d,
                 )
+
+
+def test_sampling_homogenous():
+    src_ar = np.asarray([0, 1, 2, 0, 1, 2, 7, 9, 10, 11], dtype=np.int32)
+    dst_ar = np.asarray([3, 4, 5, 6, 7, 8, 6, 6, 6, 6], dtype=np.int32)
+    g = dgl.heterograph({("a", "connects", "a"): (src_ar, dst_ar)})
+    cugraph_gs = cugraph_storage_from_heterograph(g)
+    # Convert to homogeneous
+    g = dgl.to_homogeneous(g)
+    nodes = [6]
+    # Test for multiple fanouts
+    for fanout in [1, 2, 3]:
+        exp_g = g.sample_neighbors(nodes, fanout=fanout)
+        cu_g = cugraph_gs.sample_neighbors(nodes, fanout=fanout)
+        exp_src, exp_dst = exp_g.edges()
+        cu_src, cu_dst = cu_g.edges()
+        assert len(exp_src) == len(cu_src)
+
+    # Test same results for all neighbours
+    exp_g = g.sample_neighbors(nodes, fanout=-1)
+    cu_g = cugraph_gs.sample_neighbors(nodes, fanout=-1)
+    exp_src, exp_dst = exp_g.edges()
+    exp_src, exp_dst = exp_src.numpy(), exp_dst.numpy()
+
+    cu_src, cu_dst = cu_g.edges()
+    cu_src, cu_dst = cu_src.to("cpu").numpy(), cu_dst.to("cpu").numpy()
+
+    np.testing.assert_equal(exp_src, cu_src)
+    np.testing.assert_equal(exp_dst, cu_dst)
