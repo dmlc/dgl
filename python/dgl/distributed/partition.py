@@ -23,7 +23,7 @@ RESERVED_FIELD_DTYPE = {
     ETYPE: F.int32
     }
 
-def _save_graphs(filename, g_list):
+def _save_graphs(filename, g_list, formats=None):
     '''Format data types in graphs before saving
     '''
     for g in g_list:
@@ -32,7 +32,7 @@ def _save_graphs(filename, g_list):
                 g.ndata[k] = F.astype(g.ndata[k], dtype)
             if k in g.edata:
                 g.edata[k] = F.astype(g.edata[k], dtype)
-    save_graphs(filename , g_list)
+    save_graphs(filename , g_list, formats=formats)
 
 def _get_inner_node_mask(graph, ntype_id):
     if NTYPE in graph.ndata:
@@ -368,7 +368,8 @@ def _set_trainer_ids(g, sim_g, node_parts):
 
 def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method="metis",
                     reshuffle=True, balance_ntypes=None, balance_edges=False, return_mapping=False,
-                    num_trainers_per_machine=1, objtype='cut'):
+                    num_trainers_per_machine=1, objtype='cut',
+                    graph_formats=None):
     ''' Partition a graph for distributed training and store the partitions on files.
 
     The partitioning occurs in three steps: 1) run a partition algorithm (e.g., Metis) to
@@ -549,6 +550,11 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     objtype : str, "cut" or "vol"
         Set the objective as edge-cut minimization or communication volume minimization. This
         argument is used by the Metis algorithm.
+    graph_formats : str or list[str]
+        Save partitions in specified formats. It could be any combination of ``coo``,
+        ``csc`` and ``csr``. If not specified, save one format only according to what
+        format is available. If multiple formats are available, selection priority
+        from high to low is ``coo``, ``csc``, ``csr``.
 
     Returns
     -------
@@ -930,7 +936,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         save_tensors(node_feat_file, node_feats)
         save_tensors(edge_feat_file, edge_feats)
 
-        _save_graphs(part_graph_file, [part])
+        _save_graphs(part_graph_file, [part], formats=graph_formats)
     print('Save partitions: {:.3f} seconds, peak memory: {:.3f} GB'.format(
         time.time() - start, get_peak_mem()))
 

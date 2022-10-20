@@ -342,9 +342,6 @@ class DistGraphServer(KVServer):
                 if k in self.client_g.edata:
                     self.client_g.edata[k] = F.astype(
                         self.client_g.edata[k], dtype)
-            # Create the graph formats specified the users.
-            self.client_g = self.client_g.formats(graph_format)
-            self.client_g.create_formats_()
             # Sort underlying matrix beforehand to avoid runtime overhead during sampling.
             if len(etypes) > 1:
                 if 'csr' in graph_format:
@@ -353,6 +350,9 @@ class DistGraphServer(KVServer):
                 if 'csc' in graph_format:
                     self.client_g = sort_csc_by_tag(
                         self.client_g, tag=self.client_g.edata[ETYPE], tag_type='edge')
+            # Create the graph formats specified the users.
+            self.client_g = self.client_g.formats(graph_format)
+            self.client_g.create_formats_()
             if not disable_shared_mem:
                 self.client_g = _copy_graph_to_shared_mem(self.client_g, graph_name, graph_format)
 
