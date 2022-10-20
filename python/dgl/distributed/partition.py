@@ -24,7 +24,7 @@ RESERVED_FIELD_DTYPE = {
     ETYPE: F.int32
     }
 
-def _save_graphs(filename, g_list, formats=None):
+def _save_graphs(filename, g_list, formats=None, sort_etypes=False):
     '''Preprocess partitions before saving:
     1. format data types.
     2. sort csc/csr by tag.
@@ -36,7 +36,7 @@ def _save_graphs(filename, g_list, formats=None):
             if k in g.edata:
                 g.edata[k] = F.astype(g.edata[k], dtype)
     for g in g_list:
-        if formats is None:
+        if (not sort_etypes) or (formats is None):
             continue
         if 'csr' in formats:
             g = sort_csr_by_tag(g, tag=g.edata[ETYPE], tag_type='edge')
@@ -946,7 +946,9 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         save_tensors(node_feat_file, node_feats)
         save_tensors(edge_feat_file, edge_feats)
 
-        _save_graphs(part_graph_file, [part], formats=graph_formats)
+        sort_etypes = len(g.etypes) > 1
+        _save_graphs(part_graph_file, [part], formats=graph_formats,
+            sort_etypes=sort_etypes)
     print('Save partitions: {:.3f} seconds, peak memory: {:.3f} GB'.format(
         time.time() - start, get_peak_mem()))
 

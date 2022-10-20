@@ -700,9 +700,9 @@ def gen_dist_partitions(rank, world_size, params):
     graph_formats = None
     if params.graph_formats:
         graph_formats = params.graph_formats.split(',')
-    print(f"--------- graph_formats: {graph_formats}")
+    sort_etypes = len(etypes_map) > 1
     write_dgl_objects(graph_obj, rcvd_node_features, rcvd_edge_features, params.output, \
-        rank, orig_nids, orig_eids, graph_formats)
+        rank, orig_nids, orig_eids, graph_formats, sort_etypes)
     memory_snapshot("DiskWriteDGLObjectsComplete: ", rank)
 
     #get the meta-data
