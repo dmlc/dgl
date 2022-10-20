@@ -1,6 +1,7 @@
 """dgl sparse matrix module."""
 from typing import Optional, Tuple
 import torch
+from .pybind import _SparseMatrix
 
 __all__ = ['SparseMatrix', 'create_from_coo', 'create_from_csr', 'create_from_csc']
 
@@ -62,6 +63,8 @@ class SparseMatrix:
             if len(val.shape) > 1:
                 shape += (val.shape[-1],)
             self.adj = torch.sparse_coo_tensor(i, val, shape).coalesce()
+        # The _sparse_matrix will replace torch.sparse_coo_tensor
+        self._sparse_matrix = _SparseMatrix(row, col, val, shape)
 
     def __repr__(self):
         return f'SparseMatrix(indices={self.indices("COO")}, \nvalues={self.val}, \
@@ -120,7 +123,9 @@ class SparseMatrix:
         tensor
             Row indices of the nonzero elements
         """
-        return self.adj.indices()[0]
+        # We need to get all properties from the self._sparse_matrix
+        return self._sparse_matrix.row()
+        # return self.adj.indices()[0]
 
     @property
     def col(self) -> torch.tensor:

@@ -21,22 +21,21 @@ namespace cpu {
  *       for the computation of different edges.
  */
 template <typename IdType, typename DType>
-torch::Tensor SDDMMCoo(torch::Tensor row, torch::Tensor col,
-              torch::Tensor val, torch::Tensor matB,
-              torch::Tensor matC) {
+torch::Tensor SDDMMCoo(torch::Tensor row, torch::Tensor col, torch::Tensor val,
+                       torch::Tensor matB, torch::Tensor matC) {
 
-  const IdType* row_data = row.data_ptr<IdType>();
-  const IdType* col_data = col.data_ptr<IdType>();
-  const DType* val_data = val.data_ptr<DType>();
-  const DType* B_data = matB.data_ptr<DType>();
-  const DType* C_data = matC.data_ptr<DType>();
+  const IdType *row_data = row.data_ptr<IdType>();
+  const IdType *col_data = col.data_ptr<IdType>();
+  const DType *val_data = val.data_ptr<DType>();
+  const DType *B_data = matB.data_ptr<DType>();
+  const DType *C_data = matC.data_ptr<DType>();
 
   const int64_t M = matB.size(-2);
   const int64_t N = matC.size(-1);
   const int64_t K = matB.size(-1);
   const int64_t nnz = row.numel();
   torch::Tensor out_val = torch::empty(nnz);
-  DType* out_val_data = out_val.data_ptr<DType>();
+  DType *out_val_data = out_val.data_ptr<DType>();
 
 #pragma omp parallel for
   for (int64_t i = 0; i < nnz; ++i) {
@@ -51,10 +50,15 @@ torch::Tensor SDDMMCoo(torch::Tensor row, torch::Tensor col,
   return out_val;
 }
 
-}  // namespace cpu
+template <typename IdType, typename DType>
+torch::Tensor SDDMMCooV2(const COO &coo, torch::Tensor matB,
+                         torch::Tensor matC) {
+  /* SDDMM implementation */
+}
+
+} // namespace cpu
 
 // }  // namespace aten
 // }  // namespace dgl
 
-
-#endif  // DGL_ARRAY_CPU_SDDMM_H_
+#endif // DGL_ARRAY_CPU_SDDMM_H_

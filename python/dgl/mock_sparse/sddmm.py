@@ -61,3 +61,9 @@ def sddmm(
     rowptr = A.adj.to_sparse_csr().crow_indices()
     res = torch.ops.dgl_sparse.SDDMM(A.row, rowptr, A.col, A.val, mat1, mat2)
     return SparseMatrix(A.row, A.col, res, A.adj.shape)
+
+def sddmm_v2(
+    A: SparseMatrix, mat1: torch.Tensor, mat2: torch.Tensor
+) -> SparseMatrix:
+    m = torch.ops.dgl_sparse.SDDMMV2(A._sparse_matrix, mat1, mat2)
+    return SparseMatrix.create_from_internal(m)
