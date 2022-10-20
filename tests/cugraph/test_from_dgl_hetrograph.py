@@ -1,6 +1,5 @@
 import dgl
 from dgl.contrib.cugraph.convert import cugraph_storage_from_heterograph
-from dgl.contrib.cugraph import CuGraphStorage
 
 import dgl.backend as F
 import torch as th
