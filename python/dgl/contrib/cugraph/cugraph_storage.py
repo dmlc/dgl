@@ -23,10 +23,98 @@ from .utils.cugraph_utils import convert_can_etype_s_to_tup
 
 class CuGraphStorage:
     """
-    Duck-typed version of the DGL GraphStorage class made for cuGraph
+    Duck-typed version of the DGLHeteroGraph class made for cuGraph
+    for storing graph structure and node/edge feature data.
+
+    This object is wrapper around cugraph's PropertyGraph and returns samples
+    that conform with `DGLHeteroGraph`
+    See: TODO link after https://github.com/rapidsai/cugraph/pull/2826
+
+
+    Read the user guide chapter :ref:`guide-`CuGraphStorage` for an in-depth
+    explanation about its usage.
+
     """
 
-    def __init__(self, single_gpu=True, idtype=F.int32):
+    def __init__(self, single_gpu: bool = True, idtype=F.int32):
+        """
+        Constructor for creating a object of instance CuGraphStorage
+
+        See also ``dgl.contrib.cugraph.cugraph_storage_from_heterograph``
+        to convert from DGLHeteroGraph to CuGraphStorage
+
+        Parameters
+        ----------
+         single_gpu: bool
+            Wether to create the cugraph object
+            on a single GPU or multiple GPUs
+            single GPU = True creates PropertyGraph
+            single GPU = False creates MGPropertyGraph
+         idtype:   Framework-specific device object,
+            The data type for storing the structure-related graph
+            information this can be ``torch.int32`` or ``torch.int64``
+            for PyTorch.
+
+         Examples
+         --------
+         The following example uses `CuGraphStorage` :
+
+            >>> from dgl.contrib.cugraph.cugraph_storage import CuGraphStorage
+            >>> import cudf
+            >>> gs = CuGraphStorage()
+            # Add Node Data
+            # note: cugraph currently requires ids to be unique across types
+            # but contiguous per type for now
+            # we will remove that dependency soon
+
+            # add nodes
+            >>> drug_df = cudf.DataFrame({'node_ids':[0,1,2]})
+            >>> drug_df['node_ids'] = drug_df['node_ids'] + 0
+            >>> gs.add_node_data(drug_df, "node_ids", ntype='drug')
+
+            >>> gene_df = cudf.DataFrame({'node_ids':cudf.Series([0,1])})
+            >>> gene_df['node_ids'] += gs.total_number_of_nodes
+            >>> gs.add_node_data(gene_df, "node_ids", ntype='gene')
+
+            >>> disease_df = cudf.DataFrame({'node_ids':cudf.Series([0])})
+            >>> disease_df['node_ids'] += gs.total_number_of_nodes
+            >>> gs.add_node_data(disease_df, "node_ids", ntype='disease')
+
+            # add edges
+            >>> drug_interacts_drug_df = cudf.DataFrame({'src':[0,1],
+                                                         'dst':[1,2]})
+            >>> drug_interacts_gene = cudf.DataFrame({'src':[0,1],
+                                                      'dst':[3,4]})
+            >>> drug_treats_disease = cudf.DataFrame({'src':[1],
+                                                      'dst':[5]})
+            >>> gs.add_edge_data(drug_interacts_drug_df,
+                                 node_col_names=['src','dst'],
+                                 canonical_etype=('drug', 'interacts', 'drug'))
+            >>> gs.add_edge_data(drug_interacts_gene,
+                                 node_col_names=['src','dst'],
+                                 canonical_etype=('drug', 'interacts', 'gene'))
+            >>> gs.add_edge_data(drug_treats_disease,
+                                 node_col_names=['src','dst'],
+                                canonical_etype=('drug', 'treats', 'disease'))
+            >>> gs.ntypes
+            ['disease', 'drug', 'gene']
+            >>> gs.etypes
+            ['interacts', 'interacts', 'treats']
+            >>> gs.canonical_etypes
+            [('drug', 'interacts', 'drug'),
+             ('drug', 'interacts', 'gene'),
+             ('drug', 'treats', 'disease')]
+
+            >>> gs.sample_neighbors({'drug':[0]},
+                                    1)
+            Graph(num_nodes={'disease': 1, 'drug': 3, 'gene': 2},
+            num_edges={('drug', 'interacts', 'drug'): 1,
+                       ('drug', 'interacts', 'gene'): 0,
+                       ('drug', 'treats', 'disease'): 0},
+            metagraph=[('drug', 'drug', 'interacts'),
+                       ('drug', 'gene', 'interacts'),
+                       ('drug', 'disease', 'treats')])
+        """
         # lazy import to prevent creating cuda context
         # till later to help in multiprocessing
         from cugraph.gnn import CuGraphStore
