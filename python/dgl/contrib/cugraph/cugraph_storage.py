@@ -36,7 +36,9 @@ class CuGraphStorage:
 
     """
 
-    def __init__(self, single_gpu: bool = True, idtype=F.int32):
+    def __init__(
+        self, single_gpu: bool = True, num_nodes_dict={}, idtype=F.int32
+    ):
         """
         Constructor for creating a object of instance CuGraphStorage
 
@@ -50,43 +52,37 @@ class CuGraphStorage:
             on a single GPU or multiple GPUs
             single GPU = True creates PropertyGraph
             single GPU = False creates MGPropertyGraph
-         idtype:   Framework-specific device object,
+         num_nodes_dict: dict[str, int]
+            The number of nodes for some node types, which is a
+            dictionary mapping a node type T to the number of T-typed nodes.
+         idtype: Framework-specific device object,
             The data type for storing the structure-related graph
             information this can be ``torch.int32`` or ``torch.int64``
             for PyTorch.
-
          Examples
          --------
          The following example uses `CuGraphStorage` :
 
             >>> from dgl.contrib.cugraph.cugraph_storage import CuGraphStorage
             >>> import cudf
-            >>> gs = CuGraphStorage()
-            # Add Node Data
-            # note: cugraph currently requires ids to be unique across types
-            # but contiguous per type for now
-            # we will remove that dependency soon
-
+            >>> gs = CuGraphStorage(num_nodes_dict={'drug':3, 'gene':2, 'disease':1})
             # add nodes
             >>> drug_df = cudf.DataFrame({'node_ids':[0,1,2]})
-            >>> drug_df['node_ids'] = drug_df['node_ids'] + 0
             >>> gs.add_node_data(drug_df, "node_ids", ntype='drug')
 
             >>> gene_df = cudf.DataFrame({'node_ids':cudf.Series([0,1])})
-            >>> gene_df['node_ids'] += gs.total_number_of_nodes
             >>> gs.add_node_data(gene_df, "node_ids", ntype='gene')
 
             >>> disease_df = cudf.DataFrame({'node_ids':cudf.Series([0])})
-            >>> disease_df['node_ids'] += gs.total_number_of_nodes
             >>> gs.add_node_data(disease_df, "node_ids", ntype='disease')
 
             # add edges
             >>> drug_interacts_drug_df = cudf.DataFrame({'src':[0,1],
                                                          'dst':[1,2]})
             >>> drug_interacts_gene = cudf.DataFrame({'src':[0,1],
-                                                      'dst':[3,4]})
+                                                      'dst':[0,1]})
             >>> drug_treats_disease = cudf.DataFrame({'src':[1],
-                                                      'dst':[5]})
+                                                      'dst':[0]})
             >>> gs.add_edge_data(drug_interacts_drug_df,
                                  node_col_names=['src','dst'],
                                  canonical_etype=('drug', 'interacts', 'drug'))
@@ -105,12 +101,12 @@ class CuGraphStorage:
              ('drug', 'interacts', 'gene'),
              ('drug', 'treats', 'disease')]
 
-            >>> gs.sample_neighbors({'drug':[0]},
+            >>> gs.sample_neighbors({'disease':[0]},
                                     1)
             Graph(num_nodes={'disease': 1, 'drug': 3, 'gene': 2},
-            num_edges={('drug', 'interacts', 'drug'): 1,
+            num_edges={('drug', 'interacts', 'drug'): 0,
                        ('drug', 'interacts', 'gene'): 0,
-                       ('drug', 'treats', 'disease'): 0},
+                       ('drug', 'treats', 'disease'): 1},
             metagraph=[('drug', 'drug', 'interacts'),
                        ('drug', 'gene', 'interacts'),
                        ('drug', 'disease', 'treats')])
@@ -130,10 +126,10 @@ class CuGraphStorage:
 
         self.graphstore = CuGraphStore(graph=pg)
         self.idtype = idtype
-
+        self.num_nodes_dict = num_nodes_dict
+        self._node_id_offset_d = self.__get_node_id_offset_d(num_nodes_dict)
         # TODO: Potentially expand to set below
         # directly
-        self._node_id_offset_d = None
         self._edge_id_offset_d = None
 
     def add_node_data(
@@ -172,6 +168,10 @@ class CuGraphStorage:
         -------
         None
         """
+        if ntype:
+            df[node_col_name] = df[node_col_name] + self.get_node_id_offset(
+                ntype
+            )
         self.graphstore.add_node_data(
             df=df,
             node_col_name=node_col_name,
@@ -218,7 +218,10 @@ class CuGraphStorage:
         """
         if canonical_etype:
             _assert_valid_canonical_etype(canonical_etype)
-
+            src_n, dst_n = node_col_names
+            src_type, dst_type = canonical_etype[0], canonical_etype[2]
+            df[src_n] = df[src_n] + self.get_node_id_offset(src_type)
+            df[dst_n] = df[dst_n] + self.get_node_id_offset(dst_type)
         # Convert to a string because cugraph PG does not support tuple objects
         canonical_etype = str(canonical_etype)
         self.graphstore.add_edge_data(
@@ -580,9 +583,6 @@ class CuGraphStorage:
             total_nodes += self.num_nodes(ntype)
         return total_nodes
 
-    @property
-    def num_nodes_dict(self):
-        return self.graphstore.num_nodes_dict
 
     @property
     def num_canonical_edges_dict(self):

@@ -53,10 +53,9 @@ def add_ndata_of_single_type(
     feat_t_d: Optional[dict[torch.Tensor]],
     ntype: str,
     n_rows: int,
-    node_offset: int,
     idtype=torch.int64,
 ):
-    node_ids = dgl.backend.arange(0, n_rows, idtype, ctx="cuda") + node_offset
+    node_ids = dgl.backend.arange(0, n_rows, idtype, ctx="cuda")
     node_ids = cp.from_dlpack(zerocopy_to_dlpack(node_ids))
 
     if feat_t_d:
@@ -86,17 +85,8 @@ def add_ndata_of_single_type(
 def add_nodes_from_dgl_heteroGraph(
     gs: dgl.contrib.cugraph.CuGraphStorage,
     graph: dgl.DGLHeteroGraph,
-    num_nodes_dict: Optional[dict[str, int]] = None,
 ):
     if len(graph.ntypes) > 1:
-        if num_nodes_dict is None:
-            raise ValueError(
-                "num_nodes_dict must be provided for adding ndata"
-                "from Heterogeneous Graphs"
-            )
-        node_id_offset_d = gs._CuGraphStorage__get_node_id_offset_d(
-            num_nodes_dict
-        )
         ntype_feat_d = dict()
         for feat_name in graph.ndata.keys():
             for ntype in graph.ndata[feat_name]:
@@ -104,15 +94,13 @@ def add_nodes_from_dgl_heteroGraph(
                     ntype_feat_d[ntype] = {}
                 ntype_feat_d[ntype][feat_name] = graph.ndata[feat_name][ntype]
 
-        for ntype in num_nodes_dict.keys():
-            node_offset = node_id_offset_d[ntype]
+        for ntype in gs.num_nodes_dict.keys():
             feat_t_d = ntype_feat_d.get(ntype, None)
             gs = add_ndata_of_single_type(
                 gs=gs,
                 feat_t_d=feat_t_d,
                 ntype=ntype,
-                n_rows=num_nodes_dict[ntype],
-                node_offset=node_offset,
+                n_rows=gs.num_nodes_dict[ntype],
                 idtype=graph.idtype,
             )
     else:
@@ -123,7 +111,6 @@ def add_nodes_from_dgl_heteroGraph(
             feat_t_d=graph.ndata,
             ntype=ntype,
             n_rows=graph.number_of_nodes(),
-            node_offset=0,
             idtype=graph.idtype,
         )
     return gs
@@ -136,15 +123,10 @@ def add_edata_of_single_type(
     src_t: torch.Tensor,
     dst_t: torch.Tensor,
     can_etype: tuple([str, str, str]),
-    src_offset: int,
-    dst_offset: int,
 ):
 
     src_t = src_t.to("cuda")
     dst_t = dst_t.to("cuda")
-
-    src_t = src_t + src_offset
-    dst_t = dst_t + dst_offset
 
     df = cudf.DataFrame(
         {
@@ -181,7 +163,6 @@ def add_edata_of_single_type(
 def add_edges_from_dgl_heteroGraph(
     gs: dgl.contrib.cugraph.CuGraphStorage,
     graph: dgl.DGLHeteroGraph,
-    num_nodes_dict: Optional[dict[str, int]] = None,
 ):
     etype_feat_d = dict()
     for feat_name in graph.edata.keys():
@@ -190,29 +171,8 @@ def add_edges_from_dgl_heteroGraph(
                 etype_feat_d[etype] = {}
             etype_feat_d[etype][feat_name] = graph.edata[feat_name][etype]
 
-    if len(graph.ntypes) > 1:
-        if num_nodes_dict is None:
-            raise ValueError(
-                "num_nodes_dict must be provided for"
-                "adding edges from HeteroGraphs"
-            )
-        node_id_offset_d = gs._CuGraphStorage__get_node_id_offset_d(
-            num_nodes_dict
-        )
-    else:
-        node_id_offset_d = None
-
     for can_etype in graph.canonical_etypes:
         src_t, dst_t = graph.edges(form="uv", etype=can_etype)
         src_type, _, dst_type = can_etype
-        if node_id_offset_d:
-            src_offset, dst_offset = (
-                node_id_offset_d[src_type],
-                node_id_offset_d[dst_type],
-            )
-        else:
-            src_offset, dst_offset = 0, 0
         feat_t_d = etype_feat_d.get(can_etype, None)
-        add_edata_of_single_type(
-            gs, feat_t_d, src_t, dst_t, can_etype, src_offset, dst_offset
-        )
+        add_edata_of_single_type(gs, feat_t_d, src_t, dst_t, can_etype)
