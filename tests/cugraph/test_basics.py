@@ -2,8 +2,8 @@
 #    See https://github.com/rapidsai/cugraph/issues/2718
 import cugraph
 import backend as F
-import dgl
 
+import dgl
 
 
 def test_dummy():
