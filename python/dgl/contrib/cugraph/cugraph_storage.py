@@ -65,20 +65,18 @@ class CuGraphStorage:
 
             >>> from dgl.contrib.cugraph.cugraph_storage import CuGraphStorage
             >>> import cudf
-            >>> gs = CuGraphStorage(num_nodes_dict={'drug':3, 'gene':2, 'disease':1})
-            # add nodes
-            >>> drug_df = cudf.DataFrame({'node_ids':[0,1,2]})
+            >>> gs = CuGraphStorage(num_nodes_dict={'drug':3,
+                                                    'gene':2,
+                                                    'disease':1})
+            # add node data
+            >>> drug_df = cudf.DataFrame({'node_ids':[0,1,2],
+                                          'node_feat':[0.1,0.2,0.3]})
             >>> gs.add_node_data(drug_df, "node_ids", ntype='drug')
 
-            >>> gene_df = cudf.DataFrame({'node_ids':cudf.Series([0,1])})
-            >>> gs.add_node_data(gene_df, "node_ids", ntype='gene')
-
-            >>> disease_df = cudf.DataFrame({'node_ids':cudf.Series([0])})
-            >>> gs.add_node_data(disease_df, "node_ids", ntype='disease')
-
-            # add edges
+            # add edges and edge data
             >>> drug_interacts_drug_df = cudf.DataFrame({'src':[0,1],
-                                                         'dst':[1,2]})
+                                                         'dst':[1,2],
+                                                         'edge_feat':[0.2,0.4]})})
             >>> drug_interacts_gene = cudf.DataFrame({'src':[0,1],
                                                       'dst':[0,1]})
             >>> drug_treats_disease = cudf.DataFrame({'src':[1],
@@ -110,6 +108,16 @@ class CuGraphStorage:
             metagraph=[('drug', 'drug', 'interacts'),
                        ('drug', 'gene', 'interacts'),
                        ('drug', 'disease', 'treats')])
+
+            >>> gs.get_node_storage(key='node_feat',
+                                    ntype='drug').fetch([0,1,2])
+            tensor([0.1000, 0.2000, 0.3000], device='cuda:0',
+             dtype=torch.float64)
+
+            >>> es = gs.get_edge_storage(key='edge_feat',
+                                    etype=('drug', 'interacts', 'drug'))
+            >>> es.fetch([0,1])
+            tensor([0.2000, 0.4000], device='cuda:0', dtype=torch.float64)
         """
         # lazy import to prevent creating cuda context
         # till later to help in multiprocessing
@@ -510,11 +518,15 @@ class CuGraphStorage:
         int
             The number of nodes.
         """
-        return self.graphstore.num_nodes(ntype)
+        if ntype:
+            return self.num_nodes_dict[ntype]
+        else:
+            return self.graphstore.num_nodes(ntype)
 
-    def number_of_nodes(self, ntype):
+    def number_of_nodes(self, ntype=None):
         """
         Return the number of nodes in the graph.
+        Alias of ``num_nodes``
         Parameters
         ----------
         ntype : str, optional
@@ -582,7 +594,6 @@ class CuGraphStorage:
         for ntype in self.ntypes:
             total_nodes += self.num_nodes(ntype)
         return total_nodes
-
 
     @property
     def num_canonical_edges_dict(self):
