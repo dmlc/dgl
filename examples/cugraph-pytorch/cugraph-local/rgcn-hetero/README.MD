@@ -13,8 +13,13 @@ to work with cugraphstorage
 mamba create -n dgl_and_cugraph -c dglteam -c rapidsai-nightly -c nvidia -c pytorch -c conda-forge     cugraph pytorch cudatoolkit=11.6 dgl-cuda11.6 tqdm rdflib
 ```
 
-Example code was tested with rdflib 4.2.2 and pandas 0.23.4
+### Results:
 
+| dataset | Avg(cugraph, 18 runs) | Avg(DGL, 5 runs) |
+|---------|-----------------------|------------------|
+| aifb    | 93.81                 | 94.44            |
+| bgs     | 90.04                 | 91.04            |
+| mutag   | 66.17                 | 67.37            |
 
 
 ### Entity Classification w/ minibatch training with cugraph
@@ -27,22 +32,20 @@ g = cugraph_storage_from_heterograph(g)
 
 Accuracy numbers are reported by 5 runs.
 
-AIFB: (TODO: Add cugraph numbers) accuracy best=97.22% avg=94.44%
+AIFB:
 ```
 python3 entity_classify_mb.py -d aifb --testing --gpu 0 --fanout=8 --use_cugraph_storage
 ```
-
-MUTAG: (TODO: Add cugraph numbers) 
+MUTAG:
 ```
 python3 entity_classify_mb.py -d mutag --l2norm 5e-4 --n-bases 30 --testing --gpu 0 --batch-size=50 --fanout=8 --use_cugraph_storage
 ```
-
-BGS: (TODO: Add cugraph numbers) 
+BGS:
 ```
 python3 entity_classify_mb.py -d bgs --l2norm 5e-4 --n-bases 40 --testing --gpu 0 --use_cugraph_storage
 ```
 
-AM: (TODO: Add cugraph numbers) 
+AM: 
 ```
 python3 entity_classify_mb.py -d am --l2norm 5e-4 --n-bases 40 --testing --gpu 0 --use_cugraph_storage
 ```
