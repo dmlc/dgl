@@ -390,7 +390,7 @@ def write_graph_dgl(graph_file, graph_obj):
     graph_file : string
         File name in which graph object is serialized
     """
-    dgl.save_graphs(graph_file, [graph_obj])
+    dgl.distributed.partition._save_graphs(graph_file, [graph_obj])
 
 def write_dgl_objects(graph_obj, node_features, edge_features,
         output_dir, part_id, orig_nids, orig_eids):

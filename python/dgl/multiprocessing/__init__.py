@@ -6,11 +6,12 @@
 # make fork() and openmp work together.
 from .. import backend as F
 
-if F.get_preferred_backend() == 'pytorch':
+if F.get_preferred_backend() == "pytorch":
     # Wrap around torch.multiprocessing...
     from torch.multiprocessing import *
+
     # ... and override the Process initializer.
     from .pytorch import *
 else:
     # Just import multiprocessing module.
-    from multiprocessing import *           # pylint: disable=redefined-builtin
+    from multiprocessing import *  # pylint: disable=redefined-builtin

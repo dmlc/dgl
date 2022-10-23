@@ -63,12 +63,10 @@ class DenseGraphConv(nn.Module):
     --------
     `GraphConv <https://docs.dgl.ai/api/python/nn.pytorch.html#graphconv>`__
     """
-    def __init__(self,
-                 in_feats,
-                 out_feats,
-                 norm='both',
-                 bias=True,
-                 activation=None):
+
+    def __init__(
+        self, in_feats, out_feats, norm="both", bias=True, activation=None
+    ):
         super(DenseGraphConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
@@ -77,7 +75,7 @@ class DenseGraphConv(nn.Module):
         if bias:
             self.bias = nn.Parameter(th.Tensor(out_feats))
         else:
-            self.register_buffer('bias', None)
+            self.register_buffer("bias", None)
 
         self.reset_parameters()
         self._activation = activation
@@ -114,7 +112,7 @@ class DenseGraphConv(nn.Module):
         dst_degrees = adj.sum(dim=1).clamp(min=1)
         feat_src = feat
 
-        if self._norm == 'both':
+        if self._norm == "both":
             norm_src = th.pow(src_degrees, -0.5)
             shp = norm_src.shape + (1,) * (feat.dim() - 1)
             norm_src = th.reshape(norm_src, shp).to(feat.device)
@@ -129,10 +127,10 @@ class DenseGraphConv(nn.Module):
             rst = adj @ feat_src
             rst = th.matmul(rst, self.weight)
 
-        if self._norm != 'none':
-            if self._norm == 'both':
+        if self._norm != "none":
+            if self._norm == "both":
                 norm_dst = th.pow(dst_degrees, -0.5)
-            else: # right
+            else:  # right
                 norm_dst = 1.0 / dst_degrees
             shp = norm_dst.shape + (1,) * (feat.dim() - 1)
             norm_dst = th.reshape(norm_dst, shp).to(feat.device)

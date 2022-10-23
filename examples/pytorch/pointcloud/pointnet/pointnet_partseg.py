@@ -1,12 +1,14 @@
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-import numpy as np
+
 
 class PointNetPartSeg(nn.Module):
-    def __init__(self, output_classes, input_dims=3, num_points=2048,
-                 use_transform=True):
+    def __init__(
+        self, output_classes, input_dims=3, num_points=2048, use_transform=True
+    ):
         super(PointNetPartSeg, self).__init__()
         self.input_dims = input_dims
 
@@ -33,7 +35,7 @@ class PointNetPartSeg(nn.Module):
         self.pool_feat_len = 2048
 
         self.conv3 = nn.ModuleList()
-        self.conv3.append(nn.Conv1d(2048 + 64 + 128*3 + 512 + 16, 256, 1))
+        self.conv3.append(nn.Conv1d(2048 + 64 + 128 * 3 + 512 + 16, 256, 1))
         self.conv3.append(nn.Conv1d(256, 256, 1))
         self.conv3.append(nn.Conv1d(256, 128, 1))
 
@@ -98,6 +100,7 @@ class PointNetPartSeg(nn.Module):
         out = self.conv_out(h)
         return out
 
+
 class TransformNet(nn.Module):
     def __init__(self, input_dims=3, num_points=2048):
         super(TransformNet, self).__init__()
@@ -131,7 +134,7 @@ class TransformNet(nn.Module):
             h = conv(h)
             h = bn(h)
             h = F.relu(h)
-        
+
         h = self.maxpool(h).view(-1, self.pool_feat_len)
         for mlp, bn in zip(self.mlp2, self.bn2):
             h = mlp(h)
@@ -140,20 +143,27 @@ class TransformNet(nn.Module):
 
         out = self.mlp_out(h)
 
-        iden = Variable(torch.from_numpy(np.eye(self.input_dims).flatten().astype(np.float32)))
-        iden = iden.view(1, self.input_dims * self.input_dims).repeat(batch_size, 1)
+        iden = Variable(
+            torch.from_numpy(
+                np.eye(self.input_dims).flatten().astype(np.float32)
+            )
+        )
+        iden = iden.view(1, self.input_dims * self.input_dims).repeat(
+            batch_size, 1
+        )
         if out.is_cuda:
             iden = iden.cuda()
         out = out + iden
         out = out.view(-1, self.input_dims, self.input_dims)
         return out
 
+
 class PartSegLoss(nn.Module):
     def __init__(self, eps=0.2):
         super(PartSegLoss, self).__init__()
         self.eps = eps
         self.loss = nn.CrossEntropyLoss()
-    
+
     def forward(self, logits, y):
         num_classes = logits.shape[1]
         logits = logits.permute(0, 2, 1).contiguous().view(-1, num_classes)

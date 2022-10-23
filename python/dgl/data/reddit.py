@@ -15,48 +15,6 @@ from ..transforms import reorder_graph
 class RedditDataset(DGLBuiltinDataset):
     r""" Reddit dataset for community detection (node classification)
 
-    .. deprecated:: 0.5.0
-
-        - ``graph`` is deprecated, it is replaced by:
-
-            >>> dataset = RedditDataset()
-            >>> graph = dataset[0]
-
-        - ``num_labels`` is deprecated, it is replaced by:
-
-            >>> dataset = RedditDataset()
-            >>> num_classes = dataset.num_classes
-
-        - ``train_mask`` is deprecated, it is replaced by:
-
-            >>> dataset = RedditDataset()
-            >>> graph = dataset[0]
-            >>> train_mask = graph.ndata['train_mask']
-
-        - ``val_mask`` is deprecated, it is replaced by:
-
-            >>> dataset = RedditDataset()
-            >>> graph = dataset[0]
-            >>> val_mask = graph.ndata['val_mask']
-
-        - ``test_mask`` is deprecated, it is replaced by:
-
-            >>> dataset = RedditDataset()
-            >>> graph = dataset[0]
-            >>> test_mask = graph.ndata['test_mask']
-
-        - ``features`` is deprecated, it is replaced by:
-
-            >>> dataset = RedditDataset()
-            >>> graph = dataset[0]
-            >>> features = graph.ndata['feat']
-
-        - ``labels`` is deprecated, it is replaced by:
-
-            >>> dataset = RedditDataset()
-            >>> graph = dataset[0]
-            >>> labels = graph.ndata['label']
-
     This is a graph dataset from Reddit posts made in the month of September, 2014.
     The node label in this case is the community, or “subreddit”, that a post belongs to.
     The authors sampled 50 large communities and built a post-to-post graph, connecting
@@ -95,20 +53,6 @@ class RedditDataset(DGLBuiltinDataset):
     ----------
     num_classes : int
         Number of classes for each node
-    graph : :class:`dgl.DGLGraph`
-        Graph of the dataset
-    num_labels : int
-        Number of classes for each node
-    train_mask: numpy.ndarray
-        Mask of training nodes
-    val_mask: numpy.ndarray
-        Mask of validation nodes
-    test_mask: numpy.ndarray
-        Mask of test nodes
-    features : Tensor
-        Node features
-    labels :  Tensor
-        Node labels
 
     Examples
     --------
@@ -201,41 +145,6 @@ class RedditDataset(DGLBuiltinDataset):
     def num_classes(self):
         r"""Number of classes for each node."""
         return 41
-
-    @property
-    def num_labels(self):
-        deprecate_property('dataset.num_labels', 'dataset.num_classes')
-        return self.num_classes
-
-    @property
-    def graph(self):
-        deprecate_property('dataset.graph', 'dataset[0]')
-        return self._graph
-
-    @property
-    def train_mask(self):
-        deprecate_property('dataset.train_mask', 'graph.ndata[\'train_mask\']')
-        return F.asnumpy(self._graph.ndata['train_mask'])
-
-    @property
-    def val_mask(self):
-        deprecate_property('dataset.val_mask', 'graph.ndata[\'val_mask\']')
-        return F.asnumpy(self._graph.ndata['val_mask'])
-
-    @property
-    def test_mask(self):
-        deprecate_property('dataset.test_mask', 'graph.ndata[\'test_mask\']')
-        return F.asnumpy(self._graph.ndata['test_mask'])
-
-    @property
-    def features(self):
-        deprecate_property('dataset.features', 'graph.ndata[\'feat\']')
-        return self._graph.ndata['feat']
-
-    @property
-    def labels(self):
-        deprecate_property('dataset.labels', 'graph.ndata[\'label\']')
-        return self._graph.ndata['label']
 
     def __getitem__(self, idx):
         r""" Get graph by index

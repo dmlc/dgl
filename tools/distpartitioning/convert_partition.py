@@ -14,6 +14,7 @@ from pyarrow import csv
 
 import constants
 from utils import get_idranges, memory_snapshot, read_json
+from dgl.distributed.partition import RESERVED_FIELD_DTYPE
 
 
 def create_dgl_object(schema, part_id, node_data, edge_data, edgeid_offset,
@@ -106,7 +107,6 @@ def create_dgl_object(schema, part_id, node_data, edge_data, edgeid_offset,
     memory_snapshot("CreateDGLObj_Begin", part_id)
     _, global_nid_ranges = get_idranges(schema[constants.STR_NODE_TYPE],
         schema[constants.STR_NUM_NODES_PER_CHUNK])
-    memory_snapshot("CreateDGLObj_Begin", part_id)
 
     _, global_eid_ranges = get_idranges(schema[constants.STR_EDGE_TYPE],
                                     schema[constants.STR_NUM_EDGES_PER_CHUNK])
@@ -232,7 +232,7 @@ def create_dgl_object(schema, part_id, node_data, edge_data, edgeid_offset,
     2. Once the map is created, use this map to map all the node-ids in the part_local_src_id 
     and part_local_dst_id list to their appropriate `new` node-ids (post-reshuffle order).
     3. Since only the node's order is changed, we will have to re-order nodes related information when
-    creating dgl object: this includes orig_id, dgl.NTYPE, dgl.NID and inner_node.
+    creating dgl object: this includes dgl.NTYPE, dgl.NID and inner_node.
     4. Edge's order is not changed. At this point in the execution path edges are still ordered by their etype-ids.
     5. Create the dgl object appropriately and return the dgl object.
     
@@ -272,9 +272,9 @@ def create_dgl_object(schema, part_id, node_data, edge_data, edgeid_offset,
     part_graph = dgl.graph(data=(part_local_src_id, part_local_dst_id), num_nodes=len(uniq_ids))
     part_graph.edata[dgl.EID] = th.arange(
         edgeid_offset, edgeid_offset + part_graph.number_of_edges(), dtype=th.int64)
-    part_graph.edata['orig_id'] = th.as_tensor(global_edge_id)
-    part_graph.edata[dgl.ETYPE] = th.as_tensor(etype_ids)
-    part_graph.edata['inner_edge'] = th.ones(part_graph.number_of_edges(), dtype=th.bool)
+    part_graph.edata[dgl.ETYPE] = th.as_tensor(etype_ids, dtype=RESERVED_FIELD_DTYPE[dgl.ETYPE])
+    part_graph.edata['inner_edge'] = th.ones(part_graph.number_of_edges(),
+        dtype=RESERVED_FIELD_DTYPE['inner_edge'])
 
 
     #compute per_type_ids and ntype for all the nodes in the graph.
@@ -285,10 +285,10 @@ def create_dgl_object(schema, part_id, node_data, edge_data, edgeid_offset,
     ntype, per_type_ids = id_map(part_global_ids)
 
     #continue with the graph creation
-    part_graph.ndata['orig_id'] = th.as_tensor(per_type_ids)
-    part_graph.ndata[dgl.NTYPE] = th.as_tensor(ntype)
+    part_graph.ndata[dgl.NTYPE] = th.as_tensor(ntype, dtype=RESERVED_FIELD_DTYPE[dgl.NTYPE])
     part_graph.ndata[dgl.NID] = th.as_tensor(uniq_ids[reshuffle_nodes])
-    part_graph.ndata['inner_node'] = inner_nodes[reshuffle_nodes]
+    part_graph.ndata['inner_node'] = th.as_tensor(inner_nodes[reshuffle_nodes],
+        dtype=RESERVED_FIELD_DTYPE['inner_node'])
 
     orig_nids = None
     orig_eids = None

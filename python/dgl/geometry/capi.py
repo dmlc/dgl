@@ -1,12 +1,15 @@
 """Python interfaces to DGL farthest point sampler."""
 import numpy as np
-from .._ffi.base import DGLError
-from .._ffi.function import _init_api
+
 from .. import backend as F
 from .. import ndarray as nd
+from .._ffi.base import DGLError
+from .._ffi.function import _init_api
 
 
-def _farthest_point_sampler(data, batch_size, sample_points, dist, start_idx, result):
+def _farthest_point_sampler(
+    data, batch_size, sample_points, dist, start_idx, result
+):
     r"""Farthest Point Sampler
 
     Parameters
@@ -32,14 +35,19 @@ def _farthest_point_sampler(data, batch_size, sample_points, dist, start_idx, re
     assert F.shape(data)[0] >= sample_points * batch_size
     assert F.shape(data)[0] % batch_size == 0
 
-    _CAPI_FarthestPointSampler(F.zerocopy_to_dgl_ndarray(data),
-                               batch_size, sample_points,
-                               F.zerocopy_to_dgl_ndarray(dist),
-                               F.zerocopy_to_dgl_ndarray(start_idx),
-                               F.zerocopy_to_dgl_ndarray(result))
+    _CAPI_FarthestPointSampler(
+        F.zerocopy_to_dgl_ndarray(data),
+        batch_size,
+        sample_points,
+        F.zerocopy_to_dgl_ndarray(dist),
+        F.zerocopy_to_dgl_ndarray(start_idx),
+        F.zerocopy_to_dgl_ndarray(result),
+    )
 
 
-def _neighbor_matching(graph_idx, num_nodes, edge_weights=None, relabel_idx=True):
+def _neighbor_matching(
+    graph_idx, num_nodes, edge_weights=None, relabel_idx=True
+):
     """
     Description
     -----------
@@ -82,7 +90,11 @@ def _neighbor_matching(graph_idx, num_nodes, edge_weights=None, relabel_idx=True
     if edge_weights is not None:
         edge_weight_capi = F.zerocopy_to_dgl_ndarray(edge_weights)
     node_label = F.full_1d(
-        num_nodes, -1, getattr(F, graph_idx.dtype), F.to_backend_ctx(graph_idx.ctx))
+        num_nodes,
+        -1,
+        getattr(F, graph_idx.dtype),
+        F.to_backend_ctx(graph_idx.ctx),
+    )
     node_label_capi = F.zerocopy_to_dgl_ndarray_for_write(node_label)
     _CAPI_NeighborMatching(graph_idx, edge_weight_capi, node_label_capi)
     if F.reduce_sum(node_label < 0).item() != 0:
@@ -99,4 +111,4 @@ def _neighbor_matching(graph_idx, num_nodes, edge_weights=None, relabel_idx=True
         return node_label
 
 
-_init_api('dgl.geometry', __name__)
+_init_api("dgl.geometry", __name__)

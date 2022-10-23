@@ -1,21 +1,22 @@
 import backend as F
-import dgl.nn
-import dgl
 import numpy as np
 import pytest
 import torch as th
-from dgl import DGLError
-from dgl.base import DGLWarning
-from dgl.geometry import neighbor_matching, farthest_point_sampler
 from test_utils import parametrize_idtype
 from test_utils.graph_cases import get_cases
+
+import dgl
+import dgl.nn
+from dgl import DGLError
+from dgl.base import DGLWarning
+from dgl.geometry import farthest_point_sampler, neighbor_matching
 
 
 def test_fps():
     N = 1000
     batch_size = 5
     sample_points = 10
-    x = th.tensor(np.random.uniform(size=(batch_size, int(N/batch_size), 3)))
+    x = th.tensor(np.random.uniform(size=(batch_size, int(N / batch_size), 3)))
     ctx = F.ctx()
     if F.gpu_ctx():
         x = x.to(ctx)
@@ -29,17 +30,18 @@ def test_fps_start_idx():
     N = 1000
     batch_size = 5
     sample_points = 10
-    x = th.tensor(np.random.uniform(size=(batch_size, int(N/batch_size), 3)))
+    x = th.tensor(np.random.uniform(size=(batch_size, int(N / batch_size), 3)))
     ctx = F.ctx()
     if F.gpu_ctx():
         x = x.to(ctx)
     res = farthest_point_sampler(x, sample_points, start_idx=0)
     assert th.any(res[:, 0] == 0)
 
+
 def _test_knn_common(device, algorithm, dist, exclude_self):
     x = th.randn(8, 3).to(device)
     kg = dgl.nn.KNNGraph(3)
-    if dist == 'euclidean':
+    if dist == "euclidean":
         d = th.cdist(x, x).to(F.cpu())
     else:
         x = x + th.randn(1).item()
@@ -55,7 +57,14 @@ def _test_knn_common(device, algorithm, dist, exclude_self):
             assert len(src) == k
             if check_indices:
                 i = v - start
-                src_ans = set(th.topk(d[start:end, start:end][i], k + (1 if exclude_self else 0), largest=False)[1].numpy() + start)
+                src_ans = set(
+                    th.topk(
+                        d[start:end, start:end][i],
+                        k + (1 if exclude_self else 0),
+                        largest=False,
+                    )[1].numpy()
+                    + start
+                )
                 if exclude_self:
                     # remove self
                     src_ans.remove(v)
@@ -63,7 +72,9 @@ def _test_knn_common(device, algorithm, dist, exclude_self):
 
     def check_batch(g, k, expected_batch_info):
         assert F.array_equal(g.batch_num_nodes(), F.tensor(expected_batch_info))
-        assert F.array_equal(g.batch_num_edges(), k*F.tensor(expected_batch_info))
+        assert F.array_equal(
+            g.batch_num_edges(), k * F.tensor(expected_batch_info)
+        )
 
     # check knn with 2d input
     g = kg(x, algorithm, dist, exclude_self)
@@ -145,23 +156,27 @@ def _test_knn_common(device, algorithm, dist, exclude_self):
     kg = dgl.nn.SegmentedKNNGraph(3)
     g = kg(x, [4, 7, 5, 4], algorithm, dist, exclude_self)
     # different algorithms may break the tie differently, so don't check the indices
-    check_knn(g, x,  0,  4, 3, exclude_self, False)
-    check_knn(g, x,  4, 11, 3, exclude_self, False)
+    check_knn(g, x, 0, 4, 3, exclude_self, False)
+    check_knn(g, x, 4, 11, 3, exclude_self, False)
     check_knn(g, x, 11, 16, 3, exclude_self, False)
     check_knn(g, x, 16, 20, 3, exclude_self, False)
     check_batch(g, 3, [4, 7, 5, 4])
 
 
-@pytest.mark.parametrize('algorithm', ['bruteforce-blas', 'bruteforce', 'kd-tree'])
-@pytest.mark.parametrize('dist', ['euclidean', 'cosine'])
-@pytest.mark.parametrize('exclude_self', [False, True])
+@pytest.mark.parametrize(
+    "algorithm", ["bruteforce-blas", "bruteforce", "kd-tree"]
+)
+@pytest.mark.parametrize("dist", ["euclidean", "cosine"])
+@pytest.mark.parametrize("exclude_self", [False, True])
 def test_knn_cpu(algorithm, dist, exclude_self):
     _test_knn_common(F.cpu(), algorithm, dist, exclude_self)
 
 
-@pytest.mark.parametrize('algorithm', ['bruteforce-blas', 'bruteforce', 'bruteforce-sharemem'])
-@pytest.mark.parametrize('dist', ['euclidean', 'cosine'])
-@pytest.mark.parametrize('exclude_self', [False, True])
+@pytest.mark.parametrize(
+    "algorithm", ["bruteforce-blas", "bruteforce", "bruteforce-sharemem"]
+)
+@pytest.mark.parametrize("dist", ["euclidean", "cosine"])
+@pytest.mark.parametrize("exclude_self", [False, True])
 def test_knn_cuda(algorithm, dist, exclude_self):
     if not th.cuda.is_available():
         return
@@ -169,9 +184,9 @@ def test_knn_cuda(algorithm, dist, exclude_self):
 
 
 @parametrize_idtype
-@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['dglgraph']))
-@pytest.mark.parametrize('weight', [True, False])
-@pytest.mark.parametrize('relabel', [True, False])
+@pytest.mark.parametrize("g", get_cases(["homo"], exclude=["dglgraph"]))
+@pytest.mark.parametrize("weight", [True, False])
+@pytest.mark.parametrize("relabel", [True, False])
 def test_edge_coarsening(idtype, g, weight, relabel):
     num_nodes = g.num_nodes()
     g = dgl.to_bidirected(g)
@@ -205,7 +220,7 @@ def test_edge_coarsening(idtype, g, weight, relabel):
             assert g.has_edges_between(u, v)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_fps()
     test_fps_start_idx()
     test_knn()

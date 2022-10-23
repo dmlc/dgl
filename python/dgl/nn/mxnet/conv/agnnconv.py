@@ -4,10 +4,10 @@ import mxnet as mx
 from mxnet.gluon import nn
 
 from .... import function as fn
-from ...functional import edge_softmax
-from ..utils import normalize
 from ....base import DGLError
 from ....utils import expand_as_pair
+from ...functional import edge_softmax
+from ..utils import normalize
 
 
 class AGNNConv(nn.Block):
@@ -75,17 +75,19 @@ class AGNNConv(nn.Block):
     [1. 1. 1. 1. 1. 1. 1. 1. 1. 1.]]
     <NDArray 6x10 @cpu(0)>
     """
-    def __init__(self,
-                 init_beta=1.,
-                 learn_beta=True,
-                 allow_zero_in_degree=False):
+
+    def __init__(
+        self, init_beta=1.0, learn_beta=True, allow_zero_in_degree=False
+    ):
         super(AGNNConv, self).__init__()
         self._allow_zero_in_degree = allow_zero_in_degree
         with self.name_scope():
-            self.beta = self.params.get('beta',
-                                        shape=(1,),
-                                        grad_req='write' if learn_beta else 'null',
-                                        init=mx.init.Constant(init_beta))
+            self.beta = self.params.get(
+                "beta",
+                shape=(1,),
+                grad_req="write" if learn_beta else "null",
+                init=mx.init.Constant(init_beta),
+            )
 
     def set_allow_zero_in_degree(self, set_value):
         r"""
@@ -135,25 +137,27 @@ class AGNNConv(nn.Block):
         with graph.local_scope():
             if not self._allow_zero_in_degree:
                 if graph.in_degrees().min() == 0:
-                    raise DGLError('There are 0-in-degree nodes in the graph, '
-                                   'output for those nodes will be invalid. '
-                                   'This is harmful for some applications, '
-                                   'causing silent performance regression. '
-                                   'Adding self-loop on the input graph by '
-                                   'calling `g = dgl.add_self_loop(g)` will resolve '
-                                   'the issue. Setting ``allow_zero_in_degree`` '
-                                   'to be `True` when constructing this module will '
-                                   'suppress the check and let the code run.')
+                    raise DGLError(
+                        "There are 0-in-degree nodes in the graph, "
+                        "output for those nodes will be invalid. "
+                        "This is harmful for some applications, "
+                        "causing silent performance regression. "
+                        "Adding self-loop on the input graph by "
+                        "calling `g = dgl.add_self_loop(g)` will resolve "
+                        "the issue. Setting ``allow_zero_in_degree`` "
+                        "to be `True` when constructing this module will "
+                        "suppress the check and let the code run."
+                    )
 
             feat_src, feat_dst = expand_as_pair(feat, graph)
-            graph.srcdata['h'] = feat_src
-            graph.srcdata['norm_h'] = normalize(feat_src, p=2, axis=-1)
+            graph.srcdata["h"] = feat_src
+            graph.srcdata["norm_h"] = normalize(feat_src, p=2, axis=-1)
             if isinstance(feat, tuple) or graph.is_block:
-                graph.dstdata['norm_h'] = normalize(feat_dst, p=2, axis=-1)
+                graph.dstdata["norm_h"] = normalize(feat_dst, p=2, axis=-1)
             # compute cosine distance
-            graph.apply_edges(fn.u_dot_v('norm_h', 'norm_h', 'cos'))
-            cos = graph.edata.pop('cos')
+            graph.apply_edges(fn.u_dot_v("norm_h", "norm_h", "cos"))
+            cos = graph.edata.pop("cos")
             e = self.beta.data(feat_src.context) * cos
-            graph.edata['p'] = edge_softmax(graph, e)
-            graph.update_all(fn.u_mul_e('h', 'p', 'm'), fn.sum('m', 'h'))
-            return graph.dstdata.pop('h')
+            graph.edata["p"] = edge_softmax(graph, e)
+            graph.update_all(fn.u_mul_e("h", "p", "m"), fn.sum("m", "h"))
+            return graph.dstdata.pop("h")
