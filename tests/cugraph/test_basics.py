@@ -5,6 +5,7 @@ import backend as F
 import dgl
 
 
+
 def test_dummy():
     cg = cugraph.Graph()
     assert cg is not None
