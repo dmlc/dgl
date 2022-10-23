@@ -3,11 +3,15 @@
 
 from __future__ import absolute_import
 
-import os, sys, hashlib
-import traceback
 import abc
-from .utils import download, extract_archive, get_download_dir, makedirs
+import hashlib
+import os
+import sys
+import traceback
+
 from ..utils import retry_method_with_fix
+from .utils import download, extract_archive, get_download_dir, makedirs
+
 
 class DGLDataset(object):
     r"""The basic DGL dataset for creating graph datasets.
@@ -75,8 +79,18 @@ class DGLDataset(object):
     hash : str
         Hash value for the dataset and the setting.
     """
-    def __init__(self, name, url=None, raw_dir=None, save_dir=None,
-                 hash_key=(), force_reload=False, verbose=False, transform=None):
+
+    def __init__(
+        self,
+        name,
+        url=None,
+        raw_dir=None,
+        save_dir=None,
+        hash_key=(),
+        force_reload=False,
+        verbose=False,
+        transform=None,
+    ):
         self._name = name
         self._url = url
         self._force_reload = force_reload
@@ -131,8 +145,7 @@ class DGLDataset(object):
 
     @abc.abstractmethod
     def process(self):
-        r"""Overwrite to realize your own logic of processing the input data.
-        """
+        r"""Overwrite to realize your own logic of processing the input data."""
         pass
 
     def has_cache(self):
@@ -177,21 +190,21 @@ class DGLDataset(object):
             try:
                 self.load()
                 if self.verbose:
-                    print('Done loading data from cached files.')
+                    print("Done loading data from cached files.")
             except KeyboardInterrupt:
                 raise
             except:
                 load_flag = False
                 if self.verbose:
                     print(traceback.format_exc())
-                    print('Loading from cache failed, re-processing.')
+                    print("Loading from cache failed, re-processing.")
 
         if not load_flag:
             self._download()
             self.process()
             self.save()
             if self.verbose:
-                print('Done saving data into cached files.')
+                print("Done saving data into cached files.")
 
     def _get_hash(self):
         """Compute the hash of the input tuple
@@ -205,62 +218,54 @@ class DGLDataset(object):
         'a770b222'
         """
         hash_func = hashlib.sha1()
-        hash_func.update(str(self._hash_key).encode('utf-8'))
+        hash_func.update(str(self._hash_key).encode("utf-8"))
         return hash_func.hexdigest()[:8]
 
     @property
     def url(self):
-        r"""Get url to download the raw dataset.
-        """
+        r"""Get url to download the raw dataset."""
         return self._url
 
     @property
     def name(self):
-        r"""Name of the dataset.
-        """
+        r"""Name of the dataset."""
         return self._name
 
     @property
     def raw_dir(self):
-        r"""Raw file directory contains the input data folder.
-        """
+        r"""Raw file directory contains the input data folder."""
         return self._raw_dir
 
     @property
     def raw_path(self):
         r"""Directory contains the input data files.
-            By default raw_path = os.path.join(self.raw_dir, self.name)
+        By default raw_path = os.path.join(self.raw_dir, self.name)
         """
         return os.path.join(self.raw_dir, self.name)
 
     @property
     def save_dir(self):
-        r"""Directory to save the processed dataset.
-        """
+        r"""Directory to save the processed dataset."""
         return self._save_dir
 
     @property
     def save_path(self):
-        r"""Path to save the processed dataset.
-        """
+        r"""Path to save the processed dataset."""
         return os.path.join(self._save_dir, self.name)
 
     @property
     def verbose(self):
-        r"""Whether to print information.
-        """
+        r"""Whether to print information."""
         return self._verbose
 
     @property
     def hash(self):
-        r"""Hash value for the dataset and the setting.
-        """
+        r"""Hash value for the dataset and the setting."""
         return self._hash
 
     @abc.abstractmethod
     def __getitem__(self, idx):
-        r"""Gets the data object at index.
-        """
+        r"""Gets the data object at index."""
         pass
 
     @abc.abstractmethod
@@ -269,8 +274,11 @@ class DGLDataset(object):
         pass
 
     def __repr__(self):
-        return f'Dataset("{self.name}", num_graphs={len(self)},' + \
-               f' save_path={self.save_path})'
+        return (
+            f'Dataset("{self.name}", num_graphs={len(self)},'
+            + f" save_path={self.save_path})"
+        )
+
 
 class DGLBuiltinDataset(DGLDataset):
     r"""The Basic DGL Builtin Dataset.
@@ -299,21 +307,31 @@ class DGLBuiltinDataset(DGLDataset):
         a transformed version. The :class:`~dgl.DGLGraph` object will be
         transformed before every access.
     """
-    def __init__(self, name, url, raw_dir=None, hash_key=(),
-                 force_reload=False, verbose=False, transform=None):
-        super(DGLBuiltinDataset, self).__init__(name,
-                                                url=url,
-                                                raw_dir=raw_dir,
-                                                save_dir=None,
-                                                hash_key=hash_key,
-                                                force_reload=force_reload,
-                                                verbose=verbose,
-                                                transform=transform)
+
+    def __init__(
+        self,
+        name,
+        url,
+        raw_dir=None,
+        hash_key=(),
+        force_reload=False,
+        verbose=False,
+        transform=None,
+    ):
+        super(DGLBuiltinDataset, self).__init__(
+            name,
+            url=url,
+            raw_dir=raw_dir,
+            save_dir=None,
+            hash_key=hash_key,
+            force_reload=force_reload,
+            verbose=verbose,
+            transform=transform,
+        )
 
     def download(self):
-        r""" Automatically download data and extract it.
-        """
+        r"""Automatically download data and extract it."""
         if self.url is not None:
-            zip_file_path = os.path.join(self.raw_dir, self.name + '.zip')
+            zip_file_path = os.path.join(self.raw_dir, self.name + ".zip")
             download(self.url, path=zip_file_path)
             extract_archive(zip_file_path, self.raw_path)

@@ -1,15 +1,16 @@
 """ICEWS18 dataset for temporal graph"""
-import numpy as np
 import os
 
-from .dgl_dataset import DGLBuiltinDataset
-from .utils import loadtxt, _get_dgl_url, save_graphs, load_graphs
-from ..convert import graph as dgl_graph
+import numpy as np
+
 from .. import backend as F
+from ..convert import graph as dgl_graph
+from .dgl_dataset import DGLBuiltinDataset
+from .utils import _get_dgl_url, load_graphs, loadtxt, save_graphs
 
 
 class ICEWS18Dataset(DGLBuiltinDataset):
-    r""" ICEWS18 dataset for temporal graph
+    r"""ICEWS18 dataset for temporal graph
 
     Integrated Crisis Early Warning System (ICEWS18)
 
@@ -65,21 +66,33 @@ class ICEWS18Dataset(DGLBuiltinDataset):
     ....
     >>>
     """
-    def __init__(self, mode='train', raw_dir=None, force_reload=False, verbose=False, transform=None):
+
+    def __init__(
+        self,
+        mode="train",
+        raw_dir=None,
+        force_reload=False,
+        verbose=False,
+        transform=None,
+    ):
         mode = mode.lower()
-        assert mode in ['train', 'valid', 'test'], "Mode not valid"
+        assert mode in ["train", "valid", "test"], "Mode not valid"
         self.mode = mode
-        _url = _get_dgl_url('dataset/icews18.zip')
-        super(ICEWS18Dataset, self).__init__(name='ICEWS18',
-                                             url=_url,
-                                             raw_dir=raw_dir,
-                                             force_reload=force_reload,
-                                             verbose=verbose,
-                                             transform=transform)
+        _url = _get_dgl_url("dataset/icews18.zip")
+        super(ICEWS18Dataset, self).__init__(
+            name="ICEWS18",
+            url=_url,
+            raw_dir=raw_dir,
+            force_reload=force_reload,
+            verbose=verbose,
+            transform=transform,
+        )
 
     def process(self):
-        data = loadtxt(os.path.join(self.save_path, '{}.txt'.format(self.mode)),
-                       delimiter='\t').astype(np.int64)
+        data = loadtxt(
+            os.path.join(self.save_path, "{}.txt".format(self.mode)),
+            delimiter="\t",
+        ).astype(np.int64)
         num_nodes = 23033
         # The source code is not released, but the paper indicates there're
         # totally 137 samples. The cutoff below has exactly 137 samples.
@@ -92,23 +105,31 @@ class ICEWS18Dataset(DGLBuiltinDataset):
             edges = data[row_mask][:, [0, 2]]
             rate = data[row_mask][:, 1]
             g = dgl_graph((edges[:, 0], edges[:, 1]))
-            g.edata['rel_type'] = F.tensor(rate.reshape(-1, 1), dtype=F.data_type_dict['int64'])
+            g.edata["rel_type"] = F.tensor(
+                rate.reshape(-1, 1), dtype=F.data_type_dict["int64"]
+            )
             self._graphs.append(g)
 
     def has_cache(self):
-        graph_path = os.path.join(self.save_path, '{}_dgl_graph.bin'.format(self.mode))
+        graph_path = os.path.join(
+            self.save_path, "{}_dgl_graph.bin".format(self.mode)
+        )
         return os.path.exists(graph_path)
 
     def save(self):
-        graph_path = os.path.join(self.save_path, '{}_dgl_graph.bin'.format(self.mode))
+        graph_path = os.path.join(
+            self.save_path, "{}_dgl_graph.bin".format(self.mode)
+        )
         save_graphs(graph_path, self._graphs)
 
     def load(self):
-        graph_path = os.path.join(self.save_path, '{}_dgl_graph.bin'.format(self.mode))
+        graph_path = os.path.join(
+            self.save_path, "{}_dgl_graph.bin".format(self.mode)
+        )
         self._graphs = load_graphs(graph_path)[0]
 
     def __getitem__(self, idx):
-        r""" Get graph by index
+        r"""Get graph by index
 
         Parameters
         ----------

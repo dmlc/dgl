@@ -1,41 +1,48 @@
+import argparse
+import os
+import urllib
+from functools import partial
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.utils.data import DataLoader
-from modelnet import ModelNet
+import tqdm
 from model import Model, compute_loss
+from modelnet import ModelNet
+from torch.utils.data import DataLoader
+
 from dgl.data.utils import download, get_download_dir
 
-from functools import partial
-import tqdm
-import urllib
-import os
-import argparse
-
 parser = argparse.ArgumentParser()
-parser.add_argument('--dataset-path', type=str, default='')
-parser.add_argument('--load-model-path', type=str, default='')
-parser.add_argument('--save-model-path', type=str, default='')
-parser.add_argument('--num-epochs', type=int, default=100)
-parser.add_argument('--num-workers', type=int, default=0)
-parser.add_argument('--batch-size', type=int, default=32)
+parser.add_argument("--dataset-path", type=str, default="")
+parser.add_argument("--load-model-path", type=str, default="")
+parser.add_argument("--save-model-path", type=str, default="")
+parser.add_argument("--num-epochs", type=int, default=100)
+parser.add_argument("--num-workers", type=int, default=0)
+parser.add_argument("--batch-size", type=int, default=32)
 args = parser.parse_args()
 
 num_workers = args.num_workers
 batch_size = args.batch_size
-data_filename = 'modelnet40-sampled-2048.h5'
-local_path = args.dataset_path or os.path.join(get_download_dir(), data_filename)
+data_filename = "modelnet40-sampled-2048.h5"
+local_path = args.dataset_path or os.path.join(
+    get_download_dir(), data_filename
+)
 
 if not os.path.exists(local_path):
-    download('https://data.dgl.ai/dataset/modelnet40-sampled-2048.h5', local_path)
+    download(
+        "https://data.dgl.ai/dataset/modelnet40-sampled-2048.h5", local_path
+    )
 
 CustomDataLoader = partial(
-        DataLoader,
-        num_workers=num_workers,
-        batch_size=batch_size,
-        shuffle=True,
-        drop_last=True)
+    DataLoader,
+    num_workers=num_workers,
+    batch_size=batch_size,
+    shuffle=True,
+    drop_last=True,
+)
+
 
 def train(model, opt, scheduler, train_loader, dev):
     scheduler.step()
@@ -65,11 +72,15 @@ def train(model, opt, scheduler, train_loader, dev):
             total_loss += loss
             total_correct += correct
 
-            tq.set_postfix({
-                'Loss': '%.5f' % loss,
-                'AvgLoss': '%.5f' % (total_loss / num_batches),
-                'Acc': '%.5f' % (correct / num_examples),
-                'AvgAcc': '%.5f' % (total_correct / count)})
+            tq.set_postfix(
+                {
+                    "Loss": "%.5f" % loss,
+                    "AvgLoss": "%.5f" % (total_loss / num_batches),
+                    "Acc": "%.5f" % (correct / num_examples),
+                    "AvgAcc": "%.5f" % (total_correct / count),
+                }
+            )
+
 
 def evaluate(model, test_loader, dev):
     model.eval()
@@ -89,9 +100,12 @@ def evaluate(model, test_loader, dev):
                 total_correct += correct
                 count += num_examples
 
-                tq.set_postfix({
-                    'Acc': '%.5f' % (correct / num_examples),
-                    'AvgAcc': '%.5f' % (total_correct / count)})
+                tq.set_postfix(
+                    {
+                        "Acc": "%.5f" % (correct / num_examples),
+                        "AvgAcc": "%.5f" % (total_correct / count),
+                    }
+                )
 
     return total_correct / count
 
@@ -105,7 +119,9 @@ if args.load_model_path:
 
 opt = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=1e-4)
 
-scheduler = optim.lr_scheduler.CosineAnnealingLR(opt, args.num_epochs, eta_min=0.001)
+scheduler = optim.lr_scheduler.CosineAnnealingLR(
+    opt, args.num_epochs, eta_min=0.001
+)
 
 modelnet = ModelNet(local_path, 1024)
 
@@ -117,7 +133,7 @@ best_valid_acc = 0
 best_test_acc = 0
 
 for epoch in range(args.num_epochs):
-    print('Epoch #%d Validating' % epoch)
+    print("Epoch #%d Validating" % epoch)
     valid_acc = evaluate(model, valid_loader, dev)
     test_acc = evaluate(model, test_loader, dev)
     if valid_acc > best_valid_acc:
@@ -125,7 +141,9 @@ for epoch in range(args.num_epochs):
         best_test_acc = test_acc
         if args.save_model_path:
             torch.save(model.state_dict(), args.save_model_path)
-    print('Current validation acc: %.5f (best: %.5f), test acc: %.5f (best: %.5f)' % (
-        valid_acc, best_valid_acc, test_acc, best_test_acc))
+    print(
+        "Current validation acc: %.5f (best: %.5f), test acc: %.5f (best: %.5f)"
+        % (valid_acc, best_valid_acc, test_acc, best_test_acc)
+    )
 
     train(model, opt, scheduler, train_loader, dev)
