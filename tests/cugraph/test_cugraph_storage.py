@@ -1,12 +1,11 @@
-import numpy as np
 import dgl
 from dgl.contrib.cugraph.convert import cugraph_storage_from_heterograph
+import torch as th
+import cudf
+import numpy as np
 
 
 def create_dgl_graph():
-    import dgl
-    import torch as th
-
     graph_data = {
         ("nt.a", "connects", "nt.b"): (
             th.tensor([0, 1, 2]),
@@ -25,14 +24,61 @@ def create_dgl_graph():
     return g
 
 
-def assert_same_sampling_len(dgl_g, cugraph_gs, nodes, fanout, edge_dir):
-    dgl_o = dgl_g.sample_neighbors(nodes, fanout=fanout, edge_dir=edge_dir)
-    cugraph_o = cugraph_gs.sample_neighbors(
-        nodes, fanout=fanout, edge_dir=edge_dir
+def test_cugraphstore_basic_apis():
+    from dgl.contrib.cugraph.cugraph_storage import CuGraphStorage
+
+    gs = CuGraphStorage(num_nodes_dict={"drug": 3, "gene": 2, "disease": 1})
+    # add node data
+    drug_df = cudf.DataFrame(
+        {"node_ids": [0, 1, 2], "node_feat": [0.1, 0.2, 0.3]}
     )
-    assert cugraph_o.num_edges() == dgl_o.num_edges()
-    for etype in dgl_o.canonical_etypes:
-        assert dgl_o.num_edges(etype) == cugraph_o.num_edges(etype)
+    gs.add_node_data(drug_df, "node_ids", ntype="drug")
+
+    # add edges
+    drug_interacts_drug_df = cudf.DataFrame(
+        {"src": [0, 1], "dst": [1, 2], "edge_feat": [0.2, 0.4]}
+    )
+    drug_interacts_gene = cudf.DataFrame({"src": [0, 1], "dst": [0, 1]})
+    drug_treats_disease = cudf.DataFrame({"src": [1], "dst": [0]})
+    gs.add_edge_data(
+        drug_interacts_drug_df,
+        node_col_names=["src", "dst"],
+        canonical_etype=("drug", "interacts", "drug"),
+    )
+    gs.add_edge_data(
+        drug_interacts_gene,
+        node_col_names=["src", "dst"],
+        canonical_etype=("drug", "interacts", "gene"),
+    )
+    gs.add_edge_data(
+        drug_treats_disease,
+        node_col_names=["src", "dst"],
+        canonical_etype=("drug", "treats", "disease"),
+    )
+
+    assert gs.num_nodes() == 6
+
+    assert gs.num_edges(("drug", "interacts", "drug")) == 2
+    assert gs.num_edges(("drug", "interacts", "gene")) == 2
+    assert gs.num_edges(("drug", "treats", "disease")) == 1
+
+    node_feat = (
+        gs.get_node_storage(key="node_feat", ntype="drug")
+        .fetch([0, 1, 2])
+        .to("cpu")
+        .numpy()
+    )
+    np.testing.assert_equal(node_feat, np.asarray([0.1, 0.2, 0.3]))
+
+    edge_feat = (
+        gs.get_edge_storage(
+            key="edge_feat", etype=("drug", "interacts", "drug")
+        )
+        .fetch([0, 1])
+        .to("cpu")
+        .numpy()
+    )
+    np.testing.assert_equal(edge_feat, np.asarray([0.2, 0.4]))
 
 
 def test_sampling_heterograph():
@@ -78,3 +124,13 @@ def test_sampling_homogenous():
 
     np.testing.assert_equal(exp_src, cu_src)
     np.testing.assert_equal(exp_dst, cu_dst)
+
+
+def assert_same_sampling_len(dgl_g, cugraph_gs, nodes, fanout, edge_dir):
+    dgl_o = dgl_g.sample_neighbors(nodes, fanout=fanout, edge_dir=edge_dir)
+    cugraph_o = cugraph_gs.sample_neighbors(
+        nodes, fanout=fanout, edge_dir=edge_dir
+    )
+    assert cugraph_o.num_edges() == dgl_o.num_edges()
+    for etype in dgl_o.canonical_etypes:
+        assert dgl_o.num_edges(etype) == cugraph_o.num_edges(etype)

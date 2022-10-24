@@ -15,8 +15,6 @@
 
 import dgl
 import dgl.backend as F
-from functools import cached_property
-
 from .utils.cugraph_utils import _assert_valid_canonical_etype
 from .utils.cugraph_utils import convert_can_etype_s_to_tup
 
@@ -588,12 +586,11 @@ class CuGraphStorage:
         return self.graphstore.num_edges(etype)
 
     # Node Properties
-    @cached_property
+    @property
     def total_number_of_nodes(self):
-        total_nodes = 0
-        for ntype in self.ntypes:
-            total_nodes += self.num_nodes(ntype)
-        return total_nodes
+        if not hasattr(self, '_total_number_of_nodes'):
+            self.__total_number_of_nodes = self.num_nodes()
+        return self.__total_number_of_nodes
 
     @property
     def num_canonical_edges_dict(self):
