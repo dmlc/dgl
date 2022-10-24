@@ -3,17 +3,20 @@
 import math
 
 import torch as th
-from pylibcugraphops.aggregators.node_level import (
-    agg_hg_basis_post_bwd_int32,
-    agg_hg_basis_post_bwd_int64,
-    agg_hg_basis_post_fwd_int32,
-    agg_hg_basis_post_fwd_int64,
-)
-from pylibcugraphops.structure.graph_types import (
-    message_flow_graph_hg_csr_int32,
-    message_flow_graph_hg_csr_int64,
-)
 from torch import nn
+
+try:
+    from pylibcugraphops.legacy.aggregators.node_level import (
+        agg_hg_basis_post_bwd_int32, agg_hg_basis_post_bwd_int64,
+        agg_hg_basis_post_fwd_int32, agg_hg_basis_post_fwd_int64)
+    from pylibcugraphops.legacy.structure.graph_types import (
+        message_flow_graph_hg_csr_int32, message_flow_graph_hg_csr_int64)
+except ModuleNotFoundError:
+    from pylibcugraphops.aggregators.node_level import (
+        agg_hg_basis_post_bwd_int32, agg_hg_basis_post_bwd_int64,
+        agg_hg_basis_post_fwd_int32, agg_hg_basis_post_fwd_int64)
+    from pylibcugraphops.structure.graph_types import (
+        message_flow_graph_hg_csr_int32, message_flow_graph_hg_csr_int64)
 
 CUDA_SM_PER_BLOCK = 49152
 
@@ -26,8 +29,8 @@ class RelGraphConvAgg(th.autograd.Function):
 
         Parameters
         ----------
-        g : dgl.heterograph.DGLHeteroGraph
-            Heterogeneous graph.
+        g : DGLGraph
+            The graph.
         fanout : int
             Maximum in-degree of nodes.
         num_rels : int
