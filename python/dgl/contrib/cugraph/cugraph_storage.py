@@ -14,7 +14,7 @@
 # NOTE: Requires cuGraph nightly cugraph-22.06.00a220417 or later
 
 import dgl
-import dgl.backend as F
+from ... import backend as F
 from .utils.cugraph_utils import _assert_valid_canonical_etype
 from .utils.cugraph_utils import convert_can_etype_s_to_tup
 
