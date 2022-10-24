@@ -268,9 +268,6 @@ std::pair<bool, bool> COOIsSorted(COOMatrix coo);
 template <DGLDeviceType XPU, typename IdType>
 COOMatrix COORemove(COOMatrix coo, IdArray entries);
 
-template <DGLDeviceType XPU, typename IdType, typename DType>
-COOMatrix COORemoveIf(COOMatrix coo, NDArray values, DType criteria);
-
 // FloatType is the type of probability data.
 template <DGLDeviceType XPU, typename IdType, typename DType>
 COOMatrix COORowWiseSampling(
