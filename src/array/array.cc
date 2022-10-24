@@ -806,23 +806,6 @@ COOMatrix COORemove(COOMatrix coo, IdArray entries) {
   return ret;
 }
 
-template <typename DType>
-COOMatrix COORemoveIf(COOMatrix coo, NDArray values, DType criteria) {
-  if (IsNullArray(values))
-    return coo;
-
-  COOMatrix ret;
-  CHECK(values->dtype == DGLDataTypeTraits<DType>::dtype);
-  ATEN_COO_SWITCH_CUDA(coo, XPU, IdType, "COORemoveIf", {
-    ret = impl::COORemoveIf<XPU, IdType, DType>(coo, values, criteria);
-  });
-  return ret;
-}
-template COOMatrix COORemoveIf<int8_t>(COOMatrix, NDArray, int8_t);
-template COOMatrix COORemoveIf<uint8_t>(COOMatrix, NDArray, uint8_t);
-template COOMatrix COORemoveIf<float>(COOMatrix, NDArray, float);
-template COOMatrix COORemoveIf<double>(COOMatrix, NDArray, double);
-
 COOMatrix COORowWiseSampling(
     COOMatrix mat, IdArray rows, int64_t num_samples, NDArray prob_or_mask, bool replace) {
   COOMatrix ret;
