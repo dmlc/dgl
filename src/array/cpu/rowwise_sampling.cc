@@ -95,7 +95,6 @@ inline NumPicksFn<IdxType> GetSamplingUniformNumPicksFn(
   NumPicksFn<IdxType> num_picks_fn = [num_samples, replace]
     (IdxType rowid, IdxType off, IdxType len,
      const IdxType* col, const IdxType* data) {
-      std::cout << rowid << " " << replace << " " << num_samples << " " << len << std::endl;
       const int64_t max_num_picks = (num_samples == -1) ? len : num_samples;
       if (replace)
         return static_cast<IdxType>(len == 0 ? 0 : max_num_picks);
@@ -112,7 +111,6 @@ inline PickFn<IdxType> GetSamplingUniformPickFn(
     (IdxType rowid, IdxType off, IdxType len, IdxType num_picks,
      const IdxType* col, const IdxType* data,
      IdxType* out_idx) {
-      std::cout << rowid << " " << num_picks << std::endl;
       RandomEngine::ThreadLocal()->UniformChoice<IdxType>(
           num_picks, len, out_idx, replace);
       for (int64_t j = 0; j < num_picks; ++j) {
