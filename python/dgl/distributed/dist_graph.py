@@ -13,7 +13,7 @@ from ..convert import graph as dgl_graph
 from ..transforms import compact_graphs
 from .. import heterograph_index
 from .. import backend as F
-from ..base import NID, EID, ETYPE, ALL, is_all
+from ..base import NID, EID, NTYPE, ETYPE, ALL, is_all
 from .kvstore import KVServer, get_kvstore
 from .._ffi.ndarray import empty_shared_mem
 from ..ndarray import exist_shared_mem_array
