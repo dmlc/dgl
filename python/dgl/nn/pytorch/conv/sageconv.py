@@ -116,18 +116,24 @@ class SAGEConv(nn.Module):
         self.norm = norm
         self.feat_drop = nn.Dropout(feat_drop)
         self.activation = activation
+
+        # create bias buffer
+        if bias:
+            self.bias = nn.parameter.Parameter(torch.zeros(self._out_feats))
+        else:
+            self.register_buffer('bias', None)
+
         # aggregator type: mean/pool/lstm/gcn
         if aggregator_type == 'pool':
             self.fc_pool = nn.Linear(self._in_src_feats, self._in_src_feats)
         if aggregator_type == 'lstm':
             self.lstm = nn.LSTM(self._in_src_feats, self._in_src_feats, batch_first=True)
+        
+        self.fc_neigh = nn.Linear(self._in_src_feats, out_feats, bias=False)
+
         if aggregator_type != 'gcn':
             self.fc_self = nn.Linear(self._in_dst_feats, out_feats, bias=False)
-        self.fc_neigh = nn.Linear(self._in_src_feats, out_feats, bias=False)
-        if bias:
-            self.bias = nn.parameter.Parameter(torch.zeros(self._out_feats))
-        else:
-            self.register_buffer('bias', None)
+            self.fc_self.bias = self.bias # add bias in fc_self
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -160,8 +166,8 @@ class SAGEConv(nn.Module):
             self.fc_neigh.bias = None
             if hasattr(self, 'fc_self'):
                 if bias is not None:
-                    bias = bias + self.fc_self.bias
-                    self.fc_self.bias = None
+                    bias.data = bias + self.fc_self.bias
+                    self.fc_self.bias = bias
             self.bias = bias
 
     def _lstm_reducer(self, nodes):
@@ -266,12 +272,12 @@ class SAGEConv(nn.Module):
             # GraphSAGE GCN does not require fc_self.
             if self._aggre_type == 'gcn':
                 rst = h_neigh
+                # add bias manually for GCN
+                if self.bias is not None:
+                    rst = rst + self.bias
             else:
                 rst = self.fc_self(h_self) + h_neigh
 
-            # bias term
-            if self.bias is not None:
-                rst = rst + self.bias
 
             # activation
             if self.activation is not None:
