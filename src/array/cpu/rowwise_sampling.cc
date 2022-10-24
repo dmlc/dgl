@@ -114,7 +114,6 @@ inline PickFn<IdxType> GetSamplingUniformPickFn(
     (IdxType rowid, IdxType off, IdxType len, IdxType num_picks,
      const IdxType* col, const IdxType* data,
      IdxType* out_idx) {
-      std::cout << rowid << " " << num_picks << std::endl;
       RandomEngine::ThreadLocal()->UniformChoice<IdxType>(
           num_picks, len, out_idx, replace);
       for (int64_t j = 0; j < num_picks; ++j) {
