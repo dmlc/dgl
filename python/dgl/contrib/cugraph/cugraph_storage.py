@@ -17,6 +17,7 @@ import dgl
 from ... import backend as F
 from .utils.cugraph_utils import _assert_valid_canonical_etype
 from .utils.cugraph_utils import convert_can_etype_s_to_tup
+from typing import Tuple
 
 
 class CuGraphStorage:
@@ -588,7 +589,7 @@ class CuGraphStorage:
     # Node Properties
     @property
     def total_number_of_nodes(self):
-        if not hasattr(self, '_total_number_of_nodes'):
+        if not hasattr(self, "_total_number_of_nodes"):
             self.__total_number_of_nodes = self.num_nodes()
         return self.__total_number_of_nodes
 
@@ -626,7 +627,7 @@ class CuGraphStorage:
             )
         return self._node_id_offset_d[ntype]
 
-    def get_edge_id_offset(self, canonical_etype: tuple[str, str, str]) -> int:
+    def get_edge_id_offset(self, canonical_etype: Tuple[str, str, str]) -> int:
         """
         Return the integer offset for node id of type etype
         """
