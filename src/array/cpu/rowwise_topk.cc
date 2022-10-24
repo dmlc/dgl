@@ -17,7 +17,8 @@ inline NumPicksFn<IdxType> GetTopkNumPicksFn(int64_t k) {
   NumPicksFn<IdxType> num_picks_fn = [k]
     (IdxType rowid, IdxType off, IdxType len,
      const IdxType* col, const IdxType* data) {
-      return std::min(static_cast<IdxType>(k), len);
+      const int64_t max_num_picks = (k == -1) ? len : k;
+      return std::min(static_cast<IdxType>(max_num_picks), len);
     };
   return num_picks_fn;
 }

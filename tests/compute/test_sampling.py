@@ -299,7 +299,7 @@ def _gen_neighbor_sampling_test_graph(hypersparse, reverse):
     hg.edges['follow'].data['prob'] = F.tensor([.5, .5, 0., .5, .5, 0., 1.], dtype=F.float32)
     hg.edges['follow'].data['mask'] = F.tensor([True, True, False, True, True, False, True])
     hg.edges['play'].data['prob'] = F.tensor([.8, .5, .5, .5], dtype=F.float32)
-+    # Leave out the mask of play and liked-by since all of them are True anyway.
+    # Leave out the mask of play and liked-by since all of them are True anyway.
     hg.edges['liked-by'].data['prob'] = F.tensor([.3, .5, .2, .5, .1, .1], dtype=F.float32)
 
     return g, hg
@@ -1059,12 +1059,15 @@ def test_global_uniform_negative_sampling(dtype):
 
 if __name__ == '__main__':
     from itertools import product
+    test_sample_neighbors_noprob()
+    test_sample_neighbors_prob()
+    test_sample_neighbors_mask()
     for args in product(['coo', 'csr', 'csc'], ['in', 'out'], [False, True]):
         test_sample_neighbors_etype_homogeneous(*args)
-    test_non_uniform_random_walk()
+    test_non_uniform_random_walk(False)
     test_uniform_random_walk(False)
     test_pack_traces()
-    test_pinsage_sampling()
+    test_pinsage_sampling(False)
     test_sample_neighbors_outedge()
     test_sample_neighbors_topk()
     test_sample_neighbors_topk_outedge()

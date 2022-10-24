@@ -555,7 +555,9 @@ COOMatrix CSRRowWiseSampling(
     // prob is pinned and rows on GPU is valid
     CHECK_VALID_CONTEXT(prob, rows);
     ATEN_CSR_SWITCH_CUDA_UVA(mat, rows, XPU, IdType, "CSRRowWiseSampling", {
-      ATEN_FLOAT_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
+      CHECK(!(prob->dtype.bits == 8 && XPU == kDGLCUDA)) <<
+        "GPU sampling with masks is currently not supported yet.";
+      ATEN_FLOAT_BOOL_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
         ret = impl::CSRRowWiseSampling<XPU, IdType, FloatType>(
             mat, rows, num_samples, prob, replace);
       });
@@ -803,23 +805,6 @@ COOMatrix COORemove(COOMatrix coo, IdArray entries) {
   return ret;
 }
 
-template <typename DType>
-COOMatrix COORemoveIf(COOMatrix coo, NDArray values, DType criteria) {
-  if (IsNullArray(values))
-    return coo;
-
-  COOMatrix ret;
-  CHECK(values->dtype == DGLDataTypeTraits<DType>::dtype);
-  ATEN_COO_SWITCH_CUDA(coo, XPU, IdType, "COORemoveIf", {
-    ret = impl::COORemoveIf<XPU, IdType, DType>(coo, values, criteria);
-  });
-  return ret;
-}
-template COOMatrix COORemoveIf<int8_t>(COOMatrix, NDArray, int8_t);
-template COOMatrix COORemoveIf<uint8_t>(COOMatrix, NDArray, uint8_t);
-template COOMatrix COORemoveIf<float>(COOMatrix, NDArray, float);
-template COOMatrix COORemoveIf<double>(COOMatrix, NDArray, double);
-
 COOMatrix COORowWiseSampling(
     COOMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob, bool replace) {
   COOMatrix ret;
@@ -827,7 +812,7 @@ COOMatrix COORowWiseSampling(
     if (IsNullArray(prob)) {
       ret = impl::COORowWiseSamplingUniform<XPU, IdType>(mat, rows, num_samples, replace);
     } else {
-      ATEN_FLOAT_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
+      ATEN_FLOAT_BOOL_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
         ret = impl::COORowWiseSampling<XPU, IdType, FloatType>(
             mat, rows, num_samples, prob, replace);
       });

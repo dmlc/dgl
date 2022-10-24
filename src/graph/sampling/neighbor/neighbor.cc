@@ -99,50 +99,33 @@ HeteroSubgraph SampleNeighbors(
       induced_edges[etype] = aten::NullArray(hg->DataType(), ctx);
     } else {
       COOMatrix sampled_coo;
-      if (fanouts[etype] == -1) {
-        const auto &earr = (dir == EdgeDir::kOut) ?
-          hg->OutEdges(etype, nodes_ntype) :
-          hg->InEdges(etype, nodes_ntype);
-        sampled_coo = COOMatrix(
-            hg->NumVertices(src_vtype),
-            hg->NumVertices(dst_vtype),
-            earr.src,
-            earr.dst,
-            earr.id);
-        // Exclude all the edges with zero probability
-        ATEN_FLOAT_BOOL_TYPE_SWITCH(prob[etype]->dtype, DType, "prob", {
-          sampled_coo = aten::COORemoveIf(
-              sampled_coo, prob[etype], static_cast<DType>(0));
-        });
-      } else {
-        // sample from one relation graph
-        auto req_fmt = (dir == EdgeDir::kOut)? CSR_CODE : CSC_CODE;
-        auto avail_fmt = hg->SelectFormat(etype, req_fmt);
-        switch (avail_fmt) {
-          case SparseFormat::kCOO:
-            if (dir == EdgeDir::kIn) {
-              sampled_coo = aten::COOTranspose(aten::COORowWiseSampling(
-                aten::COOTranspose(hg->GetCOOMatrix(etype)),
-                nodes_ntype, fanouts[etype], prob[etype], replace));
-            } else {
-              sampled_coo = aten::COORowWiseSampling(
-                hg->GetCOOMatrix(etype), nodes_ntype, fanouts[etype], prob[etype], replace);
-            }
-            break;
-          case SparseFormat::kCSR:
-            CHECK(dir == EdgeDir::kOut) << "Cannot sample out edges on CSC matrix.";
-            sampled_coo = aten::CSRRowWiseSampling(
-              hg->GetCSRMatrix(etype), nodes_ntype, fanouts[etype], prob[etype], replace);
-            break;
-          case SparseFormat::kCSC:
-            CHECK(dir == EdgeDir::kIn) << "Cannot sample in edges on CSR matrix.";
-            sampled_coo = aten::CSRRowWiseSampling(
-              hg->GetCSCMatrix(etype), nodes_ntype, fanouts[etype], prob[etype], replace);
-            sampled_coo = aten::COOTranspose(sampled_coo);
-            break;
-          default:
-            LOG(FATAL) << "Unsupported sparse format.";
-        }
+      // sample from one relation graph
+      auto req_fmt = (dir == EdgeDir::kOut)? CSR_CODE : CSC_CODE;
+      auto avail_fmt = hg->SelectFormat(etype, req_fmt);
+      switch (avail_fmt) {
+        case SparseFormat::kCOO:
+          if (dir == EdgeDir::kIn) {
+            sampled_coo = aten::COOTranspose(aten::COORowWiseSampling(
+              aten::COOTranspose(hg->GetCOOMatrix(etype)),
+              nodes_ntype, fanouts[etype], prob[etype], replace));
+          } else {
+            sampled_coo = aten::COORowWiseSampling(
+              hg->GetCOOMatrix(etype), nodes_ntype, fanouts[etype], prob[etype], replace);
+          }
+          break;
+        case SparseFormat::kCSR:
+          CHECK(dir == EdgeDir::kOut) << "Cannot sample out edges on CSC matrix.";
+          sampled_coo = aten::CSRRowWiseSampling(
+            hg->GetCSRMatrix(etype), nodes_ntype, fanouts[etype], prob[etype], replace);
+          break;
+        case SparseFormat::kCSC:
+          CHECK(dir == EdgeDir::kIn) << "Cannot sample in edges on CSR matrix.";
+          sampled_coo = aten::CSRRowWiseSampling(
+            hg->GetCSCMatrix(etype), nodes_ntype, fanouts[etype], prob[etype], replace);
+          sampled_coo = aten::COOTranspose(sampled_coo);
+          break;
+        default:
+          LOG(FATAL) << "Unsupported sparse format.";
       }
 
       subrels[etype] = UnitGraph::CreateFromCOO(
@@ -286,17 +269,6 @@ HeteroSubgraph SampleNeighborsTopk(
         hg->NumVertices(dst_vtype),
         hg->DataType(), hg->Context());
       induced_edges[etype] = aten::NullArray();
-    } else if (k[etype] == -1) {
-      const auto &earr = (dir == EdgeDir::kOut) ?
-        hg->OutEdges(etype, nodes_ntype) :
-        hg->InEdges(etype, nodes_ntype);
-      subrels[etype] = UnitGraph::CreateFromCOO(
-        hg->GetRelationGraph(etype)->NumVertexTypes(),
-        hg->NumVertices(src_vtype),
-        hg->NumVertices(dst_vtype),
-        earr.src,
-        earr.dst);
-      induced_edges[etype] = earr.id;
     } else {
       // sample from one relation graph
       auto req_fmt = (dir == EdgeDir::kOut)? CSR_CODE : CSC_CODE;
@@ -375,17 +347,6 @@ HeteroSubgraph SampleNeighborsBiased(
         hg->NumVertices(dst_vtype),
         hg->DataType(), hg->Context());
       induced_edges = aten::NullArray();
-    } else if (fanout == -1) {
-      const auto &earr = (dir == EdgeDir::kOut) ?
-        hg->OutEdges(etype, nodes_ntype) :
-        hg->InEdges(etype, nodes_ntype);
-      subrel = UnitGraph::CreateFromCOO(
-        hg->GetRelationGraph(etype)->NumVertexTypes(),
-        hg->NumVertices(src_vtype),
-        hg->NumVertices(dst_vtype),
-        earr.src,
-        earr.dst);
-      induced_edges = earr.id;
     } else {
       // sample from one relation graph
       const auto req_fmt = (dir == EdgeDir::kOut)? CSR_CODE : CSC_CODE;

@@ -104,6 +104,7 @@ COOMatrix CSRRowWisePick(CSRMatrix mat, IdArray rows,
   const IdxType* rows_data = static_cast<IdxType*>(rows->data);
   const int64_t num_rows = rows->shape[0];
   const auto& ctx = mat.indptr->ctx;
+  const auto& idtype = mat.indptr->dtype;
 
   // To leverage OMP parallelization, we create two arrays to store
   // picked src and dst indices. Each array is of length num_rows * num_picks.
@@ -120,27 +121,16 @@ COOMatrix CSRRowWisePick(CSRMatrix mat, IdArray rows,
   //
   // [02/29/2020 update]: OMP is disabled for now since batch-wise parallelism is more
   //   significant. (minjie)
-  IdArray picked_row = NDArray::Empty({num_rows * num_picks},
-                                      DGLDataType{kDGLInt, 8*sizeof(IdxType), 1},
-                                      ctx);
-  IdArray picked_col = NDArray::Empty({num_rows * num_picks},
-                                      DGLDataType{kDGLInt, 8*sizeof(IdxType), 1},
-                                      ctx);
-  IdArray picked_idx = NDArray::Empty({num_rows * num_picks},
-                                      DGLDataType{kDGLInt, 8*sizeof(IdxType), 1},
-                                      ctx);
-  IdxType* picked_rdata = static_cast<IdxType*>(picked_row->data);
-  IdxType* picked_cdata = static_cast<IdxType*>(picked_col->data);
-  IdxType* picked_idata = static_cast<IdxType*>(picked_idx->data);
 
   // Do not use omp_get_max_threads() since that doesn't work for compiling without OpenMP.
   const int num_threads = runtime::compute_num_threads(0, num_rows, 1);
-  std::vector<int64_t> global_prefix(num_threads+1, 0);
+  std::vector<int64_t> global_prefix(num_threads + 1, 0);
 
   // TODO(BarclayII) Using OMP parallel directly instead of using runtime::parallel_for
   // does not handle exceptions well (directly aborts when an exception pops up).
   // It runs faster though because there is less scheduling.  Need to handle
   // exceptions better.
+  IdArray picked_row, picked_col, picked_idx;
 #pragma omp parallel num_threads(num_threads)
   {
     const int thread_id = omp_get_thread_num();
@@ -170,11 +160,18 @@ COOMatrix CSRRowWisePick(CSRMatrix mat, IdArray rows,
     #pragma omp master
     {
       for (int t = 0; t < num_threads; ++t) {
-        global_prefix[t+1] += global_prefix[t];
+        global_prefix[t + 1] += global_prefix[t];
       }
+      picked_row = IdArray::Empty({global_prefix[num_threads]}, idtype, ctx);
+      picked_col = IdArray::Empty({global_prefix[num_threads]}, idtype, ctx);
+      picked_idx = IdArray::Empty({global_prefix[num_threads]}, idtype, ctx);
     }
 
     #pragma omp barrier
+    IdxType* picked_rdata = picked_row.Ptr<IdxType>();
+    IdxType* picked_cdata = picked_col.Ptr<IdxType>();
+    IdxType* picked_idata = picked_idx.Ptr<IdxType>();
+
     const IdxType thread_offset = global_prefix[thread_id];
 
     for (int64_t i = start_i; i < end_i; ++i) {
@@ -200,12 +197,13 @@ COOMatrix CSRRowWisePick(CSRMatrix mat, IdArray rows,
   }
 
   const int64_t new_len = global_prefix.back();
-  picked_row = picked_row.CreateView({new_len}, picked_row->dtype);
-  picked_col = picked_col.CreateView({new_len}, picked_col->dtype);
-  picked_idx = picked_idx.CreateView({new_len}, picked_idx->dtype);
 
-  return COOMatrix(mat.num_rows, mat.num_cols,
-                   picked_row, picked_col, picked_idx);
+  return COOMatrix(
+      mat.num_rows,
+      mat.num_cols,
+      picked_row.CreateView({new_len}, picked_row->dtype),
+      picked_col.CreateView({new_len}, picked_row->dtype),
+      picked_idx.CreateView({new_len}, picked_row->dtype));
 }
 
 // Template for picking non-zero values row-wise. The implementation utilizes

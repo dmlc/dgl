@@ -33,6 +33,7 @@ inline NumPicksFn<IdxType> GetSamplingNumPicksFn(
   NumPicksFn<IdxType> num_picks_fn = [prob, num_samples, replace]
     (IdxType rowid, IdxType off, IdxType len,
      const IdxType* col, const IdxType* data) {
+      const int64_t max_num_picks = (num_samples == -1) ? len : num_samples;
       const FloatType* prob_data = prob.Ptr<FloatType>();
       IdxType nnz = 0;
       for (IdxType i = off; i < off + len; ++i) {
@@ -41,9 +42,9 @@ inline NumPicksFn<IdxType> GetSamplingNumPicksFn(
       }
 
       if (replace)
-        return static_cast<IdxType>(nnz == 0 ? 0 : num_samples);
+        return static_cast<IdxType>(nnz == 0 ? 0 : max_num_picks);
       else
-        return std::min(static_cast<IdxType>(num_samples), nnz);
+        return std::min(static_cast<IdxType>(max_num_picks), nnz);
     };
   return num_picks_fn;
 }
@@ -94,10 +95,12 @@ inline NumPicksFn<IdxType> GetSamplingUniformNumPicksFn(
   NumPicksFn<IdxType> num_picks_fn = [num_samples, replace]
     (IdxType rowid, IdxType off, IdxType len,
      const IdxType* col, const IdxType* data) {
+      std::cout << rowid << " " << replace << " " << num_samples << " " << len << std::endl;
+      const int64_t max_num_picks = (num_samples == -1) ? len : num_samples;
       if (replace)
-        return static_cast<IdxType>(len == 0 ? 0 : num_samples);
+        return static_cast<IdxType>(len == 0 ? 0 : max_num_picks);
       else
-        return std::min(static_cast<IdxType>(num_samples), len);
+        return std::min(static_cast<IdxType>(max_num_picks), len);
     };
   return num_picks_fn;
 }
@@ -109,6 +112,7 @@ inline PickFn<IdxType> GetSamplingUniformPickFn(
     (IdxType rowid, IdxType off, IdxType len, IdxType num_picks,
      const IdxType* col, const IdxType* data,
      IdxType* out_idx) {
+      std::cout << rowid << " " << num_picks << std::endl;
       RandomEngine::ThreadLocal()->UniformChoice<IdxType>(
           num_picks, len, out_idx, replace);
       for (int64_t j = 0; j < num_picks; ++j) {
@@ -137,6 +141,7 @@ inline NumPicksFn<IdxType> GetSamplingBiasedNumPicksFn(
   NumPicksFn<IdxType> num_picks_fn = [num_samples, split, bias, replace]
     (IdxType rowid, IdxType off, IdxType len,
      const IdxType* col, const IdxType* data) {
+      const int64_t max_num_picks = (num_samples == -1) ? len : num_samples;
       const int64_t num_tags = split->shape[1] - 1;
       const IdxType* tag_offset = split.Ptr<IdxType>() + rowid * split->shape[1];
       const FloatType* bias_data = bias.Ptr<FloatType>();
@@ -147,9 +152,9 @@ inline NumPicksFn<IdxType> GetSamplingBiasedNumPicksFn(
       }
 
       if (replace)
-        return static_cast<IdxType>(nnz == 0 ? 0 : num_samples);
+        return static_cast<IdxType>(nnz == 0 ? 0 : max_num_picks);
       else
-        return std::min(static_cast<IdxType>(num_samples), nnz);
+        return std::min(static_cast<IdxType>(max_num_picks), nnz);
     };
   return num_picks_fn;
 }
@@ -178,6 +183,8 @@ inline PickFn<IdxType> GetSamplingBiasedPickFn(
 template <DGLDeviceType XPU, typename IdxType, typename FloatType>
 COOMatrix CSRRowWiseSampling(CSRMatrix mat, IdArray rows, int64_t num_samples,
                              FloatArray prob, bool replace) {
+  // If num_samples is -1, select all neighbors without replacement.
+  replace = (replace && num_samples != -1);
   CHECK(prob.defined());
   auto num_picks_fn = GetSamplingNumPicksFn<IdxType, FloatType>(num_samples, prob, replace);
   auto pick_fn = GetSamplingPickFn<IdxType, FloatType>(num_samples, prob, replace);
@@ -222,6 +229,8 @@ template COOMatrix CSRRowWisePerEtypeSampling<kDGLCPU, int64_t, double>(
 template <DGLDeviceType XPU, typename IdxType>
 COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat, IdArray rows,
                                     int64_t num_samples, bool replace) {
+  // If num_samples is -1, select all neighbors without replacement.
+  replace = (replace && num_samples != -1);
   auto num_picks_fn = GetSamplingUniformNumPicksFn<IdxType>(num_samples, replace);
   auto pick_fn = GetSamplingUniformPickFn<IdxType>(num_samples, replace);
   return CSRRowWisePick(mat, rows, num_samples, replace, pick_fn, num_picks_fn);
@@ -254,6 +263,8 @@ COOMatrix CSRRowWiseSamplingBiased(
     FloatArray bias,
     bool replace
 ) {
+  // If num_samples is -1, select all neighbors without replacement.
+  replace = (replace && num_samples != -1);
   auto num_picks_fn = GetSamplingBiasedNumPicksFn<IdxType, FloatType>(
       num_samples, tag_offset, bias, replace);
   auto pick_fn = GetSamplingBiasedPickFn<IdxType, FloatType>(
@@ -279,6 +290,8 @@ template COOMatrix CSRRowWiseSamplingBiased<kDGLCPU, int64_t, double>(
 template <DGLDeviceType XPU, typename IdxType, typename FloatType>
 COOMatrix COORowWiseSampling(COOMatrix mat, IdArray rows, int64_t num_samples,
                              FloatArray prob, bool replace) {
+  // If num_samples is -1, select all neighbors without replacement.
+  replace = (replace && num_samples != -1);
   CHECK(prob.defined());
   auto num_picks_fn = GetSamplingNumPicksFn<IdxType, FloatType>(num_samples, prob, replace);
   auto pick_fn = GetSamplingPickFn<IdxType, FloatType>(num_samples, prob, replace);
@@ -323,6 +336,8 @@ template COOMatrix COORowWisePerEtypeSampling<kDGLCPU, int64_t, double>(
 template <DGLDeviceType XPU, typename IdxType>
 COOMatrix COORowWiseSamplingUniform(COOMatrix mat, IdArray rows,
                                     int64_t num_samples, bool replace) {
+  // If num_samples is -1, select all neighbors without replacement.
+  replace = (replace && num_samples != -1);
   auto num_picks_fn = GetSamplingUniformNumPicksFn<IdxType>(num_samples, replace);
   auto pick_fn = GetSamplingUniformPickFn<IdxType>(num_samples, replace);
   return COORowWisePick(mat, rows, num_samples, replace, pick_fn, num_picks_fn);
