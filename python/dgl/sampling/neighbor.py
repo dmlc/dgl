@@ -375,7 +375,7 @@ def _sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None,
     if exclude_edges is not None:
         if not isinstance(exclude_edges, dict):
             if len(g.etypes) > 1:
-                raise DGLError("Must specify etype type when the graph is not homogeneous.")
+                raise DGLError("Must specify etype when the graph is not homogeneous.")
             exclude_edges = {g.canonical_etypes[0] : exclude_edges}
         exclude_edges = utils.prepare_tensor_dict(g, exclude_edges, 'edges')
         for etype in g.canonical_etypes:

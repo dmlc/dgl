@@ -298,7 +298,7 @@ def _sample_labors(
         if not isinstance(exclude_edges, dict):
             if len(g.etypes) > 1:
                 raise DGLError(
-                    "Must specify etype type when the graph is not homogeneous."
+                    "Must specify etype when the graph is not homogeneous."
                 )
             exclude_edges = {g.canonical_etypes[0]: exclude_edges}
         exclude_edges = utils.prepare_tensor_dict(g, exclude_edges, "edges")
