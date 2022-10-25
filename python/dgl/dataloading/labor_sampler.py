@@ -24,9 +24,12 @@ from ..random import choice, seed
 from .. import backend as F
 from collections import defaultdict
 
+
 class LaborSampler(BlockSampler):
     """Sampler that builds computational dependency of node representations via
-    labor sampling for multilayer GNN.
+    labor sampling for multilayer GNN from
+    `(LA)yer-neigh(BOR) Sampling: Defusing Neighborhood Explosion in GNNs
+    <https://arxiv.org/abs/2210.13339>`
 
     This sampler will make every node gather messages from a fixed number of neighbors
     per edge type. The neighbors are picked uniformly with default parameters.
@@ -53,7 +56,7 @@ class LaborSampler(BlockSampler):
         Whether to use importance sampling or uniform sampling, use of negative values optimizes
         importance sampling probabilities until convergence while use of positive values runs
         optimization steps that many times.
-    layer_dependency : bool, default ``False`` 
+    layer_dependency : bool, default ``False``
         Specifies whether different layers should use same random variates.
     batch_dependency : int, default ``1``
         Makes it so that batch i and batch i + batch_dependency are independent but
@@ -96,10 +99,10 @@ class LaborSampler(BlockSampler):
     ...      ('user', 'plays', 'game'): 4,
     ...      ('game', 'played-by', 'user'): 3}] * 3)
 
-    If you would like non-uniform neighbor sampling:
+    If you would like non-uniform labor sampling:
 
     >>> g.edata['p'] = torch.rand(g.num_edges())   # any non-negative 1D vector works
-    >>> sampler = dgl.dataloading.NeighborSampler([5, 10, 15], prob='p')
+    >>> sampler = dgl.dataloading.LaborSampler([5, 10, 15], prob='p')
 
     **Edge classification and link prediction**
 
@@ -120,14 +123,26 @@ class LaborSampler(BlockSampler):
     :ref:`User Guide Section 6 <guide-minibatch>` and
     :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
     """
-    def __init__(self, fanouts, edge_dir='in', prob=None,
-                 importance_sampling=0, layer_dependency=False, batch_dependency=1,
-                 prefetch_node_feats=None, prefetch_labels=None, prefetch_edge_feats=None,
-                 output_device=None):
-        super().__init__(prefetch_node_feats=prefetch_node_feats,
-                         prefetch_labels=prefetch_labels,
-                         prefetch_edge_feats=prefetch_edge_feats,
-                         output_device=output_device)
+
+    def __init__(
+        self,
+        fanouts,
+        edge_dir="in",
+        prob=None,
+        importance_sampling=0,
+        layer_dependency=False,
+        batch_dependency=1,
+        prefetch_node_feats=None,
+        prefetch_labels=None,
+        prefetch_edge_feats=None,
+        output_device=None,
+    ):
+        super().__init__(
+            prefetch_node_feats=prefetch_node_feats,
+            prefetch_labels=prefetch_labels,
+            prefetch_edge_feats=prefetch_edge_feats,
+            output_device=output_device,
+        )
         self.fanouts = fanouts
         self.edge_dir = edge_dir
         self.prob = prob
@@ -136,11 +151,11 @@ class LaborSampler(BlockSampler):
         self.cnt = F.zeros_like(choice(1e18, 2))
         self.cnt[1] = batch_dependency
         self.set_seed()
-    
+
     def set_seed(self, random_seed=None):
         if random_seed is not None:
             seed(random_seed % 1000000007)
-        if not hasattr(self, 'random_seed') or self.cnt[1] == 1:
+        if not hasattr(self, "random_seed") or self.cnt[1] == 1:
             self.random_seed = choice(1e18, 2 if self.cnt[1] > 1 else 1)
         else:
             self.random_seed[0] = self.random_seed[1]
@@ -150,26 +165,35 @@ class LaborSampler(BlockSampler):
         output_nodes = seed_nodes
         blocks = []
         for i, fanout in enumerate(reversed(self.fanouts)):
-            random_seed_i = F.zerocopy_to_dgl_ndarray(self.random_seed + (i if not self.layer_dependency else 0))
+            random_seed_i = F.zerocopy_to_dgl_ndarray(
+                self.random_seed + (i if not self.layer_dependency else 0)
+            )
             frontier, importances = g.sample_labors(
-                seed_nodes, fanout, (random_seed_i, F.zerocopy_to_dgl_ndarray(self.cnt)),
+                seed_nodes,
+                fanout,
+                (random_seed_i, F.zerocopy_to_dgl_ndarray(self.cnt)),
                 prob=self.prob,
                 importance_sampling=self.importance_sampling,
                 edge_dir=self.edge_dir,
                 output_device=self.output_device,
-                exclude_edges=exclude_eids)
+                exclude_edges=exclude_eids,
+            )
             eid = frontier.edata[EID]
-            block = to_block(frontier, seed_nodes, include_dst_in_src=True, src_nodes=None)
+            block = to_block(
+                frontier, seed_nodes, include_dst_in_src=True, src_nodes=None
+            )
             block.edata[EID] = eid
             if self.importance_sampling:
                 if len(g.canonical_etypes) > 1:
-                    for etype, importance in zip(g.canonical_etypes, importances):
-                        block.edata['edge_weights'][etype] = importance
+                    for etype, importance in zip(
+                        g.canonical_etypes, importances
+                    ):
+                        block.edata["edge_weights"][etype] = importance
                 else:
-                    block.edata['edge_weights'] = importances[0]
+                    block.edata["edge_weights"] = importances[0]
             seed_nodes = block.srcdata[NID]
             blocks.insert(0, block)
-        
+
         self.cnt[0] += 1
         if self.cnt[0] % self.cnt[1] == 0:
             self.set_seed(self.random_seed[0].item())
