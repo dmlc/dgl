@@ -2381,11 +2381,18 @@ def test_module_gdc(idtype):
 
 @parametrize_idtype
 def test_module_node_shuffle(idtype):
+    import torch
+
+    dev = F.ctx()
     transform = dgl.NodeShuffle()
     g = dgl.heterograph({
         ('A', 'r', 'B'): ([0, 1], [1, 2]),
-    }, idtype=idtype, device=F.ctx())
+    }, idtype=idtype, device=dev)
+    g.nodes['A'].data['h'] = torch.randn(g.num_nodes('A'), 2).to(dev)
+    old_nfeat = g.nodes['A'].data['h']
     new_g = transform(g)
+    new_nfeat = g.nodes['A'].data['h']
+    assert torch.allclose(old_nfeat, new_nfeat)
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
 @parametrize_idtype
