@@ -46,7 +46,7 @@ def sample_labors(g, nodes, fanout, random_seed, edge_dir='in', prob=None,
     Parameters
     ----------
     g : DGLGraph
-        The graph.  Can be either on CPU or GPU.
+        The graph, allowed to have multiple node or edge types. Can be either on CPU or GPU.
     nodes : tensor or dict
         Node IDs to sample neighbors from.
 
