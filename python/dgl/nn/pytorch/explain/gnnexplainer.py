@@ -739,11 +739,11 @@ class HeteroGNNExplainer(nn.Module):
         for _ in range(self.num_epochs):
             optimizer.zero_grad()
             h = {}
-            for node_type in sg_feat.keys():
-                h[node_type] = sg_feat[node_type] * feat_mask[node_type].sigmoid()
+            for node_type, sg_node_feat in sg_feat.items():
+                h[node_type] = sg_node_feat * feat_mask[node_type].sigmoid()
             eweight = {}
-            for canonical_etype in edge_mask.keys():
-                eweight[canonical_etype] = edge_mask[canonical_etype].sigmoid()
+            for canonical_etype, canonical_etype_mask in edge_mask.items():
+                eweight[canonical_etype] = canonical_etype_mask.sigmoid()
             logits = self.model(graph=sg, feat=h,
                                 eweight=eweight, **kwargs)[ntype]
             log_probs = logits.log_softmax(dim=-1)
@@ -890,8 +890,8 @@ class HeteroGNNExplainer(nn.Module):
             for node_type in feat:
                 h[node_type] = feat[node_type] * feat_mask[node_type].sigmoid()
             eweight = {}
-            for canonical_etype in edge_mask.keys():
-                eweight[canonical_etype] = edge_mask[canonical_etype].sigmoid()
+            for canonical_etype, canonical_etype_mask in edge_mask.items():
+                eweight[canonical_etype] = canonical_etype_mask.sigmoid()
             logits = self.model(graph=graph, feat=h,
                                 eweight=eweight, **kwargs)
             log_probs = logits.log_softmax(dim=-1)
