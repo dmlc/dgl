@@ -171,7 +171,16 @@
   }                                                           \
 } while (0)
 
-#define ATEN_FLOAT_BOOL_TYPE_SWITCH(val, DType, val_name, ...) do {     \
+/*
+ * Dispatch according to data type (int8, uint8, float32 or float64):
+ *
+ * ATEN_FLOAT_INT8_UINT8_TYPE_SWITCH(array->dtype, DType, {
+ *   // Now DType is the type corresponding to data type in array.
+ *   // For instance, one can do this for a CPU array:
+ *   DType *data = static_cast<DType *>(array->data);
+ * });
+ */
+#define ATEN_FLOAT_INT8_UINT8_TYPE_SWITCH(val, DType, val_name, ...) do {     \
   if ((val).code == kDGLInt && (val).bits == 8) {              \
     typedef int8_t DType;                                     \
     {__VA_ARGS__}                                             \
