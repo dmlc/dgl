@@ -929,7 +929,9 @@ def test_standalone_etype_sampling():
     with tempfile.TemporaryDirectory() as tmpdirname:
         os.environ['DGL_DIST_MODE'] = 'standalone'
         check_standalone_etype_sampling(Path(tmpdirname), True)
-        check_standalone_etype_sampling(Path(tmpdirname), False)
+        # (BarclayII) sample_etype_neighbors no longer support BasicPartitionBook.  Do
+        # we even need to support BasicPartitionBook?
+        #check_standalone_etype_sampling(Path(tmpdirname), False)
 
 if __name__ == "__main__":
     import tempfile
