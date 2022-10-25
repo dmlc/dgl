@@ -1141,7 +1141,7 @@ class KVClient(object):
         for ntype in partition_book.ntypes:
             policy = NodePartitionPolicy(partition_book, ntype)
             self._all_possible_part_policy[policy.policy_str] = policy
-        for etype in partition_book.etypes:
+        for etype in partition_book.canonical_etypes:
             policy = EdgePartitionPolicy(partition_book, etype)
             self._all_possible_part_policy[policy.policy_str] = policy
 
