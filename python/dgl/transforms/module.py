@@ -1441,11 +1441,12 @@ class DropNode(BaseTransform):
         self.dist = Bernoulli(p)
 
     def __call__(self, g):
+        g = g.clone()
+
         # Fast path
         if self.p == 0:
             return g
 
-        g = g.clone()
         for ntype in g.ntypes:
             samples = self.dist.sample(torch.Size([g.num_nodes(ntype)]))
             nids_to_remove = g.nodes(ntype)[samples.bool().to(g.device)]
@@ -1487,11 +1488,12 @@ class DropEdge(BaseTransform):
         self.dist = Bernoulli(p)
 
     def __call__(self, g):
+        g = g.clone()
+
         # Fast path
         if self.p == 0:
             return g
 
-        g = g.clone()
         for c_etype in g.canonical_etypes:
             samples = self.dist.sample(torch.Size([g.num_edges(c_etype)]))
             eids_to_remove = g.edges(form='eid', etype=c_etype)[samples.bool().to(g.device)]
