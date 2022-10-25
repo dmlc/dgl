@@ -5,7 +5,10 @@ The folder contains example implementations of selected research papers related 
 * For examples working with a certain release, check out `https://github.com/dmlc/dgl/tree/<release_version>/examples` (E.g., https://github.com/dmlc/dgl/tree/0.5.x/examples)
 
 To quickly locate the examples of your interest, search for the tagged keywords or use the search tool on [dgl.ai](https://www.dgl.ai/).
-
+## 2022
+- <a name="labor"></a> Balin et al. (LA)yer-neigh(BOR) Sampling: Defusing Neighborhood Explosion in GNNs. [Paper link](https://arxiv.org/abs/2210.13339)
+    - Example code: [PyTorch](../examples/labor/train_lightning.py)
+    - Tags: node classification, weighted graphs, sampling
 ## 2021
 - <a name="rnaglib"></a> Mallet et al. Learning Protein and Small Molecule binding sites in RNA molecules with 2.5D graphs. [Paper link](https://academic.oup.com/bioinformatics/article/38/5/1458/6462185?login=true)
     - Example code: [PyTorch](https://jwgitlab.cs.mcgill.ca/cgoliver/rnaglib)
