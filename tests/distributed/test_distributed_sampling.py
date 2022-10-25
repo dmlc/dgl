@@ -1,6 +1,7 @@
 import dgl
 import unittest
 import os
+import traceback
 from dgl.data import CitationGraphDataset
 from dgl.data import WN18Dataset
 from dgl.distributed import sample_neighbors, sample_etype_neighbors
@@ -35,7 +36,7 @@ def start_sample_client(rank, tmpdir, disable_shared_mem):
     try:
         sampled_graph = sample_neighbors(dist_graph, [0, 10, 99, 66, 1024, 2008], 3)
     except Exception as e:
-        print(e)
+        print(traceback.format_exc())
         sampled_graph = None
     dgl.distributed.exit_client()
     return sampled_graph
@@ -69,7 +70,7 @@ def start_find_edges_client(rank, tmpdir, disable_shared_mem, eids, etype=None):
     try:
         u, v = dist_graph.find_edges(eids, etype=etype)
     except Exception as e:
-        print(e)
+        print(traceback.format_exc())
         u, v = None, None
     dgl.distributed.exit_client()
     return u, v
@@ -86,7 +87,7 @@ def start_get_degrees_client(rank, tmpdir, disable_shared_mem, nids=None):
         out_deg = dist_graph.out_degrees(nids)
         all_out_deg = dist_graph.out_degrees()
     except Exception as e:
-        print(e)
+        print(traceback.format_exc())
         in_deg, out_deg, all_in_deg, all_out_deg = None, None, None, None
     dgl.distributed.exit_client()
     return in_deg, out_deg, all_in_deg, all_out_deg
@@ -329,7 +330,7 @@ def start_hetero_sample_client(rank, tmpdir, disable_shared_mem, nodes):
         block = dgl.to_block(sampled_graph, nodes)
         block.edata[dgl.EID] = sampled_graph.edata[dgl.EID]
     except Exception as e:
-        print(e)
+        print(traceback.format_exc())
         block = None
     dgl.distributed.exit_client()
     return block, gpb
@@ -360,12 +361,11 @@ def start_hetero_etype_sample_client(rank, tmpdir, disable_shared_mem, fanout=3,
         gpb = dist_graph.get_partition_book()
     try:
         sampled_graph = sample_etype_neighbors(
-                dist_graph, nodes, gpb._local_etype_offset, fanout,
-                etype_sorted=etype_sorted)
+                dist_graph, nodes, fanout, etype_sorted=etype_sorted)
         block = dgl.to_block(sampled_graph, nodes)
         block.edata[dgl.EID] = sampled_graph.edata[dgl.EID]
     except Exception as e:
-        print(e)
+        print(traceback.format_exc())
         block = None
     dgl.distributed.exit_client()
     return block, gpb
@@ -583,8 +583,7 @@ def start_bipartite_etype_sample_client(rank, tmpdir, disable_shared_mem, fanout
 
     if gpb is None:
         gpb = dist_graph.get_partition_book()
-    sampled_graph = sample_etype_neighbors(
-        dist_graph, nodes, gpb._local_etype_offset, fanout)
+    sampled_graph = sample_etype_neighbors(dist_graph, nodes, fanout)
     block = dgl.to_block(sampled_graph, nodes)
     if sampled_graph.num_edges() > 0:
         block.edata[dgl.EID] = sampled_graph.edata[dgl.EID]
@@ -814,8 +813,7 @@ def check_standalone_etype_sampling(tmpdir, reshuffle):
     dgl.distributed.initialize("rpc_ip_config.txt")
     dist_graph = DistGraph("test_sampling", part_config=tmpdir / 'test_sampling.json')
     gpb = dist_graph.get_partition_book()
-    sampled_graph = sample_etype_neighbors(
-            dist_graph, [0, 10, 99, 66, 1023], gpb._local_etype_offset, 3)
+    sampled_graph = sample_etype_neighbors(dist_graph, [0, 10, 99, 66, 1023], 3)
 
     src, dst = sampled_graph.edges()
     assert sampled_graph.number_of_nodes() == hg.number_of_nodes()
@@ -840,7 +838,7 @@ def check_standalone_etype_sampling_heterograph(tmpdir, reshuffle):
     dist_graph = DistGraph("test_hetero_sampling", part_config=tmpdir / 'test_hetero_sampling.json')
     gpb = dist_graph.get_partition_book()
     sampled_graph = sample_etype_neighbors(
-            dist_graph, [0, 1, 2, 10, 99, 66, 1023, 1024, 2700, 2701], gpb._local_etype_offset, 1)
+            dist_graph, [0, 1, 2, 10, 99, 66, 1023, 1024, 2700, 2701], 1)
     src, dst = sampled_graph.edges(etype=('paper', 'cite', 'paper'))
     assert len(src) == 10
     src, dst = sampled_graph.edges(etype=('paper', 'cite-by', 'paper'))
@@ -867,7 +865,7 @@ def start_in_subgraph_client(rank, tmpdir, disable_shared_mem, nodes):
     try:
         sampled_graph = dgl.distributed.in_subgraph(dist_graph, nodes)
     except Exception as e:
-        print(e)
+        print(traceback.format_exc())
         sampled_graph = None
     dgl.distributed.exit_client()
     return sampled_graph
