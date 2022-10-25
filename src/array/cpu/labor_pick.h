@@ -110,9 +110,9 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
           const FloatType c = cs[i];
           const IdxType rid = rows_data[i];
           for (auto j = indptr[rid]; j < indptr[rid + 1]; j++) {
-            auto [it, b] = hop_map2.emplace(indices[j], c);
-            if (!b)
-              it->second = std::max(c, it->second);
+            auto itb = hop_map2.emplace(indices[j], c);
+            if (!itb.second)
+              itb.first->second = std::max(c, itb.first->second);
           }
         }
         if (hop_map.empty())
@@ -232,8 +232,8 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
     for (auto j = indptr[rid]; j < indptr[rid + 1]; j++) {
       const auto v = indices[j];
       const auto u = nids ? nids[v] : v;
-      auto [it, b] = rand_map.emplace(u, 0);
-      if (b) {
+      auto itb = rand_map.emplace(u, 0);
+      if (itb.second) {
         auto ng = ng0;
         ng.discard(u);
         if (num_seeds > 1) {
@@ -243,13 +243,13 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
           ng.discard(u);
           norm.reset();
           rnd += a1 * norm(ng);
-          it->second = std::erfc(-rnd * (FloatType)M_SQRT1_2) / 2;
+          itb.first->second = std::erfc(-rnd * (FloatType)M_SQRT1_2) / 2;
         } else {
           uni.reset();
-          it->second = uni(ng);
+          itb.first->second = uni(ng);
         }
       }
-      const auto rnd = it->second;
+      const auto rnd = itb.first->second;
       num_edges += rnd <= (importance_sampling ? c * hop_map[v] : c * (weights ? A[j] : 1));
       rands[off++] = rnd;
     }
@@ -328,8 +328,10 @@ std::pair<COOMatrix, FloatArray> COOLaborPick(
   using namespace aten;
   const auto& csr = COOToCSR(COOSliceRows(mat, rows));
   const IdArray new_rows = Range(0, rows->shape[0], rows->dtype.bits, rows->ctx);
-  const auto& [picked, importances] = CSRLaborPick<IdxType, FloatType>(
+  const auto&& picked_importances = CSRLaborPick<IdxType, FloatType>(
       csr, NIDs, new_rows, num_picks, prob, random_seed, cnt, importance_sampling);
+  const auto& picked = picked_importances.first;
+  const auto& importances = picked_importances.second;
   return std::make_pair(COOMatrix(mat.num_rows, mat.num_cols,
                    IndexSelect(rows, picked.row),  // map the row index to the correct one
                    picked.col,

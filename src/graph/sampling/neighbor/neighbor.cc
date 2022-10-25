@@ -138,11 +138,11 @@ std::pair<HeteroSubgraph, std::vector<FloatArray>> SampleLabors(
       switch (avail_fmt) {
         case SparseFormat::kCOO:
           if (dir == EdgeDir::kIn) {
-            auto [f, s] = aten::COOLaborSampling(
+            auto fs = aten::COOLaborSampling(
               aten::COOTranspose(hg->GetCOOMatrix(etype)), NIDs_ntype,
               nodes_ntype, fanouts[etype], prob[etype], random_seed, cnt, importance_sampling);
-            sampled_coo = aten::COOTranspose(f);
-            importances = s;
+            sampled_coo = aten::COOTranspose(fs.first);
+            importances = fs.second;
           } else {
             std::tie(sampled_coo, importances) = aten::COOLaborSampling(
               hg->GetCOOMatrix(etype), NIDs_ntype, nodes_ntype, fanouts[etype],
