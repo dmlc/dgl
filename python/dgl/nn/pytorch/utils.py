@@ -601,32 +601,45 @@ class LaplacianPosEnc(nn.Module):
     >>> PosEnc = DeepSetLPE(EigVals, EigVecs)
     """
 
-    def __init__(self, model_type, num_layer, max_freqs, lpe_dim, n_head=1, batch_norm=False,
-                 post_n_layer=0):
+    def __init__(
+        self,
+        model_type,
+        num_layer,
+        max_freqs,
+        lpe_dim,
+        n_head=1,
+        batch_norm=False,
+        post_n_layer=0,
+    ):
         super(LaplacianPosEnc, self).__init__()
         self.model_type = model_type
         self.linear_A = nn.Linear(2, lpe_dim)
 
-        if self.model_type == 'Transformer':
-            encoder_layer = nn.TransformerEncoderLayer(d_model=lpe_dim, nhead=n_head,
-                                                       batch_first=True)
-            self.pe_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layer)
-        elif self.model_type == 'DeepSet':
+        if self.model_type == "Transformer":
+            encoder_layer = nn.TransformerEncoderLayer(
+                d_model=lpe_dim, nhead=n_head, batch_first=True
+            )
+            self.pe_encoder = nn.TransformerEncoder(
+                encoder_layer, num_layers=num_layer
+            )
+        elif self.model_type == "DeepSet":
             layers = []
             if num_layer == 1:
                 layers.append(nn.ReLU())
             else:
-                self.linear_A = nn.Linear(2, 2*lpe_dim)
+                self.linear_A = nn.Linear(2, 2 * lpe_dim)
                 layers.append(nn.ReLU())
-                for _ in range(num_layer-2):
-                    layers.append(nn.Linear(2*lpe_dim, 2*lpe_dim))
+                for _ in range(num_layer - 2):
+                    layers.append(nn.Linear(2 * lpe_dim, 2 * lpe_dim))
                     layers.append(nn.ReLU())
-                layers.append(nn.Linear(2*lpe_dim, lpe_dim))
+                layers.append(nn.Linear(2 * lpe_dim, lpe_dim))
                 layers.append(nn.ReLU())
             self.pe_encoder = nn.Sequential(*layers)
         else:
-            raise ValueError(f"model_type '{model_type}' is not allowed, must be 'Transformer'"
-                              "or 'DeepSet'.")
+            raise ValueError(
+                f"model_type '{model_type}' is not allowed, must be 'Transformer'"
+                "or 'DeepSet'."
+            )
 
         if batch_norm:
             self.raw_norm = nn.BatchNorm1d(max_freqs)
@@ -639,12 +652,12 @@ class LaplacianPosEnc(nn.Module):
                 layers.append(nn.Linear(lpe_dim, lpe_dim))
                 layers.append(nn.ReLU())
             else:
-                layers.append(nn.Linear(lpe_dim, 2*lpe_dim))
+                layers.append(nn.Linear(lpe_dim, 2 * lpe_dim))
                 layers.append(nn.ReLU())
-                for _ in range(post_n_layer-2):
-                    layers.append(nn.Linear(2*lpe_dim, 2*lpe_dim))
+                for _ in range(post_n_layer - 2):
+                    layers.append(nn.Linear(2 * lpe_dim, 2 * lpe_dim))
                     layers.append(nn.ReLU())
-                layers.append(nn.Linear(2*lpe_dim, lpe_dim))
+                layers.append(nn.Linear(2 * lpe_dim, lpe_dim))
                 layers.append(nn.ReLU())
             self.post_mlp = nn.Sequential(*layers)
         else:
@@ -665,7 +678,9 @@ class LaplacianPosEnc(nn.Module):
             Return the laplacian positional encodings of shape :math:`(N, lpe_dim)`,
             where :math:`N` is the number of nodes in the input graph.
         """
-        PosEnc = th.cat((EigVecs.unsqueeze(2), EigVals.unsqueeze(2)), dim=2).float()
+        PosEnc = th.cat(
+            (EigVecs.unsqueeze(2), EigVals.unsqueeze(2)), dim=2
+        ).float()
         empty_mask = th.isnan(PosEnc)
 
         PosEnc[empty_mask] = 0
@@ -673,13 +688,15 @@ class LaplacianPosEnc(nn.Module):
             PosEnc = self.raw_norm(PosEnc)
         PosEnc = self.linear_A(PosEnc)
 
-        if self.model_type == 'Transformer':
-            PosEnc = self.pe_encoder(src=PosEnc, src_key_padding_mask=empty_mask[:,:,1])
+        if self.model_type == "Transformer":
+            PosEnc = self.pe_encoder(
+                src=PosEnc, src_key_padding_mask=empty_mask[:, :, 1]
+            )
         else:
             PosEnc = self.pe_encoder(PosEnc)
 
         # Remove masked sequences
-        PosEnc[empty_mask[:,:,1]] = 0
+        PosEnc[empty_mask[:, :, 1]] = 0
 
         # Sum pooling
         PosEnc = th.sum(PosEnc, 1, keepdim=False)
