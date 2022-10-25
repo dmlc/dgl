@@ -62,13 +62,13 @@ def dist_tensor_test_sanity(data_shape, name=None):
     stride = 3
     pos = (part_id // 2) * num_client_per_machine + local_rank
     if part_id % 2 == 0:
-        dist_ten[pos * stride : (pos + 1) * stride] = F.ones(
+        dist_ten[pos * stride: (pos + 1) * stride] = F.ones(
             (stride, 2), dtype=F.int32, ctx=F.cpu()
         ) * (pos + 1)
 
     dgl.distributed.client_barrier()
     assert F.allclose(
-        dist_ten[pos * stride : (pos + 1) * stride],
+        dist_ten[pos * stride: (pos + 1) * stride],
         F.ones((stride, 2), dtype=F.int32, ctx=F.cpu()) * (pos + 1),
     )
 
@@ -102,7 +102,7 @@ def dist_tensor_test_persistent(data_shape):
             data_shape, F.float32, dist_ten_name
         )
         raise Exception("")
-    except:
+    except BaseException:
         pass
 
 
@@ -163,7 +163,7 @@ def dist_embedding_check_existing(num_nodes):
             num_nodes, 2, name=dist_emb_name, init_func=zeros_init
         )
         raise Exception("")
-    except:
+    except BaseException:
         pass
 
 
@@ -188,27 +188,31 @@ def test_dist_embedding(g):
 def dist_optimizer_check_store(g, num_nodes):
     rank = dgl.distributed.get_rank()
     emb = dgl.distributed.DistEmbedding(
-        num_nodes, 1, name='optimizer_test', init_func=zeros_init
+        num_nodes, 1, name="optimizer_test", init_func=zeros_init
     )
-    emb_optimizer = dgl.distributed.optim.SparseAdam(
-            [emb], lr=0.1
-    )
+    emb_optimizer = dgl.distributed.optim.SparseAdam([emb], lr=0.1)
     if rank == 0:
         name_to_state = {}
         for _, emb_states in emb_optimizer._state.items():
             for state in emb_states:
-                name_to_state[state.name] = F.uniform(state.shape, F.float32, F.cpu(), 0, 1)
-                state[F.arange(0, state.shape[0], F.int64, F.cpu())] = name_to_state[state.name]
-        emb_optimizer.save_state_to('emb.pt')
+                name_to_state[state.name] = F.uniform(
+                    state.shape, F.float32, F.cpu(), 0, 1
+                )
+                state[
+                    F.arange(0, state.shape[0], F.int64, F.cpu())
+                ] = name_to_state[state.name]
+        emb_optimizer.save_state_to("emb.pt")
         new_emb_optimizer = dgl.distributed.optim.SparseAdam(
-            [emb], lr=000.1,  eps=2e-08, betas=(0.1, 0.222)
+            [emb], lr=000.1, eps=2e-08, betas=(0.1, 0.222)
         )
-        new_emb_optimizer.load_state_from('emb.pt')
+        new_emb_optimizer.load_state_from("emb.pt")
         if rank == 0:
             for _, emb_states in new_emb_optimizer._state.items():
                 for new_state in emb_states:
                     state = name_to_state[new_state.name]
-                    new_state = new_state[F.arange(0, state.shape[0], F.int64, F.cpu())]
+                    new_state = new_state[
+                        F.arange(0, state.shape[0], F.int64, F.cpu())
+                    ]
                     is_same = F.equal(state, new_state)
                     assert np.all(F.asnumpy(is_same))
             assert new_emb_optimizer._lr == emb_optimizer._lr
@@ -217,9 +221,11 @@ def dist_optimizer_check_store(g, num_nodes):
             assert new_emb_optimizer._beta2 == emb_optimizer._beta2
         dgl.distributed.client_barrier()
 
+
 def test_dist_optimizer(g):
     num_nodes = g.number_of_nodes(g.ntypes[0])
     dist_optimizer_check_store(g, num_nodes)
+
 
 if mode == "server":
     shared_mem = bool(int(os.environ.get("DIST_DGL_TEST_SHARED_MEM")))
@@ -244,7 +250,7 @@ elif mode == "client":
     target_func_map = {
         "DistTensor": test_dist_tensor,
         "DistEmbedding": test_dist_embedding,
-        "DistOptimizer": test_dist_optimizer
+        "DistOptimizer": test_dist_optimizer,
     }
 
     target = os.environ.get("DIST_DGL_TEST_OBJECT_TYPE", "")
