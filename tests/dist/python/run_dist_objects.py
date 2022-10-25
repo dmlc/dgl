@@ -201,25 +201,25 @@ def dist_optimizer_check_store(g, num_nodes):
                 state[
                     F.arange(0, state.shape[0], F.int64, F.cpu())
                 ] = name_to_state[state.name]
-        emb_optimizer.save_state_to("emb.pt")
-        new_emb_optimizer = dgl.distributed.optim.SparseAdam(
-            [emb], lr=000.1, eps=2e-08, betas=(0.1, 0.222)
-        )
-        new_emb_optimizer.load_state_from("emb.pt")
-        if rank == 0:
-            for _, emb_states in new_emb_optimizer._state.items():
-                for new_state in emb_states:
-                    state = name_to_state[new_state.name]
-                    new_state = new_state[
-                        F.arange(0, state.shape[0], F.int64, F.cpu())
-                    ]
-                    is_same = F.equal(state, new_state)
-                    assert np.all(F.asnumpy(is_same))
-            assert new_emb_optimizer._lr == emb_optimizer._lr
-            assert new_emb_optimizer._eps == emb_optimizer._eps
-            assert new_emb_optimizer._beta1 == emb_optimizer._beta1
-            assert new_emb_optimizer._beta2 == emb_optimizer._beta2
-        dgl.distributed.client_barrier()
+    emb_optimizer.save_state_to("emb.pt")
+    new_emb_optimizer = dgl.distributed.optim.SparseAdam(
+        [emb], lr=000.1, eps=2e-08, betas=(0.1, 0.222)
+    )
+    new_emb_optimizer.load_state_from("emb.pt")
+    if rank == 0:
+        for _, emb_states in new_emb_optimizer._state.items():
+            for new_state in emb_states:
+                state = name_to_state[new_state.name]
+                new_state = new_state[
+                    F.arange(0, state.shape[0], F.int64, F.cpu())
+                ]
+                is_same = F.equal(state, new_state)
+                assert np.all(F.asnumpy(is_same))
+        assert new_emb_optimizer._lr == emb_optimizer._lr
+        assert new_emb_optimizer._eps == emb_optimizer._eps
+        assert new_emb_optimizer._beta1 == emb_optimizer._beta1
+        assert new_emb_optimizer._beta2 == emb_optimizer._beta2
+    dgl.distributed.client_barrier()
 
 
 def test_dist_optimizer(g):

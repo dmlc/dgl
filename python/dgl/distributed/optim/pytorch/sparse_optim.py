@@ -1,5 +1,6 @@
 """Node embedding optimizers for distributed training"""
 import abc
+import dgl
 import logging
 from abc import abstractmethod
 from os.path import exists
@@ -56,10 +57,11 @@ class DistSparseGradOptimizer(abc.ABC):
         """
         lcoal_state_dict = {}
         lcoal_state_dict["emb_states"] = {}
-        lcoal_state_dict["params"] = {"world_size": self._world_size}
+        num_clients = dgl.distributed.get_num_client()
+        lcoal_state_dict["params"] = {"num_clients": num_clients}
         for emb in self._params:
             kvstore = emb._tensor.kvstore
-            trainers_per_server = self._world_size // kvstore.num_servers
+            trainers_per_server = num_clients // kvstore.num_servers
             emb_state_dict = {}
             idx_i = F.tensor(range(emb.weight.shape[0]), F.int64)
             part_policy = (
@@ -70,7 +72,8 @@ class DistSparseGradOptimizer(abc.ABC):
             idx_i = F.boolean_mask(idx_i, mask)
             if trainers_per_server > 1:
                 kv_idx_split = th.remainder(idx_i, trainers_per_server).long()
-                local_rank = self._rank % trainers_per_server
+                client_id = kvstore.client_id
+                local_rank = client_id % trainers_per_server
                 mask = kv_idx_split == local_rank
                 idx_i = F.boolean_mask(idx_i, mask)
             emb_state_dict.update({"ids": idx_i})
@@ -98,7 +101,6 @@ class DistSparseGradOptimizer(abc.ABC):
         """
         for emb_name, emb_state in local_state_dict["emb_states"].items():
             idx = emb_state["ids"]
-            print(idx)
             if len(emb_state["states"]) != len(self._state[emb_name]):
                 raise ValueError(
                     f"loaded state dict has a different number of states"
@@ -112,7 +114,7 @@ class DistSparseGradOptimizer(abc.ABC):
                 if name not in name_to_index:
                     raise ValueError(
                         "loaded state dict contains a state {name}"
-                        "that can't be found in states"
+                        "that can't be found in the optimizer states"
                     )
                 state_idx = name_to_index[name]
                 state = state.to(self._state[emb_name][state_idx].dtype)
@@ -128,22 +130,24 @@ class DistSparseGradOptimizer(abc.ABC):
 
         Parameters
         ----------
-        f : Union[str, os.PathLike, BinaryIO, IO[bytes]]
-            a file-like object (has to implement write and flush) ora string or
-            os.PathLike object containing a file name
+        f : Union[str, PathLike]
+            The basic path of the file, client id
+            will be attached as full name.
 
         See Also
         --------
         load_state_from
         """
-        if self._world_size > 1:
-            th.distributed.barrier()
-        f = f"{f}_{self._rank}"
-        print(f)
-        logging.info(f"Saving state dict to {f} at rank {self._rank}")
+        num_clients = dgl.distributed.get_num_client()
+        if num_clients > 1:
+            dgl.distributed.client_barrier()
+        client_id = dgl.distributed.get_rank()
+        f = str(f)
+        f = f"{f}_{client_id}"
+        logging.info(f"Saving state dict to {f} at rank {client_id}")
         th.save(self.local_state_dict(), f)
-        if self._world_size > 1:
-            th.distributed.barrier()
+        if num_clients > 1:
+            dgl.distributed.client_barrier()
 
     def load_state_from(self, f):
         """Load the local state of the oprimizer from file on per rank.
@@ -152,41 +156,43 @@ class DistSparseGradOptimizer(abc.ABC):
 
         Parameters
         ----------
-        f : Union[str, os.PathLike, BinaryIO, IO[bytes]]
-            a file-like object (has to implement write and flush) ora string or
-            os.PathLike object containing a file name
+        f : Union[str, PathLike]
+            The basic path of the file, client id
+            will be attached as full name.
 
         See Also
         --------
         save_state_to
         """
         if self._world_size > 1:
-            th.distributed.barrier()
-        f_attach_rank = f"{f}_{self._rank}"
+            dgl.distributed.client_barrier()
+        client_id = dgl.distributed.get_rank()
+        f = str(f)
+        f_attach_client_id = f"{f}_{client_id}"
         # Don't throw error here to support device number scale-out after
         # reloading
-        if not exists(f_attach_rank):
-            logging.warn(f"{f_attach_rank} cannot be found.")
+        if not exists(f_attach_client_id):
+            logging.warn(f"{f_attach_client_id} cannot be found, loading nothing.")
         else:
-            logging.info(f"Loading state dict from {f} at rank {self._rank}")
-            world_size = self._load_state_from(f_attach_rank)
+            logging.info(f"Loading state dict from {f} at rank {client_id}")
+            old_num_clients = self._load_state_from(f_attach_client_id)
+            num_clients = dgl.distributed.get_num_client()
             # Device number scale-in
-            if self._world_size < world_size:
+            if num_clients < old_num_clients:
                 for rank in range(
-                    self._rank + self._world_size, world_size, self._world_size
+                    client_id + num_clients, old_num_clients, num_clients
                 ):
-                    logging.info(f"Loading state dict from {f} at rank {rank}")
+                    logging.info(f"Loading state dict from {f} at rank {num_clients}")
                     self._load_state_from(f"{f}_{rank}")
         if self._world_size > 1:
-            th.distributed.barrier()
+            dgl.distributed.client_barrier()
 
     def _load_state_from(self, f):
-        print(f)
         local_state_dict = th.load(f)
-        world_size = local_state_dict["params"]["world_size"]
-        del local_state_dict["params"]["world_size"]
+        num_clients = local_state_dict["params"]["num_clients"]
+        del local_state_dict["params"]["num_clients"]
         self.load_local_state_dict(local_state_dict)
-        return world_size
+        return num_clients
 
     def step(self):
         """The step function.
