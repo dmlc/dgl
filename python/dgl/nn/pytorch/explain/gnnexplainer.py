@@ -739,10 +739,10 @@ class HeteroGNNExplainer(nn.Module):
         for _ in range(self.num_epochs):
             optimizer.zero_grad()
             h = {}
-            for node_type in sg_feat:
+            for node_type in sg_feat.keys():
                 h[node_type] = sg_feat[node_type] * feat_mask[node_type].sigmoid()
             eweight = {}
-            for canonical_etype in edge_mask:
+            for canonical_etype in edge_mask.keys():
                 eweight[canonical_etype] = edge_mask[canonical_etype].sigmoid()
             logits = self.model(graph=sg, feat=h,
                                 eweight=eweight, **kwargs)[ntype]
@@ -890,7 +890,7 @@ class HeteroGNNExplainer(nn.Module):
             for node_type in feat:
                 h[node_type] = feat[node_type] * feat_mask[node_type].sigmoid()
             eweight = {}
-            for canonical_etype in edge_mask:
+            for canonical_etype in edge_mask.keys():
                 eweight[canonical_etype] = edge_mask[canonical_etype].sigmoid()
             logits = self.model(graph=graph, feat=h,
                                 eweight=eweight, **kwargs)
