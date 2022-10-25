@@ -250,12 +250,12 @@ def _sample_labors(
     for ntype in g.ntypes:
         if ntype in nodes:
             nodes_all_types.append(F.to_dgl_nd(nodes[ntype]))
-            try:
+            if NID in g.ndata:
                 if len(g.ntypes) > 1:
                     nids_all_types.append(F.to_dgl_nd(g.ndata[NID][ntype]))
                 else:
                     nids_all_types.append(F.to_dgl_nd(g.ndata[NID]))
-            except KeyError:
+            else:
                 nids_all_types.append(nd.array([], ctx=ctx))
         else:
             nodes_all_types.append(nd.array([], ctx=ctx))
