@@ -537,13 +537,13 @@ DGL_REGISTER_GLOBAL("sampling.labor._CAPI_DGLSampleLabors")
 
     std::shared_ptr<HeteroSubgraph> subg_ptr(new HeteroSubgraph);
 
-    auto &&[subg, importances] = sampling::SampleLabors(
+    auto &&subg_importances = sampling::SampleLabors(
         hg.sptr(), NIDs, nodes, fanouts, random_seed,
         cnt, dir, prob, exclude_edges, importance_sampling);
-    *subg_ptr = subg;
+    *subg_ptr = subg_importances.first;
     List<Value> ret_val;
     ret_val.push_back(Value(subg_ptr));
-    for (auto &imp : importances)
+    for (auto &imp : subg_importances.second)
       ret_val.push_back(Value(MakeValue(imp)));
 
     *rv = ret_val;

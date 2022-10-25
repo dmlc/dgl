@@ -243,7 +243,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
           ng.discard(u);
           norm.reset();
           rnd += a1 * norm(ng);
-          itb.first->second = std::erfc(-rnd * (FloatType)M_SQRT1_2) / 2;
+          itb.first->second = std::erfc(-rnd * (FloatType)/*M_SQRT1_2*/0.70710678118654752440) / 2;
         } else {
           uni.reset();
           itb.first->second = uni(ng);
