@@ -26,6 +26,7 @@ enum class SparseFormat {
  * \brief Sparse format codes
  */
 const dgl_format_code_t ALL_CODE = 0x7;
+const dgl_format_code_t ANY_CODE = 0x0;
 const dgl_format_code_t COO_CODE = 0x1;
 const dgl_format_code_t CSR_CODE = 0x2;
 const dgl_format_code_t CSC_CODE = 0x4;

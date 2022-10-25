@@ -56,7 +56,7 @@ def run_server(
     print("start server", server_id)
     # verify dtype of underlying graph
     cg = g.client_g
-    for k, dtype in dgl.distributed.dist_graph.FIELD_DICT.items():
+    for k, dtype in dgl.distributed.dist_graph.RESERVED_FIELD_DTYPE.items():
         if k in cg.ndata:
             assert (
                 F.dtype(cg.ndata[k]) == dtype
