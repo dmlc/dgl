@@ -529,7 +529,7 @@ class HeteroGNNExplainer(nn.Module):
         feat_masks = {}
         std = 0.1
         for node_type, feature in feat.items():
-            num_nodes, feat_size = feature.size()
+            _, feat_size = feature.size()
             feat_masks[node_type] = nn.Parameter(torch.randn(1, feat_size, device=device) * std)
 
         edge_masks = {}
@@ -625,8 +625,8 @@ class HeteroGNNExplainer(nn.Module):
         feat_mask : dict[str, Tensor]
             The dictionary that associates the learned node feature importance masks (values) with
             the respective node types (keys). The masks are of shape :math:`(D_t)`, where
-            :math:`D_t` is the node feature size for node type :attr:`t`. The values are within range
-            :math:`(0, 1)`. The higher, the more important.
+            :math:`D_t` is the node feature size for node type :attr:`t`. The values are within
+            range :math:`(0, 1)`. The higher, the more important.
         edge_mask : dict[Tuple[str], Tensor]
             The dictionary that associates the learned edge importance masks (values) with
             the respective canonical edge types (keys). The masks are of shape :math:`(E_t)`,
@@ -717,7 +717,6 @@ class HeteroGNNExplainer(nn.Module):
         sg, inverse_indices = khop_in_subgraph(graph, {ntype: node_id}, self.num_hops)
         inverse_indices = inverse_indices[ntype]
         sg_nodes = sg.ndata[NID]
-        sg_edges = sg.edata[EID]
         sg_feat = {}
 
         for node_type in sg_nodes.keys():
@@ -789,8 +788,8 @@ class HeteroGNNExplainer(nn.Module):
         feat_mask : dict[str, Tensor]
             The dictionary that associates the learned node feature importance masks (values) with
             the respective node types (keys). The masks are of shape :math:`(D_t)`, where
-            :math:`D_t` is the node feature size for node type :attr:`t`. The values are within range
-            :math:`(0, 1)`. The higher, the more important.
+            :math:`D_t` is the node feature size for node type :attr:`t`. The values are within
+            range :math:`(0, 1)`. The higher, the more important.
         edge_mask : dict[Tuple[str], Tensor]
             The dictionary that associates the learned edge importance masks (values) with
             the respective canonical edge types (keys). The masks are of shape :math:`(E_t)`,
