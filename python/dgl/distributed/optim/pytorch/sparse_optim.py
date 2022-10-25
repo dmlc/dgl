@@ -1,11 +1,14 @@
 """Node embedding optimizers for distributed training"""
 import abc
 from abc import abstractmethod
+import logging
 import torch as th
+from .... import backend as F
 
 from ...dist_tensor import DistTensor
 from ...nn.pytorch import DistEmbedding
 from .utils import alltoallv_cpu, alltoall_cpu
+from os.path import exists
 
 class DistSparseGradOptimizer(abc.ABC):
     r''' The abstract dist sparse optimizer.
@@ -27,6 +30,7 @@ class DistSparseGradOptimizer(abc.ABC):
         self._shared_cache = {}
         self._clean_grad = False
         self._opt_meta = {}
+        self._defaults = {}
 
         if th.distributed.is_initialized():
             self._rank = th.distributed.get_rank()
@@ -34,6 +38,136 @@ class DistSparseGradOptimizer(abc.ABC):
         else:
             self._rank = 0
             self._world_size = 1
+
+    def local_state_dict(self):
+        """Return the state pertaining to current rank of the optimizer.
+
+        Returns
+        -------
+        dict
+            Local state dict
+
+        See Also
+        --------
+        load_local_state_dict
+        """
+        lcoal_state_dict = {}
+        lcoal_state_dict['emb_states'] = {}
+        lcoal_state_dict['params'] = {'world_size':self._world_size}
+        for emb in self._params:
+            kvstore = emb._tensor.kvstore
+            trainers_per_server = self._world_size // kvstore.num_servers
+            emb_state_dict = {}
+            idx_i = F.tensor(range(emb.weight.shape[0]), F.int64)
+            part_policy = emb.part_policy if emb.part_policy else emb._tensor.part_policy
+            machine_id = kvstore.get_partid(emb.data_name, idx_i)
+            mask = machine_id == part_policy.part_id
+            idx_i = F.boolean_mask(idx_i, mask)
+            if trainers_per_server > 1:
+                kv_idx_split = th.remainder(idx_i, trainers_per_server).long()
+                local_rank = self._rank % trainers_per_server
+                mask = kv_idx_split == local_rank
+                idx_i = F.boolean_mask(idx_i, mask)
+            emb_state_dict.update({'ids': idx_i})
+            emb_state = {state.name:state[idx_i] for state in self._state[emb.name]}
+            emb_state_dict.update({'states': emb_state})
+            lcoal_state_dict['emb_states'].update({emb.name: emb_state_dict})
+        lcoal_state_dict['params'].update(self._defaults)
+        return lcoal_state_dict
+
+    def load_local_state_dict(self, local_state_dict):
+        """Load the local state from the input state_dict,
+        updating the optimizer as needed..
+
+        Parameters
+        ----------
+        local_state_dict : dict
+            Optimizer state; should be an object returned from a call to local_state_dict()
+
+        See Also
+        --------
+        local_state_dict
+        """
+        for emb_name, emb_state in local_state_dict['emb_states'].items():
+            idx = emb_state['ids']
+            print(idx)
+            if len(emb_state['states']) != len(self._state[emb_name]):
+                raise ValueError(f'loaded state dict has a different number of states of embedding {emb_name}')
+            name_to_index = {state.name:index for index,state in enumerate(self._state[emb_name], 0)}
+            for name, state in emb_state['states'].items():
+                if name not in name_to_index:
+                    raise ValueError("loaded state dict contains a state {name}"
+                        "that can't be found in states")
+                state_idx = name_to_index[name]
+                state = state.to(self._state[emb_name][state_idx].dtype)
+                state = state.to(th.device('cpu'))
+                self._state[emb_name][state_idx][idx] = state
+        self._defaults.update(local_state_dict['params'])
+        self.__dict__.update(local_state_dict['params'])
+
+    def save_state_to(self, f):
+        """Save the local state_dict to disk on per rank.
+
+        NOTE: This needs to be called on all ranks.
+
+        Parameters
+        ----------
+        f : Union[str, os.PathLike, BinaryIO, IO[bytes]]
+            a file-like object (has to implement write and flush) ora string or
+            os.PathLike object containing a file name
+
+        See Also
+        --------
+        load_state_from
+        """
+        if self._world_size > 1:
+            th.distributed.barrier()
+        f = f'{f}_{self._rank}'
+        print(f)
+        logging.info(f'Saving state dict to {f} at rank {self._rank}')
+        th.save(self.local_state_dict(), f)
+        if self._world_size > 1:
+            th.distributed.barrier()
+
+    def load_state_from(self, f):
+        """Load the local state of the oprimizer from file on per rank.
+
+        NOTE: This needs to be called on all ranks.
+
+        Parameters
+        ----------
+        f : Union[str, os.PathLike, BinaryIO, IO[bytes]]
+            a file-like object (has to implement write and flush) ora string or
+            os.PathLike object containing a file name
+
+        See Also
+        --------
+        save_state_to
+        """
+        if self._world_size > 1:
+            th.distributed.barrier()
+        f_attach_rank = f'{f}_{self._rank}'
+        ## Don't throw error here to support device number scale-out after reloading
+        if not exists(f_attach_rank):
+            logging.warn(f'{f_attach_rank} cannot be found.')
+        else:
+            logging.info(f'Loading state dict from {f} at rank {self._rank}')
+            world_size = self._load_state_from(f_attach_rank)
+            ## Device number scale-in
+            if self._world_size < world_size:
+                for rank in range(self._rank+self._world_size, world_size, self._world_size):
+                    logging.info(f'Loading state dict from {f} at rank {rank}')
+                    self._load_state_from(f'{f}_{rank}')
+        if self._world_size > 1:
+            th.distributed.barrier()
+
+    def _load_state_from(self, f):
+        print(f)
+        local_state_dict = th.load(f)
+        world_size = local_state_dict['params']['world_size']
+        del local_state_dict['params']['world_size']
+        self.load_local_state_dict(local_state_dict)
+        return world_size
 
     def step(self):
         ''' The step function.
@@ -129,7 +263,6 @@ class DistSparseGradOptimizer(abc.ABC):
             # do local update
             for emb in self._params:
                 name = emb._tensor.name
-
                 idx = th.cat(local_indics[name], dim=0)
                 grad = th.cat(local_grads[name], dim=0)
                 self.update(idx.to(device, non_blocking=True),
@@ -200,6 +333,7 @@ class SparseAdagrad(DistSparseGradOptimizer):
     def __init__(self, params, lr, eps=1e-10):
         super(SparseAdagrad, self).__init__(params, lr)
         self._eps = eps
+        self._defaults = {'_lr':lr, '_eps':eps}
         # We need to register a state sum for each embedding in the kvstore.
         self._state = {}
         for emb in params:
@@ -310,6 +444,7 @@ class SparseAdam(DistSparseGradOptimizer):
         # We need to register a state sum for each embedding in the kvstore.
         self._beta1 = betas[0]
         self._beta2 = betas[1]
+        self._defaults = {'_lr':lr, '_eps':eps, '_beta1': betas[0], '_beta2':betas[1]}
         self._state = {}
         for emb in params:
             assert isinstance(emb, DistEmbedding), \
