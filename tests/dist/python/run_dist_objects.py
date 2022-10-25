@@ -180,6 +180,11 @@ def test_dist_embedding(g):
     dist_embedding_check_existing(num_nodes)
 
 
+##########################################
+############# DistOptimizer ##############
+##########################################
+
+
 def dist_optimizer_check_store(g, num_nodes):
     rank = dgl.distributed.get_rank()
     emb = dgl.distributed.DistEmbedding(
@@ -208,8 +213,8 @@ def dist_optimizer_check_store(g, num_nodes):
                     assert np.all(F.asnumpy(is_same))
             assert new_emb_optimizer._lr == emb_optimizer._lr
             assert new_emb_optimizer._eps == emb_optimizer._eps
-            assert new_emb_optimizer._betas1 == emb_optimizer._betas1
-            assert new_emb_optimizer._betas2 == emb_optimizer._betas2
+            assert new_emb_optimizer._beta1 == emb_optimizer._beta1
+            assert new_emb_optimizer._beta2 == emb_optimizer._beta2
         dgl.distributed.client_barrier()
 
 def test_dist_optimizer(g):
@@ -239,6 +244,7 @@ elif mode == "client":
     target_func_map = {
         "DistTensor": test_dist_tensor,
         "DistEmbedding": test_dist_embedding,
+        "DistOptimizer": test_dist_optimizer
     }
 
     target = os.environ.get("DIST_DGL_TEST_OBJECT_TYPE", "")
@@ -249,5 +255,4 @@ elif mode == "client":
         target_func_map[target](g)
 
 else:
-    print("DIST_DGL_TEST_MODE has to be either server or client")
     exit(1)
