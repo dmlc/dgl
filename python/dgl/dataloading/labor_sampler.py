@@ -22,7 +22,6 @@ from ..transforms import to_block
 from .base import BlockSampler
 from ..random import choice, seed
 from .. import backend as F
-from collections import defaultdict
 
 
 class LaborSampler(BlockSampler):
@@ -153,6 +152,7 @@ class LaborSampler(BlockSampler):
         self.set_seed()
 
     def set_seed(self, random_seed=None):
+        '''sets the underlying seed for the sampler'''
         if random_seed is not None:
             seed(random_seed % 1000000007)
         if not hasattr(self, "random_seed") or self.cnt[1] == 1:

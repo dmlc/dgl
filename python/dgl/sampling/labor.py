@@ -21,7 +21,7 @@
 
 from .._ffi.function import _init_api
 from .. import backend as F
-from ..base import DGLError, NID, EID
+from ..base import DGLError, NID
 from ..heterograph import DGLHeteroGraph
 from .. import ndarray as nd
 from .. import utils
@@ -246,20 +246,20 @@ def _sample_labors(
         )
     ctx = utils.to_dgl_context(F.context(next(iter(nodes.values()))))
     nodes_all_types = []
-    NIDs_all_types = []
+    nids_all_types = []
     for ntype in g.ntypes:
         if ntype in nodes:
             nodes_all_types.append(F.to_dgl_nd(nodes[ntype]))
             try:
                 if len(g.ntypes) > 1:
-                    NIDs_all_types.append(F.to_dgl_nd(g.ndata[NID][ntype]))
+                    nids_all_types.append(F.to_dgl_nd(g.ndata[NID][ntype]))
                 else:
-                    NIDs_all_types.append(F.to_dgl_nd(g.ndata[NID]))
-            except:
-                NIDs_all_types.append(nd.array([], ctx=ctx))
+                    nids_all_types.append(F.to_dgl_nd(g.ndata[NID]))
+            except KeyError:
+                nids_all_types.append(nd.array([], ctx=ctx))
         else:
             nodes_all_types.append(nd.array([], ctx=ctx))
-            NIDs_all_types.append(nd.array([], ctx=ctx))
+            nids_all_types.append(nd.array([], ctx=ctx))
 
     if isinstance(fanout, nd.NDArray):
         fanout_array = fanout
@@ -310,7 +310,7 @@ def _sample_labors(
 
     ret_val = _CAPI_DGLSampleLabors(
         g._graph,
-        NIDs_all_types,
+        nids_all_types,
         nodes_all_types,
         fanout_array,
         random_seed[0],
