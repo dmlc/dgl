@@ -2379,6 +2379,7 @@ def test_module_gdc(idtype):
     eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
     assert eset == {(0, 0), (1, 1), (2, 2), (3, 3), (4, 3), (4, 4), (5, 5)}
 
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support a slicing operation")
 @parametrize_idtype
 def test_module_node_shuffle(idtype):
     transform = dgl.NodeShuffle()
