@@ -9,6 +9,7 @@ from .. import backend as F
 from ..base import NID, EID, NTYPE, ETYPE, dgl_warning
 from ..convert import to_homogeneous
 from ..random import choice as random_choice
+from ..transforms import sort_csr_by_tag, sort_csc_by_tag
 from ..data.utils import load_graphs, save_graphs, load_tensors, save_tensors
 from ..partition import metis_partition_assignment, partition_graph_with_halo, get_peak_mem
 from .graph_partition_book import BasicPartitionBook, RangePartitionBook
@@ -23,8 +24,10 @@ RESERVED_FIELD_DTYPE = {
     ETYPE: F.int32
     }
 
-def _save_graphs(filename, g_list):
-    '''Format data types in graphs before saving
+def _save_graphs(filename, g_list, formats=None, sort_etypes=False):
+    '''Preprocess partitions before saving:
+    1. format data types.
+    2. sort csc/csr by tag.
     '''
     for g in g_list:
         for k, dtype in RESERVED_FIELD_DTYPE.items():
@@ -32,7 +35,14 @@ def _save_graphs(filename, g_list):
                 g.ndata[k] = F.astype(g.ndata[k], dtype)
             if k in g.edata:
                 g.edata[k] = F.astype(g.edata[k], dtype)
-    save_graphs(filename , g_list)
+    for g in g_list:
+        if (not sort_etypes) or (formats is None):
+            continue
+        if 'csr' in formats:
+            g = sort_csr_by_tag(g, tag=g.edata[ETYPE], tag_type='edge')
+        if 'csc' in formats:
+            g = sort_csc_by_tag(g, tag=g.edata[ETYPE], tag_type='edge')
+    save_graphs(filename , g_list, formats=formats)
 
 def _get_inner_node_mask(graph, ntype_id):
     if NTYPE in graph.ndata:
@@ -368,7 +378,8 @@ def _set_trainer_ids(g, sim_g, node_parts):
 
 def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method="metis",
                     reshuffle=True, balance_ntypes=None, balance_edges=False, return_mapping=False,
-                    num_trainers_per_machine=1, objtype='cut'):
+                    num_trainers_per_machine=1, objtype='cut',
+                    graph_formats=None):
     ''' Partition a graph for distributed training and store the partitions on files.
 
     The partitioning occurs in three steps: 1) run a partition algorithm (e.g., Metis) to
@@ -549,6 +560,11 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     objtype : str, "cut" or "vol"
         Set the objective as edge-cut minimization or communication volume minimization. This
         argument is used by the Metis algorithm.
+    graph_formats : str or list[str]
+        Save partitions in specified formats. It could be any combination of ``coo``,
+        ``csc`` and ``csr``. If not specified, save one format only according to what
+        format is available. If multiple formats are available, selection priority
+        from high to low is ``coo``, ``csc``, ``csr``.
 
     Returns
     -------
@@ -573,6 +589,9 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     ...     g, node_feats, edge_feats, gpb, graph_name, ntypes_list, etypes_list,
     ... ) = dgl.distributed.load_partition('output/test.json', 0)
     '''
+    # 'coo' is required for partition
+    assert 'coo' in np.concatenate(list(g.formats().values())), \
+        "'coo' format should be allowed for partitioning graph."
     def get_homogeneous(g, balance_ntypes):
         if g.is_homogeneous:
             sim_g = to_homogeneous(g)
@@ -930,7 +949,9 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         save_tensors(node_feat_file, node_feats)
         save_tensors(edge_feat_file, edge_feats)
 
-        _save_graphs(part_graph_file, [part])
+        sort_etypes = len(g.etypes) > 1
+        _save_graphs(part_graph_file, [part], formats=graph_formats,
+            sort_etypes=sort_etypes)
     print('Save partitions: {:.3f} seconds, peak memory: {:.3f} GB'.format(
         time.time() - start, get_peak_mem()))
 
