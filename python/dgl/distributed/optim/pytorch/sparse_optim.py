@@ -1,11 +1,12 @@
 """Node embedding optimizers for distributed training"""
 import abc
-import dgl
 import logging
 from abc import abstractmethod
 from os.path import exists
 
 import torch as th
+
+import dgl
 
 from .... import backend as F
 from ...dist_tensor import DistTensor
@@ -34,6 +35,7 @@ class DistSparseGradOptimizer(abc.ABC):
         self._shared_cache = {}
         self._clean_grad = False
         self._opt_meta = {}
+        self._state = {}
         self._defaults = {}
 
         if th.distributed.is_initialized():
@@ -172,7 +174,9 @@ class DistSparseGradOptimizer(abc.ABC):
         # Don't throw error here to support device number scale-out after
         # reloading
         if not exists(f_attach_client_id):
-            logging.warn(f"{f_attach_client_id} cannot be found, loading nothing.")
+            logging.warn(
+                f"{f_attach_client_id} cannot be found, loading nothing."
+            )
         else:
             logging.info(f"Loading state dict from {f} at rank {client_id}")
             old_num_clients = self._load_state_from(f_attach_client_id)
@@ -182,7 +186,9 @@ class DistSparseGradOptimizer(abc.ABC):
                 for rank in range(
                     client_id + num_clients, old_num_clients, num_clients
                 ):
-                    logging.info(f"Loading state dict from {f} at rank {num_clients}")
+                    logging.info(
+                        f"Loading state dict from {f} at rank {num_clients}"
+                    )
                     self._load_state_from(f"{f}_{rank}")
         if self._world_size > 1:
             dgl.distributed.client_barrier()
@@ -406,7 +412,6 @@ class SparseAdagrad(DistSparseGradOptimizer):
         self._eps = eps
         self._defaults = {"_lr": lr, "_eps": eps}
         # We need to register a state sum for each embedding in the kvstore.
-        self._state = {}
         for emb in params:
             assert isinstance(
                 emb, DistEmbedding
@@ -535,7 +540,6 @@ class SparseAdam(DistSparseGradOptimizer):
             "_beta1": betas[0],
             "_beta2": betas[1],
         }
-        self._state = {}
         for emb in params:
             assert isinstance(
                 emb, DistEmbedding
