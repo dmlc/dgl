@@ -57,28 +57,17 @@ def add_ndata_of_single_type(
 ):
     node_ids = dgl.backend.arange(0, n_rows, idtype, ctx="cuda")
     node_ids = cp.from_dlpack(zerocopy_to_dlpack(node_ids))
-
-    if feat_t_d:
-        df, feat_name_map = create_feature_frame(feat_t_d)
-        df["node_id"] = node_ids
-        if not gs.single_gpu:
-            df = dask_cudf.from_cudf(df, npartitions=16)
-        gs.add_node_data(
-            df,
-            "node_id",
-            ntype=ntype,
-            feat_name=feat_name_map,
-            contains_vector_features=True,
-        )
-    else:
-        df = cudf.DataFrame()
-        df["node_id"] = node_ids
-        if not gs.single_gpu:
-            df = dask_cudf.from_cudf(df, npartitions=16)
-
-        gs.add_node_data(
-            df, "node_id", ntype=ntype, contains_vector_features=False
-        )
+    df, feat_name_map = create_feature_frame(feat_t_d)
+    df["node_id"] = node_ids
+    if not gs.single_gpu:
+        df = dask_cudf.from_cudf(df, npartitions=16)
+    gs.add_node_data(
+        df,
+        "node_id",
+        ntype=ntype,
+        feat_name=feat_name_map,
+        contains_vector_features=True,
+    )
     return gs
 
 
@@ -96,16 +85,16 @@ def add_nodes_from_dgl_heteroGraph(
 
         for ntype in gs.num_nodes_dict.keys():
             feat_t_d = ntype_feat_d.get(ntype, None)
-            gs = add_ndata_of_single_type(
-                gs=gs,
-                feat_t_d=feat_t_d,
-                ntype=ntype,
-                n_rows=gs.num_nodes_dict[ntype],
-                idtype=graph.idtype,
-            )
+            if feat_t_d is not None:
+                gs = add_ndata_of_single_type(
+                    gs=gs,
+                    feat_t_d=feat_t_d,
+                    ntype=ntype,
+                    n_rows=gs.num_nodes_dict[ntype],
+                    idtype=graph.idtype,
+                )
     else:
         ntype = graph.ntypes[0]
-        ntype_feat_d = dict()
         gs = add_ndata_of_single_type(
             gs,
             feat_t_d=graph.ndata,
@@ -173,6 +162,5 @@ def add_edges_from_dgl_heteroGraph(
 
     for can_etype in graph.canonical_etypes:
         src_t, dst_t = graph.edges(form="uv", etype=can_etype)
-        src_type, _, dst_type = can_etype
         feat_t_d = etype_feat_d.get(can_etype, None)
         add_edata_of_single_type(gs, feat_t_d, src_t, dst_t, can_etype)

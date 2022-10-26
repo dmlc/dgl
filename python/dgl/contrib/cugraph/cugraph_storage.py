@@ -17,6 +17,7 @@ import dgl
 from ... import backend as F
 from .utils.cugraph_utils import _assert_valid_canonical_etype
 from .utils.cugraph_utils import convert_can_etype_s_to_tup
+from .utils.cugraph_utils import backend_dtype_to_np_dtype_dict
 from typing import Tuple
 
 
@@ -36,7 +37,7 @@ class CuGraphStorage:
     """
 
     def __init__(
-        self, single_gpu: bool = True, num_nodes_dict={}, idtype=F.int32
+        self, num_nodes_dict: dict, single_gpu: bool = True, idtype=F.int32
     ):
         """
         Constructor for creating a object of instance CuGraphStorage
@@ -133,6 +134,7 @@ class CuGraphStorage:
 
         self.graphstore = CuGraphStore(graph=pg)
         self.idtype = idtype
+        self.id_np_type = backend_dtype_to_np_dtype_dict[idtype]
         self.num_nodes_dict = num_nodes_dict
         self._node_id_offset_d = self.__get_node_id_offset_d(num_nodes_dict)
         # TODO: Potentially expand to set below
@@ -179,6 +181,8 @@ class CuGraphStorage:
             df[node_col_name] = df[node_col_name] + self.get_node_id_offset(
                 ntype
             )
+        # Enforce ID dtype requirement
+        df[node_col_name] = df[node_col_name].astype(self.id_np_type)
         self.graphstore.add_node_data(
             df=df,
             node_col_name=node_col_name,
@@ -229,6 +233,10 @@ class CuGraphStorage:
             src_type, dst_type = canonical_etype[0], canonical_etype[2]
             df[src_n] = df[src_n] + self.get_node_id_offset(src_type)
             df[dst_n] = df[dst_n] + self.get_node_id_offset(dst_type)
+
+        # Enforce ID dtype requirement
+        df[src_n] = df[src_n].astype(self.id_np_type)
+        df[dst_n] = df[dst_n].astype(self.id_np_type)
         # Convert to a string because cugraph PG does not support tuple objects
         canonical_etype = str(canonical_etype)
         self.graphstore.add_edge_data(
@@ -551,7 +559,8 @@ class CuGraphStorage:
         list[str]
             All the node type names in a list.
         """
-        return self.graphstore.ntypes
+        ntypes = list(self.num_nodes_dict.keys())
+        return ntypes
 
     @property
     def etypes(self):

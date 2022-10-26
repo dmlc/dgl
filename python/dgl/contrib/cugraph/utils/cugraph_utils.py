@@ -11,12 +11,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import dgl
+import numpy as np
+from .... import backend as F
 
 
 def convert_can_etype_s_to_tup(canonical_etype_s):
-    '''
+    """
     Convert canonical string to canonical tupple type
-    '''
+    """
     src_type, etype, dst_type = canonical_etype_s.split(",")
     src_type = src_type[2:-1]
     dst_type = dst_type[2:-2]
@@ -46,3 +48,15 @@ def _is_valid_canonical_etype(canonical_etype):
             return False
     return True
 
+
+backend_dtype_to_np_dtype_dict = {
+    F.bool: np.bool,
+    F.uint8: np.uint8,
+    F.int8: np.int8,
+    F.int16: np.int16,
+    F.int32: np.int32,
+    F.int64: np.int64,
+    F.float16: np.float16,
+    F.float32: np.float32,
+    F.float64: np.float64,
+}
