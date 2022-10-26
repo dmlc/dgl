@@ -720,7 +720,7 @@ COOMatrix _CSRRowWiseSampling(
   return COOMatrix(mat.num_rows, mat.num_cols, picked_row, picked_col, picked_idx);
 }
 
-template <DGLDeviceType XPU, typename IdType, typename FloatType>
+template <DGLDeviceType XPU, typename IdType, typename DType>
 COOMatrix CSRRowWiseSampling(
     CSRMatrix mat, IdArray rows, int64_t num_picks, FloatArray prob, bool replace) {
   COOMatrix result;
@@ -730,11 +730,11 @@ COOMatrix CSRRowWiseSampling(
     IdArray sliced_rows = IndexSelect(rows, coo.row);
     result = COOMatrix(mat.num_rows, mat.num_cols, sliced_rows, coo.col, coo.data);
   } else {
-    result = _CSRRowWiseSampling<XPU, IdType, FloatType>(mat, rows, num_picks, prob, replace);
+    result = _CSRRowWiseSampling<XPU, IdType, DType>(mat, rows, num_picks, prob, replace);
   }
   // NOTE(BarclayII): I'm removing the entries with zero probability after sampling.
   // Is there a better way?
-  return _COORemoveIf<XPU, IdType, FloatType>(result, prob, static_cast<FloatType>(0));
+  return _COORemoveIf<XPU, IdType, DType>(result, prob, static_cast<DType>(0));
 }
 
 template COOMatrix CSRRowWiseSampling<kDGLCUDA, int32_t, float>(
