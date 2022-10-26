@@ -27,7 +27,7 @@ def _verify_partition_data_types(part_g):
             assert part_g.edata[k].dtype == dtype
 
 def _verify_partition_formats(part_g, formats):
-    # verify saved graph formats
+    # Verify saved graph formats
     if formats is None:
         assert "coo" in part_g.formats()["created"]
     else:

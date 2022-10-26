@@ -12,7 +12,11 @@ from dgl.distributed.graph_partition_book import (BasicPartitionBook,
                                                   HeteroDataName,
                                                   NodePartitionPolicy,
                                                   RangePartitionBook)
-from dgl.distributed.partition import RESERVED_FIELD_DTYPE
+from dgl.distributed.partition import (
+    RESERVED_FIELD_DTYPE,
+    _get_inner_node_mask,
+    _get_inner_edge_mask
+)
 from scipy import sparse as spsp
 from utils import reset_envs
 
@@ -32,30 +36,6 @@ def _verify_partition_formats(part_g, formats):
     else:
         for format in formats:
             assert format in part_g.formats()["created"]
-
-
-def _get_inner_node_mask(graph, ntype_id):
-    if dgl.NTYPE in graph.ndata:
-        dtype = F.dtype(graph.ndata["inner_node"])
-        return (
-            graph.ndata["inner_node"]
-            * F.astype(graph.ndata[dgl.NTYPE] == ntype_id, dtype)
-            == 1
-        )
-    else:
-        return graph.ndata["inner_node"] == 1
-
-
-def _get_inner_edge_mask(graph, etype_id):
-    if dgl.ETYPE in graph.edata:
-        dtype = F.dtype(graph.edata["inner_edge"])
-        return (
-            graph.edata["inner_edge"]
-            * F.astype(graph.edata[dgl.ETYPE] == etype_id, dtype)
-            == 1
-        )
-    else:
-        return graph.edata["inner_edge"] == 1
 
 
 def create_random_graph(n):

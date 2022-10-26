@@ -589,6 +589,9 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
     ...     g, node_feats, edge_feats, gpb, graph_name, ntypes_list, etypes_list,
     ... ) = dgl.distributed.load_partition('output/test.json', 0)
     '''
+    # 'coo' is required for partition
+    assert 'coo' in np.concatenate(list(g.formats().values())), \
+        "'coo' format should be allowed for partitioning graph."
     def get_homogeneous(g, balance_ntypes):
         if g.is_homogeneous:
             sim_g = to_homogeneous(g)
