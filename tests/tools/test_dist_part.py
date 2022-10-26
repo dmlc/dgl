@@ -26,6 +26,15 @@ def _verify_partition_data_types(part_g):
         if k in part_g.edata:
             assert part_g.edata[k].dtype == dtype
 
+def _verify_partition_formats(part_g, formats):
+    # Verify saved graph formats
+    if formats is None:
+        assert "coo" in part_g.formats()["created"]
+    else:
+        formats = formats.split(',')
+        for format in formats:
+            assert format in part_g.formats()["created"]
+
 
 def _verify_graph_feats(
     g, gpb, part, node_feats, edge_feats, orig_nids, orig_eids
@@ -139,9 +148,12 @@ def test_chunk_graph(num_chunks):
             assert feat_array.shape[0] == num_edges[etype] // num_chunks
 
 
-@pytest.mark.parametrize("num_chunks", [1, 2, 3, 4, 8])
-@pytest.mark.parametrize("num_parts", [1, 2, 3, 4, 8])
-def test_part_pipeline(num_chunks, num_parts):
+@pytest.mark.parametrize("num_chunks", [1, 3, 8])
+@pytest.mark.parametrize("num_parts", [1, 3, 8])
+@pytest.mark.parametrize(
+    "graph_formats", [None, "csc", "coo,csc", "coo,csc,csr"]
+)
+def test_part_pipeline(num_chunks, num_parts, graph_formats):
     if num_chunks < num_parts:
         # num_parts should less/equal than num_chunks
         return
@@ -182,6 +194,7 @@ def test_part_pipeline(num_chunks, num_parts):
         cmd += " --process-group-timeout 60"
         cmd += " --save-orig-nids"
         cmd += " --save-orig-eids"
+        cmd += f" --graph-formats {graph_formats}" if graph_formats else ""
         os.system(cmd)
 
         # read original node/edge IDs
@@ -207,6 +220,7 @@ def test_part_pipeline(num_chunks, num_parts):
                 part_config, i
             )
             _verify_partition_data_types(part_g)
+            _verify_partition_formats(part_g, graph_formats)
             _verify_graph_feats(
                 g, gpb, part_g, node_feats, edge_feats, orig_nids, orig_eids
             )
