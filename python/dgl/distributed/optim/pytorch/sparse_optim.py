@@ -1,6 +1,6 @@
 """Node embedding optimizers for distributed training"""
 import abc
-import logging
+import warnings
 from abc import abstractmethod
 from os.path import exists
 
@@ -146,7 +146,6 @@ class DistSparseGradOptimizer(abc.ABC):
         client_id = dgl.distributed.get_rank()
         f = str(f)
         f = f"{f}_{client_id}"
-        logging.info(f"Saving state dict to {f} at rank {client_id}")
         th.save(self.local_state_dict(), f)
         if num_clients > 1:
             dgl.distributed.client_barrier()
@@ -171,14 +170,13 @@ class DistSparseGradOptimizer(abc.ABC):
         client_id = dgl.distributed.get_rank()
         f = str(f)
         f_attach_client_id = f"{f}_{client_id}"
-        # Don't throw error here to support device number scale-out after
-        # reloading
+        # Don't throw error here to support device number scale-out
+        # after reloading
         if not exists(f_attach_client_id):
-            logging.warn(
-                f"{f_attach_client_id} cannot be found, loading nothing."
+            warnings.warn(
+                f"File {f_attach_client_id} can't be found, load nothing."
             )
         else:
-            logging.info(f"Loading state dict from {f} at rank {client_id}")
             old_num_clients = self._load_state_from(f_attach_client_id)
             num_clients = dgl.distributed.get_num_client()
             # Device number scale-in
@@ -186,9 +184,6 @@ class DistSparseGradOptimizer(abc.ABC):
                 for rank in range(
                     client_id + num_clients, old_num_clients, num_clients
                 ):
-                    logging.info(
-                        f"Loading state dict from {f} at rank {num_clients}"
-                    )
                     self._load_state_from(f"{f}_{rank}")
         if self._world_size > 1:
             dgl.distributed.client_barrier()
