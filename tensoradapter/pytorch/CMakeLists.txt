@@ -31,6 +31,17 @@ set(TORCH_TARGET_NAME "tensoradapter_pytorch_${TORCH_VER}")
 file(GLOB TA_TORCH_SRC *.cpp)
 add_library(${TORCH_TARGET_NAME} SHARED "${TA_TORCH_SRC}")
 
+#***** SPARSE LIBRARY ********/
+set(SPARSE_DIR "${CMAKE_SOURCE_DIR}/../../src/sparse")
+file(GLOB SPARSE_HEADERS ${SPARSE_DIR}/*.h)
+file(GLOB SPARSE_SRC
+  ${SPARSE_DIR}/*.cc
+)
+add_library(dgl_sparse SHARED ${SPARSE_SRC} ${SPARSE_HEADERS})
+target_include_directories(
+  dgl_sparse PRIVATE ${SPARSE_DIR})
+target_link_libraries(dgl_sparse "${TORCH_LIBRARIES}")
+
 # use the library name rather than the path
 set(TENSORADAPTER_TORCH_LIBS torch)
 

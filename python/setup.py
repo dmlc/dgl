@@ -48,7 +48,8 @@ def get_lib_path():
 
 def get_ta_lib_pattern():
     if sys.platform.startswith("linux"):
-        ta_lib_pattern = "libtensoradapter_*.so"
+        # Find libdgl_sparse.so and libtensoradapter_*.so
+        ta_lib_pattern = "*.so"
     elif sys.platform.startswith("darwin"):
         ta_lib_pattern = "libtensoradapter_*.dylib"
     elif sys.platform.startswith("win"):
