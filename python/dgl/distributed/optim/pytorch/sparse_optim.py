@@ -153,7 +153,7 @@ class DistSparseGradOptimizer(abc.ABC):
             dgl.distributed.client_barrier()
 
     def load_state_from(self, f):
-        """Load the local state of the oprimizer from file on per rank.
+        """Load the local state of the optimizer from the file on per rank.
 
         NOTE: This needs to be called on all ranks.
 
