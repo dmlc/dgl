@@ -27,37 +27,39 @@ inline FloatArray DoubleSlice(FloatArray array, const IdxType* idx_data,
   return ret;
 }
 
-template <typename IdxType, typename FloatType>
+template <typename IdxType, typename DType>
 inline NumPicksFn<IdxType> GetSamplingNumPicksFn(
     int64_t num_samples, FloatArray prob, bool replace) {
   NumPicksFn<IdxType> num_picks_fn = [prob, num_samples, replace]
     (IdxType rowid, IdxType off, IdxType len,
      const IdxType* col, const IdxType* data) {
       const int64_t max_num_picks = (num_samples == -1) ? len : num_samples;
-      const FloatType* prob_data = prob.Ptr<FloatType>();
+      const DType* prob_data = prob.Ptr<DType>();
       IdxType nnz = 0;
       for (IdxType i = off; i < off + len; ++i) {
-        if (prob_data[i] > 0)
+        if (prob_data[i] > 0) {
           ++nnz;
+        }
       }
 
-      if (replace)
+      if (replace) {
         return static_cast<IdxType>(nnz == 0 ? 0 : max_num_picks);
-      else
+      } else {
         return std::min(static_cast<IdxType>(max_num_picks), nnz);
+      }
     };
   return num_picks_fn;
 }
 
-template <typename IdxType, typename FloatType>
+template <typename IdxType, typename DType>
 inline PickFn<IdxType> GetSamplingPickFn(
     int64_t num_samples, FloatArray prob, bool replace) {
   PickFn<IdxType> pick_fn = [prob, num_samples, replace]
     (IdxType rowid, IdxType off, IdxType len, IdxType num_picks,
      const IdxType* col, const IdxType* data,
      IdxType* out_idx) {
-      FloatArray prob_selected = DoubleSlice<IdxType, FloatType>(prob, data, off, len);
-      RandomEngine::ThreadLocal()->Choice<IdxType, FloatType>(
+      FloatArray prob_selected = DoubleSlice<IdxType, DType>(prob, data, off, len);
+      RandomEngine::ThreadLocal()->Choice<IdxType, DType>(
           num_picks, prob_selected, out_idx, replace);
       for (int64_t j = 0; j < num_picks; ++j) {
         out_idx[j] += off;
@@ -96,10 +98,11 @@ inline NumPicksFn<IdxType> GetSamplingUniformNumPicksFn(
     (IdxType rowid, IdxType off, IdxType len,
      const IdxType* col, const IdxType* data) {
       const int64_t max_num_picks = (num_samples == -1) ? len : num_samples;
-      if (replace)
+      if (replace) {
         return static_cast<IdxType>(len == 0 ? 0 : max_num_picks);
-      else
+      } else {
         return std::min(static_cast<IdxType>(max_num_picks), len);
+      }
     };
   return num_picks_fn;
 }
@@ -145,14 +148,16 @@ inline NumPicksFn<IdxType> GetSamplingBiasedNumPicksFn(
       const FloatType* bias_data = bias.Ptr<FloatType>();
       IdxType nnz = 0;
       for (int64_t j = 0; j < num_tags; ++j) {
-        if (bias_data[j] > 0)
+        if (bias_data[j] > 0) {
           nnz += tag_offset[j + 1] - tag_offset[j];
+        }
       }
 
-      if (replace)
+      if (replace) {
         return static_cast<IdxType>(nnz == 0 ? 0 : max_num_picks);
-      else
+      } else {
         return std::min(static_cast<IdxType>(max_num_picks), nnz);
+      }
     };
   return num_picks_fn;
 }

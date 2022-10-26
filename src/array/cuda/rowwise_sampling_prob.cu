@@ -405,7 +405,7 @@ __global__ void _GenerateFlagsKernel(
 }
 
 template <DGLDeviceType XPU, typename IdType, typename DType, typename MaskGen>
-COOMatrix COOGeneralRemoveIf(COOMatrix coo, MaskGen maskgen) {
+COOMatrix COOGeneralRemoveIf(const COOMatrix& coo, MaskGen maskgen) {
   using namespace dgl::cuda;
 
   const auto idtype = coo.row->dtype;
@@ -427,7 +427,7 @@ COOMatrix COOGeneralRemoveIf(COOMatrix coo, MaskGen maskgen) {
 
   int8_t* flags = static_cast<int8_t*>(device->AllocWorkspace(ctx, nnz));
   int nt = dgl::cuda::FindNumThreads(nnz);
-  int nb = (nnz + nt - 1) / nt;
+  int64_t nb = (nnz + nt - 1) / nt;
 
   maskgen(nb, nt, stream, nnz, data, flags);
 
@@ -449,7 +449,7 @@ COOMatrix COOGeneralRemoveIf(COOMatrix coo, MaskGen maskgen) {
 }
 
 template <DGLDeviceType XPU, typename IdType, typename DType>
-COOMatrix _COORemoveIf(COOMatrix coo, NDArray values, DType criteria) {
+COOMatrix _COORemoveIf(const COOMatrix& coo, const NDArray& values, DType criteria) {
   const DType* val = values.Ptr<DType>();
   auto maskgen = [val, criteria] (
       int nb, int nt, cudaStream_t stream, int64_t nnz, const IdType* data,
@@ -487,7 +487,11 @@ COOMatrix _COORemoveIf(COOMatrix coo, NDArray values, DType criteria) {
 */
 template <DGLDeviceType XPU, typename IdType, typename FloatType>
 COOMatrix _CSRRowWiseSampling(
-    CSRMatrix mat, IdArray rows, int64_t num_picks, FloatArray prob, bool replace) {
+    const CSRMatrix& mat,
+    const IdArray& rows,
+    int64_t num_picks,
+    const FloatArray& prob,
+    bool replace) {
   const auto& ctx = rows->ctx;
   auto device = runtime::DeviceAPI::Get(ctx);
   cudaStream_t stream = runtime::getCurrentCUDAStream();

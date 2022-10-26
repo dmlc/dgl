@@ -34,7 +34,8 @@ class BaseSampler {
 
 // (BarclayII 2022.9.20) Changing the internal data type of probabilities to double since
 // we are using non-uniform sampling to sample on boolean masks, where False represents
-// probability 0.
+// probability 0.  DType could be uint8 in this case, which will give incorrect arithmetic
+// results due to overflowing and/or integer division.
 
 /*
  * AliasSampler is used to sample elements from a given discrete categorical distribution.

@@ -24,9 +24,9 @@ inline NumPicksFn<IdxType> GetTopkNumPicksFn(int64_t k) {
 }
 
 template <typename IdxType, typename DType>
-inline PickFn<IdxType> GetTopkPickFn(int64_t k, NDArray weight, bool ascending) {
+inline PickFn<IdxType> GetTopkPickFn(NDArray weight, bool ascending) {
   const DType* wdata = static_cast<DType*>(weight->data);
-  PickFn<IdxType> pick_fn = [k, ascending, wdata]
+  PickFn<IdxType> pick_fn = [ascending, wdata]
     (IdxType rowid, IdxType off, IdxType len, IdxType num_picks,
      const IdxType* col, const IdxType* data,
      IdxType* out_idx) {
@@ -70,7 +70,7 @@ template <DGLDeviceType XPU, typename IdxType, typename DType>
 COOMatrix CSRRowWiseTopk(
     CSRMatrix mat, IdArray rows, int64_t k, NDArray weight, bool ascending) {
   auto num_picks_fn = GetTopkNumPicksFn<IdxType>(k);
-  auto pick_fn = GetTopkPickFn<IdxType, DType>(k, weight, ascending);
+  auto pick_fn = GetTopkPickFn<IdxType, DType>(weight, ascending);
   return CSRRowWisePick(mat, rows, k, false, pick_fn, num_picks_fn);
 }
 
@@ -95,7 +95,7 @@ template <DGLDeviceType XPU, typename IdxType, typename DType>
 COOMatrix COORowWiseTopk(
     COOMatrix mat, IdArray rows, int64_t k, NDArray weight, bool ascending) {
   auto num_picks_fn = GetTopkNumPicksFn<IdxType>(k);
-  auto pick_fn = GetTopkPickFn<IdxType, DType>(k, weight, ascending);
+  auto pick_fn = GetTopkPickFn<IdxType, DType>(weight, ascending);
   return COORowWisePick(mat, rows, k, false, pick_fn, num_picks_fn);
 }
 
