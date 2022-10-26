@@ -52,11 +52,11 @@ class SEALOGBLDataset(Dataset):
             self.g_list, tensor_dict = self.load_cached()
             self.labels = tensor_dict["y"]
             return
-        
+
         pos_edge, neg_edge = get_pos_neg_edges(
             split, self.split_edge, self.graph, self.percent
         )
-        self.links = torch.cat([pos_edge, neg_edge], 0) # [Np + Nn, 2]
+        self.links = torch.cat([pos_edge, neg_edge], 0)  # [Np + Nn, 2]
         self.labels = np.array([1] * len(pos_edge) + [0] * len(neg_edge))
 
     def __len__(self):
@@ -285,7 +285,9 @@ if __name__ == "__main__":
         help="You can set this value from 'none', 'input', 'hidden' or 'all' " \
              "to apply NGNN to different GNN layers.",
     )
-    parser.add_argument("--num_ngnn_layers", type=int, default=1, choices=[1, 2])
+    parser.add_argument(
+        "--num_ngnn_layers", type=int, default=1, choices=[1, 2]
+    )
     # Subgraph extraction settings
     parser.add_argument("--ratio_per_hop", type=float, default=1.0)
     parser.add_argument(
@@ -508,8 +510,10 @@ if __name__ == "__main__":
         if args.dynamic_train:
             _sampled_indices = list(range(1000))
             if args.dataset.startswith("ogbl-citation"):
-                _sampled_indices = _sampled_indices + list(range(len(train_dataset)-1000, len(train_dataset)))
-            #_sampled_indices = np.random.choice(
+                _sampled_indices = _sampled_indices + list(
+                    range(len(train_dataset) - 1000, len(train_dataset))
+                )
+            # _sampled_indices = np.random.choice(
             # len(train_dataset), 1000, replace=False
             # )
         else:
@@ -538,7 +542,7 @@ if __name__ == "__main__":
             else 0,
             dropout=args.dropout,
             ngnn_type=args.ngnn_type,
-            num_ngnn_layers=args.num_ngnn_layers
+            num_ngnn_layers=args.num_ngnn_layers,
         ).to(device)
         parameters = list(model.parameters())
         optimizer = torch.optim.Adam(params=parameters, lr=args.lr)
