@@ -3,6 +3,7 @@
 import torch
 import torch.nn as nn
 
+
 class TransE(nn.Module):
     r"""Similarity measure from `Translating Embeddings for Modeling Multi-relational Data
     <https://papers.nips.cc/paper/2013/hash/1cecc7a77928ca8133fa24680a88d2f9-Abstract.html>`__
@@ -53,6 +54,7 @@ class TransE(nn.Module):
     >>> scorer(h_head, h_tail, rels).shape
     torch.Size([30])
     """
+
     def __init__(self, num_rels, feats, p=1):
         super(TransE, self).__init__()
 
@@ -94,4 +96,4 @@ class TransE(nn.Module):
         """
         h_rel = self.rel_emb(rels)
 
-        return - torch.norm(h_head + h_rel - h_tail, p=self.p, dim=-1)
+        return -torch.norm(h_head + h_rel - h_tail, p=self.p, dim=-1)

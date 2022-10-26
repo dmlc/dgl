@@ -1,8 +1,9 @@
 """Utility functions related to pinned memory tensors."""
 
-from ..base import DGLError
 from .. import backend as F
 from .._ffi.function import _init_api
+from ..base import DGLError
+
 
 def pin_memory_inplace(tensor):
     """Register the tensor into pinned memory in-place (i.e. without copying).
@@ -19,9 +20,11 @@ def pin_memory_inplace(tensor):
         The dgl.ndarray object that holds the pinning status and shares the same
         underlying data with the tensor.
     """
-    if F.backend_name in ['mxnet', 'tensorflow']:
-        raise DGLError("The {} backend does not support pinning " \
-            "tensors in-place.".format(F.backend_name))
+    if F.backend_name in ["mxnet", "tensorflow"]:
+        raise DGLError(
+            "The {} backend does not support pinning "
+            "tensors in-place.".format(F.backend_name)
+        )
 
     # needs to be writable to allow in-place modification
     try:
@@ -30,6 +33,7 @@ def pin_memory_inplace(tensor):
         return nd_array
     except Exception as e:
         raise DGLError("Failed to pin memory in-place due to: {}".format(e))
+
 
 def gather_pinned_tensor_rows(tensor, rows):
     """Directly gather rows from a CPU tensor given an indices array on CUDA devices,
@@ -47,7 +51,10 @@ def gather_pinned_tensor_rows(tensor, rows):
     Tensor
         The result with the same device as :attr:`rows`.
     """
-    return F.from_dgl_nd(_CAPI_DGLIndexSelectCPUFromGPU(F.to_dgl_nd(tensor), F.to_dgl_nd(rows)))
+    return F.from_dgl_nd(
+        _CAPI_DGLIndexSelectCPUFromGPU(F.to_dgl_nd(tensor), F.to_dgl_nd(rows))
+    )
+
 
 def scatter_pinned_tensor_rows(dest, rows, source):
     """Directly scatter rows from a GPU tensor given an indices array on CUDA devices,
@@ -62,8 +69,9 @@ def scatter_pinned_tensor_rows(dest, rows, source):
     source : Tensor
         The tensor on the GPU to scatter rows from.
     """
-    _CAPI_DGLIndexScatterGPUToCPU(F.to_dgl_nd(dest), F.to_dgl_nd(rows),
-        F.to_dgl_nd(source))
+    _CAPI_DGLIndexScatterGPUToCPU(
+        F.to_dgl_nd(dest), F.to_dgl_nd(rows), F.to_dgl_nd(source)
+    )
 
 
 _init_api("dgl.ndarray.uvm", __name__)

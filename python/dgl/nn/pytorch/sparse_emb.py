@@ -1,16 +1,19 @@
 """Torch NodeEmbedding."""
 from datetime import timedelta
+
 import torch as th
+
 from ...backend import pytorch as F
-from ...utils import get_shared_mem_array, create_shared_mem_array
 from ...cuda import nccl
 from ...partition import NDArrayPartition
+from ...utils import create_shared_mem_array, get_shared_mem_array
 
 _STORE = None
 _COMM = None
 
-class NodeEmbedding: # NodeEmbedding
-    '''Class for storing node embeddings.
+
+class NodeEmbedding:  # NodeEmbedding
+    """Class for storing node embeddings.
 
     The class is optimized for training large-scale node embeddings. It updates the embedding in
     a sparse way and can scale to graphs with millions of nodes. It also supports partitioning
@@ -63,15 +66,22 @@ class NodeEmbedding: # NodeEmbedding
     ...     loss = F.sum(feats + 1, 0)
     ...     loss.backward()
     ...     optimizer.step()
-    '''
+    """
 
-    def __init__(self, num_embeddings, embedding_dim, name,
-                 init_func=None, device=None, partition=None):
+    def __init__(
+        self,
+        num_embeddings,
+        embedding_dim,
+        name,
+        init_func=None,
+        device=None,
+        partition=None,
+    ):
         global _STORE
         global _COMM
 
         if device is None:
-            device = th.device('cpu')
+            device = th.device("cpu")
 
         # Check whether it is multi-gpu training or not.
         if th.distributed.is_initialized():
@@ -86,7 +96,7 @@ class NodeEmbedding: # NodeEmbedding
         self._comm = None
         self._partition = partition
 
-        host_name = '127.0.0.1'
+        host_name = "127.0.0.1"
         port = 12346
 
         if rank >= 0:
@@ -94,25 +104,34 @@ class NodeEmbedding: # NodeEmbedding
             # embeding status synchronization across GPU processes
             if _STORE is None:
                 _STORE = th.distributed.TCPStore(
-                    host_name, port, world_size, rank == 0, timedelta(seconds=10*60))
+                    host_name,
+                    port,
+                    world_size,
+                    rank == 0,
+                    timedelta(seconds=10 * 60),
+                )
             self._store = _STORE
 
         # embeddings is stored in CPU memory.
-        if th.device(device) == th.device('cpu'):
+        if th.device(device) == th.device("cpu"):
             if rank <= 0:
-                emb = create_shared_mem_array(name, (num_embeddings, embedding_dim), th.float32)
+                emb = create_shared_mem_array(
+                    name, (num_embeddings, embedding_dim), th.float32
+                )
                 if init_func is not None:
                     emb = init_func(emb)
-            if rank == 0: # the master gpu process
+            if rank == 0:  # the master gpu process
                 for _ in range(1, world_size):
                     # send embs
                     self._store.set(name, name)
             elif rank > 0:
                 # receive
                 self._store.wait([name])
-                emb = get_shared_mem_array(name, (num_embeddings, embedding_dim), th.float32)
+                emb = get_shared_mem_array(
+                    name, (num_embeddings, embedding_dim), th.float32
+                )
             self._tensor = emb
-        else: # embeddings is stored in GPU memory.
+        else:  # embeddings is stored in GPU memory.
             # setup nccl communicator
             if _COMM is None:
                 if rank < 0:
@@ -123,11 +142,14 @@ class NodeEmbedding: # NodeEmbedding
                     if rank == 0:
                         # root process broadcasts nccl id
                         nccl_id = nccl.UniqueId()
-                        self._store.set('nccl_root_id_sparse_emb', str(nccl_id))
+                        self._store.set("nccl_root_id_sparse_emb", str(nccl_id))
                     else:
-                        nccl_id = nccl.UniqueId(self._store.get('nccl_root_id_sparse_emb'))
-                    _COMM = nccl.Communicator(self._world_size, self._rank,
-                                              nccl_id)
+                        nccl_id = nccl.UniqueId(
+                            self._store.get("nccl_root_id_sparse_emb")
+                        )
+                    _COMM = nccl.Communicator(
+                        self._world_size, self._rank, nccl_id
+                    )
             self._comm = _COMM
 
             if not self._partition:
@@ -135,14 +157,19 @@ class NodeEmbedding: # NodeEmbedding
                 self._partition = NDArrayPartition(
                     num_embeddings,
                     self._world_size if self._world_size > 0 else 1,
-                    mode='remainder')
+                    mode="remainder",
+                )
 
             # create local tensors for the weights
             local_size = self._partition.local_size(self._comm.rank())
 
             # TODO(dlasalle): support 16-bit/half embeddings
-            emb = th.empty([local_size, embedding_dim], dtype=th.float32,
-                           requires_grad=False, device=device)
+            emb = th.empty(
+                [local_size, embedding_dim],
+                dtype=th.float32,
+                requires_grad=False,
+                device=device,
+            )
             if init_func:
                 emb = init_func(emb)
             self._tensor = emb
@@ -150,10 +177,10 @@ class NodeEmbedding: # NodeEmbedding
         self._num_embeddings = num_embeddings
         self._embedding_dim = embedding_dim
         self._name = name
-        self._optm_state = None # track optimizer state
-        self._trace = [] # track minibatch
+        self._optm_state = None  # track optimizer state
+        self._trace = []  # track minibatch
 
-    def __call__(self, node_ids, device=th.device('cpu')):
+    def __call__(self, node_ids, device=th.device("cpu")):
         """
         node_ids : th.tensor
             Index of the embeddings to collect.
@@ -165,7 +192,8 @@ class NodeEmbedding: # NodeEmbedding
         else:
             if self.world_size > 0:
                 emb = self._comm.sparse_all_to_all_pull(
-                    node_ids, self._tensor, self._partition)
+                    node_ids, self._tensor, self._partition
+                )
             else:
                 emb = self._tensor[node_ids]
             emb = emb.to(device)
@@ -331,7 +359,7 @@ class NodeEmbedding: # NodeEmbedding
         return self._tensor
 
     def all_set_embedding(self, values):
-        """ Set the values of the embedding. This method must be called by all
+        """Set the values of the embedding. This method must be called by all
         processes sharing the embedding with identical tensors for
         :attr:`values`.
 
@@ -346,20 +374,23 @@ class NodeEmbedding: # NodeEmbedding
         if self._partition:
             idxs = F.copy_to(
                 self._partition.get_local_indices(
-                    self._comm.rank(),
-                    ctx=F.context(self._tensor)),
-                F.context(values))
-            self._tensor[:] = F.copy_to(F.gather_row(values, idxs),
-                                        ctx=F.context(self._tensor))[:]
+                    self._comm.rank(), ctx=F.context(self._tensor)
+                ),
+                F.context(values),
+            )
+            self._tensor[:] = F.copy_to(
+                F.gather_row(values, idxs), ctx=F.context(self._tensor)
+            )[:]
         else:
             if self._rank == 0:
-                self._tensor[:] = F.copy_to(values,
-                                            ctx=F.context(self._tensor))[:]
+                self._tensor[:] = F.copy_to(
+                    values, ctx=F.context(self._tensor)
+                )[:]
         if th.distributed.is_initialized():
             th.distributed.barrier()
 
     def all_get_embedding(self):
-        """ Return a copy of the embedding stored in CPU memory. If this is a
+        """Return a copy of the embedding stored in CPU memory. If this is a
         multi-processing instance, the tensor will be returned in shared
         memory. If the embedding is currently stored on multiple GPUs, all
         processes must call this method in the same order.
@@ -375,7 +406,7 @@ class NodeEmbedding: # NodeEmbedding
         if self._partition:
             if self._world_size == 0:
                 # non-multiprocessing
-                return self._tensor.to(th.device('cpu'))
+                return self._tensor.to(th.device("cpu"))
             else:
                 # create a shared memory tensor
                 shared_name = self._name + "_gather"
@@ -384,18 +415,23 @@ class NodeEmbedding: # NodeEmbedding
                     emb = create_shared_mem_array(
                         shared_name,
                         (self._num_embeddings, self._embedding_dim),
-                        self._tensor.dtype)
+                        self._tensor.dtype,
+                    )
                     self._store.set(shared_name, shared_name)
                 else:
                     self._store.wait([shared_name])
                     emb = get_shared_mem_array(
-                        shared_name, (self._num_embeddings, self._embedding_dim),
-                        self._tensor.dtype)
+                        shared_name,
+                        (self._num_embeddings, self._embedding_dim),
+                        self._tensor.dtype,
+                    )
                 # need to map indices and slice into existing tensor
                 idxs = self._partition.map_to_global(
-                    F.arange(0, self._tensor.shape[0],
-                             ctx=F.context(self._tensor)),
-                    self._rank).to(emb.device)
+                    F.arange(
+                        0, self._tensor.shape[0], ctx=F.context(self._tensor)
+                    ),
+                    self._rank,
+                ).to(emb.device)
                 emb[idxs] = self._tensor.to(emb.device)
 
                 # wait for all processes to finish

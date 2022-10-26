@@ -4,6 +4,7 @@ import torch.nn as nn
 from dgl.nn.pytorch import GraphConv
 from dgl.nn.pytorch.glob import AvgPooling
 
+
 class LogReg(nn.Module):
     def __init__(self, hid_dim, n_classes):
         super(LogReg, self).__init__()
@@ -36,13 +37,17 @@ class Discriminator(nn.Module):
 
         return logits
 
-class MVGRL(nn.Module):
 
+class MVGRL(nn.Module):
     def __init__(self, in_dim, out_dim):
         super(MVGRL, self).__init__()
 
-        self.encoder1 = GraphConv(in_dim, out_dim, norm='both', bias=True, activation=nn.PReLU())
-        self.encoder2 = GraphConv(in_dim, out_dim, norm='none', bias=True, activation=nn.PReLU())
+        self.encoder1 = GraphConv(
+            in_dim, out_dim, norm="both", bias=True, activation=nn.PReLU()
+        )
+        self.encoder2 = GraphConv(
+            in_dim, out_dim, norm="none", bias=True, activation=nn.PReLU()
+        )
         self.pooling = AvgPooling()
 
         self.disc = Discriminator(out_dim)
