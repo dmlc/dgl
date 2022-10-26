@@ -63,19 +63,21 @@ class DistSparseGradOptimizer(abc.ABC):
         lcoal_state_dict["params"] = {"num_clients": num_clients}
         for emb in self._params:
             kvstore = emb._tensor.kvstore
-            trainers_per_server = num_clients // kvstore.num_servers
+            trainers_per_machine = (
+                num_clients // dgl.distributed.get_num_machines()
+            )
             emb_state_dict = {}
             idx_i = F.tensor(range(emb.weight.shape[0]), F.int64)
             part_policy = (
                 emb.part_policy if emb.part_policy else emb._tensor.part_policy
             )
-            machine_id = kvstore.get_partid(emb.data_name, idx_i)
-            mask = machine_id == part_policy.part_id
+            part_id = kvstore.get_partid(emb.data_name, idx_i)
+            mask = part_id == part_policy.part_id
             idx_i = F.boolean_mask(idx_i, mask)
-            if trainers_per_server > 1:
-                kv_idx_split = th.remainder(idx_i, trainers_per_server).long()
+            if trainers_per_machine > 1:
+                kv_idx_split = th.remainder(idx_i, trainers_per_machine).long()
                 client_id = kvstore.client_id
-                local_rank = client_id % trainers_per_server
+                local_rank = client_id % trainers_per_machine
                 mask = kv_idx_split == local_rank
                 idx_i = F.boolean_mask(idx_i, mask)
             emb_state_dict.update({"ids": idx_i})
