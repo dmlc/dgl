@@ -558,7 +558,7 @@ class LabelPropagation(nn.Module):
 
 
 class LaplacianPosEnc(nn.Module):
-    r"""Laplacian Positional Encoder, as introduced in
+    r"""Laplacian Positional Encoder (LPE), as introduced in
     `GraphGPS: General Powerful Scalable Graph Transformers
     <https://arxiv.org/abs/2205.12454>`__
     This module is a learned laplacian positional encoding module using Transformer or DeepSet.
@@ -566,21 +566,21 @@ class LaplacianPosEnc(nn.Module):
     Parameters
     ----------
     model_type : str
-        Encoder NN model type for LPE, can only be "Transformer" or "DeepSet".
+        Encoder model type for LPE, can only be "Transformer" or "DeepSet".
     num_layer : int
         Number of layers in Transformer/DeepSet Encoder.
-    max_freqs : int
-        Number of eigenvectors.
+    k : int
+        Number of smallest non-trivial eigenvectors.
     lpe_dim : int
         Output size of final laplacian encoding.
     n_head : int, optional
         Number of heads in Transformer Encoder.
         Default : 1.
     batch_norm : bool, optional
-        If True, implement batch normalization on raw LaplacianPE.
+        If True, apply batch normalization on raw LaplacianPE.
         Default : False.
-    post_n_layer : int, optional
-        If post_n_layer > 0, apply an MLP after pooling.
+    num_post_layer : int, optional
+        If num_post_layer > 0, apply an MLP of ``num_post_layer`` layers after pooling.
         Default : 0.
 
     Example
@@ -593,11 +593,11 @@ class LaplacianPosEnc(nn.Module):
     >>> g = dgl.graph(([0,1,2,3,4,2,3,1,4,0], [2,3,1,4,0,0,1,2,3,4]))
     >>> g = transform(g)
     >>> EigVals, EigVecs = g.ndata['eigval'], g.ndata['eigvec']
-    >>> TransformerLPE = LaplacianPosEnc(model_type="Transformer", num_layer=3, max_freqs=5,
+    >>> TransformerLPE = LaplacianPosEnc(model_type="Transformer", num_layer=3, k=5,
                                          lpe_dim=16, n_head=4)
     >>> PosEnc = TransformerLPE(EigVals, EigVecs)
-    >>> DeepSetLPE = LaplacianPosEnc(model_type="DeepSet", num_layer=3, max_freqs=5,
-                                     lpe_dim=16, post_n_layer=2)
+    >>> DeepSetLPE = LaplacianPosEnc(model_type="DeepSet", num_layer=3, k=5,
+                                     lpe_dim=16, num_post_layer=2)
     >>> PosEnc = DeepSetLPE(EigVals, EigVecs)
     """
 
@@ -605,15 +605,15 @@ class LaplacianPosEnc(nn.Module):
         self,
         model_type,
         num_layer,
-        max_freqs,
+        k,
         lpe_dim,
         n_head=1,
         batch_norm=False,
-        post_n_layer=0,
+        num_post_layer=0,
     ):
         super(LaplacianPosEnc, self).__init__()
         self.model_type = model_type
-        self.linear_A = nn.Linear(2, lpe_dim)
+        self.linear = nn.Linear(2, lpe_dim)
 
         if self.model_type == "Transformer":
             encoder_layer = nn.TransformerEncoderLayer(
@@ -627,7 +627,7 @@ class LaplacianPosEnc(nn.Module):
             if num_layer == 1:
                 layers.append(nn.ReLU())
             else:
-                self.linear_A = nn.Linear(2, 2 * lpe_dim)
+                self.linear = nn.Linear(2, 2 * lpe_dim)
                 layers.append(nn.ReLU())
                 for _ in range(num_layer - 2):
                     layers.append(nn.Linear(2 * lpe_dim, 2 * lpe_dim))
@@ -642,19 +642,19 @@ class LaplacianPosEnc(nn.Module):
             )
 
         if batch_norm:
-            self.raw_norm = nn.BatchNorm1d(max_freqs)
+            self.raw_norm = nn.BatchNorm1d(k)
         else:
             self.raw_norm = None
 
-        if post_n_layer > 0:
+        if num_post_layer > 0:
             layers = []
-            if post_n_layer == 1:
+            if num_post_layer == 1:
                 layers.append(nn.Linear(lpe_dim, lpe_dim))
                 layers.append(nn.ReLU())
             else:
                 layers.append(nn.Linear(lpe_dim, 2 * lpe_dim))
                 layers.append(nn.ReLU())
-                for _ in range(post_n_layer - 2):
+                for _ in range(num_post_layer - 2):
                     layers.append(nn.Linear(2 * lpe_dim, 2 * lpe_dim))
                     layers.append(nn.ReLU())
                 layers.append(nn.Linear(2 * lpe_dim, lpe_dim))
@@ -668,7 +668,8 @@ class LaplacianPosEnc(nn.Module):
         Parameters
         ----------
         EigVals : Tensor
-            Laplacian Eigenvalues of shape :math:`(N, k)`, can be obtained by using `LaplacianPE`.
+            Laplacian Eigenvalues of shape :math:`(N, k)`, k different eigenvalues repeat N times,
+            can be obtained by using `LaplacianPE`.
         EigVecs : Tensor
             Laplacian Eigenvectors of shape :math:`(N, k)`, can be obtained by using `LaplacianPE`.
 
@@ -686,7 +687,7 @@ class LaplacianPosEnc(nn.Module):
         PosEnc[empty_mask] = 0
         if self.raw_norm:
             PosEnc = self.raw_norm(PosEnc)
-        PosEnc = self.linear_A(PosEnc)
+        PosEnc = self.linear(PosEnc)
 
         if self.model_type == "Transformer":
             PosEnc = self.pe_encoder(
