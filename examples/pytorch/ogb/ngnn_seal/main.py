@@ -132,8 +132,8 @@ class SEALOGBLDataset(Dataset):
         pos_edge, neg_edge = get_pos_neg_edges(
             self.split, self.split_edge, self.graph, self.percent
         )
-        self.links = torch.cat([pos_edge, neg_edge], 0).tolist()  # [Np + Nn, 2]
-        self.labels = [1] * len(pos_edge) + [0] * len(neg_edge)
+        self.links = torch.cat([pos_edge, neg_edge], 0)  # [Np + Nn, 2]
+        self.labels = np.array([1] * len(pos_edge) + [0] * len(neg_edge))
 
         g_list, labels = self.process()
         save_graphs(path, g_list, labels)
@@ -507,17 +507,12 @@ if __name__ == "__main__":
     )
 
     if 0 < args.sortpool_k <= 1:  # Transform percentile to number.
-        if args.dynamic_train:
-            _sampled_indices = list(range(1000))
-            if args.dataset.startswith("ogbl-citation"):
-                _sampled_indices = _sampled_indices + list(
-                    range(len(train_dataset) - 1000, len(train_dataset))
-                )
-            # _sampled_indices = np.random.choice(
-            # len(train_dataset), 1000, replace=False
-            # )
+        if args.dataset.startswith("ogbl-citation"):
+            _sampled_indices = list(range(1000)) + list(
+                range(len(train_dataset) - 1000, len(train_dataset))
+            )
         else:
-            _sampled_indices = range(len(train_dataset))
+            _sampled_indices = list(range(1000))
         _num_nodes = sorted(
             [train_dataset[i][0].num_nodes() for i in _sampled_indices]
         )
