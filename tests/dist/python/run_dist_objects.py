@@ -186,41 +186,50 @@ def test_dist_embedding(g):
 
 
 def dist_optimizer_check_store(g, num_nodes):
-    rank = dgl.distributed.get_rank()
-    emb = dgl.distributed.DistEmbedding(
-        num_nodes, 1, name="optimizer_test", init_func=zeros_init
-    )
-    emb_optimizer = dgl.distributed.optim.SparseAdam([emb], lr=0.1)
-    if rank == 0:
-        name_to_state = {}
-        for _, emb_states in emb_optimizer._state.items():
-            for state in emb_states:
-                name_to_state[state.name] = F.uniform(
-                    state.shape, F.float32, F.cpu(), 0, 1
-                )
-                state[
-                    F.arange(0, state.shape[0], F.int64, F.cpu())
-                ] = name_to_state[state.name]
-    emb_optimizer.save_state_to("emb.pt")
-    new_emb_optimizer = dgl.distributed.optim.SparseAdam(
-        [emb], lr=000.1, eps=2e-08, betas=(0.1, 0.222)
-    )
-    new_emb_optimizer.load_state_from("emb.pt")
-    if rank == 0:
-        for _, emb_states in new_emb_optimizer._state.items():
-            for new_state in emb_states:
-                state = name_to_state[new_state.name]
-                new_state = new_state[
-                    F.arange(0, state.shape[0], F.int64, F.cpu())
-                ]
-                is_same = F.equal(state, new_state)
-                assert np.all(F.asnumpy(is_same))
-        assert new_emb_optimizer._lr == emb_optimizer._lr
-        assert new_emb_optimizer._eps == emb_optimizer._eps
-        assert new_emb_optimizer._beta1 == emb_optimizer._beta1
-        assert new_emb_optimizer._beta2 == emb_optimizer._beta2
-    dgl.distributed.client_barrier()
-
+    rank = g.rank()
+    try:
+        emb = dgl.distributed.DistEmbedding(
+            num_nodes, 1, name="optimizer_test", init_func=zeros_init
+        )
+        emb2 = dgl.distributed.DistEmbedding(
+            num_nodes, 1, name="optimizer_test2", init_func=zeros_init
+        )
+        emb_optimizer = dgl.distributed.optim.SparseAdam([emb, emb2], lr=0.1)
+        if rank == 0:
+            name_to_state = {}
+            for _, emb_states in emb_optimizer._state.items():
+                for state in emb_states:
+                    name_to_state[state.name] = F.uniform(
+                        state.shape, F.float32, F.cpu(), 0, 1
+                    )
+                    state[
+                        F.arange(0, num_nodes, F.int64, F.cpu())
+                    ] = name_to_state[state.name]
+        emb_optimizer.save("emb.pt")
+        new_emb_optimizer = dgl.distributed.optim.SparseAdam(
+            [emb, emb2], lr=000.1, eps=2e-08, betas=(0.1, 0.222)
+        )
+        new_emb_optimizer.load("emb.pt")
+        if rank == 0:
+            for _, emb_states in new_emb_optimizer._state.items():
+                for new_state in emb_states:
+                    state = name_to_state[new_state.name]
+                    print(new_state.name)
+                    print(state)
+                    new_state = new_state[
+                        F.arange(0, num_nodes, F.int64, F.cpu())
+                    ]
+                    print(new_state)
+                    assert F.allclose (state, new_state, 0., 0.)
+            assert new_emb_optimizer._lr == emb_optimizer._lr
+            assert new_emb_optimizer._eps == emb_optimizer._eps
+            assert new_emb_optimizer._beta1 == emb_optimizer._beta1
+            assert new_emb_optimizer._beta2 == emb_optimizer._beta2
+        g.barrier()
+    finally:
+        file = f'emb.pt_{rank}'
+        if os.path.exists(file):
+            os.remove(file)
 
 def test_dist_optimizer(g):
     num_nodes = g.number_of_nodes(g.ntypes[0])

@@ -36,6 +36,7 @@ class DistSparseGradOptimizer(abc.ABC):
         self._clean_grad = False
         self._opt_meta = {}
         self._state = {}
+        ## collect all hyper parameters for save
         self._defaults = {}
 
         if th.distributed.is_initialized():
@@ -62,27 +63,24 @@ class DistSparseGradOptimizer(abc.ABC):
         num_clients = dgl.distributed.get_num_client()
         lcoal_state_dict["params"] = {"num_clients": num_clients}
         for emb in self._params:
-            kvstore = emb._tensor.kvstore
+            kvstore = emb.kvstore
             trainers_per_machine = (
                 num_clients // dgl.distributed.get_num_machines()
             )
             emb_state_dict = {}
-            idx_i = F.tensor(range(emb.weight.shape[0]), F.int64)
             part_policy = (
                 emb.part_policy if emb.part_policy else emb._tensor.part_policy
             )
-            part_id = kvstore.get_partid(emb.data_name, idx_i)
-            mask = part_id == part_policy.part_id
-            idx_i = F.boolean_mask(idx_i, mask)
+            idx = self._get_local_ids(part_policy)
             if trainers_per_machine > 1:
-                kv_idx_split = th.remainder(idx_i, trainers_per_machine).long()
+                kv_idx_split = th.remainder(idx, trainers_per_machine).long()
                 client_id = kvstore.client_id
                 local_rank = client_id % trainers_per_machine
                 mask = kv_idx_split == local_rank
-                idx_i = F.boolean_mask(idx_i, mask)
-            emb_state_dict.update({"ids": idx_i})
+                idx = F.boolean_mask(idx, mask)
+            emb_state_dict.update({"ids": idx})
             emb_state = {
-                state.name: state[idx_i] for state in self._state[emb.name]
+                state.name: state[idx] for state in self._state[emb.name]
             }
             emb_state_dict.update({"states": emb_state})
             lcoal_state_dict["emb_states"].update({emb.name: emb_state_dict})
@@ -127,7 +125,7 @@ class DistSparseGradOptimizer(abc.ABC):
         self._defaults.update(local_state_dict["params"])
         self.__dict__.update(local_state_dict["params"])
 
-    def save_state_to(self, f):
+    def save(self, f):
         """Save the local state_dict to disk on per rank.
 
         NOTE: This needs to be called on all ranks.
@@ -140,19 +138,19 @@ class DistSparseGradOptimizer(abc.ABC):
 
         See Also
         --------
-        load_state_from
+        load
         """
         num_clients = dgl.distributed.get_num_client()
         if num_clients > 1:
             dgl.distributed.client_barrier()
         client_id = dgl.distributed.get_rank()
-        f = str(f)
+        f = f if isinstance(f, str) else str(f, 'UTF-8')
         f = f"{f}_{client_id}"
         th.save(self.local_state_dict(), f)
         if num_clients > 1:
             dgl.distributed.client_barrier()
-
-    def load_state_from(self, f):
+        
+    def load(self, f):
         """Load the local state of the optimizer from the file on per rank.
 
         NOTE: This needs to be called on all ranks.
@@ -165,29 +163,30 @@ class DistSparseGradOptimizer(abc.ABC):
 
         See Also
         --------
-        save_state_to
+        save
         """
-        if self._world_size > 1:
+        num_clients = dgl.distributed.get_num_client()
+        if num_clients > 1:
             dgl.distributed.client_barrier()
         client_id = dgl.distributed.get_rank()
-        f = str(f)
+        f = f if isinstance(f, str) else str(f, 'UTF-8')
         f_attach_client_id = f"{f}_{client_id}"
         # Don't throw error here to support device number scale-out
-        # after reloading
+        # after reloading, but make sure your hyper parameter is same
+        # as before because added local optimizers will not be filled
         if not exists(f_attach_client_id):
             warnings.warn(
                 f"File {f_attach_client_id} can't be found, load nothing."
             )
         else:
             old_num_clients = self._load_state_from(f_attach_client_id)
-            num_clients = dgl.distributed.get_num_client()
             # Device number scale-in
             if num_clients < old_num_clients:
                 for rank in range(
                     client_id + num_clients, old_num_clients, num_clients
                 ):
                     self._load_state_from(f"{f}_{rank}")
-        if self._world_size > 1:
+        if num_clients > 1:
             dgl.distributed.client_barrier()
 
     def _load_state_from(self, f):
@@ -196,6 +195,20 @@ class DistSparseGradOptimizer(abc.ABC):
         del local_state_dict["params"]["num_clients"]
         self.load_local_state_dict(local_state_dict)
         return num_clients
+
+    def _get_local_ids(self, part_policy):
+        if "edge" in part_policy.policy_str:
+            return part_policy.partition_book.partid2eids(
+                part_policy.part_id, part_policy.type_name
+            )
+        elif "node" in part_policy.policy_str:
+            return part_policy._partition_book.partid2nids(
+                part_policy.part_id, part_policy.type_name
+            )
+        else:
+            raise RuntimeError(
+                "Cannot support policy: %s " % part_policy.policy_str
+            )
 
     def step(self):
         """The step function.
