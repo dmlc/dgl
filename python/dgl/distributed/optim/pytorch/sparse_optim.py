@@ -79,9 +79,13 @@ class DistSparseGradOptimizer(abc.ABC):
                 mask = kv_idx_split == local_rank
                 idx = F.boolean_mask(idx, mask)
             emb_state_dict.update({"ids": idx})
-            emb_state = {
-                state.name: state[idx] for state in self._state[emb.name]
-            }
+            emb_state = {}
+            states = (
+                list(self._state[emb.name])
+                if isinstance(self._state[emb.name], tuple)
+                else [self._state[emb.name]]
+            )
+            emb_state = {state.name: state[idx] for state in states}
             emb_state_dict.update({"states": emb_state})
             lcoal_state_dict["emb_states"].update({emb.name: emb_state_dict})
         lcoal_state_dict["params"].update(self._defaults)
@@ -103,14 +107,18 @@ class DistSparseGradOptimizer(abc.ABC):
         """
         for emb_name, emb_state in local_state_dict["emb_states"].items():
             idx = emb_state["ids"]
-            if len(emb_state["states"]) != len(self._state[emb_name]):
+            states = (
+                list(self._state[emb_name])
+                if isinstance(self._state[emb_name], tuple)
+                else [self._state[emb_name]]
+            )
+            if len(emb_state["states"]) != len(states):
                 raise ValueError(
                     f"loaded state dict has a different number of states"
-                    f"of embedding {emb_name}"
+                    f" of embedding {emb_name}"
                 )
             name_to_index = {
-                state.name: index
-                for index, state in enumerate(self._state[emb_name], 0)
+                state.name: index for index, state in enumerate(states, 0)
             }
             for name, state in emb_state["states"].items():
                 if name not in name_to_index:
@@ -119,14 +127,20 @@ class DistSparseGradOptimizer(abc.ABC):
                         "that can't be found in the optimizer states"
                     )
                 state_idx = name_to_index[name]
-                state = state.to(self._state[emb_name][state_idx].dtype)
+                state = state.to(states[state_idx].dtype)
                 state = state.to(th.device("cpu"))
-                self._state[emb_name][state_idx][idx] = state
+                states[state_idx][idx] = state
         self._defaults.update(local_state_dict["params"])
         self.__dict__.update(local_state_dict["params"])
 
     def save(self, f):
         """Save the local state_dict to disk on per rank.
+
+        Saved dict contains three parts:
+
+        * 'ids': list of global ids of the nodes/edges selected locally
+        * 'params': hyper parameters of the optimizer
+        * 'states': partial optimizer states indexed by ```ids``` of entire states
 
         NOTE: This needs to be called on all ranks.
 
@@ -144,12 +158,12 @@ class DistSparseGradOptimizer(abc.ABC):
         if num_clients > 1:
             dgl.distributed.client_barrier()
         client_id = dgl.distributed.get_rank()
-        f = f if isinstance(f, str) else str(f, 'UTF-8')
+        f = f if isinstance(f, str) else str(f, "UTF-8")
         f = f"{f}_{client_id}"
         th.save(self.local_state_dict(), f)
         if num_clients > 1:
             dgl.distributed.client_barrier()
-        
+
     def load(self, f):
         """Load the local state of the optimizer from the file on per rank.
 
@@ -169,7 +183,7 @@ class DistSparseGradOptimizer(abc.ABC):
         if num_clients > 1:
             dgl.distributed.client_barrier()
         client_id = dgl.distributed.get_rank()
-        f = f if isinstance(f, str) else str(f, 'UTF-8')
+        f = f if isinstance(f, str) else str(f, "UTF-8")
         f_attach_client_id = f"{f}_{client_id}"
         # Don't throw error here to support device number scale-out
         # after reloading, but make sure your hyper parameter is same
