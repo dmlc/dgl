@@ -391,6 +391,7 @@ class GNNExplainer(nn.Module):
         >>> edge_mask
         tensor([0.2154, 0.2235, 0.8325, ..., 0.7787, 0.1735, 0.1847])
         """
+        self.model = self.model.to(graph.device)
         self.model.eval()
 
         # Get the initial prediction.
@@ -760,20 +761,20 @@ class HeteroGNNExplainer(nn.Module):
 
         for node_type in feat_mask:
             feat_mask[node_type] = feat_mask[node_type].detach().sigmoid().squeeze()
+
         for canonical_etype in edge_mask:
             edge_mask[canonical_etype] = edge_mask[canonical_etype].detach().sigmoid()
 
         return inverse_indices, sg, feat_mask, edge_mask
 
     def explain_graph(self, graph, feat, **kwargs):
-        r"""Learn and return a node feature masks and an edge masks that play a
+        r"""Learn and return node feature masks and edge masks that play a
         crucial role to explain the prediction made by the GNN for a graph.
 
         Parameters
         ----------
         graph : DGLGraph
-            A heterogeneous graph that will be explained. :attr:`model` must be trained to
-            make predictions for this graph type.
+            A heterogeneous graph that will be explained.
         feat : dict[str, Tensor]
             The dictionary that associates input node features (values) with
             the respective node types (keys) present in the graph.
@@ -794,6 +795,7 @@ class HeteroGNNExplainer(nn.Module):
             The dictionary that associates the learned edge importance masks (values) with
             the respective canonical edge types (keys). The masks are of shape :math:`(E_t)`,
             where :math:`E_t` is the number of edges for canonical edge type :math:`t` in the
+            graph. The values are within range :math:`(0, 1)`. The higher, the more important.
 
         Examples
         --------
@@ -828,12 +830,11 @@ class HeteroGNNExplainer(nn.Module):
         ...                     c_etype_func_dict[c_etype] = (
         ...                         fn.u_mul_e(f'h_{c_etype}', 'w', 'm'), fn.mean('m', 'h'))
         ...             graph.multi_update_all(c_etype_func_dict, 'sum')
-        ...             with graph.local_scope():
-        ...                 hg = 0
-        ...                 for ntype in graph.ntypes:
-        ...                     if graph.num_nodes(ntype):
-        ...                         hg = hg + dgl.mean_nodes(graph, 'h', ntype=ntype)
-        ...                     return hg
+        ...             hg = 0
+        ...             for ntype in graph.ntypes:
+        ...                 if graph.num_nodes(ntype):
+        ...                     hg = hg + dgl.mean_nodes(graph, 'h', ntype=ntype)
+        ...             return hg
 
         >>> input_dim = 5
         >>> num_classes = 2
@@ -856,7 +857,7 @@ class HeteroGNNExplainer(nn.Module):
         ...     loss.backward()
         ...     optimizer.step()
 
-        >>> # Explain the prediction for node 0 of type 'user'
+        >>> # Explain for the graph
         >>> explainer = HeteroGNNExplainer(model, num_hops=1)
         >>> feat_mask, edge_mask = explainer.explain_graph(g, feat)
         >>> feat_mask
@@ -866,12 +867,11 @@ class HeteroGNNExplainer(nn.Module):
         {('game', 'rev_plays', 'user'): tensor([0.8922, 0.1966, 0.8371, 0.1330]),
          ('user', 'plays', 'game'): tensor([0.1785, 0.1696, 0.8065, 0.2167])}
         """
+        self.model = self.model.to(graph.device)
         self.model.eval()
-        device = graph.device
 
         # Get the initial prediction.
         with torch.no_grad():
-            self.model = self.model.to(device=device)
             logits = self.model(graph=graph, feat=feat, **kwargs)
             pred_label = logits.argmax(dim=-1)
 
@@ -887,8 +887,8 @@ class HeteroGNNExplainer(nn.Module):
         for _ in range(self.num_epochs):
             optimizer.zero_grad()
             h = {}
-            for node_type in feat:
-                h[node_type] = feat[node_type] * feat_mask[node_type].sigmoid()
+            for node_type, node_feat in feat.items():
+                h[node_type] = node_feat * feat_mask[node_type].sigmoid()
             eweight = {}
             for canonical_etype, canonical_etype_mask in edge_mask.items():
                 eweight[canonical_etype] = canonical_etype_mask.sigmoid()

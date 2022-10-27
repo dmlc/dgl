@@ -8,7 +8,7 @@ import backend as F
 import pytest
 import torch
 from test_utils.graph_cases import get_cases, random_graph, random_bipartite, random_dglgraph
-from test_utils import parametrize_idtype, parametrize_idtype64
+from test_utils import parametrize_idtype
 from copy import deepcopy
 import pickle
 
@@ -1329,8 +1329,8 @@ def test_gnnexplainer(g, idtype, out_dim):
     explainer = nn.GNNExplainer(model, num_hops=1)
     feat_mask, edge_mask = explainer.explain_graph(g, feat)
 
-@parametrize_idtype64
 @pytest.mark.parametrize('g', get_cases(['hetero'], exclude=['zero-degree']))
+@pytest.mark.parametrize('idtype', [F.int64])
 @pytest.mark.parametrize('input_dim', [5])
 @pytest.mark.parametrize('output_dim', [1, 2])
 def test_heterognnexplainer(g, idtype, input_dim, output_dim):
@@ -1371,13 +1371,12 @@ def test_heterognnexplainer(g, idtype, input_dim, output_dim):
                             fn.u_mul_e(f'h_{c_etype}', 'w', 'm'), fn.mean('m', 'h'))
                 graph.multi_update_all(c_etype_func_dict, 'sum')
                 if self.graph:
-                    with graph.local_scope():
-                        hg = 0
-                        for ntype in graph.ntypes:
-                            if graph.num_nodes(ntype):
-                                hg = hg + dgl.mean_nodes(graph, 'h', ntype=ntype)
+                    hg = 0
+                    for ntype in graph.ntypes:
+                        if graph.num_nodes(ntype):
+                            hg = hg + dgl.mean_nodes(graph, 'h', ntype=ntype)
 
-                            return hg
+                    return hg
                 else:
                     return graph.ndata['h']
 
