@@ -377,6 +377,15 @@ def write_edge_features(edge_features, edge_file):
     edge_file     : string 
         File in which the edge information is serialized
     """
+    # TODO[Rui]: Below is a temporary fix for etype and will be
+    # further refined in the near future as we'll shift to canonical
+    # etypes entirely.
+    def format_etype(etype):
+        etype, name = etype.split('/')
+        etype = etype.split(':')[1]
+        return etype + '/' + name
+    edge_features = {format_etype(etype):
+        data for etype, data in edge_features.items()}
     dgl.data.utils.save_tensors(edge_file, edge_features)
 
 def write_graph_dgl(graph_file, graph_obj, formats, sort_etypes):
