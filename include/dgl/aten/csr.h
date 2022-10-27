@@ -474,8 +474,9 @@ COOMatrix CSRRowWiseSampling(
  * \param rows Rows to sample from.
  * \param etype_offset The offset to each edge type.
  * \param num_samples Number of samples to choose per edge type.
- * \param prob Unnormalized probability array. Should be of the same length as the data array.
- *             If an empty array is provided, assume uniform.
+ * \param prob_or_mask Unnormalized probability array or mask array.
+ *                     Should be of the same length as the data array.
+ *                     If an empty array is provided, assume uniform.
  * \param replace True if sample with replacement
  * \return A COOMatrix storing the picked row, col and data indices.
  * \note The edges must be ordered by their edge types.
@@ -485,7 +486,7 @@ COOMatrix CSRRowWisePerEtypeSampling(
     IdArray rows,
     const std::vector<int64_t>& etype_offset,
     const std::vector<int64_t>& num_samples,
-    const std::vector<FloatArray>& prob,
+    const std::vector<NDArray>& prob_or_mask,
     bool replace = true,
     bool etype_sorted = false);
 

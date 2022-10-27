@@ -569,18 +569,19 @@ COOMatrix CSRRowWiseSampling(
 
 COOMatrix CSRRowWisePerEtypeSampling(
     CSRMatrix mat, IdArray rows, const std::vector<int64_t>& etype_offset,
-    const std::vector<int64_t>& num_samples, const std::vector<FloatArray>& prob,
+    const std::vector<int64_t>& num_samples, const std::vector<NDArray>& prob_or_mask,
     bool replace, bool etype_sorted) {
   COOMatrix ret;
-  CHECK(prob.size() > 0) << "probability or mask array is empty";
+  CHECK(prob_or_mask.size() > 0) << "prob_or_maskability or mask array is empty";
   ATEN_CSR_SWITCH(mat, XPU, IdType, "CSRRowWisePerEtypeSampling", {
-    if (IsAllNullArray(prob)) {
+    if (IsAllNullArray(prob_or_mask)) {
       ret = impl::CSRRowWisePerEtypeSamplingUniform<XPU, IdType>(
             mat, rows, etype_offset, num_samples, replace, etype_sorted);
     } else {
-      ATEN_FLOAT_INT8_UINT8_TYPE_SWITCH(prob[0]->dtype, FloatType, "probability or mask", {
-        ret = impl::CSRRowWisePerEtypeSampling<XPU, IdType, FloatType>(
-            mat, rows, etype_offset, num_samples, prob, replace, etype_sorted);
+      ATEN_FLOAT_INT8_UINT8_TYPE_SWITCH(
+          prob_or_mask_or_mask[0]->dtype, DType, "prob_or_maskability or mask", {
+        ret = impl::CSRRowWisePerEtypeSampling<XPU, IdType, DType>(
+            mat, rows, etype_offset, num_samples, prob_or_mask, replace, etype_sorted);
       });
     }
   });
@@ -826,18 +827,19 @@ COOMatrix COORowWiseSampling(
 
 COOMatrix COORowWisePerEtypeSampling(
     COOMatrix mat, IdArray rows, const std::vector<int64_t>& etype_offset,
-    const std::vector<int64_t>& num_samples, const std::vector<FloatArray>& prob,
+    const std::vector<int64_t>& num_samples, const std::vector<NDArray>& prob_or_mask,
     bool replace) {
   COOMatrix ret;
-  CHECK(prob.size() > 0) << "probability or mask array is empty";
+  CHECK(prob_or_mask.size() > 0) << "probability or mask array is empty";
   ATEN_COO_SWITCH(mat, XPU, IdType, "COORowWisePerEtypeSampling", {
-    if (IsAllNullArray(prob)) {
+    if (IsAllNullArray(prob_or_mask)) {
       ret = impl::COORowWisePerEtypeSamplingUniform<XPU, IdType>(
             mat, rows, etype_offset, num_samples, replace);
     } else {
-      ATEN_FLOAT_INT8_UINT8_TYPE_SWITCH(prob[0]->dtype, FloatType, "probability or mask", {
-        ret = impl::COORowWisePerEtypeSampling<XPU, IdType, FloatType>(
-            mat, rows, etype_offset, num_samples, prob, replace);
+      ATEN_FLOAT_INT8_UINT8_TYPE_SWITCH(
+          prob_or_mask[0]->dtype, DType, "probability or mask", {
+        ret = impl::COORowWisePerEtypeSampling<XPU, IdType, DType>(
+            mat, rows, etype_offset, num_samples, prob_or_mask, replace);
       });
     }
   });

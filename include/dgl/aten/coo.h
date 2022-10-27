@@ -446,8 +446,9 @@ COOMatrix COORowWiseSampling(
  * \param rows Rows to sample from.
  * \param etype_offset The offset to each edge type.
  * \param num_samples Number of samples
- * \param prob Unnormalized probability array. Should be of the same length as the data array.
- *             If an empty array is provided, assume uniform.
+ * \param prob_or_mask Unnormalized probability array or mask array.
+ *                     Should be of the same length as the data array.
+ *                     If an empty array is provided, assume uniform.
  * \param replace True if sample with replacement
  * \return A COOMatrix storing the picked row and col indices. Its data field stores the
  *         the index of the picked elements in the value array.
@@ -458,7 +459,7 @@ COOMatrix COORowWisePerEtypeSampling(
     IdArray rows,
     const std::vector<int64_t>& etype_offset,
     const std::vector<int64_t>& num_samples,
-    const std::vector<FloatArray>& prob,
+    const std::vector<NDArray>& prob_or_mask,
     bool replace = true);
 
 /*!
