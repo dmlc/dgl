@@ -447,7 +447,7 @@ def check_rpc_hetero_sampling_empty_shuffle(tmpdir, num_server):
     assert block.number_of_edges() == 0
     assert len(block.etypes) == len(g.etypes)
 
-def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server, etype_sorted=False):
+def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server, graph_formats=None):
     generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
     g = create_random_hetero(dense=True)
@@ -455,7 +455,8 @@ def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server, etype_sorted=Fal
     num_hops = 1
 
     orig_nid_map, orig_eid_map = partition_graph(g, 'test_sampling', num_parts, tmpdir,
-        num_hops=num_hops, part_method='metis', reshuffle=True, return_mapping=True)
+        num_hops=num_hops, part_method='metis', reshuffle=True, return_mapping=True,
+        graph_formats=graph_formats)
 
     pserver_list = []
     ctx = mp.get_context('spawn')
@@ -466,6 +467,9 @@ def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server, etype_sorted=Fal
         pserver_list.append(p)
 
     fanout = 3
+    etype_sorted = False
+    if graph_formats is not None:
+        etype_sorted = 'csc' in graph_formats or 'csr' in graph_formats
     block, gpb = start_hetero_etype_sample_client(0, tmpdir, num_server > 1, fanout,
                                                   nodes={'n3': [0, 10, 99, 66, 124, 208]},
                                                   etype_sorted=etype_sorted)
@@ -768,7 +772,9 @@ def test_rpc_sampling_shuffle(num_server):
         check_rpc_hetero_sampling_shuffle(Path(tmpdirname), num_server)
         check_rpc_hetero_sampling_empty_shuffle(Path(tmpdirname), num_server)
         check_rpc_hetero_etype_sampling_shuffle(Path(tmpdirname), num_server)
-        check_rpc_hetero_etype_sampling_shuffle(Path(tmpdirname), num_server, etype_sorted=True)
+        check_rpc_hetero_etype_sampling_shuffle(Path(tmpdirname), num_server, ['csc'])
+        check_rpc_hetero_etype_sampling_shuffle(Path(tmpdirname), num_server, ['csr'])
+        check_rpc_hetero_etype_sampling_shuffle(Path(tmpdirname), num_server, ['csc', 'coo'])
         check_rpc_hetero_etype_sampling_empty_shuffle(Path(tmpdirname), num_server)
         check_rpc_bipartite_sampling_empty(Path(tmpdirname), num_server)
         check_rpc_bipartite_sampling_shuffle(Path(tmpdirname), num_server)
