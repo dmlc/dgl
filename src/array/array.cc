@@ -558,7 +558,7 @@ COOMatrix CSRRowWiseSampling(
       CHECK(!(prob_or_mask->dtype.bits == 8 && XPU == kDGLCUDA)) <<
         "GPU sampling with masks is currently not supported yet.";
       ATEN_FLOAT_INT8_UINT8_TYPE_SWITCH(
-          prob_or_mask->dtype, FloatType, "prob_or_maskability or mask", {
+          prob_or_mask->dtype, FloatType, "probability or mask", {
         ret = impl::CSRRowWiseSampling<XPU, IdType, FloatType>(
             mat, rows, num_samples, prob_or_mask, replace);
       });
@@ -814,7 +814,7 @@ COOMatrix COORowWiseSampling(
       ret = impl::COORowWiseSamplingUniform<XPU, IdType>(mat, rows, num_samples, replace);
     } else {
       ATEN_FLOAT_INT8_UINT8_TYPE_SWITCH(
-          prob_or_mask->dtype, DType, "prob_or_maskability or mask", {
+          prob_or_mask->dtype, DType, "probability or mask", {
         ret = impl::COORowWiseSampling<XPU, IdType, DType>(
             mat, rows, num_samples, prob_or_mask, replace);
       });
