@@ -545,21 +545,22 @@ CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries) {
 }
 
 COOMatrix CSRRowWiseSampling(
-    CSRMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob, bool replace) {
+    CSRMatrix mat, IdArray rows, int64_t num_samples, NDArray prob_or_mask, bool replace) {
   COOMatrix ret;
-  if (IsNullArray(prob)) {
+  if (IsNullArray(prob_or_mask)) {
     ATEN_CSR_SWITCH_CUDA_UVA(mat, rows, XPU, IdType, "CSRRowWiseSamplingUniform", {
       ret = impl::CSRRowWiseSamplingUniform<XPU, IdType>(mat, rows, num_samples, replace);
     });
   } else {
-    // prob is pinned and rows on GPU is valid
-    CHECK_VALID_CONTEXT(prob, rows);
+    // prob_or_mask is pinned and rows on GPU is valid
+    CHECK_VALID_CONTEXT(prob_or_mask, rows);
     ATEN_CSR_SWITCH_CUDA_UVA(mat, rows, XPU, IdType, "CSRRowWiseSampling", {
-      CHECK(!(prob->dtype.bits == 8 && XPU == kDGLCUDA)) <<
+      CHECK(!(prob_or_mask->dtype.bits == 8 && XPU == kDGLCUDA)) <<
         "GPU sampling with masks is currently not supported yet.";
-      ATEN_FLOAT_INT8_UINT8_TYPE_SWITCH(prob->dtype, FloatType, "probability or mask", {
+      ATEN_FLOAT_INT8_UINT8_TYPE_SWITCH(
+          prob_or_mask->dtype, FloatType, "prob_or_maskability or mask", {
         ret = impl::CSRRowWiseSampling<XPU, IdType, FloatType>(
-            mat, rows, num_samples, prob, replace);
+            mat, rows, num_samples, prob_or_mask, replace);
       });
     });
   }
@@ -806,15 +807,16 @@ COOMatrix COORemove(COOMatrix coo, IdArray entries) {
 }
 
 COOMatrix COORowWiseSampling(
-    COOMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob, bool replace) {
+    COOMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob_or_mask, bool replace) {
   COOMatrix ret;
   ATEN_COO_SWITCH(mat, XPU, IdType, "COORowWiseSampling", {
-    if (IsNullArray(prob)) {
+    if (IsNullArray(prob_or_mask)) {
       ret = impl::COORowWiseSamplingUniform<XPU, IdType>(mat, rows, num_samples, replace);
     } else {
-      ATEN_FLOAT_INT8_UINT8_TYPE_SWITCH(prob->dtype, FloatType, "probability or mask", {
+      ATEN_FLOAT_INT8_UINT8_TYPE_SWITCH(
+          prob_or_mask->dtype, FloatType, "prob_or_maskability or mask", {
         ret = impl::COORowWiseSampling<XPU, IdType, FloatType>(
-            mat, rows, num_samples, prob, replace);
+            mat, rows, num_samples, prob_or_mask, replace);
       });
     }
   });

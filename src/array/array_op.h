@@ -160,9 +160,9 @@ template <DGLDeviceType XPU, typename IdType>
 CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries);
 
 // FloatType is the type of probability data.
-template <DGLDeviceType XPU, typename IdType, typename FloatType>
+template <DGLDeviceType XPU, typename IdType, typename DType>
 COOMatrix CSRRowWiseSampling(
-    CSRMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob, bool replace);
+    CSRMatrix mat, IdArray rows, int64_t num_samples, NDArray prob_or_mask, bool replace);
 
 // FloatType is the type of probability data.
 template <DGLDeviceType XPU, typename IdType, typename FloatType>
@@ -269,9 +269,9 @@ template <DGLDeviceType XPU, typename IdType>
 COOMatrix COORemove(COOMatrix coo, IdArray entries);
 
 // FloatType is the type of probability data.
-template <DGLDeviceType XPU, typename IdType, typename FloatType>
+template <DGLDeviceType XPU, typename IdType, typename DType>
 COOMatrix COORowWiseSampling(
-    COOMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob, bool replace);
+    COOMatrix mat, IdArray rows, int64_t num_samples, NDArray prob_or_mask, bool replace);
 
 // FloatType is the type of probability data.
 template <DGLDeviceType XPU, typename IdType, typename FloatType>

@@ -29,15 +29,15 @@ inline FloatArray DoubleSlice(FloatArray array, const IdxType* idx_data,
 
 template <typename IdxType, typename DType>
 inline NumPicksFn<IdxType> GetSamplingNumPicksFn(
-    int64_t num_samples, FloatArray prob, bool replace) {
-  NumPicksFn<IdxType> num_picks_fn = [prob, num_samples, replace]
+    int64_t num_samples, NDArray prob_or_mask, bool replace) {
+  NumPicksFn<IdxType> num_picks_fn = [prob_or_mask, num_samples, replace]
     (IdxType rowid, IdxType off, IdxType len,
      const IdxType* col, const IdxType* data) {
       const int64_t max_num_picks = (num_samples == -1) ? len : num_samples;
-      const DType* prob_data = prob.Ptr<DType>();
+      const DType* prob_or_mask_data = prob_or_mask.Ptr<DType>();
       IdxType nnz = 0;
       for (IdxType i = off; i < off + len; ++i) {
-        if (prob_data[i] > 0) {
+        if (prob_or_mask_data[i] > 0) {
           ++nnz;
         }
       }
@@ -53,14 +53,14 @@ inline NumPicksFn<IdxType> GetSamplingNumPicksFn(
 
 template <typename IdxType, typename DType>
 inline PickFn<IdxType> GetSamplingPickFn(
-    int64_t num_samples, FloatArray prob, bool replace) {
-  PickFn<IdxType> pick_fn = [prob, num_samples, replace]
+    int64_t num_samples, NDArray prob_or_mask, bool replace) {
+  PickFn<IdxType> pick_fn = [prob_or_mask, num_samples, replace]
     (IdxType rowid, IdxType off, IdxType len, IdxType num_picks,
      const IdxType* col, const IdxType* data,
      IdxType* out_idx) {
-      FloatArray prob_selected = DoubleSlice<IdxType, DType>(prob, data, off, len);
+      NDArray prob_or_mask_selected = DoubleSlice<IdxType, DType>(prob_or_mask, data, off, len);
       RandomEngine::ThreadLocal()->Choice<IdxType, DType>(
-          num_picks, prob_selected, out_idx, replace);
+          num_picks, prob_or_mask_selected, out_idx, replace);
       for (int64_t j = 0; j < num_picks; ++j) {
         out_idx[j] += off;
       }
@@ -183,33 +183,35 @@ inline PickFn<IdxType> GetSamplingBiasedPickFn(
 
 /////////////////////////////// CSR ///////////////////////////////
 
-template <DGLDeviceType XPU, typename IdxType, typename FloatType>
+template <DGLDeviceType XPU, typename IdxType, typename DType>
 COOMatrix CSRRowWiseSampling(CSRMatrix mat, IdArray rows, int64_t num_samples,
-                             FloatArray prob, bool replace) {
+                             NDArray prob_or_mask, bool replace) {
   // If num_samples is -1, select all neighbors without replacement.
   replace = (replace && num_samples != -1);
-  CHECK(prob.defined());
-  auto num_picks_fn = GetSamplingNumPicksFn<IdxType, FloatType>(num_samples, prob, replace);
-  auto pick_fn = GetSamplingPickFn<IdxType, FloatType>(num_samples, prob, replace);
+  CHECK(prob_or_mask.defined());
+  auto num_picks_fn = GetSamplingNumPicksFn<IdxType, DType>(
+      num_samples, prob_or_mask, replace);
+  auto pick_fn = GetSamplingPickFn<IdxType, DType>(
+      num_samples, prob_or_mask, replace);
   return CSRRowWisePick(mat, rows, num_samples, replace, pick_fn, num_picks_fn);
 }
 
 template COOMatrix CSRRowWiseSampling<kDGLCPU, int32_t, float>(
-    CSRMatrix, IdArray, int64_t, FloatArray, bool);
+    CSRMatrix, IdArray, int64_t, NDArray, bool);
 template COOMatrix CSRRowWiseSampling<kDGLCPU, int64_t, float>(
-    CSRMatrix, IdArray, int64_t, FloatArray, bool);
+    CSRMatrix, IdArray, int64_t, NDArray, bool);
 template COOMatrix CSRRowWiseSampling<kDGLCPU, int32_t, double>(
-    CSRMatrix, IdArray, int64_t, FloatArray, bool);
+    CSRMatrix, IdArray, int64_t, NDArray, bool);
 template COOMatrix CSRRowWiseSampling<kDGLCPU, int64_t, double>(
-    CSRMatrix, IdArray, int64_t, FloatArray, bool);
+    CSRMatrix, IdArray, int64_t, NDArray, bool);
 template COOMatrix CSRRowWiseSampling<kDGLCPU, int32_t, int8_t>(
-    CSRMatrix, IdArray, int64_t, FloatArray, bool);
+    CSRMatrix, IdArray, int64_t, NDArray, bool);
 template COOMatrix CSRRowWiseSampling<kDGLCPU, int64_t, int8_t>(
-    CSRMatrix, IdArray, int64_t, FloatArray, bool);
+    CSRMatrix, IdArray, int64_t, NDArray, bool);
 template COOMatrix CSRRowWiseSampling<kDGLCPU, int32_t, uint8_t>(
-    CSRMatrix, IdArray, int64_t, FloatArray, bool);
+    CSRMatrix, IdArray, int64_t, NDArray, bool);
 template COOMatrix CSRRowWiseSampling<kDGLCPU, int64_t, uint8_t>(
-    CSRMatrix, IdArray, int64_t, FloatArray, bool);
+    CSRMatrix, IdArray, int64_t, NDArray, bool);
 
 template <DGLDeviceType XPU, typename IdxType, typename FloatType>
 COOMatrix CSRRowWisePerEtypeSampling(CSRMatrix mat, IdArray rows, IdArray etypes,
@@ -290,33 +292,35 @@ template COOMatrix CSRRowWiseSamplingBiased<kDGLCPU, int64_t, double>(
 
 /////////////////////////////// COO ///////////////////////////////
 
-template <DGLDeviceType XPU, typename IdxType, typename FloatType>
+template <DGLDeviceType XPU, typename IdxType, typename DType>
 COOMatrix COORowWiseSampling(COOMatrix mat, IdArray rows, int64_t num_samples,
-                             FloatArray prob, bool replace) {
+                             NDArray prob_or_mask, bool replace) {
   // If num_samples is -1, select all neighbors without replacement.
   replace = (replace && num_samples != -1);
-  CHECK(prob.defined());
-  auto num_picks_fn = GetSamplingNumPicksFn<IdxType, FloatType>(num_samples, prob, replace);
-  auto pick_fn = GetSamplingPickFn<IdxType, FloatType>(num_samples, prob, replace);
+  CHECK(prob_or_mask.defined());
+  auto num_picks_fn = GetSamplingNumPicksFn<IdxType, DType>(
+      num_samples, prob_or_mask, replace);
+  auto pick_fn = GetSamplingPickFn<IdxType, DType>(
+      num_samples, prob_or_mask, replace);
   return COORowWisePick(mat, rows, num_samples, replace, pick_fn, num_picks_fn);
 }
 
 template COOMatrix COORowWiseSampling<kDGLCPU, int32_t, float>(
-    COOMatrix, IdArray, int64_t, FloatArray, bool);
+    COOMatrix, IdArray, int64_t, NDArray, bool);
 template COOMatrix COORowWiseSampling<kDGLCPU, int64_t, float>(
-    COOMatrix, IdArray, int64_t, FloatArray, bool);
+    COOMatrix, IdArray, int64_t, NDArray, bool);
 template COOMatrix COORowWiseSampling<kDGLCPU, int32_t, double>(
-    COOMatrix, IdArray, int64_t, FloatArray, bool);
+    COOMatrix, IdArray, int64_t, NDArray, bool);
 template COOMatrix COORowWiseSampling<kDGLCPU, int64_t, double>(
-    COOMatrix, IdArray, int64_t, FloatArray, bool);
+    COOMatrix, IdArray, int64_t, NDArray, bool);
 template COOMatrix COORowWiseSampling<kDGLCPU, int32_t, int8_t>(
-    COOMatrix, IdArray, int64_t, FloatArray, bool);
+    COOMatrix, IdArray, int64_t, NDArray, bool);
 template COOMatrix COORowWiseSampling<kDGLCPU, int64_t, int8_t>(
-    COOMatrix, IdArray, int64_t, FloatArray, bool);
+    COOMatrix, IdArray, int64_t, NDArray, bool);
 template COOMatrix COORowWiseSampling<kDGLCPU, int32_t, uint8_t>(
-    COOMatrix, IdArray, int64_t, FloatArray, bool);
+    COOMatrix, IdArray, int64_t, NDArray, bool);
 template COOMatrix COORowWiseSampling<kDGLCPU, int64_t, uint8_t>(
-    COOMatrix, IdArray, int64_t, FloatArray, bool);
+    COOMatrix, IdArray, int64_t, NDArray, bool);
 
 template <DGLDeviceType XPU, typename IdxType, typename FloatType>
 COOMatrix COORowWisePerEtypeSampling(COOMatrix mat, IdArray rows, IdArray etypes,
