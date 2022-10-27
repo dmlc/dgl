@@ -183,14 +183,14 @@ class LaborSampler(BlockSampler):
                 frontier, seed_nodes, include_dst_in_src=True, src_nodes=None
             )
             block.edata[EID] = eid
-            if self.importance_sampling:
-                if len(g.canonical_etypes) > 1:
-                    for etype, importance in zip(
-                        g.canonical_etypes, importances
-                    ):
+            if len(g.canonical_etypes) > 1:
+                for etype, importance in zip(
+                    g.canonical_etypes, importances
+                ):
+                    if importance.shape[0] == block.num_edges(etype):
                         block.edata["edge_weights"][etype] = importance
-                else:
-                    block.edata["edge_weights"] = importances[0]
+            elif importances[0].shape[0] == block.num_edges():
+                block.edata["edge_weights"] = importances[0]
             seed_nodes = block.srcdata[NID]
             blocks.insert(0, block)
 

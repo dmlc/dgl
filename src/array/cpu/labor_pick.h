@@ -66,6 +66,8 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
   constexpr bool linear_c_convergence = false;
 
   const bool weights = !IsNullArray(prob);
+  if (importance_sampling >= 0)
+    importance_sampling += weights;
   auto A_arr = prob;
   FloatType *A = static_cast<FloatType*>(A_arr->data);
   constexpr double eps = 0.0001;
@@ -110,9 +112,10 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
           const FloatType c = cs[i];
           const IdxType rid = rows_data[i];
           for (auto j = indptr[rid]; j < indptr[rid + 1]; j++) {
-            auto itb = hop_map2.emplace(indices[j], c);
+            const auto ct = c * (weights && iters == 1 ? A[j] : 1);
+            auto itb = hop_map2.emplace(indices[j], ct);
             if (!itb.second)
-              itb.first->second = std::max(c, itb.first->second);
+              itb.first->second = std::max(ct, itb.first->second);
           }
         }
         if (hop_map.empty())
@@ -120,8 +123,6 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
         else
           for (auto it : hop_map2)
             hop_map[it.first] *= it.second;
-      } else if (importance_sampling > 0) {
-        importance_sampling++;
       }
 
       for (int64_t i = 0; i < num_rows; ++i) {
@@ -250,7 +251,8 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
         }
       }
       const auto rnd = itb.first->second;
-      num_edges += rnd <= (importance_sampling ? c * hop_map[v] : c * (weights ? A[j] : 1));
+      num_edges +=
+          rnd <= (importance_sampling - weights ? c * hop_map[v] : c * (weights ? A[j] : 1));
       rands[off++] = rnd;
     }
   }
@@ -286,7 +288,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
     for (auto j = indptr[rid]; j < indptr[rid + 1]; j++) {
       const auto v = indices[j];
       const auto w = (weights ? A[j] : 1);
-      const auto ps = std::min(ONE, importance_sampling ? c * hop_map[v] : c * w);
+      const auto ps = std::min(ONE, importance_sampling - weights ? c * hop_map[v] : c * w);
       const auto rnd = rands[idx++];
       if (rnd <= ps) {
         norm_inv_p += w / ps;

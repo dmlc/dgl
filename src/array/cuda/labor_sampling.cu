@@ -220,8 +220,17 @@ template <typename FloatType>
 struct SquareFunc {
   __host__ __device__
   auto operator() (FloatType x) {
-    return x * x;
+    return thrust::make_tuple(x, x * x);
   }
+};
+
+struct TupleSum {
+    template <typename T>
+    __host__ __device__
+    T operator()(const T &a, const T &b) const {
+        return thrust::make_tuple(thrust::get<0>(a) + thrust::get<0>(b),
+            thrust::get<1>(a) + thrust::get<1>(b));
+    }
 };
 
 template <typename IdType, typename FloatType>
@@ -254,8 +263,10 @@ __global__ void _CSRRowWiseOneHopExtractorKernel(
   const IdType * const indices,
   const IdType * const idx_coo,
   const IdType * const nids,
+  const FloatType * const A,
   FloatType * const rands,
-  IdType * const hop) {
+  IdType * const hop,
+  FloatType * const A_l) {
   IdType tx = static_cast<IdType>(blockIdx.x) * blockDim.x + threadIdx.x;
   const int stride_x = gridDim.x * blockDim.x;
 
@@ -282,6 +293,8 @@ __global__ void _CSRRowWiseOneHopExtractorKernel(
     } else {
       rnd = curand_uniform(&rng);
     }
+    if (A)
+      A_l[tx] = A[in_idx];
     rands[tx] = (FloatType)rnd;
     tx += stride_x;
   }
@@ -320,24 +333,22 @@ __global__ void _CSRRowWiseLayerSampleDegreeKernel(
 
     const IdType d = indptr[row + 1] - in_row_start;
 
-    // slightly better than NS
-    const FloatType var_target = num_picks < d ?
-        (ds ?
-            ds[row] * ds[row] * (ONE / num_picks - ONE / d) + d2s[row]
-            : d * (FloatType)1 * d / num_picks)
-        : (ds ? d2s[row] : d);
-
-    auto c = cs[out_row];
-
     if (d > 0) {
+      const auto k = min(num_picks, d);
+      // slightly better than NS
+      const FloatType d_ = ds ? ds[row] : d;
+      FloatType var_target = d_ * d_ / k + (ds ? d2s[row] - d_ * d_ / d : 0);
+
+      auto c = cs[out_row];
       const int num_valid = min(d, (IdType)CTA_SIZE);
       FloatType var_1;
       do {
         var_1 = 0;
-        if (A) {  // weights first iter
+        if (A) {
           for (int idx = threadIdx.x; idx < d; idx += CTA_SIZE) {
-            const auto ps = A[in_row_start + idx];
-            var_1 += 1 / min(ONE, c * ps);
+            const auto w = A[in_row_start + idx];
+            const auto ps = probs ? probs[out_row_start + idx] : w;
+            var_1 += w * w / min(ONE, c * ps);
           }
         } else {
           for (int idx = threadIdx.x; idx < d; idx += CTA_SIZE) {
@@ -353,10 +364,10 @@ __global__ void _CSRRowWiseLayerSampleDegreeKernel(
 
         c *= var_1 / var_target;
       } while (min(var_1, var_target) / max(var_1, var_target) < 1 - eps);
-    }
 
-    if (threadIdx.x == 0)
-      cs[out_row] = c;
+      if (threadIdx.x == 0)
+        cs[out_row] = c;
+    }
 
     out_row += BLOCK_CTAS;
   }
@@ -434,44 +445,40 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
   auto d2s_arr = weights ? NewFloatArray(num_rows, ctx, sizeof(FloatType) * 8) : NullArray();
   auto d2s = static_cast<FloatType*>(d2s_arr->data);
 
-  {
-    if (weights) {
-      auto b_offsets = thrust::make_transform_iterator(rows, IndptrFunc<IdType>{indptr});
-      auto e_offsets = thrust::make_transform_iterator(rows, IndptrFunc<IdType>{indptr + 1});
+  if (weights) {
+    auto b_offsets = thrust::make_transform_iterator(rows, IndptrFunc<IdType>{indptr});
+    auto e_offsets = thrust::make_transform_iterator(rows, IndptrFunc<IdType>{indptr + 1});
 
-      size_t prefix_temp_size = 0;
-      CUDA_CALL(cub::DeviceSegmentedReduce::Sum(
-        nullptr, prefix_temp_size,
-        A,
-        ds,
-        num_rows,
-        b_offsets,
-        e_offsets,
-        stream));
-      auto temp = allocator.alloc_unique<char>(prefix_temp_size);
-      CUDA_CALL(cub::DeviceSegmentedReduce::Sum(
-        temp.get(), prefix_temp_size,
-        A,
-        ds,
-        num_rows,
-        b_offsets,
-        e_offsets,
-        stream));
-      auto A2 = thrust::make_transform_iterator(A, SquareFunc<FloatType>{});
-      CUDA_CALL(cub::DeviceSegmentedReduce::Sum(
-        temp.get(), prefix_temp_size,
-        A2,
-        d2s,
-        num_rows,
-        b_offsets,
-        e_offsets,
-        stream));
-    }
+    auto A_A2 = thrust::make_transform_iterator(A, SquareFunc<FloatType>{});
+    auto ds_d2s = thrust::make_zip_iterator(ds, d2s);
 
-    thrust::counting_iterator<IdType> iota(0);
-    thrust::for_each(exec_policy, iota, iota + num_rows, DegreeFunc<IdType, FloatType>{
-        num_picks, rows, indptr, weights ? ds : nullptr, in_deg.get(), cs});
+    size_t prefix_temp_size = 0;
+    CUDA_CALL(cub::DeviceSegmentedReduce::Reduce(
+      nullptr, prefix_temp_size,
+      A_A2,
+      ds_d2s,
+      num_rows,
+      b_offsets,
+      e_offsets,
+      TupleSum{},
+      thrust::make_tuple((FloatType)0, (FloatType)0),
+      stream));
+    auto temp = allocator.alloc_unique<char>(prefix_temp_size);
+    CUDA_CALL(cub::DeviceSegmentedReduce::Reduce(
+      temp.get(), prefix_temp_size,
+      A_A2,
+      ds_d2s,
+      num_rows,
+      b_offsets,
+      e_offsets,
+      TupleSum{},
+      thrust::make_tuple((FloatType)0, (FloatType)0),
+      stream));
   }
+
+  thrust::counting_iterator<IdType> iota(0);
+  thrust::for_each(exec_policy, iota, iota + num_rows, DegreeFunc<IdType, FloatType>{
+    num_picks, rows, indptr, weights ? ds : nullptr, in_deg.get(), cs});
 
   // fill subindptr
   auto subindptr_arr = NewIdArray(num_rows + 1, ctx, sizeof(IdType) * 8);
@@ -498,6 +505,8 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
       DGLContext{kDGLCPU, 0},
       mat.indptr->dtype);
   }
+  auto A_l_arr = weights ? NewFloatArray(hop_size, ctx, sizeof(FloatType) * 8) : NullArray();
+  auto A_l = static_cast<FloatType*>(A_l_arr->data);
   auto hop_arr = NewIdArray(hop_size, ctx, sizeof(IdType) * 8);
   CSRMatrix smat(num_rows, mat.num_cols, subindptr_arr, hop_arr, NullArray(), mat.sorted);
   // Consider fusing CSRToCOO into StencilOpFused kernel
@@ -509,6 +518,27 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
   auto hop_1 = static_cast<IdType*>(hop_arr->data);
   auto rands = allocator.alloc_unique<FloatType>(importance_sampling ? hop_size : 1);
   auto probs_found = allocator.alloc_unique<FloatType>(importance_sampling ? hop_size : 1);
+
+  if (weights) {
+    constexpr int BLOCK_CTAS = BLOCK_SIZE / CTA_SIZE;
+    // the number of rows each thread block will cover
+    constexpr int TILE_SIZE = BLOCK_CTAS;
+    const dim3 block(CTA_SIZE, BLOCK_CTAS);
+    const dim3 grid((num_rows + TILE_SIZE - 1) / TILE_SIZE);
+    CUDA_KERNEL_CALL(
+      (_CSRRowWiseLayerSampleDegreeKernel<IdType, FloatType, BLOCK_CTAS, TILE_SIZE>),
+      grid, block, 0, stream,
+      num_picks,
+      num_rows,
+      rows,
+      cs,
+      ds,
+      d2s,
+      indptr,
+      nullptr,
+      A,
+      subindptr);
+  }
 
   if (importance_sampling) {
     { // extracts the onehop neighborhood cols to a contigous range into hop_1
@@ -524,7 +554,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
       CUDA_KERNEL_CALL((_CSRRowWiseOneHopExtractorKernel<IdType, FloatType>),
         grid, block, 0, stream,
         seeds[0], seeds[num_seeds - 1], a, b, hop_size, rows,
-        indptr, subindptr, indices, idx_coo, nids, rands.get(), hop_1);
+        indptr, subindptr, indices, idx_coo, nids, weights ? A : nullptr, rands.get(), hop_1, A_l);
     }
     int64_t hop_uniq_size = 0;
     auto hop_new_arr = NewIdArray(hop_size, ctx, sizeof(IdType) * 8);
@@ -622,7 +652,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
     COOMatrix rmat(
         num_rows, hop_uniq_size, idx_coo_arr, hop_new_arr, NullArray(), true, mat.sorted);
     CSRMatrix rmatcsc;
-    if (use_csr_spmv)
+    if (use_csr_spmv)  // @todo need to permute A_l_arr too if this option is wanted
       rmatcsc = COOToCSR(COOTranspose(rmat));
 
     BcastOff bcast_off;
@@ -641,24 +671,36 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
     double prev_ex_nodes = hop_uniq_size;
 
     for (int iters = 0; iters < importance_sampling || importance_sampling < 0; iters++) {
-      if (!weights || iters) {
-        if (!use_csr_spmv) {
+      if (!use_csr_spmv) {
+        if (weights && iters == 0) {
           cuda::SpMMCoo<IdType, FloatType,
-              cuda::binary::CopyLhs<FloatType>, cuda::reduce::Max<IdType, FloatType, true>>(
-              bcast_off, rmat, cs_arr, NullArray(), iters ? probs_arr : probs_arr_2, arg_u, arg_e);
+            cuda::binary::Mul<FloatType>, cuda::reduce::Max<IdType, FloatType, true>>(
+            bcast_off, rmat, cs_arr, A_l_arr, probs_arr_2, arg_u, arg_e);
+        } else {
+          cuda::SpMMCoo<IdType, FloatType,
+            cuda::binary::CopyLhs<FloatType>, cuda::reduce::Max<IdType, FloatType, true>>(
+            bcast_off, rmat, cs_arr, NullArray(), iters ? probs_arr : probs_arr_2, arg_u, arg_e);
+        }
+      } else {
+        if (weights && iters == 0) {
+          // A_l_arr needs to be permuted also, @todo
+          thrust::fill_n(exec_policy, probs, hop_uniq_size, 0);
+          cuda::SpMMCsr<IdType, FloatType, cuda::binary::Mul<FloatType>,
+              cuda::reduce::Max<IdType, FloatType, false>>(bcast_off,
+              rmatcsc, cs_arr, A_l_arr, probs_arr_2, arg_u, arg_e);
         } else {
           thrust::fill_n(exec_policy, iters ? probs_1 : probs, hop_uniq_size, 0);
           cuda::SpMMCsr<IdType, FloatType, cuda::binary::CopyLhs<FloatType>,
               cuda::reduce::Max<IdType, FloatType, false>>(bcast_off,
               rmatcsc, cs_arr, NullArray(), iters ? probs_arr : probs_arr_2, arg_u, arg_e);
         }
-
-        if (iters)
-          thrust::transform(exec_policy,
-              probs_1, probs_1 + hop_uniq_size, probs, probs, thrust::multiplies<FloatType>{});
-
-        thrust::gather(exec_policy, hop_new, hop_new + hop_size, probs, probs_found.get());
       }
+
+      if (iters)
+        thrust::transform(exec_policy,
+            probs_1, probs_1 + hop_uniq_size, probs, probs, thrust::multiplies<FloatType>{});
+
+      thrust::gather(exec_policy, hop_new, hop_new + hop_size, probs, probs_found.get());
 
       {
         constexpr int BLOCK_CTAS = BLOCK_SIZE / CTA_SIZE;
@@ -677,11 +719,11 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
           weights ? d2s : nullptr,
           indptr,
           probs_found.get(),
-          iters == 0 ? A : nullptr,
+          A,
           subindptr);
       }
 
-      if (!weights || iters) {
+      {
         auto probs_min_1 = thrust::make_transform_iterator(probs, TransformOpMinWith1{});
         double cur_ex_nodes = thrust::reduce(exec_policy,
             probs_min_1, probs_min_1 + hop_uniq_size, 0.0);
@@ -708,7 +750,6 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
 
   IdType num_edges;
   {
-    thrust::counting_iterator<IdType> iota(0);
     thrust::constant_iterator<FloatType> one(1);
     if (importance_sampling) {
       auto output = thrust::make_zip_iterator(
