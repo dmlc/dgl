@@ -132,6 +132,29 @@ struct cuda_dtype<double> {
   static constexpr cudaDataType_t value = CUDA_R_64F;
 };
 
+/*
+ * \brief Accumulator type for SpMM.
+ */
+template <typename T>
+struct accum_dtype {
+  typedef float type;
+};
+
+template <>
+struct accum_dtype<half> {
+  typedef float type;
+};
+
+template <>
+struct accum_dtype<float> {
+  typedef float type;
+};
+
+template <>
+struct accum_dtype<double> {
+  typedef double type;
+};
+
 #if CUDART_VERSION >= 11000
 /**
  * @brief Cast index data type to cusparseIndexType_t.

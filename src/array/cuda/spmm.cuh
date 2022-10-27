@@ -553,7 +553,7 @@ __global__ void SpMMCsrKernel(
   while (ty < num_rows) {
     int tx = blockIdx.y * blockDim.x + threadIdx.x;
     while (tx < out_len) {
-      DType local_accum = ReduceOp::zero();
+      typename accum_dtype<DType>::type local_accum = ReduceOp::zero();
       Idx local_argu = 0, local_arge = 0;
       const int lhs_add = UseBcast ? ubcast_off[tx] : tx;
       const int rhs_add = UseBcast ? ebcast_off[tx] : tx;
@@ -573,7 +573,7 @@ __global__ void SpMMCsrKernel(
       // Separate kernel `SpMMCmpCsrHeteroKernel` is used for max- and
       // min-reducer. It does not affect the output on homogeneous graph as
       // `out` is initialized to zero.
-      out[ty * out_len + tx] += local_accum;
+      out[ty * out_len + tx] += static_cast<DType>(local_accum);
       if (ReduceOp::require_arg && BinaryOp::use_lhs)
         arg_u[ty * out_len + tx] = local_argu;
       if (ReduceOp::require_arg && BinaryOp::use_rhs)
