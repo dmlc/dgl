@@ -14,18 +14,36 @@
 namespace dgl {
 namespace sparse {
 
+/*! \brief SparseFormat enumeration */
 enum SparseFormat { kCOO, kCSR, kCSC };
 
+/*! \brief CSR sparse structure */
 struct CSR {
   torch::Tensor indptr, indices;
-  torch::optional<torch::Tensor> eids;
+  // The element order of the sparse format. In the SparseMatrix, we have data
+  // (value_) for each non-zero values. The elements in sparse formats may not
+  // follow the same order as in the SparseMatrix. So we store `e_order` in a
+  // sparse format to indicate its relative element order to the SparseMatrix.
+  // With `e_order`, we can retrieve the correct data for a sparse format, i.e.,
+  // `value_[e_order]`. If `e_order` is not defined, this sparse format follows
+  // the same element order as in the SparseMatrix.
+  torch::optional<torch::Tensor> e_order;
 };
 
+/*! \brief COO sparse structure */
 struct COO {
   torch::Tensor row, col;
-  torch::optional<torch::Tensor> eids;
+  // The element order of the sparse format. In the SparseMatrix, we have data
+  // (value_) for each non-zero values. The elements in sparse formats may not
+  // follow the same order as in the SparseMatrix. So we store `e_order` in a
+  // sparse format to indicate its relative element order to the SparseMatrix.
+  // With `e_order`, we can retrieve the correct data for a sparse format, i.e.,
+  // `value_[e_order]`. If `e_order` is not defined, this sparse format follows
+  // the same element order as in the SparseMatrix.
+  torch::optional<torch::Tensor> e_order;
 };
 
+/*! \brief SparseMatrix bound to Python  */
 class SparseMatrix : public torch::CustomClassHolder {
  public:
   SparseMatrix(
@@ -77,16 +95,32 @@ class SparseMatrix : public torch::CustomClassHolder {
     }
   }
 
+  // COO/CSC/CSR pointers. Nullptr indicates non-existence.
   std::shared_ptr<COO> coo_;
   std::shared_ptr<CSR> csr_, csc_;
+  // Value of the SparseMatrix
   torch::Tensor value_;
+  // Shape of the SparseMatrix
   std::vector<int64_t> shape_;
 };
 
+/*!
+* \brief Constructing a SparseMatrix from a COO pointer.
+* \param coo COO pointer
+* \param value Value of the sparse matrix
+* \param shape Shape of the sparse matrix
+*/
 c10::intrusive_ptr<SparseMatrix> CreateFromCOOPtr(
     const std::shared_ptr<COO>& coo, torch::Tensor value,
     const std::vector<int64_t>& shape);
 
+/*!
+* \brief Constructing a SparseMatrix from COO Pytorch tensors.
+* \param row Row ids of the COO
+* \param col Column ids of the COO
+* \param value Value of the sparse matrix
+* \param shape Shape of the sparse matrix
+*/
 c10::intrusive_ptr<SparseMatrix> CreateFromCOO(
     torch::Tensor row, torch::Tensor col, torch::Tensor value,
     const std::vector<int64_t>& shape);

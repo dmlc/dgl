@@ -12,8 +12,8 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
 SparseMatrix::COOTensors() {
   auto coo = COOPtr();
   auto val = Value();
-  if (coo->eids.has_value()) {
-    val = val[coo->eids.value()];
+  if (coo->e_order.has_value()) {
+    val = val[coo->e_order.value()];
   }
   return {coo->row, coo->col, val};
 };

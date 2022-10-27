@@ -9,6 +9,9 @@
 namespace dgl {
 namespace sparse {
 
+/*! \brief Macro to select the sparse format for two sparse matrices. It chooses
+ * COO if anyone of the two sparse matrices has COO format. If none of them has
+ * COO, it tries CSR and CSC in the same manner. */
 #define SPARSE_FORMAT_SELECT_BINARY(A, B, fmt, ...) \
   do {                                              \
     SparseFormat fmt;                               \
