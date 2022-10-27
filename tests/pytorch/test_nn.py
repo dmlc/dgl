@@ -8,7 +8,7 @@ import backend as F
 import pytest
 import torch
 from test_utils.graph_cases import get_cases, random_graph, random_bipartite, random_dglgraph
-from test_utils import parametrize_idtype
+from test_utils import parametrize_idtype, parametrize_idtype64
 from copy import deepcopy
 import pickle
 
@@ -1329,12 +1329,11 @@ def test_gnnexplainer(g, idtype, out_dim):
     explainer = nn.GNNExplainer(model, num_hops=1)
     feat_mask, edge_mask = explainer.explain_graph(g, feat)
 
-@parametrize_idtype
+@parametrize_idtype64
 @pytest.mark.parametrize('g', get_cases(['hetero'], exclude=['zero-degree']))
 @pytest.mark.parametrize('input_dim', [5])
-@pytest.mark.parametrize('hidden_dim', [10])
 @pytest.mark.parametrize('output_dim', [1, 2])
-def test_heterognnexplainer(g, idtype, input_dim, hidden_dim, output_dim):
+def test_heterognnexplainer(g, idtype, input_dim, output_dim):
     g = g.astype(idtype).to(F.ctx())
     device = g.device
 
