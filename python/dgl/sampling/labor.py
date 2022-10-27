@@ -71,7 +71,8 @@ def sample_labors(
 
         If -1 is given for a single edge type, all the neighboring edges with that edge
         type will be selected.
-    random_seed : tensor with 3 or 4 integers
+    random_seed : a tuple of 2 tensors, the first tensor with either 1 or 2 integers, the second
+        one with 2 integers
         The random seed(s) to be used for sampling along with batch dependency count information
         stores as the last two elements
     edge_dir : str, optional
@@ -112,8 +113,8 @@ def sample_labors(
 
     Returns
     -------
-    DGLGraph
-        A sampled subgraph containing only the sampled neighboring edges.
+    tuple(DGLGraph, list of tensors)
+        A sampled subgraph containing only the sampled neighboring edges along with edge weights.
 
     Notes
     -----
@@ -205,7 +206,7 @@ def sample_labors(
         )
         if exclude_edges is not None:
             eid_excluder = EidExcluder(exclude_edges)
-            if importance_sampling != 0:
+            if importance_sampling != 0 or prob is not None:
                 frontier, importances = eid_excluder(frontier, importances)
             else:
                 frontier = eid_excluder(frontier)

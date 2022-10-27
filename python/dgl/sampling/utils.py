@@ -69,7 +69,7 @@ class EidExcluder(object):
             if len(located_eids) > 0:
                 frontier = transforms.remove_edges(
                     frontier, located_eids, store_ids=True)
-                if weights is not None:
+                if weights is not None and weights[0].shape[0] == frontier.num_edges():
                     weights[0] = F.gather_row(weights[0], frontier.edata[EID])
                 frontier.edata[EID] = F.gather_row(parent_eids, frontier.edata[EID])
         else:
@@ -81,7 +81,7 @@ class EidExcluder(object):
                     frontier = transforms.remove_edges(
                         frontier, v, etype=k, store_ids=True)
                     new_eids[k] = F.gather_row(parent_eids[k], frontier.edges[k].data[EID])
-                    if weights is not None:
+                    if weights is not None and weights[i].shape[0] == frontier.num_edges(k):
                         weights[i] = F.gather_row(weights[i], frontier.edges[k].data[EID])
             frontier.edata[EID] = new_eids
         return frontier if weights is None else (frontier, weights)
