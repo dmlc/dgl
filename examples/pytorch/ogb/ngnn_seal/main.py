@@ -48,16 +48,15 @@ class SEALOGBLDataset(Dataset):
         else:
             self.node_features = None
 
-        if not self.dynamic:
-            self.g_list, tensor_dict = self.load_cached()
-            self.labels = tensor_dict["y"]
-            return
-
         pos_edge, neg_edge = get_pos_neg_edges(
-            split, self.split_edge, self.graph, self.percent
+            self.split, self.split_edge, self.graph, self.percent
         )
         self.links = torch.cat([pos_edge, neg_edge], 0)  # [Np + Nn, 2]
         self.labels = np.array([1] * len(pos_edge) + [0] * len(neg_edge))
+
+        if not self.dynamic:
+            self.g_list, tensor_dict = self.load_cached()
+            self.labels = tensor_dict["y"]
 
     def __len__(self):
         return len(self.labels)
@@ -128,12 +127,6 @@ class SEALOGBLDataset(Dataset):
 
         if not os.path.exists(self.root):
             os.makedirs(self.root)
-
-        pos_edge, neg_edge = get_pos_neg_edges(
-            self.split, self.split_edge, self.graph, self.percent
-        )
-        self.links = torch.cat([pos_edge, neg_edge], 0)  # [Np + Nn, 2]
-        self.labels = np.array([1] * len(pos_edge) + [0] * len(neg_edge))
 
         g_list, labels = self.process()
         save_graphs(path, g_list, labels)
@@ -508,6 +501,12 @@ if __name__ == "__main__":
 
     if 0 < args.sortpool_k <= 1:  # Transform percentile to number.
         if args.dataset.startswith("ogbl-citation"):
+        # For this dataset, subgraphs extracted around positive edges are
+        # rather larger than negative edges. Thus we sample from 1000
+        # positive and 1000 negative edges to estimate the k (number of 
+        # nodes to hold for each graph) used in SortPooling.
+        # You can certainly set k manually, instead of estimating from
+        # a percentage of sampled subgraphs.
             _sampled_indices = list(range(1000)) + list(
                 range(len(train_dataset) - 1000, len(train_dataset))
             )
