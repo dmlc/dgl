@@ -572,13 +572,13 @@ COOMatrix CSRRowWisePerEtypeSampling(
     const std::vector<int64_t>& num_samples, const std::vector<FloatArray>& prob,
     bool replace, bool etype_sorted) {
   COOMatrix ret;
-  CHECK(prob.size() > 0) << "probability array is empty";
+  CHECK(prob.size() > 0) << "probability or mask array is empty";
   ATEN_CSR_SWITCH(mat, XPU, IdType, "CSRRowWisePerEtypeSampling", {
     if (IsAllNullArray(prob)) {
       ret = impl::CSRRowWisePerEtypeSamplingUniform<XPU, IdType>(
             mat, rows, etype_offset, num_samples, replace, etype_sorted);
     } else {
-      ATEN_FLOAT_INT8_UINT8_TYPE_SWITCH(prob[0]->dtype, FloatType, "probability", {
+      ATEN_FLOAT_INT8_UINT8_TYPE_SWITCH(prob[0]->dtype, FloatType, "probability or mask", {
         ret = impl::CSRRowWisePerEtypeSampling<XPU, IdType, FloatType>(
             mat, rows, etype_offset, num_samples, prob, replace, etype_sorted);
       });
@@ -829,13 +829,13 @@ COOMatrix COORowWisePerEtypeSampling(
     const std::vector<int64_t>& num_samples, const std::vector<FloatArray>& prob,
     bool replace) {
   COOMatrix ret;
-  CHECK(prob.size() > 0) << "probability array is empty";
+  CHECK(prob.size() > 0) << "probability or mask array is empty";
   ATEN_COO_SWITCH(mat, XPU, IdType, "COORowWisePerEtypeSampling", {
     if (IsAllNullArray(prob)) {
       ret = impl::COORowWisePerEtypeSamplingUniform<XPU, IdType>(
             mat, rows, etype_offset, num_samples, replace);
     } else {
-      ATEN_FLOAT_INT8_UINT8_TYPE_SWITCH(prob[0]->dtype, FloatType, "probability", {
+      ATEN_FLOAT_INT8_UINT8_TYPE_SWITCH(prob[0]->dtype, FloatType, "probability or mask", {
         ret = impl::COORowWisePerEtypeSampling<XPU, IdType, FloatType>(
             mat, rows, etype_offset, num_samples, prob, replace);
       });
