@@ -58,6 +58,8 @@ if __name__ == "__main__":
                         help='Save original node IDs into files')
     parser.add_argument('--save-orig-eids', action='store_true',
                         help='Save original edge IDs into files')
+    parser.add_argument('--graph-formats', default=None, type=str,
+        help='Save partitions in specified formats.')
     params = parser.parse_args()
 
     #invoke the pipeline function
