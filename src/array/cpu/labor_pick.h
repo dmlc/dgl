@@ -48,64 +48,73 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
     CSRMatrix mat,
     IdArray NIDs,
     IdArray rows,
-    int64_t __num_picks,
+    int64_t num_picks,
     FloatArray prob,
     IdArray random_seed,
     IdArray cnt,
     int importance_sampling) {
   using namespace aten;
-  const IdxType* indptr = static_cast<IdxType*>(mat.indptr->data);
-  const IdxType* indices = static_cast<IdxType*>(mat.indices->data);
-  const IdxType* data = CSRHasData(mat)? static_cast<IdxType*>(mat.data->data) : nullptr;
-  const IdxType* rows_data = static_cast<IdxType*>(rows->data);
-  const IdxType* nids = NIDs->shape[0] ? static_cast<IdxType*>(NIDs->data) : nullptr;
+  const IdxType* indptr = mat.indptr.Ptr<IdxType>();
+  const IdxType* indices = mat.indices.Ptr<IdxType>();
+  const IdxType* data = CSRHasData(mat) ? mat.data.Ptr<IdxType>() : nullptr;
+  const IdxType* rows_data = rows.Ptr<IdxType>();
+  const IdxType* nids = NIDs->shape[0] ? NIDs.Ptr<IdxType>() : nullptr;
   const auto num_rows = rows->shape[0];
-  const IdxType num_picks = __num_picks;
   const auto& ctx = mat.indptr->ctx;
 
   constexpr bool linear_c_convergence = false;
 
   const bool weights = !IsNullArray(prob);
+  // O(1) c computation not possible, so one more iteration is needed.
   if (importance_sampling >= 0)
     importance_sampling += weights;
+  // A stands for A in arXiv:2210.13339, that is edge weights
   auto A_arr = prob;
-  FloatType *A = static_cast<FloatType*>(A_arr->data);
+  FloatType *A = A_arr.Ptr<FloatType>();
   constexpr double eps = 0.0001;
   constexpr FloatType ONE = 1;
 
   phmap::flat_hash_map<IdxType, FloatType> hop_map;
 
-  FloatArray cs_array = NDArray::Empty({num_rows},
-                                        DGLDataType{kDGLFloat, 8*sizeof(FloatType), 1},
-                                        ctx);
-  FloatType* cs = static_cast<FloatType*>(cs_array->data);
-  FloatArray ds_array = NDArray::Empty({num_rows},
-                                        DGLDataType{kDGLFloat, 8*sizeof(FloatType), 1},
-                                        ctx);
-  FloatType* ds = static_cast<FloatType*>(ds_array->data);
+  constexpr auto fidtype = DGLDataTypeTraits<FloatType>::dtype;
 
-  IdxType max_d = 1;
+  // cs stands for c_s in arXiv:2210.13339
+  FloatArray cs_array = NDArray::Empty({num_rows}, fidtype, ctx);
+  FloatType* cs = cs_array.Ptr<FloatType>();
+  // ds stands for A_{*s} in arXiv:2210.13339
+  FloatArray ds_array = NDArray::Empty({num_rows}, fidtype, ctx);
+  FloatType* ds = ds_array.Ptr<FloatType>();
+
+  IdxType max_degree = 1;
   IdxType hop_size = 0;
   for (int64_t i = 0; i < num_rows; ++i) {
     const IdxType rid = rows_data[i];
-    const auto act_d = indptr[rid + 1] - indptr[rid];
-    max_d = std::max(act_d, max_d);
-    double d = weights ? std::accumulate(A + indptr[rid], A + indptr[rid + 1], 0.0) : act_d;
+    const auto act_degree = indptr[rid + 1] - indptr[rid];
+    max_degree = std::max(act_degree, max_degree);
+    double d = weights ? std::accumulate(A + indptr[rid], A + indptr[rid + 1], 0.0) : act_degree;
+    // O(1) c computation, samples more than needed for weighted case, mentioned in the sentence
+    // between (10) and (11) in arXiv:2210.13339
     cs[i] = num_picks / d;
     ds[i] = d;
-    hop_size += act_d;
+    hop_size += act_degree;
   }
 
   if (importance_sampling) {
-    FloatArray ps_array = NDArray::Empty({max_d + 1},
-                                          DGLDataType{kDGLFloat, 8*sizeof(FloatType), 1},
-                                          ctx);
-    FloatType* ps = static_cast<FloatType*>(ps_array->data);
+    // ps stands for \pi in arXiv:2210.13339
+    FloatArray ps_array = NDArray::Empty({max_degree + 1}, fidtype, ctx);
+    FloatType* ps = ps_array.Ptr<FloatType>();
 
-    double prev_ex_nodes = max_d * num_rows;
+    double prev_ex_nodes = max_degree * num_rows;
 
     phmap::flat_hash_map<IdxType, FloatType> hop_map2;
     for (int iters = 0; iters < importance_sampling || importance_sampling < 0; iters++) {
+      /*
+      An implementation detail about when there are no weights, then the first c values can be computed in O(1) because all the edge weights are uniform. The c value is just k / d where k is fanout and d is the degree. But when there are weights, since the computed c values are incorrect, I have to skip some logic making use of it to compute the right c values below.
+
+      The later iterations will have correct c values so they will take the if in that case.
+
+      I also increase importance_sampling by 1 above so that the weighted case can do one more of this iteration to match the unweighted case.
+      */
       if (!weights || iters) {
         hop_map2.clear();
         for (int64_t i = 0; i < num_rows; ++i) {
@@ -131,7 +140,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
         if (d == 0)
           continue;
 
-        const auto k = std::min(num_picks, d);
+        const auto k = std::min((IdxType)num_picks, d);
 
         if (hop_map.empty()) {  // weights first iter, pi = A
           for (auto j = indptr[rid]; j < indptr[rid + 1]; j++)
@@ -141,6 +150,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
             ps[j - indptr[rid]] = hop_map[indices[j]];
         }
 
+        // stands for right handside of Equation (22) in arXiv:2210.13339
         double var_target = ds[i] * ds[i] / k;
         if (weights) {
           var_target -= ds[i] * ds[i] / d;
@@ -148,6 +158,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
             var_target += A[j] * A[j];
         }
         FloatType c = cs[i];
+        // stands for left handside of Equation (22) in arXiv:2210.13339
         double var_1;
         if (linear_c_convergence) {
           // fix weights case
@@ -208,9 +219,9 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
   }
 
   // When run distributed, random_seed needs to be equivalent.
-  auto seeds = static_cast<const int64_t *>(random_seed->data);
+  auto seeds = random_seed.Ptr<int64_t>();
   const auto num_seeds = random_seed->shape[0];
-  auto cnts = static_cast<const int64_t *>(cnt->data);
+  auto cnts = cnt.Ptr<int64_t>();
   const auto l = (cnts[0] % cnts[1]) * 1.0 / cnts[1];
   const auto pi = std::acos(-1.0);
   const auto a0 = std::cos(pi * l / 2);
@@ -223,16 +234,15 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
   // compute number of edges first and store randoms
   IdxType num_edges = 0;
   phmap::flat_hash_map<IdxType, FloatType> rand_map;
-  auto rands_arr = NDArray::Empty({hop_size},
-                                  DGLDataType{kDGLFloat, 8*sizeof(FloatType), 1},
-                                  ctx);
-  FloatType* rands = static_cast<FloatType*>(rands_arr->data);
+  FloatArray rands_arr = NDArray::Empty({hop_size}, fidtype, ctx);
+  auto rands = rands_arr.Ptr<FloatType>();
   for (int64_t i = 0, off = 0; i < num_rows; i++) {
     const IdxType rid = rows_data[i];
     const auto c = cs[i];
     for (auto j = indptr[rid]; j < indptr[rid + 1]; j++) {
       const auto v = indices[j];
       const auto u = nids ? nids[v] : v;
+      // itb stands for a pair of iterator and boolean indicating if insertion was successful
       auto itb = rand_map.emplace(u, 0);
       if (itb.second) {
         auto ng = ng0;
@@ -251,28 +261,23 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
         }
       }
       const auto rnd = itb.first->second;
+      // if hop_map is initialized, get ps from there, otherwise get it from the alternative.
       num_edges +=
           rnd <= (importance_sampling - weights ? c * hop_map[v] : c * (weights ? A[j] : 1));
       rands[off++] = rnd;
     }
   }
 
-  IdArray picked_row = NDArray::Empty({num_edges},
-                                      DGLDataType{kDGLInt, 8*sizeof(IdxType), 1},
-                                      ctx);
-  IdArray picked_col = NDArray::Empty({num_edges},
-                                      DGLDataType{kDGLInt, 8*sizeof(IdxType), 1},
-                                      ctx);
-  IdArray picked_idx = NDArray::Empty({num_edges},
-                                      DGLDataType{kDGLInt, 8*sizeof(IdxType), 1},
-                                      ctx);
-  FloatArray importances = NDArray::Empty({importance_sampling ? num_edges : 1},
-                                          DGLDataType{kDGLFloat, 8*sizeof(FloatType), 1},
-                                          ctx);
-  IdxType* picked_rdata = static_cast<IdxType*>(picked_row->data);
-  IdxType* picked_cdata = static_cast<IdxType*>(picked_col->data);
-  IdxType* picked_idata = static_cast<IdxType*>(picked_idx->data);
-  FloatType* importances_data = static_cast<FloatType*>(importances->data);
+  constexpr auto vidtype = DGLDataTypeTraits<IdxType>::dtype;
+
+  IdArray picked_row = NDArray::Empty({num_edges}, vidtype, ctx);
+  IdArray picked_col = NDArray::Empty({num_edges}, vidtype, ctx);
+  IdArray picked_idx = NDArray::Empty({num_edges}, vidtype, ctx);
+  FloatArray importances = NDArray::Empty({importance_sampling ? num_edges : 1}, fidtype, ctx);
+  IdxType* picked_rdata = picked_row.Ptr<IdxType>();
+  IdxType* picked_cdata = picked_col.Ptr<IdxType>();
+  IdxType* picked_idata = picked_idx.Ptr<IdxType>();
+  FloatType* importances_data = importances.Ptr<FloatType>();
 
   std::size_t off = 0, idx = 0;
 
@@ -308,7 +313,8 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
     }
   }
 
-  assert((IdxType)off == num_edges);
+  CHECK((IdxType)off == num_edges) << "computed num_edges should match the number of edges sampled"
+      << num_edges << " != " << off;
 
   return std::make_pair(COOMatrix(mat.num_rows, mat.num_cols,
                    picked_row, picked_col, picked_idx), importances);

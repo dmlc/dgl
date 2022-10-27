@@ -89,7 +89,7 @@ def sample_labors(
         to sum up to one).  Otherwise, the result will be undefined.
 
         If :attr:`prob` is not None, GPU sampling is not supported.
-    importance_sampling : bool, optional
+    importance_sampling : int, optional
         Whether to use importance sampling with replacement or uniform sampling without replacement.
     copy_ndata: bool, optional
         If True, the node features of the new graph are copied from

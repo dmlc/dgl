@@ -38,7 +38,6 @@
 
 #include <numeric>
 #include <utility>
-#include <memory>
 #include <type_traits>
 #include <algorithm>
 #include <limits>
@@ -62,36 +61,6 @@ constexpr double eps = 0.0001;
 constexpr bool labor = true;
 
 namespace {
-
-template <typename ctx_t>
-class workspace_memory_alloc {
-  ctx_t ctx;
-
- public:
-  typedef char value_type;
-
-  void operator()(void * ptr) {
-    runtime::DeviceAPI::Get(*ctx)->FreeWorkspace(*ctx, ptr);
-  }
-
-  explicit workspace_memory_alloc(ctx_t ctx) : ctx(ctx) {}
-
-  workspace_memory_alloc & operator=(const workspace_memory_alloc &) = default;
-
-  template <typename T>
-  std::unique_ptr<T, workspace_memory_alloc> alloc_unique(std::size_t size) {
-    return std::unique_ptr<T, workspace_memory_alloc>(reinterpret_cast<T *>(
-        runtime::DeviceAPI::Get(*ctx)->AllocWorkspace(*ctx, sizeof(T) * size)), *this);
-  }
-
-  char *allocate(std::ptrdiff_t size) {
-    return reinterpret_cast<char *>(runtime::DeviceAPI::Get(*ctx)->AllocWorkspace(*ctx, size));
-  }
-
-  void deallocate(char *ptr, std::size_t) {
-    runtime::DeviceAPI::Get(*ctx)->FreeWorkspace(*ctx, ptr);
-  }
-};
 
 template <typename IdType>
 struct TransformOp {
@@ -331,27 +300,30 @@ __global__ void _CSRRowWiseLayerSampleDegreeKernel(
     const auto in_row_start = indptr[row];
     const auto out_row_start = subindptr[out_row];
 
-    const IdType d = indptr[row + 1] - in_row_start;
+    const IdType degree = indptr[row + 1] - in_row_start;
 
-    if (d > 0) {
-      const auto k = min(num_picks, d);
+    if (degree > 0) {
+      // stands for k in in arXiv:2210.13339, i.e. fanout
+      const auto k = min(num_picks, degree);
       // slightly better than NS
-      const FloatType d_ = ds ? ds[row] : d;
-      FloatType var_target = d_ * d_ / k + (ds ? d2s[row] - d_ * d_ / d : 0);
+      const FloatType d_ = ds ? ds[row] : degree;
+      // stands for right handside of Equation (22) in arXiv:2210.13339
+      FloatType var_target = d_ * d_ / k + (ds ? d2s[row] - d_ * d_ / degree : 0);
 
       auto c = cs[out_row];
-      const int num_valid = min(d, (IdType)CTA_SIZE);
+      const int num_valid = min(degree, (IdType)CTA_SIZE);
+      // stands for left handside of Equation (22) in arXiv:2210.13339
       FloatType var_1;
       do {
         var_1 = 0;
         if (A) {
-          for (int idx = threadIdx.x; idx < d; idx += CTA_SIZE) {
+          for (int idx = threadIdx.x; idx < degree; idx += CTA_SIZE) {
             const auto w = A[in_row_start + idx];
             const auto ps = probs ? probs[out_row_start + idx] : w;
             var_1 += w * w / min(ONE, c * ps);
           }
         } else {
-          for (int idx = threadIdx.x; idx < d; idx += CTA_SIZE) {
+          for (int idx = threadIdx.x; idx < degree; idx += CTA_SIZE) {
             const auto ps = probs[out_row_start + idx];
             var_1 += 1 / min(ONE, c * ps);
           }
@@ -419,7 +391,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
 
   const auto& ctx = rows_arr->ctx;
 
-  workspace_memory_alloc<decltype(&ctx)> allocator(&ctx);
+  runtime::workspace_memory_alloc<decltype(&ctx)> allocator(&ctx);
 
   const auto stream = runtime::getCurrentCUDAStream();
   const auto exec_policy = thrust::cuda::par_nosync(allocator).on(stream);
@@ -438,10 +410,13 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
 
   // compute in-degrees
   auto in_deg = allocator.alloc_unique<IdType>(num_rows + 1);
+  // cs stands for c_s in arXiv:2210.13339
   auto cs_arr = NewFloatArray(num_rows, ctx, sizeof(FloatType) * 8);
   auto cs = static_cast<FloatType*>(cs_arr->data);
+  // ds stands for A_{*s} in arXiv:2210.13339
   auto ds_arr = weights ? NewFloatArray(num_rows, ctx, sizeof(FloatType) * 8) : NullArray();
   auto ds = static_cast<FloatType*>(ds_arr->data);
+  // d2s stands for (A^2)_{*s} in arXiv:2210.13339, ^2 is elementwise.
   auto d2s_arr = weights ? NewFloatArray(num_rows, ctx, sizeof(FloatType) * 8) : NullArray();
   auto d2s = static_cast<FloatType*>(d2s_arr->data);
 
@@ -541,7 +516,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
   }
 
   if (importance_sampling) {
-    { // extracts the onehop neighborhood cols to a contigous range into hop_1
+    { // extracts the onehop neighborhood cols to a contiguous range into hop_1
       const dim3 block(BLOCK_SIZE);
       const dim3 grid((hop_size + BLOCK_SIZE - 1) / BLOCK_SIZE);
       auto seeds = static_cast<const int64_t *>(random_seed->data);
