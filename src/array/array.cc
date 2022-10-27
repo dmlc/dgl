@@ -557,7 +557,7 @@ COOMatrix CSRRowWiseSampling(
     ATEN_CSR_SWITCH_CUDA_UVA(mat, rows, XPU, IdType, "CSRRowWiseSampling", {
       CHECK(!(prob->dtype.bits == 8 && XPU == kDGLCUDA)) <<
         "GPU sampling with masks is currently not supported yet.";
-      ATEN_FLOAT_INT8_UINT8_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
+      ATEN_FLOAT_INT8_UINT8_TYPE_SWITCH(prob->dtype, FloatType, "probability or mask", {
         ret = impl::CSRRowWiseSampling<XPU, IdType, FloatType>(
             mat, rows, num_samples, prob, replace);
       });
@@ -812,7 +812,7 @@ COOMatrix COORowWiseSampling(
     if (IsNullArray(prob)) {
       ret = impl::COORowWiseSamplingUniform<XPU, IdType>(mat, rows, num_samples, replace);
     } else {
-      ATEN_FLOAT_INT8_UINT8_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
+      ATEN_FLOAT_INT8_UINT8_TYPE_SWITCH(prob->dtype, FloatType, "probability or mask", {
         ret = impl::COORowWiseSampling<XPU, IdType, FloatType>(
             mat, rows, num_samples, prob, replace);
       });
