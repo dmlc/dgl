@@ -807,15 +807,15 @@ COOMatrix COORemove(COOMatrix coo, IdArray entries) {
 }
 
 COOMatrix COORowWiseSampling(
-    COOMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob_or_mask, bool replace) {
+    COOMatrix mat, IdArray rows, int64_t num_samples, NDArray prob_or_mask, bool replace) {
   COOMatrix ret;
   ATEN_COO_SWITCH(mat, XPU, IdType, "COORowWiseSampling", {
     if (IsNullArray(prob_or_mask)) {
       ret = impl::COORowWiseSamplingUniform<XPU, IdType>(mat, rows, num_samples, replace);
     } else {
       ATEN_FLOAT_INT8_UINT8_TYPE_SWITCH(
-          prob_or_mask->dtype, FloatType, "prob_or_maskability or mask", {
-        ret = impl::COORowWiseSampling<XPU, IdType, FloatType>(
+          prob_or_mask->dtype, DType, "prob_or_maskability or mask", {
+        ret = impl::COORowWiseSampling<XPU, IdType, DType>(
             mat, rows, num_samples, prob_or_mask, replace);
       });
     }
