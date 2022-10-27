@@ -7,11 +7,14 @@ from torch.nn import Conv1d, Embedding, Linear, MaxPool1d, ModuleList
 
 
 class NGNN_GCNConv(torch.nn.Module):
-    def __init__(self, input_channels, hidden_channels, output_channels):
+    def __init__(
+        self, input_channels, hidden_channels, output_channels, num_layers
+    ):
         super(NGNN_GCNConv, self).__init__()
         self.conv = GraphConv(input_channels, hidden_channels)
         self.fc = Linear(hidden_channels, hidden_channels)
         self.fc2 = Linear(hidden_channels, output_channels)
+        self.num_layers = num_layers
 
     def reset_parameters(self):
         self.conv.reset_parameters()
@@ -24,8 +27,9 @@ class NGNN_GCNConv(torch.nn.Module):
 
     def forward(self, g, x, edge_weight=None):
         x = self.conv(g, x, edge_weight)
-        # x = F.relu(x)
-        # x = self.fc(x)
+        if self.num_layers == 2:
+            x = F.relu(x)
+            x = self.fc(x)
         x = F.relu(x)
         x = self.fc2(x)
         return x
@@ -44,6 +48,7 @@ class DGCNN(torch.nn.Module):
         NGNN=NGNN_GCNConv,
         dropout=0.0,
         ngnn_type="all",
+        num_ngnn_layers=1,
     ):
         super(DGCNN, self).__init__()
 
@@ -59,9 +64,15 @@ class DGCNN(torch.nn.Module):
         self.convs = ModuleList()
         initial_channels = hidden_channels + self.feature_dim
 
+        self.num_ngnn_layers = num_ngnn_layers
         if ngnn_type in ["input", "all"]:
             self.convs.append(
-                NGNN(initial_channels, hidden_channels, hidden_channels)
+                NGNN(
+                    initial_channels,
+                    hidden_channels,
+                    hidden_channels,
+                    self.num_ngnn_layers,
+                )
             )
         else:
             self.convs.append(GNN(initial_channels, hidden_channels))
@@ -69,14 +80,21 @@ class DGCNN(torch.nn.Module):
         if ngnn_type in ["hidden", "all"]:
             for _ in range(0, num_layers - 1):
                 self.convs.append(
-                    NGNN(hidden_channels, hidden_channels, hidden_channels)
+                    NGNN(
+                        hidden_channels,
+                        hidden_channels,
+                        hidden_channels,
+                        self.num_ngnn_layers,
+                    )
                 )
         else:
             for _ in range(0, num_layers - 1):
                 self.convs.append(GNN(hidden_channels, hidden_channels))
 
         if ngnn_type in ["output", "all"]:
-            self.convs.append(NGNN(hidden_channels, hidden_channels, 1))
+            self.convs.append(
+                NGNN(hidden_channels, hidden_channels, 1, self.num_ngnn_layers)
+            )
         else:
             self.convs.append(GNN(hidden_channels, 1))
 
