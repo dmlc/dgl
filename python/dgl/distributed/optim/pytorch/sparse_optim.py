@@ -60,12 +60,11 @@ class DistSparseGradOptimizer(abc.ABC):
         """
         lcoal_state_dict = {}
         lcoal_state_dict["emb_states"] = {}
-        num_clients = dgl.distributed.get_num_client()
-        lcoal_state_dict["params"] = {"num_clients": num_clients}
+        lcoal_state_dict["params"] = {"world_size": self._world_size}
         for emb in self._params:
             kvstore = emb.kvstore
             trainers_per_machine = (
-                num_clients // dgl.distributed.get_num_machines()
+                self._world_size // max(1, dgl.distributed.get_num_machines())
             )
             emb_state_dict = {}
             part_policy = (
@@ -74,8 +73,7 @@ class DistSparseGradOptimizer(abc.ABC):
             idx = self._get_local_ids(part_policy)
             if trainers_per_machine > 1:
                 kv_idx_split = th.remainder(idx, trainers_per_machine).long()
-                client_id = kvstore.client_id
-                local_rank = client_id % trainers_per_machine
+                local_rank = self._rank % trainers_per_machine
                 mask = kv_idx_split == local_rank
                 idx = F.boolean_mask(idx, mask)
             emb_state_dict.update({"ids": idx})
@@ -93,7 +91,7 @@ class DistSparseGradOptimizer(abc.ABC):
 
     def load_local_state_dict(self, local_state_dict):
         """Load the local state from the input state_dict,
-        updating the optimizer as needed..
+        updating the optimizer as needed.
 
         Parameters
         ----------
@@ -147,22 +145,20 @@ class DistSparseGradOptimizer(abc.ABC):
         Parameters
         ----------
         f : Union[str, PathLike]
-            The basic path of the file, client id
+            The basic path of the file, rank
             will be attached as full name.
 
         See Also
         --------
         load
         """
-        num_clients = dgl.distributed.get_num_client()
-        if num_clients > 1:
-            dgl.distributed.client_barrier()
-        client_id = dgl.distributed.get_rank()
+        if self._world_size > 1:
+            th.distributed.barrier()
         f = f if isinstance(f, str) else str(f, "UTF-8")
-        f = f"{f}_{client_id}"
+        f = f"{f}_{self._rank}"
         th.save(self.local_state_dict(), f)
-        if num_clients > 1:
-            dgl.distributed.client_barrier()
+        if self._world_size > 1:
+            th.distributed.barrier()
 
     def load(self, f):
         """Load the local state of the optimizer from the file on per rank.
@@ -172,43 +168,41 @@ class DistSparseGradOptimizer(abc.ABC):
         Parameters
         ----------
         f : Union[str, PathLike]
-            The basic path of the file, client id
+            The basic path of the file, rank
             will be attached as full name.
 
         See Also
         --------
         save
         """
-        num_clients = dgl.distributed.get_num_client()
-        if num_clients > 1:
-            dgl.distributed.client_barrier()
-        client_id = dgl.distributed.get_rank()
+        if self._world_size > 1:
+            th.distributed.barrier()
         f = f if isinstance(f, str) else str(f, "UTF-8")
-        f_attach_client_id = f"{f}_{client_id}"
+        f_attach_rank = f"{f}_{self._rank}"
         # Don't throw error here to support device number scale-out
         # after reloading, but make sure your hyper parameter is same
         # as before because added local optimizers will not be filled
-        if not exists(f_attach_client_id):
+        if not exists(f_attach_rank):
             warnings.warn(
-                f"File {f_attach_client_id} can't be found, load nothing."
+                f"File {f_attach_rank} can't be found, load nothing."
             )
         else:
-            old_num_clients = self._load_state_from(f_attach_client_id)
+            old_world_size = self._load_state_from(f_attach_rank)
             # Device number scale-in
-            if num_clients < old_num_clients:
+            if self._world_size < old_world_size:
                 for rank in range(
-                    client_id + num_clients, old_num_clients, num_clients
+                    self._rank + self._world_size, old_world_size, self._world_size
                 ):
                     self._load_state_from(f"{f}_{rank}")
-        if num_clients > 1:
-            dgl.distributed.client_barrier()
+        if self._world_size > 1:
+            th.distributed.barrier()
 
     def _load_state_from(self, f):
         local_state_dict = th.load(f)
-        num_clients = local_state_dict["params"]["num_clients"]
-        del local_state_dict["params"]["num_clients"]
+        world_size = local_state_dict["params"]["world_size"]
+        del local_state_dict["params"]["world_size"]
         self.load_local_state_dict(local_state_dict)
-        return num_clients
+        return world_size
 
     def _get_local_ids(self, part_policy):
         if "edge" in part_policy.policy_str:
