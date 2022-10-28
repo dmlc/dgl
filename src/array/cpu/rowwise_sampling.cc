@@ -37,7 +37,8 @@ inline NumPicksFn<IdxType> GetSamplingNumPicksFn(
       const DType* prob_or_mask_data = prob_or_mask.Ptr<DType>();
       IdxType nnz = 0;
       for (IdxType i = off; i < off + len; ++i) {
-        if (prob_or_mask_data[i] > 0) {
+        const IdxType eid = data ? data[i] : i;
+        if (prob_or_mask_data[eid] > 0) {
           ++nnz;
         }
       }
