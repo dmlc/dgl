@@ -579,7 +579,7 @@ COOMatrix CSRRowWisePerEtypeSampling(
             mat, rows, etype_offset, num_samples, replace, etype_sorted);
     } else {
       ATEN_FLOAT_INT8_UINT8_TYPE_SWITCH(
-          prob_or_mask_or_mask[0]->dtype, DType, "probability or mask", {
+          prob_or_mask[0]->dtype, DType, "probability or mask", {
         ret = impl::CSRRowWisePerEtypeSampling<XPU, IdType, DType>(
             mat, rows, etype_offset, num_samples, prob_or_mask, replace, etype_sorted);
       });
