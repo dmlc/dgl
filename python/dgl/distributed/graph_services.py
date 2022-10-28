@@ -791,7 +791,7 @@ def sample_neighbors(g, nodes, fanout, edge_dir="in", prob=None, replace=False):
     def local_access(local_g, partition_book, local_nids):
         # See NOTE 1
         _prob = (
-            g.edata[prob].local_partition if prob is not None else None
+            [g.edata[prob].local_partition] if prob is not None else None
         )
         return _sample_neighbors(
             local_g,
