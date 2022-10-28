@@ -572,14 +572,14 @@ COOMatrix CSRRowWisePerEtypeSampling(
     const std::vector<int64_t>& num_samples, const std::vector<NDArray>& prob_or_mask,
     bool replace, bool etype_sorted) {
   COOMatrix ret;
-  CHECK(prob_or_mask.size() > 0) << "prob_or_maskability or mask array is empty";
+  CHECK(prob_or_mask.size() > 0) << "probability or mask array is empty";
   ATEN_CSR_SWITCH(mat, XPU, IdType, "CSRRowWisePerEtypeSampling", {
     if (IsAllNullArray(prob_or_mask)) {
       ret = impl::CSRRowWisePerEtypeSamplingUniform<XPU, IdType>(
             mat, rows, etype_offset, num_samples, replace, etype_sorted);
     } else {
       ATEN_FLOAT_INT8_UINT8_TYPE_SWITCH(
-          prob_or_mask_or_mask[0]->dtype, DType, "prob_or_maskability or mask", {
+          prob_or_mask_or_mask[0]->dtype, DType, "probability or mask", {
         ret = impl::CSRRowWisePerEtypeSampling<XPU, IdType, DType>(
             mat, rows, etype_offset, num_samples, prob_or_mask, replace, etype_sorted);
       });

@@ -77,7 +77,7 @@ HeteroSubgraph SampleNeighbors(
   CHECK_EQ(fanouts.size(), hg->NumEdgeTypes())
     << "Number of fanout values must match the number of edge types.";
   CHECK_EQ(prob_or_mask.size(), hg->NumEdgeTypes())
-    << "Number of prob_or_maskability tensors must match the number of edge types.";
+    << "Number of probability tensors must match the number of edge types.";
 
   DGLContext ctx = aten::GetContextOf(nodes);
 
