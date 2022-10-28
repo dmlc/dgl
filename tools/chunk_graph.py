@@ -9,7 +9,10 @@ import torch
 from utils import array_readwriter, setdir
 
 import dgl
-
+from dgl.distributed.partition import (
+    _etype_tuple_to_str,
+    _etype_str_to_tuple,
+)
 
 def chunk_numpy_array(arr, fmt_meta, chunk_sizes, path_fmt):
     paths = []
@@ -37,9 +40,9 @@ def _chunk_graph(g, name, ndata_paths, edata_paths, num_chunks, output_path):
     ):
         edata_paths = {g.etypes[0]: ndata_paths}
     # Then convert all edge types to canonical edge types
-    etypestrs = {etype: ":".join(etype) for etype in g.canonical_etypes}
+    etypestrs = {etype: _etype_tuple_to_str(etype) for etype in g.canonical_etypes}
     edata_paths = {
-        ":".join(g.to_canonical_etype(k)): v for k, v in edata_paths.items()
+        _etype_tuple_to_str(g.to_canonical_etype(k)): v for k, v in edata_paths.items()
     }
 
     metadata = {}
@@ -137,7 +140,7 @@ def _chunk_graph(g, name, ndata_paths, edata_paths, num_chunks, output_path):
                         **reader_fmt_meta
                     ).read(path)
                     edata_key_meta["format"] = writer_fmt_meta
-                    etype = tuple(etypestr.split(":"))
+                    etype = _etype_str_to_tuple(etypestr)
                     edata_key_meta["data"] = chunk_numpy_array(
                         arr,
                         writer_fmt_meta,
@@ -150,7 +153,7 @@ def _chunk_graph(g, name, ndata_paths, edata_paths, num_chunks, output_path):
 
     metadata_path = "metadata.json"
     with open(metadata_path, "w") as f:
-        json.dump(metadata, f)
+        json.dump(metadata, f, sort_keys=True, indent=4)
     logging.info("Saved metadata in %s" % os.path.abspath(metadata_path))
 
 
@@ -170,9 +173,9 @@ def chunk_graph(g, name, ndata_paths, edata_paths, num_chunks, output_path):
     ndata_paths : dict[str, pathlike] or dict[ntype, dict[str, pathlike]]
         The dictionary of paths pointing to the corresponding numpy array file for each
         node data key.
-    edata_paths : dict[str, pathlike] or dict[etype, dict[str, pathlike]]
+    edata_paths : dict[etype, pathlike] or dict[etype, dict[str, pathlike]]
         The dictionary of paths pointing to the corresponding numpy array file for each
-        edge data key.
+        edge data key. ``etype`` could be canonical or non-canonical.
     num_chunks : int
         The number of chunks
     output_path : pathlike

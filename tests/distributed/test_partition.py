@@ -1,43 +1,23 @@
 import os
+import unittest
 
 import backend as F
 import dgl
 import numpy as np
 import pytest
-from scipy import sparse as spsp
-from dgl.distributed import (
-    partition_graph,
-    load_partition,
-    load_partition_feats,
-)
-from dgl.distributed.graph_partition_book import (
-    BasicPartitionBook,
-    RangePartitionBook,
-    NodePartitionPolicy,
-    EdgePartitionPolicy,
-    HeteroDataName,
-    DEFAULT_NTYPE,
-    DEFAULT_ETYPE,
-    _etype_tuple_to_str,
-)
 from dgl import function as fn
-from dgl.distributed import (
-    load_partition,
-    load_partition_feats,
-    partition_graph,
-)
-from dgl.distributed.graph_partition_book import (
-    BasicPartitionBook,
-    EdgePartitionPolicy,
-    HeteroDataName,
-    NodePartitionPolicy,
-    RangePartitionBook,
-)
-from dgl.distributed.partition import (
-    RESERVED_FIELD_DTYPE,
-    _get_inner_node_mask,
-    _get_inner_edge_mask,
-)
+from dgl.distributed import (load_partition, load_partition_feats,
+                             partition_graph)
+from dgl.distributed.graph_partition_book import (DEFAULT_ETYPE, DEFAULT_NTYPE,
+                                                  BasicPartitionBook,
+                                                  EdgePartitionPolicy,
+                                                  HeteroDataName,
+                                                  NodePartitionPolicy,
+                                                  RangePartitionBook,
+                                                  _etype_tuple_to_str)
+from dgl.distributed.partition import (RESERVED_FIELD_DTYPE,
+                                       _get_inner_edge_mask,
+                                       _get_inner_node_mask)
 from scipy import sparse as spsp
 from utils import reset_envs
 
@@ -212,7 +192,12 @@ def verify_graph_feats(
 
 
 def check_hetero_partition(
-    hg, part_method, num_parts=4, num_trainers_per_machine=1, load_feats=True
+    hg,
+    part_method,
+    num_parts=4,
+    num_trainers_per_machine=1,
+    load_feats=True,
+    graph_formats=None,
 ):
     test_ntype = "n1"
     test_etype = ("n1", "r1", "n2")
@@ -339,6 +324,7 @@ def check_partition(
     num_parts=4,
     num_trainers_per_machine=1,
     load_feats=True,
+    graph_formats=None,
 ):
     g.ndata["labels"] = F.arange(0, g.number_of_nodes())
     g.ndata["feats"] = F.tensor(
@@ -527,31 +513,6 @@ def check_partition(
         eid2pid = gpb.eid2partid(F.arange(0, len(edge_map)))
         assert F.dtype(eid2pid) in (F.int32, F.int64)
         assert np.all(F.asnumpy(eid2pid) == edge_map)
-
-
-def check_hetero_partition_single_etype(num_trainers):
-    user_ids = np.arange(1000)
-    item_ids = np.arange(2000)
-    num_edges = 3 * 1000
-    src_ids = np.random.choice(user_ids, size=num_edges)
-    dst_ids = np.random.choice(item_ids, size=num_edges)
-    hg = dgl.heterograph({("user", "like", "item"): (src_ids, dst_ids)})
-
-    with tempfile.TemporaryDirectory() as test_dir:
-        orig_nids, orig_eids = partition_graph(
-            hg,
-            "test",
-            2,
-            test_dir,
-            num_trainers_per_machine=num_trainers,
-            return_mapping=True,
-        )
-        assert len(orig_nids) == len(hg.ntypes)
-        assert len(orig_eids) == len(hg.canonical_etypes)
-        for ntype in hg.ntypes:
-            assert len(orig_nids[ntype]) == hg.number_of_nodes(ntype)
-        for etype in hg.canonical_etypes:
-            assert len(orig_eids[etype]) == hg.number_of_edges(etype)
 
 
 @unittest.skipIf(os.name == "nt", reason="Do not support windows yet")
