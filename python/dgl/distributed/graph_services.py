@@ -240,7 +240,7 @@ class SamplingRequest(Request):
         partition_book = server_state.partition_book
         kv_store = server_state.kv_store
         if self.prob is not None:
-            prob = kv_store.data_store[self.prob]
+            prob = [kv_store.data_store[self.prob]]
         else:
             prob = None
         global_src, global_dst, global_eids = _sample_neighbors(
