@@ -226,7 +226,8 @@ COOMatrix CSRRowWisePerEtypeSampling(
     CHECK(p.defined());
   auto pick_fn = GetSamplingRangePickFn<IdxType, DType>(num_samples, prob_or_mask, replace);
   return CSRRowWisePerEtypePick<IdxType, DType>(
-      mat, rows, eid2etype_offset, num_samples, replace, rowwise_etype_sorted, pick_fn, prob_or_mask);
+      mat, rows, eid2etype_offset, num_samples, replace, rowwise_etype_sorted, pick_fn,
+      prob_or_mask);
 }
 
 template COOMatrix CSRRowWisePerEtypeSampling<kDGLCPU, int32_t, float>(
