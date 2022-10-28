@@ -790,8 +790,6 @@ def sample_neighbors(g, nodes, fanout, edge_dir="in", prob=None, replace=False):
     def issue_remote_req(node_ids):
         if prob is not None:
             # See NOTE 1
-            # Is there a better way to get the KVStore key given the name and
-            # node/edge type?
             _prob = g.edata[prob].kvstore_key
         else:
             _prob = None

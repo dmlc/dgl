@@ -3,7 +3,7 @@ from .dataloader import BlockSampler
 from .. import sampling, distributed
 from .. import ndarray as nd
 from .. import backend as F
-from ..base import ETYPE, EID
+from ..base import ETYPE
 
 class NeighborSamplingMixin(object):
     """Mixin object containing common optimizing routines that caches fanout and probability
@@ -134,7 +134,7 @@ class MultiLayerNeighborSampler(NeighborSamplingMixin, BlockSampler):
         if isinstance(g, distributed.DistGraph):
             if len(g.etypes) > 1: # heterogeneous distributed graph
                 frontier = distributed.sample_etype_neighbors(
-                    g, seed_nodes, ETYPE, EID, fanout, replace=self.replace)
+                    g, seed_nodes, ETYPE, fanout, replace=self.replace)
             else:
                 frontier = distributed.sample_neighbors(
                     g, seed_nodes, fanout, replace=self.replace)

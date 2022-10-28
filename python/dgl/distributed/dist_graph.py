@@ -90,13 +90,6 @@ def _copy_graph_to_shared_mem(g, graph_name, graph_format):
         )
     return new_g
 
-FIELD_DICT = {'inner_node': F.int32,    # A flag indicates whether the node is inside a partition.
-              'inner_edge': F.int32,    # A flag indicates whether the edge is inside a partition.
-              NID: F.int64,
-              EID: F.int64,
-              NTYPE: F.int32,
-              ETYPE: F.int32}
-
 def _get_shared_mem_ndata(g, graph_name, name):
     ''' Get shared-memory node data from DistGraph server.
 
@@ -341,6 +334,7 @@ class DistGraphServer(KVServer):
             # Loading of node/edge_feats are deferred to lower the peak memory consumption.
             self.client_g, _, _, self.gpb, graph_name, \
                     ntypes, etypes = load_partition(part_config, self.part_id, load_feats=False)
+            print('load ' + graph_name)
             # formatting dtype
             # TODO(Rui) Formatting forcely is not a perfect solution.
             #   We'd better store all dtypes when mapping to shared memory
@@ -388,10 +382,13 @@ class DistGraphServer(KVServer):
                 # The feature name has the following format: edge_type + "/" + feature_name to avoid
                 # feature name collision for different edge types.
                 etype, feat_name = name.split('/')
+
                 # Edge features are prefixed with canonical edge types, but the partition policy
                 # is still using a single edge type string.
+                # TODO(BarclayII): check if this is still the case and can be removed.
                 etype = etype.split(':')
                 etype = etype[1 if len(etype) == 3 else 0]
+
                 data_name = HeteroDataName(False, etype, feat_name)
                 self.init_data(name=str(data_name), policy_str=data_name.policy_str,
                                data_tensor=edge_feats[name])
@@ -1314,11 +1311,6 @@ class DistGraph:
             if name.is_edge() and right_type:
                 edata_names.append(name)
         return edata_names
-
-    @property
-    def client(self):
-        ''' Get the ``KVClient`` object for the underlying KVStore.'''
-        return self._client
 
 def _get_overlap(mask_arr, ids):
     """ Select the IDs given a boolean mask array.

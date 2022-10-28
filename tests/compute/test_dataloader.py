@@ -48,5 +48,5 @@ def test_edge_prediction_sampler(idtype):
     result = sampler.sample(g, {"follows": seeds})
 
 
-if __name__ == '__main__':
-    test_edge_prediction_sampler(F.int64)
+if __name__ == "__main__":
+    test_edge_prediction_sampler()

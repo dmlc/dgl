@@ -5,10 +5,6 @@ import unittest
 from collections import defaultdict
 import pytest
 
-np.random.seed(100)
-import torch
-torch.random.manual_seed(100)
-
 def check_random_walk(g, metapath, traces, ntypes, prob=None, trace_eids=None):
     traces = F.asnumpy(traces)
     ntypes = F.asnumpy(ntypes)
@@ -679,14 +675,14 @@ def test_sample_neighbors_prob():
     _test_sample_neighbors(False, 'prob')
     #_test_sample_neighbors(True)
 
+def test_sample_neighbors_outedge():
+    _test_sample_neighbors_outedge(False)
+    #_test_sample_neighbors_outedge(True)
+
 @unittest.skipIf(F.backend_name == 'mxnet', reason='MXNet has problem converting bool arrays')
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors with mask not implemented")
 def test_sample_neighbors_mask():
     _test_sample_neighbors(False, 'mask')
-
-def test_sample_neighbors_outedge():
-    _test_sample_neighbors_outedge(False)
-    #_test_sample_neighbors_outedge(True)
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
 def test_sample_neighbors_topk():
