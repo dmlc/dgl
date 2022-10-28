@@ -409,7 +409,8 @@ def _set_trainer_ids(g, sim_g, node_parts):
         for c_etype in g.canonical_etypes:
             # An edge is assigned to a partition based on its destination node.
             _, _, dst_type = c_etype
-            trainer_id = F.gather_row(g.nodes[dst_type].data['trainer_id'], g.edges(etype=c_etype)[1])
+            trainer_id = F.gather_row(g.nodes[dst_type].data['trainer_id'],
+                g.edges(etype=c_etype)[1])
             g.edges[c_etype].data['trainer_id'] = trainer_id
 
 def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method="metis",

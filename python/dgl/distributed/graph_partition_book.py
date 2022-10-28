@@ -2,14 +2,13 @@
 
 import pickle
 from abc import ABC
-from ast import literal_eval
 
 import numpy as np
 
 from .. import backend as F
 from .. import utils
 from .._ffi.ndarray import empty_shared_mem
-from ..base import EID, NID, DGLError, dgl_warning
+from ..base import EID, NID, DGLError
 from ..ndarray import exist_shared_mem_array
 from ..partition import NDArrayPartition
 from .constants import DEFAULT_ETYPE, DEFAULT_NTYPE

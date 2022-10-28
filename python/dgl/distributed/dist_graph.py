@@ -22,7 +22,7 @@ from .partition import load_partition, load_partition_feats, load_partition_book
 from .graph_partition_book import PartitionPolicy, get_shared_mem_partition_book
 from .graph_partition_book import HeteroDataName, parse_hetero_data_name
 from .graph_partition_book import NodePartitionPolicy, EdgePartitionPolicy
-from .graph_partition_book import _etype_tuple_to_str, _etype_str_to_tuple
+from .graph_partition_book import _etype_str_to_tuple
 from .shared_mem_utils import _to_shared_mem, _get_ndata_path, _get_edata_path, DTYPE_DICT
 from . import rpc
 from . import role
@@ -885,8 +885,8 @@ class DistGraph:
         123718280
         """
         if etype is None:
-                return sum([self._gpb._num_edges(etype) \
-                    for etype in self.canonical_etypes])
+            return sum([self._gpb._num_edges(etype) \
+                for etype in self.canonical_etypes])
         return self._gpb._num_edges(etype)
 
     def out_degrees(self, u=ALL):
