@@ -372,14 +372,11 @@ template <DGLDeviceType XPU, typename IdType, typename FloatType>
 std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
                   IdArray NIDs,
                   IdArray rows_arr,
-                  const int64_t num_picks__,
+                  const int64_t num_picks,
                   FloatArray prob_arr,
                   IdArray random_seed,
                   IdArray cnt,
                   int importance_sampling) {
-  constexpr bool use_csr_spmv = false;
-  constexpr bool use_hashtable = false;
-  const IdType num_picks = num_picks__;
   const bool weights = !IsNullArray(prob_arr);
 
   const uint64_t max_log_num_vertices = [&]() -> int {
@@ -453,7 +450,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
 
   thrust::counting_iterator<IdType> iota(0);
   thrust::for_each(exec_policy, iota, iota + num_rows, DegreeFunc<IdType, FloatType>{
-    num_picks, rows, indptr, weights ? ds : nullptr, in_deg.get(), cs});
+    (IdType)num_picks, rows, indptr, weights ? ds : nullptr, in_deg.get(), cs});
 
   // fill subindptr
   auto subindptr_arr = NewIdArray(num_rows + 1, ctx, sizeof(IdType) * 8);
@@ -503,7 +500,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
     CUDA_KERNEL_CALL(
       (_CSRRowWiseLayerSampleDegreeKernel<IdType, FloatType, BLOCK_CTAS, TILE_SIZE>),
       grid, block, 0, stream,
-      num_picks,
+      (IdType)num_picks,
       num_rows,
       rows,
       cs,
@@ -537,44 +534,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
     auto hop_unique = allocator.alloc_unique<IdType>(hop_size);
     // After this block, hop_unique holds the unique set of one-hop neighborhood
     // and hop_new holds the renamed hop_1, idx_coo already holds renamed destination.
-    if (use_hashtable) {
-      std::vector<int64_t> maxNodesPerType(1, hop_size);
-      transform::cuda::DeviceNodeMap<IdType> node_maps(maxNodesPerType, 0, ctx, stream);
-      auto count_lhs_device = allocator.alloc_unique<int64_t>(1);
-
-      CUDA_CALL(cudaMemsetAsync(
-        count_lhs_device.get(),
-        0,
-        sizeof(*count_lhs_device.get()),
-        stream));
-
-      node_maps.LhsHashTable(0).FillWithDuplicates(
-        hop_1,
-        hop_size,
-        hop_unique.get(),
-        count_lhs_device.get(),
-        stream);
-
-      device->CopyDataFromTo(
-        count_lhs_device.get(), 0,
-        &hop_uniq_size, 0,
-        sizeof(hop_uniq_size),
-        ctx,
-        DGLContext{kDGLCPU, 0},
-        DGLDataType{kDGLInt, 64, 1});
-
-      constexpr const size_t TILE_SIZE = 1024;
-
-      const dim3 grid((hop_size + TILE_SIZE - 1) / TILE_SIZE);
-      const dim3 block(BLOCK_SIZE);
-
-      CUDA_KERNEL_CALL((map_vertex_ids_global<IdType, BLOCK_SIZE, TILE_SIZE>),
-        grid, block, 0, stream,
-        hop_1,
-        hop_new,
-        hop_size,
-        node_maps.LhsHashTable(0).DeviceHandle());
-    } else {
+    {
       auto hop_2 = allocator.alloc_unique<IdType>(hop_size);
       auto hop_3 = allocator.alloc_unique<IdType>(hop_size);
 
@@ -626,9 +586,6 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
     // Consider creating a CSC because the SpMV will be done multiple times.
     COOMatrix rmat(
         num_rows, hop_uniq_size, idx_coo_arr, hop_new_arr, NullArray(), true, mat.sorted);
-    CSRMatrix rmatcsc;
-    if (use_csr_spmv)  // @todo need to permute A_l_arr too if this option is wanted
-      rmatcsc = COOToCSR(COOTranspose(rmat));
 
     BcastOff bcast_off;
     bcast_off.use_bcast = false;
@@ -646,29 +603,14 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
     double prev_ex_nodes = hop_uniq_size;
 
     for (int iters = 0; iters < importance_sampling || importance_sampling < 0; iters++) {
-      if (!use_csr_spmv) {
-        if (weights && iters == 0) {
-          cuda::SpMMCoo<IdType, FloatType,
-            cuda::binary::Mul<FloatType>, cuda::reduce::Max<IdType, FloatType, true>>(
-            bcast_off, rmat, cs_arr, A_l_arr, probs_arr_2, arg_u, arg_e);
-        } else {
-          cuda::SpMMCoo<IdType, FloatType,
-            cuda::binary::CopyLhs<FloatType>, cuda::reduce::Max<IdType, FloatType, true>>(
-            bcast_off, rmat, cs_arr, NullArray(), iters ? probs_arr : probs_arr_2, arg_u, arg_e);
-        }
+      if (weights && iters == 0) {
+        cuda::SpMMCoo<IdType, FloatType,
+          cuda::binary::Mul<FloatType>, cuda::reduce::Max<IdType, FloatType, true>>(
+          bcast_off, rmat, cs_arr, A_l_arr, probs_arr_2, arg_u, arg_e);
       } else {
-        if (weights && iters == 0) {
-          // A_l_arr needs to be permuted also, @todo
-          thrust::fill_n(exec_policy, probs, hop_uniq_size, 0);
-          cuda::SpMMCsr<IdType, FloatType, cuda::binary::Mul<FloatType>,
-              cuda::reduce::Max<IdType, FloatType, false>>(bcast_off,
-              rmatcsc, cs_arr, A_l_arr, probs_arr_2, arg_u, arg_e);
-        } else {
-          thrust::fill_n(exec_policy, iters ? probs_1 : probs, hop_uniq_size, 0);
-          cuda::SpMMCsr<IdType, FloatType, cuda::binary::CopyLhs<FloatType>,
-              cuda::reduce::Max<IdType, FloatType, false>>(bcast_off,
-              rmatcsc, cs_arr, NullArray(), iters ? probs_arr : probs_arr_2, arg_u, arg_e);
-        }
+        cuda::SpMMCoo<IdType, FloatType,
+          cuda::binary::CopyLhs<FloatType>, cuda::reduce::Max<IdType, FloatType, true>>(
+          bcast_off, rmat, cs_arr, NullArray(), iters ? probs_arr : probs_arr_2, arg_u, arg_e);
       }
 
       if (iters)
@@ -686,7 +628,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
         CUDA_KERNEL_CALL(
           (_CSRRowWiseLayerSampleDegreeKernel<IdType, FloatType, BLOCK_CTAS, TILE_SIZE>),
           grid, block, 0, stream,
-          num_picks,
+          (IdType)num_picks,
           num_rows,
           rows,
           cs,
