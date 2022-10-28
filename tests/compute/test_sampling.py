@@ -272,6 +272,7 @@ def _gen_neighbor_sampling_test_graph(hypersparse, reverse):
         }, {'user': card if card is not None else 4})
         g = g.to(F.ctx())
         g.edata['prob'] = F.tensor([.5, .5, 0., .5, .5, 0., 1.], dtype=F.float32)
+        g.edata['mask'] = F.tensor([True, True, False, True, True, False, True])
         hg = dgl.heterograph({
             ('user', 'follow', 'user'): ([0, 0, 0, 1, 1, 1, 2],
                                          [1, 2, 3, 0, 2, 3, 0]),
@@ -286,6 +287,7 @@ def _gen_neighbor_sampling_test_graph(hypersparse, reverse):
         }, {'user': card if card is not None else 4})
         g = g.to(F.ctx())
         g.edata['prob'] = F.tensor([.5, .5, 0., .5, .5, 0., 1.], dtype=F.float32)
+        g.edata['mask'] = F.tensor([True, True, False, True, True, False, True])
         hg = dgl.heterograph({
             ('user', 'follow', 'user'): ([1, 2, 3, 0, 2, 3, 0],
                                          [0, 0, 0, 1, 1, 1, 2]),
@@ -295,7 +297,9 @@ def _gen_neighbor_sampling_test_graph(hypersparse, reverse):
         }, num_nodes_dict)
         hg = hg.to(F.ctx())
     hg.edges['follow'].data['prob'] = F.tensor([.5, .5, 0., .5, .5, 0., 1.], dtype=F.float32)
+    hg.edges['follow'].data['mask'] = F.tensor([True, True, False, True, True, False, True])
     hg.edges['play'].data['prob'] = F.tensor([.8, .5, .5, .5], dtype=F.float32)
+    # Leave out the mask of play and liked-by since all of them are True anyway.
     hg.edges['liked-by'].data['prob'] = F.tensor([.3, .5, .2, .5, .1, .1], dtype=F.float32)
 
     return g, hg
@@ -344,7 +348,13 @@ def _test_sample_neighbors(hypersparse, prob):
         subg = dgl.sampling.sample_neighbors(g, [0, 1], -1, prob=p, replace=replace)
         assert subg.number_of_nodes() == g.number_of_nodes()
         u, v = subg.edges()
-        u_ans, v_ans = subg.in_edges([0, 1])
+        u_ans, v_ans, e_ans = g.in_edges([0, 1], form='all')
+        if p is not None:
+            emask = F.gather_row(g.edata[p], e_ans)
+            if p == 'prob':
+                emask = (emask != 0)
+            u_ans = F.boolean_mask(u_ans, emask)
+            v_ans = F.boolean_mask(v_ans, emask)
         uv = set(zip(F.asnumpy(u), F.asnumpy(v)))
         uv_ans = set(zip(F.asnumpy(u_ans), F.asnumpy(v_ans)))
         assert uv == uv_ans
@@ -371,7 +381,13 @@ def _test_sample_neighbors(hypersparse, prob):
         subg = dgl.sampling.sample_neighbors(g, [0, 2], -1, prob=p, replace=replace)
         assert subg.number_of_nodes() == g.number_of_nodes()
         u, v = subg.edges()
-        u_ans, v_ans = subg.in_edges([0, 2])
+        u_ans, v_ans, e_ans = g.in_edges([0, 2], form='all')
+        if p is not None:
+            emask = F.gather_row(g.edata[p], e_ans)
+            if p == 'prob':
+                emask = (emask != 0)
+            u_ans = F.boolean_mask(u_ans, emask)
+            v_ans = F.boolean_mask(v_ans, emask)
         uv = set(zip(F.asnumpy(u), F.asnumpy(v)))
         uv_ans = set(zip(F.asnumpy(u_ans), F.asnumpy(v_ans)))
         assert uv == uv_ans
@@ -398,7 +414,7 @@ def _test_sample_neighbors(hypersparse, prob):
         subg = dgl.sampling.sample_neighbors(hg, {'user': [0, 1], 'game': 0}, -1, prob=p, replace=replace)
         assert len(subg.ntypes) == 3
         assert len(subg.etypes) == 4
-        assert subg['follow'].number_of_edges() == 6
+        assert subg['follow'].number_of_edges() == 6 if p is None else 4
         assert subg['play'].number_of_edges() == 1
         assert subg['liked-by'].number_of_edges() == 4
         assert subg['flips'].number_of_edges() == 0
@@ -436,7 +452,13 @@ def _test_sample_neighbors_outedge(hypersparse):
         subg = dgl.sampling.sample_neighbors(g, [0, 1], -1, prob=p, replace=replace, edge_dir='out')
         assert subg.number_of_nodes() == g.number_of_nodes()
         u, v = subg.edges()
-        u_ans, v_ans = subg.out_edges([0, 1])
+        u_ans, v_ans, e_ans = g.out_edges([0, 1], form='all')
+        if p is not None:
+            emask = F.gather_row(g.edata[p], e_ans)
+            if p == 'prob':
+                emask = (emask != 0)
+            u_ans = F.boolean_mask(u_ans, emask)
+            v_ans = F.boolean_mask(v_ans, emask)
         uv = set(zip(F.asnumpy(u), F.asnumpy(v)))
         uv_ans = set(zip(F.asnumpy(u_ans), F.asnumpy(v_ans)))
         assert uv == uv_ans
@@ -465,7 +487,13 @@ def _test_sample_neighbors_outedge(hypersparse):
         subg = dgl.sampling.sample_neighbors(g, [0, 2], -1, prob=p, replace=replace, edge_dir='out')
         assert subg.number_of_nodes() == g.number_of_nodes()
         u, v = subg.edges()
-        u_ans, v_ans = subg.out_edges([0, 2])
+        u_ans, v_ans, e_ans = g.out_edges([0, 2], form='all')
+        if p is not None:
+            emask = F.gather_row(g.edata[p], e_ans)
+            if p == 'prob':
+                emask = (emask != 0)
+            u_ans = F.boolean_mask(u_ans, emask)
+            v_ans = F.boolean_mask(v_ans, emask)
         uv = set(zip(F.asnumpy(u), F.asnumpy(v)))
         uv_ans = set(zip(F.asnumpy(u_ans), F.asnumpy(v_ans)))
         assert uv == uv_ans
@@ -494,7 +522,7 @@ def _test_sample_neighbors_outedge(hypersparse):
         subg = dgl.sampling.sample_neighbors(hg, {'user': [0, 1], 'game': 0}, -1, prob=p, replace=replace, edge_dir='out')
         assert len(subg.ntypes) == 3
         assert len(subg.etypes) == 4
-        assert subg['follow'].number_of_edges() == 6
+        assert subg['follow'].number_of_edges() == 6 if p is None else 4
         assert subg['play'].number_of_edges() == 1
         assert subg['liked-by'].number_of_edges() == 4
         assert subg['flips'].number_of_edges() == 0
@@ -650,6 +678,11 @@ def test_sample_neighbors_prob():
 def test_sample_neighbors_outedge():
     _test_sample_neighbors_outedge(False)
     #_test_sample_neighbors_outedge(True)
+
+@unittest.skipIf(F.backend_name == 'mxnet', reason='MXNet has problem converting bool arrays')
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors with mask not implemented")
+def test_sample_neighbors_mask():
+    _test_sample_neighbors(False, 'mask')
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
 def test_sample_neighbors_topk():
@@ -1026,12 +1059,15 @@ def test_global_uniform_negative_sampling(dtype):
 
 if __name__ == '__main__':
     from itertools import product
+    test_sample_neighbors_noprob()
+    test_sample_neighbors_prob()
+    test_sample_neighbors_mask()
     for args in product(['coo', 'csr', 'csc'], ['in', 'out'], [False, True]):
         test_sample_neighbors_etype_homogeneous(*args)
-    test_non_uniform_random_walk()
+    test_non_uniform_random_walk(False)
     test_uniform_random_walk(False)
     test_pack_traces()
-    test_pinsage_sampling()
+    test_pinsage_sampling(False)
     test_sample_neighbors_outedge()
     test_sample_neighbors_topk()
     test_sample_neighbors_topk_outedge()
