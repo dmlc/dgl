@@ -32,6 +32,11 @@ class BaseSampler {
   }
 };
 
+// (BarclayII 2022.9.20) Changing the internal data type of probabilities to double since
+// we are using non-uniform sampling to sample on boolean masks, where False represents
+// probability 0.  DType could be uint8 in this case, which will give incorrect arithmetic
+// results due to overflowing and/or integer division.
+
 /*
  * AliasSampler is used to sample elements from a given discrete categorical distribution.
  * Algorithm: Alias Method(https://en.wikipedia.org/wiki/Alias_method)
@@ -47,9 +52,9 @@ class AliasSampler: public BaseSampler<Idx> {
  private:
   RandomEngine *re;
   Idx N;
-  DType accum, taken;             // accumulated likelihood
+  double accum, taken;            // accumulated likelihood
   std::vector<Idx> K;             // alias table
-  std::vector<DType> U;           // probability table
+  std::vector<double> U;          // probability table
   FloatArray _prob;               // category distribution
   std::vector<bool> used;         // indicate availability, activated when replace=false;
   std::vector<Idx> id_mapping;    // index mapping, activated when replace=false;
@@ -63,7 +68,7 @@ class AliasSampler: public BaseSampler<Idx> {
 
   void Reconstruct(FloatArray prob) {  // Reconstruct alias table
     const int64_t prob_size = prob->shape[0];
-    const DType *prob_data = static_cast<DType *>(prob->data);
+    const DType *prob_data = prob.Ptr<DType>();
     N = 0;
     accum = 0.;
     taken = 0.;
@@ -79,11 +84,11 @@ class AliasSampler: public BaseSampler<Idx> {
     if (N == 0) LOG(FATAL) << "Cannot take more sample than population when 'replace=false'";
     K.resize(N);
     U.resize(N);
-    DType avg = accum / static_cast<DType>(N);
+    double avg = accum / static_cast<double>(N);
     std::fill(U.begin(), U.end(), avg);     // initialize U
-    std::queue<std::pair<Idx, DType> > under, over;
+    std::queue<std::pair<Idx, double> > under, over;
     for (Idx i = 0; i < N; ++i) {
-      DType p = prob_data[Map(i)];
+      double p = prob_data[Map(i)];
       if (p > avg)
         over.push(std::make_pair(i, p));
       else
@@ -93,7 +98,7 @@ class AliasSampler: public BaseSampler<Idx> {
     while (!under.empty() && !over.empty()) {
       auto u_pair = under.front(), o_pair = over.front();
       Idx i_u = u_pair.first, i_o = o_pair.first;
-      DType p_u = u_pair.second, p_o = o_pair.second;
+      double p_u = u_pair.second, p_o = o_pair.second;
       K[i_u] = i_o;
       U[i_u] = p_u;
       if (p_o + p_u > 2 * avg)
@@ -121,21 +126,24 @@ class AliasSampler: public BaseSampler<Idx> {
   ~AliasSampler() {}
 
   Idx Draw() {
-    DType avg = accum / N;
     if (!replace) {
-      const DType *_prob_data = static_cast<DType *>(_prob->data);
+      const DType *_prob_data = _prob.Ptr<DType>();
       if (2 * taken >= accum)
         Reconstruct(_prob);
+      if (accum <= 0)
+        return -1;
+      // accum changes after Reconstruct(), so avg should be computed after that.
+      double avg = accum / N;
       while (true) {
-        DType dice = re->Uniform<DType>(0, N);
+        double dice = re->Uniform<double>(0, N);
         Idx i = static_cast<Idx>(dice), rst;
-        DType p = (dice - i) * avg;
-        if (p <= U[Map(i)]) {
+        double p = (dice - i) * avg;
+        if (p <= U[i]) {
           rst = Map(i);
         } else {
           rst = Map(K[i]);
         }
-        DType cap = _prob_data[rst];
+        double cap = _prob_data[rst];
         if (!used[rst]) {
           used[rst] = true;
           taken += cap;
@@ -143,10 +151,13 @@ class AliasSampler: public BaseSampler<Idx> {
         }
       }
     }
-    DType dice = re->Uniform<DType>(0, N);
+    if (accum <= 0)
+      return -1;
+    double avg = accum / N;
+    double dice = re->Uniform<double>(0, N);
     Idx i = static_cast<Idx>(dice);
-    DType p = (dice - i) * avg;
-    if (p <= U[Map(i)])
+    double p = (dice - i) * avg;
+    if (p <= U[i])
         return Map(i);
     else
         return Map(K[i]);
@@ -169,9 +180,9 @@ class CDFSampler: public BaseSampler<Idx> {
  private:
   RandomEngine *re;
   Idx N;
-  DType accum, taken;
+  double accum, taken;
   FloatArray _prob;             // categorical distribution
-  std::vector<DType> cdf;       // cumulative distribution function
+  std::vector<double> cdf;      // cumulative distribution function
   std::vector<bool> used;       // indicate availability, activated when replace=false;
   std::vector<Idx> id_mapping;  // indicate index mapping, activated when replace=false;
 
@@ -184,7 +195,7 @@ class CDFSampler: public BaseSampler<Idx> {
 
   void Reconstruct(FloatArray prob) {  // Reconstruct CDF
     int64_t prob_size = prob->shape[0];
-    const DType *prob_data = static_cast<DType *>(prob->data);
+    const DType *prob_data = prob.Ptr<DType>();
     N = 0;
     accum = 0.;
     taken = 0.;
@@ -219,15 +230,17 @@ class CDFSampler: public BaseSampler<Idx> {
   ~CDFSampler() {}
 
   Idx Draw() {
-    DType eps = std::numeric_limits<DType>::min();
+    double eps = std::numeric_limits<double>::min();
     if (!replace) {
-      const DType *_prob_data = static_cast<DType *>(_prob->data);
+      const DType *_prob_data = _prob.Ptr<DType>();
       if (2 * taken >= accum)
         Reconstruct(_prob);
+      if (accum <= 0)
+        return -1;
       while (true) {
-        DType p = std::max(re->Uniform<DType>(0., accum), eps);
+        double p = std::max(re->Uniform<double>(0., accum), eps);
         Idx rst = Map(std::lower_bound(cdf.begin(), cdf.end(), p) - cdf.begin() - 1);
-        DType cap = _prob_data[rst];
+        double cap = static_cast<double>(_prob_data[rst]);
         if (!used[rst]) {
           used[rst] = true;
           taken += cap;
@@ -235,7 +248,9 @@ class CDFSampler: public BaseSampler<Idx> {
         }
       }
     }
-    DType p = std::max(re->Uniform<DType>(0., accum), eps);
+    if (accum <= 0)
+      return -1;
+    double p = std::max(re->Uniform<double>(0., accum), eps);
     return Map(std::lower_bound(cdf.begin(), cdf.end(), p) - cdf.begin() - 1);
   }
 };
@@ -255,7 +270,7 @@ template <
 class TreeSampler: public BaseSampler<Idx> {
  private:
   RandomEngine *re;
-  std::vector<DType> weight;    // accumulated likelihood of subtrees.
+  std::vector<double> weight;    // accumulated likelihood of subtrees.
   int64_t N;
   int64_t num_leafs;
   const DType *decrease;
@@ -263,7 +278,7 @@ class TreeSampler: public BaseSampler<Idx> {
  public:
   void ResetState(FloatArray prob) {
     int64_t prob_size = prob->shape[0];
-    const DType *prob_data = static_cast<DType *>(prob->data);
+    const DType *prob_data = prob.Ptr<DType>();
     std::fill(weight.begin(), weight.end(), 0);
     for (int64_t i = 0; i < prob_size; ++i)
       weight[num_leafs + i] = prob_data[i];
@@ -293,13 +308,15 @@ class TreeSampler: public BaseSampler<Idx> {
    *
    */
   Idx Draw() {
+    if (weight[1] <= 0)
+      return -1;
     int64_t cur = 1;
-    DType p = re->Uniform<DType>(0, weight[cur]);
-    DType accum = 0.;
+    double p = re->Uniform<double>(0, weight[cur]);
+    double accum = 0.;
     while (cur < num_leafs) {
-      DType w_l = weight[cur * 2], w_r = weight[cur * 2 + 1];
-      DType pivot = accum + w_l;
-      // w_r > 0 can depress some numerical problems.
+      double w_l = weight[cur * 2], w_r = weight[cur * 2 + 1];
+      double pivot = accum + w_l;
+      // w_r > 0 can suppress some numerical problems.
       Idx shift = static_cast<Idx>(p > pivot && w_r > 0);
       cur = cur * 2 + shift;
       if (shift == 1)
@@ -309,7 +326,8 @@ class TreeSampler: public BaseSampler<Idx> {
     if (!replace) {
       while (cur >= 1) {
         if (cur >= num_leafs)
-          weight[cur] = this->decrease ? weight[cur] - this->decrease[rst] : 0.;
+          weight[cur] = this->decrease ?
+            weight[cur] - static_cast<double>(this->decrease[rst]) : 0.;
         else
           weight[cur] = weight[cur * 2] + weight[cur * 2 + 1];
         cur /= 2;

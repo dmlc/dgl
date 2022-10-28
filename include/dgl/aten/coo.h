@@ -396,8 +396,9 @@ COOMatrix COOReorder(COOMatrix coo, runtime::NDArray new_row_ids, runtime::NDArr
  * \param mat Input coo matrix.
  * \param rows Rows to sample from.
  * \param num_samples Number of samples
- * \param prob Unnormalized probability array. Should be of the same length as the data array.
- *             If an empty array is provided, assume uniform.
+ * \param prob_or_mask Unnormalized probability array or mask array.
+ *                     Should be of the same length as the data array.
+ *                     If an empty array is provided, assume uniform.
  * \param replace True if sample with replacement
  * \return A COOMatrix storing the picked row and col indices. Its data field stores the
  *         the index of the picked elements in the value array.
@@ -406,7 +407,7 @@ COOMatrix COORowWiseSampling(
     COOMatrix mat,
     IdArray rows,
     int64_t num_samples,
-    FloatArray prob = FloatArray(),
+    NDArray prob_or_mask = NDArray(),
     bool replace = true);
 
 /*!
