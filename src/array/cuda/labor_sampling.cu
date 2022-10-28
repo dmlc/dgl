@@ -120,8 +120,7 @@ struct StencilOp {
 
 template <typename IdType, typename FloatType, typename ps_t, typename A_t>
 struct StencilOpFused {
-  const uint64_t rand_seed, rand_seed2;
-  const FloatType a, b;
+  const uint64_t rand_seed;
   const IdType * idx_coo;
   const FloatType * cs;
   const ps_t probs;
@@ -130,7 +129,6 @@ struct StencilOpFused {
   const IdType * rows;
   const IdType * indptr;
   const IdType * indices;
-  const IdType * nids;
   __device__
   auto operator() (IdType idx) {
     const auto in_row = idx_coo[idx];
@@ -139,21 +137,13 @@ struct StencilOpFused {
     const IdType row = rows[in_row];
     const auto in_idx = indptr[row] + rofs;
     const auto u = indices[in_idx];
-    const auto v = nids ? nids[u] : u;
     curandStatePhilox4_32_10_t rng;
     if (labor)
-      curand_init(123123, rand_seed, v, &rng);
+      curand_init(123123, rand_seed, u, &rng);
     else
       curand_init(rand_seed, idx, 0, &rng);
     float rnd;
-    if (rand_seed != rand_seed2) {
-      rnd = a * curand_normal(&rng);
-      curand_init(123123, rand_seed2, v, &rng);
-      rnd += b * curand_normal(&rng);
-      rnd = normcdf(rnd);
-    } else {
-      rnd = curand_uniform(&rng);
-    }
+    rnd = curand_uniform(&rng);
     return rnd <= cs[in_row] * A[in_idx] * ps;
   }
 };
@@ -222,16 +212,12 @@ struct DegreeFunc {
 template <typename IdType, typename FloatType>
 __global__ void _CSRRowWiseOneHopExtractorKernel(
   const uint64_t rand_seed,
-  const uint64_t rand_seed2,
-  const FloatType a,
-  const FloatType b,
   const IdType hop_size,
   const IdType * const rows,
   const IdType * const indptr,
   const IdType * const subindptr,
   const IdType * const indices,
   const IdType * const idx_coo,
-  const IdType * const nids,
   const FloatType * const A,
   FloatType * const rands,
   IdType * const hop,
@@ -250,18 +236,10 @@ __global__ void _CSRRowWiseOneHopExtractorKernel(
     const auto in_idx = indptr[row] + rofs;
     const auto u = indices[in_idx];
     hop[tx] = u;
-    const auto v = nids ? nids[u] : u;
     if (labor)
-      curand_init(123123, rand_seed, v, &rng);
+      curand_init(123123, rand_seed, u, &rng);
     float rnd;
-    if (rand_seed != rand_seed2) {
-      rnd = a * curand_normal(&rng);
-      curand_init(123123, rand_seed2, v, &rng);
-      rnd += b * curand_normal(&rng);
-      rnd = normcdf(rnd);
-    } else {
-      rnd = curand_uniform(&rng);
-    }
+    rnd = curand_uniform(&rng);
     if (A)
       A_l[tx] = A[in_idx];
     rands[tx] = (FloatType)rnd;
@@ -370,12 +348,9 @@ __global__ void map_vertex_ids_global(
 
 template <DGLDeviceType XPU, typename IdType, typename FloatType>
 std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
-                  IdArray NIDs,
                   IdArray rows_arr,
                   const int64_t num_picks,
                   FloatArray prob_arr,
-                  IdArray random_seed,
-                  IdArray cnt,
                   int importance_sampling) {
   const bool weights = !IsNullArray(prob_arr);
 
@@ -397,7 +372,6 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
 
   const IdType num_rows = rows_arr->shape[0];
   IdType * rows = static_cast<IdType*>(rows_arr->data);
-  IdType * nids = NIDs->shape[0] == mat.num_cols ? static_cast<IdType*>(NIDs->data) : nullptr;
   FloatType * A = static_cast<FloatType*>(prob_arr->data);
 
   const IdType * const indptr = static_cast<const IdType*>(mat.indptr->data);
@@ -512,21 +486,16 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
       subindptr);
   }
 
+  const uint64_t random_seed = RandomEngine::ThreadLocal()->RandInt(1000000000);
+
   if (importance_sampling) {
     { // extracts the onehop neighborhood cols to a contiguous range into hop_1
       const dim3 block(BLOCK_SIZE);
       const dim3 grid((hop_size + BLOCK_SIZE - 1) / BLOCK_SIZE);
-      auto seeds = static_cast<const int64_t *>(random_seed->data);
-      const auto num_seeds = random_seed->shape[0];
-      auto cnt_ = static_cast<const int64_t *>(cnt->data);
-      const auto l = (cnt_[0] % cnt_[1]) * 1.0 / cnt_[1];
-      const auto pi = std::acos(-1.0);
-      const FloatType a = std::cos(pi * l / 2);
-      const FloatType b = std::sin(pi * l / 2);
       CUDA_KERNEL_CALL((_CSRRowWiseOneHopExtractorKernel<IdType, FloatType>),
         grid, block, 0, stream,
-        seeds[0], seeds[num_seeds - 1], a, b, hop_size, rows,
-        indptr, subindptr, indices, idx_coo, nids, weights ? A : nullptr, rands.get(), hop_1, A_l);
+        random_seed, hop_size, rows,
+        indptr, subindptr, indices, idx_coo, weights ? A : nullptr, rands.get(), hop_1, A_l);
     }
     int64_t hop_uniq_size = 0;
     auto hop_new_arr = NewIdArray(hop_size, ctx, sizeof(IdType) * 8);
@@ -689,13 +658,6 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
             thrust::make_zip_function(StencilOp<FloatType>{cs})) - transformed_output;
       }
     } else {
-      auto seeds = static_cast<const uint64_t *>(random_seed->data);
-      const auto num_seeds = random_seed->shape[0];
-      auto cnt_ = static_cast<const int64_t *>(cnt->data);
-      const auto l = (cnt_[0] % cnt_[1]) * 1.0 / cnt_[1];
-      const auto pi = std::acos(-1.0);
-      const FloatType a = std::cos(pi * l / 2);
-      const FloatType b = std::sin(pi * l / 2);
       if (weights) {
         auto output = thrust::make_zip_iterator(
             picked_inrow.get(), picked_row_data, picked_col_data, picked_idx_data, picked_imp_data);
@@ -703,8 +665,8 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
             TransformOpImp<IdType, FloatType, decltype(one), FloatType *, FloatType *>{
             one, A, A, idx_coo, rows, cs, indptr, subindptr, indices, data});
         const auto pred = StencilOpFused<IdType, FloatType, decltype(one), FloatType *>{
-            seeds[0], seeds[num_seeds - 1], a, b, idx_coo, cs,
-            one, A, subindptr, rows, indptr, indices, nids};
+            random_seed, idx_coo, cs,
+            one, A, subindptr, rows, indptr, indices};
         num_edges = thrust::copy_if(exec_policy,
             iota, iota + hop_size, iota, transformed_output, pred) - transformed_output;
       } else {
@@ -712,8 +674,8 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
         auto transformed_output = thrust::make_transform_output_iterator(output,
             TransformOp<IdType>{idx_coo, rows, indptr, subindptr, indices, data});
         const auto pred = StencilOpFused<IdType, FloatType, decltype(one), decltype(one)>{
-            seeds[0], seeds[num_seeds - 1], a, b, idx_coo, cs,
-            one, one, subindptr, rows, indptr, indices, nids};
+            random_seed, idx_coo, cs,
+            one, one, subindptr, rows, indptr, indices};
         num_edges = thrust::copy_if(exec_policy,
             iota, iota + hop_size, iota, transformed_output, pred) - transformed_output;
       }
@@ -762,13 +724,13 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
 }
 
 template std::pair<COOMatrix, FloatArray> CSRLaborSampling<kDGLCUDA, int32_t, float>(
-  CSRMatrix, IdArray, IdArray, int64_t, FloatArray, IdArray, IdArray, int);
+  CSRMatrix, IdArray, int64_t, FloatArray, int);
 template std::pair<COOMatrix, FloatArray> CSRLaborSampling<kDGLCUDA, int64_t, float>(
-  CSRMatrix, IdArray, IdArray, int64_t, FloatArray, IdArray, IdArray, int);
+  CSRMatrix, IdArray, int64_t, FloatArray, int);
 template std::pair<COOMatrix, FloatArray> CSRLaborSampling<kDGLCUDA, int32_t, double>(
-  CSRMatrix, IdArray, IdArray, int64_t, FloatArray, IdArray, IdArray, int);
+  CSRMatrix, IdArray, int64_t, FloatArray, int);
 template std::pair<COOMatrix, FloatArray> CSRLaborSampling<kDGLCUDA, int64_t, double>(
-  CSRMatrix, IdArray, IdArray, int64_t, FloatArray, IdArray, IdArray, int);
+  CSRMatrix, IdArray, int64_t, FloatArray, int);
 
 }  // namespace impl
 }  // namespace aten

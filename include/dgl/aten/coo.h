@@ -396,7 +396,7 @@ COOMatrix COOReorder(
  * // coo.data = [2, 3, 0, 1, 4]
  * COOMatrix coo = ...;
  * IdArray rows = ... ; // [1, 3]
- * COOMatrix sampled = COOLaborSampling(coo, NullArray(), rows, 2, FloatArray(), 12, [1, 1], false);
+ * COOMatrix sampled = COOLaborSampling(coo, NullArray(), rows, 2, FloatArray(), false);
  * // possible sampled coo matrix:
  * // sampled.num_rows = 4
  * // sampled.num_cols = 4
@@ -405,12 +405,9 @@ COOMatrix COOReorder(
  * // sampled.data = [3, 0, 4]
  *
  * \param mat Input coo matrix.
- * \param NIDs global nids if sampling from a subgraph
  * \param rows Rows to sample from.
  * \param num_samples Number of samples using labor sampling
  * \param prob Probability array for nonuniform sampling
- * \param random_seed The random seed for the sampler
- * \param cnt A tensor to keep track of batch dependency
  * \param importance_sampling Whether to enable importance sampling
  * \return A pair of COOMatrix storing the picked row and col indices and edge weights
  *         if importance_sampling != 0 or prob argument was passed.
@@ -418,12 +415,9 @@ COOMatrix COOReorder(
  */
 std::pair<COOMatrix, FloatArray> COOLaborSampling(
     COOMatrix mat,
-    IdArray NIDs,
     IdArray rows,
     int64_t num_samples,
     FloatArray prob,
-    IdArray random_seed,
-    IdArray cnt,
     int importance_sampling);
 
 /*!

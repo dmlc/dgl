@@ -29,50 +29,44 @@ namespace impl {
 template <DGLDeviceType XPU, typename IdxType, typename FloatType>
 std::pair<COOMatrix, FloatArray> CSRLaborSampling(
     CSRMatrix mat,
-    IdArray NIDs,
     IdArray rows,
     int64_t num_samples,
     FloatArray prob,
-    IdArray random_seed,
-    IdArray cnt,
     int importance_sampling) {
   return CSRLaborPick<IdxType, FloatType>(
-      mat, NIDs, rows, num_samples, prob, random_seed, cnt, importance_sampling);
+      mat, rows, num_samples, prob, importance_sampling);
 }
 
 template std::pair<COOMatrix, FloatArray> CSRLaborSampling<kDGLCPU, int32_t, float>(
-    CSRMatrix, IdArray, IdArray, int64_t, FloatArray, IdArray, IdArray, int);
+    CSRMatrix, IdArray, int64_t, FloatArray, int);
 template std::pair<COOMatrix, FloatArray> CSRLaborSampling<kDGLCPU, int64_t, float>(
-    CSRMatrix, IdArray, IdArray, int64_t, FloatArray, IdArray, IdArray, int);
+    CSRMatrix, IdArray, int64_t, FloatArray, int);
 template std::pair<COOMatrix, FloatArray> CSRLaborSampling<kDGLCPU, int32_t, double>(
-    CSRMatrix, IdArray, IdArray, int64_t, FloatArray, IdArray, IdArray, int);
+    CSRMatrix, IdArray, int64_t, FloatArray, int);
 template std::pair<COOMatrix, FloatArray> CSRLaborSampling<kDGLCPU, int64_t, double>(
-    CSRMatrix, IdArray, IdArray, int64_t, FloatArray, IdArray, IdArray, int);
+    CSRMatrix, IdArray, int64_t, FloatArray, int);
 
 /////////////////////////////// COO ///////////////////////////////
 
 template <DGLDeviceType XPU, typename IdxType, typename FloatType>
 std::pair<COOMatrix, FloatArray> COOLaborSampling(
     COOMatrix mat,
-    IdArray NIDs,
     IdArray rows,
     int64_t num_samples,
     FloatArray prob,
-    IdArray random_seed,
-    IdArray cnt,
     int importance_sampling) {
   return COOLaborPick<IdxType, FloatType>(
-      mat, NIDs, rows, num_samples, prob, random_seed, cnt, importance_sampling);
+      mat, rows, num_samples, prob, importance_sampling);
 }
 
 template std::pair<COOMatrix, FloatArray> COOLaborSampling<kDGLCPU, int32_t, float>(
-    COOMatrix, IdArray, IdArray, int64_t, FloatArray, IdArray, IdArray, int);
+    COOMatrix, IdArray, int64_t, FloatArray, int);
 template std::pair<COOMatrix, FloatArray> COOLaborSampling<kDGLCPU, int64_t, float>(
-    COOMatrix, IdArray, IdArray, int64_t, FloatArray, IdArray, IdArray, int);
+    COOMatrix, IdArray, int64_t, FloatArray, int);
 template std::pair<COOMatrix, FloatArray> COOLaborSampling<kDGLCPU, int32_t, double>(
-    COOMatrix, IdArray, IdArray, int64_t, FloatArray, IdArray, IdArray, int);
+    COOMatrix, IdArray, int64_t, FloatArray, int);
 template std::pair<COOMatrix, FloatArray> COOLaborSampling<kDGLCPU, int64_t, double>(
-    COOMatrix, IdArray, IdArray, int64_t, FloatArray, IdArray, IdArray, int);
+    COOMatrix, IdArray, int64_t, FloatArray, int);
 
 }  // namespace impl
 }  // namespace aten

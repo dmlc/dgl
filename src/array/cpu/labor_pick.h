@@ -46,19 +46,15 @@ namespace impl {
 template <typename IdxType, typename FloatType>
 std::pair<COOMatrix, FloatArray> CSRLaborPick(
     CSRMatrix mat,
-    IdArray NIDs,
     IdArray rows,
     int64_t num_picks,
     FloatArray prob,
-    IdArray random_seed,
-    IdArray cnt,
     int importance_sampling) {
   using namespace aten;
   const IdxType* indptr = mat.indptr.Ptr<IdxType>();
   const IdxType* indices = mat.indices.Ptr<IdxType>();
   const IdxType* data = CSRHasData(mat) ? mat.data.Ptr<IdxType>() : nullptr;
   const IdxType* rows_data = rows.Ptr<IdxType>();
-  const IdxType* nids = NIDs->shape[0] ? NIDs.Ptr<IdxType>() : nullptr;
   const auto num_rows = rows->shape[0];
   const auto& ctx = mat.indptr->ctx;
 
@@ -185,18 +181,8 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
     }
   }
 
-  // When run distributed, random_seed needs to be equivalent.
-  auto seeds = random_seed.Ptr<int64_t>();
-  const auto num_seeds = random_seed->shape[0];
-  auto cnts = cnt.Ptr<int64_t>();
-  const auto l = (cnts[0] % cnts[1]) * 1.0 / cnts[1];
-  const auto pi = std::acos(-1.0);
-  const auto a0 = std::cos(pi * l / 2);
-  const auto a1 = std::sin(pi * l / 2);
-
-  const pcg32 ng0(seeds[0]), ng1(seeds[num_seeds - 1]);
+  const pcg32 ng0(RandomEngine::ThreadLocal()->RandInt(1000000000));
   std::uniform_real_distribution<FloatType> uni;
-  std::normal_distribution<FloatType> norm;
 
   // compute number of edges first and store randoms
   IdxType num_edges = 0;
@@ -208,24 +194,13 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
     const auto c = cs[i];
     for (auto j = indptr[rid]; j < indptr[rid + 1]; j++) {
       const auto v = indices[j];
-      const auto u = nids ? nids[v] : v;
       // itb stands for a pair of iterator and boolean indicating if insertion was successful
-      auto itb = rand_map.emplace(u, 0);
+      auto itb = rand_map.emplace(v, 0);
       if (itb.second) {
         auto ng = ng0;
-        ng.discard(u);
-        if (num_seeds > 1) {
-          norm.reset();
-          auto rnd = a0 * norm(ng);
-          ng = ng1;
-          ng.discard(u);
-          norm.reset();
-          rnd += a1 * norm(ng);
-          itb.first->second = std::erfc(-rnd * (FloatType)/*M_SQRT1_2*/0.70710678118654752440) / 2;
-        } else {
-          uni.reset();
-          itb.first->second = uni(ng);
-        }
+        ng.discard(v);
+        uni.reset();
+        itb.first->second = uni(ng);
       }
       const auto rnd = itb.first->second;
       // if hop_map is initialized, get ps from there, otherwise get it from the alternative.
@@ -293,18 +268,15 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
 template <typename IdxType, typename FloatType>
 std::pair<COOMatrix, FloatArray> COOLaborPick(
     COOMatrix mat,
-    IdArray NIDs,
     IdArray rows,
     int64_t num_picks,
     FloatArray prob,
-    IdArray random_seed,
-    IdArray cnt,
     int importance_sampling) {
   using namespace aten;
   const auto& csr = COOToCSR(COOSliceRows(mat, rows));
   const IdArray new_rows = Range(0, rows->shape[0], rows->dtype.bits, rows->ctx);
   const auto&& picked_importances = CSRLaborPick<IdxType, FloatType>(
-      csr, NIDs, new_rows, num_picks, prob, random_seed, cnt, importance_sampling);
+      csr, new_rows, num_picks, prob, importance_sampling);
   const auto& picked = picked_importances.first;
   const auto& importances = picked_importances.second;
   return std::make_pair(COOMatrix(mat.num_rows, mat.num_cols,

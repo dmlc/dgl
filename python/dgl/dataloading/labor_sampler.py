@@ -55,12 +55,6 @@ class LaborSampler(BlockSampler):
         Whether to use importance sampling or uniform sampling, use of negative values optimizes
         importance sampling probabilities until convergence while use of positive values runs
         optimization steps that many times.
-    layer_dependency : bool, default ``False``
-        Specifies whether different layers should use same random variates.
-    batch_dependency : int, default ``1``
-        Makes it so that batch i and batch i + batch_dependency are independent but
-        consecutive batches are dependent. The bigger this parameter, the more dependency between
-        batches.
     prefetch_node_feats : list[str] or dict[ntype, list[str]], optional
         The source node data to prefetch for the first MFG, corresponding to the
         input node features necessary for the first GNN layer.
@@ -129,8 +123,6 @@ class LaborSampler(BlockSampler):
         edge_dir="in",
         prob=None,
         importance_sampling=0,
-        layer_dependency=False,
-        batch_dependency=1,
         prefetch_node_feats=None,
         prefetch_labels=None,
         prefetch_edge_feats=None,
@@ -146,32 +138,14 @@ class LaborSampler(BlockSampler):
         self.edge_dir = edge_dir
         self.prob = prob
         self.importance_sampling = importance_sampling
-        self.layer_dependency = layer_dependency
-        self.cnt = F.zeros_like(choice(1e18, 2))
-        self.cnt[1] = batch_dependency
-        self.set_seed()
-
-    def set_seed(self, random_seed=None):
-        '''sets the underlying seed for the sampler'''
-        if random_seed is not None:
-            seed(random_seed % 1000000007)
-        if not hasattr(self, "random_seed") or self.cnt[1] == 1:
-            self.random_seed = choice(1e18, 2 if self.cnt[1] > 1 else 1)
-        else:
-            self.random_seed[0] = self.random_seed[1]
-            self.random_seed[1] = choice(1e18, 1)
 
     def sample_blocks(self, g, seed_nodes, exclude_eids=None):
         output_nodes = seed_nodes
         blocks = []
         for i, fanout in enumerate(reversed(self.fanouts)):
-            random_seed_i = F.zerocopy_to_dgl_ndarray(
-                self.random_seed + (i if not self.layer_dependency else 0)
-            )
             frontier, importances = g.sample_labors(
                 seed_nodes,
                 fanout,
-                (random_seed_i, F.zerocopy_to_dgl_ndarray(self.cnt)),
                 prob=self.prob,
                 importance_sampling=self.importance_sampling,
                 edge_dir=self.edge_dir,
@@ -194,7 +168,4 @@ class LaborSampler(BlockSampler):
             seed_nodes = block.srcdata[NID]
             blocks.insert(0, block)
 
-        self.cnt[0] += 1
-        if self.cnt[0] % self.cnt[1] == 0:
-            self.set_seed(self.random_seed[0].item())
         return seed_nodes, output_nodes, blocks

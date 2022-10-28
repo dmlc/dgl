@@ -169,12 +169,9 @@ CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries);
 template <DGLDeviceType XPU, typename IdType, typename FloatType>
 std::pair<COOMatrix, FloatArray> CSRLaborSampling(
     CSRMatrix mat,
-    IdArray NIDs,
     IdArray rows,
     int64_t num_samples,
     FloatArray prob,
-    IdArray random_seed,
-    IdArray cnt,
     int importance_sampling);
 
 // FloatType is the type of probability data.
@@ -287,12 +284,9 @@ COOMatrix COORemove(COOMatrix coo, IdArray entries);
 template <DGLDeviceType XPU, typename IdType, typename FloatType>
 std::pair<COOMatrix, FloatArray> COOLaborSampling(
     COOMatrix mat,
-    IdArray NIDs,
     IdArray rows,
     int64_t num_samples,
     FloatArray prob,
-    IdArray random_seed,
-    IdArray cnt,
     int importance_sampling);
 
 // FloatType is the type of probability data.

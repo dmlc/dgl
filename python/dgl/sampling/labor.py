@@ -35,7 +35,6 @@ def sample_labors(
     g,
     nodes,
     fanout,
-    random_seed,
     edge_dir="in",
     prob=None,
     importance_sampling=0,
@@ -71,10 +70,6 @@ def sample_labors(
 
         If -1 is given for a single edge type, all the neighboring edges with that edge
         type will be selected.
-    random_seed : a tuple of 2 tensors, the first tensor with either 1 or 2 integers, the second
-        one with 2 integers
-        The random seed(s) to be used for sampling along with batch dependency count information
-        stores as the last two elements
     edge_dir : str, optional
         Determines whether to sample inbound or outbound edges.
 
@@ -184,7 +179,6 @@ def sample_labors(
             g,
             nodes,
             fanout,
-            random_seed,
             edge_dir=edge_dir,
             prob=prob,
             importance_sampling=importance_sampling,
@@ -197,7 +191,6 @@ def sample_labors(
             g,
             nodes,
             fanout,
-            random_seed,
             edge_dir=edge_dir,
             prob=prob,
             importance_sampling=importance_sampling,
@@ -224,7 +217,6 @@ def _sample_labors(
     g,
     nodes,
     fanout,
-    random_seed,
     edge_dir="in",
     prob=None,
     importance_sampling=0,
@@ -247,20 +239,11 @@ def _sample_labors(
         )
     ctx = utils.to_dgl_context(F.context(next(iter(nodes.values()))))
     nodes_all_types = []
-    nids_all_types = []
     for ntype in g.ntypes:
         if ntype in nodes:
             nodes_all_types.append(F.to_dgl_nd(nodes[ntype]))
-            if NID in g.ndata:
-                if len(g.ntypes) > 1:
-                    nids_all_types.append(F.to_dgl_nd(g.ndata[NID][ntype]))
-                else:
-                    nids_all_types.append(F.to_dgl_nd(g.ndata[NID]))
-            else:
-                nids_all_types.append(nd.array([], ctx=ctx))
         else:
             nodes_all_types.append(nd.array([], ctx=ctx))
-            nids_all_types.append(nd.array([], ctx=ctx))
 
     if isinstance(fanout, nd.NDArray):
         fanout_array = fanout
@@ -311,11 +294,8 @@ def _sample_labors(
 
     ret_val = _CAPI_DGLSampleLabors(
         g._graph,
-        nids_all_types,
         nodes_all_types,
         fanout_array,
-        random_seed[0],
-        random_seed[1],
         edge_dir,
         prob_arrays,
         excluded_edges_all_t,
