@@ -1120,10 +1120,18 @@ class RangePartitionBook(GraphPartitionBook):
 
     @property
     def local_ntype_offset(self):
+        """Get the node type offset array of the local partition.
+
+        The i-th element indicates the starting position of the i-th node type.
+        """
         return self._local_ntype_offset
 
     @property
     def local_etype_offset(self):
+        """Get the edge type offset array of the local partition.
+
+        The i-th element indicates the starting position of the i-th edge type.
+        """
         return self._local_etype_offset
 
     def _to_canonical_etype(self, etype):
