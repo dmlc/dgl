@@ -104,8 +104,13 @@ class KVClient(object):
         return F.count_nonzero(self._data[name])
 
     @property
-    def local_store(self):
+    def data_store(self):
         """Return the local partition of the data storage.
+
+        Returns
+        -------
+        dict[str, Tensor]
+            The tensor storages of the local partition.
         """
         return self._data
 

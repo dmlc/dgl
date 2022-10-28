@@ -83,6 +83,11 @@ class NeighborSampler(BlockSampler):
     >>> g.edata['p'] = torch.rand(g.num_edges())   # any non-negative 1D vector works
     >>> sampler = dgl.dataloading.NeighborSampler([5, 10, 15], prob='p')
 
+    Or sampling on edge masks:
+
+    >>> g.edata['mask'] = torch.rand(g.num_edges()) < 0.2   # any 1D boolean mask works
+    >>> sampler = dgl.dataloading.NeighborSampler([5, 10, 15], prob='mask')
+
     **Edge classification and link prediction**
 
     This class can also work for edge classification and link prediction together

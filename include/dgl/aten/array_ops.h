@@ -37,20 +37,6 @@ inline bool IsNullArray(NDArray array) {
 }
 
 /*!
- * \return Whether all the input arrays are null arrays.
- */
-inline bool IsAllNullArray(const std::vector<NDArray>& arrays) {
-  bool all_null = true;
-  for (auto& arr : arrays) {
-    if (!IsNullArray(arr)) {
-      all_null = false;
-      break;
-    }
-  }
-  return all_null;
-}
-
-/*!
  * \brief Create a new id array with given length
  * \param length The array length
  * \param ctx The array context

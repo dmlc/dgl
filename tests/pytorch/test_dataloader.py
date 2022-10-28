@@ -91,8 +91,10 @@ def test_neighbor_nonuniform(idtype, mode, use_ddp, use_mask):
         g = g.to(F.cuda())
     use_uva = mode.startswith('uva')
 
-    prob = 'p' if not use_mask else None
-    mask = 'mask' if use_mask else None
+    if use_mask:
+        prob, mask = 'p', None
+    else:
+        prob, mask = None, 'mask'
 
     sampler = dgl.dataloading.MultiLayerNeighborSampler([2], prob=prob, mask=mask)
     for num_workers in [0, 1, 2] if mode == 'cpu' else [0]:

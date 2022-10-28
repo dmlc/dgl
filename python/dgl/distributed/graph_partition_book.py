@@ -1118,6 +1118,14 @@ class RangePartitionBook(GraphPartitionBook):
         """
         return self._canonical_etypes
 
+    @property
+    def local_ntype_offset(self):
+        return self._local_ntype_offset
+
+    @property
+    def local_etype_offset(self):
+        return self._local_etype_offset
+
     def _to_canonical_etype(self, etype):
         """Convert an edge type to the corresponding canonical edge type.
         If canonical etype is not available, no conversion is applied.

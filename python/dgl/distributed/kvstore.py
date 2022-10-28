@@ -1395,8 +1395,13 @@ class KVClient(object):
         return total
 
     @property
-    def local_store(self):
+    def data_store(self):
         """Return the local partition of the data storage.
+
+        Returns
+        -------
+        dict[str, Tensor]
+            The tensor storages of the local partition.
         """
         return self._data_store
 

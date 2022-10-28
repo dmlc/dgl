@@ -15,6 +15,14 @@ __all__ = [
     'select_topk']
 
 def _prepare_edge_arrays(g, arg):
+    """Converts the argument into a list of NDArrays.
+
+    If the argument is already a list of array-like objects, directly do the
+    conversion.
+
+    If the argument is a string, converts g.edata[arg] into a list of NDArrays
+    ordered by the edge types.
+    """
     if isinstance(arg, list) and len(arg) > 0:
         if isinstance(arg[0], nd.NDArray):
             return arg

@@ -189,7 +189,7 @@ class DistTensor:
     @property
     def local_partition(self):
         """Return the local partition of this DistTensor."""
-        return self.kvstore.local_store[self._name]
+        return self.kvstore.data_store[self._name]
 
     def __or__(self, other):
         new_dist_tensor = DistTensor(

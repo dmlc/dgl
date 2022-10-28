@@ -69,21 +69,21 @@ inline PickFn<IdxType> GetSamplingPickFn(
 }
 
 template <typename IdxType, typename FloatType>
-inline RangePickFn<IdxType> GetSamplingRangePickFn(
+inline EtypeRangePickFn<IdxType> GetSamplingRangePickFn(
     const std::vector<int64_t>& num_samples,
     const std::vector<FloatArray>& prob, bool replace) {
-  RangePickFn<IdxType> pick_fn = [prob, num_samples, replace]
+  EtypeRangePickFn<IdxType> pick_fn = [prob, num_samples, replace]
     (IdxType off, IdxType et_offset, IdxType cur_et, IdxType et_len,
     const std::vector<IdxType> &et_idx,
     const std::vector<IdxType> &et_eid,
-    const IdxType* data, IdxType* out_idx) {
+    const IdxType* eid, IdxType* out_idx) {
       const FloatArray& p = prob[cur_et];
       const FloatType* p_data = IsNullArray(p) ? nullptr : p.Ptr<FloatType>();
       FloatArray probs = FloatArray::Empty({et_len}, p->dtype, p->ctx);
       FloatType* probs_data = probs.Ptr<FloatType>();
       for (int64_t j = 0; j < et_len; ++j) {
-        probs_data[j] = p_data ?
-          p_data[et_eid[et_idx[et_offset + j]]] : static_cast<FloatType>(1.);
+        const IdxType cur_eid = et_eid[et_idx[et_offset + j]];
+        probs_data[j] = p_data ? p_data[cur_eid] : static_cast<FloatType>(1.);
       }
 
       RandomEngine::ThreadLocal()->Choice<IdxType, FloatType>(
@@ -125,9 +125,9 @@ inline PickFn<IdxType> GetSamplingUniformPickFn(
 }
 
 template <typename IdxType>
-inline RangePickFn<IdxType> GetSamplingUniformRangePickFn(
+inline EtypeRangePickFn<IdxType> GetSamplingUniformRangePickFn(
     const std::vector<int64_t>& num_samples, bool replace) {
-  RangePickFn<IdxType> pick_fn = [num_samples, replace]
+  EtypeRangePickFn<IdxType> pick_fn = [num_samples, replace]
     (IdxType off, IdxType et_offset, IdxType cur_et, IdxType et_len,
     const std::vector<IdxType> &et_idx,
     const std::vector<IdxType> &et_eid,
@@ -217,16 +217,16 @@ template COOMatrix CSRRowWiseSampling<kDGLCPU, int64_t, uint8_t>(
 
 template <DGLDeviceType XPU, typename IdxType, typename DType>
 COOMatrix CSRRowWisePerEtypeSampling(
-    CSRMatrix mat, IdArray rows, const std::vector<int64_t>& etype_offset,
+    CSRMatrix mat, IdArray rows, const std::vector<int64_t>& eid2etype_offset,
     const std::vector<int64_t>& num_samples, const std::vector<NDArray>& prob_or_mask,
-    bool replace, bool etype_sorted) {
+    bool replace, bool rowwise_etype_sorted) {
   CHECK(prob_or_mask.size() == num_samples.size()) <<
-    "the number of probability tensors do not match the number of edge types.";
+    "the number of probability tensors does not match the number of edge types.";
   for (auto& p : prob_or_mask)
     CHECK(p.defined());
   auto pick_fn = GetSamplingRangePickFn<IdxType, DType>(num_samples, prob_or_mask, replace);
   return CSRRowWisePerEtypePick<IdxType, DType>(
-      mat, rows, etype_offset, num_samples, replace, etype_sorted, pick_fn, prob_or_mask);
+      mat, rows, eid2etype_offset, num_samples, replace, rowwise_etype_sorted, pick_fn, prob_or_mask);
 }
 
 template COOMatrix CSRRowWisePerEtypeSampling<kDGLCPU, int32_t, float>(
@@ -271,11 +271,11 @@ template COOMatrix CSRRowWiseSamplingUniform<kDGLCPU, int64_t>(
 
 template <DGLDeviceType XPU, typename IdxType>
 COOMatrix CSRRowWisePerEtypeSamplingUniform(
-    CSRMatrix mat, IdArray rows, const std::vector<int64_t>& etype_offset,
-    const std::vector<int64_t>& num_samples, bool replace, bool etype_sorted) {
+    CSRMatrix mat, IdArray rows, const std::vector<int64_t>& eid2etype_offset,
+    const std::vector<int64_t>& num_samples, bool replace, bool rowwise_etype_sorted) {
   auto pick_fn = GetSamplingUniformRangePickFn<IdxType>(num_samples, replace);
   return CSRRowWisePerEtypePick<IdxType, float>(
-      mat, rows, etype_offset, num_samples, replace, etype_sorted, pick_fn, {});
+      mat, rows, eid2etype_offset, num_samples, replace, rowwise_etype_sorted, pick_fn, {});
 }
 
 template COOMatrix CSRRowWisePerEtypeSamplingUniform<kDGLCPU, int32_t>(
@@ -350,7 +350,7 @@ template COOMatrix COORowWiseSampling<kDGLCPU, int64_t, uint8_t>(
 
 template <DGLDeviceType XPU, typename IdxType, typename DType>
 COOMatrix COORowWisePerEtypeSampling(
-    COOMatrix mat, IdArray rows, const std::vector<int64_t>& etype_offset,
+    COOMatrix mat, IdArray rows, const std::vector<int64_t>& eid2etype_offset,
     const std::vector<int64_t>& num_samples, const std::vector<NDArray>& prob_or_mask,
     bool replace) {
   CHECK(prob_or_mask.size() == num_samples.size()) <<
@@ -359,7 +359,7 @@ COOMatrix COORowWisePerEtypeSampling(
     CHECK(p.defined());
   auto pick_fn = GetSamplingRangePickFn<IdxType, DType>(num_samples, prob_or_mask, replace);
   return COORowWisePerEtypePick<IdxType, DType>(
-      mat, rows, etype_offset, num_samples, replace, pick_fn, prob_or_mask);
+      mat, rows, eid2etype_offset, num_samples, replace, pick_fn, prob_or_mask);
 }
 
 template COOMatrix COORowWisePerEtypeSampling<kDGLCPU, int32_t, float>(
@@ -404,11 +404,11 @@ template COOMatrix COORowWiseSamplingUniform<kDGLCPU, int64_t>(
 
 template <DGLDeviceType XPU, typename IdxType>
 COOMatrix COORowWisePerEtypeSamplingUniform(
-    COOMatrix mat, IdArray rows, const std::vector<int64_t>& etype_offset,
+    COOMatrix mat, IdArray rows, const std::vector<int64_t>& eid2etype_offset,
     const std::vector<int64_t>& num_samples, bool replace) {
   auto pick_fn = GetSamplingUniformRangePickFn<IdxType>(num_samples, replace);
   return COORowWisePerEtypePick<IdxType, float>(
-      mat, rows, etype_offset, num_samples, replace, pick_fn, {});
+      mat, rows, eid2etype_offset, num_samples, replace, pick_fn, {});
 }
 
 template COOMatrix COORowWisePerEtypeSamplingUniform<kDGLCPU, int32_t>(

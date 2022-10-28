@@ -383,12 +383,6 @@ class DistGraphServer(KVServer):
                 # feature name collision for different edge types.
                 etype, feat_name = name.split('/')
 
-                # Edge features are prefixed with canonical edge types, but the partition policy
-                # is still using a single edge type string.
-                # TODO(BarclayII): check if this is still the case and can be removed.
-                etype = etype.split(':')
-                etype = etype[1 if len(etype) == 3 else 0]
-
                 data_name = HeteroDataName(False, etype, feat_name)
                 self.init_data(name=str(data_name), policy_str=data_name.policy_str,
                                data_tensor=edge_feats[name])
@@ -1275,11 +1269,7 @@ class DistGraph:
                          output_device=None):
         # pylint: disable=unused-argument
         """Sample neighbors from a distributed graph."""
-        # Currently exclude_edges, output_device, and edge_dir are ignored.
         if len(self.etypes) > 1:
-            assert isinstance(self._gpb, RangePartitionBook), \
-                    "Sampling distributed heterogeneous graphs require a RangePartitionBook. "
-
             frontier = graph_services.sample_etype_neighbors(
                 self, seed_nodes, fanout, replace=replace,
                 etype_sorted=etype_sorted, prob=prob)

@@ -183,7 +183,7 @@ def _in_subgraph(local_g, partition_book, seed_nodes):
 
 
 # --- NOTE 1 ---
-# BIG HACK AHEAD.
+# (BarclayII)
 # If the sampling algorithm needs node and edge data, ideally the
 # algorithm should query the underlying feature storage to get what it
 # just needs to complete the job.  For instance, with
@@ -195,18 +195,17 @@ def _in_subgraph(local_g, partition_book, seed_nodes):
 # the data of *all* the nodes/edges.  Going distributed, we now need
 # the node/edge data of the *entire* local graph partition.
 #
-# If we only use edge data, everything will be fine because the local
-# edge data storage contains the data all the edges within the partition.
-# So here, I'm directly pulling out the local data partition from the
-# DistTensor.
+# If the sampling algorithm only use edge data, the current design works
+# because the local graph partition contains all the in-edges of the
+# assigned nodes as well as the data.  This is the case for
+# sample_etype_neighbors.
 #
-# Things will be a lot more difficult if we use node data (e.g.
-# sample_neighbors_biased), since the local node data storage do not
-# contain the data for the halo nodes.  If we don't want to overhaul
-# the design of DistDGL, the best thing I can think of is to cache
-# the halo node features, which (1) incurs a lot more extra memory cost,
-# and (2) needs significant refactor on DistGraph and/or DistTensor.
-
+# However, if the sampling algorithm requires data of the neighbor nodes
+# (e.g. sample_neighbors_biased which performs biased sampling based on the
+# type of the neighbor nodes), the current design will fail because the
+# neighbor nodes (hence the data) may not belong to the current partition.
+# This is a limitation of the current DistDGL design.  We should improve it
+# later.
 
 class SamplingRequest(Request):
     """Sampling Request"""
@@ -241,7 +240,7 @@ class SamplingRequest(Request):
         partition_book = server_state.partition_book
         kv_store = server_state.kv_store
         if self.prob is not None:
-            prob = kv_store.local_partition[self.prob]
+            prob = kv_store.data_store[self.prob]
         else:
             prob = None
         global_src, global_dst, global_eids = _sample_neighbors(
@@ -663,6 +662,8 @@ def sample_etype_neighbors(
         if prob is not None:
             # See NOTE 1
             _prob = [
+                # NOTE (BarclayII)
+                # Currently DistGraph.edges[] does not accept canonical etype.
                 g.edges[etype].data[prob].kvstore_key
                 if prob in g.edges[etype].data
                 else ""
@@ -683,17 +684,7 @@ def sample_etype_neighbors(
         etype_offset = gpb._local_etype_offset
         # See NOTE 1
         if prob is None:
-            return _sample_etype_neighbors(
-                local_g,
-                partition_book,
-                local_nids,
-                etype_offset,
-                fanout,
-                edge_dir,
-                None,
-                replace,
-                etype_sorted=etype_sorted,
-            )
+            _prob = None
         else:
             _prob = [
                 g.edges[etype].data[prob].local_partition
@@ -701,17 +692,17 @@ def sample_etype_neighbors(
                 else None
                 for etype in g.etypes
             ]
-            return _sample_etype_neighbors(
-                local_g,
-                partition_book,
-                local_nids,
-                etype_offset,
-                fanout,
-                edge_dir,
-                _prob,
-                replace,
-                etype_sorted=etype_sorted,
-            )
+        return _sample_etype_neighbors(
+            local_g,
+            partition_book,
+            local_nids,
+            etype_offset,
+            fanout,
+            edge_dir,
+            _prob,
+            replace,
+            etype_sorted=etype_sorted,
+        )
 
     frontier = _distributed_access(g, nodes, issue_remote_req, local_access)
     if not gpb.is_homogeneous:

@@ -784,6 +784,10 @@ def test_rpc_sampling_shuffle(num_server):
 
 def check_standalone_sampling(tmpdir, reshuffle):
     g = CitationGraphDataset("cora")[0]
+    prob = np.maximum(np.random.randn(g.num_edges()), 0)
+    mask = (prob > 0)
+    g.edata['prob'] = F.tensor(prob)
+    g.edata['mask'] = F.tensor(mask)
     num_parts = 1
     num_hops = 1
     partition_graph(g, 'test_sampling', num_parts, tmpdir,
@@ -800,10 +804,24 @@ def check_standalone_sampling(tmpdir, reshuffle):
     eids = g.edge_ids(src, dst)
     assert np.array_equal(
         F.asnumpy(sampled_graph.edata[dgl.EID]), F.asnumpy(eids))
+
+    sampled_graph = sample_neighbors(
+            dist_graph, [0, 10, 99, 66, 1024, 2008], 3, prob='mask')
+    eid = F.asnumpy(sampled_graph.edata[dgl.EID])
+    assert mask[eid].all()
+
+    sampled_graph = sample_neighbors(
+            dist_graph, [0, 10, 99, 66, 1024, 2008], 3, prob='prob')
+    eid = F.asnumpy(sampled_graph.edata[dgl.EID])
+    assert (prob[eid] > 0).all()
     dgl.distributed.exit_client()
 
 def check_standalone_etype_sampling(tmpdir, reshuffle):
     hg = CitationGraphDataset('cora')[0]
+    prob = np.maximum(np.random.randn(hg.num_edges()), 0)
+    mask = (prob > 0)
+    hg.edata['prob'] = F.tensor(prob)
+    hg.edata['mask'] = F.tensor(mask)
     num_parts = 1
     num_hops = 1
 
@@ -812,7 +830,6 @@ def check_standalone_etype_sampling(tmpdir, reshuffle):
     os.environ['DGL_DIST_MODE'] = 'standalone'
     dgl.distributed.initialize("rpc_ip_config.txt")
     dist_graph = DistGraph("test_sampling", part_config=tmpdir / 'test_sampling.json')
-    gpb = dist_graph.get_partition_book()
     sampled_graph = sample_etype_neighbors(dist_graph, [0, 10, 99, 66, 1023], 3)
 
     src, dst = sampled_graph.edges()
@@ -821,6 +838,16 @@ def check_standalone_etype_sampling(tmpdir, reshuffle):
     eids = hg.edge_ids(src, dst)
     assert np.array_equal(
         F.asnumpy(sampled_graph.edata[dgl.EID]), F.asnumpy(eids))
+
+    sampled_graph = sample_etype_neighbors(
+            dist_graph, [0, 10, 99, 66, 1023], 3, prob='mask')
+    eid = F.asnumpy(sampled_graph.edata[dgl.EID])
+    assert mask[eid].all()
+
+    sampled_graph = sample_etype_neighbors(
+            dist_graph, [0, 10, 99, 66, 1023], 3, prob='prob')
+    eid = F.asnumpy(sampled_graph.edata[dgl.EID])
+    assert (prob[eid] > 0).all()
     dgl.distributed.exit_client()
 
 def check_standalone_etype_sampling_heterograph(tmpdir, reshuffle):
@@ -836,7 +863,6 @@ def check_standalone_etype_sampling_heterograph(tmpdir, reshuffle):
     os.environ['DGL_DIST_MODE'] = 'standalone'
     dgl.distributed.initialize("rpc_ip_config.txt")
     dist_graph = DistGraph("test_hetero_sampling", part_config=tmpdir / 'test_hetero_sampling.json')
-    gpb = dist_graph.get_partition_book()
     sampled_graph = sample_etype_neighbors(
             dist_graph, [0, 1, 2, 10, 99, 66, 1023, 1024, 2700, 2701], 1)
     src, dst = sampled_graph.edges(etype=('paper', 'cite', 'paper'))
@@ -929,9 +955,6 @@ def test_standalone_etype_sampling():
     with tempfile.TemporaryDirectory() as tmpdirname:
         os.environ['DGL_DIST_MODE'] = 'standalone'
         check_standalone_etype_sampling(Path(tmpdirname), True)
-        # (BarclayII) sample_etype_neighbors no longer support BasicPartitionBook.  Do
-        # we even need to support BasicPartitionBook?
-        #check_standalone_etype_sampling(Path(tmpdirname), False)
 
 if __name__ == "__main__":
     import tempfile

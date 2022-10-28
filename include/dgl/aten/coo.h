@@ -429,11 +429,11 @@ COOMatrix COORowWiseSampling(
  * // coo.rows = [0, 0, 0, 0, 3]
  * // coo.cols = [0, 1, 3, 2, 3]
  * // coo.data = [2, 3, 0, 1, 4]
- * // etype = [0, 0, 0, 2, 1]
+ * // eid2etype_offset = [0, 3, 4, 5]
  * COOMatrix coo = ...;
  * IdArray rows = ... ; // [0, 3]
  * std::vector<int64_t> num_samples = {2, 2, 2};
- * COOMatrix sampled = COORowWisePerEtypeSampling(coo, rows, etype, num_samples,
+ * COOMatrix sampled = COORowWisePerEtypeSampling(coo, rows, eid2etype_offset, num_samples,
  *                                                FloatArray(), false);
  * // possible sampled coo matrix:
  * // sampled.num_rows = 4
@@ -444,7 +444,7 @@ COOMatrix COORowWiseSampling(
  *
  * \param mat Input coo matrix.
  * \param rows Rows to sample from.
- * \param etype_offset The offset to each edge type.
+ * \param eid2etype_offset The offset to each edge type.
  * \param num_samples Number of samples
  * \param prob_or_mask Unnormalized probability array or mask array.
  *                     Should be of the same length as the data array.
@@ -457,7 +457,7 @@ COOMatrix COORowWiseSampling(
 COOMatrix COORowWisePerEtypeSampling(
     COOMatrix mat,
     IdArray rows,
-    const std::vector<int64_t>& etype_offset,
+    const std::vector<int64_t>& eid2etype_offset,
     const std::vector<int64_t>& num_samples,
     const std::vector<NDArray>& prob_or_mask,
     bool replace = true);

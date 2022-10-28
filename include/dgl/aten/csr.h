@@ -427,7 +427,6 @@ CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries);
  *                     Should be of the same length as the data array.
  *                     If an empty array is provided, assume uniform.
  * \param replace True if sample with replacement
- * \param etype_sorted whether the CSR column indices per row are ordered by edge type.
  * \return A COOMatrix storing the picked row, col and data indices.
  * \note The edges of the entire graph must be ordered by their edge types.
  */
@@ -457,11 +456,11 @@ COOMatrix CSRRowWiseSampling(
  * // csr.indptr = [0, 4, 4, 4, 5]
  * // csr.cols = [0, 1, 3, 2, 3]
  * // csr.data = [2, 3, 0, 1, 4]
- * // etype = [0, 0, 0, 2, 1]
+ * // eid2etype_offset = [0, 3, 4, 5]
  * CSRMatrix csr = ...;
  * IdArray rows = ... ; // [0, 3]
  * std::vector<int64_t> num_samples = {2, 2, 2};
- * COOMatrix sampled = CSRRowWisePerEtypeSampling(csr, rows, etype, num_samples,
+ * COOMatrix sampled = CSRRowWisePerEtypeSampling(csr, rows, eid2etype_offset, num_samples,
  *                                                FloatArray(), false);
  * // possible sampled coo matrix:
  * // sampled.num_rows = 4
@@ -472,23 +471,24 @@ COOMatrix CSRRowWiseSampling(
  *
  * \param mat Input CSR matrix.
  * \param rows Rows to sample from.
- * \param etype_offset The offset to each edge type.
+ * \param eid2etype_offset The offset to each edge type.
  * \param num_samples Number of samples to choose per edge type.
  * \param prob_or_mask Unnormalized probability array or mask array.
  *                     Should be of the same length as the data array.
  *                     If an empty array is provided, assume uniform.
  * \param replace True if sample with replacement
+ * \param rowwise_etype_sorted whether the CSR column indices per row are ordered by edge type.
  * \return A COOMatrix storing the picked row, col and data indices.
  * \note The edges must be ordered by their edge types.
  */
 COOMatrix CSRRowWisePerEtypeSampling(
     CSRMatrix mat,
     IdArray rows,
-    const std::vector<int64_t>& etype_offset,
+    const std::vector<int64_t>& eid2etype_offset,
     const std::vector<int64_t>& num_samples,
     const std::vector<NDArray>& prob_or_mask,
     bool replace = true,
-    bool etype_sorted = false);
+    bool rowwise_etype_sorted = false);
 
 /*!
  * \brief Select K non-zero entries with the largest weights along each given row.
