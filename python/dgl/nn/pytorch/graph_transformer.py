@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import dgl
 
 
 class DegreeEncoder(nn.Module):
@@ -12,17 +11,18 @@ class DegreeEncoder(nn.Module):
     Parameters
     ----------
     max_degree : int
-        Upper bound of degrees to be encoded. Each degree will be clamped to (0, max_degree).
+        Upper bound of degrees to be encoded. Each degree will be clamped to into the range [0, ``max_degree``].
     embedding_dim : int
-        Dimension of output embedding vector of each node.
+        Output dimension of embedding vectors.
     direction : str, optional
-        Degrees of which direction to be encoded, only in "in", "out" and "both".
-        Default : "both".
+        Degrees of which direction to be encoded, selected from ``in``, ``out`` and ``both``.
+        ``both`` encodes degrees from both directions and output the addition of them.
+        Default : ``both``.
 
     Example
     ------
     >>> import dgl
-    >>> from dgl.nn.pytorch import DegreeEncoder
+    >>> from dgl.nn import DegreeEncoder
 
     >>> g = dgl.graph(([0,0,0,1,1,2,3,3], [1,2,3,0,3,0,0,1]))
     >>> degree_encoder = DegreeEncoder(5, 16)
@@ -31,15 +31,19 @@ class DegreeEncoder(nn.Module):
     def __init__(self, max_degree, embedding_dim, direction='both'):
         super(DegreeEncoder, self).__init__()
         self.direction = direction
-        self.degree_encoder = nn.Embedding(max_degree + 1, embedding_dim, padding_idx=0)
+        if direction == 'both':
+            self.degree_encoder_1 = nn.Embedding(max_degree + 1, embedding_dim, padding_idx=0)
+            self.degree_encoder_2 = nn.Embedding(max_degree + 1, embedding_dim, padding_idx=0)
+        else:
+            self.degree_encoder = nn.Embedding(max_degree + 1, embedding_dim, padding_idx=0)
         self.max_degree = max_degree
-
+    
     def forward(self, g):
         """
         Parameters
         ----------
         g : DGLGraph
-            A DGLGraph containing sampled nodes to be encoded.
+            A DGLGraph to be encoded. If a heterogeneous one, it will be processed after being transformed into an isomorphic graph.
 
         Returns
         -------
@@ -63,8 +67,8 @@ class DegreeEncoder(nn.Module):
         elif self.direction == 'out':
             degree_embedding = self.degree_encoder(out_degree)
         elif self.direction == 'both':
-            degree_embedding = (self.degree_encoder(in_degree)
-                                + self.degree_encoder(out_degree))
+            degree_embedding = (self.degree_encoder_1(in_degree)
+                                + self.degree_encoder_2(out_degree))
         else:
             raise ValueError(
                 f'Supported direction options: "in", "out" and "both", but got {self.direction}')
