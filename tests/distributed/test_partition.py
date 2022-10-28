@@ -1,23 +1,30 @@
 import os
-import unittest
 
 import backend as F
 import dgl
 import numpy as np
 import pytest
 from dgl import function as fn
-from dgl.distributed import (load_partition, load_partition_feats,
-                             partition_graph)
-from dgl.distributed.graph_partition_book import (DEFAULT_ETYPE, DEFAULT_NTYPE,
-                                                  BasicPartitionBook,
-                                                  EdgePartitionPolicy,
-                                                  HeteroDataName,
-                                                  NodePartitionPolicy,
-                                                  RangePartitionBook,
-                                                  _etype_tuple_to_str)
-from dgl.distributed.partition import (RESERVED_FIELD_DTYPE,
-                                       _get_inner_edge_mask,
-                                       _get_inner_node_mask)
+from dgl.distributed import (
+    load_partition,
+    load_partition_feats,
+    partition_graph,
+)
+from dgl.distributed.graph_partition_book import (
+    DEFAULT_ETYPE,
+    DEFAULT_NTYPE,
+    BasicPartitionBook,
+    EdgePartitionPolicy,
+    HeteroDataName,
+    NodePartitionPolicy,
+    RangePartitionBook,
+    _etype_tuple_to_str,
+)
+from dgl.distributed.partition import (
+    RESERVED_FIELD_DTYPE,
+    _get_inner_edge_mask,
+    _get_inner_node_mask,
+)
 from scipy import sparse as spsp
 from utils import reset_envs
 
@@ -513,20 +520,6 @@ def check_partition(
         eid2pid = gpb.eid2partid(F.arange(0, len(edge_map)))
         assert F.dtype(eid2pid) in (F.int32, F.int64)
         assert np.all(F.asnumpy(eid2pid) == edge_map)
-
-
-@unittest.skipIf(os.name == "nt", reason="Do not support windows yet")
-def test_partition():
-    os.environ["DGL_DIST_DEBUG"] = "1"
-    g = create_random_graph(1000)
-    check_partition(g, "metis", False)
-    check_partition(g, "metis", True)
-    check_partition(g, "metis", True, 4, 8)
-    check_partition(g, "metis", True, 1, 8)
-    check_partition(g, "random", False)
-    check_partition(g, "random", True)
-    check_partition(g, "metis", True, 4, 8, load_feats=False)
-    reset_envs()
 
 
 @pytest.mark.parametrize("part_method", ["metis", "random"])

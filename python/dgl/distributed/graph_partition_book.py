@@ -1202,7 +1202,7 @@ class PartitionPolicy(object):
     Parameters
     ----------
     policy_str : str
-        Partition policy name, e.g., 'edge:_N:_E:_N' or 'node:_N'.
+        Partition policy name, e.g., 'edge~_N:_E:_N' or 'node~_N'.
     partition_book : GraphPartitionBook
         A graph partition book
     """
