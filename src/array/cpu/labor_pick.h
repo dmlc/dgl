@@ -62,8 +62,6 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
   const auto num_rows = rows->shape[0];
   const auto& ctx = mat.indptr->ctx;
 
-  constexpr bool linear_c_convergence = false;
-
   const bool weights = !IsNullArray(prob);
   // O(1) c computation not possible, so one more iteration is needed.
   if (importance_sampling >= 0)
@@ -160,49 +158,18 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
         FloatType c = cs[i];
         // stands for left handside of Equation (22) in arXiv:2210.13339
         double var_1;
-        if (linear_c_convergence) {
-          // fix weights case
-          std::make_heap(ps, ps + d);
-          double r = 0;
+        do {
+          var_1 = 0;
           if (weights) {
-            for (IdxType i = 0; i < d; i++) {
-              const auto w = A[i + indptr[rid]];
-              r += w / ps[i];
-            }
+            for (auto j = indptr[rid]; j < indptr[rid + 1]; j++)
+              var_1 += A[j] * A[j] / std::min(ONE, c * ps[j - indptr[rid]]);
           } else {
-            for (IdxType i = 0; i < d; i++)
-              r += 1 / ps[i];
+            for (auto j = indptr[rid]; j < indptr[rid + 1]; j++)
+              var_1 += ONE / std::min(ONE, c * ps[j - indptr[rid]]);
           }
-          c = r / var_target;
-          if (weights) {
-            double v = A[d - 1] * A[d - 1];
-            for (auto i = d - 1; i > 0 && c * ps[i] >= 1; i--) {
-              // fix this
-              r -= ps[i];
-              c = r / (var_target - v);
-              v += A[i - 1 + indptr[rid]];
-            }
-          } else {
-            for (auto i = d - 1; i > 0 && c * ps[i] >= 1; i--) {
-              std::pop_heap(ps, ps + i + 1);
-              r -= ps[i];
-              c = r / (var_target - (d - i));
-            }
-          }
-        } else {
-          do {
-            var_1 = 0;
-            if (weights) {
-              for (auto j = indptr[rid]; j < indptr[rid + 1]; j++)
-                var_1 += A[j] * A[j] / std::min(ONE, c * ps[j - indptr[rid]]);
-            } else {
-              for (auto j = indptr[rid]; j < indptr[rid + 1]; j++)
-                var_1 += ONE / std::min(ONE, c * ps[j - indptr[rid]]);
-            }
 
-            c *= var_1 / var_target;
-          } while (std::min(var_1, var_target) / std::max(var_1, var_target) < 1 - eps);
-        }
+          c *= var_1 / var_target;
+        } while (std::min(var_1, var_target) / std::max(var_1, var_target) < 1 - eps);
 
         cs[i] = c;
       }
