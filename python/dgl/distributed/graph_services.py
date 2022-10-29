@@ -298,7 +298,7 @@ class SamplingRequestEtype(Request):
         local_g = server_state.graph
         partition_book = server_state.partition_book
         kv_store = server_state.kv_store
-        etype_offset = partition_book._local_etype_offset
+        etype_offset = partition_book.local_etype_offset
         # See NOTE 1
         if self.prob is not None:
             probs = [
@@ -681,7 +681,7 @@ def sample_etype_neighbors(
         )
 
     def local_access(local_g, partition_book, local_nids):
-        etype_offset = gpb._local_etype_offset
+        etype_offset = gpb.local_etype_offset
         # See NOTE 1
         if prob is None:
             _prob = None
