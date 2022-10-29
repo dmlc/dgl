@@ -41,6 +41,113 @@ namespace dgl {
 namespace aten {
 namespace impl {
 
+constexpr double eps = 0.0001;
+
+template <typename ctx_t, typename dtype_t, typename IdxType, typename FloatType>
+void compute_importance_sampling_probabilities(
+  ctx_t ctx,
+  dtype_t fidtype,
+  const IdxType max_degree,
+  const IdxType num_rows,
+  const int importance_sampling,
+  const bool weights,
+  const IdxType* rows_data,
+  const IdxType* indptr,
+  const FloatType* A,
+  const IdxType* indices,
+  const IdxType num_picks,
+  const FloatType* ds,
+  FloatType* cs,
+  phmap::flat_hash_map<IdxType, FloatType> &hop_map
+) {
+  constexpr FloatType ONE = 1;
+  // ps stands for \pi in arXiv:2210.13339
+  FloatArray ps_array = NDArray::Empty({max_degree + 1}, fidtype, ctx);
+  FloatType* ps = ps_array.Ptr<FloatType>();
+
+  double prev_ex_nodes = max_degree * num_rows;
+
+  phmap::flat_hash_map<IdxType, FloatType> hop_map2;
+  for (int iters = 0; iters < importance_sampling || importance_sampling < 0; iters++) {
+    /*
+    An implementation detail about when there are no weights, then the first c values can be computed in O(1) because all the edge weights are uniform. The c value is just k / d where k is fanout and d is the degree. But when there are weights, since the computed c values are incorrect, I have to skip some logic making use of it to compute the right c values below.
+
+    The later iterations will have correct c values so they will take the if in that case.
+
+    I also increase importance_sampling by 1 above so that the weighted case can do one more of this iteration to match the unweighted case.
+    */
+    if (!weights || iters) {
+      hop_map2.clear();
+      for (int64_t i = 0; i < num_rows; ++i) {
+        const FloatType c = cs[i];
+        const IdxType rid = rows_data[i];
+        for (auto j = indptr[rid]; j < indptr[rid + 1]; j++) {
+          const auto ct = c * (weights && iters == 1 ? A[j] : 1);
+          auto itb = hop_map2.emplace(indices[j], ct);
+          if (!itb.second)
+            itb.first->second = std::max(ct, itb.first->second);
+        }
+      }
+      if (hop_map.empty())
+        hop_map = std::move(hop_map2);
+      else
+        for (auto it : hop_map2)
+          hop_map[it.first] *= it.second;
+    }
+
+    for (int64_t i = 0; i < num_rows; ++i) {
+      const IdxType rid = rows_data[i];
+      const auto d = indptr[rid + 1] - indptr[rid];
+      if (d == 0)
+        continue;
+
+      const auto k = std::min(num_picks, d);
+
+      if (hop_map.empty()) {  // weights first iter, pi = A
+        for (auto j = indptr[rid]; j < indptr[rid + 1]; j++)
+          ps[j - indptr[rid]] = A[j];
+      } else {
+        for (auto j = indptr[rid]; j < indptr[rid + 1]; j++)
+          ps[j - indptr[rid]] = hop_map[indices[j]];
+      }
+
+      // stands for right handside of Equation (22) in arXiv:2210.13339
+      double var_target = ds[i] * ds[i] / k;
+      if (weights) {
+        var_target -= ds[i] * ds[i] / d;
+        for (auto j = indptr[rid]; j < indptr[rid + 1]; j++)
+          var_target += A[j] * A[j];
+      }
+      FloatType c = cs[i];
+      // stands for left handside of Equation (22) in arXiv:2210.13339
+      double var_1;
+      do {
+        var_1 = 0;
+        if (weights) {
+          for (auto j = indptr[rid]; j < indptr[rid + 1]; j++)
+            var_1 += A[j] * A[j] / std::min(ONE, c * ps[j - indptr[rid]]);
+        } else {
+          for (auto j = indptr[rid]; j < indptr[rid + 1]; j++)
+            var_1 += ONE / std::min(ONE, c * ps[j - indptr[rid]]);
+        }
+
+        c *= var_1 / var_target;
+      } while (std::min(var_1, var_target) / std::max(var_1, var_target) < 1 - eps);
+
+      cs[i] = c;
+    }
+
+    if (!weights || iters) {
+      double cur_ex_nodes = 0;
+      for (auto it : hop_map)
+        cur_ex_nodes += std::min((FloatType)1, it.second);
+      if (cur_ex_nodes / prev_ex_nodes >= 1 - eps)
+        break;
+      prev_ex_nodes = cur_ex_nodes;
+    }
+  }
+}
+
 // Template for picking non-zero values row-wise.
 template <typename IdxType, typename FloatType>
 std::pair<COOMatrix, FloatArray> CSRLaborPick(
@@ -64,10 +171,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
   // A stands for A in arXiv:2210.13339, that is edge weights
   auto A_arr = prob;
   FloatType *A = A_arr.Ptr<FloatType>();
-  constexpr double eps = 0.0001;
   constexpr FloatType ONE = 1;
-
-  phmap::flat_hash_map<IdxType, FloatType> hop_map;
 
   constexpr auto fidtype = DGLDataTypeTraits<FloatType>::dtype;
 
@@ -92,93 +196,25 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
     hop_size += act_degree;
   }
 
-  if (importance_sampling) {
-    // ps stands for \pi in arXiv:2210.13339
-    FloatArray ps_array = NDArray::Empty({max_degree + 1}, fidtype, ctx);
-    FloatType* ps = ps_array.Ptr<FloatType>();
+  phmap::flat_hash_map<IdxType, FloatType> hop_map;
 
-    double prev_ex_nodes = max_degree * num_rows;
-
-    phmap::flat_hash_map<IdxType, FloatType> hop_map2;
-    for (int iters = 0; iters < importance_sampling || importance_sampling < 0; iters++) {
-      /*
-      An implementation detail about when there are no weights, then the first c values can be computed in O(1) because all the edge weights are uniform. The c value is just k / d where k is fanout and d is the degree. But when there are weights, since the computed c values are incorrect, I have to skip some logic making use of it to compute the right c values below.
-
-      The later iterations will have correct c values so they will take the if in that case.
-
-      I also increase importance_sampling by 1 above so that the weighted case can do one more of this iteration to match the unweighted case.
-      */
-      if (!weights || iters) {
-        hop_map2.clear();
-        for (int64_t i = 0; i < num_rows; ++i) {
-          const FloatType c = cs[i];
-          const IdxType rid = rows_data[i];
-          for (auto j = indptr[rid]; j < indptr[rid + 1]; j++) {
-            const auto ct = c * (weights && iters == 1 ? A[j] : 1);
-            auto itb = hop_map2.emplace(indices[j], ct);
-            if (!itb.second)
-              itb.first->second = std::max(ct, itb.first->second);
-          }
-        }
-        if (hop_map.empty())
-          hop_map = std::move(hop_map2);
-        else
-          for (auto it : hop_map2)
-            hop_map[it.first] *= it.second;
-      }
-
-      for (int64_t i = 0; i < num_rows; ++i) {
-        const IdxType rid = rows_data[i];
-        const auto d = indptr[rid + 1] - indptr[rid];
-        if (d == 0)
-          continue;
-
-        const auto k = std::min((IdxType)num_picks, d);
-
-        if (hop_map.empty()) {  // weights first iter, pi = A
-          for (auto j = indptr[rid]; j < indptr[rid + 1]; j++)
-            ps[j - indptr[rid]] = A[j];
-        } else {
-          for (auto j = indptr[rid]; j < indptr[rid + 1]; j++)
-            ps[j - indptr[rid]] = hop_map[indices[j]];
-        }
-
-        // stands for right handside of Equation (22) in arXiv:2210.13339
-        double var_target = ds[i] * ds[i] / k;
-        if (weights) {
-          var_target -= ds[i] * ds[i] / d;
-          for (auto j = indptr[rid]; j < indptr[rid + 1]; j++)
-            var_target += A[j] * A[j];
-        }
-        FloatType c = cs[i];
-        // stands for left handside of Equation (22) in arXiv:2210.13339
-        double var_1;
-        do {
-          var_1 = 0;
-          if (weights) {
-            for (auto j = indptr[rid]; j < indptr[rid + 1]; j++)
-              var_1 += A[j] * A[j] / std::min(ONE, c * ps[j - indptr[rid]]);
-          } else {
-            for (auto j = indptr[rid]; j < indptr[rid + 1]; j++)
-              var_1 += ONE / std::min(ONE, c * ps[j - indptr[rid]]);
-          }
-
-          c *= var_1 / var_target;
-        } while (std::min(var_1, var_target) / std::max(var_1, var_target) < 1 - eps);
-
-        cs[i] = c;
-      }
-
-      if (!weights || iters) {
-        double cur_ex_nodes = 0;
-        for (auto it : hop_map)
-          cur_ex_nodes += std::min((FloatType)1, it.second);
-        if (cur_ex_nodes / prev_ex_nodes >= 1 - eps)
-          break;
-        prev_ex_nodes = cur_ex_nodes;
-      }
-    }
-  }
+  if (importance_sampling)
+    compute_importance_sampling_probabilities<decltype(ctx), decltype(fidtype), IdxType, FloatType>(
+        ctx,
+        fidtype,
+        max_degree,
+        num_rows,
+        importance_sampling,
+        weights,
+        rows_data,
+        indptr,
+        A,
+        indices,
+        (IdxType)num_picks,
+        ds,
+        cs,
+        hop_map
+    );
 
   // compute number of edges first and store randoms
   IdxType num_edges = 0;
@@ -215,11 +251,8 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
 
   std::size_t off = 0, idx = 0;
 
-  for (int64_t i = 0; i < num_rows; ++i) {
+  for (int64_t i = 0; i < num_rows; i++) {
     const IdxType rid = rows_data[i];
-    const auto d = indptr[rid + 1] - indptr[rid];
-    if (d == 0)
-      continue;
     const auto c = cs[i];
 
     FloatType norm_inv_p = 0;
