@@ -200,14 +200,10 @@ def sample_labors(
         if exclude_edges is not None:
             eid_excluder = EidExcluder(exclude_edges)
             frontier, importances = eid_excluder(frontier, importances)
-    return (
-        (frontier, importances)
-        if output_device is None
-        else (
-            frontier.to(output_device),
-            list(map(lambda x: x.to(output_device), importances)),
-        )
-    )
+    if output_device is None:
+        return (frontier, importances)
+    else:
+        return (frontier.to(output_device), list(map(lambda x: x.to(output_device), importances)))
 
 
 def _sample_labors(
