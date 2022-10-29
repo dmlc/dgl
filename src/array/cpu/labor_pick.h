@@ -215,7 +215,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
   IdArray picked_row = NDArray::Empty({num_edges}, vidtype, ctx);
   IdArray picked_col = NDArray::Empty({num_edges}, vidtype, ctx);
   IdArray picked_idx = NDArray::Empty({num_edges}, vidtype, ctx);
-  FloatArray importances = NDArray::Empty({importance_sampling ? num_edges : 1}, fidtype, ctx);
+  FloatArray importances = NDArray::Empty({importance_sampling ? num_edges : 0}, fidtype, ctx);
   IdxType* picked_rdata = picked_row.Ptr<IdxType>();
   IdxType* picked_cdata = picked_col.Ptr<IdxType>();
   IdxType* picked_idata = picked_idx.Ptr<IdxType>();

@@ -199,10 +199,7 @@ def sample_labors(
         )
         if exclude_edges is not None:
             eid_excluder = EidExcluder(exclude_edges)
-            if importance_sampling != 0 or prob is not None:
-                frontier, importances = eid_excluder(frontier, importances)
-            else:
-                frontier = eid_excluder(frontier)
+            frontier, importances = eid_excluder(frontier, importances)
     return (
         (frontier, importances)
         if output_device is None

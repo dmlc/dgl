@@ -45,13 +45,13 @@ std::pair<HeteroSubgraph, std::vector<FloatArray>> ExcludeCertainEdges(
         continue;
       }
       ATEN_ID_TYPE_SWITCH(hg_view->DataType(), IdType, {
-        const auto dtype = weights ?
+        const auto dtype = weights && (*weights)[etype]->shape[0] ?
             (*weights)[etype]->dtype
             : DGLDataType{kDGLFloat, 8*sizeof(float), 1};
         ATEN_FLOAT_TYPE_SWITCH(dtype, FloatType, "weights", {
           IdType* idx_data = edge_ids.Ptr<IdType>();
           IdType* induced_edges_data = sg.induced_edges[etype].Ptr<IdType>();
-          FloatType* weights_data = weights ? (*weights)[etype].Ptr<FloatType>() : nullptr;
+          FloatType* weights_data = weights && (*weights)[etype]->shape[0] ? (*weights)[etype].Ptr<FloatType>() : nullptr;
           const IdType exclude_edges_len = exclude_edges[etype]->shape[0];
           std::sort(exclude_edges[etype].Ptr<IdType>(),
                     exclude_edges[etype].Ptr<IdType>() + exclude_edges_len);
@@ -70,8 +70,8 @@ std::pair<HeteroSubgraph, std::vector<FloatArray>> ExcludeCertainEdges(
           }
           remain_edges[etype] = aten::IndexSelect(edge_ids, 0, outId);
           remain_induced_edges[etype] = aten::IndexSelect(sg.induced_edges[etype], 0, outId);
-          if (weights)
-            remain_weights[etype] = aten::IndexSelect((*weights)[etype], 0, outId);
+          remain_weights[etype] = weights_data ? aten::IndexSelect((*weights)[etype], 0, outId)
+              : NullArray();
         });
       });
     }
@@ -175,7 +175,7 @@ std::pair<HeteroSubgraph, std::vector<FloatArray>> SampleLabors(
   ret.induced_edges = std::move(induced_edges);
 
   if (!exclude_edges.empty())
-    return ExcludeCertainEdges(ret, exclude_edges, importance_sampling ? &subimportances : nullptr);
+    return ExcludeCertainEdges(ret, exclude_edges, &subimportances);
 
   return std::make_pair(ret, std::move(subimportances));
 }
