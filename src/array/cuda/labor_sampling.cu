@@ -140,7 +140,7 @@ struct StencilOpFused {
     curandStatePhilox4_32_10_t rng;
     if (labor)
       curand_init(123123, rand_seed, u, &rng);
-    else
+    else  // reduces to neighbor sampling, see r_t vs r_{ts} in arXiv:2210.13339
       curand_init(rand_seed, idx, 0, &rng);
     float rnd;
     rnd = curand_uniform(&rng);
@@ -226,7 +226,7 @@ __global__ void _CSRRowWiseOneHopExtractorKernel(
   const int stride_x = gridDim.x * blockDim.x;
 
   curandStatePhilox4_32_10_t rng;
-  if (!labor)
+  if (!labor)  // reduces to neighbor sampling, see r_t vs r_{ts} in arXiv:2210.13339
     curand_init(rand_seed, tx, 0, &rng);
 
   while (tx < hop_size) {
@@ -344,6 +344,176 @@ __global__ void map_vertex_ids_global(
 
 }  // namespace
 
+template <typename IdType, typename FloatType, typename exec_policy_t>
+void compute_importance_sampling_probabilities(
+  CSRMatrix mat,
+  const IdType hop_size,
+  cudaStream_t stream,
+  const uint64_t random_seed,
+  const IdType num_rows,
+  const IdType *rows,
+  const IdType *indptr,
+  const IdType *subindptr,
+  const IdType *indices,
+  IdArray idx_coo_arr,
+  FloatArray cs_arr,
+  const bool weights,
+  const FloatType *A,
+  const FloatType *ds,
+  const FloatType *d2s,
+  const IdType num_picks,
+  DGLContext ctx,
+  const runtime::CUDAWorkspaceAllocator &allocator,
+  const exec_policy_t &exec_policy,
+  const int importance_sampling,
+  IdType *hop_1,
+  FloatType *rands,
+  FloatType *probs_found) {
+  auto device = runtime::DeviceAPI::Get(ctx);
+  auto idx_coo = static_cast<IdType*>(idx_coo_arr->data);
+  auto cs = static_cast<FloatType*>(cs_arr->data);
+  auto A_l_arr = weights ? NewFloatArray(hop_size, ctx, sizeof(FloatType) * 8) : NullArray();
+  auto A_l = static_cast<FloatType*>(A_l_arr->data);
+
+  const uint64_t max_log_num_vertices = [&]() -> int {
+    for (int i = 0; i < static_cast<int>(sizeof(IdType)) * 8; i++)
+      if (mat.num_cols <= ((IdType)1) << i)
+        return i;
+    return sizeof(IdType) * 8;
+  }();
+
+  { // extracts the onehop neighborhood cols to a contiguous range into hop_1
+    const dim3 block(BLOCK_SIZE);
+    const dim3 grid((hop_size + BLOCK_SIZE - 1) / BLOCK_SIZE);
+    CUDA_KERNEL_CALL((_CSRRowWiseOneHopExtractorKernel<IdType, FloatType>),
+      grid, block, 0, stream,
+      random_seed, hop_size, rows,
+      indptr, subindptr, indices, idx_coo, weights ? A : nullptr, rands, hop_1, A_l);
+  }
+  int64_t hop_uniq_size = 0;
+  auto hop_new_arr = NewIdArray(hop_size, ctx, sizeof(IdType) * 8);
+  auto hop_new = static_cast<IdType*>(hop_new_arr->data);
+  auto hop_unique = allocator.alloc_unique<IdType>(hop_size);
+  // After this block, hop_unique holds the unique set of one-hop neighborhood
+  // and hop_new holds the renamed hop_1, idx_coo already holds renamed destination.
+  {
+    auto hop_2 = allocator.alloc_unique<IdType>(hop_size);
+    auto hop_3 = allocator.alloc_unique<IdType>(hop_size);
+
+    device->CopyDataFromTo(hop_1, 0, hop_2.get(), 0,
+        sizeof(IdType) * hop_size,
+        ctx,
+        ctx,
+        mat.indptr->dtype);
+
+    cub::DoubleBuffer<IdType> hop_b(hop_2.get(), hop_3.get());
+
+    {
+      std::size_t temp_storage_bytes = 0;
+      CUDA_CALL(cub::DeviceRadixSort::SortKeys(
+          nullptr, temp_storage_bytes, hop_b, hop_size, 0, max_log_num_vertices, stream));
+
+      auto temp = allocator.alloc_unique<char>(temp_storage_bytes);
+
+      CUDA_CALL(cub::DeviceRadixSort::SortKeys(
+          temp.get(), temp_storage_bytes, hop_b, hop_size, 0, max_log_num_vertices, stream));
+    }
+
+    auto hop_counts = allocator.alloc_unique<IdType>(hop_size + 1);
+    auto hop_unique_size = allocator.alloc_unique<int64_t>(1);
+
+    {
+      std::size_t temp_storage_bytes = 0;
+      CUDA_CALL(cub::DeviceRunLengthEncode::Encode(
+        nullptr, temp_storage_bytes, hop_b.Current(),
+        hop_unique.get(), hop_counts.get(), hop_unique_size.get(), hop_size, stream));
+
+      auto temp = allocator.alloc_unique<char>(temp_storage_bytes);
+
+      CUDA_CALL(cub::DeviceRunLengthEncode::Encode(
+          temp.get(), temp_storage_bytes, hop_b.Current(),
+          hop_unique.get(), hop_counts.get(), hop_unique_size.get(), hop_size, stream));
+
+      device->CopyDataFromTo(hop_unique_size.get(), 0, &hop_uniq_size, 0,
+        sizeof(hop_uniq_size),
+        ctx,
+        DGLContext{kDGLCPU, 0},
+        mat.indptr->dtype);
+    }
+
+    thrust::lower_bound(exec_policy,
+        hop_unique.get(), hop_unique.get() + hop_uniq_size, hop_1, hop_1 + hop_size, hop_new);
+  }
+
+  // Consider creating a CSC because the SpMV will be done multiple times.
+  COOMatrix rmat(
+      num_rows, hop_uniq_size, idx_coo_arr, hop_new_arr, NullArray(), true, mat.sorted);
+
+  BcastOff bcast_off;
+  bcast_off.use_bcast = false;
+  bcast_off.out_len = 1;
+  bcast_off.lhs_len = 1;
+  bcast_off.rhs_len = 1;
+
+  auto probs_arr = NewFloatArray(hop_uniq_size, ctx, sizeof(FloatType) * 8);
+  auto probs_1 = static_cast<FloatType*>(probs_arr->data);
+  auto probs_arr_2 = NewFloatArray(hop_uniq_size, ctx, sizeof(FloatType) * 8);
+  auto probs = static_cast<FloatType*>(probs_arr_2->data);
+  auto arg_u = NewIdArray(hop_uniq_size, ctx, sizeof(IdType) * 8);
+  auto arg_e = NewIdArray(hop_size, ctx, sizeof(IdType) * 8);
+
+  double prev_ex_nodes = hop_uniq_size;
+
+  for (int iters = 0; iters < importance_sampling || importance_sampling < 0; iters++) {
+    if (weights && iters == 0) {
+      cuda::SpMMCoo<IdType, FloatType,
+        cuda::binary::Mul<FloatType>, cuda::reduce::Max<IdType, FloatType, true>>(
+        bcast_off, rmat, cs_arr, A_l_arr, probs_arr_2, arg_u, arg_e);
+    } else {
+      cuda::SpMMCoo<IdType, FloatType,
+        cuda::binary::CopyLhs<FloatType>, cuda::reduce::Max<IdType, FloatType, true>>(
+        bcast_off, rmat, cs_arr, NullArray(), iters ? probs_arr : probs_arr_2, arg_u, arg_e);
+    }
+
+    if (iters)
+      thrust::transform(exec_policy,
+          probs_1, probs_1 + hop_uniq_size, probs, probs, thrust::multiplies<FloatType>{});
+
+    thrust::gather(exec_policy, hop_new, hop_new + hop_size, probs, probs_found);
+
+    {
+      constexpr int BLOCK_CTAS = BLOCK_SIZE / CTA_SIZE;
+      // the number of rows each thread block will cover
+      constexpr int TILE_SIZE = BLOCK_CTAS;
+      const dim3 block(CTA_SIZE, BLOCK_CTAS);
+      const dim3 grid((num_rows + TILE_SIZE - 1) / TILE_SIZE);
+      CUDA_KERNEL_CALL(
+        (_CSRRowWiseLayerSampleDegreeKernel<IdType, FloatType, BLOCK_CTAS, TILE_SIZE>),
+        grid, block, 0, stream,
+        (IdType)num_picks,
+        num_rows,
+        rows,
+        cs,
+        weights ? ds : nullptr,
+        weights ? d2s : nullptr,
+        indptr,
+        probs_found,
+        A,
+        subindptr);
+    }
+
+    {
+      auto probs_min_1 = thrust::make_transform_iterator(probs, TransformOpMinWith1{});
+      double cur_ex_nodes = thrust::reduce(exec_policy,
+          probs_min_1, probs_min_1 + hop_uniq_size, 0.0);
+      // std::cerr << iters << ' ' << cur_ex_nodes << '\n';
+      if (cur_ex_nodes / prev_ex_nodes >= 1 - eps)
+        break;
+      prev_ex_nodes = cur_ex_nodes;
+    }
+  }
+}
+
 /////////////////////////////// CSR ///////////////////////////////
 
 template <DGLDeviceType XPU, typename IdType, typename FloatType>
@@ -353,13 +523,6 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
                   FloatArray prob_arr,
                   int importance_sampling) {
   const bool weights = !IsNullArray(prob_arr);
-
-  const uint64_t max_log_num_vertices = [&]() -> int {
-    for (int i = 0; i < static_cast<int>(sizeof(IdType)) * 8; i++)
-      if (mat.num_cols <= ((IdType)1) << i)
-        return i;
-    return sizeof(IdType) * 8;
-  }();
 
   const auto& ctx = rows_arr->ctx;
 
@@ -451,8 +614,6 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
       DGLContext{kDGLCPU, 0},
       mat.indptr->dtype);
   }
-  auto A_l_arr = weights ? NewFloatArray(hop_size, ctx, sizeof(FloatType) * 8) : NullArray();
-  auto A_l = static_cast<FloatType*>(A_l_arr->data);
   auto hop_arr = NewIdArray(hop_size, ctx, sizeof(IdType) * 8);
   CSRMatrix smat(num_rows, mat.num_cols, subindptr_arr, hop_arr, NullArray(), mat.sorted);
   // Consider fusing CSRToCOO into StencilOpFused kernel
@@ -465,7 +626,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
   auto rands = allocator.alloc_unique<FloatType>(importance_sampling ? hop_size : 1);
   auto probs_found = allocator.alloc_unique<FloatType>(importance_sampling ? hop_size : 1);
 
-  if (weights) {
+  if (weights) {  // the computed c values are wrong when there are weights, so we recompute.
     constexpr int BLOCK_CTAS = BLOCK_SIZE / CTA_SIZE;
     // the number of rows each thread block will cover
     constexpr int TILE_SIZE = BLOCK_CTAS;
@@ -488,138 +649,31 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
 
   const uint64_t random_seed = RandomEngine::ThreadLocal()->RandInt(1000000000);
 
-  if (importance_sampling) {
-    { // extracts the onehop neighborhood cols to a contiguous range into hop_1
-      const dim3 block(BLOCK_SIZE);
-      const dim3 grid((hop_size + BLOCK_SIZE - 1) / BLOCK_SIZE);
-      CUDA_KERNEL_CALL((_CSRRowWiseOneHopExtractorKernel<IdType, FloatType>),
-        grid, block, 0, stream,
-        random_seed, hop_size, rows,
-        indptr, subindptr, indices, idx_coo, weights ? A : nullptr, rands.get(), hop_1, A_l);
-    }
-    int64_t hop_uniq_size = 0;
-    auto hop_new_arr = NewIdArray(hop_size, ctx, sizeof(IdType) * 8);
-    auto hop_new = static_cast<IdType*>(hop_new_arr->data);
-    auto hop_unique = allocator.alloc_unique<IdType>(hop_size);
-    // After this block, hop_unique holds the unique set of one-hop neighborhood
-    // and hop_new holds the renamed hop_1, idx_coo already holds renamed destination.
-    {
-      auto hop_2 = allocator.alloc_unique<IdType>(hop_size);
-      auto hop_3 = allocator.alloc_unique<IdType>(hop_size);
-
-      device->CopyDataFromTo(hop_1, 0, hop_2.get(), 0,
-          sizeof(IdType) * hop_size,
-          ctx,
-          ctx,
-          mat.indptr->dtype);
-
-      cub::DoubleBuffer<IdType> hop_b(hop_2.get(), hop_3.get());
-
-      {
-        std::size_t temp_storage_bytes = 0;
-        CUDA_CALL(cub::DeviceRadixSort::SortKeys(
-            nullptr, temp_storage_bytes, hop_b, hop_size, 0, max_log_num_vertices, stream));
-
-        auto temp = allocator.alloc_unique<char>(temp_storage_bytes);
-
-        CUDA_CALL(cub::DeviceRadixSort::SortKeys(
-            temp.get(), temp_storage_bytes, hop_b, hop_size, 0, max_log_num_vertices, stream));
-      }
-
-      auto hop_counts = allocator.alloc_unique<IdType>(hop_size + 1);
-      auto hop_unique_size = allocator.alloc_unique<int64_t>(1);
-
-      {
-        std::size_t temp_storage_bytes = 0;
-        CUDA_CALL(cub::DeviceRunLengthEncode::Encode(
-          nullptr, temp_storage_bytes, hop_b.Current(),
-          hop_unique.get(), hop_counts.get(), hop_unique_size.get(), hop_size, stream));
-
-        auto temp = allocator.alloc_unique<char>(temp_storage_bytes);
-
-        CUDA_CALL(cub::DeviceRunLengthEncode::Encode(
-            temp.get(), temp_storage_bytes, hop_b.Current(),
-            hop_unique.get(), hop_counts.get(), hop_unique_size.get(), hop_size, stream));
-
-        device->CopyDataFromTo(hop_unique_size.get(), 0, &hop_uniq_size, 0,
-          sizeof(hop_uniq_size),
-          ctx,
-          DGLContext{kDGLCPU, 0},
-          mat.indptr->dtype);
-      }
-
-      thrust::lower_bound(exec_policy,
-          hop_unique.get(), hop_unique.get() + hop_uniq_size, hop_1, hop_1 + hop_size, hop_new);
-    }
-
-    // Consider creating a CSC because the SpMV will be done multiple times.
-    COOMatrix rmat(
-        num_rows, hop_uniq_size, idx_coo_arr, hop_new_arr, NullArray(), true, mat.sorted);
-
-    BcastOff bcast_off;
-    bcast_off.use_bcast = false;
-    bcast_off.out_len = 1;
-    bcast_off.lhs_len = 1;
-    bcast_off.rhs_len = 1;
-
-    auto probs_arr = NewFloatArray(hop_uniq_size, ctx, sizeof(FloatType) * 8);
-    auto probs_1 = static_cast<FloatType*>(probs_arr->data);
-    auto probs_arr_2 = NewFloatArray(hop_uniq_size, ctx, sizeof(FloatType) * 8);
-    auto probs = static_cast<FloatType*>(probs_arr_2->data);
-    auto arg_u = NewIdArray(hop_uniq_size, ctx, sizeof(IdType) * 8);
-    auto arg_e = NewIdArray(hop_size, ctx, sizeof(IdType) * 8);
-
-    double prev_ex_nodes = hop_uniq_size;
-
-    for (int iters = 0; iters < importance_sampling || importance_sampling < 0; iters++) {
-      if (weights && iters == 0) {
-        cuda::SpMMCoo<IdType, FloatType,
-          cuda::binary::Mul<FloatType>, cuda::reduce::Max<IdType, FloatType, true>>(
-          bcast_off, rmat, cs_arr, A_l_arr, probs_arr_2, arg_u, arg_e);
-      } else {
-        cuda::SpMMCoo<IdType, FloatType,
-          cuda::binary::CopyLhs<FloatType>, cuda::reduce::Max<IdType, FloatType, true>>(
-          bcast_off, rmat, cs_arr, NullArray(), iters ? probs_arr : probs_arr_2, arg_u, arg_e);
-      }
-
-      if (iters)
-        thrust::transform(exec_policy,
-            probs_1, probs_1 + hop_uniq_size, probs, probs, thrust::multiplies<FloatType>{});
-
-      thrust::gather(exec_policy, hop_new, hop_new + hop_size, probs, probs_found.get());
-
-      {
-        constexpr int BLOCK_CTAS = BLOCK_SIZE / CTA_SIZE;
-        // the number of rows each thread block will cover
-        constexpr int TILE_SIZE = BLOCK_CTAS;
-        const dim3 block(CTA_SIZE, BLOCK_CTAS);
-        const dim3 grid((num_rows + TILE_SIZE - 1) / TILE_SIZE);
-        CUDA_KERNEL_CALL(
-          (_CSRRowWiseLayerSampleDegreeKernel<IdType, FloatType, BLOCK_CTAS, TILE_SIZE>),
-          grid, block, 0, stream,
-          (IdType)num_picks,
-          num_rows,
-          rows,
-          cs,
-          weights ? ds : nullptr,
-          weights ? d2s : nullptr,
-          indptr,
-          probs_found.get(),
-          A,
-          subindptr);
-      }
-
-      {
-        auto probs_min_1 = thrust::make_transform_iterator(probs, TransformOpMinWith1{});
-        double cur_ex_nodes = thrust::reduce(exec_policy,
-            probs_min_1, probs_min_1 + hop_uniq_size, 0.0);
-        // std::cerr << iters << ' ' << cur_ex_nodes << '\n';
-        if (cur_ex_nodes / prev_ex_nodes >= 1 - eps)
-          break;
-        prev_ex_nodes = cur_ex_nodes;
-      }
-    }
-  }
+  if (importance_sampling)
+    compute_importance_sampling_probabilities<IdType, FloatType, decltype(exec_policy)>(
+      mat,
+      hop_size,
+      stream,
+      random_seed,
+      num_rows,
+      rows,
+      indptr,
+      subindptr,
+      indices,
+      idx_coo_arr,
+      cs_arr,
+      weights,
+      A,
+      ds,
+      d2s,
+      (IdType)num_picks,
+      ctx,
+      allocator,
+      exec_policy,
+      importance_sampling,
+      hop_1,
+      rands.get(),
+      probs_found.get());
 
   IdArray picked_row = NewIdArray(hop_size, ctx, sizeof(IdType) * 8);
   IdArray picked_col = NewIdArray(hop_size, ctx, sizeof(IdType) * 8);
@@ -632,8 +686,9 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
   IdType* const picked_idx_data = static_cast<IdType*>(picked_idx->data);
   FloatType* const picked_imp_data = static_cast<FloatType*>(picked_imp->data);
 
-  auto picked_inrow = allocator.alloc_unique<IdType>(importance_sampling ? hop_size : 1);
+  auto picked_inrow = allocator.alloc_unique<IdType>(importance_sampling || weights ? hop_size : 1);
 
+  // Sample edges here
   IdType num_edges;
   {
     thrust::constant_iterator<FloatType> one(1);
@@ -682,6 +737,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
     }
   }
 
+  // Normalize edge weights here
   if (importance_sampling || weights) {
     thrust::constant_iterator<IdType> one(1);
     auto ds = allocator.alloc_unique<IdType>(num_rows);

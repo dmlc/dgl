@@ -43,10 +43,10 @@ namespace impl {
 
 constexpr double eps = 0.0001;
 
-template <typename ctx_t, typename dtype_t, typename IdxType, typename FloatType>
+template <typename IdxType, typename FloatType>
 void compute_importance_sampling_probabilities(
-  ctx_t ctx,
-  dtype_t fidtype,
+  DGLContext ctx,
+  DGLDataType fidtype,
   const IdxType max_degree,
   const IdxType num_rows,
   const int importance_sampling,
@@ -199,7 +199,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
   phmap::flat_hash_map<IdxType, FloatType> hop_map;
 
   if (importance_sampling)
-    compute_importance_sampling_probabilities<decltype(ctx), decltype(fidtype), IdxType, FloatType>(
+    compute_importance_sampling_probabilities<IdxType, FloatType>(
         ctx,
         fidtype,
         max_degree,
@@ -213,8 +213,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
         (IdxType)num_picks,
         ds,
         cs,
-        hop_map
-    );
+        hop_map);
 
   // compute number of edges first and store randoms
   IdxType num_edges = 0;
