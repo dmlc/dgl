@@ -36,7 +36,6 @@
 #include <utility>
 #include <cmath>
 #include <iostream>
-#include <pcg_random.hpp>
 
 namespace dgl {
 namespace aten {
@@ -181,9 +180,6 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
     }
   }
 
-  const pcg32 ng0(RandomEngine::ThreadLocal()->RandInt(1000000000));
-  std::uniform_real_distribution<FloatType> uni;
-
   // compute number of edges first and store randoms
   IdxType num_edges = 0;
   phmap::flat_hash_map<IdxType, FloatType> rand_map;
@@ -196,12 +192,8 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
       const auto v = indices[j];
       // itb stands for a pair of iterator and boolean indicating if insertion was successful
       auto itb = rand_map.emplace(v, 0);
-      if (itb.second) {
-        auto ng = ng0;
-        ng.discard(v);
-        uni.reset();
-        itb.first->second = uni(ng);
-      }
+      if (itb.second)
+        itb.first->second = RandomEngine::ThreadLocal()->Uniform<FloatType>();
       const auto rnd = itb.first->second;
       // if hop_map is initialized, get ps from there, otherwise get it from the alternative.
       num_edges +=
