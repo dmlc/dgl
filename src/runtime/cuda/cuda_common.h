@@ -21,9 +21,9 @@ namespace runtime {
 
 /*
   How to use this class to get a nonblocking thrust execution policy that uses DGL's memory pool
-  and the current cuda stream, ctx is here is a DGLContext object"
+  and the current cuda stream
   
-  runtime::workspace_memory_alloc<decltype(&ctx)> allocator(&ctx);
+  runtime::CUDAWorkspaceAllocator allocator(ctx);
   const auto stream = runtime::getCurrentCUDAStream();
   const auto exec_policy = thrust::cuda::par_nosync(allocator).on(stream);
 
@@ -33,33 +33,32 @@ namespace runtime {
   auto int_array = allocator.alloc_unique<int>(1000);
   int_array.get() gives the raw pointer.
 */
-template <typename ctx_t>
-class workspace_memory_alloc {
-  ctx_t ctx;
+class CUDAWorkspaceAllocator {
+  DGLContext ctx;
 
  public:
   typedef char value_type;
 
   void operator()(void* ptr) {
-    runtime::DeviceAPI::Get(*ctx)->FreeWorkspace(*ctx, ptr);
+    runtime::DeviceAPI::Get(ctx)->FreeWorkspace(ctx, ptr);
   }
 
-  explicit workspace_memory_alloc(ctx_t ctx) : ctx(ctx) {}
+  explicit CUDAWorkspaceAllocator(DGLContext ctx) : ctx(ctx) {}
 
-  workspace_memory_alloc & operator=(const workspace_memory_alloc &) = default;
+  CUDAWorkspaceAllocator & operator=(const CUDAWorkspaceAllocator &) = default;
 
   template <typename T>
-  std::unique_ptr<T, workspace_memory_alloc> alloc_unique(std::size_t size) {
-    return std::unique_ptr<T, workspace_memory_alloc>(reinterpret_cast<T *>(
-        runtime::DeviceAPI::Get(*ctx)->AllocWorkspace(*ctx, sizeof(T) * size)), *this);
+  std::unique_ptr<T, CUDAWorkspaceAllocator> alloc_unique(std::size_t size) {
+    return std::unique_ptr<T, CUDAWorkspaceAllocator>(reinterpret_cast<T *>(
+        runtime::DeviceAPI::Get(ctx)->AllocWorkspace(ctx, sizeof(T) * size)), *this);
   }
 
   char *allocate(std::ptrdiff_t size) {
-    return reinterpret_cast<char *>(runtime::DeviceAPI::Get(*ctx)->AllocWorkspace(*ctx, size));
+    return reinterpret_cast<char *>(runtime::DeviceAPI::Get(ctx)->AllocWorkspace(ctx, size));
   }
 
   void deallocate(char* ptr, std::size_t) {
-    runtime::DeviceAPI::Get(*ctx)->FreeWorkspace(*ctx, ptr);
+    runtime::DeviceAPI::Get(ctx)->FreeWorkspace(ctx, ptr);
   }
 };
 

@@ -363,7 +363,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
 
   const auto& ctx = rows_arr->ctx;
 
-  runtime::workspace_memory_alloc<decltype(&ctx)> allocator(&ctx);
+  runtime::CUDAWorkspaceAllocator allocator(ctx);
 
   const auto stream = runtime::getCurrentCUDAStream();
   const auto exec_policy = thrust::cuda::par_nosync(allocator).on(stream);
