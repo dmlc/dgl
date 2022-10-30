@@ -1731,3 +1731,10 @@ def test_MetaPath2Vec(idtype):
     model = model.to(dev)
     embeds = model.node_embed.weight
     assert embeds.shape[0] == g.num_nodes()
+
+@pytest.mark.parametrize('max_degree', 5)
+@pytest.mark.parametrize('embedding_dim', 16)
+def test_degree_encoder(max_degree, embedding_dim):
+    g = dgl.graph(([0, 0, 0, 1, 1, 2, 3, 3], [1, 2, 3, 0, 3, 0, 0, 1]))
+    model = nn.DegreeEncoder(max_degree, embedding_dim)
+    model(g)
