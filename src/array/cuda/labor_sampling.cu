@@ -746,10 +746,10 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
     auto ws_2 = allocator.alloc_unique<FloatType>(num_rows);
     auto output_ = thrust::make_zip_iterator(ds.get(), ws.get());
     auto keys = allocator.alloc_unique<IdType>(num_rows);
+    auto input = thrust::make_zip_iterator(one, picked_imp_data);
     auto new_end = thrust::reduce_by_key(exec_policy,
-        picked_inrow.get(), picked_inrow.get() + num_edges, one, keys.get(), ds.get());
-    thrust::reduce_by_key(exec_policy,
-        picked_inrow.get(), picked_inrow.get() + num_edges, picked_imp_data, keys.get(), ws.get());
+        picked_inrow.get(), picked_inrow.get() + num_edges, input, keys.get(), output_,
+        thrust::equal_to<IdType>{}, TupleSum{});
     {
       thrust::constant_iterator<IdType> zero_int(0);
       thrust::constant_iterator<FloatType> zero_float(0);
