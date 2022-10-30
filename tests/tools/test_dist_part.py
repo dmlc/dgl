@@ -26,6 +26,15 @@ def _verify_partition_data_types(part_g):
         if k in part_g.edata:
             assert part_g.edata[k].dtype == dtype
 
+def _verify_partition_formats(part_g, formats):
+    # Verify saved graph formats
+    if formats is None:
+        assert "coo" in part_g.formats()["created"]
+    else:
+        formats = formats.split(',')
+        for format in formats:
+            assert format in part_g.formats()["created"]
+
 
 def _verify_graph_feats(
     g, gpb, part, node_feats, edge_feats, orig_nids, orig_eids
@@ -49,7 +58,8 @@ def _verify_graph_feats(
             ndata = node_feats[ntype + "/" + name][local_nids]
             assert torch.equal(ndata, true_feats)
 
-    for etype in g.etypes:
+    for c_etype in g.canonical_etypes:
+        etype = c_etype[1]
         etype_id = g.get_etype_id(etype)
         inner_edge_mask = _get_inner_edge_mask(part, etype_id)
         inner_eids = part.edata[dgl.EID][inner_edge_mask]
@@ -66,7 +76,7 @@ def _verify_graph_feats(
                 continue
             true_feats = g.edges[etype].data[name][orig_id]
             edata = edge_feats[etype + "/" + name][local_eids]
-            assert torch.equal(edata == true_feats)
+            assert torch.equal(edata, true_feats)
 
 
 @pytest.mark.parametrize("num_chunks", [1, 8])
@@ -110,13 +120,17 @@ def test_chunk_graph(num_chunks):
 
         # check node_data
         output_node_data_dir = os.path.join(output_dir, "node_data", "paper")
-        for feat in ["feat", "label", "year"]:
+        for feat in ["feat", "label", "year", "orig_ids"]:
+            feat_data = []
             for i in range(num_chunks):
                 chunk_f_name = "{}-{}.npy".format(feat, i)
                 chunk_f_name = os.path.join(output_node_data_dir, chunk_f_name)
                 assert os.path.isfile(chunk_f_name)
                 feat_array = np.load(chunk_f_name)
                 assert feat_array.shape[0] == num_papers // num_chunks
+                feat_data.append(feat_array)
+            feat_data = np.concatenate(feat_data, 0)
+            assert torch.equal(torch.from_numpy(feat_data), g.nodes['paper'].data[feat])
 
         # check edge_data
         num_edges = {
@@ -128,20 +142,29 @@ def test_chunk_graph(num_chunks):
         for etype, feat in [
             ["paper:cites:paper", "count"],
             ["author:writes:paper", "year"],
+            ["author:writes:paper", "orig_ids"],
             ["paper:rev_writes:author", "year"],
         ]:
+            feat_data = []
             output_edge_sub_dir = os.path.join(output_edge_data_dir, etype)
             for i in range(num_chunks):
                 chunk_f_name = "{}-{}.npy".format(feat, i)
                 chunk_f_name = os.path.join(output_edge_sub_dir, chunk_f_name)
                 assert os.path.isfile(chunk_f_name)
                 feat_array = np.load(chunk_f_name)
-            assert feat_array.shape[0] == num_edges[etype] // num_chunks
+                assert feat_array.shape[0] == num_edges[etype] // num_chunks
+                feat_data.append(feat_array)
+            feat_data = np.concatenate(feat_data, 0)
+            assert torch.equal(torch.from_numpy(feat_data),
+                g.edges[etype.split(':')[1]].data[feat])
 
 
-@pytest.mark.parametrize("num_chunks", [1, 2, 3, 4, 8])
-@pytest.mark.parametrize("num_parts", [1, 2, 3, 4, 8])
-def test_part_pipeline(num_chunks, num_parts):
+@pytest.mark.parametrize("num_chunks", [1, 3, 8])
+@pytest.mark.parametrize("num_parts", [1, 3, 8])
+@pytest.mark.parametrize(
+    "graph_formats", [None, "csc", "coo,csc", "coo,csc,csr"]
+)
+def test_part_pipeline(num_chunks, num_parts, graph_formats):
     if num_chunks < num_parts:
         # num_parts should less/equal than num_chunks
         return
@@ -182,6 +205,7 @@ def test_part_pipeline(num_chunks, num_parts):
         cmd += " --process-group-timeout 60"
         cmd += " --save-orig-nids"
         cmd += " --save-orig-eids"
+        cmd += f" --graph-formats {graph_formats}" if graph_formats else ""
         os.system(cmd)
 
         # read original node/edge IDs
@@ -207,6 +231,7 @@ def test_part_pipeline(num_chunks, num_parts):
                 part_config, i
             )
             _verify_partition_data_types(part_g)
+            _verify_partition_formats(part_g, graph_formats)
             _verify_graph_feats(
                 g, gpb, part_g, node_feats, edge_feats, orig_nids, orig_eids
             )

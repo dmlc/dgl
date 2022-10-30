@@ -172,6 +172,33 @@
 } while (0)
 
 /*
+ * Dispatch according to data type (int8, uint8, float32 or float64):
+ *
+ * ATEN_FLOAT_INT8_UINT8_TYPE_SWITCH(array->dtype, DType, {
+ *   // Now DType is the type corresponding to data type in array.
+ *   // For instance, one can do this for a CPU array:
+ *   DType *data = static_cast<DType *>(array->data);
+ * });
+ */
+#define ATEN_FLOAT_INT8_UINT8_TYPE_SWITCH(val, DType, val_name, ...) do {     \
+  if ((val).code == kDGLInt && (val).bits == 8) {              \
+    typedef int8_t DType;                                     \
+    {__VA_ARGS__}                                             \
+  } else if ((val).code == kDGLUInt && (val).bits == 8) {      \
+    typedef uint8_t DType;                                    \
+    {__VA_ARGS__}                                             \
+  } else if ((val).code == kDGLFloat && (val).bits == 32) {    \
+    typedef float DType;                                      \
+    {__VA_ARGS__}                                             \
+  } else if ((val).code == kDGLFloat && (val).bits == 64) {    \
+    typedef double DType;                                     \
+    {__VA_ARGS__}                                             \
+  } else {                                                    \
+    LOG(FATAL) << (val_name) << " can only be int8, uint8, float32 or float64"; \
+  }                                                           \
+} while (0)
+
+/*
  * Dispatch data type only based on bit-width (8-bit, 16-bit, 32-bit, 64-bit):
  *
  * ATEN_DTYPE_BITS_ONLY_SWITCH(array->dtype, DType, {
