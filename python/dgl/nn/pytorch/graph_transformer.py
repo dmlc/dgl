@@ -1,3 +1,4 @@
+"""Torch modules for graph transformers."""
 import torch.nn as nn
 
 
