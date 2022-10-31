@@ -133,9 +133,7 @@ def alltoallv_cpu(rank, world_size, input_tensor_list):
     #extract un-padded message from the output_tensor_list and return it
     return_vals = []
     for s, t in zip(recv_counts, output_tensor_list):
-        if s[0] == 0:
-            return_vals.append(None)
-        else:
+        if s[0] != 0:
             return_vals.append(t[0:s[0]])
     return return_vals
 
