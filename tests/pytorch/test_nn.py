@@ -1718,23 +1718,22 @@ def test_DeepWalk():
     loss.backward()
     optim.step()
 
-@parametrize_idtype
-def test_MetaPath2Vec(idtype):
-    dev = F.ctx()
-    g = dgl.heterograph({
-        ('user', 'uc', 'company'): ([0, 0, 2, 1, 3], [1, 2, 1, 3, 0]),
-        ('company', 'cp', 'product'): ([0, 0, 0, 1, 2, 3], [0, 2, 3, 0, 2, 1]),
-        ('company', 'cu', 'user'): ([1, 2, 1, 3, 0], [0, 0, 2, 1, 3]),
-        ('product', 'pc', 'company'): ([0, 2, 3, 0, 2, 1], [0, 0, 0, 1, 2, 3])
-    }, idtype=idtype, device=dev)
-    model = nn.MetaPath2Vec(g, ['uc', 'cu'], window_size=1)
-    model = model.to(dev)
-    embeds = model.node_embed.weight
-    assert embeds.shape[0] == g.num_nodes()
-
-@pytest.mark.parametrize('max_degree', 5)
-@pytest.mark.parametrize('embedding_dim', 16)
-def test_degree_encoder(max_degree, embedding_dim):
-    g = dgl.graph(([0, 0, 0, 1, 1, 2, 3, 3], [1, 2, 3, 0, 3, 0, 0, 1]))
-    model = nn.DegreeEncoder(max_degree, embedding_dim)
-    model(g)
+@pytest.mark.parametrize('max_degree', [2, 6])
+@pytest.mark.parametrize('embedding_dim', [8, 16])
+@pytest.mark.parametrize('direction', ['in', 'out', 'both'])
+def test_degree_encoder(max_degree, embedding_dim, direction):
+    g = dgl.graph((
+        th.tensor([0, 0, 0, 1, 1, 2, 3, 3]),
+        th.tensor([1, 2, 3, 0, 3, 0, 0, 1])
+    ))
+    # test heterograph
+    hg = dgl.heterograph({
+        ('drug', 'interacts', 'drug'): (th.tensor([0, 1]), th.tensor([1, 2])),
+        ('drug', 'interacts', 'gene'): (th.tensor([0, 1]), th.tensor([2, 3])),
+        ('drug', 'treats', 'disease'): (th.tensor([1]), th.tensor([2]))
+    })
+    model = nn.DegreeEncoder(max_degree, embedding_dim, direction=direction)
+    de_g = model(g)
+    de_hg = model(hg)
+    assert de_g.shape == (4, embedding_dim)
+    assert de_hg.shape == (10, embedding_dim)
