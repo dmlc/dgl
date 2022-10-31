@@ -740,11 +740,16 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(CSRMatrix mat,
   // Normalize edge weights here
   if (importance_sampling || weights) {
     thrust::constant_iterator<IdType> one(1);
+    // contains degree information
     auto ds = allocator.alloc_unique<IdType>(num_rows);
+    // contains sum of edge weights
     auto ws = allocator.alloc_unique<FloatType>(num_rows);
+    // contains degree information only for vertices with nonzero degree
     auto ds_2 = allocator.alloc_unique<IdType>(num_rows);
+    // contains sum of edge weights only for vertices with nonzero degree
     auto ws_2 = allocator.alloc_unique<FloatType>(num_rows);
     auto output_ = thrust::make_zip_iterator(ds.get(), ws.get());
+    // contains row ids only for vertices with nonzero degree
     auto keys = allocator.alloc_unique<IdType>(num_rows);
     auto input = thrust::make_zip_iterator(one, picked_imp_data);
     auto new_end = thrust::reduce_by_key(exec_policy,

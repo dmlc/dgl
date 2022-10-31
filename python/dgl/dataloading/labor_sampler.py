@@ -20,8 +20,6 @@
 from ..base import NID, EID
 from ..transforms import to_block
 from .base import BlockSampler
-from ..random import choice, seed
-from .. import backend as F
 
 
 class LaborSampler(BlockSampler):
@@ -142,7 +140,7 @@ class LaborSampler(BlockSampler):
     def sample_blocks(self, g, seed_nodes, exclude_eids=None):
         output_nodes = seed_nodes
         blocks = []
-        for i, fanout in enumerate(reversed(self.fanouts)):
+        for fanout in reversed(self.fanouts):
             frontier, importances = g.sample_labors(
                 seed_nodes,
                 fanout,

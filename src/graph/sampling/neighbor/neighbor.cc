@@ -59,6 +59,8 @@ std::pair<HeteroSubgraph, std::vector<FloatArray>> ExcludeCertainEdges(
           const IdType* exclude_edges_data = exclude_edges[etype].Ptr<IdType>();
           IdType outId = 0;
           for (IdType i = 0; i != sg.induced_edges[etype]->shape[0]; ++i) {
+            // the following binary search is the bottleneck, excluding weights together with
+            // edges should almost be free.
             if (!std::binary_search(exclude_edges_data,
                                     exclude_edges_data + exclude_edges_len,
                                     induced_edges_data[i])) {
