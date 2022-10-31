@@ -10,7 +10,7 @@ import numpy as np
 from ..heterograph import DGLHeteroGraph
 from ..convert import heterograph as dgl_heterograph
 from ..convert import graph as dgl_graph
-from ..transforms import compact_graphs, sort_csr_by_tag, sort_csc_by_tag
+from ..transforms import compact_graphs
 from .. import heterograph_index
 from .. import backend as F
 from ..base import NID, EID, ETYPE, ALL, is_all
@@ -83,7 +83,10 @@ def _copy_graph_to_shared_mem(g, graph_name, graph_format):
     # for heterogeneous graph, we need to put ETYPE into KVStore
     # for homogeneous graph, ETYPE does not exist
     if ETYPE in g.edata:
-        new_g.edata[ETYPE] = _to_shared_mem(g.edata[ETYPE], _get_edata_path(graph_name, ETYPE))
+        new_g.edata[ETYPE] = _to_shared_mem(
+                g.edata[ETYPE],
+                _get_edata_path(graph_name, ETYPE),
+        )
     return new_g
 
 def _get_shared_mem_ndata(g, graph_name, name):
@@ -345,14 +348,6 @@ class DistGraphServer(KVServer):
             # Create the graph formats specified the users.
             self.client_g = self.client_g.formats(graph_format)
             self.client_g.create_formats_()
-            # Sort underlying matrix beforehand to avoid runtime overhead during sampling.
-            if len(etypes) > 1:
-                if 'csr' in graph_format:
-                    self.client_g = sort_csr_by_tag(
-                        self.client_g, tag=self.client_g.edata[ETYPE], tag_type='edge')
-                if 'csc' in graph_format:
-                    self.client_g = sort_csc_by_tag(
-                        self.client_g, tag=self.client_g.edata[ETYPE], tag_type='edge')
             if not disable_shared_mem:
                 self.client_g = _copy_graph_to_shared_mem(self.client_g, graph_name, graph_format)
 
@@ -386,6 +381,7 @@ class DistGraphServer(KVServer):
                 # The feature name has the following format: edge_type + "/" + feature_name to avoid
                 # feature name collision for different edge types.
                 etype, feat_name = name.split('/')
+
                 data_name = HeteroDataName(False, etype, feat_name)
                 self.init_data(name=str(data_name), policy_str=data_name.policy_str,
                                data_tensor=edge_feats[name])
@@ -1272,13 +1268,13 @@ class DistGraph:
                          output_device=None):
         # pylint: disable=unused-argument
         """Sample neighbors from a distributed graph."""
-        # Currently prob, exclude_edges, output_device, and edge_dir are ignored.
         if len(self.etypes) > 1:
             frontier = graph_services.sample_etype_neighbors(
-                self, seed_nodes, ETYPE, fanout, replace=replace, etype_sorted=etype_sorted)
+                self, seed_nodes, fanout, replace=replace,
+                etype_sorted=etype_sorted, prob=prob)
         else:
             frontier = graph_services.sample_neighbors(
-                self, seed_nodes, fanout, replace=replace)
+                self, seed_nodes, fanout, replace=replace, prob=prob)
         return frontier
 
     def _get_ndata_names(self, ntype=None):

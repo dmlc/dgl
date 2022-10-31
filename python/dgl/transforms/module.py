@@ -1397,6 +1397,7 @@ class NodeShuffle(BaseTransform):
             [ 7.,  8.]])
     """
     def __call__(self, g):
+        g = g.clone()
         for ntype in g.ntypes:
             nids = F.astype(g.nodes(ntype), F.int64)
             perm = F.rand_shuffle(nids)
@@ -1440,6 +1441,8 @@ class DropNode(BaseTransform):
         self.dist = Bernoulli(p)
 
     def __call__(self, g):
+        g = g.clone()
+
         # Fast path
         if self.p == 0:
             return g
@@ -1485,6 +1488,8 @@ class DropEdge(BaseTransform):
         self.dist = Bernoulli(p)
 
     def __call__(self, g):
+        g = g.clone()
+
         # Fast path
         if self.p == 0:
             return g
@@ -1526,6 +1531,7 @@ class AddEdge(BaseTransform):
 
         device = g.device
         idtype = g.idtype
+        g = g.clone()
         for c_etype in g.canonical_etypes:
             utype, _, vtype = c_etype
             num_edges_to_add = int(g.num_edges(c_etype) * self.ratio)

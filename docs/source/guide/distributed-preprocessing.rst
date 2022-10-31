@@ -174,7 +174,7 @@ and chunk sizes (e.g., number of nodes, number of edges).
            [648874463, 648874463]     # number of paper:cites:paper edges per chunk
        ],
        "edges" : {
-            "author:write:paper" : {  # edge type
+            "author:writes:paper" : {  # edge type
                  "format" : {"name": "csv", "delimiter": " "},
                  # The list of paths. Can be relative or absolute.
                  "data" : ["edges/writes-part1.csv", "edges/writes-part2.csv"]
@@ -183,7 +183,7 @@ and chunk sizes (e.g., number of nodes, number of edges).
                  "format" : {"name": "csv", "delimiter": " "},
                  "data" : ["edges/affiliated_with-part1.csv", "edges/affiliated_with-part2.csv"]
             },
-            "author:affiliated_with:institution" : {
+            "paper:cites:paper" : {
                  "format" : {"name": "csv", "delimiter": " "},
                  "data" : ["edges/cites-part1.csv", "edges/cites-part2.csv"]
             }

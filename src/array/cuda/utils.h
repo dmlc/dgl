@@ -11,6 +11,7 @@
 #include <dgl/runtime/device_api.h>
 #include <dgl/runtime/ndarray.h>
 #include "../../runtime/cuda/cuda_common.h"
+#include "dgl_cub.cuh"
 
 namespace dgl {
 namespace cuda {
@@ -250,6 +251,20 @@ __device__ IdType _BinarySearch(const IdType *A, int64_t n, IdType x) {
     }
   }
   return n;  // not found
+}
+
+template <typename DType, typename BoolType>
+void MaskSelect(
+    runtime::DeviceAPI* device, const DGLContext& ctx,
+    const DType* input, const BoolType* mask, DType* output, int64_t n,
+    int64_t* rst, cudaStream_t stream) {
+  size_t workspace_size = 0;
+  CUDA_CALL(cub::DeviceSelect::Flagged(
+      nullptr, workspace_size, input, mask, output, rst, n, stream));
+  void* workspace = device->AllocWorkspace(ctx, workspace_size);
+  CUDA_CALL(cub::DeviceSelect::Flagged(
+      workspace, workspace_size, input, mask, output, rst, n, stream));
+  device->FreeWorkspace(ctx, workspace);
 }
 
 }  // namespace cuda
