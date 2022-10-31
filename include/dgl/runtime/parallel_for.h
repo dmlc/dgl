@@ -24,13 +24,6 @@ int64_t divup(int64_t x, int64_t y) {
 namespace dgl {
 namespace runtime {
 namespace {
-size_t compute_num_threads(size_t begin, size_t end, size_t grain_size) {
-  if (omp_in_parallel() || end - begin <= grain_size || end - begin == 1)
-    return 1;
-
-  return std::min(static_cast<int64_t>(omp_get_max_threads()), divup(end - begin, grain_size));
-}
-
 struct DefaultGrainSizeT {
   size_t grain_size;
 
@@ -49,6 +42,17 @@ struct DefaultGrainSizeT {
   }
 };
 }  // namespace
+
+inline size_t compute_num_threads(size_t begin, size_t end, size_t grain_size) {
+#ifdef _OPENMP
+  if (omp_in_parallel() || end - begin <= grain_size || end - begin == 1)
+    return 1;
+
+  return std::min(static_cast<int64_t>(omp_get_max_threads()), divup(end - begin, grain_size));
+#else
+  return 1;
+#endif
+}
 
 static DefaultGrainSizeT default_grain_size;
 

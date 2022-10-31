@@ -48,7 +48,7 @@ def check_sort(spm, tag_arr=None, tag_pos=None):
                 # tag value is equal to `tag_pos_ptr`
                 return False
             if tag_arr[dst[j]] > tag_arr[dst[j + 1]]:
-                # The tag should be in descending order after sorting
+                # The tag should be in ascending order after sorting
                 return False
             if tag_pos is not None and tag_arr[dst[j]] < tag_arr[dst[j + 1]]:
                 if j + 1 != int(tag_pos_row[tag_pos_ptr + 1]):

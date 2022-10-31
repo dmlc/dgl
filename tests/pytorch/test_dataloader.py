@@ -71,14 +71,18 @@ def test_saint(num_workers, mode):
 @parametrize_idtype
 @pytest.mark.parametrize('mode', ['cpu', 'uva_cuda_indices', 'uva_cpu_indices', 'pure_gpu'])
 @pytest.mark.parametrize('use_ddp', [False, True])
-def test_neighbor_nonuniform(idtype, mode, use_ddp):
+@pytest.mark.parametrize('use_mask', [False, True])
+def test_neighbor_nonuniform(idtype, mode, use_ddp, use_mask):
     if mode != 'cpu' and F.ctx() == F.cpu():
         pytest.skip('UVA and GPU sampling require a GPU.')
+    if mode != 'cpu' and use_mask:
+        pytest.skip('Masked sampling only works on CPU.')
     if use_ddp:
         dist.init_process_group('gloo' if F.ctx() == F.cpu() else 'nccl',
             'tcp://127.0.0.1:12347', world_size=1, rank=0)
     g = dgl.graph(([1, 2, 3, 4, 5, 6, 7, 8], [0, 0, 0, 0, 1, 1, 1, 1])).astype(idtype)
     g.edata['p'] = torch.FloatTensor([1, 1, 0, 0, 1, 1, 0, 0])
+    g.edata['mask'] = (g.edata['p'] != 0)
     if mode in ('cpu', 'uva_cpu_indices'):
         indices = F.copy_to(F.tensor([0, 1], idtype), F.cpu())
     else:
@@ -87,7 +91,12 @@ def test_neighbor_nonuniform(idtype, mode, use_ddp):
         g = g.to(F.cuda())
     use_uva = mode.startswith('uva')
 
-    sampler = dgl.dataloading.MultiLayerNeighborSampler([2], prob='p')
+    if use_mask:
+        prob, mask = None, 'mask'
+    else:
+        prob, mask = 'p', None
+
+    sampler = dgl.dataloading.MultiLayerNeighborSampler([2], prob=prob, mask=mask)
     for num_workers in [0, 1, 2] if mode == 'cpu' else [0]:
         dataloader = dgl.dataloading.NodeDataLoader(
             g, indices, sampler,
@@ -108,7 +117,9 @@ def test_neighbor_nonuniform(idtype, mode, use_ddp):
         ('C', 'CA', 'A'): ([1, 2, 3, 4, 5, 6, 7, 8], [0, 0, 0, 0, 1, 1, 1, 1]),
         }).astype(idtype)
     g.edges['BA'].data['p'] = torch.FloatTensor([1, 1, 0, 0, 1, 1, 0, 0])
+    g.edges['BA'].data['mask'] = (g.edges['BA'].data['p'] != 0)
     g.edges['CA'].data['p'] = torch.FloatTensor([0, 0, 1, 1, 0, 0, 1, 1])
+    g.edges['CA'].data['mask'] = (g.edges['CA'].data['p'] != 0)
     if mode == 'pure_gpu':
         g = g.to(F.cuda())
     for num_workers in [0, 1, 2] if mode == 'cpu' else [0]:
