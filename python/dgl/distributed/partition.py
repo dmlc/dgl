@@ -6,12 +6,16 @@ import time
 import numpy as np
 
 from .. import backend as F
-from ..base import NID, EID, NTYPE, ETYPE, dgl_warning
+from ..base import NID, EID, NTYPE, ETYPE, dgl_warning, DGLError
 from ..convert import to_homogeneous
 from ..random import choice as random_choice
 from ..transforms import sort_csr_by_tag, sort_csc_by_tag
 from ..data.utils import load_graphs, save_graphs, load_tensors, save_tensors
-from ..partition import metis_partition_assignment, partition_graph_with_halo, get_peak_mem
+from ..partition import (
+    metis_partition_assignment,
+    partition_graph_with_halo,
+    get_peak_mem,
+)
 from .constants import DEFAULT_ETYPE, DEFAULT_NTYPE
 from .graph_partition_book import (
     BasicPartitionBook,
@@ -49,8 +53,15 @@ def _format_part_metadata(part_metadata, formator):
 def _load_part_config(part_config):
     ''' Load part config and format
     '''
-    with open(part_config) as f:
-        part_metadata = _format_part_metadata(json.load(f), _etype_str_to_tuple)
+    try:
+        with open(part_config) as f:
+            part_metadata = _format_part_metadata(json.load(f),
+                _etype_str_to_tuple)
+    except AssertionError as e:
+        raise DGLError(f"Failed to load partition config due to {e}. "
+            "Probably caused by outdated config. If so, please refer to "
+            "https://github.com/dmlc/dgl/tree/master/tools#change-edge-"
+            "type-to-canonical-edge-type-for-partition-configuration-json")
     return part_metadata
 
 def _dump_part_config(part_config, part_metadata):

@@ -25,12 +25,17 @@ CANONICAL_ETYPE_DELIMITER = ":"
 def _etype_tuple_to_str(c_etype):
     '''Convert canonical etype from tuple to string.
     '''
+    assert isinstance(c_etype, tuple) and len(c_etype) == 3, \
+        "Passed-in canonical etype should be in format of (str, str, str)."
     return CANONICAL_ETYPE_DELIMITER.join(c_etype)
 
 def _etype_str_to_tuple(c_etype):
     '''Convert canonical etype from tuple to string.
     '''
-    return tuple(c_etype.split(CANONICAL_ETYPE_DELIMITER))
+    ret = tuple(c_etype.split(CANONICAL_ETYPE_DELIMITER))
+    assert len(ret) == 3, \
+        "Passed-in canonical etype should be in format of 'str:str:str'."
+    return ret
 
 def _move_metadata_to_shared_mem(
     graph_name,
