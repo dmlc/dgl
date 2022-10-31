@@ -37,7 +37,11 @@ class CuGraphStorage:
     """
 
     def __init__(
-        self, num_nodes_dict: dict, single_gpu: bool = True, idtype=F.int32
+        self,
+        num_nodes_dict: dict,
+        single_gpu: bool = True,
+        cugraph_service_client=None,
+        idtype=F.int32,
     ):
         """
         Constructor for creating a object of instance CuGraphStorage
@@ -48,13 +52,16 @@ class CuGraphStorage:
         Parameters
         ----------
          single_gpu: bool
-            Wether to create the cugraph object
+            Wether to create the cugraph Property Graph
             on a single GPU or multiple GPUs
             single GPU = True creates PropertyGraph
             single GPU = False creates MGPropertyGraph
          num_nodes_dict: dict[str, int]
             The number of nodes for some node types, which is a
             dictionary mapping a node type T to the number of T-typed nodes.
+        cugraph_service_client: cugraph.Service.Client
+            #TODO: Cleanup
+            The remote_client to use to connect to cugraph serive
          idtype: Framework-specific device object,
             The data type for storing the structure-related graph
             information this can be ``torch.int32`` or ``torch.int64``
@@ -121,18 +128,24 @@ class CuGraphStorage:
         """
         # lazy import to prevent creating cuda context
         # till later to help in multiprocessing
-        from cugraph.gnn import CuGraphStore
-        from cugraph.experimental import PropertyGraph
-        from cugraph.experimental import MGPropertyGraph
+        if cugraph_service_client is not None:
+            from cugraph.gnn import CuGraphRemoteStore
 
-        if single_gpu:
-            pg = PropertyGraph()
+            self.graphstore = CuGraphRemoteStore(
+                cugraph_service_client.graph(), cugraph_service_client
+            )
         else:
-            pg = MGPropertyGraph()
+            from cugraph.gnn import CuGraphStore
+            from cugraph.experimental import PropertyGraph
+            from cugraph.experimental import MGPropertyGraph
 
-        self.single_gpu = single_gpu
+            if single_gpu:
+                pg = PropertyGraph()
+            else:
+                pg = MGPropertyGraph()
+            self.graphstore = CuGraphStore(graph=pg)
+            self.single_gpu = single_gpu
 
-        self.graphstore = CuGraphStore(graph=pg)
         self.idtype = idtype
         self.id_np_type = backend_dtype_to_np_dtype_dict[idtype]
         self.num_nodes_dict = num_nodes_dict
@@ -191,9 +204,7 @@ class CuGraphStorage:
             contains_vector_features=contains_vector_features,
         )
 
-        # This will delete cached value
-        if "total_number_of_nodes" in self.__dict__:
-            del self.total_number_of_nodes
+        self._clear_cached_properties()
 
     def add_edge_data(
         self,
@@ -246,6 +257,116 @@ class CuGraphStorage:
             feat_name=feat_name,
             contains_vector_features=contains_vector_features,
         )
+
+        self._clear_cached_properties()
+
+    def add_node_data_from_parquet(
+        self,
+        file_path,
+        node_col_name,
+        ntype=None,
+        feat_name=None,
+        contains_vector_features=False,
+    ):
+        """
+        Add a dataframe describing node properties to the PropertyGraph.
+
+        Parameters
+        ----------
+        file_path: string
+            Path of the files on the server
+        node_col_name : string
+            The column name that contains the values to be used as vertex IDs.
+        ntype : string
+            The node type to be added.
+            For example, if dataframe contains data about users, ntype
+            might be "users".
+            If not specified, the type of properties will be added as
+            an empty string.
+        feat_name : {} or string
+            A map of feature names under which we should save the added
+            properties like {"feat_1":[f1, f2], "feat_2":[f3, f4]}
+            (ignored if contains_vector_features=False and the col names of
+            the dataframe are treated as corresponding feature names)
+        contains_vector_features : False
+            Whether to treat the columns of the dataframe being added as
+            as 2d features
+        Returns
+        -------
+        None
+        """
+
+        if ntype:
+            node_offset = self.get_node_id_offset(ntype)
+        else:
+            node_offset = 0
+
+        self.graphstore.add_node_data_from_parquet(
+            file_path=file_path,
+            node_col_name=node_col_name,
+            ntype=ntype,
+            node_offset=node_offset,
+            feat_name=feat_name,
+            contains_vector_features=contains_vector_features,
+        )
+
+        self._clear_cached_properties()
+
+    def add_edge_data_from_parquet(
+        self,
+        file_path,
+        node_col_names,
+        canonical_etype=None,
+        feat_name=None,
+        contains_vector_features=False,
+    ):
+        """
+        Add a dataframe describing edge properties to the PropertyGraph.
+        Parameters
+        ----------
+        file_path : string
+            Path of file on server
+        node_col_names : string
+            The column names that contain the values to be used as the source
+            and destination vertex IDs for the edges.
+        canonical_etype : string
+            The edge type to be added. This should follow the string format
+            '(src_type),(edge_type),(dst_type)'
+            If not specified, the type of properties will be added as
+            an empty string.
+        feat_name : string or dict {}
+            The feature name under which we should save the added properties
+            (ignored if contains_vector_features=False and the col names of
+            the dataframe are treated as corresponding feature names)
+        contains_vector_features : False
+            Whether to treat the columns of the dataframe being added as
+            as 2d features
+        Returns
+        -------
+        None
+        """
+
+        if canonical_etype:
+            _assert_valid_canonical_etype(canonical_etype)
+            src_type, dst_type = canonical_etype[0], canonical_etype[2]
+            src_offset = self.get_node_id_offset(src_type)
+            dst_offset = self.get_node_id_offset(dst_type)
+        else:
+            src_offset = 0
+            dst_offset = 0
+
+        canonical_etype = str(canonical_etype)
+        self.graphstore.add_edge_data_from_parquet(
+            file_path=file_path,
+            node_col_names=node_col_names,
+            canonical_etype=canonical_etype,
+            src_offset=src_offset,
+            dst_offset=dst_offset,
+            feat_name=feat_name,
+            contains_vector_features=contains_vector_features,
+        )
+
+        self._clear_cached_properties()
 
     # Sampling Function
     def sample_neighbors(
@@ -549,6 +670,9 @@ class CuGraphStorage:
         """
         return self.num_nodes(ntype)
 
+    def _clear_cached_properties(self):
+        self.__total_number_of_nodes = None
+
     @property
     def ntypes(self):
         """
@@ -598,7 +722,7 @@ class CuGraphStorage:
     # Node Properties
     @property
     def total_number_of_nodes(self):
-        if not hasattr(self, "_total_number_of_nodes"):
+        if self.__total_number_of_nodes is None:
             self.__total_number_of_nodes = self.num_nodes()
         return self.__total_number_of_nodes
 
