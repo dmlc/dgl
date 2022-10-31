@@ -125,7 +125,7 @@ class DistSparseGradOptimizer(abc.ABC):
         ----------
         local_state_dict : dict
             Optimizer state; should be an object returned
-            from a call to local_state_dict()
+            from a call to local_state_dict().
 
         See Also
         --------
@@ -162,18 +162,19 @@ class DistSparseGradOptimizer(abc.ABC):
     def save(self, f):
         """Save the local state_dict to disk on per rank.
 
-        Saved dict contains three parts:
+        Saved dict contains 2 parts:
 
-        * 'ids': list of global ids of the nodes/edges selected locally
-        * 'params': hyper parameters of the optimizer
-        * 'states': partial optimizer states indexed by ```ids``` of entire states
+        * 'params': hyper parameters of the optimizer.
+        * 'emb_states': partial optimizer states, each embedding contains 2 items:
+            1. ```ids```: global id of the nodes/edges stored in this rank.
+            2. ```states```: state data corrseponding to ```ids```.
 
         NOTE: This needs to be called on all ranks.
 
         Parameters
         ----------
         f : Union[str, os.PathLike]
-            The path of the file.
+            The path of the file to save to.
 
         See Also
         --------
@@ -195,7 +196,7 @@ class DistSparseGradOptimizer(abc.ABC):
         Parameters
         ----------
         f : Union[str, os.PathLike]
-            The path of the file.
+            The path of the file to load from.
 
         See Also
         --------
