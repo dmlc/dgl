@@ -13,8 +13,9 @@
 namespace dgl {
 namespace sparse {
 
-c10::intrusive_ptr<SparseMatrix> Add(
-    c10::intrusive_ptr<SparseMatrix> A, c10::intrusive_ptr<SparseMatrix> B);
+c10::intrusive_ptr<SparseMatrix> SpMatAddSpMat(
+    const c10::intrusive_ptr<SparseMatrix>& A,
+    const c10::intrusive_ptr<SparseMatrix>& B);
 
 }  // namespace sparse
 }  // namespace dgl

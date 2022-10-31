@@ -16,9 +16,9 @@ TORCH_LIBRARY(dgl_sparse, m) {
   m.class_<SparseMatrix>("SparseMatrix")
       .def("coo", &SparseMatrix::COOTensors)
       .def("val", &SparseMatrix::Value)
-      .def("shape", &SparseMatrix::Shape)
-      .def("__add__", &Add);
-  m.def("create_from_coo", &CreateFromCOO);
+      .def("shape", &SparseMatrix::Shape);
+  m.def("create_from_coo", &CreateFromCOO)
+      .def("spmat_add_spmat", &SpMatAddSpMat);
 }
 
 }  // namespace sparse

@@ -15,5 +15,5 @@ def test_sparse_op_sparse():
     valB = torch.rand(len(rowA))
     B = create_from_coo(rowA, colA, valB, (10, 50))
 
-    C = A.__add__(B)
+    C = A + B
     torch.allclose(C.val(), valA + valB)

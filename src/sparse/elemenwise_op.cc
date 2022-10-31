@@ -1,23 +1,22 @@
 /*!
  *  Copyright (c) 2022 by Contributors
  * \file sparse/elementwise_op.h
- * \brief DGL C++ sparse elementwise operators
+ * \brief DGL C++ sparse elementwise operator implementation
  */
-#ifndef DGL_SPARSE_ELEMENTWISE_OP_H_
-#define DGL_SPARSE_ELEMENTWISE_OP_H_
-
 #include <torch/custom_class.h>
+#include <torch/script.h>
 
 #include <memory>
 
+#include "./elementwise_op.h"
 #include "./sparse_matrix.h"
 #include "./utils.h"
 
 namespace dgl {
 namespace sparse {
 
-c10::intrusive_ptr<SparseMatrix> Add(
-    c10::intrusive_ptr<SparseMatrix> A, c10::intrusive_ptr<SparseMatrix> B) {
+c10::intrusive_ptr<SparseMatrix> SpMatAddSpMat(
+    const c10::intrusive_ptr<SparseMatrix>& A, const c10::intrusive_ptr<SparseMatrix>& B) {
   SPARSE_FORMAT_SELECT_BINARY(A, B, fmt, {
     if (fmt == SparseFormat::kCOO) {
       auto value = A->Value() + B->Value();
@@ -31,5 +30,3 @@ c10::intrusive_ptr<SparseMatrix> Add(
 
 }  // namespace sparse
 }  // namespace dgl
-
-#endif  //  DGL_SPARSE_ELEMENTWISE_OP_H_

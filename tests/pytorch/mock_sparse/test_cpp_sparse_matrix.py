@@ -24,7 +24,7 @@ def test_create_from_coo(dense_dim, row, col, mat_shape):
     mat = create_from_coo(row, col, val, mat_shape)
 
     mat_row, mat_col, mat_val = mat.coo()
-    assert tuple(mat.shape()) == mat_shape
+    assert tuple(mat.shape) == mat_shape
     assert torch.allclose(mat_val, val)
     assert torch.allclose(mat_row, row)
     assert torch.allclose(mat_col, col)

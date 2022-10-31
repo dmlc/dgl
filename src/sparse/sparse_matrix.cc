@@ -5,6 +5,8 @@
  */
 #include "./sparse_matrix.h"
 
+#include "./elementwise_op.h"
+
 namespace dgl {
 namespace sparse {
 
@@ -16,7 +18,7 @@ SparseMatrix::COOTensors() {
     val = val[coo->e_order.value()];
   }
   return {coo->row, coo->col, val};
-};
+}
 
 c10::intrusive_ptr<SparseMatrix> CreateFromCOOPtr(
     const std::shared_ptr<COO>& coo, torch::Tensor value,
