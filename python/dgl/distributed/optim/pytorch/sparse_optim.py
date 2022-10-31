@@ -58,11 +58,10 @@ class DistSparseGradOptimizer(abc.ABC):
         --------
         load_local_state_dict
         """
-        lcoal_state_dict = {}
-        lcoal_state_dict["emb_states"] = {}
-        lcoal_state_dict["params"] = {"world_size": self._world_size}
+        local_state_dict = {}
+        local_state_dict["emb_states"] = {}
+        local_state_dict["params"] = {"world_size": self._world_size}
         for emb in self._params:
-            kvstore = emb.kvstore
             trainers_per_machine = (
                 self._world_size // max(1, dgl.distributed.get_num_machines())
             )
@@ -72,7 +71,7 @@ class DistSparseGradOptimizer(abc.ABC):
             )
             idx = self._get_local_ids(part_policy)
             if trainers_per_machine > 1:
-                kv_idx_split = th.remainder(idx, trainers_per_machine).long()
+                kv_idx_split = (idx % trainers_per_machine).long()
                 local_rank = self._rank % trainers_per_machine
                 mask = kv_idx_split == local_rank
                 idx = F.boolean_mask(idx, mask)
@@ -85,9 +84,9 @@ class DistSparseGradOptimizer(abc.ABC):
             )
             emb_state = {state.name: state[idx] for state in states}
             emb_state_dict.update({"states": emb_state})
-            lcoal_state_dict["emb_states"].update({emb.name: emb_state_dict})
-        lcoal_state_dict["params"].update(self._defaults)
-        return lcoal_state_dict
+            local_state_dict["emb_states"].update({emb.name: emb_state_dict})
+        local_state_dict["params"].update(self._defaults)
+        return local_state_dict
 
     def load_local_state_dict(self, local_state_dict):
         """Load the local state from the input state_dict,
@@ -144,9 +143,8 @@ class DistSparseGradOptimizer(abc.ABC):
 
         Parameters
         ----------
-        f : Union[str, PathLike]
-            The basic path of the file, rank
-            will be attached as full name.
+        f : Union[str, os.PathLike]
+            The path of the file.
 
         See Also
         --------
@@ -167,9 +165,8 @@ class DistSparseGradOptimizer(abc.ABC):
 
         Parameters
         ----------
-        f : Union[str, PathLike]
-            The basic path of the file, rank
-            will be attached as full name.
+        f : Union[str, os.PathLike]
+            The path of the file.
 
         See Also
         --------
@@ -181,7 +178,8 @@ class DistSparseGradOptimizer(abc.ABC):
         f_attach_rank = f"{f}_{self._rank}"
         # Don't throw error here to support device number scale-out
         # after reloading, but make sure your hyper parameter is same
-        # as before because added local optimizers will not be filled
+        # as before because new added local optimizers will be filled
+        # in nothing
         if not exists(f_attach_rank):
             warnings.warn(
                 f"File {f_attach_rank} can't be found, load nothing."
