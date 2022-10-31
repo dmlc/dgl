@@ -1731,3 +1731,24 @@ def test_MetaPath2Vec(idtype):
     model = model.to(dev)
     embeds = model.node_embed.weight
     assert embeds.shape[0] == g.num_nodes()
+
+@pytest.mark.parametrize('num_layer', [1, 4])
+@pytest.mark.parametrize('k', [3, 5])
+@pytest.mark.parametrize('lpe_dim', [4, 16])
+@pytest.mark.parametrize('n_head', [1, 4])
+@pytest.mark.parametrize('batch_norm', [True, False])
+@pytest.mark.parametrize('num_post_layer', [0, 1, 2])
+def test_LaplacianPosEnc(num_layer, k, lpe_dim, n_head, batch_norm, num_post_layer):
+    ctx = F.ctx()
+    num_nodes = 4
+
+    EigVals = th.randn((num_nodes, k)).to(ctx)
+    EigVecs = th.randn((num_nodes, k)).to(ctx)
+
+    model = nn.LaplacianPosEnc("Transformer", num_layer, k, lpe_dim, n_head,
+                               batch_norm, num_post_layer).to(ctx)
+    assert model(EigVals, EigVecs).shape == (num_nodes, lpe_dim)
+
+    model = nn.LaplacianPosEnc("DeepSet", num_layer, k, lpe_dim,
+                               batch_norm=batch_norm, num_post_layer=num_post_layer).to(ctx)
+    assert model(EigVals, EigVecs).shape == (num_nodes, lpe_dim)
