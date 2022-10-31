@@ -46,7 +46,7 @@ class SparseMatrix:
 # TODO: Move elementwise ops to a seperate file, which needs to rewrite __init__.py.
 # TODO: Add addition for DiagMatrix
 def sp_add(A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
-    return torch.ops.dgl_sparse.spmat_add_spmat(A._c_sparse_matrix, B._c_sparse_matrix)
+    return SparseMatrix(torch.ops.dgl_sparse.spmat_add_spmat(A._c_sparse_matrix, B._c_sparse_matrix))
 
 
 SparseMatrix.__add__ = sp_add
