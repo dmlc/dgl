@@ -235,16 +235,14 @@ __global__ void _CSRRowWiseSampleUniformReplaceKernel(
     out_row += 1;
   }
 }
-}  // namespace
 
+}  // namespace
 
 ///////////////////////////// CSR sampling //////////////////////////
 
 template <DGLDeviceType XPU, typename IdType>
-COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
-                                    IdArray rows,
-                                    const int64_t num_picks,
-                                    const bool replace) {
+COOMatrix _CSRRowWiseSamplingUniform(
+    CSRMatrix mat, IdArray rows, const int64_t num_picks, const bool replace) {
   const auto& ctx = rows->ctx;
   auto device = runtime::DeviceAPI::Get(ctx);
   cudaStream_t stream = runtime::getCurrentCUDAStream();
@@ -367,6 +365,19 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat,
 
   return COOMatrix(mat.num_rows, mat.num_cols, picked_row,
       picked_col, picked_idx);
+}
+
+template <DGLDeviceType XPU, typename IdType>
+COOMatrix CSRRowWiseSamplingUniform(
+    CSRMatrix mat, IdArray rows, const int64_t num_picks, const bool replace) {
+  if (num_picks == -1) {
+    // Basically this is UnitGraph::InEdges().
+    COOMatrix coo = CSRToCOO(CSRSliceRows(mat, rows), false);
+    IdArray sliced_rows = IndexSelect(rows, coo.row);
+    return COOMatrix(mat.num_rows, mat.num_cols, sliced_rows, coo.col, coo.data);
+  } else {
+    return _CSRRowWiseSamplingUniform<XPU, IdType>(mat, rows, num_picks, replace);
+  }
 }
 
 template COOMatrix CSRRowWiseSamplingUniform<kDGLCUDA, int32_t>(
