@@ -11,16 +11,19 @@ class DegreeEncoder(nn.Module):
     Parameters
     ----------
     max_degree : int
-        Upper bound of degrees to be encoded. Each degree will be clamped to into the range [0, ``max_degree``].
+        Upper bound of degrees to be encoded.
+        Each degree will be clamped into the range [0, ``max_degree``].
     embedding_dim : int
         Output dimension of embedding vectors.
     direction : str, optional
-        Degrees of which direction to be encoded, selected from ``in``, ``out`` and ``both``.
-        ``both`` encodes degrees from both directions and output the addition of them.
+        Degrees of which direction to be encoded,
+        selected from ``in``, ``out`` and ``both``.
+        ``both`` encodes degrees from both directions
+        and output the addition of them.
         Default : ``both``.
 
     Example
-    ------
+    -------
     >>> import dgl
     >>> from dgl.nn import DegreeEncoder
 
@@ -28,49 +31,55 @@ class DegreeEncoder(nn.Module):
     >>> degree_encoder = DegreeEncoder(5, 16)
     >>> degree_embedding = degree_encoder(g)
     """
-    def __init__(self, max_degree, embedding_dim, direction='both'):
+
+    def __init__(self, max_degree, embedding_dim, direction="both"):
         super(DegreeEncoder, self).__init__()
         self.direction = direction
-        if direction == 'both':
-            self.degree_encoder_1 = nn.Embedding(max_degree + 1, embedding_dim, padding_idx=0)
-            self.degree_encoder_2 = nn.Embedding(max_degree + 1, embedding_dim, padding_idx=0)
+        if direction == "both":
+            self.degree_encoder_1 = nn.Embedding(
+                max_degree + 1, embedding_dim, padding_idx=0
+            )
+            self.degree_encoder_2 = nn.Embedding(
+                max_degree + 1, embedding_dim, padding_idx=0
+            )
         else:
-            self.degree_encoder = nn.Embedding(max_degree + 1, embedding_dim, padding_idx=0)
+            self.degree_encoder = nn.Embedding(
+                max_degree + 1, embedding_dim, padding_idx=0
+            )
         self.max_degree = max_degree
-    
+
     def forward(self, g):
         """
         Parameters
         ----------
         g : DGLGraph
-            A DGLGraph to be encoded. If a heterogeneous one, it will be processed after being transformed into an isomorphic graph.
+            A DGLGraph to be encoded. If it is a heterogeneous one,
+            it will be transformed into a homogeneous one first.
 
         Returns
         -------
         Tensor
-            Return degree embedding vectors of shape :math:`(N, embedding_dim)`, where :math:`N` is the
-            number of nodes in the input graph.
+            Return degree embedding vectors of shape :math:`(N, embedding_dim)`,
+            where :math:`N` is th number of nodes in the input graph.
         """
         if len(g.ntypes) > 1 or len(g.etypes) > 1:
-            hg = dgl.to_homogeneous(g)
-            in_degree = hg.in_degrees()
-            out_degree = hg.out_degrees()
-        else:
-            in_degree = g.in_degrees()
-            out_degree = g.out_degrees()
-
+            g = dgl.to_homogeneous(g)
+        in_degree = g.in_degrees()
+        out_degree = g.out_degress()
         in_degree.clamp(0, self.max_degree)
         out_degree.clamp(0, self.max_degree)
 
-        if self.direction == 'in':
+        if self.direction == "in":
             degree_embedding = self.degree_encoder(in_degree)
-        elif self.direction == 'out':
+        elif self.direction == "out":
             degree_embedding = self.degree_encoder(out_degree)
-        elif self.direction == 'both':
+        elif self.direction == "both":
             degree_embedding = (self.degree_encoder_1(in_degree)
                                 + self.degree_encoder_2(out_degree))
         else:
             raise ValueError(
-                f'Supported direction options: "in", "out" and "both", but got {self.direction}')
+                f'Supported direction options: "in", "out" and "both", '
+                f'but got {self.direction}'
+            )
 
         return degree_embedding
