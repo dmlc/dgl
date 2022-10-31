@@ -14,11 +14,12 @@ from ...nn.pytorch import DistEmbedding
 from .utils import alltoall_cpu, alltoallv_cpu
 from ...graph_partition_book import EDGE_PART_POLICY, NODE_PART_POLICY
 
-EMB_STATES = 'emb_states'
-WORLD_SIZE = 'world_size'
-IDS = 'ids'
-PARAMS = 'params'
-STATES = 'states'
+EMB_STATES = "emb_states"
+WORLD_SIZE = "world_size"
+IDS = "ids"
+PARAMS = "params"
+STATES = "states"
+
 
 class DistSparseGradOptimizer(abc.ABC):
     r"""The abstract dist sparse optimizer.
@@ -90,8 +91,8 @@ class DistSparseGradOptimizer(abc.ABC):
         local_state_dict[EMB_STATES] = {}
         local_state_dict[PARAMS] = {WORLD_SIZE: self._world_size}
         for emb in self._params:
-            trainers_per_machine = (
-                self._world_size // max(1, dgl.distributed.get_num_machines())
+            trainers_per_machine = self._world_size // max(
+                1, dgl.distributed.get_num_machines()
             )
             emb_state_dict = {}
             part_policy = (
@@ -209,15 +210,15 @@ class DistSparseGradOptimizer(abc.ABC):
         # as before because new added local optimizers will be filled
         # in nothing
         if not exists(f_attach_rank):
-            warnings.warn(
-                f"File {f_attach_rank} can't be found, load nothing."
-            )
+            warnings.warn(f"File {f_attach_rank} can't be found, load nothing.")
         else:
             old_world_size = self._load_state_from(f_attach_rank)
             # Device number scale-in
             if self._world_size < old_world_size:
                 for rank in range(
-                    self._rank + self._world_size, old_world_size, self._world_size
+                    self._rank + self._world_size,
+                    old_world_size,
+                    self._world_size,
                 ):
                     self._load_state_from(f"{f}_{rank}")
         if self._world_size > 1:
