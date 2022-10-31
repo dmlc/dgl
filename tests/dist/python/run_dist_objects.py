@@ -185,14 +185,15 @@ def test_dist_embedding(g):
 ##########################################
 
 
-def dist_optimizer_check_store(g, num_nodes):
+def dist_optimizer_check_store(g):
+    num_nodes = g.number_of_nodes(g.ntypes[0])
     rank = g.rank()
     try:
         emb = dgl.distributed.DistEmbedding(
             num_nodes, 1, name="optimizer_test", init_func=zeros_init
         )
         emb2 = dgl.distributed.DistEmbedding(
-            num_nodes, 1, name="optimizer_test2", init_func=zeros_init
+            num_nodes, 5, name="optimizer_test2", init_func=zeros_init
         )
         emb_optimizer = dgl.distributed.optim.SparseAdam([emb, emb2], lr=0.1)
         if rank == 0:
@@ -214,12 +215,9 @@ def dist_optimizer_check_store(g, num_nodes):
             for _, emb_states in new_emb_optimizer._state.items():
                 for new_state in emb_states:
                     state = name_to_state[new_state.name]
-                    print(new_state.name)
-                    print(state)
                     new_state = new_state[
                         F.arange(0, num_nodes, F.int64, F.cpu())
                     ]
-                    print(new_state)
                     assert F.allclose (state, new_state, 0., 0.)
             assert new_emb_optimizer._lr == emb_optimizer._lr
             assert new_emb_optimizer._eps == emb_optimizer._eps
@@ -232,8 +230,7 @@ def dist_optimizer_check_store(g, num_nodes):
             os.remove(file)
 
 def test_dist_optimizer(g):
-    num_nodes = g.number_of_nodes(g.ntypes[0])
-    dist_optimizer_check_store(g, num_nodes)
+    dist_optimizer_check_store(g)
 
 
 if mode == "server":

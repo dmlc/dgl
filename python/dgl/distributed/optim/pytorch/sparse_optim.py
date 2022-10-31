@@ -12,7 +12,13 @@ from .... import backend as F
 from ...dist_tensor import DistTensor
 from ...nn.pytorch import DistEmbedding
 from .utils import alltoall_cpu, alltoallv_cpu
+from ...graph_partition_book import EDGE_PART_POLICY, NODE_PART_POLICY
 
+EMB_STATES = 'emb_states'
+WORLD_SIZE = 'world_size'
+IDS = 'ids'
+PARAMS = 'params'
+STATES = 'states'
 
 class DistSparseGradOptimizer(abc.ABC):
     r"""The abstract dist sparse optimizer.
@@ -53,14 +59,36 @@ class DistSparseGradOptimizer(abc.ABC):
         -------
         dict
             Local state dict
+            Example Dict of Adagrad Optimizer:
+            .. code-block:: json
+
+            {
+                "params": {
+                    "_lr": 0.01,
+                    "_eps": "1e-8",
+                    "world_size": 2
+                },
+                "emb_states": {
+                    "emb_name1": {
+                        "ids": [0, 2, 4, 6 ,8 ,10], ## tensor,
+                        "emb_name1_sum": [0.1 , 0.2, 0.5, 0.1, 0.2] ## tensor,
+                    },
+                    "emb_name2": {
+                        "ids": [0, 2, 4, 6 ,8 ,10], ## tensor,
+                        "emb_name2_sum": [0.3 , 0.2, 0.4, 0.5, 0.2] ## tensor,
+                    }
+                }
+            }
+
+            :param json: json object
 
         See Also
         --------
         load_local_state_dict
         """
         local_state_dict = {}
-        local_state_dict["emb_states"] = {}
-        local_state_dict["params"] = {"world_size": self._world_size}
+        local_state_dict[EMB_STATES] = {}
+        local_state_dict[PARAMS] = {WORLD_SIZE: self._world_size}
         for emb in self._params:
             trainers_per_machine = (
                 self._world_size // max(1, dgl.distributed.get_num_machines())
@@ -75,7 +103,7 @@ class DistSparseGradOptimizer(abc.ABC):
                 local_rank = self._rank % trainers_per_machine
                 mask = kv_idx_split == local_rank
                 idx = F.boolean_mask(idx, mask)
-            emb_state_dict.update({"ids": idx})
+            emb_state_dict.update({IDS: idx})
             emb_state = {}
             states = (
                 list(self._state[emb.name])
@@ -83,9 +111,9 @@ class DistSparseGradOptimizer(abc.ABC):
                 else [self._state[emb.name]]
             )
             emb_state = {state.name: state[idx] for state in states}
-            emb_state_dict.update({"states": emb_state})
-            local_state_dict["emb_states"].update({emb.name: emb_state_dict})
-        local_state_dict["params"].update(self._defaults)
+            emb_state_dict.update({STATES: emb_state})
+            local_state_dict[EMB_STATES].update({emb.name: emb_state_dict})
+        local_state_dict[PARAMS].update(self._defaults)
         return local_state_dict
 
     def load_local_state_dict(self, local_state_dict):
@@ -102,14 +130,14 @@ class DistSparseGradOptimizer(abc.ABC):
         --------
         local_state_dict
         """
-        for emb_name, emb_state in local_state_dict["emb_states"].items():
-            idx = emb_state["ids"]
+        for emb_name, emb_state in local_state_dict[EMB_STATES].items():
+            idx = emb_state[IDS]
             states = (
                 list(self._state[emb_name])
                 if isinstance(self._state[emb_name], tuple)
                 else [self._state[emb_name]]
             )
-            if len(emb_state["states"]) != len(states):
+            if len(emb_state[STATES]) != len(states):
                 raise ValueError(
                     f"loaded state dict has a different number of states"
                     f" of embedding {emb_name}"
@@ -117,7 +145,7 @@ class DistSparseGradOptimizer(abc.ABC):
             name_to_index = {
                 state.name: index for index, state in enumerate(states, 0)
             }
-            for name, state in emb_state["states"].items():
+            for name, state in emb_state[STATES].items():
                 if name not in name_to_index:
                     raise ValueError(
                         "loaded state dict contains a state {name}"
@@ -127,8 +155,8 @@ class DistSparseGradOptimizer(abc.ABC):
                 state = state.to(states[state_idx].dtype)
                 state = state.to(th.device("cpu"))
                 states[state_idx][idx] = state
-        self._defaults.update(local_state_dict["params"])
-        self.__dict__.update(local_state_dict["params"])
+        self._defaults.update(local_state_dict[PARAMS])
+        self.__dict__.update(local_state_dict[PARAMS])
 
     def save(self, f):
         """Save the local state_dict to disk on per rank.
@@ -197,17 +225,16 @@ class DistSparseGradOptimizer(abc.ABC):
 
     def _load_state_from(self, f):
         local_state_dict = th.load(f)
-        world_size = local_state_dict["params"]["world_size"]
-        del local_state_dict["params"]["world_size"]
+        world_size = local_state_dict[PARAMS].pop(WORLD_SIZE)
         self.load_local_state_dict(local_state_dict)
         return world_size
 
     def _get_local_ids(self, part_policy):
-        if "edge" in part_policy.policy_str:
+        if EDGE_PART_POLICY in part_policy.policy_str:
             return part_policy.partition_book.partid2eids(
                 part_policy.part_id, part_policy.type_name
             )
-        elif "node" in part_policy.policy_str:
+        elif NODE_PART_POLICY in part_policy.policy_str:
             return part_policy._partition_book.partid2nids(
                 part_policy.part_id, part_policy.type_name
             )
