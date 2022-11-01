@@ -3,19 +3,17 @@
  * \file sparse/sparse_matrix.cc
  * \brief DGL C++ sparse matrix implementations
  */
-#include "./sparse_matrix.h"
-
-#include "./elementwise_op.h"
+#include <dgl/sparse/elementwise_op.h>
+#include <dgl/sparse/sparse_matrix.h>
 
 namespace dgl {
 namespace sparse {
 
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
-SparseMatrix::COOTensors() {
+std::vector<torch::Tensor> SparseMatrix::COOTensors() {
   auto coo = COOPtr();
   auto val = Value();
-  if (coo->e_order.has_value()) {
-    val = val[coo->e_order.value()];
+  if (coo->value_indices.has_value()) {
+    val = val[coo->value_indices.value()];
   }
   return {coo->row, coo->col, val};
 }

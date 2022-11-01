@@ -23,11 +23,12 @@ struct CSR {
   // The element order of the sparse format. In the SparseMatrix, we have data
   // (value_) for each non-zero value. The order of non-zero values in (value_)
   // may differ from the order of non-zero entries in the sparse format. So we
-  // store `e_order` in a sparse format to indicate its relative element order
-  // to the SparseMatrix. With `e_order`, we can retrieve the correct data for a
-  // sparse format, i.e., `value_[e_order]`. If `e_order` is not defined, this
-  // sparse format follows the same non-zero value order as the SparseMatrix.
-  torch::optional<torch::Tensor> e_order;
+  // store `value_indices` in a sparse format to indicate its relative element
+  // order to the SparseMatrix. With `value_indices`, we can retrieve the
+  // correct data for a sparse format, i.e., `value_[value_indices]`. If
+  // `value_indices` is not defined, this sparse format follows the same
+  // non-zero value order as the SparseMatrix.
+  torch::optional<torch::Tensor> value_indices;
 };
 
 /*! \brief COO sparse structure */
@@ -36,11 +37,12 @@ struct COO {
   // The element order of the sparse format. In the SparseMatrix, we have data
   // (value_) for each non-zero value. The order of non-zero values in (value_)
   // may differ from the order of non-zero entries in the sparse format. So we
-  // store `e_order` in a sparse format to indicate its relative element order
-  // to the SparseMatrix. With `e_order`, we can retrieve the correct data for a
-  // sparse format, i.e., `value_[e_order]`. If `e_order` is not defined, this
-  // sparse format follows the same non-zero value order as the SparseMatrix.
-  torch::optional<torch::Tensor> e_order;
+  // store `value_indices` in a sparse format to indicate its relative element
+  // order to the SparseMatrix. With `value_indices`, we can retrieve the
+  // correct data for a sparse format, i.e., `value_[value_indices]`. If
+  // `value_indices` is not defined, this sparse format follows the same
+  // non-zero value order as the SparseMatrix.
+  torch::optional<torch::Tensor> value_indices;
 };
 
 /*! \brief SparseMatrix bound to Python  */
@@ -72,28 +74,16 @@ class SparseMatrix : public torch::CustomClassHolder {
   bool HasCSR() const { return csr_ != nullptr; }
   bool HasCSC() const { return csc_ != nullptr; }
 
-  std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> COOTensors();
-  std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> CSRTensors();
-  std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> CSCTensors();
+  // TODO
+  std::vector<torch::Tensor> COOTensors();
+  std::vector<torch::Tensor> CSRTensors();
+  std::vector<torch::Tensor> CSCTensors();
 
  private:
-  void _CreateCOOIfNotExist() {
-    if (coo_ == nullptr) {
-      // TODO: Create COO
-    }
-  }
-
-  void _CreateCSRIfNotExist() {
-    if (csr_ == nullptr) {
-      // TODO: Create CSR
-    }
-  }
-
-  void _CreateCSCIfNotExist() {
-    if (csc_ == nullptr) {
-      // TODO: Create CSC
-    }
-  }
+  // TODO Move the implementation to .cc
+  void _CreateCOOIfNotExist() {}
+  void _CreateCSRIfNotExist() {}
+  void _CreateCSCIfNotExist() {}
 
   // COO/CSC/CSR pointers. Nullptr indicates non-existence.
   std::shared_ptr<COO> coo_;

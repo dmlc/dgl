@@ -6,8 +6,8 @@
 #include <torch/custom_class.h>
 #include <torch/script.h>
 
-#include "./elementwise_op.h"
-#include "./sparse_matrix.h"
+#include <dgl/sparse/elementwise_op.h>
+#include <dgl/sparse/sparse_matrix.h>
 
 namespace dgl {
 namespace sparse {
@@ -18,7 +18,7 @@ TORCH_LIBRARY(dgl_sparse, m) {
       .def("val", &SparseMatrix::Value)
       .def("shape", &SparseMatrix::Shape);
   m.def("create_from_coo", &CreateFromCOO)
-      .def("spmat_add_spmat", &SpMatAddSpMat);
+      .def("spspadd", &SpSpAdd);
 }
 
 }  // namespace sparse
