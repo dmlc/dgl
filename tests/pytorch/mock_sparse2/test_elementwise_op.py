@@ -5,7 +5,7 @@ import pytest
 import torch
 
 import dgl
-from dgl.mock_sparse.cpp_interface import create_from_coo
+from dgl.mock_sparse2 import create_from_coo
 
 def test_sparse_op_sparse():
     rowA = torch.tensor([1, 0, 2, 7, 1])
@@ -16,4 +16,4 @@ def test_sparse_op_sparse():
     B = create_from_coo(rowA, colA, valB, (10, 50))
 
     C = A + B
-    torch.allclose(C.val(), valA + valB)
+    torch.allclose(C.val, valA + valB)

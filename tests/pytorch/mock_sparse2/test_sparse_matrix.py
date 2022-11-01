@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from dgl.mock_sparse.cpp_interface import create_from_coo
+from dgl.mock_sparse2 import create_from_coo
 
 
 @pytest.mark.parametrize("dense_dim", [None, 4])

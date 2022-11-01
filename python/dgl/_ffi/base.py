@@ -148,3 +148,37 @@ def load_tensor_adapter(backend, version):
     if not tensor_adapter_loaded:
         logger = logging.getLogger("dgl-core")
         logger.debug("Memory optimization with PyTorch is not enabled.")
+
+dgl_sparse_loaded = False
+
+
+def load_dgl_sparse(backend, version):
+    """Tell DGL to load a sparse matrix library for given backend and version.
+
+    Parameters
+    ----------
+    backend : str
+        The backend (currently ``pytorch``, ``mxnet`` or ``tensorflow``).
+    version : str
+        The version number of the backend.
+    """
+    global dgl_sparse_loaded
+    version = version.split("+")[0]
+    if sys.platform.startswith("linux"):
+        basename = "libdgl_sparse_%s_%s.so" % (backend, version) 
+    elif sys.platform.startswith("darwin"):
+        basename = "libdgl_sparse_%s_%s.dylib" % (backend, version) 
+    elif sys.platform.startswith("win"):
+        basename = "dgl_sparse_%s_%s.dll" % (backend, version) 
+    else:
+        raise NotImplementedError("Unsupported system: %s" % sys.platform)
+    path = os.path.join(_DIR_NAME, "dgl_sparse", basename)
+
+    import torch
+    try:
+        torch.classes.load_library(path)
+        dgl_sparse_loaded = True
+    except:
+        pass
+
+    
