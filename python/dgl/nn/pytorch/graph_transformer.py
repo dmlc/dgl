@@ -1,4 +1,5 @@
 """Torch modules for graph transformers."""
+import torch as th
 import torch.nn as nn
 
 
@@ -64,10 +65,8 @@ class DegreeEncoder(nn.Module):
         """
         if len(g.ntypes) > 1 or len(g.etypes) > 1:
             g = dgl.to_homogeneous(g)
-        in_degree = g.in_degrees()
-        out_degree = g.out_degress()
-        in_degree.clamp(0, self.max_degree)
-        out_degree.clamp(0, self.max_degree)
+        in_degree = th.clamp(g.in_degrees(), min=0, max=self.max_degree)
+        out_degree = th.clamp(g.out_degrees(), min=0, max=self.max_degree)
 
         if self.direction == "in":
             degree_embedding = self.degree_encoder(in_degree)
