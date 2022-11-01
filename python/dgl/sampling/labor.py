@@ -94,7 +94,9 @@ def sample_labors(
 
         If :attr:`prob` is not None, GPU sampling is not supported.
     importance_sampling : int, optional
-        Whether to use importance sampling with replacement or uniform sampling without replacement.
+        Whether to use importance sampling or uniform sampling, use of negative values optimizes
+        importance sampling probabilities until convergence while use of positive values runs
+        optimization steps that many times. If the value is i, then LABOR-i variant is used.
     random_seed : tensor
         The random seed to be used for sampling, can be None, in which case the
         random seed is queried from the DGL PRNG.

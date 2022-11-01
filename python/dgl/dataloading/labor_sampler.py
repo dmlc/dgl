@@ -56,7 +56,7 @@ class LaborSampler(BlockSampler):
     importance_sampling : int, default ``0``
         Whether to use importance sampling or uniform sampling, use of negative values optimizes
         importance sampling probabilities until convergence while use of positive values runs
-        optimization steps that many times.
+        optimization steps that many times. If the value is i, then LABOR-i variant is used.
     layer_dependency : bool, default ``False``
         Specifies whether different layers should use same random variates.
     prefetch_node_feats : list[str] or dict[ntype, list[str]], optional
