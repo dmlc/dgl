@@ -133,6 +133,9 @@ class DistSparseGradOptimizer(abc.ABC):
         """
         for emb_name, emb_state in local_state_dict[EMB_STATES].items():
             idx = emb_state[IDS]
+            # As state of an embedding of different optimizers can be a single DistTensor(Adagrad) or
+            # a tuple of that(Adam), converting it to list for consistency. The list contains
+            # reference(s) to original DistTensor(s).
             states = (
                 list(self._state[emb_name])
                 if isinstance(self._state[emb_name], tuple)
