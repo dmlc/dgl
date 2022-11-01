@@ -21,12 +21,12 @@
 
 from .._ffi.function import _init_api
 from .. import backend as F
-from ..base import DGLError
+from ..base import DGLError, NID
 from ..heterograph import DGLHeteroGraph
 from .. import ndarray as nd
 from .. import utils
 from .utils import EidExcluder
-from ..backend import from_dgl_nd
+from ..random import choice
 
 __all__ = ["sample_labors"]
 
@@ -38,12 +38,21 @@ def sample_labors(
     edge_dir="in",
     prob=None,
     importance_sampling=0,
+    random_seed=None,
     copy_ndata=True,
     copy_edata=True,
     exclude_edges=None,
     output_device=None,
 ):
-    """Sample neighboring edges of the given nodes and return the induced subgraph.
+    """Sampler that builds computational dependency of node representations via
+    labor sampling for multilayer GNN from
+    `(LA)yer-neigh(BOR) Sampling: Defusing Neighborhood Explosion in GNNs
+    <https://arxiv.org/abs/2210.13339>`
+
+    This sampler will make every node gather messages from a fixed number of neighbors
+    per edge type. The neighbors are picked uniformly with default parameters. For every vertex t
+    that will be considered to be sampled, there will be a single random variate r_t. Sampling
+    from a subgraph will use the random variate r_{NID[t]}, where NID is g.ndata[NID].
 
     For each node, a number of inbound (or outbound when ``edge_dir == 'out'``) edges
     will be randomly chosen.  The graph returned will then contain all the nodes in the
@@ -86,6 +95,9 @@ def sample_labors(
         If :attr:`prob` is not None, GPU sampling is not supported.
     importance_sampling : int, optional
         Whether to use importance sampling with replacement or uniform sampling without replacement.
+    random_seed : tensor
+        The random seed to be used for sampling, can be None, in which case the
+        random seed is queried from the DGL PRNG.
     copy_ndata: bool, optional
         If True, the node features of the new graph are copied from
         the original graph. If False, the new graph will not have any
@@ -182,6 +194,7 @@ def sample_labors(
             edge_dir=edge_dir,
             prob=prob,
             importance_sampling=importance_sampling,
+            random_seed=random_seed,
             copy_ndata=copy_ndata,
             copy_edata=copy_edata,
             exclude_edges=exclude_edges,
@@ -194,6 +207,7 @@ def sample_labors(
             edge_dir=edge_dir,
             prob=prob,
             importance_sampling=importance_sampling,
+            random_seed=random_seed,
             copy_ndata=copy_ndata,
             copy_edata=copy_edata,
         )
@@ -213,10 +227,13 @@ def _sample_labors(
     edge_dir="in",
     prob=None,
     importance_sampling=0,
+    random_seed=None,
     copy_ndata=True,
     copy_edata=True,
     exclude_edges=None,
 ):
+    if random_seed is None:
+        random_seed = F.to_dgl_nd(choice(1e18, 1))
     if not isinstance(nodes, dict):
         if len(g.ntypes) > 1:
             raise DGLError(
@@ -232,11 +249,20 @@ def _sample_labors(
         )
     ctx = utils.to_dgl_context(F.context(next(iter(nodes.values()))))
     nodes_all_types = []
+    nids_all_types = []
     for ntype in g.ntypes:
         if ntype in nodes:
             nodes_all_types.append(F.to_dgl_nd(nodes[ntype]))
+            if NID in g.ndata:
+                if len(g.ntypes) > 1:
+                    nids_all_types.append(F.to_dgl_nd(g.ndata[NID][ntype]))
+                else:
+                    nids_all_types.append(F.to_dgl_nd(g.ndata[NID]))
+            else:
+                nids_all_types.append(nd.array([], ctx=ctx))
         else:
             nodes_all_types.append(nd.array([], ctx=ctx))
+            nids_all_types.append(nd.array([], ctx=ctx))
 
     if isinstance(fanout, nd.NDArray):
         fanout_array = fanout
@@ -293,9 +319,11 @@ def _sample_labors(
         prob_arrays,
         excluded_edges_all_t,
         importance_sampling,
+        random_seed,
+        nids_all_types,
     )
     subgidx = ret_val[0]
-    importances = [from_dgl_nd(importance) for importance in ret_val[1:]]
+    importances = [F.from_dgl_nd(importance) for importance in ret_val[1:]]
     induced_edges = subgidx.induced_edges
     ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
 

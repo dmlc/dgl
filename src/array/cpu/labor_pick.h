@@ -156,12 +156,15 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
     IdArray rows,
     int64_t num_picks,
     FloatArray prob,
-    int importance_sampling) {
+    int importance_sampling,
+    IdArray random_seed_arr,
+    IdArray NIDs) {
   using namespace aten;
   const IdxType* indptr = mat.indptr.Ptr<IdxType>();
   const IdxType* indices = mat.indices.Ptr<IdxType>();
   const IdxType* data = CSRHasData(mat) ? mat.data.Ptr<IdxType>() : nullptr;
   const IdxType* rows_data = rows.Ptr<IdxType>();
+  const IdxType* nids = IsNullArray(NIDs) ? nullptr : NIDs.Ptr<IdxType>();
   const auto num_rows = rows->shape[0];
   const auto& ctx = mat.indptr->ctx;
 
@@ -216,7 +219,10 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
         cs,
         hop_map);
 
-  const pcg32 ng0(RandomEngine::ThreadLocal()->RandInt(1000000000));
+  const uint64_t random_seed = IsNullArray(random_seed_arr) ?
+      RandomEngine::ThreadLocal()->RandInt(1000000000) : random_seed_arr.Ptr<int64_t>()[0];
+
+  const pcg32 ng0(random_seed);
   std::uniform_real_distribution<FloatType> uni;
 
   // compute number of edges first and store randoms
@@ -229,11 +235,12 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
     const auto c = cs[i];
     for (auto j = indptr[rid]; j < indptr[rid + 1]; j++) {
       const auto v = indices[j];
+      const auto u = nids ? nids[v] : v;
       // itb stands for a pair of iterator and boolean indicating if insertion was successful
-      auto itb = rand_map.emplace(v, 0);
+      auto itb = rand_map.emplace(u, 0);
       if (itb.second) {
         auto ng = ng0;
-        ng.discard(v);
+        ng.discard(u);
         uni.reset();
         itb.first->second = uni(ng);
       }
@@ -303,12 +310,14 @@ std::pair<COOMatrix, FloatArray> COOLaborPick(
     IdArray rows,
     int64_t num_picks,
     FloatArray prob,
-    int importance_sampling) {
+    int importance_sampling,
+    IdArray random_seed,
+    IdArray NIDs) {
   using namespace aten;
   const auto& csr = COOToCSR(COOSliceRows(mat, rows));
   const IdArray new_rows = Range(0, rows->shape[0], rows->dtype.bits, rows->ctx);
   const auto&& picked_importances = CSRLaborPick<IdxType, FloatType>(
-      csr, new_rows, num_picks, prob, importance_sampling);
+      csr, new_rows, num_picks, prob, importance_sampling, random_seed, NIDs);
   const auto& picked = picked_importances.first;
   const auto& importances = picked_importances.second;
   return std::make_pair(COOMatrix(mat.num_rows, mat.num_cols,

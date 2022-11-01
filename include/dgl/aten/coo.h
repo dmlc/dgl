@@ -396,7 +396,7 @@ COOMatrix COOReorder(
  * // coo.data = [2, 3, 0, 1, 4]
  * COOMatrix coo = ...;
  * IdArray rows = ... ; // [1, 3]
- * COOMatrix sampled = COOLaborSampling(coo, NullArray(), rows, 2, FloatArray(), false);
+ * COOMatrix sampled = COOLaborSampling(coo, rows, 2, NullArray(), 0, NullArray(), NullArray());
  * // possible sampled coo matrix:
  * // sampled.num_rows = 4
  * // sampled.num_cols = 4
@@ -409,6 +409,8 @@ COOMatrix COOReorder(
  * \param num_samples Number of samples using labor sampling
  * \param prob Probability array for nonuniform sampling
  * \param importance_sampling Whether to enable importance sampling
+ * \param random_seed The random seed for the sampler
+ * \param NIDs global nids if sampling from a subgraph
  * \return A pair of COOMatrix storing the picked row and col indices and edge weights
  *         if importance_sampling != 0 or prob argument was passed.
  *         Its data field stores the the index of the picked elements in the value array.
@@ -417,8 +419,10 @@ std::pair<COOMatrix, FloatArray> COOLaborSampling(
     COOMatrix mat,
     IdArray rows,
     int64_t num_samples,
-    FloatArray prob,
-    int importance_sampling);
+    FloatArray prob = NullArray(),
+    int importance_sampling = 0,
+    IdArray random_seed = NullArray(),
+    IdArray NIDs = NullArray());
 
 /*!
  * \brief Randomly select a fixed number of non-zero entries along each given row independently.

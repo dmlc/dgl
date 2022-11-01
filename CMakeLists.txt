@@ -194,10 +194,6 @@ endif(USE_CUDA)
 
 set_property(TARGET dgl PROPERTY CXX_STANDARD 14)
 
-if(USE_CUDA)
-  enable_language(CUDA)
-endif(USE_CUDA)
-
 # include directories
 target_include_directories(dgl PRIVATE "include")
 target_include_directories(dgl PRIVATE "third_party/dlpack/include")

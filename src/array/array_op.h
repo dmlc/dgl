@@ -172,7 +172,9 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
     IdArray rows,
     int64_t num_samples,
     FloatArray prob,
-    int importance_sampling);
+    int importance_sampling,
+    IdArray random_seed,
+    IdArray NIDs);
 
 // FloatType is the type of probability data.
 template <DGLDeviceType XPU, typename IdType, typename DType>
@@ -287,7 +289,9 @@ std::pair<COOMatrix, FloatArray> COOLaborSampling(
     IdArray rows,
     int64_t num_samples,
     FloatArray prob,
-    int importance_sampling);
+    int importance_sampling,
+    IdArray random_seed,
+    IdArray NIDs);
 
 // FloatType is the type of probability data.
 template <DGLDeviceType XPU, typename IdType, typename DType>
