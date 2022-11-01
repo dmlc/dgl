@@ -194,6 +194,10 @@ endif(USE_CUDA)
 
 set_property(TARGET dgl PROPERTY CXX_STANDARD 14)
 
+if(USE_CUDA)
+  enable_language(CUDA)
+endif(USE_CUDA)
+
 # include directories
 target_include_directories(dgl PRIVATE "include")
 target_include_directories(dgl PRIVATE "third_party/dlpack/include")
@@ -204,7 +208,7 @@ target_include_directories(dgl PRIVATE "third_party/METIS/include/")
 target_include_directories(dgl PRIVATE "tensoradapter/include")
 target_include_directories(dgl PRIVATE "third_party/nanoflann/include")
 target_include_directories(dgl PRIVATE "third_party/libxsmm/include")
-
+target_include_directories(dgl PRIVATE "third_party/pcg/include")
 
 # For serialization
 if (USE_HDFS)
