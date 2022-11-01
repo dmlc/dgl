@@ -41,6 +41,7 @@ class CuGraphStorage:
         num_nodes_dict: dict,
         single_gpu: bool = True,
         cugraph_service_client=None,
+        device_id=0,
         idtype=F.int32,
     ):
         """
@@ -60,9 +61,12 @@ class CuGraphStorage:
             The number of nodes for some node types, which is a
             dictionary mapping a node type T to the number of T-typed nodes.
         cugraph_service_client: cugraph.Service.Client
-            #TODO: Cleanup
-            The remote_client to use to connect to cugraph serive
-         idtype: Framework-specific device object,
+            The remote_client to use to connect to cugraph service if using
+            remote storage
+        device_id: int
+            If specified, must be the integer ID of the GPU device to have the
+            results being created on
+        idtype: Framework-specific device object,
             The data type for storing the structure-related graph
             information this can be ``torch.int32`` or ``torch.int64``
             for PyTorch.
@@ -132,9 +136,18 @@ class CuGraphStorage:
             from cugraph.gnn import CuGraphRemoteStore
 
             self.graphstore = CuGraphRemoteStore(
-                cugraph_service_client.graph(), cugraph_service_client
+                cugraph_service_client.graph(),
+                cugraph_service_client,
+                device_id,
             )
         else:
+            # Order is very important
+            # do this first before cuda work
+            # Create cuda context on the right gpu,
+            # defaults to gpu-0
+            import numba.cuda as cuda
+
+            cuda.select_device(device_id)
             from cugraph.gnn import CuGraphStore
             from cugraph.experimental import PropertyGraph
             from cugraph.experimental import MGPropertyGraph
