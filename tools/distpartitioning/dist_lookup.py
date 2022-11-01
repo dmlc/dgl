@@ -296,6 +296,9 @@ class DistLookupService:
 
         # Send the shuffle-global-nids to their respective ranks.
         mapped_global_nids = alltoallv_cpu(self.rank, self.world_size, shuffle_nids_list)
+        for idx in range(len(mapped_global_nids)):
+            if mapped_global_nids[idx] == None:
+                mapped_global_nids[idx] = torch.empty((0,), dtype=torch.int64)
 
         # Reorder to match global_nids (function parameter).
         global_nids_order = np.concatenate(id_list)
