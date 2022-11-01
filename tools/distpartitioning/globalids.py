@@ -86,13 +86,47 @@ def lookup_shuffle_global_nids_edges(rank, world_size, edge_data, id_lookup, nod
         dictionary where keys are column names and values are numpy arrays representing all the
         edges present in the current graph partition
     '''
+    # Make sure that the outgoing message size does not exceed 2GB in size. 
+    # Even though gloo can handle upto 10GB size of data in the outgoing messages,
+    # it needs additional memory to store temporary information into the buffers which will increase
+    # the memory needs of the process. 
+    MILLION = 1000 * 1000
+    BATCH_SIZE = 250 * MILLION
     memory_snapshot("GlobalToShuffleIDMapBegin: ", rank)
-    node_list = np.concatenate([edge_data[constants.GLOBAL_SRC_ID], edge_data[constants.GLOBAL_DST_ID]])
-    shuffle_ids = id_lookup.get_shuffle_nids(node_list,
+    node_list = edge_data[constants.GLOBAL_SRC_ID]
+
+    # Determine the no. of times each process has to send alltoall messages.
+    all_sizes = allgather_sizes([node_list.shape[0]], world_size, return_sizes=True)
+    max_count = np.amax(all_sizes)
+    if max_count >= BATCH_SIZE:
+        num_splits = max_count // BATCH_SIZE + 1
+    else:
+        num_splits = 1
+
+    # Split the message into batches and send.
+    splits = np.array_split(node_list, num_splits)
+    shuffle_mappings = []
+    for item in splits:
+        logging.info(f'[Rank: {rank} SENDING : {item.shape}')
+        shuffle_ids = id_lookup.get_shuffle_nids(item,
                                             node_data[constants.GLOBAL_NID],
                                             node_data[constants.SHUFFLE_GLOBAL_NID])
+        shuffle_mappings.append(shuffle_ids)
 
-    edge_data[constants.SHUFFLE_GLOBAL_SRC_ID], edge_data[constants.SHUFFLE_GLOBAL_DST_ID] = np.split(shuffle_ids, 2)
+    shuffle_ids = np.concatenate(shuffle_mappings)
+    assert shuffle_ids.shape[0] == node_list.shape[0]
+    edge_data[constants.SHUFFLE_GLOBAL_SRC_ID] = shuffle_ids
+
+    # Destination end points of edges are owned by the current node and therefore
+    # should have corresponding SHUFFLE_GLOBAL_NODE_IDs. 
+    # Here retrieve SHUFFLE_GLOBAL_NODE_IDs for the destination end points of local edges.
+    uniq_ids, inverse_idx = np.unique(edge_data[constants.GLOBAL_DST_ID], return_inverse=True)
+    common, idx1, idx2 = np.intersect1d(uniq_ids, node_data[constants.GLOBAL_NID], assume_unique=True, return_indices=True)
+    assert len(common) == len(uniq_ids)
+
+    edge_data[constants.SHUFFLE_GLOBAL_DST_ID] = node_data[constants.SHUFFLE_GLOBAL_NID][idx2][inverse_idx]
+    assert len(edge_data[constants.SHUFFLE_GLOBAL_DST_ID]) == len(edge_data[constants.GLOBAL_DST_ID])
+
     memory_snapshot("GlobalToShuffleIDMap_AfterLookupServiceCalls: ", rank)
     return edge_data
 
