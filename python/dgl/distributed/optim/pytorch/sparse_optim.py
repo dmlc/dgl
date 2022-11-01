@@ -96,7 +96,7 @@ class DistSparseGradOptimizer(abc.ABC):
             )
             emb_state_dict = {}
             part_policy = (
-                emb.part_policy if emb.part_policy else emb._tensor.part_policy
+                emb.part_policy if emb.part_policy else emb.weight.part_policy
             )
             idx = self._get_local_ids(part_policy)
             if trainers_per_machine > 1:
@@ -147,7 +147,7 @@ class DistSparseGradOptimizer(abc.ABC):
                     f" of embedding {emb_name}"
                 )
             name_to_index = {
-                state.name: index for index, state in enumerate(states, 0)
+                state.name: index for index, state in enumerate(states)
             }
             for name, state in emb_state[STATES].items():
                 if name not in name_to_index:
@@ -156,8 +156,9 @@ class DistSparseGradOptimizer(abc.ABC):
                         "that can't be found in the optimizer states"
                     )
                 state_idx = name_to_index[name]
-                state = state.to(states[state_idx].dtype)
-                state = state.to(th.device("cpu"))
+                state = state.to(
+                    th.device("cpu"), states[name_to_index[name]].dtype
+                )
                 states[state_idx][idx] = state
         self._defaults.update(local_state_dict[PARAMS])
         self.__dict__.update(local_state_dict[PARAMS])
@@ -259,8 +260,8 @@ class DistSparseGradOptimizer(abc.ABC):
             local_grads = {emb.name: [] for emb in self._params}
             device = th.device("cpu")
             for emb in self._params:
-                name = emb._tensor.name
-                kvstore = emb._tensor.kvstore
+                name = emb.weight.name
+                kvstore = emb.weight.kvstore
                 trainers_per_server = self._world_size // kvstore.num_servers
 
                 idics = []
@@ -382,7 +383,7 @@ class DistSparseGradOptimizer(abc.ABC):
 
             # do local update
             for emb in self._params:
-                name = emb._tensor.name
+                name = emb.weight.name
                 idx = th.cat(local_indics[name], dim=0)
                 grad = th.cat(local_grads[name], dim=0)
                 self.update(
