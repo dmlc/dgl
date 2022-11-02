@@ -235,13 +235,14 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
     const auto c = cs[i];
     for (auto j = indptr[rid]; j < indptr[rid + 1]; j++) {
       const auto v = indices[j];
-      const auto u = nids ? nids[v] : v;
+      const auto t = nids ? nids[v] : v;  // t in the paper
       // itb stands for a pair of iterator and boolean indicating if insertion was successful
-      auto itb = rand_map.emplace(u, 0);
+      auto itb = rand_map.emplace(v, 0);
       if (itb.second) {
         auto ng = ng0;
-        ng.discard(u);
+        ng.discard(t);
         uni.reset();
+        // rolled random number r_t is a function of the random_seed and t
         itb.first->second = uni(ng);
       }
       const auto rnd = itb.first->second;

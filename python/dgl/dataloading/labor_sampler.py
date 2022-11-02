@@ -146,8 +146,29 @@ class LaborSampler(BlockSampler):
         self.set_seed()
 
     def set_seed(self, random_seed=None):
-        '''updates the underlying seed for the sampler'''
-        self.random_seed = choice(1e18, 1) if random_seed is None else F.tensor(random_seed)
+        """Updates the underlying seed for the sampler
+        
+        The passed random_seed makes it so that for any seed vertex s and its neighbor t, the rolled
+        random variate r_t is the same for any instance of this class with the same random seed.
+        When sampling as part of the same batch, one would want identical seeds so that LABOR
+        can globally sample. One example is that for heterogenous graphs, there is a single random
+        seed passed for each edge type. This will sample much fewer vertices compared to having
+        unique random seeds for each edge type. If one called this function individually for each
+        edge type for a heterogenous graph with different random seeds, then it would run LABOR
+        locally for each edge type, resulting into a larger number of vertices being sampled.
+
+        If this function is called without any parameters, we get the random seed by getting a
+        random number from DGL.
+
+        Parameters
+        ----------
+        random_seed : int, default ``None``
+            The random seed to be used for next sampling call.
+        """
+        if random_seed is None:
+            self.random_seed = choice(1e18, 1)
+        else:
+            self.random_seed = F.tensor(random_seed, 'int64')
 
     def sample_blocks(self, g, seed_nodes, exclude_eids=None):
         output_nodes = seed_nodes

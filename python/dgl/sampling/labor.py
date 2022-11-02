@@ -97,8 +97,17 @@ def sample_labors(
         importance sampling probabilities until convergence while use of positive values runs
         optimization steps that many times. If the value is i, then LABOR-i variant is used.
     random_seed : tensor
-        The random seed to be used for sampling, can be None, in which case the
-        random seed is queried from the DGL PRNG.
+        The passed random_seed makes it so that for any seed vertex s and its neighbor t, the rolled
+        random variate r_t is the same for any call to this function with the same random seed.
+        When sampling as part of the same batch, one would want identical seeds so that LABOR
+        can globally sample. One example is that for heterogenous graphs, there is a single random
+        seed passed for each edge type. This will sample much fewer vertices compared to having
+        unique random seeds for each edge type. If one called this function individually for each
+        edge type for a heterogenous graph with different random seeds, then it would run LABOR
+        locally for each edge type, resulting into a larger number of vertices being sampled.
+
+        If this function is called without a random_seed, we get the random seed by getting a
+        random number from DGL.
     copy_ndata: bool, optional
         If True, the node features of the new graph are copied from
         the original graph. If False, the new graph will not have any

@@ -138,10 +138,11 @@ struct StencilOpFused {
     const IdType row = rows[in_row];
     const auto in_idx = indptr[row] + rofs;
     const auto u = indices[in_idx];
-    const auto v = nids ? nids[u] : u;
+    const auto t = nids ? nids[u] : u;  // t in the paper
     curandStatePhilox4_32_10_t rng;
     if (labor)
-      curand_init(123123, rand_seed, v, &rng);
+      // rolled random number r_t is a function of the random_seed and t
+      curand_init(123123, rand_seed, t, &rng);
     else  // reduces to neighbor sampling, see r_t vs r_{ts} in arXiv:2210.13339
       curand_init(rand_seed, idx, 0, &rng);
     const float rnd = curand_uniform(&rng);
