@@ -5,13 +5,14 @@ from .. import DGLGraph
 from .. import ops
 from ..typing import NData, EData, EType
 
-__all__ = ['copy_u', 'copy_v']
+__all__ = ["copy_u", "copy_v"]
 
 #######################################################
 # Edge-wise operators that fetch node data to edges
 #######################################################
 
-def copy_u(g : DGLGraph, x : NData, etype : EType = None) -> EData:
+
+def copy_u(g: DGLGraph, x: NData, etype: EType = None) -> EData:
     """Compute new edge data by fetching from source node data.
 
     Given an input graph :math:`G(V, E)` (or a unidirectional bipartite graph
@@ -64,7 +65,8 @@ def copy_u(g : DGLGraph, x : NData, etype : EType = None) -> EData:
     etype_g = g if etype is None else g[etype]
     return ops.gsddmm(etype_g, "copy_lhs", x, None)
 
-def copy_v(g : DGLGraph, x : NData, etype : EType = None) -> EData:
+
+def copy_v(g: DGLGraph, x: NData, etype: EType = None) -> EData:
     """Compute new edge data by fetching from destination node data.
 
     Given an input graph :math:`G(V, E)` (or a unidirectional bipartite graph
@@ -117,15 +119,17 @@ def copy_v(g : DGLGraph, x : NData, etype : EType = None) -> EData:
     etype_g = g if etype is None else g[etype]
     return ops.gsddmm(etype_g, "copy_rhs", None, x)
 
+
 #######################################################
 # Binary edge-wise operators
 #######################################################
+
 
 def _gen_u_op_v(op):
     """Internal helper function to create binary edge-wise operators.
 
     The function will return a Python function with:
-    
+
      - Name: u_{op}_v
      - Docstring template
 
@@ -136,11 +140,11 @@ def _gen_u_op_v(op):
     """
     name = f"u_{op}_v"
     op_verb = {
-        "add" : "adding",
-        "sub" : "subtracting",
-        "mul" : "multiplying",
-        "div" : "dividing",
-        "dot" : "dot-product",
+        "add": "adding",
+        "sub": "subtracting",
+        "mul": "multiplying",
+        "div": "dividing",
+        "dot": "dot-product",
     }
     docstring = f"""Compute new edge data by {op_verb[op]} the source node data
 and destination node data.
@@ -210,19 +214,19 @@ Examples
 (500, 5)
 """
 
-    def func(g : DGLGraph, x : NData, y : NData, etype : EType = None) -> EData:
+    def func(g: DGLGraph, x: NData, y: NData, etype: EType = None) -> EData:
         etype_g = g if etype is None else g[etype]
-        return ops.gsddmm(
-            etype_g, op, x, y, lhs_target="u", rhs_target="v"
-        )
+        return ops.gsddmm(etype_g, op, x, y, lhs_target="u", rhs_target="v")
 
     func.__name__ = name
     func.__doc__ = docstring
     return func
 
+
 def _register_func(func):
     setattr(sys.modules[__name__], func.__name__, func)
     __all__.append(func.__name__)
+
 
 _register_func(_gen_u_op_v("add"))
 _register_func(_gen_u_op_v("sub"))

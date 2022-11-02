@@ -11,6 +11,7 @@ np.random.seed(42)
 dgl.seed(42)
 torch.random.manual_seed(42)
 
+
 @parametrize_idtype
 @pytest.mark.parametrize("feat_size", [(5,), ()])
 def test_copy_u(idtype, feat_size):
@@ -31,23 +32,26 @@ def test_copy_u(idtype, feat_size):
     assert torch.allclose(y, y_true)
     assert torch.allclose(x_grad, x_grad_true)
 
+
 @parametrize_idtype
 @pytest.mark.parametrize("feat_size", [(5,), ()])
 def test_copy_u_hetero(idtype, feat_size):
-    hg = dgl.heterograph({
-        ('user', 'follow', 'user'): ([0, 1, 2], [2, 3, 4]),
-        ('user', 'like', 'movie'): ([3, 3, 1, 2], [0, 0, 1, 1])
-    })
+    hg = dgl.heterograph(
+        {
+            ("user", "follow", "user"): ([0, 1, 2], [2, 3, 4]),
+            ("user", "like", "movie"): ([3, 3, 1, 2], [0, 0, 1, 1]),
+        }
+    )
 
     hg = hg.astype(idtype).to(F.ctx())
-    x = torch.randn((hg.num_nodes('user'),) + feat_size, requires_grad=True)
+    x = torch.randn((hg.num_nodes("user"),) + feat_size, requires_grad=True)
 
-    y = dgl.copy_u(hg, x, etype='like')
+    y = dgl.copy_u(hg, x, etype="like")
     y.sum().backward()
     x_grad = x.grad
 
     x.grad.zero_()
-    u, v = hg.edges(etype='like')
+    u, v = hg.edges(etype="like")
     y_true = x[u.long()]
     y_true.sum().backward()
     x_grad_true = x.grad
@@ -76,29 +80,33 @@ def test_copy_v(idtype, feat_size):
     assert torch.allclose(y, y_true)
     assert torch.allclose(x_grad, x_grad_true)
 
+
 @parametrize_idtype
 @pytest.mark.parametrize("feat_size", [(5,), ()])
 def test_copy_v_hetero(idtype, feat_size):
-    hg = dgl.heterograph({
-        ('user', 'follow', 'user'): ([0, 1, 2], [2, 3, 4]),
-        ('user', 'like', 'movie'): ([3, 3, 1, 2], [0, 0, 1, 1])
-    })
+    hg = dgl.heterograph(
+        {
+            ("user", "follow", "user"): ([0, 1, 2], [2, 3, 4]),
+            ("user", "like", "movie"): ([3, 3, 1, 2], [0, 0, 1, 1]),
+        }
+    )
 
     hg = hg.astype(idtype).to(F.ctx())
-    x = torch.randn((hg.num_nodes('movie'),) + feat_size, requires_grad=True)
+    x = torch.randn((hg.num_nodes("movie"),) + feat_size, requires_grad=True)
 
-    y = dgl.copy_v(hg, x, etype='like')
+    y = dgl.copy_v(hg, x, etype="like")
     y.sum().backward()
     x_grad = x.grad
 
     x.grad.zero_()
-    u, v = hg.edges(etype='like')
+    u, v = hg.edges(etype="like")
     y_true = x[v.long()]
     y_true.sum().backward()
     x_grad_true = x.grad
 
     assert torch.allclose(y, y_true)
     assert torch.allclose(x_grad, x_grad_true)
+
 
 binary_arg_sizes = [
     ((5,), (5,)),
@@ -118,6 +126,7 @@ dot_arg_sizes = [
 
 ops = ["add", "sub", "mul", "div"]
 
+
 def pad_shape(x, y, x_size, y_size):
     xy_size = torch.broadcast_shapes(x_size, y_size)
     new_x_size = (1,) * (len(xy_size) - len(x_size)) + x_size
@@ -125,6 +134,7 @@ def pad_shape(x, y, x_size, y_size):
     new_x = x.view(-1, *new_x_size)
     new_y = y.view(-1, *new_y_size)
     return new_x, new_y
+
 
 @parametrize_idtype
 @pytest.mark.parametrize("op", ops)
@@ -135,7 +145,7 @@ def test_u_op_v(idtype, op, x_size, y_size):
     x = torch.randn((g.num_nodes(),) + x_size, requires_grad=True)
     y = torch.randn((g.num_nodes(),) + y_size, requires_grad=True)
 
-    f_dgl = getattr(dgl, f'u_{op}_v')
+    f_dgl = getattr(dgl, f"u_{op}_v")
     z = f_dgl(g, x, y)
     z.sum().backward()
     x_grad = x.grad
@@ -154,6 +164,7 @@ def test_u_op_v(idtype, op, x_size, y_size):
     assert torch.allclose(z, z_true)
     assert torch.allclose(x_grad, x_grad_true)
     assert torch.allclose(y_grad, y_grad_true)
+
 
 @parametrize_idtype
 @pytest.mark.parametrize("x_size,y_size", dot_arg_sizes)
