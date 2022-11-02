@@ -104,9 +104,11 @@ class RandomEngine {
 
   /*!
    * \brief Pick a random integer between 0 to N-1 according to given
-   * probabilities \tparam IdxType Return integer type \param prob Array of N
-   * unnormalized probability of each element.  Must be non-negative. \return An
-   * integer randomly picked from 0 to N-1.
+   *        probabilities.
+   * \tparam IdxType Return integer type.
+   * \param prob Array of N unnormalized probability of each element. Must be
+   *        non-negative.
+   * \return An integer randomly picked from 0 to N-1.
    */
   template <typename IdxType>
   IdxType Choice(FloatArray prob);
@@ -121,7 +123,8 @@ class RandomEngine {
    * \tparam FloatType Probability value type
    * \param num Number of integers to choose
    * \param prob Array of N unnormalized probability of each element.  Must be
-   * non-negative. \param out The output buffer to write selected indices.
+   *        non-negative.
+   * \param out The output buffer to write selected indices.
    * \param replace If true, choose with replacement.
    */
   template <typename IdxType, typename FloatType>
@@ -137,8 +140,9 @@ class RandomEngine {
    * \tparam FloatType Probability value type
    * \param num Number of integers to choose
    * \param prob Array of N unnormalized probability of each element.  Must be
-   * non-negative. \param replace If true, choose with replacement. \return
-   * Picked indices
+   *        non-negative.
+   * \param replace If true, choose with replacement.
+   * \return Picked indices
    */
   template <typename IdxType, typename FloatType>
   IdArray Choice(IdxType num, FloatArray prob, bool replace = true) {
@@ -209,9 +213,10 @@ class RandomEngine {
    * \tparam IdxType Return integer type
    * \param num Number of integers to choose
    * \param split Array of T+1 split positions of different segments(including
-   * start and end) \param bias Array of T weight of each segments \param out
-   * The output buffer to write selected indices. \param replace If true, choose
-   * with replacement.
+   *        start and end)
+   * \param bias Array of T weight of each segments.
+   * \param out The output buffer to write selected indices.
+   * \param replace If true, choose with replacement.
    */
   template <typename IdxType, typename FloatType>
   void BiasedChoice(

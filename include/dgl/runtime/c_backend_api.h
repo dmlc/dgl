@@ -42,15 +42,15 @@ DGL_DLL int DGLBackendRegisterSystemLibSymbol(const char* name, void* ptr);
  * \brief Backend function to allocate temporal workspace.
  *
  * \note The result allocate spaced is ensured to be aligned to
- * kTempAllocaAlignment.
+ *       kTempAllocaAlignment.
  *
  * \param nbytes The size of the space requested.
  * \param device_type The device type which the space will be allocated.
  * \param device_id The device id which the space will be allocated.
  * \param dtype_code_hint The type code of the array elements. Only used in
- * certain backends such as OpenGL.
+ *        certain backends such as OpenGL.
  * \param dtype_bits_hint The type bits of the array elements. Only used in
- * certain backends such as OpenGL.
+ *        certain backends such as OpenGL.
  * \return nullptr when error is thrown, a valid ptr if success
  */
 DGL_DLL void* DGLBackendAllocWorkspace(
@@ -96,7 +96,7 @@ typedef int (*FDGLParallelLambda)(
  * \param flambda The parallel function to be launched.
  * \param cdata The closure data.
  * \param num_task Number of tasks to launch, can be 0, means launch
- *           with all available threads.
+ *        with all available threads.
  *
  * \return 0 when no error is thrown, -1 when failure happens
  */

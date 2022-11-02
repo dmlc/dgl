@@ -609,7 +609,8 @@ class ImmutableGraph : public GraphInterface {
    * \brief Find the predecessors of a vertex.
    * \param vid The vertex id.
    * \param radius The radius of the neighborhood. Default is immediate neighbor
-   * (radius=1). \return the predecessor id array.
+   *        (radius=1).
+   * \return the predecessor id array.
    */
   IdArray Predecessors(dgl_id_t vid, uint64_t radius = 1) const override {
     return GetInCSR()->Successors(vid, radius);
@@ -619,7 +620,8 @@ class ImmutableGraph : public GraphInterface {
    * \brief Find the successors of a vertex.
    * \param vid The vertex id.
    * \param radius The radius of the neighborhood. Default is immediate neighbor
-   * (radius=1). \return the successor id array.
+   *        (radius=1).
+   * \return the successor id array.
    */
   IdArray Successors(dgl_id_t vid, uint64_t radius = 1) const override {
     return GetOutCSR()->Successors(vid, radius);
@@ -663,7 +665,7 @@ class ImmutableGraph : public GraphInterface {
    * \brief Find the edge ID and return the pair of endpoints
    * \param eid The edge ID
    * \return a pair whose first element is the source and the second the
-   * destination.
+   *         destination.
    */
   std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_id_t eid) const override {
     return GetCOO()->FindEdge(eid);
@@ -673,7 +675,7 @@ class ImmutableGraph : public GraphInterface {
    * \brief Find the edge IDs and return their source and target node IDs.
    * \param eids The edge ID array.
    * \return EdgeArray containing all edges with id in eid.  The order is
-   * preserved.
+   *         preserved.
    */
   EdgeArray FindEdges(IdArray eids) const override {
     return GetCOO()->FindEdges(eids);
@@ -724,7 +726,8 @@ class ImmutableGraph : public GraphInterface {
    * \note If sorted is true, the returned edges list is sorted by their src and
    *       dst ids. Otherwise, they are in their edge id order.
    * \param sorted Whether the returned edge list is sorted by their src and dst
-   * ids \return the id arrays of the two endpoints of the edges.
+   *        ids.
+   * \return the id arrays of the two endpoints of the edges.
    */
   EdgeArray Edges(const std::string &order = "") const override;
 
@@ -991,7 +994,7 @@ CSR::CSR(
     int64_t num_vertices, int64_t num_edges, IndptrIter indptr_begin,
     IndicesIter indices_begin, EdgeIdIter edge_ids_begin) {
   // TODO(minjie): this should be changed to a device-agnostic implementation
-  //   in the future
+  // in the future.
   adj_.num_rows = num_vertices;
   adj_.num_cols = num_vertices;
   adj_.indptr = aten::NewIdArray(num_vertices + 1);

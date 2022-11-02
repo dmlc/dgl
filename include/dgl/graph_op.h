@@ -96,9 +96,9 @@ class GraphOp {
    *
    * \param parent_vid_map An array that maps the vids in the parent graph to
    * the subgraph. The elements store the vertex Ids in the parent graph, and
-   * the indices indicate the vertex Ids in the subgraph. \param query The
-   * vertex Ids in the parent graph. \return an Id array that contains the
-   * subgraph node Ids.
+   * the indices indicate the vertex Ids in the subgraph.
+   * \param query The vertex Ids in the parent graph.
+   * \return an Id array that contains the subgraph node Ids.
    */
   static IdArray MapParentIdToSubgraphId(IdArray parent_vid_map, IdArray query);
 
@@ -139,7 +139,9 @@ class GraphOp {
 
   /*!
    * \brief Same as BidirectedMutableGraph except that the returned graph is
-   * immutable. \param graph The input graph. \return a new immutable bidirected
+   *        immutable.
+   * \param graph The input graph.
+   * \return a new immutable bidirected
    * graph.
    */
   static GraphPtr ToBidirectedImmutableGraph(GraphPtr graph);
@@ -157,9 +159,11 @@ class GraphOp {
   /*!
    * \brief Get a induced subgraph with HALO nodes.
    * The HALO nodes are the ones that can be reached from `nodes` within
-   * `num_hops`. \param graph The input graph. \param nodes The input nodes that
-   * form the core of the induced subgraph. \param num_hops The number of hops
-   * to reach. \return the induced subgraph with HALO nodes.
+   * `num_hops`.
+   * \param graph The input graph.
+   * \param nodes The input nodes that form the core of the induced subgraph.
+   * \param num_hops The number of hops to reach.
+   * \return the induced subgraph with HALO nodes.
    */
   static HaloSubgraph GetSubgraphWithHalo(
       GraphPtr graph, IdArray nodes, int num_hops);
@@ -168,7 +172,8 @@ class GraphOp {
    * \brief Reorder the nodes in the immutable graph.
    * \param graph The input graph.
    * \param new_order The node Ids in the new graph. The index in `new_order` is
-   * old node Ids. \return the graph with reordered node Ids
+   *        old node Ids.
+   * \return the graph with reordered node Ids
    */
   static GraphPtr ReorderImmutableGraph(
       ImmutableGraphPtr ig, IdArray new_order);

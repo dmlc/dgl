@@ -154,7 +154,8 @@ constexpr const char* dgl_dev_mblob_nbytes = "__dgl_dev_mblob_nbytes";
 constexpr const char* dgl_set_device = "__dgl_set_device";
 /*! \brief Auxiliary counter to global barrier. */
 constexpr const char* dgl_global_barrier_state = "__dgl_global_barrier_state";
-/*! \brief Prepare the global barrier before kernels that uses global barrier.
+/*!
+ * \brief Prepare the global barrier before kernels that uses global barrier.
  */
 constexpr const char* dgl_prepare_global_barrier =
     "__dgl_prepare_global_barrier";

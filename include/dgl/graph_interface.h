@@ -127,7 +127,7 @@ class GraphInterface : public runtime::Object {
 
   /*!
    * \brief Get the number of integer bits used to store node/edge ids
-   * (32 or 64).
+   *        (32 or 64).
    */
   virtual uint8_t NumBits() const = 0;
 
@@ -235,7 +235,7 @@ class GraphInterface : public runtime::Object {
    * \brief Find the edge ID and return the pair of endpoints
    * \param eid The edge ID
    * \return a pair whose first element is the source and the second the
-   * destination.
+   *         destination.
    */
   virtual std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_id_t eid) const = 0;
 
@@ -243,7 +243,7 @@ class GraphInterface : public runtime::Object {
    * \brief Find the edge IDs and return their source and target node IDs.
    * \param eids The edge ID array.
    * \return EdgeArray containing all edges with id in eid.  The order is
-   * preserved.
+   *         preserved.
    */
   virtual EdgeArray FindEdges(IdArray eids) const = 0;
 
@@ -280,8 +280,9 @@ class GraphInterface : public runtime::Object {
   /*!
    * \brief Get all the edges in the graph.
    * \note If order is "srcdst", the returned edges list is sorted by their src
-   * and dst ids. If order is "eid", they are in their edge id order. Otherwise,
-   * in the arbitrary order. \param order The order of the returned edge list.
+   *       and dst ids. If order is "eid", they are in their edge id order. Otherwise,
+   *       in the arbitrary order.
+   * \param order The order of the returned edge list.
    * \return the id arrays of the two endpoints of the edges.
    */
   virtual EdgeArray Edges(const std::string &order = "") const = 0;
@@ -349,7 +350,8 @@ class GraphInterface : public runtime::Object {
    *
    * \param eids The edges in the subgraph.
    * \param preserve_nodes If true, the vertices will not be relabeled, so some
-   * vertices may have no incident edges. \return the induced edge subgraph
+   *        vertices may have no incident edges.
+   * \return the induced edge subgraph
    */
   virtual Subgraph EdgeSubgraph(
       IdArray eids, bool preserve_nodes = false) const = 0;
@@ -423,13 +425,13 @@ struct Subgraph : public runtime::Object {
   /*!
    * \brief The induced vertex ids.
    * \note This is also a map from the new vertex id to the vertex id in the
-   * parent graph.
+   *       parent graph.
    */
   IdArray induced_vertices;
   /*!
    * \brief The induced edge ids.
    * \note This is also a map from the new edge id to the edge id in the parent
-   * graph.
+   *       graph.
    */
   IdArray induced_edges;
 

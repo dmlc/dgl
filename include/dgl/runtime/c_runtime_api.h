@@ -61,7 +61,7 @@ typedef enum {
 
 /*!
  * \brief The object type code is used in DGL FFI to indicate the types of
- * objects passed between C and Python.
+ *        objects passed between C and Python.
  */
 typedef enum {
   kInt = 0U,
@@ -371,7 +371,8 @@ DGL_DLL int DGLCbArgToReturn(DGLValue* value, int code);
  * \param ret The return value handle.
  * \param resource_handle The handle additional resouce handle from fron-end.
  * \return 0 if success, -1 if failure happens, set error via
- * DGLAPISetLastError. \sa DGLCFuncSetReturn
+ *         DGLAPISetLastError.
+ * \sa DGLCFuncSetReturn
  */
 typedef int (*DGLPackedCFunc)(
     DGLValue* args, int* type_codes, int num_args, DGLRetValueHandle ret,
@@ -403,8 +404,9 @@ typedef int (*DGLExtensionFuncDeclarer)(DGLFunctionHandle register_func_handle);
  * \param func The packed C function.
  * \param resource_handle The resource handle from front-end, can be NULL.
  * \param fin The finalizer on resource handle when the FunctionHandle get
- * freed, can be NULL \param out the result function handle. \return 0 when
- * success, -1 when failure happens
+ *        freed, can be NULL.
+ * \param out the result function handle.
+ * \return 0 when success, -1 when failure happens.
  */
 DGL_DLL int DGLFuncCreateFromCFunc(
     DGLPackedCFunc func, void* resource_handle, DGLPackedCFuncFinalizer fin,

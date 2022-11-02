@@ -80,8 +80,9 @@ Frontiers DGLDFSEdges(const CSRMatrix& csr, IdArray source);
  *
  * A FORWARD edge is one in which `u` has been visisted but `v` has not.
  * A REVERSE edge is one in which both `u` and `v` have been visisted and the
- * edge is in the DFS tree. A NONTREE edge is one in which both `u` and `v` have
- * been visisted but the edge is NOT in the DFS tree.
+ * edge is in the DFS tree.
+ * A NONTREE edge is one in which both `u` and `v` have been visisted but the
+ * edge is NOT in the DFS tree.
  *
  * \param csr The input csr matrix.
  * \param sources Source nodes.
