@@ -280,8 +280,8 @@ class GraphInterface : public runtime::Object {
   /*!
    * \brief Get all the edges in the graph.
    * \note If order is "srcdst", the returned edges list is sorted by their src
-   *       and dst ids. If order is "eid", they are in their edge id order. Otherwise,
-   *       in the arbitrary order.
+   *       and dst ids. If order is "eid", they are in their edge id order.
+   *       Otherwise, in the arbitrary order.
    * \param order The order of the returned edge list.
    * \return the id arrays of the two endpoints of the edges.
    */
