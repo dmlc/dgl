@@ -51,8 +51,7 @@ def sample_labors(
 
     This sampler will make every node gather messages from a fixed number of neighbors
     per edge type. The neighbors are picked uniformly with default parameters. For every vertex t
-    that will be considered to be sampled, there will be a single random variate r_t. Sampling
-    from a subgraph will use the random variate r_{NID[t]}, where NID is g.ndata[NID].
+    that will be considered to be sampled, there will be a single random variate r_t.
 
     For each node, a number of inbound (or outbound when ``edge_dir == 'out'``) edges
     will be randomly chosen.  The graph returned will then contain all the nodes in the
@@ -251,11 +250,14 @@ def _sample_labors(
         )
     ctx = utils.to_dgl_context(F.context(next(iter(nodes.values()))))
     nodes_all_types = []
+    # nids_all_types is needed if one wants labor to work for subgraphs whose vertices have
+    # been renamed and the rolled randoms should be rolled for global vertex ids.
+    # It is disabled for now below by having if False ...
     nids_all_types = []
     for ntype in g.ntypes:
         if ntype in nodes:
             nodes_all_types.append(F.to_dgl_nd(nodes[ntype]))
-            if NID in g.ndata:
+            if False and NID in g.ndata:
                 if len(g.ntypes) > 1:
                     nids_all_types.append(F.to_dgl_nd(g.ndata[NID][ntype]))
                 else:

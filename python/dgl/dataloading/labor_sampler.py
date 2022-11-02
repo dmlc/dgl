@@ -32,8 +32,7 @@ class LaborSampler(BlockSampler):
 
     This sampler will make every node gather messages from a fixed number of neighbors
     per edge type. The neighbors are picked uniformly with default parameters. For every vertex t
-    that will be considered to be sampled, there will be a single random variate r_t. Sampling
-    from a subgraph will use the random variate r_{NID[t]}, where NID is g.ndata[NID].
+    that will be considered to be sampled, there will be a single random variate r_t.
 
     Parameters
     ----------
