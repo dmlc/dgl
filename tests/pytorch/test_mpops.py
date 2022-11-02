@@ -1,10 +1,12 @@
 import random
-import numpy as np
-import dgl
-import torch
+
 import backend as F
+import numpy as np
 import pytest
+import torch
 from test_utils import parametrize_idtype
+
+import dgl
 
 random.seed(42)
 np.random.seed(42)

@@ -1,9 +1,8 @@
 """Operators for computing edge data."""
 import sys
 
-from .. import DGLGraph
-from .. import ops
-from ..typing import NData, EData, EType
+from .. import DGLGraph, ops
+from ..typing import EData, EType, NData
 
 __all__ = ["copy_u", "copy_v"]
 

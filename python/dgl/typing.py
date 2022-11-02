@@ -2,7 +2,7 @@
 
 __all__ = ["NData", "EData", "NType", "EType"]
 
-from typing import Union, Tuple
+from typing import Tuple, Union
 
 try:
     import torch
