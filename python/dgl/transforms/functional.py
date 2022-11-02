@@ -86,6 +86,7 @@ __all__ = [
     'to_float',
     'to_double',
     'double_radius_node_labeling',
+    'shortest_dist',
     ]
 
 
@@ -3855,5 +3856,134 @@ def double_radius_node_labeling(g, src, dst):
     z[np.isnan(z)] = 0  # unreachable nodes
 
     return F.tensor(z, F.int64)
+
+def shortest_dist(g, root=None, directed=True, return_paths=False):
+    r"""Compute shortest distance and paths on the given graph.
+
+    This function computes the shortest distance between all pairs of nodes
+    or between all nodes and a specified root node. Corresponding shortest
+    paths can be returned and represented with edge IDs. Note that only
+    unweighted cases are allowed.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The input graph. Must be homogeneous.
+    root : int, optional
+        The root node ID if the graph is provided with a root node.
+        Default: None. If a root node ID is provided, the function returns
+        single-source shortest paths. Otherwise, it returns all-pairs
+        shortest paths.
+    directed: bool, optional
+        A flag to indicate whether the graph is considered as directed.
+        Default: True. If False, reverse edges are considered for constructing
+        shortest paths.
+    return_paths: bool, optional
+        A flag to indicate whether to return paths. Default: False. If True,
+        return shortest paths represented with edge IDs.
+
+    Returns
+    -------
+    dist: Tensor
+        The shortest distance tensor of shape :math:`(N, N)` if root is None,
+        where :math:`N` is the number of nodes in the input graph. Or the
+        shortest distance tensor of shape :math:`(N,)` if a root node is
+        specified. The distance of unreachable pairs are filled with -1.
+    paths: Tensor, optional
+        Return the shortest paths tensor of shape :math:`(N, N, max_len)` if
+        root is None, or tensor of shape :math:`(N, max_len)` when a root node
+        is specified, where ``max_len`` is the length of the longest paths.
+        Each path vector consists of edge IDs padded with -1 in the end. The
+        paths tensor is only returned if ``return_paths`` is True.
+
+    Example
+    -------
+    >>> import dgl
+
+    >>> g = dgl.graph(([0, 1, 3], [1, 2, 1]))
+    >>> dgl.shortest_dist(g, root=0, directed=True)
+    tensor([ 0,  1,  2, -1])
+    >>> dgl.shortest_dist(g, root=None, directed=False, return_paths=True)
+    (tensor([[0, 1, 2, 2],
+        [1, 0, 1, 1],
+        [2, 1, 0, 2],
+        [2, 1, 2, 0]]), tensor([[[-1, -1],
+         [ 0, -1],
+         [ 0,  1],
+         [ 0,  2]],
+
+        [[ 0, -1],
+         [-1, -1],
+         [ 1, -1],
+         [ 2, -1]],
+
+        [[ 1,  0],
+         [ 1, -1],
+         [-1, -1],
+         [ 1,  2]],
+
+        [[ 2,  0],
+         [ 2, -1],
+         [ 2,  1],
+         [-1, -1]]]))
+    """
+    if root is None:
+        dist, pred = sparse.csgraph.shortest_path(
+            g.adj(scipy_fmt='csr'), return_predecessors=True, unweighted=True,
+            directed=directed
+        )
+    else:
+        dist, pred = sparse.csgraph.dijkstra(
+            g.adj(scipy_fmt='csr'), directed=directed, indices=root,
+            return_predecessors=True, unweighted=True,
+        )
+    dist[np.isinf(dist)] = -1
+
+    if not return_paths:
+        return F.tensor(dist, dtype=F.int64)
+
+    def _get_nodes(pred, i, j):
+        r"""return node IDs of a path from i to j given predecessors"""
+        if i == j:
+            return []
+        prev = pred[j]
+        nodes = [j, prev]
+        while prev != i:
+            prev = pred[prev]
+            nodes.append(prev)
+        nodes.reverse()
+
+        return nodes
+
+    # construct paths with given predecessors
+    max_len = int(dist[~np.isinf(dist)].max())
+    N = g.num_nodes()
+    roots = list(range(N)) if root is None else [root]
+    paths = np.ones([len(roots), N, max_len], dtype=np.int64) * -1
+    masks = np.zeros([len(roots), N, max_len], dtype=bool)
+    u, v = [], []
+    for i in roots:
+        for j in range(N):
+            pred_ = pred[i] if root is None else pred
+            masks_ = masks[i] if root is None else masks[0]
+            if pred_[j] < 0:
+                continue
+            nodes = _get_nodes(pred_, i, j)
+            u.extend(nodes[:-1])
+            v.extend(nodes[1:])
+            if nodes:
+                masks_[j, :len(nodes) - 1] = True
+
+    u, v = np.array(u), np.array(v)
+    if not directed:
+        # flip src and dst if reverse edges are used in undirected cases
+        has_edges = g.has_edges_between(u, v)
+        u[~has_edges], v[~has_edges] = v[~has_edges], u[~has_edges]
+    edge_ids = g.edge_ids(u, v)
+    paths[masks] = edge_ids
+    if root is not None:
+        paths = paths[0]
+
+    return F.tensor(dist, dtype=F.int64), F.tensor(paths, dtype=F.int64)
 
 _init_api("dgl.transform", __name__)
