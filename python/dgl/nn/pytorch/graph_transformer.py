@@ -1,6 +1,7 @@
 """Torch modules for graph transformers."""
 import torch as th
 import torch.nn as nn
+import dgl
 
 
 class DegreeEncoder(nn.Module):
