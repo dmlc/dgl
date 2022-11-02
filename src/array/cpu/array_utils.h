@@ -8,16 +8,19 @@
 
 #include <dgl/aten/types.h>
 #include <parallel_hashmap/phmap.h>
-#include <vector>
+
 #include <unordered_map>
 #include <utility>
+#include <vector>
+
 #include "../../c_api_common.h"
 
 namespace dgl {
 namespace aten {
 
 /*!
- * \brief A hashmap that maps each ids in the given array to new ids starting from zero.
+ * \brief A hashmap that maps each ids in the given array to new ids starting
+ * from zero.
  *
  * Useful for relabeling integers and finding unique integers.
  *
@@ -27,23 +30,21 @@ template <typename IdType>
 class IdHashMap {
  public:
   // default ctor
-  IdHashMap(): filter_(kFilterSize, false) {}
+  IdHashMap() : filter_(kFilterSize, false) {}
 
   // Construct the hashmap using the given id array.
   // The id array could contain duplicates.
-  // If the id array has no duplicates, the array will be relabeled to consecutive
-  // integers starting from 0.
-  explicit IdHashMap(IdArray ids): filter_(kFilterSize, false) {
+  // If the id array has no duplicates, the array will be relabeled to
+  // consecutive integers starting from 0.
+  explicit IdHashMap(IdArray ids) : filter_(kFilterSize, false) {
     oldv2newv_.reserve(ids->shape[0]);
     Update(ids);
   }
 
   // copy ctor
-  IdHashMap(const IdHashMap &other) = default;
+  IdHashMap(const IdHashMap& other) = default;
 
-  void Reserve(const int64_t size) {
-    oldv2newv_.reserve(size);
-  }
+  void Reserve(const int64_t size) { oldv2newv_.reserve(size); }
 
   // Update the hashmap with given id array.
   // The id array could contain duplicates.
@@ -52,8 +53,8 @@ class IdHashMap {
     const int64_t len = ids->shape[0];
     for (int64_t i = 0; i < len; ++i) {
       const IdType id = ids_data[i];
-      // phmap::flat_hash_map::insert assures that an insertion will not happen if the
-      // key already exists.
+      // phmap::flat_hash_map::insert assures that an insertion will not happen
+      // if the key already exists.
       oldv2newv_.insert({id, oldv2newv_.size()});
       filter_[id & kFilterMask] = true;
     }
@@ -88,22 +89,21 @@ class IdHashMap {
 
   // Return all the old ids collected so far, ordered by new id.
   IdArray Values() const {
-    IdArray values = NewIdArray(oldv2newv_.size(), DGLContext{kDGLCPU, 0}, sizeof(IdType) * 8);
+    IdArray values = NewIdArray(
+        oldv2newv_.size(), DGLContext{kDGLCPU, 0}, sizeof(IdType) * 8);
     IdType* values_data = static_cast<IdType*>(values->data);
-    for (auto pair : oldv2newv_)
-      values_data[pair.second] = pair.first;
+    for (auto pair : oldv2newv_) values_data[pair.second] = pair.first;
     return values;
   }
 
-  inline size_t Size() const {
-    return oldv2newv_.size();
-  }
+  inline size_t Size() const { return oldv2newv_.size(); }
 
  private:
   static constexpr int32_t kFilterMask = 0xFFFFFF;
   static constexpr int32_t kFilterSize = kFilterMask + 1;
   // This bitmap is used as a bloom filter to remove some lookups.
-  // Hashtable is very slow. Using bloom filter can significantly speed up lookups.
+  // Hashtable is very slow. Using bloom filter can significantly speed up
+  // lookups.
   std::vector<bool> filter_;
   // The hashmap from old vid to new vid
   phmap::flat_hash_map<IdType, IdType> oldv2newv_;
@@ -114,7 +114,7 @@ class IdHashMap {
  */
 struct PairHash {
   template <class T1, class T2>
-  std::size_t operator() (const std::pair<T1, T2>& pair) const {
+  std::size_t operator()(const std::pair<T1, T2>& pair) const {
     return std::hash<T1>()(pair.first) ^ std::hash<T2>()(pair.second);
   }
 };

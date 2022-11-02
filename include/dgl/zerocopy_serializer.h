@@ -12,12 +12,12 @@
 #include <dmlc/serializer.h>
 
 #include <deque>
+#include <memory>
 #include <queue>
 #include <string>
 #include <tuple>
 #include <utility>
 #include <vector>
-#include <memory>
 
 #include "dmlc/logging.h"
 
@@ -85,8 +85,9 @@ class StreamWithBuffer : public dmlc::SeekStream {
    * // Read from remote sended pointer list
    * StreamWithBuffer buf_strm(&blob, data_ptr_list)
    */
-  StreamWithBuffer(std::unique_ptr<dmlc::SeekStream> strm,
-                   const std::vector<void*>& data_ptr_list)
+  StreamWithBuffer(
+      std::unique_ptr<dmlc::SeekStream> strm,
+      const std::vector<void*>& data_ptr_list)
       : strm_(std::move(strm)), send_to_remote_(true) {
     for (void* data : data_ptr_list) {
       buffer_list_.emplace_back(data);
@@ -136,8 +137,8 @@ class StreamWithBuffer : public dmlc::SeekStream {
    * \param size buffer size
    * \param data_ptr_list pointer list for NDArrays to deconstruct from
    */
-  StreamWithBuffer(char* p_buffer, size_t size,
-                   const std::vector<void*>& data_ptr_list)
+  StreamWithBuffer(
+      char* p_buffer, size_t size, const std::vector<void*>& data_ptr_list)
       : strm_(new dmlc::MemoryFixedSizeStream(p_buffer, size)),
         send_to_remote_(true) {
     for (void* data : data_ptr_list) {
