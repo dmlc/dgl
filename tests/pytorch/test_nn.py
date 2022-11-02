@@ -1427,7 +1427,6 @@ def test_subgraphxexplainer(g, idtype, out_dim):
     # TODO: Not implemented yet.
     # Explain node prediction.
 
-
     # Explain graph prediction
     model = Model(5, out_dim, graph=True)
     model = model.to(F.ctx())

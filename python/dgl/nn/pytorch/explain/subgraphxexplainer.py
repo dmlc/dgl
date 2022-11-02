@@ -1,10 +1,11 @@
 import math
 import networkx as nx
-from shapley import *
+from .shapley import *
 from torch import nn
 import torch.nn.functional as torch_func
 
 __all__ = ['SubgraphXExplainer']
+
 
 class MCTSNode:
     def __init__(self, subgraph, pruning_action):
@@ -29,7 +30,6 @@ class MCTSNode:
 
     def U(self, hyperparam, sum_C) -> float:
         return hyperparam * self.R * math.sqrt(sum_C) / (1 + self.C)
-
 
 
 # WARNING: when iterating over subgraphs, may have disconnected components.
@@ -118,7 +118,6 @@ class SubgraphXExplainer(nn.Module):
             subgraphs.append(new_subgraph)
 
         return (subgraphs, pruned_nodes)
-
 
     def explain_graph(self, graph, M, N_min, features, **kwargs):
         # self.value_func = self.gen_value_func(self.model, label, features, **kwargs)
