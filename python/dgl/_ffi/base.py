@@ -174,10 +174,12 @@ def load_dgl_sparse(backend, version):
         raise NotImplementedError("Unsupported system: %s" % sys.platform)
     path = os.path.join(_DIR_NAME, "dgl_sparse", basename)
 
-    import torch
-    try:
-        torch.classes.load_library(path)
-        dgl_sparse_loaded = True
-    except Exception: # pylint: disable=W0703
-        pass
-    
+    if backend == 'pytorch':
+        import torch
+        try:
+            torch.classes.load_library(path)
+            dgl_sparse_loaded = True
+        except Exception: # pylint: disable=W0703
+            logger = logging.getLogger("dgl-core")
+            logger.debug("DGL sparse library is not loaded.")
+        
