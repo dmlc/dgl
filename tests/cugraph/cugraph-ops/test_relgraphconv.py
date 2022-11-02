@@ -30,7 +30,8 @@ def test_full_graph():
     res = conv(g, feat, g.edata[dgl.ETYPE])
 
     fanout = g.in_degrees().max().item()
-    conv_ops = RelGraphConvOps(in_feat, out_feat, num_rels, fanout, **kwargs)
+    conv_ops = RelGraphConvOps(
+        in_feat, out_feat, num_rels, fanout, **kwargs).to(device)
     conv_ops.W.data = conv.linear_r.W.data
     conv_ops.coeff.data = conv.linear_r.coeff.data
     res_ops = conv_ops(g, feat, g.edata[dgl.ETYPE])
@@ -54,7 +55,8 @@ def test_mfg():
     res = conv(block, feat[block.srcdata[dgl.NID]], block.edata[dgl.ETYPE])
 
     fanout = block.in_degrees().max().item()
-    conv_ops = RelGraphConvOps(in_feat, out_feat, num_rels, fanout, **kwargs)
+    conv_ops = RelGraphConvOps(
+        in_feat, out_feat, num_rels, fanout, **kwargs).to(device)
     conv_ops.W.data = conv.linear_r.W.data
     conv_ops.coeff.data = conv.linear_r.coeff.data
     res_ops = conv_ops(

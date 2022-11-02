@@ -20,7 +20,6 @@ except ModuleNotFoundError:
 
 CUDA_SM_PER_BLOCK = 49152
 
-
 class RelGraphConvAgg(th.autograd.Function):
     @staticmethod
     def forward(ctx, g, fanout, num_rels, edge_types, feat, coeff):
@@ -52,23 +51,7 @@ class RelGraphConvAgg(th.autograd.Function):
             when ``regularizer='basis'``.
 
         """
-        if not g.device.type == "cuda":
-            raise TypeError(
-                f"dgl.contrib.cugraph.nn.RelGraphConv requires "
-                f"DGL graph on device cuda, but got {g.device}"
-            )
         ctx.device = g.device
-        if not ctx.device == edge_types.device:
-            raise RuntimeError(
-                f"Expected graph and etypes tensor on the same device, "
-                f"but got {ctx.device} and {edge_types.device}"
-            )
-        if not ctx.device == feat.device:
-            raise RuntimeError(
-                f"Expected graph and feature tensor on the same device, "
-                f"but got {ctx.device} and {feat.device}"
-            )
-
         if g.idtype == th.int32:
             mfg_csr_func = message_flow_graph_hg_csr_int32
             agg_fwd_func = agg_hg_basis_post_fwd_int32
@@ -126,7 +109,7 @@ class RelGraphConvAgg(th.autograd.Function):
                 weights_combination=coeff.detach(),
             )
 
-        ctx.backward_cache = mfg
+        ctx.mfg = mfg
         ctx.save_for_backward(feat, coeff)
         return agg_output
 
@@ -141,23 +124,17 @@ class RelGraphConvAgg(th.autograd.Function):
             Gradient of loss function w.r.t output.
 
         """
-        mfg = ctx.backward_cache
         feat, coeff = ctx.saved_tensors
 
         if ctx.graph_idtype == th.int32:
             agg_bwd_func = agg_hg_basis_post_bwd_int32
-        elif ctx.graph_idtype == th.int64:
-            agg_bwd_func = agg_hg_basis_post_bwd_int64
         else:
-            raise TypeError(
-                f"Supported ID type: torch.int32 or torch.int64, "
-                f"but got {ctx.graph_idtype}"
-            )
+            agg_bwd_func = agg_hg_basis_post_bwd_int64
 
         grad_feat = th.empty_like(feat, dtype=th.float32, device=ctx.device)
         if coeff is None:
             grad_coeff = None
-            agg_bwd_func(grad_feat, grad_output, feat.detach(), mfg)
+            agg_bwd_func(grad_feat, grad_output, feat.detach(), ctx.mfg)
         else:
             grad_coeff = th.empty_like(
                 coeff, dtype=th.float32, device=ctx.device
@@ -166,7 +143,7 @@ class RelGraphConvAgg(th.autograd.Function):
                 grad_feat,
                 grad_output,
                 feat.detach(),
-                mfg,
+                ctx.mfg,
                 output_weight_gradient=grad_coeff,
                 weights_combination=coeff.detach(),
             )
@@ -223,9 +200,9 @@ class RelGraphConv(nn.Module):
     >>> dataloader = DataLoader(g, train_nid, sampler,
     ...     device=device, batch_size=1024)
     >>> conv1 = RelGraphConv(in_dim, h_dim, num_rels, fanouts[0],
-    ...     regularizer='basis', num_bases=10)
+    ...     regularizer='basis', num_bases=10).to(device)
     >>> conv2 = RelGraphConv(h_dim, out_dim, num_rels, fanouts[1],
-    ...     regularizer='basis', num_bases=10)
+    ...     regularizer='basis', num_bases=10).to(device)
     >>> for input_nodes, output_nodes, blocks in dataloader:
     ...     h = conv1(blocks[0], x, blocks[0].edata[dgl.ETYPE])
     ...     h = F.relu(h)
@@ -255,7 +232,7 @@ class RelGraphConv(nn.Module):
         # regularizer (see dgl.nn.pytorch.linear.TypedLinear)
         if regularizer is None:
             self.W = nn.Parameter(
-                th.Tensor(num_rels, in_feat, out_feat).cuda()
+                th.Tensor(num_rels, in_feat, out_feat)
             )
             self.coeff = None
         elif regularizer == "basis":
@@ -264,9 +241,9 @@ class RelGraphConv(nn.Module):
                     'Missing "num_bases" for basis regularization.'
                 )
             self.W = nn.Parameter(
-                th.Tensor(num_bases, in_feat, out_feat).cuda()
+                th.Tensor(num_bases, in_feat, out_feat)
             )
-            self.coeff = nn.Parameter(th.Tensor(num_rels, num_bases).cuda())
+            self.coeff = nn.Parameter(th.Tensor(num_rels, num_bases))
             self.num_bases = num_bases
         else:
             raise ValueError(
@@ -284,7 +261,7 @@ class RelGraphConv(nn.Module):
 
         # bias
         if self.bias:
-            self.h_bias = nn.Parameter(th.Tensor(out_feat).cuda())
+            self.h_bias = nn.Parameter(th.Tensor(out_feat))
             nn.init.zeros_(self.h_bias)
 
         # layer norm
@@ -296,7 +273,7 @@ class RelGraphConv(nn.Module):
         # weight for self_loop
         if self.self_loop:
             self.loop_weight = nn.Parameter(
-                th.Tensor(in_feat, out_feat).cuda()
+                th.Tensor(in_feat, out_feat)
             )
             nn.init.xavier_uniform_(
                 self.loop_weight, gain=nn.init.calculate_gain("relu")
@@ -351,6 +328,28 @@ class RelGraphConv(nn.Module):
         torch.Tensor
             New node features. Shape: :math:`(|V|, D_{out})`.
         """
+        _device = next(self.parameters()).device
+        if _device.type != "cuda":
+            raise RuntimeError(
+                f"dgl.contrib.cugraph.nn.RelGraphConv requires "
+                f"the model on device 'cuda', but got '{_device.type}'"
+            )
+        if _device != g.device:
+            raise RuntimeError(
+                f"Expected model and graph on the same device, "
+                f"but got '{_device}' and '{g.device}'"
+            )
+        if _device != etypes.device:
+            raise RuntimeError(
+                f"Expected model and etypes on the same device, "
+                f"but got '{_device}' and '{etypes.device}'"
+            )
+        if _device != feat.device:
+            raise RuntimeError(
+                f"Expected model and feature tensor on the same device, "
+                f"but got '{_device}' and '{feat.device}'"
+            )
+        # check shared memory per block size
         _sm_size = (
             self.fanout * 2 + 3 + self.num_rels * self.num_bases
             if self.regularizer == "basis"
