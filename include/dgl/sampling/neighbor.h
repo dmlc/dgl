@@ -26,16 +26,20 @@ namespace sampling {
  *
  * \param hg The input graph.
  * \param nodes Node IDs of each type. The vector length must be equal to the
- * number of node types. Empty array is allowed. \param fanouts Number of
- * sampled neighbors for each edge type. The vector length should be equal to
- * the number of edge types, or one if they all have the same fanout. \param dir
- * Edge direction. \param probability A vector of 1D float arrays, indicating
- * the transition probability of each edge by edge type.  An empty float array
- * assumes uniform transition. \param exclude_edges Edges IDs of each type which
- * will be excluded during sampling. The vector length must be equal to the
- * number of edges types. Empty array is allowed. \param replace If true, sample
- * with replacement. \return Sampled neighborhoods as a graph. The return graph
- * has the same schema as the original one.
+ * number of node types. Empty array is allowed.
+ * \param fanouts Number of sampled neighbors for each edge type. The vector
+ * length should be equal to the number of edge types, or one if they all have
+ * the same fanout.
+ * \param dir Edge direction.
+ * \param probability A vector of 1D float arrays, indicating the transition
+ * probability of each edge by edge type.  An empty float array assumes uniform
+ * transition.
+ * \param exclude_edges Edges IDs of each type which will be excluded during
+ * sampling. The vector length must be equal to the number of edges types. Empty
+ * array is allowed.
+ * \param replace If true, sample with replacement.
+ * \return Sampled neighborhoods as a graph. The return graph has the same
+ * schema as the original one.
  */
 HeteroSubgraph SampleNeighbors(
     const HeteroGraphPtr hg, const std::vector<IdArray>& nodes,
@@ -51,15 +55,16 @@ HeteroSubgraph SampleNeighbors(
  *
  * \param hg The input graph.
  * \param nodes Node IDs of each type. The vector length must be equal to the
- * number of node types. Empty array is allowed. \param k The k value for each
- * edge type. The vector length should be equal to the number of edge types, or
- * one if they all have the same fanout. \param dir Edge direction. \param
- * weight A vector of 1D float arrays, indicating the weights associated with
- *               each edge.
+ * number of node types. Empty array is allowed.
+ * \param k The k value for each edge type. The vector length should be equal to
+ * the number of edge types, or one if they all have the same fanout.
+ * \param dir Edge direction.
+ * \param weight A vector of 1D float arrays, indicating the weights associated
+ * witheach edge.
  * \param ascending If true, elements are sorted by ascending order, equivalent
- * to find the K smallest values. Otherwise, find K largest values. \return
- * Sampled neighborhoods as a graph. The return graph has the same schema as the
- *         original one.
+ * to find the K smallest values. Otherwise, find K largest values.
+ * \return Sampled neighborhoods as a graph. The return graph has the same
+ * schema as the original one.
  */
 HeteroSubgraph SampleNeighborsTopk(
     const HeteroGraphPtr hg, const std::vector<IdArray>& nodes,

@@ -38,8 +38,10 @@
 #endif  // DGL_USE_CUDA
 #include "ndarray.h"
 
-/*! \brief Casts a pointer \c entry to a function pointer with signature of \c
- * func */
+/*!
+ * \brief Casts a pointer \c entry to a function pointer with signature of \c
+ * func.
+ */
 #define FUNCCAST(func, entry) (*reinterpret_cast<decltype(&(func))>(entry))
 
 namespace dgl {
@@ -59,15 +61,14 @@ class TensorDispatcher {
     return &inst;
   }
 
-  /*! \brief Whether an adapter library is available */
+  /*! \brief Whether an adapter library is available. */
   inline bool IsAvailable() { return available_; }
 
-  /*! \brief Load symbols from the given tensor adapter library path */
+  /*! \brief Load symbols from the given tensor adapter library path. */
   bool Load(const char* path_cstr);
 
   /*!
-   * \brief Allocate a piece of CPU memory via
-   * PyTorch's CPUAllocator.
+   * \brief Allocate a piece of CPU memory via PyTorch's CPUAllocator.
    * Used in CPUDeviceAPI::AllocWorkspace().
    *
    * \param nbytes The size to be allocated.
