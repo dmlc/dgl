@@ -126,8 +126,8 @@ class GraphInterface : public runtime::Object {
   virtual DGLContext Context() const = 0;
 
   /*!
-   * \brief Get the number of integer bits used to store node/edge ids (32 or
-   * 64).
+   * \brief Get the number of integer bits used to store node/edge ids
+   * (32 or 64).
    */
   virtual uint8_t NumBits() const = 0;
 
@@ -182,7 +182,8 @@ class GraphInterface : public runtime::Object {
   virtual bool HasVertex(dgl_id_t vid) const { return vid < NumVertices(); }
 
   /*! \return a 0-1 array indicating whether the given vertices are in the
-   * graph.*/
+   *          graph.
+   */
   virtual BoolArray HasVertices(IdArray vids) const = 0;
 
   /*! \return true if the given edge is in the graph.*/
@@ -195,7 +196,8 @@ class GraphInterface : public runtime::Object {
    * \brief Find the predecessors of a vertex.
    * \param vid The vertex id.
    * \param radius The radius of the neighborhood. Default is immediate neighbor
-   * (radius=1). \return the predecessor id array.
+   *        (radius=1).
+   * \return the predecessor id array.
    */
   virtual IdArray Predecessors(dgl_id_t vid, uint64_t radius = 1) const = 0;
 
@@ -203,7 +205,8 @@ class GraphInterface : public runtime::Object {
    * \brief Find the successors of a vertex.
    * \param vid The vertex id.
    * \param radius The radius of the neighborhood. Default is immediate neighbor
-   * (radius=1). \return the successor id array.
+   *        (radius=1).
+   * \return the successor id array.
    */
   virtual IdArray Successors(dgl_id_t vid, uint64_t radius = 1) const = 0;
 

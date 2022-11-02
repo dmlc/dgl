@@ -110,7 +110,8 @@ class Graph : public GraphInterface {
   uint64_t NumEdges() const override { return num_edges_; }
 
   /*! \return a 0-1 array indicating whether the given vertices are in the
-   * graph.*/
+   * graph.
+   */
   BoolArray HasVertices(IdArray vids) const override;
 
   /*! \return true if the given edge is in the graph.*/
@@ -123,7 +124,8 @@ class Graph : public GraphInterface {
    * \brief Find the predecessors of a vertex.
    * \param vid The vertex id.
    * \param radius The radius of the neighborhood. Default is immediate neighbor
-   * (radius=1). \return the predecessor id array.
+   *        (radius=1).
+   * \return the predecessor id array.
    */
   IdArray Predecessors(dgl_id_t vid, uint64_t radius = 1) const override;
 
@@ -131,7 +133,8 @@ class Graph : public GraphInterface {
    * \brief Find the successors of a vertex.
    * \param vid The vertex id.
    * \param radius The radius of the neighborhood. Default is immediate neighbor
-   * (radius=1). \return the successor id array.
+   *        (radius=1).
+   * \return the successor id array.
    */
   IdArray Successors(dgl_id_t vid, uint64_t radius = 1) const override;
 
@@ -170,7 +173,7 @@ class Graph : public GraphInterface {
    * \brief Find the edge IDs and return their source and target node IDs.
    * \param eids The edge ID array.
    * \return EdgeArray containing all edges with id in eid.  The order is
-   * preserved.
+   *         preserved.
    */
   EdgeArray FindEdges(IdArray eids) const override;
 
@@ -209,7 +212,8 @@ class Graph : public GraphInterface {
    * \note If sorted is true, the returned edges list is sorted by their src and
    *       dst ids. Otherwise, they are in their edge id order.
    * \param sorted Whether the returned edge list is sorted by their src and dst
-   * ids \return the id arrays of the two endpoints of the edges.
+   *        ids.
+   * \return the id arrays of the two endpoints of the edges.
    */
   EdgeArray Edges(const std::string& order = "") const override;
 

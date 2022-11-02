@@ -56,8 +56,7 @@ class BaseHeteroGraph : public runtime::Object {
 
   virtual ~BaseHeteroGraph() = default;
 
-  ////////////////////////// query/operations on meta graph
-  ///////////////////////////
+  ////////////////////// query/operations on meta graph ///////////////////////
 
   /*! \return the number of vertex types */
   virtual uint64_t NumVertexTypes() const { return meta_graph_->NumVertices(); }
@@ -81,8 +80,7 @@ class BaseHeteroGraph : public runtime::Object {
    */
   virtual HeteroGraphPtr GetRelationGraph(dgl_type_t etype) const = 0;
 
-  ////////////////////////// query/operations on realized graph
-  ///////////////////////////
+  ///////////////////// query/operations on realized graph /////////////////////
 
   /*! \brief Add vertices to the given vertex type */
   virtual void AddVertices(dgl_type_t vtype, uint64_t num_vertices) = 0;
@@ -155,7 +153,8 @@ class BaseHeteroGraph : public runtime::Object {
   virtual bool HasVertex(dgl_type_t vtype, dgl_id_t vid) const = 0;
 
   /*! \return a 0-1 array indicating whether the given vertices are in the
-   * graph.*/
+   * graph.
+   */
   virtual BoolArray HasVertices(dgl_type_t vtype, IdArray vids) const = 0;
 
   /*! \return true if the given edge is in the graph.*/

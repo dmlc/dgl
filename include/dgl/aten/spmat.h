@@ -112,8 +112,7 @@ struct SparseMatrix : public runtime::Object {
 
   // Boolean flags.
   // TODO(minjie): We might revisit this later to provide a more general
-  // solution. Currently,
-  //   we only consider aten::COOMatrix and aten::CSRMatrix.
+  // solution. Currently, we only consider aten::COOMatrix and aten::CSRMatrix.
   std::vector<bool> flags;
 
   SparseMatrix() {}
