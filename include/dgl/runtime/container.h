@@ -6,11 +6,12 @@
 #ifndef DGL_RUNTIME_CONTAINER_H_
 #define DGL_RUNTIME_CONTAINER_H_
 
-#include <unordered_map>
-#include <vector>
 #include <memory>
-#include <utility>
 #include <string>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+
 #include "object.h"
 #include "packed_func.h"
 
@@ -44,7 +45,7 @@ inline std::shared_ptr<ValueObject> MakeValue(T&& val) {
 class Value : public ObjectRef {
  public:
   Value() {}
-  explicit Value(std::shared_ptr<Object> o): ObjectRef(o) {}
+  explicit Value(std::shared_ptr<Object> o) : ObjectRef(o) {}
 
   const ValueObject* operator->() const {
     return static_cast<const ValueObject*>(obj_.get());
@@ -60,7 +61,7 @@ class ListObject : public Object {
   std::vector<std::shared_ptr<Object> > data;
 
   void VisitAttrs(AttrVisitor* visitor) final {
-     // Visitor to list have no effect.
+    // Visitor to list have no effect.
   }
 
   static constexpr const char* _type_key = "List";
@@ -71,7 +72,7 @@ class ListObject : public Object {
 class MapObject : public Object {
  public:
   void VisitAttrs(AttrVisitor* visitor) final {
-     // Visitor to map have no effect.
+    // Visitor to map have no effect.
   }
   // hash function
   struct Hash {
@@ -90,9 +91,7 @@ class MapObject : public Object {
 
   /*! \brief The corresponding conatiner type */
   using ContainerType = std::unordered_map<
-   std::shared_ptr<Object>,
-   std::shared_ptr<Object>,
-   Hash, Equal>;
+      std::shared_ptr<Object>, std::shared_ptr<Object>, Hash, Equal>;
 
   /*! \brief the data content */
   ContainerType data;
@@ -101,17 +100,15 @@ class MapObject : public Object {
   DGL_DECLARE_OBJECT_TYPE_INFO(MapObject, Object);
 };
 
-
 /*! \brief specialized map obj with string as key */
 class StrMapObject : public Object {
  public:
   void VisitAttrs(AttrVisitor* visitor) final {
-     // Visitor to map have no effect.
+    // Visitor to map have no effect.
   }
   /*! \brief The corresponding conatiner type */
-  using ContainerType = std::unordered_map<
-    std::string,
-    std::shared_ptr<Object> >;
+  using ContainerType =
+      std::unordered_map<std::string, std::shared_ptr<Object> >;
 
   /*! \brief the data content */
   ContainerType data;
@@ -125,8 +122,7 @@ class StrMapObject : public Object {
  * \tparam Converter a struct that contains converting function
  * \tparam TIter the content iterator type.
  */
-template<typename Converter,
-         typename TIter>
+template <typename Converter, typename TIter>
 class IterAdapter {
  public:
   explicit IterAdapter(TIter iter) : iter_(iter) {}
@@ -144,9 +140,7 @@ class IterAdapter {
   inline bool operator==(IterAdapter other) const {
     return iter_ == other.iter_;
   }
-  inline bool operator!=(IterAdapter other) const {
-    return !(*this == other);
-  }
+  inline bool operator!=(IterAdapter other) const { return !(*this == other); }
   inline const typename Converter::ResultType operator*() const {
     return Converter::convert(*iter_);
   }
@@ -175,7 +169,7 @@ class IterAdapter {
  * <code>
  *      error: no type named 'type' in 'struct std::enable_if<false, void>'
  * </code>
- * 
+ *
  * Example:
  *
  * <code>
@@ -183,31 +177,32 @@ class IterAdapter {
  *     // List<NDArray> list2;     // fails
  *     List<Value> list;           // works
  *     list.push_back(Value(MakeValue(1)));  // works
- *     list.push_back(Value(MakeValue(NDArray::Empty(shape, dtype, ctx))));  // works
+ *     list.push_back(Value(MakeValue(NDArray::Empty(shape, dtype, ctx))));  //
+ * works
  * </code>
  */
-template<typename T,
-         typename = typename std::enable_if<std::is_base_of<ObjectRef, T>::value>::type >
+template <
+    typename T,
+    typename =
+        typename std::enable_if<std::is_base_of<ObjectRef, T>::value>::type>
 class List : public ObjectRef {
  public:
   /*!
    * \brief default constructor
    */
-  List() {
-    obj_ = std::make_shared<ListObject>();
-  }
+  List() { obj_ = std::make_shared<ListObject>(); }
   /*!
    * \brief move constructor
    * \param other source
    */
-  List(List<T> && other) {  // NOLINT(*)
+  List(List<T>&& other) {  // NOLINT(*)
     obj_ = std::move(other.obj_);
   }
   /*!
    * \brief copy constructor
    * \param other source
    */
-  List(const List<T> &other) : ObjectRef(other.obj_) { // NOLINT(*)
+  List(const List<T>& other) : ObjectRef(other.obj_) {  // NOLINT(*)
   }
   /*!
    * \brief constructor from pointer
@@ -220,7 +215,7 @@ class List : public ObjectRef {
    * \param end end of iterator
    * \tparam IterType The type of iterator
    */
-  template<typename IterType>
+  template <typename IterType>
   List(IterType begin, IterType end) {
     assign(begin, end);
   }
@@ -228,20 +223,19 @@ class List : public ObjectRef {
    * \brief constructor from initializer list
    * \param init The initalizer list
    */
-  List(std::initializer_list<T> init) { // NOLINT(*)
+  List(std::initializer_list<T> init) {  // NOLINT(*)
     assign(init.begin(), init.end());
   }
   /*!
    * \brief constructor from vector
    * \param init The vector
    */
-  List(const std::vector<T>& init) { // NOLINT(*)
+  List(const std::vector<T>& init) {  // NOLINT(*)
     assign(init.begin(), init.end());
   }
   /*!
-   * \brief Constructs a container with n elements. Each element is a copy of val
-   * \param n The size of the container
-   * \param val The init value
+   * \brief Constructs a container with n elements. Each element is a copy of
+   * val \param n The size of the container \param val The init value
    */
   explicit List(size_t n, const T& val) {
     auto tmp_obj = std::make_shared<ListObject>();
@@ -255,7 +249,7 @@ class List : public ObjectRef {
    * \param other The source of assignment
    * \return reference to self.
    */
-  List<T>& operator=(List<T> && other) {
+  List<T>& operator=(List<T>&& other) {
     obj_ = std::move(other.obj_);
     return *this;
   }
@@ -264,7 +258,7 @@ class List : public ObjectRef {
    * \param other The source of assignment
    * \return reference to self.
    */
-  List<T>& operator=(const List<T> & other) {
+  List<T>& operator=(const List<T>& other) {
     obj_ = other.obj_;
     return *this;
   }
@@ -274,7 +268,7 @@ class List : public ObjectRef {
    * \param end end of iterator
    * \tparam IterType The type of iterator
    */
-  template<typename IterType>
+  template <typename IterType>
   void assign(IterType begin, IterType end) {
     auto n = std::make_shared<ListObject>();
     for (IterType it = begin; it != end; ++it) {
@@ -304,7 +298,7 @@ class List : public ObjectRef {
    * \return Handle to the internal obj container(which ganrantees to be unique)
    */
   inline ListObject* CopyOnWrite() {
-    if (obj_.get() == nullptr || !obj_.unique())  {
+    if (obj_.get() == nullptr || !obj_.unique()) {
       obj_ = std::make_shared<ListObject>(
           *static_cast<const ListObject*>(obj_.get()));
     }
@@ -328,9 +322,7 @@ class List : public ObjectRef {
     n->data[i] = value.obj_;
   }
   /*! \return whether list is empty */
-  inline bool empty() const {
-    return size() == 0;
-  }
+  inline bool empty() const { return size() == 0; }
   /*! \brief Copy the content to a vector */
   inline std::vector<T> ToVector() const {
     return std::vector<T>(begin(), end());
@@ -340,16 +332,14 @@ class List : public ObjectRef {
 
   struct Ptr2ObjectRef {
     using ResultType = T;
-    static inline T convert(const std::shared_ptr<Object>& n) {
-      return T(n);
-    }
+    static inline T convert(const std::shared_ptr<Object>& n) { return T(n); }
   };
-  using iterator = IterAdapter<Ptr2ObjectRef,
-                               std::vector<std::shared_ptr<Object> >::const_iterator>;
+  using iterator = IterAdapter<
+      Ptr2ObjectRef, std::vector<std::shared_ptr<Object> >::const_iterator>;
 
   using reverse_iterator = IterAdapter<
-    Ptr2ObjectRef,
-    std::vector<std::shared_ptr<Object> >::const_reverse_iterator>;
+      Ptr2ObjectRef,
+      std::vector<std::shared_ptr<Object> >::const_reverse_iterator>;
 
   /*! \return begin iterator */
   inline iterator begin() const {
@@ -361,11 +351,13 @@ class List : public ObjectRef {
   }
   /*! \return rbegin iterator */
   inline reverse_iterator rbegin() const {
-    return reverse_iterator(static_cast<const ListObject*>(obj_.get())->data.rbegin());
+    return reverse_iterator(
+        static_cast<const ListObject*>(obj_.get())->data.rbegin());
   }
   /*! \return rend iterator */
   inline reverse_iterator rend() const {
-    return reverse_iterator(static_cast<const ListObject*>(obj_.get())->data.rend());
+    return reverse_iterator(
+        static_cast<const ListObject*>(obj_.get())->data.rend());
   }
 };
 
@@ -390,7 +382,7 @@ class List : public ObjectRef {
  * <code>
  *      error: no type named 'type' in 'struct std::enable_if<false, void>'
  * </code>
- * 
+ *
  * Example:
  *
  * <code>
@@ -398,35 +390,35 @@ class List : public ObjectRef {
  *     // Map<std::string, NDArray> map2;     // fails
  *     Map<std::string, Value> map;           // works
  *     map.Set("key1", Value(MakeValue(1)));  // works
- *     map.Set("key2", Value(MakeValue(NDArray::Empty(shape, dtype, ctx))));  // works
+ *     map.Set("key2", Value(MakeValue(NDArray::Empty(shape, dtype, ctx))));  //
+ * works
  * </code>
  */
-template<typename K,
-         typename V,
-         typename = typename std::enable_if<
-           std::is_base_of<ObjectRef, K>::value ||
-           std::is_base_of<std::string, K>::value >::type,
-         typename = typename std::enable_if<std::is_base_of<ObjectRef, V>::value>::type>
+template <
+    typename K, typename V,
+    typename = typename std::enable_if<
+        std::is_base_of<ObjectRef, K>::value ||
+        std::is_base_of<std::string, K>::value>::type,
+    typename =
+        typename std::enable_if<std::is_base_of<ObjectRef, V>::value>::type>
 class Map : public ObjectRef {
  public:
   /*!
    * \brief default constructor
    */
-  Map() {
-    obj_ = std::make_shared<MapObject>();
-  }
+  Map() { obj_ = std::make_shared<MapObject>(); }
   /*!
    * \brief move constructor
    * \param other source
    */
-  Map(Map<K, V> && other) {  // NOLINT(*)
+  Map(Map<K, V>&& other) {  // NOLINT(*)
     obj_ = std::move(other.obj_);
   }
   /*!
    * \brief copy constructor
    * \param other source
    */
-  Map(const Map<K, V> &other) : ObjectRef(other.obj_) { // NOLINT(*)
+  Map(const Map<K, V>& other) : ObjectRef(other.obj_) {  // NOLINT(*)
   }
   /*!
    * \brief constructor from pointer
@@ -439,7 +431,7 @@ class Map : public ObjectRef {
    * \param end end of iterator
    * \tparam IterType The type of iterator
    */
-  template<typename IterType>
+  template <typename IterType>
   Map(IterType begin, IterType end) {
     assign(begin, end);
   }
@@ -447,15 +439,15 @@ class Map : public ObjectRef {
    * \brief constructor from initializer list
    * \param init The initalizer list
    */
-  Map(std::initializer_list<std::pair<K, V> > init) { // NOLINT(*)
+  Map(std::initializer_list<std::pair<K, V> > init) {  // NOLINT(*)
     assign(init.begin(), init.end());
   }
   /*!
    * \brief constructor from vector
    * \param init The vector
    */
-  template<typename Hash, typename Equal>
-  Map(const std::unordered_map<K, V, Hash, Equal>& init) { // NOLINT(*)
+  template <typename Hash, typename Equal>
+  Map(const std::unordered_map<K, V, Hash, Equal>& init) {  // NOLINT(*)
     assign(init.begin(), init.end());
   }
   /*!
@@ -463,7 +455,7 @@ class Map : public ObjectRef {
    * \param other The source of assignment
    * \return reference to self.
    */
-  Map<K, V>& operator=(Map<K, V> && other) {
+  Map<K, V>& operator=(Map<K, V>&& other) {
     obj_ = std::move(other.obj_);
     return *this;
   }
@@ -472,7 +464,7 @@ class Map : public ObjectRef {
    * \param other The source of assignment
    * \return reference to self.
    */
-  Map<K, V>& operator=(const Map<K, V> & other) {
+  Map<K, V>& operator=(const Map<K, V>& other) {
     obj_ = other.obj_;
     return *this;
   }
@@ -482,12 +474,11 @@ class Map : public ObjectRef {
    * \param end end of iterator
    * \tparam IterType The type of iterator
    */
-  template<typename IterType>
+  template <typename IterType>
   void assign(IterType begin, IterType end) {
     auto n = std::shared_ptr<MapObject>();
     for (IterType i = begin; i != end; ++i) {
-      n->data.emplace(std::make_pair(i->first.obj_,
-                                     i->second.obj_));
+      n->data.emplace(std::make_pair(i->first.obj_, i->second.obj_));
     }
     obj_ = std::move(n);
   }
@@ -526,7 +517,7 @@ class Map : public ObjectRef {
    * \return Handle to the internal obj container(which ganrantees to be unique)
    */
   inline MapObject* CopyOnWrite() {
-    if (obj_.get() == nullptr || !obj_.unique())  {
+    if (obj_.get() == nullptr || !obj_.unique()) {
       obj_ = std::make_shared<MapObject>(
           *static_cast<const MapObject*>(obj_.get()));
     }
@@ -543,23 +534,20 @@ class Map : public ObjectRef {
   }
 
   /*! \return whether list is empty */
-  inline bool empty() const {
-    return size() == 0;
-  }
+  inline bool empty() const { return size() == 0; }
   /*! \brief specify container obj */
   using ContainerType = MapObject;
 
   struct Ptr2ObjectRef {
     using ResultType = std::pair<K, V>;
-    static inline ResultType convert(const std::pair<
-                            std::shared_ptr<Object>,
-                            std::shared_ptr<Object> >& n) {
+    static inline ResultType convert(
+        const std::pair<std::shared_ptr<Object>, std::shared_ptr<Object> >& n) {
       return std::make_pair(K(n.first), V(n.second));
     }
   };
 
-  using iterator = IterAdapter<
-    Ptr2ObjectRef, MapObject::ContainerType::const_iterator>;
+  using iterator =
+      IterAdapter<Ptr2ObjectRef, MapObject::ContainerType::const_iterator>;
 
   /*! \return begin iterator */
   inline iterator begin() const {
@@ -571,50 +559,49 @@ class Map : public ObjectRef {
   }
   /*! \return begin iterator */
   inline iterator find(const K& key) const {
-    return iterator(static_cast<const MapObject*>(obj_.get())->data.find(key.obj_));
+    return iterator(
+        static_cast<const MapObject*>(obj_.get())->data.find(key.obj_));
   }
 };
 
 // specialize of string map
-template<typename V, typename T1, typename T2>
+template <typename V, typename T1, typename T2>
 class Map<std::string, V, T1, T2> : public ObjectRef {
  public:
   // for code reuse
-  Map() {
-    obj_ = std::make_shared<StrMapObject>();
-  }
-  Map(Map<std::string, V> && other) {  // NOLINT(*)
+  Map() { obj_ = std::make_shared<StrMapObject>(); }
+  Map(Map<std::string, V>&& other) {  // NOLINT(*)
     obj_ = std::move(other.obj_);
   }
-  Map(const Map<std::string, V> &other) : ObjectRef(other.obj_) { // NOLINT(*)
+  Map(const Map<std::string, V>& other) : ObjectRef(other.obj_) {  // NOLINT(*)
   }
   explicit Map(std::shared_ptr<Object> n) : ObjectRef(n) {}
-  template<typename IterType>
+  template <typename IterType>
   Map(IterType begin, IterType end) {
     assign(begin, end);
   }
-  Map(std::initializer_list<std::pair<std::string, V> > init) { // NOLINT(*)
+  Map(std::initializer_list<std::pair<std::string, V> > init) {  // NOLINT(*)
     assign(init.begin(), init.end());
   }
 
-  template<typename Hash, typename Equal>
-  Map(const std::unordered_map<std::string, V, Hash, Equal>& init) { // NOLINT(*)
+  template <typename Hash, typename Equal>
+  Map(const std::unordered_map<std::string, V, Hash, Equal>&
+          init) {  // NOLINT(*)
     assign(init.begin(), init.end());
   }
-  Map<std::string, V>& operator=(Map<std::string, V> && other) {
+  Map<std::string, V>& operator=(Map<std::string, V>&& other) {
     obj_ = std::move(other.obj_);
     return *this;
   }
-  Map<std::string, V>& operator=(const Map<std::string, V> & other) {
+  Map<std::string, V>& operator=(const Map<std::string, V>& other) {
     obj_ = other.obj_;
     return *this;
   }
-  template<typename IterType>
+  template <typename IterType>
   void assign(IterType begin, IterType end) {
     auto n = std::make_shared<StrMapObject>();
     for (IterType i = begin; i != end; ++i) {
-      n->data.emplace(std::make_pair(i->first,
-                                     i->second.obj_));
+      n->data.emplace(std::make_pair(i->first, i->second.obj_));
     }
     obj_ = std::move(n);
   }
@@ -633,7 +620,7 @@ class Map<std::string, V, T1, T2> : public ObjectRef {
     return static_cast<const StrMapObject*>(obj_.get())->data.count(key);
   }
   inline StrMapObject* CopyOnWrite() {
-    if (obj_.get() == nullptr || !obj_.unique())  {
+    if (obj_.get() == nullptr || !obj_.unique()) {
       obj_ = std::make_shared<MapObject>(
           *static_cast<const MapObject*>(obj_.get()));
     }
@@ -643,22 +630,19 @@ class Map<std::string, V, T1, T2> : public ObjectRef {
     StrMapObject* n = this->CopyOnWrite();
     n->data[key] = value.obj_;
   }
-  inline bool empty() const {
-    return size() == 0;
-  }
+  inline bool empty() const { return size() == 0; }
   using ContainerType = StrMapObject;
 
   struct Ptr2ObjectRef {
     using ResultType = std::pair<std::string, V>;
-    static inline ResultType convert(const std::pair<
-                            std::string,
-                            std::shared_ptr<Object> >& n) {
+    static inline ResultType convert(
+        const std::pair<std::string, std::shared_ptr<Object> >& n) {
       return std::make_pair(n.first, V(n.second));
     }
   };
 
-  using iterator = IterAdapter<
-    Ptr2ObjectRef, StrMapObject::ContainerType::const_iterator>;
+  using iterator =
+      IterAdapter<Ptr2ObjectRef, StrMapObject::ContainerType::const_iterator>;
 
   /*! \return begin iterator */
   inline iterator begin() const {
@@ -670,7 +654,8 @@ class Map<std::string, V, T1, T2> : public ObjectRef {
   }
   /*! \return begin iterator */
   inline iterator find(const std::string& key) const {
-    return iterator(static_cast<const StrMapObject*>(obj_.get())->data.find(key));
+    return iterator(
+        static_cast<const StrMapObject*>(obj_.get())->data.find(key));
   }
 };
 

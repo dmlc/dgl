@@ -22,17 +22,17 @@ class Lazy {
   /*!\brief default constructor to construct a lazy object */
   Lazy() {}
 
-  /*!\brief constructor to construct an object with given value (non-lazy case) */
-  explicit Lazy(const T& val): ptr_(new T(val)) {}
+  /*!\brief constructor to construct an object with given value (non-lazy case)
+   */
+  explicit Lazy(const T& val) : ptr_(new T(val)) {}
 
   /*!\brief destructor */
   ~Lazy() = default;
 
   /*!
-   * \brief Get the value of this object. If the object has not been instantiated,
-   *        using the provided function to create it.
-   * \param fn The creator function.
-   * \return the object value.
+   * \brief Get the value of this object. If the object has not been
+   * instantiated, using the provided function to create it. \param fn The
+   * creator function. \return the object value.
    */
   template <typename Fn>
   const T& Get(Fn fn) {

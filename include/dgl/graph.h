@@ -6,13 +6,12 @@
 #ifndef DGL_GRAPH_H_
 #define DGL_GRAPH_H_
 
-#include <string>
-#include <vector>
-#include <string>
 #include <cstdint>
-#include <utility>
-#include <tuple>
 #include <memory>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
 
 #include "graph_interface.h"
 
@@ -23,7 +22,7 @@ class GraphOp;
 typedef std::shared_ptr<Graph> MutableGraphPtr;
 
 /*! \brief Mutable graph based on adjacency list. */
-class Graph: public GraphInterface {
+class Graph : public GraphInterface {
  public:
   /*! \brief default constructor */
   Graph() {}
@@ -89,13 +88,9 @@ class Graph: public GraphInterface {
     num_edges_ = 0;
   }
 
-  DGLContext Context() const override {
-    return DGLContext{kDGLCPU, 0};
-  }
+  DGLContext Context() const override { return DGLContext{kDGLCPU, 0}; }
 
-  uint8_t NumBits() const override {
-    return 64;
-  }
+  uint8_t NumBits() const override { return 64; }
 
   /*!
    * \note not const since we have caches
@@ -106,21 +101,16 @@ class Graph: public GraphInterface {
   /*!
    * \return whether the graph is read-only
    */
-  bool IsReadonly() const override {
-    return false;
-  }
+  bool IsReadonly() const override { return false; }
 
   /*! \return the number of vertices in the graph.*/
-  uint64_t NumVertices() const override {
-    return adjlist_.size();
-  }
+  uint64_t NumVertices() const override { return adjlist_.size(); }
 
   /*! \return the number of edges in the graph.*/
-  uint64_t NumEdges() const override {
-    return num_edges_;
-  }
+  uint64_t NumEdges() const override { return num_edges_; }
 
-  /*! \return a 0-1 array indicating whether the given vertices are in the graph.*/
+  /*! \return a 0-1 array indicating whether the given vertices are in the
+   * graph.*/
   BoolArray HasVertices(IdArray vids) const override;
 
   /*! \return true if the given edge is in the graph.*/
@@ -132,16 +122,16 @@ class Graph: public GraphInterface {
   /*!
    * \brief Find the predecessors of a vertex.
    * \param vid The vertex id.
-   * \param radius The radius of the neighborhood. Default is immediate neighbor (radius=1).
-   * \return the predecessor id array.
+   * \param radius The radius of the neighborhood. Default is immediate neighbor
+   * (radius=1). \return the predecessor id array.
    */
   IdArray Predecessors(dgl_id_t vid, uint64_t radius = 1) const override;
 
   /*!
    * \brief Find the successors of a vertex.
    * \param vid The vertex id.
-   * \param radius The radius of the neighborhood. Default is immediate neighbor (radius=1).
-   * \return the successor id array.
+   * \param radius The radius of the neighborhood. Default is immediate neighbor
+   * (radius=1). \return the successor id array.
    */
   IdArray Successors(dgl_id_t vid, uint64_t radius = 1) const override;
 
@@ -169,7 +159,8 @@ class Graph: public GraphInterface {
   /*!
    * \brief Find the edge ID and return the pair of endpoints
    * \param eid The edge ID
-   * \return a pair whose first element is the source and the second the destination.
+   * \return a pair whose first element is the source and the second the
+   * destination.
    */
   std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_id_t eid) const override {
     return std::make_pair(all_edges_src_[eid], all_edges_dst_[eid]);
@@ -178,7 +169,8 @@ class Graph: public GraphInterface {
   /*!
    * \brief Find the edge IDs and return their source and target node IDs.
    * \param eids The edge ID array.
-   * \return EdgeArray containing all edges with id in eid.  The order is preserved.
+   * \return EdgeArray containing all edges with id in eid.  The order is
+   * preserved.
    */
   EdgeArray FindEdges(IdArray eids) const override;
 
@@ -216,10 +208,10 @@ class Graph: public GraphInterface {
    * \brief Get all the edges in the graph.
    * \note If sorted is true, the returned edges list is sorted by their src and
    *       dst ids. Otherwise, they are in their edge id order.
-   * \param sorted Whether the returned edge list is sorted by their src and dst ids
-   * \return the id arrays of the two endpoints of the edges.
+   * \param sorted Whether the returned edge list is sorted by their src and dst
+   * ids \return the id arrays of the two endpoints of the edges.
    */
-  EdgeArray Edges(const std::string &order = "") const override;
+  EdgeArray Edges(const std::string& order = "") const override;
 
   /*!
    * \brief Get the in degree of the given vertex.
@@ -258,13 +250,14 @@ class Graph: public GraphInterface {
   /*!
    * \brief Construct the induced subgraph of the given vertices.
    *
-   * The induced subgraph is a subgraph formed by specifying a set of vertices V' and then
-   * selecting all of the edges from the original graph that connect two vertices in V'.
+   * The induced subgraph is a subgraph formed by specifying a set of vertices
+   * V' and then selecting all of the edges from the original graph that connect
+   * two vertices in V'.
    *
-   * Vertices and edges in the original graph will be "reindexed" to local index. The local
-   * index of the vertices preserve the order of the given id array, while the local index
-   * of the edges preserve the index order in the original graph. Vertices not in the
-   * original graph are ignored.
+   * Vertices and edges in the original graph will be "reindexed" to local
+   * index. The local index of the vertices preserve the order of the given id
+   * array, while the local index of the edges preserve the index order in the
+   * original graph. Vertices not in the original graph are ignored.
    *
    * The result subgraph is read-only.
    *
@@ -276,20 +269,22 @@ class Graph: public GraphInterface {
   /*!
    * \brief Construct the induced edge subgraph of the given edges.
    *
-   * The induced edges subgraph is a subgraph formed by specifying a set of edges E' and then
-   * selecting all of the nodes from the original graph that are endpoints in E'.
+   * The induced edges subgraph is a subgraph formed by specifying a set of
+   * edges E' and then selecting all of the nodes from the original graph that
+   * are endpoints in E'.
    *
-   * Vertices and edges in the original graph will be "reindexed" to local index. The local
-   * index of the edges preserve the order of the given id array, while the local index
-   * of the vertices preserve the index order in the original graph. Edges not in the
-   * original graph are ignored.
+   * Vertices and edges in the original graph will be "reindexed" to local
+   * index. The local index of the edges preserve the order of the given id
+   * array, while the local index of the vertices preserve the index order in
+   * the original graph. Edges not in the original graph are ignored.
    *
    * The result subgraph is read-only.
    *
    * \param eids The edges in the subgraph.
    * \return the induced edge subgraph
    */
-  Subgraph EdgeSubgraph(IdArray eids, bool preserve_nodes = false) const override;
+  Subgraph EdgeSubgraph(
+      IdArray eids, bool preserve_nodes = false) const override;
 
   /*!
    * \brief Return the successor vector
@@ -344,12 +339,11 @@ class Graph: public GraphInterface {
    * \param fmt the format of the returned adjacency matrix.
    * \return a vector of three IdArray.
    */
-  std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const override;
+  std::vector<IdArray> GetAdj(
+      bool transpose, const std::string& fmt) const override;
 
   /*! \brief Create an empty graph */
-  static MutableGraphPtr Create() {
-    return std::make_shared<Graph>();
-  }
+  static MutableGraphPtr Create() { return std::make_shared<Graph>(); }
 
   /*! \brief Create from coo */
   static MutableGraphPtr CreateFromCOO(
