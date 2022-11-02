@@ -501,12 +501,12 @@ if __name__ == "__main__":
 
     if 0 < args.sortpool_k <= 1:  # Transform percentile to number.
         if args.dataset.startswith("ogbl-citation"):
-        # For this dataset, subgraphs extracted around positive edges are
-        # rather larger than negative edges. Thus we sample from 1000
-        # positive and 1000 negative edges to estimate the k (number of 
-        # nodes to hold for each graph) used in SortPooling.
-        # You can certainly set k manually, instead of estimating from
-        # a percentage of sampled subgraphs.
+            # For this dataset, subgraphs extracted around positive edges are
+            # rather larger than negative edges. Thus we sample from 1000
+            # positive and 1000 negative edges to estimate the k (number of 
+            # nodes to hold for each graph) used in SortPooling.
+            # You can certainly set k manually, instead of estimating from
+            # a percentage of sampled subgraphs.
             _sampled_indices = list(range(1000)) + list(
                 range(len(train_dataset) - 1000, len(train_dataset))
             )
