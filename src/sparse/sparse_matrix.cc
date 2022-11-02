@@ -12,9 +12,6 @@ namespace sparse {
 std::vector<torch::Tensor> SparseMatrix::COOTensors() {
   auto coo = COOPtr();
   auto val = Value();
-  if (coo->value_indices.has_value()) {
-    val = val[coo->value_indices.value()];
-  }
   return {coo->row, coo->col, val};
 }
 
@@ -27,8 +24,7 @@ c10::intrusive_ptr<SparseMatrix> CreateFromCOOPtr(
 c10::intrusive_ptr<SparseMatrix> CreateFromCOO(
     torch::Tensor row, torch::Tensor col, torch::Tensor value,
     const std::vector<int64_t>& shape) {
-  auto coo =
-      std::make_shared<COO>(COO{row, col, torch::optional<torch::Tensor>()});
+  auto coo = std::make_shared<COO>(COO{row, col});
   return CreateFromCOOPtr(coo, value, shape);
 }
 

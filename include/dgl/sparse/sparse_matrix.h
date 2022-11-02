@@ -8,9 +8,9 @@
 
 #include <torch/custom_class.h>
 #include <torch/script.h>
-#include <vector>
 
 #include <memory>
+#include <vector>
 
 namespace dgl {
 namespace sparse {
@@ -18,6 +18,8 @@ namespace sparse {
 /*! \brief SparseFormat enumeration */
 enum SparseFormat { kCOO, kCSR, kCSC };
 
+// TODO(zhenkun): we may need to add flags like `num_rows`, `num_cols`,
+// `row_sorted`, `col_sorted` in the sparse formats
 /*! \brief CSR sparse structure */
 struct CSR {
   torch::Tensor indptr, indices;
@@ -35,15 +37,6 @@ struct CSR {
 /*! \brief COO sparse structure */
 struct COO {
   torch::Tensor row, col;
-  // The element order of the sparse format. In the SparseMatrix, we have data
-  // (value_) for each non-zero value. The order of non-zero values in (value_)
-  // may differ from the order of non-zero entries in the sparse format. So we
-  // store `value_indices` in a sparse format to indicate its relative element
-  // order to the SparseMatrix. With `value_indices`, we can retrieve the
-  // correct data for a sparse format, i.e., `value_[value_indices]`. If
-  // `value_indices` is not defined, this sparse format follows the same
-  // non-zero value order as the SparseMatrix.
-  torch::optional<torch::Tensor> value_indices;
 };
 
 /*! \brief SparseMatrix bound to Python  */
