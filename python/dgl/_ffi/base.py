@@ -165,11 +165,11 @@ def load_dgl_sparse(backend, version):
     global dgl_sparse_loaded
     version = version.split("+")[0]
     if sys.platform.startswith("linux"):
-        basename = "libdgl_sparse_%s_%s.so" % (backend, version) 
+        basename = "libdgl_sparse_%s_%s.so" % (backend, version)
     elif sys.platform.startswith("darwin"):
-        basename = "libdgl_sparse_%s_%s.dylib" % (backend, version) 
+        basename = "libdgl_sparse_%s_%s.dylib" % (backend, version)
     elif sys.platform.startswith("win"):
-        basename = "dgl_sparse_%s_%s.dll" % (backend, version) 
+        basename = "dgl_sparse_%s_%s.dll" % (backend, version)
     else:
         raise NotImplementedError("Unsupported system: %s" % sys.platform)
     path = os.path.join(_DIR_NAME, "dgl_sparse", basename)
@@ -178,7 +178,6 @@ def load_dgl_sparse(backend, version):
     try:
         torch.classes.load_library(path)
         dgl_sparse_loaded = True
-    except:
+    except Exception: # pylint: disable=W0703
         pass
-
     

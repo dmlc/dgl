@@ -1,7 +1,7 @@
 """DGL sparse matrix module."""
-import os
-import torch
 from typing import List, Optional, Tuple
+
+import torch
 
 from .._ffi.base import dgl_sparse_loaded
 
@@ -9,6 +9,7 @@ assert dgl_sparse_loaded
 
 # We may not need to use this constructor.
 _C_SparseMatrixConstructor = torch.classes.dgl_sparse.SparseMatrix
+
 
 class SparseMatrix:
     r"""Class for sparse matrix.
@@ -18,6 +19,7 @@ class SparseMatrix:
     c_sparse_matrix : torch.ScriptObject
         C++ SparseMatrix object
     """
+
     def __init__(self, c_sparse_matrix: torch.ScriptObject):
         self.c_sparse_matrix = c_sparse_matrix
 
@@ -42,8 +44,8 @@ class SparseMatrix:
             The shape of the matrix
         """
         return self.c_sparse_matrix.shape()
-    
-    def coo(self) -> Tuple[torch.Tensor, ...] :
+
+    def coo(self) -> Tuple[torch.Tensor, ...]:
         """Get the coordinate (COO) representation of the sparse matrix.
 
         Returns
@@ -52,6 +54,7 @@ class SparseMatrix:
             A tuple of tensors containing row, column coordinates and values.
         """
         return self.c_sparse_matrix.coo()
+
 
 # TODO To make the docstring complete, we need to define SparseMatrix.__repr__
 def create_from_coo(
@@ -117,4 +120,3 @@ def create_from_coo(
     return SparseMatrix(
         torch.ops.dgl_sparse.create_from_coo(row, col, val, shape)
     )
-

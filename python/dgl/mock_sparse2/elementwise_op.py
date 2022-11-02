@@ -1,13 +1,13 @@
 """DGL elementwise operator module."""
-from .sparse_matrix import SparseMatrix
 import torch
 
-# TODO: Add addition for DiagMatrix
+from .sparse_matrix import SparseMatrix
+
+
 def sp_add(A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
+    """TODO Add op for DiagMatrix"""
     return SparseMatrix(
-        torch.ops.dgl_sparse.spspadd(
-            A.c_sparse_matrix, B.c_sparse_matrix
-        )
+        torch.ops.dgl_sparse.spspadd(A.c_sparse_matrix, B.c_sparse_matrix)
     )
 
 

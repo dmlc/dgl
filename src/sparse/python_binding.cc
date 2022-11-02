@@ -3,11 +3,10 @@
  * \file sparse/pybind.cc
  * \brief DGL sparse library Python binding
  */
-#include <torch/custom_class.h>
-#include <torch/script.h>
-
 #include <dgl/sparse/elementwise_op.h>
 #include <dgl/sparse/sparse_matrix.h>
+#include <torch/custom_class.h>
+#include <torch/script.h>
 
 namespace dgl {
 namespace sparse {
@@ -17,8 +16,7 @@ TORCH_LIBRARY(dgl_sparse, m) {
       .def("coo", &SparseMatrix::COOTensors)
       .def("val", &SparseMatrix::Value)
       .def("shape", &SparseMatrix::Shape);
-  m.def("create_from_coo", &CreateFromCOO)
-      .def("spspadd", &SpSpAdd);
+  m.def("create_from_coo", &CreateFromCOO).def("spspadd", &SpSpAdd);
 }
 
 }  // namespace sparse

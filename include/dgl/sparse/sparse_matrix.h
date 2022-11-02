@@ -8,6 +8,7 @@
 
 #include <torch/custom_class.h>
 #include <torch/script.h>
+#include <vector>
 
 #include <memory>
 
@@ -74,13 +75,13 @@ class SparseMatrix : public torch::CustomClassHolder {
   bool HasCSR() const { return csr_ != nullptr; }
   bool HasCSC() const { return csc_ != nullptr; }
 
-  // TODO
+  // TODO(zhenkun): implementation
   std::vector<torch::Tensor> COOTensors();
   std::vector<torch::Tensor> CSRTensors();
   std::vector<torch::Tensor> CSCTensors();
 
  private:
-  // TODO Move the implementation to .cc
+  // TODO(zhenkun): add implementation on .cc
   void _CreateCOOIfNotExist() {}
   void _CreateCSRIfNotExist() {}
   void _CreateCSCIfNotExist() {}
