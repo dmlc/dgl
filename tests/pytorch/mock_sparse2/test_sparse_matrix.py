@@ -1,9 +1,15 @@
 import pytest
 import torch
+import sys
 
-from dgl.mock_sparse2 import create_from_coo
+if sys.platform.startswith("linux"):
+    from dgl.mock_sparse2 import create_from_coo
 
 
+@pytest.mark.skipif(
+    not sys.platform.startswith("linux"),
+    reason="Sparse library only supports linux for now",
+)
 @pytest.mark.parametrize("dense_dim", [None, 4])
 @pytest.mark.parametrize("row", [[0, 0, 1, 2], (0, 1, 2, 4)])
 @pytest.mark.parametrize("col", [(0, 1, 2, 2), (1, 3, 3, 4)])

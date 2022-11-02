@@ -3,8 +3,8 @@
  * \file sparse/pybind.cc
  * \brief DGL sparse library Python binding
  */
-#include <dgl/sparse/elementwise_op.h>
-#include <dgl/sparse/sparse_matrix.h>
+#include <sparse/elementwise_op.h>
+#include <sparse/sparse_matrix.h>
 #include <torch/custom_class.h>
 #include <torch/script.h>
 

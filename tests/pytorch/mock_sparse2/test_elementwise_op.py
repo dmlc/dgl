@@ -2,11 +2,19 @@ import operator
 
 import numpy as np
 import pytest
+import sys
 import torch
 
 import dgl
-from dgl.mock_sparse2 import create_from_coo
 
+if sys.platform.startswith("linux"):
+    from dgl.mock_sparse2 import create_from_coo
+
+
+@pytest.mark.skipif(
+    not sys.platform.startswith("linux"),
+    reason="Sparse library only supports linux for now",
+)
 def test_sparse_op_sparse():
     rowA = torch.tensor([1, 0, 2, 7, 1])
     colA = torch.tensor([0, 49, 2, 1, 7])

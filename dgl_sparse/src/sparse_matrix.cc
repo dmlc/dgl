@@ -3,8 +3,8 @@
  * \file sparse/sparse_matrix.cc
  * \brief DGL C++ sparse matrix implementations
  */
-#include <dgl/sparse/elementwise_op.h>
-#include <dgl/sparse/sparse_matrix.h>
+#include <sparse/elementwise_op.h>
+#include <sparse/sparse_matrix.h>
 
 namespace dgl {
 namespace sparse {

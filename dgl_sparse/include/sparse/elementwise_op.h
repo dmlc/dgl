@@ -8,7 +8,7 @@
 
 #include <torch/custom_class.h>
 
-#include "./sparse_matrix.h"
+#include <sparse/sparse_matrix.h>
 
 namespace dgl {
 namespace sparse {

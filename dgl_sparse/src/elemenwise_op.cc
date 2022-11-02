@@ -3,8 +3,8 @@
  * \file sparse/elementwise_op.h
  * \brief DGL C++ sparse elementwise operator implementation
  */
-#include <dgl/sparse/elementwise_op.h>
-#include <dgl/sparse/sparse_matrix.h>
+#include <sparse/elementwise_op.h>
+#include <sparse/sparse_matrix.h>
 #include <torch/custom_class.h>
 #include <torch/script.h>
 

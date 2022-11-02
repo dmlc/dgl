@@ -318,7 +318,7 @@ endif(BUILD_TORCH)
 if(BUILD_SPARSE)
   file(TO_NATIVE_PATH ${CMAKE_CURRENT_BINARY_DIR} BINDIR)
   file(TO_NATIVE_PATH ${CMAKE_COMMAND} CMAKE_CMD)
-  # TODO: MSVC support?
+  # TODO(zhenkun): MSVC support?
   file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/dgl_sparse/build.sh BUILD_SCRIPT)
   add_custom_target(
     dgl_sparse

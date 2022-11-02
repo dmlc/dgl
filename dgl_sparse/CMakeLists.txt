@@ -27,13 +27,13 @@ find_package(Torch REQUIRED)
 
 set(LIB_DGL_SPARSE_NAME "dgl_sparse_pytorch_${TORCH_VER}")
 
-set(SPARSE_DIR "${CMAKE_SOURCE_DIR}/../src/sparse")
-set(DGL_INCLUDE "${CMAKE_SOURCE_DIR}/../include")
-file(GLOB SPARSE_HEADERS ${DGL_INCLUDE}/sparse)
+set(SPARSE_DIR "${CMAKE_SOURCE_DIR}/src")
+set(SPARSE_INCLUDE "${CMAKE_SOURCE_DIR}/include")
+file(GLOB SPARSE_HEADERS ${SPARSE_INCLUDE})
 file(GLOB SPARSE_SRC
   ${SPARSE_DIR}/*.cc
 )
 add_library(${LIB_DGL_SPARSE_NAME} SHARED ${SPARSE_SRC} ${SPARSE_HEADERS})
 target_include_directories(
-  ${LIB_DGL_SPARSE_NAME} PRIVATE ${SPARSE_DIR} ${DGL_INCLUDE})
+  ${LIB_DGL_SPARSE_NAME} PRIVATE ${SPARSE_DIR} ${SPARSE_HEADERS})
 target_link_libraries(${LIB_DGL_SPARSE_NAME} "${TORCH_LIBRARIES}")
