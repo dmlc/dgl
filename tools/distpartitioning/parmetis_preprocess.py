@@ -26,17 +26,18 @@ def get_proc_info():
     MPI_WORLDSIZE appropriately as described above to retrieve total no. of
     processes, when needed.
 
+    MPI_LOCALRANKID is only valid on a single-node cluster. In a multi-node cluster
+    the correct key to use is PMI_RANK. In a multi-node cluster, MPI_LOCALRANKID
+    returns local rank of the process in the context of a particular node in which
+    it is unique.
+
     Returns:
     --------
     integer :
         Rank of the current process.
     """
     env_variables = dict(os.environ)
-    if "OMPI_COMM_WORLD_RANK" in env_variables:
-        local_rank = int(os.environ.get("OMPI_COMM_WORLD_RANK") or 0)
-    elif "MPI_LOCALRANKID" in env_variables:
-        local_rank = int(os.environ.get("MPI_LOCALRANKID") or 0)
-    return local_rank
+    return int(os.environ.get("PMI_RANK") or 0)
 
 
 def gen_edge_files(schema_map, output):

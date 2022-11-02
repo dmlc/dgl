@@ -10,6 +10,7 @@ from ..sampling import sample_etype_neighbors as local_sample_etype_neighbors
 from ..sampling import sample_neighbors as local_sample_neighbors
 from ..subgraph import in_subgraph as local_in_subgraph
 from ..utils import toindex
+from .. import backend as F
 from .rpc import (
     Request,
     Response,
@@ -98,7 +99,7 @@ def _sample_etype_neighbors(
     local_g,
     partition_book,
     seed_nodes,
-    etype_field,
+    etype_offset,
     fan_out,
     edge_dir,
     prob,
@@ -118,7 +119,7 @@ def _sample_etype_neighbors(
     sampled_graph = local_sample_etype_neighbors(
         local_g,
         local_ids,
-        etype_field,
+        etype_offset,
         fan_out,
         edge_dir,
         prob,
@@ -181,6 +182,31 @@ def _in_subgraph(local_g, partition_book, seed_nodes):
     return global_src, global_dst, global_eids
 
 
+# --- NOTE 1 ---
+# (BarclayII)
+# If the sampling algorithm needs node and edge data, ideally the
+# algorithm should query the underlying feature storage to get what it
+# just needs to complete the job.  For instance, with
+# sample_etype_neighbors, we only need the probability of the seed nodes'
+# neighbors.
+#
+# However, right now we are reusing the existing subgraph sampling
+# interfaces of DGLGraph (i.e. single machine solution), which needs
+# the data of *all* the nodes/edges.  Going distributed, we now need
+# the node/edge data of the *entire* local graph partition.
+#
+# If the sampling algorithm only use edge data, the current design works
+# because the local graph partition contains all the in-edges of the
+# assigned nodes as well as the data.  This is the case for
+# sample_etype_neighbors.
+#
+# However, if the sampling algorithm requires data of the neighbor nodes
+# (e.g. sample_neighbors_biased which performs biased sampling based on the
+# type of the neighbor nodes), the current design will fail because the
+# neighbor nodes (hence the data) may not belong to the current partition.
+# This is a limitation of the current DistDGL design.  We should improve it
+# later.
+
 class SamplingRequest(Request):
     """Sampling Request"""
 
@@ -212,13 +238,18 @@ class SamplingRequest(Request):
     def process_request(self, server_state):
         local_g = server_state.graph
         partition_book = server_state.partition_book
+        kv_store = server_state.kv_store
+        if self.prob is not None:
+            prob = [kv_store.data_store[self.prob]]
+        else:
+            prob = None
         global_src, global_dst, global_eids = _sample_neighbors(
             local_g,
             partition_book,
             self.seed_nodes,
             self.fan_out,
             self.edge_dir,
-            self.prob,
+            prob,
             self.replace,
         )
         return SubgraphResponse(global_src, global_dst, global_eids)
@@ -230,7 +261,6 @@ class SamplingRequestEtype(Request):
     def __init__(
         self,
         nodes,
-        etype_field,
         fan_out,
         edge_dir="in",
         prob=None,
@@ -242,7 +272,6 @@ class SamplingRequestEtype(Request):
         self.prob = prob
         self.replace = replace
         self.fan_out = fan_out
-        self.etype_field = etype_field
         self.etype_sorted = etype_sorted
 
     def __setstate__(self, state):
@@ -252,7 +281,6 @@ class SamplingRequestEtype(Request):
             self.prob,
             self.replace,
             self.fan_out,
-            self.etype_field,
             self.etype_sorted,
         ) = state
 
@@ -263,21 +291,30 @@ class SamplingRequestEtype(Request):
             self.prob,
             self.replace,
             self.fan_out,
-            self.etype_field,
             self.etype_sorted,
         )
 
     def process_request(self, server_state):
         local_g = server_state.graph
         partition_book = server_state.partition_book
+        kv_store = server_state.kv_store
+        etype_offset = partition_book.local_etype_offset
+        # See NOTE 1
+        if self.prob is not None:
+            probs = [
+                kv_store.data_store[key] if key != "" else None
+                for key in self.prob
+            ]
+        else:
+            probs = None
         global_src, global_dst, global_eids = _sample_etype_neighbors(
             local_g,
             partition_book,
             self.seed_nodes,
-            self.etype_field,
+            etype_offset,
             self.fan_out,
             self.edge_dir,
-            self.prob,
+            probs,
             self.replace,
             self.etype_sorted,
         )
@@ -536,7 +573,6 @@ def _frontier_to_heterogeneous_graph(g, frontier, gpb):
 def sample_etype_neighbors(
     g,
     nodes,
-    etype_field,
     fanout,
     edge_dir="in",
     prob=None,
@@ -552,8 +588,8 @@ def sample_etype_neighbors(
     Node/edge features are not preserved. The original IDs of
     the sampled edges are stored as the `dgl.EID` feature in the returned graph.
 
-    This function assumes the input is a homogeneous ``DGLGraph`` with the TRUE edge type
-    information stored as the edge data in `etype_field`. The sampled subgraph is also
+    This function assumes the input is a homogeneous ``DGLGraph`` with the edges
+    ordered by their edge types. The sampled subgraph is also
     stored in the homogeneous graph format. That is, all nodes and edges are assigned
     with unique IDs (in contrast, we typically use a type name and a node/edge ID to
     identify a node or an edge in ``DGLGraph``). We refer to this type of IDs
@@ -569,8 +605,6 @@ def sample_etype_neighbors(
     nodes : tensor or dict
         Node IDs to sample neighbors from. If it's a dict, it should contain only
         one key-value pair to make this API consistent with dgl.sampling.sample_neighbors.
-    etype_field : string
-        The field in g.edata storing the edge type.
     fanout : int or dict[etype, int]
         The number of edges to be sampled for each node per edge type.  If an integer
         is given, DGL assumes that the same fanout is applied to every edge type.
@@ -625,25 +659,47 @@ def sample_etype_neighbors(
         nodes = F.cat(homo_nids, 0)
 
     def issue_remote_req(node_ids):
+        if prob is not None:
+            # See NOTE 1
+            _prob = [
+                # NOTE (BarclayII)
+                # Currently DistGraph.edges[] does not accept canonical etype.
+                g.edges[etype].data[prob].kvstore_key
+                if prob in g.edges[etype].data
+                else ""
+                for etype in g.etypes
+            ]
+        else:
+            _prob = None
         return SamplingRequestEtype(
             node_ids,
-            etype_field,
             fanout,
             edge_dir=edge_dir,
-            prob=prob,
+            prob=_prob,
             replace=replace,
             etype_sorted=etype_sorted,
         )
 
     def local_access(local_g, partition_book, local_nids):
+        etype_offset = gpb.local_etype_offset
+        # See NOTE 1
+        if prob is None:
+            _prob = None
+        else:
+            _prob = [
+                g.edges[etype].data[prob].local_partition
+                if prob in g.edges[etype].data
+                else None
+                for etype in g.etypes
+            ]
         return _sample_etype_neighbors(
             local_g,
             partition_book,
             local_nids,
-            etype_field,
+            etype_offset,
             fanout,
             edge_dir,
-            prob,
+            _prob,
             replace,
             etype_sorted=etype_sorted,
         )
@@ -723,13 +779,28 @@ def sample_neighbors(g, nodes, fanout, edge_dir="in", prob=None, replace=False):
         nodes = list(nodes.values())[0]
 
     def issue_remote_req(node_ids):
+        if prob is not None:
+            # See NOTE 1
+            _prob = g.edata[prob].kvstore_key
+        else:
+            _prob = None
         return SamplingRequest(
-            node_ids, fanout, edge_dir=edge_dir, prob=prob, replace=replace
+            node_ids, fanout, edge_dir=edge_dir, prob=_prob, replace=replace
         )
 
     def local_access(local_g, partition_book, local_nids):
+        # See NOTE 1
+        _prob = (
+            [g.edata[prob].local_partition] if prob is not None else None
+        )
         return _sample_neighbors(
-            local_g, partition_book, local_nids, fanout, edge_dir, prob, replace
+            local_g,
+            partition_book,
+            local_nids,
+            fanout,
+            edge_dir,
+            _prob,
+            replace,
         )
 
     frontier = _distributed_access(g, nodes, issue_remote_req, local_access)

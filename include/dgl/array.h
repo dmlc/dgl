@@ -8,10 +8,10 @@
  */
 #ifndef DGL_ARRAY_H_
 #define DGL_ARRAY_H_
-#include "./aten/types.h"
 #include "./aten/array_ops.h"
+#include "./aten/coo.h"
+#include "./aten/csr.h"
 #include "./aten/macro.h"
 #include "./aten/spmat.h"
-#include "./aten/csr.h"
-#include "./aten/coo.h"
+#include "./aten/types.h"
 #endif  // DGL_ARRAY_H_

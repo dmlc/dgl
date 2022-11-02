@@ -874,6 +874,18 @@ class RangePartitionBook(GraphPartitionBook):
         self._nid_map = IdMap(self._typed_nid_range)
         self._eid_map = IdMap(self._typed_eid_range)
 
+        # Local node/edge type offset that maps the local homogenized node/edge IDs
+        # to local heterogenized node/edge IDs.  One can do the mapping by binary search
+        # on these arrays.
+        self._local_ntype_offset = np.cumsum(
+                [0] + [
+                    v[self._partid, 1] - v[self._partid, 0]
+                    for v in self._typed_nid_range.values()]).tolist()
+        self._local_etype_offset = np.cumsum(
+                [0] + [
+                    v[self._partid, 1] - v[self._partid, 0]
+                    for v in self._typed_eid_range.values()]).tolist()
+
         # Get meta data of the partition book
         self._partition_meta_data = []
         for partid in range(self._num_partitions):
@@ -1105,6 +1117,22 @@ class RangePartitionBook(GraphPartitionBook):
             are not available.
         """
         return self._canonical_etypes
+
+    @property
+    def local_ntype_offset(self):
+        """Get the node type offset array of the local partition.
+
+        The i-th element indicates the starting position of the i-th node type.
+        """
+        return self._local_ntype_offset
+
+    @property
+    def local_etype_offset(self):
+        """Get the edge type offset array of the local partition.
+
+        The i-th element indicates the starting position of the i-th edge type.
+        """
+        return self._local_etype_offset
 
     def _to_canonical_etype(self, etype):
         """Convert an edge type to the corresponding canonical edge type.

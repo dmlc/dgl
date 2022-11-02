@@ -31,10 +31,10 @@ struct DLPackConvert {
   /*!
    * \brief Deleter for NDArray converted from DLPack.
    *
-   * This is used from data which is passed from external DLPack(DLManagedTensor)
-   * that are not allocated inside of DGL.
-   * This enables us to create NDArray from memory allocated by other
-   * frameworks that are DLPack compatible
+   * This is used from data which is passed from external
+   * DLPack(DLManagedTensor) that are not allocated inside of DGL. This enables
+   * us to create NDArray from memory allocated by other frameworks that are
+   * DLPack compatible
    */
   static void DLPackDeleter(NDArray::Container* ptr);
 
@@ -43,7 +43,7 @@ struct DLPackConvert {
    * \param from The DGL NDArray.
    * \return A DLPack tensor.
    */
-  static DLManagedTensor* ToDLPack(const NDArray &from);
+  static DLManagedTensor* ToDLPack(const NDArray& from);
 };
 
 }  // namespace runtime
@@ -66,8 +66,7 @@ DGL_DLL void DGLDLManagedTensorCallDeleter(DLManagedTensor* dltensor);
  * \param out The output array handle.
  * \return 0 when success, -1 when failure happens
  */
-DGL_DLL int DGLArrayFromDLPack(DLManagedTensor* from,
-                               DGLArrayHandle* out);
+DGL_DLL int DGLArrayFromDLPack(DLManagedTensor* from, DGLArrayHandle* out);
 
 /*!
  * \brief Produce a DLMangedTensor from the array that shares data memory with
@@ -76,8 +75,8 @@ DGL_DLL int DGLArrayFromDLPack(DLManagedTensor* from,
  * \param out The DLManagedTensor handle.
  * \return 0 when success, -1 when failure happens
  */
-DGL_DLL int DGLArrayToDLPack(DGLArrayHandle from, DLManagedTensor** out,
-                             int alignment = 0);
+DGL_DLL int DGLArrayToDLPack(
+    DGLArrayHandle from, DLManagedTensor** out, int alignment = 0);
 
 #ifdef __cplusplus
 }  // DGL_EXTERN_C

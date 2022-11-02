@@ -83,13 +83,14 @@ using NumPicksFn = std::function<IdxType(
 // \param cur_et The edge type.
 // \param et_len Length of the range.
 // \param et_idx A map from local idx to column id.
-// \param data Pointer of the data indices.
+// \param et_eid Edge-type-specific id array.
+// \param eid Pointer of the homogenized edge id array.
 // \param out_idx Picked indices in [et_offset, et_offset + et_len).
 template <typename IdxType>
-using RangePickFn = std::function<void(
+using EtypeRangePickFn = std::function<void(
     IdxType off, IdxType et_offset, IdxType cur_et, IdxType et_len,
-    const std::vector<IdxType> &et_idx, const IdxType* data,
-    IdxType* out_idx)>;
+    const std::vector<IdxType>& et_idx, const std::vector<IdxType>& et_eid,
+    const IdxType* eid, IdxType* out_idx)>;
 
 // Template for picking non-zero values row-wise. The implementation utilizes
 // OpenMP parallelization on rows because each row performs computation independently.
@@ -208,20 +209,21 @@ COOMatrix CSRRowWisePick(CSRMatrix mat, IdArray rows,
 
 // Template for picking non-zero values row-wise. The implementation utilizes
 // OpenMP parallelization on rows because each row performs computation independently.
-template <typename IdxType>
-COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows, IdArray etypes,
+template <typename IdxType, typename DType>
+COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows,
+                                 const std::vector<int64_t>& eid2etype_offset,
                                  const std::vector<int64_t>& num_picks, bool replace,
-                                 bool etype_sorted, RangePickFn<IdxType> pick_fn) {
+                                 bool rowwise_etype_sorted, EtypeRangePickFn<IdxType> pick_fn,
+                                 const std::vector<NDArray>& prob_or_mask) {
   using namespace aten;
   const IdxType* indptr = mat.indptr.Ptr<IdxType>();
   const IdxType* indices = mat.indices.Ptr<IdxType>();
-  const IdxType* data = CSRHasData(mat)? mat.data.Ptr<IdxType>() : nullptr;
+  const IdxType* eid = CSRHasData(mat)? mat.data.Ptr<IdxType>() : nullptr;
   const IdxType* rows_data = rows.Ptr<IdxType>();
-  const int32_t* etype_data = etypes.Ptr<int32_t>();
   const int64_t num_rows = rows->shape[0];
   const auto& ctx = mat.indptr->ctx;
   const int64_t num_etypes = num_picks.size();
-  CHECK_EQ(etypes->dtype.bits / 8, sizeof(int32_t)) << "etypes must be int32";
+  const bool has_probs = (prob_or_mask.size() > 0);
   std::vector<IdArray> picked_rows(rows->shape[0]);
   std::vector<IdArray> picked_cols(rows->shape[0]);
   std::vector<IdArray> picked_idxs(rows->shape[0]);
@@ -260,13 +262,36 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows, IdArray etypes,
         IdArray idx = Full(-1, len, sizeof(IdxType) * 8, ctx);
         IdxType* cdata = cols.Ptr<IdxType>();
         IdxType* idata = idx.Ptr<IdxType>();
+
+        int64_t k = 0;
         for (int64_t j = 0; j < len; ++j) {
-          cdata[j] = indices[off + j];
-          idata[j] = data ? data[off + j] : off + j;
+          const IdxType homogenized_eid = eid ? eid[off + j] : off + j;
+          auto it = std::upper_bound(
+              eid2etype_offset.begin(), eid2etype_offset.end(), homogenized_eid);
+          const IdxType heterogenized_etype = it - eid2etype_offset.begin() - 1;
+          const IdxType heterogenized_eid = \
+              homogenized_eid - eid2etype_offset[heterogenized_etype];
+
+          if (!has_probs || IsNullArray(prob_or_mask[heterogenized_etype])) {
+            // No probability array, select all
+            cdata[k] = indices[off + j];
+            idata[k] = homogenized_eid;
+            ++k;
+          } else {
+            // Select the entries with non-zero probability
+            const NDArray& p = prob_or_mask[heterogenized_etype];
+            const DType* pdata = p.Ptr<DType>();
+            if (pdata[heterogenized_eid] > 0) {
+              cdata[k] = indices[off + j];
+              idata[k] = homogenized_eid;
+              ++k;
+            }
+          }
         }
-        picked_rows[i] = rows;
-        picked_cols[i] = cols;
-        picked_idxs[i] = idx;
+
+        picked_rows[i] = rows.CreateView({k}, rows->dtype);
+        picked_cols[i] = cols.CreateView({k}, cols->dtype);
+        picked_idxs[i] = idx.CreateView({k}, idx->dtype);
       } else {
         // need to do per edge type sample
         std::vector<IdxType> rows;
@@ -275,15 +300,22 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows, IdArray etypes,
 
         std::vector<IdxType> et(len);
         std::vector<IdxType> et_idx(len);
+        std::vector<IdxType> et_eid(len);
         std::iota(et_idx.begin(), et_idx.end(), 0);
         for (int64_t j = 0; j < len; ++j) {
-          et[j] = data ? etype_data[data[off+j]] : etype_data[off+j];
+          const IdxType homogenized_eid = eid ? eid[off + j] : off + j;
+          auto it = std::upper_bound(
+              eid2etype_offset.begin(), eid2etype_offset.end(), homogenized_eid);
+          const IdxType heterogenized_etype = it - eid2etype_offset.begin() - 1;
+          const IdxType heterogenized_eid = \
+              homogenized_eid - eid2etype_offset[heterogenized_etype];
+          et[j] = heterogenized_etype;
+          et_eid[j] = heterogenized_eid;
         }
-        if (!etype_sorted)  // the edge type is sorted, not need to sort it
+        if (!rowwise_etype_sorted)  // the edge type is sorted, not need to sort it
           std::sort(et_idx.begin(), et_idx.end(),
                     [&et](IdxType i1, IdxType i2) {return et[i1] < et[i2];});
-        CHECK(et[et_idx[len - 1]] < num_etypes) <<
-          "etype values exceed the number of fanouts";
+        CHECK_LT(et[et_idx[len - 1]], num_etypes) << "etype values exceed the number of fanouts";
 
         IdxType cur_et = et[et_idx[0]];
         int64_t et_offset = 0;
@@ -291,7 +323,7 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows, IdArray etypes,
         for (int64_t j = 0; j < len; ++j) {
           CHECK((j + 1 == len) || (et[et_idx[j]] <= et[et_idx[j + 1]]))
               << "Edge type is not sorted. Please sort in advance or specify "
-                 "'etype_sorted' as false.";
+                 "'rowwise_etype_sorted' as false.";
           if ((j + 1 == len) || cur_et != et[et_idx[j + 1]]) {
             // 1 end of the current etype
             // 2 end of the row
@@ -300,29 +332,49 @@ COOMatrix CSRRowWisePerEtypePick(CSRMatrix mat, IdArray rows, IdArray etypes,
                 (et_len <= num_picks[cur_et] && !replace)) {
               // fast path, select all
               for (int64_t k = 0; k < et_len; ++k) {
-                rows.push_back(rid);
-                cols.push_back(indices[off+et_idx[et_offset+k]]);
-                if (data)
-                  idx.push_back(data[off+et_idx[et_offset+k]]);
-                else
-                  idx.push_back(off+et_idx[et_offset+k]);
+                const IdxType eid_offset = off + et_idx[et_offset + k];
+                const IdxType homogenized_eid = eid ? eid[eid_offset] : eid_offset;
+                auto it = std::upper_bound(
+                    eid2etype_offset.begin(), eid2etype_offset.end(), homogenized_eid);
+                const IdxType heterogenized_etype = it - eid2etype_offset.begin() - 1;
+                const IdxType heterogenized_eid = \
+                    homogenized_eid - eid2etype_offset[heterogenized_etype];
+
+                if (!has_probs || IsNullArray(prob_or_mask[heterogenized_etype])) {
+                  // No probability, select all
+                  rows.push_back(rid);
+                  cols.push_back(indices[eid_offset]);
+                  idx.push_back(homogenized_eid);
+                } else {
+                  // Select the entries with non-zero probability
+                  const NDArray& p = prob_or_mask[heterogenized_etype];
+                  const DType* pdata = p.Ptr<DType>();
+                  if (pdata[heterogenized_eid] > 0) {
+                    rows.push_back(rid);
+                    cols.push_back(indices[eid_offset]);
+                    idx.push_back(homogenized_eid);
+                  }
+                }
               }
             } else {
               IdArray picked_idx = Full(-1, num_picks[cur_et], sizeof(IdxType) * 8, ctx);
-              IdxType* picked_idata = static_cast<IdxType*>(picked_idx->data);
+              IdxType* picked_idata = picked_idx.Ptr<IdxType>();
 
               // need call random pick
               pick_fn(off, et_offset, cur_et,
-                      et_len, et_idx,
-                      data, picked_idata);
+                      et_len, et_idx, et_eid,
+                      eid, picked_idata);
               for (int64_t k = 0; k < num_picks[cur_et]; ++k) {
                 const IdxType picked = picked_idata[k];
+                if (picked == -1)
+                  continue;
                 rows.push_back(rid);
                 cols.push_back(indices[off+et_idx[et_offset+picked]]);
-                if (data)
-                  idx.push_back(data[off+et_idx[et_offset+picked]]);
-                else
+                if (eid) {
+                  idx.push_back(eid[off+et_idx[et_offset+picked]]);
+                } else {
                   idx.push_back(off+et_idx[et_offset+picked]);
+                }
               }
             }
 
@@ -375,15 +427,17 @@ COOMatrix COORowWisePick(COOMatrix mat, IdArray rows,
 // Template for picking non-zero values row-wise. The implementation first slices
 // out the corresponding rows and then converts it to CSR format. It then performs
 // row-wise pick on the CSR matrix and rectifies the returned results.
-template <typename IdxType>
-COOMatrix COORowWisePerEtypePick(COOMatrix mat, IdArray rows, IdArray etypes,
-                                 const std::vector<int64_t>& num_picks, bool replace,
-                                 bool etype_sorted, RangePickFn<IdxType> pick_fn) {
+template <typename IdxType, typename DType>
+COOMatrix COORowWisePerEtypePick(
+    COOMatrix mat, IdArray rows, const std::vector<int64_t>& eid2etype_offset,
+    const std::vector<int64_t>& num_picks, bool replace,
+    EtypeRangePickFn<IdxType> pick_fn,
+    const std::vector<NDArray>& prob_or_mask) {
   using namespace aten;
   const auto& csr = COOToCSR(COOSliceRows(mat, rows));
   const IdArray new_rows = Range(0, rows->shape[0], rows->dtype.bits, rows->ctx);
-  const auto& picked = CSRRowWisePerEtypePick<IdxType>(
-    csr, new_rows, etypes, num_picks, replace, etype_sorted, pick_fn);
+  const auto& picked = CSRRowWisePerEtypePick<IdxType, DType>(
+    csr, new_rows, eid2etype_offset, num_picks, replace, false, pick_fn, prob_or_mask);
   return COOMatrix(mat.num_rows, mat.num_cols,
                    IndexSelect(rows, picked.row),  // map the row index to the correct one
                    picked.col,
