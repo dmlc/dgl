@@ -157,6 +157,8 @@ def assign_shuffle_global_nids_edges(rank, world_size, num_parts, edge_data):
         rank of the current process
     world_size : integer
         total count of processes in execution
+    num_parts : integer
+        total number of output graph partitions
     edge_data : numpy ndarray
         edge data as read from xxx_edges.txt file
 

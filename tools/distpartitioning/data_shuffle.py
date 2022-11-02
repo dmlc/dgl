@@ -100,8 +100,10 @@ def gen_node_data(rank, world_size, num_parts, id_lookup, ntid_ntype_map, schema
         local_node_data[constants.NTYPE_ID+"/"+str(local_part_id)] = []
         local_node_data[constants.GLOBAL_TYPE_NID+"/"+str(local_part_id)] = []
 
-    # Note that `get_idranges` always returns so that the values in these dicts
-    # always contains `p` entries, which is num_parts.
+    # Note that `get_idranges` always returns two dictionaries. Keys in these
+    # dictionaries are type names for nodes and edges and values are 
+    # `num_parts` number of tuples indicating the range of type-ids in first
+    # dictionary and range of global-nids in the second dictionary. 
     type_nid_dict, global_nid_dict = get_idranges(schema_map[constants.STR_NODE_TYPE],
                                         schema_map[constants.STR_NUM_NODES_PER_CHUNK],
                                         num_chunks=num_parts)
@@ -152,10 +154,10 @@ def exchange_edge_data(rank, world_size, num_parts, edge_data):
         in the world.
     """
 
+    # Prepare data for each rank in the cluster. 
     start = timer()
     for local_part_id in range(num_parts//world_size):
 
-        # Prepare data for each rank in the MPI_WORLD.
         input_list = []
         for idx in range(world_size):
             send_idx = (edge_data[constants.OWNER_PROCESS] == (idx + local_part_id*world_size))
@@ -295,7 +297,7 @@ def exchange_features(rank, world_size, num_parts, feature_tids, ntype_gnid_map,
                 feats_per_rank = []
                 global_nid_per_rank = []
                 local_feat_key = feat_key + "/" + str(local_part_id)
-                for part_id in range(world_size):
+                for idx in range(world_size):
                     # Get the partition ids for the range of global nids.
                     if feat_type == constants.STR_NODE_FEATURES:
                         # Retrieve the partition ids for the node features.
@@ -316,7 +318,7 @@ def exchange_features(rank, world_size, num_parts, feature_tids, ntype_gnid_map,
                         assert np.all(global_eids == data[constants.GLOBAL_EID][idx1])
                         partid_slice = id_lookup.get_partition_ids(global_dst_nids)
                     
-                    cond = (partid_slice == (part_id + local_part_id*world_size))
+                    cond = (partid_slice == (idx + local_part_id*world_size))
                     gnids_per_partid = gnids_feat[cond]
                     tnids_per_partid = tnids_feat[cond]
                     local_idx_partid = local_idx[cond]
@@ -633,8 +635,9 @@ def gen_dist_partitions(rank, world_size, params):
                                         schema_map[constants.STR_NUM_NODES_PER_CHUNK], params.num_parts)
     id_map = dgl.distributed.id_map.IdMap(global_nid_ranges)
 
-    # The resources, which are node-id to partition-id mappings, are still
-    # into `world_size` (num_processes) parts. 
+    # The resources, which are node-id to partition-id mappings, are split
+    # into `world_size` number of parts, where each part can be mapped to
+    # each physical node.
     id_lookup = DistLookupService(os.path.join(params.input_dir, params.partitions_dir),\
                                     schema_map[constants.STR_NODE_TYPE],\
                                     id_map, rank, world_size)
@@ -737,7 +740,6 @@ def gen_dist_partitions(rank, world_size, params):
             if k.endswith(str(local_part_id)):
                 tokens = k.split("/")
                 local_data['/'.join(tokens[:-1])] = v
-                #src_data.pop(k)
         return local_data
 
     #create dgl objects here
@@ -751,7 +753,7 @@ def gen_dist_partitions(rank, world_size, params):
         local_edge_data = prepare_local_data(edge_data, local_part_id)
         graph_obj, ntypes_map_val, etypes_map_val, ntypes_map, etypes_map, \
             orig_nids, orig_eids = create_dgl_object(schema_map, rank, 
-                    local_part_id, local_node_data, local_edge_data, 
+                    local_node_data, local_edge_data, 
                     num_edges, params.save_orig_nids, params.save_orig_eids)
         for k, v in orig_eids.items():
             logging.info(f'Rank: {rank} k: {k} value -- {v.shape}')

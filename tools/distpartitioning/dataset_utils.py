@@ -144,7 +144,9 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
         for ntype_name, ntype_feature_data in dataset_features.items():
             for feat_name, feat_data in ntype_feature_data.items():
                 assert feat_data[constants.STR_FORMAT][constants.STR_NAME] == constants.STR_NUMPY
-                # Assumption is here is that num_chunks >= num_partitions.
+
+                # It is guaranteed that num_chunks is always greater 
+                # than num_partitions. 
                 num_chunks = len(feat_data[constants.STR_DATA])
                 read_list = np.array_split(np.arange(num_chunks), num_parts)
                 nfeat = []
@@ -168,14 +170,19 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
     else:
         assert len(node_features) == len(node_feature_tids)
 
-        for k, v in node_features.items():
+        for feat_name, feat_info  in node_features.items():
             logging.info(f'[Rank: {rank}] node feature name: {k}, feature data shape: {v.size()}')
-            tids = node_feature_tids[k]
+
+            # Get the range of type ids which are mapped to the current node.
+            tids = node_feature_tids[feat_name]
+
+            # Iterate over the range of type ids for the current node feature
+            # and count the number of features for this feature name.
             count = 0
             for item in tids:
                 count += item[1] - item[0]
 
-            assert count == v.size()[0]
+            assert count == feat_info.size()[0]
 
 
     '''
@@ -218,7 +225,7 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
     edge_features = {}
     edge_feature_tids = {}
 
-    # Read edges for each node types that are processed by the currnet process.
+    # Read edges for each edge type that are processed by the currnet process.
     edge_tids, _ = get_idranges(schema_map[constants.STR_EDGE_TYPE], 
                                     schema_map[constants.STR_NUM_EDGES_PER_CHUNK], num_parts)
 
@@ -336,7 +343,13 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
         read_list = np.array_split(np.arange(num_chunks), num_parts)
         src_ids = []
         dst_ids = []
-        for idx in np.concatenate([read_list[x] for x in range(num_parts) if map_partid_rank(x, world_size) == rank]):
+
+        curr_partids = []
+        for part_id in range(num_parts):
+            if map_partid_rank(part_id, world_size) == rank:
+                curr_partids.append(read_list[part_id])
+
+        for idx in np.concatenate(curr_partids):
             edge_file = edge_info[idx]
             if not os.path.isabs(edge_file):
                 edge_file = os.path.join(input_dir, edge_file)

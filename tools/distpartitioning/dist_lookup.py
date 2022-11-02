@@ -254,7 +254,7 @@ class DistLookupService:
             This process has the node <-> partition id mapping
         my_shuffle_global_nids : numpy ndarray
             array of shuffle_global_nids which are assigned by the current process/rank
-        world_size : integer
+        world_size : int
             total no. of processes in the MPI_WORLD
 
         Returns:
@@ -267,10 +267,19 @@ class DistLookupService:
         # Get the owner_ids (partition-ids or rank).
         owner_ids = self.get_partition_ids(global_nids)
 
-        # These owner_ids are in the range 0 - (num_partitions - 1).
-        # The resources, in this case, ntype-ids, type_nids are split in 
-        # `num_process` parts.
-        # Note that `num_processes` * k = num_partitions where k = 1, 2, 3...
+        # These owner_ids, which are also partition ids of the nodes in the 
+        # input graph, are in the range 0 - (num_partitions - 1).
+        # These ids are generated using some kind of graph partitioning method.
+        # Distribuged lookup service, as used by the graph partitioning 
+        # pipeline, is used to store ntype-ids (also type_nids) and their 
+        # mapping to the associated partition-id. 
+        # These ids are split into `num_process` chunks and processes in the
+        # dist. lookup service are assigned the owernship of these chunks.
+        # The pipeline also enforeces the following constraint among the
+        # pipeline input parameters: num_partitions, num_processes
+        #   num_partitions is an integer multiple of num_processes
+        #   which means each individual node in the cluster will be running
+        #   equal number of processes.
         owner_ids = map_partid_rank(owner_ids, world_size)
 
         # Ask these owners to supply for the shuffle_global_nids.

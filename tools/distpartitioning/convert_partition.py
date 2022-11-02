@@ -17,7 +17,7 @@ from utils import get_idranges, memory_snapshot, read_json
 from dgl.distributed.partition import RESERVED_FIELD_DTYPE
 
 
-def create_dgl_object(schema, part_id, local_part_id, node_data, edge_data, edgeid_offset,
+def create_dgl_object(schema, part_id, node_data, edge_data, edgeid_offset,
                         return_orig_nids=False, return_orig_eids=False):
     """
     This function creates dgl objects for a given graph partition, as in function
