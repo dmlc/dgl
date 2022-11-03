@@ -17,7 +17,6 @@ namespace impl {
 template<typename DType, typename IdType>
 NDArray IndexSelectCPUFromGPU(NDArray array, IdArray index) {
   cudaStream_t stream = runtime::getCurrentCUDAStream();
-  const DType* array_data = static_cast<DType*>(array->data);
   const IdType* idx_data = static_cast<IdType*>(index->data);
   const int64_t arr_len = array->shape[0];
   const int64_t len = index->shape[0];
@@ -25,6 +24,8 @@ NDArray IndexSelectCPUFromGPU(NDArray array, IdArray index) {
   std::vector<int64_t> shape{len};
 
   CHECK(array.IsPinned());
+  const DType* array_data = nullptr;
+  CUDA_CALL(cudaHostGetDevicePointer(&array_data, array.Ptr<DType>(), 0));
   CHECK_EQ(index->ctx.device_type, kDGLCUDA);
 
   for (int d = 1; d < array->ndim; ++d) {
@@ -76,7 +77,6 @@ template NDArray IndexSelectCPUFromGPU<int64_t, int64_t>(NDArray, IdArray);
 template<typename DType, typename IdType>
 void IndexScatterGPUToCPU(NDArray dest, IdArray index, NDArray source) {
   cudaStream_t stream = runtime::getCurrentCUDAStream();
-  DType* dest_data = static_cast<DType*>(dest->data);
   const DType* source_data = static_cast<DType*>(source->data);
   const IdType* idx_data = static_cast<IdType*>(index->data);
   const int64_t arr_len = dest->shape[0];
@@ -85,6 +85,8 @@ void IndexScatterGPUToCPU(NDArray dest, IdArray index, NDArray source) {
   std::vector<int64_t> shape{len};
 
   CHECK(dest.IsPinned());
+  DType* dest_data = nullptr;
+  CUDA_CALL(cudaHostGetDevicePointer(&dest_data, dest.Ptr<DType>(), 0));
   CHECK_EQ(index->ctx.device_type, kDGLCUDA);
   CHECK_EQ(source->ctx.device_type, kDGLCUDA);
 
