@@ -7,17 +7,17 @@
 #ifndef DGL_BASE_HETEROGRAPH_H_
 #define DGL_BASE_HETEROGRAPH_H_
 
-#include <string>
-#include <vector>
-#include <utility>
 #include <algorithm>
 #include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "./runtime/object.h"
+#include "array.h"
 #include "aten/spmat.h"
 #include "aten/types.h"
 #include "graph_interface.h"
-#include "array.h"
 
 namespace dgl {
 
@@ -52,31 +52,26 @@ enum class EdgeDir {
  */
 class BaseHeteroGraph : public runtime::Object {
  public:
-  explicit BaseHeteroGraph(GraphPtr meta_graph): meta_graph_(meta_graph) {}
+  explicit BaseHeteroGraph(GraphPtr meta_graph) : meta_graph_(meta_graph) {}
 
   virtual ~BaseHeteroGraph() = default;
 
-  ////////////////////////// query/operations on meta graph ////////////////////////
+  ////////////////////// query/operations on meta graph ///////////////////////
 
   /*! \return the number of vertex types */
-  virtual uint64_t NumVertexTypes() const {
-    return meta_graph_->NumVertices();
-  }
+  virtual uint64_t NumVertexTypes() const { return meta_graph_->NumVertices(); }
 
   /*! \return the number of edge types */
-  virtual uint64_t NumEdgeTypes() const {
-    return meta_graph_->NumEdges();
-  }
+  virtual uint64_t NumEdgeTypes() const { return meta_graph_->NumEdges(); }
 
   /*! \return given the edge type, find the source type */
-  virtual std::pair<dgl_type_t, dgl_type_t> GetEndpointTypes(dgl_type_t etype) const {
+  virtual std::pair<dgl_type_t, dgl_type_t> GetEndpointTypes(
+      dgl_type_t etype) const {
     return meta_graph_->FindEdge(etype);
   }
 
   /*! \return the meta graph */
-  virtual GraphPtr meta_graph() const {
-    return meta_graph_;
-  }
+  virtual GraphPtr meta_graph() const { return meta_graph_; }
 
   /*!
    * \brief Return the bipartite graph of the given edge type.
@@ -85,7 +80,7 @@ class BaseHeteroGraph : public runtime::Object {
    */
   virtual HeteroGraphPtr GetRelationGraph(dgl_type_t etype) const = 0;
 
-  ////////////////////////// query/operations on realized graph ////////////////////////
+  ///////////////////// query/operations on realized graph /////////////////////
 
   /*! \brief Add vertices to the given vertex type */
   virtual void AddVertices(dgl_type_t vtype, uint64_t num_vertices) = 0;
@@ -128,7 +123,8 @@ class BaseHeteroGraph : public runtime::Object {
   virtual void RecordStream(DGLStreamHandle stream) = 0;
 
   /*!
-   * \brief Get the number of integer bits used to store node/edge ids (32 or 64).
+   * \brief Get the number of integer bits used to store node/edge ids (32 or
+   * 64).
    */
   // TODO(BarclayII) replace NumBits() calls to DataType() calls
   virtual uint8_t NumBits() const = 0;
@@ -156,14 +152,18 @@ class BaseHeteroGraph : public runtime::Object {
   /*! \return true if the given vertex is in the graph.*/
   virtual bool HasVertex(dgl_type_t vtype, dgl_id_t vid) const = 0;
 
-  /*! \return a 0-1 array indicating whether the given vertices are in the graph.*/
+  /*! \return a 0-1 array indicating whether the given vertices are in the
+   * graph.
+   */
   virtual BoolArray HasVertices(dgl_type_t vtype, IdArray vids) const = 0;
 
   /*! \return true if the given edge is in the graph.*/
-  virtual bool HasEdgeBetween(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const = 0;
+  virtual bool HasEdgeBetween(
+      dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const = 0;
 
   /*! \return a 0-1 array indicating whether the given edges are in the graph.*/
-  virtual BoolArray HasEdgesBetween(dgl_type_t etype, IdArray src_ids, IdArray dst_ids) const = 0;
+  virtual BoolArray HasEdgesBetween(
+      dgl_type_t etype, IdArray src_ids, IdArray dst_ids) const = 0;
 
   /*!
    * \brief Find the predecessors of a vertex.
@@ -187,14 +187,13 @@ class BaseHeteroGraph : public runtime::Object {
 
   /*!
    * \brief Get all edge ids between the two given endpoints
-   * \note The given src and dst vertices should belong to the source vertex type
-   *       and the dest vertex type of the given edge type, respectively.
-   * \param etype The edge type
-   * \param src The source vertex.
-   * \param dst The destination vertex.
-   * \return the edge id array.
+   * \note The given src and dst vertices should belong to the source vertex
+   * type and the dest vertex type of the given edge type, respectively. \param
+   * etype The edge type \param src The source vertex. \param dst The
+   * destination vertex. \return the edge id array.
    */
-  virtual IdArray EdgeId(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const = 0;
+  virtual IdArray EdgeId(
+      dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const = 0;
 
   /*!
    * \brief Get all edge ids between the given endpoint pairs.
@@ -204,34 +203,40 @@ class BaseHeteroGraph : public runtime::Object {
    * \param dst The dst vertex ids.
    * \return EdgeArray containing all edges between all pairs.
    */
-  virtual EdgeArray EdgeIdsAll(dgl_type_t etype, IdArray src, IdArray dst) const = 0;
+  virtual EdgeArray EdgeIdsAll(
+      dgl_type_t etype, IdArray src, IdArray dst) const = 0;
 
   /*!
    * \brief Get edge ids between the given endpoint pairs.
    *
-   * Only find one matched edge Ids even if there are multiple matches due to parallel
-   * edges. The i^th Id in the returned array is for edge (src[i], dst[i]).
+   * Only find one matched edge Ids even if there are multiple matches due to
+   * parallel edges. The i^th Id in the returned array is for edge (src[i],
+   * dst[i]).
    *
    * \param etype The edge type
    * \param src The src vertex ids.
    * \param dst The dst vertex ids.
    * \return EdgeArray containing all edges between all pairs.
    */
-  virtual IdArray EdgeIdsOne(dgl_type_t etype, IdArray src, IdArray dst) const = 0;
+  virtual IdArray EdgeIdsOne(
+      dgl_type_t etype, IdArray src, IdArray dst) const = 0;
 
   /*!
    * \brief Find the edge ID and return the pair of endpoints
    * \param etype The edge type
    * \param eid The edge ID
-   * \return a pair whose first element is the source and the second the destination.
+   * \return a pair whose first element is the source and the second the
+   * destination.
    */
-  virtual std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_type_t etype, dgl_id_t eid) const = 0;
+  virtual std::pair<dgl_id_t, dgl_id_t> FindEdge(
+      dgl_type_t etype, dgl_id_t eid) const = 0;
 
   /*!
    * \brief Find the edge IDs and return their source and target node IDs.
    * \param etype The edge type
    * \param eids The edge ID array.
-   * \return EdgeArray containing all edges with id in eid.  The order is preserved.
+   * \return EdgeArray containing all edges with id in eid.  The order is
+   * preserved.
    */
   virtual EdgeArray FindEdges(dgl_type_t etype, IdArray eids) const = 0;
 
@@ -277,14 +282,14 @@ class BaseHeteroGraph : public runtime::Object {
 
   /*!
    * \brief Get all the edges in the graph.
-   * \note If order is "srcdst", the returned edges list is sorted by their src and
-   *       dst ids. If order is "eid", they are in their edge id order.
-   *       Otherwise, in the arbitrary order.
-   * \param etype The edge type
-   * \param order The order of the returned edge list.
-   * \return the id arrays of the two endpoints of the edges.
+   * \note If order is "srcdst", the returned edges list is sorted by their src
+   * and dst ids. If order is "eid", they are in their edge id order. Otherwise,
+   * in the arbitrary order. \param etype The edge type \param order The order
+   * of the returned edge list. \return the id arrays of the two endpoints of
+   * the edges.
    */
-  virtual EdgeArray Edges(dgl_type_t etype, const std::string &order = "") const = 0;
+  virtual EdgeArray Edges(
+      dgl_type_t etype, const std::string& order = "") const = 0;
 
   /*!
    * \brief Get the in degree of the given vertex.
@@ -373,15 +378,15 @@ class BaseHeteroGraph : public runtime::Object {
    * If the fmt is 'csr', the function should return three arrays, representing
    *  indptr, indices and edge ids
    *
-   * If the fmt is 'coo', the function should return one array of shape (2, nnz),
-   * representing a horitonzal stack of row and col indices.
+   * If the fmt is 'coo', the function should return one array of shape (2,
+   * nnz), representing a horitonzal stack of row and col indices.
    *
    * \param transpose A flag to transpose the returned adjacency matrix.
    * \param fmt the format of the returned adjacency matrix.
    * \return a vector of IdArrays.
    */
   virtual std::vector<IdArray> GetAdj(
-      dgl_type_t etype, bool transpose, const std::string &fmt) const = 0;
+      dgl_type_t etype, bool transpose, const std::string& fmt) const = 0;
 
   /*!
    * \brief Determine which format to use with a preference.
@@ -451,39 +456,42 @@ class BaseHeteroGraph : public runtime::Object {
   /*!
    * \brief Extract the induced subgraph by the given vertices.
    *
-   * The length of the given vector should be equal to the number of vertex types.
-   * Empty arrays can be provided if no vertex is needed for the type. The result
-   * subgraph has the same meta graph with the parent, but some types can have no
-   * node/edge.
+   * The length of the given vector should be equal to the number of vertex
+   * types. Empty arrays can be provided if no vertex is needed for the type.
+   * The result subgraph has the same meta graph with the parent, but some types
+   * can have no node/edge.
    *
    * \param vids the induced vertices per type.
    * \return the subgraph.
    */
-  virtual HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const = 0;
+  virtual HeteroSubgraph VertexSubgraph(
+      const std::vector<IdArray>& vids) const = 0;
 
   /*!
    * \brief Extract the induced subgraph by the given edges.
    *
    * The length of the given vector should be equal to the number of edge types.
    * Empty arrays can be provided if no edge is needed for the type. The result
-   * subgraph has the same meta graph with the parent, but some types can have no
-   * node/edge.
+   * subgraph has the same meta graph with the parent, but some types can have
+   * no node/edge.
    *
    * \param eids The edges in the subgraph.
-   * \param preserve_nodes If true, the vertices will not be relabeled, so some vertices
-   *                       may have no incident edges.
-   * \return the subgraph.
+   * \param preserve_nodes If true, the vertices will not be relabeled, so some
+   * vertices may have no incident edges. \return the subgraph.
    */
   virtual HeteroSubgraph EdgeSubgraph(
       const std::vector<IdArray>& eids, bool preserve_nodes = false) const = 0;
 
   /*!
-   * \brief Convert the list of requested unitgraph graphs into a single unitgraph graph.
+   * \brief Convert the list of requested unitgraph graphs into a single
+   * unitgraph graph.
    *
    * \param etypes The list of edge type IDs.
-   * \return The flattened graph, with induced source/edge/destination types/IDs.
+   * \return The flattened graph, with induced source/edge/destination
+   * types/IDs.
    */
-  virtual FlattenedHeteroGraphPtr Flatten(const std::vector<dgl_type_t>& etypes) const {
+  virtual FlattenedHeteroGraphPtr Flatten(
+      const std::vector<dgl_type_t>& etypes) const {
     LOG(FATAL) << "Flatten operation unsupported";
     return nullptr;
   }
@@ -502,7 +510,7 @@ class BaseHeteroGraph : public runtime::Object {
   GraphPtr meta_graph_;
 
   // empty constructor
-  BaseHeteroGraph(){}
+  BaseHeteroGraph() {}
 };
 
 // Define HeteroGraphRef
@@ -527,9 +535,9 @@ struct HeteroSubgraph : public runtime::Object {
   HeteroGraphPtr graph;
   /*!
    * \brief The induced vertex ids of each entity type.
-   * The vector length is equal to the number of vertex types in the parent graph.
-   * Each array i has the same length as the number of vertices in type i.
-   * Empty array is allowed if the mapping is identity.
+   * The vector length is equal to the number of vertex types in the parent
+   * graph. Each array i has the same length as the number of vertices in type
+   * i. Empty array is allowed if the mapping is identity.
    */
   std::vector<IdArray> induced_vertices;
   /*!
@@ -553,7 +561,8 @@ struct FlattenedHeteroGraph : public runtime::Object {
   HeteroGraphRef graph;
   /*!
    * \brief Mapping from source node ID to node type in parent graph
-   * \note The induced type array guarantees that the same type always appear contiguously.
+   * \note The induced type array guarantees that the same type always appear
+   * contiguously.
    */
   IdArray induced_srctype;
   /*!
@@ -564,7 +573,8 @@ struct FlattenedHeteroGraph : public runtime::Object {
   IdArray induced_srcid;
   /*!
    * \brief Mapping from edge ID to edge type in parent graph
-   * \note The induced type array guarantees that the same type always appear contiguously.
+   * \note The induced type array guarantees that the same type always appear
+   * contiguously.
    */
   IdArray induced_etype;
   /*!
@@ -575,17 +585,20 @@ struct FlattenedHeteroGraph : public runtime::Object {
   IdArray induced_eid;
   /*!
    * \brief Mapping from destination node ID to node type in parent graph
-   * \note The induced type array guarantees that the same type always appear contiguously.
+   * \note The induced type array guarantees that the same type always appear
+   * contiguously.
    */
   IdArray induced_dsttype;
   /*!
-   * \brief The set of node types in parent graph appearing in destination nodes.
+   * \brief The set of node types in parent graph appearing in destination
+   * nodes.
    */
   IdArray induced_dsttype_set;
-  /*! \brief Mapping from destination node ID to local node ID in parent graph */
+  /*! \brief Mapping from destination node ID to local node ID in parent graph
+   */
   IdArray induced_dstid;
 
-  void VisitAttrs(runtime::AttrVisitor *v) final {
+  void VisitAttrs(runtime::AttrVisitor* v) final {
     v->Visit("graph", &graph);
     v->Visit("induced_srctype", &induced_srctype);
     v->Visit("induced_srctype_set", &induced_srctype_set);
@@ -610,9 +623,8 @@ DGL_DEFINE_OBJECT_REF(FlattenedHeteroGraphRef, FlattenedHeteroGraph);
  * additionally specifying number of nodes per type.
  */
 HeteroGraphPtr CreateHeteroGraph(
-    GraphPtr meta_graph,
-    const std::vector<HeteroGraphPtr> &rel_graphs,
-    const std::vector<int64_t> &num_nodes_per_type = {});
+    GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& rel_graphs,
+    const std::vector<int64_t>& num_nodes_per_type = {});
 
 /*!
  * \brief Create a heterograph from COO input.
@@ -629,8 +641,8 @@ HeteroGraphPtr CreateHeteroGraph(
  * \return A heterograph pointer.
  */
 HeteroGraphPtr CreateFromCOO(
-    int64_t num_vtypes, int64_t num_src, int64_t num_dst,
-    IdArray row, IdArray col, bool row_sorted = false, bool col_sorted = false,
+    int64_t num_vtypes, int64_t num_src, int64_t num_dst, IdArray row,
+    IdArray col, bool row_sorted = false, bool col_sorted = false,
     dgl_format_code_t formats = ALL_CODE);
 
 /*!
@@ -656,9 +668,8 @@ HeteroGraphPtr CreateFromCOO(
  * \return A heterograph pointer.
  */
 HeteroGraphPtr CreateFromCSR(
-    int64_t num_vtypes, int64_t num_src, int64_t num_dst,
-    IdArray indptr, IdArray indices, IdArray edge_ids,
-    dgl_format_code_t formats = ALL_CODE);
+    int64_t num_vtypes, int64_t num_src, int64_t num_dst, IdArray indptr,
+    IdArray indices, IdArray edge_ids, dgl_format_code_t formats = ALL_CODE);
 
 /*!
  * \brief Create a heterograph from CSR input.
@@ -683,9 +694,8 @@ HeteroGraphPtr CreateFromCSR(
  * \return A heterograph pointer.
  */
 HeteroGraphPtr CreateFromCSC(
-    int64_t num_vtypes, int64_t num_src, int64_t num_dst,
-    IdArray indptr, IdArray indices, IdArray edge_ids,
-    dgl_format_code_t formats = ALL_CODE);
+    int64_t num_vtypes, int64_t num_src, int64_t num_dst, IdArray indptr,
+    IdArray indices, IdArray edge_ids, dgl_format_code_t formats = ALL_CODE);
 
 /*!
  * \brief Create a heterograph from CSC input.
@@ -702,23 +712,25 @@ HeteroGraphPtr CreateFromCSC(
  * \brief Extract the subgraph of the in edges of the given nodes.
  * \param graph Graph
  * \param nodes Node IDs of each type
- * \param relabel_nodes Whether to remove isolated nodes and relabel the rest ones
- * \return Subgraph containing only the in edges. The returned graph has the same
- *         schema as the original one.
+ * \param relabel_nodes Whether to remove isolated nodes and relabel the rest
+ * ones \return Subgraph containing only the in edges. The returned graph has
+ * the same schema as the original one.
  */
 HeteroSubgraph InEdgeGraph(
-    const HeteroGraphPtr graph, const std::vector<IdArray>& nodes, bool relabel_nodes = false);
+    const HeteroGraphPtr graph, const std::vector<IdArray>& nodes,
+    bool relabel_nodes = false);
 
 /*!
  * \brief Extract the subgraph of the out edges of the given nodes.
  * \param graph Graph
  * \param nodes Node IDs of each type
- * \param relabel_nodes Whether to remove isolated nodes and relabel the rest ones
- * \return Subgraph containing only the out edges. The returned graph has the same
- *         schema as the original one.
+ * \param relabel_nodes Whether to remove isolated nodes and relabel the rest
+ * ones \return Subgraph containing only the out edges. The returned graph has
+ * the same schema as the original one.
  */
 HeteroSubgraph OutEdgeGraph(
-    const HeteroGraphPtr graph, const std::vector<IdArray>& nodes, bool relabel_nodes = false);
+    const HeteroGraphPtr graph, const std::vector<IdArray>& nodes,
+    bool relabel_nodes = false);
 
 /*!
  * \brief Joint union multiple graphs into one graph.
@@ -735,7 +747,8 @@ HeteroGraphPtr JointUnionHeteroGraph(
     GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& component_graphs);
 
 /*!
- * \brief Union multiple graphs into one with each input graph as one disjoint component.
+ * \brief Union multiple graphs into one with each input graph as one disjoint
+ * component.
  *
  * All input graphs should have the same metagraph.
  *
@@ -754,7 +767,8 @@ HeteroGraphPtr DisjointUnionHeteroGraph2(
     GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& component_graphs);
 
 /*!
- * \brief Slice a contiguous subgraph, e.g. retrieve a component graph from a batched graph.
+ * \brief Slice a contiguous subgraph, e.g. retrieve a component graph from a
+ * batched graph.
  *
  * TODO(mufei): remove the meta_graph argument
  *
@@ -767,25 +781,22 @@ HeteroGraphPtr DisjointUnionHeteroGraph2(
  * \return Sliced graph
  */
 HeteroGraphPtr SliceHeteroGraph(
-    GraphPtr meta_graph,
-    HeteroGraphPtr batched_graph,
-    IdArray num_nodes_per_type,
-    IdArray start_nid_per_type,
-    IdArray num_edges_per_type,
-    IdArray start_eid_per_type);
+    GraphPtr meta_graph, HeteroGraphPtr batched_graph,
+    IdArray num_nodes_per_type, IdArray start_nid_per_type,
+    IdArray num_edges_per_type, IdArray start_eid_per_type);
 
 /*!
  * \brief Split a graph into multiple disjoin components.
  *
- * Edges across different components are ignored. All the result graphs have the same
- * metagraph as the input one.
+ * Edges across different components are ignored. All the result graphs have the
+ * same metagraph as the input one.
  *
- * The `vertex_sizes` and `edge_sizes` arrays the concatenation of arrays of each
- * node/edge type. Suppose there are N vertex types, then the array length should
- * be B*N, where B is the number of components to split.
+ * The `vertex_sizes` and `edge_sizes` arrays the concatenation of arrays of
+ * each node/edge type. Suppose there are N vertex types, then the array length
+ * should be B*N, where B is the number of components to split.
  *
- * TODO(minjie): remove the meta_graph argument; use vector<IdArray> for vertex_sizes
- *   and edge_sizes.
+ * TODO(minjie): remove the meta_graph argument; use vector<IdArray> for
+ * vertex_sizes and edge_sizes.
  *
  * \tparam IdType Graph's index data type, can be int32_t or int64_t
  * \param meta_graph Metagraph.
@@ -796,16 +807,11 @@ HeteroGraphPtr SliceHeteroGraph(
  */
 template <class IdType>
 std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes(
-    GraphPtr meta_graph,
-    HeteroGraphPtr batched_graph,
-    IdArray vertex_sizes,
+    GraphPtr meta_graph, HeteroGraphPtr batched_graph, IdArray vertex_sizes,
     IdArray edge_sizes);
 
-
 std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes2(
-    GraphPtr meta_graph,
-    HeteroGraphPtr batched_graph,
-    IdArray vertex_sizes,
+    GraphPtr meta_graph, HeteroGraphPtr batched_graph, IdArray vertex_sizes,
     IdArray edge_sizes);
 
 /*!
@@ -862,7 +868,8 @@ DGL_DEFINE_OBJECT_REF(HeteroPickleStatesRef, HeteroPickleStates);
 HeteroGraphPtr HeteroUnpickle(const HeteroPickleStates& states);
 
 /*!
- * \brief Get the pickling state of the relation graph structure in backend tensors.
+ * \brief Get the pickling state of the relation graph structure in backend
+ * tensors.
  *
  * \return a HeteroPickleStates object
  */
@@ -886,8 +893,8 @@ HeteroGraphPtr HeteroUnpickleOld(const HeteroPickleStates& states);
 HeteroGraphPtr HeteroForkingUnpickle(const HeteroPickleStates& states);
 
 /*!
- * \brief Get the pickling states of the relation graph structure in backend tensors for
- * ForkingPickler.
+ * \brief Get the pickling states of the relation graph structure in backend
+ * tensors for ForkingPickler.
  *
  * This is different from HeteroPickle where
  * (1) Backward compatibility is not required,
@@ -895,14 +902,11 @@ HeteroGraphPtr HeteroForkingUnpickle(const HeteroPickleStates& states);
  */
 HeteroPickleStates HeteroForkingPickle(HeteroGraphPtr graph);
 
-#define FORMAT_HAS_CSC(format) \
-  ((format) & CSC_CODE)
+#define FORMAT_HAS_CSC(format) ((format)&CSC_CODE)
 
-#define FORMAT_HAS_CSR(format) \
-  ((format) & CSR_CODE)
+#define FORMAT_HAS_CSR(format) ((format)&CSR_CODE)
 
-#define FORMAT_HAS_COO(format) \
-  ((format) & COO_CODE)
+#define FORMAT_HAS_COO(format) ((format)&COO_CODE)
 
 }  // namespace dgl
 

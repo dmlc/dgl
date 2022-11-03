@@ -4,8 +4,10 @@
  * \brief COO matrix remove entries CPU implementation
  */
 #include <dgl/array.h>
+
 #include <utility>
 #include <vector>
+
 #include "array_utils.h"
 
 namespace dgl {
@@ -15,14 +17,12 @@ namespace impl {
 
 namespace {
 
-/*! \brief COORemove implementation for COOMatrix with default consecutive edge IDs */
+/*! \brief COORemove implementation for COOMatrix with default consecutive edge
+ * IDs */
 template <DGLDeviceType XPU, typename IdType>
 void COORemoveConsecutive(
-    COOMatrix coo,
-    IdArray entries,
-    std::vector<IdType> *new_rows,
-    std::vector<IdType> *new_cols,
-    std::vector<IdType> *new_eids) {
+    COOMatrix coo, IdArray entries, std::vector<IdType> *new_rows,
+    std::vector<IdType> *new_cols, std::vector<IdType> *new_eids) {
   const int64_t nnz = coo.row->shape[0];
   const int64_t n_entries = entries->shape[0];
   const IdType *row_data = static_cast<IdType *>(coo.row->data);
@@ -36,8 +36,7 @@ void COORemoveConsecutive(
   for (int64_t i = 0; i < nnz; ++i) {
     if (j < n_entries && entry_data_sorted[j] == i) {
       // Move on to the next different entry
-      while (j < n_entries && entry_data_sorted[j] == i)
-        ++j;
+      while (j < n_entries && entry_data_sorted[j] == i) ++j;
       continue;
     }
     new_rows->push_back(row_data[i]);
@@ -49,11 +48,8 @@ void COORemoveConsecutive(
 /*! \brief COORemove implementation for COOMatrix with shuffled edge IDs */
 template <DGLDeviceType XPU, typename IdType>
 void COORemoveShuffled(
-    COOMatrix coo,
-    IdArray entries,
-    std::vector<IdType> *new_rows,
-    std::vector<IdType> *new_cols,
-    std::vector<IdType> *new_eids) {
+    COOMatrix coo, IdArray entries, std::vector<IdType> *new_rows,
+    std::vector<IdType> *new_cols, std::vector<IdType> *new_eids) {
   const int64_t nnz = coo.row->shape[0];
   const IdType *row_data = static_cast<IdType *>(coo.row->data);
   const IdType *col_data = static_cast<IdType *>(coo.col->data);
@@ -63,8 +59,7 @@ void COORemoveShuffled(
 
   for (int64_t i = 0; i < nnz; ++i) {
     const IdType eid = eid_data[i];
-    if (eid_map.Contains(eid))
-      continue;
+    if (eid_map.Contains(eid)) continue;
     new_rows->push_back(row_data[i]);
     new_cols->push_back(col_data[i]);
     new_eids->push_back(eid);
@@ -77,8 +72,7 @@ template <DGLDeviceType XPU, typename IdType>
 COOMatrix COORemove(COOMatrix coo, IdArray entries) {
   const int64_t nnz = coo.row->shape[0];
   const int64_t n_entries = entries->shape[0];
-  if (n_entries == 0)
-    return coo;
+  if (n_entries == 0) return coo;
 
   std::vector<IdType> new_rows, new_cols, new_eids;
   new_rows.reserve(nnz - n_entries);
@@ -86,16 +80,16 @@ COOMatrix COORemove(COOMatrix coo, IdArray entries) {
   new_eids.reserve(nnz - n_entries);
 
   if (COOHasData(coo))
-    COORemoveShuffled<XPU, IdType>(coo, entries, &new_rows, &new_cols, &new_eids);
+    COORemoveShuffled<XPU, IdType>(
+        coo, entries, &new_rows, &new_cols, &new_eids);
   else
     // Removing from COO ordered by eid has more efficient implementation.
-    COORemoveConsecutive<XPU, IdType>(coo, entries, &new_rows, &new_cols, &new_eids);
+    COORemoveConsecutive<XPU, IdType>(
+        coo, entries, &new_rows, &new_cols, &new_eids);
 
   return COOMatrix(
-      coo.num_rows, coo.num_cols,
-      IdArray::FromVector(new_rows),
-      IdArray::FromVector(new_cols),
-      IdArray::FromVector(new_eids));
+      coo.num_rows, coo.num_cols, IdArray::FromVector(new_rows),
+      IdArray::FromVector(new_cols), IdArray::FromVector(new_eids));
 }
 
 template COOMatrix COORemove<kDGLCPU, int32_t>(COOMatrix coo, IdArray entries);

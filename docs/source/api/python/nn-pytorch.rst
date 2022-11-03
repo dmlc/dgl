@@ -114,6 +114,7 @@ Utility Modules
     ~dgl.nn.pytorch.explain.GNNExplainer
     ~dgl.nn.pytorch.explain.HeteroGNNExplainer
     ~dgl.nn.pytorch.utils.LabelPropagation
+    ~dgl.nn.pytorch.graph_transformer.DegreeEncoder
     ~dgl.nn.pytorch.utils.LaplacianPosEnc
 
 Network Embedding Modules
