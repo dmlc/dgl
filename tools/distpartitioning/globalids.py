@@ -98,10 +98,7 @@ def lookup_shuffle_global_nids_edges(rank, world_size, edge_data, id_lookup, nod
     # Determine the no. of times each process has to send alltoall messages.
     all_sizes = allgather_sizes([node_list.shape[0]], world_size, return_sizes=True)
     max_count = np.amax(all_sizes)
-    if max_count >= BATCH_SIZE:
-        num_splits = max_count // BATCH_SIZE + 1
-    else:
-        num_splits = 1
+    num_splits = max_count // BATCH_SIZE + 1
 
     # Split the message into batches and send.
     splits = np.array_split(node_list, num_splits)
