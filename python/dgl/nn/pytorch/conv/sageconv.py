@@ -128,7 +128,7 @@ class SAGEConv(nn.Module):
             self.fc_pool = nn.Linear(self._in_src_feats, self._in_src_feats)
         if aggregator_type == 'lstm':
             self.lstm = nn.LSTM(self._in_src_feats, self._in_src_feats, batch_first=True)
-        
+
         self.fc_neigh = nn.Linear(self._in_src_feats, out_feats, bias=False)
 
         if aggregator_type != 'gcn':
