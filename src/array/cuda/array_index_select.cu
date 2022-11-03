@@ -18,7 +18,7 @@ template <DGLDeviceType XPU, typename DType, typename IdType>
 NDArray IndexSelect(NDArray array, IdArray index) {
   cudaStream_t stream = runtime::getCurrentCUDAStream();
   const DType* array_data = array.Ptr<DType>();
-  if (array->ctx.device_type == kDGLCPU) {
+  if (array.IsPinned()) {
     CUDA_CALL(cudaHostGetDevicePointer(&array_data, array.Ptr<DType>(), 0));
   }
   const IdType* idx_data = static_cast<IdType*>(index->data);
