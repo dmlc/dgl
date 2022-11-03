@@ -20,9 +20,9 @@ namespace sampling {
 
 namespace {
 
-void CheckNode2vecInputs(const HeteroGraphPtr hg, const IdArray seeds,
-                         const double p, const double q,
-                         const int64_t walk_length, const FloatArray &prob) {
+void CheckNode2vecInputs(
+    const HeteroGraphPtr hg, const IdArray seeds, const double p,
+    const double q, const int64_t walk_length, const FloatArray &prob) {
   CHECK_INT(seeds, "seeds");
   CHECK_NDIM(seeds, 1, "seeds");
   CHECK_FLOAT(prob, "probability");
@@ -31,8 +31,7 @@ void CheckNode2vecInputs(const HeteroGraphPtr hg, const IdArray seeds,
 
 std::pair<IdArray, IdArray> Node2vec(
     const HeteroGraphPtr hg, const IdArray seeds, const double p,
-    const double q, const int64_t walk_length,
-    const FloatArray &prob) {
+    const double q, const int64_t walk_length, const FloatArray &prob) {
   CheckNode2vecInputs(hg, seeds, p, q, walk_length, prob);
 
   std::pair<IdArray, IdArray> result;
