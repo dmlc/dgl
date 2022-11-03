@@ -87,7 +87,7 @@ def etype2canonical_etype(part_config, config):
             )
             canonical_etypes.update(c_etype)
         return canonical_etypes
-    except ValueError as e:
+    except KeyError as e:
         print(e)
 
 
