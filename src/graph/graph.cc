@@ -5,11 +5,13 @@
  */
 #include <dgl/graph.h>
 #include <dgl/sampler.h>
+
 #include <algorithm>
-#include <unordered_map>
-#include <set>
 #include <functional>
+#include <set>
 #include <tuple>
+#include <unordered_map>
+
 #include "../c_api_common.h"
 
 namespace dgl {
@@ -20,16 +22,16 @@ Graph::Graph(IdArray src_ids, IdArray dst_ids, size_t num_nodes) {
   this->AddVertices(num_nodes);
   num_edges_ = src_ids->shape[0];
   CHECK(static_cast<int64_t>(num_edges_) == dst_ids->shape[0])
-    << "vectors in COO must have the same length";
-  const dgl_id_t *src_data = static_cast<dgl_id_t*>(src_ids->data);
-  const dgl_id_t *dst_data = static_cast<dgl_id_t*>(dst_ids->data);
+      << "vectors in COO must have the same length";
+  const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_ids->data);
+  const dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst_ids->data);
   all_edges_src_.reserve(num_edges_);
   all_edges_dst_.reserve(num_edges_);
   for (uint64_t i = 0; i < num_edges_; i++) {
     auto src = src_data[i];
     auto dst = dst_data[i];
     CHECK(HasVertex(src) && HasVertex(dst))
-      << "Invalid vertices: src=" << src << " dst=" << dst;
+        << "Invalid vertices: src=" << src << " dst=" << dst;
 
     adjlist_[src].succ.push_back(dst);
     adjlist_[src].edge_id.push_back(i);
@@ -53,16 +55,16 @@ bool Graph::IsMultigraph() const {
     pairs.emplace_back(all_edges_src_[eid], all_edges_dst_[eid]);
   }
   // sort according to src and dst ids
-  std::sort(pairs.begin(), pairs.end(),
-      [] (const Pair& t1, const Pair& t2) {
-        return std::get<0>(t1) < std::get<0>(t2)
-          || (std::get<0>(t1) == std::get<0>(t2) && std::get<1>(t1) < std::get<1>(t2));
-      });
-  for (uint64_t eid = 0; eid < num_edges_-1; ++eid) {
+  std::sort(pairs.begin(), pairs.end(), [](const Pair& t1, const Pair& t2) {
+    return std::get<0>(t1) < std::get<0>(t2) ||
+           (std::get<0>(t1) == std::get<0>(t2) &&
+            std::get<1>(t1) < std::get<1>(t2));
+  });
+  for (uint64_t eid = 0; eid < num_edges_ - 1; ++eid) {
     // As src and dst are all sorted, we only need to compare i and i+1
-    if (std::get<0>(pairs[eid]) == std::get<0>(pairs[eid+1]) &&
-        std::get<1>(pairs[eid]) == std::get<1>(pairs[eid+1]))
-        return true;
+    if (std::get<0>(pairs[eid]) == std::get<0>(pairs[eid + 1]) &&
+        std::get<1>(pairs[eid]) == std::get<1>(pairs[eid + 1]))
+      return true;
   }
 
   return false;
@@ -77,7 +79,7 @@ void Graph::AddVertices(uint64_t num_vertices) {
 void Graph::AddEdge(dgl_id_t src, dgl_id_t dst) {
   CHECK(!read_only_) << "Graph is read-only. Mutations are not allowed.";
   CHECK(HasVertex(src) && HasVertex(dst))
-    << "Invalid vertices: src=" << src << " dst=" << dst;
+      << "Invalid vertices: src=" << src << " dst=" << dst;
 
   dgl_id_t eid = num_edges_++;
 
@@ -125,7 +127,7 @@ BoolArray Graph::HasVertices(IdArray vids) const {
   int64_t* rst_data = static_cast<int64_t*>(rst->data);
   const int64_t nverts = NumVertices();
   for (int64_t i = 0; i < len; ++i) {
-    rst_data[i] = (vid_data[i] < nverts && vid_data[i] >= 0)? 1 : 0;
+    rst_data[i] = (vid_data[i] < nverts && vid_data[i] >= 0) ? 1 : 0;
   }
   return rst;
 }
@@ -151,18 +153,18 @@ BoolArray Graph::HasEdgesBetween(IdArray src_ids, IdArray dst_ids) const {
   if (srclen == 1) {
     // one-many
     for (int64_t i = 0; i < dstlen; ++i) {
-      rst_data[i] = HasEdgeBetween(src_data[0], dst_data[i])? 1 : 0;
+      rst_data[i] = HasEdgeBetween(src_data[0], dst_data[i]) ? 1 : 0;
     }
   } else if (dstlen == 1) {
     // many-one
     for (int64_t i = 0; i < srclen; ++i) {
-      rst_data[i] = HasEdgeBetween(src_data[i], dst_data[0])? 1 : 0;
+      rst_data[i] = HasEdgeBetween(src_data[i], dst_data[0]) ? 1 : 0;
     }
   } else {
     // many-many
     CHECK(srclen == dstlen) << "Invalid src and dst id array.";
     for (int64_t i = 0; i < srclen; ++i) {
-      rst_data[i] = HasEdgeBetween(src_data[i], dst_data[i])? 1 : 0;
+      rst_data[i] = HasEdgeBetween(src_data[i], dst_data[i]) ? 1 : 0;
     }
   }
   return rst;
@@ -174,11 +176,11 @@ IdArray Graph::Predecessors(dgl_id_t vid, uint64_t radius) const {
   CHECK(radius >= 1) << "invalid radius: " << radius;
   std::set<dgl_id_t> vset;
 
-  for (auto& it : reverse_adjlist_[vid].succ)
-    vset.insert(it);
+  for (auto& it : reverse_adjlist_[vid].succ) vset.insert(it);
 
   const int64_t len = vset.size();
-  IdArray rst = IdArray::Empty({len}, DGLDataType{kDGLInt, 64, 1}, DGLContext{kDGLCPU, 0});
+  IdArray rst = IdArray::Empty(
+      {len}, DGLDataType{kDGLInt, 64, 1}, DGLContext{kDGLCPU, 0});
   int64_t* rst_data = static_cast<int64_t*>(rst->data);
 
   std::copy(vset.begin(), vset.end(), rst_data);
@@ -191,11 +193,11 @@ IdArray Graph::Successors(dgl_id_t vid, uint64_t radius) const {
   CHECK(radius >= 1) << "invalid radius: " << radius;
   std::set<dgl_id_t> vset;
 
-  for (auto& it : adjlist_[vid].succ)
-    vset.insert(it);
+  for (auto& it : adjlist_[vid].succ) vset.insert(it);
 
   const int64_t len = vset.size();
-  IdArray rst = IdArray::Empty({len}, DGLDataType{kDGLInt, 64, 1}, DGLContext{kDGLCPU, 0});
+  IdArray rst = IdArray::Empty(
+      {len}, DGLDataType{kDGLInt, 64, 1}, DGLContext{kDGLCPU, 0});
   int64_t* rst_data = static_cast<int64_t*>(rst->data);
 
   std::copy(vset.begin(), vset.end(), rst_data);
@@ -204,19 +206,20 @@ IdArray Graph::Successors(dgl_id_t vid, uint64_t radius) const {
 
 // O(E)
 IdArray Graph::EdgeId(dgl_id_t src, dgl_id_t dst) const {
-  CHECK(HasVertex(src) && HasVertex(dst)) << "invalid edge: " << src << " -> " << dst;
+  CHECK(HasVertex(src) && HasVertex(dst))
+      << "invalid edge: " << src << " -> " << dst;
 
   const auto& succ = adjlist_[src].succ;
   std::vector<dgl_id_t> edgelist;
 
   for (size_t i = 0; i < succ.size(); ++i) {
-    if (succ[i] == dst)
-      edgelist.push_back(adjlist_[src].edge_id[i]);
+    if (succ[i] == dst) edgelist.push_back(adjlist_[src].edge_id[i]);
   }
 
   // FIXME: signed?  Also it seems that we are using int64_t everywhere...
   const int64_t len = edgelist.size();
-  IdArray rst = IdArray::Empty({len}, DGLDataType{kDGLInt, 64, 1}, DGLContext{kDGLCPU, 0});
+  IdArray rst = IdArray::Empty(
+      {len}, DGLDataType{kDGLInt, 64, 1}, DGLContext{kDGLCPU, 0});
   // FIXME: signed?
   int64_t* rst_data = static_cast<int64_t*>(rst->data);
 
@@ -234,7 +237,7 @@ EdgeArray Graph::EdgeIds(IdArray src_ids, IdArray dst_ids) const {
   int64_t i, j;
 
   CHECK((srclen == dstlen) || (srclen == 1) || (dstlen == 1))
-    << "Invalid src and dst id array.";
+      << "Invalid src and dst id array.";
 
   const int64_t src_stride = (srclen == 1 && dstlen != 1) ? 0 : 1;
   const int64_t dst_stride = (dstlen == 1 && srclen != 1) ? 0 : 1;
@@ -243,10 +246,11 @@ EdgeArray Graph::EdgeIds(IdArray src_ids, IdArray dst_ids) const {
 
   std::vector<dgl_id_t> src, dst, eid;
 
-  for (i = 0, j = 0; i < srclen && j < dstlen; i += src_stride, j += dst_stride) {
+  for (i = 0, j = 0; i < srclen && j < dstlen;
+       i += src_stride, j += dst_stride) {
     const dgl_id_t src_id = src_data[i], dst_id = dst_data[j];
-    CHECK(HasVertex(src_id) && HasVertex(dst_id)) <<
-        "invalid edge: " << src_id << " -> " << dst_id;
+    CHECK(HasVertex(src_id) && HasVertex(dst_id))
+        << "invalid edge: " << src_id << " -> " << dst_id;
     const auto& succ = adjlist_[src_id].succ;
     for (size_t k = 0; k < succ.size(); ++k) {
       if (succ[k] == dst_id) {
@@ -286,8 +290,7 @@ EdgeArray Graph::FindEdges(IdArray eids) const {
 
   for (uint64_t i = 0; i < (uint64_t)len; ++i) {
     dgl_id_t eid = eid_data[i];
-    if (eid >= num_edges_)
-      LOG(FATAL) << "invalid edge id:" << eid;
+    if (eid >= num_edges_) LOG(FATAL) << "invalid edge id:" << eid;
 
     rst_src_data[i] = all_edges_src_[eid];
     rst_dst_data[i] = all_edges_dst_[eid];
@@ -301,9 +304,12 @@ EdgeArray Graph::FindEdges(IdArray eids) const {
 EdgeArray Graph::InEdges(dgl_id_t vid) const {
   CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
   const int64_t len = reverse_adjlist_[vid].succ.size();
-  IdArray src = IdArray::Empty({len}, DGLDataType{kDGLInt, 64, 1}, DGLContext{kDGLCPU, 0});
-  IdArray dst = IdArray::Empty({len}, DGLDataType{kDGLInt, 64, 1}, DGLContext{kDGLCPU, 0});
-  IdArray eid = IdArray::Empty({len}, DGLDataType{kDGLInt, 64, 1}, DGLContext{kDGLCPU, 0});
+  IdArray src = IdArray::Empty(
+      {len}, DGLDataType{kDGLInt, 64, 1}, DGLContext{kDGLCPU, 0});
+  IdArray dst = IdArray::Empty(
+      {len}, DGLDataType{kDGLInt, 64, 1}, DGLContext{kDGLCPU, 0});
+  IdArray eid = IdArray::Empty(
+      {len}, DGLDataType{kDGLInt, 64, 1}, DGLContext{kDGLCPU, 0});
   int64_t* src_data = static_cast<int64_t*>(src->data);
   int64_t* dst_data = static_cast<int64_t*>(dst->data);
   int64_t* eid_data = static_cast<int64_t*>(eid->data);
@@ -347,9 +353,12 @@ EdgeArray Graph::InEdges(IdArray vids) const {
 EdgeArray Graph::OutEdges(dgl_id_t vid) const {
   CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
   const int64_t len = adjlist_[vid].succ.size();
-  IdArray src = IdArray::Empty({len}, DGLDataType{kDGLInt, 64, 1}, DGLContext{kDGLCPU, 0});
-  IdArray dst = IdArray::Empty({len}, DGLDataType{kDGLInt, 64, 1}, DGLContext{kDGLCPU, 0});
-  IdArray eid = IdArray::Empty({len}, DGLDataType{kDGLInt, 64, 1}, DGLContext{kDGLCPU, 0});
+  IdArray src = IdArray::Empty(
+      {len}, DGLDataType{kDGLInt, 64, 1}, DGLContext{kDGLCPU, 0});
+  IdArray dst = IdArray::Empty(
+      {len}, DGLDataType{kDGLInt, 64, 1}, DGLContext{kDGLCPU, 0});
+  IdArray eid = IdArray::Empty(
+      {len}, DGLDataType{kDGLInt, 64, 1}, DGLContext{kDGLCPU, 0});
   int64_t* src_data = static_cast<int64_t*>(src->data);
   int64_t* dst_data = static_cast<int64_t*>(dst->data);
   int64_t* eid_data = static_cast<int64_t*>(eid->data);
@@ -390,11 +399,14 @@ EdgeArray Graph::OutEdges(IdArray vids) const {
 }
 
 // O(E*log(E)) if sort is required; otherwise, O(E)
-EdgeArray Graph::Edges(const std::string &order) const {
+EdgeArray Graph::Edges(const std::string& order) const {
   const int64_t len = num_edges_;
-  IdArray src = IdArray::Empty({len}, DGLDataType{kDGLInt, 64, 1}, DGLContext{kDGLCPU, 0});
-  IdArray dst = IdArray::Empty({len}, DGLDataType{kDGLInt, 64, 1}, DGLContext{kDGLCPU, 0});
-  IdArray eid = IdArray::Empty({len}, DGLDataType{kDGLInt, 64, 1}, DGLContext{kDGLCPU, 0});
+  IdArray src = IdArray::Empty(
+      {len}, DGLDataType{kDGLInt, 64, 1}, DGLContext{kDGLCPU, 0});
+  IdArray dst = IdArray::Empty(
+      {len}, DGLDataType{kDGLInt, 64, 1}, DGLContext{kDGLCPU, 0});
+  IdArray eid = IdArray::Empty(
+      {len}, DGLDataType{kDGLInt, 64, 1}, DGLContext{kDGLCPU, 0});
 
   if (order == "srcdst") {
     typedef std::tuple<int64_t, int64_t, int64_t> Tuple;
@@ -404,10 +416,11 @@ EdgeArray Graph::Edges(const std::string &order) const {
       tuples.emplace_back(all_edges_src_[eid], all_edges_dst_[eid], eid);
     }
     // sort according to src and dst ids
-    std::sort(tuples.begin(), tuples.end(),
-        [] (const Tuple& t1, const Tuple& t2) {
-          return std::get<0>(t1) < std::get<0>(t2)
-            || (std::get<0>(t1) == std::get<0>(t2) && std::get<1>(t1) < std::get<1>(t2));
+    std::sort(
+        tuples.begin(), tuples.end(), [](const Tuple& t1, const Tuple& t2) {
+          return std::get<0>(t1) < std::get<0>(t2) ||
+                 (std::get<0>(t1) == std::get<0>(t2) &&
+                  std::get<1>(t1) < std::get<1>(t2));
         });
 
     // make return arrays
@@ -488,8 +501,11 @@ Subgraph Graph::VertexSubgraph(IdArray vids) const {
       }
     }
   }
-  rst.induced_edges = IdArray::Empty({static_cast<int64_t>(edges.size())}, vids->dtype, vids->ctx);
-  std::copy(edges.begin(), edges.end(), static_cast<int64_t*>(rst.induced_edges->data));
+  rst.induced_edges = IdArray::Empty(
+      {static_cast<int64_t>(edges.size())}, vids->dtype, vids->ctx);
+  std::copy(
+      edges.begin(), edges.end(),
+      static_cast<int64_t*>(rst.induced_edges->data));
   return rst;
 }
 
@@ -524,7 +540,9 @@ Subgraph Graph::EdgeSubgraph(IdArray eids, bool preserve_nodes) const {
 
     rst.induced_vertices = IdArray::Empty(
         {static_cast<int64_t>(nodes.size())}, eids->dtype, eids->ctx);
-    std::copy(nodes.begin(), nodes.end(), static_cast<int64_t*>(rst.induced_vertices->data));
+    std::copy(
+        nodes.begin(), nodes.end(),
+        static_cast<int64_t*>(rst.induced_vertices->data));
   } else {
     rst.graph = std::make_shared<Graph>();
     rst.induced_edges = eids;
@@ -536,59 +554,58 @@ Subgraph Graph::EdgeSubgraph(IdArray eids, bool preserve_nodes) const {
       rst.graph->AddEdge(src_id, dst_id);
     }
 
-    for (uint64_t i = 0; i < NumVertices(); ++i)
-      nodes.push_back(i);
+    for (uint64_t i = 0; i < NumVertices(); ++i) nodes.push_back(i);
 
     rst.induced_vertices = IdArray::Empty(
         {static_cast<int64_t>(nodes.size())}, eids->dtype, eids->ctx);
-    std::copy(nodes.begin(), nodes.end(), static_cast<int64_t*>(rst.induced_vertices->data));
+    std::copy(
+        nodes.begin(), nodes.end(),
+        static_cast<int64_t*>(rst.induced_vertices->data));
   }
 
   return rst;
 }
 
-std::vector<IdArray> Graph::GetAdj(bool transpose, const std::string &fmt) const {
+std::vector<IdArray> Graph::GetAdj(
+    bool transpose, const std::string& fmt) const {
   uint64_t num_edges = NumEdges();
   uint64_t num_nodes = NumVertices();
   if (fmt == "coo") {
     IdArray idx = IdArray::Empty(
-        {2 * static_cast<int64_t>(num_edges)},
-        DGLDataType{kDGLInt, 64, 1},
+        {2 * static_cast<int64_t>(num_edges)}, DGLDataType{kDGLInt, 64, 1},
         DGLContext{kDGLCPU, 0});
-    int64_t *idx_data = static_cast<int64_t*>(idx->data);
+    int64_t* idx_data = static_cast<int64_t*>(idx->data);
     if (transpose) {
       std::copy(all_edges_src_.begin(), all_edges_src_.end(), idx_data);
-      std::copy(all_edges_dst_.begin(), all_edges_dst_.end(), idx_data + num_edges);
+      std::copy(
+          all_edges_dst_.begin(), all_edges_dst_.end(), idx_data + num_edges);
     } else {
       std::copy(all_edges_dst_.begin(), all_edges_dst_.end(), idx_data);
-      std::copy(all_edges_src_.begin(), all_edges_src_.end(), idx_data + num_edges);
+      std::copy(
+          all_edges_src_.begin(), all_edges_src_.end(), idx_data + num_edges);
     }
     IdArray eid = IdArray::Empty(
-        {static_cast<int64_t>(num_edges)},
-        DGLDataType{kDGLInt, 64, 1},
+        {static_cast<int64_t>(num_edges)}, DGLDataType{kDGLInt, 64, 1},
         DGLContext{kDGLCPU, 0});
-    int64_t *eid_data = static_cast<int64_t*>(eid->data);
+    int64_t* eid_data = static_cast<int64_t*>(eid->data);
     for (uint64_t eid = 0; eid < num_edges; ++eid) {
       eid_data[eid] = eid;
     }
     return std::vector<IdArray>{idx, eid};
   } else if (fmt == "csr") {
     IdArray indptr = IdArray::Empty(
-        {static_cast<int64_t>(num_nodes) + 1},
-        DGLDataType{kDGLInt, 64, 1},
+        {static_cast<int64_t>(num_nodes) + 1}, DGLDataType{kDGLInt, 64, 1},
         DGLContext{kDGLCPU, 0});
     IdArray indices = IdArray::Empty(
-        {static_cast<int64_t>(num_edges)},
-        DGLDataType{kDGLInt, 64, 1},
+        {static_cast<int64_t>(num_edges)}, DGLDataType{kDGLInt, 64, 1},
         DGLContext{kDGLCPU, 0});
     IdArray eid = IdArray::Empty(
-        {static_cast<int64_t>(num_edges)},
-        DGLDataType{kDGLInt, 64, 1},
+        {static_cast<int64_t>(num_edges)}, DGLDataType{kDGLInt, 64, 1},
         DGLContext{kDGLCPU, 0});
-    int64_t *indptr_data = static_cast<int64_t*>(indptr->data);
-    int64_t *indices_data = static_cast<int64_t*>(indices->data);
-    int64_t *eid_data = static_cast<int64_t*>(eid->data);
-    const AdjacencyList *adjlist;
+    int64_t* indptr_data = static_cast<int64_t*>(indptr->data);
+    int64_t* indices_data = static_cast<int64_t*>(indices->data);
+    int64_t* eid_data = static_cast<int64_t*>(eid->data);
+    const AdjacencyList* adjlist;
     if (transpose) {
       // Out-edges.
       adjlist = &adjlist_;
@@ -599,10 +616,12 @@ std::vector<IdArray> Graph::GetAdj(bool transpose, const std::string &fmt) const
     indptr_data[0] = 0;
     for (size_t i = 0; i < adjlist->size(); i++) {
       indptr_data[i + 1] = indptr_data[i] + adjlist->at(i).succ.size();
-      std::copy(adjlist->at(i).succ.begin(), adjlist->at(i).succ.end(),
-                indices_data + indptr_data[i]);
-      std::copy(adjlist->at(i).edge_id.begin(), adjlist->at(i).edge_id.end(),
-                eid_data + indptr_data[i]);
+      std::copy(
+          adjlist->at(i).succ.begin(), adjlist->at(i).succ.end(),
+          indices_data + indptr_data[i]);
+      std::copy(
+          adjlist->at(i).edge_id.begin(), adjlist->at(i).edge_id.end(),
+          eid_data + indptr_data[i]);
     }
     return std::vector<IdArray>{indptr, indices, eid};
   } else {
