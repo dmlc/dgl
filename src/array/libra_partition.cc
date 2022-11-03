@@ -510,32 +510,32 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLLibra2dglSetLR")
  * \brief For each node in a partition, it creates a list of remote clone IDs;
  *        also, for each node in a partition, it gathers the data (feats, label,
  *        trian, test) from input graph.
- * \param[out] feat node features in current partition
- * \param[in] gfeat input graph node features
- * \param[out] adj list of node IDs of remote clones
- * \param[out] inner_nodes marks whether a node is split or not
+ * \param[out] feat node features in current partition c.
+ * \param[in] gfeat input graph node features.
+ * \param[out] adj list of node IDs of remote clones.
+ * \param[out] inner_nodes marks whether a node is split or not.
  * \param[in] ldt_key per partition dict for tracking global to local node IDs
  * \param[out] gdt_key global dict for storing number of local nodes (or split
  *             nodes) for a given global node ID \param[out] gdt_value global
  *             dict, stores local node IDs (due to split) across partitions for
- *             a given global node ID
+ *             a given global node ID.
  * \param[in] node_map keeps track of range of local node IDs (consecutive)
- *            given to the nodes in the partitions
- * \param[out] lr 1-level tree marking for local split nodes
- * \param[in] lrtensor global (all the partitions) 1-level tree
- * \param[in] num_nodes number of nodes in current partition
- * \param[in] nc number of partitions/communities
- * \param[in] c current partition/community
- * \param[in] feat_size node feature vector size
- * \param[out] labels local (for this partition) labels
- * \param[out] trainm local (for this partition) training nodes
- * \param[out] testm local (for this partition) testing nodes
- * \param[out] valm local (for this partition) validation nodes
- * \param[in] glabels global (input graph) labels
- * \param[in] gtrainm glabal (input graph) training nodes
- * \param[in] gtestm glabal (input graph) testing nodes
- * \param[in] gvalm glabal (input graph) validation nodes
- * \param[out] Nn number of nodes in the input graph
+ *            given to the nodes in the partitions.
+ * \param[out] lr 1-level tree marking for local split nodes.
+ * \param[in] lrtensor global (all the partitions) 1-level tree.
+ * \param[in] num_nodes number of nodes in current partition.
+ * \param[in] nc number of partitions/communities.
+ * \param[in] c current partition/community.
+ * \param[in] feat_size node feature vector size.
+ * \param[out] labels local (for this partition) labels.
+ * \param[out] trainm local (for this partition) training nodes.
+ * \param[out] testm local (for this partition) testing nodes.
+ * \param[out] valm local (for this partition) validation nodes.
+ * \param[in] glabels global (input graph) labels.
+ * \param[in] gtrainm glabal (input graph) training nodes.
+ * \param[in] gtestm glabal (input graph) testing nodes.
+ * \param[in] gvalm glabal (input graph) validation nodes.
+ * \param[out] Nn number of nodes in the input graph.
  */
 template <typename IdType, typename IdType2, typename DType>
 void Libra2dglBuildAdjlist(
