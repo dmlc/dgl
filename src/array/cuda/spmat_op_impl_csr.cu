@@ -62,18 +62,17 @@ NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col) {
   const IdType* indptr_data = csr.indptr.Ptr<IdType>();
   const IdType* indices_data = csr.indices.Ptr<IdType>();
   if (csr.is_pinned) {
-    CUDA_CALL(cudaHostGetDevicePointer(
-        &indptr_data, csr.indptr.Ptr<IdType>(), 0));
-    CUDA_CALL(cudaHostGetDevicePointer(
-        &indices_data, csr.indices.Ptr<IdType>(), 0));
+    CUDA_CALL(
+        cudaHostGetDevicePointer(&indptr_data, csr.indptr.Ptr<IdType>(), 0));
+    CUDA_CALL(
+        cudaHostGetDevicePointer(&indices_data, csr.indices.Ptr<IdType>(), 0));
   }
   // TODO(minjie): use binary search for sorted csr
-  CUDA_KERNEL_CALL(dgl::cuda::_LinearSearchKernel,
-      nb, nt, 0, stream,
-      indptr_data, indices_data, data,
-      row.Ptr<IdType>(), col.Ptr<IdType>(),
-      row_stride, col_stride, rstlen,
-      static_cast<IdType*>(nullptr), static_cast<IdType>(-1), rst.Ptr<IdType>());
+  CUDA_KERNEL_CALL(
+      dgl::cuda::_LinearSearchKernel, nb, nt, 0, stream, indptr_data,
+      indices_data, data, row.Ptr<IdType>(), col.Ptr<IdType>(), row_stride,
+      col_stride, rstlen, static_cast<IdType*>(nullptr),
+      static_cast<IdType>(-1), rst.Ptr<IdType>());
   return rst != -1;
 }
 
@@ -156,8 +155,8 @@ NDArray CSRGetRowNNZ(CSRMatrix csr, NDArray rows) {
   const IdType* vid_data = rows.Ptr<IdType>();
   const IdType* indptr_data = csr.indptr.Ptr<IdType>();
   if (csr.is_pinned) {
-    CUDA_CALL(cudaHostGetDevicePointer(
-        &indptr_data, csr.indptr.Ptr<IdType>(), 0));
+    CUDA_CALL(
+        cudaHostGetDevicePointer(&indptr_data, csr.indptr.Ptr<IdType>(), 0));
   }
   NDArray rst = NDArray::Empty({len}, rows->dtype, rows->ctx);
   IdType* rst_data = static_cast<IdType*>(rst->data);
@@ -270,31 +269,28 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
   const IdType* indices_data = csr.indices.Ptr<IdType>();
   const IdType* data_data = CSRHasData(csr) ? csr.data.Ptr<IdType>() : nullptr;
   if (csr.is_pinned) {
-    CUDA_CALL(cudaHostGetDevicePointer(
-        &indptr_data, csr.indptr.Ptr<IdType>(), 0));
-    CUDA_CALL(cudaHostGetDevicePointer(
-        &indices_data, csr.indices.Ptr<IdType>(), 0));
+    CUDA_CALL(
+        cudaHostGetDevicePointer(&indptr_data, csr.indptr.Ptr<IdType>(), 0));
+    CUDA_CALL(
+        cudaHostGetDevicePointer(&indices_data, csr.indices.Ptr<IdType>(), 0));
     if (CSRHasData(csr)) {
-      CUDA_CALL(cudaHostGetDevicePointer(
-          &data_data, csr.data.Ptr<IdType>(), 0));
+      CUDA_CALL(
+          cudaHostGetDevicePointer(&data_data, csr.data.Ptr<IdType>(), 0));
     }
   }
 
-  CUDA_KERNEL_CALL(_SegmentCopyKernel,
-      nb, nt, 0, stream,
-      indptr_data, indices_data,
-      rows.Ptr<IdType>(), nnz, len,
-      ret_indptr.Ptr<IdType>(), ret_indices.Ptr<IdType>());
+  CUDA_KERNEL_CALL(
+      _SegmentCopyKernel, nb, nt, 0, stream, indptr_data, indices_data,
+      rows.Ptr<IdType>(), nnz, len, ret_indptr.Ptr<IdType>(),
+      ret_indices.Ptr<IdType>());
   // Copy data.
   IdArray ret_data = NDArray::Empty({nnz}, csr.indptr->dtype, rows->ctx);
-  CUDA_KERNEL_CALL(_SegmentCopyKernel,
-      nb, nt, 0, stream,
-      indptr_data, data_data,
-      rows.Ptr<IdType>(), nnz, len,
-      ret_indptr.Ptr<IdType>(), ret_data.Ptr<IdType>());
-  return CSRMatrix(len, csr.num_cols,
-                   ret_indptr, ret_indices, ret_data,
-                   csr.sorted);
+  CUDA_KERNEL_CALL(
+      _SegmentCopyKernel, nb, nt, 0, stream, indptr_data, data_data,
+      rows.Ptr<IdType>(), nnz, len, ret_indptr.Ptr<IdType>(),
+      ret_data.Ptr<IdType>());
+  return CSRMatrix(
+      len, csr.num_cols, ret_indptr, ret_indices, ret_data, csr.sorted);
 }
 
 template CSRMatrix CSRSliceRows<kDGLCUDA, int32_t>(CSRMatrix, NDArray);
@@ -386,21 +382,19 @@ std::vector<NDArray> CSRGetDataAndIndices(
   const IdType* indptr_data = csr.indptr.Ptr<IdType>();
   const IdType* indices_data = csr.indices.Ptr<IdType>();
   if (csr.is_pinned) {
-    CUDA_CALL(cudaHostGetDevicePointer(
-        &indptr_data, csr.indptr.Ptr<IdType>(), 0));
-    CUDA_CALL(cudaHostGetDevicePointer(
-        &indices_data, csr.indices.Ptr<IdType>(), 0));
+    CUDA_CALL(
+        cudaHostGetDevicePointer(&indptr_data, csr.indptr.Ptr<IdType>(), 0));
+    CUDA_CALL(
+        cudaHostGetDevicePointer(&indices_data, csr.indices.Ptr<IdType>(), 0));
   }
 
   // Generate a 0-1 mask for matched (row, col) positions.
   IdArray mask = Full(0, nnz, nbits, ctx);
   const int nt = dgl::cuda::FindNumThreads(len);
   const int nb = (len + nt - 1) / nt;
-  CUDA_KERNEL_CALL(_SegmentMaskKernel,
-      nb, nt, 0, stream,
-      indptr_data, indices_data,
-      row.Ptr<IdType>(), col.Ptr<IdType>(),
-      row_stride, col_stride, len,
+  CUDA_KERNEL_CALL(
+      _SegmentMaskKernel, nb, nt, 0, stream, indptr_data, indices_data,
+      row.Ptr<IdType>(), col.Ptr<IdType>(), row_stride, col_stride, len,
       mask.Ptr<IdType>());
 
   IdArray idx = AsNumBits(NonZero(mask), nbits);
@@ -412,11 +406,9 @@ std::vector<NDArray> CSRGetDataAndIndices(
   IdArray ret_row = NewIdArray(idx->shape[0], ctx, nbits);
   const int nt2 = dgl::cuda::FindNumThreads(idx->shape[0]);
   const int nb2 = (idx->shape[0] + nt - 1) / nt;
-  CUDA_KERNEL_CALL(_SortedSearchKernel,
-      nb2, nt2, 0, stream,
-      indptr_data, csr.num_rows,
-      idx.Ptr<IdType>(), idx->shape[0],
-      ret_row.Ptr<IdType>());
+  CUDA_KERNEL_CALL(
+      _SortedSearchKernel, nb2, nt2, 0, stream, indptr_data, csr.num_rows,
+      idx.Ptr<IdType>(), idx->shape[0], ret_row.Ptr<IdType>());
 
   // Column & data can be obtained by index select.
   IdArray ret_col = IndexSelect(csr.indices, idx);
@@ -508,19 +500,18 @@ CSRMatrix CSRSliceMatrix(
   const IdType* indptr_data = csr.indptr.Ptr<IdType>();
   const IdType* indices_data = csr.indices.Ptr<IdType>();
   if (csr.is_pinned) {
-    CUDA_CALL(cudaHostGetDevicePointer(
-        &indptr_data, csr.indptr.Ptr<IdType>(), 0));
-    CUDA_CALL(cudaHostGetDevicePointer(
-        &indices_data, csr.indices.Ptr<IdType>(), 0));
+    CUDA_CALL(
+        cudaHostGetDevicePointer(&indptr_data, csr.indptr.Ptr<IdType>(), 0));
+    CUDA_CALL(
+        cudaHostGetDevicePointer(&indices_data, csr.indices.Ptr<IdType>(), 0));
   }
 
   // Execute SegmentMaskColKernel
   int nb = (nnz_csr + nt - 1) / nt;
-  CUDA_KERNEL_CALL(_SegmentMaskColKernel,
-      nb, nt, 0, stream,
-      indptr_data, indices_data, csr.num_rows, nnz_csr,
-      ptr_sorted_cols, cols_size,
-      mask.Ptr<IdType>(), count.Ptr<IdType>());
+  CUDA_KERNEL_CALL(
+      _SegmentMaskColKernel, nb, nt, 0, stream, indptr_data, indices_data,
+      csr.num_rows, nnz_csr, ptr_sorted_cols, cols_size, mask.Ptr<IdType>(),
+      count.Ptr<IdType>());
 
   IdArray idx = AsNumBits(NonZero(mask), nbits);
   if (idx->shape[0] == 0)

@@ -236,11 +236,14 @@ COOMatrix _CSRRowWiseSamplingUniform(
   cudaStream_t stream = runtime::getCurrentCUDAStream();
 
   const int64_t num_rows = rows->shape[0];
-  const IdType * const slice_rows = static_cast<const IdType*>(rows->data);
+  const IdType* const slice_rows = static_cast<const IdType*>(rows->data);
 
-  IdArray picked_row = NewIdArray(num_rows * num_picks, ctx, sizeof(IdType) * 8);
-  IdArray picked_col = NewIdArray(num_rows * num_picks, ctx, sizeof(IdType) * 8);
-  IdArray picked_idx = NewIdArray(num_rows * num_picks, ctx, sizeof(IdType) * 8);
+  IdArray picked_row =
+      NewIdArray(num_rows * num_picks, ctx, sizeof(IdType) * 8);
+  IdArray picked_col =
+      NewIdArray(num_rows * num_picks, ctx, sizeof(IdType) * 8);
+  IdArray picked_idx =
+      NewIdArray(num_rows * num_picks, ctx, sizeof(IdType) * 8);
   IdType* const out_rows = static_cast<IdType*>(picked_row->data);
   IdType* const out_cols = static_cast<IdType*>(picked_col->data);
   IdType* const out_idxs = static_cast<IdType*>(picked_idx->data);
@@ -249,13 +252,10 @@ COOMatrix _CSRRowWiseSamplingUniform(
   const IdType* in_cols = mat.indices.Ptr<IdType>();
   const IdType* data = CSRHasData(mat) ? mat.data.Ptr<IdType>() : nullptr;
   if (mat.is_pinned) {
-    CUDA_CALL(cudaHostGetDevicePointer(
-        &in_ptr, mat.indptr.Ptr<IdType>(), 0));
-    CUDA_CALL(cudaHostGetDevicePointer(
-        &in_cols, mat.indices.Ptr<IdType>(), 0));
+    CUDA_CALL(cudaHostGetDevicePointer(&in_ptr, mat.indptr.Ptr<IdType>(), 0));
+    CUDA_CALL(cudaHostGetDevicePointer(&in_cols, mat.indices.Ptr<IdType>(), 0));
     if (CSRHasData(mat)) {
-      CUDA_CALL(cudaHostGetDevicePointer(
-          &data, mat.data.Ptr<IdType>(), 0));
+      CUDA_CALL(cudaHostGetDevicePointer(&data, mat.data.Ptr<IdType>(), 0));
     }
   }
 
