@@ -341,13 +341,14 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLLibraVertexCut")
  * \param[out] gdt_key global dict for storing number of local nodes (or split
  *             nodes) for a given global node ID
  * \param[out] gdt_value global dict, stores local node IDs (due to split)
- *             across partitions for a given global node ID \param[out] node_map
- *             keeps track of range of local node IDs (consecutive) given to the
- *             nodes in the partitions
- * \param[in, out] offset start of the range of local node IDs for this partition
- * \param[in] nc  number of partitions/communities
- * \param[in] c current partition number
- * \param[in] fsize size of pre-allocated memory tensor
+ *             across partitions for a given global node ID
+ * \param[out] node_map keeps track of range of local node IDs (consecutive)
+ *             given to the nodes in the partitions
+ * \param[in, out] offset start of the range of local node IDs for this
+ *                 partition
+ * \param[in] nc number of partitions/communities
+ * \param[in] c current partition number \param[in] fsize size of pre-allocated
+ *            memory tensor
  * \param[in] prefix input Libra partition file location
  */
 List<Value> Libra2dglBuildDict(
