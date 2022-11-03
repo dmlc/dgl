@@ -136,7 +136,7 @@ def _chunk_graph(g, name, ndata_paths, edata_paths, num_chunks, output_path):
                         **reader_fmt_meta
                     ).read(path)
                     edata_key_meta["format"] = writer_fmt_meta
-                    etype = _etype_str_to_tuple(etypestr)
+                    etype = tuple(etypestr.split(":"))
                     edata_key_meta["data"] = chunk_numpy_array(
                         arr,
                         writer_fmt_meta,
