@@ -7,6 +7,7 @@
 #define DGL_ARRAY_UVM_ARRAY_OP_H_
 
 #include <dgl/array.h>
+
 #include <utility>
 
 namespace dgl {

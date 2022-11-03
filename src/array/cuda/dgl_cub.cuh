@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2021 by Contributors
  * \file cuda_common.h
- * \brief Wrapper to place cub in dgl namespace. 
+ * \brief Wrapper to place cub in dgl namespace.
  */
 
 #ifndef DGL_ARRAY_CUDA_DGL_CUB_CUH_
