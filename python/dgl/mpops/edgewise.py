@@ -1,8 +1,7 @@
 """Operators for computing edge data."""
 import sys
 
-from .. import DGLGraph, ops
-from ..typing import EData, EType, NData
+from .. import ops
 
 __all__ = ["copy_u", "copy_v"]
 
@@ -11,7 +10,7 @@ __all__ = ["copy_u", "copy_v"]
 #######################################################
 
 
-def copy_u(g: DGLGraph, x: NData, etype: EType = None) -> EData:
+def copy_u(g, x_node, etype = None):
     """Compute new edge data by fetching from source node data.
 
     Given an input graph :math:`G(V, E)` (or a unidirectional bipartite graph
@@ -27,11 +26,11 @@ def copy_u(g: DGLGraph, x: NData, etype: EType = None) -> EData:
     ----------
     g : DGLGraph
         The input graph.
-    x : Tensor
+    x_node : Tensor
         The tensor storing the source node data. Shape :math:`(|V_{src}|, *)`.
     etype : str or (str, str, str), optional
-        Edge type. If not specified, the input graph must have
-        only one type of edges.
+        Edge type. If not specified, the input graph must have only one type of
+        edges.
 
     Returns
     -------
@@ -61,11 +60,11 @@ def copy_u(g: DGLGraph, x: NData, etype: EType = None) -> EData:
     >>> print(y.shape)
     (4, 5)
     """
-    etype_g = g if etype is None else g[etype]
-    return ops.gsddmm(etype_g, "copy_lhs", x, None)
+    etype_subg = g if etype is None else g[etype]
+    return ops.gsddmm(etype_subg, "copy_lhs", x_node, None)
 
 
-def copy_v(g: DGLGraph, x: NData, etype: EType = None) -> EData:
+def copy_v(g, x_node, etype = None):
     """Compute new edge data by fetching from destination node data.
 
     Given an input graph :math:`G(V, E)` (or a unidirectional bipartite graph
@@ -81,7 +80,7 @@ def copy_v(g: DGLGraph, x: NData, etype: EType = None) -> EData:
     ----------
     g : DGLGraph
         The input graph.
-    x : Tensor
+    x_node : Tensor
         The tensor storing the destination node data. Shape :math:`(|V_{dst}|, *)`.
     etype : str or (str, str, str), optional
         Edge type. If not specified, the input graph must have
@@ -115,8 +114,8 @@ def copy_v(g: DGLGraph, x: NData, etype: EType = None) -> EData:
     >>> print(y.shape)
     (4, 5)
     """
-    etype_g = g if etype is None else g[etype]
-    return ops.gsddmm(etype_g, "copy_rhs", None, x)
+    etype_subg = g if etype is None else g[etype]
+    return ops.gsddmm(etype_subg, "copy_rhs", None, x_node)
 
 
 #######################################################
@@ -166,9 +165,9 @@ Parameters
 ----------
 g : DGLGraph
     The input graph.
-x : Tensor
+x_node : Tensor
     The tensor storing the source node data. Shape :math:`(|V_{{src}}|, *)`.
-y : Tensor
+y_node : Tensor
     The tensor storing the destination node data. Shape :math:`(|V_{{dst}}|, *)`.
 etype : str or (str, str, str), optional
     Edge type. If not specified, the input graph must have
@@ -213,9 +212,9 @@ Examples
 (500, 5)
 """
 
-    def func(g: DGLGraph, x: NData, y: NData, etype: EType = None) -> EData:
-        etype_g = g if etype is None else g[etype]
-        return ops.gsddmm(etype_g, op, x, y, lhs_target="u", rhs_target="v")
+    def func(g, x_node, y_node, etype = None):
+        etype_subg = g if etype is None else g[etype]
+        return ops.gsddmm(etype_subg, op, x_node, y_node, lhs_target="u", rhs_target="v")
 
     func.__name__ = name
     func.__doc__ = docstring
