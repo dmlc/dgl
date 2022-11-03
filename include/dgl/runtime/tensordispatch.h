@@ -1,8 +1,8 @@
 /*!
  *  Copyright (c) 2020-2022 by Contributors
  * \file array/tensordispatch.h
- * \brief This file defines the dispatcher of tensor operators to framework-specific
- *  implementations.
+ * \brief This file defines the dispatcher of tensor operators to
+ * framework-specific implementations.
  *
  *  The dispatcher consists of a TensorDispatcher singleton in DGL C library and
  *  one separately-built shared library per supported backend.
@@ -15,14 +15,14 @@
  *  The TensorDispatcher singleton maintains a mapping from an array operator to
  *  the address of the corresponding symbol in the shared library.  During
  *  initialization, the TensorDispatcher checks which backend DGL is using.
- *  It then locates and opens the corresponding shared library using dlopen(3) (or
- *  LoadLibrary in Windows), and populates the said mapping above with dlsym(3)
- *  (or GetProcAddress in Windows).
+ *  It then locates and opens the corresponding shared library using dlopen(3)
+ * (or LoadLibrary in Windows), and populates the said mapping above with
+ * dlsym(3) (or GetProcAddress in Windows).
  *
- *  A tensor operator in TensorDispatcher first checks whether the corresponding symbol
- *  address is found in the mapping.  If so, it calls the function located at the
- *  symbol address instead, allocate/free pieces of memory on CPU/GPU.
- *  If not, it falls back to DeviceAPI::AllocWorkspace/FreeWorkspace.
+ *  A tensor operator in TensorDispatcher first checks whether the corresponding
+ * symbol address is found in the mapping.  If so, it calls the function located
+ * at the symbol address instead, allocate/free pieces of memory on CPU/GPU. If
+ * not, it falls back to DeviceAPI::AllocWorkspace/FreeWorkspace.
  */
 
 #ifndef DGL_RUNTIME_TENSORDISPATCH_H_
@@ -38,14 +38,18 @@
 #endif  // DGL_USE_CUDA
 #include "ndarray.h"
 
-/*! \brief Casts a pointer \c entry to a function pointer with signature of \c func */
-#define FUNCCAST(func, entry)   (*reinterpret_cast<decltype(&(func))>(entry))
+/*!
+ * \brief Casts a pointer \c entry to a function pointer with signature of \c
+ * func.
+ */
+#define FUNCCAST(func, entry) (*reinterpret_cast<decltype(&(func))>(entry))
 
 namespace dgl {
 namespace runtime {
 
 /*!
- * \brief Dispatcher that delegates the function calls to framework-specific C++ APIs.
+ * \brief Dispatcher that delegates the function calls to framework-specific C++
+ * APIs.
  *
  * This class is not thread-safe.
  */
@@ -57,17 +61,14 @@ class TensorDispatcher {
     return &inst;
   }
 
-  /*! \brief Whether an adapter library is available */
-  inline bool IsAvailable() {
-    return available_;
-  }
+  /*! \brief Whether an adapter library is available. */
+  inline bool IsAvailable() { return available_; }
 
-  /*! \brief Load symbols from the given tensor adapter library path */
-  bool Load(const char *path_cstr);
+  /*! \brief Load symbols from the given tensor adapter library path. */
+  bool Load(const char* path_cstr);
 
   /*!
-   * \brief Allocate a piece of CPU memory via
-   * PyTorch's CPUAllocator.
+   * \brief Allocate a piece of CPU memory via PyTorch's CPUAllocator.
    * Used in CPUDeviceAPI::AllocWorkspace().
    *
    * \param nbytes The size to be allocated.
@@ -94,7 +95,7 @@ class TensorDispatcher {
    * \brief Allocate a piece of GPU memory via
    * PyTorch's THCCachingAllocator.
    * Used in CUDADeviceAPI::AllocWorkspace().
-   * 
+   *
    * \note THCCachingAllocator specify the device to allocate on
    * via cudaGetDevice(). Make sure to call cudaSetDevice()
    * before invoking this function.
@@ -120,15 +121,15 @@ class TensorDispatcher {
   }
 
   /*!
-  * \brief Find the current PyTorch CUDA stream
-  * Used in runtime::getCurrentCUDAStream().
-  * 
-  * \note PyTorch pre-allocates/sets the current CUDA stream
-  * on current device via cudaGetDevice(). Make sure to call cudaSetDevice()
-  * before invoking this function.
-  *
-  * \return cudaStream_t stream handle
-  */
+   * \brief Find the current PyTorch CUDA stream
+   * Used in runtime::getCurrentCUDAStream().
+   *
+   * \note PyTorch pre-allocates/sets the current CUDA stream
+   * on current device via cudaGetDevice(). Make sure to call cudaSetDevice()
+   * before invoking this function.
+   *
+   * \return cudaStream_t stream handle
+   */
   inline cudaStream_t CUDAGetCurrentStream() {
     auto entry = entrypoints_[Op::kCUDACurrentStream];
     return FUNCCAST(tensoradapter::CUDACurrentStream, entry)();
@@ -146,8 +147,8 @@ class TensorDispatcher {
   inline void RecordStream(void* ptr, DGLStreamHandle stream, int device_id) {
 #ifdef DGL_USE_CUDA
     auto entry = entrypoints_[Op::kRecordStream];
-    FUNCCAST(tensoradapter::RecordStream, entry)(
-      ptr, static_cast<cudaStream_t>(stream), device_id);
+    FUNCCAST(tensoradapter::RecordStream, entry)
+    (ptr, static_cast<cudaStream_t>(stream), device_id);
 #endif  // DGL_USE_CUDA
   }
 
@@ -162,14 +163,10 @@ class TensorDispatcher {
    *
    * Must match the functions in tensoradapter/include/tensoradapter.h.
    */
-  static constexpr const char *names_[] = {
-    "CPURawAlloc",
-    "CPURawDelete",
+  static constexpr const char* names_[] = {
+      "CPURawAlloc",  "CPURawDelete",
 #ifdef DGL_USE_CUDA
-    "CUDARawAlloc",
-    "CUDARawDelete",
-    "CUDACurrentStream",
-    "RecordStream",
+      "CUDARawAlloc", "CUDARawDelete", "CUDACurrentStream", "RecordStream",
 #endif  // DGL_USE_CUDA
   };
 
@@ -191,13 +188,9 @@ class TensorDispatcher {
 
   /*! \brief Entrypoints of each function */
   void* entrypoints_[num_entries_] = {
-    nullptr,
-    nullptr,
+      nullptr, nullptr,
 #ifdef DGL_USE_CUDA
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
+      nullptr, nullptr, nullptr, nullptr,
 #endif  // DGL_USE_CUDA
   };
 

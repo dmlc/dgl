@@ -4,8 +4,10 @@
  * \brief CSR matrix remove entries CPU implementation
  */
 #include <dgl/array.h>
+
 #include <utility>
 #include <vector>
+
 #include "array_utils.h"
 
 namespace dgl {
@@ -17,11 +19,8 @@ namespace {
 
 template <DGLDeviceType XPU, typename IdType>
 void CSRRemoveConsecutive(
-    CSRMatrix csr,
-    IdArray entries,
-    std::vector<IdType> *new_indptr,
-    std::vector<IdType> *new_indices,
-    std::vector<IdType> *new_eids) {
+    CSRMatrix csr, IdArray entries, std::vector<IdType> *new_indptr,
+    std::vector<IdType> *new_indices, std::vector<IdType> *new_eids) {
   CHECK_SAME_DTYPE(csr.indices, entries);
   const int64_t n_entries = entries->shape[0];
   const IdType *indptr_data = static_cast<IdType *>(csr.indptr->data);
@@ -37,8 +36,7 @@ void CSRRemoveConsecutive(
     for (IdType j = indptr_data[i]; j < indptr_data[i + 1]; ++j) {
       if (k < n_entries && entry_data_sorted[k] == j) {
         // Move on to the next different entry
-        while (k < n_entries && entry_data_sorted[k] == j)
-          ++k;
+        while (k < n_entries && entry_data_sorted[k] == j) ++k;
         continue;
       }
       new_indices->push_back(indices_data[j]);
@@ -50,11 +48,8 @@ void CSRRemoveConsecutive(
 
 template <DGLDeviceType XPU, typename IdType>
 void CSRRemoveShuffled(
-    CSRMatrix csr,
-    IdArray entries,
-    std::vector<IdType> *new_indptr,
-    std::vector<IdType> *new_indices,
-    std::vector<IdType> *new_eids) {
+    CSRMatrix csr, IdArray entries, std::vector<IdType> *new_indptr,
+    std::vector<IdType> *new_indices, std::vector<IdType> *new_eids) {
   CHECK_SAME_DTYPE(csr.indices, entries);
   const IdType *indptr_data = static_cast<IdType *>(csr.indptr->data);
   const IdType *indices_data = static_cast<IdType *>(csr.indices->data);
@@ -66,8 +61,7 @@ void CSRRemoveShuffled(
   for (int64_t i = 0; i < csr.num_rows; ++i) {
     for (IdType j = indptr_data[i]; j < indptr_data[i + 1]; ++j) {
       const IdType eid = eid_data ? eid_data[j] : j;
-      if (eid_map.Contains(eid))
-        continue;
+      if (eid_map.Contains(eid)) continue;
       new_indices->push_back(indices_data[j]);
       new_eids->push_back(eid);
     }
@@ -82,8 +76,7 @@ CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries) {
   CHECK_SAME_DTYPE(csr.indices, entries);
   const int64_t nnz = csr.indices->shape[0];
   const int64_t n_entries = entries->shape[0];
-  if (n_entries == 0)
-    return csr;
+  if (n_entries == 0) return csr;
 
   std::vector<IdType> new_indptr, new_indices, new_eids;
   new_indptr.reserve(nnz - n_entries);
@@ -91,16 +84,16 @@ CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries) {
   new_eids.reserve(nnz - n_entries);
 
   if (CSRHasData(csr))
-    CSRRemoveShuffled<XPU, IdType>(csr, entries, &new_indptr, &new_indices, &new_eids);
+    CSRRemoveShuffled<XPU, IdType>(
+        csr, entries, &new_indptr, &new_indices, &new_eids);
   else
     // Removing from CSR ordered by eid has more efficient implementation
-    CSRRemoveConsecutive<XPU, IdType>(csr, entries, &new_indptr, &new_indices, &new_eids);
+    CSRRemoveConsecutive<XPU, IdType>(
+        csr, entries, &new_indptr, &new_indices, &new_eids);
 
   return CSRMatrix(
-      csr.num_rows, csr.num_cols,
-      IdArray::FromVector(new_indptr),
-      IdArray::FromVector(new_indices),
-      IdArray::FromVector(new_eids));
+      csr.num_rows, csr.num_cols, IdArray::FromVector(new_indptr),
+      IdArray::FromVector(new_indices), IdArray::FromVector(new_eids));
 }
 
 template CSRMatrix CSRRemove<kDGLCPU, int32_t>(CSRMatrix csr, IdArray entries);

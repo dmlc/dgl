@@ -4,7 +4,6 @@
  * \brief DGL runtime config
  */
 
-
 #ifndef DGL_RUNTIME_CONFIG_H_
 #define DGL_RUNTIME_CONFIG_H_
 
@@ -23,7 +22,7 @@ class Config {
   bool IsLibxsmmAvailable() const;
 
  private:
-  Config() =  default;
+  Config() = default;
   bool libxsmm_ = true;
 };
 

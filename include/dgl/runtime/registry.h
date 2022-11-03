@@ -27,6 +27,7 @@
 
 #include <string>
 #include <vector>
+
 #include "packed_func.h"
 
 namespace dgl {
@@ -61,7 +62,7 @@ class Registry {
    * \tparam FType the signature of the function.
    * \tparam FLambda The type of f.
    */
-  template<typename FType, typename FLambda>
+  template <typename FType, typename FLambda>
   Registry& set_body_typed(FLambda f) {
     return set_body(TypedPackedFunc<FType>(f).packed());
   }
@@ -71,7 +72,8 @@ class Registry {
    * \param override Whether allow oveeride existing function.
    * \return Reference to theregistry.
    */
-  DGL_DLL static Registry& Register(const std::string& name, bool override = false);  // NOLINT(*)
+  DGL_DLL static Registry& Register(
+      const std::string& name, bool override = false);  // NOLINT(*)
   /*!
    * \brief Erase global function from registry, if exist.
    * \param name The name of the function.
@@ -112,11 +114,11 @@ class Registry {
 #define DGL_STR_CONCAT_(__x, __y) __x##__y
 #define DGL_STR_CONCAT(__x, __y) DGL_STR_CONCAT_(__x, __y)
 
-#define DGL_FUNC_REG_VAR_DEF                                            \
-  static DGL_ATTRIBUTE_UNUSED ::dgl::runtime::Registry& __mk_ ## DGL
+#define DGL_FUNC_REG_VAR_DEF \
+  static DGL_ATTRIBUTE_UNUSED ::dgl::runtime::Registry& __mk_##DGL
 
-#define DGL_TYPE_REG_VAR_DEF                                            \
-  static DGL_ATTRIBUTE_UNUSED ::dgl::runtime::ExtTypeVTable* __mk_ ## DGLT
+#define DGL_TYPE_REG_VAR_DEF \
+  static DGL_ATTRIBUTE_UNUSED ::dgl::runtime::ExtTypeVTable* __mk_##DGLT
 
 /*!
  * \brief Register a function globally.
@@ -126,8 +128,8 @@ class Registry {
  *   });
  * \endcode
  */
-#define DGL_REGISTER_GLOBAL(OpName)                              \
-  DGL_STR_CONCAT(DGL_FUNC_REG_VAR_DEF, __COUNTER__) =            \
+#define DGL_REGISTER_GLOBAL(OpName)                   \
+  DGL_STR_CONCAT(DGL_FUNC_REG_VAR_DEF, __COUNTER__) = \
       ::dgl::runtime::Registry::Register(OpName)
 
 /*!
@@ -135,8 +137,8 @@ class Registry {
  *  This must be registered in a cc file
  *  after the trait extension_class_info is defined.
  */
-#define DGL_REGISTER_EXT_TYPE(T)                                 \
-  DGL_STR_CONCAT(DGL_TYPE_REG_VAR_DEF, __COUNTER__) =            \
+#define DGL_REGISTER_EXT_TYPE(T)                      \
+  DGL_STR_CONCAT(DGL_TYPE_REG_VAR_DEF, __COUNTER__) = \
       ::dgl::runtime::ExtTypeVTable::Register_<T>()
 
 }  // namespace runtime

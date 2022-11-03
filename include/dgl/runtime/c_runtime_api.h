@@ -38,8 +38,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
 /*! \brief type of array index. */
 typedef int64_t dgl_index_t;
@@ -60,7 +60,8 @@ typedef enum {
 } DGLDeviceType;
 
 /*!
- * \brief The object type code is used in DGL FFI to indicate the types of objects passed between C and Python.
+ * \brief The object type code is used in DGL FFI to indicate the types of
+ *        objects passed between C and Python.
  */
 typedef enum {
   kInt = 0U,
@@ -105,9 +106,9 @@ typedef enum {
 } DGLDataTypeCode;
 
 /*!
- * \brief The data type the tensor can hold. The data type is assumed to follow the
- * native endian-ness. An explicit error message should be raised when attempting to
- * export an array with non-native endianness
+ * \brief The data type the tensor can hold. The data type is assumed to follow
+ * the native endian-ness. An explicit error message should be raised when
+ * attempting to export an array with non-native endianness
  *
  *  Examples
  *   - float: type_code = 2, bits = 32, lanes=1
@@ -149,12 +150,12 @@ typedef struct {
 typedef struct {
   /*!
    * \brief The data pointer points to the allocated data.
-   * 
+   *
    * Depending on the device context, it can be a CPU pointer, or a CUDA
    * device pointer or  acl_mem handle in OpenCL.
    * This pointer is always aligned to 256 bytes as in CUDA. Use the
-   * `byte_offset` field to mark the beginning of the actual data (if the address
-   * is not 256 byte aligned).
+   * `byte_offset` field to mark the beginning of the actual data (if the
+   * address is not 256 byte aligned).
    *
    * Note that as of Nov 2021, multiply libraries (CuPy, PyTorch, TensorFlow,
    * TVM, perhaps others) do not adhere to this 256 byte alignment requirement
@@ -247,7 +248,7 @@ DGL_DLL void DGLAPISetLastError(const char* msg);
  *  this function is threadsafe and can be called by different thread
  *  \return error info
  */
-DGL_DLL const char *DGLGetLastError(void);
+DGL_DLL const char* DGLGetLastError(void);
 /*!
  * \brief Load module from file.
  * \param file_name The file name to load the module from.
@@ -258,9 +259,8 @@ DGL_DLL const char *DGLGetLastError(void);
  * \note The resulting module do not contain import relation.
  *  It can be reconstructed by DGLModImport.
  */
-DGL_DLL int DGLModLoadFromFile(const char* file_name,
-                               const char* format,
-                               DGLModuleHandle* out);
+DGL_DLL int DGLModLoadFromFile(
+    const char* file_name, const char* format, DGLModuleHandle* out);
 
 /*!
  * \brief Add dep to mod's dependency.
@@ -270,8 +270,7 @@ DGL_DLL int DGLModLoadFromFile(const char* file_name,
  * \param dep The dependent module to be imported.
  * \return 0 when success, -1 when failure happens
  */
-DGL_DLL int DGLModImport(DGLModuleHandle mod,
-                         DGLModuleHandle dep);
+DGL_DLL int DGLModImport(DGLModuleHandle mod, DGLModuleHandle dep);
 
 /*!
  * \brief Get function from the module.
@@ -281,10 +280,9 @@ DGL_DLL int DGLModImport(DGLModuleHandle mod,
  * \param out The result function, can be NULL if it is not available.
  * \return 0 when no error is thrown, -1 when failure happens
  */
-DGL_DLL int DGLModGetFunction(DGLModuleHandle mod,
-                              const char* func_name,
-                              int query_imports,
-                              DGLFunctionHandle *out);
+DGL_DLL int DGLModGetFunction(
+    DGLModuleHandle mod, const char* func_name, int query_imports,
+    DGLFunctionHandle* out);
 
 /*!
  * \brief Free front-end extension type resource.
@@ -334,12 +332,9 @@ DGL_DLL int DGLFuncFree(DGLFunctionHandle func);
  *   The front-end need to call free function (e.g. DGLFuncFree)
  *   to free these handles.
  */
-DGL_DLL int DGLFuncCall(DGLFunctionHandle func,
-                        DGLValue* arg_values,
-                        int* type_codes,
-                        int num_args,
-                        DGLValue* ret_val,
-                        int* ret_type_code);
+DGL_DLL int DGLFuncCall(
+    DGLFunctionHandle func, DGLValue* arg_values, int* type_codes, int num_args,
+    DGLValue* ret_val, int* ret_type_code);
 
 /*!
  * \brief Set the return value of DGLPackedCFunc.
@@ -352,10 +347,8 @@ DGL_DLL int DGLFuncCall(DGLFunctionHandle func,
  * \param type_code The type of the value to be returned.
  * \param num_ret Number of return values, for now only 1 is supported.
  */
-DGL_DLL int DGLCFuncSetReturn(DGLRetValueHandle ret,
-                              DGLValue* value,
-                              int* type_code,
-                              int num_ret);
+DGL_DLL int DGLCFuncSetReturn(
+    DGLRetValueHandle ret, DGLValue* value, int* type_code, int num_ret);
 
 /*!
  * \brief Inplace translate callback argument value to return value.
@@ -377,14 +370,12 @@ DGL_DLL int DGLCbArgToReturn(DGLValue* value, int code);
  * \param num_args Number of arguments.
  * \param ret The return value handle.
  * \param resource_handle The handle additional resouce handle from fron-end.
- * \return 0 if success, -1 if failure happens, set error via DGLAPISetLastError.
+ * \return 0 if success, -1 if failure happens, set error via
+ *         DGLAPISetLastError.
  * \sa DGLCFuncSetReturn
  */
 typedef int (*DGLPackedCFunc)(
-    DGLValue* args,
-    int* type_codes,
-    int num_args,
-    DGLRetValueHandle ret,
+    DGLValue* args, int* type_codes, int num_args, DGLRetValueHandle ret,
     void* resource_handle);
 
 /*!
@@ -407,18 +398,19 @@ typedef int (*DGLExtensionFuncDeclarer)(DGLFunctionHandle register_func_handle);
 /*!
  * \brief Wrap a DGLPackedCFunc to become a FunctionHandle.
  *
- * The resource_handle will be managed by DGL API, until the function is no longer used.
+ * The resource_handle will be managed by DGL API, until the function is no
+ * longer used.
  *
  * \param func The packed C function.
  * \param resource_handle The resource handle from front-end, can be NULL.
- * \param fin The finalizer on resource handle when the FunctionHandle get freed, can be NULL
+ * \param fin The finalizer on resource handle when the FunctionHandle get
+ *        freed, can be NULL.
  * \param out the result function handle.
- * \return 0 when success, -1 when failure happens
+ * \return 0 when success, -1 when failure happens.
  */
-DGL_DLL int DGLFuncCreateFromCFunc(DGLPackedCFunc func,
-                                   void* resource_handle,
-                                   DGLPackedCFuncFinalizer fin,
-                                   DGLFunctionHandle *out);
+DGL_DLL int DGLFuncCreateFromCFunc(
+    DGLPackedCFunc func, void* resource_handle, DGLPackedCFuncFinalizer fin,
+    DGLFunctionHandle* out);
 
 /*!
  * \brief Register the function to runtime's global table.
@@ -449,8 +441,7 @@ DGL_DLL int DGLFuncGetGlobal(const char* name, DGLFunctionHandle* out);
  * \param out_array The array of function names.
  * \return 0 when success, -1 when failure happens
  */
-DGL_DLL int DGLFuncListGlobalNames(int* out_size,
-                                   const char*** out_array);
+DGL_DLL int DGLFuncListGlobalNames(int* out_size, const char*** out_array);
 
 // Array related apis for quick proptyping
 /*!
@@ -467,14 +458,9 @@ DGL_DLL int DGLFuncListGlobalNames(int* out_size,
  * \param out The output handle.
  * \return 0 when success, -1 when failure happens
  */
-DGL_DLL int DGLArrayAlloc(const dgl_index_t* shape,
-                          int ndim,
-                          int dtype_code,
-                          int dtype_bits,
-                          int dtype_lanes,
-                          int device_type,
-                          int device_id,
-                          DGLArrayHandle* out);
+DGL_DLL int DGLArrayAlloc(
+    const dgl_index_t* shape, int ndim, int dtype_code, int dtype_bits,
+    int dtype_lanes, int device_type, int device_id, DGLArrayHandle* out);
 
 /*!
  * \brief Allocate a nd-array's with shared memory,
@@ -490,14 +476,9 @@ DGL_DLL int DGLArrayAlloc(const dgl_index_t* shape,
  * \param out The output handle.
  * \return 0 when success, -1 when failure happens
  */
-int DGLArrayAllocSharedMem(const char *mem_name,
-                           const dgl_index_t *shape,
-                           int ndim,
-                           int dtype_code,
-                           int dtype_bits,
-                           int dtype_lanes,
-                           bool is_create,
-                           DGLArrayHandle* out);
+int DGLArrayAllocSharedMem(
+    const char* mem_name, const dgl_index_t* shape, int ndim, int dtype_code,
+    int dtype_bits, int dtype_lanes, bool is_create, DGLArrayHandle* out);
 
 /*!
  * \brief Free the DGL Array.
@@ -513,9 +494,8 @@ DGL_DLL int DGLArrayFree(DGLArrayHandle handle);
  * \param nbytes The number of bytes to copy.
  * \return 0 when success, -1 when failure happens
  */
-DGL_DLL int DGLArrayCopyFromBytes(DGLArrayHandle handle,
-                                  void* data,
-                                  size_t nbytes);
+DGL_DLL int DGLArrayCopyFromBytes(
+    DGLArrayHandle handle, void* data, size_t nbytes);
 
 /*!
  * \brief Copy array data to CPU byte array.
@@ -524,9 +504,8 @@ DGL_DLL int DGLArrayCopyFromBytes(DGLArrayHandle handle,
  * \param nbytes The number of bytes to copy.
  * \return 0 when success, -1 when failure happens
  */
-DGL_DLL int DGLArrayCopyToBytes(DGLArrayHandle handle,
-                                void* data,
-                                size_t nbytes);
+DGL_DLL int DGLArrayCopyToBytes(
+    DGLArrayHandle handle, void* data, size_t nbytes);
 
 /*!
  * \brief Copy the array, both from and to must be valid during the copy.
@@ -534,8 +513,7 @@ DGL_DLL int DGLArrayCopyToBytes(DGLArrayHandle handle,
  * \param to The target space.
  * \return 0 when success, -1 when failure happens
  */
-DGL_DLL int DGLArrayCopyFromTo(DGLArrayHandle from,
-                               DGLArrayHandle to);
+DGL_DLL int DGLArrayCopyFromTo(DGLArrayHandle from, DGLArrayHandle to);
 
 /*!
  * \brief Create a new runtime stream.
@@ -545,7 +523,8 @@ DGL_DLL int DGLArrayCopyFromTo(DGLArrayHandle from,
  * \param out The new stream handle
  * \return 0 when success, -1 when failure happens
  */
-DGL_DLL int DGLStreamCreate(int device_type, int device_id, DGLStreamHandle* out);
+DGL_DLL int DGLStreamCreate(
+    int device_type, int device_id, DGLStreamHandle* out);
 
 /*!
  * \brief Free a created stream handle.
@@ -555,7 +534,8 @@ DGL_DLL int DGLStreamCreate(int device_type, int device_id, DGLStreamHandle* out
  * \param stream The stream to be freed
  * \return 0 when success, -1 when failure happens
  */
-DGL_DLL int DGLStreamFree(int device_type, int device_id, DGLStreamHandle stream);
+DGL_DLL int DGLStreamFree(
+    int device_type, int device_id, DGLStreamHandle stream);
 
 /*!
  * \brief Set the runtime stream of current thread to be stream.
@@ -568,7 +548,8 @@ DGL_DLL int DGLStreamFree(int device_type, int device_id, DGLStreamHandle stream
  * \param handle The stream handle.
  * \return 0 when success, -1 when failure happens
  */
-DGL_DLL int DGLSetStream(int device_type, int device_id, DGLStreamHandle handle);
+DGL_DLL int DGLSetStream(
+    int device_type, int device_id, DGLStreamHandle handle);
 
 /*!
  * \brief Get the runtime stream of current thread.
@@ -578,7 +559,8 @@ DGL_DLL int DGLSetStream(int device_type, int device_id, DGLStreamHandle handle)
  * \param handle The stream handle.
  * \return 0 when success, -1 when failure happens
  */
-DGL_DLL int DGLGetStream(int device_type, int device_id, DGLStreamHandle* handle);
+DGL_DLL int DGLGetStream(
+    int device_type, int device_id, DGLStreamHandle* handle);
 
 /*!
  * \brief Wait until all computations on stream completes.
@@ -588,7 +570,8 @@ DGL_DLL int DGLGetStream(int device_type, int device_id, DGLStreamHandle* handle
  * \param stream The stream to be synchronized.
  * \return 0 when success, -1 when failure happens
  */
-DGL_DLL int DGLSynchronize(int device_type, int device_id, DGLStreamHandle stream);
+DGL_DLL int DGLSynchronize(
+    int device_type, int device_id, DGLStreamHandle stream);
 
 /*!
  * \brief Synchronize two streams of execution.
@@ -599,16 +582,14 @@ DGL_DLL int DGLSynchronize(int device_type, int device_id, DGLStreamHandle strea
  * \param dst The destination stream to synchronize.
  * \return 0 when success, -1 when failure happens
  */
-DGL_DLL int DGLStreamStreamSynchronize(int device_type,
-                                       int device_id,
-                                       DGLStreamHandle src,
-                                       DGLStreamHandle dst);
+DGL_DLL int DGLStreamStreamSynchronize(
+    int device_type, int device_id, DGLStreamHandle src, DGLStreamHandle dst);
 
 /*!
  * \brief Load tensor adapter.
  * \return 0 when success, -1 when failure happens.
  */
-DGL_DLL int DGLLoadTensorAdapter(const char *path);
+DGL_DLL int DGLLoadTensorAdapter(const char* path);
 
 /*!
  * \brief Pin host memory.
@@ -628,17 +609,18 @@ int DGLArrayRecordStream(DGLArrayHandle handle, DGLStreamHandle stream);
 /*!
  * \brief Bug report macro.
  *
- * This serves as a sanity check on system side to make sure the code is correct by
- * checking whether a condition always holds for complex reasons.  Failing the
- * condition signifies a system bug instead of users giving invalid inputs or using
- * the functionality incorrectly.
+ * This serves as a sanity check on system side to make sure the code is correct
+ * by checking whether a condition always holds for complex reasons.  Failing
+ * the condition signifies a system bug instead of users giving invalid inputs
+ * or using the functionality incorrectly.
  *
  * Hints the user to file a bug report if the condition fails.
  */
-#define BUG_IF_FAIL(cond) \
-  CHECK(cond) << "A bug has been occurred.  " \
-                 "Please file a bug report at https://github.com/dmlc/dgl/issues.  " \
-                 "Message: "
+#define BUG_IF_FAIL(cond)                                                    \
+  CHECK(cond)                                                                \
+      << "A bug has been occurred.  "                                        \
+         "Please file a bug report at https://github.com/dmlc/dgl/issues.  " \
+         "Message: "
 
 #ifdef __cplusplus
 }  // DGL_EXTERN_C

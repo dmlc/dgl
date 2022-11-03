@@ -48,10 +48,10 @@ Distributed embedding optimizer
 -------------------------
 
 .. autoclass:: dgl.distributed.optim.SparseAdagrad
-    :members: step
+    :members: step, save, load
 
 .. autoclass:: dgl.distributed.optim.SparseAdam
-    :members: step
+    :members: step, save, load
 
 Distributed workload split
 --------------------------
