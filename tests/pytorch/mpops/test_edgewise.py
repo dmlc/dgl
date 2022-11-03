@@ -17,9 +17,10 @@ torch.random.manual_seed(42)
 @parametrize_idtype
 @pytest.mark.parametrize("feat_size", [(5,), ()])
 def test_copy_u(idtype, feat_size):
+    ctx = F.ctx()
     g = dgl.rand_graph(30, 100)
-    g = g.astype(idtype).to(F.ctx())
-    x = torch.randn((g.num_nodes(),) + feat_size, requires_grad=True)
+    g = g.astype(idtype).to(ctx)
+    x = torch.randn((g.num_nodes(),) + feat_size, requires_grad=True, device=ctx)
 
     y = dgl.copy_u(g, x)
     y.sum().backward()
@@ -38,6 +39,7 @@ def test_copy_u(idtype, feat_size):
 @parametrize_idtype
 @pytest.mark.parametrize("feat_size", [(5,), ()])
 def test_copy_u_hetero(idtype, feat_size):
+    ctx = F.ctx()
     hg = dgl.heterograph(
         {
             ("user", "follow", "user"): ([0, 1, 2], [2, 3, 4]),
@@ -45,8 +47,8 @@ def test_copy_u_hetero(idtype, feat_size):
         }
     )
 
-    hg = hg.astype(idtype).to(F.ctx())
-    x = torch.randn((hg.num_nodes("user"),) + feat_size, requires_grad=True)
+    hg = hg.astype(idtype).to(ctx)
+    x = torch.randn((hg.num_nodes("user"),) + feat_size, requires_grad=True, device=ctx)
 
     y = dgl.copy_u(hg, x, etype="like")
     y.sum().backward()
@@ -65,9 +67,10 @@ def test_copy_u_hetero(idtype, feat_size):
 @parametrize_idtype
 @pytest.mark.parametrize("feat_size", [(5,), ()])
 def test_copy_v(idtype, feat_size):
+    ctx = F.ctx()
     g = dgl.rand_graph(30, 100)
-    g = g.astype(idtype).to(F.ctx())
-    x = torch.randn((g.num_nodes(),) + feat_size, requires_grad=True)
+    g = g.astype(idtype).to(ctx)
+    x = torch.randn((g.num_nodes(),) + feat_size, requires_grad=True, device=ctx)
 
     y = dgl.copy_v(g, x)
     y.sum().backward()
@@ -86,6 +89,7 @@ def test_copy_v(idtype, feat_size):
 @parametrize_idtype
 @pytest.mark.parametrize("feat_size", [(5,), ()])
 def test_copy_v_hetero(idtype, feat_size):
+    ctx = F.ctx()
     hg = dgl.heterograph(
         {
             ("user", "follow", "user"): ([0, 1, 2], [2, 3, 4]),
@@ -93,8 +97,8 @@ def test_copy_v_hetero(idtype, feat_size):
         }
     )
 
-    hg = hg.astype(idtype).to(F.ctx())
-    x = torch.randn((hg.num_nodes("movie"),) + feat_size, requires_grad=True)
+    hg = hg.astype(idtype).to(ctx)
+    x = torch.randn((hg.num_nodes("movie"),) + feat_size, requires_grad=True, device=ctx)
 
     y = dgl.copy_v(hg, x, etype="like")
     y.sum().backward()
@@ -142,10 +146,11 @@ def pad_shape(x, y, x_size, y_size):
 @pytest.mark.parametrize("op", ops)
 @pytest.mark.parametrize("x_size,y_size", binary_arg_sizes)
 def test_u_op_v(idtype, op, x_size, y_size):
+    ctx = F.ctx()
     g = dgl.rand_graph(30, 100)
-    g = g.astype(idtype).to(F.ctx())
-    x = torch.randn((g.num_nodes(),) + x_size, requires_grad=True)
-    y = torch.randn((g.num_nodes(),) + y_size, requires_grad=True)
+    g = g.astype(idtype).to(ctx)
+    x = torch.randn((g.num_nodes(),) + x_size, requires_grad=True, device=ctx)
+    y = torch.randn((g.num_nodes(),) + y_size, requires_grad=True, device=ctx)
 
     f_dgl = getattr(dgl, f"u_{op}_v")
     z = f_dgl(g, x, y)
@@ -171,10 +176,11 @@ def test_u_op_v(idtype, op, x_size, y_size):
 @parametrize_idtype
 @pytest.mark.parametrize("x_size,y_size", dot_arg_sizes)
 def test_u_dot_v(idtype, x_size, y_size):
+    ctx = F.ctx()
     g = dgl.rand_graph(30, 100)
-    g = g.astype(idtype).to(F.ctx())
-    x = torch.randn((g.num_nodes(),) + x_size, requires_grad=True)
-    y = torch.randn((g.num_nodes(),) + y_size, requires_grad=True)
+    g = g.astype(idtype).to(ctx)
+    x = torch.randn((g.num_nodes(),) + x_size, requires_grad=True, device=ctx)
+    y = torch.randn((g.num_nodes(),) + y_size, requires_grad=True, device=ctx)
 
     z = dgl.u_dot_v(g, x, y)
     z.sum().backward()
@@ -190,6 +196,6 @@ def test_u_dot_v(idtype, x_size, y_size):
     x_grad_true = x.grad
     y_grad_true = y.grad
 
-    assert torch.allclose(z, z_true)
+    assert torch.allclose(z, z_true, atol=1e-4, rtol=1e-4)
     assert torch.allclose(x_grad, x_grad_true)
     assert torch.allclose(y_grad, y_grad_true)
