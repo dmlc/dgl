@@ -42,8 +42,10 @@ int32_t Ver2partition(IdType in_val, int64_t *node_map, int32_t num_parts) {
   LOG(FATAL) << "Error: Unexpected output in Ver2partition!";
 }
 
-/*! \brief Identifies the lead loaded partition/community for a given edge
- * assignment.*/
+/*!
+ * \brief Identifies the lead loaded partition/community for a given edge
+ * assignment.
+ */
 int32_t LeastLoad(int64_t *community_edges, int32_t nc) {
   std::vector<int> loc;
   int32_t min = 1e9;
@@ -63,23 +65,25 @@ int32_t LeastLoad(int64_t *community_edges, int32_t nc) {
   return loc[r];
 }
 
-/*! \brief Libra - vertexcut based graph partitioning.
-  It takes list of edges from input DGL graph and distributed them among nc
-  partitions During edge distribution, Libra assign a given edge to a partition
-  based on the end vertices, in doing so, it tries to minimized the splitting of
-  the graph vertices. In case of conflict Libra assigns an edge to the least
-  loaded partition/community. \param[in] nc Number of partitions/communities
-  \param[in] node_degree per node degree
-  \param[in] edgenum_unassigned node degree
-  \param[out] community_weights weight of the created partitions
-  \param[in] u src nodes
-  \param[in] v dst nodes
-  \param[out] w weight per edge
-  \param[out] out partition assignment of the edges
-  \param[in] N_n number of nodes in the input graph
-  \param[in] N_e number of edges in the input graph
-  \param[in] prefix output/partition storage location
-*/
+/*!
+ * \brief Libra - vertexcut based graph partitioning.
+ * It takes list of edges from input DGL graph and distributed them among nc
+ * partitions During edge distribution, Libra assign a given edge to a partition
+ * based on the end vertices, in doing so, it tries to minimized the splitting
+ * of the graph vertices. In case of conflict Libra assigns an edge to the least
+ * loaded partition/community.
+ * \param[in] nc Number of partitions/communities
+ * \param[in] node_degree per node degree
+ * \param[in] edgenum_unassigned node degree
+ * \param[out] community_weights weight of the created partitions
+ * \param[in] u src nodes
+ * \param[in] v dst nodes
+ * \param[out] w weight per edge
+ * \param[out] out partition assignment of the edges
+ * \param[in] N_n number of nodes in the input graph
+ * \param[in] N_e number of edges in the input graph
+ * \param[in] prefix output/partition storage location
+ */
 template <typename IdType, typename IdType2>
 void LibraVertexCut(
     int32_t nc, NDArray node_degree, NDArray edgenum_unassigned,
@@ -320,26 +324,31 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLLibraVertexCut")
       });
     });
 
-/*! \brief
-   1. Builds dictionary (ldt) for assigning local node IDs to nodes in the
-  partitions
-   2. Builds dictionary (gdt) for storing copies (local ID) of split nodes
-   These dictionaries will be used in the subsequesnt stages to setup tracking
-  of split nodes copies across the partition, setting up partition `ndata`
-  dictionaries. \param[out] a local src node ID of an edge in a partition
-  \param[out] b local dst node ID of an edge in a partition
-  \param[-] indices temporary memory, keeps track of global node ID to local
-  node ID in a partition \param[out] ldt_key per partition dict for storing
-  global and local node IDs (consecutive) \param[out] gdt_key global dict for
-  storing number of local nodes (or split nodes) for a given global node ID
-  \param[out] gdt_value global dict, stores local node IDs (due to split) across
-  partitions for a given global node ID \param[out] node_map keeps track of
-  range of local node IDs (consecutive) given to the nodes in the partitions
-  \param[in, out] offset start of the range of local node IDs for this partition
-  \param[in] nc  number of partitions/communities
-  \param[in] c current partition number
-  \param[in] fsize size of pre-allocated memory tensor
-  \param[in] prefix input Libra partition file location
+/*!
+ * \brief
+ * 1. Builds dictionary (ldt) for assigning local node IDs to nodes in the
+ *    partitions
+ * 2. Builds dictionary (gdt) for storing copies (local ID) of split nodes
+ *    These dictionaries will be used in the subsequesnt stages to setup
+ *    tracking of split nodes copies across the partition, setting up partition
+ *    `ndata` dictionaries.
+ * \param[out] a local src node ID of an edge in a partition
+ * \param[out] b local dst node ID of an edge in a partition
+ * \param[-] indices temporary memory, keeps track of global node ID to local
+ *           node ID in a partition
+ * \param[out] ldt_key per partition dict for storing global and local node IDs
+ *             (consecutive)
+ * \param[out] gdt_key global dict for storing number of local nodes (or split
+ *             nodes) for a given global node ID
+ * \param[out] gdt_value global dict, stores local node IDs (due to split)
+ *             across partitions for a given global node ID \param[out] node_map
+ *             keeps track of range of local node IDs (consecutive) given to the
+ *             nodes in the partitions
+ * \param[in, out] offset start of the range of local node IDs for this partition
+ * \param[in] nc  number of partitions/communities
+ * \param[in] c current partition number
+ * \param[in] fsize size of pre-allocated memory tensor
+ * \param[in] prefix input Libra partition file location
  */
 List<Value> Libra2dglBuildDict(
     NDArray a, NDArray b, NDArray indices, NDArray ldt_key, NDArray gdt_key,
@@ -446,12 +455,15 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLLibra2dglBuildDict")
       *rv = ret;
     });
 
-/*! \brief sets up the 1-level tree among the clones of the split-nodes.
-  \param[in] gdt_key global dict for assigning consecutive node IDs to nodes
-  across all the partitions \param[in] gdt_value global dict for assigning
-  consecutive node IDs to nodes across all the partition \param[out] lrtensor
-  keeps the root node ID of 1-level tree \param[in] nc number of
-  partitions/communities \param[in] Nn number of nodes in the input graph
+/*!
+ * \brief sets up the 1-level tree among the clones of the split-nodes.
+ * \param[in] gdt_key global dict for assigning consecutive node IDs to nodes
+ *            across all the partitions
+ * \param[in] gdt_value global dict for assigning consecutive node IDs to nodes
+ *            across all the partition
+ * \param[out] lrtensor keeps the root node ID of 1-level tree
+ * \param[in] nc number of partitions/communities
+ * \param[in] Nn number of nodes in the input graph
  */
 void Libra2dglSetLR(
     NDArray gdt_key, NDArray gdt_value, NDArray lrtensor, int32_t nc,
@@ -494,32 +506,35 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLLibra2dglSetLR")
     });
 
 /*!
-  \brief For each node in a partition, it creates a list of remote clone IDs;
-  also, for each node in a partition, it gathers the data (feats, label, trian,
-  test) from input graph. \param[out] feat node features in current partition c
-  \param[in] gfeat input graph node features
-  \param[out] adj list of node IDs of remote clones
-  \param[out] inner_nodes marks whether a node is split or not
-  \param[in] ldt_key per partition dict for tracking global to local node IDs
-  \param[out] gdt_key global dict for storing number of local nodes (or split
-  nodes) for a given global node ID \param[out] gdt_value global dict, stores
-  local node IDs (due to split) across partitions for a given global node ID
-  \param[in] node_map keeps track of range of local node IDs (consecutive) given
-  to the nodes in the partitions \param[out] lr 1-level tree marking for local
-  split nodes \param[in] lrtensor global (all the partitions) 1-level tree
-  \param[in] num_nodes number of nodes in current partition
-  \param[in] nc number of partitions/communities
-  \param[in] c current partition/community
-  \param[in] feat_size node feature vector size
-  \param[out] labels local (for this partition) labels
-  \param[out] trainm local (for this partition) training nodes
-  \param[out] testm local (for this partition) testing nodes
-  \param[out] valm local (for this partition) validation nodes
-  \param[in] glabels global (input graph) labels
-  \param[in] gtrainm glabal (input graph) training nodes
-  \param[in] gtestm glabal (input graph) testing nodes
-  \param[in] gvalm glabal (input graph) validation nodes
-  \param[out] Nn number of nodes in the input graph
+ * \brief For each node in a partition, it creates a list of remote clone IDs;
+ *        also, for each node in a partition, it gathers the data (feats, label,
+ *        trian, test) from input graph.
+ * \param[out] feat node features in current partition
+ * \param[in] gfeat input graph node features
+ * \param[out] adj list of node IDs of remote clones
+ * \param[out] inner_nodes marks whether a node is split or not
+ * \param[in] ldt_key per partition dict for tracking global to local node IDs
+ * \param[out] gdt_key global dict for storing number of local nodes (or split
+ *             nodes) for a given global node ID \param[out] gdt_value global
+ *             dict, stores local node IDs (due to split) across partitions for
+ *             a given global node ID
+ * \param[in] node_map keeps track of range of local node IDs (consecutive)
+ *            given to the nodes in the partitions
+ * \param[out] lr 1-level tree marking for local split nodes
+ * \param[in] lrtensor global (all the partitions) 1-level tree
+ * \param[in] num_nodes number of nodes in current partition
+ * \param[in] nc number of partitions/communities
+ * \param[in] c current partition/community
+ * \param[in] feat_size node feature vector size
+ * \param[out] labels local (for this partition) labels
+ * \param[out] trainm local (for this partition) training nodes
+ * \param[out] testm local (for this partition) testing nodes
+ * \param[out] valm local (for this partition) validation nodes
+ * \param[in] glabels global (input graph) labels
+ * \param[in] gtrainm glabal (input graph) training nodes
+ * \param[in] gtestm glabal (input graph) testing nodes
+ * \param[in] gvalm glabal (input graph) validation nodes
+ * \param[out] Nn number of nodes in the input graph
  */
 template <typename IdType, typename IdType2, typename DType>
 void Libra2dglBuildAdjlist(

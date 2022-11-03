@@ -269,9 +269,11 @@ inline libxsmm_meltwfunction_opreduce_vecs_idx SpMMCreateLibxsmmKernel(
  * \param has_idx For the edge features, are there indices available.
  * \param N Feature size.
  * \param num_M_blocks Number of blocks to create along the rows of adjacency
- * matrix. \param num_K_blocks Number of blocks to create along the columns of
- * adjacency matrix. \param M_block_size block size along the rows of adjacency
- * matrix. \param kernel The libxsmm kernel.
+ *        matrix.
+ * \param num_K_blocks Number of blocks to create along the columns of adjacency
+ *        matrix.
+ * \param M_block_size block size along the rows of adjacency matrix.
+ * \param kernel The libxsmm kernel.
  */
 template <typename IdType, typename DType>
 inline void SpMMBlockwiseOpSum(
@@ -326,9 +328,11 @@ inline void SpMMBlockwiseOpSum(
  * \param has_idx For the edge features, are there indices available.
  * \param N Feature size.
  * \param num_M_blocks Number of blocks to create along the rows of adjacency
- * matrix. \param num_K_blocks Number of blocks to create along the columns of
- * adjacency matrix. \param M_block_size block size along the rows of adjacency
- * matrix. \param kernel The libxsmm kernel.
+ *        matrix.
+ * \param num_K_blocks Number of blocks to create along the columns of adjacency
+ *        matrix.
+ * \param M_block_size block size along the rows of adjacency matrix.
+ * \param kernel The libxsmm kernel.
  */
 template <typename IdType, typename DType, typename Op, typename Cmp>
 inline void SpMMBlockwiseOpCmp(
@@ -381,9 +385,11 @@ inline void SpMMBlockwiseOpCmp(
  * \brief Free the tiled CSR matrix data.
  * \param block_csr_array The array containing csr matrices of all blocks.
  * \param num_M_blocks Number of blocks to create along the rows of adjacency
- * matrix. \param num_K_blocks Number of blocks to create along the columns of
- * adjacency matrix. \param use_lhs Whether to use lhs. \param use_rhs Whether
- * to use rhs.
+ *        matrix.
+ * \param num_K_blocks Number of blocks to create along the columns of adjacency
+ *        matrix.
+ * \param use_lhs Whether to use lhs.
+ * \param use_rhs Whether to use rhs.
  */
 template <typename IdType>
 inline void SpMMFreeBlocks(

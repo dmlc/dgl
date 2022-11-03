@@ -225,8 +225,10 @@ void UpdateGradMinMax_hetero(
 
 /*!
  * \brief CUDA implementation of backward phase of Segment Reduce with Min/Max
- * reducer. \note math equation: out[arg[i, k], k] = feat[i, k] \param feat The
- * input tensor. \param arg The ArgMin/Max information, used for indexing.
+ *        reducer.
+ * \note math equation: out[arg[i, k], k] = feat[i, k] \param feat The input
+ *       tensor.
+ * \param arg The ArgMin/Max information, used for indexing.
  * \param out The output tensor.
  */
 template <typename IdType, typename DType>

@@ -172,8 +172,7 @@ NDArray CSRGetRowNNZ(CSRMatrix csr, NDArray rows) {
 template NDArray CSRGetRowNNZ<kDGLCUDA, int32_t>(CSRMatrix, NDArray);
 template NDArray CSRGetRowNNZ<kDGLCUDA, int64_t>(CSRMatrix, NDArray);
 
-///////////////////////////// CSRGetRowColumnIndices
-////////////////////////////////
+////////////////////////// CSRGetRowColumnIndices //////////////////////////////
 
 template <DGLDeviceType XPU, typename IdType>
 NDArray CSRGetRowColumnIndices(CSRMatrix csr, int64_t row) {
