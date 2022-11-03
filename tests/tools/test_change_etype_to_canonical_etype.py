@@ -41,14 +41,12 @@ def create_random_hetero(type_n, node_n):
     "type_n, node_n, num_parts", [[3, 100, 2], [10, 500, 4], [10, 1000, 8]]
 )
 def test_hetero_graph(type_n, node_n, num_parts):
-    return
     g, expected_c_etypes = create_random_hetero(type_n, node_n)
     do_convert_and_check(g, "convert_conf_test", num_parts, expected_c_etypes)
 
 
 @pytest.mark.parametrize("node_n, num_parts", [[100, 2], [500, 4]])
 def test_homo_graph(node_n, num_parts):
-    return
     g = dgl.rand_graph(node_n, node_n // 10)
     do_convert_and_check(g, "convert_conf_test", num_parts, ["_N:_E:_N"])
 

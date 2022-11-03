@@ -10,10 +10,10 @@ import dgl
 from dgl._ffi.base import DGLError
 from dgl.data.utils import load_graphs
 from dgl.distributed import load_partition_book
-from dgl.distributed.graph_partition_book import CANONICAL_ETYPE_DELIMITER
 
 etypes_key = "etypes"
 edge_map_key = "edge_map"
+canonical_etypes_delimiter = ":"
 
 
 def convert_conf(part_config):
@@ -95,7 +95,7 @@ def _find_c_etypes_in_partition(
         etype_id = etype_id.item()
         dst_tid = dst_tid.item()
         c_etype = (ntypes[src_tid], etypes[etype_id], ntypes[dst_tid])
-        canonical_etypes[CANONICAL_ETYPE_DELIMITER.join(c_etype)] = etype_id
+        canonical_etypes[canonical_etypes_delimiter.join(c_etype)] = etype_id
     return canonical_etypes
 
 
@@ -110,7 +110,7 @@ def _find_edges(local_g, partition_book, seed_edges):
 
 def is_old_version(config):
     first_etype = list(config[etypes_key].keys())[0]
-    etype_tuple = first_etype.split(CANONICAL_ETYPE_DELIMITER)
+    etype_tuple = first_etype.split(canonical_etypes_delimiter)
     return len(etype_tuple) == 1
 
 
