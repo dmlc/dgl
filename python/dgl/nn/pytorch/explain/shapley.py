@@ -1,5 +1,6 @@
 import torch
 import dgl
+from ....base import NID, EID
 import numpy as np
 import copy
 
@@ -14,8 +15,7 @@ import copy
 # To simplify, we'll only have 1 way of building subgraphs from masks. In addition, won't rely on class
 # MarginalSubgraphDataset(Dataset).
 
-def marginal_contribution(graph, exclude_masks, include_masks,
-                          value_func):
+def marginal_contribution(graph, exclude_masks, include_masks, value_func, features):
     """ Calculate the marginal value for each pair. Here exclude_mask and include_mask are node mask. """
 
     # Seems redundant to do : (shapley func) node index list ---> turned into node mask passed into
@@ -44,8 +44,8 @@ def marginal_contribution(graph, exclude_masks, include_masks,
         # WARNING: subgraph method relabels graph nodes but original labels can be recovered with parent_nid.
         # Dow we have to take this into account in the value_func methods?
 
-        exclude_values = value_func(exclude_subgraph)
-        include_values = value_func(include_subgraph)
+        exclude_values = value_func(exclude_subgraph, features)
+        include_values = value_func(include_subgraph, features)
 
         margin_values = include_values - exclude_values
 
@@ -69,7 +69,7 @@ def neighbors(node, graph):
 
 
 # Change subgraph from list to dl.DGLGraph? What would be gained?
-def mc_l_shapley(value_func, graph, subgraph, local_radius, sample_num):
+def mc_l_shapley(value_func, graph, subgraph, local_radius, sample_num, features):
     """ monte carlo sampling approximation of the l_shapley value """
     num_nodes = graph.num_nodes()
 
@@ -109,7 +109,7 @@ def mc_l_shapley(value_func, graph, subgraph, local_radius, sample_num):
 
     exclude_masks = np.stack(set_exclude_masks, axis=0)
     include_masks = np.stack(set_include_masks, axis=0)
-    marginal_contributions = marginal_contribution(graph, exclude_masks, include_masks, value_func)
+    marginal_contributions = marginal_contribution(graph, exclude_masks, include_masks, value_func, features)
     # marginal_contribution(data, exclude_mask, include_mask, value_func, subgraph_build_func)
 
     mc_l_shapley_value = marginal_contributions.mean().item()

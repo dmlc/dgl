@@ -36,7 +36,8 @@ class MCTSNode:
 class SubgraphXExplainer(nn.Module):
     # Pruning actions: dict of {dgl.DGLGraph : set(node ids to prune/remove from subgraph)}
     # For now, leave it empty as ref impl doesn't really implement any special pruning actions.
-    def __init__(self, model, hyperparam, pruning_action, num_child_expand=2, local_radius=1, sample_num=1):
+    def __init__(self, model, hyperparam, pruning_action, num_child_expand=2, local_radius=1,
+                 sample_num=1):
         super(SubgraphXExplainer, self).__init__()
 
         self.hyperparam = hyperparam
@@ -66,7 +67,7 @@ class SubgraphXExplainer(nn.Module):
                 logits = self.model(gr, features, **kwargs)
                 probs = torch_func.softmax(logits, dim=-1)
                 # score = probs[:, target_class]
-            # return score
+                # return score
                 return probs
 
         return value_func
@@ -87,7 +88,8 @@ class SubgraphXExplainer(nn.Module):
         # 3. Convert to a networkx graph object.
         nx_graph = dgl.to_networkx(new_graph).to_undirected()
         # 4. Find and sort graph components by size from largest to smallest and take the biggest one.
-        biggest_comp = list([c for c in sorted(nx.connected_components(nx_graph), key=len, reverse=True)][0])
+        biggest_comp = list(
+            [c for c in sorted(nx.connected_components(nx_graph), key=len, reverse=True)][0])
         # 5. Convert back to DGLGraph object.
         return dgl.node_subgraph(graph, biggest_comp)
 
@@ -145,10 +147,14 @@ class SubgraphXExplainer(nn.Module):
                 if len(self.state_map[curr_node.state_map_index].children) == 0:
                     # "for each node, pruning it and get the remaining sub-graph..."
                     # make sure to add nodes to curr_node's children
-                    (subgraphs, pruned_nodes) = self.prune_graph(curr_node.subgraph, self.pruning_action)
+                    (subgraphs, pruned_nodes) = self.prune_graph(curr_node.subgraph,
+                                                                 self.pruning_action)
                     for j in range(len(subgraphs)):
                         new_child_node = MCTSNode(subgraphs[j], str(pruned_nodes[j]))
-                        new_child_node.R = self.score_func(self.value_func, graph, new_child_node.subgraph.nodes().tolist(), self.local_radius, self.sample_num)
+                        new_child_node.R = self.score_func(self.model, graph,
+                                                           new_child_node.subgraph.nodes().tolist(),
+                                                           self.local_radius, self.sample_num,
+                                                           features)
                         self.state_map[curr_node.state_map_index].children.append(new_child_node)
                         self.state_map[new_child_node.state_map_index] = new_child_node
 
@@ -163,15 +169,21 @@ class SubgraphXExplainer(nn.Module):
 
             leaf_set.add(curr_node)
 
-            score_leaf_node = self.score_func(self.model, graph, curr_node.subgraph.nodes().tolist(),
-                                              self.local_radius, self.sample_num)
+            score_leaf_node = self.score_func(self.model,
+                                              graph,
+                                              curr_node.subgraph.nodes().tolist(),
+                                              self.local_radius,
+                                              self.sample_num,
+                                              features)
+
             # Update nodes in curr_path
-            for node in curr_node:
+            for node in leaf_set:
                 self.state_map[node.state_map_index].C += 1
                 self.state_map[node.state_map_index].W += score_leaf_node
 
         # Select subgraph with the highest score (R value) from S_l.
         best_node = max(leaf_set, key=lambda x: x.R)
+
         return best_node.subgraph
 
     def explain_node(self):

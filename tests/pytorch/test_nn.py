@@ -1393,6 +1393,7 @@ def test_heterognnexplainer(g, idtype, input_dim, output_dim):
     explainer = nn.explain.HeteroGNNExplainer(model, num_hops=1)
     feat_mask, edge_mask = explainer.explain_graph(g, feat)
 
+
 @pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
 @pytest.mark.parametrize('idtype', [F.int64])
 @pytest.mark.parametrize('out_dim', [1, 2])
@@ -1432,6 +1433,7 @@ def test_subgraphxexplainer(g, idtype, out_dim):
     model = model.to(F.ctx())
     explainer = nn.SubgraphXExplainer(model, hyperparam=0.1, pruning_action="high2low")
     g_explain = explainer.explain_graph(g, M=100, N_min=50, features=feat)
+
 
 def test_jumping_knowledge():
     ctx = F.ctx()
