@@ -4,6 +4,7 @@
  * \brief COO2CSR
  */
 #include <dgl/array.h>
+
 #include "../../runtime/cuda/cuda_common.h"
 #include "./utils.h"
 
@@ -46,18 +47,15 @@ CSRMatrix COOToCSR<kDGLCUDA, int32_t>(COOMatrix coo) {
   if (!COOHasData(coo))
     coo.data = aten::Range(0, nnz, coo.row->dtype.bits, coo.row->ctx);
 
-  NDArray indptr = aten::NewIdArray(coo.num_rows + 1, coo.row->ctx, coo.row->dtype.bits);
+  NDArray indptr =
+      aten::NewIdArray(coo.num_rows + 1, coo.row->ctx, coo.row->dtype.bits);
   int32_t* indptr_ptr = static_cast<int32_t*>(indptr->data);
   CUSPARSE_CALL(cusparseXcoo2csr(
-        thr_entry->cusparse_handle,
-        coo.row.Ptr<int32_t>(),
-        nnz,
-        coo.num_rows,
-        indptr_ptr,
-        CUSPARSE_INDEX_BASE_ZERO));
+      thr_entry->cusparse_handle, coo.row.Ptr<int32_t>(), nnz, coo.num_rows,
+      indptr_ptr, CUSPARSE_INDEX_BASE_ZERO));
 
-  return CSRMatrix(coo.num_rows, coo.num_cols,
-                   indptr, coo.col, coo.data, col_sorted);
+  return CSRMatrix(
+      coo.num_rows, coo.num_cols, indptr, coo.col, coo.data, col_sorted);
 }
 
 /*!
@@ -77,9 +75,8 @@ CSRMatrix COOToCSR<kDGLCUDA, int32_t>(COOMatrix coo) {
  */
 template <typename IdType>
 __global__ void _SortedSearchKernelUpperBound(
-    const IdType* hay, int64_t hay_size,
-    const IdType* needles, int64_t num_needles,
-    IdType* pos) {
+    const IdType* hay, int64_t hay_size, const IdType* needles,
+    int64_t num_needles, IdType* pos) {
   int tx = blockIdx.x * blockDim.x + threadIdx.x;
   const int stride_x = gridDim.x * blockDim.x;
   while (tx < num_needles) {
@@ -123,14 +120,12 @@ CSRMatrix COOToCSR<kDGLCUDA, int64_t>(COOMatrix coo) {
   const int nt = cuda::FindNumThreads(coo.num_rows);
   const int nb = (coo.num_rows + nt - 1) / nt;
   IdArray indptr = Full(0, coo.num_rows + 1, nbits, ctx);
-  CUDA_KERNEL_CALL(_SortedSearchKernelUpperBound,
-      nb, nt, 0, stream,
-      coo.row.Ptr<int64_t>(), nnz,
-      rowids.Ptr<int64_t>(), coo.num_rows,
-      indptr.Ptr<int64_t>() + 1);
+  CUDA_KERNEL_CALL(
+      _SortedSearchKernelUpperBound, nb, nt, 0, stream, coo.row.Ptr<int64_t>(),
+      nnz, rowids.Ptr<int64_t>(), coo.num_rows, indptr.Ptr<int64_t>() + 1);
 
-  return CSRMatrix(coo.num_rows, coo.num_cols,
-                   indptr, coo.col, coo.data, col_sorted);
+  return CSRMatrix(
+      coo.num_rows, coo.num_cols, indptr, coo.col, coo.data, col_sorted);
 }
 
 template CSRMatrix COOToCSR<kDGLCUDA, int32_t>(COOMatrix coo);

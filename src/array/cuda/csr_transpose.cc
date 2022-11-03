@@ -4,6 +4,7 @@
  * \brief CSR transpose (convert to CSC)
  */
 #include <dgl/array.h>
+
 #include "../../runtime/cuda/cuda_common.h"
 
 namespace dgl {
@@ -33,14 +34,13 @@ CSRMatrix CSRTranspose<kDGLCUDA, int32_t>(CSRMatrix csr) {
   const int64_t nnz = indices->shape[0];
   const auto& ctx = indptr->ctx;
   const auto bits = indptr->dtype.bits;
-  if (aten::IsNullArray(data))
-    data = aten::Range(0, nnz, bits, ctx);
+  if (aten::IsNullArray(data)) data = aten::Range(0, nnz, bits, ctx);
   const int32_t* indptr_ptr = static_cast<int32_t*>(indptr->data);
   const int32_t* indices_ptr = static_cast<int32_t*>(indices->data);
   const void* data_ptr = data->data;
 
-  // (BarclayII) csr2csc doesn't seem to clear the content of cscColPtr if nnz == 0.
-  // We need to do it ourselves.
+  // (BarclayII) csr2csc doesn't seem to clear the content of cscColPtr if nnz
+  // == 0. We need to do it ourselves.
   NDArray t_indptr = aten::Full(0, csr.num_cols + 1, bits, ctx);
   NDArray t_indices = aten::NewIdArray(nnz, ctx, bits);
   NDArray t_data = aten::NewIdArray(nnz, ctx, bits);
@@ -53,40 +53,29 @@ CSRMatrix CSRTranspose<kDGLCUDA, int32_t>(CSRMatrix csr) {
   // workspace
   size_t workspace_size;
   CUSPARSE_CALL(cusparseCsr2cscEx2_bufferSize(
-      thr_entry->cusparse_handle,
-      csr.num_rows, csr.num_cols, nnz,
-      data_ptr, indptr_ptr, indices_ptr,
-      t_data_ptr, t_indptr_ptr, t_indices_ptr,
-      CUDA_R_32F,
-      CUSPARSE_ACTION_NUMERIC,
-      CUSPARSE_INDEX_BASE_ZERO,
+      thr_entry->cusparse_handle, csr.num_rows, csr.num_cols, nnz, data_ptr,
+      indptr_ptr, indices_ptr, t_data_ptr, t_indptr_ptr, t_indices_ptr,
+      CUDA_R_32F, CUSPARSE_ACTION_NUMERIC, CUSPARSE_INDEX_BASE_ZERO,
       CUSPARSE_CSR2CSC_ALG1,  // see cusparse doc for reference
       &workspace_size));
   void* workspace = device->AllocWorkspace(ctx, workspace_size);
   CUSPARSE_CALL(cusparseCsr2cscEx2(
-      thr_entry->cusparse_handle,
-      csr.num_rows, csr.num_cols, nnz,
-      data_ptr, indptr_ptr, indices_ptr,
-      t_data_ptr, t_indptr_ptr, t_indices_ptr,
-      CUDA_R_32F,
-      CUSPARSE_ACTION_NUMERIC,
-      CUSPARSE_INDEX_BASE_ZERO,
+      thr_entry->cusparse_handle, csr.num_rows, csr.num_cols, nnz, data_ptr,
+      indptr_ptr, indices_ptr, t_data_ptr, t_indptr_ptr, t_indices_ptr,
+      CUDA_R_32F, CUSPARSE_ACTION_NUMERIC, CUSPARSE_INDEX_BASE_ZERO,
       CUSPARSE_CSR2CSC_ALG1,  // see cusparse doc for reference
       workspace));
   device->FreeWorkspace(ctx, workspace);
 #else
   CUSPARSE_CALL(cusparseScsr2csc(
-      thr_entry->cusparse_handle,
-      csr.num_rows, csr.num_cols, nnz,
+      thr_entry->cusparse_handle, csr.num_rows, csr.num_cols, nnz,
       static_cast<const float*>(data_ptr), indptr_ptr, indices_ptr,
       static_cast<float*>(t_data_ptr), t_indices_ptr, t_indptr_ptr,
-      CUSPARSE_ACTION_NUMERIC,
-      CUSPARSE_INDEX_BASE_ZERO));
+      CUSPARSE_ACTION_NUMERIC, CUSPARSE_INDEX_BASE_ZERO));
 #endif
 
-  return CSRMatrix(csr.num_cols, csr.num_rows,
-                   t_indptr, t_indices, t_data,
-                   false);
+  return CSRMatrix(
+      csr.num_cols, csr.num_rows, t_indptr, t_indices, t_data, false);
 }
 
 template <>

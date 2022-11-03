@@ -7,10 +7,11 @@
 #define DGL_ARRAY_CPU_SEGMENT_REDUCE_H_
 
 #include <dgl/array.h>
-#include <dgl/runtime/parallel_for.h>
 #include <dgl/base_heterograph.h>
-#include <vector>
+#include <dgl/runtime/parallel_for.h>
+
 #include <string>
+#include <vector>
 
 namespace dgl {
 namespace aten {
@@ -26,11 +27,10 @@ template <typename IdType, typename DType>
 void SegmentSum(NDArray feat, NDArray offsets, NDArray out) {
   int n = out->shape[0];
   int dim = 1;
-  for (int i = 1; i < out->ndim; ++i)
-    dim *= out->shape[i];
+  for (int i = 1; i < out->ndim; ++i) dim *= out->shape[i];
   const DType* feat_data = feat.Ptr<DType>();
   const IdType* offsets_data = offsets.Ptr<IdType>();
-  DType *out_data = out.Ptr<DType>();
+  DType* out_data = out.Ptr<DType>();
   runtime::parallel_for(0, n, [=](int b, int e) {
     for (auto i = b; i < e; ++i) {
       for (IdType j = offsets_data[i]; j < offsets_data[i + 1]; ++j) {
@@ -51,16 +51,14 @@ void SegmentSum(NDArray feat, NDArray offsets, NDArray out) {
  *        used in backward phase.
  */
 template <typename IdType, typename DType, typename Cmp>
-void SegmentCmp(NDArray feat, NDArray offsets,
-                NDArray out, NDArray arg) {
+void SegmentCmp(NDArray feat, NDArray offsets, NDArray out, NDArray arg) {
   int n = out->shape[0];
   int dim = 1;
-  for (int i = 1; i < out->ndim; ++i)
-    dim *= out->shape[i];
+  for (int i = 1; i < out->ndim; ++i) dim *= out->shape[i];
   const DType* feat_data = feat.Ptr<DType>();
   const IdType* offsets_data = offsets.Ptr<IdType>();
-  DType *out_data = out.Ptr<DType>();
-  IdType *arg_data = arg.Ptr<IdType>();
+  DType* out_data = out.Ptr<DType>();
+  IdType* arg_data = arg.Ptr<IdType>();
   std::fill(out_data, out_data + out.NumElements(), Cmp::zero);
   std::fill(arg_data, arg_data + arg.NumElements(), -1);
   runtime::parallel_for(0, n, [=](int b, int e) {
@@ -89,8 +87,7 @@ template <typename IdType, typename DType>
 void ScatterAdd(NDArray feat, NDArray idx, NDArray out) {
   int n = feat->shape[0];
   int dim = 1;
-  for (int i = 1; i < out->ndim; ++i)
-    dim *= out->shape[i];
+  for (int i = 1; i < out->ndim; ++i) dim *= out->shape[i];
   const DType* feat_data = feat.Ptr<DType>();
   const IdType* idx_data = idx.Ptr<IdType>();
   DType* out_data = out.Ptr<DType>();
@@ -114,24 +111,26 @@ void ScatterAdd(NDArray feat, NDArray idx, NDArray out) {
  * \param list_out List of the output tensors.
  */
 template <typename IdType, typename DType>
-void UpdateGradMinMax_hetero(HeteroGraphPtr graph,
-                       const std::string& op,
-                       const std::vector<NDArray>& list_feat,
-                       const std::vector<NDArray>& list_idx,
-                       const std::vector<NDArray>& list_idx_types,
-                       std::vector<NDArray>* list_out) {
+void UpdateGradMinMax_hetero(
+    HeteroGraphPtr graph, const std::string& op,
+    const std::vector<NDArray>& list_feat, const std::vector<NDArray>& list_idx,
+    const std::vector<NDArray>& list_idx_types,
+    std::vector<NDArray>* list_out) {
   if (op == "copy_lhs" || op == "copy_rhs") {
-    std::vector<std::vector<dgl_id_t>> src_dst_ntypes(graph->NumVertexTypes(),
-    std::vector<dgl_id_t>());
+    std::vector<std::vector<dgl_id_t>> src_dst_ntypes(
+        graph->NumVertexTypes(), std::vector<dgl_id_t>());
 
     for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
       auto pair = graph->meta_graph()->FindEdge(etype);
       const dgl_id_t dst_ntype = pair.first;  // graph is reversed
       const dgl_id_t src_ntype = pair.second;
-      auto same_src_dst_ntype = std::find(std::begin(src_dst_ntypes[dst_ntype]),
-        std::end(src_dst_ntypes[dst_ntype]), src_ntype);
-      // if op is "copy_lhs", relation type with same src and dst node type will be updated once
-      if (op == "copy_lhs" && same_src_dst_ntype != std::end(src_dst_ntypes[dst_ntype]))
+      auto same_src_dst_ntype = std::find(
+          std::begin(src_dst_ntypes[dst_ntype]),
+          std::end(src_dst_ntypes[dst_ntype]), src_ntype);
+      // if op is "copy_lhs", relation type with same src and dst node type will
+      // be updated once
+      if (op == "copy_lhs" &&
+          same_src_dst_ntype != std::end(src_dst_ntypes[dst_ntype]))
         continue;
       src_dst_ntypes[dst_ntype].push_back(src_ntype);
       const DType* feat_data = list_feat[dst_ntype].Ptr<DType>();
@@ -149,7 +148,8 @@ void UpdateGradMinMax_hetero(HeteroGraphPtr graph,
           if (type == idx_type_data[i * dim + k]) {
             const int write_row = idx_data[i * dim + k];
 #pragma omp atomic
-            out_data[write_row * dim + k] += feat_data[i * dim + k];  // feat = dZ
+            out_data[write_row * dim + k] +=
+                feat_data[i * dim + k];  // feat = dZ
           }
         }
       }
@@ -170,8 +170,7 @@ template <typename IdType, typename DType>
 void BackwardSegmentCmp(NDArray feat, NDArray arg, NDArray out) {
   int n = feat->shape[0];
   int dim = 1;
-  for (int i = 1; i < out->ndim; ++i)
-    dim *= out->shape[i];
+  for (int i = 1; i < out->ndim; ++i) dim *= out->shape[i];
   const DType* feat_data = feat.Ptr<DType>();
   const IdType* arg_data = arg.Ptr<IdType>();
   DType* out_data = out.Ptr<DType>();
