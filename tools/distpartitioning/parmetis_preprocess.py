@@ -293,7 +293,7 @@ def gen_parmetis_input_args(params, schema_map):
     #   num_constraints = no. of node types + train_mask + test_mask + val_mask
     #   Here, (train/test/val) masks will be set to 1 if these masks exist for
     #   all the node types in the graph, otherwise these flags will be set to 0
-    assert graph_name in schema_map, "Graph name is not present in the json file"
+    assert constants.GRAPH_NAMEe in schema_map, "Graph name is not present in the json file"
     graph_name = schema_map[constants.GRAPH_NAME]
     if not os.path.isfile(f'{graph_name}_stats.txt'):
         num_nodes = np.sum(np.concatenate(schema_map[constants.STR_NUM_NODES_PER_CHUNK]))
