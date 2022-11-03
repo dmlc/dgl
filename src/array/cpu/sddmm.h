@@ -117,8 +117,7 @@ void SDDMMCoo(
 
 namespace op {
 
-//////////////////////////////// binary operators on CPU
-///////////////////////////////////
+////////////////////////// binary operators on CPU /////////////////////////////
 template <typename DType>
 struct Add {
   static constexpr bool use_lhs = true;

@@ -55,9 +55,11 @@ int32_t GetLLCSize() {
  * \param csr The Csr matrix.
  * \param block_csr_array The array containing csr matrices of all blocks.
  * \param num_M_blocks Number of blocks to create along the rows of adjacency
- * matrix. \param num_K_blocks Number of blocks to create along the columns of
- * adjacency matrix. \param M_block_size block size along the rows of adjacency
- * matrix. \param K_block_size block size along the columns of adjacency matrix.
+ *        matrix.
+ * \param num_K_blocks Number of blocks to create along the columns of adjacency
+ *        matrix.
+ * \param M_block_size block size along the rows of adjacency matrix.
+ * \param K_block_size block size along the columns of adjacency matrix.
  * \param use_lhs Whether to use lhs.
  * \param use_rhs Whether to use rhs.
  */

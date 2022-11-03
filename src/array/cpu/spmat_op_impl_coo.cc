@@ -127,8 +127,7 @@ NDArray COOGetRowNNZ(COOMatrix coo, NDArray rows) {
 template NDArray COOGetRowNNZ<kDGLCPU, int32_t>(COOMatrix, NDArray);
 template NDArray COOGetRowNNZ<kDGLCPU, int64_t>(COOMatrix, NDArray);
 
-///////////////////////////// COOGetRowDataAndIndices
-////////////////////////////////
+////////////////////////// COOGetRowDataAndIndices /////////////////////////////
 
 template <DGLDeviceType XPU, typename IdType>
 std::pair<NDArray, NDArray> COOGetRowDataAndIndices(
@@ -182,9 +181,8 @@ IdArray COOGetData(COOMatrix coo, IdArray rows, IdArray cols) {
   IdType *ret_data = ret.Ptr<IdType>();
 
   // TODO(minjie): We might need to consider sorting the COO beforehand
-  // especially
-  //   when the number of (row, col) pairs is large. Need more benchmarks to
-  //   justify the choice.
+  // especially when the number of (row, col) pairs is large. Need more
+  // benchmarks to justify the choice.
 
   if (coo.row_sorted) {
     parallel_for(0, retlen, [&](size_t b, size_t e) {

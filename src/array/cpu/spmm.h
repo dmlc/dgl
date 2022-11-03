@@ -235,12 +235,14 @@ void SpMMSumCoo(
  * \param argu Arg-Min/Max on source nodes, which refers the source node indices
  *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max
- * reducer. \param arge Arg-Min/Max on edges. which refers the source node
- * indices correspond to the minimum/maximum values of reduction result on
+ *        reducer.
+ * \param arge Arg-Min/Max on edges. which refers the source node indices
+          correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max
- * reducer. \note It uses node parallel strategy, different threads are
- * responsible for the computation of different nodes. \note The result will
- * contain infinity for zero-degree nodes.
+ *        reducer.
+ * \note It uses node parallel strategy, different threads are responsible for
+ *       the computation of different nodes.
+ * \note The result will contain infinity for zero-degree nodes.
  */
 template <typename IdType, typename DType, typename Op, typename Cmp>
 void SpMMCmpCsr(
@@ -331,16 +333,19 @@ void SpMMCmpCsr(
  *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max
  *        reducer.
- * \param arge Arg-Min/Max on edges. which refers the source node
- *        indices correspond to the minimum/maximum values of reduction result
- * on destination nodes. It's useful in computing gradients of Min/Max reducer.
+ * \param arge Arg-Min/Max on edges. which refers the source node indices
+ *        correspond to the minimum/maximum values of reduction result on
+ *        destination nodes. It's useful in computing gradients of Min/Max
+ *        reducer.
  * \param argu_ntype Node type of the arg-Min/Max on source nodes, which refers
- * the source node types correspond to the minimum/maximum values of reduction
- * result on destination nodes. It's useful in computing gradients of Min/Max
- * reducer. \param arge_etype Edge-type of the arg-Min/Max on edges. which
- * refers the source node indices correspond to the minimum/maximum values of
- * reduction result on destination nodes. It's useful in computing gradients of
- * Min/Max reducer. \param src_type Node type of the source nodes of an etype
+ *        the source node types correspond to the minimum/maximum values of
+ *        reduction result on destination nodes. It's useful in computing
+ *        gradients of Min/Max reducer.
+ * \param arge_etype Edge-type of the arg-Min/Max on edges. which refers the
+ *        source node indices correspond to the minimum/maximum values of
+ *        reduction result on destination nodes. It's useful in computing
+ *        gradients of Min/Max reducer.
+ * \param src_type Node type of the source nodes of an etype
  * \param etype Edge type
  */
 template <typename IdType, typename DType, typename Op, typename Cmp>
@@ -423,13 +428,15 @@ void SpMMCmpCsrHetero(
  * \param argu Arg-Min/Max on source nodes, which refers the source node indices
  *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max
- * reducer. \param arge Arg-Min/Max on edges. which refers the source node
- * indices correspond to the minimum/maximum values of reduction result on
+ *        reducer.
+ * \param arge Arg-Min/Max on edges. which refers the source node indices
+ *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max
- * reducer. \note it uses node parallel strategy, different threads are
- * responsible for the computation of different nodes. To avoid possible data
- * hazard, we use atomic operators in the reduction phase. \note The result will
- * contain infinity for zero-degree nodes.
+ *        reducer.
+ * \note it uses node parallel strategy, different threads are responsible for
+ *       the computation of different nodes. To avoid possible data hazard, we
+ *       use atomic operators in the reduction phase.
+ * \note The result will contain infinity for zero-degree nodes.
  */
 template <typename IdType, typename DType, typename Op, typename Cmp>
 void SpMMCmpCoo(
