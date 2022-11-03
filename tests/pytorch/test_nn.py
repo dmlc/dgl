@@ -1394,6 +1394,45 @@ def test_heterognnexplainer(g, idtype, input_dim, output_dim):
     feat_mask, edge_mask = explainer.explain_graph(g, feat)
 
 
+@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
+@pytest.mark.parametrize('idtype', [F.int64])
+@pytest.mark.parametrize('out_dim', [1, 2])
+def test_pgexplainerexplainer(g, idtype, out_dim):
+    g = g.astype(idtype).to(F.ctx())
+    feat = F.randn((g.num_nodes(), 5))
+    class Model(th.nn.Module):
+        def __init__(self, in_feats, out_feats, graph=False):
+            super(Model, self).__init__()
+            self.linear = th.nn.Linear(in_feats, out_feats)
+            if graph:
+                self.pool = nn.AvgPooling()
+            else:
+                self.pool = None
+        def forward(self, graph, feat, eweight=None):
+            with graph.local_scope():
+                feat = self.linear(feat)
+                graph.ndata['h'] = feat
+                if eweight is None:
+                    graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
+                else:
+                    graph.edata['w'] = eweight
+                    graph.update_all(fn.u_mul_e('h', 'w', 'm'), fn.sum('m', 'h'))
+                if self.pool:
+                    return self.pool(graph, graph.ndata['h'])
+                else:
+                    return graph.ndata['h']
+    # TODO: Not implemented yet.
+    # Explain node prediction.
+
+
+    # Explain graph prediction
+    model = Model(5, out_dim, graph=True)
+    model = model.to(F.ctx())
+    explainer = nn.PGExplainer(model, g, 16, feat, log=True, epochs=30, lr=0.01)
+    gr, expl = explainer.explain_graph(0)
+
+
+
 def test_jumping_knowledge():
     ctx = F.ctx()
     num_layers = 2

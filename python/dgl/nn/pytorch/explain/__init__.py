@@ -2,3 +2,4 @@
 # pylint: disable= no-member, arguments-differ, invalid-name
 
 from .gnnexplainer import GNNExplainer, HeteroGNNExplainer
+from .pgexplainer import PGExplainer
