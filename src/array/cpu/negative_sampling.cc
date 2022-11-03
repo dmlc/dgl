@@ -57,7 +57,6 @@ std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
           return a.first < b.first ||
                  (a.first == b.first && a.second < b.second);
         });
-    ;
     end = std::unique(begin, end);
   }
   int64_t num_sampled =
