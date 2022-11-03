@@ -5,6 +5,7 @@
  */
 
 #include <dgl/array.h>
+
 #include <vector>
 
 namespace dgl {
@@ -19,8 +20,7 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
   const IdType* coo_row_data = static_cast<IdType*>(coo.row->data);
   const IdType* coo_col_data = static_cast<IdType*>(coo.col->data);
 
-  if (!coo.row_sorted || !coo.col_sorted)
-    coo = COOSort(coo, true);
+  if (!coo.row_sorted || !coo.col_sorted) coo = COOSort(coo, true);
 
   std::vector<IdType> new_row, new_col, count;
   IdType prev_row = -1, prev_col = -1;
@@ -39,8 +39,12 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
   }
 
   COOMatrix coo_result = COOMatrix{
-      coo.num_rows, coo.num_cols, NDArray::FromVector(new_row), NDArray::FromVector(new_col),
-      NullArray(), true};
+      coo.num_rows,
+      coo.num_cols,
+      NDArray::FromVector(new_row),
+      NDArray::FromVector(new_col),
+      NullArray(),
+      true};
   return std::make_pair(coo_result, NDArray::FromVector(count));
 }
 

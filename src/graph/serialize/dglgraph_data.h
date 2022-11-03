@@ -6,25 +6,27 @@
 #ifndef DGL_GRAPH_SERIALIZE_DGLGRAPH_DATA_H_
 #define DGL_GRAPH_SERIALIZE_DGLGRAPH_DATA_H_
 
-#include <dgl/graph.h>
 #include <dgl/array.h>
+#include <dgl/graph.h>
 #include <dgl/immutable_graph.h>
+#include <dgl/packed_func_ext.h>
+#include <dgl/runtime/container.h>
+#include <dgl/runtime/ndarray.h>
+#include <dgl/runtime/object.h>
 #include <dmlc/io.h>
 #include <dmlc/type_traits.h>
-#include <dgl/runtime/ndarray.h>
-#include <dgl/runtime/container.h>
-#include <dgl/runtime/object.h>
-#include <dgl/packed_func_ext.h>
-#include <iostream>
-#include <string>
-#include <vector>
+
 #include <algorithm>
-#include <utility>
+#include <iostream>
 #include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
 #include "../../c_api_common.h"
 
-using dgl::runtime::NDArray;
 using dgl::ImmutableGraph;
+using dgl::runtime::NDArray;
 using namespace dgl::runtime;
 
 namespace dgl {
@@ -39,9 +41,9 @@ class GraphDataObject : public runtime::Object {
   std::vector<NamedTensor> edge_tensors;
   static constexpr const char *_type_key = "graph_serialize.GraphData";
 
-  void SetData(ImmutableGraphPtr gptr,
-               Map<std::string, Value> node_tensors,
-               Map<std::string, Value> edge_tensors);
+  void SetData(
+      ImmutableGraphPtr gptr, Map<std::string, Value> node_tensors,
+      Map<std::string, Value> edge_tensors);
 
   void Save(dmlc::Stream *fs) const;
 
@@ -49,7 +51,6 @@ class GraphDataObject : public runtime::Object {
 
   DGL_DECLARE_OBJECT_TYPE_INFO(GraphDataObject, runtime::Object);
 };
-
 
 class GraphData : public runtime::ObjectRef {
  public:
@@ -60,7 +61,6 @@ class GraphData : public runtime::ObjectRef {
     return GraphData(std::make_shared<GraphDataObject>());
   }
 };
-
 
 ImmutableGraphPtr ToImmutableGraph(GraphPtr g);
 
