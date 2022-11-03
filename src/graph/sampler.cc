@@ -1322,7 +1322,6 @@ NegSubgraph EdgeSamplerObject::genChunkedNegEdgeSubgraph(
   local_neg_vids.resize(global_neg_vids.size());
   for (size_t i = 0; i < global_neg_vids.size(); i++) {
     local_neg_vids[i] = global2local_map(global_neg_vids[i], &neg_map);
-    ;
   }
 
   for (int64_t i_chunk = 0; i_chunk < num_chunks; i_chunk++) {
