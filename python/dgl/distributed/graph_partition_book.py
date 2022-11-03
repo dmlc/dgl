@@ -24,17 +24,35 @@ CANONICAL_ETYPE_DELIMITER = ":"
 
 def _etype_tuple_to_str(c_etype):
     '''Convert canonical etype from tuple to string.
+
+    Examples
+    --------
+    >>> c_etype = ('user', 'like', 'item')
+    >>> c_etype_str = _etype_tuple_to_str(c_etype)
+    >>> print(c_etype_str)
+    'user:like:item'
+
     '''
     assert isinstance(c_etype, tuple) and len(c_etype) == 3, \
-        "Passed-in canonical etype should be in format of (str, str, str)."
+        "Passed-in canonical etype should be in format of (str, str, str). " \
+        f"But got {c_etype}."
     return CANONICAL_ETYPE_DELIMITER.join(c_etype)
 
 def _etype_str_to_tuple(c_etype):
     '''Convert canonical etype from tuple to string.
+
+    Examples
+    --------
+    >>> c_etype_str = 'user:like:item'
+    >>> c_etype = _etype_str_to_tuple(c_etype_str)
+    >>> print(c_etype)
+    ('user', 'like', 'item')
+
     '''
     ret = tuple(c_etype.split(CANONICAL_ETYPE_DELIMITER))
     assert len(ret) == 3, \
-        "Passed-in canonical etype should be in format of 'str:str:str'."
+        "Passed-in canonical etype should be in format of 'str:str:str'. " \
+        f"But got {c_etype}."
     return ret
 
 def _move_metadata_to_shared_mem(
@@ -827,11 +845,10 @@ class RangePartitionBook(GraphPartitionBook):
         assert all(
             ntype is not None for ntype in self._ntypes
         ), "The node types have invalid IDs."
-        for etype, etype_id in etypes.items():
-            assert isinstance(etype, tuple) and len(etype) == 3, \
-                "Only canonical etype in tuple is supproted: (str, str, str)."
-            c_etype = etype
-            etype = etype[1]
+        for c_etype, etype_id in etypes.items():
+            assert isinstance(c_etype, tuple) and len(c_etype) == 3, \
+                f"Expect canonical edge type in a triplet of string, but got {c_etype}."
+            etype = c_etype[1]
             self._etypes[etype_id] = etype
             self._canonical_etypes[etype_id] = c_etype
             if etype in self._etype2canonical:
@@ -1212,8 +1229,7 @@ class PartitionPolicy(object):
     """
 
     def __init__(self, policy_str, partition_book):
-        splits = policy_str.split(POLICY_DELIMITER)
-        if len(splits) == 1:
+        if POLICY_DELIMITER not in policy_str:
             assert policy_str in (
                 EDGE_PART_POLICY,
                 NODE_PART_POLICY,
@@ -1225,8 +1241,8 @@ class PartitionPolicy(object):
         self._policy_str = policy_str
         self._part_id = partition_book.partid
         self._partition_book = partition_book
-        self._type_name = self.policy_str[5:]
-        if policy_str.startswith(EDGE_PART_POLICY):
+        part_policy, self._type_name = policy_str.split(POLICY_DELIMITER, 1)
+        if part_policy == EDGE_PART_POLICY:
             self._type_name = _etype_str_to_tuple(self._type_name)
 
     @property
@@ -1371,7 +1387,7 @@ class EdgePartitionPolicy(PartitionPolicy):
 
     def __init__(self, partition_book, etype=DEFAULT_ETYPE):
         assert isinstance(etype, tuple) and len(etype) == 3, \
-            "Only canonical etype in tuple is supproted: (str, str, str)."
+            f"Expect canonical edge type in a triplet of string, but got {etype}."
         super(EdgePartitionPolicy, self).__init__(
             EDGE_PART_POLICY + POLICY_DELIMITER + _etype_tuple_to_str(etype),
             partition_book
@@ -1400,7 +1416,7 @@ class HeteroDataName(object):
         self._policy = NODE_PART_POLICY if is_node else EDGE_PART_POLICY
         if not is_node:
             assert isinstance(entity_type, tuple) and len(entity_type) == 3, \
-                "Only canonical etype in tuple is supproted: (str, str, str)."
+                f"Expect canonical edge type in a triplet of string, but got {entity_type}."
         self._entity_type = entity_type
         self.data_name = data_name
 

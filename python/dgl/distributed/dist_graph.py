@@ -481,7 +481,6 @@ class DistGraph:
     '''
     def __init__(self, graph_name, gpb=None, part_config=None):
         self.graph_name = graph_name
-        self._gpb_input = gpb
         if os.environ.get('DGL_DIST_MODE', 'standalone') == 'standalone':
             assert part_config is not None, \
                     'When running in the standalone model, the partition config file is required'
@@ -511,7 +510,7 @@ class DistGraph:
             self._client.map_shared_data(self._gpb)
             rpc.set_num_client(1)
         else:
-            self._init()
+            self._init(gpb)
             # Tell the backup servers to load the graph structure from shared memory.
             for server_id in range(self._client.num_servers):
                 rpc.send_request(server_id, InitGraphRequest(graph_name))
@@ -534,22 +533,22 @@ class DistGraph:
         self._ntype_map = {ntype:i for i, ntype in enumerate(self.ntypes)}
         self._etype_map = {etype:i for i, etype in enumerate(self.canonical_etypes)}
 
-    def _init(self):
+    def _init(self, gpb):
         self._client = get_kvstore()
         assert self._client is not None, \
                 'Distributed module is not initialized. Please call dgl.distributed.initialize.'
         self._g = _get_graph_from_shared_mem(self.graph_name)
         self._gpb = get_shared_mem_partition_book(self.graph_name, self._g)
         if self._gpb is None:
-            self._gpb = self._gpb_input
+            self._gpb = gpb
         self._client.map_shared_data(self._gpb)
 
     def __getstate__(self):
         return self.graph_name, self._gpb
 
     def __setstate__(self, state):
-        self.graph_name, self._gpb_input = state
-        self._init()
+        self.graph_name, gpb = state
+        self._init(gpb)
 
         self._ndata_store = {}
         self._edata_store = {}
@@ -885,8 +884,8 @@ class DistGraph:
         123718280
         """
         if etype is None:
-            return sum([self._gpb._num_edges(etype) \
-                for etype in self.canonical_etypes])
+            return sum([self._gpb._num_edges(c_etype)
+                for c_etype in self.canonical_etypes])
         return self._gpb._num_edges(etype)
 
     def out_degrees(self, u=ALL):

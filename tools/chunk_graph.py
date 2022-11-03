@@ -9,10 +9,6 @@ import torch
 from utils import array_readwriter, setdir
 
 import dgl
-from dgl.distributed.partition import (
-    _etype_tuple_to_str,
-    _etype_str_to_tuple,
-)
 
 def chunk_numpy_array(arr, fmt_meta, chunk_sizes, path_fmt):
     paths = []
@@ -40,9 +36,9 @@ def _chunk_graph(g, name, ndata_paths, edata_paths, num_chunks, output_path):
     ):
         edata_paths = {g.etypes[0]: ndata_paths}
     # Then convert all edge types to canonical edge types
-    etypestrs = {etype: _etype_tuple_to_str(etype) for etype in g.canonical_etypes}
+    etypestrs = {etype: ":".join(etype) for etype in g.canonical_etypes}
     edata_paths = {
-        _etype_tuple_to_str(g.to_canonical_etype(k)): v for k, v in edata_paths.items()
+        ":".join(g.to_canonical_etype(k)): v for k, v in edata_paths.items()
     }
 
     metadata = {}

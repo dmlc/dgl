@@ -35,7 +35,7 @@ RESERVED_FIELD_DTYPE = {
     }
 
 def _format_part_metadata(part_metadata, formator):
-    ''' Format etypes with specified formator
+    '''Format etypes with specified formator.
     '''
     for key in ['edge_map', 'etypes']:
         if key not in part_metadata:
@@ -51,7 +51,7 @@ def _format_part_metadata(part_metadata, formator):
     return part_metadata
 
 def _load_part_config(part_config):
-    ''' Load part config and format
+    '''Load part config and format.
     '''
     try:
         with open(part_config) as f:
@@ -65,7 +65,7 @@ def _load_part_config(part_config):
     return part_metadata
 
 def _dump_part_config(part_config, part_metadata):
-    ''' Format and dump part config
+    '''Format and dump part config.
     '''
     part_metadata = _format_part_metadata(part_metadata, _etype_tuple_to_str)
     with open(part_config, 'w') as outfile:
