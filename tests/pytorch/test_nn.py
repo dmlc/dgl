@@ -1397,7 +1397,9 @@ def test_heterognnexplainer(g, idtype, input_dim, output_dim):
 @pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
 @pytest.mark.parametrize('idtype', [F.int64])
 @pytest.mark.parametrize('out_dim', [1, 2])
-def test_subgraphxexplainer(g, idtype, out_dim):
+@pytest.mark.parametrize('N_min', [5, 50])
+@pytest.mark.parametrize('M', [5, 100])
+def test_subgraphxexplainer(g, idtype, out_dim, N_min, M):
     g = g.astype(idtype).to(F.ctx())
     feat = F.randn((g.num_nodes(), 5))
 
@@ -1432,7 +1434,7 @@ def test_subgraphxexplainer(g, idtype, out_dim):
     model = Model(5, out_dim, graph=True)
     model = model.to(F.ctx())
     explainer = nn.SubgraphXExplainer(model, hyperparam=0.1, pruning_action="high2low")
-    g_explain = explainer.explain_graph(g, M=100, N_min=50, features=feat)
+    g_explain = explainer.explain_graph(g, M=M, N_min=N_min, features=feat)
 
 
 def test_jumping_knowledge():
@@ -1454,6 +1456,7 @@ def test_jumping_knowledge():
     model = nn.JumpingKnowledge('lstm', num_feats, num_layers).to(ctx)
     model.reset_parameters()
     assert model(feat_list).shape == (num_nodes, num_feats)
+
 
 @pytest.mark.parametrize('op', ['dot', 'cos', 'ele', 'cat'])
 def test_edge_predictor(op):
