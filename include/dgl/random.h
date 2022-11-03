@@ -14,6 +14,7 @@
 #include <random>
 #include <thread>
 #include <vector>
+#include <pcg_random.hpp>
 
 namespace dgl {
 
@@ -47,7 +48,7 @@ class RandomEngine {
   }
 
   /*! \brief Constructor with given seed */
-  explicit RandomEngine(uint32_t seed) { SetSeed(seed); }
+  explicit RandomEngine(uint32_t seed, uint32_t stream=GetThreadId()) { SetSeed(seed, stream); }
 
   /*! \brief Get the thread-local random number generator instance */
   static RandomEngine* ThreadLocal() {
@@ -57,7 +58,7 @@ class RandomEngine {
   /*!
    * \brief Set the seed of this random number generator
    */
-  void SetSeed(uint32_t seed) { rng_.seed(seed + GetThreadId()); }
+  void SetSeed(uint32_t seed, uint32_t stream=GetThreadId()) { rng_.seed(seed, stream); }
 
   /*!
    * \brief Generate an arbitrary random 32-bit integer.
@@ -246,7 +247,7 @@ class RandomEngine {
   }
 
  private:
-  std::default_random_engine rng_;
+  pcg32 rng_;
 };
 
 };  // namespace dgl
