@@ -104,7 +104,6 @@ def lookup_shuffle_global_nids_edges(rank, world_size, edge_data, id_lookup, nod
     splits = np.array_split(node_list, num_splits)
     shuffle_mappings = []
     for item in splits:
-        logging.info(f'[Rank: {rank} SENDING : {item.shape}')
         shuffle_ids = id_lookup.get_shuffle_nids(item,
                                             node_data[constants.GLOBAL_NID],
                                             node_data[constants.SHUFFLE_GLOBAL_NID])
