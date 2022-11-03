@@ -6,10 +6,11 @@
 #ifndef DGL_SAMPLER_H_
 #define DGL_SAMPLER_H_
 
-#include <vector>
-#include <string>
 #include <cstdlib>
 #include <ctime>
+#include <string>
+#include <vector>
+
 #include "graph_interface.h"
 #include "nodeflow.h"
 
@@ -32,13 +33,11 @@ class SamplerOp {
    * \param probability the transition probability (float/double).
    * \return a NodeFlow graph.
    */
-  template<typename ValueType>
-  static NodeFlow NeighborSample(const ImmutableGraph *graph,
-                                 const std::vector<dgl_id_t>& seeds,
-                                 const std::string &edge_type,
-                                 int num_hops, int expand_factor,
-                                 const bool add_self_loop,
-                                 const ValueType *probability);
+  template <typename ValueType>
+  static NodeFlow NeighborSample(
+      const ImmutableGraph *graph, const std::vector<dgl_id_t> &seeds,
+      const std::string &edge_type, int num_hops, int expand_factor,
+      const bool add_self_loop, const ValueType *probability);
 
   /*!
    * \brief Sample a graph from the seed vertices with layer sampling.
@@ -50,10 +49,9 @@ class SamplerOp {
    * \param layer_sizes The size of layers.
    * \return a NodeFlow graph.
    */
-  static NodeFlow LayerUniformSample(const ImmutableGraph *graph,
-                                     const std::vector<dgl_id_t>& seeds,
-                                     const std::string &neigh_type,
-                                     IdArray layer_sizes);
+  static NodeFlow LayerUniformSample(
+      const ImmutableGraph *graph, const std::vector<dgl_id_t> &seeds,
+      const std::string &neigh_type, IdArray layer_sizes);
 };
 
 }  // namespace dgl

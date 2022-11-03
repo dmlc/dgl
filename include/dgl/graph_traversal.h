@@ -16,7 +16,8 @@ namespace dgl {
  * \brief Class for representing frontiers.
  *
  * Each frontier is a list of nodes/edges (specified by their ids).
- * An optional tag can be specified on each node/edge (represented by an int value).
+ * An optional tag can be specified on each node/edge (represented by an int
+ * value).
  */
 struct Frontiers {
   /*!\brief a vector store for the nodes/edges in all the frontiers */
@@ -78,10 +79,10 @@ Frontiers DGLDFSEdges(const CSRMatrix& csr, IdArray source);
  * FORWARD(0), REVERSE(1), NONTREE(2)
  *
  * A FORWARD edge is one in which `u` has been visisted but `v` has not.
- * A REVERSE edge is one in which both `u` and `v` have been visisted and the edge
- * is in the DFS tree.
- * A NONTREE edge is one in which both `u` and `v` have been visisted but the edge
- * is NOT in the DFS tree.
+ * A REVERSE edge is one in which both `u` and `v` have been visisted and the
+ * edge is in the DFS tree.
+ * A NONTREE edge is one in which both `u` and `v` have been visisted but the
+ * edge is NOT in the DFS tree.
  *
  * \param csr The input csr matrix.
  * \param sources Source nodes.
@@ -90,11 +91,9 @@ Frontiers DGLDFSEdges(const CSRMatrix& csr, IdArray source);
  * \param return_labels If true, return the recorded edge tags.
  * \return A Frontiers object containing the search result
  */
-Frontiers DGLDFSLabeledEdges(const CSRMatrix& csr,
-                             IdArray source,
-                             const bool has_reverse_edge,
-                             const bool has_nontree_edge,
-                             const bool return_labels);
+Frontiers DGLDFSLabeledEdges(
+    const CSRMatrix& csr, IdArray source, const bool has_reverse_edge,
+    const bool has_nontree_edge, const bool return_labels);
 
 }  // namespace aten
 }  // namespace dgl

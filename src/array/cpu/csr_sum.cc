@@ -7,7 +7,9 @@
 #include <dgl/array.h>
 #include <dgl/runtime/parallel_for.h>
 #include <parallel_hashmap/phmap.h>
+
 #include <vector>
+
 #include "array_utils.h"
 
 namespace dgl {
@@ -22,8 +24,7 @@ namespace {
 template <typename IdType>
 void CountNNZPerRow(
     const std::vector<const IdType*>& A_indptr,
-    const std::vector<const IdType*>& A_indices,
-    IdType* C_indptr_data,
+    const std::vector<const IdType*>& A_indices, IdType* C_indptr_data,
     int64_t M) {
   int64_t n = A_indptr.size();
 
@@ -57,11 +58,8 @@ void ComputeIndicesAndData(
     const std::vector<const IdType*>& A_indptr,
     const std::vector<const IdType*>& A_indices,
     const std::vector<const IdType*>& A_eids,
-    const std::vector<const DType*>& A_data,
-    const IdType* C_indptr_data,
-    IdType* C_indices_data,
-    DType* C_weights_data,
-    int64_t M) {
+    const std::vector<const DType*>& A_data, const IdType* C_indptr_data,
+    IdType* C_indices_data, DType* C_weights_data, int64_t M) {
   int64_t n = A_indptr.size();
   runtime::parallel_for(0, M, [=](size_t b, size_t e) {
     for (auto i = b; i < e; ++i) {
@@ -87,10 +85,10 @@ void ComputeIndicesAndData(
 
 template <int XPU, typename IdType, typename DType>
 std::pair<CSRMatrix, NDArray> CSRSum(
-    const std::vector<CSRMatrix>& A,
-    const std::vector<NDArray>& A_weights) {
+    const std::vector<CSRMatrix>& A, const std::vector<NDArray>& A_weights) {
   CHECK(A.size() > 0) << "List of matrices can't be empty.";
-  CHECK_EQ(A.size(), A_weights.size()) << "List of matrices and weights must have same length";
+  CHECK_EQ(A.size(), A_weights.size())
+      << "List of matrices and weights must have same length";
   const int64_t M = A[0].num_rows;
   const int64_t N = A[0].num_cols;
   const int64_t n = A.size();
@@ -111,22 +109,26 @@ std::pair<CSRMatrix, NDArray> CSRSum(
     A_data[i] = data.Ptr<DType>();
   }
 
-  IdArray C_indptr = IdArray::Empty({M + 1}, A[0].indptr->dtype, A[0].indptr->ctx);
+  IdArray C_indptr =
+      IdArray::Empty({M + 1}, A[0].indptr->dtype, A[0].indptr->ctx);
   IdType* C_indptr_data = C_indptr.Ptr<IdType>();
 
   CountNNZPerRow<IdType>(A_indptr, A_indices, C_indptr_data, M);
   IdType nnz = ComputeIndptrInPlace<IdType>(C_indptr_data, M);
   // Allocate indices and weights array
-  IdArray C_indices = IdArray::Empty({nnz}, A[0].indices->dtype, A[0].indices->ctx);
-  NDArray C_weights = NDArray::Empty({nnz}, A_weights[0]->dtype, A_weights[0]->ctx);
+  IdArray C_indices =
+      IdArray::Empty({nnz}, A[0].indices->dtype, A[0].indices->ctx);
+  NDArray C_weights =
+      NDArray::Empty({nnz}, A_weights[0]->dtype, A_weights[0]->ctx);
   IdType* C_indices_data = C_indices.Ptr<IdType>();
   DType* C_weights_data = C_weights.Ptr<DType>();
   ComputeIndicesAndData<IdType, DType>(
-      A_indptr, A_indices, A_eids, A_data,
-      C_indptr_data, C_indices_data, C_weights_data, M);
+      A_indptr, A_indices, A_eids, A_data, C_indptr_data, C_indices_data,
+      C_weights_data, M);
 
   return {
-      CSRMatrix(M, N, C_indptr, C_indices, NullArray(C_indptr->dtype, C_indptr->ctx)),
+      CSRMatrix(
+          M, N, C_indptr, C_indices, NullArray(C_indptr->dtype, C_indptr->ctx)),
       C_weights};
 }
 

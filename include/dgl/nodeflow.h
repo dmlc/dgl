@@ -6,9 +6,9 @@
 #ifndef DGL_NODEFLOW_H_
 #define DGL_NODEFLOW_H_
 
-#include <vector>
-#include <string>
 #include <memory>
+#include <string>
+#include <vector>
 
 #include "./runtime/object.h"
 #include "graph_interface.h"
@@ -18,12 +18,12 @@ namespace dgl {
 class ImmutableGraph;
 
 /*!
- * \brief A NodeFlow graph stores the sampling results for a sampler that samples
- * nodes/edges in layers.
+ * \brief A NodeFlow graph stores the sampling results for a sampler that
+ * samples nodes/edges in layers.
  *
- * We store multiple layers of the sampling results in a single graph, which results
- * in a more compact format. We store extra information,
- * such as the node and edge mapping from the NodeFlow graph to the parent graph.
+ * We store multiple layers of the sampling results in a single graph, which
+ * results in a more compact format. We store extra information, such as the
+ * node and edge mapping from the NodeFlow graph to the parent graph.
  */
 struct NodeFlowObject : public runtime::Object {
   /*! \brief The graph. */
@@ -45,7 +45,7 @@ struct NodeFlowObject : public runtime::Object {
    */
   IdArray edge_mapping;
 
-  static constexpr const char* _type_key = "graph.NodeFlow";
+  static constexpr const char *_type_key = "graph.NodeFlow";
   DGL_DECLARE_OBJECT_TYPE_INFO(NodeFlowObject, runtime::Object);
 };
 
@@ -80,8 +80,8 @@ class NodeFlow : public runtime::ObjectRef {
  * of an edge and the column represents the source.
  *
  * If fmt == "csr", the function returns three arrays: indptr, indices, eid.
- * If fmt == "coo", the function returns two arrays: idx, eid. Here, the idx array
- *   is the concatenation of src and dst node id arrays.
+ * If fmt == "coo", the function returns two arrays: idx, eid. Here, the idx
+ * array is the concatenation of src and dst node id arrays.
  *
  * \param graph An immutable graph.
  * \param fmt the format of the returned adjacency matrix.
@@ -92,11 +92,10 @@ class NodeFlow : public runtime::ObjectRef {
  * space.
  * \return a vector of IdArrays.
  */
-std::vector<IdArray> GetNodeFlowSlice(const ImmutableGraph &graph, const std::string &fmt,
-                                      size_t layer0_size, size_t layer1_start,
-                                      size_t layer1_end, bool remap);
+std::vector<IdArray> GetNodeFlowSlice(
+    const ImmutableGraph &graph, const std::string &fmt, size_t layer0_size,
+    size_t layer1_start, size_t layer1_end, bool remap);
 
 }  // namespace dgl
 
 #endif  // DGL_NODEFLOW_H_
-

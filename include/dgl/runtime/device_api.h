@@ -7,8 +7,9 @@
 #define DGL_RUNTIME_DEVICE_API_H_
 
 #include <string>
-#include "packed_func.h"
+
 #include "c_runtime_api.h"
+#include "packed_func.h"
 
 namespace dgl {
 namespace runtime {
@@ -30,7 +31,8 @@ enum DeviceAttrKind : int {
 /*! \brief Number of bytes each allocation must align to */
 constexpr int kAllocAlignment = 64;
 
-/*! \brief Number of bytes each allocation must align to in temporary allocation */
+/*! \brief Number of bytes each allocation must align to in temporary allocation
+ */
 constexpr int kTempAllocaAlignment = 64;
 
 /*! \brief Maximum size that can be allocated on stack */
@@ -47,9 +49,7 @@ class DeviceAPI {
   /*!
    * \brief Check whether the device is available.
    */
-  virtual bool IsAvailable() {
-    return true;
-  }
+  virtual bool IsAvailable() { return true; }
   /*!
    * \brief Set the environment device id to ctx
    * \param ctx The context to be set.
@@ -62,7 +62,8 @@ class DeviceAPI {
    * \param rv The return value.
    * \sa DeviceAttrKind
    */
-  virtual void GetAttr(DGLContext ctx, DeviceAttrKind kind, DGLRetValue* rv) = 0;
+  virtual void GetAttr(
+      DGLContext ctx, DeviceAttrKind kind, DGLRetValue* rv) = 0;
   /*!
    * \brief Allocate a data space on device.
    * \param ctx The device context to perform operation.
@@ -72,10 +73,9 @@ class DeviceAPI {
    * as OpenGL, as nbytes & alignment are sufficient for most backends.
    * \return The allocated device pointer.
    */
-  virtual void* AllocDataSpace(DGLContext ctx,
-                               size_t nbytes,
-                               size_t alignment,
-                               DGLDataType type_hint) = 0;
+  virtual void* AllocDataSpace(
+      DGLContext ctx, size_t nbytes, size_t alignment,
+      DGLDataType type_hint) = 0;
   /*!
    * \brief Free a data space on device.
    * \param ctx The device context to perform operation.
@@ -94,15 +94,11 @@ class DeviceAPI {
    * \param type_hint The type of elements, only neded by certain backends.
    *                  can be useful for cross device endian converison.
    */
-  virtual void CopyDataFromTo(const void* from,
-                              size_t from_offset,
-                              void* to,
-                              size_t to_offset,
-                              size_t num_bytes,
-                              DGLContext ctx_from,
-                              DGLContext ctx_to,
-                              DGLDataType type_hint) = 0;
-   /*!
+  virtual void CopyDataFromTo(
+      const void* from, size_t from_offset, void* to, size_t to_offset,
+      size_t num_bytes, DGLContext ctx_from, DGLContext ctx_to,
+      DGLDataType type_hint) = 0;
+  /*!
    * \brief Create a new stream of execution.
    *
    * \param ctx The context of allocation.
@@ -145,31 +141,28 @@ class DeviceAPI {
    * \param event_src The source stream to synchronize.
    * \param event_dst The destination stream to synchronize.
    */
-  DGL_DLL virtual void SyncStreamFromTo(DGLContext ctx,
-                                        DGLStreamHandle event_src,
-                                        DGLStreamHandle event_dst);
+  DGL_DLL virtual void SyncStreamFromTo(
+      DGLContext ctx, DGLStreamHandle event_src, DGLStreamHandle event_dst);
 
   /*!
    * \brief Pin host memory using cudaHostRegister().
    *
    * \param ptr The host memory pointer to be pinned.
-   * \param nbytes The size to be pinned.   
-   */  
+   * \param nbytes The size to be pinned.
+   */
   DGL_DLL virtual void PinData(void* ptr, size_t nbytes);
 
   /*!
    * \brief Unpin host memory using cudaHostUnregister().
    *
-   * \param ptr The host memory pointer to be unpinned.   
-   */ 
+   * \param ptr The host memory pointer to be unpinned.
+   */
   DGL_DLL virtual void UnpinData(void* ptr);
 
   /*!
    * \brief Check whether the memory is in pinned memory.
    */
-  DGL_DLL virtual bool IsPinned(const void* ptr) {
-    return false;
-  }
+  DGL_DLL virtual bool IsPinned(const void* ptr) { return false; }
 
   /*!
    * \brief Allocate temporal workspace for backend execution.
@@ -180,16 +173,16 @@ class DeviceAPI {
    *  - Only a few allocation will happen, and space will be released after use.
    *  - The release order is usually in reverse order of allocate (stack style).
    *  - Repeative pattern of same allocations over different runs.
-   *  - Workspace should not overlap between different threads(i.e. be threadlocal)
+   *  - Workspace should not overlap between different threads(i.e. be
+   * threadlocal)
    *
    * \param ctx The context of allocation.
    * \param nbytes The size to be allocated.
    * \param type_hint The type of elements. Only needed by certain backends such
    * as OpenGL, as nbytes is sufficient for most backends.
    */
-  DGL_DLL virtual void* AllocWorkspace(DGLContext ctx,
-                                       size_t nbytes,
-                                       DGLDataType type_hint = {});
+  DGL_DLL virtual void* AllocWorkspace(
+      DGLContext ctx, size_t nbytes, DGLDataType type_hint = {});
   /*!
    * \brief Free temporal workspace in backend execution.
    *
@@ -206,14 +199,14 @@ class DeviceAPI {
    */
   DGL_DLL static DeviceAPI* Get(DGLContext ctx, bool allow_missing = false);
 
-
   /*!
    * \brief Get device API based on context.
    * \param dev_type The device type
    * \param allow_missing Whether allow missing
    * \return The corresponding device API.
    */
-  DGL_DLL static DeviceAPI* Get(DGLDeviceType dev_type, bool allow_missing = false);
+  DGL_DLL static DeviceAPI* Get(
+      DGLDeviceType dev_type, bool allow_missing = false);
 };
 
 /*! \brief The device type bigger than this is RPC device */
