@@ -10,7 +10,9 @@ import torch
 from pyarrow import csv
 
 import constants
-
+from dgl.distributed.partition import (
+    _dump_part_config
+)
 
 def read_ntype_partition_files(schema_map, input_dir):
     """
@@ -234,8 +236,7 @@ def write_metadata_json(metadata_list, output_dir, graph_name):
     for i in range(len(metadata_list)):
         graph_metadata["part-{}".format(i)] = metadata_list[i]["part-{}".format(i)]
 
-    with open('{}/metadata.json'.format(output_dir), 'w') as outfile: 
-        json.dump(graph_metadata, outfile, sort_keys=False, indent=4)
+    _dump_part_config(f'{output_dir}/metadata.json', graph_metadata)
 
 def augment_edge_data(edge_data, lookup_service, edge_tids, rank, world_size):
     """
@@ -377,15 +378,6 @@ def write_edge_features(edge_features, edge_file):
     edge_file     : string 
         File in which the edge information is serialized
     """
-    # TODO[Rui]: Below is a temporary fix for etype and will be
-    # further refined in the near future as we'll shift to canonical
-    # etypes entirely.
-    def format_etype(etype):
-        etype, name = etype.split('/')
-        etype = etype.split(':')[1]
-        return etype + '/' + name
-    edge_features = {format_etype(etype):
-        data for etype, data in edge_features.items()}
     dgl.data.utils.save_tensors(edge_file, edge_features)
 
 def write_graph_dgl(graph_file, graph_obj, formats, sort_etypes):
