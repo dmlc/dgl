@@ -5,8 +5,9 @@
  */
 #include <dgl/runtime/threading_backend.h>
 #include <dmlc/logging.h>
-#include <thread>
+
 #include <algorithm>
+#include <thread>
 #if defined(__linux__) || defined(__ANDROID__)
 #include <fstream>
 #else
@@ -21,12 +22,12 @@ namespace threading {
 
 class ThreadGroup::Impl {
  public:
-  Impl(int num_workers,
-       std::function<void(int)> worker_callback,
-       bool exclude_worker0)
+  Impl(
+      int num_workers, std::function<void(int)> worker_callback,
+      bool exclude_worker0)
       : num_workers_(num_workers) {
     CHECK_GE(num_workers, 1)
-      << "Requested a non-positive number of worker threads.";
+        << "Requested a non-positive number of worker threads.";
     for (int i = exclude_worker0; i < num_workers_; ++i) {
       threads_.emplace_back([worker_callback, i] { worker_callback(i); });
     }
@@ -35,7 +36,7 @@ class ThreadGroup::Impl {
   ~Impl() { Join(); }
 
   void Join() {
-    for (auto& t : threads_) {
+    for (auto &t : threads_) {
       if (t.joinable()) t.join();
     }
   }
@@ -64,11 +65,11 @@ class ThreadGroup::Impl {
     if (val == nullptr || atoi(val) == 1) {
       // Do not set affinity if there are more workers than found cores
       if (sorted_order_.size() >= static_cast<unsigned int>(num_workers_)) {
-          SetAffinity(exclude_worker0, mode == kLittle);
+        SetAffinity(exclude_worker0, mode == kLittle);
       } else {
         LOG(WARNING)
-          << "The thread affinity cannot be set when the number of workers"
-          << "is larger than the number of available cores in the system.";
+            << "The thread affinity cannot be set when the number of workers"
+            << "is larger than the number of available cores in the system.";
       }
     }
     return num_workers_used;
@@ -82,15 +83,14 @@ class ThreadGroup::Impl {
 #if defined(__ANDROID__)
 #ifndef CPU_SET
 #define CPU_SETSIZE 1024
-#define __NCPUBITS (8 * sizeof (uint64_t))
+#define __NCPUBITS (8 * sizeof(uint64_t))
     typedef struct {
       uint64_t __bits[CPU_SETSIZE / __NCPUBITS];
     } cpu_set_t;
 
 #define CPU_SET(cpu, cpusetp) \
-    ((cpusetp)->__bits[(cpu)/__NCPUBITS] |= (1UL << ((cpu) % __NCPUBITS)))
-#define CPU_ZERO(cpusetp) \
-    memset((cpusetp), 0, sizeof(cpu_set_t))
+  ((cpusetp)->__bits[(cpu) / __NCPUBITS] |= (1UL << ((cpu) % __NCPUBITS)))
+#define CPU_ZERO(cpusetp) memset((cpusetp), 0, sizeof(cpu_set_t))
 #endif
 #endif
 #if defined(__linux__) || defined(__ANDROID__)
@@ -99,7 +99,8 @@ class ThreadGroup::Impl {
     for (unsigned i = 0; i < threads_.size(); ++i) {
       unsigned core_id;
       if (reverse) {
-        core_id = sorted_order_[sorted_order_.size() - (i + exclude_worker0) - 1];
+        core_id =
+            sorted_order_[sorted_order_.size() - (i + exclude_worker0) - 1];
       } else {
         core_id = sorted_order_[i + exclude_worker0];
       }
@@ -107,10 +108,11 @@ class ThreadGroup::Impl {
       CPU_ZERO(&cpuset);
       CPU_SET(core_id, &cpuset);
 #if defined(__ANDROID__)
-      sched_setaffinity(threads_[i].native_handle(), sizeof(cpu_set_t), &cpuset);
+      sched_setaffinity(
+          threads_[i].native_handle(), sizeof(cpu_set_t), &cpuset);
 #else
-      pthread_setaffinity_np(threads_[i].native_handle(),
-          sizeof(cpu_set_t), &cpuset);
+      pthread_setaffinity_np(
+          threads_[i].native_handle(), sizeof(cpu_set_t), &cpuset);
 #endif
     }
     if (exclude_worker0) {  // bind the master thread to core 0
@@ -122,11 +124,9 @@ class ThreadGroup::Impl {
         CPU_SET(sorted_order_[0], &cpuset);
       }
 #if defined(__ANDROID__)
-      sched_setaffinity(pthread_self(),
-        sizeof(cpu_set_t), &cpuset);
+      sched_setaffinity(pthread_self(), sizeof(cpu_set_t), &cpuset);
 #else
-      pthread_setaffinity_np(pthread_self(),
-        sizeof(cpu_set_t), &cpuset);
+      pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
 #endif
     }
 #endif
@@ -134,27 +134,28 @@ class ThreadGroup::Impl {
 
   void InitSortedOrder() {
     unsigned int threads = std::thread::hardware_concurrency();
-    std::vector<std::pair <unsigned int, int64_t> > max_freqs;
+    std::vector<std::pair<unsigned int, int64_t> > max_freqs;
 
     for (unsigned int i = 0; i < threads; ++i) {
       int64_t cur_freq = 0;
-      #if defined(__linux__) || defined(__ANDROID__)
-        std::ostringstream filepath;
-        filepath << "/sys/devices/system/cpu/cpu"  << i << "/cpufreq/cpuinfo_max_freq";
-        std::ifstream ifs(filepath.str());
-        if (!ifs.fail()) {
-          if (!(ifs >> cur_freq)) {
-            cur_freq = -1;
-          }
-          ifs.close();
+#if defined(__linux__) || defined(__ANDROID__)
+      std::ostringstream filepath;
+      filepath << "/sys/devices/system/cpu/cpu" << i
+               << "/cpufreq/cpuinfo_max_freq";
+      std::ifstream ifs(filepath.str());
+      if (!ifs.fail()) {
+        if (!(ifs >> cur_freq)) {
+          cur_freq = -1;
         }
-      #endif
+        ifs.close();
+      }
+#endif
       max_freqs.push_back(std::make_pair(i, cur_freq));
     }
 
-    auto fcmpbyfreq = [] (const std::pair<unsigned int, int64_t> &a,
-                          const std::pair<unsigned int, int64_t> &b) {
-        return a.second == b.second ? a.first < b.first : a.second > b.second;
+    auto fcmpbyfreq = [](const std::pair<unsigned int, int64_t> &a,
+                         const std::pair<unsigned int, int64_t> &b) {
+      return a.second == b.second ? a.first < b.first : a.second > b.second;
     };
     std::sort(max_freqs.begin(), max_freqs.end(), fcmpbyfreq);
     int64_t big_freq = max_freqs.begin()->second;
@@ -180,20 +181,20 @@ class ThreadGroup::Impl {
   int little_count_ = 0;
 };
 
-ThreadGroup::ThreadGroup(int num_workers,
-                         std::function<void(int)> worker_callback,
-                         bool exclude_worker0)
-  : impl_(new ThreadGroup::Impl(num_workers, worker_callback, exclude_worker0)) {}
+ThreadGroup::ThreadGroup(
+    int num_workers, std::function<void(int)> worker_callback,
+    bool exclude_worker0)
+    : impl_(new ThreadGroup::Impl(
+          num_workers, worker_callback, exclude_worker0)) {}
 ThreadGroup::~ThreadGroup() { delete impl_; }
 void ThreadGroup::Join() { impl_->Join(); }
 
-int ThreadGroup::Configure(AffinityMode mode, int nthreads, bool exclude_worker0) {
+int ThreadGroup::Configure(
+    AffinityMode mode, int nthreads, bool exclude_worker0) {
   return impl_->Configure(mode, nthreads, exclude_worker0);
 }
 
-void YieldThread() {
-  std::this_thread::yield();
-}
+void YieldThread() { std::this_thread::yield(); }
 
 int MaxConcurrency() {
   int max_concurrency = 1;
@@ -211,7 +212,6 @@ int MaxConcurrency() {
   }
   return std::max(max_concurrency, 1);
 }
-
 
 }  // namespace threading
 }  // namespace runtime
