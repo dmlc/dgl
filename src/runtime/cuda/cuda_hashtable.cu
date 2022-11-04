@@ -76,8 +76,8 @@ class MutableDeviceOrderedHashTable : public DeviceOrderedHashTable<IdType> {
       // minimum index in position. Match the type of atomicMin, so ignore
       // linting
       atomicMin(
-          reinterpret_cast<unsigned long long*>(
-              &GetMutable(pos)->index),             // NOLINT
+          reinterpret_cast<unsigned long long*>(    // NOLINT
+              &GetMutable(pos)->index),
           static_cast<unsigned long long>(index));  // NOLINT
       return true;
     } else {
