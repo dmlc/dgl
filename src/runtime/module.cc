@@ -4,10 +4,11 @@
  * \brief DGL module system
  */
 #include <dgl/runtime/module.h>
-#include <dgl/runtime/registry.h>
 #include <dgl/runtime/packed_func.h>
-#include <unordered_set>
+#include <dgl/runtime/registry.h>
+
 #include <cstring>
+#include <unordered_set>
 #ifndef _LIBCPP_SGX_CONFIG
 #include "file_util.h"
 #endif
@@ -44,20 +45,18 @@ void Module::Import(Module other) {
   node_->imports_.emplace_back(std::move(other));
 }
 
-Module Module::LoadFromFile(const std::string& file_name,
-                            const std::string& format) {
+Module Module::LoadFromFile(
+    const std::string& file_name, const std::string& format) {
 #ifndef _LIBCPP_SGX_CONFIG
   std::string fmt = GetFileFormat(file_name, format);
-  CHECK(fmt.length() != 0)
-      << "Cannot deduce format of file " << file_name;
+  CHECK(fmt.length() != 0) << "Cannot deduce format of file " << file_name;
   if (fmt == "dll" || fmt == "dylib" || fmt == "dso") {
     fmt = "so";
   }
   std::string load_f_name = "module.loadfile_" + fmt;
   const PackedFunc* f = Registry::Get(load_f_name);
-  CHECK(f != nullptr)
-      << "Loader of " << format << "("
-      << load_f_name << ") is not presented.";
+  CHECK(f != nullptr) << "Loader of " << format << "(" << load_f_name
+                      << ") is not presented.";
   Module m = (*f)(file_name, format);
   return m;
 #else
@@ -65,8 +64,8 @@ Module Module::LoadFromFile(const std::string& file_name,
 #endif
 }
 
-void ModuleNode::SaveToFile(const std::string& file_name,
-                            const std::string& format) {
+void ModuleNode::SaveToFile(
+    const std::string& file_name, const std::string& format) {
   LOG(FATAL) << "Module[" << type_key() << "] does not support SaveToFile";
 }
 
@@ -89,9 +88,8 @@ const PackedFunc* ModuleNode::GetFuncFromEnv(const std::string& name) {
   }
   if (pf == nullptr) {
     const PackedFunc* f = Registry::Get(name);
-    CHECK(f != nullptr)
-        << "Cannot find function " << name
-        << " in the imported modules or global registry";
+    CHECK(f != nullptr) << "Cannot find function " << name
+                        << " in the imported modules or global registry";
     return f;
   } else {
     std::unique_ptr<PackedFunc> f(new PackedFunc(pf));
@@ -125,7 +123,8 @@ bool RuntimeEnabled(const std::string& target) {
   } else if (target.length() >= 4 && target.substr(0, 4) == "rocm") {
     f_name = "device_api.rocm";
   } else if (target.length() >= 4 && target.substr(0, 4) == "llvm") {
-    const PackedFunc* pf = runtime::Registry::Get("codegen.llvm_target_enabled");
+    const PackedFunc* pf =
+        runtime::Registry::Get("codegen.llvm_target_enabled");
     if (pf == nullptr) return false;
     return (*pf)(target);
   } else {
@@ -135,41 +134,38 @@ bool RuntimeEnabled(const std::string& target) {
 }
 
 DGL_REGISTER_GLOBAL("module._Enabled")
-.set_body([](DGLArgs args, DGLRetValue *ret) {
-    *ret = RuntimeEnabled(args[0]);
+    .set_body([](DGLArgs args, DGLRetValue* ret) {
+      *ret = RuntimeEnabled(args[0]);
     });
 
 DGL_REGISTER_GLOBAL("module._GetSource")
-.set_body([](DGLArgs args, DGLRetValue *ret) {
-    *ret = args[0].operator Module()->GetSource(args[1]);
+    .set_body([](DGLArgs args, DGLRetValue* ret) {
+      *ret = args[0].operator Module()->GetSource(args[1]);
     });
 
 DGL_REGISTER_GLOBAL("module._ImportsSize")
-.set_body([](DGLArgs args, DGLRetValue *ret) {
-    *ret = static_cast<int64_t>(
-        args[0].operator Module()->imports().size());
+    .set_body([](DGLArgs args, DGLRetValue* ret) {
+      *ret = static_cast<int64_t>(args[0].operator Module()->imports().size());
     });
 
 DGL_REGISTER_GLOBAL("module._GetImport")
-.set_body([](DGLArgs args, DGLRetValue *ret) {
-    *ret = args[0].operator Module()->
-        imports().at(args[1].operator int());
+    .set_body([](DGLArgs args, DGLRetValue* ret) {
+      *ret = args[0].operator Module()->imports().at(args[1].operator int());
     });
 
 DGL_REGISTER_GLOBAL("module._GetTypeKey")
-.set_body([](DGLArgs args, DGLRetValue *ret) {
-    *ret = std::string(args[0].operator Module()->type_key());
+    .set_body([](DGLArgs args, DGLRetValue* ret) {
+      *ret = std::string(args[0].operator Module()->type_key());
     });
 
 DGL_REGISTER_GLOBAL("module._LoadFromFile")
-.set_body([](DGLArgs args, DGLRetValue *ret) {
-    *ret = Module::LoadFromFile(args[0], args[1]);
+    .set_body([](DGLArgs args, DGLRetValue* ret) {
+      *ret = Module::LoadFromFile(args[0], args[1]);
     });
 
 DGL_REGISTER_GLOBAL("module._SaveToFile")
-.set_body([](DGLArgs args, DGLRetValue *ret) {
-    args[0].operator Module()->
-        SaveToFile(args[1], args[2]);
+    .set_body([](DGLArgs args, DGLRetValue* ret) {
+      args[0].operator Module()->SaveToFile(args[1], args[2]);
     });
 }  // namespace runtime
 }  // namespace dgl

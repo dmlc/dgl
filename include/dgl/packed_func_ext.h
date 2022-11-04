@@ -1,28 +1,28 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file packed_func_ext.h
- * \brief Extension package to PackedFunc
+ * @file packed_func_ext.h
+ * @brief Extension package to PackedFunc
  *   This enables pass ObjectRef types into/from PackedFunc.
  */
 #ifndef DGL_PACKED_FUNC_EXT_H_
 #define DGL_PACKED_FUNC_EXT_H_
 
+#include <memory>
 #include <sstream>
 #include <string>
-#include <memory>
 #include <type_traits>
 
-#include "./runtime/packed_func.h"
-#include "./runtime/object.h"
 #include "./runtime/container.h"
+#include "./runtime/object.h"
+#include "./runtime/packed_func.h"
 
 namespace dgl {
 namespace runtime {
 /*!
- * \brief Runtime type checker for node type.
- * \tparam T the type to be checked.
+ * @brief Runtime type checker for node type.
+ * @tparam T the type to be checked.
  */
-template<typename T>
+template <typename T>
 struct ObjectTypeChecker {
   static inline bool Check(Object* sptr) {
     // This is the only place in the project where RTTI is used
@@ -31,13 +31,13 @@ struct ObjectTypeChecker {
     using ContainerType = typename T::ContainerType;
     return sptr->derived_from<ContainerType>();
   }
-  static inline void PrintName(std::ostringstream& os) { // NOLINT(*)
+  static inline void PrintName(std::ostringstream& os) {  // NOLINT(*)
     using ContainerType = typename T::ContainerType;
     os << ContainerType::_type_key;
   }
 };
 
-template<typename T>
+template <typename T>
 struct ObjectTypeChecker<List<T> > {
   static inline bool Check(Object* sptr) {
     if (sptr == nullptr) return false;
@@ -48,14 +48,14 @@ struct ObjectTypeChecker<List<T> > {
     }
     return true;
   }
-  static inline void PrintName(std::ostringstream& os) { // NOLINT(*)
+  static inline void PrintName(std::ostringstream& os) {  // NOLINT(*)
     os << "list<";
     ObjectTypeChecker<T>::PrintName(os);
     os << ">";
   }
 };
 
-template<typename V>
+template <typename V>
 struct ObjectTypeChecker<Map<std::string, V> > {
   static inline bool Check(Object* sptr) {
     if (sptr == nullptr) return false;
@@ -66,7 +66,7 @@ struct ObjectTypeChecker<Map<std::string, V> > {
     }
     return true;
   }
-  static inline void PrintName(std::ostringstream& os) { // NOLINT(*)
+  static inline void PrintName(std::ostringstream& os) {  // NOLINT(*)
     os << "map<string";
     os << ',';
     ObjectTypeChecker<V>::PrintName(os);
@@ -74,9 +74,7 @@ struct ObjectTypeChecker<Map<std::string, V> > {
   }
 };
 
-
-
-template<typename K, typename V>
+template <typename K, typename V>
 struct ObjectTypeChecker<Map<K, V> > {
   static inline bool Check(Object* sptr) {
     if (sptr == nullptr) return false;
@@ -88,7 +86,7 @@ struct ObjectTypeChecker<Map<K, V> > {
     }
     return true;
   }
-  static inline void PrintName(std::ostringstream& os) { // NOLINT(*)
+  static inline void PrintName(std::ostringstream& os) {  // NOLINT(*)
     os << "map<";
     ObjectTypeChecker<K>::PrintName(os);
     os << ',';
@@ -97,7 +95,7 @@ struct ObjectTypeChecker<Map<K, V> > {
   }
 };
 
-template<typename T>
+template <typename T>
 inline std::string NodeTypeName() {
   std::ostringstream os;
   ObjectTypeChecker<T>::PrintName(os);
@@ -106,7 +104,7 @@ inline std::string NodeTypeName() {
 
 // extensions for DGLArgValue
 
-template<typename TObjectRef>
+template <typename TObjectRef>
 inline TObjectRef DGLArgValue::AsObjectRef() const {
   static_assert(
       std::is_base_of<ObjectRef, TObjectRef>::value,
@@ -115,8 +113,8 @@ inline TObjectRef DGLArgValue::AsObjectRef() const {
   DGL_CHECK_TYPE_CODE(type_code_, kObjectHandle);
   std::shared_ptr<Object>& sptr = *ptr<std::shared_ptr<Object> >();
   CHECK(ObjectTypeChecker<TObjectRef>::Check(sptr.get()))
-      << "Expected type " << NodeTypeName<TObjectRef>()
-      << " but get " << sptr->type_key();
+      << "Expected type " << NodeTypeName<TObjectRef>() << " but get "
+      << sptr->type_key();
   return TObjectRef(sptr);
 }
 
@@ -125,12 +123,10 @@ inline std::shared_ptr<Object>& DGLArgValue::obj_sptr() {
   return *ptr<std::shared_ptr<Object> >();
 }
 
-
-template<typename TObjectRef, typename>
+template <typename TObjectRef, typename>
 inline bool DGLArgValue::IsObjectType() const {
   DGL_CHECK_TYPE_CODE(type_code_, kObjectHandle);
-  std::shared_ptr<Object>& sptr =
-      *ptr<std::shared_ptr<Object> >();
+  std::shared_ptr<Object>& sptr = *ptr<std::shared_ptr<Object> >();
   return ObjectTypeChecker<TObjectRef>::Check(sptr.get());
 }
 
@@ -155,7 +151,7 @@ inline DGLRetValue& DGLRetValue::operator=(const ObjectRef& other) {
   return *this;
 }
 
-template<typename TObjectRef>
+template <typename TObjectRef>
 inline TObjectRef DGLRetValue::AsObjectRef() const {
   static_assert(
       std::is_base_of<ObjectRef, TObjectRef>::value,
@@ -165,7 +161,8 @@ inline TObjectRef DGLRetValue::AsObjectRef() const {
   return TObjectRef(*ptr<std::shared_ptr<Object> >());
 }
 
-inline void DGLArgsSetter::operator()(size_t i, const ObjectRef& other) const {  // NOLINT(*)
+inline void DGLArgsSetter::operator()(
+    size_t i, const ObjectRef& other) const {  // NOLINT(*)
   if (other.defined()) {
     values_[i].v_handle = const_cast<std::shared_ptr<Object>*>(&(other.obj_));
     type_codes_[i] = kObjectHandle;

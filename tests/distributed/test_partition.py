@@ -5,17 +5,25 @@ import dgl
 import numpy as np
 import pytest
 from dgl import function as fn
-from dgl.distributed import (load_partition, load_partition_feats,
-                             partition_graph)
-from dgl.distributed.graph_partition_book import (BasicPartitionBook,
-                                                  EdgePartitionPolicy,
-                                                  HeteroDataName,
-                                                  NodePartitionPolicy,
-                                                  RangePartitionBook)
+from dgl.distributed import (
+    load_partition,
+    load_partition_feats,
+    partition_graph,
+)
+from dgl.distributed.graph_partition_book import (
+    DEFAULT_ETYPE,
+    DEFAULT_NTYPE,
+    BasicPartitionBook,
+    EdgePartitionPolicy,
+    HeteroDataName,
+    NodePartitionPolicy,
+    RangePartitionBook,
+    _etype_tuple_to_str,
+)
 from dgl.distributed.partition import (
     RESERVED_FIELD_DTYPE,
+    _get_inner_edge_mask,
     _get_inner_node_mask,
-    _get_inner_edge_mask
 )
 from scipy import sparse as spsp
 from utils import reset_envs
@@ -47,7 +55,12 @@ def create_random_graph(n):
 
 def create_random_hetero():
     num_nodes = {"n1": 1000, "n2": 1010, "n3": 1020}
-    etypes = [("n1", "r1", "n2"), ("n1", "r2", "n3"), ("n2", "r3", "n3")]
+    etypes = [
+        ("n1", "r1", "n2"),
+        ("n2", "r1", "n1"),
+        ("n1", "r2", "n3"),
+        ("n2", "r3", "n3"),
+    ]
     edges = {}
     for etype in etypes:
         src_ntype, _, dst_ntype = etype
@@ -64,16 +77,16 @@ def create_random_hetero():
 
 def verify_hetero_graph(g, parts):
     num_nodes = {ntype: 0 for ntype in g.ntypes}
-    num_edges = {etype: 0 for etype in g.etypes}
+    num_edges = {etype: 0 for etype in g.canonical_etypes}
     for part in parts:
         assert len(g.ntypes) == len(F.unique(part.ndata[dgl.NTYPE]))
-        assert len(g.etypes) == len(F.unique(part.edata[dgl.ETYPE]))
+        assert len(g.canonical_etypes) == len(F.unique(part.edata[dgl.ETYPE]))
         for ntype in g.ntypes:
             ntype_id = g.get_ntype_id(ntype)
             inner_node_mask = _get_inner_node_mask(part, ntype_id)
             num_inner_nodes = F.sum(F.astype(inner_node_mask, F.int64), 0)
             num_nodes[ntype] += num_inner_nodes
-        for etype in g.etypes:
+        for etype in g.canonical_etypes:
             etype_id = g.get_etype_id(etype)
             inner_edge_mask = _get_inner_edge_mask(part, etype_id)
             num_inner_edges = F.sum(F.astype(inner_edge_mask, F.int64), 0)
@@ -87,7 +100,7 @@ def verify_hetero_graph(g, parts):
         )
         assert g.number_of_nodes(ntype) == num_nodes[ntype]
     # Verify the number of edges are correct.
-    for etype in g.etypes:
+    for etype in g.canonical_etypes:
         print(
             "edge {}: {}, {}".format(
                 etype, g.number_of_edges(etype), num_edges[etype]
@@ -96,12 +109,12 @@ def verify_hetero_graph(g, parts):
         assert g.number_of_edges(etype) == num_edges[etype]
 
     nids = {ntype: [] for ntype in g.ntypes}
-    eids = {etype: [] for etype in g.etypes}
+    eids = {etype: [] for etype in g.canonical_etypes}
     for part in parts:
         _, _, eid = part.edges(form="all")
         etype_arr = F.gather_row(part.edata[dgl.ETYPE], eid)
         eid_type = F.gather_row(part.edata[dgl.EID], eid)
-        for etype in g.etypes:
+        for etype in g.canonical_etypes:
             etype_id = g.get_etype_id(etype)
             eids[etype].append(F.boolean_mask(eid_type, etype_arr == etype_id))
             # Make sure edge Ids fall into a range.
@@ -163,7 +176,7 @@ def verify_graph_feats(
             ndata = F.gather_row(node_feats[ntype + "/" + name], local_nids)
             assert np.all(F.asnumpy(ndata == true_feats))
 
-    for etype in g.etypes:
+    for etype in g.canonical_etypes:
         etype_id = g.get_etype_id(etype)
         inner_edge_mask = _get_inner_edge_mask(part, etype_id)
         inner_eids = F.boolean_mask(part.edata[dgl.EID], inner_edge_mask)
@@ -179,7 +192,9 @@ def verify_graph_feats(
             if name in [dgl.EID, "inner_edge"]:
                 continue
             true_feats = F.gather_row(g.edges[etype].data[name], orig_id)
-            edata = F.gather_row(edge_feats[etype + "/" + name], local_eids)
+            edata = F.gather_row(
+                edge_feats[_etype_tuple_to_str(etype) + "/" + name], local_eids
+            )
             assert np.all(F.asnumpy(edata == true_feats))
 
 
@@ -191,14 +206,16 @@ def check_hetero_partition(
     load_feats=True,
     graph_formats=None,
 ):
-    hg.nodes["n1"].data["labels"] = F.arange(0, hg.number_of_nodes("n1"))
-    hg.nodes["n1"].data["feats"] = F.tensor(
-        np.random.randn(hg.number_of_nodes("n1"), 10), F.float32
+    test_ntype = "n1"
+    test_etype = ("n1", "r1", "n2")
+    hg.nodes[test_ntype].data["labels"] = F.arange(0, hg.num_nodes(test_ntype))
+    hg.nodes[test_ntype].data["feats"] = F.tensor(
+        np.random.randn(hg.num_nodes(test_ntype), 10), F.float32
     )
-    hg.edges["r1"].data["feats"] = F.tensor(
-        np.random.randn(hg.number_of_edges("r1"), 10), F.float32
+    hg.edges[test_etype].data["feats"] = F.tensor(
+        np.random.randn(hg.num_edges(test_etype), 10), F.float32
     )
-    hg.edges["r1"].data["labels"] = F.arange(0, hg.number_of_edges("r1"))
+    hg.edges[test_etype].data["labels"] = F.arange(0, hg.num_edges(test_etype))
     num_hops = 1
 
     orig_nids, orig_eids = partition_graph(
@@ -214,10 +231,10 @@ def check_hetero_partition(
         graph_formats=graph_formats,
     )
     assert len(orig_nids) == len(hg.ntypes)
-    assert len(orig_eids) == len(hg.etypes)
+    assert len(orig_eids) == len(hg.canonical_etypes)
     for ntype in hg.ntypes:
         assert len(orig_nids[ntype]) == hg.number_of_nodes(ntype)
-    for etype in hg.etypes:
+    for etype in hg.canonical_etypes:
         assert len(orig_eids[etype]) == hg.number_of_edges(etype)
     parts = []
     shuffled_labels = []
@@ -243,8 +260,8 @@ def check_hetero_partition(
                 )
                 assert np.all(F.asnumpy(part_ids) == i)
 
-            for etype in hg.etypes:
-                name = etype + "/trainer_id"
+            for etype in hg.canonical_etypes:
+                name = _etype_tuple_to_str(etype) + "/trainer_id"
                 assert name in edge_feats
                 part_ids = F.floor_div(
                     edge_feats[name], num_trainers_per_machine
@@ -262,7 +279,7 @@ def check_hetero_partition(
         dst_ntype_ids, part_dst_ids = gpb.map_to_per_ntype(part_dst_ids)
         etype_ids, part_eids = gpb.map_to_per_etype(part_eids)
         # These are original per-type IDs.
-        for etype_id, etype in enumerate(hg.etypes):
+        for etype_id, etype in enumerate(hg.canonical_etypes):
             part_src_ids1 = F.boolean_mask(part_src_ids, etype_ids == etype_id)
             src_ntype_ids1 = F.boolean_mask(
                 src_ntype_ids, etype_ids == etype_id
@@ -287,8 +304,10 @@ def check_hetero_partition(
             hg, gpb, part_g, node_feats, edge_feats, orig_nids, orig_eids
         )
 
-        shuffled_labels.append(node_feats["n1/labels"])
-        shuffled_elabels.append(edge_feats["r1/labels"])
+        shuffled_labels.append(node_feats[test_ntype + "/labels"])
+        shuffled_elabels.append(
+            edge_feats[_etype_tuple_to_str(test_etype) + "/labels"]
+        )
     verify_hetero_graph(hg, parts)
 
     shuffled_labels = F.asnumpy(F.cat(shuffled_labels, 0))
@@ -297,10 +316,12 @@ def check_hetero_partition(
     orig_elabels = np.zeros(
         shuffled_elabels.shape, dtype=shuffled_elabels.dtype
     )
-    orig_labels[F.asnumpy(orig_nids["n1"])] = shuffled_labels
-    orig_elabels[F.asnumpy(orig_eids["r1"])] = shuffled_elabels
-    assert np.all(orig_labels == F.asnumpy(hg.nodes["n1"].data["labels"]))
-    assert np.all(orig_elabels == F.asnumpy(hg.edges["r1"].data["labels"]))
+    orig_labels[F.asnumpy(orig_nids[test_ntype])] = shuffled_labels
+    orig_elabels[F.asnumpy(orig_eids[test_etype])] = shuffled_elabels
+    assert np.all(orig_labels == F.asnumpy(hg.nodes[test_ntype].data["labels"]))
+    assert np.all(
+        orig_elabels == F.asnumpy(hg.edges[test_etype].data["labels"])
+    )
 
 
 def check_partition(
@@ -339,7 +360,7 @@ def check_partition(
     shuffled_labels = []
     shuffled_edata = []
     for i in range(num_parts):
-        part_g, node_feats, edge_feats, gpb, _, ntypes, etypes = load_partition(
+        part_g, node_feats, edge_feats, gpb, _, _, _ = load_partition(
             "/tmp/partition/test.json", i, load_feats=load_feats
         )
         _verify_partition_data_types(part_g)
@@ -359,8 +380,8 @@ def check_partition(
                 )
                 assert np.all(F.asnumpy(part_ids) == i)
 
-            for etype in g.etypes:
-                name = etype + "/trainer_id"
+            for etype in g.canonical_etypes:
+                name = _etype_tuple_to_str(etype) + "/trainer_id"
                 assert name in edge_feats
                 part_ids = F.floor_div(
                     edge_feats[name], num_trainers_per_machine
@@ -460,16 +481,17 @@ def check_partition(
             ndata = F.gather_row(node_feats["_N/" + name], local_nid)
             assert np.all(F.asnumpy(true_feats) == F.asnumpy(ndata))
         for name in ["feats"]:
-            assert "_E/" + name in edge_feats
-            assert edge_feats["_E/" + name].shape[0] == len(local_edges)
+            efeat_name = _etype_tuple_to_str(DEFAULT_ETYPE) + "/" + name
+            assert efeat_name in edge_feats
+            assert edge_feats[efeat_name].shape[0] == len(local_edges)
             true_feats = F.gather_row(g.edata[name], local_edges)
-            edata = F.gather_row(edge_feats["_E/" + name], local_eid)
+            edata = F.gather_row(edge_feats[efeat_name], local_eid)
             assert np.all(F.asnumpy(true_feats) == F.asnumpy(edata))
 
         # This only works if node/edge IDs are shuffled.
         if reshuffle:
             shuffled_labels.append(node_feats["_N/labels"])
-            shuffled_edata.append(edge_feats["_E/feats"])
+            shuffled_edata.append(edge_feats["_N:_E:_N/feats"])
 
     # Verify that we can reconstruct node/edge data for original IDs.
     if reshuffle:
@@ -555,31 +577,38 @@ def test_BasicPartitionBook():
 
     node_policy = NodePartitionPolicy(gpb, "_N")
     assert node_policy.type_name == "_N"
-    edge_policy = EdgePartitionPolicy(gpb, "_E")
-    assert edge_policy.type_name == "_E"
+    expect_except = False
+    try:
+        edge_policy = EdgePartitionPolicy(gpb, "_E")
+    except AssertionError:
+        expect_except = True
+    assert expect_except
+    edge_policy = EdgePartitionPolicy(gpb, c_etype)
+    assert edge_policy.type_name == c_etype
 
 
 def test_RangePartitionBook():
     part_id = 0
     num_parts = 2
+
     # homogeneous
-    node_map = {"_N": F.tensor([[0, 1000], [1000, 2000]])}
-    edge_map = {"_E": F.tensor([[0, 5000], [5000, 10000]])}
-    ntypes = {"_N": 0}
-    etypes = {"_E": 0}
+    node_map = {DEFAULT_NTYPE: F.tensor([[0, 1000], [1000, 2000]])}
+    edge_map = {DEFAULT_ETYPE: F.tensor([[0, 5000], [5000, 10000]])}
+    ntypes = {DEFAULT_NTYPE: 0}
+    etypes = {DEFAULT_ETYPE: 0}
     gpb = RangePartitionBook(
         part_id, num_parts, node_map, edge_map, ntypes, etypes
     )
-    assert gpb.etypes == ["_E"]
-    assert gpb.canonical_etypes == [None]
-    assert gpb._to_canonical_etype("_E") == "_E"
+    assert gpb.etypes == [DEFAULT_ETYPE[1]]
+    assert gpb.canonical_etypes == [DEFAULT_ETYPE]
+    assert gpb.to_canonical_etype(DEFAULT_ETYPE[1]) == DEFAULT_ETYPE
 
-    node_policy = NodePartitionPolicy(gpb, "_N")
-    assert node_policy.type_name == "_N"
-    edge_policy = EdgePartitionPolicy(gpb, "_E")
-    assert edge_policy.type_name == "_E"
+    node_policy = NodePartitionPolicy(gpb, DEFAULT_NTYPE)
+    assert node_policy.type_name == DEFAULT_NTYPE
+    edge_policy = EdgePartitionPolicy(gpb, DEFAULT_ETYPE)
+    assert edge_policy.type_name == DEFAULT_ETYPE
 
-    # heterogeneous, init via etype
+    # Init via etype is not supported
     node_map = {
         "node1": F.tensor([[0, 1000], [1000, 2000]]),
         "node2": F.tensor([[0, 1000], [1000, 2000]]),
@@ -587,17 +616,20 @@ def test_RangePartitionBook():
     edge_map = {"edge1": F.tensor([[0, 5000], [5000, 10000]])}
     ntypes = {"node1": 0, "node2": 1}
     etypes = {"edge1": 0}
-    gpb = RangePartitionBook(
-        part_id, num_parts, node_map, edge_map, ntypes, etypes
-    )
-    assert gpb.etypes == ["edge1"]
-    assert gpb.canonical_etypes == [None]
-    assert gpb._to_canonical_etype("edge1") == "edge1"
-
-    node_policy = NodePartitionPolicy(gpb, "node1")
-    assert node_policy.type_name == "node1"
-    edge_policy = EdgePartitionPolicy(gpb, "edge1")
-    assert edge_policy.type_name == "edge1"
+    expect_except = False
+    try:
+        RangePartitionBook(
+            part_id, num_parts, node_map, edge_map, ntypes, etypes
+        )
+    except AssertionError:
+        expect_except = True
+    assert expect_except
+    expect_except = False
+    try:
+        EdgePartitionPolicy(gpb, "edge1")
+    except AssertionError:
+        expect_except = True
+    assert expect_except
 
     # heterogeneous, init via canonical etype
     node_map = {
@@ -615,18 +647,18 @@ def test_RangePartitionBook():
     )
     assert gpb.etypes == ["edge1"]
     assert gpb.canonical_etypes == [c_etype]
-    assert gpb._to_canonical_etype("edge1") == c_etype
-    assert gpb._to_canonical_etype(c_etype) == c_etype
+    assert gpb.to_canonical_etype("edge1") == c_etype
+    assert gpb.to_canonical_etype(c_etype) == c_etype
     expect_except = False
     try:
-        gpb._to_canonical_etype(("node1", "edge2", "node2"))
-    except dgl.DGLError:
+        gpb.to_canonical_etype(("node1", "edge2", "node2"))
+    except:
         expect_except = True
     assert expect_except
     expect_except = False
     try:
-        gpb._to_canonical_etype("edge2")
-    except dgl.DGLError:
+        gpb.to_canonical_etype("edge2")
+    except:
         expect_except = True
     assert expect_except
 
@@ -635,7 +667,11 @@ def test_RangePartitionBook():
     edge_policy = EdgePartitionPolicy(gpb, c_etype)
     assert edge_policy.type_name == c_etype
 
-    data_name = HeteroDataName(False, "edge1", "edge1")
-    assert data_name.get_type() == "edge1"
-    data_name = HeteroDataName(False, c_etype, "edge1")
+    expect_except = False
+    try:
+        HeteroDataName(False, "edge1", "feat")
+    except:
+        expect_except = True
+    assert expect_except
+    data_name = HeteroDataName(False, c_etype, "feat")
     assert data_name.get_type() == c_etype

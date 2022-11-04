@@ -7,6 +7,7 @@
 #define DGL_RUNTIME_THREAD_STORAGE_SCOPE_H_
 
 #include <dgl/runtime/packed_func.h>
+
 #include <string>
 #include <vector>
 
@@ -40,9 +41,12 @@ enum class StorageRank {
  */
 inline StorageRank DefaultStorageRank(int thread_scope_rank) {
   switch (thread_scope_rank) {
-    case -1: return StorageRank::kGlobal;
-    case 0: return StorageRank::kShared;
-    case 1: return StorageRank::kLocal;
+    case -1:
+      return StorageRank::kGlobal;
+    case 0:
+      return StorageRank::kShared;
+    case 1:
+      return StorageRank::kLocal;
     default: {
       LOG(FATAL) << "unknown rank";
       return StorageRank::kGlobal;
@@ -66,11 +70,17 @@ struct StorageScope {
   inline std::string to_string() const {
     std::string ret;
     switch (rank) {
-      case StorageRank::kGlobal: return "global" + tag;
-      case StorageRank::kShared: return "shared" + tag;
-      case StorageRank::kWarp: return "warp" + tag;
-      case StorageRank::kLocal: return "local" + tag;
-      default: LOG(FATAL) << "unknown storage scope"; return "";
+      case StorageRank::kGlobal:
+        return "global" + tag;
+      case StorageRank::kShared:
+        return "shared" + tag;
+      case StorageRank::kWarp:
+        return "warp" + tag;
+      case StorageRank::kLocal:
+        return "local" + tag;
+      default:
+        LOG(FATAL) << "unknown storage scope";
+        return "";
     }
   }
   /*!
@@ -80,7 +90,7 @@ struct StorageScope {
    */
   static StorageScope make(const std::string& s) {
     StorageScope r;
-    if (s.compare(0, 6, "global")  == 0) {
+    if (s.compare(0, 6, "global") == 0) {
       r.rank = StorageRank::kGlobal;
       r.tag = s.substr(6, std::string::npos);
     } else if (s.compare(0, 6, "shared") == 0) {
@@ -129,7 +139,6 @@ struct ThreadScope {
   }
 };
 
-
 /*! \brief workload speccification */
 struct ThreadWorkLoad {
   // array, first three are thread configuration.
@@ -138,22 +147,17 @@ struct ThreadWorkLoad {
    * \param i The block dimension.
    * \return i-th block dim
    */
-  inline size_t block_dim(size_t i) const {
-    return work_size[i + 3];
-  }
+  inline size_t block_dim(size_t i) const { return work_size[i + 3]; }
   /*!
    * \param i The grid dimension.
    * \return i-th grid dim
    */
-  inline size_t grid_dim(size_t i) const {
-    return work_size[i];
-  }
+  inline size_t grid_dim(size_t i) const { return work_size[i]; }
 };
 /*! \brief Thread axis configuration */
 class ThreadAxisConfig {
  public:
-  void Init(size_t base,
-            const std::vector<std::string>& thread_axis_tags)  {
+  void Init(size_t base, const std::vector<std::string>& thread_axis_tags) {
     base_ = base;
     std::vector<bool> filled(6, false);
     for (size_t i = 0; i < thread_axis_tags.size(); ++i) {
@@ -180,9 +184,7 @@ class ThreadAxisConfig {
     return w;
   }
   // return the work dim
-  size_t work_dim() const {
-    return work_dim_;
-  }
+  size_t work_dim() const { return work_dim_; }
 
  private:
   /*! \brief base axis */

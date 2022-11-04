@@ -3,12 +3,12 @@
  * \file src/runtime/dlpack_convert.cc
  * \brief Conversion between NDArray and DLPack.
  */
-#include <dgl/runtime/dlpack_convert.h>
-
-#include <dlpack/dlpack.h>
-#include <dgl/runtime/ndarray.h>
 #include <dgl/runtime/c_runtime_api.h>
 #include <dgl/runtime/device_api.h>
+#include <dgl/runtime/dlpack_convert.h>
+#include <dgl/runtime/ndarray.h>
+#include <dlpack/dlpack.h>
+
 #include "runtime_base.h"
 
 // deleter for arrays used by DLPack exporter
@@ -69,8 +69,7 @@ NDArray DLPackConvert::FromDLPack(DLManagedTensor* tensor) {
 
 void DLPackConvert::DLPackDeleter(NDArray::Container* ptr) {
   // if the array is pinned by dgl, unpin it before freeing
-  if (ptr->pinned_by_dgl_)
-    NDArray::UnpinContainer(ptr);
+  if (ptr->pinned_by_dgl_) NDArray::UnpinContainer(ptr);
   DLManagedTensor* tensor = static_cast<DLManagedTensor*>(ptr->manager_ctx);
   if (tensor->deleter != nullptr) {
     (*tensor->deleter)(tensor);
@@ -95,7 +94,7 @@ DLManagedTensor* ContainerToDLPack(NDArray::Container* from) {
   return ret;
 }
 
-DLManagedTensor* DLPackConvert::ToDLPack(const NDArray &from) {
+DLManagedTensor* DLPackConvert::ToDLPack(const NDArray& from) {
   return ContainerToDLPack(from.data_);
 }
 
@@ -113,15 +112,14 @@ inline bool IsAligned(const void* ptr, std::uintptr_t alignment) noexcept {
   return !(iptr % alignment);
 }
 
-int DGLArrayFromDLPack(DLManagedTensor* from,
-                       DGLArrayHandle* out) {
+int DGLArrayFromDLPack(DLManagedTensor* from, DGLArrayHandle* out) {
   API_BEGIN();
   *out = NDArray::Internal::MoveAsDGLArray(DLPackConvert::FromDLPack(from));
   API_END();
 }
 
-int DGLArrayToDLPack(DGLArrayHandle from, DLManagedTensor** out,
-                     int alignment) {
+int DGLArrayToDLPack(
+    DGLArrayHandle from, DLManagedTensor** out, int alignment) {
   API_BEGIN();
   auto* nd_container = reinterpret_cast<NDArray::Container*>(from);
   DGLArray* nd = &(nd_container->dl_tensor);

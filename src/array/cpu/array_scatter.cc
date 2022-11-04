@@ -13,7 +13,8 @@ namespace impl {
 
 template <DGLDeviceType XPU, typename DType, typename IdType>
 NDArray Scatter(NDArray array, IdArray indices) {
-  NDArray result = NDArray::Empty({indices->shape[0]}, array->dtype, array->ctx);
+  NDArray result =
+      NDArray::Empty({indices->shape[0]}, array->dtype, array->ctx);
 
   const DType *array_data = static_cast<DType *>(array->data);
   const IdType *indices_data = static_cast<IdType *>(indices->data);
@@ -37,9 +38,9 @@ template NDArray Scatter<kDGLCPU, double, int64_t>(NDArray, IdArray);
 template <DGLDeviceType XPU, typename DType, typename IdType>
 void Scatter_(IdArray index, NDArray value, NDArray out) {
   const int64_t len = index->shape[0];
-  const IdType* idx = index.Ptr<IdType>();
-  const DType* val = value.Ptr<DType>();
-  DType* outd = out.Ptr<DType>();
+  const IdType *idx = index.Ptr<IdType>();
+  const DType *val = value.Ptr<DType>();
+  DType *outd = out.Ptr<DType>();
   runtime::parallel_for(0, len, [&](size_t b, size_t e) {
     for (auto i = b; i < e; ++i) {
       outd[idx[i]] = val[i];

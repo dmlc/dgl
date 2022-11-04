@@ -1,16 +1,16 @@
 /*!
  *  Copyright (c) 2021 by Contributors
- * \file ndarray_partition.h 
- * \brief DGL utilities for working with the partitioned NDArrays 
+ * \file ndarray_partition.h
+ * \brief DGL utilities for working with the partitioned NDArrays
  */
-
 
 #ifndef DGL_PARTITION_NDARRAY_PARTITION_H_
 #define DGL_PARTITION_NDARRAY_PARTITION_H_
 
-#include <dgl/runtime/object.h>
-#include <dgl/packed_func_ext.h>
 #include <dgl/array.h>
+#include <dgl/packed_func_ext.h>
+#include <dgl/runtime/object.h>
+
 #include <utility>
 
 namespace dgl {
@@ -28,9 +28,7 @@ class NDArrayPartition : public runtime::Object {
    * @param array_size The first dimension of the partitioned array.
    * @param num_parts The number parts to the array is split into.
    */
-  NDArrayPartition(
-      int64_t array_size,
-      int num_parts);
+  NDArrayPartition(int64_t array_size, int num_parts);
 
   virtual ~NDArrayPartition() = default;
 
@@ -50,8 +48,7 @@ class NDArrayPartition : public runtime::Object {
    * @return A pair containing 0) the permutation to re-order the indices by
    * partition, 1) the number of indices per partition (int64_t).
    */
-  virtual std::pair<IdArray, NDArray>
-  GeneratePermutation(
+  virtual std::pair<IdArray, NDArray> GeneratePermutation(
       IdArray in_idx) const = 0;
 
   /**
@@ -62,8 +59,7 @@ class NDArrayPartition : public runtime::Object {
    *
    * @return The local indices.
    */
-  virtual IdArray MapToLocal(
-      IdArray in_idx) const = 0;
+  virtual IdArray MapToLocal(IdArray in_idx) const = 0;
 
   /**
    * @brief Generate the global indices (the numbering unique across all
@@ -74,9 +70,7 @@ class NDArrayPartition : public runtime::Object {
    *
    * @return The global indices.
    */
-  virtual IdArray MapToGlobal(
-      IdArray in_idx,
-      int part_id) const = 0;
+  virtual IdArray MapToGlobal(IdArray in_idx, int part_id) const = 0;
 
   /**
    * @brief Get the number of rows/items assigned to the given part.
@@ -85,8 +79,7 @@ class NDArrayPartition : public runtime::Object {
    *
    * @return The size.
    */
-  virtual int64_t PartSize(
-          int part_id) const = 0;
+  virtual int64_t PartSize(int part_id) const = 0;
 
   /**
    * @brief Get the first dimension of the partitioned array.
@@ -119,9 +112,7 @@ DGL_DEFINE_OBJECT_REF(NDArrayPartitionRef, NDArrayPartition);
  * @return The partition object.
  */
 NDArrayPartitionRef CreatePartitionRemainderBased(
-    int64_t array_size,
-    int num_parts);
-
+    int64_t array_size, int num_parts);
 
 /**
  * @brief Create a new partition object, using the range (exclusive prefix-sum)
@@ -136,9 +127,7 @@ NDArrayPartitionRef CreatePartitionRemainderBased(
  * @return The partition object.
  */
 NDArrayPartitionRef CreatePartitionRangeBased(
-    int64_t array_size,
-    int num_parts,
-    IdArray range);
+    int64_t array_size, int num_parts, IdArray range);
 
 }  // namespace partition
 }  // namespace dgl

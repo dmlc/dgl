@@ -7,19 +7,32 @@
 #define DGL_RUNTIME_RUNTIME_BASE_H_
 
 #include <dgl/runtime/c_runtime_api.h>
+
 #include <stdexcept>
 
 /*! \brief  macro to guard beginning and end section of all functions */
 #define API_BEGIN() try {
 /*! \brief every function starts with API_BEGIN();
      and finishes with API_END() or API_END_HANDLE_ERROR */
-#define API_END() } catch(std::runtime_error &_except_) { return DGLAPIHandleException(_except_); } return 0;  // NOLINT(*)
+#define API_END()                           \
+  }                                         \
+  catch (std::runtime_error & _except_) {   \
+    return DGLAPIHandleException(_except_); \
+  }                                         \
+  return 0;  // NOLINT(*)
 /*!
  * \brief every function starts with API_BEGIN();
  *   and finishes with API_END() or API_END_HANDLE_ERROR
- *   The finally clause contains procedure to cleanup states when an error happens.
+ *   The finally clause contains procedure to cleanup states when an error
+ * happens.
  */
-#define API_END_HANDLE_ERROR(Finalize) } catch(std::runtime_error &_except_) { Finalize; return DGLAPIHandleException(_except_); } return 0; // NOLINT(*)
+#define API_END_HANDLE_ERROR(Finalize)      \
+  }                                         \
+  catch (std::runtime_error & _except_) {   \
+    Finalize;                               \
+    return DGLAPIHandleException(_except_); \
+  }                                         \
+  return 0;  // NOLINT(*)
 
 /*!
  * \brief handle exception throwed out

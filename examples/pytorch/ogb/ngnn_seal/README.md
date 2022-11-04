@@ -33,6 +33,21 @@ python main.py --dataset ogbl-ppa --ngnn_type input --hidden_channels 48 --epoch
 
 As training is very costly, we select the best model by evaluation on a subset of the validation edges and using a lower K for Hits@K. Then we do experiments on the full validation and test sets with the best model selected, and get the required metrics.  
 
+### ogbl-citation2
+
+#### performance
+
+|              | Test MRR | Validation MRR | #Parameters |
+|:------------:|:-------------------:|:-----------------:|:------------:|
+| SEAL | 0.8767 ± 0.0032 | 0.8757 ± 0.0031 | 260,802 |
+| SEAL + NGNN | 0.8891 ± 0.0022 | 0.8879 ± 0.0022 | 1,134,402 |
+
+#### Reproduction of performance
+
+```{.bash}
+python main.py --dataset ogbl-citation2 --ngnn_type all --hidden_channels 256 --epochs 15 --lr 2e-05 --batch_size 64 --num_workers 24  --train_percent 8 --val_percent 4 --num_ngnn_layers 2 --use_feature --use_edge_weight --dynamic_train --dynamic_val --dynamic_test --runs 10
+```
+
 For all datasets, if you specify `--dynamic_train`, the enclosing subgraphs of the training links will be extracted on the fly instead of preprocessing and saving to disk. Similarly for `--dynamic_val` and `--dynamic_test`. You can increase `--num_workers` to accelerate the dynamic subgraph extraction process.  
 You can also specify the `val_percent` and `eval_hits_K` arguments in the above command to adjust the proportion of the validation dataset to use and the K to use for Hits@K.
 

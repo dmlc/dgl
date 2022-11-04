@@ -6,9 +6,9 @@
 #ifndef DGL_RPC_NETWORK_SOCKET_POOL_H_
 #define DGL_RPC_NETWORK_SOCKET_POOL_H_
 
-#include <unordered_map>
-#include <queue>
 #include <memory>
+#include <queue>
+#include <unordered_map>
 
 namespace dgl {
 namespace network {
@@ -19,7 +19,7 @@ class TCPSocket;
  * \brief SocketPool maintains a group of nonblocking sockets, and can provide
  * active sockets.
  * Currently SocketPool is based on epoll, a scalable I/O event notification
- * mechanism in Linux operating system. 
+ * mechanism in Linux operating system.
  */
 class SocketPool {
  public:
@@ -42,8 +42,8 @@ class SocketPool {
    * \param socket_id receiver/sender id of the socket
    * \param events READ, WRITE or READ + WRITE
    */
-  void AddSocket(std::shared_ptr<TCPSocket> socket, int socket_id,
-    int events = READ);
+  void AddSocket(
+      std::shared_ptr<TCPSocket> socket, int socket_id, int events = READ);
 
   /*!
    * \brief Remove socket from SocketPool

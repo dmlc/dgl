@@ -1,24 +1,26 @@
 /*!
- *  Copyright (c) 2020 by Contributors * \file dgl/aten/bcast.h
- * \brief Broadcast related function C++ header.
+ *  Copyright (c) 2020 by Contributors
+ * @file dgl/aten/bcast.h
+ * @brief Broadcast related function C++ header.
  */
 #ifndef DGL_BCAST_H_
 #define DGL_BCAST_H_
 
 #include <string>
 #include <vector>
+
 #include "./runtime/ndarray.h"
 
 using namespace dgl::runtime;
 namespace dgl {
 
 /*!
- * \brief Broadcast offsets and auxiliary information.
+ * @brief Broadcast offsets and auxiliary information.
  */
 struct BcastOff {
   /*!
-   * \brief offset vector of lhs operand and rhs operand.
-   * \note lhs_offset[i] indicates the start position of the scalar
+   * @brief offset vector of lhs operand and rhs operand.
+   * @note lhs_offset[i] indicates the start position of the scalar
    *       in lhs operand that required to compute the i-th element
    *       in the output, likewise for rhs_offset.
    *
@@ -34,11 +36,11 @@ struct BcastOff {
    * rhs array.
    */
   std::vector<int64_t> lhs_offset, rhs_offset;
-  /*! \brief Whether broadcast is required or not. */
+  /*! @brief Whether broadcast is required or not. */
   bool use_bcast;
   /*!
-   * \brief Auxiliary information for kernel computation 
-   * \note lhs_len refers to the left hand side operand length.
+   * @brief Auxiliary information for kernel computation
+   * @note lhs_len refers to the left hand side operand length.
    *       e.g. 15 for shape (1, 3, 5)
    *       rhs_len refers to the right hand side operand length.
    *       e.g. 15 for shape (3, 1, 5)
@@ -51,17 +53,16 @@ struct BcastOff {
 };
 
 /*!
- * \brief: Compute broadcast and auxiliary information given operator
+ * @brief: Compute broadcast and auxiliary information given operator
  *         and operands for kernel computation.
- * \param op: a string indicates the operator, could be `add`, `sub`,
+ * @param op: a string indicates the operator, could be `add`, `sub`,
  *        `mul`, `div`, `dot`, 'copy_u`, `copy_e`.
- * \param lhs The left hand side operand of NDArray class.
- * \param rhs The right hand side operand of NDArray class.
- * \return the broadcast information of BcastOff class.
+ * @param lhs The left hand side operand of NDArray class.
+ * @param rhs The right hand side operand of NDArray class.
+ * @return the broadcast information of BcastOff class.
  */
 BcastOff CalcBcastOff(const std::string& op, NDArray lhs, NDArray rhs);
 
-}   // namespace dgl
+}  // namespace dgl
 
 #endif  // DGL_BCAST_H_
-

@@ -10,7 +10,6 @@ from utils import array_readwriter, setdir
 
 import dgl
 
-
 def chunk_numpy_array(arr, fmt_meta, chunk_sizes, path_fmt):
     paths = []
     offset = 0
@@ -150,7 +149,7 @@ def _chunk_graph(g, name, ndata_paths, edata_paths, num_chunks, output_path):
 
     metadata_path = "metadata.json"
     with open(metadata_path, "w") as f:
-        json.dump(metadata, f)
+        json.dump(metadata, f, sort_keys=True, indent=4)
     logging.info("Saved metadata in %s" % os.path.abspath(metadata_path))
 
 
@@ -170,9 +169,9 @@ def chunk_graph(g, name, ndata_paths, edata_paths, num_chunks, output_path):
     ndata_paths : dict[str, pathlike] or dict[ntype, dict[str, pathlike]]
         The dictionary of paths pointing to the corresponding numpy array file for each
         node data key.
-    edata_paths : dict[str, pathlike] or dict[etype, dict[str, pathlike]]
+    edata_paths : dict[etype, pathlike] or dict[etype, dict[str, pathlike]]
         The dictionary of paths pointing to the corresponding numpy array file for each
-        edge data key.
+        edge data key. ``etype`` could be canonical or non-canonical.
     num_chunks : int
         The number of chunks
     output_path : pathlike
