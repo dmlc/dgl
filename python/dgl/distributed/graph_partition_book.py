@@ -847,14 +847,15 @@ class RangePartitionBook(GraphPartitionBook):
         ), "The node types have invalid IDs."
         for c_etype, etype_id in etypes.items():
             assert isinstance(c_etype, tuple) and len(c_etype) == 3, \
-                f"Expect canonical edge type in a triplet of string, but got {c_etype}."
+                "Expect canonical edge type in a triplet of string, but got " \
+                f"{c_etype}."
             etype = c_etype[1]
             self._etypes[etype_id] = etype
             self._canonical_etypes[etype_id] = c_etype
             if etype in self._etype2canonical:
-                # If one etype maps to multiple canonical etypes, empty
-                # tuple is used to indicate such ambiguity casued by etype.
-                # See more details in self.to_canonical_etype().
+                # If one etype maps to multiple canonical etypes, empty tuple
+                # is used to indicate such ambiguity casued by etype. See more
+                # details in self.to_canonical_etype().
                 self._etype2canonical[etype] = tuple()
             else:
                 self._etype2canonical[etype] = c_etype
@@ -863,9 +864,10 @@ class RangePartitionBook(GraphPartitionBook):
         ), "The edge types have invalid IDs."
 
         # This stores the node ID ranges for each node type in each partition.
-        # The key is the node type, the value is a NumPy matrix with two columns, in which
-        # each row indicates the start and the end of the node ID range in a partition.
-        # The node IDs are global node IDs in the homogeneous representation.
+        # The key is the node type, the value is a NumPy matrix with two
+        # columns, in which each row indicates the start and the end of the
+        # node ID range in a partition. The node IDs are global node IDs in the
+        # homogeneous representation.
         self._typed_nid_range = {}
         # This stores the node ID map for per-node-type IDs in each partition.
         # The key is the node type, the value is a NumPy vector which indicates
@@ -1416,7 +1418,8 @@ class HeteroDataName(object):
         self._policy = NODE_PART_POLICY if is_node else EDGE_PART_POLICY
         if not is_node:
             assert isinstance(entity_type, tuple) and len(entity_type) == 3, \
-                f"Expect canonical edge type in a triplet of string, but got {entity_type}."
+                "Expect canonical edge type in a triplet of string, but got " \
+                f"{entity_type}."
         self._entity_type = entity_type
         self.data_name = data_name
 
@@ -1439,7 +1442,8 @@ class HeteroDataName(object):
     def get_type(self):
         """The type of the node/edge.
         This is only meaningful in a heterogeneous graph.
-        In homogeneous graph, type is '_N' for a node and '_N:_E:_N' for an edge.
+        In homogeneous graph, type is '_N' for a node and '_N:_E:_N' for an
+        edge.
         """
         return self._entity_type
 
