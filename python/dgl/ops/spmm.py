@@ -1,4 +1,4 @@
-"""dgl spmm operator module."""
+"""Internal module for general spmm operators."""
 import sys
 
 from .. import backend as F

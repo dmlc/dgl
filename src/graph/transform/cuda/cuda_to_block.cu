@@ -43,7 +43,7 @@ namespace {
 template<typename IdType>
 class DeviceNodeMapMaker {
  public:
-  DeviceNodeMapMaker(
+  explicit DeviceNodeMapMaker(
       const std::vector<int64_t>& maxNodesPerType) :
       max_num_nodes_(0) {
     max_num_nodes_ = *std::max_element(maxNodesPerType.begin(),
