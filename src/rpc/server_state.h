@@ -7,11 +7,12 @@
 #ifndef DGL_RPC_SERVER_STATE_H_
 #define DGL_RPC_SERVER_STATE_H_
 
-#include <dgl/runtime/object.h>
-#include <dgl/runtime/ndarray.h>
 #include <dgl/base_heterograph.h>
-#include <unordered_map>
+#include <dgl/runtime/ndarray.h>
+#include <dgl/runtime/object.h>
+
 #include <string>
+#include <unordered_map>
 
 namespace dgl {
 namespace rpc {

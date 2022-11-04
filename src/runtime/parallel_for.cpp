@@ -8,4 +8,4 @@ namespace dgl {
 namespace runtime {
 DefaultGrainSizeT default_grain_size;
 }  // namespace runtime
-}  // namesoace dgl
+}  // namespace dgl
