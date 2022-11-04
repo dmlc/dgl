@@ -3859,7 +3859,7 @@ def double_radius_node_labeling(g, src, dst):
 
 def shortest_dist(g, root=None, return_paths=False):
     r"""Compute shortest distance and paths on the given graph.
-    
+
     Only unweighted cases are supported. Only directed paths (in which the
     edges are all oriented in the same direction) are considered effective.
 
