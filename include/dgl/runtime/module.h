@@ -76,7 +76,7 @@ class Module {
  */
 class ModuleNode {
  public:
-  /*! \brief virtual destructor */
+  /*! @brief virtual destructor */
   virtual ~ModuleNode() {}
   /*! \return The module type key */
   virtual const char* type_key() const = 0;
@@ -134,32 +134,32 @@ class ModuleNode {
 
  protected:
   friend class Module;
-  /*! \brief The modules this module depend on */
+  /*! @brief The modules this module depend on */
   std::vector<Module> imports_;
 
  private:
-  /*! \brief Cache used by GetImport */
+  /*! @brief Cache used by GetImport */
   std::unordered_map<std::string, std::unique_ptr<PackedFunc> > import_cache_;
 };
 
-/*! \brief namespace for constant symbols */
+/*! @brief namespace for constant symbols */
 namespace symbol {
-/*! \brief Global variable to store module context. */
+/*! @brief Global variable to store module context. */
 constexpr const char* dgl_module_ctx = "__dgl_module_ctx";
-/*! \brief Global variable to store device module blob */
+/*! @brief Global variable to store device module blob */
 constexpr const char* dgl_dev_mblob = "__dgl_dev_mblob";
-/*! \brief Number of bytes of device module blob. */
+/*! @brief Number of bytes of device module blob. */
 constexpr const char* dgl_dev_mblob_nbytes = "__dgl_dev_mblob_nbytes";
-/*! \brief global function to set device */
+/*! @brief global function to set device */
 constexpr const char* dgl_set_device = "__dgl_set_device";
-/*! \brief Auxiliary counter to global barrier. */
+/*! @brief Auxiliary counter to global barrier. */
 constexpr const char* dgl_global_barrier_state = "__dgl_global_barrier_state";
 /*!
  * @brief Prepare the global barrier before kernels that uses global barrier.
  */
 constexpr const char* dgl_prepare_global_barrier =
     "__dgl_prepare_global_barrier";
-/*! \brief Placeholder for the module's entry function. */
+/*! @brief Placeholder for the module's entry function. */
 constexpr const char* dgl_module_main = "__dgl_main__";
 }  // namespace symbol
 

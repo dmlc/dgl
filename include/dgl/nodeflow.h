@@ -26,7 +26,7 @@ class ImmutableGraph;
  * node and edge mapping from the NodeFlow graph to the parent graph.
  */
 struct NodeFlowObject : public runtime::Object {
-  /*! \brief The graph. */
+  /*! @brief The graph. */
   GraphPtr graph;
   /*!
    * @brief the offsets of each layer.
@@ -54,7 +54,7 @@ class NodeFlow : public runtime::ObjectRef {
  public:
   DGL_DEFINE_OBJECT_REF_METHODS(NodeFlow, runtime::ObjectRef, NodeFlowObject);
 
-  /*! \brief create a new nodeflow reference */
+  /*! @brief create a new nodeflow reference */
   static NodeFlow Create() {
     return NodeFlow(std::make_shared<NodeFlowObject>());
   }

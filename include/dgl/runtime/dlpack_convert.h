@@ -38,7 +38,7 @@ struct DLPackConvert {
    */
   static void DLPackDeleter(NDArray::Container* ptr);
 
-  /*! \brief Convert a DGL NDArray to a DLPack tensor.
+  /*! @brief Convert a DGL NDArray to a DLPack tensor.
    *
    * @param from The DGL NDArray.
    * @return A DLPack tensor.

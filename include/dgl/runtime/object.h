@@ -54,7 +54,7 @@ class AttrVisitor {
  */
 class Object {
  public:
-  /*! \brief virtual destructor */
+  /*! @brief virtual destructor */
   virtual ~Object() {}
   /*! \return The unique type key of the object */
   virtual const char* type_key() const = 0;
@@ -94,7 +94,7 @@ class Object {
   inline bool derived_from() const;
   /*!
    * @return whether the object is of type T
-   * \tparam The type to be checked.
+   * @tparam The type to be checked.
    */
   template <typename T>
   inline bool is_type() const;
@@ -103,10 +103,10 @@ class Object {
   static constexpr const char* _type_key = "Object";
 };
 
-/*! \brief base class of all reference object */
+/*! @brief base class of all reference object */
 class ObjectRef {
  public:
-  /*! \brief type indicate the container type */
+  /*! @brief type indicate the container type */
   using ContainerType = Object;
   /*!
    * @brief Comparator
@@ -163,16 +163,16 @@ class ObjectRef {
    * if (const Banana *banana = obj->as<Banana>()) {
    *   // This is a Banana!
    * }
-   * \tparam T the target type, must be subtype of Object
+   * @tparam T the target type, must be subtype of Object
    */
   template <typename T>
   inline const T* as() const;
 
-  /*! \brief default constructor */
+  /*! @brief default constructor */
   ObjectRef() = default;
   explicit ObjectRef(std::shared_ptr<Object> obj) : obj_(obj) {}
 
-  /*! \brief the internal object, do not touch */
+  /*! @brief the internal object, do not touch */
   std::shared_ptr<Object> obj_;
 };
 
@@ -222,7 +222,7 @@ class ObjectRef {
     return Parent::_DerivedFrom(tid);                                \
   }
 
-/*! \brief Macro to generate common object reference class method definition */
+/*! @brief Macro to generate common object reference class method definition */
 #define DGL_DEFINE_OBJECT_REF_METHODS(TypeName, BaseTypeName, ObjectName)   \
   TypeName() {}                                                             \
   explicit TypeName(std::shared_ptr<runtime::Object> obj)                   \
@@ -237,7 +237,7 @@ class ObjectRef {
   operator bool() const { return this->defined(); }                         \
   using ContainerType = ObjectName
 
-/*! \brief Macro to generate object reference class definition */
+/*! @brief Macro to generate object reference class definition */
 #define DGL_DEFINE_OBJECT_REF(TypeName, ObjectName)       \
   class TypeName : public ::dgl::runtime::ObjectRef {     \
    public:                                                \
@@ -300,12 +300,12 @@ inline const T* ObjectRef::as() const {
   return nullptr;
 }
 
-/*! \brief The hash function for nodes */
+/*! @brief The hash function for nodes */
 struct ObjectHash {
   size_t operator()(const ObjectRef& a) const { return a.hash(); }
 };
 
-/*! \brief The equal comparator for nodes */
+/*! @brief The equal comparator for nodes */
 struct ObjectEqual {
   bool operator()(const ObjectRef& a, const ObjectRef& b) const {
     return a.get() == b.get();

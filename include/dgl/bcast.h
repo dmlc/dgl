@@ -35,7 +35,7 @@ struct BcastOff {
    * rhs array.
    */
   std::vector<int64_t> lhs_offset, rhs_offset;
-  /*! \brief Whether broadcast is required or not. */
+  /*! @brief Whether broadcast is required or not. */
   bool use_bcast;
   /*!
    * @brief Auxiliary information for kernel computation

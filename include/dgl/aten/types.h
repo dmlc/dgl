@@ -14,7 +14,7 @@ namespace dgl {
 
 typedef uint64_t dgl_id_t;
 typedef uint64_t dgl_type_t;
-/*! \brief Type for dgl fomrat code, whose binary representation indices
+/*! @brief Type for dgl fomrat code, whose binary representation indices
  * which sparse format is in use and which is not.
  *
  * Suppose the binary representation is xyz, then

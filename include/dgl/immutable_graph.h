@@ -180,13 +180,13 @@ class CSR : public GraphInterface {
     return {adj_.indptr, adj_.indices, adj_.data};
   }
 
-  /*! \brief Indicate whether this uses shared memory. */
+  /*! @brief Indicate whether this uses shared memory. */
   bool IsSharedMem() const { return !shared_mem_name_.empty(); }
 
-  /*! \brief Return the reverse of this CSR graph (i.e, a CSC graph) */
+  /*! @brief Return the reverse of this CSR graph (i.e, a CSC graph) */
   CSRPtr Transpose() const;
 
-  /*! \brief Convert this CSR to COO */
+  /*! @brief Convert this CSR to COO */
   COOPtr ToCOO() const;
 
   /*!
@@ -239,7 +239,7 @@ class CSR : public GraphInterface {
  private:
   friend class Serializer;
 
-  /*! \brief private default constructor */
+  /*! @brief private default constructor */
   CSR() { adj_.sorted = false; }
   // The internal CSR adjacency matrix.
   // The data field stores edge ids.
@@ -424,12 +424,12 @@ class COO : public GraphInterface {
     }
   }
 
-  /*! \brief Return the transpose of this COO */
+  /*! @brief Return the transpose of this COO */
   COOPtr Transpose() const {
     return COOPtr(new COO(adj_.num_rows, adj_.col, adj_.row));
   }
 
-  /*! \brief Convert this COO to CSR */
+  /*! @brief Convert this COO to CSR */
   CSRPtr ToCSR() const;
 
   /*!
@@ -460,7 +460,7 @@ class COO : public GraphInterface {
    */
   COO AsNumBits(uint8_t bits) const;
 
-  /*! \brief Indicate whether this uses shared memory. */
+  /*! @brief Indicate whether this uses shared memory. */
   bool IsSharedMem() const { return false; }
 
   // member getters
@@ -485,7 +485,7 @@ class COO : public GraphInterface {
  */
 class ImmutableGraph : public GraphInterface {
  public:
-  /*! \brief Construct an immutable graph from the COO format. */
+  /*! @brief Construct an immutable graph from the COO format. */
   explicit ImmutableGraph(COOPtr coo) : coo_(coo) {}
 
   /*!
@@ -506,14 +506,14 @@ class ImmutableGraph : public GraphInterface {
     CHECK(in_csr_ || out_csr_) << "Both CSR are missing.";
   }
 
-  /*! \brief Construct an immutable graph from one CSR. */
+  /*! @brief Construct an immutable graph from one CSR. */
   explicit ImmutableGraph(CSRPtr csr) : out_csr_(csr) {}
 
-  /*! \brief default copy constructor */
+  /*! @brief default copy constructor */
   ImmutableGraph(const ImmutableGraph &other) = default;
 
 #ifndef _MSC_VER
-  /*! \brief default move constructor */
+  /*! @brief default move constructor */
   ImmutableGraph(ImmutableGraph &&other) = default;
 #else
   ImmutableGraph(ImmutableGraph &&other) {
@@ -526,10 +526,10 @@ class ImmutableGraph : public GraphInterface {
   }
 #endif  // _MSC_VER
 
-  /*! \brief default assign constructor */
+  /*! @brief default assign constructor */
   ImmutableGraph &operator=(const ImmutableGraph &other) = default;
 
-  /*! \brief default destructor */
+  /*! @brief default destructor */
   ~ImmutableGraph() = default;
 
   void AddVertices(uint64_t num_vertices) override {
@@ -863,14 +863,14 @@ class ImmutableGraph : public GraphInterface {
   /* !\brief Return coo. If not exist, create from csr.*/
   COOPtr GetCOO() const;
 
-  /*! \brief Create an immutable graph from CSR. */
+  /*! @brief Create an immutable graph from CSR. */
   static ImmutableGraphPtr CreateFromCSR(
       IdArray indptr, IdArray indices, IdArray edge_ids,
       const std::string &edge_dir);
 
   static ImmutableGraphPtr CreateFromCSR(const std::string &shared_mem_name);
 
-  /*! \brief Create an immutable graph from COO. */
+  /*! @brief Create an immutable graph from COO. */
   static ImmutableGraphPtr CreateFromCOO(
       int64_t num_vertices, IdArray src, IdArray dst, bool row_osrted = false,
       bool col_sorted = false);
@@ -933,7 +933,7 @@ class ImmutableGraph : public GraphInterface {
 
   bool HasOutCSR() const { return out_csr_ != NULL; }
 
-  /*! \brief Cast this graph to a heterograph */
+  /*! @brief Cast this graph to a heterograph */
   HeteroGraphPtr AsHeteroGraph() const;
 
  protected:

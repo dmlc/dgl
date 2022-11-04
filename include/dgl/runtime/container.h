@@ -26,14 +26,14 @@ namespace runtime {
  */
 class ValueObject : public Object {
  public:
-  /*! \brief the value data */
+  /*! @brief the value data */
   DGLRetValue data;
 
   static constexpr const char* _type_key = "Value";
   DGL_DECLARE_OBJECT_TYPE_INFO(ValueObject, Object);
 };
 
-/*! \brief Construct a value object. */
+/*! @brief Construct a value object. */
 template <typename T>
 inline std::shared_ptr<ValueObject> MakeValue(T&& val) {
   auto obj = std::make_shared<ValueObject>();
@@ -41,7 +41,7 @@ inline std::shared_ptr<ValueObject> MakeValue(T&& val) {
   return obj;
 }
 
-/*! \brief Vallue reference type */
+/*! @brief Vallue reference type */
 class Value : public ObjectRef {
  public:
   Value() {}
@@ -54,10 +54,10 @@ class Value : public ObjectRef {
   using ContainerType = ValueObject;
 };
 
-/*! \brief list obj content in list */
+/*! @brief list obj content in list */
 class ListObject : public Object {
  public:
-  /*! \brief the data content */
+  /*! @brief the data content */
   std::vector<std::shared_ptr<Object> > data;
 
   void VisitAttrs(AttrVisitor* visitor) final {
@@ -68,7 +68,7 @@ class ListObject : public Object {
   DGL_DECLARE_OBJECT_TYPE_INFO(ListObject, Object);
 };
 
-/*! \brief map obj content */
+/*! @brief map obj content */
 class MapObject : public Object {
  public:
   void VisitAttrs(AttrVisitor* visitor) final {
@@ -89,28 +89,28 @@ class MapObject : public Object {
     }
   };
 
-  /*! \brief The corresponding conatiner type */
+  /*! @brief The corresponding conatiner type */
   using ContainerType = std::unordered_map<
       std::shared_ptr<Object>, std::shared_ptr<Object>, Hash, Equal>;
 
-  /*! \brief the data content */
+  /*! @brief the data content */
   ContainerType data;
 
   static constexpr const char* _type_key = "Map";
   DGL_DECLARE_OBJECT_TYPE_INFO(MapObject, Object);
 };
 
-/*! \brief specialized map obj with string as key */
+/*! @brief specialized map obj with string as key */
 class StrMapObject : public Object {
  public:
   void VisitAttrs(AttrVisitor* visitor) final {
     // Visitor to map have no effect.
   }
-  /*! \brief The corresponding conatiner type */
+  /*! @brief The corresponding conatiner type */
   using ContainerType =
       std::unordered_map<std::string, std::shared_ptr<Object> >;
 
-  /*! \brief the data content */
+  /*! @brief the data content */
   ContainerType data;
 
   static constexpr const char* _type_key = "StrMap";
@@ -119,8 +119,8 @@ class StrMapObject : public Object {
 
 /*!
  * @brief iterator adapter that adapts TIter to return another type.
- * \tparam Converter a struct that contains converting function
- * \tparam TIter the content iterator type.
+ * @tparam Converter a struct that contains converting function
+ * @tparam TIter the content iterator type.
  */
 template <typename Converter, typename TIter>
 class IterAdapter {
@@ -161,7 +161,7 @@ class IterAdapter {
  *
  * operator[] only provide const access, use Set to mutate the content.
  *
- * \tparam T The content ObjectRef type.
+ * @tparam T The content ObjectRef type.
  *
  * @note The element type must subclass \c ObjectRef.  Otherwise, the
  * compiler would throw an error:
@@ -213,7 +213,7 @@ class List : public ObjectRef {
    * @brief constructor from iterator
    * @param begin begin of iterator
    * @param end end of iterator
-   * \tparam IterType The type of iterator
+   * @tparam IterType The type of iterator
    */
   template <typename IterType>
   List(IterType begin, IterType end) {
@@ -266,7 +266,7 @@ class List : public ObjectRef {
    * @brief reset the list to content from iterator.
    * @param begin begin of iterator
    * @param end end of iterator
-   * \tparam IterType The type of iterator
+   * @tparam IterType The type of iterator
    */
   template <typename IterType>
   void assign(IterType begin, IterType end) {
@@ -323,11 +323,11 @@ class List : public ObjectRef {
   }
   /*! \return whether list is empty */
   inline bool empty() const { return size() == 0; }
-  /*! \brief Copy the content to a vector */
+  /*! @brief Copy the content to a vector */
   inline std::vector<T> ToVector() const {
     return std::vector<T>(begin(), end());
   }
-  /*! \brief specify container obj */
+  /*! @brief specify container obj */
   using ContainerType = ListObject;
 
   struct Ptr2ObjectRef {
@@ -373,8 +373,8 @@ class List : public ObjectRef {
  *
  * operator[] only provide const acces, use Set to mutate the content.
  *
- * \tparam K The key ObjectRef type.
- * \tparam V The value ObjectRef type.
+ * @tparam K The key ObjectRef type.
+ * @tparam V The value ObjectRef type.
  *
  * @note The element type must subclass \c ObjectRef.  Otherwise, the
  * compiler would throw an error:
@@ -429,7 +429,7 @@ class Map : public ObjectRef {
    * @brief constructor from iterator
    * @param begin begin of iterator
    * @param end end of iterator
-   * \tparam IterType The type of iterator
+   * @tparam IterType The type of iterator
    */
   template <typename IterType>
   Map(IterType begin, IterType end) {
@@ -472,7 +472,7 @@ class Map : public ObjectRef {
    * @brief reset the list to content from iterator.
    * @param begin begin of iterator
    * @param end end of iterator
-   * \tparam IterType The type of iterator
+   * @tparam IterType The type of iterator
    */
   template <typename IterType>
   void assign(IterType begin, IterType end) {
@@ -535,7 +535,7 @@ class Map : public ObjectRef {
 
   /*! \return whether list is empty */
   inline bool empty() const { return size() == 0; }
-  /*! \brief specify container obj */
+  /*! @brief specify container obj */
   using ContainerType = MapObject;
 
   struct Ptr2ObjectRef {
@@ -661,7 +661,7 @@ class Map<std::string, V, T1, T2> : public ObjectRef {
 
 /*!
  * @brief Helper function to convert a List<Value> object to a vector.
- * \tparam T element type
+ * @tparam T element type
  * @param list Input list object.
  * @return std vector
  */

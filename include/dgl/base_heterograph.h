@@ -31,7 +31,7 @@ typedef std::shared_ptr<FlattenedHeteroGraph> FlattenedHeteroGraphPtr;
 
 struct HeteroSubgraph;
 
-/*! \brief Enum class for edge direction */
+/*! @brief Enum class for edge direction */
 enum class EdgeDir {
   kIn,  // in edge direction
   kOut  // out edge direction
@@ -82,13 +82,13 @@ class BaseHeteroGraph : public runtime::Object {
 
   ///////////////////// query/operations on realized graph /////////////////////
 
-  /*! \brief Add vertices to the given vertex type */
+  /*! @brief Add vertices to the given vertex type */
   virtual void AddVertices(dgl_type_t vtype, uint64_t num_vertices) = 0;
 
-  /*! \brief Add one edge to the given edge type */
+  /*! @brief Add one edge to the given edge type */
   virtual void AddEdge(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) = 0;
 
-  /*! \brief Add edges to the given edge type */
+  /*! @brief Add edges to the given edge type */
   virtual void AddEdges(dgl_type_t etype, IdArray src_ids, IdArray dst_ids) = 0;
 
   /*!
@@ -496,7 +496,7 @@ class BaseHeteroGraph : public runtime::Object {
     return nullptr;
   }
 
-  /*! \brief Cast this graph to immutable graph */
+  /*! @brief Cast this graph to immutable graph */
   virtual GraphPtr AsImmutableGraph() const {
     LOG(FATAL) << "AsImmutableGraph not supported.";
     return nullptr;
@@ -506,7 +506,7 @@ class BaseHeteroGraph : public runtime::Object {
   DGL_DECLARE_OBJECT_TYPE_INFO(BaseHeteroGraph, runtime::Object);
 
  protected:
-  /*! \brief meta graph */
+  /*! @brief meta graph */
   GraphPtr meta_graph_;
 
   // empty constructor
@@ -531,7 +531,7 @@ DGL_DEFINE_OBJECT_REF(HeteroGraphRef, BaseHeteroGraph);
  * </code>
  */
 struct HeteroSubgraph : public runtime::Object {
-  /*! \brief The heterograph. */
+  /*! @brief The heterograph. */
   HeteroGraphPtr graph;
   /*!
    * @brief The induced vertex ids of each entity type.
@@ -555,9 +555,9 @@ struct HeteroSubgraph : public runtime::Object {
 // Define HeteroSubgraphRef
 DGL_DEFINE_OBJECT_REF(HeteroSubgraphRef, HeteroSubgraph);
 
-/*! \brief The flattened heterograph */
+/*! @brief The flattened heterograph */
 struct FlattenedHeteroGraph : public runtime::Object {
-  /*! \brief The graph */
+  /*! @brief The graph */
   HeteroGraphRef graph;
   /*!
    * @brief Mapping from source node ID to node type in parent graph
@@ -569,7 +569,7 @@ struct FlattenedHeteroGraph : public runtime::Object {
    * @brief The set of node types in parent graph appearing in source nodes.
    */
   IdArray induced_srctype_set;
-  /*! \brief Mapping from source node ID to local node ID in parent graph */
+  /*! @brief Mapping from source node ID to local node ID in parent graph */
   IdArray induced_srcid;
   /*!
    * @brief Mapping from edge ID to edge type in parent graph
@@ -581,7 +581,7 @@ struct FlattenedHeteroGraph : public runtime::Object {
    * @brief The set of edge types in parent graph appearing in edges.
    */
   IdArray induced_etype_set;
-  /*! \brief Mapping from edge ID to local edge ID in parent graph */
+  /*! @brief Mapping from edge ID to local edge ID in parent graph */
   IdArray induced_eid;
   /*!
    * @brief Mapping from destination node ID to node type in parent graph
@@ -594,7 +594,7 @@ struct FlattenedHeteroGraph : public runtime::Object {
    * nodes.
    */
   IdArray induced_dsttype_set;
-  /*! \brief Mapping from destination node ID to local node ID in parent graph
+  /*! @brief Mapping from destination node ID to local node ID in parent graph
    */
   IdArray induced_dstid;
 
@@ -754,7 +754,7 @@ HeteroGraphPtr JointUnionHeteroGraph(
  *
  * TODO(minjie): remove the meta_graph argument
  *
- * \tparam IdType Graph's index data type, can be int32_t or int64_t
+ * @tparam IdType Graph's index data type, can be int32_t or int64_t
  * @param meta_graph Metagraph of the inputs and result.
  * @param component_graphs Input graphs
  * @return One graph that unions all the components
@@ -798,7 +798,7 @@ HeteroGraphPtr SliceHeteroGraph(
  * TODO(minjie): remove the meta_graph argument; use vector<IdArray> for
  * vertex_sizes and edge_sizes.
  *
- * \tparam IdType Graph's index data type, can be int32_t or int64_t
+ * @tparam IdType Graph's index data type, can be int32_t or int64_t
  * @param meta_graph Metagraph.
  * @param batched_graph Input graph.
  * @param vertex_sizes Number of vertices of each component.
@@ -827,29 +827,29 @@ std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes2(
  * This class can be used as arguments and return values of a C API.
  */
 struct HeteroPickleStates : public runtime::Object {
-  /*! \brief version number */
+  /*! @brief version number */
   int64_t version = 0;
 
-  /*! \brief Metainformation
+  /*! @brief Metainformation
    *
    * metagraph, number of nodes per type, format, flags
    */
   std::string meta;
 
-  /*! \brief Arrays representing graph structure (coo or csr) */
+  /*! @brief Arrays representing graph structure (coo or csr) */
   std::vector<IdArray> arrays;
 
   /* To support backward compatibility, we have to retain fields in the old
    * version of HeteroPickleStates
    */
 
-  /*! \brief Metagraph(64bits ImmutableGraph) */
+  /*! @brief Metagraph(64bits ImmutableGraph) */
   GraphPtr metagraph;
 
-  /*! \brief Number of nodes per type */
+  /*! @brief Number of nodes per type */
   std::vector<int64_t> num_nodes_per_type;
 
-  /*! \brief adjacency matrices of each relation graph */
+  /*! @brief adjacency matrices of each relation graph */
   std::vector<std::shared_ptr<SparseMatrix> > adjs;
 
   static constexpr const char* _type_key = "graph.HeteroPickleStates";

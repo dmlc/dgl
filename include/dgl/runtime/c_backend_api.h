@@ -77,7 +77,7 @@ typedef struct {
    * @brief Auxiliary used for synchronization
    */
   void* sync_handle;
-  /*! \brief total amount of task */
+  /*! @brief total amount of task */
   int32_t num_task;
 } DGLParallelGroupEnv;
 

@@ -21,20 +21,20 @@ class Graph;
 class GraphOp;
 typedef std::shared_ptr<Graph> MutableGraphPtr;
 
-/*! \brief Mutable graph based on adjacency list. */
+/*! @brief Mutable graph based on adjacency list. */
 class Graph : public GraphInterface {
  public:
-  /*! \brief default constructor */
+  /*! @brief default constructor */
   Graph() {}
 
-  /*! \brief construct a graph from the coo format. */
+  /*! @brief construct a graph from the coo format. */
   Graph(IdArray src_ids, IdArray dst_ids, size_t num_nodes);
 
-  /*! \brief default copy constructor */
+  /*! @brief default copy constructor */
   Graph(const Graph& other) = default;
 
 #ifndef _MSC_VER
-  /*! \brief default move constructor */
+  /*! @brief default move constructor */
   Graph(Graph&& other) = default;
 #else
   Graph(Graph&& other) {
@@ -48,10 +48,10 @@ class Graph : public GraphInterface {
   }
 #endif  // _MSC_VER
 
-  /*! \brief default assign constructor */
+  /*! @brief default assign constructor */
   Graph& operator=(const Graph& other) = default;
 
-  /*! \brief default destructor */
+  /*! @brief default destructor */
   ~Graph() = default;
 
   /*!
@@ -346,10 +346,10 @@ class Graph : public GraphInterface {
   std::vector<IdArray> GetAdj(
       bool transpose, const std::string& fmt) const override;
 
-  /*! \brief Create an empty graph */
+  /*! @brief Create an empty graph */
   static MutableGraphPtr Create() { return std::make_shared<Graph>(); }
 
-  /*! \brief Create from coo */
+  /*! @brief Create from coo */
   static MutableGraphPtr CreateFromCOO(
       int64_t num_nodes, IdArray src_ids, IdArray dst_ids) {
     return std::make_shared<Graph>(src_ids, dst_ids, num_nodes);
@@ -357,29 +357,29 @@ class Graph : public GraphInterface {
 
  protected:
   friend class GraphOp;
-  /*! \brief Internal edge list type */
+  /*! @brief Internal edge list type */
   struct EdgeList {
-    /*! \brief successor vertex list */
+    /*! @brief successor vertex list */
     std::vector<dgl_id_t> succ;
-    /*! \brief out edge list */
+    /*! @brief out edge list */
     std::vector<dgl_id_t> edge_id;
   };
   typedef std::vector<EdgeList> AdjacencyList;
 
-  /*! \brief adjacency list using vector storage */
+  /*! @brief adjacency list using vector storage */
   AdjacencyList adjlist_;
-  /*! \brief reverse adjacency list using vector storage */
+  /*! @brief reverse adjacency list using vector storage */
   AdjacencyList reverse_adjlist_;
 
-  /*! \brief all edges' src endpoints in their edge id order */
+  /*! @brief all edges' src endpoints in their edge id order */
   std::vector<dgl_id_t> all_edges_src_;
-  /*! \brief all edges' dst endpoints in their edge id order */
+  /*! @brief all edges' dst endpoints in their edge id order */
   std::vector<dgl_id_t> all_edges_dst_;
 
-  /*! \brief read only flag */
+  /*! @brief read only flag */
   bool read_only_ = false;
 
-  /*! \brief number of edges */
+  /*! @brief number of edges */
   uint64_t num_edges_ = 0;
 };
 

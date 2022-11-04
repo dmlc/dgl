@@ -70,7 +70,7 @@ class PackedFunc {
    * \endcode
    */
   using FType = std::function<void(DGLArgs args, DGLRetValue* rv)>;
-  /*! \brief default constructor */
+  /*! @brief default constructor */
   PackedFunc() {}
   /*!
    * @brief constructing a packed function from a std::function.
@@ -80,7 +80,7 @@ class PackedFunc {
   /*!
    * @brief Call packed function by directly passing in unpacked format.
    * @param args Arguments to be passed.
-   * \tparam Args arguments to be passed.
+   * @tparam Args arguments to be passed.
    *
    * \code
    *   // Example code on how to call packed function
@@ -107,7 +107,7 @@ class PackedFunc {
   bool operator!=(std::nullptr_t null) const { return body_ != nullptr; }
 
  private:
-  /*! \brief internal container of packed function */
+  /*! @brief internal container of packed function */
   FType body_;
 };
 
@@ -147,15 +147,15 @@ class TypedPackedFunc;
  *  // Can be directly converted to PackedFunc
  *  PackedFunc packed = ftype;
  * \endcode
- * \tparam R The return value of the function.
- * \tparam Args The argument signature of the function.
+ * @tparam R The return value of the function.
+ * @tparam Args The argument signature of the function.
  */
 template <typename R, typename... Args>
 class TypedPackedFunc<R(Args...)> {
  public:
-  /*! \brief short hand for this function type */
+  /*! @brief short hand for this function type */
   using TSelf = TypedPackedFunc<R(Args...)>;
-  /*! \brief default constructor */
+  /*! @brief default constructor */
   TypedPackedFunc() {}
   /*!
    * @brief construct by wrap a PackedFunc
@@ -188,7 +188,7 @@ class TypedPackedFunc<R(Args...)> {
    * \endcode
    *
    * @param typed_lambda typed lambda function.
-   * \tparam FLambda the type of the lambda function.
+   * @tparam FLambda the type of the lambda function.
    */
   template <
       typename FLambda, typename = typename std::enable_if<std::is_convertible<
@@ -209,7 +209,7 @@ class TypedPackedFunc<R(Args...)> {
    * \endcode
    *
    * @param typed_lambda typed lambda function.
-   * \tparam FLambda the type of the lambda function.
+   * @tparam FLambda the type of the lambda function.
    * @returns reference to self.
    */
   template <
@@ -247,20 +247,20 @@ class TypedPackedFunc<R(Args...)> {
 
  private:
   friend class DGLRetValue;
-  /*! \brief The internal packed function */
+  /*! @brief The internal packed function */
   PackedFunc packed_;
   /*!
    * @brief Assign the packed field using a typed lambda function.
    *
    * @param flambda The lambda function.
-   * \tparam FLambda The lambda function type.
+   * @tparam FLambda The lambda function type.
    * @note We capture the lambda when possible for maximum efficiency.
    */
   template <typename FLambda>
   inline void AssignTypedLambda(FLambda flambda);
 };
 
-/*! \brief Arguments into DGL functions. */
+/*! @brief Arguments into DGL functions. */
 class DGLArgs {
  public:
   const DGLValue* values;
@@ -293,7 +293,7 @@ class DGLArgs {
  * Extension class can be passed and returned via PackedFunc in all dgl runtime.
  * Internally extension class is stored as T*.
  *
- * \tparam T the typename
+ * @tparam T the typename
  */
 template <typename T>
 struct extension_class_info {
@@ -305,13 +305,13 @@ struct extension_class_info {
  */
 class ExtTypeVTable {
  public:
-  /*! \brief function to be called to delete a handle */
+  /*! @brief function to be called to delete a handle */
   void (*destroy)(void* handle);
-  /*! \brief function to be called when clone a handle */
+  /*! @brief function to be called when clone a handle */
   void* (*clone)(void* handle);
   /*!
    * @brief Register type
-   * \tparam T The type to be register.
+   * @tparam T The type to be register.
    * @return The registered vtable.
    */
   template <typename T>
@@ -395,7 +395,7 @@ class DGLPODValue_ {
   int type_code() const { return type_code_; }
   /*!
    * @brief return handle as specific pointer type.
-   * \tparam T the data type.
+   * @tparam T the data type.
    * @return The pointer type.
    */
   template <typename T>
@@ -410,9 +410,9 @@ class DGLPODValue_ {
   DGLPODValue_(DGLValue value, int type_code)
       : value_(value), type_code_(type_code) {}
 
-  /*! \brief The value */
+  /*! @brief The value */
   DGLValue value_;
-  /*! \brief the type code */
+  /*! @brief the type code */
   int type_code_;
 };
 
@@ -424,7 +424,7 @@ class DGLPODValue_ {
  */
 class DGLArgValue : public DGLPODValue_ {
  public:
-  /*! \brief default constructor */
+  /*! @brief default constructor */
   DGLArgValue() {}
   /*!
    * @brief constructor
@@ -507,7 +507,7 @@ class DGLArgValue : public DGLPODValue_ {
  */
 class DGLRetValue : public DGLPODValue_ {
  public:
-  /*! \brief default constructor */
+  /*! @brief default constructor */
   DGLRetValue() {}
   /*!
    * @brief move constructor from anoter return value.
@@ -518,7 +518,7 @@ class DGLRetValue : public DGLPODValue_ {
     other.value_.v_handle = nullptr;
     other.type_code_ = kNull;
   }
-  /*! \brief destructor */
+  /*! @brief destructor */
   ~DGLRetValue() { this->Clear(); }
   // reuse converter from parent
   using DGLPODValue_::operator double;
@@ -920,9 +920,9 @@ class DGLArgsSetter {
   inline void operator()(size_t i, const ObjectRef& other) const;  // NOLINT(*)
 
  private:
-  /*! \brief The values fields */
+  /*! @brief The values fields */
   DGLValue* values_;
-  /*! \brief The type code fields */
+  /*! @brief The type code fields */
   int* type_codes_;
 };
 

@@ -16,7 +16,7 @@
 extern "C" {
 #endif
 
-/*! \brief handle to object */
+/*! @brief handle to object */
 typedef void* ObjectHandle;
 
 /*!

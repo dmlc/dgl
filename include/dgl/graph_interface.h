@@ -418,9 +418,9 @@ class GraphInterface : public runtime::Object {
 // Define GraphRef
 DGL_DEFINE_OBJECT_REF(GraphRef, GraphInterface);
 
-/*! \brief Subgraph data structure */
+/*! @brief Subgraph data structure */
 struct Subgraph : public runtime::Object {
-  /*! \brief The graph. */
+  /*! @brief The graph. */
   GraphPtr graph;
   /*!
    * @brief The induced vertex ids.
@@ -439,21 +439,21 @@ struct Subgraph : public runtime::Object {
   DGL_DECLARE_OBJECT_TYPE_INFO(Subgraph, runtime::Object);
 };
 
-/*! \brief Subgraph data structure for negative subgraph */
+/*! @brief Subgraph data structure for negative subgraph */
 struct NegSubgraph : public Subgraph {
-  /*! \brief The existence of the negative edges in the parent graph. */
+  /*! @brief The existence of the negative edges in the parent graph. */
   IdArray exist;
 
-  /*! \brief The Ids of head nodes */
+  /*! @brief The Ids of head nodes */
   IdArray head_nid;
 
-  /*! \brief The Ids of tail nodes */
+  /*! @brief The Ids of tail nodes */
   IdArray tail_nid;
 };
 
-/*! \brief Subgraph data structure for halo subgraph */
+/*! @brief Subgraph data structure for halo subgraph */
 struct HaloSubgraph : public Subgraph {
-  /*! \brief Indicate if a node belongs to the partition. */
+  /*! @brief Indicate if a node belongs to the partition. */
   IdArray inner_nodes;
 };
 

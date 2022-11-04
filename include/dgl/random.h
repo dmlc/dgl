@@ -40,16 +40,16 @@ inline uint32_t GetThreadId() {
  */
 class RandomEngine {
  public:
-  /*! \brief Constructor with default seed */
+  /*! @brief Constructor with default seed */
   RandomEngine() {
     std::random_device rd;
     SetSeed(rd());
   }
 
-  /*! \brief Constructor with given seed */
+  /*! @brief Constructor with given seed */
   explicit RandomEngine(uint32_t seed) { SetSeed(seed); }
 
-  /*! \brief Get the thread-local random number generator instance */
+  /*! @brief Get the thread-local random number generator instance */
   static RandomEngine* ThreadLocal() {
     return dmlc::ThreadLocalStore<RandomEngine>::Get();
   }
@@ -105,7 +105,7 @@ class RandomEngine {
   /*!
    * @brief Pick a random integer between 0 to N-1 according to given
    *        probabilities.
-   * \tparam IdxType Return integer type.
+   * @tparam IdxType Return integer type.
    * @param prob Array of N unnormalized probability of each element. Must be
    *        non-negative.
    * @return An integer randomly picked from 0 to N-1.
@@ -119,8 +119,8 @@ class RandomEngine {
    *
    * If replace is false, the number of picked integers must not larger than N.
    *
-   * \tparam IdxType Id type
-   * \tparam FloatType Probability value type
+   * @tparam IdxType Id type
+   * @tparam FloatType Probability value type
    * @param num Number of integers to choose
    * @param prob Array of N unnormalized probability of each element.  Must be
    *        non-negative.
@@ -136,8 +136,8 @@ class RandomEngine {
    *
    * If replace is false, the number of picked integers must not larger than N.
    *
-   * \tparam IdxType Id type
-   * \tparam FloatType Probability value type
+   * @tparam IdxType Id type
+   * @tparam FloatType Probability value type
    * @param num Number of integers to choose
    * @param prob Array of N unnormalized probability of each element.  Must be
    *        non-negative.
@@ -158,7 +158,7 @@ class RandomEngine {
    *
    * If replace is false, num must not be larger than population.
    *
-   * \tparam IdxType Return integer type
+   * @tparam IdxType Return integer type
    * @param num Number of integers to choose
    * @param population Total number of elements to choose from.
    * @param out The output buffer to write selected indices.
@@ -173,7 +173,7 @@ class RandomEngine {
    *
    * If replace is false, num must not be larger than population.
    *
-   * \tparam IdxType Return integer type
+   * @tparam IdxType Return integer type
    * @param num Number of integers to choose
    * @param population Total number of elements to choose from.
    * @param replace If true, choose with replacement.
@@ -210,7 +210,7 @@ class RandomEngine {
    *
    * If replace is false, num must not be larger than population.
    *
-   * \tparam IdxType Return integer type
+   * @tparam IdxType Return integer type
    * @param num Number of integers to choose
    * @param split Array of T+1 split positions of different segments(including
    *        start and end)
@@ -229,7 +229,7 @@ class RandomEngine {
    *
    * If replace is false, num must not be larger than population.
    *
-   * \tparam IdxType Return integer type
+   * @tparam IdxType Return integer type
    * @param num Number of integers to choose
    * @param split Split positions of different segments
    * @param bias Weights of different segments

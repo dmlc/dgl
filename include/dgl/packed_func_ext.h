@@ -20,7 +20,7 @@ namespace dgl {
 namespace runtime {
 /*!
  * @brief Runtime type checker for node type.
- * \tparam T the type to be checked.
+ * @tparam T the type to be checked.
  */
 template <typename T>
 struct ObjectTypeChecker {

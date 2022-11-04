@@ -41,7 +41,7 @@ extern "C" {
 #include <stddef.h>
 #include <stdint.h>
 
-/*! \brief type of array index. */
+/*! @brief type of array index. */
 typedef int64_t dgl_index_t;
 
 /*!
@@ -52,9 +52,9 @@ typedef enum : int32_t {
 #else
 typedef enum {
 #endif
-  /*! \brief CPU device */
+  /*! @brief CPU device */
   kDGLCPU = 1,
-  /*! \brief CUDA GPU device */
+  /*! @brief CUDA GPU device */
   kDGLCUDA = 2,
   // add more devices once supported
 } DGLDeviceType;
@@ -94,13 +94,13 @@ typedef enum {
  * @brief The type code options DGLDataType.
  */
 typedef enum {
-  /*! \brief signed integer */
+  /*! @brief signed integer */
   kDGLInt = 0U,
-  /*! \brief unsigned integer */
+  /*! @brief unsigned integer */
   kDGLUInt = 1U,
-  /*! \brief IEEE floating point */
+  /*! @brief IEEE floating point */
   kDGLFloat = 2U,
-  /*! \brief bfloat16 */
+  /*! @brief bfloat16 */
   kDGLBfloat = 4U,
   // add more data types if we are going to support them
 } DGLDataTypeCode;
@@ -126,7 +126,7 @@ typedef struct {
    * @brief Number of bits, common choices are 8, 16, 32.
    */
   uint8_t bits;
-  /*! \brief Number of lanes in the type, used for vector types. */
+  /*! @brief Number of lanes in the type, used for vector types. */
   uint16_t lanes;
 } DGLDataType;
 
@@ -134,7 +134,7 @@ typedef struct {
  * @brief The Device information, abstract away common device types.
  */
 typedef struct {
-  /*! \brief The device type used in the device. */
+  /*! @brief The device type used in the device. */
   DGLDeviceType device_type;
   /*!
    * @brief The device index.
@@ -178,24 +178,24 @@ typedef struct {
    * \endcode
    */
   void* data;
-  /*! \brief The device of the tensor */
+  /*! @brief The device of the tensor */
   DGLContext ctx;
-  /*! \brief Number of dimensions */
+  /*! @brief Number of dimensions */
   int32_t ndim;
-  /*! \brief The data type of the pointer*/
+  /*! @brief The data type of the pointer*/
   DGLDataType dtype;
-  /*! \brief The shape of the tensor */
+  /*! @brief The shape of the tensor */
   int64_t* shape;
   /*!
    * @brief strides of the tensor (in number of elements, not bytes)
    *  can be NULL, indicating tensor is compact and row-majored.
    */
   int64_t* strides;
-  /*! \brief The offset in bytes to the beginning pointer to data */
+  /*! @brief The offset in bytes to the beginning pointer to data */
   uint64_t byte_offset;
 } DGLArray;
 
-/*! \brief the array handle */
+/*! @brief the array handle */
 typedef DGLArray* DGLArrayHandle;
 
 /*!
@@ -220,11 +220,11 @@ typedef struct {
   size_t size;
 } DGLByteArray;
 
-/*! \brief Handle to DGL runtime modules. */
+/*! @brief Handle to DGL runtime modules. */
 typedef void* DGLModuleHandle;
-/*! \brief Handle to packed function handle. */
+/*! @brief Handle to packed function handle. */
 typedef void* DGLFunctionHandle;
-/*! \brief Handle to hold return value. */
+/*! @brief Handle to hold return value. */
 typedef void* DGLRetValueHandle;
 /*!
  * @brief The stream that is specific to device

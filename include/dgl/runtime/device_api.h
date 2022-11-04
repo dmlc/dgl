@@ -28,14 +28,14 @@ enum DeviceAttrKind : int {
   kMaxThreadDimensions = 8
 };
 
-/*! \brief Number of bytes each allocation must align to */
+/*! @brief Number of bytes each allocation must align to */
 constexpr int kAllocAlignment = 64;
 
-/*! \brief Number of bytes each allocation must align to in temporary allocation
+/*! @brief Number of bytes each allocation must align to in temporary allocation
  */
 constexpr int kTempAllocaAlignment = 64;
 
-/*! \brief Maximum size that can be allocated on stack */
+/*! @brief Maximum size that can be allocated on stack */
 constexpr int kMaxStackAlloca = 1024;
 
 /*!
@@ -44,7 +44,7 @@ constexpr int kMaxStackAlloca = 1024;
  */
 class DeviceAPI {
  public:
-  /*! \brief virtual destructor */
+  /*! @brief virtual destructor */
   virtual ~DeviceAPI() {}
   /*!
    * @brief Check whether the device is available.
@@ -209,7 +209,7 @@ class DeviceAPI {
       DGLDeviceType dev_type, bool allow_missing = false);
 };
 
-/*! \brief The device type bigger than this is RPC device */
+/*! @brief The device type bigger than this is RPC device */
 constexpr int kRPCSessMask = 128;
 }  // namespace runtime
 }  // namespace dgl

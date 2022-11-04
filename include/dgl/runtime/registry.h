@@ -33,7 +33,7 @@
 namespace dgl {
 namespace runtime {
 
-/*! \brief Registry for global function */
+/*! @brief Registry for global function */
 class Registry {
  public:
   /*!
@@ -59,8 +59,8 @@ class Registry {
    * \endcode
    *
    * @param f The body of the function.
-   * \tparam FType the signature of the function.
-   * \tparam FLambda The type of f.
+   * @tparam FType the signature of the function.
+   * @tparam FLambda The type of f.
    */
   template <typename FType, typename FLambda>
   Registry& set_body_typed(FLambda f) {
@@ -97,14 +97,14 @@ class Registry {
   struct Manager;
 
  protected:
-  /*! \brief name of the function */
+  /*! @brief name of the function */
   std::string name_;
-  /*! \brief internal packed function */
+  /*! @brief internal packed function */
   PackedFunc func_;
   friend struct Manager;
 };
 
-/*! \brief helper macro to supress unused warning */
+/*! @brief helper macro to supress unused warning */
 #if defined(__GNUC__)
 #define DGL_ATTRIBUTE_UNUSED __attribute__((unused))
 #else
