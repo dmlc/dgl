@@ -1,14 +1,18 @@
 """DGL elementwise operator module."""
-import torch
+from typing import Union
 
+from .diag_matrix import DiagMatrix
+from .elementwise_op_diag import diag_add
+from .elementwise_op_sp import sp_add
 from .sparse_matrix import SparseMatrix
 
-
-def sp_add(A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
-    """TODO Add op for DiagMatrix"""
-    return SparseMatrix(
-        torch.ops.dgl_sparse.spspadd(A.c_sparse_matrix, B.c_sparse_matrix)
-    )
+__all__ = ["add"]
 
 
-SparseMatrix.__add__ = sp_add
+def add(
+    A: Union[SparseMatrix, DiagMatrix], B: Union[SparseMatrix, DiagMatrix]
+) -> Union[SparseMatrix, DiagMatrix]:
+    """Elementwise addition"""
+    if isinstance(A, DiagMatrix) and isinstance(B, DiagMatrix):
+        return diag_add(A, B)
+    return sp_add(A, B)

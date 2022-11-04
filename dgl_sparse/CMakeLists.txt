@@ -37,3 +37,8 @@ add_library(${LIB_DGL_SPARSE_NAME} SHARED ${SPARSE_SRC} ${SPARSE_HEADERS})
 target_include_directories(
   ${LIB_DGL_SPARSE_NAME} PRIVATE ${SPARSE_DIR} ${SPARSE_HEADERS})
 target_link_libraries(${LIB_DGL_SPARSE_NAME} "${TORCH_LIBRARIES}")
+
+add_subdirectory("${CMAKE_SOURCE_DIR}/../third_party/dmlc-core" "${CMAKE_SOURCE_DIR}/build/third_party/dmlc-core")
+target_include_directories(${LIB_DGL_SPARSE_NAME} PRIVATE "${CMAKE_SOURCE_DIR}/../third_party/dmlc-core/include")
+target_link_libraries(${LIB_DGL_SPARSE_NAME} dmlc)
+set(GOOGLE_TEST 0) # Turn off dmlc-core test

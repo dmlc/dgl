@@ -1,8 +1,9 @@
 /*!
  *  Copyright (c) 2022 by Contributors
- * \file sparse/elementwise_op.h
- * \brief DGL C++ sparse elementwise operator implementation
+ * @file elementwise_op.cc
+ * @brief DGL C++ sparse elementwise operator implementation
  */
+#include <dmlc/logging.h>
 #include <sparse/elementwise_op.h>
 #include <sparse/sparse_matrix.h>
 #include <torch/custom_class.h>
@@ -18,15 +19,16 @@ namespace sparse {
 c10::intrusive_ptr<SparseMatrix> SpSpAdd(
     const c10::intrusive_ptr<SparseMatrix>& A,
     const c10::intrusive_ptr<SparseMatrix>& B) {
-  SPARSE_FORMAT_SELECT_BINARY(A, B, fmt, {
-    if (fmt == SparseFormat::kCOO) {
-      auto value = A->Value() + B->Value();
-      auto ret = CreateFromCOOPtr(A->COOPtr(), value, A->Shape());
-      return ret;
-    } else {
-      // TODO(zhenkun): CSR and CSC implementation
-    }
-  });
+  auto fmt = FindAnyExistingFormat(A, B);
+  auto value = A->value() + B->value();
+  ElementwiseOpSanityCheck(A, B);
+  if (fmt == SparseFormat::kCOO) {
+    return SparseMatrix::FromCOO(A->COOPtr(), value, A->shape());
+  } else if (fmt == SparseFormat::kCSR) {
+    return SparseMatrix::FromCSR(A->CSRPtr(), value, A->shape());
+  } else {
+    return SparseMatrix::FromCSC(A->CSCPtr(), value, A->shape());
+  }
 }
 
 }  // namespace sparse
