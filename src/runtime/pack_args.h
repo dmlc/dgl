@@ -61,8 +61,9 @@ inline PackedFunc PackFuncNonBufferArg(
  * arguments.
  *
  * \param f with signature (DGLArgs args, DGLRetValue* rv, void* pack_args,
- * size_t nbytes) \param arg_types The arguments that wish to get from \tparam F
- * the function type
+ * size_t nbytes)
+ * \param arg_types The arguments that wish to get from
+ * \tparam F the function type
  *
  * \return The wrapped packed function.
  */
