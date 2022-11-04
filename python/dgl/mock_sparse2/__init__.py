@@ -4,6 +4,9 @@ import os
 import torch
 
 from .._ffi import libinfo
+from .sparse_matrix import *
+from .diag_matrix import *
+from .elementwise_op import *
 
 def load_dgl_sparse():
     """Load DGL C++ sparse library"""
@@ -21,7 +24,3 @@ def load_dgl_sparse():
 
 
 load_dgl_sparse()
-
-from .sparse_matrix import *
-from .diag_matrix import *
-from .elementwise_op import *
