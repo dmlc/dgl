@@ -7,6 +7,7 @@
 #define DGL_GRAPH_OP_H_
 
 #include <vector>
+
 #include "graph.h"
 #include "immutable_graph.h"
 
@@ -17,7 +18,8 @@ class GraphOp {
   /*!
    * \brief Return a new graph with all the edges reversed.
    *
-   * The returned graph preserves the vertex and edge index in the original graph.
+   * The returned graph preserves the vertex and edge index in the original
+   * graph.
    *
    * \return the reversed graph
    */
@@ -40,10 +42,10 @@ class GraphOp {
    * \brief Return a disjoint union of the input graphs.
    *
    * The new graph will include all the nodes/edges in the given graphs.
-   * Nodes/Edges will be relabled by adding the cumsum of the previous graph sizes
-   * in the given sequence order. For example, giving input [g1, g2, g3], where
-   * they have 5, 6, 7 nodes respectively. Then node#2 of g2 will become node#7
-   * in the result graph. Edge ids are re-assigned similarly.
+   * Nodes/Edges will be relabled by adding the cumsum of the previous graph
+   * sizes in the given sequence order. For example, giving input [g1, g2, g3],
+   * where they have 5, 6, 7 nodes respectively. Then node#2 of g2 will become
+   * node#7 in the result graph. Edge ids are re-assigned similarly.
    *
    * The input list must be either ALL mutable graphs or ALL immutable graphs.
    * The returned graph type is also determined by the input graph type.
@@ -62,12 +64,13 @@ class GraphOp {
    *
    * If the input graph is mutable, the result graphs are mutable.
    * If the input graph is immutable, the result graphs are immutable.
-   * 
+   *
    * \param graph The graph to be partitioned.
    * \param num The number of partitions.
    * \return a list of partitioned graphs
    */
-  static std::vector<GraphPtr> DisjointPartitionByNum(GraphPtr graph, int64_t num);
+  static std::vector<GraphPtr> DisjointPartitionByNum(
+      GraphPtr graph, int64_t num);
 
   /*!
    * \brief Partition the graph into several subgraphs.
@@ -78,21 +81,22 @@ class GraphOp {
    *
    * If the input graph is mutable, the result graphs are mutable.
    * If the input graph is immutable, the result graphs are immutable.
-   * 
+   *
    * \param graph The graph to be partitioned.
    * \param sizes The number of partitions.
    * \return a list of partitioned graphs
    */
-  static std::vector<GraphPtr> DisjointPartitionBySizes(GraphPtr graph, IdArray sizes);
+  static std::vector<GraphPtr> DisjointPartitionBySizes(
+      GraphPtr graph, IdArray sizes);
 
   /*!
    * \brief Map vids in the parent graph to the vids in the subgraph.
    *
    * If the Id doesn't exist in the subgraph, -1 will be used.
    *
-   * \param parent_vid_map An array that maps the vids in the parent graph to the
-   * subgraph. The elements store the vertex Ids in the parent graph, and the
-   * indices indicate the vertex Ids in the subgraph.
+   * \param parent_vid_map An array that maps the vids in the parent graph to
+   * the subgraph. The elements store the vertex Ids in the parent graph, and
+   * the indices indicate the vertex Ids in the subgraph.
    * \param query The vertex Ids in the parent graph.
    * \return an Id array that contains the subgraph node Ids.
    */
@@ -134,15 +138,18 @@ class GraphOp {
   static GraphPtr ToBidirectedMutableGraph(GraphPtr graph);
 
   /*!
-   * \brief Same as BidirectedMutableGraph except that the returned graph is immutable.
+   * \brief Same as BidirectedMutableGraph except that the returned graph is
+   *        immutable.
    * \param graph The input graph.
-   * \return a new immutable bidirected graph.
+   * \return a new immutable bidirected
+   * graph.
    */
   static GraphPtr ToBidirectedImmutableGraph(GraphPtr graph);
   /*!
-   * \brief Same as BidirectedMutableGraph except that the returned graph is immutable
-   * and call gk_csr_MakeSymmetric in GKlib. This is more efficient than ToBidirectedImmutableGraph.
-   * It return a null pointer if the conversion fails.
+   * \brief Same as BidirectedMutableGraph except that the returned graph is
+   * immutable and call gk_csr_MakeSymmetric in GKlib. This is more efficient
+   * than ToBidirectedImmutableGraph. It return a null pointer if the conversion
+   * fails.
    *
    * \param graph The input graph.
    * \return a new immutable bidirected graph.
@@ -151,21 +158,25 @@ class GraphOp {
 
   /*!
    * \brief Get a induced subgraph with HALO nodes.
-   * The HALO nodes are the ones that can be reached from `nodes` within `num_hops`.
+   * The HALO nodes are the ones that can be reached from `nodes` within
+   * `num_hops`.
    * \param graph The input graph.
    * \param nodes The input nodes that form the core of the induced subgraph.
    * \param num_hops The number of hops to reach.
    * \return the induced subgraph with HALO nodes.
    */
-  static HaloSubgraph GetSubgraphWithHalo(GraphPtr graph, IdArray nodes, int num_hops);
+  static HaloSubgraph GetSubgraphWithHalo(
+      GraphPtr graph, IdArray nodes, int num_hops);
 
   /*!
    * \brief Reorder the nodes in the immutable graph.
    * \param graph The input graph.
-   * \param new_order The node Ids in the new graph. The index in `new_order` is old node Ids.
+   * \param new_order The node Ids in the new graph. The index in `new_order` is
+   *        old node Ids.
    * \return the graph with reordered node Ids
    */
-  static GraphPtr ReorderImmutableGraph(ImmutableGraphPtr ig, IdArray new_order);
+  static GraphPtr ReorderImmutableGraph(
+      ImmutableGraphPtr ig, IdArray new_order);
 };
 
 }  // namespace dgl

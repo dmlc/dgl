@@ -7,6 +7,7 @@
 
 #include <string>
 #include <vector>
+
 #include "./runtime/ndarray.h"
 
 using namespace dgl::runtime;
@@ -37,7 +38,7 @@ struct BcastOff {
   /*! \brief Whether broadcast is required or not. */
   bool use_bcast;
   /*!
-   * \brief Auxiliary information for kernel computation 
+   * \brief Auxiliary information for kernel computation
    * \note lhs_len refers to the left hand side operand length.
    *       e.g. 15 for shape (1, 3, 5)
    *       rhs_len refers to the right hand side operand length.
@@ -61,7 +62,6 @@ struct BcastOff {
  */
 BcastOff CalcBcastOff(const std::string& op, NDArray lhs, NDArray rhs);
 
-}   // namespace dgl
+}  // namespace dgl
 
 #endif  // DGL_BCAST_H_
-

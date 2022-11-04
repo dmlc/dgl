@@ -7,14 +7,16 @@
 #define DGL_RUNTIME_PACKED_FUNC_H_
 
 #include <dmlc/logging.h>
+
 #include <functional>
-#include <tuple>
-#include <vector>
-#include <string>
 #include <limits>
 #include <memory>
-#include <utility>
+#include <string>
+#include <tuple>
 #include <type_traits>
+#include <utility>
+#include <vector>
+
 #include "c_runtime_api.h"
 #include "module.h"
 #include "ndarray.h"
@@ -67,7 +69,7 @@ class PackedFunc {
    *   }
    * \endcode
    */
-  using FType = std::function<void (DGLArgs args, DGLRetValue* rv)>;
+  using FType = std::function<void(DGLArgs args, DGLRetValue* rv)>;
   /*! \brief default constructor */
   PackedFunc() {}
   /*!
@@ -89,8 +91,8 @@ class PackedFunc {
    *   }
    * \endcode
    */
-  template<typename... Args>
-  inline DGLRetValue operator()(Args&& ...args) const;
+  template <typename... Args>
+  inline DGLRetValue operator()(Args&&... args) const;
   /*!
    * \brief Call the function in packed format.
    * \param args The arguments
@@ -100,13 +102,9 @@ class PackedFunc {
   /*! \return the internal body function */
   inline FType body() const;
   /*! \return Whether the packed function is nullptr */
-  bool operator==(std::nullptr_t null) const {
-    return body_ == nullptr;
-  }
+  bool operator==(std::nullptr_t null) const { return body_ == nullptr; }
   /*! \return Whether the packed function is not nullptr */
-  bool operator!=(std::nullptr_t null) const {
-    return body_ != nullptr;
-  }
+  bool operator!=(std::nullptr_t null) const { return body_ != nullptr; }
 
  private:
   /*! \brief internal container of packed function */
@@ -114,9 +112,10 @@ class PackedFunc {
 };
 
 /*!
- * \brief Please refer to \ref TypedPackedFuncAnchor "TypedPackedFunc<R(Args..)>"
+ * \brief Please refer to \ref TypedPackedFuncAnchor
+ * "TypedPackedFunc<R(Args..)>"
  */
-template<typename FType>
+template <typename FType>
 class TypedPackedFunc;
 
 /*!
@@ -151,7 +150,7 @@ class TypedPackedFunc;
  * \tparam R The return value of the function.
  * \tparam Args The argument signature of the function.
  */
-template<typename R, typename ...Args>
+template <typename R, typename... Args>
 class TypedPackedFunc<R(Args...)> {
  public:
   /*! \brief short hand for this function type */
@@ -191,11 +190,9 @@ class TypedPackedFunc<R(Args...)> {
    * \param typed_lambda typed lambda function.
    * \tparam FLambda the type of the lambda function.
    */
-  template<typename FLambda,
-           typename = typename std::enable_if<
-             std::is_convertible<FLambda,
-                                 std::function<R(Args...)>
-                                 >::value>::type>
+  template <
+      typename FLambda, typename = typename std::enable_if<std::is_convertible<
+                            FLambda, std::function<R(Args...)> >::value>::type>
   explicit TypedPackedFunc(const FLambda& typed_lambda) {
     this->AssignTypedLambda(typed_lambda);
   }
@@ -215,11 +212,10 @@ class TypedPackedFunc<R(Args...)> {
    * \tparam FLambda the type of the lambda function.
    * \returns reference to self.
    */
-  template<typename FLambda,
-           typename = typename std::enable_if<
-             std::is_convertible<FLambda,
-                                 std::function<R(Args...)>
-                                 >::value>::type>
+  template <
+      typename FLambda, typename = typename std::enable_if<std::is_convertible<
+                            FLambda,
+                            std::function<R(Args...)> >::value>::type>
   TSelf& operator=(FLambda typed_lambda) {  // NOLINT(*)
     this->AssignTypedLambda(typed_lambda);
     return *this;
@@ -238,20 +234,16 @@ class TypedPackedFunc<R(Args...)> {
    * \param args The arguments
    * \returns The return value.
    */
-  inline R operator()(Args ...args) const;
+  inline R operator()(Args... args) const;
   /*!
    * \brief convert to PackedFunc
    * \return the internal PackedFunc
    */
-  operator PackedFunc() const {
-    return packed();
-  }
+  operator PackedFunc() const { return packed(); }
   /*!
    * \return reference the internal PackedFunc
    */
-  const PackedFunc& packed() const {
-    return packed_;
-  }
+  const PackedFunc& packed() const { return packed_; }
 
  private:
   friend class DGLRetValue;
@@ -264,7 +256,7 @@ class TypedPackedFunc<R(Args...)> {
    * \tparam FLambda The lambda function type.
    * \note We capture the lambda when possible for maximum efficiency.
    */
-  template<typename FLambda>
+  template <typename FLambda>
   inline void AssignTypedLambda(FLambda flambda);
 };
 
@@ -280,12 +272,8 @@ class DGLArgs {
    * \param type_codes The argument type codes
    * \param num_args number of arguments.
    */
-  DGLArgs(const DGLValue* values,
-          const int* type_codes,
-          int num_args)
-      : values(values),
-        type_codes(type_codes),
-        num_args(num_args) { }
+  DGLArgs(const DGLValue* values, const int* type_codes, int num_args)
+      : values(values), type_codes(type_codes), num_args(num_args) {}
   /*! \return size of the arguments */
   inline int size() const;
   /*!
@@ -307,7 +295,7 @@ class DGLArgs {
  *
  * \tparam T the typename
  */
-template<typename T>
+template <typename T>
 struct extension_class_info {
   static const int code = 0;
 };
@@ -337,7 +325,8 @@ class ExtTypeVTable {
 
  private:
   // Internal registration function.
-  DGL_DLL static ExtTypeVTable* RegisterInternal(int type_code, const ExtTypeVTable& vt);
+  DGL_DLL static ExtTypeVTable* RegisterInternal(
+      int type_code, const ExtTypeVTable& vt);
 };
 
 /*!
@@ -366,8 +355,7 @@ class DGLPODValue_ {
   }
   operator int() const {
     DGL_CHECK_TYPE_CODE(type_code_, kDGLInt);
-    CHECK_LE(value_.v_int64,
-             std::numeric_limits<int>::max());
+    CHECK_LE(value_.v_int64, std::numeric_limits<int>::max());
     return static_cast<int>(value_.v_int64);
   }
   operator bool() const {
@@ -381,14 +369,12 @@ class DGLPODValue_ {
     return value_.v_handle;
   }
   operator DGLArray*() const {
-    if (type_code_ == kArrayHandle ||
-        type_code_ == kNDArrayContainer) {
+    if (type_code_ == kArrayHandle || type_code_ == kNDArrayContainer) {
       return static_cast<DGLArray*>(value_.v_handle);
     } else {
       if (type_code_ == kNull) return nullptr;
       LOG(FATAL) << "Expected "
-                 << "DGLArray* or NDArray but get "
-                 << TypeCode2Str(type_code_);
+                 << "DGLArray* or NDArray but get " << TypeCode2Str(type_code_);
       return nullptr;
     }
   }
@@ -401,20 +387,18 @@ class DGLPODValue_ {
     DGL_CHECK_TYPE_CODE(type_code_, kDGLContext);
     return value_.v_ctx;
   }
-  template<typename TExtension>
+  template <typename TExtension>
   const TExtension& AsExtension() const {
     CHECK_LT(type_code_, kExtEnd);
     return static_cast<TExtension*>(value_.v_handle)[0];
   }
-  int type_code() const {
-    return type_code_;
-  }
+  int type_code() const { return type_code_; }
   /*!
    * \brief return handle as specific pointer type.
    * \tparam T the data type.
    * \return The pointer type.
    */
-  template<typename T>
+  template <typename T>
   T* ptr() const {
     return static_cast<T*>(value_.v_handle);
   }
@@ -447,9 +431,7 @@ class DGLArgValue : public DGLPODValue_ {
    * \param value of the function
    * \param type_code The type code.
    */
-  DGLArgValue(DGLValue value, int type_code)
-      : DGLPODValue_(value, type_code) {
-  }
+  DGLArgValue(DGLValue value, int type_code) : DGLPODValue_(value, type_code) {}
   // reuse converter from parent
   using DGLPODValue_::operator double;
   using DGLPODValue_::operator int64_t;
@@ -485,7 +467,7 @@ class DGLArgValue : public DGLPODValue_ {
     DGL_CHECK_TYPE_CODE(type_code_, kFuncHandle);
     return *ptr<PackedFunc>();
   }
-  template<typename FType>
+  template <typename FType>
   operator TypedPackedFunc<FType>() const {
     return TypedPackedFunc<FType>(operator PackedFunc());
   }
@@ -493,24 +475,22 @@ class DGLArgValue : public DGLPODValue_ {
     DGL_CHECK_TYPE_CODE(type_code_, kModuleHandle);
     return *ptr<Module>();
   }
-  const DGLValue& value() const {
-    return value_;
-  }
+  const DGLValue& value() const { return value_; }
 
   // Deferred extension handler.
-  template<typename TObjectRef>
+  template <typename TObjectRef>
   inline TObjectRef AsObjectRef() const;
 
   // Convert this value to arbitrary class type
-  template<typename T,
-           typename = typename std::enable_if<
-             std::is_class<T>::value>::type>
+  template <
+      typename T,
+      typename = typename std::enable_if<std::is_class<T>::value>::type>
   inline operator T() const;
 
   // Return true if the value is of TObjectRef type
-  template<typename TObjectRef,
-           typename = typename std::enable_if<
-             std::is_class<TObjectRef>::value>::type>
+  template <
+      typename TObjectRef, typename = typename std::enable_if<
+                               std::is_class<TObjectRef>::value>::type>
   inline bool IsObjectType() const;
 
   // get internal node ptr, if it is node
@@ -539,9 +519,7 @@ class DGLRetValue : public DGLPODValue_ {
     other.type_code_ = kNull;
   }
   /*! \brief destructor */
-  ~DGLRetValue() {
-    this->Clear();
-  }
+  ~DGLRetValue() { this->Clear(); }
   // reuse converter from parent
   using DGLPODValue_::operator double;
   using DGLPODValue_::operator int64_t;
@@ -553,9 +531,7 @@ class DGLRetValue : public DGLPODValue_ {
   using DGLPODValue_::operator DGLContext;
   using DGLPODValue_::operator NDArray;
   // Disable copy and assign from another value, but allow move.
-  DGLRetValue(const DGLRetValue& other) {
-    this->Assign(other);
-  }
+  DGLRetValue(const DGLRetValue& other) { this->Assign(other); }
   // conversion operators
   operator std::string() const {
     if (type_code_ == kDGLDataType) {
@@ -578,7 +554,7 @@ class DGLRetValue : public DGLPODValue_ {
     DGL_CHECK_TYPE_CODE(type_code_, kFuncHandle);
     return *ptr<PackedFunc>();
   }
-  template<typename FType>
+  template <typename FType>
   operator TypedPackedFunc<FType>() const {
     return TypedPackedFunc<FType>(operator PackedFunc());
   }
@@ -653,7 +629,7 @@ class DGLRetValue : public DGLPODValue_ {
     this->SwitchToClass(kFuncHandle, f);
     return *this;
   }
-  template<typename FType>
+  template <typename FType>
   DGLRetValue& operator=(const TypedPackedFunc<FType>& f) {
     return operator=(f.packed());
   }
@@ -669,12 +645,11 @@ class DGLRetValue : public DGLPODValue_ {
     this->Assign(other);
     return *this;
   }
-  template<typename T,
-           typename = typename std::enable_if<
-             extension_class_info<T>::code != 0>::type>
+  template <
+      typename T, typename = typename std::enable_if<
+                      extension_class_info<T>::code != 0>::type>
   DGLRetValue& operator=(const T& other) {
-    this->SwitchToClass<T>(
-        extension_class_info<T>::code, other);
+    this->SwitchToClass<T>(extension_class_info<T>::code, other);
     return *this;
   }
   /*!
@@ -686,8 +661,7 @@ class DGLRetValue : public DGLPODValue_ {
    * \param ret_value The return value.
    * \param ret_type_code The return type code.
    */
-  void MoveToCHost(DGLValue* ret_value,
-                   int* ret_type_code) {
+  void MoveToCHost(DGLValue* ret_value, int* ret_type_code) {
     // cannot move str; need specially handle.
     CHECK(type_code_ != kStr && type_code_ != kBytes);
     *ret_value = value_;
@@ -696,24 +670,24 @@ class DGLRetValue : public DGLPODValue_ {
   }
   /*! \return The value field, if the data is POD */
   const DGLValue& value() const {
-    CHECK(type_code_ != kObjectHandle &&
-          type_code_ != kFuncHandle &&
-          type_code_ != kModuleHandle &&
-          type_code_ != kStr) << "DGLRetValue.value can only be used for POD data";
+    CHECK(
+        type_code_ != kObjectHandle && type_code_ != kFuncHandle &&
+        type_code_ != kModuleHandle && type_code_ != kStr)
+        << "DGLRetValue.value can only be used for POD data";
     return value_;
   }
   // ObjectRef related extenstions: in dgl/packed_func_ext.h
-  template<typename T,
-           typename = typename std::enable_if<
-             std::is_class<T>::value>::type>
+  template <
+      typename T,
+      typename = typename std::enable_if<std::is_class<T>::value>::type>
   inline operator T() const;
-  template<typename TObjectRef>
+  template <typename TObjectRef>
   inline TObjectRef AsObjectRef() const;
   inline DGLRetValue& operator=(const ObjectRef& other);
   inline DGLRetValue& operator=(const std::shared_ptr<Object>& other);
 
  private:
-  template<typename T>
+  template <typename T>
   void Assign(const T& other) {
     switch (other.type_code()) {
       case kStr: {
@@ -751,9 +725,8 @@ class DGLRetValue : public DGLPODValue_ {
 #else
           this->Clear();
           type_code_ = other.type_code();
-          value_.v_handle =
-              (*(ExtTypeVTable::Get(other.type_code())->clone))(
-                  other.value().v_handle);
+          value_.v_handle = (*(ExtTypeVTable::Get(other.type_code())->clone))(
+              other.value().v_handle);
 #endif
         }
         break;
@@ -767,7 +740,7 @@ class DGLRetValue : public DGLPODValue_ {
       type_code_ = type_code;
     }
   }
-  template<typename T>
+  template <typename T>
   void SwitchToClass(int type_code, T v) {
     if (type_code_ != type_code) {
       this->Clear();
@@ -780,10 +753,19 @@ class DGLRetValue : public DGLPODValue_ {
   void Clear() {
     if (type_code_ == kNull) return;
     switch (type_code_) {
-      case kStr: case kBytes: delete ptr<std::string>(); break;
-      case kFuncHandle: delete ptr<PackedFunc>(); break;
-      case kModuleHandle: delete ptr<Module>(); break;
-      case kObjectHandle: delete ptr<std::shared_ptr<Object> >(); break;
+      case kStr:
+      case kBytes:
+        delete ptr<std::string>();
+        break;
+      case kFuncHandle:
+        delete ptr<PackedFunc>();
+        break;
+      case kModuleHandle:
+        delete ptr<Module>();
+        break;
+      case kObjectHandle:
+        delete ptr<std::shared_ptr<Object> >();
+        break;
       case kNDArrayContainer: {
         static_cast<NDArray::Container*>(value_.v_handle)->DecRef();
         break;
@@ -791,7 +773,7 @@ class DGLRetValue : public DGLPODValue_ {
     }
     if (type_code_ > kExtBegin) {
 #if DGL_RUNTIME_HEADER_ONLY
-          LOG(FATAL) << "Header only mode do not support ext type";
+      LOG(FATAL) << "Header only mode do not support ext type";
 #else
       (*(ExtTypeVTable::Get(type_code_)->destroy))(value_.v_handle);
 #endif
@@ -802,49 +784,42 @@ class DGLRetValue : public DGLPODValue_ {
 
 // implementation details
 inline DGLArgValue DGLArgs::operator[](int i) const {
-  CHECK_LT(i, num_args)
-      << "not enough argument passed, "
-      << num_args << " passed"
-      << " but request arg[" << i << "].";
+  CHECK_LT(i, num_args) << "not enough argument passed, " << num_args
+                        << " passed"
+                        << " but request arg[" << i << "].";
   return DGLArgValue(values[i], type_codes[i]);
 }
 
-inline int DGLArgs::size() const {
-  return num_args;
-}
+inline int DGLArgs::size() const { return num_args; }
 
 inline void PackedFunc::CallPacked(DGLArgs args, DGLRetValue* rv) const {
   body_(args, rv);
 }
 
-inline PackedFunc::FType PackedFunc::body() const {
-  return body_;
-}
-
-
+inline PackedFunc::FType PackedFunc::body() const { return body_; }
 
 // internal namespace
 namespace detail {
 
-template<bool stop, std::size_t I, typename F>
+template <bool stop, std::size_t I, typename F>
 struct for_each_dispatcher {
-  template<typename T, typename ...Args>
+  template <typename T, typename... Args>
   static void run(const F& f, T&& value, Args&&... args) {  // NOLINT(*)
     f(I, std::forward<T>(value));
-    for_each_dispatcher<sizeof...(Args) == 0, (I+1), F>
-        ::run(f, std::forward<Args>(args)...);
+    for_each_dispatcher<sizeof...(Args) == 0, (I + 1), F>::run(
+        f, std::forward<Args>(args)...);
   }
 };
 
-template<std::size_t I, typename F>
-struct for_each_dispatcher<true, I, F>  {
+template <std::size_t I, typename F>
+struct for_each_dispatcher<true, I, F> {
   static void run(const F& f) {}  // NOLINT(*)
 };
 
-template<typename F, typename ...Args>
+template <typename F, typename... Args>
 inline void for_each(const F& f, Args&&... args) {  // NOLINT(*)
-  for_each_dispatcher<sizeof...(Args) == 0, 0, F>
-      ::run(f, std::forward<Args>(args)...);
+  for_each_dispatcher<sizeof...(Args) == 0, 0, F>::run(
+      f, std::forward<Args>(args)...);
 }
 }  // namespace detail
 
@@ -854,17 +829,16 @@ class DGLArgsSetter {
   DGLArgsSetter(DGLValue* values, int* type_codes)
       : values_(values), type_codes_(type_codes) {}
   // setters for POD types
-  template<typename T,
-           typename = typename std::enable_if<
-             std::is_integral<T>::value>::type>
+  template <
+      typename T,
+      typename = typename std::enable_if<std::is_integral<T>::value>::type>
   void operator()(size_t i, T value) const {
     values_[i].v_int64 = static_cast<int64_t>(value);
     type_codes_[i] = kDGLInt;
   }
   void operator()(size_t i, uint64_t value) const {
     values_[i].v_int64 = static_cast<int64_t>(value);
-    CHECK_LE(value,
-             static_cast<uint64_t>(std::numeric_limits<int64_t>::max()));
+    CHECK_LE(value, static_cast<uint64_t>(std::numeric_limits<int64_t>::max()));
     type_codes_[i] = kDGLInt;
   }
   void operator()(size_t i, double value) const {
@@ -914,8 +888,9 @@ class DGLArgsSetter {
     values_[i].v_handle = const_cast<PackedFunc*>(&value);
     type_codes_[i] = kFuncHandle;
   }
-  template<typename FType>
-  void operator()(size_t i, const TypedPackedFunc<FType>& value) const {  // NOLINT(*)
+  template <typename FType>
+  void operator()(
+      size_t i, const TypedPackedFunc<FType>& value) const {  // NOLINT(*)
     operator()(i, value.packed());
   }
   void operator()(size_t i, const Module& value) const {  // NOLINT(*)
@@ -937,9 +912,9 @@ class DGLArgsSetter {
     }
   }
   // extension
-  template<typename T,
-           typename = typename std::enable_if<
-             extension_class_info<T>::code != 0>::type>
+  template <
+      typename T, typename = typename std::enable_if<
+                      extension_class_info<T>::code != 0>::type>
   inline void operator()(size_t i, const T& value) const;
   // ObjectRef related extenstions: in dgl/packed_func_ext.h
   inline void operator()(size_t i, const ObjectRef& other) const;  // NOLINT(*)
@@ -951,156 +926,143 @@ class DGLArgsSetter {
   int* type_codes_;
 };
 
-template<typename... Args>
-inline DGLRetValue PackedFunc::operator()(Args&& ...args) const {
+template <typename... Args>
+inline DGLRetValue PackedFunc::operator()(Args&&... args) const {
   const int kNumArgs = sizeof...(Args);
   const int kArraySize = kNumArgs > 0 ? kNumArgs : 1;
   DGLValue values[kArraySize];
   int type_codes[kArraySize];
-  detail::for_each(DGLArgsSetter(values, type_codes),
-                   std::forward<Args>(args)...);
+  detail::for_each(
+      DGLArgsSetter(values, type_codes), std::forward<Args>(args)...);
   DGLRetValue rv;
   body_(DGLArgs(values, type_codes, kNumArgs), &rv);
   return rv;
 }
 
 namespace detail {
-template<typename R, int nleft, int index, typename F>
+template <typename R, int nleft, int index, typename F>
 struct unpack_call_dispatcher {
-  template<typename ...Args>
-  static void run(const F& f,
-                  const DGLArgs& args_pack,
-                  DGLRetValue* rv,
-                  Args&&... unpacked_args) {
-    unpack_call_dispatcher<R, nleft - 1, index + 1, F>
-        ::run(f, args_pack, rv,
-              std::forward<Args>(unpacked_args)...,
-              args_pack[index]);
+  template <typename... Args>
+  static void run(
+      const F& f, const DGLArgs& args_pack, DGLRetValue* rv,
+      Args&&... unpacked_args) {
+    unpack_call_dispatcher<R, nleft - 1, index + 1, F>::run(
+        f, args_pack, rv, std::forward<Args>(unpacked_args)...,
+        args_pack[index]);
   }
 };
 
-template<typename R, int index, typename F>
+template <typename R, int index, typename F>
 struct unpack_call_dispatcher<R, 0, index, F> {
-  template<typename ...Args>
-  static void run(const F& f,
-                  const DGLArgs& args_pack,
-                  DGLRetValue* rv,
-                  Args&&... unpacked_args) {
+  template <typename... Args>
+  static void run(
+      const F& f, const DGLArgs& args_pack, DGLRetValue* rv,
+      Args&&... unpacked_args) {
     *rv = R(f(std::forward<Args>(unpacked_args)...));
   }
 };
 
-template<int index, typename F>
+template <int index, typename F>
 struct unpack_call_dispatcher<void, 0, index, F> {
-  template<typename ...Args>
-  static void run(const F& f,
-                  const DGLArgs& args_pack,
-                  DGLRetValue* rv,
-                  Args&&... unpacked_args) {
+  template <typename... Args>
+  static void run(
+      const F& f, const DGLArgs& args_pack, DGLRetValue* rv,
+      Args&&... unpacked_args) {
     f(std::forward<Args>(unpacked_args)...);
   }
 };
 
-template<typename R, int nargs, typename F>
+template <typename R, int nargs, typename F>
 inline void unpack_call(const F& f, const DGLArgs& args, DGLRetValue* rv) {
   unpack_call_dispatcher<R, nargs, 0, F>::run(f, args, rv);
 }
 
-template<typename R, typename ...Args>
-inline R call_packed(const PackedFunc& pf, Args&& ...args) {
+template <typename R, typename... Args>
+inline R call_packed(const PackedFunc& pf, Args&&... args) {
   return R(pf(std::forward<Args>(args)...));
 }
 
-template<typename R>
+template <typename R>
 struct typed_packed_call_dispatcher {
-  template<typename ...Args>
-  static inline R run(const PackedFunc& pf, Args&& ...args) {
+  template <typename... Args>
+  static inline R run(const PackedFunc& pf, Args&&... args) {
     return pf(std::forward<Args>(args)...);
   }
 };
 
-template<>
+template <>
 struct typed_packed_call_dispatcher<void> {
-  template<typename ...Args>
-  static inline void run(const PackedFunc& pf, Args&& ...args) {
+  template <typename... Args>
+  static inline void run(const PackedFunc& pf, Args&&... args) {
     pf(std::forward<Args>(args)...);
   }
 };
 }  // namespace detail
 
-template<typename R, typename ...Args>
+template <typename R, typename... Args>
 TypedPackedFunc<R(Args...)>::TypedPackedFunc(PackedFunc packed)
-  : packed_(packed) {}
+    : packed_(packed) {}
 
-template<typename R, typename ...Args>
-template<typename FType>
+template <typename R, typename... Args>
+template <typename FType>
 inline void TypedPackedFunc<R(Args...)>::AssignTypedLambda(FType flambda) {
   packed_ = PackedFunc([flambda](const DGLArgs& args, DGLRetValue* rv) {
-      detail::unpack_call<R, sizeof...(Args)>(flambda, args, rv);
-    });
+    detail::unpack_call<R, sizeof...(Args)>(flambda, args, rv);
+  });
 }
 
-template<typename R, typename ...Args>
+template <typename R, typename... Args>
 inline R TypedPackedFunc<R(Args...)>::operator()(Args... args) const {
-  return detail::typed_packed_call_dispatcher<R>
-      ::run(packed_, std::forward<Args>(args)...);
+  return detail::typed_packed_call_dispatcher<R>::run(
+      packed_, std::forward<Args>(args)...);
 }
 
 // extension and node type handling
 namespace detail {
-template<typename T, typename TSrc, bool is_ext>
+template <typename T, typename TSrc, bool is_ext>
 struct DGLValueCast {
-  static T Apply(const TSrc* self) {
-    return self->template AsObjectRef<T>();
-  }
+  static T Apply(const TSrc* self) { return self->template AsObjectRef<T>(); }
 };
 
-template<typename T, typename TSrc>
+template <typename T, typename TSrc>
 struct DGLValueCast<T, TSrc, true> {
-  static T Apply(const TSrc* self) {
-    return self->template AsExtension<T>();
-  }
+  static T Apply(const TSrc* self) { return self->template AsExtension<T>(); }
 };
 }  // namespace detail
 
-template<typename T, typename>
+template <typename T, typename>
 inline DGLArgValue::operator T() const {
-  return detail::
-      DGLValueCast<T, DGLArgValue, extension_class_info<T>::code != 0>
-      ::Apply(this);
+  return detail::DGLValueCast<
+      T, DGLArgValue, extension_class_info<T>::code != 0>::Apply(this);
 }
 
-template<typename T, typename>
+template <typename T, typename>
 inline DGLRetValue::operator T() const {
-  return detail::
-      DGLValueCast<T, DGLRetValue, extension_class_info<T>::code != 0>
-      ::Apply(this);
+  return detail::DGLValueCast<
+      T, DGLRetValue, extension_class_info<T>::code != 0>::Apply(this);
 }
 
-template<typename T, typename>
+template <typename T, typename>
 inline void DGLArgsSetter::operator()(size_t i, const T& value) const {
-  static_assert(extension_class_info<T>::code != 0,
-                "Need to have extesion code");
+  static_assert(
+      extension_class_info<T>::code != 0, "Need to have extesion code");
   type_codes_[i] = extension_class_info<T>::code;
   values_[i].v_handle = const_cast<T*>(&value);
 }
 
 // extension type handling
-template<typename T>
+template <typename T>
 struct ExtTypeInfo {
-  static void destroy(void* handle) {
-    delete static_cast<T*>(handle);
-  }
-  static void* clone(void* handle) {
-    return new T(*static_cast<T*>(handle));
-  }
+  static void destroy(void* handle) { delete static_cast<T*>(handle); }
+  static void* clone(void* handle) { return new T(*static_cast<T*>(handle)); }
 };
 
-template<typename T>
+template <typename T>
 inline ExtTypeVTable* ExtTypeVTable::Register_() {
   const int code = extension_class_info<T>::code;
-  static_assert(code != 0,
-                "require extension_class_info traits to be declared with non-zero code");
+  static_assert(
+      code != 0,
+      "require extension_class_info traits to be declared with non-zero code");
   ExtTypeVTable vt;
   vt.clone = ExtTypeInfo<T>::clone;
   vt.destroy = ExtTypeInfo<T>::destroy;
@@ -1109,7 +1071,8 @@ inline ExtTypeVTable* ExtTypeVTable::Register_() {
 
 // Implement Module::GetFunction
 // Put implementation in this file so we have seen the PackedFunc
-inline PackedFunc Module::GetFunction(const std::string& name, bool query_imports) {
+inline PackedFunc Module::GetFunction(
+    const std::string& name, bool query_imports) {
   PackedFunc pf = node_->GetFunction(name, node_);
   if (pf != nullptr) return pf;
   if (query_imports) {

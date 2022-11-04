@@ -17,10 +17,10 @@
 
 #include <algorithm>
 #include <iostream>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
-#include <memory>
 
 #include "../../c_api_common.h"
 #include "../heterograph.h"
@@ -30,7 +30,6 @@ using namespace dgl::runtime;
 
 namespace dgl {
 namespace serialize {
-
 
 typedef std::pair<std::string, NDArray> NamedTensor;
 class HeteroGraphDataObject : public runtime::Object {
@@ -42,14 +41,14 @@ class HeteroGraphDataObject : public runtime::Object {
   std::vector<std::string> ntype_names;
 
   static constexpr const char *_type_key =
-    "heterograph_serialize.HeteroGraphData";
+      "heterograph_serialize.HeteroGraphData";
 
   HeteroGraphDataObject() {}
 
-  HeteroGraphDataObject(HeteroGraphPtr gptr,
-                        List<Map<std::string, Value>> ndata,
-                        List<Map<std::string, Value>> edata,
-                        List<Value> ntype_names, List<Value> etype_names) {
+  HeteroGraphDataObject(
+      HeteroGraphPtr gptr, List<Map<std::string, Value>> ndata,
+      List<Map<std::string, Value>> edata, List<Value> ntype_names,
+      List<Value> etype_names) {
     this->gptr = std::dynamic_pointer_cast<HeteroGraph>(gptr);
     CHECK_NOTNULL(this->gptr);
     for (auto nd_dict : ndata) {
@@ -95,17 +94,16 @@ class HeteroGraphDataObject : public runtime::Object {
 
 class HeteroGraphData : public runtime::ObjectRef {
  public:
-  DGL_DEFINE_OBJECT_REF_METHODS(HeteroGraphData, runtime::ObjectRef,
-                                HeteroGraphDataObject);
+  DGL_DEFINE_OBJECT_REF_METHODS(
+      HeteroGraphData, runtime::ObjectRef, HeteroGraphDataObject);
 
   /*! \brief create a new GraphData reference */
-  static HeteroGraphData Create(HeteroGraphPtr gptr,
-                                List<Map<std::string, Value>> node_tensors,
-                                List<Map<std::string, Value>> edge_tensors,
-                                List<Value> ntype_names,
-                                List<Value> etype_names) {
+  static HeteroGraphData Create(
+      HeteroGraphPtr gptr, List<Map<std::string, Value>> node_tensors,
+      List<Map<std::string, Value>> edge_tensors, List<Value> ntype_names,
+      List<Value> etype_names) {
     return HeteroGraphData(std::make_shared<HeteroGraphDataObject>(
-      gptr, node_tensors, edge_tensors, ntype_names, etype_names));
+        gptr, node_tensors, edge_tensors, ntype_names, etype_names));
   }
 
   /*! \brief create an empty GraphData reference */

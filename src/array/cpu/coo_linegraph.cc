@@ -5,24 +5,24 @@
  */
 
 #include <dgl/array.h>
-#include <numeric>
+
 #include <algorithm>
-#include <vector>
 #include <iterator>
+#include <numeric>
+#include <vector>
 
 namespace dgl {
 namespace aten {
 namespace impl {
 
 template <DGLDeviceType XPU, typename IdType>
-COOMatrix COOLineGraph(const COOMatrix &coo, bool backtracking) {
+COOMatrix COOLineGraph(const COOMatrix& coo, bool backtracking) {
   const int64_t nnz = coo.row->shape[0];
   IdType* coo_row = coo.row.Ptr<IdType>();
   IdType* coo_col = coo.col.Ptr<IdType>();
-  IdArray data = COOHasData(coo) ? coo.data : Range(0,
-                                                    nnz,
-                                                    coo.row->dtype.bits,
-                                                    coo.row->ctx);
+  IdArray data = COOHasData(coo)
+                     ? coo.data
+                     : Range(0, nnz, coo.row->dtype.bits, coo.row->ctx);
   IdType* data_data = data.Ptr<IdType>();
   std::vector<IdType> new_row;
   std::vector<IdType> new_col;
@@ -32,8 +32,7 @@ COOMatrix COOLineGraph(const COOMatrix &coo, bool backtracking) {
     IdType v = coo_col[i];
     for (int64_t j = 0; j < nnz; ++j) {
       // no self-loop
-      if (i == j)
-        continue;
+      if (i == j) continue;
 
       // succ_u == v
       // if not backtracking succ_u != u
@@ -44,14 +43,16 @@ COOMatrix COOLineGraph(const COOMatrix &coo, bool backtracking) {
     }
   }
 
-  COOMatrix res = COOMatrix(nnz, nnz, NDArray::FromVector(new_row), NDArray::FromVector(new_col),
-    NullArray(), false, false);
+  COOMatrix res = COOMatrix(
+      nnz, nnz, NDArray::FromVector(new_row), NDArray::FromVector(new_col),
+      NullArray(), false, false);
   return res;
 }
 
-
-template COOMatrix COOLineGraph<kDGLCPU, int32_t>(const COOMatrix &coo, bool backtracking);
-template COOMatrix COOLineGraph<kDGLCPU, int64_t>(const COOMatrix &coo, bool backtracking);
+template COOMatrix COOLineGraph<kDGLCPU, int32_t>(
+    const COOMatrix& coo, bool backtracking);
+template COOMatrix COOLineGraph<kDGLCPU, int64_t>(
+    const COOMatrix& coo, bool backtracking);
 
 }  // namespace impl
 }  // namespace aten

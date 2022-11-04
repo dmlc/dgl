@@ -4,20 +4,20 @@
  * \brief Array index select GPU implementation
  */
 #include <dgl/array.h>
+
 #include "../../../runtime/cuda/cuda_common.h"
 #include "../array_index_select.cuh"
-#include "./array_index_select_uvm.cuh"
 #include "../utils.h"
+#include "./array_index_select_uvm.cuh"
 
 namespace dgl {
 using runtime::NDArray;
 namespace aten {
 namespace impl {
 
-template<typename DType, typename IdType>
+template <typename DType, typename IdType>
 NDArray IndexSelectCPUFromGPU(NDArray array, IdArray index) {
   cudaStream_t stream = runtime::getCurrentCUDAStream();
-  const DType* array_data = static_cast<DType*>(array->data);
   const IdType* idx_data = static_cast<IdType*>(index->data);
   const int64_t arr_len = array->shape[0];
   const int64_t len = index->shape[0];
@@ -25,6 +25,8 @@ NDArray IndexSelectCPUFromGPU(NDArray array, IdArray index) {
   std::vector<int64_t> shape{len};
 
   CHECK(array.IsPinned());
+  const DType* array_data = nullptr;
+  CUDA_CALL(cudaHostGetDevicePointer(&array_data, array.Ptr<DType>(), 0));
   CHECK_EQ(index->ctx.device_type, kDGLCUDA);
 
   for (int d = 1; d < array->ndim; ++d) {
@@ -33,31 +35,31 @@ NDArray IndexSelectCPUFromGPU(NDArray array, IdArray index) {
   }
 
   NDArray ret = NDArray::Empty(shape, array->dtype, index->ctx);
-  if (len == 0)
-    return ret;
+  if (len == 0) return ret;
   DType* ret_data = static_cast<DType*>(ret->data);
 
   if (num_feat == 1) {
-      const int nt = cuda::FindNumThreads(len);
-      const int nb = (len + nt - 1) / nt;
-      CUDA_KERNEL_CALL(IndexSelectSingleKernel, nb, nt, 0,
-          stream, array_data, idx_data, len, arr_len, ret_data);
+    const int nt = cuda::FindNumThreads(len);
+    const int nb = (len + nt - 1) / nt;
+    CUDA_KERNEL_CALL(
+        IndexSelectSingleKernel, nb, nt, 0, stream, array_data, idx_data, len,
+        arr_len, ret_data);
   } else {
-      dim3 block(256, 1);
-      while (static_cast<int64_t>(block.x) >= 2*num_feat) {
-          block.x /= 2;
-          block.y *= 2;
-      }
-      const dim3 grid((len+block.y-1)/block.y);
-      if (num_feat * sizeof(DType) < 2 * CACHE_LINE_SIZE) {
-        CUDA_KERNEL_CALL(IndexSelectMultiKernel, grid, block, 0,
-            stream, array_data, num_feat, idx_data,
-            len, arr_len, ret_data);
-      } else {
-        CUDA_KERNEL_CALL(IndexSelectMultiKernelAligned, grid, block, 0,
-            stream, array_data, num_feat, idx_data,
-            len, arr_len, ret_data);
-      }
+    dim3 block(256, 1);
+    while (static_cast<int64_t>(block.x) >= 2 * num_feat) {
+      block.x /= 2;
+      block.y *= 2;
+    }
+    const dim3 grid((len + block.y - 1) / block.y);
+    if (num_feat * sizeof(DType) < 2 * CACHE_LINE_SIZE) {
+      CUDA_KERNEL_CALL(
+          IndexSelectMultiKernel, grid, block, 0, stream, array_data, num_feat,
+          idx_data, len, arr_len, ret_data);
+    } else {
+      CUDA_KERNEL_CALL(
+          IndexSelectMultiKernelAligned, grid, block, 0, stream, array_data,
+          num_feat, idx_data, len, arr_len, ret_data);
+    }
   }
   return ret;
 }
@@ -72,11 +74,9 @@ template NDArray IndexSelectCPUFromGPU<int32_t, int64_t>(NDArray, IdArray);
 template NDArray IndexSelectCPUFromGPU<int64_t, int32_t>(NDArray, IdArray);
 template NDArray IndexSelectCPUFromGPU<int64_t, int64_t>(NDArray, IdArray);
 
-
-template<typename DType, typename IdType>
+template <typename DType, typename IdType>
 void IndexScatterGPUToCPU(NDArray dest, IdArray index, NDArray source) {
   cudaStream_t stream = runtime::getCurrentCUDAStream();
-  DType* dest_data = static_cast<DType*>(dest->data);
   const DType* source_data = static_cast<DType*>(source->data);
   const IdType* idx_data = static_cast<IdType*>(index->data);
   const int64_t arr_len = dest->shape[0];
@@ -85,6 +85,8 @@ void IndexScatterGPUToCPU(NDArray dest, IdArray index, NDArray source) {
   std::vector<int64_t> shape{len};
 
   CHECK(dest.IsPinned());
+  DType* dest_data = nullptr;
+  CUDA_CALL(cudaHostGetDevicePointer(&dest_data, dest.Ptr<DType>(), 0));
   CHECK_EQ(index->ctx.device_type, kDGLCUDA);
   CHECK_EQ(source->ctx.device_type, kDGLCUDA);
 
@@ -92,24 +94,24 @@ void IndexScatterGPUToCPU(NDArray dest, IdArray index, NDArray source) {
     num_feat *= source->shape[d];
   }
 
-  if (len == 0)
-    return;
+  if (len == 0) return;
 
   if (num_feat == 1) {
-      const int nt = cuda::FindNumThreads(len);
-      const int nb = (len + nt - 1) / nt;
-      CUDA_KERNEL_CALL(IndexScatterSingleKernel, nb, nt, 0,
-          stream, source_data, idx_data, len, arr_len, dest_data);
+    const int nt = cuda::FindNumThreads(len);
+    const int nb = (len + nt - 1) / nt;
+    CUDA_KERNEL_CALL(
+        IndexScatterSingleKernel, nb, nt, 0, stream, source_data, idx_data, len,
+        arr_len, dest_data);
   } else {
-      dim3 block(256, 1);
-      while (static_cast<int64_t>(block.x) >= 2*num_feat) {
-          block.x /= 2;
-          block.y *= 2;
-      }
-      const dim3 grid((len+block.y-1)/block.y);
-      CUDA_KERNEL_CALL(IndexScatterMultiKernel, grid, block, 0,
-          stream, source_data, num_feat, idx_data,
-          len, arr_len, dest_data);
+    dim3 block(256, 1);
+    while (static_cast<int64_t>(block.x) >= 2 * num_feat) {
+      block.x /= 2;
+      block.y *= 2;
+    }
+    const dim3 grid((len + block.y - 1) / block.y);
+    CUDA_KERNEL_CALL(
+        IndexScatterMultiKernel, grid, block, 0, stream, source_data, num_feat,
+        idx_data, len, arr_len, dest_data);
   }
 }
 

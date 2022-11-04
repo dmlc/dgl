@@ -1,26 +1,28 @@
 /**
-*   Copyright (c) 2022, NVIDIA CORPORATION.
-*
-*   Licensed under the Apache License, Version 2.0 (the "License");
-*   you may not use this file except in compliance with the License.
-*   You may obtain a copy of the License at
-*
-*       http://www.apache.org/licenses/LICENSE-2.0
-*
-*   Unless required by applicable law or agreed to in writing, software
-*   distributed under the License is distributed on an "AS IS" BASIS,
-*   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-*   See the License for the specific language governing permissions and
-*   limitations under the License.
-*
-* \file array/gpu/disjoint_union.cu
-* \brief Disjoint union GPU implementation.
-*/
+ *   Copyright (c) 2022, NVIDIA CORPORATION.
+ *
+ *   Licensed under the Apache License, Version 2.0 (the "License");
+ *   you may not use this file except in compliance with the License.
+ *   You may obtain a copy of the License at
+ *
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *   Unless required by applicable law or agreed to in writing, software
+ *   distributed under the License is distributed on an "AS IS" BASIS,
+ *   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *   See the License for the specific language governing permissions and
+ *   limitations under the License.
+ *
+ * \file array/gpu/disjoint_union.cu
+ * \brief Disjoint union GPU implementation.
+ */
 
-#include <dgl/runtime/parallel_for.h>
 #include <dgl/array.h>
-#include <vector>
+#include <dgl/runtime/parallel_for.h>
+
 #include <tuple>
+#include <vector>
+
 #include "../../runtime/cuda/cuda_common.h"
 #include "./utils.h"
 
@@ -31,8 +33,8 @@ namespace impl {
 
 template <typename IdType>
 __global__ void _DisjointUnionKernel(
-    IdType** arrs, IdType* prefix, IdType* offset, IdType* out,
-    int64_t n_arrs, int n_elms) {
+    IdType** arrs, IdType* prefix, IdType* offset, IdType* out, int64_t n_arrs,
+    int n_elms) {
   IdType tx = static_cast<IdType>(blockIdx.x) * blockDim.x + threadIdx.x;
   const int stride_x = gridDim.x * blockDim.x;
   while (tx < n_elms) {
@@ -48,7 +50,8 @@ __global__ void _DisjointUnionKernel(
 }
 
 template <DGLDeviceType XPU, typename IdType>
-std::tuple<IdArray, IdArray, IdArray> _ComputePrefixSums(const std::vector<COOMatrix>& coos) {
+std::tuple<IdArray, IdArray, IdArray> _ComputePrefixSums(
+    const std::vector<COOMatrix>& coos) {
   IdType n = coos.size(), nbits = coos[0].row->dtype.bits;
   IdArray n_rows = NewIdArray(n, CPU, nbits);
   IdArray n_cols = NewIdArray(n, CPU, nbits);
@@ -58,7 +61,7 @@ std::tuple<IdArray, IdArray, IdArray> _ComputePrefixSums(const std::vector<COOMa
   IdType* n_cols_data = n_cols.Ptr<IdType>();
   IdType* n_elms_data = n_elms.Ptr<IdType>();
 
-  dgl::runtime::parallel_for(0, coos.size(), [&](IdType b, IdType e){
+  dgl::runtime::parallel_for(0, coos.size(), [&](IdType b, IdType e) {
     for (IdType i = b; i < e; ++i) {
       n_rows_data[i] = coos[i].num_rows;
       n_cols_data[i] = coos[i].num_cols;
@@ -66,30 +69,30 @@ std::tuple<IdArray, IdArray, IdArray> _ComputePrefixSums(const std::vector<COOMa
     }
   });
 
-  return std::make_tuple(CumSum(n_rows.CopyTo(coos[0].row->ctx), true),
-                         CumSum(n_cols.CopyTo(coos[0].row->ctx), true),
-                         CumSum(n_elms.CopyTo(coos[0].row->ctx), true));
+  return std::make_tuple(
+      CumSum(n_rows.CopyTo(coos[0].row->ctx), true),
+      CumSum(n_cols.CopyTo(coos[0].row->ctx), true),
+      CumSum(n_elms.CopyTo(coos[0].row->ctx), true));
 }
 
 template <DGLDeviceType XPU, typename IdType>
-void _Merge(IdType** arrs, IdType* prefix, IdType* offset, IdType* out,
-            int64_t n_arrs, int n_elms,
-            DGLContext ctx, DGLDataType dtype, cudaStream_t stream) {
+void _Merge(
+    IdType** arrs, IdType* prefix, IdType* offset, IdType* out, int64_t n_arrs,
+    int n_elms, DGLContext ctx, DGLDataType dtype, cudaStream_t stream) {
   auto device = runtime::DeviceAPI::Get(ctx);
   int nt = 256;
   int nb = (n_elms + nt - 1) / nt;
 
   IdType** arrs_dev = static_cast<IdType**>(
-      device->AllocWorkspace(ctx, n_arrs*sizeof(IdType*)));
+      device->AllocWorkspace(ctx, n_arrs * sizeof(IdType*)));
 
   device->CopyDataFromTo(
-      arrs, 0, arrs_dev, 0, sizeof(IdType*)*n_arrs,
-      DGLContext{kDGLCPU, 0}, ctx, dtype);
+      arrs, 0, arrs_dev, 0, sizeof(IdType*) * n_arrs, DGLContext{kDGLCPU, 0},
+      ctx, dtype);
 
-  CUDA_KERNEL_CALL(_DisjointUnionKernel,
-      nb, nt, 0, stream,
-      arrs_dev, prefix, offset,
-      out, n_arrs, n_elms);
+  CUDA_KERNEL_CALL(
+      _DisjointUnionKernel, nb, nt, 0, stream, arrs_dev, prefix, offset, out,
+      n_arrs, n_elms);
 
   device->FreeWorkspace(ctx, arrs_dev);
 }
@@ -132,52 +135,50 @@ COOMatrix DisjointUnionCoo(const std::vector<COOMatrix>& coos) {
 
   IdType n_elements = 0;
   device->CopyDataFromTo(
-      &prefix_elm[coos.size()], 0, &n_elements, 0,
-      sizeof(IdType), coos[0].row->ctx, DGLContext{kDGLCPU, 0},
-      coos[0].row->dtype);
+      &prefix_elm[coos.size()], 0, &n_elements, 0, sizeof(IdType),
+      coos[0].row->ctx, DGLContext{kDGLCPU, 0}, coos[0].row->dtype);
 
   device->CopyDataFromTo(
-      &prefix_src[coos.size()], 0, &src_offset, 0,
-      sizeof(IdType), coos[0].row->ctx, DGLContext{kDGLCPU, 0},
-      coos[0].row->dtype);
+      &prefix_src[coos.size()], 0, &src_offset, 0, sizeof(IdType),
+      coos[0].row->ctx, DGLContext{kDGLCPU, 0}, coos[0].row->dtype);
 
   device->CopyDataFromTo(
-      &prefix_dst[coos.size()], 0, &dst_offset, 0,
-      sizeof(IdType), coos[0].row->ctx, DGLContext{kDGLCPU, 0},
-      coos[0].row->dtype);
+      &prefix_dst[coos.size()], 0, &dst_offset, 0, sizeof(IdType),
+      coos[0].row->ctx, DGLContext{kDGLCPU, 0}, coos[0].row->dtype);
 
   // Union src array
-  IdArray result_src = NewIdArray(
-    n_elements, coos[0].row->ctx, coos[0].row->dtype.bits);
-  _Merge<XPU, IdType>(rows.get(), prefix_src, prefix_elm, result_src.Ptr<IdType>(),
-         coos.size(), n_elements, ctx, dtype, stream);
+  IdArray result_src =
+      NewIdArray(n_elements, coos[0].row->ctx, coos[0].row->dtype.bits);
+  _Merge<XPU, IdType>(
+      rows.get(), prefix_src, prefix_elm, result_src.Ptr<IdType>(), coos.size(),
+      n_elements, ctx, dtype, stream);
 
   // Union dst array
-  IdArray result_dst = NewIdArray(
-    n_elements, coos[0].col->ctx, coos[0].col->dtype.bits);
-  _Merge<XPU, IdType>(cols.get(), prefix_dst, prefix_elm, result_dst.Ptr<IdType>(),
-         coos.size(), n_elements, ctx, dtype, stream);
+  IdArray result_dst =
+      NewIdArray(n_elements, coos[0].col->ctx, coos[0].col->dtype.bits);
+  _Merge<XPU, IdType>(
+      cols.get(), prefix_dst, prefix_elm, result_dst.Ptr<IdType>(), coos.size(),
+      n_elements, ctx, dtype, stream);
 
   // Union data array if exists and fetch number of elements
   IdArray result_dat = NullArray();
   if (has_data) {
-    result_dat =  NewIdArray(
-      n_elements, coos[0].row->ctx, coos[0].row->dtype.bits);
-    _Merge<XPU, IdType>(data.get(), prefix_elm, prefix_elm, result_dat.Ptr<IdType>(),
-          coos.size(), n_elements, ctx, dtype, stream);
+    result_dat =
+        NewIdArray(n_elements, coos[0].row->ctx, coos[0].row->dtype.bits);
+    _Merge<XPU, IdType>(
+        data.get(), prefix_elm, prefix_elm, result_dat.Ptr<IdType>(),
+        coos.size(), n_elements, ctx, dtype, stream);
   }
 
   return COOMatrix(
-    src_offset, dst_offset,
-    result_src,
-    result_dst,
-    result_dat,
-    row_sorted,
-    col_sorted);
+      src_offset, dst_offset, result_src, result_dst, result_dat, row_sorted,
+      col_sorted);
 }
 
-template COOMatrix DisjointUnionCoo<kDGLCUDA, int32_t>(const std::vector<COOMatrix>& coos);
-template COOMatrix DisjointUnionCoo<kDGLCUDA, int64_t>(const std::vector<COOMatrix>& coos);
+template COOMatrix DisjointUnionCoo<kDGLCUDA, int32_t>(
+    const std::vector<COOMatrix>& coos);
+template COOMatrix DisjointUnionCoo<kDGLCUDA, int64_t>(
+    const std::vector<COOMatrix>& coos);
 
 }  // namespace impl
 }  // namespace aten
