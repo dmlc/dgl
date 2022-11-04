@@ -3910,26 +3910,29 @@ def shortest_dist(g, root=None, return_paths=False):
     >>> dist, paths = dgl.shortest_dist(g, root=None, return_paths=True)
     >>> print(dist)
     tensor([[ 0, -1,  1,  2],
-        [ 1,  0,  2,  1],
-        [-1, -1,  0,  1],
-        [-1, -1, -1,  0]])
+            [ 1,  0,  2,  1],
+            [-1, -1,  0,  1],
+            [-1, -1, -1,  0]])
     >>> print(paths)
     tensor([[[-1, -1],
-         [-1, -1],
-         [ 0, -1],
-         [ 0,  3]],
-        [[ 1, -1],
-         [-1, -1],
-         [ 1,  0],
-         [ 2, -1]],
-        [[-1, -1],
-         [-1, -1],
-         [-1, -1],
-         [ 3, -1]],
-        [[-1, -1],
-         [-1, -1],
-         [-1, -1],
-         [-1, -1]]])
+            [-1, -1],
+            [ 0, -1],
+            [ 0,  3]],
+    <BLANKLINE>
+            [[ 1, -1],
+            [-1, -1],
+            [ 1,  0],
+            [ 2, -1]],
+    <BLANKLINE>
+            [[-1, -1],
+            [-1, -1],
+            [-1, -1],
+            [ 3, -1]],
+    <BLANKLINE>
+            [[-1, -1],
+            [-1, -1],
+            [-1, -1],
+            [-1, -1]]])
     """
     if root is None:
         dist, pred = sparse.csgraph.shortest_path(
