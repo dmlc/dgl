@@ -31,8 +31,8 @@ using namespace dgl::aten;
 namespace dgl {
 
 template <>
-NDArray SharedMemManager::CopyToSharedMem<NDArray>(const NDArray &data,
-                                                   std::string name) {
+NDArray SharedMemManager::CopyToSharedMem<NDArray>(
+    const NDArray &data, std::string name) {
   DGLContext ctx = {kDGLCPU, 0};
   std::vector<int64_t> shape(data->shape, data->shape + data->ndim);
   strm_->Write(data->ndim);
@@ -46,28 +46,29 @@ NDArray SharedMemManager::CopyToSharedMem<NDArray>(const NDArray &data,
     return data;
   } else {
     auto nd =
-      NDArray::EmptyShared(graph_name_ + name, shape, data->dtype, ctx, true);
+        NDArray::EmptyShared(graph_name_ + name, shape, data->dtype, ctx, true);
     nd.CopyFrom(data);
     return nd;
   }
 }
 
 template <>
-CSRMatrix SharedMemManager::CopyToSharedMem<CSRMatrix>(const CSRMatrix &csr,
-                                                       std::string name) {
+CSRMatrix SharedMemManager::CopyToSharedMem<CSRMatrix>(
+    const CSRMatrix &csr, std::string name) {
   auto indptr_shared_mem = CopyToSharedMem(csr.indptr, name + "_indptr");
   auto indices_shared_mem = CopyToSharedMem(csr.indices, name + "_indices");
   auto data_shared_mem = CopyToSharedMem(csr.data, name + "_data");
   strm_->Write(csr.num_rows);
   strm_->Write(csr.num_cols);
   strm_->Write(csr.sorted);
-  return CSRMatrix(csr.num_rows, csr.num_cols, indptr_shared_mem,
-                   indices_shared_mem, data_shared_mem, csr.sorted);
+  return CSRMatrix(
+      csr.num_rows, csr.num_cols, indptr_shared_mem, indices_shared_mem,
+      data_shared_mem, csr.sorted);
 }
 
 template <>
-COOMatrix SharedMemManager::CopyToSharedMem<COOMatrix>(const COOMatrix &coo,
-                                                       std::string name) {
+COOMatrix SharedMemManager::CopyToSharedMem<COOMatrix>(
+    const COOMatrix &coo, std::string name) {
   auto row_shared_mem = CopyToSharedMem(coo.row, name + "_row");
   auto col_shared_mem = CopyToSharedMem(coo.col, name + "_col");
   auto data_shared_mem = CopyToSharedMem(coo.data, name + "_data");
@@ -75,13 +76,14 @@ COOMatrix SharedMemManager::CopyToSharedMem<COOMatrix>(const COOMatrix &coo,
   strm_->Write(coo.num_cols);
   strm_->Write(coo.row_sorted);
   strm_->Write(coo.col_sorted);
-  return COOMatrix(coo.num_rows, coo.num_cols, row_shared_mem, col_shared_mem,
-                   data_shared_mem, coo.row_sorted, coo.col_sorted);
+  return COOMatrix(
+      coo.num_rows, coo.num_cols, row_shared_mem, col_shared_mem,
+      data_shared_mem, coo.row_sorted, coo.col_sorted);
 }
 
 template <>
-bool SharedMemManager::CreateFromSharedMem<NDArray>(NDArray *nd,
-                                                    std::string name) {
+bool SharedMemManager::CreateFromSharedMem<NDArray>(
+    NDArray *nd, std::string name) {
   int ndim;
   DGLContext ctx = {kDGLCPU, 0};
   DGLDataType dtype;
@@ -98,15 +100,14 @@ bool SharedMemManager::CreateFromSharedMem<NDArray>(NDArray *nd,
   if (is_null) {
     *nd = NDArray::Empty(shape, dtype, ctx);
   } else {
-    *nd =
-      NDArray::EmptyShared(graph_name_ + name, shape, dtype, ctx, false);
+    *nd = NDArray::EmptyShared(graph_name_ + name, shape, dtype, ctx, false);
   }
   return true;
 }
 
 template <>
-bool SharedMemManager::CreateFromSharedMem<COOMatrix>(COOMatrix *coo,
-                                                      std::string name) {
+bool SharedMemManager::CreateFromSharedMem<COOMatrix>(
+    COOMatrix *coo, std::string name) {
   CreateFromSharedMem(&coo->row, name + "_row");
   CreateFromSharedMem(&coo->col, name + "_col");
   CreateFromSharedMem(&coo->data, name + "_data");
@@ -118,8 +119,8 @@ bool SharedMemManager::CreateFromSharedMem<COOMatrix>(COOMatrix *coo,
 }
 
 template <>
-bool SharedMemManager::CreateFromSharedMem<CSRMatrix>(CSRMatrix *csr,
-                                                      std::string name) {
+bool SharedMemManager::CreateFromSharedMem<CSRMatrix>(
+    CSRMatrix *csr, std::string name) {
   CreateFromSharedMem(&csr->indptr, name + "_indptr");
   CreateFromSharedMem(&csr->indices, name + "_indices");
   CreateFromSharedMem(&csr->data, name + "_data");

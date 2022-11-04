@@ -24,8 +24,8 @@
 #include <dgl/array.h>
 #include <dgl/base_heterograph.h>
 
-#include <vector>
 #include <utility>
+#include <vector>
 
 namespace dgl {
 namespace transform {
@@ -41,9 +41,8 @@ namespace transform {
  *
  * @return The vector of compacted graphs and the vector of induced nodes.
  */
-template<DGLDeviceType XPU, typename IdType>
-std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>>
-CompactGraphs(
+template <DGLDeviceType XPU, typename IdType>
+std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>> CompactGraphs(
     const std::vector<HeteroGraphPtr> &graphs,
     const std::vector<IdArray> &always_preserve);
 

@@ -3,29 +3,29 @@
  * \file communicator.cc
  * \brief SocketCommunicator for DGL distributed training.
  */
-#include <dmlc/logging.h>
+#include "socket_communicator.h"
 
-#include <string.h>
+#include <dmlc/logging.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
+
 #include <memory>
 
-#include "socket_communicator.h"
 #include "../../c_api_common.h"
 #include "socket_pool.h"
 
 #ifdef _WIN32
 #include <windows.h>
-#else   // !_WIN32
+#else  // !_WIN32
 #include <unistd.h>
 #endif  // _WIN32
 
 namespace dgl {
 namespace network {
 
-
-/////////////////////////////////////// SocketSender ///////////////////////////////////////////
-
+/////////////////////////////////////// SocketSender
+//////////////////////////////////////////////
 
 bool SocketSender::ConnectReceiver(const std::string& addr, int recv_id) {
   if (recv_id < 0) {
@@ -92,9 +92,7 @@ bool SocketSender::ConnectReceiverFinalize(const int max_try_times) {
     msg_queue_.push_back(std::make_shared<MessageQueue>(queue_size_));
     // Create a new thread for this socket connection
     threads_.push_back(std::make_shared<std::thread>(
-      SendLoop,
-      sockets_[thread_id],
-      msg_queue_[thread_id]));
+        SendLoop, sockets_[thread_id], msg_queue_[thread_id]));
   }
 
   return true;
@@ -105,14 +103,13 @@ void SocketSender::Send(const rpc::RPCMessage& msg, int recv_id) {
   StreamWithBuffer zc_write_strm(zerocopy_blob.get(), true);
   zc_write_strm.Write(msg);
   int32_t nonempty_ndarray_count = zc_write_strm.buffer_list().size();
-  zerocopy_blob->append(reinterpret_cast<char*>(&nonempty_ndarray_count),
-                        sizeof(int32_t));
+  zerocopy_blob->append(
+      reinterpret_cast<char*>(&nonempty_ndarray_count), sizeof(int32_t));
   Message rpc_meta_msg;
   rpc_meta_msg.data = const_cast<char*>(zerocopy_blob->data());
   rpc_meta_msg.size = zerocopy_blob->size();
   rpc_meta_msg.deallocator = [zerocopy_blob](Message*) {};
-  CHECK_EQ(Send(
-    rpc_meta_msg, recv_id), ADD_SUCCESS);
+  CHECK_EQ(Send(rpc_meta_msg, recv_id), ADD_SUCCESS);
   // send real ndarray data
   for (auto ptr : zc_write_strm.buffer_list()) {
     Message ndarray_data_msg;
@@ -123,8 +120,7 @@ void SocketSender::Send(const rpc::RPCMessage& msg, int recv_id) {
     ndarray_data_msg.size = ptr.size;
     NDArray tensor = ptr.tensor;
     ndarray_data_msg.deallocator = [tensor](Message*) {};
-    CHECK_EQ(Send(
-      ndarray_data_msg, recv_id), ADD_SUCCESS);
+    CHECK_EQ(Send(ndarray_data_msg, recv_id), ADD_SUCCESS);
   }
 }
 
@@ -156,7 +152,7 @@ void SocketSender::Finalize() {
   }
   // Clear all sockets
   for (auto& group_sockets_ : sockets_) {
-    for (auto &socket : group_sockets_) {
+    for (auto& socket : group_sockets_) {
       socket.second->Close();
     }
   }
@@ -168,9 +164,8 @@ void SendCore(Message msg, TCPSocket* socket) {
   int64_t sent_bytes = 0;
   while (static_cast<size_t>(sent_bytes) < sizeof(int64_t)) {
     int64_t max_len = sizeof(int64_t) - sent_bytes;
-    int64_t tmp = socket->Send(
-      reinterpret_cast<char*>(&msg.size) + sent_bytes,
-      max_len);
+    int64_t tmp =
+        socket->Send(reinterpret_cast<char*>(&msg.size) + sent_bytes, max_len);
     CHECK_NE(tmp, -1);
     sent_bytes += tmp;
   }
@@ -178,7 +173,7 @@ void SendCore(Message msg, TCPSocket* socket) {
   sent_bytes = 0;
   while (sent_bytes < msg.size) {
     int64_t max_len = msg.size - sent_bytes;
-    int64_t tmp = socket->Send(msg.data+sent_bytes, max_len);
+    int64_t tmp = socket->Send(msg.data + sent_bytes, max_len);
     CHECK_NE(tmp, -1);
     sent_bytes += tmp;
   }
@@ -189,8 +184,8 @@ void SendCore(Message msg, TCPSocket* socket) {
 }
 
 void SocketSender::SendLoop(
-  std::unordered_map<int, std::shared_ptr<TCPSocket>> sockets,
-  std::shared_ptr<MessageQueue> queue) {
+    std::unordered_map<int, std::shared_ptr<TCPSocket>> sockets,
+    std::shared_ptr<MessageQueue> queue) {
   for (;;) {
     Message msg;
     STATUS code = queue->Remove(&msg);
@@ -205,8 +200,10 @@ void SocketSender::SendLoop(
   }
 }
 
-/////////////////////////////////////// SocketReceiver ///////////////////////////////////////////
-bool SocketReceiver::Wait(const std::string &addr, int num_sender, bool blocking) {
+/////////////////////////////////////// SocketReceiver
+//////////////////////////////////////////////
+bool SocketReceiver::Wait(
+    const std::string& addr, int num_sender, bool blocking) {
   CHECK_GT(num_sender, 0);
   CHECK_EQ(blocking, true);
   std::vector<std::string> substring;
@@ -231,7 +228,7 @@ bool SocketReceiver::Wait(const std::string &addr, int num_sender, bool blocking
   num_sender_ = num_sender;
 #ifdef USE_EPOLL
   if (max_thread_count_ == 0 || max_thread_count_ > num_sender_) {
-      max_thread_count_ = num_sender_;
+    max_thread_count_ = num_sender_;
   }
 #else
   max_thread_count_ = num_sender_;
@@ -256,7 +253,8 @@ bool SocketReceiver::Wait(const std::string &addr, int num_sender, bool blocking
     auto socket = std::make_shared<TCPSocket>();
     sockets_[thread_id][i] = socket;
     msg_queue_[i] = std::make_shared<MessageQueue>(queue_size_);
-    if (server_socket_->Accept(socket.get(), &accept_ip, &accept_port) == false) {
+    if (server_socket_->Accept(socket.get(), &accept_ip, &accept_port) ==
+        false) {
       LOG(WARNING) << "Error on accept socket.";
       return false;
     }
@@ -266,10 +264,7 @@ bool SocketReceiver::Wait(const std::string &addr, int num_sender, bool blocking
   for (int thread_id = 0; thread_id < max_thread_count_; ++thread_id) {
     // create new thread for each socket
     threads_.push_back(std::make_shared<std::thread>(
-      RecvLoop,
-      sockets_[thread_id],
-      msg_queue_,
-      &queue_sem_));
+        RecvLoop, sockets_[thread_id], msg_queue_, &queue_sem_));
   }
 
   return true;
@@ -285,7 +280,7 @@ rpc::RPCStatus SocketReceiver::Recv(rpc::RPCMessage* msg, int timeout) {
     return rpc::kRPCTimeOut;
   }
   CHECK_EQ(status, REMOVE_SUCCESS);
-  char* count_ptr = rpc_meta_msg.data+rpc_meta_msg.size-sizeof(int32_t);
+  char* count_ptr = rpc_meta_msg.data + rpc_meta_msg.size - sizeof(int32_t);
   int32_t nonempty_ndarray_count = *(reinterpret_cast<int32_t*>(count_ptr));
   // Recv real ndarray data
   std::vector<void*> buffer_list(nonempty_ndarray_count);
@@ -305,7 +300,8 @@ rpc::RPCStatus SocketReceiver::Recv(rpc::RPCMessage* msg, int timeout) {
     CHECK_EQ(status, REMOVE_SUCCESS);
     buffer_list[i] = ndarray_data_msg.data;
   }
-  StreamWithBuffer zc_read_strm(rpc_meta_msg.data, rpc_meta_msg.size-sizeof(int32_t), buffer_list);
+  StreamWithBuffer zc_read_strm(
+      rpc_meta_msg.data, rpc_meta_msg.size - sizeof(int32_t), buffer_list);
   zc_read_strm.Read(msg);
   rpc_meta_msg.deallocator(&rpc_meta_msg);
   return rpc::kRPCSuccess;
@@ -352,7 +348,7 @@ void SocketReceiver::Finalize() {
   for (auto& mq : msg_queue_) {
     // wait until queue is empty
     while (mq.second->Empty() == false) {
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+      std::this_thread::sleep_for(std::chrono::seconds(1));
     }
     mq.second->SignalFinished(mq.first);
   }
@@ -376,8 +372,7 @@ int64_t RecvDataSize(TCPSocket* socket) {
   while (static_cast<size_t>(received_bytes) < sizeof(int64_t)) {
     int64_t max_len = sizeof(int64_t) - received_bytes;
     int64_t tmp = socket->Receive(
-      reinterpret_cast<char*>(&data_size) + received_bytes,
-      max_len);
+        reinterpret_cast<char*>(&data_size) + received_bytes, max_len);
     if (tmp == -1) {
       if (received_bytes > 0) {
         // We want to finish reading full data_size
@@ -390,8 +385,9 @@ int64_t RecvDataSize(TCPSocket* socket) {
   return data_size;
 }
 
-void RecvData(TCPSocket* socket, char* buffer, const int64_t &data_size,
-  int64_t *received_bytes) {
+void RecvData(
+    TCPSocket* socket, char* buffer, const int64_t& data_size,
+    int64_t* received_bytes) {
   while (*received_bytes < data_size) {
     int64_t max_len = data_size - *received_bytes;
     int64_t tmp = socket->Receive(buffer + *received_bytes, max_len);
@@ -404,15 +400,17 @@ void RecvData(TCPSocket* socket, char* buffer, const int64_t &data_size,
 }
 
 void SocketReceiver::RecvLoop(
-  std::unordered_map<int /* Sender (virtual) ID */,
-    std::shared_ptr<TCPSocket>> sockets,
-  std::unordered_map<int /* Sender (virtual) ID */,
-    std::shared_ptr<MessageQueue>> queues,
-  runtime::Semaphore *queue_sem) {
+    std::unordered_map<
+        int /* Sender (virtual) ID */, std::shared_ptr<TCPSocket>>
+        sockets,
+    std::unordered_map<
+        int /* Sender (virtual) ID */, std::shared_ptr<MessageQueue>>
+        queues,
+    runtime::Semaphore* queue_sem) {
   std::unordered_map<int, std::unique_ptr<RecvContext>> recv_contexts;
   SocketPool socket_pool;
   for (auto& socket : sockets) {
-    auto &sender_id = socket.first;
+    auto& sender_id = socket.first;
     socket_pool.AddSocket(socket.second, sender_id);
     recv_contexts[sender_id] = std::unique_ptr<RecvContext>(new RecvContext());
   }
@@ -432,9 +430,9 @@ void SocketReceiver::RecvLoop(
 
     // Nonblocking socket might be interrupted at any point. So we need to
     // store the partially received data
-    std::unique_ptr<RecvContext> &ctx = recv_contexts[sender_id];
-    int64_t &data_size = ctx->data_size;
-    int64_t &received_bytes = ctx->received_bytes;
+    std::unique_ptr<RecvContext>& ctx = recv_contexts[sender_id];
+    int64_t& data_size = ctx->data_size;
+    int64_t& received_bytes = ctx->received_bytes;
     char*& buffer = ctx->buffer;
 
     if (data_size == -1) {
@@ -443,7 +441,7 @@ void SocketReceiver::RecvLoop(
       if (data_size > 0) {
         try {
           buffer = new char[data_size];
-        } catch(const std::bad_alloc&) {
+        } catch (const std::bad_alloc&) {
           LOG(FATAL) << "Cannot allocate enough memory for message, "
                      << "(message size: " << data_size << ")";
         }

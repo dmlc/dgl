@@ -4,17 +4,19 @@
  * \brief k-nearest-neighbor (KNN) implementation (cuda)
  */
 
+#include <curand_kernel.h>
 #include <dgl/array.h>
 #include <dgl/random.h>
 #include <dgl/runtime/device_api.h>
-#include <curand_kernel.h>
+
 #include <algorithm>
+#include <limits>
 #include <string>
 #include <vector>
-#include <limits>
+
 #include "../../../array/cuda/dgl_cub.cuh"
-#include "../../../runtime/cuda/cuda_common.h"
 #include "../../../array/cuda/utils.h"
+#include "../../../runtime/cuda/cuda_common.h"
 #include "../knn.h"
 
 namespace dgl {
@@ -26,12 +28,12 @@ namespace impl {
  */
 template <typename Type>
 struct SharedMemory {
-  __device__ inline operator Type* () {
+  __device__ inline operator Type*() {
     extern __shared__ int __smem[];
     return reinterpret_cast<Type*>(__smem);
   }
 
-  __device__ inline operator const Type* () const {
+  __device__ inline operator const Type*() const {
     extern __shared__ int __smem[];
     return reinterpret_cast<Type*>(__smem);
   }
@@ -41,12 +43,12 @@ struct SharedMemory {
 // access compile errors
 template <>
 struct SharedMemory<double> {
-  __device__ inline operator double* () {
+  __device__ inline operator double*() {
     extern __shared__ double __smem_d[];
     return reinterpret_cast<double*>(__smem_d);
   }
 
-  __device__ inline operator const double* () const {
+  __device__ inline operator const double*() const {
     extern __shared__ double __smem_d[];
     return reinterpret_cast<double*>(__smem_d);
   }
@@ -54,9 +56,8 @@ struct SharedMemory<double> {
 
 /*! \brief Compute Euclidean distance between two vectors in a cuda kernel */
 template <typename FloatType, typename IdType>
-__device__ FloatType EuclideanDist(const FloatType* vec1,
-                                   const FloatType* vec2,
-                                   const int64_t dim) {
+__device__ FloatType
+EuclideanDist(const FloatType* vec1, const FloatType* vec2, const int64_t dim) {
   FloatType dist = 0;
   IdType idx = 0;
   for (; idx < dim - 3; idx += 4) {
@@ -82,10 +83,9 @@ __device__ FloatType EuclideanDist(const FloatType* vec1,
  *  than the worst distance.
  */
 template <typename FloatType, typename IdType>
-__device__ FloatType EuclideanDistWithCheck(const FloatType* vec1,
-                                            const FloatType* vec2,
-                                            const int64_t dim,
-                                            const FloatType worst_dist) {
+__device__ FloatType EuclideanDistWithCheck(
+    const FloatType* vec1, const FloatType* vec2, const int64_t dim,
+    const FloatType worst_dist) {
   FloatType dist = 0;
   IdType idx = 0;
   bool early_stop = false;
@@ -151,9 +151,9 @@ __device__ void BuildHeap(IdType* indices, FloatType* dists, int size) {
 }
 
 template <typename FloatType, typename IdType>
-__device__ void HeapInsert(IdType* indices, FloatType* dist,
-                           IdType new_idx, FloatType new_dist,
-                           int size, bool check_repeat = false) {
+__device__ void HeapInsert(
+    IdType* indices, FloatType* dist, IdType new_idx, FloatType new_dist,
+    int size, bool check_repeat = false) {
   if (new_dist > dist[0]) return;
 
   // check if we have it
@@ -192,9 +192,9 @@ __device__ void HeapInsert(IdType* indices, FloatType* dist,
 }
 
 template <typename FloatType, typename IdType>
-__device__ bool FlaggedHeapInsert(IdType* indices, FloatType* dist, bool* flags,
-                                  IdType new_idx, FloatType new_dist, bool new_flag,
-                                  int size, bool check_repeat = false) {
+__device__ bool FlaggedHeapInsert(
+    IdType* indices, FloatType* dist, bool* flags, IdType new_idx,
+    FloatType new_dist, bool new_flag, int size, bool check_repeat = false) {
   if (new_dist > dist[0]) return false;
 
   // check if we have it
@@ -239,22 +239,26 @@ __device__ bool FlaggedHeapInsert(IdType* indices, FloatType* dist, bool* flags,
 }
 
 /*!
- * \brief Brute force kNN kernel. Compute distance for each pair of input points and get
- *  the result directly (without a distance matrix).
+ * \brief Brute force kNN kernel. Compute distance for each pair of input points
+ * and get the result directly (without a distance matrix).
  */
 template <typename FloatType, typename IdType>
-__global__ void BruteforceKnnKernel(const FloatType* data_points, const IdType* data_offsets,
-                                    const FloatType* query_points, const IdType* query_offsets,
-                                    const int k, FloatType* dists, IdType* query_out,
-                                    IdType* data_out, const int64_t num_batches,
-                                    const int64_t feature_size) {
+__global__ void BruteforceKnnKernel(
+    const FloatType* data_points, const IdType* data_offsets,
+    const FloatType* query_points, const IdType* query_offsets, const int k,
+    FloatType* dists, IdType* query_out, IdType* data_out,
+    const int64_t num_batches, const int64_t feature_size) {
   const IdType q_idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (q_idx >= query_offsets[num_batches]) return;
   IdType batch_idx = 0;
   for (IdType b = 0; b < num_batches + 1; ++b) {
-    if (query_offsets[b] > q_idx) { batch_idx = b - 1; break; }
+    if (query_offsets[b] > q_idx) {
+      batch_idx = b - 1;
+      break;
+    }
   }
-  const IdType data_start = data_offsets[batch_idx], data_end = data_offsets[batch_idx + 1];
+  const IdType data_start = data_offsets[batch_idx],
+               data_end = data_offsets[batch_idx + 1];
 
   for (IdType k_idx = 0; k_idx < k; ++k_idx) {
     query_out[q_idx * k + k_idx] = q_idx;
@@ -264,12 +268,12 @@ __global__ void BruteforceKnnKernel(const FloatType* data_points, const IdType* 
 
   for (IdType d_idx = data_start; d_idx < data_end; ++d_idx) {
     FloatType tmp_dist = EuclideanDistWithCheck<FloatType, IdType>(
-      query_points + q_idx * feature_size,
-      data_points + d_idx * feature_size,
-      feature_size, worst_dist);
+        query_points + q_idx * feature_size, data_points + d_idx * feature_size,
+        feature_size, worst_dist);
 
     IdType out_offset = q_idx * k;
-    HeapInsert<FloatType, IdType>(data_out + out_offset, dists + out_offset, d_idx, tmp_dist, k);
+    HeapInsert<FloatType, IdType>(
+        data_out + out_offset, dists + out_offset, d_idx, tmp_dist, k);
     worst_dist = dists[q_idx * k];
   }
 }
@@ -281,22 +285,19 @@ __global__ void BruteforceKnnKernel(const FloatType* data_points, const IdType* 
  *  This kernel is faster when the dimension of input points is not large.
  */
 template <typename FloatType, typename IdType>
-__global__ void BruteforceKnnShareKernel(const FloatType* data_points,
-                                         const IdType* data_offsets,
-                                         const FloatType* query_points,
-                                         const IdType* query_offsets,
-                                         const IdType* block_batch_id,
-                                         const IdType* local_block_id,
-                                         const int k, FloatType* dists,
-                                         IdType* query_out, IdType* data_out,
-                                         const int64_t num_batches,
-                                         const int64_t feature_size) {
+__global__ void BruteforceKnnShareKernel(
+    const FloatType* data_points, const IdType* data_offsets,
+    const FloatType* query_points, const IdType* query_offsets,
+    const IdType* block_batch_id, const IdType* local_block_id, const int k,
+    FloatType* dists, IdType* query_out, IdType* data_out,
+    const int64_t num_batches, const int64_t feature_size) {
   const IdType block_idx = static_cast<IdType>(blockIdx.x);
   const IdType block_size = static_cast<IdType>(blockDim.x);
   const IdType batch_idx = block_batch_id[block_idx];
   const IdType local_bid = local_block_id[block_idx];
   const IdType query_start = query_offsets[batch_idx] + block_size * local_bid;
-  const IdType query_end = min(query_start + block_size, query_offsets[batch_idx + 1]);
+  const IdType query_end =
+      min(query_start + block_size, query_offsets[batch_idx + 1]);
   if (query_start >= query_end) return;
   const IdType query_idx = query_start + threadIdx.x;
   const IdType data_start = data_offsets[batch_idx];
@@ -318,17 +319,20 @@ __global__ void BruteforceKnnShareKernel(const FloatType* data_points,
   if (query_idx < query_end) {
     for (auto i = 0; i < feature_size; ++i) {
       // to avoid bank conflict, we use transpose here
-      query_buff[threadIdx.x + i * block_size] = query_points[query_idx * feature_size + i];
+      query_buff[threadIdx.x + i * block_size] =
+          query_points[query_idx * feature_size + i];
     }
   }
 
   // perform computation on each tile
-  for (auto tile_start = data_start; tile_start < data_end; tile_start += block_size) {
+  for (auto tile_start = data_start; tile_start < data_end;
+       tile_start += block_size) {
     // each thread load one data point into the shared memory
     IdType load_idx = tile_start + threadIdx.x;
     if (load_idx < data_end) {
       for (auto i = 0; i < feature_size; ++i) {
-        data_buff[threadIdx.x * feature_size + i] = data_points[load_idx * feature_size + i];
+        data_buff[threadIdx.x * feature_size + i] =
+            data_points[load_idx * feature_size + i];
       }
     }
     __syncthreads();
@@ -342,16 +346,20 @@ __global__ void BruteforceKnnShareKernel(const FloatType* data_points,
         IdType dim_idx = 0;
 
         for (; dim_idx < feature_size - 3; dim_idx += 4) {
-          FloatType diff0 = query_buff[threadIdx.x + block_size * (dim_idx)]
-            - data_buff[d_idx * feature_size + dim_idx];
-          FloatType diff1 = query_buff[threadIdx.x + block_size * (dim_idx + 1)]
-            - data_buff[d_idx * feature_size + dim_idx + 1];
-          FloatType diff2 = query_buff[threadIdx.x + block_size * (dim_idx + 2)]
-            - data_buff[d_idx * feature_size + dim_idx + 2];
-          FloatType diff3 = query_buff[threadIdx.x + block_size * (dim_idx + 3)]
-            - data_buff[d_idx * feature_size + dim_idx + 3];
+          FloatType diff0 = query_buff[threadIdx.x + block_size * (dim_idx)] -
+                            data_buff[d_idx * feature_size + dim_idx];
+          FloatType diff1 =
+              query_buff[threadIdx.x + block_size * (dim_idx + 1)] -
+              data_buff[d_idx * feature_size + dim_idx + 1];
+          FloatType diff2 =
+              query_buff[threadIdx.x + block_size * (dim_idx + 2)] -
+              data_buff[d_idx * feature_size + dim_idx + 2];
+          FloatType diff3 =
+              query_buff[threadIdx.x + block_size * (dim_idx + 3)] -
+              data_buff[d_idx * feature_size + dim_idx + 3];
 
-          tmp_dist += diff0 * diff0 + diff1 * diff1 + diff2 * diff2 + diff3 * diff3;
+          tmp_dist +=
+              diff0 * diff0 + diff1 * diff1 + diff2 * diff2 + diff3 * diff3;
 
           if (tmp_dist > worst_dist) {
             early_stop = true;
@@ -361,8 +369,9 @@ __global__ void BruteforceKnnShareKernel(const FloatType* data_points,
         }
 
         for (; dim_idx < feature_size; ++dim_idx) {
-          const FloatType diff = query_buff[threadIdx.x + dim_idx * block_size]
-            - data_buff[d_idx * feature_size + dim_idx];
+          const FloatType diff =
+              query_buff[threadIdx.x + dim_idx * block_size] -
+              data_buff[d_idx * feature_size + dim_idx];
           tmp_dist += diff * diff;
 
           if (tmp_dist > worst_dist) {
@@ -374,8 +383,8 @@ __global__ void BruteforceKnnShareKernel(const FloatType* data_points,
         if (early_stop) continue;
 
         HeapInsert<FloatType, IdType>(
-          res_buff + threadIdx.x * k, dist_buff + threadIdx.x * k,
-          d_idx + tile_start, tmp_dist, k);
+            res_buff + threadIdx.x * k, dist_buff + threadIdx.x * k,
+            d_idx + tile_start, tmp_dist, k);
         worst_dist = dist_buff[threadIdx.x * k];
       }
     }
@@ -393,9 +402,9 @@ __global__ void BruteforceKnnShareKernel(const FloatType* data_points,
 
 /*! \brief determine the number of blocks for each segment */
 template <typename IdType>
-__global__ void GetNumBlockPerSegment(const IdType* offsets, IdType* out,
-                                      const int64_t batch_size,
-                                      const int64_t block_size) {
+__global__ void GetNumBlockPerSegment(
+    const IdType* offsets, IdType* out, const int64_t batch_size,
+    const int64_t block_size) {
   const IdType idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < batch_size) {
     out[idx] = (offsets[idx + 1] - offsets[idx] - 1) / block_size + 1;
@@ -404,9 +413,9 @@ __global__ void GetNumBlockPerSegment(const IdType* offsets, IdType* out,
 
 /*! \brief Get the batch index and local index in segment for each block */
 template <typename IdType>
-__global__ void GetBlockInfo(const IdType* num_block_prefixsum,
-                             IdType* block_batch_id, IdType* local_block_id,
-                             size_t batch_size, size_t num_blocks) {
+__global__ void GetBlockInfo(
+    const IdType* num_block_prefixsum, IdType* block_batch_id,
+    IdType* local_block_id, size_t batch_size, size_t num_blocks) {
   const IdType idx = blockIdx.x * blockDim.x + threadIdx.x;
   IdType i = 0;
 
@@ -421,8 +430,8 @@ __global__ void GetBlockInfo(const IdType* num_block_prefixsum,
 }
 
 /*!
- * \brief Brute force kNN. Compute distance for each pair of input points and get
- *  the result directly (without a distance matrix).
+ * \brief Brute force kNN. Compute distance for each pair of input points and
+ * get the result directly (without a distance matrix).
  *
  * \tparam FloatType The type of input points.
  * \tparam IdType The type of id.
@@ -434,9 +443,10 @@ __global__ void GetBlockInfo(const IdType* num_block_prefixsum,
  * \param result output array
  */
 template <typename FloatType, typename IdType>
-void BruteForceKNNCuda(const NDArray& data_points, const IdArray& data_offsets,
-                       const NDArray& query_points, const IdArray& query_offsets,
-                       const int k, IdArray result) {
+void BruteForceKNNCuda(
+    const NDArray& data_points, const IdArray& data_offsets,
+    const NDArray& query_points, const IdArray& query_offsets, const int k,
+    IdArray result) {
   cudaStream_t stream = runtime::getCurrentCUDAStream();
   const auto& ctx = data_points->ctx;
   auto device = runtime::DeviceAPI::Get(ctx);
@@ -450,13 +460,14 @@ void BruteForceKNNCuda(const NDArray& data_points, const IdArray& data_offsets,
   IdType* data_out = query_out + k * query_points->shape[0];
 
   FloatType* dists = static_cast<FloatType*>(device->AllocWorkspace(
-    ctx, k * query_points->shape[0] * sizeof(FloatType)));
+      ctx, k * query_points->shape[0] * sizeof(FloatType)));
 
   const int64_t block_size = cuda::FindNumThreads(query_points->shape[0]);
   const int64_t num_blocks = (query_points->shape[0] - 1) / block_size + 1;
-  CUDA_KERNEL_CALL(BruteforceKnnKernel, num_blocks, block_size, 0, stream,
-    data_points_data, data_offsets_data, query_points_data, query_offsets_data,
-    k, dists, query_out, data_out, batch_size, feature_size);
+  CUDA_KERNEL_CALL(
+      BruteforceKnnKernel, num_blocks, block_size, 0, stream, data_points_data,
+      data_offsets_data, query_points_data, query_offsets_data, k, dists,
+      query_out, data_out, batch_size, feature_size);
 
   device->FreeWorkspace(ctx, dists);
 }
@@ -477,9 +488,10 @@ void BruteForceKNNCuda(const NDArray& data_points, const IdArray& data_offsets,
  * \param result output array
  */
 template <typename FloatType, typename IdType>
-void BruteForceKNNSharedCuda(const NDArray& data_points, const IdArray& data_offsets,
-                             const NDArray& query_points, const IdArray& query_offsets,
-                             const int k, IdArray result) {
+void BruteForceKNNSharedCuda(
+    const NDArray& data_points, const IdArray& data_offsets,
+    const NDArray& query_points, const IdArray& query_offsets, const int k,
+    IdArray result) {
   cudaStream_t stream = runtime::getCurrentCUDAStream();
   const auto& ctx = data_points->ctx;
   auto device = runtime::DeviceAPI::Get(ctx);
@@ -496,44 +508,44 @@ void BruteForceKNNSharedCuda(const NDArray& data_points, const IdArray& data_off
   // determine block size according to this value
   int max_sharedmem_per_block = 0;
   CUDA_CALL(cudaDeviceGetAttribute(
-    &max_sharedmem_per_block, cudaDevAttrMaxSharedMemoryPerBlock, ctx.device_id));
-  const int64_t single_shared_mem = (k + 2 * feature_size) * sizeof(FloatType) +
-    k * sizeof(IdType);
-  const int64_t block_size = cuda::FindNumThreads(max_sharedmem_per_block / single_shared_mem);
+      &max_sharedmem_per_block, cudaDevAttrMaxSharedMemoryPerBlock,
+      ctx.device_id));
+  const int64_t single_shared_mem =
+      (k + 2 * feature_size) * sizeof(FloatType) + k * sizeof(IdType);
+  const int64_t block_size =
+      cuda::FindNumThreads(max_sharedmem_per_block / single_shared_mem);
 
   // Determine the number of blocks. We first get the number of blocks for each
   // segment. Then we get the block id offset via prefix sum.
   IdType* num_block_per_segment = static_cast<IdType*>(
-    device->AllocWorkspace(ctx, batch_size * sizeof(IdType)));
+      device->AllocWorkspace(ctx, batch_size * sizeof(IdType)));
   IdType* num_block_prefixsum = static_cast<IdType*>(
-    device->AllocWorkspace(ctx, batch_size * sizeof(IdType)));
+      device->AllocWorkspace(ctx, batch_size * sizeof(IdType)));
 
   // block size for GetNumBlockPerSegment computation
   int64_t temp_block_size = cuda::FindNumThreads(batch_size);
   int64_t temp_num_blocks = (batch_size - 1) / temp_block_size + 1;
-  CUDA_KERNEL_CALL(GetNumBlockPerSegment, temp_num_blocks,
-                   temp_block_size, 0, stream,
-                   query_offsets_data, num_block_per_segment,
-                   batch_size, block_size);
+  CUDA_KERNEL_CALL(
+      GetNumBlockPerSegment, temp_num_blocks, temp_block_size, 0, stream,
+      query_offsets_data, num_block_per_segment, batch_size, block_size);
   size_t prefix_temp_size = 0;
   CUDA_CALL(cub::DeviceScan::ExclusiveSum(
-    nullptr, prefix_temp_size, num_block_per_segment,
-    num_block_prefixsum, batch_size, stream));
+      nullptr, prefix_temp_size, num_block_per_segment, num_block_prefixsum,
+      batch_size, stream));
   void* prefix_temp = device->AllocWorkspace(ctx, prefix_temp_size);
   CUDA_CALL(cub::DeviceScan::ExclusiveSum(
-    prefix_temp, prefix_temp_size, num_block_per_segment,
-    num_block_prefixsum, batch_size, stream));
+      prefix_temp, prefix_temp_size, num_block_per_segment, num_block_prefixsum,
+      batch_size, stream));
   device->FreeWorkspace(ctx, prefix_temp);
 
-  int64_t num_blocks = 0, final_elem = 0, copyoffset = (batch_size - 1) * sizeof(IdType);
+  int64_t num_blocks = 0, final_elem = 0,
+          copyoffset = (batch_size - 1) * sizeof(IdType);
   device->CopyDataFromTo(
-    num_block_prefixsum, copyoffset, &num_blocks, 0,
-    sizeof(IdType), ctx, DGLContext{kDGLCPU, 0},
-    query_offsets->dtype);
+      num_block_prefixsum, copyoffset, &num_blocks, 0, sizeof(IdType), ctx,
+      DGLContext{kDGLCPU, 0}, query_offsets->dtype);
   device->CopyDataFromTo(
-    num_block_per_segment, copyoffset, &final_elem, 0,
-    sizeof(IdType), ctx, DGLContext{kDGLCPU, 0},
-    query_offsets->dtype);
+      num_block_per_segment, copyoffset, &final_elem, 0, sizeof(IdType), ctx,
+      DGLContext{kDGLCPU, 0}, query_offsets->dtype);
   num_blocks += final_elem;
   device->FreeWorkspace(ctx, num_block_per_segment);
   device->FreeWorkspace(ctx, num_block_prefixsum);
@@ -541,22 +553,22 @@ void BruteForceKNNSharedCuda(const NDArray& data_points, const IdArray& data_off
   // get batch id and local id in segment
   temp_block_size = cuda::FindNumThreads(num_blocks);
   temp_num_blocks = (num_blocks - 1) / temp_block_size + 1;
-  IdType* block_batch_id = static_cast<IdType*>(device->AllocWorkspace(
-    ctx, num_blocks * sizeof(IdType)));
-  IdType* local_block_id = static_cast<IdType*>(device->AllocWorkspace(
-    ctx, num_blocks * sizeof(IdType)));
+  IdType* block_batch_id = static_cast<IdType*>(
+      device->AllocWorkspace(ctx, num_blocks * sizeof(IdType)));
+  IdType* local_block_id = static_cast<IdType*>(
+      device->AllocWorkspace(ctx, num_blocks * sizeof(IdType)));
   CUDA_KERNEL_CALL(
-    GetBlockInfo, temp_num_blocks, temp_block_size, 0,
-    stream, num_block_prefixsum, block_batch_id,
-    local_block_id, batch_size, num_blocks);
+      GetBlockInfo, temp_num_blocks, temp_block_size, 0, stream,
+      num_block_prefixsum, block_batch_id, local_block_id, batch_size,
+      num_blocks);
 
   FloatType* dists = static_cast<FloatType*>(device->AllocWorkspace(
-    ctx, k * query_points->shape[0] * sizeof(FloatType)));
-  CUDA_KERNEL_CALL(BruteforceKnnShareKernel, num_blocks, block_size,
-    single_shared_mem * block_size, stream, data_points_data,
-    data_offsets_data, query_points_data, query_offsets_data,
-    block_batch_id, local_block_id, k, dists, query_out,
-    data_out, batch_size, feature_size);
+      ctx, k * query_points->shape[0] * sizeof(FloatType)));
+  CUDA_KERNEL_CALL(
+      BruteforceKnnShareKernel, num_blocks, block_size,
+      single_shared_mem * block_size, stream, data_points_data,
+      data_offsets_data, query_points_data, query_offsets_data, block_batch_id,
+      local_block_id, k, dists, query_out, data_out, batch_size, feature_size);
 
   device->FreeWorkspace(ctx, dists);
   device->FreeWorkspace(ctx, local_block_id);
@@ -564,9 +576,8 @@ void BruteForceKNNSharedCuda(const NDArray& data_points, const IdArray& data_off
 }
 
 /*! \brief Setup rng state for nn-descent */
-__global__ void SetupRngKernel(curandState* states,
-                               const uint64_t seed,
-                               const size_t n) {
+__global__ void SetupRngKernel(
+    curandState* states, const uint64_t seed, const size_t n) {
   size_t id = blockIdx.x * blockDim.x + threadIdx.x;
   if (id < n) {
     curand_init(seed, id, 0, states + id);
@@ -578,16 +589,10 @@ __global__ void SetupRngKernel(curandState* states,
  * for each nodes
  */
 template <typename FloatType, typename IdType>
-__global__ void RandomInitNeighborsKernel(const FloatType* points,
-                                          const IdType* offsets,
-                                          IdType* central_nodes,
-                                          IdType* neighbors,
-                                          FloatType* dists,
-                                          bool* flags,
-                                          const int k,
-                                          const int64_t feature_size,
-                                          const int64_t batch_size,
-                                          const uint64_t seed) {
+__global__ void RandomInitNeighborsKernel(
+    const FloatType* points, const IdType* offsets, IdType* central_nodes,
+    IdType* neighbors, FloatType* dists, bool* flags, const int k,
+    const int64_t feature_size, const int64_t batch_size, const uint64_t seed) {
   const IdType point_idx = blockIdx.x * blockDim.x + threadIdx.x;
   IdType batch_idx = 0;
   if (point_idx >= offsets[batch_size]) return;
@@ -623,21 +628,23 @@ __global__ void RandomInitNeighborsKernel(const FloatType* points,
   for (IdType i = 0; i < k; ++i) {
     current_flags[i] = true;
     current_dists[i] = EuclideanDist<FloatType, IdType>(
-      points + point_idx * feature_size,
-      points + current_neighbors[i] * feature_size,
-      feature_size);
+        points + point_idx * feature_size,
+        points + current_neighbors[i] * feature_size, feature_size);
   }
 
   // build heap
   BuildHeap<FloatType, IdType>(neighbors + point_idx * k, current_dists, k);
 }
 
-/*! \brief Randomly select candidates from current knn and reverse-knn graph for nn-descent */
+/*!
+ * \brief Randomly select candidates from current knn and reverse-knn graph for
+ *        nn-descent.
+ */
 template <typename IdType>
-__global__ void FindCandidatesKernel(const IdType* offsets, IdType* new_candidates,
-                                     IdType* old_candidates, IdType* neighbors, bool* flags,
-                                     const uint64_t seed, const int64_t batch_size,
-                                     const int num_candidates, const int k) {
+__global__ void FindCandidatesKernel(
+    const IdType* offsets, IdType* new_candidates, IdType* old_candidates,
+    IdType* neighbors, bool* flags, const uint64_t seed,
+    const int64_t batch_size, const int num_candidates, const int k) {
   const IdType point_idx = blockIdx.x * blockDim.x + threadIdx.x;
   IdType batch_idx = 0;
   if (point_idx >= offsets[batch_size]) return;
@@ -652,13 +659,16 @@ __global__ void FindCandidatesKernel(const IdType* offsets, IdType* new_candidat
     }
   }
 
-  IdType segment_start = offsets[batch_idx], segment_end = offsets[batch_idx + 1];
+  IdType segment_start = offsets[batch_idx],
+         segment_end = offsets[batch_idx + 1];
   IdType* current_neighbors = neighbors + point_idx * k;
   bool* current_flags = flags + point_idx * k;
 
   // reset candidates
-  IdType* new_candidates_ptr = new_candidates + point_idx * (num_candidates + 1);
-  IdType* old_candidates_ptr = old_candidates + point_idx * (num_candidates + 1);
+  IdType* new_candidates_ptr =
+      new_candidates + point_idx * (num_candidates + 1);
+  IdType* old_candidates_ptr =
+      old_candidates + point_idx * (num_candidates + 1);
   new_candidates_ptr[0] = 0;
   old_candidates_ptr[0] = 0;
 
@@ -666,7 +676,8 @@ __global__ void FindCandidatesKernel(const IdType* offsets, IdType* new_candidat
   // here we use candidate[0] for reservoir sampling temporarily
   for (IdType i = 0; i < k; ++i) {
     IdType candidate = current_neighbors[i];
-    IdType* candidate_array = current_flags[i] ? new_candidates_ptr : old_candidates_ptr;
+    IdType* candidate_array =
+        current_flags[i] ? new_candidates_ptr : old_candidates_ptr;
     IdType curr_num = candidate_array[0];
     IdType* candidate_data = candidate_array + 1;
 
@@ -686,7 +697,8 @@ __global__ void FindCandidatesKernel(const IdType* offsets, IdType* new_candidat
   for (IdType i = index_start; i < index_end; ++i) {
     if (neighbors[i] == point_idx) {
       IdType reverse_candidate = (i - index_start) / k + segment_start;
-      IdType* candidate_array = flags[i] ? new_candidates_ptr : old_candidates_ptr;
+      IdType* candidate_array =
+          flags[i] ? new_candidates_ptr : old_candidates_ptr;
       IdType curr_num = candidate_array[0];
       IdType* candidate_data = candidate_array + 1;
 
@@ -702,8 +714,10 @@ __global__ void FindCandidatesKernel(const IdType* offsets, IdType* new_candidat
   }
 
   // set candidate[0] back to length
-  if (new_candidates_ptr[0] > num_candidates) new_candidates_ptr[0] = num_candidates;
-  if (old_candidates_ptr[0] > num_candidates) old_candidates_ptr[0] = num_candidates;
+  if (new_candidates_ptr[0] > num_candidates)
+    new_candidates_ptr[0] = num_candidates;
+  if (old_candidates_ptr[0] > num_candidates)
+    old_candidates_ptr[0] = num_candidates;
 
   // mark new_candidates as old
   IdType num_new_candidates = new_candidates_ptr[0];
@@ -723,19 +737,20 @@ __global__ void FindCandidatesKernel(const IdType* offsets, IdType* new_candidat
 
 /*! \brief Update knn graph according to selected candidates for nn-descent */
 template <typename FloatType, typename IdType>
-__global__ void UpdateNeighborsKernel(const FloatType* points, const IdType* offsets,
-                                      IdType* neighbors, IdType* new_candidates,
-                                      IdType* old_candidates, FloatType* distances,
-                                      bool* flags, IdType* num_updates,
-                                      const int64_t batch_size, const int num_candidates,
-                                      const int k, const int64_t feature_size) {
+__global__ void UpdateNeighborsKernel(
+    const FloatType* points, const IdType* offsets, IdType* neighbors,
+    IdType* new_candidates, IdType* old_candidates, FloatType* distances,
+    bool* flags, IdType* num_updates, const int64_t batch_size,
+    const int num_candidates, const int k, const int64_t feature_size) {
   const IdType point_idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (point_idx >= offsets[batch_size]) return;
   IdType* current_neighbors = neighbors + point_idx * k;
   bool* current_flags = flags + point_idx * k;
   FloatType* current_dists = distances + point_idx * k;
-  IdType* new_candidates_ptr = new_candidates + point_idx * (num_candidates + 1);
-  IdType* old_candidates_ptr = old_candidates + point_idx * (num_candidates + 1);
+  IdType* new_candidates_ptr =
+      new_candidates + point_idx * (num_candidates + 1);
+  IdType* old_candidates_ptr =
+      old_candidates + point_idx * (num_candidates + 1);
   IdType num_new_candidates = new_candidates_ptr[0];
   IdType num_old_candidates = old_candidates_ptr[0];
   IdType current_num_updates = 0;
@@ -755,15 +770,14 @@ __global__ void UpdateNeighborsKernel(const FloatType* points, const IdType* off
     for (IdType j = 1; j <= num_twohop_new; ++j) {
       IdType twohop_new_c = twohop_new_ptr[j];
       FloatType new_dist = EuclideanDistWithCheck<FloatType, IdType>(
-        points + point_idx * feature_size,
-        points + twohop_new_c * feature_size,
-        feature_size, worst_dist);
+          points + point_idx * feature_size,
+          points + twohop_new_c * feature_size, feature_size, worst_dist);
 
       if (FlaggedHeapInsert<FloatType, IdType>(
-          current_neighbors, current_dists, current_flags,
-          twohop_new_c, new_dist, true, k, true)) {
-            ++current_num_updates;
-            worst_dist = current_dists[0];
+              current_neighbors, current_dists, current_flags, twohop_new_c,
+              new_dist, true, k, true)) {
+        ++current_num_updates;
+        worst_dist = current_dists[0];
       }
     }
 
@@ -771,15 +785,14 @@ __global__ void UpdateNeighborsKernel(const FloatType* points, const IdType* off
     for (IdType j = 1; j <= num_twohop_old; ++j) {
       IdType twohop_old_c = twohop_old_ptr[j];
       FloatType new_dist = EuclideanDistWithCheck<FloatType, IdType>(
-        points + point_idx * feature_size,
-        points + twohop_old_c * feature_size,
-        feature_size, worst_dist);
+          points + point_idx * feature_size,
+          points + twohop_old_c * feature_size, feature_size, worst_dist);
 
       if (FlaggedHeapInsert<FloatType, IdType>(
-        current_neighbors, current_dists, current_flags,
-        twohop_old_c, new_dist, true, k, true)) {
-          ++current_num_updates;
-          worst_dist = current_dists[0];
+              current_neighbors, current_dists, current_flags, twohop_old_c,
+              new_dist, true, k, true)) {
+        ++current_num_updates;
+        worst_dist = current_dists[0];
       }
     }
   }
@@ -797,15 +810,14 @@ __global__ void UpdateNeighborsKernel(const FloatType* points, const IdType* off
     for (IdType j = 1; j <= num_twohop_new; ++j) {
       IdType twohop_new_c = twohop_new_ptr[j];
       FloatType new_dist = EuclideanDistWithCheck<FloatType, IdType>(
-        points + point_idx * feature_size,
-        points + twohop_new_c * feature_size,
-        feature_size, worst_dist);
+          points + point_idx * feature_size,
+          points + twohop_new_c * feature_size, feature_size, worst_dist);
 
       if (FlaggedHeapInsert<FloatType, IdType>(
-        current_neighbors, current_dists, current_flags,
-        twohop_new_c, new_dist, true, k, true)) {
-          ++current_num_updates;
-          worst_dist = current_dists[0];
+              current_neighbors, current_dists, current_flags, twohop_new_c,
+              new_dist, true, k, true)) {
+        ++current_num_updates;
+        worst_dist = current_dists[0];
       }
     }
   }
@@ -816,24 +828,25 @@ __global__ void UpdateNeighborsKernel(const FloatType* points, const IdType* off
 }  // namespace impl
 
 template <DGLDeviceType XPU, typename FloatType, typename IdType>
-void KNN(const NDArray& data_points, const IdArray& data_offsets,
-         const NDArray& query_points, const IdArray& query_offsets,
-         const int k, IdArray result, const std::string& algorithm) {
+void KNN(
+    const NDArray& data_points, const IdArray& data_offsets,
+    const NDArray& query_points, const IdArray& query_offsets, const int k,
+    IdArray result, const std::string& algorithm) {
   if (algorithm == std::string("bruteforce")) {
     impl::BruteForceKNNCuda<FloatType, IdType>(
-      data_points, data_offsets, query_points, query_offsets, k, result);
+        data_points, data_offsets, query_points, query_offsets, k, result);
   } else if (algorithm == std::string("bruteforce-sharemem")) {
     impl::BruteForceKNNSharedCuda<FloatType, IdType>(
-      data_points, data_offsets, query_points, query_offsets, k, result);
+        data_points, data_offsets, query_points, query_offsets, k, result);
   } else {
     LOG(FATAL) << "Algorithm " << algorithm << " is not supported on CUDA.";
   }
 }
 
 template <DGLDeviceType XPU, typename FloatType, typename IdType>
-void NNDescent(const NDArray& points, const IdArray& offsets,
-               IdArray result, const int k, const int num_iters,
-               const int num_candidates, const double delta) {
+void NNDescent(
+    const NDArray& points, const IdArray& offsets, IdArray result, const int k,
+    const int num_iters, const int num_candidates, const double delta) {
   cudaStream_t stream = runtime::getCurrentCUDAStream();
   const auto& ctx = points->ctx;
   auto device = runtime::DeviceAPI::Get(ctx);
@@ -847,66 +860,68 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
   IdType* neighbors = central_nodes + k * num_nodes;
   uint64_t seed;
   int warp_size = 0;
-  CUDA_CALL(cudaDeviceGetAttribute(
-    &warp_size, cudaDevAttrWarpSize, ctx.device_id));
-  // We don't need large block sizes, since there's not much inter-thread communication
+  CUDA_CALL(
+      cudaDeviceGetAttribute(&warp_size, cudaDevAttrWarpSize, ctx.device_id));
+  // We don't need large block sizes, since there's not much inter-thread
+  // communication
   int64_t block_size = warp_size;
   int64_t num_blocks = (num_nodes - 1) / block_size + 1;
 
   // allocate space for candidates, distances and flags
   // we use the first element in candidate array to represent length
-  IdType* new_candidates = static_cast<IdType*>(
-    device->AllocWorkspace(ctx, num_nodes * (num_candidates + 1) * sizeof(IdType)));
-  IdType* old_candidates = static_cast<IdType*>(
-    device->AllocWorkspace(ctx, num_nodes * (num_candidates + 1) * sizeof(IdType)));
+  IdType* new_candidates = static_cast<IdType*>(device->AllocWorkspace(
+      ctx, num_nodes * (num_candidates + 1) * sizeof(IdType)));
+  IdType* old_candidates = static_cast<IdType*>(device->AllocWorkspace(
+      ctx, num_nodes * (num_candidates + 1) * sizeof(IdType)));
   IdType* num_updates = static_cast<IdType*>(
-    device->AllocWorkspace(ctx, num_nodes * sizeof(IdType)));
+      device->AllocWorkspace(ctx, num_nodes * sizeof(IdType)));
   FloatType* distances = static_cast<FloatType*>(
-    device->AllocWorkspace(ctx, num_nodes * k * sizeof(IdType)));
+      device->AllocWorkspace(ctx, num_nodes * k * sizeof(IdType)));
   bool* flags = static_cast<bool*>(
-    device->AllocWorkspace(ctx, num_nodes * k * sizeof(IdType)));
+      device->AllocWorkspace(ctx, num_nodes * k * sizeof(IdType)));
 
   size_t sum_temp_size = 0;
   IdType total_num_updates = 0;
-  IdType* total_num_updates_d = static_cast<IdType*>(
-    device->AllocWorkspace(ctx, sizeof(IdType)));
+  IdType* total_num_updates_d =
+      static_cast<IdType*>(device->AllocWorkspace(ctx, sizeof(IdType)));
 
   CUDA_CALL(cub::DeviceReduce::Sum(
-    nullptr, sum_temp_size, num_updates, total_num_updates_d, num_nodes, stream));
-  IdType* sum_temp_storage = static_cast<IdType*>(
-    device->AllocWorkspace(ctx, sum_temp_size));
+      nullptr, sum_temp_size, num_updates, total_num_updates_d, num_nodes,
+      stream));
+  IdType* sum_temp_storage =
+      static_cast<IdType*>(device->AllocWorkspace(ctx, sum_temp_size));
 
   // random initialize neighbors
   seed = RandomEngine::ThreadLocal()->RandInt<uint64_t>(
-    std::numeric_limits<uint64_t>::max());
+      std::numeric_limits<uint64_t>::max());
   CUDA_KERNEL_CALL(
-    impl::RandomInitNeighborsKernel, num_blocks, block_size, 0, stream,
-    points_data, offsets_data, central_nodes, neighbors, distances, flags, k,
-    feature_size, batch_size, seed);
+      impl::RandomInitNeighborsKernel, num_blocks, block_size, 0, stream,
+      points_data, offsets_data, central_nodes, neighbors, distances, flags, k,
+      feature_size, batch_size, seed);
 
   for (int i = 0; i < num_iters; ++i) {
     // select candidates
     seed = RandomEngine::ThreadLocal()->RandInt<uint64_t>(
-      std::numeric_limits<uint64_t>::max());
+        std::numeric_limits<uint64_t>::max());
     CUDA_KERNEL_CALL(
-      impl::FindCandidatesKernel, num_blocks, block_size, 0,
-      stream, offsets_data, new_candidates, old_candidates, neighbors,
-      flags, seed, batch_size, num_candidates, k);
+        impl::FindCandidatesKernel, num_blocks, block_size, 0, stream,
+        offsets_data, new_candidates, old_candidates, neighbors, flags, seed,
+        batch_size, num_candidates, k);
 
     // update
     CUDA_KERNEL_CALL(
-      impl::UpdateNeighborsKernel, num_blocks, block_size, 0, stream,
-      points_data, offsets_data, neighbors, new_candidates, old_candidates, distances,
-      flags, num_updates, batch_size, num_candidates, k, feature_size);
+        impl::UpdateNeighborsKernel, num_blocks, block_size, 0, stream,
+        points_data, offsets_data, neighbors, new_candidates, old_candidates,
+        distances, flags, num_updates, batch_size, num_candidates, k,
+        feature_size);
 
     total_num_updates = 0;
     CUDA_CALL(cub::DeviceReduce::Sum(
-      sum_temp_storage, sum_temp_size, num_updates, total_num_updates_d, num_nodes,
-      stream));
+        sum_temp_storage, sum_temp_size, num_updates, total_num_updates_d,
+        num_nodes, stream));
     device->CopyDataFromTo(
-      total_num_updates_d, 0, &total_num_updates, 0,
-      sizeof(IdType), ctx, DGLContext{kDGLCPU, 0},
-      offsets->dtype);
+        total_num_updates_d, 0, &total_num_updates, 0, sizeof(IdType), ctx,
+        DGLContext{kDGLCPU, 0}, offsets->dtype);
 
     if (total_num_updates <= static_cast<IdType>(delta * k * num_nodes)) {
       break;
@@ -923,38 +938,34 @@ void NNDescent(const NDArray& points, const IdArray& offsets,
 }
 
 template void KNN<kDGLCUDA, float, int32_t>(
-  const NDArray& data_points, const IdArray& data_offsets,
-  const NDArray& query_points, const IdArray& query_offsets,
-  const int k, IdArray result, const std::string& algorithm);
+    const NDArray& data_points, const IdArray& data_offsets,
+    const NDArray& query_points, const IdArray& query_offsets, const int k,
+    IdArray result, const std::string& algorithm);
 template void KNN<kDGLCUDA, float, int64_t>(
-  const NDArray& data_points, const IdArray& data_offsets,
-  const NDArray& query_points, const IdArray& query_offsets,
-  const int k, IdArray result, const std::string& algorithm);
+    const NDArray& data_points, const IdArray& data_offsets,
+    const NDArray& query_points, const IdArray& query_offsets, const int k,
+    IdArray result, const std::string& algorithm);
 template void KNN<kDGLCUDA, double, int32_t>(
-  const NDArray& data_points, const IdArray& data_offsets,
-  const NDArray& query_points, const IdArray& query_offsets,
-  const int k, IdArray result, const std::string& algorithm);
+    const NDArray& data_points, const IdArray& data_offsets,
+    const NDArray& query_points, const IdArray& query_offsets, const int k,
+    IdArray result, const std::string& algorithm);
 template void KNN<kDGLCUDA, double, int64_t>(
-  const NDArray& data_points, const IdArray& data_offsets,
-  const NDArray& query_points, const IdArray& query_offsets,
-  const int k, IdArray result, const std::string& algorithm);
+    const NDArray& data_points, const IdArray& data_offsets,
+    const NDArray& query_points, const IdArray& query_offsets, const int k,
+    IdArray result, const std::string& algorithm);
 
 template void NNDescent<kDGLCUDA, float, int32_t>(
-  const NDArray& points, const IdArray& offsets,
-  IdArray result, const int k, const int num_iters,
-  const int num_candidates, const double delta);
+    const NDArray& points, const IdArray& offsets, IdArray result, const int k,
+    const int num_iters, const int num_candidates, const double delta);
 template void NNDescent<kDGLCUDA, float, int64_t>(
-  const NDArray& points, const IdArray& offsets,
-  IdArray result, const int k, const int num_iters,
-  const int num_candidates, const double delta);
+    const NDArray& points, const IdArray& offsets, IdArray result, const int k,
+    const int num_iters, const int num_candidates, const double delta);
 template void NNDescent<kDGLCUDA, double, int32_t>(
-  const NDArray& points, const IdArray& offsets,
-  IdArray result, const int k, const int num_iters,
-  const int num_candidates, const double delta);
+    const NDArray& points, const IdArray& offsets, IdArray result, const int k,
+    const int num_iters, const int num_candidates, const double delta);
 template void NNDescent<kDGLCUDA, double, int64_t>(
-  const NDArray& points, const IdArray& offsets,
-  IdArray result, const int k, const int num_iters,
-  const int num_candidates, const double delta);
+    const NDArray& points, const IdArray& offsets, IdArray result, const int k,
+    const int num_iters, const int num_candidates, const double delta);
 
 }  // namespace transform
 }  // namespace dgl

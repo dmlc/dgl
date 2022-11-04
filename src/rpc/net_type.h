@@ -7,6 +7,7 @@
 #define DGL_RPC_NET_TYPE_H_
 
 #include <string>
+
 #include "rpc_msg.h"
 
 namespace dgl {
@@ -29,11 +30,12 @@ struct RPCBase {
 struct RPCSender : RPCBase {
   /*!
    * \brief Connect to a receiver.
-   * 
-   * When there are multiple receivers to be connected, application will call `ConnectReceiver`
-   * for each and then call `ConnectReceiverFinalize` to make sure that either all the connections are
-   * successfully established or some of them fail.
-   * 
+   *
+   * When there are multiple receivers to be connected, application will call
+   * `ConnectReceiver` for each and then call `ConnectReceiverFinalize` to make
+   * sure that either all the connections are successfully established or some
+   * of them fail.
+   *
    * \param addr Networking address, e.g., 'tcp://127.0.0.1:50091'
    * \param recv_id receiver's ID
    * \return True for success and False for fail
@@ -49,13 +51,11 @@ struct RPCSender : RPCBase {
    *
    * The function is *not* thread-safe; only one thread can invoke this API.
    */
-  virtual bool ConnectReceiverFinalize(const int max_try_times) {
-    return true;
-  }
+  virtual bool ConnectReceiverFinalize(const int max_try_times) { return true; }
 
   /*!
    * \brief Send RPCMessage to specified Receiver.
-   * \param msg data message 
+   * \param msg data message
    * \param recv_id receiver's ID
    */
   virtual void Send(const RPCMessage &msg, int recv_id) = 0;
@@ -71,13 +71,14 @@ struct RPCReceiver : RPCBase {
    *
    * Wait() is not thread-safe and only one thread can invoke this API.
    */
-  virtual bool Wait(const std::string &addr, int num_sender,
-                    bool blocking = true) = 0;
+  virtual bool Wait(
+      const std::string &addr, int num_sender, bool blocking = true) = 0;
 
   /*!
    * \brief Recv RPCMessage from Sender. Actually removing data from queue.
    * \param msg pointer of RPCmessage
-   * \param timeout The timeout value in milliseconds. If zero, wait indefinitely.
+   * \param timeout The timeout value in milliseconds. If zero, wait
+   * indefinitely.
    * \return RPCStatus: kRPCSuccess or kRPCTimeOut.
    */
   virtual RPCStatus Recv(RPCMessage *msg, int timeout) = 0;

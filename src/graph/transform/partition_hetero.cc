@@ -37,25 +37,28 @@ HeteroGraphPtr ReorderUnitGraph(UnitGraphPtr ug, IdArray new_order) {
   if (format & CSC_CODE) {
     auto cscmat = ug->GetCSCMatrix(0);
     auto new_cscmat = aten::CSRReorder(cscmat, new_order, new_order);
-    return UnitGraph::CreateFromCSC(ug->NumVertexTypes(), new_cscmat, ug->GetAllowedFormats());
+    return UnitGraph::CreateFromCSC(
+        ug->NumVertexTypes(), new_cscmat, ug->GetAllowedFormats());
   } else if (format & CSR_CODE) {
     auto csrmat = ug->GetCSRMatrix(0);
     auto new_csrmat = aten::CSRReorder(csrmat, new_order, new_order);
-    return UnitGraph::CreateFromCSR(ug->NumVertexTypes(), new_csrmat, ug->GetAllowedFormats());
+    return UnitGraph::CreateFromCSR(
+        ug->NumVertexTypes(), new_csrmat, ug->GetAllowedFormats());
   } else {
     auto coomat = ug->GetCOOMatrix(0);
     auto new_coomat = aten::COOReorder(coomat, new_order, new_order);
-    return UnitGraph::CreateFromCOO(ug->NumVertexTypes(), new_coomat, ug->GetAllowedFormats());
+    return UnitGraph::CreateFromCOO(
+        ug->NumVertexTypes(), new_coomat, ug->GetAllowedFormats());
   }
 }
 
-HaloHeteroSubgraph GetSubgraphWithHalo(std::shared_ptr<HeteroGraph> hg,
-                                       IdArray nodes, int num_hops) {
+HaloHeteroSubgraph GetSubgraphWithHalo(
+    std::shared_ptr<HeteroGraph> hg, IdArray nodes, int num_hops) {
   CHECK_EQ(hg->NumBits(), 64) << "halo subgraph only supports 64bits graph";
   CHECK_EQ(hg->relation_graphs().size(), 1)
-    << "halo subgraph only supports homogeneous graph";
+      << "halo subgraph only supports homogeneous graph";
   CHECK_EQ(nodes->dtype.bits, 64)
-    << "halo subgraph only supports 64bits nodes tensor";
+      << "halo subgraph only supports 64bits nodes tensor";
   const dgl_id_t *nid = static_cast<dgl_id_t *>(nodes->data);
   const auto id_len = nodes->shape[0];
   // A map contains all nodes in the subgraph.
@@ -113,8 +116,8 @@ HaloHeteroSubgraph GetSubgraphWithHalo(std::shared_ptr<HeteroGraph> hg,
     const dgl_id_t *eid_data = static_cast<dgl_id_t *>(eid->data);
     for (int64_t i = 0; i < num_edges; i++) {
       auto it1 = orig_nodes.find(src_data[i]);
-      // If the source node is in the partition, we have got this edge when we iterate over
-      // the out-edges above.
+      // If the source node is in the partition, we have got this edge when we
+      // iterate over the out-edges above.
       if (it1 == orig_nodes.end()) {
         edge_src.push_back(src_data[i]);
         edge_dst.push_back(dst_data[i]);
@@ -164,10 +167,10 @@ HaloHeteroSubgraph GetSubgraphWithHalo(std::shared_ptr<HeteroGraph> hg,
   }
 
   num_edges = edge_src.size();
-  IdArray new_src = IdArray::Empty({num_edges}, DGLDataType{kDGLInt, 64, 1},
-                                   DGLContext{kDGLCPU, 0});
-  IdArray new_dst = IdArray::Empty({num_edges}, DGLDataType{kDGLInt, 64, 1},
-                                   DGLContext{kDGLCPU, 0});
+  IdArray new_src = IdArray::Empty(
+      {num_edges}, DGLDataType{kDGLInt, 64, 1}, DGLContext{kDGLCPU, 0});
+  IdArray new_dst = IdArray::Empty(
+      {num_edges}, DGLDataType{kDGLInt, 64, 1}, DGLContext{kDGLCPU, 0});
   dgl_id_t *new_src_data = static_cast<dgl_id_t *>(new_src->data);
   dgl_id_t *new_dst_data = static_cast<dgl_id_t *>(new_dst->data);
   for (size_t i = 0; i < edge_src.size(); i++) {
@@ -180,8 +183,8 @@ HaloHeteroSubgraph GetSubgraphWithHalo(std::shared_ptr<HeteroGraph> hg,
     dgl_id_t old_nid = old_node_ids[i];
     inner_nodes[i] = all_nodes[old_nid];
   }
-  aten::COOMatrix coo(old_node_ids.size(), old_node_ids.size(), new_src,
-                      new_dst);
+  aten::COOMatrix coo(
+      old_node_ids.size(), old_node_ids.size(), new_src, new_dst);
   HeteroGraphPtr ugptr = UnitGraph::CreateFromCOO(1, coo);
   HeteroGraphPtr subg = CreateHeteroGraph(hg->meta_graph(), {ugptr});
   HaloHeteroSubgraph halo_subg;
@@ -194,83 +197,83 @@ HaloHeteroSubgraph GetSubgraphWithHalo(std::shared_ptr<HeteroGraph> hg,
 }
 
 DGL_REGISTER_GLOBAL("partition._CAPI_DGLReorderGraph_Hetero")
-  .set_body([](DGLArgs args, DGLRetValue *rv) {
-    HeteroGraphRef g = args[0];
-    auto hgptr = std::dynamic_pointer_cast<HeteroGraph>(g.sptr());
-    CHECK(hgptr) << "Invalid HeteroGraph object";
-    CHECK_EQ(hgptr->relation_graphs().size(), 1)
-      << "Reorder only supports HomoGraph";
-    auto ugptr = hgptr->relation_graphs()[0];
-    const IdArray new_order = args[1];
-    auto reorder_ugptr = ReorderUnitGraph(ugptr, new_order);
-    std::vector<HeteroGraphPtr> rel_graphs = {reorder_ugptr};
-    *rv = HeteroGraphRef(std::make_shared<HeteroGraph>(
-      hgptr->meta_graph(), rel_graphs, hgptr->NumVerticesPerType()));
-  });
+    .set_body([](DGLArgs args, DGLRetValue *rv) {
+      HeteroGraphRef g = args[0];
+      auto hgptr = std::dynamic_pointer_cast<HeteroGraph>(g.sptr());
+      CHECK(hgptr) << "Invalid HeteroGraph object";
+      CHECK_EQ(hgptr->relation_graphs().size(), 1)
+          << "Reorder only supports HomoGraph";
+      auto ugptr = hgptr->relation_graphs()[0];
+      const IdArray new_order = args[1];
+      auto reorder_ugptr = ReorderUnitGraph(ugptr, new_order);
+      std::vector<HeteroGraphPtr> rel_graphs = {reorder_ugptr};
+      *rv = HeteroGraphRef(std::make_shared<HeteroGraph>(
+          hgptr->meta_graph(), rel_graphs, hgptr->NumVerticesPerType()));
+    });
 
 DGL_REGISTER_GLOBAL("partition._CAPI_DGLPartitionWithHalo_Hetero")
-  .set_body([](DGLArgs args, DGLRetValue *rv) {
-    HeteroGraphRef g = args[0];
-    auto hgptr = std::dynamic_pointer_cast<HeteroGraph>(g.sptr());
-    CHECK(hgptr) << "Invalid HeteroGraph object";
-    CHECK_EQ(hgptr->relation_graphs().size(), 1)
-      << "Metis partition only supports HomoGraph";
-    auto ugptr = hgptr->relation_graphs()[0];
+    .set_body([](DGLArgs args, DGLRetValue *rv) {
+      HeteroGraphRef g = args[0];
+      auto hgptr = std::dynamic_pointer_cast<HeteroGraph>(g.sptr());
+      CHECK(hgptr) << "Invalid HeteroGraph object";
+      CHECK_EQ(hgptr->relation_graphs().size(), 1)
+          << "Metis partition only supports HomoGraph";
+      auto ugptr = hgptr->relation_graphs()[0];
 
-    IdArray node_parts = args[1];
-    int num_hops = args[2];
+      IdArray node_parts = args[1];
+      int num_hops = args[2];
 
-    CHECK_EQ(node_parts->dtype.bits, 64)
-      << "Only supports 64bits tensor for now";
+      CHECK_EQ(node_parts->dtype.bits, 64)
+          << "Only supports 64bits tensor for now";
 
-    const int64_t *part_data = static_cast<int64_t *>(node_parts->data);
-    int64_t num_nodes = node_parts->shape[0];
-    std::unordered_map<int, std::vector<int64_t>> part_map;
-    for (int64_t i = 0; i < num_nodes; i++) {
-      dgl_id_t part_id = part_data[i];
-      auto it = part_map.find(part_id);
-      if (it == part_map.end()) {
-        std::vector<int64_t> vec;
-        vec.push_back(i);
-        part_map[part_id] = vec;
-      } else {
-        it->second.push_back(i);
+      const int64_t *part_data = static_cast<int64_t *>(node_parts->data);
+      int64_t num_nodes = node_parts->shape[0];
+      std::unordered_map<int, std::vector<int64_t>> part_map;
+      for (int64_t i = 0; i < num_nodes; i++) {
+        dgl_id_t part_id = part_data[i];
+        auto it = part_map.find(part_id);
+        if (it == part_map.end()) {
+          std::vector<int64_t> vec;
+          vec.push_back(i);
+          part_map[part_id] = vec;
+        } else {
+          it->second.push_back(i);
+        }
       }
-    }
-    std::vector<int> part_ids;
-    std::vector<std::vector<int64_t>> part_nodes;
-    int max_part_id = 0;
-    for (auto it = part_map.begin(); it != part_map.end(); it++) {
-      max_part_id = std::max(it->first, max_part_id);
-      part_ids.push_back(it->first);
-      part_nodes.push_back(it->second);
-    }
-    // When we construct subgraphs, we need to access both in-edges and out-edges.
-    // We need to make sure the in-CSR and out-CSR exist. Otherwise, we'll
-    // try to construct in-CSR and out-CSR in openmp for loop, which will lead
-    // to some unexpected results.
-    ugptr->GetInCSR();
-    ugptr->GetOutCSR();
-    std::vector<std::shared_ptr<HaloHeteroSubgraph>> subgs(max_part_id + 1);
-    int num_partitions = part_nodes.size();
-    runtime::parallel_for(0, num_partitions, [&](int b, int e) {
-      for (auto i = b; i < e; i++) {
-        auto nodes = aten::VecToIdArray(part_nodes[i]);
-        HaloHeteroSubgraph subg = GetSubgraphWithHalo(hgptr, nodes, num_hops);
-        std::shared_ptr<HaloHeteroSubgraph> subg_ptr(
-          new HaloHeteroSubgraph(subg));
-        int part_id = part_ids[i];
-        subgs[part_id] = subg_ptr;
+      std::vector<int> part_ids;
+      std::vector<std::vector<int64_t>> part_nodes;
+      int max_part_id = 0;
+      for (auto it = part_map.begin(); it != part_map.end(); it++) {
+        max_part_id = std::max(it->first, max_part_id);
+        part_ids.push_back(it->first);
+        part_nodes.push_back(it->second);
       }
+      // When we construct subgraphs, we need to access both in-edges and
+      // out-edges. We need to make sure the in-CSR and out-CSR exist.
+      // Otherwise, we'll try to construct in-CSR and out-CSR in openmp for
+      // loop, which will lead to some unexpected results.
+      ugptr->GetInCSR();
+      ugptr->GetOutCSR();
+      std::vector<std::shared_ptr<HaloHeteroSubgraph>> subgs(max_part_id + 1);
+      int num_partitions = part_nodes.size();
+      runtime::parallel_for(0, num_partitions, [&](int b, int e) {
+        for (auto i = b; i < e; i++) {
+          auto nodes = aten::VecToIdArray(part_nodes[i]);
+          HaloHeteroSubgraph subg = GetSubgraphWithHalo(hgptr, nodes, num_hops);
+          std::shared_ptr<HaloHeteroSubgraph> subg_ptr(
+              new HaloHeteroSubgraph(subg));
+          int part_id = part_ids[i];
+          subgs[part_id] = subg_ptr;
+        }
+      });
+      List<HeteroSubgraphRef> ret_list;
+      for (size_t i = 0; i < subgs.size(); i++) {
+        ret_list.push_back(HeteroSubgraphRef(subgs[i]));
+      }
+      *rv = ret_list;
     });
-    List<HeteroSubgraphRef> ret_list;
-    for (size_t i = 0; i < subgs.size(); i++) {
-      ret_list.push_back(HeteroSubgraphRef(subgs[i]));
-    }
-    *rv = ret_list;
-  });
 
-template<class IdType>
+template <class IdType>
 struct EdgeProperty {
   IdType eid;
   int64_t idx;
@@ -280,98 +283,101 @@ struct EdgeProperty {
 // Reassign edge IDs so that all edges in a partition have contiguous edge IDs.
 // The original edge IDs are returned.
 DGL_REGISTER_GLOBAL("partition._CAPI_DGLReassignEdges_Hetero")
-  .set_body([](DGLArgs args, DGLRetValue *rv) {
-    HeteroGraphRef g = args[0];
-    auto hgptr = std::dynamic_pointer_cast<HeteroGraph>(g.sptr());
-    CHECK(hgptr) << "Invalid HeteroGraph object";
-    CHECK_EQ(hgptr->relation_graphs().size(), 1)
-      << "Reorder only supports HomoGraph";
-    auto ugptr = hgptr->relation_graphs()[0];
-    IdArray etype = args[1];
-    IdArray part_id = args[2];
-    bool is_incsr = args[3];
-    auto csrmat = is_incsr ? ugptr->GetCSCMatrix(0) : ugptr->GetCSRMatrix(0);
-    int64_t num_edges = csrmat.data->shape[0];
-    int64_t num_rows = csrmat.indptr->shape[0] - 1;
-    IdArray new_data =
-      IdArray::Empty({num_edges}, csrmat.data->dtype, csrmat.data->ctx);
-    // Return the original edge Ids.
-    *rv = new_data;
+    .set_body([](DGLArgs args, DGLRetValue *rv) {
+      HeteroGraphRef g = args[0];
+      auto hgptr = std::dynamic_pointer_cast<HeteroGraph>(g.sptr());
+      CHECK(hgptr) << "Invalid HeteroGraph object";
+      CHECK_EQ(hgptr->relation_graphs().size(), 1)
+          << "Reorder only supports HomoGraph";
+      auto ugptr = hgptr->relation_graphs()[0];
+      IdArray etype = args[1];
+      IdArray part_id = args[2];
+      bool is_incsr = args[3];
+      auto csrmat = is_incsr ? ugptr->GetCSCMatrix(0) : ugptr->GetCSRMatrix(0);
+      int64_t num_edges = csrmat.data->shape[0];
+      int64_t num_rows = csrmat.indptr->shape[0] - 1;
+      IdArray new_data =
+          IdArray::Empty({num_edges}, csrmat.data->dtype, csrmat.data->ctx);
+      // Return the original edge Ids.
+      *rv = new_data;
 
-    // Generate new edge Ids.
-    ATEN_ID_TYPE_SWITCH(new_data->dtype, IdType, {
-      CHECK(etype->dtype.bits == sizeof(IdType) * 8);
-      CHECK(part_id->dtype.bits == sizeof(IdType) * 8);
-      const IdType *part_id_data = static_cast<IdType *>(part_id->data);
-      const IdType *etype_data = static_cast<IdType *>(etype->data);
-      const IdType *indptr_data = static_cast<IdType *>(csrmat.indptr->data);
-      IdType *typed_data = static_cast<IdType *>(csrmat.data->data);
-      IdType *typed_new_data = static_cast<IdType *>(new_data->data);
-      std::vector<EdgeProperty<IdType>> indexed_eids(num_edges);
-      for (int64_t i = 0; i < num_rows; i++) {
-        for (int64_t j = indptr_data[i]; j < indptr_data[i + 1]; j++) {
-          indexed_eids[j].eid = typed_data[j];
-          indexed_eids[j].idx = j;
-          indexed_eids[j].part_id = part_id_data[i];
+      // Generate new edge Ids.
+      ATEN_ID_TYPE_SWITCH(new_data->dtype, IdType, {
+        CHECK(etype->dtype.bits == sizeof(IdType) * 8);
+        CHECK(part_id->dtype.bits == sizeof(IdType) * 8);
+        const IdType *part_id_data = static_cast<IdType *>(part_id->data);
+        const IdType *etype_data = static_cast<IdType *>(etype->data);
+        const IdType *indptr_data = static_cast<IdType *>(csrmat.indptr->data);
+        IdType *typed_data = static_cast<IdType *>(csrmat.data->data);
+        IdType *typed_new_data = static_cast<IdType *>(new_data->data);
+        std::vector<EdgeProperty<IdType>> indexed_eids(num_edges);
+        for (int64_t i = 0; i < num_rows; i++) {
+          for (int64_t j = indptr_data[i]; j < indptr_data[i + 1]; j++) {
+            indexed_eids[j].eid = typed_data[j];
+            indexed_eids[j].idx = j;
+            indexed_eids[j].part_id = part_id_data[i];
+          }
         }
-      }
-      auto comp = [etype_data](const EdgeProperty<IdType> &a, const EdgeProperty<IdType> &b) {
-        if (a.part_id == b.part_id) {
-          return etype_data[a.eid] < etype_data[b.eid];
-        } else {
-          return a.part_id < b.part_id;
+        auto comp = [etype_data](
+                        const EdgeProperty<IdType> &a,
+                        const EdgeProperty<IdType> &b) {
+          if (a.part_id == b.part_id) {
+            return etype_data[a.eid] < etype_data[b.eid];
+          } else {
+            return a.part_id < b.part_id;
+          }
+        };
+        // We only need to sort the edges if the input graph has multiple
+        // relations. If it's a homogeneous grap, we'll just assign edge Ids
+        // based on its previous order.
+        if (etype->shape[0] > 0) {
+          std::sort(indexed_eids.begin(), indexed_eids.end(), comp);
         }
-      };
-      // We only need to sort the edges if the input graph has multiple relations.
-      // If it's a homogeneous grap, we'll just assign edge Ids based on its previous order.
-      if (etype->shape[0] > 0) {
-        std::sort(indexed_eids.begin(), indexed_eids.end(), comp);
-      }
-      for (int64_t new_eid = 0; new_eid < num_edges; new_eid++) {
-        int64_t orig_idx = indexed_eids[new_eid].idx;
-        typed_new_data[new_eid] = typed_data[orig_idx];
-        typed_data[orig_idx] = new_eid;
-      }
+        for (int64_t new_eid = 0; new_eid < num_edges; new_eid++) {
+          int64_t orig_idx = indexed_eids[new_eid].idx;
+          typed_new_data[new_eid] = typed_data[orig_idx];
+          typed_data[orig_idx] = new_eid;
+        }
+      });
+      ugptr->InvalidateCSR();
+      ugptr->InvalidateCOO();
     });
-    ugptr->InvalidateCSR();
-    ugptr->InvalidateCOO();
-  });
 
 DGL_REGISTER_GLOBAL("partition._CAPI_GetHaloSubgraphInnerNodes_Hetero")
-  .set_body([](DGLArgs args, DGLRetValue *rv) {
-    HeteroSubgraphRef g = args[0];
-    auto gptr = std::dynamic_pointer_cast<HaloHeteroSubgraph>(g.sptr());
-    CHECK(gptr) << "The input graph has to be HaloHeteroSubgraph";
-    *rv = gptr->inner_nodes[0];
-  });
-
+    .set_body([](DGLArgs args, DGLRetValue *rv) {
+      HeteroSubgraphRef g = args[0];
+      auto gptr = std::dynamic_pointer_cast<HaloHeteroSubgraph>(g.sptr());
+      CHECK(gptr) << "The input graph has to be HaloHeteroSubgraph";
+      *rv = gptr->inner_nodes[0];
+    });
 
 DGL_REGISTER_GLOBAL("partition._CAPI_DGLMakeSymmetric_Hetero")
-  .set_body([](DGLArgs args, DGLRetValue *rv) {
-    HeteroGraphRef g = args[0];
-    auto hgptr = std::dynamic_pointer_cast<HeteroGraph>(g.sptr());
-    CHECK(hgptr) << "Invalid HeteroGraph object";
-    CHECK_EQ(hgptr->relation_graphs().size(), 1)
-      << "Metis partition only supports homogeneous graph";
-    auto ugptr = hgptr->relation_graphs()[0];
+    .set_body([](DGLArgs args, DGLRetValue *rv) {
+      HeteroGraphRef g = args[0];
+      auto hgptr = std::dynamic_pointer_cast<HeteroGraph>(g.sptr());
+      CHECK(hgptr) << "Invalid HeteroGraph object";
+      CHECK_EQ(hgptr->relation_graphs().size(), 1)
+          << "Metis partition only supports homogeneous graph";
+      auto ugptr = hgptr->relation_graphs()[0];
 
 #if !defined(_WIN32)
-    // TODO(zhengda) should we get whatever CSR exists in the graph.
-    gk_csr_t *gk_csr = Convert2GKCsr(ugptr->GetCSCMatrix(0), true);
-    gk_csr_t *sym_gk_csr = gk_csr_MakeSymmetric(gk_csr, GK_CSR_SYM_SUM);
-    auto mat = Convert2DGLCsr(sym_gk_csr, true);
-    gk_csr_Free(&gk_csr);
-    gk_csr_Free(&sym_gk_csr);
+      // TODO(zhengda) should we get whatever CSR exists in the graph.
+      gk_csr_t *gk_csr = Convert2GKCsr(ugptr->GetCSCMatrix(0), true);
+      gk_csr_t *sym_gk_csr = gk_csr_MakeSymmetric(gk_csr, GK_CSR_SYM_SUM);
+      auto mat = Convert2DGLCsr(sym_gk_csr, true);
+      gk_csr_Free(&gk_csr);
+      gk_csr_Free(&sym_gk_csr);
 
-    auto new_ugptr = UnitGraph::CreateFromCSC(ugptr->NumVertexTypes(), mat,
-                                              ugptr->GetAllowedFormats());
-    std::vector<HeteroGraphPtr> rel_graphs = {new_ugptr};
-    *rv = HeteroGraphRef(std::make_shared<HeteroGraph>(
-      hgptr->meta_graph(), rel_graphs, hgptr->NumVerticesPerType()));
+      auto new_ugptr = UnitGraph::CreateFromCSC(
+          ugptr->NumVertexTypes(), mat, ugptr->GetAllowedFormats());
+      std::vector<HeteroGraphPtr> rel_graphs = {new_ugptr};
+      *rv = HeteroGraphRef(std::make_shared<HeteroGraph>(
+          hgptr->meta_graph(), rel_graphs, hgptr->NumVerticesPerType()));
 #else
-    LOG(FATAL) << "The fast version of making symmetric graph is not supported in Windows.";
+      LOG(FATAL) << "The fast version of making symmetric graph is not "
+                    "supported in Windows.";
 #endif  // !defined(_WIN32)
-  });
+    });
 
 }  // namespace transform
 }  // namespace dgl
