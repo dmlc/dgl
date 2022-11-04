@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
  * \file runtime/object.h
- * \brief Defines the Object data structures.
+ * @brief Defines the Object data structures.
  */
 #ifndef DGL_RUNTIME_OBJECT_H_
 #define DGL_RUNTIME_OBJECT_H_
@@ -22,7 +22,7 @@ class ObjectRef;
 class NDArray;
 
 /*!
- * \brief Visitor class to each object attribute.
+ * @brief Visitor class to each object attribute.
  *  The content is going to be called for each field.
  */
 class AttrVisitor {
@@ -49,7 +49,7 @@ class AttrVisitor {
 };
 
 /*!
- * \brief base class of object container.
+ * @brief base class of object container.
  *  All object's internal is stored as std::shared_ptr<Object>
  */
 class Object {
@@ -59,41 +59,41 @@ class Object {
   /*! \return The unique type key of the object */
   virtual const char* type_key() const = 0;
   /*!
-   * \brief Apply visitor to each field of the Object
+   * @brief Apply visitor to each field of the Object
    *  Visitor could mutate the content of the object.
    *  override if Object contains attribute fields.
-   * \param visitor The visitor
+   * @param visitor The visitor
    */
   virtual void VisitAttrs(AttrVisitor* visitor) {}
   /*! \return the type index of the object */
   virtual uint32_t type_index() const = 0;
   /*!
-   * \brief Whether this object derives from object with type_index=tid.
+   * @brief Whether this object derives from object with type_index=tid.
    *  Implemented by DGL_DECLARE_OBJECT_TYPE_INFO
    *
-   * \param tid The type index.
-   * \return the check result.
+   * @param tid The type index.
+   * @return the check result.
    */
   virtual bool _DerivedFrom(uint32_t tid) const;
   /*!
-   * \brief get a runtime unique type index given a type key
-   * \param type_key Type key of a type.
-   * \return the corresponding type index.
+   * @brief get a runtime unique type index given a type key
+   * @param type_key Type key of a type.
+   * @return the corresponding type index.
    */
   static uint32_t TypeKey2Index(const char* type_key);
   /*!
-   * \brief get type key from type index.
-   * \param index The type index
-   * \return the corresponding type key.
+   * @brief get type key from type index.
+   * @param index The type index
+   * @return the corresponding type key.
    */
   static const char* TypeIndex2Key(uint32_t index);
   /*!
-   * \return whether the type is derived from
+   * @return whether the type is derived from
    */
   template <typename T>
   inline bool derived_from() const;
   /*!
-   * \return whether the object is of type T
+   * @return whether the object is of type T
    * \tparam The type to be checked.
    */
   template <typename T>
@@ -109,39 +109,39 @@ class ObjectRef {
   /*! \brief type indicate the container type */
   using ContainerType = Object;
   /*!
-   * \brief Comparator
+   * @brief Comparator
    *
    * Compare with the two are referencing to the same object (compare by
    * address).
    *
-   * \param other Another object ref.
-   * \return the compare result.
+   * @param other Another object ref.
+   * @return the compare result.
    * \sa same_as
    */
   inline bool operator==(const ObjectRef& other) const;
   /*!
-   * \brief Comparator
+   * @brief Comparator
    *
    * Compare with the two are referencing to the same object (compare by
    * address).
    *
-   * \param other Another object ref.
-   * \return the compare result.
+   * @param other Another object ref.
+   * @return the compare result.
    */
   inline bool same_as(const ObjectRef& other) const;
   /*!
-   * \brief Comparator
+   * @brief Comparator
    *
    * The operator overload allows ObjectRef be used in std::map.
    *
-   * \param other Another object ref.
-   * \return the compare result.
+   * @param other Another object ref.
+   * @return the compare result.
    */
   inline bool operator<(const ObjectRef& other) const;
   /*!
-   * \brief Comparator
-   * \param other Another object ref.
-   * \return the compare result.
+   * @brief Comparator
+   * @param other Another object ref.
+   * @return the compare result.
    * \sa same_as
    */
   inline bool operator!=(const ObjectRef& other) const;
@@ -156,7 +156,7 @@ class ObjectRef {
   /*! \return the internal object pointer */
   inline const Object* operator->() const;
   /*!
-   * \brief Downcast this object to its actual type.
+   * @brief Downcast this object to its actual type.
    * This returns nullptr if the object is not of the requested type.
    * Example usage:
    *
@@ -177,7 +177,7 @@ class ObjectRef {
 };
 
 /*!
- * \brief helper macro to declare type information in a base object.
+ * @brief helper macro to declare type information in a base object.
  *
  * This is macro should be used in abstract base class definition
  * because it does not define type_key and type_index.
@@ -190,7 +190,7 @@ class ObjectRef {
   }
 
 /*!
- * \brief helper macro to declare type information in a terminal class
+ * @brief helper macro to declare type information in a terminal class
  *
  * This is macro should be used in terminal class definition.
  *

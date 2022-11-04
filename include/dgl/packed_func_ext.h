@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
  * \file packed_func_ext.h
- * \brief Extension package to PackedFunc
+ * @brief Extension package to PackedFunc
  *   This enables pass ObjectRef types into/from PackedFunc.
  */
 #ifndef DGL_PACKED_FUNC_EXT_H_
@@ -19,7 +19,7 @@
 namespace dgl {
 namespace runtime {
 /*!
- * \brief Runtime type checker for node type.
+ * @brief Runtime type checker for node type.
  * \tparam T the type to be checked.
  */
 template <typename T>

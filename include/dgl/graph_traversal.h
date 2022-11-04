@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file dgl/graph_traversal.h
- * \brief common graph traversal operations
+ * @brief common graph traversal operations
  */
 #ifndef DGL_GRAPH_TRAVERSAL_H_
 #define DGL_GRAPH_TRAVERSAL_H_
@@ -13,7 +13,7 @@ namespace dgl {
 
 ///////////////////////// Graph Traverse routines //////////////////////////
 /*!
- * \brief Class for representing frontiers.
+ * @brief Class for representing frontiers.
  *
  * Each frontier is a list of nodes/edges (specified by their ids).
  * An optional tag can be specified on each node/edge (represented by an int
@@ -24,7 +24,7 @@ struct Frontiers {
   IdArray ids;
 
   /*!
-   * \brief a vector store for node/edge tags. Dtype is int64.
+   * @brief a vector store for node/edge tags. Dtype is int64.
    * Empty if no tags are requested
    */
   IdArray tags;
@@ -36,43 +36,43 @@ struct Frontiers {
 namespace aten {
 
 /*!
- * \brief Traverse the graph in a breadth-first-search (BFS) order.
+ * @brief Traverse the graph in a breadth-first-search (BFS) order.
  *
- * \param csr The input csr matrix.
- * \param sources Source nodes.
- * \return A Frontiers object containing the search result
+ * @param csr The input csr matrix.
+ * @param sources Source nodes.
+ * @return A Frontiers object containing the search result
  */
 Frontiers BFSNodesFrontiers(const CSRMatrix& csr, IdArray source);
 
 /*!
- * \brief Traverse the graph in a breadth-first-search (BFS) order, returning
+ * @brief Traverse the graph in a breadth-first-search (BFS) order, returning
  *        the edges of the BFS tree.
  *
- * \param csr The input csr matrix.
- * \param sources Source nodes.
- * \return A Frontiers object containing the search result
+ * @param csr The input csr matrix.
+ * @param sources Source nodes.
+ * @return A Frontiers object containing the search result
  */
 Frontiers BFSEdgesFrontiers(const CSRMatrix& csr, IdArray source);
 
 /*!
- * \brief Traverse the graph in topological order.
+ * @brief Traverse the graph in topological order.
  *
- * \param csr The input csr matrix.
- * \return A Frontiers object containing the search result
+ * @param csr The input csr matrix.
+ * @return A Frontiers object containing the search result
  */
 Frontiers TopologicalNodesFrontiers(const CSRMatrix& csr);
 
 /*!
- * \brief Traverse the graph in a depth-first-search (DFS) order.
+ * @brief Traverse the graph in a depth-first-search (DFS) order.
  *
- * \param csr The input csr matrix.
- * \param sources Source nodes.
- * \return A Frontiers object containing the search result
+ * @param csr The input csr matrix.
+ * @param sources Source nodes.
+ * @return A Frontiers object containing the search result
  */
 Frontiers DGLDFSEdges(const CSRMatrix& csr, IdArray source);
 
 /*!
- * \brief Traverse the graph in a depth-first-search (DFS) order and return the
+ * @brief Traverse the graph in a depth-first-search (DFS) order and return the
  *        recorded edge tag if return_labels is specified.
  *
  * The traversal visit edges in its DFS order. Edges have three tags:
@@ -84,12 +84,12 @@ Frontiers DGLDFSEdges(const CSRMatrix& csr, IdArray source);
  * A NONTREE edge is one in which both `u` and `v` have been visisted but the
  * edge is NOT in the DFS tree.
  *
- * \param csr The input csr matrix.
- * \param sources Source nodes.
- * \param has_reverse_edge If true, REVERSE edges are included
- * \param has_nontree_edge If true, NONTREE edges are included
- * \param return_labels If true, return the recorded edge tags.
- * \return A Frontiers object containing the search result
+ * @param csr The input csr matrix.
+ * @param sources Source nodes.
+ * @param has_reverse_edge If true, REVERSE edges are included
+ * @param has_nontree_edge If true, NONTREE edges are included
+ * @param return_labels If true, return the recorded edge tags.
+ * @return A Frontiers object containing the search result
  */
 Frontiers DGLDFSLabeledEdges(
     const CSRMatrix& csr, IdArray source, const bool has_reverse_edge,

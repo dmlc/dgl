@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2017 by Contributors
  * \file dgl/random.h
- * \brief Random number generators
+ * @brief Random number generators
  */
 
 #ifndef DGL_RANDOM_H_
@@ -36,7 +36,7 @@ inline uint32_t GetThreadId() {
 };  // namespace
 
 /*!
- * \brief Thread-local Random Number Generator class
+ * @brief Thread-local Random Number Generator class
  */
 class RandomEngine {
  public:
@@ -55,17 +55,17 @@ class RandomEngine {
   }
 
   /*!
-   * \brief Set the seed of this random number generator
+   * @brief Set the seed of this random number generator
    */
   void SetSeed(uint32_t seed) { rng_.seed(seed + GetThreadId()); }
 
   /*!
-   * \brief Generate an arbitrary random 32-bit integer.
+   * @brief Generate an arbitrary random 32-bit integer.
    */
   int32_t RandInt32() { return static_cast<int32_t>(rng_()); }
 
   /*!
-   * \brief Generate a uniform random integer in [0, upper)
+   * @brief Generate a uniform random integer in [0, upper)
    */
   template <typename T>
   T RandInt(T upper) {
@@ -73,7 +73,7 @@ class RandomEngine {
   }
 
   /*!
-   * \brief Generate a uniform random integer in [lower, upper)
+   * @brief Generate a uniform random integer in [lower, upper)
    */
   template <typename T>
   T RandInt(T lower, T upper) {
@@ -83,7 +83,7 @@ class RandomEngine {
   }
 
   /*!
-   * \brief Generate a uniform random float in [0, 1)
+   * @brief Generate a uniform random float in [0, 1)
    */
   template <typename T>
   T Uniform() {
@@ -91,7 +91,7 @@ class RandomEngine {
   }
 
   /*!
-   * \brief Generate a uniform random float in [lower, upper)
+   * @brief Generate a uniform random float in [lower, upper)
    */
   template <typename T>
   T Uniform(T lower, T upper) {
@@ -103,46 +103,46 @@ class RandomEngine {
   }
 
   /*!
-   * \brief Pick a random integer between 0 to N-1 according to given
+   * @brief Pick a random integer between 0 to N-1 according to given
    *        probabilities.
    * \tparam IdxType Return integer type.
-   * \param prob Array of N unnormalized probability of each element. Must be
+   * @param prob Array of N unnormalized probability of each element. Must be
    *        non-negative.
-   * \return An integer randomly picked from 0 to N-1.
+   * @return An integer randomly picked from 0 to N-1.
    */
   template <typename IdxType>
   IdxType Choice(FloatArray prob);
 
   /*!
-   * \brief Pick random integers between 0 to N-1 according to given
+   * @brief Pick random integers between 0 to N-1 according to given
    * probabilities
    *
    * If replace is false, the number of picked integers must not larger than N.
    *
    * \tparam IdxType Id type
    * \tparam FloatType Probability value type
-   * \param num Number of integers to choose
-   * \param prob Array of N unnormalized probability of each element.  Must be
+   * @param num Number of integers to choose
+   * @param prob Array of N unnormalized probability of each element.  Must be
    *        non-negative.
-   * \param out The output buffer to write selected indices.
-   * \param replace If true, choose with replacement.
+   * @param out The output buffer to write selected indices.
+   * @param replace If true, choose with replacement.
    */
   template <typename IdxType, typename FloatType>
   void Choice(IdxType num, FloatArray prob, IdxType* out, bool replace = true);
 
   /*!
-   * \brief Pick random integers between 0 to N-1 according to given
+   * @brief Pick random integers between 0 to N-1 according to given
    * probabilities
    *
    * If replace is false, the number of picked integers must not larger than N.
    *
    * \tparam IdxType Id type
    * \tparam FloatType Probability value type
-   * \param num Number of integers to choose
-   * \param prob Array of N unnormalized probability of each element.  Must be
+   * @param num Number of integers to choose
+   * @param prob Array of N unnormalized probability of each element.  Must be
    *        non-negative.
-   * \param replace If true, choose with replacement.
-   * \return Picked indices
+   * @param replace If true, choose with replacement.
+   * @return Picked indices
    */
   template <typename IdxType, typename FloatType>
   IdArray Choice(IdxType num, FloatArray prob, bool replace = true) {
@@ -154,30 +154,30 @@ class RandomEngine {
   }
 
   /*!
-   * \brief Pick random integers from population by uniform distribution.
+   * @brief Pick random integers from population by uniform distribution.
    *
    * If replace is false, num must not be larger than population.
    *
    * \tparam IdxType Return integer type
-   * \param num Number of integers to choose
-   * \param population Total number of elements to choose from.
-   * \param out The output buffer to write selected indices.
-   * \param replace If true, choose with replacement.
+   * @param num Number of integers to choose
+   * @param population Total number of elements to choose from.
+   * @param out The output buffer to write selected indices.
+   * @param replace If true, choose with replacement.
    */
   template <typename IdxType>
   void UniformChoice(
       IdxType num, IdxType population, IdxType* out, bool replace = true);
 
   /*!
-   * \brief Pick random integers from population by uniform distribution.
+   * @brief Pick random integers from population by uniform distribution.
    *
    * If replace is false, num must not be larger than population.
    *
    * \tparam IdxType Return integer type
-   * \param num Number of integers to choose
-   * \param population Total number of elements to choose from.
-   * \param replace If true, choose with replacement.
-   * \return Picked indices
+   * @param num Number of integers to choose
+   * @param population Total number of elements to choose from.
+   * @param replace If true, choose with replacement.
+   * @return Picked indices
    */
   template <typename IdxType>
   IdArray UniformChoice(IdxType num, IdxType population, bool replace = true) {
@@ -190,7 +190,7 @@ class RandomEngine {
   }
 
   /*!
-   * \brief Pick random integers with different probability for different
+   * @brief Pick random integers with different probability for different
    * segments.
    *
    * For example, if split=[0, 4, 10] and bias=[1.5, 1], it means to pick some
@@ -211,12 +211,12 @@ class RandomEngine {
    * If replace is false, num must not be larger than population.
    *
    * \tparam IdxType Return integer type
-   * \param num Number of integers to choose
-   * \param split Array of T+1 split positions of different segments(including
+   * @param num Number of integers to choose
+   * @param split Array of T+1 split positions of different segments(including
    *        start and end)
-   * \param bias Array of T weight of each segments.
-   * \param out The output buffer to write selected indices.
-   * \param replace If true, choose with replacement.
+   * @param bias Array of T weight of each segments.
+   * @param out The output buffer to write selected indices.
+   * @param replace If true, choose with replacement.
    */
   template <typename IdxType, typename FloatType>
   void BiasedChoice(
@@ -224,16 +224,16 @@ class RandomEngine {
       bool replace = true);
 
   /*!
-   * \brief Pick random integers with different probability for different
+   * @brief Pick random integers with different probability for different
    * segments.
    *
    * If replace is false, num must not be larger than population.
    *
    * \tparam IdxType Return integer type
-   * \param num Number of integers to choose
-   * \param split Split positions of different segments
-   * \param bias Weights of different segments
-   * \param replace If true, choose with replacement.
+   * @param num Number of integers to choose
+   * @param split Split positions of different segments
+   * @param bias Weights of different segments
+   * @param replace If true, choose with replacement.
    */
   template <typename IdxType, typename FloatType>
   IdArray BiasedChoice(

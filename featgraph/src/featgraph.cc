@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file featgraph/src/featgraph.cc
- * \brief FeatGraph kernels.
+ * @brief FeatGraph kernels.
  */
 #include <dmlc/logging.h>
 #include <featgraph.h>
@@ -12,7 +12,7 @@
 namespace dgl {
 namespace featgraph {
 
-/* \brief Singleton that loads the featgraph module. */
+/* @brief Singleton that loads the featgraph module. */
 class FeatGraphModule {
  public:
   static FeatGraphModule* Global() {
@@ -38,12 +38,12 @@ class FeatGraphModule {
   FeatGraphModule() {}
 };
 
-/* \brief Load Featgraph module from given path. */
+/* @brief Load Featgraph module from given path. */
 void LoadFeatGraphModule(const std::string& path) {
   FeatGraphModule::Global()->Load(path);
 }
 
-/* \brief Convert DLDataType to string. */
+/* @brief Convert DLDataType to string. */
 inline std::string DTypeAsStr(const DLDataType& t) {
   switch (t.code) {
     case 0U:
@@ -59,14 +59,14 @@ inline std::string DTypeAsStr(const DLDataType& t) {
   }
 }
 
-/* \brief Get operator filename. */
+/* @brief Get operator filename. */
 inline std::string GetOperatorName(
     const std::string& base_name, const DLDataType& dtype,
     const DLDataType& idtype) {
   return base_name + "_" + DTypeAsStr(dtype) + "_" + DTypeAsStr(idtype);
 }
 
-/* \brief Call FeatGraph's SDDMM kernel. */
+/* @brief Call FeatGraph's SDDMM kernel. */
 void SDDMMTreeReduction(
     DLManagedTensor* row, DLManagedTensor* col, DLManagedTensor* lhs,
     DLManagedTensor* rhs, DLManagedTensor* out) {

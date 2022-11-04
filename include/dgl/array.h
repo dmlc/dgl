@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file dgl/array.h
- * \brief Common array operations required by DGL.
+ * @brief Common array operations required by DGL.
  *
  * Note that this is not meant for a full support of array library such as ATen.
  * Only a limited set of operators required by DGL are implemented.

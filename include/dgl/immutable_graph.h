@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2018 by Contributors
  * \file dgl/immutable_graph.h
- * \brief DGL immutable graph index class.
+ * @brief DGL immutable graph index class.
  */
 #ifndef DGL_IMMUTABLE_GRAPH_H_
 #define DGL_IMMUTABLE_GRAPH_H_
@@ -30,7 +30,7 @@ class ImmutableGraph;
 typedef std::shared_ptr<ImmutableGraph> ImmutableGraphPtr;
 
 /*!
- * \brief Graph class stored using CSR structure.
+ * @brief Graph class stored using CSR structure.
  */
 class CSR : public GraphInterface {
  public:
@@ -190,30 +190,30 @@ class CSR : public GraphInterface {
   COOPtr ToCOO() const;
 
   /*!
-   * \return the csr matrix that represents this graph.
-   * \note The csr matrix shares the storage with this graph.
+   * @return the csr matrix that represents this graph.
+   * @note The csr matrix shares the storage with this graph.
    *       The data field of the CSR matrix stores the edge ids.
    */
   aten::CSRMatrix ToCSRMatrix() const { return adj_; }
 
   /*!
-   * \brief Copy the data to another context.
-   * \param ctx The target context.
-   * \return The graph under another context.
+   * @brief Copy the data to another context.
+   * @param ctx The target context.
+   * @return The graph under another context.
    */
   CSR CopyTo(const DGLContext &ctx) const;
 
   /*!
-   * \brief Copy data to shared memory.
-   * \param name The name of the shared memory.
-   * \return The graph in the shared memory
+   * @brief Copy data to shared memory.
+   * @param name The name of the shared memory.
+   * @return The graph in the shared memory
    */
   CSR CopyToSharedMem(const std::string &name) const;
 
   /*!
-   * \brief Convert the graph to use the given number of bits for storage.
-   * \param bits The new number of integer bits (32 or 64).
-   * \return The graph with new bit size storage.
+   * @brief Convert the graph to use the given number of bits for storage.
+   * @param bits The new number of integer bits (32 or 64).
+   * @return The graph with new bit size storage.
    */
   CSR AsNumBits(uint8_t bits) const;
 
@@ -433,30 +433,30 @@ class COO : public GraphInterface {
   CSRPtr ToCSR() const;
 
   /*!
-   * \brief Get the coo matrix that represents this graph.
-   * \note The coo matrix shares the storage with this graph.
+   * @brief Get the coo matrix that represents this graph.
+   * @note The coo matrix shares the storage with this graph.
    *       The data field of the coo matrix is none.
    */
   aten::COOMatrix ToCOOMatrix() const { return adj_; }
 
   /*!
-   * \brief Copy the data to another context.
-   * \param ctx The target context.
-   * \return The graph under another context.
+   * @brief Copy the data to another context.
+   * @param ctx The target context.
+   * @return The graph under another context.
    */
   COO CopyTo(const DGLContext &ctx) const;
 
   /*!
-   * \brief Copy data to shared memory.
-   * \param name The name of the shared memory.
-   * \return The graph in the shared memory
+   * @brief Copy data to shared memory.
+   * @param name The name of the shared memory.
+   * @return The graph in the shared memory
    */
   COO CopyToSharedMem(const std::string &name) const;
 
   /*!
-   * \brief Convert the graph to use the given number of bits for storage.
-   * \param bits The new number of integer bits (32 or 64).
-   * \return The graph with new bit size storage.
+   * @brief Convert the graph to use the given number of bits for storage.
+   * @param bits The new number of integer bits (32 or 64).
+   * @return The graph with new bit size storage.
    */
   COO AsNumBits(uint8_t bits) const;
 
@@ -479,7 +479,7 @@ class COO : public GraphInterface {
 };
 
 /*!
- * \brief DGL immutable graph index class.
+ * @brief DGL immutable graph index class.
  *
  * DGL's graph is directed. Vertices are integers enumerated from zero.
  */
@@ -489,7 +489,7 @@ class ImmutableGraph : public GraphInterface {
   explicit ImmutableGraph(COOPtr coo) : coo_(coo) {}
 
   /*!
-   * \brief Construct an immutable graph from the CSR format.
+   * @brief Construct an immutable graph from the CSR format.
    *
    * For a single graph, we need two CSRs, one stores the in-edges of vertices
    * and the other stores the out-edges of vertices. These two CSRs stores the
@@ -553,18 +553,18 @@ class ImmutableGraph : public GraphInterface {
   uint8_t NumBits() const override { return AnyGraph()->NumBits(); }
 
   /*!
-   * \note not const since we have caches
-   * \return whether the graph is a multigraph
+   * @note not const since we have caches
+   * @return whether the graph is a multigraph
    */
   bool IsMultigraph() const override { return AnyGraph()->IsMultigraph(); }
 
   /*!
-   * \return whether the graph is read-only
+   * @return whether the graph is read-only
    */
   bool IsReadonly() const override { return true; }
 
   /**
-   * \brief Check if the graph is unibipartite.
+   * @brief Check if the graph is unibipartite.
    *
    * @return True if the graph is unibipartite.
    */
@@ -606,34 +606,34 @@ class ImmutableGraph : public GraphInterface {
   }
 
   /*!
-   * \brief Find the predecessors of a vertex.
-   * \param vid The vertex id.
-   * \param radius The radius of the neighborhood. Default is immediate neighbor
+   * @brief Find the predecessors of a vertex.
+   * @param vid The vertex id.
+   * @param radius The radius of the neighborhood. Default is immediate neighbor
    *        (radius=1).
-   * \return the predecessor id array.
+   * @return the predecessor id array.
    */
   IdArray Predecessors(dgl_id_t vid, uint64_t radius = 1) const override {
     return GetInCSR()->Successors(vid, radius);
   }
 
   /*!
-   * \brief Find the successors of a vertex.
-   * \param vid The vertex id.
-   * \param radius The radius of the neighborhood. Default is immediate neighbor
+   * @brief Find the successors of a vertex.
+   * @param vid The vertex id.
+   * @param radius The radius of the neighborhood. Default is immediate neighbor
    *        (radius=1).
-   * \return the successor id array.
+   * @return the successor id array.
    */
   IdArray Successors(dgl_id_t vid, uint64_t radius = 1) const override {
     return GetOutCSR()->Successors(vid, radius);
   }
 
   /*!
-   * \brief Get all edge ids between the two given endpoints
-   * \note Edges are associated with an integer id start from zero.
+   * @brief Get all edge ids between the two given endpoints
+   * @note Edges are associated with an integer id start from zero.
    *       The id is assigned when the edge is being added to the graph.
-   * \param src The source vertex.
-   * \param dst The destination vertex.
-   * \return the edge id array.
+   * @param src The source vertex.
+   * @param dst The destination vertex.
+   * @return the edge id array.
    */
   IdArray EdgeId(dgl_id_t src, dgl_id_t dst) const override {
     if (in_csr_) {
@@ -644,13 +644,13 @@ class ImmutableGraph : public GraphInterface {
   }
 
   /*!
-   * \brief Get all edge ids between the given endpoint pairs.
-   * \note Edges are associated with an integer id start from zero.
+   * @brief Get all edge ids between the given endpoint pairs.
+   * @note Edges are associated with an integer id start from zero.
    *       The id is assigned when the edge is being added to the graph.
    *       If duplicate pairs exist, the returned edge IDs will also duplicate.
    *       The order of returned edge IDs will follow the order of src-dst pairs
    *       first, and ties are broken by the order of edge ID.
-   * \return EdgeArray containing all edges between all pairs.
+   * @return EdgeArray containing all edges between all pairs.
    */
   EdgeArray EdgeIds(IdArray src, IdArray dst) const override {
     if (in_csr_) {
@@ -662,9 +662,9 @@ class ImmutableGraph : public GraphInterface {
   }
 
   /*!
-   * \brief Find the edge ID and return the pair of endpoints
-   * \param eid The edge ID
-   * \return a pair whose first element is the source and the second the
+   * @brief Find the edge ID and return the pair of endpoints
+   * @param eid The edge ID
+   * @return a pair whose first element is the source and the second the
    *         destination.
    */
   std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_id_t eid) const override {
@@ -672,9 +672,9 @@ class ImmutableGraph : public GraphInterface {
   }
 
   /*!
-   * \brief Find the edge IDs and return their source and target node IDs.
-   * \param eids The edge ID array.
-   * \return EdgeArray containing all edges with id in eid.  The order is
+   * @brief Find the edge IDs and return their source and target node IDs.
+   * @param eids The edge ID array.
+   * @return EdgeArray containing all edges with id in eid.  The order is
    *         preserved.
    */
   EdgeArray FindEdges(IdArray eids) const override {
@@ -682,10 +682,10 @@ class ImmutableGraph : public GraphInterface {
   }
 
   /*!
-   * \brief Get the in edges of the vertex.
-   * \note The returned dst id array is filled with vid.
-   * \param vid The vertex id.
-   * \return the edges
+   * @brief Get the in edges of the vertex.
+   * @note The returned dst id array is filled with vid.
+   * @param vid The vertex id.
+   * @return the edges
    */
   EdgeArray InEdges(dgl_id_t vid) const override {
     const EdgeArray &ret = GetInCSR()->OutEdges(vid);
@@ -693,9 +693,9 @@ class ImmutableGraph : public GraphInterface {
   }
 
   /*!
-   * \brief Get the in edges of the vertices.
-   * \param vids The vertex id array.
-   * \return the id arrays of the two endpoints of the edges.
+   * @brief Get the in edges of the vertices.
+   * @param vids The vertex id array.
+   * @return the id arrays of the two endpoints of the edges.
    */
   EdgeArray InEdges(IdArray vids) const override {
     const EdgeArray &ret = GetInCSR()->OutEdges(vids);
@@ -703,72 +703,72 @@ class ImmutableGraph : public GraphInterface {
   }
 
   /*!
-   * \brief Get the out edges of the vertex.
-   * \note The returned src id array is filled with vid.
-   * \param vid The vertex id.
-   * \return the id arrays of the two endpoints of the edges.
+   * @brief Get the out edges of the vertex.
+   * @note The returned src id array is filled with vid.
+   * @param vid The vertex id.
+   * @return the id arrays of the two endpoints of the edges.
    */
   EdgeArray OutEdges(dgl_id_t vid) const override {
     return GetOutCSR()->OutEdges(vid);
   }
 
   /*!
-   * \brief Get the out edges of the vertices.
-   * \param vids The vertex id array.
-   * \return the id arrays of the two endpoints of the edges.
+   * @brief Get the out edges of the vertices.
+   * @param vids The vertex id array.
+   * @return the id arrays of the two endpoints of the edges.
    */
   EdgeArray OutEdges(IdArray vids) const override {
     return GetOutCSR()->OutEdges(vids);
   }
 
   /*!
-   * \brief Get all the edges in the graph.
-   * \note If sorted is true, the returned edges list is sorted by their src and
+   * @brief Get all the edges in the graph.
+   * @note If sorted is true, the returned edges list is sorted by their src and
    *       dst ids. Otherwise, they are in their edge id order.
-   * \param sorted Whether the returned edge list is sorted by their src and dst
+   * @param sorted Whether the returned edge list is sorted by their src and dst
    *        ids.
-   * \return the id arrays of the two endpoints of the edges.
+   * @return the id arrays of the two endpoints of the edges.
    */
   EdgeArray Edges(const std::string &order = "") const override;
 
   /*!
-   * \brief Get the in degree of the given vertex.
-   * \param vid The vertex id.
-   * \return the in degree
+   * @brief Get the in degree of the given vertex.
+   * @param vid The vertex id.
+   * @return the in degree
    */
   uint64_t InDegree(dgl_id_t vid) const override {
     return GetInCSR()->OutDegree(vid);
   }
 
   /*!
-   * \brief Get the in degrees of the given vertices.
-   * \param vid The vertex id array.
-   * \return the in degree array
+   * @brief Get the in degrees of the given vertices.
+   * @param vid The vertex id array.
+   * @return the in degree array
    */
   DegreeArray InDegrees(IdArray vids) const override {
     return GetInCSR()->OutDegrees(vids);
   }
 
   /*!
-   * \brief Get the out degree of the given vertex.
-   * \param vid The vertex id.
-   * \return the out degree
+   * @brief Get the out degree of the given vertex.
+   * @param vid The vertex id.
+   * @return the out degree
    */
   uint64_t OutDegree(dgl_id_t vid) const override {
     return GetOutCSR()->OutDegree(vid);
   }
 
   /*!
-   * \brief Get the out degrees of the given vertices.
-   * \param vid The vertex id array.
-   * \return the out degree array
+   * @brief Get the out degrees of the given vertices.
+   * @param vid The vertex id array.
+   * @return the out degree array
    */
   DegreeArray OutDegrees(IdArray vids) const override {
     return GetOutCSR()->OutDegrees(vids);
   }
 
   /*!
-   * \brief Construct the induced subgraph of the given vertices.
+   * @brief Construct the induced subgraph of the given vertices.
    *
    * The induced subgraph is a subgraph formed by specifying a set of vertices
    * V' and then selecting all of the edges from the original graph that connect
@@ -781,13 +781,13 @@ class ImmutableGraph : public GraphInterface {
    *
    * The result subgraph is read-only.
    *
-   * \param vids The vertices in the subgraph.
-   * \return the induced subgraph
+   * @param vids The vertices in the subgraph.
+   * @return the induced subgraph
    */
   Subgraph VertexSubgraph(IdArray vids) const override;
 
   /*!
-   * \brief Construct the induced edge subgraph of the given edges.
+   * @brief Construct the induced edge subgraph of the given edges.
    *
    * The induced edges subgraph is a subgraph formed by specifying a set of
    * edges E' and then selecting all of the nodes from the original graph that
@@ -800,56 +800,56 @@ class ImmutableGraph : public GraphInterface {
    *
    * The result subgraph is read-only.
    *
-   * \param eids The edges in the subgraph.
-   * \return the induced edge subgraph
+   * @param eids The edges in the subgraph.
+   * @return the induced edge subgraph
    */
   Subgraph EdgeSubgraph(
       IdArray eids, bool preserve_nodes = false) const override;
 
   /*!
-   * \brief Return the successor vector
-   * \param vid The vertex id.
-   * \return the successor vector
+   * @brief Return the successor vector
+   * @param vid The vertex id.
+   * @return the successor vector
    */
   DGLIdIters SuccVec(dgl_id_t vid) const override {
     return GetOutCSR()->SuccVec(vid);
   }
 
   /*!
-   * \brief Return the out edge id vector
-   * \param vid The vertex id.
-   * \return the out edge id vector
+   * @brief Return the out edge id vector
+   * @param vid The vertex id.
+   * @return the out edge id vector
    */
   DGLIdIters OutEdgeVec(dgl_id_t vid) const override {
     return GetOutCSR()->OutEdgeVec(vid);
   }
 
   /*!
-   * \brief Return the predecessor vector
-   * \param vid The vertex id.
-   * \return the predecessor vector
+   * @brief Return the predecessor vector
+   * @param vid The vertex id.
+   * @return the predecessor vector
    */
   DGLIdIters PredVec(dgl_id_t vid) const override {
     return GetInCSR()->SuccVec(vid);
   }
 
   /*!
-   * \brief Return the in edge id vector
-   * \param vid The vertex id.
-   * \return the in edge id vector
+   * @brief Return the in edge id vector
+   * @param vid The vertex id.
+   * @return the in edge id vector
    */
   DGLIdIters InEdgeVec(dgl_id_t vid) const override {
     return GetInCSR()->OutEdgeVec(vid);
   }
 
   /*!
-   * \brief Get the adjacency matrix of the graph.
+   * @brief Get the adjacency matrix of the graph.
    *
    * By default, a row of returned adjacency matrix represents the destination
    * of an edge and the column represents the source.
-   * \param transpose A flag to transpose the returned adjacency matrix.
-   * \param fmt the format of the returned adjacency matrix.
-   * \return a vector of three IdArray.
+   * @param transpose A flag to transpose the returned adjacency matrix.
+   * @param fmt the format of the returned adjacency matrix.
+   * @return a vector of three IdArray.
    */
   std::vector<IdArray> GetAdj(
       bool transpose, const std::string &fmt) const override;
@@ -876,45 +876,45 @@ class ImmutableGraph : public GraphInterface {
       bool col_sorted = false);
 
   /*!
-   * \brief Convert the given graph to an immutable graph.
+   * @brief Convert the given graph to an immutable graph.
    *
    * If the graph is already an immutable graph. The result graph will share
    * the storage with the given one.
    *
-   * \param graph The input graph.
-   * \return an immutable graph object.
+   * @param graph The input graph.
+   * @return an immutable graph object.
    */
   static ImmutableGraphPtr ToImmutable(GraphPtr graph);
 
   /*!
-   * \brief Copy the data to another context.
-   * \param ctx The target context.
-   * \return The graph under another context.
+   * @brief Copy the data to another context.
+   * @param ctx The target context.
+   * @return The graph under another context.
    */
   static ImmutableGraphPtr CopyTo(ImmutableGraphPtr g, const DGLContext &ctx);
 
   /*!
-   * \brief Copy data to shared memory.
-   * \param name The name of the shared memory.
-   * \return The graph in the shared memory
+   * @brief Copy data to shared memory.
+   * @param name The name of the shared memory.
+   * @return The graph in the shared memory
    */
   static ImmutableGraphPtr CopyToSharedMem(
       ImmutableGraphPtr g, const std::string &name);
 
   /*!
-   * \brief Convert the graph to use the given number of bits for storage.
-   * \param bits The new number of integer bits (32 or 64).
-   * \return The graph with new bit size storage.
+   * @brief Convert the graph to use the given number of bits for storage.
+   * @param bits The new number of integer bits (32 or 64).
+   * @return The graph with new bit size storage.
    */
   static ImmutableGraphPtr AsNumBits(ImmutableGraphPtr g, uint8_t bits);
 
   /*!
-   * \brief Return a new graph with all the edges reversed.
+   * @brief Return a new graph with all the edges reversed.
    *
    * The returned graph preserves the vertex and edge index in the original
    * graph.
    *
-   * \return the reversed graph
+   * @return the reversed graph
    */
   ImmutableGraphPtr Reverse() const;
 

@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file dgl/aten/spmat.h
- * \brief Sparse matrix definitions
+ * @brief Sparse matrix definitions
  */
 #ifndef DGL_ATEN_SPMAT_H_
 #define DGL_ATEN_SPMAT_H_
@@ -15,7 +15,7 @@
 namespace dgl {
 
 /*!
- * \brief Sparse format.
+ * @brief Sparse format.
  */
 enum class SparseFormat {
   kCOO = 1,
@@ -24,7 +24,7 @@ enum class SparseFormat {
 };
 
 /*!
- * \brief Sparse format codes
+ * @brief Sparse format codes
  */
 const dgl_format_code_t ALL_CODE = 0x7;
 const dgl_format_code_t ANY_CODE = 0x0;

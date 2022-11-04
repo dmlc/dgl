@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file dgl/aten/types.h
- * \brief Array and ID types
+ * @brief Array and ID types
  */
 #ifndef DGL_ATEN_TYPES_H_
 #define DGL_ATEN_TYPES_H_
