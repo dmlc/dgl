@@ -157,14 +157,17 @@ class HeteroNodeView(object):
         return NodeSpace(data=NodeDataView(self._graph, key))
 
 class HeteroEdgeView(object):
-    """A NodeView class to act as G.nodes for a DistGraph."""
+    """A EdgeView class to act as G.edges for a DistGraph."""
     __slots__ = ['_graph']
 
     def __init__(self, graph):
         self._graph = graph
 
     def __getitem__(self, key):
-        assert isinstance(key, str)
+        assert isinstance(key, str) or \
+            (isinstance(key, tuple) and len(key) == 3), \
+            "Expect edge type in string or a triplet of string, but got " \
+            f"{key}."
         return EdgeSpace(data=EdgeDataView(self._graph, key))
 
 class NodeDataView(MutableMapping):
