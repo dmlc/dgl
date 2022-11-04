@@ -3872,8 +3872,8 @@ def shortest_dist(g, root=None, return_paths=False):
         (optional) between the root node and all the nodes. If None, it returns
         the results for all node pairs. Default: None.
     return_paths : bool, optional
-        A flag to indicate whether to return paths. Default: False. If True,
-        return shortest paths represented with edge IDs.
+        If True, it returns the shortest paths corresponding to the shortest
+        distances. Default: False.
 
     Returns
     -------
