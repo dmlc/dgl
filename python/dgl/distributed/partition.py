@@ -34,8 +34,8 @@ RESERVED_FIELD_DTYPE = {
     ETYPE: F.int32
     }
 
-def _format_part_metadata(part_metadata, formator):
-    '''Format etypes with specified formator.
+def _format_part_metadata(part_metadata, formatter):
+    '''Format etypes with specified formatter.
     '''
     for key in ['edge_map', 'etypes']:
         if key not in part_metadata:
@@ -45,7 +45,7 @@ def _format_part_metadata(part_metadata, formator):
             continue
         new_data = {}
         for etype, data in orig_data.items():
-            etype = formator(etype)
+            etype = formatter(etype)
             new_data[etype] = data
         part_metadata[key] = new_data
     return part_metadata
