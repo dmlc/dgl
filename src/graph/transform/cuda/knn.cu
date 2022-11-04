@@ -636,8 +636,10 @@ __global__ void RandomInitNeighborsKernel(
   BuildHeap<FloatType, IdType>(neighbors + point_idx * k, current_dists, k);
 }
 
-/*! \brief Randomly select candidates from current knn and reverse-knn graph for
- * nn-descent */
+/*!
+ * \brief Randomly select candidates from current knn and reverse-knn graph for
+ *        nn-descent.
+ */
 template <typename IdType>
 __global__ void FindCandidatesKernel(
     const IdType* offsets, IdType* new_candidates, IdType* old_candidates,

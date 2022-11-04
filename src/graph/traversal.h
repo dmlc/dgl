@@ -40,11 +40,11 @@ namespace traverse {
  *
  * \param graph The graph.
  * \param sources Source nodes.
- * \param reversed If true, BFS follows the in-edge direction
+ * \param reversed If true, BFS follows the in-edge direction.
  * \param queue The queue used to do bfs.
  * \param visit The function to call when a node is visited.
  * \param make_frontier The function to indicate that a new froniter can be
- * made;
+ *        made.
  */
 template <typename Queue, typename VisitFn, typename FrontierFn>
 void BFSNodes(
@@ -102,12 +102,12 @@ void BFSNodes(
  *
  * \param graph The graph.
  * \param sources Source nodes.
- * \param reversed If true, BFS follows the in-edge direction
+ * \param reversed If true, BFS follows the in-edge direction.
  * \param queue The queue used to do bfs.
  * \param visit The function to call when a node is visited.
  *        The argument would be edge ID.
  * \param make_frontier The function to indicate that a new frontier can be
- * made;
+ *        made.
  */
 template <typename Queue, typename VisitFn, typename FrontierFn>
 void BFSEdges(
@@ -164,11 +164,11 @@ void BFSEdges(
  *   void (*make_frontier)(void);
  *
  * \param graph The graph.
- * \param reversed If true, follows the in-edge direction
+ * \param reversed If true, follows the in-edge direction.
  * \param queue The queue used to do bfs.
  * \param visit The function to call when a node is visited.
  * \param make_frontier The function to indicate that a new froniter can be
- * made;
+ *        made.
  */
 template <typename Queue, typename VisitFn, typename FrontierFn>
 void TopologicalNodes(
@@ -222,7 +222,7 @@ enum DFSEdgeTag {
  * \brief Traverse the graph in a depth-first-search (DFS) order.
  *
  * The traversal visit edges in its DFS order. Edges have three tags:
- * FORWARD(0), REVERSE(1), NONTREE(2)
+ * FORWARD(0), REVERSE(1), NONTREE(2).
  *
  * A FORWARD edge is one in which `u` has been visisted but `v` has not.
  * A REVERSE edge is one in which both `u` and `v` have been visisted and the
@@ -230,11 +230,11 @@ enum DFSEdgeTag {
  * been visisted but the edge is NOT in the DFS tree.
  *
  * \param source Source node.
- * \param reversed If true, DFS follows the in-edge direction
- * \param has_reverse_edge If true, REVERSE edges are included
- * \param has_nontree_edge If true, NONTREE edges are included
+ * \param reversed If true, DFS follows the in-edge direction.
+ * \param has_reverse_edge If true, REVERSE edges are included.
+ * \param has_nontree_edge If true, NONTREE edges are included.
  * \param visit The function to call when an edge is visited; the edge id and
- * its tag will be given as the arguments.
+ *        its tag will be given as the arguments.
  */
 template <typename VisitFn>
 void DFSLabeledEdges(

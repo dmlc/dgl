@@ -23,10 +23,11 @@ using namespace dgl::aten;
 namespace transform {
 
 /*!
- * \brief Create Line Graph
- * \param hg Graph
+ * \brief Create Line Graph.
+ * \param hg Graph.
  * \param backtracking whether the pair of (v, u) (u, v) edges are treated as
- * linked \return The Line Graph
+ *        linked.
+ * \return The Line Graph.
  */
 HeteroGraphPtr CreateLineGraph(HeteroGraphPtr hg, bool backtracking) {
   const auto hgp = std::dynamic_pointer_cast<HeteroGraph>(hg);

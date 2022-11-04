@@ -20,16 +20,19 @@ namespace knn_utils {
 
 /*!
  * \brief A simple 2D NDArray adapter for nanoflann, without duplicating the
- * storage.
+ *        storage.
  *
  * \tparam FloatType: The type of the point coordinates (typically, double or
- * float). \tparam IdType: The type for indices in the KD-tree index (typically,
- * size_t of int) \tparam FeatureDim: If set to > 0, it specifies a compile-time
- * fixed dimensionality for the points in the data set, allowing more compiler
- * optimizations. \tparam Dist: The distance metric to use:
- * nanoflann::metric_L1, nanoflann::metric_L2, nanoflann::metric_L2_Simple, etc.
+ *         float).
+ * \tparam IdType: The type for indices in the KD-tree index (typically,
+ *         size_t of int)
+ * \tparam FeatureDim: If set to > 0, it specifies a compile-time fixed
+ *         dimensionality for the points in the data set, allowing more compiler
+ *         optimizations.
+ * \tparam Dist: The distance metric to use: nanoflann::metric_L1,
+           nanoflann::metric_L2, nanoflann::metric_L2_Simple, etc.
  * \note The spelling of dgl's adapter ("adapter") is different from naneflann
- * ("adaptor")
+ *       ("adaptor")
  */
 template <
     typename FloatType, typename IdType, int FeatureDim = -1,

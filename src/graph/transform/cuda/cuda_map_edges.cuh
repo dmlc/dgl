@@ -99,9 +99,10 @@ __global__ void map_edge_ids(
  *
  * \param num_nodes Number of nodes per type.
  * \param offset When offset is set to 0, LhsHashTable is identical to
- * RhsHashTable. Or set to num_nodes.size()/2 to use seperated LhsHashTable and
- * RhsHashTable. \param ctx The DGL context. \param stream The stream to operate
- * on.
+ *        RhsHashTable. Or set to num_nodes.size()/2 to use seperated
+ *        LhsHashTable and RhsHashTable.
+ * \param ctx The DGL context.
+ * \param stream The stream to operate on.
  */
 template <typename IdType>
 class DeviceNodeMap {
