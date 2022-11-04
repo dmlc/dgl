@@ -3858,43 +3858,49 @@ def double_radius_node_labeling(g, src, dst):
     return F.tensor(z, F.int64)
 
 def shortest_dist(g, root=None, directed=True, return_paths=False):
-    r"""Compute shortest distance and paths on the given graph.
-
-    This function computes the shortest distance between all pairs of nodes
-    or between all nodes and a specified root node. Corresponding shortest
-    paths can be returned and represented with edge IDs. Note that only
-    unweighted cases are allowed.
+    r"""Compute shortest distance and paths on the given graph. Only unweighted
+    cases are supported.
 
     Parameters
     ----------
     g : DGLGraph
         The input graph. Must be homogeneous.
     root : int, optional
-        The root node ID if the graph is provided with a root node.
-        Default: None. If a root node ID is provided, the function returns
-        single-source shortest paths. Otherwise, it returns all-pairs
-        shortest paths.
-    directed: bool, optional
+        Given a root node ID, it returns the shortest distance and paths
+        (optional) between the root node and all the nodes. If None, it returns
+        the results for all node pairs. Default: None.
+    directed : bool, optional
         A flag to indicate whether the graph is considered as directed.
         Default: True. If False, reverse edges are considered for constructing
         shortest paths.
-    return_paths: bool, optional
+    return_paths : bool, optional
         A flag to indicate whether to return paths. Default: False. If True,
         return shortest paths represented with edge IDs.
 
     Returns
     -------
-    dist: Tensor
-        The shortest distance tensor of shape :math:`(N, N)` if root is None,
-        where :math:`N` is the number of nodes in the input graph. Or the
-        shortest distance tensor of shape :math:`(N,)` if a root node is
-        specified. The distance of unreachable pairs are filled with -1.
-    paths: Tensor, optional
-        Return the shortest paths tensor of shape :math:`(N, N, max_len)` if
-        root is None, or tensor of shape :math:`(N, max_len)` when a root node
-        is specified, where ``max_len`` is the length of the longest paths.
-        Each path vector consists of edge IDs padded with -1 in the end. The
-        paths tensor is only returned if ``return_paths`` is True.
+    dist : Tensor
+        The shortest distance tensor.
+
+        * If :attr:`root` is a node ID, it is a tensor of shape :math:`(N,)`,
+          where :math:`N` is the number of nodes. :attr:`dist[j]` gives the
+          shortest distance from :attr:`root` to node :attr:`j`.
+        * Otherwise, it is a tensor of shape :math:`(N, N)`. :attr:`dist[i][j]`
+          gives the shortest distance from node :attr:`i` to node :attr:`j`.
+        * The distance values of unreachable node pairs are filled with -1.
+    paths : Tensor, optional
+        The shortest path tensor. It is only returned when :attr:`return_paths`
+        is True.
+
+        * If :attr:`root` is a node ID, it is a tensor of shape :math:`(N, L)`,
+          where :math:`L` is the length of the longest path. :attr:`path[j]` is
+          the shortest path from node :attr:`root` to node :attr:`j`.
+        * Otherwise, it is a tensor of shape :math:`(N, N, L)`.
+          :attr:`path[i][j]` is the shortest path from node :attr:`i` to node
+          :attr:`j`.
+        * Each path is a vector that consists of edge IDs with paddings of -1
+          at the end.
+        * Shortest path between a node and itself is a vector filled with -1's.
 
     Example
     -------
@@ -3903,29 +3909,30 @@ def shortest_dist(g, root=None, directed=True, return_paths=False):
     >>> g = dgl.graph(([0, 1, 3], [1, 2, 1]))
     >>> dgl.shortest_dist(g, root=0, directed=True)
     tensor([ 0,  1,  2, -1])
-    >>> dgl.shortest_dist(g, root=None, directed=False, return_paths=True)
-    (tensor([[0, 1, 2, 2],
+    >>> dist, paths = dgl.shortest_dist(
+    ...     g, root=None, directed=False, return_paths=True)
+    >>> print(dist)
+    tensor([[0, 1, 2, 2],
         [1, 0, 1, 1],
         [2, 1, 0, 2],
-        [2, 1, 2, 0]]), tensor([[[-1, -1],
+        [2, 1, 2, 0]])
+    >>> print(paths)
+    tensor([[[-1, -1],
          [ 0, -1],
          [ 0,  1],
          [ 0,  2]],
-
         [[ 0, -1],
          [-1, -1],
          [ 1, -1],
          [ 2, -1]],
-
         [[ 1,  0],
          [ 1, -1],
          [-1, -1],
          [ 1,  2]],
-
         [[ 2,  0],
          [ 2, -1],
          [ 2,  1],
-         [-1, -1]]]))
+         [-1, -1]]])
     """
     if root is None:
         dist, pred = sparse.csgraph.shortest_path(
@@ -3960,24 +3967,25 @@ def shortest_dist(g, root=None, directed=True, return_paths=False):
     N = g.num_nodes()
     roots = list(range(N)) if root is None else [root]
     paths = np.ones([len(roots), N, max_len], dtype=np.int64) * -1
-    masks = np.zeros([len(roots), N, max_len], dtype=bool)
-    u, v = [], []
+    masks, u, v = [], [], []
     for i in roots:
+        pred_ = pred[i] if root is None else pred
+        masks_i = np.zeros([N, max_len], dtype=bool)
         for j in range(N):
-            pred_ = pred[i] if root is None else pred
-            masks_ = masks[i] if root is None else masks[0]
             if pred_[j] < 0:
                 continue
             nodes = _get_nodes(pred_, i, j)
             u.extend(nodes[:-1])
             v.extend(nodes[1:])
             if nodes:
-                masks_[j, :len(nodes) - 1] = True
+                masks_i[j, :len(nodes) - 1] = True
+        masks.append(masks_i)
+    masks = np.stack(masks, axis=0)
 
     u, v = np.array(u), np.array(v)
     if not directed:
         # flip src and dst if reverse edges are used in undirected cases
-        has_edges = g.has_edges_between(u, v)
+        has_edges = F.asnumpy(g.has_edges_between(u, v))
         u[~has_edges], v[~has_edges] = v[~has_edges], u[~has_edges]
     edge_ids = g.edge_ids(u, v)
     paths[masks] = edge_ids

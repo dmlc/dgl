@@ -2642,7 +2642,6 @@ def test_module_feat_mask(idtype):
 
 @parametrize_idtype
 def test_shortest_dist(idtype):
-    dgl.graph(([0, 1, 3], [1, 2, 1]))
     g = dgl.graph(([0, 1, 3], [1, 2, 1]), idtype=idtype, device=F.ctx())
 
     # case 1: directed single source
