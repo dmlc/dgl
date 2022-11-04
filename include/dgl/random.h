@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2017 by Contributors
- * \file dgl/random.h
+ * @file dgl/random.h
  * @brief Random number generators
  */
 

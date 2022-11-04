@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file dgl/graph_traversal.h
+ * @file dgl/graph_traversal.h
  * @brief common graph traversal operations
  */
 #ifndef DGL_GRAPH_TRAVERSAL_H_

@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file dgl/nodeflow.h
+ * @file dgl/nodeflow.h
  * @brief DGL NodeFlow class.
  */
 #ifndef DGL_NODEFLOW_H_

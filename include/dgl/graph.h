@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2018 by Contributors
- * \file dgl/graph.h
+ * @file dgl/graph.h
  * @brief DGL graph index class.
  */
 #ifndef DGL_GRAPH_H_

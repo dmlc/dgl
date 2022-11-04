@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file dgl/array.h
+ * @file dgl/array.h
  * @brief Common array operations required by DGL.
  *
  * Note that this is not meant for a full support of array library such as ATen.

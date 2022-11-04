@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2017 by Contributors
- * \file dgl/runtime/registry.h
+ * @file dgl/runtime/registry.h
  * @brief This file defines the DGL global function registry.
  *
  *  The registered functions will be made available to front-end

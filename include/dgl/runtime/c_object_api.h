@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file dgl/runtime/c_object_api.h
+ * @file dgl/runtime/c_object_api.h
  *
  * @brief DGL Object C API, used to extend and prototype new CAPIs.
  *

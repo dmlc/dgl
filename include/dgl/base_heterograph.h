@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file dgl/heterograph_interface.h
+ * @file dgl/heterograph_interface.h
  * @brief DGL heterogeneous graph index class.
  */
 

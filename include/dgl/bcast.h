@@ -1,5 +1,5 @@
 /*!
- *  Copyright (c) 2020 by Contributors * \file dgl/aten/bcast.h
+ *  Copyright (c) 2020 by Contributors * @file dgl/aten/bcast.h
  * @brief Broadcast related function C++ header.
  */
 #ifndef DGL_BCAST_H_

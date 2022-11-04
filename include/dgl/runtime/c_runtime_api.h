@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2016-2022 by Contributors
- * \file dgl/runtime/c_runtime_api.h
+ * @file dgl/runtime/c_runtime_api.h
  * @brief DGL runtime library.
  *
  * This runtime is adapted from TVM project (commit: 2ce5277)

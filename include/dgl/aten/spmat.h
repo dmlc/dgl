@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file dgl/aten/spmat.h
+ * @file dgl/aten/spmat.h
  * @brief Sparse matrix definitions
  */
 #ifndef DGL_ATEN_SPMAT_H_

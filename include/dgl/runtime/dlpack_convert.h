@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2022 by Contributors
- * \file include/dgl/runtime/dlpack_convert.h
+ * @file include/dgl/runtime/dlpack_convert.h
  * @brief Conversion between NDArray and DLPack.
  */
 #ifndef DGL_RUNTIME_DLPACK_CONVERT_H_

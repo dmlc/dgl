@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file packed_func_ext.h
+ * @file packed_func_ext.h
  * @brief Extension package to PackedFunc
  *   This enables pass ObjectRef types into/from PackedFunc.
  */

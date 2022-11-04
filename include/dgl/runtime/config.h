@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file runtime/config.h
+ * @file runtime/config.h
  * @brief DGL runtime config
  */
 

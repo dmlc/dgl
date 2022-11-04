@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2017 by Contributors
- * \file dgl/runtime/serializer.h
+ * @file dgl/runtime/serializer.h
  * @brief Serializer extension to support DGL data types
  *  Include this file to enable serialization of DGLDataType, DGLContext
  */

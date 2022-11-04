@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2018 by Contributors
- * \file dgl/immutable_graph.h
+ * @file dgl/immutable_graph.h
  * @brief DGL immutable graph index class.
  */
 #ifndef DGL_IMMUTABLE_GRAPH_H_

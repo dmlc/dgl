@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2017 by Contributors
- * \file dgl/runtime/ndarray.h
+ * @file dgl/runtime/ndarray.h
  * @brief shared memory management.
  */
 #ifndef DGL_RUNTIME_SHARED_MEM_H_

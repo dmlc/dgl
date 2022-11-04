@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2017 by Contributors
- * \file dgl/runtime/c_backend_api.h
+ * @file dgl/runtime/c_backend_api.h
  * @brief DGL runtime backend API.
  *
  *  The functions defined in this header are intended to be

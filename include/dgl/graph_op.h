@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2018 by Contributors
- * \file dgl/graph_op.h
+ * @file dgl/graph_op.h
  * @brief Operations on graph index.
  */
 #ifndef DGL_GRAPH_OP_H_

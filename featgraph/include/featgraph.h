@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file featgraph/include/featgraph.h
+ * @file featgraph/include/featgraph.h
  * @brief FeatGraph kernel headers.
  */
 #ifndef FEATGRAPH_H_

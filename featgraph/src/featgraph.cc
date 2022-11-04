@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file featgraph/src/featgraph.cc
+ * @file featgraph/src/featgraph.cc
  * @brief FeatGraph kernels.
  */
 #include <dmlc/logging.h>

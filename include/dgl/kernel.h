@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file dgl/aten/kernel.h
+ * @file dgl/aten/kernel.h
  * @brief Sparse matrix operators.
  */
 #ifndef DGL_KERNEL_H_

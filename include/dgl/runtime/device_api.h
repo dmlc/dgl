@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2016 by Contributors
- * \file dgl/runtime/device_api.h
+ * @file dgl/runtime/device_api.h
  * @brief Abstract device memory management API
  */
 #ifndef DGL_RUNTIME_DEVICE_API_H_

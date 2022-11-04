@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file runtime/object.h
+ * @file runtime/object.h
  * @brief Defines the Object data structures.
  */
 #ifndef DGL_RUNTIME_OBJECT_H_

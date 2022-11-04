@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2017 by Contributors
- * \file dgl/runtime/packed_func.h
+ * @file dgl/runtime/packed_func.h
  * @brief Type-erased function used across DGL API.
  */
 #ifndef DGL_RUNTIME_PACKED_FUNC_H_

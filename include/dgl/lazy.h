@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file dgl/lazy.h
+ * @file dgl/lazy.h
  * @brief Lazy object that will be materialized only when being queried.
  */
 #ifndef DGL_LAZY_H_
