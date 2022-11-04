@@ -8,9 +8,10 @@
 
 #include <string>
 #include <vector>
+
 #include "../../runtime/cuda/cuda_common.h"
-#include "./utils.h"
 #include "./atomic.cuh"
+#include "./utils.h"
 
 namespace dgl {
 
@@ -24,11 +25,9 @@ namespace cuda {
  * \note each blockthread is responsible for aggregation on a row
  *       in the result tensor.
  */
-template <typename IdType, typename DType,
-          typename ReduceOp>
+template <typename IdType, typename DType, typename ReduceOp>
 __global__ void SegmentReduceKernel(
-    const DType* feat, const IdType* offsets,
-    DType* out, IdType* arg,
+    const DType* feat, const IdType* offsets, DType* out, IdType* arg,
     int64_t n, int64_t dim) {
   for (int row = blockIdx.x; row < n; row += gridDim.x) {
     int col = blockIdx.y * blockDim.x + threadIdx.x;
@@ -39,8 +38,7 @@ __global__ void SegmentReduceKernel(
         ReduceOp::Call(&local_accum, &local_arg, feat[i * dim + col], i);
       }
       out[row * dim + col] = local_accum;
-      if (ReduceOp::require_arg)
-        arg[row * dim + col] = local_arg;
+      if (ReduceOp::require_arg) arg[row * dim + col] = local_arg;
       col += gridDim.y * blockDim.x;
     }
   }
@@ -53,8 +51,7 @@ __global__ void SegmentReduceKernel(
  */
 template <typename IdType, typename DType>
 __global__ void ScatterAddKernel(
-    const DType *feat, const IdType *idx, DType *out,
-    int64_t n, int64_t dim) {
+    const DType* feat, const IdType* idx, DType* out, int64_t n, int64_t dim) {
   for (int row = blockIdx.x; row < n; row += gridDim.x) {
     const int write_row = idx[row];
     int col = blockIdx.y * blockDim.x + threadIdx.x;
@@ -73,7 +70,7 @@ __global__ void ScatterAddKernel(
 
 template <typename IdType, typename DType>
 __global__ void UpdateGradMinMaxHeteroKernel(
-    const DType *feat, const IdType *idx, const IdType *idx_type, DType *out,
+    const DType* feat, const IdType* idx, const IdType* idx_type, DType* out,
     int64_t n, int64_t dim, int type) {
   unsigned int tId = threadIdx.x;
   unsigned int laneId = tId & 31;
@@ -100,8 +97,7 @@ __global__ void UpdateGradMinMaxHeteroKernel(
  */
 template <typename IdType, typename DType>
 __global__ void BackwardSegmentCmpKernel(
-    const DType *feat, const IdType *arg, DType *out,
-    int64_t n, int64_t dim) {
+    const DType* feat, const IdType* arg, DType* out, int64_t n, int64_t dim) {
   for (int row = blockIdx.x; row < n; row += gridDim.x) {
     int col = blockIdx.y * blockDim.x + threadIdx.x;
     while (col < dim) {
@@ -122,11 +118,7 @@ __global__ void BackwardSegmentCmpKernel(
  * \param arg An auxiliary tensor storing ArgMax/Min information,
  */
 template <typename IdType, typename DType, typename ReduceOp>
-void SegmentReduce(
-    NDArray feat,
-    NDArray offsets,
-    NDArray out,
-    NDArray arg) {
+void SegmentReduce(NDArray feat, NDArray offsets, NDArray out, NDArray arg) {
   const DType* feat_data = feat.Ptr<DType>();
   const IdType* offsets_data = offsets.Ptr<IdType>();
   DType* out_data = out.Ptr<DType>();
@@ -135,8 +127,7 @@ void SegmentReduce(
   cudaStream_t stream = runtime::getCurrentCUDAStream();
   int64_t n = out->shape[0];
   int64_t dim = 1;
-  for (int i = 1; i < out->ndim; ++i)
-    dim *= out->shape[i];
+  for (int i = 1; i < out->ndim; ++i) dim *= out->shape[i];
 
   const int nbx = FindNumBlocks<'x'>(n);
   const int ntx = FindNumThreads(dim);
@@ -145,10 +136,9 @@ void SegmentReduce(
   const dim3 nblks(nbx, nby);
   const dim3 nthrs(ntx, nty);
   // TODO(zihao): try cub's DeviceSegmentedReduce and compare the performance.
-  CUDA_KERNEL_CALL((SegmentReduceKernel<IdType, DType, ReduceOp>),
-      nblks, nthrs, 0, stream,
-      feat_data, offsets_data, out_data, arg_data,
-      n, dim);
+  CUDA_KERNEL_CALL(
+      (SegmentReduceKernel<IdType, DType, ReduceOp>), nblks, nthrs, 0, stream,
+      feat_data, offsets_data, out_data, arg_data, n, dim);
 }
 
 /*!
@@ -159,19 +149,15 @@ void SegmentReduce(
  * \param out The output tensor.
  */
 template <typename IdType, typename DType>
-void ScatterAdd(
-    NDArray feat,
-    NDArray idx,
-    NDArray out) {
+void ScatterAdd(NDArray feat, NDArray idx, NDArray out) {
   const DType* feat_data = feat.Ptr<DType>();
   const IdType* idx_data = idx.Ptr<IdType>();
-  DType *out_data = out.Ptr<DType>();
+  DType* out_data = out.Ptr<DType>();
 
   cudaStream_t stream = runtime::getCurrentCUDAStream();
   int64_t n = feat->shape[0];
   int64_t dim = 1;
-  for (int i = 1; i < out->ndim; ++i)
-    dim *= out->shape[i];
+  for (int i = 1; i < out->ndim; ++i) dim *= out->shape[i];
 
   const int nbx = FindNumBlocks<'x'>(n);
   const int ntx = FindNumThreads(dim);
@@ -179,10 +165,9 @@ void ScatterAdd(
   const int nty = 1;
   const dim3 nblks(nbx, nby);
   const dim3 nthrs(ntx, nty);
-  CUDA_KERNEL_CALL((ScatterAddKernel<IdType, DType>),
-                   nblks, nthrs, 0, stream,
-                   feat_data, idx_data, out_data,
-                   n, dim);
+  CUDA_KERNEL_CALL(
+      (ScatterAddKernel<IdType, DType>), nblks, nthrs, 0, stream, feat_data,
+      idx_data, out_data, n, dim);
 }
 
 /*!
@@ -195,24 +180,26 @@ void ScatterAdd(
  * \param list_out List of the output tensors.
  */
 template <typename IdType, typename DType>
-void UpdateGradMinMax_hetero(const HeteroGraphPtr& graph,
-                const std::string& op,
-                const std::vector<NDArray>& list_feat,
-                const std::vector<NDArray>& list_idx,
-                const std::vector<NDArray>& list_idx_types,
-                std::vector<NDArray>* list_out) {
+void UpdateGradMinMax_hetero(
+    const HeteroGraphPtr& graph, const std::string& op,
+    const std::vector<NDArray>& list_feat, const std::vector<NDArray>& list_idx,
+    const std::vector<NDArray>& list_idx_types,
+    std::vector<NDArray>* list_out) {
   cudaStream_t stream = runtime::getCurrentCUDAStream();
   if (op == "copy_lhs" || op == "copy_rhs") {
-    std::vector<std::vector<dgl_id_t>> src_dst_ntypes(graph->NumVertexTypes(),
-    std::vector<dgl_id_t>());
+    std::vector<std::vector<dgl_id_t>> src_dst_ntypes(
+        graph->NumVertexTypes(), std::vector<dgl_id_t>());
     for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
       auto pair = graph->meta_graph()->FindEdge(etype);
       const dgl_id_t dst_ntype = pair.first;  // graph is reversed
       const dgl_id_t src_ntype = pair.second;
-      auto same_src_dst_ntype = std::find(std::begin(src_dst_ntypes[dst_ntype]),
-        std::end(src_dst_ntypes[dst_ntype]), src_ntype);
-      // if op is "copy_lhs", relation type with same src and dst node type will be updated once
-      if (op == "copy_lhs" && same_src_dst_ntype != std::end(src_dst_ntypes[dst_ntype]))
+      auto same_src_dst_ntype = std::find(
+          std::begin(src_dst_ntypes[dst_ntype]),
+          std::end(src_dst_ntypes[dst_ntype]), src_ntype);
+      // if op is "copy_lhs", relation type with same src and dst node type will
+      // be updated once
+      if (op == "copy_lhs" &&
+          same_src_dst_ntype != std::end(src_dst_ntypes[dst_ntype]))
         continue;
       src_dst_ntypes[dst_ntype].push_back(src_ntype);
       const DType* feat_data = list_feat[dst_ntype].Ptr<DType>();
@@ -229,35 +216,31 @@ void UpdateGradMinMax_hetero(const HeteroGraphPtr& graph,
       const int nbx = FindNumBlocks<'x'>((n * th_per_row + ntx - 1) / ntx);
       const dim3 nblks(nbx);
       const dim3 nthrs(ntx);
-      CUDA_KERNEL_CALL((UpdateGradMinMaxHeteroKernel<IdType, DType>),
-                       nblks, nthrs, 0, stream,
-                       feat_data, idx_data, idx_type_data,
-                       out_data, n, dim, type);
+      CUDA_KERNEL_CALL(
+          (UpdateGradMinMaxHeteroKernel<IdType, DType>), nblks, nthrs, 0,
+          stream, feat_data, idx_data, idx_type_data, out_data, n, dim, type);
     }
   }
 }
 
 /*!
- * \brief CUDA implementation of backward phase of Segment Reduce with Min/Max reducer.
- * \note math equation: out[arg[i, k], k] = feat[i, k]
- * \param feat The input tensor.
+ * \brief CUDA implementation of backward phase of Segment Reduce with Min/Max
+ *        reducer.
+ * \note math equation: out[arg[i, k], k] = feat[i, k] \param feat The input
+ *       tensor.
  * \param arg The ArgMin/Max information, used for indexing.
  * \param out The output tensor.
  */
 template <typename IdType, typename DType>
-void BackwardSegmentCmp(
-    NDArray feat,
-    NDArray arg,
-    NDArray out) {
+void BackwardSegmentCmp(NDArray feat, NDArray arg, NDArray out) {
   const DType* feat_data = feat.Ptr<DType>();
   const IdType* arg_data = arg.Ptr<IdType>();
-  DType *out_data = out.Ptr<DType>();
+  DType* out_data = out.Ptr<DType>();
 
   cudaStream_t stream = runtime::getCurrentCUDAStream();
   int64_t n = feat->shape[0];
   int64_t dim = 1;
-  for (int i = 1; i < out->ndim; ++i)
-    dim *= out->shape[i];
+  for (int i = 1; i < out->ndim; ++i) dim *= out->shape[i];
 
   const int nbx = FindNumBlocks<'x'>(n);
   const int ntx = FindNumThreads(dim);
@@ -265,10 +248,9 @@ void BackwardSegmentCmp(
   const int nty = 1;
   const dim3 nblks(nbx, nby);
   const dim3 nthrs(ntx, nty);
-  CUDA_KERNEL_CALL((BackwardSegmentCmpKernel<IdType, DType>),
-                   nblks, nthrs, 0, stream,
-                   feat_data, arg_data, out_data,
-                   n, dim);
+  CUDA_KERNEL_CALL(
+      (BackwardSegmentCmpKernel<IdType, DType>), nblks, nthrs, 0, stream,
+      feat_data, arg_data, out_data, n, dim);
 }
 
 }  // namespace cuda

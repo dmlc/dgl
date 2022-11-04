@@ -3,8 +3,8 @@
  * \file tensoradapter.h
  * \brief Header file for functions exposed by the adapter library.
  *
- * Functions in this library must be exported with extern "C" so that DGL can locate
- * them with dlsym(3) (or GetProcAddress on Windows).
+ * Functions in this library must be exported with extern "C" so that DGL can
+ * locate them with dlsym(3) (or GetProcAddress on Windows).
  */
 
 #ifndef TENSORADAPTER_H_
@@ -66,7 +66,6 @@ cudaStream_t CUDACurrentStream();
  */
 void RecordStream(void* ptr, cudaStream_t stream, int device_id);
 #endif  // DGL_USE_CUDA
-
 }
 
 };  // namespace tensoradapter

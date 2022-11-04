@@ -7,8 +7,9 @@
 #define DGL_RUNTIME_WORKSPACE_POOL_H_
 
 #include <dgl/runtime/device_api.h>
-#include <vector>
+
 #include <memory>
+#include <vector>
 
 namespace dgl {
 namespace runtime {

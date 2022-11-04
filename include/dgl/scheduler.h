@@ -7,6 +7,7 @@
 #define DGL_SCHEDULER_H_
 
 #include <vector>
+
 #include "runtime/ndarray.h"
 
 namespace dgl {
@@ -21,8 +22,8 @@ namespace sched {
  * \param msg_ids The edge id for each message
  * \param vids The destination vertex for each message
  * \param recv_ids The recv nodes (for checking zero degree nodes)
- * \note If there are multiple messages going into the same destination vertex, then
- *       there will be multiple copies of the destination vertex in vids
+ * \note If there are multiple messages going into the same destination vertex,
+ *       then there will be multiple copies of the destination vertex in vids.
  * \return a vector of 5 IdArrays for degree bucketing. The 5 arrays are:
  *         degrees: degrees for each bucket
  *         nids: destination node ids
@@ -31,8 +32,8 @@ namespace sched {
  *         mid_section: number of messages in each bucket (used to split mids)
  */
 template <class IdType>
-std::vector<IdArray> DegreeBucketing(const IdArray& msg_ids, const IdArray& vids,
-        const IdArray& recv_ids);
+std::vector<IdArray> DegreeBucketing(
+    const IdArray& msg_ids, const IdArray& vids, const IdArray& recv_ids);
 
 /*!
  * \brief Generate degree bucketing schedule for group_apply edge
@@ -53,8 +54,8 @@ std::vector<IdArray> DegreeBucketing(const IdArray& msg_ids, const IdArray& vids
  *                   new_uids, new_vids, and new_eids)
  */
 template <class IdType>
-std::vector<IdArray> GroupEdgeByNodeDegree(const IdArray& uids,
-        const IdArray& vids, const IdArray& eids);
+std::vector<IdArray> GroupEdgeByNodeDegree(
+    const IdArray& uids, const IdArray& vids, const IdArray& eids);
 
 }  // namespace sched
 

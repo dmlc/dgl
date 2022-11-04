@@ -14,7 +14,11 @@ from pyarrow import csv
 
 import constants
 from utils import get_idranges, memory_snapshot, read_json
-from dgl.distributed.partition import RESERVED_FIELD_DTYPE
+from dgl.distributed.partition import (
+    RESERVED_FIELD_DTYPE,
+    _etype_str_to_tuple,
+    _etype_tuple_to_str,
+)
 
 
 def create_dgl_object(schema, part_id, node_data, edge_data, edgeid_offset,
@@ -121,10 +125,10 @@ def create_dgl_object(schema, part_id, node_data, edge_data, edgeid_offset,
     etypes = [(key, global_eid_ranges[key][0, 0]) for key in global_eid_ranges]
     etypes.sort(key=lambda e: e[1])
     etypes = [e[0] for e in etypes]
-    etypes_map = {e.split(":")[1]: i for i, e in enumerate(etypes)}
+    etypes_map = {_etype_str_to_tuple(e): i for i, e in enumerate(etypes)}
 
     node_map_val = {ntype: [] for ntype in ntypes}
-    edge_map_val = {etype.split(":")[1]: [] for etype in etypes}
+    edge_map_val = {_etype_str_to_tuple(etype): [] for etype in etypes}
 
     memory_snapshot("CreateDGLObj_AssignNodeData", part_id)
     shuffle_global_nids = node_data[constants.SHUFFLE_GLOBAL_NID]
@@ -194,11 +198,11 @@ def create_dgl_object(schema, part_id, node_data, edge_data, edgeid_offset,
     # Determine the edge ID range of different edge types.
     edge_id_start = edgeid_offset 
     for etype_name in global_eid_ranges:
-        tokens = etype_name.split(":")
-        assert len(tokens) == 3
-        etype_id = etypes_map[tokens[1]]
-        edge_map_val[tokens[1]].append([edge_id_start,
-                                         edge_id_start + np.sum(etype_ids == etype_id)])
+        etype = _etype_str_to_tuple(etype_name)
+        assert len(etype) == 3
+        etype_id = etypes_map[etype]
+        edge_map_val[etype].append([edge_id_start,
+            edge_id_start + np.sum(etype_ids == etype_id)])
         edge_id_start += np.sum(etype_ids == etype_id)
     memory_snapshot("CreateDGLObj_UniqueNodeIds: ", part_id)
 
@@ -303,7 +307,7 @@ def create_dgl_object(schema, part_id, node_data, edge_data, edgeid_offset,
         for etype, etype_id in etypes_map.items():
             mask = th.logical_and(part_graph.edata[dgl.ETYPE] == etype_id,
                                     part_graph.edata['inner_edge'])
-            orig_eids[etype] = th.as_tensor(global_edge_id[mask])
+            orig_eids[_etype_tuple_to_str(etype)] = th.as_tensor(global_edge_id[mask])
 
 
     return part_graph, node_map_val, edge_map_val, ntypes_map, etypes_map, \

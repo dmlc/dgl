@@ -15,9 +15,9 @@ namespace featgraph {
 void LoadFeatGraphModule(const std::string& path);
 
 /* \brief Call Featgraph's SDDMM kernel. */
-void SDDMMTreeReduction(DLManagedTensor* row, DLManagedTensor* col, 
-                        DLManagedTensor* lhs, DLManagedTensor* rhs, 
-                        DLManagedTensor* out);
+void SDDMMTreeReduction(
+    DLManagedTensor* row, DLManagedTensor* col, DLManagedTensor* lhs,
+    DLManagedTensor* rhs, DLManagedTensor* out);
 
 }  // namespace featgraph
 }  // namespace dgl

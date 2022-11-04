@@ -14,31 +14,28 @@ namespace aten {
 namespace impl {
 
 /*  This is a cross-device access version of IndexSelectMultiKernel.
-*   Since the memory access over PCIe is more sensitive to the
-*   data access aligment (cacheline), we need a separate version here.
-*/
+ *   Since the memory access over PCIe is more sensitive to the
+ *   data access aligment (cacheline), we need a separate version here.
+ */
 template <typename DType, typename IdType>
 __global__ void IndexSelectMultiKernelAligned(
-        const DType* const array,
-        const int64_t num_feat,
-        const IdType* const index,
-        const int64_t length,
-        const int64_t arr_len,
-        DType* const out) {
-  int64_t out_row = blockIdx.x*blockDim.y+threadIdx.y;
+    const DType* const array, const int64_t num_feat, const IdType* const index,
+    const int64_t length, const int64_t arr_len, DType* const out) {
+  int64_t out_row = blockIdx.x * blockDim.y + threadIdx.y;
 
-  const int64_t stride = blockDim.y*gridDim.x;
+  const int64_t stride = blockDim.y * gridDim.x;
 
   while (out_row < length) {
     int64_t col = threadIdx.x;
     const int64_t in_row = index[out_row];
     assert(in_row >= 0 && in_row < arr_len);
     const int64_t idx_offset =
-      ((uint64_t)(&array[in_row*num_feat]) % CACHE_LINE_SIZE) / sizeof(DType);
+        ((uint64_t)(&array[in_row * num_feat]) % CACHE_LINE_SIZE) /
+        sizeof(DType);
     col = col - idx_offset;
     while (col < num_feat) {
       if (col >= 0)
-        out[out_row*num_feat+col] = array[in_row*num_feat+col];
+        out[out_row * num_feat + col] = array[in_row * num_feat + col];
       col += blockDim.x;
     }
     out_row += stride;

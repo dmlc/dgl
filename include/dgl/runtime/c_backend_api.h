@@ -27,9 +27,8 @@ extern "C" {
  * \param out The result function.
  * \return 0 when no error is thrown, -1 when failure happens
  */
-DGL_DLL int DGLBackendGetFuncFromEnv(void* mod_node,
-                                     const char* func_name,
-                                     DGLFunctionHandle *out);
+DGL_DLL int DGLBackendGetFuncFromEnv(
+    void* mod_node, const char* func_name, DGLFunctionHandle* out);
 /*!
  * \brief Backend function to register system-wide library symbol.
  *
@@ -42,22 +41,21 @@ DGL_DLL int DGLBackendRegisterSystemLibSymbol(const char* name, void* ptr);
 /*!
  * \brief Backend function to allocate temporal workspace.
  *
- * \note The result allocate spaced is ensured to be aligned to kTempAllocaAlignment.
+ * \note The result allocate spaced is ensured to be aligned to
+ *       kTempAllocaAlignment.
  *
  * \param nbytes The size of the space requested.
  * \param device_type The device type which the space will be allocated.
  * \param device_id The device id which the space will be allocated.
  * \param dtype_code_hint The type code of the array elements. Only used in
- * certain backends such as OpenGL.
+ *        certain backends such as OpenGL.
  * \param dtype_bits_hint The type bits of the array elements. Only used in
- * certain backends such as OpenGL.
+ *        certain backends such as OpenGL.
  * \return nullptr when error is thrown, a valid ptr if success
  */
-DGL_DLL void* DGLBackendAllocWorkspace(int device_type,
-                                       int device_id,
-                                       uint64_t nbytes,
-                                       int dtype_code_hint,
-                                       int dtype_bits_hint);
+DGL_DLL void* DGLBackendAllocWorkspace(
+    int device_type, int device_id, uint64_t nbytes, int dtype_code_hint,
+    int dtype_bits_hint);
 
 /*!
  * \brief Backend function to free temporal workspace.
@@ -69,9 +67,7 @@ DGL_DLL void* DGLBackendAllocWorkspace(int device_type,
  *
  * \sa DGLBackendAllocWorkspace
  */
-DGL_DLL int DGLBackendFreeWorkspace(int device_type,
-                                    int device_id,
-                                    void* ptr);
+DGL_DLL int DGLBackendFreeWorkspace(int device_type, int device_id, void* ptr);
 
 /*!
  * \brief Environment for DGL parallel task.
@@ -100,13 +96,12 @@ typedef int (*FDGLParallelLambda)(
  * \param flambda The parallel function to be launched.
  * \param cdata The closure data.
  * \param num_task Number of tasks to launch, can be 0, means launch
- *           with all available threads.
+ *        with all available threads.
  *
  * \return 0 when no error is thrown, -1 when failure happens
  */
-DGL_DLL int DGLBackendParallelLaunch(FDGLParallelLambda flambda,
-                                     void* cdata,
-                                     int num_task);
+DGL_DLL int DGLBackendParallelLaunch(
+    FDGLParallelLambda flambda, void* cdata, int num_task);
 
 /*!
  * \brief BSP barrrier between parallel threads
@@ -115,7 +110,6 @@ DGL_DLL int DGLBackendParallelLaunch(FDGLParallelLambda flambda,
  * \return 0 when no error is thrown, -1 when failure happens
  */
 DGL_DLL int DGLBackendParallelBarrier(int task_id, DGLParallelGroupEnv* penv);
-
 
 /*!
  * \brief Simple static initialization fucntion.
@@ -128,10 +122,8 @@ DGL_DLL int DGLBackendParallelBarrier(int task_id, DGLParallelGroupEnv* penv);
  * \param nbytes Number of bytes in the closure data.
  * \return 0 when no error is thrown, -1 when failure happens
  */
-DGL_DLL int DGLBackendRunOnce(void** handle,
-                              int (*f)(void*),
-                              void *cdata,
-                              int nbytes);
+DGL_DLL int DGLBackendRunOnce(
+    void** handle, int (*f)(void*), void* cdata, int nbytes);
 
 #ifdef __cplusplus
 }  // DGL_EXTERN_C

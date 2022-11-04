@@ -32,8 +32,7 @@ DGL_DLL int DGLObjectFree(ObjectHandle handle);
  * \param out_index the corresponding type index.
  * \return 0 when success, -1 when failure happens
  */
-DGL_DLL int DGLObjectTypeKey2Index(const char* type_key,
-                                 int* out_index);
+DGL_DLL int DGLObjectTypeKey2Index(const char* type_key, int* out_index);
 
 /*!
  * \brief Get runtime type index of the object.
@@ -41,8 +40,7 @@ DGL_DLL int DGLObjectTypeKey2Index(const char* type_key,
  * \param out_index the corresponding type index.
  * \return 0 when success, -1 when failure happens
  */
-DGL_DLL int DGLObjectGetTypeIndex(ObjectHandle handle,
-                                int* out_index);
+DGL_DLL int DGLObjectGetTypeIndex(ObjectHandle handle, int* out_index);
 
 /*!
  * \brief get attributes given key
@@ -54,11 +52,9 @@ DGL_DLL int DGLObjectGetTypeIndex(ObjectHandle handle,
  * \return 0 when success, -1 when failure happens
  * \note API calls always exchanges with type bits=64, lanes=1
  */
-DGL_DLL int DGLObjectGetAttr(ObjectHandle handle,
-                           const char* key,
-                           DGLValue* out_value,
-                           int* out_type_code,
-                           int* out_success);
+DGL_DLL int DGLObjectGetAttr(
+    ObjectHandle handle, const char* key, DGLValue* out_value,
+    int* out_type_code, int* out_success);
 
 /*!
  * \brief get attributes names in the object.
@@ -67,9 +63,8 @@ DGL_DLL int DGLObjectGetAttr(ObjectHandle handle,
  * \param out_array The array of function names.
  * \return 0 when success, -1 when failure happens
  */
-DGL_DLL int DGLObjectListAttrNames(ObjectHandle handle,
-                                 int *out_size,
-                                 const char*** out_array);
+DGL_DLL int DGLObjectListAttrNames(
+    ObjectHandle handle, int* out_size, const char*** out_array);
 #ifdef __cplusplus
 }  // DGL_EXTERN_C
 #endif
