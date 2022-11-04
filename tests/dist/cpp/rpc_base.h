@@ -24,6 +24,6 @@ std::shared_ptr<tensorpipe::Context> InitTPContext() {
   context->registerChannel(0 /* low priority */, "basic", basicChannel);
   return context;
 }
-} // namespace
+}  // namespace
 
 #endif
