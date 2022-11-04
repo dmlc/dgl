@@ -3857,9 +3857,11 @@ def double_radius_node_labeling(g, src, dst):
 
     return F.tensor(z, F.int64)
 
-def shortest_dist(g, root=None, directed=True, return_paths=False):
-    r"""Compute shortest distance and paths on the given graph. Only unweighted
-    cases are supported.
+def shortest_dist(g, root=None, return_paths=False):
+    r"""Compute shortest distance and paths on the given graph.
+    
+    Only unweighted cases are supported. Only directed paths (in which the
+    edges are all oriented in the same direction) are considered effective.
 
     Parameters
     ----------
@@ -3869,10 +3871,6 @@ def shortest_dist(g, root=None, directed=True, return_paths=False):
         Given a root node ID, it returns the shortest distance and paths
         (optional) between the root node and all the nodes. If None, it returns
         the results for all node pairs. Default: None.
-    directed : bool, optional
-        A flag to indicate whether the graph is considered as directed.
-        Default: True. If False, reverse edges are considered for constructing
-        shortest paths.
     return_paths : bool, optional
         A flag to indicate whether to return paths. Default: False. If True,
         return shortest paths represented with edge IDs.
@@ -3906,48 +3904,47 @@ def shortest_dist(g, root=None, directed=True, return_paths=False):
     -------
     >>> import dgl
 
-    >>> g = dgl.graph(([0, 1, 3], [1, 2, 1]))
-    >>> dgl.shortest_dist(g, root=0, directed=True)
-    tensor([ 0,  1,  2, -1])
-    >>> dist, paths = dgl.shortest_dist(
-    ...     g, root=None, directed=False, return_paths=True)
+    >>> g = dgl.graph(([0, 1, 1, 2], [2, 0, 3, 3]))
+    >>> dgl.shortest_dist(g, root=0)
+    tensor([ 0,  -1,  1, 2])
+    >>> dist, paths = dgl.shortest_dist(g, root=None, return_paths=True)
     >>> print(dist)
-    tensor([[0, 1, 2, 2],
-        [1, 0, 1, 1],
-        [2, 1, 0, 2],
-        [2, 1, 2, 0]])
+    tensor([[ 0, -1,  1,  2],
+        [ 1,  0,  2,  1],
+        [-1, -1,  0,  1],
+        [-1, -1, -1,  0]])
     >>> print(paths)
     tensor([[[-1, -1],
+         [-1, -1],
          [ 0, -1],
-         [ 0,  1],
-         [ 0,  2]],
-        [[ 0, -1],
+         [ 0,  3]],
+        [[ 1, -1],
          [-1, -1],
-         [ 1, -1],
+         [ 1,  0],
          [ 2, -1]],
-        [[ 1,  0],
-         [ 1, -1],
+        [[-1, -1],
          [-1, -1],
-         [ 1,  2]],
-        [[ 2,  0],
-         [ 2, -1],
-         [ 2,  1],
+         [-1, -1],
+         [ 3, -1]],
+        [[-1, -1],
+         [-1, -1],
+         [-1, -1],
          [-1, -1]]])
     """
     if root is None:
         dist, pred = sparse.csgraph.shortest_path(
             g.adj(scipy_fmt='csr'), return_predecessors=True, unweighted=True,
-            directed=directed
+            directed=True
         )
     else:
         dist, pred = sparse.csgraph.dijkstra(
-            g.adj(scipy_fmt='csr'), directed=directed, indices=root,
+            g.adj(scipy_fmt='csr'), directed=True, indices=root,
             return_predecessors=True, unweighted=True,
         )
     dist[np.isinf(dist)] = -1
 
     if not return_paths:
-        return F.tensor(dist, dtype=F.int64)
+        return F.copy_to(F.tensor(dist, dtype=F.int64), g.device)
 
     def _get_nodes(pred, i, j):
         r"""return node IDs of a path from i to j given predecessors"""
@@ -3983,15 +3980,12 @@ def shortest_dist(g, root=None, directed=True, return_paths=False):
     masks = np.stack(masks, axis=0)
 
     u, v = np.array(u), np.array(v)
-    if not directed:
-        # flip src and dst if reverse edges are used in undirected cases
-        has_edges = F.asnumpy(g.has_edges_between(u, v))
-        u[~has_edges], v[~has_edges] = v[~has_edges], u[~has_edges]
     edge_ids = g.edge_ids(u, v)
-    paths[masks] = edge_ids
+    paths[masks] = F.asnumpy(edge_ids)
     if root is not None:
         paths = paths[0]
 
-    return F.tensor(dist, dtype=F.int64), F.tensor(paths, dtype=F.int64)
+    return F.copy_to(F.tensor(dist, dtype=F.int64), g.device), \
+        F.copy_to(F.tensor(paths, dtype=F.int64), g.device)
 
 _init_api("dgl.transform", __name__)
