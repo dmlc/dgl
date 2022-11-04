@@ -93,7 +93,7 @@ class MessageQueue {
    * \param queue_size size (bytes) of message queue
    * \param num_producers number of producers, use 1 by default
    */
-  MessageQueue(int64_t queue_size /* in bytes */,
+  explicit MessageQueue(int64_t queue_size /* in bytes */,
                int num_producers = 1);
 
   /*!
