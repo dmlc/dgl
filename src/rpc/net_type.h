@@ -78,7 +78,8 @@ struct RPCReceiver : RPCBase {
    * \brief Recv RPCMessage from Sender. Actually removing data from queue.
    * \param msg pointer of RPCmessage
    * \param timeout The timeout value in milliseconds. If zero, wait
-   * indefinitely. \return RPCStatus: kRPCSuccess or kRPCTimeOut.
+   * indefinitely.
+   * \return RPCStatus: kRPCSuccess or kRPCTimeOut.
    */
   virtual RPCStatus Recv(RPCMessage *msg, int timeout) = 0;
 };

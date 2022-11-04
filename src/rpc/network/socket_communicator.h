@@ -95,8 +95,10 @@ class SocketSender : public Sender {
 
   /*!
    * \brief Send data to specified Receiver. Actually pushing message to message
-   * queue. \param msg data message \param recv_id receiver's ID \return Status
-   * code
+   * queue.
+   * \param msg data message.
+   * \param recv_id receiver's ID.
+   * \return Status code.
    *
    * (1) The send is non-blocking. There is no guarantee that the message has
    * been physically sent out when the function returns. (2) The communicator
@@ -176,7 +178,8 @@ class SocketReceiver : public Receiver {
    * \brief Recv RPCMessage from Sender. Actually removing data from queue.
    * \param msg pointer of RPCmessage
    * \param timeout The timeout value in milliseconds. If zero, wait
-   * indefinitely. \return RPCStatus: kRPCSuccess or kRPCTimeOut.
+   * indefinitely.
+   * \return RPCStatus: kRPCSuccess or kRPCTimeOut.
    */
   rpc::RPCStatus Recv(rpc::RPCMessage* msg, int timeout) override;
 
@@ -185,7 +188,8 @@ class SocketReceiver : public Receiver {
    * \param msg pointer of data message
    * \param send_id which sender current msg comes from
    * \param timeout The timeout value in milliseconds. If zero, wait
-   * indefinitely. \return Status code
+   * indefinitely.
+   * \return Status code
    *
    * (1) The Recv() API is thread-safe.
    * (2) Memory allocated by communicator but will not own it after the function
@@ -195,9 +199,12 @@ class SocketReceiver : public Receiver {
 
   /*!
    * \brief Recv data from a specified Sender. Actually removing data from
-   * msg_queue. \param msg pointer of data message \param send_id sender's ID
+   * msg_queue.
+   * \param msg pointer of data message.
+   * \param send_id sender's ID
    * \param timeout The timeout value in milliseconds. If zero, wait
-   * indefinitely. \return Status code
+   * indefinitely.
+   * \return Status code
    *
    * (1) The RecvFrom() API is thread-safe.
    * (2) Memory allocated by communicator but will not own it after the function

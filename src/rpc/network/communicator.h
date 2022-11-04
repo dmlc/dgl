@@ -101,7 +101,8 @@ class Receiver : public rpc::RPCReceiver {
    * \param msg pointer of data message
    * \param send_id which sender current msg comes from
    * \param timeout The timeout value in milliseconds. If zero, wait
-   * indefinitely. \return Status code
+   * indefinitely.
+   * \return Status code
    *
    * (1) The Recv() API is thread-safe.
    * (2) Memory allocated by communicator but will not own it after the function
@@ -114,7 +115,8 @@ class Receiver : public rpc::RPCReceiver {
    * \param msg pointer of data message
    * \param send_id sender's ID
    * \param timeout The timeout value in milliseconds. If zero, wait
-   * indefinitely. \return Status code
+   * indefinitely.
+   * \return Status code
    *
    * (1) The RecvFrom() API is thread-safe.
    * (2) Memory allocated by communicator but will not own it after the function
