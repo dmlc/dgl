@@ -262,7 +262,7 @@ class NDArray {
 
   /*!
    * @brief Create a NDArray by copying from std::vector.
-   * \tparam T Type of vector data.  Determines the dtype of returned array.
+   * @tparam T Type of vector data.  Determines the dtype of returned array.
    */
   template<typename T>
   DGL_DLL static NDArray FromVector(
@@ -276,7 +276,7 @@ class NDArray {
 
   /*!
    * @brief Create a std::vector from a 1D NDArray.
-   * \tparam T Type of vector data.
+   * @tparam T Type of vector data.
    * @note Type casting is NOT performed.  The caller has to make sure that the vector
    *       type matches the dtype of NDArray.
    */

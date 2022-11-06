@@ -36,7 +36,7 @@ union ArgUnion {
  *
  * @param f with signiture (DGLArgs args, DGLRetValue* rv, void* void_args)
  * @param arg_types The arguments type information.
- * \tparam F the function type
+ * @tparam F the function type
  *
  * @return The wrapped packed function.
  */
@@ -49,7 +49,7 @@ inline PackedFunc PackFuncVoidAddr(
  *
  * @param f with signiture (DGLArgs args, DGLRetValue* rv, ArgUnion* pack_args)
  * @param arg_types The arguments type information.
- * \tparam F the function type
+ * @tparam F the function type
  *
  * @return The wrapped packed function.
  */
@@ -63,7 +63,7 @@ inline PackedFunc PackFuncNonBufferArg(
  * @param f with signature (DGLArgs args, DGLRetValue* rv, void* pack_args,
  * size_t nbytes)
  * @param arg_types The arguments that wish to get from
- * \tparam F the function type
+ * @tparam F the function type
  *
  * @return The wrapped packed function.
  */

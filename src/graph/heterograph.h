@@ -299,7 +299,7 @@ class HeteroGraph : public BaseHeteroGraph {
 
   /*! \brief template class for Flatten operation
   * 
-  * \tparam IdType Graph's index data type, can be int32_t or int64_t
+  * @tparam IdType Graph's index data type, can be int32_t or int64_t
   * @param etypes vector of etypes to be falttened
   * @return pointer of FlattenedHeteroGraphh
   */

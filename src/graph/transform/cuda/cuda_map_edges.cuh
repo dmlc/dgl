@@ -61,9 +61,9 @@ __device__ void map_vertex_ids(
 /**
  * @brief Generate mapped edge endpoint ids.
  *
- * \tparam IdType The type of id.
- * \tparam BLOCK_SIZE The size of each thread block.
- * \tparam TILE_SIZE The number of edges to process per thread block.
+ * @tparam IdType The type of id.
+ * @tparam BLOCK_SIZE The size of each thread block.
+ * @tparam TILE_SIZE The number of edges to process per thread block.
  * @param global_srcs_device The source ids to map.
  * @param new_global_srcs_device The mapped source ids (output).
  * @param global_dsts_device The destination ids to map.

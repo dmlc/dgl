@@ -146,7 +146,7 @@ IdArray NonZero(BoolArray bool_arr);
 
 /*!
  * @brief Return the data under the index. In numpy notation, A[I]
- * \tparam ValueType The type of return value.
+ * @tparam ValueType The type of return value.
  */
 template<typename ValueType>
 ValueType IndexSelect(NDArray array, int64_t index);

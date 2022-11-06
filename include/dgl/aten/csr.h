@@ -260,7 +260,7 @@ runtime::NDArray CSRGetData(CSRMatrix, runtime::NDArray rows, runtime::NDArray c
  *
  * @note This operator allows broadcasting (i.e, either row or col can be of length 1).
  *
- * \tparam DType the data type of the weights array.
+ * @tparam DType the data type of the weights array.
  * @param mat Sparse matrix.
  * @param rows Row index.
  * @param cols Column index.

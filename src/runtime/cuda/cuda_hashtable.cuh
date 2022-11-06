@@ -60,7 +60,7 @@ class OrderedHashTable;
  * to get the remaped array:
  * [0, 1, 2, 0, 3, 4, 1, 2, 5, 3]
  *
- * \tparam IdType The type of the IDs.
+ * @tparam IdType The type of the IDs.
  */
 template <typename IdType>
 class DeviceOrderedHashTable {
@@ -208,7 +208,7 @@ class DeviceOrderedHashTable {
  *   {key: 1, local: 5, index: 8}
  * ]
  *
- * \tparam IdType The type of the IDs.
+ * @tparam IdType The type of the IDs.
  */
 template <typename IdType>
 class OrderedHashTable {

@@ -433,8 +433,8 @@ __global__ void GetBlockInfo(
  * @brief Brute force kNN. Compute distance for each pair of input points and
  * get the result directly (without a distance matrix).
  *
- * \tparam FloatType The type of input points.
- * \tparam IdType The type of id.
+ * @tparam FloatType The type of input points.
+ * @tparam IdType The type of id.
  * @param data_points NDArray of dataset points.
  * @param data_offsets offsets of point index in data points.
  * @param query_points NDArray of query points
@@ -478,8 +478,8 @@ void BruteForceKNNCuda(
  *  query block, it will make a loop over all data blocks and compute distances.
  *  It will be faster when the dimension of input points is not large.
  *
- * \tparam FloatType The type of input points.
- * \tparam IdType The type of id.
+ * @tparam FloatType The type of input points.
+ * @tparam IdType The type of id.
  * @param data_points NDArray of dataset points.
  * @param data_offsets offsets of point index in data points.
  * @param query_points NDArray of query points

@@ -37,7 +37,7 @@ void ImportModuleBlob(const char* mblob, std::vector<Module>* module_list);
 /*!
  * @brief Utility to initialize conext function symbols during startup
  * @param flookup A symbol lookup function.
- * \tparam FLookup a function of signature string->void*
+ * @tparam FLookup a function of signature string->void*
  */
 template <typename FLookup>
 void InitContextFunctions(FLookup flookup) {

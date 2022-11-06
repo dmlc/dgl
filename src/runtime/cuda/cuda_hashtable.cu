@@ -168,9 +168,9 @@ struct BlockPrefixCallbackOp {
  * @brief This generates a hash map where the keys are the global item numbers,
  * and the values are indexes, and inputs may have duplciates.
  *
- * \tparam IdType The type of of id.
- * \tparam BLOCK_SIZE The size of the thread block.
- * \tparam TILE_SIZE The number of entries each thread block will process.
+ * @tparam IdType The type of of id.
+ * @tparam BLOCK_SIZE The size of the thread block.
+ * @tparam TILE_SIZE The number of entries each thread block will process.
  * @param items The items to insert.
  * @param num_items The number of items to insert.
  * @param table The hash table.
@@ -197,9 +197,9 @@ __global__ void generate_hashmap_duplicates(
  * @brief This generates a hash map where the keys are the global item numbers,
  * and the values are indexes, and all inputs are unique.
  *
- * \tparam IdType The type of of id.
- * \tparam BLOCK_SIZE The size of the thread block.
- * \tparam TILE_SIZE The number of entries each thread block will process.
+ * @tparam IdType The type of of id.
+ * @tparam BLOCK_SIZE The size of the thread block.
+ * @tparam TILE_SIZE The number of entries each thread block will process.
  * @param items The unique items to insert.
  * @param num_items The number of items to insert.
  * @param table The hash table.
@@ -231,9 +231,9 @@ __global__ void generate_hashmap_unique(
 /**
  * @brief This counts the number of nodes inserted per thread block.
  *
- * \tparam IdType The type of of id.
- * \tparam BLOCK_SIZE The size of the thread block.
- * \tparam TILE_SIZE The number of entries each thread block will process.
+ * @tparam IdType The type of of id.
+ * @tparam BLOCK_SIZE The size of the thread block.
+ * @tparam TILE_SIZE The number of entries each thread block will process.
  * @param input The nodes to insert.
  * @param num_input The number of nodes to insert.
  * @param table The hash table.
@@ -280,9 +280,9 @@ __global__ void count_hashmap(
 /**
  * @brief Update the local numbering of elements in the hashmap.
  *
- * \tparam IdType The type of id.
- * \tparam BLOCK_SIZE The size of the thread blocks.
- * \tparam TILE_SIZE The number of elements each thread block works on.
+ * @tparam IdType The type of id.
+ * @tparam BLOCK_SIZE The size of the thread blocks.
+ * @tparam TILE_SIZE The number of elements each thread block works on.
  * @param items The set of non-unique items to update from.
  * @param num_items The number of non-unique items.
  * @param table The hash table.
