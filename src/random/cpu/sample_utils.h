@@ -37,7 +37,7 @@ class BaseSampler {
 // probability 0.  DType could be uint8 in this case, which will give incorrect arithmetic
 // results due to overflowing and/or integer division.
 
-/*
+/**
  * AliasSampler is used to sample elements from a given discrete categorical distribution.
  * Algorithm: Alias Method(https://en.wikipedia.org/wiki/Alias_method)
  * Sampler building complexity: O(n)
@@ -165,7 +165,7 @@ class AliasSampler: public BaseSampler<Idx> {
 };
 
 
-/*
+/**
  * CDFSampler is used to sample elements from a given discrete categorical distribution.
  * Algorithm: create a cumulative distribution function and conduct binary search for sampling.
  * Reference: https://github.com/numpy/numpy/blob/d37908/numpy/random/mtrand.pyx#L804
@@ -256,7 +256,7 @@ class CDFSampler: public BaseSampler<Idx> {
 };
 
 
-/*
+/**
  * TreeSampler is used to sample elements from a given discrete categorical distribution.
  * Algorithm: create a heap that stores accumulated likelihood of its leaf descendents.
  * Reference: https://blog.smola.org/post/1016514759

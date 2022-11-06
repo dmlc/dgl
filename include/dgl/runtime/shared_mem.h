@@ -14,7 +14,7 @@
 namespace dgl {
 namespace runtime {
 
-/*
+/**
  * @brief This class owns shared memory.
  *
  * When the object is gone, the shared memory will also be destroyed.
@@ -22,7 +22,7 @@ namespace runtime {
  * the shared memory is removed.
  */
 class SharedMemory {
-  /*
+  /**
    * @brief whether the shared memory is owned by the object.
    *
    * If shared memory is created in the object, it'll be owned by the object
@@ -41,7 +41,7 @@ class SharedMemory {
   /* @brief the size of the shared memory. */
   size_t size_;
 
-  /*
+  /**
    * @brief the name of the object.
    *
    * In Unix, shared memory is identified by a file. Thus, `name` is actually
@@ -54,31 +54,31 @@ class SharedMemory {
    */
   std::string GetName() const { return name; }
 
-  /*
+  /**
    * @brief constructor of the shared memory.
    * @param name The file corresponding to the shared memory.
    */
   explicit SharedMemory(const std::string &name);
-  /*
+  /**
    * @brief destructor of the shared memory.
    * It deallocates the shared memory and removes the corresponding file.
    */
   ~SharedMemory();
-  /*
+  /**
    * @brief create shared memory.
    * It creates the file and shared memory.
    * @param sz the size of the shared memory.
    * @return the address of the shared memory
    */
   void *CreateNew(size_t sz);
-  /*
+  /**
    * @brief allocate shared memory that has been created.
    * @param sz the size of the shared memory.
    * @return the address of the shared memory
    */
   void *Open(size_t sz);
 
-  /*
+  /**
    * @brief check if the shared memory exist.
    * @param name the name of the shared memory.
    * @return a boolean value to indicate if the shared memory exists.

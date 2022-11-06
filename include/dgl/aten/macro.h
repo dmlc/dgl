@@ -9,7 +9,7 @@
 
 ///////////////////////// Dispatchers //////////////////////////
 
-/*
+/**
  * Dispatch according to device:
  *
  * ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
@@ -28,7 +28,7 @@
   }                                                             \
 } while (0)
 
-/*
+/**
  * Dispatch according to device:
  *
  * XXX(minjie): temporary macro that allows CUDA operator
@@ -59,7 +59,7 @@
 #define ATEN_XPU_SWITCH_CUDA ATEN_XPU_SWITCH
 #endif  // DGL_USE_CUDA
 
-/*
+/**
  * Dispatch according to integral type (either int32 or int64):
  *
  * ATEN_ID_TYPE_SWITCH(array->dtype, IdType, {
@@ -81,7 +81,7 @@
   }                                                           \
 } while (0)
 
-/*
+/**
  * Dispatch according to bits (either int32 or int64):
  *
  * ATEN_ID_BITS_SWITCH(bits, IdType, {
@@ -104,7 +104,7 @@
     }                                                           \
   } while (0)
 
-/*
+/**
  * Dispatch according to float type (either float32 or float64):
  *
  * ATEN_FLOAT_TYPE_SWITCH(array->dtype, FloatType, {
@@ -128,7 +128,7 @@
   }                                                           \
 } while (0)
 
-/*
+/**
  * Dispatch according to float type, including 16bits (float16/bfloat16/float32/float64).
  */
 #ifdef DGL_USE_CUDA
@@ -185,7 +185,7 @@
   ATEN_FLOAT_TYPE_SWITCH(val, FloatType, val_name, {__VA_ARGS__})
 #endif  // DGL_USE_CUDA
 
-/*
+/**
  * Dispatch according to data type (int32, int64, float32 or float64):
  *
  * ATEN_DTYPE_SWITCH(array->dtype, DType, {
@@ -212,7 +212,7 @@
   }                                                           \
 } while (0)
 
-/*
+/**
  * Dispatch according to data type (int8, uint8, float32 or float64):
  *
  * ATEN_FLOAT_INT8_UINT8_TYPE_SWITCH(array->dtype, DType, {
@@ -239,7 +239,7 @@
   }                                                           \
 } while (0)
 
-/*
+/**
  * Dispatch data type only based on bit-width (8-bit, 16-bit, 32-bit, 64-bit):
  *
  * ATEN_DTYPE_BITS_ONLY_SWITCH(array->dtype, DType, {
@@ -268,7 +268,7 @@
   }                                                                       \
 } while (0)
 
-/*
+/**
  * Dispatch according to integral type of CSR graphs.
  * Identical to ATEN_ID_TYPE_SWITCH except for a different error message.
  */
@@ -306,7 +306,7 @@
     << "context as " << (#VAR1) << "(" << (VAR1)->ctx << "). "                            \
     << "Or " << (#VAR1) << "(" << (VAR1)->ctx << ")" << " is pinned";
 
-/*
+/**
  * Macro to dispatch according to the context of array and dtype of csr
  * to enable CUDA UVA ops.
  * Context check is covered here to avoid confusion with CHECK_SAME_CONTEXT.

@@ -109,7 +109,7 @@ inline const char* curandGetErrorString(curandStatus_t error) {
   return "Unrecognized curand error string";
 }
 
-/*
+/**
  * @brief Cast data type to cudaDataType_t.
  */
 template <typename T>
@@ -133,7 +133,7 @@ struct cuda_dtype<double> {
 };
 
 #if CUDART_VERSION >= 11000
-/*
+/**
  * @brief Cast index data type to cusparseIndexType_t.
  */
 template <typename T>

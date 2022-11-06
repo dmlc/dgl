@@ -653,7 +653,7 @@ std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
 std::pair<CSRMatrix, NDArray> CSRSortByTag(
     const CSRMatrix& csr, const IdArray tag_array, int64_t num_tags);
 
-/*
+/**
  * @brief Union two CSRMatrix into one CSRMatrix.
  *
  * Two Matrix must have the same shape.

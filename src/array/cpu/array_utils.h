@@ -109,7 +109,7 @@ class IdHashMap {
   phmap::flat_hash_map<IdType, IdType> oldv2newv_;
 };
 
-/*
+/**
  * @brief Hash type for building maps/sets with pairs as keys.
  */
 struct PairHash {

@@ -13,7 +13,7 @@
 namespace dgl {
 namespace runtime {
 
-/*
+/**
  * The runtime allocates resources during the computation. Some of the resources
  * cannot be destroyed after the process exits especially when the process
  * doesn't exits normally. We need to keep track of the resources in the system

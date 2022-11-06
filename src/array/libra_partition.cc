@@ -1,4 +1,4 @@
-/*
+/**
 Copyright (c) 2021 Intel Corporation
  \file distgnn/partition/main_Libra.py
  \brief Libra - Vertex-cut based graph partitioner for distirbuted training

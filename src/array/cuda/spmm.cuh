@@ -151,7 +151,7 @@ void _Transpose(const DType* in, DType* out,
       out, row));
 }
 
-/*
+/**
  * @brief Tranpose the input matrix for data type half.
  * @note cuBLAS has no geam API for half data type, fallback to our kernel.
  */
@@ -165,7 +165,7 @@ void _Transpose<half>(const half* in, half* out,
 }
 
 #if BF16_ENABLED
-/*
+/**
  * @brief Tranpose the input matrix for data type half.
  * @note cuBLAS has no geam API for bf16 data type, fallback to our kernel.
  */
@@ -179,7 +179,7 @@ void _Transpose<__nv_bfloat16>(const __nv_bfloat16* in, __nv_bfloat16* out,
 }
 #endif  // BF16_ENABLED
 
-/*
+/**
  * @brief
  */
 template <typename DType, typename IdType>

@@ -264,7 +264,7 @@ void _TestConcat(DGLContext ctx) {
 
 template <typename IdType>
 void _TestToSimpleCsr(DGLContext ctx) {
-  /*
+  /**
    * A = [[0, 0, 0, 0],
    *      [1, 0, 0, 1],
    *      [1, 1, 1, 1],
@@ -341,7 +341,7 @@ TEST(MatrixTest, TestToSimpleCsr) {
 
 template <typename IdType>
 void _TestToSimpleCoo(DGLContext ctx) {
-  /*
+  /**
    * A = [[0, 0, 0, 0],
    *      [1, 0, 0, 1],
    *      [1, 1, 1, 1],
@@ -429,7 +429,7 @@ TEST(MatrixTest, TestToSimpleCoo) {
 
 template <typename IdType>
 void _TestDisjointUnionPartitionCoo(DGLContext ctx) {
-  /*
+  /**
    * A = [[0, 0, 1],
    *      [1, 0, 1],
    *      [0, 1, 0]]
@@ -564,7 +564,7 @@ TEST(DisjointUnionTest, TestDisjointUnionPartitionCoo) {
 
 template <typename IdType>
 void _TestDisjointUnionPartitionCsr(DGLContext ctx) {
-  /*
+  /**
    * A = [[0, 0, 1],
    *      [1, 0, 1],
    *      [0, 1, 0]]
@@ -690,7 +690,7 @@ TEST(DisjointUnionTest, TestDisjointUnionPartitionCsr) {
 
 template <typename IdType>
 void _TestSliceContiguousChunkCoo(DGLContext ctx) {
-  /*
+  /**
    * A = [[1, 0, 0, 0],
    *      [0, 0, 1, 0],
    *      [0, 0, 0, 0]]
@@ -758,7 +758,7 @@ TEST(SliceContiguousChunk, TestSliceContiguousChunkCoo) {
 
 template <typename IdType>
 void _TestSliceContiguousChunkCsr(DGLContext ctx) {
-  /*
+  /**
    * A = [[1, 0, 0, 0],
    *      [0, 0, 1, 0],
    *      [0, 0, 0, 0]]
@@ -825,7 +825,7 @@ TEST(SliceContiguousChunk, TestSliceContiguousChunkCsr) {
 
 template <typename IdType>
 void _TestMatrixUnionCsr(DGLContext ctx) {
-  /*
+  /**
    * A = [[0, 0, 0, 0],
    *      [0, 0, 0, 0],
    *      [0, 1, 0, 0],
@@ -1016,7 +1016,7 @@ TEST(MatrixUnionTest, TestMatrixUnionCsr) {
 
 template <typename IdType>
 void _TestMatrixUnionCoo(DGLContext ctx) {
-  /*
+  /**
    * A = [[0, 0, 0, 0],
    *      [0, 0, 0, 0],
    *      [0, 1, 0, 0],
@@ -1293,7 +1293,7 @@ TEST(ArrayTest, NonZero) {
 
 template <typename IdType>
 void _TestLineGraphCOO(DGLContext ctx) {
-  /*
+  /**
    * A = [[0, 0, 1, 0],
    *      [1, 0, 1, 0],
    *      [1, 1, 0, 0],
