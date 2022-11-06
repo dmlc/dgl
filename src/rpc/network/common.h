@@ -33,19 +33,18 @@ namespace network {
 //   substrings[2] == "banana"
 //------------------------------------------------------------------------------
 
-void SplitStringUsing(const std::string& full,
-                      const char* delim,
-                      std::vector<std::string>* result);
+void SplitStringUsing(
+    const std::string& full, const char* delim,
+    std::vector<std::string>* result);
 
 // This function has the same semnatic as SplitStringUsing.  Results
 // are saved in an STL set container.
-void SplitStringToSetUsing(const std::string& full,
-                           const char* delim,
-                           std::set<std::string>* result);
+void SplitStringToSetUsing(
+    const std::string& full, const char* delim, std::set<std::string>* result);
 
 template <typename T>
 struct simple_insert_iterator {
-  explicit simple_insert_iterator(T* t) : t_(t) { }
+  explicit simple_insert_iterator(T* t) : t_(t) {}
 
   simple_insert_iterator<T>& operator=(const typename T::value_type& value) {
     t_->insert(value);
@@ -76,10 +75,8 @@ struct back_insert_iterator {
 };
 
 template <typename StringType, typename ITR>
-static inline
-void SplitStringToIteratorUsing(const StringType& full,
-                                const char* delim,
-                                ITR* result) {
+static inline void SplitStringToIteratorUsing(
+    const StringType& full, const char* delim, ITR* result) {
   CHECK_NOTNULL(delim);
   // Optimize the common case where delim is a single character.
   if (delim[0] != '\0' && delim[1] == '\0') {

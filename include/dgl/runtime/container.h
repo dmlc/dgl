@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file runtime/container.h
- * \brief Defines the container object data structures.
+ * @file runtime/container.h
+ * @brief Defines the container object data structures.
  */
 #ifndef DGL_RUNTIME_CONTAINER_H_
 #define DGL_RUNTIME_CONTAINER_H_
@@ -19,21 +19,21 @@ namespace dgl {
 namespace runtime {
 
 /*!
- * \brief value object.
+ * @brief value object.
  *
  * It is typically used to wrap a non-Object type to Object type.
  * Any type that is supported by DGLRetValue is supported by this.
  */
 class ValueObject : public Object {
  public:
-  /*! \brief the value data */
+  /*! @brief the value data */
   DGLRetValue data;
 
   static constexpr const char* _type_key = "Value";
   DGL_DECLARE_OBJECT_TYPE_INFO(ValueObject, Object);
 };
 
-/*! \brief Construct a value object. */
+/*! @brief Construct a value object. */
 template <typename T>
 inline std::shared_ptr<ValueObject> MakeValue(T&& val) {
   auto obj = std::make_shared<ValueObject>();
@@ -41,7 +41,7 @@ inline std::shared_ptr<ValueObject> MakeValue(T&& val) {
   return obj;
 }
 
-/*! \brief Vallue reference type */
+/*! @brief Vallue reference type */
 class Value : public ObjectRef {
  public:
   Value() {}
@@ -54,10 +54,10 @@ class Value : public ObjectRef {
   using ContainerType = ValueObject;
 };
 
-/*! \brief list obj content in list */
+/*! @brief list obj content in list */
 class ListObject : public Object {
  public:
-  /*! \brief the data content */
+  /*! @brief the data content */
   std::vector<std::shared_ptr<Object> > data;
 
   void VisitAttrs(AttrVisitor* visitor) final {
@@ -68,7 +68,7 @@ class ListObject : public Object {
   DGL_DECLARE_OBJECT_TYPE_INFO(ListObject, Object);
 };
 
-/*! \brief map obj content */
+/*! @brief map obj content */
 class MapObject : public Object {
  public:
   void VisitAttrs(AttrVisitor* visitor) final {
@@ -89,28 +89,28 @@ class MapObject : public Object {
     }
   };
 
-  /*! \brief The corresponding conatiner type */
+  /*! @brief The corresponding conatiner type */
   using ContainerType = std::unordered_map<
       std::shared_ptr<Object>, std::shared_ptr<Object>, Hash, Equal>;
 
-  /*! \brief the data content */
+  /*! @brief the data content */
   ContainerType data;
 
   static constexpr const char* _type_key = "Map";
   DGL_DECLARE_OBJECT_TYPE_INFO(MapObject, Object);
 };
 
-/*! \brief specialized map obj with string as key */
+/*! @brief specialized map obj with string as key */
 class StrMapObject : public Object {
  public:
   void VisitAttrs(AttrVisitor* visitor) final {
     // Visitor to map have no effect.
   }
-  /*! \brief The corresponding conatiner type */
+  /*! @brief The corresponding conatiner type */
   using ContainerType =
       std::unordered_map<std::string, std::shared_ptr<Object> >;
 
-  /*! \brief the data content */
+  /*! @brief the data content */
   ContainerType data;
 
   static constexpr const char* _type_key = "StrMap";
@@ -118,9 +118,9 @@ class StrMapObject : public Object {
 };
 
 /*!
- * \brief iterator adapter that adapts TIter to return another type.
- * \tparam Converter a struct that contains converting function
- * \tparam TIter the content iterator type.
+ * @brief iterator adapter that adapts TIter to return another type.
+ * @tparam Converter a struct that contains converting function
+ * @tparam TIter the content iterator type.
  */
 template <typename Converter, typename TIter>
 class IterAdapter {
@@ -150,7 +150,7 @@ class IterAdapter {
 };
 
 /*!
- * \brief List container of ObjectRef.
+ * @brief List container of ObjectRef.
  *
  * List implements copy on write semantics, which means list is mutable
  * but copy will happen when list is referenced in more than two places.
@@ -161,9 +161,9 @@ class IterAdapter {
  *
  * operator[] only provide const access, use Set to mutate the content.
  *
- * \tparam T The content ObjectRef type.
+ * @tparam T The content ObjectRef type.
  *
- * \note The element type must subclass \c ObjectRef.  Otherwise, the
+ * @note The element type must subclass \c ObjectRef.  Otherwise, the
  * compiler would throw an error:
  *
  * <code>
@@ -188,53 +188,53 @@ template <
 class List : public ObjectRef {
  public:
   /*!
-   * \brief default constructor
+   * @brief default constructor
    */
   List() { obj_ = std::make_shared<ListObject>(); }
   /*!
-   * \brief move constructor
-   * \param other source
+   * @brief move constructor
+   * @param other source
    */
   List(List<T>&& other) {  // NOLINT(*)
     obj_ = std::move(other.obj_);
   }
   /*!
-   * \brief copy constructor
-   * \param other source
+   * @brief copy constructor
+   * @param other source
    */
   List(const List<T>& other) : ObjectRef(other.obj_) {  // NOLINT(*)
   }
   /*!
-   * \brief constructor from pointer
-   * \param n the container pointer
+   * @brief constructor from pointer
+   * @param n the container pointer
    */
   explicit List(std::shared_ptr<Object> n) : ObjectRef(n) {}
   /*!
-   * \brief constructor from iterator
-   * \param begin begin of iterator
-   * \param end end of iterator
-   * \tparam IterType The type of iterator
+   * @brief constructor from iterator
+   * @param begin begin of iterator
+   * @param end end of iterator
+   * @tparam IterType The type of iterator
    */
   template <typename IterType>
   List(IterType begin, IterType end) {
     assign(begin, end);
   }
   /*!
-   * \brief constructor from initializer list
-   * \param init The initalizer list
+   * @brief constructor from initializer list
+   * @param init The initalizer list
    */
   List(std::initializer_list<T> init) {  // NOLINT(*)
     assign(init.begin(), init.end());
   }
   /*!
-   * \brief constructor from vector
-   * \param init The vector
+   * @brief constructor from vector
+   * @param init The vector
    */
   List(const std::vector<T>& init) {  // NOLINT(*)
     assign(init.begin(), init.end());
   }
   /*!
-   * \brief Constructs a container with n elements. Each element is a copy of
+   * @brief Constructs a container with n elements. Each element is a copy of
    * val \param n The size of the container \param val The init value
    */
   explicit List(size_t n, const T& val) {
@@ -245,28 +245,28 @@ class List : public ObjectRef {
     obj_ = std::move(tmp_obj);
   }
   /*!
-   * \brief move assign operator
-   * \param other The source of assignment
-   * \return reference to self.
+   * @brief move assign operator
+   * @param other The source of assignment
+   * @return reference to self.
    */
   List<T>& operator=(List<T>&& other) {
     obj_ = std::move(other.obj_);
     return *this;
   }
   /*!
-   * \brief copy assign operator
-   * \param other The source of assignment
-   * \return reference to self.
+   * @brief copy assign operator
+   * @param other The source of assignment
+   * @return reference to self.
    */
   List<T>& operator=(const List<T>& other) {
     obj_ = other.obj_;
     return *this;
   }
   /*!
-   * \brief reset the list to content from iterator.
-   * \param begin begin of iterator
-   * \param end end of iterator
-   * \tparam IterType The type of iterator
+   * @brief reset the list to content from iterator.
+   * @param begin begin of iterator
+   * @param end end of iterator
+   * @tparam IterType The type of iterator
    */
   template <typename IterType>
   void assign(IterType begin, IterType end) {
@@ -277,9 +277,9 @@ class List : public ObjectRef {
     obj_ = std::move(n);
   }
   /*!
-   * \brief Read i-th element from list.
-   * \param i The index
-   * \return the i-th element.
+   * @brief Read i-th element from list.
+   * @param i The index
+   * @return the i-th element.
    */
   inline const T operator[](size_t i) const {
     return T(static_cast<const ListObject*>(obj_.get())->data[i]);
@@ -290,12 +290,12 @@ class List : public ObjectRef {
     return static_cast<const ListObject*>(obj_.get())->data.size();
   }
   /*!
-   * \brief copy on write semantics
+   * @brief copy on write semantics
    *  Do nothing if current handle is the unique copy of the list.
    *  Otherwise make a new copy of the list to ensure the current handle
    *  hold a unique copy.
    *
-   * \return Handle to the internal obj container(which ganrantees to be unique)
+   * @return Handle to the internal obj container(which ganrantees to be unique)
    */
   inline ListObject* CopyOnWrite() {
     if (obj_.get() == nullptr || !obj_.unique()) {
@@ -305,17 +305,17 @@ class List : public ObjectRef {
     return static_cast<ListObject*>(obj_.get());
   }
   /*!
-   * \brief push a new item to the back of the list
-   * \param item The item to be pushed.
+   * @brief push a new item to the back of the list
+   * @param item The item to be pushed.
    */
   inline void push_back(const T& item) {
     ListObject* n = this->CopyOnWrite();
     n->data.push_back(item.obj_);
   }
   /*!
-   * \brief set i-th element of the list.
-   * \param i The index
-   * \param value The value to be setted.
+   * @brief set i-th element of the list.
+   * @param i The index
+   * @param value The value to be setted.
    */
   inline void Set(size_t i, const T& value) {
     ListObject* n = this->CopyOnWrite();
@@ -323,11 +323,11 @@ class List : public ObjectRef {
   }
   /*! \return whether list is empty */
   inline bool empty() const { return size() == 0; }
-  /*! \brief Copy the content to a vector */
+  /*! @brief Copy the content to a vector */
   inline std::vector<T> ToVector() const {
     return std::vector<T>(begin(), end());
   }
-  /*! \brief specify container obj */
+  /*! @brief specify container obj */
   using ContainerType = ListObject;
 
   struct Ptr2ObjectRef {
@@ -362,7 +362,7 @@ class List : public ObjectRef {
 };
 
 /*!
- * \brief Map container of ObjectRef->ObjectRef.
+ * @brief Map container of ObjectRef->ObjectRef.
  *
  * Map implements copy on write semantics, which means map is mutable
  * but copy will happen when list is referenced in more than two places.
@@ -373,10 +373,10 @@ class List : public ObjectRef {
  *
  * operator[] only provide const acces, use Set to mutate the content.
  *
- * \tparam K The key ObjectRef type.
- * \tparam V The value ObjectRef type.
+ * @tparam K The key ObjectRef type.
+ * @tparam V The value ObjectRef type.
  *
- * \note The element type must subclass \c ObjectRef.  Otherwise, the
+ * @note The element type must subclass \c ObjectRef.  Otherwise, the
  * compiler would throw an error:
  *
  * <code>
@@ -404,75 +404,75 @@ template <
 class Map : public ObjectRef {
  public:
   /*!
-   * \brief default constructor
+   * @brief default constructor
    */
   Map() { obj_ = std::make_shared<MapObject>(); }
   /*!
-   * \brief move constructor
-   * \param other source
+   * @brief move constructor
+   * @param other source
    */
   Map(Map<K, V>&& other) {  // NOLINT(*)
     obj_ = std::move(other.obj_);
   }
   /*!
-   * \brief copy constructor
-   * \param other source
+   * @brief copy constructor
+   * @param other source
    */
   Map(const Map<K, V>& other) : ObjectRef(other.obj_) {  // NOLINT(*)
   }
   /*!
-   * \brief constructor from pointer
-   * \param n the container pointer
+   * @brief constructor from pointer
+   * @param n the container pointer
    */
   explicit Map(std::shared_ptr<Object> n) : ObjectRef(n) {}
   /*!
-   * \brief constructor from iterator
-   * \param begin begin of iterator
-   * \param end end of iterator
-   * \tparam IterType The type of iterator
+   * @brief constructor from iterator
+   * @param begin begin of iterator
+   * @param end end of iterator
+   * @tparam IterType The type of iterator
    */
   template <typename IterType>
   Map(IterType begin, IterType end) {
     assign(begin, end);
   }
   /*!
-   * \brief constructor from initializer list
-   * \param init The initalizer list
+   * @brief constructor from initializer list
+   * @param init The initalizer list
    */
   Map(std::initializer_list<std::pair<K, V> > init) {  // NOLINT(*)
     assign(init.begin(), init.end());
   }
   /*!
-   * \brief constructor from vector
-   * \param init The vector
+   * @brief constructor from vector
+   * @param init The vector
    */
   template <typename Hash, typename Equal>
   Map(const std::unordered_map<K, V, Hash, Equal>& init) {  // NOLINT(*)
     assign(init.begin(), init.end());
   }
   /*!
-   * \brief move assign operator
-   * \param other The source of assignment
-   * \return reference to self.
+   * @brief move assign operator
+   * @param other The source of assignment
+   * @return reference to self.
    */
   Map<K, V>& operator=(Map<K, V>&& other) {
     obj_ = std::move(other.obj_);
     return *this;
   }
   /*!
-   * \brief copy assign operator
-   * \param other The source of assignment
-   * \return reference to self.
+   * @brief copy assign operator
+   * @param other The source of assignment
+   * @return reference to self.
    */
   Map<K, V>& operator=(const Map<K, V>& other) {
     obj_ = other.obj_;
     return *this;
   }
   /*!
-   * \brief reset the list to content from iterator.
-   * \param begin begin of iterator
-   * \param end end of iterator
-   * \tparam IterType The type of iterator
+   * @brief reset the list to content from iterator.
+   * @param begin begin of iterator
+   * @param end end of iterator
+   * @tparam IterType The type of iterator
    */
   template <typename IterType>
   void assign(IterType begin, IterType end) {
@@ -483,17 +483,17 @@ class Map : public ObjectRef {
     obj_ = std::move(n);
   }
   /*!
-   * \brief Read element from map.
-   * \param key The key
-   * \return the corresonding element.
+   * @brief Read element from map.
+   * @param key The key
+   * @return the corresonding element.
    */
   inline const V operator[](const K& key) const {
     return V(static_cast<const MapObject*>(obj_.get())->data.at(key.obj_));
   }
   /*!
-   * \brief Read element from map.
-   * \param key The key
-   * \return the corresonding element.
+   * @brief Read element from map.
+   * @param key The key
+   * @return the corresonding element.
    */
   inline const V at(const K& key) const {
     return V(static_cast<const MapObject*>(obj_.get())->data.at(key.obj_));
@@ -509,12 +509,12 @@ class Map : public ObjectRef {
     return static_cast<const MapObject*>(obj_.get())->data.count(key.obj_);
   }
   /*!
-   * \brief copy on write semantics
+   * @brief copy on write semantics
    *  Do nothing if current handle is the unique copy of the list.
    *  Otherwise make a new copy of the list to ensure the current handle
    *  hold a unique copy.
    *
-   * \return Handle to the internal obj container(which ganrantees to be unique)
+   * @return Handle to the internal obj container(which ganrantees to be unique)
    */
   inline MapObject* CopyOnWrite() {
     if (obj_.get() == nullptr || !obj_.unique()) {
@@ -524,9 +524,9 @@ class Map : public ObjectRef {
     return static_cast<MapObject*>(obj_.get());
   }
   /*!
-   * \brief set the Map.
-   * \param key The index key.
-   * \param value The value to be setted.
+   * @brief set the Map.
+   * @param key The index key.
+   * @param value The value to be setted.
    */
   inline void Set(const K& key, const V& value) {
     MapObject* n = this->CopyOnWrite();
@@ -535,7 +535,7 @@ class Map : public ObjectRef {
 
   /*! \return whether list is empty */
   inline bool empty() const { return size() == 0; }
-  /*! \brief specify container obj */
+  /*! @brief specify container obj */
   using ContainerType = MapObject;
 
   struct Ptr2ObjectRef {
@@ -660,10 +660,10 @@ class Map<std::string, V, T1, T2> : public ObjectRef {
 };
 
 /*!
- * \brief Helper function to convert a List<Value> object to a vector.
- * \tparam T element type
- * \param list Input list object.
- * \return std vector
+ * @brief Helper function to convert a List<Value> object to a vector.
+ * @tparam T element type
+ * @param list Input list object.
+ * @return std vector
  */
 template <typename T>
 inline std::vector<T> ListValueToVector(const List<Value>& list) {

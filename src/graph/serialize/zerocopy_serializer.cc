@@ -13,8 +13,8 @@ namespace dgl {
 
 using dgl::runtime::NDArray;
 
-NDArray CreateNDArrayFromRawData(std::vector<int64_t> shape, DGLDataType dtype,
-                                 DGLContext ctx, void* raw) {
+NDArray CreateNDArrayFromRawData(
+    std::vector<int64_t> shape, DGLDataType dtype, DGLContext ctx, void* raw) {
   return NDArray::CreateFromRaw(shape, dtype, ctx, raw, true);
 }
 
@@ -25,9 +25,9 @@ void StreamWithBuffer::PushNDArray(const NDArray& tensor) {
   int ndim = tensor->ndim;
   this->WriteArray(tensor->shape, ndim);
   CHECK(tensor.IsContiguous())
-    << "StreamWithBuffer only supports contiguous tensor";
+      << "StreamWithBuffer only supports contiguous tensor";
   CHECK_EQ(tensor->byte_offset, 0)
-    << "StreamWithBuffer only supports zero byte offset tensor";
+      << "StreamWithBuffer only supports zero byte offset tensor";
   int type_bytes = tensor->dtype.bits / 8;
   int64_t num_elems = 1;
   for (int i = 0; i < ndim; ++i) {
@@ -40,7 +40,8 @@ void StreamWithBuffer::PushNDArray(const NDArray& tensor) {
     // If the stream is for remote communication or the data is not stored in
     // shared memory, serialize the data content as a buffer.
     this->Write<bool>(false);
-    // If this is a null ndarray, we will not push it into the underlying buffer_list
+    // If this is a null ndarray, we will not push it into the underlying
+    // buffer_list
     if (data_byte_size != 0) {
       buffer_list_.emplace_back(tensor, tensor->data, data_byte_size);
     }
@@ -90,8 +91,8 @@ NDArray StreamWithBuffer::PopNDArray() {
       // Mean this is a null ndarray
       ret = CreateNDArrayFromRawData(shape, dtype, cpu_ctx, nullptr);
     } else {
-      ret = CreateNDArrayFromRawData(shape, dtype, cpu_ctx,
-                                     buffer_list_.front().data);
+      ret = CreateNDArrayFromRawData(
+          shape, dtype, cpu_ctx, buffer_list_.front().data);
       buffer_list_.pop_front();
     }
     return ret;

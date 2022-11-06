@@ -6,11 +6,13 @@
 #ifndef DGL_RUNTIME_META_DATA_H_
 #define DGL_RUNTIME_META_DATA_H_
 
-#include <dmlc/json.h>
-#include <dmlc/io.h>
 #include <dgl/runtime/packed_func.h>
+#include <dmlc/io.h>
+#include <dmlc/json.h>
+
 #include <string>
 #include <vector>
+
 #include "runtime_base.h"
 
 namespace dgl {

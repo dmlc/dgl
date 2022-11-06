@@ -9,15 +9,16 @@
 #include <dmlc/logging.h>
 #include <tensorpipe/tensorpipe.h>
 
+#include <atomic>
 #include <deque>
 #include <memory>
 #include <string>
 #include <thread>
 #include <unordered_map>
 #include <vector>
-#include <atomic>
-#include "./queue.h"
+
 #include "../net_type.h"
+#include "./queue.h"
 
 namespace dgl {
 namespace rpc {
@@ -47,11 +48,12 @@ class TPSender : public RPCSender {
 
   /*!
    * \brief Connect to a receiver.
-   * 
-   * When there are multiple receivers to be connected, application will call `ConnectReceiver`
-   * for each and then call `ConnectReceiverFinalize` to make sure that either all the connections are
-   * successfully established or some of them fail.
-   * 
+   *
+   * When there are multiple receivers to be connected, application will call
+   * `ConnectReceiver` for each and then call `ConnectReceiverFinalize` to make
+   * sure that either all the connections are successfully established or some
+   * of them fail.
+   *
    * \param addr Networking address, e.g., 'tcp://127.0.0.1:50091'
    * \param recv_id receiver's ID
    * \return True for success and False for fail
@@ -75,7 +77,7 @@ class TPSender : public RPCSender {
   /*!
    * \brief Communicator type: 'tp'
    */
-  const std::string &NetType() const override {
+  const std::string& NetType() const override {
     static const std::string net_type = "tensorpipe";
     return net_type;
   }
@@ -90,7 +92,7 @@ class TPSender : public RPCSender {
    * \brief pipe for each connection of receiver
    */
   std::unordered_map<int /* receiver ID */, std::shared_ptr<tensorpipe::Pipe>>
-    pipes_;
+      pipes_;
 
   /*!
    * \brief receivers' listening address
@@ -129,13 +131,14 @@ class TPReceiver : public RPCReceiver {
    *
    * Wait() is not thread-safe and only one thread can invoke this API.
    */
-  bool Wait(const std::string &addr, int num_sender,
-            bool blocking = true) override;
+  bool Wait(
+      const std::string& addr, int num_sender, bool blocking = true) override;
 
   /*!
    * \brief Recv RPCMessage from Sender. Actually removing data from queue.
    * \param msg pointer of RPCmessage
-   * \param timeout The timeout value in milliseconds. If zero, wait indefinitely.
+   * \param timeout The timeout value in milliseconds. If zero, wait
+   * indefinitely.
    * \return RPCStatus: kRPCSuccess or kRPCTimeOut.
    */
   RPCStatus Recv(RPCMessage* msg, int timeout) override;
@@ -150,7 +153,7 @@ class TPReceiver : public RPCReceiver {
   /*!
    * \brief Communicator type: 'tp' (tensorpipe)
    */
-  const std::string &NetType() const override {
+  const std::string& NetType() const override {
     static const std::string net_type = "tensorpipe";
     return net_type;
   }
@@ -158,8 +161,9 @@ class TPReceiver : public RPCReceiver {
   /*!
    * \brief Issue a receive request on pipe, and push the result into queue
    */
-  static void ReceiveFromPipe(std::shared_ptr<tensorpipe::Pipe> pipe,
-                              std::shared_ptr<RPCMessageQueue> queue);
+  static void ReceiveFromPipe(
+      std::shared_ptr<tensorpipe::Pipe> pipe,
+      std::shared_ptr<RPCMessageQueue> queue);
 
  private:
   /*!
@@ -186,9 +190,9 @@ class TPReceiver : public RPCReceiver {
   /*!
    * \brief pipe for each client connections
    */
-  std::unordered_map<int /* Sender (virutal) ID */,
-                     std::shared_ptr<tensorpipe::Pipe>>
-    pipes_;
+  std::unordered_map<
+      int /* Sender (virutal) ID */, std::shared_ptr<tensorpipe::Pipe>>
+      pipes_;
 
   /*!
    * \brief RPCMessage queue

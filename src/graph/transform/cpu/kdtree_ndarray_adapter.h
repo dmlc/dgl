@@ -9,7 +9,9 @@
 
 #include <dgl/array.h>
 #include <dmlc/logging.h>
+
 #include <nanoflann.hpp>
+
 #include "../../../c_api_common.h"
 
 namespace dgl {
@@ -17,78 +19,75 @@ namespace transform {
 namespace knn_utils {
 
 /*!
- * \brief A simple 2D NDArray adapter for nanoflann, without duplicating the storage.
+ * \brief A simple 2D NDArray adapter for nanoflann, without duplicating the
+ *        storage.
  *
- * \tparam FloatType: The type of the point coordinates (typically, double or float).
- * \tparam IdType: The type for indices in the KD-tree index (typically, size_t of int)
- * \tparam FeatureDim: If set to > 0, it specifies a compile-time fixed dimensionality
- *         for the points in the data set, allowing more compiler optimizations.
- * \tparam Dist: The distance metric to use: nanoflann::metric_L1, nanoflann::metric_L2,
- *         nanoflann::metric_L2_Simple, etc.
- * \note The spelling of dgl's adapter ("adapter") is different from naneflann ("adaptor")
+ * \tparam FloatType: The type of the point coordinates (typically, double or
+ *         float).
+ * \tparam IdType: The type for indices in the KD-tree index (typically,
+ *         size_t of int)
+ * \tparam FeatureDim: If set to > 0, it specifies a compile-time fixed
+ *         dimensionality for the points in the data set, allowing more compiler
+ *         optimizations.
+ * \tparam Dist: The distance metric to use: nanoflann::metric_L1,
+           nanoflann::metric_L2, nanoflann::metric_L2_Simple, etc.
+ * \note The spelling of dgl's adapter ("adapter") is different from naneflann
+ *       ("adaptor")
  */
-template <typename FloatType,
-          typename IdType,
-          int FeatureDim = -1,
-          typename Dist = nanoflann::metric_L2>
+template <
+    typename FloatType, typename IdType, int FeatureDim = -1,
+    typename Dist = nanoflann::metric_L2>
 class KDTreeNDArrayAdapter {
  public:
   using self_type = KDTreeNDArrayAdapter<FloatType, IdType, FeatureDim, Dist>;
-  using metric_type = typename Dist::template traits<FloatType, self_type>::distance_t;
+  using metric_type =
+      typename Dist::template traits<FloatType, self_type>::distance_t;
   using index_type = nanoflann::KDTreeSingleIndexAdaptor<
-    metric_type, self_type, FeatureDim, IdType>;
+      metric_type, self_type, FeatureDim, IdType>;
 
-  KDTreeNDArrayAdapter(const size_t /* dims */,
-                       const NDArray data_points,
-                       const int leaf_max_size = 10)
+  KDTreeNDArrayAdapter(
+      const size_t /* dims */, const NDArray data_points,
+      const int leaf_max_size = 10)
       : data_(data_points) {
     CHECK(data_points->shape[0] != 0 && data_points->shape[1] != 0)
-      << "Tensor containing input data point set must be 2D.";
+        << "Tensor containing input data point set must be 2D.";
     const size_t dims = data_points->shape[1];
     CHECK(!(FeatureDim > 0 && static_cast<int>(dims) != FeatureDim))
-      << "Data set feature dimension does not match the 'FeatureDim' "
-      << "template argument.";
+        << "Data set feature dimension does not match the 'FeatureDim' "
+        << "template argument.";
     index_ = new index_type(
-      static_cast<int>(dims), *this, nanoflann::KDTreeSingleIndexAdaptorParams(leaf_max_size));
+        static_cast<int>(dims), *this,
+        nanoflann::KDTreeSingleIndexAdaptorParams(leaf_max_size));
     index_->buildIndex();
   }
 
-  ~KDTreeNDArrayAdapter() {
-    delete index_;
-  }
+  ~KDTreeNDArrayAdapter() { delete index_; }
 
-  index_type* GetIndex() {
-    return index_;
-  }
+  index_type* GetIndex() { return index_; }
 
   /*!
    * \brief Query for the \a num_closest points to a given point
    *  Note that this is a short-cut method for GetIndex()->findNeighbors().
    */
-  void query(const FloatType* query_pt, const size_t num_closest,
-             IdType* out_idxs, FloatType* out_dists) const {
+  void query(
+      const FloatType* query_pt, const size_t num_closest, IdType* out_idxs,
+      FloatType* out_dists) const {
     nanoflann::KNNResultSet<FloatType, IdType> resultSet(num_closest);
     resultSet.init(out_idxs, out_dists);
     index_->findNeighbors(resultSet, query_pt, nanoflann::SearchParams());
   }
 
   /*! \brief Interface expected by KDTreeSingleIndexAdaptor */
-  const self_type& derived() const {
-    return *this;
-  }
+  const self_type& derived() const { return *this; }
 
   /*! \brief Interface expected by KDTreeSingleIndexAdaptor */
-  self_type& derived() {
-    return *this;
-  }
+  self_type& derived() { return *this; }
 
   /*!
    * \brief Interface expected by KDTreeSingleIndexAdaptor,
    *  return the number of data points
    */
-  size_t kdtree_get_point_count() const {
-    return data_->shape[0];
-  }
+  size_t kdtree_get_point_count() const { return data_->shape[0]; }
 
   /*!
    * \brief Interface expected by KDTreeSingleIndexAdaptor,
@@ -110,7 +109,7 @@ class KDTreeNDArrayAdapter {
   }
 
  private:
-  index_type* index_;    // The kd tree index
+  index_type* index_;   // The kd tree index
   const NDArray data_;  // data points
 };
 

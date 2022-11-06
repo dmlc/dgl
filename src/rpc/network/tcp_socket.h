@@ -11,7 +11,7 @@
 #include <ws2tcpip.h>
 
 #pragma comment(lib, "Ws2_32.lib")
-#else   // !_WIN32
+#else  // !_WIN32
 #include <sys/socket.h>
 #endif  // _WIN32
 #include <string>
@@ -20,7 +20,7 @@ namespace dgl {
 namespace network {
 
 /*!
- * \brief TCPSocket is a simple wrapper around a socket. 
+ * \brief TCPSocket is a simple wrapper around a socket.
  * It supports only TCP connections.
  */
 class TCPSocket {
@@ -32,7 +32,7 @@ class TCPSocket {
 
   /*!
    * \brief TCPSocket deconstructor
-   */  
+   */
   ~TCPSocket();
 
   /*!
@@ -41,7 +41,7 @@ class TCPSocket {
    * \param port end port
    * \return true for success and false for failure
    */
-  bool Connect(const char * ip, int port);
+  bool Connect(const char* ip, int port);
 
   /*!
    * \brief Bind on the given IP and PORT
@@ -49,7 +49,7 @@ class TCPSocket {
    * \param port end port
    * \return true for success and false for failure
    */
-  bool Bind(const char * ip, int port);
+  bool Bind(const char* ip, int port);
 
   /*!
    * \brief listen for remote connection
@@ -65,9 +65,7 @@ class TCPSocket {
    * \param port_client new PORT will be stored to port_client
    * \return true for success and false for failure
    */
-  bool Accept(TCPSocket * socket,
-              std::string * ip_client,
-              int * port_client);
+  bool Accept(TCPSocket* socket, std::string* ip_client, int* port_client);
 
   /*!
    * \brief SetNonBlocking() is needed refering to this example of epoll:
@@ -103,27 +101,27 @@ class TCPSocket {
    * \param data data for sending
    * \param len_data length of data
    * \return return number of bytes sent if OK, -1 on error
-   */  
-  int64_t Send(const char * data, int64_t len_data);
+   */
+  int64_t Send(const char* data, int64_t len_data);
 
   /*!
    * \brief Receive data.
    * \param buffer buffer for receving
    * \param size_buffer size of buffer
    * \return return number of bytes received if OK, -1 on error
-   */ 
-  int64_t Receive(char * buffer, int64_t size_buffer);
+   */
+  int64_t Receive(char* buffer, int64_t size_buffer);
 
   /*!
    * \brief Get socket's file descriptor
    * \return socket's file descriptor
-   */ 
+   */
   int Socket() const;
 
  private:
   /*!
    * \brief socket's file descriptor
-   */ 
+   */
   int socket_;
 };
 
