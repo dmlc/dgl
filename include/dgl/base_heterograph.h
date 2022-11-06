@@ -58,19 +58,19 @@ class BaseHeteroGraph : public runtime::Object {
 
   ////////////////////// query/operations on meta graph ///////////////////////
 
-  /*! \return the number of vertex types */
+  /*! @return the number of vertex types */
   virtual uint64_t NumVertexTypes() const { return meta_graph_->NumVertices(); }
 
-  /*! \return the number of edge types */
+  /*! @return the number of edge types */
   virtual uint64_t NumEdgeTypes() const { return meta_graph_->NumEdges(); }
 
-  /*! \return given the edge type, find the source type */
+  /*! @return given the edge type, find the source type */
   virtual std::pair<dgl_type_t, dgl_type_t> GetEndpointTypes(
       dgl_type_t etype) const {
     return meta_graph_->FindEdge(etype);
   }
 
-  /*! \return the meta graph */
+  /*! @return the meta graph */
   virtual GraphPtr meta_graph() const { return meta_graph_; }
 
   /*!
@@ -134,34 +134,34 @@ class BaseHeteroGraph : public runtime::Object {
    */
   virtual bool IsMultigraph() const = 0;
 
-  /*! \return whether the graph is read-only */
+  /*! @return whether the graph is read-only */
   virtual bool IsReadonly() const = 0;
 
-  /*! \return the number of vertices in the graph.*/
+  /*! @return the number of vertices in the graph.*/
   virtual uint64_t NumVertices(dgl_type_t vtype) const = 0;
 
-  /*! \return the number of vertices for each type in the graph as a vector */
+  /*! @return the number of vertices for each type in the graph as a vector */
   inline virtual std::vector<int64_t> NumVerticesPerType() const {
     LOG(FATAL) << "[BUG] NumVerticesPerType() not supported on this object.";
     return {};
   }
 
-  /*! \return the number of edges in the graph.*/
+  /*! @return the number of edges in the graph.*/
   virtual uint64_t NumEdges(dgl_type_t etype) const = 0;
 
-  /*! \return true if the given vertex is in the graph.*/
+  /*! @return true if the given vertex is in the graph.*/
   virtual bool HasVertex(dgl_type_t vtype, dgl_id_t vid) const = 0;
 
-  /*! \return a 0-1 array indicating whether the given vertices are in the
+  /*! @return a 0-1 array indicating whether the given vertices are in the
    * graph.
    */
   virtual BoolArray HasVertices(dgl_type_t vtype, IdArray vids) const = 0;
 
-  /*! \return true if the given edge is in the graph.*/
+  /*! @return true if the given edge is in the graph.*/
   virtual bool HasEdgeBetween(
       dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const = 0;
 
-  /*! \return a 0-1 array indicating whether the given edges are in the graph.*/
+  /*! @return a 0-1 array indicating whether the given edges are in the graph.*/
   virtual BoolArray HasEdgesBetween(
       dgl_type_t etype, IdArray src_ids, IdArray dst_ids) const = 0;
 

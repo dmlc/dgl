@@ -172,24 +172,24 @@ class GraphInterface : public runtime::Object {
    */
   virtual bool IsReadonly() const = 0;
 
-  /*! \return the number of vertices in the graph.*/
+  /*! @return the number of vertices in the graph.*/
   virtual uint64_t NumVertices() const = 0;
 
-  /*! \return the number of edges in the graph.*/
+  /*! @return the number of edges in the graph.*/
   virtual uint64_t NumEdges() const = 0;
 
-  /*! \return true if the given vertex is in the graph.*/
+  /*! @return true if the given vertex is in the graph.*/
   virtual bool HasVertex(dgl_id_t vid) const { return vid < NumVertices(); }
 
-  /*! \return a 0-1 array indicating whether the given vertices are in the
+  /*! @return a 0-1 array indicating whether the given vertices are in the
    *          graph.
    */
   virtual BoolArray HasVertices(IdArray vids) const = 0;
 
-  /*! \return true if the given edge is in the graph.*/
+  /*! @return true if the given edge is in the graph.*/
   virtual bool HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const = 0;
 
-  /*! \return a 0-1 array indicating whether the given edges are in the graph.*/
+  /*! @return a 0-1 array indicating whether the given edges are in the graph.*/
   virtual BoolArray HasEdgesBetween(IdArray src_ids, IdArray dst_ids) const = 0;
 
   /*!

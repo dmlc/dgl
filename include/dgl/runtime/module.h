@@ -43,9 +43,9 @@ class Module {
    */
   inline PackedFunc GetFunction(
       const std::string& name, bool query_imports = false);
-  /*! \return internal container */
+  /*! @return internal container */
   inline ModuleNode* operator->();
-  /*! \return internal container */
+  /*! @return internal container */
   inline const ModuleNode* operator->() const;
   // The following functions requires link with runtime.
   /*!
@@ -78,7 +78,7 @@ class ModuleNode {
  public:
   /*! @brief virtual destructor */
   virtual ~ModuleNode() {}
-  /*! \return The module type key */
+  /*! @return The module type key */
   virtual const char* type_key() const = 0;
   /*!
    * @brief Get a PackedFunc from module.
@@ -129,7 +129,7 @@ class ModuleNode {
    * @return The corresponding function.
    */
   DGL_DLL const PackedFunc* GetFuncFromEnv(const std::string& name);
-  /*! \return The module it imports from */
+  /*! @return The module it imports from */
   const std::vector<Module>& imports() const { return imports_; }
 
  protected:

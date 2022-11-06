@@ -56,7 +56,7 @@ class Object {
  public:
   /*! @brief virtual destructor */
   virtual ~Object() {}
-  /*! \return The unique type key of the object */
+  /*! @return The unique type key of the object */
   virtual const char* type_key() const = 0;
   /*!
    * @brief Apply visitor to each field of the Object
@@ -65,7 +65,7 @@ class Object {
    * @param visitor The visitor
    */
   virtual void VisitAttrs(AttrVisitor* visitor) {}
-  /*! \return the type index of the object */
+  /*! @return the type index of the object */
   virtual uint32_t type_index() const = 0;
   /*!
    * @brief Whether this object derives from object with type_index=tid.
@@ -145,15 +145,15 @@ class ObjectRef {
    * \sa same_as
    */
   inline bool operator!=(const ObjectRef& other) const;
-  /*! \return the hash function for ObjectRef */
+  /*! @return the hash function for ObjectRef */
   inline size_t hash() const;
-  /*! \return whether the expression is null */
+  /*! @return whether the expression is null */
   inline bool defined() const;
-  /*! \return the internal type index of Object */
+  /*! @return the internal type index of Object */
   inline uint32_t type_index() const;
-  /*! \return the internal object pointer */
+  /*! @return the internal object pointer */
   inline const Object* get() const;
-  /*! \return the internal object pointer */
+  /*! @return the internal object pointer */
   inline const Object* operator->() const;
   /*!
    * @brief Downcast this object to its actual type.

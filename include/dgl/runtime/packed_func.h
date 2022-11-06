@@ -99,11 +99,11 @@ class PackedFunc {
    * @param rv The return value.
    */
   inline void CallPacked(DGLArgs args, DGLRetValue* rv) const;
-  /*! \return the internal body function */
+  /*! @return the internal body function */
   inline FType body() const;
-  /*! \return Whether the packed function is nullptr */
+  /*! @return Whether the packed function is nullptr */
   bool operator==(std::nullptr_t null) const { return body_ == nullptr; }
-  /*! \return Whether the packed function is not nullptr */
+  /*! @return Whether the packed function is not nullptr */
   bool operator!=(std::nullptr_t null) const { return body_ != nullptr; }
 
  private:
@@ -274,7 +274,7 @@ class DGLArgs {
    */
   DGLArgs(const DGLValue* values, const int* type_codes, int num_args)
       : values(values), type_codes(type_codes), num_args(num_args) {}
-  /*! \return size of the arguments */
+  /*! @return size of the arguments */
   inline int size() const;
   /*!
    * @brief Get i-th argument
@@ -668,7 +668,7 @@ class DGLRetValue : public DGLPODValue_ {
     *ret_type_code = type_code_;
     type_code_ = kNull;
   }
-  /*! \return The value field, if the data is POD */
+  /*! @return The value field, if the data is POD */
   const DGLValue& value() const {
     CHECK(
         type_code_ != kObjectHandle && type_code_ != kFuncHandle &&
