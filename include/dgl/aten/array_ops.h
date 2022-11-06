@@ -23,7 +23,7 @@ namespace aten {
 // ID array
 //////////////////////////////////////////////////////////////////////
 
-/*! \return A special array to represent null. */
+/*! @return A special array to represent null. */
 inline NDArray NullArray(const DGLDataType& dtype = DGLDataType{kDGLInt, 64, 1},
                          const DGLContext& ctx = DGLContext{kDGLCPU, 0}) {
   return NDArray::Empty({0}, dtype, ctx);

@@ -219,10 +219,10 @@ class HeteroGraph : public BaseHeteroGraph {
 
   GraphPtr AsImmutableGraph() const override;
 
-  /*! \return Load HeteroGraph from stream, using CSRMatrix*/
+  /*! @return Load HeteroGraph from stream, using CSRMatrix*/
   bool Load(dmlc::Stream* fs);
 
-  /*! \return Save HeteroGraph to stream, using CSRMatrix */
+  /*! @return Save HeteroGraph to stream, using CSRMatrix */
   void Save(dmlc::Stream* fs) const;
 
   /*! @brief Convert the graph to use the given number of bits for storage */

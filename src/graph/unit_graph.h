@@ -258,13 +258,13 @@ class UnitGraph : public BaseHeteroGraph {
    */
   COOPtr GetCOO(bool inplace = true) const;
 
-  /*! \return Return the COO matrix form */
+  /*! @return Return the COO matrix form */
   aten::COOMatrix GetCOOMatrix(dgl_type_t etype) const override;
 
-  /*! \return Return the in-edge CSC in the matrix form */
+  /*! @return Return the in-edge CSC in the matrix form */
   aten::CSRMatrix GetCSCMatrix(dgl_type_t etype) const override;
 
-  /*! \return Return the out-edge CSR in the matrix form */
+  /*! @return Return the out-edge CSR in the matrix form */
   aten::CSRMatrix GetCSRMatrix(dgl_type_t etype) const override;
 
   SparseFormat SelectFormat(dgl_type_t etype, dgl_format_code_t preferred_formats) const override {
@@ -285,19 +285,19 @@ class UnitGraph : public BaseHeteroGraph {
 
   HeteroGraphPtr GetGraphInFormat(dgl_format_code_t formats) const override;
 
-  /*! \return Load UnitGraph from stream, using CSRMatrix*/
+  /*! @return Load UnitGraph from stream, using CSRMatrix*/
   bool Load(dmlc::Stream* fs);
 
-  /*! \return Save UnitGraph to stream, using CSRMatrix */
+  /*! @return Save UnitGraph to stream, using CSRMatrix */
   void Save(dmlc::Stream* fs) const;
 
   /*! @brief Creat a LineGraph of self */
   HeteroGraphPtr LineGraph(bool backtracking) const;
 
-  /*! \return the reversed graph */
+  /*! @return the reversed graph */
   UnitGraphPtr Reverse() const;
 
-  /*! \return the simpled (no-multi-edge) graph
+  /*! @return the simpled (no-multi-edge) graph
    *          the count recording the number of duplicated edges from the original graph.
    *          the edge mapping from the edge IDs of original graph to those of the
    *          returned graph.
@@ -350,7 +350,7 @@ class UnitGraph : public BaseHeteroGraph {
       bool has_coo,
       dgl_format_code_t formats = ALL_CODE);
 
-  /*! \return Return any existing format. */
+  /*! @return Return any existing format. */
   HeteroGraphPtr GetAny() const;
 
   /*!
@@ -364,7 +364,7 @@ class UnitGraph : public BaseHeteroGraph {
    */
   SparseFormat SelectFormat(dgl_format_code_t preferred_formats) const;
 
-  /*! \return Whether the graph is hypersparse */
+  /*! @return Whether the graph is hypersparse */
   bool IsHypersparse() const;
 
   GraphPtr AsImmutableGraph() const override;

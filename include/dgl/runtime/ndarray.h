@@ -133,11 +133,11 @@ class NDArray {
     NDArray(std::move(other)).swap(*this); // NOLINT(*)
     return *this;
   }
-  /*! \return If NDArray is defined */
+  /*! @return If NDArray is defined */
   bool defined() const {
     return data_ != nullptr;
   }
-  /*! \return If both NDArray reference the same container */
+  /*! @return If both NDArray reference the same container */
   bool same_as(const NDArray& other) const {
     return data_ == other.data_;
   }
@@ -148,11 +148,11 @@ class NDArray {
    * @note this number is approximate in multi-threaded setting.
    */
   inline int use_count() const;
-  /*! \return Pointer to content of DGLArray */
+  /*! @return Pointer to content of DGLArray */
   inline const DGLArray* operator->() const;
-  /*! \return True if the ndarray is contiguous. */
+  /*! @return True if the ndarray is contiguous. */
   bool IsContiguous() const;
-  /*! \return the data pointer with type. */
+  /*! @return the data pointer with type. */
   template <typename T>
   inline T* Ptr() const {
     if (!defined())

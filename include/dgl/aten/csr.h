@@ -341,7 +341,7 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, runtime::NDArray rows);
  */
 CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
 
-/*! \return True if the matrix has duplicate entries */
+/*! @return True if the matrix has duplicate entries */
 bool CSRHasDuplicate(CSRMatrix csr);
 
 /*!

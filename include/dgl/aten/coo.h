@@ -303,7 +303,7 @@ COOMatrix COOSliceRows(COOMatrix coo, runtime::NDArray rows);
  */
 COOMatrix COOSliceMatrix(COOMatrix coo, runtime::NDArray rows, runtime::NDArray cols);
 
-/*! \return True if the matrix has duplicate entries */
+/*! @return True if the matrix has duplicate entries */
 bool COOHasDuplicate(COOMatrix coo);
 
 /*!
