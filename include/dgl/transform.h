@@ -87,9 +87,9 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>> ToBlock(
  * @brief Convert a multigraph to a simple graph.
  *
  * @return A triplet of
- * * \c hg : The said simple graph.
- * * \c count : The array of edge occurrences per edge type.
- * * \c edge_map : The mapping from original edge IDs to new edge IDs per edge
+ * * @c hg : The said simple graph.
+ * * @c count : The array of edge occurrences per edge type.
+ * * @c edge_map : The mapping from original edge IDs to new edge IDs per edge
  * type.
  *
  * @note Example: consider a graph with the following edges

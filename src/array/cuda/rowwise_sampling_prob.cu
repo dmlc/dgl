@@ -4,7 +4,7 @@
  * @brief weighted rowwise sampling. The degree computing kernels and
  * host-side functions are partially borrowed from the uniform rowwise
  * sampling code rowwise_sampling.cu.
- * \author pengqirong (OPPO), dlasalle and Xin from Nvidia.
+ * @author pengqirong (OPPO), dlasalle and Xin from Nvidia.
  */
 #include <dgl/random.h>
 #include <dgl/runtime/device_api.h>

@@ -14,13 +14,13 @@
  *  then into the same global registry in C++.
  *  The goal is to mix the front-end language and the DGL back-end.
  *
- * \code
+ * @code
  *   // register the function as MyAPIFuncName
  *   DGL_REGISTER_GLOBAL(MyAPIFuncName)
  *   .set_body([](DGLArgs args, DGLRetValue* rv) {
  *     // my code.
  *   });
- * \endcode
+ * @endcode
  */
 #ifndef DGL_RUNTIME_REGISTRY_H_
 #define DGL_RUNTIME_REGISTRY_H_
@@ -51,12 +51,12 @@ class Registry {
   /*!
    * @brief set the body of the function to be TypedPackedFunc.
    *
-   * \code
+   * @code
    *
    * DGL_REGISTER_API("addone")
    * .set_body_typed<int(int)>([](int x) { return x + 1; });
    *
-   * \endcode
+   * @endcode
    *
    * @param f The body of the function.
    * @tparam FType the signature of the function.
@@ -122,11 +122,11 @@ class Registry {
 
 /*!
  * @brief Register a function globally.
- * \code
+ * @code
  *   DGL_REGISTER_GLOBAL("MyPrint")
  *   .set_body([](DGLArgs args, DGLRetValue* rv) {
  *   });
- * \endcode
+ * @endcode
  */
 #define DGL_REGISTER_GLOBAL(OpName)                   \
   DGL_STR_CONCAT(DGL_FUNC_REG_VAR_DEF, __COUNTER__) = \

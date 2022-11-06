@@ -166,7 +166,7 @@ typedef struct {
    * For a DGLArray, the size of memory required to store the contents of
    * data can be calculated as follows:
    *
-   * \code{.c}
+   * @code{.c}
    * static inline size_t GetDataSize(const DGLArray* t) {
    *   size_t size = 1;
    *   for (int32_t i = 0; i < t->ndim; ++i) {
@@ -175,7 +175,7 @@ typedef struct {
    *   size *= (t->dtype.bits * t->dtype.lanes + 7) / 8;
    *   return size;
    * }
-   * \endcode
+   * @endcode
    */
   void* data;
   /*! @brief The device of the tensor */

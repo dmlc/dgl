@@ -26,7 +26,7 @@ static constexpr int kTimeOut =
 static constexpr int kMaxConnection = 1024;  // maximal connection: 1024
 
 /*!
- * \breif Networking address
+ * @breif Networking address
  */
 struct IPAddr {
   std::string ip;

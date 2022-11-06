@@ -2,7 +2,7 @@
  *  Copyright (c) 2019 by Contributors
  * @file intel/cpu_support.h
  * @brief Intel CPU support
- * \author Pawel Piotrowicz <pawel.piotrowicz@intel.com>
+ * @author Pawel Piotrowicz <pawel.piotrowicz@intel.com>
  */
 #ifndef INTEL_CPU_SUPPORT_H_
 #define INTEL_CPU_SUPPORT_H_
