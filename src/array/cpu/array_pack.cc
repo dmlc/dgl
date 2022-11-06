@@ -5,6 +5,7 @@
  */
 #include <dgl/array.h>
 #include <dgl/runtime/parallel_for.h>
+
 #include <tuple>
 #include <utility>
 
@@ -14,7 +15,7 @@ using runtime::parallel_for;
 namespace aten {
 namespace impl {
 
-template<DGLDeviceType XPU, typename DType, typename IdType>
+template <DGLDeviceType XPU, typename DType, typename IdType>
 std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths) {
   const int64_t rows = lengths->shape[0];
   const int64_t cols = (array->ndim == 1 ? array->shape[0] : array->shape[1]);
@@ -41,16 +42,24 @@ std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths) {
   return std::make_pair(concat, offsets);
 }
 
-template std::pair<NDArray, IdArray> ConcatSlices<kDGLCPU, int32_t, int32_t>(NDArray, IdArray);
-template std::pair<NDArray, IdArray> ConcatSlices<kDGLCPU, int64_t, int32_t>(NDArray, IdArray);
-template std::pair<NDArray, IdArray> ConcatSlices<kDGLCPU, float, int32_t>(NDArray, IdArray);
-template std::pair<NDArray, IdArray> ConcatSlices<kDGLCPU, double, int32_t>(NDArray, IdArray);
-template std::pair<NDArray, IdArray> ConcatSlices<kDGLCPU, int32_t, int64_t>(NDArray, IdArray);
-template std::pair<NDArray, IdArray> ConcatSlices<kDGLCPU, int64_t, int64_t>(NDArray, IdArray);
-template std::pair<NDArray, IdArray> ConcatSlices<kDGLCPU, float, int64_t>(NDArray, IdArray);
-template std::pair<NDArray, IdArray> ConcatSlices<kDGLCPU, double, int64_t>(NDArray, IdArray);
+template std::pair<NDArray, IdArray> ConcatSlices<kDGLCPU, int32_t, int32_t>(
+    NDArray, IdArray);
+template std::pair<NDArray, IdArray> ConcatSlices<kDGLCPU, int64_t, int32_t>(
+    NDArray, IdArray);
+template std::pair<NDArray, IdArray> ConcatSlices<kDGLCPU, float, int32_t>(
+    NDArray, IdArray);
+template std::pair<NDArray, IdArray> ConcatSlices<kDGLCPU, double, int32_t>(
+    NDArray, IdArray);
+template std::pair<NDArray, IdArray> ConcatSlices<kDGLCPU, int32_t, int64_t>(
+    NDArray, IdArray);
+template std::pair<NDArray, IdArray> ConcatSlices<kDGLCPU, int64_t, int64_t>(
+    NDArray, IdArray);
+template std::pair<NDArray, IdArray> ConcatSlices<kDGLCPU, float, int64_t>(
+    NDArray, IdArray);
+template std::pair<NDArray, IdArray> ConcatSlices<kDGLCPU, double, int64_t>(
+    NDArray, IdArray);
 
-template<DGLDeviceType XPU, typename DType>
+template <DGLDeviceType XPU, typename DType>
 std::tuple<NDArray, IdArray, IdArray> Pack(NDArray array, DType pad_value) {
   CHECK_NDIM(array, 2, "array");
   const DType *array_data = static_cast<DType *>(array->data);
@@ -64,8 +73,7 @@ std::tuple<NDArray, IdArray, IdArray> Pack(NDArray array, DType pad_value) {
       int64_t j;
       for (j = 0; j < cols; ++j) {
         const DType val = array_data[i * cols + j];
-        if (val == pad_value)
-          break;
+        if (val == pad_value) break;
       }
       length_data[i] = j;
     }
@@ -75,10 +83,14 @@ std::tuple<NDArray, IdArray, IdArray> Pack(NDArray array, DType pad_value) {
   return std::make_tuple(ret.first, length, ret.second);
 }
 
-template std::tuple<NDArray, IdArray, IdArray> Pack<kDGLCPU, int32_t>(NDArray, int32_t);
-template std::tuple<NDArray, IdArray, IdArray> Pack<kDGLCPU, int64_t>(NDArray, int64_t);
-template std::tuple<NDArray, IdArray, IdArray> Pack<kDGLCPU, float>(NDArray, float);
-template std::tuple<NDArray, IdArray, IdArray> Pack<kDGLCPU, double>(NDArray, double);
+template std::tuple<NDArray, IdArray, IdArray> Pack<kDGLCPU, int32_t>(
+    NDArray, int32_t);
+template std::tuple<NDArray, IdArray, IdArray> Pack<kDGLCPU, int64_t>(
+    NDArray, int64_t);
+template std::tuple<NDArray, IdArray, IdArray> Pack<kDGLCPU, float>(
+    NDArray, float);
+template std::tuple<NDArray, IdArray, IdArray> Pack<kDGLCPU, double>(
+    NDArray, double);
 
 }  // namespace impl
 }  // namespace aten

@@ -4,12 +4,14 @@
  * \brief COO operator GPU implementation
  */
 #include <dgl/array.h>
-#include <vector>
-#include <unordered_set>
+
 #include <numeric>
+#include <unordered_set>
+#include <vector>
+
 #include "../../runtime/cuda/cuda_common.h"
-#include "./utils.h"
 #include "./atomic.cuh"
+#include "./utils.h"
 
 namespace dgl {
 
@@ -19,9 +21,8 @@ using namespace cuda;
 namespace aten {
 namespace impl {
 
-
 template <typename IdType>
-__device__ void _warpReduce(volatile IdType *sdata, IdType tid) {
+__device__ void _warpReduce(volatile IdType* sdata, IdType tid) {
   sdata[tid] += sdata[tid + 32];
   sdata[tid] += sdata[tid + 16];
   sdata[tid] += sdata[tid + 8];
@@ -32,10 +33,8 @@ __device__ void _warpReduce(volatile IdType *sdata, IdType tid) {
 
 template <typename IdType>
 __global__ void _COOGetRowNNZKernel(
-    const IdType* __restrict__ row_indices,
-    IdType* __restrict__ glb_cnt,
-    const int64_t row_query,
-    IdType nnz) {
+    const IdType* __restrict__ row_indices, IdType* __restrict__ glb_cnt,
+    const int64_t row_query, IdType nnz) {
   __shared__ IdType local_cnt[1024];
   IdType tx = threadIdx.x;
   IdType bx = blockIdx.x;
@@ -80,10 +79,9 @@ int64_t COOGetRowNNZ(COOMatrix coo, int64_t row) {
   IdType nb = dgl::cuda::FindNumBlocks<'x'>((nnz + nt - 1) / nt);
   NDArray rst = NDArray::Empty({1}, coo.row->dtype, coo.row->ctx);
   _Fill(rst.Ptr<IdType>(), 1, IdType(0));
-  CUDA_KERNEL_CALL(_COOGetRowNNZKernel,
-      nb, nt, 0, stream,
-      coo.row.Ptr<IdType>(), rst.Ptr<IdType>(),
-      row, nnz);
+  CUDA_KERNEL_CALL(
+      _COOGetRowNNZKernel, nb, nt, 0, stream, coo.row.Ptr<IdType>(),
+      rst.Ptr<IdType>(), row, nnz);
   rst = rst.CopyTo(DGLContext{kDGLCPU, 0});
   return *rst.Ptr<IdType>();
 }
@@ -93,8 +91,7 @@ template int64_t COOGetRowNNZ<kDGLCUDA, int64_t>(COOMatrix, int64_t);
 
 template <typename IdType>
 __global__ void _COOGetAllRowNNZKernel(
-    const IdType* __restrict__ row_indices,
-    IdType* __restrict__ glb_cnts,
+    const IdType* __restrict__ row_indices, IdType* __restrict__ glb_cnts,
     IdType nnz) {
   IdType eid = blockIdx.x * blockDim.x + threadIdx.x;
   while (eid < nnz) {
@@ -118,20 +115,18 @@ NDArray COOGetRowNNZ(COOMatrix coo, NDArray rows) {
     IdType nb = dgl::cuda::FindNumBlocks<'x'>((nnz + nt - 1) / nt);
     NDArray rst = NDArray::Empty({1}, coo.row->dtype, coo.row->ctx);
     _Fill(rst.Ptr<IdType>(), 1, IdType(0));
-    CUDA_KERNEL_CALL(_COOGetRowNNZKernel,
-        nb, nt, 0, stream,
-        coo.row.Ptr<IdType>(), rst.Ptr<IdType>(),
-        row, nnz);
+    CUDA_KERNEL_CALL(
+        _COOGetRowNNZKernel, nb, nt, 0, stream, coo.row.Ptr<IdType>(),
+        rst.Ptr<IdType>(), row, nnz);
     return rst;
   } else {
     IdType nt = 1024;
     IdType nb = dgl::cuda::FindNumBlocks<'x'>((nnz + nt - 1) / nt);
     NDArray in_degrees = NDArray::Empty({num_rows}, rows->dtype, rows->ctx);
     _Fill(in_degrees.Ptr<IdType>(), num_rows, IdType(0));
-    CUDA_KERNEL_CALL(_COOGetAllRowNNZKernel,
-        nb, nt, 0, stream,
-        coo.row.Ptr<IdType>(), in_degrees.Ptr<IdType>(),
-        nnz);
+    CUDA_KERNEL_CALL(
+        _COOGetAllRowNNZKernel, nb, nt, 0, stream, coo.row.Ptr<IdType>(),
+        in_degrees.Ptr<IdType>(), nnz);
     return IndexSelect(in_degrees, rows);
   }
 }

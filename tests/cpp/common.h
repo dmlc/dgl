@@ -22,9 +22,7 @@ inline int32_t* PI32(dgl::runtime::NDArray nd) {
   return static_cast<int32_t*>(nd->data);
 }
 
-inline int64_t Len(dgl::runtime::NDArray nd) {
-  return nd->shape[0];
-}
+inline int64_t Len(dgl::runtime::NDArray nd) { return nd->shape[0]; }
 
 template <typename T>
 inline bool ArrayEQ(dgl::runtime::NDArray a1, dgl::runtime::NDArray a2) {
@@ -35,8 +33,7 @@ inline bool ArrayEQ(dgl::runtime::NDArray a1, dgl::runtime::NDArray a2) {
   if (a1.NumElements() == 0) return true;
   int64_t num = 1;
   for (int i = 0; i < a1->ndim; ++i) {
-    if (a1->shape[i] != a2->shape[i])
-      return false;
+    if (a1->shape[i] != a2->shape[i]) return false;
     num *= a1->shape[i];
   }
   if (a1->ctx != a2->ctx) return false;
@@ -50,11 +47,9 @@ inline bool ArrayEQ(dgl::runtime::NDArray a1, dgl::runtime::NDArray a2) {
 
 template <typename T>
 inline bool IsInArray(dgl::runtime::NDArray a, T x) {
-  if (!a.defined() || a->shape[0] == 0)
-    return false;
+  if (!a.defined() || a->shape[0] == 0) return false;
   for (int64_t i = 0; i < a->shape[0]; ++i) {
-    if (x == static_cast<T*>(a->data)[i])
-      return true;
+    if (x == static_cast<T*>(a->data)[i]) return true;
   }
   return false;
 }

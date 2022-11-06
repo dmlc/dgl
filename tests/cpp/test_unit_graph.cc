@@ -3,15 +3,17 @@
  * \file test_unit_graph.cc
  * \brief Test UnitGraph
  */
-#include "../../src/graph/unit_graph.h"
-#include "./../src/graph/heterograph.h"
-#include "./common.h"
 #include <dgl/array.h>
 #include <dgl/immutable_graph.h>
 #include <dgl/runtime/device_api.h>
 #include <gtest/gtest.h>
+
 #include <memory>
 #include <vector>
+
+#include "../../src/graph/unit_graph.h"
+#include "./../src/graph/heterograph.h"
+#include "./common.h"
 
 using namespace dgl;
 using namespace dgl::runtime;
@@ -24,18 +26,13 @@ aten::CSRMatrix CSR1(DGLContext ctx) {
    *      [0, 1, 0],
    *      [1, 0, 1]]
    */
-  IdArray g_indptr =
-    aten::VecToIdArray(std::vector<IdType>({0, 1, 3, 4, 6}), sizeof(IdType)*8, CTX);
-  IdArray g_indices =
-    aten::VecToIdArray(std::vector<IdType>({2, 0, 2, 1, 0, 2}), sizeof(IdType)*8, CTX);
+  IdArray g_indptr = aten::VecToIdArray(
+      std::vector<IdType>({0, 1, 3, 4, 6}), sizeof(IdType) * 8, CTX);
+  IdArray g_indices = aten::VecToIdArray(
+      std::vector<IdType>({2, 0, 2, 1, 0, 2}), sizeof(IdType) * 8, CTX);
 
-  const aten::CSRMatrix &csr_a = aten::CSRMatrix(
-    4,
-    3,
-    g_indptr,
-    g_indices,
-    aten::NullArray(),
-    false);
+  const aten::CSRMatrix &csr_a =
+      aten::CSRMatrix(4, 3, g_indptr, g_indices, aten::NullArray(), false);
   return csr_a;
 }
 
@@ -48,18 +45,12 @@ aten::COOMatrix COO1(DGLContext ctx) {
    * G = [[1, 1, 0],
    *      [0, 1, 0]]
    */
-  IdArray g_row =
-    aten::VecToIdArray(std::vector<IdType>({0, 0, 1}), sizeof(IdType)*8, CTX);
-  IdArray g_col =
-    aten::VecToIdArray(std::vector<IdType>({0, 1, 1}), sizeof(IdType)*8, CTX);
-  const aten::COOMatrix &coo = aten::COOMatrix(
-    2,
-    3,
-    g_row,
-    g_col,
-    aten::NullArray(),
-    true,
-    true);
+  IdArray g_row = aten::VecToIdArray(
+      std::vector<IdType>({0, 0, 1}), sizeof(IdType) * 8, CTX);
+  IdArray g_col = aten::VecToIdArray(
+      std::vector<IdType>({0, 1, 1}), sizeof(IdType) * 8, CTX);
+  const aten::COOMatrix &coo =
+      aten::COOMatrix(2, 3, g_row, g_col, aten::NullArray(), true, true);
 
   return coo;
 }
@@ -67,7 +58,8 @@ aten::COOMatrix COO1(DGLContext ctx) {
 template aten::COOMatrix COO1<int32_t>(DGLContext ctx);
 template aten::COOMatrix COO1<int64_t>(DGLContext ctx);
 
-template <typename IdType> void _TestUnitGraph_InOutDegrees(DGLContext ctx) {
+template <typename IdType>
+void _TestUnitGraph_InOutDegrees(DGLContext ctx) {
   /*
   InDegree(s) is available only if COO or CSC formats permitted.
   OutDegree(s) is available only if COO or CSR formats permitted.
@@ -346,8 +338,8 @@ void _TestUnitGraph_Reserve(DGLContext ctx) {
 }
 
 template <typename IdType>
-void _TestUnitGraph_CopyTo(const DGLContext &src_ctx,
-                           const DGLContext &dst_ctx) {
+void _TestUnitGraph_CopyTo(
+    const DGLContext &src_ctx, const DGLContext &dst_ctx) {
   const aten::CSRMatrix &csr = CSR1<IdType>(src_ctx);
   const aten::COOMatrix &coo = COO1<IdType>(src_ctx);
 

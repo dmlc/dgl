@@ -190,15 +190,16 @@ def check_rpc_hetero_find_edges_shuffle(tmpdir, num_server):
         time.sleep(1)
         pserver_list.append(p)
 
-    eids = F.tensor(np.random.randint(g.num_edges('r12'), size=100))
+    test_etype = g.to_canonical_etype('r12')
+    eids = F.tensor(np.random.randint(g.num_edges(test_etype), size=100))
     expect_except = False
     try:
-        _, _ = g.find_edges(orig_eid['r12'][eids], etype=('n1', 'r12'))
+        _, _ = g.find_edges(orig_eid[test_etype][eids], etype=('n1', 'r12'))
     except:
         expect_except = True
     assert expect_except
-    u, v = g.find_edges(orig_eid['r12'][eids], etype='r12')
-    u1, v1 = g.find_edges(orig_eid['r12'][eids], etype=('n1', 'r12', 'n2'))
+    u, v = g.find_edges(orig_eid[test_etype][eids], etype='r12')
+    u1, v1 = g.find_edges(orig_eid[test_etype][eids], etype=('n1', 'r12', 'n2'))
     assert F.array_equal(u, u1)
     assert F.array_equal(v, v1)
     du, dv = start_find_edges_client(0, tmpdir, num_server > 1, eids, etype='r12')
@@ -394,7 +395,8 @@ def check_rpc_hetero_sampling_shuffle(tmpdir, num_server):
     for p in pserver_list:
         p.join()
 
-    for src_type, etype, dst_type in block.canonical_etypes:
+    for c_etype in block.canonical_etypes:
+        src_type, etype, dst_type = c_etype
         src, dst = block.edges(etype=etype)
         # These are global Ids after shuffling.
         shuffled_src = F.gather_row(block.srcnodes[src_type].data[dgl.NID], src)
@@ -403,7 +405,7 @@ def check_rpc_hetero_sampling_shuffle(tmpdir, num_server):
 
         orig_src = F.asnumpy(F.gather_row(orig_nid_map[src_type], shuffled_src))
         orig_dst = F.asnumpy(F.gather_row(orig_nid_map[dst_type], shuffled_dst))
-        orig_eid = F.asnumpy(F.gather_row(orig_eid_map[etype], shuffled_eid))
+        orig_eid = F.asnumpy(F.gather_row(orig_eid_map[c_etype], shuffled_eid))
 
         # Check the node Ids and edge Ids.
         orig_src1, orig_dst1 = g.find_edges(orig_eid, etype=etype)
@@ -484,7 +486,8 @@ def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server, graph_formats=No
     src, dst = block.edges(etype=('n2', 'r23', 'n3'))
     assert len(src) == 18
 
-    for src_type, etype, dst_type in block.canonical_etypes:
+    for c_etype in block.canonical_etypes:
+        src_type, etype, dst_type = c_etype
         src, dst = block.edges(etype=etype)
         # These are global Ids after shuffling.
         shuffled_src = F.gather_row(block.srcnodes[src_type].data[dgl.NID], src)
@@ -493,7 +496,7 @@ def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server, graph_formats=No
 
         orig_src = F.asnumpy(F.gather_row(orig_nid_map[src_type], shuffled_src))
         orig_dst = F.asnumpy(F.gather_row(orig_nid_map[dst_type], shuffled_dst))
-        orig_eid = F.asnumpy(F.gather_row(orig_eid_map[etype], shuffled_eid))
+        orig_eid = F.asnumpy(F.gather_row(orig_eid_map[c_etype], shuffled_eid))
 
         # Check the node Ids and edge Ids.
         orig_src1, orig_dst1 = g.find_edges(orig_eid, etype=etype)
@@ -652,7 +655,8 @@ def check_rpc_bipartite_sampling_shuffle(tmpdir, num_server):
     for p in pserver_list:
         p.join()
 
-    for src_type, etype, dst_type in block.canonical_etypes:
+    for c_etype in block.canonical_etypes:
+        src_type, etype, dst_type = c_etype
         src, dst = block.edges(etype=etype)
         # These are global Ids after shuffling.
         shuffled_src = F.gather_row(
@@ -665,7 +669,7 @@ def check_rpc_bipartite_sampling_shuffle(tmpdir, num_server):
             orig_nid_map[src_type], shuffled_src))
         orig_dst = F.asnumpy(F.gather_row(
             orig_nid_map[dst_type], shuffled_dst))
-        orig_eid = F.asnumpy(F.gather_row(orig_eid_map[etype], shuffled_eid))
+        orig_eid = F.asnumpy(F.gather_row(orig_eid_map[c_etype], shuffled_eid))
 
         # Check the node Ids and edge Ids.
         orig_src1, orig_dst1 = g.find_edges(orig_eid, etype=etype)
@@ -736,7 +740,8 @@ def check_rpc_bipartite_etype_sampling_shuffle(tmpdir, num_server):
     for p in pserver_list:
         p.join()
 
-    for src_type, etype, dst_type in block.canonical_etypes:
+    for c_etype in block.canonical_etypes:
+        src_type, etype, dst_type = c_etype
         src, dst = block.edges(etype=etype)
         # These are global Ids after shuffling.
         shuffled_src = F.gather_row(
@@ -749,7 +754,7 @@ def check_rpc_bipartite_etype_sampling_shuffle(tmpdir, num_server):
             orig_nid_map[src_type], shuffled_src))
         orig_dst = F.asnumpy(F.gather_row(
             orig_nid_map[dst_type], shuffled_dst))
-        orig_eid = F.asnumpy(F.gather_row(orig_eid_map[etype], shuffled_eid))
+        orig_eid = F.asnumpy(F.gather_row(orig_eid_map[c_etype], shuffled_eid))
 
         # Check the node Ids and edge Ids.
         orig_src1, orig_dst1 = g.find_edges(orig_eid, etype=etype)

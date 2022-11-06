@@ -4,6 +4,7 @@
  * \brief Workspace pool utility.
  */
 #include "workspace_pool.h"
+
 #include <memory>
 
 namespace dgl {
@@ -26,7 +27,8 @@ class WorkspacePool::Pool {
   // allocate from pool
   void* Alloc(DGLContext ctx, DeviceAPI* device, size_t nbytes) {
     // Allocate align to page.
-    nbytes = (nbytes + (kWorkspacePageSize - 1)) / kWorkspacePageSize * kWorkspacePageSize;
+    nbytes = (nbytes + (kWorkspacePageSize - 1)) / kWorkspacePageSize *
+             kWorkspacePageSize;
     if (nbytes == 0) nbytes = kWorkspacePageSize;
     Entry e;
     DGLDataType type;
@@ -39,7 +41,8 @@ class WorkspacePool::Pool {
       if (e.size < nbytes) {
         // resize the page
         device->FreeDataSpace(ctx, e.data);
-        e.data = device->AllocDataSpace(ctx, nbytes, kTempAllocaAlignment, type);
+        e.data =
+            device->AllocDataSpace(ctx, nbytes, kTempAllocaAlignment, type);
         e.size = nbytes;
       }
     } else if (free_list_.size() == 1) {
@@ -49,7 +52,8 @@ class WorkspacePool::Pool {
       if (free_list_.back().size >= nbytes) {
         // find smallest fit
         auto it = free_list_.end() - 2;
-        for (; it->size >= nbytes; --it) {}
+        for (; it->size >= nbytes; --it) {
+        }
         e = *(it + 1);
         free_list_.erase(it + 1);
       } else {
@@ -57,7 +61,8 @@ class WorkspacePool::Pool {
         e = free_list_.back();
         free_list_.pop_back();
         device->FreeDataSpace(ctx, e.data);
-        e.data = device->AllocDataSpace(ctx, nbytes, kTempAllocaAlignment, type);
+        e.data =
+            device->AllocDataSpace(ctx, nbytes, kTempAllocaAlignment, type);
         e.size = nbytes;
       }
     }
@@ -73,7 +78,8 @@ class WorkspacePool::Pool {
       allocated_.pop_back();
     } else {
       int index = static_cast<int>(allocated_.size()) - 2;
-      for (; index > 0 && allocated_[index].data != data; --index) {}
+      for (; index > 0 && allocated_[index].data != data; --index) {
+      }
       CHECK_GT(index, 0) << "trying to free things that has not been allocated";
       e = allocated_[index];
       allocated_.erase(allocated_.begin() + index);
@@ -113,16 +119,16 @@ class WorkspacePool::Pool {
   std::vector<Entry> allocated_;
 };
 
-WorkspacePool::WorkspacePool(DGLDeviceType device_type, std::shared_ptr<DeviceAPI> device)
-    : device_type_(device_type), device_(device) {
-}
+WorkspacePool::WorkspacePool(
+    DGLDeviceType device_type, std::shared_ptr<DeviceAPI> device)
+    : device_type_(device_type), device_(device) {}
 
 WorkspacePool::~WorkspacePool() {
-  /*
-   Comment out the destruct of WorkspacePool, due to Segmentation fault with MXNet
-   Since this will be only called at the termination of process,
-   not manually wiping out should not cause problems.
-  */
+  /**
+   * Comment out the destruct of WorkspacePool, due to Segmentation fault with
+   * MXNet Since this will be only called at the termination of process, not
+   * manually wiping out should not cause problems.
+   */
   // for (size_t i = 0; i < array_.size(); ++i) {
   //   if (array_[i] != nullptr) {
   //     DGLContext ctx;
@@ -145,8 +151,9 @@ void* WorkspacePool::AllocWorkspace(DGLContext ctx, size_t size) {
 }
 
 void WorkspacePool::FreeWorkspace(DGLContext ctx, void* ptr) {
-  CHECK(static_cast<size_t>(ctx.device_id) < array_.size() &&
-        array_[ctx.device_id] != nullptr);
+  CHECK(
+      static_cast<size_t>(ctx.device_id) < array_.size() &&
+      array_[ctx.device_id] != nullptr);
   array_[ctx.device_id]->Free(ptr);
 }
 

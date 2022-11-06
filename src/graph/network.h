@@ -6,12 +6,12 @@
 #ifndef DGL_GRAPH_NETWORK_H_
 #define DGL_GRAPH_NETWORK_H_
 
-#include <dmlc/logging.h>
 #include <dgl/runtime/ndarray.h>
-
+#include <dmlc/logging.h>
 #include <string.h>
-#include <vector>
+
 #include <string>
+#include <vector>
 
 #include "../c_api_common.h"
 #include "../rpc/network/msg_queue.h"
@@ -24,10 +24,8 @@ namespace network {
 /*!
  * \brief Create NDArray from raw data
  */
-NDArray CreateNDArrayFromRaw(std::vector<int64_t> shape,
-                             DGLDataType dtype,
-                             DGLContext ctx,
-                             void* raw);
+NDArray CreateNDArrayFromRaw(
+    std::vector<int64_t> shape, DGLDataType dtype, DGLContext ctx, void* raw);
 
 /*!
  * \brief Message type for DGL distributed training
@@ -63,18 +61,17 @@ enum MessageType {
   kBarrierMsg = 6,
   /*!
    * \brief IP and ID msg for KVStore
-   */  
+   */
   kIPIDMsg = 7,
   /*!
    * \brief Get data shape msg for KVStore
-   */  
+   */
   kGetShapeMsg = 8,
   /*!
    * \brief Get data shape back msg for KVStore
-   */ 
+   */
   kGetShapeBackMsg = 9
 };
-
 
 /*!
  * \brief Meta data for NDArray message
@@ -85,8 +82,7 @@ class ArrayMeta {
    * \brief ArrayMeta constructor.
    * \param msg_type type of message
    */
-  explicit ArrayMeta(int msg_type)
-  : msg_type_(msg_type), ndarray_count_(0) {}
+  explicit ArrayMeta(int msg_type) : msg_type_(msg_type), ndarray_count_(0) {}
 
   /*!
    * \brief Construct ArrayMeta from binary data buffer.
@@ -101,16 +97,12 @@ class ArrayMeta {
   /*!
    * \return message type
    */
-  inline int msg_type() const {
-    return msg_type_;
-  }
+  inline int msg_type() const { return msg_type_; }
 
   /*!
    * \return count of ndarray
    */
-  inline int ndarray_count() const {
-    return ndarray_count_;
-  }
+  inline int ndarray_count() const { return ndarray_count_; }
 
   /*!
    * \brief Add NDArray meta data to ArrayMeta
@@ -148,8 +140,8 @@ class ArrayMeta {
   std::vector<DGLDataType> data_type_;
 
   /*!
-   * \brief We first write the ndim to data_shape_ 
-   * and then write the data shape. 
+   * \brief We first write the ndim to data_shape_
+   * and then write the data shape.
    */
   std::vector<int64_t> data_shape_;
 };
@@ -175,7 +167,7 @@ class KVStoreMsg {
   }
   /*!
    * \brief Serialize KVStoreMsg to data buffer
-   *  Note that we don't serialize ID and data here. 
+   *  Note that we don't serialize ID and data here.
    * \param size size of serialized message
    * \return pointer of data buffer
    */
@@ -188,29 +180,29 @@ class KVStoreMsg {
    */
   void Deserialize(char* buffer, int64_t size);
 
- /*!
-  * \brief Message type of kvstore
-  */
+  /*!
+   * \brief Message type of kvstore
+   */
   int msg_type;
- /*!
-  * \brief Sender's ID
-  */
+  /*!
+   * \brief Sender's ID
+   */
   int rank;
- /*!
-  * \brief data name
-  */
+  /*!
+   * \brief data name
+   */
   std::string name;
- /*!
-  * \brief data ID
-  */
+  /*!
+   * \brief data ID
+   */
   NDArray id;
- /*!
-  * \brief data matrix
-  */
+  /*!
+   * \brief data matrix
+   */
   NDArray data;
   /*!
-  * \brief data shape
-  */
+   * \brief data shape
+   */
   NDArray shape;
 };
 

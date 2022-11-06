@@ -53,7 +53,7 @@ TEST(ZeroCopySerialize, NDArray) {
   zc_write_strm.Write(tensor2);
 
   EXPECT_EQ(nonzerocopy_blob.size() - zerocopy_blob.size(), 126)
-    << "Invalid save";
+      << "Invalid save";
 
   std::vector<void *> new_ptr_list;
   // Use memcpy to mimic remote machine reconstruction
@@ -103,7 +103,7 @@ TEST(ZeroCopySerialize, SharedMem) {
   std::vector<int64_t> shape{4};
   DGLContext cpu_ctx = {kDGLCPU, 0};
   auto shared_tensor =
-    NDArray::EmptyShared("test", shape, dtype, cpu_ctx, true);
+      NDArray::EmptyShared("test", shape, dtype, cpu_ctx, true);
   shared_tensor.CopyFrom(tensor1);
 
   std::string nonzerocopy_blob;
@@ -115,7 +115,7 @@ TEST(ZeroCopySerialize, SharedMem) {
   zc_write_strm.Write(shared_tensor);
 
   EXPECT_EQ(nonzerocopy_blob.size() - zerocopy_blob.size(), 51)
-    << "Invalid save";
+      << "Invalid save";
   NDArray loadtensor1;
 
   StreamWithBuffer zc_read_strm = StreamWithBuffer(&zerocopy_blob, false);
@@ -146,7 +146,7 @@ TEST(ZeroCopySerialize, HeteroGraph) {
   zc_write_strm.Write(hrptr);
 
   EXPECT_EQ(nonzerocopy_blob.size() - zerocopy_blob.size(), 745)
-    << "Invalid save";
+      << "Invalid save";
 
   std::vector<void *> new_ptr_list;
   // Use memcpy to mimic remote machine reconstruction
