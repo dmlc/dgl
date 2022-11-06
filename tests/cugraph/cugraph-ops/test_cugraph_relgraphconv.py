@@ -4,8 +4,9 @@ import dgl
 from dgl.nn import CuGraphRelGraphConv
 from dgl.nn import RelGraphConv
 
-regularizers = [None, 'basis']
+regularizers = [None, "basis"]
 device = "cuda"
+
 
 def generate_graph():
     u = torch.tensor([0, 1, 0, 2, 3, 0, 4, 0, 5, 0, 6, 7, 0, 8, 9])
@@ -15,7 +16,8 @@ def generate_graph():
     g.edata[dgl.ETYPE] = torch.randint(num_rels, (g.num_edges(),))
     return g
 
-@pytest.mark.parametrize('regularizer', regularizers)
+
+@pytest.mark.parametrize("regularizer", regularizers)
 def test_full_graph(regularizer):
     in_feat, out_feat, num_rels, num_bases = 10, 2, 3, 2
     kwargs = {
@@ -33,7 +35,8 @@ def test_full_graph(regularizer):
 
     torch.manual_seed(0)
     conv2 = CuGraphRelGraphConv(
-        in_feat, out_feat, num_rels, fanout, **kwargs).to(device)
+        in_feat, out_feat, num_rels, fanout, **kwargs
+    ).to(device)
 
     out1 = conv1(g, feat, g.edata[dgl.ETYPE])
     out2 = conv2(g, feat, g.edata[dgl.ETYPE])
@@ -46,9 +49,11 @@ def test_full_graph(regularizer):
     assert torch.allclose(conv1.linear_r.W.grad, conv2.W.grad, atol=1e-6)
     if regularizer is not None:
         assert torch.allclose(
-            conv1.linear_r.coeff.grad, conv2.coeff.grad, atol=1e-6)
+            conv1.linear_r.coeff.grad, conv2.coeff.grad, atol=1e-6
+        )
 
-@pytest.mark.parametrize('regularizer', regularizers)
+
+@pytest.mark.parametrize("regularizer", regularizers)
 def test_mfg(regularizer):
     in_feat, out_feat, num_rels, num_bases = 10, 2, 3, 2
     kwargs = {
@@ -67,12 +72,11 @@ def test_mfg(regularizer):
 
     torch.manual_seed(0)
     conv2 = CuGraphRelGraphConv(
-        in_feat, out_feat, num_rels, fanout, **kwargs).to(device)
+        in_feat, out_feat, num_rels, fanout, **kwargs
+    ).to(device)
 
     out1 = conv1(block, feat[block.srcdata[dgl.NID]], block.edata[dgl.ETYPE])
-    out2 = conv2(
-        block, feat[block.srcdata[dgl.NID]], block.edata[dgl.ETYPE]
-    )
+    out2 = conv2(block, feat[block.srcdata[dgl.NID]], block.edata[dgl.ETYPE])
 
     assert torch.allclose(out1, out2, atol=1e-06)
 
@@ -82,4 +86,5 @@ def test_mfg(regularizer):
     assert torch.allclose(conv1.linear_r.W.grad, conv2.W.grad, atol=1e-6)
     if regularizer is not None:
         assert torch.allclose(
-            conv1.linear_r.coeff.grad, conv2.coeff.grad, atol=1e-6)
+            conv1.linear_r.coeff.grad, conv2.coeff.grad, atol=1e-6
+        )
