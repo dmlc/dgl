@@ -731,7 +731,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelGetEdgeMapping")
  * @param B_ref The right operand.
  * @param B_weights The edge weights of graph B.
  * @param num_vtypes The number of vertex types of the graph to be returned.
- * \return A pair consisting of the new graph as well as its edge weights.
+ * @return A pair consisting of the new graph as well as its edge weights.
  */
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLCSRMM")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {

@@ -106,7 +106,7 @@ class MessageQueue {
    * @brief Add message to the queue
    * @param msg data message
    * @param is_blocking Blocking if cannot add, else return
-   * \return Status code
+   * @return Status code
    */
   STATUS Add(Message msg, bool is_blocking = true);
 
@@ -114,7 +114,7 @@ class MessageQueue {
    * @brief Remove message from the queue
    * @param msg pointer of data msg
    * @param is_blocking Blocking if cannot remove, else return
-   * \return Status code
+   * @return Status code
    */
   STATUS Remove(Message* msg, bool is_blocking = true);
 
@@ -125,12 +125,12 @@ class MessageQueue {
   void SignalFinished(int producer_id);
 
   /*!
-   * \return true if queue is empty.
+   * @return true if queue is empty.
    */
   bool Empty() const;
 
   /*!
-   * \return true if queue is empty and all num_producers have signaled.
+   * @return true if queue is empty and all num_producers have signaled.
    */
   bool EmptyAndNoMoreAdd() const;
 

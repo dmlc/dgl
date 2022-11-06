@@ -26,7 +26,7 @@ namespace sampling {
  * @param prob A vector of 1D float arrays, indicating the transition
  * probability of each edge by edge type. An empty float array assumes uniform
  * transition.
- * \return A pair of
+ * @return A pair of
  *         1. One 2D array of shape (len(seeds), len(metapath) + 1) with node
  *            IDs. The paths that terminated early are padded with -1.
  *         2. One 2D array of shape (len(seeds), len(metapath)) with edge IDs.
@@ -47,7 +47,7 @@ std::tuple<IdArray, IdArray, TypeArray> RandomWalk(
  * probability of each edge by edge type. An empty float array assumes uniform
  * transition.
  * @param restart_prob Restart probability.
- * \return A pair of
+ * @return A pair of
  *         1. One 2D array of shape (len(seeds), len(metapath) + 1) with node
  *            IDs. The paths that terminated early are padded with -1.
  *         2. One 2D array of shape (len(seeds), len(metapath)) with edge IDs.
@@ -71,7 +71,7 @@ std::tuple<IdArray, IdArray, TypeArray> RandomWalkWithRestart(
  * @param restart_prob Restart probability array which has the same number of
  * elements as \c metapath, indicating the probability to terminate after
  * transition.
- * \return A pair of
+ * @return A pair of
  *         1. One 2D array of shape (len(seeds), len(metapath) + 1) with node
  *            IDs. The paths that terminated early are padded with -1.
  *         2. One 2D array of shape (len(seeds), len(metapath)) with edge IDs.

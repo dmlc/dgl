@@ -98,7 +98,7 @@ class DeviceOrderedHashTable {
    *
    * @param id The key to search for.
    *
-   * \return An iterator to the mapping.
+   * @return An iterator to the mapping.
    */
   inline __device__ ConstIterator Search(const IdType id) const {
     const IdType pos = SearchForPosition(id);
@@ -111,7 +111,7 @@ class DeviceOrderedHashTable {
    *
    * @param id The key to check for.
    *
-   * \return True if the key exists in the hashtable.
+   * @return True if the key exists in the hashtable.
    */
   inline __device__ bool Contains(const IdType id) const {
     IdType pos = Hash(id);
@@ -150,7 +150,7 @@ class DeviceOrderedHashTable {
    *
    * @param id The ID of the item to search for.
    *
-   * \return The the position of the item in the hashtable.
+   * @return The the position of the item in the hashtable.
    */
   inline __device__ IdType SearchForPosition(const IdType id) const {
     IdType pos = Hash(id);
@@ -172,7 +172,7 @@ class DeviceOrderedHashTable {
    *
    * @param id The ID to hash.
    *
-   * \return The hash.
+   * @return The hash.
    */
   inline __device__ size_t Hash(const IdType id) const { return id % size_; }
 
@@ -267,7 +267,7 @@ class OrderedHashTable {
   /**
    * @brief Get a verison of the hashtable usable from device functions.
    *
-   * \return This hashtable.
+   * @return This hashtable.
    */
   DeviceOrderedHashTable<IdType> DeviceHandle() const;
 

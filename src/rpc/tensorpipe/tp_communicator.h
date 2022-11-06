@@ -56,7 +56,7 @@ class TPSender : public RPCSender {
    *
    * @param addr Networking address, e.g., 'tcp://127.0.0.1:50091'
    * @param recv_id receiver's ID
-   * \return True for success and False for fail
+   * @return True for success and False for fail
    *
    * The function is *not* thread-safe; only one thread can invoke this API.
    */
@@ -127,7 +127,7 @@ class TPReceiver : public RPCReceiver {
    * @param addr Networking address, e.g., 'tcp://127.0.0.1:50051'
    * @param num_sender total number of Senders
    * @param blocking whether to wait blockingly
-   * \return True for success and False for fail
+   * @return True for success and False for fail
    *
    * Wait() is not thread-safe and only one thread can invoke this API.
    */
@@ -139,7 +139,7 @@ class TPReceiver : public RPCReceiver {
    * @param msg pointer of RPCmessage
    * @param timeout The timeout value in milliseconds. If zero, wait
    * indefinitely.
-   * \return RPCStatus: kRPCSuccess or kRPCTimeOut.
+   * @return RPCStatus: kRPCSuccess or kRPCTimeOut.
    */
   RPCStatus Recv(RPCMessage* msg, int timeout) override;
 

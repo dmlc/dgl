@@ -72,7 +72,7 @@ class TensorDispatcher {
    * Used in CPUDeviceAPI::AllocWorkspace().
    *
    * @param nbytes The size to be allocated.
-   * \return Pointer to the allocated memory.
+   * @return Pointer to the allocated memory.
    */
   inline void* CPUAllocWorkspace(size_t nbytes) {
     auto entry = entrypoints_[Op::kCPURawAlloc];
@@ -102,7 +102,7 @@ class TensorDispatcher {
    *
    * @param nbytes The size to be allocated.
    * @param stream The stream to be allocated on.
-   * \return Pointer to the allocated memory.
+   * @return Pointer to the allocated memory.
    */
   inline void* CUDAAllocWorkspace(size_t nbytes, cudaStream_t stream) {
     auto entry = entrypoints_[Op::kCUDARawAlloc];
@@ -128,7 +128,7 @@ class TensorDispatcher {
    * on current device via cudaGetDevice(). Make sure to call cudaSetDevice()
    * before invoking this function.
    *
-   * \return cudaStream_t stream handle
+   * @return cudaStream_t stream handle
    */
   inline cudaStream_t CUDAGetCurrentStream() {
     auto entry = entrypoints_[Op::kCUDACurrentStream];

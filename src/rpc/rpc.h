@@ -173,7 +173,7 @@ struct RPCContext {
  * the contents have been transmitted.
  *
  * @param msg RPC message to send
- * \return status flag
+ * @return status flag
  */
 RPCStatus SendRPCMessage(const RPCMessage& msg);
 
@@ -184,7 +184,7 @@ RPCStatus SendRPCMessage(const RPCMessage& msg);
  *
  * @param msg The received message
  * @param timeout The timeout value in milliseconds. If zero, wait indefinitely.
- * \return status flag
+ * @return status flag
  */
 RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout = 0);
 

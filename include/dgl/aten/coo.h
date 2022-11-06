@@ -225,7 +225,7 @@ std::pair<bool, bool> COOIsSorted(COOMatrix coo);
  * @param mat Sparse matrix
  * @param rows Row index
  * @param cols Column index
- * \return Three arrays {rows, cols, data}
+ * @return Three arrays {rows, cols, data}
  */
 std::vector<runtime::NDArray> COOGetDataAndIndices(
     COOMatrix mat, runtime::NDArray rows, runtime::NDArray cols);
@@ -250,7 +250,7 @@ inline runtime::NDArray COOGetAllData(COOMatrix mat, int64_t row, int64_t col) {
  * @param mat Sparse matrix.
  * @param rows Row index.
  * @param cols Column index.
- * \return Data array. The i^th element is the data of (rows[i], cols[i])
+ * @return Data array. The i^th element is the data of (rows[i], cols[i])
  */
 runtime::NDArray COOGetData(COOMatrix mat, runtime::NDArray rows, runtime::NDArray cols);
 
@@ -277,7 +277,7 @@ COOMatrix COOTranspose(COOMatrix coo);
  * - Otherwise, the conversion is more costly but still is O(nnz).
  *
  * @param coo Input COO matrix.
- * \return CSR matrix.
+ * @return CSR matrix.
  */
 CSRMatrix COOToCSR(COOMatrix coo);
 
@@ -299,7 +299,7 @@ COOMatrix COOSliceRows(COOMatrix coo, runtime::NDArray rows);
  * @param coo The input coo matrix
  * @param rows The row index to select
  * @param cols The col index to select
- * \return submatrix
+ * @return submatrix
  */
 COOMatrix COOSliceMatrix(COOMatrix coo, runtime::NDArray rows, runtime::NDArray cols);
 
@@ -339,7 +339,7 @@ void COOSort_(COOMatrix* mat, bool sort_column = false);
  *
  * @param mat The input coo matrix
  * @param sort_column True if column index should be sorted too.
- * \return COO matrix with index sorted.
+ * @return COO matrix with index sorted.
  */
 inline COOMatrix COOSort(COOMatrix mat, bool sort_column = false) {
   if ((mat.row_sorted && !sort_column) || mat.col_sorted)
@@ -354,7 +354,7 @@ inline COOMatrix COOSort(COOMatrix mat, bool sort_column = false) {
 
 /*!
  * @brief Remove entries from COO matrix by entry indices (data indices)
- * \return A new COO matrix as well as a mapping from the new COO entries to the old COO
+ * @return A new COO matrix as well as a mapping from the new COO entries to the old COO
  *         entries.
  */
 COOMatrix COORemove(COOMatrix coo, IdArray entries);
@@ -400,7 +400,7 @@ COOMatrix COOReorder(COOMatrix coo, runtime::NDArray new_row_ids, runtime::NDArr
  *                     Should be of the same length as the data array.
  *                     If an empty array is provided, assume uniform.
  * @param replace True if sample with replacement
- * \return A COOMatrix storing the picked row and col indices. Its data field stores the
+ * @return A COOMatrix storing the picked row and col indices. Its data field stores the
  *         the index of the picked elements in the value array.
  */
 COOMatrix COORowWiseSampling(
@@ -450,7 +450,7 @@ COOMatrix COORowWiseSampling(
  *                     Should be of the same length as the data array.
  *                     If an empty array is provided, assume uniform.
  * @param replace True if sample with replacement
- * \return A COOMatrix storing the picked row and col indices. Its data field stores the
+ * @return A COOMatrix storing the picked row and col indices. Its data field stores the
  *         the index of the picked elements in the value array.
  * @note The edges of the entire graph must be ordered by their edge types.
  */
@@ -496,7 +496,7 @@ COOMatrix COORowWisePerEtypeSampling(
  *               data array. If an empty array is provided, assume uniform.
  * @param ascending If true, elements are sorted by ascending order, equivalent to find
  *                  the K smallest values. Otherwise, find K largest values.
- * \return A COOMatrix storing the picked row and col indices. Its data field stores the
+ * @return A COOMatrix storing the picked row and col indices. Its data field stores the
  *         the index of the picked elements in the value array.
  */
 COOMatrix COORowWiseTopk(
@@ -568,7 +568,7 @@ COOMatrix UnionCoo(
  * @param coos The input list of coo matrix.
  * @param src_offset A list of integers recording src vertix id offset of each Matrix in coos
  * @param src_offset A list of integers recording dst vertix id offset of each Matrix in coos
- * \return The combined COOMatrix.
+ * @return The combined COOMatrix.
  */
 COOMatrix DisjointUnionCoo(
   const std::vector<COOMatrix>& coos);
@@ -590,7 +590,7 @@ COOMatrix DisjointUnionCoo(
  * cnt = [3, 2, 1, 1, 4]
  * edge_map = [0, 0, 0, 1, 1, 2, 3, 4, 4, 4, 4]
  *
- * \return The simplified COOMatrix
+ * @return The simplified COOMatrix
  *         The count recording the number of duplicated edges from the original graph.
  *         The edge mapping from the edge IDs of original graph to those of the
  *         returned graph.
@@ -639,7 +639,7 @@ std::tuple<COOMatrix, IdArray, IdArray> COOToSimple(const COOMatrix& coo);
  * @param edge_cumsum Number of edges of each components
  * @param src_vertex_cumsum Number of src vertices of each component.
  * @param dst_vertex_cumsum Number of dst vertices of each component.
- * \return A list of COOMatrixes representing each disjoint components.
+ * @return A list of COOMatrixes representing each disjoint components.
  */
 std::vector<COOMatrix> DisjointPartitionCooBySizes(
   const COOMatrix &coo,
@@ -681,7 +681,7 @@ std::vector<COOMatrix> DisjointPartitionCooBySizes(
  * @param edge_range ID range of the edges in the chunk
  * @param src_vertex_range ID range of the src vertices in the chunk.
  * @param dst_vertex_range ID range of the dst vertices in the chunk.
- * \return COOMatrix representing the chunk.
+ * @return COOMatrix representing the chunk.
  */
 COOMatrix COOSliceContiguousChunk(
   const COOMatrix &coo,
@@ -717,7 +717,7 @@ COOMatrix COOSliceContiguousChunk(
  *
  * @param coo COOMatrix to create the LineGraph
  * @param backtracking whether the pair of (v, u) (u, v) edges are treated as linked
- * \return LineGraph in COO format
+ * @return LineGraph in COO format
  */
 COOMatrix COOLineGraph(const COOMatrix &coo, bool backtracking);
 

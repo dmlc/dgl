@@ -22,7 +22,7 @@ std::string GetFileFormat(
     const std::string& file_name, const std::string& format);
 
 /*!
- * \return the directory in which DGL stores cached files.
+ * @return the directory in which DGL stores cached files.
  *         May be set using DGL_CACHE_DIR; defaults to system locations.
  */
 std::string GetCacheDir();
@@ -36,7 +36,7 @@ std::string GetMetaFilePath(const std::string& file_name);
 /*!
  * @brief Get file basename (i.e. without leading directories)
  * @param file_name The name of the file.
- * \return the base name
+ * @return the base name
  */
 std::string GetFileBasename(const std::string& file_name);
 

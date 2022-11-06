@@ -58,7 +58,7 @@ class SocketSender : public Sender {
    *
    * @param addr Networking address, e.g., 'tcp://127.0.0.1:50091'
    * @param recv_id receiver's ID
-   * \return True for success and False for fail
+   * @return True for success and False for fail
    *
    * The function is *not* thread-safe; only one thread can invoke this API.
    */
@@ -67,7 +67,7 @@ class SocketSender : public Sender {
   /*!
    * @brief Finalize the action to connect to receivers. Make sure that either
    *        all connections are successfully established or connection fails.
-   * \return True for success and False for fail
+   * @return True for success and False for fail
    *
    * The function is *not* thread-safe; only one thread can invoke this API.
    */
@@ -98,7 +98,7 @@ class SocketSender : public Sender {
    * queue.
    * @param msg data message.
    * @param recv_id receiver's ID.
-   * \return Status code.
+   * @return Status code.
    *
    * (1) The send is non-blocking. There is no guarantee that the message has
    * been physically sent out when the function returns. (2) The communicator
@@ -167,7 +167,7 @@ class SocketReceiver : public Receiver {
    * @param addr Networking address, e.g., 'tcp://127.0.0.1:50051', 'mpi://0'
    * @param num_sender total number of Senders
    * @param blocking whether wait blockingly
-   * \return True for success and False for fail
+   * @return True for success and False for fail
    *
    * Wait() is not thread-safe and only one thread can invoke this API.
    */
@@ -179,7 +179,7 @@ class SocketReceiver : public Receiver {
    * @param msg pointer of RPCmessage
    * @param timeout The timeout value in milliseconds. If zero, wait
    * indefinitely.
-   * \return RPCStatus: kRPCSuccess or kRPCTimeOut.
+   * @return RPCStatus: kRPCSuccess or kRPCTimeOut.
    */
   rpc::RPCStatus Recv(rpc::RPCMessage* msg, int timeout) override;
 
@@ -189,7 +189,7 @@ class SocketReceiver : public Receiver {
    * @param send_id which sender current msg comes from
    * @param timeout The timeout value in milliseconds. If zero, wait
    * indefinitely.
-   * \return Status code
+   * @return Status code
    *
    * (1) The Recv() API is thread-safe.
    * (2) Memory allocated by communicator but will not own it after the function
@@ -204,7 +204,7 @@ class SocketReceiver : public Receiver {
    * @param send_id sender's ID
    * @param timeout The timeout value in milliseconds. If zero, wait
    * indefinitely.
-   * \return Status code
+   * @return Status code
    *
    * (1) The RecvFrom() API is thread-safe.
    * (2) Memory allocated by communicator but will not own it after the function

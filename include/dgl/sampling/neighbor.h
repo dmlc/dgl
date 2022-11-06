@@ -38,7 +38,7 @@ namespace sampling {
  * sampling. The vector length must be equal to the number of edges types. Empty
  * array is allowed.
  * @param replace If true, sample with replacement.
- * \return Sampled neighborhoods as a graph. The return graph has the same
+ * @return Sampled neighborhoods as a graph. The return graph has the same
  * schema as the original one.
  */
 HeteroSubgraph SampleNeighbors(
@@ -63,7 +63,7 @@ HeteroSubgraph SampleNeighbors(
  * witheach edge.
  * @param ascending If true, elements are sorted by ascending order, equivalent
  * to find the K smallest values. Otherwise, find K largest values.
- * \return Sampled neighborhoods as a graph. The return graph has the same
+ * @return Sampled neighborhoods as a graph. The return graph has the same
  * schema as the original one.
  */
 HeteroSubgraph SampleNeighborsTopk(

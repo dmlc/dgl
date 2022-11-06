@@ -84,7 +84,7 @@ __device__ __forceinline__ T _ldg(T* addr) {
  * @param flags The bool array.
  * @param length The length.
  * @param ctx Device context.
- * \return True if all the flags are true.
+ * @return True if all the flags are true.
  */
 bool AllTrue(int8_t* flags, int64_t length, const DGLContext& ctx);
 

@@ -27,7 +27,7 @@ namespace transform {
  * @param hg Graph.
  * @param backtracking whether the pair of (v, u) (u, v) edges are treated as
  *        linked.
- * \return The Line Graph.
+ * @return The Line Graph.
  */
 HeteroGraphPtr CreateLineGraph(HeteroGraphPtr hg, bool backtracking) {
   const auto hgp = std::dynamic_pointer_cast<HeteroGraph>(hg);

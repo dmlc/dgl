@@ -51,7 +51,7 @@ using TerminatePredicate = std::function<bool(IdxType *, dgl_id_t, int64_t)>;
  * @param prob Transition probability per edge type.
  * @param terminate Predicate for terminating the current random walk path.
  *
- * \return A tuple of ID of next successor (-1 if not exist), the last traversed
+ * @return A tuple of ID of next successor (-1 if not exist), the last traversed
  * edge ID, as well as whether to terminate.
  */
 template <DGLDeviceType XPU, typename IdxType>
@@ -118,7 +118,7 @@ std::tuple<dgl_id_t, dgl_id_t, bool> MetapathRandomWalkStep(
  * will be a NullArray \param terminate Predicate for terminating the current
  * random walk path.
  *
- * \return A pair of ID of next successor (-1 if not exist), as well as whether
+ * @return A pair of ID of next successor (-1 if not exist), as well as whether
  * to terminate. \note This function is called only if all the probability
  * arrays are null.
  */

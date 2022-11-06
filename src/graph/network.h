@@ -95,12 +95,12 @@ class ArrayMeta {
   }
 
   /*!
-   * \return message type
+   * @return message type
    */
   inline int msg_type() const { return msg_type_; }
 
   /*!
-   * \return count of ndarray
+   * @return count of ndarray
    */
   inline int ndarray_count() const { return ndarray_count_; }
 
@@ -113,7 +113,7 @@ class ArrayMeta {
   /*!
    * @brief Serialize ArrayMeta to data buffer
    * @param size size of serialized message
-   * \return pointer of data buffer
+   * @return pointer of data buffer
    */
   char* Serialize(int64_t* size);
 
@@ -169,7 +169,7 @@ class KVStoreMsg {
    * @brief Serialize KVStoreMsg to data buffer
    *  Note that we don't serialize ID and data here.
    * @param size size of serialized message
-   * \return pointer of data buffer
+   * @return pointer of data buffer
    */
   char* Serialize(int64_t* size);
 

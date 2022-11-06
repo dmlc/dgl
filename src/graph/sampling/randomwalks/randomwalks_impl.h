@@ -37,7 +37,7 @@ using StepFunc = std::function<
 
 /*!
  * @brief Get the node types traversed by the metapath.
- * \return A 1D array of shape (len(metapath) + 1,) with node type IDs.
+ * @return A 1D array of shape (len(metapath) + 1,) with node type IDs.
  */
 template <DGLDeviceType XPU, typename IdxType>
 TypeArray GetNodeTypesFromMetapath(

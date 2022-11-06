@@ -301,7 +301,7 @@ class HeteroGraph : public BaseHeteroGraph {
   * 
   * \tparam IdType Graph's index data type, can be int32_t or int64_t
   * @param etypes vector of etypes to be falttened
-  * \return pointer of FlattenedHeteroGraphh
+  * @return pointer of FlattenedHeteroGraphh
   */
   template <class IdType>
   FlattenedHeteroGraphPtr FlattenImpl(const std::vector<dgl_type_t>& etypes) const;

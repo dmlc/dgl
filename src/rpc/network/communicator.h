@@ -46,7 +46,7 @@ class Sender : public rpc::RPCSender {
    * @brief Send data to specified Receiver.
    * @param msg data message
    * @param recv_id receiver's ID
-   * \return Status code
+   * @return Status code
    *
    * (1) The send is non-blocking. There is no guarantee that the message has
    * been physically sent out when the function returns. (2) The communicator
@@ -102,7 +102,7 @@ class Receiver : public rpc::RPCReceiver {
    * @param send_id which sender current msg comes from
    * @param timeout The timeout value in milliseconds. If zero, wait
    * indefinitely.
-   * \return Status code
+   * @return Status code
    *
    * (1) The Recv() API is thread-safe.
    * (2) Memory allocated by communicator but will not own it after the function
@@ -116,7 +116,7 @@ class Receiver : public rpc::RPCReceiver {
    * @param send_id sender's ID
    * @param timeout The timeout value in milliseconds. If zero, wait
    * indefinitely.
-   * \return Status code
+   * @return Status code
    *
    * (1) The RecvFrom() API is thread-safe.
    * (2) Memory allocated by communicator but will not own it after the function

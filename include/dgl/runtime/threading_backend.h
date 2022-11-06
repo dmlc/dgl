@@ -59,7 +59,7 @@ class ThreadGroup {
    *        `worker_callback` will only be called for values >= 1. This
    *        allows use of the main thread as a worker.
    *
-   * \return The number of workers to use.
+   * @return The number of workers to use.
    */
   int Configure(AffinityMode mode, int nthreads, bool exclude_worker0);
 
@@ -75,7 +75,7 @@ class ThreadGroup {
 void YieldThread();
 
 /*!
- * \return the maximum number of effective workers for this system.
+ * @return the maximum number of effective workers for this system.
  */
 int MaxConcurrency();
 

@@ -37,7 +37,7 @@ enum class StorageRank {
 
 /*!
  * @param thread_scope_rank The thread scope rank
- * \return default storage rank given the thread scope
+ * @return default storage rank given the thread scope
  */
 inline StorageRank DefaultStorageRank(int thread_scope_rank) {
   switch (thread_scope_rank) {
@@ -86,7 +86,7 @@ struct StorageScope {
   /*!
    * @brief make storage scope from string
    * @param s The string to be parsed.
-   * \return The storage scope.
+   * @return The storage scope.
    */
   static StorageScope make(const std::string& s) {
     StorageScope r;
@@ -118,7 +118,7 @@ struct ThreadScope {
   /*!
    * @brief make storage scope from string
    * @param s The string to be parsed.
-   * \return The storage scope.
+   * @return The storage scope.
    */
   static ThreadScope make(const std::string& s) {
     ThreadScope r;
@@ -145,12 +145,12 @@ struct ThreadWorkLoad {
   size_t work_size[6];
   /*!
    * @param i The block dimension.
-   * \return i-th block dim
+   * @return i-th block dim
    */
   inline size_t block_dim(size_t i) const { return work_size[i + 3]; }
   /*!
    * @param i The grid dimension.
-   * \return i-th grid dim
+   * @return i-th grid dim
    */
   inline size_t grid_dim(size_t i) const { return work_size[i]; }
 };

@@ -31,7 +31,7 @@ class SamplerOp {
    * @param expand_factor the max number of neighbors to sample.
    * @param add_self_loop whether to add self loop to the sampled subgraph
    * @param probability the transition probability (float/double).
-   * \return a NodeFlow graph.
+   * @return a NodeFlow graph.
    */
   template <typename ValueType>
   static NodeFlow NeighborSample(
@@ -47,7 +47,7 @@ class SamplerOp {
    * @param seeds the nodes where we should start to sample.
    * @param edge_type the type of edges we should sample neighbors.
    * @param layer_sizes The size of layers.
-   * \return a NodeFlow graph.
+   * @return a NodeFlow graph.
    */
   static NodeFlow LayerUniformSample(
       const ImmutableGraph *graph, const std::vector<dgl_id_t> &seeds,

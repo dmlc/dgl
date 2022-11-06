@@ -116,7 +116,7 @@ class NDArray {
   /*!
    * @brief copy assignmemt
    * @param other The value to be assigned.
-   * \return reference to self.
+   * @return reference to self.
    */
   NDArray& operator=(const NDArray& other) {  // NOLINT(*)
     // copy-and-swap idiom
@@ -126,7 +126,7 @@ class NDArray {
   /*!
    * @brief move assignmemt
    * @param other The value to be assigned.
-   * \return reference to self.
+   * @return reference to self.
    */
   NDArray& operator=(NDArray&& other) {  // NOLINT(*)
     // copy-and-swap idiom
@@ -144,7 +144,7 @@ class NDArray {
   /*! \brief reset the content of NDArray to be nullptr */
   inline void reset();
   /*!
-   * \return the reference counter
+   * @return the reference counter
    * @note this number is approximate in multi-threaded setting.
    */
   inline int use_count() const;
@@ -173,7 +173,7 @@ class NDArray {
   /*!
    * @brief Copy the data to another context.
    * @param ctx The target context.
-   * \return The array under another context.
+   * @return The array under another context.
    */
   inline NDArray CopyTo(const DGLContext &ctx) const;
   /*!
@@ -209,7 +209,7 @@ class NDArray {
   /*!
    * @brief Load NDArray from stream
    * @param stream The input data stream
-   * \return Whether load is successful
+   * @return Whether load is successful
    */
   bool Load(dmlc::Stream* stream);
   /*!
@@ -231,7 +231,7 @@ class NDArray {
    * @param shape The shape of the new array.
    * @param dtype The data type of the new array.
    * @param ctx The context of the Array.
-   * \return The created Array
+   * @return The created Array
    */
   DGL_DLL static NDArray Empty(std::vector<int64_t> shape,
                                DGLDataType dtype,
@@ -243,7 +243,7 @@ class NDArray {
    * @param dtype The data type of the new array.
    * @param ctx The context of the Array.
    * @param is_create whether to create shared memory.
-   * \return The created Array
+   * @return The created Array
    */
   DGL_DLL static NDArray EmptyShared(const std::string &name,
                                      std::vector<int64_t> shape,
@@ -320,7 +320,7 @@ class NDArray {
   /*!
    * @brief Function check if the DGLArray of a Container is pinned.
    * @param ptr The container to be checked.
-   * \return true if pinned.
+   * @return true if pinned.
    */
   DGL_DLL static bool IsContainerPinned(Container* ptr);
 
@@ -582,7 +582,7 @@ inline bool SaveDGLArray(dmlc::Stream* strm,
 /*!
  * @brief Convert type code to its name
  * @param type_code The type code .
- * \return The name of type code.
+ * @return The name of type code.
  */
 inline const char* TypeCode2Str(int type_code) {
   switch (type_code) {
@@ -608,7 +608,7 @@ inline const char* TypeCode2Str(int type_code) {
 /*!
  * @brief Convert device type code to its name
  * @param device_type The device type code.
- * \return The name of the device.
+ * @return The name of the device.
  */
 inline const char* DeviceTypeCode2Str(DGLDeviceType device_type) {
   switch (device_type) {
@@ -622,7 +622,7 @@ inline const char* DeviceTypeCode2Str(DGLDeviceType device_type) {
 /*!
  * @brief convert a string to DGL type.
  * @param s The string to be converted.
- * \return The corresponding dgl type.
+ * @return The corresponding dgl type.
  */
 inline DGLDataType String2DGLDataType(std::string s) {
   DGLDataType t;
@@ -654,7 +654,7 @@ inline DGLDataType String2DGLDataType(std::string s) {
 /*!
  * @brief convert a DGL type to string.
  * @param t The type to be converted.
- * \return The corresponding dgl type in string.
+ * @return The corresponding dgl type in string.
  */
 inline std::string DGLDataType2String(DGLDataType t) {
 #ifndef _LIBCPP_SGX_NO_IOSTREAMS

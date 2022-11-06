@@ -238,7 +238,7 @@ class UnitGraph : public BaseHeteroGraph {
    * @brief Create in-edge CSR format of the unit graph.
    * @param inplace if true and the in-edge CSR format does not exist, the created
    *                format will be cached in this object unless the format is restricted.
-   * \return Return the in-edge CSR format. Create from other format if not exist.
+   * @return Return the in-edge CSR format. Create from other format if not exist.
    */
   CSRPtr GetInCSR(bool inplace = true) const;
 
@@ -246,7 +246,7 @@ class UnitGraph : public BaseHeteroGraph {
    * @brief Create out-edge CSR format of the unit graph.
    * @param inplace if true and the out-edge CSR format does not exist, the created
    *                format will be cached in this object unless the format is restricted.
-   * \return Return the out-edge CSR format. Create from other format if not exist.
+   * @return Return the out-edge CSR format. Create from other format if not exist.
    */
   CSRPtr GetOutCSR(bool inplace = true) const;
 
@@ -254,7 +254,7 @@ class UnitGraph : public BaseHeteroGraph {
    * @brief Create COO format of the unit graph.
    * @param inplace if true and the COO format does not exist, the created
    *                format will be cached in this object unless the format is restricted.
-   * \return Return the COO format. Create from other format if not exist.
+   * @return Return the COO format. Create from other format if not exist.
    */
   COOPtr GetCOO(bool inplace = true) const;
 
@@ -275,7 +275,7 @@ class UnitGraph : public BaseHeteroGraph {
    * @brief Return the graph in the given format. Perform format conversion if the
    * requested format does not exist.
    *
-   * \return A graph in the requested format.
+   * @return A graph in the requested format.
    */
   HeteroGraphPtr GetFormat(SparseFormat format) const;
 

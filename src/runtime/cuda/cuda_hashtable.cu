@@ -66,7 +66,7 @@ class MutableDeviceOrderedHashTable : public DeviceOrderedHashTable<IdType> {
    * @param id The ID to insert into the hash table.
    * @param index The original index of the item being inserted.
    *
-   * \return True, if the insertion was successful.
+   * @return True, if the insertion was successful.
    */
   inline __device__ bool AttemptInsertAt(
       const size_t pos, const IdType id, const size_t index) {

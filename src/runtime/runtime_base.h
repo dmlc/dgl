@@ -37,7 +37,7 @@
 /*!
  * @brief handle exception throwed out
  * @param e the exception
- * \return the return value of API after exception is handled
+ * @return the return value of API after exception is handled
  */
 inline int DGLAPIHandleException(const std::runtime_error &e) {
   DGLAPISetLastError(e.what());

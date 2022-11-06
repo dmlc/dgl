@@ -32,7 +32,7 @@ namespace sampling {
  * @param replace Whether to sample with replacement.
  * @param redundancy How much redundant negative examples to take in case of
  * duplicate examples.
- * \return The pair of source and destination tensors.
+ * @return The pair of source and destination tensors.
  */
 std::pair<IdArray, IdArray> GlobalUniformNegativeSampling(
     HeteroGraphPtr hg, dgl_type_t etype, int64_t num_samples, int num_trials,

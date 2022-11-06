@@ -23,7 +23,7 @@ extern "C" {
  * PyTorch's CPUAllocator
  *
  * @param nbytes The size to be allocated.
- * \return Pointer to the allocated memory.
+ * @return Pointer to the allocated memory.
  */
 void* CPURawAlloc(size_t nbytes);
 
@@ -41,7 +41,7 @@ void CPURawDelete(void* ptr);
  *
  * @param nbytes The size to be allocated.
  * @param stream The stream to be allocated on.
- * \return Pointer to the allocated memory.
+ * @return Pointer to the allocated memory.
  */
 void* CUDARawAlloc(size_t nbytes, cudaStream_t stream);
 

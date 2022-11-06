@@ -30,7 +30,7 @@ inline NDArray NullArray(const DGLDataType& dtype = DGLDataType{kDGLInt, 64, 1},
 }
 
 /*!
- * \return Whether the input array is a null array.
+ * @return Whether the input array is a null array.
  */
 inline bool IsNullArray(NDArray array) {
   return array->shape[0] == 0;
@@ -41,7 +41,7 @@ inline bool IsNullArray(NDArray array) {
  * @param length The array length
  * @param ctx The array context
  * @param nbits The number of integer bits
- * \return id array
+ * @return id array
  */
 IdArray NewIdArray(int64_t length,
                    DGLContext ctx = DGLContext{kDGLCPU, 0},
@@ -52,7 +52,7 @@ IdArray NewIdArray(int64_t length,
  * @param vec The vector data
  * @param nbits The integer bits of the returned array
  * @param ctx The array context
- * \return the id array
+ * @return the id array
  */
 template <typename T>
 IdArray VecToIdArray(const std::vector<T>& vec,
@@ -65,7 +65,7 @@ IdArray VecToIdArray(const std::vector<T>& vec,
  * @param high Higher bound (exclusive).
  * @param nbits result array's bits (32 or 64)
  * @param ctx Device context
- * \return range array
+ * @return range array
  */
 IdArray Range(int64_t low, int64_t high, uint8_t nbits, DGLContext ctx);
 
@@ -75,7 +75,7 @@ IdArray Range(int64_t low, int64_t high, uint8_t nbits, DGLContext ctx);
  * @param length Number of elements.
  * @param nbits result array's bits (32 or 64)
  * @param ctx Device context
- * \return the result array
+ * @return the result array
  */
 IdArray Full(int64_t val, int64_t length, uint8_t nbits, DGLContext ctx);
 
@@ -84,7 +84,7 @@ IdArray Full(int64_t val, int64_t length, uint8_t nbits, DGLContext ctx);
  * @param val The value to fill.
  * @param length Number of elements.
  * @param ctx Device context
- * \return the result array
+ * @return the result array
  */
 template <typename DType>
 NDArray Full(DType val, int64_t length, DGLContext ctx);
@@ -207,7 +207,7 @@ NDArray Repeat(NDArray array, IdArray repeats);
  * 2, 1 maps to 3, so on and so forth.
  *
  * @param arrays The id arrays to relabel.
- * \return mapping array M from new id to old id.
+ * @return mapping array M from new id to old id.
  */
 IdArray Relabel_(const std::vector<IdArray>& arrays);
 
@@ -220,7 +220,7 @@ IdArray Relabel_(const std::vector<IdArray>& arrays);
  * Return [2, 3, 10, 0, 2, 4, 10, 5]
  *
  * @param arrays The id arrays to concatenate.
- * \return concatenated array.
+ * @return concatenated array.
  */
 NDArray Concat(const std::vector<IdArray>& arrays);
 
@@ -242,7 +242,7 @@ inline bool IsValidIdArray(const dgl::runtime::NDArray& arr) {
  *
  * @param array The tensor containing sequences padded to the same length
  * @param pad_value The padding value
- * \return A triplet of packed tensor, the length tensor, and the offset tensor
+ * @return A triplet of packed tensor, the length tensor, and the offset tensor
  *
  * @note Example: consider the following array with padding value -1:
  *
@@ -287,7 +287,7 @@ std::tuple<NDArray, IdArray, IdArray> Pack(NDArray array, ValueType pad_value);
  *
  * @param array A 1D or 2D tensor for slicing
  * @param lengths A 1D tensor indicating the number of elements to slice
- * \return The tensor with packed slices along with the offsets.
+ * @return The tensor with packed slices along with the offsets.
  */
 std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths);
 
@@ -303,7 +303,7 @@ std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths);
  * an indptr array over a count array.
  *
  * @param array The 1D input array.
- * \return Array after cumsum.
+ * @return Array after cumsum.
  */
 IdArray CumSum(IdArray array, bool prepend_zero = false);
 
@@ -313,7 +313,7 @@ IdArray CumSum(IdArray array, bool prepend_zero = false);
  * Only support 1D array. The result index array is in int64.
  *
  * @param array The input array.
- * \return A 1D index array storing the positions of the non zero values.
+ * @return A 1D index array storing the positions of the non zero values.
  */
 IdArray NonZero(NDArray array);
 
@@ -330,7 +330,7 @@ IdArray NonZero(NDArray array);
  *                 speed up the sorting if the underlying sorting algorithm is radix sort (e.g., on GPU).
  *                 Setting it to zero (default value) means using all the bits for comparison.
  *                 On CPU, it currently has no effect.
- * \return A pair of arrays: sorted values and sorted index to the original position.
+ * @return A pair of arrays: sorted values and sorted index to the original position.
  */
 std::pair<IdArray, IdArray> Sort(IdArray array, int num_bits = 0);
 

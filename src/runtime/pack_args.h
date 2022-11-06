@@ -38,7 +38,7 @@ union ArgUnion {
  * @param arg_types The arguments type information.
  * \tparam F the function type
  *
- * \return The wrapped packed function.
+ * @return The wrapped packed function.
  */
 template <typename F>
 inline PackedFunc PackFuncVoidAddr(
@@ -51,7 +51,7 @@ inline PackedFunc PackFuncVoidAddr(
  * @param arg_types The arguments type information.
  * \tparam F the function type
  *
- * \return The wrapped packed function.
+ * @return The wrapped packed function.
  */
 template <typename F>
 inline PackedFunc PackFuncNonBufferArg(
@@ -65,7 +65,7 @@ inline PackedFunc PackFuncNonBufferArg(
  * @param arg_types The arguments that wish to get from
  * \tparam F the function type
  *
- * \return The wrapped packed function.
+ * @return The wrapped packed function.
  */
 template <typename F>
 inline PackedFunc PackFuncPackedArg(
@@ -73,7 +73,7 @@ inline PackedFunc PackFuncPackedArg(
 /*!
  * @brief Extract number of buffer argument from the argument types.
  * @param arg_types The argument types.
- * \return number of buffer arguments
+ * @return number of buffer arguments
  */
 inline size_t NumBufferArgs(const std::vector<DGLDataType>& arg_types);
 

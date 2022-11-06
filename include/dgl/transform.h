@@ -29,7 +29,7 @@ namespace transform {
  * @param always_preserve The list of nodes to preserve regardless of whether
  * the inbound or outbound edges exist.
  *
- * \return A pair.  The first element is the list of compacted graphs, and the
+ * @return A pair.  The first element is the list of compacted graphs, and the
  * second element is the mapping from the compacted graphs and the original
  * graph.
  */
@@ -70,7 +70,7 @@ std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>> CompactGraphs(
  * @param include_rhs_in_lhs If false, do not include the nodes of node type \c
  * ntype_r in \c ntype_l.
  *
- * \return A triplet containing
+ * @return A triplet containing
  *         * The bipartite-structured graph,
  *         * The induced node from the left side for each graph,
  *         * The induced edges.
@@ -86,7 +86,7 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>> ToBlock(
 /*!
  * @brief Convert a multigraph to a simple graph.
  *
- * \return A triplet of
+ * @return A triplet of
  * * \c hg : The said simple graph.
  * * \c count : The array of edge occurrences per edge type.
  * * \c edge_map : The mapping from original edge IDs to new edge IDs per edge
@@ -122,7 +122,7 @@ ToSimpleGraph(const HeteroGraphPtr graph);
  * @param graph The graph.
  * @param eids The edge IDs to remove per edge type.
  *
- * \return A pair of the graph with edges removed, as well as the edge ID
+ * @return A pair of the graph with edges removed, as well as the edge ID
  * mapping from the original graph to the new graph per edge type.
  */
 std::pair<HeteroGraphPtr, std::vector<IdArray>> RemoveEdges(

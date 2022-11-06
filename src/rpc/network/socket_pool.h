@@ -48,7 +48,7 @@ class SocketPool {
   /*!
    * @brief Remove socket from SocketPool
    * @param socket tcp socket to remove
-   * \return number of remaing sockets in the pool
+   * @return number of remaing sockets in the pool
    */
   size_t RemoveSocket(std::shared_ptr<TCPSocket> socket);
 
@@ -60,7 +60,7 @@ class SocketPool {
   /*!
    * @brief Get current active socket. This is a blocking method
    * @param socket_id output parameter of the socket_id of active socket
-   * \return active TCPSocket
+   * @return active TCPSocket
    */
   std::shared_ptr<TCPSocket> GetActiveSocket(int* socket_id);
 

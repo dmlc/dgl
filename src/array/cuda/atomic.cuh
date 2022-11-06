@@ -180,7 +180,7 @@ DEFINE_ATOMIC(Add)
 * @param compare The value to compare to.
 * @param val The new value to conditionally store.
 *
-* \return The old value at the address.
+* @return The old value at the address.
 */
 inline __device__ int64_t AtomicCAS(
     int64_t * const address,
@@ -206,7 +206,7 @@ inline __device__ int64_t AtomicCAS(
 * @param compare The value to compare to.
 * @param val The new value to conditionally store.
 *
-* \return The old value at the address.
+* @return The old value at the address.
 */
 inline __device__ int32_t AtomicCAS(
     int32_t * const address,
