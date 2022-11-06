@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file array/cuda/gather_mm.cu
  * @brief GatherMM C APIs and definitions.
@@ -15,7 +15,7 @@ namespace aten {
 
 namespace {
 
-/*! @brief Call cuBLAS GEMM API for dense matmul operation for float and double. */
+/** @brief Call cuBLAS GEMM API for dense matmul operation for float and double. */
 template <typename DType>
 cublasStatus_t cublasGemm(cublasHandle_t handle, cublasOperation_t transa,
     cublasOperation_t transb, int m, int n, int k,
@@ -198,7 +198,7 @@ __global__ void GatherMMScatterKernel2(
 
 }  // namespace cuda
 
-/*!
+/**
  * @brief Implementation of Gather_mm operator. The input matrix A is
  *        expected to be sorted according to relation type.
  * @param A The input dense matrix of dimension m x k
@@ -309,7 +309,7 @@ void SegmentMMBackwardB(const NDArray A,
     }
 }
 
-/*!
+/**
  * @brief Implementation of Gather_mm operator. The input matrix A is
  *        expected to be sorted according to relation type.
  * @param A The input dense matrix of dimension m x k
@@ -346,7 +346,7 @@ void GatherMM(const NDArray A,
         tot_num_rows, in_len, out_len);
 }
 
-/*!
+/**
  * @brief Implementation of Gather_mm operator. The input matrix A is
  *        expected to be sorted according to relation type.
  * @param A The input dense matrix of dimension m x k

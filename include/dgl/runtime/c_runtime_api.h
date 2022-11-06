@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2016-2022 by Contributors
  * @file dgl/runtime/c_runtime_api.h
  * @brief DGL runtime library.
@@ -41,10 +41,10 @@ extern "C" {
 #include <stddef.h>
 #include <stdint.h>
 
-/*! @brief type of array index. */
+/** @brief type of array index. */
 typedef int64_t dgl_index_t;
 
-/*!
+/**
  * @brief The device type in DGLContext.
  */
 #ifdef __cplusplus
@@ -52,14 +52,14 @@ typedef enum : int32_t {
 #else
 typedef enum {
 #endif
-  /*! @brief CPU device */
+  /** @brief CPU device */
   kDGLCPU = 1,
-  /*! @brief CUDA GPU device */
+  /** @brief CUDA GPU device */
   kDGLCUDA = 2,
   // add more devices once supported
 } DGLDeviceType;
 
-/*!
+/**
  * @brief The object type code is used in DGL FFI to indicate the types of
  *        objects passed between C and Python.
  */
@@ -90,22 +90,22 @@ typedef enum {
   kExtEnd = 128U
 } DGLObjectTypeCode;
 
-/*!
+/**
  * @brief The type code options DGLDataType.
  */
 typedef enum {
-  /*! @brief signed integer */
+  /** @brief signed integer */
   kDGLInt = 0U,
-  /*! @brief unsigned integer */
+  /** @brief unsigned integer */
   kDGLUInt = 1U,
-  /*! @brief IEEE floating point */
+  /** @brief IEEE floating point */
   kDGLFloat = 2U,
-  /*! @brief bfloat16 */
+  /** @brief bfloat16 */
   kDGLBfloat = 4U,
   // add more data types if we are going to support them
 } DGLDataTypeCode;
 
-/*!
+/**
  * @brief The data type the tensor can hold. The data type is assumed to follow
  * the native endian-ness. An explicit error message should be raised when
  * attempting to export an array with non-native endianness
@@ -116,39 +116,39 @@ typedef enum {
  *   - int8: type_code = 0, bits = 8, lanes=1
  */
 typedef struct {
-  /*!
+  /**
    * @brief Type code of base types.
    * We keep it uint8_t instead of DGLDataTypeCode for minimal memory
    * footprint, but the value should be one of DGLDataTypeCode enum values.
    * */
   uint8_t code;
-  /*!
+  /**
    * @brief Number of bits, common choices are 8, 16, 32.
    */
   uint8_t bits;
-  /*! @brief Number of lanes in the type, used for vector types. */
+  /** @brief Number of lanes in the type, used for vector types. */
   uint16_t lanes;
 } DGLDataType;
 
-/*!
+/**
  * @brief The Device information, abstract away common device types.
  */
 typedef struct {
-  /*! @brief The device type used in the device. */
+  /** @brief The device type used in the device. */
   DGLDeviceType device_type;
-  /*!
+  /**
    * @brief The device index.
    * For vanilla CPU memory, pinned memory, or managed memory, this is set to 0.
    */
   int32_t device_id;
 } DGLContext;
 
-/*!
+/**
  * @brief The tensor array stucture to DGL API.
  * The structure is heavily inspired by DLTensor from DLPack.
  */
 typedef struct {
-  /*!
+  /**
    * @brief The data pointer points to the allocated data.
    *
    * Depending on the device context, it can be a CPU pointer, or a CUDA
@@ -178,27 +178,27 @@ typedef struct {
    * @endcode
    */
   void* data;
-  /*! @brief The device of the tensor */
+  /** @brief The device of the tensor */
   DGLContext ctx;
-  /*! @brief Number of dimensions */
+  /** @brief Number of dimensions */
   int32_t ndim;
-  /*! @brief The data type of the pointer*/
+  /** @brief The data type of the pointer*/
   DGLDataType dtype;
-  /*! @brief The shape of the tensor */
+  /** @brief The shape of the tensor */
   int64_t* shape;
-  /*!
+  /**
    * @brief strides of the tensor (in number of elements, not bytes)
    *  can be NULL, indicating tensor is compact and row-majored.
    */
   int64_t* strides;
-  /*! @brief The offset in bytes to the beginning pointer to data */
+  /** @brief The offset in bytes to the beginning pointer to data */
   uint64_t byte_offset;
 } DGLArray;
 
-/*! @brief the array handle */
+/** @brief the array handle */
 typedef DGLArray* DGLArrayHandle;
 
-/*!
+/**
  * @brief Union type of values
  *  being passed through API and function calls.
  */
@@ -211,7 +211,7 @@ typedef union {
   DGLContext v_ctx;
 } DGLValue;
 
-/*!
+/**
  * @brief Byte array type used to pass in byte array
  *  When kBytes is used as data type.
  */
@@ -220,26 +220,26 @@ typedef struct {
   size_t size;
 } DGLByteArray;
 
-/*! @brief Handle to DGL runtime modules. */
+/** @brief Handle to DGL runtime modules. */
 typedef void* DGLModuleHandle;
-/*! @brief Handle to packed function handle. */
+/** @brief Handle to packed function handle. */
 typedef void* DGLFunctionHandle;
-/*! @brief Handle to hold return value. */
+/** @brief Handle to hold return value. */
 typedef void* DGLRetValueHandle;
-/*!
+/**
  * @brief The stream that is specific to device
  * can be NULL, which indicates the default one.
  */
 typedef void* DGLStreamHandle;
 
-/*!
+/**
  * @brief Used for implementing C API function.
  *  Set last error message before return.
  * @param msg The error message to be set.
  */
 DGL_DLL void DGLAPISetLastError(const char* msg);
 
-/*!
+/**
  * @brief return str message of the last error
  *  all function in this file will return 0 when success
  *  and -1 when an error occured,
@@ -249,7 +249,7 @@ DGL_DLL void DGLAPISetLastError(const char* msg);
  *  \return error info
  */
 DGL_DLL const char* DGLGetLastError(void);
-/*!
+/**
  * @brief Load module from file.
  * @param file_name The file name to load the module from.
  * @param format The format of the module.
@@ -262,7 +262,7 @@ DGL_DLL const char* DGLGetLastError(void);
 DGL_DLL int DGLModLoadFromFile(
     const char* file_name, const char* format, DGLModuleHandle* out);
 
-/*!
+/**
  * @brief Add dep to mod's dependency.
  *  This allows functions in this module to use modules.
  *
@@ -272,7 +272,7 @@ DGL_DLL int DGLModLoadFromFile(
  */
 DGL_DLL int DGLModImport(DGLModuleHandle mod, DGLModuleHandle dep);
 
-/*!
+/**
  * @brief Get function from the module.
  * @param mod The module handle.
  * @param func_name The name of the function.
@@ -284,7 +284,7 @@ DGL_DLL int DGLModGetFunction(
     DGLModuleHandle mod, const char* func_name, int query_imports,
     DGLFunctionHandle* out);
 
-/*!
+/**
  * @brief Free front-end extension type resource.
  * @param handle The extension handle.
  * @param type_code The type of of the extension type.
@@ -292,7 +292,7 @@ DGL_DLL int DGLModGetFunction(
  */
 DGL_DLL int DGLExtTypeFree(void* handle, int type_code);
 
-/*!
+/**
  * @brief Free the Module
  * @param mod The module to be freed.
  *
@@ -305,14 +305,14 @@ DGL_DLL int DGLExtTypeFree(void* handle, int type_code);
  */
 DGL_DLL int DGLModFree(DGLModuleHandle mod);
 
-/*!
+/**
  * @brief Free the function when it is no longer needed.
  * @param func The function handle
  * @return 0 when success, -1 when failure happens
  */
 DGL_DLL int DGLFuncFree(DGLFunctionHandle func);
 
-/*!
+/**
  * @brief Call a Packed DGL Function.
  *
  * @param func node handle of the function.
@@ -336,7 +336,7 @@ DGL_DLL int DGLFuncCall(
     DGLFunctionHandle func, DGLValue* arg_values, int* type_codes, int num_args,
     DGLValue* ret_val, int* ret_type_code);
 
-/*!
+/**
  * @brief Set the return value of DGLPackedCFunc.
  *
  *  This function is called by DGLPackedCFunc to set the return value.
@@ -350,7 +350,7 @@ DGL_DLL int DGLFuncCall(
 DGL_DLL int DGLCFuncSetReturn(
     DGLRetValueHandle ret, DGLValue* value, int* type_code, int num_ret);
 
-/*!
+/**
  * @brief Inplace translate callback argument value to return value.
  *  This is only needed for non-POD arguments.
  *
@@ -362,7 +362,7 @@ DGL_DLL int DGLCFuncSetReturn(
  */
 DGL_DLL int DGLCbArgToReturn(DGLValue* value, int code);
 
-/*!
+/**
  * @brief C type of packed function.
  *
  * @param args The arguments
@@ -378,13 +378,13 @@ typedef int (*DGLPackedCFunc)(
     DGLValue* args, int* type_codes, int num_args, DGLRetValueHandle ret,
     void* resource_handle);
 
-/*!
+/**
  * @brief C callback to free the resource handle in C packed function.
  * @param resource_handle The handle additional resouce handle from fron-end.
  */
 typedef void (*DGLPackedCFuncFinalizer)(void* resource_handle);
 
-/*!
+/**
  * @brief Signature for extension function declarer.
  *
  *  DGL call this function to get the extension functions
@@ -395,7 +395,7 @@ typedef void (*DGLPackedCFuncFinalizer)(void* resource_handle);
  */
 typedef int (*DGLExtensionFuncDeclarer)(DGLFunctionHandle register_func_handle);
 
-/*!
+/**
  * @brief Wrap a DGLPackedCFunc to become a FunctionHandle.
  *
  * The resource_handle will be managed by DGL API, until the function is no
@@ -412,7 +412,7 @@ DGL_DLL int DGLFuncCreateFromCFunc(
     DGLPackedCFunc func, void* resource_handle, DGLPackedCFuncFinalizer fin,
     DGLFunctionHandle* out);
 
-/*!
+/**
  * @brief Register the function to runtime's global table.
  *
  * The registered function then can be pulled by the backend by the name.
@@ -424,7 +424,7 @@ DGL_DLL int DGLFuncCreateFromCFunc(
 DGL_DLL int DGLFuncRegisterGlobal(
     const char* name, DGLFunctionHandle f, int override);
 
-/*!
+/**
  * @brief Get a global function.
  *
  * @param name The name of the function.
@@ -435,7 +435,7 @@ DGL_DLL int DGLFuncRegisterGlobal(
  */
 DGL_DLL int DGLFuncGetGlobal(const char* name, DGLFunctionHandle* out);
 
-/*!
+/**
  * @brief List all the globally registered function name
  * @param out_size The number of functions
  * @param out_array The array of function names.
@@ -444,7 +444,7 @@ DGL_DLL int DGLFuncGetGlobal(const char* name, DGLFunctionHandle* out);
 DGL_DLL int DGLFuncListGlobalNames(int* out_size, const char*** out_array);
 
 // Array related apis for quick proptyping
-/*!
+/**
  * @brief Allocate a nd-array's memory,
  *  including space of shape, of given spec.
  *
@@ -462,7 +462,7 @@ DGL_DLL int DGLArrayAlloc(
     const dgl_index_t* shape, int ndim, int dtype_code, int dtype_bits,
     int dtype_lanes, int device_type, int device_id, DGLArrayHandle* out);
 
-/*!
+/**
  * @brief Allocate a nd-array's with shared memory,
  *  including space of shape, of given spec.
  *
@@ -480,14 +480,14 @@ int DGLArrayAllocSharedMem(
     const char* mem_name, const dgl_index_t* shape, int ndim, int dtype_code,
     int dtype_bits, int dtype_lanes, bool is_create, DGLArrayHandle* out);
 
-/*!
+/**
  * @brief Free the DGL Array.
  * @param handle The array handle to be freed.
  * @return 0 when success, -1 when failure happens
  */
 DGL_DLL int DGLArrayFree(DGLArrayHandle handle);
 
-/*!
+/**
  * @brief Copy array data from CPU byte array.
  * @param handle The array handle.
  * @param data the data pointer
@@ -497,7 +497,7 @@ DGL_DLL int DGLArrayFree(DGLArrayHandle handle);
 DGL_DLL int DGLArrayCopyFromBytes(
     DGLArrayHandle handle, void* data, size_t nbytes);
 
-/*!
+/**
  * @brief Copy array data to CPU byte array.
  * @param handle The array handle.
  * @param data the data pointer
@@ -507,7 +507,7 @@ DGL_DLL int DGLArrayCopyFromBytes(
 DGL_DLL int DGLArrayCopyToBytes(
     DGLArrayHandle handle, void* data, size_t nbytes);
 
-/*!
+/**
  * @brief Copy the array, both from and to must be valid during the copy.
  * @param from The array to be copied from.
  * @param to The target space.
@@ -515,7 +515,7 @@ DGL_DLL int DGLArrayCopyToBytes(
  */
 DGL_DLL int DGLArrayCopyFromTo(DGLArrayHandle from, DGLArrayHandle to);
 
-/*!
+/**
  * @brief Create a new runtime stream.
  *
  * @param device_type The device type of context
@@ -526,7 +526,7 @@ DGL_DLL int DGLArrayCopyFromTo(DGLArrayHandle from, DGLArrayHandle to);
 DGL_DLL int DGLStreamCreate(
     int device_type, int device_id, DGLStreamHandle* out);
 
-/*!
+/**
  * @brief Free a created stream handle.
  *
  * @param device_type The device type of context
@@ -537,7 +537,7 @@ DGL_DLL int DGLStreamCreate(
 DGL_DLL int DGLStreamFree(
     int device_type, int device_id, DGLStreamHandle stream);
 
-/*!
+/**
  * @brief Set the runtime stream of current thread to be stream.
  *  The subsequent calls to the same device_type
  *  will use the setted stream handle.
@@ -551,7 +551,7 @@ DGL_DLL int DGLStreamFree(
 DGL_DLL int DGLSetStream(
     int device_type, int device_id, DGLStreamHandle handle);
 
-/*!
+/**
  * @brief Get the runtime stream of current thread.
  *
  * @param device_type The device type of context
@@ -562,7 +562,7 @@ DGL_DLL int DGLSetStream(
 DGL_DLL int DGLGetStream(
     int device_type, int device_id, DGLStreamHandle* handle);
 
-/*!
+/**
  * @brief Wait until all computations on stream completes.
  *
  * @param device_type The device type of context
@@ -573,7 +573,7 @@ DGL_DLL int DGLGetStream(
 DGL_DLL int DGLSynchronize(
     int device_type, int device_id, DGLStreamHandle stream);
 
-/*!
+/**
  * @brief Synchronize two streams of execution.
  *
  * @param device_type The device type of context
@@ -585,28 +585,28 @@ DGL_DLL int DGLSynchronize(
 DGL_DLL int DGLStreamStreamSynchronize(
     int device_type, int device_id, DGLStreamHandle src, DGLStreamHandle dst);
 
-/*!
+/**
  * @brief Load tensor adapter.
  * @return 0 when success, -1 when failure happens.
  */
 DGL_DLL int DGLLoadTensorAdapter(const char* path);
 
-/*!
+/**
  * @brief Pin host memory.
  */
 int DGLArrayPinData(DGLArrayHandle handle, DGLContext ctx);
 
-/*!
+/**
  * @brief Unpin host memory.
  */
 int DGLArrayUnpinData(DGLArrayHandle handle, DGLContext ctx);
 
-/*!
+/**
  * @brief Record the stream that's using this tensor.
  */
 int DGLArrayRecordStream(DGLArrayHandle handle, DGLStreamHandle stream);
 
-/*!
+/**
  * @brief Bug report macro.
  *
  * This serves as a sanity check on system side to make sure the code is correct

@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2017 by Contributors
  * @file workspace_pool.h
  * @brief Workspace pool utility.
@@ -13,7 +13,7 @@
 
 namespace dgl {
 namespace runtime {
-/*!
+/**
  * @brief A workspace pool to manage
  *
  *  \note We have the following assumption about backend temporal
@@ -26,21 +26,21 @@ namespace runtime {
  */
 class WorkspacePool {
  public:
-  /*!
+  /**
    * @brief Create pool with specific device type and device.
    * @param device_type The device type.
    * @param device The device API.
    */
   WorkspacePool(DGLDeviceType device_type, std::shared_ptr<DeviceAPI> device);
-  /*! @brief destructor */
+  /** @brief destructor */
   ~WorkspacePool();
-  /*!
+  /**
    * @brief Allocate temporal workspace.
    * @param ctx The context of allocation.
    * @param size The size to be allocated.
    */
   void* AllocWorkspace(DGLContext ctx, size_t size);
-  /*!
+  /**
    * @brief Free temporal workspace in backend execution.
    *
    * @param ctx The context of allocation.
@@ -50,11 +50,11 @@ class WorkspacePool {
 
  private:
   class Pool;
-  /*! @brief pool of device local array */
+  /** @brief pool of device local array */
   std::vector<Pool*> array_;
-  /*! @brief device type this pool support */
+  /** @brief device type this pool support */
   DGLDeviceType device_type_;
-  /*! @brief The device API */
+  /** @brief The device API */
   std::shared_ptr<DeviceAPI> device_;
 };
 

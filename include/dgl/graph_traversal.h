@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file dgl/graph_traversal.h
  * @brief common graph traversal operations
@@ -12,7 +12,7 @@
 namespace dgl {
 
 ///////////////////////// Graph Traverse routines //////////////////////////
-/*!
+/**
  * @brief Class for representing frontiers.
  *
  * Each frontier is a list of nodes/edges (specified by their ids).
@@ -20,22 +20,22 @@ namespace dgl {
  * value).
  */
 struct Frontiers {
-  /*!\brief a vector store for the nodes/edges in all the frontiers */
+  /**\brief a vector store for the nodes/edges in all the frontiers */
   IdArray ids;
 
-  /*!
+  /**
    * @brief a vector store for node/edge tags. Dtype is int64.
    * Empty if no tags are requested
    */
   IdArray tags;
 
-  /*!\brief a section vector to indicate each frontier Dtype is int64. */
+  /**\brief a section vector to indicate each frontier Dtype is int64. */
   IdArray sections;
 };
 
 namespace aten {
 
-/*!
+/**
  * @brief Traverse the graph in a breadth-first-search (BFS) order.
  *
  * @param csr The input csr matrix.
@@ -44,7 +44,7 @@ namespace aten {
  */
 Frontiers BFSNodesFrontiers(const CSRMatrix& csr, IdArray source);
 
-/*!
+/**
  * @brief Traverse the graph in a breadth-first-search (BFS) order, returning
  *        the edges of the BFS tree.
  *
@@ -54,7 +54,7 @@ Frontiers BFSNodesFrontiers(const CSRMatrix& csr, IdArray source);
  */
 Frontiers BFSEdgesFrontiers(const CSRMatrix& csr, IdArray source);
 
-/*!
+/**
  * @brief Traverse the graph in topological order.
  *
  * @param csr The input csr matrix.
@@ -62,7 +62,7 @@ Frontiers BFSEdgesFrontiers(const CSRMatrix& csr, IdArray source);
  */
 Frontiers TopologicalNodesFrontiers(const CSRMatrix& csr);
 
-/*!
+/**
  * @brief Traverse the graph in a depth-first-search (DFS) order.
  *
  * @param csr The input csr matrix.
@@ -71,7 +71,7 @@ Frontiers TopologicalNodesFrontiers(const CSRMatrix& csr);
  */
 Frontiers DGLDFSEdges(const CSRMatrix& csr, IdArray source);
 
-/*!
+/**
  * @brief Traverse the graph in a depth-first-search (DFS) order and return the
  *        recorded edge tag if return_labels is specified.
  *

@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file array/cpu/spmm_binary_ops.h
  * @brief SPMM CPU Binary ops.

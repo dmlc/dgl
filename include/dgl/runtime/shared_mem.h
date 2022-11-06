@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2017 by Contributors
  * @file dgl/runtime/ndarray.h
  * @brief shared memory management.

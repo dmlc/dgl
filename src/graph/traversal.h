@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2018 by Contributors
  * @file graph/traversal.h
  * @brief Graph traversal routines.
@@ -20,7 +20,7 @@
 namespace dgl {
 namespace traverse {
 
-/*!
+/**
  * @brief Traverse the graph in a breadth-first-search (BFS) order.
  *
  * The queue object must suffice following interface:
@@ -81,7 +81,7 @@ void BFSNodes(
   }
 }
 
-/*!
+/**
  * @brief Traverse the graph in a breadth-first-search (BFS) order, returning
  *        the edges of the BFS tree.
  *
@@ -145,7 +145,7 @@ void BFSEdges(
   }
 }
 
-/*!
+/**
  * @brief Traverse the graph in topological order.
  *
  * The queue object must suffice following interface:
@@ -212,13 +212,13 @@ void TopologicalNodes(
   }
 }
 
-/*!\brief Tags for ``DFSEdges``. */
+/**\brief Tags for ``DFSEdges``. */
 enum DFSEdgeTag {
   kForward = 0,
   kReverse,
   kNonTree,
 };
-/*!
+/**
  * @brief Traverse the graph in a depth-first-search (DFS) order.
  *
  * The traversal visit edges in its DFS order. Edges have three tags:

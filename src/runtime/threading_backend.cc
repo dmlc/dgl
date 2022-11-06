@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2018 by Contributors
  * @file threading_backend.cc
  * @brief Native threading backend

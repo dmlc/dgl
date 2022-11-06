@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
  * @file dgl/runtime/c_object_api.h
  *
@@ -16,17 +16,17 @@
 extern "C" {
 #endif
 
-/*! @brief handle to object */
+/** @brief handle to object */
 typedef void* ObjectHandle;
 
-/*!
+/**
  * @brief free the object handle
  * @param handle The object handle to be freed.
  * @return 0 when success, -1 when failure happens
  */
 DGL_DLL int DGLObjectFree(ObjectHandle handle);
 
-/*!
+/**
  * @brief Convert type key to type index.
  * @param type_key The key of the type.
  * @param out_index the corresponding type index.
@@ -34,7 +34,7 @@ DGL_DLL int DGLObjectFree(ObjectHandle handle);
  */
 DGL_DLL int DGLObjectTypeKey2Index(const char* type_key, int* out_index);
 
-/*!
+/**
  * @brief Get runtime type index of the object.
  * @param handle the object handle.
  * @param out_index the corresponding type index.
@@ -42,7 +42,7 @@ DGL_DLL int DGLObjectTypeKey2Index(const char* type_key, int* out_index);
  */
 DGL_DLL int DGLObjectGetTypeIndex(ObjectHandle handle, int* out_index);
 
-/*!
+/**
  * @brief get attributes given key
  * @param handle The object handle
  * @param key The attribute name
@@ -56,7 +56,7 @@ DGL_DLL int DGLObjectGetAttr(
     ObjectHandle handle, const char* key, DGLValue* out_value,
     int* out_type_code, int* out_success);
 
-/*!
+/**
  * @brief get attributes names in the object.
  * @param handle The object handle
  * @param out_size The number of functions

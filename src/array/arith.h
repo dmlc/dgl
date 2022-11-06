@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
  * @file array/arith.h
  * @brief Arithmetic functors

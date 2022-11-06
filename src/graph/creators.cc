@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file graph/creators.cc
  * @brief Functions for constructing graphs.

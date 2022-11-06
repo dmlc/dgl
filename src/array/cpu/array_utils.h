@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
  * @file dgl/array_utils.h
  * @brief Utility classes and functions for DGL arrays.
@@ -18,7 +18,7 @@
 namespace dgl {
 namespace aten {
 
-/*!
+/**
  * @brief A hashmap that maps each ids in the given array to new ids starting
  * from zero.
  *

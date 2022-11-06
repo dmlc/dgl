@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file dgl/sampling/neighbor.h
  * @brief Neighborhood-based sampling.
@@ -14,7 +14,7 @@
 namespace dgl {
 namespace sampling {
 
-/*!
+/**
  * @brief Sample from the neighbors of the given nodes and return the sampled
  * edges as a graph.
  *
@@ -47,7 +47,7 @@ HeteroSubgraph SampleNeighbors(
     const std::vector<FloatArray>& probability,
     const std::vector<IdArray>& exclude_edges, bool replace = true);
 
-/*!
+/**
  * Select the neighbors with k-largest weights on the connecting edges for each
  * given node.
  *

@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
  * @file array/cpu/array_scatter.cc
  * @brief Array scatter CPU implementation

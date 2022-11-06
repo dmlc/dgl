@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file array/cuda/csr2coo.cc
  * @brief CSR2COO
@@ -45,7 +45,7 @@ COOMatrix CSRToCOO<kDGLCUDA, int32_t>(CSRMatrix csr) {
       csr.num_rows, csr.num_cols, row, indices, data, true, csr.sorted);
 }
 
-/*!
+/**
  * @brief Repeat elements
  * @param val Value to repeat
  * @param repeats Number of repeats for each value

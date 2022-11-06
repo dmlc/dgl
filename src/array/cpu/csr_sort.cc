@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file array/cpu/csr_sort.cc
  * @brief CSR sorting

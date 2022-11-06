@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file array/cpu/rowwise_pick.h
  * @brief Template implementation for rowwise pick operators.

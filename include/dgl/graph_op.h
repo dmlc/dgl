@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2018 by Contributors
  * @file dgl/graph_op.h
  * @brief Operations on graph index.
@@ -15,7 +15,7 @@ namespace dgl {
 
 class GraphOp {
  public:
-  /*!
+  /**
    * @brief Return a new graph with all the edges reversed.
    *
    * The returned graph preserves the vertex and edge index in the original
@@ -25,7 +25,7 @@ class GraphOp {
    */
   static GraphPtr Reverse(GraphPtr graph);
 
-  /*!
+  /**
    * @brief Return the line graph.
    *
    * If i~j and j~i are two edges in original graph G, then
@@ -38,7 +38,7 @@ class GraphOp {
    */
   static GraphPtr LineGraph(GraphPtr graph, bool backtracking);
 
-  /*!
+  /**
    * @brief Return a disjoint union of the input graphs.
    *
    * The new graph will include all the nodes/edges in the given graphs.
@@ -55,7 +55,7 @@ class GraphOp {
    */
   static GraphPtr DisjointUnion(std::vector<GraphPtr> graphs);
 
-  /*!
+  /**
    * @brief Partition the graph into several subgraphs.
    *
    * This is a reverse operation of DisjointUnion. The graph will be partitioned
@@ -72,7 +72,7 @@ class GraphOp {
   static std::vector<GraphPtr> DisjointPartitionByNum(
       GraphPtr graph, int64_t num);
 
-  /*!
+  /**
    * @brief Partition the graph into several subgraphs.
    *
    * This is a reverse operation of DisjointUnion. The graph will be partitioned
@@ -89,7 +89,7 @@ class GraphOp {
   static std::vector<GraphPtr> DisjointPartitionBySizes(
       GraphPtr graph, IdArray sizes);
 
-  /*!
+  /**
    * @brief Map vids in the parent graph to the vids in the subgraph.
    *
    * If the Id doesn't exist in the subgraph, -1 will be used.
@@ -102,7 +102,7 @@ class GraphOp {
    */
   static IdArray MapParentIdToSubgraphId(IdArray parent_vid_map, IdArray query);
 
-  /*!
+  /**
    * @brief Expand an Id array based on the offset array.
    *
    * For example,
@@ -118,14 +118,14 @@ class GraphOp {
    */
   static IdArray ExpandIds(IdArray ids, IdArray offset);
 
-  /*!
+  /**
    * @brief Convert the graph to a simple graph.
    * @param graph The input graph.
    * @return a new immutable simple graph with no multi-edge.
    */
   static GraphPtr ToSimpleGraph(GraphPtr graph);
 
-  /*!
+  /**
    * @brief Convert the graph to a mutable bidirected graph.
    *
    * If the original graph has m edges for i -> j and n edges for
@@ -137,7 +137,7 @@ class GraphOp {
    */
   static GraphPtr ToBidirectedMutableGraph(GraphPtr graph);
 
-  /*!
+  /**
    * @brief Same as BidirectedMutableGraph except that the returned graph is
    *        immutable.
    * @param graph The input graph.
@@ -145,7 +145,7 @@ class GraphOp {
    * graph.
    */
   static GraphPtr ToBidirectedImmutableGraph(GraphPtr graph);
-  /*!
+  /**
    * @brief Same as BidirectedMutableGraph except that the returned graph is
    * immutable and call gk_csr_MakeSymmetric in GKlib. This is more efficient
    * than ToBidirectedImmutableGraph. It return a null pointer if the conversion
@@ -156,7 +156,7 @@ class GraphOp {
    */
   static GraphPtr ToBidirectedSimpleImmutableGraph(ImmutableGraphPtr ig);
 
-  /*!
+  /**
    * @brief Get a induced subgraph with HALO nodes.
    * The HALO nodes are the ones that can be reached from `nodes` within
    * `num_hops`.
@@ -168,7 +168,7 @@ class GraphOp {
   static HaloSubgraph GetSubgraphWithHalo(
       GraphPtr graph, IdArray nodes, int num_hops);
 
-  /*!
+  /**
    * @brief Reorder the nodes in the immutable graph.
    * @param graph The input graph.
    * @param new_order The node Ids in the new graph. The index in `new_order` is

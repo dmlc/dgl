@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
  * @file tp_communicator.cc
  * @brief Tensorpipe Communicator for DGL distributed training.

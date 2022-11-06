@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
  * @file test_unit_graph.cc
  * @brief Test UnitGraph

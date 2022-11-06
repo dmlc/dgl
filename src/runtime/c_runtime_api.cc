@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2016-2022 by Contributors
  * @file c_runtime_api.cc
  * @brief Runtime API implementation
@@ -22,7 +22,7 @@
 namespace dgl {
 namespace runtime {
 
-/*!
+/**
  * @brief The name of Device API factory.
  * @param type The device type.
  */

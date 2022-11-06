@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2021 by Contributors
  * @file runtime/cuda/cuda_device_common.cuh
  * @brief Device level functions for within cuda kernels.
@@ -19,7 +19,7 @@ namespace cuda {
 template <typename>
 class OrderedHashTable;
 
-/*!
+/**
  * @brief A device-side handle for a GPU hashtable for mapping items to the
  * first index at which they appear in the provided data array.
  *
@@ -179,7 +179,7 @@ class DeviceOrderedHashTable {
   friend class OrderedHashTable<IdType>;
 };
 
-/*!
+/**
  * @brief A host-side handle for a GPU hashtable for mapping items to the
  * first index at which they appear in the provided data array. This host-side
  * handle is responsible for allocating and free the GPU memory of the

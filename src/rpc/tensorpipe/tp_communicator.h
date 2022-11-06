@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
  * @file tp_communicator.h
  * @brief Tensorpipe Communicator for DGL distributed training.
@@ -25,14 +25,14 @@ namespace rpc {
 
 typedef Queue<RPCMessage> RPCMessageQueue;
 
-/*!
+/**
  * @brief TPSender for DGL distributed training.
  *
  * TPSender is the communicator implemented by tcp socket.
  */
 class TPSender : public RPCSender {
  public:
-  /*!
+  /**
    * @brief Sender constructor
    * @param queue_size size of message queue
    */
@@ -41,12 +41,12 @@ class TPSender : public RPCSender {
     this->context = ctx;
   }
 
-  /*!
+  /**
    * @brief Sender destructor
    */
   ~TPSender() { Finalize(); }
 
-  /*!
+  /**
    * @brief Connect to a receiver.
    *
    * When there are multiple receivers to be connected, application will call
@@ -62,19 +62,19 @@ class TPSender : public RPCSender {
    */
   bool ConnectReceiver(const std::string& addr, int recv_id) override;
 
-  /*!
+  /**
    * @brief Send RPCMessage to specified Receiver.
    * @param msg data message
    * @param recv_id receiver's ID
    */
   void Send(const RPCMessage& msg, int recv_id) override;
 
-  /*!
+  /**
    * @brief Finalize TPSender
    */
   void Finalize() override;
 
-  /*!
+  /**
    * @brief Communicator type: 'tp'
    */
   const std::string& NetType() const override {
@@ -83,31 +83,31 @@ class TPSender : public RPCSender {
   }
 
  private:
-  /*!
+  /**
    * @brief global context of tensorpipe
    */
   std::shared_ptr<tensorpipe::Context> context;
 
-  /*!
+  /**
    * @brief pipe for each connection of receiver
    */
   std::unordered_map<int /* receiver ID */, std::shared_ptr<tensorpipe::Pipe>>
       pipes_;
 
-  /*!
+  /**
    * @brief receivers' listening address
    */
   std::unordered_map<int /* receiver ID */, std::string> receiver_addrs_;
 };
 
-/*!
+/**
  * @brief TPReceiver for DGL distributed training.
  *
  * Tensorpipe Receiver is the communicator implemented by tcp socket.
  */
 class TPReceiver : public RPCReceiver {
  public:
-  /*!
+  /**
    * @brief Receiver constructor
    * @param queue_size size of message queue.
    */
@@ -117,12 +117,12 @@ class TPReceiver : public RPCReceiver {
     queue_ = std::make_shared<RPCMessageQueue>();
   }
 
-  /*!
+  /**
    * @brief Receiver destructor
    */
   ~TPReceiver() { Finalize(); }
 
-  /*!
+  /**
    * @brief Wait for all the Senders to connect
    * @param addr Networking address, e.g., 'tcp://127.0.0.1:50051'
    * @param num_sender total number of Senders
@@ -134,7 +134,7 @@ class TPReceiver : public RPCReceiver {
   bool Wait(
       const std::string& addr, int num_sender, bool blocking = true) override;
 
-  /*!
+  /**
    * @brief Recv RPCMessage from Sender. Actually removing data from queue.
    * @param msg pointer of RPCmessage
    * @param timeout The timeout value in milliseconds. If zero, wait
@@ -143,14 +143,14 @@ class TPReceiver : public RPCReceiver {
    */
   RPCStatus Recv(RPCMessage* msg, int timeout) override;
 
-  /*!
+  /**
    * @brief Finalize SocketReceiver
    *
    * Finalize() is not thread-safe and only one thread can invoke this API.
    */
   void Finalize() override;
 
-  /*!
+  /**
    * @brief Communicator type: 'tp' (tensorpipe)
    */
   const std::string& NetType() const override {
@@ -158,7 +158,7 @@ class TPReceiver : public RPCReceiver {
     return net_type;
   }
 
-  /*!
+  /**
    * @brief Issue a receive request on pipe, and push the result into queue
    */
   static void ReceiveFromPipe(
@@ -166,45 +166,45 @@ class TPReceiver : public RPCReceiver {
       std::shared_ptr<RPCMessageQueue> queue);
 
  private:
-  /*!
+  /**
    * @brief Callback for new connection is accepted.
    */
   void OnAccepted(const tensorpipe::Error&, std::shared_ptr<tensorpipe::Pipe>);
 
  private:
-  /*!
+  /**
    * @brief number of sender
    */
   int num_sender_;
 
-  /*!
+  /**
    * @brief listener to build pipe
    */
   std::shared_ptr<tensorpipe::Listener> listener;
 
-  /*!
+  /**
    * @brief global context of tensorpipe
    */
   std::shared_ptr<tensorpipe::Context> context;
 
-  /*!
+  /**
    * @brief pipe for each client connections
    */
   std::unordered_map<
       int /* Sender (virutal) ID */, std::shared_ptr<tensorpipe::Pipe>>
       pipes_;
 
-  /*!
+  /**
    * @brief RPCMessage queue
    */
   std::shared_ptr<RPCMessageQueue> queue_;
 
-  /*!
+  /**
    * @brief number of accepted connections
    */
   std::atomic<int32_t> num_connected_{0};
 
-  /*!
+  /**
    * @brief listner
    */
   std::shared_ptr<tensorpipe::Listener> listener_{nullptr};

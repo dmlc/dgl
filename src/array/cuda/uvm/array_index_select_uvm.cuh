@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2021 by Contributors
  * @file array/cpu/array_index_select_uvm.cuh
  * @brief Array index select GPU kernel implementation

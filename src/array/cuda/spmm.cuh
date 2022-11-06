@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file array/cuda/spmm.cuh
  * @brief SPMM CUDA kernel function header.
@@ -21,7 +21,7 @@ using namespace cuda;
 
 namespace aten {
 
-/*!
+/**
  * @brief Determine whether cusparse SpMM function is applicable.
  */
 template <typename DType, typename IdType>
@@ -41,7 +41,7 @@ inline bool cusparse_available(bool more_nnz_than_matrix_size) {
 
 namespace {
 
-/*! @brief Call cuBLAS geam API for transpose operation for float and double. */
+/** @brief Call cuBLAS geam API for transpose operation for float and double. */
 template <typename DType>
 cublasStatus_t Xgeam(cublasHandle_t handle, cublasOperation_t transa,
     cublasOperation_t transb, int m, int n,
@@ -247,7 +247,7 @@ cusparseStatus_t Xcsrmm2<double>(cusparseHandle_t handle, cusparseOperation_t tr
 }
 #endif
 
-/*! Cusparse implementation of SpMM on Csr format. */
+/** Cusparse implementation of SpMM on Csr format. */
 template <typename DType, typename IdType>
 void CusparseCsrmm2(
     const DGLContext& ctx,
@@ -347,7 +347,7 @@ void CusparseCsrmm2(
     device->FreeWorkspace(ctx, valptr);
 }
 
-/*! Cusparse implementation of SpMM on Csr format. */
+/** Cusparse implementation of SpMM on Csr format. */
 template <typename DType, typename IdType>
 void CusparseCsrmm2Hetero(
     const DGLContext& ctx,
@@ -476,7 +476,7 @@ void CusparseCsrmm2Hetero(
 namespace cuda {
 
 
-/*!
+/**
  * @brief CUDA kernel of g-SpMM on Coo format.
  * @note it uses edge parallel strategy, different threadblocks (on y-axis)
  *       is responsible for the computation on different edges. Threadblocks
@@ -525,7 +525,7 @@ __global__ void SpMMCooKernel(
   }
 }
 
-/*!
+/**
  * @brief CUDA kernel to compute argu and arge in g-SpMM on Coo format.
  * @note it uses edge parallel strategy, different threadblocks (on y-axis)
  *       is responsible for the computation on different edges. Threadblocks
@@ -573,7 +573,7 @@ __global__ void ArgSpMMCooKernel(
   }
 }
 
-/*!
+/**
  * @brief CUDA kernel of g-SpMM on Csr format.
  * @note it uses node parallel strategy, different threadblocks (on y-axis)
  *       is responsible for the computation on different destination nodes.
@@ -631,7 +631,7 @@ __global__ void SpMMCsrKernel(
   }
 }
 
-/*!
+/**
  * @brief CUDA kernel of SpMM-Min/Max on Csr format.
  * @note it uses node parallel strategy, different threadblocks (on y-axis)
  *       is responsible for the computation on different destination nodes.
@@ -692,7 +692,7 @@ __global__ void SpMMCmpCsrHeteroKernel(
   }
 }
 
-/*!
+/**
  * @brief CUDA implementation of g-SpMM on Coo format.
  * @param bcast Broadcast information.
  * @param coo The Coo matrix.
@@ -769,7 +769,7 @@ void SpMMCoo(
   });
 }
 
-/*!
+/**
  * @brief CUDA implementation of g-SpMM on Csr format.
  * @param bcast Broadcast information.
  * @param csr The Csr matrix.
@@ -824,7 +824,7 @@ void SpMMCsr(
   });
 }
 
-/*!
+/**
  * @brief CUDA kernel of SpMM-Min/Max on Csr format on heterogeneous graph.
  * @param bcast Broadcast information.
  * @param csr The Csr matrix.

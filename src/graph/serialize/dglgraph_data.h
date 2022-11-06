@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
  * @file graph/serialize/dglgraph_data.h
  * @brief Graph serialization header
@@ -56,7 +56,7 @@ class GraphData : public runtime::ObjectRef {
  public:
   DGL_DEFINE_OBJECT_REF_METHODS(GraphData, runtime::ObjectRef, GraphDataObject);
 
-  /*! @brief create a new GraphData reference */
+  /** @brief create a new GraphData reference */
   static GraphData Create() {
     return GraphData(std::make_shared<GraphDataObject>());
   }

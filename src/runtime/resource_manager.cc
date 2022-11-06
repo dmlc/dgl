@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file resource_manager.cc
  * @brief Manage the resources.

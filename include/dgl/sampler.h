@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2018 by Contributors
  * @file dgl/sampler.h
  * @brief DGL sampler header.
@@ -20,7 +20,7 @@ class ImmutableGraph;
 
 class SamplerOp {
  public:
-  /*!
+  /**
    * @brief Sample a graph from the seed vertices with neighbor sampling.
    * The neighbors are sampled with a uniform distribution.
    *
@@ -39,7 +39,7 @@ class SamplerOp {
       const std::string &edge_type, int num_hops, int expand_factor,
       const bool add_self_loop, const ValueType *probability);
 
-  /*!
+  /**
    * @brief Sample a graph from the seed vertices with layer sampling.
    * The layers are sampled with a uniform distribution.
    *

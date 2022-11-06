@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file graph/heterograph_capi.cc
  * @brief Heterograph CAPI bindings.

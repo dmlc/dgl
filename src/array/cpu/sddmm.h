@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file array/cpu/sddmm.h
  * @brief SDDMM CPU kernel function header.
@@ -16,7 +16,7 @@ namespace dgl {
 namespace aten {
 namespace cpu {
 
-/*!
+/**
  * @brief CPU kernel of g-SDDMM on Csr format.
  * @param bcast Broadcast information.
  * @param csr The Csr matrix.
@@ -68,7 +68,7 @@ void SDDMMCsr(
   });
 }
 
-/*!
+/**
  * @brief CPU kernel of g-SDDMM on Coo format.
  * @param bcast Broadcast information.
  * @param coo The COO matrix.

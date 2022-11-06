@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file array/cuda/spmm.cu
  * @brief SpGEAM C APIs and definitions.
@@ -16,7 +16,7 @@ using namespace dgl::runtime;
 namespace aten {
 namespace cusparse {
 
-/*! Cusparse implementation of SpSum on Csr format. */
+/** Cusparse implementation of SpSum on Csr format. */
 template <typename DType, typename IdType>
 std::pair<CSRMatrix, NDArray> CusparseCsrgeam2(
     const CSRMatrix& A,

@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
  * @file runtime/config.cc
  * @brief DGL runtime config

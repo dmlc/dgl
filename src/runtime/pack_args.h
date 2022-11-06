@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2017 by Contributors
  * @file pack_args.h
  * @brief Utility to pack DGLArgs to other type-erased fution calling
@@ -22,7 +22,7 @@
 
 namespace dgl {
 namespace runtime {
-/*!
+/**
  * @brief argument union type of 32bit.
  * Choose 32 bit because most GPU API do not work well with 64 bit.
  */
@@ -31,7 +31,7 @@ union ArgUnion {
   uint32_t v_uint32;
   float v_float32;
 };
-/*!
+/**
  * @brief Create a packed function from void addr types.
  *
  * @param f with signiture (DGLArgs args, DGLRetValue* rv, void* void_args)
@@ -43,7 +43,7 @@ union ArgUnion {
 template <typename F>
 inline PackedFunc PackFuncVoidAddr(
     F f, const std::vector<DGLDataType>& arg_types);
-/*!
+/**
  * @brief Create a packed function that from function only packs buffer
  * arguments.
  *
@@ -56,7 +56,7 @@ inline PackedFunc PackFuncVoidAddr(
 template <typename F>
 inline PackedFunc PackFuncNonBufferArg(
     F f, const std::vector<DGLDataType>& arg_types);
-/*!
+/**
  * @brief Create a packed function that from function that takes a packed
  * arguments.
  *
@@ -70,7 +70,7 @@ inline PackedFunc PackFuncNonBufferArg(
 template <typename F>
 inline PackedFunc PackFuncPackedArg(
     F f, const std::vector<DGLDataType>& arg_types);
-/*!
+/**
  * @brief Extract number of buffer argument from the argument types.
  * @param arg_types The argument types.
  * @return number of buffer arguments
@@ -98,7 +98,7 @@ class TempArray<T, 0> {
   std::vector<T> data_;
 };
 
-/*! @brief conversion code used in void arg. */
+/** @brief conversion code used in void arg. */
 enum ArgConvertCode {
   INT64_TO_INT64,
   INT64_TO_INT32,

@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2021 by Contributors
  * @file cuda_common.h
  * @brief Wrapper to place cub in dgl namespace.

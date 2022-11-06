@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020-2022 by Contributors
  * @file array/tensordispatch.h
  * @brief This file defines the dispatcher of tensor operators to
@@ -38,7 +38,7 @@
 #endif  // DGL_USE_CUDA
 #include "ndarray.h"
 
-/*!
+/**
  * @brief Casts a pointer \c entry to a function pointer with signature of \c
  * func.
  */
@@ -47,7 +47,7 @@
 namespace dgl {
 namespace runtime {
 
-/*!
+/**
  * @brief Dispatcher that delegates the function calls to framework-specific C++
  * APIs.
  *
@@ -55,19 +55,19 @@ namespace runtime {
  */
 class TensorDispatcher {
  public:
-  /*! @brief Get the singleton instance. */
+  /** @brief Get the singleton instance. */
   static TensorDispatcher* Global() {
     static TensorDispatcher inst;
     return &inst;
   }
 
-  /*! @brief Whether an adapter library is available. */
+  /** @brief Whether an adapter library is available. */
   inline bool IsAvailable() { return available_; }
 
-  /*! @brief Load symbols from the given tensor adapter library path. */
+  /** @brief Load symbols from the given tensor adapter library path. */
   bool Load(const char* path_cstr);
 
-  /*!
+  /**
    * @brief Allocate a piece of CPU memory via PyTorch's CPUAllocator.
    * Used in CPUDeviceAPI::AllocWorkspace().
    *
@@ -79,7 +79,7 @@ class TensorDispatcher {
     return FUNCCAST(tensoradapter::CPURawAlloc, entry)(nbytes);
   }
 
-  /*!
+  /**
    * @brief Free the CPU memory.
    * Used in CPUDeviceAPI::FreeWorkspace().
    *
@@ -91,7 +91,7 @@ class TensorDispatcher {
   }
 
 #ifdef DGL_USE_CUDA
-  /*!
+  /**
    * @brief Allocate a piece of GPU memory via
    * PyTorch's THCCachingAllocator.
    * Used in CUDADeviceAPI::AllocWorkspace().
@@ -109,7 +109,7 @@ class TensorDispatcher {
     return FUNCCAST(tensoradapter::CUDARawAlloc, entry)(nbytes, stream);
   }
 
-  /*!
+  /**
    * @brief Free the GPU memory.
    * Used in CUDADeviceAPI::FreeWorkspace().
    *
@@ -120,7 +120,7 @@ class TensorDispatcher {
     FUNCCAST(tensoradapter::CUDARawDelete, entry)(ptr);
   }
 
-  /*!
+  /**
    * @brief Find the current PyTorch CUDA stream
    * Used in runtime::getCurrentCUDAStream().
    *
@@ -136,7 +136,7 @@ class TensorDispatcher {
   }
 #endif  // DGL_USE_CUDA
 
-  /*!
+  /**
    * @brief Record streams that are using this tensor.
    * Used in NDArray::RecordStream().
    *
@@ -153,12 +153,12 @@ class TensorDispatcher {
   }
 
  private:
-  /*! @brief ctor */
+  /** @brief ctor */
   TensorDispatcher() = default;
-  /*! @brief dtor */
+  /** @brief dtor */
   ~TensorDispatcher();
 
-  /*!
+  /**
    * @brief List of symbols in the adapter library.
    *
    * Must match the functions in tensoradapter/include/tensoradapter.h.
@@ -170,7 +170,7 @@ class TensorDispatcher {
 #endif  // DGL_USE_CUDA
   };
 
-  /*! @brief Index of each function to the symbol list */
+  /** @brief Index of each function to the symbol list */
   class Op {
    public:
     static constexpr int kCPURawAlloc = 0;
@@ -183,10 +183,10 @@ class TensorDispatcher {
 #endif  // DGL_USE_CUDA
   };
 
-  /*! @brief Number of functions */
+  /** @brief Number of functions */
   static constexpr int num_entries_ = sizeof(names_) / sizeof(names_[0]);
 
-  /*! @brief Entrypoints of each function */
+  /** @brief Entrypoints of each function */
   void* entrypoints_[num_entries_] = {
       nullptr, nullptr,
 #ifdef DGL_USE_CUDA

@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file array/cuda/macro.cuh
  * @brief Macro to call SPMM/SDDMM cuda kernels.

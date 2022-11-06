@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file array/cuda/spmat_op_impl_csr.cu
  * @brief CSR operator CPU implementation
@@ -81,7 +81,7 @@ template NDArray CSRIsNonZero<kDGLCUDA, int64_t>(CSRMatrix, NDArray, NDArray);
 
 ///////////////////////////// CSRHasDuplicate /////////////////////////////
 
-/*!
+/**
  * @brief Check whether each row does not have any duplicate entries.
  * Assume the CSR is sorted.
  */
@@ -227,7 +227,7 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end) {
 template CSRMatrix CSRSliceRows<kDGLCUDA, int32_t>(CSRMatrix, int64_t, int64_t);
 template CSRMatrix CSRSliceRows<kDGLCUDA, int64_t>(CSRMatrix, int64_t, int64_t);
 
-/*!
+/**
  * @brief Copy data segment to output buffers
  *
  * For the i^th row r = row[i], copy the data from indptr[r] ~ indptr[r+1]
@@ -298,7 +298,7 @@ template CSRMatrix CSRSliceRows<kDGLCUDA, int64_t>(CSRMatrix, NDArray);
 
 ///////////////////////////// CSRGetDataAndIndices /////////////////////////////
 
-/*!
+/**
  * @brief Generate a 0-1 mask for each index that hits the provided (row, col)
  *        index.
  *
@@ -330,7 +330,7 @@ __global__ void _SegmentMaskKernel(
   }
 }
 
-/*!
+/**
  * @brief Search for the insertion positions for needle in the hay.
  *
  * The hay is a list of sorted elements and the result is the insertion position
@@ -423,7 +423,7 @@ template std::vector<NDArray> CSRGetDataAndIndices<kDGLCUDA, int64_t>(
 
 ///////////////////////////// CSRSliceMatrix /////////////////////////////
 
-/*!
+/**
  * @brief Generate a 0-1 mask for each index whose column is in the provided
  * set. It also counts the number of masked values per row.
  */

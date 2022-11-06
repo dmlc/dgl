@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
  * @file graph/heterograph.cc
  * @brief Heterograph implementation

@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file dgl/aten/macro.h
  * @brief Common macros for aten package.

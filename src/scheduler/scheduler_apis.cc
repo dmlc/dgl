@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2018 by Contributors
  * @file scheduler/scheduler_apis.cc
  * @brief DGL scheduler APIs

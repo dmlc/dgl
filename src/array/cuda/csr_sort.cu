@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file array/cuda/csr_sort.cc
  * @brief Sort CSR index
@@ -16,7 +16,7 @@ using runtime::NDArray;
 namespace aten {
 namespace impl {
 
-/*!
+/**
  * @brief Check whether each row is sorted.
  */
 template <typename IdType>

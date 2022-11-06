@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file graph/metis_partition.cc
  * @brief Call Metis partitioning

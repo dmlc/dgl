@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2017 by Contributors
  * @file workspace_pool.h
  * @brief Workspace pool utility.
@@ -108,14 +108,14 @@ class WorkspacePool::Pool {
   }
 
  private:
-  /*! @brief a single entry in the pool */
+  /** @brief a single entry in the pool */
   struct Entry {
     void* data;
     size_t size;
   };
-  /*! @brief List of free items, sorted from small to big size */
+  /** @brief List of free items, sorted from small to big size */
   std::vector<Entry> free_list_;
-  /*! @brief List of allocated items */
+  /** @brief List of allocated items */
   std::vector<Entry> allocated_;
 };
 

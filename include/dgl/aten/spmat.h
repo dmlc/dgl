@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file dgl/aten/spmat.h
  * @brief Sparse matrix definitions
@@ -14,7 +14,7 @@
 
 namespace dgl {
 
-/*!
+/**
  * @brief Sparse format.
  */
 enum class SparseFormat {
@@ -23,7 +23,7 @@ enum class SparseFormat {
   kCSC = 3,
 };
 
-/*!
+/**
  * @brief Sparse format codes
  */
 const dgl_format_code_t ALL_CODE = 0x7;

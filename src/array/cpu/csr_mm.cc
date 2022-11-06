@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
  * @file array/cpu/csr_mm.cc
  * @brief CSR Matrix Multiplication

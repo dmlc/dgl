@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
  * @file graph/transform/cpu/knn.cc
  * @brief k-nearest-neighbor (KNN) implementation
@@ -27,7 +27,7 @@ namespace impl {
 // This value is directly from pynndescent
 static constexpr int NN_DESCENT_BLOCK_SIZE = 16384;
 
-/*!
+/**
  * @brief Compute Euclidean distance between two vectors, return positive
  *  infinite value if the intermediate distance is greater than the worst
  *  distance.
@@ -54,7 +54,7 @@ FloatType EuclideanDistWithCheck(
   }
 }
 
-/*! @brief Compute Euclidean distance between two vectors */
+/** @brief Compute Euclidean distance between two vectors */
 template <typename FloatType, typename IdType>
 FloatType EuclideanDist(
     const FloatType* vec1, const FloatType* vec2, int64_t dim) {
@@ -67,7 +67,7 @@ FloatType EuclideanDist(
   return dist;
 }
 
-/*! @brief Insert a new element into a heap */
+/** @brief Insert a new element into a heap */
 template <typename FloatType, typename IdType>
 void HeapInsert(
     IdType* out, FloatType* dist, IdType new_id, FloatType new_dist, int k,
@@ -104,7 +104,7 @@ void HeapInsert(
   }
 }
 
-/*! @brief Insert a new element and its flag into heap, return 1 if insert
+/** @brief Insert a new element and its flag into heap, return 1 if insert
  * successfully */
 template <typename FloatType, typename IdType>
 int FlaggedHeapInsert(
@@ -144,7 +144,7 @@ int FlaggedHeapInsert(
   return 1;
 }
 
-/*! @brief Build heap for each point. Used by NN-descent */
+/** @brief Build heap for each point. Used by NN-descent */
 template <typename FloatType, typename IdType>
 void BuildHeap(IdType* index, FloatType* dist, int k) {
   for (int i = k / 2 - 1; i >= 0; --i) {
@@ -170,7 +170,7 @@ void BuildHeap(IdType* index, FloatType* dist, int k) {
   }
 }
 
-/*!
+/**
  * @brief Neighbor update process in NN-descent. The distance between
  *  two points are computed. If this new distance is less than any worst
  *  distance of these two points, we update the neighborhood of that point.
@@ -208,7 +208,7 @@ int UpdateNeighbors(
   return num_updates;
 }
 
-/*! @brief The kd-tree implementation of K-Nearest Neighbors */
+/** @brief The kd-tree implementation of K-Nearest Neighbors */
 template <typename FloatType, typename IdType>
 void KdTreeKNN(
     const NDArray& data_points, const IdArray& data_offsets,

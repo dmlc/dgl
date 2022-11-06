@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
  * @file array/cuda/atomic.cuh
  * @brief Atomic functions

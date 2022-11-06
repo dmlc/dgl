@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file dgl/aten/kernel.h
  * @brief Sparse matrix operators.
@@ -17,7 +17,7 @@
 namespace dgl {
 namespace aten {
 
-/*!
+/**
  * @brief Generalized Sparse Matrix-Matrix Multiplication.
  * @param op The binary operator, could be `add`, `sub', `mul`, 'div',
  *        `copy_u`, `copy_e'.
@@ -34,7 +34,7 @@ void SpMM(
     const std::string& op, const std::string& reduce, HeteroGraphPtr graph,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
 
-/*!
+/**
  * @brief Generalized Sampled Dense-Dense Matrix Multiplication.
  * @param op The binary operator, could be `add`, `sub', `mul`, 'div',
  *        `dot`, `copy_u`, `copy_e'.
@@ -47,7 +47,7 @@ void SDDMM(
     const std::string& op, HeteroGraphPtr graph, NDArray ufeat, NDArray efeat,
     NDArray out);
 
-/*!
+/**
  * @brief Sparse-sparse matrix multiplication.
  *
  * The sparse matrices must have scalar weights (i.e. \a A_weights and \a
@@ -56,7 +56,7 @@ void SDDMM(
 std::pair<CSRMatrix, NDArray> CSRMM(
     CSRMatrix A, NDArray A_weights, CSRMatrix B, NDArray B_weights);
 
-/*!
+/**
  * @brief Summing up a list of sparse matrices.
  *
  * The sparse matrices must have scalar weights (i.e. the arrays in \a A_weights

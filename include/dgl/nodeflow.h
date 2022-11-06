@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
  * @file dgl/nodeflow.h
  * @brief DGL NodeFlow class.
@@ -17,7 +17,7 @@ namespace dgl {
 
 class ImmutableGraph;
 
-/*!
+/**
  * @brief A NodeFlow graph stores the sampling results for a sampler that
  * samples nodes/edges in layers.
  *
@@ -26,21 +26,21 @@ class ImmutableGraph;
  * node and edge mapping from the NodeFlow graph to the parent graph.
  */
 struct NodeFlowObject : public runtime::Object {
-  /*! @brief The graph. */
+  /** @brief The graph. */
   GraphPtr graph;
-  /*!
+  /**
    * @brief the offsets of each layer.
    */
   IdArray layer_offsets;
-  /*!
+  /**
    * @brief the offsets of each flow.
    */
   IdArray flow_offsets;
-  /*!
+  /**
    * @brief The node mapping from the NodeFlow graph to the parent graph.
    */
   IdArray node_mapping;
-  /*!
+  /**
    * @brief The edge mapping from the NodeFlow graph to the parent graph.
    */
   IdArray edge_mapping;
@@ -54,13 +54,13 @@ class NodeFlow : public runtime::ObjectRef {
  public:
   DGL_DEFINE_OBJECT_REF_METHODS(NodeFlow, runtime::ObjectRef, NodeFlowObject);
 
-  /*! @brief create a new nodeflow reference */
+  /** @brief create a new nodeflow reference */
   static NodeFlow Create() {
     return NodeFlow(std::make_shared<NodeFlowObject>());
   }
 };
 
-/*!
+/**
  * @brief Get a slice on a graph that represents a NodeFlow.
  *
  * The entire block has to be taken as a slice. Users have to specify the

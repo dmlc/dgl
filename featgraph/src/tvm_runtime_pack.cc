@@ -21,7 +21,7 @@
  * under the License.
  */
 
-/*!
+/**
  * @brief This is an all in one TVM runtime file.
  *
  *   You only have to use this file to compile libtvm_runtime to

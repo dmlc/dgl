@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file array/cuda/sddmm.cu
  * @brief SDDMM C APIs and definitions.
@@ -10,7 +10,7 @@
 namespace dgl {
 namespace aten {
 
-/*!
+/**
  * @brief CUDA implementation of g-SDDMM on Csr format.
  */
 template <int XPU, typename IdType, typename DType>
@@ -30,7 +30,7 @@ void SDDMMCsr(const std::string& op,
 }
 
 
-/*!
+/**
  * @brief CUDA implementation of g-SDDMM on Coo format.
  */
 template <int XPU, typename IdType, typename DType>

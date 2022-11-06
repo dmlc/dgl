@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2018 by Contributors
  * @file graph/sampler/generic_randomwalk_cpu.h
  * @brief DGL sampler - templated implementation definition of random walks on
@@ -28,7 +28,7 @@ namespace impl {
 
 namespace {
 
-/*!
+/**
  * @brief Generic Random Walk.
  * @param seeds A 1D array of seed nodes, with the type the source type of the
  * first edge type in the metapath. \param max_num_steps The maximum number of

@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2021 by Contributors
  * @file array/filter.cc
  * @brief Object for selecting items in a set, or selecting items not in a set.

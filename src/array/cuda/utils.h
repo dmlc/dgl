@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file array/cuda/utils.h
  * @brief Utilities for CUDA kernels.
@@ -23,7 +23,7 @@ namespace cuda {
 #define CUDA_MAX_NUM_THREADS 256
 
 
-/*! @brief Calculate the number of threads needed given the dimension length.
+/** @brief Calculate the number of threads needed given the dimension length.
  *
  * It finds the biggest number that is smaller than min(dim, max_nthrs)
  * and is also power of two.
@@ -77,7 +77,7 @@ __device__ __forceinline__ T _ldg(T* addr) {
 #endif
 }
 
-/*!
+/**
  * @brief Return true if the given bool flag array is all true.
  * The input bool array is in int8_t type so it is aligned with byte address.
  *
@@ -88,7 +88,7 @@ __device__ __forceinline__ T _ldg(T* addr) {
  */
 bool AllTrue(int8_t* flags, int64_t length, const DGLContext& ctx);
 
-/*!
+/**
  * @brief CUDA Kernel of filling the vector started from ptr of size length
  *        with val.
  * @note internal use only.
@@ -103,7 +103,7 @@ __global__ void _FillKernel(DType* ptr, size_t length, DType val) {
   }
 }
 
-/*! @brief Fill the vector started from ptr of size length with val */
+/** @brief Fill the vector started from ptr of size length with val */
 template <typename DType>
 void _Fill(DType* ptr, size_t length, DType val) {
   cudaStream_t stream = runtime::getCurrentCUDAStream();
@@ -112,7 +112,7 @@ void _Fill(DType* ptr, size_t length, DType val) {
   CUDA_KERNEL_CALL(cuda::_FillKernel, nb, nt, 0, stream, ptr, length, val);
 }
 
-/*!
+/**
  * @brief Search adjacency list linearly for each (row, col) pair and
  * write the data under the matched position in the indices array to the output.
  *
@@ -156,7 +156,7 @@ __global__ void _LinearSearchKernel(
 }
 
 #if BF16_ENABLED
-/*!
+/**
  * @brief Specialization for bf16 because conversion from long long to bfloat16
  * doesn't exist before SM80.
  */
@@ -205,7 +205,7 @@ inline DType GetCUDAScalar(
   return result;
 }
 
-/*!
+/**
  * @brief Given a sorted array and a value this function returns the index
  * of the first element which compares greater than value.
  *
@@ -230,7 +230,7 @@ __device__ IdType _UpperBound(const IdType *A, int64_t n, IdType x) {
   return l;
 }
 
-/*!
+/**
  * @brief Given a sorted array and a value this function returns the index
  * of the element who is equal to val. If not exist returns n+1
  *

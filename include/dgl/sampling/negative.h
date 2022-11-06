@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file dgl/sampling/negative.h
  * @brief Negative sampling.
@@ -14,7 +14,7 @@
 namespace dgl {
 namespace sampling {
 
-/*!
+/**
  * @brief Given an edge type, uniformly sample source-destination pairs that do
  * not have an edge in between using rejection sampling.
  *

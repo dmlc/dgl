@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2017 by Contributors
  * @file thread_pool.cc
  * @brief Threadpool for multi-threading runtime.
@@ -30,7 +30,7 @@ namespace runtime {
 // stride in the page, fit to cache line.
 constexpr int kSyncStride = 64 / sizeof(std::atomic<int>);
 
-/*!
+/**
  * @brief Thread local master environment.
  */
 class ParallelLauncher {
@@ -112,10 +112,10 @@ class ParallelLauncher {
   std::vector<std::string> par_errors_;
 };
 
-/*! @brief Lock-free single-producer-single-consumer queue for each thread */
+/** @brief Lock-free single-producer-single-consumer queue for each thread */
 class SpscTaskQueue {
  public:
-  /*! @brief The task entry */
+  /** @brief The task entry */
   struct Task {
     ParallelLauncher* launcher;
     int32_t task_id;
@@ -125,7 +125,7 @@ class SpscTaskQueue {
 
   ~SpscTaskQueue() { delete[] buffer_; }
 
-  /*!
+  /**
    * @brief Push a task into the queue and notify the comsumer if it is on wait.
    * @param input The task to be dequeued.
    */
@@ -139,7 +139,7 @@ class SpscTaskQueue {
     }
   }
 
-  /*!
+  /**
    * @brief Pop a task out of the queue and condition wait if no tasks.
    * @param output The pointer to the task to be dequeued.
    * @param spin_count The number of iterations to spin before sleep.
@@ -169,7 +169,7 @@ class SpscTaskQueue {
     return true;
   }
 
-  /*!
+  /**
    * @brief Signal to terminate the worker.
    */
   void SignalForKill() {
@@ -179,7 +179,7 @@ class SpscTaskQueue {
   }
 
  protected:
-  /*!
+  /**
    * @brief Lock-free enqueue.
    * @param input The task to be enqueued.
    * @return Whether the task is enqueued.
