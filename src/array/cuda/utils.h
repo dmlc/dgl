@@ -22,36 +22,6 @@ namespace cuda {
 // The max number of threads per block
 #define CUDA_MAX_NUM_THREADS 256
 
-#ifdef USE_FP16
-#define SWITCH_BITS(bits, DType, ...)                           \
-  do {                                                          \
-    if ((bits) == 16) {                                         \
-      typedef half DType;                                       \
-      { __VA_ARGS__ }                                           \
-    } else if ((bits) == 32) {                                  \
-      typedef float DType;                                      \
-      { __VA_ARGS__ }                                           \
-    } else if ((bits) == 64) {                                  \
-      typedef double DType;                                     \
-      { __VA_ARGS__ }                                           \
-    } else {                                                    \
-      LOG(FATAL) << "Data type not recognized with bits " << bits; \
-    }                                                           \
-  } while (0)
-#else  // USE_FP16
-#define SWITCH_BITS(bits, DType, ...)                           \
-  do {                                                          \
-    if ((bits) == 32) {                                         \
-      typedef float DType;                                      \
-      { __VA_ARGS__ }                                           \
-    } else if ((bits) == 64) {                                  \
-      typedef double DType;                                     \
-      { __VA_ARGS__ }                                           \
-    } else {                                                    \
-      LOG(FATAL) << "Data type not recognized with bits " << bits; \
-    }                                                           \
-  } while (0)
-#endif  // USE_FP16
 
 /*! \brief Calculate the number of threads needed given the dimension length.
  *
@@ -184,6 +154,40 @@ __global__ void _LinearSearchKernel(
     tx += stride_x;
   }
 }
+
+#if BF16_ENABLED
+/*!
+ * \brief Specialization for bf16 because conversion from long long to bfloat16
+ * doesn't exist before SM80.
+ */
+template <typename IdType>
+__global__ void _LinearSearchKernel(
+    const IdType* indptr, const IdType* indices, const IdType* data,
+    const IdType* row, const IdType* col,
+    int64_t row_stride, int64_t col_stride, int64_t length,
+    const __nv_bfloat16* weights, __nv_bfloat16 filler, __nv_bfloat16* out) {
+  int tx = blockIdx.x * blockDim.x + threadIdx.x;
+  const int stride_x = gridDim.x * blockDim.x;
+  while (tx < length) {
+    int rpos = tx * row_stride, cpos = tx * col_stride;
+    IdType v = -1;
+    const IdType r = row[rpos], c = col[cpos];
+    for (IdType i = indptr[r]; i < indptr[r + 1]; ++i) {
+      if (indices[i] == c) {
+        v = data ? data[i] : i;
+        break;
+      }
+    }
+    if (v == -1) {
+      out[tx] = filler;
+    } else {
+      // If the result is saved in bf16, it should be fine to convert it to float first
+      out[tx] = weights ? weights[v] : __nv_bfloat16(static_cast<float>(v));
+    }
+    tx += stride_x;
+  }
+}
+#endif  // BF16_ENABLED
 
 template <typename DType>
 inline DType GetCUDAScalar(

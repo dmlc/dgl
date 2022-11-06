@@ -9,6 +9,7 @@
 #include <cuda_runtime.h>
 #include <cassert>
 #include "fp16.cuh"
+#include "bf16.cuh"
 
 #if __CUDA_ARCH__ >= 600
 #include <cuda_fp16.h>
@@ -44,7 +45,6 @@ template <typename T> struct Cast {
   }
 };
 
-#ifdef USE_FP16
 template <> struct Cast<half> {
   typedef Code<sizeof(half)>::Type Type;
   static __device__ __forceinline__ Type Encode(half val) {
@@ -54,7 +54,32 @@ template <> struct Cast<half> {
     return __ushort_as_half(code);
   }
 };
+
+#if BF16_ENABLED
+template <> struct Cast<__nv_bfloat16> {
+  typedef Code<sizeof(__nv_bfloat16)>::Type Type;
+  static __device__ __forceinline__ Type Encode(__nv_bfloat16 val) {
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 800
+    return __bfloat16_as_ushort(val);
+#else
+    printf("Atomic operations are not supported for bfloat16 (BF16) "
+        "on GPUs with compute capability less than 8.0.\n");
+    __trap();
+    return static_cast<Type>(0);
 #endif
+  }
+  static __device__ __forceinline__ __nv_bfloat16 Decode(Type code) {
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 800
+    return __ushort_as_bfloat16(code);
+#else
+    printf("Atomic operations are not supported for bfloat16 (BF16) "
+        "on GPUs with compute capability less than 8.0.\n");
+    __trap();
+    return static_cast<__nv_bfloat16>(0.0f);
+#endif
+  }
+};
+#endif  // BF16_ENABLED
 
 template <> struct Cast<float> {
   typedef Code<sizeof(float)>::Type Type;
@@ -109,9 +134,9 @@ static __device__ __forceinline__ unsigned short int atomicCASshort(  // NOLINT
     return Cast<T>::Decode(old);                                 \
   }
 
-#define DEFINE_ATOMIC_HALF(NAME) \
+#define DEFINE_ATOMIC_16BIT(NAME, dtype) \
   template <>                                                    \
-  __device__ __forceinline__ half Atomic##NAME<half>(half* addr, half val) {  \
+  __device__ __forceinline__ dtype Atomic##NAME<dtype>(dtype* addr, dtype val) {  \
     typedef uint16_t CT;                                         \
     CT* addr_as_ui = reinterpret_cast<CT*>(addr);                \
     CT old = *addr_as_ui;                                        \
@@ -119,23 +144,25 @@ static __device__ __forceinline__ unsigned short int atomicCASshort(  // NOLINT
     do {                                                         \
       assumed = old;                                             \
       old = atomicCASshort(addr_as_ui, assumed,                  \
-          Cast<half>::Encode(OP(val, Cast<half>::Decode(old)))); \
+          Cast<dtype>::Encode(OP(val, Cast<dtype>::Decode(old)))); \
     } while (assumed != old);                                    \
-    return Cast<half>::Decode(old);                              \
+    return Cast<dtype>::Decode(old);                              \
   }
 
 #define OP(a, b) max(a, b)
 DEFINE_ATOMIC(Max)
-#ifdef USE_FP16
-DEFINE_ATOMIC_HALF(Max)
-#endif  // USE_FP16
+DEFINE_ATOMIC_16BIT(Max, half)
+#if BF16_ENABLED
+DEFINE_ATOMIC_16BIT(Max, __nv_bfloat16)
+#endif  // BF16_ENABLED
 #undef OP
 
 #define OP(a, b) min(a, b)
 DEFINE_ATOMIC(Min)
-#ifdef USE_FP16
-DEFINE_ATOMIC_HALF(Min)
-#endif  // USE_FP16
+DEFINE_ATOMIC_16BIT(Min, half)
+#if BF16_ENABLED
+DEFINE_ATOMIC_16BIT(Min, __nv_bfloat16)
+#endif  // BF16_ENABLED
 #undef OP
 
 #define OP(a, b) a + b
@@ -258,11 +285,10 @@ __device__ __forceinline__ double AtomicAdd<double>(double* addr, double val) {
 #endif
 }
 
-#ifdef USE_FP16
 #if defined(CUDART_VERSION) && CUDART_VERSION >= 10000
 template <>
 __device__ __forceinline__ half AtomicAdd<half>(half* addr, half val) {
-// half make sure we have half support
+// make sure we have half support
 #if __CUDA_ARCH__ >= 700
   return atomicAdd(addr, val);
 #else
@@ -275,7 +301,24 @@ __device__ __forceinline__ half AtomicAdd<half>(half* addr, half val) {
 #endif  // __CUDA_ARCH__ >= 700
 }
 #endif  // defined(CUDART_VERSION) && CUDART_VERSION >= 10000
-#endif  // USE_FP16
+
+#if BF16_ENABLED
+template <>
+__device__ __forceinline__ __nv_bfloat16 AtomicAdd<__nv_bfloat16>(
+    __nv_bfloat16* addr, __nv_bfloat16 val) {
+// make sure we have bfloat16 support
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 800
+  return atomicAdd(addr, val);
+#else
+  (void)addr;
+  (void)val;
+  printf("Atomic operations are not supported for bfloat16 (BF16) "
+      "on GPUs with compute capability less than 8.0.\n");
+  __trap();
+  return val;
+#endif  // defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 800
+}
+#endif  // BF16_ENABLED
 
 
 }  // namespace cuda

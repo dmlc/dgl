@@ -10,6 +10,7 @@
 #include <limits>
 #include "macro.cuh"
 #include "fp16.cuh"
+#include "bf16.cuh"
 #include "atomic.cuh"
 #include "../../runtime/cuda/cuda_common.h"
 #include "./utils.h"
@@ -19,6 +20,24 @@ namespace dgl {
 using namespace cuda;
 
 namespace aten {
+
+/*!
+ * \brief Determine whether cusparse SpMM function is applicable.
+ */
+template <typename DType, typename IdType>
+inline bool cusparse_available(bool more_nnz_than_matrix_size) {
+#if CUDART_VERSION < 11000
+  if (std::is_same<IdType, int>::value &&
+      (std::is_same<DType, float>::value || std::is_same<DType, double>::value))
+    return true;
+  return false;
+#else
+  if (std::is_same<DType, __half>::value || std::is_same<DType, __nv_bfloat16>::value)
+    return false;  // cusparse's SpMM on fp16 is slow, temporally disabled.
+  // If the CSR matrix has more NNZ than matrix size, we should not use cuSPARSE 11.1.
+  return !more_nnz_than_matrix_size;
+#endif
+}
 
 namespace {
 
@@ -33,7 +52,6 @@ cublasStatus_t Xgeam(cublasHandle_t handle, cublasOperation_t transa,
   return CUBLAS_STATUS_EXECUTION_FAILED;
 }
 
-#ifdef USE_FP16
 template <>
 cublasStatus_t Xgeam<__half>(cublasHandle_t handle, cublasOperation_t transa,
     cublasOperation_t transb, int m, int n,
@@ -45,7 +63,20 @@ cublasStatus_t Xgeam<__half>(cublasHandle_t handle, cublasOperation_t transa,
   LOG(FATAL) << "Xgeam does not support dtype half (FP16)";
   return CUBLAS_STATUS_EXECUTION_FAILED;
 }
-#endif
+
+#if BF16_ENABLED
+template <>
+cublasStatus_t Xgeam<__nv_bfloat16>(cublasHandle_t handle, cublasOperation_t transa,
+    cublasOperation_t transb, int m, int n,
+    const __nv_bfloat16* alpha, const __nv_bfloat16* A, int lda,
+    const __nv_bfloat16* beta, const __nv_bfloat16* B, int ldb,
+    __nv_bfloat16* C, int ldc) {
+  // TODO(ndickson): There is no cublasHgeam, so a different
+  // implementation would be required.
+  LOG(FATAL) << "Xgeam does not support dtype bfloat16 (BF16)";
+  return CUBLAS_STATUS_EXECUTION_FAILED;
+}
+#endif  // BF16_ENABLED
 
 template <>
 cublasStatus_t Xgeam<float>(cublasHandle_t handle, cublasOperation_t transa,
@@ -130,6 +161,21 @@ void _Transpose<half>(const half* in, half* out,
   int nb = col;
   CUDA_KERNEL_CALL(_TransposeKernel, nb, nt, 0, stream, in, out, col, row);
 }
+
+#if BF16_ENABLED
+/*
+ * \brief Tranpose the input matrix for data type half.
+ * \note cuBLAS has no geam API for bf16 data type, fallback to our kernel.
+ */
+template <>
+void _Transpose<__nv_bfloat16>(const __nv_bfloat16* in, __nv_bfloat16* out,
+                               int row, int col) {
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
+  int nt = FindNumThreads(row);
+  int nb = col;
+  CUDA_KERNEL_CALL(_TransposeKernel, nb, nt, 0, stream, in, out, col, row);
+}
+#endif  // BF16_ENABLED
 
 /*
  * \brief

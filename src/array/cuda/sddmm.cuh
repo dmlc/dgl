@@ -11,6 +11,7 @@
 #include "atomic.cuh"
 #include "functor.cuh"
 #include "fp16.cuh"
+#include "bf16.cuh"
 #include "./utils.h"
 #include "./functor.cuh"
 #include "../selector.h"

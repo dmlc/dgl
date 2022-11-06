@@ -9,6 +9,8 @@
 
 #include <cusparse.h>
 #include <dgl/runtime/c_runtime_api.h>
+#include "fp16.cuh"
+#include "bf16.cuh"
 
 namespace dgl {
 namespace aten {
@@ -34,7 +36,6 @@ struct CSRGEMM {
   }
 };
 
-#ifdef USE_FP16
 template <>
 struct CSRGEMM<__half> {
   template <typename... Args>
@@ -58,7 +59,32 @@ struct CSRGEMM<__half> {
     return static_cast<cusparseStatus_t>(0);
   }
 };
-#endif
+
+#if BF16_ENABLED
+template <>
+struct CSRGEMM<__nv_bfloat16> {
+  template <typename... Args>
+  static inline cusparseStatus_t bufferSizeExt(Args... args) {
+    // TODO(ndickson): There is no cusparseHcsrgemm2_bufferSizeExt, so a different
+    // implementation would be required.
+    LOG(FATAL) << "CSRGEMM::bufferSizeExt does not support dtype bfloat16 (BF16).";
+    return static_cast<cusparseStatus_t>(0);
+  }
+
+  template <typename... Args>
+  static inline cusparseStatus_t nnz(Args... args) {
+    return cusparseXcsrgemm2Nnz(args...);
+  }
+
+  template <typename... Args>
+  static inline cusparseStatus_t compute(Args... args) {
+    // TODO(ndickson): There is no cusparseHcsrgemm2, so a different
+    // implementation would be required.
+    LOG(FATAL) << "CSRGEMM::compute does not support dtype bfloat16 (BF16).";
+    return static_cast<cusparseStatus_t>(0);
+  }
+};
+#endif  // BF16_ENABLED
 
 template <>
 struct CSRGEMM<float> {
@@ -117,7 +143,6 @@ struct CSRGEAM {
   }
 };
 
-#ifdef USE_FP16
 template <>
 struct CSRGEAM<__half> {
   template <typename... Args>
@@ -141,7 +166,32 @@ struct CSRGEAM<__half> {
     return static_cast<cusparseStatus_t>(0);
   }
 };
-#endif
+
+#if BF16_ENABLED
+template <>
+struct CSRGEAM<__nv_bfloat16> {
+  template <typename... Args>
+  static inline cusparseStatus_t bufferSizeExt(Args... args) {
+    // TODO(ndickson): There is no cusparseHcsrgeam2_bufferSizeExt, so a different
+    // implementation would be required.
+    LOG(FATAL) << "CSRGEAM::bufferSizeExt does not support dtype bfloat16 (BF16).";
+    return static_cast<cusparseStatus_t>(0);
+  }
+
+  template <typename... Args>
+  static inline cusparseStatus_t nnz(Args... args) {
+    return cusparseXcsrgeam2Nnz(args...);
+  }
+
+  template <typename... Args>
+  static inline cusparseStatus_t compute(Args... args) {
+    // TODO(ndickson): There is no cusparseHcsrgeam2, so a different
+    // implementation would be required.
+    LOG(FATAL) << "CSRGEAM::compute does not support dtype bfloat16 (BF16).";
+    return static_cast<cusparseStatus_t>(0);
+  }
+};
+#endif  // BF16_ENABLED
 
 template <>
 struct CSRGEAM<float> {

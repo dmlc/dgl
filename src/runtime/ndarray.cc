@@ -22,9 +22,12 @@ constexpr DGLDataType DGLDataTypeTraits<int32_t>::dtype;
 constexpr DGLDataType DGLDataTypeTraits<int64_t>::dtype;
 constexpr DGLDataType DGLDataTypeTraits<uint32_t>::dtype;
 constexpr DGLDataType DGLDataTypeTraits<uint64_t>::dtype;
-#ifdef USE_FP16
+#ifdef DGL_USE_CUDA
 constexpr DGLDataType DGLDataTypeTraits<__half>::dtype;
-#endif
+#if BF16_ENABLED
+constexpr DGLDataType DGLDataTypeTraits<__nv_bfloat16>::dtype;
+#endif  // BF16_ENABLED
+#endif  // DGL_USE_CUDA
 constexpr DGLDataType DGLDataTypeTraits<float>::dtype;
 constexpr DGLDataType DGLDataTypeTraits<double>::dtype;
 

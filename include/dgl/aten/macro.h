@@ -123,26 +123,67 @@
     typedef double FloatType;                                 \
     {__VA_ARGS__}                                             \
   } else {                                                    \
-    LOG(FATAL) << (val_name) << " can only be float32 or float64";  \
+    LOG(FATAL) << (val_name)                                  \
+      << " can only be float32 or float64";                   \
   }                                                           \
 } while (0)
 
-#define ATEN_FLOAT_BITS_SWITCH(val, bits, val_name, ...) do {  \
-  CHECK_EQ((val).code, kDGLFloat)                              \
-    << (val_name) << " must be float type";                   \
-  if ((val).bits == 16) {                                     \
-    constexpr int bits = 16;                                  \
-    {__VA_ARGS__}                                             \
-  } else if ((val).bits == 32) {                              \
-    constexpr int bits = 32;                                  \
-    {__VA_ARGS__}                                             \
-  } else if ((val).bits == 64) {                              \
-    constexpr int bits = 64;                                  \
-    {__VA_ARGS__}                                             \
-  } else {                                                    \
-    LOG(FATAL) << (val_name) << " can only be float32 or float64";  \
-  }                                                           \
+/*
+ * Dispatch according to float type, including 16bits (float16/bfloat16/float32/float64).
+ */
+#ifdef DGL_USE_CUDA
+#if BF16_ENABLED
+#define ATEN_FLOAT_TYPE_SWITCH_16BITS(val, FloatType, XPU, val_name, ...) do {  \
+  CHECK((val).code == kDGLFloat || (val.code == kDGLBfloat))        \
+    << (val_name) << " must be float type";                         \
+  if ((val).bits == 32) {                                           \
+    typedef float FloatType;                                        \
+    {__VA_ARGS__}                                                   \
+  } else if ((val).bits == 64) {                                    \
+    typedef double FloatType;                                       \
+    {__VA_ARGS__}                                                   \
+  } else if (XPU == kDGLCUDA && (val).bits == 16 && (val).code == kDGLFloat) {  \
+    typedef __half FloatType;                                       \
+    {__VA_ARGS__}                                                   \
+  } else if (XPU == kDGLCUDA && (val).bits == 16 && (val).code == kDGLBfloat) {  \
+    typedef __nv_bfloat16 FloatType;                                \
+    {__VA_ARGS__}                                                   \
+  } else if (XPU == kDGLCPU) {                                      \
+    LOG(FATAL) << (val_name)                                        \
+      << " can only be float32 or float64 on CPU";                  \
+  } else {                                                          \
+    LOG(FATAL) << (val_name)                                        \
+      << " can only be float16/bfloat16/float32/float64 on GPU";    \
+  }                                                                 \
 } while (0)
+#else  // BF16_ENABLED
+#define ATEN_FLOAT_TYPE_SWITCH_16BITS(val, FloatType, XPU, val_name, ...) do {  \
+  CHECK((val).code == kDGLFloat || (val.code == kDGLBfloat))        \
+    << (val_name) << " must be float type";                         \
+  if ((val).bits == 32) {                                           \
+    typedef float FloatType;                                        \
+    {__VA_ARGS__}                                                   \
+  } else if ((val).bits == 64) {                                    \
+    typedef double FloatType;                                       \
+    {__VA_ARGS__}                                                   \
+  } else if (XPU == kDGLCUDA && (val).bits == 16 && (val).code == kDGLFloat) {  \
+    typedef __half FloatType;                                       \
+    {__VA_ARGS__}                                                   \
+  } else if (XPU == kDGLCUDA && (val).bits == 16 && (val).code == kDGLBfloat) {  \
+    LOG(FATAL) << "bfloat16 requires CUDA >= 11.0";                 \
+  } else if (XPU == kDGLCPU) {                                      \
+    LOG(FATAL) << (val_name)                                        \
+      << " can only be float32 or float64 on CPU";                  \
+  } else {                                                          \
+    LOG(FATAL) << (val_name)                                        \
+      << " can only be float16/float32/float64 on GPU";             \
+  }                                                                 \
+} while (0)
+#endif  // BF16_ENABLED
+#else  // DGL_USE_CUDA
+#define ATEN_FLOAT_TYPE_SWITCH_16BITS(val, FloatType, XPU, val_name, ...)  \
+  ATEN_FLOAT_TYPE_SWITCH(val, FloatType, val_name, {__VA_ARGS__})
+#endif  // DGL_USE_CUDA
 
 /*
  * Dispatch according to data type (int32, int64, float32 or float64):
