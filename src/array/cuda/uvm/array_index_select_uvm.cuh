@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2021 by Contributors
  * \file array/cpu/array_index_select_uvm.cuh
- * \brief Array index select GPU kernel implementation
+ * @brief Array index select GPU kernel implementation
  */
 
 #ifndef DGL_ARRAY_CUDA_UVM_ARRAY_INDEX_SELECT_UVM_CUH_

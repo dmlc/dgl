@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2021 by Contributors
  * \file array/cuda/rowwise_sampling.cu
- * \brief uniform rowwise sampling
+ * @brief uniform rowwise sampling
  */
 
 #include <curand_kernel.h>

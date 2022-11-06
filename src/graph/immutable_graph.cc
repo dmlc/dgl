@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2018 by Contributors
  * \file graph/immutable_graph.cc
- * \brief DGL immutable graph index implementation
+ * @brief DGL immutable graph index implementation
  */
 
 #include <dgl/base_heterograph.h>

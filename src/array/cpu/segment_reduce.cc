@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file kernel/cpu/segment_reduce.cc
- * \brief Segment reduce C APIs and definitions.
+ * @brief Segment reduce C APIs and definitions.
  */
 #include "./segment_reduce.h"
 #include <dgl/array.h>

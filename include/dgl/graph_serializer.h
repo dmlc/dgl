@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2018 by Contributors
  * \file graph/graph_serializer.cc
- * \brief DGL serializer APIs
+ * @brief DGL serializer APIs
  */
 
 #ifndef DGL_GRAPH_SERIALIZER_H_

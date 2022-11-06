@@ -14,7 +14,7 @@
  *  limitations under the License.
  *
  * \file graph/transform/compact.h
- * \brief Functions to find and eliminate the common isolated nodes across
+ * @brief Functions to find and eliminate the common isolated nodes across
  * all given graphs with the same set of nodes.
  */
 

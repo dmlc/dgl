@@ -14,7 +14,7 @@
  *   limitations under the License.
  *
  * \file array/gpu/disjoint_union.cu
- * \brief Disjoint union GPU implementation.
+ * @brief Disjoint union GPU implementation.
  */
 
 #include <dgl/array.h>

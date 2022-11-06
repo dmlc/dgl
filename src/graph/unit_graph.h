@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
  * \file graph/unit_graph.h
- * \brief UnitGraph graph
+ * @brief UnitGraph graph
  */
 
 #ifndef DGL_GRAPH_UNIT_GRAPH_H_
@@ -27,7 +27,7 @@ class UnitGraph;
 typedef std::shared_ptr<UnitGraph> UnitGraphPtr;
 
 /*!
- * \brief UnitGraph graph
+ * @brief UnitGraph graph
  *
  * UnitGraph graph is a special type of heterograph which
  * (1) Have two types of nodes: "Src" and "Dst". All the edges are
@@ -210,7 +210,7 @@ class UnitGraph : public BaseHeteroGraph {
   static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DGLContext &ctx);
 
   /*!
-  * \brief Pin the in_csr_, out_scr_ and coo_ of the current graph.
+  * @brief Pin the in_csr_, out_scr_ and coo_ of the current graph.
   * \note The graph will be pinned inplace. Behavior depends on the current context,
   *       kDGLCPU: will be pinned;
   *       IsPinned: directly return;
@@ -220,7 +220,7 @@ class UnitGraph : public BaseHeteroGraph {
   void PinMemory_() override;
 
   /*!
-  * \brief Unpin the in_csr_, out_scr_ and coo_ of the current graph.
+  * @brief Unpin the in_csr_, out_scr_ and coo_ of the current graph.
   * \note The graph will be unpinned inplace. Behavior depends on the current context,
   *       IsPinned: will be unpinned;
   *       others: directly return.
@@ -229,13 +229,13 @@ class UnitGraph : public BaseHeteroGraph {
   void UnpinMemory_();
 
   /*!
-   * \brief Record stream for this graph.
+   * @brief Record stream for this graph.
    * @param stream The stream that is using the graph
    */
   void RecordStream(DGLStreamHandle stream) override;
 
   /*! 
-   * \brief Create in-edge CSR format of the unit graph.
+   * @brief Create in-edge CSR format of the unit graph.
    * @param inplace if true and the in-edge CSR format does not exist, the created
    *                format will be cached in this object unless the format is restricted.
    * \return Return the in-edge CSR format. Create from other format if not exist.
@@ -243,7 +243,7 @@ class UnitGraph : public BaseHeteroGraph {
   CSRPtr GetInCSR(bool inplace = true) const;
 
   /*! 
-   * \brief Create out-edge CSR format of the unit graph.
+   * @brief Create out-edge CSR format of the unit graph.
    * @param inplace if true and the out-edge CSR format does not exist, the created
    *                format will be cached in this object unless the format is restricted.
    * \return Return the out-edge CSR format. Create from other format if not exist.
@@ -251,7 +251,7 @@ class UnitGraph : public BaseHeteroGraph {
   CSRPtr GetOutCSR(bool inplace = true) const;
 
   /*!
-   * \brief Create COO format of the unit graph.
+   * @brief Create COO format of the unit graph.
    * @param inplace if true and the COO format does not exist, the created
    *                format will be cached in this object unless the format is restricted.
    * \return Return the COO format. Create from other format if not exist.
@@ -272,7 +272,7 @@ class UnitGraph : public BaseHeteroGraph {
   }
 
   /*!
-   * \brief Return the graph in the given format. Perform format conversion if the
+   * @brief Return the graph in the given format. Perform format conversion if the
    * requested format does not exist.
    *
    * \return A graph in the requested format.
@@ -320,7 +320,7 @@ class UnitGraph : public BaseHeteroGraph {
   UnitGraph() {}
 
   /*!
-   * \brief constructor
+   * @brief constructor
    * @param metagraph metagraph
    * @param in_csr in edge csr
    * @param out_csr out edge csr
@@ -330,7 +330,7 @@ class UnitGraph : public BaseHeteroGraph {
             dgl_format_code_t formats = ALL_CODE);
 
   /*!
-   * \brief constructor
+   * @brief constructor
    * @param num_vtypes number of vertex types (1 or 2)
    * @param metagraph metagraph
    * @param in_csr in edge csr
@@ -354,7 +354,7 @@ class UnitGraph : public BaseHeteroGraph {
   HeteroGraphPtr GetAny() const;
 
   /*!
-   * \brief Determine which format to use with a preference.
+   * @brief Determine which format to use with a preference.
    *
    * If the storage of unit graph is "locked", i.e. no conversion is allowed, then
    * it will return the locked format.
@@ -378,7 +378,7 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \brief COO representation */
   COOPtr coo_;
   /*!
-   * \brief Storage format restriction.
+   * @brief Storage format restriction.
    */
   dgl_format_code_t formats_;
   /*! \brief which streams have recorded the graph */

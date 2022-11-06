@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
  * \file runtime/config.cc
- * \brief DGL runtime config
+ * @brief DGL runtime config
  */
 
 #include <dgl/runtime/config.h>

@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
  * \file dgl/array_utils.h
- * \brief Utility classes and functions for DGL arrays.
+ * @brief Utility classes and functions for DGL arrays.
  */
 #ifndef DGL_ARRAY_CPU_ARRAY_UTILS_H_
 #define DGL_ARRAY_CPU_ARRAY_UTILS_H_
@@ -19,7 +19,7 @@ namespace dgl {
 namespace aten {
 
 /*!
- * \brief A hashmap that maps each ids in the given array to new ids starting
+ * @brief A hashmap that maps each ids in the given array to new ids starting
  * from zero.
  *
  * Useful for relabeling integers and finding unique integers.
@@ -110,7 +110,7 @@ class IdHashMap {
 };
 
 /*
- * \brief Hash type for building maps/sets with pairs as keys.
+ * @brief Hash type for building maps/sets with pairs as keys.
  */
 struct PairHash {
   template <class T1, class T2>

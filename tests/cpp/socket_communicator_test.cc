@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
  * \file socket_communicator_test.cc
- * \brief Test SocketCommunicator
+ * @brief Test SocketCommunicator
  */
 #include "../src/rpc/network/socket_communicator.h"
 

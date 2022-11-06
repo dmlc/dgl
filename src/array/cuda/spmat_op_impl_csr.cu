@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file array/cuda/spmat_op_impl_csr.cu
- * \brief CSR operator CPU implementation
+ * @brief CSR operator CPU implementation
  */
 #include <dgl/array.h>
 
@@ -82,7 +82,7 @@ template NDArray CSRIsNonZero<kDGLCUDA, int64_t>(CSRMatrix, NDArray, NDArray);
 ///////////////////////////// CSRHasDuplicate /////////////////////////////
 
 /*!
- * \brief Check whether each row does not have any duplicate entries.
+ * @brief Check whether each row does not have any duplicate entries.
  * Assume the CSR is sorted.
  */
 template <typename IdType>
@@ -228,7 +228,7 @@ template CSRMatrix CSRSliceRows<kDGLCUDA, int32_t>(CSRMatrix, int64_t, int64_t);
 template CSRMatrix CSRSliceRows<kDGLCUDA, int64_t>(CSRMatrix, int64_t, int64_t);
 
 /*!
- * \brief Copy data segment to output buffers
+ * @brief Copy data segment to output buffers
  *
  * For the i^th row r = row[i], copy the data from indptr[r] ~ indptr[r+1]
  * to the out_data from out_indptr[i] ~ out_indptr[i+1]
@@ -299,7 +299,7 @@ template CSRMatrix CSRSliceRows<kDGLCUDA, int64_t>(CSRMatrix, NDArray);
 ///////////////////////////// CSRGetDataAndIndices /////////////////////////////
 
 /*!
- * \brief Generate a 0-1 mask for each index that hits the provided (row, col)
+ * @brief Generate a 0-1 mask for each index that hits the provided (row, col)
  *        index.
  *
  * Examples:
@@ -331,7 +331,7 @@ __global__ void _SegmentMaskKernel(
 }
 
 /*!
- * \brief Search for the insertion positions for needle in the hay.
+ * @brief Search for the insertion positions for needle in the hay.
  *
  * The hay is a list of sorted elements and the result is the insertion position
  * of each needle so that the insertion still gives sorted order.
@@ -424,7 +424,7 @@ template std::vector<NDArray> CSRGetDataAndIndices<kDGLCUDA, int64_t>(
 ///////////////////////////// CSRSliceMatrix /////////////////////////////
 
 /*!
- * \brief Generate a 0-1 mask for each index whose column is in the provided
+ * @brief Generate a 0-1 mask for each index whose column is in the provided
  * set. It also counts the number of masked values per row.
  */
 template <typename IdType>

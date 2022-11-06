@@ -14,7 +14,7 @@
  *  limitations under the License.
  *
  * \file graph/transform/compact.cc
- * \brief Compact graph implementation
+ * @brief Compact graph implementation
  */
 
 #include "compact.h"

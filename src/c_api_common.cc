@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2018 by Contributors
  * \file c_runtime_api.cc
- * \brief DGL C API common implementations
+ * @brief DGL C API common implementations
  */
 #include "c_api_common.h"
 

@@ -43,7 +43,7 @@ int32_t Ver2partition(IdType in_val, int64_t *node_map, int32_t num_parts) {
 }
 
 /*!
- * \brief Identifies the lead loaded partition/community for a given edge
+ * @brief Identifies the lead loaded partition/community for a given edge
  * assignment.
  */
 int32_t LeastLoad(int64_t *community_edges, int32_t nc) {
@@ -66,7 +66,7 @@ int32_t LeastLoad(int64_t *community_edges, int32_t nc) {
 }
 
 /*!
- * \brief Libra - vertexcut based graph partitioning.
+ * @brief Libra - vertexcut based graph partitioning.
  * It takes list of edges from input DGL graph and distributed them among nc
  * partitions During edge distribution, Libra assign a given edge to a partition
  * based on the end vertices, in doing so, it tries to minimized the splitting
@@ -325,7 +325,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLLibraVertexCut")
     });
 
 /*!
- * \brief
+ * @brief
  * 1. Builds dictionary (ldt) for assigning local node IDs to nodes in the
  *    partitions
  * 2. Builds dictionary (gdt) for storing copies (local ID) of split nodes
@@ -457,7 +457,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLLibra2dglBuildDict")
     });
 
 /*!
- * \brief sets up the 1-level tree among the clones of the split-nodes.
+ * @brief sets up the 1-level tree among the clones of the split-nodes.
  * @param[in] gdt_key global dict for assigning consecutive node IDs to nodes
  *            across all the partitions
  * @param[in] gdt_value global dict for assigning consecutive node IDs to nodes
@@ -507,7 +507,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLLibra2dglSetLR")
     });
 
 /*!
- * \brief For each node in a partition, it creates a list of remote clone IDs;
+ * @brief For each node in a partition, it creates a list of remote clone IDs;
  *        also, for each node in a partition, it gathers the data (feats, label,
  *        trian, test) from input graph.
  * @param[out] feat node features in current partition c.

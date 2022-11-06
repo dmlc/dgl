@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file array/kernel.cc
- * \brief New kernels
+ * @brief New kernels
  */
 #include <dgl/packed_func_ext.h>
 #include <dgl/base_heterograph.h>
@@ -259,7 +259,7 @@ void SDDMM(const std::string& op,
 }
 
 /*!
- * \brief Find the src/dst/etype id based on the target 'u', 'v' or 'e'.
+ * @brief Find the src/dst/etype id based on the target 'u', 'v' or 'e'.
  *
  * @param graph The input graph.
  * @param target 'u', 'v' or 'e'. The target of the lhs or rhs data of an etype.
@@ -724,7 +724,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelGetEdgeMapping")
   });
 
 /*!
- * \brief Sparse matrix multiplication with graph interface.
+ * @brief Sparse matrix multiplication with graph interface.
  *
  * @param A_ref The left operand.
  * @param A_weights The edge weights of graph A.

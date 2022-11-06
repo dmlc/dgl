@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file rpc/server_state.h
- * \brief Implementation of RPC utilities used by both server and client sides.
+ * @brief Implementation of RPC utilities used by both server and client sides.
  */
 
 #ifndef DGL_RPC_SERVER_STATE_H_
@@ -18,7 +18,7 @@ namespace dgl {
 namespace rpc {
 
 /*!
- * \brief Data stored in one DGL server.
+ * @brief Data stored in one DGL server.
  *
  * In a distributed setting, DGL partitions all data associated with the graph
  * (e.g., node and edge features, graph structure, etc.) to multiple partitions,

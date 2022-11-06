@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file array/cpu/coo_remove.cc
- * \brief COO matrix remove entries CPU implementation
+ * @brief COO matrix remove entries CPU implementation
  */
 #include <dgl/array.h>
 

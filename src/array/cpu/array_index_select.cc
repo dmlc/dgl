@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
  * \file array/cpu/array_index_select.cc
- * \brief Array index select CPU implementation
+ * @brief Array index select CPU implementation
  */
 #include <dgl/array.h>
 

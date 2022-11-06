@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2017 by Contributors
  * \file cuda_common.h
- * \brief Common utilities for CUDA
+ * @brief Common utilities for CUDA
  */
 #ifndef DGL_RUNTIME_CUDA_CUDA_COMMON_H_
 #define DGL_RUNTIME_CUDA_CUDA_COMMON_H_
@@ -110,7 +110,7 @@ inline const char* curandGetErrorString(curandStatus_t error) {
 }
 
 /*
- * \brief Cast data type to cudaDataType_t.
+ * @brief Cast data type to cudaDataType_t.
  */
 template <typename T>
 struct cuda_dtype {
@@ -134,7 +134,7 @@ struct cuda_dtype<double> {
 
 #if CUDART_VERSION >= 11000
 /*
- * \brief Cast index data type to cusparseIndexType_t.
+ * @brief Cast index data type to cusparseIndexType_t.
  */
 template <typename T>
 struct cusparse_idtype {

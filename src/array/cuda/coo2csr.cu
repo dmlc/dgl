@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file array/cuda/coo2csr.cc
- * \brief COO2CSR
+ * @brief COO2CSR
  */
 #include <dgl/array.h>
 
@@ -59,7 +59,7 @@ CSRMatrix COOToCSR<kDGLCUDA, int32_t>(COOMatrix coo) {
 }
 
 /*!
- * \brief Search for the insertion positions for needle in the hay.
+ * @brief Search for the insertion positions for needle in the hay.
  *
  * The hay is a list of sorted elements and the result is the insertion position
  * of each needle so that the insertion still gives sorted order.

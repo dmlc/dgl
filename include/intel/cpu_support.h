@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
  * \file intel/cpu_support.h
- * \brief Intel CPU support
+ * @brief Intel CPU support
  * \author Pawel Piotrowicz <pawel.piotrowicz@intel.com>
  */
 #ifndef INTEL_CPU_SUPPORT_H_
@@ -54,7 +54,7 @@ struct IntelKernel {
 };
 
 /*!
- * \brief Element-wise addition kernel using Intel AVX512 instructions.
+ * @brief Element-wise addition kernel using Intel AVX512 instructions.
  * \note it uses AVX512.
  */
 template <class Op>

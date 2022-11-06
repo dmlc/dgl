@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2018 by Contributors
  * \file graph/traversal.cc
- * \brief Graph traversal implementation
+ * @brief Graph traversal implementation
  */
 #include "./traversal.h"
 
@@ -89,7 +89,7 @@ IdArray ComputeMergedSections(const std::vector<std::vector<DType>>& traces) {
 }  // namespace
 
 /*!
- * \brief Class for representing frontiers.
+ * @brief Class for representing frontiers.
  *
  * Each frontier is a list of nodes/edges (specified by their ids).
  * An optional tag can be specified on each node/edge (represented by an int

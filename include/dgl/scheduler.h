@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2018 by Contributors
  * \file dgl/scheduler.h
- * \brief Operations on graph index.
+ * @brief Operations on graph index.
  */
 #ifndef DGL_SCHEDULER_H_
 #define DGL_SCHEDULER_H_
@@ -17,7 +17,7 @@ typedef dgl::runtime::NDArray IdArray;
 namespace sched {
 
 /*!
- * \brief Generate degree bucketing schedule
+ * @brief Generate degree bucketing schedule
  * \tparam IdType Graph's index data type, can be int32_t or int64_t
  * @param msg_ids The edge id for each message
  * @param vids The destination vertex for each message
@@ -36,7 +36,7 @@ std::vector<IdArray> DegreeBucketing(
     const IdArray& msg_ids, const IdArray& vids, const IdArray& recv_ids);
 
 /*!
- * \brief Generate degree bucketing schedule for group_apply edge
+ * @brief Generate degree bucketing schedule for group_apply edge
  * \tparam IdType Graph's index data type, can be int32_t or int64_t
  * @param uids One end vertex of edge by which edges are grouped
  * @param vids The other end vertex of edge

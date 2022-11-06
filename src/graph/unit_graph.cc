@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
  * \file graph/unit_graph.cc
- * \brief UnitGraph graph implementation
+ * @brief UnitGraph graph implementation
  */
 #include <dgl/array.h>
 #include <dgl/base_heterograph.h>
@@ -433,7 +433,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
   }
 
   /*!
-   * \brief Determines whether the graph is "hypersparse", i.e. having significantly more
+   * @brief Determines whether the graph is "hypersparse", i.e. having significantly more
    * nodes than edges.
    */
   bool IsHypersparse() const {

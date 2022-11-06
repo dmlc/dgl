@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file array/cuda/gather_mm.cu
- * \brief GatherMM C APIs and definitions.
+ * @brief GatherMM C APIs and definitions.
  */
 #include <dgl/array.h>
 #include <algorithm>  // std::swap
@@ -197,7 +197,7 @@ __global__ void GatherMMScatterKernel2(
 }  // namespace cuda
 
 /*!
- * \brief Implementation of Gather_mm operator. The input matrix A is
+ * @brief Implementation of Gather_mm operator. The input matrix A is
  *        expected to be sorted according to relation type.
  * @param A The input dense matrix of dimension m x k
  * @param B The input dense matrix of dimension k x n
@@ -308,7 +308,7 @@ void SegmentMMBackwardB(const NDArray A,
 }
 
 /*!
- * \brief Implementation of Gather_mm operator. The input matrix A is
+ * @brief Implementation of Gather_mm operator. The input matrix A is
  *        expected to be sorted according to relation type.
  * @param A The input dense matrix of dimension m x k
  * @param B The input dense matrix of dimension k x n
@@ -345,7 +345,7 @@ void GatherMM(const NDArray A,
 }
 
 /*!
- * \brief Implementation of Gather_mm operator. The input matrix A is
+ * @brief Implementation of Gather_mm operator. The input matrix A is
  *        expected to be sorted according to relation type.
  * @param A The input dense matrix of dimension m x k
  * @param B The input dense matrix of dimension k x n

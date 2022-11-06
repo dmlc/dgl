@@ -14,7 +14,7 @@
  *  limitations under the License.
  *
  * \file graph/transform/cuda/cuda_map_edges.cuh
- * \brief Device level functions for mapping edges.
+ * @brief Device level functions for mapping edges.
  */
 
 #ifndef DGL_GRAPH_TRANSFORM_CUDA_CUDA_MAP_EDGES_CUH_
@@ -59,7 +59,7 @@ __device__ void map_vertex_ids(
 }
 
 /**
- * \brief Generate mapped edge endpoint ids.
+ * @brief Generate mapped edge endpoint ids.
  *
  * \tparam IdType The type of id.
  * \tparam BLOCK_SIZE The size of each thread block.
@@ -95,7 +95,7 @@ __global__ void map_edge_ids(
 }
 
 /**
- * \brief Device level node maps for each node type.
+ * @brief Device level node maps for each node type.
  *
  * @param num_nodes Number of nodes per type.
  * @param offset When offset is set to 0, LhsHashTable is identical to

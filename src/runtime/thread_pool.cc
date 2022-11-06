@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2017 by Contributors
  * \file thread_pool.cc
- * \brief Threadpool for multi-threading runtime.
+ * @brief Threadpool for multi-threading runtime.
  */
 #include <dgl/runtime/c_backend_api.h>
 #include <dgl/runtime/c_runtime_api.h>
@@ -31,7 +31,7 @@ namespace runtime {
 constexpr int kSyncStride = 64 / sizeof(std::atomic<int>);
 
 /*!
- * \brief Thread local master environment.
+ * @brief Thread local master environment.
  */
 class ParallelLauncher {
  public:
@@ -126,7 +126,7 @@ class SpscTaskQueue {
   ~SpscTaskQueue() { delete[] buffer_; }
 
   /*!
-   * \brief Push a task into the queue and notify the comsumer if it is on wait.
+   * @brief Push a task into the queue and notify the comsumer if it is on wait.
    * @param input The task to be dequeued.
    */
   void Push(const Task& input) {
@@ -140,7 +140,7 @@ class SpscTaskQueue {
   }
 
   /*!
-   * \brief Pop a task out of the queue and condition wait if no tasks.
+   * @brief Pop a task out of the queue and condition wait if no tasks.
    * @param output The pointer to the task to be dequeued.
    * @param spin_count The number of iterations to spin before sleep.
    * \return Whether pop is successful (true) or we need to exit now (false).
@@ -170,7 +170,7 @@ class SpscTaskQueue {
   }
 
   /*!
-   * \brief Signal to terminate the worker.
+   * @brief Signal to terminate the worker.
    */
   void SignalForKill() {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -180,7 +180,7 @@ class SpscTaskQueue {
 
  protected:
   /*!
-   * \brief Lock-free enqueue.
+   * @brief Lock-free enqueue.
    * @param input The task to be enqueued.
    * \return Whether the task is enqueued.
    */

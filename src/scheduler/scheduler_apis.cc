@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2018 by Contributors
  * \file scheduler/scheduler_apis.cc
- * \brief DGL scheduler APIs
+ * @brief DGL scheduler APIs
  */
 #include <dgl/array.h>
 #include <dgl/graph.h>

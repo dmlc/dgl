@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2018 by Contributors
  * \file dgl/sampler.h
- * \brief DGL sampler header.
+ * @brief DGL sampler header.
  */
 #ifndef DGL_SAMPLER_H_
 #define DGL_SAMPLER_H_
@@ -21,7 +21,7 @@ class ImmutableGraph;
 class SamplerOp {
  public:
   /*!
-   * \brief Sample a graph from the seed vertices with neighbor sampling.
+   * @brief Sample a graph from the seed vertices with neighbor sampling.
    * The neighbors are sampled with a uniform distribution.
    *
    * @param graphs A graph for sampling.
@@ -40,7 +40,7 @@ class SamplerOp {
       const bool add_self_loop, const ValueType *probability);
 
   /*!
-   * \brief Sample a graph from the seed vertices with layer sampling.
+   * @brief Sample a graph from the seed vertices with layer sampling.
    * The layers are sampled with a uniform distribution.
    *
    * @param graphs A graph for sampling.

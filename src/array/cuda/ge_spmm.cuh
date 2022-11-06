@@ -1,7 +1,7 @@
 /*!
  * Copyright (c) 2020 by Contributors
  * \file array/cuda/ge_spmm.cuh
- * \brief GE-SpMM CUDA kernel function header.
+ * @brief GE-SpMM CUDA kernel function header.
  */
 #ifndef DGL_ARRAY_CUDA_GE_SPMM_CUH_
 #define DGL_ARRAY_CUDA_GE_SPMM_CUH_
@@ -19,7 +19,7 @@ namespace aten {
 namespace cuda {
 
 /*!
- * \brief CUDA kernel of GE-SpMM on Csr.
+ * @brief CUDA kernel of GE-SpMM on Csr.
  * \note GE-SpMM: https://arxiv.org/pdf/2007.03179.pdf
  *       The grid dimension x and y are reordered for better performance.
  */

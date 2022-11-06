@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2017 by Contributors
  * \file random.cc
- * \brief Random number generator interfaces
+ * @brief Random number generator interfaces
  */
 
 #include <dgl/array.h>

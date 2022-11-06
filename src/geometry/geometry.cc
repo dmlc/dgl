@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
  * \file geometry/geometry.cc
- * \brief DGL geometry utilities implementation
+ * @brief DGL geometry utilities implementation
  */
 #include <dgl/array.h>
 #include <dgl/base_heterograph.h>

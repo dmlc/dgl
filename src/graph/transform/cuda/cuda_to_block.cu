@@ -14,7 +14,7 @@
  *  limitations under the License.
  *
  * \file graph/transform/cuda/cuda_to_block.cu
- * \brief Functions to convert a set of edges into a graph block with local
+ * @brief Functions to convert a set of edges into a graph block with local
  * ids.
  */
 
@@ -50,7 +50,7 @@ class DeviceNodeMapMaker {
   }
 
   /**
-   * \brief This function builds node maps for each node type, preserving the
+   * @brief This function builds node maps for each node type, preserving the
    * order of the input nodes. Here it is assumed the lhs_nodes are not unique,
    * and thus a unique list is generated.
    *
@@ -96,7 +96,7 @@ class DeviceNodeMapMaker {
   }
 
   /**
-   * \brief This function builds node maps for each node type, preserving the
+   * @brief This function builds node maps for each node type, preserving the
    * order of the input nodes. Here it is assumed both lhs_nodes and rhs_nodes
    * are unique.
    *

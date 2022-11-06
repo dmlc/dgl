@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file array/cuda/csr_mm.cu
- * \brief SpSpMM/SpGEMM C APIs and definitions.
+ * @brief SpSpMM/SpGEMM C APIs and definitions.
  */
 #include <dgl/array.h>
 #include <dgl/runtime/device_api.h>

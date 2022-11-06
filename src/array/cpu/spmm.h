@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file array/cpu/spmm.h
- * \brief SPMM CPU kernel function header.
+ * @brief SPMM CPU kernel function header.
  */
 #ifndef DGL_ARRAY_CPU_SPMM_H_
 #define DGL_ARRAY_CPU_SPMM_H_
@@ -33,7 +33,7 @@ namespace cpu {
 #if !defined(_WIN32)
 #ifdef USE_AVX
 /*!
- * \brief CPU kernel of SpMM on Csr format using Xbyak.
+ * @brief CPU kernel of SpMM on Csr format using Xbyak.
  * @param cpu_spec JIT'ed kernel
  * @param bcast Broadcast information.
  * @param csr The Csr matrix.
@@ -70,7 +70,7 @@ void SpMMSumCsrXbyak(
 #endif  // _WIN32
 
 /*!
- * \brief Naive CPU kernel of SpMM on Csr format.
+ * @brief Naive CPU kernel of SpMM on Csr format.
  * @param cpu_spec JIT'ed kernel
  * @param bcast Broadcast information.
  * @param csr The Csr matrix.
@@ -111,7 +111,7 @@ void SpMMSumCsrNaive(
 }
 
 /*!
- * \brief CPU kernel of SpMM on Csr format.
+ * @brief CPU kernel of SpMM on Csr format.
  * @param bcast Broadcast information.
  * @param csr The Csr matrix.
  * @param ufeat The feature on source nodes.
@@ -177,7 +177,7 @@ void SpMMSumCsr(
 }
 
 /*!
- * \brief CPU kernel of SpMM on Coo format.
+ * @brief CPU kernel of SpMM on Coo format.
  * @param bcast Broadcast information.
  * @param coo The Coo matrix.
  * @param ufeat The feature on source nodes.
@@ -226,7 +226,7 @@ void SpMMSumCoo(
 }
 
 /*!
- * \brief CPU kernel of SpMM-Min/Max on Csr format.
+ * @brief CPU kernel of SpMM-Min/Max on Csr format.
  * @param bcast Broadcast information.
  * @param csr The Csr matrix.
  * @param ufeat The feature on source nodes.
@@ -323,7 +323,7 @@ void SpMMCmpCsr(
 }
 
 /*!
- * \brief CPU kernel of SpMM-Min/Max on Csr format.
+ * @brief CPU kernel of SpMM-Min/Max on Csr format.
  * @param bcast Broadcast information.
  * @param csr The Csr matrix.
  * @param ufeat The feature on source nodes.
@@ -419,7 +419,7 @@ void SpMMCmpCsrHetero(
 }
 
 /*!
- * \brief CPU kernel of SpMM-Min/Max on Coo format.
+ * @brief CPU kernel of SpMM-Min/Max on Coo format.
  * @param bcast Broadcast information.
  * @param coo The Coo matrix.
  * @param ufeat The feature on source nodes.
@@ -485,7 +485,7 @@ void SpMMCmpCoo(
 }
 
 /*!
- * \brief CPU kernel of Edge_softmax_csr_forward on Csr format.
+ * @brief CPU kernel of Edge_softmax_csr_forward on Csr format.
  * @param bcast Broadcast information.
  * @param csr The Csr matrix.
  * @param ufeat The feature on source nodes.
@@ -533,7 +533,7 @@ void Edge_softmax_csr_forward(
 }
 
 /*!
- * \brief CPU kernel of Edge_softmax_csr_backward on Csr format.
+ * @brief CPU kernel of Edge_softmax_csr_backward on Csr format.
  * @param bcast Broadcast information.
  * @param csr The Csr matrix.
  * @param out The result of forward.

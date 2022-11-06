@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
  * \file graph/transform/cpu/knn.cc
- * \brief k-nearest-neighbor (KNN) implementation
+ * @brief k-nearest-neighbor (KNN) implementation
  */
 
 #include "../knn.h"
@@ -28,7 +28,7 @@ namespace impl {
 static constexpr int NN_DESCENT_BLOCK_SIZE = 16384;
 
 /*!
- * \brief Compute Euclidean distance between two vectors, return positive
+ * @brief Compute Euclidean distance between two vectors, return positive
  *  infinite value if the intermediate distance is greater than the worst
  *  distance.
  */
@@ -171,7 +171,7 @@ void BuildHeap(IdType* index, FloatType* dist, int k) {
 }
 
 /*!
- * \brief Neighbor update process in NN-descent. The distance between
+ * @brief Neighbor update process in NN-descent. The distance between
  *  two points are computed. If this new distance is less than any worst
  *  distance of these two points, we update the neighborhood of that point.
  */

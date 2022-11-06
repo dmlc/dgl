@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2017-2022 by Contributors
  * \file dgl/runtime/ndarray.h
- * \brief Abstract device memory management API
+ * @brief Abstract device memory management API
  */
 #ifndef DGL_RUNTIME_NDARRAY_H_
 #define DGL_RUNTIME_NDARRAY_H_
@@ -34,7 +34,7 @@ inline std::ostream& operator << (std::ostream& os, DGLDataType t);
 namespace dgl {
 
 /*!
- * \brief Type traits that converts a C type to a DGLDataType.
+ * @brief Type traits that converts a C type to a DGLDataType.
  *
  * Usage:
  * DGLDataTypeTraits<int>::dtype == dtype
@@ -70,12 +70,12 @@ GEN_DGLDATATYPETRAITS_FOR(double, kDGLFloat, 64);
 namespace runtime {
 
 /*!
- * \brief DLPack converter.
+ * @brief DLPack converter.
  */
 struct DLPackConvert;
 
 /*!
- * \brief Managed NDArray.
+ * @brief Managed NDArray.
  *  The array is backed by reference counted blocks.
  */
 class NDArray {
@@ -85,17 +85,17 @@ class NDArray {
   /*! \brief default constructor */
   NDArray() {}
   /*!
-   * \brief cosntruct a NDArray that refers to data
+   * @brief cosntruct a NDArray that refers to data
    * @param data The data this NDArray refers to
    */
   explicit inline NDArray(Container* data);
   /*!
-   * \brief copy constructor
+   * @brief copy constructor
    * @param other The value to be copied
    */
   inline NDArray(const NDArray& other);  // NOLINT(*)
   /*!
-   * \brief move constructor
+   * @brief move constructor
    * @param other The value to be moved
    */
   NDArray(NDArray&& other) // NOLINT(*)
@@ -107,14 +107,14 @@ class NDArray {
     this->reset();
   }
   /*!
-   * \brief Swap this array with another NDArray
+   * @brief Swap this array with another NDArray
    * @param other The other NDArray
    */
   void swap(NDArray& other) {  // NOLINT(*)
     std::swap(data_, other.data_);
   }
   /*!
-   * \brief copy assignmemt
+   * @brief copy assignmemt
    * @param other The value to be assigned.
    * \return reference to self.
    */
@@ -124,7 +124,7 @@ class NDArray {
     return *this;
   }
   /*!
-   * \brief move assignmemt
+   * @brief move assignmemt
    * @param other The value to be assigned.
    * \return reference to self.
    */
@@ -161,7 +161,7 @@ class NDArray {
       return static_cast<T*>(operator->()->data);
   }
    /*!
-   * \brief Copy data content from/into another array.
+   * @brief Copy data content from/into another array.
    * @param other The source array to be copied from.
    * \note The copy runs on the dgl internal stream if it involves a GPU context.
    */
@@ -171,17 +171,17 @@ class NDArray {
   inline void CopyTo(const NDArray &other) const;
 
   /*!
-   * \brief Copy the data to another context.
+   * @brief Copy the data to another context.
    * @param ctx The target context.
    * \return The array under another context.
    */
   inline NDArray CopyTo(const DGLContext &ctx) const;
   /*!
-   * \brief Return a new array with a copy of the content.
+   * @brief Return a new array with a copy of the content.
    */
   inline NDArray Clone() const;
   /*!
-   * \brief In-place method to pin the current array by calling PinContainer
+   * @brief In-place method to pin the current array by calling PinContainer
    *        on the underlying NDArray:Container.
    * \note This is an in-place method. Behavior depends on the current context,
    *       kDGLCPU: will be pinned;
@@ -190,7 +190,7 @@ class NDArray {
    */
   inline void PinMemory_();
   /*!
-   * \brief In-place method to unpin the current array by calling UnpinContainer
+   * @brief In-place method to unpin the current array by calling UnpinContainer
    *        on the underlying NDArray:Container.
    * \note This is an in-place method. Behavior depends on the current context,
    *       IsPinned: will be unpinned;
@@ -198,27 +198,27 @@ class NDArray {
    */
   inline void UnpinMemory_();
   /*!
-   * \brief Check if the array is pinned.
+   * @brief Check if the array is pinned.
    */
   inline bool IsPinned() const;
   /*!
-   * \brief Record streams that are using the underlying tensor.
+   * @brief Record streams that are using the underlying tensor.
    * @param stream The stream that is using the underlying tensor.
    */
   inline void RecordStream(DGLStreamHandle stream) const;
   /*!
-   * \brief Load NDArray from stream
+   * @brief Load NDArray from stream
    * @param stream The input data stream
    * \return Whether load is successful
    */
   bool Load(dmlc::Stream* stream);
   /*!
-   * \brief Save NDArray to stream
+   * @brief Save NDArray to stream
    * @param stream The output data stream
    */
   void Save(dmlc::Stream* stream) const;
   /*!
-   * \brief Create a NDArray that shares the data memory with the current one.
+   * @brief Create a NDArray that shares the data memory with the current one.
    * @param shape The shape of the new array.
    * @param dtype The data type of the new array.
    * @param offset The offset (in bytes) of the starting pointer.
@@ -227,7 +227,7 @@ class NDArray {
   DGL_DLL NDArray CreateView(
       std::vector<int64_t> shape, DGLDataType dtype, int64_t offset = 0);
   /*!
-   * \brief Create an empty NDArray.
+   * @brief Create an empty NDArray.
    * @param shape The shape of the new array.
    * @param dtype The data type of the new array.
    * @param ctx The context of the Array.
@@ -237,7 +237,7 @@ class NDArray {
                                DGLDataType dtype,
                                DGLContext ctx);
   /*!
-   * \brief Create an empty NDArray with shared memory.
+   * @brief Create an empty NDArray with shared memory.
    * @param name The name of shared memory.
    * @param shape The shape of the new array.
    * @param dtype The data type of the new array.
@@ -251,17 +251,17 @@ class NDArray {
                                      DGLContext ctx,
                                      bool is_create);
   /*!
-   * \brief Get the size of the array in the number of bytes.
+   * @brief Get the size of the array in the number of bytes.
    */
   size_t GetSize() const;
 
   /*!
-   * \brief Get the number of elements in this array.
+   * @brief Get the number of elements in this array.
    */
   int64_t NumElements() const;
 
   /*!
-   * \brief Create a NDArray by copying from std::vector.
+   * @brief Create a NDArray by copying from std::vector.
    * \tparam T Type of vector data.  Determines the dtype of returned array.
    */
   template<typename T>
@@ -269,13 +269,13 @@ class NDArray {
       const std::vector<T>& vec, DGLContext ctx = DGLContext{kDGLCPU, 0});
 
   /*!
-   * \brief Create a NDArray from a raw pointer.
+   * @brief Create a NDArray from a raw pointer.
    */
   DGL_DLL static NDArray CreateFromRaw(const std::vector<int64_t>& shape,
       DGLDataType dtype, DGLContext ctx, void* raw, bool auto_free);
 
   /*!
-   * \brief Create a std::vector from a 1D NDArray.
+   * @brief Create a std::vector from a 1D NDArray.
    * \tparam T Type of vector data.
    * \note Type casting is NOT performed.  The caller has to make sure that the vector
    *       type matches the dtype of NDArray.
@@ -286,7 +286,7 @@ class NDArray {
   std::shared_ptr<SharedMemory> GetSharedMem() const;
 
   /*!
-   * \brief Function to copy data from one array to another.
+   * @brief Function to copy data from one array to another.
    * @param from The source array.
    * @param to The target array.
    * @param (optional) stream The stream used in copy.
@@ -297,7 +297,7 @@ class NDArray {
       DGLArray* from, DGLArray* to, DGLStreamHandle stream);
 
   /*!
-   * \brief Function to pin the DGLArray of a Container.
+   * @brief Function to pin the DGLArray of a Container.
    * @param ptr The container to be pinned.
    * \note Data of the given array will be pinned inplace.
    *       Behavior depends on the current context,
@@ -308,7 +308,7 @@ class NDArray {
   DGL_DLL static void PinContainer(Container* ptr);
 
   /*!
-   * \brief Function to unpin the DGLArray of a Container.
+   * @brief Function to unpin the DGLArray of a Container.
    * @param ptr The container to be unpinned.
    * \note Data of the given array will be unpinned inplace.
    *       Behavior depends on the current context,
@@ -318,14 +318,14 @@ class NDArray {
   DGL_DLL static void UnpinContainer(Container* ptr);
 
   /*!
-   * \brief Function check if the DGLArray of a Container is pinned.
+   * @brief Function check if the DGLArray of a Container is pinned.
    * @param ptr The container to be checked.
    * \return true if pinned.
    */
   DGL_DLL static bool IsContainerPinned(Container* ptr);
 
   /*!
-   * \brief Record streams that are using this tensor.
+   * @brief Record streams that are using this tensor.
    * @param ptr Pointer of the tensor to be recorded.
    * @param stream The stream that is using this tensor.
    */
@@ -354,7 +354,7 @@ class NDArray {
 };
 
 /*!
- * \brief Save a DGLArray to stream
+ * @brief Save a DGLArray to stream
  * @param strm The outpu stream
  * @param tensor The tensor to be saved.
  */
@@ -362,7 +362,7 @@ inline bool SaveDGLArray(dmlc::Stream* strm, const DGLArray* tensor);
 
 
 /*!
- * \brief Reference counted Container object used to back NDArray.
+ * @brief Reference counted Container object used to back NDArray.
  *
  *  This object is DGLArray compatible:
  *    the pointer to the NDArrayContainer can be directly
@@ -377,21 +377,21 @@ struct NDArray::Container {
    * is only called when the reference counter goes to 0
    */
   /*!
-   * \brief Tensor structure.
+   * @brief Tensor structure.
    * \note it is important that the first field is DGLArray
    *  So that this data structure is DGLArray compatible.
    *  The head ptr of this struct can be viewed as DGLArray*.
    */
   DGLArray dl_tensor;
   /*!
-   * \brief addtional context, reserved for recycling
+   * @brief addtional context, reserved for recycling
    * \note We can attach additional content here
    *  which the current container depend on
    *  (e.g. reference to original memory when creating views).
    */
   void* manager_ctx{nullptr};
   /*!
-   * \brief Customized deleter
+   * @brief Customized deleter
    *
    * \note The customized deleter is helpful to enable
    *  different ways of memory allocator that are not
@@ -427,12 +427,12 @@ struct NDArray::Container {
   friend class NDArray;
   friend class RPCWrappedFunc;
   /*!
-   * \brief The shape container,
+   * @brief The shape container,
    *  can be used for shape data.
    */
   std::vector<int64_t> shape_;
   /*!
-   * \brief The stride container,
+   * @brief The stride container,
    *  can be used for stride data.
    */
   std::vector<int64_t> stride_;
@@ -580,7 +580,7 @@ inline bool SaveDGLArray(dmlc::Stream* strm,
 }
 
 /*!
- * \brief Convert type code to its name
+ * @brief Convert type code to its name
  * @param type_code The type code .
  * \return The name of type code.
  */
@@ -606,7 +606,7 @@ inline const char* TypeCode2Str(int type_code) {
 }
 
 /*!
- * \brief Convert device type code to its name
+ * @brief Convert device type code to its name
  * @param device_type The device type code.
  * \return The name of the device.
  */
@@ -620,7 +620,7 @@ inline const char* DeviceTypeCode2Str(DGLDeviceType device_type) {
 }
 
 /*!
- * \brief convert a string to DGL type.
+ * @brief convert a string to DGL type.
  * @param s The string to be converted.
  * \return The corresponding dgl type.
  */
@@ -652,7 +652,7 @@ inline DGLDataType String2DGLDataType(std::string s) {
 }
 
 /*!
- * \brief convert a DGL type to string.
+ * @brief convert a DGL type to string.
  * @param t The type to be converted.
  * \return The corresponding dgl type in string.
  */

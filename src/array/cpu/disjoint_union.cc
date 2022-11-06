@@ -14,7 +14,7 @@
  *   limitations under the License.
  *
  * \file array/cpu/disjoint_union.cc
- * \brief Disjoint union CPU implementation.
+ * @brief Disjoint union CPU implementation.
  */
 
 #include <dgl/array.h>

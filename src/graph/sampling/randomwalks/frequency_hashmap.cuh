@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2021 by Contributors
  * \file graph/sampling/frequency_hashmap.cuh
- * \brief frequency hashmap - used to select top-k frequency edges of each node
+ * @brief frequency hashmap - used to select top-k frequency edges of each node
  */
 
 #ifndef DGL_GRAPH_SAMPLING_RANDOMWALKS_FREQUENCY_HASHMAP_CUH_

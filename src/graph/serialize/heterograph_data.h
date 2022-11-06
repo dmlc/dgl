@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
  * \file graph/serialize/heterograph_data.h
- * \brief Graph serialization header
+ * @brief Graph serialization header
  */
 #ifndef DGL_GRAPH_SERIALIZE_HETEROGRAPH_DATA_H_
 #define DGL_GRAPH_SERIALIZE_HETEROGRAPH_DATA_H_

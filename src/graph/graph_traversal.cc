@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2018 by Contributors
  * \file graph/traversal.cc
- * \brief Graph traversal implementation
+ * @brief Graph traversal implementation
  */
 #include <dgl/graph_traversal.h>
 #include <dgl/packed_func_ext.h>

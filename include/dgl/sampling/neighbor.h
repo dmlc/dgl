@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file dgl/sampling/neighbor.h
- * \brief Neighborhood-based sampling.
+ * @brief Neighborhood-based sampling.
  */
 #ifndef DGL_SAMPLING_NEIGHBOR_H_
 #define DGL_SAMPLING_NEIGHBOR_H_
@@ -15,7 +15,7 @@ namespace dgl {
 namespace sampling {
 
 /*!
- * \brief Sample from the neighbors of the given nodes and return the sampled
+ * @brief Sample from the neighbors of the given nodes and return the sampled
  * edges as a graph.
  *
  * When sampling with replacement, the sampled subgraph could have parallel

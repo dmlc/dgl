@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2017 by Contributors
  * \file thread_storage_scope.h
- * \brief Extract thread axis configuration from DGLArgs.
+ * @brief Extract thread axis configuration from DGLArgs.
  */
 #ifndef DGL_RUNTIME_THREAD_STORAGE_SCOPE_H_
 #define DGL_RUNTIME_THREAD_STORAGE_SCOPE_H_
@@ -15,7 +15,7 @@ namespace dgl {
 namespace runtime {
 
 /*!
- * \brief Memory hierachy rank in the storage system
+ * @brief Memory hierachy rank in the storage system
  * \note The global rank and shared rank have one to one
  *       correspondence to the thread rank.
  */
@@ -25,7 +25,7 @@ enum class StorageRank {
   /*! \brief shared memory among thread group */
   kShared = 1,
   /*!
-   * \brief reserved for warp memory.
+   * @brief reserved for warp memory.
    *  This is only used by programming model.
    *  There is no such memory usually in GPU.
    *  Instead, we can simulate it by registers and shuffle.
@@ -84,7 +84,7 @@ struct StorageScope {
     }
   }
   /*!
-   * \brief make storage scope from string
+   * @brief make storage scope from string
    * @param s The string to be parsed.
    * \return The storage scope.
    */
@@ -116,7 +116,7 @@ struct ThreadScope {
   /*! \brief the dimension index under the rank */
   int dim_index{0};
   /*!
-   * \brief make storage scope from string
+   * @brief make storage scope from string
    * @param s The string to be parsed.
    * \return The storage scope.
    */

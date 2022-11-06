@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file array/cpu/spmm.h
- * \brief Segment reduce kernel function header.
+ * @brief Segment reduce kernel function header.
  */
 #ifndef DGL_ARRAY_CPU_SEGMENT_REDUCE_H_
 #define DGL_ARRAY_CPU_SEGMENT_REDUCE_H_
@@ -18,7 +18,7 @@ namespace aten {
 namespace cpu {
 
 /*!
- * \brief CPU kernel of segment sum.
+ * @brief CPU kernel of segment sum.
  * @param feat The input tensor.
  * @param offsets The offset tensor storing the ranges of segments.
  * @param out The output tensor.
@@ -43,7 +43,7 @@ void SegmentSum(NDArray feat, NDArray offsets, NDArray out) {
 }
 
 /*!
- * \brief CPU kernel of segment min/max.
+ * @brief CPU kernel of segment min/max.
  * @param feat The input tensor.
  * @param offsets The offset tensor storing the ranges of segments.
  * @param out The output tensor.
@@ -77,7 +77,7 @@ void SegmentCmp(NDArray feat, NDArray offsets, NDArray out, NDArray arg) {
 }
 
 /*!
- * \brief CPU kernel of Scatter Add (on first dimension) operator.
+ * @brief CPU kernel of Scatter Add (on first dimension) operator.
  * \note math equation: out[idx[i], *] += feat[i, *]
  * @param feat The input tensor.
  * @param idx The indices tensor.
@@ -102,7 +102,7 @@ void ScatterAdd(NDArray feat, NDArray idx, NDArray out) {
 }
 
 /*!
- * \brief CPU kernel to update gradients for reduce op max/min
+ * @brief CPU kernel to update gradients for reduce op max/min
  * @param graph The input heterogeneous graph.
  * @param op The binary operator, could be `copy_u`, `copy_e'.
  * @param list_feat List of the input tensors.
@@ -160,7 +160,7 @@ void UpdateGradMinMax_hetero(
 }
 
 /*!
- * \brief CPU kernel of backward phase of segment min/max.
+ * @brief CPU kernel of backward phase of segment min/max.
  * \note math equation: out[arg[i, k], k] = feat[i, k]
  * @param feat The input tensor.
  * @param arg The argmin/argmax tensor.

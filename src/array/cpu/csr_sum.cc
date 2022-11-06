@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
  * \file array/cpu/csr_sum.cc
- * \brief CSR Summation
+ * @brief CSR Summation
  */
 
 #include <dgl/array.h>

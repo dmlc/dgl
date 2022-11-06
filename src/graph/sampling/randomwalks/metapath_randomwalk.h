@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2018 by Contributors
  * \file graph/sampler/generic_randomwalk_cpu.h
- * \brief DGL sampler - templated implementation definition of random walks on
+ * @brief DGL sampler - templated implementation definition of random walks on
  * CPU
  */
 
@@ -38,7 +38,7 @@ template <typename IdxType>
 using TerminatePredicate = std::function<bool(IdxType *, dgl_id_t, int64_t)>;
 
 /*!
- * \brief Select one successor of metapath-based random walk, given the path
+ * @brief Select one successor of metapath-based random walk, given the path
  * generated so far.
  *
  * @param data The path generated so far, of type \c IdxType.
@@ -104,7 +104,7 @@ std::tuple<dgl_id_t, dgl_id_t, bool> MetapathRandomWalkStep(
 }
 
 /*!
- * \brief Select one successor of metapath-based random walk, given the path
+ * @brief Select one successor of metapath-based random walk, given the path
  * generated so far specifically for the uniform probability distribution.
  *
  * @param data The path generated so far, of type \c IdxType.
@@ -155,7 +155,7 @@ std::tuple<dgl_id_t, dgl_id_t, bool> MetapathRandomWalkStepUniform(
 }
 
 /*!
- * \brief Metapath-based random walk.
+ * @brief Metapath-based random walk.
  * @param hg The heterograph.
  * @param seeds A 1D array of seed nodes, with the type the source type of the
  * first edge type in the metapath. \param metapath A 1D array of edge types

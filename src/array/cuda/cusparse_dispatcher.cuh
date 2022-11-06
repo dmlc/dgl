@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file array/cuda/dispatcher.cuh
- * \brief Templates to dispatch into different cuSPARSE routines based on the type
+ * @brief Templates to dispatch into different cuSPARSE routines based on the type
  *        argument.
  */
 #ifndef DGL_ARRAY_CUDA_CUSPARSE_DISPATCHER_CUH_

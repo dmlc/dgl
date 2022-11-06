@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file dgl/sampling/negative.h
- * \brief Negative sampling.
+ * @brief Negative sampling.
  */
 #ifndef DGL_SAMPLING_NEGATIVE_H_
 #define DGL_SAMPLING_NEGATIVE_H_
@@ -15,7 +15,7 @@ namespace dgl {
 namespace sampling {
 
 /*!
- * \brief Given an edge type, uniformly sample source-destination pairs that do
+ * @brief Given an edge type, uniformly sample source-destination pairs that do
  * not have an edge in between using rejection sampling.
  *
  * \note This function may not return the same number of elements as the given

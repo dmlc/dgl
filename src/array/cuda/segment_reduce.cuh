@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file array/cuda/segment_reduce.cuh
- * \brief Segment reduce kernel function header.
+ * @brief Segment reduce kernel function header.
  */
 #ifndef DGL_ARRAY_CUDA_SEGMENT_REDUCE_CUH_
 #define DGL_ARRAY_CUDA_SEGMENT_REDUCE_CUH_
@@ -21,7 +21,7 @@ namespace aten {
 namespace cuda {
 
 /*!
- * \brief CUDA kernel of segment reduce.
+ * @brief CUDA kernel of segment reduce.
  * \note each blockthread is responsible for aggregation on a row
  *       in the result tensor.
  */
@@ -45,7 +45,7 @@ __global__ void SegmentReduceKernel(
 }
 
 /*!
- * \brief CUDA kernel of scatter add.
+ * @brief CUDA kernel of scatter add.
  * \note each blockthread is responsible for adding a row in feature tensor
  *       to a target row in output tensor.
  */
@@ -63,7 +63,7 @@ __global__ void ScatterAddKernel(
 }
 
 /*!
- * \brief CUDA kernel to update gradients for reduce op max/min
+ * @brief CUDA kernel to update gradients for reduce op max/min
  * \note each WARP (group of 32 threads) is responsible for adding a row in
  * feature tensor to a target row in output tensor.
  */
@@ -91,7 +91,7 @@ __global__ void UpdateGradMinMaxHeteroKernel(
 }
 
 /*!
- * \brief CUDA kernel of backward phase in segment min/max.
+ * @brief CUDA kernel of backward phase in segment min/max.
  * \note each blockthread is responsible for writing a row in the
  *       result gradient tensor by lookup the ArgMin/Max for index information.
  */
@@ -111,7 +111,7 @@ __global__ void BackwardSegmentCmpKernel(
 }
 
 /*!
- * \brief CUDA implementation of forward phase of Segment Reduce.
+ * @brief CUDA implementation of forward phase of Segment Reduce.
  * @param feat The input tensor.
  * @param offsets The offsets tensor.
  * @param out The output tensor.
@@ -142,7 +142,7 @@ void SegmentReduce(NDArray feat, NDArray offsets, NDArray out, NDArray arg) {
 }
 
 /*!
- * \brief CUDA implementation of Scatter Add (on first dimension).
+ * @brief CUDA implementation of Scatter Add (on first dimension).
  * \note math equation: out[idx[i], *] += feat[i, *]
  * @param feat The input tensor.
  * @param idx The indices tensor.
@@ -171,7 +171,7 @@ void ScatterAdd(NDArray feat, NDArray idx, NDArray out) {
 }
 
 /*!
- * \brief CUDA implementation to update gradients for reduce op max/min
+ * @brief CUDA implementation to update gradients for reduce op max/min
  * @param graph The input heterogeneous graph.
  * @param op The binary operator, could be `copy_u`, `copy_e'.
  * @param list_feat List of the input tensors.
@@ -224,7 +224,7 @@ void UpdateGradMinMax_hetero(
 }
 
 /*!
- * \brief CUDA implementation of backward phase of Segment Reduce with Min/Max
+ * @brief CUDA implementation of backward phase of Segment Reduce with Min/Max
  *        reducer.
  * \note math equation: out[arg[i, k], k] = feat[i, k] \param feat The input
  *       tensor.

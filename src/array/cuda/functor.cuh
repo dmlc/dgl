@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file array/cuda/functor.cuh
- * \brief Functors for template on CUDA
+ * @brief Functors for template on CUDA
  */
 #ifndef DGL_ARRAY_CUDA_FUNCTOR_CUH_
 #define DGL_ARRAY_CUDA_FUNCTOR_CUH_

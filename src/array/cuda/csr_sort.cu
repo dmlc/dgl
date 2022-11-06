@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file array/cuda/csr_sort.cc
- * \brief Sort CSR index
+ * @brief Sort CSR index
  */
 #include <dgl/array.h>
 
@@ -17,7 +17,7 @@ namespace aten {
 namespace impl {
 
 /*!
- * \brief Check whether each row is sorted.
+ * @brief Check whether each row is sorted.
  */
 template <typename IdType>
 __global__ void _SegmentIsSorted(

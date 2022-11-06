@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
  * \file dgl/transform.h
- * \brief DGL graph transformations
+ * @brief DGL graph transformations
  */
 
 #ifndef DGL_TRANSFORM_H_
@@ -19,7 +19,7 @@ namespace dgl {
 namespace transform {
 
 /*!
- * \brief Given a list of graphs, remove the common nodes that do not have
+ * @brief Given a list of graphs, remove the common nodes that do not have
  * inbound and outbound edges.
  *
  * The graphs should have identical node ID space (i.e. should have the same set
@@ -38,7 +38,7 @@ std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>> CompactGraphs(
     const std::vector<IdArray> &always_preserve);
 
 /*!
- * \brief Convert a graph into a bipartite-structured graph for message passing.
+ * @brief Convert a graph into a bipartite-structured graph for message passing.
  *
  * Specifically, we create one node type \c ntype_l on the "left" side and
  * another node type \c ntype_r on the "right" side for each node type \c ntype.
@@ -84,7 +84,7 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>> ToBlock(
     bool include_rhs_in_lhs);
 
 /*!
- * \brief Convert a multigraph to a simple graph.
+ * @brief Convert a multigraph to a simple graph.
  *
  * \return A triplet of
  * * \c hg : The said simple graph.
@@ -117,7 +117,7 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>>
 ToSimpleGraph(const HeteroGraphPtr graph);
 
 /*!
- * \brief Remove edges from a graph.
+ * @brief Remove edges from a graph.
  *
  * @param graph The graph.
  * @param eids The edge IDs to remove per edge type.

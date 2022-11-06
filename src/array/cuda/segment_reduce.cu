@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file array/cuda/segment_reduce.cu
- * \brief Segment reduce C APIs and definitions.
+ * @brief Segment reduce C APIs and definitions.
  */
 #include <dgl/array.h>
 #include <dgl/base_heterograph.h>

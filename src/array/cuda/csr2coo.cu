@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file array/cuda/csr2coo.cc
- * \brief CSR2COO
+ * @brief CSR2COO
  */
 #include <dgl/array.h>
 
@@ -46,7 +46,7 @@ COOMatrix CSRToCOO<kDGLCUDA, int32_t>(CSRMatrix csr) {
 }
 
 /*!
- * \brief Repeat elements
+ * @brief Repeat elements
  * @param val Value to repeat
  * @param repeats Number of repeats for each value
  * @param pos The position of the output buffer to write the value.

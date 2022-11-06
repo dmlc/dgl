@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2018 by Contributors
  * \file graph/graph.cc
- * \brief DGL graph index APIs
+ * @brief DGL graph index APIs
  */
 #include <dgl/graph.h>
 #include <dgl/graph_op.h>

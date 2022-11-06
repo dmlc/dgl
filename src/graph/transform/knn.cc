@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
  * \file graph/transform/knn.cc
- * \brief k-nearest-neighbor (KNN) interface
+ * @brief k-nearest-neighbor (KNN) interface
  */
 
 #include "knn.h"

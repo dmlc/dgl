@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2021 by Contributors
  * \file semaphore_wrapper.cc
- * \brief A simple corss platform semaphore wrapper
+ * @brief A simple corss platform semaphore wrapper
  */
 #include "semaphore_wrapper.h"
 

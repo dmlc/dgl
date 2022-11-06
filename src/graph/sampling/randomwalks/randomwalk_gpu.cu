@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2021-2022 by Contributors
  * \file graph/sampling/randomwalk_gpu.cu
- * \brief CUDA random walk sampleing
+ * @brief CUDA random walk sampleing
  */
 
 #include <curand_kernel.h>
@@ -239,7 +239,7 @@ std::pair<IdArray, IdArray> RandomWalkUniform(
 }
 
 /**
- * \brief Random walk for biased choice. We use inverse transform sampling to
+ * @brief Random walk for biased choice. We use inverse transform sampling to
  * choose the next step.
  */
 template <DGLDeviceType XPU, typename FloatType, typename IdType>

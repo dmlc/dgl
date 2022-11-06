@@ -14,7 +14,7 @@
  *  limitations under the License.
  *
  * \file graph/transform/to_bipartite.h
- * \brief Functions to convert a set of edges into a graph block with local
+ * @brief Functions to convert a set of edges into a graph block with local
  * ids.
  */
 

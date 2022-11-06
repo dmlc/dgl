@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file array/cpu/spmm_binary_ops.h
- * \brief SPMM CPU Binary ops.
+ * @brief SPMM CPU Binary ops.
  */
 #ifndef DGL_ARRAY_CPU_SPMM_BINARY_OPS_H_
 #define DGL_ARRAY_CPU_SPMM_BINARY_OPS_H_

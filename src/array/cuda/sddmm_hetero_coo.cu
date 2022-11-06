@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file array/cuda/sddmm.cu
- * \brief SDDMM C APIs and definitions.
+ * @brief SDDMM C APIs and definitions.
  */
 #include <dgl/array.h>
 #include "./sddmm.cuh"
@@ -10,7 +10,7 @@ namespace dgl {
 namespace aten {
 
 /*!
- * \brief CUDA implementation of g-SDDMM on heterograph using
+ * @brief CUDA implementation of g-SDDMM on heterograph using
     Csr format.
  */
 template <int XPU, typename IdType, typename DType>

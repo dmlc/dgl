@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2018 by Contributors
  * \file dgl/runtime/threading_backend.h
- * \brief Utilities for manipulating thread pool threads.
+ * @brief Utilities for manipulating thread pool threads.
  */
 #ifndef DGL_RUNTIME_THREADING_BACKEND_H_
 #define DGL_RUNTIME_THREADING_BACKEND_H_
@@ -15,7 +15,7 @@ namespace runtime {
 namespace threading {
 
 /*!
- * \brief A platform-agnostic abstraction for managing a collection of
+ * @brief A platform-agnostic abstraction for managing a collection of
  *        thread pool threads.
  */
 class ThreadGroup {
@@ -23,7 +23,7 @@ class ThreadGroup {
   class Impl;
 
   /*!
-   * \brief Creates a collection of threads which run a provided function.
+   * @brief Creates a collection of threads which run a provided function.
    *
    * @param num_workers The total number of worker threads in this group.
             Includes main thread if `exclude_worker0 = true`
@@ -40,7 +40,7 @@ class ThreadGroup {
   ~ThreadGroup();
 
   /*!
-   * \brief Blocks until all non-main threads in the pool finish.
+   * @brief Blocks until all non-main threads in the pool finish.
    */
   void Join();
 
@@ -50,7 +50,7 @@ class ThreadGroup {
   };
 
   /*!
-   * \brief configure the CPU id affinity
+   * @brief configure the CPU id affinity
    *
    * @param mode The preferred CPU type (1 = big, -1 = little).
    * @param nthreads The number of threads to use (0 = use all).
@@ -68,7 +68,7 @@ class ThreadGroup {
 };
 
 /*!
- * \brief Platform-agnostic no-op.
+ * @brief Platform-agnostic no-op.
  */
 // This used to be Yield(), renaming to YieldThread() because windows.h defined
 // it as a macro in later SDKs.

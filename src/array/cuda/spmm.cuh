@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file array/cuda/spmm.cuh
- * \brief SPMM CUDA kernel function header.
+ * @brief SPMM CUDA kernel function header.
  */
 #ifndef DGL_ARRAY_CUDA_SPMM_CUH_
 #define DGL_ARRAY_CUDA_SPMM_CUH_
@@ -22,7 +22,7 @@ using namespace cuda;
 namespace aten {
 
 /*!
- * \brief Determine whether cusparse SpMM function is applicable.
+ * @brief Determine whether cusparse SpMM function is applicable.
  */
 template <typename DType, typename IdType>
 inline bool cusparse_available(bool more_nnz_than_matrix_size) {
@@ -98,7 +98,7 @@ cublasStatus_t Xgeam<double>(cublasHandle_t handle, cublasOperation_t transa,
       beta, B, ldb, C, ldc);
 }
 
-/* \brief IndexSelect operator kernel implementation.
+/* @brief IndexSelect operator kernel implementation.
  * \note duplicate of IndexSelectKernel defined in array_index_select.cu
  */
 template <typename DType, typename IdType>
@@ -112,7 +112,7 @@ __global__ void _IndexSelectKernel(
     out[i * m + j] = in[idx[i] * m + j];
 }
 
-/* \brief Transpose operator kernel implementation.
+/* @brief Transpose operator kernel implementation.
  * \note not efficient but it's not a bottleneck, used for float16 dtype.
  */
 template <typename DType>
@@ -126,7 +126,7 @@ __global__ void _TransposeKernel(
 }
 
 /*
- * \brief Tranpose the input matrix.
+ * @brief Tranpose the input matrix.
  * @param row number of rows of input matrix.
  * @param col number of columns of input matrix.
  */
@@ -150,7 +150,7 @@ void _Transpose(const DType* in, DType* out,
 }
 
 /*
- * \brief Tranpose the input matrix for data type half.
+ * @brief Tranpose the input matrix for data type half.
  * \note cuBLAS has no geam API for half data type, fallback to our kernel.
  */
 template <>
@@ -164,7 +164,7 @@ void _Transpose<half>(const half* in, half* out,
 
 #if BF16_ENABLED
 /*
- * \brief Tranpose the input matrix for data type half.
+ * @brief Tranpose the input matrix for data type half.
  * \note cuBLAS has no geam API for bf16 data type, fallback to our kernel.
  */
 template <>
@@ -178,7 +178,7 @@ void _Transpose<__nv_bfloat16>(const __nv_bfloat16* in, __nv_bfloat16* out,
 #endif  // BF16_ENABLED
 
 /*
- * \brief
+ * @brief
  */
 template <typename DType, typename IdType>
 __global__ void _IndexSelectKernel(const DType* array, const IdType* index,
@@ -191,7 +191,7 @@ __global__ void _IndexSelectKernel(const DType* array, const IdType* index,
   }
 }
 
-/* \brief IndexSelect operator.
+/* @brief IndexSelect operator.
  * \note duplicate of IndexSelect defined in array_op.h but it can
  *    not be applied to float16 dtype.
  */
@@ -477,7 +477,7 @@ namespace cuda {
 
 
 /*!
- * \brief CUDA kernel of g-SpMM on Coo format.
+ * @brief CUDA kernel of g-SpMM on Coo format.
  * \note it uses edge parallel strategy, different threadblocks (on y-axis)
  *       is responsible for the computation on different edges. Threadblocks
  *       on the x-axis are responsible for the computation on different positions
@@ -526,7 +526,7 @@ __global__ void SpMMCooKernel(
 }
 
 /*!
- * \brief CUDA kernel to compute argu and arge in g-SpMM on Coo format.
+ * @brief CUDA kernel to compute argu and arge in g-SpMM on Coo format.
  * \note it uses edge parallel strategy, different threadblocks (on y-axis)
  *       is responsible for the computation on different edges. Threadblocks
  *       on the x-axis are responsible for the computation on different positions
@@ -574,7 +574,7 @@ __global__ void ArgSpMMCooKernel(
 }
 
 /*!
- * \brief CUDA kernel of g-SpMM on Csr format.
+ * @brief CUDA kernel of g-SpMM on Csr format.
  * \note it uses node parallel strategy, different threadblocks (on y-axis)
  *       is responsible for the computation on different destination nodes.
  *       Threadblocks on the x-axis are responsible for the computation on
@@ -632,7 +632,7 @@ __global__ void SpMMCsrKernel(
 }
 
 /*!
- * \brief CUDA kernel of SpMM-Min/Max on Csr format.
+ * @brief CUDA kernel of SpMM-Min/Max on Csr format.
  * \note it uses node parallel strategy, different threadblocks (on y-axis)
  *       is responsible for the computation on different destination nodes.
  *       Threadblocks on the x-axis are responsible for the computation on
@@ -693,7 +693,7 @@ __global__ void SpMMCmpCsrHeteroKernel(
 }
 
 /*!
- * \brief CUDA implementation of g-SpMM on Coo format.
+ * @brief CUDA implementation of g-SpMM on Coo format.
  * @param bcast Broadcast information.
  * @param coo The Coo matrix.
  * @param ufeat The feature on source nodes.
@@ -770,7 +770,7 @@ void SpMMCoo(
 }
 
 /*!
- * \brief CUDA implementation of g-SpMM on Csr format.
+ * @brief CUDA implementation of g-SpMM on Csr format.
  * @param bcast Broadcast information.
  * @param csr The Csr matrix.
  * @param ufeat The feature on source nodes.
@@ -825,7 +825,7 @@ void SpMMCsr(
 }
 
 /*!
- * \brief CUDA kernel of SpMM-Min/Max on Csr format on heterogeneous graph.
+ * @brief CUDA kernel of SpMM-Min/Max on Csr format on heterogeneous graph.
  * @param bcast Broadcast information.
  * @param csr The Csr matrix.
  * @param ufeat The feature on source nodes.

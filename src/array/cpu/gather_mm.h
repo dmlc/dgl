@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2022 by Contributors
  * \file array/cpu/gather_mm.h
- * \brief GATHER_MM CPU kernel function header.
+ * @brief GATHER_MM CPU kernel function header.
  */
 #ifndef DGL_ARRAY_CPU_GATHER_MM_H_
 #define DGL_ARRAY_CPU_GATHER_MM_H_
@@ -46,7 +46,7 @@ void matmul(
 }
 
 /*!
- * \brief CPU kernel of Gather_mm. The input matrix A is expected to be
+ * @brief CPU kernel of Gather_mm. The input matrix A is expected to be
  *        sorted according to relation type.
  * @param A The input dense matrix of dimension m x k
  * @param B The input dense matrix of dimension k x n

@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
  * \file communicator.h
- * \brief Communicator for DGL distributed training.
+ * @brief Communicator for DGL distributed training.
  */
 #ifndef DGL_RPC_NETWORK_COMMUNICATOR_H_
 #define DGL_RPC_NETWORK_COMMUNICATOR_H_
@@ -17,7 +17,7 @@ namespace dgl {
 namespace network {
 
 /*!
- * \brief Network Sender for DGL distributed training.
+ * @brief Network Sender for DGL distributed training.
  *
  * Sender is an abstract class that defines a set of APIs for sending binary
  * data message over network. It can be implemented by different underlying
@@ -28,7 +28,7 @@ namespace network {
 class Sender : public rpc::RPCSender {
  public:
   /*!
-   * \brief Sender constructor
+   * @brief Sender constructor
    * @param queue_size size (bytes) of message queue.
    * @param max_thread_count size of thread pool. 0 for no limit
    * Note that, the queue_size parameter is optional.
@@ -43,7 +43,7 @@ class Sender : public rpc::RPCSender {
   virtual ~Sender() {}
 
   /*!
-   * \brief Send data to specified Receiver.
+   * @brief Send data to specified Receiver.
    * @param msg data message
    * @param recv_id receiver's ID
    * \return Status code
@@ -59,17 +59,17 @@ class Sender : public rpc::RPCSender {
 
  protected:
   /*!
-   * \brief Size of message queue
+   * @brief Size of message queue
    */
   int64_t queue_size_;
   /*!
-   * \brief Size of thread pool. 0 for no limit
+   * @brief Size of thread pool. 0 for no limit
    */
   int max_thread_count_;
 };
 
 /*!
- * \brief Network Receiver for DGL distributed training.
+ * @brief Network Receiver for DGL distributed training.
  *
  * Receiver is an abstract class that defines a set of APIs for receiving binary
  * data message over network. It can be implemented by different underlying
@@ -80,7 +80,7 @@ class Sender : public rpc::RPCSender {
 class Receiver : public rpc::RPCReceiver {
  public:
   /*!
-   * \brief Receiver constructor
+   * @brief Receiver constructor
    * @param queue_size size of message queue.
    * @param max_thread_count size of thread pool. 0 for no limit
    * Note that, the queue_size parameter is optional.
@@ -97,7 +97,7 @@ class Receiver : public rpc::RPCReceiver {
   virtual ~Receiver() {}
 
   /*!
-   * \brief Recv data from Sender
+   * @brief Recv data from Sender
    * @param msg pointer of data message
    * @param send_id which sender current msg comes from
    * @param timeout The timeout value in milliseconds. If zero, wait
@@ -111,7 +111,7 @@ class Receiver : public rpc::RPCReceiver {
   virtual STATUS Recv(Message* msg, int* send_id, int timeout = 0) = 0;
 
   /*!
-   * \brief Recv data from a specified Sender
+   * @brief Recv data from a specified Sender
    * @param msg pointer of data message
    * @param send_id sender's ID
    * @param timeout The timeout value in milliseconds. If zero, wait
@@ -126,11 +126,11 @@ class Receiver : public rpc::RPCReceiver {
 
  protected:
   /*!
-   * \brief Size of message queue
+   * @brief Size of message queue
    */
   int64_t queue_size_;
   /*!
-   * \brief Size of thread pool. 0 for no limit
+   * @brief Size of thread pool. 0 for no limit
    */
   int max_thread_count_;
 };

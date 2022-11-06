@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2018 by Contributors
  * \file graph/graph.cc
- * \brief Graph operation implementation
+ * @brief Graph operation implementation
  */
 #include <dgl/array.h>
 #include <dgl/graph_op.h>

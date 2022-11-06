@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
  * \file array/cpu/coo_coalesce.cc
- * \brief COO coalescing
+ * @brief COO coalescing
  */
 
 #include <dgl/array.h>

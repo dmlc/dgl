@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file graph/gk_ops.cc
- * \brief Graph operation implemented in GKlib
+ * @brief Graph operation implemented in GKlib
  */
 
 #if !defined(_WIN32)

@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file rpc/shared_mem_serializer.h
- * \brief headers for serializer.
+ * @brief headers for serializer.
  */
 #ifndef DGL_ZEROCOPY_SERIALIZER_H_
 #define DGL_ZEROCOPY_SERIALIZER_H_
@@ -63,7 +63,7 @@ class StreamWithBuffer : public dmlc::SeekStream {
   };
 
   /*!
-   * \brief This constructor is for writing scenario or reading from local
+   * @brief This constructor is for writing scenario or reading from local
    * machine
    * @param strm The backup stream to write/load from
    * @param send_to_remote Whether this stream will be deserialized at remote
@@ -75,7 +75,7 @@ class StreamWithBuffer : public dmlc::SeekStream {
         buffer_list_(),
         send_to_remote_(send_to_remote) {}
   /*!
-   * \brief This constructor is for reading from remote
+   * @brief This constructor is for reading from remote
    * @param strm The stream to write/load from zerocopy write/load
    * @param data_ptr_list list of pointer to reconstruct NDArray
    *
@@ -95,7 +95,7 @@ class StreamWithBuffer : public dmlc::SeekStream {
   }
 
   /*!
-   * \brief Construct stream backed up by string
+   * @brief Construct stream backed up by string
    * @param blob The string to write/load from zerocopy write/load
    * @param send_to_remote Whether this stream will be deserialized at remote
    * machine or the local machine. If true, will record the data pointer into
@@ -106,7 +106,7 @@ class StreamWithBuffer : public dmlc::SeekStream {
         send_to_remote_(send_to_remote) {}
 
   /*!
-   * \brief Construct stream backed up by string
+   * @brief Construct stream backed up by string
    * @param p_buffer buffer pointer
    * @param size buffer size
    * @param send_to_remote Whether this stream will be deserialized at remote
@@ -118,7 +118,7 @@ class StreamWithBuffer : public dmlc::SeekStream {
         send_to_remote_(send_to_remote) {}
 
   /*!
-   * \brief Construct stream backed up by string, and reconstruct NDArray
+   * @brief Construct stream backed up by string, and reconstruct NDArray
    * from data_ptr_list
    * @param blob The string to write/load from zerocopy write/load
    * @param data_ptr_list pointer list for NDArrays to deconstruct from
@@ -131,7 +131,7 @@ class StreamWithBuffer : public dmlc::SeekStream {
   }
 
   /*!
-   * \brief Construct stream backed up by string, and reconstruct NDArray
+   * @brief Construct stream backed up by string, and reconstruct NDArray
    * from data_ptr_list
    * @param p_buffer buffer pointer
    * @param size buffer size
@@ -156,14 +156,14 @@ class StreamWithBuffer : public dmlc::SeekStream {
   using dmlc::Stream::Write;
 
   /*!
-   * \brief push NDArray into stream
+   * @brief push NDArray into stream
    * If send_to_remote=true, the NDArray will be saved to the buffer list
    * If send_to_remote=false, the NDArray will be saved to the backedup string
    */
   void PushNDArray(const runtime::NDArray& tensor);
 
   /*!
-   * \brief pop NDArray from stream
+   * @brief pop NDArray from stream
    * If send_to_remote=true, the NDArray will be reconstructed from buffer list
    * If send_to_remote=false, the NDArray will be reconstructed from shared
    * memory
@@ -171,12 +171,12 @@ class StreamWithBuffer : public dmlc::SeekStream {
   dgl::runtime::NDArray PopNDArray();
 
   /*!
-   * \brief Get whether this stream is for remote usage
+   * @brief Get whether this stream is for remote usage
    */
   bool send_to_remote() { return send_to_remote_; }
 
   /*!
-   * \brief Get underlying buffer list
+   * @brief Get underlying buffer list
    */
   const std::deque<Buffer>& buffer_list() const { return buffer_list_; }
 

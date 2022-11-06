@@ -14,7 +14,7 @@
  *  limitations under the License.
  *
  * \file graph/transform/cuda/cuda_compact_graph.cu
- * \brief Functions to find and eliminate the common isolated nodes across
+ * @brief Functions to find and eliminate the common isolated nodes across
  * all given graphs with the same set of nodes.
  */
 
@@ -41,7 +41,7 @@ namespace transform {
 namespace {
 
 /**
- * \brief This function builds node maps for each node type, preserving the
+ * @brief This function builds node maps for each node type, preserving the
  * order of the input nodes. Here it is assumed the nodes are not unique,
  * and thus a unique list is generated.
  *

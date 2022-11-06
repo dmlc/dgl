@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
  * \file array/cpu/array_index_select.cu
- * \brief Array index select GPU implementation
+ * @brief Array index select GPU implementation
  */
 #include <dgl/array.h>
 

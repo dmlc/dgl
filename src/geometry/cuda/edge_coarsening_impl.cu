@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
  * \file geometry/cuda/edge_coarsening_impl.cu
- * \brief Edge coarsening CUDA implementation
+ * @brief Edge coarsening CUDA implementation
  */
 #include <curand_kernel.h>
 #include <dgl/array.h>

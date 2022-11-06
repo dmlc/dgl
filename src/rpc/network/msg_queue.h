@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
  * \file msg_queue.h
- * \brief Message queue for DGL distributed training.
+ * @brief Message queue for DGL distributed training.
  */
 #ifndef DGL_RPC_NETWORK_MSG_QUEUE_H_
 #define DGL_RPC_NETWORK_MSG_QUEUE_H_
@@ -23,7 +23,7 @@ namespace network {
 typedef int STATUS;
 
 /*!
- * \brief Status code of message queue
+ * @brief Status code of message queue
  */
 #define ADD_SUCCESS 3400     // Add message successfully
 #define MSG_GT_SIZE 3401     // Message size beyond queue size
@@ -34,45 +34,45 @@ typedef int STATUS;
 #define QUEUE_EMPTY 3406     // Cannot remove when queue is empty
 
 /*!
- * \brief Message used by network communicator and message queue.
+ * @brief Message used by network communicator and message queue.
  */
 struct Message {
   /*!
-   * \brief Constructor
+   * @brief Constructor
    */
   Message() {}
 
   /*!
-   * \brief Constructor
+   * @brief Constructor
    */
   Message(char* data_ptr, int64_t data_size)
       : data(data_ptr), size(data_size) {}
 
   /*!
-   * \brief message data
+   * @brief message data
    */
   char* data;
   /*!
-   * \brief message size in bytes
+   * @brief message size in bytes
    */
   int64_t size;
   /*!
-   * \brief message receiver id
+   * @brief message receiver id
    */
   int receiver_id = -1;
   /*!
-   * \brief user-defined deallocator, which can be nullptr
+   * @brief user-defined deallocator, which can be nullptr
    */
   std::function<void(Message*)> deallocator = nullptr;
 };
 
 /*!
- * \brief Free memory buffer of message
+ * @brief Free memory buffer of message
  */
 inline void DefaultMessageDeleter(Message* msg) { delete[] msg->data; }
 
 /*!
- * \brief Message Queue for network communication.
+ * @brief Message Queue for network communication.
  *
  * MessageQueue is FIFO queue that adopts producer/consumer model for data
  * message. It supports one or more producer threads and one or more consumer
@@ -90,7 +90,7 @@ inline void DefaultMessageDeleter(Message* msg) { delete[] msg->data; }
 class MessageQueue {
  public:
   /*!
-   * \brief MessageQueue constructor
+   * @brief MessageQueue constructor
    * @param queue_size size (bytes) of message queue
    * @param num_producers number of producers, use 1 by default
    */
@@ -98,12 +98,12 @@ class MessageQueue {
       int64_t queue_size /* in bytes */, int num_producers = 1);
 
   /*!
-   * \brief MessageQueue deconstructor
+   * @brief MessageQueue deconstructor
    */
   ~MessageQueue() {}
 
   /*!
-   * \brief Add message to the queue
+   * @brief Add message to the queue
    * @param msg data message
    * @param is_blocking Blocking if cannot add, else return
    * \return Status code
@@ -111,7 +111,7 @@ class MessageQueue {
   STATUS Add(Message msg, bool is_blocking = true);
 
   /*!
-   * \brief Remove message from the queue
+   * @brief Remove message from the queue
    * @param msg pointer of data msg
    * @param is_blocking Blocking if cannot remove, else return
    * \return Status code
@@ -119,7 +119,7 @@ class MessageQueue {
   STATUS Remove(Message* msg, bool is_blocking = true);
 
   /*!
-   * \brief Signal that producer producer_id will no longer produce anything
+   * @brief Signal that producer producer_id will no longer produce anything
    * @param producer_id An integer uniquely to identify a producer thread
    */
   void SignalFinished(int producer_id);
@@ -136,47 +136,47 @@ class MessageQueue {
 
  protected:
   /*!
-   * \brief message queue
+   * @brief message queue
    */
   std::queue<Message> queue_;
 
   /*!
-   * \brief Size of the queue in bytes
+   * @brief Size of the queue in bytes
    */
   int64_t queue_size_;
 
   /*!
-   * \brief Free size of the queue
+   * @brief Free size of the queue
    */
   int64_t free_size_;
 
   /*!
-   * \brief Used to check all producers will no longer produce anything
+   * @brief Used to check all producers will no longer produce anything
    */
   size_t num_producers_;
 
   /*!
-   * \brief Store finished producer id
+   * @brief Store finished producer id
    */
   std::set<int /* producer_id */> finished_producers_;
 
   /*!
-   * \brief Condition when consumer should wait
+   * @brief Condition when consumer should wait
    */
   std::condition_variable cond_not_full_;
 
   /*!
-   * \brief Condition when producer should wait
+   * @brief Condition when producer should wait
    */
   std::condition_variable cond_not_empty_;
 
   /*!
-   * \brief Signal for exit wait
+   * @brief Signal for exit wait
    */
   std::atomic<bool> exit_flag_{false};
 
   /*!
-   * \brief Protect all above data and conditions
+   * @brief Protect all above data and conditions
    */
   mutable std::mutex mutex_;
 };

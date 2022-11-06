@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2021 by Contributors
  * \file runtime/container.h
- * \brief Defines the container object data structures.
+ * @brief Defines the container object data structures.
  */
 #ifndef DGL_RUNTIME_PARALLEL_FOR_H_
 #define DGL_RUNTIME_PARALLEL_FOR_H_
@@ -57,7 +57,7 @@ inline size_t compute_num_threads(size_t begin, size_t end, size_t grain_size) {
 static DefaultGrainSizeT default_grain_size;
 
 /*!
- * \brief OpenMP-based parallel for loop.
+ * @brief OpenMP-based parallel for loop.
  *
  * It requires each thread's workload to have at least \a grain_size elements.
  * The loop body will be a function that takes in two arguments \a begin and \a end, which
@@ -102,7 +102,7 @@ void parallel_for(
 }
 
 /*!
- * \brief OpenMP-based parallel for loop with default grain size.
+ * @brief OpenMP-based parallel for loop with default grain size.
  *
  * parallel_for with grain size to default value, either 1 or controlled through
  * environment variable DGL_PARALLEL_FOR_GRAIN_SIZE.
@@ -118,7 +118,7 @@ void parallel_for(
 }
 
 /*!
- * \brief OpenMP-based two-stage parallel reduction.
+ * @brief OpenMP-based two-stage parallel reduction.
  *
  * The first-stage reduction function \a f works in parallel.  Each thread's workload has
  * at least \a grain_size elements.  The loop body will be a function that takes in

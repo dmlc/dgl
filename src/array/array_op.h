@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
  * \file array/array_op.h
- * \brief Array operator templates
+ * @brief Array operator templates
  */
 #ifndef DGL_ARRAY_ARRAY_OP_H_
 #define DGL_ARRAY_ARRAY_OP_H_

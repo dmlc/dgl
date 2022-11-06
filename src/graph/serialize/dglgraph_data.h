@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
  * \file graph/serialize/dglgraph_data.h
- * \brief Graph serialization header
+ * @brief Graph serialization header
  */
 #ifndef DGL_GRAPH_SERIALIZE_DGLGRAPH_DATA_H_
 #define DGL_GRAPH_SERIALIZE_DGLGRAPH_DATA_H_

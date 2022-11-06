@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file aten/cpu/sddmm.cc
- * \brief SDDMM C APIs and definitions.
+ * @brief SDDMM C APIs and definitions.
  */
 #include "./sddmm.h"
 #include <dgl/array.h>

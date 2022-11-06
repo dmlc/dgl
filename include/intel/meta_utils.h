@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
  * \file intel/meta_utils.h
- * \brief Meta programming utils
+ * @brief Meta programming utils
  * \author Pawel Piotrowicz <pawel.piotrowicz@intel.com>
  */
 #ifndef INTEL_META_UTILS_H_

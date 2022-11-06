@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
  * \file array/cpu/geometry_op_impl.cc
- * \brief Geometry operator CPU implementation
+ * @brief Geometry operator CPU implementation
  */
 #include <dgl/random.h>
 
@@ -77,7 +77,7 @@ IdArray GroupRandomPerm(
 }
 
 /*!
- * \brief Farthest Point Sampler without the need to compute all pairs of
+ * @brief Farthest Point Sampler without the need to compute all pairs of
  * distance.
  *
  * The input array has shape (N, d), where N is the number of points, and d is

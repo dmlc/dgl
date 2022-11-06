@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2017 by Contributors
  * \file registry.cc
- * \brief The global registry of packed function.
+ * @brief The global registry of packed function.
  */
 #include <dgl/runtime/registry.h>
 #include <dmlc/logging.h>

@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2017 by Contributors
  * \file dgl/runtime/util.h
- * \brief Useful runtime util.
+ * @brief Useful runtime util.
  */
 #ifndef DGL_RUNTIME_UTIL_H_
 #define DGL_RUNTIME_UTIL_H_
@@ -12,7 +12,7 @@ namespace dgl {
 namespace runtime {
 
 /*!
- * \brief Check whether type matches the given spec.
+ * @brief Check whether type matches the given spec.
  * @param t The type
  * @param code The type code.
  * @param bits The number of bits to be matched.

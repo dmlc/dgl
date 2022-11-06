@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
  * \file graph/heterograph.h
- * \brief Heterograph
+ * @brief Heterograph
  */
 
 #ifndef DGL_GRAPH_HETEROGRAPH_H_
@@ -233,7 +233,7 @@ class HeteroGraph : public BaseHeteroGraph {
 
 
   /*!
-  * \brief Pin all relation graphs of the current graph.
+  * @brief Pin all relation graphs of the current graph.
   * \note The graph will be pinned inplace. Behavior depends on the current context,
   *       kDGLCPU: will be pinned;
   *       IsPinned: directly return;
@@ -243,7 +243,7 @@ class HeteroGraph : public BaseHeteroGraph {
   void PinMemory_() override;
 
   /*!
-  * \brief Unpin all relation graphs of the current graph.
+  * @brief Unpin all relation graphs of the current graph.
   * \note The graph will be unpinned inplace. Behavior depends on the current context,
   *       IsPinned: will be unpinned;
   *       others: directly return.
@@ -252,7 +252,7 @@ class HeteroGraph : public BaseHeteroGraph {
   void UnpinMemory_();
 
   /*!
-   * \brief Record stream for this graph.
+   * @brief Record stream for this graph.
    * @param stream The stream that is using the graph
    */
   void RecordStream(DGLStreamHandle stream) override;

@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2018 by Contributors
  * \file c_api_common.h
- * \brief DGL C API common util functions
+ * @brief DGL C API common util functions
  */
 #ifndef DGL_C_API_COMMON_H_
 #define DGL_C_API_COMMON_H_
@@ -26,13 +26,13 @@ typedef void* CommunicatorHandle;
 typedef void* KVMsgHandle;
 
 /*!
- * \brief Convert a vector of NDArray to PackedFunc.
+ * @brief Convert a vector of NDArray to PackedFunc.
  */
 dgl::runtime::PackedFunc ConvertNDArrayVectorToPackedFunc(
     const std::vector<dgl::runtime::NDArray>& vec);
 
 /*!
- * \brief Copy a vector to an NDArray.
+ * @brief Copy a vector to an NDArray.
  *
  * The data type of the NDArray will be IdType, which must be an integer type.
  * The element type (DType) of the vector must be convertible to IdType.

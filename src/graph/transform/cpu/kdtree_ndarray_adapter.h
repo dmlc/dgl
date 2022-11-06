@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2021 by Contributors
  * \file graph/transform/cpu/kdtree_ndarray_adapter.h
- * \brief NDArray adapter for nanoflann, without
+ * @brief NDArray adapter for nanoflann, without
  *        duplicating the storage
  */
 #ifndef DGL_GRAPH_TRANSFORM_CPU_KDTREE_NDARRAY_ADAPTER_H_
@@ -19,7 +19,7 @@ namespace transform {
 namespace knn_utils {
 
 /*!
- * \brief A simple 2D NDArray adapter for nanoflann, without duplicating the
+ * @brief A simple 2D NDArray adapter for nanoflann, without duplicating the
  *        storage.
  *
  * \tparam FloatType: The type of the point coordinates (typically, double or
@@ -66,7 +66,7 @@ class KDTreeNDArrayAdapter {
   index_type* GetIndex() { return index_; }
 
   /*!
-   * \brief Query for the \a num_closest points to a given point
+   * @brief Query for the \a num_closest points to a given point
    *  Note that this is a short-cut method for GetIndex()->findNeighbors().
    */
   void query(
@@ -84,13 +84,13 @@ class KDTreeNDArrayAdapter {
   self_type& derived() { return *this; }
 
   /*!
-   * \brief Interface expected by KDTreeSingleIndexAdaptor,
+   * @brief Interface expected by KDTreeSingleIndexAdaptor,
    *  return the number of data points
    */
   size_t kdtree_get_point_count() const { return data_->shape[0]; }
 
   /*!
-   * \brief Interface expected by KDTreeSingleIndexAdaptor,
+   * @brief Interface expected by KDTreeSingleIndexAdaptor,
    *  return the dim'th component of the idx'th point
    */
   FloatType kdtree_get_pt(const size_t idx, const size_t dim) const {
@@ -98,7 +98,7 @@ class KDTreeNDArrayAdapter {
   }
 
   /*!
-   * \brief Interface expected by KDTreeSingleIndexAdaptor.
+   * @brief Interface expected by KDTreeSingleIndexAdaptor.
    *  Optional bounding-box computation: return false to
    *  default to a standard bbox computation loop.
    *

@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2016 by Contributors
  * \file runtime_base.h
- * \brief Base of all C APIs
+ * @brief Base of all C APIs
  */
 #ifndef DGL_RUNTIME_RUNTIME_BASE_H_
 #define DGL_RUNTIME_RUNTIME_BASE_H_
@@ -21,7 +21,7 @@
   }                                         \
   return 0;  // NOLINT(*)
 /*!
- * \brief every function starts with API_BEGIN();
+ * @brief every function starts with API_BEGIN();
  *   and finishes with API_END() or API_END_HANDLE_ERROR
  *   The finally clause contains procedure to cleanup states when an error
  * happens.
@@ -35,7 +35,7 @@
   return 0;  // NOLINT(*)
 
 /*!
- * \brief handle exception throwed out
+ * @brief handle exception throwed out
  * @param e the exception
  * \return the return value of API after exception is handled
  */

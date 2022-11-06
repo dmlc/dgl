@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2017 by Contributors
  * \file pack_args.h
- * \brief Utility to pack DGLArgs to other type-erased fution calling
+ * @brief Utility to pack DGLArgs to other type-erased fution calling
  * convention.
  *
  *  Two type erased function signatures are supported.
@@ -23,7 +23,7 @@
 namespace dgl {
 namespace runtime {
 /*!
- * \brief argument union type of 32bit.
+ * @brief argument union type of 32bit.
  * Choose 32 bit because most GPU API do not work well with 64 bit.
  */
 union ArgUnion {
@@ -32,7 +32,7 @@ union ArgUnion {
   float v_float32;
 };
 /*!
- * \brief Create a packed function from void addr types.
+ * @brief Create a packed function from void addr types.
  *
  * @param f with signiture (DGLArgs args, DGLRetValue* rv, void* void_args)
  * @param arg_types The arguments type information.
@@ -44,7 +44,7 @@ template <typename F>
 inline PackedFunc PackFuncVoidAddr(
     F f, const std::vector<DGLDataType>& arg_types);
 /*!
- * \brief Create a packed function that from function only packs buffer
+ * @brief Create a packed function that from function only packs buffer
  * arguments.
  *
  * @param f with signiture (DGLArgs args, DGLRetValue* rv, ArgUnion* pack_args)
@@ -57,7 +57,7 @@ template <typename F>
 inline PackedFunc PackFuncNonBufferArg(
     F f, const std::vector<DGLDataType>& arg_types);
 /*!
- * \brief Create a packed function that from function that takes a packed
+ * @brief Create a packed function that from function that takes a packed
  * arguments.
  *
  * @param f with signature (DGLArgs args, DGLRetValue* rv, void* pack_args,
@@ -71,7 +71,7 @@ template <typename F>
 inline PackedFunc PackFuncPackedArg(
     F f, const std::vector<DGLDataType>& arg_types);
 /*!
- * \brief Extract number of buffer argument from the argument types.
+ * @brief Extract number of buffer argument from the argument types.
  * @param arg_types The argument types.
  * \return number of buffer arguments
  */

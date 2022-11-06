@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
  * \file test_unit_graph.cc
- * \brief Test UnitGraph
+ * @brief Test UnitGraph
  */
 #include <dgl/array.h>
 #include <dgl/immutable_graph.h>

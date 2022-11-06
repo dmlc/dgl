@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2018 by Contributors
  * \file graph/sampler.cc
- * \brief DGL sampler implementation
+ * @brief DGL sampler implementation
  */
 #include <dgl/array.h>
 #include <dgl/immutable_graph.h>

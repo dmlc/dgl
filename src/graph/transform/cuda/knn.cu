@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file graph/transform/cuda/knn.cu
- * \brief k-nearest-neighbor (KNN) implementation (cuda)
+ * @brief k-nearest-neighbor (KNN) implementation (cuda)
  */
 
 #include <curand_kernel.h>
@@ -23,7 +23,7 @@ namespace dgl {
 namespace transform {
 namespace impl {
 /*!
- * \brief Utility class used to avoid linker errors with extern
+ * @brief Utility class used to avoid linker errors with extern
  *  unsized shared memory arrays with templated type
  */
 template <typename Type>
@@ -78,7 +78,7 @@ EuclideanDist(const FloatType* vec1, const FloatType* vec2, const int64_t dim) {
 }
 
 /*!
- * \brief Compute Euclidean distance between two vectors in a cuda kernel,
+ * @brief Compute Euclidean distance between two vectors in a cuda kernel,
  *  return positive infinite value if the intermediate distance is greater
  *  than the worst distance.
  */
@@ -239,7 +239,7 @@ __device__ bool FlaggedHeapInsert(
 }
 
 /*!
- * \brief Brute force kNN kernel. Compute distance for each pair of input points
+ * @brief Brute force kNN kernel. Compute distance for each pair of input points
  * and get the result directly (without a distance matrix).
  */
 template <typename FloatType, typename IdType>
@@ -279,7 +279,7 @@ __global__ void BruteforceKnnKernel(
 }
 
 /*!
- * \brief Same as BruteforceKnnKernel, but use shared memory as buffer.
+ * @brief Same as BruteforceKnnKernel, but use shared memory as buffer.
  *  This kernel divides query points and data points into blocks. For each
  *  query block, it will make a loop over all data blocks and compute distances.
  *  This kernel is faster when the dimension of input points is not large.
@@ -430,7 +430,7 @@ __global__ void GetBlockInfo(
 }
 
 /*!
- * \brief Brute force kNN. Compute distance for each pair of input points and
+ * @brief Brute force kNN. Compute distance for each pair of input points and
  * get the result directly (without a distance matrix).
  *
  * \tparam FloatType The type of input points.
@@ -473,7 +473,7 @@ void BruteForceKNNCuda(
 }
 
 /*!
- * \brief Brute force kNN with shared memory.
+ * @brief Brute force kNN with shared memory.
  *  This function divides query points and data points into blocks. For each
  *  query block, it will make a loop over all data blocks and compute distances.
  *  It will be faster when the dimension of input points is not large.
@@ -585,7 +585,7 @@ __global__ void SetupRngKernel(
 }
 
 /*!
- * \brief Randomly initialize neighbors (sampling without replacement)
+ * @brief Randomly initialize neighbors (sampling without replacement)
  * for each nodes
  */
 template <typename FloatType, typename IdType>
@@ -637,7 +637,7 @@ __global__ void RandomInitNeighborsKernel(
 }
 
 /*!
- * \brief Randomly select candidates from current knn and reverse-knn graph for
+ * @brief Randomly select candidates from current knn and reverse-knn graph for
  *        nn-descent.
  */
 template <typename IdType>

@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2021 by Contributors
  * \file runtime/cuda/cuda_device_common.cuh
- * \brief Device level functions for within cuda kernels.
+ * @brief Device level functions for within cuda kernels.
  */
 
 #include <cassert>
@@ -60,7 +60,7 @@ class MutableDeviceOrderedHashTable : public DeviceOrderedHashTable<IdType> {
   }
 
   /**
-   * \brief Attempt to insert into the hash table at a specific location.
+   * @brief Attempt to insert into the hash table at a specific location.
    *
    * @param pos The position to insert at.
    * @param id The ID to insert into the hash table.
@@ -165,7 +165,7 @@ struct BlockPrefixCallbackOp {
 }  // namespace
 
 /**
- * \brief This generates a hash map where the keys are the global item numbers,
+ * @brief This generates a hash map where the keys are the global item numbers,
  * and the values are indexes, and inputs may have duplciates.
  *
  * \tparam IdType The type of of id.
@@ -194,7 +194,7 @@ __global__ void generate_hashmap_duplicates(
 }
 
 /**
- * \brief This generates a hash map where the keys are the global item numbers,
+ * @brief This generates a hash map where the keys are the global item numbers,
  * and the values are indexes, and all inputs are unique.
  *
  * \tparam IdType The type of of id.
@@ -229,7 +229,7 @@ __global__ void generate_hashmap_unique(
 }
 
 /**
- * \brief This counts the number of nodes inserted per thread block.
+ * @brief This counts the number of nodes inserted per thread block.
  *
  * \tparam IdType The type of of id.
  * \tparam BLOCK_SIZE The size of the thread block.
@@ -278,7 +278,7 @@ __global__ void count_hashmap(
 }
 
 /**
- * \brief Update the local numbering of elements in the hashmap.
+ * @brief Update the local numbering of elements in the hashmap.
  *
  * \tparam IdType The type of id.
  * \tparam BLOCK_SIZE The size of the thread blocks.

@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file graph/heterograph_capi.cc
- * \brief Heterograph CAPI bindings.
+ * @brief Heterograph CAPI bindings.
  */
 #include <dgl/array.h>
 #include <dgl/aten/coo.h>

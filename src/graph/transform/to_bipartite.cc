@@ -14,7 +14,7 @@
  *  limitations under the License.
  *
  * \file graph/transform/to_bipartite.cc
- * \brief Convert a graph to a bipartite-structured graph.
+ * @brief Convert a graph to a bipartite-structured graph.
  */
 
 #include "to_bipartite.h"

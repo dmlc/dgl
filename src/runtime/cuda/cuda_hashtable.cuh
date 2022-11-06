@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2021 by Contributors
  * \file runtime/cuda/cuda_device_common.cuh
- * \brief Device level functions for within cuda kernels.
+ * @brief Device level functions for within cuda kernels.
  */
 
 #ifndef DGL_RUNTIME_CUDA_CUDA_HASHTABLE_CUH_
@@ -20,7 +20,7 @@ template <typename>
 class OrderedHashTable;
 
 /*!
- * \brief A device-side handle for a GPU hashtable for mapping items to the
+ * @brief A device-side handle for a GPU hashtable for mapping items to the
  * first index at which they appear in the provided data array.
  *
  * For any ID array A, one can view it as a mapping from the index `i`
@@ -66,19 +66,19 @@ template <typename IdType>
 class DeviceOrderedHashTable {
  public:
   /**
-   * \brief An entry in the hashtable.
+   * @brief An entry in the hashtable.
    */
   struct Mapping {
     /**
-     * \brief The ID of the item inserted.
+     * @brief The ID of the item inserted.
      */
     IdType key;
     /**
-     * \brief The index of the item in the unique list.
+     * @brief The index of the item in the unique list.
      */
     IdType local;
     /**
-     * \brief The index of the item when inserted into the hashtable (e.g.,
+     * @brief The index of the item when inserted into the hashtable (e.g.,
      * the index within the array passed into FillWithDuplicates()).
      */
     int64_t index;
@@ -91,7 +91,7 @@ class DeviceOrderedHashTable {
       default;
 
   /**
-   * \brief Find the non-mutable mapping of a given key within the hash table.
+   * @brief Find the non-mutable mapping of a given key within the hash table.
    *
    * WARNING: The key must exist within the hashtable. Searching for a key not
    * in the hashtable is undefined behavior.
@@ -107,7 +107,7 @@ class DeviceOrderedHashTable {
   }
 
   /**
-   * \brief Check whether a key exists within the hashtable.
+   * @brief Check whether a key exists within the hashtable.
    *
    * @param id The key to check for.
    *
@@ -135,7 +135,7 @@ class DeviceOrderedHashTable {
   size_t size_;
 
   /**
-   * \brief Create a new device-side handle to the hash table.
+   * @brief Create a new device-side handle to the hash table.
    *
    * @param table The table stored in GPU memory.
    * @param size The size of the table.
@@ -143,7 +143,7 @@ class DeviceOrderedHashTable {
   explicit DeviceOrderedHashTable(const Mapping* table, size_t size);
 
   /**
-   * \brief Search for an item in the hash table which is known to exist.
+   * @brief Search for an item in the hash table which is known to exist.
    *
    * WARNING: If the ID searched for does not exist within the hashtable, this
    * function will never return.
@@ -168,7 +168,7 @@ class DeviceOrderedHashTable {
   }
 
   /**
-   * \brief Hash an ID to a to a position in the hash table.
+   * @brief Hash an ID to a to a position in the hash table.
    *
    * @param id The ID to hash.
    *
@@ -180,7 +180,7 @@ class DeviceOrderedHashTable {
 };
 
 /*!
- * \brief A host-side handle for a GPU hashtable for mapping items to the
+ * @brief A host-side handle for a GPU hashtable for mapping items to the
  * first index at which they appear in the provided data array. This host-side
  * handle is responsible for allocating and free the GPU memory of the
  * hashtable.
@@ -218,7 +218,7 @@ class OrderedHashTable {
   using Mapping = typename DeviceOrderedHashTable<IdType>::Mapping;
 
   /**
-   * \brief Create a new ordered hash table. The amoutn of GPU memory
+   * @brief Create a new ordered hash table. The amoutn of GPU memory
    * consumed by the resulting hashtable is O(`size` * 2^`scale`).
    *
    * @param size The number of items to insert into the hashtable.
@@ -232,7 +232,7 @@ class OrderedHashTable {
       const int scale = kDefaultScale);
 
   /**
-   * \brief Cleanup after the hashtable.
+   * @brief Cleanup after the hashtable.
    */
   ~OrderedHashTable();
 
@@ -241,7 +241,7 @@ class OrderedHashTable {
   OrderedHashTable& operator=(const OrderedHashTable& other) = delete;
 
   /**
-   * \brief Fill the hashtable with the array containing possibly duplicate
+   * @brief Fill the hashtable with the array containing possibly duplicate
    * IDs.
    *
    * @param input The array of IDs to insert.
@@ -255,7 +255,7 @@ class OrderedHashTable {
       int64_t* const num_unique, cudaStream_t stream);
 
   /**
-   * \brief Fill the hashtable with an array of unique keys.
+   * @brief Fill the hashtable with an array of unique keys.
    *
    * @param input The array of unique IDs.
    * @param num_input The number of keys.
@@ -265,7 +265,7 @@ class OrderedHashTable {
       const IdType* const input, const size_t num_input, cudaStream_t stream);
 
   /**
-   * \brief Get a verison of the hashtable usable from device functions.
+   * @brief Get a verison of the hashtable usable from device functions.
    *
    * \return This hashtable.
    */

@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2021 by Contributors
  * \file graph/transform/knn.h
- * \brief k-nearest-neighbor (KNN) implementation
+ * @brief k-nearest-neighbor (KNN) implementation
  */
 
 #ifndef DGL_GRAPH_TRANSFORM_KNN_H_
@@ -15,7 +15,7 @@ namespace dgl {
 namespace transform {
 
 /*!
- * \brief For each point in each segment in \a query_points, find \a k nearest
+ * @brief For each point in each segment in \a query_points, find \a k nearest
  *        points in the same segment in \a data_points. \a data_offsets and \a
  *        query_offsets determine the start index of each segment in \a
  *        data_points and \a query_points.
@@ -36,7 +36,7 @@ void KNN(
     IdArray result, const std::string& algorithm);
 
 /*!
- * \brief For each input point, find \a k approximate nearest points in the same
+ * @brief For each input point, find \a k approximate nearest points in the same
  *        segment using NN-descent algorithm.
  *
  * @param points input points.

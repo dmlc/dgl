@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2018 by Contributors
  * \file scheduler/scheduler.cc
- * \brief DGL Scheduler implementation
+ * @brief DGL Scheduler implementation
  */
 #include <dgl/scheduler.h>
 

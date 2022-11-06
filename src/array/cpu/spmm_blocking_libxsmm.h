@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2021 Intel Corporation
  * \file array/cpu/spmm.h
- * \brief SPMM CPU kernel function header.
+ * @brief SPMM CPU kernel function header.
  * \author Sanchit Misra <sanchit.misra@intel.com>,
  *         Ramanarayan Mohanty <ramanarayan.mohanty@intel.com>,
  *         Vasimuddin Md <vasimuddin.md@intel.com>,
@@ -49,7 +49,7 @@ int32_t GetLLCSize() {
 }
 
 /*!
- * \brief Tile the CSR matrix to roughly make sure that the column tiles and
+ * @brief Tile the CSR matrix to roughly make sure that the column tiles and
  *        corresponding neighbor features fit into LLC and the row tiles
  *        are assigned to OMP threads.
  * @param csr The Csr matrix.
@@ -166,7 +166,7 @@ inline void SpMMCreateBlocks(
 }
 
 /*!
- * \brief Create libxsmm kernel.
+ * @brief Create libxsmm kernel.
  * @param has_idx For the edge features, are there indices available.
  * @param N Feature size.
  * @param redop_flag Flag specifying the reduction operation.
@@ -270,7 +270,7 @@ inline libxsmm_meltwfunction_opreduce_vecs_idx SpMMCreateLibxsmmKernel(
 }
 
 /*!
- * \brief Use libxsmm to perform SpMM-Sum on all blocks.
+ * @brief Use libxsmm to perform SpMM-Sum on all blocks.
  * @param block_csr_array The array containing csr matrices of all blocks.
  * @param B The feature on source nodes.
  * @param E The feature on edges.
@@ -327,7 +327,7 @@ inline void SpMMBlockwiseOpSum(
 }
 
 /*!
- * \brief Use libxsmm to perform SpMM-Max/Min on all blocks.
+ * @brief Use libxsmm to perform SpMM-Max/Min on all blocks.
  * @param block_csr_array The array containing csr matrices of all blocks.
  * @param B The feature on source nodes.
  * @param E The feature on edges.
@@ -391,7 +391,7 @@ inline void SpMMBlockwiseOpCmp(
 }
 
 /*!
- * \brief Free the tiled CSR matrix data.
+ * @brief Free the tiled CSR matrix data.
  * @param block_csr_array The array containing csr matrices of all blocks.
  * @param num_M_blocks Number of blocks to create along the rows of adjacency
  *        matrix.
@@ -413,7 +413,7 @@ inline void SpMMFreeBlocks(
 }
 
 /*!
- * \brief Optimized CPU kernel of SpMM-Sum/Max/Min on Csr format.
+ * @brief Optimized CPU kernel of SpMM-Sum/Max/Min on Csr format.
  * @param bcast Broadcast information.
  * @param csr The Csr matrix.
  * @param ufeat The feature on source nodes.
@@ -551,7 +551,7 @@ void SpMMRedopCsrOpt(
 }
 
 /*!
- * \brief Optimized CPU kernel of SpMM-Sum on Csr format.
+ * @brief Optimized CPU kernel of SpMM-Sum on Csr format.
  * @param bcast Broadcast information.
  * @param csr The Csr matrix.
  * @param ufeat The feature on source nodes.
@@ -569,7 +569,7 @@ void SpMMSumCsrLibxsmm(
 }
 
 /*!
- * \brief Optimized CPU kernel of SpMM-Min/Max on Csr format.
+ * @brief Optimized CPU kernel of SpMM-Min/Max on Csr format.
  * @param bcast Broadcast information.
  * @param csr The Csr matrix.
  * @param ufeat The feature on source nodes.

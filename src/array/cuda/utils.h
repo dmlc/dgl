@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file array/cuda/utils.h
- * \brief Utilities for CUDA kernels.
+ * @brief Utilities for CUDA kernels.
  */
 #ifndef DGL_ARRAY_CUDA_UTILS_H_
 #define DGL_ARRAY_CUDA_UTILS_H_
@@ -78,7 +78,7 @@ __device__ __forceinline__ T _ldg(T* addr) {
 }
 
 /*!
- * \brief Return true if the given bool flag array is all true.
+ * @brief Return true if the given bool flag array is all true.
  * The input bool array is in int8_t type so it is aligned with byte address.
  *
  * @param flags The bool array.
@@ -89,7 +89,7 @@ __device__ __forceinline__ T _ldg(T* addr) {
 bool AllTrue(int8_t* flags, int64_t length, const DGLContext& ctx);
 
 /*!
- * \brief CUDA Kernel of filling the vector started from ptr of size length
+ * @brief CUDA Kernel of filling the vector started from ptr of size length
  *        with val.
  * \note internal use only.
  */
@@ -113,7 +113,7 @@ void _Fill(DType* ptr, size_t length, DType val) {
 }
 
 /*!
- * \brief Search adjacency list linearly for each (row, col) pair and
+ * @brief Search adjacency list linearly for each (row, col) pair and
  * write the data under the matched position in the indices array to the output.
  *
  * If there is no match, the value in \c filler is written.
@@ -157,7 +157,7 @@ __global__ void _LinearSearchKernel(
 
 #if BF16_ENABLED
 /*!
- * \brief Specialization for bf16 because conversion from long long to bfloat16
+ * @brief Specialization for bf16 because conversion from long long to bfloat16
  * doesn't exist before SM80.
  */
 template <typename IdType>
@@ -206,7 +206,7 @@ inline DType GetCUDAScalar(
 }
 
 /*!
- * \brief Given a sorted array and a value this function returns the index
+ * @brief Given a sorted array and a value this function returns the index
  * of the first element which compares greater than value.
  *
  * This function assumes 0-based index
@@ -231,7 +231,7 @@ __device__ IdType _UpperBound(const IdType *A, int64_t n, IdType x) {
 }
 
 /*!
- * \brief Given a sorted array and a value this function returns the index
+ * @brief Given a sorted array and a value this function returns the index
  * of the element who is equal to val. If not exist returns n+1
  *
  * This function assumes 0-based index

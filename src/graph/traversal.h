@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2018 by Contributors
  * \file graph/traversal.h
- * \brief Graph traversal routines.
+ * @brief Graph traversal routines.
  *
  * Traversal routines generate frontiers. Frontiers can be node frontiers or
  * edge frontiers depending on the traversal function. Each frontier is a list
@@ -21,7 +21,7 @@ namespace dgl {
 namespace traverse {
 
 /*!
- * \brief Traverse the graph in a breadth-first-search (BFS) order.
+ * @brief Traverse the graph in a breadth-first-search (BFS) order.
  *
  * The queue object must suffice following interface:
  *   Members:
@@ -82,7 +82,7 @@ void BFSNodes(
 }
 
 /*!
- * \brief Traverse the graph in a breadth-first-search (BFS) order, returning
+ * @brief Traverse the graph in a breadth-first-search (BFS) order, returning
  *        the edges of the BFS tree.
  *
  * The queue object must suffice following interface:
@@ -146,7 +146,7 @@ void BFSEdges(
 }
 
 /*!
- * \brief Traverse the graph in topological order.
+ * @brief Traverse the graph in topological order.
  *
  * The queue object must suffice following interface:
  *   Members:
@@ -219,7 +219,7 @@ enum DFSEdgeTag {
   kNonTree,
 };
 /*!
- * \brief Traverse the graph in a depth-first-search (DFS) order.
+ * @brief Traverse the graph in a depth-first-search (DFS) order.
  *
  * The traversal visit edges in its DFS order. Edges have three tags:
  * FORWARD(0), REVERSE(1), NONTREE(2).

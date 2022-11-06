@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
  * \file array/cuda/atomic.cuh
- * \brief Atomic functions
+ * @brief Atomic functions
  */
 #ifndef DGL_ARRAY_CUDA_ATOMIC_CUH_
 #define DGL_ARRAY_CUDA_ATOMIC_CUH_
@@ -171,7 +171,7 @@ DEFINE_ATOMIC(Add)
 
 
 /**
-* \brief Performs an atomic compare-and-swap on 64 bit integers. That is,
+* @brief Performs an atomic compare-and-swap on 64 bit integers. That is,
 * it the word `old` at the memory location `address`, computes
 * `(old == compare ? val : old)` , and stores the result back to memory at
 * the same address.
@@ -197,7 +197,7 @@ inline __device__ int64_t AtomicCAS(
 }
 
 /**
-* \brief Performs an atomic compare-and-swap on 32 bit integers. That is,
+* @brief Performs an atomic compare-and-swap on 32 bit integers. That is,
 * it the word `old` at the memory location `address`, computes
 * `(old == compare ? val : old)` , and stores the result back to memory at
 * the same address.
