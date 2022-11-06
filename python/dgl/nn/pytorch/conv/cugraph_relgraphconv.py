@@ -18,15 +18,8 @@ try:
         message_flow_graph_hg_csr_int64,
     )
 except ModuleNotFoundError:
-    from pylibcugraphops.aggregators.node_level import (
-        agg_hg_basis_post_bwd_int32,
-        agg_hg_basis_post_bwd_int64,
-        agg_hg_basis_post_fwd_int32,
-        agg_hg_basis_post_fwd_int64,
-    )
-    from pylibcugraphops.structure.graph_types import (
-        message_flow_graph_hg_csr_int32,
-        message_flow_graph_hg_csr_int64,
+    raise ModuleNotFoundError(
+        "dgl.nn.CuGraphRelGraphConv requires pylibcugraphops to be installed."
     )
 
 CUDA_SM_PER_BLOCK = 49152
@@ -123,7 +116,7 @@ class RelGraphConvAgg(th.autograd.Function):
                 agg_output,
                 feat.detach(),
                 mfg,
-                weights_combination=coeff.detach(),
+                weights_combination=coeff.detach()
             )
 
         ctx.save_for_backward(feat, coeff)
@@ -159,7 +152,7 @@ class RelGraphConvAgg(th.autograd.Function):
                 feat.detach(),
                 ctx.mfg,
                 output_weight_gradient=grad_coeff,
-                weights_combination=coeff.detach(),
+                weights_combination=coeff.detach()
             )
 
         return None, None, None, None, grad_feat, grad_coeff
@@ -198,6 +191,7 @@ class CuGraphRelGraphConv(nn.Module):
         Dropout rate. Default: ``0.0``
     layer_norm: bool, optional
         True to add layer norm. Default: ``False``
+
     Examples
     --------
     >>> import dgl
@@ -210,16 +204,15 @@ class CuGraphRelGraphConv(nn.Module):
     >>> sampler = NeighborSampler(fanouts)
     >>> dataloader = DataLoader(g, train_nid, sampler,
     ...     device=device, batch_size=1024)
-    >>> conv1 = RelGraphConv(in_dim, h_dim, num_rels, fanouts[0],
+    >>> conv1 = CuGraphRelGraphConv(in_dim, h_dim, num_rels, fanouts[0],
     ...     regularizer='basis', num_bases=10).to(device)
-    >>> conv2 = RelGraphConv(h_dim, out_dim, num_rels, fanouts[1],
+    >>> conv2 = CuGraphRelGraphConv(h_dim, out_dim, num_rels, fanouts[1],
     ...     regularizer='basis', num_bases=10).to(device)
     >>> for input_nodes, output_nodes, blocks in dataloader:
     ...     h = conv1(blocks[0], x, blocks[0].edata[dgl.ETYPE])
     ...     h = F.relu(h)
     ...     h = conv2(blocks[1], h, blocks[1].edata[dgl.ETYPE])
     """
-
     def __init__(
         self,
         in_feat,
@@ -311,6 +304,7 @@ class CuGraphRelGraphConv(nn.Module):
 
     def forward(self, g, feat, etypes, norm=None):
         r"""Forward computation.
+
         Parameters
         ----------
         g : DGLGraph
@@ -326,6 +320,7 @@ class CuGraphRelGraphConv(nn.Module):
             types. Forward on pre-sorted graph may be faster. Graphs created
             by :func:`~dgl.to_homogeneous` automatically satisfy the condition.
             Also see :func:`~dgl.reorder_graph` for sorting edges manually.
+
         Returns
         -------
         torch.Tensor
