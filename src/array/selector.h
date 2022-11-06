@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file array/selector.h
+ * @file array/selector.h
  * @brief Selector functions to select among src/edge/dst attributes.
  */
 #ifndef DGL_ARRAY_SELECTOR_H_

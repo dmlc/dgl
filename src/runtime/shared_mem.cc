@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file shared_mem.cc
+ * @file shared_mem.cc
  * @brief Shared memory management.
  */
 #ifndef _WIN32

@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file array/cuda/csr_sort.cc
+ * @file array/cuda/csr_sort.cc
  * @brief Sort CSR index
  */
 #include <dgl/array.h>

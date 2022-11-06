@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file array/cpu/rowwise_sampling.cc
+ * @file array/cpu/rowwise_sampling.cc
  * @brief rowwise sampling
  */
 #include <dgl/random.h>

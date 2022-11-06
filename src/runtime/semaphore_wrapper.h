@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2021 by Contributors
- * \file semaphore_wrapper.h
+ * @file semaphore_wrapper.h
  * @brief A simple corss platform semaphore wrapper
  */
 #ifndef DGL_RUNTIME_SEMAPHORE_WRAPPER_H_

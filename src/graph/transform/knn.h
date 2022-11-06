@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2021 by Contributors
- * \file graph/transform/knn.h
+ * @file graph/transform/knn.h
  * @brief k-nearest-neighbor (KNN) implementation
  */
 

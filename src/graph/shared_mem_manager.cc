@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2018 by Contributors
- * \file graph/shared_mem_manager.cc
+ * @file graph/shared_mem_manager.cc
  * @brief DGL sampler implementation
  */
 #include "shared_mem_manager.h"

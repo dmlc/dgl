@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2018 by Contributors
- * \file graph/network.h
+ * @file graph/network.h
  * @brief DGL networking related APIs
  */
 #ifndef DGL_GRAPH_NETWORK_H_

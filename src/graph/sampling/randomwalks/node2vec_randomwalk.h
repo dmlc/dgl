@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2021 by Contributors
- * \file graph/sampling/node2vec_randomwalk.cc
+ * @file graph/sampling/node2vec_randomwalk.cc
  * @brief DGL sampler - CPU implementation of node2vec random walk.
  */
 

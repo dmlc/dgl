@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file graph/nodeflow.cc
+ * @file graph/nodeflow.cc
  * @brief DGL NodeFlow related functions.
  */
 

@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2017 by Contributors
- * \file pack_args.h
+ * @file pack_args.h
  * @brief Utility to pack DGLArgs to other type-erased fution calling
  * convention.
  *

@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file graph/transform/to_simple.cc
+ * @file graph/transform/to_simple.cc
  * @brief Convert multigraphs to simple graphs
  */
 

@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file graph/heterograph_capi.cc
+ * @file graph/heterograph_capi.cc
  * @brief Heterograph CAPI bindings.
  */
 #include <dgl/array.h>

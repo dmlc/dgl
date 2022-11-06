@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file array/cuda/csr_mm.cu
+ * @file array/cuda/csr_mm.cu
  * @brief SpSpMM/SpGEMM C APIs and definitions.
  */
 #include <dgl/array.h>

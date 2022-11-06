@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2021 by Contributors
- * \file runtime/container.h
+ * @file runtime/container.h
  * @brief Defines the container object data structures.
  */
 #ifndef DGL_RUNTIME_PARALLEL_FOR_H_

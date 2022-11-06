@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2021 by Contributors
- * \file ndarray_partition.h
+ * @file ndarray_partition.h
  * @brief Operations on partition implemented in CUDA.
  */
 

@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2017 by Contributors
- * \file file_util.h
+ * @file file_util.h
  * @brief Minimum file manipulation util for runtime.
  */
 #ifndef DGL_RUNTIME_FILE_UTIL_H_

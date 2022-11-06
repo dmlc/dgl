@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file array/cpu/array_op_impl.cc
+ * @file array/cpu/array_op_impl.cc
  * @brief Array operator CPU implementation
  */
 #include <dgl/array.h>

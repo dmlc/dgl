@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2017 by Contributors
- * \file workspace_pool.h
+ * @file workspace_pool.h
  * @brief Workspace pool utility.
  */
 #ifndef DGL_RUNTIME_WORKSPACE_POOL_H_

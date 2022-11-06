@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file rpc/rpc_msg.h
+ * @file rpc/rpc_msg.h
  * @brief Common headers for remote process call (RPC).
  */
 #ifndef DGL_RPC_RPC_MSG_H_

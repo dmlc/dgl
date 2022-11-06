@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file tcp_socket.h
+ * @file tcp_socket.h
  * @brief TCP socket for DGL distributed training.
  */
 #ifndef DGL_RPC_NETWORK_TCP_SOCKET_H_

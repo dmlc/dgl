@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file array/cuda/macro.cuh
+ * @file array/cuda/macro.cuh
  * @brief Macro to call SPMM/SDDMM cuda kernels.
  */
 #ifndef DGL_ARRAY_CUDA_MACRO_CUH_

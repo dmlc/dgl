@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2021 by Contributors
- * \file array/cuda/negative_sampling.cu
+ * @file array/cuda/negative_sampling.cu
  * @brief rowwise sampling
  */
 

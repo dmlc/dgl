@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file kernel/cpu/spmm.cc
+ * @file kernel/cpu/spmm.cc
  * @brief SPMM C APIs and definitions.
  */
 #include "./spmm.h"

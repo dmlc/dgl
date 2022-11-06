@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file array/cuda/utils.h
+ * @file array/cuda/utils.h
  * @brief Utilities for CUDA kernels.
  */
 #ifndef DGL_ARRAY_CUDA_UTILS_H_

@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file array/cuda/coo2csr.cc
+ * @file array/cuda/coo2csr.cc
  * @brief COO2CSR
  */
 #include <dgl/array.h>

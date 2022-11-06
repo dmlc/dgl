@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file common.h
+ * @file common.h
  * @brief This file provide basic facilities for string
  * to make programming convenient.
  */

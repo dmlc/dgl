@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file array/cuda/sddmm.cuh
+ * @file array/cuda/sddmm.cuh
  * @brief SDDMM CUDA kernel function header.
  */
 #ifndef DGL_ARRAY_CUDA_SDDMM_CUH_

@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file graph/subgraph.cc
+ * @file graph/subgraph.cc
  * @brief Functions for extracting subgraphs.
  */
 #include "./heterograph.h"

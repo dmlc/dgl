@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file graph/heterograph.h
+ * @file graph/heterograph.h
  * @brief Heterograph
  */
 

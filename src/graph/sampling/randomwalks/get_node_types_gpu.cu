@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2021 by Contributors
- * \file graph/sampling/get_node_types_gpu.cu
+ * @file graph/sampling/get_node_types_gpu.cu
  * @brief DGL sampler
  */
 

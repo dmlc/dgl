@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file geometry/cuda/geometry_op_impl.cc
+ * @file geometry/cuda/geometry_op_impl.cc
  * @brief Geometry operator CUDA implementation
  */
 #include <dgl/array.h>

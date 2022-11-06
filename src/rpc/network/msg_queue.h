@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file msg_queue.h
+ * @file msg_queue.h
  * @brief Message queue for DGL distributed training.
  */
 #ifndef DGL_RPC_NETWORK_MSG_QUEUE_H_

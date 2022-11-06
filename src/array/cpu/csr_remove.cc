@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file array/cpu/coo_remove.cc
+ * @file array/cpu/coo_remove.cc
  * @brief CSR matrix remove entries CPU implementation
  */
 #include <dgl/array.h>

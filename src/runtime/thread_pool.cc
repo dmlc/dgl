@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2017 by Contributors
- * \file thread_pool.cc
+ * @file thread_pool.cc
  * @brief Threadpool for multi-threading runtime.
  */
 #include <dgl/runtime/c_backend_api.h>

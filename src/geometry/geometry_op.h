@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file geometry/geometry_op.h
+ * @file geometry/geometry_op.h
  * @brief Geometry operator templates
  */
 #ifndef DGL_GEOMETRY_GEOMETRY_OP_H_

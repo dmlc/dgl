@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2021 by Contributors
- * \file array/cpu/negative_sampling.cc
+ * @file array/cpu/negative_sampling.cc
  * @brief Uniform negative sampling on CSR.
  */
 

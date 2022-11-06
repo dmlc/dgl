@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file kernel/bcast.h
+ * @file kernel/bcast.h
  * @brief Broadcast related function implementations.
  */
 #include <dgl/bcast.h>

@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2021-2022 by Contributors
- * \file graph/sampling/randomwalk_gpu.cu
+ * @file graph/sampling/randomwalk_gpu.cu
  * @brief CUDA random walk sampleing
  */
 

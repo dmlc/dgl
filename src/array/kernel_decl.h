@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file array/kernel_decl.h
+ * @file array/kernel_decl.h
  * @brief Sparse matrix format-specific operator declarations.
  */
 #ifndef DGL_ARRAY_KERNEL_DECL_H_

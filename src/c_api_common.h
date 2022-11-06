@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2018 by Contributors
- * \file c_api_common.h
+ * @file c_api_common.h
  * @brief DGL C API common util functions
  */
 #ifndef DGL_C_API_COMMON_H_

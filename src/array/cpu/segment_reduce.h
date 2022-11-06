@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file array/cpu/spmm.h
+ * @file array/cpu/spmm.h
  * @brief Segment reduce kernel function header.
  */
 #ifndef DGL_ARRAY_CPU_SEGMENT_REDUCE_H_

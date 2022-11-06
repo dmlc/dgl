@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file tp_communicator.h
+ * @file tp_communicator.h
  * @brief Tensorpipe Communicator for DGL distributed training.
  */
 #ifndef DGL_RPC_TENSORPIPE_TP_COMMUNICATOR_H_

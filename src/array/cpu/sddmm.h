@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file array/cpu/sddmm.h
+ * @file array/cpu/sddmm.h
  * @brief SDDMM CPU kernel function header.
  */
 #ifndef DGL_ARRAY_CPU_SDDMM_H_

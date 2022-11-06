@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file array/cpu/traversal.cc
+ * @file array/cpu/traversal.cc
  * @brief Graph traversal implementation
  */
 

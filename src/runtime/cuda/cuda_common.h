@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2017 by Contributors
- * \file cuda_common.h
+ * @file cuda_common.h
  * @brief Common utilities for CUDA
  */
 #ifndef DGL_RUNTIME_CUDA_CUDA_COMMON_H_

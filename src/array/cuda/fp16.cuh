@@ -13,7 +13,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
- * \file array/cuda/fp16.cuh
+ * @file array/cuda/fp16.cuh
  * @brief float16 related functions.
  * @note this file is modified from TVM project:
  *       https://github.com/apache/tvm/blob/e561007f0c330e3d14c2bc8a3ef40fb741db9004/src/target/source/literal/cuda_half_t.h.

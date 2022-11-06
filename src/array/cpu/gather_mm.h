@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2022 by Contributors
- * \file array/cpu/gather_mm.h
+ * @file array/cpu/gather_mm.h
  * @brief GATHER_MM CPU kernel function header.
  */
 #ifndef DGL_ARRAY_CPU_GATHER_MM_H_

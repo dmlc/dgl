@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2018 by Contributors
- * \file dgl/sampler.h
+ * @file dgl/sampler.h
  * @brief DGL sampler header.
  */
 #ifndef DGL_SAMPLER_H_

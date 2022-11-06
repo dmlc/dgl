@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file graph/transform/knn.cc
+ * @file graph/transform/knn.cc
  * @brief k-nearest-neighbor (KNN) interface
  */
 

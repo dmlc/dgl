@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file array/cpu/spmat_op_impl_csr.cc
+ * @file array/cpu/spmat_op_impl_csr.cc
  * @brief CSR matrix operator CPU implementation
  */
 #include <dgl/array.h>

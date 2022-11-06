@@ -1,6 +1,6 @@
  /*!
  *  Copyright (c) 2020 by Contributors
- * \file kernel/cpu/gaher_mm.cc
+ * @file kernel/cpu/gaher_mm.cc
  * @brief GatherMM C APIs and definitions.
  */
 #include "./gather_mm.h"

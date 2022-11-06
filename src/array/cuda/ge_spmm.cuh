@@ -1,6 +1,6 @@
 /*!
  * Copyright (c) 2020 by Contributors
- * \file array/cuda/ge_spmm.cuh
+ * @file array/cuda/ge_spmm.cuh
  * @brief GE-SpMM CUDA kernel function header.
  */
 #ifndef DGL_ARRAY_CUDA_GE_SPMM_CUH_

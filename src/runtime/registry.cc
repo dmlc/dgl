@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2017 by Contributors
- * \file registry.cc
+ * @file registry.cc
  * @brief The global registry of packed function.
  */
 #include <dgl/runtime/registry.h>

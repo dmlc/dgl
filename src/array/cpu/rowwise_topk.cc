@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file array/cpu/rowwise_topk.cc
+ * @file array/cpu/rowwise_topk.cc
  * @brief rowwise topk
  */
 #include <numeric>

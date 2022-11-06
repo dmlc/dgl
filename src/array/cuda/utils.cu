@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file array/cuda/utils.cu
+ * @file array/cuda/utils.cu
  * @brief Utilities for CUDA kernels.
  */
 

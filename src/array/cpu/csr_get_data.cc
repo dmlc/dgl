@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2021 by Contributors
- * \file array/cpu/csr_get_data.cc
+ * @file array/cpu/csr_get_data.cc
  * @brief Retrieve entries of a CSR matrix
  */
 #include <dgl/array.h>

@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2021 by Contributors
- * \file graph/sampling/node2vec_impl.h
+ * @file graph/sampling/node2vec_impl.h
  * @brief DGL sampler - templated implementation definition of node2vec random
  * walks
  */

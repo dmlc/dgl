@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file graph/serialize/tensor_serialize.cc
+ * @file graph/serialize/tensor_serialize.cc
  * @brief Graph serialization implementation
  */
 #include <dgl/packed_func_ext.h>

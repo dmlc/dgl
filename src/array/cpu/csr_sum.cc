@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file array/cpu/csr_sum.cc
+ * @file array/cpu/csr_sum.cc
  * @brief CSR Summation
  */
 

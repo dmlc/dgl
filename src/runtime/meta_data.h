@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2017 by Contributors
- * \file meta_data.h
+ * @file meta_data.h
  * @brief Meta data related utilities
  */
 #ifndef DGL_RUNTIME_META_DATA_H_

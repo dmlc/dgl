@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2018 by Contributors
- * \file dgl/runtime/threading_backend.h
+ * @file dgl/runtime/threading_backend.h
  * @brief Utilities for manipulating thread pool threads.
  */
 #ifndef DGL_RUNTIME_THREADING_BACKEND_H_

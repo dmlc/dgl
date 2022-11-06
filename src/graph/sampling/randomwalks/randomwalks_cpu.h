@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2018 by Contributors
- * \file graph/sampler/generic_randomwalk_cpu.h
+ * @file graph/sampler/generic_randomwalk_cpu.h
  * @brief DGL sampler - templated implementation definition of random walks on
  * CPU
  */

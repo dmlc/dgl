@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file runtime/tensordispatch.cc
+ * @file runtime/tensordispatch.cc
  * @brief Adapter library caller
  */
 

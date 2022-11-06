@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2017 by Contributors
- * \file thread_storage_scope.h
+ * @file thread_storage_scope.h
  * @brief Extract thread axis configuration from DGLArgs.
  */
 #ifndef DGL_RUNTIME_THREAD_STORAGE_SCOPE_H_

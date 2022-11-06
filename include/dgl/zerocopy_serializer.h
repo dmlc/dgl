@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file rpc/shared_mem_serializer.h
+ * @file rpc/shared_mem_serializer.h
  * @brief headers for serializer.
  */
 #ifndef DGL_ZEROCOPY_SERIALIZER_H_

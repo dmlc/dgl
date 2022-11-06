@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file communicator.h
+ * @file communicator.h
  * @brief SocketCommunicator for DGL distributed training.
  */
 #ifndef DGL_RPC_NETWORK_SOCKET_COMMUNICATOR_H_

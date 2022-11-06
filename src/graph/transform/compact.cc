@@ -13,7 +13,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
- * \file graph/transform/compact.cc
+ * @file graph/transform/compact.cc
  * @brief Compact graph implementation
  */
 

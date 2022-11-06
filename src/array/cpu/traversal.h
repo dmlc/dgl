@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file array/cpu/traversal.h
+ * @file array/cpu/traversal.h
  * @brief Graph traversal routines.
  *
  * Traversal routines generate frontiers. Frontiers can be node frontiers or

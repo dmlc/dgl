@@ -13,7 +13,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
- * \file graph/transform/compact.h
+ * @file graph/transform/compact.h
  * @brief Functions to find and eliminate the common isolated nodes across
  * all given graphs with the same set of nodes.
  */

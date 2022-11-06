@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2021 by Contributors
- * \file graph/sampling/node2vec_cpu.cc
+ * @file graph/sampling/node2vec_cpu.cc
  * @brief DGL sampler - CPU implementation of node2vec random walk with OpenMP
  */
 

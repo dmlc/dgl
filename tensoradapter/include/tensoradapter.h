@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020-2022 by Contributors
- * \file tensoradapter.h
+ * @file tensoradapter.h
  * @brief Header file for functions exposed by the adapter library.
  *
  * Functions in this library must be exported with extern "C" so that DGL can

@@ -1,7 +1,7 @@
 
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file dgl/aten/coo.h
+ * @file dgl/aten/coo.h
  * @brief Common COO operations required by DGL.
  */
 #ifndef DGL_ATEN_COO_H_

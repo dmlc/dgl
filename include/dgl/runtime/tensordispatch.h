@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020-2022 by Contributors
- * \file array/tensordispatch.h
+ * @file array/tensordispatch.h
  * @brief This file defines the dispatcher of tensor operators to
  * framework-specific implementations.
  *

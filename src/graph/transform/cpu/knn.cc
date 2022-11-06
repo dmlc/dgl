@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file graph/transform/cpu/knn.cc
+ * @file graph/transform/cpu/knn.cc
  * @brief k-nearest-neighbor (KNN) implementation
  */
 

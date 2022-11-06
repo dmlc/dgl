@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file dgl/transform.h
+ * @file dgl/transform.h
  * @brief DGL graph transformations
  */
 

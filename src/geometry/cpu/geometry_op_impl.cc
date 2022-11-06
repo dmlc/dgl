@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file array/cpu/geometry_op_impl.cc
+ * @file array/cpu/geometry_op_impl.cc
  * @brief Geometry operator CPU implementation
  */
 #include <dgl/random.h>

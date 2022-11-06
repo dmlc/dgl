@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file dgl/sampling/neighbor.h
+ * @file dgl/sampling/neighbor.h
  * @brief Neighborhood-based sampling.
  */
 #ifndef DGL_SAMPLING_NEIGHBOR_H_

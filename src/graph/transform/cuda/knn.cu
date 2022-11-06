@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file graph/transform/cuda/knn.cu
+ * @file graph/transform/cuda/knn.cu
  * @brief k-nearest-neighbor (KNN) implementation (cuda)
  */
 

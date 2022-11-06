@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file graph_index_test.cc
+ * @file graph_index_test.cc
  * @brief Test GraphIndex
  */
 #include <dgl/graph.h>

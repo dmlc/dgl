@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file graph/transform/line_graph.cc
+ * @file graph/transform/line_graph.cc
  * @brief Line graph implementation
  */
 

@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2021 by Contributors
- * \file socket_pool.h
+ * @file socket_pool.h
  * @brief Socket pool of nonblocking sockets for DGL distributed training.
  */
 #ifndef DGL_RPC_NETWORK_SOCKET_POOL_H_

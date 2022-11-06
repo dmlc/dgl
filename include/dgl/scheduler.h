@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2018 by Contributors
- * \file dgl/scheduler.h
+ * @file dgl/scheduler.h
  * @brief Operations on graph index.
  */
 #ifndef DGL_SCHEDULER_H_

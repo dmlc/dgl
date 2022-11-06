@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file array/check.h
+ * @file array/check.h
  * @brief DGL check utilities
  */
 #ifndef DGL_ARRAY_CHECK_H_

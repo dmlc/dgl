@@ -13,7 +13,7 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  *
- * \file array/gpu/disjoint_union.cu
+ * @file array/gpu/disjoint_union.cu
  * @brief Disjoint union GPU implementation.
  */
 

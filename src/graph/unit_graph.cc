@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file graph/unit_graph.cc
+ * @file graph/unit_graph.cc
  * @brief UnitGraph graph implementation
  */
 #include <dgl/array.h>

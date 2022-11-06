@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file array/cuda/atomic.cuh
+ * @file array/cuda/atomic.cuh
  * @brief Atomic functions
  */
 #ifndef DGL_ARRAY_CUDA_ATOMIC_CUH_

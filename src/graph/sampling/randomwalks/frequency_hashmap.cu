@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2021 by Contributors
- * \file graph/sampling/frequency_hashmap.cu
+ * @file graph/sampling/frequency_hashmap.cu
  * @brief frequency hashmap - used to select top-k frequency edges of each node
  */
 

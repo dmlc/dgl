@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2017 by Contributors
- * \file module.cc
+ * @file module.cc
  * @brief DGL module system
  */
 #include <dgl/runtime/module.h>

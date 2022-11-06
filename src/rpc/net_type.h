@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2022 by Contributors
- * \file net_type.h
+ * @file net_type.h
  * @brief Base communicator for DGL distributed training.
  */
 #ifndef DGL_RPC_NET_TYPE_H_

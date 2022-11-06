@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2017 by Contributors
- * \file module_util.h
+ * @file module_util.h
  * @brief Helper utilities for module building
  */
 #ifndef DGL_RUNTIME_MODULE_UTIL_H_

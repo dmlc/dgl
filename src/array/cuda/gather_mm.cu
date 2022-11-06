@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file array/cuda/gather_mm.cu
+ * @file array/cuda/gather_mm.cu
  * @brief GatherMM C APIs and definitions.
  */
 #include <dgl/array.h>

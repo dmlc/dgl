@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file array/cuda/sddmm.cu
+ * @file array/cuda/sddmm.cu
  * @brief SDDMM C APIs and definitions.
  */
 #include <dgl/array.h>

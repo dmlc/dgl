@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file intel/cpu_support.h
+ * @file intel/cpu_support.h
  * @brief Intel CPU support
  * \author Pawel Piotrowicz <pawel.piotrowicz@intel.com>
  */

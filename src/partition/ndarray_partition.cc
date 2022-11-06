@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2021 by Contributors
- * \file ndarray_partition.cc
+ * @file ndarray_partition.cc
  * @brief DGL utilities for working with the partitioned NDArrays
  */
 

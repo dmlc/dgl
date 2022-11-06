@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file array/cuda/spmat_op_impl_csr.cu
+ * @file array/cuda/spmat_op_impl_csr.cu
  * @brief CSR operator CPU implementation
  */
 #include <dgl/array.h>

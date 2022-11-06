@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2018 by Contributors
- * \file graph/sampling/randomwalk_with_restart_cpu.cc
+ * @file graph/sampling/randomwalk_with_restart_cpu.cc
  * @brief DGL sampler - CPU implementation of metapath-based random walk with
  * restart with OpenMP
  */

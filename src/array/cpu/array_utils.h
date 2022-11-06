@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file dgl/array_utils.h
+ * @file dgl/array_utils.h
  * @brief Utility classes and functions for DGL arrays.
  */
 #ifndef DGL_ARRAY_CPU_ARRAY_UTILS_H_

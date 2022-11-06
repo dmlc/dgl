@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file common.cc
+ * @file common.cc
  * @brief This file provide basic facilities for string
  * to make programming convenient.
  */

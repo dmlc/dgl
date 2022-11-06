@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file random/choice.cc
+ * @file random/choice.cc
  * @brief Non-uniform discrete sampling implementation
  */
 

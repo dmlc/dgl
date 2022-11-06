@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file dgl/samplinig/randomwalks.h
+ * @file dgl/samplinig/randomwalks.h
  * @brief Random walk functions.
  */
 #ifndef DGL_SAMPLING_RANDOMWALKS_H_

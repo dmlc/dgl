@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020-2022 by Contributors
- * \file graph/serailize/zerocopy_serializer.cc
+ * @file graph/serailize/zerocopy_serializer.cc
  * @brief serializer implementation.
  */
 

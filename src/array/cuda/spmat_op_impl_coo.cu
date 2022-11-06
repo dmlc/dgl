@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2021 by contributors.
- * \file array/cuda/spmat_op_impl_coo.cu
+ * @file array/cuda/spmat_op_impl_coo.cu
  * @brief COO operator GPU implementation
  */
 #include <dgl/array.h>

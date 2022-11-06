@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file dgl/aten/csr.h
+ * @file dgl/aten/csr.h
  * @brief Common CSR operations required by DGL.
  */
 #ifndef DGL_ATEN_CSR_H_

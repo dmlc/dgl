@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file array/cpu/rowwise_pick.h
+ * @file array/cpu/rowwise_pick.h
  * @brief Template implementation for rowwise pick operators.
  */
 #ifndef DGL_ARRAY_CPU_ROWWISE_PICK_H_

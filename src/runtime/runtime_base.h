@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2016 by Contributors
- * \file runtime_base.h
+ * @file runtime_base.h
  * @brief Base of all C APIs
  */
 #ifndef DGL_RUNTIME_RUNTIME_BASE_H_

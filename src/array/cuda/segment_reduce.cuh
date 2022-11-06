@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file array/cuda/segment_reduce.cuh
+ * @file array/cuda/segment_reduce.cuh
  * @brief Segment reduce kernel function header.
  */
 #ifndef DGL_ARRAY_CUDA_SEGMENT_REDUCE_CUH_

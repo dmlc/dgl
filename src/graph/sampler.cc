@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2018 by Contributors
- * \file graph/sampler.cc
+ * @file graph/sampler.cc
  * @brief DGL sampler implementation
  */
 #include <dgl/array.h>

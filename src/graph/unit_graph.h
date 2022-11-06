@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file graph/unit_graph.h
+ * @file graph/unit_graph.h
  * @brief UnitGraph graph
  */
 

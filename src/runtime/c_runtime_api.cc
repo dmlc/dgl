@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2016-2022 by Contributors
- * \file c_runtime_api.cc
+ * @file c_runtime_api.cc
  * @brief Runtime API implementation
  */
 #include <dgl/runtime/c_backend_api.h>

@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file aten/cpu/sddmm.cc
+ * @file aten/cpu/sddmm.cc
  * @brief SDDMM C APIs and definitions.
  */
 #include "./sddmm.h"

@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2017 by Contributors
- * \file dgl/runtime/util.h
+ * @file dgl/runtime/util.h
  * @brief Useful runtime util.
  */
 #ifndef DGL_RUNTIME_UTIL_H_

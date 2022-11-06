@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file dgl/sample_utils.h
+ * @file dgl/sample_utils.h
  * @brief Sampling utilities
  */
 #ifndef DGL_RANDOM_CPU_SAMPLE_UTILS_H_

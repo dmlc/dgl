@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file array/cuda/csr_transpose.cc
+ * @file array/cuda/csr_transpose.cc
  * @brief CSR transpose (convert to CSC)
  */
 #include <dgl/array.h>

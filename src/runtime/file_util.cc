@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2017 by Contributors
- * \file file_util.cc
+ * @file file_util.cc
  */
 #include "file_util.h"
 

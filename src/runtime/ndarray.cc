@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2017-2022 by Contributors
- * \file ndarray.cc
+ * @file ndarray.cc
  * @brief NDArray container infratructure.
  */
 #include <string.h>

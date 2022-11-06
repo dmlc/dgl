@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2016 by Contributors
  * Implementation of C API (reference: tvm/src/api/c_api.cc)
- * \file c_api.cc
+ * @file c_api.cc
  */
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/c_object_api.h>

@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file rpc/server_state.h
+ * @file rpc/server_state.h
  * @brief Implementation of RPC utilities used by both server and client sides.
  */
 

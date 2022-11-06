@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file utils.cc
+ * @file utils.cc
  * @brief DGL util functions
  */
 

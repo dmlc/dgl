@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file dgl/sampling/negative.h
+ * @file dgl/sampling/negative.h
  * @brief Negative sampling.
  */
 #ifndef DGL_SAMPLING_NEGATIVE_H_

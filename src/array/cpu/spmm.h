@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file array/cpu/spmm.h
+ * @file array/cpu/spmm.h
  * @brief SPMM CPU kernel function header.
  */
 #ifndef DGL_ARRAY_CPU_SPMM_H_

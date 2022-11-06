@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2018 by Contributors
- * \file graph/sampling/randomwalks_impl.h
+ * @file graph/sampling/randomwalks_impl.h
  * @brief DGL sampler - templated implementation definition of random walks
  */
 

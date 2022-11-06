@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2017-2022 by Contributors
- * \file dgl/runtime/ndarray.h
+ * @file dgl/runtime/ndarray.h
  * @brief Abstract device memory management API
  */
 #ifndef DGL_RUNTIME_NDARRAY_H_

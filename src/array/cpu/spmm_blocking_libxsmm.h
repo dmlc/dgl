@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2021 Intel Corporation
- * \file array/cpu/spmm.h
+ * @file array/cpu/spmm.h
  * @brief SPMM CPU kernel function header.
  * \author Sanchit Misra <sanchit.misra@intel.com>,
  *         Ramanarayan Mohanty <ramanarayan.mohanty@intel.com>,

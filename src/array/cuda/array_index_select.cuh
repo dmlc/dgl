@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2021-2022 by Contributors
- * \file array/cuda/array_index_select.cuh
+ * @file array/cuda/array_index_select.cuh
  * @brief Array index select GPU kernel implementation
  */
 
