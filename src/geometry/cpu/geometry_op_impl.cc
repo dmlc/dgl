@@ -16,7 +16,7 @@ using runtime::NDArray;
 namespace geometry {
 namespace impl {
 
-/*! \brief Knuth shuffle algorithm */
+/*! @brief Knuth shuffle algorithm */
 template <typename IdType>
 void IndexShuffle(IdType *idxs, int64_t num_elems) {
   for (int64_t i = num_elems - 1; i > 0; --i) {
@@ -27,7 +27,7 @@ void IndexShuffle(IdType *idxs, int64_t num_elems) {
 template void IndexShuffle<int32_t>(int32_t *idxs, int64_t num_elems);
 template void IndexShuffle<int64_t>(int64_t *idxs, int64_t num_elems);
 
-/*! \brief Groupwise index shuffle algorithm. This function will perform shuffle
+/*! @brief Groupwise index shuffle algorithm. This function will perform shuffle
  * in subarrays indicated by group index. The group index is similar to indptr
  * in CSRMatrix.
  *

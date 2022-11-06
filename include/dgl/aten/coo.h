@@ -37,21 +37,21 @@ constexpr uint64_t kDGLSerialize_AtenCooMatrixMagic = 0xDD61ffd305dff127;
 // TODO(BarclayII): Graph queries on COO formats should support the case where
 // data ordered by rows/columns instead of EID.
 struct COOMatrix {
-  /*! \brief the dense shape of the matrix */
+  /*! @brief the dense shape of the matrix */
   int64_t num_rows = 0, num_cols = 0;
-  /*! \brief COO index arrays */
+  /*! @brief COO index arrays */
   IdArray row, col;
-  /*! \brief data index array. When is null, assume it is from 0 to NNZ - 1. */
+  /*! @brief data index array. When is null, assume it is from 0 to NNZ - 1. */
   IdArray data;
-  /*! \brief whether the row indices are sorted */
+  /*! @brief whether the row indices are sorted */
   bool row_sorted = false;
-  /*! \brief whether the column indices per row are sorted */
+  /*! @brief whether the column indices per row are sorted */
   bool col_sorted = false;
-  /*! \brief whether the matrix is in pinned memory */
+  /*! @brief whether the matrix is in pinned memory */
   bool is_pinned = false;
-  /*! \brief default constructor */
+  /*! @brief default constructor */
   COOMatrix() = default;
-  /*! \brief constructor */
+  /*! @brief constructor */
   COOMatrix(int64_t nrows, int64_t ncols, IdArray rarr, IdArray carr,
             IdArray darr = NullArray(), bool rsorted = false,
             bool csorted = false)
@@ -65,7 +65,7 @@ struct COOMatrix {
     CheckValidity();
   }
 
-  /*! \brief constructor from SparseMatrix object */
+  /*! @brief constructor from SparseMatrix object */
   explicit COOMatrix(const SparseMatrix& spmat)
       : num_rows(spmat.num_rows),
         num_cols(spmat.num_cols),
@@ -121,7 +121,7 @@ struct COOMatrix {
     CHECK_NO_OVERFLOW(row->dtype, num_cols);
   }
 
-  /*! \brief Return a copy of this matrix on the give device context. */
+  /*! @brief Return a copy of this matrix on the give device context. */
   inline COOMatrix CopyTo(const DGLContext &ctx) const {
     if (ctx == row->ctx)
       return *this;
@@ -182,7 +182,7 @@ struct COOMatrix {
 
 ///////////////////////// COO routines //////////////////////////
 
-/*! \brief Return true if the value (row, col) is non-zero */
+/*! @brief Return true if the value (row, col) is non-zero */
 bool COOIsNonZero(COOMatrix , int64_t row, int64_t col);
 /*!
  * @brief Batched implementation of COOIsNonZero.
@@ -190,15 +190,15 @@ bool COOIsNonZero(COOMatrix , int64_t row, int64_t col);
  */
 runtime::NDArray COOIsNonZero(COOMatrix , runtime::NDArray row, runtime::NDArray col);
 
-/*! \brief Return the nnz of the given row */
+/*! @brief Return the nnz of the given row */
 int64_t COOGetRowNNZ(COOMatrix , int64_t row);
 runtime::NDArray COOGetRowNNZ(COOMatrix , runtime::NDArray row);
 
-/*! \brief Return the data array of the given row */
+/*! @brief Return the data array of the given row */
 std::pair<runtime::NDArray, runtime::NDArray>
 COOGetRowDataAndIndices(COOMatrix , int64_t row);
 
-/*! \brief Whether the COO matrix contains data */
+/*! @brief Whether the COO matrix contains data */
 inline bool COOHasData(COOMatrix csr) {
   return !IsNullArray(csr.data);
 }
@@ -230,7 +230,7 @@ std::pair<bool, bool> COOIsSorted(COOMatrix coo);
 std::vector<runtime::NDArray> COOGetDataAndIndices(
     COOMatrix mat, runtime::NDArray rows, runtime::NDArray cols);
 
-/*! \brief Get data. The return type is an ndarray due to possible duplicate entries. */
+/*! @brief Get data. The return type is an ndarray due to possible duplicate entries. */
 inline runtime::NDArray COOGetAllData(COOMatrix mat, int64_t row, int64_t col) {
   IdArray rows = VecToIdArray<int64_t>({row}, mat.row->dtype.bits, mat.row->ctx);
   IdArray cols = VecToIdArray<int64_t>({col}, mat.row->dtype.bits, mat.row->ctx);
@@ -254,7 +254,7 @@ inline runtime::NDArray COOGetAllData(COOMatrix mat, int64_t row, int64_t col) {
  */
 runtime::NDArray COOGetData(COOMatrix mat, runtime::NDArray rows, runtime::NDArray cols);
 
-/*! \brief Return a transposed COO matrix */
+/*! @brief Return a transposed COO matrix */
 COOMatrix COOTranspose(COOMatrix coo);
 
 /*!

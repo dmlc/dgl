@@ -34,7 +34,7 @@ struct RPCContext;
 // Communicator handler type
 typedef void* CommunicatorHandle;
 
-/*! \brief Context information for RPC communication */
+/*! @brief Context information for RPC communication */
 struct RPCContext {
   /*!
    * @brief Rank of this process.
@@ -112,13 +112,13 @@ struct RPCContext {
   int32_t curr_client_id = -1;
   std::unordered_map<int32_t, std::unordered_map<int32_t, int32_t>> clients_;
 
-  /*! \brief Get the RPC context singleton */
+  /*! @brief Get the RPC context singleton */
   static RPCContext* getInstance() {
     static RPCContext ctx;
     return &ctx;
   }
 
-  /*! \brief Reset the RPC context */
+  /*! @brief Reset the RPC context */
   static void Reset() {
     auto* t = getInstance();
     t->rank = -1;

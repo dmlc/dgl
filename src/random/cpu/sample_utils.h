@@ -20,12 +20,12 @@
 namespace dgl {
 namespace utils {
 
-/*! \brief Base sampler class */
+/*! @brief Base sampler class */
 template <typename Idx>
 class BaseSampler {
  public:
   virtual ~BaseSampler() = default;
-  /*! \brief Draw one integer sample */
+  /*! @brief Draw one integer sample */
   virtual Idx Draw() {
     LOG(INFO) << "Not implemented yet.";
     return 0;

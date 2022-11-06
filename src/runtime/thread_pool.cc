@@ -112,10 +112,10 @@ class ParallelLauncher {
   std::vector<std::string> par_errors_;
 };
 
-/*! \brief Lock-free single-producer-single-consumer queue for each thread */
+/*! @brief Lock-free single-producer-single-consumer queue for each thread */
 class SpscTaskQueue {
  public:
-  /*! \brief The task entry */
+  /*! @brief The task entry */
   struct Task {
     ParallelLauncher* launcher;
     int32_t task_id;

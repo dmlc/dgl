@@ -89,13 +89,13 @@ IdArray Full(int64_t val, int64_t length, uint8_t nbits, DGLContext ctx);
 template <typename DType>
 NDArray Full(DType val, int64_t length, DGLContext ctx);
 
-/*! \brief Create a deep copy of the given array */
+/*! @brief Create a deep copy of the given array */
 IdArray Clone(IdArray arr);
 
-/*! \brief Convert the idarray to the given bit width */
+/*! @brief Convert the idarray to the given bit width */
 IdArray AsNumBits(IdArray arr, uint8_t bits);
 
-/*! \brief Arithmetic functions */
+/*! @brief Arithmetic functions */
 IdArray Add(IdArray lhs, IdArray rhs);
 IdArray Sub(IdArray lhs, IdArray rhs);
 IdArray Mul(IdArray lhs, IdArray rhs);
@@ -138,10 +138,10 @@ IdArray LE(int64_t lhs, IdArray rhs);
 IdArray EQ(int64_t lhs, IdArray rhs);
 IdArray NE(int64_t lhs, IdArray rhs);
 
-/*! \brief Stack two arrays (of len L) into a 2*L length array */
+/*! @brief Stack two arrays (of len L) into a 2*L length array */
 IdArray HStack(IdArray arr1, IdArray arr2);
 
-/*! \brief Return the indices of the elements that are non-zero. */
+/*! @brief Return the indices of the elements that are non-zero. */
 IdArray NonZero(BoolArray bool_arr);
 
 /*!

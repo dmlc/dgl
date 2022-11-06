@@ -54,7 +54,7 @@ struct SharedMemory<double> {
   }
 };
 
-/*! \brief Compute Euclidean distance between two vectors in a cuda kernel */
+/*! @brief Compute Euclidean distance between two vectors in a cuda kernel */
 template <typename FloatType, typename IdType>
 __device__ FloatType
 EuclideanDist(const FloatType* vec1, const FloatType* vec2, const int64_t dim) {
@@ -400,7 +400,7 @@ __global__ void BruteforceKnnShareKernel(
   }
 }
 
-/*! \brief determine the number of blocks for each segment */
+/*! @brief determine the number of blocks for each segment */
 template <typename IdType>
 __global__ void GetNumBlockPerSegment(
     const IdType* offsets, IdType* out, const int64_t batch_size,
@@ -411,7 +411,7 @@ __global__ void GetNumBlockPerSegment(
   }
 }
 
-/*! \brief Get the batch index and local index in segment for each block */
+/*! @brief Get the batch index and local index in segment for each block */
 template <typename IdType>
 __global__ void GetBlockInfo(
     const IdType* num_block_prefixsum, IdType* block_batch_id,
@@ -575,7 +575,7 @@ void BruteForceKNNSharedCuda(
   device->FreeWorkspace(ctx, block_batch_id);
 }
 
-/*! \brief Setup rng state for nn-descent */
+/*! @brief Setup rng state for nn-descent */
 __global__ void SetupRngKernel(
     curandState* states, const uint64_t seed, const size_t n) {
   size_t id = blockIdx.x * blockDim.x + threadIdx.x;
@@ -735,7 +735,7 @@ __global__ void FindCandidatesKernel(
   }
 }
 
-/*! \brief Update knn graph according to selected candidates for nn-descent */
+/*! @brief Update knn graph according to selected candidates for nn-descent */
 template <typename FloatType, typename IdType>
 __global__ void UpdateNeighborsKernel(
     const FloatType* points, const IdType* offsets, IdType* neighbors,

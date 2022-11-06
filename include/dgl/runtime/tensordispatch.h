@@ -55,16 +55,16 @@ namespace runtime {
  */
 class TensorDispatcher {
  public:
-  /*! \brief Get the singleton instance. */
+  /*! @brief Get the singleton instance. */
   static TensorDispatcher* Global() {
     static TensorDispatcher inst;
     return &inst;
   }
 
-  /*! \brief Whether an adapter library is available. */
+  /*! @brief Whether an adapter library is available. */
   inline bool IsAvailable() { return available_; }
 
-  /*! \brief Load symbols from the given tensor adapter library path. */
+  /*! @brief Load symbols from the given tensor adapter library path. */
   bool Load(const char* path_cstr);
 
   /*!
@@ -153,9 +153,9 @@ class TensorDispatcher {
   }
 
  private:
-  /*! \brief ctor */
+  /*! @brief ctor */
   TensorDispatcher() = default;
-  /*! \brief dtor */
+  /*! @brief dtor */
   ~TensorDispatcher();
 
   /*!
@@ -170,7 +170,7 @@ class TensorDispatcher {
 #endif  // DGL_USE_CUDA
   };
 
-  /*! \brief Index of each function to the symbol list */
+  /*! @brief Index of each function to the symbol list */
   class Op {
    public:
     static constexpr int kCPURawAlloc = 0;
@@ -183,10 +183,10 @@ class TensorDispatcher {
 #endif  // DGL_USE_CUDA
   };
 
-  /*! \brief Number of functions */
+  /*! @brief Number of functions */
   static constexpr int num_entries_ = sizeof(names_) / sizeof(names_[0]);
 
-  /*! \brief Entrypoints of each function */
+  /*! @brief Entrypoints of each function */
   void* entrypoints_[num_entries_] = {
       nullptr, nullptr,
 #ifdef DGL_USE_CUDA

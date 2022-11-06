@@ -82,7 +82,7 @@ class NDArray {
  public:
   // internal container type
   struct Container;
-  /*! \brief default constructor */
+  /*! @brief default constructor */
   NDArray() {}
   /*!
    * @brief cosntruct a NDArray that refers to data
@@ -102,7 +102,7 @@ class NDArray {
       : data_(other.data_) {
     other.data_ = nullptr;
   }
-  /*! \brief destructor */
+  /*! @brief destructor */
   ~NDArray() {
     this->reset();
   }
@@ -141,7 +141,7 @@ class NDArray {
   bool same_as(const NDArray& other) const {
     return data_ == other.data_;
   }
-  /*! \brief reset the content of NDArray to be nullptr */
+  /*! @brief reset the content of NDArray to be nullptr */
   inline void reset();
   /*!
    * @return the reference counter
@@ -344,7 +344,7 @@ class NDArray {
   };
 
  private:
-  /*! \brief Internal Data content */
+  /*! @brief Internal Data content */
   Container* data_{nullptr};
   // enable internal functions
   friend struct Internal;
@@ -398,7 +398,7 @@ struct NDArray::Container {
    *  currently defined by the system.
    */
   void (*deleter)(Container* self) = nullptr;
-  /*! \brief default constructor */
+  /*! @brief default constructor */
   Container() {
     dl_tensor.data = nullptr;
     dl_tensor.ndim = 0;
@@ -406,13 +406,13 @@ struct NDArray::Container {
     dl_tensor.strides = nullptr;
     dl_tensor.byte_offset = 0;
   }
-  /*! \brief pointer to shared memory */
+  /*! @brief pointer to shared memory */
   std::shared_ptr<SharedMemory> mem;
-  /*! \brief developer function, increases reference counter */
+  /*! @brief developer function, increases reference counter */
   void IncRef() {
     ref_counter_.fetch_add(1, std::memory_order_relaxed);
   }
-  /*! \brief developer function, decrease reference counter */
+  /*! @brief developer function, decrease reference counter */
   void DecRef() {
     if (ref_counter_.fetch_sub(1, std::memory_order_release) == 1) {
       std::atomic_thread_fence(std::memory_order_acquire);
@@ -436,7 +436,7 @@ struct NDArray::Container {
    *  can be used for stride data.
    */
   std::vector<int64_t> stride_;
-  /*! \brief The internal array object */
+  /*! @brief The internal array object */
   std::atomic<int> ref_counter_{0};
 
   bool pinned_by_dgl_{false};
@@ -527,7 +527,7 @@ inline const DGLArray* NDArray::operator->() const {
   return &(data_->dl_tensor);
 }
 
-/*! \brief Magic number for NDArray file */
+/*! @brief Magic number for NDArray file */
 constexpr uint64_t kDGLNDArrayMagic = 0xDD5E40F096B4A13F;
 
 inline bool SaveDGLArray(dmlc::Stream* strm,
@@ -737,12 +737,12 @@ std::ostream& operator << (std::ostream& os, dgl::runtime::NDArray array);
 
 ///////////////// Operator overloading for DGLDataType /////////////////
 
-/*! \brief Check whether two data types are the same.*/
+/*! @brief Check whether two data types are the same.*/
 inline bool operator == (const DGLDataType& ty1, const DGLDataType& ty2) {
   return ty1.code == ty2.code && ty1.bits == ty2.bits && ty1.lanes == ty2.lanes;
 }
 
-/*! \brief Check whether two data types are different.*/
+/*! @brief Check whether two data types are different.*/
 inline bool operator != (const DGLDataType& ty1, const DGLDataType& ty2) {
   return !(ty1 == ty2);
 }
@@ -761,12 +761,12 @@ inline std::ostream& operator << (std::ostream& os, DGLDataType t) {
 
 ///////////////// Operator overloading for DGLContext /////////////////
 
-/*! \brief Check whether two device contexts are the same.*/
+/*! @brief Check whether two device contexts are the same.*/
 inline bool operator == (const DGLContext& ctx1, const DGLContext& ctx2) {
   return ctx1.device_type == ctx2.device_type && ctx1.device_id == ctx2.device_id;
 }
 
-/*! \brief Check whether two device contexts are different.*/
+/*! @brief Check whether two device contexts are different.*/
 inline bool operator != (const DGLContext& ctx1, const DGLContext& ctx2) {
   return !(ctx1 == ctx2);
 }

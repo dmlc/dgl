@@ -15,7 +15,7 @@
 namespace dgl {
 namespace aten {
 
-/*! \brief cusparseXcsrgemm dispatcher */
+/*! @brief cusparseXcsrgemm dispatcher */
 template <typename DType>
 struct CSRGEMM {
   template <typename... Args>
@@ -122,7 +122,7 @@ struct CSRGEMM<double> {
   }
 };
 
-/*! \brief cusparseXcsrgeam dispatcher */
+/*! @brief cusparseXcsrgeam dispatcher */
 template <typename DType>
 struct CSRGEAM {
   template <typename... Args>

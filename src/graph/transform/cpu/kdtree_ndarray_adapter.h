@@ -77,10 +77,10 @@ class KDTreeNDArrayAdapter {
     index_->findNeighbors(resultSet, query_pt, nanoflann::SearchParams());
   }
 
-  /*! \brief Interface expected by KDTreeSingleIndexAdaptor */
+  /*! @brief Interface expected by KDTreeSingleIndexAdaptor */
   const self_type& derived() const { return *this; }
 
-  /*! \brief Interface expected by KDTreeSingleIndexAdaptor */
+  /*! @brief Interface expected by KDTreeSingleIndexAdaptor */
   self_type& derived() { return *this; }
 
   /*!

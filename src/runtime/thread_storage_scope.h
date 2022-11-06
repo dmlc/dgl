@@ -20,9 +20,9 @@ namespace runtime {
  *       correspondence to the thread rank.
  */
 enum class StorageRank {
-  /*! \brief global memory */
+  /*! @brief global memory */
   kGlobal = 0,
-  /*! \brief shared memory among thread group */
+  /*! @brief shared memory among thread group */
   kShared = 1,
   /*!
    * @brief reserved for warp memory.
@@ -31,7 +31,7 @@ enum class StorageRank {
    *  Instead, we can simulate it by registers and shuffle.
    */
   kWarp = 2,
-  /*! \brief thread local memory */
+  /*! @brief thread local memory */
   kLocal = 3
 };
 
@@ -54,11 +54,11 @@ inline StorageRank DefaultStorageRank(int thread_scope_rank) {
   }
 }
 
-/*! \brief class to represent storage scope */
+/*! @brief class to represent storage scope */
 struct StorageScope {
-  /*! \brief The rank of the storage */
+  /*! @brief The rank of the storage */
   StorageRank rank{StorageRank::kGlobal};
-  /*! \brief tag for special purpose memory. */
+  /*! @brief tag for special purpose memory. */
   std::string tag;
   // comparator
   inline bool operator==(const StorageScope& other) const {
@@ -109,11 +109,11 @@ struct StorageScope {
   }
 };
 
-/*! \brief class to represent thread scope */
+/*! @brief class to represent thread scope */
 struct ThreadScope {
-  /*! \brief The rank of thread scope */
+  /*! @brief The rank of thread scope */
   int rank{0};
-  /*! \brief the dimension index under the rank */
+  /*! @brief the dimension index under the rank */
   int dim_index{0};
   /*!
    * @brief make storage scope from string
@@ -139,7 +139,7 @@ struct ThreadScope {
   }
 };
 
-/*! \brief workload speccification */
+/*! @brief workload speccification */
 struct ThreadWorkLoad {
   // array, first three are thread configuration.
   size_t work_size[6];
@@ -154,7 +154,7 @@ struct ThreadWorkLoad {
    */
   inline size_t grid_dim(size_t i) const { return work_size[i]; }
 };
-/*! \brief Thread axis configuration */
+/*! @brief Thread axis configuration */
 class ThreadAxisConfig {
  public:
   void Init(size_t base, const std::vector<std::string>& thread_axis_tags) {
@@ -187,11 +187,11 @@ class ThreadAxisConfig {
   size_t work_dim() const { return work_dim_; }
 
  private:
-  /*! \brief base axis */
+  /*! @brief base axis */
   size_t base_;
-  /*! \brief The worker dimension */
+  /*! @brief The worker dimension */
   size_t work_dim_;
-  /*! \brief The index mapping. */
+  /*! @brief The index mapping. */
   std::vector<uint32_t> arg_index_map_;
 };
 

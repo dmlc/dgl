@@ -41,7 +41,7 @@ inline bool cusparse_available(bool more_nnz_than_matrix_size) {
 
 namespace {
 
-/*! \brief Call cuBLAS geam API for transpose operation for float and double. */
+/*! @brief Call cuBLAS geam API for transpose operation for float and double. */
 template <typename DType>
 cublasStatus_t Xgeam(cublasHandle_t handle, cublasOperation_t transa,
     cublasOperation_t transb, int m, int n,

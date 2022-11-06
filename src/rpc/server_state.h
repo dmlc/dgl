@@ -39,16 +39,16 @@ namespace rpc {
  * shared memory.
  */
 struct ServerState : public runtime::Object {
-  /*! \brief Key value store for NDArray data */
+  /*! @brief Key value store for NDArray data */
   std::unordered_map<std::string, runtime::NDArray> kv_store;
 
-  /*! \brief Graph structure of one partition */
+  /*! @brief Graph structure of one partition */
   HeteroGraphPtr graph;
 
-  /*! \brief Total number of nodes */
+  /*! @brief Total number of nodes */
   int64_t total_num_nodes = 0;
 
-  /*! \brief Total number of edges */
+  /*! @brief Total number of edges */
   int64_t total_num_edges = 0;
 
   static constexpr const char* _type_key = "server_state.ServerState";

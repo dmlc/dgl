@@ -17,19 +17,19 @@
 
 #include "runtime_base.h"
 
-/*! \brief entry to to easily hold returning information */
+/*! @brief entry to to easily hold returning information */
 struct DGLAPIThreadLocalEntry {
-  /*! \brief result holder for returning strings */
+  /*! @brief result holder for returning strings */
   std::vector<std::string> ret_vec_str;
-  /*! \brief result holder for returning string pointers */
+  /*! @brief result holder for returning string pointers */
   std::vector<const char*> ret_vec_charp;
-  /*! \brief result holder for retruning string */
+  /*! @brief result holder for retruning string */
   std::string ret_str;
 };
 
 using namespace dgl::runtime;
 
-/*! \brief Thread local store that can be used to hold return values. */
+/*! @brief Thread local store that can be used to hold return values. */
 typedef dmlc::ThreadLocalStore<DGLAPIThreadLocalEntry> DGLAPIThreadLocalStore;
 
 using DGLAPIObject = std::shared_ptr<Object>;

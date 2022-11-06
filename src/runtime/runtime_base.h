@@ -10,9 +10,9 @@
 
 #include <stdexcept>
 
-/*! \brief  macro to guard beginning and end section of all functions */
+/*! @brief  macro to guard beginning and end section of all functions */
 #define API_BEGIN() try {
-/*! \brief every function starts with API_BEGIN();
+/*! @brief every function starts with API_BEGIN();
      and finishes with API_END() or API_END_HANDLE_ERROR */
 #define API_END()                           \
   }                                         \

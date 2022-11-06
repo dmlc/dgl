@@ -109,7 +109,7 @@ __global__ void weighted_respond_kernel(
   }
 }
 
-/*! \brief The colorize procedure. This procedure randomly marks unmarked
+/*! @brief The colorize procedure. This procedure randomly marks unmarked
  * nodes with BLUE(-1) and RED(-2) and checks whether the node matching
  * process has finished.
  */
@@ -137,7 +137,7 @@ bool Colorize(IdType *result_data, int64_t num_nodes, float *const prop) {
   return done_h;
 }
 
-/*! \brief Weighted neighbor matching procedure (GPU version).
+/*! @brief Weighted neighbor matching procedure (GPU version).
  * This implementation is from `A GPU Algorithm for Greedy Graph Matching
  * <http://www.staff.science.uu.nl/~bisse101/Articles/match12.pdf>`__
  *
@@ -198,7 +198,7 @@ template void WeightedNeighborMatching<kDGLCUDA, double, int32_t>(
 template void WeightedNeighborMatching<kDGLCUDA, double, int64_t>(
     const aten::CSRMatrix &csr, const NDArray weight, IdArray result);
 
-/*! \brief Unweighted neighbor matching procedure (GPU version).
+/*! @brief Unweighted neighbor matching procedure (GPU version).
  * Instead of directly sample neighbors, we assign each neighbor
  * with a random weight. We use random weight for 2 reasons:
  *  1. Random sample for each node in GPU is expensive. Although

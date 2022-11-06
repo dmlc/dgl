@@ -42,7 +42,7 @@ namespace aten {
   } while (0)
 
 
-/*! \brief Generalized SDDMM on Csr format. */
+/*! @brief Generalized SDDMM on Csr format. */
 template <int XPU, typename IdType, typename DType>
 void SDDMMCsr(const std::string& op,
               const BcastOff& bcast,
@@ -59,7 +59,7 @@ void SDDMMCsr(const std::string& op,
   });
 }
 
-/*! \brief Generalized SDDMM on Csr format with Heterograph support. */
+/*! @brief Generalized SDDMM on Csr format with Heterograph support. */
 template <int XPU, typename IdType, typename DType>
 void SDDMMCsrHetero(const std::string& op,
               const BcastOff& bcast,
@@ -131,7 +131,7 @@ template void SDDMMCsrHetero<kDGLCPU, int64_t, double>(
     const std::vector<dgl_type_t>& in_eid,
     const std::vector<dgl_type_t>& out_eid);
 
-/*! \brief Generalized SDDMM on Coo format. */
+/*! @brief Generalized SDDMM on Coo format. */
 template <int XPU, typename IdType, typename DType>
 void SDDMMCoo(const std::string& op,
               const BcastOff& bcast,
@@ -148,7 +148,7 @@ void SDDMMCoo(const std::string& op,
   });
 }
 
-/*! \brief Generalized SDDMM on Coo format with Heterograph support. */
+/*! @brief Generalized SDDMM on Coo format with Heterograph support. */
 template <int XPU, typename IdType, typename DType>
 void SDDMMCooHetero(const std::string& op,
               const BcastOff& bcast,

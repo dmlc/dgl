@@ -15,7 +15,7 @@ namespace aten {
 
 namespace {
 
-/*! \brief Call cuBLAS GEMM API for dense matmul operation for float and double. */
+/*! @brief Call cuBLAS GEMM API for dense matmul operation for float and double. */
 template <typename DType>
 cublasStatus_t cublasGemm(cublasHandle_t handle, cublasOperation_t transa,
     cublasOperation_t transb, int m, int n, int k,

@@ -111,15 +111,15 @@ ExtTypeVTable* ExtTypeVTable::RegisterInternal(
 }  // namespace runtime
 }  // namespace dgl
 
-/*! \brief entry to to easily hold returning information */
+/*! @brief entry to to easily hold returning information */
 struct DGLFuncThreadLocalEntry {
-  /*! \brief result holder for returning strings */
+  /*! @brief result holder for returning strings */
   std::vector<std::string> ret_vec_str;
-  /*! \brief result holder for returning string pointers */
+  /*! @brief result holder for returning string pointers */
   std::vector<const char*> ret_vec_charp;
 };
 
-/*! \brief Thread local store that can be used to hold return values. */
+/*! @brief Thread local store that can be used to hold return values. */
 typedef dmlc::ThreadLocalStore<DGLFuncThreadLocalEntry> DGLFuncThreadLocalStore;
 
 int DGLExtTypeFree(void* handle, int type_code) {

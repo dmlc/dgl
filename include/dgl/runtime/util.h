@@ -28,7 +28,7 @@ inline bool TypeMatch(DGLDataType t, int code, int bits, int lanes = 1) {
 namespace dgl {
 namespace ir {
 namespace intrinsic {
-/*! \brief The kind of structure field info used in intrinsic */
+/*! @brief The kind of structure field info used in intrinsic */
 enum DGLStructFieldKind : int {
   // array head address
   kArrAddr,

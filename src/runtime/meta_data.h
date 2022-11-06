@@ -18,7 +18,7 @@
 namespace dgl {
 namespace runtime {
 
-/*! \brief function information needed by device */
+/*! @brief function information needed by device */
 struct FunctionInfo {
   std::string name;
   std::vector<DGLDataType> arg_types;

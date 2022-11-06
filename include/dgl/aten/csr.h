@@ -36,19 +36,19 @@ struct COOMatrix;
 constexpr uint64_t kDGLSerialize_AtenCsrMatrixMagic = 0xDD6cd31205dff127;
 
 struct CSRMatrix {
-  /*! \brief the dense shape of the matrix */
+  /*! @brief the dense shape of the matrix */
   int64_t num_rows = 0, num_cols = 0;
-  /*! \brief CSR index arrays */
+  /*! @brief CSR index arrays */
   IdArray indptr, indices;
-  /*! \brief data index array. When is null, assume it is from 0 to NNZ - 1. */
+  /*! @brief data index array. When is null, assume it is from 0 to NNZ - 1. */
   IdArray data;
-  /*! \brief whether the column indices per row are sorted */
+  /*! @brief whether the column indices per row are sorted */
   bool sorted = false;
-  /*! \brief whether the matrix is in pinned memory */
+  /*! @brief whether the matrix is in pinned memory */
   bool is_pinned = false;
-  /*! \brief default constructor */
+  /*! @brief default constructor */
   CSRMatrix() = default;
-  /*! \brief constructor */
+  /*! @brief constructor */
   CSRMatrix(int64_t nrows, int64_t ncols, IdArray parr, IdArray iarr,
             IdArray darr = NullArray(), bool sorted_flag = false)
       : num_rows(nrows),
@@ -60,7 +60,7 @@ struct CSRMatrix {
     CheckValidity();
   }
 
-  /*! \brief constructor from SparseMatrix object */
+  /*! @brief constructor from SparseMatrix object */
   explicit CSRMatrix(const SparseMatrix& spmat)
       : num_rows(spmat.num_rows),
         num_cols(spmat.num_cols),
@@ -114,7 +114,7 @@ struct CSRMatrix {
     CHECK_EQ(indptr->shape[0], num_rows + 1);
   }
 
-  /*! \brief Return a copy of this matrix on the give device context. */
+  /*! @brief Return a copy of this matrix on the give device context. */
   inline CSRMatrix CopyTo(const DGLContext &ctx) const {
     if (ctx == indptr->ctx)
       return *this;
@@ -174,7 +174,7 @@ struct CSRMatrix {
 
 ///////////////////////// CSR routines //////////////////////////
 
-/*! \brief Return true if the value (row, col) is non-zero */
+/*! @brief Return true if the value (row, col) is non-zero */
 bool CSRIsNonZero(CSRMatrix , int64_t row, int64_t col);
 /*!
  * @brief Batched implementation of CSRIsNonZero.
@@ -182,22 +182,22 @@ bool CSRIsNonZero(CSRMatrix , int64_t row, int64_t col);
  */
 runtime::NDArray CSRIsNonZero(CSRMatrix, runtime::NDArray row, runtime::NDArray col);
 
-/*! \brief Return the nnz of the given row */
+/*! @brief Return the nnz of the given row */
 int64_t CSRGetRowNNZ(CSRMatrix , int64_t row);
 runtime::NDArray CSRGetRowNNZ(CSRMatrix , runtime::NDArray row);
 
-/*! \brief Return the column index array of the given row */
+/*! @brief Return the column index array of the given row */
 runtime::NDArray CSRGetRowColumnIndices(CSRMatrix , int64_t row);
 
-/*! \brief Return the data array of the given row */
+/*! @brief Return the data array of the given row */
 runtime::NDArray CSRGetRowData(CSRMatrix , int64_t row);
 
-/*! \brief Whether the CSR matrix contains data */
+/*! @brief Whether the CSR matrix contains data */
 inline bool CSRHasData(CSRMatrix csr) {
   return !IsNullArray(csr.data);
 }
 
-/*! \brief Whether the column indices of each row is sorted. */
+/*! @brief Whether the column indices of each row is sorted. */
 bool CSRIsSorted(CSRMatrix csr);
 
 /*!
@@ -273,7 +273,7 @@ runtime::NDArray CSRGetData(
     CSRMatrix, runtime::NDArray rows, runtime::NDArray cols, runtime::NDArray weights,
     DType filler);
 
-/*! \brief Return a transposed CSR matrix */
+/*! @brief Return a transposed CSR matrix */
 CSRMatrix CSRTranspose(CSRMatrix csr);
 
 /*!

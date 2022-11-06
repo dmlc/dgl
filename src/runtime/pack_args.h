@@ -98,7 +98,7 @@ class TempArray<T, 0> {
   std::vector<T> data_;
 };
 
-/*! \brief conversion code used in void arg. */
+/*! @brief conversion code used in void arg. */
 enum ArgConvertCode {
   INT64_TO_INT64,
   INT64_TO_INT32,

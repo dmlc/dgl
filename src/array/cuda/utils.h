@@ -23,7 +23,7 @@ namespace cuda {
 #define CUDA_MAX_NUM_THREADS 256
 
 
-/*! \brief Calculate the number of threads needed given the dimension length.
+/*! @brief Calculate the number of threads needed given the dimension length.
  *
  * It finds the biggest number that is smaller than min(dim, max_nthrs)
  * and is also power of two.
@@ -103,7 +103,7 @@ __global__ void _FillKernel(DType* ptr, size_t length, DType val) {
   }
 }
 
-/*! \brief Fill the vector started from ptr of size length with val */
+/*! @brief Fill the vector started from ptr of size length with val */
 template <typename DType>
 void _Fill(DType* ptr, size_t length, DType val) {
   cudaStream_t stream = runtime::getCurrentCUDAStream();
