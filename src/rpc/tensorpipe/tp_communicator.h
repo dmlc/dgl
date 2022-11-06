@@ -34,7 +34,7 @@ class TPSender : public RPCSender {
  public:
   /*!
    * \brief Sender constructor
-   * \param queue_size size of message queue
+   * @param queue_size size of message queue
    */
   explicit TPSender(std::shared_ptr<tensorpipe::Context> ctx) {
     CHECK(ctx) << "Context is not initialized";
@@ -54,8 +54,8 @@ class TPSender : public RPCSender {
    * sure that either all the connections are successfully established or some
    * of them fail.
    *
-   * \param addr Networking address, e.g., 'tcp://127.0.0.1:50091'
-   * \param recv_id receiver's ID
+   * @param addr Networking address, e.g., 'tcp://127.0.0.1:50091'
+   * @param recv_id receiver's ID
    * \return True for success and False for fail
    *
    * The function is *not* thread-safe; only one thread can invoke this API.
@@ -64,8 +64,8 @@ class TPSender : public RPCSender {
 
   /*!
    * \brief Send RPCMessage to specified Receiver.
-   * \param msg data message
-   * \param recv_id receiver's ID
+   * @param msg data message
+   * @param recv_id receiver's ID
    */
   void Send(const RPCMessage& msg, int recv_id) override;
 
@@ -109,7 +109,7 @@ class TPReceiver : public RPCReceiver {
  public:
   /*!
    * \brief Receiver constructor
-   * \param queue_size size of message queue.
+   * @param queue_size size of message queue.
    */
   explicit TPReceiver(std::shared_ptr<tensorpipe::Context> ctx) {
     CHECK(ctx) << "Context is not initialized";
@@ -124,9 +124,9 @@ class TPReceiver : public RPCReceiver {
 
   /*!
    * \brief Wait for all the Senders to connect
-   * \param addr Networking address, e.g., 'tcp://127.0.0.1:50051'
-   * \param num_sender total number of Senders
-   * \param blocking whether to wait blockingly
+   * @param addr Networking address, e.g., 'tcp://127.0.0.1:50051'
+   * @param num_sender total number of Senders
+   * @param blocking whether to wait blockingly
    * \return True for success and False for fail
    *
    * Wait() is not thread-safe and only one thread can invoke this API.
@@ -136,8 +136,8 @@ class TPReceiver : public RPCReceiver {
 
   /*!
    * \brief Recv RPCMessage from Sender. Actually removing data from queue.
-   * \param msg pointer of RPCmessage
-   * \param timeout The timeout value in milliseconds. If zero, wait
+   * @param msg pointer of RPCmessage
+   * @param timeout The timeout value in milliseconds. If zero, wait
    * indefinitely.
    * \return RPCStatus: kRPCSuccess or kRPCTimeOut.
    */

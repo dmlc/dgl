@@ -71,7 +71,7 @@ class TensorDispatcher {
    * \brief Allocate a piece of CPU memory via PyTorch's CPUAllocator.
    * Used in CPUDeviceAPI::AllocWorkspace().
    *
-   * \param nbytes The size to be allocated.
+   * @param nbytes The size to be allocated.
    * \return Pointer to the allocated memory.
    */
   inline void* CPUAllocWorkspace(size_t nbytes) {
@@ -83,7 +83,7 @@ class TensorDispatcher {
    * \brief Free the CPU memory.
    * Used in CPUDeviceAPI::FreeWorkspace().
    *
-   * \param ptr Pointer to the memory to be freed.
+   * @param ptr Pointer to the memory to be freed.
    */
   inline void CPUFreeWorkspace(void* ptr) {
     auto entry = entrypoints_[Op::kCPURawDelete];
@@ -100,8 +100,8 @@ class TensorDispatcher {
    * via cudaGetDevice(). Make sure to call cudaSetDevice()
    * before invoking this function.
    *
-   * \param nbytes The size to be allocated.
-   * \param stream The stream to be allocated on.
+   * @param nbytes The size to be allocated.
+   * @param stream The stream to be allocated on.
    * \return Pointer to the allocated memory.
    */
   inline void* CUDAAllocWorkspace(size_t nbytes, cudaStream_t stream) {
@@ -113,7 +113,7 @@ class TensorDispatcher {
    * \brief Free the GPU memory.
    * Used in CUDADeviceAPI::FreeWorkspace().
    *
-   * \param ptr Pointer to the memory to be freed.
+   * @param ptr Pointer to the memory to be freed.
    */
   inline void CUDAFreeWorkspace(void* ptr) {
     auto entry = entrypoints_[Op::kCUDARawDelete];
@@ -140,9 +140,9 @@ class TensorDispatcher {
    * \brief Record streams that are using this tensor.
    * Used in NDArray::RecordStream().
    *
-   * \param ptr Pointer of the tensor to be recorded.
-   * \param stream The stream that is using this tensor.
-   * \param device_id Device of the tensor.
+   * @param ptr Pointer of the tensor to be recorded.
+   * @param stream The stream that is using this tensor.
+   * @param device_id Device of the tensor.
    */
   inline void RecordStream(void* ptr, DGLStreamHandle stream, int device_id) {
 #ifdef DGL_USE_CUDA

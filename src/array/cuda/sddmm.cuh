@@ -256,11 +256,11 @@ __global__ void SDDMMCsrKernel(
 
 /*!
  * \brief CUDA implementation of g-SDDMM on Coo format.
- * \param bcast Broadcast information.
- * \param coo The Coo matrix.
- * \param lhs The left hand side operand feature.
- * \param rhs The right hand size operand feature.
- * \param out The result feature on edges.
+ * @param bcast Broadcast information.
+ * @param coo The Coo matrix.
+ * @param lhs The left hand side operand feature.
+ * @param rhs The right hand size operand feature.
+ * @param out The result feature on edges.
  */
 template <typename Idx, typename DType, typename Op,
           int LhsTarget = 0, int RhsTarget = 2>
@@ -325,11 +325,11 @@ void SDDMMCoo(
 
 /*!
  * \brief CUDA implementation of g-SDDMM on Csr format.
- * \param bcast Broadcast information.
- * \param csr The Csr matrix.
- * \param lhs The left hand side operand feature.
- * \param rhs The right hand size operand feature.
- * \param out The result feature on edges.
+ * @param bcast Broadcast information.
+ * @param csr The Csr matrix.
+ * @param lhs The left hand side operand feature.
+ * @param rhs The right hand size operand feature.
+ * @param out The result feature on edges.
  */
 template <typename Idx, typename DType, typename Op,
           int LhsTarget = 0, int RhsTarget = 2>

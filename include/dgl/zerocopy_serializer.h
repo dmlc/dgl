@@ -65,8 +65,8 @@ class StreamWithBuffer : public dmlc::SeekStream {
   /*!
    * \brief This constructor is for writing scenario or reading from local
    * machine
-   * \param strm The backup stream to write/load from
-   * \param send_to_remote Whether this stream will be deserialized at remote
+   * @param strm The backup stream to write/load from
+   * @param send_to_remote Whether this stream will be deserialized at remote
    * machine or the local machine. If true, will record the data pointer into
    * buffer list.
    */
@@ -76,8 +76,8 @@ class StreamWithBuffer : public dmlc::SeekStream {
         send_to_remote_(send_to_remote) {}
   /*!
    * \brief This constructor is for reading from remote
-   * \param strm The stream to write/load from zerocopy write/load
-   * \param data_ptr_list list of pointer to reconstruct NDArray
+   * @param strm The stream to write/load from zerocopy write/load
+   * @param data_ptr_list list of pointer to reconstruct NDArray
    *
    * For example:
    * std::string blob;
@@ -96,8 +96,8 @@ class StreamWithBuffer : public dmlc::SeekStream {
 
   /*!
    * \brief Construct stream backed up by string
-   * \param blob The string to write/load from zerocopy write/load
-   * \param send_to_remote Whether this stream will be deserialized at remote
+   * @param blob The string to write/load from zerocopy write/load
+   * @param send_to_remote Whether this stream will be deserialized at remote
    * machine or the local machine. If true, will record the data pointer into
    * buffer list.
    */
@@ -107,9 +107,9 @@ class StreamWithBuffer : public dmlc::SeekStream {
 
   /*!
    * \brief Construct stream backed up by string
-   * \param p_buffer buffer pointer
-   * \param size buffer size
-   * \param send_to_remote Whether this stream will be deserialized at remote
+   * @param p_buffer buffer pointer
+   * @param size buffer size
+   * @param send_to_remote Whether this stream will be deserialized at remote
    * machine or the local machine. If true, will record the data pointer into
    * buffer list.
    */
@@ -120,8 +120,8 @@ class StreamWithBuffer : public dmlc::SeekStream {
   /*!
    * \brief Construct stream backed up by string, and reconstruct NDArray
    * from data_ptr_list
-   * \param blob The string to write/load from zerocopy write/load
-   * \param data_ptr_list pointer list for NDArrays to deconstruct from
+   * @param blob The string to write/load from zerocopy write/load
+   * @param data_ptr_list pointer list for NDArrays to deconstruct from
    */
   StreamWithBuffer(std::string* blob, const std::vector<void*>& data_ptr_list)
       : strm_(new dmlc::MemoryStringStream(blob)), send_to_remote_(true) {
@@ -133,9 +133,9 @@ class StreamWithBuffer : public dmlc::SeekStream {
   /*!
    * \brief Construct stream backed up by string, and reconstruct NDArray
    * from data_ptr_list
-   * \param p_buffer buffer pointer
-   * \param size buffer size
-   * \param data_ptr_list pointer list for NDArrays to deconstruct from
+   * @param p_buffer buffer pointer
+   * @param size buffer size
+   * @param data_ptr_list pointer list for NDArrays to deconstruct from
    */
   StreamWithBuffer(
       char* p_buffer, size_t size, const std::vector<void*>& data_ptr_list)

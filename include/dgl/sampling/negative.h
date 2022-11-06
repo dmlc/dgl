@@ -23,14 +23,14 @@ namespace sampling {
  * \note This function requires sorting the CSR or CSC matrix of the graph
  * in-place.  It prefers CSC over CSR.
  *
- * \param hg The graph.
- * \param etype The edge type.
- * \param num_samples The number of negative examples to sample.
- * \param num_trials The number of rejection sampling trials.
- * \param exclude_self_loops Do not include the examples where the source equals
+ * @param hg The graph.
+ * @param etype The edge type.
+ * @param num_samples The number of negative examples to sample.
+ * @param num_trials The number of rejection sampling trials.
+ * @param exclude_self_loops Do not include the examples where the source equals
  * the destination.
- * \param replace Whether to sample with replacement.
- * \param redundancy How much redundant negative examples to take in case of
+ * @param replace Whether to sample with replacement.
+ * @param redundancy How much redundant negative examples to take in case of
  * duplicate examples.
  * \return The pair of source and destination tensors.
  */

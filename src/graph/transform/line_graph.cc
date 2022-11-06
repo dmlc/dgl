@@ -24,8 +24,8 @@ namespace transform {
 
 /*!
  * \brief Create Line Graph.
- * \param hg Graph.
- * \param backtracking whether the pair of (v, u) (u, v) edges are treated as
+ * @param hg Graph.
+ * @param backtracking whether the pair of (v, u) (u, v) edges are treated as
  *        linked.
  * \return The Line Graph.
  */

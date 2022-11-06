@@ -22,7 +22,7 @@ extern "C" {
  * \brief Allocate a piece of CPU memory via
  * PyTorch's CPUAllocator
  *
- * \param nbytes The size to be allocated.
+ * @param nbytes The size to be allocated.
  * \return Pointer to the allocated memory.
  */
 void* CPURawAlloc(size_t nbytes);
@@ -30,7 +30,7 @@ void* CPURawAlloc(size_t nbytes);
 /*!
  * \brief Free the CPU memory.
  *
- * \param ptr Pointer to the memory to be freed.
+ * @param ptr Pointer to the memory to be freed.
  */
 void CPURawDelete(void* ptr);
 
@@ -39,8 +39,8 @@ void CPURawDelete(void* ptr);
  * \brief Allocate a piece of GPU memory via
  * PyTorch's THCCachingAllocator.
  *
- * \param nbytes The size to be allocated.
- * \param stream The stream to be allocated on.
+ * @param nbytes The size to be allocated.
+ * @param stream The stream to be allocated on.
  * \return Pointer to the allocated memory.
  */
 void* CUDARawAlloc(size_t nbytes, cudaStream_t stream);
@@ -48,7 +48,7 @@ void* CUDARawAlloc(size_t nbytes, cudaStream_t stream);
 /*!
  * \brief Free the GPU memory.
  *
- * \param ptr Pointer to the memory to be freed.
+ * @param ptr Pointer to the memory to be freed.
  */
 void CUDARawDelete(void* ptr);
 
@@ -60,9 +60,9 @@ cudaStream_t CUDACurrentStream();
 /*!
  * \brief Let the caching allocator know which streams are using this tensor.
  *
- * \param ptr Pointer of the tensor to be recorded.
- * \param stream The stream that is using this tensor.
- * \param device_id Device of the tensor.
+ * @param ptr Pointer of the tensor to be recorded.
+ * @param stream The stream that is using this tensor.
+ * @param device_id Device of the tensor.
  */
 void RecordStream(void* ptr, cudaStream_t stream, int device_id);
 #endif  // DGL_USE_CUDA

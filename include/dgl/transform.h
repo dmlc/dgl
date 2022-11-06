@@ -25,8 +25,8 @@ namespace transform {
  * The graphs should have identical node ID space (i.e. should have the same set
  * of nodes, including types and IDs).
  *
- * \param graphs The list of graphs.
- * \param always_preserve The list of nodes to preserve regardless of whether
+ * @param graphs The list of graphs.
+ * @param always_preserve The list of nodes to preserve regardless of whether
  * the inbound or outbound edges exist.
  *
  * \return A pair.  The first element is the list of compacted graphs, and the
@@ -65,9 +65,9 @@ std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>> CompactGraphs(
  *     output = x
  * </code>
  *
- * \param graph The graph.
- * \param rhs_nodes Designated nodes that would appear on the right side.
- * \param include_rhs_in_lhs If false, do not include the nodes of node type \c
+ * @param graph The graph.
+ * @param rhs_nodes Designated nodes that would appear on the right side.
+ * @param include_rhs_in_lhs If false, do not include the nodes of node type \c
  * ntype_r in \c ntype_l.
  *
  * \return A triplet containing
@@ -119,8 +119,8 @@ ToSimpleGraph(const HeteroGraphPtr graph);
 /*!
  * \brief Remove edges from a graph.
  *
- * \param graph The graph.
- * \param eids The edge IDs to remove per edge type.
+ * @param graph The graph.
+ * @param eids The edge IDs to remove per edge type.
  *
  * \return A pair of the graph with edges removed, as well as the edge ID
  * mapping from the original graph to the new graph per edge type.

@@ -28,23 +28,23 @@ class WorkspacePool {
  public:
   /*!
    * \brief Create pool with specific device type and device.
-   * \param device_type The device type.
-   * \param device The device API.
+   * @param device_type The device type.
+   * @param device The device API.
    */
   WorkspacePool(DGLDeviceType device_type, std::shared_ptr<DeviceAPI> device);
   /*! \brief destructor */
   ~WorkspacePool();
   /*!
    * \brief Allocate temporal workspace.
-   * \param ctx The context of allocation.
-   * \param size The size to be allocated.
+   * @param ctx The context of allocation.
+   * @param size The size to be allocated.
    */
   void* AllocWorkspace(DGLContext ctx, size_t size);
   /*!
    * \brief Free temporal workspace in backend execution.
    *
-   * \param ctx The context of allocation.
-   * \param ptr The pointer to be freed.
+   * @param ctx The context of allocation.
+   * @param ptr The pointer to be freed.
    */
   void FreeWorkspace(DGLContext ctx, void* ptr);
 

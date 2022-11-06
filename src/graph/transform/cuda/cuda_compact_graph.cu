@@ -45,11 +45,11 @@ namespace {
  * order of the input nodes. Here it is assumed the nodes are not unique,
  * and thus a unique list is generated.
  *
- * \param input_nodes The set of input nodes.
- * \param node_maps The node maps to be constructed.
- * \param count_unique_device The number of unique nodes (on the GPU).
- * \param unique_nodes_device The unique nodes (on the GPU).
- * \param stream The stream to operate on.
+ * @param input_nodes The set of input nodes.
+ * @param node_maps The node maps to be constructed.
+ * @param count_unique_device The number of unique nodes (on the GPU).
+ * @param unique_nodes_device The unique nodes (on the GPU).
+ * @param stream The stream to operate on.
  */
 template <typename IdType>
 void BuildNodeMaps(

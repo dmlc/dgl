@@ -253,7 +253,7 @@ class HeteroGraph : public BaseHeteroGraph {
 
   /*!
    * \brief Record stream for this graph.
-   * \param stream The stream that is using the graph
+   * @param stream The stream that is using the graph
    */
   void RecordStream(DGLStreamHandle stream) override;
 
@@ -300,7 +300,7 @@ class HeteroGraph : public BaseHeteroGraph {
   /*! \brief template class for Flatten operation
   * 
   * \tparam IdType Graph's index data type, can be int32_t or int64_t
-  * \param etypes vector of etypes to be falttened
+  * @param etypes vector of etypes to be falttened
   * \return pointer of FlattenedHeteroGraphh
   */
   template <class IdType>

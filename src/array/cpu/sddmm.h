@@ -18,11 +18,11 @@ namespace cpu {
 
 /*!
  * \brief CPU kernel of g-SDDMM on Csr format.
- * \param bcast Broadcast information.
- * \param csr The Csr matrix.
- * \param lhs The left hand side operand feature.
- * \param rhs The right hand size operand feature.
- * \param out The result feature on edges.
+ * @param bcast Broadcast information.
+ * @param csr The Csr matrix.
+ * @param lhs The left hand side operand feature.
+ * @param rhs The right hand size operand feature.
+ * @param out The result feature on edges.
  * \note it uses node parallel strategy, different threads are responsible
  *       for the computation of different nodes.
  */
@@ -70,11 +70,11 @@ void SDDMMCsr(
 
 /*!
  * \brief CPU kernel of g-SDDMM on Coo format.
- * \param bcast Broadcast information.
- * \param coo The COO matrix.
- * \param lhs The left hand side operand feature.
- * \param rhs The right hand size operand feature.
- * \param out The result feature on edges.
+ * @param bcast Broadcast information.
+ * @param coo The COO matrix.
+ * @param lhs The left hand side operand feature.
+ * @param rhs The right hand size operand feature.
+ * @param out The result feature on edges.
  * \note it uses edge parallel strategy, different threads are responsible
  *       for the computation of different edges.
  */

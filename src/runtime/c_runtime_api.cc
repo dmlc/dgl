@@ -24,7 +24,7 @@ namespace runtime {
 
 /*!
  * \brief The name of Device API factory.
- * \param type The device type.
+ * @param type The device type.
  */
 inline std::string DeviceName(int type) {
   switch (type) {

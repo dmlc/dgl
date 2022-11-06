@@ -284,7 +284,7 @@ void GetUniformSample(
 /*
  * Non-uniform sample via ArrayHeap
  *
- * \param probability Transition probability on the entire graph, indexed by
+ * @param probability Transition probability on the entire graph, indexed by
  * edge ID
  */
 template <typename ValueType>

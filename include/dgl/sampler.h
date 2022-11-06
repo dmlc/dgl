@@ -24,13 +24,13 @@ class SamplerOp {
    * \brief Sample a graph from the seed vertices with neighbor sampling.
    * The neighbors are sampled with a uniform distribution.
    *
-   * \param graphs A graph for sampling.
-   * \param seeds the nodes where we should start to sample.
-   * \param edge_type the type of edges we should sample neighbors.
-   * \param num_hops the number of hops to sample neighbors.
-   * \param expand_factor the max number of neighbors to sample.
-   * \param add_self_loop whether to add self loop to the sampled subgraph
-   * \param probability the transition probability (float/double).
+   * @param graphs A graph for sampling.
+   * @param seeds the nodes where we should start to sample.
+   * @param edge_type the type of edges we should sample neighbors.
+   * @param num_hops the number of hops to sample neighbors.
+   * @param expand_factor the max number of neighbors to sample.
+   * @param add_self_loop whether to add self loop to the sampled subgraph
+   * @param probability the transition probability (float/double).
    * \return a NodeFlow graph.
    */
   template <typename ValueType>
@@ -43,10 +43,10 @@ class SamplerOp {
    * \brief Sample a graph from the seed vertices with layer sampling.
    * The layers are sampled with a uniform distribution.
    *
-   * \param graphs A graph for sampling.
-   * \param seeds the nodes where we should start to sample.
-   * \param edge_type the type of edges we should sample neighbors.
-   * \param layer_sizes The size of layers.
+   * @param graphs A graph for sampling.
+   * @param seeds the nodes where we should start to sample.
+   * @param edge_type the type of edges we should sample neighbors.
+   * @param layer_sizes The size of layers.
    * \return a NodeFlow graph.
    */
   static NodeFlow LayerUniformSample(

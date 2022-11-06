@@ -127,8 +127,8 @@ __global__ void _TransposeKernel(
 
 /*
  * \brief Tranpose the input matrix.
- * \param row number of rows of input matrix.
- * \param col number of columns of input matrix.
+ * @param row number of rows of input matrix.
+ * @param col number of columns of input matrix.
  */
 template <typename DType>
 void _Transpose(const DType* in, DType* out,
@@ -694,15 +694,15 @@ __global__ void SpMMCmpCsrHeteroKernel(
 
 /*!
  * \brief CUDA implementation of g-SpMM on Coo format.
- * \param bcast Broadcast information.
- * \param coo The Coo matrix.
- * \param ufeat The feature on source nodes.
- * \param efeat The feature on edges.
- * \param out The result feature on destination nodes.
- * \param argu Arg-Min/Max on source nodes, which refers the source node indices
+ * @param bcast Broadcast information.
+ * @param coo The Coo matrix.
+ * @param ufeat The feature on source nodes.
+ * @param efeat The feature on edges.
+ * @param out The result feature on destination nodes.
+ * @param argu Arg-Min/Max on source nodes, which refers the source node indices
  *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max reducer.
- * \param arge Arg-Min/Max on edges. which refers the source node indices
+ * @param arge Arg-Min/Max on edges. which refers the source node indices
  *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max reducer.
  */
@@ -771,15 +771,15 @@ void SpMMCoo(
 
 /*!
  * \brief CUDA implementation of g-SpMM on Csr format.
- * \param bcast Broadcast information.
- * \param csr The Csr matrix.
- * \param ufeat The feature on source nodes.
- * \param efeat The feature on edges.
- * \param out The result feature on destination nodes.
- * \param argu Arg-Min/Max on source nodes, which refers the source node indices
+ * @param bcast Broadcast information.
+ * @param csr The Csr matrix.
+ * @param ufeat The feature on source nodes.
+ * @param efeat The feature on edges.
+ * @param out The result feature on destination nodes.
+ * @param argu Arg-Min/Max on source nodes, which refers the source node indices
  *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max reducer.
- * \param arge Arg-Min/Max on edges. which refers the source node indices
+ * @param arge Arg-Min/Max on edges. which refers the source node indices
  *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max reducer.
  */
@@ -826,25 +826,25 @@ void SpMMCsr(
 
 /*!
  * \brief CUDA kernel of SpMM-Min/Max on Csr format on heterogeneous graph.
- * \param bcast Broadcast information.
- * \param csr The Csr matrix.
- * \param ufeat The feature on source nodes.
- * \param efeat The feature on edges.
- * \param out The result feature on destination nodes.
- * \param argu Arg-Min/Max on source nodes, which refers the source node indices
+ * @param bcast Broadcast information.
+ * @param csr The Csr matrix.
+ * @param ufeat The feature on source nodes.
+ * @param efeat The feature on edges.
+ * @param out The result feature on destination nodes.
+ * @param argu Arg-Min/Max on source nodes, which refers the source node indices
  *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max reducer.
- * \param arge Arg-Min/Max on edges. which refers the source node indices
+ * @param arge Arg-Min/Max on edges. which refers the source node indices
  *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max reducer.
- * \param argu_ntype Node type of the arg-Min/Max on source nodes, which refers the
+ * @param argu_ntype Node type of the arg-Min/Max on source nodes, which refers the
  *        source node types correspond to the minimum/maximum values of reduction result
  *        on destination nodes. It's useful in computing gradients of Min/Max reducer.
- * \param arge_etype Edge-type of the arg-Min/Max on edges. which refers the source
+ * @param arge_etype Edge-type of the arg-Min/Max on edges. which refers the source
  *        node indices correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max reducer.
- * \param src_type Node type of the source nodes of an etype
- * \param etype Edge type
+ * @param src_type Node type of the source nodes of an etype
+ * @param etype Edge type
  */
 template <typename Idx, typename DType,
           typename BinaryOp, typename ReduceOp>

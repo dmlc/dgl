@@ -230,13 +230,13 @@ class UnitGraph : public BaseHeteroGraph {
 
   /*!
    * \brief Record stream for this graph.
-   * \param stream The stream that is using the graph
+   * @param stream The stream that is using the graph
    */
   void RecordStream(DGLStreamHandle stream) override;
 
   /*! 
    * \brief Create in-edge CSR format of the unit graph.
-   * \param inplace if true and the in-edge CSR format does not exist, the created
+   * @param inplace if true and the in-edge CSR format does not exist, the created
    *                format will be cached in this object unless the format is restricted.
    * \return Return the in-edge CSR format. Create from other format if not exist.
    */
@@ -244,7 +244,7 @@ class UnitGraph : public BaseHeteroGraph {
 
   /*! 
    * \brief Create out-edge CSR format of the unit graph.
-   * \param inplace if true and the out-edge CSR format does not exist, the created
+   * @param inplace if true and the out-edge CSR format does not exist, the created
    *                format will be cached in this object unless the format is restricted.
    * \return Return the out-edge CSR format. Create from other format if not exist.
    */
@@ -252,7 +252,7 @@ class UnitGraph : public BaseHeteroGraph {
 
   /*!
    * \brief Create COO format of the unit graph.
-   * \param inplace if true and the COO format does not exist, the created
+   * @param inplace if true and the COO format does not exist, the created
    *                format will be cached in this object unless the format is restricted.
    * \return Return the COO format. Create from other format if not exist.
    */
@@ -321,24 +321,24 @@ class UnitGraph : public BaseHeteroGraph {
 
   /*!
    * \brief constructor
-   * \param metagraph metagraph
-   * \param in_csr in edge csr
-   * \param out_csr out edge csr
-   * \param coo coo
+   * @param metagraph metagraph
+   * @param in_csr in edge csr
+   * @param out_csr out edge csr
+   * @param coo coo
    */
   UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo,
             dgl_format_code_t formats = ALL_CODE);
 
   /*!
    * \brief constructor
-   * \param num_vtypes number of vertex types (1 or 2)
-   * \param metagraph metagraph
-   * \param in_csr in edge csr
-   * \param out_csr out edge csr
-   * \param coo coo
-   * \param has_in_csr whether in_csr is valid
-   * \param has_out_csr whether out_csr is valid
-   * \param has_coo whether coo is valid
+   * @param num_vtypes number of vertex types (1 or 2)
+   * @param metagraph metagraph
+   * @param in_csr in edge csr
+   * @param out_csr out edge csr
+   * @param coo coo
+   * @param has_in_csr whether in_csr is valid
+   * @param has_out_csr whether out_csr is valid
+   * @param has_coo whether coo is valid
    */
   static HeteroGraphPtr CreateUnitGraphFrom(
       int num_vtypes,

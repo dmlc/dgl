@@ -38,16 +38,16 @@ class SocketPool {
 
   /*!
    * \brief Add a socket to SocketPool
-   * \param socket tcp socket to add
-   * \param socket_id receiver/sender id of the socket
-   * \param events READ, WRITE or READ + WRITE
+   * @param socket tcp socket to add
+   * @param socket_id receiver/sender id of the socket
+   * @param events READ, WRITE or READ + WRITE
    */
   void AddSocket(
       std::shared_ptr<TCPSocket> socket, int socket_id, int events = READ);
 
   /*!
    * \brief Remove socket from SocketPool
-   * \param socket tcp socket to remove
+   * @param socket tcp socket to remove
    * \return number of remaing sockets in the pool
    */
   size_t RemoveSocket(std::shared_ptr<TCPSocket> socket);
@@ -59,7 +59,7 @@ class SocketPool {
 
   /*!
    * \brief Get current active socket. This is a blocking method
-   * \param socket_id output parameter of the socket_id of active socket
+   * @param socket_id output parameter of the socket_id of active socket
    * \return active TCPSocket
    */
   std::shared_ptr<TCPSocket> GetActiveSocket(int* socket_id);

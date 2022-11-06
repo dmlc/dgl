@@ -127,7 +127,7 @@ class SpscTaskQueue {
 
   /*!
    * \brief Push a task into the queue and notify the comsumer if it is on wait.
-   * \param input The task to be dequeued.
+   * @param input The task to be dequeued.
    */
   void Push(const Task& input) {
     while (!Enqueue(input)) {
@@ -141,8 +141,8 @@ class SpscTaskQueue {
 
   /*!
    * \brief Pop a task out of the queue and condition wait if no tasks.
-   * \param output The pointer to the task to be dequeued.
-   * \param spin_count The number of iterations to spin before sleep.
+   * @param output The pointer to the task to be dequeued.
+   * @param spin_count The number of iterations to spin before sleep.
    * \return Whether pop is successful (true) or we need to exit now (false).
    */
   bool Pop(Task* output, uint32_t spin_count = 300000) {
@@ -181,7 +181,7 @@ class SpscTaskQueue {
  protected:
   /*!
    * \brief Lock-free enqueue.
-   * \param input The task to be enqueued.
+   * @param input The task to be enqueued.
    * \return Whether the task is enqueued.
    */
   bool Enqueue(const Task& input) {

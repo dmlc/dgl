@@ -261,9 +261,9 @@ void SDDMM(const std::string& op,
 /*!
  * \brief Find the src/dst/etype id based on the target 'u', 'v' or 'e'.
  *
- * \param graph The input graph.
- * \param target 'u', 'v' or 'e'. The target of the lhs or rhs data of an etype.
- * \param etype Relation type of the input graph.
+ * @param graph The input graph.
+ * @param target 'u', 'v' or 'e'. The target of the lhs or rhs data of an etype.
+ * @param etype Relation type of the input graph.
  */
 int get_typeid_by_target(HeteroGraphPtr graph, int target, dgl_type_t etype) {
   auto pair = graph->meta_graph()->FindEdge(etype);
@@ -726,11 +726,11 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelGetEdgeMapping")
 /*!
  * \brief Sparse matrix multiplication with graph interface.
  *
- * \param A_ref The left operand.
- * \param A_weights The edge weights of graph A.
- * \param B_ref The right operand.
- * \param B_weights The edge weights of graph B.
- * \param num_vtypes The number of vertex types of the graph to be returned.
+ * @param A_ref The left operand.
+ * @param A_weights The edge weights of graph A.
+ * @param B_ref The right operand.
+ * @param B_weights The edge weights of graph B.
+ * @param num_vtypes The number of vertex types of the graph to be returned.
  * \return A pair consisting of the new graph as well as its edge weights.
  */
 DGL_REGISTER_GLOBAL("sparse._CAPI_DGLCSRMM")

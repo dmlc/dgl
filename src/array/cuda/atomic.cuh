@@ -176,9 +176,9 @@ DEFINE_ATOMIC(Add)
 * `(old == compare ? val : old)` , and stores the result back to memory at
 * the same address.
 *
-* \param address The address to perform the atomic operation on.
-* \param compare The value to compare to.
-* \param val The new value to conditionally store.
+* @param address The address to perform the atomic operation on.
+* @param compare The value to compare to.
+* @param val The new value to conditionally store.
 *
 * \return The old value at the address.
 */
@@ -202,9 +202,9 @@ inline __device__ int64_t AtomicCAS(
 * `(old == compare ? val : old)` , and stores the result back to memory at
 * the same address.
 *
-* \param address The address to perform the atomic operation on.
-* \param compare The value to compare to.
-* \param val The new value to conditionally store.
+* @param address The address to perform the atomic operation on.
+* @param compare The value to compare to.
+* @param val The new value to conditionally store.
 *
 * \return The old value at the address.
 */

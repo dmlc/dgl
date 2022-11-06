@@ -96,7 +96,7 @@ class DeviceOrderedHashTable {
    * WARNING: The key must exist within the hashtable. Searching for a key not
    * in the hashtable is undefined behavior.
    *
-   * \param id The key to search for.
+   * @param id The key to search for.
    *
    * \return An iterator to the mapping.
    */
@@ -109,7 +109,7 @@ class DeviceOrderedHashTable {
   /**
    * \brief Check whether a key exists within the hashtable.
    *
-   * \param id The key to check for.
+   * @param id The key to check for.
    *
    * \return True if the key exists in the hashtable.
    */
@@ -137,8 +137,8 @@ class DeviceOrderedHashTable {
   /**
    * \brief Create a new device-side handle to the hash table.
    *
-   * \param table The table stored in GPU memory.
-   * \param size The size of the table.
+   * @param table The table stored in GPU memory.
+   * @param size The size of the table.
    */
   explicit DeviceOrderedHashTable(const Mapping* table, size_t size);
 
@@ -148,7 +148,7 @@ class DeviceOrderedHashTable {
    * WARNING: If the ID searched for does not exist within the hashtable, this
    * function will never return.
    *
-   * \param id The ID of the item to search for.
+   * @param id The ID of the item to search for.
    *
    * \return The the position of the item in the hashtable.
    */
@@ -170,7 +170,7 @@ class DeviceOrderedHashTable {
   /**
    * \brief Hash an ID to a to a position in the hash table.
    *
-   * \param id The ID to hash.
+   * @param id The ID to hash.
    *
    * \return The hash.
    */
@@ -221,11 +221,11 @@ class OrderedHashTable {
    * \brief Create a new ordered hash table. The amoutn of GPU memory
    * consumed by the resulting hashtable is O(`size` * 2^`scale`).
    *
-   * \param size The number of items to insert into the hashtable.
-   * \param ctx The device context to store the hashtable on.
-   * \param scale The power of two times larger the number of buckets should
+   * @param size The number of items to insert into the hashtable.
+   * @param ctx The device context to store the hashtable on.
+   * @param scale The power of two times larger the number of buckets should
    * be than the number of items.
-   * \param stream The stream to use for initializing the hashtable.
+   * @param stream The stream to use for initializing the hashtable.
    */
   OrderedHashTable(
       const size_t size, DGLContext ctx, cudaStream_t stream,
@@ -244,11 +244,11 @@ class OrderedHashTable {
    * \brief Fill the hashtable with the array containing possibly duplicate
    * IDs.
    *
-   * \param input The array of IDs to insert.
-   * \param num_input The number of IDs to insert.
-   * \param unique The list of unique IDs inserted.
-   * \param num_unique The number of unique IDs inserted.
-   * \param stream The stream to perform operations on.
+   * @param input The array of IDs to insert.
+   * @param num_input The number of IDs to insert.
+   * @param unique The list of unique IDs inserted.
+   * @param num_unique The number of unique IDs inserted.
+   * @param stream The stream to perform operations on.
    */
   void FillWithDuplicates(
       const IdType* const input, const size_t num_input, IdType* const unique,
@@ -257,9 +257,9 @@ class OrderedHashTable {
   /**
    * \brief Fill the hashtable with an array of unique keys.
    *
-   * \param input The array of unique IDs.
-   * \param num_input The number of keys.
-   * \param stream The stream to perform operations on.
+   * @param input The array of unique IDs.
+   * @param num_input The number of keys.
+   * @param stream The stream to perform operations on.
    */
   void FillWithUnique(
       const IdType* const input, const size_t num_input, cudaStream_t stream);

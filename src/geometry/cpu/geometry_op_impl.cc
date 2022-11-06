@@ -31,10 +31,10 @@ template void IndexShuffle<int64_t>(int64_t *idxs, int64_t num_elems);
  * in subarrays indicated by group index. The group index is similar to indptr
  * in CSRMatrix.
  *
- * \param group_idxs group index array.
- * \param idxs index array for shuffle.
- * \param num_groups_idxs length of group_idxs
- * \param num_elems length of idxs
+ * @param group_idxs group index array.
+ * @param idxs index array for shuffle.
+ * @param num_groups_idxs length of group_idxs
+ * @param num_elems length of idxs
  */
 template <typename IdType>
 void GroupIndexShuffle(

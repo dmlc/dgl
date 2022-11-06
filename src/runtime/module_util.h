@@ -22,21 +22,21 @@ namespace dgl {
 namespace runtime {
 /*!
  * \brief Wrap a BackendPackedCFunc to packed function.
- * \param faddr The function address
- * \param mptr The module pointer node.
+ * @param faddr The function address
+ * @param mptr The module pointer node.
  */
 PackedFunc WrapPackedFunc(
     BackendPackedCFunc faddr, const std::shared_ptr<ModuleNode>& mptr);
 /*!
  * \brief Load and append module blob to module list
- * \param mblob The module blob.
- * \param module_list The module list to append to
+ * @param mblob The module blob.
+ * @param module_list The module list to append to
  */
 void ImportModuleBlob(const char* mblob, std::vector<Module>* module_list);
 
 /*!
  * \brief Utility to initialize conext function symbols during startup
- * \param flookup A symbol lookup function.
+ * @param flookup A symbol lookup function.
  * \tparam FLookup a function of signature string->void*
  */
 template <typename FLookup>

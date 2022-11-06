@@ -384,7 +384,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCMessageGetTensors")
 #if defined(__linux__)
 /*!
  * \brief The signal handler.
- * \param s signal
+ * @param s signal
  */
 void SigHandler(int s) {
   LOG(INFO) << "\nUser pressed Ctrl+C, Exiting";

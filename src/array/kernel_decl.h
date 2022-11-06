@@ -189,10 +189,10 @@ void BackwardSegmentCmp(NDArray feat,
 /*!
  * \brief Sparse-sparse matrix multiplication
  *
- * \param A The left operand.
- * \param A_weights The weights of matrix as a 1D tensor.
- * \param B The right operand.
- * \param B_weights The weights of matrix as a 1D tensor.
+ * @param A The left operand.
+ * @param A_weights The weights of matrix as a 1D tensor.
+ * @param B The right operand.
+ * @param B_weights The weights of matrix as a 1D tensor.
  *
  * \note GPU implementation will cast the indices to 32 bit.
  * \note The zero entries in the result are not removed.
@@ -208,8 +208,8 @@ std::pair<CSRMatrix, NDArray> CSRMM(
 /*!
  * \brief Sparse-sparse matrix summation.
  *
- * \param A The sparse matrices with the same size.
- * \param A_weights The weights of each sparse matrix as a 1D tensor.
+ * @param A The sparse matrices with the same size.
+ * @param A_weights The weights of each sparse matrix as a 1D tensor.
  *
  * \note GPU implementation will cast the indices to 32 bit.
  * \note The zero entries in the result are not removed.

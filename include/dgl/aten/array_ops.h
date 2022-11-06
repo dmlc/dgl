@@ -38,9 +38,9 @@ inline bool IsNullArray(NDArray array) {
 
 /*!
  * \brief Create a new id array with given length
- * \param length The array length
- * \param ctx The array context
- * \param nbits The number of integer bits
+ * @param length The array length
+ * @param ctx The array context
+ * @param nbits The number of integer bits
  * \return id array
  */
 IdArray NewIdArray(int64_t length,
@@ -49,9 +49,9 @@ IdArray NewIdArray(int64_t length,
 
 /*!
  * \brief Create a new id array using the given vector data
- * \param vec The vector data
- * \param nbits The integer bits of the returned array
- * \param ctx The array context
+ * @param vec The vector data
+ * @param nbits The integer bits of the returned array
+ * @param ctx The array context
  * \return the id array
  */
 template <typename T>
@@ -61,29 +61,29 @@ IdArray VecToIdArray(const std::vector<T>& vec,
 
 /*!
  * \brief Return an array representing a 1D range.
- * \param low Lower bound (inclusive).
- * \param high Higher bound (exclusive).
- * \param nbits result array's bits (32 or 64)
- * \param ctx Device context
+ * @param low Lower bound (inclusive).
+ * @param high Higher bound (exclusive).
+ * @param nbits result array's bits (32 or 64)
+ * @param ctx Device context
  * \return range array
  */
 IdArray Range(int64_t low, int64_t high, uint8_t nbits, DGLContext ctx);
 
 /*!
  * \brief Return an array full of the given value
- * \param val The value to fill.
- * \param length Number of elements.
- * \param nbits result array's bits (32 or 64)
- * \param ctx Device context
+ * @param val The value to fill.
+ * @param length Number of elements.
+ * @param nbits result array's bits (32 or 64)
+ * @param ctx Device context
  * \return the result array
  */
 IdArray Full(int64_t val, int64_t length, uint8_t nbits, DGLContext ctx);
 
 /*!
  * \brief Return an array full of the given value with the given type.
- * \param val The value to fill.
- * \param length Number of elements.
- * \param ctx Device context
+ * @param val The value to fill.
+ * @param length Number of elements.
+ * @param ctx Device context
  * \return the result array
  */
 template <typename DType>
@@ -188,8 +188,8 @@ void Scatter_(IdArray index, NDArray value, NDArray out);
 
 /*!
  * \brief Repeat each element a number of times.  Equivalent to np.repeat(array, repeats)
- * \param array A 1D vector
- * \param repeats A 1D integer vector for number of times to repeat for each element in
+ * @param array A 1D vector
+ * @param repeats A 1D integer vector for number of times to repeat for each element in
  *                \c array.  Must have the same shape as \c array.
  */
 NDArray Repeat(NDArray array, IdArray repeats);
@@ -206,7 +206,7 @@ NDArray Repeat(NDArray array, IdArray repeats);
  * mapping is [2, 3, 10, 4, 0, 5], meaning the new ID 0 maps to the old ID
  * 2, 1 maps to 3, so on and so forth.
  *
- * \param arrays The id arrays to relabel.
+ * @param arrays The id arrays to relabel.
  * \return mapping array M from new id to old id.
  */
 IdArray Relabel_(const std::vector<IdArray>& arrays);
@@ -219,7 +219,7 @@ IdArray Relabel_(const std::vector<IdArray>& arrays);
  * Given two IdArrays [2, 3, 10, 0, 2] and [4, 10, 5]
  * Return [2, 3, 10, 0, 2, 4, 10, 5]
  *
- * \param arrays The id arrays to concatenate.
+ * @param arrays The id arrays to concatenate.
  * \return concatenated array.
  */
 NDArray Concat(const std::vector<IdArray>& arrays);
@@ -240,8 +240,8 @@ inline bool IsValidIdArray(const dgl::runtime::NDArray& arr) {
  * 3. Along with the tensor containing the packed sequence, it returns both the
  *    length, as well as the offsets to the packed tensor, of each sequence.
  *
- * \param array The tensor containing sequences padded to the same length
- * \param pad_value The padding value
+ * @param array The tensor containing sequences padded to the same length
+ * @param pad_value The padding value
  * \return A triplet of packed tensor, the length tensor, and the offset tensor
  *
  * \note Example: consider the following array with padding value -1:
@@ -285,8 +285,8 @@ std::tuple<NDArray, IdArray, IdArray> Pack(NDArray array, ValueType pad_value);
  *         return packed, offsets
  * </code>
  *
- * \param array A 1D or 2D tensor for slicing
- * \param lengths A 1D tensor indicating the number of elements to slice
+ * @param array A 1D or 2D tensor for slicing
+ * @param lengths A 1D tensor indicating the number of elements to slice
  * \return The tensor with packed slices along with the offsets.
  */
 std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths);
@@ -302,7 +302,7 @@ std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths);
  * length is the input array length plus one. This is useful for creating
  * an indptr array over a count array.
  *
- * \param array The 1D input array.
+ * @param array The 1D input array.
  * \return Array after cumsum.
  */
 IdArray CumSum(IdArray array, bool prepend_zero = false);
@@ -312,7 +312,7 @@ IdArray CumSum(IdArray array, bool prepend_zero = false);
  *
  * Only support 1D array. The result index array is in int64.
  *
- * \param array The input array.
+ * @param array The input array.
  * \return A 1D index array storing the positions of the non zero values.
  */
 IdArray NonZero(NDArray array);
@@ -323,8 +323,8 @@ IdArray NonZero(NDArray array);
  * It performs both sort and arg_sort (returning the sorted index). The sorted index
  * is always in int64.
  *
- * \param array Input array.
- * \param num_bits The number of bits used in key comparison. For example, if the data type
+ * @param array Input array.
+ * @param num_bits The number of bits used in key comparison. For example, if the data type
  *                 of the input array is int32_t and `num_bits = 8`, it only uses bits in index
  *                 range [0, 8) for sorting. Setting it to a small value could
  *                 speed up the sorting if the underlying sorting algorithm is radix sort (e.g., on GPU).

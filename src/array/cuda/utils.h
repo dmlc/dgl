@@ -81,9 +81,9 @@ __device__ __forceinline__ T _ldg(T* addr) {
  * \brief Return true if the given bool flag array is all true.
  * The input bool array is in int8_t type so it is aligned with byte address.
  *
- * \param flags The bool array.
- * \param length The length.
- * \param ctx Device context.
+ * @param flags The bool array.
+ * @param length The length.
+ * @param ctx Device context.
  * \return True if all the flags are true.
  */
 bool AllTrue(int8_t* flags, int64_t length, const DGLContext& ctx);

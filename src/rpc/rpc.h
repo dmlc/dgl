@@ -172,7 +172,7 @@ struct RPCContext {
  * The underlying sending threads will hold references to the tensors until
  * the contents have been transmitted.
  *
- * \param msg RPC message to send
+ * @param msg RPC message to send
  * \return status flag
  */
 RPCStatus SendRPCMessage(const RPCMessage& msg);
@@ -182,8 +182,8 @@ RPCStatus SendRPCMessage(const RPCMessage& msg);
  *
  * The operation is blocking -- it returns when it receives any message
  *
- * \param msg The received message
- * \param timeout The timeout value in milliseconds. If zero, wait indefinitely.
+ * @param msg The received message
+ * @param timeout The timeout value in milliseconds. If zero, wait indefinitely.
  * \return status flag
  */
 RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout = 0);

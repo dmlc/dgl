@@ -80,14 +80,14 @@ class ArrayMeta {
  public:
   /*!
    * \brief ArrayMeta constructor.
-   * \param msg_type type of message
+   * @param msg_type type of message
    */
   explicit ArrayMeta(int msg_type) : msg_type_(msg_type), ndarray_count_(0) {}
 
   /*!
    * \brief Construct ArrayMeta from binary data buffer.
-   * \param buffer data buffer
-   * \param size data size
+   * @param buffer data buffer
+   * @param size data size
    */
   ArrayMeta(char* buffer, int64_t size) {
     CHECK_NOTNULL(buffer);
@@ -106,21 +106,21 @@ class ArrayMeta {
 
   /*!
    * \brief Add NDArray meta data to ArrayMeta
-   * \param array DGL NDArray
+   * @param array DGL NDArray
    */
   void AddArray(const NDArray& array);
 
   /*!
    * \brief Serialize ArrayMeta to data buffer
-   * \param size size of serialized message
+   * @param size size of serialized message
    * \return pointer of data buffer
    */
   char* Serialize(int64_t* size);
 
   /*!
    * \brief Deserialize ArrayMeta from data buffer
-   * \param buffer data buffer
-   * \param size size of data buffer
+   * @param buffer data buffer
+   * @param size size of data buffer
    */
   void Deserialize(char* buffer, int64_t size);
 
@@ -158,8 +158,8 @@ class KVStoreMsg {
 
   /*!
    * \brief Construct KVStoreMsg from binary data buffer.
-   * \param buffer data buffer
-   * \param size data size
+   * @param buffer data buffer
+   * @param size data size
    */
   KVStoreMsg(char* buffer, int64_t size) {
     CHECK_NOTNULL(buffer);
@@ -168,15 +168,15 @@ class KVStoreMsg {
   /*!
    * \brief Serialize KVStoreMsg to data buffer
    *  Note that we don't serialize ID and data here.
-   * \param size size of serialized message
+   * @param size size of serialized message
    * \return pointer of data buffer
    */
   char* Serialize(int64_t* size);
 
   /*!
    * \brief Deserialize KVStoreMsg from data buffer
-   * \param buffer data buffer
-   * \param size size of data buffer
+   * @param buffer data buffer
+   * @param size size of data buffer
    */
   void Deserialize(char* buffer, int64_t size);
 

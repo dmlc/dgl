@@ -34,8 +34,8 @@ union ArgUnion {
 /*!
  * \brief Create a packed function from void addr types.
  *
- * \param f with signiture (DGLArgs args, DGLRetValue* rv, void* void_args)
- * \param arg_types The arguments type information.
+ * @param f with signiture (DGLArgs args, DGLRetValue* rv, void* void_args)
+ * @param arg_types The arguments type information.
  * \tparam F the function type
  *
  * \return The wrapped packed function.
@@ -47,8 +47,8 @@ inline PackedFunc PackFuncVoidAddr(
  * \brief Create a packed function that from function only packs buffer
  * arguments.
  *
- * \param f with signiture (DGLArgs args, DGLRetValue* rv, ArgUnion* pack_args)
- * \param arg_types The arguments type information.
+ * @param f with signiture (DGLArgs args, DGLRetValue* rv, ArgUnion* pack_args)
+ * @param arg_types The arguments type information.
  * \tparam F the function type
  *
  * \return The wrapped packed function.
@@ -60,9 +60,9 @@ inline PackedFunc PackFuncNonBufferArg(
  * \brief Create a packed function that from function that takes a packed
  * arguments.
  *
- * \param f with signature (DGLArgs args, DGLRetValue* rv, void* pack_args,
+ * @param f with signature (DGLArgs args, DGLRetValue* rv, void* pack_args,
  * size_t nbytes)
- * \param arg_types The arguments that wish to get from
+ * @param arg_types The arguments that wish to get from
  * \tparam F the function type
  *
  * \return The wrapped packed function.
@@ -72,7 +72,7 @@ inline PackedFunc PackFuncPackedArg(
     F f, const std::vector<DGLDataType>& arg_types);
 /*!
  * \brief Extract number of buffer argument from the argument types.
- * \param arg_types The argument types.
+ * @param arg_types The argument types.
  * \return number of buffer arguments
  */
 inline size_t NumBufferArgs(const std::vector<DGLDataType>& arg_types);

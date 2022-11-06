@@ -199,13 +199,13 @@ __global__ void GatherMMScatterKernel2(
 /*!
  * \brief Implementation of Gather_mm operator. The input matrix A is
  *        expected to be sorted according to relation type.
- * \param A The input dense matrix of dimension m x k
- * \param B The input dense matrix of dimension k x n
- * \param C The output dense matrix of dimension m x n
- * \param seglen_A The input vector of size R. Each element
+ * @param A The input dense matrix of dimension m x k
+ * @param B The input dense matrix of dimension k x n
+ * @param C The output dense matrix of dimension m x n
+ * @param seglen_A The input vector of size R. Each element
  *        is the length of segments of input ``A``
- * \param a_trans Matrix A to be transposed
- * \param b_trans Matrix B to be transposed
+ * @param a_trans Matrix A to be transposed
+ * @param b_trans Matrix B to be transposed
  */
 template <int XPU, typename IdType, typename DType>
 void SegmentMM(const NDArray A,
@@ -310,11 +310,11 @@ void SegmentMMBackwardB(const NDArray A,
 /*!
  * \brief Implementation of Gather_mm operator. The input matrix A is
  *        expected to be sorted according to relation type.
- * \param A The input dense matrix of dimension m x k
- * \param B The input dense matrix of dimension k x n
- * \param C The output dense matrix of dimension m x n
- * \param idx_a The input vector to gather left hand operand on
- * \param idx_b The input vector to gather right hand operand on
+ * @param A The input dense matrix of dimension m x k
+ * @param B The input dense matrix of dimension k x n
+ * @param C The output dense matrix of dimension m x n
+ * @param idx_a The input vector to gather left hand operand on
+ * @param idx_b The input vector to gather right hand operand on
  */
 
 template <int XPU, typename IdType, typename DType>
@@ -347,15 +347,15 @@ void GatherMM(const NDArray A,
 /*!
  * \brief Implementation of Gather_mm operator. The input matrix A is
  *        expected to be sorted according to relation type.
- * \param A The input dense matrix of dimension m x k
- * \param B The input dense matrix of dimension k x n
- * \param C The output dense matrix of dimension m x n
- * \param idx_a The input vector to gather left hand operand on
- * \param idx_b The input vector to gather right hand operand on
- * \param idx_c The input vector to gather output operand on
- * \param num_rel The number of idx types in idx_b
- * \param a_trans Matrix A to be transposed
- * \param b_trans Matrix B to be transposed
+ * @param A The input dense matrix of dimension m x k
+ * @param B The input dense matrix of dimension k x n
+ * @param C The output dense matrix of dimension m x n
+ * @param idx_a The input vector to gather left hand operand on
+ * @param idx_b The input vector to gather right hand operand on
+ * @param idx_c The input vector to gather output operand on
+ * @param num_rel The number of idx types in idx_b
+ * @param a_trans Matrix A to be transposed
+ * @param b_trans Matrix B to be transposed
  */
 template <int XPU, typename IdType, typename DType>
 void GatherMMScatter(const NDArray A,

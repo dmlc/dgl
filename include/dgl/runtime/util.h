@@ -13,10 +13,10 @@ namespace runtime {
 
 /*!
  * \brief Check whether type matches the given spec.
- * \param t The type
- * \param code The type code.
- * \param bits The number of bits to be matched.
- * \param lanes The number of lanes sin the type.
+ * @param t The type
+ * @param code The type code.
+ * @param bits The number of bits to be matched.
+ * @param lanes The number of lanes sin the type.
  */
 inline bool TypeMatch(DGLDataType t, int code, int bits, int lanes = 1) {
   return t.code == code && t.bits == bits && t.lanes == lanes;

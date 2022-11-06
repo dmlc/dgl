@@ -91,8 +91,8 @@ class MessageQueue {
  public:
   /*!
    * \brief MessageQueue constructor
-   * \param queue_size size (bytes) of message queue
-   * \param num_producers number of producers, use 1 by default
+   * @param queue_size size (bytes) of message queue
+   * @param num_producers number of producers, use 1 by default
    */
   explicit MessageQueue(
       int64_t queue_size /* in bytes */, int num_producers = 1);
@@ -104,23 +104,23 @@ class MessageQueue {
 
   /*!
    * \brief Add message to the queue
-   * \param msg data message
-   * \param is_blocking Blocking if cannot add, else return
+   * @param msg data message
+   * @param is_blocking Blocking if cannot add, else return
    * \return Status code
    */
   STATUS Add(Message msg, bool is_blocking = true);
 
   /*!
    * \brief Remove message from the queue
-   * \param msg pointer of data msg
-   * \param is_blocking Blocking if cannot remove, else return
+   * @param msg pointer of data msg
+   * @param is_blocking Blocking if cannot remove, else return
    * \return Status code
    */
   STATUS Remove(Message* msg, bool is_blocking = true);
 
   /*!
    * \brief Signal that producer producer_id will no longer produce anything
-   * \param producer_id An integer uniquely to identify a producer thread
+   * @param producer_id An integer uniquely to identify a producer thread
    */
   void SignalFinished(int producer_id);
 

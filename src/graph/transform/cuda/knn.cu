@@ -435,12 +435,12 @@ __global__ void GetBlockInfo(
  *
  * \tparam FloatType The type of input points.
  * \tparam IdType The type of id.
- * \param data_points NDArray of dataset points.
- * \param data_offsets offsets of point index in data points.
- * \param query_points NDArray of query points
- * \param query_offsets offsets of point index in query points.
- * \param k the number of nearest points
- * \param result output array
+ * @param data_points NDArray of dataset points.
+ * @param data_offsets offsets of point index in data points.
+ * @param query_points NDArray of query points
+ * @param query_offsets offsets of point index in query points.
+ * @param k the number of nearest points
+ * @param result output array
  */
 template <typename FloatType, typename IdType>
 void BruteForceKNNCuda(
@@ -480,12 +480,12 @@ void BruteForceKNNCuda(
  *
  * \tparam FloatType The type of input points.
  * \tparam IdType The type of id.
- * \param data_points NDArray of dataset points.
- * \param data_offsets offsets of point index in data points.
- * \param query_points NDArray of query points
- * \param query_offsets offsets of point index in query points.
- * \param k the number of nearest points
- * \param result output array
+ * @param data_points NDArray of dataset points.
+ * @param data_offsets offsets of point index in data points.
+ * @param query_points NDArray of query points
+ * @param query_offsets offsets of point index in query points.
+ * @param k the number of nearest points
+ * @param result output array
  */
 template <typename FloatType, typename IdType>
 void BruteForceKNNSharedCuda(

@@ -29,8 +29,8 @@ class Sender : public rpc::RPCSender {
  public:
   /*!
    * \brief Sender constructor
-   * \param queue_size size (bytes) of message queue.
-   * \param max_thread_count size of thread pool. 0 for no limit
+   * @param queue_size size (bytes) of message queue.
+   * @param max_thread_count size of thread pool. 0 for no limit
    * Note that, the queue_size parameter is optional.
    */
   explicit Sender(int64_t queue_size = 0, int max_thread_count = 0) {
@@ -44,8 +44,8 @@ class Sender : public rpc::RPCSender {
 
   /*!
    * \brief Send data to specified Receiver.
-   * \param msg data message
-   * \param recv_id receiver's ID
+   * @param msg data message
+   * @param recv_id receiver's ID
    * \return Status code
    *
    * (1) The send is non-blocking. There is no guarantee that the message has
@@ -81,8 +81,8 @@ class Receiver : public rpc::RPCReceiver {
  public:
   /*!
    * \brief Receiver constructor
-   * \param queue_size size of message queue.
-   * \param max_thread_count size of thread pool. 0 for no limit
+   * @param queue_size size of message queue.
+   * @param max_thread_count size of thread pool. 0 for no limit
    * Note that, the queue_size parameter is optional.
    */
   explicit Receiver(int64_t queue_size = 0, int max_thread_count = 0) {
@@ -98,9 +98,9 @@ class Receiver : public rpc::RPCReceiver {
 
   /*!
    * \brief Recv data from Sender
-   * \param msg pointer of data message
-   * \param send_id which sender current msg comes from
-   * \param timeout The timeout value in milliseconds. If zero, wait
+   * @param msg pointer of data message
+   * @param send_id which sender current msg comes from
+   * @param timeout The timeout value in milliseconds. If zero, wait
    * indefinitely.
    * \return Status code
    *
@@ -112,9 +112,9 @@ class Receiver : public rpc::RPCReceiver {
 
   /*!
    * \brief Recv data from a specified Sender
-   * \param msg pointer of data message
-   * \param send_id sender's ID
-   * \param timeout The timeout value in milliseconds. If zero, wait
+   * @param msg pointer of data message
+   * @param send_id sender's ID
+   * @param timeout The timeout value in milliseconds. If zero, wait
    * indefinitely.
    * \return Status code
    *
