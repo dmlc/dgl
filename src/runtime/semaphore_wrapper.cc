@@ -25,9 +25,7 @@ Semaphore::Semaphore() {
   }
 }
 
-void Semaphore::Wait() {
-  WaitForSingleObject(sem_, INFINITE);
-}
+void Semaphore::Wait() { WaitForSingleObject(sem_, INFINITE); }
 
 bool Semaphore::TimedWait(int) {
   // Timed wait is not supported on WIN32.
@@ -35,19 +33,13 @@ bool Semaphore::TimedWait(int) {
   return true;
 }
 
-void Semaphore::Post() {
-  ReleaseSemaphore(sem_, 1, nullptr);
-}
+void Semaphore::Post() { ReleaseSemaphore(sem_, 1, nullptr); }
 
 #else
 
-Semaphore::Semaphore() {
-  sem_init(&sem_, 0, 0);
-}
+Semaphore::Semaphore() { sem_init(&sem_, 0, 0); }
 
-void Semaphore::Wait() {
-  sem_wait(&sem_);
-}
+void Semaphore::Wait() { sem_wait(&sem_); }
 
 bool Semaphore::TimedWait(int timeout) {
   // sem_timedwait does not exist in Mac OS.
@@ -92,9 +84,7 @@ bool Semaphore::TimedWait(int timeout) {
   return true;
 }
 
-void Semaphore::Post() {
-  sem_post(&sem_);
-}
+void Semaphore::Post() { sem_post(&sem_); }
 
 #endif
 

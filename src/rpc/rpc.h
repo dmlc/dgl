@@ -6,24 +6,25 @@
 #ifndef DGL_RPC_RPC_H_
 #define DGL_RPC_RPC_H_
 
-#include <dgl/runtime/object.h>
 #include <dgl/runtime/ndarray.h>
+#include <dgl/runtime/object.h>
 #include <dgl/zerocopy_serializer.h>
 #include <dmlc/thread_local.h>
-#include <cstdint>
-#include <memory>
-#include <deque>
-#include <vector>
-#include <string>
-#include <mutex>
-#include <unordered_map>
 
+#include <cstdint>
+#include <deque>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
+#include "./network/common.h"
 #include "./rpc_msg.h"
+#include "./server_state.h"
 #include "net_type.h"
 #include "network/socket_communicator.h"
 #include "tensorpipe/tp_communicator.h"
-#include "./network/common.h"
-#include "./server_state.h"
 
 namespace dgl {
 namespace rpc {
@@ -138,7 +139,7 @@ struct RPCContext {
   }
 
   int32_t RegisterClient(int32_t client_id, int32_t group_id) {
-    auto &&m = clients_[group_id];
+    auto&& m = clients_[group_id];
     if (m.find(client_id) != m.end()) {
       return -1;
     }
@@ -150,7 +151,7 @@ struct RPCContext {
     if (clients_.find(group_id) == clients_.end()) {
       return -1;
     }
-    const auto &m = clients_.at(group_id);
+    const auto& m = clients_.at(group_id);
     if (m.find(client_id) == m.end()) {
       return -1;
     }

@@ -16,6 +16,7 @@
 namespace dgl {
 
 constexpr DGLDataType DGLDataTypeTraits<int8_t>::dtype;
+constexpr DGLDataType DGLDataTypeTraits<uint8_t>::dtype;
 constexpr DGLDataType DGLDataTypeTraits<int16_t>::dtype;
 constexpr DGLDataType DGLDataTypeTraits<int32_t>::dtype;
 constexpr DGLDataType DGLDataTypeTraits<int64_t>::dtype;

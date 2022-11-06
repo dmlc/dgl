@@ -6,7 +6,9 @@
 
 #include <dgl/array.h>
 #include <dgl/base_heterograph.h>
+
 #include <utility>
+
 #include "randomwalks_impl.h"
 
 namespace dgl {
@@ -18,10 +20,9 @@ namespace sampling {
 
 namespace impl {
 
-template<DGLDeviceType XPU, typename IdxType>
+template <DGLDeviceType XPU, typename IdxType>
 TypeArray GetNodeTypesFromMetapath(
-    const HeteroGraphPtr hg,
-    const TypeArray metapath) {
+    const HeteroGraphPtr hg, const TypeArray metapath) {
   uint64_t num_etypes = metapath->shape[0];
   TypeArray result = TypeArray::Empty(
       {metapath->shape[0] + 1}, metapath->dtype, metapath->ctx);
@@ -38,8 +39,8 @@ TypeArray GetNodeTypesFromMetapath(
     dgl_type_t dsttype = src_dst_type.second;
 
     if (srctype != curr_type) {
-      LOG(FATAL) << "source of edge type #" << i <<
-        " does not match destination of edge type #" << i - 1;
+      LOG(FATAL) << "source of edge type #" << i
+                 << " does not match destination of edge type #" << i - 1;
       return result;
     }
     curr_type = dsttype;
@@ -48,14 +49,10 @@ TypeArray GetNodeTypesFromMetapath(
   return result;
 }
 
-template
-TypeArray GetNodeTypesFromMetapath<kDGLCPU, int32_t>(
-    const HeteroGraphPtr hg,
-    const TypeArray metapath);
-template
-TypeArray GetNodeTypesFromMetapath<kDGLCPU, int64_t>(
-    const HeteroGraphPtr hg,
-    const TypeArray metapath);
+template TypeArray GetNodeTypesFromMetapath<kDGLCPU, int32_t>(
+    const HeteroGraphPtr hg, const TypeArray metapath);
+template TypeArray GetNodeTypesFromMetapath<kDGLCPU, int64_t>(
+    const HeteroGraphPtr hg, const TypeArray metapath);
 
 };  // namespace impl
 

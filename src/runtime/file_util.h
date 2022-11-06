@@ -8,6 +8,7 @@
 
 #include <string>
 #include <unordered_map>
+
 #include "meta_data.h"
 
 namespace dgl {
@@ -17,8 +18,8 @@ namespace runtime {
  * \param file_name The name of the file.
  * \param format The format of the file.
  */
-std::string GetFileFormat(const std::string& file_name,
-                          const std::string& format);
+std::string GetFileFormat(
+    const std::string& file_name, const std::string& format);
 
 /*!
  * \return the directory in which DGL stores cached files.
@@ -44,16 +45,14 @@ std::string GetFileBasename(const std::string& file_name);
  * \param file_name The name of the file.
  * \param data The data to be loaded.
  */
-void LoadBinaryFromFile(const std::string& file_name,
-                        std::string* data);
+void LoadBinaryFromFile(const std::string& file_name, std::string* data);
 
 /*!
  * \brief Load binary file into a in-memory buffer.
  * \param file_name The name of the file.
  * \param data The binary data to be saved.
  */
-void SaveBinaryToFile(const std::string& file_name,
-                      const std::string& data);
+void SaveBinaryToFile(const std::string& file_name, const std::string& data);
 
 /*!
  * \brief Save meta data to file.

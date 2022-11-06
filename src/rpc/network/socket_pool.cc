@@ -6,6 +6,7 @@
 #include "socket_pool.h"
 
 #include <dmlc/logging.h>
+
 #include "tcp_socket.h"
 
 #ifdef USE_EPOLL
@@ -24,8 +25,8 @@ SocketPool::SocketPool() {
 #endif
 }
 
-void SocketPool::AddSocket(std::shared_ptr<TCPSocket> socket, int socket_id,
-  int events) {
+void SocketPool::AddSocket(
+    std::shared_ptr<TCPSocket> socket, int socket_id, int events) {
   int fd = socket->Socket();
   tcp_sockets_[fd] = socket;
   socket_ids_[fd] = socket_id;
@@ -47,7 +48,7 @@ void SocketPool::AddSocket(std::shared_ptr<TCPSocket> socket, int socket_id,
 #else
   if (tcp_sockets_.size() > 1) {
     LOG(FATAL) << "SocketPool supports only one socket if not use epoll."
-      "Please turn on USE_EPOLL on building";
+                  "Please turn on USE_EPOLL on building";
   }
 #endif
 }

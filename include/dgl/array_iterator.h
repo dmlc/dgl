@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file dgl/array_iterator.h
- * \brief Various iterators.
+ * @file dgl/array_iterator.h
+ * @brief Various iterators.
  */
 #ifndef DGL_ARRAY_ITERATOR_H_
 #define DGL_ARRAY_ITERATOR_H_
@@ -12,8 +12,8 @@
 #define CUB_INLINE inline
 #endif  // __CUDA_ARCH__
 
-#include <iterator>
 #include <algorithm>
+#include <iterator>
 #include <utility>
 
 namespace dgl {
@@ -51,8 +51,8 @@ CUB_INLINE void swap(const Pair<DType>& r1, const Pair<DType>& r2) {
   r1.swap(r2);
 }
 
-// PairRef and PairIterator that serves as an iterator over a pair of arrays in a
-// zipped fashion like zip(a, b).
+// PairRef and PairIterator that serves as an iterator over a pair of arrays in
+// a zipped fashion like zip(a, b).
 template <typename DType>
 struct PairRef {
   PairRef() = delete;
@@ -69,9 +69,7 @@ struct PairRef {
     *b = val.second;
     return *this;
   }
-  CUB_INLINE operator Pair<DType>() const {
-    return Pair<DType>(*a, *b);
-  }
+  CUB_INLINE operator Pair<DType>() const { return Pair<DType>(*a, *b); }
   CUB_INLINE operator std::pair<DType, DType>() const {
     return std::make_pair(*a, *b);
   }
@@ -91,11 +89,9 @@ CUB_INLINE void swap(const PairRef<DType>& r1, const PairRef<DType>& r2) {
 }
 
 template <typename DType>
-struct PairIterator : public std::iterator<std::random_access_iterator_tag,
-                                              Pair<DType>,
-                                              std::ptrdiff_t,
-                                              Pair<DType*>,
-                                              PairRef<DType>> {
+struct PairIterator : public std::iterator<
+                          std::random_access_iterator_tag, Pair<DType>,
+                          std::ptrdiff_t, Pair<DType*>, PairRef<DType>> {
   PairIterator() = default;
   PairIterator(const PairIterator& other) = default;
   PairIterator(PairIterator&& other) = default;
@@ -103,12 +99,24 @@ struct PairIterator : public std::iterator<std::random_access_iterator_tag,
   PairIterator& operator=(const PairIterator& other) = default;
   PairIterator& operator=(PairIterator&& other) = default;
   ~PairIterator() = default;
-  CUB_INLINE bool operator==(const PairIterator& other) const { return a == other.a; }
-  CUB_INLINE bool operator!=(const PairIterator& other) const { return a != other.a; }
-  CUB_INLINE bool operator<(const PairIterator& other) const { return a < other.a; }
-  CUB_INLINE bool operator>(const PairIterator& other) const { return a > other.a; }
-  CUB_INLINE bool operator<=(const PairIterator& other) const { return a <= other.a; }
-  CUB_INLINE bool operator>=(const PairIterator& other) const { return a >= other.a; }
+  CUB_INLINE bool operator==(const PairIterator& other) const {
+    return a == other.a;
+  }
+  CUB_INLINE bool operator!=(const PairIterator& other) const {
+    return a != other.a;
+  }
+  CUB_INLINE bool operator<(const PairIterator& other) const {
+    return a < other.a;
+  }
+  CUB_INLINE bool operator>(const PairIterator& other) const {
+    return a > other.a;
+  }
+  CUB_INLINE bool operator<=(const PairIterator& other) const {
+    return a <= other.a;
+  }
+  CUB_INLINE bool operator>=(const PairIterator& other) const {
+    return a >= other.a;
+  }
   CUB_INLINE PairIterator& operator+=(const std::ptrdiff_t& movement) {
     a += movement;
     b += movement;
@@ -148,12 +156,8 @@ struct PairIterator : public std::iterator<std::random_access_iterator_tag,
   CUB_INLINE std::ptrdiff_t operator-(const PairIterator& other) const {
     return a - other.a;
   }
-  CUB_INLINE PairRef<DType> operator*() const {
-    return PairRef<DType>(a, b);
-  }
-  CUB_INLINE PairRef<DType> operator*() {
-    return PairRef<DType>(a, b);
-  }
+  CUB_INLINE PairRef<DType> operator*() const { return PairRef<DType>(a, b); }
+  CUB_INLINE PairRef<DType> operator*() { return PairRef<DType>(a, b); }
   CUB_INLINE PairRef<DType> operator[](size_t offset) const {
     return PairRef<DType>(a + offset, b + offset);
   }

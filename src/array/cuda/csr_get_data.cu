@@ -41,11 +41,24 @@ NDArray CSRGetData(
     BUG_IF_FAIL(DGLDataTypeTraits<DType>::dtype == rows->dtype) <<
       "DType does not match row's dtype.";
 
+  const IdType* indptr_data = csr.indptr.Ptr<IdType>();
+  const IdType* indices_data = csr.indices.Ptr<IdType>();
+  const IdType* data_data = CSRHasData(csr) ? csr.data.Ptr<IdType>() : nullptr;
+  if (csr.is_pinned) {
+    CUDA_CALL(cudaHostGetDevicePointer(
+        &indptr_data, csr.indptr.Ptr<IdType>(), 0));
+    CUDA_CALL(cudaHostGetDevicePointer(
+        &indices_data, csr.indices.Ptr<IdType>(), 0));
+    if (CSRHasData(csr)) {
+      CUDA_CALL(cudaHostGetDevicePointer(
+          &data_data, csr.data.Ptr<IdType>(), 0));
+    }
+  }
+
   // TODO(minjie): use binary search for sorted csr
   CUDA_KERNEL_CALL(cuda::_LinearSearchKernel,
       nb, nt, 0, stream,
-      csr.indptr.Ptr<IdType>(), csr.indices.Ptr<IdType>(),
-      CSRHasData(csr)? csr.data.Ptr<IdType>() : nullptr,
+      indptr_data, indices_data, data_data,
       rows.Ptr<IdType>(), cols.Ptr<IdType>(),
       row_stride, col_stride, rstlen,
       return_eids ? nullptr : weights.Ptr<DType>(), filler, rst.Ptr<DType>());

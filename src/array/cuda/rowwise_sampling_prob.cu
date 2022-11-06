@@ -12,6 +12,7 @@
 #include <numeric>
 
 #include "./dgl_cub.cuh"
+#include "./utils.h"
 #include "../../array/cuda/atomic.cuh"
 #include "../../runtime/cuda/cuda_common.h"
 
@@ -392,6 +393,74 @@ __global__ void _CSRRowWiseSampleReplaceKernel(
   }
 }
 
+template <typename IdType, typename DType, typename BoolType>
+__global__ void _GenerateFlagsKernel(
+    int64_t n, const IdType* idx, const DType* values, DType criteria, BoolType* output) {
+  int tx = blockIdx.x * blockDim.x + threadIdx.x;
+  const int stride_x = gridDim.x * blockDim.x;
+  while (tx < n) {
+    output[tx] = (values[idx ? idx[tx] : tx] != criteria);
+    tx += stride_x;
+  }
+}
+
+template <DGLDeviceType XPU, typename IdType, typename DType, typename MaskGen>
+COOMatrix COOGeneralRemoveIf(const COOMatrix& coo, MaskGen maskgen) {
+  using namespace dgl::cuda;
+
+  const auto idtype = coo.row->dtype;
+  const auto ctx = coo.row->ctx;
+  const int64_t nnz = coo.row->shape[0];
+  const IdType* row = coo.row.Ptr<IdType>();
+  const IdType* col = coo.col.Ptr<IdType>();
+  const IdArray& eid = COOHasData(coo) ? coo.data : Range(
+      0, nnz, sizeof(IdType) * 8, ctx);
+  const IdType* data = coo.data.Ptr<IdType>();
+  IdArray new_row = IdArray::Empty({nnz}, idtype, ctx);
+  IdArray new_col = IdArray::Empty({nnz}, idtype, ctx);
+  IdArray new_eid = IdArray::Empty({nnz}, idtype, ctx);
+  IdType* new_row_data = new_row.Ptr<IdType>();
+  IdType* new_col_data = new_col.Ptr<IdType>();
+  IdType* new_eid_data = new_eid.Ptr<IdType>();
+  auto stream = runtime::getCurrentCUDAStream();
+  auto device = runtime::DeviceAPI::Get(ctx);
+
+  int8_t* flags = static_cast<int8_t*>(device->AllocWorkspace(ctx, nnz));
+  int nt = dgl::cuda::FindNumThreads(nnz);
+  int64_t nb = (nnz + nt - 1) / nt;
+
+  maskgen(nb, nt, stream, nnz, data, flags);
+
+  int64_t* rst = static_cast<int64_t*>(device->AllocWorkspace(ctx, sizeof(int64_t)));
+  MaskSelect(device, ctx, row, flags, new_row_data, nnz, rst, stream);
+  MaskSelect(device, ctx, col, flags, new_col_data, nnz, rst, stream);
+  MaskSelect(device, ctx, data, flags, new_eid_data, nnz, rst, stream);
+
+  int64_t new_len = GetCUDAScalar(device, ctx, rst);
+
+  device->FreeWorkspace(ctx, flags);
+  device->FreeWorkspace(ctx, rst);
+  return COOMatrix(
+      coo.num_rows,
+      coo.num_cols,
+      new_row.CreateView({new_len}, idtype, 0),
+      new_col.CreateView({new_len}, idtype, 0),
+      new_eid.CreateView({new_len}, idtype, 0));
+}
+
+template <DGLDeviceType XPU, typename IdType, typename DType>
+COOMatrix _COORemoveIf(const COOMatrix& coo, const NDArray& values, DType criteria) {
+  const DType* val = values.Ptr<DType>();
+  auto maskgen = [val, criteria] (
+      int nb, int nt, cudaStream_t stream, int64_t nnz, const IdType* data,
+      int8_t* flags) {
+    CUDA_KERNEL_CALL((_GenerateFlagsKernel<IdType, DType, int8_t>),
+        nb, nt, 0, stream,
+        nnz, data, val, criteria, flags);
+  };
+  return COOGeneralRemoveIf<XPU, IdType, DType, decltype(maskgen)>(coo, maskgen);
+}
+
 }  // namespace
 
 /////////////////////////////// CSR ///////////////////////////////
@@ -417,11 +486,12 @@ __global__ void _CSRRowWiseSampleReplaceKernel(
 * @author pengqirong (OPPO), dlasalle and Xin from Nvidia.
 */
 template <DGLDeviceType XPU, typename IdType, typename FloatType>
-COOMatrix CSRRowWiseSampling(CSRMatrix mat,
-                             IdArray rows,
-                             int64_t num_picks,
-                             FloatArray prob,
-                             bool replace) {
+COOMatrix _CSRRowWiseSampling(
+    const CSRMatrix& mat,
+    const IdArray& rows,
+    int64_t num_picks,
+    const FloatArray& prob,
+    bool replace) {
   const auto& ctx = rows->ctx;
   auto device = runtime::DeviceAPI::Get(ctx);
   cudaStream_t stream = runtime::getCurrentCUDAStream();
@@ -432,15 +502,26 @@ COOMatrix CSRRowWiseSampling(CSRMatrix mat,
   IdArray picked_row = NewIdArray(num_rows * num_picks, ctx, sizeof(IdType) * 8);
   IdArray picked_col = NewIdArray(num_rows * num_picks, ctx, sizeof(IdType) * 8);
   IdArray picked_idx = NewIdArray(num_rows * num_picks, ctx, sizeof(IdType) * 8);
-  const IdType * const in_ptr = static_cast<const IdType*>(mat.indptr->data);
-  const IdType * const in_cols = static_cast<const IdType*>(mat.indices->data);
   IdType* const out_rows = static_cast<IdType*>(picked_row->data);
   IdType* const out_cols = static_cast<IdType*>(picked_col->data);
   IdType* const out_idxs = static_cast<IdType*>(picked_idx->data);
 
-  const IdType* const data = CSRHasData(mat) ?
-      static_cast<IdType*>(mat.data->data) : nullptr;
-  const FloatType* const prob_data = static_cast<const FloatType*>(prob->data);
+  const IdType* in_ptr = mat.indptr.Ptr<IdType>();
+  const IdType* in_cols = mat.indices.Ptr<IdType>();
+  const IdType* data = CSRHasData(mat) ? mat.data.Ptr<IdType>() : nullptr;
+  const FloatType* prob_data = prob.Ptr<FloatType>();
+  if (mat.is_pinned) {
+    CUDA_CALL(cudaHostGetDevicePointer(
+        &in_ptr, mat.indptr.Ptr<IdType>(), 0));
+    CUDA_CALL(cudaHostGetDevicePointer(
+        &in_cols, mat.indices.Ptr<IdType>(), 0));
+    if (CSRHasData(mat)) {
+      CUDA_CALL(cudaHostGetDevicePointer(
+          &data, mat.data.Ptr<IdType>(), 0));
+    }
+    CUDA_CALL(cudaHostGetDevicePointer(
+        &prob_data, prob.Ptr<FloatType>(), 0));
+  }
 
   // compute degree
   // out_deg: the size of each row in the sampled matrix
@@ -647,8 +728,24 @@ COOMatrix CSRRowWiseSampling(CSRMatrix mat,
   picked_col = picked_col.CreateView({new_len}, picked_col->dtype);
   picked_idx = picked_idx.CreateView({new_len}, picked_idx->dtype);
 
-  return COOMatrix(mat.num_rows, mat.num_cols, picked_row,
-      picked_col, picked_idx);
+  return COOMatrix(mat.num_rows, mat.num_cols, picked_row, picked_col, picked_idx);
+}
+
+template <DGLDeviceType XPU, typename IdType, typename DType>
+COOMatrix CSRRowWiseSampling(
+    CSRMatrix mat, IdArray rows, int64_t num_picks, FloatArray prob, bool replace) {
+  COOMatrix result;
+  if (num_picks == -1) {
+    // Basically this is UnitGraph::InEdges().
+    COOMatrix coo = CSRToCOO(CSRSliceRows(mat, rows), false);
+    IdArray sliced_rows = IndexSelect(rows, coo.row);
+    result = COOMatrix(mat.num_rows, mat.num_cols, sliced_rows, coo.col, coo.data);
+  } else {
+    result = _CSRRowWiseSampling<XPU, IdType, DType>(mat, rows, num_picks, prob, replace);
+  }
+  // NOTE(BarclayII): I'm removing the entries with zero probability after sampling.
+  // Is there a better way?
+  return _COORemoveIf<XPU, IdType, DType>(result, prob, static_cast<DType>(0));
 }
 
 template COOMatrix CSRRowWiseSampling<kDGLCUDA, int32_t, float>(
@@ -658,6 +755,16 @@ template COOMatrix CSRRowWiseSampling<kDGLCUDA, int64_t, float>(
 template COOMatrix CSRRowWiseSampling<kDGLCUDA, int32_t, double>(
   CSRMatrix, IdArray, int64_t, FloatArray, bool);
 template COOMatrix CSRRowWiseSampling<kDGLCUDA, int64_t, double>(
+  CSRMatrix, IdArray, int64_t, FloatArray, bool);
+// These are not being called, but we instantiate them anyway to prevent missing
+// symbols in Debug build
+template COOMatrix CSRRowWiseSampling<kDGLCUDA, int32_t, int8_t>(
+  CSRMatrix, IdArray, int64_t, FloatArray, bool);
+template COOMatrix CSRRowWiseSampling<kDGLCUDA, int64_t, int8_t>(
+  CSRMatrix, IdArray, int64_t, FloatArray, bool);
+template COOMatrix CSRRowWiseSampling<kDGLCUDA, int32_t, uint8_t>(
+  CSRMatrix, IdArray, int64_t, FloatArray, bool);
+template COOMatrix CSRRowWiseSampling<kDGLCUDA, int64_t, uint8_t>(
   CSRMatrix, IdArray, int64_t, FloatArray, bool);
 
 }  // namespace impl

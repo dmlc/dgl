@@ -9,14 +9,14 @@
 
 #include <dgl/runtime/c_runtime_api.h>
 
-#include "cuda_runtime.h"
 #include "cuda_common.h"
+#include "cuda_runtime.h"
 
 namespace dgl {
 namespace runtime {
 namespace cuda {
 
-template<typename>
+template <typename>
 class OrderedHashTable;
 
 /*!
@@ -31,7 +31,7 @@ class OrderedHashTable;
  * used.
  *
  * The hash table should be used in two phases, with the first being populating
- * the hash table with the OrderedHashTable object, and then generating this 
+ * the hash table with the OrderedHashTable object, and then generating this
  * handle from it. This object can then be used to search the hash table,
  * to find mappings, from with CUDA code.
  *
@@ -62,7 +62,7 @@ class OrderedHashTable;
  *
  * \tparam IdType The type of the IDs.
  */
-template<typename IdType>
+template <typename IdType>
 class DeviceOrderedHashTable {
  public:
   /**
@@ -80,16 +80,15 @@ class DeviceOrderedHashTable {
     /**
      * \brief The index of the item when inserted into the hashtable (e.g.,
      * the index within the array passed into FillWithDuplicates()).
-    */
+     */
     int64_t index;
   };
 
   typedef const Mapping* ConstIterator;
 
-  DeviceOrderedHashTable(
-      const DeviceOrderedHashTable& other) = default;
-  DeviceOrderedHashTable& operator=(
-      const DeviceOrderedHashTable& other) = default;
+  DeviceOrderedHashTable(const DeviceOrderedHashTable& other) = default;
+  DeviceOrderedHashTable& operator=(const DeviceOrderedHashTable& other) =
+      default;
 
   /**
    * \brief Find the non-mutable mapping of a given key within the hash table.
@@ -101,8 +100,7 @@ class DeviceOrderedHashTable {
    *
    * \return An iterator to the mapping.
    */
-  inline __device__ ConstIterator Search(
-      const IdType id) const {
+  inline __device__ ConstIterator Search(const IdType id) const {
     const IdType pos = SearchForPosition(id);
 
     return &table_[pos];
@@ -115,8 +113,7 @@ class DeviceOrderedHashTable {
    *
    * \return True if the key exists in the hashtable.
    */
-  inline __device__ bool Contains(
-      const IdType id) const {
+  inline __device__ bool Contains(const IdType id) const {
     IdType pos = Hash(id);
 
     IdType delta = 1;
@@ -124,8 +121,8 @@ class DeviceOrderedHashTable {
       if (table_[pos].key == id) {
         return true;
       }
-      pos = Hash(pos+delta);
-      delta +=1;
+      pos = Hash(pos + delta);
+      delta += 1;
     }
     return false;
   }
@@ -134,7 +131,7 @@ class DeviceOrderedHashTable {
   // Must be uniform bytes for memset to work
   static constexpr IdType kEmptyKey = static_cast<IdType>(-1);
 
-  const Mapping * table_;
+  const Mapping* table_;
   size_t size_;
 
   /**
@@ -143,9 +140,7 @@ class DeviceOrderedHashTable {
    * \param table The table stored in GPU memory.
    * \param size The size of the table.
    */
-  explicit DeviceOrderedHashTable(
-      const Mapping * table,
-      size_t size);
+  explicit DeviceOrderedHashTable(const Mapping* table, size_t size);
 
   /**
    * \brief Search for an item in the hash table which is known to exist.
@@ -157,16 +152,15 @@ class DeviceOrderedHashTable {
    *
    * \return The the position of the item in the hashtable.
    */
-  inline __device__ IdType SearchForPosition(
-      const IdType id) const {
+  inline __device__ IdType SearchForPosition(const IdType id) const {
     IdType pos = Hash(id);
 
     // linearly scan for matching entry
     IdType delta = 1;
     while (table_[pos].key != id) {
       assert(table_[pos].key != kEmptyKey);
-      pos = Hash(pos+delta);
-      delta +=1;
+      pos = Hash(pos + delta);
+      delta += 1;
     }
     assert(pos < size_);
 
@@ -180,10 +174,7 @@ class DeviceOrderedHashTable {
    *
    * \return The hash.
    */
-  inline __device__ size_t Hash(
-      const IdType id) const {
-    return id % size_;
-  }
+  inline __device__ size_t Hash(const IdType id) const { return id % size_; }
 
   friend class OrderedHashTable<IdType>;
 };
@@ -219,7 +210,7 @@ class DeviceOrderedHashTable {
  *
  * \tparam IdType The type of the IDs.
  */
-template<typename IdType>
+template <typename IdType>
 class OrderedHashTable {
  public:
   static constexpr int kDefaultScale = 3;
@@ -237,9 +228,7 @@ class OrderedHashTable {
    * \param stream The stream to use for initializing the hashtable.
    */
   OrderedHashTable(
-      const size_t size,
-      DGLContext ctx,
-      cudaStream_t stream,
+      const size_t size, DGLContext ctx, cudaStream_t stream,
       const int scale = kDefaultScale);
 
   /**
@@ -248,10 +237,8 @@ class OrderedHashTable {
   ~OrderedHashTable();
 
   // Disable copying
-  OrderedHashTable(
-      const OrderedHashTable& other) = delete;
-  OrderedHashTable& operator=(
-      const OrderedHashTable& other) = delete;
+  OrderedHashTable(const OrderedHashTable& other) = delete;
+  OrderedHashTable& operator=(const OrderedHashTable& other) = delete;
 
   /**
    * \brief Fill the hashtable with the array containing possibly duplicate
@@ -264,11 +251,8 @@ class OrderedHashTable {
    * \param stream The stream to perform operations on.
    */
   void FillWithDuplicates(
-      const IdType * const input,
-      const size_t num_input,
-      IdType * const unique,
-      int64_t * const num_unique,
-      cudaStream_t stream);
+      const IdType* const input, const size_t num_input, IdType* const unique,
+      int64_t* const num_unique, cudaStream_t stream);
 
   /**
    * \brief Fill the hashtable with an array of unique keys.
@@ -278,9 +262,7 @@ class OrderedHashTable {
    * \param stream The stream to perform operations on.
    */
   void FillWithUnique(
-      const IdType * const input,
-      const size_t num_input,
-      cudaStream_t stream);
+      const IdType* const input, const size_t num_input, cudaStream_t stream);
 
   /**
    * \brief Get a verison of the hashtable usable from device functions.
@@ -290,11 +272,10 @@ class OrderedHashTable {
   DeviceOrderedHashTable<IdType> DeviceHandle() const;
 
  private:
-  Mapping * table_;
+  Mapping* table_;
   size_t size_;
   DGLContext ctx_;
 };
-
 
 }  // namespace cuda
 }  // namespace runtime

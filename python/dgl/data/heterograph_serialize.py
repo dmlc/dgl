@@ -19,7 +19,7 @@ def tensor_dict_to_ndarray_dict(tensor_dict):
     return convert_to_strmap(ndarray_dict)
 
 
-def save_heterographs(filename, g_list, labels):
+def save_heterographs(filename, g_list, labels, formats):
     """Save heterographs into file"""
     if labels is None:
         labels = {}
@@ -29,10 +29,13 @@ def save_heterographs(filename, g_list, labels):
         [type(g) == DGLHeteroGraph for g in g_list]
     ), "Invalid DGLHeteroGraph in g_list argument"
     gdata_list = [HeteroGraphData.create(g) for g in g_list]
+    if formats is None:
+        formats = []
+    elif isinstance(formats, str):
+        formats = [formats]
     _CAPI_SaveHeteroGraphData(
-        filename, gdata_list, tensor_dict_to_ndarray_dict(labels)
+        filename, gdata_list, tensor_dict_to_ndarray_dict(labels), formats
     )
-
 
 @register_object("heterograph_serialize.HeteroGraphData")
 class HeteroGraphData(ObjectBase):

@@ -11,7 +11,8 @@ namespace dgl {
 HeteroSubgraph InEdgeGraphRelabelNodes(
     const HeteroGraphPtr graph, const std::vector<IdArray>& vids) {
   CHECK_EQ(vids.size(), graph->NumVertexTypes())
-    << "Invalid input: the input list size must be the same as the number of vertex types.";
+      << "Invalid input: the input list size must be the same as the number of "
+         "vertex types.";
   std::vector<IdArray> eids(graph->NumEdgeTypes());
   DGLContext ctx = aten::GetContextOf(vids);
   for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
@@ -29,9 +30,11 @@ HeteroSubgraph InEdgeGraphRelabelNodes(
 
 HeteroSubgraph InEdgeGraphNoRelabelNodes(
     const HeteroGraphPtr graph, const std::vector<IdArray>& vids) {
-  // TODO(mufei): This should also use EdgeSubgraph once it is supported for CSR graphs
+  // TODO(mufei): This should also use EdgeSubgraph once it is supported for CSR
+  // graphs
   CHECK_EQ(vids.size(), graph->NumVertexTypes())
-    << "Invalid input: the input list size must be the same as the number of vertex types.";
+      << "Invalid input: the input list size must be the same as the number of "
+         "vertex types.";
   std::vector<HeteroGraphPtr> subrels(graph->NumEdgeTypes());
   std::vector<IdArray> induced_edges(graph->NumEdgeTypes());
   DGLContext ctx = aten::GetContextOf(vids);
@@ -43,30 +46,28 @@ HeteroSubgraph InEdgeGraphNoRelabelNodes(
     if (aten::IsNullArray(vids[dst_vtype])) {
       // create a placeholder graph
       subrels[etype] = UnitGraph::Empty(
-        relgraph->NumVertexTypes(),
-        graph->NumVertices(src_vtype),
-        graph->NumVertices(dst_vtype),
-        graph->DataType(), ctx);
-      induced_edges[etype] = IdArray::Empty({0}, graph->DataType(), graph->Context());
+          relgraph->NumVertexTypes(), graph->NumVertices(src_vtype),
+          graph->NumVertices(dst_vtype), graph->DataType(), ctx);
+      induced_edges[etype] =
+          IdArray::Empty({0}, graph->DataType(), graph->Context());
     } else {
       const auto& earr = graph->InEdges(etype, {vids[dst_vtype]});
       subrels[etype] = UnitGraph::CreateFromCOO(
-        relgraph->NumVertexTypes(),
-        graph->NumVertices(src_vtype),
-        graph->NumVertices(dst_vtype),
-        earr.src,
-        earr.dst);
+          relgraph->NumVertexTypes(), graph->NumVertices(src_vtype),
+          graph->NumVertices(dst_vtype), earr.src, earr.dst);
       induced_edges[etype] = earr.id;
     }
   }
   HeteroSubgraph ret;
-  ret.graph = CreateHeteroGraph(graph->meta_graph(), subrels, graph->NumVerticesPerType());
+  ret.graph = CreateHeteroGraph(
+      graph->meta_graph(), subrels, graph->NumVerticesPerType());
   ret.induced_edges = std::move(induced_edges);
   return ret;
 }
 
 HeteroSubgraph InEdgeGraph(
-    const HeteroGraphPtr graph, const std::vector<IdArray>& vids, bool relabel_nodes) {
+    const HeteroGraphPtr graph, const std::vector<IdArray>& vids,
+    bool relabel_nodes) {
   if (relabel_nodes) {
     return InEdgeGraphRelabelNodes(graph, vids);
   } else {
@@ -77,7 +78,8 @@ HeteroSubgraph InEdgeGraph(
 HeteroSubgraph OutEdgeGraphRelabelNodes(
     const HeteroGraphPtr graph, const std::vector<IdArray>& vids) {
   CHECK_EQ(vids.size(), graph->NumVertexTypes())
-    << "Invalid input: the input list size must be the same as the number of vertex types.";
+      << "Invalid input: the input list size must be the same as the number of "
+         "vertex types.";
   std::vector<IdArray> eids(graph->NumEdgeTypes());
   DGLContext ctx = aten::GetContextOf(vids);
   for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
@@ -95,9 +97,11 @@ HeteroSubgraph OutEdgeGraphRelabelNodes(
 
 HeteroSubgraph OutEdgeGraphNoRelabelNodes(
     const HeteroGraphPtr graph, const std::vector<IdArray>& vids) {
-  // TODO(mufei): This should also use EdgeSubgraph once it is supported for CSR graphs
+  // TODO(mufei): This should also use EdgeSubgraph once it is supported for CSR
+  // graphs
   CHECK_EQ(vids.size(), graph->NumVertexTypes())
-    << "Invalid input: the input list size must be the same as the number of vertex types.";
+      << "Invalid input: the input list size must be the same as the number of "
+         "vertex types.";
   std::vector<HeteroGraphPtr> subrels(graph->NumEdgeTypes());
   std::vector<IdArray> induced_edges(graph->NumEdgeTypes());
   DGLContext ctx = aten::GetContextOf(vids);
@@ -109,30 +113,28 @@ HeteroSubgraph OutEdgeGraphNoRelabelNodes(
     if (aten::IsNullArray(vids[src_vtype])) {
       // create a placeholder graph
       subrels[etype] = UnitGraph::Empty(
-        relgraph->NumVertexTypes(),
-        graph->NumVertices(src_vtype),
-        graph->NumVertices(dst_vtype),
-        graph->DataType(), ctx);
-      induced_edges[etype] = IdArray::Empty({0}, graph->DataType(), graph->Context());
+          relgraph->NumVertexTypes(), graph->NumVertices(src_vtype),
+          graph->NumVertices(dst_vtype), graph->DataType(), ctx);
+      induced_edges[etype] =
+          IdArray::Empty({0}, graph->DataType(), graph->Context());
     } else {
       const auto& earr = graph->OutEdges(etype, {vids[src_vtype]});
       subrels[etype] = UnitGraph::CreateFromCOO(
-          relgraph->NumVertexTypes(),
-          graph->NumVertices(src_vtype),
-          graph->NumVertices(dst_vtype),
-          earr.src,
-          earr.dst);
+          relgraph->NumVertexTypes(), graph->NumVertices(src_vtype),
+          graph->NumVertices(dst_vtype), earr.src, earr.dst);
       induced_edges[etype] = earr.id;
     }
   }
   HeteroSubgraph ret;
-  ret.graph = CreateHeteroGraph(graph->meta_graph(), subrels, graph->NumVerticesPerType());
+  ret.graph = CreateHeteroGraph(
+      graph->meta_graph(), subrels, graph->NumVerticesPerType());
   ret.induced_edges = std::move(induced_edges);
   return ret;
 }
 
 HeteroSubgraph OutEdgeGraph(
-    const HeteroGraphPtr graph, const std::vector<IdArray>& vids, bool relabel_nodes) {
+    const HeteroGraphPtr graph, const std::vector<IdArray>& vids,
+    bool relabel_nodes) {
   if (relabel_nodes) {
     return OutEdgeGraphRelabelNodes(graph, vids);
   } else {

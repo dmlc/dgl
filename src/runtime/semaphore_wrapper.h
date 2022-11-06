@@ -12,7 +12,6 @@
 #include <semaphore.h>
 #endif
 
-
 namespace dgl {
 namespace runtime {
 
@@ -31,7 +30,8 @@ class Semaphore {
   void Wait();
   /*!
    * \brief timed wait, decrease semaphore by 1 or returns if times out
-   * \param timeout The timeout value in milliseconds. If zero, wait indefinitely.
+   * \param timeout The timeout value in milliseconds. If zero, wait
+   * indefinitely.
    */
   bool TimedWait(int timeout);
   /*!
