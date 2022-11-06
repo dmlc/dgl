@@ -17,7 +17,7 @@ namespace aten {
 
 /*!
  * @brief CUDA implementation of g-SpMM on Csr format.
- * \note use cusparse if the reduce operator is `sum` and there is
+ * @note use cusparse if the reduce operator is `sum` and there is
  *       no broadcast, use dgl's kernel in other cases.
  */
 template <int XPU, typename IdType, typename DType>

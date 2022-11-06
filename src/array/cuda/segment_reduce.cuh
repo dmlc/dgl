@@ -22,7 +22,7 @@ namespace cuda {
 
 /*!
  * @brief CUDA kernel of segment reduce.
- * \note each blockthread is responsible for aggregation on a row
+ * @note each blockthread is responsible for aggregation on a row
  *       in the result tensor.
  */
 template <typename IdType, typename DType, typename ReduceOp>
@@ -46,7 +46,7 @@ __global__ void SegmentReduceKernel(
 
 /*!
  * @brief CUDA kernel of scatter add.
- * \note each blockthread is responsible for adding a row in feature tensor
+ * @note each blockthread is responsible for adding a row in feature tensor
  *       to a target row in output tensor.
  */
 template <typename IdType, typename DType>
@@ -64,7 +64,7 @@ __global__ void ScatterAddKernel(
 
 /*!
  * @brief CUDA kernel to update gradients for reduce op max/min
- * \note each WARP (group of 32 threads) is responsible for adding a row in
+ * @note each WARP (group of 32 threads) is responsible for adding a row in
  * feature tensor to a target row in output tensor.
  */
 
@@ -92,7 +92,7 @@ __global__ void UpdateGradMinMaxHeteroKernel(
 
 /*!
  * @brief CUDA kernel of backward phase in segment min/max.
- * \note each blockthread is responsible for writing a row in the
+ * @note each blockthread is responsible for writing a row in the
  *       result gradient tensor by lookup the ArgMin/Max for index information.
  */
 template <typename IdType, typename DType>
@@ -143,7 +143,7 @@ void SegmentReduce(NDArray feat, NDArray offsets, NDArray out, NDArray arg) {
 
 /*!
  * @brief CUDA implementation of Scatter Add (on first dimension).
- * \note math equation: out[idx[i], *] += feat[i, *]
+ * @note math equation: out[idx[i], *] += feat[i, *]
  * @param feat The input tensor.
  * @param idx The indices tensor.
  * @param out The output tensor.
@@ -226,7 +226,7 @@ void UpdateGradMinMax_hetero(
 /*!
  * @brief CUDA implementation of backward phase of Segment Reduce with Min/Max
  *        reducer.
- * \note math equation: out[arg[i, k], k] = feat[i, k] \param feat The input
+ * @note math equation: out[arg[i, k], k] = feat[i, k] \param feat The input
  *       tensor.
  * @param arg The ArgMin/Max information, used for indexing.
  * @param out The output tensor.

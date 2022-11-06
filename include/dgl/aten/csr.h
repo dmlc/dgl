@@ -124,7 +124,7 @@ struct CSRMatrix {
 
   /*!
   * @brief Pin the indptr, indices and data (if not Null) of the matrix.
-  * \note This is an in-place method. Behavior depends on the current context,
+  * @note This is an in-place method. Behavior depends on the current context,
   *       kDGLCPU: will be pinned;
   *       IsPinned: directly return;
   *       kDGLCUDA: invalid, will throw an error.
@@ -143,7 +143,7 @@ struct CSRMatrix {
 
   /*!
   * @brief Unpin the indptr, indices and data (if not Null) of the matrix.
-  * \note This is an in-place method. Behavior depends on the current context,
+  * @note This is an in-place method. Behavior depends on the current context,
   *       IsPinned: will be unpinned;
   *       others: directly return.
   *       The context check is deferred to unpinning the NDArray.
@@ -178,7 +178,7 @@ struct CSRMatrix {
 bool CSRIsNonZero(CSRMatrix , int64_t row, int64_t col);
 /*!
  * @brief Batched implementation of CSRIsNonZero.
- * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
+ * @note This operator allows broadcasting (i.e, either row or col can be of length 1).
  */
 runtime::NDArray CSRIsNonZero(CSRMatrix, runtime::NDArray row, runtime::NDArray col);
 
@@ -210,7 +210,7 @@ bool CSRIsSorted(CSRMatrix csr);
  * If some (row, col) pairs do not contain a valid non-zero elements,
  * they will not be included in the return arrays.
  *
- * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
+ * @note This operator allows broadcasting (i.e, either row or col can be of length 1).
  * @param mat Sparse matrix
  * @param rows Row index
  * @param cols Column index
@@ -239,7 +239,7 @@ inline runtime::NDArray CSRGetAllData(CSRMatrix mat, int64_t row, int64_t col) {
  * If some (row, col) pairs do not contain a valid non-zero elements,
  * their data values are filled with -1.
  *
- * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
+ * @note This operator allows broadcasting (i.e, either row or col can be of length 1).
  *
  * @param mat Sparse matrix.
  * @param rows Row index.
@@ -258,7 +258,7 @@ runtime::NDArray CSRGetData(CSRMatrix, runtime::NDArray rows, runtime::NDArray c
  * If some (row, col) pairs do not contain a valid non-zero elements to index into the
  * weights array, DGL returns the value \a filler for that pair instead.
  *
- * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
+ * @note This operator allows broadcasting (i.e, either row or col can be of length 1).
  *
  * \tparam DType the data type of the weights array.
  * @param mat Sparse matrix.
@@ -428,7 +428,7 @@ CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries);
  *                     If an empty array is provided, assume uniform.
  * @param replace True if sample with replacement
  * \return A COOMatrix storing the picked row, col and data indices.
- * \note The edges of the entire graph must be ordered by their edge types.
+ * @note The edges of the entire graph must be ordered by their edge types.
  */
 COOMatrix CSRRowWiseSampling(
     CSRMatrix mat,
@@ -479,7 +479,7 @@ COOMatrix CSRRowWiseSampling(
  * @param replace True if sample with replacement
  * @param rowwise_etype_sorted whether the CSR column indices per row are ordered by edge type.
  * \return A COOMatrix storing the picked row, col and data indices.
- * \note The edges must be ordered by their edge types.
+ * @note The edges must be ordered by their edge types.
  */
 COOMatrix CSRRowWisePerEtypeSampling(
     CSRMatrix mat,
@@ -603,7 +603,7 @@ COOMatrix CSRRowWiseSamplingBiased(
  * @brief Uniformly sample row-column pairs whose entries do not exist in the given
  * sparse matrix using rejection sampling.
  *
- * \note The number of samples returned may not necessarily be the number of samples
+ * @note The number of samples returned may not necessarily be the number of samples
  * given.
  *
  * @param csr The CSR matrix.

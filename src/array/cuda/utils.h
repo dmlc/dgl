@@ -91,7 +91,7 @@ bool AllTrue(int8_t* flags, int64_t length, const DGLContext& ctx);
 /*!
  * @brief CUDA Kernel of filling the vector started from ptr of size length
  *        with val.
- * \note internal use only.
+ * @note internal use only.
  */
 template <typename DType>
 __global__ void _FillKernel(DType* ptr, size_t length, DType val) {

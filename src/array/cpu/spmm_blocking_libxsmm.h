@@ -171,7 +171,7 @@ inline void SpMMCreateBlocks(
  * @param N Feature size.
  * @param redop_flag Flag specifying the reduction operation.
  * @param is_cmp Is the reduction operation a compare operation.
- * \note libxsmm_dispatch_meltw_opreduce_vecs_idx creates a JIT'ed kernel.
+ * @note libxsmm_dispatch_meltw_opreduce_vecs_idx creates a JIT'ed kernel.
  *       Given a node u, the kernel performs an elementwise "Op" on the
  *       features of the neighbors and/or the edges incident on u.
  *       Subsequently, it performs an elementwise "Redop" on all such
@@ -421,7 +421,7 @@ inline void SpMMFreeBlocks(
  * @param out The result feature on destination nodes.
  * @param argu Arg-Min/Max on source nodes.
  * @param arge Arg-Min/Max on edges.
- * \note it uses libxsmm, blocking and dynamic thread scheduling.
+ * @note it uses libxsmm, blocking and dynamic thread scheduling.
  */
 template <typename IdType, typename DType, typename Op, typename Redop>
 void SpMMRedopCsrOpt(
@@ -557,7 +557,7 @@ void SpMMRedopCsrOpt(
  * @param ufeat The feature on source nodes.
  * @param efeat The feature on edges.
  * @param out The result feature on destination nodes.
- * \note it uses libxsmm, blocking and dynamic thread scheduling.
+ * @note it uses libxsmm, blocking and dynamic thread scheduling.
  */
 template <typename IdType, typename DType, typename Op>
 void SpMMSumCsrLibxsmm(
@@ -577,7 +577,7 @@ void SpMMSumCsrLibxsmm(
  * @param out The result feature on destination nodes.
  * @param argu Arg-Min/Max on source nodes.
  * @param arge Arg-Min/Max on edges.
- * \note it uses libxsmm, blocking and dynamic thread scheduling.
+ * @note it uses libxsmm, blocking and dynamic thread scheduling.
  */
 template <typename IdType, typename DType, typename Op, typename Cmp>
 void SpMMCmpCsrLibxsmm(

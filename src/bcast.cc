@@ -30,7 +30,7 @@ bool UseBcast(const std::string& op, NDArray lhs, NDArray rhs) {
 /*!
  * @brief: Compute broadcast and auxiliary information given operator
  *         and operands for kernel computation.
- * \note: Expect lhs, rhs to have ndim >= 2 and the shape of lhs/rhs
+ * @note: Expect lhs, rhs to have ndim >= 2 and the shape of lhs/rhs
  *        valid for the op computation.
  */
 BcastOff CalcBcastOff(const std::string& op, NDArray lhs, NDArray rhs) {

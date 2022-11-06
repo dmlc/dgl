@@ -211,7 +211,7 @@ class UnitGraph : public BaseHeteroGraph {
 
   /*!
   * @brief Pin the in_csr_, out_scr_ and coo_ of the current graph.
-  * \note The graph will be pinned inplace. Behavior depends on the current context,
+  * @note The graph will be pinned inplace. Behavior depends on the current context,
   *       kDGLCPU: will be pinned;
   *       IsPinned: directly return;
   *       kDGLCUDA: invalid, will throw an error.
@@ -221,7 +221,7 @@ class UnitGraph : public BaseHeteroGraph {
 
   /*!
   * @brief Unpin the in_csr_, out_scr_ and coo_ of the current graph.
-  * \note The graph will be unpinned inplace. Behavior depends on the current context,
+  * @note The graph will be unpinned inplace. Behavior depends on the current context,
   *       IsPinned: will be unpinned;
   *       others: directly return.
   *       The context check is deferred to unpinning the NDArray.

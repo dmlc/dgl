@@ -78,7 +78,7 @@ void SegmentCmp(NDArray feat, NDArray offsets, NDArray out, NDArray arg) {
 
 /*!
  * @brief CPU kernel of Scatter Add (on first dimension) operator.
- * \note math equation: out[idx[i], *] += feat[i, *]
+ * @note math equation: out[idx[i], *] += feat[i, *]
  * @param feat The input tensor.
  * @param idx The indices tensor.
  * @param out The output tensor.
@@ -161,7 +161,7 @@ void UpdateGradMinMax_hetero(
 
 /*!
  * @brief CPU kernel of backward phase of segment min/max.
- * \note math equation: out[arg[i, k], k] = feat[i, k]
+ * @note math equation: out[arg[i, k], k] = feat[i, k]
  * @param feat The input tensor.
  * @param arg The argmin/argmax tensor.
  * @param out The output tensor.

@@ -31,7 +31,7 @@ namespace knn_utils {
  *         optimizations.
  * \tparam Dist: The distance metric to use: nanoflann::metric_L1,
            nanoflann::metric_L2, nanoflann::metric_L2_Simple, etc.
- * \note The spelling of dgl's adapter ("adapter") is different from naneflann
+ * @note The spelling of dgl's adapter ("adapter") is different from naneflann
  *       ("adaptor")
  */
 template <

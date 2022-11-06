@@ -99,7 +99,7 @@ cublasStatus_t Xgeam<double>(cublasHandle_t handle, cublasOperation_t transa,
 }
 
 /* @brief IndexSelect operator kernel implementation.
- * \note duplicate of IndexSelectKernel defined in array_index_select.cu
+ * @note duplicate of IndexSelectKernel defined in array_index_select.cu
  */
 template <typename DType, typename IdType>
 __global__ void _IndexSelectKernel(
@@ -113,7 +113,7 @@ __global__ void _IndexSelectKernel(
 }
 
 /* @brief Transpose operator kernel implementation.
- * \note not efficient but it's not a bottleneck, used for float16 dtype.
+ * @note not efficient but it's not a bottleneck, used for float16 dtype.
  */
 template <typename DType>
 __global__ void _TransposeKernel(
@@ -151,7 +151,7 @@ void _Transpose(const DType* in, DType* out,
 
 /*
  * @brief Tranpose the input matrix for data type half.
- * \note cuBLAS has no geam API for half data type, fallback to our kernel.
+ * @note cuBLAS has no geam API for half data type, fallback to our kernel.
  */
 template <>
 void _Transpose<half>(const half* in, half* out,
@@ -165,7 +165,7 @@ void _Transpose<half>(const half* in, half* out,
 #if BF16_ENABLED
 /*
  * @brief Tranpose the input matrix for data type half.
- * \note cuBLAS has no geam API for bf16 data type, fallback to our kernel.
+ * @note cuBLAS has no geam API for bf16 data type, fallback to our kernel.
  */
 template <>
 void _Transpose<__nv_bfloat16>(const __nv_bfloat16* in, __nv_bfloat16* out,
@@ -192,7 +192,7 @@ __global__ void _IndexSelectKernel(const DType* array, const IdType* index,
 }
 
 /* @brief IndexSelect operator.
- * \note duplicate of IndexSelect defined in array_op.h but it can
+ * @note duplicate of IndexSelect defined in array_op.h but it can
  *    not be applied to float16 dtype.
  */
 template<typename DType, typename IdType>
@@ -478,7 +478,7 @@ namespace cuda {
 
 /*!
  * @brief CUDA kernel of g-SpMM on Coo format.
- * \note it uses edge parallel strategy, different threadblocks (on y-axis)
+ * @note it uses edge parallel strategy, different threadblocks (on y-axis)
  *       is responsible for the computation on different edges. Threadblocks
  *       on the x-axis are responsible for the computation on different positions
  *       in feature dimension.
@@ -527,7 +527,7 @@ __global__ void SpMMCooKernel(
 
 /*!
  * @brief CUDA kernel to compute argu and arge in g-SpMM on Coo format.
- * \note it uses edge parallel strategy, different threadblocks (on y-axis)
+ * @note it uses edge parallel strategy, different threadblocks (on y-axis)
  *       is responsible for the computation on different edges. Threadblocks
  *       on the x-axis are responsible for the computation on different positions
  *       in feature dimension.
@@ -575,7 +575,7 @@ __global__ void ArgSpMMCooKernel(
 
 /*!
  * @brief CUDA kernel of g-SpMM on Csr format.
- * \note it uses node parallel strategy, different threadblocks (on y-axis)
+ * @note it uses node parallel strategy, different threadblocks (on y-axis)
  *       is responsible for the computation on different destination nodes.
  *       Threadblocks on the x-axis are responsible for the computation on
  *       different positions in feature dimension.
@@ -633,7 +633,7 @@ __global__ void SpMMCsrKernel(
 
 /*!
  * @brief CUDA kernel of SpMM-Min/Max on Csr format.
- * \note it uses node parallel strategy, different threadblocks (on y-axis)
+ * @note it uses node parallel strategy, different threadblocks (on y-axis)
  *       is responsible for the computation on different destination nodes.
  *       Threadblocks on the x-axis are responsible for the computation on
  *       different positions in feature dimension.

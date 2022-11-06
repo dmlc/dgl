@@ -55,7 +55,7 @@ struct IntelKernel {
 
 /*!
  * @brief Element-wise addition kernel using Intel AVX512 instructions.
- * \note it uses AVX512.
+ * @note it uses AVX512.
  */
 template <class Op>
 class ElemWiseAddUpdate : public Xbyak::CodeGenerator {

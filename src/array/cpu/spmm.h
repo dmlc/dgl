@@ -40,7 +40,7 @@ namespace cpu {
  * @param X The feature on source nodes.
  * @param W The feature on edges.
  * @param O The result feature on destination nodes.
- * \note it uses node parallel strategy, different threads are responsible
+ * @note it uses node parallel strategy, different threads are responsible
  *       for the computation of different nodes. For each edge, it uses the
  *       JIT'ed kernel.
  */
@@ -77,7 +77,7 @@ void SpMMSumCsrXbyak(
  * @param X The feature on source nodes.
  * @param W The feature on edges.
  * @param O The result feature on destination nodes.
- * \note it uses node parallel strategy, different threads are responsible
+ * @note it uses node parallel strategy, different threads are responsible
  *       for the computation of different nodes.
  */
 template <typename IdType, typename DType, typename Op>
@@ -117,7 +117,7 @@ void SpMMSumCsrNaive(
  * @param ufeat The feature on source nodes.
  * @param efeat The feature on edges.
  * @param out The result feature on destination nodes.
- * \note it uses node parallel strategy, different threads are responsible
+ * @note it uses node parallel strategy, different threads are responsible
  *       for the computation of different nodes.
  */
 template <typename IdType, typename DType, typename Op>
@@ -183,7 +183,7 @@ void SpMMSumCsr(
  * @param ufeat The feature on source nodes.
  * @param efeat The feature on edges.
  * @param out The result feature on destination nodes.
- * \note it uses node parallel strategy, different threads are responsible
+ * @note it uses node parallel strategy, different threads are responsible
  *       for the computation of different nodes. To avoid possible data hazard,
  *       we use atomic operators in the reduction phase.
  */
@@ -240,9 +240,9 @@ void SpMMSumCoo(
           correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max
  *        reducer.
- * \note It uses node parallel strategy, different threads are responsible for
+ * @note It uses node parallel strategy, different threads are responsible for
  *       the computation of different nodes.
- * \note The result will contain infinity for zero-degree nodes.
+ * @note The result will contain infinity for zero-degree nodes.
  */
 template <typename IdType, typename DType, typename Op, typename Cmp>
 void SpMMCmpCsr(
@@ -433,10 +433,10 @@ void SpMMCmpCsrHetero(
  *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max
  *        reducer.
- * \note it uses node parallel strategy, different threads are responsible for
+ * @note it uses node parallel strategy, different threads are responsible for
  *       the computation of different nodes. To avoid possible data hazard, we
  *       use atomic operators in the reduction phase.
- * \note The result will contain infinity for zero-degree nodes.
+ * @note The result will contain infinity for zero-degree nodes.
  */
 template <typename IdType, typename DType, typename Op, typename Cmp>
 void SpMMCmpCoo(

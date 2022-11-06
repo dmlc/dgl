@@ -194,9 +194,9 @@ void BackwardSegmentCmp(NDArray feat,
  * @param B The right operand.
  * @param B_weights The weights of matrix as a 1D tensor.
  *
- * \note GPU implementation will cast the indices to 32 bit.
- * \note The zero entries in the result are not removed.
- * \note The CSR matrix should not have duplicate entries.
+ * @note GPU implementation will cast the indices to 32 bit.
+ * @note The zero entries in the result are not removed.
+ * @note The CSR matrix should not have duplicate entries.
  */
 template <int XPU, typename IdType, typename DType>
 std::pair<CSRMatrix, NDArray> CSRMM(
@@ -211,9 +211,9 @@ std::pair<CSRMatrix, NDArray> CSRMM(
  * @param A The sparse matrices with the same size.
  * @param A_weights The weights of each sparse matrix as a 1D tensor.
  *
- * \note GPU implementation will cast the indices to 32 bit.
- * \note The zero entries in the result are not removed.
- * \note The CSR matrix should not have duplicate entries.
+ * @note GPU implementation will cast the indices to 32 bit.
+ * @note The zero entries in the result are not removed.
+ * @note The CSR matrix should not have duplicate entries.
  */
 template <int XPU, typename IdType, typename DType>
 std::pair<CSRMatrix, NDArray> CSRSum(

@@ -234,7 +234,7 @@ class HeteroGraph : public BaseHeteroGraph {
 
   /*!
   * @brief Pin all relation graphs of the current graph.
-  * \note The graph will be pinned inplace. Behavior depends on the current context,
+  * @note The graph will be pinned inplace. Behavior depends on the current context,
   *       kDGLCPU: will be pinned;
   *       IsPinned: directly return;
   *       kDGLCUDA: invalid, will throw an error.
@@ -244,7 +244,7 @@ class HeteroGraph : public BaseHeteroGraph {
 
   /*!
   * @brief Unpin all relation graphs of the current graph.
-  * \note The graph will be unpinned inplace. Behavior depends on the current context,
+  * @note The graph will be unpinned inplace. Behavior depends on the current context,
   *       IsPinned: will be unpinned;
   *       others: directly return.
   *       The context check is deferred to unpinning the NDArray.

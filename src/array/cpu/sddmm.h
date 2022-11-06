@@ -23,7 +23,7 @@ namespace cpu {
  * @param lhs The left hand side operand feature.
  * @param rhs The right hand size operand feature.
  * @param out The result feature on edges.
- * \note it uses node parallel strategy, different threads are responsible
+ * @note it uses node parallel strategy, different threads are responsible
  *       for the computation of different nodes.
  */
 template <
@@ -75,7 +75,7 @@ void SDDMMCsr(
  * @param lhs The left hand side operand feature.
  * @param rhs The right hand size operand feature.
  * @param out The result feature on edges.
- * \note it uses edge parallel strategy, different threads are responsible
+ * @note it uses edge parallel strategy, different threads are responsible
  *       for the computation of different edges.
  */
 template <

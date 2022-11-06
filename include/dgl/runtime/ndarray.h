@@ -145,7 +145,7 @@ class NDArray {
   inline void reset();
   /*!
    * \return the reference counter
-   * \note this number is approximate in multi-threaded setting.
+   * @note this number is approximate in multi-threaded setting.
    */
   inline int use_count() const;
   /*! \return Pointer to content of DGLArray */
@@ -163,7 +163,7 @@ class NDArray {
    /*!
    * @brief Copy data content from/into another array.
    * @param other The source array to be copied from.
-   * \note The copy runs on the dgl internal stream if it involves a GPU context.
+   * @note The copy runs on the dgl internal stream if it involves a GPU context.
    */
   inline void CopyFrom(DGLArray* other);
   inline void CopyFrom(const NDArray& other);
@@ -183,7 +183,7 @@ class NDArray {
   /*!
    * @brief In-place method to pin the current array by calling PinContainer
    *        on the underlying NDArray:Container.
-   * \note This is an in-place method. Behavior depends on the current context,
+   * @note This is an in-place method. Behavior depends on the current context,
    *       kDGLCPU: will be pinned;
    *       IsPinned: directly return;
    *       kDGLCUDA: invalid, will throw an error.
@@ -192,7 +192,7 @@ class NDArray {
   /*!
    * @brief In-place method to unpin the current array by calling UnpinContainer
    *        on the underlying NDArray:Container.
-   * \note This is an in-place method. Behavior depends on the current context,
+   * @note This is an in-place method. Behavior depends on the current context,
    *       IsPinned: will be unpinned;
    *       others: directly return.
    */
@@ -222,7 +222,7 @@ class NDArray {
    * @param shape The shape of the new array.
    * @param dtype The data type of the new array.
    * @param offset The offset (in bytes) of the starting pointer.
-   * \note The memory size of new array must be smaller than the current one.
+   * @note The memory size of new array must be smaller than the current one.
    */
   DGL_DLL NDArray CreateView(
       std::vector<int64_t> shape, DGLDataType dtype, int64_t offset = 0);
@@ -277,7 +277,7 @@ class NDArray {
   /*!
    * @brief Create a std::vector from a 1D NDArray.
    * \tparam T Type of vector data.
-   * \note Type casting is NOT performed.  The caller has to make sure that the vector
+   * @note Type casting is NOT performed.  The caller has to make sure that the vector
    *       type matches the dtype of NDArray.
    */
   template<typename T>
@@ -299,7 +299,7 @@ class NDArray {
   /*!
    * @brief Function to pin the DGLArray of a Container.
    * @param ptr The container to be pinned.
-   * \note Data of the given array will be pinned inplace.
+   * @note Data of the given array will be pinned inplace.
    *       Behavior depends on the current context,
    *       kDGLCPU: will be pinned;
    *       IsPinned: directly return;
@@ -310,7 +310,7 @@ class NDArray {
   /*!
    * @brief Function to unpin the DGLArray of a Container.
    * @param ptr The container to be unpinned.
-   * \note Data of the given array will be unpinned inplace.
+   * @note Data of the given array will be unpinned inplace.
    *       Behavior depends on the current context,
    *       IsPinned: will be unpinned;
    *       others: directly return.
@@ -368,7 +368,7 @@ inline bool SaveDGLArray(dmlc::Stream* strm, const DGLArray* tensor);
  *    the pointer to the NDArrayContainer can be directly
  *    interpreted as a DGLArray*
  *
- * \note: do not use this function directly, use NDArray.
+ * @note: do not use this function directly, use NDArray.
  */
 struct NDArray::Container {
  public:
@@ -378,14 +378,14 @@ struct NDArray::Container {
    */
   /*!
    * @brief Tensor structure.
-   * \note it is important that the first field is DGLArray
+   * @note it is important that the first field is DGLArray
    *  So that this data structure is DGLArray compatible.
    *  The head ptr of this struct can be viewed as DGLArray*.
    */
   DGLArray dl_tensor;
   /*!
    * @brief addtional context, reserved for recycling
-   * \note We can attach additional content here
+   * @note We can attach additional content here
    *  which the current container depend on
    *  (e.g. reference to original memory when creating views).
    */
@@ -393,7 +393,7 @@ struct NDArray::Container {
   /*!
    * @brief Customized deleter
    *
-   * \note The customized deleter is helpful to enable
+   * @note The customized deleter is helpful to enable
    *  different ways of memory allocator that are not
    *  currently defined by the system.
    */

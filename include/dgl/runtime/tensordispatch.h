@@ -96,7 +96,7 @@ class TensorDispatcher {
    * PyTorch's THCCachingAllocator.
    * Used in CUDADeviceAPI::AllocWorkspace().
    *
-   * \note THCCachingAllocator specify the device to allocate on
+   * @note THCCachingAllocator specify the device to allocate on
    * via cudaGetDevice(). Make sure to call cudaSetDevice()
    * before invoking this function.
    *
@@ -124,7 +124,7 @@ class TensorDispatcher {
    * @brief Find the current PyTorch CUDA stream
    * Used in runtime::getCurrentCUDAStream().
    *
-   * \note PyTorch pre-allocates/sets the current CUDA stream
+   * @note PyTorch pre-allocates/sets the current CUDA stream
    * on current device via cudaGetDevice(). Make sure to call cudaSetDevice()
    * before invoking this function.
    *

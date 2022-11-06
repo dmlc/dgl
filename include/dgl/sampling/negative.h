@@ -18,9 +18,9 @@ namespace sampling {
  * @brief Given an edge type, uniformly sample source-destination pairs that do
  * not have an edge in between using rejection sampling.
  *
- * \note This function may not return the same number of elements as the given
+ * @note This function may not return the same number of elements as the given
  * number of samples.
- * \note This function requires sorting the CSR or CSC matrix of the graph
+ * @note This function requires sorting the CSR or CSC matrix of the graph
  * in-place.  It prefers CSC over CSR.
  *
  * @param hg The graph.

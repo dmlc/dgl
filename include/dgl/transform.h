@@ -75,7 +75,7 @@ std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>> CompactGraphs(
  *         * The induced node from the left side for each graph,
  *         * The induced edges.
  *
- * \note If include_rhs_in_lhs is true, then for each node type \c ntype, the
+ * @note If include_rhs_in_lhs is true, then for each node type \c ntype, the
  * nodes in rhs_nodes[ntype] would always appear first in the nodes of type \c
  * ntype_l in the new graph.
  */
@@ -92,7 +92,7 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>> ToBlock(
  * * \c edge_map : The mapping from original edge IDs to new edge IDs per edge
  * type.
  *
- * \note Example: consider a graph with the following edges
+ * @note Example: consider a graph with the following edges
  *
  *     [(0, 1), (1, 3), (2, 2), (1, 3), (1, 4), (1, 4)]
  *

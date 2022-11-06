@@ -244,7 +244,7 @@ inline bool IsValidIdArray(const dgl::runtime::NDArray& arr) {
  * @param pad_value The padding value
  * \return A triplet of packed tensor, the length tensor, and the offset tensor
  *
- * \note Example: consider the following array with padding value -1:
+ * @note Example: consider the following array with padding value -1:
  *
  * <code>
  *     [[1, 2, -1, -1],

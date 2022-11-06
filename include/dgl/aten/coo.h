@@ -132,7 +132,7 @@ struct COOMatrix {
 
   /*!
   * @brief Pin the row, col and data (if not Null) of the matrix.
-  * \note This is an in-place method. Behavior depends on the current context,
+  * @note This is an in-place method. Behavior depends on the current context,
   *       kDGLCPU: will be pinned;
   *       IsPinned: directly return;
   *       kDGLCUDA: invalid, will throw an error.
@@ -151,7 +151,7 @@ struct COOMatrix {
 
   /*!
   * @brief Unpin the row, col and data (if not Null) of the matrix.
-  * \note This is an in-place method. Behavior depends on the current context,
+  * @note This is an in-place method. Behavior depends on the current context,
   *       IsPinned: will be unpinned;
   *       others: directly return.
   *       The context check is deferred to unpinning the NDArray.
@@ -186,7 +186,7 @@ struct COOMatrix {
 bool COOIsNonZero(COOMatrix , int64_t row, int64_t col);
 /*!
  * @brief Batched implementation of COOIsNonZero.
- * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
+ * @note This operator allows broadcasting (i.e, either row or col can be of length 1).
  */
 runtime::NDArray COOIsNonZero(COOMatrix , runtime::NDArray row, runtime::NDArray col);
 
@@ -221,7 +221,7 @@ std::pair<bool, bool> COOIsSorted(COOMatrix coo);
  * will be returned. The operator assumes there is NO duplicate (row, col) pair
  * in the given input. Otherwise, the returned result is undefined.
  *
- * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
+ * @note This operator allows broadcasting (i.e, either row or col can be of length 1).
  * @param mat Sparse matrix
  * @param rows Row index
  * @param cols Column index
@@ -245,7 +245,7 @@ inline runtime::NDArray COOGetAllData(COOMatrix mat, int64_t row, int64_t col) {
  * will be returned for each (row, col) pair. Support duplicate input (row, col)
  * pairs.
  *
- * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
+ * @note This operator allows broadcasting (i.e, either row or col can be of length 1).
  *
  * @param mat Sparse matrix.
  * @param rows Row index.
@@ -452,7 +452,7 @@ COOMatrix COORowWiseSampling(
  * @param replace True if sample with replacement
  * \return A COOMatrix storing the picked row and col indices. Its data field stores the
  *         the index of the picked elements in the value array.
- * \note The edges of the entire graph must be ordered by their edge types.
+ * @note The edges of the entire graph must be ordered by their edge types.
  */
 COOMatrix COORowWisePerEtypeSampling(
     COOMatrix mat,

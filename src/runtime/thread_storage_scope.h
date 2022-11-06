@@ -16,7 +16,7 @@ namespace runtime {
 
 /*!
  * @brief Memory hierachy rank in the storage system
- * \note The global rank and shared rank have one to one
+ * @note The global rank and shared rank have one to one
  *       correspondence to the thread rank.
  */
 enum class StorageRank {
