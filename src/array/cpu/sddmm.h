@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file array/cpu/sddmm.h
- * \brief SDDMM CPU kernel function header.
+ * @file array/cpu/sddmm.h
+ * @brief SDDMM CPU kernel function header.
  */
 #ifndef DGL_ARRAY_CPU_SDDMM_H_
 #define DGL_ARRAY_CPU_SDDMM_H_
@@ -17,13 +17,13 @@ namespace aten {
 namespace cpu {
 
 /*!
- * \brief CPU kernel of g-SDDMM on Csr format.
- * \param bcast Broadcast information.
- * \param csr The Csr matrix.
- * \param lhs The left hand side operand feature.
- * \param rhs The right hand size operand feature.
- * \param out The result feature on edges.
- * \note it uses node parallel strategy, different threads are responsible
+ * @brief CPU kernel of g-SDDMM on Csr format.
+ * @param bcast Broadcast information.
+ * @param csr The Csr matrix.
+ * @param lhs The left hand side operand feature.
+ * @param rhs The right hand size operand feature.
+ * @param out The result feature on edges.
+ * @note it uses node parallel strategy, different threads are responsible
  *       for the computation of different nodes.
  */
 template <
@@ -69,13 +69,13 @@ void SDDMMCsr(
 }
 
 /*!
- * \brief CPU kernel of g-SDDMM on Coo format.
- * \param bcast Broadcast information.
- * \param coo The COO matrix.
- * \param lhs The left hand side operand feature.
- * \param rhs The right hand size operand feature.
- * \param out The result feature on edges.
- * \note it uses edge parallel strategy, different threads are responsible
+ * @brief CPU kernel of g-SDDMM on Coo format.
+ * @param bcast Broadcast information.
+ * @param coo The COO matrix.
+ * @param lhs The left hand side operand feature.
+ * @param rhs The right hand size operand feature.
+ * @param out The result feature on edges.
+ * @note it uses edge parallel strategy, different threads are responsible
  *       for the computation of different edges.
  */
 template <

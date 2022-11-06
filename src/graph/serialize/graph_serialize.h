@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file graph/serialize/graph_serialize.h
- * \brief Graph serialization header
+ * @file graph/serialize/graph_serialize.h
+ * @brief Graph serialization header
  */
 #ifndef DGL_GRAPH_SERIALIZE_GRAPH_SERIALIZE_H_
 #define DGL_GRAPH_SERIALIZE_GRAPH_SERIALIZE_H_
@@ -76,7 +76,7 @@ class StorageMetaData : public runtime::ObjectRef {
   DGL_DEFINE_OBJECT_REF_METHODS(
       StorageMetaData, runtime::ObjectRef, StorageMetaDataObject);
 
-  /*! \brief create a new StorageMetaData reference */
+  /*! @brief create a new StorageMetaData reference */
   static StorageMetaData Create() {
     return StorageMetaData(std::make_shared<StorageMetaDataObject>());
   }

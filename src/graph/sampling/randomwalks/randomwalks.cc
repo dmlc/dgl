@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2018 by Contributors
- * \file graph/sampling/randomwalks.cc
- * \brief Dispatcher of different DGL random walks by device type
+ * @file graph/sampling/randomwalks.cc
+ * @brief Dispatcher of different DGL random walks by device type
  */
 
 #include <dgl/array.h>

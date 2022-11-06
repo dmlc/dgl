@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2021 by Contributors
- * \file graph/sampling/negative/global_uniform.cc
- * \brief Global uniform negative sampling.
+ * @file graph/sampling/negative/global_uniform.cc
+ * @brief Global uniform negative sampling.
  */
 
 #include <dgl/array.h>

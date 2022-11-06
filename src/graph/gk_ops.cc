@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file graph/gk_ops.cc
- * \brief Graph operation implemented in GKlib
+ * @file graph/gk_ops.cc
+ * @brief Graph operation implemented in GKlib
  */
 
 #if !defined(_WIN32)
@@ -17,9 +17,9 @@ namespace dgl {
 /*!
  * Convert DGL CSR to GKLib CSR.
  * GKLib CSR actually stores a CSR object and a CSC object of a graph.
- * \param mat the DGL CSR matrix.
- * \param is_row the input DGL matrix is CSR or CSC.
- * \return a GKLib CSR.
+ * @param mat the DGL CSR matrix.
+ * @param is_row the input DGL matrix is CSR or CSC.
+ * @return a GKLib CSR.
  */
 gk_csr_t *Convert2GKCsr(const aten::CSRMatrix mat, bool is_row) {
   // TODO(zhengda) The conversion will be zero-copy in the future.
@@ -63,9 +63,9 @@ gk_csr_t *Convert2GKCsr(const aten::CSRMatrix mat, bool is_row) {
 /*!
  * Convert GKLib CSR to DGL CSR.
  * GKLib CSR actually stores a CSR object and a CSC object of a graph.
- * \param gk_csr the GKLib CSR.
- * \param is_row specify whether to convert the CSR or CSC object of GKLib CSR.
- * \return a DGL CSR matrix.
+ * @param gk_csr the GKLib CSR.
+ * @param is_row specify whether to convert the CSR or CSC object of GKLib CSR.
+ * @return a DGL CSR matrix.
  */
 aten::CSRMatrix Convert2DGLCsr(gk_csr_t *gk_csr, bool is_row) {
   // TODO(zhengda) The conversion will be zero-copy in the future.

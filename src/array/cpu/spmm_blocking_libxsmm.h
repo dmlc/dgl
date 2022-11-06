@@ -1,8 +1,8 @@
 /*!
  *  Copyright (c) 2021 Intel Corporation
- * \file array/cpu/spmm.h
- * \brief SPMM CPU kernel function header.
- * \author Sanchit Misra <sanchit.misra@intel.com>,
+ * @file array/cpu/spmm.h
+ * @brief SPMM CPU kernel function header.
+ * @author Sanchit Misra <sanchit.misra@intel.com>,
  *         Ramanarayan Mohanty <ramanarayan.mohanty@intel.com>,
  *         Vasimuddin Md <vasimuddin.md@intel.com>,
  *         Sasikanth Avancha <sasikanth.avancha@intel.com>
@@ -49,19 +49,19 @@ int32_t GetLLCSize() {
 }
 
 /*!
- * \brief Tile the CSR matrix to roughly make sure that the column tiles and
+ * @brief Tile the CSR matrix to roughly make sure that the column tiles and
  *        corresponding neighbor features fit into LLC and the row tiles
  *        are assigned to OMP threads.
- * \param csr The Csr matrix.
- * \param block_csr_array The array containing csr matrices of all blocks.
- * \param num_M_blocks Number of blocks to create along the rows of adjacency
+ * @param csr The Csr matrix.
+ * @param block_csr_array The array containing csr matrices of all blocks.
+ * @param num_M_blocks Number of blocks to create along the rows of adjacency
  *        matrix.
- * \param num_K_blocks Number of blocks to create along the columns of adjacency
+ * @param num_K_blocks Number of blocks to create along the columns of adjacency
  *        matrix.
- * \param M_block_size block size along the rows of adjacency matrix.
- * \param K_block_size block size along the columns of adjacency matrix.
- * \param use_lhs Whether to use lhs.
- * \param use_rhs Whether to use rhs.
+ * @param M_block_size block size along the rows of adjacency matrix.
+ * @param K_block_size block size along the columns of adjacency matrix.
+ * @param use_lhs Whether to use lhs.
+ * @param use_rhs Whether to use rhs.
  */
 template <typename IdType>
 inline void SpMMCreateBlocks(
@@ -166,12 +166,12 @@ inline void SpMMCreateBlocks(
 }
 
 /*!
- * \brief Create libxsmm kernel.
- * \param has_idx For the edge features, are there indices available.
- * \param N Feature size.
- * \param redop_flag Flag specifying the reduction operation.
- * \param is_cmp Is the reduction operation a compare operation.
- * \note libxsmm_dispatch_meltw_opreduce_vecs_idx creates a JIT'ed kernel.
+ * @brief Create libxsmm kernel.
+ * @param has_idx For the edge features, are there indices available.
+ * @param N Feature size.
+ * @param redop_flag Flag specifying the reduction operation.
+ * @param is_cmp Is the reduction operation a compare operation.
+ * @note libxsmm_dispatch_meltw_opreduce_vecs_idx creates a JIT'ed kernel.
  *       Given a node u, the kernel performs an elementwise "Op" on the
  *       features of the neighbors and/or the edges incident on u.
  *       Subsequently, it performs an elementwise "Redop" on all such
@@ -270,19 +270,19 @@ inline libxsmm_meltwfunction_opreduce_vecs_idx SpMMCreateLibxsmmKernel(
 }
 
 /*!
- * \brief Use libxsmm to perform SpMM-Sum on all blocks.
- * \param block_csr_array The array containing csr matrices of all blocks.
- * \param B The feature on source nodes.
- * \param E The feature on edges.
- * \param C The result feature on destination nodes.
- * \param has_idx For the edge features, are there indices available.
- * \param N Feature size.
- * \param num_M_blocks Number of blocks to create along the rows of adjacency
+ * @brief Use libxsmm to perform SpMM-Sum on all blocks.
+ * @param block_csr_array The array containing csr matrices of all blocks.
+ * @param B The feature on source nodes.
+ * @param E The feature on edges.
+ * @param C The result feature on destination nodes.
+ * @param has_idx For the edge features, are there indices available.
+ * @param N Feature size.
+ * @param num_M_blocks Number of blocks to create along the rows of adjacency
  *        matrix.
- * \param num_K_blocks Number of blocks to create along the columns of adjacency
+ * @param num_K_blocks Number of blocks to create along the columns of adjacency
  *        matrix.
- * \param M_block_size block size along the rows of adjacency matrix.
- * \param kernel The libxsmm kernel.
+ * @param M_block_size block size along the rows of adjacency matrix.
+ * @param kernel The libxsmm kernel.
  */
 template <typename IdType, typename DType>
 inline void SpMMBlockwiseOpSum(
@@ -327,21 +327,21 @@ inline void SpMMBlockwiseOpSum(
 }
 
 /*!
- * \brief Use libxsmm to perform SpMM-Max/Min on all blocks.
- * \param block_csr_array The array containing csr matrices of all blocks.
- * \param B The feature on source nodes.
- * \param E The feature on edges.
- * \param C The result feature on destination nodes.
- * \param argB Arg-Min/Max on source nodes.
- * \param argE Arg-Min/Max on edges.
- * \param has_idx For the edge features, are there indices available.
- * \param N Feature size.
- * \param num_M_blocks Number of blocks to create along the rows of adjacency
+ * @brief Use libxsmm to perform SpMM-Max/Min on all blocks.
+ * @param block_csr_array The array containing csr matrices of all blocks.
+ * @param B The feature on source nodes.
+ * @param E The feature on edges.
+ * @param C The result feature on destination nodes.
+ * @param argB Arg-Min/Max on source nodes.
+ * @param argE Arg-Min/Max on edges.
+ * @param has_idx For the edge features, are there indices available.
+ * @param N Feature size.
+ * @param num_M_blocks Number of blocks to create along the rows of adjacency
  *        matrix.
- * \param num_K_blocks Number of blocks to create along the columns of adjacency
+ * @param num_K_blocks Number of blocks to create along the columns of adjacency
  *        matrix.
- * \param M_block_size block size along the rows of adjacency matrix.
- * \param kernel The libxsmm kernel.
+ * @param M_block_size block size along the rows of adjacency matrix.
+ * @param kernel The libxsmm kernel.
  */
 template <typename IdType, typename DType, typename Op, typename Cmp>
 inline void SpMMBlockwiseOpCmp(
@@ -391,14 +391,14 @@ inline void SpMMBlockwiseOpCmp(
 }
 
 /*!
- * \brief Free the tiled CSR matrix data.
- * \param block_csr_array The array containing csr matrices of all blocks.
- * \param num_M_blocks Number of blocks to create along the rows of adjacency
+ * @brief Free the tiled CSR matrix data.
+ * @param block_csr_array The array containing csr matrices of all blocks.
+ * @param num_M_blocks Number of blocks to create along the rows of adjacency
  *        matrix.
- * \param num_K_blocks Number of blocks to create along the columns of adjacency
+ * @param num_K_blocks Number of blocks to create along the columns of adjacency
  *        matrix.
- * \param use_lhs Whether to use lhs.
- * \param use_rhs Whether to use rhs.
+ * @param use_lhs Whether to use lhs.
+ * @param use_rhs Whether to use rhs.
  */
 template <typename IdType>
 inline void SpMMFreeBlocks(
@@ -413,15 +413,15 @@ inline void SpMMFreeBlocks(
 }
 
 /*!
- * \brief Optimized CPU kernel of SpMM-Sum/Max/Min on Csr format.
- * \param bcast Broadcast information.
- * \param csr The Csr matrix.
- * \param ufeat The feature on source nodes.
- * \param efeat The feature on edges.
- * \param out The result feature on destination nodes.
- * \param argu Arg-Min/Max on source nodes.
- * \param arge Arg-Min/Max on edges.
- * \note it uses libxsmm, blocking and dynamic thread scheduling.
+ * @brief Optimized CPU kernel of SpMM-Sum/Max/Min on Csr format.
+ * @param bcast Broadcast information.
+ * @param csr The Csr matrix.
+ * @param ufeat The feature on source nodes.
+ * @param efeat The feature on edges.
+ * @param out The result feature on destination nodes.
+ * @param argu Arg-Min/Max on source nodes.
+ * @param arge Arg-Min/Max on edges.
+ * @note it uses libxsmm, blocking and dynamic thread scheduling.
  */
 template <typename IdType, typename DType, typename Op, typename Redop>
 void SpMMRedopCsrOpt(
@@ -551,13 +551,13 @@ void SpMMRedopCsrOpt(
 }
 
 /*!
- * \brief Optimized CPU kernel of SpMM-Sum on Csr format.
- * \param bcast Broadcast information.
- * \param csr The Csr matrix.
- * \param ufeat The feature on source nodes.
- * \param efeat The feature on edges.
- * \param out The result feature on destination nodes.
- * \note it uses libxsmm, blocking and dynamic thread scheduling.
+ * @brief Optimized CPU kernel of SpMM-Sum on Csr format.
+ * @param bcast Broadcast information.
+ * @param csr The Csr matrix.
+ * @param ufeat The feature on source nodes.
+ * @param efeat The feature on edges.
+ * @param out The result feature on destination nodes.
+ * @note it uses libxsmm, blocking and dynamic thread scheduling.
  */
 template <typename IdType, typename DType, typename Op>
 void SpMMSumCsrLibxsmm(
@@ -569,15 +569,15 @@ void SpMMSumCsrLibxsmm(
 }
 
 /*!
- * \brief Optimized CPU kernel of SpMM-Min/Max on Csr format.
- * \param bcast Broadcast information.
- * \param csr The Csr matrix.
- * \param ufeat The feature on source nodes.
- * \param efeat The feature on edges.
- * \param out The result feature on destination nodes.
- * \param argu Arg-Min/Max on source nodes.
- * \param arge Arg-Min/Max on edges.
- * \note it uses libxsmm, blocking and dynamic thread scheduling.
+ * @brief Optimized CPU kernel of SpMM-Min/Max on Csr format.
+ * @param bcast Broadcast information.
+ * @param csr The Csr matrix.
+ * @param ufeat The feature on source nodes.
+ * @param efeat The feature on edges.
+ * @param out The result feature on destination nodes.
+ * @param argu Arg-Min/Max on source nodes.
+ * @param arge Arg-Min/Max on edges.
+ * @note it uses libxsmm, blocking and dynamic thread scheduling.
  */
 template <typename IdType, typename DType, typename Op, typename Cmp>
 void SpMMCmpCsrLibxsmm(

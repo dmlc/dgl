@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2022 by Contributors
- * \file api/api_test.cc
- * \brief C APIs for testing FFI
+ * @file api/api_test.cc
+ * @brief C APIs for testing FFI
  */
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/container.h>

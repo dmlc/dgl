@@ -13,8 +13,8 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
- * \file graph/transform/cuda/cuda_compact_graph.cu
- * \brief Functions to find and eliminate the common isolated nodes across
+ * @file graph/transform/cuda/cuda_compact_graph.cu
+ * @brief Functions to find and eliminate the common isolated nodes across
  * all given graphs with the same set of nodes.
  */
 
@@ -41,15 +41,15 @@ namespace transform {
 namespace {
 
 /**
- * \brief This function builds node maps for each node type, preserving the
+ * @brief This function builds node maps for each node type, preserving the
  * order of the input nodes. Here it is assumed the nodes are not unique,
  * and thus a unique list is generated.
  *
- * \param input_nodes The set of input nodes.
- * \param node_maps The node maps to be constructed.
- * \param count_unique_device The number of unique nodes (on the GPU).
- * \param unique_nodes_device The unique nodes (on the GPU).
- * \param stream The stream to operate on.
+ * @param input_nodes The set of input nodes.
+ * @param node_maps The node maps to be constructed.
+ * @param count_unique_device The number of unique nodes (on the GPU).
+ * @param unique_nodes_device The unique nodes (on the GPU).
+ * @param stream The stream to operate on.
  */
 template <typename IdType>
 void BuildNodeMaps(

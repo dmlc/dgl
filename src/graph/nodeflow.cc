@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file graph/nodeflow.cc
- * \brief DGL NodeFlow related functions.
+ * @file graph/nodeflow.cc
+ * @brief DGL NodeFlow related functions.
  */
 
 #include <dgl/immutable_graph.h>

@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file tcp_socket.cc
- * \brief TCP socket for DGL distributed training.
+ * @file tcp_socket.cc
+ * @brief TCP socket for DGL distributed training.
  */
 #include "tcp_socket.h"
 

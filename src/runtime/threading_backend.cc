@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2018 by Contributors
- * \file threading_backend.cc
- * \brief Native threading backend
+ * @file threading_backend.cc
+ * @brief Native threading backend
  */
 #include <dgl/runtime/threading_backend.h>
 #include <dmlc/logging.h>

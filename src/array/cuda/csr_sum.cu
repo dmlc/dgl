@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file array/cuda/spmm.cu
- * \brief SpGEAM C APIs and definitions.
+ * @file array/cuda/spmm.cu
+ * @brief SpGEAM C APIs and definitions.
  */
 #include <dgl/array.h>
 #include <dgl/runtime/device_api.h>

@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file common.h
- * \brief This file provide basic facilities for string
+ * @file common.h
+ * @brief This file provide basic facilities for string
  * to make programming convenient.
  */
 #ifndef DGL_RPC_NETWORK_COMMON_H_

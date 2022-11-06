@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file array/cuda/gather_mm.cu
- * \brief GatherMM C APIs and definitions.
+ * @file array/cuda/gather_mm.cu
+ * @brief GatherMM C APIs and definitions.
  */
 #include <dgl/array.h>
 #include <algorithm>  // std::swap
@@ -15,7 +15,7 @@ namespace aten {
 
 namespace {
 
-/*! \brief Call cuBLAS GEMM API for dense matmul operation for float and double. */
+/*! @brief Call cuBLAS GEMM API for dense matmul operation for float and double. */
 template <typename DType>
 cublasStatus_t cublasGemm(cublasHandle_t handle, cublasOperation_t transa,
     cublasOperation_t transb, int m, int n, int k,
@@ -77,12 +77,13 @@ cublasStatus_t cublasGemm<double>(cublasHandle_t handle, cublasOperation_t trans
 
 namespace cuda {
 
-/* \Note Each row of A multiplies a segment of matrix of B of dimension in_len * outlen.
-  One warp is assigned to process one row of A. Each WARP sequentially multiplies
-  one element of A and a row of B to compute partial result of the output. A
-  is loaded in shared memory in a coalesced way. Output matrix is loaded in
-  registers. B should get benefit from L2 cache.
-*/
+/**
+ * @note Each row of A multiplies a segment of matrix of B of dimension in_len * outlen.
+ * One warp is assigned to process one row of A. Each WARP sequentially multiplies
+ * one element of A and a row of B to compute partial result of the output. A
+ * is loaded in shared memory in a coalesced way. Output matrix is loaded in
+ * registers. B should get benefit from L2 cache.
+ */
 template <typename Idx, typename DType>
 __global__ void GatherMMScatterKernel(
     const DType* __restrict__ A,
@@ -138,12 +139,13 @@ __global__ void GatherMMScatterKernel(
 }
 
 
-/* \Note Output matrix is accumulated via atomic operations. Rest of the strategies
-  are similar to GatherMMKernel. One warp is assigned to process one row of A. Each
-  WARP sequentially multiplies one element of A and a row of B to compute partial
-  result of the output. A is loaded in shared memory in a coalesced way. B should
-  get benefit from L2 cache.
-*/
+/**
+ * @note Output matrix is accumulated via atomic operations. Rest of the strategies
+ * are similar to GatherMMKernel. One warp is assigned to process one row of A. Each
+ * WARP sequentially multiplies one element of A and a row of B to compute partial
+ * result of the output. A is loaded in shared memory in a coalesced way. B should
+ * get benefit from L2 cache.
+ */
 template <typename Idx, typename DType>
 __global__ void GatherMMScatterKernel2(
     const DType* __restrict__ A,
@@ -197,15 +199,15 @@ __global__ void GatherMMScatterKernel2(
 }  // namespace cuda
 
 /*!
- * \brief Implementation of Gather_mm operator. The input matrix A is
+ * @brief Implementation of Gather_mm operator. The input matrix A is
  *        expected to be sorted according to relation type.
- * \param A The input dense matrix of dimension m x k
- * \param B The input dense matrix of dimension k x n
- * \param C The output dense matrix of dimension m x n
- * \param seglen_A The input vector of size R. Each element
+ * @param A The input dense matrix of dimension m x k
+ * @param B The input dense matrix of dimension k x n
+ * @param C The output dense matrix of dimension m x n
+ * @param seglen_A The input vector of size R. Each element
  *        is the length of segments of input ``A``
- * \param a_trans Matrix A to be transposed
- * \param b_trans Matrix B to be transposed
+ * @param a_trans Matrix A to be transposed
+ * @param b_trans Matrix B to be transposed
  */
 template <int XPU, typename IdType, typename DType>
 void SegmentMM(const NDArray A,
@@ -308,13 +310,13 @@ void SegmentMMBackwardB(const NDArray A,
 }
 
 /*!
- * \brief Implementation of Gather_mm operator. The input matrix A is
+ * @brief Implementation of Gather_mm operator. The input matrix A is
  *        expected to be sorted according to relation type.
- * \param A The input dense matrix of dimension m x k
- * \param B The input dense matrix of dimension k x n
- * \param C The output dense matrix of dimension m x n
- * \param idx_a The input vector to gather left hand operand on
- * \param idx_b The input vector to gather right hand operand on
+ * @param A The input dense matrix of dimension m x k
+ * @param B The input dense matrix of dimension k x n
+ * @param C The output dense matrix of dimension m x n
+ * @param idx_a The input vector to gather left hand operand on
+ * @param idx_b The input vector to gather right hand operand on
  */
 
 template <int XPU, typename IdType, typename DType>
@@ -345,17 +347,17 @@ void GatherMM(const NDArray A,
 }
 
 /*!
- * \brief Implementation of Gather_mm operator. The input matrix A is
+ * @brief Implementation of Gather_mm operator. The input matrix A is
  *        expected to be sorted according to relation type.
- * \param A The input dense matrix of dimension m x k
- * \param B The input dense matrix of dimension k x n
- * \param C The output dense matrix of dimension m x n
- * \param idx_a The input vector to gather left hand operand on
- * \param idx_b The input vector to gather right hand operand on
- * \param idx_c The input vector to gather output operand on
- * \param num_rel The number of idx types in idx_b
- * \param a_trans Matrix A to be transposed
- * \param b_trans Matrix B to be transposed
+ * @param A The input dense matrix of dimension m x k
+ * @param B The input dense matrix of dimension k x n
+ * @param C The output dense matrix of dimension m x n
+ * @param idx_a The input vector to gather left hand operand on
+ * @param idx_b The input vector to gather right hand operand on
+ * @param idx_c The input vector to gather output operand on
+ * @param num_rel The number of idx types in idx_b
+ * @param a_trans Matrix A to be transposed
+ * @param b_trans Matrix B to be transposed
  */
 template <int XPU, typename IdType, typename DType>
 void GatherMMScatter(const NDArray A,

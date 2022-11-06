@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file geometry/cuda/geometry_op_impl.cc
- * \brief Geometry operator CUDA implementation
+ * @file geometry/cuda/geometry_op_impl.cc
+ * @brief Geometry operator CUDA implementation
  */
 #include <dgl/array.h>
 
@@ -16,7 +16,7 @@ namespace geometry {
 namespace impl {
 
 /*!
- * \brief Farthest Point Sampler without the need to compute all pairs of
+ * @brief Farthest Point Sampler without the need to compute all pairs of
  * distance.
  *
  * The input array has shape (N, d), where N is the number of points, and d is

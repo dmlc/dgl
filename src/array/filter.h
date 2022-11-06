@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2021 by Contributors
- * \file array/filter.h
- * \brief Object for selecting items in a set, or selecting items not in a set.
+ * @file array/filter.h
+ * @brief Object for selecting items in a set, or selecting items not in a set.
  */
 
 #ifndef DGL_ARRAY_FILTER_H_

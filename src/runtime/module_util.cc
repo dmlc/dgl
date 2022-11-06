@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2017 by Contributors
- * \file module_util.cc
- * \brief Utilities for module.
+ * @file module_util.cc
+ * @brief Utilities for module.
  */
 #ifndef _LIBCPP_SGX_CONFIG
 #include <dmlc/memory_io.h>

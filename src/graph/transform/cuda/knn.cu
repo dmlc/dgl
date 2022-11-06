@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file graph/transform/cuda/knn.cu
- * \brief k-nearest-neighbor (KNN) implementation (cuda)
+ * @file graph/transform/cuda/knn.cu
+ * @brief k-nearest-neighbor (KNN) implementation (cuda)
  */
 
 #include <curand_kernel.h>
@@ -23,7 +23,7 @@ namespace dgl {
 namespace transform {
 namespace impl {
 /*!
- * \brief Utility class used to avoid linker errors with extern
+ * @brief Utility class used to avoid linker errors with extern
  *  unsized shared memory arrays with templated type
  */
 template <typename Type>
@@ -54,7 +54,7 @@ struct SharedMemory<double> {
   }
 };
 
-/*! \brief Compute Euclidean distance between two vectors in a cuda kernel */
+/*! @brief Compute Euclidean distance between two vectors in a cuda kernel */
 template <typename FloatType, typename IdType>
 __device__ FloatType
 EuclideanDist(const FloatType* vec1, const FloatType* vec2, const int64_t dim) {
@@ -78,7 +78,7 @@ EuclideanDist(const FloatType* vec1, const FloatType* vec2, const int64_t dim) {
 }
 
 /*!
- * \brief Compute Euclidean distance between two vectors in a cuda kernel,
+ * @brief Compute Euclidean distance between two vectors in a cuda kernel,
  *  return positive infinite value if the intermediate distance is greater
  *  than the worst distance.
  */
@@ -239,7 +239,7 @@ __device__ bool FlaggedHeapInsert(
 }
 
 /*!
- * \brief Brute force kNN kernel. Compute distance for each pair of input points
+ * @brief Brute force kNN kernel. Compute distance for each pair of input points
  * and get the result directly (without a distance matrix).
  */
 template <typename FloatType, typename IdType>
@@ -279,7 +279,7 @@ __global__ void BruteforceKnnKernel(
 }
 
 /*!
- * \brief Same as BruteforceKnnKernel, but use shared memory as buffer.
+ * @brief Same as BruteforceKnnKernel, but use shared memory as buffer.
  *  This kernel divides query points and data points into blocks. For each
  *  query block, it will make a loop over all data blocks and compute distances.
  *  This kernel is faster when the dimension of input points is not large.
@@ -400,7 +400,7 @@ __global__ void BruteforceKnnShareKernel(
   }
 }
 
-/*! \brief determine the number of blocks for each segment */
+/*! @brief determine the number of blocks for each segment */
 template <typename IdType>
 __global__ void GetNumBlockPerSegment(
     const IdType* offsets, IdType* out, const int64_t batch_size,
@@ -411,7 +411,7 @@ __global__ void GetNumBlockPerSegment(
   }
 }
 
-/*! \brief Get the batch index and local index in segment for each block */
+/*! @brief Get the batch index and local index in segment for each block */
 template <typename IdType>
 __global__ void GetBlockInfo(
     const IdType* num_block_prefixsum, IdType* block_batch_id,
@@ -430,17 +430,17 @@ __global__ void GetBlockInfo(
 }
 
 /*!
- * \brief Brute force kNN. Compute distance for each pair of input points and
+ * @brief Brute force kNN. Compute distance for each pair of input points and
  * get the result directly (without a distance matrix).
  *
- * \tparam FloatType The type of input points.
- * \tparam IdType The type of id.
- * \param data_points NDArray of dataset points.
- * \param data_offsets offsets of point index in data points.
- * \param query_points NDArray of query points
- * \param query_offsets offsets of point index in query points.
- * \param k the number of nearest points
- * \param result output array
+ * @tparam FloatType The type of input points.
+ * @tparam IdType The type of id.
+ * @param data_points NDArray of dataset points.
+ * @param data_offsets offsets of point index in data points.
+ * @param query_points NDArray of query points
+ * @param query_offsets offsets of point index in query points.
+ * @param k the number of nearest points
+ * @param result output array
  */
 template <typename FloatType, typename IdType>
 void BruteForceKNNCuda(
@@ -473,19 +473,19 @@ void BruteForceKNNCuda(
 }
 
 /*!
- * \brief Brute force kNN with shared memory.
+ * @brief Brute force kNN with shared memory.
  *  This function divides query points and data points into blocks. For each
  *  query block, it will make a loop over all data blocks and compute distances.
  *  It will be faster when the dimension of input points is not large.
  *
- * \tparam FloatType The type of input points.
- * \tparam IdType The type of id.
- * \param data_points NDArray of dataset points.
- * \param data_offsets offsets of point index in data points.
- * \param query_points NDArray of query points
- * \param query_offsets offsets of point index in query points.
- * \param k the number of nearest points
- * \param result output array
+ * @tparam FloatType The type of input points.
+ * @tparam IdType The type of id.
+ * @param data_points NDArray of dataset points.
+ * @param data_offsets offsets of point index in data points.
+ * @param query_points NDArray of query points
+ * @param query_offsets offsets of point index in query points.
+ * @param k the number of nearest points
+ * @param result output array
  */
 template <typename FloatType, typename IdType>
 void BruteForceKNNSharedCuda(
@@ -575,7 +575,7 @@ void BruteForceKNNSharedCuda(
   device->FreeWorkspace(ctx, block_batch_id);
 }
 
-/*! \brief Setup rng state for nn-descent */
+/*! @brief Setup rng state for nn-descent */
 __global__ void SetupRngKernel(
     curandState* states, const uint64_t seed, const size_t n) {
   size_t id = blockIdx.x * blockDim.x + threadIdx.x;
@@ -585,7 +585,7 @@ __global__ void SetupRngKernel(
 }
 
 /*!
- * \brief Randomly initialize neighbors (sampling without replacement)
+ * @brief Randomly initialize neighbors (sampling without replacement)
  * for each nodes
  */
 template <typename FloatType, typename IdType>
@@ -637,7 +637,7 @@ __global__ void RandomInitNeighborsKernel(
 }
 
 /*!
- * \brief Randomly select candidates from current knn and reverse-knn graph for
+ * @brief Randomly select candidates from current knn and reverse-knn graph for
  *        nn-descent.
  */
 template <typename IdType>
@@ -735,7 +735,7 @@ __global__ void FindCandidatesKernel(
   }
 }
 
-/*! \brief Update knn graph according to selected candidates for nn-descent */
+/*! @brief Update knn graph according to selected candidates for nn-descent */
 template <typename FloatType, typename IdType>
 __global__ void UpdateNeighborsKernel(
     const FloatType* points, const IdType* offsets, IdType* neighbors,

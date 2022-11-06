@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2021 by Contributors
- * \file array/cpu/csr_get_data.cc
- * \brief Retrieve entries of a CSR matrix
+ * @file array/cpu/csr_get_data.cc
+ * @brief Retrieve entries of a CSR matrix
  */
 #include <dgl/array.h>
 #include <dgl/runtime/parallel_for.h>

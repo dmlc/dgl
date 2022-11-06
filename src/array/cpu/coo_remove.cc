@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file array/cpu/coo_remove.cc
- * \brief COO matrix remove entries CPU implementation
+ * @file array/cpu/coo_remove.cc
+ * @brief COO matrix remove entries CPU implementation
  */
 #include <dgl/array.h>
 
@@ -17,7 +17,7 @@ namespace impl {
 
 namespace {
 
-/*! \brief COORemove implementation for COOMatrix with default consecutive edge
+/*! @brief COORemove implementation for COOMatrix with default consecutive edge
  * IDs */
 template <DGLDeviceType XPU, typename IdType>
 void COORemoveConsecutive(
@@ -45,7 +45,7 @@ void COORemoveConsecutive(
   }
 }
 
-/*! \brief COORemove implementation for COOMatrix with shuffled edge IDs */
+/*! @brief COORemove implementation for COOMatrix with shuffled edge IDs */
 template <DGLDeviceType XPU, typename IdType>
 void COORemoveShuffled(
     COOMatrix coo, IdArray entries, std::vector<IdType> *new_rows,

@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file communicator.cc
- * \brief SocketCommunicator for DGL distributed training.
+ * @file communicator.cc
+ * @brief SocketCommunicator for DGL distributed training.
  */
 #include "socket_communicator.h"
 

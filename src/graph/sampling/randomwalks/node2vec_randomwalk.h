@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2021 by Contributors
- * \file graph/sampling/node2vec_randomwalk.cc
- * \brief DGL sampler - CPU implementation of node2vec random walk.
+ * @file graph/sampling/node2vec_randomwalk.cc
+ * @brief DGL sampler - CPU implementation of node2vec random walk.
  */
 
 #ifndef DGL_GRAPH_SAMPLING_RANDOMWALKS_NODE2VEC_RANDOMWALK_H_
@@ -47,15 +47,15 @@ bool has_edge_between(const CSRMatrix &csr, dgl_id_t u, dgl_id_t v) {
 }
 
 /*!
- * \brief Node2vec random walk step function
- * \param data The path generated so far, of type \c IdxType.
- * \param curr The last node ID generated.
- * \param pre The last last node ID generated
- * \param p Float, indicating likelihood of immediately revisiting a node in the
+ * @brief Node2vec random walk step function
+ * @param data The path generated so far, of type \c IdxType.
+ * @param curr The last node ID generated.
+ * @param pre The last last node ID generated
+ * @param p Float, indicating likelihood of immediately revisiting a node in the
  *        walk.
- * \param q Float, control parameter to interpolate between breadth-first
+ * @param q Float, control parameter to interpolate between breadth-first
  *        strategy and depth-first strategy.
- * \param len The number of nodes generated so far.  Note that the seed node is
+ * @param len The number of nodes generated so far.  Note that the seed node is
  *        always included as \c data[0], and the successors start from \c
  * data[1]. \param csr The CSR matrix \param prob Transition probability \param
  * terminate Predicate for terminating the current random walk path. \return A

@@ -13,8 +13,8 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
- * \file nccl_api.cu
- * \brief Implementation of wrapper around NCCL routines.
+ * @file nccl_api.cu
+ * @brief Implementation of wrapper around NCCL routines.
  */
 
 #include <cuda_fp16.h>

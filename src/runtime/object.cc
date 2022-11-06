@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file runtime/object.cc
- * \brief Implementation of runtime object APIs.
+ * @file runtime/object.cc
+ * @brief Implementation of runtime object APIs.
  */
 #include <dgl/runtime/object.h>
 

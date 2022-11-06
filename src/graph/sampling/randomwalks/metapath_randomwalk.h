@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2018 by Contributors
- * \file graph/sampler/generic_randomwalk_cpu.h
- * \brief DGL sampler - templated implementation definition of random walks on
+ * @file graph/sampler/generic_randomwalk_cpu.h
+ * @brief DGL sampler - templated implementation definition of random walks on
  * CPU
  */
 
@@ -38,20 +38,20 @@ template <typename IdxType>
 using TerminatePredicate = std::function<bool(IdxType *, dgl_id_t, int64_t)>;
 
 /*!
- * \brief Select one successor of metapath-based random walk, given the path
+ * @brief Select one successor of metapath-based random walk, given the path
  * generated so far.
  *
- * \param data The path generated so far, of type \c IdxType.
- * \param curr The last node ID generated.
- * \param len The number of nodes generated so far.  Note that the seed node is
+ * @param data The path generated so far, of type \c IdxType.
+ * @param curr The last node ID generated.
+ * @param len The number of nodes generated so far.  Note that the seed node is
  * always included as \c data[0], and the successors start from \c data[1].
  *
- * \param edges_by_type Vector of results from \c GetAdj() by edge type.
- * \param metapath_data Edge types of given metapath.
- * \param prob Transition probability per edge type.
- * \param terminate Predicate for terminating the current random walk path.
+ * @param edges_by_type Vector of results from \c GetAdj() by edge type.
+ * @param metapath_data Edge types of given metapath.
+ * @param prob Transition probability per edge type.
+ * @param terminate Predicate for terminating the current random walk path.
  *
- * \return A tuple of ID of next successor (-1 if not exist), the last traversed
+ * @return A tuple of ID of next successor (-1 if not exist), the last traversed
  * edge ID, as well as whether to terminate.
  */
 template <DGLDeviceType XPU, typename IdxType>
@@ -104,21 +104,21 @@ std::tuple<dgl_id_t, dgl_id_t, bool> MetapathRandomWalkStep(
 }
 
 /*!
- * \brief Select one successor of metapath-based random walk, given the path
+ * @brief Select one successor of metapath-based random walk, given the path
  * generated so far specifically for the uniform probability distribution.
  *
- * \param data The path generated so far, of type \c IdxType.
- * \param curr The last node ID generated.
- * \param len The number of nodes generated so far.  Note that the seed node is
+ * @param data The path generated so far, of type \c IdxType.
+ * @param curr The last node ID generated.
+ * @param len The number of nodes generated so far.  Note that the seed node is
  * always included as \c data[0], and the successors start from \c data[1].
  *
- * \param edges_by_type Vector of results from \c GetAdj() by edge type.
- * \param metapath_data Edge types of given metapath.
- * \param prob Transition probability per edge type, for this special case this
+ * @param edges_by_type Vector of results from \c GetAdj() by edge type.
+ * @param metapath_data Edge types of given metapath.
+ * @param prob Transition probability per edge type, for this special case this
  * will be a NullArray \param terminate Predicate for terminating the current
  * random walk path.
  *
- * \return A pair of ID of next successor (-1 if not exist), as well as whether
+ * @return A pair of ID of next successor (-1 if not exist), as well as whether
  * to terminate. \note This function is called only if all the probability
  * arrays are null.
  */
@@ -155,9 +155,9 @@ std::tuple<dgl_id_t, dgl_id_t, bool> MetapathRandomWalkStepUniform(
 }
 
 /*!
- * \brief Metapath-based random walk.
- * \param hg The heterograph.
- * \param seeds A 1D array of seed nodes, with the type the source type of the
+ * @brief Metapath-based random walk.
+ * @param hg The heterograph.
+ * @param seeds A 1D array of seed nodes, with the type the source type of the
  * first edge type in the metapath. \param metapath A 1D array of edge types
  * representing the metapath. \param prob A vector of 1D float arrays,
  * indicating the transition probability of each edge by edge type.  An empty

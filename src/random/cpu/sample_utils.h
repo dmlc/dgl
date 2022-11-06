@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file dgl/sample_utils.h
- * \brief Sampling utilities
+ * @file dgl/sample_utils.h
+ * @brief Sampling utilities
  */
 #ifndef DGL_RANDOM_CPU_SAMPLE_UTILS_H_
 #define DGL_RANDOM_CPU_SAMPLE_UTILS_H_
@@ -20,12 +20,12 @@
 namespace dgl {
 namespace utils {
 
-/*! \brief Base sampler class */
+/*! @brief Base sampler class */
 template <typename Idx>
 class BaseSampler {
  public:
   virtual ~BaseSampler() = default;
-  /*! \brief Draw one integer sample */
+  /*! @brief Draw one integer sample */
   virtual Idx Draw() {
     LOG(INFO) << "Not implemented yet.";
     return 0;

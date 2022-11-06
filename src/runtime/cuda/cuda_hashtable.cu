@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2021 by Contributors
- * \file runtime/cuda/cuda_device_common.cuh
- * \brief Device level functions for within cuda kernels.
+ * @file runtime/cuda/cuda_device_common.cuh
+ * @brief Device level functions for within cuda kernels.
  */
 
 #include <cassert>
@@ -60,13 +60,13 @@ class MutableDeviceOrderedHashTable : public DeviceOrderedHashTable<IdType> {
   }
 
   /**
-   * \brief Attempt to insert into the hash table at a specific location.
+   * @brief Attempt to insert into the hash table at a specific location.
    *
-   * \param pos The position to insert at.
-   * \param id The ID to insert into the hash table.
-   * \param index The original index of the item being inserted.
+   * @param pos The position to insert at.
+   * @param id The ID to insert into the hash table.
+   * @param index The original index of the item being inserted.
    *
-   * \return True, if the insertion was successful.
+   * @return True, if the insertion was successful.
    */
   inline __device__ bool AttemptInsertAt(
       const size_t pos, const IdType id, const size_t index) {
@@ -165,15 +165,15 @@ struct BlockPrefixCallbackOp {
 }  // namespace
 
 /**
- * \brief This generates a hash map where the keys are the global item numbers,
+ * @brief This generates a hash map where the keys are the global item numbers,
  * and the values are indexes, and inputs may have duplciates.
  *
- * \tparam IdType The type of of id.
- * \tparam BLOCK_SIZE The size of the thread block.
- * \tparam TILE_SIZE The number of entries each thread block will process.
- * \param items The items to insert.
- * \param num_items The number of items to insert.
- * \param table The hash table.
+ * @tparam IdType The type of of id.
+ * @tparam BLOCK_SIZE The size of the thread block.
+ * @tparam TILE_SIZE The number of entries each thread block will process.
+ * @param items The items to insert.
+ * @param num_items The number of items to insert.
+ * @param table The hash table.
  */
 template <typename IdType, int BLOCK_SIZE, size_t TILE_SIZE>
 __global__ void generate_hashmap_duplicates(
@@ -194,15 +194,15 @@ __global__ void generate_hashmap_duplicates(
 }
 
 /**
- * \brief This generates a hash map where the keys are the global item numbers,
+ * @brief This generates a hash map where the keys are the global item numbers,
  * and the values are indexes, and all inputs are unique.
  *
- * \tparam IdType The type of of id.
- * \tparam BLOCK_SIZE The size of the thread block.
- * \tparam TILE_SIZE The number of entries each thread block will process.
- * \param items The unique items to insert.
- * \param num_items The number of items to insert.
- * \param table The hash table.
+ * @tparam IdType The type of of id.
+ * @tparam BLOCK_SIZE The size of the thread block.
+ * @tparam TILE_SIZE The number of entries each thread block will process.
+ * @param items The unique items to insert.
+ * @param num_items The number of items to insert.
+ * @param table The hash table.
  */
 template <typename IdType, int BLOCK_SIZE, size_t TILE_SIZE>
 __global__ void generate_hashmap_unique(
@@ -229,15 +229,15 @@ __global__ void generate_hashmap_unique(
 }
 
 /**
- * \brief This counts the number of nodes inserted per thread block.
+ * @brief This counts the number of nodes inserted per thread block.
  *
- * \tparam IdType The type of of id.
- * \tparam BLOCK_SIZE The size of the thread block.
- * \tparam TILE_SIZE The number of entries each thread block will process.
- * \param input The nodes to insert.
- * \param num_input The number of nodes to insert.
- * \param table The hash table.
- * \param num_unique The number of nodes inserted into the hash table per thread
+ * @tparam IdType The type of of id.
+ * @tparam BLOCK_SIZE The size of the thread block.
+ * @tparam TILE_SIZE The number of entries each thread block will process.
+ * @param input The nodes to insert.
+ * @param num_input The number of nodes to insert.
+ * @param table The hash table.
+ * @param num_unique The number of nodes inserted into the hash table per thread
  * block.
  */
 template <typename IdType, int BLOCK_SIZE, size_t TILE_SIZE>
@@ -278,18 +278,18 @@ __global__ void count_hashmap(
 }
 
 /**
- * \brief Update the local numbering of elements in the hashmap.
+ * @brief Update the local numbering of elements in the hashmap.
  *
- * \tparam IdType The type of id.
- * \tparam BLOCK_SIZE The size of the thread blocks.
- * \tparam TILE_SIZE The number of elements each thread block works on.
- * \param items The set of non-unique items to update from.
- * \param num_items The number of non-unique items.
- * \param table The hash table.
- * \param num_items_prefix The number of unique items preceding each thread
+ * @tparam IdType The type of id.
+ * @tparam BLOCK_SIZE The size of the thread blocks.
+ * @tparam TILE_SIZE The number of elements each thread block works on.
+ * @param items The set of non-unique items to update from.
+ * @param num_items The number of non-unique items.
+ * @param table The hash table.
+ * @param num_items_prefix The number of unique items preceding each thread
  * block.
- * \param unique_items The set of unique items (output).
- * \param num_unique_items The number of unique items (output).
+ * @param unique_items The set of unique items (output).
+ * @param num_unique_items The number of unique items (output).
  */
 template <typename IdType, int BLOCK_SIZE, size_t TILE_SIZE>
 __global__ void compact_hashmap(

@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file dgl/aten/csr.h
- * \brief Common CSR operations required by DGL.
+ * @file dgl/aten/csr.h
+ * @brief Common CSR operations required by DGL.
  */
 #ifndef DGL_ATEN_CSR_H_
 #define DGL_ATEN_CSR_H_
@@ -23,7 +23,7 @@ namespace aten {
 struct COOMatrix;
 
 /*!
- * \brief Plain CSR matrix
+ * @brief Plain CSR matrix
  *
  * The column indices are 0-based and are not necessarily sorted. The data array stores
  * integer ids for reading edge features.
@@ -36,19 +36,19 @@ struct COOMatrix;
 constexpr uint64_t kDGLSerialize_AtenCsrMatrixMagic = 0xDD6cd31205dff127;
 
 struct CSRMatrix {
-  /*! \brief the dense shape of the matrix */
+  /*! @brief the dense shape of the matrix */
   int64_t num_rows = 0, num_cols = 0;
-  /*! \brief CSR index arrays */
+  /*! @brief CSR index arrays */
   IdArray indptr, indices;
-  /*! \brief data index array. When is null, assume it is from 0 to NNZ - 1. */
+  /*! @brief data index array. When is null, assume it is from 0 to NNZ - 1. */
   IdArray data;
-  /*! \brief whether the column indices per row are sorted */
+  /*! @brief whether the column indices per row are sorted */
   bool sorted = false;
-  /*! \brief whether the matrix is in pinned memory */
+  /*! @brief whether the matrix is in pinned memory */
   bool is_pinned = false;
-  /*! \brief default constructor */
+  /*! @brief default constructor */
   CSRMatrix() = default;
-  /*! \brief constructor */
+  /*! @brief constructor */
   CSRMatrix(int64_t nrows, int64_t ncols, IdArray parr, IdArray iarr,
             IdArray darr = NullArray(), bool sorted_flag = false)
       : num_rows(nrows),
@@ -60,7 +60,7 @@ struct CSRMatrix {
     CheckValidity();
   }
 
-  /*! \brief constructor from SparseMatrix object */
+  /*! @brief constructor from SparseMatrix object */
   explicit CSRMatrix(const SparseMatrix& spmat)
       : num_rows(spmat.num_rows),
         num_cols(spmat.num_cols),
@@ -114,7 +114,7 @@ struct CSRMatrix {
     CHECK_EQ(indptr->shape[0], num_rows + 1);
   }
 
-  /*! \brief Return a copy of this matrix on the give device context. */
+  /*! @brief Return a copy of this matrix on the give device context. */
   inline CSRMatrix CopyTo(const DGLContext &ctx) const {
     if (ctx == indptr->ctx)
       return *this;
@@ -123,8 +123,8 @@ struct CSRMatrix {
   }
 
   /*!
-  * \brief Pin the indptr, indices and data (if not Null) of the matrix.
-  * \note This is an in-place method. Behavior depends on the current context,
+  * @brief Pin the indptr, indices and data (if not Null) of the matrix.
+  * @note This is an in-place method. Behavior depends on the current context,
   *       kDGLCPU: will be pinned;
   *       IsPinned: directly return;
   *       kDGLCUDA: invalid, will throw an error.
@@ -142,8 +142,8 @@ struct CSRMatrix {
   }
 
   /*!
-  * \brief Unpin the indptr, indices and data (if not Null) of the matrix.
-  * \note This is an in-place method. Behavior depends on the current context,
+  * @brief Unpin the indptr, indices and data (if not Null) of the matrix.
+  * @note This is an in-place method. Behavior depends on the current context,
   *       IsPinned: will be unpinned;
   *       others: directly return.
   *       The context check is deferred to unpinning the NDArray.
@@ -160,8 +160,8 @@ struct CSRMatrix {
   }
 
   /*!
-   * \brief Record stream for the indptr, indices and data (if not Null) of the matrix.
-   * \param stream The stream that is using the graph
+   * @brief Record stream for the indptr, indices and data (if not Null) of the matrix.
+   * @param stream The stream that is using the graph
    */
   inline void RecordStream(DGLStreamHandle stream) const {
     indptr.RecordStream(stream);
@@ -174,34 +174,34 @@ struct CSRMatrix {
 
 ///////////////////////// CSR routines //////////////////////////
 
-/*! \brief Return true if the value (row, col) is non-zero */
+/*! @brief Return true if the value (row, col) is non-zero */
 bool CSRIsNonZero(CSRMatrix , int64_t row, int64_t col);
 /*!
- * \brief Batched implementation of CSRIsNonZero.
- * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
+ * @brief Batched implementation of CSRIsNonZero.
+ * @note This operator allows broadcasting (i.e, either row or col can be of length 1).
  */
 runtime::NDArray CSRIsNonZero(CSRMatrix, runtime::NDArray row, runtime::NDArray col);
 
-/*! \brief Return the nnz of the given row */
+/*! @brief Return the nnz of the given row */
 int64_t CSRGetRowNNZ(CSRMatrix , int64_t row);
 runtime::NDArray CSRGetRowNNZ(CSRMatrix , runtime::NDArray row);
 
-/*! \brief Return the column index array of the given row */
+/*! @brief Return the column index array of the given row */
 runtime::NDArray CSRGetRowColumnIndices(CSRMatrix , int64_t row);
 
-/*! \brief Return the data array of the given row */
+/*! @brief Return the data array of the given row */
 runtime::NDArray CSRGetRowData(CSRMatrix , int64_t row);
 
-/*! \brief Whether the CSR matrix contains data */
+/*! @brief Whether the CSR matrix contains data */
 inline bool CSRHasData(CSRMatrix csr) {
   return !IsNullArray(csr.data);
 }
 
-/*! \brief Whether the column indices of each row is sorted. */
+/*! @brief Whether the column indices of each row is sorted. */
 bool CSRIsSorted(CSRMatrix csr);
 
 /*!
- * \brief Get the data and the row,col indices for each returned entries.
+ * @brief Get the data and the row,col indices for each returned entries.
  *
  * The operator supports matrix with duplicate entries and all the matched entries
  * will be returned. The operator assumes there is NO duplicate (row, col) pair
@@ -210,16 +210,16 @@ bool CSRIsSorted(CSRMatrix csr);
  * If some (row, col) pairs do not contain a valid non-zero elements,
  * they will not be included in the return arrays.
  *
- * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
- * \param mat Sparse matrix
- * \param rows Row index
- * \param cols Column index
- * \return Three arrays {rows, cols, data}
+ * @note This operator allows broadcasting (i.e, either row or col can be of length 1).
+ * @param mat Sparse matrix
+ * @param rows Row index
+ * @param cols Column index
+ * @return Three arrays {rows, cols, data}
  */
 std::vector<runtime::NDArray> CSRGetDataAndIndices(
     CSRMatrix , runtime::NDArray rows, runtime::NDArray cols);
 
-/* \brief Get data. The return type is an ndarray due to possible duplicate entries. */
+/* @brief Get data. The return type is an ndarray due to possible duplicate entries. */
 inline runtime::NDArray CSRGetAllData(CSRMatrix mat, int64_t row, int64_t col) {
   const auto& nbits = mat.indptr->dtype.bits;
   const auto& ctx = mat.indptr->ctx;
@@ -230,7 +230,7 @@ inline runtime::NDArray CSRGetAllData(CSRMatrix mat, int64_t row, int64_t col) {
 }
 
 /*!
- * \brief Get the data for each (row, col) pair.
+ * @brief Get the data for each (row, col) pair.
  *
  * The operator supports matrix with duplicate entries but only one matched entry
  * will be returned for each (row, col) pair. Support duplicate input (row, col)
@@ -239,17 +239,17 @@ inline runtime::NDArray CSRGetAllData(CSRMatrix mat, int64_t row, int64_t col) {
  * If some (row, col) pairs do not contain a valid non-zero elements,
  * their data values are filled with -1.
  *
- * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
+ * @note This operator allows broadcasting (i.e, either row or col can be of length 1).
  *
- * \param mat Sparse matrix.
- * \param rows Row index.
- * \param cols Column index.
- * \return Data array. The i^th element is the data of (rows[i], cols[i])
+ * @param mat Sparse matrix.
+ * @param rows Row index.
+ * @param cols Column index.
+ * @return Data array. The i^th element is the data of (rows[i], cols[i])
  */
 runtime::NDArray CSRGetData(CSRMatrix, runtime::NDArray rows, runtime::NDArray cols);
 
 /*!
- * \brief Get the data for each (row, col) pair, then index into the weights array.
+ * @brief Get the data for each (row, col) pair, then index into the weights array.
  *
  * The operator supports matrix with duplicate entries but only one matched entry
  * will be returned for each (row, col) pair. Support duplicate input (row, col)
@@ -258,26 +258,26 @@ runtime::NDArray CSRGetData(CSRMatrix, runtime::NDArray rows, runtime::NDArray c
  * If some (row, col) pairs do not contain a valid non-zero elements to index into the
  * weights array, DGL returns the value \a filler for that pair instead.
  *
- * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
+ * @note This operator allows broadcasting (i.e, either row or col can be of length 1).
  *
- * \tparam DType the data type of the weights array.
- * \param mat Sparse matrix.
- * \param rows Row index.
- * \param cols Column index.
- * \param weights The weights array.
- * \param filler The value to return for row-column pairs not existent in the matrix.
- * \return Data array. The i^th element is the data of (rows[i], cols[i])
+ * @tparam DType the data type of the weights array.
+ * @param mat Sparse matrix.
+ * @param rows Row index.
+ * @param cols Column index.
+ * @param weights The weights array.
+ * @param filler The value to return for row-column pairs not existent in the matrix.
+ * @return Data array. The i^th element is the data of (rows[i], cols[i])
  */
 template <typename DType>
 runtime::NDArray CSRGetData(
     CSRMatrix, runtime::NDArray rows, runtime::NDArray cols, runtime::NDArray weights,
     DType filler);
 
-/*! \brief Return a transposed CSR matrix */
+/*! @brief Return a transposed CSR matrix */
 CSRMatrix CSRTranspose(CSRMatrix csr);
 
 /*!
- * \brief Convert CSR matrix to COO matrix.
+ * @brief Convert CSR matrix to COO matrix.
  *
  * Complexity: O(nnz)
  *
@@ -287,17 +287,17 @@ CSRMatrix CSRTranspose(CSRMatrix csr);
  * - If the input CSR is further sorted, the result COO is also
  *   column sorted.
  *
- * \param csr Input csr matrix
- * \param data_as_order If true, the data array in the input csr matrix contains the order
+ * @param csr Input csr matrix
+ * @param data_as_order If true, the data array in the input csr matrix contains the order
  *                      by which the resulting COO tuples are stored. In this case, the
  *                      data array of the resulting COO matrix will be empty because it
  *                      is essentially a consecutive range.
- * \return a coo matrix
+ * @return a coo matrix
  */
 COOMatrix CSRToCOO(CSRMatrix csr, bool data_as_order);
 
 /*!
- * \brief Slice rows of the given matrix and return.
+ * @brief Slice rows of the given matrix and return.
  *
  * The sliced row IDs are relabeled to starting from zero.
  *
@@ -314,16 +314,16 @@ COOMatrix CSRToCOO(CSRMatrix csr, bool data_as_order);
  * indptr = [0, 1, 1]
  * indices = [2]
  *
- * \param csr CSR matrix
- * \param start Start row id (inclusive)
- * \param end End row id (exclusive)
- * \return sliced rows stored in a CSR matrix
+ * @param csr CSR matrix
+ * @param start Start row id (inclusive)
+ * @param end End row id (exclusive)
+ * @return sliced rows stored in a CSR matrix
  */
 CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end);
 CSRMatrix CSRSliceRows(CSRMatrix csr, runtime::NDArray rows);
 
 /*!
- * \brief Get the submatrix specified by the row and col ids.
+ * @brief Get the submatrix specified by the row and col ids.
  *
  * In numpy notation, given matrix M, row index array I, col index array J
  * This function returns the submatrix M[I, J]. It assumes that there is no
@@ -334,18 +334,18 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, runtime::NDArray rows);
  * rows and cols (i.e., row #0 in the new matrix corresponds to rows[0] in
  * the original matrix).
  *
- * \param csr The input csr matrix
- * \param rows The row index to select
- * \param cols The col index to select
- * \return submatrix
+ * @param csr The input csr matrix
+ * @param rows The row index to select
+ * @param cols The col index to select
+ * @return submatrix
  */
 CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
 
-/*! \return True if the matrix has duplicate entries */
+/*! @return True if the matrix has duplicate entries */
 bool CSRHasDuplicate(CSRMatrix csr);
 
 /*!
- * \brief Sort the column index at each row in ascending order in-place.
+ * @brief Sort the column index at each row in ascending order in-place.
  *
  * Only the indices and data arrays (if available) will be mutated. The indptr array
  * stays the same.
@@ -364,7 +364,7 @@ bool CSRHasDuplicate(CSRMatrix csr);
 void CSRSort_(CSRMatrix* csr);
 
 /*!
- * \brief Sort the column index at each row in ascending order.
+ * @brief Sort the column index at each row in ascending order.
  *
  * Return a new CSR matrix with sorted column indices and data arrays.
  */
@@ -380,22 +380,22 @@ inline CSRMatrix CSRSort(CSRMatrix csr) {
 }
 
 /*!
- * \brief Reorder the rows and colmns according to the new row and column order.
- * \param csr The input csr matrix.
- * \param new_row_ids the new row Ids (the index is the old row Id)
- * \param new_col_ids the new column Ids (the index is the old col Id).
+ * @brief Reorder the rows and colmns according to the new row and column order.
+ * @param csr The input csr matrix.
+ * @param new_row_ids the new row Ids (the index is the old row Id)
+ * @param new_col_ids the new column Ids (the index is the old col Id).
  */
 CSRMatrix CSRReorder(CSRMatrix csr, runtime::NDArray new_row_ids, runtime::NDArray new_col_ids);
 
 /*!
- * \brief Remove entries from CSR matrix by entry indices (data indices)
- * \return A new CSR matrix as well as a mapping from the new CSR entries to the old CSR
+ * @brief Remove entries from CSR matrix by entry indices (data indices)
+ * @return A new CSR matrix as well as a mapping from the new CSR entries to the old CSR
  *         entries.
  */
 CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries);
 
 /*!
- * \brief Randomly select a fixed number of non-zero entries along each given row independently.
+ * @brief Randomly select a fixed number of non-zero entries along each given row independently.
  *
  * The function performs random choices along each row independently.
  * The picked indices are returned in the form of a COO matrix.
@@ -420,15 +420,15 @@ CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries);
  * // sampled.cols = [1, 2, 3]
  * // sampled.data = [3, 0, 4]
  *
- * \param mat Input CSR matrix.
- * \param rows Rows to sample from.
- * \param num_samples Number of samples
- * \param prob_or_mask Unnormalized probability array or mask array.
+ * @param mat Input CSR matrix.
+ * @param rows Rows to sample from.
+ * @param num_samples Number of samples
+ * @param prob_or_mask Unnormalized probability array or mask array.
  *                     Should be of the same length as the data array.
  *                     If an empty array is provided, assume uniform.
- * \param replace True if sample with replacement
- * \return A COOMatrix storing the picked row, col and data indices.
- * \note The edges of the entire graph must be ordered by their edge types.
+ * @param replace True if sample with replacement
+ * @return A COOMatrix storing the picked row, col and data indices.
+ * @note The edges of the entire graph must be ordered by their edge types.
  */
 COOMatrix CSRRowWiseSampling(
     CSRMatrix mat,
@@ -438,7 +438,7 @@ COOMatrix CSRRowWiseSampling(
     bool replace = true);
 
 /*!
- * \brief Randomly select a fixed number of non-zero entries for each edge type
+ * @brief Randomly select a fixed number of non-zero entries for each edge type
  *        along each given row independently.
  *
  * The function performs random choices along each row independently.
@@ -469,17 +469,17 @@ COOMatrix CSRRowWiseSampling(
  * // sampled.cols = [0, 3, 2, 3]
  * // sampled.data = [2, 0, 1, 4]
  *
- * \param mat Input CSR matrix.
- * \param rows Rows to sample from.
- * \param eid2etype_offset The offset to each edge type.
- * \param num_samples Number of samples to choose per edge type.
- * \param prob_or_mask Unnormalized probability array or mask array.
+ * @param mat Input CSR matrix.
+ * @param rows Rows to sample from.
+ * @param eid2etype_offset The offset to each edge type.
+ * @param num_samples Number of samples to choose per edge type.
+ * @param prob_or_mask Unnormalized probability array or mask array.
  *                     Should be of the same length as the data array.
  *                     If an empty array is provided, assume uniform.
- * \param replace True if sample with replacement
- * \param rowwise_etype_sorted whether the CSR column indices per row are ordered by edge type.
- * \return A COOMatrix storing the picked row, col and data indices.
- * \note The edges must be ordered by their edge types.
+ * @param replace True if sample with replacement
+ * @param rowwise_etype_sorted whether the CSR column indices per row are ordered by edge type.
+ * @return A COOMatrix storing the picked row, col and data indices.
+ * @note The edges must be ordered by their edge types.
  */
 COOMatrix CSRRowWisePerEtypeSampling(
     CSRMatrix mat,
@@ -491,7 +491,7 @@ COOMatrix CSRRowWisePerEtypeSampling(
     bool rowwise_etype_sorted = false);
 
 /*!
- * \brief Select K non-zero entries with the largest weights along each given row.
+ * @brief Select K non-zero entries with the largest weights along each given row.
  *
  * The function performs top-k selection along each row independently.
  * The picked indices are returned in the form of a COO matrix.
@@ -517,14 +517,14 @@ COOMatrix CSRRowWisePerEtypeSampling(
  * // sampled.cols = [1, 1, 2]
  * // sampled.data = [3, 0, 1]
  *
- * \param mat Input CSR matrix.
- * \param rows Rows to sample from.
- * \param k The K value.
- * \param weight Weight associated with each entry. Should be of the same length as the
+ * @param mat Input CSR matrix.
+ * @param rows Rows to sample from.
+ * @param k The K value.
+ * @param weight Weight associated with each entry. Should be of the same length as the
  *               data array. If an empty array is provided, assume uniform.
- * \param ascending If true, elements are sorted by ascending order, equivalent to find
+ * @param ascending If true, elements are sorted by ascending order, equivalent to find
  *                 the K smallest values. Otherwise, find K largest values.
- * \return A COOMatrix storing the picked row and col indices. Its data field stores the
+ * @return A COOMatrix storing the picked row and col indices. Its data field stores the
  *         the index of the picked elements in the value array.
  */
 COOMatrix CSRRowWiseTopk(
@@ -537,7 +537,7 @@ COOMatrix CSRRowWiseTopk(
 
 
 /*!
- * \brief Randomly select a fixed number of non-zero entries along each given row independently,
+ * @brief Randomly select a fixed number of non-zero entries along each given row independently,
  *        where the probability of columns to be picked can be biased according to its tag.
  *
  * Each column is assigned an integer tag which determines its probability to be sampled.
@@ -580,13 +580,13 @@ COOMatrix CSRRowWiseTopk(
  * // probability of tag 1 is 0.
  *
  *
- * \param mat Input CSR matrix.
- * \param rows Rows to sample from.
- * \param num_samples Number of samples.
- * \param tag_offset The boundaries of tags. Should be of the shape [num_row, num_tags+1]
- * \param bias Unnormalized probability array. Should be of length num_tags
- * \param replace True if sample with replacement
- * \return A COOMatrix storing the picked row and col indices. Its data field stores the
+ * @param mat Input CSR matrix.
+ * @param rows Rows to sample from.
+ * @param num_samples Number of samples.
+ * @param tag_offset The boundaries of tags. Should be of the shape [num_row, num_tags+1]
+ * @param bias Unnormalized probability array. Should be of length num_tags
+ * @param replace True if sample with replacement
+ * @return A COOMatrix storing the picked row and col indices. Its data field stores the
  *         the index of the picked elements in the value array.
  *
  */
@@ -600,19 +600,19 @@ COOMatrix CSRRowWiseSamplingBiased(
 );
 
 /*!
- * \brief Uniformly sample row-column pairs whose entries do not exist in the given
+ * @brief Uniformly sample row-column pairs whose entries do not exist in the given
  * sparse matrix using rejection sampling.
  *
- * \note The number of samples returned may not necessarily be the number of samples
+ * @note The number of samples returned may not necessarily be the number of samples
  * given.
  *
- * \param csr The CSR matrix.
- * \param num_samples The number of samples.
- * \param num_trials The number of trials.
- * \param exclude_self_loops Do not include the examples where the row equals the column.
- * \param replace Whether to sample with replacement.
- * \param redundancy How much redundant negative examples to take in case of duplicate examples.
- * \return A pair of row and column tensors.
+ * @param csr The CSR matrix.
+ * @param num_samples The number of samples.
+ * @param num_trials The number of trials.
+ * @param exclude_self_loops Do not include the examples where the row equals the column.
+ * @param replace Whether to sample with replacement.
+ * @param redundancy How much redundant negative examples to take in case of duplicate examples.
+ * @return A pair of row and column tensors.
  */
 std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
     const CSRMatrix& csr,
@@ -623,7 +623,7 @@ std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
     double redundancy);
 
 /*!
- * \brief Sort the column index according to the tag of each column.
+ * @brief Sort the column index according to the tag of each column.
  *
  * Example:
  * indptr  = [0, 5, 8]
@@ -643,10 +643,10 @@ std::pair<IdArray, IdArray> CSRGlobalUniformNegativeSampling(
  * Return:
  * [[0, 2, 4, 5], [0, 1, 3, 3]] (marked with ^)
  *
- * \param csr The csr matrix to be sorted
- * \param tag_array Tag of each column. IdArray with length num_cols
- * \param num_tags Number of tags. It should be equal to max(tag_array)+1.
- * \return 1. A sorted copy of the given CSR matrix
+ * @param csr The csr matrix to be sorted
+ * @param tag_array Tag of each column. IdArray with length num_cols
+ * @param num_tags Number of tags. It should be equal to max(tag_array)+1.
+ * @return 1. A sorted copy of the given CSR matrix
  *         2. The split positions of different tags. NDArray of shape (num_rows, num_tags + 1)
  */
 std::pair<CSRMatrix, NDArray> CSRSortByTag(
@@ -655,7 +655,7 @@ std::pair<CSRMatrix, NDArray> CSRSortByTag(
     int64_t num_tags);
 
 /*
- * \brief Union two CSRMatrix into one CSRMatrix.
+ * @brief Union two CSRMatrix into one CSRMatrix.
  *
  * Two Matrix must have the same shape.
  *
@@ -687,7 +687,7 @@ CSRMatrix UnionCsr(
   const std::vector<CSRMatrix>& csrs);
 
 /*!
- * \brief Union a list CSRMatrix into one CSRMatrix.
+ * @brief Union a list CSRMatrix into one CSRMatrix.
  *
  * Examples:
  *
@@ -713,16 +713,16 @@ CSRMatrix UnionCsr(
  * CSRMatrix_C.num_rows : 5
  * CSRMatrix_C.num_cols : 5
  *
- * \param csrs The input list of csr matrix.
- * \param src_offset A list of integers recording src vertix id offset of each Matrix in csrs
- * \param src_offset A list of integers recording dst vertix id offset of each Matrix in csrs
- * \return The combined CSRMatrix.
+ * @param csrs The input list of csr matrix.
+ * @param src_offset A list of integers recording src vertix id offset of each Matrix in csrs
+ * @param src_offset A list of integers recording dst vertix id offset of each Matrix in csrs
+ * @return The combined CSRMatrix.
  */
 CSRMatrix DisjointUnionCsr(
   const std::vector<CSRMatrix>& csrs);
 
 /*!
- * \brief CSRMatrix toSimple.
+ * @brief CSRMatrix toSimple.
  *
  * A = [[0, 0, 0],
  *      [3, 0, 2],
@@ -738,7 +738,7 @@ CSRMatrix DisjointUnionCsr(
  * cnt = [3, 2, 1, 1, 4]
  * edge_map = [0, 0, 0, 1, 1, 2, 3, 4, 4, 4, 4]
  *
- * \return The simplified CSRMatrix
+ * @return The simplified CSRMatrix
  *         The count recording the number of duplicated edges from the original graph.
  *         The edge mapping from the edge IDs of original graph to those of the
  *         returned graph.
@@ -746,7 +746,7 @@ CSRMatrix DisjointUnionCsr(
 std::tuple<CSRMatrix, IdArray, IdArray> CSRToSimple(const CSRMatrix& csr);
 
 /*!
- * \brief Split a CSRMatrix into multiple disjoint components.
+ * @brief Split a CSRMatrix into multiple disjoint components.
  *
  * Examples:
  *
@@ -782,12 +782,12 @@ std::tuple<CSRMatrix, IdArray, IdArray> CSRToSimple(const CSRMatrix& csr);
  * CSRMatrix_B.num_rows : 3
  * CSRMatrix_B.num_cols : 2
  *
- * \param csr CSRMatrix to split.
- * \param batch_size Number of disjoin components (Sub CSRMatrix)
- * \param edge_cumsum Number of edges of each components
- * \param src_vertex_cumsum Number of src vertices of each component.
- * \param dst_vertex_cumsum Number of dst vertices of each component.
- * \return A list of CSRMatrixes representing each disjoint components.
+ * @param csr CSRMatrix to split.
+ * @param batch_size Number of disjoin components (Sub CSRMatrix)
+ * @param edge_cumsum Number of edges of each components
+ * @param src_vertex_cumsum Number of src vertices of each component.
+ * @param dst_vertex_cumsum Number of dst vertices of each component.
+ * @return A list of CSRMatrixes representing each disjoint components.
  */
 std::vector<CSRMatrix> DisjointPartitionCsrBySizes(
   const CSRMatrix &csrs,
@@ -797,7 +797,7 @@ std::vector<CSRMatrix> DisjointPartitionCsrBySizes(
   const std::vector<uint64_t> &dst_vertex_cumsum);
 
 /*!
- * \brief Slice a contiguous chunk from a CSRMatrix
+ * @brief Slice a contiguous chunk from a CSRMatrix
  *
  * Examples:
  *
@@ -825,11 +825,11 @@ std::vector<CSRMatrix> DisjointPartitionCsrBySizes(
  * CSRMatrix_ret.num_rows : 3
  * CSRMatrix_ret.num_cols : 2
  *
- * \param csr CSRMatrix to slice.
- * \param edge_range ID range of the edges in the chunk
- * \param src_vertex_range ID range of the src vertices in the chunk.
- * \param dst_vertex_range ID range of the dst vertices in the chunk.
- * \return CSRMatrix representing the chunk.
+ * @param csr CSRMatrix to slice.
+ * @param edge_range ID range of the edges in the chunk
+ * @param src_vertex_range ID range of the src vertices in the chunk.
+ * @param dst_vertex_range ID range of the dst vertices in the chunk.
+ * @return CSRMatrix representing the chunk.
  */
 CSRMatrix CSRSliceContiguousChunk(
   const CSRMatrix &csr,

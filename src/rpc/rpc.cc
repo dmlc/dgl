@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file rpc/rpc.cc
- * \brief Implementation of RPC utilities used by both server and client sides.
+ * @file rpc/rpc.cc
+ * @brief Implementation of RPC utilities used by both server and client sides.
  */
 #if defined(__linux__)
 #include "./rpc.h"
@@ -383,8 +383,8 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCMessageGetTensors")
 
 #if defined(__linux__)
 /*!
- * \brief The signal handler.
- * \param s signal
+ * @brief The signal handler.
+ * @param s signal
  */
 void SigHandler(int s) {
   LOG(INFO) << "\nUser pressed Ctrl+C, Exiting";

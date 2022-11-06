@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2018 by Contributors
- * \file graph/traversal.h
- * \brief Graph traversal routines.
+ * @file graph/traversal.h
+ * @brief Graph traversal routines.
  *
  * Traversal routines generate frontiers. Frontiers can be node frontiers or
  * edge frontiers depending on the traversal function. Each frontier is a list
@@ -21,7 +21,7 @@ namespace dgl {
 namespace traverse {
 
 /*!
- * \brief Traverse the graph in a breadth-first-search (BFS) order.
+ * @brief Traverse the graph in a breadth-first-search (BFS) order.
  *
  * The queue object must suffice following interface:
  *   Members:
@@ -38,12 +38,12 @@ namespace traverse {
  * The frontier function must be compatible with following interface:
  *   void (*make_frontier)(void);
  *
- * \param graph The graph.
- * \param sources Source nodes.
- * \param reversed If true, BFS follows the in-edge direction.
- * \param queue The queue used to do bfs.
- * \param visit The function to call when a node is visited.
- * \param make_frontier The function to indicate that a new froniter can be
+ * @param graph The graph.
+ * @param sources Source nodes.
+ * @param reversed If true, BFS follows the in-edge direction.
+ * @param queue The queue used to do bfs.
+ * @param visit The function to call when a node is visited.
+ * @param make_frontier The function to indicate that a new froniter can be
  *        made.
  */
 template <typename Queue, typename VisitFn, typename FrontierFn>
@@ -82,7 +82,7 @@ void BFSNodes(
 }
 
 /*!
- * \brief Traverse the graph in a breadth-first-search (BFS) order, returning
+ * @brief Traverse the graph in a breadth-first-search (BFS) order, returning
  *        the edges of the BFS tree.
  *
  * The queue object must suffice following interface:
@@ -100,13 +100,13 @@ void BFSNodes(
  * The frontier function must be compatible with following interface:
  *   void (*make_frontier)(void);
  *
- * \param graph The graph.
- * \param sources Source nodes.
- * \param reversed If true, BFS follows the in-edge direction.
- * \param queue The queue used to do bfs.
- * \param visit The function to call when a node is visited.
+ * @param graph The graph.
+ * @param sources Source nodes.
+ * @param reversed If true, BFS follows the in-edge direction.
+ * @param queue The queue used to do bfs.
+ * @param visit The function to call when a node is visited.
  *        The argument would be edge ID.
- * \param make_frontier The function to indicate that a new frontier can be
+ * @param make_frontier The function to indicate that a new frontier can be
  *        made.
  */
 template <typename Queue, typename VisitFn, typename FrontierFn>
@@ -146,7 +146,7 @@ void BFSEdges(
 }
 
 /*!
- * \brief Traverse the graph in topological order.
+ * @brief Traverse the graph in topological order.
  *
  * The queue object must suffice following interface:
  *   Members:
@@ -163,11 +163,11 @@ void BFSEdges(
  * The frontier function must be compatible with following interface:
  *   void (*make_frontier)(void);
  *
- * \param graph The graph.
- * \param reversed If true, follows the in-edge direction.
- * \param queue The queue used to do bfs.
- * \param visit The function to call when a node is visited.
- * \param make_frontier The function to indicate that a new froniter can be
+ * @param graph The graph.
+ * @param reversed If true, follows the in-edge direction.
+ * @param queue The queue used to do bfs.
+ * @param visit The function to call when a node is visited.
+ * @param make_frontier The function to indicate that a new froniter can be
  *        made.
  */
 template <typename Queue, typename VisitFn, typename FrontierFn>
@@ -219,7 +219,7 @@ enum DFSEdgeTag {
   kNonTree,
 };
 /*!
- * \brief Traverse the graph in a depth-first-search (DFS) order.
+ * @brief Traverse the graph in a depth-first-search (DFS) order.
  *
  * The traversal visit edges in its DFS order. Edges have three tags:
  * FORWARD(0), REVERSE(1), NONTREE(2).
@@ -229,11 +229,11 @@ enum DFSEdgeTag {
  * edge is in the DFS tree. A NONTREE edge is one in which both `u` and `v` have
  * been visisted but the edge is NOT in the DFS tree.
  *
- * \param source Source node.
- * \param reversed If true, DFS follows the in-edge direction.
- * \param has_reverse_edge If true, REVERSE edges are included.
- * \param has_nontree_edge If true, NONTREE edges are included.
- * \param visit The function to call when an edge is visited; the edge id and
+ * @param source Source node.
+ * @param reversed If true, DFS follows the in-edge direction.
+ * @param has_reverse_edge If true, REVERSE edges are included.
+ * @param has_nontree_edge If true, NONTREE edges are included.
+ * @param visit The function to call when an edge is visited; the edge id and
  *        its tag will be given as the arguments.
  */
 template <typename VisitFn>

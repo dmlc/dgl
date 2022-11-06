@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2017 by Contributors
- * \file dso_dll_module.cc
- * \brief Module to load from dynamic shared library.
+ * @file dso_dll_module.cc
+ * @brief Module to load from dynamic shared library.
  */
 #include <dgl/runtime/module.h>
 #include <dgl/runtime/packed_func.h>

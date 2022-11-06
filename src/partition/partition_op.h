@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2021 by Contributors
- * \file ndarray_partition.h
- * \brief DGL utilities for working with the partitioned NDArrays
+ * @file ndarray_partition.h
+ * @brief DGL utilities for working with the partitioned NDArrays
  */
 
 #ifndef DGL_PARTITION_PARTITION_OP_H_

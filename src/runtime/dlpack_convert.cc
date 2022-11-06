@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2022 by Contributors
- * \file src/runtime/dlpack_convert.cc
- * \brief Conversion between NDArray and DLPack.
+ * @file src/runtime/dlpack_convert.cc
+ * @brief Conversion between NDArray and DLPack.
  */
 #include <dgl/runtime/c_runtime_api.h>
 #include <dgl/runtime/device_api.h>

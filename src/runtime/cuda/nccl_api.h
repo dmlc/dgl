@@ -13,8 +13,8 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
- * \file nccl_api.h
- * \brief Wrapper around NCCL routines.
+ * @file nccl_api.h
+ * @brief Wrapper around NCCL routines.
  */
 
 #ifndef DGL_RUNTIME_CUDA_NCCL_API_H_

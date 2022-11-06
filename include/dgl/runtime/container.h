@@ -284,7 +284,7 @@ class List : public ObjectRef {
   inline const T operator[](size_t i) const {
     return T(static_cast<const ListObject*>(obj_.get())->data[i]);
   }
-  /*! \return The size of the list */
+  /*! @return The size of the list */
   inline size_t size() const {
     if (obj_.get() == nullptr) return 0;
     return static_cast<const ListObject*>(obj_.get())->data.size();
@@ -321,7 +321,7 @@ class List : public ObjectRef {
     ListObject* n = this->CopyOnWrite();
     n->data[i] = value.obj_;
   }
-  /*! \return whether list is empty */
+  /*! @return whether list is empty */
   inline bool empty() const { return size() == 0; }
   /*! @brief Copy the content to a vector */
   inline std::vector<T> ToVector() const {
@@ -341,20 +341,20 @@ class List : public ObjectRef {
       Ptr2ObjectRef,
       std::vector<std::shared_ptr<Object> >::const_reverse_iterator>;
 
-  /*! \return begin iterator */
+  /*! @return begin iterator */
   inline iterator begin() const {
     return iterator(static_cast<const ListObject*>(obj_.get())->data.begin());
   }
-  /*! \return end iterator */
+  /*! @return end iterator */
   inline iterator end() const {
     return iterator(static_cast<const ListObject*>(obj_.get())->data.end());
   }
-  /*! \return rbegin iterator */
+  /*! @return rbegin iterator */
   inline reverse_iterator rbegin() const {
     return reverse_iterator(
         static_cast<const ListObject*>(obj_.get())->data.rbegin());
   }
-  /*! \return rend iterator */
+  /*! @return rend iterator */
   inline reverse_iterator rend() const {
     return reverse_iterator(
         static_cast<const ListObject*>(obj_.get())->data.rend());
@@ -498,12 +498,12 @@ class Map : public ObjectRef {
   inline const V at(const K& key) const {
     return V(static_cast<const MapObject*>(obj_.get())->data.at(key.obj_));
   }
-  /*! \return The size of the list */
+  /*! @return The size of the list */
   inline size_t size() const {
     if (obj_.get() == nullptr) return 0;
     return static_cast<const MapObject*>(obj_.get())->data.size();
   }
-  /*! \return The size of the list */
+  /*! @return The size of the list */
   inline size_t count(const K& key) const {
     if (obj_.get() == nullptr) return 0;
     return static_cast<const MapObject*>(obj_.get())->data.count(key.obj_);
@@ -533,7 +533,7 @@ class Map : public ObjectRef {
     n->data[key.obj_] = value.obj_;
   }
 
-  /*! \return whether list is empty */
+  /*! @return whether list is empty */
   inline bool empty() const { return size() == 0; }
   /*! @brief specify container obj */
   using ContainerType = MapObject;
@@ -549,15 +549,15 @@ class Map : public ObjectRef {
   using iterator =
       IterAdapter<Ptr2ObjectRef, MapObject::ContainerType::const_iterator>;
 
-  /*! \return begin iterator */
+  /*! @return begin iterator */
   inline iterator begin() const {
     return iterator(static_cast<const MapObject*>(obj_.get())->data.begin());
   }
-  /*! \return end iterator */
+  /*! @return end iterator */
   inline iterator end() const {
     return iterator(static_cast<const MapObject*>(obj_.get())->data.end());
   }
-  /*! \return begin iterator */
+  /*! @return begin iterator */
   inline iterator find(const K& key) const {
     return iterator(
         static_cast<const MapObject*>(obj_.get())->data.find(key.obj_));
@@ -644,15 +644,15 @@ class Map<std::string, V, T1, T2> : public ObjectRef {
   using iterator =
       IterAdapter<Ptr2ObjectRef, StrMapObject::ContainerType::const_iterator>;
 
-  /*! \return begin iterator */
+  /*! @return begin iterator */
   inline iterator begin() const {
     return iterator(static_cast<const StrMapObject*>(obj_.get())->data.begin());
   }
-  /*! \return end iterator */
+  /*! @return end iterator */
   inline iterator end() const {
     return iterator(static_cast<const StrMapObject*>(obj_.get())->data.end());
   }
-  /*! \return begin iterator */
+  /*! @return begin iterator */
   inline iterator find(const std::string& key) const {
     return iterator(
         static_cast<const StrMapObject*>(obj_.get())->data.find(key));

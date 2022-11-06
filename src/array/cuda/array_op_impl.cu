@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020-2021 by Contributors
- * \file array/cuda/array_op_impl.cu
- * \brief Array operator GPU implementation
+ * @file array/cuda/array_op_impl.cu
+ * @brief Array operator GPU implementation
  */
 #include <dgl/array.h>
 #include "../../runtime/cuda/cuda_common.h"

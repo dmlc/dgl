@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2017 by Contributors
- * \file module.cc
- * \brief DGL module system
+ * @file module.cc
+ * @brief DGL module system
  */
 #include <dgl/runtime/module.h>
 #include <dgl/runtime/packed_func.h>

@@ -103,21 +103,21 @@ class Graph : public GraphInterface {
    */
   bool IsReadonly() const override { return false; }
 
-  /*! \return the number of vertices in the graph.*/
+  /*! @return the number of vertices in the graph.*/
   uint64_t NumVertices() const override { return adjlist_.size(); }
 
-  /*! \return the number of edges in the graph.*/
+  /*! @return the number of edges in the graph.*/
   uint64_t NumEdges() const override { return num_edges_; }
 
-  /*! \return a 0-1 array indicating whether the given vertices are in the
+  /*! @return a 0-1 array indicating whether the given vertices are in the
    * graph.
    */
   BoolArray HasVertices(IdArray vids) const override;
 
-  /*! \return true if the given edge is in the graph.*/
+  /*! @return true if the given edge is in the graph.*/
   bool HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const override;
 
-  /*! \return a 0-1 array indicating whether the given edges are in the graph.*/
+  /*! @return a 0-1 array indicating whether the given edges are in the graph.*/
   BoolArray HasEdgesBetween(IdArray src_ids, IdArray dst_ids) const override;
 
   /*!

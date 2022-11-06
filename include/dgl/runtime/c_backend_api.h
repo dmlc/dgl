@@ -65,7 +65,7 @@ DGL_DLL void* DGLBackendAllocWorkspace(
  * @param device_id The device id which the space will be allocated.
  * @return 0 when no error is thrown, -1 when failure happens
  *
- * \sa DGLBackendAllocWorkspace
+ * @sa DGLBackendAllocWorkspace
  */
 DGL_DLL int DGLBackendFreeWorkspace(int device_type, int device_id, void* ptr);
 

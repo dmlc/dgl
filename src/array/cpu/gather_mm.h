@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2022 by Contributors
- * \file array/cpu/gather_mm.h
- * \brief GATHER_MM CPU kernel function header.
+ * @file array/cpu/gather_mm.h
+ * @brief GATHER_MM CPU kernel function header.
  */
 #ifndef DGL_ARRAY_CPU_GATHER_MM_H_
 #define DGL_ARRAY_CPU_GATHER_MM_H_
@@ -46,15 +46,15 @@ void matmul(
 }
 
 /*!
- * \brief CPU kernel of Gather_mm. The input matrix A is expected to be
+ * @brief CPU kernel of Gather_mm. The input matrix A is expected to be
  *        sorted according to relation type.
- * \param A The input dense matrix of dimension m x k
- * \param B The input dense matrix of dimension k x n
- * \param C The output dense matrix od dimension m x n
- * \param A_dim1_per_rel The number of rows in each relation in A
- * \param B_dim1_per_rel The number of rows in each relation in B
- * \param a_trans Matrix A to be transposed
- * \param b_trans Matrix B to be transposed
+ * @param A The input dense matrix of dimension m x k
+ * @param B The input dense matrix of dimension k x n
+ * @param C The output dense matrix od dimension m x n
+ * @param A_dim1_per_rel The number of rows in each relation in A
+ * @param B_dim1_per_rel The number of rows in each relation in B
+ * @param a_trans Matrix A to be transposed
+ * @param b_trans Matrix B to be transposed
  */
 template <int XPU, typename IdType, typename DType>
 void gatherMM_SortedEtype(

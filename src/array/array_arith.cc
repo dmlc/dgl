@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file array/array_aritch.cc
- * \brief DGL array arithmetic operations
+ * @file array/array_aritch.cc
+ * @brief DGL array arithmetic operations
  */
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/container.h>

@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2018 by Contributors
- * \file graph/sampling/get_node_types_cpu.cc
- * \brief DGL sampler - CPU implementation of random walks with OpenMP
+ * @file graph/sampling/get_node_types_cpu.cc
+ * @brief DGL sampler - CPU implementation of random walks with OpenMP
  */
 
 #include <dgl/array.h>

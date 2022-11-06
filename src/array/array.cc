@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019-2021 by Contributors
- * \file array/array.cc
- * \brief DGL array utilities implementation
+ * @file array/array.cc
+ * @brief DGL array utilities implementation
  */
 #include <dgl/array.h>
 #include <dgl/graph_traversal.h>

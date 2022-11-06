@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file api/api_container.cc
- * \brief Runtime container APIs. (reference: tvm/src/api/api_lang.cc)
+ * @file api/api_container.cc
+ * @brief Runtime container APIs. (reference: tvm/src/api/api_lang.cc)
  */
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/container.h>

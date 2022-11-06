@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file array/cuda/array_scatter.cu
- * \brief Array scatter GPU implementation
+ * @file array/cuda/array_scatter.cu
+ * @brief Array scatter GPU implementation
  */
 #include <dgl/array.h>
 #include "../../runtime/cuda/cuda_common.h"

@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2017 by Contributors
- * \file meta_data.h
- * \brief Meta data related utilities
+ * @file meta_data.h
+ * @brief Meta data related utilities
  */
 #ifndef DGL_RUNTIME_META_DATA_H_
 #define DGL_RUNTIME_META_DATA_H_
@@ -18,7 +18,7 @@
 namespace dgl {
 namespace runtime {
 
-/*! \brief function information needed by device */
+/*! @brief function information needed by device */
 struct FunctionInfo {
   std::string name;
   std::vector<DGLDataType> arg_types;

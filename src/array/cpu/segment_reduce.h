@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file array/cpu/spmm.h
- * \brief Segment reduce kernel function header.
+ * @file array/cpu/spmm.h
+ * @brief Segment reduce kernel function header.
  */
 #ifndef DGL_ARRAY_CPU_SEGMENT_REDUCE_H_
 #define DGL_ARRAY_CPU_SEGMENT_REDUCE_H_
@@ -18,10 +18,10 @@ namespace aten {
 namespace cpu {
 
 /*!
- * \brief CPU kernel of segment sum.
- * \param feat The input tensor.
- * \param offsets The offset tensor storing the ranges of segments.
- * \param out The output tensor.
+ * @brief CPU kernel of segment sum.
+ * @param feat The input tensor.
+ * @param offsets The offset tensor storing the ranges of segments.
+ * @param out The output tensor.
  */
 template <typename IdType, typename DType>
 void SegmentSum(NDArray feat, NDArray offsets, NDArray out) {
@@ -43,11 +43,11 @@ void SegmentSum(NDArray feat, NDArray offsets, NDArray out) {
 }
 
 /*!
- * \brief CPU kernel of segment min/max.
- * \param feat The input tensor.
- * \param offsets The offset tensor storing the ranges of segments.
- * \param out The output tensor.
- * \param arg An auxiliary tensor storing the argmin/max information
+ * @brief CPU kernel of segment min/max.
+ * @param feat The input tensor.
+ * @param offsets The offset tensor storing the ranges of segments.
+ * @param out The output tensor.
+ * @param arg An auxiliary tensor storing the argmin/max information
  *        used in backward phase.
  */
 template <typename IdType, typename DType, typename Cmp>
@@ -77,11 +77,11 @@ void SegmentCmp(NDArray feat, NDArray offsets, NDArray out, NDArray arg) {
 }
 
 /*!
- * \brief CPU kernel of Scatter Add (on first dimension) operator.
- * \note math equation: out[idx[i], *] += feat[i, *]
- * \param feat The input tensor.
- * \param idx The indices tensor.
- * \param out The output tensor.
+ * @brief CPU kernel of Scatter Add (on first dimension) operator.
+ * @note math equation: out[idx[i], *] += feat[i, *]
+ * @param feat The input tensor.
+ * @param idx The indices tensor.
+ * @param out The output tensor.
  */
 template <typename IdType, typename DType>
 void ScatterAdd(NDArray feat, NDArray idx, NDArray out) {
@@ -102,13 +102,13 @@ void ScatterAdd(NDArray feat, NDArray idx, NDArray out) {
 }
 
 /*!
- * \brief CPU kernel to update gradients for reduce op max/min
- * \param graph The input heterogeneous graph.
- * \param op The binary operator, could be `copy_u`, `copy_e'.
- * \param list_feat List of the input tensors.
- * \param list_idx  List of the indices tensors.
- * \param list_idx_etype List of the node- or edge-type tensors.
- * \param list_out List of the output tensors.
+ * @brief CPU kernel to update gradients for reduce op max/min
+ * @param graph The input heterogeneous graph.
+ * @param op The binary operator, could be `copy_u`, `copy_e'.
+ * @param list_feat List of the input tensors.
+ * @param list_idx  List of the indices tensors.
+ * @param list_idx_etype List of the node- or edge-type tensors.
+ * @param list_out List of the output tensors.
  */
 template <typename IdType, typename DType>
 void UpdateGradMinMax_hetero(
@@ -160,11 +160,11 @@ void UpdateGradMinMax_hetero(
 }
 
 /*!
- * \brief CPU kernel of backward phase of segment min/max.
- * \note math equation: out[arg[i, k], k] = feat[i, k]
- * \param feat The input tensor.
- * \param arg The argmin/argmax tensor.
- * \param out The output tensor.
+ * @brief CPU kernel of backward phase of segment min/max.
+ * @note math equation: out[arg[i, k], k] = feat[i, k]
+ * @param feat The input tensor.
+ * @param arg The argmin/argmax tensor.
+ * @param out The output tensor.
  */
 template <typename IdType, typename DType>
 void BackwardSegmentCmp(NDArray feat, NDArray arg, NDArray out) {

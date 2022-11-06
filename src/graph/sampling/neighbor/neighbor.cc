@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020-2021 by Contributors
- * \file graph/sampling/neighbor.cc
- * \brief Definition of neighborhood-based sampler APIs.
+ * @file graph/sampling/neighbor.cc
+ * @brief Definition of neighborhood-based sampler APIs.
  */
 
 #include <dgl/runtime/container.h>

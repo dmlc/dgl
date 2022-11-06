@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file kernel/cpu/spmm.cc
- * \brief SPMM C APIs and definitions.
+ * @file kernel/cpu/spmm.cc
+ * @brief SPMM C APIs and definitions.
  */
 #include "./spmm.h"
 #include <dgl/array.h>
@@ -9,7 +9,7 @@
 namespace dgl {
 namespace aten {
 
-/*! \brief Generalized SpMM on Csr format. */
+/*! @brief Generalized SpMM on Csr format. */
 template <int XPU, typename IdType, typename DType>
 void SpMMCsr(const std::string& op, const std::string& reduce,
              const BcastOff& bcast,
@@ -41,7 +41,7 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
   }
 }
 
-/*! \brief Generalized SpMM on Csr format. */
+/*! @brief Generalized SpMM on Csr format. */
 template <int XPU, typename IdType, typename DType>
 void SpMMCsrHetero(const std::string& op, const std::string& reduce,
              const BcastOff& bcast,
@@ -159,7 +159,7 @@ template void SpMMCsrHetero<kDGLCPU, int64_t, double>(
     const std::vector<dgl_type_t>& ufeat_node_tids,
     const std::vector<dgl_type_t>& out_node_tids);
 
-/*! \brief Edge_softmax_csr forward op on Csr format. */
+/*! @brief Edge_softmax_csr forward op on Csr format. */
 template <int XPU, typename IdType, typename DType>
 void Edge_softmax_csr_forward(const std::string& op,
              const BcastOff& bcast,
@@ -172,7 +172,7 @@ void Edge_softmax_csr_forward(const std::string& op,
   });
 }
 
-/*! \brief Edge_softmax_csr backward op on Csr format. */
+/*! @brief Edge_softmax_csr backward op on Csr format. */
 template <int XPU, typename IdType, typename DType>
 void Edge_softmax_csr_backward(const std::string& op,
              const BcastOff& bcast,
@@ -219,7 +219,7 @@ template void Edge_softmax_csr_backward<kDGLCPU, int64_t, double>(
     const BcastOff& bcast, const CSRMatrix& csr,
     NDArray ufeat, NDArray efeat, NDArray out);
 
-/*! \brief Generalized SpMM on Coo format. */
+/*! @brief Generalized SpMM on Coo format. */
 template <int XPU, typename IdType, typename DType>
 void SpMMCoo(const std::string& op, const std::string& reduce,
              const BcastOff& bcast,

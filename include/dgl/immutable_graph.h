@@ -225,10 +225,10 @@ class CSR : public GraphInterface {
 
   IdArray edge_ids() const { return adj_.data; }
 
-  /*! \return Load CSR from stream */
+  /*! @return Load CSR from stream */
   bool Load(dmlc::Stream *fs);
 
-  /*! \return Save CSR to stream */
+  /*! @return Save CSR to stream */
   void Save(dmlc::Stream *fs) const;
 
   void SortCSR() override {
@@ -577,18 +577,18 @@ class ImmutableGraph : public GraphInterface {
     return is_unibipartite_;
   }
 
-  /*! \return the number of vertices in the graph.*/
+  /*! @return the number of vertices in the graph.*/
   uint64_t NumVertices() const override { return AnyGraph()->NumVertices(); }
 
-  /*! \return the number of edges in the graph.*/
+  /*! @return the number of edges in the graph.*/
   uint64_t NumEdges() const override { return AnyGraph()->NumEdges(); }
 
-  /*! \return true if the given vertex is in the graph.*/
+  /*! @return true if the given vertex is in the graph.*/
   bool HasVertex(dgl_id_t vid) const override { return vid < NumVertices(); }
 
   BoolArray HasVertices(IdArray vids) const override;
 
-  /*! \return true if the given edge is in the graph.*/
+  /*! @return true if the given edge is in the graph.*/
   bool HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const override {
     if (in_csr_) {
       return in_csr_->HasEdgeBetween(dst, src);
@@ -918,10 +918,10 @@ class ImmutableGraph : public GraphInterface {
    */
   ImmutableGraphPtr Reverse() const;
 
-  /*! \return Load ImmutableGraph from stream, using out csr */
+  /*! @return Load ImmutableGraph from stream, using out csr */
   bool Load(dmlc::Stream *fs);
 
-  /*! \return Save ImmutableGraph to stream, using out csr */
+  /*! @return Save ImmutableGraph to stream, using out csr */
   void Save(dmlc::Stream *fs) const;
 
   void SortCSR() override {

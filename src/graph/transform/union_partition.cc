@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file graph/transform/union_partition.cc
- * \brief Functions for partition, union multiple graphs.
+ * @file graph/transform/union_partition.cc
+ * @brief Functions for partition, union multiple graphs.
  */
 #include "../heterograph.h"
 using namespace dgl::runtime;

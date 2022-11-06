@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file dgl/aten/macro.h
- * \brief Common macros for aten package.
+ * @file dgl/aten/macro.h
+ * @brief Common macros for aten package.
  */
 
 #ifndef DGL_ATEN_MACRO_H_

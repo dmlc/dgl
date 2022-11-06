@@ -1,7 +1,7 @@
  /*!
  *  Copyright (c) 2020 by Contributors
- * \file kernel/cpu/gaher_mm.cc
- * \brief GatherMM C APIs and definitions.
+ * @file kernel/cpu/gaher_mm.cc
+ * @brief GatherMM C APIs and definitions.
  */
 #include "./gather_mm.h"
 #include <dgl/array.h>
@@ -9,7 +9,7 @@
 namespace dgl {
 namespace aten {
 
-/*! \brief Generalized SegmentMM. */
+/*! @brief Generalized SegmentMM. */
 template <int XPU, typename IdType, typename DType>
 void SegmentMM(const NDArray A,
           const NDArray B,
@@ -27,7 +27,7 @@ void SegmentMMBackwardB(const NDArray A,
     LOG(FATAL) << "Unsupported CPU kernel for SegmentMMBackwardB.";
 }
 
-/*! \brief Generalized GatherMM. */
+/*! @brief Generalized GatherMM. */
 template <int XPU, typename IdType, typename DType>
 void GatherMM(const NDArray A,
           const NDArray B,
@@ -37,7 +37,7 @@ void GatherMM(const NDArray A,
     LOG(FATAL) << "Unsupported CPU kernel for GatherMM.";
 }
 
-/*! \brief Generalized GatherMM_scatter. */
+/*! @brief Generalized GatherMM_scatter. */
 template <int XPU, typename IdType, typename DType>
 void GatherMMScatter(const NDArray A,
           const NDArray B,

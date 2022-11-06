@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file graph/transform/to_simple.cc
- * \brief Convert multigraphs to simple graphs
+ * @file graph/transform/to_simple.cc
+ * @brief Convert multigraphs to simple graphs
  */
 
 #include <dgl/array.h>

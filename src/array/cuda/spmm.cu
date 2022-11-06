@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file array/cuda/spmm.cu
- * \brief SPMM C APIs and definitions.
+ * @file array/cuda/spmm.cu
+ * @brief SPMM C APIs and definitions.
  */
 #include <dgl/array.h>
 #include "./spmm.cuh"
@@ -16,8 +16,8 @@ using namespace cuda;
 namespace aten {
 
 /*!
- * \brief CUDA implementation of g-SpMM on Csr format.
- * \note use cusparse if the reduce operator is `sum` and there is
+ * @brief CUDA implementation of g-SpMM on Csr format.
+ * @note use cusparse if the reduce operator is `sum` and there is
  *       no broadcast, use dgl's kernel in other cases.
  */
 template <int XPU, typename IdType, typename DType>
@@ -81,7 +81,7 @@ void SpMMCsr(const std::string& op, const std::string& reduce,
 
 
 /*!
- * \brief CUDA implementation of g-SpMM on Coo format.
+ * @brief CUDA implementation of g-SpMM on Coo format.
  */
 template <int XPU, typename IdType, typename DType>
 void SpMMCoo(const std::string& op, const std::string& reduce,

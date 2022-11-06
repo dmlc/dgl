@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file graph/serialize/graph_serialize.cc
- * \brief Graph serialization implementation
+ * @file graph/serialize/graph_serialize.cc
+ * @brief Graph serialization implementation
  *
  * The storage structure is
  * {

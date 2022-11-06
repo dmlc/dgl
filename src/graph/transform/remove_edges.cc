@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file graph/transform/remove_edges.cc
- * \brief Remove edges.
+ * @file graph/transform/remove_edges.cc
+ * @brief Remove edges.
  */
 
 #include <dgl/array.h>

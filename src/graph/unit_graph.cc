@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file graph/unit_graph.cc
- * \brief UnitGraph graph implementation
+ * @file graph/unit_graph.cc
+ * @brief UnitGraph graph implementation
  */
 #include <dgl/array.h>
 #include <dgl/base_heterograph.h>
@@ -161,17 +161,17 @@ class UnitGraph::COO : public BaseHeteroGraph {
   }
 
 
-  /*! \brief Pin the adj_: COOMatrix of the COO graph. */
+  /*! @brief Pin the adj_: COOMatrix of the COO graph. */
   void PinMemory_() {
     adj_.PinMemory_();
   }
 
-  /*! \brief Unpin the adj_: COOMatrix of the COO graph. */
+  /*! @brief Unpin the adj_: COOMatrix of the COO graph. */
   void UnpinMemory_() {
     adj_.UnpinMemory_();
   }
 
-  /*! \brief Record stream for the adj_: COOMatrix of the COO graph. */
+  /*! @brief Record stream for the adj_: COOMatrix of the COO graph. */
   void RecordStream(DGLStreamHandle stream) override {
     adj_.RecordStream(stream);
   }
@@ -433,7 +433,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
   }
 
   /*!
-   * \brief Determines whether the graph is "hypersparse", i.e. having significantly more
+   * @brief Determines whether the graph is "hypersparse", i.e. having significantly more
    * nodes than edges.
    */
   bool IsHypersparse() const {
@@ -457,7 +457,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
  private:
   friend class Serializer;
 
-  /*! \brief internal adjacency matrix. Data array is empty */
+  /*! @brief internal adjacency matrix. Data array is empty */
   aten::COOMatrix adj_;
 };
 
@@ -467,7 +467,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
 //
 //////////////////////////////////////////////////////////
 
-/*! \brief CSR graph */
+/*! @brief CSR graph */
 class UnitGraph::CSR : public BaseHeteroGraph {
  public:
   CSR(GraphPtr metagraph, int64_t num_src, int64_t num_dst,
@@ -571,17 +571,17 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     }
   }
 
-  /*! \brief Pin the adj_: CSRMatrix of the CSR graph. */
+  /*! @brief Pin the adj_: CSRMatrix of the CSR graph. */
   void PinMemory_() {
     adj_.PinMemory_();
   }
 
-  /*! \brief Unpin the adj_: CSRMatrix of the CSR graph. */
+  /*! @brief Unpin the adj_: CSRMatrix of the CSR graph. */
   void UnpinMemory_() {
     adj_.UnpinMemory_();
   }
 
-  /*! \brief Record stream for the adj_: CSRMatrix of the CSR graph. */
+  /*! @brief Record stream for the adj_: CSRMatrix of the CSR graph. */
   void RecordStream(DGLStreamHandle stream) override {
     adj_.RecordStream(stream);
   }
@@ -851,7 +851,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
  private:
   friend class Serializer;
 
-  /*! \brief internal adjacency matrix. Data array stores edge ids */
+  /*! @brief internal adjacency matrix. Data array stores edge ids */
   aten::CSRMatrix adj_;
 };
 

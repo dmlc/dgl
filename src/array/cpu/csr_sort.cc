@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file array/cpu/csr_sort.cc
- * \brief CSR sorting
+ * @file array/cpu/csr_sort.cc
+ * @brief CSR sorting
  */
 #include <dgl/array.h>
 #include <dgl/runtime/parallel_for.h>

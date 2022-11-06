@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file array/cpu/spmat_op_impl.cc
- * \brief CPU implementation of COO sparse matrix operators
+ * @file array/cpu/spmat_op_impl.cc
+ * @brief CPU implementation of COO sparse matrix operators
  */
 #include <dgl/runtime/parallel_for.h>
 #include <dmlc/omp.h>

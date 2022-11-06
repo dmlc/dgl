@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file graph/pickle.cc
- * \brief Functions for pickle and unpickle a graph
+ * @file graph/pickle.cc
+ * @brief Functions for pickle and unpickle a graph
  */
 #include <dgl/graph_serializer.h>
 #include <dgl/immutable_graph.h>

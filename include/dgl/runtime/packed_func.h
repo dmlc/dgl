@@ -56,7 +56,7 @@ class PackedFunc {
    * @param args The arguments to the function.
    * @param rv The return value.
    *
-   * \code
+   * @code
    *   // Example code on how to implemented FType
    *   void MyPackedFunc(DGLArgs args, DGLRetValue* rv) {
    *     // automatically convert arguments to desired type.
@@ -67,7 +67,7 @@ class PackedFunc {
    *     std::string my_return_value = "x";
    *     *rv = my_return_value;
    *   }
-   * \endcode
+   * @endcode
    */
   using FType = std::function<void(DGLArgs args, DGLRetValue* rv)>;
   /*! @brief default constructor */
@@ -82,14 +82,14 @@ class PackedFunc {
    * @param args Arguments to be passed.
    * @tparam Args arguments to be passed.
    *
-   * \code
+   * @code
    *   // Example code on how to call packed function
    *   void CallPacked(PackedFunc f) {
    *     // call like normal functions by pass in arguments
    *     // return value is automatically converted back
    *     int rvalue = f(1, 2.0);
    *   }
-   * \endcode
+   * @endcode
    */
   template <typename... Args>
   inline DGLRetValue operator()(Args&&... args) const;
@@ -99,11 +99,11 @@ class PackedFunc {
    * @param rv The return value.
    */
   inline void CallPacked(DGLArgs args, DGLRetValue* rv) const;
-  /*! \return the internal body function */
+  /*! @return the internal body function */
   inline FType body() const;
-  /*! \return Whether the packed function is nullptr */
+  /*! @return Whether the packed function is nullptr */
   bool operator==(std::nullptr_t null) const { return body_ == nullptr; }
-  /*! \return Whether the packed function is not nullptr */
+  /*! @return Whether the packed function is not nullptr */
   bool operator!=(std::nullptr_t null) const { return body_ != nullptr; }
 
  private:
@@ -119,7 +119,7 @@ template <typename FType>
 class TypedPackedFunc;
 
 /*!
- * \anchor TypedPackedFuncAnchor
+ * @anchor TypedPackedFuncAnchor
  * @brief A PackedFunc wrapper to provide typed function signature.
  * It is backed by a PackedFunc internally.
  *
@@ -134,7 +134,7 @@ class TypedPackedFunc;
  * We can construct a TypedPackedFunc from a lambda function
  * with the same signature.
  *
- * \code
+ * @code
  *  // user defined lambda function.
  *  auto addone = [](int x)->int {
  *    return x + 1;
@@ -146,7 +146,7 @@ class TypedPackedFunc;
  *  int y = ftyped(1);
  *  // Can be directly converted to PackedFunc
  *  PackedFunc packed = ftype;
- * \endcode
+ * @endcode
  * @tparam R The return value of the function.
  * @tparam Args The argument signature of the function.
  */
@@ -161,7 +161,7 @@ class TypedPackedFunc<R(Args...)> {
    * @brief construct by wrap a PackedFunc
    *
    * Example usage:
-   * \code
+   * @code
    * PackedFunc packed([](DGLArgs args, DGLRetValue *rv) {
    *   int x = args[0];
    *   *rv = x + 1;
@@ -170,7 +170,7 @@ class TypedPackedFunc<R(Args...)> {
    * TypedPackedFunc<int(int)> ftyped(packed);
    * // call the typed version.
    * CHECK_EQ(ftyped(1), 2);
-   * \endcode
+   * @endcode
    *
    * @param packed The packed function
    */
@@ -179,13 +179,13 @@ class TypedPackedFunc<R(Args...)> {
    * @brief construct from a lambda function with the same signature.
    *
    * Example usage:
-   * \code
+   * @code
    * auto typed_lambda = [](int x)->int { return x + 1; }
    * // construct from packed function
    * TypedPackedFunc<int(int)> ftyped(typed_lambda);
    * // call the typed version.
    * CHECK_EQ(ftyped(1), 2);
-   * \endcode
+   * @endcode
    *
    * @param typed_lambda typed lambda function.
    * @tparam FLambda the type of the lambda function.
@@ -200,13 +200,13 @@ class TypedPackedFunc<R(Args...)> {
    * @brief copy assignment operator from typed lambda
    *
    * Example usage:
-   * \code
+   * @code
    * // construct from packed function
    * TypedPackedFunc<int(int)> ftyped;
    * ftyped = [](int x) { return x + 1; }
    * // call the typed version.
    * CHECK_EQ(ftyped(1), 2);
-   * \endcode
+   * @endcode
    *
    * @param typed_lambda typed lambda function.
    * @tparam FLambda the type of the lambda function.
@@ -274,7 +274,7 @@ class DGLArgs {
    */
   DGLArgs(const DGLValue* values, const int* type_codes, int num_args)
       : values(values), type_codes(type_codes), num_args(num_args) {}
-  /*! \return size of the arguments */
+  /*! @return size of the arguments */
   inline int size() const;
   /*!
    * @brief Get i-th argument
@@ -668,7 +668,7 @@ class DGLRetValue : public DGLPODValue_ {
     *ret_type_code = type_code_;
     type_code_ = kNull;
   }
-  /*! \return The value field, if the data is POD */
+  /*! @return The value field, if the data is POD */
   const DGLValue& value() const {
     CHECK(
         type_code_ != kObjectHandle && type_code_ != kFuncHandle &&

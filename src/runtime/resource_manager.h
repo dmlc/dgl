@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
- * \file resource_manager.h
- * \brief Manage the resources in the runtime system.
+ * @file resource_manager.h
+ * @brief Manage the resources in the runtime system.
  */
 #ifndef DGL_RUNTIME_RESOURCE_MANAGER_H_
 #define DGL_RUNTIME_RESOURCE_MANAGER_H_

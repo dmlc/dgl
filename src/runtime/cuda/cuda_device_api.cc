@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2017-2022 by Contributors
- * \file cuda_device_api.cc
- * \brief GPU specific API
+ * @file cuda_device_api.cc
+ * @brief GPU specific API
  */
 #include <cuda_runtime.h>
 #include <dgl/runtime/device_api.h>
