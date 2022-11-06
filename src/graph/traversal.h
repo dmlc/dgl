@@ -212,7 +212,7 @@ void TopologicalNodes(
   }
 }
 
-/**\brief Tags for ``DFSEdges``. */
+/** @brief Tags for ``DFSEdges``. */
 enum DFSEdgeTag {
   kForward = 0,
   kReverse,

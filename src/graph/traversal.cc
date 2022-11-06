@@ -96,13 +96,13 @@ IdArray ComputeMergedSections(const std::vector<std::vector<DType>>& traces) {
  * value).
  */
 struct Frontiers {
-  /**\brief a vector store for the nodes/edges in all the frontiers */
+  /** @brief a vector store for the nodes/edges in all the frontiers */
   std::vector<dgl_id_t> ids;
 
-  /**\brief a vector store for node/edge tags. Empty if no tags are requested */
+  /** @brief a vector store for node/edge tags. Empty if no tags are requested */
   std::vector<int64_t> tags;
 
-  /**\brief a section vector to indicate each frontier */
+  /** @brief a section vector to indicate each frontier */
   std::vector<int64_t> sections;
 };
 

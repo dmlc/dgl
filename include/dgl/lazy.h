@@ -19,7 +19,7 @@ namespace dgl {
 template <typename T>
 class Lazy {
  public:
-  /**\brief default constructor to construct a lazy object */
+  /** @brief default constructor to construct a lazy object */
   Lazy() {}
 
   /**
@@ -27,7 +27,7 @@ class Lazy {
    */
   explicit Lazy(const T& val) : ptr_(new T(val)) {}
 
-  /**\brief destructor */
+  /** @brief destructor */
   ~Lazy() = default;
 
   /**
@@ -45,7 +45,7 @@ class Lazy {
   }
 
  private:
-  /**\brief the internal data pointer */
+  /** @brief the internal data pointer */
   std::shared_ptr<T> ptr_{nullptr};
 };
 

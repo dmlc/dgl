@@ -20,7 +20,7 @@ namespace dgl {
  * value).
  */
 struct Frontiers {
-  /**\brief a vector store for the nodes/edges in all the frontiers */
+  /** @brief a vector store for the nodes/edges in all the frontiers */
   IdArray ids;
 
   /**
@@ -29,7 +29,7 @@ struct Frontiers {
    */
   IdArray tags;
 
-  /**\brief a section vector to indicate each frontier Dtype is int64. */
+  /** @brief a section vector to indicate each frontier Dtype is int64. */
   IdArray sections;
 };
 

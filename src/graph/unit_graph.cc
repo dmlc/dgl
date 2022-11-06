@@ -1433,7 +1433,7 @@ UnitGraph::CSRPtr UnitGraph::GetInCSR(bool inplace) const {
   return ret;
 }
 
-/* !\brief Return out csr. If not exist, transpose the other one.*/
+/** @brief Return out csr. If not exist, transpose the other one.*/
 UnitGraph::CSRPtr UnitGraph::GetOutCSR(bool inplace) const {
   if (inplace)
     if (!(formats_ & CSR_CODE))
@@ -1469,7 +1469,7 @@ UnitGraph::CSRPtr UnitGraph::GetOutCSR(bool inplace) const {
   return ret;
 }
 
-/* !\brief Return coo. If not exist, create from csr.*/
+/** @brief Return coo. If not exist, create from csr.*/
 UnitGraph::COOPtr UnitGraph::GetCOO(bool inplace) const {
   if (inplace)
     if (!(formats_ & COO_CODE))

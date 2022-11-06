@@ -98,7 +98,8 @@ cublasStatus_t Xgeam<double>(cublasHandle_t handle, cublasOperation_t transa,
       beta, B, ldb, C, ldc);
 }
 
-/* @brief IndexSelect operator kernel implementation.
+/**
+ * @brief IndexSelect operator kernel implementation.
  * @note duplicate of IndexSelectKernel defined in array_index_select.cu
  */
 template <typename DType, typename IdType>
@@ -112,7 +113,8 @@ __global__ void _IndexSelectKernel(
     out[i * m + j] = in[idx[i] * m + j];
 }
 
-/* @brief Transpose operator kernel implementation.
+/**
+ * @brief Transpose operator kernel implementation.
  * @note not efficient but it's not a bottleneck, used for float16 dtype.
  */
 template <typename DType>
@@ -125,7 +127,7 @@ __global__ void _TransposeKernel(
     out[i * m + j] = in[j * n + i];
 }
 
-/*
+/**
  * @brief Tranpose the input matrix.
  * @param row number of rows of input matrix.
  * @param col number of columns of input matrix.
