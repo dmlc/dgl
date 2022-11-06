@@ -470,7 +470,7 @@ class COO : public GraphInterface {
   IdArray dst() const { return adj_.col; }
 
  private:
-  /* !\brief private default constructor */
+  /** @brief private default constructor */
   COO() {}
 
   // The internal COO adjacency matrix.
@@ -854,13 +854,13 @@ class ImmutableGraph : public GraphInterface {
   std::vector<IdArray> GetAdj(
       bool transpose, const std::string &fmt) const override;
 
-  /* !\brief Return in csr. If not exist, transpose the other one.*/
+  /** @brief Return in csr. If not exist, transpose the other one.*/
   CSRPtr GetInCSR() const;
 
-  /* !\brief Return out csr. If not exist, transpose the other one.*/
+  /** @brief Return out csr. If not exist, transpose the other one.*/
   CSRPtr GetOutCSR() const;
 
-  /* !\brief Return coo. If not exist, create from csr.*/
+  /** @brief Return coo. If not exist, create from csr.*/
   COOPtr GetCOO() const;
 
   /** @brief Create an immutable graph from CSR. */
@@ -940,10 +940,10 @@ class ImmutableGraph : public GraphInterface {
   friend class Serializer;
   friend class UnitGraph;
 
-  /* !\brief internal default constructor */
+  /** @brief internal default constructor */
   ImmutableGraph() {}
 
-  /* !\brief internal constructor for all the members */
+  /** @brief internal constructor for all the members */
   ImmutableGraph(CSRPtr in_csr, CSRPtr out_csr, COOPtr coo)
       : in_csr_(in_csr), out_csr_(out_csr), coo_(coo) {
     CHECK(AnyGraph()) << "At least one graph structure should exist.";
@@ -956,7 +956,7 @@ class ImmutableGraph : public GraphInterface {
     this->shared_mem_name_ = shared_mem_name;
   }
 
-  /* !\brief return pointer to any available graph structure */
+  /** @brief return pointer to any available graph structure */
   GraphPtr AnyGraph() const {
     if (in_csr_) {
       return in_csr_;

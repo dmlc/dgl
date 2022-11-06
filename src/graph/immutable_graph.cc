@@ -430,7 +430,7 @@ CSRPtr ImmutableGraph::GetInCSR() const {
   return in_csr_;
 }
 
-/* !\brief Return out csr. If not exist, transpose the other one.*/
+/** @brief Return out csr. If not exist, transpose the other one.*/
 CSRPtr ImmutableGraph::GetOutCSR() const {
   if (!out_csr_) {
     if (in_csr_) {
@@ -447,7 +447,7 @@ CSRPtr ImmutableGraph::GetOutCSR() const {
   return out_csr_;
 }
 
-/* !\brief Return coo. If not exist, create from csr.*/
+/** @brief Return coo. If not exist, create from csr.*/
 COOPtr ImmutableGraph::GetCOO() const {
   if (!coo_) {
     if (in_csr_) {

@@ -28,9 +28,9 @@ const dgl_id_t DGL_INVALID_ID = static_cast<dgl_id_t>(-1);
  */
 class DGLIdIters {
  public:
-  /* !\brief default constructor to create an empty range */
+  /** @brief default constructor to create an empty range */
   DGLIdIters() {}
-  /* !\brief constructor with given begin and end */
+  /** @brief constructor with given begin and end */
   DGLIdIters(const dgl_id_t *begin, const dgl_id_t *end) {
     this->begin_ = begin;
     this->end_ = end;
@@ -50,9 +50,9 @@ class DGLIdIters {
  */
 class DGLIdIters32 {
  public:
-  /* !\brief default constructor to create an empty range */
+  /** @brief default constructor to create an empty range */
   DGLIdIters32() {}
-  /* !\brief constructor with given begin and end */
+  /** @brief constructor with given begin and end */
   DGLIdIters32(const int32_t *begin, const int32_t *end) {
     this->begin_ = begin;
     this->end_ = end;
