@@ -60,7 +60,7 @@ class DeviceAPI {
    * @param ctx The device context
    * @param kind The result kind
    * @param rv The return value.
-   * \sa DeviceAttrKind
+   * @sa DeviceAttrKind
    */
   virtual void GetAttr(
       DGLContext ctx, DeviceAttrKind kind, DGLRetValue* rv) = 0;

@@ -116,7 +116,7 @@ class ObjectRef {
    *
    * @param other Another object ref.
    * @return the compare result.
-   * \sa same_as
+   * @sa same_as
    */
   inline bool operator==(const ObjectRef& other) const;
   /*!
@@ -142,7 +142,7 @@ class ObjectRef {
    * @brief Comparator
    * @param other Another object ref.
    * @return the compare result.
-   * \sa same_as
+   * @sa same_as
    */
   inline bool operator!=(const ObjectRef& other) const;
   /*! @return the hash function for ObjectRef */

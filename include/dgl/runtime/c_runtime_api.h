@@ -372,7 +372,7 @@ DGL_DLL int DGLCbArgToReturn(DGLValue* value, int code);
  * @param resource_handle The handle additional resouce handle from fron-end.
  * @return 0 if success, -1 if failure happens, set error via
  *         DGLAPISetLastError.
- * \sa DGLCFuncSetReturn
+ * @sa DGLCFuncSetReturn
  */
 typedef int (*DGLPackedCFunc)(
     DGLValue* args, int* type_codes, int num_args, DGLRetValueHandle ret,

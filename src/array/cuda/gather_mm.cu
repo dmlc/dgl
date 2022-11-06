@@ -77,12 +77,13 @@ cublasStatus_t cublasGemm<double>(cublasHandle_t handle, cublasOperation_t trans
 
 namespace cuda {
 
-/* \Note Each row of A multiplies a segment of matrix of B of dimension in_len * outlen.
-  One warp is assigned to process one row of A. Each WARP sequentially multiplies
-  one element of A and a row of B to compute partial result of the output. A
-  is loaded in shared memory in a coalesced way. Output matrix is loaded in
-  registers. B should get benefit from L2 cache.
-*/
+/**
+ * @note Each row of A multiplies a segment of matrix of B of dimension in_len * outlen.
+ * One warp is assigned to process one row of A. Each WARP sequentially multiplies
+ * one element of A and a row of B to compute partial result of the output. A
+ * is loaded in shared memory in a coalesced way. Output matrix is loaded in
+ * registers. B should get benefit from L2 cache.
+ */
 template <typename Idx, typename DType>
 __global__ void GatherMMScatterKernel(
     const DType* __restrict__ A,
@@ -138,12 +139,13 @@ __global__ void GatherMMScatterKernel(
 }
 
 
-/* \Note Output matrix is accumulated via atomic operations. Rest of the strategies
-  are similar to GatherMMKernel. One warp is assigned to process one row of A. Each
-  WARP sequentially multiplies one element of A and a row of B to compute partial
-  result of the output. A is loaded in shared memory in a coalesced way. B should
-  get benefit from L2 cache.
-*/
+/**
+ * @note Output matrix is accumulated via atomic operations. Rest of the strategies
+ * are similar to GatherMMKernel. One warp is assigned to process one row of A. Each
+ * WARP sequentially multiplies one element of A and a row of B to compute partial
+ * result of the output. A is loaded in shared memory in a coalesced way. B should
+ * get benefit from L2 cache.
+ */
 template <typename Idx, typename DType>
 __global__ void GatherMMScatterKernel2(
     const DType* __restrict__ A,
