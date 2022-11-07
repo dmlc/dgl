@@ -221,9 +221,9 @@ inline libxsmm_meltwfunction_opreduce_vecs_idx SpMMCreateLibxsmmKernel(
   } else {
     opredop_flags |= LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OPORDER_VECIDX_VECIN;
     if (has_idx) {
-      opredop_flags = LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_INDEXED_VEC;
+      opredop_flags |= LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_INDEXED_VEC;
     } else {
-      opredop_flags = LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_IMPLICIT_INDEXED_VEC;
+      opredop_flags |= LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_IMPLICIT_INDEXED_VEC;
     }
   }
   // Third, we set the Redop in the opredop_flags
