@@ -4,7 +4,6 @@ from __future__ import absolute_import
 from . import backend as F
 from . import utils
 from ._ffi.function import _init_api
-from .heterograph import DGLGraph
 
 __all__ = [
     "bfs_nodes_generator",

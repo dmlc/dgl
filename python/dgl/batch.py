@@ -9,7 +9,7 @@ from . import convert
 from . import utils
 
 
-__all__ = ['batch', 'unbatch', 'slice_batch', 'batch_hetero', 'unbatch_hetero']
+__all__ = ['batch', 'unbatch', 'slice_batch']
 
 def batch(graphs, ndata=ALL, edata=ALL, *,
           node_attrs=None, edge_attrs=None):
@@ -504,4 +504,3 @@ def slice_batch(g, gid, store_ids=False):
                                                    retg.idtype, retg.device)
 
     return retg
-
