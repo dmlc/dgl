@@ -146,7 +146,7 @@ void _Transpose(const DType* in, DType* out, int row, int col) {
  * @note cuBLAS has no geam API for half data type, fallback to our kernel.
  */
 template <>
-void _Transpose<half>(const half* in, half* out, int row, int col) {
+void _Transpose<__half>(const __half* in, __half* out, int row, int col) {
   cudaStream_t stream = runtime::getCurrentCUDAStream();
   int nt = FindNumThreads(row);
   int nb = col;
@@ -664,7 +664,7 @@ void SpMMCoo(
     const BcastOff& bcast, const COOMatrix& coo, NDArray ufeat, NDArray efeat,
     NDArray out, NDArray argu, NDArray arge) {
 #if defined(CUDART_VERSION) && CUDART_VERSION <= 10000
-  if (std::is_same<DType, half>::value)
+  if (std::is_same<DType, __half>::value)
     LOG(FATAL) << "SpMMCoo requires atomicCAS, which is not supported "
                << "for float16 in CUDA 10.0. Please upgrade your CUDA "
                << "to later versions.";

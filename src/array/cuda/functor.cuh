@@ -178,13 +178,13 @@ template <typename Idx, typename DType, bool atomic = false>
 struct Sum : _Sum<Idx, DType, atomic> {};
 
 template <typename Idx, bool atomic>
-struct Sum<Idx, half, atomic> : _Sum<Idx, half, atomic> {
-  static constexpr __host__ __device__ __forceinline__ half zero() {
+struct Sum<Idx, __half, atomic> : _Sum<Idx, __half, atomic> {
+  static constexpr __host__ __device__ __forceinline__ __half zero() {
     return 0.0f;
   }
   static __device__ __forceinline__ void Call(
-    half *out_buf, Idx *arg_u_buf, Idx *arg_e_buf,
-    half val, Idx uid, Idx eid) {
+    __half *out_buf, Idx *arg_u_buf, Idx *arg_e_buf,
+    __half val, Idx uid, Idx eid) {
     if (!atomic) {
       *out_buf += val;
     } else {
@@ -192,8 +192,8 @@ struct Sum<Idx, half, atomic> : _Sum<Idx, half, atomic> {
     }
   }
   static __device__ __forceinline__ void Call(
-      half *out_buf, Idx *arg_buf,
-      half val, Idx id) {
+      __half *out_buf, Idx *arg_buf,
+      __half val, Idx id) {
     if (!atomic) {
       *out_buf += val;
     } else {
@@ -203,7 +203,7 @@ struct Sum<Idx, half, atomic> : _Sum<Idx, half, atomic> {
   // float accumulator
   static __device__ __forceinline__ void Call(
     float *out_buf, Idx *arg_u_buf, Idx *arg_e_buf,
-    half val, Idx uid, Idx eid) {
+    __half val, Idx uid, Idx eid) {
     if (!atomic) {
       *out_buf += static_cast<float>(val);
     } else {
@@ -212,7 +212,7 @@ struct Sum<Idx, half, atomic> : _Sum<Idx, half, atomic> {
   }
   static __device__ __forceinline__ void Call(
       float *out_buf, Idx *arg_buf,
-      half val, Idx id) {
+      __half val, Idx id) {
     if (!atomic) {
       *out_buf += static_cast<float>(val);
     } else {
@@ -276,13 +276,13 @@ template <typename Idx, typename DType, bool atomic = false>
 struct Max : _Max<Idx, DType, atomic> {};
 
 template <typename Idx, bool atomic>
-struct Max<Idx, half, atomic> : _Max<Idx, half, atomic> {
-  static constexpr __host__ __device__ __forceinline__ half zero() {
+struct Max<Idx, __half, atomic> : _Max<Idx, __half, atomic> {
+  static constexpr __host__ __device__ __forceinline__ __half zero() {
     return __float2half_rn(-6.550400e+04f);
   }
   static __device__ __forceinline__ void Call(
-    half *out_buf, Idx *arg_u_buf, Idx *arg_e_buf,
-    half val, Idx uid, Idx eid) {
+    __half *out_buf, Idx *arg_u_buf, Idx *arg_e_buf,
+    __half val, Idx uid, Idx eid) {
     if (!atomic) {
       if (*out_buf < val) {
         *out_buf = val;
@@ -294,8 +294,8 @@ struct Max<Idx, half, atomic> : _Max<Idx, half, atomic> {
     }
   }
   static __device__ __forceinline__ void Call(
-      half *out_buf, Idx *arg_buf,
-      half val, Idx id) {
+      __half *out_buf, Idx *arg_buf,
+      __half val, Idx id) {
     if (!atomic) {
       if (*out_buf < val) {
         *out_buf = val;
@@ -308,7 +308,7 @@ struct Max<Idx, half, atomic> : _Max<Idx, half, atomic> {
   // float accumulator
   static __device__ __forceinline__ void Call(
     float *out_buf, Idx *arg_u_buf, Idx *arg_e_buf,
-    half val, Idx uid, Idx eid) {
+    __half val, Idx uid, Idx eid) {
     if (!atomic) {
       if (*out_buf < static_cast<float>(val)) {
         *out_buf = static_cast<float>(val);
@@ -321,7 +321,7 @@ struct Max<Idx, half, atomic> : _Max<Idx, half, atomic> {
   }
   static __device__ __forceinline__ void Call(
       float *out_buf, Idx *arg_buf,
-      half val, Idx id) {
+      __halflf val, Idx id) {
     if (!atomic) {
       if (*out_buf < static_cast<float>(val)) {
         *out_buf = static_cast<float>(val);
@@ -388,13 +388,13 @@ template <typename Idx, typename DType, bool atomic = false>
 struct Min : _Min<Idx, DType, atomic> {};
 
 template <typename Idx, bool atomic>
-struct Min<Idx, half, atomic> : _Min<Idx, half, atomic> {
-  static constexpr __host__ __device__ __forceinline__ half zero() {
+struct Min<Idx, __half, atomic> : _Min<Idx, __half, atomic> {
+  static constexpr __host__ __device__ __forceinline__ __half zero() {
     return __float2half_rn(6.550400e+04f);
   }
   static __device__ __forceinline__ void Call(
-    half *out_buf, Idx *arg_u_buf, Idx *arg_e_buf,
-    half val, Idx uid, Idx eid) {
+    __half *out_buf, Idx *arg_u_buf, Idx *arg_e_buf,
+    __half val, Idx uid, Idx eid) {
     if (!atomic) {
       if (*out_buf > val) {
         *out_buf = val;
@@ -406,8 +406,8 @@ struct Min<Idx, half, atomic> : _Min<Idx, half, atomic> {
     }
   }
   static __device__ __forceinline__ void Call(
-      half *out_buf, Idx *arg_buf,
-      half val, Idx id) {
+      __half *out_buf, Idx *arg_buf,
+      __half val, Idx id) {
     if (!atomic) {
       if (*out_buf > val) {
         *out_buf = val;
@@ -420,7 +420,7 @@ struct Min<Idx, half, atomic> : _Min<Idx, half, atomic> {
   // float accumulator
   static __device__ __forceinline__ void Call(
     float *out_buf, Idx *arg_u_buf, Idx *arg_e_buf,
-    half val, Idx uid, Idx eid) {
+    __half val, Idx uid, Idx eid) {
     if (!atomic) {
       if (*out_buf > static_cast<float>(val)) {
         *out_buf = static_cast<float>(val);
@@ -433,7 +433,7 @@ struct Min<Idx, half, atomic> : _Min<Idx, half, atomic> {
   }
   static __device__ __forceinline__ void Call(
       float *out_buf, Idx *arg_buf,
-      half val, Idx id) {
+      __half val, Idx id) {
     if (!atomic) {
       if (*out_buf > static_cast<float>(val)) {
         *out_buf = static_cast<float>(val);
