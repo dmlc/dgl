@@ -157,7 +157,7 @@ class HeteroNodeView(object):
         return NodeSpace(data=NodeDataView(self._graph, key))
 
 class HeteroEdgeView(object):
-    """A EdgeView class to act as G.edges for a DistGraph."""
+    """An EdgeView class to act as G.edges for a DistGraph."""
     __slots__ = ['_graph']
 
     def __init__(self, graph):

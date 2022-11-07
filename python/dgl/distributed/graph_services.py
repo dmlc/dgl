@@ -549,8 +549,7 @@ def _frontier_to_heterogeneous_graph(g, frontier, gpb):
 
     data_dict = dict()
     edge_ids = {}
-    for etid in range(len(g.canonical_etypes)):
-        etype = g.canonical_etypes[etid]
+    for etid, etype in enumerate(g.canonical_etypes):
         type_idx = etype_ids == etid
         if F.sum(type_idx, 0) > 0:
             data_dict[etype] = (
@@ -640,16 +639,16 @@ def sample_etype_neighbors(
         fanout = F.full_1d(len(g.canonical_etypes), fanout, F.int64, F.cpu())
     else:
         etype_ids = {etype: i for i, etype in enumerate(g.canonical_etypes)}
-        fanout_ = [None] * len(g.canonical_etypes)
+        fanout_array = [None] * len(g.canonical_etypes)
         for etype, v in fanout.items():
             c_etype = g.to_canonical_etype(etype)
-            fanout_[etype_ids[c_etype]] = v
-        assert all(v is not None for v in fanout_), (
+            fanout_array[etype_ids[c_etype]] = v
+        assert all(v is not None for v in fanout_array), (
             "Not all etypes have valid fanout. Please make sure passed-in "
             "fanout in dict includes all the etypes in graph. Passed-in "
             f"fanout: {fanout}, graph etypes: {g.canonical_etypes}."
         )
-        fanout = F.tensor(fanout_, dtype=F.int64)
+        fanout = F.tensor(fanout_array, dtype=F.int64)
 
     gpb = g.get_partition_book()
     if isinstance(nodes, dict):
