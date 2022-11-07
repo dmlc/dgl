@@ -196,19 +196,13 @@ struct Sum<Idx, __half, atomic> : _Sum<Idx, __half, atomic> {
   static __device__ __forceinline__ void Call(
       float *out_buf, Idx *arg_u_buf, Idx *arg_e_buf,
       __half val, Idx uid, Idx eid) {
-    if (!atomic) {
-      *out_buf += static_cast<float>(val);
-    } else {
-      cuda::AtomicAdd(out_buf, static_cast<float>(val));
-    }
+    _Sum<Idx, float, atomic>::Call(out_buf, arg_u_buf, arg_e_buf,
+        static_cast<float>(val), uid, eid);
   }
   static __device__ __forceinline__ void Call(
       float *out_buf, Idx *arg_buf, __half val, Idx id) {
-    if (!atomic) {
-      *out_buf += static_cast<float>(val);
-    } else {
-      cuda::AtomicAdd(out_buf, static_cast<float>(val));
-    }
+    _Sum<Idx, float, atomic>::Call(out_buf, arg_buf,
+        static_cast<float>(val), id);
   }
 };
 
@@ -232,19 +226,13 @@ struct Sum<Idx, __nv_bfloat16, atomic> : _Sum<Idx, __nv_bfloat16, atomic> {
   static __device__ __forceinline__ void Call(
       float *out_buf, Idx *arg_u_buf, Idx *arg_e_buf,
       __nv_bfloat16 val, Idx uid, Idx eid) {
-    if (!atomic) {
-      *out_buf += static_cast<float>(val);
-    } else {
-      cuda::AtomicAdd(out_buf, static_cast<float>(val));
-    }
+    _Sum<Idx, float, atomic>::Call(out_buf, arg_u_buf, arg_e_buf,
+        static_cast<float>(val), uid, eid);
   }
   static __device__ __forceinline__ void Call(
       float *out_buf, Idx *arg_buf, __nv_bfloat16 val, Idx id) {
-    if (!atomic) {
-      *out_buf += static_cast<float>(val);
-    } else {
-      cuda::AtomicAdd(out_buf, static_cast<float>(val));
-    }
+    _Sum<Idx, float, atomic>::Call(out_buf, arg_buf,
+        static_cast<float>(val), id);
   }
 };
 #endif  // BF16_ENABLED
@@ -313,26 +301,13 @@ struct Max<Idx, __half, atomic> : _Max<Idx, __half, atomic> {
   static __device__ __forceinline__ void Call(
       float *out_buf, Idx *arg_u_buf, Idx *arg_e_buf,
       __half val, Idx uid, Idx eid) {
-    if (!atomic) {
-      if (*out_buf < static_cast<float>(val)) {
-        *out_buf = static_cast<float>(val);
-        *arg_u_buf = uid;
-        *arg_e_buf = eid;
-      }
-    } else {
-      cuda::AtomicMax(out_buf, static_cast<float>(val));
-    }
+    _Max<Idx, float, atomic>::Call(out_buf, arg_u_buf, arg_e_buf,
+        static_cast<float>(val), uid, eid);
   }
   static __device__ __forceinline__ void Call(
       float *out_buf, Idx *arg_buf, __half val, Idx id) {
-    if (!atomic) {
-      if (*out_buf < static_cast<float>(val)) {
-        *out_buf = static_cast<float>(val);
-        *arg_buf = id;
-      }
-    } else {
-      cuda::AtomicMax(out_buf, static_cast<float>(val));
-    }
+    _Max<Idx, float, atomic>::Call(out_buf, arg_buf,
+        static_cast<float>(val), id);
   }
 };
 
@@ -356,26 +331,13 @@ struct Max<Idx, __nv_bfloat16, atomic> : _Max<Idx, __nv_bfloat16, atomic> {
   static __device__ __forceinline__ void Call(
       float *out_buf, Idx *arg_u_buf, Idx *arg_e_buf,
       __nv_bfloat16 val, Idx uid, Idx eid) {
-    if (!atomic) {
-      if (*out_buf < static_cast<float>(val)) {
-        *out_buf = static_cast<float>(val);
-        *arg_u_buf = uid;
-        *arg_e_buf = eid;
-      }
-    } else {
-      cuda::AtomicMax(out_buf, static_cast<float>(val));
-    }
+    _Max<Idx, float, atomic>::Call(out_buf, arg_u_buf, arg_e_buf,
+        static_cast<float>(val), uid, eid);
   }
   static __device__ __forceinline__ void Call(
       float *out_buf, Idx *arg_buf, __nv_bfloat16 val, Idx id) {
-    if (!atomic) {
-      if (*out_buf < static_cast<float>(val)) {
-        *out_buf = static_cast<float>(val);
-        *arg_buf = id;
-      }
-    } else {
-      cuda::AtomicMax(out_buf, static_cast<float>(val));
-    }
+    _Max<Idx, float, atomic>::Call(out_buf, arg_buf,
+        static_cast<float>(val), id);
   }
 };
 #endif  // BF16_ENABLED
@@ -444,26 +406,13 @@ struct Min<Idx, __half, atomic> : _Min<Idx, __half, atomic> {
   static __device__ __forceinline__ void Call(
       float *out_buf, Idx *arg_u_buf, Idx *arg_e_buf,
       __half val, Idx uid, Idx eid) {
-    if (!atomic) {
-      if (*out_buf > static_cast<float>(val)) {
-        *out_buf = static_cast<float>(val);
-        *arg_u_buf = uid;
-        *arg_e_buf = eid;
-      }
-    } else {
-      cuda::AtomicMin(out_buf, static_cast<float>(val));
-    }
+    _Min<Idx, float, atomic>::Call(out_buf, arg_u_buf, arg_e_buf,
+        static_cast<float>(val), uid, eid);
   }
   static __device__ __forceinline__ void Call(
       float *out_buf, Idx *arg_buf, __half val, Idx id) {
-    if (!atomic) {
-      if (*out_buf > static_cast<float>(val)) {
-        *out_buf = static_cast<float>(val);
-        *arg_buf = id;
-      }
-    } else {
-      cuda::AtomicMin(out_buf, static_cast<float>(val));
-    }
+    _Min<Idx, float, atomic>::Call(out_buf, arg_buf,
+        static_cast<float>(val), id);
   }
 };
 
@@ -487,26 +436,13 @@ struct Min<Idx, __nv_bfloat16, atomic> : _Min<Idx, __nv_bfloat16, atomic> {
   static __device__ __forceinline__ void Call(
       float *out_buf, Idx *arg_u_buf, Idx *arg_e_buf,
       __nv_bfloat16 val, Idx uid, Idx eid) {
-    if (!atomic) {
-      if (*out_buf > static_cast<float>(val)) {
-        *out_buf = static_cast<float>(val);
-        *arg_u_buf = uid;
-        *arg_e_buf = eid;
-      }
-    } else {
-      cuda::AtomicMin(out_buf, static_cast<float>(val));
-    }
+    _Min<Idx, float, atomic>::Call(out_buf, arg_u_buf, arg_e_buf,
+        static_cast<float>(val), uid, eid);
   }
   static __device__ __forceinline__ void Call(
       float *out_buf, Idx *arg_buf, __nv_bfloat16 val, Idx id) {
-    if (!atomic) {
-      if (*out_buf > static_cast<float>(val)) {
-        *out_buf = static_cast<float>(val);
-        *arg_buf = id;
-      }
-    } else {
-      cuda::AtomicMin(out_buf, static_cast<float>(val));
-    }
+    _Min<Idx, float, atomic>::Call(out_buf, arg_buf,
+        static_cast<float>(val), id);
   }
 };
 #endif  // BF16_ENABLED
