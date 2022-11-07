@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2021 by Contributors
- * \file array/cuda/cuda_filter.cc
- * \brief Object for selecting items in a set, or selecting items not in a set.
+ * @file array/cuda/cuda_filter.cc
+ * @brief Object for selecting items in a set, or selecting items not in a set.
  */
 
 #include <dgl/runtime/device_api.h>

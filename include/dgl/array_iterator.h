@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
- * \file dgl/array_iterator.h
- * \brief Various iterators.
+ * @file dgl/array_iterator.h
+ * @brief Various iterators.
  */
 #ifndef DGL_ARRAY_ITERATOR_H_
 #define DGL_ARRAY_ITERATOR_H_

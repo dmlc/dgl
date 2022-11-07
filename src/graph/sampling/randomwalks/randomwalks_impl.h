@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2018 by Contributors
- * \file graph/sampling/randomwalks_impl.h
- * \brief DGL sampler - templated implementation definition of random walks
+ * @file graph/sampling/randomwalks_impl.h
+ * @brief DGL sampler - templated implementation definition of random walks
  */
 
 #ifndef DGL_GRAPH_SAMPLING_RANDOMWALKS_RANDOMWALKS_IMPL_H_
@@ -24,8 +24,8 @@ namespace sampling {
 
 namespace impl {
 
-/*!
- * \brief Random walk step function
+/**
+ * @brief Random walk step function
  */
 template <typename IdxType>
 using StepFunc = std::function<
@@ -35,18 +35,18 @@ using StepFunc = std::function<
         dgl_id_t,   // last node ID
         int64_t)>;  // # of steps
 
-/*!
- * \brief Get the node types traversed by the metapath.
- * \return A 1D array of shape (len(metapath) + 1,) with node type IDs.
+/**
+ * @brief Get the node types traversed by the metapath.
+ * @return A 1D array of shape (len(metapath) + 1,) with node type IDs.
  */
 template <DGLDeviceType XPU, typename IdxType>
 TypeArray GetNodeTypesFromMetapath(
     const HeteroGraphPtr hg, const TypeArray metapath);
 
-/*!
- * \brief Metapath-based random walk.
- * \param hg The heterograph.
- * \param seeds A 1D array of seed nodes, with the type the source type of the
+/**
+ * @brief Metapath-based random walk.
+ * @param hg The heterograph.
+ * @param seeds A 1D array of seed nodes, with the type the source type of the
  * first edge type in the metapath. \param metapath A 1D array of edge types
  * representing the metapath. \param prob A vector of 1D float arrays,
  * indicating the transition probability of each edge by edge type.  An empty
@@ -62,10 +62,10 @@ std::pair<IdArray, IdArray> RandomWalk(
     const HeteroGraphPtr hg, const IdArray seeds, const TypeArray metapath,
     const std::vector<FloatArray> &prob);
 
-/*!
- * \brief Metapath-based random walk with restart probability.
- * \param hg The heterograph.
- * \param seeds A 1D array of seed nodes, with the type the source type of the
+/**
+ * @brief Metapath-based random walk with restart probability.
+ * @param hg The heterograph.
+ * @param seeds A 1D array of seed nodes, with the type the source type of the
  * first edge type in the metapath. \param metapath A 1D array of edge types
  * representing the metapath. \param prob A vector of 1D float arrays,
  * indicating the transition probability of each edge by edge type.  An empty
@@ -82,11 +82,11 @@ std::pair<IdArray, IdArray> RandomWalkWithRestart(
     const HeteroGraphPtr hg, const IdArray seeds, const TypeArray metapath,
     const std::vector<FloatArray> &prob, double restart_prob);
 
-/*!
- * \brief Metapath-based random walk with stepwise restart probability.  Useful
+/**
+ * @brief Metapath-based random walk with stepwise restart probability.  Useful
  *        for PinSAGE-like models.
- * \param hg The heterograph.
- * \param seeds A 1D array of seed nodes, with the type the source type of the
+ * @param hg The heterograph.
+ * @param seeds A 1D array of seed nodes, with the type the source type of the
  * first edge type in the metapath. \param metapath A 1D array of edge types
  * representing the metapath. \param prob A vector of 1D float arrays,
  * indicating the transition probability of each edge by edge type.  An empty

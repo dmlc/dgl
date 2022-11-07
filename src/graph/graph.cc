@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2018 by Contributors
- * \file graph/graph.cc
- * \brief DGL graph index implementation
+ * @file graph/graph.cc
+ * @brief DGL graph index implementation
  */
 #include <dgl/graph.h>
 #include <dgl/sampler.h>

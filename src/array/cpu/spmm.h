@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
- * \file array/cpu/spmm.h
- * \brief SPMM CPU kernel function header.
+ * @file array/cpu/spmm.h
+ * @brief SPMM CPU kernel function header.
  */
 #ifndef DGL_ARRAY_CPU_SPMM_H_
 #define DGL_ARRAY_CPU_SPMM_H_
@@ -32,15 +32,15 @@ namespace cpu {
 
 #if !defined(_WIN32)
 #ifdef USE_AVX
-/*!
- * \brief CPU kernel of SpMM on Csr format using Xbyak.
- * \param cpu_spec JIT'ed kernel
- * \param bcast Broadcast information.
- * \param csr The Csr matrix.
- * \param X The feature on source nodes.
- * \param W The feature on edges.
- * \param O The result feature on destination nodes.
- * \note it uses node parallel strategy, different threads are responsible
+/**
+ * @brief CPU kernel of SpMM on Csr format using Xbyak.
+ * @param cpu_spec JIT'ed kernel
+ * @param bcast Broadcast information.
+ * @param csr The Csr matrix.
+ * @param X The feature on source nodes.
+ * @param W The feature on edges.
+ * @param O The result feature on destination nodes.
+ * @note it uses node parallel strategy, different threads are responsible
  *       for the computation of different nodes. For each edge, it uses the
  *       JIT'ed kernel.
  */
@@ -69,15 +69,15 @@ void SpMMSumCsrXbyak(
 #endif  // USE_AVX
 #endif  // _WIN32
 
-/*!
- * \brief Naive CPU kernel of SpMM on Csr format.
- * \param cpu_spec JIT'ed kernel
- * \param bcast Broadcast information.
- * \param csr The Csr matrix.
- * \param X The feature on source nodes.
- * \param W The feature on edges.
- * \param O The result feature on destination nodes.
- * \note it uses node parallel strategy, different threads are responsible
+/**
+ * @brief Naive CPU kernel of SpMM on Csr format.
+ * @param cpu_spec JIT'ed kernel
+ * @param bcast Broadcast information.
+ * @param csr The Csr matrix.
+ * @param X The feature on source nodes.
+ * @param W The feature on edges.
+ * @param O The result feature on destination nodes.
+ * @note it uses node parallel strategy, different threads are responsible
  *       for the computation of different nodes.
  */
 template <typename IdType, typename DType, typename Op>
@@ -110,14 +110,14 @@ void SpMMSumCsrNaive(
   });
 }
 
-/*!
- * \brief CPU kernel of SpMM on Csr format.
- * \param bcast Broadcast information.
- * \param csr The Csr matrix.
- * \param ufeat The feature on source nodes.
- * \param efeat The feature on edges.
- * \param out The result feature on destination nodes.
- * \note it uses node parallel strategy, different threads are responsible
+/**
+ * @brief CPU kernel of SpMM on Csr format.
+ * @param bcast Broadcast information.
+ * @param csr The Csr matrix.
+ * @param ufeat The feature on source nodes.
+ * @param efeat The feature on edges.
+ * @param out The result feature on destination nodes.
+ * @note it uses node parallel strategy, different threads are responsible
  *       for the computation of different nodes.
  */
 template <typename IdType, typename DType, typename Op>
@@ -176,14 +176,14 @@ void SpMMSumCsr(
 #endif  // _WIN32
 }
 
-/*!
- * \brief CPU kernel of SpMM on Coo format.
- * \param bcast Broadcast information.
- * \param coo The Coo matrix.
- * \param ufeat The feature on source nodes.
- * \param efeat The feature on edges.
- * \param out The result feature on destination nodes.
- * \note it uses node parallel strategy, different threads are responsible
+/**
+ * @brief CPU kernel of SpMM on Coo format.
+ * @param bcast Broadcast information.
+ * @param coo The Coo matrix.
+ * @param ufeat The feature on source nodes.
+ * @param efeat The feature on edges.
+ * @param out The result feature on destination nodes.
+ * @note it uses node parallel strategy, different threads are responsible
  *       for the computation of different nodes. To avoid possible data hazard,
  *       we use atomic operators in the reduction phase.
  */
@@ -225,24 +225,24 @@ void SpMMSumCoo(
   }
 }
 
-/*!
- * \brief CPU kernel of SpMM-Min/Max on Csr format.
- * \param bcast Broadcast information.
- * \param csr The Csr matrix.
- * \param ufeat The feature on source nodes.
- * \param efeat The feature on edges.
- * \param out The result feature on destination nodes.
- * \param argu Arg-Min/Max on source nodes, which refers the source node indices
+/**
+ * @brief CPU kernel of SpMM-Min/Max on Csr format.
+ * @param bcast Broadcast information.
+ * @param csr The Csr matrix.
+ * @param ufeat The feature on source nodes.
+ * @param efeat The feature on edges.
+ * @param out The result feature on destination nodes.
+ * @param argu Arg-Min/Max on source nodes, which refers the source node indices
  *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max
  *        reducer.
- * \param arge Arg-Min/Max on edges. which refers the source node indices
+ * @param arge Arg-Min/Max on edges. which refers the source node indices
           correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max
  *        reducer.
- * \note It uses node parallel strategy, different threads are responsible for
+ * @note It uses node parallel strategy, different threads are responsible for
  *       the computation of different nodes.
- * \note The result will contain infinity for zero-degree nodes.
+ * @note The result will contain infinity for zero-degree nodes.
  */
 template <typename IdType, typename DType, typename Op, typename Cmp>
 void SpMMCmpCsr(
@@ -322,31 +322,31 @@ void SpMMCmpCsr(
 #endif  // _WIN32
 }
 
-/*!
- * \brief CPU kernel of SpMM-Min/Max on Csr format.
- * \param bcast Broadcast information.
- * \param csr The Csr matrix.
- * \param ufeat The feature on source nodes.
- * \param efeat The feature on edges.
- * \param out The result feature on destination nodes.
- * \param argu Arg-Min/Max on source nodes, which refers the source node indices
+/**
+ * @brief CPU kernel of SpMM-Min/Max on Csr format.
+ * @param bcast Broadcast information.
+ * @param csr The Csr matrix.
+ * @param ufeat The feature on source nodes.
+ * @param efeat The feature on edges.
+ * @param out The result feature on destination nodes.
+ * @param argu Arg-Min/Max on source nodes, which refers the source node indices
  *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max
  *        reducer.
- * \param arge Arg-Min/Max on edges. which refers the source node indices
+ * @param arge Arg-Min/Max on edges. which refers the source node indices
  *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max
  *        reducer.
- * \param argu_ntype Node type of the arg-Min/Max on source nodes, which refers
+ * @param argu_ntype Node type of the arg-Min/Max on source nodes, which refers
  *        the source node types correspond to the minimum/maximum values of
  *        reduction result on destination nodes. It's useful in computing
  *        gradients of Min/Max reducer.
- * \param arge_etype Edge-type of the arg-Min/Max on edges. which refers the
+ * @param arge_etype Edge-type of the arg-Min/Max on edges. which refers the
  *        source node indices correspond to the minimum/maximum values of
  *        reduction result on destination nodes. It's useful in computing
  *        gradients of Min/Max reducer.
- * \param src_type Node type of the source nodes of an etype
- * \param etype Edge type
+ * @param src_type Node type of the source nodes of an etype
+ * @param etype Edge type
  */
 template <typename IdType, typename DType, typename Op, typename Cmp>
 void SpMMCmpCsrHetero(
@@ -418,25 +418,25 @@ void SpMMCmpCsrHetero(
   });
 }
 
-/*!
- * \brief CPU kernel of SpMM-Min/Max on Coo format.
- * \param bcast Broadcast information.
- * \param coo The Coo matrix.
- * \param ufeat The feature on source nodes.
- * \param efeat The feature on edges.
- * \param out The result feature on destination nodes.
- * \param argu Arg-Min/Max on source nodes, which refers the source node indices
+/**
+ * @brief CPU kernel of SpMM-Min/Max on Coo format.
+ * @param bcast Broadcast information.
+ * @param coo The Coo matrix.
+ * @param ufeat The feature on source nodes.
+ * @param efeat The feature on edges.
+ * @param out The result feature on destination nodes.
+ * @param argu Arg-Min/Max on source nodes, which refers the source node indices
  *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max
  *        reducer.
- * \param arge Arg-Min/Max on edges. which refers the source node indices
+ * @param arge Arg-Min/Max on edges. which refers the source node indices
  *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max
  *        reducer.
- * \note it uses node parallel strategy, different threads are responsible for
+ * @note it uses node parallel strategy, different threads are responsible for
  *       the computation of different nodes. To avoid possible data hazard, we
  *       use atomic operators in the reduction phase.
- * \note The result will contain infinity for zero-degree nodes.
+ * @note The result will contain infinity for zero-degree nodes.
  */
 template <typename IdType, typename DType, typename Op, typename Cmp>
 void SpMMCmpCoo(
@@ -484,13 +484,13 @@ void SpMMCmpCoo(
   }
 }
 
-/*!
- * \brief CPU kernel of Edge_softmax_csr_forward on Csr format.
- * \param bcast Broadcast information.
- * \param csr The Csr matrix.
- * \param ufeat The feature on source nodes.
- * \param efeat The feature on edges.
- * \param out The result of edge_softmax_forward.
+/**
+ * @brief CPU kernel of Edge_softmax_csr_forward on Csr format.
+ * @param bcast Broadcast information.
+ * @param csr The Csr matrix.
+ * @param ufeat The feature on source nodes.
+ * @param efeat The feature on edges.
+ * @param out The result of edge_softmax_forward.
  */
 template <typename IdType, typename DType, typename Op>
 void Edge_softmax_csr_forward(
@@ -532,13 +532,13 @@ void Edge_softmax_csr_forward(
   });
 }
 
-/*!
- * \brief CPU kernel of Edge_softmax_csr_backward on Csr format.
- * \param bcast Broadcast information.
- * \param csr The Csr matrix.
- * \param out The result of forward.
- * \param sds The result of gradiet * out.
- * \param back_out The result of edge_softmax_backward.
+/**
+ * @brief CPU kernel of Edge_softmax_csr_backward on Csr format.
+ * @param bcast Broadcast information.
+ * @param csr The Csr matrix.
+ * @param out The result of forward.
+ * @param sds The result of gradiet * out.
+ * @param back_out The result of edge_softmax_backward.
  */
 template <typename IdType, typename DType, typename Op>
 void Edge_softmax_csr_backward(

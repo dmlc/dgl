@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
- * \file array/cpu/geometry_op_impl.cc
- * \brief Geometry operator CPU implementation
+ * @file array/cpu/geometry_op_impl.cc
+ * @brief Geometry operator CPU implementation
  */
 #include <dgl/random.h>
 
@@ -16,7 +16,7 @@ using runtime::NDArray;
 namespace geometry {
 namespace impl {
 
-/*! \brief Knuth shuffle algorithm */
+/** @brief Knuth shuffle algorithm */
 template <typename IdType>
 void IndexShuffle(IdType *idxs, int64_t num_elems) {
   for (int64_t i = num_elems - 1; i > 0; --i) {
@@ -27,14 +27,14 @@ void IndexShuffle(IdType *idxs, int64_t num_elems) {
 template void IndexShuffle<int32_t>(int32_t *idxs, int64_t num_elems);
 template void IndexShuffle<int64_t>(int64_t *idxs, int64_t num_elems);
 
-/*! \brief Groupwise index shuffle algorithm. This function will perform shuffle
+/** @brief Groupwise index shuffle algorithm. This function will perform shuffle
  * in subarrays indicated by group index. The group index is similar to indptr
  * in CSRMatrix.
  *
- * \param group_idxs group index array.
- * \param idxs index array for shuffle.
- * \param num_groups_idxs length of group_idxs
- * \param num_elems length of idxs
+ * @param group_idxs group index array.
+ * @param idxs index array for shuffle.
+ * @param num_groups_idxs length of group_idxs
+ * @param num_elems length of idxs
  */
 template <typename IdType>
 void GroupIndexShuffle(
@@ -76,8 +76,8 @@ IdArray GroupRandomPerm(
   return perm;
 }
 
-/*!
- * \brief Farthest Point Sampler without the need to compute all pairs of
+/**
+ * @brief Farthest Point Sampler without the need to compute all pairs of
  * distance.
  *
  * The input array has shape (N, d), where N is the number of points, and d is

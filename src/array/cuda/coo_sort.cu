@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
- * \file array/cuda/coo_sort.cc
- * \brief Sort COO index
+ * @file array/cuda/coo_sort.cc
+ * @brief Sort COO index
  */
 #include <dgl/array.h>
 

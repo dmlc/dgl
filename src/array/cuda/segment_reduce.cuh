@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
- * \file array/cuda/segment_reduce.cuh
- * \brief Segment reduce kernel function header.
+ * @file array/cuda/segment_reduce.cuh
+ * @brief Segment reduce kernel function header.
  */
 #ifndef DGL_ARRAY_CUDA_SEGMENT_REDUCE_CUH_
 #define DGL_ARRAY_CUDA_SEGMENT_REDUCE_CUH_
@@ -20,9 +20,9 @@ using namespace cuda;
 namespace aten {
 namespace cuda {
 
-/*!
- * \brief CUDA kernel of segment reduce.
- * \note each blockthread is responsible for aggregation on a row
+/**
+ * @brief CUDA kernel of segment reduce.
+ * @note each blockthread is responsible for aggregation on a row
  *       in the result tensor.
  */
 template <typename IdType, typename DType, typename ReduceOp>
@@ -44,9 +44,9 @@ __global__ void SegmentReduceKernel(
   }
 }
 
-/*!
- * \brief CUDA kernel of scatter add.
- * \note each blockthread is responsible for adding a row in feature tensor
+/**
+ * @brief CUDA kernel of scatter add.
+ * @note each blockthread is responsible for adding a row in feature tensor
  *       to a target row in output tensor.
  */
 template <typename IdType, typename DType>
@@ -62,9 +62,9 @@ __global__ void ScatterAddKernel(
   }
 }
 
-/*!
- * \brief CUDA kernel to update gradients for reduce op max/min
- * \note each WARP (group of 32 threads) is responsible for adding a row in
+/**
+ * @brief CUDA kernel to update gradients for reduce op max/min
+ * @note each WARP (group of 32 threads) is responsible for adding a row in
  * feature tensor to a target row in output tensor.
  */
 
@@ -90,9 +90,9 @@ __global__ void UpdateGradMinMaxHeteroKernel(
   }
 }
 
-/*!
- * \brief CUDA kernel of backward phase in segment min/max.
- * \note each blockthread is responsible for writing a row in the
+/**
+ * @brief CUDA kernel of backward phase in segment min/max.
+ * @note each blockthread is responsible for writing a row in the
  *       result gradient tensor by lookup the ArgMin/Max for index information.
  */
 template <typename IdType, typename DType>
@@ -110,12 +110,12 @@ __global__ void BackwardSegmentCmpKernel(
   }
 }
 
-/*!
- * \brief CUDA implementation of forward phase of Segment Reduce.
- * \param feat The input tensor.
- * \param offsets The offsets tensor.
- * \param out The output tensor.
- * \param arg An auxiliary tensor storing ArgMax/Min information,
+/**
+ * @brief CUDA implementation of forward phase of Segment Reduce.
+ * @param feat The input tensor.
+ * @param offsets The offsets tensor.
+ * @param out The output tensor.
+ * @param arg An auxiliary tensor storing ArgMax/Min information,
  */
 template <typename IdType, typename DType, typename ReduceOp>
 void SegmentReduce(NDArray feat, NDArray offsets, NDArray out, NDArray arg) {
@@ -141,12 +141,12 @@ void SegmentReduce(NDArray feat, NDArray offsets, NDArray out, NDArray arg) {
       feat_data, offsets_data, out_data, arg_data, n, dim);
 }
 
-/*!
- * \brief CUDA implementation of Scatter Add (on first dimension).
- * \note math equation: out[idx[i], *] += feat[i, *]
- * \param feat The input tensor.
- * \param idx The indices tensor.
- * \param out The output tensor.
+/**
+ * @brief CUDA implementation of Scatter Add (on first dimension).
+ * @note math equation: out[idx[i], *] += feat[i, *]
+ * @param feat The input tensor.
+ * @param idx The indices tensor.
+ * @param out The output tensor.
  */
 template <typename IdType, typename DType>
 void ScatterAdd(NDArray feat, NDArray idx, NDArray out) {
@@ -170,14 +170,14 @@ void ScatterAdd(NDArray feat, NDArray idx, NDArray out) {
       idx_data, out_data, n, dim);
 }
 
-/*!
- * \brief CUDA implementation to update gradients for reduce op max/min
- * \param graph The input heterogeneous graph.
- * \param op The binary operator, could be `copy_u`, `copy_e'.
- * \param list_feat List of the input tensors.
- * \param list_idx  List of the indices tensors.
- * \param list_idx_etype List of the node- or edge-type tensors.
- * \param list_out List of the output tensors.
+/**
+ * @brief CUDA implementation to update gradients for reduce op max/min
+ * @param graph The input heterogeneous graph.
+ * @param op The binary operator, could be `copy_u`, `copy_e'.
+ * @param list_feat List of the input tensors.
+ * @param list_idx  List of the indices tensors.
+ * @param list_idx_etype List of the node- or edge-type tensors.
+ * @param list_out List of the output tensors.
  */
 template <typename IdType, typename DType>
 void UpdateGradMinMax_hetero(
@@ -223,13 +223,13 @@ void UpdateGradMinMax_hetero(
   }
 }
 
-/*!
- * \brief CUDA implementation of backward phase of Segment Reduce with Min/Max
+/**
+ * @brief CUDA implementation of backward phase of Segment Reduce with Min/Max
  *        reducer.
- * \note math equation: out[arg[i, k], k] = feat[i, k] \param feat The input
+ * @note math equation: out[arg[i, k], k] = feat[i, k] \param feat The input
  *       tensor.
- * \param arg The ArgMin/Max information, used for indexing.
- * \param out The output tensor.
+ * @param arg The ArgMin/Max information, used for indexing.
+ * @param out The output tensor.
  */
 template <typename IdType, typename DType>
 void BackwardSegmentCmp(NDArray feat, NDArray arg, NDArray out) {
