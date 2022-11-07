@@ -2,14 +2,13 @@
 
 import pickle
 from abc import ABC
-from ast import literal_eval
 
 import numpy as np
 
 from .. import backend as F
 from .. import utils
 from .._ffi.ndarray import empty_shared_mem
-from ..base import EID, NID, DGLError, dgl_warning
+from ..base import EID, NID, DGLError
 from ..ndarray import exist_shared_mem_array
 from ..partition import NDArrayPartition
 from .constants import DEFAULT_ETYPE, DEFAULT_NTYPE
@@ -21,14 +20,40 @@ from .shared_mem_utils import (
     _to_shared_mem,
 )
 
+CANONICAL_ETYPE_DELIMITER = ":"
 
-def _str_to_tuple(s):
-    try:
-        ret = literal_eval(s)
-    except ValueError:
-        ret = s
+def _etype_tuple_to_str(c_etype):
+    '''Convert canonical etype from tuple to string.
+
+    Examples
+    --------
+    >>> c_etype = ('user', 'like', 'item')
+    >>> c_etype_str = _etype_tuple_to_str(c_etype)
+    >>> print(c_etype_str)
+    'user:like:item'
+
+    '''
+    assert isinstance(c_etype, tuple) and len(c_etype) == 3, \
+        "Passed-in canonical etype should be in format of (str, str, str). " \
+        f"But got {c_etype}."
+    return CANONICAL_ETYPE_DELIMITER.join(c_etype)
+
+def _etype_str_to_tuple(c_etype):
+    '''Convert canonical etype from tuple to string.
+
+    Examples
+    --------
+    >>> c_etype_str = 'user:like:item'
+    >>> c_etype = _etype_str_to_tuple(c_etype_str)
+    >>> print(c_etype)
+    ('user', 'like', 'item')
+
+    '''
+    ret = tuple(c_etype.split(CANONICAL_ETYPE_DELIMITER))
+    assert len(ret) == 3, \
+        "Passed-in canonical etype should be in format of 'str:str:str'. " \
+        f"But got {c_etype}."
     return ret
-
 
 def _move_metadata_to_shared_mem(
     graph_name,
@@ -437,6 +462,20 @@ class GraphPartitionBook(ABC):
             A list of canonical etypes
         """
 
+    def to_canonical_etype(self, etype):
+        """Convert an edge type to the corresponding canonical edge type.
+
+        Parameters
+        ----------
+        etype : str or (str, str, str)
+            The edge type
+
+        Returns
+        -------
+        (str, str, str)
+            The corresponding canonical edge type
+        """
+
     @property
     def is_homogeneous(self):
         """check if homogeneous"""
@@ -494,7 +533,7 @@ class GraphPartitionBook(ABC):
         ids : tensor
             Type-wise edge Ids
         etype : str or (str, str, str)
-            edge type
+            The edge type
 
         Returns
         -------
@@ -738,14 +777,32 @@ class BasicPartitionBook(GraphPartitionBook):
         """
         return [DEFAULT_ETYPE]
 
+    def to_canonical_etype(self, etype):
+        """Convert an edge type to the corresponding canonical edge type.
+
+        Parameters
+        ----------
+        etype : str or (str, str, str)
+            The edge type
+
+        Returns
+        -------
+        (str, str, str)
+            The corresponding canonical edge type
+        """
+        assert etype in (
+            DEFAULT_ETYPE,
+            DEFAULT_ETYPE[1],
+        ), "Base partition book only supports homogeneous graph."
+        return self.canonical_etypes
+
 
 class RangePartitionBook(GraphPartitionBook):
     """This partition book supports more efficient storage of partition information.
 
     This partition book is used if the nodes and edges of a graph partition are assigned
     with contiguous IDs. It uses very small amount of memory to store the partition
-    information. Canonical etypes are availabe only when the keys of argument ``etypes``
-    are canonical etypes.
+    information.
 
     Parameters
     ----------
@@ -759,7 +816,7 @@ class RangePartitionBook(GraphPartitionBook):
         the number of partitions. Each row has two integers: the starting and the ending IDs
         for a particular node type in a partition. For example, all nodes of type ``"T"`` in
         partition ``i`` has ID range ``node_map["T"][i][0]`` to ``node_map["T"][i][1]``.
-    edge_map : dict[str, Tensor] or dict[(str, str, str), Tensor]
+    edge_map : dict[(str, str, str), Tensor]
         Global edge ID ranges within partitions for each edge type. The key is the edge type
         name in string. The value is a tensor of shape :math:`(K, 2)`, where :math:`K` is
         the number of partitions. Each row has two integers: the starting and the ending IDs
@@ -767,13 +824,9 @@ class RangePartitionBook(GraphPartitionBook):
         partition ``i`` has ID range ``edge_map["T"][i][0]`` to ``edge_map["T"][i][1]``.
     ntypes : dict[str, int]
         map ntype strings to ntype IDs.
-    etypes : dict[str, int] or dict[(str, str, str), int]
-        map etype strings to etype IDs.
+    etypes : dict[(str, str, str), int]
+        map canonical etypes to etype IDs.
 
-    .. deprecated:: 0.9.1
-
-        Single string format for keys of ``edge_map`` and ``etypes`` is deprecated.
-        ``(str, str, str)`` will be the only format supported in the future.
     """
 
     def __init__(self, part_id, num_parts, node_map, edge_map, ntypes, etypes):
@@ -792,36 +845,29 @@ class RangePartitionBook(GraphPartitionBook):
         assert all(
             ntype is not None for ntype in self._ntypes
         ), "The node types have invalid IDs."
-        for etype, etype_id in etypes.items():
-            if isinstance(etype, tuple):
-                assert (
-                    len(etype) == 3
-                ), "Canonical etype should be in format of (str, str, str)."
-                c_etype = etype
-                etype = etype[1]
-                self._etypes[etype_id] = etype
-                self._canonical_etypes[etype_id] = c_etype
-                if etype in self._etype2canonical:
-                    # If one etype maps to multiple canonical etypes, empty
-                    # tuple is used to indicate such ambiguity casued by etype.
-                    # See more details in self._to_canonical_etype().
-                    self._etype2canonical[etype] = tuple()
-                else:
-                    self._etype2canonical[etype] = c_etype
+        for c_etype, etype_id in etypes.items():
+            assert isinstance(c_etype, tuple) and len(c_etype) == 3, \
+                "Expect canonical edge type in a triplet of string, but got " \
+                f"{c_etype}."
+            etype = c_etype[1]
+            self._etypes[etype_id] = etype
+            self._canonical_etypes[etype_id] = c_etype
+            if etype in self._etype2canonical:
+                # If one etype maps to multiple canonical etypes, empty tuple
+                # is used to indicate such ambiguity casued by etype. See more
+                # details in self.to_canonical_etype().
+                self._etype2canonical[etype] = tuple()
             else:
-                dgl_warning(
-                    "Etype with 'str' format is deprecated. Please use '(str, str, str)'."
-                )
-                self._etypes[etype_id] = etype
-                self._canonical_etypes[etype_id] = None
+                self._etype2canonical[etype] = c_etype
         assert all(
             etype is not None for etype in self._etypes
         ), "The edge types have invalid IDs."
 
         # This stores the node ID ranges for each node type in each partition.
-        # The key is the node type, the value is a NumPy matrix with two columns, in which
-        # each row indicates the start and the end of the node ID range in a partition.
-        # The node IDs are global node IDs in the homogeneous representation.
+        # The key is the node type, the value is a NumPy matrix with two
+        # columns, in which each row indicates the start and the end of the
+        # node ID range in a partition. The node IDs are global node IDs in the
+        # homogeneous representation.
         self._typed_nid_range = {}
         # This stores the node ID map for per-node-type IDs in each partition.
         # The key is the node type, the value is a NumPy vector which indicates
@@ -874,6 +920,18 @@ class RangePartitionBook(GraphPartitionBook):
         self._nid_map = IdMap(self._typed_nid_range)
         self._eid_map = IdMap(self._typed_eid_range)
 
+        # Local node/edge type offset that maps the local homogenized node/edge IDs
+        # to local heterogenized node/edge IDs.  One can do the mapping by binary search
+        # on these arrays.
+        self._local_ntype_offset = np.cumsum(
+                [0] + [
+                    v[self._partid, 1] - v[self._partid, 0]
+                    for v in self._typed_nid_range.values()]).tolist()
+        self._local_etype_offset = np.cumsum(
+                [0] + [
+                    v[self._partid, 1] - v[self._partid, 0]
+                    for v in self._typed_eid_range.values()]).tolist()
+
         # Get meta data of the partition book
         self._partition_meta_data = []
         for partid in range(self._num_partitions):
@@ -900,10 +958,9 @@ class RangePartitionBook(GraphPartitionBook):
             nid_range[i] = (ntype, self._typed_nid_range[ntype])
         nid_range_pickle = list(pickle.dumps(nid_range))
 
-        eid_range = [None] * len(self.etypes)
-        for i, etype in enumerate(self.etypes):
-            c_etype = self._to_canonical_etype(etype)
-            eid_range[i] = (c_etype, self._typed_eid_range[c_etype])
+        eid_range = [None] * len(self.canonical_etypes)
+        for i, etype in enumerate(self.canonical_etypes):
+            eid_range[i] = (etype, self._typed_eid_range[etype])
         eid_range_pickle = list(pickle.dumps(eid_range))
 
         self._meta = _move_metadata_to_shared_mem(
@@ -933,7 +990,7 @@ class RangePartitionBook(GraphPartitionBook):
         if etype in (DEFAULT_ETYPE, DEFAULT_ETYPE[1]):
             return int(self._max_edge_ids[-1])
         else:
-            c_etype = self._to_canonical_etype(etype)
+            c_etype = self.to_canonical_etype(etype)
             return int(self._typed_max_edge_ids[c_etype][-1])
 
     def metadata(self):
@@ -968,7 +1025,7 @@ class RangePartitionBook(GraphPartitionBook):
     def map_to_homo_eid(self, ids, etype):
         """Map per-edge-type IDs to global edge IDs in the homoenegeous format."""
         ids = utils.toindex(ids).tousertensor()
-        c_etype = self._to_canonical_etype(etype)
+        c_etype = self.to_canonical_etype(etype)
         partids = self.eid2partid(ids, c_etype)
         typed_max_eids = F.zerocopy_from_numpy(
             self._typed_max_edge_ids[c_etype]
@@ -1001,7 +1058,7 @@ class RangePartitionBook(GraphPartitionBook):
                 self._max_edge_ids, eids.tonumpy(), side="right"
             )
         else:
-            c_etype = self._to_canonical_etype(etype)
+            c_etype = self.to_canonical_etype(etype)
             ret = np.searchsorted(
                 self._typed_max_edge_ids[c_etype], eids.tonumpy(), side="right"
             )
@@ -1030,7 +1087,7 @@ class RangePartitionBook(GraphPartitionBook):
             end = self._max_edge_ids[partid]
             return F.arange(start, end)
         else:
-            c_etype = self._to_canonical_etype(etype)
+            c_etype = self.to_canonical_etype(etype)
             start = (
                 self._typed_max_edge_ids[c_etype][partid - 1]
                 if partid > 0
@@ -1070,7 +1127,7 @@ class RangePartitionBook(GraphPartitionBook):
         if etype in (DEFAULT_ETYPE, DEFAULT_ETYPE[1]):
             start = self._max_edge_ids[partid - 1] if partid > 0 else 0
         else:
-            c_etype = self._to_canonical_etype(etype)
+            c_etype = self.to_canonical_etype(etype)
             start = (
                 self._typed_max_edge_ids[c_etype][partid - 1]
                 if partid > 0
@@ -1106,19 +1163,38 @@ class RangePartitionBook(GraphPartitionBook):
         """
         return self._canonical_etypes
 
-    def _to_canonical_etype(self, etype):
+    @property
+    def local_ntype_offset(self):
+        """Get the node type offset array of the local partition.
+
+        The i-th element indicates the starting position of the i-th node type.
+        """
+        return self._local_ntype_offset
+
+    @property
+    def local_etype_offset(self):
+        """Get the edge type offset array of the local partition.
+
+        The i-th element indicates the starting position of the i-th edge type.
+        """
+        return self._local_etype_offset
+
+    def to_canonical_etype(self, etype):
         """Convert an edge type to the corresponding canonical edge type.
-        If canonical etype is not available, no conversion is applied.
+
+        Parameters
+        ----------
+        etype : str or (str, str, str)
+            The edge type
+
+        Returns
+        -------
+        (str, str, str)
+            The corresponding canonical edge type
         """
         if isinstance(etype, tuple):
             if etype not in self.canonical_etypes:
                 raise DGLError('Edge type "{}" does not exist.'.format(etype))
-            return etype
-        if not self._etype2canonical:
-            # canonical etype is not available, no conversion is applied.
-            # This is the case that 'etypes' passed in when instantiating
-            # are in format of str instead of (str, str, str).
-            # [TODO] Deprecate support for str etypes.
             return etype
         ret = self._etype2canonical.get(etype, None)
         if ret is None:
@@ -1133,6 +1209,7 @@ class RangePartitionBook(GraphPartitionBook):
 
 NODE_PART_POLICY = "node"
 EDGE_PART_POLICY = "edge"
+POLICY_DELIMITER = '~'
 
 
 class PartitionPolicy(object):
@@ -1148,26 +1225,27 @@ class PartitionPolicy(object):
     Parameters
     ----------
     policy_str : str
-        Partition policy name, e.g., 'edge:_E' or 'node:_N'.
+        Partition policy name, e.g., 'edge~_N:_E:_N' or 'node~_N'.
     partition_book : GraphPartitionBook
         A graph partition book
     """
 
     def __init__(self, policy_str, partition_book):
-        splits = policy_str.split(":")
-        if len(splits) == 1:
+        if POLICY_DELIMITER not in policy_str:
             assert policy_str in (
                 EDGE_PART_POLICY,
                 NODE_PART_POLICY,
             ), "policy_str must contain 'edge' or 'node'."
             if NODE_PART_POLICY == policy_str:
-                policy_str = NODE_PART_POLICY + ":" + DEFAULT_NTYPE
+                policy_str = NODE_PART_POLICY + POLICY_DELIMITER + DEFAULT_NTYPE
             else:
-                policy_str = EDGE_PART_POLICY + ":" + DEFAULT_ETYPE[1]
+                policy_str = EDGE_PART_POLICY + POLICY_DELIMITER + DEFAULT_ETYPE[1]
         self._policy_str = policy_str
         self._part_id = partition_book.partid
         self._partition_book = partition_book
-        self._type_name = _str_to_tuple(self.policy_str[5:])
+        part_policy, self._type_name = policy_str.split(POLICY_DELIMITER, 1)
+        if part_policy == EDGE_PART_POLICY:
+            self._type_name = _etype_str_to_tuple(self._type_name)
 
     @property
     def policy_str(self):
@@ -1302,7 +1380,7 @@ class NodePartitionPolicy(PartitionPolicy):
 
     def __init__(self, partition_book, ntype=DEFAULT_NTYPE):
         super(NodePartitionPolicy, self).__init__(
-            NODE_PART_POLICY + ":" + ntype, partition_book
+            NODE_PART_POLICY + POLICY_DELIMITER + ntype, partition_book
         )
 
 
@@ -1310,8 +1388,11 @@ class EdgePartitionPolicy(PartitionPolicy):
     """Partition policy for edges."""
 
     def __init__(self, partition_book, etype=DEFAULT_ETYPE):
+        assert isinstance(etype, tuple) and len(etype) == 3, \
+            f"Expect canonical edge type in a triplet of string, but got {etype}."
         super(EdgePartitionPolicy, self).__init__(
-            EDGE_PART_POLICY + ":" + str(etype), partition_book
+            EDGE_PART_POLICY + POLICY_DELIMITER + _etype_tuple_to_str(etype),
+            partition_book
         )
 
 
@@ -1335,26 +1416,34 @@ class HeteroDataName(object):
 
     def __init__(self, is_node, entity_type, data_name):
         self._policy = NODE_PART_POLICY if is_node else EDGE_PART_POLICY
+        if not is_node:
+            assert isinstance(entity_type, tuple) and len(entity_type) == 3, \
+                "Expect canonical edge type in a triplet of string, but got " \
+                f"{entity_type}."
         self._entity_type = entity_type
         self.data_name = data_name
 
     @property
     def policy_str(self):
         """concatenate policy and entity type into string"""
-        return self._policy + ":" + str(self.get_type())
+        entity_type = self.get_type()
+        if self.is_edge():
+            entity_type = _etype_tuple_to_str(entity_type)
+        return self._policy + POLICY_DELIMITER + entity_type
 
     def is_node(self):
         """Is this the name of node data"""
-        return NODE_PART_POLICY in self.policy_str
+        return self._policy == NODE_PART_POLICY
 
     def is_edge(self):
         """Is this the name of edge data"""
-        return EDGE_PART_POLICY in self.policy_str
+        return self._policy == EDGE_PART_POLICY
 
     def get_type(self):
         """The type of the node/edge.
         This is only meaningful in a heterogeneous graph.
-        In homogeneous graph, type is '_N' for a node and '_E' for an edge.
+        In homogeneous graph, type is '_N' for a node and '_N:_E:_N' for an
+        edge.
         """
         return self._entity_type
 
@@ -1367,7 +1456,7 @@ class HeteroDataName(object):
 
         The full name is used as the key in the KVStore.
         """
-        return self.policy_str + ":" + self.data_name
+        return self.policy_str + POLICY_DELIMITER + self.data_name
 
 
 def parse_hetero_data_name(name):
@@ -1386,7 +1475,7 @@ def parse_hetero_data_name(name):
     -------
     HeteroDataName
     """
-    names = name.split(":")
+    names = name.split(POLICY_DELIMITER)
     assert len(names) == 3, "{} is not a valid heterograph data name".format(
         name
     )
@@ -1394,6 +1483,10 @@ def parse_hetero_data_name(name):
         NODE_PART_POLICY,
         EDGE_PART_POLICY,
     ), "{} is not a valid heterograph data name".format(name)
+    is_node = names[0] == NODE_PART_POLICY
+    entity_type = names[1]
+    if not is_node:
+        entity_type = _etype_str_to_tuple(entity_type)
     return HeteroDataName(
-        names[0] == NODE_PART_POLICY, _str_to_tuple(names[1]), names[2]
+        is_node, entity_type, names[2]
     )

@@ -1141,7 +1141,7 @@ class KVClient(object):
         for ntype in partition_book.ntypes:
             policy = NodePartitionPolicy(partition_book, ntype)
             self._all_possible_part_policy[policy.policy_str] = policy
-        for etype in partition_book.etypes:
+        for etype in partition_book.canonical_etypes:
             policy = EdgePartitionPolicy(partition_book, etype)
             self._all_possible_part_policy[policy.policy_str] = policy
 
@@ -1393,6 +1393,17 @@ class KVClient(object):
             res = rpc.recv_response()
             total += res.num_local_nonzero
         return total
+
+    @property
+    def data_store(self):
+        """Return the local partition of the data storage.
+
+        Returns
+        -------
+        dict[str, Tensor]
+            The tensor storages of the local partition.
+        """
+        return self._data_store
 
 KVCLIENT = None
 

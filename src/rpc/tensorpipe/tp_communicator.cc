@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
- * \file tp_communicator.cc
- * \brief Tensorpipe Communicator for DGL distributed training.
+ * @file tp_communicator.cc
+ * @brief Tensorpipe Communicator for DGL distributed training.
  */
 
 #include "tp_communicator.h"
@@ -48,8 +48,8 @@ void TPSender::Send(const RPCMessage &msg, int recv_id) {
   StreamWithBuffer zc_write_strm(zerocopy_blob_ptr, true);
   zc_write_strm.Write(msg);
   int32_t nonempty_ndarray_count = zc_write_strm.buffer_list().size();
-  zerocopy_blob_ptr->append(reinterpret_cast<char *>(&nonempty_ndarray_count),
-                            sizeof(int32_t));
+  zerocopy_blob_ptr->append(
+      reinterpret_cast<char *>(&nonempty_ndarray_count), sizeof(int32_t));
   tp_msg.tensors.resize(nonempty_ndarray_count);
   // Hold the NDArray that ensure it's valid until write operation completes
   auto ndarray_holder = std::make_shared<std::vector<NDArray>>();
@@ -68,14 +68,14 @@ void TPSender::Send(const RPCMessage &msg, int recv_id) {
   }
   // Let's write blockingly in case of congestion in underlying transports.
   auto done = std::make_shared<std::promise<void>>();
-  pipe->write(tp_msg,
-              [ndarray_holder, recv_id, done](const tensorpipe::Error &error) {
-                if (error) {
-                  LOG(FATAL) << "Failed to send message to " << recv_id
-                             << ". Details: " << error.what();
-                }
-                done->set_value();
-              });
+  pipe->write(
+      tp_msg, [ndarray_holder, recv_id, done](const tensorpipe::Error &error) {
+        if (error) {
+          LOG(FATAL) << "Failed to send message to " << recv_id
+                     << ". Details: " << error.what();
+        }
+        done->set_value();
+      });
   done->get_future().wait();
 }
 
@@ -120,7 +120,8 @@ void TPReceiver::OnAccepted(const Error &error, std::shared_ptr<Pipe> pipe) {
     if (error.isOfType<ListenerClosedError>()) {
       // Expected.
     } else {
-      LOG(WARNING) << "Unexpected error when accepting incoming pipe: " << error.what();
+      LOG(WARNING) << "Unexpected error when accepting incoming pipe: "
+                   << error.what();
     }
     return;
   }
@@ -133,7 +134,8 @@ void TPReceiver::OnAccepted(const Error &error, std::shared_ptr<Pipe> pipe) {
   // read the handshake message: "dglconnect"
   pipe->readDescriptor([pipe, this](const Error &error, Descriptor descriptor) {
     if (error) {
-      LOG(ERROR) << "Unexpected error when reading from accepted pipe: " << error.what();
+      LOG(ERROR) << "Unexpected error when reading from accepted pipe: "
+                 << error.what();
       return;
     }
     Allocation allocation;
@@ -145,10 +147,10 @@ void TPReceiver::OnAccepted(const Error &error, std::shared_ptr<Pipe> pipe) {
   });
 }
 
-void TPReceiver::ReceiveFromPipe(std::shared_ptr<Pipe> pipe,
-                                 std::shared_ptr<RPCMessageQueue> queue) {
-  pipe->readDescriptor([pipe, queue = std::move(queue)](const Error &error,
-                                                        Descriptor descriptor) {
+void TPReceiver::ReceiveFromPipe(
+    std::shared_ptr<Pipe> pipe, std::shared_ptr<RPCMessageQueue> queue) {
+  pipe->readDescriptor([pipe, queue = std::move(queue)](
+                           const Error &error, Descriptor descriptor) {
     if (error) {
       // Error may happen when the pipe is closed
       return;
@@ -165,31 +167,33 @@ void TPReceiver::ReceiveFromPipe(std::shared_ptr<Pipe> pipe,
         allocation.tensors[i].buffer = cpu_buffer;
       }
     }
-    pipe->read(allocation, [allocation, descriptor = std::move(descriptor),
-                            queue = std::move(queue),
-                            pipe](const Error &error) {
-      if (error) {
-        // Because we always have a read event posted to the epoll,
-        // Therefore when pipe is closed, error will be raised.
-        // But this error is expected.
-        // Other error is not expected. But we cannot identify the error with
-        // each Other for now. Thus here we skip handling for all errors
-        return;
-      }
+    pipe->read(
+        allocation, [allocation, descriptor = std::move(descriptor),
+                     queue = std::move(queue), pipe](const Error &error) {
+          if (error) {
+            // Because we always have a read event posted to the epoll,
+            // Therefore when pipe is closed, error will be raised.
+            // But this error is expected.
+            // Other error is not expected. But we cannot identify the error
+            // with each Other for now. Thus here we skip handling for all
+            // errors
+            return;
+          }
 
-      char *meta_msg_begin = const_cast<char *>(&descriptor.metadata[0]);
-      std::vector<void *> buffer_list(descriptor.tensors.size());
-      for (size_t i = 0; i < descriptor.tensors.size(); i++) {
-        buffer_list[i] = allocation.tensors[i].buffer.unwrap<CpuBuffer>().ptr;
-      }
-      StreamWithBuffer zc_read_strm(
-          meta_msg_begin, descriptor.metadata.size() - sizeof(int32_t),
-          buffer_list);
-      RPCMessage msg;
-      zc_read_strm.Read(&msg);
-      queue->push(msg);
-      TPReceiver::ReceiveFromPipe(pipe, queue);
-    });
+          char *meta_msg_begin = const_cast<char *>(&descriptor.metadata[0]);
+          std::vector<void *> buffer_list(descriptor.tensors.size());
+          for (size_t i = 0; i < descriptor.tensors.size(); i++) {
+            buffer_list[i] =
+                allocation.tensors[i].buffer.unwrap<CpuBuffer>().ptr;
+          }
+          StreamWithBuffer zc_read_strm(
+              meta_msg_begin, descriptor.metadata.size() - sizeof(int32_t),
+              buffer_list);
+          RPCMessage msg;
+          zc_read_strm.Read(&msg);
+          queue->push(msg);
+          TPReceiver::ReceiveFromPipe(pipe, queue);
+        });
   });
 }
 

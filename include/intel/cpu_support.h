@@ -1,14 +1,15 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
- * \file intel/cpu_support.h
- * \brief Intel CPU support
- * \author Pawel Piotrowicz <pawel.piotrowicz@intel.com>
+ * @file intel/cpu_support.h
+ * @brief Intel CPU support
+ * @author Pawel Piotrowicz <pawel.piotrowicz@intel.com>
  */
 #ifndef INTEL_CPU_SUPPORT_H_
 #define INTEL_CPU_SUPPORT_H_
 #include <memory>
 #include <tuple>
 #include <type_traits>
+
 #include "dmlc/logging.h"
 #include "meta_utils.h"
 #include "xbyak/xbyak.h"
@@ -52,19 +53,19 @@ struct IntelKernel {
   }
 };
 
-/*!
- * \brief Element-wise addition kernel using Intel AVX512 instructions.
- * \note it uses AVX512.
+/**
+ * @brief Element-wise addition kernel using Intel AVX512 instructions.
+ * @note it uses AVX512.
  */
 template <class Op>
 class ElemWiseAddUpdate : public Xbyak::CodeGenerator {
  public:
   typedef typename Op::type DType;
   static_assert(
-    std::is_base_of<std::true_type,
-                    utils::has_type<DType, supported_types>>::value,
-    "Use case fail dgl::ElemWiseAddUpdate< Operator<DType> > DType is not "
-    "supported !");
+      std::is_base_of<
+          std::true_type, utils::has_type<DType, supported_types>>::value,
+      "Use case fail dgl::ElemWiseAddUpdate< Operator<DType> > DType is not "
+      "supported !");
 
  protected:
   const Xbyak::Reg64 &r_out_;
@@ -80,77 +81,86 @@ class ElemWiseAddUpdate : public Xbyak::CodeGenerator {
   static constexpr int BITS_IN_BYTES = 8;
   static constexpr int REG_BIT_SIZE = 512;
   static constexpr int UNIT_PER_REG =
-    REG_BIT_SIZE / (UNIT_SIZE_BYTES * BITS_IN_BYTES);
+      REG_BIT_SIZE / (UNIT_SIZE_BYTES * BITS_IN_BYTES);
 
-  template <class TType, class R1, class R2,
-            utils::CheckCmp<TType, float> = true>
+  template <
+      class TType, class R1, class R2, utils::CheckCmp<TType, float> = true>
   void alias_load(R1 r1, R2 r2) {
     vmovups(r1, r2);
   }
-  template <class TType, class R1, class R2,
-            utils::CheckCmp<TType, double> = true>
+  template <
+      class TType, class R1, class R2, utils::CheckCmp<TType, double> = true>
   void alias_load(R1 r1, R2 r2) {
     vmovupd(r1, r2);
   }
 
-  template <class TType, class R1, class R2,
-            utils::CheckCmp<TType, float> = true>
+  template <
+      class TType, class R1, class R2, utils::CheckCmp<TType, float> = true>
   void alias_save(R1 r1, R2 r2) {
     alias_load<TType>(r1, r2);
   }
-  template <class TType, class R1, class R2,
-            utils::CheckCmp<TType, double> = true>
+  template <
+      class TType, class R1, class R2, utils::CheckCmp<TType, double> = true>
   void alias_save(R1 r1, R2 r2) {
     alias_load<TType>(r1, r2);
   }
 
-  template <class TType, class R1, class R2, class R3,
-            utils::CheckCmp<TType, float> = true>
+  template <
+      class TType, class R1, class R2, class R3,
+      utils::CheckCmp<TType, float> = true>
   void alias_ADD(R1 r1, R2 r2, R3 r3) {
     vaddps(r1, r2, r3);
   }
-  template <class TType, class R1, class R2, class R3,
-            utils::CheckCmp<TType, double> = true>
+  template <
+      class TType, class R1, class R2, class R3,
+      utils::CheckCmp<TType, double> = true>
   void alias_ADD(R1 r1, R2 r2, R3 r3) {
     vaddpd(r1, r2, r3);
   }
 
-  template <class TType, class R1, class R2, class R3,
-            utils::CheckCmp<TType, float> = true>
+  template <
+      class TType, class R1, class R2, class R3,
+      utils::CheckCmp<TType, float> = true>
   void alias_SUB(R1 r1, R2 r2, R3 r3) {
     vsubps(r1, r2, r3);
   }
-  template <class TType, class R1, class R2, class R3,
-            utils::CheckCmp<TType, double> = true>
+  template <
+      class TType, class R1, class R2, class R3,
+      utils::CheckCmp<TType, double> = true>
   void alias_SUB(R1 r1, R2 r2, R3 r3) {
     vsubpd(r1, r2, r3);
   }
 
-  template <class TType, class R1, class R2, class R3,
-            utils::CheckCmp<TType, float> = true>
+  template <
+      class TType, class R1, class R2, class R3,
+      utils::CheckCmp<TType, float> = true>
   void alias_DIV(R1 r1, R2 r2, R3 r3) {
     vdivps(r1, r2, r3);
   }
-  template <class TType, class R1, class R2, class R3,
-            utils::CheckCmp<TType, double> = true>
+  template <
+      class TType, class R1, class R2, class R3,
+      utils::CheckCmp<TType, double> = true>
   void alias_DIV(R1 r1, R2 r2, R3 r3) {
     vdivpd(r1, r2, r3);
   }
 
-  template <class TType, class R1, class R2, class R3,
-            utils::CheckCmp<TType, float> = true>
+  template <
+      class TType, class R1, class R2, class R3,
+      utils::CheckCmp<TType, float> = true>
   void alias_MUL(R1 r1, R2 r2, R3 r3) {
     vmulps(r1, r2, r3);
   }
-  template <class TType, class R1, class R2, class R3,
-            utils::CheckCmp<TType, double> = true>
+  template <
+      class TType, class R1, class R2, class R3,
+      utils::CheckCmp<TType, double> = true>
   void alias_MUL(R1 r1, R2 r2, R3 r3) {
     vmulpd(r1, r2, r3);
   }
 
-  template <class Operator,
-            utils::Verify<Operator, ::dgl::aten::cpu::op::CopyLhs,
-                          supported_types> = true>
+  template <
+      class Operator,
+      utils::Verify<Operator, ::dgl::aten::cpu::op::CopyLhs, supported_types> =
+          true>
   void full_chunk_loop_operations() {
     typedef typename Operator::type IType;
     alias_load<IType>(zmm0, ptr[r_out_ + r9 * sizeof(IType)]);
@@ -158,9 +168,10 @@ class ElemWiseAddUpdate : public Xbyak::CodeGenerator {
     alias_ADD<IType>(zmm2, zmm0, zmm1);
     alias_save<IType>(ptr[r_out_ + r9 * sizeof(IType)], zmm2);
   }
-  template <class Operator,
-            utils::Verify<Operator, ::dgl::aten::cpu::op::CopyRhs,
-                          supported_types> = true>
+  template <
+      class Operator,
+      utils::Verify<Operator, ::dgl::aten::cpu::op::CopyRhs, supported_types> =
+          true>
   void full_chunk_loop_operations() {
     typedef typename Operator::type IType;
     alias_load<IType>(zmm0, ptr[r_out_ + r9 * sizeof(IType)]);
@@ -179,16 +190,20 @@ class ElemWiseAddUpdate : public Xbyak::CodeGenerator {
     alias_ADD<T>(zmm2, zmm0, zmm2);
     alias_save<T>(ptr[r_out_ + r9 * sizeof(T)], zmm2);
   }
-  template <class Operator, utils::Verify<Operator, ::dgl::aten::cpu::op::Add,
-                                          supported_types> = true>
+  template <
+      class Operator,
+      utils::Verify<Operator, ::dgl::aten::cpu::op::Add, supported_types> =
+          true>
   void full_chunk_loop_operations() {
     typedef typename Operator::type IType;
     loop_pre<IType>();
     alias_ADD<IType>(zmm2, zmm1, zmm2);
     loop_post<IType>();
   }
-  template <class Operator, utils::Verify<Operator, ::dgl::aten::cpu::op::Sub,
-                                          supported_types> = true>
+  template <
+      class Operator,
+      utils::Verify<Operator, ::dgl::aten::cpu::op::Sub, supported_types> =
+          true>
   void full_chunk_loop_operations() {
     typedef typename Operator::type IType;
     loop_pre<IType>();
@@ -196,8 +211,10 @@ class ElemWiseAddUpdate : public Xbyak::CodeGenerator {
     loop_post<IType>();
   }
 
-  template <class Operator, utils::Verify<Operator, ::dgl::aten::cpu::op::Div,
-                                          supported_types> = true>
+  template <
+      class Operator,
+      utils::Verify<Operator, ::dgl::aten::cpu::op::Div, supported_types> =
+          true>
   void full_chunk_loop_operations() {
     typedef typename Operator::type IType;
     loop_pre<IType>();
@@ -205,8 +222,10 @@ class ElemWiseAddUpdate : public Xbyak::CodeGenerator {
     loop_post<IType>();
   }
 
-  template <class Operator, utils::Verify<Operator, ::dgl::aten::cpu::op::Mul,
-                                          supported_types> = true>
+  template <
+      class Operator,
+      utils::Verify<Operator, ::dgl::aten::cpu::op::Mul, supported_types> =
+          true>
   void full_chunk_loop_operations() {
     typedef typename Operator::type IType;
     loop_pre<IType>();
@@ -214,17 +233,19 @@ class ElemWiseAddUpdate : public Xbyak::CodeGenerator {
     loop_post<IType>();
   }
 
-  template <class Operator,
-            utils::Verify<Operator, ::dgl::aten::cpu::op::CopyLhs,
-                          supported_types> = true>
+  template <
+      class Operator,
+      utils::Verify<Operator, ::dgl::aten::cpu::op::CopyLhs, supported_types> =
+          true>
   void remainder_operations(const Xbyak::Opmask mask) {
     typedef typename Operator::type IType;
     alias_load<IType>(make_zmm(zmm2) | mask, ptr[r_left_ + r9 * sizeof(IType)]);
   }
 
-  template <class Operator,
-            utils::Verify<Operator, ::dgl::aten::cpu::op::CopyRhs,
-                          supported_types> = true>
+  template <
+      class Operator,
+      utils::Verify<Operator, ::dgl::aten::cpu::op::CopyRhs, supported_types> =
+          true>
   void remainder_operations(const Xbyak::Opmask mask) {
     typedef typename Operator::type IType;
     alias_load<IType>(make_zmm(zmm2) | mask, ptr[r_right + r9 * sizeof(IType)]);
@@ -236,32 +257,40 @@ class ElemWiseAddUpdate : public Xbyak::CodeGenerator {
     alias_load<T>(make_zmm(zmm1) | mask, ptr[r_right + r9 * sizeof(T)]);
   }
 
-  template <class Operator, utils::Verify<Operator, ::dgl::aten::cpu::op::Mul,
-                                          supported_types> = true>
+  template <
+      class Operator,
+      utils::Verify<Operator, ::dgl::aten::cpu::op::Mul, supported_types> =
+          true>
   void remainder_operations(const Xbyak::Opmask mask) {
     typedef typename Operator::type IType;
     remainder_fetch_LR<IType>(mask);
     alias_MUL<IType>(zmm2, zmm2, zmm1);
   }
 
-  template <class Operator, utils::Verify<Operator, ::dgl::aten::cpu::op::Add,
-                                          supported_types> = true>
+  template <
+      class Operator,
+      utils::Verify<Operator, ::dgl::aten::cpu::op::Add, supported_types> =
+          true>
   void remainder_operations(const Xbyak::Opmask mask) {
     typedef typename Operator::type IType;
     remainder_fetch_LR<IType>(mask);
     alias_ADD<DType>(zmm2, zmm2, zmm1);
   }
 
-  template <class Operator, utils::Verify<Operator, ::dgl::aten::cpu::op::Div,
-                                          supported_types> = true>
+  template <
+      class Operator,
+      utils::Verify<Operator, ::dgl::aten::cpu::op::Div, supported_types> =
+          true>
   void remainder_operations(const Xbyak::Opmask mask) {
     typedef typename Operator::type IType;
     remainder_fetch_LR<IType>(mask);
     alias_DIV<DType>(zmm2, zmm2, zmm1);
   }
 
-  template <class Operator, utils::Verify<Operator, ::dgl::aten::cpu::op::Sub,
-                                          supported_types> = true>
+  template <
+      class Operator,
+      utils::Verify<Operator, ::dgl::aten::cpu::op::Sub, supported_types> =
+          true>
   void remainder_operations(const Xbyak::Opmask mask) {
     typedef typename Operator::type IType;
     remainder_fetch_LR<IType>(mask);
@@ -280,9 +309,10 @@ class ElemWiseAddUpdate : public Xbyak::CodeGenerator {
     if (current_cpu.has(Xbyak::util::Cpu::tAVX512F)) {
       /* prepare REMAINDER */
       mov(r8, r_size_);
-      and_(r8,
-           UNIT_PER_REG - 1);  // r8_modulo = size/(sizeof(zmm)/sizeof(float))
-      xor_(r9, r9);            // reset r9
+      and_(
+          r8,
+          UNIT_PER_REG - 1);  // r8_modulo = size/(sizeof(zmm)/sizeof(float))
+      xor_(r9, r9);           // reset r9
       cmp(r_size_, UNIT_PER_REG);  // if ( size < 16 ) {  }
       jl("remainder");
 
@@ -306,12 +336,12 @@ class ElemWiseAddUpdate : public Xbyak::CodeGenerator {
       sal(rax, cl);
       dec(rax);        // k1= (1 << r8 )-1
       kmovw(k1, eax);  // set bitmask
-      alias_load<DType>(make_zmm(zmm0) | k1,
-                        ptr[r_out_ + r9 * UNIT_SIZE_BYTES]);
+      alias_load<DType>(
+          make_zmm(zmm0) | k1, ptr[r_out_ + r9 * UNIT_SIZE_BYTES]);
       remainder_operations<Op>(k1);
       alias_ADD<DType>(zmm3, zmm2, zmm0);
-      alias_save<DType>(ptr[r_out_ + r9 * UNIT_SIZE_BYTES],
-                        make_zmm(zmm3) | k1);
+      alias_save<DType>(
+          ptr[r_out_ + r9 * UNIT_SIZE_BYTES], make_zmm(zmm3) | k1);
       L("done");
       applicable_ = true;
       log_intel("AVX512F cpu kernel is ready");

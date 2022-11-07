@@ -51,6 +51,7 @@ from . import optim
 from .frame import LazyFeature
 from .utils import apply_each
 from .global_config import is_libxsmm_enabled, use_libxsmm
+from .mpops import *
 
 from ._deprecate.graph import DGLGraph as DGLGraphStale
 from ._deprecate.nodeflow import *
