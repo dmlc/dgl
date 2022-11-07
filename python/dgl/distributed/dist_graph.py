@@ -164,10 +164,9 @@ class HeteroEdgeView(object):
         self._graph = graph
 
     def __getitem__(self, key):
-        assert isinstance(key, str) or \
-            (isinstance(key, tuple) and len(key) == 3), \
-            "Expect edge type in string or a triplet of string, but got " \
-            f"{key}."
+        assert isinstance(key, str) or (
+            isinstance(key, tuple) and len(key) == 3
+        ), f"Expect edge type in string or triplet of string, but got {key}."
         return EdgeSpace(data=EdgeDataView(self._graph, key))
 
 class NodeDataView(MutableMapping):

@@ -644,10 +644,11 @@ def sample_etype_neighbors(
         for etype, v in fanout.items():
             c_etype = g.to_canonical_etype(etype)
             fanout_[etype_ids[c_etype]] = v
-        assert all(v is not None for v in fanout_), \
-            "Not all etypes have valid fanout. Please make sure passed-in " \
-            "fanout in dict includes all the etypes in graph. Passed-in " \
+        assert all(v is not None for v in fanout_), (
+            "Not all etypes have valid fanout. Please make sure passed-in "
+            "fanout in dict includes all the etypes in graph. Passed-in "
             f"fanout: {fanout}, graph etypes: {g.canonical_etypes}."
+        )
         fanout = F.tensor(fanout_, dtype=F.int64)
 
     gpb = g.get_partition_book()
