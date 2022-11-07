@@ -97,17 +97,20 @@ def sample_labors(
         importance sampling probabilities until convergence while use of positive values runs
         optimization steps that many times. If the value is i, then LABOR-i variant is used.
     random_seed : tensor
-        The passed random_seed makes it so that for any seed vertex s and its neighbor t, the rolled
-        random variate r_t is the same for any call to this function with the same random seed.
-        When sampling as part of the same batch, one would want identical seeds so that LABOR
-        can globally sample. One example is that for heterogenous graphs, there is a single random
-        seed passed for each edge type. This will sample much fewer vertices compared to having
-        unique random seeds for each edge type. If one called this function individually for each
-        edge type for a heterogenous graph with different random seeds, then it would run LABOR
+        An int64 tensor with one element.
+
+        The passed random_seed makes it so that for any seed vertex ``s`` and its neighbor ``t``,
+        the rolled random variate ``r_t`` is the same for any call to this function with the same
+        random seed. When sampling as part of the same batch, one would want identical seeds so that
+        LABOR can globally sample. One example is that for heterogenous graphs, there is a single
+        random seed passed for each edge type. This will sample much fewer vertices compared to
+        having unique random seeds for each edge type. If one called this function individually for
+        each edge type for a heterogenous graph with different random seeds, then it would run LABOR
         locally for each edge type, resulting into a larger number of vertices being sampled.
 
-        If this function is called without a random_seed, we get the random seed by getting a
-        random number from DGL.
+        If this function is called without a ``random_seed``, we get the random seed by getting a
+        random number from DGL. Use this argument with identical random_seed if multiple calls to
+        this function are used to sample as part of a single batch.
     copy_ndata: bool, optional
         If True, the node features of the new graph are copied from
         the original graph. If False, the new graph will not have any
@@ -130,7 +133,7 @@ def sample_labors(
 
     Returns
     -------
-    tuple(DGLGraph, list of tensors)
+    tuple(DGLGraph, list[Tensor])
         A sampled subgraph containing only the sampled neighboring edges along with edge weights.
 
     Notes

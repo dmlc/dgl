@@ -57,7 +57,8 @@ class LaborSampler(BlockSampler):
         importance sampling probabilities until convergence while use of positive values runs
         optimization steps that many times. If the value is i, then LABOR-i variant is used.
     layer_dependency : bool, default ``False``
-        Specifies whether different layers should use same random variates.
+        Specifies whether different layers should use same random variates. Results into a reduction
+        in the number of vertices sampled, but may degrade the quality slightly.
     prefetch_node_feats : list[str] or dict[ntype, list[str]], optional
         The source node data to prefetch for the first MFG, corresponding to the
         input node features necessary for the first GNN layer.
@@ -148,17 +149,20 @@ class LaborSampler(BlockSampler):
     def set_seed(self, random_seed=None):
         """Updates the underlying seed for the sampler
 
-        The passed random_seed makes it so that for any seed vertex s and its neighbor t, the rolled
-        random variate r_t is the same for any instance of this class with the same random seed.
-        When sampling as part of the same batch, one would want identical seeds so that LABOR
-        can globally sample. One example is that for heterogenous graphs, there is a single random
-        seed passed for each edge type. This will sample much fewer vertices compared to having
-        unique random seeds for each edge type. If one called this function individually for each
-        edge type for a heterogenous graph with different random seeds, then it would run LABOR
+        Calling this function enforces the sampling algorithm to use the same seed on every edge
+        type. This can reduce the number of nodes being sampled because the passed random_seed makes
+        it so that for any seed vertex ``s`` and its neighbor ``t``,
+        the rolled random variate ``r_t`` is the same for any instance of this class with the same
+        random seed. When sampling as part of the same batch, one would want identical seeds so that
+        LABOR can globally sample. One example is that for heterogenous graphs, there is a single
+        random seed passed for each edge type. This will sample much fewer vertices compared to
+        having unique random seeds for each edge type. If one called this function individually for
+        each edge type for a heterogenous graph with different random seeds, then it would run LABOR
         locally for each edge type, resulting into a larger number of vertices being sampled.
 
         If this function is called without any parameters, we get the random seed by getting a
-        random number from DGL.
+        random number from DGL. Call this function if multiple instances of LaborSampler are used
+        to sample as part of a single batch.
 
         Parameters
         ----------
@@ -168,7 +172,7 @@ class LaborSampler(BlockSampler):
         if random_seed is None:
             self.random_seed = choice(1e18, 1)
         else:
-            self.random_seed = F.tensor(random_seed, 'int64')
+            self.random_seed = F.tensor(random_seed, F.int64)
 
     def sample_blocks(self, g, seed_nodes, exclude_eids=None):
         output_nodes = seed_nodes

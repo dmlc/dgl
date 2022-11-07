@@ -70,13 +70,16 @@ void compute_importance_sampling_probabilities(
 
   phmap::flat_hash_map<IdxType, FloatType> hop_map2;
   for (int iters = 0; iters < importance_sampling || importance_sampling < 0; iters++) {
-    /*
-    An implementation detail about when there are no weights, then the first c values can be computed in O(1) because all the edge weights are uniform. The c value is just k / d where k is fanout and d is the degree. But when there are weights, since the computed c values are incorrect, I have to skip some logic making use of it to compute the right c values below.
+    // NOTE(mfbalin) An implementation detail about when there are no weights, then the first c
+    // values can be computed in O(1) because all the edge weights are uniform. The c value is
+    // just k / d where k is fanout and d is the degree. But when there are weights, since the
+    // computed c values are incorrect, I have to skip some logic making use of it to compute the
+    // right c values below.
 
-    The later iterations will have correct c values so they will take the if in that case.
+    // The later iterations will have correct c values so they will take the if in that case.
 
-    I also increase importance_sampling by 1 above so that the weighted case can do one more of this iteration to match the unweighted case.
-    */
+    // I also increase importance_sampling by 1 above so that the weighted case can do one more of
+    // this iteration to match the unweighted case.
     if (!weights || iters) {
       hop_map2.clear();
       for (int64_t i = 0; i < num_rows; ++i) {
@@ -92,10 +95,12 @@ void compute_importance_sampling_probabilities(
       if (hop_map.empty())
         hop_map = std::move(hop_map2);
       else
+        // Update the pi array according to Eq 18.
         for (auto it : hop_map2)
           hop_map[it.first] *= it.second;
     }
 
+    // Compute c_s according to Equation (15), (17) is slower because sorting is required.
     for (int64_t i = 0; i < num_rows; ++i) {
       const IdxType rid = rows_data[i];
       const auto d = indptr[rid + 1] - indptr[rid];
@@ -112,7 +117,7 @@ void compute_importance_sampling_probabilities(
           ps[j - indptr[rid]] = hop_map[indices[j]];
       }
 
-      // stands for right handside of Equation (22) in arXiv:2210.13339
+      // stands for right handside of Equation (15) in arXiv:2210.13339
       double var_target = ds[i] * ds[i] / k;
       if (weights) {
         var_target -= ds[i] * ds[i] / d;
@@ -120,7 +125,7 @@ void compute_importance_sampling_probabilities(
           var_target += A[j] * A[j];
       }
       FloatType c = cs[i];
-      // stands for left handside of Equation (22) in arXiv:2210.13339
+      // stands for left handside of Equation (15) in arXiv:2210.13339
       double var_1;
       do {
         var_1 = 0;
@@ -138,6 +143,7 @@ void compute_importance_sampling_probabilities(
       cs[i] = c;
     }
 
+    // Check convergence
     if (!weights || iters) {
       double cur_ex_nodes = 0;
       for (auto it : hop_map)
