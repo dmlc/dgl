@@ -1,14 +1,15 @@
 /**
-Copyright (c) 2021 Intel Corporation
- \file distgnn/partition/main_Libra.py
- \brief Libra - Vertex-cut based graph partitioner for distirbuted training
- \author Vasimuddin Md <vasimuddin.md@intel.com>,
-         Guixiang Ma <guixiang.ma@intel.com>
-         Sanchit Misra <sanchit.misra@intel.com>,
-         Ramanarayan Mohanty <ramanarayan.mohanty@intel.com>,
-         Sasikanth Avancha <sasikanth.avancha@intel.com>
-         Nesreen K. Ahmed <nesreen.k.ahmed@intel.com>
-*/
+ *  Copyright (c) 2021 Intel Corporation
+ *
+ *  @file distgnn/partition/main_Libra.py
+ *  @brief Libra - Vertex-cut based graph partitioner for distirbuted training
+ *  @author Vasimuddin Md <vasimuddin.md@intel.com>,
+ *          Guixiang Ma <guixiang.ma@intel.com>
+ *          Sanchit Misra <sanchit.misra@intel.com>,
+ *          Ramanarayan Mohanty <ramanarayan.mohanty@intel.com>,
+ *          Sasikanth Avancha <sasikanth.avancha@intel.com>
+ *          Nesreen K. Ahmed <nesreen.k.ahmed@intel.com>
+ */
 
 #include <dgl/base_heterograph.h>
 #include <dgl/packed_func_ext.h>
