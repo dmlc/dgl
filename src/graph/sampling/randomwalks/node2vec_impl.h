@@ -31,8 +31,10 @@ namespace impl {
  * @param seeds A 1D array of seed nodes, with the type the source type of the
  * first edge type in the metapath.
  * @param p Float, indicating likelihood of immediately revisiting a node in the
- * walk. \param q Float, control parameter to interpolate between breadth-first
- * strategy and depth-first strategy. \param walk_length Int, length of walk.
+ * walk.
+ * @param q Float, control parameter to interpolate between breadth-first
+ * strategy and depth-first strategy.
+ * @param walk_length Int, length of walk.
  * @param prob A vector of 1D float arrays, indicating the transition
  *        probability of each edge by edge type.  An empty float array assumes
  * uniform transition. \return A 2D array of shape (len(seeds), len(walk_length)

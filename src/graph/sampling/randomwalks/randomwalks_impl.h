@@ -47,8 +47,10 @@ TypeArray GetNodeTypesFromMetapath(
  * @brief Metapath-based random walk.
  * @param hg The heterograph.
  * @param seeds A 1D array of seed nodes, with the type the source type of the
- * first edge type in the metapath. \param metapath A 1D array of edge types
- * representing the metapath. \param prob A vector of 1D float arrays,
+ * first edge type in the metapath.
+ * @param metapath A 1D array of edge types
+ * representing the metapath.
+ * @param prob A vector of 1D float arrays,
  * indicating the transition probability of each edge by edge type.  An empty
  * float array assumes uniform transition. \return A 2D array of shape
  * (len(seeds), len(metapath) + 1) with node IDs.  The paths that terminated
@@ -66,10 +68,13 @@ std::pair<IdArray, IdArray> RandomWalk(
  * @brief Metapath-based random walk with restart probability.
  * @param hg The heterograph.
  * @param seeds A 1D array of seed nodes, with the type the source type of the
- * first edge type in the metapath. \param metapath A 1D array of edge types
- * representing the metapath. \param prob A vector of 1D float arrays,
+ * first edge type in the metapath.
+ * @param metapath A 1D array of edge types
+ * representing the metapath.
+ * @param prob A vector of 1D float arrays,
  * indicating the transition probability of each edge by edge type.  An empty
- * float array assumes uniform transition. \param restart_prob Restart
+ * float array assumes uniform transition.
+ * @param restart_prob Restart
  * probability \return A 2D array of shape (len(seeds), len(metapath) + 1) with
  * node IDs.  The paths that terminated early are padded with -1. A 2D array of
  * shape (len(seeds), len(metapath)) with edge IDs.  The paths that terminated
@@ -87,10 +92,13 @@ std::pair<IdArray, IdArray> RandomWalkWithRestart(
  *        for PinSAGE-like models.
  * @param hg The heterograph.
  * @param seeds A 1D array of seed nodes, with the type the source type of the
- * first edge type in the metapath. \param metapath A 1D array of edge types
- * representing the metapath. \param prob A vector of 1D float arrays,
+ * first edge type in the metapath.
+ * @param metapath A 1D array of edge types
+ * representing the metapath.
+ * @param prob A vector of 1D float arrays,
  * indicating the transition probability of each edge by edge type.  An empty
- * float array assumes uniform transition. \param restart_prob Restart
+ * float array assumes uniform transition.
+ * @param restart_prob Restart
  * probability array which has the same number of elements as \c metapath,
  * indicating the probability to terminate after transition. \return A 2D array
  * of shape (len(seeds), len(metapath) + 1) with node IDs.  The paths that
