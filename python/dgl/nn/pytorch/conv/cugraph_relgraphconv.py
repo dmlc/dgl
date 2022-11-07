@@ -63,7 +63,6 @@ class RelGraphConvAgg(th.autograd.Function):
             when ``coeff=None``; Shape: (num_dst_nodes, num_bases * in_feat)
             otherwise.
         """
-        ctx.device = g.device
         if g.idtype == th.int32:
             mfg_csr_func = message_flow_graph_hg_csr_int32
             agg_fwd_func = agg_hg_basis_post_fwd_int32
@@ -109,7 +108,7 @@ class RelGraphConvAgg(th.autograd.Function):
             g.num_dst_nodes(),
             leading_dimension,
             dtype=th.float32,
-            device=ctx.device,
+            device=feat.device,
         )
         if coeff is None:
             agg_fwd_func(agg_output, feat.detach(), mfg)
@@ -140,13 +139,13 @@ class RelGraphConvAgg(th.autograd.Function):
         else:
             agg_bwd_func = agg_hg_basis_post_bwd_int64
 
-        grad_feat = th.empty_like(feat, dtype=th.float32, device=ctx.device)
+        grad_feat = th.empty_like(feat, dtype=th.float32, device=feat.device)
         if coeff is None:
             grad_coeff = None
             agg_bwd_func(grad_feat, grad_output, feat.detach(), ctx.mfg)
         else:
             grad_coeff = th.empty_like(
-                coeff, dtype=th.float32, device=ctx.device
+                coeff, dtype=th.float32, device=coeff.device
             )
             agg_bwd_func(
                 grad_feat,
@@ -161,8 +160,10 @@ class RelGraphConvAgg(th.autograd.Function):
 
 
 class CuGraphRelGraphConv(nn.Module):
-    r"""An accelerated relational graph convolution layer using the
-    highly-optimized aggregation primitives in cugraph-ops.
+    r"""An accelerated relational graph convolution layer from `Modeling
+    Relational Data with Graph Convolutional Networks
+    <https://arxiv.org/abs/1703.06103>`__ that leverages the highly-optimized
+    aggregation primitives in cugraph-ops.
 
     See :class:`dgl.nn.pytorch.conv.RelGraphConv` for mathematical model.
 
@@ -172,9 +173,6 @@ class CuGraphRelGraphConv(nn.Module):
 
         * Only works on cuda devices.
         * Only supports basis-decomposition regularization.
-        * Requires an extra argument `fanout` as input, since the current model
-          is designed for sampled-graph (message-flow-graph) use-cases.
-          Full-graph support will be added in upcoming releases.
 
     Parameters
     ----------
@@ -203,7 +201,7 @@ class CuGraphRelGraphConv(nn.Module):
         True to include self loop message. Default: ``True``.
     dropout : float, optional
         Dropout rate. Default: ``0.0``
-    layer_norm: bool, optional
+    layer_norm : bool, optional
         True to add layer norm. Default: ``False``
 
     Examples
@@ -326,9 +324,9 @@ class CuGraphRelGraphConv(nn.Module):
         feat : torch.Tensor
             A 2D tensor of node features. Shape: :math:`(|V|, D_{in})`.
         etypes : torch.Tensor
-            An 1D integer tensor of edge types. Shape: :math:`(|E|,)`.
+            A 1D integer tensor of edge types. Shape: :math:`(|E|,)`.
         norm : torch.Tensor, optional
-            An 1D tensor of edge norm value.  Shape: :math:`(|E|,)`.
+            A 1D tensor of edge norm value.  Shape: :math:`(|E|,)`.
 
         Returns
         -------
@@ -338,8 +336,8 @@ class CuGraphRelGraphConv(nn.Module):
         _device = next(self.parameters()).device
         if _device.type != "cuda":
             raise RuntimeError(
-                f"dgl.nn.CuGraphRelGraphConv requires "
-                f"the model on device 'cuda', but got '{_device.type}'."
+                f"dgl.nn.CuGraphRelGraphConv requires the model to be on "
+                f"device 'cuda', but got '{_device.type}'."
             )
         if _device != g.device:
             raise RuntimeError(
