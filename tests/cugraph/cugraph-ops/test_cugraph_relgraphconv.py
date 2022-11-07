@@ -4,7 +4,7 @@ import dgl
 from dgl.nn import CuGraphRelGraphConv
 from dgl.nn import RelGraphConv
 
-fanouts = [None, 8]
+max_in_degrees = [None, 8]
 regularizers = [None, "basis"]
 device = "cuda"
 
@@ -17,9 +17,9 @@ def generate_graph():
     g.edata[dgl.ETYPE] = torch.randint(num_rels, (g.num_edges(),))
     return g
 
-@pytest.mark.parametrize('fanout', fanouts)
+@pytest.mark.parametrize('max_in_degree', max_in_degrees)
 @pytest.mark.parametrize("regularizer", regularizers)
-def test_full_graph(fanout, regularizer):
+def test_full_graph(max_in_degree, regularizer):
     in_feat, out_feat, num_rels, num_bases = 10, 2, 3, 2
     kwargs = {
         "num_bases": num_bases,
@@ -35,7 +35,8 @@ def test_full_graph(fanout, regularizer):
 
     torch.manual_seed(0)
     conv2 = CuGraphRelGraphConv(
-        in_feat, out_feat, num_rels, fanout=fanout, **kwargs).to(device)
+        in_feat, out_feat, num_rels, max_in_degree=max_in_degree, **kwargs
+    ).to(device)
 
     out1 = conv1(g, feat, g.edata[dgl.ETYPE])
     out2 = conv2(g, feat, g.edata[dgl.ETYPE])
@@ -51,9 +52,9 @@ def test_full_graph(fanout, regularizer):
             conv1.linear_r.coeff.grad, conv2.coeff.grad, atol=1e-6
         )
 
-@pytest.mark.parametrize('fanout', fanouts)
+@pytest.mark.parametrize('max_in_degree', max_in_degrees)
 @pytest.mark.parametrize("regularizer", regularizers)
-def test_mfg(fanout, regularizer):
+def test_mfg(max_in_degree, regularizer):
     in_feat, out_feat, num_rels, num_bases = 10, 2, 3, 2
     kwargs = {
         "num_bases": num_bases,
@@ -70,7 +71,8 @@ def test_mfg(fanout, regularizer):
 
     torch.manual_seed(0)
     conv2 = CuGraphRelGraphConv(
-        in_feat, out_feat, num_rels, fanout=fanout, **kwargs).to(device)
+        in_feat, out_feat, num_rels, max_in_degree=max_in_degree, **kwargs
+    ).to(device)
 
     out1 = conv1(block, feat[block.srcdata[dgl.NID]], block.edata[dgl.ETYPE])
     out2 = conv2(block, feat[block.srcdata[dgl.NID]], block.edata[dgl.ETYPE])

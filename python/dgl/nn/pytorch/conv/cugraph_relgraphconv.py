@@ -33,7 +33,7 @@ class RelGraphConvAgg(th.autograd.Function):
     aggregation functions in cugraph-ops."""
 
     @staticmethod
-    def forward(ctx, g, num_rels, edge_types, fanout, feat, coeff):
+    def forward(ctx, g, num_rels, edge_types, max_in_degree, feat, coeff):
         r"""Compute the forward pass of R-GCN aggregation layer.
 
         Parameters
@@ -47,7 +47,7 @@ class RelGraphConvAgg(th.autograd.Function):
             edge_types in int32, so any input of other integer types will be
             casted into int32, thus introducing some overhead. Pass in int32
             tensor for best performance.
-        fanout : int
+        max_in_degree : int
             Maximum number of sampled neighbors of a destination node.
         feat : torch.Tensor
             Tensor of source node features. Shape: (num_src_nodes, in_feat).
@@ -85,7 +85,7 @@ class RelGraphConvAgg(th.autograd.Function):
         _out_node_types = _in_node_types = None
 
         mfg = mfg_csr_func(
-            fanout,
+            max_in_degree,
             g.dstnodes(),
             g.srcnodes(),
             indptr,
@@ -200,7 +200,7 @@ class CuGraphRelGraphConv(nn.Module):
         Dropout rate. Default: ``0.0``.
     layer_norm : bool, optional
         True to add layer norm. Default: ``False``.
-    fanout : int, optional
+    max_in_degree : int, optional
         Maximum number of sampled neighbors of a destination node,
         i.e. maximum in degree of destination nodes. If ``None``, it will be
         calculated on the fly during :meth:`forward`.
@@ -238,13 +238,13 @@ class CuGraphRelGraphConv(nn.Module):
         self_loop=True,
         dropout=0.0,
         layer_norm=False,
-        fanout=None
+        max_in_degree=None
     ):
         super().__init__()
         self.in_feat = in_feat
         self.out_feat = out_feat
         self.num_rels = num_rels
-        self.fanout = fanout
+        self.max_in_degree = max_in_degree
 
         # regularizer
         if regularizer is None:
@@ -355,13 +355,13 @@ class CuGraphRelGraphConv(nn.Module):
                 f"Expected model and feature tensor on the same device, "
                 f"but got '{_device}' and '{feat.device}'."
             )
-        # Compute fanout.
-        fanout = self.fanout
-        if fanout is None:
-            fanout = g.in_degrees().max().item()
+        # Compute max_in_degree.
+        max_in_degree = self.max_in_degree
+        if max_in_degree is None:
+            max_in_degree = g.in_degrees().max().item()
         # Check shared memory per block size.
         _sm_size = (
-            fanout * 2 + 3 + self.num_rels * self.num_bases
+            max_in_degree * 2 + 3 + self.num_rels * self.num_bases
             if self.regularizer == "basis"
             else 0
         )
@@ -370,7 +370,7 @@ class CuGraphRelGraphConv(nn.Module):
             raise MemoryError(
                 f"Failed to allocate {_sm_size} bytes shared memory on CUDA, "
                 f"larger than the limit: {CUDA_SM_PER_BLOCK} bytes. "
-                f"Try reducing fanout or num_bases."
+                f"Try reducing max_in_degree or num_bases."
             )
         with g.local_scope():
             g.srcdata["h"] = feat
@@ -378,7 +378,7 @@ class CuGraphRelGraphConv(nn.Module):
                 g.edata["norm"] = norm
             # message passing
             h = RelGraphConvAgg.apply(
-                g, self.num_rels, etypes, fanout, feat, self.coeff
+                g, self.num_rels, etypes, max_in_degree, feat, self.coeff
             )
             h = h @ self.W.view(-1, self.out_feat)
             # apply bias and activation
