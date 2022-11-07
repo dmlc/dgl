@@ -160,16 +160,13 @@ std::tuple<dgl_id_t, dgl_id_t, bool> MetapathRandomWalkStepUniform(
  * @param hg The heterograph.
  * @param seeds A 1D array of seed nodes, with the type the source type of the
  * first edge type in the metapath.
- * @param metapath A 1D array of edge types
- * representing the metapath.
- * @param prob A vector of 1D float arrays,
- * indicating the transition probability of each edge by edge type.  An empty
- * float array assumes uniform transition.
- * @param terminate Predicate for
- * terminating a random walk path.
- * @return A 2D array of shape (len(seeds),
- * len(metapath) + 1) with node IDs, and A 2D array of shape (len(seeds),
- * len(metapath)) with edge IDs.
+ * @param metapath A 1D array of edge types representing the metapath.
+ * @param prob A vector of 1D float arrays, indicating the transition
+ * probability of each edge by edge type.  An empty float array assumes uniform
+ * transition.
+ * @param terminate Predicate for terminating a random walk path.
+ * @return A 2D array of shape (len(seeds), len(metapath) + 1) with node IDs,
+ * and A 2D array of shape (len(seeds), len(metapath)) with edge IDs.
  */
 template <DGLDeviceType XPU, typename IdxType>
 std::pair<IdArray, IdArray> MetapathBasedRandomWalk(

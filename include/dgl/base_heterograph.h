@@ -288,18 +288,16 @@ class BaseHeteroGraph : public runtime::Object {
    * and dst ids. If order is "eid", they are in their edge id order. Otherwise,
    * in the arbitrary order.
    * @param etype The edge type
-   * @param order The order
-   * of the returned edge list.
-   * @return the id arrays of the two endpoints of
-   * the edges.
+   * @param order The order of the returned edge list.
+   * @return the id arrays of the two endpoints of the edges.
    */
   virtual EdgeArray Edges(
       dgl_type_t etype, const std::string& order = "") const = 0;
 
   /**
    * @brief Get the in degree of the given vertex.
-   * @note The given vertex should belong to the dest vertex type
-   *       of the given edge type.
+   * @note The given vertex should belong to the dest vertex type of the given
+   * edge type.
    * @param etype The edge type
    * @param vid The vertex id.
    * @return the in degree
@@ -308,8 +306,8 @@ class BaseHeteroGraph : public runtime::Object {
 
   /**
    * @brief Get the in degrees of the given vertices.
-   * @note The given vertex should belong to the dest vertex type
-   *       of the given edge type.
+   * @note The given vertex should belong to the dest vertex type of the given
+   * edge type.
    * @param etype The edge type
    * @param vid The vertex id array.
    * @return the in degree array
@@ -318,8 +316,8 @@ class BaseHeteroGraph : public runtime::Object {
 
   /**
    * @brief Get the out degree of the given vertex.
-   * @note The given vertex should belong to the source vertex type
-   *       of the given edge type.
+   * @note The given vertex should belong to the source vertex type of the given
+   * edge type.
    * @param etype The edge type
    * @param vid The vertex id.
    * @return the out degree
@@ -328,8 +326,8 @@ class BaseHeteroGraph : public runtime::Object {
 
   /**
    * @brief Get the out degrees of the given vertices.
-   * @note The given vertex should belong to the source vertex type
-   *       of the given edge type.
+   * @note The given vertex should belong to the source vertex type of the given
+   * edge type.
    * @param etype The edge type
    * @param vid The vertex id array.
    * @return the out degree array
@@ -338,8 +336,8 @@ class BaseHeteroGraph : public runtime::Object {
 
   /**
    * @brief Return the successor vector
-   * @note The given vertex should belong to the source vertex type
-   *       of the given edge type.
+   * @note The given vertex should belong to the source vertex type of the given
+   * edge type.
    * @param vid The vertex id.
    * @return the successor vector iterator pair.
    */
@@ -347,8 +345,8 @@ class BaseHeteroGraph : public runtime::Object {
 
   /**
    * @brief Return the out edge id vector
-   * @note The given vertex should belong to the source vertex type
-   *       of the given edge type.
+   * @note The given vertex should belong to the source vertex type of the given
+   * edge type.
    * @param vid The vertex id.
    * @return the out edge id vector iterator pair.
    */
@@ -356,8 +354,8 @@ class BaseHeteroGraph : public runtime::Object {
 
   /**
    * @brief Return the predecessor vector
-   * @note The given vertex should belong to the dest vertex type
-   *       of the given edge type.
+   * @note The given vertex should belong to the dest vertex type of the given
+   * edge type.
    * @param vid The vertex id.
    * @return the predecessor vector iterator pair.
    */
@@ -365,8 +363,8 @@ class BaseHeteroGraph : public runtime::Object {
 
   /**
    * @brief Return the in edge id vector
-   * @note The given vertex should belong to the dest vertex type
-   *       of the given edge type.
+   * @note The given vertex should belong to the dest vertex type of the given
+   * edge type.
    * @param vid The vertex id.
    * @return the in edge id vector iterator pair.
    */
@@ -396,7 +394,6 @@ class BaseHeteroGraph : public runtime::Object {
   /**
    * @brief Determine which format to use with a preference.
    *
-
    * Otherwise, it will return whatever DGL thinks is the most appropriate given
    * the arguments.
    *
