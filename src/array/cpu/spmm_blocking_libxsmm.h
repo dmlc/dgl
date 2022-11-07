@@ -210,7 +210,6 @@ inline libxsmm_meltwfunction_opreduce_vecs_idx SpMMCreateLibxsmmKernel(
   // the first operand. So, if we need to copy rhs, we need to set that as the
   // first operand. For rhs, we also set whether to use implicit indices or
   // provided indices.
-  // TODO(Steve): fix this long line in a separate PR.
   if (std::is_same<Op, op::CopyLhs<DType>>::value) {
     opredop_flags |= LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OPORDER_VECIDX_VECIN;
   } else if (std::is_same<Op, op::CopyRhs<DType>>::value) {
