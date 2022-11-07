@@ -21,8 +21,8 @@
 #ifndef DGL_ARRAY_CUDA_FP16_CUH_
 #define DGL_ARRAY_CUDA_FP16_CUH_
 
-
 #include <cuda_fp16.h>
+
 #include <algorithm>
 
 static __device__ __forceinline__ half max(half a, half b) {
@@ -42,45 +42,64 @@ static __device__ __forceinline__ half min(half a, half b) {
 }
 
 #ifdef __CUDACC__
-// Arithmetic FP16 operations for architecture >= 5.3 are already defined in cuda_fp16.h
+// Arithmetic FP16 operations for architecture >= 5.3 are already defined in
+// cuda_fp16.h
 #if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ < 530)
-__device__ __forceinline__ __half operator+(const __half& lh, const __half& rh) {
+__device__ __forceinline__ __half
+operator+(const __half& lh, const __half& rh) {
   return __half(float(lh) + float(rh));  // NOLINT
 }
-__device__ __forceinline__ __half operator-(const __half& lh, const __half& rh) {
+__device__ __forceinline__ __half
+operator-(const __half& lh, const __half& rh) {
   return __half(float(lh) - float(rh));  // NOLINT
 }
-__device__ __forceinline__ __half operator*(const __half& lh, const __half& rh) {
+__device__ __forceinline__ __half
+operator*(const __half& lh, const __half& rh) {
   return __half(float(lh) * float(rh));  // NOLINT
 }
-__device__ __forceinline__ __half operator/(const __half& lh, const __half& rh) {
+__device__ __forceinline__ __half
+operator/(const __half& lh, const __half& rh) {
   return __half(float(lh) / float(rh));  // NOLINT
 }
 
-__device__ __forceinline__ __half& operator+=(__half& lh, const __half& rh) {  // NOLINT
-  lh = __half(float(lh) + float(rh)); return lh;  // NOLINT
+__device__ __forceinline__ __half& operator+=(
+    __half& lh, const __half& rh) {    // NOLINT
+  lh = __half(float(lh) + float(rh));  // NOLINT
+  return lh;
 }
-__device__ __forceinline__ __half& operator-=(__half& lh, const __half& rh) {  // NOLINT
-  lh = __half(float(lh) - float(rh)); return lh;  // NOLINT
+__device__ __forceinline__ __half& operator-=(
+    __half& lh, const __half& rh) {    // NOLINT
+  lh = __half(float(lh) - float(rh));  // NOLINT
+  return lh;
 }
-__device__ __forceinline__ __half& operator*=(__half& lh, const __half& rh) {  // NOLINT
-  lh = __half(float(lh) * float(rh)); return lh;  // NOLINT
+__device__ __forceinline__ __half& operator*=(
+    __half& lh, const __half& rh) {    // NOLINT
+  lh = __half(float(lh) * float(rh));  // NOLINT
+  return lh;
 }
-__device__ __forceinline__ __half& operator/=(__half& lh, const __half& rh) {  // NOLINT
-  lh = __half(float(lh) / float(rh)); return lh;  // NOLINT
+__device__ __forceinline__ __half& operator/=(
+    __half& lh, const __half& rh) {    // NOLINT
+  lh = __half(float(lh) / float(rh));  // NOLINT
+  return lh;
 }
 
 __device__ __forceinline__ __half& operator++(__half& h) {  // NOLINT
-  h = __half(float(h) + 1.0f); return h;  // NOLINT
+  h = __half(float(h) + 1.0f);                              // NOLINT
+  return h;
 }
 __device__ __forceinline__ __half& operator--(__half& h) {  // NOLINT
-  h = __half(float(h) - 1.0f); return h;  // NOLINT
+  h = __half(float(h) - 1.0f);                              // NOLINT
+  return h;
 }
-__device__ __forceinline__ __half  operator++(__half& h, int) {  // NOLINT
-  __half ret = h; h = __half(float(h) + 1.0f); return ret;  // NOLINT
+__device__ __forceinline__ __half operator++(__half& h, int) {  // NOLINT
+  __half ret = h;
+  h = __half(float(h) + 1.0f);  // NOLINT
+  return ret;
 }
-__device__ __forceinline__ __half  operator--(__half& h, int) {  // NOLINT
-  __half ret = h; h = __half(float(h) - 1.0f); return ret;  // NOLINT
+__device__ __forceinline__ __half operator--(__half& h, int) {  // NOLINT
+  __half ret = h;
+  h = __half(float(h) - 1.0f);  // NOLINT
+  return ret;
 }
 
 __device__ __forceinline__ __half operator+(const __half& h) { return h; }
@@ -94,11 +113,11 @@ __device__ __forceinline__ bool operator==(const __half& lh, const __half& rh) {
 __device__ __forceinline__ bool operator!=(const __half& lh, const __half& rh) {
   return float(lh) != float(rh);  // NOLINT
 }
-__device__ __forceinline__ bool operator> (const __half& lh, const __half& rh) {
-  return float(lh) >  float(rh);  // NOLINT
+__device__ __forceinline__ bool operator>(const __half& lh, const __half& rh) {
+  return float(lh) > float(rh);  // NOLINT
 }
-__device__ __forceinline__ bool operator< (const __half& lh, const __half& rh) {
-  return float(lh) <  float(rh);  // NOLINT
+__device__ __forceinline__ bool operator<(const __half& lh, const __half& rh) {
+  return float(lh) < float(rh);  // NOLINT
 }
 __device__ __forceinline__ bool operator>=(const __half& lh, const __half& rh) {
   return float(lh) >= float(rh);  // NOLINT

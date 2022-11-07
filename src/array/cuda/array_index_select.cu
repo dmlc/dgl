@@ -63,8 +63,10 @@ template NDArray IndexSelect<kDGLCUDA, int64_t, int64_t>(NDArray, IdArray);
 template NDArray IndexSelect<kDGLCUDA, __half, int32_t>(NDArray, IdArray);
 template NDArray IndexSelect<kDGLCUDA, __half, int64_t>(NDArray, IdArray);
 #if BF16_ENABLED
-template NDArray IndexSelect<kDGLCUDA, __nv_bfloat16, int32_t>(NDArray, IdArray);
-template NDArray IndexSelect<kDGLCUDA, __nv_bfloat16, int64_t>(NDArray, IdArray);
+template NDArray IndexSelect<kDGLCUDA, __nv_bfloat16, int32_t>(
+    NDArray, IdArray);
+template NDArray IndexSelect<kDGLCUDA, __nv_bfloat16, int64_t>(
+    NDArray, IdArray);
 #endif  // BF16_ENABLED
 template NDArray IndexSelect<kDGLCUDA, float, int32_t>(NDArray, IdArray);
 template NDArray IndexSelect<kDGLCUDA, float, int64_t>(NDArray, IdArray);
@@ -76,8 +78,8 @@ DType IndexSelect(NDArray array, int64_t index) {
   auto device = runtime::DeviceAPI::Get(array->ctx);
   DType ret = static_cast<DType>(0.0f);
   device->CopyDataFromTo(
-      static_cast<DType*>(array->data) + index, 0, &ret, 0,
-      sizeof(DType), array->ctx, DGLContext{kDGLCPU, 0}, array->dtype);
+      static_cast<DType*>(array->data) + index, 0, &ret, 0, sizeof(DType),
+      array->ctx, DGLContext{kDGLCPU, 0}, array->dtype);
   return ret;
 }
 
@@ -87,7 +89,8 @@ template uint32_t IndexSelect<kDGLCUDA, uint32_t>(NDArray array, int64_t index);
 template uint64_t IndexSelect<kDGLCUDA, uint64_t>(NDArray array, int64_t index);
 template __half IndexSelect<kDGLCUDA, __half>(NDArray array, int64_t index);
 #if BF16_ENABLED
-template __nv_bfloat16 IndexSelect<kDGLCUDA, __nv_bfloat16>(NDArray array, int64_t index);
+template __nv_bfloat16 IndexSelect<kDGLCUDA, __nv_bfloat16>(
+    NDArray array, int64_t index);
 #endif  // BF16_ENABLED
 template float IndexSelect<kDGLCUDA, float>(NDArray array, int64_t index);
 template double IndexSelect<kDGLCUDA, double>(NDArray array, int64_t index);

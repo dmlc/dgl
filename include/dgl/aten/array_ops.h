@@ -10,10 +10,11 @@
 #define DGL_ATEN_ARRAY_OPS_H_
 
 #include <algorithm>
+#include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
-#include <tuple>
-#include <string>
+
 #include "./types.h"
 
 namespace dgl {
@@ -24,17 +25,16 @@ namespace aten {
 //////////////////////////////////////////////////////////////////////
 
 /** @return A special array to represent null. */
-inline NDArray NullArray(const DGLDataType& dtype = DGLDataType{kDGLInt, 64, 1},
-                         const DGLContext& ctx = DGLContext{kDGLCPU, 0}) {
+inline NDArray NullArray(
+    const DGLDataType& dtype = DGLDataType{kDGLInt, 64, 1},
+    const DGLContext& ctx = DGLContext{kDGLCPU, 0}) {
   return NDArray::Empty({0}, dtype, ctx);
 }
 
 /**
  * @return Whether the input array is a null array.
  */
-inline bool IsNullArray(NDArray array) {
-  return array->shape[0] == 0;
-}
+inline bool IsNullArray(NDArray array) { return array->shape[0] == 0; }
 
 /**
  * @brief Create a new id array with given length
@@ -43,9 +43,9 @@ inline bool IsNullArray(NDArray array) {
  * @param nbits The number of integer bits
  * @return id array
  */
-IdArray NewIdArray(int64_t length,
-                   DGLContext ctx = DGLContext{kDGLCPU, 0},
-                   uint8_t nbits = 64);
+IdArray NewIdArray(
+    int64_t length, DGLContext ctx = DGLContext{kDGLCPU, 0},
+    uint8_t nbits = 64);
 
 /**
  * @brief Create a new id array using the given vector data
@@ -55,9 +55,9 @@ IdArray NewIdArray(int64_t length,
  * @return the id array
  */
 template <typename T>
-IdArray VecToIdArray(const std::vector<T>& vec,
-                     uint8_t nbits = 64,
-                     DGLContext ctx = DGLContext{kDGLCPU, 0});
+IdArray VecToIdArray(
+    const std::vector<T>& vec, uint8_t nbits = 64,
+    DGLContext ctx = DGLContext{kDGLCPU, 0});
 
 /**
  * @brief Return an array representing a 1D range.
@@ -148,7 +148,7 @@ IdArray NonZero(BoolArray bool_arr);
  * @brief Return the data under the index. In numpy notation, A[I]
  * @tparam ValueType The type of return value.
  */
-template<typename ValueType>
+template <typename ValueType>
 ValueType IndexSelect(NDArray array, int64_t index);
 
 /**
@@ -187,10 +187,11 @@ NDArray Scatter(NDArray array, IdArray indices);
 void Scatter_(IdArray index, NDArray value, NDArray out);
 
 /**
- * @brief Repeat each element a number of times.  Equivalent to np.repeat(array, repeats)
+ * @brief Repeat each element a number of times.  Equivalent to np.repeat(array,
+ * repeats)
  * @param array A 1D vector
- * @param repeats A 1D integer vector for number of times to repeat for each element in
- *                \c array.  Must have the same shape as \c array.
+ * @param repeats A 1D integer vector for number of times to repeat for each
+ * element in \c array.  Must have the same shape as \c array.
  */
 NDArray Repeat(NDArray array, IdArray repeats);
 
@@ -253,12 +254,13 @@ inline bool IsValidIdArray(const dgl::runtime::NDArray& arr) {
  *
  * The packed tensor would be [1, 2, 3, 4, 5].
  *
- * The length tensor would be [2, 3], i.e. the length of each sequence before padding.
+ * The length tensor would be [2, 3], i.e. the length of each sequence before
+ * padding.
  *
- * The offset tensor would be [0, 2], i.e. the offset to the packed tensor for each
- * sequence (before padding)
+ * The offset tensor would be [0, 2], i.e. the offset to the packed tensor for
+ * each sequence (before padding)
  */
-template<typename ValueType>
+template <typename ValueType>
 std::tuple<NDArray, IdArray, IdArray> Pack(NDArray array, ValueType pad_value);
 
 /**
@@ -295,8 +297,9 @@ std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths);
  * @brief Return the cumulative summation (or inclusive sum) of the input array.
  *
  * The first element out[0] is equal to the first element of the input array
- * array[0]. The rest elements are defined recursively, out[i] = out[i-1] + array[i].
- * Hence, the result array length is the same as the input array length.
+ * array[0]. The rest elements are defined recursively, out[i] = out[i-1] +
+ * array[i]. Hence, the result array length is the same as the input array
+ * length.
  *
  * If prepend_zero is true, then the first element is zero and the result array
  * length is the input array length plus one. This is useful for creating
@@ -320,17 +323,18 @@ IdArray NonZero(NDArray array);
 /**
  * @brief Sort the ID vector in ascending order.
  *
- * It performs both sort and arg_sort (returning the sorted index). The sorted index
- * is always in int64.
+ * It performs both sort and arg_sort (returning the sorted index). The sorted
+ * index is always in int64.
  *
  * @param array Input array.
- * @param num_bits The number of bits used in key comparison. For example, if the data type
- *                 of the input array is int32_t and `num_bits = 8`, it only uses bits in index
- *                 range [0, 8) for sorting. Setting it to a small value could
- *                 speed up the sorting if the underlying sorting algorithm is radix sort (e.g., on GPU).
- *                 Setting it to zero (default value) means using all the bits for comparison.
- *                 On CPU, it currently has no effect.
- * @return A pair of arrays: sorted values and sorted index to the original position.
+ * @param num_bits The number of bits used in key comparison. For example, if
+ * the data type of the input array is int32_t and `num_bits = 8`, it only uses
+ * bits in index range [0, 8) for sorting. Setting it to a small value could
+ *                 speed up the sorting if the underlying sorting algorithm is
+ * radix sort (e.g., on GPU). Setting it to zero (default value) means using all
+ * the bits for comparison. On CPU, it currently has no effect.
+ * @return A pair of arrays: sorted values and sorted index to the original
+ * position.
  */
 std::pair<IdArray, IdArray> Sort(IdArray array, int num_bits = 0);
 
@@ -341,9 +345,7 @@ std::string ToDebugString(NDArray array);
 
 // inline implementations
 template <typename T>
-IdArray VecToIdArray(const std::vector<T>& vec,
-                     uint8_t nbits,
-                     DGLContext ctx) {
+IdArray VecToIdArray(const std::vector<T>& vec, uint8_t nbits, DGLContext ctx) {
   IdArray ret = NewIdArray(vec.size(), DGLContext{kDGLCPU, 0}, nbits);
   if (nbits == 32) {
     std::copy(vec.begin(), vec.end(), static_cast<int32_t*>(ret->data));
@@ -367,7 +369,8 @@ inline DGLContext GetContextOf(const std::vector<IdArray>& arrays) {
       first = false;
       result = array->ctx;
     } else {
-      CHECK_EQ(array->ctx, result) << "Context of the input arrays are different";
+      CHECK_EQ(array->ctx, result)
+          << "Context of the input arrays are different";
     }
   }
   return result;
