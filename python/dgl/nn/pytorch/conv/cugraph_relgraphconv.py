@@ -33,15 +33,13 @@ class RelGraphConvAgg(th.autograd.Function):
     aggregation functions in cugraph-ops."""
 
     @staticmethod
-    def forward(ctx, g, fanout, num_rels, edge_types, feat, coeff):
+    def forward(ctx, g, num_rels, edge_types, fanout, feat, coeff):
         r"""Compute the forward pass of R-GCN aggregation layer.
 
         Parameters
         ----------
         g : DGLGraph
             The graph.
-        fanout : int
-            Maximum in-degree of nodes.
         num_rels : int
             Number of relations.
         edge_types : torch.Tensor
@@ -49,6 +47,8 @@ class RelGraphConvAgg(th.autograd.Function):
             edge_types in int32, so any input of other integer types will be
             casted into int32, thus introducing some overhead. Pass in int32
             tensor for best performance.
+        fanout : int
+            Maximum number of sampled neighbors of a destination node.
         feat : torch.Tensor
             Tensor of source node features. Shape: (num_src_nodes, in_feat).
         coeff : torch.Tensor
@@ -182,16 +182,13 @@ class CuGraphRelGraphConv(nn.Module):
         Output feature size.
     num_rels : int
         Number of relations.
-    fanout : int
-        Maximum number of sampled neighbors of a destination node,
-        i.e. maximum in degree of destination nodes
     regularizer : str, optional
         Which weight regularizer to use ("basis" or ``None``):
          - "basis" is for basis-decomposition.
          - ``None`` applies no regularization.
         Default: ``None``.
     num_bases : int, optional
-        Number of bases. Only used when "basis" regularizer is applied.
+        Number of bases. It comes into effect when a regularizer is applied.
         Default: ``None``.
     bias : bool, optional
         True if bias is added. Default: ``True``.
@@ -200,37 +197,40 @@ class CuGraphRelGraphConv(nn.Module):
     self_loop : bool, optional
         True to include self loop message. Default: ``True``.
     dropout : float, optional
-        Dropout rate. Default: ``0.0``
+        Dropout rate. Default: ``0.0``.
     layer_norm : bool, optional
-        True to add layer norm. Default: ``False``
+        True to add layer norm. Default: ``False``.
+    fanout : int, optional
+        Maximum number of sampled neighbors of a destination node,
+        i.e. maximum in degree of destination nodes. If ``None``, it will be
+        calculated on the fly during :meth:`forward`.
 
     Examples
     --------
     >>> import dgl
-    >>> from dgl.dataloading import NeighborSampler, DataLoader
+    >>> import torch as th
     >>> from dgl.nn import CuGraphRelGraphConv
-    >>> import torch.nn.functional as F
     ...
     >>> device = 'cuda'
-    >>> fanouts = [5, 6]
-    >>> sampler = NeighborSampler(fanouts)
-    >>> dataloader = DataLoader(g, train_nid, sampler,
-    ...     device=device, batch_size=1024)
-    >>> conv1 = CuGraphRelGraphConv(in_dim, h_dim, num_rels, fanouts[0],
-    ...     regularizer='basis', num_bases=10).to(device)
-    >>> conv2 = CuGraphRelGraphConv(h_dim, out_dim, num_rels, fanouts[1],
-    ...     regularizer='basis', num_bases=10).to(device)
-    >>> for input_nodes, output_nodes, blocks in dataloader:
-    ...     h = conv1(blocks[0], x, blocks[0].edata[dgl.ETYPE])
-    ...     h = F.relu(h)
-    ...     h = conv2(blocks[1], h, blocks[1].edata[dgl.ETYPE])
+    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3])).to(device)
+    >>> feat = th.ones(6, 10).to(device)
+    >>> conv = CuGraphRelGraphConv(
+    ...     10, 2, 3, regularizer='basis', num_bases=2).to(device)
+    >>> etype = th.tensor([0,1,2,0,1,2]).to(device)
+    >>> res = conv(g, feat, etype)
+    >>> res
+    tensor([[-1.7774, -2.0184],
+            [-1.4335, -2.3758],
+            [-1.7774, -2.0184],
+            [-0.4698, -3.0876],
+            [-1.4335, -2.3758],
+            [-1.4331, -2.3295]], device='cuda:0', grad_fn=<AddBackward0>)
     """
     def __init__(
         self,
         in_feat,
         out_feat,
         num_rels,
-        fanout,
         regularizer=None,
         num_bases=None,
         bias=True,
@@ -238,6 +238,7 @@ class CuGraphRelGraphConv(nn.Module):
         self_loop=True,
         dropout=0.0,
         layer_norm=False,
+        fanout=None
     ):
         super().__init__()
         self.in_feat = in_feat
@@ -259,7 +260,7 @@ class CuGraphRelGraphConv(nn.Module):
             self.num_bases = num_bases
         else:
             raise ValueError(
-                f"Supported regularizer options: 'basis', but got "
+                f"Supported regularizer options: 'basis' or None, but got "
                 f"{regularizer}."
             )
         self.regularizer = regularizer
@@ -354,9 +355,13 @@ class CuGraphRelGraphConv(nn.Module):
                 f"Expected model and feature tensor on the same device, "
                 f"but got '{_device}' and '{feat.device}'."
             )
+        # Compute fanout.
+        fanout = self.fanout
+        if fanout is None:
+            fanout = g.in_degrees().max().item()
         # Check shared memory per block size.
         _sm_size = (
-            self.fanout * 2 + 3 + self.num_rels * self.num_bases
+            fanout * 2 + 3 + self.num_rels * self.num_bases
             if self.regularizer == "basis"
             else 0
         )
@@ -373,7 +378,7 @@ class CuGraphRelGraphConv(nn.Module):
                 g.edata["norm"] = norm
             # message passing
             h = RelGraphConvAgg.apply(
-                g, self.fanout, self.num_rels, etypes, feat, self.coeff
+                g, self.num_rels, etypes, fanout, feat, self.coeff
             )
             h = h @ self.W.view(-1, self.out_feat)
             # apply bias and activation
