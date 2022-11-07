@@ -1,8 +1,12 @@
 import pytest
 import torch
+import sys
 
 from dgl.mock_sparse2 import create_from_coo, create_from_csr, create_from_csc
 
+# FIXME: Skipping tests on win.
+if not sys.platform.startswith("linux"):
+    pytest.skip("skipping tests on win", allow_module_level=True)
 
 @pytest.mark.parametrize("dense_dim", [None, 4])
 @pytest.mark.parametrize("row", [[0, 0, 1, 2], (0, 1, 2, 4)])
@@ -36,7 +40,6 @@ def test_create_from_coo(dense_dim, row, col, shape):
     assert torch.allclose(mat_col, col)
 
 
-@pytest.mark.skip(reason="no way of currently testing this")
 @pytest.mark.parametrize("dense_dim", [None, 4])
 @pytest.mark.parametrize("indptr", [[0, 0, 1, 4], (0, 1, 2, 4)])
 @pytest.mark.parametrize("indices", [(0, 1, 2, 3), (1, 2, 3, 4)])
@@ -62,7 +65,6 @@ def test_create_from_csr(dense_dim, indptr, indices, shape):
     assert torch.allclose(mat_indices, indices)
     assert torch.allclose(mat_val, val)
 
-@pytest.mark.skip(reason="no way of currently testing this")
 @pytest.mark.parametrize("dense_dim", [None, 4])
 @pytest.mark.parametrize("indptr", [[0, 0, 1, 4], (0, 1, 2, 4)])
 @pytest.mark.parametrize("indices", [(0, 1, 2, 3), (1, 2, 3, 4)])
@@ -83,7 +85,7 @@ def test_create_from_csc(dense_dim, indptr, indices, shape):
     assert mat.shape == shape
     assert mat.nnz == indices.numel()
     assert mat.dtype == val.dtype
-    mat_indptr, mat_indices, mat_val = mat.csr()
+    mat_indptr, mat_indices, mat_val = mat.csc()
     assert torch.allclose(mat_indptr, indptr)
     assert torch.allclose(mat_indices, indices)
     assert torch.allclose(mat_val, val)

@@ -3,14 +3,12 @@ import operator
 import numpy as np
 import pytest
 import torch
+import sys
 from dgl.mock_sparse import diag
 
-parametrize_idtype = pytest.mark.parametrize(
-    "idtype", [torch.int32, torch.int64]
-)
-parametrize_dtype = pytest.mark.parametrize(
-    "dtype", [torch.float32, torch.float64]
-)
+# FIXME: Skipping tests on win.
+if not sys.platform.startswith("linux"):
+    pytest.skip("skipping tests on win", allow_module_level=True)
 
 
 def all_close_sparse(A, B):

@@ -3,10 +3,13 @@ import operator
 import numpy as np
 import pytest
 import torch
-
+import sys
 import dgl
 from dgl.mock_sparse2 import create_from_coo, diag
 
+# FIXME: Skipping tests on win.
+if not sys.platform.startswith("linux"):
+    pytest.skip("skipping tests on win", allow_module_level=True)
 
 def all_close_sparse(A, row, col, val, shape):
     rowA, colA, valA = A.coo()

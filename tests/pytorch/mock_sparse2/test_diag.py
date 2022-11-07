@@ -1,10 +1,16 @@
 import pytest
 import torch
+import sys
 
 from dgl.mock_sparse2 import diag, identity, DiagMatrix
 
-@pytest.mark.parametrize('val_shape', [(3,), (3, 2)])
-@pytest.mark.parametrize('mat_shape', [None, (3, 5), (5, 3)])
+# FIXME: Skipping tests on win.
+if not sys.platform.startswith("linux"):
+    pytest.skip("skipping tests on win", allow_module_level=True)
+
+
+@pytest.mark.parametrize("val_shape", [(3,), (3, 2)])
+@pytest.mark.parametrize("mat_shape", [None, (3, 5), (5, 3)])
 def test_diag(val_shape, mat_shape):
     # creation
     val = torch.randn(val_shape)
@@ -45,8 +51,9 @@ def test_diag(val_shape, mat_shape):
     assert torch.allclose(col, edge_index)
     assert torch.allclose(val, val)
 
-@pytest.mark.parametrize('shape', [(3, 3), (3, 5), (5, 3)])
-@pytest.mark.parametrize('d', [None, 2])
+
+@pytest.mark.parametrize("shape", [(3, 3), (3, 5), (5, 3)])
+@pytest.mark.parametrize("d", [None, 2])
 def test_identity(shape, d):
     # creation
     mat = identity(shape, d)
@@ -57,7 +64,7 @@ def test_identity(shape, d):
     # val
     len_val = min(shape)
     if d is None:
-        val_shape = (len_val)
+        val_shape = len_val
     else:
         val_shape = (len_val, d)
     val = torch.ones(val_shape)
