@@ -117,6 +117,7 @@ Operators for generating positional encodings of each node.
     random_walk_pe
     laplacian_pe
     double_radius_node_labeling
+    shortest_dist
 
 .. _api-partition:
 

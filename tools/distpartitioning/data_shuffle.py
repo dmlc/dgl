@@ -697,8 +697,12 @@ def gen_dist_partitions(rank, world_size, params):
         orig_nids, orig_eids = create_dgl_object(schema_map, rank, node_data, \
             edge_data, num_edges, params.save_orig_nids, params.save_orig_eids)
     memory_snapshot("CreateDGLObjectsComplete: ", rank)
+    graph_formats = None
+    if params.graph_formats:
+        graph_formats = params.graph_formats.split(',')
+    sort_etypes = len(etypes_map) > 1
     write_dgl_objects(graph_obj, rcvd_node_features, rcvd_edge_features, params.output, \
-        rank, orig_nids, orig_eids)
+        rank, orig_nids, orig_eids, graph_formats, sort_etypes)
     memory_snapshot("DiskWriteDGLObjectsComplete: ", rank)
 
     #get the meta-data

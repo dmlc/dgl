@@ -39,11 +39,6 @@ class SEALOGBLDataset(Dataset):
         self.directed = directed
         self.dynamic = dynamic
 
-        if not self.dynamic:
-            self.g_list, tensor_dict = self.load_cached()
-            self.labels = tensor_dict["y"]
-            return
-
         if "weights" in self.graph.edata:
             self.edge_weights = self.graph.edata["weights"]
         else:
@@ -54,10 +49,14 @@ class SEALOGBLDataset(Dataset):
             self.node_features = None
 
         pos_edge, neg_edge = get_pos_neg_edges(
-            split, self.split_edge, self.graph, self.percent
+            self.split, self.split_edge, self.graph, self.percent
         )
-        self.links = torch.cat([pos_edge, neg_edge], 0).tolist()  # [Np + Nn, 2]
-        self.labels = [1] * len(pos_edge) + [0] * len(neg_edge)
+        self.links = torch.cat([pos_edge, neg_edge], 0)  # [Np + Nn, 2]
+        self.labels = np.array([1] * len(pos_edge) + [0] * len(neg_edge))
+
+        if not self.dynamic:
+            self.g_list, tensor_dict = self.load_cached()
+            self.labels = tensor_dict["y"]
 
     def __len__(self):
         return len(self.labels)
@@ -69,7 +68,7 @@ class SEALOGBLDataset(Dataset):
             w = None if "w" not in g.edata else g.eata["w"]
             return g, g.ndata["z"], x, w, y
 
-        src, dst = self.links[idx]
+        src, dst = self.links[idx][0].item(), self.links[idx][1].item()
         y = self.labels[idx]
         subg = k_hop_subgraph(
             src, dst, 1, self.graph, self.ratio_per_hop, self.directed
@@ -128,12 +127,6 @@ class SEALOGBLDataset(Dataset):
 
         if not os.path.exists(self.root):
             os.makedirs(self.root)
-
-        pos_edge, neg_edge = get_pos_neg_edges(
-            self.split, self.split_edge, self.graph, self.percent
-        )
-        self.links = torch.cat([pos_edge, neg_edge], 0).tolist()  # [Np + Nn, 2]
-        self.labels = [1] * len(pos_edge) + [0] * len(neg_edge)
 
         g_list, labels = self.process()
         save_graphs(path, g_list, labels)
@@ -285,6 +278,9 @@ if __name__ == "__main__":
         help="You can set this value from 'none', 'input', 'hidden' or 'all' " \
              "to apply NGNN to different GNN layers.",
     )
+    parser.add_argument(
+        "--num_ngnn_layers", type=int, default=1, choices=[1, 2]
+    )
     # Subgraph extraction settings
     parser.add_argument("--ratio_per_hop", type=float, default=1.0)
     parser.add_argument(
@@ -310,8 +306,8 @@ if __name__ == "__main__":
     parser.add_argument("--runs", type=int, default=10)
     parser.add_argument("--train_percent", type=float, default=1)
     parser.add_argument("--val_percent", type=float, default=1)
-    parser.add_argument("--final_val_percent", type=float, default=1)
-    parser.add_argument("--test_percent", type=float, default=1)
+    parser.add_argument("--final_val_percent", type=float, default=100)
+    parser.add_argument("--test_percent", type=float, default=100)
     parser.add_argument("--no_test", action="store_true")
     parser.add_argument(
         "--dynamic_train",
@@ -504,13 +500,18 @@ if __name__ == "__main__":
     )
 
     if 0 < args.sortpool_k <= 1:  # Transform percentile to number.
-        if args.dynamic_train:
-            _sampled_indices = range(1000)
-            #_sampled_indices = np.random.choice(
-            # len(train_dataset), 1000, replace=False
-            # )
+        if args.dataset.startswith("ogbl-citation"):
+            # For this dataset, subgraphs extracted around positive edges are
+            # rather larger than negative edges. Thus we sample from 1000
+            # positive and 1000 negative edges to estimate the k (number of 
+            # nodes to hold for each graph) used in SortPooling.
+            # You can certainly set k manually, instead of estimating from
+            # a percentage of sampled subgraphs.
+            _sampled_indices = list(range(1000)) + list(
+                range(len(train_dataset) - 1000, len(train_dataset))
+            )
         else:
-            _sampled_indices = range(len(train_dataset))
+            _sampled_indices = list(range(1000))
         _num_nodes = sorted(
             [train_dataset[i][0].num_nodes() for i in _sampled_indices]
         )
@@ -535,6 +536,7 @@ if __name__ == "__main__":
             else 0,
             dropout=args.dropout,
             ngnn_type=args.ngnn_type,
+            num_ngnn_layers=args.num_ngnn_layers,
         ).to(device)
         parameters = list(model.parameters())
         optimizer = torch.optim.Adam(params=parameters, lr=args.lr)

@@ -25,7 +25,7 @@ if [[ $arch == *"x86"* ]]; then
 fi
 
 if [[ $1 != "cpu" ]]; then
-    CMAKE_VARS="-DUSE_CUDA=ON -DUSE_NCCL=ON -DUSE_FP16=ON $CMAKE_VARS"
+    CMAKE_VARS="-DUSE_CUDA=ON -DUSE_NCCL=ON $CMAKE_VARS"
 fi
 
 if [ -d build ]; then

@@ -10,7 +10,9 @@ import torch
 from pyarrow import csv
 
 import constants
-
+from dgl.distributed.partition import (
+    _dump_part_config
+)
 
 def read_ntype_partition_files(schema_map, input_dir):
     """
@@ -234,8 +236,7 @@ def write_metadata_json(metadata_list, output_dir, graph_name):
     for i in range(len(metadata_list)):
         graph_metadata["part-{}".format(i)] = metadata_list[i]["part-{}".format(i)]
 
-    with open('{}/metadata.json'.format(output_dir), 'w') as outfile: 
-        json.dump(graph_metadata, outfile, sort_keys=False, indent=4)
+    _dump_part_config(f'{output_dir}/metadata.json', graph_metadata)
 
 def augment_edge_data(edge_data, lookup_service, edge_tids, rank, world_size):
     """
@@ -379,7 +380,7 @@ def write_edge_features(edge_features, edge_file):
     """
     dgl.data.utils.save_tensors(edge_file, edge_features)
 
-def write_graph_dgl(graph_file, graph_obj): 
+def write_graph_dgl(graph_file, graph_obj, formats, sort_etypes):
     """
     Utility function to serialize graph dgl objects
 
@@ -389,11 +390,16 @@ def write_graph_dgl(graph_file, graph_obj):
         graph dgl object, as created in convert_partition.py, which is to be serialized
     graph_file : string
         File name in which graph object is serialized
+    formats : str or list[str]
+        Save graph in specified formats.
+    sort_etypes : bool
+        Whether to sort etypes in csc/csr.
     """
-    dgl.distributed.partition._save_graphs(graph_file, [graph_obj])
+    dgl.distributed.partition._save_graphs(graph_file, [graph_obj],
+        formats, sort_etypes)
 
 def write_dgl_objects(graph_obj, node_features, edge_features,
-        output_dir, part_id, orig_nids, orig_eids):
+        output_dir, part_id, orig_nids, orig_eids, formats, sort_etypes):
     """
     Wrapper function to write graph, node/edge feature, original node/edge IDs.
 
@@ -413,11 +419,15 @@ def write_dgl_objects(graph_obj, node_features, edge_features,
         original node IDs
     orig_eids : dict
         original edge IDs
+    formats : str or list[str]
+        Save graph in formats.
+    sort_etypes : bool
+        Whether to sort etypes in csc/csr.
     """
-
     part_dir = output_dir + '/part' + str(part_id)
     os.makedirs(part_dir, exist_ok=True)
-    write_graph_dgl(os.path.join(part_dir ,'graph.dgl'), graph_obj)
+    write_graph_dgl(os.path.join(part_dir ,'graph.dgl'), graph_obj,
+        formats, sort_etypes)
 
     if node_features != None:
         write_node_features(node_features, os.path.join(part_dir, "node_feat.dgl"))

@@ -272,6 +272,7 @@ def _gen_neighbor_sampling_test_graph(hypersparse, reverse):
         }, {'user': card if card is not None else 4})
         g = g.to(F.ctx())
         g.edata['prob'] = F.tensor([.5, .5, 0., .5, .5, 0., 1.], dtype=F.float32)
+        g.edata['mask'] = F.tensor([True, True, False, True, True, False, True])
         hg = dgl.heterograph({
             ('user', 'follow', 'user'): ([0, 0, 0, 1, 1, 1, 2],
                                          [1, 2, 3, 0, 2, 3, 0]),
@@ -286,6 +287,7 @@ def _gen_neighbor_sampling_test_graph(hypersparse, reverse):
         }, {'user': card if card is not None else 4})
         g = g.to(F.ctx())
         g.edata['prob'] = F.tensor([.5, .5, 0., .5, .5, 0., 1.], dtype=F.float32)
+        g.edata['mask'] = F.tensor([True, True, False, True, True, False, True])
         hg = dgl.heterograph({
             ('user', 'follow', 'user'): ([1, 2, 3, 0, 2, 3, 0],
                                          [0, 0, 0, 1, 1, 1, 2]),
@@ -295,7 +297,9 @@ def _gen_neighbor_sampling_test_graph(hypersparse, reverse):
         }, num_nodes_dict)
         hg = hg.to(F.ctx())
     hg.edges['follow'].data['prob'] = F.tensor([.5, .5, 0., .5, .5, 0., 1.], dtype=F.float32)
+    hg.edges['follow'].data['mask'] = F.tensor([True, True, False, True, True, False, True])
     hg.edges['play'].data['prob'] = F.tensor([.8, .5, .5, .5], dtype=F.float32)
+    # Leave out the mask of play and liked-by since all of them are True anyway.
     hg.edges['liked-by'].data['prob'] = F.tensor([.3, .5, .2, .5, .1, .1], dtype=F.float32)
 
     return g, hg
@@ -344,7 +348,13 @@ def _test_sample_neighbors(hypersparse, prob):
         subg = dgl.sampling.sample_neighbors(g, [0, 1], -1, prob=p, replace=replace)
         assert subg.number_of_nodes() == g.number_of_nodes()
         u, v = subg.edges()
-        u_ans, v_ans = subg.in_edges([0, 1])
+        u_ans, v_ans, e_ans = g.in_edges([0, 1], form='all')
+        if p is not None:
+            emask = F.gather_row(g.edata[p], e_ans)
+            if p == 'prob':
+                emask = (emask != 0)
+            u_ans = F.boolean_mask(u_ans, emask)
+            v_ans = F.boolean_mask(v_ans, emask)
         uv = set(zip(F.asnumpy(u), F.asnumpy(v)))
         uv_ans = set(zip(F.asnumpy(u_ans), F.asnumpy(v_ans)))
         assert uv == uv_ans
@@ -371,7 +381,13 @@ def _test_sample_neighbors(hypersparse, prob):
         subg = dgl.sampling.sample_neighbors(g, [0, 2], -1, prob=p, replace=replace)
         assert subg.number_of_nodes() == g.number_of_nodes()
         u, v = subg.edges()
-        u_ans, v_ans = subg.in_edges([0, 2])
+        u_ans, v_ans, e_ans = g.in_edges([0, 2], form='all')
+        if p is not None:
+            emask = F.gather_row(g.edata[p], e_ans)
+            if p == 'prob':
+                emask = (emask != 0)
+            u_ans = F.boolean_mask(u_ans, emask)
+            v_ans = F.boolean_mask(v_ans, emask)
         uv = set(zip(F.asnumpy(u), F.asnumpy(v)))
         uv_ans = set(zip(F.asnumpy(u_ans), F.asnumpy(v_ans)))
         assert uv == uv_ans
@@ -398,7 +414,7 @@ def _test_sample_neighbors(hypersparse, prob):
         subg = dgl.sampling.sample_neighbors(hg, {'user': [0, 1], 'game': 0}, -1, prob=p, replace=replace)
         assert len(subg.ntypes) == 3
         assert len(subg.etypes) == 4
-        assert subg['follow'].number_of_edges() == 6
+        assert subg['follow'].number_of_edges() == 6 if p is None else 4
         assert subg['play'].number_of_edges() == 1
         assert subg['liked-by'].number_of_edges() == 4
         assert subg['flips'].number_of_edges() == 0
@@ -436,7 +452,13 @@ def _test_sample_neighbors_outedge(hypersparse):
         subg = dgl.sampling.sample_neighbors(g, [0, 1], -1, prob=p, replace=replace, edge_dir='out')
         assert subg.number_of_nodes() == g.number_of_nodes()
         u, v = subg.edges()
-        u_ans, v_ans = subg.out_edges([0, 1])
+        u_ans, v_ans, e_ans = g.out_edges([0, 1], form='all')
+        if p is not None:
+            emask = F.gather_row(g.edata[p], e_ans)
+            if p == 'prob':
+                emask = (emask != 0)
+            u_ans = F.boolean_mask(u_ans, emask)
+            v_ans = F.boolean_mask(v_ans, emask)
         uv = set(zip(F.asnumpy(u), F.asnumpy(v)))
         uv_ans = set(zip(F.asnumpy(u_ans), F.asnumpy(v_ans)))
         assert uv == uv_ans
@@ -465,7 +487,13 @@ def _test_sample_neighbors_outedge(hypersparse):
         subg = dgl.sampling.sample_neighbors(g, [0, 2], -1, prob=p, replace=replace, edge_dir='out')
         assert subg.number_of_nodes() == g.number_of_nodes()
         u, v = subg.edges()
-        u_ans, v_ans = subg.out_edges([0, 2])
+        u_ans, v_ans, e_ans = g.out_edges([0, 2], form='all')
+        if p is not None:
+            emask = F.gather_row(g.edata[p], e_ans)
+            if p == 'prob':
+                emask = (emask != 0)
+            u_ans = F.boolean_mask(u_ans, emask)
+            v_ans = F.boolean_mask(v_ans, emask)
         uv = set(zip(F.asnumpy(u), F.asnumpy(v)))
         uv_ans = set(zip(F.asnumpy(u_ans), F.asnumpy(v_ans)))
         assert uv == uv_ans
@@ -494,7 +522,7 @@ def _test_sample_neighbors_outedge(hypersparse):
         subg = dgl.sampling.sample_neighbors(hg, {'user': [0, 1], 'game': 0}, -1, prob=p, replace=replace, edge_dir='out')
         assert len(subg.ntypes) == 3
         assert len(subg.etypes) == 4
-        assert subg['follow'].number_of_edges() == 6
+        assert subg['follow'].number_of_edges() == 6 if p is None else 4
         assert subg['play'].number_of_edges() == 1
         assert subg['liked-by'].number_of_edges() == 4
         assert subg['flips'].number_of_edges() == 0
@@ -651,6 +679,11 @@ def test_sample_neighbors_outedge():
     _test_sample_neighbors_outedge(False)
     #_test_sample_neighbors_outedge(True)
 
+@unittest.skipIf(F.backend_name == 'mxnet', reason='MXNet has problem converting bool arrays')
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors with mask not implemented")
+def test_sample_neighbors_mask():
+    _test_sample_neighbors(False, 'mask')
+
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
 def test_sample_neighbors_topk():
     _test_sample_neighbors_topk(False)
@@ -709,6 +742,11 @@ def create_etype_test_graph(num_nodes, num_edges_per_node, rare_cnt):
                          ("v2", "e_minor", "u") : (minor_src, minor_dst),
                          ("v2", "most_zero", "u") : (most_zero_src, most_zero_dst),
                          ("u", "e_minor_rev", "v2") : (minor_dst, minor_src)})
+    for etype in g.etypes:
+        prob = np.random.rand(g.num_edges(etype))
+        prob[prob > 0.2] = 0
+        g.edges[etype].data['p'] = F.zerocopy_from_numpy(prob)
+        g.edges[etype].data['mask'] = F.zerocopy_from_numpy(prob != 0)
 
     return g
 
@@ -802,6 +840,7 @@ def test_sample_neighbors_biased_bipartite():
         check_num(subg.edges()[1], tag)
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
+@unittest.skipIf(F.backend_name == 'mxnet', reason='MXNet has problem converting bool arrays')
 @pytest.mark.parametrize('format_', ['coo', 'csr', 'csc'])
 @pytest.mark.parametrize('direction', ['in', 'out'])
 @pytest.mark.parametrize('replace', [False, True])
@@ -809,38 +848,59 @@ def test_sample_neighbors_etype_homogeneous(format_, direction, replace):
     num_nodes = 100
     rare_cnt = 4
     g = create_etype_test_graph(100, 30, rare_cnt)
-    h_g = dgl.to_homogeneous(g)
+    h_g = dgl.to_homogeneous(g, edata=['p', 'mask'])
+    h_g_etype = F.asnumpy(h_g.edata[dgl.ETYPE])
+    h_g_offset = np.cumsum(np.insert(np.bincount(h_g_etype), 0, 0)).tolist()
+    sg = g.edge_subgraph(g.edata['mask'], relabel_nodes=False)
+    h_sg = h_g.edge_subgraph(h_g.edata['mask'], relabel_nodes=False)
+    h_sg_etype = F.asnumpy(h_sg.edata[dgl.ETYPE])
+    h_sg_offset = np.cumsum(np.insert(np.bincount(h_sg_etype), 0, 0)).tolist()
+
     seed_ntype = g.get_ntype_id("u")
     seeds = F.nonzero_1d(h_g.ndata[dgl.NTYPE] == seed_ntype)
     fanouts = F.tensor([6, 5, 4, 3, 2], dtype=F.int64)
 
     def check_num(h_g, all_src, all_dst, subg, replace, fanouts, direction):
         src, dst = subg.edges()
-        num_etypes = F.asnumpy(h_g.edata[dgl.ETYPE]).max()
+        all_etype_array = F.asnumpy(h_g.edata[dgl.ETYPE])
+        num_etypes = all_etype_array.max() + 1
         etype_array = F.asnumpy(subg.edata[dgl.ETYPE])
         src = F.asnumpy(src)
         dst = F.asnumpy(dst)
         fanouts = F.asnumpy(fanouts)
 
-        all_etype_array = F.asnumpy(h_g.edata[dgl.ETYPE])
         all_src = F.asnumpy(all_src)
         all_dst = F.asnumpy(all_dst)
 
         src_per_etype = []
         dst_per_etype = []
+        all_src_per_etype = []
+        all_dst_per_etype = []
         for etype in range(num_etypes):
             src_per_etype.append(src[etype_array == etype])
             dst_per_etype.append(dst[etype_array == etype])
+            all_src_per_etype.append(all_src[all_etype_array == etype])
+            all_dst_per_etype.append(all_dst[all_etype_array == etype])
 
         if replace:
             if direction == 'in':
                 in_degree_per_etype = [np.bincount(d) for d in dst_per_etype]
-                for in_degree, fanout in zip(in_degree_per_etype, fanouts):
-                    assert np.all(in_degree == fanout)
+                for etype in range(len(fanouts)):
+                    in_degree = in_degree_per_etype[etype]
+                    fanout = fanouts[etype]
+                    ans = np.zeros_like(in_degree)
+                    if len(in_degree) > 0:
+                        ans[all_dst_per_etype[etype]] = fanout
+                    assert np.all(in_degree == ans)
             else:
                 out_degree_per_etype = [np.bincount(s) for s in src_per_etype]
-                for out_degree, fanout in zip(out_degree_per_etype, fanouts):
-                    assert np.all(out_degree == fanout)
+                for etype in range(len(fanouts)):
+                    out_degree = out_degree_per_etype[etype]
+                    fanout = fanouts[etype]
+                    ans = np.zeros_like(out_degree)
+                    if len(out_degree) > 0:
+                        ans[all_src_per_etype[etype]] = fanout
+                    assert np.all(out_degree == ans)
         else:
             if direction == 'in':
                 for v in set(dst):
@@ -864,16 +924,31 @@ def test_sample_neighbors_etype_homogeneous(format_, direction, replace):
                         assert (len(v_etype) == fanouts[etype]) or (v_etype == all_v_etype)
 
     all_src, all_dst = h_g.edges()
+    all_sub_src, all_sub_dst = h_sg.edges()
     h_g = h_g.formats(format_)
     if (direction, format_) in [('in', 'csr'), ('out', 'csc')]:
         h_g = h_g.formats(['csc', 'csr', 'coo'])
     for _ in range(5):
         subg = dgl.sampling.sample_etype_neighbors(
-            h_g, seeds, dgl.ETYPE, fanouts, replace=replace, edge_dir=direction)
+            h_g, seeds, h_g_offset, fanouts, replace=replace,
+            edge_dir=direction)
         check_num(h_g, all_src, all_dst, subg, replace, fanouts, direction)
+
+        p = [g.edges[etype].data['p'] for etype in g.etypes]
+        subg = dgl.sampling.sample_etype_neighbors(
+            h_g, seeds, h_g_offset, fanouts, replace=replace,
+            edge_dir=direction, prob=p)
+        check_num(h_sg, all_sub_src, all_sub_dst, subg, replace, fanouts, direction)
+
+        p = [g.edges[etype].data['mask'] for etype in g.etypes]
+        subg = dgl.sampling.sample_etype_neighbors(
+            h_g, seeds, h_g_offset, fanouts, replace=replace,
+            edge_dir=direction, prob=p)
+        check_num(h_sg, all_sub_src, all_sub_dst, subg, replace, fanouts, direction)
 
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
+@unittest.skipIf(F.backend_name == 'mxnet', reason='MXNet has problem converting bool arrays')
 @pytest.mark.parametrize('format_', ['csr', 'csc'])
 @pytest.mark.parametrize('direction', ['in', 'out'])
 def test_sample_neighbors_etype_sorted_homogeneous(format_, direction):
@@ -886,17 +961,16 @@ def test_sample_neighbors_etype_sorted_homogeneous(format_, direction):
     h_g = h_g.formats(format_)
     if (direction, format_) in [('in', 'csr'), ('out', 'csc')]:
         h_g = h_g.formats(['csc', 'csr', 'coo'])
-    orig_etype = F.asnumpy(h_g.edata[dgl.ETYPE])
-    h_g.edata[dgl.ETYPE] = F.tensor(
-        np.sort(orig_etype)[::-1].tolist(), dtype=F.int64)
 
-    try:
-        dgl.sampling.sample_etype_neighbors(
-            h_g, seeds, dgl.ETYPE, fanouts, edge_dir=direction, etype_sorted=True)
-        fail = False
-    except dgl.DGLError:
-        fail = True
-    assert fail
+    if direction == 'in':
+        h_g = dgl.sort_csc_by_tag(h_g, h_g.edata[dgl.ETYPE], tag_type='edge')
+    else:
+        h_g = dgl.sort_csr_by_tag(h_g, h_g.edata[dgl.ETYPE], tag_type='edge')
+    # shuffle
+    h_g_etype = F.asnumpy(h_g.edata[dgl.ETYPE])
+    h_g_offset = np.cumsum(np.insert(np.bincount(h_g_etype), 0, 0)).tolist()
+    sg = dgl.sampling.sample_etype_neighbors(
+        h_g, seeds, h_g_offset, fanouts, edge_dir=direction, etype_sorted=True)
 
 @pytest.mark.parametrize('dtype', ['int32', 'int64'])
 def test_sample_neighbors_exclude_edges_heteroG(dtype):
@@ -1026,12 +1100,17 @@ def test_global_uniform_negative_sampling(dtype):
 
 if __name__ == '__main__':
     from itertools import product
+    test_sample_neighbors_noprob()
+    test_sample_neighbors_prob()
+    test_sample_neighbors_mask()
     for args in product(['coo', 'csr', 'csc'], ['in', 'out'], [False, True]):
         test_sample_neighbors_etype_homogeneous(*args)
-    test_non_uniform_random_walk()
+    for args in product(['csr', 'csc'], ['in', 'out']):
+        test_sample_neighbors_etype_sorted_homogeneous(*args)
+    test_non_uniform_random_walk(False)
     test_uniform_random_walk(False)
     test_pack_traces()
-    test_pinsage_sampling()
+    test_pinsage_sampling(False)
     test_sample_neighbors_outedge()
     test_sample_neighbors_topk()
     test_sample_neighbors_topk_outedge()

@@ -1,13 +1,15 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
- * \file random/choice.cc
- * \brief Non-uniform discrete sampling implementation
+ * @file random/choice.cc
+ * @brief Non-uniform discrete sampling implementation
  */
 
 #include <dgl/array.h>
 #include <dgl/random.h>
+
 #include <numeric>
 #include <vector>
+
 #include "sample_utils.h"
 
 namespace dgl {
@@ -27,12 +29,12 @@ template int32_t RandomEngine::Choice<int32_t>(FloatArray);
 template int64_t RandomEngine::Choice<int64_t>(FloatArray);
 
 template <typename IdxType, typename FloatType>
-void RandomEngine::Choice(IdxType num, FloatArray prob, IdxType* out,
-                          bool replace) {
+void RandomEngine::Choice(
+    IdxType num, FloatArray prob, IdxType* out, bool replace) {
   const IdxType N = prob->shape[0];
   if (!replace)
     CHECK_LE(num, N)
-      << "Cannot take more sample than population when 'replace=false'";
+        << "Cannot take more sample than population when 'replace=false'";
   if (num == N && !replace) std::iota(out, out + num, 0);
 
   utils::BaseSampler<IdxType>* sampler = nullptr;
@@ -45,23 +47,31 @@ void RandomEngine::Choice(IdxType num, FloatArray prob, IdxType* out,
   delete sampler;
 }
 
-template void RandomEngine::Choice<int32_t, float>(int32_t num, FloatArray prob,
-                                                   int32_t* out, bool replace);
-template void RandomEngine::Choice<int64_t, float>(int64_t num, FloatArray prob,
-                                                   int64_t* out, bool replace);
-template void RandomEngine::Choice<int32_t, double>(int32_t num,
-                                                    FloatArray prob,
-                                                    int32_t* out, bool replace);
-template void RandomEngine::Choice<int64_t, double>(int64_t num,
-                                                    FloatArray prob,
-                                                    int64_t* out, bool replace);
+template void RandomEngine::Choice<int32_t, float>(
+    int32_t num, FloatArray prob, int32_t* out, bool replace);
+template void RandomEngine::Choice<int64_t, float>(
+    int64_t num, FloatArray prob, int64_t* out, bool replace);
+template void RandomEngine::Choice<int32_t, double>(
+    int32_t num, FloatArray prob, int32_t* out, bool replace);
+template void RandomEngine::Choice<int64_t, double>(
+    int64_t num, FloatArray prob, int64_t* out, bool replace);
+template void RandomEngine::Choice<int32_t, int8_t>(
+    int32_t num, FloatArray prob, int32_t* out, bool replace);
+template void RandomEngine::Choice<int64_t, int8_t>(
+    int64_t num, FloatArray prob, int64_t* out, bool replace);
+template void RandomEngine::Choice<int32_t, uint8_t>(
+    int32_t num, FloatArray prob, int32_t* out, bool replace);
+template void RandomEngine::Choice<int64_t, uint8_t>(
+    int64_t num, FloatArray prob, int64_t* out, bool replace);
 
 template <typename IdxType>
-void RandomEngine::UniformChoice(IdxType num, IdxType population, IdxType* out,
-                                 bool replace) {
+void RandomEngine::UniformChoice(
+    IdxType num, IdxType population, IdxType* out, bool replace) {
+  CHECK_GE(num, 0) << "The numbers to sample should be non-negative.";
+  CHECK_GE(population, 0) << "The population size should be non-negative.";
   if (!replace)
     CHECK_LE(num, population)
-      << "Cannot take more sample than population when 'replace=false'";
+        << "Cannot take more sample than population when 'replace=false'";
   if (replace) {
     for (IdxType i = 0; i < num; ++i) out[i] = RandInt(population);
   } else {
@@ -100,14 +110,15 @@ void RandomEngine::UniformChoice(IdxType num, IdxType population, IdxType* out,
       }
 
     } else {
-      // In this case, `num >= population / 10`. To reduce the computation overhead,
-      // we should reduce the number of random number generations. Even though
-      // reservior algorithm is more memory effficient (it has O(num) memory complexity),
-      // it generates O(population) random numbers, which is computationally expensive.
-      // This algorithm has memory complexity of O(population) but generates much fewer random
-      // numbers O(num). In the case of `num >= population/10`, we don't need to worry about
-      // memory complexity because `num` is usually small. So is `population`. Allocating a small
-      // piece of memory is very efficient.
+      // In this case, `num >= population / 10`. To reduce the computation
+      // overhead, we should reduce the number of random number generations.
+      // Even though reservior algorithm is more memory effficient (it has
+      // O(num) memory complexity), it generates O(population) random numbers,
+      // which is computationally expensive. This algorithm has memory
+      // complexity of O(population) but generates much fewer random numbers
+      // O(num). In the case of `num >= population/10`, we don't need to worry
+      // about memory complexity because `num` is usually small. So is
+      // `population`. Allocating a small piece of memory is very efficient.
       std::vector<IdxType> seq(population);
       for (size_t i = 0; i < seq.size(); i++) seq[i] = i;
       for (IdxType i = 0; i < num; i++) {
@@ -122,23 +133,22 @@ void RandomEngine::UniformChoice(IdxType num, IdxType population, IdxType* out,
   }
 }
 
-template void RandomEngine::UniformChoice<int32_t>(int32_t num,
-                                                   int32_t population,
-                                                   int32_t* out, bool replace);
-template void RandomEngine::UniformChoice<int64_t>(int64_t num,
-                                                   int64_t population,
-                                                   int64_t* out, bool replace);
+template void RandomEngine::UniformChoice<int32_t>(
+    int32_t num, int32_t population, int32_t* out, bool replace);
+template void RandomEngine::UniformChoice<int64_t>(
+    int64_t num, int64_t population, int64_t* out, bool replace);
 
 template <typename IdxType, typename FloatType>
 void RandomEngine::BiasedChoice(
-    IdxType num, const IdxType *split, FloatArray bias, IdxType* out, bool replace) {
+    IdxType num, const IdxType* split, FloatArray bias, IdxType* out,
+    bool replace) {
   const int64_t num_tags = bias->shape[0];
-  const FloatType *bias_data = static_cast<FloatType *>(bias->data);
+  const FloatType* bias_data = static_cast<FloatType*>(bias->data);
   IdxType total_node_num = 0;
   FloatArray prob = NDArray::Empty({num_tags}, bias->dtype, bias->ctx);
-  FloatType *prob_data = static_cast<FloatType *>(prob->data);
-  for (int64_t tag = 0 ; tag < num_tags; ++tag) {
-    int64_t tag_num_nodes = split[tag+1] - split[tag];
+  FloatType* prob_data = static_cast<FloatType*>(prob->data);
+  for (int64_t tag = 0; tag < num_tags; ++tag) {
+    int64_t tag_num_nodes = split[tag + 1] - split[tag];
     total_node_num += tag_num_nodes;
     FloatType tag_bias = bias_data[tag];
     prob_data[tag] = tag_num_nodes * tag_bias;
@@ -147,19 +157,21 @@ void RandomEngine::BiasedChoice(
     auto sampler = utils::TreeSampler<IdxType, FloatType, true>(this, prob);
     for (IdxType i = 0; i < num; ++i) {
       const int64_t tag = sampler.Draw();
-      const IdxType tag_num_nodes = split[tag+1] - split[tag];
+      const IdxType tag_num_nodes = split[tag + 1] - split[tag];
       out[i] = RandInt(tag_num_nodes) + split[tag];
     }
   } else {
-    utils::TreeSampler<int64_t, FloatType, false> sampler(this, prob, bias_data);
+    utils::TreeSampler<int64_t, FloatType, false> sampler(
+        this, prob, bias_data);
     CHECK_GE(total_node_num, num)
         << "Cannot take more sample than population when 'replace=false'";
-    // we use hash set here. Maybe in the future we should support reservoir algorithm
+    // we use hash set here. Maybe in the future we should support reservoir
+    // algorithm
     std::vector<std::unordered_set<IdxType>> selected(num_tags);
-    for (IdxType i = 0 ; i < num ; ++i) {
+    for (IdxType i = 0; i < num; ++i) {
       const int64_t tag = sampler.Draw();
       bool inserted = false;
-      const IdxType tag_num_nodes = split[tag+1] - split[tag];
+      const IdxType tag_num_nodes = split[tag + 1] - split[tag];
       IdxType selected_node;
       while (!inserted) {
         CHECK_LT(selected[tag].size(), tag_num_nodes)

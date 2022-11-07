@@ -1,6 +1,7 @@
 import dgl
 import unittest
 import os
+import traceback
 from dgl.data import CitationGraphDataset
 from dgl.data import WN18Dataset
 from dgl.distributed import sample_neighbors, sample_etype_neighbors
@@ -35,7 +36,7 @@ def start_sample_client(rank, tmpdir, disable_shared_mem):
     try:
         sampled_graph = sample_neighbors(dist_graph, [0, 10, 99, 66, 1024, 2008], 3)
     except Exception as e:
-        print(e)
+        print(traceback.format_exc())
         sampled_graph = None
     dgl.distributed.exit_client()
     return sampled_graph
@@ -69,7 +70,7 @@ def start_find_edges_client(rank, tmpdir, disable_shared_mem, eids, etype=None):
     try:
         u, v = dist_graph.find_edges(eids, etype=etype)
     except Exception as e:
-        print(e)
+        print(traceback.format_exc())
         u, v = None, None
     dgl.distributed.exit_client()
     return u, v
@@ -86,7 +87,7 @@ def start_get_degrees_client(rank, tmpdir, disable_shared_mem, nids=None):
         out_deg = dist_graph.out_degrees(nids)
         all_out_deg = dist_graph.out_degrees()
     except Exception as e:
-        print(e)
+        print(traceback.format_exc())
         in_deg, out_deg, all_in_deg, all_out_deg = None, None, None, None
     dgl.distributed.exit_client()
     return in_deg, out_deg, all_in_deg, all_out_deg
@@ -189,15 +190,16 @@ def check_rpc_hetero_find_edges_shuffle(tmpdir, num_server):
         time.sleep(1)
         pserver_list.append(p)
 
-    eids = F.tensor(np.random.randint(g.num_edges('r12'), size=100))
+    test_etype = g.to_canonical_etype('r12')
+    eids = F.tensor(np.random.randint(g.num_edges(test_etype), size=100))
     expect_except = False
     try:
-        _, _ = g.find_edges(orig_eid['r12'][eids], etype=('n1', 'r12'))
+        _, _ = g.find_edges(orig_eid[test_etype][eids], etype=('n1', 'r12'))
     except:
         expect_except = True
     assert expect_except
-    u, v = g.find_edges(orig_eid['r12'][eids], etype='r12')
-    u1, v1 = g.find_edges(orig_eid['r12'][eids], etype=('n1', 'r12', 'n2'))
+    u, v = g.find_edges(orig_eid[test_etype][eids], etype='r12')
+    u1, v1 = g.find_edges(orig_eid[test_etype][eids], etype=('n1', 'r12', 'n2'))
     assert F.array_equal(u, u1)
     assert F.array_equal(v, v1)
     du, dv = start_find_edges_client(0, tmpdir, num_server > 1, eids, etype='r12')
@@ -329,7 +331,7 @@ def start_hetero_sample_client(rank, tmpdir, disable_shared_mem, nodes):
         block = dgl.to_block(sampled_graph, nodes)
         block.edata[dgl.EID] = sampled_graph.edata[dgl.EID]
     except Exception as e:
-        print(e)
+        print(traceback.format_exc())
         block = None
     dgl.distributed.exit_client()
     return block, gpb
@@ -359,11 +361,12 @@ def start_hetero_etype_sample_client(rank, tmpdir, disable_shared_mem, fanout=3,
     if gpb is None:
         gpb = dist_graph.get_partition_book()
     try:
-        sampled_graph = sample_etype_neighbors(dist_graph, nodes, dgl.ETYPE, fanout, etype_sorted=etype_sorted)
+        sampled_graph = sample_etype_neighbors(
+                dist_graph, nodes, fanout, etype_sorted=etype_sorted)
         block = dgl.to_block(sampled_graph, nodes)
         block.edata[dgl.EID] = sampled_graph.edata[dgl.EID]
     except Exception as e:
-        print(e)
+        print(traceback.format_exc())
         block = None
     dgl.distributed.exit_client()
     return block, gpb
@@ -392,7 +395,8 @@ def check_rpc_hetero_sampling_shuffle(tmpdir, num_server):
     for p in pserver_list:
         p.join()
 
-    for src_type, etype, dst_type in block.canonical_etypes:
+    for c_etype in block.canonical_etypes:
+        src_type, etype, dst_type = c_etype
         src, dst = block.edges(etype=etype)
         # These are global Ids after shuffling.
         shuffled_src = F.gather_row(block.srcnodes[src_type].data[dgl.NID], src)
@@ -401,7 +405,7 @@ def check_rpc_hetero_sampling_shuffle(tmpdir, num_server):
 
         orig_src = F.asnumpy(F.gather_row(orig_nid_map[src_type], shuffled_src))
         orig_dst = F.asnumpy(F.gather_row(orig_nid_map[dst_type], shuffled_dst))
-        orig_eid = F.asnumpy(F.gather_row(orig_eid_map[etype], shuffled_eid))
+        orig_eid = F.asnumpy(F.gather_row(orig_eid_map[c_etype], shuffled_eid))
 
         # Check the node Ids and edge Ids.
         orig_src1, orig_dst1 = g.find_edges(orig_eid, etype=etype)
@@ -447,7 +451,7 @@ def check_rpc_hetero_sampling_empty_shuffle(tmpdir, num_server):
     assert block.number_of_edges() == 0
     assert len(block.etypes) == len(g.etypes)
 
-def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server, etype_sorted=False):
+def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server, graph_formats=None):
     generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
     g = create_random_hetero(dense=True)
@@ -455,7 +459,8 @@ def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server, etype_sorted=Fal
     num_hops = 1
 
     orig_nid_map, orig_eid_map = partition_graph(g, 'test_sampling', num_parts, tmpdir,
-        num_hops=num_hops, part_method='metis', reshuffle=True, return_mapping=True)
+        num_hops=num_hops, part_method='metis', reshuffle=True, return_mapping=True,
+        graph_formats=graph_formats)
 
     pserver_list = []
     ctx = mp.get_context('spawn')
@@ -466,6 +471,9 @@ def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server, etype_sorted=Fal
         pserver_list.append(p)
 
     fanout = 3
+    etype_sorted = False
+    if graph_formats is not None:
+        etype_sorted = 'csc' in graph_formats or 'csr' in graph_formats
     block, gpb = start_hetero_etype_sample_client(0, tmpdir, num_server > 1, fanout,
                                                   nodes={'n3': [0, 10, 99, 66, 124, 208]},
                                                   etype_sorted=etype_sorted)
@@ -478,7 +486,8 @@ def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server, etype_sorted=Fal
     src, dst = block.edges(etype=('n2', 'r23', 'n3'))
     assert len(src) == 18
 
-    for src_type, etype, dst_type in block.canonical_etypes:
+    for c_etype in block.canonical_etypes:
+        src_type, etype, dst_type = c_etype
         src, dst = block.edges(etype=etype)
         # These are global Ids after shuffling.
         shuffled_src = F.gather_row(block.srcnodes[src_type].data[dgl.NID], src)
@@ -487,7 +496,7 @@ def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server, etype_sorted=Fal
 
         orig_src = F.asnumpy(F.gather_row(orig_nid_map[src_type], shuffled_src))
         orig_dst = F.asnumpy(F.gather_row(orig_nid_map[dst_type], shuffled_dst))
-        orig_eid = F.asnumpy(F.gather_row(orig_eid_map[etype], shuffled_eid))
+        orig_eid = F.asnumpy(F.gather_row(orig_eid_map[c_etype], shuffled_eid))
 
         # Check the node Ids and edge Ids.
         orig_src1, orig_dst1 = g.find_edges(orig_eid, etype=etype)
@@ -577,8 +586,7 @@ def start_bipartite_etype_sample_client(rank, tmpdir, disable_shared_mem, fanout
 
     if gpb is None:
         gpb = dist_graph.get_partition_book()
-    sampled_graph = sample_etype_neighbors(
-        dist_graph, nodes, dgl.ETYPE, fanout)
+    sampled_graph = sample_etype_neighbors(dist_graph, nodes, fanout)
     block = dgl.to_block(sampled_graph, nodes)
     if sampled_graph.num_edges() > 0:
         block.edata[dgl.EID] = sampled_graph.edata[dgl.EID]
@@ -647,7 +655,8 @@ def check_rpc_bipartite_sampling_shuffle(tmpdir, num_server):
     for p in pserver_list:
         p.join()
 
-    for src_type, etype, dst_type in block.canonical_etypes:
+    for c_etype in block.canonical_etypes:
+        src_type, etype, dst_type = c_etype
         src, dst = block.edges(etype=etype)
         # These are global Ids after shuffling.
         shuffled_src = F.gather_row(
@@ -660,7 +669,7 @@ def check_rpc_bipartite_sampling_shuffle(tmpdir, num_server):
             orig_nid_map[src_type], shuffled_src))
         orig_dst = F.asnumpy(F.gather_row(
             orig_nid_map[dst_type], shuffled_dst))
-        orig_eid = F.asnumpy(F.gather_row(orig_eid_map[etype], shuffled_eid))
+        orig_eid = F.asnumpy(F.gather_row(orig_eid_map[c_etype], shuffled_eid))
 
         # Check the node Ids and edge Ids.
         orig_src1, orig_dst1 = g.find_edges(orig_eid, etype=etype)
@@ -731,7 +740,8 @@ def check_rpc_bipartite_etype_sampling_shuffle(tmpdir, num_server):
     for p in pserver_list:
         p.join()
 
-    for src_type, etype, dst_type in block.canonical_etypes:
+    for c_etype in block.canonical_etypes:
+        src_type, etype, dst_type = c_etype
         src, dst = block.edges(etype=etype)
         # These are global Ids after shuffling.
         shuffled_src = F.gather_row(
@@ -744,7 +754,7 @@ def check_rpc_bipartite_etype_sampling_shuffle(tmpdir, num_server):
             orig_nid_map[src_type], shuffled_src))
         orig_dst = F.asnumpy(F.gather_row(
             orig_nid_map[dst_type], shuffled_dst))
-        orig_eid = F.asnumpy(F.gather_row(orig_eid_map[etype], shuffled_eid))
+        orig_eid = F.asnumpy(F.gather_row(orig_eid_map[c_etype], shuffled_eid))
 
         # Check the node Ids and edge Ids.
         orig_src1, orig_dst1 = g.find_edges(orig_eid, etype=etype)
@@ -768,7 +778,9 @@ def test_rpc_sampling_shuffle(num_server):
         check_rpc_hetero_sampling_shuffle(Path(tmpdirname), num_server)
         check_rpc_hetero_sampling_empty_shuffle(Path(tmpdirname), num_server)
         check_rpc_hetero_etype_sampling_shuffle(Path(tmpdirname), num_server)
-        check_rpc_hetero_etype_sampling_shuffle(Path(tmpdirname), num_server, etype_sorted=True)
+        check_rpc_hetero_etype_sampling_shuffle(Path(tmpdirname), num_server, ['csc'])
+        check_rpc_hetero_etype_sampling_shuffle(Path(tmpdirname), num_server, ['csr'])
+        check_rpc_hetero_etype_sampling_shuffle(Path(tmpdirname), num_server, ['csc', 'coo'])
         check_rpc_hetero_etype_sampling_empty_shuffle(Path(tmpdirname), num_server)
         check_rpc_bipartite_sampling_empty(Path(tmpdirname), num_server)
         check_rpc_bipartite_sampling_shuffle(Path(tmpdirname), num_server)
@@ -777,6 +789,10 @@ def test_rpc_sampling_shuffle(num_server):
 
 def check_standalone_sampling(tmpdir, reshuffle):
     g = CitationGraphDataset("cora")[0]
+    prob = np.maximum(np.random.randn(g.num_edges()), 0)
+    mask = (prob > 0)
+    g.edata['prob'] = F.tensor(prob)
+    g.edata['mask'] = F.tensor(mask)
     num_parts = 1
     num_hops = 1
     partition_graph(g, 'test_sampling', num_parts, tmpdir,
@@ -793,10 +809,24 @@ def check_standalone_sampling(tmpdir, reshuffle):
     eids = g.edge_ids(src, dst)
     assert np.array_equal(
         F.asnumpy(sampled_graph.edata[dgl.EID]), F.asnumpy(eids))
+
+    sampled_graph = sample_neighbors(
+            dist_graph, [0, 10, 99, 66, 1024, 2008], 3, prob='mask')
+    eid = F.asnumpy(sampled_graph.edata[dgl.EID])
+    assert mask[eid].all()
+
+    sampled_graph = sample_neighbors(
+            dist_graph, [0, 10, 99, 66, 1024, 2008], 3, prob='prob')
+    eid = F.asnumpy(sampled_graph.edata[dgl.EID])
+    assert (prob[eid] > 0).all()
     dgl.distributed.exit_client()
 
 def check_standalone_etype_sampling(tmpdir, reshuffle):
     hg = CitationGraphDataset('cora')[0]
+    prob = np.maximum(np.random.randn(hg.num_edges()), 0)
+    mask = (prob > 0)
+    hg.edata['prob'] = F.tensor(prob)
+    hg.edata['mask'] = F.tensor(mask)
     num_parts = 1
     num_hops = 1
 
@@ -805,7 +835,7 @@ def check_standalone_etype_sampling(tmpdir, reshuffle):
     os.environ['DGL_DIST_MODE'] = 'standalone'
     dgl.distributed.initialize("rpc_ip_config.txt")
     dist_graph = DistGraph("test_sampling", part_config=tmpdir / 'test_sampling.json')
-    sampled_graph = sample_etype_neighbors(dist_graph, [0, 10, 99, 66, 1023], dgl.ETYPE, 3)
+    sampled_graph = sample_etype_neighbors(dist_graph, [0, 10, 99, 66, 1023], 3)
 
     src, dst = sampled_graph.edges()
     assert sampled_graph.number_of_nodes() == hg.number_of_nodes()
@@ -813,6 +843,16 @@ def check_standalone_etype_sampling(tmpdir, reshuffle):
     eids = hg.edge_ids(src, dst)
     assert np.array_equal(
         F.asnumpy(sampled_graph.edata[dgl.EID]), F.asnumpy(eids))
+
+    sampled_graph = sample_etype_neighbors(
+            dist_graph, [0, 10, 99, 66, 1023], 3, prob='mask')
+    eid = F.asnumpy(sampled_graph.edata[dgl.EID])
+    assert mask[eid].all()
+
+    sampled_graph = sample_etype_neighbors(
+            dist_graph, [0, 10, 99, 66, 1023], 3, prob='prob')
+    eid = F.asnumpy(sampled_graph.edata[dgl.EID])
+    assert (prob[eid] > 0).all()
     dgl.distributed.exit_client()
 
 def check_standalone_etype_sampling_heterograph(tmpdir, reshuffle):
@@ -828,7 +868,8 @@ def check_standalone_etype_sampling_heterograph(tmpdir, reshuffle):
     os.environ['DGL_DIST_MODE'] = 'standalone'
     dgl.distributed.initialize("rpc_ip_config.txt")
     dist_graph = DistGraph("test_hetero_sampling", part_config=tmpdir / 'test_hetero_sampling.json')
-    sampled_graph = sample_etype_neighbors(dist_graph, [0, 1, 2, 10, 99, 66, 1023, 1024, 2700, 2701], dgl.ETYPE, 1)
+    sampled_graph = sample_etype_neighbors(
+            dist_graph, [0, 1, 2, 10, 99, 66, 1023, 1024, 2700, 2701], 1)
     src, dst = sampled_graph.edges(etype=('paper', 'cite', 'paper'))
     assert len(src) == 10
     src, dst = sampled_graph.edges(etype=('paper', 'cite-by', 'paper'))
@@ -855,7 +896,7 @@ def start_in_subgraph_client(rank, tmpdir, disable_shared_mem, nodes):
     try:
         sampled_graph = dgl.distributed.in_subgraph(dist_graph, nodes)
     except Exception as e:
-        print(e)
+        print(traceback.format_exc())
         sampled_graph = None
     dgl.distributed.exit_client()
     return sampled_graph
@@ -919,7 +960,6 @@ def test_standalone_etype_sampling():
     with tempfile.TemporaryDirectory() as tmpdirname:
         os.environ['DGL_DIST_MODE'] = 'standalone'
         check_standalone_etype_sampling(Path(tmpdirname), True)
-        check_standalone_etype_sampling(Path(tmpdirname), False)
 
 if __name__ == "__main__":
     import tempfile
