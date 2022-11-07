@@ -107,10 +107,11 @@ class EdgeWeightNorm(nn.Module):
                                'This leads to square root of zero or negative values.')
 
             dev = graph.device
+            dtype = edge_weight.dtype
             graph.srcdata['_src_out_w'] = th.ones(
-                    graph.number_of_src_nodes(), dtype=edge_weight.dtype, device=dev)
+                graph.number_of_src_nodes(), dtype=dtype, device=dev)
             graph.dstdata['_dst_in_w'] = th.ones(
-                    graph.number_of_dst_nodes(), dtype=edge_weight.dtype, device=dev)
+                graph.number_of_dst_nodes(), dtype=dtype, device=dev)
             graph.edata['_edge_w'] = edge_weight
 
             if self._norm == 'both':
