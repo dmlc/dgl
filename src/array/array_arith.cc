@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
  * @file array/array_aritch.cc
  * @brief DGL array arithmetic operations

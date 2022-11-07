@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2017 by Contributors
  * @file dgl/runtime/util.h
  * @brief Useful runtime util.
@@ -11,7 +11,7 @@
 namespace dgl {
 namespace runtime {
 
-/*!
+/**
  * @brief Check whether type matches the given spec.
  * @param t The type
  * @param code The type code.
@@ -28,7 +28,7 @@ inline bool TypeMatch(DGLDataType t, int code, int bits, int lanes = 1) {
 namespace dgl {
 namespace ir {
 namespace intrinsic {
-/*! @brief The kind of structure field info used in intrinsic */
+/** @brief The kind of structure field info used in intrinsic */
 enum DGLStructFieldKind : int {
   // array head address
   kArrAddr,

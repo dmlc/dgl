@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file dgl/aten/array_ops.h
  * @brief Common array operations required by DGL.
@@ -23,20 +23,20 @@ namespace aten {
 // ID array
 //////////////////////////////////////////////////////////////////////
 
-/*! @return A special array to represent null. */
+/** @return A special array to represent null. */
 inline NDArray NullArray(const DGLDataType& dtype = DGLDataType{kDGLInt, 64, 1},
                          const DGLContext& ctx = DGLContext{kDGLCPU, 0}) {
   return NDArray::Empty({0}, dtype, ctx);
 }
 
-/*!
+/**
  * @return Whether the input array is a null array.
  */
 inline bool IsNullArray(NDArray array) {
   return array->shape[0] == 0;
 }
 
-/*!
+/**
  * @brief Create a new id array with given length
  * @param length The array length
  * @param ctx The array context
@@ -47,7 +47,7 @@ IdArray NewIdArray(int64_t length,
                    DGLContext ctx = DGLContext{kDGLCPU, 0},
                    uint8_t nbits = 64);
 
-/*!
+/**
  * @brief Create a new id array using the given vector data
  * @param vec The vector data
  * @param nbits The integer bits of the returned array
@@ -59,7 +59,7 @@ IdArray VecToIdArray(const std::vector<T>& vec,
                      uint8_t nbits = 64,
                      DGLContext ctx = DGLContext{kDGLCPU, 0});
 
-/*!
+/**
  * @brief Return an array representing a 1D range.
  * @param low Lower bound (inclusive).
  * @param high Higher bound (exclusive).
@@ -69,7 +69,7 @@ IdArray VecToIdArray(const std::vector<T>& vec,
  */
 IdArray Range(int64_t low, int64_t high, uint8_t nbits, DGLContext ctx);
 
-/*!
+/**
  * @brief Return an array full of the given value
  * @param val The value to fill.
  * @param length Number of elements.
@@ -79,7 +79,7 @@ IdArray Range(int64_t low, int64_t high, uint8_t nbits, DGLContext ctx);
  */
 IdArray Full(int64_t val, int64_t length, uint8_t nbits, DGLContext ctx);
 
-/*!
+/**
  * @brief Return an array full of the given value with the given type.
  * @param val The value to fill.
  * @param length Number of elements.
@@ -89,13 +89,13 @@ IdArray Full(int64_t val, int64_t length, uint8_t nbits, DGLContext ctx);
 template <typename DType>
 NDArray Full(DType val, int64_t length, DGLContext ctx);
 
-/*! @brief Create a deep copy of the given array */
+/** @brief Create a deep copy of the given array */
 IdArray Clone(IdArray arr);
 
-/*! @brief Convert the idarray to the given bit width */
+/** @brief Convert the idarray to the given bit width */
 IdArray AsNumBits(IdArray arr, uint8_t bits);
 
-/*! @brief Arithmetic functions */
+/** @brief Arithmetic functions */
 IdArray Add(IdArray lhs, IdArray rhs);
 IdArray Sub(IdArray lhs, IdArray rhs);
 IdArray Mul(IdArray lhs, IdArray rhs);
@@ -138,30 +138,30 @@ IdArray LE(int64_t lhs, IdArray rhs);
 IdArray EQ(int64_t lhs, IdArray rhs);
 IdArray NE(int64_t lhs, IdArray rhs);
 
-/*! @brief Stack two arrays (of len L) into a 2*L length array */
+/** @brief Stack two arrays (of len L) into a 2*L length array */
 IdArray HStack(IdArray arr1, IdArray arr2);
 
-/*! @brief Return the indices of the elements that are non-zero. */
+/** @brief Return the indices of the elements that are non-zero. */
 IdArray NonZero(BoolArray bool_arr);
 
-/*!
+/**
  * @brief Return the data under the index. In numpy notation, A[I]
  * @tparam ValueType The type of return value.
  */
 template<typename ValueType>
 ValueType IndexSelect(NDArray array, int64_t index);
 
-/*!
+/**
  * @brief Return the data under the index. In numpy notation, A[I]
  */
 NDArray IndexSelect(NDArray array, IdArray index);
 
-/*!
+/**
  * @brief Return the data from `start` (inclusive) to `end` (exclusive).
  */
 NDArray IndexSelect(NDArray array, int64_t start, int64_t end);
 
-/*!
+/**
  * @brief Permute the elements of an array according to given indices.
  *
  * Only support 1D arrays.
@@ -175,7 +175,7 @@ NDArray IndexSelect(NDArray array, int64_t start, int64_t end);
  */
 NDArray Scatter(NDArray array, IdArray indices);
 
-/*!
+/**
  * @brief Scatter data into the output array.
  *
  * Equivalent to:
@@ -186,7 +186,7 @@ NDArray Scatter(NDArray array, IdArray indices);
  */
 void Scatter_(IdArray index, NDArray value, NDArray out);
 
-/*!
+/**
  * @brief Repeat each element a number of times.  Equivalent to np.repeat(array, repeats)
  * @param array A 1D vector
  * @param repeats A 1D integer vector for number of times to repeat for each element in
@@ -194,7 +194,7 @@ void Scatter_(IdArray index, NDArray value, NDArray out);
  */
 NDArray Repeat(NDArray array, IdArray repeats);
 
-/*!
+/**
  * @brief Relabel the given ids to consecutive ids.
  *
  * Relabeling is done inplace. The mapping is created from the union
@@ -211,7 +211,7 @@ NDArray Repeat(NDArray array, IdArray repeats);
  */
 IdArray Relabel_(const std::vector<IdArray>& arrays);
 
-/*!
+/**
  * @brief concatenate the given id arrays to one array
  *
  * Example:
@@ -224,12 +224,12 @@ IdArray Relabel_(const std::vector<IdArray>& arrays);
  */
 NDArray Concat(const std::vector<IdArray>& arrays);
 
-/*!\brief Return whether the array is a valid 1D int array*/
+/** @brief Return whether the array is a valid 1D int array*/
 inline bool IsValidIdArray(const dgl::runtime::NDArray& arr) {
   return arr->ndim == 1 && arr->dtype.code == kDGLInt;
 }
 
-/*!
+/**
  * @brief Packs a tensor containing padded sequences of variable length.
  *
  * Similar to \c pack_padded_sequence in PyTorch, except that
@@ -261,7 +261,7 @@ inline bool IsValidIdArray(const dgl::runtime::NDArray& arr) {
 template<typename ValueType>
 std::tuple<NDArray, IdArray, IdArray> Pack(NDArray array, ValueType pad_value);
 
-/*!
+/**
  * @brief Batch-slice a 1D or 2D array, and then pack the list of sliced arrays
  * by concatenation.
  *
@@ -291,7 +291,7 @@ std::tuple<NDArray, IdArray, IdArray> Pack(NDArray array, ValueType pad_value);
  */
 std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths);
 
-/*!
+/**
  * @brief Return the cumulative summation (or inclusive sum) of the input array.
  *
  * The first element out[0] is equal to the first element of the input array
@@ -307,7 +307,7 @@ std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths);
  */
 IdArray CumSum(IdArray array, bool prepend_zero = false);
 
-/*!
+/**
  * @brief Return the nonzero index.
  *
  * Only support 1D array. The result index array is in int64.
@@ -317,7 +317,7 @@ IdArray CumSum(IdArray array, bool prepend_zero = false);
  */
 IdArray NonZero(NDArray array);
 
-/*!
+/**
  * @brief Sort the ID vector in ascending order.
  *
  * It performs both sort and arg_sort (returning the sorted index). The sorted index
@@ -334,7 +334,7 @@ IdArray NonZero(NDArray array);
  */
 std::pair<IdArray, IdArray> Sort(IdArray array, int num_bits = 0);
 
-/*!
+/**
  * @brief Return a string that prints out some debug information.
  */
 std::string ToDebugString(NDArray array);
@@ -355,7 +355,7 @@ IdArray VecToIdArray(const std::vector<T>& vec,
   return ret.CopyTo(ctx);
 }
 
-/*!
+/**
  * @brief Get the context of the first array, and check if the non-null arrays'
  * contexts are the same.
  */

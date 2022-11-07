@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2017 by Contributors
  * @file cuda_common.h
  * @brief Common utilities for CUDA
@@ -109,7 +109,7 @@ inline const char* curandGetErrorString(curandStatus_t error) {
   return "Unrecognized curand error string";
 }
 
-/*
+/**
  * @brief Cast data type to cudaDataType_t.
  */
 template <typename T>
@@ -133,7 +133,7 @@ struct cuda_dtype<double> {
 };
 
 #if CUDART_VERSION >= 11000
-/*
+/**
  * @brief Cast index data type to cusparseIndexType_t.
  */
 template <typename T>
@@ -152,24 +152,24 @@ struct cusparse_idtype<int64_t> {
 };
 #endif
 
-/*! @brief Thread local workspace */
+/** @brief Thread local workspace */
 class CUDAThreadEntry {
  public:
-  /*! @brief The cusparse handler */
+  /** @brief The cusparse handler */
   cusparseHandle_t cusparse_handle{nullptr};
-  /*! @brief The cublas handler */
+  /** @brief The cublas handler */
   cublasHandle_t cublas_handle{nullptr};
-  /*! @brief The curand generator */
+  /** @brief The curand generator */
   curandGenerator_t curand_gen{nullptr};
-  /*! @brief thread local pool*/
+  /** @brief thread local pool*/
   WorkspacePool pool;
-  /*! @brief constructor */
+  /** @brief constructor */
   CUDAThreadEntry();
   // get the threadlocal workspace
   static CUDAThreadEntry* ThreadLocal();
 };
 
-/*! @brief Get the current CUDA stream */
+/** @brief Get the current CUDA stream */
 cudaStream_t getCurrentCUDAStream();
 }  // namespace runtime
 }  // namespace dgl

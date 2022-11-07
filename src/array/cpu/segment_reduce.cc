@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file kernel/cpu/segment_reduce.cc
  * @brief Segment reduce C APIs and definitions.
@@ -11,7 +11,7 @@
 namespace dgl {
 namespace aten {
 
-/*! @brief Segment Reduce operator. */
+/** @brief Segment Reduce operator. */
 template <int XPU, typename IdType, typename DType>
 void SegmentReduce(
     const std::string& op,
@@ -34,7 +34,7 @@ void SegmentReduce(
   }
 }
 
-/*! @brief Scatter Add.*/
+/** @brief Scatter Add.*/
 template <int XPU, typename IdType, typename DType>
 void ScatterAdd(NDArray feat,
                 NDArray idx,
@@ -42,7 +42,7 @@ void ScatterAdd(NDArray feat,
   cpu::ScatterAdd<IdType, DType>(feat, idx, out);
 }
 
-/*! @brief Update gradients for reduce operator max/min on heterogeneous graph.*/
+/** @brief Update gradients for reduce operator max/min on heterogeneous graph.*/
 template <int XPU, typename IdType, typename DType>
 void UpdateGradMinMax_hetero(const HeteroGraphPtr& g,
                 const std::string& op,
@@ -53,7 +53,7 @@ void UpdateGradMinMax_hetero(const HeteroGraphPtr& g,
   cpu::UpdateGradMinMax_hetero<IdType, DType>(g, op, feat, idx, idx_etype, out);
 }
 
-/*! @brief Backward function of segment cmp.*/
+/** @brief Backward function of segment cmp.*/
 template <int XPU, typename IdType, typename DType>
 void BackwardSegmentCmp(
     NDArray feat,

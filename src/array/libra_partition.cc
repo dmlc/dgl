@@ -1,4 +1,4 @@
-/*
+/**
 Copyright (c) 2021 Intel Corporation
  \file distgnn/partition/main_Libra.py
  \brief Libra - Vertex-cut based graph partitioner for distirbuted training
@@ -42,7 +42,7 @@ int32_t Ver2partition(IdType in_val, int64_t *node_map, int32_t num_parts) {
   LOG(FATAL) << "Error: Unexpected output in Ver2partition!";
 }
 
-/*!
+/**
  * @brief Identifies the lead loaded partition/community for a given edge
  * assignment.
  */
@@ -65,7 +65,7 @@ int32_t LeastLoad(int64_t *community_edges, int32_t nc) {
   return loc[r];
 }
 
-/*!
+/**
  * @brief Libra - vertexcut based graph partitioning.
  * It takes list of edges from input DGL graph and distributed them among nc
  * partitions During edge distribution, Libra assign a given edge to a partition
@@ -324,7 +324,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLLibraVertexCut")
       });
     });
 
-/*!
+/**
  * @brief
  * 1. Builds dictionary (ldt) for assigning local node IDs to nodes in the
  *    partitions
@@ -456,7 +456,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLLibra2dglBuildDict")
       *rv = ret;
     });
 
-/*!
+/**
  * @brief sets up the 1-level tree among the clones of the split-nodes.
  * @param[in] gdt_key global dict for assigning consecutive node IDs to nodes
  *            across all the partitions
@@ -506,7 +506,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLLibra2dglSetLR")
       Libra2dglSetLR(gdt_key, gdt_value, lrtensor, nc, Nn);
     });
 
-/*!
+/**
  * @brief For each node in a partition, it creates a list of remote clone IDs;
  *        also, for each node in a partition, it gathers the data (feats, label,
  *        trian, test) from input graph.

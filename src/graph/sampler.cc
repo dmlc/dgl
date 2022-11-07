@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2018 by Contributors
  * @file graph/sampler.cc
  * @brief DGL sampler implementation
@@ -24,7 +24,7 @@ using namespace dgl::runtime;
 namespace dgl {
 
 namespace {
-/*
+/**
  * ArrayHeap is used to sample elements from vector
  */
 template <typename ValueType>
@@ -49,7 +49,7 @@ class ArrayHeap {
   }
   ~ArrayHeap() {}
 
-  /*
+  /**
    * Remove term from index (this costs O(log m) steps)
    */
   void Delete(size_t index) {
@@ -64,7 +64,7 @@ class ArrayHeap {
     }
   }
 
-  /*
+  /**
    * Add value w to index (this costs O(log m) steps)
    */
   void Add(size_t index, ValueType w) {
@@ -75,7 +75,7 @@ class ArrayHeap {
     }
   }
 
-  /*
+  /**
    * Sample from arrayHeap
    */
   size_t Sample() {
@@ -92,7 +92,7 @@ class ArrayHeap {
     return i - limit_;
   }
 
-  /*
+  /**
    * Sample a vector by given the size n
    */
   size_t SampleWithoutReplacement(size_t n, std::vector<size_t> *samples) {
@@ -175,7 +175,7 @@ class EdgeSamplerObject : public Object {
   int64_t chunk_size_;
 };
 
-/*
+/**
  * Uniformly sample integers from [0, set_size) without replacement.
  */
 void RandomSample(size_t set_size, size_t num, std::vector<size_t> *out) {
@@ -221,7 +221,7 @@ void RandomSample(
   }
 }
 
-/*
+/**
  * For a sparse array whose non-zeros are represented by nz_idxs,
  * negate the sparse array and outputs the non-zeros in the negated array.
  */
@@ -244,7 +244,7 @@ void NegateArray(
   }
 }
 
-/*
+/**
  * Uniform sample vertices from a list of vertices.
  */
 void GetUniformSample(
@@ -281,7 +281,7 @@ void GetUniformSample(
   }
 }
 
-/*
+/**
  * Non-uniform sample via ArrayHeap
  *
  * @param probability Transition probability on the entire graph, indexed by
@@ -318,7 +318,7 @@ void GetNonUniformSample(
   sort(out_edge->begin(), out_edge->end());
 }
 
-/*
+/**
  * Used for subgraph sampling
  */
 struct neigh_list {
@@ -643,7 +643,7 @@ void ConstructLayers(
     const std::vector<dgl_id_t> &seed_array, IdArray layer_sizes,
     std::vector<dgl_id_t> *layer_offsets, std::vector<dgl_id_t> *node_mapping,
     std::vector<int64_t> *actl_layer_sizes, std::vector<float> *probabilities) {
-  /*
+  /**
    * Given a graph and a collection of seed nodes, this function constructs
    * NodeFlow layers via uniform layer-wise sampling, and return the resultant
    * layers and their corresponding probabilities.
@@ -705,7 +705,7 @@ void ConstructFlows(
     std::vector<dgl_id_t> *sub_indptr, std::vector<dgl_id_t> *sub_indices,
     std::vector<dgl_id_t> *sub_eids, std::vector<dgl_id_t> *flow_offsets,
     std::vector<dgl_id_t> *edge_mapping) {
-  /*
+  /**
    * Given a graph and a sequence of NodeFlow layers, this function constructs
    * dense subgraphs (flows) between consecutive layers.
    */

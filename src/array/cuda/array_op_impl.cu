@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020-2021 by Contributors
  * @file array/cuda/array_op_impl.cu
  * @brief Array operator GPU implementation

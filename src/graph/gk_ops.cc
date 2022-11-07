@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file graph/gk_ops.cc
  * @brief Graph operation implemented in GKlib
@@ -14,7 +14,7 @@ namespace dgl {
 
 #if !defined(_WIN32)
 
-/*!
+/**
  * Convert DGL CSR to GKLib CSR.
  * GKLib CSR actually stores a CSR object and a CSC object of a graph.
  * @param mat the DGL CSR matrix.
@@ -60,7 +60,7 @@ gk_csr_t *Convert2GKCsr(const aten::CSRMatrix mat, bool is_row) {
   return gk_csr;
 }
 
-/*!
+/**
  * Convert GKLib CSR to DGL CSR.
  * GKLib CSR actually stores a CSR object and a CSC object of a graph.
  * @param gk_csr the GKLib CSR.

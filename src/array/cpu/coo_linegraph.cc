@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file array/cpu/coo_line_graph.cc
  * @brief COO LineGraph

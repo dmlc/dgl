@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
  * @file shared_mem.cc
  * @brief Shared memory management.
@@ -18,7 +18,7 @@
 namespace dgl {
 namespace runtime {
 
-/*
+/**
  * Shared memory is a resource that cannot be cleaned up if the process doesn't
  * exit normally. We'll manage the resource with ResourceManager.
  */

@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
  * @file dgl/array_utils.h
  * @brief Utility classes and functions for DGL arrays.
@@ -18,7 +18,7 @@
 namespace dgl {
 namespace aten {
 
-/*!
+/**
  * @brief A hashmap that maps each ids in the given array to new ids starting
  * from zero.
  *
@@ -109,7 +109,7 @@ class IdHashMap {
   phmap::flat_hash_map<IdType, IdType> oldv2newv_;
 };
 
-/*
+/**
  * @brief Hash type for building maps/sets with pairs as keys.
  */
 struct PairHash {

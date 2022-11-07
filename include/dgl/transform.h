@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
  * @file dgl/transform.h
  * @brief DGL graph transformations
@@ -18,7 +18,7 @@ namespace dgl {
 
 namespace transform {
 
-/*!
+/**
  * @brief Given a list of graphs, remove the common nodes that do not have
  * inbound and outbound edges.
  *
@@ -37,7 +37,7 @@ std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>> CompactGraphs(
     const std::vector<HeteroGraphPtr> &graphs,
     const std::vector<IdArray> &always_preserve);
 
-/*!
+/**
  * @brief Convert a graph into a bipartite-structured graph for message passing.
  *
  * Specifically, we create one node type \c ntype_l on the "left" side and
@@ -83,7 +83,7 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>> ToBlock(
     HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes,
     bool include_rhs_in_lhs);
 
-/*!
+/**
  * @brief Convert a multigraph to a simple graph.
  *
  * @return A triplet of
@@ -116,7 +116,7 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>> ToBlock(
 std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>>
 ToSimpleGraph(const HeteroGraphPtr graph);
 
-/*!
+/**
  * @brief Remove edges from a graph.
  *
  * @param graph The graph.

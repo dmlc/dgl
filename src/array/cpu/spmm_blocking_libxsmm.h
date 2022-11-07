@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2021 Intel Corporation
  * @file array/cpu/spmm.h
  * @brief SPMM CPU kernel function header.
@@ -48,7 +48,7 @@ int32_t GetLLCSize() {
   return cache_size;
 }
 
-/*!
+/**
  * @brief Tile the CSR matrix to roughly make sure that the column tiles and
  *        corresponding neighbor features fit into LLC and the row tiles
  *        are assigned to OMP threads.
@@ -165,7 +165,7 @@ inline void SpMMCreateBlocks(
   }
 }
 
-/*!
+/**
  * @brief Create libxsmm kernel.
  * @param has_idx For the edge features, are there indices available.
  * @param N Feature size.
@@ -269,7 +269,7 @@ inline libxsmm_meltwfunction_opreduce_vecs_idx SpMMCreateLibxsmmKernel(
   return kernel;
 }
 
-/*!
+/**
  * @brief Use libxsmm to perform SpMM-Sum on all blocks.
  * @param block_csr_array The array containing csr matrices of all blocks.
  * @param B The feature on source nodes.
@@ -326,7 +326,7 @@ inline void SpMMBlockwiseOpSum(
   }
 }
 
-/*!
+/**
  * @brief Use libxsmm to perform SpMM-Max/Min on all blocks.
  * @param block_csr_array The array containing csr matrices of all blocks.
  * @param B The feature on source nodes.
@@ -390,7 +390,7 @@ inline void SpMMBlockwiseOpCmp(
   }
 }
 
-/*!
+/**
  * @brief Free the tiled CSR matrix data.
  * @param block_csr_array The array containing csr matrices of all blocks.
  * @param num_M_blocks Number of blocks to create along the rows of adjacency
@@ -412,7 +412,7 @@ inline void SpMMFreeBlocks(
   free(block_csr_array);
 }
 
-/*!
+/**
  * @brief Optimized CPU kernel of SpMM-Sum/Max/Min on Csr format.
  * @param bcast Broadcast information.
  * @param csr The Csr matrix.
@@ -550,7 +550,7 @@ void SpMMRedopCsrOpt(
 #endif  // DEBUG
 }
 
-/*!
+/**
  * @brief Optimized CPU kernel of SpMM-Sum on Csr format.
  * @param bcast Broadcast information.
  * @param csr The Csr matrix.
@@ -568,7 +568,7 @@ void SpMMSumCsrLibxsmm(
       bcast, csr, ufeat, efeat, out, dummy, dummy);
 }
 
-/*!
+/**
  * @brief Optimized CPU kernel of SpMM-Min/Max on Csr format.
  * @param bcast Broadcast information.
  * @param csr The Csr matrix.

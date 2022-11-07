@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file rpc/rpc.cc
  * @brief Implementation of RPC utilities used by both server and client sides.
@@ -382,7 +382,7 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCMessageGetTensors")
     });
 
 #if defined(__linux__)
-/*!
+/**
  * @brief The signal handler.
  * @param s signal
  */

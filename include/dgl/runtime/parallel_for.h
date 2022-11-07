@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2021 by Contributors
  * @file runtime/container.h
  * @brief Defines the container object data structures.
@@ -56,7 +56,7 @@ inline size_t compute_num_threads(size_t begin, size_t end, size_t grain_size) {
 
 static DefaultGrainSizeT default_grain_size;
 
-/*!
+/**
  * @brief OpenMP-based parallel for loop.
  *
  * It requires each thread's workload to have at least \a grain_size elements.
@@ -101,7 +101,7 @@ void parallel_for(
 #endif
 }
 
-/*!
+/**
  * @brief OpenMP-based parallel for loop with default grain size.
  *
  * parallel_for with grain size to default value, either 1 or controlled through
@@ -117,7 +117,7 @@ void parallel_for(
   parallel_for(begin, end, default_grain_size(), std::forward<F>(f));
 }
 
-/*!
+/**
  * @brief OpenMP-based two-stage parallel reduction.
  *
  * The first-stage reduction function \a f works in parallel.  Each thread's workload has

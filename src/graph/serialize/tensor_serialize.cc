@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
  * @file graph/serialize/tensor_serialize.cc
  * @brief Graph serialization implementation

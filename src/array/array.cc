@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2019-2021 by Contributors
  * @file array/array.cc
  * @brief DGL array utilities implementation
@@ -956,7 +956,7 @@ COOToSimple(const COOMatrix& coo) {
   const COOMatrix &coalesced_adj = coalesced_result.first;
   const IdArray &count = coalesced_result.second;
 
-  /*
+  /**
    * eids_shuffled actually already contains the mapping from old edge space to the
    * new one:
    *

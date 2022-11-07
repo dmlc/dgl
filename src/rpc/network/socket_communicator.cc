@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
  * @file communicator.cc
  * @brief SocketCommunicator for DGL distributed training.

@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file array/cuda/sddmm.cu
  * @brief SDDMM C APIs and definitions.
@@ -9,7 +9,7 @@
 namespace dgl {
 namespace aten {
 
-/*!
+/**
  * @brief CUDA implementation of g-SDDMM on heterograph using
     Csr format.
  */

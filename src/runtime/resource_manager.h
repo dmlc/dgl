@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file resource_manager.h
  * @brief Manage the resources in the runtime system.
@@ -13,7 +13,7 @@
 namespace dgl {
 namespace runtime {
 
-/*
+/**
  * A class that provides the interface to describe a resource that can be
  * managed by a resource manager. Some of the resources cannot be free'd
  * automatically when the process exits, especially when the process doesn't

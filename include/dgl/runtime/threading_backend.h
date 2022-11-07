@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2018 by Contributors
  * @file dgl/runtime/threading_backend.h
  * @brief Utilities for manipulating thread pool threads.
@@ -14,7 +14,7 @@ namespace dgl {
 namespace runtime {
 namespace threading {
 
-/*!
+/**
  * @brief A platform-agnostic abstraction for managing a collection of
  *        thread pool threads.
  */
@@ -22,7 +22,7 @@ class ThreadGroup {
  public:
   class Impl;
 
-  /*!
+  /**
    * @brief Creates a collection of threads which run a provided function.
    *
    * @param num_workers The total number of worker threads in this group.
@@ -39,7 +39,7 @@ class ThreadGroup {
       bool exclude_worker0 = false);
   ~ThreadGroup();
 
-  /*!
+  /**
    * @brief Blocks until all non-main threads in the pool finish.
    */
   void Join();
@@ -49,7 +49,7 @@ class ThreadGroup {
     kLittle = -1,
   };
 
-  /*!
+  /**
    * @brief configure the CPU id affinity
    *
    * @param mode The preferred CPU type (1 = big, -1 = little).
@@ -67,14 +67,14 @@ class ThreadGroup {
   Impl* impl_;
 };
 
-/*!
+/**
  * @brief Platform-agnostic no-op.
  */
 // This used to be Yield(), renaming to YieldThread() because windows.h defined
 // it as a macro in later SDKs.
 void YieldThread();
 
-/*!
+/**
  * @return the maximum number of effective workers for this system.
  */
 int MaxConcurrency();

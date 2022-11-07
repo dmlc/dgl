@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2016-2022 by Contributors
  * @file cpu_device_api.cc
  */

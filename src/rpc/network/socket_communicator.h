@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
  * @file communicator.h
  * @brief SocketCommunicator for DGL distributed training.
@@ -25,7 +25,7 @@ static constexpr int kTimeOut =
     10 * 60;  // 10 minutes (in seconds) for socket timeout
 static constexpr int kMaxConnection = 1024;  // maximal connection: 1024
 
-/*!
+/**
  * @breif Networking address
  */
 struct IPAddr {
@@ -33,14 +33,14 @@ struct IPAddr {
   int port;
 };
 
-/*!
+/**
  * @brief SocketSender for DGL distributed training.
  *
  * SocketSender is the communicator implemented by tcp socket.
  */
 class SocketSender : public Sender {
  public:
-  /*!
+  /**
    * @brief Sender constructor
    * @param queue_size size of message queue
    * @param max_thread_count size of thread pool. 0 for no limit
@@ -48,7 +48,7 @@ class SocketSender : public Sender {
   SocketSender(int64_t queue_size, int max_thread_count)
       : Sender(queue_size, max_thread_count) {}
 
-  /*!
+  /**
    * @brief Connect to a receiver.
    *
    * When there are multiple receivers to be connected, application will call
@@ -64,7 +64,7 @@ class SocketSender : public Sender {
    */
   bool ConnectReceiver(const std::string& addr, int recv_id) override;
 
-  /*!
+  /**
    * @brief Finalize the action to connect to receivers. Make sure that either
    *        all connections are successfully established or connection fails.
    * @return True for success and False for fail
@@ -73,19 +73,19 @@ class SocketSender : public Sender {
    */
   bool ConnectReceiverFinalize(const int max_try_times) override;
 
-  /*!
+  /**
    * @brief Send RPCMessage to specified Receiver.
    * @param msg data message
    * @param recv_id receiver's ID
    */
   void Send(const rpc::RPCMessage& msg, int recv_id) override;
 
-  /*!
+  /**
    * @brief Finalize TPSender
    */
   void Finalize() override;
 
-  /*!
+  /**
    * @brief Communicator type: 'socket'
    */
   const std::string& NetType() const override {
@@ -93,7 +93,7 @@ class SocketSender : public Sender {
     return net_type;
   }
 
-  /*!
+  /**
    * @brief Send data to specified Receiver. Actually pushing message to message
    * queue.
    * @param msg data message.
@@ -110,29 +110,29 @@ class SocketSender : public Sender {
   STATUS Send(Message msg, int recv_id) override;
 
  private:
-  /*!
+  /**
    * @brief socket for each connection of receiver
    */
   std::vector<
       std::unordered_map<int /* receiver ID */, std::shared_ptr<TCPSocket>>>
       sockets_;
 
-  /*!
+  /**
    * @brief receivers' address
    */
   std::unordered_map<int /* receiver ID */, IPAddr> receiver_addrs_;
 
-  /*!
+  /**
    * @brief message queue for each thread
    */
   std::vector<std::shared_ptr<MessageQueue>> msg_queue_;
 
-  /*!
+  /**
    * @brief Independent thread
    */
   std::vector<std::shared_ptr<std::thread>> threads_;
 
-  /*!
+  /**
    * @brief Send-loop for each thread
    * @param sockets TCPSockets for current thread
    * @param queue message_queue for current thread
@@ -147,14 +147,14 @@ class SocketSender : public Sender {
       std::shared_ptr<MessageQueue> queue);
 };
 
-/*!
+/**
  * @brief SocketReceiver for DGL distributed training.
  *
  * SocketReceiver is the communicator implemented by tcp socket.
  */
 class SocketReceiver : public Receiver {
  public:
-  /*!
+  /**
    * @brief Receiver constructor
    * @param queue_size size of message queue.
    * @param max_thread_count size of thread pool. 0 for no limit
@@ -162,7 +162,7 @@ class SocketReceiver : public Receiver {
   SocketReceiver(int64_t queue_size, int max_thread_count)
       : Receiver(queue_size, max_thread_count) {}
 
-  /*!
+  /**
    * @brief Wait for all the Senders to connect
    * @param addr Networking address, e.g., 'tcp://127.0.0.1:50051', 'mpi://0'
    * @param num_sender total number of Senders
@@ -174,7 +174,7 @@ class SocketReceiver : public Receiver {
   bool Wait(
       const std::string& addr, int num_sender, bool blocking = true) override;
 
-  /*!
+  /**
    * @brief Recv RPCMessage from Sender. Actually removing data from queue.
    * @param msg pointer of RPCmessage
    * @param timeout The timeout value in milliseconds. If zero, wait
@@ -183,7 +183,7 @@ class SocketReceiver : public Receiver {
    */
   rpc::RPCStatus Recv(rpc::RPCMessage* msg, int timeout) override;
 
-  /*!
+  /**
    * @brief Recv data from Sender. Actually removing data from msg_queue.
    * @param msg pointer of data message
    * @param send_id which sender current msg comes from
@@ -197,7 +197,7 @@ class SocketReceiver : public Receiver {
    */
   STATUS Recv(Message* msg, int* send_id, int timeout = 0) override;
 
-  /*!
+  /**
    * @brief Recv data from a specified Sender. Actually removing data from
    * msg_queue.
    * @param msg pointer of data message.
@@ -212,14 +212,14 @@ class SocketReceiver : public Receiver {
    */
   STATUS RecvFrom(Message* msg, int send_id, int timeout = 0) override;
 
-  /*!
+  /**
    * @brief Finalize SocketReceiver
    *
    * Finalize() is not thread-safe and only one thread can invoke this API.
    */
   void Finalize() override;
 
-  /*!
+  /**
    * @brief Communicator type: 'socket'
    */
   const std::string& NetType() const override {
@@ -233,24 +233,24 @@ class SocketReceiver : public Receiver {
     int64_t received_bytes = 0;
     char* buffer = nullptr;
   };
-  /*!
+  /**
    * @brief number of sender
    */
   int num_sender_;
 
-  /*!
+  /**
    * @brief server socket for listening connections
    */
   TCPSocket* server_socket_;
 
-  /*!
+  /**
    * @brief socket for each client connections
    */
   std::vector<std::unordered_map<
       int /* Sender (virutal) ID */, std::shared_ptr<TCPSocket>>>
       sockets_;
 
-  /*!
+  /**
    * @brief Message queue for each socket connection
    */
   std::unordered_map<
@@ -258,18 +258,18 @@ class SocketReceiver : public Receiver {
       msg_queue_;
   std::unordered_map<int, std::shared_ptr<MessageQueue>>::iterator mq_iter_;
 
-  /*!
+  /**
    * @brief Independent thead
    */
   std::vector<std::shared_ptr<std::thread>> threads_;
 
-  /*!
+  /**
    * @brief queue_sem_ semphore to indicate number of messages in multiple
    * message queues to prevent busy wait of Recv
    */
   runtime::Semaphore queue_sem_;
 
-  /*!
+  /**
    * @brief Recv-loop for each thread
    * @param sockets client sockets of current thread
    * @param queue message queues of current thread

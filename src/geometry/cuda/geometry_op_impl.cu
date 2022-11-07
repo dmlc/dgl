@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
  * @file geometry/cuda/geometry_op_impl.cc
  * @brief Geometry operator CUDA implementation
@@ -15,7 +15,7 @@ namespace dgl {
 namespace geometry {
 namespace impl {
 
-/*!
+/**
  * @brief Farthest Point Sampler without the need to compute all pairs of
  * distance.
  *

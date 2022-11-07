@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
  * @file graph/serialize/heterograph_serialize.cc
  * @brief DGLHeteroGraph serialization implementation

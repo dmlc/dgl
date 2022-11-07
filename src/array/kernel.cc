@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file array/kernel.cc
  * @brief New kernels
@@ -23,7 +23,7 @@ namespace {
 
 }  // namespace
 
-/*! @brief Generalized Sparse Matrix-Matrix Multiplication. */
+/** @brief Generalized Sparse Matrix-Matrix Multiplication. */
 void SpMM(const std::string& op, const std::string& reduce,
           HeteroGraphPtr graph,
           NDArray ufeat,
@@ -54,7 +54,7 @@ void SpMM(const std::string& op, const std::string& reduce,
 }
 
 
-/*! @brief Generalized segmented dense Matrix-Matrix Multiplication. */
+/** @brief Generalized segmented dense Matrix-Matrix Multiplication. */
 void SegmentMM(const NDArray A,
                const NDArray B,
                NDArray C,
@@ -102,7 +102,7 @@ void SegmentMMBackwardB(const NDArray A,
 }
 
 
-/*! @brief Generalized Dense Matrix-Matrix Multiplication according to relation types. */
+/** @brief Generalized Dense Matrix-Matrix Multiplication according to relation types. */
 void GatherMM(const NDArray A,
               const NDArray B,
               NDArray C,
@@ -139,7 +139,7 @@ void GatherMM(const NDArray A,
 }
 
 
-/*! @brief Generalized Dense Matrix-Matrix Multiplication according to relation types. */
+/** @brief Generalized Dense Matrix-Matrix Multiplication according to relation types. */
 void GatherMMScatter(const NDArray A,
                      const NDArray B,
                      NDArray C,
@@ -179,7 +179,7 @@ void GatherMMScatter(const NDArray A,
 }
 
 
-/*! @brief Generalized Sparse Matrix-Matrix Multiplication with hetero-graph support. */
+/** @brief Generalized Sparse Matrix-Matrix Multiplication with hetero-graph support. */
 void SpMMHetero(const std::string& op, const std::string& reduce,
           HeteroGraphPtr graph,
           const std::vector<NDArray>& ufeat_vec,
@@ -227,7 +227,7 @@ void SpMMHetero(const std::string& op, const std::string& reduce,
 }
 
 
-/*! @brief Generalized Sampled Dense-Dense Matrix Multiplication. */
+/** @brief Generalized Sampled Dense-Dense Matrix Multiplication. */
 void SDDMM(const std::string& op,
            HeteroGraphPtr graph,
            NDArray lhs,
@@ -258,7 +258,7 @@ void SDDMM(const std::string& op,
   });
 }
 
-/*!
+/**
  * @brief Find the src/dst/etype id based on the target 'u', 'v' or 'e'.
  *
  * @param graph The input graph.
@@ -274,7 +274,7 @@ int get_typeid_by_target(HeteroGraphPtr graph, int target, dgl_type_t etype) {
   return etype;
 }
 
-/*! @brief Generalized Sampled Dense-Dense Matrix Multiplication. */
+/** @brief Generalized Sampled Dense-Dense Matrix Multiplication. */
 void SDDMMHetero(const std::string& op,
            HeteroGraphPtr graph,
            std::vector<NDArray> lhs,
@@ -322,7 +322,7 @@ void SDDMMHetero(const std::string& op,
 }
 
 
-/*! @brief Generalized Edge_softmax op for forward */
+/** @brief Generalized Edge_softmax op for forward */
 void Edge_softmax_forward(const std::string& op,
           HeteroGraphPtr graph,
           NDArray ufeat,
@@ -342,7 +342,7 @@ void Edge_softmax_forward(const std::string& op,
 }
 
 
-/*! @brief Generalized Edge_softmax op for backward */
+/** @brief Generalized Edge_softmax op for backward */
 void Edge_softmax_backward(const std::string& op,
           HeteroGraphPtr graph,
           NDArray out,
@@ -372,7 +372,7 @@ NDArray GetEdgeMapping(HeteroGraphRef graph) {
   }
 }
 
-/*! @brief Segment reduce dispatch function. */
+/** @brief Segment reduce dispatch function. */
 void SegmentReduceDispatch(const std::string& op,
                            NDArray feat,
                            NDArray offsets,
@@ -387,7 +387,7 @@ void SegmentReduceDispatch(const std::string& op,
   });
 }
 
-/*! @brief Scatter Add (on first dimension) dispatch function. */
+/** @brief Scatter Add (on first dimension) dispatch function. */
 void ScatterAddDispatch(NDArray feat, NDArray idx, NDArray out) {
   ATEN_XPU_SWITCH_CUDA(feat->ctx.device_type, XPU, "ScatterAdd", {
     ATEN_ID_TYPE_SWITCH(idx->dtype, IdType, {
@@ -398,7 +398,7 @@ void ScatterAddDispatch(NDArray feat, NDArray idx, NDArray out) {
   });
 }
 
-/*! @brief Update gradients (reduce op max/min) dispatch function on heterogeneous graph. */
+/** @brief Update gradients (reduce op max/min) dispatch function on heterogeneous graph. */
 void UpdateGradMinMaxDispatchHetero(const HeteroGraphPtr& graph,
                         const std::string& op,
                         const std::vector<NDArray>& feat,
@@ -416,7 +416,7 @@ void UpdateGradMinMaxDispatchHetero(const HeteroGraphPtr& graph,
   });
 }
 
-/*! @brief Backward segment cmp dispatch function.*/
+/** @brief Backward segment cmp dispatch function.*/
 void BackwardSegmentCmpDispatch(NDArray feat, NDArray arg, NDArray out) {
   ATEN_XPU_SWITCH_CUDA(feat->ctx.device_type, XPU, "BackwardSegmentCmp", {
     ATEN_ID_TYPE_SWITCH(arg->dtype, IdType, {
@@ -723,7 +723,7 @@ DGL_REGISTER_GLOBAL("sparse._CAPI_DGLKernelGetEdgeMapping")
     *rv = GetEdgeMapping(graph);
   });
 
-/*!
+/**
  * @brief Sparse matrix multiplication with graph interface.
  *
  * @param A_ref The left operand.

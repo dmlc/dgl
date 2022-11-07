@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
  * @file test_unit_graph.cc
  * @brief Test UnitGraph
@@ -20,7 +20,7 @@ using namespace dgl::runtime;
 
 template <typename IdType>
 aten::CSRMatrix CSR1(DGLContext ctx) {
-  /*
+  /**
    * G = [[0, 0, 1],
    *      [1, 0, 1],
    *      [0, 1, 0],
@@ -41,7 +41,7 @@ template aten::CSRMatrix CSR1<int64_t>(DGLContext ctx);
 
 template <typename IdType>
 aten::COOMatrix COO1(DGLContext ctx) {
-  /*
+  /**
    * G = [[1, 1, 0],
    *      [0, 1, 0]]
    */
@@ -60,7 +60,7 @@ template aten::COOMatrix COO1<int64_t>(DGLContext ctx);
 
 template <typename IdType>
 void _TestUnitGraph_InOutDegrees(DGLContext ctx) {
-  /*
+  /**
   InDegree(s) is available only if COO or CSC formats permitted.
   OutDegree(s) is available only if COO or CSR formats permitted.
   */

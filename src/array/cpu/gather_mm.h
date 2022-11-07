@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2022 by Contributors
  * @file array/cpu/gather_mm.h
  * @brief GATHER_MM CPU kernel function header.
@@ -45,7 +45,7 @@ void matmul(
   }
 }
 
-/*!
+/**
  * @brief CPU kernel of Gather_mm. The input matrix A is expected to be
  *        sorted according to relation type.
  * @param A The input dense matrix of dimension m x k

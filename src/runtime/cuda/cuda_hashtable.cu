@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2021 by Contributors
  * @file runtime/cuda/cuda_device_common.cuh
  * @brief Device level functions for within cuda kernels.

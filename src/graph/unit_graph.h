@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
  * @file graph/unit_graph.h
  * @brief UnitGraph graph
@@ -26,7 +26,7 @@ class HeteroGraph;
 class UnitGraph;
 typedef std::shared_ptr<UnitGraph> UnitGraphPtr;
 
-/*!
+/**
  * @brief UnitGraph graph
  *
  * UnitGraph graph is a special type of heterograph which
@@ -164,7 +164,7 @@ class UnitGraph : public BaseHeteroGraph {
       const std::vector<IdArray>& eids, bool preserve_nodes = false) const override;
 
   // creators
-  /*! @brief Create a graph with no edges */
+  /** @brief Create a graph with no edges */
   static HeteroGraphPtr Empty(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,
       DGLDataType dtype, DGLContext ctx) {
@@ -173,7 +173,7 @@ class UnitGraph : public BaseHeteroGraph {
     return CreateFromCOO(num_vtypes, num_src, num_dst, row, col);
   }
 
-  /*! @brief Create a graph from COO arrays */
+  /** @brief Create a graph from COO arrays */
   static HeteroGraphPtr CreateFromCOO(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,
       IdArray row, IdArray col, bool row_sorted = false,
@@ -183,7 +183,7 @@ class UnitGraph : public BaseHeteroGraph {
       int64_t num_vtypes, const aten::COOMatrix& mat,
       dgl_format_code_t formats = ALL_CODE);
 
-  /*! @brief Create a graph from (out) CSR arrays */
+  /** @brief Create a graph from (out) CSR arrays */
   static HeteroGraphPtr CreateFromCSR(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,
       IdArray indptr, IdArray indices, IdArray edge_ids,
@@ -193,7 +193,7 @@ class UnitGraph : public BaseHeteroGraph {
       int64_t num_vtypes, const aten::CSRMatrix& mat,
       dgl_format_code_t formats = ALL_CODE);
 
-  /*! @brief Create a graph from (in) CSC arrays */
+  /** @brief Create a graph from (in) CSC arrays */
   static HeteroGraphPtr CreateFromCSC(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,
       IdArray indptr, IdArray indices, IdArray edge_ids,
@@ -203,13 +203,13 @@ class UnitGraph : public BaseHeteroGraph {
       int64_t num_vtypes, const aten::CSRMatrix& mat,
       dgl_format_code_t formats = ALL_CODE);
 
-  /*! @brief Convert the graph to use the given number of bits for storage */
+  /** @brief Convert the graph to use the given number of bits for storage */
   static HeteroGraphPtr AsNumBits(HeteroGraphPtr g, uint8_t bits);
 
-  /*! @brief Copy the data to another context */
+  /** @brief Copy the data to another context */
   static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DGLContext &ctx);
 
-  /*!
+  /**
   * @brief Pin the in_csr_, out_scr_ and coo_ of the current graph.
   * @note The graph will be pinned inplace. Behavior depends on the current context,
   *       kDGLCPU: will be pinned;
@@ -219,7 +219,7 @@ class UnitGraph : public BaseHeteroGraph {
   */
   void PinMemory_() override;
 
-  /*!
+  /**
   * @brief Unpin the in_csr_, out_scr_ and coo_ of the current graph.
   * @note The graph will be unpinned inplace. Behavior depends on the current context,
   *       IsPinned: will be unpinned;
@@ -228,13 +228,13 @@ class UnitGraph : public BaseHeteroGraph {
   */
   void UnpinMemory_();
 
-  /*!
+  /**
    * @brief Record stream for this graph.
    * @param stream The stream that is using the graph
    */
   void RecordStream(DGLStreamHandle stream) override;
 
-  /*! 
+  /** 
    * @brief Create in-edge CSR format of the unit graph.
    * @param inplace if true and the in-edge CSR format does not exist, the created
    *                format will be cached in this object unless the format is restricted.
@@ -242,7 +242,7 @@ class UnitGraph : public BaseHeteroGraph {
    */
   CSRPtr GetInCSR(bool inplace = true) const;
 
-  /*! 
+  /** 
    * @brief Create out-edge CSR format of the unit graph.
    * @param inplace if true and the out-edge CSR format does not exist, the created
    *                format will be cached in this object unless the format is restricted.
@@ -250,7 +250,7 @@ class UnitGraph : public BaseHeteroGraph {
    */
   CSRPtr GetOutCSR(bool inplace = true) const;
 
-  /*!
+  /**
    * @brief Create COO format of the unit graph.
    * @param inplace if true and the COO format does not exist, the created
    *                format will be cached in this object unless the format is restricted.
@@ -258,20 +258,20 @@ class UnitGraph : public BaseHeteroGraph {
    */
   COOPtr GetCOO(bool inplace = true) const;
 
-  /*! @return Return the COO matrix form */
+  /** @return Return the COO matrix form */
   aten::COOMatrix GetCOOMatrix(dgl_type_t etype) const override;
 
-  /*! @return Return the in-edge CSC in the matrix form */
+  /** @return Return the in-edge CSC in the matrix form */
   aten::CSRMatrix GetCSCMatrix(dgl_type_t etype) const override;
 
-  /*! @return Return the out-edge CSR in the matrix form */
+  /** @return Return the out-edge CSR in the matrix form */
   aten::CSRMatrix GetCSRMatrix(dgl_type_t etype) const override;
 
   SparseFormat SelectFormat(dgl_type_t etype, dgl_format_code_t preferred_formats) const override {
     return SelectFormat(preferred_formats);
   }
 
-  /*!
+  /**
    * @brief Return the graph in the given format. Perform format conversion if the
    * requested format does not exist.
    *
@@ -285,19 +285,19 @@ class UnitGraph : public BaseHeteroGraph {
 
   HeteroGraphPtr GetGraphInFormat(dgl_format_code_t formats) const override;
 
-  /*! @return Load UnitGraph from stream, using CSRMatrix*/
+  /** @return Load UnitGraph from stream, using CSRMatrix*/
   bool Load(dmlc::Stream* fs);
 
-  /*! @return Save UnitGraph to stream, using CSRMatrix */
+  /** @return Save UnitGraph to stream, using CSRMatrix */
   void Save(dmlc::Stream* fs) const;
 
-  /*! @brief Creat a LineGraph of self */
+  /** @brief Creat a LineGraph of self */
   HeteroGraphPtr LineGraph(bool backtracking) const;
 
-  /*! @return the reversed graph */
+  /** @return the reversed graph */
   UnitGraphPtr Reverse() const;
 
-  /*! @return the simpled (no-multi-edge) graph
+  /** @return the simpled (no-multi-edge) graph
    *          the count recording the number of duplicated edges from the original graph.
    *          the edge mapping from the edge IDs of original graph to those of the
    *          returned graph.
@@ -319,7 +319,7 @@ class UnitGraph : public BaseHeteroGraph {
   // private empty constructor
   UnitGraph() {}
 
-  /*!
+  /**
    * @brief constructor
    * @param metagraph metagraph
    * @param in_csr in edge csr
@@ -329,7 +329,7 @@ class UnitGraph : public BaseHeteroGraph {
   UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo,
             dgl_format_code_t formats = ALL_CODE);
 
-  /*!
+  /**
    * @brief constructor
    * @param num_vtypes number of vertex types (1 or 2)
    * @param metagraph metagraph
@@ -350,10 +350,10 @@ class UnitGraph : public BaseHeteroGraph {
       bool has_coo,
       dgl_format_code_t formats = ALL_CODE);
 
-  /*! @return Return any existing format. */
+  /** @return Return any existing format. */
   HeteroGraphPtr GetAny() const;
 
-  /*!
+  /**
    * @brief Determine which format to use with a preference.
    *
    * If the storage of unit graph is "locked", i.e. no conversion is allowed, then
@@ -364,24 +364,24 @@ class UnitGraph : public BaseHeteroGraph {
    */
   SparseFormat SelectFormat(dgl_format_code_t preferred_formats) const;
 
-  /*! @return Whether the graph is hypersparse */
+  /** @return Whether the graph is hypersparse */
   bool IsHypersparse() const;
 
   GraphPtr AsImmutableGraph() const override;
 
   // Graph stored in different format. We use an on-demand strategy: the format is
   // only materialized if the operation that suitable for it is invoked.
-  /*! @brief CSR graph that stores reverse edges */
+  /** @brief CSR graph that stores reverse edges */
   CSRPtr in_csr_;
-  /*! @brief CSR representation */
+  /** @brief CSR representation */
   CSRPtr out_csr_;
-  /*! @brief COO representation */
+  /** @brief COO representation */
   COOPtr coo_;
-  /*!
+  /**
    * @brief Storage format restriction.
    */
   dgl_format_code_t formats_;
-  /*! @brief which streams have recorded the graph */
+  /** @brief which streams have recorded the graph */
   std::vector<DGLStreamHandle> recorded_streams;
 };
 

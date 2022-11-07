@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2018 by Contributors
  * @file graph/traversal.cc
  * @brief Graph traversal implementation

@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file tensoradapter_exports.h
  * @brief Header file for functions exposed by the adapter library.

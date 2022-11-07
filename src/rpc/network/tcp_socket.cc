@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
  * @file tcp_socket.cc
  * @brief TCP socket for DGL distributed training.

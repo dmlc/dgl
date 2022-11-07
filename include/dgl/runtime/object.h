@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
  * @file runtime/object.h
  * @brief Defines the Object data structures.
@@ -21,7 +21,7 @@ class Object;
 class ObjectRef;
 class NDArray;
 
-/*!
+/**
  * @brief Visitor class to each object attribute.
  *  The content is going to be called for each field.
  */
@@ -48,26 +48,26 @@ class AttrVisitor {
   //! \endcond
 };
 
-/*!
+/**
  * @brief base class of object container.
  *  All object's internal is stored as std::shared_ptr<Object>
  */
 class Object {
  public:
-  /*! @brief virtual destructor */
+  /** @brief virtual destructor */
   virtual ~Object() {}
-  /*! @return The unique type key of the object */
+  /** @return The unique type key of the object */
   virtual const char* type_key() const = 0;
-  /*!
+  /**
    * @brief Apply visitor to each field of the Object
    *  Visitor could mutate the content of the object.
    *  override if Object contains attribute fields.
    * @param visitor The visitor
    */
   virtual void VisitAttrs(AttrVisitor* visitor) {}
-  /*! @return the type index of the object */
+  /** @return the type index of the object */
   virtual uint32_t type_index() const = 0;
-  /*!
+  /**
    * @brief Whether this object derives from object with type_index=tid.
    *  Implemented by DGL_DECLARE_OBJECT_TYPE_INFO
    *
@@ -75,24 +75,24 @@ class Object {
    * @return the check result.
    */
   virtual bool _DerivedFrom(uint32_t tid) const;
-  /*!
+  /**
    * @brief get a runtime unique type index given a type key
    * @param type_key Type key of a type.
    * @return the corresponding type index.
    */
   static uint32_t TypeKey2Index(const char* type_key);
-  /*!
+  /**
    * @brief get type key from type index.
    * @param index The type index
    * @return the corresponding type key.
    */
   static const char* TypeIndex2Key(uint32_t index);
-  /*!
+  /**
    * @return whether the type is derived from
    */
   template <typename T>
   inline bool derived_from() const;
-  /*!
+  /**
    * @return whether the object is of type T
    * @tparam The type to be checked.
    */
@@ -103,12 +103,12 @@ class Object {
   static constexpr const char* _type_key = "Object";
 };
 
-/*! @brief base class of all reference object */
+/** @brief base class of all reference object */
 class ObjectRef {
  public:
-  /*! @brief type indicate the container type */
+  /** @brief type indicate the container type */
   using ContainerType = Object;
-  /*!
+  /**
    * @brief Comparator
    *
    * Compare with the two are referencing to the same object (compare by
@@ -119,7 +119,7 @@ class ObjectRef {
    * @sa same_as
    */
   inline bool operator==(const ObjectRef& other) const;
-  /*!
+  /**
    * @brief Comparator
    *
    * Compare with the two are referencing to the same object (compare by
@@ -129,7 +129,7 @@ class ObjectRef {
    * @return the compare result.
    */
   inline bool same_as(const ObjectRef& other) const;
-  /*!
+  /**
    * @brief Comparator
    *
    * The operator overload allows ObjectRef be used in std::map.
@@ -138,24 +138,24 @@ class ObjectRef {
    * @return the compare result.
    */
   inline bool operator<(const ObjectRef& other) const;
-  /*!
+  /**
    * @brief Comparator
    * @param other Another object ref.
    * @return the compare result.
    * @sa same_as
    */
   inline bool operator!=(const ObjectRef& other) const;
-  /*! @return the hash function for ObjectRef */
+  /** @return the hash function for ObjectRef */
   inline size_t hash() const;
-  /*! @return whether the expression is null */
+  /** @return whether the expression is null */
   inline bool defined() const;
-  /*! @return the internal type index of Object */
+  /** @return the internal type index of Object */
   inline uint32_t type_index() const;
-  /*! @return the internal object pointer */
+  /** @return the internal object pointer */
   inline const Object* get() const;
-  /*! @return the internal object pointer */
+  /** @return the internal object pointer */
   inline const Object* operator->() const;
-  /*!
+  /**
    * @brief Downcast this object to its actual type.
    * This returns nullptr if the object is not of the requested type.
    * Example usage:
@@ -168,15 +168,15 @@ class ObjectRef {
   template <typename T>
   inline const T* as() const;
 
-  /*! @brief default constructor */
+  /** @brief default constructor */
   ObjectRef() = default;
   explicit ObjectRef(std::shared_ptr<Object> obj) : obj_(obj) {}
 
-  /*! @brief the internal object, do not touch */
+  /** @brief the internal object, do not touch */
   std::shared_ptr<Object> obj_;
 };
 
-/*!
+/**
  * @brief helper macro to declare type information in a base object.
  *
  * This is macro should be used in abstract base class definition
@@ -189,7 +189,7 @@ class ObjectRef {
     return Parent::_DerivedFrom(tid);                          \
   }
 
-/*!
+/**
  * @brief helper macro to declare type information in a terminal class
  *
  * This is macro should be used in terminal class definition.
@@ -222,7 +222,7 @@ class ObjectRef {
     return Parent::_DerivedFrom(tid);                                \
   }
 
-/*! @brief Macro to generate common object reference class method definition */
+/** @brief Macro to generate common object reference class method definition */
 #define DGL_DEFINE_OBJECT_REF_METHODS(TypeName, BaseTypeName, ObjectName)   \
   TypeName() {}                                                             \
   explicit TypeName(std::shared_ptr<runtime::Object> obj)                   \
@@ -237,7 +237,7 @@ class ObjectRef {
   operator bool() const { return this->defined(); }                         \
   using ContainerType = ObjectName
 
-/*! @brief Macro to generate object reference class definition */
+/** @brief Macro to generate object reference class definition */
 #define DGL_DEFINE_OBJECT_REF(TypeName, ObjectName)       \
   class TypeName : public ::dgl::runtime::ObjectRef {     \
    public:                                                \
@@ -300,12 +300,12 @@ inline const T* ObjectRef::as() const {
   return nullptr;
 }
 
-/*! @brief The hash function for nodes */
+/** @brief The hash function for nodes */
 struct ObjectHash {
   size_t operator()(const ObjectRef& a) const { return a.hash(); }
 };
 
-/*! @brief The equal comparator for nodes */
+/** @brief The equal comparator for nodes */
 struct ObjectEqual {
   bool operator()(const ObjectRef& a, const ObjectRef& b) const {
     return a.get() == b.get();

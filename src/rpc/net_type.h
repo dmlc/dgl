@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2022 by Contributors
  * @file net_type.h
  * @brief Base communicator for DGL distributed training.
@@ -14,21 +14,21 @@ namespace dgl {
 namespace rpc {
 
 struct RPCBase {
-  /*!
+  /**
    * @brief Finalize Receiver
    *
    * Finalize() is not thread-safe and only one thread can invoke this API.
    */
   virtual void Finalize() = 0;
 
-  /*!
+  /**
    * @brief Communicator type: 'socket', 'tensorpipe', etc
    */
   virtual const std::string &NetType() const = 0;
 };
 
 struct RPCSender : RPCBase {
-  /*!
+  /**
    * @brief Connect to a receiver.
    *
    * When there are multiple receivers to be connected, application will call
@@ -44,7 +44,7 @@ struct RPCSender : RPCBase {
    */
   virtual bool ConnectReceiver(const std::string &addr, int recv_id) = 0;
 
-  /*!
+  /**
    * @brief Finalize the action to connect to receivers. Make sure that either
    *        all connections are successfully established or connection fails.
    * @return True for success and False for fail
@@ -53,7 +53,7 @@ struct RPCSender : RPCBase {
    */
   virtual bool ConnectReceiverFinalize(const int max_try_times) { return true; }
 
-  /*!
+  /**
    * @brief Send RPCMessage to specified Receiver.
    * @param msg data message
    * @param recv_id receiver's ID
@@ -62,7 +62,7 @@ struct RPCSender : RPCBase {
 };
 
 struct RPCReceiver : RPCBase {
-  /*!
+  /**
    * @brief Wait for all the Senders to connect
    * @param addr Networking address, e.g., 'tcp://127.0.0.1:50051', 'mpi://0'
    * @param num_sender total number of Senders
@@ -74,7 +74,7 @@ struct RPCReceiver : RPCBase {
   virtual bool Wait(
       const std::string &addr, int num_sender, bool blocking = true) = 0;
 
-  /*!
+  /**
    * @brief Recv RPCMessage from Sender. Actually removing data from queue.
    * @param msg pointer of RPCmessage
    * @param timeout The timeout value in milliseconds. If zero, wait

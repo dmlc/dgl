@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2019-2022 by Contributors
  * @file array/uvm_array.cc
  * @brief DGL array utilities implementation

@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file graph/transform/line_graph.cc
  * @brief Line graph implementation
@@ -22,7 +22,7 @@ using namespace dgl::aten;
 
 namespace transform {
 
-/*!
+/**
  * @brief Create Line Graph.
  * @param hg Graph.
  * @param backtracking whether the pair of (v, u) (u, v) edges are treated as

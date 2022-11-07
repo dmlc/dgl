@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
  * @file dgl/samplinig/randomwalks.h
  * @brief Random walk functions.
@@ -17,7 +17,7 @@ namespace dgl {
 
 namespace sampling {
 
-/*!
+/**
  * @brief Metapath-based random walk.
  * @param hg The heterograph.
  * @param seeds A 1D array of seed nodes, with the type the source type of the
@@ -37,7 +37,7 @@ std::tuple<IdArray, IdArray, TypeArray> RandomWalk(
     const HeteroGraphPtr hg, const IdArray seeds, const TypeArray metapath,
     const std::vector<FloatArray> &prob);
 
-/*!
+/**
  * @brief Metapath-based random walk with restart probability.
  * @param hg The heterograph.
  * @param seeds A 1D array of seed nodes, with the type the source type of the
@@ -58,7 +58,7 @@ std::tuple<IdArray, IdArray, TypeArray> RandomWalkWithRestart(
     const HeteroGraphPtr hg, const IdArray seeds, const TypeArray metapath,
     const std::vector<FloatArray> &prob, double restart_prob);
 
-/*!
+/**
  * @brief Metapath-based random walk with stepwise restart probability. Useful
  *        for PinSAGE-like models.
  * @param hg The heterograph.

@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2022 by Contributors
  * @file include/dgl/runtime/dlpack_convert.h
  * @brief Conversion between NDArray and DLPack.
@@ -15,7 +15,7 @@ namespace dgl {
 namespace runtime {
 
 struct DLPackConvert {
-  /*!
+  /**
    * @brief Create a DGL NDArray from a DLPack tensor.
    *
    * This allows us to create a NDArray using the memory
@@ -28,7 +28,7 @@ struct DLPackConvert {
    */
   static NDArray FromDLPack(DLManagedTensor* tensor);
 
-  /*!
+  /**
    * @brief Deleter for NDArray converted from DLPack.
    *
    * This is used from data which is passed from external
@@ -38,7 +38,7 @@ struct DLPackConvert {
    */
   static void DLPackDeleter(NDArray::Container* ptr);
 
-  /*! @brief Convert a DGL NDArray to a DLPack tensor.
+  /** @brief Convert a DGL NDArray to a DLPack tensor.
    *
    * @param from The DGL NDArray.
    * @return A DLPack tensor.
@@ -53,13 +53,13 @@ struct DLPackConvert {
 extern "C" {
 #endif
 
-/*!
+/**
  * @brief Delete (free) a DLManagedTensor's data.
  * @param dltensor Pointer to the DLManagedTensor.
  */
 DGL_DLL void DGLDLManagedTensorCallDeleter(DLManagedTensor* dltensor);
 
-/*!
+/**
  * @brief Produce an array from the DLManagedTensor that shares data memory
  * with the DLManagedTensor.
  * @param from The source DLManagedTensor.
@@ -68,7 +68,7 @@ DGL_DLL void DGLDLManagedTensorCallDeleter(DLManagedTensor* dltensor);
  */
 DGL_DLL int DGLArrayFromDLPack(DLManagedTensor* from, DGLArrayHandle* out);
 
-/*!
+/**
  * @brief Produce a DLMangedTensor from the array that shares data memory with
  * the array.
  * @param from The source array.

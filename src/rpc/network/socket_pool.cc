@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2021 by Contributors
  * @file socket_pool.cc
  * @brief Socket pool of nonblocking sockets for DGL distributed training.

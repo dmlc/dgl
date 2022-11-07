@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file array/cpu/array_cumsum.cu
  * @brief Array cumsum GPU implementation

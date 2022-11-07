@@ -1,5 +1,5 @@
 
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file dgl/aten/coo.h
  * @brief Common COO operations required by DGL.
@@ -23,7 +23,7 @@ namespace aten {
 
 struct CSRMatrix;
 
-/*!
+/**
  * @brief Plain COO structure
  *
  * The data array stores integer ids for reading edge features.
@@ -37,21 +37,21 @@ constexpr uint64_t kDGLSerialize_AtenCooMatrixMagic = 0xDD61ffd305dff127;
 // TODO(BarclayII): Graph queries on COO formats should support the case where
 // data ordered by rows/columns instead of EID.
 struct COOMatrix {
-  /*! @brief the dense shape of the matrix */
+  /** @brief the dense shape of the matrix */
   int64_t num_rows = 0, num_cols = 0;
-  /*! @brief COO index arrays */
+  /** @brief COO index arrays */
   IdArray row, col;
-  /*! @brief data index array. When is null, assume it is from 0 to NNZ - 1. */
+  /** @brief data index array. When is null, assume it is from 0 to NNZ - 1. */
   IdArray data;
-  /*! @brief whether the row indices are sorted */
+  /** @brief whether the row indices are sorted */
   bool row_sorted = false;
-  /*! @brief whether the column indices per row are sorted */
+  /** @brief whether the column indices per row are sorted */
   bool col_sorted = false;
-  /*! @brief whether the matrix is in pinned memory */
+  /** @brief whether the matrix is in pinned memory */
   bool is_pinned = false;
-  /*! @brief default constructor */
+  /** @brief default constructor */
   COOMatrix() = default;
-  /*! @brief constructor */
+  /** @brief constructor */
   COOMatrix(int64_t nrows, int64_t ncols, IdArray rarr, IdArray carr,
             IdArray darr = NullArray(), bool rsorted = false,
             bool csorted = false)
@@ -65,7 +65,7 @@ struct COOMatrix {
     CheckValidity();
   }
 
-  /*! @brief constructor from SparseMatrix object */
+  /** @brief constructor from SparseMatrix object */
   explicit COOMatrix(const SparseMatrix& spmat)
       : num_rows(spmat.num_rows),
         num_cols(spmat.num_cols),
@@ -121,7 +121,7 @@ struct COOMatrix {
     CHECK_NO_OVERFLOW(row->dtype, num_cols);
   }
 
-  /*! @brief Return a copy of this matrix on the give device context. */
+  /** @brief Return a copy of this matrix on the give device context. */
   inline COOMatrix CopyTo(const DGLContext &ctx) const {
     if (ctx == row->ctx)
       return *this;
@@ -130,7 +130,7 @@ struct COOMatrix {
                      row_sorted, col_sorted);
   }
 
-  /*!
+  /**
   * @brief Pin the row, col and data (if not Null) of the matrix.
   * @note This is an in-place method. Behavior depends on the current context,
   *       kDGLCPU: will be pinned;
@@ -149,7 +149,7 @@ struct COOMatrix {
     is_pinned = true;
   }
 
-  /*!
+  /**
   * @brief Unpin the row, col and data (if not Null) of the matrix.
   * @note This is an in-place method. Behavior depends on the current context,
   *       IsPinned: will be unpinned;
@@ -167,7 +167,7 @@ struct COOMatrix {
     is_pinned = false;
   }
 
-  /*!
+  /**
    * @brief Record stream for the row, col and data (if not Null) of the matrix.
    * @param stream The stream that is using the graph
    */
@@ -182,28 +182,28 @@ struct COOMatrix {
 
 ///////////////////////// COO routines //////////////////////////
 
-/*! @brief Return true if the value (row, col) is non-zero */
+/** @brief Return true if the value (row, col) is non-zero */
 bool COOIsNonZero(COOMatrix , int64_t row, int64_t col);
-/*!
+/**
  * @brief Batched implementation of COOIsNonZero.
  * @note This operator allows broadcasting (i.e, either row or col can be of length 1).
  */
 runtime::NDArray COOIsNonZero(COOMatrix , runtime::NDArray row, runtime::NDArray col);
 
-/*! @brief Return the nnz of the given row */
+/** @brief Return the nnz of the given row */
 int64_t COOGetRowNNZ(COOMatrix , int64_t row);
 runtime::NDArray COOGetRowNNZ(COOMatrix , runtime::NDArray row);
 
-/*! @brief Return the data array of the given row */
+/** @brief Return the data array of the given row */
 std::pair<runtime::NDArray, runtime::NDArray>
 COOGetRowDataAndIndices(COOMatrix , int64_t row);
 
-/*! @brief Whether the COO matrix contains data */
+/** @brief Whether the COO matrix contains data */
 inline bool COOHasData(COOMatrix csr) {
   return !IsNullArray(csr.data);
 }
 
-/*!
+/**
  * @brief Check whether the COO is sorted.
  *
  * It returns two flags: one for whether the row is sorted;
@@ -214,7 +214,7 @@ inline bool COOHasData(COOMatrix csr) {
  */
 std::pair<bool, bool> COOIsSorted(COOMatrix coo);
 
-/*!
+/**
  * @brief Get the data and the row,col indices for each returned entries.
  *
  * The operator supports matrix with duplicate entries and all the matched entries
@@ -230,7 +230,7 @@ std::pair<bool, bool> COOIsSorted(COOMatrix coo);
 std::vector<runtime::NDArray> COOGetDataAndIndices(
     COOMatrix mat, runtime::NDArray rows, runtime::NDArray cols);
 
-/*! @brief Get data. The return type is an ndarray due to possible duplicate entries. */
+/** @brief Get data. The return type is an ndarray due to possible duplicate entries. */
 inline runtime::NDArray COOGetAllData(COOMatrix mat, int64_t row, int64_t col) {
   IdArray rows = VecToIdArray<int64_t>({row}, mat.row->dtype.bits, mat.row->ctx);
   IdArray cols = VecToIdArray<int64_t>({col}, mat.row->dtype.bits, mat.row->ctx);
@@ -238,7 +238,7 @@ inline runtime::NDArray COOGetAllData(COOMatrix mat, int64_t row, int64_t col) {
   return rst[2];
 }
 
-/*!
+/**
  * @brief Get the data for each (row, col) pair.
  *
  * The operator supports matrix with duplicate entries but only one matched entry
@@ -254,10 +254,10 @@ inline runtime::NDArray COOGetAllData(COOMatrix mat, int64_t row, int64_t col) {
  */
 runtime::NDArray COOGetData(COOMatrix mat, runtime::NDArray rows, runtime::NDArray cols);
 
-/*! @brief Return a transposed COO matrix */
+/** @brief Return a transposed COO matrix */
 COOMatrix COOTranspose(COOMatrix coo);
 
-/*!
+/**
  * @brief Convert COO matrix to CSR matrix.
  *
  * If the input COO matrix does not have data array, the data array of
@@ -281,7 +281,7 @@ COOMatrix COOTranspose(COOMatrix coo);
  */
 CSRMatrix COOToCSR(COOMatrix coo);
 
-/*!
+/**
  * @brief Slice rows of the given matrix and return.
  * @param coo COO matrix
  * @param start Start row id (inclusive)
@@ -290,7 +290,7 @@ CSRMatrix COOToCSR(COOMatrix coo);
 COOMatrix COOSliceRows(COOMatrix coo, int64_t start, int64_t end);
 COOMatrix COOSliceRows(COOMatrix coo, runtime::NDArray rows);
 
-/*!
+/**
  * @brief Get the submatrix specified by the row and col ids.
  *
  * In numpy notation, given matrix M, row index array I, col index array J
@@ -303,16 +303,16 @@ COOMatrix COOSliceRows(COOMatrix coo, runtime::NDArray rows);
  */
 COOMatrix COOSliceMatrix(COOMatrix coo, runtime::NDArray rows, runtime::NDArray cols);
 
-/*! @return True if the matrix has duplicate entries */
+/** @return True if the matrix has duplicate entries */
 bool COOHasDuplicate(COOMatrix coo);
 
-/*!
+/**
  * @brief Deduplicate the entries of a sorted COO matrix, replacing the data with the
  * number of occurrences of the row-col coordinates.
  */
 std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo);
 
-/*!
+/**
  * @brief Sort the indices of a COO matrix in-place.
  *
  * The function sorts row indices in ascending order. If sort_column is true,
@@ -327,7 +327,7 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo);
  */
 void COOSort_(COOMatrix* mat, bool sort_column = false);
 
-/*!
+/**
  * @brief Sort the indices of a COO matrix.
  *
  * The function sorts row indices in ascending order. If sort_column is true,
@@ -352,14 +352,14 @@ inline COOMatrix COOSort(COOMatrix mat, bool sort_column = false) {
   return ret;
 }
 
-/*!
+/**
  * @brief Remove entries from COO matrix by entry indices (data indices)
  * @return A new COO matrix as well as a mapping from the new COO entries to the old COO
  *         entries.
  */
 COOMatrix COORemove(COOMatrix coo, IdArray entries);
 
-/*!
+/**
  * @brief Reorder the rows and colmns according to the new row and column order.
  * @param csr The input coo matrix.
  * @param new_row_ids the new row Ids (the index is the old row Id)
@@ -367,7 +367,7 @@ COOMatrix COORemove(COOMatrix coo, IdArray entries);
  */
 COOMatrix COOReorder(COOMatrix coo, runtime::NDArray new_row_ids, runtime::NDArray new_col_ids);
 
-/*!
+/**
  * @brief Randomly select a fixed number of non-zero entries along each given row independently.
  *
  * The function performs random choices along each row independently.
@@ -410,7 +410,7 @@ COOMatrix COORowWiseSampling(
     NDArray prob_or_mask = NDArray(),
     bool replace = true);
 
-/*!
+/**
  * @brief Randomly select a fixed number of non-zero entries for each edge type
  *        along each given row independently.
  *
@@ -462,7 +462,7 @@ COOMatrix COORowWisePerEtypeSampling(
     const std::vector<NDArray>& prob_or_mask,
     bool replace = true);
 
-/*!
+/**
  * @brief Select K non-zero entries with the largest weights along each given row.
  *
  * The function performs top-k selection along each row independently.
@@ -506,7 +506,7 @@ COOMatrix COORowWiseTopk(
     NDArray weight,
     bool ascending = false);
 
-/*!
+/**
  * @brief Union two COOMatrix into one COOMatrix.
  *
  * Two Matrix must have the same shape.
@@ -538,7 +538,7 @@ COOMatrix COORowWiseTopk(
 COOMatrix UnionCoo(
   const std::vector<COOMatrix>& coos);
 
-/*!
+/**
  * @brief DisjointUnion a list COOMatrix into one COOMatrix.
  *
  * Examples:
@@ -573,7 +573,7 @@ COOMatrix UnionCoo(
 COOMatrix DisjointUnionCoo(
   const std::vector<COOMatrix>& coos);
 
-/*!
+/**
  * @brief COOMatrix toSimple.
  *
  * A = [[0, 0, 0],
@@ -597,7 +597,7 @@ COOMatrix DisjointUnionCoo(
  */
 std::tuple<COOMatrix, IdArray, IdArray> COOToSimple(const COOMatrix& coo);
 
-/*!
+/**
  * @brief Split a COOMatrix into multiple disjoin components.
  *
  * Examples:
@@ -648,7 +648,7 @@ std::vector<COOMatrix> DisjointPartitionCooBySizes(
   const std::vector<uint64_t> &src_vertex_cumsum,
   const std::vector<uint64_t> &dst_vertex_cumsum);
 
-/*!
+/**
  * @brief Slice a contiguous chunk from a COOMatrix
  *
  * Examples:
@@ -689,7 +689,7 @@ COOMatrix COOSliceContiguousChunk(
   const std::vector<uint64_t> &src_vertex_range,
   const std::vector<uint64_t> &dst_vertex_range);
 
-/*!
+/**
  * @brief Create a LineGraph of input coo
  *
  * A = [[0, 0, 1],

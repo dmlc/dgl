@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2021 by Contributors
  * @file graph/sampling/node2vec_impl.h
  * @brief DGL sampler - templated implementation definition of node2vec random
@@ -25,7 +25,7 @@ namespace sampling {
 
 namespace impl {
 
-/*!
+/**
  * @brief Node2vec random walk.
  * @param hg The heterograph.
  * @param seeds A 1D array of seed nodes, with the type the source type of the

@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2017-2022 by Contributors
  * @file ndarray.cc
  * @brief NDArray container infratructure.

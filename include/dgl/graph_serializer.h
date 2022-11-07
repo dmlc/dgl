@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2018 by Contributors
  * @file graph/graph_serializer.cc
  * @brief DGL serializer APIs

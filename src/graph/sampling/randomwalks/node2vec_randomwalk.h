@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2021 by Contributors
  * @file graph/sampling/node2vec_randomwalk.cc
  * @brief DGL sampler - CPU implementation of node2vec random walk.
@@ -46,7 +46,7 @@ bool has_edge_between(const CSRMatrix &csr, dgl_id_t u, dgl_id_t v) {
     return std::find(u_succ, u_succ + size, v) != u_succ + size;
 }
 
-/*!
+/**
  * @brief Node2vec random walk step function
  * @param data The path generated so far, of type \c IdxType.
  * @param curr The last node ID generated.

@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020-2022 by Contributors
  * @file tensoradapter.h
  * @brief Header file for functions exposed by the adapter library.
@@ -18,7 +18,7 @@ namespace tensoradapter {
 
 extern "C" {
 
-/*!
+/**
  * @brief Allocate a piece of CPU memory via
  * PyTorch's CPUAllocator
  *
@@ -27,7 +27,7 @@ extern "C" {
  */
 void* CPURawAlloc(size_t nbytes);
 
-/*!
+/**
  * @brief Free the CPU memory.
  *
  * @param ptr Pointer to the memory to be freed.
@@ -35,7 +35,7 @@ void* CPURawAlloc(size_t nbytes);
 void CPURawDelete(void* ptr);
 
 #ifdef DGL_USE_CUDA
-/*!
+/**
  * @brief Allocate a piece of GPU memory via
  * PyTorch's THCCachingAllocator.
  *
@@ -45,19 +45,19 @@ void CPURawDelete(void* ptr);
  */
 void* CUDARawAlloc(size_t nbytes, cudaStream_t stream);
 
-/*!
+/**
  * @brief Free the GPU memory.
  *
  * @param ptr Pointer to the memory to be freed.
  */
 void CUDARawDelete(void* ptr);
 
-/*!
+/**
  * @brief Get the current CUDA stream.
  */
 cudaStream_t CUDACurrentStream();
 
-/*!
+/**
  * @brief Let the caching allocator know which streams are using this tensor.
  *
  * @param ptr Pointer of the tensor to be recorded.

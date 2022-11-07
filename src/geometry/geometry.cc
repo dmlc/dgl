@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
  * @file geometry/geometry.cc
  * @brief DGL geometry utilities implementation

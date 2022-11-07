@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2018 by Contributors
  * @file graph/shared_mem_manager.cc
  * @brief DGL shared mem manager APIs

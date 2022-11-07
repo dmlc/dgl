@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file array/cpu/spmm.h
  * @brief SPMM CPU kernel function header.
@@ -32,7 +32,7 @@ namespace cpu {
 
 #if !defined(_WIN32)
 #ifdef USE_AVX
-/*!
+/**
  * @brief CPU kernel of SpMM on Csr format using Xbyak.
  * @param cpu_spec JIT'ed kernel
  * @param bcast Broadcast information.
@@ -69,7 +69,7 @@ void SpMMSumCsrXbyak(
 #endif  // USE_AVX
 #endif  // _WIN32
 
-/*!
+/**
  * @brief Naive CPU kernel of SpMM on Csr format.
  * @param cpu_spec JIT'ed kernel
  * @param bcast Broadcast information.
@@ -110,7 +110,7 @@ void SpMMSumCsrNaive(
   });
 }
 
-/*!
+/**
  * @brief CPU kernel of SpMM on Csr format.
  * @param bcast Broadcast information.
  * @param csr The Csr matrix.
@@ -176,7 +176,7 @@ void SpMMSumCsr(
 #endif  // _WIN32
 }
 
-/*!
+/**
  * @brief CPU kernel of SpMM on Coo format.
  * @param bcast Broadcast information.
  * @param coo The Coo matrix.
@@ -225,7 +225,7 @@ void SpMMSumCoo(
   }
 }
 
-/*!
+/**
  * @brief CPU kernel of SpMM-Min/Max on Csr format.
  * @param bcast Broadcast information.
  * @param csr The Csr matrix.
@@ -322,7 +322,7 @@ void SpMMCmpCsr(
 #endif  // _WIN32
 }
 
-/*!
+/**
  * @brief CPU kernel of SpMM-Min/Max on Csr format.
  * @param bcast Broadcast information.
  * @param csr The Csr matrix.
@@ -418,7 +418,7 @@ void SpMMCmpCsrHetero(
   });
 }
 
-/*!
+/**
  * @brief CPU kernel of SpMM-Min/Max on Coo format.
  * @param bcast Broadcast information.
  * @param coo The Coo matrix.
@@ -484,7 +484,7 @@ void SpMMCmpCoo(
   }
 }
 
-/*!
+/**
  * @brief CPU kernel of Edge_softmax_csr_forward on Csr format.
  * @param bcast Broadcast information.
  * @param csr The Csr matrix.
@@ -532,7 +532,7 @@ void Edge_softmax_csr_forward(
   });
 }
 
-/*!
+/**
  * @brief CPU kernel of Edge_softmax_csr_backward on Csr format.
  * @param bcast Broadcast information.
  * @param csr The Csr matrix.

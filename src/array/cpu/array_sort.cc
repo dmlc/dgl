@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file array/cpu/array_sort.cc
  * @brief Array sort CPU implementation

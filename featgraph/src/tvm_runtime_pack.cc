@@ -1,4 +1,4 @@
-/*
+/**
  * NOTE(zihao): this file was modified from TVM project:
  * -
  * https://github.com/apache/tvm/blob/9713d675c64ae3075e10be5acadeef1328a44bb5/apps/howto_deploy/tvm_runtime_pack.cc
@@ -21,7 +21,7 @@
  * under the License.
  */
 
-/*!
+/**
  * @brief This is an all in one TVM runtime file.
  *
  *   You only have to use this file to compile libtvm_runtime to
