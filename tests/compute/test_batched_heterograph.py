@@ -112,7 +112,7 @@ def test_topology(gs, idtype):
 
 @parametrize_idtype
 def test_batching_batched(idtype):
-    """Test batching a DGLHeteroGraph and a BatchedDGLHeteroGraph."""
+    """Test batching a DGLGraph and a BatchedDGLHeteroGraph."""
     g1 = dgl.heterograph({
         ('user', 'follows', 'user'): ([0, 1], [1, 2]),
         ('user', 'plays', 'game'): ([0, 1], [0, 0])

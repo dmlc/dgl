@@ -7,7 +7,7 @@ import networkx as nx
 
 from . import backend as F
 from . import heterograph_index
-from .heterograph import DGLHeteroGraph, combine_frames, DGLBlock
+from .heterograph import DGLGraph, combine_frames, DGLBlock
 from . import graph_index
 from . import utils
 from .base import NTYPE, ETYPE, NID, EID, DGLError, dgl_warning
@@ -224,7 +224,7 @@ def hetero_from_shared_memory(name):
     HeteroGraph (in shared memory)
     """
     g, ntypes, etypes = heterograph_index.create_heterograph_from_shared_memory(name)
-    return DGLHeteroGraph(g, ntypes, etypes)
+    return DGLGraph(g, ntypes, etypes)
 
 def heterograph(data_dict,
                 num_nodes_dict=None,
@@ -378,7 +378,7 @@ def heterograph(data_dict,
     # create graph index
     hgidx = heterograph_index.create_heterograph_from_relations(
         metagraph, [rgrh._graph for rgrh in rel_graphs], num_nodes_per_type)
-    retg = DGLHeteroGraph(hgidx, ntypes, etypes)
+    retg = DGLGraph(hgidx, ntypes, etypes)
 
     return retg.to(device)
 
@@ -612,7 +612,7 @@ def block_to_graph(block):
     """
     new_types = [ntype + '_src' for ntype in block.srctypes] + \
                 [ntype + '_dst' for ntype in block.dsttypes]
-    retg = DGLHeteroGraph(block._graph, new_types, block.etypes)
+    retg = DGLGraph(block._graph, new_types, block.etypes)
 
     for srctype in block.srctypes:
         retg.nodes[srctype + '_src'].data.update(block.srcnodes[srctype].data)
@@ -1620,7 +1620,7 @@ def to_networkx(g, node_attrs=None, edge_attrs=None):
             attr.update({key: F.squeeze(feat_dict[key], 0) for key in edge_attrs})
     return nx_graph
 
-DGLHeteroGraph.to_networkx = to_networkx
+DGLGraph.to_networkx = to_networkx
 
 def to_cugraph(g):
     """Convert a DGL graph to a :class:`cugraph.Graph` and return.
@@ -1677,7 +1677,7 @@ def to_cugraph(g):
                                  destination='destination')
     return g_cugraph
 
-DGLHeteroGraph.to_cugraph = to_cugraph
+DGLGraph.to_cugraph = to_cugraph
 
 def from_cugraph(cugraph_graph):
     """Create a graph from a :class:`cugraph.Graph` object.
@@ -1766,7 +1766,7 @@ def create_from_edges(sparse_fmt, arrays,
 
     Returns
     -------
-    DGLHeteroGraph
+    DGLGraph
     """
     if utype == vtype:
         num_ntypes = 1
@@ -1784,6 +1784,6 @@ def create_from_edges(sparse_fmt, arrays,
             num_ntypes, urange, vrange, indptr, indices, eids, ['coo', 'csr', 'csc'],
             sparse_fmt == 'csc')
     if utype == vtype:
-        return DGLHeteroGraph(hgidx, [utype], [etype])
+        return DGLGraph(hgidx, [utype], [etype])
     else:
-        return DGLHeteroGraph(hgidx, [utype, vtype], [etype])
+        return DGLGraph(hgidx, [utype, vtype], [etype])

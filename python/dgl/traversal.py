@@ -4,7 +4,7 @@ from __future__ import absolute_import
 from . import backend as F
 from . import utils
 from ._ffi.function import _init_api
-from .heterograph import DGLHeteroGraph
+from .heterograph import DGLGraph
 
 __all__ = [
     "bfs_nodes_generator",
@@ -20,7 +20,7 @@ def bfs_nodes_generator(graph, source, reverse=False):
 
     Parameters
     ----------
-    graph : DGLHeteroGraph
+    graph : DGLGraph
         The graph object.
     source : list, tensor of nodes
         Source nodes.
@@ -45,9 +45,6 @@ def bfs_nodes_generator(graph, source, reverse=False):
     >>> list(dgl.bfs_nodes_generator(g, 0))
     [tensor([0]), tensor([1]), tensor([2, 3]), tensor([4, 5])]
     """
-    assert isinstance(
-        graph, DGLHeteroGraph
-    ), "DGLGraph is deprecated, Please use DGLHeteroGraph"
     assert (
         len(graph.canonical_etypes) == 1
     ), "bfs_nodes_generator only support homogeneous graph"
@@ -67,7 +64,7 @@ def bfs_edges_generator(graph, source, reverse=False):
 
     Parameters
     ----------
-    graph : DGLHeteroGraph
+    graph : DGLGraph
         The graph object.
     source : list, tensor of nodes
         Source nodes.
@@ -93,9 +90,6 @@ def bfs_edges_generator(graph, source, reverse=False):
     >>> list(dgl.bfs_edges_generator(g, 0))
     [tensor([0]), tensor([1, 2]), tensor([4, 5])]
     """
-    assert isinstance(
-        graph, DGLHeteroGraph
-    ), "DGLGraph is deprecated, Please use DGLHeteroGraph"
     assert (
         len(graph.canonical_etypes) == 1
     ), "bfs_edges_generator only support homogeneous graph"
@@ -115,7 +109,7 @@ def topological_nodes_generator(graph, reverse=False):
 
     Parameters
     ----------
-    graph : DGLHeteroGraph
+    graph : DGLGraph
         The graph object.
     reverse : bool, optional
         If True, traverse following the in-edge direction.
@@ -138,9 +132,6 @@ def topological_nodes_generator(graph, reverse=False):
     >>> list(dgl.topological_nodes_generator(g))
     [tensor([0]), tensor([1]), tensor([2]), tensor([3, 4]), tensor([5])]
     """
-    assert isinstance(
-        graph, DGLHeteroGraph
-    ), "DGLGraph is deprecated, Please use DGLHeteroGraph"
     assert (
         len(graph.canonical_etypes) == 1
     ), "topological_nodes_generator only support homogeneous graph"
@@ -163,7 +154,7 @@ def dfs_edges_generator(graph, source, reverse=False):
 
     Parameters
     ----------
-    graph : DGLHeteroGraph
+    graph : DGLGraph
         The graph object.
     source : list, tensor of nodes
         Source nodes.
@@ -190,9 +181,6 @@ def dfs_edges_generator(graph, source, reverse=False):
     >>> list(dgl.dfs_edges_generator(g, 0))
     [tensor([0]), tensor([1]), tensor([3]), tensor([5]), tensor([4])]
     """
-    assert isinstance(
-        graph, DGLHeteroGraph
-    ), "DGLGraph is deprecated, Please use DGLHeteroGraph"
     assert (
         len(graph.canonical_etypes) == 1
     ), "dfs_edges_generator only support homogeneous graph"
@@ -234,7 +222,7 @@ def dfs_labeled_edges_generator(
 
     Parameters
     ----------
-    graph : DGLHeteroGraph
+    graph : DGLGraph
         The graph object.
     source : list, tensor of nodes
         Source nodes.
@@ -270,9 +258,6 @@ def dfs_labeled_edges_generator(
     (tensor([0]), tensor([1]), tensor([3]), tensor([5]), tensor([4]), tensor([2])),
     (tensor([0]), tensor([0]), tensor([0]), tensor([0]), tensor([0]), tensor([2]))
     """
-    assert isinstance(
-        graph, DGLHeteroGraph
-    ), "DGLGraph is deprecated, Please use DGLHeteroGraph"
     assert (
         len(graph.canonical_etypes) == 1
     ), "dfs_labeled_edges_generator only support homogeneous graph"
