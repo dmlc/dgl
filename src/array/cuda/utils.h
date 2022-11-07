@@ -39,7 +39,7 @@ inline int FindNumThreads(int dim, int max_nthrs = CUDA_MAX_NUM_THREADS) {
 }
 
 /**
- * !\brief Find number of blocks is smaller than nblks and max_nblks
+ * @brief Find number of blocks is smaller than nblks and max_nblks
  * on the given axis ('x', 'y' or 'z').
  */
 template <char axis>

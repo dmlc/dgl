@@ -32,13 +32,13 @@ namespace impl {
 // *ATTENTION*: This function will be invoked concurrently. Please make sure
 // it is thread-safe.
 //
-// \param rowid The row to pick from.
-// \param off Starting offset of this row.
-// \param len NNZ of the row.
-// \param num_picks Number of picks on the row.
-// \param col Pointer of the column indices.
-// \param data Pointer of the data indices.
-// \param out_idx Picked indices in [off, off + len).
+// @param rowid The row to pick from.
+// @param off Starting offset of this row.
+// @param len NNZ of the row.
+// @param num_picks Number of picks on the row.
+// @param col Pointer of the column indices.
+// @param data Pointer of the data indices.
+// @param out_idx Picked indices in [off, off + len).
 template <typename IdxType>
 using PickFn = std::function<void(
     IdxType rowid, IdxType off, IdxType len, IdxType num_picks,
@@ -57,11 +57,11 @@ using PickFn = std::function<void(
 // *ATTENTION*: This function will be invoked concurrently. Please make sure
 // it is thread-safe.
 //
-// \param rowid The row to pick from.
-// \param off Starting offset of this row.
-// \param len NNZ of the row.
-// \param col Pointer of the column indices.
-// \param data Pointer of the data indices.
+// @param rowid The row to pick from.
+// @param off Starting offset of this row.
+// @param len NNZ of the row.
+// @param col Pointer of the column indices.
+// @param data Pointer of the data indices.
 template <typename IdxType>
 using NumPicksFn = std::function<IdxType(
     IdxType rowid, IdxType off, IdxType len, const IdxType* col,
@@ -80,14 +80,14 @@ using NumPicksFn = std::function<IdxType(
 // *ATTENTION*: This function will be invoked concurrently. Please make sure
 // it is thread-safe.
 //
-// \param off Starting offset of this row.
-// \param et_offset Starting offset of this range.
-// \param cur_et The edge type.
-// \param et_len Length of the range.
-// \param et_idx A map from local idx to column id.
-// \param et_eid Edge-type-specific id array.
-// \param eid Pointer of the homogenized edge id array.
-// \param out_idx Picked indices in [et_offset, et_offset + et_len).
+// @param off Starting offset of this row.
+// @param et_offset Starting offset of this range.
+// @param cur_et The edge type.
+// @param et_len Length of the range.
+// @param et_idx A map from local idx to column id.
+// @param et_eid Edge-type-specific id array.
+// @param eid Pointer of the homogenized edge id array.
+// @param out_idx Picked indices in [et_offset, et_offset + et_len).
 template <typename IdxType>
 using EtypeRangePickFn = std::function<void(
     IdxType off, IdxType et_offset, IdxType cur_et, IdxType et_len,
