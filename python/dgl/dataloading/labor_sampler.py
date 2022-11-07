@@ -147,7 +147,7 @@ class LaborSampler(BlockSampler):
 
     def set_seed(self, random_seed=None):
         """Updates the underlying seed for the sampler
-        
+
         The passed random_seed makes it so that for any seed vertex s and its neighbor t, the rolled
         random variate r_t is the same for any instance of this class with the same random seed.
         When sampling as part of the same batch, one would want identical seeds so that LABOR

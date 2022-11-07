@@ -261,21 +261,13 @@ def _sample_labors(
     nodes_all_types = []
     # nids_all_types is needed if one wants labor to work for subgraphs whose vertices have
     # been renamed and the rolled randoms should be rolled for global vertex ids.
-    # It is disabled for now below by having if False ...
-    nids_all_types = []
+    # It is disabled for now below by passing empty ndarrays.
+    nids_all_types = [nd.array([], ctx=ctx) for _ in g.ntypes]
     for ntype in g.ntypes:
         if ntype in nodes:
             nodes_all_types.append(F.to_dgl_nd(nodes[ntype]))
-            if False and NID in g.ndata:
-                if len(g.ntypes) > 1:
-                    nids_all_types.append(F.to_dgl_nd(g.ndata[NID][ntype]))
-                else:
-                    nids_all_types.append(F.to_dgl_nd(g.ndata[NID]))
-            else:
-                nids_all_types.append(nd.array([], ctx=ctx))
         else:
             nodes_all_types.append(nd.array([], ctx=ctx))
-            nids_all_types.append(nd.array([], ctx=ctx))
 
     if isinstance(fanout, nd.NDArray):
         fanout_array = fanout
