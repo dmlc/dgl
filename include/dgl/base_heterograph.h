@@ -188,9 +188,11 @@ class BaseHeteroGraph : public runtime::Object {
   /**
    * @brief Get all edge ids between the two given endpoints
    * @note The given src and dst vertices should belong to the source vertex
-   * type and the dest vertex type of the given edge type, respectively. \param
-   * etype The edge type \param src The source vertex. \param dst The
-   * destination vertex. \return the edge id array.
+   * type and the dest vertex type of the given edge type, respectively.
+   * @param etype The edge type
+   * @param src The source vertex.
+   * @param dst The destination vertex.
+   * @return the edge id array.
    */
   virtual IdArray EdgeId(
       dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const = 0;
@@ -284,7 +286,9 @@ class BaseHeteroGraph : public runtime::Object {
    * @brief Get all the edges in the graph.
    * @note If order is "srcdst", the returned edges list is sorted by their src
    * and dst ids. If order is "eid", they are in their edge id order. Otherwise,
-   * in the arbitrary order. \param etype The edge type \param order The order
+   * in the arbitrary order.
+   * @param etype The edge type
+   * @param order The order
    * of the returned edge list. \return the id arrays of the two endpoints of
    * the edges.
    */
