@@ -223,8 +223,10 @@ bool CSRIsSorted(CSRMatrix csr);
 std::vector<runtime::NDArray> CSRGetDataAndIndices(
     CSRMatrix, runtime::NDArray rows, runtime::NDArray cols);
 
-/* @brief Get data. The return type is an ndarray due to possible duplicate
- * entries. */
+/**
+ * @brief Get data. The return type is an ndarray due to possible duplicate
+ * entries.
+ */
 inline runtime::NDArray CSRGetAllData(CSRMatrix mat, int64_t row, int64_t col) {
   const auto& nbits = mat.indptr->dtype.bits;
   const auto& ctx = mat.indptr->ctx;

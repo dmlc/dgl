@@ -6,12 +6,11 @@
 #ifndef DGL_RUNTIME_NDARRAY_H_
 #define DGL_RUNTIME_NDARRAY_H_
 
-
 #include <atomic>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
-#include <memory>
 
 #include "c_runtime_api.h"
 #include "serializer.h"
@@ -29,7 +28,7 @@
 #endif  // DGL_USE_CUDA
 
 // forward declaration
-inline std::ostream& operator << (std::ostream& os, DGLDataType t);
+inline std::ostream& operator<<(std::ostream& os, DGLDataType t);
 
 namespace dgl {
 
@@ -39,13 +38,13 @@ namespace dgl {
  * Usage:
  * DGLDataTypeTraits<int>::dtype == dtype
  */
-template<typename T>
+template <typename T>
 struct DGLDataTypeTraits {
-  static constexpr DGLDataType dtype{0, 0, 0};   // dummy
+  static constexpr DGLDataType dtype{0, 0, 0};  // dummy
 };
-#define GEN_DGLDATATYPETRAITS_FOR(T, code, bits) \
-  template<> \
-  struct DGLDataTypeTraits<T> { \
+#define GEN_DGLDATATYPETRAITS_FOR(T, code, bits)       \
+  template <>                                          \
+  struct DGLDataTypeTraits<T> {                        \
     static constexpr DGLDataType dtype{code, bits, 1}; \
   }
 GEN_DGLDATATYPETRAITS_FOR(int8_t, kDGLInt, 8);
@@ -53,8 +52,8 @@ GEN_DGLDATATYPETRAITS_FOR(uint8_t, kDGLUInt, 8);
 GEN_DGLDATATYPETRAITS_FOR(int16_t, kDGLInt, 16);
 GEN_DGLDATATYPETRAITS_FOR(int32_t, kDGLInt, 32);
 GEN_DGLDATATYPETRAITS_FOR(int64_t, kDGLInt, 64);
-// XXX(BarclayII) most DL frameworks do not support unsigned int and long arrays, so I'm just
-// converting uints to signed DTypes.
+// XXX(BarclayII) most DL frameworks do not support unsigned int and long
+// arrays, so I'm just converting uints to signed DTypes.
 GEN_DGLDATATYPETRAITS_FOR(uint32_t, kDGLInt, 32);
 GEN_DGLDATATYPETRAITS_FOR(uint64_t, kDGLInt, 64);
 #ifdef DGL_USE_CUDA
@@ -98,14 +97,12 @@ class NDArray {
    * @brief move constructor
    * @param other The value to be moved
    */
-  NDArray(NDArray&& other) // NOLINT(*)
+  NDArray(NDArray&& other)  // NOLINT(*)
       : data_(other.data_) {
     other.data_ = nullptr;
   }
   /** @brief destructor */
-  ~NDArray() {
-    this->reset();
-  }
+  ~NDArray() { this->reset(); }
   /**
    * @brief Swap this array with another NDArray
    * @param other The other NDArray
@@ -130,17 +127,13 @@ class NDArray {
    */
   NDArray& operator=(NDArray&& other) {  // NOLINT(*)
     // copy-and-swap idiom
-    NDArray(std::move(other)).swap(*this); // NOLINT(*)
+    NDArray(std::move(other)).swap(*this);  // NOLINT(*)
     return *this;
   }
   /** @return If NDArray is defined */
-  bool defined() const {
-    return data_ != nullptr;
-  }
+  bool defined() const { return data_ != nullptr; }
   /** @return If both NDArray reference the same container */
-  bool same_as(const NDArray& other) const {
-    return data_ == other.data_;
-  }
+  bool same_as(const NDArray& other) const { return data_ == other.data_; }
   /** @brief reset the content of NDArray to be nullptr */
   inline void reset();
   /**
@@ -160,22 +153,23 @@ class NDArray {
     else
       return static_cast<T*>(operator->()->data);
   }
-   /**
+  /**
    * @brief Copy data content from/into another array.
    * @param other The source array to be copied from.
-   * @note The copy runs on the dgl internal stream if it involves a GPU context.
+   * @note The copy runs on the dgl internal stream if it involves a GPU
+   * context.
    */
   inline void CopyFrom(DGLArray* other);
   inline void CopyFrom(const NDArray& other);
-  inline void CopyTo(DGLArray *other) const;
-  inline void CopyTo(const NDArray &other) const;
+  inline void CopyTo(DGLArray* other) const;
+  inline void CopyTo(const NDArray& other) const;
 
   /**
    * @brief Copy the data to another context.
    * @param ctx The target context.
    * @return The array under another context.
    */
-  inline NDArray CopyTo(const DGLContext &ctx) const;
+  inline NDArray CopyTo(const DGLContext& ctx) const;
   /**
    * @brief Return a new array with a copy of the content.
    */
@@ -224,8 +218,8 @@ class NDArray {
    * @param offset The offset (in bytes) of the starting pointer.
    * @note The memory size of new array must be smaller than the current one.
    */
-  DGL_DLL NDArray CreateView(
-      std::vector<int64_t> shape, DGLDataType dtype, int64_t offset = 0);
+  DGL_DLL NDArray
+  CreateView(std::vector<int64_t> shape, DGLDataType dtype, int64_t offset = 0);
   /**
    * @brief Create an empty NDArray.
    * @param shape The shape of the new array.
@@ -233,9 +227,8 @@ class NDArray {
    * @param ctx The context of the Array.
    * @return The created Array
    */
-  DGL_DLL static NDArray Empty(std::vector<int64_t> shape,
-                               DGLDataType dtype,
-                               DGLContext ctx);
+  DGL_DLL static NDArray Empty(
+      std::vector<int64_t> shape, DGLDataType dtype, DGLContext ctx);
   /**
    * @brief Create an empty NDArray with shared memory.
    * @param name The name of shared memory.
@@ -245,11 +238,9 @@ class NDArray {
    * @param is_create whether to create shared memory.
    * @return The created Array
    */
-  DGL_DLL static NDArray EmptyShared(const std::string &name,
-                                     std::vector<int64_t> shape,
-                                     DGLDataType dtype,
-                                     DGLContext ctx,
-                                     bool is_create);
+  DGL_DLL static NDArray EmptyShared(
+      const std::string& name, std::vector<int64_t> shape, DGLDataType dtype,
+      DGLContext ctx, bool is_create);
   /**
    * @brief Get the size of the array in the number of bytes.
    */
@@ -264,23 +255,24 @@ class NDArray {
    * @brief Create a NDArray by copying from std::vector.
    * @tparam T Type of vector data.  Determines the dtype of returned array.
    */
-  template<typename T>
+  template <typename T>
   DGL_DLL static NDArray FromVector(
       const std::vector<T>& vec, DGLContext ctx = DGLContext{kDGLCPU, 0});
 
   /**
    * @brief Create a NDArray from a raw pointer.
    */
-  DGL_DLL static NDArray CreateFromRaw(const std::vector<int64_t>& shape,
-      DGLDataType dtype, DGLContext ctx, void* raw, bool auto_free);
+  DGL_DLL static NDArray CreateFromRaw(
+      const std::vector<int64_t>& shape, DGLDataType dtype, DGLContext ctx,
+      void* raw, bool auto_free);
 
   /**
    * @brief Create a std::vector from a 1D NDArray.
    * @tparam T Type of vector data.
-   * @note Type casting is NOT performed.  The caller has to make sure that the vector
-   *       type matches the dtype of NDArray.
+   * @note Type casting is NOT performed.  The caller has to make sure that the
+   * vector type matches the dtype of NDArray.
    */
-  template<typename T>
+  template <typename T>
   std::vector<T> ToVector() const;
 
   std::shared_ptr<SharedMemory> GetSharedMem() const;
@@ -291,8 +283,7 @@ class NDArray {
    * @param to The target array.
    * @param (optional) stream The stream used in copy.
    */
-  DGL_DLL static void CopyFromTo(
-      DGLArray* from, DGLArray* to);
+  DGL_DLL static void CopyFromTo(DGLArray* from, DGLArray* to);
   DGL_DLL static void CopyFromTo(
       DGLArray* from, DGLArray* to, DGLStreamHandle stream);
 
@@ -337,8 +328,8 @@ class NDArray {
     static void DefaultDeleter(NDArray::Container* ptr);
     // Local create function which allocates tensor metadata
     // but does not allocate space for the data.
-    static NDArray Create(std::vector<int64_t> shape,
-                          DGLDataType dtype, DGLContext ctx);
+    static NDArray Create(
+        std::vector<int64_t> shape, DGLDataType dtype, DGLContext ctx);
     // Implementation of API function
     static DGLArray* MoveAsDGLArray(NDArray arr);
   };
@@ -359,7 +350,6 @@ class NDArray {
  * @param tensor The tensor to be saved.
  */
 inline bool SaveDGLArray(dmlc::Stream* strm, const DGLArray* tensor);
-
 
 /**
  * @brief Reference counted Container object used to back NDArray.
@@ -409,9 +399,7 @@ struct NDArray::Container {
   /** @brief pointer to shared memory */
   std::shared_ptr<SharedMemory> mem;
   /** @brief developer function, increases reference counter */
-  void IncRef() {
-    ref_counter_.fetch_add(1, std::memory_order_relaxed);
-  }
+  void IncRef() { ref_counter_.fetch_add(1, std::memory_order_relaxed); }
   /** @brief developer function, decrease reference counter */
   void DecRef() {
     if (ref_counter_.fetch_sub(1, std::memory_order_release) == 1) {
@@ -444,16 +432,12 @@ struct NDArray::Container {
 
 // implementations of inline functions
 // the usages of functions are documented in place.
-inline NDArray::NDArray(Container* data)
-  : data_(data) {
-  if (data_)
-    data_->IncRef();
+inline NDArray::NDArray(Container* data) : data_(data) {
+  if (data_) data_->IncRef();
 }
 
-inline NDArray::NDArray(const NDArray& other)
-  : data_(other.data_) {
-  if (data_)
-    data_->IncRef();
+inline NDArray::NDArray(const NDArray& other) : data_(other.data_) {
+  if (data_) data_->IncRef();
 }
 
 inline void NDArray::reset() {
@@ -473,21 +457,22 @@ inline void NDArray::CopyFrom(const NDArray& other) {
   CopyFrom(&(other.data_->dl_tensor));
 }
 
-inline void NDArray::CopyTo(DGLArray *other) const {
+inline void NDArray::CopyTo(DGLArray* other) const {
   CHECK(data_ != nullptr);
   CopyFromTo(&(data_->dl_tensor), other);
 }
 
-inline void NDArray::CopyTo(const NDArray &other) const {
+inline void NDArray::CopyTo(const NDArray& other) const {
   CHECK(other.data_ != nullptr);
   CopyTo(&(other.data_->dl_tensor));
 }
 
-inline NDArray NDArray::CopyTo(const DGLContext &ctx) const {
+inline NDArray NDArray::CopyTo(const DGLContext& ctx) const {
   CHECK(data_ != nullptr);
   const DGLArray* dptr = operator->();
-  NDArray ret = Empty(std::vector<int64_t>(dptr->shape, dptr->shape + dptr->ndim),
-                      dptr->dtype, ctx);
+  NDArray ret = Empty(
+      std::vector<int64_t>(dptr->shape, dptr->shape + dptr->ndim), dptr->dtype,
+      ctx);
   this->CopyTo(ret);
   return ret;
 }
@@ -530,8 +515,7 @@ inline const DGLArray* NDArray::operator->() const {
 /** @brief Magic number for NDArray file */
 constexpr uint64_t kDGLNDArrayMagic = 0xDD5E40F096B4A13F;
 
-inline bool SaveDGLArray(dmlc::Stream* strm,
-                         DGLArray* tensor) {
+inline bool SaveDGLArray(dmlc::Stream* strm, DGLArray* tensor) {
   uint64_t header = kDGLNDArrayMagic, reserved = 0;
   strm->Write(header);
   strm->Write(reserved);
@@ -560,16 +544,14 @@ inline bool SaveDGLArray(dmlc::Stream* strm,
   int64_t data_byte_size = type_bytes * num_elems;
   strm->Write(data_byte_size);
 
-  if (DMLC_IO_NO_ENDIAN_SWAP &&
-      tensor->ctx.device_type == kDGLCPU &&
-      tensor->strides == nullptr &&
-      tensor->byte_offset == 0) {
+  if (DMLC_IO_NO_ENDIAN_SWAP && tensor->ctx.device_type == kDGLCPU &&
+      tensor->strides == nullptr && tensor->byte_offset == 0) {
     // quick path
     strm->Write(tensor->data, data_byte_size);
   } else {
     std::vector<uint8_t> bytes(data_byte_size);
-    CHECK_EQ(DGLArrayCopyToBytes(
-        tensor, dmlc::BeginPtr(bytes), data_byte_size), 0)
+    CHECK_EQ(
+        DGLArrayCopyToBytes(tensor, dmlc::BeginPtr(bytes), data_byte_size), 0)
         << DGLGetLastError();
     if (!DMLC_IO_NO_ENDIAN_SWAP) {
       dmlc::ByteSwap(dmlc::BeginPtr(bytes), type_bytes, num_elems);
@@ -586,22 +568,37 @@ inline bool SaveDGLArray(dmlc::Stream* strm,
  */
 inline const char* TypeCode2Str(int type_code) {
   switch (type_code) {
-    case kDGLInt: return "int";
-    case kDGLUInt: return "uint";
-    case kDGLFloat: return "float";
-    case kStr: return "str";
-    case kBytes: return "bytes";
-    case kHandle: return "handle";
-    case kNull: return "NULL";
-    case kObjectHandle: return "ObjectHandle";
-    case kArrayHandle: return "ArrayHandle";
-    case kDGLDataType: return "DGLDataType";
-    case kDGLContext: return "DGLContext";
-    case kFuncHandle: return "FunctionHandle";
-    case kModuleHandle: return "ModuleHandle";
-    case kNDArrayContainer: return "NDArrayContainer";
-    default: LOG(FATAL) << "unknown type_code="
-                        << static_cast<int>(type_code); return "";
+    case kDGLInt:
+      return "int";
+    case kDGLUInt:
+      return "uint";
+    case kDGLFloat:
+      return "float";
+    case kStr:
+      return "str";
+    case kBytes:
+      return "bytes";
+    case kHandle:
+      return "handle";
+    case kNull:
+      return "NULL";
+    case kObjectHandle:
+      return "ObjectHandle";
+    case kArrayHandle:
+      return "ArrayHandle";
+    case kDGLDataType:
+      return "DGLDataType";
+    case kDGLContext:
+      return "DGLContext";
+    case kFuncHandle:
+      return "FunctionHandle";
+    case kModuleHandle:
+      return "ModuleHandle";
+    case kNDArrayContainer:
+      return "NDArrayContainer";
+    default:
+      LOG(FATAL) << "unknown type_code=" << static_cast<int>(type_code);
+      return "";
   }
 }
 
@@ -612,10 +609,14 @@ inline const char* TypeCode2Str(int type_code) {
  */
 inline const char* DeviceTypeCode2Str(DGLDeviceType device_type) {
   switch (device_type) {
-    case kDGLCPU: return "cpu";
-    case kDGLCUDA: return "cuda";
-    default: LOG(FATAL) << "Unsupported device type code="
-                        << static_cast<int>(device_type); return "";
+    case kDGLCPU:
+      return "cpu";
+    case kDGLCUDA:
+      return "cuda";
+    default:
+      LOG(FATAL) << "Unsupported device type code="
+                 << static_cast<int>(device_type);
+      return "";
   }
 }
 
@@ -626,14 +627,18 @@ inline const char* DeviceTypeCode2Str(DGLDeviceType device_type) {
  */
 inline DGLDataType String2DGLDataType(std::string s) {
   DGLDataType t;
-  t.bits = 32; t.lanes = 1;
+  t.bits = 32;
+  t.lanes = 1;
   const char* scan;
   if (s.substr(0, 3) == "int") {
-    t.code = kDGLInt;  scan = s.c_str() + 3;
+    t.code = kDGLInt;
+    scan = s.c_str() + 3;
   } else if (s.substr(0, 4) == "uint") {
-    t.code = kDGLUInt; scan = s.c_str() + 4;
+    t.code = kDGLUInt;
+    scan = s.c_str() + 4;
   } else if (s.substr(0, 5) == "float") {
-    t.code = kDGLFloat; scan = s.c_str() + 5;
+    t.code = kDGLFloat;
+    scan = s.c_str() + 5;
   } else if (s.substr(0, 6) == "handle") {
     t.code = kHandle;
     t.bits = 64;  // handle uses 64 bit by default.
@@ -674,9 +679,9 @@ inline std::string DGLDataType2String(DGLDataType t) {
 }
 
 // macro to check type code.
-#define DGL_CHECK_TYPE_CODE(CODE, T)                           \
-  CHECK_EQ(CODE, T) << " expected "                            \
-  << TypeCode2Str(T) << " but get " << TypeCode2Str(CODE)      \
+#define DGL_CHECK_TYPE_CODE(CODE, T)                                  \
+  CHECK_EQ(CODE, T) << " expected " << TypeCode2Str(T) << " but get " \
+                    << TypeCode2Str(CODE)
 
 }  // namespace runtime
 }  // namespace dgl
@@ -686,69 +691,69 @@ DMLC_DECLARE_TRAITS(has_saveload, dgl::runtime::NDArray, true);
 }  // namespace dmlc
 
 ///////////////// Operator overloading for NDArray /////////////////
-dgl::runtime::NDArray operator + (const dgl::runtime::NDArray& a1,
-                                  const dgl::runtime::NDArray& a2);
-dgl::runtime::NDArray operator - (const dgl::runtime::NDArray& a1,
-                                  const dgl::runtime::NDArray& a2);
-dgl::runtime::NDArray operator * (const dgl::runtime::NDArray& a1,
-                                  const dgl::runtime::NDArray& a2);
-dgl::runtime::NDArray operator / (const dgl::runtime::NDArray& a1,
-                                  const dgl::runtime::NDArray& a2);
-dgl::runtime::NDArray operator % (const dgl::runtime::NDArray& a1,
-                                  const dgl::runtime::NDArray& a2);
-dgl::runtime::NDArray operator + (const dgl::runtime::NDArray& a1, int64_t rhs);
-dgl::runtime::NDArray operator - (const dgl::runtime::NDArray& a1, int64_t rhs);
-dgl::runtime::NDArray operator * (const dgl::runtime::NDArray& a1, int64_t rhs);
-dgl::runtime::NDArray operator / (const dgl::runtime::NDArray& a1, int64_t rhs);
-dgl::runtime::NDArray operator % (const dgl::runtime::NDArray& a1, int64_t rhs);
-dgl::runtime::NDArray operator + (int64_t lhs, const dgl::runtime::NDArray& a2);
-dgl::runtime::NDArray operator - (int64_t lhs, const dgl::runtime::NDArray& a2);
-dgl::runtime::NDArray operator * (int64_t lhs, const dgl::runtime::NDArray& a2);
-dgl::runtime::NDArray operator / (int64_t lhs, const dgl::runtime::NDArray& a2);
-dgl::runtime::NDArray operator % (int64_t lhs, const dgl::runtime::NDArray& a2);
-dgl::runtime::NDArray operator - (const dgl::runtime::NDArray& array);
+dgl::runtime::NDArray operator+(
+    const dgl::runtime::NDArray& a1, const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator-(
+    const dgl::runtime::NDArray& a1, const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator*(
+    const dgl::runtime::NDArray& a1, const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator/(
+    const dgl::runtime::NDArray& a1, const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator%(
+    const dgl::runtime::NDArray& a1, const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator+(const dgl::runtime::NDArray& a1, int64_t rhs);
+dgl::runtime::NDArray operator-(const dgl::runtime::NDArray& a1, int64_t rhs);
+dgl::runtime::NDArray operator*(const dgl::runtime::NDArray& a1, int64_t rhs);
+dgl::runtime::NDArray operator/(const dgl::runtime::NDArray& a1, int64_t rhs);
+dgl::runtime::NDArray operator%(const dgl::runtime::NDArray& a1, int64_t rhs);
+dgl::runtime::NDArray operator+(int64_t lhs, const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator-(int64_t lhs, const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator*(int64_t lhs, const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator/(int64_t lhs, const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator%(int64_t lhs, const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator-(const dgl::runtime::NDArray& array);
 
-dgl::runtime::NDArray operator > (const dgl::runtime::NDArray& a1,
-                                  const dgl::runtime::NDArray& a2);
-dgl::runtime::NDArray operator < (const dgl::runtime::NDArray& a1,
-                                  const dgl::runtime::NDArray& a2);
-dgl::runtime::NDArray operator >= (const dgl::runtime::NDArray& a1,
-                                   const dgl::runtime::NDArray& a2);
-dgl::runtime::NDArray operator <= (const dgl::runtime::NDArray& a1,
-                                   const dgl::runtime::NDArray& a2);
-dgl::runtime::NDArray operator == (const dgl::runtime::NDArray& a1,
-                                   const dgl::runtime::NDArray& a2);
-dgl::runtime::NDArray operator != (const dgl::runtime::NDArray& a1,
-                                   const dgl::runtime::NDArray& a2);
-dgl::runtime::NDArray operator > (const dgl::runtime::NDArray& a1, int64_t rhs);
-dgl::runtime::NDArray operator < (const dgl::runtime::NDArray& a1, int64_t rhs);
-dgl::runtime::NDArray operator >= (const dgl::runtime::NDArray& a1, int64_t rhs);
-dgl::runtime::NDArray operator <= (const dgl::runtime::NDArray& a1, int64_t rhs);
-dgl::runtime::NDArray operator == (const dgl::runtime::NDArray& a1, int64_t rhs);
-dgl::runtime::NDArray operator != (const dgl::runtime::NDArray& a1, int64_t rhs);
-dgl::runtime::NDArray operator > (int64_t lhs, const dgl::runtime::NDArray& a2);
-dgl::runtime::NDArray operator < (int64_t lhs, const dgl::runtime::NDArray& a2);
-dgl::runtime::NDArray operator >= (int64_t lhs, const dgl::runtime::NDArray& a2);
-dgl::runtime::NDArray operator <= (int64_t lhs, const dgl::runtime::NDArray& a2);
-dgl::runtime::NDArray operator == (int64_t lhs, const dgl::runtime::NDArray& a2);
-dgl::runtime::NDArray operator != (int64_t lhs, const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator>(
+    const dgl::runtime::NDArray& a1, const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator<(
+    const dgl::runtime::NDArray& a1, const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator>=(
+    const dgl::runtime::NDArray& a1, const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator<=(
+    const dgl::runtime::NDArray& a1, const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator==(
+    const dgl::runtime::NDArray& a1, const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator!=(
+    const dgl::runtime::NDArray& a1, const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator>(const dgl::runtime::NDArray& a1, int64_t rhs);
+dgl::runtime::NDArray operator<(const dgl::runtime::NDArray& a1, int64_t rhs);
+dgl::runtime::NDArray operator>=(const dgl::runtime::NDArray& a1, int64_t rhs);
+dgl::runtime::NDArray operator<=(const dgl::runtime::NDArray& a1, int64_t rhs);
+dgl::runtime::NDArray operator==(const dgl::runtime::NDArray& a1, int64_t rhs);
+dgl::runtime::NDArray operator!=(const dgl::runtime::NDArray& a1, int64_t rhs);
+dgl::runtime::NDArray operator>(int64_t lhs, const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator<(int64_t lhs, const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator>=(int64_t lhs, const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator<=(int64_t lhs, const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator==(int64_t lhs, const dgl::runtime::NDArray& a2);
+dgl::runtime::NDArray operator!=(int64_t lhs, const dgl::runtime::NDArray& a2);
 
-std::ostream& operator << (std::ostream& os, dgl::runtime::NDArray array);
+std::ostream& operator<<(std::ostream& os, dgl::runtime::NDArray array);
 
 ///////////////// Operator overloading for DGLDataType /////////////////
 
 /** @brief Check whether two data types are the same.*/
-inline bool operator == (const DGLDataType& ty1, const DGLDataType& ty2) {
+inline bool operator==(const DGLDataType& ty1, const DGLDataType& ty2) {
   return ty1.code == ty2.code && ty1.bits == ty2.bits && ty1.lanes == ty2.lanes;
 }
 
 /** @brief Check whether two data types are different.*/
-inline bool operator != (const DGLDataType& ty1, const DGLDataType& ty2) {
+inline bool operator!=(const DGLDataType& ty1, const DGLDataType& ty2) {
   return !(ty1 == ty2);
 }
 
 #ifndef _LIBCPP_SGX_NO_IOSTREAMS
-inline std::ostream& operator << (std::ostream& os, DGLDataType t) {
+inline std::ostream& operator<<(std::ostream& os, DGLDataType t) {
   os << dgl::runtime::TypeCode2Str(t.code);
   if (t.code == kHandle) return os;
   os << static_cast<int>(t.bits);
@@ -762,18 +767,20 @@ inline std::ostream& operator << (std::ostream& os, DGLDataType t) {
 ///////////////// Operator overloading for DGLContext /////////////////
 
 /** @brief Check whether two device contexts are the same.*/
-inline bool operator == (const DGLContext& ctx1, const DGLContext& ctx2) {
-  return ctx1.device_type == ctx2.device_type && ctx1.device_id == ctx2.device_id;
+inline bool operator==(const DGLContext& ctx1, const DGLContext& ctx2) {
+  return ctx1.device_type == ctx2.device_type &&
+         ctx1.device_id == ctx2.device_id;
 }
 
 /** @brief Check whether two device contexts are different.*/
-inline bool operator != (const DGLContext& ctx1, const DGLContext& ctx2) {
+inline bool operator!=(const DGLContext& ctx1, const DGLContext& ctx2) {
   return !(ctx1 == ctx2);
 }
 
 #ifndef _LIBCPP_SGX_NO_IOSTREAMS
-inline std::ostream& operator << (std::ostream& os, const DGLContext& ctx) {
-  return os << dgl::runtime::DeviceTypeCode2Str(ctx.device_type) << ":" << ctx.device_id;
+inline std::ostream& operator<<(std::ostream& os, const DGLContext& ctx) {
+  return os << dgl::runtime::DeviceTypeCode2Str(ctx.device_type) << ":"
+            << ctx.device_id;
 }
 #endif
 

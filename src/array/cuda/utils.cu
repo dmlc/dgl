@@ -4,9 +4,9 @@
  * @brief Utilities for CUDA kernels.
  */
 
-#include "./utils.h"
-#include "./dgl_cub.cuh"
 #include "../../runtime/cuda/cuda_common.h"
+#include "./dgl_cub.cuh"
+#include "./utils.h"
 
 namespace dgl {
 namespace cuda {
@@ -17,9 +17,11 @@ bool AllTrue(int8_t* flags, int64_t length, const DGLContext& ctx) {
   // Call CUB's reduction
   size_t workspace_size = 0;
   cudaStream_t stream = runtime::getCurrentCUDAStream();
-  CUDA_CALL(cub::DeviceReduce::Min(nullptr, workspace_size, flags, rst, length, stream));
+  CUDA_CALL(cub::DeviceReduce::Min(
+      nullptr, workspace_size, flags, rst, length, stream));
   void* workspace = device->AllocWorkspace(ctx, workspace_size);
-  CUDA_CALL(cub::DeviceReduce::Min(workspace, workspace_size, flags, rst, length, stream));
+  CUDA_CALL(cub::DeviceReduce::Min(
+      workspace, workspace_size, flags, rst, length, stream));
   int8_t cpu_rst = GetCUDAScalar(device, ctx, rst);
   device->FreeWorkspace(ctx, workspace);
   device->FreeWorkspace(ctx, rst);
