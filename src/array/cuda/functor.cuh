@@ -17,8 +17,7 @@ namespace dgl {
 namespace aten {
 namespace cuda {
 
-/////////////////////////////// CUDA binary operators
-//////////////////////////////////
+/////////////////////////// CUDA binary operators //////////////////////////////
 namespace binary {
 template <typename DType>
 struct Add {
@@ -145,8 +144,7 @@ constexpr bool Dot<DType>::reduce_last_dim;
 
 }  // end of namespace binary
 
-/////////////////////////////// CUDA reduce operators
-//////////////////////////////////
+/////////////////////////// CUDA reduce operators //////////////////////////////
 namespace reduce {
 template <typename Idx, typename DType, bool atomic>
 struct _Sum {

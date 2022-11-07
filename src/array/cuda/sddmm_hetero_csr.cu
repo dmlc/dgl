@@ -11,8 +11,7 @@ namespace dgl {
 namespace aten {
 
 /**
- * @brief CUDA implementation of g-SDDMM on heterograph using
-    Csr format.
+ * @brief CUDA implementation of g-SDDMM on heterograph using Csr format.
  */
 template <int XPU, typename IdType, typename DType>
 void SDDMMCsrHetero(

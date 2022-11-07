@@ -1079,8 +1079,8 @@ DGLIdIters UnitGraph::InEdgeVec(dgl_type_t etype, dgl_id_t vid) const {
 std::vector<IdArray> UnitGraph::GetAdj(
     dgl_type_t etype, bool transpose, const std::string& fmt) const {
   // TODO(minjie): Our current semantics of adjacency matrix is row for dst
-  // nodes and col for
-  //   src nodes. Therefore, we need to flip the transpose flag. For example,
+  // nodes and col for src nodes. Therefore, we need to flip the transpose flag.
+  // For example,
   //   transpose=False is equal to in edge CSR. We have this behavior because
   //   previously we use framework's SPMM and we don't cache reverse adj. This
   //   is not intuitive and also not consistent with networkx's

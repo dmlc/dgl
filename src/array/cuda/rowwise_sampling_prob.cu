@@ -457,9 +457,10 @@ COOMatrix _COORemoveIf(
 
 /**
  * @brief Perform weighted row-wise sampling on a CSR matrix, and generate a COO
- * matrix. Use CDF sampling algorithm for with replacement: 1) Calculate the CDF
- * of all neighbor's prob. 2) For each [0, num_picks), generate a rand ~ U(0,
- * 1). Use binary search to find its index in the CDF array as a chosen item.
+ * matrix. Use CDF sampling algorithm for with replacement:
+ *   1) Calculate the CDF of all neighbor's prob.
+ *   2) For each [0, num_picks), generate a rand ~ U(0, 1). Use binary search to
+ *      find its index in the CDF array as a chosen item.
  * Use A-Res sampling algorithm for without replacement:
  *   1) For rows with deg > num_picks, calculate A-Res values for all neighbors.
  *   2) Sort the A-Res array and select top-num_picks as chosen items.
@@ -577,9 +578,9 @@ COOMatrix _CSRRowWiseSampling(
 
   // allocate workspace
   // 1) for w/ replacement, it's a global buffer to store cdf segments (one
-  // segment for each row). 2) for w/o replacement, it's used to store a-res
-  // segments (one segment for
-  //    each row with degree > num_picks)
+  // segment for each row).
+  // 2) for w/o replacement, it's used to store a-res segments (one segment for
+  // each row with degree > num_picks)
   FloatType* temp = static_cast<FloatType*>(
       device->AllocWorkspace(ctx, temp_len * sizeof(FloatType)));
 

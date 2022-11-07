@@ -63,43 +63,43 @@ operator/(const __half& lh, const __half& rh) {
 }
 
 __device__ __forceinline__ __half& operator+=(
-    __half& lh, const __half& rh) {  // NOLINT
-  lh = __half(float(lh) + float(rh));
-  return lh;  // NOLINT
+    __half& lh, const __half& rh) {
+  lh = __half(float(lh) + float(rh));  // NOLINT
+  return lh;
 }
 __device__ __forceinline__ __half& operator-=(
-    __half& lh, const __half& rh) {  // NOLINT
-  lh = __half(float(lh) - float(rh));
-  return lh;  // NOLINT
+    __half& lh, const __half& rh) {
+  lh = __half(float(lh) - float(rh));  // NOLINT
+  return lh;
 }
 __device__ __forceinline__ __half& operator*=(
-    __half& lh, const __half& rh) {  // NOLINT
-  lh = __half(float(lh) * float(rh));
-  return lh;  // NOLINT
+    __half& lh, const __half& rh) {
+  lh = __half(float(lh) * float(rh));  // NOLINT
+  return lh;
 }
 __device__ __forceinline__ __half& operator/=(
-    __half& lh, const __half& rh) {  // NOLINT
-  lh = __half(float(lh) / float(rh));
-  return lh;  // NOLINT
+    __half& lh, const __half& rh) {
+  lh = __half(float(lh) / float(rh));  // NOLINT
+  return lh;
 }
 
-__device__ __forceinline__ __half& operator++(__half& h) {  // NOLINT
-  h = __half(float(h) + 1.0f);
-  return h;  // NOLINT
+__device__ __forceinline__ __half& operator++(__half& h) {
+  h = __half(float(h) + 1.0f);  // NOLINT
+  return h;
 }
-__device__ __forceinline__ __half& operator--(__half& h) {  // NOLINT
-  h = __half(float(h) - 1.0f);
-  return h;  // NOLINT
+__device__ __forceinline__ __half& operator--(__half& h) {
+  h = __half(float(h) - 1.0f);  // NOLINT
+  return h;
 }
-__device__ __forceinline__ __half operator++(__half& h, int) {  // NOLINT
+__device__ __forceinline__ __half operator++(__half& h, int) {
   __half ret = h;
-  h = __half(float(h) + 1.0f);
-  return ret;  // NOLINT
+  h = __half(float(h) + 1.0f);  // NOLINT
+  return ret;
 }
-__device__ __forceinline__ __half operator--(__half& h, int) {  // NOLINT
+__device__ __forceinline__ __half operator--(__half& h, int) {
   __half ret = h;
-  h = __half(float(h) - 1.0f);
-  return ret;  // NOLINT
+  h = __half(float(h) - 1.0f);  // NOLINT
+  return ret;
 }
 
 __device__ __forceinline__ __half operator+(const __half& h) { return h; }

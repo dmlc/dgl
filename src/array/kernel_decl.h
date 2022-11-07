@@ -28,7 +28,7 @@ void SpMMCsr(
 
 /**
  * @brief Generalized Sparse Matrix Dense Matrix Multiplication on Csr format
- with heterograph support.
+ * with heterograph support.
  */
 template <int XPU, typename IdType, typename DType>
 void SpMMCsrHetero(
@@ -55,9 +55,9 @@ void SDDMMCsr(
     const std::string& op, const BcastOff& bcast, const aten::CSRMatrix& csr,
     NDArray lhs, NDArray rhs, NDArray out, int lhs_target, int rhs_target);
 /**
- * @brief Generalized Sampled Dense-Dense Matrix Multiplication on Csr
- format with heterograph support.
-  */
+ * @brief Generalized Sampled Dense-Dense Matrix Multiplication on Csr format
+ * with heterograph support.
+ */
 template <int XPU, typename IdType, typename DType>
 void SDDMMCsrHetero(
     const std::string& op, const BcastOff& bcast,
@@ -75,9 +75,9 @@ void SDDMMCoo(
     NDArray lhs, NDArray rhs, NDArray out, int lhs_target, int rhs_target);
 
 /**
- * @brief Generalized Sampled Dense-Dense Matrix Multiplication on Coo
- format with heterograph support.
-  */
+ * @brief Generalized Sampled Dense-Dense Matrix Multiplication on Coo format
+ * with heterograph support.
+ */
 template <int XPU, typename IdType, typename DType>
 void SDDMMCooHetero(
     const std::string& op, const BcastOff& bcast,

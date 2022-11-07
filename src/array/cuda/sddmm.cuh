@@ -169,7 +169,6 @@ __global__ void SDDMMCooTreeReduceKernel(
       const Idx lhs_add = UseBcast ? __ldg(lhs_off + i) : i;
       const Idx rhs_add = UseBcast ? __ldg(rhs_off + i) : i;
       DType val = reduce::Sum<Idx, DType>::zero();
-      ;
       for (int j = tx; j < reduce_size; j += 64) {
         val += lhsoff[lhs_add * reduce_size + j] *
                rhsoff[rhs_add * reduce_size + j];
