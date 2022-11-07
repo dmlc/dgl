@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2022 by Contributors
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,8 +13,8 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
- * \file array/cuda/bf16.cuh
- * \brief bfloat16 related functions.
+ * @file array/cuda/bf16.cuh
+ * @brief bfloat16 related functions.
  */
 #ifndef DGL_ARRAY_CUDA_BF16_CUH_
 #define DGL_ARRAY_CUDA_BF16_CUH_
@@ -65,46 +65,46 @@ operator/(const __nv_bfloat16& lh, const __nv_bfloat16& rh) {
 
 __device__ __forceinline__ __nv_bfloat16& operator+=(
     __nv_bfloat16& lh, const __nv_bfloat16& rh) {  // NOLINT
-  lh = __nv_bfloat16(float(lh) + float(rh));
-  return lh;  // NOLINT
+  lh = __nv_bfloat16(float(lh) + float(rh));       // NOLINT
+  return lh;
 }
 __device__ __forceinline__ __nv_bfloat16& operator-=(
     __nv_bfloat16& lh, const __nv_bfloat16& rh) {  // NOLINT
-  lh = __nv_bfloat16(float(lh) - float(rh));
-  return lh;  // NOLINT
+  lh = __nv_bfloat16(float(lh) - float(rh));       // NOLINT
+  return lh;
 }
 __device__ __forceinline__ __nv_bfloat16& operator*=(
     __nv_bfloat16& lh, const __nv_bfloat16& rh) {  // NOLINT
-  lh = __nv_bfloat16(float(lh) * float(rh));
-  return lh;  // NOLINT
+  lh = __nv_bfloat16(float(lh) * float(rh));       // NOLINT
+  return lh;
 }
 __device__ __forceinline__ __nv_bfloat16& operator/=(
     __nv_bfloat16& lh, const __nv_bfloat16& rh) {  // NOLINT
-  lh = __nv_bfloat16(float(lh) / float(rh));
-  return lh;  // NOLINT
+  lh = __nv_bfloat16(float(lh) / float(rh));       // NOLINT
+  return lh;
 }
 
 __device__ __forceinline__ __nv_bfloat16& operator++(
-    __nv_bfloat16& h) {  // NOLINT
-  h = __nv_bfloat16(float(h) + 1.0f);
-  return h;  // NOLINT
+    __nv_bfloat16& h) {                // NOLINT
+  h = __nv_bfloat16(float(h) + 1.0f);  // NOLINT
+  return h;
 }
 __device__ __forceinline__ __nv_bfloat16& operator--(
-    __nv_bfloat16& h) {  // NOLINT
-  h = __nv_bfloat16(float(h) - 1.0f);
-  return h;  // NOLINT
+    __nv_bfloat16& h) {                // NOLINT
+  h = __nv_bfloat16(float(h) - 1.0f);  // NOLINT
+  return h;
 }
 __device__ __forceinline__ __nv_bfloat16
 operator++(__nv_bfloat16& h, int) {  // NOLINT
   __nv_bfloat16 ret = h;
-  h = __nv_bfloat16(float(h) + 1.0f);
-  return ret;  // NOLINT
+  h = __nv_bfloat16(float(h) + 1.0f);  // NOLINT
+  return ret;
 }
 __device__ __forceinline__ __nv_bfloat16
 operator--(__nv_bfloat16& h, int) {  // NOLINT
   __nv_bfloat16 ret = h;
-  h = __nv_bfloat16(float(h) - 1.0f);
-  return ret;  // NOLINT
+  h = __nv_bfloat16(float(h) - 1.0f);  // NOLINT
+  return ret;
 }
 
 __device__ __forceinline__ __nv_bfloat16 operator+(const __nv_bfloat16& h) {
