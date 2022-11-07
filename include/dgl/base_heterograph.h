@@ -289,7 +289,8 @@ class BaseHeteroGraph : public runtime::Object {
    * in the arbitrary order.
    * @param etype The edge type
    * @param order The order
-   * of the returned edge list. \return the id arrays of the two endpoints of
+   * of the returned edge list.
+   * @return the id arrays of the two endpoints of
    * the edges.
    */
   virtual EdgeArray Edges(
@@ -481,7 +482,8 @@ class BaseHeteroGraph : public runtime::Object {
    *
    * @param eids The edges in the subgraph.
    * @param preserve_nodes If true, the vertices will not be relabeled, so some
-   * vertices may have no incident edges. \return the subgraph.
+   * vertices may have no incident edges.
+   * @return the subgraph.
    */
   virtual HeteroSubgraph EdgeSubgraph(
       const std::vector<IdArray>& eids, bool preserve_nodes = false) const = 0;
@@ -717,7 +719,8 @@ HeteroGraphPtr CreateFromCSC(
  * @param graph Graph
  * @param nodes Node IDs of each type
  * @param relabel_nodes Whether to remove isolated nodes and relabel the rest
- * ones \return Subgraph containing only the in edges. The returned graph has
+ * ones
+ * @return Subgraph containing only the in edges. The returned graph has
  * the same schema as the original one.
  */
 HeteroSubgraph InEdgeGraph(
@@ -729,7 +732,8 @@ HeteroSubgraph InEdgeGraph(
  * @param graph Graph
  * @param nodes Node IDs of each type
  * @param relabel_nodes Whether to remove isolated nodes and relabel the rest
- * ones \return Subgraph containing only the out edges. The returned graph has
+ * ones
+ * @return Subgraph containing only the out edges. The returned graph has
  * the same schema as the original one.
  */
 HeteroSubgraph OutEdgeGraph(

@@ -37,7 +37,8 @@ namespace {
  * @param step The random walk step function with
  * type \c StepFunc.
  * @param max_nodes Throws an error if one of the values in \c
- * seeds exceeds this argument. \return A 2D array of shape (len(seeds),
+ * seeds exceeds this argument.
+ * @return A 2D array of shape (len(seeds),
  * max_num_steps + 1) with node IDs. \note The graph itself should be bounded in
  * the closure of \c step.
  */

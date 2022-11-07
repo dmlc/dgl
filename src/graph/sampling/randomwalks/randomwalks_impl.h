@@ -52,7 +52,8 @@ TypeArray GetNodeTypesFromMetapath(
  * representing the metapath.
  * @param prob A vector of 1D float arrays,
  * indicating the transition probability of each edge by edge type.  An empty
- * float array assumes uniform transition. \return A 2D array of shape
+ * float array assumes uniform transition.
+ * @return A 2D array of shape
  * (len(seeds), len(metapath) + 1) with node IDs.  The paths that terminated
  * early are padded with -1. A 2D array of shape (len(seeds), len(metapath))
  * with edge IDs.  The paths that terminated early are padded with -1. \note
@@ -75,7 +76,8 @@ std::pair<IdArray, IdArray> RandomWalk(
  * indicating the transition probability of each edge by edge type.  An empty
  * float array assumes uniform transition.
  * @param restart_prob Restart
- * probability \return A 2D array of shape (len(seeds), len(metapath) + 1) with
+ * probability
+ * @return A 2D array of shape (len(seeds), len(metapath) + 1) with
  * node IDs.  The paths that terminated early are padded with -1. A 2D array of
  * shape (len(seeds), len(metapath)) with edge IDs.  The paths that terminated
  * early are padded with -1. \note This function should be called together with
@@ -100,7 +102,8 @@ std::pair<IdArray, IdArray> RandomWalkWithRestart(
  * float array assumes uniform transition.
  * @param restart_prob Restart
  * probability array which has the same number of elements as \c metapath,
- * indicating the probability to terminate after transition. \return A 2D array
+ * indicating the probability to terminate after transition.
+ * @return A 2D array
  * of shape (len(seeds), len(metapath) + 1) with node IDs.  The paths that
  * terminated early are padded with -1. A 2D array of shape (len(seeds),
  * len(metapath)) with edge IDs.  The paths that terminated early are padded

@@ -61,7 +61,8 @@ bool has_edge_between(const CSRMatrix &csr, dgl_id_t u, dgl_id_t v) {
  * @param csr The CSR matrix
  * @param prob Transition probability
  * @param
- * terminate Predicate for terminating the current random walk path. \return A
+ * terminate Predicate for terminating the current random walk path.
+ * @return A
  * tuple of ID of next successor (-1 if not exist), the edge ID traversed, as
  * well as whether to terminate.
  */

@@ -255,7 +255,8 @@ class HeteroGraph : public BaseHeteroGraph {
    */
   void RecordStream(DGLStreamHandle stream) override;
 
-  /** @brief Copy the data to shared memory.
+  /**
+   * @brief Copy the data to shared memory.
    *
    * Also save names of node types and edge types of the HeteroGraph object to
    * shared memory
@@ -266,8 +267,10 @@ class HeteroGraph : public BaseHeteroGraph {
       const std::vector<std::string>& etypes,
       const std::set<std::string>& fmts);
 
-  /** @brief Create a heterograph from
-   *   \return the HeteroGraphPtr, names of node types, names of edge types
+  /**
+   * @brief Create a heterograph from
+   *
+   * @return the HeteroGraphPtr, names of node types, names of edge types
    */
   static std::tuple<
       HeteroGraphPtr, std::vector<std::string>, std::vector<std::string>>
@@ -296,11 +299,14 @@ class HeteroGraph : public BaseHeteroGraph {
   /** @brief The shared memory object for meta info*/
   std::shared_ptr<runtime::SharedMemory> shared_mem_;
 
-  /** @brief The name of the shared memory. Return empty string if it is not in
-   * shared memory. */
+  /**
+   * @brief The name of the shared memory. Return empty string if it is not in
+   * shared memory.
+    */
   std::string SharedMemName() const;
 
-  /** @brief template class for Flatten operation
+  /**
+   * @brief template class for Flatten operation
    *
    * @tparam IdType Graph's index data type, can be int32_t or int64_t
    * @param etypes vector of etypes to be falttened
