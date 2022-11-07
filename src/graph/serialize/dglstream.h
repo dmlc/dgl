@@ -9,6 +9,7 @@
 #include <dgl/aten/spmat.h>
 #include <dmlc/io.h>
 #include <dmlc/type_traits.h>
+
 #include <memory>
 
 namespace dgl {
@@ -21,8 +22,9 @@ namespace serialize {
 class DGLStream : public dmlc::Stream {
  public:
   /*! \brief create a new DGLStream instance */
-  static DGLStream *Create(const char *uri, const char *const flag,
-                                  bool allow_null, dgl_format_code_t formats) {
+  static DGLStream *Create(
+      const char *uri, const char *const flag, bool allow_null,
+      dgl_format_code_t formats) {
     return new DGLStream(uri, flag, allow_null, formats);
   }
 
@@ -45,10 +47,11 @@ class DGLStream : public dmlc::Stream {
   uint64_t FormatsToSave() const { return formats_to_save_; }
 
  private:
-  DGLStream(const char *uri, const char *const flag, bool allow_null,
-                   dgl_format_code_t formats)
-      : strm_(dmlc::Stream::Create(uri, flag, allow_null)), formats_to_save_(formats) {
-  }
+  DGLStream(
+      const char *uri, const char *const flag, bool allow_null,
+      dgl_format_code_t formats)
+      : strm_(dmlc::Stream::Create(uri, flag, allow_null)),
+        formats_to_save_(formats) {}
   // stream for serialization
   std::unique_ptr<dmlc::Stream> strm_;
   // size of already written to stream
