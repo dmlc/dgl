@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
- * \file graph/serialize/dglstream.h
- * \brief Graph serialization header
+ * @file graph/serialize/dglstream.h
+ * @brief Graph serialization header
  */
 #ifndef DGL_GRAPH_SERIALIZE_DGLSTREAM_H_
 #define DGL_GRAPH_SERIALIZE_DGLSTREAM_H_
@@ -15,13 +15,13 @@
 namespace dgl {
 namespace serialize {
 
-/*!
- * \brief DGLStream counts the bytes that already written into the
+/**
+ * @brief DGLStream counts the bytes that already written into the
  * underlying stream.
  */
 class DGLStream : public dmlc::Stream {
  public:
-  /*! \brief create a new DGLStream instance */
+  /** @brief create a new DGLStream instance */
   static DGLStream *Create(
       const char *uri, const char *const flag, bool allow_null,
       dgl_format_code_t formats) {
