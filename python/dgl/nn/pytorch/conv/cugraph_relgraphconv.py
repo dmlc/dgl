@@ -1,6 +1,6 @@
 """Torch Module for Relational graph convolution layer using the
 aggregation primitives in cugraph-ops"""
-# pylint: disable= no-member, arguments-differ, invalid-name
+# pylint: disable=no-member, arguments-differ, invalid-name, too-many-arguments
 import math
 
 import torch as th
@@ -159,8 +159,19 @@ class RelGraphConvAgg(th.autograd.Function):
 
 
 class CuGraphRelGraphConv(nn.Module):
-    r"""Relational graph convolution layer using the aggregation
-    functions in cugraph-ops.
+    r"""An accelerated relational graph convolution layer using the
+    highly-optimized aggregation primitives in cugraph-ops.
+    See :class:`dgl.nn.pytorch.conv.RelGraphConv` for mathematical model.
+
+    .. note::
+        This is an **experimental** feature.
+        Compared with :class:`dgl.nn.pytorch.conv.RelGraphConv`, this model:
+
+        * Only works on cuda devices.
+        * Only support basis-decomposition regularization.
+        * Requires an extra argument `fanout` as input, since the current model is
+          designed for sampled-graph (message-flow-graph) use-cases.
+          Full-graph support will be added in upcoming releases.
 
     Parameters
     ----------
@@ -198,7 +209,7 @@ class CuGraphRelGraphConv(nn.Module):
     >>> from dgl.dataloading import NeighborSampler, DataLoader
     >>> from dgl.nn import CuGraphRelGraphConv
     >>> import torch.nn.functional as F
-    >>>
+    ...
     >>> device = 'cuda'
     >>> fanouts = [5, 6]
     >>> sampler = NeighborSampler(fanouts)
@@ -315,11 +326,6 @@ class CuGraphRelGraphConv(nn.Module):
             An 1D integer tensor of edge types. Shape: :math:`(|E|,)`.
         norm : torch.Tensor, optional
             An 1D tensor of edge norm value.  Shape: :math:`(|E|,)`.
-        presorted : bool, optional
-            Whether the edges of the input graph have been sorted by their
-            types. Forward on pre-sorted graph may be faster. Graphs created
-            by :func:`~dgl.to_homogeneous` automatically satisfy the condition.
-            Also see :func:`~dgl.reorder_graph` for sorting edges manually.
 
         Returns
         -------
@@ -329,7 +335,7 @@ class CuGraphRelGraphConv(nn.Module):
         _device = next(self.parameters()).device
         if _device.type != "cuda":
             raise RuntimeError(
-                f"dgl.contrib.cugraph.nn.RelGraphConv requires "
+                f"dgl.nn.CuGraphRelGraphConv requires "
                 f"the model on device 'cuda', but got '{_device.type}'"
             )
         if _device != g.device:
