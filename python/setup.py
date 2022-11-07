@@ -58,9 +58,22 @@ def get_ta_lib_pattern():
     return ta_lib_pattern
 
 
+def get_dgl_sparse_pattern():
+    if sys.platform.startswith("linux"):
+        dgl_sparse_lib_pattern = "libdgl_sparse_*.so"
+    elif sys.platform.startswith("darwin"):
+        dgl_sparse_lib_pattern = "libdgl_sparse_*.dylib"
+    elif sys.platform.startswith("win"):
+        dgl_sparse_lib_pattern = "dgl_sparse_*.dll"
+    else:
+        raise NotImplementedError("Unsupported system: %s" % sys.platform)
+    return dgl_sparse_lib_pattern
+
+
 LIBS, VERSION = get_lib_path()
 BACKENDS = ["pytorch"]
 TA_LIB_PATTERN = get_ta_lib_pattern()
+SPARSE_LIB_PATTERN = get_dgl_sparse_pattern()
 
 
 def cleanup():
@@ -86,6 +99,17 @@ def cleanup():
                 os.remove(ta_path)
             except BaseException:
                 pass
+
+        if backend == "pytorch":
+            for sparse_path in glob.glob(
+                os.path.join(
+                    CURRENT_DIR, "dgl", "dgl_sparse", SPARSE_LIB_PATTERN
+                )
+            ):
+                try:
+                    os.remove(sparse_path)
+                except BaseException:
+                    pass
 
 
 def config_cython():
@@ -176,6 +200,23 @@ if wheel_include_libs:
                 fo.write(
                     "include dgl/tensoradapter/%s/%s\n" % (backend, ta_name)
                 )
+            if backend == 'pytorch':
+                for sparse_path in glob.glob(
+                    os.path.join(dir_, "dgl_sparse", SPARSE_LIB_PATTERN)
+                ):
+                    sparse_name = os.path.basename(sparse_path)
+                    os.makedirs(
+                        os.path.join(CURRENT_DIR, "dgl", "dgl_sparse"),
+                        exist_ok=True,
+                    )
+                    shutil.copy(
+                        os.path.join(dir_, "dgl_sparse", sparse_name),
+                        os.path.join(CURRENT_DIR, "dgl", "dgl_sparse"),
+                    )
+                    fo.write(
+                        "include dgl/dgl_sparse/%s\n" % sparse_name
+                    )
+
 
     setup_kwargs = {"include_package_data": True}
 
@@ -199,6 +240,19 @@ if include_libs:
                     ),
                 )
             )
+            if backend == 'pytorch':
+                data_files.append(
+                    (
+                        "dgl/dgl_sparse",
+                        glob.glob(
+                            os.path.join(
+                                os.path.dirname(os.path.relpath(path, CURRENT_DIR)),
+                                "dgl_sparse",
+                                SPARSE_LIB_PATTERN,
+                            )
+                        ),
+                    )
+                )
     setup_kwargs = {"include_package_data": True, "data_files": data_files}
 
 setup(
