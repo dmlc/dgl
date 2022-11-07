@@ -18,7 +18,7 @@ if (CUDA_VERSION_MAJOR GREATER_EQUAL "11")
 endif()
 # CMake 3.5 doesn't support VERSION_GREATER_EQUAL
 if (NOT CUDA_VERSION VERSION_LESS "11.8")
-list(APPEND dgl_known_gpu_archs "90")
+  list(APPEND dgl_known_gpu_archs "90")
   set(dgl_cuda_arch_ptx "90")
 endif()
 
@@ -73,6 +73,7 @@ set(CUDA_gpu_detect_output "")
       message(STATUS "Found GPU arch ${__nvcc_out}")
       string(REGEX MATCH "([1-9].[0-9])" __nvcc_out "${__nvcc_out}")
       if(__nvcc_out VERSION_LESS "3.5")
+        # drop support for cc < 3.5 and build for all known archs.
         message(WARNING "GPU arch is too old to support.")
       else()
         set(CUDA_gpu_detect_output ${__nvcc_out} CACHE INTERNAL "Returned GPU architetures from mshadow_detect_gpus tool" FORCE)
@@ -96,7 +97,7 @@ endfunction()
 # Usage:
 #   dgl_select_nvcc_arch_flags(out_variable)
 function(dgl_select_nvcc_arch_flags out_variable)
-  # List of arch names
+  # List of arch names. Turing and Ada don't have a new major version, so they are not added to default build.
   set(__archs_names "Kepler" "Maxwell" "Pascal" "Volta" "Turing" "Ampere" "Ada" "Hopper" "All" "Manual")
   set(__archs_name_default "All")
   if(NOT CMAKE_CROSSCOMPILING)
@@ -153,6 +154,8 @@ function(dgl_select_nvcc_arch_flags out_variable)
     set(__cuda_arch_ptx ${dgl_cuda_arch_ptx})
   elseif(${CUDA_ARCH_NAME} STREQUAL "Auto")
     dgl_detect_installed_gpus(__cuda_arch_bin)
+    # if detect successes, __cuda_arch_ptx = __cuda_arch_bin
+    # if detect fails, __cuda_arch_ptx is the latest arch in __cuda_arch_bin
     list(GET __cuda_arch_bin -1 __cuda_arch_ptx)
   else()  # (${CUDA_ARCH_NAME} STREQUAL "Manual")
     set(__cuda_arch_bin ${CUDA_ARCH_BIN})
