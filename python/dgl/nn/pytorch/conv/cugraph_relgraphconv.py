@@ -43,25 +43,22 @@ class RelGraphConvAgg(th.autograd.Function):
         num_rels : int
             Number of relations.
         edge_types : torch.Tensor
-            A 1D tensor of edge types. Note that pylibcugraphops only accepts
-            edge_types in int32, so any input of other integer types will be
-            casted into int32, thus introducing some overhead. Pass in int32
-            tensor for best performance.
+            A 1D tensor of edge types.
         max_in_degree : int
             Maximum number of sampled neighbors of a destination node.
         feat : torch.Tensor
-            Tensor of source node features. Shape: (num_src_nodes, in_feat).
+            A 2D tensor of node features. Shape: (num_src_nodes, in_feat).
         coeff : torch.Tensor
-            The coefficient matrix used in basis-decomposition regularization.
-            Shape: (num_rels, num_bases). It should be set to ``None``
-            when no regularization is applied.
+            A 2D tensor of the coefficient matrix used in basis-decomposition
+            regularization. Shape: (num_rels, num_bases). It should be set to
+            ``None`` when no regularization is applied.
 
         Returns
         -------
         agg_output : torch.Tensor
-            Aggregation output. Shape: (num_dst_nodes, num_rels * in_feat)
-            when ``coeff=None``; Shape: (num_dst_nodes, num_bases * in_feat)
-            otherwise.
+            A 2D tensor of aggregation output. Shape: (num_dst_nodes,
+            num_rels * in_feat) when ``coeff=None``; Shape: (num_dst_nodes,
+            num_bases * in_feat) otherwise.
         """
         if g.idtype == th.int32:
             mfg_csr_func = message_flow_graph_hg_csr_int32
@@ -130,7 +127,7 @@ class RelGraphConvAgg(th.autograd.Function):
         Parameters
         ----------
         grad_output : torch.Tensor
-            Gradient of loss function w.r.t output.
+            A 2D tensor of the gradient of loss function w.r.t output.
         """
         feat, coeff = ctx.saved_tensors
 
@@ -326,6 +323,10 @@ class CuGraphRelGraphConv(nn.Module):
             A 2D tensor of node features. Shape: :math:`(|V|, D_{in})`.
         etypes : torch.Tensor
             A 1D integer tensor of edge types. Shape: :math:`(|E|,)`.
+            Note that cugraph-ops only accepts edge type tensors in int32,
+            so any input of other integer types will be casted into int32,
+            thus introducing some overhead. Pass in int32 tensors directly
+            for best performance.
         norm : torch.Tensor, optional
             A 1D tensor of edge norm value.  Shape: :math:`(|E|,)`.
 
