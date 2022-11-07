@@ -124,7 +124,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     device = torch.device("cuda")
-    print(f"Training with DGL cugraph.nn RGCN module with sampling.")
+    print(f"Training with DGL CuGraphRelGraphConv module with sampling.")
 
     # load and preprocess dataset
     if args.dataset == "aifb":
