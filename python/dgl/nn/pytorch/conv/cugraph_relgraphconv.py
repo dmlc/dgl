@@ -1,5 +1,5 @@
-"""Torch Module for Relational graph convolution layer using the
-aggregation primitives in cugraph-ops"""
+"""Torch Module for Relational graph convolution layer using the aggregation
+primitives in cugraph-ops"""
 # pylint: disable=no-member, arguments-differ, invalid-name, too-many-arguments
 import math
 
@@ -22,6 +22,9 @@ except ModuleNotFoundError:
         "dgl.nn.CuGraphRelGraphConv requires pylibcugraphops to be installed."
     )
 
+# Maximum amount of shared memory per thread block used by cugraph-ops is 48KB.
+# TODO(tingyu66): raise a more informative error message in cugraph-ops to
+# skip the size check in nn.Module.
 CUDA_SM_PER_BLOCK = 49152
 
 
@@ -43,22 +46,22 @@ class RelGraphConvAgg(th.autograd.Function):
             Number of relations.
         edge_types : torch.Tensor
             A 1D tensor of edge types. Note that pylibcugraphops only accepts
-            edge_types in int32, so any input of other integer types will be casted
-            into int32, thus introducing some overhead. Pass in int32 tensor for
-            best performance.
-        feat : torch.Tensor, dtype=torch.float32, requires_grad=True
+            edge_types in int32, so any input of other integer types will be
+            casted into int32, thus introducing some overhead. Pass in int32
+            tensor for best performance.
+        feat : torch.Tensor
             Tensor of source node features. Shape: (num_src_nodes, in_feat).
-        coeff : torch.Tensor, dtype=torch.float32, requires_grad=True
+        coeff : torch.Tensor
             The coefficient matrix used in basis-decomposition regularization.
             Shape: (num_rels, num_bases). It should be set to ``None``
-            when ``regularizer=None``.
+            when no regularization is applied.
 
         Returns
         -------
         agg_output : torch.Tensor, dtype=torch.float32
             Aggregation output. Shape: (num_dst_nodes, num_rels * in_feat)
-            when ``regularizer=None``; Shape: (num_dst_nodes, num_bases * in_feat)
-            when ``regularizer='basis'``.
+            when ``coeff=None``; Shape: (num_dst_nodes, num_bases * in_feat)
+            otherwise.
         """
         ctx.device = g.device
         if g.idtype == th.int32:
@@ -69,17 +72,16 @@ class RelGraphConvAgg(th.autograd.Function):
             agg_fwd_func = agg_hg_basis_post_fwd_int64
         else:
             raise TypeError(
-                f"Supported ID type: torch.int32 or torch.int64, "
-                f"but got {g.idtype}"
+                f"Supported ID type: torch.int32 or torch.int64, but got "
+                f"{g.idtype}."
             )
         ctx.idtype = g.idtype
 
         _in_feat = feat.shape[-1]
         indptr, indices, edge_ids = g.adj_sparse("csc")
-        # edge_ids is in a mixed order, need to permutate incoming etypes
-        # and stash the result for backward propagation
+        # Edge_ids is in a mixed order, need to permutate incoming etypes.
         ctx.edge_types_int32 = edge_types[edge_ids.long()].int()
-        # node_types are not needed by the post-variant RGCN aggregation functions
+        # Node_types are not being used in agg_fwd_func.
         _num_node_types = 0
         _out_node_types = _in_node_types = None
 
@@ -168,9 +170,9 @@ class CuGraphRelGraphConv(nn.Module):
         Compared with :class:`dgl.nn.pytorch.conv.RelGraphConv`, this model:
 
         * Only works on cuda devices.
-        * Only support basis-decomposition regularization.
-        * Requires an extra argument `fanout` as input, since the current model is
-          designed for sampled-graph (message-flow-graph) use-cases.
+        * Only supports basis-decomposition regularization.
+        * Requires an extra argument `fanout` as input, since the current model
+          is designed for sampled-graph (message-flow-graph) use-cases.
           Full-graph support will be added in upcoming releases.
 
     Parameters
@@ -244,7 +246,7 @@ class CuGraphRelGraphConv(nn.Module):
         self.num_rels = num_rels
         self.fanout = fanout
 
-        # regularizer (see dgl.nn.pytorch.linear.TypedLinear)
+        # regularizer
         if regularizer is None:
             self.W = nn.Parameter(th.Tensor(num_rels, in_feat, out_feat))
             self.coeff = None
@@ -258,8 +260,8 @@ class CuGraphRelGraphConv(nn.Module):
             self.num_bases = num_bases
         else:
             raise ValueError(
-                f"Supported regularizer options: 'basis', "
-                f"but got {regularizer}"
+                f"Supported regularizer options: 'basis', but got "
+                f"{regularizer}."
             )
         self.regularizer = regularizer
         self.reset_parameters()
@@ -336,24 +338,24 @@ class CuGraphRelGraphConv(nn.Module):
         if _device.type != "cuda":
             raise RuntimeError(
                 f"dgl.nn.CuGraphRelGraphConv requires "
-                f"the model on device 'cuda', but got '{_device.type}'"
+                f"the model on device 'cuda', but got '{_device.type}'."
             )
         if _device != g.device:
             raise RuntimeError(
                 f"Expected model and graph on the same device, "
-                f"but got '{_device}' and '{g.device}'"
+                f"but got '{_device}' and '{g.device}'."
             )
         if _device != etypes.device:
             raise RuntimeError(
                 f"Expected model and etypes on the same device, "
-                f"but got '{_device}' and '{etypes.device}'"
+                f"but got '{_device}' and '{etypes.device}'."
             )
         if _device != feat.device:
             raise RuntimeError(
                 f"Expected model and feature tensor on the same device, "
-                f"but got '{_device}' and '{feat.device}'"
+                f"but got '{_device}' and '{feat.device}'."
             )
-        # check shared memory per block size
+        # Check shared memory per block size.
         _sm_size = (
             self.fanout * 2 + 3 + self.num_rels * self.num_bases
             if self.regularizer == "basis"
