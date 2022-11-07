@@ -58,7 +58,7 @@ class RelGraphConvAgg(th.autograd.Function):
 
         Returns
         -------
-        agg_output : torch.Tensor, dtype=torch.float32
+        agg_output : torch.Tensor
             Aggregation output. Shape: (num_dst_nodes, num_rels * in_feat)
             when ``coeff=None``; Shape: (num_dst_nodes, num_bases * in_feat)
             otherwise.
@@ -130,7 +130,7 @@ class RelGraphConvAgg(th.autograd.Function):
 
         Parameters
         ----------
-        grad_output : torch.Tensor, dtype=torch.float32
+        grad_output : torch.Tensor
             Gradient of loss function w.r.t output.
         """
         feat, coeff = ctx.saved_tensors
@@ -163,6 +163,7 @@ class RelGraphConvAgg(th.autograd.Function):
 class CuGraphRelGraphConv(nn.Module):
     r"""An accelerated relational graph convolution layer using the
     highly-optimized aggregation primitives in cugraph-ops.
+
     See :class:`dgl.nn.pytorch.conv.RelGraphConv` for mathematical model.
 
     .. note::
@@ -184,8 +185,8 @@ class CuGraphRelGraphConv(nn.Module):
     num_rels : int
         Number of relations.
     fanout : int
-        Maximum number of sampled neighbors of an destination node;
-        i.e, maximum in degree of destination nodes
+        Maximum number of sampled neighbors of a destination node,
+        i.e. maximum in degree of destination nodes
     regularizer : str, optional
         Which weight regularizer to use ("basis" or ``None``):
          - "basis" is for basis-decomposition.
@@ -324,7 +325,7 @@ class CuGraphRelGraphConv(nn.Module):
             The graph.
         feat : torch.Tensor
             A 2D tensor of node features. Shape: :math:`(|V|, D_{in})`.
-        etypes : torch.Tensor or list[int]
+        etypes : torch.Tensor
             An 1D integer tensor of edge types. Shape: :math:`(|E|,)`.
         norm : torch.Tensor, optional
             An 1D tensor of edge norm value.  Shape: :math:`(|E|,)`.
