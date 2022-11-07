@@ -213,23 +213,29 @@ inline libxsmm_meltwfunction_opreduce_vecs_idx SpMMCreateLibxsmmKernel(
   // TODO(Steve): fix this long line in a separate PR.
   if (std::is_same<Op, op::CopyLhs<DType>>::value) {
     opredop_flags =
-        (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags | LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OPORDER_VECIDX_VECIN);
+        (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags |
+        LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OPORDER_VECIDX_VECIN);
   } else if (std::is_same<Op, op::CopyRhs<DType>>::value) {
     opredop_flags =
-        (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags | LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OPORDER_VECIN_VECIDX);
+        (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags |
+        LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OPORDER_VECIN_VECIDX);
     if (!has_idx) {
       opredop_flags =
-          (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags | LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_IMPLICIT_INDEXED_VECIDX);
+          (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags |
+          LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_IMPLICIT_INDEXED_VECIDX);
     }
   } else {
     opredop_flags =
-        (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags | LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OPORDER_VECIDX_VECIN);
+        (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags |
+        LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OPORDER_VECIDX_VECIN);
     if (has_idx) {
       opredop_flags =
-          (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags | LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_INDEXED_VEC);
+          (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags |
+          LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_INDEXED_VEC);
     } else {
       opredop_flags =
-          (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags | LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_IMPLICIT_INDEXED_VEC);
+          (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags |
+          LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_IMPLICIT_INDEXED_VEC);
     }
   }
   // Third, we set the Redop in the opredop_flags
@@ -240,11 +246,13 @@ inline libxsmm_meltwfunction_opreduce_vecs_idx SpMMCreateLibxsmmKernel(
   if (is_cmp) {
     if (Op::use_lhs) {
       opredop_flags =
-          (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags | LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_RECORD_ARGOP_OFF_VEC_0);
+          (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags |
+          LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_RECORD_ARGOP_OFF_VEC_0);
     }
     if (Op::use_rhs) {
       opredop_flags =
-          (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags | LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_RECORD_ARGOP_OFF_VEC_1);
+          (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags |
+          LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_RECORD_ARGOP_OFF_VEC_1);
     }
   }
   libxsmm_meltwfunction_opreduce_vecs_idx kernel = nullptr;
