@@ -154,7 +154,7 @@ struct accum_dtype<__half> {
 
 #if BF16_ENABLED
 template <>
-struct accum_dtype<__nvbfloat16> {
+struct accum_dtype<__nv_bfloat16> {
   typedef float type;
 };
 #endif  // BF16_ENABLED
