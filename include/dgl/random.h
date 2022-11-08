@@ -1,5 +1,5 @@
 /**
- *  Copyright (c) 2017 by Contributors
+ * Copyright (c) 2017 by Contributors
  * @file dgl/random.h
  * @brief Random number generators
  */
@@ -96,7 +96,7 @@ class RandomEngine {
   template <typename T>
   T Uniform(T lower, T upper) {
     // Although the result is in [lower, upper), we allow lower == upper as in
-    // www.cplusplus.com/reference/random/uniform_real_distribution/uniform_real_distribution/  // NOLINT
+    // www.cplusplus.com/reference/random/uniform_real_distribution/uniform_real_distribution/
     CHECK_LE(lower, upper);
     std::uniform_real_distribution<T> dist(lower, upper);
     return dist(rng_);
