@@ -47,11 +47,11 @@ class DistEmb(nn.Module):
 
 def load_embs(standalone, emb_layer, g):
     nodes = dgl.distributed.node_split(
-        np.arange(g.number_of_nodes()), g.get_partition_book(), force_even=True
+        np.arange(g.num_nodes()), g.get_partition_book(), force_even=True
     )
     x = dgl.distributed.DistTensor(
         (
-            g.number_of_nodes(),
+            g.num_nodes(),
             emb_layer.module.emb_size
             if isinstance(emb_layer, th.nn.parallel.DistributedDataParallel)
             else emb_layer.emb_size,
@@ -303,7 +303,7 @@ def main(args):
     else:
         dev_id = g.rank() % args.num_gpus
         device = th.device("cuda:" + str(dev_id))
-    labels = g.ndata["labels"][np.arange(g.number_of_nodes())]
+    labels = g.ndata["labels"][np.arange(g.num_nodes())]
     n_classes = len(th.unique(labels[th.logical_not(th.isnan(labels))]))
     print("#labels:", n_classes)
 

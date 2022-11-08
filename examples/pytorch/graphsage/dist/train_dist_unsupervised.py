@@ -60,12 +60,12 @@ class DistSAGE(nn.Module):
         # on each layer are of course splitted in batches.
         # TODO: can we standardize this?
         nodes = dgl.distributed.node_split(
-            np.arange(g.number_of_nodes()),
+            np.arange(g.num_nodes()),
             g.get_partition_book(),
             force_even=True,
         )
         y = dgl.distributed.DistTensor(
-            (g.number_of_nodes(), self.n_hidden),
+            (g.num_nodes(), self.n_hidden),
             th.float32,
             "h",
             persistent=True,
@@ -73,7 +73,7 @@ class DistSAGE(nn.Module):
         for l, layer in enumerate(self.layers):
             if l == len(self.layers) - 1:
                 y = dgl.distributed.DistTensor(
-                    (g.number_of_nodes(), self.n_classes),
+                    (g.num_nodes(), self.n_classes),
                     th.float32,
                     "h_last",
                     persistent=True,
@@ -284,7 +284,7 @@ def run(args, device, data):
                 optimizer.step()
                 update_t.append(time.time() - compute_end)
 
-                pos_edges = pos_graph.number_of_edges()
+                pos_edges = pos_graph.num_edges()
 
                 step_t = time.time() - start
                 step_time.append(step_t)
@@ -359,26 +359,26 @@ def main(args):
         th.distributed.init_process_group(backend="gloo")
     g = dgl.distributed.DistGraph(args.graph_name, part_config=args.part_config)
     print("rank:", g.rank())
-    print("number of edges", g.number_of_edges())
+    print("number of edges", g.num_edges())
 
     train_eids = dgl.distributed.edge_split(
-        th.ones((g.number_of_edges(),), dtype=th.bool),
+        th.ones((g.num_edges(),), dtype=th.bool),
         g.get_partition_book(),
         force_even=True,
     )
     train_nids = dgl.distributed.node_split(
-        th.ones((g.number_of_nodes(),), dtype=th.bool), g.get_partition_book()
+        th.ones((g.num_nodes(),), dtype=th.bool), g.get_partition_book()
     )
     global_train_nid = th.LongTensor(
-        np.nonzero(g.ndata["train_mask"][np.arange(g.number_of_nodes())])
+        np.nonzero(g.ndata["train_mask"][np.arange(g.num_nodes())])
     )
     global_valid_nid = th.LongTensor(
-        np.nonzero(g.ndata["val_mask"][np.arange(g.number_of_nodes())])
+        np.nonzero(g.ndata["val_mask"][np.arange(g.num_nodes())])
     )
     global_test_nid = th.LongTensor(
-        np.nonzero(g.ndata["test_mask"][np.arange(g.number_of_nodes())])
+        np.nonzero(g.ndata["test_mask"][np.arange(g.num_nodes())])
     )
-    labels = g.ndata["labels"][np.arange(g.number_of_nodes())]
+    labels = g.ndata["labels"][np.arange(g.num_nodes())]
     if args.num_gpus == -1:
         device = th.device("cpu")
     else:

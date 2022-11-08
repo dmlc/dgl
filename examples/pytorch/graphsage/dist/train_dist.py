@@ -68,12 +68,12 @@ class DistSAGE(nn.Module):
         # on each layer are of course splitted in batches.
         # TODO: can we standardize this?
         nodes = dgl.distributed.node_split(
-            np.arange(g.number_of_nodes()),
+            np.arange(g.num_nodes()),
             g.get_partition_book(),
             force_even=True,
         )
         y = dgl.distributed.DistTensor(
-            (g.number_of_nodes(), self.n_hidden),
+            (g.num_nodes(), self.n_hidden),
             th.float32,
             "h",
             persistent=True,
@@ -81,14 +81,14 @@ class DistSAGE(nn.Module):
         for l, layer in enumerate(self.layers):
             if l == len(self.layers) - 1:
                 y = dgl.distributed.DistTensor(
-                    (g.number_of_nodes(), self.n_classes),
+                    (g.num_nodes(), self.n_classes),
                     th.float32,
                     "h_last",
                     persistent=True,
                 )
             print(
                 "|V|={}, eval batch size: {}".format(
-                    g.number_of_nodes(), batch_size
+                    g.num_nodes(), batch_size
                 )
             )
 
@@ -351,7 +351,7 @@ def main(args):
         device = th.device("cuda:" + str(dev_id))
     n_classes = args.n_classes
     if n_classes == 0:
-        labels = g.ndata["labels"][np.arange(g.number_of_nodes())]
+        labels = g.ndata["labels"][np.arange(g.num_nodes())]
         n_classes = len(th.unique(labels[th.logical_not(th.isnan(labels))]))
         del labels
     print("#labels:", n_classes)
