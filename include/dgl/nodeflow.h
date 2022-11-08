@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
- * \file dgl/nodeflow.h
- * \brief DGL NodeFlow class.
+ * @file dgl/nodeflow.h
+ * @brief DGL NodeFlow class.
  */
 #ifndef DGL_NODEFLOW_H_
 #define DGL_NODEFLOW_H_
@@ -17,8 +17,8 @@ namespace dgl {
 
 class ImmutableGraph;
 
-/*!
- * \brief A NodeFlow graph stores the sampling results for a sampler that
+/**
+ * @brief A NodeFlow graph stores the sampling results for a sampler that
  * samples nodes/edges in layers.
  *
  * We store multiple layers of the sampling results in a single graph, which
@@ -26,22 +26,22 @@ class ImmutableGraph;
  * node and edge mapping from the NodeFlow graph to the parent graph.
  */
 struct NodeFlowObject : public runtime::Object {
-  /*! \brief The graph. */
+  /** @brief The graph. */
   GraphPtr graph;
-  /*!
-   * \brief the offsets of each layer.
+  /**
+   * @brief the offsets of each layer.
    */
   IdArray layer_offsets;
-  /*!
-   * \brief the offsets of each flow.
+  /**
+   * @brief the offsets of each flow.
    */
   IdArray flow_offsets;
-  /*!
-   * \brief The node mapping from the NodeFlow graph to the parent graph.
+  /**
+   * @brief The node mapping from the NodeFlow graph to the parent graph.
    */
   IdArray node_mapping;
-  /*!
-   * \brief The edge mapping from the NodeFlow graph to the parent graph.
+  /**
+   * @brief The edge mapping from the NodeFlow graph to the parent graph.
    */
   IdArray edge_mapping;
 
@@ -54,14 +54,14 @@ class NodeFlow : public runtime::ObjectRef {
  public:
   DGL_DEFINE_OBJECT_REF_METHODS(NodeFlow, runtime::ObjectRef, NodeFlowObject);
 
-  /*! \brief create a new nodeflow reference */
+  /** @brief create a new nodeflow reference */
   static NodeFlow Create() {
     return NodeFlow(std::make_shared<NodeFlowObject>());
   }
 };
 
-/*!
- * \brief Get a slice on a graph that represents a NodeFlow.
+/**
+ * @brief Get a slice on a graph that represents a NodeFlow.
  *
  * The entire block has to be taken as a slice. Users have to specify the
  * correct starting and ending location of a layer.
@@ -83,14 +83,14 @@ class NodeFlow : public runtime::ObjectRef {
  * If fmt == "coo", the function returns two arrays: idx, eid. Here, the idx
  * array is the concatenation of src and dst node id arrays.
  *
- * \param graph An immutable graph.
- * \param fmt the format of the returned adjacency matrix.
- * \param layer0_size the size of the first layer in the block.
- * \param layer1_start the location where the second layer starts.
- * \param layer1_end the location where the secnd layer ends.
- * \param remap Indicates to remap all vertex ids and edge Ids to local Id
+ * @param graph An immutable graph.
+ * @param fmt the format of the returned adjacency matrix.
+ * @param layer0_size the size of the first layer in the block.
+ * @param layer1_start the location where the second layer starts.
+ * @param layer1_end the location where the secnd layer ends.
+ * @param remap Indicates to remap all vertex ids and edge Ids to local Id
  * space.
- * \return a vector of IdArrays.
+ * @return a vector of IdArrays.
  */
 std::vector<IdArray> GetNodeFlowSlice(
     const ImmutableGraph &graph, const std::string &fmt, size_t layer0_size,

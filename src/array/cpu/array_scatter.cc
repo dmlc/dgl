@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
- * \file array/cpu/array_scatter.cc
- * \brief Array scatter CPU implementation
+ * @file array/cpu/array_scatter.cc
+ * @brief Array scatter CPU implementation
  */
 #include <dgl/array.h>
 #include <dgl/runtime/parallel_for.h>

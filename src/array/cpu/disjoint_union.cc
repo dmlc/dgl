@@ -13,8 +13,8 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  *
- * \file array/cpu/disjoint_union.cc
- * \brief Disjoint union CPU implementation.
+ * @file array/cpu/disjoint_union.cc
+ * @brief Disjoint union CPU implementation.
  */
 
 #include <dgl/array.h>
