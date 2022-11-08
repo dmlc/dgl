@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2022 by Contributors
  * \file sparse/elementwise_op.h
  * \brief DGL C++ sparse elementwise operators
@@ -13,7 +13,7 @@ namespace dgl {
 namespace sparse {
 
 // TODO(zhenkun): support addition of matrices with different sparsity.
-/*!
+/**
  * @brief Adds two sparse matrices. Currently does not support two matrices with
  * different sparsity.
  * 
