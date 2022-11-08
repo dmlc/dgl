@@ -452,7 +452,7 @@ void SpMMRedopCsrOpt(
 
   IdType K_block_size = std::min(
       (int64_t)K,
-      (int64_t)(llc_size / (N * sizeof(DType) * nnz_prob * BLOCKING_HEURISTIC_PARAM)));
+      (int64_t)(llc_size / (N * sizeof(DType) * nnz_prob * BLOCKING_HEURISTIC_PARAM)));  // NOLINT
   IdType M_block_size = M / (nthreads * NUM_BLOCKS_PER_THREAD);
   if (M_block_size == 0) M_block_size = 1;
   if (K_block_size == 0) K_block_size = 1;
