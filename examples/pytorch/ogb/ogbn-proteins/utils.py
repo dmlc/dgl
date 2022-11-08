@@ -3,7 +3,6 @@ import random
 import numpy as np
 import torch
 import torch.nn.functional as F
-
 from models import MWE_DGCN, MWE_GCN
 
 
@@ -87,4 +86,3 @@ class Logger(object):
             print(f"  Final Train: {r.mean():.2f} ± {r.std():.2f}")
             r = best_result[:, 3]
             print(f"   Final Test: {r.mean():.2f} ± {r.std():.2f}")
-

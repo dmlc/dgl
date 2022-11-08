@@ -1,6 +1,8 @@
 """Negative samplers"""
 from collections.abc import Mapping
+
 from .. import backend as F
+
 
 class _BaseNegativeSampler(object):
     def _generate(self, g, eids, canonical_etype):
@@ -25,11 +27,13 @@ class _BaseNegativeSampler(object):
             eids = {g.to_canonical_etype(k): v for k, v in eids.items()}
             neg_pair = {k: self._generate(g, v, k) for k, v in eids.items()}
         else:
-            assert len(g.canonical_etypes) == 1, \
-                'please specify a dict of etypes and ids for graphs with multiple edge types'
+            assert (
+                len(g.canonical_etypes) == 1
+            ), "please specify a dict of etypes and ids for graphs with multiple edge types"
             neg_pair = self._generate(g, eids, g.canonical_etypes[0])
 
         return neg_pair
+
 
 class PerSourceUniform(_BaseNegativeSampler):
     """Negative sampler that randomly chooses negative destination nodes
@@ -52,6 +56,7 @@ class PerSourceUniform(_BaseNegativeSampler):
     >>> neg_sampler(g, torch.tensor([0, 1]))
     (tensor([0, 0, 1, 1]), tensor([1, 0, 2, 3]))
     """
+
     def __init__(self, k):
         self.k = k
 
@@ -66,8 +71,10 @@ class PerSourceUniform(_BaseNegativeSampler):
         dst = F.randint(shape, dtype, ctx, 0, g.num_nodes(vtype))
         return src, dst
 
+
 # Alias
 Uniform = PerSourceUniform
+
 
 class GlobalUniform(_BaseNegativeSampler):
     """Negative sampler that randomly chooses negative source-destination pairs according
@@ -104,6 +111,7 @@ class GlobalUniform(_BaseNegativeSampler):
     >>> neg_sampler(g, torch.LongTensor([0, 1]))
     (tensor([0, 1, 3, 2]), tensor([2, 0, 2, 1]))
     """
+
     def __init__(self, k, exclude_self_loops=True, replace=False):
         self.k = k
         self.exclude_self_loops = exclude_self_loops
@@ -111,4 +119,8 @@ class GlobalUniform(_BaseNegativeSampler):
 
     def _generate(self, g, eids, canonical_etype):
         return g.global_uniform_negative_sampling(
-            len(eids) * self.k, self.exclude_self_loops, self.replace, canonical_etype)
+            len(eids) * self.k,
+            self.exclude_self_loops,
+            self.replace,
+            canonical_etype,
+        )

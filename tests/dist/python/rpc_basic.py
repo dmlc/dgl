@@ -1,10 +1,12 @@
 import os
-import dgl
+
 import backend as F
 from numpy.testing import assert_array_equal
 
+import dgl
+
 INTEGER = 2
-STR = 'hello world!'
+STR = "hello world!"
 HELLO_SERVICE_ID = 901231
 TENSOR = F.zeros((1000, 1000), F.int64, F.cpu())
 
@@ -47,25 +49,36 @@ class HelloRequest(dgl.distributed.Request):
         return res
 
 
-def start_server(server_id, ip_config, num_servers, num_clients, net_type, keep_alive):
+def start_server(
+    server_id, ip_config, num_servers, num_clients, net_type, keep_alive
+):
     server_state = dgl.distributed.ServerState(
-        None, local_g=None, partition_book=None, keep_alive=keep_alive)
+        None, local_g=None, partition_book=None, keep_alive=keep_alive
+    )
     dgl.distributed.register_service(
-        HELLO_SERVICE_ID, HelloRequest, HelloResponse)
+        HELLO_SERVICE_ID, HelloRequest, HelloResponse
+    )
     print("Start server {}".format(server_id))
-    dgl.distributed.start_server(server_id=server_id,
-                                 ip_config=ip_config,
-                                 num_servers=num_servers,
-                                 num_clients=num_clients,
-                                 server_state=server_state,
-                                 net_type=net_type)
+    dgl.distributed.start_server(
+        server_id=server_id,
+        ip_config=ip_config,
+        num_servers=num_servers,
+        num_clients=num_clients,
+        server_state=server_state,
+        net_type=net_type,
+    )
 
 
 def start_client(ip_config, num_servers, group_id, net_type):
     dgl.distributed.register_service(
-        HELLO_SERVICE_ID, HelloRequest, HelloResponse)
+        HELLO_SERVICE_ID, HelloRequest, HelloResponse
+    )
     dgl.distributed.connect_to_server(
-        ip_config=ip_config, num_servers=num_servers, group_id=group_id, net_type=net_type)
+        ip_config=ip_config,
+        num_servers=num_servers,
+        group_id=group_id,
+        net_type=net_type,
+    )
     req = HelloRequest(STR, INTEGER, TENSOR, tensor_func)
     server_namebook = dgl.distributed.read_ip_config(ip_config, num_servers)
     for server_id in server_namebook.keys():
@@ -102,19 +115,20 @@ def start_client(ip_config, num_servers, group_id, net_type):
 
 
 def main():
-    ip_config = os.environ.get('DIST_DGL_TEST_IP_CONFIG')
-    num_servers = int(os.environ.get('DIST_DGL_TEST_NUM_SERVERS'))
-    net_type = os.environ.get('DIST_DGL_TEST_NET_TYPE', 'tensorpipe')
-    if os.environ.get('DIST_DGL_TEST_ROLE', 'server') == 'server':
-        server_id = int(os.environ.get('DIST_DGL_TEST_SERVER_ID'))
-        num_clients = int(os.environ.get('DIST_DGL_TEST_NUM_CLIENTS'))
-        keep_alive = 'DIST_DGL_TEST_KEEP_ALIVE' in os.environ
-        start_server(server_id, ip_config, num_servers,
-                     num_clients, net_type, keep_alive)
+    ip_config = os.environ.get("DIST_DGL_TEST_IP_CONFIG")
+    num_servers = int(os.environ.get("DIST_DGL_TEST_NUM_SERVERS"))
+    net_type = os.environ.get("DIST_DGL_TEST_NET_TYPE", "tensorpipe")
+    if os.environ.get("DIST_DGL_TEST_ROLE", "server") == "server":
+        server_id = int(os.environ.get("DIST_DGL_TEST_SERVER_ID"))
+        num_clients = int(os.environ.get("DIST_DGL_TEST_NUM_CLIENTS"))
+        keep_alive = "DIST_DGL_TEST_KEEP_ALIVE" in os.environ
+        start_server(
+            server_id, ip_config, num_servers, num_clients, net_type, keep_alive
+        )
     else:
-        group_id = int(os.environ.get('DIST_DGL_TEST_GROUP_ID', '0'))
+        group_id = int(os.environ.get("DIST_DGL_TEST_GROUP_ID", "0"))
         start_client(ip_config, num_servers, group_id, net_type)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

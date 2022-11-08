@@ -112,6 +112,7 @@ class DistTensor:
         self._shape = shape
         self._dtype = dtype
         self._attach = attach
+        self._is_gdata = is_gdata
 
         part_policies = self.kvstore.all_possible_part_policy
         # If a user doesn't provide a partition policy, we should find one based on
@@ -179,6 +180,29 @@ class DistTensor:
         idx = idx.tousertensor()
         # TODO(zhengda) how do we want to support broadcast (e.g., G.ndata['h'][idx] = 1).
         self.kvstore.push(name=self._name, id_tensor=idx, data_tensor=val)
+
+    @property
+    def kvstore_key(self):
+        """Return the key string of this DistTensor in the associated KVStore."""
+        return self._name
+
+    @property
+    def local_partition(self):
+        """Return the local partition of this DistTensor."""
+        return self.kvstore.data_store[self._name]
+
+    def __or__(self, other):
+        new_dist_tensor = DistTensor(
+                self._shape,
+                self._dtype,
+                part_policy=self._part_policy,
+                persistent=self._persistent,
+                is_gdata=self._is_gdata,
+                attach=self._attach
+        )
+        kvstore = self.kvstore
+        kvstore.union(self._name, other._name, new_dist_tensor._name)
+        return new_dist_tensor
 
     def __len__(self):
         return self._shape[0]

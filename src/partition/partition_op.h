@@ -1,14 +1,14 @@
-/*!
+/**
  *  Copyright (c) 2021 by Contributors
- * \file ndarray_partition.h
- * \brief DGL utilities for working with the partitioned NDArrays
+ * @file ndarray_partition.h
+ * @brief DGL utilities for working with the partitioned NDArrays
  */
-
 
 #ifndef DGL_PARTITION_PARTITION_OP_H_
 #define DGL_PARTITION_PARTITION_OP_H_
 
 #include <dgl/array.h>
+
 #include <utility>
 
 namespace dgl {
@@ -32,12 +32,9 @@ namespace impl {
  * @return The permutation to group the indices by part id, and the number of
  * indices in each part.
  */
-template <DLDeviceType XPU, typename IdType>
-std::pair<IdArray, IdArray>
-GeneratePermutationFromRemainder(
-        int64_t array_size,
-        int num_parts,
-        IdArray in_idx);
+template <DGLDeviceType XPU, typename IdType>
+std::pair<IdArray, IdArray> GeneratePermutationFromRemainder(
+    int64_t array_size, int num_parts, IdArray in_idx);
 
 /**
  * @brief Generate the set of local indices from the global indices, using
@@ -51,10 +48,8 @@ GeneratePermutationFromRemainder(
  *
  * @return The array of local indices.
  */
-template <DLDeviceType XPU, typename IdType>
-IdArray MapToLocalFromRemainder(
-    int num_parts,
-    IdArray global_idx);
+template <DGLDeviceType XPU, typename IdType>
+IdArray MapToLocalFromRemainder(int num_parts, IdArray global_idx);
 
 /**
  * @brief Generate the set of global indices from the local indices, using
@@ -69,11 +64,8 @@ IdArray MapToLocalFromRemainder(
  *
  * @return The array of global indices.
  */
-template <DLDeviceType XPU, typename IdType>
-IdArray MapToGlobalFromRemainder(
-    int num_parts,
-    IdArray local_idx,
-    int part_id);
+template <DGLDeviceType XPU, typename IdType>
+IdArray MapToGlobalFromRemainder(int num_parts, IdArray local_idx, int part_id);
 
 /**
  * @brief Create a permutation that groups indices by the part id when used for
@@ -95,13 +87,9 @@ IdArray MapToGlobalFromRemainder(
  * @return The permutation to group the indices by part id, and the number of
  * indices in each part.
  */
-template <DLDeviceType XPU, typename IdType, typename RangeType>
-std::pair<IdArray, IdArray>
-GeneratePermutationFromRange(
-        int64_t array_size,
-        int num_parts,
-        IdArray range,
-        IdArray in_idx);
+template <DGLDeviceType XPU, typename IdType, typename RangeType>
+std::pair<IdArray, IdArray> GeneratePermutationFromRange(
+    int64_t array_size, int num_parts, IdArray range, IdArray in_idx);
 
 /**
  * @brief Generate the set of local indices from the global indices, using
@@ -118,11 +106,8 @@ GeneratePermutationFromRange(
  *
  * @return The array of local indices.
  */
-template <DLDeviceType XPU, typename IdType, typename RangeType>
-IdArray MapToLocalFromRange(
-    int num_parts,
-    IdArray range,
-    IdArray global_idx);
+template <DGLDeviceType XPU, typename IdType, typename RangeType>
+IdArray MapToLocalFromRange(int num_parts, IdArray range, IdArray global_idx);
 
 /**
  * @brief Generate the set of global indices from the local indices, using
@@ -140,14 +125,9 @@ IdArray MapToLocalFromRange(
  *
  * @return The array of global indices.
  */
-template <DLDeviceType XPU, typename IdType, typename RangeType>
+template <DGLDeviceType XPU, typename IdType, typename RangeType>
 IdArray MapToGlobalFromRange(
-    int num_parts,
-    IdArray range,
-    IdArray local_idx,
-    int part_id);
-
-
+    int num_parts, IdArray range, IdArray local_idx, int part_id);
 
 }  // namespace impl
 }  // namespace partition

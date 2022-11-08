@@ -8,5 +8,5 @@
     This package is experimental and the interfaces may be subject
     to changes in future releases.
 """
-from .fps import *
 from .edge_coarsening import *
+from .fps import *

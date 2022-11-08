@@ -32,9 +32,18 @@ def generate_emb(standalone, model, emb_layer, g, batch_size, device):
     g.barrier()
     return pred
 
+
 def run(args, device, data):
     # Unpack data
-    train_eids, train_nids, g, global_train_nid, global_valid_nid, global_test_nid, labels = data
+    (
+        train_eids,
+        train_nids,
+        g,
+        global_train_nid,
+        global_valid_nid,
+        global_test_nid,
+        labels,
+    ) = data
     # Create sampler
     neg_sampler = dgl.dataloading.negative_sampler.Uniform(args.num_negs)
     sampler = dgl.dataloading.NeighborSampler([int(fanout) for fanout in args.fan_out.split(',')])
@@ -52,7 +61,9 @@ def run(args, device, data):
             model = th.nn.parallel.DistributedDataParallel(model)
         else:
             dev_id = g.rank() % args.num_gpus
-            model = th.nn.parallel.DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
+            model = th.nn.parallel.DistributedDataParallel(
+                model, device_ids=[dev_id], output_device=dev_id
+            )
             if not args.dgl_sparse:
                 emb_layer = th.nn.parallel.DistributedDataParallel(emb_layer)
     loss_fcn = CrossEntropyLoss()
@@ -60,14 +71,20 @@ def run(args, device, data):
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
     if args.dgl_sparse:
-        emb_optimizer = dgl.distributed.optim.SparseAdam([emb_layer.sparse_emb], lr=args.sparse_lr)
-        print('optimize DGL sparse embedding:', emb_layer.sparse_emb)
+        emb_optimizer = dgl.distributed.optim.SparseAdam(
+            [emb_layer.sparse_emb], lr=args.sparse_lr
+        )
+        print("optimize DGL sparse embedding:", emb_layer.sparse_emb)
     elif args.standalone:
-        emb_optimizer = th.optim.SparseAdam(list(emb_layer.sparse_emb.parameters()), lr=args.sparse_lr)
-        print('optimize Pytorch sparse embedding:', emb_layer.sparse_emb)
+        emb_optimizer = th.optim.SparseAdam(
+            list(emb_layer.sparse_emb.parameters()), lr=args.sparse_lr
+        )
+        print("optimize Pytorch sparse embedding:", emb_layer.sparse_emb)
     else:
-        emb_optimizer = th.optim.SparseAdam(list(emb_layer.module.sparse_emb.parameters()), lr=args.sparse_lr)
-        print('optimize Pytorch sparse embedding:', emb_layer.module.sparse_emb)
+        emb_optimizer = th.optim.SparseAdam(
+            list(emb_layer.module.sparse_emb.parameters()), lr=args.sparse_lr
+        )
+        print("optimize Pytorch sparse embedding:", emb_layer.module.sparse_emb)
 
     # Training loop
     epoch = 0
@@ -129,15 +146,28 @@ def run(args, device, data):
 
                 start = time.time()
 
-        print('[{}]Epoch Time(s): {:.4f}, sample: {:.4f}, data copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #seeds: {}, #inputs: {}'.format(
-            g.rank(), np.sum(step_time), np.sum(sample_t), np.sum(feat_copy_t), np.sum(forward_t), np.sum(backward_t), np.sum(update_t), num_seeds, num_inputs))
+        print(
+            "[{}]Epoch Time(s): {:.4f}, sample: {:.4f}, data copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #seeds: {}, #inputs: {}".format(
+                g.rank(),
+                np.sum(step_time),
+                np.sum(sample_t),
+                np.sum(feat_copy_t),
+                np.sum(forward_t),
+                np.sum(backward_t),
+                np.sum(update_t),
+                num_seeds,
+                num_inputs,
+            )
+        )
         epoch += 1
 
     # evaluate the embedding using LogisticRegression
     pred = generate_emb(args.standalone, model, emb_layer, g, args.batch_size_eval, device)
     if g.rank() == 0:
-        eval_acc, test_acc = compute_acc(pred, labels, global_train_nid, global_valid_nid, global_test_nid)
-        print('eval acc {:.4f}; test acc {:.4f}'.format(eval_acc, test_acc))
+        eval_acc, test_acc = compute_acc(
+            pred, labels, global_train_nid, global_valid_nid, global_test_nid
+        )
+        print("eval acc {:.4f}; test acc {:.4f}".format(eval_acc, test_acc))
 
     # sync for eval and test
     if not args.standalone:
@@ -148,27 +178,40 @@ def run(args, device, data):
 
         # save features into file
         if g.rank() == 0:
-            th.save(pred, 'emb.pt')
+            th.save(pred, "emb.pt")
     else:
-        feat = g.ndata['features']
-        th.save(pred, 'emb.pt')
+        feat = g.ndata["features"]
+        th.save(pred, "emb.pt")
+
 
 def main(args):
     dgl.distributed.initialize(args.ip_config)
     if not args.standalone:
-        th.distributed.init_process_group(backend='gloo')
+        th.distributed.init_process_group(backend="gloo")
     g = dgl.distributed.DistGraph(args.graph_name, part_config=args.part_config)
-    print('rank:', g.rank())
-    print('number of edges', g.number_of_edges())
+    print("rank:", g.rank())
+    print("number of edges", g.number_of_edges())
 
-    train_eids = dgl.distributed.edge_split(th.ones((g.number_of_edges(),), dtype=th.bool), g.get_partition_book(), force_even=True)
-    train_nids = dgl.distributed.node_split(th.ones((g.number_of_nodes(),), dtype=th.bool), g.get_partition_book())
-    global_train_nid = th.LongTensor(np.nonzero(g.ndata['train_mask'][np.arange(g.number_of_nodes())]))
-    global_valid_nid = th.LongTensor(np.nonzero(g.ndata['val_mask'][np.arange(g.number_of_nodes())]))
-    global_test_nid = th.LongTensor(np.nonzero(g.ndata['test_mask'][np.arange(g.number_of_nodes())]))
-    labels = g.ndata['labels'][np.arange(g.number_of_nodes())]
+    train_eids = dgl.distributed.edge_split(
+        th.ones((g.number_of_edges(),), dtype=th.bool),
+        g.get_partition_book(),
+        force_even=True,
+    )
+    train_nids = dgl.distributed.node_split(
+        th.ones((g.number_of_nodes(),), dtype=th.bool), g.get_partition_book()
+    )
+    global_train_nid = th.LongTensor(
+        np.nonzero(g.ndata["train_mask"][np.arange(g.number_of_nodes())])
+    )
+    global_valid_nid = th.LongTensor(
+        np.nonzero(g.ndata["val_mask"][np.arange(g.number_of_nodes())])
+    )
+    global_test_nid = th.LongTensor(
+        np.nonzero(g.ndata["test_mask"][np.arange(g.number_of_nodes())])
+    )
+    labels = g.ndata["labels"][np.arange(g.number_of_nodes())]
     if args.num_gpus == -1:
-        device = th.device('cpu')
+        device = th.device("cpu")
     else:
         dev_id = g.rank() % args.num_gpus
         device = th.device('cuda:'+str(dev_id))
@@ -180,41 +223,74 @@ def main(args):
     print("number of train {}".format(global_train_nid.shape[0]))
     print("number of valid {}".format(global_valid_nid.shape[0]))
     print("number of test {}".format(global_test_nid.shape[0]))
-    data = train_eids, train_nids, g, global_train_nid, global_valid_nid, global_test_nid, labels
+    data = (
+        train_eids,
+        train_nids,
+        g,
+        global_train_nid,
+        global_valid_nid,
+        global_test_nid,
+        labels,
+    )
     run(args, device, data)
     print("parent ends")
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='GCN')
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="GCN")
     register_data_args(parser)
-    parser.add_argument('--graph_name', type=str, help='graph name')
-    parser.add_argument('--id', type=int, help='the partition id')
-    parser.add_argument('--ip_config', type=str, help='The file for IP configuration')
-    parser.add_argument('--part_config', type=str, help='The path to the partition config file')
-    parser.add_argument('--n_classes', type=int, help='the number of classes')
-    parser.add_argument('--num_gpus', type=int, default=-1,
-                        help="the number of GPU device. Use -1 for CPU training")
-    parser.add_argument('--num_epochs', type=int, default=5)
-    parser.add_argument('--num_hidden', type=int, default=16)
-    parser.add_argument('--num-layers', type=int, default=2)
-    parser.add_argument('--fan_out', type=str, default='10,25')
-    parser.add_argument('--batch_size', type=int, default=1000)
-    parser.add_argument('--batch_size_eval', type=int, default=100000)
-    parser.add_argument('--log_every', type=int, default=20)
-    parser.add_argument('--eval_every', type=int, default=5)
-    parser.add_argument('--lr', type=float, default=0.003)
-    parser.add_argument('--dropout', type=float, default=0.5)
-    parser.add_argument('--local_rank', type=int, help='get rank of the process')
-    parser.add_argument('--standalone', action='store_true', help='run in the standalone mode')
-    parser.add_argument('--num_negs', type=int, default=1)
-    parser.add_argument('--neg_share', default=False, action='store_true',
-        help="sharing neg nodes for positive nodes")
-    parser.add_argument('--remove_edge', default=False, action='store_true',
-        help="whether to remove edges during sampling")
-    parser.add_argument("--dgl_sparse", action='store_true',
-            help='Whether to use DGL sparse embedding')
-    parser.add_argument("--sparse_lr", type=float, default=1e-2,
-            help="sparse lr rate")
+    parser.add_argument("--graph_name", type=str, help="graph name")
+    parser.add_argument("--id", type=int, help="the partition id")
+    parser.add_argument(
+        "--ip_config", type=str, help="The file for IP configuration"
+    )
+    parser.add_argument(
+        "--part_config", type=str, help="The path to the partition config file"
+    )
+    parser.add_argument("--n_classes", type=int, help="the number of classes")
+    parser.add_argument(
+        "--num_gpus",
+        type=int,
+        default=-1,
+        help="the number of GPU device. Use -1 for CPU training",
+    )
+    parser.add_argument("--num_epochs", type=int, default=5)
+    parser.add_argument("--num_hidden", type=int, default=16)
+    parser.add_argument("--num-layers", type=int, default=2)
+    parser.add_argument("--fan_out", type=str, default="10,25")
+    parser.add_argument("--batch_size", type=int, default=1000)
+    parser.add_argument("--batch_size_eval", type=int, default=100000)
+    parser.add_argument("--log_every", type=int, default=20)
+    parser.add_argument("--eval_every", type=int, default=5)
+    parser.add_argument("--lr", type=float, default=0.003)
+    parser.add_argument("--dropout", type=float, default=0.5)
+    parser.add_argument(
+        "--local_rank", type=int, help="get rank of the process"
+    )
+    parser.add_argument(
+        "--standalone", action="store_true", help="run in the standalone mode"
+    )
+    parser.add_argument("--num_negs", type=int, default=1)
+    parser.add_argument(
+        "--neg_share",
+        default=False,
+        action="store_true",
+        help="sharing neg nodes for positive nodes",
+    )
+    parser.add_argument(
+        "--remove_edge",
+        default=False,
+        action="store_true",
+        help="whether to remove edges during sampling",
+    )
+    parser.add_argument(
+        "--dgl_sparse",
+        action="store_true",
+        help="Whether to use DGL sparse embedding",
+    )
+    parser.add_argument(
+        "--sparse_lr", type=float, default=1e-2, help="sparse lr rate"
+    )
     args = parser.parse_args()
     print(args)
     main(args)

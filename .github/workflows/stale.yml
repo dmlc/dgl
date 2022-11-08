@@ -22,10 +22,10 @@ jobs:
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         days-before-issue-stale: 30
-        days-before-issue-close: 7
+        days-before-issue-close: -1 # disable issue close
         days-before-pr-stale: -1 # disable stale bot on pr
         days-before-pr-close: -1 # disable stale bot on pr
         stale-issue-message: 'This issue has been automatically marked as stale due to lack of activity. It will be closed if no further activity occurs. Thank you'
         close-issue-message: 'This issue is closed due to lack of activity. Feel free to reopen it if you still have questions.'
         stale-issue-label: 'stale-issue'
-        exempt-issue-labels: 'RFC,pinned,bug,dist DGL,doc,enhancement,feature request,help wanted,model request,wontfix,Suspended,system performance,windows,PyTorch,MXNet,TensorFlow'
+        exempt-issue-labels: 'Roadmap,RFC,pinned,bug:confirmed,bug:unconfirmed,dist DGL,doc,enhancement,feature request,help wanted,model request,wontfix,Suspended,system performance,windows,PyTorch,MXNet,TensorFlow'

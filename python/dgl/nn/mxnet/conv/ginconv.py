@@ -58,27 +58,30 @@ class GINConv(nn.Block):
     -0.02858362 -0.10365082  0.07060662  0.23041813]]
     <NDArray 6x10 @cpu(0)>
     """
-    def __init__(self,
-                 apply_func,
-                 aggregator_type,
-                 init_eps=0,
-                 learn_eps=False):
+
+    def __init__(
+        self, apply_func, aggregator_type, init_eps=0, learn_eps=False
+    ):
         super(GINConv, self).__init__()
-        if aggregator_type == 'sum':
+        if aggregator_type == "sum":
             self._reducer = fn.sum
-        elif aggregator_type == 'max':
+        elif aggregator_type == "max":
             self._reducer = fn.max
-        elif aggregator_type == 'mean':
+        elif aggregator_type == "mean":
             self._reducer = fn.mean
         else:
-            raise KeyError('Aggregator type {} not recognized.'.format(aggregator_type))
+            raise KeyError(
+                "Aggregator type {} not recognized.".format(aggregator_type)
+            )
 
         with self.name_scope():
             self.apply_func = apply_func
-            self.eps = self.params.get('eps',
-                                       shape=(1,),
-                                       grad_req='write' if learn_eps else 'null',
-                                       init=mx.init.Constant(init_eps))
+            self.eps = self.params.get(
+                "eps",
+                shape=(1,),
+                grad_req="write" if learn_eps else "null",
+                init=mx.init.Constant(init_eps),
+            )
 
     def forward(self, graph, feat):
         r"""
@@ -109,9 +112,11 @@ class GINConv(nn.Block):
         """
         with graph.local_scope():
             feat_src, feat_dst = expand_as_pair(feat, graph)
-            graph.srcdata['h'] = feat_src
-            graph.update_all(fn.copy_u('h', 'm'), self._reducer('m', 'neigh'))
-            rst = (1 + self.eps.data(feat_dst.context)) * feat_dst + graph.dstdata['neigh']
+            graph.srcdata["h"] = feat_src
+            graph.update_all(fn.copy_u("h", "m"), self._reducer("m", "neigh"))
+            rst = (
+                1 + self.eps.data(feat_dst.context)
+            ) * feat_dst + graph.dstdata["neigh"]
             if self.apply_func is not None:
                 rst = self.apply_func(rst)
             return rst

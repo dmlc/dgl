@@ -1,6 +1,7 @@
 """Torch Module for DenseSAGEConv"""
 # pylint: disable= no-member, arguments-differ, invalid-name
 from torch import nn
+
 from ....utils import check_eq_shape
 
 
@@ -56,13 +57,16 @@ class DenseSAGEConv(nn.Module):
     --------
     `SAGEConv <https://docs.dgl.ai/api/python/nn.pytorch.html#sageconv>`__
     """
-    def __init__(self,
-                 in_feats,
-                 out_feats,
-                 feat_drop=0.,
-                 bias=True,
-                 norm=None,
-                 activation=None):
+
+    def __init__(
+        self,
+        in_feats,
+        out_feats,
+        feat_drop=0.0,
+        bias=True,
+        norm=None,
+        activation=None,
+    ):
         super(DenseSAGEConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
@@ -83,7 +87,7 @@ class DenseSAGEConv(nn.Module):
         -----
         The linear weights :math:`W^{(l)}` are initialized using Glorot uniform initialization.
         """
-        gain = nn.init.calculate_gain('relu')
+        gain = nn.init.calculate_gain("relu")
         nn.init.xavier_uniform_(self.fc.weight, gain=gain)
 
     def forward(self, adj, feat):

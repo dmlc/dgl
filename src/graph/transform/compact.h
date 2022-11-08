@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright 2021 Contributors
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,8 +13,8 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
- * \file graph/transform/compact.h
- * \brief Functions to find and eliminate the common isolated nodes across
+ * @file graph/transform/compact.h
+ * @brief Functions to find and eliminate the common isolated nodes across
  * all given graphs with the same set of nodes.
  */
 
@@ -24,8 +24,8 @@
 #include <dgl/array.h>
 #include <dgl/base_heterograph.h>
 
-#include <vector>
 #include <utility>
+#include <vector>
 
 namespace dgl {
 namespace transform {
@@ -41,9 +41,8 @@ namespace transform {
  *
  * @return The vector of compacted graphs and the vector of induced nodes.
  */
-template<DLDeviceType XPU, typename IdType>
-std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>>
-CompactGraphs(
+template <DGLDeviceType XPU, typename IdType>
+std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>> CompactGraphs(
     const std::vector<HeteroGraphPtr> &graphs,
     const std::vector<IdArray> &always_preserve);
 

@@ -60,10 +60,8 @@ class EdgeConv(layers.Layer):
     A common practise to handle this is to filter out the nodes with zere-in-degree when use
     after conv.
     """
-    def __init__(self,
-                 out_feats,
-                 batch_norm=False,
-                 allow_zero_in_degree=False):
+
+    def __init__(self, out_feats, batch_norm=False, allow_zero_in_degree=False):
         super(EdgeConv, self).__init__()
         self.batch_norm = batch_norm
         self._allow_zero_in_degree = allow_zero_in_degree
@@ -111,29 +109,31 @@ class EdgeConv(layers.Layer):
         """
         with g.local_scope():
             if not self._allow_zero_in_degree:
-                if  tf.math.count_nonzero(g.in_degrees() == 0) > 0:
-                    raise DGLError('There are 0-in-degree nodes in the graph, '
-                                   'output for those nodes will be invalid. '
-                                   'This is harmful for some applications, '
-                                   'causing silent performance regression. '
-                                   'Adding self-loop on the input graph by '
-                                   'calling `g = dgl.add_self_loop(g)` will resolve '
-                                   'the issue. Setting ``allow_zero_in_degree`` '
-                                   'to be `True` when constructing this module will '
-                                   'suppress the check and let the code run.')
+                if tf.math.count_nonzero(g.in_degrees() == 0) > 0:
+                    raise DGLError(
+                        "There are 0-in-degree nodes in the graph, "
+                        "output for those nodes will be invalid. "
+                        "This is harmful for some applications, "
+                        "causing silent performance regression. "
+                        "Adding self-loop on the input graph by "
+                        "calling `g = dgl.add_self_loop(g)` will resolve "
+                        "the issue. Setting ``allow_zero_in_degree`` "
+                        "to be `True` when constructing this module will "
+                        "suppress the check and let the code run."
+                    )
             h_src, h_dst = expand_as_pair(feat, g)
-            g.srcdata['x'] = h_src
-            g.dstdata['x'] = h_dst
-            g.apply_edges(fn.v_sub_u('x', 'x', 'theta'))
-            g.edata['theta'] = self.theta(g.edata['theta'])
-            g.dstdata['phi'] = self.phi(g.dstdata['x'])
+            g.srcdata["x"] = h_src
+            g.dstdata["x"] = h_dst
+            g.apply_edges(fn.v_sub_u("x", "x", "theta"))
+            g.edata["theta"] = self.theta(g.edata["theta"])
+            g.dstdata["phi"] = self.phi(g.dstdata["x"])
             if not self.batch_norm:
-                g.update_all(fn.e_add_v('theta', 'phi', 'e'), fn.max('e', 'x'))
+                g.update_all(fn.e_add_v("theta", "phi", "e"), fn.max("e", "x"))
             else:
-                g.apply_edges(fn.e_add_v('theta', 'phi', 'e'))
+                g.apply_edges(fn.e_add_v("theta", "phi", "e"))
                 # for more comments on why global batch norm instead
                 # of batch norm within EdgeConv go to
                 # https://github.com/dmlc/dgl/blob/master/python/dgl/nn/pytorch/conv/edgeconv.py
-                g.edata['e'] = self.bn(g.edata['e'])
-                g.update_all(fn.copy_e('e', 'e'), fn.max('e', 'x'))
-            return g.dstdata['x']
+                g.edata["e"] = self.bn(g.edata["e"])
+                g.update_all(fn.copy_e("e", "e"), fn.max("e", "x"))
+            return g.dstdata["x"]

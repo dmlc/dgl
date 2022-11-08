@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2021 by Contributors
- * \file cuda_common.h
- * \brief Wrapper to place cub in dgl namespace. 
+ * @file cuda_common.h
+ * @brief Wrapper to place cub in dgl namespace.
  */
 
 #ifndef DGL_ARRAY_CUDA_DGL_CUB_CUH_
@@ -14,4 +14,4 @@ static_assert(false, "THRUST_CUB_WRAPPED_NAMESPACE must be defined for DGL.");
 
 #include "cub/cub.cuh"
 
-#endif
+#endif  // DGL_ARRAY_CUDA_DGL_CUB_CUH_

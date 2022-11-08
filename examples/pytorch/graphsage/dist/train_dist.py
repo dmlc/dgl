@@ -20,22 +20,25 @@ def load_subtensor(g, seeds, input_nodes, device, load_feat=True):
     """
     Copys features and labels of a set of nodes onto GPU.
     """
-    batch_inputs = g.ndata['features'][input_nodes].to(device) if load_feat else None
-    batch_labels = g.ndata['labels'][seeds].to(device)
+    batch_inputs = (
+        g.ndata["features"][input_nodes].to(device) if load_feat else None
+    )
+    batch_labels = g.ndata["labels"][seeds].to(device)
     return batch_inputs, batch_labels
 
 class DistSAGE(nn.Module):
-    def __init__(self, in_feats, n_hidden, n_classes, n_layers,
-                 activation, dropout):
+    def __init__(
+        self, in_feats, n_hidden, n_classes, n_layers, activation, dropout
+    ):
         super().__init__()
         self.n_layers = n_layers
         self.n_hidden = n_hidden
         self.n_classes = n_classes
         self.layers = nn.ModuleList()
-        self.layers.append(dglnn.SAGEConv(in_feats, n_hidden, 'mean'))
+        self.layers.append(dglnn.SAGEConv(in_feats, n_hidden, "mean"))
         for i in range(1, n_layers - 1):
-            self.layers.append(dglnn.SAGEConv(n_hidden, n_hidden, 'mean'))
-        self.layers.append(dglnn.SAGEConv(n_hidden, n_classes, 'mean'))
+            self.layers.append(dglnn.SAGEConv(n_hidden, n_hidden, "mean"))
+        self.layers.append(dglnn.SAGEConv(n_hidden, n_classes, "mean"))
         self.dropout = nn.Dropout(dropout)
         self.activation = activation
 
@@ -62,10 +65,17 @@ class DistSAGE(nn.Module):
         # Therefore, we compute the representation of all nodes layer by layer.  The nodes
         # on each layer are of course splitted in batches.
         # TODO: can we standardize this?
-        nodes = dgl.distributed.node_split(np.arange(g.number_of_nodes()),
-                                           g.get_partition_book(), force_even=True)
-        y = dgl.distributed.DistTensor((g.number_of_nodes(), self.n_hidden), th.float32, 'h',
-                                       persistent=True)
+        nodes = dgl.distributed.node_split(
+            np.arange(g.number_of_nodes()),
+            g.get_partition_book(),
+            force_even=True,
+        )
+        y = dgl.distributed.DistTensor(
+            (g.number_of_nodes(), self.n_hidden),
+            th.float32,
+            "h",
+            persistent=True,
+        )
         for l, layer in enumerate(self.layers):
             if l == len(self.layers) - 1:
                 y = dgl.distributed.DistTensor((g.number_of_nodes(), self.n_classes),
@@ -79,7 +89,7 @@ class DistSAGE(nn.Module):
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
                 block = blocks[0].to(device)
                 h = x[input_nodes].to(device)
-                h_dst = h[:block.number_of_dst_nodes()]
+                h_dst = h[: block.number_of_dst_nodes()]
                 h = layer(block, (h, h_dst))
                 if l != len(self.layers) - 1:
                     h = self.activation(h)
@@ -103,6 +113,7 @@ def compute_acc(pred, labels):
     labels = labels.long()
     return (th.argmax(pred, dim=1) == labels).float().sum() / len(pred)
 
+
 def evaluate(model, g, inputs, labels, val_nid, test_nid, batch_size, device):
     """
     Evaluate the model on the validation set specified by ``val_nid``.
@@ -117,7 +128,9 @@ def evaluate(model, g, inputs, labels, val_nid, test_nid, batch_size, device):
     with th.no_grad():
         pred = model.inference(g, inputs, batch_size, device)
     model.train()
-    return compute_acc(pred[val_nid], labels[val_nid]), compute_acc(pred[test_nid], labels[test_nid])
+    return compute_acc(pred[val_nid], labels[val_nid]), compute_acc(
+        pred[test_nid], labels[test_nid]
+    )
 
 
 def run(args, device, data):
@@ -129,13 +142,22 @@ def run(args, device, data):
     dataloader = dgl.dataloading.DistNodeDataLoader(
         g, train_nid, sampler, batch_size=args.batch_size, shuffle=shuffle, drop_last=False)
     # Define model and optimizer
-    model = DistSAGE(in_feats, args.num_hidden, n_classes, args.num_layers, F.relu, args.dropout)
+    model = DistSAGE(
+        in_feats,
+        args.num_hidden,
+        n_classes,
+        args.num_layers,
+        F.relu,
+        args.dropout,
+    )
     model = model.to(device)
     if not args.standalone:
         if args.num_gpus == -1:
             model = th.nn.parallel.DistributedDataParallel(model)
         else:
-            model = th.nn.parallel.DistributedDataParallel(model, device_ids=[device], output_device=device)
+            model = th.nn.parallel.DistributedDataParallel(
+                model, device_ids=[device], output_device=device
+            )
     loss_fcn = nn.CrossEntropyLoss()
     loss_fcn = loss_fcn.to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
@@ -189,16 +211,39 @@ def run(args, device, data):
                 iter_tput.append(len(blocks[-1].dstdata[dgl.NID]) / step_t)
                 if step % args.log_every == 0:
                     acc = compute_acc(batch_pred, batch_labels)
-                    gpu_mem_alloc = th.cuda.max_memory_allocated() / 1000000 if th.cuda.is_available() else 0
-                    print('Part {} | Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MB | time {:.3f} s'.format(
-                        g.rank(), epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:]), gpu_mem_alloc, np.sum(step_time[-args.log_every:])))
+                    gpu_mem_alloc = (
+                        th.cuda.max_memory_allocated() / 1000000
+                        if th.cuda.is_available()
+                        else 0
+                    )
+                    print(
+                        "Part {} | Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MB | time {:.3f} s".format(
+                            g.rank(),
+                            epoch,
+                            step,
+                            loss.item(),
+                            acc.item(),
+                            np.mean(iter_tput[3:]),
+                            gpu_mem_alloc,
+                            np.sum(step_time[-args.log_every :]),
+                        )
+                    )
                 start = time.time()
 
         toc = time.time()
-        print('Part {}, Epoch Time(s): {:.4f}, sample+data_copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #seeds: {}, #inputs: {}'.format(
-            g.rank(), toc - tic, sample_time, forward_time, backward_time, update_time, num_seeds, num_inputs))
+        print(
+            "Part {}, Epoch Time(s): {:.4f}, sample+data_copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #seeds: {}, #inputs: {}".format(
+                g.rank(),
+                toc - tic,
+                sample_time,
+                forward_time,
+                backward_time,
+                update_time,
+                num_seeds,
+                num_inputs,
+            )
+        )
         epoch += 1
-
 
         if epoch % args.eval_every == 0 and epoch != 0:
             start = time.time()
@@ -208,27 +253,45 @@ def run(args, device, data):
                                                                                   time.time() - start))
 
 def main(args):
-    print(socket.gethostname(), 'Initializing DGL dist')
+    print(socket.gethostname(), "Initializing DGL dist")
     dgl.distributed.initialize(args.ip_config, net_type=args.net_type)
     if not args.standalone:
-        print(socket.gethostname(), 'Initializing DGL process group')
+        print(socket.gethostname(), "Initializing DGL process group")
         th.distributed.init_process_group(backend=args.backend)
-    print(socket.gethostname(), 'Initializing DistGraph')
+    print(socket.gethostname(), "Initializing DistGraph")
     g = dgl.distributed.DistGraph(args.graph_name, part_config=args.part_config)
-    print(socket.gethostname(), 'rank:', g.rank())
+    print(socket.gethostname(), "rank:", g.rank())
 
     pb = g.get_partition_book()
-    if 'trainer_id' in g.ndata:
-        train_nid = dgl.distributed.node_split(g.ndata['train_mask'], pb, force_even=True,
-                                               node_trainer_ids=g.ndata['trainer_id'])
-        val_nid = dgl.distributed.node_split(g.ndata['val_mask'], pb, force_even=True,
-                                             node_trainer_ids=g.ndata['trainer_id'])
-        test_nid = dgl.distributed.node_split(g.ndata['test_mask'], pb, force_even=True,
-                                              node_trainer_ids=g.ndata['trainer_id'])
+    if "trainer_id" in g.ndata:
+        train_nid = dgl.distributed.node_split(
+            g.ndata["train_mask"],
+            pb,
+            force_even=True,
+            node_trainer_ids=g.ndata["trainer_id"],
+        )
+        val_nid = dgl.distributed.node_split(
+            g.ndata["val_mask"],
+            pb,
+            force_even=True,
+            node_trainer_ids=g.ndata["trainer_id"],
+        )
+        test_nid = dgl.distributed.node_split(
+            g.ndata["test_mask"],
+            pb,
+            force_even=True,
+            node_trainer_ids=g.ndata["trainer_id"],
+        )
     else:
-        train_nid = dgl.distributed.node_split(g.ndata['train_mask'], pb, force_even=True)
-        val_nid = dgl.distributed.node_split(g.ndata['val_mask'], pb, force_even=True)
-        test_nid = dgl.distributed.node_split(g.ndata['test_mask'], pb, force_even=True)
+        train_nid = dgl.distributed.node_split(
+            g.ndata["train_mask"], pb, force_even=True
+        )
+        val_nid = dgl.distributed.node_split(
+            g.ndata["val_mask"], pb, force_even=True
+        )
+        test_nid = dgl.distributed.node_split(
+            g.ndata["test_mask"], pb, force_even=True
+        )
     local_nid = pb.partid2nids(pb.partid).detach().numpy()
     print('part {}, train: {} (local: {}), val: {} (local: {}), test: {} (local: {})'.format(
         g.rank(), len(train_nid), len(np.intersect1d(train_nid.numpy(), local_nid)),
@@ -236,7 +299,7 @@ def main(args):
         len(test_nid), len(np.intersect1d(test_nid.numpy(), local_nid))))
     del local_nid
     if args.num_gpus == -1:
-        device = th.device('cpu')
+        device = th.device("cpu")
     else:
         dev_id = g.rank() % args.num_gpus
         device = th.device('cuda:'+str(dev_id))
@@ -248,13 +311,14 @@ def main(args):
     print('#labels:', n_classes)
 
     # Pack data
-    in_feats = g.ndata['features'].shape[1]
+    in_feats = g.ndata["features"].shape[1]
     data = train_nid, val_nid, test_nid, in_feats, n_classes, g
     run(args, device, data)
     print("parent ends")
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='GCN')
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="GCN")
     register_data_args(parser)
     parser.add_argument('--graph_name', type=str, help='graph name')
     parser.add_argument('--id', type=int, help='the partition id')

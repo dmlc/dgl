@@ -1,25 +1,26 @@
-/*!
+/**
  *  Copyright (c) 2017 by Contributors
- * \file thread_pool.cc
- * \brief Threadpool for multi-threading runtime.
+ * @file thread_pool.cc
+ * @brief Threadpool for multi-threading runtime.
  */
-#include <dgl/runtime/c_runtime_api.h>
 #include <dgl/runtime/c_backend_api.h>
-#include <dgl/runtime/registry.h>
+#include <dgl/runtime/c_runtime_api.h>
 #include <dgl/runtime/packed_func.h>
+#include <dgl/runtime/registry.h>
 #include <dgl/runtime/threading_backend.h>
-#include <dmlc/thread_local.h>
 #include <dmlc/logging.h>
-#include <thread>
-#include <condition_variable>
-#include <mutex>
-#include <atomic>
+#include <dmlc/thread_local.h>
+
 #include <algorithm>
-#include <vector>
-#include <string>
+#include <atomic>
+#include <condition_variable>
 #include <cstring>
 #include <memory>
+#include <mutex>
 #include <sstream>
+#include <string>
+#include <thread>
+#include <vector>
 
 const constexpr int kL1CacheBytes = 64;
 
@@ -29,16 +30,14 @@ namespace runtime {
 // stride in the page, fit to cache line.
 constexpr int kSyncStride = 64 / sizeof(std::atomic<int>);
 
-/*!
- * \brief Thread local master environment.
+/**
+ * @brief Thread local master environment.
  */
 class ParallelLauncher {
  public:
   // Reset the the task request.
-  void Init(FDGLParallelLambda flambda,
-            void* cdata,
-            int num_task,
-            bool need_sync) {
+  void Init(
+      FDGLParallelLambda flambda, void* cdata, int num_task, bool need_sync) {
     num_pending_.store(num_task);
     this->cdata = cdata;
     this->flambda = flambda;
@@ -54,17 +53,14 @@ class ParallelLauncher {
     }
     if (need_sync) {
       for (int i = 0; i < num_task; ++i) {
-        sync_counter_[i * kSyncStride].store(
-            0, std::memory_order_relaxed);
+        sync_counter_[i * kSyncStride].store(0, std::memory_order_relaxed);
       }
       this->env.sync_handle = sync_counter_;
     } else {
       this->env.sync_handle = nullptr;
     }
   }
-  ~ParallelLauncher() {
-    delete[] sync_counter_;
-  }
+  ~ParallelLauncher() { delete[] sync_counter_; }
   // Wait n jobs to finish
   int WaitForJobs() {
     while (num_pending_.load() != 0) {
@@ -90,9 +86,7 @@ class ParallelLauncher {
     has_error_.store(true);
   }
   // Signal that one job has finished.
-  void SignalJobFinish() {
-    num_pending_.fetch_sub(1);
-  }
+  void SignalJobFinish() { num_pending_.fetch_sub(1); }
   // Get thread local version of the store.
   static ParallelLauncher* ThreadLocal() {
     return dmlc::ThreadLocalStore<ParallelLauncher>::Get();
@@ -118,28 +112,22 @@ class ParallelLauncher {
   std::vector<std::string> par_errors_;
 };
 
-/*! \brief Lock-free single-producer-single-consumer queue for each thread */
+/** @brief Lock-free single-producer-single-consumer queue for each thread */
 class SpscTaskQueue {
  public:
-  /*! \brief The task entry */
+  /** @brief The task entry */
   struct Task {
     ParallelLauncher* launcher;
     int32_t task_id;
   };
 
-  SpscTaskQueue() :
-    buffer_(new Task[kRingSize]),
-    head_(0),
-    tail_(0) {
-  }
+  SpscTaskQueue() : buffer_(new Task[kRingSize]), head_(0), tail_(0) {}
 
-  ~SpscTaskQueue() {
-    delete[] buffer_;
-  }
+  ~SpscTaskQueue() { delete[] buffer_; }
 
-  /*!
-   * \brief Push a task into the queue and notify the comsumer if it is on wait.
-   * \param input The task to be dequeued.
+  /**
+   * @brief Push a task into the queue and notify the comsumer if it is on wait.
+   * @param input The task to be dequeued.
    */
   void Push(const Task& input) {
     while (!Enqueue(input)) {
@@ -151,24 +139,24 @@ class SpscTaskQueue {
     }
   }
 
-  /*!
-   * \brief Pop a task out of the queue and condition wait if no tasks.
-   * \param output The pointer to the task to be dequeued.
-   * \param spin_count The number of iterations to spin before sleep.
-   * \return Whether pop is successful (true) or we need to exit now (false).
+  /**
+   * @brief Pop a task out of the queue and condition wait if no tasks.
+   * @param output The pointer to the task to be dequeued.
+   * @param spin_count The number of iterations to spin before sleep.
+   * @return Whether pop is successful (true) or we need to exit now (false).
    */
   bool Pop(Task* output, uint32_t spin_count = 300000) {
     // Busy wait a bit when the queue is empty.
-    // If a new task comes to the queue quickly, this wait avoid the worker from sleeping.
-    // The default spin count is set by following the typical omp convention
+    // If a new task comes to the queue quickly, this wait avoid the worker from
+    // sleeping. The default spin count is set by following the typical omp
+    // convention
     for (uint32_t i = 0; i < spin_count && pending_.load() == 0; ++i) {
       dgl::runtime::threading::YieldThread();
     }
     if (pending_.fetch_sub(1) == 0) {
       std::unique_lock<std::mutex> lock(mutex_);
-      cv_.wait(lock, [this] {
-          return pending_.load() >= 0 || exit_now_.load();
-        });
+      cv_.wait(
+          lock, [this] { return pending_.load() >= 0 || exit_now_.load(); });
     }
     if (exit_now_.load(std::memory_order_relaxed)) {
       return false;
@@ -181,8 +169,8 @@ class SpscTaskQueue {
     return true;
   }
 
-  /*!
-   * \brief Signal to terminate the worker.
+  /**
+   * @brief Signal to terminate the worker.
    */
   void SignalForKill() {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -191,10 +179,10 @@ class SpscTaskQueue {
   }
 
  protected:
-  /*!
-   * \brief Lock-free enqueue.
-   * \param input The task to be enqueued.
-   * \return Whether the task is enqueued.
+  /**
+   * @brief Lock-free enqueue.
+   * @param input The task to be enqueued.
+   * @return Whether the task is enqueued.
    */
   bool Enqueue(const Task& input) {
     if (exit_now_.load(std::memory_order_relaxed)) return false;
@@ -209,7 +197,8 @@ class SpscTaskQueue {
     return false;
   }
 
-  // the cache line paddings are used for avoid false sharing between atomic variables
+  // the cache line paddings are used for avoid false sharing between atomic
+  // variables
   typedef char cache_line_pad_t[kL1CacheBytes];
   cache_line_pad_t pad0_;
   // size of the queue, the queue can host size_ - 1 items at most
@@ -243,16 +232,17 @@ class SpscTaskQueue {
 // The thread pool
 class ThreadPool {
  public:
-  ThreadPool(): num_workers_(dgl::runtime::threading::MaxConcurrency()) {
+  ThreadPool() : num_workers_(dgl::runtime::threading::MaxConcurrency()) {
     for (int i = 0; i < num_workers_; ++i) {
       // The SpscTaskQueue only hosts ONE item at a time
       queues_.emplace_back(std::unique_ptr<SpscTaskQueue>(new SpscTaskQueue()));
     }
     threads_ = std::unique_ptr<dgl::runtime::threading::ThreadGroup>(
         new dgl::runtime::threading::ThreadGroup(
-          num_workers_, [this](int worker_id) { this->RunWorker(worker_id); },
-          exclude_worker0_ /* include_main_thread */));
-    num_workers_used_ = threads_->Configure(threading::ThreadGroup::kBig, 0, exclude_worker0_);
+            num_workers_, [this](int worker_id) { this->RunWorker(worker_id); },
+            exclude_worker0_ /* include_main_thread */));
+    num_workers_used_ =
+        threads_->Configure(threading::ThreadGroup::kBig, 0, exclude_worker0_);
   }
   ~ThreadPool() {
     for (std::unique_ptr<SpscTaskQueue>& q : queues_) {
@@ -260,13 +250,11 @@ class ThreadPool {
     }
     threads_.reset();
   }
-  int Launch(FDGLParallelLambda flambda,
-             void* cdata,
-             int num_task,
-             int need_sync) {
+  int Launch(
+      FDGLParallelLambda flambda, void* cdata, int num_task, int need_sync) {
     ParallelLauncher* launcher = ParallelLauncher::ThreadLocal();
-    CHECK(!launcher->is_worker)
-        << "Cannot launch parallel job inside worker, consider fuse then parallel";
+    CHECK(!launcher->is_worker) << "Cannot launch parallel job inside worker, "
+                                   "consider fuse then parallel";
     if (num_task == 0) {
       num_task = num_workers_used_;
     }
@@ -300,11 +288,11 @@ class ThreadPool {
     return dmlc::ThreadLocalStore<ThreadPool>::Get();
   }
 
-  void UpdateWorkerConfiguration(threading::ThreadGroup::AffinityMode mode, int nthreads) {
+  void UpdateWorkerConfiguration(
+      threading::ThreadGroup::AffinityMode mode, int nthreads) {
     // this will also reset the affinity of the ThreadGroup
     // may use less than the MaxConcurrency number of workers
-    num_workers_used_ = threads_->Configure(mode, nthreads,
-                                            exclude_worker0_);
+    num_workers_used_ = threads_->Configure(mode, nthreads, exclude_worker0_);
     // if MaxConcurrency restricted the number of workers (e.g., due to
     // hyperthreading), respect the restriction
     num_workers_used_ = std::min(num_workers_, num_workers_used_);
@@ -341,23 +329,19 @@ class ThreadPool {
 };
 
 DGL_REGISTER_GLOBAL("runtime.config_threadpool")
-.set_body([](DGLArgs args, DGLRetValue* rv) {
-    threading::ThreadGroup::AffinityMode mode =\
-    static_cast<threading::ThreadGroup::AffinityMode>(\
-    static_cast<int>(args[0]));
-    int nthreads = args[1];
-    ThreadPool::ThreadLocal()->UpdateWorkerConfiguration(mode, nthreads);
-});
-
+    .set_body([](DGLArgs args, DGLRetValue* rv) {
+      threading::ThreadGroup::AffinityMode mode =
+          static_cast<threading::ThreadGroup::AffinityMode>(
+              static_cast<int>(args[0]));
+      int nthreads = args[1];
+      ThreadPool::ThreadLocal()->UpdateWorkerConfiguration(mode, nthreads);
+    });
 
 }  // namespace runtime
 }  // namespace dgl
 
-
 int DGLBackendParallelLaunch(
-    FDGLParallelLambda flambda,
-    void* cdata,
-    int num_task) {
+    FDGLParallelLambda flambda, void* cdata, int num_task) {
   int res = dgl::runtime::ThreadPool::ThreadLocal()->Launch(
       flambda, cdata, num_task, 1);
   return res;
@@ -372,8 +356,8 @@ int DGLBackendParallelBarrier(int task_id, DGLParallelGroupEnv* penv) {
       1, std::memory_order_release);
   for (int i = 0; i < num_task; ++i) {
     if (i != task_id) {
-      while (sync_counter[i * kSyncStride].load(
-                 std::memory_order_relaxed) <= old_counter) {
+      while (sync_counter[i * kSyncStride].load(std::memory_order_relaxed) <=
+             old_counter) {
         dgl::runtime::threading::YieldThread();
       }
     }
