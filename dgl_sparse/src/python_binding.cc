@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2022 by Contributors
  * @file python_binding.cc
  * @brief DGL sparse library Python binding
