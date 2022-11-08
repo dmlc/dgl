@@ -56,20 +56,20 @@
 通常，需要对用于整图的GNN模块进行如下调整以将其用于块作为输入的情况：
 
 -  切片取输入特征的前几行，得到输出节点的特征。切片行数可以通过
-   :meth:`block.number_of_dst_nodes <dgl.DGLHeteroGraph.number_of_dst_nodes>` 获得。
--  如果原图只包含一种节点类型，对输入节点特征，将 :attr:`g.ndata <dgl.DGLHeteroGraph.ndata>` 替换为
-   :attr:`block.srcdata <dgl.DGLHeteroGraph.srcdata>`；对于输出节点特征，将
-   :attr:`g.ndata <dgl.DGLHeteroGraph.ndata>`  替换为
-   :attr:`block.dstdata <dgl.DGLHeteroGraph.dstdata>`。
+   :meth:`block.number_of_dst_nodes <dgl.DGLGraph.number_of_dst_nodes>` 获得。
+-  如果原图只包含一种节点类型，对输入节点特征，将 :attr:`g.ndata <dgl.DGLGraph.ndata>` 替换为
+   :attr:`block.srcdata <dgl.DGLGraph.srcdata>`；对于输出节点特征，将
+   :attr:`g.ndata <dgl.DGLGraph.ndata>`  替换为
+   :attr:`block.dstdata <dgl.DGLGraph.dstdata>`。
 -  如果原图包含多种节点类型，对于输入节点特征，将
-   :attr:`g.nodes <dgl.DGLHeteroGraph.nodes>` 替换为
-   :attr:`block.srcnodes <dgl.DGLHeteroGraph.srcnodes>`；对于输出节点特征，将
-   :attr:`g.nodes <dgl.DGLHeteroGraph.nodes>` 替换为
-   :attr:`block.dstnodes <dgl.DGLHeteroGraph.dstnodes>`。
--  对于输入节点数量，将 :meth:`g.number_of_nodes <dgl.DGLHeteroGraph.number_of_nodes>` 替换为
-   :meth:`block.number_of_src_nodes <dgl.DGLHeteroGraph.number_of_src_nodes>` ；
-   对于输出节点数量，将 :meth:`g.number_of_nodes <dgl.DGLHeteroGraph.number_of_nodes>` 替换为
-   :meth:`block.number_of_dst_nodes <dgl.DGLHeteroGraph.number_of_dst_nodes>` 。
+   :attr:`g.nodes <dgl.DGLGraph.nodes>` 替换为
+   :attr:`block.srcnodes <dgl.DGLGraph.srcnodes>`；对于输出节点特征，将
+   :attr:`g.nodes <dgl.DGLGraph.nodes>` 替换为
+   :attr:`block.dstnodes <dgl.DGLGraph.dstnodes>`。
+-  对于输入节点数量，将 :meth:`g.number_of_nodes <dgl.DGLGraph.number_of_nodes>` 替换为
+   :meth:`block.number_of_src_nodes <dgl.DGLGraph.number_of_src_nodes>` ；
+   对于输出节点数量，将 :meth:`g.number_of_nodes <dgl.DGLGraph.number_of_nodes>` 替换为
+   :meth:`block.number_of_dst_nodes <dgl.DGLGraph.number_of_dst_nodes>` 。
 
 异构图上的模型定制
 ~~~~~~~~~~~~~~~~~~~~
