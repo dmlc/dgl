@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2022 by Contributors
  * @file elementwise_op.cc
  * @brief DGL C++ sparse elementwise operator implementation
