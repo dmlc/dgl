@@ -1,13 +1,14 @@
 """GraphSAINT samplers."""
 from ..base import DGLError
 from ..random import choice
-from ..sampling import random_walk, pack_traces
-from .base import set_node_lazy_features, set_edge_lazy_features, Sampler
+from ..sampling import pack_traces, random_walk
+from .base import Sampler, set_edge_lazy_features, set_node_lazy_features
 
 try:
     import torch
 except ImportError:
     pass
+
 
 class SAINTSampler(Sampler):
     """Random node/edge/walk sampler from
@@ -65,18 +66,28 @@ class SAINTSampler(Sampler):
     >>> for subg in dataloader:
     ...     train_on(subg)
     """
-    def __init__(self, mode, budget, cache=True, prefetch_ndata=None,
-                 prefetch_edata=None, output_device='cpu'):
+
+    def __init__(
+        self,
+        mode,
+        budget,
+        cache=True,
+        prefetch_ndata=None,
+        prefetch_edata=None,
+        output_device="cpu",
+    ):
         super().__init__()
         self.budget = budget
-        if mode == 'node':
+        if mode == "node":
             self.sampler = self.node_sampler
-        elif mode == 'edge':
+        elif mode == "edge":
             self.sampler = self.edge_sampler
-        elif mode == 'walk':
+        elif mode == "walk":
             self.sampler = self.walk_sampler
         else:
-            raise DGLError(f"Expect mode to be 'node', 'edge' or 'walk', got {mode}.")
+            raise DGLError(
+                f"Expect mode to be 'node', 'edge' or 'walk', got {mode}."
+            )
 
         self.cache = cache
         self.prob = None
@@ -95,8 +106,11 @@ class SAINTSampler(Sampler):
             prob = g.out_degrees().float().clamp(min=1)
             if self.cache:
                 self.prob = prob
-        return torch.multinomial(prob, num_samples=self.budget,
-                                 replacement=True).unique().type(g.idtype)
+        return (
+            torch.multinomial(prob, num_samples=self.budget, replacement=True)
+            .unique()
+            .type(g.idtype)
+        )
 
     def edge_sampler(self, g):
         """Node ID sampler for random edge sampler"""
@@ -107,11 +121,13 @@ class SAINTSampler(Sampler):
             in_deg = g.in_degrees().float().clamp(min=1)
             out_deg = g.out_degrees().float().clamp(min=1)
             # We can reduce the sample space by half if graphs are always symmetric.
-            prob = 1. / in_deg[dst.long()] + 1. / out_deg[src.long()]
+            prob = 1.0 / in_deg[dst.long()] + 1.0 / out_deg[src.long()]
             prob /= prob.sum()
             if self.cache:
                 self.prob = prob
-        sampled_edges = torch.unique(choice(len(prob), size=self.budget, prob=prob))
+        sampled_edges = torch.unique(
+            choice(len(prob), size=self.budget, prob=prob)
+        )
         sampled_nodes = torch.cat([src[sampled_edges], dst[sampled_edges]])
         return sampled_nodes.unique().type(g.idtype)
 
@@ -139,7 +155,9 @@ class SAINTSampler(Sampler):
             The sampled subgraph.
         """
         node_ids = self.sampler(g)
-        sg = g.subgraph(node_ids, relabel_nodes=True, output_device=self.output_device)
+        sg = g.subgraph(
+            node_ids, relabel_nodes=True, output_device=self.output_device
+        )
         set_node_lazy_features(sg, self.prefetch_ndata)
         set_edge_lazy_features(sg, self.prefetch_edata)
         return sg

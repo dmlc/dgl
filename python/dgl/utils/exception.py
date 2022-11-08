@@ -16,14 +16,17 @@ import traceback
 # and the frame (which holds reference to all the object in its temporary scope)
 # holding reference the traceback.
 
+
 class KeyErrorMessage(str):
     r"""str subclass that returns itself in repr"""
-    def __repr__(self):     # pylint: disable=invalid-repr-returned
+
+    def __repr__(self):  # pylint: disable=invalid-repr-returned
         return self
 
 
 class ExceptionWrapper(object):
     r"""Wraps an exception plus traceback to communicate across threads"""
+
     def __init__(self, exc_info=None, where="in background"):
         # It is important that we don't store exc_info, see
         # NOTE [ Python Traceback Reference Cycle Problem ]
@@ -38,7 +41,8 @@ class ExceptionWrapper(object):
         # Format a message such as: "Caught ValueError in DataLoader worker
         # process 2. Original Traceback:", followed by the traceback.
         msg = "Caught {} {}.\nOriginal {}".format(
-            self.exc_type.__name__, self.where, self.exc_msg)
+            self.exc_type.__name__, self.where, self.exc_msg
+        )
         if self.exc_type == KeyError:
             # KeyError calls repr() on its argument (usually a dict key). This
             # makes stack traces unreadable. It will not be changed in Python

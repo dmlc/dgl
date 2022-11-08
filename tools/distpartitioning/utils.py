@@ -10,7 +10,9 @@ import torch
 from pyarrow import csv
 
 import constants
-
+from dgl.distributed.partition import (
+    _dump_part_config
+)
 
 def read_ntype_partition_files(schema_map, input_dir):
     """
@@ -67,6 +69,27 @@ def read_json(json_file):
 
     return val
 
+def get_etype_featnames(etype_name, schema_map):
+    """Retrieves edge feature names for a given edge_type
+
+    Parameters:
+    -----------
+    eype_name : string
+        a string specifying a edge_type name
+
+    schema : dictionary
+        metadata json object as a dictionary, which is read from the input
+        metadata file from the input dataset
+
+    Returns:
+    --------
+    list : 
+        a list of feature names for a given edge_type
+    """
+    edge_data = schema_map[constants.STR_EDGE_DATA]
+    feats = edge_data.get(etype_name, {})
+    return [feat for feat in feats]
+
 def get_ntype_featnames(ntype_name, schema_map): 
     """
     Retrieves node feature names for a given node_type
@@ -88,6 +111,30 @@ def get_ntype_featnames(ntype_name, schema_map):
     node_data = schema_map[constants.STR_NODE_DATA]
     feats = node_data.get(ntype_name, {})
     return [feat for feat in feats]
+
+def get_edge_types(schema_map):
+    """Utility method to extract edge_typename -> edge_type mappings
+    as defined by the input schema
+
+    Parameters:
+    -----------
+    schema_map : dictionary
+        Input schema from which the edge_typename -> edge_typeid
+        dictionary is created.
+
+    Returns:
+    --------
+    dictionary
+        with keys as edge type names and values as ids (integers)
+    list
+        list of etype name strings
+    dictionary
+        with keys as etype ids (integers) and values as edge type names
+    """
+    etypes = schema_map[constants.STR_EDGE_TYPE]
+    etype_etypeid_map = {e : i for i, e in enumerate(etypes)}
+    etypeid_etype_map = {i : e for i, e in enumerate(etypes)}
+    return etype_etypeid_map, etypes, etypeid_etype_map
 
 def get_node_types(schema_map):
     """ 
@@ -189,8 +236,7 @@ def write_metadata_json(metadata_list, output_dir, graph_name):
     for i in range(len(metadata_list)):
         graph_metadata["part-{}".format(i)] = metadata_list[i]["part-{}".format(i)]
 
-    with open('{}/metadata.json'.format(output_dir), 'w') as outfile: 
-        json.dump(graph_metadata, outfile, sort_keys=False, indent=4)
+    _dump_part_config(f'{output_dir}/metadata.json', graph_metadata)
 
 def augment_edge_data(edge_data, lookup_service, edge_tids, rank, world_size):
     """
@@ -334,7 +380,7 @@ def write_edge_features(edge_features, edge_file):
     """
     dgl.data.utils.save_tensors(edge_file, edge_features)
 
-def write_graph_dgl(graph_file, graph_obj): 
+def write_graph_dgl(graph_file, graph_obj, formats, sort_etypes):
     """
     Utility function to serialize graph dgl objects
 
@@ -344,11 +390,16 @@ def write_graph_dgl(graph_file, graph_obj):
         graph dgl object, as created in convert_partition.py, which is to be serialized
     graph_file : string
         File name in which graph object is serialized
+    formats : str or list[str]
+        Save graph in specified formats.
+    sort_etypes : bool
+        Whether to sort etypes in csc/csr.
     """
-    dgl.save_graphs(graph_file, [graph_obj])
+    dgl.distributed.partition._save_graphs(graph_file, [graph_obj],
+        formats, sort_etypes)
 
 def write_dgl_objects(graph_obj, node_features, edge_features,
-        output_dir, part_id, orig_nids, orig_eids):
+        output_dir, part_id, orig_nids, orig_eids, formats, sort_etypes):
     """
     Wrapper function to write graph, node/edge feature, original node/edge IDs.
 
@@ -368,11 +419,15 @@ def write_dgl_objects(graph_obj, node_features, edge_features,
         original node IDs
     orig_eids : dict
         original edge IDs
+    formats : str or list[str]
+        Save graph in formats.
+    sort_etypes : bool
+        Whether to sort etypes in csc/csr.
     """
-
     part_dir = output_dir + '/part' + str(part_id)
     os.makedirs(part_dir, exist_ok=True)
-    write_graph_dgl(os.path.join(part_dir ,'graph.dgl'), graph_obj)
+    write_graph_dgl(os.path.join(part_dir ,'graph.dgl'), graph_obj,
+        formats, sort_etypes)
 
     if node_features != None:
         write_node_features(node_features, os.path.join(part_dir, "node_feat.dgl"))

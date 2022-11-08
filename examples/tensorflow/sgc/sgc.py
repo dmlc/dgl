@@ -16,11 +16,10 @@ import tensorflow_addons as tfa
 from dgl.data import CiteseerGraphDataset, CoraGraphDataset, PubmedGraphDataset
 from dgl.nn.tensorflow.conv import SGConv
 
-
 _DATASETS = {
-    'citeseer': CiteseerGraphDataset(verbose=False),
-    'cora': CoraGraphDataset(verbose=False),
-    'pubmed': PubmedGraphDataset(verbose=False)
+    "citeseer": CiteseerGraphDataset(verbose=False),
+    "cora": CoraGraphDataset(verbose=False),
+    "pubmed": PubmedGraphDataset(verbose=False),
 }
 
 
@@ -29,7 +28,7 @@ def load_data(dataset):
 
 
 def _sum_boolean_tensor(x):
-    return tf.reduce_sum(tf.cast(x, dtype='int64'))
+    return tf.reduce_sum(tf.cast(x, dtype="int64"))
 
 
 def describe_data(data):
@@ -38,9 +37,9 @@ def describe_data(data):
     n_edges = g.number_of_edges()
     num_classes = data.num_classes
 
-    train_mask = g.ndata['train_mask']
-    val_mask = g.ndata['val_mask']
-    test_mask = g.ndata['test_mask']
+    train_mask = g.ndata["train_mask"]
+    val_mask = g.ndata["val_mask"]
+    test_mask = g.ndata["test_mask"]
 
     description = textwrap.dedent(
         f"""
@@ -65,7 +64,7 @@ class SGC(tf.keras.Model):
             out_feats=self.num_classes,
             k=2,
             cached=True,
-            bias=bias
+            bias=bias,
         )
 
     def call(self, inputs):
@@ -73,7 +72,7 @@ class SGC(tf.keras.Model):
 
     @property
     def in_feats(self):
-        return self.g.ndata['feat'].shape[1]
+        return self.g.ndata["feat"].shape[1]
 
     @property
     def num_nodes(self):
@@ -87,7 +86,7 @@ class SGC(tf.keras.Model):
 
     def train_step(self, data):
         X, y = data
-        mask = self.g.ndata['train_mask']
+        mask = self.g.ndata["train_mask"]
 
         with tf.GradientTape() as tape:
             y_pred = self(X, training=True)
@@ -101,7 +100,7 @@ class SGC(tf.keras.Model):
 
     def test_step(self, data):
         X, y = data
-        mask = self.g.ndata['val_mask']
+        mask = self.g.ndata["val_mask"]
         y_pred = self(X, training=False)
         self.compiled_loss(y[mask], y_pred[mask])
         self.compiled_metrics.update_state(y[mask], y_pred[mask])
@@ -111,12 +110,12 @@ class SGC(tf.keras.Model):
         super().compile(*args, **kwargs, run_eagerly=True)
 
     def fit(self, *args, **kwargs):
-        kwargs['batch_size'] = self.num_nodes
-        kwargs['shuffle'] = False
+        kwargs["batch_size"] = self.num_nodes
+        kwargs["shuffle"] = False
         super().fit(*args, **kwargs)
 
     def predict(self, *args, **kwargs):
-        kwargs['batch_size'] = self.num_nodes
+        kwargs["batch_size"] = self.num_nodes
         return super().predict(*args, **kwargs)
 
 
@@ -125,41 +124,32 @@ def main(dataset, lr, bias, n_epochs, weight_decay):
     print(describe_data(data))
 
     g = data[0]
-    X = g.ndata['feat']
-    y = g.ndata['label']
+    X = g.ndata["feat"]
+    y = g.ndata["label"]
 
     model = SGC(g=g, num_classes=data.num_classes, bias=bias)
 
     loss = tf.losses.SparseCategoricalCrossentropy(from_logits=True)
     optimizer = tfa.optimizers.AdamW(weight_decay, lr)
-    accuracy = tf.metrics.SparseCategoricalAccuracy(name='accuracy')
+    accuracy = tf.metrics.SparseCategoricalAccuracy(name="accuracy")
 
     model.compile(optimizer, loss, metrics=[accuracy])
-    model.fit(
-        x=X,
-        y=y,
-        epochs=n_epochs,
-        validation_data=(X, y)
-    )
+    model.fit(x=X, y=y, epochs=n_epochs, validation_data=(X, y))
 
     y_pred = model.predict(X, batch_size=len(X))
-    test_mask = g.ndata['test_mask']
+    test_mask = g.ndata["test_mask"]
     test_accuracy = accuracy(y[test_mask], y_pred[test_mask])
     print(f"Test Accuracy: {test_accuracy:.1%}")
 
 
 def _parse_args():
     parser = argparse.ArgumentParser(
-        description='Run experiment for Simple Graph Convolution (SGC)'
+        description="Run experiment for Simple Graph Convolution (SGC)"
     )
+    parser.add_argument("--dataset", default="cora", help="dataset to run")
+    parser.add_argument("--lr", type=float, default=0.2, help="learning rate")
     parser.add_argument(
-        "--dataset", default='cora', help="dataset to run"
-    )
-    parser.add_argument(
-        "--lr", type=float, default=0.2, help="learning rate"
-    )
-    parser.add_argument(
-        "--bias", action='store_true', default=False, help="flag to use bias"
+        "--bias", action="store_true", default=False, help="flag to use bias"
     )
     parser.add_argument(
         "--n-epochs", type=int, default=100, help="number of training epochs"
@@ -170,12 +160,12 @@ def _parse_args():
     return parser.parse_args()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = _parse_args()
     main(
         dataset=args.dataset,
         lr=args.lr,
         bias=args.bias,
         n_epochs=args.n_epochs,
-        weight_decay=args.weight_decay
+        weight_decay=args.weight_decay,
     )

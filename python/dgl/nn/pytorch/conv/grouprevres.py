@@ -1,12 +1,15 @@
 """Torch module for grouped reversible residual connections for GNNs"""
 # pylint: disable= no-member, arguments-differ, invalid-name, C0116, R1728
 from copy import deepcopy
+
 import numpy as np
 import torch
 import torch.nn as nn
 
+
 class InvertibleCheckpoint(torch.autograd.Function):
     r"""Extension of torch.autograd"""
+
     @staticmethod
     def forward(ctx, fn, fn_inverse, num_inputs, *inputs_and_weights):
         ctx.fn = fn
@@ -40,19 +43,25 @@ class InvertibleCheckpoint(torch.autograd.Function):
     @staticmethod
     def backward(ctx, *grad_outputs):
         if not torch.autograd._is_checkpoint_valid():
-            raise RuntimeError("InvertibleCheckpoint is not compatible with .grad(), \
-                               please use .backward() if possible")
+            raise RuntimeError(
+                "InvertibleCheckpoint is not compatible with .grad(), \
+                               please use .backward() if possible"
+            )
         # retrieve input and output tensor nodes
         if len(ctx.outputs) == 0:
-            raise RuntimeError("Trying to perform backward on the InvertibleCheckpoint \
-                               for more than once.")
+            raise RuntimeError(
+                "Trying to perform backward on the InvertibleCheckpoint \
+                               for more than once."
+            )
         inputs = ctx.inputs.pop()
         outputs = ctx.outputs.pop()
 
         # reconstruct input node features
         with torch.no_grad():
             # inputs[0] is DGLGraph and inputs[1] is input node features
-            inputs_inverted = ctx.fn_inverse(*((inputs[0], outputs)+inputs[2:]))
+            inputs_inverted = ctx.fn_inverse(
+                *((inputs[0], outputs) + inputs[2:])
+            )
             # clear memory of outputs
             outputs.storage().resize_(0)
 
@@ -72,11 +81,16 @@ class InvertibleCheckpoint(torch.autograd.Function):
             detached_inputs = tuple(detached_inputs)
             temp_output = ctx.fn(*detached_inputs)
 
-        filtered_detached_inputs = tuple(filter(lambda x: getattr(x, 'requires_grad', False),
-                                                detached_inputs))
-        gradients = torch.autograd.grad(outputs=(temp_output,),
-                                        inputs=filtered_detached_inputs + ctx.weights,
-                                        grad_outputs=grad_outputs)
+        filtered_detached_inputs = tuple(
+            filter(
+                lambda x: getattr(x, "requires_grad", False), detached_inputs
+            )
+        )
+        gradients = torch.autograd.grad(
+            outputs=(temp_output,),
+            inputs=filtered_detached_inputs + ctx.weights,
+            grad_outputs=grad_outputs,
+        )
 
         input_gradients = []
         i = 0
@@ -87,7 +101,7 @@ class InvertibleCheckpoint(torch.autograd.Function):
             else:
                 input_gradients.append(None)
 
-        gradients = tuple(input_gradients) + gradients[-len(ctx.weights):]
+        gradients = tuple(input_gradients) + gradients[-len(ctx.weights) :]
 
         return (None, None, None) + gradients
 
@@ -157,6 +171,7 @@ class GroupRevRes(nn.Module):
     >>> model = GroupRevRes(conv, groups)
     >>> out = model(g, x)
     """
+
     def __init__(self, gnn_module, groups=2):
         super(GroupRevRes, self).__init__()
         self.gnn_modules = nn.ModuleList()
@@ -173,7 +188,9 @@ class GroupRevRes(nn.Module):
         if len(args) == 0:
             args_chunks = [()] * self.groups
         else:
-            chunked_args = list(map(lambda arg: torch.chunk(arg, self.groups, dim=-1), args))
+            chunked_args = list(
+                map(lambda arg: torch.chunk(arg, self.groups, dim=-1), args)
+            )
             args_chunks = list(zip(*chunked_args))
         y_in = sum(xs[1:])
 
@@ -192,13 +209,15 @@ class GroupRevRes(nn.Module):
         if len(args) == 0:
             args_chunks = [()] * self.groups
         else:
-            chunked_args = list(map(lambda arg: torch.chunk(arg, self.groups, dim=-1), args))
+            chunked_args = list(
+                map(lambda arg: torch.chunk(arg, self.groups, dim=-1), args)
+            )
             args_chunks = list(zip(*chunked_args))
 
         xs = []
-        for i in range(self.groups-1, -1, -1):
+        for i in range(self.groups - 1, -1, -1):
             if i != 0:
-                y_in = ys[i-1]
+                y_in = ys[i - 1]
             else:
                 y_in = sum(xs)
 
@@ -232,6 +251,7 @@ class GroupRevRes(nn.Module):
             self._forward,
             self._inverse,
             len(args),
-            *(args + tuple([p for p in self.parameters() if p.requires_grad])))
+            *(args + tuple([p for p in self.parameters() if p.requires_grad]))
+        )
 
         return y

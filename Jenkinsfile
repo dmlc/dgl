@@ -1,6 +1,6 @@
 #!/usr/bin/env groovy
 
-dgl_linux_libs = 'build/libdgl.so, build/runUnitTests, python/dgl/_ffi/_cy3/core.cpython-*-x86_64-linux-gnu.so, build/tensoradapter/pytorch/*.so'
+dgl_linux_libs = 'build/libdgl.so, build/runUnitTests, python/dgl/_ffi/_cy3/core.cpython-*-x86_64-linux-gnu.so, build/tensoradapter/pytorch/*.so, build/dgl_sparse/*.so'
 // Currently DGL on Windows is not working with Cython yet
 dgl_win64_libs = "build\\dgl.dll, build\\runUnitTests.exe, build\\tensoradapter\\pytorch\\*.dll"
 
@@ -298,7 +298,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "rapidsai/cugraph_nightly_torch-cuda:11.5-base-ubuntu18.04-py3.9-pytorch1.12.0-rapids22.10"
+                  image "rapidsai/cugraph_nightly_torch-cuda:11.5-base-ubuntu18.04-py3.9-pytorch1.12.0-rapids22.12"
                   args "-u root"
                   alwaysPull true
                 }
@@ -525,7 +525,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-gpu-node"
-                  image "rapidsai/cugraph_nightly_torch-cuda:11.5-base-ubuntu18.04-py3.9-pytorch1.12.0-rapids22.10"
+                  image "rapidsai/cugraph_nightly_torch-cuda:11.5-base-ubuntu18.04-py3.9-pytorch1.12.0-rapids22.12"
                   args "--runtime nvidia --shm-size=8gb"
                   alwaysPull true
                 }

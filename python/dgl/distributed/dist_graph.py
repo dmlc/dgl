@@ -4,15 +4,16 @@ from collections.abc import MutableMapping
 from collections import namedtuple
 
 import os
+import gc
 import numpy as np
 
 from ..heterograph import DGLHeteroGraph
 from ..convert import heterograph as dgl_heterograph
 from ..convert import graph as dgl_graph
-from ..transforms import compact_graphs, sort_csr_by_tag, sort_csc_by_tag
+from ..transforms import compact_graphs
 from .. import heterograph_index
 from .. import backend as F
-from ..base import NID, EID, NTYPE, ETYPE, ALL, is_all
+from ..base import NID, EID, ETYPE, ALL, is_all
 from .kvstore import KVServer, get_kvstore
 from .._ffi.ndarray import empty_shared_mem
 from ..ndarray import exist_shared_mem_array
@@ -21,6 +22,7 @@ from .partition import load_partition, load_partition_feats, load_partition_book
 from .graph_partition_book import PartitionPolicy, get_shared_mem_partition_book
 from .graph_partition_book import HeteroDataName, parse_hetero_data_name
 from .graph_partition_book import NodePartitionPolicy, EdgePartitionPolicy
+from .graph_partition_book import _etype_str_to_tuple
 from .shared_mem_utils import _to_shared_mem, _get_ndata_path, _get_edata_path, DTYPE_DICT
 from . import rpc
 from . import role
@@ -31,6 +33,7 @@ from .graph_services import find_edges as dist_find_edges
 from .graph_services import out_degrees as dist_out_degrees
 from .graph_services import in_degrees as dist_in_degrees
 from .dist_tensor import DistTensor
+from .partition import RESERVED_FIELD_DTYPE
 
 INIT_GRAPH = 800001
 
@@ -81,15 +84,11 @@ def _copy_graph_to_shared_mem(g, graph_name, graph_format):
     # for heterogeneous graph, we need to put ETYPE into KVStore
     # for homogeneous graph, ETYPE does not exist
     if ETYPE in g.edata:
-        new_g.edata[ETYPE] = _to_shared_mem(g.edata[ETYPE], _get_edata_path(graph_name, ETYPE))
+        new_g.edata[ETYPE] = _to_shared_mem(
+                g.edata[ETYPE],
+                _get_edata_path(graph_name, ETYPE),
+        )
     return new_g
-
-FIELD_DICT = {'inner_node': F.int32,    # A flag indicates whether the node is inside a partition.
-              'inner_edge': F.int32,    # A flag indicates whether the edge is inside a partition.
-              NID: F.int64,
-              EID: F.int64,
-              NTYPE: F.int32,
-              ETYPE: F.int32}
 
 def _get_shared_mem_ndata(g, graph_name, name):
     ''' Get shared-memory node data from DistGraph server.
@@ -98,7 +97,7 @@ def _get_shared_mem_ndata(g, graph_name, name):
     with shared memory.
     '''
     shape = (g.number_of_nodes(),)
-    dtype = FIELD_DICT[name]
+    dtype = RESERVED_FIELD_DTYPE[name]
     dtype = DTYPE_DICT[dtype]
     data = empty_shared_mem(_get_ndata_path(graph_name, name), False, shape, dtype)
     dlpack = data.to_dlpack()
@@ -111,7 +110,7 @@ def _get_shared_mem_edata(g, graph_name, name):
     with shared memory.
     '''
     shape = (g.number_of_edges(),)
-    dtype = FIELD_DICT[name]
+    dtype = RESERVED_FIELD_DTYPE[name]
     dtype = DTYPE_DICT[dtype]
     data = empty_shared_mem(_get_edata_path(graph_name, name), False, shape, dtype)
     dlpack = data.to_dlpack()
@@ -158,14 +157,16 @@ class HeteroNodeView(object):
         return NodeSpace(data=NodeDataView(self._graph, key))
 
 class HeteroEdgeView(object):
-    """A NodeView class to act as G.nodes for a DistGraph."""
+    """An EdgeView class to act as G.edges for a DistGraph."""
     __slots__ = ['_graph']
 
     def __init__(self, graph):
         self._graph = graph
 
     def __getitem__(self, key):
-        assert isinstance(key, str)
+        assert isinstance(key, str) or (
+            isinstance(key, tuple) and len(key) == 3
+        ), f"Expect edge type in string or triplet of string, but got {key}."
         return EdgeSpace(data=EdgeDataView(self._graph, key))
 
 class NodeDataView(MutableMapping):
@@ -340,7 +341,7 @@ class DistGraphServer(KVServer):
             # TODO(Rui) Formatting forcely is not a perfect solution.
             #   We'd better store all dtypes when mapping to shared memory
             #   and map back with original dtypes.
-            for k, dtype in FIELD_DICT.items():
+            for k, dtype in RESERVED_FIELD_DTYPE.items():
                 if k in self.client_g.ndata:
                     self.client_g.ndata[k] = F.astype(
                         self.client_g.ndata[k], dtype)
@@ -350,14 +351,6 @@ class DistGraphServer(KVServer):
             # Create the graph formats specified the users.
             self.client_g = self.client_g.formats(graph_format)
             self.client_g.create_formats_()
-            # Sort underlying matrix beforehand to avoid runtime overhead during sampling.
-            if len(etypes) > 1:
-                if 'csr' in graph_format:
-                    self.client_g = sort_csr_by_tag(
-                        self.client_g, tag=self.client_g.edata[ETYPE], tag_type='edge')
-                if 'csc' in graph_format:
-                    self.client_g = sort_csc_by_tag(
-                        self.client_g, tag=self.client_g.edata[ETYPE], tag_type='edge')
             if not disable_shared_mem:
                 self.client_g = _copy_graph_to_shared_mem(self.client_g, graph_name, graph_format)
 
@@ -365,14 +358,15 @@ class DistGraphServer(KVServer):
             self.gpb.shared_memory(graph_name)
         assert self.gpb.partid == self.part_id
         for ntype in ntypes:
-            node_name = HeteroDataName(True, ntype, None)
+            node_name = HeteroDataName(True, ntype, "")
             self.add_part_policy(PartitionPolicy(node_name.policy_str, self.gpb))
         for etype in etypes:
-            edge_name = HeteroDataName(False, etype, None)
+            edge_name = HeteroDataName(False, etype, "")
             self.add_part_policy(PartitionPolicy(edge_name.policy_str, self.gpb))
 
         if not self.is_backup_server():
-            node_feats, edge_feats = load_partition_feats(part_config, self.part_id)
+            node_feats, _ = load_partition_feats(part_config, self.part_id,
+                load_nodes=True, load_edges=False)
             for name in node_feats:
                 # The feature name has the following format: node_type + "/" + feature_name to avoid
                 # feature name collision for different node types.
@@ -381,14 +375,23 @@ class DistGraphServer(KVServer):
                 self.init_data(name=str(data_name), policy_str=data_name.policy_str,
                                data_tensor=node_feats[name])
                 self.orig_data.add(str(data_name))
+            # Let's free once node features are copied to shared memory
+            del node_feats
+            gc.collect()
+            _, edge_feats = load_partition_feats(part_config, self.part_id,
+                load_nodes=False, load_edges=True)
             for name in edge_feats:
                 # The feature name has the following format: edge_type + "/" + feature_name to avoid
                 # feature name collision for different edge types.
                 etype, feat_name = name.split('/')
+                etype = _etype_str_to_tuple(etype)
                 data_name = HeteroDataName(False, etype, feat_name)
                 self.init_data(name=str(data_name), policy_str=data_name.policy_str,
                                data_tensor=edge_feats[name])
                 self.orig_data.add(str(data_name))
+            # Let's free once edge features are copied to shared memory
+            del edge_feats
+            gc.collect()
 
     def start(self):
         """ Start graph store server.
@@ -480,7 +483,6 @@ class DistGraph:
     '''
     def __init__(self, graph_name, gpb=None, part_config=None):
         self.graph_name = graph_name
-        self._gpb_input = gpb
         if os.environ.get('DGL_DIST_MODE', 'standalone') == 'standalone':
             assert part_config is not None, \
                     'When running in the standalone model, the partition config file is required'
@@ -503,13 +505,14 @@ class DistGraph:
             for name in edge_feats:
                 # The feature name has the following format: edge_type + "/" + feature_name.
                 etype, feat_name = name.split('/')
+                etype = _etype_str_to_tuple(etype)
                 self._client.add_data(str(HeteroDataName(False, etype, feat_name)),
                                       edge_feats[name],
                                       EdgePartitionPolicy(self._gpb, etype=etype))
             self._client.map_shared_data(self._gpb)
             rpc.set_num_client(1)
         else:
-            self._init()
+            self._init(gpb)
             # Tell the backup servers to load the graph structure from shared memory.
             for server_id in range(self._client.num_servers):
                 rpc.send_request(server_id, InitGraphRequest(graph_name))
@@ -530,56 +533,25 @@ class DistGraph:
 
         # When we store node/edge types in a list, they are stored in the order of type IDs.
         self._ntype_map = {ntype:i for i, ntype in enumerate(self.ntypes)}
-        self._etype_map = {etype:i for i, etype in enumerate(self.etypes)}
+        self._etype_map = {etype:i for i, etype in enumerate(self.canonical_etypes)}
 
-        # Get canonical edge types.
-        # TODO(zhengda) this requires the server to store the graph with coo format.
-        eid = []
-        for etype in self.etypes:
-            type_eid = F.zeros((1,), F.int64, F.cpu())
-            eid.append(self._gpb.map_to_homo_eid(type_eid, etype))
-        eid = F.cat(eid, 0)
-        src, dst = dist_find_edges(self, eid)
-        src_tids, _ = self._gpb.map_to_per_ntype(src)
-        dst_tids, _ = self._gpb.map_to_per_ntype(dst)
-        self._canonical_etypes = []
-        etype_ids = F.arange(0, len(self.etypes))
-        for src_tid, etype_id, dst_tid in zip(src_tids, etype_ids, dst_tids):
-            src_tid = F.as_scalar(src_tid)
-            etype_id = F.as_scalar(etype_id)
-            dst_tid = F.as_scalar(dst_tid)
-            self._canonical_etypes.append((self.ntypes[src_tid], self.etypes[etype_id],
-                                           self.ntypes[dst_tid]))
-        self._etype2canonical = {}
-        for src_type, etype, dst_type in self._canonical_etypes:
-            if etype in self._etype2canonical:
-                self._etype2canonical[etype] = ()
-            else:
-                self._etype2canonical[etype] = (src_type, etype, dst_type)
-
-    def _init(self):
+    def _init(self, gpb):
         self._client = get_kvstore()
         assert self._client is not None, \
                 'Distributed module is not initialized. Please call dgl.distributed.initialize.'
         self._g = _get_graph_from_shared_mem(self.graph_name)
         self._gpb = get_shared_mem_partition_book(self.graph_name, self._g)
         if self._gpb is None:
-            self._gpb = self._gpb_input
+            self._gpb = gpb
         self._client.map_shared_data(self._gpb)
 
     def __getstate__(self):
-        return self.graph_name, self._gpb, self._canonical_etypes
+        return self.graph_name, self._gpb
 
     def __setstate__(self, state):
-        self.graph_name, self._gpb_input, self._canonical_etypes = state
-        self._init()
+        self.graph_name, gpb = state
+        self._init(gpb)
 
-        self._etype2canonical = {}
-        for src_type, etype, dst_type in self._canonical_etypes:
-            if etype in self._etype2canonical:
-                self._etype2canonical[etype] = ()
-            else:
-                self._etype2canonical[etype] = (src_type, etype, dst_type)
         self._ndata_store = {}
         self._edata_store = {}
         self._ndata = NodeDataView(self)
@@ -724,7 +696,6 @@ class DistGraph:
         >>> g.etypes
         ['_E']
         """
-        # Currently, we only support a graph with one edge type.
         return self._gpb.etypes
 
     @property
@@ -761,7 +732,7 @@ class DistGraph:
          ('user', 'follows', 'game'),
          ('user', 'plays', 'game')]
         """
-        return self._canonical_etypes
+        return self._gpb.canonical_etypes
 
     def to_canonical_etype(self, etype):
         """Convert an edge type to the corresponding canonical edge type in the graph.
@@ -806,21 +777,7 @@ class DistGraph:
         --------
         canonical_etypes
         """
-        if etype is None:
-            if len(self.etypes) != 1:
-                raise DGLError('Edge type name must be specified if there are more than one '
-                               'edge types.')
-            etype = self.etypes[0]
-        if isinstance(etype, tuple):
-            return etype
-        else:
-            ret = self._etype2canonical.get(etype, None)
-            if ret is None:
-                raise DGLError('Edge type "{}" does not exist.'.format(etype))
-            if len(ret) != 3:
-                raise DGLError('Edge type "{}" is ambiguous. Please use canonical edge type '
-                               'in the form of (srctype, etype, dsttype)'.format(etype))
-            return ret
+        return self._gpb.to_canonical_etype(etype)
 
     def get_ntype_id(self, ntype):
         """Return the ID of the given node type.
@@ -864,6 +821,7 @@ class DistGraph:
                 raise DGLError('Edge type name must be specified if there are more than one '
                                'edge types.')
             return 0
+        etype = self.to_canonical_etype(etype)
         return self._etype_map[etype]
 
     def number_of_nodes(self, ntype=None):
@@ -928,10 +886,8 @@ class DistGraph:
         123718280
         """
         if etype is None:
-            if len(self.etypes) == 1:
-                return self._gpb._num_edges(self.etypes[0])
-            else:
-                return sum([self._gpb._num_edges(etype) for etype in self.etypes])
+            return sum([self._gpb._num_edges(c_etype)
+                for c_etype in self.canonical_etypes])
         return self._gpb._num_edges(etype)
 
     def out_degrees(self, u=ALL):
@@ -1131,10 +1087,6 @@ class DistGraph:
 
         gpb = self.get_partition_book()
         if len(gpb.etypes) > 1:
-            # if etype is a canonical edge type (str, str, str), extract the edge type
-            if isinstance(etype, tuple):
-                assert len(etype) == 3, 'Invalid canonical etype: {}'.format(etype)
-                etype = etype[1]
             edges = gpb.map_to_homo_eid(edges, etype)
         src, dst = dist_find_edges(self, edges)
         if len(gpb.ntypes) > 1:
@@ -1180,14 +1132,10 @@ class DistGraph:
         if isinstance(edges, dict):
             # TODO(zhengda) we need to directly generate subgraph of all relations with
             # one invocation.
-            if isinstance(list(edges.keys())[0], tuple):
-                subg = {etype: self.find_edges(edges[etype], etype[1]) for etype in edges}
-            else:
-                subg = {}
-                for etype in edges:
-                    assert len(self._etype2canonical[etype]) == 3, \
-                            'the etype in input edges is ambiguous'
-                    subg[self._etype2canonical[etype]] = self.find_edges(edges[etype], etype)
+            subg = {}
+            for etype, edge in edges.items():
+                etype = self.to_canonical_etype(etype)
+                subg[etype] = self.find_edges(edge, etype)
             num_nodes = {ntype: self.number_of_nodes(ntype) for ntype in self.ntypes}
             subg = dgl_heterograph(subg, num_nodes_dict=num_nodes)
             for etype in edges:
@@ -1245,7 +1193,7 @@ class DistGraph:
 
         Parameters
         ----------
-        etype : str
+        etype : str or (str, str, str)
             The edge type
 
         Returns
@@ -1253,6 +1201,7 @@ class DistGraph:
         PartitionPolicy
             The partition policy for the edge type.
         """
+        etype = self.to_canonical_etype(etype)
         return EdgePartitionPolicy(self.get_partition_book(), etype)
 
     def barrier(self):
@@ -1268,13 +1217,13 @@ class DistGraph:
                          output_device=None):
         # pylint: disable=unused-argument
         """Sample neighbors from a distributed graph."""
-        # Currently prob, exclude_edges, output_device, and edge_dir are ignored.
         if len(self.etypes) > 1:
             frontier = graph_services.sample_etype_neighbors(
-                self, seed_nodes, ETYPE, fanout, replace=replace, etype_sorted=etype_sorted)
+                self, seed_nodes, fanout, replace=replace,
+                etype_sorted=etype_sorted, prob=prob)
         else:
             frontier = graph_services.sample_neighbors(
-                self, seed_nodes, fanout, replace=replace)
+                self, seed_nodes, fanout, replace=replace, prob=prob)
         return frontier
 
     def _get_ndata_names(self, ntype=None):
@@ -1292,6 +1241,8 @@ class DistGraph:
     def _get_edata_names(self, etype=None):
         ''' Get the names of all edge data.
         '''
+        if etype is not None:
+            etype = self.to_canonical_etype(etype)
         names = self._client.gdata_name_list()
         edata_names = []
         for name in names:
@@ -1570,7 +1521,7 @@ def edge_split(edges, partition_book=None, etype='_E', rank=None, force_even=Tru
         A boolean mask vector that indicates input edges.
     partition_book : GraphPartitionBook, optional
         The graph partition book
-    etype : str, optional
+    etype : str or (str, str, str), optional
         The edge type of the input edges.
     rank : int, optional
         The rank of a process. If not given, the rank of the current process is used.

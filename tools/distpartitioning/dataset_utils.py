@@ -50,7 +50,14 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
         in which keys are edge-type names and values are triplets. This triplet has edge-feature name, 
         and range of tids for theedge feature data read from the files by the current process. Each
         edge-type may have several edge features and associated tensor data.
-
+    dictionary
+        Data read from numpy files for all the edge features in this dataset. This dictionary's keys
+        are feature names and values are tensors data representing edge feature data.
+    dictionary
+        This dictionary is used for identifying the global-id range for the associated edge features
+        present in the previous return value. The keys are edge-type names and values are triplets.
+        Each triplet consists of edge-feature name and starting and ending points of the range of 
+        tids representing the corresponding edge feautres.
     """
 
     #node features dictionary
@@ -160,12 +167,97 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
                 item[1] = node_tids[ntype_name][rank][0]
                 item[2] = node_tids[ntype_name][rank][1]
 
-    #done build node_features locally. 
+    #done building node_features locally. 
     if len(node_features) <= 0:
         logging.info(f'[Rank: {rank}] This dataset does not have any node features')
     else:
         for k, v in node_features.items():
             logging.info(f'[Rank: {rank}] node feature name: {k}, feature data shape: {v.size()}')
+
+    '''
+    Reading edge features now.
+    The structure of the edge_data is as follows, which is present in the input metadata json file. 
+       "edge_data" : {
+            "etype0-name" : {
+                "feat0-name" : {
+                    "format" : {"name": "numpy"},
+                    "data" :   [ #list
+                        "<path>/feat-0.npy",
+                        "<path>/feat-1.npy",
+                        ....
+                        "<path>/feat-<p-1>.npy"
+                    ]
+                },
+                "feat1-name" : {
+                    "format" : {"name": "numpy"}, 
+                    "data" : [ #list 
+                        "<path>/feat-0.npy",
+                        "<path>/feat-1.npy",
+                        ....
+                        "<path>/feat-<p-1>.npy"
+                    ]
+                }
+            }
+       }
+
+    As shown above, the value for the key "edge_data" is a dictionary object, which is 
+    used to describe the feature data for each of the edge-type names. Keys in this top-level
+    dictionary are edge-type names and value is a dictionary which captures all the features
+    for the current edge-type. Feature data is captured with keys being the feature-names and
+    value is a dictionary object which has 2 keys namely `format` and `data`. Format entry is used
+    to mention the format of the storage used by the node features themselves and "data" is used
+    to mention all the files present for this given node feature.
+
+    Data read from each of the node features file is a multi-dimensional tensor data and is read
+    in numpy format, which is also the storage format of node features on the permanent storage.
+    '''
+    edge_features = {}
+    edge_feature_tids = {}
+
+    # Iterate over the "edge_data" dictionary in the schema_map.
+    # Read the edge features if exists.
+    # Also keep track of the type_eids for which the edge_features are read.
+    dataset_features = schema_map[constants.STR_EDGE_DATA]
+    if dataset_features and (len(dataset_features) > 0):
+        for etype_name, etype_feature_data in dataset_features.items():
+            #etype_feature_data is a dictionary
+            #where key: feature_name, value: dictionary in which keys are "format", "data"
+            edge_feature_tids[etype_name] = []
+            for feat_name, feat_data in etype_feature_data.items():
+                assert feat_data[constants.STR_FORMAT][constants.STR_NAME] == constants.STR_NUMPY
+                num_chunks = len(feat_data[constants.STR_DATA])
+                read_list = np.array_split(np.arange(num_chunks), world_size)
+                efeat = []
+                for idx in read_list[rank]:
+                    efeat_file = feat_data[constants.STR_DATA][idx]
+                    if not os.path.isabs(efeat_file):
+                        efeat_file = os.path.join(input_dir, efeat_file)
+                    logging.info(
+                        f'Loading edge feature[{feat_name}] of etype[{etype_name}] from {efeat_file}'
+                    )
+                    efeat.append(np.load(efeat_file))
+                efeat = np.concatenate(efeat)
+                edge_features[etype_name + '/' + feat_name] = torch.from_numpy(efeat)
+
+                edge_feature_tids[etype_name].append([feat_name, -1, -1])
+
+    # Read edges for each node types that are processed by the currnet process.
+    edge_tids, _ = get_idranges(schema_map[constants.STR_EDGE_TYPE], 
+                                schema_map[constants.STR_NUM_EDGES_PER_CHUNK],
+                                num_chunks=world_size)
+    for etype_name in schema_map[constants.STR_EDGE_TYPE]: 
+        if etype_name in edge_feature_tids: 
+            for item in edge_feature_tids[etype_name]:
+                item[1] = edge_tids[etype_name][rank][0]
+                item[2] = edge_tids[etype_name][rank][1]
+
+    # Done with building node_features locally. 
+    if len(edge_features) <= 0:
+        logging.info(f'[Rank: {rank}] This dataset does not have any edge features')
+    else:
+        for k, v in edge_features.items():
+            logging.info(f'[Rank: {rank}] edge feature name: {k}, feature data shape: {v.size()}')
+
 
     '''
     Code below is used to read edges from the input dataset with the help of the metadata json file
@@ -245,11 +337,18 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
             if not os.path.isabs(edge_file):
                 edge_file = os.path.join(input_dir, edge_file)
             logging.info(f'Loading edges of etype[{etype_name}] from {edge_file}')
-            data_df = csv.read_csv(edge_file,
-                        read_options=pyarrow.csv.ReadOptions(autogenerate_column_names=True), 
-                        parse_options=pyarrow.csv.ParseOptions(delimiter=' '))
-            src_ids.append(data_df['f0'].to_numpy())
-            dst_ids.append(data_df['f1'].to_numpy())
+
+            read_options=pyarrow.csv.ReadOptions(use_threads=True, block_size=4096, autogenerate_column_names=True)
+            parse_options=pyarrow.csv.ParseOptions(delimiter=' ')
+            with pyarrow.csv.open_csv(edge_file, read_options=read_options, parse_options=parse_options) as reader:
+                for next_chunk in reader:
+                    if next_chunk is None:
+                        break
+
+                    next_table = pyarrow.Table.from_batches([next_chunk])
+                    src_ids.append(next_table['f0'].to_numpy())
+                    dst_ids.append(next_table['f1'].to_numpy())
+
         src_ids = np.concatenate(src_ids)
         dst_ids = np.concatenate(dst_ids)
 
@@ -270,5 +369,5 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
     assert edge_datadict[constants.GLOBAL_TYPE_EID].shape == edge_datadict[constants.ETYPE_ID].shape
     logging.info(f'[Rank: {rank}] Done reading edge_file: {len(edge_datadict)}, {edge_datadict[constants.GLOBAL_SRC_ID].shape}')
 
-    return node_tids, node_features, node_feature_tids, edge_datadict, edge_tids
+    return node_tids, node_features, node_feature_tids, edge_datadict, edge_tids, edge_features, edge_feature_tids
 

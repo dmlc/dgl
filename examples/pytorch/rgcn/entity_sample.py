@@ -17,13 +17,13 @@ class RGCN(nn.Module):
                                   num_bases=num_rels, self_loop=False)
         self.conv2 = RelGraphConv(h_dim, out_dim, num_rels, regularizer='basis',
                                   num_bases=num_rels, self_loop=False)
-        
+
     def forward(self, g):
         x = self.emb(g[0].srcdata[dgl.NID])
         h = F.relu(self.conv1(g[0], x, g[0].edata[dgl.ETYPE], g[0].edata['norm']))
         h = self.conv2(g[1], h, g[1].edata[dgl.ETYPE], g[1].edata['norm'])
         return h
-    
+
 def evaluate(model, label, dataloader, inv_target):
     model.eval()
     eval_logits = []
@@ -68,7 +68,7 @@ def train(device, g, target_idx, labels, train_mask, model):
         acc = evaluate(model, labels, val_loader, inv_target)
         print("Epoch {:05d} | Loss {:.4f} | Val. Accuracy {:.4f} "
               . format(epoch, total_loss / (it+1), acc))
-        
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='RGCN for entity classification with sampling')
     parser.add_argument("--dataset", type=str, default="aifb",
@@ -105,12 +105,12 @@ if __name__ == '__main__':
     # find the mapping (inv_target) from global node IDs to type-specific node IDs
     inv_target = torch.empty((g.num_nodes(),), dtype=torch.int64).to(device)
     inv_target[target_idx] = torch.arange(0, target_idx.shape[0], dtype=inv_target.dtype).to(device)
-    
-    # create RGCN model    
+
+    # create RGCN model
     in_size = g.num_nodes() # featureless with one-hot encoding
     out_size = data.num_classes
     model = RGCN(in_size, 16, out_size, num_rels).to(device)
-    
+
     train(device, g, target_idx, labels, train_mask, model)
     test_idx = torch.nonzero(test_mask, as_tuple=False).squeeze()
     test_sampler = MultiLayerNeighborSampler([-1, -1]) # -1 for sampling all neighbors

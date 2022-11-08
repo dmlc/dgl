@@ -1,8 +1,10 @@
+import operator
+
 import numpy as np
 import pytest
-import dgl
 import torch
-import operator
+
+import dgl
 from dgl.mock_sparse import SparseMatrix, diag
 
 parametrize_idtype = pytest.mark.parametrize(

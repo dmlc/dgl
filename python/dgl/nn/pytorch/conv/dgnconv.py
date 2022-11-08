@@ -1,67 +1,100 @@
 """Torch Module for Directional Graph Networks Convolution Layer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
 from functools import partial
+
 import torch
 import torch.nn as nn
+
 from .pnaconv import AGGREGATORS, SCALERS, PNAConv, PNAConvTower
+
 
 def aggregate_dir_av(h, eig_s, eig_d, eig_idx):
     """directional average aggregation"""
-    h_mod = torch.mul(h, (
-        torch.abs(eig_s[:, :, eig_idx] - eig_d[:, :, eig_idx]) /
-            (torch.sum(torch.abs(eig_s[:, :, eig_idx] - eig_d[:, :, eig_idx]),
-            keepdim=True, dim=1) + 1e-30)).unsqueeze(-1))
+    h_mod = torch.mul(
+        h,
+        (
+            torch.abs(eig_s[:, :, eig_idx] - eig_d[:, :, eig_idx])
+            / (
+                torch.sum(
+                    torch.abs(eig_s[:, :, eig_idx] - eig_d[:, :, eig_idx]),
+                    keepdim=True,
+                    dim=1,
+                )
+                + 1e-30
+            )
+        ).unsqueeze(-1),
+    )
     return torch.sum(h_mod, dim=1)
+
 
 def aggregate_dir_dx(h, eig_s, eig_d, h_in, eig_idx):
     """directional derivative aggregation"""
-    eig_w = ((
-        eig_s[:, :, eig_idx] - eig_d[:, :, eig_idx]) /
-        (torch.sum(
-            torch.abs(eig_s[:, :, eig_idx] - eig_d[:, :, eig_idx]),
-            keepdim=True, dim=1) + 1e-30
+    eig_w = (
+        (eig_s[:, :, eig_idx] - eig_d[:, :, eig_idx])
+        / (
+            torch.sum(
+                torch.abs(eig_s[:, :, eig_idx] - eig_d[:, :, eig_idx]),
+                keepdim=True,
+                dim=1,
+            )
+            + 1e-30
         )
     ).unsqueeze(-1)
     h_mod = torch.mul(h, eig_w)
     return torch.abs(torch.sum(h_mod, dim=1) - torch.sum(eig_w, dim=1) * h_in)
 
+
 for k in range(1, 4):
-    AGGREGATORS[f'dir{k}-av'] = partial(aggregate_dir_av, eig_idx=k-1)
-    AGGREGATORS[f'dir{k}-dx'] = partial(aggregate_dir_dx, eig_idx=k-1)
+    AGGREGATORS[f"dir{k}-av"] = partial(aggregate_dir_av, eig_idx=k - 1)
+    AGGREGATORS[f"dir{k}-dx"] = partial(aggregate_dir_dx, eig_idx=k - 1)
+
 
 class DGNConvTower(PNAConvTower):
     """A single DGN tower with modified reduce function"""
+
     def message(self, edges):
         """message function for DGN layer"""
         if self.edge_feat_size > 0:
-            f = torch.cat([edges.src['h'], edges.dst['h'], edges.data['a']], dim=-1)
+            f = torch.cat(
+                [edges.src["h"], edges.dst["h"], edges.data["a"]], dim=-1
+            )
         else:
-            f = torch.cat([edges.src['h'], edges.dst['h']], dim=-1)
-        return {'msg': self.M(f), 'eig_s': edges.src['eig'], 'eig_d': edges.dst['eig']}
+            f = torch.cat([edges.src["h"], edges.dst["h"]], dim=-1)
+        return {
+            "msg": self.M(f),
+            "eig_s": edges.src["eig"],
+            "eig_d": edges.dst["eig"],
+        }
 
     def reduce_func(self, nodes):
         """reduce function for DGN layer"""
-        h_in = nodes.data['h']
-        eig_s = nodes.mailbox['eig_s']
-        eig_d = nodes.mailbox['eig_d']
-        msg = nodes.mailbox['msg']
+        h_in = nodes.data["h"]
+        eig_s = nodes.mailbox["eig_s"]
+        eig_d = nodes.mailbox["eig_d"]
+        msg = nodes.mailbox["msg"]
         degree = msg.size(1)
 
         h = []
         for agg in self.aggregators:
-            if agg.startswith('dir'):
-                if agg.endswith('av'):
+            if agg.startswith("dir"):
+                if agg.endswith("av"):
                     h.append(AGGREGATORS[agg](msg, eig_s, eig_d))
                 else:
                     h.append(AGGREGATORS[agg](msg, eig_s, eig_d, h_in))
             else:
                 h.append(AGGREGATORS[agg](msg))
         h = torch.cat(h, dim=1)
-        h = torch.cat([
-            SCALERS[scaler](h, D=degree, delta=self.delta) if scaler != 'identity' else h
-            for scaler in self.scalers
-        ], dim=1)
-        return {'h_neigh': h}
+        h = torch.cat(
+            [
+                SCALERS[scaler](h, D=degree, delta=self.delta)
+                if scaler != "identity"
+                else h
+                for scaler in self.scalers
+            ],
+            dim=1,
+        )
+        return {"h_neigh": h}
+
 
 class DGNConv(PNAConv):
     r"""Directional Graph Network Layer from `Directional Graph Networks
@@ -154,24 +187,49 @@ class DGNConv(PNAConv):
     >>> conv = DGNConv(10, 10, ['dir1-av', 'dir1-dx', 'sum'], ['identity', 'amplification'], 2.5)
     >>> ret = conv(g, feat, eig_vec=eig)
     """
-    def __init__(self, in_size, out_size, aggregators, scalers, delta,
-        dropout=0., num_towers=1, edge_feat_size=0, residual=True):
+
+    def __init__(
+        self,
+        in_size,
+        out_size,
+        aggregators,
+        scalers,
+        delta,
+        dropout=0.0,
+        num_towers=1,
+        edge_feat_size=0,
+        residual=True,
+    ):
         super(DGNConv, self).__init__(
-            in_size, out_size, aggregators, scalers, delta, dropout,
-            num_towers, edge_feat_size, residual
+            in_size,
+            out_size,
+            aggregators,
+            scalers,
+            delta,
+            dropout,
+            num_towers,
+            edge_feat_size,
+            residual,
         )
 
-        self.towers = nn.ModuleList([
-            DGNConvTower(
-                self.tower_in_size, self.tower_out_size,
-                aggregators, scalers, delta,
-                dropout=dropout, edge_feat_size=edge_feat_size
-            ) for _ in range(num_towers)
-        ])
+        self.towers = nn.ModuleList(
+            [
+                DGNConvTower(
+                    self.tower_in_size,
+                    self.tower_out_size,
+                    aggregators,
+                    scalers,
+                    delta,
+                    dropout=dropout,
+                    edge_feat_size=edge_feat_size,
+                )
+                for _ in range(num_towers)
+            ]
+        )
 
         self.use_eig_vec = False
         for aggr in aggregators:
-            if aggr.startswith('dir'):
+            if aggr.startswith("dir"):
                 self.use_eig_vec = True
                 break
 
@@ -203,5 +261,5 @@ class DGNConv(PNAConv):
         """
         with graph.local_scope():
             if self.use_eig_vec:
-                graph.ndata['eig'] = eig_vec
+                graph.ndata["eig"] = eig_vec
             return super().forward(graph, node_feat, edge_feat)

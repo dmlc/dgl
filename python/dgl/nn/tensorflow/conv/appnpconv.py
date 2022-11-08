@@ -1,8 +1,8 @@
 """TF Module for APPNPConv"""
 # pylint: disable= no-member, arguments-differ, invalid-name
+import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
-import numpy as np
 
 from .... import function as fn
 
@@ -29,10 +29,7 @@ class APPNPConv(layers.Layer):
         messages received by each node. Default: ``0``.
     """
 
-    def __init__(self,
-                 k,
-                 alpha,
-                 edge_drop=0.):
+    def __init__(self, k, alpha, edge_drop=0.0):
         super(APPNPConv, self).__init__()
         self._k = k
         self._alpha = alpha
@@ -56,8 +53,11 @@ class APPNPConv(layers.Layer):
             should be the same as input shape.
         """
         with graph.local_scope():
-            degs = tf.clip_by_value(tf.cast(graph.in_degrees(), tf.float32),
-                                    clip_value_min=1, clip_value_max=np.inf)
+            degs = tf.clip_by_value(
+                tf.cast(graph.in_degrees(), tf.float32),
+                clip_value_min=1,
+                clip_value_max=np.inf,
+            )
             norm = tf.pow(degs, -0.5)
             shp = norm.shape + (1,) * (feat.ndim - 1)
             norm = tf.reshape(norm, shp)
@@ -65,12 +65,12 @@ class APPNPConv(layers.Layer):
             for _ in range(self._k):
                 # normalization by src node
                 feat = feat * norm
-                graph.ndata['h'] = feat
-                graph.edata['w'] = self.edge_drop(
-                    tf.ones(graph.number_of_edges(), 1))
-                graph.update_all(fn.u_mul_e('h', 'w', 'm'),
-                                 fn.sum('m', 'h'))
-                feat = graph.ndata.pop('h')
+                graph.ndata["h"] = feat
+                graph.edata["w"] = self.edge_drop(
+                    tf.ones(graph.number_of_edges(), 1)
+                )
+                graph.update_all(fn.u_mul_e("h", "w", "m"), fn.sum("m", "h"))
+                feat = graph.ndata.pop("h")
                 # normalization by dst node
                 feat = feat * norm
                 feat = (1 - self._alpha) * feat + self._alpha * feat_0
