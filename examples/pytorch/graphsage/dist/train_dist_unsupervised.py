@@ -1,31 +1,29 @@
 import os
-os.environ['DGLBACKEND']='pytorch'
-import argparse, time
-import numpy as np
-import tqdm
-import sklearn.linear_model as lm
-import sklearn.metrics as skm
+
+os.environ["DGLBACKEND"] = "pytorch"
+import argparse
+import time
+from contextlib import contextmanager
 
 import dgl
-from dgl.data import register_data_args
 import dgl.function as fn
 import dgl.nn.pytorch as dglnn
-
+import numpy as np
+import sklearn.linear_model as lm
+import sklearn.metrics as skm
 import torch as th
 import torch.multiprocessing as mp
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from contextlib import contextmanager
+import tqdm
+from dgl.data import register_data_args
+
 
 class DistSAGE(nn.Module):
-    def __init__(self,
-                 in_feats,
-                 n_hidden,
-                 n_classes,
-                 n_layers,
-                 activation,
-                 dropout):
+    def __init__(
+        self, in_feats, n_hidden, n_classes, n_layers, activation, dropout
+    ):
         super().__init__()
         self.n_layers = n_layers
         self.n_hidden = n_hidden
@@ -61,18 +59,36 @@ class DistSAGE(nn.Module):
         # Therefore, we compute the representation of all nodes layer by layer.  The nodes
         # on each layer are of course splitted in batches.
         # TODO: can we standardize this?
-        nodes = dgl.distributed.node_split(np.arange(g.number_of_nodes()),
-                                           g.get_partition_book(), force_even=True)
-        y = dgl.distributed.DistTensor((g.number_of_nodes(), self.n_hidden), th.float32, 'h',
-                                       persistent=True)
+        nodes = dgl.distributed.node_split(
+            np.arange(g.number_of_nodes()),
+            g.get_partition_book(),
+            force_even=True,
+        )
+        y = dgl.distributed.DistTensor(
+            (g.number_of_nodes(), self.n_hidden),
+            th.float32,
+            "h",
+            persistent=True,
+        )
         for l, layer in enumerate(self.layers):
             if l == len(self.layers) - 1:
-                y = dgl.distributed.DistTensor((g.number_of_nodes(), self.n_classes),
-                                               th.float32, 'h_last', persistent=True)
+                y = dgl.distributed.DistTensor(
+                    (g.number_of_nodes(), self.n_classes),
+                    th.float32,
+                    "h_last",
+                    persistent=True,
+                )
             # Create sampler
             sampler = dgl.dataloading.NeighborSampler([-1])
             # Create dataloader
-            dataloader = dgl.dataloading.DistNodeDataLoader(g, nodes, sampler, batch_size=batch_size, shuffle=False, drop_last=False)
+            dataloader = dgl.dataloading.DistNodeDataLoader(
+                g,
+                nodes,
+                sampler,
+                batch_size=batch_size,
+                shuffle=False,
+                drop_last=False,
+            )
 
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
                 block = blocks[0].to(device)
@@ -93,6 +109,7 @@ class DistSAGE(nn.Module):
     def join(self):
         """dummy join for standalone"""
         yield
+
 
 def load_subtensor(g, input_nodes, device):
     """
@@ -182,12 +199,23 @@ def run(args, device, data):
     ) = data
     # Create sampler
     neg_sampler = dgl.dataloading.negative_sampler.Uniform(args.num_negs)
-    sampler = dgl.dataloading.NeighborSampler([int(fanout) for fanout in args.fan_out.split(',')])
+    sampler = dgl.dataloading.NeighborSampler(
+        [int(fanout) for fanout in args.fan_out.split(",")]
+    )
     # Create dataloader
-    exclude = 'reverse_id' if args.remove_edge else None
+    exclude = "reverse_id" if args.remove_edge else None
     reverse_eids = th.arange(g.num_edges()) if args.remove_edge else None
-    dataloader = dgl.dataloading.DistEdgeDataLoader(g, train_eids, sampler, negative_sampler=neg_sampler,
-                                                    exclude=exclude, reverse_eids=reverse_eids, batch_size=args.batch_size, shuffle=True, drop_last=False)
+    dataloader = dgl.dataloading.DistEdgeDataLoader(
+        g,
+        train_eids,
+        sampler,
+        negative_sampler=neg_sampler,
+        exclude=exclude,
+        reverse_eids=reverse_eids,
+        batch_size=args.batch_size,
+        shuffle=True,
+        drop_last=False,
+    )
     # Define model and optimizer
     model = DistSAGE(
         in_feats,
@@ -228,7 +256,9 @@ def run(args, device, data):
         with model.join():
             # Loop over the dataloader to sample the computation dependency graph as a list of
             # blocks.
-            for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(dataloader):
+            for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(
+                dataloader
+            ):
                 tic_step = time.time()
                 sample_t.append(tic_step - start)
 
@@ -261,11 +291,22 @@ def run(args, device, data):
                 iter_tput.append(pos_edges / step_t)
                 num_seeds += pos_edges
                 if step % args.log_every == 0:
-                    print('[{}] Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f} | time {:.3f} s' \
-                            '| sample {:.3f} | copy {:.3f} | forward {:.3f} | backward {:.3f} | update {:.3f}'.format(
-                        g.rank(), epoch, step, loss.item(), np.mean(iter_tput[3:]), np.sum(step_time[-args.log_every:]),
-                        np.sum(sample_t[-args.log_every:]), np.sum(feat_copy_t[-args.log_every:]), np.sum(forward_t[-args.log_every:]),
-                        np.sum(backward_t[-args.log_every:]), np.sum(update_t[-args.log_every:])))
+                    print(
+                        "[{}] Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f} | time {:.3f} s"
+                        "| sample {:.3f} | copy {:.3f} | forward {:.3f} | backward {:.3f} | update {:.3f}".format(
+                            g.rank(),
+                            epoch,
+                            step,
+                            loss.item(),
+                            np.mean(iter_tput[3:]),
+                            np.sum(step_time[-args.log_every :]),
+                            np.sum(sample_t[-args.log_every :]),
+                            np.sum(feat_copy_t[-args.log_every :]),
+                            np.sum(forward_t[-args.log_every :]),
+                            np.sum(backward_t[-args.log_every :]),
+                            np.sum(update_t[-args.log_every :]),
+                        )
+                    )
                 start = time.time()
 
         print(
@@ -284,8 +325,13 @@ def run(args, device, data):
         epoch += 1
 
     # evaluate the embedding using LogisticRegression
-    pred = generate_emb(model if args.standalone else model.module,
-                        g, g.ndata['features'], args.batch_size_eval, device)
+    pred = generate_emb(
+        model if args.standalone else model.module,
+        g,
+        g.ndata["features"],
+        args.batch_size_eval,
+        device,
+    )
     if g.rank() == 0:
         eval_acc, test_acc = compute_acc(
             pred, labels, global_train_nid, global_valid_nid, global_test_nid
@@ -337,7 +383,7 @@ def main(args):
         device = th.device("cpu")
     else:
         dev_id = g.rank() % args.num_gpus
-        device = th.device('cuda:'+str(dev_id))
+        device = th.device("cuda:" + str(dev_id))
 
     # Pack data
     in_feats = g.ndata["features"].shape[1]
@@ -364,28 +410,44 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="GCN")
     register_data_args(parser)
-    parser.add_argument('--graph_name', type=str, help='graph name')
-    parser.add_argument('--id', type=int, help='the partition id')
-    parser.add_argument('--ip_config', type=str, help='The file for IP configuration')
-    parser.add_argument('--part_config', type=str, help='The path to the partition config file')
-    parser.add_argument('--n_classes', type=int, help='the number of classes')
-    parser.add_argument('--num_gpus', type=int, default=-1,
-                        help="the number of GPU device. Use -1 for CPU training")
-    parser.add_argument('--num_epochs', type=int, default=20)
-    parser.add_argument('--num_hidden', type=int, default=16)
-    parser.add_argument('--num-layers', type=int, default=2)
-    parser.add_argument('--fan_out', type=str, default='10,25')
-    parser.add_argument('--batch_size', type=int, default=1000)
-    parser.add_argument('--batch_size_eval', type=int, default=100000)
-    parser.add_argument('--log_every', type=int, default=20)
-    parser.add_argument('--eval_every', type=int, default=5)
-    parser.add_argument('--lr', type=float, default=0.003)
-    parser.add_argument('--dropout', type=float, default=0.5)
-    parser.add_argument('--local_rank', type=int, help='get rank of the process')
-    parser.add_argument('--standalone', action='store_true', help='run in the standalone mode')
-    parser.add_argument('--num_negs', type=int, default=1)
-    parser.add_argument('--remove_edge', default=False, action='store_true',
-        help="whether to remove edges during sampling")
+    parser.add_argument("--graph_name", type=str, help="graph name")
+    parser.add_argument("--id", type=int, help="the partition id")
+    parser.add_argument(
+        "--ip_config", type=str, help="The file for IP configuration"
+    )
+    parser.add_argument(
+        "--part_config", type=str, help="The path to the partition config file"
+    )
+    parser.add_argument("--n_classes", type=int, help="the number of classes")
+    parser.add_argument(
+        "--num_gpus",
+        type=int,
+        default=-1,
+        help="the number of GPU device. Use -1 for CPU training",
+    )
+    parser.add_argument("--num_epochs", type=int, default=20)
+    parser.add_argument("--num_hidden", type=int, default=16)
+    parser.add_argument("--num-layers", type=int, default=2)
+    parser.add_argument("--fan_out", type=str, default="10,25")
+    parser.add_argument("--batch_size", type=int, default=1000)
+    parser.add_argument("--batch_size_eval", type=int, default=100000)
+    parser.add_argument("--log_every", type=int, default=20)
+    parser.add_argument("--eval_every", type=int, default=5)
+    parser.add_argument("--lr", type=float, default=0.003)
+    parser.add_argument("--dropout", type=float, default=0.5)
+    parser.add_argument(
+        "--local_rank", type=int, help="get rank of the process"
+    )
+    parser.add_argument(
+        "--standalone", action="store_true", help="run in the standalone mode"
+    )
+    parser.add_argument("--num_negs", type=int, default=1)
+    parser.add_argument(
+        "--remove_edge",
+        default=False,
+        action="store_true",
+        help="whether to remove edges during sampling",
+    )
     args = parser.parse_args()
     print(args)
     main(args)

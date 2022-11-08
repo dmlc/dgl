@@ -1,17 +1,18 @@
 import os
-os.environ['DGLBACKEND']='pytorch'
-import argparse, time
-import numpy as np
+
+os.environ["DGLBACKEND"] = "pytorch"
+import argparse
+import time
 
 import dgl
-from dgl.data import register_data_args
-
+import numpy as np
 import torch as th
 import torch.nn.functional as F
 import torch.optim as optim
-
-from train_dist_unsupervised import DistSAGE, CrossEntropyLoss, compute_acc
+from dgl.data import register_data_args
 from train_dist_transductive import DistEmb, load_embs
+from train_dist_unsupervised import CrossEntropyLoss, DistSAGE, compute_acc
+
 
 def generate_emb(standalone, model, emb_layer, g, batch_size, device):
     """
@@ -46,15 +47,38 @@ def run(args, device, data):
     ) = data
     # Create sampler
     neg_sampler = dgl.dataloading.negative_sampler.Uniform(args.num_negs)
-    sampler = dgl.dataloading.NeighborSampler([int(fanout) for fanout in args.fan_out.split(',')])
+    sampler = dgl.dataloading.NeighborSampler(
+        [int(fanout) for fanout in args.fan_out.split(",")]
+    )
     # Create dataloader
-    exclude = 'reverse_id' if args.remove_edge else None
+    exclude = "reverse_id" if args.remove_edge else None
     reverse_eids = th.arange(g.num_edges()) if args.remove_edge else None
-    dataloader = dgl.dataloading.DistEdgeDataLoader(g, train_eids, sampler, negative_sampler=neg_sampler,
-                                                    exclude=exclude, reverse_eids=reverse_eids, batch_size=args.batch_size, shuffle=True, drop_last=False)
+    dataloader = dgl.dataloading.DistEdgeDataLoader(
+        g,
+        train_eids,
+        sampler,
+        negative_sampler=neg_sampler,
+        exclude=exclude,
+        reverse_eids=reverse_eids,
+        batch_size=args.batch_size,
+        shuffle=True,
+        drop_last=False,
+    )
     # Define model and optimizer
-    emb_layer = DistEmb(g.num_nodes(), args.num_hidden, dgl_sparse_emb=args.dgl_sparse, dev_id=device)
-    model = DistSAGE(args.num_hidden, args.num_hidden, args.num_hidden, args.num_layers, F.relu, args.dropout)
+    emb_layer = DistEmb(
+        g.num_nodes(),
+        args.num_hidden,
+        dgl_sparse_emb=args.dgl_sparse,
+        dev_id=device,
+    )
+    model = DistSAGE(
+        args.num_hidden,
+        args.num_hidden,
+        args.num_hidden,
+        args.num_layers,
+        F.relu,
+        args.dropout,
+    )
     model = model.to(device)
     if not args.standalone:
         if args.num_gpus == -1:
@@ -103,7 +127,9 @@ def run(args, device, data):
         with model.join():
             # Loop over the dataloader to sample the computation dependency graph as a list of
             # blocks.
-            for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(dataloader):
+            for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(
+                dataloader
+            ):
                 tic_step = time.time()
                 sample_t.append(tic_step - start)
 
@@ -138,11 +164,22 @@ def run(args, device, data):
                 iter_tput.append(pos_edges / step_t)
                 num_seeds += pos_edges
                 if step % args.log_every == 0:
-                    print('[{}] Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f} | time {:.3f} s' \
-                            '| sample {:.3f} | copy {:.3f} | forward {:.3f} | backward {:.3f} | update {:.3f}'.format(
-                        g.rank(), epoch, step, loss.item(), np.mean(iter_tput[3:]), np.sum(step_time[-args.log_every:]),
-                        np.sum(sample_t[-args.log_every:]), np.sum(feat_copy_t[-args.log_every:]), np.sum(forward_t[-args.log_every:]),
-                        np.sum(backward_t[-args.log_every:]), np.sum(update_t[-args.log_every:])))
+                    print(
+                        "[{}] Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f} | time {:.3f} s"
+                        "| sample {:.3f} | copy {:.3f} | forward {:.3f} | backward {:.3f} | update {:.3f}".format(
+                            g.rank(),
+                            epoch,
+                            step,
+                            loss.item(),
+                            np.mean(iter_tput[3:]),
+                            np.sum(step_time[-args.log_every :]),
+                            np.sum(sample_t[-args.log_every :]),
+                            np.sum(feat_copy_t[-args.log_every :]),
+                            np.sum(forward_t[-args.log_every :]),
+                            np.sum(backward_t[-args.log_every :]),
+                            np.sum(update_t[-args.log_every :]),
+                        )
+                    )
 
                 start = time.time()
 
@@ -162,7 +199,9 @@ def run(args, device, data):
         epoch += 1
 
     # evaluate the embedding using LogisticRegression
-    pred = generate_emb(args.standalone, model, emb_layer, g, args.batch_size_eval, device)
+    pred = generate_emb(
+        args.standalone, model, emb_layer, g, args.batch_size_eval, device
+    )
     if g.rank() == 0:
         eval_acc, test_acc = compute_acc(
             pred, labels, global_train_nid, global_valid_nid, global_test_nid
@@ -214,7 +253,7 @@ def main(args):
         device = th.device("cpu")
     else:
         dev_id = g.rank() % args.num_gpus
-        device = th.device('cuda:'+str(dev_id))
+        device = th.device("cuda:" + str(dev_id))
 
     # Pack data
     global_train_nid = global_train_nid.squeeze()

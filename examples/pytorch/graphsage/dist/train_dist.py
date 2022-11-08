@@ -1,20 +1,21 @@
 import os
-os.environ['DGLBACKEND']='pytorch'
-import numpy as np
-import tqdm
-import time
+
+os.environ["DGLBACKEND"] = "pytorch"
 import argparse
+import socket
+import time
+from contextlib import contextmanager
 
 import dgl
-from dgl.data import register_data_args
 import dgl.nn.pytorch as dglnn
-
+import numpy as np
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import socket
-from contextlib import contextmanager
+import tqdm
+from dgl.data import register_data_args
+
 
 def load_subtensor(g, seeds, input_nodes, device, load_feat=True):
     """
@@ -25,6 +26,7 @@ def load_subtensor(g, seeds, input_nodes, device, load_feat=True):
     )
     batch_labels = g.ndata["labels"][seeds].to(device)
     return batch_inputs, batch_labels
+
 
 class DistSAGE(nn.Module):
     def __init__(
@@ -78,13 +80,27 @@ class DistSAGE(nn.Module):
         )
         for l, layer in enumerate(self.layers):
             if l == len(self.layers) - 1:
-                y = dgl.distributed.DistTensor((g.number_of_nodes(), self.n_classes),
-                                               th.float32, 'h_last', persistent=True)
-            print('|V|={}, eval batch size: {}'.format(g.number_of_nodes(), batch_size))
+                y = dgl.distributed.DistTensor(
+                    (g.number_of_nodes(), self.n_classes),
+                    th.float32,
+                    "h_last",
+                    persistent=True,
+                )
+            print(
+                "|V|={}, eval batch size: {}".format(
+                    g.number_of_nodes(), batch_size
+                )
+            )
 
             sampler = dgl.dataloading.NeighborSampler([-1])
             dataloader = dgl.dataloading.DistNodeDataLoader(
-                g, nodes, sampler, batch_size=batch_size, shuffle=False, drop_last=False)
+                g,
+                nodes,
+                sampler,
+                batch_size=batch_size,
+                shuffle=False,
+                drop_last=False,
+            )
 
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
                 block = blocks[0].to(device)
@@ -105,6 +121,7 @@ class DistSAGE(nn.Module):
     def join(self):
         """dummy join for standalone"""
         yield
+
 
 def compute_acc(pred, labels):
     """
@@ -138,9 +155,17 @@ def run(args, device, data):
     train_nid, val_nid, test_nid, in_feats, n_classes, g = data
     shuffle = True
     # prefetch_node_feats/prefetch_labels are not supported for DistGraph yet.
-    sampler = dgl.dataloading.NeighborSampler([int(fanout) for fanout in args.fan_out.split(',')])
+    sampler = dgl.dataloading.NeighborSampler(
+        [int(fanout) for fanout in args.fan_out.split(",")]
+    )
     dataloader = dgl.dataloading.DistNodeDataLoader(
-        g, train_nid, sampler, batch_size=args.batch_size, shuffle=shuffle, drop_last=False)
+        g,
+        train_nid,
+        sampler,
+        batch_size=args.batch_size,
+        shuffle=shuffle,
+        drop_last=False,
+    )
     # Define model and optimizer
     model = DistSAGE(
         in_feats,
@@ -184,7 +209,9 @@ def run(args, device, data):
                 tic_step = time.time()
                 sample_time += tic_step - start
                 # fetch features/labels
-                batch_inputs, batch_labels = load_subtensor(g, seeds, input_nodes, "cpu")
+                batch_inputs, batch_labels = load_subtensor(
+                    g, seeds, input_nodes, "cpu"
+                )
                 batch_labels = batch_labels.long()
                 num_seeds += len(blocks[-1].dstdata[dgl.NID])
                 num_inputs += len(blocks[0].srcdata[dgl.NID])
@@ -247,10 +274,22 @@ def run(args, device, data):
 
         if epoch % args.eval_every == 0 and epoch != 0:
             start = time.time()
-            val_acc, test_acc = evaluate(model if args.standalone else model.module, g, g.ndata['features'],
-                                         g.ndata['labels'], val_nid, test_nid, args.batch_size_eval, device)
-            print('Part {}, Val Acc {:.4f}, Test Acc {:.4f}, time: {:.4f}'.format(g.rank(), val_acc, test_acc,
-                                                                                  time.time() - start))
+            val_acc, test_acc = evaluate(
+                model if args.standalone else model.module,
+                g,
+                g.ndata["features"],
+                g.ndata["labels"],
+                val_nid,
+                test_nid,
+                args.batch_size_eval,
+                device,
+            )
+            print(
+                "Part {}, Val Acc {:.4f}, Test Acc {:.4f}, time: {:.4f}".format(
+                    g.rank(), val_acc, test_acc, time.time() - start
+                )
+            )
+
 
 def main(args):
     print(socket.gethostname(), "Initializing DGL dist")
@@ -293,22 +332,29 @@ def main(args):
             g.ndata["test_mask"], pb, force_even=True
         )
     local_nid = pb.partid2nids(pb.partid).detach().numpy()
-    print('part {}, train: {} (local: {}), val: {} (local: {}), test: {} (local: {})'.format(
-        g.rank(), len(train_nid), len(np.intersect1d(train_nid.numpy(), local_nid)),
-        len(val_nid), len(np.intersect1d(val_nid.numpy(), local_nid)),
-        len(test_nid), len(np.intersect1d(test_nid.numpy(), local_nid))))
+    print(
+        "part {}, train: {} (local: {}), val: {} (local: {}), test: {} (local: {})".format(
+            g.rank(),
+            len(train_nid),
+            len(np.intersect1d(train_nid.numpy(), local_nid)),
+            len(val_nid),
+            len(np.intersect1d(val_nid.numpy(), local_nid)),
+            len(test_nid),
+            len(np.intersect1d(test_nid.numpy(), local_nid)),
+        )
+    )
     del local_nid
     if args.num_gpus == -1:
         device = th.device("cpu")
     else:
         dev_id = g.rank() % args.num_gpus
-        device = th.device('cuda:'+str(dev_id))
+        device = th.device("cuda:" + str(dev_id))
     n_classes = args.n_classes
     if n_classes == 0:
-        labels = g.ndata['labels'][np.arange(g.number_of_nodes())]
+        labels = g.ndata["labels"][np.arange(g.number_of_nodes())]
         n_classes = len(th.unique(labels[th.logical_not(th.isnan(labels))]))
         del labels
-    print('#labels:', n_classes)
+    print("#labels:", n_classes)
 
     # Pack data
     in_feats = g.ndata["features"].shape[1]
@@ -320,31 +366,58 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="GCN")
     register_data_args(parser)
-    parser.add_argument('--graph_name', type=str, help='graph name')
-    parser.add_argument('--id', type=int, help='the partition id')
-    parser.add_argument('--ip_config', type=str, help='The file for IP configuration')
-    parser.add_argument('--part_config', type=str, help='The path to the partition config file')
-    parser.add_argument('--num_clients', type=int, help='The number of clients')
-    parser.add_argument('--n_classes', type=int, default=0, help='the number of classes')
-    parser.add_argument('--backend', type=str, default='gloo', help='pytorch distributed backend')
-    parser.add_argument('--num_gpus', type=int, default=-1,
-                        help="the number of GPU device. Use -1 for CPU training")
-    parser.add_argument('--num_epochs', type=int, default=20)
-    parser.add_argument('--num_hidden', type=int, default=16)
-    parser.add_argument('--num_layers', type=int, default=2)
-    parser.add_argument('--fan_out', type=str, default='10,25')
-    parser.add_argument('--batch_size', type=int, default=1000)
-    parser.add_argument('--batch_size_eval', type=int, default=100000)
-    parser.add_argument('--log_every', type=int, default=20)
-    parser.add_argument('--eval_every', type=int, default=5)
-    parser.add_argument('--lr', type=float, default=0.003)
-    parser.add_argument('--dropout', type=float, default=0.5)
-    parser.add_argument('--local_rank', type=int, help='get rank of the process')
-    parser.add_argument('--standalone', action='store_true', help='run in the standalone mode')
-    parser.add_argument('--pad-data', default=False, action='store_true',
-                        help='Pad train nid to the same length across machine, to ensure num of batches to be the same.')
-    parser.add_argument('--net_type', type=str, default='socket',
-                        help="backend net type, 'socket' or 'tensorpipe'")
+    parser.add_argument("--graph_name", type=str, help="graph name")
+    parser.add_argument("--id", type=int, help="the partition id")
+    parser.add_argument(
+        "--ip_config", type=str, help="The file for IP configuration"
+    )
+    parser.add_argument(
+        "--part_config", type=str, help="The path to the partition config file"
+    )
+    parser.add_argument("--num_clients", type=int, help="The number of clients")
+    parser.add_argument(
+        "--n_classes", type=int, default=0, help="the number of classes"
+    )
+    parser.add_argument(
+        "--backend",
+        type=str,
+        default="gloo",
+        help="pytorch distributed backend",
+    )
+    parser.add_argument(
+        "--num_gpus",
+        type=int,
+        default=-1,
+        help="the number of GPU device. Use -1 for CPU training",
+    )
+    parser.add_argument("--num_epochs", type=int, default=20)
+    parser.add_argument("--num_hidden", type=int, default=16)
+    parser.add_argument("--num_layers", type=int, default=2)
+    parser.add_argument("--fan_out", type=str, default="10,25")
+    parser.add_argument("--batch_size", type=int, default=1000)
+    parser.add_argument("--batch_size_eval", type=int, default=100000)
+    parser.add_argument("--log_every", type=int, default=20)
+    parser.add_argument("--eval_every", type=int, default=5)
+    parser.add_argument("--lr", type=float, default=0.003)
+    parser.add_argument("--dropout", type=float, default=0.5)
+    parser.add_argument(
+        "--local_rank", type=int, help="get rank of the process"
+    )
+    parser.add_argument(
+        "--standalone", action="store_true", help="run in the standalone mode"
+    )
+    parser.add_argument(
+        "--pad-data",
+        default=False,
+        action="store_true",
+        help="Pad train nid to the same length across machine, to ensure num of batches to be the same.",
+    )
+    parser.add_argument(
+        "--net_type",
+        type=str,
+        default="socket",
+        help="backend net type, 'socket' or 'tensorpipe'",
+    )
     args = parser.parse_args()
 
     print(args)

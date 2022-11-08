@@ -1,19 +1,18 @@
 import os
-os.environ['DGLBACKEND']='pytorch'
-import argparse, time
-import numpy as np
+
+os.environ["DGLBACKEND"] = "pytorch"
+import argparse
+import time
 
 import dgl
-from dgl.data import register_data_args
-from dgl.distributed import DistEmbedding
-
 import numpy as np
 import torch as th
 import torch.multiprocessing as mp
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-
+from dgl.data import register_data_args
+from dgl.distributed import DistEmbedding
 from train_dist import DistSAGE, compute_acc
 
 
@@ -114,12 +113,32 @@ def evaluate(
 def run(args, device, data):
     # Unpack data
     train_nid, val_nid, test_nid, n_classes, g = data
-    sampler = dgl.dataloading.NeighborSampler([int(fanout) for fanout in args.fan_out.split(',')])
+    sampler = dgl.dataloading.NeighborSampler(
+        [int(fanout) for fanout in args.fan_out.split(",")]
+    )
     dataloader = dgl.dataloading.DistNodeDataLoader(
-        g, train_nid, sampler, batch_size=args.batch_size, shuffle=True, drop_last=False)
+        g,
+        train_nid,
+        sampler,
+        batch_size=args.batch_size,
+        shuffle=True,
+        drop_last=False,
+    )
     # Define model and optimizer
-    emb_layer = DistEmb(g.num_nodes(), args.num_hidden, dgl_sparse_emb=args.dgl_sparse, dev_id=device)
-    model = DistSAGE(args.num_hidden, args.num_hidden, n_classes, args.num_layers, F.relu, args.dropout)
+    emb_layer = DistEmb(
+        g.num_nodes(),
+        args.num_hidden,
+        dgl_sparse_emb=args.dgl_sparse,
+        dev_id=device,
+    )
+    model = DistSAGE(
+        args.num_hidden,
+        args.num_hidden,
+        n_classes,
+        args.num_layers,
+        F.relu,
+        args.dropout,
+    )
     model = model.to(device)
     if not args.standalone:
         if args.num_gpus == -1:
@@ -145,8 +164,10 @@ def run(args, device, data):
         )
         print("optimize Pytorch sparse embedding:", emb_layer.sparse_emb)
     else:
-        emb_optimizer = th.optim.SparseAdam(list(emb_layer.module.sparse_emb.parameters()), lr=args.sparse_lr)
-        print('optimize Pytorch sparse embedding:', emb_layer.module.sparse_emb)
+        emb_optimizer = th.optim.SparseAdam(
+            list(emb_layer.module.sparse_emb.parameters()), lr=args.sparse_lr
+        )
+        print("optimize Pytorch sparse embedding:", emb_layer.module.sparse_emb)
 
     # Training loop
     iter_tput = []
@@ -171,7 +192,7 @@ def run(args, device, data):
                 num_seeds += len(blocks[-1].dstdata[dgl.NID])
                 num_inputs += len(blocks[0].srcdata[dgl.NID])
                 blocks = [block.to(device) for block in blocks]
-                batch_labels = g.ndata['labels'][seeds].long().to(device)
+                batch_labels = g.ndata["labels"][seeds].long().to(device)
                 # Compute loss and prediction
                 start = time.time()
                 batch_inputs = emb_layer(input_nodes)
@@ -194,9 +215,23 @@ def run(args, device, data):
                 iter_tput.append(len(blocks[-1].dstdata[dgl.NID]) / step_t)
                 if step % args.log_every == 0:
                     acc = compute_acc(batch_pred, batch_labels)
-                    gpu_mem_alloc = th.cuda.max_memory_allocated() / 1000000 if th.cuda.is_available() else 0
-                    print('Part {} | Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MB | time {:.3f} s'.format(
-                        g.rank(), epoch, step, loss.item(), acc.item(), np.mean(iter_tput[3:]), gpu_mem_alloc, np.sum(step_time[-args.log_every:])))
+                    gpu_mem_alloc = (
+                        th.cuda.max_memory_allocated() / 1000000
+                        if th.cuda.is_available()
+                        else 0
+                    )
+                    print(
+                        "Part {} | Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MB | time {:.3f} s".format(
+                            g.rank(),
+                            epoch,
+                            step,
+                            loss.item(),
+                            acc.item(),
+                            np.mean(iter_tput[3:]),
+                            gpu_mem_alloc,
+                            np.sum(step_time[-args.log_every :]),
+                        )
+                    )
                 start = time.time()
 
         toc = time.time()
@@ -216,9 +251,23 @@ def run(args, device, data):
 
         if epoch % args.eval_every == 0 and epoch != 0:
             start = time.time()
-            val_acc, test_acc = evaluate(args.standalone, model, emb_layer, g,
-                                         g.ndata['labels'], val_nid, test_nid, args.batch_size_eval, device)
-            print('Part {}, Val Acc {:.4f}, Test Acc {:.4f}, time: {:.4f}'.format(g.rank(), val_acc, test_acc, time.time()-start))
+            val_acc, test_acc = evaluate(
+                args.standalone,
+                model,
+                emb_layer,
+                g,
+                g.ndata["labels"],
+                val_nid,
+                test_nid,
+                args.batch_size_eval,
+                device,
+            )
+            print(
+                "Part {}, Val Acc {:.4f}, Test Acc {:.4f}, time: {:.4f}".format(
+                    g.rank(), val_acc, test_acc, time.time() - start
+                )
+            )
+
 
 def main(args):
     dgl.distributed.initialize(args.ip_config)
@@ -253,8 +302,8 @@ def main(args):
         device = th.device("cpu")
     else:
         dev_id = g.rank() % args.num_gpus
-        device = th.device('cuda:'+str(dev_id))
-    labels = g.ndata['labels'][np.arange(g.number_of_nodes())]
+        device = th.device("cuda:" + str(dev_id))
+    labels = g.ndata["labels"][np.arange(g.number_of_nodes())]
     n_classes = len(th.unique(labels[th.logical_not(th.isnan(labels))]))
     print("#labels:", n_classes)
 
