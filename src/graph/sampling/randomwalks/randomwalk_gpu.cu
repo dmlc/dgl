@@ -50,7 +50,7 @@ __global__ void _RandomWalkKernel(
   int64_t trace_length = (max_num_steps + 1);
   curandState rng;
   // reference:
-  //     https://docs.nvidia.com/cuda/curand/device-api-overview.html#performance-notes
+  //     https://docs.nvidia.com/cuda/curand/device-api-overview.html#performance-notes  // NOLINT
   curand_init(rand_seed + idx, 0, 0, &rng);
 
   while (idx < last_idx) {
@@ -109,7 +109,7 @@ __global__ void _RandomWalkBiasedKernel(
   int64_t trace_length = (max_num_steps + 1);
   curandState rng;
   // reference:
-  //     https://docs.nvidia.com/cuda/curand/device-api-overview.html#performance-notes
+  //     https://docs.nvidia.com/cuda/curand/device-api-overview.html#performance-notes  // NOLINT
   curand_init(rand_seed + idx, 0, 0, &rng);
 
   while (idx < last_idx) {
