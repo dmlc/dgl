@@ -1,3 +1,0 @@
-./src/array/cuda/csr_mm.cu:  NDArray dC_weights = NDArray::Empty({C_nnz1}, A_weights_array->dtype, A.indptr->ctx);
-./src/array/cuda/csr_mm.cu:  auto dtype = A_weights_array->dtype;
-./src/array/cuda/csr_sum.cu:  dC_weights = NDArray::Empty({nnzC}, A_weights_array->dtype, ctx);
