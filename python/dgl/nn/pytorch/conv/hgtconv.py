@@ -135,13 +135,19 @@ class HGTConv(nn.Module):
             srcntype = ntype
             dstntype = ntype
         with g.local_scope():
-            k = self.linear_k(x_src, srcntype, presorted).view(-1, self.num_heads, self.head_size)
-            q = self.linear_q(x_dst, dstntype, presorted).view(-1, self.num_heads, self.head_size)
-            v = self.linear_v(x_src, srcntype, presorted).view(-1, self.num_heads, self.head_size)
-            g.srcdata['k'] = k
-            g.dstdata['q'] = q
-            g.srcdata['v'] = v
-            g.edata['etype'] = etype
+            k = self.linear_k(x_src, srcntype, presorted).view(
+                -1, self.num_heads, self.head_size
+                )
+            q = self.linear_q(x_dst, dstntype, presorted).view(
+                -1, self.num_heads, self.head_size
+                )
+            v = self.linear_v(x_src, srcntype, presorted).view(
+                -1, self.num_heads, self.head_size
+                )
+            g.srcdata["k"] = k
+            g.dstdata["q"] = q
+            g.srcdata["v"] = v
+            g.edata["etype"] = etype
             g.apply_edges(self.message)
             g.edata['m'] = g.edata['m'] * edge_softmax(g, g.edata['a']).unsqueeze(-1)
             g.update_all(fn.copy_e('m', 'm'), fn.sum('m', 'h'))
