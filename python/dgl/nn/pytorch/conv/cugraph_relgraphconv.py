@@ -261,7 +261,24 @@ class CuGraphRelGraphConv(nn.Module):
                 f"{regularizer}."
             )
         self.regularizer = regularizer
-        self.reset_parameters()
+
+        # initialize weights
+        with th.no_grad():
+            if self.regularizer is None:
+                nn.init.uniform_(
+                    self.W,
+                    -1 / math.sqrt(self.in_feat),
+                    1 / math.sqrt(self.in_feat),
+                )
+            else:
+                nn.init.uniform_(
+                    self.W,
+                    -1 / math.sqrt(self.in_feat),
+                    1 / math.sqrt(self.in_feat),
+                )
+                nn.init.xavier_uniform_(
+                    self.coeff, gain=nn.init.calculate_gain("relu")
+                )
 
         # others
         self.bias = bias
@@ -288,29 +305,6 @@ class CuGraphRelGraphConv(nn.Module):
             )
 
         self.dropout = nn.Dropout(dropout)
-
-    def reset_parameters(self):
-        with th.no_grad():
-            if self.regularizer is None:
-                nn.init.uniform_(
-                    self.W,
-                    -1 / math.sqrt(self.in_feat),
-                    1 / math.sqrt(self.in_feat),
-                )
-            elif self.regularizer == "basis":
-                nn.init.uniform_(
-                    self.W,
-                    -1 / math.sqrt(self.in_feat),
-                    1 / math.sqrt(self.in_feat),
-                )
-                nn.init.xavier_uniform_(
-                    self.coeff, gain=nn.init.calculate_gain("relu")
-                )
-            else:
-                raise ValueError(
-                    f"Supported regularizer options: 'basis', "
-                    f"but got {self.regularizer}"
-                )
 
     def forward(self, g, feat, etypes, norm=None):
         r"""Forward computation.
