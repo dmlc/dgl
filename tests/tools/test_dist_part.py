@@ -218,13 +218,14 @@ def _test_pipeline(num_chunks, num_parts, world_size, graph_formats=None):
 
 @pytest.mark.parametrize("num_chunks", [1, 3, 4, 8])
 @pytest.mark.parametrize("num_parts", [1, 3, 4, 8])
-def test_pipeline_basics(num_chunks, num_parts):
-    _test_pipeline(num_chunks, num_parts)
+@pytest.mark.parametrize("world_size", [1, 4, 8])
+def test_pipeline_basics(num_chunks, num_parts, world_size):
+    _test_pipeline(num_chunks, num_parts, world_size)
 
 
 @pytest.mark.parametrize(
     "graph_formats", [None, "csc", "coo,csc", "coo,csc,csr"]
 )
 def test_pipeline_formats(graph_formats):
-    _test_pipeline(4, 4, graph_formats)
+    _test_pipeline(4, 4, 4, graph_formats)
 
