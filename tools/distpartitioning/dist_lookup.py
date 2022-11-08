@@ -3,6 +3,7 @@ import os
 import numpy as np
 import pyarrow
 import torch
+import copy
 
 from pyarrow import csv
 from gloo_wrapper import alltoallv_cpu
@@ -61,10 +62,19 @@ class DistLookupService:
 
             filename = f'{ntype}.txt'
             logging.info(f'[Rank: {rank}] Reading file: {os.path.join(input_dir, filename)}')
-            df = csv.read_csv(os.path.join(input_dir, '{}.txt'.format(ntype)), \
-                read_options=pyarrow.csv.ReadOptions(autogenerate_column_names=True), \
-                parse_options=pyarrow.csv.ParseOptions(delimiter=' '))
-            ntype_partids = df['f0'].to_numpy()
+
+            read_options=pyarrow.csv.ReadOptions(use_threads=True, block_size=4096, autogenerate_column_names=True)
+            parse_options=pyarrow.csv.ParseOptions(delimiter=' ')
+            ntype_partids = []
+            with pyarrow.csv.open_csv(os.path.join(input_dir, '{}.txt'.format(ntype)),
+                    read_options=read_options, parse_options=parse_options) as reader:
+                for next_chunk in reader:
+                    if next_chunk is None:
+                        break
+                    next_table = pyarrow.Table.from_batches([next_chunk])
+                    ntype_partids.append(next_table['f0'].to_numpy())
+
+            ntype_partids = np.concatenate(ntype_partids)
             count = len(ntype_partids)
             ntype_count.append(count)
 
@@ -76,8 +86,12 @@ class DistLookupService:
                 end = count
             type_nid_begin.append(start)
             type_nid_end.append(end)
+
             # Slice the partition-ids which belong to the current instance.
-            partid_list.append(ntype_partids[start:end])
+            partid_list.append(copy.deepcopy(ntype_partids[start:end]))
+
+            # Explicitly release the array read from the file.
+            del ntype_partids
 
         # Store all the information in the object instance variable.
         self.id_map = id_map
@@ -314,6 +328,9 @@ class DistLookupService:
 
         # Send the shuffle-global-nids to their respective ranks.
         mapped_global_nids = alltoallv_cpu(self.rank, self.world_size, shuffle_nids_list)
+        for idx in range(len(mapped_global_nids)):
+            if mapped_global_nids[idx] == None:
+                mapped_global_nids[idx] = torch.empty((0,), dtype=torch.int64)
 
         # Reorder to match global_nids (function parameter).
         global_nids_order = np.concatenate(id_list)

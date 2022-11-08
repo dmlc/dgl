@@ -53,6 +53,9 @@ def create_chunked_dataset(
         ('author', 'affiliated_with', 'institution'): rand_edges(
             num_authors, num_institutions, num_affiliate_edges
         ),
+        ('institution', 'writes', 'paper'): rand_edges(
+            num_institutions, num_papers, num_write_edges
+        ),
     }
     src, dst = data_dict[('author', 'writes', 'paper')]
     data_dict[('paper', 'rev_writes', 'author')] = (dst, src)
@@ -65,6 +68,7 @@ def create_chunked_dataset(
     paper_label = np.random.choice(num_classes, num_papers)
     paper_year = np.random.choice(2022, num_papers)
     paper_orig_ids = np.arange(0, num_papers)
+    writes_orig_ids = np.arange(0, num_write_edges)
 
     # masks.
     if include_masks:
@@ -83,36 +87,54 @@ def create_chunked_dataset(
     # Edge features.
     cite_count = np.random.choice(10, num_cite_edges)
     write_year = np.random.choice(2022, num_write_edges)
+    write2_year = np.random.choice(2022, num_write_edges)
 
     # Save features.
     input_dir = os.path.join(root_dir, 'data_test')
     os.makedirs(input_dir)
-    for sub_d in ['paper', 'cites', 'writes']:
+    for sub_d in ['paper', 'cites', 'writes', 'writes2']:
         os.makedirs(os.path.join(input_dir, sub_d))
 
     paper_feat_path = os.path.join(input_dir, 'paper/feat.npy')
     with open(paper_feat_path, 'wb') as f:
         np.save(f, paper_feat)
+    g.nodes['paper'].data['feat'] = torch.from_numpy(paper_feat)
 
     paper_label_path = os.path.join(input_dir, 'paper/label.npy')
     with open(paper_label_path, 'wb') as f:
         np.save(f, paper_label)
+    g.nodes['paper'].data['label'] = torch.from_numpy(paper_label)
 
     paper_year_path = os.path.join(input_dir, 'paper/year.npy')
     with open(paper_year_path, 'wb') as f:
         np.save(f, paper_year)
+    g.nodes['paper'].data['year'] = torch.from_numpy(paper_year)
 
     paper_orig_ids_path = os.path.join(input_dir, 'paper/orig_ids.npy')
     with open(paper_orig_ids_path, 'wb') as f:
         np.save(f, paper_orig_ids)
+    g.nodes['paper'].data['orig_ids'] = torch.from_numpy(paper_orig_ids)
 
     cite_count_path = os.path.join(input_dir, 'cites/count.npy')
     with open(cite_count_path, 'wb') as f:
         np.save(f, cite_count)
+    g.edges['cites'].data['count'] = torch.from_numpy(cite_count)
 
     write_year_path = os.path.join(input_dir, 'writes/year.npy')
     with open(write_year_path, 'wb') as f:
         np.save(f, write_year)
+    g.edges[('author', 'writes', 'paper')].data['year'] = torch.from_numpy(write_year)
+    g.edges['rev_writes'].data['year'] = torch.from_numpy(write_year)
+
+    writes_orig_ids_path = os.path.join(input_dir, 'writes/orig_ids.npy')
+    with open(writes_orig_ids_path, 'wb') as f:
+        np.save(f, writes_orig_ids)
+    g.edges[('author', 'writes', 'paper')].data['orig_ids'] = torch.from_numpy(writes_orig_ids)
+
+    write2_year_path = os.path.join(input_dir, 'writes2/year.npy')
+    with open(write2_year_path, 'wb') as f:
+        np.save(f, write2_year)
+    g.edges[('institution', 'writes', 'paper')].data['year'] = torch.from_numpy(write2_year)
 
     node_data = None
     if include_masks:
@@ -193,8 +215,14 @@ def create_chunked_dataset(
 
     edge_data = {
         'cites': {'count': cite_count_path},
-        'writes': {'year': write_year_path},
+        ('author', 'writes', 'paper'): {
+            'year': write_year_path,
+            'orig_ids': writes_orig_ids_path
+        },
         'rev_writes': {'year': write_year_path},
+        ('institution', 'writes', 'paper'): {
+            'year': write2_year_path,
+        },
     }
 
     output_dir = os.path.join(root_dir, 'chunked-data')

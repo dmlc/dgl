@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.distributed as dist
 
-def allgather_sizes(send_data, world_size, num_parts):
+def allgather_sizes(send_data, world_size, num_parts, return_sizes=False):
     """ 
     Perform all gather on list lengths, used to compute prefix sums
     to determine the offsets on each ranks. This is used to allocate
@@ -16,6 +16,9 @@ def allgather_sizes(send_data, world_size, num_parts):
         No. of processes configured for execution
     num_parts : integer
         No. of output graph partitions
+    return_sizes : bool
+        Boolean flag to indicate whether to return raw sizes from each process
+        or perform prefix sum on the raw sizes.
 
     Returns : 
     ---------
@@ -34,6 +37,10 @@ def allgather_sizes(send_data, world_size, num_parts):
 
     #all_gather message
     dist.all_gather(in_tensor, out_tensor)
+
+    # Return on the raw sizes from each process
+    if return_sizes:
+        return torch.cat(in_tensor).numpy()
 
     #gather sizes in on array to return to the invoking function
     rank_sizes = np.zeros(num_parts + 1, dtype=np.int64)

@@ -2379,13 +2379,18 @@ def test_module_gdc(idtype):
     eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
     assert eset == {(0, 0), (1, 1), (2, 2), (3, 3), (4, 3), (4, 4), (5, 5)}
 
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support a slicing operation")
 @parametrize_idtype
 def test_module_node_shuffle(idtype):
     transform = dgl.NodeShuffle()
     g = dgl.heterograph({
         ('A', 'r', 'B'): ([0, 1], [1, 2]),
     }, idtype=idtype, device=F.ctx())
+    g.nodes['B'].data['h'] = F.randn((g.num_nodes('B'), 2))
+    old_nfeat = g.nodes['B'].data['h']
     new_g = transform(g)
+    new_nfeat = g.nodes['B'].data['h']
+    assert F.allclose(old_nfeat, new_nfeat)
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
 @parametrize_idtype
@@ -2394,11 +2399,15 @@ def test_module_drop_node(idtype):
     g = dgl.heterograph({
         ('A', 'r', 'B'): ([0, 1], [1, 2]),
     }, idtype=idtype, device=F.ctx())
+    num_nodes_old = g.num_nodes()
     new_g = transform(g)
     assert new_g.idtype == g.idtype
     assert new_g.device == g.device
     assert new_g.ntypes == g.ntypes
     assert new_g.canonical_etypes == g.canonical_etypes
+    num_nodes_new = g.num_nodes()
+    # Ensure that the original graph is not corrupted
+    assert num_nodes_old == num_nodes_new
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
 @parametrize_idtype
@@ -2408,11 +2417,15 @@ def test_module_drop_edge(idtype):
         ('A', 'r1', 'B'): ([0, 1], [1, 2]),
         ('C', 'r2', 'C'): ([3, 4, 5], [6, 7, 8])
     }, idtype=idtype, device=F.ctx())
+    num_edges_old = g.num_edges()
     new_g = transform(g)
     assert new_g.idtype == g.idtype
     assert new_g.device == g.device
     assert new_g.ntypes == g.ntypes
     assert new_g.canonical_etypes == g.canonical_etypes
+    num_edges_new = g.num_edges()
+    # Ensure that the original graph is not corrupted
+    assert num_edges_old == num_edges_new
 
 @parametrize_idtype
 def test_module_add_edge(idtype):
@@ -2421,6 +2434,7 @@ def test_module_add_edge(idtype):
         ('A', 'r1', 'B'): ([0, 1, 2, 3, 4], [1, 2, 3, 4, 5]),
         ('C', 'r2', 'C'): ([0, 1, 2, 3, 4], [1, 2, 3, 4, 5])
     }, idtype=idtype, device=F.ctx())
+    num_edges_old = g.num_edges()
     new_g = transform(g)
     assert new_g.num_edges(('A', 'r1', 'B')) == 6
     assert new_g.num_edges(('C', 'r2', 'C')) == 6
@@ -2428,6 +2442,9 @@ def test_module_add_edge(idtype):
     assert new_g.device == g.device
     assert new_g.ntypes == g.ntypes
     assert new_g.canonical_etypes == g.canonical_etypes
+    num_edges_new = g.num_edges()
+    # Ensure that the original graph is not corrupted
+    assert num_edges_old == num_edges_new
 
 @parametrize_idtype
 def test_module_random_walk_pe(idtype):
@@ -2483,7 +2500,7 @@ def test_module_laplacian_pe(idtype):
 @pytest.mark.parametrize('g', get_cases(['has_scalar_e_feature']))
 def test_module_sign(g):
     import torch
-    
+
     atol = 1e-06
 
     ctx = F.ctx()
@@ -2622,6 +2639,38 @@ def test_module_feat_mask(idtype):
     assert g.ndata['h']['player'].shape == (3, 5)
     assert g.edata['w'][('user', 'follows', 'user')].shape == (2, 5)
     assert g.edata['w'][('player', 'plays', 'game')].shape == (2, 5)
+
+@parametrize_idtype
+def test_shortest_dist(idtype):
+    g = dgl.graph(([0, 1, 1, 2], [2, 0, 3, 3]), idtype=idtype, device=F.ctx())
+
+    # case 1: directed single source
+    dist = dgl.shortest_dist(g, root=0)
+    tgt = F.copy_to(F.tensor([0, -1, 1, 2], dtype=F.int64), g.device)
+    assert F.array_equal(dist, tgt)
+
+    # case 2: undirected all pairs
+    dist, paths = dgl.shortest_dist(g, root=None, return_paths=True)
+    tgt_dist = F.copy_to(
+        F.tensor([
+            [0, -1, 1, 2],
+            [1, 0, 2, 1],
+            [-1, -1, 0, 1],
+            [-1, -1, -1, 0]
+        ], dtype=F.int64),
+        g.device
+    )
+    tgt_paths = F.copy_to(
+        F.tensor([
+            [[-1, -1], [-1, -1], [0, -1], [0, 3]],
+            [[1, -1], [-1, -1], [1, 0], [2, -1]],
+            [[-1, -1], [-1, -1], [-1, -1], [3, -1]],
+            [[-1, -1], [-1, -1], [-1, -1], [-1, -1]]
+        ], dtype=F.int64),
+        g.device
+    )
+    assert F.array_equal(dist, tgt_dist)
+    assert F.array_equal(paths, tgt_paths)
 
 if __name__ == '__main__':
     test_partition_with_halo()

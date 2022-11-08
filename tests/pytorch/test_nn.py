@@ -1329,6 +1329,71 @@ def test_gnnexplainer(g, idtype, out_dim):
     explainer = nn.GNNExplainer(model, num_hops=1)
     feat_mask, edge_mask = explainer.explain_graph(g, feat)
 
+@pytest.mark.parametrize('g', get_cases(['hetero'], exclude=['zero-degree']))
+@pytest.mark.parametrize('idtype', [F.int64])
+@pytest.mark.parametrize('input_dim', [5])
+@pytest.mark.parametrize('output_dim', [1, 2])
+def test_heterognnexplainer(g, idtype, input_dim, output_dim):
+    g = g.astype(idtype).to(F.ctx())
+    device = g.device
+
+    # add self-loop and reverse edges
+    transform1 = dgl.transforms.AddSelfLoop(new_etypes=True)
+    g = transform1(g)
+    transform2 = dgl.transforms.AddReverse(copy_edata=True)
+    g = transform2(g)
+
+    feat = {ntype: th.zeros((g.num_nodes(ntype), input_dim), device=device)
+            for ntype in g.ntypes}
+
+    class Model(th.nn.Module):
+        def __init__(self, in_dim, num_classes, canonical_etypes, graph=False):
+            super(Model, self).__init__()
+            self.graph=graph
+            self.etype_weights = th.nn.ModuleDict({
+                '_'.join(c_etype): th.nn.Linear(in_dim, num_classes)
+                for c_etype in canonical_etypes
+            })
+
+        def forward(self, graph, feat, eweight=None):
+            with graph.local_scope():
+                c_etype_func_dict = {}
+                for c_etype in graph.canonical_etypes:
+                    src_type, etype, dst_type = c_etype
+                    wh = self.etype_weights['_'.join(c_etype)](feat[src_type])
+                    graph.nodes[src_type].data[f'h_{c_etype}'] = wh
+                    if eweight is None:
+                        c_etype_func_dict[c_etype] = (fn.copy_u(f'h_{c_etype}', 'm'),
+                                                      fn.mean('m', 'h'))
+                    else:
+                        graph.edges[c_etype].data['w'] = eweight[c_etype]
+                        c_etype_func_dict[c_etype] = (
+                            fn.u_mul_e(f'h_{c_etype}', 'w', 'm'), fn.mean('m', 'h'))
+                graph.multi_update_all(c_etype_func_dict, 'sum')
+                if self.graph:
+                    hg = 0
+                    for ntype in graph.ntypes:
+                        if graph.num_nodes(ntype):
+                            hg = hg + dgl.mean_nodes(graph, 'h', ntype=ntype)
+
+                    return hg
+                else:
+                    return graph.ndata['h']
+
+    # Explain node prediction
+    model = Model(input_dim, output_dim, g.canonical_etypes)
+    model = model.to(F.ctx())
+    ntype = g.ntypes[0]
+    explainer = nn.explain.HeteroGNNExplainer(model, num_hops=1)
+    new_center, sg, feat_mask, edge_mask = explainer.explain_node(ntype, 0, g, feat)
+
+    # Explain graph prediction
+    model = Model(input_dim, output_dim, g.canonical_etypes, graph=True)
+    model = model.to(F.ctx())
+    explainer = nn.explain.HeteroGNNExplainer(model, num_hops=1)
+    feat_mask, edge_mask = explainer.explain_graph(g, feat)
+
+
 def test_jumping_knowledge():
     ctx = F.ctx()
     num_layers = 2
@@ -1653,6 +1718,26 @@ def test_DeepWalk():
     loss.backward()
     optim.step()
 
+@pytest.mark.parametrize('max_degree', [2, 6])
+@pytest.mark.parametrize('embedding_dim', [8, 16])
+@pytest.mark.parametrize('direction', ['in', 'out', 'both'])
+def test_degree_encoder(max_degree, embedding_dim, direction):
+    g = dgl.graph((
+        th.tensor([0, 0, 0, 1, 1, 2, 3, 3]),
+        th.tensor([1, 2, 3, 0, 3, 0, 0, 1])
+    ))
+    # test heterograph
+    hg = dgl.heterograph({
+        ('drug', 'interacts', 'drug'): (th.tensor([0, 1]), th.tensor([1, 2])),
+        ('drug', 'interacts', 'gene'): (th.tensor([0, 1]), th.tensor([2, 3])),
+        ('drug', 'treats', 'disease'): (th.tensor([1]), th.tensor([2]))
+    })
+    model = nn.DegreeEncoder(max_degree, embedding_dim, direction=direction)
+    de_g = model(g)
+    de_hg = model(hg)
+    assert de_g.shape == (4, embedding_dim)
+    assert de_hg.shape == (10, embedding_dim)
+
 @parametrize_idtype
 def test_MetaPath2Vec(idtype):
     dev = F.ctx()
@@ -1666,3 +1751,24 @@ def test_MetaPath2Vec(idtype):
     model = model.to(dev)
     embeds = model.node_embed.weight
     assert embeds.shape[0] == g.num_nodes()
+
+@pytest.mark.parametrize('num_layer', [1, 4])
+@pytest.mark.parametrize('k', [3, 5])
+@pytest.mark.parametrize('lpe_dim', [4, 16])
+@pytest.mark.parametrize('n_head', [1, 4])
+@pytest.mark.parametrize('batch_norm', [True, False])
+@pytest.mark.parametrize('num_post_layer', [0, 1, 2])
+def test_LaplacianPosEnc(num_layer, k, lpe_dim, n_head, batch_norm, num_post_layer):
+    ctx = F.ctx()
+    num_nodes = 4
+
+    EigVals = th.randn((num_nodes, k)).to(ctx)
+    EigVecs = th.randn((num_nodes, k)).to(ctx)
+
+    model = nn.LaplacianPosEnc("Transformer", num_layer, k, lpe_dim, n_head,
+                               batch_norm, num_post_layer).to(ctx)
+    assert model(EigVals, EigVecs).shape == (num_nodes, lpe_dim)
+
+    model = nn.LaplacianPosEnc("DeepSet", num_layer, k, lpe_dim,
+                               batch_norm=batch_norm, num_post_layer=num_post_layer).to(ctx)
+    assert model(EigVals, EigVecs).shape == (num_nodes, lpe_dim)

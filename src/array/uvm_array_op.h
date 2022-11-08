@@ -1,12 +1,13 @@
-/*!
+/**
  *  Copyright (c) 2019-2022 by Contributors
- * \file array/uvm_array_op.h
- * \brief Array operator templates
+ * @file array/uvm_array_op.h
+ * @brief Array operator templates
  */
 #ifndef DGL_ARRAY_UVM_ARRAY_OP_H_
 #define DGL_ARRAY_UVM_ARRAY_OP_H_
 
 #include <dgl/array.h>
+
 #include <utility>
 
 namespace dgl {

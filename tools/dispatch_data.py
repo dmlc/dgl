@@ -74,6 +74,7 @@ def submit_jobs(args) -> str:
     argslist += "--log-level {} ".format(args.log_level)
     argslist += "--save-orig-nids " if args.save_orig_nids else ""
     argslist += "--save-orig-eids " if args.save_orig_eids else ""
+    argslist += f"--graph-formats {args.graph_formats} " if args.graph_formats else ""
 
     # (BarclayII) Is it safe to assume all the workers have the Python executable at the same path?
     pipeline_cmd = os.path.join(INSTALL_DIR, PIPELINE_SCRIPT)
@@ -146,6 +147,15 @@ def main():
         "--save-orig-eids",
         action="store_true",
         help="Save original edge IDs into files",
+    )
+    parser.add_argument(
+        "--graph-formats",
+        type=str,
+        default=None,
+        help="Save partitions in specified formats. It could be any combination(joined with ``,``) "
+             "of ``coo``, ``csc`` and ``csr``. If not specified, save one format only according to "
+             "what format is available. If multiple formats are available, selection priority "
+             "from high to low is ``coo``, ``csc``, ``csr``.",
     )
 
     args, udf_command = parser.parse_known_args()

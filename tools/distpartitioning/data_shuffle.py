@@ -791,6 +791,12 @@ def gen_dist_partitions(rank, world_size, params):
     #create dgl objects here
     output_meta_json = {}
     start = timer()
+    
+    graph_formats = None
+    if params.graph_formats:
+        graph_formats = params.graph_formats.split(',')
+    sort_etypes = len(etypes_map) > 1
+    
     for local_part_id in range(params.num_parts//world_size):
         num_edges = shuffle_global_eid_offsets[local_part_id]
         node_count = len(node_data[constants.NTYPE_ID+"/"+str(local_part_id)])
@@ -810,7 +816,7 @@ def gen_dist_partitions(rank, world_size, params):
                 local_node_features, local_edge_features,
                 params.output,
                 rank + (local_part_id*world_size), 
-                orig_nids, orig_eids)
+                orig_nids, orig_eids, graph_formats, sort_etypes)
         memory_snapshot("DiskWriteDGLObjectsComplete: ", rank)
 
         #get the meta-data
