@@ -5,9 +5,6 @@ import argparse
 import time
 from contextlib import contextmanager
 
-import dgl
-import dgl.function as fn
-import dgl.nn.pytorch as dglnn
 import numpy as np
 import sklearn.linear_model as lm
 import sklearn.metrics as skm
@@ -17,6 +14,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import tqdm
+import dgl
+import dgl.function as fn
+import dgl.nn.pytorch as dglnn
 from dgl.data import register_data_args
 
 

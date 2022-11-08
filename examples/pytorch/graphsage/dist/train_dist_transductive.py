@@ -4,13 +4,13 @@ os.environ["DGLBACKEND"] = "pytorch"
 import argparse
 import time
 
-import dgl
 import numpy as np
 import torch as th
 import torch.multiprocessing as mp
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+import dgl
 from dgl.data import register_data_args
 from dgl.distributed import DistEmbedding
 from train_dist import DistSAGE, compute_acc
