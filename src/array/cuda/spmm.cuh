@@ -610,7 +610,9 @@ __global__ void SpMMCmpCsrHeteroKernel(
   while (ty < num_rows) {
     int tx = blockIdx.x * blockDim.x + threadIdx.x;
     while (tx < out_len) {
-      DType new_out = out[ty * out_len + tx];  // ReduceOp::zero();
+      using accum_type = typename accum_dtype<DType>::type;
+      accum_type local_accum = static_cast<accum_type>(
+          out[ty * out_len + tx]);  // ReduceOp::zero();
       Idx local_argu = 0, local_arge = 0;
       const int lhs_add = UseBcast ? ubcast_off[tx] : tx;
       const int rhs_add = UseBcast ? ebcast_off[tx] : tx;
@@ -622,10 +624,11 @@ __global__ void SpMMCmpCsrHeteroKernel(
         const DType* eoff =
             BinaryOp::use_rhs ? (efeat + eid * efeat_len) : nullptr;
         DType tmp_out = BinaryOp::Call(uoff + lhs_add, eoff + rhs_add);
-        ReduceOp::Call(&new_out, &local_argu, &local_arge, tmp_out, cid, eid);
+        ReduceOp::Call(&local_accum, &local_argu, &local_arge, tmp_out, cid, eid);
       }
       // Update output only when max/min values are different that original
       // output
+      DType new_out = static_cast<DType>(local_accum);
       if (out[ty * out_len + tx] != new_out) {
         out[ty * out_len + tx] = new_out;
         if (ReduceOp::require_arg && BinaryOp::use_lhs) {
