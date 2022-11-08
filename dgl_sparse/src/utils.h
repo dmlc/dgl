@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2022 by Contributors
  * @file utils.h
  * @brief DGL C++ sparse API utilities
@@ -12,7 +12,7 @@
 namespace dgl {
 namespace sparse {
 
-/*! @brief Find a proper sparse format for two sparse matrices. It chooses
+/** @brief Find a proper sparse format for two sparse matrices. It chooses
  * COO if anyone of the sparse matrices has COO format. If none of them has
  * COO, it tries CSR and CSC in the same manner. */
 inline static SparseFormat FindAnyExistingFormat(
@@ -29,7 +29,7 @@ inline static SparseFormat FindAnyExistingFormat(
   return fmt;
 }
 
-/*! @brief Check whether two matrices has the same dtype and shape for
+/** @brief Check whether two matrices has the same dtype and shape for
  * elementwise operators. */
 inline static void ElementwiseOpSanityCheck(
     const c10::intrusive_ptr<SparseMatrix>& A,
