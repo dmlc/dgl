@@ -730,8 +730,14 @@ def check_dist_graph_hetero(g, num_clients, num_nodes, num_edges):
 
     # Test reading edge data
     eids = F.arange(0, int(g.number_of_edges("r1") / 2))
-    feats1 = g.edges["r1"].data["feat"][eids]
-    feats = F.squeeze(feats1, 1)
+    # access via etype
+    feats = g.edges["r1"].data["feat"][eids]
+    feats = F.squeeze(feats, 1)
+    assert np.all(F.asnumpy(feats == eids))
+    # access via canonical etype
+    c_etype = g.to_canonical_etype("r1")
+    feats = g.edges[c_etype].data["feat"][eids]
+    feats = F.squeeze(feats, 1)
     assert np.all(F.asnumpy(feats == eids))
 
     # Test edge_subgraph
