@@ -117,7 +117,8 @@ void compute_importance_sampling_probabilities(
           ps[j - indptr[rid]] = hop_map[indices[j]];
       }
 
-      // stands for right handside of Equation (15) in arXiv:2210.13339
+      // stands for RHS of Equation (22) in arXiv:2210.13339 after moving the other terms without
+      // c_s to RHS.
       double var_target = ds[i] * ds[i] / k;
       if (weights) {
         var_target -= ds[i] * ds[i] / d;
@@ -125,8 +126,9 @@ void compute_importance_sampling_probabilities(
           var_target += A[j] * A[j];
       }
       FloatType c = cs[i];
-      // stands for left handside of Equation (15) in arXiv:2210.13339
-      double var_1;
+      // stands for left handside of Equation (22) in arXiv:2210.13339 after moving
+      double var_1;  // the other terms without c_s to RHS.
+      // Compute c_s in Equation (22) via fixed-point iteration.
       do {
         var_1 = 0;
         if (weights) {
