@@ -293,8 +293,8 @@ def gen_parmetis_input_args(params, schema_map):
     #   num_constraints = no. of node types + train_mask + test_mask + val_mask
     #   Here, (train/test/val) masks will be set to 1 if these masks exist for
     #   all the node types in the graph, otherwise these flags will be set to 0
-    assert constants.GRAPH_NAMEe in schema_map, "Graph name is not present in the json file"
-    graph_name = schema_map[constants.GRAPH_NAME]
+    assert constants.STR_GRAPH_NAME in schema_map, "Graph name is not present in the json file"
+    graph_name = schema_map[constants.STR_GRAPH_NAME]
     if not os.path.isfile(f'{graph_name}_stats.txt'):
         num_nodes = np.sum(np.concatenate(schema_map[constants.STR_NUM_NODES_PER_CHUNK]))
         num_edges = np.sum(np.concatenate(schema_map[constants.STR_NUM_EDGES_PER_CHUNK]))
@@ -312,7 +312,7 @@ def gen_parmetis_input_args(params, schema_map):
         train_mask = train_mask // num_ntypes
         test_mask = test_mask // num_ntypes
         val_mask = val_mask // num_ntypes
-        num_constraints = num_nyptes + train_mask + test_mask + val_mask
+        num_constraints = num_ntypes + train_mask + test_mask + val_mask
 
         with open(f'{graph_name}_stats.txt', 'w') as sf:
             sf.write(f'{num_nodes} {num_edges} {num_constraints}')
