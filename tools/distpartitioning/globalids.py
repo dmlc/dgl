@@ -117,7 +117,7 @@ def lookup_shuffle_global_nids_edges(rank, world_size, num_parts, edge_data, id_
         splits = np.array_split(node_list, num_splits)
         shuffle_mappings = []
         for item in splits:
-            shuffle_ids = id_lookup.get_shuffle_nids(item, local_nids, local_shuffle_nids)
+            shuffle_ids = id_lookup.get_shuffle_nids(item, local_nids, local_shuffle_nids, world_size)
             shuffle_mappings.append(shuffle_ids)
 
         shuffle_ids = np.concatenate(shuffle_mappings)
