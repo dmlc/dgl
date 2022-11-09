@@ -110,7 +110,7 @@ def test_sampling_homogenous():
         assert_same_sampling_len(g, cugraph_gs, nodes, fanout)
  
 
-def assert_same_sampling_len(dgl_g, cugraph_gs, nodes, fanout, edge_dir):
+def assert_same_sampling_len(dgl_g, cugraph_gs, nodes, fanout, edge_dir='out'):
     dgl_o = dgl_g.sample_neighbors(nodes, fanout=fanout, edge_dir=edge_dir)
     cugraph_o = cugraph_gs.sample_neighbors(
         nodes, fanout=fanout, edge_dir=edge_dir
