@@ -625,7 +625,7 @@ __global__ void SpMMCmpCsrHeteroKernel(
             BinaryOp::use_rhs ? (efeat + eid * efeat_len) : nullptr;
         DType tmp_out = BinaryOp::Call(uoff + lhs_add, eoff + rhs_add);
         ReduceOp::Call(
-            &local_accum, &local_argu, &local_arge,tmp_out, cid, eid);
+            &local_accum, &local_argu, &local_arge, tmp_out, cid, eid);
       }
       // Update output only when max/min values are different that original
       // output
