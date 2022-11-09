@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2022 by Contributors
  * @file sparse_matrix.cc
  * @brief DGL C++ sparse matrix implementations

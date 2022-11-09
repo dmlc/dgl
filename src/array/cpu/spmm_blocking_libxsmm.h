@@ -213,29 +213,23 @@ inline libxsmm_meltwfunction_opreduce_vecs_idx SpMMCreateLibxsmmKernel(
   // TODO(Steve): fix this long line in a separate PR.
   if (std::is_same<Op, op::CopyLhs<DType>>::value) {
     opredop_flags =
-        (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags |
-        LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OPORDER_VECIDX_VECIN);
+        (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags | LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OPORDER_VECIDX_VECIN);  // NOLINT
   } else if (std::is_same<Op, op::CopyRhs<DType>>::value) {
     opredop_flags =
-        (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags |
-        LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OPORDER_VECIN_VECIDX);
+        (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags | LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OPORDER_VECIN_VECIDX);  // NOLINT
     if (!has_idx) {
       opredop_flags =
-          (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags |
-          LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_IMPLICIT_INDEXED_VECIDX);
+          (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags | LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_IMPLICIT_INDEXED_VECIDX);  // NOLINT
     }
   } else {
     opredop_flags =
-        (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags |
-        LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OPORDER_VECIDX_VECIN);
+        (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags | LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_OPORDER_VECIDX_VECIN);  // NOLINT
     if (has_idx) {
       opredop_flags =
-          (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags |
-          LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_INDEXED_VEC);
+          (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags | LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_INDEXED_VEC);  // NOLINT
     } else {
       opredop_flags =
-          (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags |
-          LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_IMPLICIT_INDEXED_VEC);
+          (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags | LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_IMPLICIT_INDEXED_VEC);  // NOLINT
     }
   }
   // Third, we set the Redop in the opredop_flags
@@ -246,13 +240,11 @@ inline libxsmm_meltwfunction_opreduce_vecs_idx SpMMCreateLibxsmmKernel(
   if (is_cmp) {
     if (Op::use_lhs) {
       opredop_flags =
-          (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags |
-          LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_RECORD_ARGOP_OFF_VEC_0);
+          (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags | LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_RECORD_ARGOP_OFF_VEC_0);  // NOLINT
     }
     if (Op::use_rhs) {
       opredop_flags =
-          (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags |
-          LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_RECORD_ARGOP_OFF_VEC_1);
+          (libxsmm_meltw_opreduce_vecs_flags)(opredop_flags | LIBXSMM_MELTW_FLAG_OPREDUCE_VECS_RECORD_ARGOP_OFF_VEC_1);  // NOLINT
     }
   }
   libxsmm_meltwfunction_opreduce_vecs_idx kernel = nullptr;
@@ -460,7 +452,7 @@ void SpMMRedopCsrOpt(
 
   IdType K_block_size = std::min(
       (int64_t)K,
-      (int64_t)(llc_size / (N * sizeof(DType) * nnz_prob * BLOCKING_HEURISTIC_PARAM)));
+      (int64_t)(llc_size / (N * sizeof(DType) * nnz_prob * BLOCKING_HEURISTIC_PARAM)));  // NOLINT
   IdType M_block_size = M / (nthreads * NUM_BLOCKS_PER_THREAD);
   if (M_block_size == 0) M_block_size = 1;
   if (K_block_size == 0) K_block_size = 1;
