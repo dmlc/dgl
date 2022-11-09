@@ -1,7 +1,7 @@
 /**
  *  Copyright (c) 2019 by Contributors
  * @file graph/serialize/heterograph_serialize.cc
- * @brief DGLGraph serialization implementation
+ * @brief DGLHeteroGraph serialization implementation
  *
  * The storage structure is
  * {
