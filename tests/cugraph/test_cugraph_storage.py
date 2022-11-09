@@ -107,24 +107,8 @@ def test_sampling_homogenous():
     nodes = [6]
     # Test for multiple fanouts
     for fanout in [1, 2, 3]:
-        exp_g = g.sample_neighbors(nodes, fanout=fanout)
-        cu_g = cugraph_gs.sample_neighbors(nodes, fanout=fanout)
-        exp_src, exp_dst = exp_g.edges()
-        cu_src, cu_dst = cu_g.edges()
-        assert len(exp_src) == len(cu_src)
-
-    # Test same results for all neighbours
-    exp_g = g.sample_neighbors(nodes, fanout=-1)
-    cu_g = cugraph_gs.sample_neighbors(nodes, fanout=-1)
-    exp_src, exp_dst = exp_g.edges()
-    exp_src, exp_dst = exp_src.numpy(), exp_dst.numpy()
-
-    cu_src, cu_dst = cu_g.edges()
-    cu_src, cu_dst = cu_src.to("cpu").numpy(), cu_dst.to("cpu").numpy()
-
-    np.testing.assert_equal(exp_src, cu_src)
-    np.testing.assert_equal(exp_dst, cu_dst)
-
+        assert_same_sampling_len(dgl_g, cugraph_gs, nodes, fanout)
+ 
 
 def assert_same_sampling_len(dgl_g, cugraph_gs, nodes, fanout, edge_dir):
     dgl_o = dgl_g.sample_neighbors(nodes, fanout=fanout, edge_dir=edge_dir)
