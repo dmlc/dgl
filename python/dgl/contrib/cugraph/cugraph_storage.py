@@ -640,6 +640,9 @@ class CuGraphStorage:
         else:
             indices_offset = 0
 
+        if etype:
+            etype = str(etype)
+
         return self.graphstore.get_edge_storage(key, etype, indices_offset)
 
     # Number of edges/nodes utils
