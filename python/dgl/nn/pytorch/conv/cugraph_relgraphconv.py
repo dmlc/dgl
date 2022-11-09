@@ -264,7 +264,7 @@ class CuGraphRelGraphConv(nn.Module):
             )
         self.regularizer = regularizer
 
-        # initialize weights
+        # Initialize weights.
         with th.no_grad():
             if self.regularizer is None:
                 nn.init.uniform_(
@@ -361,12 +361,12 @@ class CuGraphRelGraphConv(nn.Module):
             g.srcdata["h"] = feat
             if norm is not None:
                 g.edata["norm"] = norm
-            # message passing
+            # Message passing.
             h = RelGraphConvAgg.apply(
                 g, self.num_rels, etypes, max_in_degree, feat, self.coeff
             )
             h = h @ self.W.view(-1, self.out_feat)
-            # apply bias and activation
+            # Apply bias and activation.
             if self.layer_norm:
                 h = self.layer_norm_weight(h)
             if self.bias:
