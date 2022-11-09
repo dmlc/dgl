@@ -22,11 +22,6 @@ except ModuleNotFoundError:
         "dgl.nn.CuGraphRelGraphConv requires pylibcugraphops to be installed."
     )
 
-# Maximum amount of shared memory per thread block used by cugraph-ops is 48KB.
-# TODO(tingyu66): raise a more informative error message in cugraph-ops to
-# skip the size check in nn.Module.
-CUDA_SM_PER_BLOCK = 49152
-
 
 class RelGraphConvAgg(th.autograd.Function):
     r"""Custom autograd function for R-GCN aggregation layer that uses the
@@ -354,19 +349,7 @@ class CuGraphRelGraphConv(nn.Module):
         max_in_degree = self.max_in_degree
         if max_in_degree is None:
             max_in_degree = g.in_degrees().max().item()
-        # Check shared memory per block size.
-        _sm_size = (
-            max_in_degree * 2 + 3 + self.num_rels * self.num_bases
-            if self.regularizer == "basis"
-            else 0
-        )
-        _sm_size *= 8 if g.idtype == th.int64 else 4
-        if _sm_size > CUDA_SM_PER_BLOCK:
-            raise MemoryError(
-                f"Failed to allocate {_sm_size} bytes shared memory on CUDA, "
-                f"larger than the limit: {CUDA_SM_PER_BLOCK} bytes. "
-                f"Try reducing max_in_degree or num_bases."
-            )
+
         with g.local_scope():
             g.srcdata["h"] = feat
             if norm is not None:
