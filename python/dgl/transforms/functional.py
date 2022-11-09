@@ -68,13 +68,11 @@ __all__ = [
     'to_block',
     'to_simple',
     'to_simple_graph',
-    'as_immutable_graph',
     'sort_csr_by_tag',
     'sort_csc_by_tag',
     'metis_partition_assignment',
     'partition_graph_with_halo',
     'metis_partition',
-    'as_heterograph',
     'adj_product_graph',
     'adj_sum_graph',
     'reorder_graph',
@@ -2894,25 +2892,6 @@ def adj_sum_graph(graphs, weight_name):
     C.edata[weight_name] = C_weights
     return C
 
-def as_heterograph(g, ntype='_U', etype='_E'):  # pylint: disable=unused-argument
-    """Convert a DGLGraph to a DGLHeteroGraph with one node and edge type.
-
-    DEPRECATED: DGLGraph and DGLHeteroGraph have been merged. This function will
-                do nothing and can be removed safely in all cases.
-    """
-    dgl_warning('DEPRECATED: DGLGraph and DGLHeteroGraph have been merged in v0.5.\n'
-                '\tdgl.as_heterograph will do nothing and can be removed safely in all cases.')
-    return g
-
-def as_immutable_graph(hg):
-    """Convert a DGLHeteroGraph with one node and edge type into a DGLGraph.
-
-    DEPRECATED: DGLGraph and DGLHeteroGraph have been merged. This function will
-                do nothing and can be removed safely in all cases.
-    """
-    dgl_warning('DEPRECATED: DGLGraph and DGLHeteroGraph have been merged in v0.5.\n'
-                '\tdgl.as_immutable_graph will do nothing and can be removed safely in all cases.')
-    return hg
 
 def sort_csr_by_tag(g, tag, tag_offset_name='_TAG_OFFSET', tag_type='node'):
     r"""Return a new graph whose CSR matrix is sorted by the given tag.
