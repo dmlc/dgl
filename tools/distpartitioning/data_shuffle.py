@@ -196,22 +196,31 @@ def exchange_edge_data(rank, world_size, num_parts, edge_data):
 
     return edge_data
 
-def exchange_feature(data, feat_type, gid_start, gid_end, type_id_start, 
-        type_id_end, local_part_id, world_size, cur_features, cur_global_ids):
+def exchange_feature(rank, data, id_lookup, feat_type, feat_key, key_feats, gid_start,
+        gid_end, type_id_start, type_id_end, local_part_id, world_size,
+        cur_features, cur_global_ids):
     """This function is used to send/receive one feature for either nodes or 
     edges of the input graph dataset.
 
     Parameters:
     -----------
+    rank : int
+	integer, unique id assigned to the current process
     data: dicitonary
         dictionry in which node or edge features are stored and this information 
         is read from the appropriate node features file which belongs to the 
         current process
+    id_lookup : instance of DistLookupService
+        instance of an implementation of dist. lookup service to retrieve values
+        for keys
     feat_type : string
         this is used to distinguish which features are being exchanged. Please 
         note that for nodes ownership is clearly defined and for edges it is 
         always assumed that destination end point of the edge defines the 
         ownership of that particular edge
+    feat_key : string
+        this string is used as a key in the dictionary to store features, as 
+        tensors, in local dictionaries
     gid_start : int
         starting global_id, of either node or edge, for the feature data
     gid_end : int
@@ -268,12 +277,12 @@ def exchange_feature(data, feat_type, gid_start, gid_end, type_id_start,
         tids_per_partid = tids_feat[cond]
         local_idx_partid = local_idx[cond]
 
-        if (gnids_per_partid.shape[0] == 0):
+        if (gids_per_partid.shape[0] == 0):
             feats_per_rank.append(torch.empty((0,1), dtype=torch.float))
             global_id_per_rank.append(np.empty((0,1), dtype=np.int64))
         else:
             feats_per_rank.append(key_feats[local_idx_partid])
-            global_id_per_rank.append(torch.from_numpy(gnids_per_partid).type(torch.int64))
+            global_id_per_rank.append(torch.from_numpy(gids_per_partid).type(torch.int64))
 
     #features (and global nids) per rank to be sent out are ready
     #for transmission, perform alltoallv here.
@@ -283,7 +292,7 @@ def exchange_feature(data, feat_type, gid_start, gid_end, type_id_start,
     #stitch node_features together to form one large feature tensor
     output_feat_list = torch.cat(output_feat_list)
     output_id_list = torch.cat(output_id_list)
-    if local_feat_key in own_features: 
+    if local_feat_key in cur_features: 
         temp = cur_features[local_feat_key]
         cur_features[local_feat_key] = torch.cat([temp, output_feat_list])
         temp = cur_global_ids[local_feat_key]
