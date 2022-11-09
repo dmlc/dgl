@@ -109,7 +109,7 @@ def lookup_shuffle_global_nids_edges(rank, world_size, num_parts, edge_data, id_
         node_list = edge_data[constants.GLOBAL_SRC_ID+"/"+str(local_part_id)]  
         
         # Determine the no. of times each process has to send alltoall messages.
-        all_sizes = allgather_sizes([node_list.shape[0]], world_size, return_sizes=True)
+        all_sizes = allgather_sizes([node_list.shape[0]], world_size, num_parts, return_sizes=True)
         max_count = np.amax(all_sizes)
         num_splits = max_count // BATCH_SIZE + 1    
     
