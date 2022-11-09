@@ -171,7 +171,7 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
         assert len(node_features) == len(node_feature_tids)
 
         for feat_name, feat_info  in node_features.items():
-            logging.info(f'[Rank: {rank}] node feature name: {k}, feature data shape: {v.size()}')
+            logging.info(f'[Rank: {rank}] node feature name: {feat_name}, feature data shape: {feat_info.size()}')
 
             # Get the range of type ids which are mapped to the current node.
             tids = node_feature_tids[feat_name]
