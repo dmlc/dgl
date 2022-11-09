@@ -624,7 +624,8 @@ __global__ void SpMMCmpCsrHeteroKernel(
         const DType* eoff =
             BinaryOp::use_rhs ? (efeat + eid * efeat_len) : nullptr;
         DType tmp_out = BinaryOp::Call(uoff + lhs_add, eoff + rhs_add);
-        ReduceOp::Call(&local_accum, &local_argu, &local_arge, tmp_out, cid, eid);
+        ReduceOp::Call(
+            &local_accum, &local_argu, &local_arge,tmp_out, cid, eid);
       }
       // Update output only when max/min values are different that original
       // output
@@ -672,7 +673,7 @@ void SpMMCoo(
    * current implementation.
    */
 #if BF16_ENABLED
-  if (std::is_same<DType, __half>::value || 
+  if (std::is_same<DType, __half>::value ||
       std::is_same<DType, __nv_bfloat16>::value)
 #else
   if (std::is_same<DType, __half>::value)
