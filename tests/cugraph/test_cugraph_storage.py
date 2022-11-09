@@ -107,7 +107,7 @@ def test_sampling_homogenous():
     nodes = [6]
     # Test for multiple fanouts
     for fanout in [1, 2, 3]:
-        assert_same_sampling_len(dgl_g, cugraph_gs, nodes, fanout)
+        assert_same_sampling_len(g, cugraph_gs, nodes, fanout)
  
 
 def assert_same_sampling_len(dgl_g, cugraph_gs, nodes, fanout, edge_dir):
