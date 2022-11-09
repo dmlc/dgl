@@ -174,6 +174,7 @@ def test_spmm(idtype, g, shp, msg, reducer):
     if "v" in g.dstdata:
         g.dstdata.pop("v")
 
+
 @unittest.skipIf(
     dgl.backend.backend_name != "pytorch",
     reason="Only support PyTorch for now."
@@ -205,7 +206,7 @@ def test_half_spmm(idtype, dtype, rtol, atol):
     assert torch.allclose(res_fp32, res_half, rtol=rtol, atol=atol)
 
     # test SpMMCOO
-    # TODO(Xin): temporally disabled because SpMMCOO has not been fixed.
+    # TODO(Xin): half-precision SpMMCoo is temporally disabled.
     # g = g.formats(['coo'])
     # res_fp32 = dgl.ops.copy_u_sum(g, feat_fp32)[0]
     # res_half = dgl.ops.copy_u_sum(g, feat_half)[0].float()

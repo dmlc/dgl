@@ -666,12 +666,20 @@ template <typename Idx, typename DType, typename BinaryOp, typename ReduceOp>
 void SpMMCoo(
     const BcastOff& bcast, const COOMatrix& coo, NDArray ufeat, NDArray efeat,
     NDArray out, NDArray argu, NDArray arge) {
-#if defined(CUDART_VERSION) && CUDART_VERSION <= 10000
+  /**
+   * TODO(Xin): Disable half precision for SpMMCoo due to the round-off error.
+   * We should use fp32 for the accumulation but it's hard to modify the 
+   * current implementation.
+   */
+#if BF16_ENABLED
+  if (std::is_same<DType, __half>::value || 
+      std::is_same<DType, __nv_bfloat16>::value)
+#else
   if (std::is_same<DType, __half>::value)
-    LOG(FATAL) << "SpMMCoo requires atomicCAS, which is not supported "
-               << "for float16 in CUDA 10.0. Please upgrade your CUDA "
-               << "to later versions.";
-#endif
+#endif  // BF16_ENABLED
+    LOG(FATAL) << "SpMMCoo doesn't support half precision fow now. "
+               << "Please use SpMMCsr instead by allowing the graph "
+               << "materialize CSR/CSC formats.";
   const Idx *row = coo.row.Ptr<Idx>(), *col = coo.col.Ptr<Idx>(),
             *edge_map = coo.data.Ptr<Idx>();
   const DType *ufeat_data = ufeat.Ptr<DType>(),
