@@ -315,6 +315,24 @@ if(BUILD_TORCH)
   add_dependencies(dgl tensoradapter_pytorch)
 endif(BUILD_TORCH)
 
+if(BUILD_SPARSE)
+  file(TO_NATIVE_PATH ${CMAKE_CURRENT_BINARY_DIR} BINDIR)
+  file(TO_NATIVE_PATH ${CMAKE_COMMAND} CMAKE_CMD)
+  # TODO(zhenkun): MSVC support?
+  file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/dgl_sparse/build.sh BUILD_SCRIPT)
+  add_custom_target(
+    dgl_sparse
+    ${CMAKE_COMMAND} -E env
+    CMAKE_COMMAND=${CMAKE_CMD}
+    CUDA_TOOLKIT_ROOT_DIR=${CUDA_TOOLKIT_ROOT_DIR}
+    USE_CUDA=${USE_CUDA}
+    BINDIR=${CMAKE_CURRENT_BINARY_DIR}
+    bash ${BUILD_SCRIPT} ${TORCH_PYTHON_INTERPS}
+    DEPENDS ${BUILD_SCRIPT}
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/dgl_sparse)
+  add_dependencies(dgl dgl_sparse)
+endif(BUILD_SPARSE)
+
 # Installation rules
 install(TARGETS dgl DESTINATION lib${LIB_SUFFIX})
 
