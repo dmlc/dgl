@@ -5936,7 +5936,7 @@ class DGLGraph(object):
     def shared_memory(self, name, formats=('coo', 'csr', 'csc')):
         """Return a copy of this graph in shared memory, without node data or edge data.
 
-        It moves the graph index to shared memory and returns a DGLHeterograph object which
+        It moves the graph index to shared memory and returns a DGLGraph object which
         has the same graph structure, node types and edge types but does not contain node data
         or edge data.
 
@@ -5949,7 +5949,7 @@ class DGLGraph(object):
 
         Returns
         -------
-        HeteroGraph
+        DGLGraph
             The graph in shared memory
         """
         assert len(name) > 0, "The name of shared memory cannot be empty"

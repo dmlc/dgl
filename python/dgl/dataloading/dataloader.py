@@ -387,10 +387,10 @@ def _prefetcher_entry(
             queue, (None, None, None, ExceptionWrapper(where='in prefetcher')), done_event)
 
 
-# DGLHeteroGraphs have the semantics of lazy feature slicing with subgraphs.  Such behavior depends
+# DGLGraphs have the semantics of lazy feature slicing with subgraphs.  Such behavior depends
 # on that DGLGraph's ndata and edata are maintained by Frames.  So to maintain compatibility
-# with older code, DGLHeteroGraphs and other graph storages are handled separately: (1)
-# DGLHeteroGraphs will preserve the lazy feature slicing for subgraphs.  (2) Other graph storages
+# with older code, DGLGraphs and other graph storages are handled separately: (1)
+# DGLGraphs will preserve the lazy feature slicing for subgraphs.  (2) Other graph storages
 # will not have lazy feature slicing; all feature slicing will be eager.
 def remove_parent_storage_columns(item, g):
     """Removes the storage objects in the given graphs' Frames if it is a sub-frame of the

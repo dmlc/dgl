@@ -9,7 +9,7 @@ from . import convert
 from . import utils
 
 
-__all__ = ['batch', 'unbatch', 'slice_batch']
+__all__ = ['batch', 'unbatch', 'slice_batch', 'batch_hetero', 'unbatch_hetero']
 
 def batch(graphs, ndata=ALL, edata=ALL, *,
           node_attrs=None, edge_attrs=None):
@@ -504,3 +504,16 @@ def slice_batch(g, gid, store_ids=False):
                                                    retg.idtype, retg.device)
 
     return retg
+
+#### DEPRECATED APIS ####
+def batch_hetero(*args, **kwargs):
+    """DEPREACTED: please use dgl.batch """
+    dgl_warning('From v0.5, DGLHeteroGraph is merged into DGLGraph. You can safely'
+                ' replace dgl.batch_hetero with dgl.batch')
+    return batch(*args, **kwargs)
+
+def unbatch_hetero(*args, **kwargs):
+    """DEPREACTED: please use dgl.unbatch """
+    dgl_warning('From v0.5, DGLHeteroGraph is merged into DGLGraph. You can safely'
+                ' replace dgl.unbatch_hetero with dgl.unbatch')
+    return unbatch(*args, **kwargs)

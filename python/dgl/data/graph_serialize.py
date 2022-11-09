@@ -203,7 +203,7 @@ def load_graphs(filename, idx_list=None):
 
 
 def load_graph_v2(filename, idx_list=None):
-    """Internal functions for loading DGLHeteroGraphs."""
+    """Internal functions for loading DGLGraphs."""
     if idx_list is None:
         idx_list = []
     assert isinstance(idx_list, list)

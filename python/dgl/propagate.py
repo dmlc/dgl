@@ -3,6 +3,7 @@ from __future__ import absolute_import
 
 from . import backend as F
 from . import traversal as trv
+from .heterograph import DGLGraph
 
 __all__ = [
     "prop_nodes",
@@ -100,6 +101,9 @@ def prop_nodes_bfs(
     --------
     dgl.traversal.bfs_nodes_generator
     """
+    assert isinstance(
+        graph, DGLGraph
+    ), "DGLHeteroGraph is merged with DGLGraph, Please use DGLGraph"
     assert (
         len(graph.canonical_etypes) == 1
     ), "prop_nodes_bfs only support homogeneous graph"
@@ -133,6 +137,9 @@ def prop_nodes_topo(
     --------
     dgl.traversal.topological_nodes_generator
     """
+    assert isinstance(
+        graph, DGLGraph
+    ), "DGLHeteroGraph is merged with DGLGraph, Please use DGLGraph"
     assert (
         len(graph.canonical_etypes) == 1
     ), "prop_nodes_topo only support homogeneous graph"
@@ -179,6 +186,9 @@ def prop_edges_dfs(
     --------
     dgl.traversal.dfs_labeled_edges_generator
     """
+    assert isinstance(
+        graph, DGLGraph
+    ), "DGLHeteroGraph is merged with DGLGraph, Please use DGLGraph"
     assert (
         len(graph.canonical_etypes) == 1
     ), "prop_edges_dfs only support homogeneous graph"
