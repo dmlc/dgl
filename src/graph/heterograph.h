@@ -302,7 +302,7 @@ class HeteroGraph : public BaseHeteroGraph {
   /**
    * @brief The name of the shared memory. Return empty string if it is not in
    * shared memory.
-    */
+   */
   std::string SharedMemName() const;
 
   /**
