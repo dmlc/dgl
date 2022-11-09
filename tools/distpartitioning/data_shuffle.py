@@ -397,8 +397,8 @@ def exchange_features(rank, world_size, num_parts, feature_tids, type_id_map, id
 
             key_feats = feature_data[feat_key]
             for local_part_id in range(num_parts//world_size):
-                own_features, own_global_ids = exchange_feature(data, 
-                        feat_type, gid_start, gid_end, type_id_start, 
+                own_features, own_global_ids = exchange_feature(rank, data, id_lookup,
+                        feat_type, feat_key, key_feats, gid_start, gid_end, type_id_start, 
                         type_id_end, local_part_id, world_size, own_features, 
                         own_global_ids)
 
