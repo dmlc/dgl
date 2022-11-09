@@ -95,13 +95,14 @@ def add_nodes_from_dgl_heteroGraph(
                 )
     else:
         ntype = graph.ntypes[0]
-        gs = add_ndata_of_single_type(
-            gs,
-            feat_t_d=graph.ndata,
-            ntype=ntype,
-            n_rows=graph.number_of_nodes(),
-            idtype=graph.idtype,
-        )
+        if graph.ndata:
+            gs = add_ndata_of_single_type(
+                gs,
+                feat_t_d=graph.ndata,
+                ntype=ntype,
+                n_rows=graph.number_of_nodes(),
+                idtype=graph.idtype,
+            )
     return gs
 
 
