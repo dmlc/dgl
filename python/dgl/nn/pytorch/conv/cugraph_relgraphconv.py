@@ -33,6 +33,8 @@ class RelGraphConvAgg(th.autograd.Function):
 
         Parameters
         ----------
+        ctx : torch.autograd.function.BackwardCFunction
+            Context object used to stash information for backward computation.
         g : DGLGraph
             The graph.
         num_rels : int
@@ -121,6 +123,8 @@ class RelGraphConvAgg(th.autograd.Function):
 
         Parameters
         ----------
+        ctx : torch.autograd.function.BackwardCFunction
+            Context object used to stash information for backward computation.
         grad_output : torch.Tensor
             A 2D tensor of the gradient of loss function w.r.t output.
         """
@@ -158,6 +162,9 @@ class CuGraphRelGraphConv(nn.Module):
     aggregation primitives in cugraph-ops.
 
     See :class:`dgl.nn.pytorch.conv.RelGraphConv` for mathematical model.
+
+    This module depends on :code:`pylibcugraphops` package, which can be
+    installed via :code:`conda install -c nvidia pylibcugraphops>=22.12`.
 
     .. note::
         This is an **experimental** feature.
