@@ -225,16 +225,28 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
         cs,
         hop_map);
 
+  constexpr auto vidtype = DGLDataTypeTraits<IdxType>::dtype;
+
+  IdArray picked_row = NDArray::Empty({hop_size}, vidtype, ctx);
+  IdArray picked_col = NDArray::Empty({hop_size}, vidtype, ctx);
+  IdArray picked_idx = NDArray::Empty({hop_size}, vidtype, ctx);
+  FloatArray picked_imp = NDArray::Empty({importance_sampling ? hop_size : 0}, fidtype, ctx);
+  IdxType* picked_rdata = picked_row.Ptr<IdxType>();
+  IdxType* picked_cdata = picked_col.Ptr<IdxType>();
+  IdxType* picked_idata = picked_idx.Ptr<IdxType>();
+  FloatType* picked_imp_data = picked_imp.Ptr<FloatType>();
+
   const uint64_t random_seed = IsNullArray(random_seed_arr) ?
       RandomEngine::ThreadLocal()->RandInt(1000000000) : random_seed_arr.Ptr<int64_t>()[0];
 
-  // compute number of edges first and store randoms
+  // compute number of edges first and do sampling
   IdxType num_edges = 0;
-  FloatArray rands_arr = NDArray::Empty({hop_size}, fidtype, ctx);
-  auto rands = rands_arr.Ptr<FloatType>();
-  for (int64_t i = 0, off = 0; i < num_rows; i++) {
+  for (int64_t i = 0; i < num_rows; i++) {
     const IdxType rid = rows_data[i];
     const auto c = cs[i];
+
+    FloatType norm_inv_p = 0;
+    const auto off = num_edges;
     for (auto j = indptr[rid]; j < indptr[rid + 1]; j++) {
       const auto v = indices[j];
       const auto t = nids ? nids[v] : v;  // t in the paper
@@ -242,60 +254,38 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
       std::uniform_real_distribution<FloatType> uni;
       // rolled random number r_t is a function of the random_seed and t
       const auto rnd = uni(ng);
-      // if hop_map is initialized, get ps from there, otherwise get it from the alternative.
-      num_edges +=
-          rnd <= (importance_sampling - weights ? c * hop_map[v] : c * (weights ? A[j] : 1));
-      rands[off++] = rnd;
-    }
-  }
-
-  constexpr auto vidtype = DGLDataTypeTraits<IdxType>::dtype;
-
-  IdArray picked_row = NDArray::Empty({num_edges}, vidtype, ctx);
-  IdArray picked_col = NDArray::Empty({num_edges}, vidtype, ctx);
-  IdArray picked_idx = NDArray::Empty({num_edges}, vidtype, ctx);
-  FloatArray importances = NDArray::Empty({importance_sampling ? num_edges : 0}, fidtype, ctx);
-  IdxType* picked_rdata = picked_row.Ptr<IdxType>();
-  IdxType* picked_cdata = picked_col.Ptr<IdxType>();
-  IdxType* picked_idata = picked_idx.Ptr<IdxType>();
-  FloatType* importances_data = importances.Ptr<FloatType>();
-
-  std::size_t off = 0, idx = 0;
-
-  for (int64_t i = 0; i < num_rows; i++) {
-    const IdxType rid = rows_data[i];
-    const auto c = cs[i];
-
-    FloatType norm_inv_p = 0;
-    const auto off_start = off;
-    for (auto j = indptr[rid]; j < indptr[rid + 1]; j++) {
-      const auto v = indices[j];
       const auto w = (weights ? A[j] : 1);
+      // if hop_map is initialized, get ps from there, otherwise get it from the alternative.
       const auto ps = std::min(ONE, importance_sampling - weights ? c * hop_map[v] : c * w);
-      const auto rnd = rands[idx++];
       if (rnd <= ps) {
-        norm_inv_p += w / ps;
-        picked_rdata[off] = rid;
-        picked_cdata[off] = indices[j];
-        picked_idata[off] = data ? data[j] : j;
-        if (importance_sampling)
-          importances_data[off] = w / ps;
-        off++;
+        picked_rdata[num_edges] = rid;
+        picked_cdata[num_edges] = v;
+        picked_idata[num_edges] = data ? data[j] : j;
+        if (importance_sampling) {
+          const auto edge_weight = w / ps;
+          norm_inv_p += edge_weight;
+          picked_imp_data[num_edges] = edge_weight;
+        }
+        num_edges++;
       }
     }
 
     if (importance_sampling) {
-      for (auto i = off_start; i < off; i++)
+      const auto norm_factor = (num_edges - off) / norm_inv_p;
+      for (auto i = off; i < num_edges; i++)
         // so that fn.mean can be used
-        importances_data[i] *= (off - off_start) / norm_inv_p;
+        picked_imp_data[i] *= norm_factor;
     }
   }
 
-  CHECK((IdxType)off == num_edges) << "computed num_edges should match the number of edges sampled"
-      << num_edges << " != " << off;
+  picked_row = picked_row.CreateView({num_edges}, picked_row->dtype);
+  picked_col = picked_col.CreateView({num_edges}, picked_col->dtype);
+  picked_idx = picked_idx.CreateView({num_edges}, picked_idx->dtype);
+  if (importance_sampling)
+    picked_imp = picked_imp.CreateView({num_edges}, picked_imp->dtype);
 
   return std::make_pair(COOMatrix(mat.num_rows, mat.num_cols,
-                   picked_row, picked_col, picked_idx), importances);
+                   picked_row, picked_col, picked_idx), picked_imp);
 }
 
 // Template for picking non-zero values row-wise. The implementation first slices
