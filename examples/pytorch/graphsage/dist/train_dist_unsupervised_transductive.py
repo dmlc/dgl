@@ -1,6 +1,3 @@
-import os
-
-os.environ["DGLBACKEND"] = "pytorch"
 import argparse
 import time
 
@@ -108,7 +105,9 @@ def run(args, device, data):
         emb_optimizer = th.optim.SparseAdam(
             list(emb_layer.module.sparse_emb.parameters()), lr=args.sparse_lr
         )
-        print("optimize Pytorch sparse embedding:", emb_layer.module.sparse_emb)
+        print(
+            "optimize Pytorch sparse embedding:", emb_layer.module.sparse_emb
+        )
 
     # Training loop
     epoch = 0
@@ -125,8 +124,8 @@ def run(args, device, data):
 
         start = time.time()
         with model.join():
-            # Loop over the dataloader to sample the computation dependency graph as a list of
-            # blocks.
+            # Loop over the dataloader to sample the computation dependency
+            # graph as a list of blocks.
             for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(
                 dataloader
             ):
@@ -137,8 +136,8 @@ def run(args, device, data):
                 pos_graph = pos_graph.to(device)
                 neg_graph = neg_graph.to(device)
                 blocks = [block.to(device) for block in blocks]
+                feat_copy_t.append(copy_t - tic_step)
                 copy_time = time.time()
-                feat_copy_t.append(copy_time - tic_step)
 
                 # Compute loss and prediction
                 batch_inputs = emb_layer(input_nodes)
@@ -165,26 +164,30 @@ def run(args, device, data):
                 num_seeds += pos_edges
                 if step % args.log_every == 0:
                     print(
-                        "[{}] Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f} | time {:.3f} s"
-                        "| sample {:.3f} | copy {:.3f} | forward {:.3f} | backward {:.3f} | update {:.3f}".format(
+                        "[{}] Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed "
+                        "(samples/sec) {:.4f} | time {:.3f}s | sample {:.3f} | "
+                        "copy {:.3f} | forward {:.3f} | backward {:.3f} | "
+                        "update {:.3f}".format(
                             g.rank(),
                             epoch,
                             step,
                             loss.item(),
                             np.mean(iter_tput[3:]),
-                            np.sum(step_time[-args.log_every :]),
-                            np.sum(sample_t[-args.log_every :]),
-                            np.sum(feat_copy_t[-args.log_every :]),
-                            np.sum(forward_t[-args.log_every :]),
-                            np.sum(backward_t[-args.log_every :]),
-                            np.sum(update_t[-args.log_every :]),
+                            np.sum(step_time[-args.log_every:]),
+                            np.sum(sample_t[-args.log_every:]),
+                            np.sum(feat_copy_t[-args.log_every:]),
+                            np.sum(forward_t[-args.log_every:]),
+                            np.sum(backward_t[-args.log_every:]),
+                            np.sum(update_t[-args.log_every:]),
                         )
                     )
 
                 start = time.time()
 
         print(
-            "[{}]Epoch Time(s): {:.4f}, sample: {:.4f}, data copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #seeds: {}, #inputs: {}".format(
+            "[{}]Epoch Time(s): {:.4f}, sample: {:.4f}, data copy: {:.4f}, "
+            "forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #seeds: {}, "
+            "#inputs: {}".format(
                 g.rank(),
                 np.sum(step_time),
                 np.sum(sample_t),
@@ -219,7 +222,6 @@ def run(args, device, data):
         if g.rank() == 0:
             th.save(pred, "emb.pt")
     else:
-        feat = g.ndata["features"]
         th.save(pred, "emb.pt")
 
 
@@ -227,7 +229,9 @@ def main(args):
     dgl.distributed.initialize(args.ip_config)
     if not args.standalone:
         th.distributed.init_process_group(backend="gloo")
-    g = dgl.distributed.DistGraph(args.graph_name, part_config=args.part_config)
+    g = dgl.distributed.DistGraph(
+            args.graph_name, part_config=args.part_config
+        )
     print("rank:", g.rank())
     print("number of edges", g.num_edges())
 

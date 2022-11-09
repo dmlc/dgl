@@ -1,6 +1,3 @@
-import os
-
-os.environ["DGLBACKEND"] = "pytorch"
 import argparse
 import time
 from contextlib import contextmanager
@@ -9,7 +6,6 @@ import numpy as np
 import sklearn.linear_model as lm
 import sklearn.metrics as skm
 import torch as th
-import torch.multiprocessing as mp
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
@@ -38,26 +34,28 @@ class DistSAGE(nn.Module):
 
     def forward(self, blocks, x):
         h = x
-        for l, (layer, block) in enumerate(zip(self.layers, blocks)):
+        for i, (layer, block) in enumerate(zip(self.layers, blocks)):
             h = layer(block, h)
-            if l != len(self.layers) - 1:
+            if i != len(self.layers) - 1:
                 h = self.activation(h)
                 h = self.dropout(h)
         return h
 
     def inference(self, g, x, batch_size, device):
         """
-        Inference with the GraphSAGE model on full neighbors (i.e. without neighbor sampling).
+        Inference with the GraphSAGE model on full neighbors (i.e. without
+        neighbor sampling).
+
         g : the entire graph.
         x : the input of entire node set.
 
-        The inference code is written in a fashion that it could handle any number of nodes and
-        layers.
+        The inference code is written in a fashion that it could handle any
+        number of nodes and layers.
         """
-        # During inference with sampling, multi-layer blocks are very inefficient because
-        # lots of computations in the first few layers are repeated.
-        # Therefore, we compute the representation of all nodes layer by layer.  The nodes
-        # on each layer are of course splitted in batches.
+        # During inference with sampling, multi-layer blocks are very
+        # inefficient because lots of computations in the first few layers are
+        # repeated. Therefore, we compute the representation of all nodes layer
+        # by layer.  The nodes on each layer are of course splitted in batches.
         # TODO: can we standardize this?
         nodes = dgl.distributed.node_split(
             np.arange(g.num_nodes()),
@@ -70,8 +68,8 @@ class DistSAGE(nn.Module):
             "h",
             persistent=True,
         )
-        for l, layer in enumerate(self.layers):
-            if l == len(self.layers) - 1:
+        for i, layer in enumerate(self.layers):
+            if i == len(self.layers) - 1:
                 y = dgl.distributed.DistTensor(
                     (g.num_nodes(), self.n_classes),
                     th.float32,
@@ -95,7 +93,7 @@ class DistSAGE(nn.Module):
                 h = x[input_nodes].to(device)
                 h_dst = h[: block.number_of_dst_nodes()]
                 h = layer(block, (h, h_dst))
-                if l != len(self.layers) - 1:
+                if i != len(self.layers) - 1:
                     h = self.activation(h)
                     h = self.dropout(h)
 
@@ -254,8 +252,8 @@ def run(args, device, data):
 
         start = time.time()
         with model.join():
-            # Loop over the dataloader to sample the computation dependency graph as a list of
-            # blocks.
+            # Loop over the dataloader to sample the computation dependency
+            # graph as a list of blocks.
             for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(
                 dataloader
             ):
@@ -292,25 +290,29 @@ def run(args, device, data):
                 num_seeds += pos_edges
                 if step % args.log_every == 0:
                     print(
-                        "[{}] Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f} | time {:.3f} s"
-                        "| sample {:.3f} | copy {:.3f} | forward {:.3f} | backward {:.3f} | update {:.3f}".format(
+                        "[{}] Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed "
+                        "(samples/sec) {:.4f} | time {:.3f}s | sample {:.3f} | "
+                        "copy {:.3f} | forward {:.3f} | backward {:.3f} | "
+                        "update {:.3f}".format(
                             g.rank(),
                             epoch,
                             step,
                             loss.item(),
                             np.mean(iter_tput[3:]),
-                            np.sum(step_time[-args.log_every :]),
-                            np.sum(sample_t[-args.log_every :]),
-                            np.sum(feat_copy_t[-args.log_every :]),
-                            np.sum(forward_t[-args.log_every :]),
-                            np.sum(backward_t[-args.log_every :]),
-                            np.sum(update_t[-args.log_every :]),
+                            np.sum(step_time[-args.log_every:]),
+                            np.sum(sample_t[-args.log_every:]),
+                            np.sum(feat_copy_t[-args.log_every:]),
+                            np.sum(forward_t[-args.log_every:]),
+                            np.sum(backward_t[-args.log_every:]),
+                            np.sum(update_t[-args.log_every:]),
                         )
                     )
                 start = time.time()
 
         print(
-            "[{}]Epoch Time(s): {:.4f}, sample: {:.4f}, data copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #seeds: {}, #inputs: {}".format(
+            "[{}]Epoch Time(s): {:.4f}, sample: {:.4f}, data copy: {:.4f}, "
+            "forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #seeds: {}, "
+            "#inputs: {}".format(
                 g.rank(),
                 np.sum(step_time),
                 np.sum(sample_t),
@@ -349,7 +351,6 @@ def run(args, device, data):
         if g.rank() == 0:
             th.save(pred, "emb.pt")
     else:
-        feat = g.ndata["features"]
         th.save(pred, "emb.pt")
 
 
@@ -357,7 +358,9 @@ def main(args):
     dgl.distributed.initialize(args.ip_config)
     if not args.standalone:
         th.distributed.init_process_group(backend="gloo")
-    g = dgl.distributed.DistGraph(args.graph_name, part_config=args.part_config)
+    g = dgl.distributed.DistGraph(
+            args.graph_name, part_config=args.part_config
+        )
     print("rank:", g.rank())
     print("number of edges", g.num_edges())
 

@@ -1,6 +1,3 @@
-import os
-
-os.environ["DGLBACKEND"] = "pytorch"
 import argparse
 import socket
 import time
@@ -46,26 +43,29 @@ class DistSAGE(nn.Module):
 
     def forward(self, blocks, x):
         h = x
-        for l, (layer, block) in enumerate(zip(self.layers, blocks)):
+        for i, (layer, block) in enumerate(zip(self.layers, blocks)):
             h = layer(block, h)
-            if l != len(self.layers) - 1:
+            if i != len(self.layers) - 1:
                 h = self.activation(h)
                 h = self.dropout(h)
         return h
 
     def inference(self, g, x, batch_size, device):
         """
-        Inference with the GraphSAGE model on full neighbors (i.e. without neighbor sampling).
+        Inference with the GraphSAGE model on full neighbors (i.e. without
+        neighbor sampling).
+
         g : the entire graph.
         x : the input of entire node set.
 
-        The inference code is written in a fashion that it could handle any number of nodes and
-        layers.
+        The inference code is written in a fashion that it could handle any
+        number of nodes and layers.
         """
-        # During inference with sampling, multi-layer blocks are very inefficient because
-        # lots of computations in the first few layers are repeated.
-        # Therefore, we compute the representation of all nodes layer by layer.  The nodes
-        # on each layer are of course splitted in batches.
+        # During inference with sampling, multi-layer blocks are very
+        # inefficient because lots of computations in the first few layers
+        # are repeated. Therefore, we compute the representation of all nodes
+        # layer by layer.  The nodes on each layer are of course splitted in
+        # batches.
         # TODO: can we standardize this?
         nodes = dgl.distributed.node_split(
             np.arange(g.num_nodes()),
@@ -78,8 +78,8 @@ class DistSAGE(nn.Module):
             "h",
             persistent=True,
         )
-        for l, layer in enumerate(self.layers):
-            if l == len(self.layers) - 1:
+        for i, layer in enumerate(self.layers):
+            if i == len(self.layers) - 1:
                 y = dgl.distributed.DistTensor(
                     (g.num_nodes(), self.n_classes),
                     th.float32,
@@ -107,7 +107,7 @@ class DistSAGE(nn.Module):
                 h = x[input_nodes].to(device)
                 h_dst = h[: block.number_of_dst_nodes()]
                 h = layer(block, (h, h_dst))
-                if l != len(self.layers) - 1:
+                if i != len(self.layers) - 1:
                     h = self.activation(h)
                     h = self.dropout(h)
 
@@ -200,8 +200,8 @@ def run(args, device, data):
         num_seeds = 0
         num_inputs = 0
         start = time.time()
-        # Loop over the dataloader to sample the computation dependency graph as a list of
-        # blocks.
+        # Loop over the dataloader to sample the computation dependency graph
+        # as a list of blocks.
         step_time = []
 
         with model.join():
@@ -244,7 +244,9 @@ def run(args, device, data):
                         else 0
                     )
                     print(
-                        "Part {} | Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MB | time {:.3f} s".format(
+                        "Part {} | Epoch {:05d} | Step {:05d} | Loss {:.4f} | "
+                        "Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU "
+                        "{:.1f} MB | time {:.3f} s".format(
                             g.rank(),
                             epoch,
                             step,
@@ -252,14 +254,16 @@ def run(args, device, data):
                             acc.item(),
                             np.mean(iter_tput[3:]),
                             gpu_mem_alloc,
-                            np.sum(step_time[-args.log_every :]),
+                            np.sum(step_time[-args.log_every:]),
                         )
                     )
                 start = time.time()
 
         toc = time.time()
         print(
-            "Part {}, Epoch Time(s): {:.4f}, sample+data_copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #seeds: {}, #inputs: {}".format(
+            "Part {}, Epoch Time(s): {:.4f}, sample+data_copy: {:.4f}, "
+            "forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #seeds: {}, "
+            "#inputs: {}".format(
                 g.rank(),
                 toc - tic,
                 sample_time,
@@ -285,7 +289,8 @@ def run(args, device, data):
                 device,
             )
             print(
-                "Part {}, Val Acc {:.4f}, Test Acc {:.4f}, time: {:.4f}".format(
+                "Part {}, Val Acc {:.4f}, Test Acc {:.4f}, time: {:.4f}".format
+                (
                     g.rank(), val_acc, test_acc, time.time() - start
                 )
             )
@@ -298,7 +303,10 @@ def main(args):
         print(socket.gethostname(), "Initializing DGL process group")
         th.distributed.init_process_group(backend=args.backend)
     print(socket.gethostname(), "Initializing DistGraph")
-    g = dgl.distributed.DistGraph(args.graph_name, part_config=args.part_config)
+    g = dgl.distributed.DistGraph(
+            args.graph_name,
+            part_config=args.part_config
+        )
     print(socket.gethostname(), "rank:", g.rank())
 
     pb = g.get_partition_book()
@@ -333,7 +341,8 @@ def main(args):
         )
     local_nid = pb.partid2nids(pb.partid).detach().numpy()
     print(
-        "part {}, train: {} (local: {}), val: {} (local: {}), test: {} (local: {})".format(
+        "part {}, train: {} (local: {}), val: {} (local: {}), test: {} "
+        "(local: {})".format(
             g.rank(),
             len(train_nid),
             len(np.intersect1d(train_nid.numpy(), local_nid)),
@@ -374,7 +383,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--part_config", type=str, help="The path to the partition config file"
     )
-    parser.add_argument("--num_clients", type=int, help="The number of clients")
+    parser.add_argument(
+        "--num_clients", type=int, help="The number of clients"
+    )
     parser.add_argument(
         "--n_classes", type=int, default=0, help="the number of classes"
     )
@@ -410,7 +421,8 @@ if __name__ == "__main__":
         "--pad-data",
         default=False,
         action="store_true",
-        help="Pad train nid to the same length across machine, to ensure num of batches to be the same.",
+        help="Pad train nid to the same length across machine, to ensure num "
+             "of batches to be the same.",
     )
     parser.add_argument(
         "--net_type",
