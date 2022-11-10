@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
  * @file packed_func_ext.h
  * @brief Extension package to PackedFunc
@@ -18,7 +18,7 @@
 
 namespace dgl {
 namespace runtime {
-/*!
+/**
  * @brief Runtime type checker for node type.
  * @tparam T the type to be checked.
  */

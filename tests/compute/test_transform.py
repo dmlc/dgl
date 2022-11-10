@@ -2640,6 +2640,38 @@ def test_module_feat_mask(idtype):
     assert g.edata['w'][('user', 'follows', 'user')].shape == (2, 5)
     assert g.edata['w'][('player', 'plays', 'game')].shape == (2, 5)
 
+@parametrize_idtype
+def test_shortest_dist(idtype):
+    g = dgl.graph(([0, 1, 1, 2], [2, 0, 3, 3]), idtype=idtype, device=F.ctx())
+
+    # case 1: directed single source
+    dist = dgl.shortest_dist(g, root=0)
+    tgt = F.copy_to(F.tensor([0, -1, 1, 2], dtype=F.int64), g.device)
+    assert F.array_equal(dist, tgt)
+
+    # case 2: undirected all pairs
+    dist, paths = dgl.shortest_dist(g, root=None, return_paths=True)
+    tgt_dist = F.copy_to(
+        F.tensor([
+            [0, -1, 1, 2],
+            [1, 0, 2, 1],
+            [-1, -1, 0, 1],
+            [-1, -1, -1, 0]
+        ], dtype=F.int64),
+        g.device
+    )
+    tgt_paths = F.copy_to(
+        F.tensor([
+            [[-1, -1], [-1, -1], [0, -1], [0, 3]],
+            [[1, -1], [-1, -1], [1, 0], [2, -1]],
+            [[-1, -1], [-1, -1], [-1, -1], [3, -1]],
+            [[-1, -1], [-1, -1], [-1, -1], [-1, -1]]
+        ], dtype=F.int64),
+        g.device
+    )
+    assert F.array_equal(dist, tgt_dist)
+    assert F.array_equal(paths, tgt_paths)
+
 if __name__ == '__main__':
     test_partition_with_halo()
     test_module_heat_kernel(F.int32)

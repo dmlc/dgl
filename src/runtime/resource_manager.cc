@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
- * \file resource_manager.cc
- * \brief Manage the resources.
+ * @file resource_manager.cc
+ * @brief Manage the resources.
  */
 
 #include "resource_manager.h"
@@ -13,7 +13,7 @@
 namespace dgl {
 namespace runtime {
 
-/*
+/**
  * The runtime allocates resources during the computation. Some of the resources
  * cannot be destroyed after the process exits especially when the process
  * doesn't exits normally. We need to keep track of the resources in the system

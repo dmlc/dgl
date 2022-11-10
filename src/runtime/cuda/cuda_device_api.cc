@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2017-2022 by Contributors
- * \file cuda_device_api.cc
- * \brief GPU specific API
+ * @file cuda_device_api.cc
+ * @brief GPU specific API
  */
 #include <cuda_runtime.h>
 #include <dgl/runtime/device_api.h>
@@ -194,7 +194,7 @@ class CUDADeviceAPI final : public DeviceAPI {
     CUDA_CALL(cudaStreamSynchronize(static_cast<cudaStream_t>(stream)));
   }
 
-  /*! NOTE: If the backend is PyTorch, we will use PyTorch's stream management,
+  /** NOTE: If the backend is PyTorch, we will use PyTorch's stream management,
    *        so just avoid calling our SetStream/CreateStream unless
    *        you really need advanced stream control.
    * TODO(Xin): Redirect this to PyTorch or remove it.
@@ -206,7 +206,7 @@ class CUDADeviceAPI final : public DeviceAPI {
     return static_cast<DGLStreamHandle>(getCurrentCUDAStream());
   }
 
-  /*! NOTE: cudaHostRegister can be called from an arbitrary GPU device,
+  /** NOTE: cudaHostRegister can be called from an arbitrary GPU device,
    *        so we don't need to specify a ctx.
    *        The pinned memory can be seen by all CUDA contexts,
    *        not just the one that performed the allocation

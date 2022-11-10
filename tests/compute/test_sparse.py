@@ -1,8 +1,8 @@
+from distutils.version import LooseVersion
 import random
 import unittest
 
 import backend as F
-import networkx as nx
 import numpy as np
 import pytest
 import torch
@@ -175,6 +175,44 @@ def test_spmm(idtype, g, shp, msg, reducer):
         g.dstdata.pop("v")
 
 
+@unittest.skipIf(
+    dgl.backend.backend_name != "pytorch",
+    reason="Only support PyTorch for now."
+)
+@unittest.skipIf(
+    F._default_context_str == "cpu",
+    reason="Don't support half precision on CPU."
+)
+@parametrize_idtype
+@pytest.mark.parametrize(
+    "dtype, rtol, atol",
+    [(torch.float16, 1e-3, 0.5), (torch.bfloat16, 4e-3, 2.)]
+)
+def test_half_spmm(idtype, dtype, rtol, atol):
+    if LooseVersion(torch.version.cuda) < LooseVersion("11.0") \
+        and dtype == torch.bfloat16:
+        pytest.skip("BF16 requires CUDA >= 11.0.")
+
+    # make sure the spmm result is < 512 to match the rtol/atol we set.
+    g = dgl.graph((torch.arange(900), torch.tensor([0] * 900)),
+                  idtype=idtype, device=F.ctx())
+    feat_fp32 = torch.rand((g.num_src_nodes(), 32)).to(0)
+    feat_half = feat_fp32.to(dtype)
+
+    # test SpMMCSR
+    g = g.formats(['csc'])
+    res_fp32 = dgl.ops.copy_u_sum(g, feat_fp32)[0]
+    res_half = dgl.ops.copy_u_sum(g, feat_half)[0].float()
+    assert torch.allclose(res_fp32, res_half, rtol=rtol, atol=atol)
+
+    # test SpMMCOO
+    # TODO(Xin): half-precision SpMMCoo is temporally disabled.
+    # g = g.formats(['coo'])
+    # res_fp32 = dgl.ops.copy_u_sum(g, feat_fp32)[0]
+    # res_half = dgl.ops.copy_u_sum(g, feat_half)[0].float()
+    # assert torch.allclose(res_fp32, res_half, rtol=rtol, atol=atol)
+
+
 @pytest.mark.parametrize("g", graphs)
 @pytest.mark.parametrize("shp", sddmm_shapes)
 @pytest.mark.parametrize("lhs_target", ["u", "v", "e"])
@@ -325,13 +363,20 @@ def test_segment_reduce(reducer):
 @parametrize_idtype
 @pytest.mark.parametrize("feat_size", [1, 8, 16, 64, 256])
 @pytest.mark.parametrize(
-    "dtype,tol",
-    [(torch.float16, 1e-2), (torch.float32, 3e-3), (torch.float64, 1e-4)],
+    "dtype, tol",
+    [(torch.float16, 1e-2), (torch.bfloat16, 1e-2),
+     (torch.float32, 3e-3), (torch.float64, 1e-4)],
 )
 def test_segment_mm(idtype, feat_size, dtype, tol):
-    if F._default_context_str == "cpu" and dtype == torch.float16:
+    if F._default_context_str == "cpu" and dtype in (torch.float16, torch.bfloat16):
         pytest.skip(
-            "fp16 support for CPU linalg functions has been removed in PyTorch."
+            "Only support float32 and float64 on CPU."
+        )
+    if F._default_context_str == "gpu" \
+        and LooseVersion(torch.version.cuda) < LooseVersion("11.0") \
+        and dtype == torch.bfloat16:
+        pytest.skip(
+            "BF16 requires CUDA >= 11.0."
         )
     dev = F.ctx()
     # input
@@ -343,7 +388,7 @@ def test_segment_mm(idtype, feat_size, dtype, tol):
         .to(dtype)
     )
     b.requires_grad_()
-    seglen_a = torch.tensor([10, 15, 8, 0, 1, 9, 18, 24, 15, 0])
+    seglen_a = torch.tensor([10, 15, 8, 0, 1, 9, 18, 24, 15, 0]).to(idtype)
     dc = torch.tensor(np.random.rand(100, feat_size + 1)).to(dev).to(dtype)
     # compute
     c = dgl.ops.segment_mm(a, b, seglen_a)
@@ -371,19 +416,28 @@ def test_segment_mm(idtype, feat_size, dtype, tol):
 @unittest.skipIf(
     dgl.backend.backend_name != "pytorch", reason="Only support PyTorch for now"
 )
-@parametrize_idtype
 @pytest.mark.parametrize("feat_size", [1, 8, 16, 64, 256])
-def test_gather_mm_idx_b(idtype, feat_size):
-    import torch
+@pytest.mark.parametrize(
+    "dtype, tol",
+    [(torch.float16, 1e-2), (torch.bfloat16, 2e-2),
+     (torch.float32, 3e-3), (torch.float64, 1e-4)]
+)
+def test_gather_mm_idx_b(feat_size, dtype, tol):
+    if F._default_context_str == "cpu" and dtype in (torch.float16, torch.bfloat16):
+        pytest.skip("Only support float32 and float64 on CPU.")
+    if F._default_context_str == "gpu" \
+        and LooseVersion(torch.version.cuda) < LooseVersion("11.0") \
+        and dtype == torch.bfloat16:
+        pytest.skip("BF16 requires CUDA >= 11.0.")
 
     dev = F.ctx()
     # input
-    a = torch.tensor(np.random.rand(100, feat_size)).to(dev)
+    a = torch.tensor(np.random.rand(100, feat_size)).to(dev).to(dtype)
     a.requires_grad_()
-    b = torch.tensor(np.random.rand(10, feat_size, feat_size + 1)).to(dev)
+    b = torch.tensor(np.random.rand(10, feat_size, feat_size + 1)).to(dev).to(dtype)
     b.requires_grad_()
     idx = torch.tensor(np.random.randint(0, 10, 100)).to(dev).long()
-    dc = torch.tensor(np.random.rand(100, feat_size + 1)).to(dev)
+    dc = torch.tensor(np.random.rand(100, feat_size + 1)).to(dev).to(dtype)
     # compute
     c = dgl.ops.gather_mm(a, b, idx_b=idx)
     c.backward(dc)
@@ -397,9 +451,9 @@ def test_gather_mm_idx_b(idtype, feat_size):
     da_t = a.grad
     db_t = b.grad
 
-    assert torch.allclose(c, c_t, atol=1e-4, rtol=1e-4)
-    assert torch.allclose(da, da_t, atol=1e-4, rtol=1e-4)
-    assert torch.allclose(db, db_t, atol=1e-4, rtol=1e-4)
+    assert torch.allclose(c, c_t, atol=tol, rtol=tol)
+    assert torch.allclose(da, da_t, atol=tol, rtol=tol)
+    assert torch.allclose(db, db_t, atol=tol, rtol=tol)
 
 
 @unittest.skipIf(

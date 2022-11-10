@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2019-2022 by Contributors
- * \file array/cuda/uvm/array_index_select_uvm.cu
- * \brief Array index select GPU implementation
+ * @file array/cuda/uvm/array_index_select_uvm.cu
+ * @brief Array index select GPU implementation
  */
 #include <dgl/array.h>
 

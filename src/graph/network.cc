@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2018-2022 by Contributors
- * \file graph/network.cc
- * \brief DGL networking related APIs
+ * @file graph/network.cc
+ * @brief DGL networking related APIs
  */
 #include "./network.h"
 

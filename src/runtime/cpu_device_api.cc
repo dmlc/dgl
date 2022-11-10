@@ -1,6 +1,6 @@
-/*!
+/**
  *  Copyright (c) 2016-2022 by Contributors
- * \file cpu_device_api.cc
+ * @file cpu_device_api.cc
  */
 #include <dgl/runtime/device_api.h>
 #include <dgl/runtime/registry.h>

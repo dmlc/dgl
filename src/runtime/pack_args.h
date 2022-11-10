@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2017 by Contributors
- * \file pack_args.h
- * \brief Utility to pack DGLArgs to other type-erased fution calling
+ * @file pack_args.h
+ * @brief Utility to pack DGLArgs to other type-erased fution calling
  * convention.
  *
  *  Two type erased function signatures are supported.
@@ -22,8 +22,8 @@
 
 namespace dgl {
 namespace runtime {
-/*!
- * \brief argument union type of 32bit.
+/**
+ * @brief argument union type of 32bit.
  * Choose 32 bit because most GPU API do not work well with 64 bit.
  */
 union ArgUnion {
@@ -31,49 +31,49 @@ union ArgUnion {
   uint32_t v_uint32;
   float v_float32;
 };
-/*!
- * \brief Create a packed function from void addr types.
+/**
+ * @brief Create a packed function from void addr types.
  *
- * \param f with signiture (DGLArgs args, DGLRetValue* rv, void* void_args)
- * \param arg_types The arguments type information.
- * \tparam F the function type
+ * @param f with signiture (DGLArgs args, DGLRetValue* rv, void* void_args)
+ * @param arg_types The arguments type information.
+ * @tparam F the function type
  *
- * \return The wrapped packed function.
+ * @return The wrapped packed function.
  */
 template <typename F>
 inline PackedFunc PackFuncVoidAddr(
     F f, const std::vector<DGLDataType>& arg_types);
-/*!
- * \brief Create a packed function that from function only packs buffer
+/**
+ * @brief Create a packed function that from function only packs buffer
  * arguments.
  *
- * \param f with signiture (DGLArgs args, DGLRetValue* rv, ArgUnion* pack_args)
- * \param arg_types The arguments type information.
- * \tparam F the function type
+ * @param f with signiture (DGLArgs args, DGLRetValue* rv, ArgUnion* pack_args)
+ * @param arg_types The arguments type information.
+ * @tparam F the function type
  *
- * \return The wrapped packed function.
+ * @return The wrapped packed function.
  */
 template <typename F>
 inline PackedFunc PackFuncNonBufferArg(
     F f, const std::vector<DGLDataType>& arg_types);
-/*!
- * \brief Create a packed function that from function that takes a packed
+/**
+ * @brief Create a packed function that from function that takes a packed
  * arguments.
  *
- * \param f with signature (DGLArgs args, DGLRetValue* rv, void* pack_args,
+ * @param f with signature (DGLArgs args, DGLRetValue* rv, void* pack_args,
  * size_t nbytes)
- * \param arg_types The arguments that wish to get from
- * \tparam F the function type
+ * @param arg_types The arguments that wish to get from
+ * @tparam F the function type
  *
- * \return The wrapped packed function.
+ * @return The wrapped packed function.
  */
 template <typename F>
 inline PackedFunc PackFuncPackedArg(
     F f, const std::vector<DGLDataType>& arg_types);
-/*!
- * \brief Extract number of buffer argument from the argument types.
- * \param arg_types The argument types.
- * \return number of buffer arguments
+/**
+ * @brief Extract number of buffer argument from the argument types.
+ * @param arg_types The argument types.
+ * @return number of buffer arguments
  */
 inline size_t NumBufferArgs(const std::vector<DGLDataType>& arg_types);
 
@@ -98,7 +98,7 @@ class TempArray<T, 0> {
   std::vector<T> data_;
 };
 
-/*! \brief conversion code used in void arg. */
+/** @brief conversion code used in void arg. */
 enum ArgConvertCode {
   INT64_TO_INT64,
   INT64_TO_INT32,

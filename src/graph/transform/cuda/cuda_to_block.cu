@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright 2020-2021 Contributors
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,8 +13,8 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
- * \file graph/transform/cuda/cuda_to_block.cu
- * \brief Functions to convert a set of edges into a graph block with local
+ * @file graph/transform/cuda/cuda_to_block.cu
+ * @brief Functions to convert a set of edges into a graph block with local
  * ids.
  */
 
@@ -50,16 +50,16 @@ class DeviceNodeMapMaker {
   }
 
   /**
-   * \brief This function builds node maps for each node type, preserving the
+   * @brief This function builds node maps for each node type, preserving the
    * order of the input nodes. Here it is assumed the lhs_nodes are not unique,
    * and thus a unique list is generated.
    *
-   * \param lhs_nodes The set of source input nodes.
-   * \param rhs_nodes The set of destination input nodes.
-   * \param node_maps The node maps to be constructed.
-   * \param count_lhs_device The number of unique source nodes (on the GPU).
-   * \param lhs_device The unique source nodes (on the GPU).
-   * \param stream The stream to operate on.
+   * @param lhs_nodes The set of source input nodes.
+   * @param rhs_nodes The set of destination input nodes.
+   * @param node_maps The node maps to be constructed.
+   * @param count_lhs_device The number of unique source nodes (on the GPU).
+   * @param lhs_device The unique source nodes (on the GPU).
+   * @param stream The stream to operate on.
    */
   void Make(
       const std::vector<IdArray>& lhs_nodes,
@@ -96,14 +96,14 @@ class DeviceNodeMapMaker {
   }
 
   /**
-   * \brief This function builds node maps for each node type, preserving the
+   * @brief This function builds node maps for each node type, preserving the
    * order of the input nodes. Here it is assumed both lhs_nodes and rhs_nodes
    * are unique.
    *
-   * \param lhs_nodes The set of source input nodes.
-   * \param rhs_nodes The set of destination input nodes.
-   * \param node_maps The node maps to be constructed.
-   * \param stream The stream to operate on.
+   * @param lhs_nodes The set of source input nodes.
+   * @param rhs_nodes The set of destination input nodes.
+   * @param node_maps The node maps to be constructed.
+   * @param stream The stream to operate on.
    */
   void Make(
       const std::vector<IdArray>& lhs_nodes,

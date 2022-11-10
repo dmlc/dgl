@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2016-2022 by Contributors
- * \file c_runtime_api.cc
- * \brief Runtime API implementation
+ * @file c_runtime_api.cc
+ * @brief Runtime API implementation
  */
 #include <dgl/runtime/c_backend_api.h>
 #include <dgl/runtime/c_runtime_api.h>
@@ -22,9 +22,9 @@
 namespace dgl {
 namespace runtime {
 
-/*!
- * \brief The name of Device API factory.
- * \param type The device type.
+/**
+ * @brief The name of Device API factory.
+ * @param type The device type.
  */
 inline std::string DeviceName(int type) {
   switch (type) {

@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2021 by Contributors
- * \file ndarray_partition.h
- * \brief Operations on partition implemented in CUDA.
+ * @file ndarray_partition.h
+ * @brief Operations on partition implemented in CUDA.
  */
 
 #ifndef DGL_RUNTIME_WORKSPACE_H_

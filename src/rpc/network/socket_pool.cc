@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2021 by Contributors
- * \file socket_pool.cc
- * \brief Socket pool of nonblocking sockets for DGL distributed training.
+ * @file socket_pool.cc
+ * @brief Socket pool of nonblocking sockets for DGL distributed training.
  */
 #include "socket_pool.h"
 

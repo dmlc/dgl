@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2017 by Contributors
- * \file thread_pool.cc
- * \brief Threadpool for multi-threading runtime.
+ * @file thread_pool.cc
+ * @brief Threadpool for multi-threading runtime.
  */
 #include <dgl/runtime/c_backend_api.h>
 #include <dgl/runtime/c_runtime_api.h>
@@ -30,8 +30,8 @@ namespace runtime {
 // stride in the page, fit to cache line.
 constexpr int kSyncStride = 64 / sizeof(std::atomic<int>);
 
-/*!
- * \brief Thread local master environment.
+/**
+ * @brief Thread local master environment.
  */
 class ParallelLauncher {
  public:
@@ -112,10 +112,10 @@ class ParallelLauncher {
   std::vector<std::string> par_errors_;
 };
 
-/*! \brief Lock-free single-producer-single-consumer queue for each thread */
+/** @brief Lock-free single-producer-single-consumer queue for each thread */
 class SpscTaskQueue {
  public:
-  /*! \brief The task entry */
+  /** @brief The task entry */
   struct Task {
     ParallelLauncher* launcher;
     int32_t task_id;
@@ -125,9 +125,9 @@ class SpscTaskQueue {
 
   ~SpscTaskQueue() { delete[] buffer_; }
 
-  /*!
-   * \brief Push a task into the queue and notify the comsumer if it is on wait.
-   * \param input The task to be dequeued.
+  /**
+   * @brief Push a task into the queue and notify the comsumer if it is on wait.
+   * @param input The task to be dequeued.
    */
   void Push(const Task& input) {
     while (!Enqueue(input)) {
@@ -139,11 +139,11 @@ class SpscTaskQueue {
     }
   }
 
-  /*!
-   * \brief Pop a task out of the queue and condition wait if no tasks.
-   * \param output The pointer to the task to be dequeued.
-   * \param spin_count The number of iterations to spin before sleep.
-   * \return Whether pop is successful (true) or we need to exit now (false).
+  /**
+   * @brief Pop a task out of the queue and condition wait if no tasks.
+   * @param output The pointer to the task to be dequeued.
+   * @param spin_count The number of iterations to spin before sleep.
+   * @return Whether pop is successful (true) or we need to exit now (false).
    */
   bool Pop(Task* output, uint32_t spin_count = 300000) {
     // Busy wait a bit when the queue is empty.
@@ -169,8 +169,8 @@ class SpscTaskQueue {
     return true;
   }
 
-  /*!
-   * \brief Signal to terminate the worker.
+  /**
+   * @brief Signal to terminate the worker.
    */
   void SignalForKill() {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -179,10 +179,10 @@ class SpscTaskQueue {
   }
 
  protected:
-  /*!
-   * \brief Lock-free enqueue.
-   * \param input The task to be enqueued.
-   * \return Whether the task is enqueued.
+  /**
+   * @brief Lock-free enqueue.
+   * @param input The task to be enqueued.
+   * @return Whether the task is enqueued.
    */
   bool Enqueue(const Task& input) {
     if (exit_now_.load(std::memory_order_relaxed)) return false;

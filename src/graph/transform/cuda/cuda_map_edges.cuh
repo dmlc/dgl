@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright 2020-2021 Contributors
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,8 +13,8 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
- * \file graph/transform/cuda/cuda_map_edges.cuh
- * \brief Device level functions for mapping edges.
+ * @file graph/transform/cuda/cuda_map_edges.cuh
+ * @brief Device level functions for mapping edges.
  */
 
 #ifndef DGL_GRAPH_TRANSFORM_CUDA_CUDA_MAP_EDGES_CUH_
@@ -59,20 +59,20 @@ __device__ void map_vertex_ids(
 }
 
 /**
- * \brief Generate mapped edge endpoint ids.
+ * @brief Generate mapped edge endpoint ids.
  *
- * \tparam IdType The type of id.
- * \tparam BLOCK_SIZE The size of each thread block.
- * \tparam TILE_SIZE The number of edges to process per thread block.
- * \param global_srcs_device The source ids to map.
- * \param new_global_srcs_device The mapped source ids (output).
- * \param global_dsts_device The destination ids to map.
- * \param new_global_dsts_device The mapped destination ids (output).
- * \param num_edges The number of edges to map.
- * \param src_mapping The mapping of sources ids.
- * \param src_hash_size The the size of source id hash table/mapping.
- * \param dst_mapping The mapping of destination ids.
- * \param dst_hash_size The the size of destination id hash table/mapping.
+ * @tparam IdType The type of id.
+ * @tparam BLOCK_SIZE The size of each thread block.
+ * @tparam TILE_SIZE The number of edges to process per thread block.
+ * @param global_srcs_device The source ids to map.
+ * @param new_global_srcs_device The mapped source ids (output).
+ * @param global_dsts_device The destination ids to map.
+ * @param new_global_dsts_device The mapped destination ids (output).
+ * @param num_edges The number of edges to map.
+ * @param src_mapping The mapping of sources ids.
+ * @param src_hash_size The the size of source id hash table/mapping.
+ * @param dst_mapping The mapping of destination ids.
+ * @param dst_hash_size The the size of destination id hash table/mapping.
  */
 template <typename IdType, int BLOCK_SIZE, IdType TILE_SIZE>
 __global__ void map_edge_ids(
@@ -95,14 +95,14 @@ __global__ void map_edge_ids(
 }
 
 /**
- * \brief Device level node maps for each node type.
+ * @brief Device level node maps for each node type.
  *
- * \param num_nodes Number of nodes per type.
- * \param offset When offset is set to 0, LhsHashTable is identical to
+ * @param num_nodes Number of nodes per type.
+ * @param offset When offset is set to 0, LhsHashTable is identical to
  *        RhsHashTable. Or set to num_nodes.size()/2 to use seperated
  *        LhsHashTable and RhsHashTable.
- * \param ctx The DGL context.
- * \param stream The stream to operate on.
+ * @param ctx The DGL context.
+ * @param stream The stream to operate on.
  */
 template <typename IdType>
 class DeviceNodeMap {

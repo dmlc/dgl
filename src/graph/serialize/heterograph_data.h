@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
- * \file graph/serialize/heterograph_data.h
- * \brief Graph serialization header
+ * @file graph/serialize/heterograph_data.h
+ * @brief Graph serialization header
  */
 #ifndef DGL_GRAPH_SERIALIZE_HETEROGRAPH_DATA_H_
 #define DGL_GRAPH_SERIALIZE_HETEROGRAPH_DATA_H_
@@ -97,7 +97,7 @@ class HeteroGraphData : public runtime::ObjectRef {
   DGL_DEFINE_OBJECT_REF_METHODS(
       HeteroGraphData, runtime::ObjectRef, HeteroGraphDataObject);
 
-  /*! \brief create a new GraphData reference */
+  /** @brief create a new GraphData reference */
   static HeteroGraphData Create(
       HeteroGraphPtr gptr, List<Map<std::string, Value>> node_tensors,
       List<Map<std::string, Value>> edge_tensors, List<Value> ntype_names,
@@ -106,7 +106,7 @@ class HeteroGraphData : public runtime::ObjectRef {
         gptr, node_tensors, edge_tensors, ntype_names, etype_names));
   }
 
-  /*! \brief create an empty GraphData reference */
+  /** @brief create an empty GraphData reference */
   static HeteroGraphData Create() {
     return HeteroGraphData(std::make_shared<HeteroGraphDataObject>());
   }

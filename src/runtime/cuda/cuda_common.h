@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2017 by Contributors
- * \file cuda_common.h
- * \brief Common utilities for CUDA
+ * @file cuda_common.h
+ * @brief Common utilities for CUDA
  */
 #ifndef DGL_RUNTIME_CUDA_CUDA_COMMON_H_
 #define DGL_RUNTIME_CUDA_CUDA_COMMON_H_
@@ -109,8 +109,8 @@ inline const char* curandGetErrorString(curandStatus_t error) {
   return "Unrecognized curand error string";
 }
 
-/*
- * \brief Cast data type to cudaDataType_t.
+/**
+ * @brief Cast data type to cudaDataType_t.
  */
 template <typename T>
 struct cuda_dtype {
@@ -118,9 +118,16 @@ struct cuda_dtype {
 };
 
 template <>
-struct cuda_dtype<half> {
+struct cuda_dtype<__half> {
   static constexpr cudaDataType_t value = CUDA_R_16F;
 };
+
+#if BF16_ENABLED
+template <>
+struct cuda_dtype<__nv_bfloat16> {
+  static constexpr cudaDataType_t value = CUDA_R_16BF;
+};
+#endif  // BF16_ENABLED
 
 template <>
 struct cuda_dtype<float> {
@@ -132,9 +139,39 @@ struct cuda_dtype<double> {
   static constexpr cudaDataType_t value = CUDA_R_64F;
 };
 
-#if CUDART_VERSION >= 11000
 /*
- * \brief Cast index data type to cusparseIndexType_t.
+ * \brief Accumulator type for SpMM.
+ */
+template <typename T>
+struct accum_dtype {
+  typedef float type;
+};
+
+template <>
+struct accum_dtype<__half> {
+  typedef float type;
+};
+
+#if BF16_ENABLED
+template <>
+struct accum_dtype<__nv_bfloat16> {
+  typedef float type;
+};
+#endif  // BF16_ENABLED
+
+template <>
+struct accum_dtype<float> {
+  typedef float type;
+};
+
+template <>
+struct accum_dtype<double> {
+  typedef double type;
+};
+
+#if CUDART_VERSION >= 11000
+/**
+ * @brief Cast index data type to cusparseIndexType_t.
  */
 template <typename T>
 struct cusparse_idtype {
@@ -152,24 +189,24 @@ struct cusparse_idtype<int64_t> {
 };
 #endif
 
-/*! \brief Thread local workspace */
+/** @brief Thread local workspace */
 class CUDAThreadEntry {
  public:
-  /*! \brief The cusparse handler */
+  /** @brief The cusparse handler */
   cusparseHandle_t cusparse_handle{nullptr};
-  /*! \brief The cublas handler */
+  /** @brief The cublas handler */
   cublasHandle_t cublas_handle{nullptr};
-  /*! \brief The curand generator */
+  /** @brief The curand generator */
   curandGenerator_t curand_gen{nullptr};
-  /*! \brief thread local pool*/
+  /** @brief thread local pool*/
   WorkspacePool pool;
-  /*! \brief constructor */
+  /** @brief constructor */
   CUDAThreadEntry();
   // get the threadlocal workspace
   static CUDAThreadEntry* ThreadLocal();
 };
 
-/*! \brief Get the current CUDA stream */
+/** @brief Get the current CUDA stream */
 cudaStream_t getCurrentCUDAStream();
 }  // namespace runtime
 }  // namespace dgl

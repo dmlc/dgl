@@ -1,7 +1,9 @@
-#include <gtest/gtest.h>
 #include <dgl/array.h>
-#include <tuple>
+#include <gtest/gtest.h>
+
 #include <set>
+#include <tuple>
+
 #include "./common.h"
 
 using namespace dgl;
@@ -62,7 +64,7 @@ std::set<ETuple<Idx>> ToEdgeSet(COOMatrix mat) {
   Idx* col = static_cast<Idx*>(mat.col->data);
   Idx* data = static_cast<Idx*>(mat.data->data);
   for (int64_t i = 0; i < mat.row->shape[0]; ++i) {
-    //std::cout << row[i] << " " << col[i] <<  " " << data[i] << std::endl;
+    // std::cout << row[i] << " " << col[i] <<  " " << data[i] << std::endl;
     eset.emplace(row[i], col[i], data[i]);
   }
   return eset;
@@ -122,7 +124,8 @@ COOMatrix COO(bool has_data) {
 template <typename Idx>
 std::pair<CSRMatrix, std::vector<int64_t>> CSREtypes(bool has_data) {
   IdArray indptr = NDArray::FromVector(std::vector<Idx>({0, 4, 5, 5, 7}));
-  IdArray indices = NDArray::FromVector(std::vector<Idx>({0, 1, 2, 3, 1, 3, 2}));
+  IdArray indices =
+      NDArray::FromVector(std::vector<Idx>({0, 1, 2, 3, 1, 3, 2}));
   IdArray data = NDArray::FromVector(std::vector<Idx>({0, 1, 4, 6, 2, 3, 5}));
   auto eid2etype_offsets = std::vector<int64_t>({0, 4, 5, 6, 7});
   if (has_data)
@@ -146,8 +149,8 @@ std::pair<COOMatrix, std::vector<int64_t>> COOEtypes(bool has_data) {
 template <typename Idx, typename FloatType>
 void _TestCSRSampling(bool has_data) {
   auto mat = CSR<Idx>(has_data);
-  FloatArray prob = NDArray::FromVector(
-      std::vector<FloatType>({.5, .5, .5, .5, .5}));
+  FloatArray prob =
+      NDArray::FromVector(std::vector<FloatType>({.5, .5, .5, .5, .5}));
   IdArray rows = NDArray::FromVector(std::vector<Idx>({0, 3}));
   for (int k = 0; k < 10; ++k) {
     auto rst = CSRRowWiseSampling(mat, rows, 2, prob, true);
@@ -170,8 +173,7 @@ void _TestCSRSampling(bool has_data) {
       ASSERT_TRUE(eset.count(std::make_tuple(3, 3, 4)));
     }
   }
-  prob = NDArray::FromVector(
-      std::vector<FloatType>({.0, .5, .5, .0, .5}));
+  prob = NDArray::FromVector(std::vector<FloatType>({.0, .5, .5, .0, .5}));
   for (int k = 0; k < 100; ++k) {
     auto rst = CSRRowWiseSampling(mat, rows, 2, prob, true);
     CheckSampledResult<Idx>(rst, rows, has_data);
@@ -240,18 +242,19 @@ void _TestCSRPerEtypeSampling(bool has_data) {
   auto mat = pair.first;
   auto eid2etype_offset = pair.second;
   std::vector<FloatArray> prob = {
-    NDArray::FromVector(std::vector<FloatType>({.5, .5, .5, .5})),
-    NDArray::FromVector(std::vector<FloatType>({.5})),
-    NDArray::FromVector(std::vector<FloatType>({.5})),
-    NDArray::FromVector(std::vector<FloatType>({.5}))
-  };
+      NDArray::FromVector(std::vector<FloatType>({.5, .5, .5, .5})),
+      NDArray::FromVector(std::vector<FloatType>({.5})),
+      NDArray::FromVector(std::vector<FloatType>({.5})),
+      NDArray::FromVector(std::vector<FloatType>({.5}))};
   IdArray rows = NDArray::FromVector(std::vector<Idx>({0, 3}));
   for (int k = 0; k < 10; ++k) {
-    auto rst = CSRRowWisePerEtypeSampling(mat, rows, eid2etype_offset, {2, 2, 2, 2}, prob, true);
+    auto rst = CSRRowWisePerEtypeSampling(
+        mat, rows, eid2etype_offset, {2, 2, 2, 2}, prob, true);
     CheckSampledPerEtypeResult<Idx>(rst, rows, has_data);
   }
   for (int k = 0; k < 10; ++k) {
-    auto rst = CSRRowWisePerEtypeSampling(mat, rows, eid2etype_offset, {2, 2, 2, 2}, prob, false);
+    auto rst = CSRRowWisePerEtypeSampling(
+        mat, rows, eid2etype_offset, {2, 2, 2, 2}, prob, false);
     CheckSampledPerEtypeResult<Idx>(rst, rows, has_data);
     auto eset = ToEdgeSet<Idx>(rst);
     if (has_data) {
@@ -294,13 +297,13 @@ void _TestCSRPerEtypeSampling(bool has_data) {
   }
 
   prob = {
-    NDArray::FromVector(std::vector<FloatType>({.0, .5, .0, .0})),
-    NDArray::FromVector(std::vector<FloatType>({.5})),
-    NDArray::FromVector(std::vector<FloatType>({.5})),
-    NDArray::FromVector(std::vector<FloatType>({.5}))
-  };
+      NDArray::FromVector(std::vector<FloatType>({.0, .5, .0, .0})),
+      NDArray::FromVector(std::vector<FloatType>({.5})),
+      NDArray::FromVector(std::vector<FloatType>({.5})),
+      NDArray::FromVector(std::vector<FloatType>({.5}))};
   for (int k = 0; k < 10; ++k) {
-    auto rst = CSRRowWisePerEtypeSampling(mat, rows, eid2etype_offset, {2, 2, 2, 2}, prob, true);
+    auto rst = CSRRowWisePerEtypeSampling(
+        mat, rows, eid2etype_offset, {2, 2, 2, 2}, prob, true);
     CheckSampledPerEtypeResult<Idx>(rst, rows, has_data);
     auto eset = ToEdgeSet<Idx>(rst);
     if (has_data) {
@@ -319,18 +322,19 @@ void _TestCSRPerEtypeSamplingSorted() {
   auto mat = pair.first;
   auto eid2etype_offset = pair.second;
   std::vector<FloatArray> prob = {
-    NDArray::FromVector(std::vector<FloatType>({.5, .5, .5, .5})),
-    NDArray::FromVector(std::vector<FloatType>({.5})),
-    NDArray::FromVector(std::vector<FloatType>({.5})),
-    NDArray::FromVector(std::vector<FloatType>({.5}))
-  };
+      NDArray::FromVector(std::vector<FloatType>({.5, .5, .5, .5})),
+      NDArray::FromVector(std::vector<FloatType>({.5})),
+      NDArray::FromVector(std::vector<FloatType>({.5})),
+      NDArray::FromVector(std::vector<FloatType>({.5}))};
   IdArray rows = NDArray::FromVector(std::vector<Idx>({0, 3}));
   for (int k = 0; k < 10; ++k) {
-    auto rst = CSRRowWisePerEtypeSampling(mat, rows, eid2etype_offset, {2, 2, 2, 2}, prob, true, true);
+    auto rst = CSRRowWisePerEtypeSampling(
+        mat, rows, eid2etype_offset, {2, 2, 2, 2}, prob, true, true);
     CheckSampledPerEtypeResult<Idx>(rst, rows, true);
   }
   for (int k = 0; k < 10; ++k) {
-    auto rst = CSRRowWisePerEtypeSampling(mat, rows, eid2etype_offset, {2, 2, 2, 2}, prob, false, true);
+    auto rst = CSRRowWisePerEtypeSampling(
+        mat, rows, eid2etype_offset, {2, 2, 2, 2}, prob, false, true);
     CheckSampledPerEtypeResult<Idx>(rst, rows, true);
     auto eset = ToEdgeSet<Idx>(rst);
     int counts = 0;
@@ -355,13 +359,13 @@ void _TestCSRPerEtypeSamplingSorted() {
   }
 
   prob = {
-    NDArray::FromVector(std::vector<FloatType>({.0, .5, .0, .0})),
-    NDArray::FromVector(std::vector<FloatType>({.5})),
-    NDArray::FromVector(std::vector<FloatType>({.5})),
-    NDArray::FromVector(std::vector<FloatType>({.5}))
-  };
+      NDArray::FromVector(std::vector<FloatType>({.0, .5, .0, .0})),
+      NDArray::FromVector(std::vector<FloatType>({.5})),
+      NDArray::FromVector(std::vector<FloatType>({.5})),
+      NDArray::FromVector(std::vector<FloatType>({.5}))};
   for (int k = 0; k < 10; ++k) {
-    auto rst = CSRRowWisePerEtypeSampling(mat, rows, eid2etype_offset, {2, 2, 2, 2}, prob, true, true);
+    auto rst = CSRRowWisePerEtypeSampling(
+        mat, rows, eid2etype_offset, {2, 2, 2, 2}, prob, true, true);
     CheckSampledPerEtypeResult<Idx>(rst, rows, true);
     auto eset = ToEdgeSet<Idx>(rst);
     ASSERT_FALSE(eset.count(std::make_tuple(0, 0, 0)));
@@ -389,18 +393,17 @@ void _TestCSRPerEtypeSamplingUniform(bool has_data) {
   auto mat = pair.first;
   auto eid2etype_offset = pair.second;
   std::vector<FloatArray> prob = {
-    aten::NullArray(),
-    aten::NullArray(),
-    aten::NullArray(),
-    aten::NullArray()
-  };
+      aten::NullArray(), aten::NullArray(), aten::NullArray(),
+      aten::NullArray()};
   IdArray rows = NDArray::FromVector(std::vector<Idx>({0, 3}));
   for (int k = 0; k < 10; ++k) {
-    auto rst = CSRRowWisePerEtypeSampling(mat, rows, eid2etype_offset, {2, 2, 2, 2}, prob, true);
+    auto rst = CSRRowWisePerEtypeSampling(
+        mat, rows, eid2etype_offset, {2, 2, 2, 2}, prob, true);
     CheckSampledPerEtypeResult<Idx>(rst, rows, has_data);
   }
   for (int k = 0; k < 10; ++k) {
-    auto rst = CSRRowWisePerEtypeSampling(mat, rows, eid2etype_offset, {2, 2, 2, 2}, prob, false);
+    auto rst = CSRRowWisePerEtypeSampling(
+        mat, rows, eid2etype_offset, {2, 2, 2, 2}, prob, false);
     CheckSampledPerEtypeResult<Idx>(rst, rows, has_data);
     auto eset = ToEdgeSet<Idx>(rst);
     if (has_data) {
@@ -449,18 +452,17 @@ void _TestCSRPerEtypeSamplingUniformSorted() {
   auto mat = pair.first;
   auto eid2etype_offset = pair.second;
   std::vector<FloatArray> prob = {
-    aten::NullArray(),
-    aten::NullArray(),
-    aten::NullArray(),
-    aten::NullArray()
-  };
+      aten::NullArray(), aten::NullArray(), aten::NullArray(),
+      aten::NullArray()};
   IdArray rows = NDArray::FromVector(std::vector<Idx>({0, 3}));
   for (int k = 0; k < 10; ++k) {
-    auto rst = CSRRowWisePerEtypeSampling(mat, rows, eid2etype_offset, {2, 2, 2, 2}, prob, true, true);
+    auto rst = CSRRowWisePerEtypeSampling(
+        mat, rows, eid2etype_offset, {2, 2, 2, 2}, prob, true, true);
     CheckSampledPerEtypeResult<Idx>(rst, rows, true);
   }
   for (int k = 0; k < 10; ++k) {
-    auto rst = CSRRowWisePerEtypeSampling(mat, rows, eid2etype_offset, {2, 2, 2, 2}, prob, false, true);
+    auto rst = CSRRowWisePerEtypeSampling(
+        mat, rows, eid2etype_offset, {2, 2, 2, 2}, prob, false, true);
     CheckSampledPerEtypeResult<Idx>(rst, rows, true);
     auto eset = ToEdgeSet<Idx>(rst);
     int counts = 0;
@@ -500,12 +502,11 @@ TEST(RowwiseTest, TestCSRPerEtypeSamplingUniform) {
   _TestCSRPerEtypeSamplingUniformSorted<int64_t, double>();
 }
 
-
 template <typename Idx, typename FloatType>
 void _TestCOOSampling(bool has_data) {
   auto mat = COO<Idx>(has_data);
-  FloatArray prob = NDArray::FromVector(
-      std::vector<FloatType>({.5, .5, .5, .5, .5}));
+  FloatArray prob =
+      NDArray::FromVector(std::vector<FloatType>({.5, .5, .5, .5, .5}));
   IdArray rows = NDArray::FromVector(std::vector<Idx>({0, 3}));
   for (int k = 0; k < 10; ++k) {
     auto rst = COORowWiseSampling(mat, rows, 2, prob, true);
@@ -528,8 +529,7 @@ void _TestCOOSampling(bool has_data) {
       ASSERT_TRUE(eset.count(std::make_tuple(3, 3, 4)));
     }
   }
-  prob = NDArray::FromVector(
-      std::vector<FloatType>({.0, .5, .5, .0, .5}));
+  prob = NDArray::FromVector(std::vector<FloatType>({.0, .5, .5, .0, .5}));
   for (int k = 0; k < 100; ++k) {
     auto rst = COORowWiseSampling(mat, rows, 2, prob, true);
     CheckSampledResult<Idx>(rst, rows, has_data);
@@ -601,18 +601,19 @@ void _TestCOOPerEtypeSampling(bool has_data) {
   auto mat = pair.first;
   auto eid2etype_offset = pair.second;
   std::vector<FloatArray> prob = {
-    NDArray::FromVector(std::vector<FloatType>({.5, .5, .5, .5})),
-    NDArray::FromVector(std::vector<FloatType>({.5})),
-    NDArray::FromVector(std::vector<FloatType>({.5})),
-    NDArray::FromVector(std::vector<FloatType>({.5}))
-  };
+      NDArray::FromVector(std::vector<FloatType>({.5, .5, .5, .5})),
+      NDArray::FromVector(std::vector<FloatType>({.5})),
+      NDArray::FromVector(std::vector<FloatType>({.5})),
+      NDArray::FromVector(std::vector<FloatType>({.5}))};
   IdArray rows = NDArray::FromVector(std::vector<Idx>({0, 3}));
   for (int k = 0; k < 10; ++k) {
-    auto rst = COORowWisePerEtypeSampling(mat, rows, eid2etype_offset, {2, 2, 2, 2}, prob, true);
+    auto rst = COORowWisePerEtypeSampling(
+        mat, rows, eid2etype_offset, {2, 2, 2, 2}, prob, true);
     CheckSampledPerEtypeResult<Idx>(rst, rows, has_data);
   }
   for (int k = 0; k < 10; ++k) {
-    auto rst = COORowWisePerEtypeSampling(mat, rows, eid2etype_offset, {2, 2, 2, 2}, prob, false);
+    auto rst = COORowWisePerEtypeSampling(
+        mat, rows, eid2etype_offset, {2, 2, 2, 2}, prob, false);
     CheckSampledPerEtypeResult<Idx>(rst, rows, has_data);
     auto eset = ToEdgeSet<Idx>(rst);
     if (has_data) {
@@ -655,13 +656,13 @@ void _TestCOOPerEtypeSampling(bool has_data) {
   }
 
   prob = {
-    NDArray::FromVector(std::vector<FloatType>({.0, .5, .0, .0})),
-    NDArray::FromVector(std::vector<FloatType>({.5})),
-    NDArray::FromVector(std::vector<FloatType>({.5})),
-    NDArray::FromVector(std::vector<FloatType>({.5}))
-  };
+      NDArray::FromVector(std::vector<FloatType>({.0, .5, .0, .0})),
+      NDArray::FromVector(std::vector<FloatType>({.5})),
+      NDArray::FromVector(std::vector<FloatType>({.5})),
+      NDArray::FromVector(std::vector<FloatType>({.5}))};
   for (int k = 0; k < 10; ++k) {
-    auto rst = COORowWisePerEtypeSampling(mat, rows, eid2etype_offset, {2, 2, 2, 2}, prob, true);
+    auto rst = COORowWisePerEtypeSampling(
+        mat, rows, eid2etype_offset, {2, 2, 2, 2}, prob, true);
     CheckSampledPerEtypeResult<Idx>(rst, rows, has_data);
     auto eset = ToEdgeSet<Idx>(rst);
     if (has_data) {
@@ -691,18 +692,17 @@ void _TestCOOPerEtypeSamplingUniform(bool has_data) {
   auto mat = pair.first;
   auto eid2etype_offset = pair.second;
   std::vector<FloatArray> prob = {
-    aten::NullArray(),
-    aten::NullArray(),
-    aten::NullArray(),
-    aten::NullArray()
-  };
+      aten::NullArray(), aten::NullArray(), aten::NullArray(),
+      aten::NullArray()};
   IdArray rows = NDArray::FromVector(std::vector<Idx>({0, 3}));
   for (int k = 0; k < 10; ++k) {
-    auto rst = COORowWisePerEtypeSampling(mat, rows, eid2etype_offset, {2, 2, 2, 2}, prob, true);
+    auto rst = COORowWisePerEtypeSampling(
+        mat, rows, eid2etype_offset, {2, 2, 2, 2}, prob, true);
     CheckSampledPerEtypeResult<Idx>(rst, rows, has_data);
   }
   for (int k = 0; k < 10; ++k) {
-    auto rst = COORowWisePerEtypeSampling(mat, rows, eid2etype_offset, {2, 2, 2, 2}, prob, false);
+    auto rst = COORowWisePerEtypeSampling(
+        mat, rows, eid2etype_offset, {2, 2, 2, 2}, prob, false);
     CheckSampledPerEtypeResult<Idx>(rst, rows, has_data);
     auto eset = ToEdgeSet<Idx>(rst);
     if (has_data) {
@@ -759,35 +759,35 @@ TEST(RowwiseTest, TestCOOPerEtypeSamplingUniform) {
 template <typename Idx, typename FloatType>
 void _TestCSRTopk(bool has_data) {
   auto mat = CSR<Idx>(has_data);
-  FloatArray weight = NDArray::FromVector(
-      std::vector<FloatType>({.1f, .0f, -.1f, .2f, .5f}));
+  FloatArray weight =
+      NDArray::FromVector(std::vector<FloatType>({.1f, .0f, -.1f, .2f, .5f}));
   // -.1, .2, .1, .0, .5
   IdArray rows = NDArray::FromVector(std::vector<Idx>({0, 3}));
 
   {
-  auto rst = CSRRowWiseTopk(mat, rows, 1, weight, true);
-  auto eset = ToEdgeSet<Idx>(rst);
-  ASSERT_EQ(eset.size(), 2);
-  if (has_data) {
-    ASSERT_TRUE(eset.count(std::make_tuple(0, 0, 2)));
-    ASSERT_TRUE(eset.count(std::make_tuple(3, 2, 1)));
-  } else {
-    ASSERT_TRUE(eset.count(std::make_tuple(0, 1, 1)));
-    ASSERT_TRUE(eset.count(std::make_tuple(3, 2, 3)));
-  }
+    auto rst = CSRRowWiseTopk(mat, rows, 1, weight, true);
+    auto eset = ToEdgeSet<Idx>(rst);
+    ASSERT_EQ(eset.size(), 2);
+    if (has_data) {
+      ASSERT_TRUE(eset.count(std::make_tuple(0, 0, 2)));
+      ASSERT_TRUE(eset.count(std::make_tuple(3, 2, 1)));
+    } else {
+      ASSERT_TRUE(eset.count(std::make_tuple(0, 1, 1)));
+      ASSERT_TRUE(eset.count(std::make_tuple(3, 2, 3)));
+    }
   }
 
   {
-  auto rst = CSRRowWiseTopk(mat, rows, 1, weight, false);
-  auto eset = ToEdgeSet<Idx>(rst);
-  ASSERT_EQ(eset.size(), 2);
-  if (has_data) {
-    ASSERT_TRUE(eset.count(std::make_tuple(0, 1, 3)));
-    ASSERT_TRUE(eset.count(std::make_tuple(3, 3, 4)));
-  } else {
-    ASSERT_TRUE(eset.count(std::make_tuple(0, 0, 0)));
-    ASSERT_TRUE(eset.count(std::make_tuple(3, 3, 4)));
-  }
+    auto rst = CSRRowWiseTopk(mat, rows, 1, weight, false);
+    auto eset = ToEdgeSet<Idx>(rst);
+    ASSERT_EQ(eset.size(), 2);
+    if (has_data) {
+      ASSERT_TRUE(eset.count(std::make_tuple(0, 1, 3)));
+      ASSERT_TRUE(eset.count(std::make_tuple(3, 3, 4)));
+    } else {
+      ASSERT_TRUE(eset.count(std::make_tuple(0, 0, 0)));
+      ASSERT_TRUE(eset.count(std::make_tuple(3, 3, 4)));
+    }
   }
 }
 
@@ -802,39 +802,38 @@ TEST(RowwiseTest, TestCSRTopk) {
   _TestCSRTopk<int64_t, double>(false);
 }
 
-
 template <typename Idx, typename FloatType>
 void _TestCOOTopk(bool has_data) {
   auto mat = COO<Idx>(has_data);
-  FloatArray weight = NDArray::FromVector(
-      std::vector<FloatType>({.1f, .0f, -.1f, .2f, .5f}));
+  FloatArray weight =
+      NDArray::FromVector(std::vector<FloatType>({.1f, .0f, -.1f, .2f, .5f}));
   // -.1, .2, .1, .0, .5
   IdArray rows = NDArray::FromVector(std::vector<Idx>({0, 3}));
 
   {
-  auto rst = COORowWiseTopk(mat, rows, 1, weight, true);
-  auto eset = ToEdgeSet<Idx>(rst);
-  ASSERT_EQ(eset.size(), 2);
-  if (has_data) {
-    ASSERT_TRUE(eset.count(std::make_tuple(0, 0, 2)));
-    ASSERT_TRUE(eset.count(std::make_tuple(3, 2, 1)));
-  } else {
-    ASSERT_TRUE(eset.count(std::make_tuple(0, 1, 1)));
-    ASSERT_TRUE(eset.count(std::make_tuple(3, 2, 3)));
-  }
+    auto rst = COORowWiseTopk(mat, rows, 1, weight, true);
+    auto eset = ToEdgeSet<Idx>(rst);
+    ASSERT_EQ(eset.size(), 2);
+    if (has_data) {
+      ASSERT_TRUE(eset.count(std::make_tuple(0, 0, 2)));
+      ASSERT_TRUE(eset.count(std::make_tuple(3, 2, 1)));
+    } else {
+      ASSERT_TRUE(eset.count(std::make_tuple(0, 1, 1)));
+      ASSERT_TRUE(eset.count(std::make_tuple(3, 2, 3)));
+    }
   }
 
   {
-  auto rst = COORowWiseTopk(mat, rows, 1, weight, false);
-  auto eset = ToEdgeSet<Idx>(rst);
-  ASSERT_EQ(eset.size(), 2);
-  if (has_data) {
-    ASSERT_TRUE(eset.count(std::make_tuple(0, 1, 3)));
-    ASSERT_TRUE(eset.count(std::make_tuple(3, 3, 4)));
-  } else {
-    ASSERT_TRUE(eset.count(std::make_tuple(0, 0, 0)));
-    ASSERT_TRUE(eset.count(std::make_tuple(3, 3, 4)));
-  }
+    auto rst = COORowWiseTopk(mat, rows, 1, weight, false);
+    auto eset = ToEdgeSet<Idx>(rst);
+    ASSERT_EQ(eset.size(), 2);
+    if (has_data) {
+      ASSERT_TRUE(eset.count(std::make_tuple(0, 1, 3)));
+      ASSERT_TRUE(eset.count(std::make_tuple(3, 3, 4)));
+    } else {
+      ASSERT_TRUE(eset.count(std::make_tuple(0, 0, 0)));
+      ASSERT_TRUE(eset.count(std::make_tuple(3, 3, 4)));
+    }
   }
 }
 
@@ -856,16 +855,11 @@ void _TestCSRSamplingBiased(bool has_data) {
   // 1 - 1
   // 3 - 2,3
   NDArray tag_offset = NDArray::FromVector(
-      std::vector<Idx>({0, 1, 2,
-                        0, 0, 1,
-                        0, 0, 0,
-                        0, 1, 2}));
+      std::vector<Idx>({0, 1, 2, 0, 0, 1, 0, 0, 0, 0, 1, 2}));
   tag_offset = tag_offset.CreateView({4, 3}, tag_offset->dtype);
   IdArray rows = NDArray::FromVector(std::vector<Idx>({0, 1, 3}));
-  FloatArray bias = NDArray::FromVector(
-      std::vector<FloatType>({0, 0.5})
-  );
-  for (int k = 0 ; k < 10 ; ++k) {
+  FloatArray bias = NDArray::FromVector(std::vector<FloatType>({0, 0.5}));
+  for (int k = 0; k < 10; ++k) {
     auto rst = CSRRowWiseSamplingBiased(mat, rows, 1, tag_offset, bias, false);
     CheckSampledResult<Idx>(rst, rows, has_data);
     auto eset = ToEdgeSet<Idx>(rst);
@@ -879,7 +873,7 @@ void _TestCSRSamplingBiased(bool has_data) {
       ASSERT_TRUE(eset.count(std::make_tuple(3, 3, 4)));
     }
   }
-  for (int k = 0 ; k < 10 ; ++k) {
+  for (int k = 0; k < 10; ++k) {
     auto rst = CSRRowWiseSamplingBiased(mat, rows, 3, tag_offset, bias, true);
     CheckSampledResult<Idx>(rst, rows, has_data);
     auto eset = ToEdgeSet<Idx>(rst);

@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2017 by Contributors
  * @file dgl/runtime/c_backend_api.h
  * @brief DGL runtime backend API.
@@ -17,7 +17,7 @@ extern "C" {
 #endif
 
 // Backend related functions.
-/*!
+/**
  * @brief Backend function for modules to get function
  *  from its environment mod_node (its imports and global function).
  *  The user do should not call DGLFuncFree on func.
@@ -29,7 +29,7 @@ extern "C" {
  */
 DGL_DLL int DGLBackendGetFuncFromEnv(
     void* mod_node, const char* func_name, DGLFunctionHandle* out);
-/*!
+/**
  * @brief Backend function to register system-wide library symbol.
  *
  * @param name The name of the symbol
@@ -38,7 +38,7 @@ DGL_DLL int DGLBackendGetFuncFromEnv(
  */
 DGL_DLL int DGLBackendRegisterSystemLibSymbol(const char* name, void* ptr);
 
-/*!
+/**
  * @brief Backend function to allocate temporal workspace.
  *
  * @note The result allocate spaced is ensured to be aligned to
@@ -57,7 +57,7 @@ DGL_DLL void* DGLBackendAllocWorkspace(
     int device_type, int device_id, uint64_t nbytes, int dtype_code_hint,
     int dtype_bits_hint);
 
-/*!
+/**
  * @brief Backend function to free temporal workspace.
  *
  * @param ptr The result allocated space pointer.
@@ -65,23 +65,23 @@ DGL_DLL void* DGLBackendAllocWorkspace(
  * @param device_id The device id which the space will be allocated.
  * @return 0 when no error is thrown, -1 when failure happens
  *
- * \sa DGLBackendAllocWorkspace
+ * @sa DGLBackendAllocWorkspace
  */
 DGL_DLL int DGLBackendFreeWorkspace(int device_type, int device_id, void* ptr);
 
-/*!
+/**
  * @brief Environment for DGL parallel task.
  */
 typedef struct {
-  /*!
+  /**
    * @brief Auxiliary used for synchronization
    */
   void* sync_handle;
-  /*! @brief total amount of task */
+  /** @brief total amount of task */
   int32_t num_task;
 } DGLParallelGroupEnv;
 
-/*!
+/**
  * @brief The callback function to execute a parallel lambda
  * @param task_id the task id of the function.
  * @param penv The parallel environment backs the execution.
@@ -90,7 +90,7 @@ typedef struct {
 typedef int (*FDGLParallelLambda)(
     int task_id, DGLParallelGroupEnv* penv, void* cdata);
 
-/*!
+/**
  * @brief Backend function for running parallel jobs.
  *
  * @param flambda The parallel function to be launched.
@@ -103,7 +103,7 @@ typedef int (*FDGLParallelLambda)(
 DGL_DLL int DGLBackendParallelLaunch(
     FDGLParallelLambda flambda, void* cdata, int num_task);
 
-/*!
+/**
  * @brief BSP barrrier between parallel threads
  * @param task_id the task id of the function.
  * @param penv The parallel environment backs the execution.
@@ -111,7 +111,7 @@ DGL_DLL int DGLBackendParallelLaunch(
  */
 DGL_DLL int DGLBackendParallelBarrier(int task_id, DGLParallelGroupEnv* penv);
 
-/*!
+/**
  * @brief Simple static initialization fucntion.
  *  Run f once and set handle to be not null.
  *  This function is mainly used for test purpose.

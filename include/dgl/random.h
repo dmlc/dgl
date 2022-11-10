@@ -1,5 +1,5 @@
-/*!
- *  Copyright (c) 2017 by Contributors
+/**
+ * Copyright (c) 2017 by Contributors
  * @file dgl/random.h
  * @brief Random number generators
  */
@@ -35,36 +35,39 @@ inline uint32_t GetThreadId() {
 
 };  // namespace
 
-/*!
+/**
  * @brief Thread-local Random Number Generator class
  */
 class RandomEngine {
  public:
-  /*! @brief Constructor with default seed */
+  /** @brief Constructor with default seed */
   RandomEngine() {
     std::random_device rd;
     SetSeed(rd());
   }
 
-  /*! @brief Constructor with given seed */
+  /** @brief Constructor with given seed */
   explicit RandomEngine(uint32_t seed) { SetSeed(seed); }
 
-  /*! @brief Get the thread-local random number generator instance */
+  /** @brief Get the thread-local random number generator instance */
   static RandomEngine* ThreadLocal() {
     return dmlc::ThreadLocalStore<RandomEngine>::Get();
   }
 
-  /*!
+  /**
    * @brief Set the seed of this random number generator
    */
-  void SetSeed(uint32_t seed) { rng_.seed(seed + GetThreadId()); }
+  void SetSeed(uint32_t seed) {
+    std::seed_seq seq{seed, GetThreadId()};
+    rng_.seed(seq);
+  }
 
-  /*!
+  /**
    * @brief Generate an arbitrary random 32-bit integer.
    */
   int32_t RandInt32() { return static_cast<int32_t>(rng_()); }
 
-  /*!
+  /**
    * @brief Generate a uniform random integer in [0, upper)
    */
   template <typename T>
@@ -72,7 +75,7 @@ class RandomEngine {
     return RandInt<T>(0, upper);
   }
 
-  /*!
+  /**
    * @brief Generate a uniform random integer in [lower, upper)
    */
   template <typename T>
@@ -82,7 +85,7 @@ class RandomEngine {
     return dist(rng_);
   }
 
-  /*!
+  /**
    * @brief Generate a uniform random float in [0, 1)
    */
   template <typename T>
@@ -90,7 +93,7 @@ class RandomEngine {
     return Uniform<T>(0., 1.);
   }
 
-  /*!
+  /**
    * @brief Generate a uniform random float in [lower, upper)
    */
   template <typename T>
@@ -102,7 +105,7 @@ class RandomEngine {
     return dist(rng_);
   }
 
-  /*!
+  /**
    * @brief Pick a random integer between 0 to N-1 according to given
    *        probabilities.
    * @tparam IdxType Return integer type.
@@ -113,7 +116,7 @@ class RandomEngine {
   template <typename IdxType>
   IdxType Choice(FloatArray prob);
 
-  /*!
+  /**
    * @brief Pick random integers between 0 to N-1 according to given
    * probabilities
    *
@@ -130,7 +133,7 @@ class RandomEngine {
   template <typename IdxType, typename FloatType>
   void Choice(IdxType num, FloatArray prob, IdxType* out, bool replace = true);
 
-  /*!
+  /**
    * @brief Pick random integers between 0 to N-1 according to given
    * probabilities
    *
@@ -153,7 +156,7 @@ class RandomEngine {
     return ret;
   }
 
-  /*!
+  /**
    * @brief Pick random integers from population by uniform distribution.
    *
    * If replace is false, num must not be larger than population.
@@ -168,7 +171,7 @@ class RandomEngine {
   void UniformChoice(
       IdxType num, IdxType population, IdxType* out, bool replace = true);
 
-  /*!
+  /**
    * @brief Pick random integers from population by uniform distribution.
    *
    * If replace is false, num must not be larger than population.
@@ -189,7 +192,7 @@ class RandomEngine {
     return ret;
   }
 
-  /*!
+  /**
    * @brief Pick random integers with different probability for different
    * segments.
    *
@@ -223,7 +226,7 @@ class RandomEngine {
       IdxType num, const IdxType* split, FloatArray bias, IdxType* out,
       bool replace = true);
 
-  /*!
+  /**
    * @brief Pick random integers with different probability for different
    * segments.
    *

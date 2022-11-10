@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
- * \file array/cpu/spmat_op_impl.cc
- * \brief CPU implementation of COO sparse matrix operators
+ * @file array/cpu/spmat_op_impl.cc
+ * @brief CPU implementation of COO sparse matrix operators
  */
 #include <dgl/runtime/parallel_for.h>
 #include <dmlc/omp.h>
@@ -22,7 +22,7 @@ using runtime::parallel_for;
 namespace aten {
 namespace impl {
 
-/*
+/**
  * TODO(BarclayII):
  * For row-major sorted COOs, we have faster implementation with binary search,
  * sorted search, etc.  Later we should benchmark how much we can gain with
@@ -624,7 +624,7 @@ CSRMatrix UnSortedDenseCOOToCSR(const COOMatrix &coo) {
 
 }  // namespace
 
-/*
+/**
 Implementation and Complexity details. N: num_nodes, NNZ: num_edges, P:
 num_threads.
   1. If row is sorted in COO, SortedCOOToCSR<> is applied. Time: O(NNZ/P).

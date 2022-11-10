@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
- * \file kernel/bcast.h
- * \brief Broadcast related function implementations.
+ * @file kernel/bcast.h
+ * @brief Broadcast related function implementations.
  */
 #include <dgl/bcast.h>
 #include <dmlc/logging.h>
@@ -11,8 +11,8 @@
 namespace dgl {
 
 namespace {
-/*!
- * \brief Determine whether use broadcasting or not, given the operator
+/**
+ * @brief Determine whether use broadcasting or not, given the operator
  *        type, lhs array and rhs array.
  */
 bool UseBcast(const std::string& op, NDArray lhs, NDArray rhs) {
@@ -27,10 +27,10 @@ bool UseBcast(const std::string& op, NDArray lhs, NDArray rhs) {
 
 }  // namespace
 
-/*!
- * \brief: Compute broadcast and auxiliary information given operator
+/**
+ * @brief: Compute broadcast and auxiliary information given operator
  *         and operands for kernel computation.
- * \note: Expect lhs, rhs to have ndim >= 2 and the shape of lhs/rhs
+ * @note: Expect lhs, rhs to have ndim >= 2 and the shape of lhs/rhs
  *        valid for the op computation.
  */
 BcastOff CalcBcastOff(const std::string& op, NDArray lhs, NDArray rhs) {

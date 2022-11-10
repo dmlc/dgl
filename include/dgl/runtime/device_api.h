@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2016 by Contributors
  * @file dgl/runtime/device_api.h
  * @brief Abstract device memory management API
@@ -13,7 +13,7 @@
 
 namespace dgl {
 namespace runtime {
-/*!
+/**
  * @brief the query type into GetAttr
  */
 enum DeviceAttrKind : int {
@@ -28,43 +28,43 @@ enum DeviceAttrKind : int {
   kMaxThreadDimensions = 8
 };
 
-/*! @brief Number of bytes each allocation must align to */
+/** @brief Number of bytes each allocation must align to */
 constexpr int kAllocAlignment = 64;
 
-/*! @brief Number of bytes each allocation must align to in temporary allocation
+/** @brief Number of bytes each allocation must align to in temporary allocation
  */
 constexpr int kTempAllocaAlignment = 64;
 
-/*! @brief Maximum size that can be allocated on stack */
+/** @brief Maximum size that can be allocated on stack */
 constexpr int kMaxStackAlloca = 1024;
 
-/*!
+/**
  * @brief DGL Runtime Device API, abstracts the device
  *  specific interface for memory management.
  */
 class DeviceAPI {
  public:
-  /*! @brief virtual destructor */
+  /** @brief virtual destructor */
   virtual ~DeviceAPI() {}
-  /*!
+  /**
    * @brief Check whether the device is available.
    */
   virtual bool IsAvailable() { return true; }
-  /*!
+  /**
    * @brief Set the environment device id to ctx
    * @param ctx The context to be set.
    */
   virtual void SetDevice(DGLContext ctx) = 0;
-  /*!
+  /**
    * @brief Get attribute of specified device.
    * @param ctx The device context
    * @param kind The result kind
    * @param rv The return value.
-   * \sa DeviceAttrKind
+   * @sa DeviceAttrKind
    */
   virtual void GetAttr(
       DGLContext ctx, DeviceAttrKind kind, DGLRetValue* rv) = 0;
-  /*!
+  /**
    * @brief Allocate a data space on device.
    * @param ctx The device context to perform operation.
    * @param nbytes The number of bytes in memory.
@@ -76,13 +76,13 @@ class DeviceAPI {
   virtual void* AllocDataSpace(
       DGLContext ctx, size_t nbytes, size_t alignment,
       DGLDataType type_hint) = 0;
-  /*!
+  /**
    * @brief Free a data space on device.
    * @param ctx The device context to perform operation.
    * @param ptr The data space.
    */
   virtual void FreeDataSpace(DGLContext ctx, void* ptr) = 0;
-  /*!
+  /**
    * @brief copy data from one place to another
    * @param from The source array.
    * @param from_offset The byte offeset in the from.
@@ -98,14 +98,14 @@ class DeviceAPI {
       const void* from, size_t from_offset, void* to, size_t to_offset,
       size_t num_bytes, DGLContext ctx_from, DGLContext ctx_to,
       DGLDataType type_hint) = 0;
-  /*!
+  /**
    * @brief Create a new stream of execution.
    *
    * @param ctx The context of allocation.
    */
   DGL_DLL virtual DGLStreamHandle CreateStream(DGLContext ctx);
 
-  /*!
+  /**
    * @brief Free a stream of execution
    *
    * @param ctx The context of the stream
@@ -113,23 +113,23 @@ class DeviceAPI {
    */
   DGL_DLL virtual void FreeStream(DGLContext ctx, DGLStreamHandle stream);
 
-  /*!
+  /**
    * @brief Synchronize the stream
    * @param ctx The context to perform operation.
    * @param stream The stream to be sync.
    */
   virtual void StreamSync(DGLContext ctx, DGLStreamHandle stream) = 0;
-  /*!
+  /**
    * @brief Set the stream
    * @param ctx The context to set stream.
    * @param stream The stream to be set.
    */
   virtual void SetStream(DGLContext ctx, DGLStreamHandle stream) {}
-  /*!
+  /**
    * @brief Get the stream
    */
   virtual DGLStreamHandle GetStream() const { return nullptr; }
-  /*!
+  /**
    * @brief Synchronize 2 streams of execution.
    *
    * An event is created in event_src stream that the second then
@@ -144,7 +144,7 @@ class DeviceAPI {
   DGL_DLL virtual void SyncStreamFromTo(
       DGLContext ctx, DGLStreamHandle event_src, DGLStreamHandle event_dst);
 
-  /*!
+  /**
    * @brief Pin host memory using cudaHostRegister().
    *
    * @param ptr The host memory pointer to be pinned.
@@ -152,19 +152,19 @@ class DeviceAPI {
    */
   DGL_DLL virtual void PinData(void* ptr, size_t nbytes);
 
-  /*!
+  /**
    * @brief Unpin host memory using cudaHostUnregister().
    *
    * @param ptr The host memory pointer to be unpinned.
    */
   DGL_DLL virtual void UnpinData(void* ptr);
 
-  /*!
+  /**
    * @brief Check whether the memory is in pinned memory.
    */
   DGL_DLL virtual bool IsPinned(const void* ptr) { return false; }
 
-  /*!
+  /**
    * @brief Allocate temporal workspace for backend execution.
    *
    *  \note We have the following assumption about backend temporal
@@ -183,7 +183,7 @@ class DeviceAPI {
    */
   DGL_DLL virtual void* AllocWorkspace(
       DGLContext ctx, size_t nbytes, DGLDataType type_hint = {});
-  /*!
+  /**
    * @brief Free temporal workspace in backend execution.
    *
    * @param ctx The context of allocation.
@@ -191,7 +191,7 @@ class DeviceAPI {
    */
   DGL_DLL virtual void FreeWorkspace(DGLContext ctx, void* ptr);
 
-  /*!
+  /**
    * @brief Get device API based on context.
    * @param ctx The context
    * @param allow_missing Whether allow missing
@@ -199,7 +199,7 @@ class DeviceAPI {
    */
   DGL_DLL static DeviceAPI* Get(DGLContext ctx, bool allow_missing = false);
 
-  /*!
+  /**
    * @brief Get device API based on context.
    * @param dev_type The device type
    * @param allow_missing Whether allow missing
@@ -209,7 +209,7 @@ class DeviceAPI {
       DGLDeviceType dev_type, bool allow_missing = false);
 };
 
-/*! @brief The device type bigger than this is RPC device */
+/** @brief The device type bigger than this is RPC device */
 constexpr int kRPCSessMask = 128;
 }  // namespace runtime
 }  // namespace dgl

@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
  * @file dgl/aten/bcast.h
  * @brief Broadcast related function C++ header.
@@ -14,11 +14,11 @@
 using namespace dgl::runtime;
 namespace dgl {
 
-/*!
+/**
  * @brief Broadcast offsets and auxiliary information.
  */
 struct BcastOff {
-  /*!
+  /**
    * @brief offset vector of lhs operand and rhs operand.
    * @note lhs_offset[i] indicates the start position of the scalar
    *       in lhs operand that required to compute the i-th element
@@ -36,9 +36,9 @@ struct BcastOff {
    * rhs array.
    */
   std::vector<int64_t> lhs_offset, rhs_offset;
-  /*! @brief Whether broadcast is required or not. */
+  /** @brief Whether broadcast is required or not. */
   bool use_bcast;
-  /*!
+  /**
    * @brief Auxiliary information for kernel computation
    * @note lhs_len refers to the left hand side operand length.
    *       e.g. 15 for shape (1, 3, 5)
@@ -52,7 +52,7 @@ struct BcastOff {
   int64_t lhs_len, rhs_len, out_len, reduce_size;
 };
 
-/*!
+/**
  * @brief: Compute broadcast and auxiliary information given operator
  *         and operands for kernel computation.
  * @param op: a string indicates the operator, could be `add`, `sub`,

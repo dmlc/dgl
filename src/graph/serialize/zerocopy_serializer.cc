@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2020-2022 by Contributors
- * \file graph/serailize/zerocopy_serializer.cc
- * \brief serializer implementation.
+ * @file graph/serailize/zerocopy_serializer.cc
+ * @brief serializer implementation.
  */
 
 #include <dgl/zerocopy_serializer.h>

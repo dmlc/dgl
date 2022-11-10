@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2017 by Contributors
- * \file system_lib_module.cc
- * \brief SystemLib module.
+ * @file system_lib_module.cc
+ * @brief SystemLib module.
  */
 #include <dgl/runtime/c_backend_api.h>
 #include <dgl/runtime/registry.h>

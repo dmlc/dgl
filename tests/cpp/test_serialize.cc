@@ -2,10 +2,12 @@
 #include <dgl/immutable_graph.h>
 #include <dmlc/memory_io.h>
 #include <gtest/gtest.h>
+
 #include <algorithm>
 #include <iostream>
 #include <memory>
 #include <vector>
+
 #include "../../src/graph/heterograph.h"
 #include "../../src/graph/unit_graph.h"
 #include "./common.h"

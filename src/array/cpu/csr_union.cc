@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
- * \file array/cpu/coo_sort.cc
- * \brief COO sorting
+ * @file array/cpu/coo_sort.cc
+ * @brief COO sorting
  */
 #include <dgl/array.h>
 #include <dgl/runtime/parallel_for.h>

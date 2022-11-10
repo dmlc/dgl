@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2021 by Contributors
- * \file array/cuda/negative_sampling.cu
- * \brief rowwise sampling
+ * @file array/cuda/negative_sampling.cu
+ * @brief rowwise sampling
  */
 
 #include <curand_kernel.h>
@@ -80,8 +80,8 @@ struct IsNotMinusOne {
   }
 };
 
-/*!
- * \brief Sort ordered pairs in ascending order, using \a tmp_major and \a
+/**
+ * @brief Sort ordered pairs in ascending order, using \a tmp_major and \a
  * tmp_minor as temporary buffers, each with \a n elements.
  */
 template <typename IdType>
