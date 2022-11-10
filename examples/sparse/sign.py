@@ -33,8 +33,8 @@ def evaluate(X, Y, model):
     model.eval()
     with torch.no_grad():
         logits = model(X)
-        _, Y_hat = torch.max(logits, dim=1)
-        return (Y_hat == Y).float().mean().item()
+        _, Y_pred = torch.max(logits, dim=1)
+        return (Y_pred == Y).float().mean().item()
 
 
 dev = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
