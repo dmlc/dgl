@@ -815,7 +815,7 @@ def gen_dist_partitions(rank, world_size, params):
             orig_nids, orig_eids = create_dgl_object(schema_map, rank, 
                     local_node_data, local_edge_data, 
                     num_edges, params.save_orig_nids, params.save_orig_eids)
-    	sort_etypes = len(etypes_map) > 1
+        sort_etypes = len(etypes_map) > 1
         for k, v in orig_eids.items():
             logging.info(f'Rank: {rank} k: {k} value -- {v.shape}')
 
