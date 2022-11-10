@@ -113,7 +113,7 @@ class RelGraphConvLayer(nn.Module):
         """
         Parameters
         ----------
-        g : DGLHeteroGraph
+        g : DGLGraph
             Input graph.
         inputs : dict[str, torch.Tensor]
             Node feature for each node type.
@@ -266,11 +266,13 @@ def train(
                 category
             ]  # we only predict the nodes with type "category"
             batch_size = seeds.shape[0]
+            input_nodes_indexes = input_nodes["paper"].to(g.device)
+            seeds = seeds.to(labels.device)
 
             emb = extract_embed(node_embed, input_nodes)
             # Add the batch's raw "paper" features
             emb.update(
-                {"paper": g.ndata["feat"]["paper"][input_nodes["paper"]]}
+                {"paper": g.ndata["feat"]["paper"][input_nodes_indexes]}
             )
 
             emb = {k: e.to(device) for k, e in emb.items()}
@@ -334,10 +336,11 @@ def test(g, model, node_embed, y_true, device, split_idx):
             category
         ]  # we only predict the nodes with type "category"
         batch_size = seeds.shape[0]
+        input_nodes_indexes = input_nodes["paper"].to(g.device)
 
         emb = extract_embed(node_embed, input_nodes)
         # Get the batch's raw "paper" features
-        emb.update({"paper": g.ndata["feat"]["paper"][input_nodes["paper"]]})
+        emb.update({"paper": g.ndata["feat"]["paper"][input_nodes_indexes]})
         emb = {k: e.to(device) for k, e in emb.items()}
 
         logits = model(emb, blocks)[category]

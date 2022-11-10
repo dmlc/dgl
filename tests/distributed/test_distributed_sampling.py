@@ -470,7 +470,7 @@ def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server, graph_formats=No
         time.sleep(1)
         pserver_list.append(p)
 
-    fanout = 3
+    fanout = {etype: 3 for etype in g.canonical_etypes}
     etype_sorted = False
     if graph_formats is not None:
         etype_sorted = 'csc' in graph_formats or 'csr' in graph_formats

@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from . import backend as F
 from .base import ALL, is_all, DGLError, dgl_warning, NID, EID
 from .heterograph_index import disjoint_union, slice_gidx
-from .heterograph import DGLHeteroGraph
+from .heterograph import DGLGraph
 from . import convert
 from . import utils
 
@@ -175,7 +175,7 @@ def batch(graphs, ndata=ALL, edata=ALL, *,
     etypes = [etype for _, etype, _ in relations]
 
     gidx = disjoint_union(graphs[0]._graph.metagraph, [g._graph for g in graphs])
-    retg = DGLHeteroGraph(gidx, ntypes, etypes)
+    retg = DGLGraph(gidx, ntypes, etypes)
 
     # Compute batch num nodes
     bnn = {}
@@ -479,7 +479,7 @@ def slice_batch(g, gid, store_ids=False):
     # Slice graph structure
     gidx = slice_gidx(g._graph, utils.toindex(num_nodes), utils.toindex(start_nid),
                       utils.toindex(num_edges), utils.toindex(start_eid))
-    retg = DGLHeteroGraph(gidx, g.ntypes, g.etypes)
+    retg = DGLGraph(gidx, g.ntypes, g.etypes)
 
     # Slice node features
     for ntid, ntype in enumerate(g.ntypes):

@@ -7,7 +7,7 @@ import os
 import gc
 import numpy as np
 
-from ..heterograph import DGLHeteroGraph
+from ..heterograph import DGLGraph
 from ..convert import heterograph as dgl_heterograph
 from ..convert import graph as dgl_graph
 from ..transforms import compact_graphs
@@ -129,7 +129,7 @@ def _get_graph_from_shared_mem(graph_name):
     g, ntypes, etypes = heterograph_index.create_heterograph_from_shared_memory(graph_name)
     if g is None:
         return None
-    g = DGLHeteroGraph(g, ntypes, etypes)
+    g = DGLGraph(g, ntypes, etypes)
 
     g.ndata['inner_node'] = _get_shared_mem_ndata(g, graph_name, 'inner_node')
     g.ndata[NID] = _get_shared_mem_ndata(g, graph_name, NID)
@@ -157,14 +157,16 @@ class HeteroNodeView(object):
         return NodeSpace(data=NodeDataView(self._graph, key))
 
 class HeteroEdgeView(object):
-    """A NodeView class to act as G.nodes for a DistGraph."""
+    """An EdgeView class to act as G.edges for a DistGraph."""
     __slots__ = ['_graph']
 
     def __init__(self, graph):
         self._graph = graph
 
     def __getitem__(self, key):
-        assert isinstance(key, str)
+        assert isinstance(key, str) or (
+            isinstance(key, tuple) and len(key) == 3
+        ), f"Expect edge type in string or triplet of string, but got {key}."
         return EdgeSpace(data=EdgeDataView(self._graph, key))
 
 class NodeDataView(MutableMapping):

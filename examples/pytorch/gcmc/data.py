@@ -46,25 +46,25 @@ class MovieLens(object):
 
     Attributes
     ----------
-    train_enc_graph : dgl.DGLHeteroGraph
+    train_enc_graph : dgl.DGLGraph
         Encoder graph for training.
-    train_dec_graph : dgl.DGLHeteroGraph
+    train_dec_graph : dgl.DGLGraph
         Decoder graph for training.
     train_labels : torch.Tensor
         The categorical label of each user-movie pair
     train_truths : torch.Tensor
         The actual rating values of each user-movie pair
-    valid_enc_graph : dgl.DGLHeteroGraph
+    valid_enc_graph : dgl.DGLGraph
         Encoder graph for validation.
-    valid_dec_graph : dgl.DGLHeteroGraph
+    valid_dec_graph : dgl.DGLGraph
         Decoder graph for validation.
     valid_labels : torch.Tensor
         The categorical label of each user-movie pair
     valid_truths : torch.Tensor
         The actual rating values of each user-movie pair
-    test_enc_graph : dgl.DGLHeteroGraph
+    test_enc_graph : dgl.DGLGraph
         Encoder graph for test.
-    test_dec_graph : dgl.DGLHeteroGraph
+    test_dec_graph : dgl.DGLGraph
         Decoder graph for test.
     test_labels : torch.Tensor
         The categorical label of each user-movie pair
