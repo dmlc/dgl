@@ -504,4 +504,3 @@ def slice_batch(g, gid, store_ids=False):
                                                    retg.idtype, retg.device)
 
     return retg
-
