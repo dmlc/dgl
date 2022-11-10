@@ -45,12 +45,14 @@ class _LazyIndex(object):
 class LazyFeature(object):
     """Placeholder for feature prefetching.
 
-    One can assign this object to ``ndata`` or ``edata`` of the graphs returned by various
-    samplers' :attr:`sample` method.  When DGL's dataloader receives the subgraphs
-    returned by the sampler, it will automatically look up all the ``ndata`` and ``edata``
-    whose data is a LazyFeature, replacing them with the actual data of the corresponding
-    nodes/edges from the original graph instead.  In particular, for a subgraph returned
-    by the sampler has a LazyFeature with name ``k`` in ``subgraph.ndata[key]``:
+    One can assign this object to ``ndata``, ``edata`` or ``gdata`` of the
+    graphs returned by various samplers' :attr:`sample` method.  When DGL's
+    dataloader receives the subgraphs returned by the sampler, it will
+    automatically look up all the ``ndata``, ``edata`` and ``gdata`` whose data
+    is a LazyFeature, replacing them with the actual data of the corresponding
+    nodes/edges from the original graph instead.  In particular, for a subgraph
+    returned by the sampler has a LazyFeature with name ``k`` in
+    ``subgraph.ndata[key]``:
 
     .. code:: python
 

@@ -265,3 +265,47 @@ class HeteroEdgeDataView(MutableMapping):
 
     def __repr__(self):
         return repr(self._transpose(as_dict=True))
+
+class HeteroGraphDataView(MutableMapping):
+    """The data view class when G.gdata is called."""
+    __slots__ = ['_graph']
+
+    def __init__(self, graph):
+        self._graph = graph
+
+    def __getitem__(self, key):
+        return self._graph._get_g_repr()[key]
+
+    def __setitem__(self, key, val):
+        if isinstance(val, LazyFeature):
+            self._graph._graph_frame[key] = val
+        else:
+            assert isinstance(val, dict) is False, \
+                'HeteroGraphDataView doesn\'t support types, ' \
+                'please pass a tensor directly'
+
+            self._graph._set_g_repr({key : val})
+
+    def __delitem__(self, key):
+        self._graph._pop_g_repr(key)
+
+    def _transpose(self, as_dict=False):
+        ret = self._graph._get_g_repr()
+        if as_dict:
+            ret = {key: ret[key] for key in self._graph._graph_frame}
+        return ret
+
+    def __len__(self):
+        return len(self._transpose())
+
+    def __iter__(self):
+        return iter(self._transpose())
+
+    def keys(self):
+        return self._transpose().keys()
+
+    def values(self):
+        return self._transpose().values()
+
+    def __repr__(self):
+        return repr(self._transpose(as_dict=True))

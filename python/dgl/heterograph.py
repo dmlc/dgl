@@ -18,7 +18,8 @@ from . import heterograph_index
 from . import utils
 from . import backend as F
 from .frame import Frame
-from .view import HeteroNodeView, HeteroNodeDataView, HeteroEdgeView, HeteroEdgeDataView
+from .view import HeteroGraphDataView, HeteroNodeView, HeteroNodeDataView, \
+                  HeteroEdgeView, HeteroEdgeDataView
 
 __all__ = ['DGLHeteroGraph', 'combine_names']
 
@@ -44,6 +45,7 @@ class DGLHeteroGraph(object):
                  etypes=['_E'],
                  node_frames=None,
                  edge_frames=None,
+                 graph_frame=None,
                  **deprecate_kwargs):
         """Internal constructor for creating a DGLGraph.
 
@@ -82,9 +84,9 @@ class DGLHeteroGraph(object):
         if len(deprecate_kwargs) != 0:
             dgl_warning('Keyword arguments {} are deprecated in v0.5, and can be safely'
                         ' removed in all cases.'.format(list(deprecate_kwargs.keys())))
-        self._init(gidx, ntypes, etypes, node_frames, edge_frames)
+        self._init(gidx, ntypes, etypes, node_frames, edge_frames, graph_frame)
 
-    def _init(self, gidx, ntypes, etypes, node_frames, edge_frames):
+    def _init(self, gidx, ntypes, etypes, node_frames, edge_frames, graph_frame):
         """Init internal states."""
         self._graph = gidx
         self._canonical_etypes = None
@@ -139,7 +141,7 @@ class DGLHeteroGraph(object):
                 self._etype2canonical[ety] = self._canonical_etypes[i]
         self._etypes_invmap = {t : i for i, t in enumerate(self._canonical_etypes)}
 
-        # node and edge frame
+        # node, edge and graph frame
         if node_frames is None:
             node_frames = [None] * len(self._ntypes)
         node_frames = [Frame(num_rows=self._graph.number_of_nodes(i))
@@ -153,6 +155,11 @@ class DGLHeteroGraph(object):
                        if frame is None else frame
                        for i, frame in enumerate(edge_frames)]
         self._edge_frames = edge_frames
+
+        if graph_frame is None:
+            self._graph_frame = Frame(num_rows=1)
+        else:
+            self._graph_frame = graph_frame
 
     def __setstate__(self, state):
         # Compatibility check
@@ -170,7 +177,7 @@ class DGLHeteroGraph(object):
             dgl_warning("The object is pickled with DGL <= 0.4.2.  "
                         "Some of the original attributes are ignored.")
             self._init(state['_graph'], state['_ntypes'], state['_etypes'], state['_node_frames'],
-                       state['_edge_frames'])
+                       state['_edge_frames'], state['_graph_frame'])
         else:
             raise IOError("Unrecognized pickle format.")
 
@@ -178,20 +185,27 @@ class DGLHeteroGraph(object):
         if len(self.ntypes) == 1 and len(self.etypes) == 1:
             ret = ('Graph(num_nodes={node}, num_edges={edge},\n'
                    '      ndata_schemes={ndata}\n'
-                   '      edata_schemes={edata})')
-            return ret.format(node=self.number_of_nodes(), edge=self.number_of_edges(),
+                   '      edata_schemes={edata}\n'
+                   '      gdata_schemes={gdata})')
+            return ret.format(node=self.number_of_nodes(),
+                              edge=self.number_of_edges(),
                               ndata=str(self.node_attr_schemes()),
-                              edata=str(self.edge_attr_schemes()))
+                              edata=str(self.edge_attr_schemes()),
+                              gdata=str(self.graph_attr_schemes()))
         else:
             ret = ('Graph(num_nodes={node},\n'
                    '      num_edges={edge},\n'
-                   '      metagraph={meta})')
+                   '      metagraph={meta},\n'
+                   '      gdata_schemes={gdata}))')
             nnode_dict = {self.ntypes[i] : self._graph.number_of_nodes(i)
                           for i in range(len(self.ntypes))}
             nedge_dict = {self.canonical_etypes[i] : self._graph.number_of_edges(i)
                           for i in range(len(self.etypes))}
             meta = str(self.metagraph().edges(keys=True))
-            return ret.format(node=nnode_dict, edge=nedge_dict, meta=meta)
+            return ret.format(node=nnode_dict,
+                              edge=nedge_dict,
+                              meta=meta,
+                              gdata=str(self.graph_attr_schemes()))
 
     def __copy__(self):
         """Shallow copy implementation."""
@@ -2144,6 +2158,43 @@ class DGLHeteroGraph(object):
             (key[2] == SLICE_FULL or key[2] == dsttype)]
         return etypes
 
+    @property
+    def gdata(self):
+        """Return a graph data view for setting/getting graph features.
+
+        Let ``g`` be a DGLGraph. Graph data view is the same for a graphs of a
+        single node type and of multiple node types. In both cases
+        ``g.gdata[feat]`` returns the graph feature associated with the name
+        ``feat``. One can also set a node feature associated with the name
+        ``feat`` by setting ``g.gdata[feat]`` to a tensor.
+
+        Notes
+        -----
+        For setting features, the device of the features must be the same as the device
+        of the graph.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Set and get feature 'y' for a graph of a single node type and of
+        multiple types.
+
+        >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 2])))
+        >>> g.gdata['y'] = torch.ones(1, 3)
+        >>> g.gdata['y']
+        tensor([[1., 1., 1.]])
+
+        See Also
+        --------
+        nodes
+        edges
+        """
+        return HeteroGraphDataView(self)
+
     def __getitem__(self, key):
         """Return the relation slice of this graph.
 
@@ -3849,6 +3900,7 @@ class DGLHeteroGraph(object):
         See Also
         --------
         edge_attr_schemes
+        graph_attr_schemes
         """
         return self._node_frames[self.get_ntype_id(ntype)].schemes
 
@@ -3905,8 +3957,42 @@ class DGLHeteroGraph(object):
         See Also
         --------
         node_attr_schemes
+        graph_attr_schemes
         """
         return self._edge_frames[self.get_etype_id(etype)].schemes
+
+    def graph_attr_schemes(self):
+        """Return the graph feature schemes.
+
+        The scheme of a feature describes the shape and data type of it.
+
+        Returns
+        -------
+        dict[str, Scheme]
+            A dictionary mapping a feature name to its associated feature scheme.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        Query for a homogeneous and heterogeneous graphs.
+
+        >>> g = dgl.graph((torch.tensor([0, 1]), torch.tensor([1, 2])))
+        >>> g.gdata['target'] = torch.randn(1, 8)
+        >>> g.gdata['label'] = torch.randn(1)
+        >>> g.graph_attr_schemes()
+        {'target': Scheme(shape=(8,), dtype=torch.float32),
+         'label': Scheme(shape=(), dtype=torch.float32)}
+
+        See Also
+        --------
+        node_attr_schemes
+        edge_attr_schemes
+        """
+        return self._graph_frame.schemes
 
     def set_n_initializer(self, initializer, field=None, ntype=None):
         """Set the initializer for node features.
@@ -4173,7 +4259,7 @@ class DGLHeteroGraph(object):
         Returns
         -------
         Tensor
-            The popped representation
+            The popped representation.
         """
         return self._node_frames[ntid].pop(key)
 
@@ -4253,7 +4339,7 @@ class DGLHeteroGraph(object):
         Returns
         -------
         dict
-            Representation dict
+            Representation dict.
         """
         # parse argument
         if is_all(edges):
@@ -4275,9 +4361,70 @@ class DGLHeteroGraph(object):
         Returns
         -------
         Tensor
-            The popped representation
+            The popped representation.
         """
         self._edge_frames[etid].pop(key)
+
+    def _set_g_repr(self, data):
+        """Internal API to set graph features.
+
+        `data` is a dictionary from the feature name to feature tensor. Each tensor
+        is of shape (1, D1, D2, ...), where (D1, D2, ...) is the shape of the graph
+        representation tensor.
+
+        All updates will be done out of place to work with autograd.
+
+        Parameters
+        ----------
+        data : dict of tensor
+            Graph representation.
+        """
+        for key, val in data.items():
+            gfeats = F.shape(val)[0]
+            if gfeats != 1:
+                raise DGLError('Number of graph features must be 1. '
+                               'Got %d instead.' % gfeats)
+            if F.context(val) != self.device:
+                raise DGLError('Cannot assign graph feature "{}" on device {} to a graph on'
+                               ' device {}. Call DGLGraph.to() to copy the graph to the'
+                               ' same device.'.format(key, F.context(val), self.device))
+            # To prevent users from doing things like:
+            #
+            #     g.pin_memory_()
+            #     g.ndata['x'] = torch.randn(...)
+            #     sg = g.sample_neighbors(torch.LongTensor([...]).cuda())
+            #     sg.ndata['x']    # Becomes a CPU tensor even if sg is on GPU due to lazy slicing
+            if self.is_pinned() and F.context(val) == 'cpu' and not F.is_pinned(val):
+                raise DGLError('Pinned graph requires the graph data to be pinned as well. '
+                               'Please pin the graph data before assignment.')
+
+        self._graph_frame.update(data)
+
+
+    def _get_g_repr(self):
+        """Get graph representation.
+
+        Returns
+        -------
+        dict
+            Representation dict from feature name to feature tensor.
+        """
+        return self._graph_frame
+
+    def _pop_g_repr(self, key):
+        """Internal API to get and remove the specified graph feature.
+
+        Parameters
+        ----------
+        key : str
+            The attribute name.
+
+        Returns
+        -------
+        Tensor
+            The popped representation.
+        """
+        return self._graph_frame.pop(key)
 
     #################################################################
     # Message passing
