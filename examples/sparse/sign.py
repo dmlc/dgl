@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-from torch.optim import Adam
 from dgl.data import CoraGraphDataset
-from dgl.mock_sparse import create_from_coo, identity, diag
+from dgl.mock_sparse import create_from_coo, diag, identity
+from torch.optim import Adam
+
 
 def sign(A, X, num_hops):
     X_sign = [X]
@@ -13,21 +13,21 @@ def sign(A, X, num_hops):
         X_sign.append(X)
     return X_sign
 
+
 class Model(nn.Module):
     def __init__(self, in_size, num_hops, num_classes, hidden_size=256):
         super().__init__()
 
         num_feats = num_hops + 1
-        self.linear = nn.ModuleList([
-            nn.Linear(in_size, hidden_size) for _ in range(num_feats)
-        ])
+        self.linear = nn.ModuleList(
+            [nn.Linear(in_size, hidden_size) for _ in range(num_feats)]
+        )
         self.pred = nn.Linear(hidden_size * num_feats, num_classes)
 
     def forward(self, X):
-        X = torch.cat([
-            self.linear[i](X[i]) for i in range(len(X))
-        ], dim=1)
+        X = torch.cat([self.linear[i](X[i]) for i in range(len(X))], dim=1)
         return self.pred(F.relu(X))
+
 
 def evaluate(X, Y, model):
     model.eval()
@@ -36,7 +36,8 @@ def evaluate(X, Y, model):
         _, Y_hat = torch.max(logits, dim=1)
         return (Y_hat == Y).float().mean().item()
 
-dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
+dev = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 data = CoraGraphDataset()
 g = data[0].to(dev)
@@ -75,7 +76,7 @@ for epoch in range(10):
     loss.backward()
     optimizer.step()
     train_acc = evaluate(X_sign_train, Y_train, model)
-    print(f'epoch {epoch} | train acc {train_acc}')
+    print(f"epoch {epoch} | train acc {train_acc}")
 
 test_acc = evaluate(X_sign_test, Y_test, model)
-print(f'test acc {test_acc}')
+print(f"test acc {test_acc}")
