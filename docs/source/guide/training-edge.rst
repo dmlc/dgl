@@ -134,7 +134,7 @@ Edge classification on heterogeneous graphs is not very different from
 that on homogeneous graphs. If you wish to perform edge classification
 on one edge type, you only need to compute the node representation for
 all node types, and predict on that edge type with
-:meth:`~dgl.DGLHeteroGraph.apply_edges` method.
+:meth:`~dgl.DGLGraph.apply_edges` method.
 
 For example, to make ``DotProductPredictor`` work on one edge type of a
 heterogeneous graph, you only need to specify the edge type in
