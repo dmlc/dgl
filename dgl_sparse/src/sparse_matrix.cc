@@ -1,11 +1,16 @@
 /**
  *  Copyright (c) 2022 by Contributors
  * @file sparse_matrix.cc
- * @brief DGL C++ sparse matrix implementations
+ * @brief DGL C++ sparse matrix implementations.
  */
-#include <dmlc/logging.h>
+// clang-format off
+#include <sparse/dgl_headers.h>
+// clang-format on
+
+#include <c10/util/Logging.h>
 #include <sparse/elementwise_op.h>
 #include <sparse/sparse_matrix.h>
+#include <torch/script.h>
 
 namespace dgl {
 namespace sparse {
@@ -114,8 +119,19 @@ std::vector<torch::Tensor> SparseMatrix::CSCTensors() {
 
 void SparseMatrix::SetValue(torch::Tensor value) { value_ = value; }
 
-// TODO(zhenkun): format conversion
-void SparseMatrix::_CreateCOO() {}
+void SparseMatrix::_CreateCOO() {
+  if (HasCOO()) {
+    return;
+  }
+  if (HasCSR()) {
+    coo_ = CSRToCOO(shape_[0], shape_[1], csr_);
+  } else if (HasCSC()) {
+    // TODO(zhenkun)
+  } else {
+    LOG(FATAL) << "SparseMatrix does not have any sparse format";
+  }
+}
+
 void SparseMatrix::_CreateCSR() {}
 void SparseMatrix::_CreateCSC() {}
 
