@@ -47,7 +47,7 @@ A = create_from_coo(dst, src, shape=(N, N))
 
 I = identity(A.shape, device=dev)
 A_hat = A + I
-D_hat = diag(A.sum(dim=1)) ** -0.5
+D_hat = diag(A_hat.sum(dim=1)) ** -0.5
 A_hat = D_hat @ A_hat @ D_hat
 
 X = g.ndata["feat"]
