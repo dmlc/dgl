@@ -4,6 +4,7 @@
  * @brief Array index select CPU implementation
  */
 #include <dgl/array.h>
+#include <dgl/runtime/parallel_for.h>
 
 namespace dgl {
 using runtime::NDArray;
@@ -22,10 +23,13 @@ NDArray IndexSelect(NDArray array, IdArray index) {
   const int64_t len = index->shape[0];
   NDArray ret = NDArray::Empty({len}, array->dtype, array->ctx);
   DType* ret_data = static_cast<DType*>(ret->data);
-  for (int64_t i = 0; i < len; ++i) {
-    CHECK_LT(idx_data[i], arr_len) << "Index out of range.";
-    ret_data[i] = array_data[idx_data[i]];
-  }
+  runtime::parallel_for(
+      0, len, [idx_data, arr_len, ret_data, array_data] (size_t b, size_t e) {
+        for (size_t i = b; i < e; ++i) {
+          CHECK_LT(idx_data[i], arr_len) << "Index out of range.";
+          ret_data[i] = array_data[idx_data[i]];
+        }
+      });
   return ret;
 }
 
