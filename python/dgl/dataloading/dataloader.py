@@ -19,7 +19,7 @@ from torch.utils.data.distributed import DistributedSampler
 
 from ..base import NID, EID, dgl_warning, DGLError
 from ..batch import batch as batch_graphs
-from ..heterograph import DGLHeteroGraph
+from ..heterograph import DGLHeteroGraph, DGLHeteroGraphData
 from ..utils import (
     recursive_apply, ExceptionWrapper, recursive_apply_pair, set_num_threads, get_num_threads,
     get_numa_nodes_cores, context_of, dtype_of)
@@ -1101,6 +1101,32 @@ class GraphCollator(object):
         if isinstance(elem, DGLHeteroGraph):
             batched_graphs = batch_graphs(items)
             return batched_graphs
+        elif isinstance(elem, DGLHeteroGraphData):
+            num_graphs = len(items)
+
+            graphs = []
+            batched_labels = {}
+
+            for i, data in enumerate(items):
+                graphs.append(data.graph)
+
+                for key, label in data.labels.items():
+                    if key not in batched_labels:
+                        if label.dim() == 1:
+                            dims = (num_graphs, label.shape[0])
+                        elif label.dim() <= 2 and label.shape[0] == 1:
+                            dims = (num_graphs, label.shape[1])
+                        else:
+                            dims = (num_graphs, *label.shape)
+
+                        batched_labels[key] = torch.zeros(
+                            dims, dtype=label.dtype, device=label.device)
+
+                    batched_labels[key][i] = label
+
+            batched_graphs = batch_graphs(graphs)
+
+            return batched_graphs, batched_labels
         elif F.is_tensor(elem):
             return F.stack(items, 0)
         elif elem_type.__module__ == 'numpy' and elem_type.__name__ != 'str_' \
