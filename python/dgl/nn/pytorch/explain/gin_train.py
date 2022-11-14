@@ -11,7 +11,7 @@ from torch.utils.data.sampler import SubsetRandomSampler
 from dgl.data import GINDataset
 from dgl.dataloading import GraphDataLoader
 from dgl.nn.pytorch.conv import GINConv
-from dgl.nn.pytorch.glob import SumPooling
+from dgl.nn.pytorch.glob import SumPooling, MaxPooling
 
 # source: https://github.com/dmlc/dgl/blob/master/examples/pytorch/gin/train.py
 class MLP(nn.Module):
@@ -56,7 +56,7 @@ class GIN(nn.Module):
                 self.linear_prediction.append(nn.Linear(hidden_dim, output_dim))
         self.drop = nn.Dropout(0.5)
         self.pool = (
-            SumPooling()
+            MaxPooling()
         )  # change to mean readout (AvgPooling) on social network datasets
 
     def forward(self, g, h):
@@ -100,14 +100,14 @@ def evaluate(dataloader, device, model):
     return acc
 
 
-def train(train_loader, val_loader, device, model):
+def train(train_loader, val_loader, device, model, epochs=350, lr=0.005):
     # loss function, optimizer and scheduler
     loss_fcn = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.01)
+    optimizer = optim.Adam(model.parameters(), lr=lr)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
 
     # training loop
-    for epoch in range(350):
+    for epoch in range(epochs):
         model.train()
         total_loss = 0
         for batch, (batched_graph, labels) in enumerate(train_loader):
@@ -168,7 +168,8 @@ if __name__ == "__main__":
     # create GIN model
     in_size = dataset.dim_nfeats
     out_size = dataset.gclasses
-    model = GIN(in_size, 16, out_size).to(device)
+
+    '''model = GIN(in_size, 128, out_size).to(device)
 
     # model training/validating
     print("Training...")
@@ -177,7 +178,11 @@ if __name__ == "__main__":
     print("Evaluating...")
     print(f"acc: {round(evaluate(train_loader, device, model), 2)}")
 
+    torch.save(model, 'model.dt')'''
+
     ##########
+    model = torch.load('model.dt')
+    model.eval()
 
     from dgl.nn import SubgraphXExplainer
     import dgl
@@ -185,7 +190,7 @@ if __name__ == "__main__":
     import networkx as nx
     import matplotlib.pyplot as plt
 
-    explainer = SubgraphXExplainer(model, hyperparam=0.1, pruning_action="high2low")
+    explainer = SubgraphXExplainer(model, hyperparam=6, pruning_action="high2low")
 
     for idx, (graph, l) in enumerate(dataset):
         print(f'{idx} / {len(dataset)}')
@@ -195,14 +200,14 @@ if __name__ == "__main__":
         if predicted == l:
             print(f'Correct Prediction {l} {predicted}')
 
-        g_explain = explainer.explain_graph(graph, M=100, N_min=5, features=feat)
+        g_explain = explainer.explain_graph(graph, M=200, N_min=6, features=feat)
 
-        print(g_explain)
+        print(f'Subgraph: {g_explain}')
         print(f'Important Subgraph: {g_explain.ndata}')
 
         # visualize the MUTAG graph
         G = dgl.to_networkx(graph)
-        plt.figure(figsize=[15, 7])
+        plt.figure(figsize=[15, 15])
 
         label_dict={
             0: 'C',
@@ -218,5 +223,7 @@ if __name__ == "__main__":
                 node_size=[1000 for i in range(graph.num_nodes())],
                 node_color=['red' if i in g_explain else 'blue' for i in range(graph.num_nodes())],
                 )
+
         plt.savefig(os.path.join("mutag_img", f"{idx}_MUTAG_explain.png"), format="PNG")
         plt.show()
+        exit()
