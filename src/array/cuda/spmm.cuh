@@ -146,7 +146,7 @@ void _Transpose(const DType* in, DType* out, int row, int col) {
  * @note cuBLAS has no geam API for half data type, fallback to our kernel.
  */
 template <>
-void _Transpose<half>(const half* in, half* out, int row, int col) {
+void _Transpose<__half>(const __half* in, __half* out, int row, int col) {
   cudaStream_t stream = runtime::getCurrentCUDAStream();
   int nt = FindNumThreads(row);
   int nb = col;
@@ -553,7 +553,7 @@ __global__ void SpMMCsrKernel(
   while (ty < num_rows) {
     int tx = blockIdx.y * blockDim.x + threadIdx.x;
     while (tx < out_len) {
-      DType local_accum = ReduceOp::zero();
+      typename accum_dtype<DType>::type local_accum = ReduceOp::zero();
       Idx local_argu = 0, local_arge = 0;
       const int lhs_add = UseBcast ? ubcast_off[tx] : tx;
       const int rhs_add = UseBcast ? ebcast_off[tx] : tx;
@@ -573,7 +573,7 @@ __global__ void SpMMCsrKernel(
       // Separate kernel `SpMMCmpCsrHeteroKernel` is used for max- and
       // min-reducer. It does not affect the output on homogeneous graph as
       // `out` is initialized to zero.
-      out[ty * out_len + tx] += local_accum;
+      out[ty * out_len + tx] += static_cast<DType>(local_accum);
       if (ReduceOp::require_arg && BinaryOp::use_lhs)
         arg_u[ty * out_len + tx] = local_argu;
       if (ReduceOp::require_arg && BinaryOp::use_rhs)
@@ -610,7 +610,9 @@ __global__ void SpMMCmpCsrHeteroKernel(
   while (ty < num_rows) {
     int tx = blockIdx.x * blockDim.x + threadIdx.x;
     while (tx < out_len) {
-      DType new_out = out[ty * out_len + tx];  // ReduceOp::zero();
+      using accum_type = typename accum_dtype<DType>::type;
+      accum_type local_accum = static_cast<accum_type>(
+          out[ty * out_len + tx]);  // ReduceOp::zero();
       Idx local_argu = 0, local_arge = 0;
       const int lhs_add = UseBcast ? ubcast_off[tx] : tx;
       const int rhs_add = UseBcast ? ebcast_off[tx] : tx;
@@ -622,10 +624,12 @@ __global__ void SpMMCmpCsrHeteroKernel(
         const DType* eoff =
             BinaryOp::use_rhs ? (efeat + eid * efeat_len) : nullptr;
         DType tmp_out = BinaryOp::Call(uoff + lhs_add, eoff + rhs_add);
-        ReduceOp::Call(&new_out, &local_argu, &local_arge, tmp_out, cid, eid);
+        ReduceOp::Call(
+            &local_accum, &local_argu, &local_arge, tmp_out, cid, eid);
       }
       // Update output only when max/min values are different that original
       // output
+      DType new_out = static_cast<DType>(local_accum);
       if (out[ty * out_len + tx] != new_out) {
         out[ty * out_len + tx] = new_out;
         if (ReduceOp::require_arg && BinaryOp::use_lhs) {
@@ -663,12 +667,20 @@ template <typename Idx, typename DType, typename BinaryOp, typename ReduceOp>
 void SpMMCoo(
     const BcastOff& bcast, const COOMatrix& coo, NDArray ufeat, NDArray efeat,
     NDArray out, NDArray argu, NDArray arge) {
-#if defined(CUDART_VERSION) && CUDART_VERSION <= 10000
-  if (std::is_same<DType, half>::value)
-    LOG(FATAL) << "SpMMCoo requires atomicCAS, which is not supported "
-               << "for float16 in CUDA 10.0. Please upgrade your CUDA "
-               << "to later versions.";
-#endif
+  /**
+   * TODO(Xin): Disable half precision for SpMMCoo due to the round-off error.
+   * We should use fp32 for the accumulation but it's hard to modify the 
+   * current implementation.
+   */
+#if BF16_ENABLED
+  if (std::is_same<DType, __half>::value ||
+      std::is_same<DType, __nv_bfloat16>::value)
+#else
+  if (std::is_same<DType, __half>::value)
+#endif  // BF16_ENABLED
+    LOG(FATAL) << "SpMMCoo doesn't support half precision fow now. "
+               << "Please use SpMMCsr instead by allowing the graph "
+               << "materialize CSR/CSC formats.";
   const Idx *row = coo.row.Ptr<Idx>(), *col = coo.col.Ptr<Idx>(),
             *edge_map = coo.data.Ptr<Idx>();
   const DType *ufeat_data = ufeat.Ptr<DType>(),
