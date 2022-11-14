@@ -23,6 +23,7 @@ from .. import backend as F
 from .. import function as fn
 from ..base import DGLError
 from . import functional
+from .. import utils
 
 try:
     import torch
@@ -52,7 +53,8 @@ __all__ = [
     'DropNode',
     'DropEdge',
     'AddEdge',
-    'SIGNDiffusion'
+    'SIGNDiffusion',
+    'ToLevi'
 ]
 
 def update_graph_structure(g, data_dict, copy_edata=True):
@@ -1718,3 +1720,69 @@ class SIGNDiffusion(BaseTransform):
                     self.alpha * in_feat
                 feat_list.append(g.ndata[self.in_feat_name])
         return feat_list
+
+class ToLevi(BaseTransform):
+    r"""This function transforms the original graph to its heterogeneous Levi graph,
+    by converting edges to intermediate nodes, only support homogeneous directed graph.
+
+    Example
+    -------
+    >>> import dgl
+    >>> import torch as th
+    >>> from dgl import ToLevi
+
+    >>> transform = ToLevi()
+    >>> g = dgl.graph(([0,1,2,3], [1,2,3,0]))
+    >>> g.ndata['h'] = th.randn((g.num_nodes(), 2))
+    >>> g.edata['w'] = th.randn((g.num_edges(), 2))
+    >>> lg = transform(g)
+    >>> lg
+    Grpah(num_nodes={'edge': 4, 'node': 4},
+          num_edges={('edge', 'e2n', 'node'): 4,
+                     ('node', 'n2e', 'edge'): 4},
+          metagraph=[('edge', 'node', 'e2n'),
+                     ('node', 'edge', 'n2e')])
+    >>> lg.nodes('node')
+    tensor([0, 1, 2, 3])
+    >>> lg.nodes('edge')
+    tensor([0, 1, 2, 3])
+    >>> lg.nodes['node'].data['h'].shape
+    torch.Size([4, 2])
+    >>> lg.nodes['edge'].data['w'].shape
+    torch.Size([4, 2])
+    """
+
+    def __init__(self):
+        pass
+
+    def __call__(self, g):
+        r"""
+        Parameters
+        ----------
+        g : DGLGraph
+            The input graph, should be a homogeneous directed graph.
+
+        Returns
+        -------
+        DGLGraph
+            The Levi graph of input, will be a heterogeneous graph, where ntypes 'node' and
+            'edge' have the corresponding ids to nodes and edges in the original graph.
+        """
+        device = g.device
+        idtype = g.idtype
+
+        edge_list = g.edges()
+        n2e, e2n = [[], []], [[], []]
+        for i in range(len(edge_list[0])):
+            n2e[0].append(edge_list[0][i]), n2e[1].append(i)
+            e2n[0].append(i), e2n[1].append(edge_list[1][i])
+        graph_data = {('node', 'n2e', 'edge'): (F.tensor(n2e[0]), F.tensor(n2e[1])),
+                      ('edge', 'e2n', 'node'): (F.tensor(e2n[0]), F.tensor(e2n[1]))}
+        levi_g = convert.heterograph(graph_data, idtype=idtype, device=device)
+
+        # copy ndata and edata
+        node_frames = utils.extract_node_subframes(g, nodes_or_device=device)
+        edge_frames = utils.extract_edge_subframes(g, edges_or_device=device)
+        utils.set_new_frames(levi_g, node_frames=edge_frames+node_frames)
+
+        return levi_g
