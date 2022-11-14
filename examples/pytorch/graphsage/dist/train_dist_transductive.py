@@ -7,7 +7,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import dgl
-from dgl.data import register_data_args
 from dgl.distributed import DistEmbedding
 from train_dist import DistSAGE, compute_acc
 
@@ -325,7 +324,6 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="GCN")
-    register_data_args(parser)
     parser.add_argument("--graph_name", type=str, help="graph name")
     parser.add_argument("--id", type=int, help="the partition id")
     parser.add_argument(
@@ -334,8 +332,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--part_config", type=str, help="The path to the partition config file"
     )
-    parser.add_argument(
-        "--num_clients", type=int, help="The number of clients")
     parser.add_argument("--n_classes", type=int, help="the number of classes")
     parser.add_argument(
         "--num_gpus",

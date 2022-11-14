@@ -13,8 +13,6 @@ import tqdm
 import dgl
 import dgl.function as fn
 import dgl.nn.pytorch as dglnn
-from dgl.data import register_data_args
-
 
 class DistSAGE(nn.Module):
     def __init__(
@@ -412,7 +410,6 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="GCN")
-    register_data_args(parser)
     parser.add_argument("--graph_name", type=str, help="graph name")
     parser.add_argument("--id", type=int, help="the partition id")
     parser.add_argument(

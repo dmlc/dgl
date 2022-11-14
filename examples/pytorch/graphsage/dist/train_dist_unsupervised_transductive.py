@@ -6,7 +6,6 @@ import torch as th
 import torch.nn.functional as F
 import torch.optim as optim
 import dgl
-from dgl.data import register_data_args
 from train_dist_transductive import DistEmb, load_embs
 from train_dist_unsupervised import CrossEntropyLoss, DistSAGE, compute_acc
 
@@ -281,7 +280,6 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="GCN")
-    register_data_args(parser)
     parser.add_argument("--graph_name", type=str, help="graph name")
     parser.add_argument("--id", type=int, help="the partition id")
     parser.add_argument(

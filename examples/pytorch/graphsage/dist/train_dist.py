@@ -11,8 +11,6 @@ import torch.optim as optim
 import tqdm
 import dgl
 import dgl.nn.pytorch as dglnn
-from dgl.data import register_data_args
-
 
 def load_subtensor(g, seeds, input_nodes, device, load_feat=True):
     """
@@ -58,8 +56,7 @@ class DistSAGE(nn.Module):
         g : the entire graph.
         x : the input of entire node set.
 
-        The inference code is written in a fashion that it could handle any
-        number of nodes and layers.
+        Distributed layer-wise inference.
         """
         # During inference with sampling, multi-layer blocks are very
         # inefficient because lots of computations in the first few layers
@@ -87,9 +84,7 @@ class DistSAGE(nn.Module):
                     persistent=True,
                 )
             print(
-                "|V|={}, eval batch size: {}".format(
-                    g.num_nodes(), batch_size
-                )
+                f"|V|={g.num_nodes()}, eval batch size: {batch_size}"
             )
 
             sampler = dgl.dataloading.NeighborSampler([-1])
@@ -374,7 +369,6 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="GCN")
-    register_data_args(parser)
     parser.add_argument("--graph_name", type=str, help="graph name")
     parser.add_argument("--id", type=int, help="the partition id")
     parser.add_argument(
@@ -382,9 +376,6 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--part_config", type=str, help="The path to the partition config file"
-    )
-    parser.add_argument(
-        "--num_clients", type=int, help="The number of clients"
     )
     parser.add_argument(
         "--n_classes", type=int, default=0, help="the number of classes"
