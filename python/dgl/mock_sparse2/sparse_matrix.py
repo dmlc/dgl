@@ -132,6 +132,10 @@ class SparseMatrix:
             Dense representation of the sparse matrix.
         """
         row, col, val = self.coo()
+        shape = self.shape + val.shape[1:]
+        mat = torch.zeros(shape, device=self.device)
+        mat[row, col] = val
+        return mat
 
 def create_from_coo(
     row: torch.Tensor,
@@ -184,7 +188,7 @@ def create_from_coo(
     Case2: Sparse matrix with scalar/vector values. Following example is with
     vector data.
 
-    >>> val = torch.tensor([[1, 1], [2, 2], [3, 3]])
+    >>> val = torch.tensor([[1., 1.], [2., 2.], [3., 3.]])
     >>> A = create_from_coo(dst, src, val)
     SparseMatrix(indices=tensor([[1, 1, 2],
                                  [2, 4, 3]]),
