@@ -27,8 +27,8 @@ NDArray IndexSelect(NDArray array, IdArray index) {
       0,
       len,
       1000,  // Thread scheduling overhead is bigger with tiny grain size.
-      [idx_data, arr_len, ret_data, array_data] (size_t b, size_t e) {
-        for (size_t i = b; i < e; ++i) {
+      [idx_data, arr_len, ret_data, array_data] (size_t begin, size_t end) {
+        for (size_t i = begin; i < end; ++i) {
           CHECK_LT(idx_data[i], arr_len) << "Index out of range.";
           ret_data[i] = array_data[idx_data[i]];
         }
