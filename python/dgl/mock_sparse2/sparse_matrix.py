@@ -123,6 +123,15 @@ class SparseMatrix:
         """
         return self.c_sparse_matrix.csc()
 
+    def dense(self) -> torch.Tensor:
+        """Return a dense representation of the matrix.
+
+        Returns
+        -------
+        torch.Tensor
+            Dense representation of the sparse matrix.
+        """
+        row, col, val = self.coo()
 
 def create_from_coo(
     row: torch.Tensor,
@@ -156,16 +165,16 @@ def create_from_coo(
 
     Case1: Sparse matrix with row and column indices without values.
 
-    >>> src = torch.tensor([1, 1, 2])
-    >>> dst = torch.tensor([2, 4, 3])
-    >>> A = create_from_coo(src, dst)
+    >>> dst = torch.tensor([1, 1, 2])
+    >>> src = torch.tensor([2, 4, 3])
+    >>> A = create_from_coo(dst, src)
     >>> print(A)
     SparseMatrix(indices=tensor([[1, 1, 2],
                                  [2, 4, 3]]),
                  values=tensor([1., 1., 1.]),
                  shape=(3, 5), nnz=3)
     >>> # Specify shape
-    >>> A = create_from_coo(src, dst, shape=(5, 5))
+    >>> A = create_from_coo(dst, src, shape=(5, 5))
     >>> print(A)
     SparseMatrix(indices=tensor([[1, 1, 2],
                                  [2, 4, 3]]),
@@ -176,7 +185,7 @@ def create_from_coo(
     vector data.
 
     >>> val = torch.tensor([[1, 1], [2, 2], [3, 3]])
-    >>> A = create_from_coo(src, dst, val)
+    >>> A = create_from_coo(dst, src, val)
     SparseMatrix(indices=tensor([[1, 1, 2],
                                  [2, 4, 3]]),
                  values=tensor([[1, 1],
