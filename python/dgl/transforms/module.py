@@ -1732,7 +1732,7 @@ class ToLevi(BaseTransform):
     >>> from dgl import ToLevi
 
     >>> transform = ToLevi()
-    >>> g = dgl.graph(([0,1,2,3], [1,2,3,0]))
+    >>> g = dgl.graph(([0, 1, 2, 3], [1, 2, 3, 0]))
     >>> g.ndata['h'] = th.randn((g.num_nodes(), 2))
     >>> g.edata['w'] = th.randn((g.num_edges(), 2))
     >>> lg = transform(g)
@@ -1772,14 +1772,10 @@ class ToLevi(BaseTransform):
         idtype = g.idtype
 
         edge_list = g.edges()
-        n2e, e2n = [[], []], [[], []]
-        for i in range(len(edge_list[0])):
-            n2e[0].append(edge_list[0][i])
-            n2e[1].append(i)
-            e2n[0].append(i)
-            e2n[1].append(edge_list[1][i])
-        graph_data = {('node', 'n2e', 'edge'): (F.tensor(n2e[0]), F.tensor(n2e[1])),
-                      ('edge', 'e2n', 'node'): (F.tensor(e2n[0]), F.tensor(e2n[1]))}
+        n2e = edge_list[0], F.arange(0, g.num_edges(), idtype, device)
+        e2n = F.arange(0, g.num_edges(), idtype, device), edge_list[1]
+        graph_data = {('node', 'n2e', 'edge'): n2e,
+                      ('edge', 'e2n', 'node'): e2n}
         levi_g = convert.heterograph(graph_data, idtype=idtype, device=device)
 
         # copy ndata and edata

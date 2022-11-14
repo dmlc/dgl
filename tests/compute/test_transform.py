@@ -2675,7 +2675,7 @@ def test_shortest_dist(idtype):
 @parametrize_idtype
 def test_module_to_levi(idtype):
     transform = dgl.ToLevi()
-    g = dgl.graph(([0,1,2,3], [1,2,3,0]), idtype=idtype, device=F.ctx())
+    g = dgl.graph(([0, 1, 2, 3], [1, 2, 3, 0]), idtype=idtype, device=F.ctx())
     g.ndata['h'] = F.randn((g.num_nodes(), 2))
     g.edata['w'] = F.randn((g.num_edges(), 2))
     lg = transform(g)
