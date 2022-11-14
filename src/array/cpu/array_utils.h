@@ -7,6 +7,7 @@
 #define DGL_ARRAY_CPU_ARRAY_UTILS_H_
 
 #include <dgl/aten/types.h>
+#include <dgl/runtime/parallel_for.h>
 #include <parallel_hashmap/phmap.h>
 
 #include <unordered_map>
