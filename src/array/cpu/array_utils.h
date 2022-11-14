@@ -81,9 +81,13 @@ class IdHashMap {
     const IdType* ids_data = static_cast<IdType*>(ids->data);
     const int64_t len = ids->shape[0];
     IdArray values = NewIdArray(len, ids->ctx, ids->dtype.bits);
-    IdType* values_data = static_cast<IdType*>(values->data);
-    for (int64_t i = 0; i < len; ++i)
-      values_data[i] = Map(ids_data[i], default_val);
+    IdType* values_data = values.Ptr<IdType>();
+    runtime::parallel_for(
+        0, len, 1000, [=] (size_t b, size_t e) {
+          for (size_t i = b; i < e; ++i) {
+            values_data[i] = Map(ids_data[i], default_val);
+          }
+        });
     return values;
   }
 
