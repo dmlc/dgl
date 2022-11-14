@@ -84,8 +84,8 @@ class IdHashMap {
     IdArray values = NewIdArray(len, ids->ctx, ids->dtype.bits);
     IdType* values_data = values.Ptr<IdType>();
     runtime::parallel_for(
-        0, len, 1000, [=] (size_t b, size_t e) {
-          for (size_t i = b; i < e; ++i) {
+        0, len, 1000, [=] (size_t begin, size_t end) {
+          for (size_t i = begin; i < end; ++i) {
             values_data[i] = Map(ids_data[i], default_val);
           }
         });
