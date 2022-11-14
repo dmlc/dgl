@@ -1774,8 +1774,10 @@ class ToLevi(BaseTransform):
         edge_list = g.edges()
         n2e, e2n = [[], []], [[], []]
         for i in range(len(edge_list[0])):
-            n2e[0].append(edge_list[0][i]), n2e[1].append(i)
-            e2n[0].append(i), e2n[1].append(edge_list[1][i])
+            n2e[0].append(edge_list[0][i])
+            n2e[1].append(i)
+            e2n[0].append(i)
+            e2n[1].append(edge_list[1][i])
         graph_data = {('node', 'n2e', 'edge'): (F.tensor(n2e[0]), F.tensor(n2e[1])),
                       ('edge', 'e2n', 'node'): (F.tensor(e2n[0]), F.tensor(e2n[1]))}
         levi_g = convert.heterograph(graph_data, idtype=idtype, device=device)
