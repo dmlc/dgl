@@ -229,16 +229,18 @@ class GMMConv(nn.Module):
                                    'suppress the check and let the code run.')
 
             feat_src, feat_dst = expand_as_pair(feat, graph)
-            graph.srcdata['h'] = self.fc(feat_src).view(-1, self._n_kernels, self._out_feats)
+            graph.srcdata['h'] = self.fc(feat_src).view(-1, self._out_feats, self._n_kernels)
             E = graph.number_of_edges()
             # compute gaussian weight
             gaussian = -0.5 * ((pseudo.view(E, 1, self._dim) -
                                 self.mu.view(1, self._n_kernels, self._dim)) ** 2)
             gaussian = gaussian * (self.inv_sigma.view(1, self._n_kernels, self._dim) ** 2)
-            gaussian = th.exp(gaussian.sum(dim=-1, keepdim=True)) # (E, K, 1)
+            gaussian = th.exp(gaussian.sum(dim=-1, keepdim=False)) # (E, K)
             graph.edata['w'] = gaussian
-            graph.update_all(fn.u_mul_e('h', 'w', 'm'), self._reducer('m', 'h'))
-            rst = graph.dstdata['h'].sum(1)
+            graph.update_all(fn.u_dot_e('h', 'w', 'm'), self._reducer('m', 'h'))
+            rst = graph.dstdata['h'].squeeze(-1)
+            rst = rst / self._n_kernels
+
             # residual connection
             if self.res_fc is not None:
                 rst = rst + self.res_fc(feat_dst)
