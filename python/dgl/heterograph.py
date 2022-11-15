@@ -6062,36 +6062,6 @@ class DGLGraph(object):
         """
         return self.astype(F.int32)
 
-    #################################################################
-    # DEPRECATED: from the old DGLGraph
-    #################################################################
-
-    def send(self, edges, message_func, etype=None):
-        """Send messages along the given edges with the same edge type.
-
-        DEPRECATE: please use send_and_recv, update_all.
-        """
-        raise DGLError('DGLGraph.send is deprecated. As a replacement, use DGLGraph.apply_edges\n'
-                       ' API to compute messages as edge data. Then use DGLGraph.send_and_recv\n'
-                       ' and set the message function as dgl.function.copy_e to conduct message\n'
-                       ' aggregation.')
-
-    def recv(self, v, reduce_func, apply_node_func=None, etype=None, inplace=False):
-        r"""Receive and reduce incoming messages and update the features of node(s) :math:`v`.
-
-        DEPRECATE: please use send_and_recv, update_all.
-        """
-        raise DGLError('DGLGraph.recv is deprecated. As a replacement, use DGLGraph.apply_edges\n'
-                       ' API to compute messages as edge data. Then use DGLGraph.send_and_recv\n'
-                       ' and set the message function as dgl.function.copy_e to conduct message\n'
-                       ' aggregation.')
-
-    def readonly(self, readonly_state=True):
-        """Deprecated: DGLGraph will always be mutable."""
-        dgl_warning('DGLGraph.readonly is deprecated in v0.5.\n'
-                    'DGLGraph now always supports mutable operations like add_nodes'
-                    ' and add_edges.')
-
 ############################################################
 # Internal APIs
 ############################################################
