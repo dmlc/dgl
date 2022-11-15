@@ -117,8 +117,8 @@ class SparseMatrix:
             raise NotImplementedError
 
     def __repr__(self):
-        return f'SparseMatrix(indices={self.indices("COO")}, \nvalues={self.val}, \
-                \nshape={self.shape}, nnz={self.nnz})'
+        return f'SparseMatrix(indices={self.indices("COO")}, \
+                \nvalues={self.val}, \nshape={self.shape}, nnz={self.nnz})'
 
     def coo(self) -> Tuple[torch.Tensor, ...]:
         """Get the coordinate (COO) representation of the sparse matrix.
@@ -164,6 +164,7 @@ class SparseMatrix:
         mat[row, col] = val
         return mat
 
+
 def create_from_coo(
     row: torch.Tensor,
     col: torch.Tensor,
@@ -179,12 +180,12 @@ def create_from_coo(
     col : tensor
         The column indices of shape (nnz).
     val : tensor, optional
-        The values of shape (nnz) or (nnz, D). If None, it will be a tensor of shape (nnz)
-        filled by 1.
+        The values of shape (nnz) or (nnz, D). If None, it will be a tensor of
+        shape (nnz) filled by 1.
     shape : tuple[int, int], optional
-        If not specified, it will be inferred from :attr:`row` and :attr:`col`, i.e.,
-        (row.max() + 1, col.max() + 1). Otherwise, :attr:`shape` should be no smaller
-        than this.
+        If not specified, it will be inferred from :attr:`row` and :attr:`col`,
+        i.e., (row.max() + 1, col.max() + 1). Otherwise, :attr:`shape` should
+        be no smaller than this.
 
     Returns
     -------
@@ -246,22 +247,24 @@ def create_from_csr(
 
     For row i of the sparse matrix
 
-    - the column indices of the nonzero entries are stored in ``indices[indptr[i]: indptr[i+1]]``
+    - the column indices of the nonzero entries are stored in
+      ``indices[indptr[i]: indptr[i+1]]``
     - the corresponding values are stored in ``val[indptr[i]: indptr[i+1]]``
 
     Parameters
     ----------
     indptr : tensor
-        Pointer to the column indices of shape (N + 1), where N is the number of rows.
+        Pointer to the column indices of shape (N + 1), where N is the number
+        of rows.
     indices : tensor
         The column indices of shape (nnz).
     val : tensor, optional
-        The values of shape (nnz) or (nnz, D). If None, it will be a tensor of shape (nnz)
-        filled by 1.
+        The values of shape (nnz) or (nnz, D). If None, it will be a tensor of
+        shape (nnz) filled by 1.
     shape : tuple[int, int], optional
-        If not specified, it will be inferred from :attr:`indptr` and :attr:`indices`, i.e.,
-        (len(indptr) - 1, indices.max() + 1). Otherwise, :attr:`shape` should be no smaller
-        than this.
+        If not specified, it will be inferred from :attr:`indptr` and
+        :attr:`indices`, i.e., (len(indptr) - 1, indices.max() + 1). Otherwise,
+        :attr:`shape` should be no smaller than this.
 
     Returns
     -------
@@ -330,22 +333,24 @@ def create_from_csc(
 
     For column i of the sparse matrix
 
-    - the row indices of the nonzero entries are stored in ``indices[indptr[i]: indptr[i+1]]``
+    - the row indices of the nonzero entries are stored in
+      ``indices[indptr[i]: indptr[i+1]]``
     - the corresponding values are stored in ``val[indptr[i]: indptr[i+1]]``
 
     Parameters
     ----------
     indptr : tensor
-        Pointer to the row indices of shape N + 1, where N is the number of columns.
+        Pointer to the row indices of shape N + 1, where N is the
+        number of columns.
     indices : tensor
         The row indices of shape nnz.
     val : tensor, optional
-        The values of shape (nnz) or (nnz, D). If None, it will be a tensor of shape (nnz)
-        filled by 1.
+        The values of shape (nnz) or (nnz, D). If None, it will be a tensor of
+        shape (nnz) filled by 1.
     shape : tuple[int, int], optional
-        If not specified, it will be inferred from :attr:`indptr` and :attr:`indices`, i.e.,
-        (indices.max() + 1, len(indptr) - 1). Otherwise, :attr:`shape` should be no smaller
-        than this.
+        If not specified, it will be inferred from :attr:`indptr` and
+        :attr:`indices`, i.e., (indices.max() + 1, len(indptr) - 1). Otherwise,
+        :attr:`shape` should be no smaller than this.
 
     Returns
     -------
