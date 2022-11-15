@@ -269,12 +269,12 @@ def test_query(idtype):
         # number of edges
         assert [g.num_edges(etype) for etype in etypes] == [2, 4, 2, 2]
 
-        # has_node & has_nodes
+        # has_nodes
         for ntype in ntypes:
             n = g.number_of_nodes(ntype)
             for i in range(n):
-                assert g.has_node(i, ntype)
-            assert not g.has_node(n, ntype)
+                assert g.has_nodes(i, ntype)
+            assert not g.has_nodes(n, ntype)
             assert np.array_equal(
                 F.asnumpy(g.has_nodes([0, n], ntype)).astype('int32'), [1, 0])
 

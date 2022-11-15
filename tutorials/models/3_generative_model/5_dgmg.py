@@ -625,7 +625,7 @@ class ChooseDestAndUpdate(nn.Module):
         if not self.training:
             dest = Categorical(dests_probs).sample().item()
 
-        if not g.has_edge_between(src, dest):
+        if not g.has_edges_between(src, dest):
             # For undirected graphs, add edges for both directions
             # so that you can perform graph propagation.
             src_list = [src, dest]
