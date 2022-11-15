@@ -30,7 +30,7 @@ class ServerState:
     ----------
     kv_store : KVServer
         reference for KVServer
-    graph : DGLHeteroGraph
+    graph : DGLGraph
         Graph structure of one partition
     total_num_nodes : int
         Total number of nodes

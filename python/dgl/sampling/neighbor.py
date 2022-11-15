@@ -3,7 +3,7 @@
 from .._ffi.function import _init_api
 from .. import backend as F
 from ..base import DGLError, EID
-from ..heterograph import DGLHeteroGraph
+from ..heterograph import DGLGraph
 from .. import ndarray as nd
 from .. import utils
 from .utils import EidExcluder
@@ -157,7 +157,7 @@ def sample_etype_neighbors(
             g._graph, nodes, etype_offset, fanout, edge_dir, prob_array,
             replace, etype_sorted)
     induced_edges = subgidx.induced_edges
-    ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
+    ret = DGLGraph(subgidx.graph, g.ntypes, g.etypes)
 
     # handle features
     # (TODO) (BarclayII) DGL distributed fails with bus error, freezes, or other
@@ -178,7 +178,7 @@ def sample_etype_neighbors(
 
     return ret if output_device is None else ret.to(output_device)
 
-DGLHeteroGraph.sample_etype_neighbors = utils.alias_func(sample_etype_neighbors)
+DGLGraph.sample_etype_neighbors = utils.alias_func(sample_etype_neighbors)
 
 def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None,
                      replace=False, copy_ndata=True, copy_edata=True,
@@ -388,7 +388,7 @@ def _sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None,
             g._graph, nodes_all_types, fanout_array, edge_dir, prob_arrays,
             excluded_edges_all_t, replace)
     induced_edges = subgidx.induced_edges
-    ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
+    ret = DGLGraph(subgidx.graph, g.ntypes, g.etypes)
 
     # handle features
     # (TODO) (BarclayII) DGL distributed fails with bus error, freezes, or other
@@ -409,7 +409,7 @@ def _sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None,
 
     return ret
 
-DGLHeteroGraph.sample_neighbors = utils.alias_func(sample_neighbors)
+DGLGraph.sample_neighbors = utils.alias_func(sample_neighbors)
 
 def sample_neighbors_biased(g, nodes, fanout, bias, edge_dir='in',
                             tag_offset_name='_TAG_OFFSET', replace=False,
@@ -568,7 +568,7 @@ def sample_neighbors_biased(g, nodes, fanout, bias, edge_dir='in',
     subgidx = _CAPI_DGLSampleNeighborsBiased(g._graph, nodes_array, fanout, bias_array,
                                              tag_offset_array, edge_dir, replace)
     induced_edges = subgidx.induced_edges
-    ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
+    ret = DGLGraph(subgidx.graph, g.ntypes, g.etypes)
 
     if copy_ndata:
         node_frames = utils.extract_node_subframes(g, device)
@@ -581,7 +581,7 @@ def sample_neighbors_biased(g, nodes, fanout, bias, edge_dir='in',
     ret.edata[EID] = induced_edges[0]
     return ret if output_device is None else ret.to(output_device)
 
-DGLHeteroGraph.sample_neighbors_biased = utils.alias_func(sample_neighbors_biased)
+DGLGraph.sample_neighbors_biased = utils.alias_func(sample_neighbors_biased)
 
 def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False,
                 copy_ndata=True, copy_edata=True, output_device=None):
@@ -705,7 +705,7 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False,
     subgidx = _CAPI_DGLSampleNeighborsTopk(
         g._graph, nodes_all_types, k_array, edge_dir, weight_arrays, bool(ascending))
     induced_edges = subgidx.induced_edges
-    ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
+    ret = DGLGraph(subgidx.graph, g.ntypes, g.etypes)
 
     # handle features
     if copy_ndata:
@@ -717,6 +717,6 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False,
         utils.set_new_frames(ret, edge_frames=edge_frames)
     return ret if output_device is None else ret.to(output_device)
 
-DGLHeteroGraph.select_topk = utils.alias_func(select_topk)
+DGLGraph.select_topk = utils.alias_func(select_topk)
 
 _init_api('dgl.sampling.neighbor', __name__)
