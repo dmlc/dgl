@@ -6066,38 +6066,6 @@ class DGLGraph(object):
     # DEPRECATED: from the old DGLGraph
     #################################################################
 
-    def register_apply_node_func(self, func):
-        """Deprecated: please directly call :func:`apply_nodes` with ``func``
-        as argument.
-        """
-        raise DGLError('DGLGraph.register_apply_node_func is deprecated.'
-                       ' Please directly call apply_nodes with func as the argument.')
-
-    def register_apply_edge_func(self, func):
-        """Deprecated: please directly call :func:`apply_edges` with ``func``
-        as argument.
-        """
-        raise DGLError('DGLGraph.register_apply_edge_func is deprecated.'
-                       ' Please directly call apply_edges with func as the argument.')
-
-    def register_message_func(self, func):
-        """Deprecated: please directly call :func:`update_all` with ``func``
-        as argument.
-        """
-        raise DGLError('DGLGraph.register_message_func is deprecated.'
-                       ' Please directly call update_all with func as the argument.')
-
-    def register_reduce_func(self, func):
-        """Deprecated: please directly call :func:`update_all` with ``func``
-        as argument.
-        """
-        raise DGLError('DGLGraph.register_reduce_func is deprecated.'
-                       ' Please directly call update_all with func as the argument.')
-
-    def group_apply_edges(self, group_by, func, edges=ALL, etype=None, inplace=False):
-        """**DEPRECATED**: The API is removed in 0.5."""
-        raise DGLError('DGLGraph.group_apply_edges is removed in 0.5.')
-
     def send(self, edges, message_func, etype=None):
         """Send messages along the given edges with the same edge type.
 
@@ -6117,28 +6085,6 @@ class DGLGraph(object):
                        ' API to compute messages as edge data. Then use DGLGraph.send_and_recv\n'
                        ' and set the message function as dgl.function.copy_e to conduct message\n'
                        ' aggregation.')
-
-    def multi_recv(self, v, reducer_dict, cross_reducer, apply_node_func=None, inplace=False):
-        r"""Receive messages from multiple edge types and perform aggregation.
-
-        DEPRECATE: please use multi_send_and_recv, multi_update_all.
-        """
-        raise DGLError('DGLGraph.multi_recv is deprecated. As a replacement,\n'
-                       ' use DGLGraph.apply_edges API to compute messages as edge data.\n'
-                       ' Then use DGLGraph.multi_send_and_recv and set the message function\n'
-                       ' as dgl.function.copy_e to conduct message aggregation.')
-
-    def multi_send_and_recv(self, etype_dict, cross_reducer, apply_node_func=None, inplace=False):
-        r"""**DEPRECATED**: The API is removed in v0.5."""
-        raise DGLError('DGLGraph.multi_pull is removed in v0.5. As a replacement,\n'
-                       ' use DGLGraph.edge_subgraph to extract the subgraph first \n'
-                       ' and then call DGLGraph.multi_update_all.')
-
-    def multi_pull(self, v, etype_dict, cross_reducer, apply_node_func=None, inplace=False):
-        r"""**DEPRECATED**: The API is removed in v0.5."""
-        raise DGLError('DGLGraph.multi_pull is removed in v0.5. As a replacement,\n'
-                       ' use DGLGraph.edge_subgraph to extract the subgraph first \n'
-                       ' and then call DGLGraph.multi_update_all.')
 
     def readonly(self, readonly_state=True):
         """Deprecated: DGLGraph will always be mutable."""
