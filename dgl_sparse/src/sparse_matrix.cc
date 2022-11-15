@@ -112,7 +112,7 @@ std::vector<torch::Tensor> SparseMatrix::CSCTensors() {
   return {csc->indptr, csc->indices, val};
 }
 
-void SparseMatrix::SetValue(torch::Tensor value) {value_ = value;}
+void SparseMatrix::SetValue(torch::Tensor value) { value_ = value; }
 
 // TODO(zhenkun): format conversion
 void SparseMatrix::_CreateCOO() {}
