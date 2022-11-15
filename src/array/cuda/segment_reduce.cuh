@@ -16,6 +16,7 @@
 namespace dgl {
 
 using namespace cuda;
+using namespace runtime;
 
 namespace aten {
 namespace cuda {
@@ -32,12 +33,12 @@ __global__ void SegmentReduceKernel(
   for (int row = blockIdx.x; row < n; row += gridDim.x) {
     int col = blockIdx.y * blockDim.x + threadIdx.x;
     while (col < dim) {
-      DType local_accum = ReduceOp::zero();
+      typename accum_dtype<DType>::type local_accum = ReduceOp::zero();
       IdType local_arg = -1;
       for (IdType i = offsets[row]; i < offsets[row + 1]; ++i) {
         ReduceOp::Call(&local_accum, &local_arg, feat[i * dim + col], i);
       }
-      out[row * dim + col] = local_accum;
+      out[row * dim + col] = static_cast<DType>(local_accum);
       if (ReduceOp::require_arg) arg[row * dim + col] = local_arg;
       col += gridDim.y * blockDim.x;
     }
