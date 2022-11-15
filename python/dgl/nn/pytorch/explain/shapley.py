@@ -33,13 +33,19 @@ def marginal_contribution(graph, exclude_masks, include_masks, value_func, featu
         exclude_subgraph = dgl.node_subgraph(graph, exclude_nodes)
         include_subgraph = dgl.node_subgraph(graph, include_nodes)
 
+        exclude_nodes_map = {i: exclude_nodes[i] for i in range(len(exclude_nodes))}
+        include_nodes_map = {i: include_nodes[i] for i in range(len(include_nodes))}
+
+        exclude_features = features[list(exclude_nodes_map.values())]
+        include_features = features[list(include_nodes_map.values())]
+
         exclude_subgraph = dgl.add_self_loop(exclude_subgraph)
         include_subgraph = dgl.add_self_loop(include_subgraph)
 
         # WARNING: subgraph method relabels graph nodes but original labels can be recovered with parent_nid.
         # Do we have to take this into account in the value_func methods?
-        exclude_values = value_func(exclude_subgraph, features)
-        include_values = value_func(include_subgraph, features)
+        exclude_values = value_func(exclude_subgraph, exclude_features)
+        include_values = value_func(include_subgraph, include_features)
 
         margin_values = include_values - exclude_values
         marginal_contribution_list.append(margin_values)
@@ -58,11 +64,11 @@ def neighbors(node, graph):
 
 # https://github.com/divelab/DIG/blob/dig-stable/dig/xgraph/method/shapley.py
 # Change subgraph from list to dl.DGLGraph? What would be gained?
-def mc_l_shapley(value_func, graph, coalition, local_radius, sample_num, features):
+def mc_l_shapley(value_func, graph, subgraph_nodes, local_radius, sample_num, features):
     """ monte carlo sampling approximation of the l_shapley value """
     num_nodes = graph.num_nodes()
 
-    local_region = copy.copy(coalition)
+    local_region = subgraph_nodes.tolist()
     for k in range(local_radius - 1):
         k_neighbourhood = []
         for node in local_region:
@@ -70,12 +76,13 @@ def mc_l_shapley(value_func, graph, coalition, local_radius, sample_num, feature
         local_region += k_neighbourhood
         local_region = list(set(local_region))
 
+    coalition = subgraph_nodes.tolist()
     coalition_placeholder = num_nodes
     set_exclude_masks = []
     set_include_masks = []
     for i in range(sample_num):
-        subset_nodes_from = [node for node in local_region if node not in coalition]
-        random_nodes_permutation = np.array(subset_nodes_from + [coalition_placeholder])
+        subset_nodes_from = list(set(local_region) - set(subgraph_nodes))
+        random_nodes_permutation =subset_nodes_from + [coalition_placeholder]
         random_nodes_permutation = np.random.permutation(random_nodes_permutation)
         split_idx = np.where(random_nodes_permutation == coalition_placeholder)[0][0]
         selected_nodes = random_nodes_permutation[:split_idx]

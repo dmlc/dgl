@@ -169,16 +169,16 @@ if __name__ == "__main__":
     in_size = dataset.dim_nfeats
     out_size = dataset.gclasses
 
-    '''model = GIN(in_size, 128, out_size).to(device)
+    model = GIN(in_size, 128, out_size).to(device)
 
     # model training/validating
-    print("Training...")
-    train(train_loader, val_loader, device, model)
+    # print("Training...")
+    # train(train_loader, val_loader, device, model)
 
-    print("Evaluating...")
-    print(f"acc: {round(evaluate(train_loader, device, model), 2)}")
+    # print("Evaluating...")
+    # print(f"acc: {round(evaluate(train_loader, device, model), 2)}")
 
-    torch.save(model, 'model.dt')'''
+    torch.save(model, 'model.dt')
 
     ##########
     model = torch.load('model.dt')
@@ -201,7 +201,8 @@ if __name__ == "__main__":
             if predicted == l:
                 print(f'Correct Prediction {l} {predicted}')
 
-            g_explain = explainer.explain_graph(graph, M=200, N_min=6, features=feat)
+            g_nodes_explain = explainer.explain_graph(graph, M=50, N_min=6, features=feat)
+            g_explain = dgl.node_subgraph(graph, g_nodes_explain)
 
             print(f'Subgraph: {g_explain}')
             print(f'Important Subgraph: {g_explain.ndata}')
@@ -222,7 +223,7 @@ if __name__ == "__main__":
                     font_size=22,
                     font_color="yellow",
                     node_size=[1000 for i in range(graph.num_nodes())],
-                    node_color=['red' if i in g_explain else 'blue' for i in range(graph.num_nodes())],
+                    node_color=['red' if i in g_nodes_explain else 'blue' for i in range(graph.num_nodes())],
                     )
 
             plt.savefig(os.path.join("mutag_img", f"{idx}_MUTAG_explain.png"), format="PNG")

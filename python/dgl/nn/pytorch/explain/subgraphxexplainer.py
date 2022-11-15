@@ -27,28 +27,21 @@ class MCTSNode:
             CPU or GPU device where the tensor stays.
         """
     def __init__(self,
-                 ori_graph,
+                 nodes,
                  pruning_action,
                  c_puct=10.0,
                  W=0.0,
                  N=0,
-                 P=0.0,
-                 device='cpu'):
-        self.W = 0.0
-        self.N = 0
-        self.P = 0.0
+                 P=0.0):
+        self.W = W
+        self.N = N
+        self.P = P
 
-        self.ori_graph = ori_graph
-        self.coalition = self.ori_graph.nodes().tolist()
-        self.device = device
+        self.nodes = nodes  # node id of the input graph
         self.a = pruning_action
 
         self.c_puct = c_puct
         self.children = []
-
-        # Will DGLGraph.nodes() always return a sorted list of nodes?
-        # Should we instead index by the subgraph itself rather than the subgraph and pruning action that produced it?
-        self.state_map_index = str(self.ori_graph.nodes()) + " : " + self.a
 
     def Q(self):
         return self.W / self.N if self.N > 0 else 0
@@ -89,9 +82,6 @@ class SubgraphXExplainer(nn.Module):
 
         self.sample_num = sample_num
 
-        # self.state_map = {self.tree_root.state_map_index: self.tree_root}
-        self.state_map = dict()
-
         # Change it so that score_func is one of 4 options
         self.score_func = mc_l_shapley
 
@@ -129,12 +119,13 @@ class SubgraphXExplainer(nn.Module):
         # 4. Find and sort graph components by size from largest to smallest and take the biggest one.
         biggest_comp = list([c for c in sorted(nx.connected_components(nx_graph), key=len, reverse=True)][0])
         # 5. Convert back to DGLGraph object.
-        return dgl.node_subgraph(graph, biggest_comp)
+        return biggest_comp
 
 
     def prune_graph(self, graph, strategy):
         # self.num_child_expand
         subgraphs = []
+        subgraphs_nodes_mapping = []
         pruned_nodes = []
         rev = False
         if strategy == "high2low":
@@ -152,13 +143,15 @@ class SubgraphXExplainer(nn.Module):
         else:
             pruned_nodes = [node_degree[i][0] for i in range(self.num_child_expand)]
         for prune_node in pruned_nodes:
-            new_subgraph_nodes = [node for node in nodes if node != prune_node]
+            new_subgraph_nodes = np.array([node for node in nodes if node != prune_node])
             # subgraphs.append(dgl.node_subgraph(graph, new_subgraph_nodes, relabel_nodes=False))
             new_subgraph = dgl.node_subgraph(graph, new_subgraph_nodes)
-            new_subgraph = self.biggest_weak_component(new_subgraph)
+            biggest_comp = self.biggest_weak_component(new_subgraph)
+            new_subgraph = dgl.node_subgraph(graph, biggest_comp)
+            subgraphs_nodes_mapping.append(new_subgraph_nodes[biggest_comp])
             subgraphs.append(new_subgraph)
 
-        return (subgraphs, pruned_nodes)
+        return (subgraphs, subgraphs_nodes_mapping, pruned_nodes)
 
 
     def explain_graph(self, graph, M, N_min, features, **kwargs):
@@ -170,41 +163,40 @@ class SubgraphXExplainer(nn.Module):
             Q, and R variables as 0. The root of search tree is N0  
             associated with graph G. The leaf set is set to S` = {}.'''
 
-        self.tree_root = MCTSNode(ori_graph=graph, pruning_action="-1", c_puct=self.hyperparam)
-        self.state_map[self.tree_root.state_map_index] = self.tree_root
+        self.tree_root = MCTSNode(nodes=graph.nodes(), pruning_action="-1", c_puct=self.hyperparam)
 
         leaf_set = set()
 
         for i in range(M):
             print("i=", i)
-            curr_node = self.state_map[self.tree_root.state_map_index]
+            curr_node = self.tree_root
             curr_path = [curr_node]
 
-            while len(curr_node.coalition) > N_min:
-                print("curr_node.coalition = ", len(curr_node.coalition))
+            while len(curr_node.nodes) > N_min:
+                print("curr_node.nodes = ", len(curr_node.nodes))
 
                 # "for all possible pruning actions"
                 # check if tree node hasn't been expanded before.
-                if len(self.state_map[curr_node.state_map_index].children) == 0:
+                if len(curr_node.children) == 0:
                     # "for each node, pruning it and get the remaining sub-graph..."
                     # make sure to add nodes to curr_node's children
-                    (subgraphs, pruned_nodes) = self.prune_graph(curr_node.ori_graph, self.pruning_action)
+                    subgraph = dgl.node_subgraph(graph, curr_node.nodes)
+                    (subgraphs, subgraphs_nodes_mapping, pruned_nodes) = self.prune_graph(subgraph, self.pruning_action)
                     for j in range(len(subgraphs)):
-                        new_child_node = MCTSNode(subgraphs[j], str(pruned_nodes[j]))
+                        new_child_node = MCTSNode(curr_node.nodes[subgraphs_nodes_mapping[j]], str(pruned_nodes[j]))
                         new_child_node.R = self.score_func(self.model,
                                                            graph,
-                                                           new_child_node.coalition,
+                                                           new_child_node.nodes,
                                                            self.local_radius,
                                                            self.sample_num,
                                                            features)
-                        self.state_map[curr_node.state_map_index].children.append(new_child_node)
-                        self.state_map[new_child_node.state_map_index] = new_child_node
+                        curr_node.children.append(new_child_node)
 
                 sum_C = 0
-                for child_node in self.state_map[curr_node.state_map_index].children:
+                for child_node in curr_node.children:
                     sum_C += child_node.N
 
-                next_node = max(self.state_map[curr_node.state_map_index].children,
+                next_node = max(curr_node.children,
                                 key=lambda x: x.Q() + x.U(sum_C))
                 curr_node = next_node
                 curr_path.append(next_node)
@@ -213,20 +205,20 @@ class SubgraphXExplainer(nn.Module):
 
             score_leaf_node = self.score_func(self.model,
                                               graph,
-                                              curr_node.coalition,
+                                              curr_node.nodes,
                                               self.local_radius,
                                               self.sample_num,
                                               features)
 
             # Update nodes in curr_path
             for node in leaf_set:
-                self.state_map[node.state_map_index].N += 1
-                self.state_map[node.state_map_index].W += score_leaf_node
+                node.N += 1
+                node.W += score_leaf_node
 
         # Select subgraph with the highest score (P value) from S_l.
         best_node = max(leaf_set, key=lambda x: x.P)
 
-        return best_node.ori_graph
+        return best_node.nodes
 
     def explain_node(self):
         pass
