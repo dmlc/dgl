@@ -19,7 +19,7 @@ def prepare_tensor(g, data, name):
 
     Parameters
     ----------
-    g : DGLHeteroGraph
+    g : DGLGraph
         Graph.
     data : int, iterable of int, tensor
         Data.
@@ -77,7 +77,7 @@ def prepare_tensor_dict(g, data, name):
 
     Parameters
     ----------
-    g : DGLHeteroGraph
+    g : DGLGraph
         Graph.
     data : dict[str, (int, iterable of int, tensor)]
         Data dict.
@@ -99,7 +99,7 @@ def prepare_tensor_or_dict(g, data, name):
 
     Parameters
     ----------
-    g : DGLHeteroGraph
+    g : DGLGraph
         Graph.
     data : dict[str, (int, iterable of int, tensor)]
         Data dict.

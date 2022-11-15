@@ -40,7 +40,7 @@ class DGLBaseGraph(object):
         Data to initialize graph.
     """
 
-    is_block = False        # for compatibility with DGLHeteroGraph
+    is_block = False        # for compatibility with DGLGraph
 
     def __init__(self, graph):
         self._graph = graph
