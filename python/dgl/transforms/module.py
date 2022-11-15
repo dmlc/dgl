@@ -1765,8 +1765,10 @@ class ToLevi(BaseTransform):
         Returns
         -------
         DGLGraph
-            The Levi graph of input, will be a heterogeneous graph, where ntypes 'node' and
-            'edge' have the corresponding ids to nodes and edges in the original graph.
+            The Levi graph of input, will be a heterogeneous graph, where nodes of
+            ntypes ``'node'`` and ``'edge'`` have corresponding IDs of nodes and edges
+            in the original graph. Edge features of the input graph are copied to
+            corresponding new nodes of ntype ``'edge'``.
         """
         device = g.device
         idtype = g.idtype
@@ -1778,7 +1780,9 @@ class ToLevi(BaseTransform):
                       ('edge', 'e2n', 'node'): e2n}
         levi_g = convert.heterograph(graph_data, idtype=idtype, device=device)
 
-        # copy ndata and edata
+        # Copy ndata and edata
+        # Since the node types in dgl.heterograph are in alphabetical order
+        # ('edge' < 'node'), edge_frames should be in front of node_frames.
         node_frames = utils.extract_node_subframes(g, nodes_or_device=device)
         edge_frames = utils.extract_edge_subframes(g, edges_or_device=device)
         utils.set_new_frames(levi_g, node_frames=edge_frames+node_frames)
