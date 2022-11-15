@@ -100,7 +100,7 @@ class HeteroGraphConv(layers.Layer):
     ----------
     mods : dict[str, nn.Module]
         Modules associated with every edge types. The forward function of each
-        module must have a `DGLHeteroGraph` object as the first argument, and
+        module must have a `DGLGraph` object as the first argument, and
         its second argument is either a tensor object representing the node
         features or a pair of tensor object representing the source and destination
         node features.
@@ -150,7 +150,7 @@ class HeteroGraphConv(layers.Layer):
 
         Parameters
         ----------
-        g : DGLHeteroGraph
+        g : DGLGraph
             Graph data.
         inputs : dict[str, Tensor] or pair of dict[str, Tensor]
             Input node features.

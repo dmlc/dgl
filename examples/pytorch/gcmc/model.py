@@ -233,7 +233,7 @@ class GCMCLayer(nn.Module):
 
         Parameters
         ----------
-        graph : DGLHeteroGraph
+        graph : DGLGraph
             User-movie rating graph. It should contain two node types: "user"
             and "movie" and many edge types each for one rating value.
         ufeat : torch.Tensor, optional
@@ -320,7 +320,7 @@ class BiDecoder(nn.Module):
 
         Parameters
         ----------
-        graph : DGLHeteroGraph
+        graph : DGLGraph
             "Flattened" user-movie graph with only one edge type.
         ufeat : th.Tensor
             User embeddings. Shape: (|V_u|, D)

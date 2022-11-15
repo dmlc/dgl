@@ -142,16 +142,26 @@ class HGTConv(nn.Module):
             New node features. Shape: :math:`(|V|, D_{head} * N_{head})`.
         """
         self.presorted = presorted
+        if g.is_block:
+            x_src = x
+            x_dst = x[:g.num_dst_nodes()]
+            srcntype = ntype
+            dstntype = ntype[:g.num_dst_nodes()]
+        else:
+            x_src = x
+            x_dst = x
+            srcntype = ntype
+            dstntype = ntype
         with g.local_scope():
-            k = self.linear_k(x, ntype, presorted).view(
+            k = self.linear_k(x_src, srcntype, presorted).view(
                 -1, self.num_heads, self.head_size
-            )
-            q = self.linear_q(x, ntype, presorted).view(
+                )
+            q = self.linear_q(x_dst, dstntype, presorted).view(
                 -1, self.num_heads, self.head_size
-            )
-            v = self.linear_v(x, ntype, presorted).view(
+                )
+            v = self.linear_v(x_src, srcntype, presorted).view(
                 -1, self.num_heads, self.head_size
-            )
+                )
             g.srcdata["k"] = k
             g.dstdata["q"] = q
             g.srcdata["v"] = v
@@ -163,12 +173,12 @@ class HGTConv(nn.Module):
             g.update_all(fn.copy_e("m", "m"), fn.sum("m", "h"))
             h = g.dstdata["h"].view(-1, self.num_heads * self.head_size)
             # target-specific aggregation
-            h = self.drop(self.linear_a(h, ntype, presorted))
-            alpha = torch.sigmoid(self.skip[ntype]).unsqueeze(-1)
-            if x.shape != h.shape:
-                h = h * alpha + (x @ self.residual_w) * (1 - alpha)
+            h = self.drop(self.linear_a(h, dstntype, presorted))
+            alpha = torch.sigmoid(self.skip[dstntype]).unsqueeze(-1)
+            if x_dst.shape != h.shape:
+                h = h * alpha + (x_dst @ self.residual_w) * (1 - alpha)
             else:
-                h = h * alpha + x * (1 - alpha)
+                h = h * alpha + x_dst * (1 - alpha)
             if self.use_norm:
                 h = self.norm(h)
             return h

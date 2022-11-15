@@ -48,7 +48,7 @@ def check_equivalence_between_heterographs(g1, g2, node_attrs=None, edge_attrs=N
 @pytest.mark.parametrize('gs', get_cases(['two_hetero_batch']))
 @parametrize_idtype
 def test_topology(gs, idtype):
-    """Test batching two DGLHeteroGraphs where some nodes are isolated in some relations"""
+    """Test batching two DGLGraphs where some nodes are isolated in some relations"""
     g1, g2 = gs
     g1 = g1.astype(idtype).to(F.ctx())
     g2 = g2.astype(idtype).to(F.ctx())
@@ -112,7 +112,7 @@ def test_topology(gs, idtype):
 
 @parametrize_idtype
 def test_batching_batched(idtype):
-    """Test batching a DGLHeteroGraph and a BatchedDGLHeteroGraph."""
+    """Test batching a DGLGraph and a batched DGLGraph."""
     g1 = dgl.heterograph({
         ('user', 'follows', 'user'): ([0, 1], [1, 2]),
         ('user', 'plays', 'game'): ([0, 1], [0, 0])
@@ -170,7 +170,7 @@ def test_batching_batched(idtype):
 
 @parametrize_idtype
 def test_features(idtype):
-    """Test the features of batched DGLHeteroGraphs"""
+    """Test the features of batched DGLGraphs"""
     g1 = dgl.heterograph({
         ('user', 'follows', 'user'): ([0, 1], [1, 2]),
         ('user', 'plays', 'game'): ([0, 1], [0, 0])
@@ -245,7 +245,7 @@ def test_features(idtype):
 @unittest.skipIf(F.backend_name == 'mxnet', reason="MXNet does not support split array with zero-length segment.")
 @parametrize_idtype
 def test_empty_relation(idtype):
-    """Test the features of batched DGLHeteroGraphs"""
+    """Test the features of batched DGLGraphs"""
     g1 = dgl.heterograph({
         ('user', 'follows', 'user'): ([0, 1], [1, 2]),
         ('user', 'plays', 'game'): ([], [])
