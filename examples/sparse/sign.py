@@ -1,3 +1,7 @@
+"""
+Simplified version of SIGN, where we only consider symmetrically normalized
+adjacency matrix A and its powers for diffusion operators
+"""
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -7,6 +11,7 @@ from torch.optim import Adam
 
 
 def sign(A, X, num_hops):
+    # X, AX, A^2X, ...
     X_sign = [X]
     for _ in range(num_hops):
         X = A @ X
@@ -18,6 +23,7 @@ class Model(nn.Module):
     def __init__(self, in_size, num_hops, num_classes, hidden_size=256):
         super().__init__()
 
+        # extra one for the original node features
         num_feats = num_hops + 1
         self.linear = nn.ModuleList(
             [nn.Linear(in_size, hidden_size) for _ in range(num_feats)]
@@ -25,7 +31,11 @@ class Model(nn.Module):
         self.pred = nn.Linear(hidden_size * num_feats, num_classes)
 
     def forward(self, X):
-        X = torch.cat([self.linear[i](X[i]) for i in range(len(X))], dim=1)
+        results = []
+        for i in range(len(X)):
+            results.append(self.linear[i](X[i]))
+        # X\theta_0 || AX\theta_1 || ...
+        X = torch.cat(results, dim=1)
         return self.pred(F.relu(X))
 
 
@@ -56,6 +66,7 @@ train_mask = g.ndata["train_mask"]
 test_mask = g.ndata["test_mask"]
 
 num_hops = 2
+# diffusion for pre-processing
 X_sign = sign(A_hat, X, num_hops)
 X_sign_train, X_sign_test = [], []
 for feat in X_sign:
