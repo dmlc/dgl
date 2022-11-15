@@ -2,17 +2,14 @@
 from collections.abc import Mapping
 
 from . import backend as F
-from .base import ALL, is_all, DGLError, dgl_warning, NID, EID
-from .heterograph_index import disjoint_union, slice_gidx
+from . import convert, utils
+from .base import ALL, EID, NID, DGLError, is_all
 from .heterograph import DGLGraph
-from . import convert
-from . import utils
-
+from .heterograph_index import disjoint_union, slice_gidx
 
 __all__ = ['batch', 'unbatch', 'slice_batch']
 
-def batch(graphs, ndata=ALL, edata=ALL, *,
-          node_attrs=None, edge_attrs=None):
+def batch(graphs, ndata=ALL, edata=ALL):
     r"""Batch a collection of :class:`DGLGraph` s into one graph for more efficient
     graph computation.
 
@@ -151,14 +148,6 @@ def batch(graphs, ndata=ALL, edata=ALL, *,
     """
     if len(graphs) == 0:
         raise DGLError('The input list of graphs cannot be empty.')
-    if node_attrs is not None:
-        dgl_warning('Arguments node_attrs has been deprecated. Please use'
-                    ' ndata instead.')
-        ndata = node_attrs
-    if edge_attrs is not None:
-        dgl_warning('Arguments edge_attrs has been deprecated. Please use'
-                    ' edata instead.')
-        edata = edge_attrs
     if not (is_all(ndata) or isinstance(ndata, list) or ndata is None):
         raise DGLError('Invalid argument ndata: must be a string list but got {}.'.format(
             type(ndata)))
