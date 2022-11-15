@@ -193,37 +193,38 @@ if __name__ == "__main__":
     explainer = SubgraphXExplainer(model, hyperparam=6, pruning_action="high2low")
 
     for idx, (graph, l) in enumerate(dataset):
-        print(f'{idx} / {len(dataset)}')
-        feat = graph.ndata.pop("attr")
+        if idx == 85:
+            print(f'{idx} / {len(dataset)}')
+            feat = graph.ndata.pop("attr")
 
-        _, predicted = torch.max(model(graph, feat), 1)
-        if predicted == l:
-            print(f'Correct Prediction {l} {predicted}')
+            _, predicted = torch.max(model(graph, feat), 1)
+            if predicted == l:
+                print(f'Correct Prediction {l} {predicted}')
 
-        g_explain = explainer.explain_graph(graph, M=200, N_min=6, features=feat)
+            g_explain = explainer.explain_graph(graph, M=200, N_min=6, features=feat)
 
-        print(f'Subgraph: {g_explain}')
-        print(f'Important Subgraph: {g_explain.ndata}')
+            print(f'Subgraph: {g_explain}')
+            print(f'Important Subgraph: {g_explain.ndata}')
 
-        # visualize the MUTAG graph
-        G = dgl.to_networkx(graph)
-        plt.figure(figsize=[15, 15])
+            # visualize the MUTAG graph
+            G = dgl.to_networkx(graph)
+            plt.figure(figsize=[15, 15])
 
-        label_dict={
-            0: 'C',
-            1: 'N',
-            2: 'O'
-        }
+            label_dict={
+                0: 'C',
+                1: 'N',
+                2: 'O'
+            }
 
-        nx.draw(G,
-                with_labels=True,
-                labels={i: label_dict[graph.ndata['label'].tolist()[i]] for i in G.nodes},
-                font_size=22,
-                font_color="yellow",
-                node_size=[1000 for i in range(graph.num_nodes())],
-                node_color=['red' if i in g_explain else 'blue' for i in range(graph.num_nodes())],
-                )
+            nx.draw(G,
+                    with_labels=True,
+                    labels={i: label_dict[graph.ndata['label'].tolist()[i]] for i in G.nodes},
+                    font_size=22,
+                    font_color="yellow",
+                    node_size=[1000 for i in range(graph.num_nodes())],
+                    node_color=['red' if i in g_explain else 'blue' for i in range(graph.num_nodes())],
+                    )
 
-        plt.savefig(os.path.join("mutag_img", f"{idx}_MUTAG_explain.png"), format="PNG")
-        plt.show()
-        exit()
+            plt.savefig(os.path.join("mutag_img", f"{idx}_MUTAG_explain.png"), format="PNG")
+            plt.show()
+            exit()
