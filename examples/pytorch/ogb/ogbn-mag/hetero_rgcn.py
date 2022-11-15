@@ -113,7 +113,7 @@ class RelGraphConvLayer(nn.Module):
         """
         Parameters
         ----------
-        g : DGLHeteroGraph
+        g : DGLGraph
             Input graph.
         inputs : dict[str, torch.Tensor]
             Node feature for each node type.

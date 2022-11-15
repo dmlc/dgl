@@ -469,7 +469,7 @@ def doc_subgraph(G, doc_ids):
     _, _, (block,) = sampler.sample(
         G.reverse(), {"doc": torch.as_tensor(doc_ids)}
     )
-    B = dgl.DGLHeteroGraph(
+    B = dgl.DGLGraph(
         block._graph, ["_", "word", "doc", "_"], block.etypes
     ).reverse()
     B.nodes["word"].data["_ID"] = block.nodes["word"].data["_ID"]
