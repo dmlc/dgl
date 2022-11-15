@@ -21,6 +21,33 @@ class SparseMatrix:
         """
         return self.c_sparse_matrix.val()
 
+    @val.setter
+    def val(self, x: torch.Tensor):
+        """Set the non-zero values inplace.
+
+        Parameters
+        ----------
+        x : torch.Tensor, optional
+            The values of shape (nnz) or (nnz, D)
+        """
+        self.c_sparse_matrix.set_val(x)
+
+    def __call__(self, x: torch.Tensor):
+        """Set the non-zero values inplace and return the object.
+
+        Parameters
+        ----------
+        x : torch.Tensor, optional
+            The values of shape (nnz) or (nnz, D)
+
+        Returns
+        -------
+        SparseMatrix
+            Matrix with the new non-zero values
+        """
+        self.val = x
+        return self
+
     @property
     def shape(self) -> Tuple[int]:
         """Shape of the sparse matrix.
@@ -200,7 +227,7 @@ def create_from_coo(
     if shape is None:
         shape = (torch.max(row).item() + 1, torch.max(col).item() + 1)
     if val is None:
-        val = torch.ones(row.shape[0])
+        val = torch.ones(row.shape[0]).to(row.device)
 
     return SparseMatrix(
         torch.ops.dgl_sparse.create_from_coo(row, col, val, shape)
@@ -284,7 +311,7 @@ def create_from_csr(
     if shape is None:
         shape = (indptr.shape[0] - 1, torch.max(indices) + 1)
     if val is None:
-        val = torch.ones(indices.shape[0])
+        val = torch.ones(indices.shape[0]).to(indptr.device)
 
     return SparseMatrix(
         torch.ops.dgl_sparse.create_from_csr(indptr, indices, val, shape)
@@ -368,7 +395,7 @@ def create_from_csc(
     if shape is None:
         shape = (torch.max(indices) + 1, indptr.shape[0] - 1)
     if val is None:
-        val = torch.ones(indices.shape[0])
+        val = torch.ones(indices.shape[0]).to(indptr.device)
 
     return SparseMatrix(
         torch.ops.dgl_sparse.create_from_csc(indptr, indices, val, shape)

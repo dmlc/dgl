@@ -129,6 +129,12 @@ class SparseMatrix : public torch::CustomClassHolder {
   /** @return {row, col, value} tensors in the CSC format. */
   std::vector<torch::Tensor> CSCTensors();
 
+  /**
+   * @brief set non-zero values of the sparse matrix
+   * @param value Values of the sparse matrix
+   */
+  void SetValue(torch::Tensor value);
+
  private:
   /** @brief Create the COO format for the sparse matrix internally */
   void _CreateCOO();

@@ -109,3 +109,18 @@ def test_dense(val_shape):
     mat = torch.zeros(shape, device=ctx)
     mat[row, col] = val
     assert torch.allclose(A_dense, mat)
+
+def test_set_val():
+    ctx = F.ctx()
+
+    row = torch.tensor([1, 1, 2]).to(ctx)
+    col = torch.tensor([2, 4, 3]).to(ctx)
+    nnz = len(row)
+    old_val = torch.ones(nnz).to(ctx)
+    A = create_from_coo(row, col, old_val)
+
+    new_val = torch.zeros(nnz).to(ctx)
+    A.val = new_val
+    assert torch.allclose(new_val, A.val)
+    A = A(old_val)
+    assert torch.allclose(old_val, A.val)
