@@ -339,14 +339,14 @@ def test_all_binary_builtins():
     # NOTE(zihao): add self-loop to avoid zero-degree nodes.
     g.add_edges(g.nodes(), g.nodes())
     for i in range(2, 18):
-        g.add_edge(0, i)
-        g.add_edge(1, i)
-        g.add_edge(i, 18)
-        g.add_edge(i, 19)
-    g.add_edge(18, 0)
-    g.add_edge(18, 1)
-    g.add_edge(19, 0)
-    g.add_edge(19, 1)
+        g.add_edges(0, i)
+        g.add_edges(1, i)
+        g.add_edges(i, 18)
+        g.add_edges(i, 19)
+    g.add_edges(18, 0)
+    g.add_edges(18, 1)
+    g.add_edges(19, 0)
+    g.add_edges(19, 1)
     g = g.to(F.ctx())
     nid = F.tensor([0, 1, 4, 5, 7, 12, 14, 15, 18, 19], g.idtype)
     target = ["u", "v", "e"]

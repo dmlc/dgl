@@ -213,7 +213,7 @@ def test_query():
         with pytest.raises(DGLError):
             eid = g.edge_id(4, 5)
 
-        g.add_edge(0, 4)
+        g.add_edges(0, 4)
         eids = g.edge_ids([0,0], [4,9])
         eid = g.edge_id(0, 4)
 
@@ -260,11 +260,11 @@ def test_scipy_adjmat():
 def test_incmat():
     g = dgl.DGLGraph()
     g.add_nodes(4)
-    g.add_edge(0, 1) # 0
-    g.add_edge(0, 2) # 1
-    g.add_edge(0, 3) # 2
-    g.add_edge(2, 3) # 3
-    g.add_edge(1, 1) # 4
+    g.add_edges(0, 1) # 0
+    g.add_edges(0, 2) # 1
+    g.add_edges(0, 3) # 2
+    g.add_edges(2, 3) # 3
+    g.add_edges(1, 1) # 4
     inc_in = F.sparse_to_numpy(g.incidence_matrix('in'))
     inc_out = F.sparse_to_numpy(g.incidence_matrix('out'))
     inc_both = F.sparse_to_numpy(g.incidence_matrix('both'))
