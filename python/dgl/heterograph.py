@@ -2969,7 +2969,7 @@ class DGLGraph(object):
             raise DGLError('Non-existing node ID {}'.format(v))
         return self._graph.successors(self.get_etype_id(etype), v)
 
-    def edge_ids(self, u, v, force_multi=None, return_uv=False, etype=None):
+    def edge_ids(self, u, v, return_uv=False, etype=None):
         """Return the edge ID(s) given the two endpoints of the edge(s).
 
         Parameters
@@ -2989,9 +2989,6 @@ class DGLGraph(object):
             * Int Tensor: Each element is a node ID. The tensor must have the same device type
               and ID data type as the graph's.
             * iterable[int]: Each element is a node ID.
-        force_multi : bool, optional
-            **DEPRECATED**, use :attr:`return_uv` instead. Whether to allow the graph to be a
-            multigraph, i.e. there can be multiple edges from one node to another.
         return_uv : bool, optional
             Whether to return the source and destination node IDs along with the edges. If
             False (default), it assumes that the graph is a simple graph and there is only
@@ -3074,10 +3071,6 @@ class DGLGraph(object):
         v = utils.prepare_tensor(self, v, 'v')
         if F.as_scalar(F.sum(self.has_nodes(v, ntype=dsttype), dim=0)) != len(v):
             raise DGLError('v contains invalid node IDs')
-        if force_multi is not None:
-            dgl_warning("force_multi will be deprecated, " \
-                        "Please use return_uv instead")
-            return_uv = force_multi
 
         if return_uv:
             return self._graph.edge_ids_all(self.get_etype_id(etype), u, v)
