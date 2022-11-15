@@ -2969,16 +2969,6 @@ class DGLGraph(object):
             raise DGLError('Non-existing node ID {}'.format(v))
         return self._graph.successors(self.get_etype_id(etype), v)
 
-    def edge_id(self, u, v, force_multi=None, return_uv=False, etype=None):
-        """Return the edge ID, or an array of edge IDs, between source node
-        `u` and destination node `v`, with the specified edge type
-
-        **DEPRECATED**: See edge_ids
-        """
-        dgl_warning("DGLGraph.edge_id is deprecated. Please use DGLGraph.edge_ids.")
-        return self.edge_ids(u, v, force_multi=force_multi,
-                             return_uv=return_uv, etype=etype)
-
     def edge_ids(self, u, v, force_multi=None, return_uv=False, etype=None):
         """Return the edge ID(s) given the two endpoints of the edge(s).
 

@@ -353,7 +353,7 @@ class DGLJTNNDecoder(nn.Module):
                     break   # At root, terminate
 
                 pu, _ = stack[-2]
-                u_pu = mol_tree_graph.edge_id(u, pu)
+                u_pu = mol_tree_graph.edge_ids(u, pu)
 
                 mol_tree_graph_lg.pull(u_pu, DGLF.copy_u('m', 'm'), DGLF.sum('m', 's'))
                 mol_tree_graph_lg.pull(u_pu, DGLF.copy_u('rm', 'rm'), DGLF.sum('rm', 'accum_rm'))

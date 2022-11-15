@@ -310,7 +310,7 @@ def test_query(idtype):
             assert set(F.asnumpy(v).tolist()) == set(succ)
             assert g.out_degrees(0, etype) == len(succ)
 
-            # edge_id & edge_ids
+            # edge_ids
             for i, (src, dst) in enumerate(zip(srcs, dsts)):
                 assert g.edge_ids(src, dst, etype=etype) == i
                 _, _, eid = g.edge_ids(src, dst, etype=etype, return_uv=True)
@@ -750,7 +750,7 @@ def test_view1(idtype):
             assert set(F.asnumpy(v).tolist()) == set(succ)
             assert g.out_degrees(0) == len(succ)
 
-            # edge_id & edge_ids
+            # edge_ids
             for i, (src, dst) in enumerate(zip(srcs, dsts)):
                 assert g.edge_ids(src, dst, etype=etype) == i
                 _, _, eid = g.edge_ids(src, dst, etype=etype, return_uv=True)
