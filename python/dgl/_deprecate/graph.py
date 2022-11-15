@@ -3083,10 +3083,10 @@ class DGLGraph(DGLBaseGraph):
         >>> g.add_nodes(3)
         >>> g.ndata['x'] = th.tensor([[0.], [1.], [2.]])
 
-        Use the built-in message function :func:`~dgl.function.copy_src` for copying
+        Use the built-in message function :func:`~dgl.function.copy_u` for copying
         node features as the message.
 
-        >>> m_func = dgl.function.copy_src('x', 'm')
+        >>> m_func = dgl.function.copy_u('x', 'm')
         >>> g.register_message_func(m_func)
 
         Use the built-int message reducing function :func:`~dgl.function.sum`, which
@@ -3180,10 +3180,10 @@ class DGLGraph(DGLBaseGraph):
         >>> g.add_nodes(3)
         >>> g.ndata['x'] = th.tensor([[1.], [2.], [3.]])
 
-        Use the built-in message function :func:`~dgl.function.copy_src` for copying
+        Use the built-in message function :func:`~dgl.function.copy_u` for copying
         node features as the message.
 
-        >>> m_func = dgl.function.copy_src('x', 'm')
+        >>> m_func = dgl.function.copy_u('x', 'm')
         >>> g.register_message_func(m_func)
 
         Use the built-int message reducing function :func:`~dgl.function.sum`, which
