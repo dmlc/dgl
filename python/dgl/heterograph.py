@@ -4458,8 +4458,7 @@ class DGLGraph(object):
                       message_func,
                       reduce_func,
                       apply_node_func=None,
-                      etype=None,
-                      inplace=False):
+                      etype=None):
         """Send messages along the specified edges and reduce them on
         the destination nodes to update their features.
 
@@ -4494,9 +4493,6 @@ class DGLGraph(object):
               triplet format in the graph.
 
             Can be omitted if the graph has only one type of edges.
-
-        inplace: bool, optional
-            **DEPRECATED**.
 
         Notes
         -----
@@ -4570,8 +4566,6 @@ class DGLGraph(object):
 
         Note that the feature of node 0 remains the same as it has no incoming edges.
         """
-        if inplace:
-            raise DGLError('The `inplace` option is removed in v0.5.')
         # edge type
         etid = self.get_etype_id(etype)
         _, dtid = self._graph.metagraph.find_edge(etid)
@@ -4594,8 +4588,7 @@ class DGLGraph(object):
              message_func,
              reduce_func,
              apply_node_func=None,
-             etype=None,
-             inplace=False):
+             etype=None):
         """Pull messages from the specified node(s)' predecessors along the
         specified edge type, aggregate them to update the node features.
 
@@ -4626,9 +4619,6 @@ class DGLGraph(object):
               triplet format in the graph.
 
             Can be omitted if the graph has only one type of edges.
-
-        inplace: bool, optional
-            **DEPRECATED**.
 
         Notes
         -----
@@ -4676,8 +4666,6 @@ class DGLGraph(object):
                 [1.],
                 [1.]])
         """
-        if inplace:
-            raise DGLError('The `inplace` option is removed in v0.5.')
         v = utils.prepare_tensor(self, v, 'v')
         if len(v) == 0:
             # no computation
@@ -4698,8 +4686,7 @@ class DGLGraph(object):
              message_func,
              reduce_func,
              apply_node_func=None,
-             etype=None,
-             inplace=False):
+             etype=None):
         """Send message from the specified node(s) to their successors
         along the specified edge type and update their node features.
 
@@ -4730,9 +4717,6 @@ class DGLGraph(object):
               triplet format in the graph.
 
             Can be omitted if the graph has only one type of edges.
-
-        inplace: bool, optional
-            **DEPRECATED**.
 
         Notes
         -----
@@ -4773,8 +4757,6 @@ class DGLGraph(object):
                 [0.],
                 [0.]])
         """
-        if inplace:
-            raise DGLError('The `inplace` option is removed in v0.5.')
         edges = self.out_edges(u, form='eid', etype=etype)
         self.send_and_recv(edges, message_func, reduce_func, apply_node_func, etype=etype)
 
