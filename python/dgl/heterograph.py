@@ -3713,15 +3713,6 @@ class DGLGraph(object):
         else:
             return self._graph.adjacency_matrix_tensors(etid, False, fmt)[2:]
 
-    def adjacency_matrix_scipy(self, transpose=False, fmt='csr', return_edge_ids=None):
-        """DEPRECATED: please use ``dgl.adjacency_matrix(transpose, scipy_fmt=fmt)``.
-        """
-        dgl_warning('DGLGraph.adjacency_matrix_scipy is deprecated. '
-                    'Please replace it with:\n\n\t'
-                    'DGLGraph.adjacency_matrix(transpose, scipy_fmt="{}").\n'.format(fmt))
-
-        return self.adjacency_matrix(transpose=transpose, scipy_fmt=fmt)
-
     def inc(self, typestr, ctx=F.cpu(), etype=None):
         """Return the incidence matrix representation of edges with the given
         edge type.
