@@ -4274,7 +4274,7 @@ class DGLGraph(object):
     # Message passing
     #################################################################
 
-    def apply_nodes(self, func, v=ALL, ntype=None, inplace=False):
+    def apply_nodes(self, func, v=ALL, ntype=None):
         """Update the features of the specified nodes by the provided function.
 
         Parameters
@@ -4294,8 +4294,6 @@ class DGLGraph(object):
         ntype : str, optional
             The node type name. Can be omitted if there is
             only one type of nodes in the graph.
-        inplace : bool, optional
-            **DEPRECATED**.
 
         Examples
         --------
@@ -4331,8 +4329,6 @@ class DGLGraph(object):
         --------
         apply_edges
         """
-        if inplace:
-            raise DGLError('The `inplace` option is removed in v0.5.')
         ntid = self.get_ntype_id(ntype)
         ntype = self.ntypes[ntid]
         if is_all(v):
@@ -4342,7 +4338,7 @@ class DGLGraph(object):
         ndata = core.invoke_node_udf(self, v_id, ntype, func, orig_nid=v_id)
         self._set_n_repr(ntid, v, ndata)
 
-    def apply_edges(self, func, edges=ALL, etype=None, inplace=False):
+    def apply_edges(self, func, edges=ALL, etype=None):
         """Update the features of the specified edges by the provided function.
 
         Parameters
@@ -4372,9 +4368,6 @@ class DGLGraph(object):
               triplet format in the graph.
 
             Can be omitted if the graph has only one type of edges.
-
-        inplace: bool, optional
-            **DEPRECATED**.
 
         Notes
         -----
@@ -4426,8 +4419,6 @@ class DGLGraph(object):
         --------
         apply_nodes
         """
-        if inplace:
-            raise DGLError('The `inplace` option is removed in v0.5.')
         # Graph with one relation type
         if self._graph.number_of_etypes() == 1 or etype is not None:
             etid = self.get_etype_id(etype)
