@@ -214,6 +214,3 @@ def _register_builtin_message_func():
                 __all__.append(func.__name__)
 
 _register_builtin_message_func()
-
-
-
