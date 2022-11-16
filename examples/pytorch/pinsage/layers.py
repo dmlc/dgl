@@ -136,7 +136,7 @@ class WeightedSAGEConv(nn.Module):
 class SAGENet(nn.Module):
     def __init__(self, hidden_dims, n_layers):
         """
-        g : DGLHeteroGraph
+        g : DGLGraph
             The user-item interaction graph.
             This is only for finding the range of categorical variables.
         item_textsets : torchtext.data.Dataset

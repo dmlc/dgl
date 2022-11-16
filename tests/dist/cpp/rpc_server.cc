@@ -6,7 +6,7 @@
 #include "rpc_base.h"
 
 class RPCServer {
-public:
+ public:
   explicit RPCServer(const std::string &ip, int num_machines)
       : ip_(ip), num_machines_(num_machines) {}
   void run() {
@@ -19,7 +19,7 @@ public:
     }
   }
 
-private:
+ private:
   void StartServer(int id) {
     dgl::rpc::TPReceiver receiver(InitTPContext());
     std::string ip_addr =

@@ -1,4 +1,4 @@
-"""dgl spmm operator module."""
+"""Internal module for general spmm operators."""
 import sys
 
 from .. import backend as F
@@ -143,7 +143,7 @@ def _gen_spmm_func(binary_op, reduce_op):
 
     Parameters
     ----------
-    g : DGLHeteroGraph
+    g : DGLGraph
         The input graph
     x : tensor
         The source node features.
@@ -191,7 +191,7 @@ def _gen_copy_reduce_func(binary_op, reduce_op):
 
     Parameters
     ----------
-    g : DGLHeteroGraph
+    g : DGLGraph
         The input graph
     x : tensor
         The {} features.

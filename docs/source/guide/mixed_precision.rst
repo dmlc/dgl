@@ -9,9 +9,9 @@ consumption. This feature requires DGL 0.9+.
 
 Message-Passing with Half Precision
 -----------------------------------
-DGL allows message-passing on ``float16 (fp16)`` features for both
-UDFs (User Defined Functions) and built-in functions (e.g., ``dgl.function.sum``,
-``dgl.function.copy_u``).
+DGL allows message-passing on ``float16 (fp16)`` / ``bfloat16 (bf16)`` (requires CUDA >= 11.0)
+features for both UDFs (User Defined Functions) and built-in functions
+(e.g., ``dgl.function.sum``, ``dgl.function.copy_u``).
 
 The following example shows how to use DGL's message-passing APIs on half-precision
 features:
@@ -63,8 +63,9 @@ efficient, most operators on half precision tensors are faster as they leverage 
     import torch.nn.functional as F
     from torch.cuda.amp import autocast
 
-    def forward(g, feat, label, mask, model, use_fp16):
-        with autocast(enabled=use_fp16):
+    def forward(g, feat, label, mask, model, amp_dtype):
+        amp_enabled = amp_dtype in (torch.float16, torch.bfloat16)
+        with autocast(enabled=amp_enabled, dtype=amp_dtype):
             logit = model(g, feat)
             loss = F.cross_entropy(logit[mask], label[mask])
             return loss
@@ -74,6 +75,7 @@ PyTorch provides a ``GradScaler`` module to address this issue. It multiplies
 the loss by a factor and invokes backward pass on the scaled loss to prevent
 the underflow problem. It then unscales the computed gradients before the optimizer
 updates the parameters. The scale factor is determined automatically.
+Note that ``bfloat16`` doesn't require a ``GradScaler``.
 
 .. code::
 
@@ -87,7 +89,7 @@ updates the parameters. The scale factor is determined automatically.
         scaler.update()
 
 The following example trains a 3-layer GAT on the Reddit dataset (w/ 114 million edges).
-Pay attention to the differences in the code when ``use_fp16`` is activated or not.
+Pay attention to the differences in the code when AMP is activated or not.
 
 .. code::
 
@@ -98,7 +100,7 @@ Pay attention to the differences in the code when ``use_fp16`` is activated or n
     from dgl.nn import GATConv
     from dgl.transforms import AddSelfLoop
 
-    use_fp16 = True
+    amp_dtype = torch.float16  # or torch.bfloat16
 
     class GAT(nn.Module):
         def __init__(self,
@@ -145,9 +147,9 @@ Pay attention to the differences in the code when ``use_fp16`` is activated or n
 
     for epoch in range(100):
         optimizer.zero_grad()
-        loss = forward(g, feat, label, train_mask, model, use_fp16)
+        loss = forward(g, feat, label, train_mask, model, amp_dtype)
 
-        if use_fp16:
+        if amp_dtype == torch.float16:
             # Backprop w/ gradient scaling
             backward(scaler, loss, optimizer)
         else:
