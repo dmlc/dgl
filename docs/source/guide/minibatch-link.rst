@@ -194,7 +194,7 @@ classification/regression.
 
 For score prediction, the only implementation difference between the
 homogeneous graph and the heterogeneous graph is that we are looping
-over the edge types for :meth:`dgl.DGLHeteroGraph.apply_edges`.
+over the edge types for :meth:`dgl.DGLGraph.apply_edges`.
 
 .. code:: python
 

@@ -147,7 +147,7 @@ def assign_textual_node_features(ndata, textset, ntype):
     The length would be stored as another node feature with name
     ``field_name + '__len'``.
 
-    block : DGLHeteroGraph
+    block : DGLGraph
         First element of the compacted blocks, with "dgl.NID" as the
         corresponding node ID in the original graph, hence the index to the
         text dataset.

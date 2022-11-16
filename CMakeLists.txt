@@ -28,7 +28,6 @@ dgl_option(USE_SYSTEM_NCCL "Build using system's NCCL library" OFF)
 dgl_option(USE_OPENMP "Build with OpenMP" ON)
 dgl_option(USE_AVX "Build with AVX optimization" OFF)
 dgl_option(USE_LIBXSMM "Build with LIBXSMM library optimization" ON)
-dgl_option(USE_FP16 "Build with fp16 support to enable mixed precision training" OFF)
 dgl_option(USE_TVM "Build with TVM kernels" OFF)
 dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" OFF)
 dgl_option(LIBCXX_ENABLE_PARALLEL_ALGORITHMS "Enable the parallel algorithms library. This requires the PSTL to be available." OFF)
@@ -126,13 +125,6 @@ if ((NOT MSVC) AND USE_EPOLL)
     message(WARNING "EPOLL is not available on this platform...")
   endif()
 endif ()
-
-# Build with fp16 to support mixed precision training.
-if(USE_FP16)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUSE_FP16")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_FP16")
-  message(STATUS "Build with fp16 to support mixed precision training")
-endif(USE_FP16)
 
 # To compile METIS correct for DGL.
 if(MSVC)
@@ -322,6 +314,24 @@ if(BUILD_TORCH)
   endif(MSVC)
   add_dependencies(dgl tensoradapter_pytorch)
 endif(BUILD_TORCH)
+
+if(BUILD_SPARSE)
+  file(TO_NATIVE_PATH ${CMAKE_CURRENT_BINARY_DIR} BINDIR)
+  file(TO_NATIVE_PATH ${CMAKE_COMMAND} CMAKE_CMD)
+  # TODO(zhenkun): MSVC support?
+  file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/dgl_sparse/build.sh BUILD_SCRIPT)
+  add_custom_target(
+    dgl_sparse
+    ${CMAKE_COMMAND} -E env
+    CMAKE_COMMAND=${CMAKE_CMD}
+    CUDA_TOOLKIT_ROOT_DIR=${CUDA_TOOLKIT_ROOT_DIR}
+    USE_CUDA=${USE_CUDA}
+    BINDIR=${CMAKE_CURRENT_BINARY_DIR}
+    bash ${BUILD_SCRIPT} ${TORCH_PYTHON_INTERPS}
+    DEPENDS ${BUILD_SCRIPT}
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/dgl_sparse)
+  add_dependencies(dgl dgl_sparse)
+endif(BUILD_SPARSE)
 
 # Installation rules
 install(TARGETS dgl DESTINATION lib${LIB_SUFFIX})

@@ -1,8 +1,8 @@
-/*!
+/**
  *  Copyright (c) 2020-2022 by Contributors
- * \file array/tensordispatch.h
- * \brief This file defines the dispatcher of tensor operators to framework-specific
- *  implementations.
+ * @file array/tensordispatch.h
+ * @brief This file defines the dispatcher of tensor operators to
+ * framework-specific implementations.
  *
  *  The dispatcher consists of a TensorDispatcher singleton in DGL C library and
  *  one separately-built shared library per supported backend.
@@ -15,14 +15,14 @@
  *  The TensorDispatcher singleton maintains a mapping from an array operator to
  *  the address of the corresponding symbol in the shared library.  During
  *  initialization, the TensorDispatcher checks which backend DGL is using.
- *  It then locates and opens the corresponding shared library using dlopen(3) (or
- *  LoadLibrary in Windows), and populates the said mapping above with dlsym(3)
- *  (or GetProcAddress in Windows).
+ *  It then locates and opens the corresponding shared library using dlopen(3)
+ * (or LoadLibrary in Windows), and populates the said mapping above with
+ * dlsym(3) (or GetProcAddress in Windows).
  *
- *  A tensor operator in TensorDispatcher first checks whether the corresponding symbol
- *  address is found in the mapping.  If so, it calls the function located at the
- *  symbol address instead, allocate/free pieces of memory on CPU/GPU.
- *  If not, it falls back to DeviceAPI::AllocWorkspace/FreeWorkspace.
+ *  A tensor operator in TensorDispatcher first checks whether the corresponding
+ * symbol address is found in the mapping.  If so, it calls the function located
+ * at the symbol address instead, allocate/free pieces of memory on CPU/GPU. If
+ * not, it falls back to DeviceAPI::AllocWorkspace/FreeWorkspace.
  */
 
 #ifndef DGL_RUNTIME_TENSORDISPATCH_H_
@@ -38,51 +38,52 @@
 #endif  // DGL_USE_CUDA
 #include "ndarray.h"
 
-/*! \brief Casts a pointer \c entry to a function pointer with signature of \c func */
-#define FUNCCAST(func, entry)   (*reinterpret_cast<decltype(&(func))>(entry))
+/**
+ * @brief Casts a pointer \c entry to a function pointer with signature of \c
+ * func.
+ */
+#define FUNCCAST(func, entry) (*reinterpret_cast<decltype(&(func))>(entry))
 
 namespace dgl {
 namespace runtime {
 
-/*!
- * \brief Dispatcher that delegates the function calls to framework-specific C++ APIs.
+/**
+ * @brief Dispatcher that delegates the function calls to framework-specific C++
+ * APIs.
  *
  * This class is not thread-safe.
  */
 class TensorDispatcher {
  public:
-  /*! \brief Get the singleton instance. */
+  /** @brief Get the singleton instance. */
   static TensorDispatcher* Global() {
     static TensorDispatcher inst;
     return &inst;
   }
 
-  /*! \brief Whether an adapter library is available */
-  inline bool IsAvailable() {
-    return available_;
-  }
+  /** @brief Whether an adapter library is available. */
+  inline bool IsAvailable() { return available_; }
 
-  /*! \brief Load symbols from the given tensor adapter library path */
-  bool Load(const char *path_cstr);
+  /** @brief Load symbols from the given tensor adapter library path. */
+  bool Load(const char* path_cstr);
 
-  /*!
-   * \brief Allocate a piece of CPU memory via
-   * PyTorch's CPUAllocator.
+  /**
+   * @brief Allocate a piece of CPU memory via PyTorch's CPUAllocator.
    * Used in CPUDeviceAPI::AllocWorkspace().
    *
-   * \param nbytes The size to be allocated.
-   * \return Pointer to the allocated memory.
+   * @param nbytes The size to be allocated.
+   * @return Pointer to the allocated memory.
    */
   inline void* CPUAllocWorkspace(size_t nbytes) {
     auto entry = entrypoints_[Op::kCPURawAlloc];
     return FUNCCAST(tensoradapter::CPURawAlloc, entry)(nbytes);
   }
 
-  /*!
-   * \brief Free the CPU memory.
+  /**
+   * @brief Free the CPU memory.
    * Used in CPUDeviceAPI::FreeWorkspace().
    *
-   * \param ptr Pointer to the memory to be freed.
+   * @param ptr Pointer to the memory to be freed.
    */
   inline void CPUFreeWorkspace(void* ptr) {
     auto entry = entrypoints_[Op::kCPURawDelete];
@@ -90,90 +91,86 @@ class TensorDispatcher {
   }
 
 #ifdef DGL_USE_CUDA
-  /*!
-   * \brief Allocate a piece of GPU memory via
+  /**
+   * @brief Allocate a piece of GPU memory via
    * PyTorch's THCCachingAllocator.
    * Used in CUDADeviceAPI::AllocWorkspace().
-   * 
-   * \note THCCachingAllocator specify the device to allocate on
+   *
+   * @note THCCachingAllocator specify the device to allocate on
    * via cudaGetDevice(). Make sure to call cudaSetDevice()
    * before invoking this function.
    *
-   * \param nbytes The size to be allocated.
-   * \param stream The stream to be allocated on.
-   * \return Pointer to the allocated memory.
+   * @param nbytes The size to be allocated.
+   * @param stream The stream to be allocated on.
+   * @return Pointer to the allocated memory.
    */
   inline void* CUDAAllocWorkspace(size_t nbytes, cudaStream_t stream) {
     auto entry = entrypoints_[Op::kCUDARawAlloc];
     return FUNCCAST(tensoradapter::CUDARawAlloc, entry)(nbytes, stream);
   }
 
-  /*!
-   * \brief Free the GPU memory.
+  /**
+   * @brief Free the GPU memory.
    * Used in CUDADeviceAPI::FreeWorkspace().
    *
-   * \param ptr Pointer to the memory to be freed.
+   * @param ptr Pointer to the memory to be freed.
    */
   inline void CUDAFreeWorkspace(void* ptr) {
     auto entry = entrypoints_[Op::kCUDARawDelete];
     FUNCCAST(tensoradapter::CUDARawDelete, entry)(ptr);
   }
 
-  /*!
-  * \brief Find the current PyTorch CUDA stream
-  * Used in runtime::getCurrentCUDAStream().
-  * 
-  * \note PyTorch pre-allocates/sets the current CUDA stream
-  * on current device via cudaGetDevice(). Make sure to call cudaSetDevice()
-  * before invoking this function.
-  *
-  * \return cudaStream_t stream handle
-  */
+  /**
+   * @brief Find the current PyTorch CUDA stream
+   * Used in runtime::getCurrentCUDAStream().
+   *
+   * @note PyTorch pre-allocates/sets the current CUDA stream
+   * on current device via cudaGetDevice(). Make sure to call cudaSetDevice()
+   * before invoking this function.
+   *
+   * @return cudaStream_t stream handle
+   */
   inline cudaStream_t CUDAGetCurrentStream() {
     auto entry = entrypoints_[Op::kCUDACurrentStream];
     return FUNCCAST(tensoradapter::CUDACurrentStream, entry)();
   }
 #endif  // DGL_USE_CUDA
 
-  /*!
-   * \brief Record streams that are using this tensor.
+  /**
+   * @brief Record streams that are using this tensor.
    * Used in NDArray::RecordStream().
    *
-   * \param ptr Pointer of the tensor to be recorded.
-   * \param stream The stream that is using this tensor.
-   * \param device_id Device of the tensor.
+   * @param ptr Pointer of the tensor to be recorded.
+   * @param stream The stream that is using this tensor.
+   * @param device_id Device of the tensor.
    */
   inline void RecordStream(void* ptr, DGLStreamHandle stream, int device_id) {
 #ifdef DGL_USE_CUDA
     auto entry = entrypoints_[Op::kRecordStream];
-    FUNCCAST(tensoradapter::RecordStream, entry)(
-      ptr, static_cast<cudaStream_t>(stream), device_id);
+    FUNCCAST(tensoradapter::RecordStream, entry)
+    (ptr, static_cast<cudaStream_t>(stream), device_id);
 #endif  // DGL_USE_CUDA
   }
 
  private:
-  /*! \brief ctor */
+  /** @brief ctor */
   TensorDispatcher() = default;
-  /*! \brief dtor */
+  /** @brief dtor */
   ~TensorDispatcher();
 
-  /*!
-   * \brief List of symbols in the adapter library.
+  /**
+   * @brief List of symbols in the adapter library.
    *
    * Must match the functions in tensoradapter/include/tensoradapter.h.
    */
-  static constexpr const char *names_[] = {
-    "CPURawAlloc",
-    "CPURawDelete",
+  static constexpr const char* names_[] = {
+      "CPURawAlloc",  "CPURawDelete",
 #ifdef DGL_USE_CUDA
-    "CUDARawAlloc",
-    "CUDARawDelete",
-    "CUDACurrentStream",
-    "RecordStream",
+      "CUDARawAlloc", "CUDARawDelete", "CUDACurrentStream", "RecordStream",
 #endif  // DGL_USE_CUDA
   };
 
-  /*! \brief Index of each function to the symbol list */
+  /** @brief Index of each function to the symbol list */
   class Op {
    public:
     static constexpr int kCPURawAlloc = 0;
@@ -186,18 +183,14 @@ class TensorDispatcher {
 #endif  // DGL_USE_CUDA
   };
 
-  /*! \brief Number of functions */
+  /** @brief Number of functions */
   static constexpr int num_entries_ = sizeof(names_) / sizeof(names_[0]);
 
-  /*! \brief Entrypoints of each function */
+  /** @brief Entrypoints of each function */
   void* entrypoints_[num_entries_] = {
-    nullptr,
-    nullptr,
+      nullptr, nullptr,
 #ifdef DGL_USE_CUDA
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
+      nullptr, nullptr, nullptr, nullptr,
 #endif  // DGL_USE_CUDA
   };
 

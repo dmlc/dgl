@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2021-2022 by Contributors
- * \file array/cuda/array_index_select.cuh
- * \brief Array index select GPU kernel implementation
+ * @file array/cuda/array_index_select.cuh
+ * @brief Array index select GPU kernel implementation
  */
 
 #ifndef DGL_ARRAY_CUDA_ARRAY_INDEX_SELECT_CUH_
