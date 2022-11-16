@@ -43,6 +43,45 @@ class SIGN(nn.Module):
         return F.sigmoid(self.omega(Z))
 
 
+def evaluate(g, pred):
+    labels = g.ndata["label"]
+    val_mask = g.ndata["val_mask"]
+    test_mask = g.ndata["test_mask"]
+
+    # Compute accuracy on validation/test set.
+    val_acc = (pred[val_mask] == labels[val_mask]).float().mean()
+    test_acc = (pred[test_mask] == labels[test_mask]).float().mean()
+    return val_acc, test_acc
+
+
+def train(g, model):
+    labels = g.ndata["label"]
+    train_mask = g.ndata["train_mask"]
+    optimizer = Adam(model.parameters(), lr=3e-3)
+
+    for e in range(20):
+        # Forward.
+        logits = model(X_sign)
+
+        # Compute prediction.
+        pred = logits.argmax(1)
+
+        # Compute loss with nodes in training set.
+        loss = F.cross_entropy(logits[train_mask], labels[train_mask])
+
+        # Backward.
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        # Evaluate the prediction.
+        val_acc, test_acc = evaluate(g, pred)
+        print(
+            f"In epoch {e}, loss: {loss:.3f}, val acc: {val_acc:.3f}, test acc"
+            f": {test_acc:.3f}"
+        )
+
+
 if __name__ == "__main__":
     # If CUDA is available, use GPU to accelerate the training, otherwise, use
     # CPU for the training.
@@ -66,37 +105,7 @@ if __name__ == "__main__":
     # Create SIGN model.
     in_size = X.shape[1]
     out_size = dataset.num_classes
-    model = SIGN(in_size, out_size, r)
+    model = SIGN(in_size, out_size, r).to(dev)
 
-    labels = g.ndata["label"]
-    train_mask = g.ndata["train_mask"]
-    val_mask = g.ndata["val_mask"]
-    test_mask = g.ndata["test_mask"]
-
-    loss_func = nn.CrossEntropyLoss()
-    optimizer = Adam(model.parameters(), lr=3e-3)
-
-    for e in range(10):
-        # Forward.
-        logits = model(X_sign).to(dev)
-
-        # Compute prediction.
-        pred = logits.argmax(1)
-
-        # Compute loss with nodes in training set.
-        loss = F.cross_entropy(logits[train_mask], labels[train_mask])
-
-        # Compute accuracy on training/validation/test.
-        train_acc = (pred[train_mask] == labels[train_mask]).float().mean()
-        val_acc = (pred[val_mask] == labels[val_mask]).float().mean()
-        test_acc = (pred[test_mask] == labels[test_mask]).float().mean()
-
-        # Backward.
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-        print(
-            f"In epoch {e}, loss: {loss:.3f}, val acc: {val_acc:.3f}, test acc"
-            f": {test_acc:.3f}"
-        )
+    # Kick off training.
+    train(g, model)
