@@ -7,7 +7,7 @@ import os
 import gc
 import numpy as np
 
-from ..heterograph import DGLHeteroGraph
+from ..heterograph import DGLGraph
 from ..convert import heterograph as dgl_heterograph
 from ..convert import graph as dgl_graph
 from ..transforms import compact_graphs
@@ -129,7 +129,7 @@ def _get_graph_from_shared_mem(graph_name):
     g, ntypes, etypes = heterograph_index.create_heterograph_from_shared_memory(graph_name)
     if g is None:
         return None
-    g = DGLHeteroGraph(g, ntypes, etypes)
+    g = DGLGraph(g, ntypes, etypes)
 
     g.ndata['inner_node'] = _get_shared_mem_ndata(g, graph_name, 'inner_node')
     g.ndata[NID] = _get_shared_mem_ndata(g, graph_name, NID)

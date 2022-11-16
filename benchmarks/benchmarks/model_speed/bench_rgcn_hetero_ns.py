@@ -88,7 +88,7 @@ class RelGraphConvLayer(nn.Module):
 
         Parameters
         ----------
-        g : DGLHeteroGraph
+        g : DGLGraph
             Input graph.
         inputs : dict[str, torch.Tensor]
             Node feature for each node type.
@@ -164,14 +164,14 @@ class RelGraphEmbed(nn.Module):
 
         Parameters
         ----------
-        block : DGLHeteroGraph, optional
+        block : DGLGraph, optional
             If not specified, directly return the full graph with embeddings stored in
             :attr:`embed_name`. Otherwise, extract and store the embeddings to the block
             graph and return.
 
         Returns
         -------
-        DGLHeteroGraph
+        DGLGraph
             The block graph fed with embeddings.
         """
         embeds = {}

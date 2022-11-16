@@ -67,8 +67,6 @@ Operators for generating new graphs by manipulating the structure of the existin
     add_self_loop
     adj_product_graph
     adj_sum_graph
-    as_heterograph
-    as_immutable_graph
     compact_graphs
     khop_adj
     khop_graph
