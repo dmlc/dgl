@@ -19,7 +19,8 @@ TORCH_LIBRARY(dgl_sparse, m) {
       .def("shape", &SparseMatrix::shape)
       .def("coo", &SparseMatrix::COOTensors)
       .def("csr", &SparseMatrix::CSRTensors)
-      .def("csc", &SparseMatrix::CSCTensors);
+      .def("csc", &SparseMatrix::CSCTensors)
+      .def("set_val", &SparseMatrix::SetValue);
   m.def("create_from_coo", &CreateFromCOO)
       .def("create_from_csr", &CreateFromCSR)
       .def("create_from_csc", &CreateFromCSC)

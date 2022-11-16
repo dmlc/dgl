@@ -42,37 +42,6 @@ class DiagMatrix:
     def __repr__(self):
         return f"DiagMatrix(val={self.val}, \nshape={self.shape})"
 
-    def __call__(self, x: torch.Tensor):
-        """Create a new diagonal matrix with the same shape as self
-        but different values.
-
-        Parameters
-        ----------
-        x : torch.Tensor
-            Values of the diagonal matrix
-
-        Returns
-        -------
-        DiagMatrix
-            Diagonal matrix
-
-        Examples
-        --------
-
-        >>> import torch
-        >>> val = torch.ones(5)
-        >>> mat = diag(val)
-        >>> print(mat)
-        DiagMatrix(val=tensor([1., 1., 1., 1., 1.]),
-                   shape=(5, 5))
-        >>> val = torch.ones(5) + 1
-        >>> mat = mat(val)
-        >>> print(mat)
-        DiagMatrix(val=tensor([2., 2., 2., 2., 2.]),
-                   shape=(5, 5))
-        """
-        return diag(x, self.shape)
-
     @property
     def nnz(self) -> int:
         """Return the number of non-zero values in the matrix
