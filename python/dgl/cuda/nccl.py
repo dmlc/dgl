@@ -82,6 +82,79 @@ def sparse_all_to_all_push(idx, value, partition):
     return recv_idx, recv_value
 
 
+def sparse_all_to_all_pull(req_idx, value, partition):
+    """Perform an all-to-all-v operation, where by all processors request
+    the values corresponding to their set of indices.
+
+    Parameters
+    ----------
+    req_idx : IdArray
+        The set of indices this processor is requesting.
+    value : NDArray
+        The multi-dimension set of values that can be requested from
+        this processor.
+    partition : NDArrayPartition
+        The object containing information for assigning indices to
+        processors.
+
+    Returns
+    -------
+    tensor
+        The set of recieved values, corresponding to `req_idx`.
+
+    Examples
+    --------
+
+    To perform a sparse_all_to_all_pull(), a partition object must be
+    provided. A partition of a homgeonous graph, where the vertices are
+    striped across processes can be generated via:
+
+    >>> from dgl.partition import NDArrayPartition
+    >>> part = NDArrayPartition(g.num_nodes(), comm.size(), mode='remainder' )
+
+    With this partition, each processor can request values/features
+    associated with vertices in the graph. So in the case where we have
+    a set of neighbors 'nbr_idxs' we need features for, and each process
+    has a tensor 'node_feat' storing the features of nodes it owns in
+    the partition, the features can be requested via:
+
+    >>> nbr_values = comm.sparse_all_to_all_pull(nbr_idxs, node_feat, part)
+
+    Then two the arrays 'nbr_idxs' and 'nbr_values' forms the sparse
+    set of features, where 'nbr_idxs[i]' is the global node id, and
+    'nbr_values[i]' is the feature vector for that node. This
+    communication pattern is useful for node features or node
+    embeddings.
+    """
+    perm, req_splits = partition.generate_permutation(req_idx)
+
+    # get response splits
+    resp_splits = torch.empty_like(req_splits)
+    dist.all_to_all_single(resp_splits, req_splits)
+    resp_sum = resp_splits.sum()
+    resp_splits = resp_splits.tolist()
+    req_splits = req_splits.tolist()
+
+    # gather requested indices
+    resp_idx = torch.empty((resp_sum,), dtype=req_idx.dtype, device=req_idx.device)
+    dist.all_to_all_single(resp_idx, req_idx[perm], resp_splits, req_splits)
+
+    # convert requested indices to local indices depending on partition
+    if resp_sum > 0:
+        resp_idx = partition.map_to_local(resp_idx)
+
+    # collect the request value
+    req_value = torch.empty(
+        (req_idx.size(0), *value.shape[1:]), dtype=value.dtype, device=value.device
+    )
+    dist.all_to_all_single(req_value, value[resp_idx], req_splits, resp_splits)
+
+    # permute the value back into the requested order
+    return_value = torch.empty_like(req_value)
+    return_value[perm] = req_value
+
+    return return_value
+
 class UniqueId(object):
     """Class for allowing python code to create and communicate NCCL Unique
     IDs, needed for creating communicators.
