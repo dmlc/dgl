@@ -130,7 +130,7 @@ class SparseMatrix : public torch::CustomClassHolder {
   std::vector<torch::Tensor> CSCTensors();
 
   /**
-   * @brief set non-zero values of the sparse matrix
+   * @brief Set non-zero values of the sparse matrix
    * @param value Values of the sparse matrix
    */
   void SetValue(torch::Tensor value);

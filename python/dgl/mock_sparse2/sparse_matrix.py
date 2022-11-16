@@ -32,22 +32,6 @@ class SparseMatrix:
         """
         self.c_sparse_matrix.set_val(x)
 
-    def __call__(self, x: torch.Tensor):
-        """Set the non-zero values inplace and return the object.
-
-        Parameters
-        ----------
-        x : torch.Tensor
-            The values of shape (nnz) or (nnz, D)
-
-        Returns
-        -------
-        SparseMatrix
-            Matrix with the new non-zero values
-        """
-        self.val = x
-        return self
-
     @property
     def shape(self) -> Tuple[int]:
         """Shape of the sparse matrix.

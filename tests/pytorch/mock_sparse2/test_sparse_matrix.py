@@ -122,5 +122,3 @@ def test_set_val():
     new_val = torch.zeros(nnz).to(ctx)
     A.val = new_val
     assert torch.allclose(new_val, A.val)
-    A = A(old_val)
-    assert torch.allclose(old_val, A.val)
