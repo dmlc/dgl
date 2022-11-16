@@ -18,7 +18,7 @@ def neighbors(node, graph):
     Function
         Returns the largest weakly connected components in graph
     """
-    nx_graph = dgl.to_networkx(graph)
+    nx_graph = dgl.to_networkx(graph.cpu())
     neighbours = nx_graph.neighbors(node)
 
     return list(neighbours)

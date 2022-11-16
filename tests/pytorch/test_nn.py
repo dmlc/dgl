@@ -1396,10 +1396,10 @@ def test_heterognnexplainer(g, idtype, input_dim, output_dim):
 
 @pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
 @pytest.mark.parametrize('idtype', [F.int64])
-@pytest.mark.parametrize('out_dim', [1, 2])
-@pytest.mark.parametrize('N_min', [10, 20])
-@pytest.mark.parametrize('M', [10, 40])
-@pytest.mark.parametrize('hyperparameter', [5, 6])
+@pytest.mark.parametrize('out_dim', [2])
+@pytest.mark.parametrize('N_min', [20])
+@pytest.mark.parametrize('M', [40])
+@pytest.mark.parametrize('hyperparameter', [6])
 @pytest.mark.parametrize('pruning_action', ['pruning_action'])
 def test_subgraphxexplainer(g, idtype, out_dim, N_min, M, hyperparameter, pruning_action):
     g = g.astype(idtype).to(F.ctx())
