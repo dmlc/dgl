@@ -31,7 +31,7 @@ class MessageFunction(BuiltinFunction):
 
 class BinaryMessageFunction(MessageFunction):
     """Class for the lhs_op_rhs builtin message function.
-    
+
     See Also
     --------
     u_mul_e
