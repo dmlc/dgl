@@ -4,35 +4,29 @@ from .shapley import *
 from torch import nn
 import torch.nn.functional as F
 
-__all__ = ['SubgraphXExplainer']
+__all__ = ["SubgraphXExplainer"]
 
 
 class MCTSNode:
     r"""Monte Carlo Tree Search Node.
 
-        Parameters
-        ----------
-        nodes: list
-            The node ids of the graph that are associated with this tree node.
-        pruning_action: str
-            A representation of the pruning action used to get to this node.
-        c_puct: flaot
-            The hyper-parameter to encourage exploration while searching.
-        W: float
-            The sum of the node .
-        N: int
-            Number times this node has been visited.
-        P: float
-            Immediate reward for selecting this node (property score).
-        """
+    Parameters
+    ----------
+    nodes: list
+        The node ids of the graph that are associated with this tree node.
+    pruning_action: str
+        A representation of the pruning action used to get to this node.
+    c_puct: flaot
+        The hyper-parameter to encourage exploration while searching.
+    W: float
+        The sum of the node .
+    N: int
+        Number times this node has been visited.
+    P: float
+        Immediate reward for selecting this node (property score).
+    """
 
-    def __init__(self,
-                 nodes,
-                 pruning_action,
-                 c_puct=10.0,
-                 W=0.0,
-                 N=0,
-                 P=0.0):
+    def __init__(self, nodes, pruning_action, c_puct=10.0, W=0.0, N=0, P=0.0):
         self.nodes = nodes
         self.a = pruning_action
         self.c_puct = c_puct
@@ -75,13 +69,15 @@ class SubgraphXExplainer(nn.Module):
         :obj:`mc_shapley`.
     """
 
-    def __init__(self,
-                 model,
-                 hyperparam,
-                 pruning_action,
-                 num_child_expand=2,
-                 local_radius=4,
-                 sample_num=100):
+    def __init__(
+        self,
+        model,
+        hyperparam,
+        pruning_action,
+        num_child_expand=2,
+        local_radius=4,
+        sample_num=100,
+    ):
         super(SubgraphXExplainer, self).__init__()
 
         self.hyperparam = hyperparam
@@ -96,7 +92,7 @@ class SubgraphXExplainer(nn.Module):
         self.model.eval()
 
     def get_value_func(self, features, **kwargs):
-        r""" Get the value function.
+        r"""Get the value function.
 
         Parameters
         ----------
@@ -115,7 +111,7 @@ class SubgraphXExplainer(nn.Module):
         """
 
         def value_func(graph):
-            r""" Get the model predictions.
+            r"""Get the model predictions.
 
             Parameters
             ----------
@@ -135,7 +131,7 @@ class SubgraphXExplainer(nn.Module):
         return value_func
 
     def biggest_weak_component(self, graph):
-        r""" Find the weakly connected components in subgraph and
+        r"""Find the weakly connected components in subgraph and
         return the biggest one.
 
         Parameters
@@ -156,14 +152,19 @@ class SubgraphXExplainer(nn.Module):
         # Convert to a networkx graph object
         nx_graph = dgl.to_networkx(new_graph).to_undirected()
         # Find and sort graph components by size from largest to smallest and take the biggest one.
-        biggest_comp = list([c for c in sorted(nx.connected_components(nx_graph),
-                                               key=len,
-                                               reverse=True)][0])
+        biggest_comp = list(
+            [
+                c
+                for c in sorted(
+                    nx.connected_components(nx_graph), key=len, reverse=True
+                )
+            ][0]
+        )
         # Convert back to DGLGraph object.
         return biggest_comp
 
     def prune_graph(self, graph, strategy):
-        r""" Find the graph based on the chosen strategy. Once prunes, return the
+        r"""Find the graph based on the chosen strategy. Once prunes, return the
         lsit of subgraphs, list of subgraph nodes and list of pruned nodes
 
         Parameters
@@ -200,10 +201,14 @@ class SubgraphXExplainer(nn.Module):
         if len(node_degree) < self.num_child_expand:
             pruned_nodes = nodes
         else:
-            pruned_nodes = [node_degree[i][0] for i in range(self.num_child_expand)]
+            pruned_nodes = [
+                node_degree[i][0] for i in range(self.num_child_expand)
+            ]
 
         for prune_node in pruned_nodes:
-            new_subgraph_nodes = np.array([node for node in nodes if node != prune_node])
+            new_subgraph_nodes = np.array(
+                [node for node in nodes if node != prune_node]
+            )
             new_subgraph = dgl.node_subgraph(graph, new_subgraph_nodes)
             biggest_comp = self.biggest_weak_component(new_subgraph)
             new_subgraph_big_comp = dgl.node_subgraph(graph, biggest_comp)
@@ -214,7 +219,7 @@ class SubgraphXExplainer(nn.Module):
         return subgraphs, subgraphs_nodes_mapping, pruned_nodes
 
     def explain_graph(self, graph, M, N_min, features, **kwargs):
-        r""" Find the subgraph that play a crucial role to explain the prediction made
+        r"""Find the subgraph that play a crucial role to explain the prediction made
         by the GNN for a graph.
 
         Parameters
@@ -291,7 +296,9 @@ class SubgraphXExplainer(nn.Module):
         self.value_func = self.get_value_func(features, **kwargs)
 
         # MCTS initialization
-        self.tree_root = MCTSNode(nodes=graph.nodes(), pruning_action="-1", c_puct=self.hyperparam)
+        self.tree_root = MCTSNode(
+            nodes=graph.nodes(), pruning_action="-1", c_puct=self.hyperparam
+        )
 
         leaf_set = set()
 
@@ -307,36 +314,47 @@ class SubgraphXExplainer(nn.Module):
                 if len(curr_node.children) == 0:
                     # make sure to add nodes to curr_node's children
                     subgraph = dgl.node_subgraph(graph, curr_node.nodes)
-                    (subgraphs, subgraphs_nodes_mapping, pruned_nodes) = \
-                        self.prune_graph(subgraph, self.pruning_action)
+                    (
+                        subgraphs,
+                        subgraphs_nodes_mapping,
+                        pruned_nodes,
+                    ) = self.prune_graph(subgraph, self.pruning_action)
 
                     for j in range(len(subgraphs)):
-                        new_child_node = MCTSNode(curr_node.nodes[subgraphs_nodes_mapping[j]],
-                                                  str(pruned_nodes[j]))
-                        new_child_node.R = self.score_func(self.model,
-                                                           graph,
-                                                           new_child_node.nodes,
-                                                           self.local_radius,
-                                                           self.sample_num,
-                                                           features)
+                        new_child_node = MCTSNode(
+                            curr_node.nodes[subgraphs_nodes_mapping[j]],
+                            str(pruned_nodes[j]),
+                        )
+                        new_child_node.R = self.score_func(
+                            self.model,
+                            graph,
+                            new_child_node.nodes,
+                            self.local_radius,
+                            self.sample_num,
+                            features,
+                        )
                         curr_node.children.append(new_child_node)
 
                 sum_N = 0
                 for child_node in curr_node.children:
                     sum_N += child_node.N
 
-                next_node = max(curr_node.children, key=lambda x: x.Q() + x.U(sum_N))
+                next_node = max(
+                    curr_node.children, key=lambda x: x.Q() + x.U(sum_N)
+                )
                 curr_node = next_node
                 curr_path.append(next_node)
 
             leaf_set.add(curr_node)
 
-            score_leaf_node = self.score_func(self.model,
-                                              graph,
-                                              curr_node.nodes,
-                                              self.local_radius,
-                                              self.sample_num,
-                                              features)
+            score_leaf_node = self.score_func(
+                self.model,
+                graph,
+                curr_node.nodes,
+                self.local_radius,
+                self.sample_num,
+                features,
+            )
 
             for node in leaf_set:
                 node.N += 1

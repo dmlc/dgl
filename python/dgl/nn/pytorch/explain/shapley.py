@@ -4,7 +4,7 @@ import numpy as np
 
 
 def neighbors(node, graph):
-    r""" Find the one-hop neighbours of a node for a given graph.
+    r"""Find the one-hop neighbours of a node for a given graph.
 
     Parameters
     ----------
@@ -24,8 +24,10 @@ def neighbors(node, graph):
     return list(neighbours)
 
 
-def marginal_contribution(graph, exclude_masks, include_masks, value_func, features):
-    r""" Calculate the marginal value for the sample coalition nodes (identified by
+def marginal_contribution(
+    graph, exclude_masks, include_masks, value_func, features
+):
+    r"""Calculate the marginal value for the sample coalition nodes (identified by
     inluded_masks).
 
     Parameters
@@ -60,8 +62,12 @@ def marginal_contribution(graph, exclude_masks, include_masks, value_func, featu
         exclude_subgraph = dgl.node_subgraph(graph, exclude_nodes)
         include_subgraph = dgl.node_subgraph(graph, include_nodes)
 
-        exclude_nodes_map = {i: exclude_nodes[i] for i in range(len(exclude_nodes))}
-        include_nodes_map = {i: include_nodes[i] for i in range(len(include_nodes))}
+        exclude_nodes_map = {
+            i: exclude_nodes[i] for i in range(len(exclude_nodes))
+        }
+        include_nodes_map = {
+            i: include_nodes[i] for i in range(len(include_nodes))
+        }
 
         exclude_features = features[list(exclude_nodes_map.values())]
         include_features = features[list(include_nodes_map.values())]
@@ -79,8 +85,10 @@ def marginal_contribution(graph, exclude_masks, include_masks, value_func, featu
     return marginal_contributions
 
 
-def mc_l_shapley(value_func, graph, subgraph_nodes, local_radius, sample_num, features):
-    r""" Monte carlo sampling approximation of the l_shapley value.
+def mc_l_shapley(
+    value_func, graph, subgraph_nodes, local_radius, sample_num, features
+):
+    r"""Monte carlo sampling approximation of the l_shapley value.
 
     Parameters
     ----------
@@ -122,8 +130,12 @@ def mc_l_shapley(value_func, graph, subgraph_nodes, local_radius, sample_num, fe
     for i in range(sample_num):
         subset_nodes_from = list(set(local_region) - set(subgraph_nodes))
         random_nodes_permutation = subset_nodes_from + [coalition_placeholder]
-        random_nodes_permutation = np.random.permutation(random_nodes_permutation)
-        split_idx = np.where(random_nodes_permutation == coalition_placeholder)[0][0]
+        random_nodes_permutation = np.random.permutation(
+            random_nodes_permutation
+        )
+        split_idx = np.where(random_nodes_permutation == coalition_placeholder)[
+            0
+        ][0]
 
         selected_nodes = random_nodes_permutation[:split_idx]
 
@@ -138,11 +150,9 @@ def mc_l_shapley(value_func, graph, subgraph_nodes, local_radius, sample_num, fe
 
     exclude_masks = np.stack(set_exclude_masks, axis=0)
     include_masks = np.stack(set_include_masks, axis=0)
-    marginal_contributions = marginal_contribution(graph,
-                                                   exclude_masks,
-                                                   include_masks,
-                                                   value_func,
-                                                   features)
+    marginal_contributions = marginal_contribution(
+        graph, exclude_masks, include_masks, value_func, features
+    )
 
     mc_l_shapley_value = marginal_contributions.mean().item()
     return mc_l_shapley_value
