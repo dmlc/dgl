@@ -2,30 +2,30 @@ import math
 import networkx as nx
 from .shapley import *
 from torch import nn
-import torch.nn.functional as torch_func
+import torch.nn.functional as F
 
 __all__ = ['SubgraphXExplainer']
+
 
 class MCTSNode:
     r"""Monte Carlo Tree Search Node.
 
         Parameters
         ----------
-        ori_graph: nx.Graph
-            The graph that is associated with this tree node.
+        nodes: list
+            The node ids of the graph that are associated with this tree node.
         pruning_action: str
             A representation of the pruning action used to get to this node.
         c_puct: flaot
             The hyper-parameter to encourage exploration while searching.
-        W : float
+        W: float
             The sum of the node .
-        N : int
+        N: int
             Number times this node has been visited.
-        P : float
+        P: float
             Immediate reward for selecting this node (property score).
-        device : device
-            CPU or GPU device where the tensor stays.
         """
+
     def __init__(self,
                  nodes,
                  pruning_action,
@@ -33,14 +33,12 @@ class MCTSNode:
                  W=0.0,
                  N=0,
                  P=0.0):
+        self.nodes = nodes
+        self.a = pruning_action
+        self.c_puct = c_puct
         self.W = W
         self.N = N
         self.P = P
-
-        self.nodes = nodes  # node id of the input graph
-        self.a = pruning_action
-
-        self.c_puct = c_puct
         self.children = []
 
     def Q(self):
@@ -50,17 +48,33 @@ class MCTSNode:
         return self.c_puct * self.P * math.sqrt(n) / (1 + self.N)
 
 
-# WARNING: when iterating over subgraphs, may have disconnected components.
 class SubgraphXExplainer(nn.Module):
-    r"""Monte Carlo Tree Search Method.
+    r"""SubgraphXExplainer model from `SubgraphXExplainer: On Explainability of
+    Graph Neural Networks via Subgraph Explorations <https://arxiv.org/pdf/2102.05152.pdf>`
 
-        Parameters
-        ----------
-        model: nn.Module
-            The GNN model to explain.
+    It identifies subgraphs from the original graph  that play a
+    critical role in GNN-based graph classification.
+
+    To generate an explanation, by efficiently exploring different subgraphs with
+    Monte Carlo tree search. They  use Shapley values as a measure of subgraph importance
+
+    Parameters
+    ----------
+    model: nn.Module
+        The GNN model to explain.
+    hyperparam: float
+        The hyperparameter that encourages exploration.
+    pruning_action: str
+        Pruning action either "high2low" or "low2high" (refer to paper).
+    num_child_expand: int
+        Max number of children a tree node is allowed to have/expand to.
+    local_radius: int
+        Number of local radius to calculate :obj:`l_shapley`.
+    sample_num: int
+        Sampling time of monte carlo sampling approximation for
+        :obj:`mc_shapley`.
     """
-    # Pruning actions: dict of {dgl.DGLGraph : set(node ids to prune/remove from subgraph)}
-    # For now, leave it empty as ref impl doesn't really implement any special pruning actions.
+
     def __init__(self,
                  model,
                  hyperparam,
@@ -71,62 +85,104 @@ class SubgraphXExplainer(nn.Module):
         super(SubgraphXExplainer, self).__init__()
 
         self.hyperparam = hyperparam
-
-        # Pruning action either "high2low" or "low2high" (refer to paper).
         self.pruning_action = pruning_action
-
-        # Max number of children a tree node is allowed to have/expand to.
         self.num_child_expand = num_child_expand
-
         self.local_radius = local_radius
-
         self.sample_num = sample_num
 
-        # Change it so that score_func is one of 4 options
         self.score_func = mc_l_shapley
 
         self.model = model
         self.model.eval()
 
+    def get_value_func(self, features, **kwargs):
+        r""" Get the value function.
 
-    def gen_value_func(self, model, features, **kwargs):
-        def value_func(gr):
+        Parameters
+        ----------
+        features : Tensor
+            The input feature of shape :math:`(N, D)`. :math:`N` is the
+            number of nodes, and :math:`D` is the feature size.
+        kwargs : dict
+            Additional arguments passed to the GNN model. Tensors whose
+            first dimension is the number of nodes or edges will be
+            assumed to be node/edge features.
+
+        Returns
+        -------
+        Function
+            Returns the value function
+        """
+
+        def value_func(graph):
+            r""" Get the model predictions.
+
+            Parameters
+            ----------
+            graph : DGLGraph
+                A homogeneous graph.
+
+            Returns
+            -------
+            Tensor
+                Returns a tensor of probabilities
+            """
             with torch.no_grad():
-                logits = self.model(gr, features, **kwargs)
-                probs = torch_func.softmax(logits, dim=-1)
-                # score = probs[:, target_class]
-            # return score
+                logits = self.model(graph, features, **kwargs)
+                probs = F.softmax(logits, dim=-1)
                 return probs
 
         return value_func
 
-
-    # Without good pruning startegies, have to try every subgraph ---> exponential complexity.
-    # Return list of subgraphs (dgl.DGLGraph) pruned from input graph.
-    #
-    # ". In addition, if multiple disconnected subgraphs are obtained after removing a node, the largest subgraph is kept"
-    #
-    # When finding components in dierected subgraphs, consider weakly connected components or stringly connected components?
-
-    # Find weakly connected components in subgraph and return the biggest one.
     def biggest_weak_component(self, graph):
-        # 1. Ensure graph is homogenous.
+        r""" Find the weakly connected components in subgraph and
+        return the biggest one.
+
+        Parameters
+        ----------
+        graph : DGLGraph
+            A homogeneous graph.
+
+        Returns
+        -------
+        Function
+            Returns the largest weakly connected components in graph
+        """
+
+        # Ensure graph is homogenous.
         new_graph = dgl.to_homogeneous(graph)
-        # 2. Turn graph into a bidirected graph first
+        # Turn graph into a bidirected graph
         new_graph = dgl.to_bidirected(new_graph)
-        # 3. Convert to a networkx graph object.
+        # Convert to a networkx graph object
         nx_graph = dgl.to_networkx(new_graph).to_undirected()
-        # 4. Find and sort graph components by size from largest to smallest and take the biggest one.
-        biggest_comp = list([c for c in sorted(nx.connected_components(nx_graph), key=len, reverse=True)][0])
-        # 5. Convert back to DGLGraph object.
+        # Find and sort graph components by size from largest to smallest and take the biggest one.
+        biggest_comp = list([c for c in sorted(nx.connected_components(nx_graph),
+                                               key=len,
+                                               reverse=True)][0])
+        # Convert back to DGLGraph object.
         return biggest_comp
 
-
     def prune_graph(self, graph, strategy):
-        # self.num_child_expand
+        r""" Find the graph based on the chosen strategy. Once prunes, return the
+        lsit of subgraphs, list of subgraph nodes and list of pruned nodes
+
+        Parameters
+        ----------
+        graph : DGLGraph
+            A homogeneous graph.
+        strategy: str
+            The strategy based on which the pruning will happen, "high2low" or "low2high"
+
+        Returns
+        -------
+        tuple(list, list, list)
+            Return a tuple consists of list of subgraphs based on pruned action,
+            list of subgraphs nodes, and list of pruned nodes
+
+        """
         subgraphs = []
         subgraphs_nodes_mapping = []
-        pruned_nodes = []
+
         rev = False
         if strategy == "high2low":
             rev = True
@@ -135,55 +191,78 @@ class SubgraphXExplainer(nn.Module):
         in_degrees = graph.in_degrees()
         nodes = graph.nodes()
         node_degree = list()
+
         for i in range(len(out_degrees)):
             node_degree.append((nodes[i], out_degrees[i] + in_degrees[i]))
+
         node_degree = sorted(node_degree, key=lambda x: x[1], reverse=rev)
+
         if len(node_degree) < self.num_child_expand:
             pruned_nodes = nodes
         else:
             pruned_nodes = [node_degree[i][0] for i in range(self.num_child_expand)]
+
         for prune_node in pruned_nodes:
             new_subgraph_nodes = np.array([node for node in nodes if node != prune_node])
-            # subgraphs.append(dgl.node_subgraph(graph, new_subgraph_nodes, relabel_nodes=False))
             new_subgraph = dgl.node_subgraph(graph, new_subgraph_nodes)
             biggest_comp = self.biggest_weak_component(new_subgraph)
-            new_subgraph = dgl.node_subgraph(graph, biggest_comp)
+            new_subgraph_big_comp = dgl.node_subgraph(graph, biggest_comp)
+
             subgraphs_nodes_mapping.append(new_subgraph_nodes[biggest_comp])
-            subgraphs.append(new_subgraph)
+            subgraphs.append(new_subgraph_big_comp)
 
-        return (subgraphs, subgraphs_nodes_mapping, pruned_nodes)
-
+        return subgraphs, subgraphs_nodes_mapping, pruned_nodes
 
     def explain_graph(self, graph, M, N_min, features, **kwargs):
-        # self.value_func = self.gen_value_func(self.model, label, features, **kwargs)
-        self.value_func = self.gen_value_func(self.model, features, **kwargs)
+        r""" Find the subgraph that play a crucial role to explain the prediction made
+        by the GNN for a graph.
+
+        Parameters
+        ----------
+        graph : DGLGraph
+            A homogeneous graph.
+        M: int
+            Max number of iteration for MCTS
+        N_min: int
+            The leaf threshold node number
+        features : Tensor
+            The input feature of shape :math:`(N, D)`. :math:`N` is the
+            number of nodes, and :math:`D` is the feature size.
+        kwargs : dict
+            Additional arguments passed to the GNN model. Tensors whose
+            first dimension is the number of nodes or edges will be
+            assumed to be node/edge features.
+
+        Returns
+        -------
+        list
+            Return list of nodes that represent the most important subgraph
+        """
+        self.value_func = self.get_value_func(features, **kwargs)
 
         # MCTS initialization
-        ''' for each (N_i, a_j ) pair , initialize its C, W ,
-            Q, and R variables as 0. The root of search tree is N0  
-            associated with graph G. The leaf set is set to S` = {}.'''
-
         self.tree_root = MCTSNode(nodes=graph.nodes(), pruning_action="-1", c_puct=self.hyperparam)
 
         leaf_set = set()
 
         for i in range(M):
-            print("i=", i)
+            # print("iteration number=", i)
             curr_node = self.tree_root
             curr_path = [curr_node]
 
             while len(curr_node.nodes) > N_min:
-                print("curr_node.nodes = ", len(curr_node.nodes))
+                # print("curr_node.nodes = ", len(curr_node.nodes))
 
-                # "for all possible pruning actions"
-                # check if tree node hasn't been expanded before.
+                # check if tree node hasn't been expanded before
                 if len(curr_node.children) == 0:
-                    # "for each node, pruning it and get the remaining sub-graph..."
                     # make sure to add nodes to curr_node's children
                     subgraph = dgl.node_subgraph(graph, curr_node.nodes)
-                    (subgraphs, subgraphs_nodes_mapping, pruned_nodes) = self.prune_graph(subgraph, self.pruning_action)
+                    (subgraphs, subgraphs_nodes_mapping, pruned_nodes) = \
+                        self.prune_graph(subgraph, self.pruning_action)
+
                     for j in range(len(subgraphs)):
-                        new_child_node = MCTSNode(curr_node.nodes[subgraphs_nodes_mapping[j]], str(pruned_nodes[j]))
+                        new_child_node = MCTSNode(curr_node.nodes[subgraphs_nodes_mapping[j]],
+                                                  str(pruned_nodes[j]))
                         new_child_node.R = self.score_func(self.model,
                                                            graph,
                                                            new_child_node.nodes,
@@ -192,12 +271,11 @@ class SubgraphXExplainer(nn.Module):
                                                            features)
                         curr_node.children.append(new_child_node)
 
-                sum_C = 0
+                sum_N = 0
                 for child_node in curr_node.children:
-                    sum_C += child_node.N
+                    sum_N += child_node.N
 
-                next_node = max(curr_node.children,
-                                key=lambda x: x.Q() + x.U(sum_C))
+                next_node = max(curr_node.children, key=lambda x: x.Q() + x.U(sum_N))
                 curr_node = next_node
                 curr_path.append(next_node)
 
@@ -210,15 +288,11 @@ class SubgraphXExplainer(nn.Module):
                                               self.sample_num,
                                               features)
 
-            # Update nodes in curr_path
             for node in leaf_set:
                 node.N += 1
                 node.W += score_leaf_node
 
-        # Select subgraph with the highest score (P value) from S_l.
+        # Select subgraph with the highest score (P value)
         best_node = max(leaf_set, key=lambda x: x.P)
 
         return best_node.nodes
-
-    def explain_node(self):
-        pass

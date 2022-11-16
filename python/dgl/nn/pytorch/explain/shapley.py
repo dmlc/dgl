@@ -1,32 +1,59 @@
 import torch
 import dgl
-from ....base import NID, EID
 import numpy as np
-import copy
-
-# https://github.com/divelab/DIG/blob/dig-stable/dig/xgraph/method/shapley.py#L67
 
 
-# Original implementation of this func and shapley score funcs have a subgraph_building_method passed in.
-# subgraph_building_method either:
-#   graph_build_zero_filling : " subgraph building through masking the unselected nodes with zero features "
-#   graph_build_split: " subgraph building through spliting the selected nodes from the original graph "
+def neighbors(node, graph):
+    r""" Find the one-hop neighbours of a node for a given graph.
 
-# To simplify, we'll only have 1 way of building subgraphs from masks. In addition, won't rely on class
-# MarginalSubgraphDataset(Dataset).
+    Parameters
+    ----------
+    node: int
+        The node to get the neighbours.
+    graph : DGLGraph
+        A homogeneous graph.
+
+    Returns
+    -------
+    Function
+        Returns the largest weakly connected components in graph
+    """
+    nx_graph = dgl.to_networkx(graph)
+    neighbours = nx_graph.neighbors(node)
+
+    return list(neighbours)
+
 
 def marginal_contribution(graph, exclude_masks, include_masks, value_func, features):
-    """ Calculate the marginal value for each pair. Here exclude_mask and include_mask are node mask. """
+    r""" Calculate the marginal value for the sample coalition nodes (identified by
+    inluded_masks).
 
-    # Seems redundant to do : (shapley func) node index list ---> turned into node mask passed into
-    # marginal_contribution ---> (marginal_contribution) node index list
+    Parameters
+    ----------
+    graph : DGLGraph
+        A homogeneous graph.
+    exclude_masks : Tensor
+        Node mask of shape :math:`(1, D)`, where :math:`D`
+        is the number of nodes in the graph.
+    include_masks: Tensor
+        Node mask of shape :math:`(1, D)`, where :math:`D`
+        is the number of nodes in the graph.
+    value_func : function
+        T The value function that will be used to get the prediction.
+    features : Tensor
+        The input feature of shape :math:`(N, D)`. :math:`N` is the
+        number of nodes, and :math:`D` is the feature size.
 
+    Returns
+    -------
+    list of Tensor
+        Returns the marginal contribution for each node index that are in the coalition
+    """
     num_nodes = graph.num_nodes()
 
     marginal_contribution_list = []
 
     for exclude_mask, include_mask in zip(exclude_masks, include_masks):
-
         exclude_nodes = [j * exclude_mask[j] for j in range(num_nodes)]
         include_nodes = [j * include_mask[j] for j in range(num_nodes)]
 
@@ -42,8 +69,6 @@ def marginal_contribution(graph, exclude_masks, include_masks, value_func, featu
         exclude_subgraph = dgl.add_self_loop(exclude_subgraph)
         include_subgraph = dgl.add_self_loop(include_subgraph)
 
-        # WARNING: subgraph method relabels graph nodes but original labels can be recovered with parent_nid.
-        # Do we have to take this into account in the value_func methods?
         exclude_values = value_func(exclude_subgraph, exclude_features)
         include_values = value_func(include_subgraph, include_features)
 
@@ -54,18 +79,32 @@ def marginal_contribution(graph, exclude_masks, include_masks, value_func, featu
     return marginal_contributions
 
 
-def neighbors(node, graph):
-  # Assume neighbors are reachable in one hop; out-edges from node
-  nx_graph = dgl.to_networkx(graph)
-  neighbours = nx_graph.neighbors(node)
-
-  return list(neighbours)
-
-
-# https://github.com/divelab/DIG/blob/dig-stable/dig/xgraph/method/shapley.py
-# Change subgraph from list to dl.DGLGraph? What would be gained?
 def mc_l_shapley(value_func, graph, subgraph_nodes, local_radius, sample_num, features):
-    """ monte carlo sampling approximation of the l_shapley value """
+    r""" Monte carlo sampling approximation of the l_shapley value.
+
+    Parameters
+    ----------
+    value_func: function
+        The value function that will be used to get the prediction.
+    graph: DGLGraph
+        A homogeneous graph.
+    subgraph_nodes: list
+        The node ids of the subgraph that are associated with this tree node.
+    local_radius: int
+        Number of local radius to calculate :obj:`l_shapley`.
+    sample_num: int
+        Sampling time of monte carlo sampling approximation for
+        :obj:`mc_shapley`.
+    features : Tensor
+        The input feature of shape :math:`(N, D)`. :math:`N` is the
+        number of nodes, and :math:`D` is the feature size.
+
+    Returns
+    -------
+    float
+        Returns the mc_l_shapley value based on the subgraph nodes
+    """
+
     num_nodes = graph.num_nodes()
 
     local_region = subgraph_nodes.tolist()
@@ -82,10 +121,12 @@ def mc_l_shapley(value_func, graph, subgraph_nodes, local_radius, sample_num, fe
     set_include_masks = []
     for i in range(sample_num):
         subset_nodes_from = list(set(local_region) - set(subgraph_nodes))
-        random_nodes_permutation =subset_nodes_from + [coalition_placeholder]
+        random_nodes_permutation = subset_nodes_from + [coalition_placeholder]
         random_nodes_permutation = np.random.permutation(random_nodes_permutation)
         split_idx = np.where(random_nodes_permutation == coalition_placeholder)[0][0]
+
         selected_nodes = random_nodes_permutation[:split_idx]
+
         set_exclude_mask = np.ones(num_nodes, dtype=np.int8)
         set_exclude_mask[local_region] = 0.0
         set_exclude_mask[selected_nodes] = 1.0
@@ -105,5 +146,3 @@ def mc_l_shapley(value_func, graph, subgraph_nodes, local_radius, sample_num, fe
 
     mc_l_shapley_value = marginal_contributions.mean().item()
     return mc_l_shapley_value
-
-
