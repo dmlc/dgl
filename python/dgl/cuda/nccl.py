@@ -1,9 +1,85 @@
 """API creating NCCL communicators."""
 
+import torch
+import torch.distributed as dist
 from .. import backend as F
 from .._ffi.function import _init_api
 
-_COMM_MODES_MAP = {"remainder": 0}
+
+def sparse_all_to_all_push(idx, value, partition):
+    """Perform an all-to-all-v operation, where by all processors send out
+    a set of indices and corresponding values. Indices and values,
+    corresponding to the current process, will copied into the output
+    arrays.
+
+    Note: This method requires 'torch.distributed.is_initialized()' and
+    'torch.distributed.get_backend() == "nccl"'.
+
+    Parameters
+    ----------
+    idx : tensor
+        The 1D set of indices to send to other processors.
+    value : tensor
+        The multi-dimension set of values to send to other processors.
+        The first dimension must match that of `idx`.
+    partition : NDArrayPartition
+        The object containing information for assigning indices to
+        processors.
+
+    Returns
+    -------
+    tensor
+        The 1D tensor of the recieved indices.
+    tensor
+        The set of recieved values.
+
+    Examples
+    --------
+
+    To perform a sparse_all_to_all_push(), a partition object must be
+    provided. A partition of a homgeonous graph, where the vertices are
+    striped across processes can be generated via:
+
+    >>> from dgl.partition import NDArrayPartition
+    >>> part = NDArrayPartition(g.num_nodes(), comm.size(), mode='remainder' )
+
+    With this partition, each processor can send values to be associatd
+    with vertices in the graph. So if we have an array `global_idxs` of all of
+    the neighbors updated during mini-batch processing, and an array
+    `global_values` containing the new values associated with the neighbors,
+    we communicate them to the own processes via:
+
+    >>> my_idxs, my_values = comm.sparse_all_to_all_push(global_idxs, global_values, part)
+
+    This communication pattern is common when communicating gradient
+    updates for node embeddings.
+
+    Indices the current process owns, do not need to treated specially,
+    as internally they will be copied to the output array. If we have a
+    set of indices in process 0 '[0, 3, 8, 9, 10]` and for process 1
+    '[0, 2, 4, 5, 8, 8, 9]'. Using a remainder partition will result
+    indices for processe 0 of '[0, 8, 10, 0, 2, 4, 8, 8]', and for
+    process 1 of '[3, 9, 5, 9]'.
+    """
+    perm, send_splits = partition.generate_permutation(idx)
+
+    recv_splits = torch.empty_like(send_splits)
+    dist.all_to_all_single(recv_splits, send_splits)
+    recv_sum = recv_splits.sum()
+    recv_splits = recv_splits.tolist()
+    send_splits = send_splits.tolist()
+
+    # send idx
+    recv_idx = torch.empty((recv_sum,), dtype=idx.dtype, device=idx.device)
+    dist.all_to_all_single(recv_idx, idx[perm], recv_splits, send_splits)
+
+    # send value
+    recv_value = torch.empty(
+        (recv_sum, *value.shape[1:]), dtype=value.dtype, device=value.device
+    )
+    dist.all_to_all_single(recv_value, value[perm], recv_splits, send_splits)
+
+    return recv_idx, recv_value
 
 
 class UniqueId(object):
