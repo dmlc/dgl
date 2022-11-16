@@ -31,6 +31,10 @@ class MessageFunction(BuiltinFunction):
 
 class BinaryMessageFunction(MessageFunction):
     """Class for the lhs_op_rhs builtin message function.
+    
+    See Also
+    --------
+    u_mul_e
     """
     def __init__(self, binary_op, lhs, rhs, lhs_field, rhs_field, out_field):
         self.binary_op = binary_op
