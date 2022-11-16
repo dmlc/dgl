@@ -30,17 +30,17 @@ def sign_diffusion(A, X, r):
 class SIGN(nn.Module):
     def __init__(self, in_size, out_size, r, hidden_size=64):
         super().__init__()
-        self.linear = nn.ModuleList(
+        self.theta = nn.ModuleList(
             [nn.Linear(in_size, hidden_size) for _ in range(r + 1)]
         )
-        self.pred = nn.Linear(hidden_size * (r + 1), out_size)
+        self.omega = nn.Linear(hidden_size * (r + 1), out_size)
 
     def forward(self, X_sign):
         results = []
         for i in range(len(X_sign)):
-            results.append(self.linear[i](X_sign[i]))
+            results.append(self.theta[i](X_sign[i]))
         Z = F.relu(torch.cat(results, dim=1))
-        return F.sigmoid(self.pred(Z))
+        return F.sigmoid(self.omega(Z))
 
 
 if __name__ == "__main__":
