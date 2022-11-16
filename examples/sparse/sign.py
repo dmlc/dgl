@@ -27,7 +27,7 @@ def sign_diffusion(A, X, r):
     return X_sign
 
 
-class Sign(nn.Module):
+class SIGN(nn.Module):
     def __init__(self, in_size, out_size, r, hidden_size=64):
         super().__init__()
         self.linear = nn.ModuleList(
@@ -66,7 +66,7 @@ if __name__ == "__main__":
     # Create SIGN model.
     in_size = X.shape[1]
     out_size = dataset.num_classes
-    model = Sign(in_size, out_size, r)
+    model = SIGN(in_size, out_size, r)
 
     labels = g.ndata["label"]
     train_mask = g.ndata["train_mask"]
