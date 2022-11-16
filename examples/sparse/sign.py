@@ -14,12 +14,12 @@ from torch.optim import Adam
 from dgl.data import CoraGraphDataset
 from dgl.mock_sparse import create_from_coo, diag, identity
 
-# If CUDA is available, use GPU to accelerate the training, otherwise, use
-# CPU for the training.
-dev = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-# Perform the r-hops diffusion operation.
+################################################################################
+# (HIGHLIGHT) Take the advantage of DGL sparse API to significantly simplify the
+# code for sign diffusion operator.
+################################################################################
 def sign_diffusion(A, X, r):
+    # Perform the r-hops diffusion operation.
     X_sign = [X]
     for _ in range(r):
         X = A @ X
@@ -28,12 +28,12 @@ def sign_diffusion(A, X, r):
 
 
 class Sign(nn.Module):
-    def __init__(self, in_size, num_classes, r, hidden_size=64):
+    def __init__(self, in_size, out_size, r, hidden_size=64):
         super().__init__()
         self.linear = nn.ModuleList(
             [nn.Linear(in_size, hidden_size) for _ in range(r + 1)]
         )
-        self.pred = nn.Linear(hidden_size * (r + 1), num_classes)
+        self.pred = nn.Linear(hidden_size * (r + 1), out_size)
 
     def forward(self, X_sign):
         results = []
@@ -44,6 +44,10 @@ class Sign(nn.Module):
 
 
 if __name__ == "__main__":
+    # If CUDA is available, use GPU to accelerate the training, otherwise, use
+    # CPU for the training.
+    dev = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
     # Create graph from the existing dataset.
     dataset = CoraGraphDataset()
     g = dataset[0].to(dev)
@@ -58,7 +62,11 @@ if __name__ == "__main__":
     r = 2
     X = g.ndata["feat"]
     X_sign = sign_diffusion(A, X, r)
-    model = Sign(X.shape[1], dataset.num_classes, r)
+
+    # Create SIGN model.
+    in_size = X.shape[1]
+    out_size = dataset.num_classes
+    model = Sign(in_size, out_size, r)
 
     labels = g.ndata["label"]
     train_mask = g.ndata["train_mask"]
@@ -72,7 +80,7 @@ if __name__ == "__main__":
 
     for e in range(100):
         # Forward.
-        logits = model(X_sign)
+        logits = model(X_sign).to(dev)
 
         # Compute prediction.
         pred = logits.argmax(1)
@@ -80,7 +88,7 @@ if __name__ == "__main__":
         # Compute loss with nodes in training set.
         loss = F.cross_entropy(logits[train_mask], labels[train_mask])
 
-        # Compute accuracy on training/validation/test
+        # Compute accuracy on training/validation/test.
         train_acc = (pred[train_mask] == labels[train_mask]).float().mean()
         val_acc = (pred[val_mask] == labels[val_mask]).float().mean()
         test_acc = (pred[test_mask] == labels[test_mask]).float().mean()
@@ -91,7 +99,7 @@ if __name__ == "__main__":
             best_val_acc = val_acc
             best_test_acc = test_acc
 
-        # Backward
+        # Backward.
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
