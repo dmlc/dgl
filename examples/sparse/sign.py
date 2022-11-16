@@ -9,9 +9,10 @@ operators on top of symmetrically normalized adjacency matrix A.
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.optim import Adam
+
 from dgl.data import CoraGraphDataset
 from dgl.mock_sparse import create_from_coo, diag, identity
-from torch.optim import Adam
 
 # If CUDA is available, use GPU to accelerate the training, otherwise, use
 # CPU for the training.
@@ -19,81 +20,84 @@ dev = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # Perform the r-hops diffusion operation.
 def sign_diffusion(A, X, r):
-  X_sign = [X]
-  for _ in range(r):
-    X = A @ X
-    X_sign.append(X)
-  return X_sign
+    X_sign = [X]
+    for _ in range(r):
+        X = A @ X
+        X_sign.append(X)
+    return X_sign
+
 
 class Sign(nn.Module):
-  def __init__(self, in_size, num_classes, r, hidden_size=64):
-    super().__init__()
-    self.linear = nn.ModuleList(
+    def __init__(self, in_size, num_classes, r, hidden_size=64):
+        super().__init__()
+        self.linear = nn.ModuleList(
             [nn.Linear(in_size, hidden_size) for _ in range(r + 1)]
         )
-    self.pred = nn.Linear(hidden_size * (r + 1), num_classes)
+        self.pred = nn.Linear(hidden_size * (r + 1), num_classes)
 
-  def forward(self, X_sign):
-    results = []
-    for i in range(len(X_sign)):
-      results.append(self.linear[i](X_sign[i]))
-    Z = F.relu(torch.cat(results, dim=1))
-    return F.sigmoid(self.pred(Z))
+    def forward(self, X_sign):
+        results = []
+        for i in range(len(X_sign)):
+            results.append(self.linear[i](X_sign[i]))
+        Z = F.relu(torch.cat(results, dim=1))
+        return F.sigmoid(self.pred(Z))
 
 
-if __name__ == '__main__':
-  # Create graph from the existing dataset.
-  dataset = CoraGraphDataset()
-  g = dataset[0].to(dev)
-  
-  # Create the sparse adjacent matrix A (note that W was used as notion for
-  # adjacent matrix in the original paper).
-  src, dst = g.edges()
-  N = g.num_nodes()
-  A = create_from_coo(dst, src, shape=(N, N))
+if __name__ == "__main__":
+    # Create graph from the existing dataset.
+    dataset = CoraGraphDataset()
+    g = dataset[0].to(dev)
 
-  # 2-hops diffusion operators.
-  r = 2
-  X = g.ndata["feat"]
-  X_sign = sign_diffusion(A, X, r)
-  model = Sign(X.shape[1], dataset.num_classes, r)
+    # Create the sparse adjacent matrix A (note that W was used as notion for
+    # adjacent matrix in the original paper).
+    src, dst = g.edges()
+    N = g.num_nodes()
+    A = create_from_coo(dst, src, shape=(N, N))
 
-  labels = g.ndata["label"]
-  train_mask = g.ndata["train_mask"]
-  val_mask = g.ndata["val_mask"]
-  test_mask = g.ndata["test_mask"]
+    # 2-hops diffusion operators.
+    r = 2
+    X = g.ndata["feat"]
+    X_sign = sign_diffusion(A, X, r)
+    model = Sign(X.shape[1], dataset.num_classes, r)
 
-  loss_func = nn.CrossEntropyLoss()
-  optimizer = Adam(model.parameters(), lr=3e-3)
-  best_val_acc = 0
-  best_test_acc = 0
+    labels = g.ndata["label"]
+    train_mask = g.ndata["train_mask"]
+    val_mask = g.ndata["val_mask"]
+    test_mask = g.ndata["test_mask"]
 
-  for e in range(100):
-    # Forward.
-    logits = model(X_sign)
+    loss_func = nn.CrossEntropyLoss()
+    optimizer = Adam(model.parameters(), lr=3e-3)
+    best_val_acc = 0
+    best_test_acc = 0
 
-    # Compute prediction.
-    pred = logits.argmax(1)
+    for e in range(100):
+        # Forward.
+        logits = model(X_sign)
 
-    # Compute loss with nodes in training set.
-    loss = F.cross_entropy(logits[train_mask], labels[train_mask])
+        # Compute prediction.
+        pred = logits.argmax(1)
 
-    # Compute accuracy on training/validation/test
-    train_acc = (pred[train_mask] == labels[train_mask]).float().mean()
-    val_acc = (pred[val_mask] == labels[val_mask]).float().mean()
-    test_acc = (pred[test_mask] == labels[test_mask]).float().mean()
+        # Compute loss with nodes in training set.
+        loss = F.cross_entropy(logits[train_mask], labels[train_mask])
 
-    # Save the best validation accuracy and the corresponding test
-    # accuracy.
-    if best_val_acc < val_acc:
-      best_val_acc = val_acc
-      best_test_acc = test_acc
+        # Compute accuracy on training/validation/test
+        train_acc = (pred[train_mask] == labels[train_mask]).float().mean()
+        val_acc = (pred[val_mask] == labels[val_mask]).float().mean()
+        test_acc = (pred[test_mask] == labels[test_mask]).float().mean()
 
-    # Backward
-    optimizer.zero_grad()
-    loss.backward()
-    optimizer.step()
+        # Save the best validation accuracy and the corresponding test
+        # accuracy.
+        if best_val_acc < val_acc:
+            best_val_acc = val_acc
+            best_test_acc = test_acc
 
-    if e % 5 == 0:
-      print(f"In epoch {e}, loss: {loss:.3f}, val acc: {val_acc:.3f} (best "
-      f"{best_val_acc:.3f}), test acc: {test_acc:.3f} (best {best_test_acc:.3f})")
+        # Backward
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        if e % 5 == 0:
+            print(
+                f"In epoch {e}, loss: {loss:.3f}, val acc: {val_acc:.3f} (best "
+                f"{best_val_acc:.3f}), test acc: {test_acc:.3f} (best {best_test_acc:.3f})"
+            )
