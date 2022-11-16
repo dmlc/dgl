@@ -1293,7 +1293,7 @@ class PartitionPolicy(object):
 
     def get_data_name(self, name):
         """Get HeteroDataName"""
-        is_node = NODE_PART_POLICY in self.policy_str
+        is_node = self.policy_str.startswith(NODE_PART_POLICY)
         return HeteroDataName(is_node, self.type_name, name)
 
     def to_local(self, id_tensor):

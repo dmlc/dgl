@@ -664,8 +664,10 @@ def test_RangePartitionBook():
 
     node_policy = NodePartitionPolicy(gpb, "node1")
     assert node_policy.type_name == "node1"
+    assert node_policy.get_data_name('x').is_node()
     edge_policy = EdgePartitionPolicy(gpb, c_etype)
     assert edge_policy.type_name == c_etype
+    assert edge_policy.get_data_name('x').is_edge()
 
     expect_except = False
     try:
