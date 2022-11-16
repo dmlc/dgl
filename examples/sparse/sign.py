@@ -99,5 +99,6 @@ if __name__ == "__main__":
         if e % 5 == 0:
             print(
                 f"In epoch {e}, loss: {loss:.3f}, val acc: {val_acc:.3f} (best "
-                f"{best_val_acc:.3f}), test acc: {test_acc:.3f} (best {best_test_acc:.3f})"
+                f"{best_val_acc:.3f}), test acc: {test_acc:.3f} (best "
+                f"{best_test_acc:.3f})"
             )
