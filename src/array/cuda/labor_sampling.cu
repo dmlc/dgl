@@ -305,7 +305,7 @@ void compute_importance_sampling_probabilities(
     const IdType* indptr, const IdType* subindptr, const IdType* indices,
     IdArray idx_coo_arr, const IdType* nids,
     FloatArray cs_arr,  // holds the computed cs values, has size num_rows
-    const bool weights, const FloatType* A, const FloatType* ds,
+    const bool weighted, const FloatType* A, const FloatType* ds,
     const FloatType* d2s, const IdType num_picks, DGLContext ctx,
     const runtime::CUDAWorkspaceAllocator& allocator,
     const exec_policy_t& exec_policy, const int importance_sampling,
@@ -317,7 +317,7 @@ void compute_importance_sampling_probabilities(
   auto device = runtime::DeviceAPI::Get(ctx);
   auto idx_coo = idx_coo_arr.Ptr<IdType>();
   auto cs = cs_arr.Ptr<FloatType>();
-  FloatArray A_l_arr = weights
+  FloatArray A_l_arr = weighted
                            ? NewFloatArray(hop_size, ctx, sizeof(FloatType) * 8)
                            : NullArray();
   auto A_l = A_l_arr.Ptr<FloatType>();
@@ -334,7 +334,7 @@ void compute_importance_sampling_probabilities(
     CUDA_KERNEL_CALL(
         (_CSRRowWiseOneHopExtractorKernel<IdType, FloatType>), grid, block, 0,
         stream, random_seed, hop_size, rows, indptr, subindptr, indices,
-        idx_coo, nids, weights ? A : nullptr, rands, hop_1, A_l);
+        idx_coo, nids, weighted ? A : nullptr, rands, hop_1, A_l);
   }
   int64_t hop_uniq_size = 0;
   IdArray hop_new_arr = NewIdArray(hop_size, ctx, sizeof(IdType) * 8);
@@ -415,7 +415,7 @@ void compute_importance_sampling_probabilities(
 
   for (int iters = 0; iters < importance_sampling || importance_sampling < 0;
        iters++) {
-    if (weights && iters == 0) {
+    if (weighted && iters == 0) {
       cuda::SpMMCoo<
           IdType, FloatType, cuda::binary::Mul<FloatType>,
           cuda::reduce::Max<IdType, FloatType, true>>(
@@ -446,8 +446,8 @@ void compute_importance_sampling_probabilities(
           (_CSRRowWiseLayerSampleDegreeKernel<
               IdType, FloatType, BLOCK_CTAS, TILE_SIZE>),
           grid, block, 0, stream, (IdType)num_picks, num_rows, rows, cs,
-          weights ? ds : nullptr, weights ? d2s : nullptr, indptr, probs_found,
-          A, subindptr);
+          weighted ? ds : nullptr, weighted ? d2s : nullptr, indptr,
+          probs_found, A, subindptr);
     }
 
     {
@@ -468,7 +468,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
     CSRMatrix mat, IdArray rows_arr, const int64_t num_picks,
     FloatArray prob_arr, const int importance_sampling, IdArray random_seed_arr,
     IdArray NIDs) {
-  const bool weights = !IsNullArray(prob_arr);
+  const bool weighted = !IsNullArray(prob_arr);
 
   const auto& ctx = rows_arr->ctx;
 
@@ -494,17 +494,17 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
   FloatArray cs_arr = NewFloatArray(num_rows, ctx, sizeof(FloatType) * 8);
   auto cs = cs_arr.Ptr<FloatType>();
   // ds stands for A_{*s} in arXiv:2210.13339
-  FloatArray ds_arr = weights
+  FloatArray ds_arr = weighted
                           ? NewFloatArray(num_rows, ctx, sizeof(FloatType) * 8)
                           : NullArray();
   auto ds = ds_arr.Ptr<FloatType>();
   // d2s stands for (A^2)_{*s} in arXiv:2210.13339, ^2 is elementwise.
-  FloatArray d2s_arr = weights
+  FloatArray d2s_arr = weighted
                            ? NewFloatArray(num_rows, ctx, sizeof(FloatType) * 8)
                            : NullArray();
   auto d2s = d2s_arr.Ptr<FloatType>();
 
-  if (weights) {
+  if (weighted) {
     auto b_offsets =
         thrust::make_transform_iterator(rows, IndptrFunc<IdType>{indptr});
     auto e_offsets =
@@ -528,8 +528,8 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
   thrust::for_each(
       exec_policy, iota, iota + num_rows,
       DegreeFunc<IdType, FloatType>{
-          (IdType)num_picks, rows, indptr, weights ? ds : nullptr, in_deg.get(),
-          cs});
+          (IdType)num_picks, rows, indptr, weighted ? ds : nullptr,
+          in_deg.get(), cs});
 
   // fill subindptr
   IdArray subindptr_arr = NewIdArray(num_rows + 1, ctx, sizeof(IdType) * 8);
@@ -565,8 +565,8 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
   auto probs_found =
       allocator.alloc_unique<FloatType>(importance_sampling ? hop_size : 1);
 
-  if (weights) {  // the computed c values are wrong when there are weights, so
-                  // we recompute.
+  if (weighted) {
+    // Recompute c for weighted graphs.
     constexpr int BLOCK_CTAS = BLOCK_SIZE / CTA_SIZE;
     // the number of rows each thread block will cover
     constexpr int TILE_SIZE = BLOCK_CTAS;
@@ -588,7 +588,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
     compute_importance_sampling_probabilities<
         IdType, FloatType, decltype(exec_policy)>(
         mat, hop_size, stream, random_seed, num_rows, rows, indptr, subindptr,
-        indices, idx_coo_arr, nids, cs_arr, weights, A, ds, d2s,
+        indices, idx_coo_arr, nids, cs_arr, weighted, A, ds, d2s,
         (IdType)num_picks, ctx, allocator, exec_policy, importance_sampling,
         hop_1, rands.get(), probs_found.get());
 
@@ -596,7 +596,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
   IdArray picked_col = NewIdArray(hop_size, ctx, sizeof(IdType) * 8);
   IdArray picked_idx = NewIdArray(hop_size, ctx, sizeof(IdType) * 8);
   FloatArray picked_imp =
-      importance_sampling || weights
+      importance_sampling || weighted
           ? NewFloatArray(hop_size, ctx, sizeof(FloatType) * 8)
           : NullArray();
 
@@ -606,7 +606,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
   FloatType* const picked_imp_data = picked_imp.Ptr<FloatType>();
 
   auto picked_inrow = allocator.alloc_unique<IdType>(
-      importance_sampling || weights ? hop_size : 1);
+      importance_sampling || weighted ? hop_size : 1);
 
   // Sample edges here
   IdType num_edges;
@@ -616,7 +616,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
       auto output = thrust::make_zip_iterator(
           picked_inrow.get(), picked_row_data, picked_col_data, picked_idx_data,
           picked_imp_data);
-      if (weights) {
+      if (weighted) {
         auto transformed_output = thrust::make_transform_output_iterator(
             output,
             TransformOpImp<
@@ -683,7 +683,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
   }
 
   // Normalize edge weights here
-  if (importance_sampling || weights) {
+  if (importance_sampling || weighted) {
     thrust::constant_iterator<IdType> one(1);
     // contains degree information
     auto ds = allocator.alloc_unique<IdType>(num_rows);
@@ -727,7 +727,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
   picked_row = picked_row.CreateView({num_edges}, picked_row->dtype);
   picked_col = picked_col.CreateView({num_edges}, picked_col->dtype);
   picked_idx = picked_idx.CreateView({num_edges}, picked_idx->dtype);
-  if (importance_sampling || weights)
+  if (importance_sampling || weighted)
     picked_imp = picked_imp.CreateView({num_edges}, picked_imp->dtype);
 
   return std::make_pair(

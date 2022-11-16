@@ -546,7 +546,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
   std::pair<COOMatrix, FloatArray> ret;
   ATEN_CSR_SWITCH_CUDA_UVA(mat, rows, XPU, IdType, "CSRLaborSampling", {
     const auto dtype = IsNullArray(prob)
-                           ? DGLDataType{kDGLFloat, 8 * sizeof(float), 1}
+                           ? DGLDataTypeTraits<float>::dtype
                            : prob->dtype;
     ATEN_FLOAT_TYPE_SWITCH(dtype, FloatType, "probability", {
       ret = impl::CSRLaborSampling<XPU, IdType, FloatType>(
@@ -820,7 +820,7 @@ std::pair<COOMatrix, FloatArray> COOLaborSampling(
   std::pair<COOMatrix, FloatArray> ret;
   ATEN_COO_SWITCH(mat, XPU, IdType, "COOLaborSampling", {
     const auto dtype = IsNullArray(prob)
-                           ? DGLDataType{kDGLFloat, 8 * sizeof(float), 1}
+                           ? DGLDataTypeTraits<float>::dtype
                            : prob->dtype;
     ATEN_FLOAT_TYPE_SWITCH(dtype, FloatType, "probability", {
       ret = impl::COOLaborSampling<XPU, IdType, FloatType>(
