@@ -592,5 +592,19 @@ class NDArrayPartition(object):
             )
         )
 
+    def generate_permutation(self, idxs):
+        """Create a mapping for the given indices to different partitions,
+        and a count of the number of indices per part.
+
+        Return
+        ------
+        perm (Tensor): The permutation to re-order the indices by partition.
+        send_sum (Tensor): The number of indices per partition.
+        """
+        ret = _CAPI_DGLNDArrayPartitionGeneratePermutation(
+            self._partition, F.zerocopy_to_dgl_ndarray(idxs)
+        )
+        return F.zerocopy_from_dgl_ndarray(ret(0)), \
+            F.zerocopy_from_dgl_ndarray(ret(1))
 
 _init_api("dgl.partition")
