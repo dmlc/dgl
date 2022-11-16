@@ -620,7 +620,7 @@ def expand_as_pair(input_, g=None):
     ----------
     input_ : Tensor, dict[str, Tensor], or their pairs
         The input features
-    g : DGLHeteroGraph or DGLGraph or None
+    g : DGLGraph or None
         The graph.
 
         If None, skip checking if the graph is a block.

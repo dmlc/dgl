@@ -10,7 +10,7 @@ from .. import backend as F
 from .. import utils
 from ..batch import batch
 from ..convert import heterograph
-from ..heterograph import DGLHeteroGraph as DGLGraph
+from ..heterograph import DGLGraph
 from ..distributed.dist_graph import DistGraph
 from ..utils import to_device
 

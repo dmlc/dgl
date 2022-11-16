@@ -9,7 +9,7 @@ from . import backend as F
 from . import utils
 from ._ffi.function import _init_api
 from .base import EID, ETYPE, NID, NTYPE
-from .heterograph import DGLHeteroGraph
+from .heterograph import DGLGraph
 from .ndarray import NDArray
 from .subgraph import edge_subgraph
 
@@ -49,7 +49,7 @@ def reorder_nodes(g, new_node_ids):
     new_gidx = _CAPI_DGLReorderGraph_Hetero(
         g._graph, new_node_ids.todgltensor()
     )
-    new_g = DGLHeteroGraph(gidx=new_gidx, ntypes=["_N"], etypes=["_E"])
+    new_g = DGLGraph(gidx=new_gidx, ntypes=["_N"], etypes=["_E"])
     new_g.ndata["orig_id"] = idx
     return new_g
 
@@ -211,7 +211,7 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
 
     # This creaets a subgraph from subgraphs returned from the CAPI above.
     def create_subgraph(subg, induced_nodes, induced_edges, inner_node):
-        subg1 = DGLHeteroGraph(gidx=subg.graph, ntypes=["_N"], etypes=["_E"])
+        subg1 = DGLGraph(gidx=subg.graph, ntypes=["_N"], etypes=["_E"])
         # If IDs are shuffled, we should shuffled edges. This will help us collect edge data
         # from the distributed graph after training.
         if reshuffle:
@@ -325,7 +325,7 @@ def metis_partition_assignment(
     # The METIS runs on the symmetric graph to generate the node assignment to partitions.
     start = time.time()
     sym_gidx = _CAPI_DGLMakeSymmetric_Hetero(g._graph)
-    sym_g = DGLHeteroGraph(gidx=sym_gidx)
+    sym_g = DGLGraph(gidx=sym_gidx)
     print(
         "Convert a graph into a bidirected graph: {:.3f} seconds, peak memory: {:.3f} GB".format(
             time.time() - start, get_peak_mem()
