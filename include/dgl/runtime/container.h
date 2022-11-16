@@ -235,7 +235,9 @@ class List : public ObjectRef {
   }
   /**
    * @brief Constructs a container with n elements. Each element is a copy of
-   * val \param n The size of the container \param val The init value
+   * val
+   * @param n The size of the container
+   * @param val The init value
    */
   explicit List(size_t n, const T& val) {
     auto tmp_obj = std::make_shared<ListObject>();

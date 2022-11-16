@@ -2672,6 +2672,34 @@ def test_shortest_dist(idtype):
     assert F.array_equal(dist, tgt_dist)
     assert F.array_equal(paths, tgt_paths)
 
+@parametrize_idtype
+def test_module_to_levi(idtype):
+    transform = dgl.ToLevi()
+    g = dgl.graph(([0, 1, 2, 3], [1, 2, 3, 0]), idtype=idtype, device=F.ctx())
+    g.ndata['h'] = F.randn((g.num_nodes(), 2))
+    g.edata['w'] = F.randn((g.num_edges(), 2))
+    lg = transform(g)
+    assert lg.device == g.device
+    assert lg.idtype == g.idtype
+    assert lg.ntypes == ['edge', 'node']
+    assert lg.canonical_etypes == [('edge', 'e2n', 'node'),
+                                   ('node', 'n2e', 'edge')]
+    assert lg.num_nodes('node') == g.num_nodes()
+    assert lg.num_nodes('edge') == g.num_edges()
+    assert lg.num_edges('n2e') == g.num_edges()
+    assert lg.num_edges('e2n') == g.num_edges()
+
+    src, dst = lg.edges(etype='n2e')
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 0), (1, 1), (2, 2), (3, 3)}
+
+    src, dst = lg.edges(etype='e2n')
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 1), (1, 2), (2, 3), (3, 0)}
+
+    assert F.allclose(lg.nodes['node'].data['h'], g.ndata['h'])
+    assert F.allclose(lg.nodes['edge'].data['w'], g.edata['w'])
+
 if __name__ == '__main__':
     test_partition_with_halo()
     test_module_heat_kernel(F.int32)

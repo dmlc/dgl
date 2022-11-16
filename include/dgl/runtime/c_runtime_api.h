@@ -246,7 +246,8 @@ DGL_DLL void DGLAPISetLastError(const char* msg);
  *  DGLGetLastError can be called to retrieve the error
  *
  *  this function is threadsafe and can be called by different thread
- *  \return error info
+ *
+ * @return error info
  */
 DGL_DLL const char* DGLGetLastError(void);
 /**

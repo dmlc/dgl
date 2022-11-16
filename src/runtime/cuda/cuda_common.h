@@ -118,9 +118,16 @@ struct cuda_dtype {
 };
 
 template <>
-struct cuda_dtype<half> {
+struct cuda_dtype<__half> {
   static constexpr cudaDataType_t value = CUDA_R_16F;
 };
+
+#if BF16_ENABLED
+template <>
+struct cuda_dtype<__nv_bfloat16> {
+  static constexpr cudaDataType_t value = CUDA_R_16BF;
+};
+#endif  // BF16_ENABLED
 
 template <>
 struct cuda_dtype<float> {
@@ -130,6 +137,36 @@ struct cuda_dtype<float> {
 template <>
 struct cuda_dtype<double> {
   static constexpr cudaDataType_t value = CUDA_R_64F;
+};
+
+/*
+ * \brief Accumulator type for SpMM.
+ */
+template <typename T>
+struct accum_dtype {
+  typedef float type;
+};
+
+template <>
+struct accum_dtype<__half> {
+  typedef float type;
+};
+
+#if BF16_ENABLED
+template <>
+struct accum_dtype<__nv_bfloat16> {
+  typedef float type;
+};
+#endif  // BF16_ENABLED
+
+template <>
+struct accum_dtype<float> {
+  typedef float type;
+};
+
+template <>
+struct accum_dtype<double> {
+  typedef double type;
 };
 
 #if CUDART_VERSION >= 11000

@@ -188,9 +188,11 @@ class BaseHeteroGraph : public runtime::Object {
   /**
    * @brief Get all edge ids between the two given endpoints
    * @note The given src and dst vertices should belong to the source vertex
-   * type and the dest vertex type of the given edge type, respectively. \param
-   * etype The edge type \param src The source vertex. \param dst The
-   * destination vertex. \return the edge id array.
+   * type and the dest vertex type of the given edge type, respectively.
+   * @param etype The edge type
+   * @param src The source vertex.
+   * @param dst The destination vertex.
+   * @return the edge id array.
    */
   virtual IdArray EdgeId(
       dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const = 0;
@@ -284,17 +286,18 @@ class BaseHeteroGraph : public runtime::Object {
    * @brief Get all the edges in the graph.
    * @note If order is "srcdst", the returned edges list is sorted by their src
    * and dst ids. If order is "eid", they are in their edge id order. Otherwise,
-   * in the arbitrary order. \param etype The edge type \param order The order
-   * of the returned edge list. \return the id arrays of the two endpoints of
-   * the edges.
+   * in the arbitrary order.
+   * @param etype The edge type
+   * @param order The order of the returned edge list.
+   * @return the id arrays of the two endpoints of the edges.
    */
   virtual EdgeArray Edges(
       dgl_type_t etype, const std::string& order = "") const = 0;
 
   /**
    * @brief Get the in degree of the given vertex.
-   * @note The given vertex should belong to the dest vertex type
-   *       of the given edge type.
+   * @note The given vertex should belong to the dest vertex type of the given
+   * edge type.
    * @param etype The edge type
    * @param vid The vertex id.
    * @return the in degree
@@ -303,8 +306,8 @@ class BaseHeteroGraph : public runtime::Object {
 
   /**
    * @brief Get the in degrees of the given vertices.
-   * @note The given vertex should belong to the dest vertex type
-   *       of the given edge type.
+   * @note The given vertex should belong to the dest vertex type of the given
+   * edge type.
    * @param etype The edge type
    * @param vid The vertex id array.
    * @return the in degree array
@@ -313,8 +316,8 @@ class BaseHeteroGraph : public runtime::Object {
 
   /**
    * @brief Get the out degree of the given vertex.
-   * @note The given vertex should belong to the source vertex type
-   *       of the given edge type.
+   * @note The given vertex should belong to the source vertex type of the given
+   * edge type.
    * @param etype The edge type
    * @param vid The vertex id.
    * @return the out degree
@@ -323,8 +326,8 @@ class BaseHeteroGraph : public runtime::Object {
 
   /**
    * @brief Get the out degrees of the given vertices.
-   * @note The given vertex should belong to the source vertex type
-   *       of the given edge type.
+   * @note The given vertex should belong to the source vertex type of the given
+   * edge type.
    * @param etype The edge type
    * @param vid The vertex id array.
    * @return the out degree array
@@ -333,8 +336,8 @@ class BaseHeteroGraph : public runtime::Object {
 
   /**
    * @brief Return the successor vector
-   * @note The given vertex should belong to the source vertex type
-   *       of the given edge type.
+   * @note The given vertex should belong to the source vertex type of the given
+   * edge type.
    * @param vid The vertex id.
    * @return the successor vector iterator pair.
    */
@@ -342,8 +345,8 @@ class BaseHeteroGraph : public runtime::Object {
 
   /**
    * @brief Return the out edge id vector
-   * @note The given vertex should belong to the source vertex type
-   *       of the given edge type.
+   * @note The given vertex should belong to the source vertex type of the given
+   * edge type.
    * @param vid The vertex id.
    * @return the out edge id vector iterator pair.
    */
@@ -351,8 +354,8 @@ class BaseHeteroGraph : public runtime::Object {
 
   /**
    * @brief Return the predecessor vector
-   * @note The given vertex should belong to the dest vertex type
-   *       of the given edge type.
+   * @note The given vertex should belong to the dest vertex type of the given
+   * edge type.
    * @param vid The vertex id.
    * @return the predecessor vector iterator pair.
    */
@@ -360,8 +363,8 @@ class BaseHeteroGraph : public runtime::Object {
 
   /**
    * @brief Return the in edge id vector
-   * @note The given vertex should belong to the dest vertex type
-   *       of the given edge type.
+   * @note The given vertex should belong to the dest vertex type of the given
+   * edge type.
    * @param vid The vertex id.
    * @return the in edge id vector iterator pair.
    */
@@ -391,7 +394,6 @@ class BaseHeteroGraph : public runtime::Object {
   /**
    * @brief Determine which format to use with a preference.
    *
-
    * Otherwise, it will return whatever DGL thinks is the most appropriate given
    * the arguments.
    *
@@ -477,7 +479,8 @@ class BaseHeteroGraph : public runtime::Object {
    *
    * @param eids The edges in the subgraph.
    * @param preserve_nodes If true, the vertices will not be relabeled, so some
-   * vertices may have no incident edges. \return the subgraph.
+   * vertices may have no incident edges.
+   * @return the subgraph.
    */
   virtual HeteroSubgraph EdgeSubgraph(
       const std::vector<IdArray>& eids, bool preserve_nodes = false) const = 0;
@@ -713,7 +716,8 @@ HeteroGraphPtr CreateFromCSC(
  * @param graph Graph
  * @param nodes Node IDs of each type
  * @param relabel_nodes Whether to remove isolated nodes and relabel the rest
- * ones \return Subgraph containing only the in edges. The returned graph has
+ * ones
+ * @return Subgraph containing only the in edges. The returned graph has
  * the same schema as the original one.
  */
 HeteroSubgraph InEdgeGraph(
@@ -725,7 +729,8 @@ HeteroSubgraph InEdgeGraph(
  * @param graph Graph
  * @param nodes Node IDs of each type
  * @param relabel_nodes Whether to remove isolated nodes and relabel the rest
- * ones \return Subgraph containing only the out edges. The returned graph has
+ * ones
+ * @return Subgraph containing only the out edges. The returned graph has
  * the same schema as the original one.
  */
 HeteroSubgraph OutEdgeGraph(
