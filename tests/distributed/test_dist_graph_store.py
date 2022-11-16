@@ -697,12 +697,19 @@ def create_random_hetero():
         )
         edges[etype] = (arr.row, arr.col)
     g = dgl.heterograph(edges, num_nodes)
-    g.nodes["n1"].data["feat"] = F.unsqueeze(
-        F.arange(0, g.number_of_nodes("n1")), 1
-    )
-    g.edges["r1"].data["feat"] = F.unsqueeze(
-        F.arange(0, g.number_of_edges("r1")), 1
-    )
+    # assign ndata & edata.
+    # data with same name as ntype/etype is assigned on purpose to verify
+    # such same names can be correctly handled in DistGraph.
+    ntype = 'n1'
+    for name in ['feat', ntype]:
+        g.nodes[ntype].data[name] = F.unsqueeze(
+            F.arange(0, g.num_nodes(ntype)), 1
+        )
+    etype = 'r1'
+    for name in ['feat', etype]:
+        g.edges[etype].data[name] = F.unsqueeze(
+            F.arange(0, g.num_edges(etype)), 1
+        )
     return g
 
 
@@ -723,22 +730,26 @@ def check_dist_graph_hetero(g, num_clients, num_nodes, num_edges):
     assert g.number_of_edges() == sum([num_edges[etype] for etype in num_edges])
 
     # Test reading node data
-    nids = F.arange(0, int(g.number_of_nodes("n1") / 2))
-    feats1 = g.nodes["n1"].data["feat"][nids]
-    feats = F.squeeze(feats1, 1)
-    assert np.all(F.asnumpy(feats == nids))
+    ntype = 'n1'
+    nids = F.arange(0, g.num_nodes(ntype) // 2)
+    for name in ['feat', ntype]:
+        data = g.nodes[ntype].data[name][nids]
+        data = F.squeeze(data, 1)
+        assert np.all(F.asnumpy(data == nids))
 
     # Test reading edge data
-    eids = F.arange(0, int(g.number_of_edges("r1") / 2))
-    # access via etype
-    feats = g.edges["r1"].data["feat"][eids]
-    feats = F.squeeze(feats, 1)
-    assert np.all(F.asnumpy(feats == eids))
-    # access via canonical etype
-    c_etype = g.to_canonical_etype("r1")
-    feats = g.edges[c_etype].data["feat"][eids]
-    feats = F.squeeze(feats, 1)
-    assert np.all(F.asnumpy(feats == eids))
+    etype = 'r1'
+    eids = F.arange(0, g.num_edges(etype) // 2)
+    for name in ['feat', etype]:
+        # access via etype
+        data = g.edges[etype].data[name][eids]
+        data = F.squeeze(data, 1)
+        assert np.all(F.asnumpy(data == eids))
+        # access via canonical etype
+        c_etype = g.to_canonical_etype(etype)
+        data = g.edges[c_etype].data[name][eids]
+        data = F.squeeze(data, 1)
+        assert np.all(F.asnumpy(data == eids))
 
     # Test edge_subgraph
     sg = g.edge_subgraph({"r1": eids})

@@ -522,8 +522,6 @@ class DistGraph:
 
         self._ndata_store = {}
         self._edata_store = {}
-        self._ndata = NodeDataView(self)
-        self._edata = EdgeDataView(self)
 
         self._num_nodes = 0
         self._num_edges = 0
@@ -554,8 +552,6 @@ class DistGraph:
 
         self._ndata_store = {}
         self._edata_store = {}
-        self._ndata = NodeDataView(self)
-        self._edata = EdgeDataView(self)
         self._num_nodes = 0
         self._num_edges = 0
         for part_md in self._gpb.metadata():
@@ -600,7 +596,7 @@ class DistGraph:
             The data view in the distributed graph storage.
         """
         assert len(self.ntypes) == 1, "ndata only works for a graph with one node type."
-        return self._ndata
+        return NodeDataView(self)
 
     @property
     def edata(self):
@@ -612,7 +608,7 @@ class DistGraph:
             The data view in the distributed graph storage.
         """
         assert len(self.etypes) == 1, "edata only works for a graph with one edge type."
-        return self._edata
+        return EdgeDataView(self)
 
     @property
     def idtype(self):
