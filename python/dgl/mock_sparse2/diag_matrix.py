@@ -43,8 +43,7 @@ class DiagMatrix:
         return f"DiagMatrix(val={self.val}, \nshape={self.shape})"
 
     def __call__(self, x: torch.Tensor):
-        """Create a new diagonal matrix with the same shape as self
-        but different values.
+        """Set the non-zero values inplace and return the object.
 
         Parameters
         ----------
@@ -71,7 +70,8 @@ class DiagMatrix:
         DiagMatrix(val=tensor([2., 2., 2., 2., 2.]),
                    shape=(5, 5))
         """
-        return diag(x, self.shape)
+        self.val = x
+        return self
 
     @property
     def nnz(self) -> int:

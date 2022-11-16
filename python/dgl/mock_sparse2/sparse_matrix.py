@@ -37,7 +37,7 @@ class SparseMatrix:
 
         Parameters
         ----------
-        x : torch.Tensor, optional
+        x : torch.Tensor
             The values of shape (nnz) or (nnz, D)
 
         Returns
