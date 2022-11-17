@@ -176,7 +176,7 @@ class NodeDataView(MutableMapping):
 
     def __init__(self, g, ntype=None):
         self._graph = g
-        if ntype is None:
+        if ntype is None or len(g.ntypes) == 1:
             self._data = g._ndata_store
         else:
             if ntype not in g.ntypes:
@@ -218,7 +218,7 @@ class EdgeDataView(MutableMapping):
 
     def __init__(self, g, etype=None):
         self._graph = g
-        if etype is None:
+        if etype is None or len(g.canonical_etypes) == 1:
             self._data = g._edata_store
         else:
             c_etype = g.to_canonical_etype(etype)
