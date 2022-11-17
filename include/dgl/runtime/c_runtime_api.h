@@ -64,9 +64,9 @@ typedef enum {
  *        objects passed between C and Python.
  */
 typedef enum {
-  kInt = 0U,
-  kUInt = 1U,
-  kFloat = 2U,
+  kObjectInt = 0U,
+  kObjectUInt = 1U,
+  kObjectFloat = 2U,
   kHandle = 3U,
   kNull = 4U,
   kDGLDataType = 5U,
