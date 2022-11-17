@@ -106,7 +106,7 @@ if __name__ == "__main__":
     D_hat = diag(A_hat.sum(dim=1)) ** -0.5
     A_hat = D_hat @ A_hat @ D_hat
 
-    # 2-hops diffusion operators.
+    # 2-hop diffusion.
     r = 2
     X = g.ndata["feat"]
     X_sign = sign_diffusion(A_hat, X, r)
