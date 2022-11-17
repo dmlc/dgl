@@ -1,4 +1,4 @@
-"""API creating NCCL communicators."""
+"""API wrapping NCCL primitives."""
 
 import torch
 import torch.distributed as dist
@@ -41,7 +41,7 @@ def sparse_all_to_all_push(idx, value, partition):
     striped across processes can be generated via:
 
     >>> from dgl.partition import NDArrayPartition
-    >>> part = NDArrayPartition(g.num_nodes(), comm.size(), mode='remainder' )
+    >>> part = NDArrayPartition(g.num_nodes(), world_size, mode='remainder' )
 
     With this partition, each processor can send values to be associatd
     with vertices in the graph. So if we have an array `global_idxs` of all of
@@ -49,7 +49,7 @@ def sparse_all_to_all_push(idx, value, partition):
     `global_values` containing the new values associated with the neighbors,
     we communicate them to the own processes via:
 
-    >>> my_idxs, my_values = comm.sparse_all_to_all_push(global_idxs, global_values, part)
+    >>> my_idxs, my_values = nccl.sparse_all_to_all_push(global_idxs, global_values, part)
 
     This communication pattern is common when communicating gradient
     updates for node embeddings.
@@ -61,6 +61,9 @@ def sparse_all_to_all_push(idx, value, partition):
     indices for processe 0 of '[0, 8, 10, 0, 2, 4, 8, 8]', and for
     process 1 of '[3, 9, 5, 9]'.
     """
+    if not dist.is_initialized() or dist.get_world_size() == 1:
+        return idx, value
+
     perm, send_splits = partition.generate_permutation(idx)
     perm = perm.long()
 
@@ -111,7 +114,7 @@ def sparse_all_to_all_pull(req_idx, value, partition):
     striped across processes can be generated via:
 
     >>> from dgl.partition import NDArrayPartition
-    >>> part = NDArrayPartition(g.num_nodes(), comm.size(), mode='remainder' )
+    >>> part = NDArrayPartition(g.num_nodes(), world_size, mode='remainder' )
 
     With this partition, each processor can request values/features
     associated with vertices in the graph. So in the case where we have
@@ -119,7 +122,7 @@ def sparse_all_to_all_pull(req_idx, value, partition):
     has a tensor 'node_feat' storing the features of nodes it owns in
     the partition, the features can be requested via:
 
-    >>> nbr_values = comm.sparse_all_to_all_pull(nbr_idxs, node_feat, part)
+    >>> nbr_values = nccl.sparse_all_to_all_pull(nbr_idxs, node_feat, part)
 
     Then two the arrays 'nbr_idxs' and 'nbr_values' forms the sparse
     set of features, where 'nbr_idxs[i]' is the global node id, and
@@ -127,6 +130,9 @@ def sparse_all_to_all_pull(req_idx, value, partition):
     communication pattern is useful for node features or node
     embeddings.
     """
+    if not dist.is_initialized() or dist.get_world_size() == 1:
+        return value[req_idx.long()]
+
     perm, req_splits = partition.generate_permutation(req_idx)
     perm = perm.long()
 
@@ -138,7 +144,9 @@ def sparse_all_to_all_pull(req_idx, value, partition):
     req_splits = req_splits.tolist()
 
     # gather requested indices
-    resp_idx = torch.empty((resp_sum,), dtype=req_idx.dtype, device=req_idx.device)
+    resp_idx = torch.empty(
+        (resp_sum,), dtype=req_idx.dtype, device=req_idx.device
+    )
     dist.all_to_all_single(resp_idx, req_idx[perm], resp_splits, req_splits)
 
     # convert requested indices to local indices depending on partition
@@ -147,7 +155,9 @@ def sparse_all_to_all_pull(req_idx, value, partition):
 
     # collect the request value
     req_value = torch.empty(
-        (req_idx.size(0), *value.shape[1:]), dtype=value.dtype, device=value.device
+        (req_idx.size(0), *value.shape[1:]),
+        dtype=value.dtype,
+        device=value.device,
     )
     dist.all_to_all_single(req_value, value[resp_idx], req_splits, resp_splits)
 
@@ -156,6 +166,7 @@ def sparse_all_to_all_pull(req_idx, value, partition):
     return_value[perm] = req_value
 
     return return_value
+
 
 class UniqueId(object):
     """Class for allowing python code to create and communicate NCCL Unique
