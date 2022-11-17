@@ -62,6 +62,7 @@ def sparse_all_to_all_push(idx, value, partition):
     process 1 of '[3, 9, 5, 9]'.
     """
     perm, send_splits = partition.generate_permutation(idx)
+    perm = perm.long()
 
     recv_splits = torch.empty_like(send_splits)
     dist.all_to_all_single(recv_splits, send_splits)
@@ -127,6 +128,7 @@ def sparse_all_to_all_pull(req_idx, value, partition):
     embeddings.
     """
     perm, req_splits = partition.generate_permutation(req_idx)
+    perm = perm.long()
 
     # get response splits
     resp_splits = torch.empty_like(req_splits)
