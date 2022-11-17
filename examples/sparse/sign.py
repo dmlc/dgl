@@ -3,7 +3,7 @@
 (https://arxiv.org/abs/2004.11198)
 
 This example shows a simplified version of SIGN: a precomputed 2-hops diffusion
-operators on top of symmetrically normalized adjacency matrix A.
+operator on top of symmetrically normalized adjacency matrix A.
 """
 
 import torch
@@ -15,11 +15,11 @@ from dgl.data import CoraGraphDataset
 from dgl.mock_sparse import create_from_coo, diag, identity
 
 ################################################################################
-# (HIGHLIGHT) Take the advantage of DGL sparse API to significantly simplify the
-# code for sign diffusion operator.
+# (HIGHLIGHT) Take the advantage of DGL sparse APIs to implement the feature
+# diffusion in SIGN laconically.
 ################################################################################
 def sign_diffusion(A, X, r):
-    # Perform the r-hops diffusion operation.
+    # Perform the r-hop diffusion operation.
     X_sign = [X]
     for _ in range(r):
         X = A @ X
@@ -30,6 +30,9 @@ def sign_diffusion(A, X, r):
 class SIGN(nn.Module):
     def __init__(self, in_size, out_size, r, hidden_size=64):
         super().__init__()
+        # Note that theta and omega refer to the learnable matrices in the
+        # original paper correspondingly. The variable r refers to subscript to
+        # theta.
         self.theta = nn.ModuleList(
             [nn.Linear(in_size, hidden_size) for _ in range(r + 1)]
         )
@@ -40,17 +43,17 @@ class SIGN(nn.Module):
         for i in range(len(X_sign)):
             results.append(self.theta[i](X_sign[i]))
         Z = F.relu(torch.cat(results, dim=1))
-        return F.sigmoid(self.omega(Z))
+        return F.softmax(self.omega(Z))
 
 
 def evaluate(g, pred):
-    labels = g.ndata["label"]
+    label = g.ndata["label"]
     val_mask = g.ndata["val_mask"]
     test_mask = g.ndata["test_mask"]
 
     # Compute accuracy on validation/test set.
-    val_acc = (pred[val_mask] == labels[val_mask]).float().mean()
-    test_acc = (pred[test_mask] == labels[test_mask]).float().mean()
+    val_acc = (pred[val_mask] == label[val_mask]).float().mean()
+    test_acc = (pred[test_mask] == label[test_mask]).float().mean()
     return val_acc, test_acc
 
 
@@ -59,12 +62,9 @@ def train(g, model):
     train_mask = g.ndata["train_mask"]
     optimizer = Adam(model.parameters(), lr=3e-3)
 
-    for e in range(20):
+    for epoch in range(20):
         # Forward.
         logits = model(X_sign)
-
-        # Compute prediction.
-        pred = logits.argmax(1)
 
         # Compute loss with nodes in training set.
         loss = F.cross_entropy(logits[train_mask], labels[train_mask])
@@ -74,25 +74,28 @@ def train(g, model):
         loss.backward()
         optimizer.step()
 
+        # Compute prediction.
+        pred = logits.argmax(1)
+
         # Evaluate the prediction.
         val_acc, test_acc = evaluate(g, pred)
         print(
-            f"In epoch {e}, loss: {loss:.3f}, val acc: {val_acc:.3f}, test acc"
-            f": {test_acc:.3f}"
+            f"In epoch {epoch}, loss: {loss:.3f}, val acc: {val_acc:.3f}, test"
+            f" acc: {test_acc:.3f}"
         )
 
 
 if __name__ == "__main__":
-    # If CUDA is available, use GPU to accelerate the training, otherwise, use
-    # CPU for the training.
+    # If CUDA is available, use GPU to accelerate the training, use CPU
+    # otherwise.
     dev = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    # Create graph from the existing dataset.
+    # Load graph from the existing dataset.
     dataset = CoraGraphDataset()
     g = dataset[0].to(dev)
 
-    # Create the sparse adjacent matrix A (note that W was used as notion for
-    # adjacent matrix in the original paper).
+    # Create the sparse adjacency matrix A (note that W was used as the notation
+    # for adjacency matrix in the original paper).
     src, dst = g.edges()
     N = g.num_nodes()
     A = create_from_coo(dst, src, shape=(N, N))
