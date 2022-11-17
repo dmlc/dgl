@@ -24,8 +24,7 @@ from utils import (augment_edge_data, get_edge_types, get_etype_featnames,
                    get_gnid_range_map, get_idranges, get_node_types,
                    get_ntype_featnames, memory_snapshot, read_json,
                    read_ntype_partition_files, write_dgl_objects,
-                   write_metadata_json)
-
+                   write_metadata_json, map_partid_rank)
 
 def gen_node_data(rank, world_size, num_parts, id_lookup, ntid_ntype_map, schema_map):
     '''
@@ -196,8 +195,8 @@ def exchange_edge_data(rank, world_size, num_parts, edge_data):
 
     return edge_data
 
-def exchange_feature(rank, data, id_lookup, feat_type, feat_key, key_feats, gid_start,
-        gid_end, type_id_start, type_id_end, local_part_id, world_size,
+def exchange_feature(rank, data, id_lookup, feat_type, feat_key, featdata_key, gid_start,
+        gid_end, type_id_start, type_id_end, local_part_id, world_size, num_parts, 
         cur_features, cur_global_ids):
     """This function is used to send/receive one feature for either nodes or 
     edges of the input graph dataset.
@@ -221,12 +220,23 @@ def exchange_feature(rank, data, id_lookup, feat_type, feat_key, key_feats, gid_
     feat_key : string
         this string is used as a key in the dictionary to store features, as 
         tensors, in local dictionaries
+    featdata_key : numpy array
+        features associated with this feature key being processed
     gid_start : int
         starting global_id, of either node or edge, for the feature data
     gid_end : int
         ending global_if, of either node or edge, for the feature data
+    type_id_start : int
+        starting type_id for the feature data
+    type_id_end : int
+        ending type_id for the feature data
+    local_part_id : int
+        integers used to the identify the local partition id used to locate
+        data belonging to this partition
     world_size : int
         total number of processes created
+    num_parts : int
+        total number of partitions
     cur_features : dictionary
         dictionary to store the feature data which belongs to the current 
         process
@@ -250,7 +260,10 @@ def exchange_feature(rank, data, id_lookup, feat_type, feat_key, key_feats, gid_
 
     feats_per_rank = []
     global_id_per_rank = []
-    local_feat_key = feat_key + "/" + str(local_part_id)
+
+    tokens = feat_key.split("/")
+    assert len(tokens) == 3
+    local_feat_key = "/".join(tokens[:-1]) +"/"+ str(local_part_id)
     for idx in range(world_size):
         # Get the partition ids for the range of global nids.
         if feat_type == constants.STR_NODE_FEATURES:
@@ -271,7 +284,7 @@ def exchange_feature(rank, data, id_lookup, feat_type, feat_key, key_feats, gid_
             global_dst_nids = data[constants.GLOBAL_DST_ID][idx1]
             assert np.all(global_eids == data[constants.GLOBAL_EID][idx1])
             partid_slice = id_lookup.get_partition_ids(global_dst_nids)
-                    
+
         cond = (partid_slice == (idx + local_part_id*world_size))
         gids_per_partid = gids_feat[cond]
         tids_per_partid = tids_feat[cond]
@@ -281,7 +294,7 @@ def exchange_feature(rank, data, id_lookup, feat_type, feat_key, key_feats, gid_
             feats_per_rank.append(torch.empty((0,1), dtype=torch.float))
             global_id_per_rank.append(np.empty((0,1), dtype=np.int64))
         else:
-            feats_per_rank.append(key_feats[local_idx_partid])
+            feats_per_rank.append(featdata_key[local_idx_partid])
             global_id_per_rank.append(torch.from_numpy(gids_per_partid).type(torch.int64))
 
     #features (and global nids) per rank to be sent out are ready
@@ -292,6 +305,7 @@ def exchange_feature(rank, data, id_lookup, feat_type, feat_key, key_feats, gid_
     #stitch node_features together to form one large feature tensor
     output_feat_list = torch.cat(output_feat_list)
     output_id_list = torch.cat(output_id_list)
+
     if local_feat_key in cur_features: 
         temp = cur_features[local_feat_key]
         cur_features[local_feat_key] = torch.cat([temp, output_feat_list])
@@ -377,7 +391,7 @@ def exchange_features(rank, world_size, num_parts, feature_tids, type_id_map, id
         #        associated with the features data 
         # Determine the owner process for these features.
         tokens = feat_key.split("/")
-        assert len(tokens) == 2
+        assert len(tokens) == 3
         type_name = tokens[0]
         feat_name = tokens[1]
         logging.info(f'[Rank: {rank}] processing feature: {feat_key}')
@@ -395,11 +409,11 @@ def exchange_features(rank, world_size, num_parts, feature_tids, type_id_map, id
             # by reading the input metadata json file for existing features.
             assert(feat_key in feature_data)
 
-            key_feats = feature_data[feat_key]
             for local_part_id in range(num_parts//world_size):
+                featdata_key = feature_data[feat_key]
                 own_features, own_global_ids = exchange_feature(rank, data, id_lookup,
-                        feat_type, feat_key, key_feats, gid_start, gid_end, type_id_start, 
-                        type_id_end, local_part_id, world_size, own_features, 
+                        feat_type, feat_key, featdata_key, gid_start, gid_end, type_id_start, 
+                        type_id_end, local_part_id, world_size, num_parts, own_features, 
                         own_global_ids)
 
     end = timer()
@@ -707,7 +721,6 @@ def gen_dist_partitions(rank, world_size, params):
         read_dataset(rank, world_size, id_lookup, params, schema_map)
     logging.info(f'[Rank: {rank}] Done augmenting file input data with auxilary columns')
     memory_snapshot("DatasetReadComplete: ", rank)
-    logging.info(f'Rank: {rank} edge feat tids: {edge_feat_tids}')
 
     #send out node and edge data --- and appropriate features.
     #this function will also stitch the data recvd from other processes
@@ -812,13 +825,10 @@ def gen_dist_partitions(rank, world_size, params):
         local_node_data = prepare_local_data(node_data, local_part_id)
         local_edge_data = prepare_local_data(edge_data, local_part_id)
         graph_obj, ntypes_map_val, etypes_map_val, ntypes_map, etypes_map, \
-            orig_nids, orig_eids = create_dgl_object(schema_map, rank, 
+            orig_nids, orig_eids = create_dgl_object(schema_map, rank+local_part_id*world_size, 
                     local_node_data, local_edge_data, 
                     num_edges, params.save_orig_nids, params.save_orig_eids)
         sort_etypes = len(etypes_map) > 1
-        for k, v in orig_eids.items():
-            logging.info(f'Rank: {rank} k: {k} value -- {v.shape}')
-
         local_node_features = prepare_local_data(rcvd_node_features, local_part_id)
         local_edge_features = prepare_local_data(rcvd_edge_features, local_part_id)
         write_dgl_objects(graph_obj, 

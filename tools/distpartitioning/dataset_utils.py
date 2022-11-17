@@ -149,20 +149,20 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
                 # than num_partitions. 
                 num_chunks = len(feat_data[constants.STR_DATA])
                 read_list = np.array_split(np.arange(num_chunks), num_parts)
-                nfeat = []
-                nfeat_tids = []
                 for local_part_id in range(num_parts):
                     if map_partid_rank(local_part_id, world_size) == rank:
+                        nfeat = []
+                        nfeat_tids = []
                         for idx in read_list[local_part_id]:
                             nfeat_file = feat_data[constants.STR_DATA][idx]
                             if not os.path.isabs(nfeat_file):
                                 nfeat_file = os.path.join(input_dir, nfeat_file)
                             logging.info(f'Loading node feature[{feat_name}] of ntype[{ntype_name}] from {nfeat_file}')
                             nfeat.append(np.load(nfeat_file))
+                        nfeat = np.concatenate(nfeat) if len(nfeat) != 0 else np.array([])
+                        node_features[ntype_name+"/"+feat_name+"/"+str(local_part_id//world_size)] = torch.from_numpy(nfeat)
                         nfeat_tids.append(node_tids[ntype_name][local_part_id])
-                nfeat = np.concatenate(nfeat)
-                node_features[ntype_name+"/"+feat_name] = torch.from_numpy(nfeat)
-                node_feature_tids[ntype_name+"/"+feat_name] = nfeat_tids
+                        node_feature_tids[ntype_name+"/"+feat_name+"/"+str(local_part_id//world_size)] = nfeat_tids
 
     #done building node_features locally. 
     if len(node_features) <= 0:
@@ -173,15 +173,17 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
         for feat_name, feat_info  in node_features.items():
             logging.info(f'[Rank: {rank}] node feature name: {feat_name}, feature data shape: {feat_info.size()}')
 
+            tokens = feat_name.split("/")
+            assert len(tokens) == 3
+            strip_feat_name = "/".join(tokens[:-1])
+
             # Get the range of type ids which are mapped to the current node.
+            # tids = node_feature_tids[strip_feat_name]
             tids = node_feature_tids[feat_name]
 
             # Iterate over the range of type ids for the current node feature
             # and count the number of features for this feature name.
-            count = 0
-            for item in tids:
-                count += item[1] - item[0]
-
+            count = tids[0][1] - tids[0][0]
             assert count == feat_info.size()[0]
 
 
@@ -239,10 +241,10 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
                 assert feat_data[constants.STR_FORMAT][constants.STR_NAME] == constants.STR_NUMPY
                 num_chunks = len(feat_data[constants.STR_DATA])
                 read_list = np.array_split(np.arange(num_chunks), num_parts)
-                efeats = []
-                efeat_tids = []
                 for local_part_id in range(num_parts):
                     if map_partid_rank(local_part_id, world_size) == rank:
+                        efeats = []
+                        efeat_tids = []
                         for idx in read_list[local_part_id]:
                             feature_fname = feat_data[constants.STR_DATA][idx]
                             if (os.path.isabs(feature_fname)):
@@ -253,8 +255,8 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
                                 logging.info(f'Loading numpy from {numpy_path}')
                                 efeats.append(torch.from_numpy(np.load(numpy_path)))
                         efeat_tids.append(edge_tids[etype_name][local_part_id])
-                edge_features[etype_name+'/'+feat_name] = torch.from_numpy(np.concatenate(efeats))
-                edge_feature_tids[etype_name+"/"+feat_name] = efeat_tids
+                        edge_features[etype_name+'/'+feat_name+"/"+str(local_part_id//world_size)] = torch.from_numpy(np.concatenate(efeats))
+                        edge_feature_tids[etype_name+"/"+feat_name+"/"+str(local_part_id//world_size)] = efeat_tids
 
     # Done with building node_features locally. 
     if len(edge_features) <= 0:
@@ -265,9 +267,7 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
         for k, v in edge_features.items():
             logging.info(f'[Rank: {rank}] edge feature name: {k}, feature data shape: {v.shape}')
             tids = edge_feature_tids[k]
-            count = 0
-            for item in tids:
-                count += item[1] - item[0]
+            count = tids[0][1] - tids[0][0]
             assert count == v.size()[0]
 
     '''
