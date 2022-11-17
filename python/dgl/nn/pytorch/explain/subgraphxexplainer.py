@@ -219,7 +219,7 @@ class SubgraphXExplainer(nn.Module):
 
         return subgraphs, subgraphs_nodes_mapping, pruned_nodes
 
-    def explain_graph(self, graph, m, n_min, features, **kwargs):
+    def explain_graph(self, graph, M, N_min, features, **kwargs):
         r"""Find the subgraph that play a crucial role to explain the prediction made
         by the GNN for a graph.
 
@@ -227,9 +227,9 @@ class SubgraphXExplainer(nn.Module):
         ----------
         graph : DGLGraph
             A homogeneous graph.
-        m: int
+        M: int
             Max number of iteration for MCTS
-        n_min: int
+        N_min: int
             The leaf threshold node number
         features : Tensor
             The input feature of shape :math:`(N, D)`. :math:`N` is the
@@ -290,7 +290,7 @@ class SubgraphXExplainer(nn.Module):
 
         >>> # Explain the prediction for graph 0
         >>> explainer = SubgraphXExplainer(model, hyperparam=6, pruning_action="high2low")
-        >>> g_nodes_explain = explainer.explain_graph(graph, m=50, n_min=6, features=features)
+        >>> g_nodes_explain = explainer.explain_graph(graph, M=50, N_min=6, features=features)
         >>> g_nodes_explain
         tensor([10, 11, 12, 13, 14])
         """
@@ -303,12 +303,12 @@ class SubgraphXExplainer(nn.Module):
 
         leaf_set = set()
 
-        for _ in range(m):
+        for _ in range(M):
             # print("iteration number=", i)
             curr_node = self.tree_root
             curr_path = [curr_node]
 
-            while len(curr_node.nodes) > n_min:
+            while len(curr_node.nodes) > N_min:
                 # print("curr_node.nodes = ", len(curr_node.nodes))
 
                 # check if tree node hasn't been expanded before
