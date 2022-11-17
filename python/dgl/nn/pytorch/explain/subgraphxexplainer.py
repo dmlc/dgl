@@ -1,9 +1,8 @@
 """Torch Module for SubgraphX"""
 import math
 import torch
-from torch import nn
-import torch.nn.functional as F
 import numpy as np
+from torch import nn
 import networkx as nx
 import dgl
 
@@ -24,10 +23,9 @@ def neighbors(node, graph):
     Function
         Returns the largest weakly connected components in graph
     """
-    nx_graph = dgl.to_networkx(graph.cpu())
-    neighbours = nx_graph.neighbors(node)
-
-    return list(neighbours)
+    neighbours = set(graph.successors(node).tolist()
+                     + graph.predecessors(node).tolist())
+    return neighbours
 
 
 def marginal_contribution(
@@ -282,7 +280,7 @@ class SubgraphXExplainer(nn.Module):
             """
             with torch.no_grad():
                 logits = self.model(graph, features, **kwargs)
-                probs = F.softmax(logits, dim=-1)
+                probs = nn.functional.softmax(logits, dim=-1)
                 return probs
 
         return value_func
@@ -444,11 +442,15 @@ class SubgraphXExplainer(nn.Module):
         ...     loss.backward()
         ...     optimizer.step()
 
-        >>> # Explain the prediction for graph 0
+        >>> # Initialize the explainer
         >>> explainer = SubgraphXExplainer(model, hyperparam=6, pruning_action="high2low")
-        >>> g_nodes_explain = explainer.explain_graph(graph, M=50, N_min=6, features=features)
+
+        >>> # Explain the prediction for graph 0
+        >>> graph, l = data[0]
+        >>> graph_feat = graph.ndata.pop("attr")
+        >>> g_nodes_explain = explainer.explain_graph(graph, M=50, N_min=6, features=graph_feat)
         >>> g_nodes_explain
-        tensor([10, 11, 12, 13, 14])
+        tensor([14, 15, 16, 17, 18, 19])
         """
         self.value_func = self.get_value_func(features, **kwargs)
 
