@@ -27,7 +27,6 @@
 #include <dgl/runtime/parallel_for.h>
 #include <dmlc/omp.h>
 #include <parallel_hashmap/phmap.h>
-#include <pcg_random.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -38,6 +37,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <pcg_random.hpp>
 
 namespace dgl {
 namespace aten {
