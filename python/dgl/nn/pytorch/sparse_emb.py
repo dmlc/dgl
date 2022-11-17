@@ -9,7 +9,6 @@ from ...partition import NDArrayPartition
 from ...utils import create_shared_mem_array, get_shared_mem_array
 
 _STORE = None
-_COMM = None
 
 
 class NodeEmbedding:  # NodeEmbedding
@@ -78,7 +77,6 @@ class NodeEmbedding:  # NodeEmbedding
         partition=None,
     ):
         global _STORE
-        global _COMM
 
         if device is None:
             device = th.device("cpu")
@@ -132,25 +130,7 @@ class NodeEmbedding:  # NodeEmbedding
                 )
             self._tensor = emb
         else:  # embeddings is stored in GPU memory.
-            # setup nccl communicator
-            if _COMM is None:
-                if rank < 0:
-                    _COMM = nccl.Communicator(1, 0, nccl.UniqueId())
-                else:
-                    # needs to be set for nccl to work
-                    th.cuda.set_device(device)
-                    if rank == 0:
-                        # root process broadcasts nccl id
-                        nccl_id = nccl.UniqueId()
-                        self._store.set("nccl_root_id_sparse_emb", str(nccl_id))
-                    else:
-                        nccl_id = nccl.UniqueId(
-                            self._store.get("nccl_root_id_sparse_emb")
-                        )
-                    _COMM = nccl.Communicator(
-                        self._world_size, self._rank, nccl_id
-                    )
-            self._comm = _COMM
+            self._comm = True
 
             if not self._partition:
                 # for communication we need a partition
@@ -161,7 +141,9 @@ class NodeEmbedding:  # NodeEmbedding
                 )
 
             # create local tensors for the weights
-            local_size = self._partition.local_size(self._comm.rank())
+            local_size = self._partition.local_size(
+                self._rank if self._rank > 0 else 0
+            )
 
             # TODO(dlasalle): support 16-bit/half embeddings
             emb = th.empty(
@@ -187,15 +169,13 @@ class NodeEmbedding:  # NodeEmbedding
         device : th.device
             Target device to put the collected embeddings.
         """
-        if not self._comm or self._comm.size() == 1:
+        if not self._comm:
             emb = self._tensor[node_ids].to(device)
         else:
-            if self.world_size > 0:
-                emb = self._comm.sparse_all_to_all_pull(
-                    node_ids, self._tensor, self._partition
-                )
-            else:
-                emb = self._tensor[node_ids]
+            # will handle self._world_size = 0 or 1
+            emb = nccl.sparse_all_to_all_pull(
+                node_ids, self._tensor, self._partition
+            )
             emb = emb.to(device)
         if F.is_recording():
             emb = F.attach_grad(emb)
@@ -214,18 +194,6 @@ class NodeEmbedding:  # NodeEmbedding
             KVStore used for meta data sharing.
         """
         return self._store
-
-    @property
-    def comm(self):
-        """Return dgl.cuda.nccl.Communicator for data
-        sharing across processes.
-
-        Returns
-        -------
-        dgl.cuda.nccl.Communicator
-            Communicator used for data sharing.
-        """
-        return self._comm
 
     @property
     def partition(self):
@@ -361,7 +329,8 @@ class NodeEmbedding:  # NodeEmbedding
         if self._partition:
             idxs = F.copy_to(
                 self._partition.get_local_indices(
-                    self._comm.rank(), ctx=F.context(self._tensor)
+                    self._rank if self._rank > 0 else 0,
+                    ctx=F.context(self._tensor),
                 ),
                 F.context(values),
             )
