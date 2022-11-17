@@ -1,8 +1,12 @@
 /**
  *  Copyright (c) 2022 by Contributors
  * @file python_binding.cc
- * @brief DGL sparse library Python binding
+ * @brief DGL sparse library Python binding.
  */
+// clang-format off
+#include <sparse/dgl_headers.h>
+// clang-format on
+
 #include <sparse/elementwise_op.h>
 #include <sparse/sparse_matrix.h>
 #include <torch/custom_class.h>
