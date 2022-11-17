@@ -27,6 +27,7 @@
 #include <dgl/runtime/parallel_for.h>
 #include <dmlc/omp.h>
 #include <parallel_hashmap/phmap.h>
+#include <pcg_random.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -34,7 +35,6 @@
 #include <iostream>
 #include <memory>
 #include <numeric>
-#include <pcg_random.hpp>
 #include <string>
 #include <utility>
 #include <vector>
@@ -46,12 +46,12 @@ namespace impl {
 constexpr double eps = 0.0001;
 
 template <typename IdxType, typename FloatType>
-void compute_importance_sampling_probabilities(
+auto compute_importance_sampling_probabilities(
     DGLContext ctx, DGLDataType dtype, const IdxType max_degree,
     const IdxType num_rows, const int importance_sampling, const bool weighted,
     const IdxType* rows_data, const IdxType* indptr, const FloatType* A,
     const IdxType* indices, const IdxType num_picks, const FloatType* ds,
-    FloatType* cs, phmap::flat_hash_map<IdxType, FloatType>& hop_map) {
+    FloatType* cs) {
   constexpr FloatType ONE = 1;
   // ps stands for \pi in arXiv:2210.13339
   FloatArray ps_array = NDArray::Empty({max_degree + 1}, dtype, ctx);
@@ -59,7 +59,7 @@ void compute_importance_sampling_probabilities(
 
   double prev_ex_nodes = max_degree * num_rows;
 
-  phmap::flat_hash_map<IdxType, FloatType> hop_map2;
+  phmap::flat_hash_map<IdxType, FloatType> hop_map, hop_map2;
   for (int iters = 0; iters < importance_sampling || importance_sampling < 0;
        iters++) {
     // NOTE(mfbalin) When the graph is unweighted, the first c values in
@@ -146,6 +146,8 @@ void compute_importance_sampling_probabilities(
       prev_ex_nodes = cur_ex_nodes;
     }
   }
+
+  return hop_map;
 }
 
 // Template for picking non-zero values row-wise.
@@ -198,9 +200,9 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
   phmap::flat_hash_map<IdxType, FloatType> hop_map;
 
   if (importance_sampling)
-    compute_importance_sampling_probabilities<IdxType, FloatType>(
+    hop_map = compute_importance_sampling_probabilities<IdxType, FloatType>(
         ctx, dtype, max_degree, num_rows, importance_sampling, weighted,
-        rows_data, indptr, A, indices, (IdxType)num_picks, ds, cs, hop_map);
+        rows_data, indptr, A, indices, (IdxType)num_picks, ds, cs);
 
   constexpr auto vidtype = DGLDataTypeTraits<IdxType>::dtype;
 

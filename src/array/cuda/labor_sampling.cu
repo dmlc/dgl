@@ -646,7 +646,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
             transformed_output;
       }
     } else {
-      if (weights) {
+      if (weighted) {
         auto output = thrust::make_zip_iterator(
             picked_inrow.get(), picked_row_data, picked_col_data,
             picked_idx_data, picked_imp_data);
