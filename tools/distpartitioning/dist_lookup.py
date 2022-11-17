@@ -181,7 +181,7 @@ class DistLookupService:
                 continue
             # Get the node_type_ids and per_type_nids for the incoming global_nids.
             ntype_ids, type_nids = self.id_map(owner_req_list[idx].numpy())
-            nypte_ids, type_nids = ntype_ids.numpy(), type_nids.numpy()
+            ntype_ids, type_nids = ntype_ids.numpy(), type_nids.numpy()
 
             # Lists to store partition-ids for the incoming global-nids.
             type_id_lookups = []
