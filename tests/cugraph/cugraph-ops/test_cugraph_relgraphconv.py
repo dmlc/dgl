@@ -5,7 +5,8 @@ from dgl.nn import CuGraphRelGraphConv
 from dgl.nn import RelGraphConv
 
 max_in_degrees = [None, 8]
-regularizers = [None, "basis"]
+# TODO(tingyu66): add back 'None' to regularizers when re-enabling CI
+regularizers = ["basis"]
 device = "cuda"
 
 
