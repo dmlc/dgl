@@ -736,6 +736,12 @@ def check_dist_graph_hetero(g, num_clients, num_nodes, num_edges):
         data = g.nodes[ntype].data[name][nids]
         data = F.squeeze(data, 1)
         assert np.all(F.asnumpy(data == nids))
+    expect_except = False
+    try:
+        g.nodes['xxx'].data['x']
+    except dgl.DGLError:
+        expect_except = True
+    assert expect_except
 
     # Test reading edge data
     etype = 'r1'
@@ -750,6 +756,12 @@ def check_dist_graph_hetero(g, num_clients, num_nodes, num_edges):
         data = g.edges[c_etype].data[name][eids]
         data = F.squeeze(data, 1)
         assert np.all(F.asnumpy(data == eids))
+    expect_except = False
+    try:
+        g.edges['xxx'].data['x']
+    except dgl.DGLError:
+        expect_except = True
+    assert expect_except
 
     # Test edge_subgraph
     sg = g.edge_subgraph({"r1": eids})
