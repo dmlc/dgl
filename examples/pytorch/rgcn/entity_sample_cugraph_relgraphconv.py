@@ -137,7 +137,7 @@ if __name__ == "__main__":
     elif args.dataset == "am":
         data = AMDataset()
     else:
-        raise ValueError("Unknown dataset: {}".format(args.dataset))
+        raise ValueError(f"Unknown dataset: {args.dataset}")
     hg = data[0].to(device)
     hg = hg.int() if args.idtype == "int32" else hg.long()
     num_rels = len(hg.canonical_etypes)
