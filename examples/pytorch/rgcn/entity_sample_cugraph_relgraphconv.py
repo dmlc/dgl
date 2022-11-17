@@ -184,4 +184,4 @@ if __name__ == "__main__":
         shuffle=False,
     )
     acc = evaluate(model, labels, test_loader, inv_target)
-    print("Test accuracy {:.4f}".format(acc))
+    print(f"Test accuracy {acc:.4f}")
