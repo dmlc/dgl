@@ -30,15 +30,16 @@ class LaborSampler(BlockSampler):
     `(LA)yer-neigh(BOR) Sampling: Defusing Neighborhood Explosion in GNNs
     <https://arxiv.org/abs/2210.13339>`
 
-    This sampler will make every node gather messages from a fixed number of neighbors
-    per edge type. The neighbors are picked uniformly with default parameters. For every vertex t
-    that will be considered to be sampled, there will be a single random variate r_t.
+    This sampler will make every node gather messages from a fixed number of
+    neighbors per edge type. The neighbors are picked uniformly with default
+    parameters. For every vertex t that will be considered to be sampled, there
+    will be a single random variate r_t.
 
     Parameters
     ----------
     fanouts : list[int] or list[dict[etype, int]]
-        List of neighbors to sample per edge type for each GNN layer, with the i-th
-        element being the fanout for the i-th GNN layer.
+        List of neighbors to sample per edge type for each GNN layer, with the
+        i-th element being the fanout for the i-th GNN layer.
 
         If only a single integer is provided, DGL assumes that every edge type
         will have the same fanout.
@@ -47,18 +48,21 @@ class LaborSampler(BlockSampler):
         of that edge type will be included.
     edge_dir : str, default ``'in'``
         Can be either ``'in' `` where the neighbors will be sampled according to
-        incoming edges, or ``'out'`` otherwise, same as :func:`dgl.sampling.sample_neighbors`.
+        incoming edges, or ``'out'`` otherwise, same as
+        :func:`dgl.sampling.sample_neighbors`.
     prob : str, optional
         If given, the probability of each neighbor being sampled is proportional
-        to the edge feature value with the given name in ``g.edata``.  The feature must be
-        a scalar on each edge.
+        to the edge feature value with the given name in ``g.edata``.
+        The feature must be a scalar on each edge.
     importance_sampling : int, default ``0``
-        Whether to use importance sampling or uniform sampling, use of negative values optimizes
-        importance sampling probabilities until convergence while use of positive values runs
-        optimization steps that many times. If the value is i, then LABOR-i variant is used.
+        Whether to use importance sampling or uniform sampling, use of negative
+        values optimizes importance sampling probabilities until convergence
+        while use of positive values runs optimization steps that many times.
+        If the value is i, then LABOR-i variant is used.
     layer_dependency : bool, default ``False``
-        Specifies whether different layers should use same random variates. Results into a reduction
-        in the number of vertices sampled, but may degrade the quality slightly.
+        Specifies whether different layers should use same random variates.
+        Results into a reduction in the number of vertices sampled, but may
+        degrade the quality slightly.
     prefetch_node_feats : list[str] or dict[ntype, list[str]], optional
         The source node data to prefetch for the first MFG, corresponding to the
         input node features necessary for the first GNN layer.
@@ -76,9 +80,10 @@ class LaborSampler(BlockSampler):
     --------
     **Node classification**
 
-    To train a 3-layer GNN for node classification on a set of nodes ``train_nid`` on
-    a homogeneous graph where each node takes messages from 5, 10, 15 neighbors for
-    the first, second, and third layer respectively (assuming the backend is PyTorch):
+    To train a 3-layer GNN for node classification on a set of nodes
+    ``train_nid`` on a homogeneous graph where each node takes messages from
+    5, 10, 15 neighbors for the first, second, and third layer respectively
+    (assuming the backend is PyTorch):
 
     >>> sampler = dgl.dataloading.LaborSampler([5, 10, 15])
     >>> dataloader = dgl.dataloading.DataLoader(
@@ -87,9 +92,9 @@ class LaborSampler(BlockSampler):
     >>> for input_nodes, output_nodes, blocks in dataloader:
     ...     train_on(blocks)
 
-    If training on a heterogeneous graph and you want different number of neighbors for each
-    edge type, one should instead provide a list of dicts.  Each dict would specify the
-    number of neighbors to pick per edge type.
+    If training on a heterogeneous graph and you want different number of
+    neighbors for each edge type, one should instead provide a list of dicts.
+    Each dict would specify the number of neighbors to pick per edge type.
 
     >>> sampler = dgl.dataloading.LaborSampler([
     ...     {('user', 'follows', 'user'): 5,
@@ -98,13 +103,14 @@ class LaborSampler(BlockSampler):
 
     If you would like non-uniform labor sampling:
 
-    >>> g.edata['p'] = torch.rand(g.num_edges())   # any non-negative 1D vector works
+    >>> # any non-negative 1D vector works
+    >>> g.edata['p'] = torch.rand(g.num_edges())
     >>> sampler = dgl.dataloading.LaborSampler([5, 10, 15], prob='p')
 
     **Edge classification and link prediction**
 
-    This class can also work for edge classification and link prediction together
-    with :func:`as_edge_prediction_sampler`.
+    This class can also work for edge classification and link prediction
+    together with :func:`as_edge_prediction_sampler`.
 
     >>> sampler = dgl.dataloading.LaborSampler([5, 10, 15])
     >>> sampler = dgl.dataloading.as_edge_prediction_sampler(sampler)
@@ -118,7 +124,8 @@ class LaborSampler(BlockSampler):
     -----
     For the concept of MFGs, please refer to
     :ref:`User Guide Section 6 <guide-minibatch>` and
-    :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
+    :doc:`Minibatch Training Tutorials
+    <tutorials/large/L0_neighbor_sampling_overview>`.
     """
 
     def __init__(
@@ -149,20 +156,23 @@ class LaborSampler(BlockSampler):
     def set_seed(self, random_seed=None):
         """Updates the underlying seed for the sampler
 
-        Calling this function enforces the sampling algorithm to use the same seed on every edge
-        type. This can reduce the number of nodes being sampled because the passed random_seed makes
-        it so that for any seed vertex ``s`` and its neighbor ``t``,
-        the rolled random variate ``r_t`` is the same for any instance of this class with the same
-        random seed. When sampling as part of the same batch, one would want identical seeds so that
-        LABOR can globally sample. One example is that for heterogenous graphs, there is a single
-        random seed passed for each edge type. This will sample much fewer vertices compared to
-        having unique random seeds for each edge type. If one called this function individually for
-        each edge type for a heterogenous graph with different random seeds, then it would run LABOR
-        locally for each edge type, resulting into a larger number of vertices being sampled.
+        Calling this function enforces the sampling algorithm to use the same
+        seed on every edge type. This can reduce the number of nodes being
+        sampled because the passed random_seed makes it so that for any seed
+        vertex ``s`` and its neighbor ``t``, the rolled random variate ``r_t``
+        is the same for any instance of this class with the same random seed.
+        When sampling as part of the same batch, one would want identical seeds
+        so that LABOR can globally sample. One example is that for heterogenous
+        graphs, there is a single random seed passed for each edge type. This
+        will sample much fewer vertices compared to having unique random seeds
+        for each edge type. If one called this function individually for each
+        edge type for a heterogenous graph with different random seeds, then it
+        would run LABOR locally for each edge type, resulting into a larger
+        number of vertices being sampled.
 
-        If this function is called without any parameters, we get the random seed by getting a
-        random number from DGL. Call this function if multiple instances of LaborSampler are used
-        to sample as part of a single batch.
+        If this function is called without any parameters, we get the random
+        seed by getting a random number from DGL. Call this function if multiple
+        instances of LaborSampler are used to sample as part of a single batch.
 
         Parameters
         ----------
