@@ -26,7 +26,7 @@ def neighbors(node, graph):
 
 
 def marginal_contribution(
-    graph, exclude_masks, include_masks, value_func, features
+    graph, exclude_masks, include_masks, model, features
 ):
     r"""Calculate the marginal value for the sample coalition nodes (identified by
     inluded_masks).
@@ -41,8 +41,8 @@ def marginal_contribution(
     include_masks: Tensor
         Node mask of shape :math:`(1, D)`, where :math:`D`
         is the number of nodes in the graph.
-    value_func : function
-        T The value function that will be used to get the prediction.
+    model: nn.Module
+        The GNN model to explain.
     features : Tensor
         The input feature of shape :math:`(N, D)`. :math:`N` is the
         number of nodes, and :math:`D` is the feature size.
@@ -76,8 +76,8 @@ def marginal_contribution(
         exclude_subgraph = dgl.add_self_loop(exclude_subgraph)
         include_subgraph = dgl.add_self_loop(include_subgraph)
 
-        exclude_values = value_func(exclude_subgraph, exclude_features)
-        include_values = value_func(include_subgraph, include_features)
+        exclude_values = model(exclude_subgraph, exclude_features)
+        include_values = model(include_subgraph, include_features)
 
         margin_values = include_values - exclude_values
         marginal_contribution_list.append(margin_values)
@@ -87,18 +87,18 @@ def marginal_contribution(
 
 
 def mc_l_shapley(
-    value_func, graph, subgraph_nodes, local_radius, sample_num, features
+    model, graph, subgraph_nodes, local_radius, sample_num, features
 ):
     r"""Monte carlo sampling approximation of the l_shapley value.
 
     Parameters
     ----------
-    value_func: function
-        The value function that will be used to get the prediction.
+    model: nn.Module
+        The GNN model to explain.
     graph: DGLGraph
         A homogeneous graph.
-    subgraph_nodes: list
-        The node ids of the subgraph that are associated with this tree node.
+    subgraph_nodes: tensor
+        The tensor node ids of the subgraph that are associated with this tree node.
     local_radius: int
         Number of local radius to calculate :obj:`l_shapley`.
     sample_num: int
@@ -152,7 +152,7 @@ def mc_l_shapley(
     exclude_masks = np.stack(set_exclude_masks, axis=0)
     include_masks = np.stack(set_include_masks, axis=0)
     marginal_contributions = marginal_contribution(
-        graph, exclude_masks, include_masks, value_func, features
+        graph, exclude_masks, include_masks, model, features
     )
 
     mc_l_shapley_value = marginal_contributions.mean().item()
