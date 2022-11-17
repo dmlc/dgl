@@ -27,20 +27,20 @@ class MCTSNode:
         Immediate reward for selecting this node (property score).
     """
 
-    def __init__(self, nodes, pruning_action, c_puct=10.0, w=0.0, n=0, p=0.0):
+    def __init__(self, nodes, pruning_action, c_puct=10.0, W=0.0, N=0, P=0.0):
         self.nodes = nodes
         self.a = pruning_action
         self.c_puct = c_puct
-        self.w = w
-        self.n = n
-        self.p = p
+        self.W = W
+        self.N = N
+        self.P = P
         self.children = []
 
     def Q(self):
-        return self.w / self.n if self.n > 0 else 0
+        return self.W / self.N if self.N > 0 else 0
 
     def U(self, n) -> float:
-        return self.c_puct * self.p * math.sqrt(n) / (1 + self.n)
+        return self.c_puct * self.P * math.sqrt(n) / (1 + self.N)
 
 
 class SubgraphXExplainer(nn.Module):
@@ -153,7 +153,14 @@ class SubgraphXExplainer(nn.Module):
         # Convert to a networkx graph object
         nx_graph = dgl.to_networkx(new_graph).to_undirected()
         # Find and sort graph components by size from largest to smallest and take the biggest one.
-        biggest_comp = list(sorted(nx.connected_components(nx_graph), key=len, reverse=True))
+        biggest_comp = list(
+            [
+                c
+                for c in sorted(
+                    nx.connected_components(nx_graph), key=len, reverse=True
+                )
+            ][0]
+        )
         # Convert back to DGLGraph object.
         return biggest_comp
 
@@ -331,7 +338,7 @@ class SubgraphXExplainer(nn.Module):
 
                 sum_n = 0
                 for child_node in curr_node.children:
-                    sum_n += child_node.n
+                    sum_n += child_node.N
 
                 next_node = max(
                     curr_node.children, key=lambda x: x.Q() + x.U(sum_n)
@@ -351,10 +358,10 @@ class SubgraphXExplainer(nn.Module):
             )
 
             for node in leaf_set:
-                node.n += 1
-                node.w += score_leaf_node
+                node.N += 1
+                node.W += score_leaf_node
 
         # Select subgraph with the highest score (P value)
-        best_node = max(leaf_set, key=lambda x: x.p)
+        best_node = max(leaf_set, key=lambda x: x.P)
 
         return best_node.nodes
