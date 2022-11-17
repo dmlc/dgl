@@ -544,50 +544,6 @@ pipeline {
                 }
               }
             }
-            stage('MXNet CPU') {
-              agent {
-                docker {
-                  label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:cu101_v220629"
-                  alwaysPull true
-                }
-              }
-              stages {
-                stage('MXNet CPU Unit test') {
-                  steps {
-                    unit_test_linux('mxnet', 'cpu')
-                  }
-                }
-              }
-              post {
-                always {
-                  cleanWs disableDeferredWipeout: true, deleteDirs: true
-                }
-              }
-            }
-            stage('MXNet GPU') {
-              agent {
-                docker {
-                  label "linux-gpu-node"
-                  image "dgllib/dgl-ci-gpu:cu101_v220816"
-                  args "--runtime nvidia"
-                  alwaysPull true
-                }
-              }
-              stages {
-                stage('MXNet GPU Unit test') {
-                  steps {
-                    sh 'nvidia-smi'
-                    unit_test_linux('mxnet', 'gpu')
-                  }
-                }
-              }
-              post {
-                always {
-                  cleanWs disableDeferredWipeout: true, deleteDirs: true
-                }
-              }
-            }
             stage('DGL-Go') {
               agent {
                 docker {
