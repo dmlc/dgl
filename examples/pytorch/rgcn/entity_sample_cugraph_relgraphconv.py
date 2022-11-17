@@ -86,8 +86,8 @@ def train(device, g, target_idx, labels, train_mask, model, fanouts):
         batch_size=100,
         shuffle=False,
     )
-    model.train()
     for epoch in range(100):
+        model.train()
         total_loss = 0
         for it, (input_nodes, output_nodes, blocks) in enumerate(train_loader):
             output_nodes = inv_target[output_nodes.type(torch.int64)]
@@ -101,9 +101,8 @@ def train(device, g, target_idx, labels, train_mask, model, fanouts):
             total_loss += loss.item()
         acc = evaluate(model, labels, val_loader, inv_target)
         print(
-            "Epoch {:05d} | Loss {:.4f} | Val. Accuracy {:.4f} ".format(
-                epoch, total_loss / (it + 1), acc
-            )
+            f"Epoch {epoch:05d} | Loss {total_loss / (it+1):.4f} | "
+            f"Val. Accuracy {acc:.4f}"
         )
 
 
@@ -116,12 +115,6 @@ if __name__ == "__main__":
         type=str,
         default="aifb",
         choices=['aifb', 'mutag', 'bgs', 'am'],
-    )
-    parser.add_argument(
-        "--idtype",
-        type=str,
-        default="int64",
-        help="Graph idtype ('int64' or 'int32'), default to 'int64'.",
     )
     args = parser.parse_args()
     device = torch.device("cuda")
@@ -139,7 +132,6 @@ if __name__ == "__main__":
     else:
         raise ValueError(f"Unknown dataset: {args.dataset}")
     hg = data[0].to(device)
-    hg = hg.int() if args.idtype == "int32" else hg.long()
     num_rels = len(hg.canonical_etypes)
     category = data.predict_category
 
