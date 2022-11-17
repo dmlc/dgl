@@ -115,7 +115,7 @@ if __name__ == "__main__":
         "--dataset",
         type=str,
         default="aifb",
-        help="Dataset name ('aifb', 'mutag', 'bgs', 'am'), default to 'aifb'.",
+        choices=['aifb', 'mutag', 'bgs', 'am'],
     )
     parser.add_argument(
         "--idtype",
