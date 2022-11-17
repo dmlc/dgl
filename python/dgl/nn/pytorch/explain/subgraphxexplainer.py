@@ -1,8 +1,9 @@
+"""Torch Module for SubgraphX"""
 import math
 import networkx as nx
-from .shapley import *
 from torch import nn
 import torch.nn.functional as F
+from .shapley import *
 
 __all__ = ["SubgraphXExplainer"]
 
@@ -218,7 +219,7 @@ class SubgraphXExplainer(nn.Module):
 
         return subgraphs, subgraphs_nodes_mapping, pruned_nodes
 
-    def explain_graph(self, graph, M, N_min, features, **kwargs):
+    def explain_graph(self, graph, m, n_min, features, **kwargs):
         r"""Find the subgraph that play a crucial role to explain the prediction made
         by the GNN for a graph.
 
@@ -226,9 +227,9 @@ class SubgraphXExplainer(nn.Module):
         ----------
         graph : DGLGraph
             A homogeneous graph.
-        M: int
+        m: int
             Max number of iteration for MCTS
-        N_min: int
+        n_min: int
             The leaf threshold node number
         features : Tensor
             The input feature of shape :math:`(N, D)`. :math:`N` is the
@@ -289,7 +290,7 @@ class SubgraphXExplainer(nn.Module):
 
         >>> # Explain the prediction for graph 0
         >>> explainer = SubgraphXExplainer(model, hyperparam=6, pruning_action="high2low")
-        >>> g_nodes_explain = explainer.explain_graph(graph, M=50, N_min=6, features=features)
+        >>> g_nodes_explain = explainer.explain_graph(graph, m=50, n_min=6, features=features)
         >>> g_nodes_explain
         tensor([10, 11, 12, 13, 14])
         """
@@ -302,12 +303,12 @@ class SubgraphXExplainer(nn.Module):
 
         leaf_set = set()
 
-        for i in range(M):
+        for _ in range(m):
             # print("iteration number=", i)
             curr_node = self.tree_root
             curr_path = [curr_node]
 
-            while len(curr_node.nodes) > N_min:
+            while len(curr_node.nodes) > n_min:
                 # print("curr_node.nodes = ", len(curr_node.nodes))
 
                 # check if tree node hasn't been expanded before
@@ -335,12 +336,12 @@ class SubgraphXExplainer(nn.Module):
                         )
                         curr_node.children.append(new_child_node)
 
-                sum_N = 0
+                sum_n = 0
                 for child_node in curr_node.children:
-                    sum_N += child_node.N
+                    sum_n += child_node.N
 
                 next_node = max(
-                    curr_node.children, key=lambda x: x.Q() + x.U(sum_N)
+                    curr_node.children, key=lambda x: x.Q() + x.U(sum_n)
                 )
                 curr_node = next_node
                 curr_path.append(next_node)

@@ -1,6 +1,7 @@
+"""Utility functions for SubgraphX"""
 import torch
-import dgl
 import numpy as np
+import dgl
 
 
 def neighbors(node, graph):
@@ -116,7 +117,7 @@ def mc_l_shapley(
     num_nodes = graph.num_nodes()
 
     local_region = subgraph_nodes.tolist()
-    for k in range(local_radius - 1):
+    for _ in range(local_radius - 1):
         k_neighbourhood = []
         for node in local_region:
             k_neighbourhood += neighbors(node, graph)
@@ -127,7 +128,7 @@ def mc_l_shapley(
     coalition_placeholder = num_nodes
     set_exclude_masks = []
     set_include_masks = []
-    for i in range(sample_num):
+    for _ in range(sample_num):
         subset_nodes_from = list(set(local_region) - set(subgraph_nodes))
         random_nodes_permutation = subset_nodes_from + [coalition_placeholder]
         random_nodes_permutation = np.random.permutation(
