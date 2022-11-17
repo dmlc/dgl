@@ -136,9 +136,6 @@ def test_chunk_graph(num_chunks):
                 test_data(sub_dir, feat, data, g.num_edges(c_etype) // num_chunks)
 
 
-@pytest.mark.parametrize("num_chunks", [1, 2, 3, 4, 8])
-@pytest.mark.parametrize("num_parts", [1, 2, 3, 4, 8])
-@pytest.mark.parametrize("world_size", [1, 2, 4])
 def _test_pipeline(num_chunks, num_parts, world_size, graph_formats=None):
     if num_chunks < num_parts:
         # num_parts should less/equal than num_chunks
@@ -216,9 +213,9 @@ def _test_pipeline(num_chunks, num_parts, world_size, graph_formats=None):
             )
 
 
-@pytest.mark.parametrize("num_chunks", [1, 3, 4, 8])
-@pytest.mark.parametrize("num_parts", [1, 3, 4, 8])
-@pytest.mark.parametrize("world_size", [1, 4, 8])
+@pytest.mark.parametrize("num_chunks", [1, 2, 3, 4, 8, 10])
+@pytest.mark.parametrize("num_parts", [1, 2, 3, 4, 6, 8])
+@pytest.mark.parametrize("world_size", [1, 2, 3, 4])
 def test_pipeline_basics(num_chunks, num_parts, world_size):
     _test_pipeline(num_chunks, num_parts, world_size)
 
