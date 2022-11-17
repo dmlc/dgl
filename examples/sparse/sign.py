@@ -3,7 +3,7 @@
 (https://arxiv.org/abs/2004.11198)
 
 This example shows a simplified version of SIGN: a precomputed 2-hops diffusion
-operator on top of symmetrically normalized adjacency matrix A.
+operator on top of symmetrically normalized adjacency matrix A_hat.
 """
 
 import torch
@@ -100,10 +100,16 @@ if __name__ == "__main__":
     N = g.num_nodes()
     A = create_from_coo(dst, src, shape=(N, N))
 
+    # Calculate the symmetrically normalized adjacency matrix.
+    I = identity(A.shape, device=dev)
+    A_hat = A + I
+    D_hat = diag(A_hat.sum(dim=1)) ** -0.5
+    A_hat = D_hat @ A_hat @ D_hat
+
     # 2-hops diffusion operators.
     r = 2
     X = g.ndata["feat"]
-    X_sign = sign_diffusion(A, X, r)
+    X_sign = sign_diffusion(A_hat, X, r)
 
     # Create SIGN model.
     in_size = X.shape[1]
