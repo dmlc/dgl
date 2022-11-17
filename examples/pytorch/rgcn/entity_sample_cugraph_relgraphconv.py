@@ -18,30 +18,31 @@ class RGCN(nn.Module):
             h_dim,
             h_dim,
             num_rels,
-            fanouts[0],
             regularizer="basis",
             num_bases=num_bases,
             self_loop=False,
+            max_in_degree=fanouts[0]
         )
         self.conv2 = CuGraphRelGraphConv(
             h_dim,
             out_dim,
             num_rels,
-            fanouts[1],
             regularizer="basis",
             num_bases=num_bases,
             self_loop=False,
+            max_in_degree=fanouts[1]
         )
 
     def forward(self, g):
         x = self.emb(g[0].srcdata[dgl.NID])
-        h = F.relu(self.conv1(g[0], x, g[0].edata[dgl.ETYPE], norm=g[0].edata["norm"]))
+        h = F.relu(self.conv1(g[0], x, g[0].edata[dgl.ETYPE],
+                   norm=g[0].edata["norm"]))
         h = self.conv2(g[1], h, g[1].edata[dgl.ETYPE], norm=g[1].edata["norm"])
         return h
 
-    def update_fanouts(self, fanouts):
-        self.conv1.fanout = fanouts[0]
-        self.conv2.fanout = fanouts[1]
+    def update_max_in_degree(self, fanouts):
+        self.conv1.max_in_degree = fanouts[0]
+        self.conv2.max_in_degree = fanouts[1]
 
 
 def evaluate(model, labels, dataloader, inv_target):
@@ -62,11 +63,11 @@ def evaluate(model, labels, dataloader, inv_target):
 
 
 def train(device, g, target_idx, labels, train_mask, model, fanouts):
-    # define train idx, loss function and optimizer
+    # Define train idx, loss function and optimizer.
     train_idx = torch.nonzero(train_mask, as_tuple=False).squeeze()
     loss_fcn = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-2, weight_decay=5e-4)
-    # construct sampler and dataloader
+    # Construct sampler and dataloader.
     sampler = MultiLayerNeighborSampler(fanouts)
     train_loader = DataLoader(
         g,
@@ -76,7 +77,7 @@ def train(device, g, target_idx, labels, train_mask, model, fanouts):
         batch_size=100,
         shuffle=True,
     )
-    # no separate validation subset, use train index instead for validation
+    # No separate validation subset, use train index instead for validation.
     val_loader = DataLoader(
         g,
         target_idx[train_idx].type(g.idtype),
@@ -86,7 +87,7 @@ def train(device, g, target_idx, labels, train_mask, model, fanouts):
         shuffle=False,
     )
     model.train()
-    for epoch in range(50):
+    for epoch in range(100):
         total_loss = 0
         for it, (input_nodes, output_nodes, blocks) in enumerate(train_loader):
             output_nodes = inv_target[output_nodes.type(torch.int64)]
@@ -126,7 +127,7 @@ if __name__ == "__main__":
     device = torch.device("cuda")
     print(f"Training with DGL CuGraphRelGraphConv module with sampling.")
 
-    # load and preprocess dataset
+    # Load and preprocess dataset.
     if args.dataset == "aifb":
         data = AIFBDataset()
     elif args.dataset == "mutag":
@@ -141,24 +142,26 @@ if __name__ == "__main__":
     hg = hg.int() if args.idtype == "int32" else hg.long()
     num_rels = len(hg.canonical_etypes)
     category = data.predict_category
+
     labels = hg.nodes[category].data.pop("labels")
     train_mask = hg.nodes[category].data.pop("train_mask")
     test_mask = hg.nodes[category].data.pop("test_mask")
-    # find target category and node id
+
+    # Find target category and node id.
     category_id = hg.ntypes.index(category)
     g = dgl.to_homogeneous(hg)
     node_ids = torch.arange(g.num_nodes()).to(device)
     target_idx = node_ids[g.ndata[dgl.NTYPE] == category_id]
-    # rename the field as they can be changed by DataLoader
     g.ndata["ntype"] = g.ndata.pop(dgl.NTYPE)
     g.ndata["type_id"] = g.ndata.pop(dgl.NID)
-    # find the mapping (inv_target) from global node IDs to type-specific node IDs
+
+    # Find the mapping from global node IDs to type-specific node IDs.
     inv_target = torch.empty((g.num_nodes(),), dtype=torch.int64).to(device)
     inv_target[target_idx] = torch.arange(
         0, target_idx.shape[0], dtype=inv_target.dtype
     ).to(device)
 
-    # create RGCN model
+    # Create RGCN model.
     in_size = g.num_nodes()  # featureless with one-hot encoding
     out_size = data.num_classes
     num_bases = 20
@@ -167,11 +170,11 @@ if __name__ == "__main__":
 
     train(device, g, target_idx, labels, train_mask, model, fanouts)
     test_idx = torch.nonzero(test_mask, as_tuple=False).squeeze()
-    # Note: cugraph-ops aggregators are designed for sampled graphs (MFGs) and expect fanout
-    # as input for performance considerations. Hence, we have to update the fanouts during evaluation.
-    # Setting fanouts to -1 for sampling all neighbors is not supported.
+    # Note: cugraph-ops aggregators are designed for sampled graphs (MFGs) and
+    # expect max_in_degree as input for performance considerations. Hence, we
+    # have to update max_in_degree with the fanouts of test_sampler.
     test_sampler = MultiLayerNeighborSampler([500, 500])
-    model.update_fanouts(test_sampler.fanouts)
+    model.update_max_in_degree(test_sampler.fanouts)
     test_loader = DataLoader(
         g,
         target_idx[test_idx].type(g.idtype),
