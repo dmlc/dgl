@@ -1,12 +1,14 @@
 /**
  *  Copyright (c) 2022 by Contributors
  * @file elementwise_op.cc
- * @brief DGL C++ sparse elementwise operator implementation
+ * @brief DGL C++ sparse elementwise operator implementation.
  */
-#include <dmlc/logging.h>
+// clang-format off
+#include <sparse/dgl_headers.h>
+// clang-format on
+
 #include <sparse/elementwise_op.h>
 #include <sparse/sparse_matrix.h>
-#include <torch/custom_class.h>
 #include <torch/script.h>
 
 #include <memory>

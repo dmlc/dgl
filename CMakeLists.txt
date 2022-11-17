@@ -251,6 +251,9 @@ if(NOT MSVC)
   target_include_directories(dgl PRIVATE third_party/tensorpipe)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+  # Avoid exposing third-party symbols when using DGL as a library.
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wl,--exclude-libs,ALL")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,--exclude-libs,ALL")
 endif(NOT MSVC)
 
 # Compile TVM Runtime and Featgraph
@@ -315,24 +318,6 @@ if(BUILD_TORCH)
   add_dependencies(dgl tensoradapter_pytorch)
 endif(BUILD_TORCH)
 
-if(BUILD_SPARSE)
-  file(TO_NATIVE_PATH ${CMAKE_CURRENT_BINARY_DIR} BINDIR)
-  file(TO_NATIVE_PATH ${CMAKE_COMMAND} CMAKE_CMD)
-  # TODO(zhenkun): MSVC support?
-  file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/dgl_sparse/build.sh BUILD_SCRIPT)
-  add_custom_target(
-    dgl_sparse
-    ${CMAKE_COMMAND} -E env
-    CMAKE_COMMAND=${CMAKE_CMD}
-    CUDA_TOOLKIT_ROOT_DIR=${CUDA_TOOLKIT_ROOT_DIR}
-    USE_CUDA=${USE_CUDA}
-    BINDIR=${CMAKE_CURRENT_BINARY_DIR}
-    bash ${BUILD_SCRIPT} ${TORCH_PYTHON_INTERPS}
-    DEPENDS ${BUILD_SCRIPT}
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/dgl_sparse)
-  add_dependencies(dgl dgl_sparse)
-endif(BUILD_SPARSE)
-
 # Installation rules
 install(TARGETS dgl DESTINATION lib${LIB_SUFFIX})
 
@@ -364,3 +349,8 @@ if(BUILD_CPP_TEST)
     target_link_libraries(rpc_server dgl)
   endif(NOT MSVC)
 endif(BUILD_CPP_TEST)
+
+if(BUILD_SPARSE)
+  set(DGL_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/include")
+  add_subdirectory(dgl_sparse)
+endif(BUILD_SPARSE)

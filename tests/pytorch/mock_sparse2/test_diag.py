@@ -24,8 +24,6 @@ def test_diag(val_shape, mat_shape):
 
     # __call__
     val = torch.randn(val_shape)
-    mat = mat(val)
-    assert torch.allclose(mat.val, val)
 
     # nnz
     assert mat.nnz == val.shape[0]
