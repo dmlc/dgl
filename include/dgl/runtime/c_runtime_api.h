@@ -64,9 +64,9 @@ typedef enum {
  *        objects passed between C and Python.
  */
 typedef enum {
-  kInt = 0U,
-  kUInt = 1U,
-  kFloat = 2U,
+  kObjectInt = 0U,
+  kObjectUInt = 1U,
+  kObjectFloat = 2U,
   kHandle = 3U,
   kNull = 4U,
   kDGLDataType = 5U,
@@ -246,7 +246,8 @@ DGL_DLL void DGLAPISetLastError(const char* msg);
  *  DGLGetLastError can be called to retrieve the error
  *
  *  this function is threadsafe and can be called by different thread
- *  \return error info
+ *
+ * @return error info
  */
 DGL_DLL const char* DGLGetLastError(void);
 /**

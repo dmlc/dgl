@@ -19,7 +19,7 @@ from torch.utils.data.distributed import DistributedSampler
 
 from ..base import NID, EID, dgl_warning, DGLError
 from ..batch import batch as batch_graphs
-from ..heterograph import DGLHeteroGraph
+from ..heterograph import DGLGraph
 from ..utils import (
     recursive_apply, ExceptionWrapper, recursive_apply_pair, set_num_threads, get_num_threads,
     get_numa_nodes_cores, context_of, dtype_of)
@@ -283,7 +283,7 @@ def _prefetch_for_subgraph(subg, dataloader):
 
 
 def _prefetch_for(item, dataloader):
-    if isinstance(item, DGLHeteroGraph):
+    if isinstance(item, DGLGraph):
         return _prefetch_for_subgraph(item, dataloader)
     elif isinstance(item, LazyFeature):
         return dataloader.other_storages[item.name].fetch(
@@ -343,7 +343,7 @@ def _prefetch(batch, dataloader, stream):
 
 
 def _assign_for(item, feat):
-    if isinstance(item, DGLHeteroGraph):
+    if isinstance(item, DGLGraph):
         subg = item
         for (tid, key), value in feat.node_feats.items():
             assert isinstance(subg._node_frames[tid][key], LazyFeature)
@@ -387,17 +387,17 @@ def _prefetcher_entry(
             queue, (None, None, None, ExceptionWrapper(where='in prefetcher')), done_event)
 
 
-# DGLHeteroGraphs have the semantics of lazy feature slicing with subgraphs.  Such behavior depends
-# on that DGLHeteroGraph's ndata and edata are maintained by Frames.  So to maintain compatibility
-# with older code, DGLHeteroGraphs and other graph storages are handled separately: (1)
-# DGLHeteroGraphs will preserve the lazy feature slicing for subgraphs.  (2) Other graph storages
+# DGLGraphs have the semantics of lazy feature slicing with subgraphs.  Such behavior depends
+# on that DGLGraph's ndata and edata are maintained by Frames.  So to maintain compatibility
+# with older code, DGLGraphs and other graph storages are handled separately: (1)
+# DGLGraphs will preserve the lazy feature slicing for subgraphs.  (2) Other graph storages
 # will not have lazy feature slicing; all feature slicing will be eager.
 def remove_parent_storage_columns(item, g):
     """Removes the storage objects in the given graphs' Frames if it is a sub-frame of the
     given parent graph, so that the storages are not serialized during IPC from PyTorch
     DataLoader workers.
     """
-    if not isinstance(item, DGLHeteroGraph) or not isinstance(g, DGLHeteroGraph):
+    if not isinstance(item, DGLGraph) or not isinstance(g, DGLGraph):
         return item
 
     for subframe, frame in zip(
@@ -419,7 +419,7 @@ def restore_parent_storage_columns(item, g):
     """Restores the storage objects in the given graphs' Frames if it is a sub-frame of the
     given parent graph (i.e. when the storage object is None).
     """
-    if not isinstance(item, DGLHeteroGraph) or not isinstance(g, DGLHeteroGraph):
+    if not isinstance(item, DGLGraph) or not isinstance(g, DGLGraph):
         return item
 
     for subframe, frame in zip(
@@ -774,7 +774,7 @@ class DataLoader(torch.utils.data.DataLoader):
         self.device = _get_device(device)
 
         # Sanity check - we only check for DGLGraphs.
-        if isinstance(self.graph, DGLHeteroGraph):
+        if isinstance(self.graph, DGLGraph):
             # Check graph and indices device as well as num_workers
             if use_uva:
                 if self.graph.device.type != 'cpu':
@@ -1098,7 +1098,7 @@ class GraphCollator(object):
         """
         elem = items[0]
         elem_type = type(elem)
-        if isinstance(elem, DGLHeteroGraph):
+        if isinstance(elem, DGLGraph):
             batched_graphs = batch_graphs(items)
             return batched_graphs
         elif F.is_tensor(elem):

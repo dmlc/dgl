@@ -56,11 +56,12 @@ bool has_edge_between(const CSRMatrix &csr, dgl_id_t u, dgl_id_t v) {
  * @param q Float, control parameter to interpolate between breadth-first
  *        strategy and depth-first strategy.
  * @param len The number of nodes generated so far.  Note that the seed node is
- *        always included as \c data[0], and the successors start from \c
- * data[1]. \param csr The CSR matrix \param prob Transition probability \param
- * terminate Predicate for terminating the current random walk path. \return A
- * tuple of ID of next successor (-1 if not exist), the edge ID traversed, as
- * well as whether to terminate.
+ * always included as \c data[0], and the successors start from \c data[1].
+ * @param csr The CSR matrix
+ * @param prob Transition probability
+ * @param terminate Predicate for terminating the current random walk path.
+ * @return A tuple of ID of next successor (-1 if not exist), the edge ID
+ * traversed, as well as whether to terminate.
  */
 
 template <DGLDeviceType XPU, typename IdxType>

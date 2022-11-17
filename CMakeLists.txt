@@ -251,6 +251,9 @@ if(NOT MSVC)
   target_include_directories(dgl PRIVATE third_party/tensorpipe)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+  # Avoid exposing third-party symbols when using DGL as a library.
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wl,--exclude-libs,ALL")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,--exclude-libs,ALL")
 endif(NOT MSVC)
 
 # Compile TVM Runtime and Featgraph
@@ -346,3 +349,8 @@ if(BUILD_CPP_TEST)
     target_link_libraries(rpc_server dgl)
   endif(NOT MSVC)
 endif(BUILD_CPP_TEST)
+
+if(BUILD_SPARSE)
+  set(DGL_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/include")
+  add_subdirectory(dgl_sparse)
+endif(BUILD_SPARSE)

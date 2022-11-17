@@ -1,5 +1,5 @@
 /**
- *  Copyright (c) 2017 by Contributors
+ * Copyright (c) 2017 by Contributors
  * @file dgl/random.h
  * @brief Random number generators
  */
@@ -57,7 +57,10 @@ class RandomEngine {
   /**
    * @brief Set the seed of this random number generator
    */
-  void SetSeed(uint32_t seed) { rng_.seed(seed + GetThreadId()); }
+  void SetSeed(uint32_t seed) {
+    std::seed_seq seq{seed, GetThreadId()};
+    rng_.seed(seq);
+  }
 
   /**
    * @brief Generate an arbitrary random 32-bit integer.

@@ -222,7 +222,7 @@ CSRMatrix UnionCsr(const std::vector<CSRMatrix>& csrs);
 template <DGLDeviceType XPU, typename IdType>
 std::tuple<CSRMatrix, IdArray, IdArray> CSRToSimple(CSRMatrix csr);
 
-///////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 template <DGLDeviceType XPU, typename IdType>
 bool COOIsNonZero(COOMatrix coo, int64_t row, int64_t col);
