@@ -43,7 +43,7 @@ class SIGN(nn.Module):
         for i in range(len(X_sign)):
             results.append(self.theta[i](X_sign[i]))
         Z = F.relu(torch.cat(results, dim=1))
-        return F.softmax(self.omega(Z))
+        return self.omega(Z)
 
 
 def evaluate(g, pred):
