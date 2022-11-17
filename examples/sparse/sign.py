@@ -28,7 +28,7 @@ def sign_diffusion(A, X, r):
 
 
 class SIGN(nn.Module):
-    def __init__(self, in_size, out_size, r, hidden_size=64):
+    def __init__(self, in_size, out_size, r, hidden_size=256):
         super().__init__()
         # Note that theta and omega refer to the learnable matrices in the
         # original paper correspondingly. The variable r refers to subscript to
@@ -62,7 +62,7 @@ def train(g, model):
     train_mask = g.ndata["train_mask"]
     optimizer = Adam(model.parameters(), lr=3e-3)
 
-    for epoch in range(20):
+    for epoch in range(10):
         # Forward.
         logits = model(X_sign)
 
