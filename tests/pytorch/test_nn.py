@@ -1786,3 +1786,17 @@ def test_LaplacianPosEnc(num_layer, k, lpe_dim, n_head, batch_norm, num_post_lay
     model = nn.LaplacianPosEnc("DeepSet", num_layer, k, lpe_dim,
                                batch_norm=batch_norm, num_post_layer=num_post_layer).to(ctx)
     assert model(EigVals, EigVecs).shape == (num_nodes, lpe_dim)
+
+@pytest.mark.parametrize('feat_size', [128, 512])
+@pytest.mark.parametrize('num_heads', [8, 16])
+@pytest.mark.parametrize('bias', [True, False])
+@pytest.mark.parametrize('attn_bias_type', ['add', 'mul'])
+def test_BiasedMultiheadAttention(feat_size, num_heads, bias, attn_bias_type):
+    ndata = th.rand(16, 100, feat_size)
+    attn_bias = th.rand(16, 100, 100, num_heads)
+    attn_mask = th.rand(16, 100, 100) < 0.5
+
+    net = nn.BiasedMultiheadAttention(feat_size, num_heads, bias, attn_bias_type)
+    out = net(ndata, attn_bias, attn_mask)
+
+    assert out.shape == (16, 100, feat_size)
