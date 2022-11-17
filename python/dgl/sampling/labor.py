@@ -333,7 +333,7 @@ def _sample_labors(
     subgidx = ret_val[0]
     importances = [F.from_dgl_nd(importance) for importance in ret_val[1:]]
     induced_edges = subgidx.induced_edges
-    ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
+    ret = DGLGraph(subgidx.graph, g.ntypes, g.etypes)
 
     if copy_ndata:
         node_frames = utils.extract_node_subframes(g, None)
@@ -346,6 +346,6 @@ def _sample_labors(
     return ret, importances
 
 
-DGLHeteroGraph.sample_labors = utils.alias_func(sample_labors)
+DGLGraph.sample_labors = utils.alias_func(sample_labors)
 
 _init_api("dgl.sampling.labor", __name__)
