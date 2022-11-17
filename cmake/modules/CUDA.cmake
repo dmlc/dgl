@@ -74,7 +74,7 @@ set(CUDA_gpu_detect_output "")
       string(REGEX MATCH "([1-9].[0-9])" __nvcc_out "${__nvcc_out}")
       if(__nvcc_out VERSION_LESS "3.5")
         # drop support for cc < 3.5 and build for all known archs.
-        message(WARNING "GPU arch is too old to support.")
+        message(WARNING "GPU arch less than 3.5 is not supported.")
       else()
         set(CUDA_gpu_detect_output ${__nvcc_out} CACHE INTERNAL "Returned GPU architetures from mshadow_detect_gpus tool" FORCE)
       endif()
