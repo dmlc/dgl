@@ -1,3 +1,13 @@
+"""
+[RGCN: Relational Graph Convolutional Networks]
+(https://arxiv.org/abs/1703.06103)
+
+This example showcases the usage of `CuGraphRelGraphConv` via the entity
+classification problem in the RGCN paper with mini-batch training. It offers
+a 1.5~2x speed-up over `RelGraphConv` on cuda devices and only requires minimal
+code changes from the current `entity_sample.py` example.
+"""
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
