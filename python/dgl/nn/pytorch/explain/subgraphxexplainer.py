@@ -462,7 +462,8 @@ class SubgraphXExplainer(nn.Module):
         >>> # Explain the prediction for graph 0
         >>> graph, l = data[0]
         >>> graph_feat = graph.ndata.pop("attr")
-        >>> g_nodes_explain = explainer.explain_graph(graph, max_iter=50, node_min=6, features=graph_feat)
+        >>> g_nodes_explain = explainer.explain_graph(graph, max_iter=50, node_min=6,
+        features=graph_feat)
         >>> g_nodes_explain
         tensor([14, 15, 16, 17, 18, 19])
         """
