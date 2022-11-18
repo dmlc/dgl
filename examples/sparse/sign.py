@@ -46,7 +46,7 @@ class SIGN(nn.Module):
         return self.omega(Z)
 
 
-def evaluate(g, model):
+def evaluate(g, pred):
     label = g.ndata["label"]
     val_mask = g.ndata["val_mask"]
     test_mask = g.ndata["test_mask"]
@@ -57,24 +57,7 @@ def evaluate(g, model):
     return val_acc, test_acc
 
 
-def train(g, model):
-    # Create the sparse adjacency matrix A (note that W was used as the notation
-    # for adjacency matrix in the original paper).
-    src, dst = g.edges()
-    N = g.num_nodes()
-    A = create_from_coo(dst, src, shape=(N, N))
-
-    # Calculate the symmetrically normalized adjacency matrix.
-    I = identity(A.shape, device=dev)
-    A_hat = A + I
-    D_hat = diag(A_hat.sum(dim=1)) ** -0.5
-    A_hat = D_hat @ A_hat @ D_hat
-
-    # 2-hop diffusion.
-    r = 2
-    X = g.ndata["feat"]
-    X_sign = sign_diffusion(A_hat, X, r)
-
+def train(g, X_sign, model):
     label = g.ndata["label"]
     train_mask = g.ndata["train_mask"]
     optimizer = Adam(model.parameters(), lr=3e-3)
@@ -102,7 +85,7 @@ def train(g, model):
         pred = logits.argmax(1)
 
         # Evaluate the prediction.
-        val_acc, test_acc = evaluate(g, model)
+        val_acc, test_acc = evaluate(g, pred)
         print(
             f"In epoch {epoch}, loss: {loss:.3f}, val acc: {val_acc:.3f}, test"
             f" acc: {test_acc:.3f}"
@@ -118,10 +101,27 @@ if __name__ == "__main__":
     dataset = CoraGraphDataset()
     g = dataset[0].to(dev)
 
+    # Create the sparse adjacency matrix A (note that W was used as the notation
+    # for adjacency matrix in the original paper).
+    src, dst = g.edges()
+    N = g.num_nodes()
+    A = create_from_coo(dst, src, shape=(N, N))
+
+    # Calculate the symmetrically normalized adjacency matrix.
+    I = identity(A.shape, device=dev)
+    A_hat = A + I
+    D_hat = diag(A_hat.sum(dim=1)) ** -0.5
+    A_hat = D_hat @ A_hat @ D_hat
+
+    # 2-hop diffusion.
+    r = 2
+    X = g.ndata["feat"]
+    X_sign = sign_diffusion(A_hat, X, r)
+
     # Create SIGN model.
-    in_size = g.ndata["feat"].shape[1]
+    in_size = X.shape[1]
     out_size = dataset.num_classes
     model = SIGN(in_size, out_size, r).to(dev)
 
     # Kick off training.
-    train(g, model)
+    train(g, X_sign, model)
