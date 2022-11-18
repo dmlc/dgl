@@ -213,9 +213,7 @@ def _test_pipeline(num_chunks, num_parts, world_size, graph_formats=None):
             )
 
 
-@pytest.mark.parametrize("num_chunks", [1, 2, 3, 4, 8, 11])
-@pytest.mark.parametrize("num_parts", [1, 2, 3, 4, 11])
-@pytest.mark.parametrize("world_size", [1, 2, 3, 4])
+@pytest.mark.parametrize("num_chunks, num_parts, world_size", [[8, 4, 2], [9, 6, 3], [11, 11, 1], [11, 4, 2], [5, 3, 1]])
 def test_pipeline_basics(num_chunks, num_parts, world_size):
     _test_pipeline(num_chunks, num_parts, world_size)
 

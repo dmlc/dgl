@@ -820,12 +820,11 @@ def gen_dist_partitions(rank, world_size, params):
     logging.info(f'[Rank: {rank}] Done resolving orig_node_id for local node_ids...')
     memory_snapshot("ShuffleGlobalID_Lookup_Complete: ", rank)
 
-    def prepare_local_data(src_data, local_part_id, num_tokens):
+    def prepare_local_data(src_data, local_part_id):
         local_data = {}
         for k, v in src_data.items():
             tokens = k.split("/")
-            assert len(tokens) == num_tokens
-            if tokens[num_tokens-1] == str(local_part_id):
+            if tokens[len(tokens)-1] == str(local_part_id):
                 local_data["/".join(tokens[:-1])] = v
         return local_data
 
@@ -841,15 +840,15 @@ def gen_dist_partitions(rank, world_size, params):
         num_edges = shuffle_global_eid_offsets[local_part_id]
         node_count = len(node_data[constants.NTYPE_ID+"/"+str(local_part_id)])
         edge_count = len(edge_data[constants.ETYPE_ID+"/"+str(local_part_id)])
-        local_node_data = prepare_local_data(node_data, local_part_id, 2)
-        local_edge_data = prepare_local_data(edge_data, local_part_id, 2)
+        local_node_data = prepare_local_data(node_data, local_part_id)
+        local_edge_data = prepare_local_data(edge_data, local_part_id)
         graph_obj, ntypes_map_val, etypes_map_val, ntypes_map, etypes_map, \
             orig_nids, orig_eids = create_dgl_object(schema_map, rank+local_part_id*world_size, 
                     local_node_data, local_edge_data, 
                     num_edges, params.save_orig_nids, params.save_orig_eids)
         sort_etypes = len(etypes_map) > 1
-        local_node_features = prepare_local_data(rcvd_node_features, local_part_id, 3)
-        local_edge_features = prepare_local_data(rcvd_edge_features, local_part_id, 3)
+        local_node_features = prepare_local_data(rcvd_node_features, local_part_id)
+        local_edge_features = prepare_local_data(rcvd_edge_features, local_part_id)
         write_dgl_objects(graph_obj, 
                 local_node_features, local_edge_features,
                 params.output,
