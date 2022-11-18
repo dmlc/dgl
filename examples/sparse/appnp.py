@@ -10,6 +10,7 @@ from dgl.data import CoraGraphDataset
 from dgl.mock_sparse import create_from_coo, diag, identity
 from torch.optim import Adam
 
+
 class APPNP(nn.Module):
     def __init__(
         self,
@@ -18,8 +19,8 @@ class APPNP(nn.Module):
         hidden_size=64,
         dropout=0.1,
         num_hops=10,
-        alpha=0.1
-        ):
+        alpha=0.1,
+    ):
         super().__init__()
 
         self.f_theta = nn.Sequential(
@@ -27,7 +28,7 @@ class APPNP(nn.Module):
             nn.Linear(in_size, hidden_size),
             nn.ReLU(),
             nn.Dropout(dropout),
-            nn.Linear(hidden_size, out_size)
+            nn.Linear(hidden_size, out_size),
         )
         self.num_hops = num_hops
         self.A_dropout = nn.Dropout(dropout)
