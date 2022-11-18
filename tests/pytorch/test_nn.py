@@ -1529,7 +1529,7 @@ def test_typed_linear(feat_size, regularizer, num_bases):
 
     assert th.allclose(y, y_sorted[rev_idx], atol=1e-4, rtol=1e-4)
 
-@parametrize_idtype
+@pytest.mark.parametrize('idtype', [F.int64])
 @pytest.mark.parametrize('in_size', [4])
 @pytest.mark.parametrize('num_heads', [1])
 def test_hgt(idtype, in_size, num_heads):
