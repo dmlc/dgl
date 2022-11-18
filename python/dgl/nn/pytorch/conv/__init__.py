@@ -66,3 +66,10 @@ __all__ = [
     "PNAConv",
     "DGNConv",
 ]
+
+try:
+    from .cugraph_relgraphconv import CuGraphRelGraphConv
+except ImportError:
+    pass
+else:
+    __all__.append('CuGraphRelGraphConv')
