@@ -9,9 +9,7 @@ import dgl
 __all__ = ["SubgraphXExplainer"]
 
 
-def marginal_contribution(
-        graph, exclude_masks, include_masks, model, features
-):
+def marginal_contribution(graph, exclude_masks, include_masks, model, features):
     r"""Calculate the marginal value for the sample coalition nodes (identified by
     inluded_masks).
 
@@ -71,7 +69,7 @@ def marginal_contribution(
 
 
 def mc_l_shapley(
-        model, graph, subgraph_nodes, local_radius, sample_num, features
+    model, graph, subgraph_nodes, local_radius, sample_num, features
 ):
     r"""Monte carlo sampling approximation of the l_shapley value.
 
@@ -104,8 +102,10 @@ def mc_l_shapley(
     for _ in range(local_radius - 1):
         k_neighbourhood = []
         for node in local_region:
-            k_neighbourhood += set(graph.successors(node).tolist()
-                                   + graph.predecessors(node).tolist())
+            k_neighbourhood += set(
+                graph.successors(node).tolist()
+                + graph.predecessors(node).tolist()
+            )
         local_region += k_neighbourhood
         local_region = list(set(local_region))
 
@@ -163,8 +163,15 @@ class MCTSNode:
         Immediate reward for selecting this node (property score).
     """
 
-    def __init__(self, nodes, pruning_action, c_puct=10.0, num_visit=0, total_reward=0.0,
-                 immediate_reward=0.0):
+    def __init__(
+        self,
+        nodes,
+        pruning_action,
+        c_puct=10.0,
+        num_visit=0,
+        total_reward=0.0,
+        immediate_reward=0.0,
+    ):
         self.nodes = nodes
         self.a = pruning_action
         self.c_puct = c_puct
@@ -196,8 +203,12 @@ class MCTSNode:
         float
             Returns the action selection criteria of node.
         """
-        return self.c_puct * self.immediate_reward * \
-               math.sqrt(total_visit_count) / (1 + self.num_visit)
+        return (
+            self.c_puct
+            * self.immediate_reward
+            * math.sqrt(total_visit_count)
+            / (1 + self.num_visit)
+        )
 
 
 class SubgraphXExplainer(nn.Module):
@@ -228,13 +239,13 @@ class SubgraphXExplainer(nn.Module):
     """
 
     def __init__(
-            self,
-            model,
-            hyperparam,
-            pruning_action,
-            num_child_expand=2,
-            local_radius=4,
-            sample_num=100,
+        self,
+        model,
+        hyperparam,
+        pruning_action,
+        num_child_expand=2,
+        local_radius=4,
+        sample_num=100,
     ):
         super(SubgraphXExplainer, self).__init__()
 
@@ -314,8 +325,8 @@ class SubgraphXExplainer(nn.Module):
             [
                 c
                 for c in sorted(
-                nx.connected_components(nx_graph), key=len, reverse=True
-            )
+                    nx.connected_components(nx_graph), key=len, reverse=True
+                )
             ][0]
         )
         # Convert back to DGLGraph object.
@@ -498,10 +509,17 @@ class SubgraphXExplainer(nn.Module):
                         curr_node.children.append(new_child_node)
 
                 next_node = max(
-                    curr_node.children, key=lambda x: x.average_reward() +
-                                                      x.action_selection_criteria(np.sum([
-                                                          child_node.num_visit
-                                                          for child_node in curr_node.children])))
+                    curr_node.children,
+                    key=lambda x: x.average_reward()
+                    + x.action_selection_criteria(
+                        np.sum(
+                            [
+                                child_node.num_visit
+                                for child_node in curr_node.children
+                            ]
+                        )
+                    ),
+                )
                 curr_node = next_node
                 curr_path.append(next_node)
 
