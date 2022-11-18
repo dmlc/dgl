@@ -372,12 +372,12 @@ def aggregate_radius(radius, g, z):
     z_list = []
     g.ndata['z'] = z
     # pulling message from 1-hop neighbourhood
-    g.update_all(fn.copy_src(src='z', out='m'), fn.sum(msg='m', out='z'))
+    g.update_all(fn.copy_u(u='z', out='m'), fn.sum(msg='m', out='z'))
     z_list.append(g.ndata['z'])
     for i in range(radius - 1):
         for j in range(2 ** i):
             #pulling message from 2^j neighborhood
-            g.update_all(fn.copy_src(src='z', out='m'), fn.sum(msg='m', out='z'))
+            g.update_all(fn.copy_u(u='z', out='m'), fn.sum(msg='m', out='z'))
         z_list.append(g.ndata['z'])
     return z_list
 

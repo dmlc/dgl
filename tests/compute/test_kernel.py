@@ -93,10 +93,10 @@ def test_copy_src_reduce():
 
         with F.record_grad():
             if partial:
-                g.pull(nid, fn.copy_src(src='u', out='m'),
+                g.pull(nid, fn.copy_u(u='u', out='m'),
                        builtin[red](msg='m', out='r1'))
             else:
-                g.update_all(fn.copy_src(src='u', out='m'),
+                g.update_all(fn.copy_u(u='u', out='m'),
                              builtin[red](msg='m', out='r1'))
             r1 = g.ndata['r1']
             F.backward(F.reduce_sum(r1))
@@ -155,10 +155,10 @@ def test_copy_edge_reduce():
 
         with F.record_grad():
             if partial:
-                g.pull(nid, fn.copy_edge(edge='e', out='m'),
+                g.pull(nid, fn.copy_e(e='e', out='m'),
                        builtin[red](msg='m', out='r1'))
             else:
-                g.update_all(fn.copy_edge(edge='e', out='m'),
+                g.update_all(fn.copy_e(e='e', out='m'),
                              builtin[red](msg='m', out='r1'))
             r1 = g.ndata['r1']
             F.backward(F.reduce_sum(r1))

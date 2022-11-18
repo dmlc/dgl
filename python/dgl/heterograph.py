@@ -4558,7 +4558,7 @@ class DGLGraph(object):
         ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1])
         ... })
         >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [2.]])
-        >>> g.send_and_recv(g['follows'].edges(), fn.copy_src('h', 'm'),
+        >>> g.send_and_recv(g['follows'].edges(), fn.copy_u('h', 'm'),
         ...                 fn.sum('m', 'h'), etype='follows')
         >>> g.nodes['user'].data['h']
         tensor([[0.],
@@ -4688,7 +4688,7 @@ class DGLGraph(object):
 
         Pull.
 
-        >>> g['follows'].pull(2, fn.copy_src('h', 'm'), fn.sum('m', 'h'), etype='follows')
+        >>> g['follows'].pull(2, fn.copy_u('h', 'm'), fn.sum('m', 'h'), etype='follows')
         >>> g.nodes['user'].data['h']
         tensor([[0.],
                 [1.],
@@ -4785,7 +4785,7 @@ class DGLGraph(object):
 
         Push.
 
-        >>> g['follows'].push(0, fn.copy_src('h', 'm'), fn.sum('m', 'h'), etype='follows')
+        >>> g['follows'].push(0, fn.copy_u('h', 'm'), fn.sum('m', 'h'), etype='follows')
         >>> g.nodes['user'].data['h']
         tensor([[0.],
                 [0.],
@@ -4864,7 +4864,7 @@ class DGLGraph(object):
         Update all.
 
         >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [2.]])
-        >>> g['follows'].update_all(fn.copy_src('h', 'm'), fn.sum('m', 'h'), etype='follows')
+        >>> g['follows'].update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'), etype='follows')
         >>> g.nodes['user'].data['h']
         tensor([[0.],
                 [0.],
@@ -4881,7 +4881,7 @@ class DGLGraph(object):
 
         >>> g.nodes['user'].data['h'] = torch.tensor([[1.], [2.]])
         >>> g.nodes['game'].data['h'] = torch.tensor([[1.]])
-        >>> g.update_all(fn.copy_src('h', 'm'), fn.sum('m', 'h'))
+        >>> g.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
         >>> g.nodes['user'].data['h']
         tensor([[0.],
                 [4.]])
@@ -4989,8 +4989,8 @@ class DGLGraph(object):
         Update all.
 
         >>> g.multi_update_all(
-        ...     {'follows': (fn.copy_src('h', 'm'), fn.sum('m', 'h')),
-        ...      'attracts': (fn.copy_src('h', 'm'), fn.sum('m', 'h'))},
+        ...     {'follows': (fn.copy_u('h', 'm'), fn.sum('m', 'h')),
+        ...      'attracts': (fn.copy_u('h', 'm'), fn.sum('m', 'h'))},
         ... "sum")
         >>> g.nodes['user'].data['h']
         tensor([[0.],
@@ -5004,8 +5004,8 @@ class DGLGraph(object):
         Use the user-defined cross reducer.
 
         >>> g.multi_update_all(
-        ...     {'follows': (fn.copy_src('h', 'm'), fn.sum('m', 'h')),
-        ...      'attracts': (fn.copy_src('h', 'm'), fn.sum('m', 'h'))},
+        ...     {'follows': (fn.copy_u('h', 'm'), fn.sum('m', 'h')),
+        ...      'attracts': (fn.copy_u('h', 'm'), fn.sum('m', 'h'))},
         ... cross_sum)
         """
         all_out = defaultdict(list)
@@ -5088,7 +5088,7 @@ class DGLGraph(object):
 
         >>> g = dgl.heterograph({('user', 'follows', 'user'): ([0, 1, 2, 3], [2, 3, 4, 4])})
         >>> g.nodes['user'].data['h'] = torch.tensor([[1.], [2.], [3.], [4.], [5.]])
-        >>> g['follows'].prop_nodes([[2, 3], [4]], fn.copy_src('h', 'm'),
+        >>> g['follows'].prop_nodes([[2, 3], [4]], fn.copy_u('h', 'm'),
         ...                         fn.sum('m', 'h'), etype='follows')
         tensor([[1.],
                 [2.],
@@ -5151,7 +5151,7 @@ class DGLGraph(object):
 
         >>> g = dgl.heterograph({('user', 'follows', 'user'): ([0, 1, 2, 3], [2, 3, 4, 4])})
         >>> g.nodes['user'].data['h'] = torch.tensor([[1.], [2.], [3.], [4.], [5.]])
-        >>> g['follows'].prop_edges([[0, 1], [2, 3]], fn.copy_src('h', 'm'),
+        >>> g['follows'].prop_edges([[0, 1], [2, 3]], fn.copy_u('h', 'm'),
         ...                         fn.sum('m', 'h'), etype='follows')
         >>> g.nodes['user'].data['h']
         tensor([[1.],

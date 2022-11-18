@@ -21,7 +21,7 @@ def dfs_order(forest, roots):
         # using find_edges().
         yield e ^ l, l
 
-dec_tree_node_msg = DGLF.copy_edge(edge='m', out='m')
+dec_tree_node_msg = DGLF.copy_e(edge='m', out='m')
 dec_tree_node_reduce = DGLF.sum(msg='m', out='h')
 
 
