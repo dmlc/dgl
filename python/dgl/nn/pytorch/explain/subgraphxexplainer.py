@@ -321,16 +321,9 @@ class SubgraphXExplainer(nn.Module):
         # Convert to a networkx graph object
         nx_graph = dgl.to_networkx(new_graph).to_undirected()
         # Find and sort graph components by size from largest to smallest and take the biggest one.
-        biggest_comp = list(
-            [
-                c
-                for c in sorted(
-                    nx.connected_components(nx_graph), key=len, reverse=True
-                )
-            ][0]
-        )
+        biggest_comp = list(sorted(nx.connected_components(nx_graph), key=len, reverse=True))[0]
         # Convert back to DGLGraph object.
-        return biggest_comp
+        return list(biggest_comp)
 
     def prune_graph(self, graph, strategy):
         r"""Find the graph based on the chosen strategy. Once prunes, return the
@@ -362,8 +355,8 @@ class SubgraphXExplainer(nn.Module):
         nodes = graph.nodes()
         node_degree = []
 
-        for i, _ in enumerate(out_degrees):
-            node_degree.append((nodes[i], out_degrees[i] + in_degrees[i]))
+        for node, in_degree, out_degree in zip(nodes, in_degrees, out_degrees):
+            node_degree.append((node, in_degree + out_degree))
 
         node_degree = sorted(node_degree, key=lambda x: x[1], reverse=rev)
 
