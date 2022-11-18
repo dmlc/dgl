@@ -8,28 +8,9 @@ import dgl
 
 __all__ = ["SubgraphXExplainer"]
 
-def neighbors(node, graph):
-    r"""Find the one-hop neighbours of a node for a given graph.
-
-    Parameters
-    ----------
-    node: int
-        The node to get the neighbours.
-    graph : DGLGraph
-        A homogeneous graph.
-
-    Returns
-    -------
-    Function
-        Returns the largest weakly connected components in graph
-    """
-    neighbours = set(graph.successors(node).tolist()
-                     + graph.predecessors(node).tolist())
-    return neighbours
-
 
 def marginal_contribution(
-    graph, exclude_masks, include_masks, model, features
+        graph, exclude_masks, include_masks, model, features
 ):
     r"""Calculate the marginal value for the sample coalition nodes (identified by
     inluded_masks).
@@ -90,7 +71,7 @@ def marginal_contribution(
 
 
 def mc_l_shapley(
-    model, graph, subgraph_nodes, local_radius, sample_num, features
+        model, graph, subgraph_nodes, local_radius, sample_num, features
 ):
     r"""Monte carlo sampling approximation of the l_shapley value.
 
@@ -114,7 +95,7 @@ def mc_l_shapley(
     Returns
     -------
     float
-        Returns the mc_l_shapley value based on the subgraph nodes
+        Returns the mc_l_shapley value based on the subgraph nodes.
     """
 
     num_nodes = graph.num_nodes()
@@ -123,7 +104,8 @@ def mc_l_shapley(
     for _ in range(local_radius - 1):
         k_neighbourhood = []
         for node in local_region:
-            k_neighbourhood += neighbors(node, graph)
+            k_neighbourhood += set(graph.successors(node).tolist()
+                                   + graph.predecessors(node).tolist())
         local_region += k_neighbourhood
         local_region = list(set(local_region))
 
@@ -173,33 +155,54 @@ class MCTSNode:
         A representation of the pruning action used to get to this node.
     c_puct: flaot
         The hyper-parameter to encourage exploration while searching.
-    W: float
-        The sum of the node .
-    N: int
+    num_visit: int
         Number times this node has been visited.
-    P: float
+    total_reward: float
+        the total reward for all node visits.
+    immediate_reward: float
         Immediate reward for selecting this node (property score).
     """
 
-    def __init__(self, nodes, pruning_action, c_puct=10.0, W=0.0, N=0, P=0.0):
+    def __init__(self, nodes, pruning_action, c_puct=10.0, num_visit=0, total_reward=0.0,
+                 immediate_reward=0.0):
         self.nodes = nodes
         self.a = pruning_action
         self.c_puct = c_puct
-        self.W = W
-        self.N = N
-        self.P = P
+        self.num_visit = num_visit
+        self.total_reward = total_reward
+        self.immediate_reward = immediate_reward
         self.children = []
 
-    def Q(self):
-        return self.W / self.N if self.N > 0 else 0
+    def average_reward(self):
+        r"""Get the average reward for multiple visits.
 
-    def U(self, n) -> float:
-        return self.c_puct * self.P * math.sqrt(n) / (1 + self.N)
+        Returns
+        -------
+        float
+            Return the averaged reward for multiple visits.
+        """
+        return self.total_reward / self.num_visit if self.num_visit > 0 else 0
+
+    def action_selection_criteria(self, total_visit_count):
+        r"""Get the action selection criteria of node.
+
+        Parameters
+        ----------
+        total_visit_count: float
+            The total visiting counts for all possible actions of node.
+
+        Returns
+        -------
+        float
+            Returns the action selection criteria of node.
+        """
+        return self.c_puct * self.immediate_reward * \
+               math.sqrt(total_visit_count) / (1 + self.num_visit)
 
 
 class SubgraphXExplainer(nn.Module):
     r"""SubgraphXExplainer model from `SubgraphXExplainer: On Explainability of
-    Graph Neural Networks via Subgraph Explorations <https://arxiv.org/pdf/2102.05152.pdf>`
+    Graph Neural Networks via Subgraph Explorations <https://arxiv.org/pdf/2102.05152.pdf>`.
 
     It identifies subgraphs from the original graph  that play a
     critical role in GNN-based graph classification.
@@ -225,13 +228,13 @@ class SubgraphXExplainer(nn.Module):
     """
 
     def __init__(
-        self,
-        model,
-        hyperparam,
-        pruning_action,
-        num_child_expand=2,
-        local_radius=4,
-        sample_num=100,
+            self,
+            model,
+            hyperparam,
+            pruning_action,
+            num_child_expand=2,
+            local_radius=4,
+            sample_num=100,
     ):
         super(SubgraphXExplainer, self).__init__()
 
@@ -251,10 +254,10 @@ class SubgraphXExplainer(nn.Module):
 
         Parameters
         ----------
-        features : Tensor
+        features: Tensor
             The input feature of shape :math:`(N, D)`. :math:`N` is the
             number of nodes, and :math:`D` is the feature size.
-        kwargs : dict
+        kwargs: dict
             Additional arguments passed to the GNN model. Tensors whose
             first dimension is the number of nodes or edges will be
             assumed to be node/edge features.
@@ -262,7 +265,7 @@ class SubgraphXExplainer(nn.Module):
         Returns
         -------
         Function
-            Returns the value function
+            Returns the value function.
         """
 
         def value_func(graph):
@@ -270,13 +273,13 @@ class SubgraphXExplainer(nn.Module):
 
             Parameters
             ----------
-            graph : DGLGraph
+            graph: DGLGraph
                 A homogeneous graph.
 
             Returns
             -------
             Tensor
-                Returns a tensor of probabilities
+                Returns a tensor of probabilities.
             """
             with torch.no_grad():
                 logits = self.model(graph, features, **kwargs)
@@ -297,7 +300,7 @@ class SubgraphXExplainer(nn.Module):
         Returns
         -------
         Function
-            Returns the largest weakly connected components in graph
+            Returns the largest weakly connected components in graph.
         """
 
         # Ensure graph is homogenous.
@@ -311,8 +314,8 @@ class SubgraphXExplainer(nn.Module):
             [
                 c
                 for c in sorted(
-                    nx.connected_components(nx_graph), key=len, reverse=True
-                )
+                nx.connected_components(nx_graph), key=len, reverse=True
+            )
             ][0]
         )
         # Convert back to DGLGraph object.
@@ -320,20 +323,20 @@ class SubgraphXExplainer(nn.Module):
 
     def prune_graph(self, graph, strategy):
         r"""Find the graph based on the chosen strategy. Once prunes, return the
-        lsit of subgraphs, list of subgraph nodes and list of pruned nodes
+        lsit of subgraphs, list of subgraph nodes and list of pruned nodes.
 
         Parameters
         ----------
         graph : DGLGraph
             A homogeneous graph.
         strategy: str
-            The strategy based on which the pruning will happen, "high2low" or "low2high"
+            The strategy based on which the pruning will happen, "high2low" or "low2high".
 
         Returns
         -------
         tuple(list, list, list)
             Return a tuple consists of list of subgraphs based on pruned action,
-            list of subgraphs nodes, and list of pruned nodes
+            list of subgraphs nodes, and list of pruned nodes.
 
         """
         subgraphs = []
@@ -373,7 +376,7 @@ class SubgraphXExplainer(nn.Module):
 
         return subgraphs, subgraphs_nodes_mapping, pruned_nodes
 
-    def explain_graph(self, graph, M, N_min, features, **kwargs):
+    def explain_graph(self, graph, max_iter, node_min, features, **kwargs):
         r"""Find the subgraph that play a crucial role to explain the prediction made
         by the GNN for a graph.
 
@@ -381,10 +384,10 @@ class SubgraphXExplainer(nn.Module):
         ----------
         graph : DGLGraph
             A homogeneous graph.
-        M: int
-            Max number of iteration for MCTS
-        N_min: int
-            The leaf threshold node number
+        max_iter: int
+            Max number of iteration for MCTS.
+        node_min: int
+            The leaf threshold node number.
         features : Tensor
             The input feature of shape :math:`(N, D)`. :math:`N` is the
             number of nodes, and :math:`D` is the feature size.
@@ -396,7 +399,7 @@ class SubgraphXExplainer(nn.Module):
         Returns
         -------
         list
-            Return list of nodes that represent the most important subgraph
+            Return list of nodes that represent the most important subgraph.
 
         Examples
         --------
@@ -448,7 +451,7 @@ class SubgraphXExplainer(nn.Module):
         >>> # Explain the prediction for graph 0
         >>> graph, l = data[0]
         >>> graph_feat = graph.ndata.pop("attr")
-        >>> g_nodes_explain = explainer.explain_graph(graph, M=50, N_min=6, features=graph_feat)
+        >>> g_nodes_explain = explainer.explain_graph(graph, max_iter=50, node_min=6, features=graph_feat)
         >>> g_nodes_explain
         tensor([14, 15, 16, 17, 18, 19])
         """
@@ -461,12 +464,12 @@ class SubgraphXExplainer(nn.Module):
 
         leaf_set = set()
 
-        for _ in range(M):
+        for _ in range(max_iter):
             # print("iteration number=", i)
             curr_node = self.tree_root
             curr_path = [curr_node]
 
-            while len(curr_node.nodes) > N_min:
+            while len(curr_node.nodes) > node_min:
                 # print("curr_node.nodes = ", len(curr_node.nodes))
 
                 # check if tree node hasn't been expanded before
@@ -494,13 +497,11 @@ class SubgraphXExplainer(nn.Module):
                         )
                         curr_node.children.append(new_child_node)
 
-                sum_n = 0
-                for child_node in curr_node.children:
-                    sum_n += child_node.N
-
                 next_node = max(
-                    curr_node.children, key=lambda x: x.Q() + x.U(sum_n)
-                )
+                    curr_node.children, key=lambda x: x.average_reward() +
+                                                      x.action_selection_criteria(np.sum([
+                                                          child_node.num_visit
+                                                          for child_node in curr_node.children])))
                 curr_node = next_node
                 curr_path.append(next_node)
 
@@ -516,10 +517,10 @@ class SubgraphXExplainer(nn.Module):
             )
 
             for node in leaf_set:
-                node.N += 1
-                node.W += score_leaf_node
+                node.num_visit += 1
+                node.total_reward += score_leaf_node
 
-        # Select subgraph with the highest score (P value)
-        best_node = max(leaf_set, key=lambda x: x.P)
+        # Select subgraph with the highest score
+        best_node = max(leaf_set, key=lambda x: x.immediate_reward)
 
         return best_node.nodes
