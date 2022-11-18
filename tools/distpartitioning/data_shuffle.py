@@ -390,6 +390,20 @@ def exchange_features(rank, world_size, num_parts, feature_tids, type_id_map, id
         #       [starting-idx, ending-idx) specifies the range of indexes 
         #        associated with the features data 
         # Determine the owner process for these features.
+        # Note that the keys in the node features (and similarly edge features)
+        # dictionary is of the following format: 
+        #   `node_type/feature_name/local_part_id`:
+        #    where node_type and feature_name are self-explanatory and 
+        #    local_part_id denotes the partition-id, in the local process, 
+        #    which will be used a suffix to store all the information of a 
+        #    given partition which is processed by the current process. Its
+        #    values start from 0 onwards, for instance 0, 1, 2 ... etc. 
+        #    local_part_id can be easily mapped to global partition id very
+        #    easily, using cyclic ordering. All local_part_ids = 0 from all 
+        #    processes will form global partition-ids between 0 and world_size-1.
+        #    Similarly all local_part_ids = 1 from all processes will form
+        #    global partition ids in the range [world_size, 2*world_size-1] and
+        #    so on.
         tokens = feat_key.split("/")
         assert len(tokens) == 3
         type_name = tokens[0]
@@ -740,7 +754,9 @@ def gen_dist_partitions(rank, world_size, params):
     for local_part_id in range(params.num_parts//world_size):
         idx = node_data[constants.NTYPE_ID+"/"+str(local_part_id)].argsort()
         for k, v in node_data.items():
-            if k.endswith(str(local_part_id)):
+            tokens = k.split("/")
+            assert len(tokens) == 2
+            if tokens[1] == str(local_part_id):
                 node_data[k] = v[idx]
         idx = None
     gc.collect()
@@ -773,7 +789,9 @@ def gen_dist_partitions(rank, world_size, params):
     for local_part_id in range(params.num_parts//world_size):
         sorted_idx = edge_data[constants.ETYPE_ID+"/"+str(local_part_id)].argsort()
         for k, v in edge_data.items():
-            if k.endswith(str(local_part_id)):
+            tokens = k.split("/")
+            assert len(tokens) == 2
+            if tokens[1] == str(local_part_id):
                 edge_data[k] = v[sorted_idx]
         sorted_idx = None
     gc.collect()
@@ -802,12 +820,13 @@ def gen_dist_partitions(rank, world_size, params):
     logging.info(f'[Rank: {rank}] Done resolving orig_node_id for local node_ids...')
     memory_snapshot("ShuffleGlobalID_Lookup_Complete: ", rank)
 
-    def prepare_local_data(src_data, local_part_id):
+    def prepare_local_data(src_data, local_part_id, num_tokens):
         local_data = {}
         for k, v in src_data.items():
-            if k.endswith(str(local_part_id)):
-                tokens = k.split("/")
-                local_data['/'.join(tokens[:-1])] = v
+            tokens = k.split("/")
+            assert len(tokens) == num_tokens
+            if tokens[num_tokens-1] == str(local_part_id):
+                local_data["/".join(tokens[:-1])] = v
         return local_data
 
     #create dgl objects here
@@ -822,15 +841,15 @@ def gen_dist_partitions(rank, world_size, params):
         num_edges = shuffle_global_eid_offsets[local_part_id]
         node_count = len(node_data[constants.NTYPE_ID+"/"+str(local_part_id)])
         edge_count = len(edge_data[constants.ETYPE_ID+"/"+str(local_part_id)])
-        local_node_data = prepare_local_data(node_data, local_part_id)
-        local_edge_data = prepare_local_data(edge_data, local_part_id)
+        local_node_data = prepare_local_data(node_data, local_part_id, 2)
+        local_edge_data = prepare_local_data(edge_data, local_part_id, 2)
         graph_obj, ntypes_map_val, etypes_map_val, ntypes_map, etypes_map, \
             orig_nids, orig_eids = create_dgl_object(schema_map, rank+local_part_id*world_size, 
                     local_node_data, local_edge_data, 
                     num_edges, params.save_orig_nids, params.save_orig_eids)
         sort_etypes = len(etypes_map) > 1
-        local_node_features = prepare_local_data(rcvd_node_features, local_part_id)
-        local_edge_features = prepare_local_data(rcvd_edge_features, local_part_id)
+        local_node_features = prepare_local_data(rcvd_node_features, local_part_id, 3)
+        local_edge_features = prepare_local_data(rcvd_edge_features, local_part_id, 3)
         write_dgl_objects(graph_obj, 
                 local_node_features, local_edge_features,
                 params.output,

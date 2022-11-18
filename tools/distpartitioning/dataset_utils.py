@@ -170,15 +170,18 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
     else:
         assert len(node_features) == len(node_feature_tids)
 
+        # Note that the keys in the node_features dictionary are as follows:
+        # `ntype_name/feat_name/local_part_id`. 
+        #   where ntype_name and feat_name are self-explanatory, and 
+        #   local_part_id indicates the partition-id, in the context of current
+        #   process which take the values 0, 1, 2, ....
         for feat_name, feat_info  in node_features.items():
             logging.info(f'[Rank: {rank}] node feature name: {feat_name}, feature data shape: {feat_info.size()}')
 
             tokens = feat_name.split("/")
             assert len(tokens) == 3
-            strip_feat_name = "/".join(tokens[:-1])
 
             # Get the range of type ids which are mapped to the current node.
-            # tids = node_feature_tids[strip_feat_name]
             tids = node_feature_tids[feat_name]
 
             # Iterate over the range of type ids for the current node feature
