@@ -699,7 +699,8 @@ def create_random_hetero():
     g = dgl.heterograph(edges, num_nodes)
     # assign ndata & edata.
     # data with same name as ntype/etype is assigned on purpose to verify
-    # such same names can be correctly handled in DistGraph.
+    # such same names can be correctly handled in DistGraph. See more details
+    # in issue #4887 and #4463 on github.
     ntype = 'n1'
     for name in ['feat', ntype]:
         g.nodes[ntype].data[name] = F.unsqueeze(

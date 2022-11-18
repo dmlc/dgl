@@ -519,8 +519,7 @@ class DistGraph:
         self._client.map_shared_data(self._gpb)
 
     def _init_ndata_store(self):
-        '''Init node data store
-        '''
+        '''Initialize node data store.'''
         self._ndata_store = {}
         for ntype in self.ntypes:
             names = self._get_ndata_names(ntype)
@@ -541,8 +540,7 @@ class DistGraph:
                 self._ndata_store[ntype] = data
 
     def _init_edata_store(self):
-        '''Init edge data store
-        '''
+        '''Initialize edge data store.'''
         self._edata_store = {}
         for etype in self.canonical_etypes:
             names = self._get_edata_names(etype)
