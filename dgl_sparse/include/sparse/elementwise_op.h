@@ -1,13 +1,12 @@
 /**
  *  Copyright (c) 2022 by Contributors
  * @file sparse/elementwise_op.h
- * @brief DGL C++ sparse elementwise operators
+ * @brief DGL C++ sparse elementwise operators.
  */
 #ifndef SPARSE_ELEMENTWISE_OP_H_
 #define SPARSE_ELEMENTWISE_OP_H_
 
 #include <sparse/sparse_matrix.h>
-#include <torch/custom_class.h>
 
 namespace dgl {
 namespace sparse {

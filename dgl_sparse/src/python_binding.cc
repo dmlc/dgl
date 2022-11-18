@@ -1,8 +1,12 @@
 /**
  *  Copyright (c) 2022 by Contributors
  * @file python_binding.cc
- * @brief DGL sparse library Python binding
+ * @brief DGL sparse library Python binding.
  */
+// clang-format off
+#include <sparse/dgl_headers.h>
+// clang-format on
+
 #include <sparse/elementwise_op.h>
 #include <sparse/sparse_matrix.h>
 #include <torch/custom_class.h>
@@ -19,7 +23,8 @@ TORCH_LIBRARY(dgl_sparse, m) {
       .def("shape", &SparseMatrix::shape)
       .def("coo", &SparseMatrix::COOTensors)
       .def("csr", &SparseMatrix::CSRTensors)
-      .def("csc", &SparseMatrix::CSCTensors);
+      .def("csc", &SparseMatrix::CSCTensors)
+      .def("set_val", &SparseMatrix::SetValue);
   m.def("create_from_coo", &CreateFromCOO)
       .def("create_from_csr", &CreateFromCSR)
       .def("create_from_csc", &CreateFromCSC)

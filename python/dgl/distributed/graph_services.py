@@ -484,7 +484,7 @@ def _distributed_access(g, nodes, issue_remote_req, local_access):
 
     Returns
     -------
-    DGLHeteroGraph
+    DGLGraph
         The subgraph that contains the neighborhoods of all input nodes.
     """
     req_list = []

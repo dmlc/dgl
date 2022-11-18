@@ -30,7 +30,7 @@ except ImportError:
 from .._ffi.function import _init_api
 from ..base import dgl_warning, DGLError, NID, EID
 from .. import convert
-from ..heterograph import DGLHeteroGraph, DGLBlock
+from ..heterograph import DGLGraph, DGLBlock
 from ..heterograph_index import create_metagraph_index, create_heterograph_from_relations
 from ..frame import Frame
 from .. import ndarray as nd
@@ -68,13 +68,11 @@ __all__ = [
     'to_block',
     'to_simple',
     'to_simple_graph',
-    'as_immutable_graph',
     'sort_csr_by_tag',
     'sort_csc_by_tag',
     'metis_partition_assignment',
     'partition_graph_with_halo',
     'metis_partition',
-    'as_heterograph',
     'adj_product_graph',
     'adj_sum_graph',
     'reorder_graph',
@@ -1034,7 +1032,7 @@ def line_graph(g, backtracking=True, shared=False):
         'only homogeneous graph is supported'
 
     dev = g.device
-    lg = DGLHeteroGraph(_CAPI_DGLHeteroLineGraph(g._graph.copy_to(nd.cpu()), backtracking))
+    lg = DGLGraph(_CAPI_DGLHeteroLineGraph(g._graph.copy_to(nd.cpu()), backtracking))
     lg = lg.to(dev)
     if shared:
         new_frames = utils.extract_edge_subframes(g, None)
@@ -1042,7 +1040,7 @@ def line_graph(g, backtracking=True, shared=False):
 
     return lg
 
-DGLHeteroGraph.line_graph = utils.alias_func(line_graph)
+DGLGraph.line_graph = utils.alias_func(line_graph)
 
 def khop_adj(g, k):
     """Return the matrix of :math:`A^k` where :math:`A` is the adjacency matrix of the graph
@@ -1276,7 +1274,7 @@ def reverse(g, copy_ndata=True, copy_edata=False, *, share_ndata=None, share_eda
         # currently reversing a block results in undefined behavior
         raise DGLError('Reversing a block graph is not supported.')
     gidx = g._graph.reverse()
-    new_g = DGLHeteroGraph(gidx, g.ntypes, g.etypes)
+    new_g = DGLGraph(gidx, g.ntypes, g.etypes)
 
     # handle ndata
     if copy_ndata:
@@ -1293,7 +1291,7 @@ def reverse(g, copy_ndata=True, copy_edata=False, *, share_ndata=None, share_eda
 
     return new_g
 
-DGLHeteroGraph.reverse = utils.alias_func(reverse)
+DGLGraph.reverse = utils.alias_func(reverse)
 
 def to_simple_graph(g):
     """Convert the graph to a simple graph with no multi-edge.
@@ -1959,7 +1957,7 @@ def add_self_loop(g, edge_feat_names=None, fill_data=1., etype=None):
         new_g = add_edges(g, nodes, nodes, etype=etype)
     return new_g
 
-DGLHeteroGraph.add_self_loop = utils.alias_func(add_self_loop)
+DGLGraph.add_self_loop = utils.alias_func(add_self_loop)
 
 def remove_self_loop(g, etype=None):
     r""" Remove self-loops for each node in the graph and return a new graph.
@@ -2034,7 +2032,7 @@ def remove_self_loop(g, etype=None):
     new_g = remove_edges(g, self_loop_eids, etype=etype)
     return new_g
 
-DGLHeteroGraph.remove_self_loop = utils.alias_func(remove_self_loop)
+DGLGraph.remove_self_loop = utils.alias_func(remove_self_loop)
 
 def compact_graphs(graphs, always_preserve=None, copy_ndata=True, copy_edata=True):
     """Given a list of graphs with the same set of nodes, find and eliminate the common
@@ -2192,7 +2190,7 @@ def compact_graphs(graphs, always_preserve=None, copy_ndata=True, copy_edata=Tru
     induced_nodes = [F.from_dgl_nd(nodes) for nodes in induced_nodes]
 
     new_graphs = [
-        DGLHeteroGraph(new_graph_index, graph.ntypes, graph.etypes)
+        DGLGraph(new_graph_index, graph.ntypes, graph.etypes)
         for new_graph_index, graph in zip(new_graph_indexes, graphs)]
 
     if copy_ndata:
@@ -2616,7 +2614,7 @@ def to_simple(g,
     if g.is_block:
         raise DGLError('Cannot convert a block graph to a simple graph.')
     simple_graph_index, counts, edge_maps = _CAPI_DGLToSimpleHetero(g._graph)
-    simple_graph = DGLHeteroGraph(simple_graph_index, g.ntypes, g.etypes)
+    simple_graph = DGLGraph(simple_graph_index, g.ntypes, g.etypes)
     counts = [F.from_dgl_nd(count) for count in counts]
     edge_maps = [F.from_dgl_nd(edge_map) for edge_map in edge_maps]
 
@@ -2644,7 +2642,7 @@ def to_simple(g,
 
     return simple_graph
 
-DGLHeteroGraph.to_simple = utils.alias_func(to_simple)
+DGLGraph.to_simple = utils.alias_func(to_simple)
 
 def _unitgraph_less_than_int32(g):
     """Check if a graph with only one edge type has more than 2 ** 31 - 1
@@ -2789,7 +2787,7 @@ def adj_product_graph(A, B, weight_name, etype='_E'):
     C_gidx = create_heterograph_from_relations(
         C_metagraph, [C_gidx], utils.toindex(num_nodes_per_type))
 
-    C = DGLHeteroGraph(C_gidx, ntypes, etypes)
+    C = DGLGraph(C_gidx, ntypes, etypes)
     C.edata[weight_name] = C_weights
     return C
 
@@ -2890,29 +2888,10 @@ def adj_sum_graph(graphs, weight_name):
     C_gidx, C_weights = F.csrsum(gidxs, weights)
     C_gidx = create_heterograph_from_relations(metagraph, [C_gidx], num_nodes)
 
-    C = DGLHeteroGraph(C_gidx, graphs[0].ntypes, graphs[0].etypes)
+    C = DGLGraph(C_gidx, graphs[0].ntypes, graphs[0].etypes)
     C.edata[weight_name] = C_weights
     return C
 
-def as_heterograph(g, ntype='_U', etype='_E'):  # pylint: disable=unused-argument
-    """Convert a DGLGraph to a DGLHeteroGraph with one node and edge type.
-
-    DEPRECATED: DGLGraph and DGLHeteroGraph have been merged. This function will
-                do nothing and can be removed safely in all cases.
-    """
-    dgl_warning('DEPRECATED: DGLGraph and DGLHeteroGraph have been merged in v0.5.\n'
-                '\tdgl.as_heterograph will do nothing and can be removed safely in all cases.')
-    return g
-
-def as_immutable_graph(hg):
-    """Convert a DGLHeteroGraph with one node and edge type into a DGLGraph.
-
-    DEPRECATED: DGLGraph and DGLHeteroGraph have been merged. This function will
-                do nothing and can be removed safely in all cases.
-    """
-    dgl_warning('DEPRECATED: DGLGraph and DGLHeteroGraph have been merged in v0.5.\n'
-                '\tdgl.as_immutable_graph will do nothing and can be removed safely in all cases.')
-    return hg
 
 def sort_csr_by_tag(g, tag, tag_offset_name='_TAG_OFFSET', tag_type='node'):
     r"""Return a new graph whose CSR matrix is sorted by the given tag.
@@ -3398,7 +3377,7 @@ def reorder_graph(g, node_permute_algo=None, edge_permute_algo='src',
     return rg
 
 
-DGLHeteroGraph.reorder_graph = utils.alias_func(reorder_graph)
+DGLGraph.reorder_graph = utils.alias_func(reorder_graph)
 
 
 def metis_perm(g, k):
@@ -3750,7 +3729,7 @@ def to_half(g):
 
     Returns
     -------
-    DGLHeteroGraph
+    DGLGraph
         Clone of graph with the feature data converted to float16.
     """
     ret = copy.copy(g)
@@ -3767,7 +3746,7 @@ def to_float(g):
 
     Returns
     -------
-    DGLHeteroGraph
+    DGLGraph
         Clone of graph with the feature data converted to float32.
     """
     ret = copy.copy(g)
@@ -3784,7 +3763,7 @@ def to_double(g):
 
     Returns
     -------
-    DGLHeteroGraph
+    DGLGraph
         Clone of graph with the feature data converted to float64.
     """
     ret = copy.copy(g)

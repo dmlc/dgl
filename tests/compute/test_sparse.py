@@ -175,6 +175,44 @@ def test_spmm(idtype, g, shp, msg, reducer):
         g.dstdata.pop("v")
 
 
+@unittest.skipIf(
+    dgl.backend.backend_name != "pytorch",
+    reason="Only support PyTorch for now."
+)
+@unittest.skipIf(
+    F._default_context_str == "cpu",
+    reason="Don't support half precision on CPU."
+)
+@parametrize_idtype
+@pytest.mark.parametrize(
+    "dtype, rtol, atol",
+    [(torch.float16, 1e-3, 0.5), (torch.bfloat16, 4e-3, 2.)]
+)
+def test_half_spmm(idtype, dtype, rtol, atol):
+    if LooseVersion(torch.version.cuda) < LooseVersion("11.0") \
+        and dtype == torch.bfloat16:
+        pytest.skip("BF16 requires CUDA >= 11.0.")
+
+    # make sure the spmm result is < 512 to match the rtol/atol we set.
+    g = dgl.graph((torch.arange(900), torch.tensor([0] * 900)),
+                  idtype=idtype, device=F.ctx())
+    feat_fp32 = torch.rand((g.num_src_nodes(), 32)).to(0)
+    feat_half = feat_fp32.to(dtype)
+
+    # test SpMMCSR
+    g = g.formats(['csc'])
+    res_fp32 = dgl.ops.copy_u_sum(g, feat_fp32)[0]
+    res_half = dgl.ops.copy_u_sum(g, feat_half)[0].float()
+    assert torch.allclose(res_fp32, res_half, rtol=rtol, atol=atol)
+
+    # test SpMMCOO
+    # TODO(Xin): half-precision SpMMCoo is temporally disabled.
+    # g = g.formats(['coo'])
+    # res_fp32 = dgl.ops.copy_u_sum(g, feat_fp32)[0]
+    # res_half = dgl.ops.copy_u_sum(g, feat_half)[0].float()
+    # assert torch.allclose(res_fp32, res_half, rtol=rtol, atol=atol)
+
+
 @pytest.mark.parametrize("g", graphs)
 @pytest.mark.parametrize("shp", sddmm_shapes)
 @pytest.mark.parametrize("lhs_target", ["u", "v", "e"])

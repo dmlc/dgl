@@ -47,7 +47,7 @@ class HANLayer(nn.Module):
 
     Inputs
     ------
-    g : DGLHeteroGraph
+    g : DGLGraph
         The heterogeneous graph
     h : tensor
         Input features

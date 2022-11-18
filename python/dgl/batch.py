@@ -4,12 +4,12 @@ from collections.abc import Mapping
 from . import backend as F
 from .base import ALL, is_all, DGLError, dgl_warning, NID, EID
 from .heterograph_index import disjoint_union, slice_gidx
-from .heterograph import DGLHeteroGraph
+from .heterograph import DGLGraph
 from . import convert
 from . import utils
 
 
-__all__ = ['batch', 'unbatch', 'slice_batch', 'batch_hetero', 'unbatch_hetero']
+__all__ = ['batch', 'unbatch', 'slice_batch']
 
 def batch(graphs, ndata=ALL, edata=ALL, *,
           node_attrs=None, edge_attrs=None):
@@ -175,7 +175,7 @@ def batch(graphs, ndata=ALL, edata=ALL, *,
     etypes = [etype for _, etype, _ in relations]
 
     gidx = disjoint_union(graphs[0]._graph.metagraph, [g._graph for g in graphs])
-    retg = DGLHeteroGraph(gidx, ntypes, etypes)
+    retg = DGLGraph(gidx, ntypes, etypes)
 
     # Compute batch num nodes
     bnn = {}
@@ -479,7 +479,7 @@ def slice_batch(g, gid, store_ids=False):
     # Slice graph structure
     gidx = slice_gidx(g._graph, utils.toindex(num_nodes), utils.toindex(start_nid),
                       utils.toindex(num_edges), utils.toindex(start_eid))
-    retg = DGLHeteroGraph(gidx, g.ntypes, g.etypes)
+    retg = DGLGraph(gidx, g.ntypes, g.etypes)
 
     # Slice node features
     for ntid, ntype in enumerate(g.ntypes):
@@ -504,16 +504,3 @@ def slice_batch(g, gid, store_ids=False):
                                                    retg.idtype, retg.device)
 
     return retg
-
-#### DEPRECATED APIS ####
-def batch_hetero(*args, **kwargs):
-    """DEPREACTED: please use dgl.batch """
-    dgl_warning('From v0.5, DGLHeteroGraph is merged into DGLGraph. You can safely'
-                ' replace dgl.batch_hetero with dgl.batch')
-    return batch(*args, **kwargs)
-
-def unbatch_hetero(*args, **kwargs):
-    """DEPREACTED: please use dgl.unbatch """
-    dgl_warning('From v0.5, DGLHeteroGraph is merged into DGLGraph. You can safely'
-                ' replace dgl.unbatch_hetero with dgl.unbatch')
-    return unbatch(*args, **kwargs)
