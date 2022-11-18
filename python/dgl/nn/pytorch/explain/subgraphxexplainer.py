@@ -506,7 +506,7 @@ class SubgraphXExplainer(nn.Module):
 
                 next_node = max(
                     curr_node.children,
-                    key=lambda x, curr_node=None: x.average_reward()
+                    key=lambda x, curr_node=curr_node: x.average_reward()
                     + x.action_selection_criteria(
                         np.sum(
                             [
