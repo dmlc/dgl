@@ -321,7 +321,9 @@ class SubgraphXExplainer(nn.Module):
         # Convert to a networkx graph object
         nx_graph = dgl.to_networkx(new_graph).to_undirected()
         # Find and sort graph components by size from largest to smallest and take the biggest one.
-        biggest_comp = list(sorted(nx.connected_components(nx_graph), key=len, reverse=True))[0]
+        biggest_comp = list(
+            sorted(nx.connected_components(nx_graph), key=len, reverse=True)
+        )[0]
         # Convert back to DGLGraph object.
         return list(biggest_comp)
 
