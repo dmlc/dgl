@@ -398,7 +398,12 @@ def check_dist_graph(g, num_clients, num_nodes, num_edges):
     test3 = dgl.distributed.DistTensor(
         new_shape, F.float32, "test3", init_func=rand_init
     )
+    test3_name = test3.kvstore_key
+    assert test3_name in g._client.data_name_list()
+    assert test3_name in g._client.gdata_name_list()
     del test3
+    assert test3_name not in g._client.data_name_list()
+    assert test3_name not in g._client.gdata_name_list()
     test3 = dgl.distributed.DistTensor(
         (g.number_of_nodes(), 3), F.float32, "test3"
     )
@@ -737,6 +742,7 @@ def check_dist_graph_hetero(g, num_clients, num_nodes, num_edges):
         data = g.nodes[ntype].data[name][nids]
         data = F.squeeze(data, 1)
         assert np.all(F.asnumpy(data == nids))
+    assert len(g.nodes['n2'].data) == 0
     expect_except = False
     try:
         g.nodes['xxx'].data['x']
@@ -757,6 +763,7 @@ def check_dist_graph_hetero(g, num_clients, num_nodes, num_edges):
         data = g.edges[c_etype].data[name][eids]
         data = F.squeeze(data, 1)
         assert np.all(F.asnumpy(data == eids))
+    assert len(g.edges['r2'].data) == 0
     expect_except = False
     try:
         g.edges['xxx'].data['x']
