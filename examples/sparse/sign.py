@@ -9,10 +9,10 @@ operator on top of symmetrically normalized adjacency matrix A_hat.
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.optim import Adam
-
 from dgl.data import CoraGraphDataset
 from dgl.mock_sparse import create_from_coo, diag, identity
+from torch.optim import Adam
+
 
 ################################################################################
 # (HIGHLIGHT) Take the advantage of DGL sparse APIs to implement the feature
