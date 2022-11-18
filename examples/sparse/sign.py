@@ -46,7 +46,7 @@ class SIGN(nn.Module):
         return self.omega(Z)
 
 
-def evaluate(g, X_sign, model):
+def evaluate(g, model):
     label = g.ndata["label"]
     val_mask = g.ndata["val_mask"]
     test_mask = g.ndata["test_mask"]
@@ -102,7 +102,7 @@ def train(g, model):
         pred = logits.argmax(1)
 
         # Evaluate the prediction.
-        val_acc, test_acc = evaluate(g, X_sign, model)
+        val_acc, test_acc = evaluate(g, model)
         print(
             f"In epoch {epoch}, loss: {loss:.3f}, val acc: {val_acc:.3f}, test"
             f" acc: {test_acc:.3f}"
