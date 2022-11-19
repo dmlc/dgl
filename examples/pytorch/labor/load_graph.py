@@ -74,11 +74,3 @@ def load_dataset(dataset_name):
         raise ValueError('unknown dataset')
     
     return g, n_classes, multilabel
-
-def inductive_split(g):
-    """Split the graph into training graph, validation graph, and test graph by training
-    and validation masks.  Suitable for inductive models."""
-    train_g = g.subgraph(g.ndata["train_mask"])
-    val_g = g.subgraph(g.ndata["train_mask"] | g.ndata["val_mask"])
-    test_g = g
-    return train_g, val_g, test_g

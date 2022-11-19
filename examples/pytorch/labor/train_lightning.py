@@ -31,9 +31,9 @@ import time
 import math
 import itertools
 
-from load_graph import load_dataset, inductive_split
+from load_graph import load_dataset
 
-from torchmetrics import Accuracy
+from torchmetrics.classification import MulticlassF1Score, MultilabelF1Score
 from pytorch_lightning.callbacks import ModelCheckpoint, Callback, EarlyStopping
 from pytorch_lightning import LightningDataModule, LightningModule, Trainer
 from pytorch_lightning.loggers import TensorBoardLogger
@@ -53,15 +53,15 @@ class SAGELightning(LightningModule):
         self.save_hyperparameters()
         self.module = SAGE(in_feats, n_hidden, n_classes, n_layers, activation, dropout)
         self.lr = lr
-        self.train_acc = Accuracy()
-        self.val_acc = Accuracy()
-        self.test_acc = Accuracy()
+        f1score_class = MulticlassF1Score if not multilabel else MultilabelF1Score
+        self.train_acc = f1score_class(n_classes, average='micro')
+        self.val_acc = f1score_class(n_classes, average='micro')
+        self.test_acc = f1score_class(n_classes, average='micro')
         self.num_steps = 0
         self.cum_sampled_nodes = [0 for _ in range(n_layers + 1)]
         self.cum_sampled_edges = [0 for _ in range(n_layers)]
         self.w = 0.99
-        self.loss_fn = nn.NLLLoss() if not multilabel else nn.BCELoss()
-        self.final_activation = nn.LogSoftmax(dim=1) if not multilabel else nn.Sigmoid()
+        self.loss_fn = nn.CrossEntropyLoss() if not multilabel else nn.BCEWithLogitsLoss()
         self.pt = 0
     
     def num_sampled_nodes(self, i):
@@ -87,8 +87,8 @@ class SAGELightning(LightningModule):
         batch_inputs = mfgs[0].srcdata['features']
         batch_labels = mfgs[-1].dstdata['labels']
         batch_pred = self.module(mfgs, batch_inputs)
-        loss = self.loss_fn(self.final_activation(batch_pred), batch_labels)
-        self.train_acc(self.final_activation(batch_pred), batch_labels.int())
+        loss = self.loss_fn(batch_pred, batch_labels)
+        self.train_acc(batch_pred, batch_labels.int())
         self.log('train_acc', self.train_acc, prog_bar=True, on_step=True, on_epoch=True, batch_size=batch_labels.shape[0])
         self.log('train_loss', loss, on_step=True, on_epoch=True, batch_size=batch_labels.shape[0])
         t = time.time()
@@ -102,8 +102,8 @@ class SAGELightning(LightningModule):
         batch_inputs = mfgs[0].srcdata['features']
         batch_labels = mfgs[-1].dstdata['labels']
         batch_pred = self.module(mfgs, batch_inputs)
-        loss = self.loss_fn(self.final_activation(batch_pred), batch_labels)
-        self.val_acc(self.final_activation(batch_pred), batch_labels.int())
+        loss = self.loss_fn(batch_pred, batch_labels)
+        self.val_acc(batch_pred, batch_labels.int())
         self.log('val_acc', self.val_acc, prog_bar=True, on_step=True, on_epoch=True, sync_dist=True, batch_size=batch_labels.shape[0])
         self.log('val_loss', loss, on_step=True, on_epoch=True, sync_dist=True, batch_size=batch_labels.shape[0])
     
@@ -113,8 +113,8 @@ class SAGELightning(LightningModule):
         batch_inputs = mfgs[0].srcdata['features']
         batch_labels = mfgs[-1].dstdata['labels']
         batch_pred = self.module(mfgs, batch_inputs)
-        loss = self.loss_fn(self.final_activation(batch_pred), batch_labels)
-        self.test_acc(self.final_activation(batch_pred), batch_labels.int())
+        loss = self.loss_fn(batch_pred, batch_labels)
+        self.test_acc(batch_pred, batch_labels.int())
         self.log('test_acc', self.test_acc, prog_bar=True, on_step=True, on_epoch=True, sync_dist=True, batch_size=batch_labels.shape[0])
         self.log('test_loss', loss, on_step=True, on_epoch=True, sync_dist=True, batch_size=batch_labels.shape[0])
 
@@ -189,7 +189,7 @@ class DataModule(LightningDataModule):
             device=self.device,
             batch_size=self.batch_size,
             shuffle=True,
-            drop_last=False,
+            drop_last=True,
             num_workers=self.num_workers)
 
     def val_dataloader(self):
@@ -281,8 +281,6 @@ if __name__ == '__main__':
     argparser.add_argument('--dropout', type=float, default=0.5)
     argparser.add_argument('--num-workers', type=int, default=0,
                            help="Number of sampling processes. Use 0 for no extra process.")
-    argparser.add_argument('--inductive', action='store_true',
-                           help="Inductive learning setting")
     argparser.add_argument('--data-cpu', action='store_true',
                            help="By default the script puts the node features and labels "
                                 "on GPU when using it to save time for data copy. This may "
@@ -301,6 +299,8 @@ if __name__ == '__main__':
     argparser.add_argument('--use-uva', action='store_true')
     argparser.add_argument('--undirected', action='store_true')
     argparser.add_argument('--val-acc-target', type=float, default=1)
+    argparser.add_argument('--early-stopping-patience', type=int, default=10)
+    argparser.add_argument('--disable-checkpoint', action='store_true')
     args = argparser.parse_args()
 
     if args.gpu >= 0:
@@ -317,27 +317,30 @@ if __name__ == '__main__':
         F.relu, args.dropout, args.lr, datamodule.multilabel)
 
     # Train
-    checkpoint_callback = ModelCheckpoint(monitor='val_acc', save_top_k=1)
-    batchsize_callback = BatchSizeCallback(args.vertex_limit)
-    earlystopping_callback = EarlyStopping(monitor='val_acc', stopping_threshold=args.val_acc_target, mode='max', patience=20)
+    callbacks = []
+    if not args.disable_checkpoint:
+        callbacks.append(ModelCheckpoint(monitor='val_acc', save_top_k=1))
+    callbacks.append(BatchSizeCallback(args.vertex_limit))
+    callbacks.append(EarlyStopping(monitor='val_acc', stopping_threshold=args.val_acc_target, mode='max', patience=args.early_stopping_patience))
     subdir = '{}_{}_{}_{}'.format(args.dataset, args.sampler, args.importance_sampling, args.layer_dependency)
     logger = TensorBoardLogger(args.logdir, name=subdir)
     trainer = Trainer(gpus=[args.gpu] if args.gpu != -1 else None,
                       max_epochs=args.num_epochs,
                       max_steps=args.num_steps,
-                      callbacks=[batchsize_callback, earlystopping_callback], # checkpoint_callback
+                      callbacks=callbacks,
                       logger=logger)
     trainer.fit(model, datamodule=datamodule)
 
     # Test
-    logdir = os.path.join(args.logdir, subdir)
-    dirs = glob.glob('./{}/*'.format(logdir))
-    version = max([int(os.path.split(x)[-1].split('_')[-1]) for x in dirs])
-    logdir = './{}/version_{}'.format(logdir, version)
-    print('Evaluating model in', logdir)
-    ckpt = glob.glob(os.path.join(logdir, 'checkpoints', '*'))[0]
+    if not args.disable_checkpoint:
+        logdir = os.path.join(args.logdir, subdir)
+        dirs = glob.glob('./{}/*'.format(logdir))
+        version = max([int(os.path.split(x)[-1].split('_')[-1]) for x in dirs])
+        logdir = './{}/version_{}'.format(logdir, version)
+        print('Evaluating model in', logdir)
+        ckpt = glob.glob(os.path.join(logdir, 'checkpoints', '*'))[0]
 
-    model = SAGELightning.load_from_checkpoint(
-        checkpoint_path=ckpt, hparams_file=os.path.join(logdir, 'hparams.yaml')).to(device)
+        model = SAGELightning.load_from_checkpoint(
+            checkpoint_path=ckpt, hparams_file=os.path.join(logdir, 'hparams.yaml')).to(device)
     test_acc = trainer.test(model, datamodule=datamodule)
     print('Test accuracy:', test_acc)
