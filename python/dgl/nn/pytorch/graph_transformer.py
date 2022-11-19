@@ -130,27 +130,28 @@ class BiasedMultiheadAttention(nn.Module):
         self.scaling = self.head_dim**-0.5
         self.attn_bias_type = attn_bias_type
 
-        self.Q = nn.Linear(feat_size, feat_size, bias=bias)
-        self.K = nn.Linear(feat_size, feat_size, bias=bias)
-        self.V = nn.Linear(feat_size, feat_size, bias=bias)
-        self.out = nn.Linear(feat_size, feat_size, bias=bias)
+        self.q_proj = nn.Linear(feat_size, feat_size, bias=bias)
+        self.k_proj = nn.Linear(feat_size, feat_size, bias=bias)
+        self.v_proj = nn.Linear(feat_size, feat_size, bias=bias)
+        self.out_proj = nn.Linear(feat_size, feat_size, bias=bias)
         # The same dropout rate as that in graphormer
         self.dropout = nn.Dropout(p=0.1)
 
         self.reset_parameters()
 
     def reset_parameters(self):
-        # The same gain as that in graphormer
-        nn.init.xavier_uniform_(self.Q.weight, gain=2**-0.5)
-        nn.init.xavier_uniform_(self.K.weight, gain=2**-0.5)
-        nn.init.xavier_uniform_(self.V.weight, gain=2**-0.5)
+        """Reset parameters of projection matrices, the same settings as that in Graphormer.
+        """
+        nn.init.xavier_uniform_(self.q_proj.weight, gain=2**-0.5)
+        nn.init.xavier_uniform_(self.k_proj.weight, gain=2**-0.5)
+        nn.init.xavier_uniform_(self.v_proj.weight, gain=2**-0.5)
 
-        nn.init.xavier_uniform_(self.out.weight)
-        if self.out.bias is not None:
-            nn.init.constant_(self.out.bias, 0.0)
+        nn.init.xavier_uniform_(self.out_proj.weight)
+        if self.out_proj.bias is not None:
+            nn.init.constant_(self.out_proj.bias, 0.0)
 
     def forward(self, ndata, attn_bias=None, attn_mask=None):
-        r"""Forward computation.
+        """Forward computation.
 
         Parameters
         ----------
@@ -169,16 +170,16 @@ class BiasedMultiheadAttention(nn.Module):
         y : torch.Tensor
             The output tensor. Shape: (batch_size, N, :attr:`feat_size`)
         """
-        q = self.Q(ndata).transpose(0, 1)
-        k = self.K(ndata).transpose(0, 1)
-        v = self.V(ndata).transpose(0, 1)
+        q_h = self.q_proj(ndata).transpose(0, 1)
+        k_h = self.k_proj(ndata).transpose(0, 1)
+        v_h = self.v_proj(ndata).transpose(0, 1)
         bsz, N, _ = ndata.shape
-        q = q.reshape(N, bsz * self.num_heads, self.head_dim).transpose(0, 1) / self.scaling
-        k = k.reshape(N, bsz * self.num_heads, self.head_dim).permute(1, 2, 0)
-        v = v.reshape(N, bsz * self.num_heads, self.head_dim).transpose(0, 1)
+        q_h = q_h.reshape(N, bsz * self.num_heads, self.head_dim).transpose(0, 1) / self.scaling
+        k_h = k_h.reshape(N, bsz * self.num_heads, self.head_dim).permute(1, 2, 0)
+        v_h = v_h.reshape(N, bsz * self.num_heads, self.head_dim).transpose(0, 1)
 
         attn_weights = (
-            th.bmm(q, k)
+            th.bmm(q_h, k_h)
             .transpose(0, 2)
             .reshape(N, N, bsz, self.num_heads)
             .transpose(0, 2)
@@ -202,8 +203,8 @@ class BiasedMultiheadAttention(nn.Module):
 
         attn_weights = self.dropout(attn_weights)
 
-        attn = th.bmm(attn_weights, v).transpose(0, 1)
+        attn = th.bmm(attn_weights, v_h).transpose(0, 1)
 
-        attn = self.out(attn.reshape(N, bsz, self.feat_size).transpose(0, 1))
+        attn = self.out_proj(attn.reshape(N, bsz, self.feat_size).transpose(0, 1))
 
         return attn
