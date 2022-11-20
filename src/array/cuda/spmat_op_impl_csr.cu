@@ -4,6 +4,7 @@
  * @brief CSR operator CPU implementation
  */
 #include <dgl/array.h>
+#include <thrust/for_each.h>
 
 #include <numeric>
 #include <unordered_set>
@@ -13,6 +14,8 @@
 #include "./atomic.cuh"
 #include "./dgl_cub.cuh"
 #include "./utils.h"
+
+#define MIN(a, b) (((a) < (b)) ? (a) : (b))
 
 namespace dgl {
 
@@ -423,26 +426,130 @@ template std::vector<NDArray> CSRGetDataAndIndices<kDGLCUDA, int64_t>(
 
 ///////////////////////////// CSRSliceMatrix /////////////////////////////
 
+int64_t _UpPower(int64_t numel) {
+  uint64_t ret = 1 << static_cast<uint64_t>(std::log2(numel) + 1);
+  return ret;
+}
+
 /**
- * @brief Generate a 0-1 mask for each index whose column is in the provided
- * set. It also counts the number of masked values per row.
+ * @brief Thomas Wang's 32 bit Mix Function
+ */
+__device__ inline uint32_t _Hash32Shift(uint32_t key) {
+  key = ~key + (key << 15);
+  key = key ^ (key >> 12);
+  key = key + (key << 2);
+  key = key ^ (key >> 4);
+  key = key * 2057;
+  key = key ^ (key >> 16);
+  return key;
+}
+
+/**
+ * @brief Thomas Wang's 64 bit Mix Function
+ */
+__device__ inline uint64_t _Hash64Shift(uint64_t key) {
+  key = (~key) + (key << 21);
+  key = key ^ (key >> 24);
+  key = (key + (key << 3)) + (key << 8);
+  key = key ^ (key >> 14);
+  key = (key + (key << 2)) + (key << 4);
+  key = key ^ (key >> 28);
+  key = key + (key << 31);
+  return key;
+}
+
+/**
+ * @brief A hashmap designed for CSRSliceMatrix, similar in function to set,
+ * Insert api inserts an element, Query api queries if an element is in the
+ * hashmap. For performance, it can only be created and called in the cuda
+ * kernel.
  */
 template <typename IdType>
+struct NodeQueryHashmap {
+  __device__ inline NodeQueryHashmap(IdType* Kptr, size_t numel)
+      : kptr_(Kptr), capacity_(numel){};
+
+  __device__ inline void Insert(IdType key) {
+    uint32_t delta = 1;
+    uint32_t pos = Hash(key);
+    IdType prev = dgl::aten::cuda::AtomicCAS(&kptr_[pos], kEmptyKey_, key);
+    while (prev != key and prev != kEmptyKey_) {
+      pos = Hash(pos + delta);
+      delta += 1;
+      prev = dgl::aten::cuda::AtomicCAS(&kptr_[pos], kEmptyKey_, key);
+    }
+  }
+
+  __device__ inline bool Query(IdType key) {
+    uint32_t delta = 1;
+    uint32_t pos = Hash(key);
+    while (true) {
+      if (kptr_[pos] == key) return true;
+      if (kptr_[pos] == kEmptyKey_) return false;
+      pos = Hash(pos + delta);
+      delta += 1;
+    }
+    return false;
+  }
+
+  __device__ inline uint32_t Hash(int32_t key) {
+    return _Hash32Shift(key) & (capacity_ - 1);
+  }
+
+  __device__ inline uint32_t Hash(uint32_t key) {
+    return _Hash32Shift(key) & (capacity_ - 1);
+  }
+
+  __device__ inline uint32_t Hash(int64_t key) {
+    return static_cast<uint32_t>(_Hash32Shift(key)) & (capacity_ - 1);
+  }
+
+  __device__ inline uint32_t Hash(uint64_t key) {
+    return static_cast<uint32_t>(_Hash64Shift(key)) & (capacity_ - 1);
+  }
+
+  IdType kEmptyKey_{-1};
+  IdType* kptr_;
+  uint32_t capacity_{0};
+};
+
+/**
+ * @brief Generate a 0-1 mask for each index whose column is in the provided
+ * hashmap. It also counts the number of masked values per row.
+ */
+template <typename IdType, int WARP_SIZE, int BLOCK_WARPS, int TILE_SIZE>
 __global__ void _SegmentMaskColKernel(
     const IdType* indptr, const IdType* indices, int64_t num_rows,
-    int64_t num_nnz, const IdType* col, int64_t col_len, IdType* mask,
-    IdType* count) {
-  IdType tx = static_cast<IdType>(blockIdx.x) * blockDim.x + threadIdx.x;
-  const int stride_x = gridDim.x * blockDim.x;
-  while (tx < num_nnz) {
-    IdType rpos = dgl::cuda::_UpperBound(indptr, num_rows, tx) - 1;
-    IdType cur_c = indices[tx];
-    IdType i = dgl::cuda::_BinarySearch(col, col_len, cur_c);
-    if (i < col_len) {
-      mask[tx] = 1;
-      cuda::AtomicAdd(count + rpos, IdType(1));
+    IdType* hashmap_buffer, int64_t buffer_size, IdType* mask, IdType* count) {
+  assert(blockDim.x == WARP_SIZE);
+  assert(blockDim.y == BLOCK_WARPS);
+
+  int warp_id = threadIdx.y;
+  int laneid = threadIdx.x;
+  IdType out_row = blockIdx.x * TILE_SIZE + threadIdx.y;
+  IdType last_row =
+      MIN(static_cast<IdType>(blockIdx.x + 1) * TILE_SIZE, num_rows);
+
+  NodeQueryHashmap<IdType> hashmap(hashmap_buffer, buffer_size);
+  typedef cub::WarpReduce<IdType> WarpReduce;
+  __shared__ typename WarpReduce::TempStorage temp_storage[BLOCK_WARPS];
+
+  while (out_row < last_row) {
+    IdType local_count = 0;
+    IdType in_row_start = indptr[out_row];
+    IdType in_row_end = indptr[out_row + 1];
+    for (int idx = in_row_start + laneid; idx < in_row_end; idx += WARP_SIZE) {
+      bool is_in = hashmap.Query(indices[idx]);
+      if (is_in) {
+        local_count += 1;
+        mask[idx] = 1;
+      }
     }
-    tx += stride_x;
+    IdType reduce_count = WarpReduce(temp_storage[warp_id]).Sum(local_count);
+    if (laneid == 0) {
+      count[out_row] = reduce_count;
+    }
+    out_row += BLOCK_WARPS;
   }
 }
 
@@ -476,26 +583,20 @@ CSRMatrix CSRSliceMatrix(
   CUDA_CALL(
       cudaMemset(count.Ptr<IdType>(), 0, sizeof(IdType) * (csr.num_rows)));
 
-  const int64_t nnz_csr = csr.indices->shape[0];
-  const int nt = 256;
-
-  // In general ``cols'' array is sorted. But it is not guaranteed.
-  // Hence checking and sorting array first. Sorting is not in place.
-  auto device = runtime::DeviceAPI::Get(ctx);
-  auto cols_size = cols->shape[0];
-
-  IdArray sorted_array = NewIdArray(cols->shape[0], ctx, cols->dtype.bits);
-  auto ptr_sorted_cols = sorted_array.Ptr<IdType>();
-  auto ptr_cols = cols.Ptr<IdType>();
-  size_t workspace_size = 0;
-  CUDA_CALL(cub::DeviceRadixSort::SortKeys(
-      nullptr, workspace_size, ptr_cols, ptr_sorted_cols, cols->shape[0], 0,
-      sizeof(IdType) * 8, stream));
-  void* workspace = device->AllocWorkspace(ctx, workspace_size);
-  CUDA_CALL(cub::DeviceRadixSort::SortKeys(
-      workspace, workspace_size, ptr_cols, ptr_sorted_cols, cols->shape[0], 0,
-      sizeof(IdType) * 8, stream));
-  device->FreeWorkspace(ctx, workspace);
+  // Generate a NodeQueryHashmap buffer. The key of the hashmap is col.
+  // For performance, the load factor of the hashmap is in (0.25, 0.5);
+  // Because num_cols is usually less than 1 Million (on GPU), the
+  // memory overhead is not significant (less than 31MB) at a low load factor.
+  int64_t buffer_size = _UpPower(new_ncols) * 2;
+  IdArray hashmap_buffer = Full(-1, buffer_size, nbits, ctx);
+  using it = thrust::counting_iterator<int64_t>;
+  thrust::for_each(
+      it(0), it(new_ncols),
+      [key = cols.Ptr<IdType>(), buffer = hashmap_buffer.Ptr<IdType>(),
+       buffer_size] __device__(int64_t i) {
+        NodeQueryHashmap<IdType> hashmap(buffer, buffer_size);
+        hashmap.Insert(key[i]);
+      });
 
   const IdType* indptr_data = csr.indptr.Ptr<IdType>();
   const IdType* indices_data = csr.indices.Ptr<IdType>();
@@ -507,10 +608,16 @@ CSRMatrix CSRSliceMatrix(
   }
 
   // Execute SegmentMaskColKernel
-  int nb = (nnz_csr + nt - 1) / nt;
+  const int64_t num_rows = csr.num_rows;
+  constexpr int WARP_SIZE = 32;
+  constexpr int BLOCK_WARP = 256 / WARP_SIZE;
+  constexpr int TILE_SIZE = 16;
+  const dim3 nthrs(WARP_SIZE, BLOCK_WARP);
+  const dim3 nblks((num_rows + TILE_SIZE - 1) / TILE_SIZE);
   CUDA_KERNEL_CALL(
-      _SegmentMaskColKernel, nb, nt, 0, stream, indptr_data, indices_data,
-      csr.num_rows, nnz_csr, ptr_sorted_cols, cols_size, mask.Ptr<IdType>(),
+      (_SegmentMaskColKernel<IdType, WARP_SIZE, BLOCK_WARP, TILE_SIZE>), nblks,
+      nthrs, 0, stream, indptr_data, indices_data, num_rows,
+      hashmap_buffer.Ptr<IdType>(), buffer_size, mask.Ptr<IdType>(),
       count.Ptr<IdType>());
 
   IdArray idx = AsNumBits(NonZero(mask), nbits);
