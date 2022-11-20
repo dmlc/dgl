@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import dgl
 
+__all__ = ["DegreeEncoder", "BiasedMultiheadAttention"]
 
 class DegreeEncoder(nn.Module):
     r"""Degree Encoder, as introduced in
@@ -93,6 +94,14 @@ class BiasedMultiheadAttention(nn.Module):
     structures, as introduced in `Do Transformers Really Perform Bad for
     Graph Representation? <https://arxiv.org/pdf/2106.05234>`__
 
+    .. math::
+
+        \text{Attn}=\text{softmax}(\dfrac{QK^T}{\sqrt{d}} \circ b)
+
+    :math:`Q` and :math:`K` are feature representation of nodes. :math:`d`
+    is the corresponding :attr:`feat_size`. :math:`b` is attention bias, which
+    can be additive or multiplicative according to the operator :math:`\circ`.
+
     Parameters
     ----------
     feat_size : int
@@ -107,6 +116,8 @@ class BiasedMultiheadAttention(nn.Module):
 
         * 'add' is for additive attention bias.
         * 'mul' is for multiplicative attention bias.
+    attn_drop : float, optional
+        Dropout probability on attention weights. Defalt: 0.1.
 
     Examples
     --------
@@ -119,7 +130,7 @@ class BiasedMultiheadAttention(nn.Module):
     >>> out = net(ndata, bias)
     """
 
-    def __init__(self, feat_size, num_heads, bias=True, attn_bias_type="add"):
+    def __init__(self, feat_size, num_heads, bias=True, attn_bias_type="add", attn_drop=0.1):
         super().__init__()
         self.feat_size = feat_size
         self.num_heads = num_heads
@@ -134,8 +145,8 @@ class BiasedMultiheadAttention(nn.Module):
         self.k_proj = nn.Linear(feat_size, feat_size, bias=bias)
         self.v_proj = nn.Linear(feat_size, feat_size, bias=bias)
         self.out_proj = nn.Linear(feat_size, feat_size, bias=bias)
-        # The same dropout rate as that in graphormer
-        self.dropout = nn.Dropout(p=0.1)
+
+        self.dropout = nn.Dropout(p=attn_drop)
 
         self.reset_parameters()
 
@@ -162,8 +173,8 @@ class BiasedMultiheadAttention(nn.Module):
             The attention bias used for attention modification. Shape:
             (batch_size, N, N, :attr:`num_heads`).
         attn_mask : torch.Tensor, optional
-            The attention mask used for avoiding computation on invalid positions,
-            where invalid positions are indicated by 1s. Shape: (batch_size, N, N).
+            The attention mask used for avoiding computation on invalid positions, where
+            invalid positions are indicated by non-zero values. Shape: (batch_size, N, N).
 
         Returns
         -------
