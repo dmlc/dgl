@@ -117,6 +117,7 @@ Utility Modules
     ~dgl.nn.pytorch.utils.LabelPropagation
     ~dgl.nn.pytorch.graph_transformer.DegreeEncoder
     ~dgl.nn.pytorch.utils.LaplacianPosEnc
+    ~dgl.nn.pytorch.graph_transformer.BiasedMultiheadAttention
 
 Network Embedding Modules
 ----------------------------------------
