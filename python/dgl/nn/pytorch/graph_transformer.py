@@ -247,7 +247,7 @@ class BiasedMultiheadAttention(nn.Module):
         return attn
 
 
-class SparseBiasedMultiheadAttention(BiasedMultiheadAttention):
+class SparseBiasedMultiheadAttention(nn.Module):
     r"""Sparse Multi-Head Attention Module with Graph Attention Bias.
 
     Implement sparse attention computation restricted to neighborhoods of
@@ -301,7 +301,36 @@ class SparseBiasedMultiheadAttention(BiasedMultiheadAttention):
         self, feat_size, num_heads, bias=True, attn_bias_type='add',
         attn_drop=0.
     ):
-        super().__init__(feat_size, num_heads, bias, attn_bias_type, attn_drop)
+        super().__init__()
+        self.feat_size = feat_size
+        self.num_heads = num_heads
+        self.head_dim = feat_size // num_heads
+        assert (
+            self.head_dim * num_heads == feat_size
+        ), "feat_size must be divisible by num_heads"
+        self.scaling = self.head_dim**-0.5
+        self.attn_bias_type = attn_bias_type
+
+        self.q_proj = nn.Linear(feat_size, feat_size, bias=bias)
+        self.k_proj = nn.Linear(feat_size, feat_size, bias=bias)
+        self.v_proj = nn.Linear(feat_size, feat_size, bias=bias)
+        self.out_proj = nn.Linear(feat_size, feat_size, bias=bias)
+
+        self.dropout = nn.Dropout(p=attn_drop)
+
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        """Reset parameters of projection matrices, the same settings as that
+        in Graphormer.
+        """
+        nn.init.xavier_uniform_(self.q_proj.weight, gain=2**-0.5)
+        nn.init.xavier_uniform_(self.k_proj.weight, gain=2**-0.5)
+        nn.init.xavier_uniform_(self.v_proj.weight, gain=2**-0.5)
+
+        nn.init.xavier_uniform_(self.out_proj.weight)
+        if self.out_proj.bias is not None:
+            nn.init.constant_(self.out_proj.bias, 0.0)
 
     def forward(self, g, ndata, attn_bias=None):
         """Forward computation.
