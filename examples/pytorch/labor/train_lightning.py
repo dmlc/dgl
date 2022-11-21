@@ -124,7 +124,7 @@ class SAGELightning(LightningModule):
 
 
 class DataModule(LightningDataModule):
-    def __init__(self, dataset_name, undirected, data_cpu=False, graph_cpu=False, use_uva=False, fan_out=[10, 25],
+    def __init__(self, dataset_name, undirected, data_cpu=False, use_uva=False, fan_out=[10, 25],
                  device=th.device('cpu'), batch_size=1000, num_workers=4, sampler='labor', importance_sampling=0, layer_dependency=False):
         super().__init__()
 
@@ -142,27 +142,18 @@ class DataModule(LightningDataModule):
 
         fanouts = [int(_) for _ in fan_out]
         if sampler == 'neighbor':
-            sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts) #, prefetch_node_feats='features', prefetch_labels='labels')
+            sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts, prefetch_node_feats=['features'], prefetch_labels=['labels'])
         else:
-            sampler = dgl.dataloading.LaborSampler(fanouts, importance_sampling=importance_sampling, layer_dependency=layer_dependency) #, prefetch_node_feats='features', prefetch_edge_feats='edge_weights', prefetch_labels='labels')
+            sampler = dgl.dataloading.LaborSampler(fanouts, importance_sampling=importance_sampling, layer_dependency=layer_dependency, prefetch_node_feats=['features'], prefetch_edge_feats=(['edge_weights'] if importance_sampling != 0 else []), prefetch_labels=['labels'])
 
         dataloader_device = th.device('cpu')
-        if use_uva or (not data_cpu and not graph_cpu):
+        g = g.formats(['csc'])
+        if use_uva or not data_cpu:
             train_nid = train_nid.to(device)
             val_nid = val_nid.to(device)
             test_nid = test_nid.to(device)
-            g = g.formats(['csc'])
-            if not data_cpu:
+            if not data_cpu and not use_uva:
                 g = g.to(device)
-            elif not graph_cpu:
-                g._graph = g._graph.copy_to(dgl.utils.to_dgl_context(device))
-            if use_uva:
-                if graph_cpu:
-                    g._graph.pin_memory_()
-                if data_cpu:
-                    for frame in itertools.chain(g._node_frames, g._edge_frames):
-                        for col in frame._columns.values():
-                            col.pin_memory_()
             dataloader_device = device
 
         self.g = g
@@ -187,6 +178,7 @@ class DataModule(LightningDataModule):
             self.train_nid,
             self.sampler,
             device=self.device,
+            use_uva=self.use_uva,
             batch_size=self.batch_size,
             shuffle=True,
             drop_last=True,
@@ -198,6 +190,7 @@ class DataModule(LightningDataModule):
             self.val_nid,
             self.val_sampler,
             device=self.device,
+            use_uva=self.use_uva,
             batch_size=self.batch_size,
             shuffle=False,
             drop_last=False,
@@ -209,6 +202,7 @@ class DataModule(LightningDataModule):
             self.test_nid,
             self.test_sampler,
             device=self.device,
+            use_uva=self.use_uva,
             batch_size=self.batch_size,
             shuffle=False,
             drop_last=False,
@@ -240,21 +234,6 @@ class BatchSizeCallback(Callback):
     def std(self):
         return math.sqrt(self.var)
     
-    def on_train_batch_start(self, trainer, datamodule, batch, batch_idx):
-        input_nodes, output_nodes, mfgs = batch
-        feats = trainer.datamodule.g.ndata['features']
-        if feats.is_pinned():
-            values = dgl.utils.gather_pinned_tensor_rows(feats, input_nodes)
-        else:
-            values = feats[input_nodes.long()]
-        mfgs[0].srcdata['features'] = values.to(trainer.datamodule.device)
-    
-    def on_validation_batch_start(self, trainer, datamodule, batch, batch_idx, dataloader_idx):
-        self.on_train_batch_start(trainer, datamodule, batch, batch_idx)
-    
-    def on_test_batch_start(self, trainer, datamodule, batch, batch_idx, dataloader_idx):
-        self.on_validation_batch_start(trainer, datamodule, batch, batch_idx, dataloader_idx)
-
     def on_train_batch_end(self, trainer, datamodule, outputs, batch, batch_idx):
         input_nodes, output_nodes, mfgs = batch
         self.push(mfgs[0].num_src_nodes())
@@ -286,11 +265,6 @@ if __name__ == '__main__':
                                 "on GPU when using it to save time for data copy. This may "
                                 "be undesired if they cannot fit in GPU memory at once. "
                                 "This flag disables that.")
-    argparser.add_argument('--graph-cpu', action='store_true',
-                           help="By default the script puts the graph"
-                                "on GPU when using it to save time for data copy. This may "
-                                "be undesired if they cannot fit in GPU memory at once. "
-                                "This flag disables that.")
     argparser.add_argument('--sampler', type=str, default='labor')
     argparser.add_argument('--importance-sampling', type=int, default=0)
     argparser.add_argument('--layer-dependency', action='store_true')
@@ -309,7 +283,7 @@ if __name__ == '__main__':
         device = th.device('cpu')
 
     datamodule = DataModule(
-        args.dataset, args.undirected, args.data_cpu, args.graph_cpu, args.use_uva,
+        args.dataset, args.undirected, args.data_cpu, args.use_uva,
         [int(_) for _ in args.fan_out.split(',')],
         device, args.batch_size, args.num_workers, args.sampler, args.importance_sampling, args.layer_dependency)
     model = SAGELightning(
