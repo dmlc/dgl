@@ -144,7 +144,7 @@ class DataModule(LightningDataModule):
         if sampler == 'neighbor':
             sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts, prefetch_node_feats=['features'], prefetch_labels=['labels'])
         else:
-            sampler = dgl.dataloading.LaborSampler(fanouts, importance_sampling=importance_sampling, layer_dependency=layer_dependency, prefetch_node_feats=['features'], prefetch_edge_feats=(['edge_weights'] if importance_sampling != 0 else []), prefetch_labels=['labels'])
+            sampler = dgl.dataloading.LaborSampler(fanouts, importance_sampling=importance_sampling, layer_dependency=layer_dependency, prefetch_node_feats=['features'], prefetch_labels=['labels'])
 
         dataloader_device = th.device('cpu')
         g = g.formats(['csc'])
