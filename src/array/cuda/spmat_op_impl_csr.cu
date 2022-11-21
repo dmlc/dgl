@@ -15,8 +15,6 @@
 #include "./dgl_cub.cuh"
 #include "./utils.h"
 
-#define MIN(a, b) (((a) < (b)) ? (a) : (b))
-
 namespace dgl {
 
 using runtime::NDArray;
@@ -528,7 +526,8 @@ __global__ void _SegmentMaskColKernel(
   int laneid = threadIdx.x;
   IdType out_row = blockIdx.x * TILE_SIZE + threadIdx.y;
   IdType last_row =
-      MIN(static_cast<IdType>(blockIdx.x + 1) * TILE_SIZE, num_rows);
+      min(static_cast<IdType>((blockIdx.x + 1) * TILE_SIZE),
+          static_cast<IdType>(num_rows));
 
   NodeQueryHashmap<IdType> hashmap(hashmap_buffer, buffer_size);
   typedef cub::WarpReduce<IdType> WarpReduce;
