@@ -18,7 +18,9 @@ class HGNN(nn.Module):
         self.Theta2 = nn.Linear(hidden_dims, out_size)
         self.dropout = nn.Dropout(0.5)
 
-        # Compute the Laplacian with Sparse Matrix API
+        ###########################################################
+        # (HIGHLIGHT) Compute the Laplacian with Sparse Matrix API
+        ###########################################################
         d_V = H.sum(1)  # node degree
         d_E = H.sum(0)  # edge degree
         n_edges = d_E.shape[0]
@@ -33,13 +35,13 @@ class HGNN(nn.Module):
         X = self.laplacian @ self.Theta2(self.dropout(X))
         return X
 
-def train(model, opt, X, Y, train_mask):
+def train(model, optimizer, X, Y, train_mask):
     model.train()
     Y_hat = model(X)
     loss = F.cross_entropy(Y_hat[train_mask], Y[train_mask])
-    opt.zero_grad()
+    optimizer.zero_grad()
     loss.backward()
-    opt.step()
+    optimizer.step()
 
 def evaluate(model, X, Y, val_mask, test_mask):
     model.eval()
@@ -73,11 +75,11 @@ def load_data():
 def main():
     H, X, Y, num_classes, train_mask, val_mask, test_mask = load_data()
     model = HGNN(H, X.shape[1], num_classes)
-    opt = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
     with tqdm.trange(500) as tq:
         for epoch in tq:
-            train(model, opt, X, Y, train_mask)
+            train(model, optimizer, X, Y, train_mask)
             val_acc, test_acc = evaluate(model, X, Y, val_mask, test_mask)
             tq.set_postfix(
                 {
