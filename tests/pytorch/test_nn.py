@@ -1819,7 +1819,7 @@ def test_SparseBiasedMultiheadAttention(
 
     net = nn.SparseBiasedMultiheadAttention(
         feat_size, num_heads, bias, attn_bias_type, attn_drop
-    )
+    ).to(dev)
     out = net(g, h, attn_bias=attn_bias)
 
     assert out.shape == (num_nodes, feat_size)
