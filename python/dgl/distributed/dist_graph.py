@@ -13,7 +13,7 @@ from ..convert import graph as dgl_graph
 from ..transforms import compact_graphs
 from .. import heterograph_index
 from .. import backend as F
-from ..base import NID, EID, ETYPE, ALL, is_all
+from ..base import NID, EID, ETYPE, ALL, is_all, DGLError
 from .kvstore import KVServer, get_kvstore
 from .._ffi.ndarray import empty_shared_mem
 from ..ndarray import exist_shared_mem_array
@@ -176,24 +176,12 @@ class NodeDataView(MutableMapping):
 
     def __init__(self, g, ntype=None):
         self._graph = g
-        # When this is created, the server may already load node data. We need to
-        # initialize the node data in advance.
-        names = g._get_ndata_names(ntype)
-        if ntype is None:
+        if ntype is None or len(g.ntypes) == 1:
             self._data = g._ndata_store
         else:
-            if ntype in g._ndata_store:
-                self._data = g._ndata_store[ntype]
-            else:
-                self._data = {}
-                g._ndata_store[ntype] = self._data
-        for name in names:
-            assert name.is_node()
-            policy = PartitionPolicy(name.policy_str, g.get_partition_book())
-            dtype, shape, _ = g._client.get_data_meta(str(name))
-            # We create a wrapper on the existing tensor in the kvstore.
-            self._data[name.get_name()] = DistTensor(shape, dtype, name.get_name(),
-                                                     part_policy=policy, attach=False)
+            if ntype not in g.ntypes:
+                raise DGLError(f"Node type {ntype} does not exist.")
+            self._data = g._ndata_store[ntype]
 
     def _get_names(self):
         return list(self._data.keys())
@@ -230,24 +218,11 @@ class EdgeDataView(MutableMapping):
 
     def __init__(self, g, etype=None):
         self._graph = g
-        # When this is created, the server may already load edge data. We need to
-        # initialize the edge data in advance.
-        names = g._get_edata_names(etype)
-        if etype is None:
+        if etype is None or len(g.canonical_etypes) == 1:
             self._data = g._edata_store
         else:
-            if etype in g._edata_store:
-                self._data = g._edata_store[etype]
-            else:
-                self._data = {}
-                g._edata_store[etype] = self._data
-        for name in names:
-            assert name.is_edge()
-            policy = PartitionPolicy(name.policy_str, g.get_partition_book())
-            dtype, shape, _ = g._client.get_data_meta(str(name))
-            # We create a wrapper on the existing tensor in the kvstore.
-            self._data[name.get_name()] = DistTensor(shape, dtype, name.get_name(),
-                                                     part_policy=policy, attach=False)
+            c_etype = g.to_canonical_etype(etype)
+            self._data = g._edata_store[c_etype]
 
     def _get_names(self):
         return list(self._data.keys())
@@ -520,10 +495,8 @@ class DistGraph:
                 rpc.recv_response()
             self._client.barrier()
 
-        self._ndata_store = {}
-        self._edata_store = {}
-        self._ndata = NodeDataView(self)
-        self._edata = EdgeDataView(self)
+        self._init_ndata_store()
+        self._init_edata_store()
 
         self._num_nodes = 0
         self._num_edges = 0
@@ -545,6 +518,48 @@ class DistGraph:
             self._gpb = gpb
         self._client.map_shared_data(self._gpb)
 
+    def _init_ndata_store(self):
+        '''Initialize node data store.'''
+        self._ndata_store = {}
+        for ntype in self.ntypes:
+            names = self._get_ndata_names(ntype)
+            data = {}
+            for name in names:
+                assert name.is_node()
+                policy = PartitionPolicy(name.policy_str,
+                    self.get_partition_book()
+                )
+                dtype, shape, _ = self._client.get_data_meta(str(name))
+                # We create a wrapper on the existing tensor in the kvstore.
+                data[name.get_name()] = DistTensor(shape, dtype,
+                    name.get_name(), part_policy=policy, attach=False
+                )
+            if len(self.ntypes) == 1:
+                self._ndata_store = data
+            else:
+                self._ndata_store[ntype] = data
+
+    def _init_edata_store(self):
+        '''Initialize edge data store.'''
+        self._edata_store = {}
+        for etype in self.canonical_etypes:
+            names = self._get_edata_names(etype)
+            data = {}
+            for name in names:
+                assert name.is_edge()
+                policy = PartitionPolicy(name.policy_str,
+                    self.get_partition_book()
+                )
+                dtype, shape, _ = self._client.get_data_meta(str(name))
+                # We create a wrapper on the existing tensor in the kvstore.
+                data[name.get_name()] = DistTensor(shape, dtype,
+                    name.get_name(), part_policy=policy, attach=False
+                )
+            if len(self.canonical_etypes) == 1:
+                self._edata_store = data
+            else:
+                self._edata_store[etype] = data
+
     def __getstate__(self):
         return self.graph_name, self._gpb
 
@@ -552,10 +567,8 @@ class DistGraph:
         self.graph_name, gpb = state
         self._init(gpb)
 
-        self._ndata_store = {}
-        self._edata_store = {}
-        self._ndata = NodeDataView(self)
-        self._edata = EdgeDataView(self)
+        self._init_ndata_store()
+        self._init_edata_store()
         self._num_nodes = 0
         self._num_edges = 0
         for part_md in self._gpb.metadata():
@@ -600,7 +613,7 @@ class DistGraph:
             The data view in the distributed graph storage.
         """
         assert len(self.ntypes) == 1, "ndata only works for a graph with one node type."
-        return self._ndata
+        return NodeDataView(self)
 
     @property
     def edata(self):
@@ -612,7 +625,7 @@ class DistGraph:
             The data view in the distributed graph storage.
         """
         assert len(self.etypes) == 1, "edata only works for a graph with one edge type."
-        return self._edata
+        return EdgeDataView(self)
 
     @property
     def idtype(self):
