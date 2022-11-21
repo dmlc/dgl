@@ -15,7 +15,7 @@ from dgl.data.utils import load_graphs, load_tensors
 
 
 def create_chunked_dataset(
-    root_dir, num_chunks, include_masks=False, data_fmt='numpy'
+    root_dir, num_chunks, include_masks=False, data_fmt='numpy', **kwargs
 ):
     """
     This function creates a sample dataset, based on MAG240 dataset.
@@ -234,6 +234,7 @@ def create_chunked_dataset(
         num_chunks=num_chunks,
         output_path=output_dir,
         data_fmt=data_fmt,
+        **kwargs
     )
     print('Done with creating chunked graph')
 
