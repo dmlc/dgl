@@ -499,7 +499,7 @@ struct NodeQueryHashmap {
   }
 
   __device__ inline uint32_t Hash(int64_t key) {
-    return static_cast<uint32_t>(_Hash32Shift(key)) & (capacity_ - 1);
+    return static_cast<uint32_t>(_Hash64Shift(key)) & (capacity_ - 1);
   }
 
   __device__ inline uint32_t Hash(uint64_t key) {
