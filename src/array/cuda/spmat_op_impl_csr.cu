@@ -467,13 +467,13 @@ __device__ inline uint64_t _Hash64Shift(uint64_t key) {
 template <typename IdType>
 struct NodeQueryHashmap {
   __device__ inline NodeQueryHashmap(IdType* Kptr, size_t numel)
-      : kptr_(Kptr), capacity_(numel){};
+      : kptr_(Kptr), capacity_(numel) {}
 
   __device__ inline void Insert(IdType key) {
     uint32_t delta = 1;
     uint32_t pos = Hash(key);
     IdType prev = dgl::aten::cuda::AtomicCAS(&kptr_[pos], kEmptyKey_, key);
-    while (prev != key and prev != kEmptyKey_) {
+    while (prev != key && prev != kEmptyKey_) {
       pos = Hash(pos + delta);
       delta += 1;
       prev = dgl::aten::cuda::AtomicCAS(&kptr_[pos], kEmptyKey_, key);
