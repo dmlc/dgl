@@ -79,12 +79,36 @@ def _verify_graph_feats(
             assert torch.equal(edata, true_feats)
 
 
-@pytest.mark.parametrize("num_chunks", [1, 8])
-def test_chunk_graph(num_chunks):
-
+@pytest.mark.parametrize(
+    "num_chunks, "
+    "num_chunks_nodes, "
+    "num_chunks_edges, "
+    "num_chunks_node_data, "
+    "num_chunks_edge_data",
+    [
+        [1, None, None, None, None],
+        [8, None, None, None, None],
+        [4, 4, 4, 8, 12],
+        [4, 4, 4, {'paper': 10}, {('author', 'writes', 'paper'): 24}],
+        [4, 4, 4, {'paper': {'feat': 10}},
+            {('author', 'writes', 'paper'): {'year': 24}}],
+    ]
+)
+def test_chunk_graph(
+    num_chunks,
+    num_chunks_nodes,
+    num_chunks_edges,
+    num_chunks_node_data,
+    num_chunks_edge_data
+):
     with tempfile.TemporaryDirectory() as root_dir:
 
-        g = create_chunked_dataset(root_dir, num_chunks)
+        g = create_chunked_dataset(root_dir, num_chunks,
+                num_chunks_nodes=num_chunks_nodes,
+                num_chunks_edges=num_chunks_edges,
+                num_chunks_node_data=num_chunks_node_data,
+                num_chunks_edge_data=num_chunks_edge_data
+            )
 
         # check metadata.json
         output_dir = os.path.join(root_dir, "chunked-data")
@@ -99,7 +123,11 @@ def test_chunk_graph(num_chunks):
         output_edge_index_dir = os.path.join(output_dir, "edge_index")
         for c_etype in g.canonical_etypes:
             c_etype_str = _etype_tuple_to_str(c_etype)
-            for i in range(num_chunks):
+            if num_chunks_edges is None:
+                n_chunks = num_chunks
+            else:
+                n_chunks = num_chunks_edges
+            for i in range(n_chunks):
                 fname = os.path.join(
                     output_edge_index_dir, f'{c_etype_str}{i}.txt'
                 )
@@ -111,7 +139,7 @@ def test_chunk_graph(num_chunks):
                     assert isinstance(int(num2), int)
 
         # check node/edge_data
-        def test_data(sub_dir, feat, expected_data, expected_shape):
+        def test_data(sub_dir, feat, expected_data, expected_shape, num_chunks):
             data = []
             for i in range(num_chunks):
                 fname = os.path.join(sub_dir, f'{feat}-{i}.npy')
@@ -125,18 +153,49 @@ def test_chunk_graph(num_chunks):
         output_node_data_dir = os.path.join(output_dir, "node_data")
         for ntype in g.ntypes:
             sub_dir = os.path.join(output_node_data_dir, ntype)
+            if isinstance(num_chunks_node_data, int):
+                chunks_data = num_chunks_node_data
+            elif isinstance(num_chunks_node_data, dict):
+                chunks_data = num_chunks_node_data.get(ntype, num_chunks)
+            else:
+                chunks_data = num_chunks
             for feat, data in g.nodes[ntype].data.items():
-                test_data(sub_dir, feat, data, g.num_nodes(ntype) // num_chunks)
+                if isinstance(chunks_data, dict):
+                    n_chunks = chunks_data.get(feat, num_chunks)
+                else:
+                    n_chunks = chunks_data
+                test_data(sub_dir, feat, data, g.num_nodes(ntype) // n_chunks,
+                    n_chunks)
 
         output_edge_data_dir = os.path.join(output_dir, "edge_data")
         for c_etype in g.canonical_etypes:
             c_etype_str = _etype_tuple_to_str(c_etype)
             sub_dir = os.path.join(output_edge_data_dir, c_etype_str)
+            if isinstance(num_chunks_edge_data, int):
+                chunks_data = num_chunks_edge_data
+            elif isinstance(num_chunks_edge_data, dict):
+                chunks_data = num_chunks_edge_data.get(c_etype, num_chunks)
+            else:
+                chunks_data = num_chunks
             for feat, data in g.edges[c_etype].data.items():
-                test_data(sub_dir, feat, data, g.num_edges(c_etype) // num_chunks)
+                if isinstance(chunks_data, dict):
+                    n_chunks = chunks_data.get(feat, num_chunks)
+                else:
+                    n_chunks = chunks_data
+                test_data(sub_dir, feat, data, g.num_edges(c_etype) // n_chunks,
+                    n_chunks)
 
 
-def _test_pipeline(num_chunks, num_parts, world_size, graph_formats=None):
+def _test_pipeline(
+    num_chunks,
+    num_parts,
+    world_size,
+    graph_formats=None,
+    num_chunks_nodes=None,
+    num_chunks_edges=None,
+    num_chunks_node_data=None,
+    num_chunks_edge_data=None
+):
     if num_chunks < num_parts:
         # num_parts should less/equal than num_chunks
         return
@@ -147,7 +206,12 @@ def _test_pipeline(num_chunks, num_parts, world_size, graph_formats=None):
 
     with tempfile.TemporaryDirectory() as root_dir:
 
-        g = create_chunked_dataset(root_dir, num_chunks)
+        g = create_chunked_dataset(root_dir, num_chunks,
+                num_chunks_nodes=num_chunks_nodes,
+                num_chunks_edges=num_chunks_edges,
+                num_chunks_node_data=num_chunks_node_data,
+                num_chunks_edge_data=num_chunks_edge_data
+            )
 
         # Step1: graph partition
         in_dir = os.path.join(root_dir, "chunked-data")
@@ -213,7 +277,14 @@ def _test_pipeline(num_chunks, num_parts, world_size, graph_formats=None):
             )
 
 
-@pytest.mark.parametrize("num_chunks, num_parts, world_size", [[8, 4, 2], [9, 6, 3], [11, 11, 1], [11, 4, 2], [5, 3, 1]])
+@pytest.mark.parametrize(
+    "num_chunks, "
+    "num_parts, "
+    "world_size",
+    [
+        [8, 4, 2], [9, 6, 3], [11, 11, 1], [11, 4, 2], [5, 3, 1]
+    ]
+)
 def test_pipeline_basics(num_chunks, num_parts, world_size):
     _test_pipeline(num_chunks, num_parts, world_size)
 
