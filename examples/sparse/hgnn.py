@@ -3,7 +3,7 @@ Hypergraph Neural Networks (https://arxiv.org/pdf/1809.09401.pdf)
 """
 import dgl
 import dgl.data
-import dgl.mock_sparse
+import dgl.mock_sparse as dglsp
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -22,9 +22,9 @@ class HGNN(nn.Module):
         d_V = H.sum(1)  # node degree
         d_E = H.sum(0)  # edge degree
         n_edges = d_E.shape[0]
-        D_V_invsqrt = dgl.mock_sparse.diag(d_V ** -0.5)  # D_V ** (-1/2)
-        D_E_inv = dgl.mock_sparse.diag(d_E ** -1)  # D_E ** (-1)
-        W = dgl.mock_sparse.identity((n_edges, n_edges))
+        D_V_invsqrt = dglsp.diag(d_V ** -0.5)  # D_V ** (-1/2)
+        D_E_inv = dglsp.diag(d_E ** -1)  # D_E ** (-1)
+        W = dglsp.identity((n_edges, n_edges))
         self.laplacian = D_V_invsqrt @ H @ W @ D_E_inv @ H.T @ D_V_invsqrt
 
     def forward(self, X):
@@ -60,8 +60,8 @@ def load_data():
     # We follow the paper and assume that the rows of the incidence matrix
     # are for nodes and the columns are for edges.
     src, dst = graph.edges()
-    H = dgl.mock_sparse.create_from_coo(dst, src)
-    H = H + dgl.mock_sparse.identity(H.shape)
+    H = dglsp.create_from_coo(dst, src)
+    H = H + dglsp.identity(H.shape)
 
     X = graph.ndata["feat"]
     Y = graph.ndata["label"]
