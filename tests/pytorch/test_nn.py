@@ -1801,3 +1801,25 @@ def test_BiasedMultiheadAttention(feat_size, num_heads, bias, attn_bias_type, at
     out = net(ndata, attn_bias, attn_mask)
 
     assert out.shape == (16, 100, feat_size)
+
+@pytest.mark.parametrize('feat_size', [128, 512])
+@pytest.mark.parametrize('num_heads', [8, 16])
+@pytest.mark.parametrize('bias', [True, False])
+@pytest.mark.parametrize('attn_bias_type', ['add', 'mul'])
+@pytest.mark.parametrize('attn_drop', [0.1, 0.])
+def test_SparseBiasedMultiheadAttention(
+    feat_size, num_heads, bias, attn_bias_type, attn_drop
+):
+    dev = F.ctx()
+    num_nodes = 100
+    num_edges = 80
+    g = dgl.rand_graph(num_nodes, num_edges).to(dev)
+    h = th.randn(num_nodes, feat_size).to(dev)
+    attn_bias = th.randn(num_edges, num_heads).to(dev)
+
+    net = nn.SparseBiasedMultiheadAttention(
+        feat_size, num_heads, bias, attn_bias_type, attn_drop
+    )
+    out = net(g, h, attn_bias=attn_bias)
+
+    assert out.shape == (num_nodes, feat_size)
