@@ -10,15 +10,14 @@ from dgl.mock_sparse2 import create_from_coo, create_from_csr, create_from_csc
 if not sys.platform.startswith("linux"):
     pytest.skip("skipping tests on win", allow_module_level=True)
 
+
 @pytest.mark.parametrize("dense_dim", [None, 4])
 @pytest.mark.parametrize("row", [[0, 0, 1, 2], (0, 1, 2, 4)])
 @pytest.mark.parametrize("col", [(0, 1, 2, 2), (1, 3, 3, 4)])
 @pytest.mark.parametrize("shape", [None, (3, 5), (5, 3)])
 def test_create_from_coo(dense_dim, row, col, shape):
     # Skip invalid matrices
-    if shape is not None and (
-        max(row) >= shape[0] or max(col) >= shape[1]
-    ):
+    if shape is not None and (max(row) >= shape[0] or max(col) >= shape[1]):
         return
 
     val_shape = (len(row),)
@@ -69,6 +68,7 @@ def test_create_from_csr(dense_dim, indptr, indices, shape):
     assert torch.allclose(mat_indices, indices)
     assert torch.allclose(mat_val, val)
 
+
 @pytest.mark.parametrize("dense_dim", [None, 4])
 @pytest.mark.parametrize("indptr", [[0, 0, 1, 4], (0, 1, 2, 4)])
 @pytest.mark.parametrize("indices", [(0, 1, 2, 3), (1, 2, 3, 4)])
@@ -95,6 +95,7 @@ def test_create_from_csc(dense_dim, indptr, indices, shape):
     assert torch.allclose(mat_indices, indices)
     assert torch.allclose(mat_val, val)
 
+
 @pytest.mark.parametrize("val_shape", [(3), (3, 2)])
 def test_dense(val_shape):
     ctx = F.ctx()
@@ -110,6 +111,7 @@ def test_dense(val_shape):
     mat[row, col] = val
     assert torch.allclose(A_dense, mat)
 
+
 def test_set_val():
     ctx = F.ctx()
 
@@ -122,6 +124,7 @@ def test_set_val():
     new_val = torch.zeros(nnz).to(ctx)
     A.val = new_val
     assert torch.allclose(new_val, A.val)
+
 
 @pytest.mark.parametrize("dense_dim", [None, 4])
 @pytest.mark.parametrize("indptr", [[0, 0, 1, 4], (0, 1, 2, 4)])
@@ -140,7 +143,11 @@ def test_csr_to_coo(dense_dim, indptr, indices, shape):
     if shape is None:
         shape = (indptr.numel() - 1, torch.max(indices).item() + 1)
 
-    row = torch.arange(0, indptr.shape[0] - 1).to(ctx).repeat_interleave(torch.diff(indptr))
+    row = (
+        torch.arange(0, indptr.shape[0] - 1)
+        .to(ctx)
+        .repeat_interleave(torch.diff(indptr))
+    )
     col = indices
     mat_row, mat_col, mat_val = mat.coo()
 
@@ -152,3 +159,196 @@ def test_csr_to_coo(dense_dim, indptr, indices, shape):
     assert torch.allclose(mat_row, row)
     assert torch.allclose(mat_col, col)
 
+
+@pytest.mark.parametrize("dense_dim", [None, 4])
+@pytest.mark.parametrize("indptr", [[0, 0, 1, 4], (0, 1, 2, 4)])
+@pytest.mark.parametrize("indices", [(0, 1, 2, 3), (1, 4, 3, 2)])
+@pytest.mark.parametrize("shape", [None, (5, 3)])
+def test_csc_to_coo(dense_dim, indptr, indices, shape):
+    ctx = F.ctx()
+    val_shape = (len(indices),)
+    if dense_dim is not None:
+        val_shape += (dense_dim,)
+    val = torch.randn(val_shape).to(ctx)
+    indptr = torch.tensor(indptr).to(ctx)
+    indices = torch.tensor(indices).to(ctx)
+    mat = create_from_csc(indptr, indices, val, shape)
+
+    if shape is None:
+        shape = (torch.max(indices).item() + 1, indptr.numel() - 1)
+
+    col = (
+        torch.arange(0, indptr.shape[0] - 1)
+        .to(ctx)
+        .repeat_interleave(torch.diff(indptr))
+    )
+    row = indices
+    mat_row, mat_col, mat_val = mat.coo()
+
+    assert mat.shape == shape
+    assert mat.nnz == row.numel()
+    assert mat.device == row.device
+    assert mat.dtype == val.dtype
+    assert torch.allclose(mat_val, val)
+    assert torch.allclose(mat_row, row)
+    assert torch.allclose(mat_col, col)
+
+
+def _scatter_add(a, index, v=1):
+    index = index.tolist()
+    for i in index:
+        a[i] += v
+    return a
+
+
+@pytest.mark.parametrize("dense_dim", [None, 4])
+@pytest.mark.parametrize("row", [[0, 0, 1, 2], (0, 1, 2, 4)])
+@pytest.mark.parametrize("col", [(0, 1, 2, 2), (1, 3, 3, 4)])
+@pytest.mark.parametrize("shape", [None, (3, 5), (5, 3)])
+def test_coo_to_csr(dense_dim, row, col, shape):
+    # Skip invalid matrices
+    if shape is not None and (max(row) >= shape[0] or max(col) >= shape[1]):
+        return
+
+    val_shape = (len(row),)
+    if dense_dim is not None:
+        val_shape += (dense_dim,)
+    ctx = F.ctx()
+    val = torch.randn(val_shape).to(ctx)
+    row = torch.tensor(row).to(ctx)
+    col = torch.tensor(col).to(ctx)
+    mat = create_from_coo(row, col, val, shape)
+
+    if shape is None:
+        shape = (torch.max(row).item() + 1, torch.max(col).item() + 1)
+
+    mat_indptr, mat_indices, mat_val = mat.csr()
+    indptr = torch.zeros(shape[0] + 1).to(ctx)
+    indptr = _scatter_add(indptr, row + 1)
+    indptr = torch.cumsum(indptr, 0).long()
+    indices = col
+
+    assert mat.shape == shape
+    assert mat.nnz == row.numel()
+    assert mat.dtype == val.dtype
+    assert torch.allclose(mat_val, val)
+    assert torch.allclose(mat_indptr, indptr)
+    assert torch.allclose(mat_indices, indices)
+
+
+@pytest.mark.parametrize("dense_dim", [None, 4])
+@pytest.mark.parametrize("indptr", [[0, 0, 1, 4], (0, 1, 2, 4)])
+@pytest.mark.parametrize("indices", [(0, 1, 2, 3), (1, 4, 3, 2)])
+@pytest.mark.parametrize("shape", [None, (5, 3)])
+def test_csc_to_csr(dense_dim, indptr, indices, shape):
+    ctx = F.ctx()
+    val_shape = (len(indices),)
+    if dense_dim is not None:
+        val_shape += (dense_dim,)
+    val = torch.randn(val_shape).to(ctx)
+    indptr = torch.tensor(indptr).to(ctx)
+    indices = torch.tensor(indices).to(ctx)
+    mat = create_from_csc(indptr, indices, val, shape)
+    mat_indptr, mat_indices, mat_val = mat.csr()
+
+    if shape is None:
+        shape = (torch.max(indices).item() + 1, indptr.numel() - 1)
+
+    col = (
+        torch.arange(0, indptr.shape[0] - 1)
+        .to(ctx)
+        .repeat_interleave(torch.diff(indptr))
+    )
+    row = indices
+    row, sort_index = row.sort(stable=True)
+    col = col[sort_index]
+    val = val[sort_index]
+    indptr = torch.zeros(shape[0] + 1).to(ctx)
+    indptr = _scatter_add(indptr, row + 1)
+    indptr = torch.cumsum(indptr, 0).long()
+    indices = col
+
+    assert mat.shape == shape
+    assert mat.nnz == row.numel()
+    assert mat.device == row.device
+    assert mat.dtype == val.dtype
+    assert torch.allclose(mat_val, val)
+    assert torch.allclose(mat_indptr, indptr)
+    assert torch.allclose(mat_indices, indices)
+
+
+@pytest.mark.parametrize("dense_dim", [None, 4])
+@pytest.mark.parametrize("row", [[0, 0, 1, 2], (0, 1, 2, 4)])
+@pytest.mark.parametrize("col", [(0, 1, 2, 2), (1, 3, 3, 4)])
+@pytest.mark.parametrize("shape", [None, (3, 5), (5, 3)])
+def test_coo_to_csc(dense_dim, row, col, shape):
+    # Skip invalid matrices
+    if shape is not None and (max(row) >= shape[0] or max(col) >= shape[1]):
+        return
+
+    val_shape = (len(row),)
+    if dense_dim is not None:
+        val_shape += (dense_dim,)
+    ctx = F.ctx()
+    val = torch.randn(val_shape).to(ctx)
+    row = torch.tensor(row).to(ctx)
+    col = torch.tensor(col).to(ctx)
+    mat = create_from_coo(row, col, val, shape)
+
+    if shape is None:
+        shape = (torch.max(row).item() + 1, torch.max(col).item() + 1)
+
+    mat_indptr, mat_indices, mat_val = mat.csc()
+    indptr = torch.zeros(shape[1] + 1).to(ctx)
+    _scatter_add(indptr, col + 1)
+    indptr = torch.cumsum(indptr, 0).long()
+    indices = row
+
+    assert mat.shape == shape
+    assert mat.nnz == row.numel()
+    assert mat.dtype == val.dtype
+    assert torch.allclose(mat_val, val)
+    assert torch.allclose(mat_indptr, indptr)
+    assert torch.allclose(mat_indices, indices)
+
+
+@pytest.mark.parametrize("dense_dim", [None, 4])
+@pytest.mark.parametrize("indptr", [[0, 0, 1, 4], (0, 1, 2, 4)])
+@pytest.mark.parametrize("indices", [(0, 1, 2, 3), (1, 2, 3, 4)])
+@pytest.mark.parametrize("shape", [None, (3, 5)])
+def test_csr_to_csc(dense_dim, indptr, indices, shape):
+    val_shape = (len(indices),)
+    if dense_dim is not None:
+        val_shape += (dense_dim,)
+    ctx = F.ctx()
+    val = torch.randn(val_shape).to(ctx)
+    indptr = torch.tensor(indptr).to(ctx)
+    indices = torch.tensor(indices).to(ctx)
+    mat = create_from_csr(indptr, indices, val, shape)
+    mat_indptr, mat_indices, mat_val = mat.csc()
+
+    if shape is None:
+        shape = (indptr.numel() - 1, torch.max(indices).item() + 1)
+
+    row = (
+        torch.arange(0, indptr.shape[0] - 1)
+        .to(ctx)
+        .repeat_interleave(torch.diff(indptr))
+    )
+
+    col = indices
+    col, sort_index = col.sort(stable=True)
+    row = row[sort_index]
+    val = val[sort_index]
+    indptr = torch.zeros(shape[1] + 1).to(ctx)
+    indptr = _scatter_add(indptr, col + 1)
+    indptr = torch.cumsum(indptr, 0).long()
+    indices = row
+
+    assert mat.shape == shape
+    assert mat.nnz == row.numel()
+    assert mat.device == row.device
+    assert mat.dtype == val.dtype
+    assert torch.allclose(mat_val, val)
+    assert torch.allclose(mat_indptr, indptr)
+    assert torch.allclose(mat_indices, indices)
