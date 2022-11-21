@@ -65,21 +65,31 @@ def sparse_all_to_all_push(idx, value, partition):
     perm, send_splits = partition.generate_permutation(idx)
     perm = perm.long()
 
+    # Get receive splits.
     recv_splits = torch.empty_like(send_splits)
     dist.all_to_all_single(recv_splits, send_splits)
+
+    # Use pinned memory to speedup D2H copy.
+    recv_splits = recv_splits.to("cpu", non_blocking=True)
+    send_splits = send_splits.to("cpu", non_blocking=True)
+    # TODO(Xin): Overlap D2H copy and index selection.
+    send_idx = idx[perm]
+    send_value = value[perm]
+    # Wait D2H copy finish.
+    torch.cuda.current_stream().synchronize()
     recv_sum = recv_splits.sum()
     recv_splits = recv_splits.tolist()
     send_splits = send_splits.tolist()
 
-    # send idx
+    # Send idx.
     recv_idx = torch.empty((recv_sum,), dtype=idx.dtype, device=idx.device)
-    dist.all_to_all_single(recv_idx, idx[perm], recv_splits, send_splits)
+    dist.all_to_all_single(recv_idx, send_idx, recv_splits, send_splits)
 
-    # send value
+    # Send value.
     recv_value = torch.empty(
         (recv_sum, *value.shape[1:]), dtype=value.dtype, device=value.device
     )
-    dist.all_to_all_single(recv_value, value[perm], recv_splits, send_splits)
+    dist.all_to_all_single(recv_value, send_value, recv_splits, send_splits)
 
     return recv_idx, recv_value
 
@@ -134,24 +144,32 @@ def sparse_all_to_all_pull(req_idx, value, partition):
     perm, req_splits = partition.generate_permutation(req_idx)
     perm = perm.long()
 
-    # get response splits
+    # Get response splits.
     resp_splits = torch.empty_like(req_splits)
     dist.all_to_all_single(resp_splits, req_splits)
+
+    # Use pinned memory to speedup D2H copy.
+    resp_splits = resp_splits.to("cpu", non_blocking=True)
+    req_splits = req_splits.to("cpu", non_blocking=True)
+    # TODO(Xin): Overlap D2H copy and index selection.
+    req_idx = req_idx[perm]
+    # Wait D2H copy finish.
+    torch.cuda.current_stream().synchronize()
     resp_sum = resp_splits.sum()
     resp_splits = resp_splits.tolist()
     req_splits = req_splits.tolist()
 
-    # gather requested indices
+    # Gather requested indices.
     resp_idx = torch.empty(
         (resp_sum,), dtype=req_idx.dtype, device=req_idx.device
     )
-    dist.all_to_all_single(resp_idx, req_idx[perm], resp_splits, req_splits)
+    dist.all_to_all_single(resp_idx, req_idx, resp_splits, req_splits)
 
-    # convert requested indices to local indices depending on partition
+    # Convert requested indices to local indices depending on partition.
     if resp_sum > 0:
         resp_idx = partition.map_to_local(resp_idx)
 
-    # collect the request value
+    # Collect the request value.
     req_value = torch.empty(
         (req_idx.size(0), *value.shape[1:]),
         dtype=value.dtype,
@@ -159,7 +177,7 @@ def sparse_all_to_all_pull(req_idx, value, partition):
     )
     dist.all_to_all_single(req_value, value[resp_idx], req_splits, resp_splits)
 
-    # permute the value back into the requested order
+    # Permute the value back into the requested order.
     return_value = torch.empty_like(req_value)
     return_value[perm] = req_value
 
