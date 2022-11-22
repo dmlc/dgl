@@ -73,7 +73,7 @@ def sp_add(
             "The shape of sparse matrix A {} and"
             " B {} are expected to match".format(A.shape, B.shape)
         )
-        C = A.adj + B.adj
+        C = (A.adj + B.adj).coalesce()
         return SparseMatrix(C.indices()[0], C.indices()[1], C.values(), C.shape)
     raise RuntimeError(
         "Elementwise addition between {} and {} is not "

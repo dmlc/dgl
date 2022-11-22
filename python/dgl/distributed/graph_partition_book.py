@@ -794,7 +794,7 @@ class BasicPartitionBook(GraphPartitionBook):
             DEFAULT_ETYPE,
             DEFAULT_ETYPE[1],
         ), "Base partition book only supports homogeneous graph."
-        return self.canonical_etypes
+        return self.canonical_etypes[0]
 
 
 class RangePartitionBook(GraphPartitionBook):
