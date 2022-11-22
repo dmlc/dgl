@@ -32,17 +32,17 @@ def evaluate(g, pred):
     return val_acc, test_acc
 
 
-def train(g, model, X_sgc):
-    labels = g.ndata["label"]
+def train(g, X_sgc, model):
+    label = g.ndata["label"]
     train_mask = g.ndata["train_mask"]
     optimizer = Adam(model.parameters(), lr=2e-1, weight_decay=5e-6)
 
-    for epoch in range(100):
+    for epoch in range(20):
         # Forward.
         logits = model(X_sgc)
 
         # Compute loss with nodes in the training set.
-        loss = F.cross_entropy(logits[train_mask], labels[train_mask])
+        loss = F.cross_entropy(logits[train_mask], label[train_mask])
 
         # Backward.
         optimizer.zero_grad()
@@ -91,4 +91,4 @@ if __name__ == "__main__":
     model = nn.Linear(in_size, out_size).to(dev)
 
     # Kick off training.
-    train(g, model, X_sgc)
+    train(g, X_sgc, model)
