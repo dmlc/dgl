@@ -204,7 +204,7 @@ target_include_directories(dgl PRIVATE "third_party/METIS/include/")
 target_include_directories(dgl PRIVATE "tensoradapter/include")
 target_include_directories(dgl PRIVATE "third_party/nanoflann/include")
 target_include_directories(dgl PRIVATE "third_party/libxsmm/include")
-
+target_include_directories(dgl PRIVATE "third_party/pcg/include")
 
 # For serialization
 if (USE_HDFS)

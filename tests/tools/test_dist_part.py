@@ -136,9 +136,13 @@ def test_chunk_graph(num_chunks):
                 test_data(sub_dir, feat, data, g.num_edges(c_etype) // num_chunks)
 
 
-def _test_pipeline(num_chunks, num_parts, graph_formats=None):
+def _test_pipeline(num_chunks, num_parts, world_size, graph_formats=None):
     if num_chunks < num_parts:
         # num_parts should less/equal than num_chunks
+        return
+
+    if num_parts % world_size != 0:
+        # num_parts should be a multiple of world_size
         return
 
     with tempfile.TemporaryDirectory() as root_dir:
@@ -161,12 +165,12 @@ def _test_pipeline(num_chunks, num_parts, graph_formats=None):
                 assert isinstance(int(header), int)
 
         # Step2: data dispatch
-        partition_dir = os.path.join(root_dir, "parted_data")
-        out_dir = os.path.join(root_dir, "partitioned")
-        ip_config = os.path.join(root_dir, "ip_config.txt")
-        with open(ip_config, "w") as f:
-            for i in range(num_parts):
-                f.write(f"127.0.0.{i + 1}\n")
+        partition_dir = os.path.join(root_dir, 'parted_data')
+        out_dir = os.path.join(root_dir, 'partitioned')
+        ip_config = os.path.join(root_dir, 'ip_config.txt')
+        with open(ip_config, 'w') as f:
+            for i in range(world_size):
+                f.write(f'127.0.0.{i + 1}\n')
 
         cmd = "python3 tools/dispatch_data.py"
         cmd += f" --in-dir {in_dir}"
@@ -209,15 +213,14 @@ def _test_pipeline(num_chunks, num_parts, graph_formats=None):
             )
 
 
-@pytest.mark.parametrize("num_chunks", [1, 3, 4, 8])
-@pytest.mark.parametrize("num_parts", [1, 3, 4, 8])
-def test_pipeline_basics(num_chunks, num_parts):
-    _test_pipeline(num_chunks, num_parts)
+@pytest.mark.parametrize("num_chunks, num_parts, world_size", [[8, 4, 2], [9, 6, 3], [11, 11, 1], [11, 4, 2], [5, 3, 1]])
+def test_pipeline_basics(num_chunks, num_parts, world_size):
+    _test_pipeline(num_chunks, num_parts, world_size)
 
 
 @pytest.mark.parametrize(
     "graph_formats", [None, "csc", "coo,csc", "coo,csc,csr"]
 )
 def test_pipeline_formats(graph_formats):
-    _test_pipeline(4, 4, graph_formats)
+    _test_pipeline(4, 4, 4, graph_formats)
 
