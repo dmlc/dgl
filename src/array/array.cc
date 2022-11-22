@@ -1,5 +1,5 @@
 /**
- *  Copyright (c) 2019-2021 by Contributors
+ *  Copyright (c) 2019-2022 by Contributors
  * @file array/array.cc
  * @brief DGL array utilities implementation
  */
@@ -23,6 +23,10 @@ namespace aten {
 
 IdArray NewIdArray(int64_t length, DGLContext ctx, uint8_t nbits) {
   return IdArray::Empty({length}, DGLDataType{kDGLInt, nbits, 1}, ctx);
+}
+
+FloatArray NewFloatArray(int64_t length, DGLContext ctx, uint8_t nbits) {
+  return FloatArray::Empty({length}, DGLDataType{kDGLFloat, nbits, 1}, ctx);
 }
 
 IdArray Clone(IdArray arr) {
@@ -536,6 +540,22 @@ CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries) {
   return ret;
 }
 
+std::pair<COOMatrix, FloatArray> CSRLaborSampling(
+    CSRMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob,
+    int importance_sampling, IdArray random_seed, IdArray NIDs) {
+  std::pair<COOMatrix, FloatArray> ret;
+  ATEN_CSR_SWITCH_CUDA_UVA(mat, rows, XPU, IdType, "CSRLaborSampling", {
+    const auto dtype = IsNullArray(prob)
+                           ? DGLDataTypeTraits<float>::dtype
+                           : prob->dtype;
+    ATEN_FLOAT_TYPE_SWITCH(dtype, FloatType, "probability", {
+      ret = impl::CSRLaborSampling<XPU, IdType, FloatType>(
+          mat, rows, num_samples, prob, importance_sampling, random_seed, NIDs);
+    });
+  });
+  return ret;
+}
+
 COOMatrix CSRRowWiseSampling(
     CSRMatrix mat, IdArray rows, int64_t num_samples, NDArray prob_or_mask,
     bool replace) {
@@ -790,6 +810,22 @@ COOMatrix COORemove(COOMatrix coo, IdArray entries) {
   COOMatrix ret;
   ATEN_COO_SWITCH(coo, XPU, IdType, "COORemove", {
     ret = impl::COORemove<XPU, IdType>(coo, entries);
+  });
+  return ret;
+}
+
+std::pair<COOMatrix, FloatArray> COOLaborSampling(
+    COOMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob,
+    int importance_sampling, IdArray random_seed, IdArray NIDs) {
+  std::pair<COOMatrix, FloatArray> ret;
+  ATEN_COO_SWITCH(mat, XPU, IdType, "COOLaborSampling", {
+    const auto dtype = IsNullArray(prob)
+                           ? DGLDataTypeTraits<float>::dtype
+                           : prob->dtype;
+    ATEN_FLOAT_TYPE_SWITCH(dtype, FloatType, "probability", {
+      ret = impl::COOLaborSampling<XPU, IdType, FloatType>(
+          mat, rows, num_samples, prob, importance_sampling, random_seed, NIDs);
+    });
   });
   return ret;
 }
