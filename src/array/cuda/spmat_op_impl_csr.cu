@@ -606,9 +606,12 @@ CSRMatrix CSRSliceMatrix(
   // memory overhead is not significant (less than 31MB) at a low load factor.
   int64_t buffer_size = _UpPower(new_ncols) * 2;
   IdArray hashmap_buffer = Full(-1, buffer_size, nbits, ctx);
+
   using it = thrust::counting_iterator<int64_t>;
+  runtime::CUDAWorkspaceAllocator allocator(ctx);
+  const auto exec_policy = thrust::cuda::par_nosync(allocator).on(stream);
   thrust::for_each(
-      thrust::device.on(stream), it(0), it(new_ncols),
+      exec_policy, it(0), it(new_ncols),
       [key = cols.Ptr<IdType>(), buffer = hashmap_buffer.Ptr<IdType>(),
        buffer_size] __device__(int64_t i) {
         NodeQueryHashmap<IdType> hashmap(buffer, buffer_size);
