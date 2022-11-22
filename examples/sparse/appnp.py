@@ -40,6 +40,7 @@ class APPNP(nn.Module):
         for _ in range(self.num_hops):
             A.val = self.A_dropout(A_val_0)
             Z = (1 - self.alpha) * A @ Z + self.alpha * Z_0
+        # Reset A.val to avoid value corruption.
         A.val = A_val_0
         return Z
 
@@ -55,18 +56,18 @@ def evaluate(g, pred):
     return val_acc, test_acc
 
 
-def train(g, model, A, X):
-    labels = g.ndata["label"]
+def train(g, A_hat, X, model):
+    label = g.ndata["label"]
     train_mask = g.ndata["train_mask"]
     optimizer = Adam(model.parameters(), lr=1e-2, weight_decay=5e-4)
 
     for epoch in range(50):
         # Forward.
         model.train()
-        logits = model(A, X)
+        logits = model(A_hat, X)
 
         # Compute loss with nodes in training set.
-        loss = F.cross_entropy(logits[train_mask], labels[train_mask])
+        loss = F.cross_entropy(logits[train_mask], label[train_mask])
 
         # Backward.
         optimizer.zero_grad()
@@ -75,7 +76,7 @@ def train(g, model, A, X):
 
         # Compute prediction.
         model.eval()
-        logits = model(A, X)
+        logits = model(A_hat, X)
         pred = logits.argmax(dim=1)
 
         # Evaluate the prediction.
@@ -113,4 +114,4 @@ if __name__ == "__main__":
     model = APPNP(in_size, out_size).to(dev)
 
     # Kick off training.
-    train(g, model, A_hat, X)
+    train(g, A_hat, X, model)
