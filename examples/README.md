@@ -247,6 +247,10 @@ To quickly locate the examples of your interest, search for the tagged keywords 
     - Example code: [pytorch](../examples/pytorch/dtgrnn)
     - Tags: Static discrete temporal graph, traffic forecasting
 
+- <a name="hgnn"></a> Feng et al. Hypergraph Neural Networks. [Paper link](https://arxiv.org/abs/1809.09401).
+    - Example code: [pytorch](../examples/sparse/hgnn)
+    - Tags: hypergraph
+
 ## 2017
 
 - <a name="gcn"></a> Kipf and Welling. Semi-Supervised Classification with Graph Convolutional Networks. [Paper link](https://arxiv.org/abs/1609.02907). 

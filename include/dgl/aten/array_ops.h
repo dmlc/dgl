@@ -48,6 +48,17 @@ IdArray NewIdArray(
     uint8_t nbits = 64);
 
 /**
+ * @brief Create a new float array with given length
+ * @param length The array length
+ * @param ctx The array context
+ * @param nbits The number of integer bits
+ * @return float array
+ */
+FloatArray NewFloatArray(int64_t length,
+                   DGLContext ctx = DGLContext{kDGLCPU, 0},
+                   uint8_t nbits = 32);
+
+/**
  * @brief Create a new id array using the given vector data
  * @param vec The vector data
  * @param nbits The integer bits of the returned array

@@ -1,6 +1,6 @@
 
 /**
- *  Copyright (c) 2020 by Contributors
+ *  Copyright (c) 2020-2022 by Contributors
  * @file dgl/aten/coo.h
  * @brief Common COO operations required by DGL.
  */
@@ -378,6 +378,66 @@ COOMatrix COORemove(COOMatrix coo, IdArray entries);
  */
 COOMatrix COOReorder(
     COOMatrix coo, runtime::NDArray new_row_ids, runtime::NDArray new_col_ids);
+
+/**
+ * @brief Randomly select a fixed number of non-zero entries along each given
+ * row using arXiv:2210.13339, Labor sampling.
+ *
+ * The picked indices are returned in the form of a COO matrix.
+ * 
+ * The passed random_seed makes it so that for any seed vertex s and its
+ * neighbor t, the rolled random variate r_t is the same for any call to this
+ * function with the same random seed. When sampling as part of the same batch,
+ * one would want identical seeds so that LABOR can globally sample. One example
+ * is that for heterogenous graphs, there is a single random seed passed for
+ * each edge type. This will sample much fewer vertices compared to having
+ * unique random seeds for each edge type. If one called this function
+ * individually for each edge type for a heterogenous graph with different
+ * random seeds, then it would run LABOR locally for each edge type, resulting
+ * into a larger number of vertices being sampled.
+ *
+ * If this function is called without a random_seed, we get the random seed by
+ * getting a random number from DGL.
+ *
+ *
+ * Examples:
+ *
+ * // coo.num_rows = 4;
+ * // coo.num_cols = 4;
+ * // coo.rows = [0, 0, 1, 3, 3]
+ * // coo.cols = [0, 1, 1, 2, 3]
+ * // coo.data = [2, 3, 0, 1, 4]
+ * COOMatrix coo = ...;
+ * IdArray rows = ... ; // [1, 3]
+ * COOMatrix sampled = COOLaborSampling(coo, rows, 2, NullArray(), 0 \
+ *     , NullArray(), NullArray());
+ * // possible sampled coo matrix:
+ * // sampled.num_rows = 4
+ * // sampled.num_cols = 4
+ * // sampled.rows = [1, 3, 3]
+ * // sampled.cols = [1, 2, 3]
+ * // sampled.data = [3, 0, 4]
+ *
+ * @param mat Input coo matrix.
+ * @param rows Rows to sample from.
+ * @param num_samples Number of samples using labor sampling
+ * @param prob Probability array for nonuniform sampling
+ * @param importance_sampling Whether to enable importance sampling
+ * @param random_seed The random seed for the sampler
+ * @param NIDs global nids if sampling from a subgraph
+ * @return A pair of COOMatrix storing the picked row and col indices and edge
+ *         weights if importance_sampling != 0 or prob argument was passed.
+ *         Its data field stores the the index of the picked elements in the
+ *         value array.
+ */
+std::pair<COOMatrix, FloatArray> COOLaborSampling(
+    COOMatrix mat,
+    IdArray rows,
+    int64_t num_samples,
+    FloatArray prob = NullArray(),
+    int importance_sampling = 0,
+    IdArray random_seed = NullArray(),
+    IdArray NIDs = NullArray());
 
 /**
  * @brief Randomly select a fixed number of non-zero entries along each given
