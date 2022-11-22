@@ -8,6 +8,7 @@ gives a holistic explanation on how different components work together.
 from .randomwalks import *
 from .pinsage import *
 from .neighbor import *
+from .labor import *
 from .node2vec_randomwalk import *
 from .negative import *
 from . import utils

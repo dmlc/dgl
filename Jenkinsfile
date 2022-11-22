@@ -65,7 +65,7 @@ def unit_test_linux(backend, dev) {
 def unit_distributed_linux(backend, dev) {
   init_git()
   unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
-  timeout(time: 30, unit: 'MINUTES') {
+  timeout(time: 40, unit: 'MINUTES') {
     sh "bash tests/scripts/task_distributed_test.sh ${backend} ${dev}"
   }
 }
