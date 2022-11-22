@@ -8,6 +8,7 @@ import pytest
 import torch
 from chunk_graph import chunk_graph
 from create_chunked_dataset import create_chunked_dataset
+from utils import array_readwriter
 
 import dgl
 from dgl.data.utils import load_graphs, load_tensors
@@ -80,11 +81,12 @@ def _verify_graph_feats(
 
 
 @pytest.mark.parametrize("num_chunks", [1, 8])
-def test_chunk_graph(num_chunks):
+@pytest.mark.parametrize("data_fmt", ['numpy', 'parquet'])
+def test_chunk_graph(num_chunks, data_fmt):
 
     with tempfile.TemporaryDirectory() as root_dir:
 
-        g = create_chunked_dataset(root_dir, num_chunks)
+        g = create_chunked_dataset(root_dir, num_chunks, data_fmt=data_fmt)
 
         # check metadata.json
         output_dir = os.path.join(root_dir, "chunked-data")
@@ -111,12 +113,16 @@ def test_chunk_graph(num_chunks):
                     assert isinstance(int(num2), int)
 
         # check node/edge_data
+        suffix = 'npy' if data_fmt=='numpy' else 'parquet'
+        reader_fmt_meta = {"name": data_fmt}
         def test_data(sub_dir, feat, expected_data, expected_shape):
             data = []
             for i in range(num_chunks):
-                fname = os.path.join(sub_dir, f'{feat}-{i}.npy')
+                fname = os.path.join(sub_dir, f'{feat}-{i}.{suffix}')
                 assert os.path.isfile(fname)
-                feat_array = np.load(fname)
+                feat_array =  array_readwriter.get_array_parser(
+                            **reader_fmt_meta
+                        ).read(fname)
                 assert feat_array.shape[0] == expected_shape
                 data.append(feat_array)
             data = np.concatenate(data, 0)
@@ -136,14 +142,14 @@ def test_chunk_graph(num_chunks):
                 test_data(sub_dir, feat, data, g.num_edges(c_etype) // num_chunks)
 
 
-def _test_pipeline(num_chunks, num_parts, graph_formats=None):
+def _test_pipeline(num_chunks, num_parts, graph_formats=None, data_fmt='numpy'):
     if num_chunks < num_parts:
         # num_parts should less/equal than num_chunks
         return
 
     with tempfile.TemporaryDirectory() as root_dir:
 
-        g = create_chunked_dataset(root_dir, num_chunks)
+        g = create_chunked_dataset(root_dir, num_chunks, data_fmt=data_fmt)
 
         # Step1: graph partition
         in_dir = os.path.join(root_dir, "chunked-data")
@@ -211,8 +217,9 @@ def _test_pipeline(num_chunks, num_parts, graph_formats=None):
 
 @pytest.mark.parametrize("num_chunks", [1, 3, 4, 8])
 @pytest.mark.parametrize("num_parts", [1, 3, 4, 8])
-def test_pipeline_basics(num_chunks, num_parts):
-    _test_pipeline(num_chunks, num_parts)
+@pytest.mark.parametrize("data_fmt", ['numpy', 'parquet'])
+def test_pipeline_basics(num_chunks, num_parts, data_fmt):
+    _test_pipeline(num_chunks, num_parts, data_fmt=data_fmt)
 
 
 @pytest.mark.parametrize(
