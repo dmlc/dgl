@@ -1519,15 +1519,17 @@ def test_hgt(idtype, in_size, num_heads):
     train_idx = th.randint(0, 100, (10, ), dtype = idtype)
     sampler = dgl.dataloading.NeighborSampler([-1])
     train_loader = dgl.dataloading.DataLoader(g, train_idx.to(dev), sampler,
-                                            batch_size=8, device=dev,
+                                            batch_size=7, device=dev,
                                             shuffle=True)
     (input_nodes, output_nodes, block) = next(iter(train_loader))
     block = block[0]
-    x = x[input_nodes.to(th.long)]
-    ntype = ntype[input_nodes.to(th.long)]
+    input_x = x[input_nodes.to(th.long)]
+    output_x = x[output_nodes.to(th.long)]
+    input_ntype = ntype[input_nodes.to(th.long)]
+    output_ntype = ntype[output_nodes.to(th.long)]
     edge = block.edata[dgl.EID]
     etype = etype[edge.to(th.long)]
-    y = m(block, x, ntype, etype)
+    y = m(block, [input_x, output_x], [input_ntype, output_ntype], etype)
     assert y.shape == (block.number_of_dst_nodes(), head_size * num_heads)
     # TODO(minjie): enable the following check
     #assert th.allclose(y, sorted_y[rev_idx], atol=1e-4, rtol=1e-4)
