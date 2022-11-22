@@ -4,6 +4,7 @@
  * @brief CSR operator CPU implementation
  */
 #include <dgl/array.h>
+#include <thrust/execution_policy.h>
 #include <thrust/for_each.h>
 
 #include <numeric>
@@ -607,7 +608,7 @@ CSRMatrix CSRSliceMatrix(
   IdArray hashmap_buffer = Full(-1, buffer_size, nbits, ctx);
   using it = thrust::counting_iterator<int64_t>;
   thrust::for_each(
-      it(0), it(new_ncols),
+      thrust::device.on(stream), it(0), it(new_ncols),
       [key = cols.Ptr<IdType>(), buffer = hashmap_buffer.Ptr<IdType>(),
        buffer_size] __device__(int64_t i) {
         NodeQueryHashmap<IdType> hashmap(buffer, buffer_size);
