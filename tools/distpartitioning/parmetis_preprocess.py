@@ -11,7 +11,7 @@ import torch
 import torch.distributed as dist
 
 import constants
-from utils import get_idranges, get_node_types, read_json
+from data_utils import get_idranges, get_node_types, read_json
 
 
 def get_proc_info():

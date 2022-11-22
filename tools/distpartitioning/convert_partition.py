@@ -13,7 +13,7 @@ import torch as th
 from pyarrow import csv
 
 import constants
-from utils import get_idranges, memory_snapshot, read_json
+from data_utils import get_idranges, memory_snapshot, read_json
 from dgl.distributed.partition import (
     RESERVED_FIELD_DTYPE,
     _etype_str_to_tuple,

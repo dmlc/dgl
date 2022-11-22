@@ -7,7 +7,7 @@ import torch
 import constants
 from dist_lookup import DistLookupService
 from gloo_wrapper import allgather_sizes, alltoallv_cpu
-from utils import memory_snapshot
+from data_utils import memory_snapshot
 
 
 def get_shuffle_global_nids(rank, world_size, global_nids_ranks, node_data):
