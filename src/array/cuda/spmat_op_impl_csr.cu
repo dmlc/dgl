@@ -430,7 +430,8 @@ int64_t _UpPower(int64_t numel) {
 }
 
 /**
- * @brief Thomas Wang's 32 bit Mix Function
+ * @brief Thomas Wang's 32 bit Mix Function.
+ * Source link: https://gist.github.com/badboy/6267743
  */
 __device__ inline uint32_t _Hash32Shift(uint32_t key) {
   key = ~key + (key << 15);
@@ -443,7 +444,8 @@ __device__ inline uint32_t _Hash32Shift(uint32_t key) {
 }
 
 /**
- * @brief Thomas Wang's 64 bit Mix Function
+ * @brief Thomas Wang's 64 bit Mix Function.
+ * Source link: https://gist.github.com/badboy/6267743
  */
 __device__ inline uint64_t _Hash64Shift(uint64_t key) {
   key = (~key) + (key << 21);
@@ -457,16 +459,19 @@ __device__ inline uint64_t _Hash64Shift(uint64_t key) {
 }
 
 /**
- * @brief A hashmap designed for CSRSliceMatrix, similar in function to set,
- * Insert api inserts an element, Query api queries if an element is in the
- * hashmap. For performance, it can only be created and called in the cuda
- * kernel.
+ * @brief A hashmap designed for CSRSliceMatrix, similar in function to set. For
+ * performance, it can only be created and called in the cuda kernel.
  */
 template <typename IdType>
 struct NodeQueryHashmap {
   __device__ inline NodeQueryHashmap(IdType* Kptr, size_t numel)
       : kptr_(Kptr), capacity_(numel) {}
 
+  /**
+   * @brief Insert a key. It must be called by cuda threads.
+   *
+   * @param key The key to be inserted.
+   */
   __device__ inline void Insert(IdType key) {
     uint32_t delta = 1;
     uint32_t pos = Hash(key);
@@ -478,6 +483,13 @@ struct NodeQueryHashmap {
     }
   }
 
+  /**
+   * @brief Check whether a key exists within the hashtable. It must be called
+   * by cuda threads.
+   *
+   * @param key The key to check for.
+   * @return True if the key exists in the hashtable.
+   */
   __device__ inline bool Query(IdType key) {
     uint32_t delta = 1;
     uint32_t pos = Hash(key);
@@ -514,6 +526,11 @@ struct NodeQueryHashmap {
 /**
  * @brief Generate a 0-1 mask for each index whose column is in the provided
  * hashmap. It also counts the number of masked values per row.
+ *
+ * @tparam IdType The ID type used for matrices.
+ * @tparam WARP_SIZE The number of cuda threads in a cuda warp.
+ * @tparam BLOCK_WARPS The number of warps in a cuda block.
+ * @tparam TILE_SIZE The number of rows covered by each threadblock.
  */
 template <typename IdType, int WARP_SIZE, int BLOCK_WARPS, int TILE_SIZE>
 __global__ void _SegmentMaskColKernel(
@@ -609,12 +626,15 @@ CSRMatrix CSRSliceMatrix(
   // Execute SegmentMaskColKernel
   const int64_t num_rows = csr.num_rows;
   constexpr int WARP_SIZE = 32;
-  constexpr int BLOCK_WARP = 256 / WARP_SIZE;
+  // With a simple fine-tuning, TILE_SIZE=16 gives a good performance.
   constexpr int TILE_SIZE = 16;
-  const dim3 nthrs(WARP_SIZE, BLOCK_WARP);
-  const dim3 nblks((num_rows + TILE_SIZE - 1) / TILE_SIZE);
+  constexpr int BLOCK_WARPS = CUDA_MAX_NUM_THREADS / WARP_SIZE;
+  IdType nb =
+      dgl::cuda::FindNumBlocks<'x'>((num_rows + TILE_SIZE - 1) / TILE_SIZE);
+  const dim3 nthrs(WARP_SIZE, BLOCK_WARPS);
+  const dim3 nblks(nb);
   CUDA_KERNEL_CALL(
-      (_SegmentMaskColKernel<IdType, WARP_SIZE, BLOCK_WARP, TILE_SIZE>), nblks,
+      (_SegmentMaskColKernel<IdType, WARP_SIZE, BLOCK_WARPS, TILE_SIZE>), nblks,
       nthrs, 0, stream, indptr_data, indices_data, num_rows,
       hashmap_buffer.Ptr<IdType>(), buffer_size, mask.Ptr<IdType>(),
       count.Ptr<IdType>());
