@@ -75,7 +75,7 @@ def test_query():
         assert set(F.asnumpy(g.predecessors(9))) == set([0,5,7,4])
         assert set(F.asnumpy(g.successors(2))) == set([7,3])
 
-        assert g.edge_id(4,4) == 5
+        assert g.edge_ids(4,4) == 5
         assert F.allclose(g.edge_ids([4,0], [4,9]), F.tensor([5,0]))
 
         src, dst = g.find_edges([3, 6, 5])
@@ -149,7 +149,7 @@ def test_query():
         # src = [0 0 0 1 1 2 2 3 3 4 4 4 4 5 5 6 7 7 7 9]
         # dst = [4 6 9 3 5 3 7 5 8 1 3 4 9 1 9 6 2 8 9 2]
         # eid = [0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9]
-        assert g.edge_id(4,4) == 11
+        assert g.edge_ids(4,4) == 11
         assert F.allclose(g.edge_ids([4,0], [4,9]), F.tensor([11,2]))
 
         src, dst = g.find_edges([3, 6, 5])
@@ -205,17 +205,17 @@ def test_query():
         g = gen_by_mutation()
         eids = g.edge_ids([4,0], [4,9])
         assert eids.shape[0] == 2
-        eid = g.edge_id(4, 4)
+        eid = g.edge_ids(4, 4)
         assert isinstance(eid, numbers.Number)
         with pytest.raises(DGLError):
             eids = g.edge_ids([9,0], [4,9])
 
         with pytest.raises(DGLError):
-            eid = g.edge_id(4, 5)
+            eid = g.edge_ids(4, 5)
 
         g.add_edge(0, 4)
         eids = g.edge_ids([0,0], [4,9])
-        eid = g.edge_id(0, 4)
+        eid = g.edge_ids(0, 4)
 
     _test(gen_by_mutation())
     _test(gen_from_data(elist_input(), False, False))
@@ -326,7 +326,7 @@ def test_hypersparse_query():
         assert g.has_node(i)
         assert i in g
     assert not g.has_node(1000002)
-    assert g.edge_id(0, 1) == 0
+    assert g.edge_ids(0, 1) == 0
     src, dst = g.find_edges([0])
     src, dst, eid = g.in_edges(1, form='all')
     src, dst, eid = g.out_edges(0, form='all')
