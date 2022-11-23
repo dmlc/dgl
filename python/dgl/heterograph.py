@@ -2682,12 +2682,6 @@ class DGLGraph(object):
         """
         return self._graph.dtype
 
-    def __contains__(self, vid):
-        """**DEPRECATED**: please directly call :func:`has_nodes`."""
-        dgl_warning('DGLGraph.__contains__ is deprecated.'
-                    ' Please directly call has_nodes.')
-        return self.has_nodes(vid)
-
     def has_nodes(self, vid, ntype=None):
         """Return whether the graph contains the given nodes.
 
