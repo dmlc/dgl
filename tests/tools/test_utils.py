@@ -2,7 +2,7 @@ import tempfile
 import os
 import pytest
 import numpy as np
-from utils import array_readwriter
+from distpartitioning import array_readwriter
 
 @pytest.mark.parametrize("shape", [[500], [300,10], [200,5,5], [100,5,5,5]])
 @pytest.mark.parametrize("format", ['numpy', 'parquet'])

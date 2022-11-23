@@ -10,7 +10,7 @@ import pyarrow
 import pyarrow.csv as csv
 
 import constants
-from data_utils import get_idranges, get_node_types, read_json
+from utils import get_idranges, get_node_types, read_json
 
 
 def post_process(params):

@@ -1,18 +1,19 @@
 import json
 import logging
 import os
+from contextlib import contextmanager
 
-import dgl
+import constants
 import numpy as np
 import psutil
 import pyarrow
 import torch
+from numpy.lib.format import open_memmap
 from pyarrow import csv
 
-import constants
-from dgl.distributed.partition import (
-    _dump_part_config
-)
+import dgl
+from dgl.distributed.partition import _dump_part_config
+
 
 def read_ntype_partition_files(schema_map, input_dir):
     """

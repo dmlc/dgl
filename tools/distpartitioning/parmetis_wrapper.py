@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 import constants
-from data_utils import read_json
+from utils import read_json
 
 
 def check_dependencies():

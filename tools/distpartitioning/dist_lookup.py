@@ -7,7 +7,7 @@ import copy
 
 from pyarrow import csv
 from gloo_wrapper import alltoallv_cpu
-from data_utils import map_partid_rank
+from utils import map_partid_rank
 
 
 class DistLookupService:

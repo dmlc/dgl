@@ -6,7 +6,8 @@ import pathlib
 from contextlib import contextmanager
 
 import torch
-from utils import array_readwriter, setdir
+from distpartitioning import array_readwriter
+from files import setdir
 
 import dgl
 

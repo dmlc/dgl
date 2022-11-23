@@ -8,17 +8,14 @@ import pytest
 import torch
 from chunk_graph import chunk_graph
 from create_chunked_dataset import create_chunked_dataset
-from utils import array_readwriter
+from distpartitioning import array_readwriter
 
 import dgl
 from dgl.data.utils import load_graphs, load_tensors
-from dgl.distributed.partition import (
-    RESERVED_FIELD_DTYPE,
-    load_partition,
-    _get_inner_node_mask,
-    _get_inner_edge_mask,
-    _etype_tuple_to_str,
-)
+from dgl.distributed.partition import (RESERVED_FIELD_DTYPE,
+                                       _etype_tuple_to_str,
+                                       _get_inner_edge_mask,
+                                       _get_inner_node_mask, load_partition)
 
 
 def _verify_partition_data_types(part_g):

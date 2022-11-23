@@ -5,10 +5,10 @@ import numpy as np
 import pyarrow
 import torch
 from pyarrow import csv
-from utils import array_readwriter
+import array_readwriter
 
 import constants
-from data_utils import get_idranges, map_partid_rank
+from utils import get_idranges, map_partid_rank
 
 
 def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):

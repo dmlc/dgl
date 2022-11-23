@@ -20,7 +20,7 @@ from globalids import (assign_shuffle_global_nids_edges,
                        assign_shuffle_global_nids_nodes,
                        lookup_shuffle_global_nids_edges)
 from gloo_wrapper import allgather_sizes, alltoallv_cpu, gather_metadata_json
-from data_utils import (augment_edge_data, get_edge_types, get_etype_featnames,
+from utils import (augment_edge_data, get_edge_types, get_etype_featnames,
                    get_gnid_range_map, get_idranges, get_node_types,
                    get_ntype_featnames, memory_snapshot, read_json,
                    read_ntype_partition_files, write_dgl_objects,
