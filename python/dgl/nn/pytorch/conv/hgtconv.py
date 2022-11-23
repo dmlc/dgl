@@ -123,10 +123,10 @@ class HGTConv(nn.Module):
         ----------
         g : DGLGraph
             The input graph.
-        x : torch.Tensor
-            A 2D tensor of node features. Shape: :math:`(|V|, D_{in})`.
-        ntype : torch.Tensor
-            An 1D integer tensor of node types. Shape: :math:`(|V|,)`.
+        x : [torch.Tensor]
+            A list of 2D tensor of node features. Shape: :math:`(|V|, D_{in})`.
+        ntype : [torch.Tensor]
+            A list of 1D integer tensor of node types. Shape: :math:`(|V|,)`.
         etype : torch.Tensor
             An 1D integer tensor of edge types. Shape: :math:`(|E|,)`.
         presorted : bool, optional
@@ -142,26 +142,15 @@ class HGTConv(nn.Module):
         """
         self.presorted = presorted
         with g.local_scope():
-            if isinstance(ntype, list):
-                k = self.linear_k(x[0], ntype[0], presorted).view(
-                    -1, self.num_heads, self.head_size
-                )
-                q = self.linear_q(x[1], ntype[1], presorted).view(
-                    -1, self.num_heads, self.head_size
-                )
-                v = self.linear_v(x[0], ntype[0], presorted).view(
-                    -1, self.num_heads, self.head_size
-                )
-            else:
-                k = self.linear_k(x, ntype, presorted).view(
-                    -1, self.num_heads, self.head_size
-                )
-                q = self.linear_q(x, ntype, presorted).view(
-                    -1, self.num_heads, self.head_size
-                )
-                v = self.linear_v(x, ntype, presorted).view(
-                    -1, self.num_heads, self.head_size
-                )
+            k = self.linear_k(x[0], ntype[0], presorted).view(
+                -1, self.num_heads, self.head_size
+            )
+            q = self.linear_q(x[-1], ntype[-1], presorted).view(
+                -1, self.num_heads, self.head_size
+            )
+            v = self.linear_v(x[0], ntype[0], presorted).view(
+                -1, self.num_heads, self.head_size
+            )
 
             g.srcdata["k"] = k
             g.dstdata["q"] = q
@@ -177,26 +166,15 @@ class HGTConv(nn.Module):
             h = g.dstdata["h"].view(-1, self.num_heads * self.head_size)
 
             # target-specific aggregation
-            if isinstance(ntype, list):
-                h = self.drop(self.linear_a(h, ntype[1], presorted))
-            else:
-                h = self.drop(self.linear_a(h, ntype, presorted))
+            h = self.drop(self.linear_a(h, ntype[-1], presorted))
 
-            alpha = torch.sigmoid(self.skip[ntype[1]]).unsqueeze(-1)
-            if isinstance(ntype, list):
-                if x[1].shape != h.shape:
-                    h = h * alpha + (x[1] @ self.residual_w) * (1 - alpha)
-                else:
-                    h = h * alpha + x[1] * (1 - alpha)
-                if self.use_norm:
-                    h = self.norm(h)
+            alpha = torch.sigmoid(self.skip[ntype[-1]]).unsqueeze(-1)
+            if x[-1].shape != h.shape:
+                h = h * alpha + (x[-1] @ self.residual_w) * (1 - alpha)
             else:
-                if x.shape != h.shape:
-                    h = h * alpha + (x @ self.residual_w) * (1 - alpha)
-                else:
-                    h = h * alpha + x * (1 - alpha)
-                if self.use_norm:
-                    h = self.norm(h)
+                h = h * alpha + x[-1] * (1 - alpha)
+            if self.use_norm:
+                h = self.norm(h)
             return h
 
     def message(self, edges):
