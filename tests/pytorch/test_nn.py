@@ -1528,7 +1528,7 @@ def test_hgt(idtype, in_size, num_heads):
     ntype = ntype[input_nodes.to(th.long)]
     edge = block.edata[dgl.EID]
     etype = etype[edge.to(th.long)]
-    if x[:block.num_dst_nodes()].size() == batch_size:
+    if block.number_of_dst_nodes() == batch_size:
         y = m(block, x, ntype, etype)
         assert y.shape == (block.number_of_dst_nodes(), head_size * num_heads)
     # TODO(minjie): enable the following check
