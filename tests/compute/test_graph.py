@@ -61,16 +61,16 @@ def test_query():
         assert g.number_of_edges() == 20
 
         for i in range(10):
-            assert g.has_node(i)
+            assert g.has_nodes(i)
             assert i in g
-        assert not g.has_node(11)
+        assert not g.has_nodes(11)
         assert not 11 in g
         assert F.allclose(g.has_nodes([0,2,10,11]), F.tensor([1,1,0,0]))
 
         src, dst = edge_pair_input()
         for u, v in zip(src, dst):
-            assert g.has_edge_between(u, v)
-        assert not g.has_edge_between(0, 0)
+            assert g.has_edges_between(u, v)
+        assert not g.has_edges_between(0, 0)
         assert F.allclose(g.has_edges_between([0, 0, 3], [0, 9, 8]), F.tensor([0,1,1]))
         assert set(F.asnumpy(g.predecessors(9))) == set([0,5,7,4])
         assert set(F.asnumpy(g.successors(2))) == set([7,3])
@@ -110,11 +110,11 @@ def test_query():
         assert set(tup) == set(t_tup)
         assert list(F.asnumpy(src)) == sorted(list(F.asnumpy(src)))
 
-        assert g.in_degree(0) == 0
-        assert g.in_degree(9) == 4
+        assert g.in_degrees(0) == 0
+        assert g.in_degrees(9) == 4
         assert F.allclose(g.in_degrees([0, 9]), F.tensor([0, 4]))
-        assert g.out_degree(8) == 0
-        assert g.out_degree(9) == 1
+        assert g.out_degrees(8) == 0
+        assert g.out_degrees(9) == 1
         assert F.allclose(g.out_degrees([8, 9]), F.tensor([0, 1]))
 
         assert np.array_equal(
@@ -132,16 +132,16 @@ def test_query():
         assert g.number_of_edges() == 20
 
         for i in range(10):
-            assert g.has_node(i)
+            assert g.has_nodes(i)
             assert i in g
-        assert not g.has_node(11)
+        assert not g.has_nodes(11)
         assert not 11 in g
         assert F.allclose(g.has_nodes([0,2,10,11]), F.tensor([1,1,0,0]))
 
         src, dst = edge_pair_input(sort=True)
         for u, v in zip(src, dst):
-            assert g.has_edge_between(u, v)
-        assert not g.has_edge_between(0, 0)
+            assert g.has_edges_between(u, v)
+        assert not g.has_edges_between(0, 0)
         assert F.allclose(g.has_edges_between([0, 0, 3], [0, 9, 8]), F.tensor([0,1,1]))
         assert set(F.asnumpy(g.predecessors(9))) == set([0,5,7,4])
         assert set(F.asnumpy(g.successors(2))) == set([7,3])
@@ -184,11 +184,11 @@ def test_query():
         assert set(tup) == set(t_tup)
         assert list(F.asnumpy(src)) == sorted(list(F.asnumpy(src)))
 
-        assert g.in_degree(0) == 0
-        assert g.in_degree(9) == 4
+        assert g.in_degrees(0) == 0
+        assert g.in_degrees(9) == 4
         assert F.allclose(g.in_degrees([0, 9]), F.tensor([0, 4]))
-        assert g.out_degree(8) == 0
-        assert g.out_degree(9) == 1
+        assert g.out_degrees(8) == 0
+        assert g.out_degrees(9) == 1
         assert F.allclose(g.out_degrees([8, 9]), F.tensor([0, 1]))
 
         assert np.array_equal(
@@ -323,18 +323,18 @@ def test_hypersparse_query():
     g.add_nodes(1000001)
     g.add_edges([0], [1])
     for i in range(10):
-        assert g.has_node(i)
+        assert g.has_nodes(i)
         assert i in g
-    assert not g.has_node(1000002)
+    assert not g.has_nodes(1000002)
     assert g.edge_id(0, 1) == 0
     src, dst = g.find_edges([0])
     src, dst, eid = g.in_edges(1, form='all')
     src, dst, eid = g.out_edges(0, form='all')
     src, dst = g.edges()
-    assert g.in_degree(0) == 0
-    assert g.in_degree(1) == 1
-    assert g.out_degree(0) == 1
-    assert g.out_degree(1) == 0
+    assert g.in_degrees(0) == 0
+    assert g.in_degrees(1) == 1
+    assert g.out_degrees(0) == 1
+    assert g.out_degrees(1) == 0
 
 def test_empty_data_initialized():
     g = dgl.DGLGraph()
