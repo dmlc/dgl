@@ -1,9 +1,6 @@
 """
-[SIGN: Scalable Inception Graph Neural Networks]
-(https://arxiv.org/abs/2004.11198)
-
-This example shows a simplified version of SIGN: a precomputed 2-hops diffusion
-operator on top of symmetrically normalized adjacency matrix A_hat.
+[Simplifying Graph Convolutional Networks]
+(https://arxiv.org/abs/1902.07153)
 """
 
 import torch
@@ -16,34 +13,12 @@ from torch.optim import Adam
 
 ################################################################################
 # (HIGHLIGHT) Take the advantage of DGL sparse APIs to implement the feature
-# diffusion in SIGN laconically.
+# pre-computation.
 ################################################################################
-def sign_diffusion(A, X, r):
-    # Perform the r-hop diffusion operation.
-    X_sign = [X]
-    for _ in range(r):
+def pre_compute(A, X, k):
+    for _ in range(k):
         X = A @ X
-        X_sign.append(X)
-    return X_sign
-
-
-class SIGN(nn.Module):
-    def __init__(self, in_size, out_size, r, hidden_size=256):
-        super().__init__()
-        # Note that theta and omega refer to the learnable matrices in the
-        # original paper correspondingly. The variable r refers to subscript to
-        # theta.
-        self.theta = nn.ModuleList(
-            [nn.Linear(in_size, hidden_size) for _ in range(r + 1)]
-        )
-        self.omega = nn.Linear(hidden_size * (r + 1), out_size)
-
-    def forward(self, X_sign):
-        results = []
-        for i in range(len(X_sign)):
-            results.append(self.theta[i](X_sign[i]))
-        Z = F.relu(torch.cat(results, dim=1))
-        return self.omega(Z)
+    return X
 
 
 def evaluate(g, pred):
@@ -57,19 +32,16 @@ def evaluate(g, pred):
     return val_acc, test_acc
 
 
-def train(g, X_sign, model):
+def train(g, X_sgc, model):
     label = g.ndata["label"]
     train_mask = g.ndata["train_mask"]
-    optimizer = Adam(model.parameters(), lr=3e-3)
+    optimizer = Adam(model.parameters(), lr=2e-1, weight_decay=5e-6)
 
-    for epoch in range(10):
-        # Switch the model to training mode.
-        model.train()
-
+    for epoch in range(20):
         # Forward.
-        logits = model(X_sign)
+        logits = model(X_sgc)
 
-        # Compute loss with nodes in training set.
+        # Compute loss with nodes in the training set.
         loss = F.cross_entropy(logits[train_mask], label[train_mask])
 
         # Backward.
@@ -77,12 +49,8 @@ def train(g, X_sign, model):
         loss.backward()
         optimizer.step()
 
-        # Switch the model to evaluating mode.
-        model.eval()
-
         # Compute prediction.
-        logits = model(X_sign)
-        pred = logits.argmax(1)
+        pred = logits.argmax(dim=1)
 
         # Evaluate the prediction.
         val_acc, test_acc = evaluate(g, pred)
@@ -101,8 +69,7 @@ if __name__ == "__main__":
     dataset = CoraGraphDataset()
     g = dataset[0].to(dev)
 
-    # Create the sparse adjacency matrix A (note that W was used as the notation
-    # for adjacency matrix in the original paper).
+    # Create the sparse adjacency matrix A
     src, dst = g.edges()
     N = g.num_nodes()
     A = create_from_coo(dst, src, shape=(N, N))
@@ -114,14 +81,14 @@ if __name__ == "__main__":
     A_hat = D_hat @ A_hat @ D_hat
 
     # 2-hop diffusion.
-    r = 2
+    k = 2
     X = g.ndata["feat"]
-    X_sign = sign_diffusion(A_hat, X, r)
+    X_sgc = pre_compute(A_hat, X, k)
 
-    # Create SIGN model.
+    # Create model.
     in_size = X.shape[1]
     out_size = dataset.num_classes
-    model = SIGN(in_size, out_size, r).to(dev)
+    model = nn.Linear(in_size, out_size).to(dev)
 
     # Kick off training.
-    train(g, X_sign, model)
+    train(g, X_sgc, model)
