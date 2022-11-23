@@ -28,7 +28,6 @@ dgl_option(USE_SYSTEM_NCCL "Build using system's NCCL library" OFF)
 dgl_option(USE_OPENMP "Build with OpenMP" ON)
 dgl_option(USE_AVX "Build with AVX optimization" OFF)
 dgl_option(USE_LIBXSMM "Build with LIBXSMM library optimization" ON)
-dgl_option(USE_FP16 "Build with fp16 support to enable mixed precision training" OFF)
 dgl_option(USE_TVM "Build with TVM kernels" OFF)
 dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" OFF)
 dgl_option(LIBCXX_ENABLE_PARALLEL_ALGORITHMS "Enable the parallel algorithms library. This requires the PSTL to be available." OFF)
@@ -127,13 +126,6 @@ if ((NOT MSVC) AND USE_EPOLL)
   endif()
 endif ()
 
-# Build with fp16 to support mixed precision training.
-if(USE_FP16)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUSE_FP16")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_FP16")
-  message(STATUS "Build with fp16 to support mixed precision training")
-endif(USE_FP16)
-
 # To compile METIS correct for DGL.
 if(MSVC)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /DIDXTYPEWIDTH=64 /DREALTYPEWIDTH=32")
@@ -214,7 +206,6 @@ target_include_directories(dgl PRIVATE "third_party/nanoflann/include")
 target_include_directories(dgl PRIVATE "third_party/libxsmm/include")
 target_include_directories(dgl PRIVATE "third_party/pcg/include")
 
-
 # For serialization
 if (USE_HDFS)
   option(DMLC_HDFS_SHARED "dgl has to build with dynamic hdfs library" ON)
@@ -260,6 +251,9 @@ if(NOT MSVC)
   target_include_directories(dgl PRIVATE third_party/tensorpipe)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+  # Avoid exposing third-party symbols when using DGL as a library.
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wl,--exclude-libs,ALL")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,--exclude-libs,ALL")
 endif(NOT MSVC)
 
 # Compile TVM Runtime and Featgraph
@@ -355,3 +349,8 @@ if(BUILD_CPP_TEST)
     target_link_libraries(rpc_server dgl)
   endif(NOT MSVC)
 endif(BUILD_CPP_TEST)
+
+if(BUILD_SPARSE)
+  set(DGL_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/include")
+  add_subdirectory(dgl_sparse)
+endif(BUILD_SPARSE)

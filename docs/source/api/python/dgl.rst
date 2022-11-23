@@ -67,8 +67,6 @@ Operators for generating new graphs by manipulating the structure of the existin
     add_self_loop
     adj_product_graph
     adj_sum_graph
-    as_heterograph
-    as_immutable_graph
     compact_graphs
     khop_adj
     khop_graph
@@ -117,6 +115,7 @@ Operators for generating positional encodings of each node.
     random_walk_pe
     laplacian_pe
     double_radius_node_labeling
+    shortest_dist
 
 .. _api-partition:
 

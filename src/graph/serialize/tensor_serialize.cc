@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
- * \file graph/serialize/tensor_serialize.cc
- * \brief Graph serialization implementation
+ * @file graph/serialize/tensor_serialize.cc
+ * @brief Graph serialization implementation
  */
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/container.h>

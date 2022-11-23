@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2018 by Contributors
- * \file graph/immutable_graph.cc
- * \brief DGL immutable graph index implementation
+ * @file graph/immutable_graph.cc
+ * @brief DGL immutable graph index implementation
  */
 
 #include <dgl/base_heterograph.h>
@@ -29,7 +29,7 @@ inline std::string GetSharedMemName(
   return name + "_" + edge_dir;
 }
 
-/*
+/**
  * The metadata of a graph index that are needed for shared-memory graph.
  */
 struct GraphIndexMetadata {
@@ -40,7 +40,7 @@ struct GraphIndexMetadata {
   bool has_coo;
 };
 
-/*
+/**
  * Serialize the metadata of a graph index and place it in a shared-memory
  * tensor. In this way, another process can reconstruct a GraphIndex from a
  * shared-memory tensor.
@@ -65,7 +65,7 @@ NDArray SerializeMetadata(ImmutableGraphPtr gidx, const std::string &name) {
 #endif  // _WIN32
 }
 
-/*
+/**
  * Deserialize the metadata of a graph index.
  */
 GraphIndexMetadata DeserializeMetadata(const std::string &name) {
@@ -430,7 +430,7 @@ CSRPtr ImmutableGraph::GetInCSR() const {
   return in_csr_;
 }
 
-/* !\brief Return out csr. If not exist, transpose the other one.*/
+/** @brief Return out csr. If not exist, transpose the other one.*/
 CSRPtr ImmutableGraph::GetOutCSR() const {
   if (!out_csr_) {
     if (in_csr_) {
@@ -447,7 +447,7 @@ CSRPtr ImmutableGraph::GetOutCSR() const {
   return out_csr_;
 }
 
-/* !\brief Return coo. If not exist, create from csr.*/
+/** @brief Return coo. If not exist, create from csr.*/
 COOPtr ImmutableGraph::GetCOO() const {
   if (!coo_) {
     if (in_csr_) {
@@ -626,7 +626,7 @@ ImmutableGraphPtr ImmutableGraph::Reverse() const {
 
 constexpr uint64_t kDGLSerialize_ImGraph = 0xDD3c5FFE20046ABF;
 
-/*! \return Load HeteroGraph from stream, using OutCSR Matrix*/
+/** @return Load HeteroGraph from stream, using OutCSR Matrix*/
 bool ImmutableGraph::Load(dmlc::Stream *fs) {
   uint64_t magicNum;
   aten::CSRMatrix out_csr_matrix;
@@ -637,7 +637,7 @@ bool ImmutableGraph::Load(dmlc::Stream *fs) {
   return true;
 }
 
-/*! \return Save HeteroGraph to stream, using OutCSR Matrix */
+/** @return Save HeteroGraph to stream, using OutCSR Matrix */
 void ImmutableGraph::Save(dmlc::Stream *fs) const {
   fs->Write(kDGLSerialize_ImGraph);
   fs->Write(GetOutCSR());

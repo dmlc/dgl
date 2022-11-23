@@ -1,28 +1,30 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
- * \file socket_communicator_test.cc
- * \brief Test SocketCommunicator
+ * @file socket_communicator_test.cc
+ * @brief Test SocketCommunicator
  */
+#include "../src/rpc/network/socket_communicator.h"
+
 #include <gtest/gtest.h>
+#include <stdlib.h>
 #include <string.h>
+#include <time.h>
+
+#include <chrono>
+#include <fstream>
+#include <streambuf>
 #include <string>
 #include <thread>
 #include <vector>
-#include <fstream>
-#include <streambuf>
-#include <chrono>
-#include <stdlib.h>
-#include <time.h>
 
 #include "../src/rpc/network/msg_queue.h"
-#include "../src/rpc/network/socket_communicator.h"
 
 using std::string;
 
-using dgl::network::SocketSender;
-using dgl::network::SocketReceiver;
-using dgl::network::Message;
 using dgl::network::DefaultMessageDeleter;
+using dgl::network::Message;
+using dgl::network::SocketReceiver;
+using dgl::network::SocketSender;
 
 const int64_t kQueueSize = 500 * 1024;
 const int kThreadNum = 2;
@@ -35,10 +37,7 @@ const int kNumReceiver = 3;
 const int kNumMessage = 10;
 
 const char* ip_addr[] = {
-  "tcp://127.0.0.1:50091",
-  "tcp://127.0.0.1:50092",
-  "tcp://127.0.0.1:50093"
-};
+    "tcp://127.0.0.1:50091", "tcp://127.0.0.1:50092", "tcp://127.0.0.1:50093"};
 
 static void start_client();
 static void start_server(int id);
@@ -70,7 +69,7 @@ TEST(SocketCommunicatorTest, SendAndRecvTimeout) {
     sender.ConnectReceiver(ip_addr[0], 0);
     sender.ConnectReceiverFinalize(kMaxTryTimes);
     for (int i = 0; i < 2; ++i) {
-      char *str_data = new char[9];
+      char* str_data = new char[9];
       memcpy(str_data, "123456789", 9);
       Message msg = {str_data, 9};
       msg.deallocator = DefaultMessageDeleter;
@@ -144,7 +143,7 @@ void start_server(int id) {
       msg.deallocator(&msg);
     }
   }
-  for (int n = 0; n < kNumSender*kNumMessage; ++n) {
+  for (int n = 0; n < kNumSender * kNumMessage; ++n) {
     Message msg;
     int recv_id;
     EXPECT_EQ(receiver.Recv(&msg, &recv_id), REMOVE_SUCCESS);
@@ -169,9 +168,7 @@ TEST(SocketCommunicatorTest, TCPSocketBind) {
 
 #pragma comment(lib, "ws2_32.lib")
 
-void sleep(int seconds) {
-  Sleep(seconds * 1000);
-}
+void sleep(int seconds) { Sleep(seconds * 1000); }
 
 static void start_client();
 static bool start_server();
@@ -181,9 +178,7 @@ DWORD WINAPI _ClientThreadFunc(LPVOID param) {
   return 0;
 }
 
-DWORD WINAPI _ServerThreadFunc(LPVOID param) {
-  return start_server() ? 1 : 0;
-}
+DWORD WINAPI _ServerThreadFunc(LPVOID param) { return start_server() ? 1 : 0; }
 
 TEST(SocketCommunicatorTest, SendAndRecv) {
   HANDLE hThreads[2];
@@ -191,7 +186,7 @@ TEST(SocketCommunicatorTest, SendAndRecv) {
   DWORD retcode, exitcode;
 
   srand((unsigned)time(NULL));
-  int port = (rand() % (5000-3000+1))+ 3000;
+  int port = (rand() % (5000 - 3000 + 1)) + 3000;
   std::string ip_addr = "tcp://127.0.0.1:" + std::to_string(port);
   std::ofstream out("addr.txt");
   out << ip_addr;
@@ -199,9 +194,11 @@ TEST(SocketCommunicatorTest, SendAndRecv) {
 
   ASSERT_EQ(::WSAStartup(MAKEWORD(2, 2), &wsaData), 0);
 
-  hThreads[0] = ::CreateThread(NULL, 0, _ClientThreadFunc, NULL, 0, NULL);  // client
+  hThreads[0] =
+      ::CreateThread(NULL, 0, _ClientThreadFunc, NULL, 0, NULL);  // client
   ASSERT_TRUE(hThreads[0] != NULL);
-  hThreads[1] = ::CreateThread(NULL, 0, _ServerThreadFunc, NULL, 0, NULL);  // server
+  hThreads[1] =
+      ::CreateThread(NULL, 0, _ServerThreadFunc, NULL, 0, NULL);  // server
   ASSERT_TRUE(hThreads[1] != NULL);
 
   retcode = ::WaitForMultipleObjects(2, hThreads, TRUE, INFINITE);
@@ -218,8 +215,8 @@ TEST(SocketCommunicatorTest, SendAndRecv) {
 
 static void start_client() {
   std::ifstream t("addr.txt");
-  std::string ip_addr((std::istreambuf_iterator<char>(t)),
-                       std::istreambuf_iterator<char>());
+  std::string ip_addr(
+      (std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
   t.close();
   SocketSender sender(kQueueSize, kThreadNum);
   sender.ConnectReceiver(ip_addr.c_str(), 0);
@@ -235,8 +232,8 @@ static void start_client() {
 static bool start_server() {
   sleep(5);
   std::ifstream t("addr.txt");
-  std::string ip_addr((std::istreambuf_iterator<char>(t)),
-                       std::istreambuf_iterator<char>());
+  std::string ip_addr(
+      (std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
   t.close();
   SocketReceiver receiver(kQueueSize, kThreadNum);
   receiver.Wait(ip_addr.c_str(), 1);

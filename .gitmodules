@@ -36,4 +36,4 @@
 	url = https://github.com/NVIDIA/thrust.git
 [submodule "third_party/pcg"]
 	path = third_party/pcg
-	url = git@github.com:imneme/pcg-cpp.git
+	url = https://github.com/imneme/pcg-cpp.git

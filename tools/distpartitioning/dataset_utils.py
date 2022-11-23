@@ -7,10 +7,10 @@ import torch
 from pyarrow import csv
 
 import constants
-from utils import get_idranges
+from utils import get_idranges, map_partid_rank
 
 
-def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
+def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
     """
     Function to read the multiple file formatted dataset. 
 
@@ -24,6 +24,8 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
         rank of the current process
     world_size : int
         total number of process in the current execution
+    num_parts : int
+        total number of output graph partitions
     schema_map : dictionary
         this is the dictionary created by reading the graph metadata json file
         for the input graph dataset
@@ -105,34 +107,7 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
 
     Data read from each of the node features file is a multi-dimensional tensor data and is read
     in numpy format, which is also the storage format of node features on the permanent storage.
-    '''
 
-    #iterate over the "node_data" dictionary in the schema_map
-    #read the node features if exists
-    #also keep track of the type_nids for which the node_features are read.
-    dataset_features = schema_map[constants.STR_NODE_DATA]
-    if((dataset_features is not None) and (len(dataset_features) > 0)):
-        for ntype_name, ntype_feature_data in dataset_features.items():
-            #ntype_feature_data is a dictionary
-            #where key: feature_name, value: dictionary in which keys are "format", "data"
-            node_feature_tids[ntype_name] = []
-            for feat_name, feat_data in ntype_feature_data.items():
-                assert feat_data[constants.STR_FORMAT][constants.STR_NAME] == constants.STR_NUMPY
-                num_chunks = len(feat_data[constants.STR_DATA])
-                read_list = np.array_split(np.arange(num_chunks), world_size)
-                nfeat = []
-                for idx in read_list[rank]:
-                    nfeat_file = feat_data[constants.STR_DATA][idx]
-                    if not os.path.isabs(nfeat_file):
-                        nfeat_file = os.path.join(input_dir, nfeat_file)
-                    logging.info(f'Loading node feature[{feat_name}] of ntype[{ntype_name}] from {nfeat_file}')
-                    nfeat.append(np.load(nfeat_file))
-                nfeat = np.concatenate(nfeat)
-                node_features[ntype_name + '/' + feat_name] = torch.from_numpy(nfeat)
-
-                node_feature_tids[ntype_name].append([feat_name, -1, -1])
-
-    '''
         "node_type" : ["ntype0-name", "ntype1-name", ....], #m node types
         "num_nodes_per_chunk" : [
             [a0, a1, ...a<p-1>], #p partitions
@@ -154,25 +129,66 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
     which are owned by that particular rank. And using the "num_nodes_per_chunk" information each
     process can easily compute any nodes per-type node_id and global node_id.
     The node-ids are treated as int64's in order to support billions of nodes in the input graph.
-
     '''
 
     #read my nodes for each node type
     node_tids, ntype_gnid_offset = get_idranges(schema_map[constants.STR_NODE_TYPE], 
                                     schema_map[constants.STR_NUM_NODES_PER_CHUNK],
-                                    num_chunks=world_size)
-    for ntype_name in schema_map[constants.STR_NODE_TYPE]: 
-        if ntype_name in node_feature_tids: 
-            for item in node_feature_tids[ntype_name]:
-                item[1] = node_tids[ntype_name][rank][0]
-                item[2] = node_tids[ntype_name][rank][1]
+                                    num_chunks=num_parts)
+
+    #iterate over the "node_data" dictionary in the schema_map
+    #read the node features if exists
+    #also keep track of the type_nids for which the node_features are read.
+    dataset_features = schema_map[constants.STR_NODE_DATA]
+    if((dataset_features is not None) and (len(dataset_features) > 0)):
+        for ntype_name, ntype_feature_data in dataset_features.items():
+            for feat_name, feat_data in ntype_feature_data.items():
+                assert feat_data[constants.STR_FORMAT][constants.STR_NAME] == constants.STR_NUMPY
+
+                # It is guaranteed that num_chunks is always greater 
+                # than num_partitions. 
+                num_chunks = len(feat_data[constants.STR_DATA])
+                read_list = np.array_split(np.arange(num_chunks), num_parts)
+                for local_part_id in range(num_parts):
+                    if map_partid_rank(local_part_id, world_size) == rank:
+                        nfeat = []
+                        nfeat_tids = []
+                        for idx in read_list[local_part_id]:
+                            nfeat_file = feat_data[constants.STR_DATA][idx]
+                            if not os.path.isabs(nfeat_file):
+                                nfeat_file = os.path.join(input_dir, nfeat_file)
+                            logging.info(f'Loading node feature[{feat_name}] of ntype[{ntype_name}] from {nfeat_file}')
+                            nfeat.append(np.load(nfeat_file))
+                        nfeat = np.concatenate(nfeat) if len(nfeat) != 0 else np.array([])
+                        node_features[ntype_name+"/"+feat_name+"/"+str(local_part_id//world_size)] = torch.from_numpy(nfeat)
+                        nfeat_tids.append(node_tids[ntype_name][local_part_id])
+                        node_feature_tids[ntype_name+"/"+feat_name+"/"+str(local_part_id//world_size)] = nfeat_tids
 
     #done building node_features locally. 
     if len(node_features) <= 0:
         logging.info(f'[Rank: {rank}] This dataset does not have any node features')
     else:
-        for k, v in node_features.items():
-            logging.info(f'[Rank: {rank}] node feature name: {k}, feature data shape: {v.size()}')
+        assert len(node_features) == len(node_feature_tids)
+
+        # Note that the keys in the node_features dictionary are as follows:
+        # `ntype_name/feat_name/local_part_id`. 
+        #   where ntype_name and feat_name are self-explanatory, and 
+        #   local_part_id indicates the partition-id, in the context of current
+        #   process which take the values 0, 1, 2, ....
+        for feat_name, feat_info  in node_features.items():
+            logging.info(f'[Rank: {rank}] node feature name: {feat_name}, feature data shape: {feat_info.size()}')
+
+            tokens = feat_name.split("/")
+            assert len(tokens) == 3
+
+            # Get the range of type ids which are mapped to the current node.
+            tids = node_feature_tids[feat_name]
+
+            # Iterate over the range of type ids for the current node feature
+            # and count the number of features for this feature name.
+            count = tids[0][1] - tids[0][0]
+            assert count == feat_info.size()[0]
+
 
     '''
     Reading edge features now.
@@ -214,50 +230,48 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
     edge_features = {}
     edge_feature_tids = {}
 
+    # Read edges for each edge type that are processed by the currnet process.
+    edge_tids, _ = get_idranges(schema_map[constants.STR_EDGE_TYPE], 
+                                    schema_map[constants.STR_NUM_EDGES_PER_CHUNK], num_parts)
+
     # Iterate over the "edge_data" dictionary in the schema_map.
     # Read the edge features if exists.
     # Also keep track of the type_eids for which the edge_features are read.
     dataset_features = schema_map[constants.STR_EDGE_DATA]
     if dataset_features and (len(dataset_features) > 0):
         for etype_name, etype_feature_data in dataset_features.items():
-            #etype_feature_data is a dictionary
-            #where key: feature_name, value: dictionary in which keys are "format", "data"
-            edge_feature_tids[etype_name] = []
             for feat_name, feat_data in etype_feature_data.items():
                 assert feat_data[constants.STR_FORMAT][constants.STR_NAME] == constants.STR_NUMPY
                 num_chunks = len(feat_data[constants.STR_DATA])
-                read_list = np.array_split(np.arange(num_chunks), world_size)
-                efeat = []
-                for idx in read_list[rank]:
-                    efeat_file = feat_data[constants.STR_DATA][idx]
-                    if not os.path.isabs(efeat_file):
-                        efeat_file = os.path.join(input_dir, efeat_file)
-                    logging.info(
-                        f'Loading edge feature[{feat_name}] of etype[{etype_name}] from {efeat_file}'
-                    )
-                    efeat.append(np.load(efeat_file))
-                efeat = np.concatenate(efeat)
-                edge_features[etype_name + '/' + feat_name] = torch.from_numpy(efeat)
-
-                edge_feature_tids[etype_name].append([feat_name, -1, -1])
-
-    # Read edges for each node types that are processed by the currnet process.
-    edge_tids, _ = get_idranges(schema_map[constants.STR_EDGE_TYPE], 
-                                schema_map[constants.STR_NUM_EDGES_PER_CHUNK],
-                                num_chunks=world_size)
-    for etype_name in schema_map[constants.STR_EDGE_TYPE]: 
-        if etype_name in edge_feature_tids: 
-            for item in edge_feature_tids[etype_name]:
-                item[1] = edge_tids[etype_name][rank][0]
-                item[2] = edge_tids[etype_name][rank][1]
+                read_list = np.array_split(np.arange(num_chunks), num_parts)
+                for local_part_id in range(num_parts):
+                    if map_partid_rank(local_part_id, world_size) == rank:
+                        efeats = []
+                        efeat_tids = []
+                        for idx in read_list[local_part_id]:
+                            feature_fname = feat_data[constants.STR_DATA][idx]
+                            if (os.path.isabs(feature_fname)):
+                                logging.info(f'Loading numpy from {feature_fname}')
+                                efeats.append(torch.from_numpy(np.load(feature_fname)))
+                            else:
+                                numpy_path = os.path.join(input_dir, feature_fname)
+                                logging.info(f'Loading numpy from {numpy_path}')
+                                efeats.append(torch.from_numpy(np.load(numpy_path)))
+                        efeat_tids.append(edge_tids[etype_name][local_part_id])
+                        edge_features[etype_name+'/'+feat_name+"/"+str(local_part_id//world_size)] = torch.from_numpy(np.concatenate(efeats))
+                        edge_feature_tids[etype_name+"/"+feat_name+"/"+str(local_part_id//world_size)] = efeat_tids
 
     # Done with building node_features locally. 
     if len(edge_features) <= 0:
         logging.info(f'[Rank: {rank}] This dataset does not have any edge features')
     else:
-        for k, v in edge_features.items():
-            logging.info(f'[Rank: {rank}] edge feature name: {k}, feature data shape: {v.size()}')
+        assert len(edge_features) == len(edge_feature_tids)
 
+        for k, v in edge_features.items():
+            logging.info(f'[Rank: {rank}] edge feature name: {k}, feature data shape: {v.shape}')
+            tids = edge_feature_tids[k]
+            count = tids[0][1] - tids[0][0]
+            assert count == v.size()[0]
 
     '''
     Code below is used to read edges from the input dataset with the help of the metadata json file
@@ -306,7 +320,7 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
     etype_name_idmap = {e : idx for idx, e in enumerate(etype_names)}
     edge_tids, _ = get_idranges(schema_map[constants.STR_EDGE_TYPE],
                     schema_map[constants.STR_NUM_EDGES_PER_CHUNK],
-                    num_chunks=world_size)
+                    num_chunks=num_parts)
 
     edge_datadict = {}
     edge_data = schema_map[constants.STR_EDGES]
@@ -329,29 +343,45 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
         dst_ntype_name = tokens[2]
 
         num_chunks = len(edge_info)
-        read_list = np.array_split(np.arange(num_chunks), world_size)
+        read_list = np.array_split(np.arange(num_chunks), num_parts)
         src_ids = []
         dst_ids = []
-        for idx in read_list[rank]:
+
+        curr_partids = []
+        for part_id in range(num_parts):
+            if map_partid_rank(part_id, world_size) == rank:
+                curr_partids.append(read_list[part_id])
+
+        for idx in np.concatenate(curr_partids):
             edge_file = edge_info[idx]
             if not os.path.isabs(edge_file):
                 edge_file = os.path.join(input_dir, edge_file)
             logging.info(f'Loading edges of etype[{etype_name}] from {edge_file}')
-            data_df = csv.read_csv(edge_file,
-                        read_options=pyarrow.csv.ReadOptions(autogenerate_column_names=True), 
-                        parse_options=pyarrow.csv.ParseOptions(delimiter=' '))
-            src_ids.append(data_df['f0'].to_numpy())
-            dst_ids.append(data_df['f1'].to_numpy())
+
+            read_options=pyarrow.csv.ReadOptions(use_threads=True, block_size=4096, autogenerate_column_names=True)
+            parse_options=pyarrow.csv.ParseOptions(delimiter=' ')
+            with pyarrow.csv.open_csv(edge_file, read_options=read_options, parse_options=parse_options) as reader:
+                for next_chunk in reader:
+                    if next_chunk is None:
+                        break
+
+                    next_table = pyarrow.Table.from_batches([next_chunk])
+                    src_ids.append(next_table['f0'].to_numpy())
+                    dst_ids.append(next_table['f1'].to_numpy())
+
         src_ids = np.concatenate(src_ids)
         dst_ids = np.concatenate(dst_ids)
 
         #currently these are just type_edge_ids... which will be converted to global ids
         edge_datadict[constants.GLOBAL_SRC_ID].append(src_ids + ntype_gnid_offset[src_ntype_name][0, 0])
         edge_datadict[constants.GLOBAL_DST_ID].append(dst_ids + ntype_gnid_offset[dst_ntype_name][0, 0])
-        edge_datadict[constants.GLOBAL_TYPE_EID].append(np.arange(edge_tids[etype_name][rank][0],\
-                edge_tids[etype_name][rank][1] ,dtype=np.int64))
         edge_datadict[constants.ETYPE_ID].append(etype_name_idmap[etype_name] * \
-                np.ones(shape=(src_ids.shape), dtype=np.int64))
+            np.ones(shape=(src_ids.shape), dtype=np.int64))
+
+        for local_part_id in range(num_parts):
+            if (map_partid_rank(local_part_id, world_size) == rank):
+                edge_datadict[constants.GLOBAL_TYPE_EID].append(np.arange(edge_tids[etype_name][local_part_id][0],\
+                    edge_tids[etype_name][local_part_id][1] ,dtype=np.int64))
 
     #stitch together to create the final data on the local machine
     for col in [constants.GLOBAL_SRC_ID, constants.GLOBAL_DST_ID, constants.GLOBAL_TYPE_EID, constants.ETYPE_ID]:
@@ -361,6 +391,7 @@ def get_dataset(input_dir, graph_name, rank, world_size, schema_map):
     assert edge_datadict[constants.GLOBAL_DST_ID].shape == edge_datadict[constants.GLOBAL_TYPE_EID].shape
     assert edge_datadict[constants.GLOBAL_TYPE_EID].shape == edge_datadict[constants.ETYPE_ID].shape
     logging.info(f'[Rank: {rank}] Done reading edge_file: {len(edge_datadict)}, {edge_datadict[constants.GLOBAL_SRC_ID].shape}')
+    logging.info(f'Rank: {rank} edge_feat_tids: {edge_feature_tids}')
 
     return node_tids, node_features, node_feature_tids, edge_datadict, edge_tids, edge_features, edge_feature_tids
 

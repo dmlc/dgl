@@ -57,7 +57,7 @@ class EidExcluder(object):
             func = lambda x, y: x.find_included_indices(y)
             return recursive_apply_pair(self._filter, parent_eids, func)
 
-    def __call__(self, frontier):
+    def __call__(self, frontier, weights=None):
         parent_eids = frontier.edata[EID]
         located_eids = self._find_indices(parent_eids)
 
@@ -69,15 +69,19 @@ class EidExcluder(object):
             if len(located_eids) > 0:
                 frontier = transforms.remove_edges(
                     frontier, located_eids, store_ids=True)
+                if weights is not None and weights[0].shape[0] == frontier.num_edges():
+                    weights[0] = F.gather_row(weights[0], frontier.edata[EID])
                 frontier.edata[EID] = F.gather_row(parent_eids, frontier.edata[EID])
         else:
             # (BarclayII) remove_edges only accepts removing one type of edges,
             # so I need to keep track of the edge IDs left one by one.
             new_eids = parent_eids.copy()
-            for k, v in located_eids.items():
+            for i, (k, v) in enumerate(located_eids.items()):
                 if len(v) > 0:
                     frontier = transforms.remove_edges(
                         frontier, v, etype=k, store_ids=True)
                     new_eids[k] = F.gather_row(parent_eids[k], frontier.edges[k].data[EID])
+                    if weights is not None and weights[i].shape[0] == frontier.num_edges(k):
+                        weights[i] = F.gather_row(weights[i], frontier.edges[k].data[EID])
             frontier.edata[EID] = new_eids
-        return frontier
+        return frontier if weights is None else (frontier, weights)

@@ -106,7 +106,7 @@ def _gen_sddmm_func(lhs_target, rhs_target, binary_op):
 
     Parameters
     ----------
-    g : DGLHeteroGraph
+    g : DGLGraph
         The input graph
     x : tensor
         The {lhs} features.
@@ -157,7 +157,7 @@ def copy_u(g, x):
 
     Parameters
     ----------
-    g : DGLHeteroGraph
+    g : DGLGraph
         The input graph.
     x : tensor
         The source node features.
@@ -179,7 +179,7 @@ def copy_v(g, x):
 
     Parameters
     ----------
-    g : DGLHeteroGraph
+    g : DGLGraph
         The input graph.
     x : tensor
         The destination node features.

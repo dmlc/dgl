@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
- * \file runtime/config.h
- * \brief DGL runtime config
+ * @file runtime/config.h
+ * @brief DGL runtime config
  */
 
 #ifndef DGL_RUNTIME_CONFIG_H_

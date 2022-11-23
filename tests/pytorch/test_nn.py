@@ -1515,6 +1515,20 @@ def test_hgt(idtype, in_size, num_heads):
     sorted_x = sorted_g.ndata['x']
     sorted_y = m(sorted_g, sorted_x, sorted_ntype, sorted_etype, presorted=False)
     assert sorted_y.shape == (g.num_nodes(), head_size * num_heads)
+    # mini-batch
+    train_idx = th.randint(0, 100, (10, ), dtype = idtype)
+    sampler = dgl.dataloading.NeighborSampler([-1])
+    train_loader = dgl.dataloading.DataLoader(g, train_idx.to(dev), sampler,
+                                            batch_size=8, device=dev,
+                                            shuffle=True)
+    (input_nodes, output_nodes, block) = next(iter(train_loader))
+    block = block[0]
+    x = x[input_nodes.to(th.long)]
+    ntype = ntype[input_nodes.to(th.long)]
+    edge = block.edata[dgl.EID]
+    etype = etype[edge.to(th.long)]
+    y = m(block, x, ntype, etype)
+    assert y.shape == (block.number_of_dst_nodes(), head_size * num_heads)
     # TODO(minjie): enable the following check
     #assert th.allclose(y, sorted_y[rev_idx], atol=1e-4, rtol=1e-4)
 
@@ -1772,3 +1786,18 @@ def test_LaplacianPosEnc(num_layer, k, lpe_dim, n_head, batch_norm, num_post_lay
     model = nn.LaplacianPosEnc("DeepSet", num_layer, k, lpe_dim,
                                batch_norm=batch_norm, num_post_layer=num_post_layer).to(ctx)
     assert model(EigVals, EigVecs).shape == (num_nodes, lpe_dim)
+
+@pytest.mark.parametrize('feat_size', [128, 512])
+@pytest.mark.parametrize('num_heads', [8, 16])
+@pytest.mark.parametrize('bias', [True, False])
+@pytest.mark.parametrize('attn_bias_type', ['add', 'mul'])
+@pytest.mark.parametrize('attn_drop', [0.1, 0.5])
+def test_BiasedMultiheadAttention(feat_size, num_heads, bias, attn_bias_type, attn_drop):
+    ndata = th.rand(16, 100, feat_size)
+    attn_bias = th.rand(16, 100, 100, num_heads)
+    attn_mask = th.rand(16, 100, 100) < 0.5
+
+    net = nn.BiasedMultiheadAttention(feat_size, num_heads, bias, attn_bias_type, attn_drop)
+    out = net(ndata, attn_bias, attn_mask)
+
+    assert out.shape == (16, 100, feat_size)

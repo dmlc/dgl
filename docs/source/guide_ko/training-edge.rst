@@ -111,7 +111,7 @@
 Heterogeneous 그래프
 ~~~~~~~~~~~~~~~~~~
 
-Heterogeneous 그래프들에 대한 에지 분류는 homogeneous 그래프와 크게 다르지 않다. 하나의 에지 타입에 대해서 에지 분류를 수행하자 한다면, 모든 노드 티압에 대한 노드 representation을 구하고, :meth:`~dgl.DGLHeteroGraph.apply_edges` 메소드를 사용해서 에지 타입을 예측하면 된다.
+Heterogeneous 그래프들에 대한 에지 분류는 homogeneous 그래프와 크게 다르지 않다. 하나의 에지 타입에 대해서 에지 분류를 수행하자 한다면, 모든 노드 티압에 대한 노드 representation을 구하고, :meth:`~dgl.DGLGraph.apply_edges` 메소드를 사용해서 에지 타입을 예측하면 된다.
 
 예를 들면, heterogeneous 그래프의 하나의 에지 타입에 대한 동작하는 ``DotProductPredictor`` 를 작성하고자 한다면, ``apply_edges`` 메소드에 해당 에지 타입을 명시하기만 하면 된다.
 

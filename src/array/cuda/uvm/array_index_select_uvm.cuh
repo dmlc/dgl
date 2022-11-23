@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2021 by Contributors
- * \file array/cpu/array_index_select_uvm.cuh
- * \brief Array index select GPU kernel implementation
+ * @file array/cpu/array_index_select_uvm.cuh
+ * @brief Array index select GPU kernel implementation
  */
 
 #ifndef DGL_ARRAY_CUDA_UVM_ARRAY_INDEX_SELECT_UVM_CUH_
@@ -13,9 +13,10 @@ namespace dgl {
 namespace aten {
 namespace impl {
 
-/*  This is a cross-device access version of IndexSelectMultiKernel.
- *   Since the memory access over PCIe is more sensitive to the
- *   data access aligment (cacheline), we need a separate version here.
+/**
+ *  This is a cross-device access version of IndexSelectMultiKernel.
+ *  Since the memory access over PCIe is more sensitive to the
+ *  data access aligment (cacheline), we need a separate version here.
  */
 template <typename DType, typename IdType>
 __global__ void IndexSelectMultiKernelAligned(

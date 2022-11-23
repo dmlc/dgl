@@ -3,9 +3,11 @@ import os
 import numpy as np
 import pyarrow
 import torch
+import copy
 
 from pyarrow import csv
 from gloo_wrapper import alltoallv_cpu
+from utils import map_partid_rank
 
 
 class DistLookupService:
@@ -60,10 +62,19 @@ class DistLookupService:
 
             filename = f'{ntype}.txt'
             logging.info(f'[Rank: {rank}] Reading file: {os.path.join(input_dir, filename)}')
-            df = csv.read_csv(os.path.join(input_dir, '{}.txt'.format(ntype)), \
-                read_options=pyarrow.csv.ReadOptions(autogenerate_column_names=True), \
-                parse_options=pyarrow.csv.ParseOptions(delimiter=' '))
-            ntype_partids = df['f0'].to_numpy()
+
+            read_options=pyarrow.csv.ReadOptions(use_threads=True, block_size=4096, autogenerate_column_names=True)
+            parse_options=pyarrow.csv.ParseOptions(delimiter=' ')
+            ntype_partids = []
+            with pyarrow.csv.open_csv(os.path.join(input_dir, '{}.txt'.format(ntype)),
+                    read_options=read_options, parse_options=parse_options) as reader:
+                for next_chunk in reader:
+                    if next_chunk is None:
+                        break
+                    next_table = pyarrow.Table.from_batches([next_chunk])
+                    ntype_partids.append(next_table['f0'].to_numpy())
+
+            ntype_partids = np.concatenate(ntype_partids)
             count = len(ntype_partids)
             ntype_count.append(count)
 
@@ -75,8 +86,12 @@ class DistLookupService:
                 end = count
             type_nid_begin.append(start)
             type_nid_end.append(end)
+
             # Slice the partition-ids which belong to the current instance.
-            partid_list.append(ntype_partids[start:end])
+            partid_list.append(copy.deepcopy(ntype_partids[start:end]))
+
+            # Explicitly release the array read from the file.
+            del ntype_partids
 
         # Store all the information in the object instance variable.
         self.id_map = id_map
@@ -86,7 +101,7 @@ class DistLookupService:
         self.ntype_count = np.array(ntype_count, dtype=np.int64)
         self.rank = rank
         self.world_size = world_size
-        
+
 
     def get_partition_ids(self, global_nids):
         '''
@@ -167,7 +182,7 @@ class DistLookupService:
                 continue
             # Get the node_type_ids and per_type_nids for the incoming global_nids.
             ntype_ids, type_nids = self.id_map(owner_req_list[idx].numpy())
-            nypte_ids, type_nids = ntype_ids.numpy(), type_nids.numpy()
+            ntype_ids, type_nids = ntype_ids.numpy(), type_nids.numpy()
 
             # Lists to store partition-ids for the incoming global-nids.
             type_id_lookups = []
@@ -223,7 +238,7 @@ class DistLookupService:
         # Now the owner_ids (partition-ids) which corresponding to the  global_nids.
         return owner_ids
 
-    def get_shuffle_nids(self, global_nids, my_global_nids, my_shuffle_global_nids):
+    def get_shuffle_nids(self, global_nids, my_global_nids, my_shuffle_global_nids, world_size):
         '''
         This function is used to retrieve shuffle_global_nids for a given set of incoming
         global_nids. Note that global_nids are of random order and will contain duplicates
@@ -253,6 +268,8 @@ class DistLookupService:
             This process has the node <-> partition id mapping
         my_shuffle_global_nids : numpy ndarray
             array of shuffle_global_nids which are assigned by the current process/rank
+        world_size : int
+            total no. of processes in the MPI_WORLD
 
         Returns:
         --------
@@ -263,6 +280,21 @@ class DistLookupService:
 
         # Get the owner_ids (partition-ids or rank).
         owner_ids = self.get_partition_ids(global_nids)
+
+        # These owner_ids, which are also partition ids of the nodes in the 
+        # input graph, are in the range 0 - (num_partitions - 1).
+        # These ids are generated using some kind of graph partitioning method.
+        # Distribuged lookup service, as used by the graph partitioning 
+        # pipeline, is used to store ntype-ids (also type_nids) and their 
+        # mapping to the associated partition-id. 
+        # These ids are split into `num_process` chunks and processes in the
+        # dist. lookup service are assigned the owernship of these chunks.
+        # The pipeline also enforeces the following constraint among the
+        # pipeline input parameters: num_partitions, num_processes
+        #   num_partitions is an integer multiple of num_processes
+        #   which means each individual node in the cluster will be running
+        #   equal number of processes.
+        owner_ids = map_partid_rank(owner_ids, world_size)
 
         # Ask these owners to supply for the shuffle_global_nids.
         send_list = []
@@ -296,6 +328,9 @@ class DistLookupService:
 
         # Send the shuffle-global-nids to their respective ranks.
         mapped_global_nids = alltoallv_cpu(self.rank, self.world_size, shuffle_nids_list)
+        for idx in range(len(mapped_global_nids)):
+            if mapped_global_nids[idx] == None:
+                mapped_global_nids[idx] = torch.empty((0,), dtype=torch.int64)
 
         # Reorder to match global_nids (function parameter).
         global_nids_order = np.concatenate(id_list)

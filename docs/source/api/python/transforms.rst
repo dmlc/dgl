@@ -33,3 +33,4 @@ dgl.transforms
     FeatMask
     RowFeatNormalizer
     SIGNDiffusion
+    ToLevi

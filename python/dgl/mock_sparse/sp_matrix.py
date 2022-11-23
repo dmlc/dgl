@@ -62,7 +62,7 @@ class SparseMatrix:
         shape: Optional[Tuple[int, int]] = None,
     ):
         if val is None:
-            val = torch.ones(row.shape[0])
+            val = torch.ones(row.shape[0]).to(row.device)
         i = torch.cat((row.unsqueeze(0), col.unsqueeze(0)), 0)
         if shape is None:
             self.adj = torch.sparse_coo_tensor(i, val).coalesce()

@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
- * \file array/cpu/array_sort.cu
- * \brief Array sort GPU implementation
+ * @file array/cpu/array_sort.cu
+ * @brief Array sort GPU implementation
  */
 #include <dgl/array.h>
 
