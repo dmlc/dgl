@@ -1499,7 +1499,7 @@ def test_hgt(idtype, in_size, num_heads):
 
     m = nn.HGTConv(in_size, head_size, num_heads, num_ntypes, num_etypes).to(dev)
 
-    y = m(g, [x], [ntype], etype)
+    y = m(g, x, ntype, etype)
     assert y.shape == (g.num_nodes(), head_size * num_heads)
     # presorted
     sorted_ntype, idx_nt = th.sort(ntype)
@@ -1513,23 +1513,21 @@ def test_hgt(idtype, in_size, num_heads):
     print(sorted_g.ndata['t'])
     print(sorted_g.edata['t'])
     sorted_x = sorted_g.ndata['x']
-    sorted_y = m(sorted_g, [sorted_x], [sorted_ntype], sorted_etype, presorted=False)
+    sorted_y = m(sorted_g, sorted_x, sorted_ntype, sorted_etype, presorted=False)
     assert sorted_y.shape == (g.num_nodes(), head_size * num_heads)
     # mini-batch
-    train_idx = th.randint(0, 100, (10, ), dtype = idtype)
+    train_idx = th.randint(0, 100, (10,), dtype=idtype)
     sampler = dgl.dataloading.NeighborSampler([-1])
     train_loader = dgl.dataloading.DataLoader(g, train_idx.to(dev), sampler,
-                                            batch_size=8, device=dev,
-                                            shuffle=True)
+                                              batch_size=8, device=dev,
+                                              shuffle=True)
     (input_nodes, output_nodes, block) = next(iter(train_loader))
     block = block[0]
-    input_x = x[input_nodes.to(th.long)]
-    output_x = x[output_nodes.to(th.long)]
-    input_ntype = ntype[input_nodes.to(th.long)]
-    output_ntype = ntype[output_nodes.to(th.long)]
+    x = x[input_nodes.to(th.long)]
+    ntype = ntype[input_nodes.to(th.long)]
     edge = block.edata[dgl.EID]
     etype = etype[edge.to(th.long)]
-    y = m(block, [input_x, output_x], [input_ntype, output_ntype], etype)
+    y = m(block, x, ntype, etype)
     assert y.shape == (block.number_of_dst_nodes(), head_size * num_heads)
     # TODO(minjie): enable the following check
     #assert th.allclose(y, sorted_y[rev_idx], atol=1e-4, rtol=1e-4)

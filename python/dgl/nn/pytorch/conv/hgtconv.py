@@ -1,6 +1,7 @@
 """Heterogeneous Graph Transformer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
 import math
+
 import torch
 import torch.nn as nn
 
@@ -123,10 +124,10 @@ class HGTConv(nn.Module):
         ----------
         g : DGLGraph
             The input graph.
-        x : [torch.Tensor]
-            A list of 2D tensor of node features. Shape: :math:`(|V|, D_{in})`.
-        ntype : [torch.Tensor]
-            A list of 1D integer tensor of node types. Shape: :math:`(|V|,)`.
+        x : torch.Tensor
+            A 2D tensor of node features. Shape: :math:`(|V|, D_{in})`.
+        ntype : torch.Tensor
+            An 1D integer tensor of node types. Shape: :math:`(|V|,)`.
         etype : torch.Tensor
             An 1D integer tensor of edge types. Shape: :math:`(|E|,)`.
         presorted : bool, optional
@@ -141,38 +142,43 @@ class HGTConv(nn.Module):
             New node features. Shape: :math:`(|V|, D_{head} * N_{head})`.
         """
         self.presorted = presorted
+        if g.is_block:
+            x_src = x
+            x_dst = x[:g.num_dst_nodes()]
+            srcntype = ntype
+            dstntype = ntype[:g.num_dst_nodes()]
+        else:
+            x_src = x
+            x_dst = x
+            srcntype = ntype
+            dstntype = ntype
         with g.local_scope():
-            k = self.linear_k(x[0], ntype[0], presorted).view(
+            k = self.linear_k(x_src, srcntype, presorted).view(
                 -1, self.num_heads, self.head_size
-            )
-            q = self.linear_q(x[-1], ntype[-1], presorted).view(
+                )
+            q = self.linear_q(x_dst, dstntype, presorted).view(
                 -1, self.num_heads, self.head_size
-            )
-            v = self.linear_v(x[0], ntype[0], presorted).view(
+                )
+            v = self.linear_v(x_src, srcntype, presorted).view(
                 -1, self.num_heads, self.head_size
-            )
-
+                )
             g.srcdata["k"] = k
             g.dstdata["q"] = q
             g.srcdata["v"] = v
-
             g.edata["etype"] = etype
-
             g.apply_edges(self.message)
             g.edata["m"] = g.edata["m"] * edge_softmax(
                 g, g.edata["a"]
             ).unsqueeze(-1)
             g.update_all(fn.copy_e("m", "m"), fn.sum("m", "h"))
             h = g.dstdata["h"].view(-1, self.num_heads * self.head_size)
-
             # target-specific aggregation
-            h = self.drop(self.linear_a(h, ntype[-1], presorted))
-
-            alpha = torch.sigmoid(self.skip[ntype[-1]]).unsqueeze(-1)
-            if x[-1].shape != h.shape:
-                h = h * alpha + (x[-1] @ self.residual_w) * (1 - alpha)
+            h = self.drop(self.linear_a(h, dstntype, presorted))
+            alpha = torch.sigmoid(self.skip[dstntype]).unsqueeze(-1)
+            if x_dst.shape != h.shape:
+                h = h * alpha + (x_dst @ self.residual_w) * (1 - alpha)
             else:
-                h = h * alpha + x[-1] * (1 - alpha)
+                h = h * alpha + x_dst * (1 - alpha)
             if self.use_norm:
                 h = self.norm(h)
             return h
