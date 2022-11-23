@@ -34,14 +34,14 @@ class APPNP(nn.Module):
         self.A_dropout = nn.Dropout(dropout)
         self.alpha = alpha
 
-    def forward(self, A, X):
-        A_val_0 = A.val
+    def forward(self, A_hat, X):
+        A_val_0 = A_hat.val
         Z_0 = Z = self.f_theta(X)
         for _ in range(self.num_hops):
-            A.val = self.A_dropout(A_val_0)
-            Z = (1 - self.alpha) * A @ Z + self.alpha * Z_0
-        # Reset A.val to avoid value corruption.
-        A.val = A_val_0
+            A_hat.val = self.A_dropout(A_val_0)
+            Z = (1 - self.alpha) * A_hat @ Z + self.alpha * Z_0
+        # Reset A_hat.val to avoid value corruption.
+        A_hat.val = A_val_0
         return Z
 
 
