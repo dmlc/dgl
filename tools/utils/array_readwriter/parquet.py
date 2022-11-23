@@ -19,6 +19,9 @@ class ParquetArrayParser(object):
         # As parquet data are tabularized, we assume the dim of ndarray is 2.
         # If not, it should be explictly specified in the file as metadata.
         shape = metadata.get(b'shape', None)
+        if not shape:
+            logging.warning("Shape info not found in the file,
+                            "read the data to a 2-dim array.")
         table = pyarrow.parquet.read_table(path, memory_map=True)
         logging.info("Done reading from %s" % path)
         arr = table.to_pandas().to_numpy()
