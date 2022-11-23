@@ -605,7 +605,7 @@ def _gsddmm_hetero(
                 expand_lhs = True
         if use_rhs:
             if rhs is not None and F.ndim(rhs) == 1:
-                rhs = F.unsqueeze(lhs, -1)
+                rhs = F.unsqueeze(rhs, -1)
                 expand_rhs = True
         ctx = F.context(lhs) if use_lhs else F.context(rhs)
         dtype = F.dtype(lhs) if use_lhs else F.dtype(rhs)
