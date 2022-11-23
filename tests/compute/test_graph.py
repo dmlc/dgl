@@ -62,9 +62,7 @@ def test_query():
 
         for i in range(10):
             assert g.has_node(i)
-            assert i in g
         assert not g.has_node(11)
-        assert not 11 in g
         assert F.allclose(g.has_nodes([0,2,10,11]), F.tensor([1,1,0,0]))
 
         src, dst = edge_pair_input()
@@ -133,9 +131,7 @@ def test_query():
 
         for i in range(10):
             assert g.has_node(i)
-            assert i in g
         assert not g.has_node(11)
-        assert not 11 in g
         assert F.allclose(g.has_nodes([0,2,10,11]), F.tensor([1,1,0,0]))
 
         src, dst = edge_pair_input(sort=True)
@@ -324,7 +320,6 @@ def test_hypersparse_query():
     g.add_edges([0], [1])
     for i in range(10):
         assert g.has_node(i)
-        assert i in g
     assert not g.has_node(1000002)
     assert g.edge_id(0, 1) == 0
     src, dst = g.find_edges([0])
