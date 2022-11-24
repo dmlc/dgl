@@ -969,9 +969,40 @@ class DataLoader(torch.utils.data.DataLoader):
         self.other_storages[name] = wrap_storage(data)
 
     def attach_ndata(self, key, feature_storage, ntype='_N'):
+        """Attach a :class:`dgl.storages.FeatureStorage` to node type
+        :attr:`ntype` with name :attr:`key`.
+
+        Parameters
+        ----------
+        key : str
+            Name of the attached node feature.
+        feature_storage : :class:`dgl.storages.FeatureStorage` or types
+        registered by ``register_storage_wrapper()``, e.g., torch.Tensor,
+        np.memmap, etc.
+            The feature source to be attached.
+        ntype : str, optional
+            Node type to attach feature to. Default is ``'_N'`` for homographs.
+            For heterographs, users usually have to specify it manually.
+        """
         self.extern_ndata[(key, ntype)] = wrap_storage(feature_storage)
 
-    def attach_edata(self, key, feature_storage, etype=('_N', '_E', '_N')):
+    def attach_edata(self, key, feature_storage, etype='_E'):
+        """Attach a :class:`dgl.storages.FeatureStorage` to edge type
+        :attr:`etype` with name :attr:`key`.
+
+        Parameters
+        ----------
+        key : str
+            Name of the attached edge feature.
+        feature_storage : :class:`dgl.storages.FeatureStorage` or types
+        registered by ``register_storage_wrapper()``, e.g., torch.Tensor,
+        np.memmap, etc.
+            The feature source to be attached.
+        ntype : str, optional
+            Edge type to attach feature to. Default is ``'_E'`` for homographs.
+            For heterographs, users usually have to specify it manually.
+        """
+        etype = self.graph.to_canonical_etype(etype)
         self.extern_edata[(key, etype)] = wrap_storage(feature_storage)
 
 
