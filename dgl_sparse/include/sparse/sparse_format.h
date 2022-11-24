@@ -18,7 +18,7 @@
 namespace dgl {
 namespace sparse {
 
-/** @brief SparseFormat enumeration */
+/** @brief SparseFormat enumeration. */
 enum SparseFormat { kCOO, kCSR, kCSC };
 
 /** @brief COO sparse structure. */
@@ -32,9 +32,9 @@ struct COO {
   /** @brief data index tensor. When it is null, assume it is from 0 to NNZ - 1.
    */
   torch::optional<torch::Tensor> data;
-  /** @brief whether the row indices are sorted */
+  /** @brief whether the row indices are sorted. */
   bool row_sorted = false;
-  /** @brief whether the column indices per row are sorted */
+  /** @brief whether the column indices per row are sorted. */
   bool col_sorted = false;
 };
 

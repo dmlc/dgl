@@ -12,7 +12,7 @@ if not sys.platform.startswith("linux"):
 
 
 @pytest.mark.parametrize("dense_dim", [None, 4])
-@pytest.mark.parametrize("row", [[0, 0, 1, 2], (0, 1, 2, 4)])
+@pytest.mark.parametrize("row", [(0, 0, 1, 2), (0, 1, 2, 4)])
 @pytest.mark.parametrize("col", [(0, 1, 2, 2), (1, 3, 3, 4)])
 @pytest.mark.parametrize("shape", [None, (3, 5), (5, 3)])
 def test_create_from_coo(dense_dim, row, col, shape):
@@ -43,7 +43,7 @@ def test_create_from_coo(dense_dim, row, col, shape):
 
 
 @pytest.mark.parametrize("dense_dim", [None, 4])
-@pytest.mark.parametrize("indptr", [[0, 0, 1, 4], (0, 1, 2, 4)])
+@pytest.mark.parametrize("indptr", [(0, 0, 1, 4), (0, 1, 2, 4)])
 @pytest.mark.parametrize("indices", [(0, 1, 2, 3), (1, 2, 3, 4)])
 @pytest.mark.parametrize("shape", [None, (3, 5)])
 def test_create_from_csr(dense_dim, indptr, indices, shape):
@@ -70,7 +70,7 @@ def test_create_from_csr(dense_dim, indptr, indices, shape):
 
 
 @pytest.mark.parametrize("dense_dim", [None, 4])
-@pytest.mark.parametrize("indptr", [[0, 0, 1, 4], (0, 1, 2, 4)])
+@pytest.mark.parametrize("indptr", [(0, 0, 1, 4), (0, 1, 2, 4)])
 @pytest.mark.parametrize("indices", [(0, 1, 2, 3), (1, 2, 3, 4)])
 @pytest.mark.parametrize("shape", [None, (5, 3)])
 def test_create_from_csc(dense_dim, indptr, indices, shape):
@@ -127,7 +127,7 @@ def test_set_val():
 
 
 @pytest.mark.parametrize("dense_dim", [None, 4])
-@pytest.mark.parametrize("indptr", [[0, 0, 1, 4], (0, 1, 2, 4)])
+@pytest.mark.parametrize("indptr", [(0, 0, 1, 4), (0, 1, 2, 4)])
 @pytest.mark.parametrize("indices", [(0, 1, 2, 3), (1, 4, 3, 2)])
 @pytest.mark.parametrize("shape", [None, (3, 5)])
 def test_csr_to_coo(dense_dim, indptr, indices, shape):
@@ -161,7 +161,7 @@ def test_csr_to_coo(dense_dim, indptr, indices, shape):
 
 
 @pytest.mark.parametrize("dense_dim", [None, 4])
-@pytest.mark.parametrize("indptr", [[0, 0, 1, 4], (0, 1, 2, 4)])
+@pytest.mark.parametrize("indptr", [(0, 0, 1, 4), (0, 1, 2, 4)])
 @pytest.mark.parametrize("indices", [(0, 1, 2, 3), (1, 4, 3, 2)])
 @pytest.mark.parametrize("shape", [None, (5, 3)])
 def test_csc_to_coo(dense_dim, indptr, indices, shape):
@@ -202,7 +202,7 @@ def _scatter_add(a, index, v=1):
 
 
 @pytest.mark.parametrize("dense_dim", [None, 4])
-@pytest.mark.parametrize("row", [[0, 0, 1, 2], (0, 1, 2, 4)])
+@pytest.mark.parametrize("row", [(0, 0, 1, 2), (0, 1, 2, 4)])
 @pytest.mark.parametrize("col", [(0, 1, 2, 2), (1, 3, 3, 4)])
 @pytest.mark.parametrize("shape", [None, (3, 5), (5, 3)])
 def test_coo_to_csr(dense_dim, row, col, shape):
@@ -237,7 +237,7 @@ def test_coo_to_csr(dense_dim, row, col, shape):
 
 
 @pytest.mark.parametrize("dense_dim", [None, 4])
-@pytest.mark.parametrize("indptr", [[0, 0, 1, 4], (0, 1, 2, 4)])
+@pytest.mark.parametrize("indptr", [(0, 0, 1, 4), (0, 1, 2, 4)])
 @pytest.mark.parametrize("indices", [(0, 1, 2, 3), (1, 4, 3, 2)])
 @pytest.mark.parametrize("shape", [None, (5, 3)])
 def test_csc_to_csr(dense_dim, indptr, indices, shape):
@@ -278,7 +278,7 @@ def test_csc_to_csr(dense_dim, indptr, indices, shape):
 
 
 @pytest.mark.parametrize("dense_dim", [None, 4])
-@pytest.mark.parametrize("row", [[0, 0, 1, 2], (0, 1, 2, 4)])
+@pytest.mark.parametrize("row", [(0, 0, 1, 2), (0, 1, 2, 4)])
 @pytest.mark.parametrize("col", [(0, 1, 2, 2), (1, 3, 3, 4)])
 @pytest.mark.parametrize("shape", [None, (3, 5), (5, 3)])
 def test_coo_to_csc(dense_dim, row, col, shape):
@@ -313,7 +313,7 @@ def test_coo_to_csc(dense_dim, row, col, shape):
 
 
 @pytest.mark.parametrize("dense_dim", [None, 4])
-@pytest.mark.parametrize("indptr", [[0, 0, 1, 4], (0, 1, 2, 4)])
+@pytest.mark.parametrize("indptr", [(0, 0, 1, 4), (0, 1, 2, 4)])
 @pytest.mark.parametrize("indices", [(0, 1, 2, 3), (1, 2, 3, 4)])
 @pytest.mark.parametrize("shape", [None, (3, 5)])
 def test_csr_to_csc(dense_dim, indptr, indices, shape):

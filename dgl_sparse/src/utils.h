@@ -61,7 +61,7 @@ inline static torch::Tensor DGLArrayToTorchTensor(runtime::NDArray array) {
   return at::fromDLPack(runtime::DLPackConvert::ToDLPack(array));
 }
 
-/** @brief Convert a optional Torch tensor to a DGL array. */
+/** @brief Convert an optional Torch tensor to a DGL array. */
 inline static runtime::NDArray OptionalTorchTensorToDGLArray(
     torch::optional<torch::Tensor> tensor) {
   if (!tensor.has_value()) {
@@ -70,7 +70,7 @@ inline static runtime::NDArray OptionalTorchTensorToDGLArray(
   return TorchTensorToDGLArray(tensor.value());
 }
 
-/** @brief Convert a DGL array to an option Torch tensor. */
+/** @brief Convert a DGL array to an optional Torch tensor. */
 inline static torch::optional<torch::Tensor> DGLArrayToOptionalTorchTensor(
     runtime::NDArray array) {
   if (aten::IsNullArray(array)) {
