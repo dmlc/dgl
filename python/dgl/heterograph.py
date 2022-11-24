@@ -346,14 +346,6 @@ class DGLGraph(object):
             self._node_frames[ntid].append(data)
         self._reset_cached_info()
 
-    def add_edge(self, u, v, data=None, etype=None):
-        """Add one edge to the graph.
-
-        DEPRECATED: please use ``add_edges``.
-        """
-        dgl_warning("DGLGraph.add_edge is deprecated. Please use DGLGraph.add_edges")
-        self.add_edges(u, v, data, etype)
-
     def add_edges(self, u, v, data=None, etype=None):
         r"""Add multiple new edges for the specified edge type
 

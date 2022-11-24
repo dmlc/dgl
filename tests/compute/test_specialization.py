@@ -13,10 +13,10 @@ def generate_graph(idtype):
     g.add_nodes(10)
     # create a graph where 0 is the source and 9 is the sink
     for i in range(1, 9):
-        g.add_edge(0, i)
-        g.add_edge(i, 9)
+        g.add_edges(0, i)
+        g.add_edges(i, 9)
     # add a back flow from 9 to 0
-    g.add_edge(9, 0)
+    g.add_edges(9, 0)
     g.ndata.update({'f1' : F.randn((10,)), 'f2' : F.randn((10, D))})
     weights = F.randn((17,))
     g.edata.update({'e1': weights, 'e2': F.unsqueeze(weights, 1)})
@@ -154,8 +154,8 @@ def test_update_all_multi_fallback(idtype):
     g = g.astype(idtype).to(F.ctx())
     g.add_nodes(10)
     for i in range(1, 9):
-        g.add_edge(0, i)
-        g.add_edge(i, 9)
+        g.add_edges(0, i)
+        g.add_edges(i, 9)
     g.ndata['h'] = F.randn((10, D))
     g.edata['w1'] = F.randn((16,))
     g.edata['w2'] = F.randn((16, D))
@@ -200,8 +200,8 @@ def test_pull_multi_fallback(idtype):
     g = g.astype(idtype).to(F.ctx())
     g.add_nodes(10)
     for i in range(1, 9):
-        g.add_edge(0, i)
-        g.add_edge(i, 9)
+        g.add_edges(0, i)
+        g.add_edges(i, 9)
     g.ndata['h'] = F.randn((10, D))
     g.edata['w1'] = F.randn((16,))
     g.edata['w2'] = F.randn((16, D))
