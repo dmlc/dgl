@@ -40,7 +40,7 @@ class GraphSageLayer(nn.Module):
         if self.use_bn and not hasattr(self, 'bn'):
             device = h.device
             self.bn = nn.BatchNorm1d(h.size()[1]).to(device)
-        g.update_all(fn.copy_src(src='h', out='m'), self.aggregator,
+        g.update_all(fn.copy_u(u='h', out='m'), self.aggregator,
                      self.bundler)
         if self.use_bn:
             h = self.bn(h)

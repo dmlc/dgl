@@ -63,7 +63,7 @@ class MWEConv(nn.Module):
             else:
                 g.ndata["feat_" + str(c)] = node_state_c
             g.update_all(
-                fn.src_mul_edge("feat_" + str(c), "feat_" + str(c), "m"), fn.sum("m", "feat_" + str(c) + "_new")
+                fn.u_mul_e("feat_" + str(c), "feat_" + str(c), "m"), fn.sum("m", "feat_" + str(c) + "_new")
             )
             node_state_c = g.ndata.pop("feat_" + str(c) + "_new")
             if self._out_feats >= self._in_feats:

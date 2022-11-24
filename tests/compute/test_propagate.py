@@ -92,10 +92,10 @@ def test_prop_nodes_topo(idtype):
     # tree
     tree = dgl.DGLGraph()
     tree.add_nodes(5)
-    tree.add_edge(1, 0)
-    tree.add_edge(2, 0)
-    tree.add_edge(3, 2)
-    tree.add_edge(4, 2)
+    tree.add_edges(1, 0)
+    tree.add_edges(2, 0)
+    tree.add_edges(3, 2)
+    tree.add_edges(4, 2)
     tree = dgl.graph(tree.edges())
     # init node feature data
     tree.ndata["x"] = F.zeros((5, 2))

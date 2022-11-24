@@ -11,7 +11,6 @@ def check_fail(fn, *args, **kwargs):
         return True
 
 def assert_is_identical(g, g2):
-    assert g.is_readonly == g2.is_readonly
     assert g.number_of_nodes() == g2.number_of_nodes()
     src, dst = g.all_edges(order='eid')
     src2, dst2 = g2.all_edges(order='eid')
@@ -26,7 +25,6 @@ def assert_is_identical(g, g2):
         assert F.allclose(g.edata[k], g2.edata[k])
 
 def assert_is_identical_hetero(g, g2, ignore_internal_data=False):
-    assert g.is_readonly == g2.is_readonly
     assert g.ntypes == g2.ntypes
     assert g.canonical_etypes == g2.canonical_etypes
 
