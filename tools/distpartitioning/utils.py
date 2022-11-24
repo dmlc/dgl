@@ -1,14 +1,11 @@
 import json
 import logging
 import os
-from contextlib import contextmanager
 
 import constants
 import numpy as np
 import psutil
 import pyarrow
-import torch
-from numpy.lib.format import open_memmap
 from pyarrow import csv
 
 import dgl
