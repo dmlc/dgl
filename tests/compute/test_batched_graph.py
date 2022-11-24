@@ -191,8 +191,8 @@ def test_batched_edge_ordering(idtype):
     e2 = F.randn((6, 10))
     g2.edata['h'] = e2
     g = dgl.batch([g1, g2])
-    r1 = g.edata['h'][g.edge_id(4, 5)]
-    r2 = g1.edata['h'][g1.edge_id(4, 5)]
+    r1 = g.edata['h'][g.edge_ids(4, 5)]
+    r2 = g1.edata['h'][g1.edge_ids(4, 5)]
     assert F.array_equal(r1, r2)
 
 @parametrize_idtype
