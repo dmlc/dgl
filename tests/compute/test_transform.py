@@ -101,8 +101,8 @@ def test_no_backtracking():
     for i in range(1, N):
         e1 = G.edge_id(0, i)
         e2 = G.edge_id(i, 0)
-        assert not L.has_edge_between(e1, e2)
-        assert not L.has_edge_between(e2, e1)
+        assert not L.has_edges_between(e1, e2)
+        assert not L.has_edges_between(e2, e1)
 
 # reverse graph related
 @parametrize_idtype

@@ -2624,20 +2624,6 @@ class DGLGraph(object):
         return len(self.ntypes) == 1 and len(self.etypes) == 1
 
     @property
-    def is_readonly(self):
-        """**DEPRECATED**: DGLGraph will always be mutable.
-
-        Returns
-        -------
-        bool
-            True if the graph is readonly, False otherwise.
-        """
-        dgl_warning('DGLGraph.is_readonly is deprecated in v0.5.\n'
-                    'DGLGraph now always supports mutable operations like add_nodes'
-                    ' and add_edges.')
-        return False
-
-    @property
     def idtype(self):
         """The data type for storing the structure-related graph information
         such as node and edge IDs.
@@ -2745,14 +2731,6 @@ class DGLGraph(object):
         else:
             return F.astype(ret, F.bool)
 
-    def has_node(self, vid, ntype=None):
-        """Whether the graph has a particular node of a given type.
-
-        **DEPRECATED**: see :func:`~DGLGraph.has_nodes`
-        """
-        dgl_warning("DGLGraph.has_node is deprecated. Please use DGLGraph.has_nodes")
-        return self.has_nodes(vid, ntype)
-
     def has_edges_between(self, u, v, etype=None):
         """Return whether the graph contains the given edges.
 
@@ -2842,15 +2820,6 @@ class DGLGraph(object):
             return bool(F.as_scalar(ret))
         else:
             return F.astype(ret, F.bool)
-
-    def has_edge_between(self, u, v, etype=None):
-        """Whether the graph has edges of type ``etype``.
-
-        **DEPRECATED**: please use :func:`~DGLGraph.has_edge_between`.
-        """
-        dgl_warning("DGLGraph.has_edge_between is deprecated. "
-                    "Please use DGLGraph.has_edges_between")
-        return self.has_edges_between(u, v, etype)
 
     def predecessors(self, v, etype=None):
         """Return the predecessor(s) of a particular node with the specified edge type.
@@ -3424,14 +3393,6 @@ class DGLGraph(object):
         else:
             raise DGLError('Invalid form: {}. Must be "all", "uv" or "eid".'.format(form))
 
-    def in_degree(self, v, etype=None):
-        """Return the in-degree of node ``v`` with edges of type ``etype``.
-
-        **DEPRECATED**: Please use in_degrees
-        """
-        dgl_warning("DGLGraph.in_degree is deprecated. Please use DGLGraph.in_degrees")
-        return self.in_degrees(v, etype)
-
     def in_degrees(self, v=ALL, etype=None):
         """Return the in-degree(s) of the given nodes.
 
@@ -3507,14 +3468,6 @@ class DGLGraph(object):
             return F.as_scalar(deg)
         else:
             return deg
-
-    def out_degree(self, u, etype=None):
-        """Return the out-degree of node `u` with edges of type ``etype``.
-
-        DEPRECATED: please use DGL.out_degrees
-        """
-        dgl_warning("DGLGraph.out_degree is deprecated. Please use DGLGraph.out_degrees")
-        return self.out_degrees(u, etype)
 
     def out_degrees(self, u=ALL, etype=None):
         """Return the out-degree(s) of the given nodes.

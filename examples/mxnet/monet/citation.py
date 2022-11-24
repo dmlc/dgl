@@ -118,7 +118,7 @@ def main(args):
     pseudo = []
     for i in range(g.number_of_edges()):
         pseudo.append(
-            [1 / np.sqrt(g.in_degree(us[i])), 1 / np.sqrt(g.in_degree(vs[i]))]
+            [1 / np.sqrt(g.in_degrees(us[i])), 1 / np.sqrt(g.in_degrees(vs[i]))]
         )
     pseudo = nd.array(pseudo, ctx=ctx)
 
