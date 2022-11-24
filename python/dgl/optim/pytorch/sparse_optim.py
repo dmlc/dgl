@@ -526,7 +526,7 @@ class SparseAdagrad(SparseGradOptimizer):
             ), "SparseAdagrad only supports dgl.nn.NodeEmbedding"
 
             emb_name = emb.name
-            if th.device(emb.emb_tensor.device) == th.device("cpu"):
+            if th.device(emb.weight.device) == th.device("cpu"):
                 # if our embedding is on the CPU, our state also has to be
                 if self._rank < 0:
                     state = th.empty(
@@ -550,9 +550,9 @@ class SparseAdagrad(SparseGradOptimizer):
             else:
                 # distributed state on on gpu
                 state = th.empty(
-                    emb.emb_tensor.shape,
+                    emb.weight.shape,
                     dtype=th.float32,
-                    device=emb.emb_tensor.device,
+                    device=emb.weight.device,
                 ).zero_()
             emb.set_optm_state(state)
 
@@ -689,7 +689,7 @@ class SparseAdam(SparseGradOptimizer):
             ), "SparseAdam only supports dgl.nn.NodeEmbedding"
             emb_name = emb.name
             self._is_using_uva[emb_name] = self._use_uva
-            if th.device(emb.emb_tensor.device) == th.device("cpu"):
+            if th.device(emb.weight.device) == th.device("cpu"):
                 # if our embedding is on the CPU, our state also has to be
                 if self._rank < 0:
                     state_step = th.empty(
@@ -743,19 +743,19 @@ class SparseAdam(SparseGradOptimizer):
 
                 # distributed state on on gpu
                 state_step = th.empty(
-                    [emb.emb_tensor.shape[0]],
+                    [emb.weight.shape[0]],
                     dtype=th.int32,
-                    device=emb.emb_tensor.device,
+                    device=emb.weight.device,
                 ).zero_()
                 state_mem = th.empty(
-                    emb.emb_tensor.shape,
+                    emb.weight.shape,
                     dtype=self._dtype,
-                    device=emb.emb_tensor.device,
+                    device=emb.weight.device,
                 ).zero_()
                 state_power = th.empty(
-                    emb.emb_tensor.shape,
+                    emb.weight.shape,
                     dtype=self._dtype,
-                    device=emb.emb_tensor.device,
+                    device=emb.weight.device,
                 ).zero_()
             state = (state_step, state_mem, state_power)
             emb.set_optm_state(state)
