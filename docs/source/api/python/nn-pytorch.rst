@@ -14,6 +14,7 @@ Conv Layers
     ~dgl.nn.pytorch.conv.GraphConv
     ~dgl.nn.pytorch.conv.EdgeWeightNorm
     ~dgl.nn.pytorch.conv.RelGraphConv
+    ~dgl.nn.pytorch.conv.CuGraphRelGraphConv
     ~dgl.nn.pytorch.conv.TAGConv
     ~dgl.nn.pytorch.conv.GATConv
     ~dgl.nn.pytorch.conv.GATv2Conv
@@ -116,6 +117,7 @@ Utility Modules
     ~dgl.nn.pytorch.utils.LabelPropagation
     ~dgl.nn.pytorch.graph_transformer.DegreeEncoder
     ~dgl.nn.pytorch.utils.LaplacianPosEnc
+    ~dgl.nn.pytorch.graph_transformer.BiasedMultiheadAttention
 
 Network Embedding Modules
 ----------------------------------------

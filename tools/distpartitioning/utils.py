@@ -188,7 +188,7 @@ def get_gnid_range_map(node_tids):
 
     return ntypes_gid_range
 
-def write_metadata_json(metadata_list, output_dir, graph_name):
+def write_metadata_json(input_list, output_dir, graph_name, world_size, num_parts):
     """
     Merge json schema's from each of the rank's on rank-0. 
     This utility function, to be used on rank-0, to create aggregated json file.
@@ -202,6 +202,14 @@ def write_metadata_json(metadata_list, output_dir, graph_name):
     graph-name : string
         a string specifying the graph name
     """
+    # Preprocess the input_list, a list of dictionaries
+    # each dictionary will contain num_parts/world_size metadata json 
+    # which correspond to local partitions on the respective ranks.
+    metadata_list = []
+    for local_part_id in range(num_parts//world_size):
+        for idx in range(world_size):
+            metadata_list.append(input_list[idx]["local-part-id-"+str(local_part_id*world_size + idx)])
+
     #Initialize global metadata
     graph_metadata = {}
 
@@ -238,7 +246,7 @@ def write_metadata_json(metadata_list, output_dir, graph_name):
 
     _dump_part_config(f'{output_dir}/metadata.json', graph_metadata)
 
-def augment_edge_data(edge_data, lookup_service, edge_tids, rank, world_size):
+def augment_edge_data(edge_data, lookup_service, edge_tids, rank, world_size, num_parts):
     """
     Add partition-id (rank which owns an edge) column to the edge_data.
 
@@ -256,6 +264,8 @@ def augment_edge_data(edge_data, lookup_service, edge_tids, rank, world_size):
         rank of the current process
     world_size : integer
         total no. of process participating in the communication primitives
+    num_parts : integer
+        total no. of partitions requested for the input graph
 
     Returns:
     --------
@@ -269,16 +279,18 @@ def augment_edge_data(edge_data, lookup_service, edge_tids, rank, world_size):
     offset = 0
     for etype_name, tid_range in edge_tids.items(): 
         assert int(tid_range[0][0]) == 0
-        assert len(tid_range) == world_size
+        assert len(tid_range) == num_parts 
         etype_offset[etype_name] = offset + int(tid_range[0][0])
         offset += int(tid_range[-1][1])
 
     global_eids = []
     for etype_name, tid_range in edge_tids.items(): 
-        global_eid_start = etype_offset[etype_name]
-        begin = global_eid_start + int(tid_range[rank][0])
-        end = global_eid_start + int(tid_range[rank][1])
-        global_eids.append(np.arange(begin, end, dtype=np.int64))
+        for idx in range(num_parts):
+            if map_partid_rank(idx, world_size) == rank:
+                global_eid_start = etype_offset[etype_name]
+                begin = global_eid_start + int(tid_range[idx][0])
+                end = global_eid_start + int(tid_range[idx][1])
+                global_eids.append(np.arange(begin, end, dtype=np.int64))
     global_eids = np.concatenate(global_eids)
     assert global_eids.shape[0] == edge_data[constants.ETYPE_ID].shape[0]
     edge_data[constants.GLOBAL_EID] = global_eids
@@ -528,3 +540,22 @@ def memory_snapshot(tag, rank):
     mem_string = f'{total:.0f} (MB) total, {peak:.0f} (MB) peak, {used:.0f} (MB) used, {avail:.0f} (MB) avail'
     logging.debug(f'[Rank: {rank} MEMORY_SNAPSHOT] {mem_string} - {tag}')
 
+
+def map_partid_rank(partid, world_size):
+    """Auxiliary function to map a given partition id to one of the rank in the
+    MPI_WORLD processes. The range of partition ids is assumed to equal or a 
+    multiple of the total size of MPI_WORLD. In this implementation, we use
+    a cyclical mapping procedure to convert partition ids to ranks.
+
+    Parameters:
+    -----------
+    partid : int
+        partition id, as read from node id to partition id mappings.
+
+    Returns:
+    --------
+    int : 
+        rank of the process, which will be responsible for the given partition
+        id.
+    """
+    return partid % world_size

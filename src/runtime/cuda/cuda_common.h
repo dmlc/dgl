@@ -12,12 +12,60 @@
 #include <cusparse.h>
 #include <dgl/runtime/packed_func.h>
 
+#include <memory>
 #include <string>
 
 #include "../workspace_pool.h"
 
 namespace dgl {
 namespace runtime {
+
+/*
+  How to use this class to get a nonblocking thrust execution policy that uses
+  DGL's memory pool and the current cuda stream
+
+  runtime::CUDAWorkspaceAllocator allocator(ctx);
+  const auto stream = runtime::getCurrentCUDAStream();
+  const auto exec_policy = thrust::cuda::par_nosync(allocator).on(stream);
+
+  now, one can pass exec_policy to thrust functions
+
+  to get an integer array of size 1000 whose lifetime is managed by unique_ptr,
+  use: auto int_array = allocator.alloc_unique<int>(1000); int_array.get() gives
+  the raw pointer.
+*/
+class CUDAWorkspaceAllocator {
+  DGLContext ctx;
+
+ public:
+  typedef char value_type;
+
+  void operator()(void* ptr) const {
+    runtime::DeviceAPI::Get(ctx)->FreeWorkspace(ctx, ptr);
+  }
+
+  explicit CUDAWorkspaceAllocator(DGLContext ctx) : ctx(ctx) {}
+
+  CUDAWorkspaceAllocator& operator=(const CUDAWorkspaceAllocator&) = default;
+
+  template <typename T>
+  std::unique_ptr<T, CUDAWorkspaceAllocator> alloc_unique(
+      std::size_t size) const {
+    return std::unique_ptr<T, CUDAWorkspaceAllocator>(
+        reinterpret_cast<T*>(runtime::DeviceAPI::Get(ctx)->AllocWorkspace(
+            ctx, sizeof(T) * size)),
+        *this);
+  }
+
+  char* allocate(std::ptrdiff_t size) const {
+    return reinterpret_cast<char*>(
+        runtime::DeviceAPI::Get(ctx)->AllocWorkspace(ctx, size));
+  }
+
+  void deallocate(char* ptr, std::size_t) const {
+    runtime::DeviceAPI::Get(ctx)->FreeWorkspace(ctx, ptr);
+  }
+};
 
 template <typename T>
 inline bool is_zero(T size) {

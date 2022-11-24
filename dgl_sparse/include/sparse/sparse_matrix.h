@@ -1,11 +1,16 @@
 /**
  *  Copyright (c) 2022 by Contributors
  * @file sparse/sparse_matrix.h
- * @brief DGL C++ sparse matrix header
+ * @brief DGL C++ sparse matrix header.
  */
 #ifndef SPARSE_SPARSE_MATRIX_H_
 #define SPARSE_SPARSE_MATRIX_H_
 
+// clang-format off
+#include <sparse/dgl_headers.h>
+// clang-format on
+
+#include <sparse/sparse_format.h>
 #include <torch/custom_class.h>
 #include <torch/script.h>
 
@@ -14,33 +19,6 @@
 
 namespace dgl {
 namespace sparse {
-
-/** @brief SparseFormat enumeration */
-enum SparseFormat { kCOO, kCSR, kCSC };
-
-/** @brief CSR sparse structure */
-struct CSR {
-  // CSR format index pointer array of the matrix
-  torch::Tensor indptr;
-  // CSR format index array of the matrix
-  torch::Tensor indices;
-  // The element order of the sparse format. In the SparseMatrix, we have data
-  // (value_) for each non-zero value. The order of non-zero values in (value_)
-  // may differ from the order of non-zero entries in CSR. So we store
-  // `value_indices` in CSR to indicate its relative non-zero value order to the
-  // SparseMatrix. With `value_indices`, we can retrieve the correct value for
-  // CSR, i.e., `value_[value_indices]`. If `value_indices` is not defined, this
-  // CSR follows the same non-zero value order as the SparseMatrix.
-  torch::optional<torch::Tensor> value_indices;
-};
-
-/** @brief COO sparse structure */
-struct COO {
-  // COO format row array of the matrix
-  torch::Tensor row;
-  // COO format column array of the matrix
-  torch::Tensor col;
-};
 
 /** @brief SparseMatrix bound to Python  */
 class SparseMatrix : public torch::CustomClassHolder {
@@ -128,6 +106,12 @@ class SparseMatrix : public torch::CustomClassHolder {
   std::vector<torch::Tensor> CSRTensors();
   /** @return {row, col, value} tensors in the CSC format. */
   std::vector<torch::Tensor> CSCTensors();
+
+  /**
+   * @brief Set non-zero values of the sparse matrix
+   * @param value Values of the sparse matrix
+   */
+  void SetValue(torch::Tensor value);
 
  private:
   /** @brief Create the COO format for the sparse matrix internally */

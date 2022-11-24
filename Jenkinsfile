@@ -65,7 +65,7 @@ def unit_test_linux(backend, dev) {
 def unit_distributed_linux(backend, dev) {
   init_git()
   unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
-  timeout(time: 30, unit: 'MINUTES') {
+  timeout(time: 40, unit: 'MINUTES') {
     sh "bash tests/scripts/task_distributed_test.sh ${backend} ${dev}"
   }
 }
@@ -535,50 +535,6 @@ pipeline {
                   steps {
                     sh 'nvidia-smi'
                     unit_test_cugraph('pytorch', 'cugraph')
-                  }
-                }
-              }
-              post {
-                always {
-                  cleanWs disableDeferredWipeout: true, deleteDirs: true
-                }
-              }
-            }
-            stage('MXNet CPU') {
-              agent {
-                docker {
-                  label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:cu101_v220629"
-                  alwaysPull true
-                }
-              }
-              stages {
-                stage('MXNet CPU Unit test') {
-                  steps {
-                    unit_test_linux('mxnet', 'cpu')
-                  }
-                }
-              }
-              post {
-                always {
-                  cleanWs disableDeferredWipeout: true, deleteDirs: true
-                }
-              }
-            }
-            stage('MXNet GPU') {
-              agent {
-                docker {
-                  label "linux-gpu-node"
-                  image "dgllib/dgl-ci-gpu:cu101_v220816"
-                  args "--runtime nvidia"
-                  alwaysPull true
-                }
-              }
-              stages {
-                stage('MXNet GPU Unit test') {
-                  steps {
-                    sh 'nvidia-smi'
-                    unit_test_linux('mxnet', 'gpu')
                   }
                 }
               }

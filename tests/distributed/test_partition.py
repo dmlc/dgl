@@ -1,6 +1,7 @@
 import os
 
 import backend as F
+import torch as th
 import dgl
 import numpy as np
 import pytest
@@ -588,7 +589,7 @@ def test_BasicPartitionBook():
 
 
 def test_RangePartitionBook():
-    part_id = 0
+    part_id = 1
     num_parts = 2
 
     # homogeneous
@@ -662,10 +663,33 @@ def test_RangePartitionBook():
         expect_except = True
     assert expect_except
 
+    # NodePartitionPolicy
     node_policy = NodePartitionPolicy(gpb, "node1")
     assert node_policy.type_name == "node1"
+    assert node_policy.policy_str == "node~node1"
+    assert node_policy.part_id == part_id
+    assert node_policy.is_node
+    assert node_policy.get_data_name('x').is_node()
+    local_ids = th.arange(0, 1000)
+    global_ids = local_ids + 1000
+    assert th.equal(node_policy.to_local(global_ids), local_ids)
+    assert th.all(node_policy.to_partid(global_ids) == part_id)
+    assert node_policy.get_part_size() == 1000
+    assert node_policy.get_size() == 2000
+
+    # EdgePartitionPolicy
     edge_policy = EdgePartitionPolicy(gpb, c_etype)
     assert edge_policy.type_name == c_etype
+    assert edge_policy.policy_str == "edge~node1:edge1:node2"
+    assert edge_policy.part_id == part_id
+    assert not edge_policy.is_node
+    assert not edge_policy.get_data_name('x').is_node()
+    local_ids = th.arange(0, 5000)
+    global_ids = local_ids + 5000
+    assert th.equal(edge_policy.to_local(global_ids), local_ids)
+    assert th.all(edge_policy.to_partid(global_ids) == part_id)
+    assert edge_policy.get_part_size() == 5000
+    assert edge_policy.get_size() == 10000
 
     expect_except = False
     try:
