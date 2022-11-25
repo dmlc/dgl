@@ -17,11 +17,11 @@ from dgl.data import CoraGraphDataset
 from dgl.mock_sparse import create_from_coo, diag, identity
 
 class MLP(nn.Module):
-    def __init__(self, in_size, hidden_size=32):
+    def __init__(self, in_size, hidden_size):
         super().__init__()
         self.linear_1 = nn.Linear(in_size, hidden_size)
         self.linear_2 = nn.Linear(hidden_size, hidden_size)
-        self.dropout = nn.Dropout(0.5)
+        self.dropout = nn.Dropout(0.8)
 
     def forward(self, X):
         H = self.linear_1(X)
@@ -36,7 +36,7 @@ class MLP(nn.Module):
 ################################################################################
 class TWIRLS(nn.Module):
     def __init__(self, in_size, out_size, hidden_size=128,
-                 num_steps=2, lam=1.0, alpha=0.5):
+                 num_steps=16, lam=1.0, alpha=0.5):
         super().__init__()
         self.num_steps = num_steps
         self.lam = lam
@@ -55,6 +55,7 @@ class TWIRLS(nn.Module):
         # Iteratively compute new Y by equation (6) in the paper.
         for k in range(self.num_steps):
             Y_hat = self.lam * A @ Y + Y0
+            # The inverse of a diagonal matrix inverses its diagonal values.
             Y = (1 - self.alpha) * Y + self.alpha * (D_tild ** -1) @ Y_hat
 
         # Apply a linear layer on the final output.
@@ -66,7 +67,7 @@ class TWIRLS(nn.Module):
 ################################################################################
 class TWIRLSWithAttention(nn.Module):
     def __init__(self, in_size, out_size, hidden_size=128,
-                 num_steps=2, lam=1.0, alpha=0.5):
+                 num_steps=16, lam=1.0, alpha=0.5):
         super().__init__()
         self.num_steps = num_steps
         self.lam = lam
@@ -78,19 +79,28 @@ class TWIRLSWithAttention(nn.Module):
         # Compute Y = Y0 = f(X; W) using a two-layer MLP.
         Y = Y0 = self.mlp(X)
 
-        # Calculate attention weight by equation (25) in the paper.
-        Y_i = Y[A.row]
-        Y_j = Y[A.col]
-        norm_ij = torch.linalg.vector_norm(Y_i - Y_j, dim=1)
-        gamma_ij = 0.5 / (norm_ij + 1e-7)  # Add a small value to avoid divide by zero.
-        A.val = gamma_ij  # Set the new weight to the sparse matrix.
-
         # Compute diagonal matrix D_tild.
         I = identity(A.shape, device=A.device)
         D_tild = self.lam * diag(A.sum(1)) + I
 
-        # Iteratively compute new Y by equation (6) in the paper.
-        for k in range(self.num_steps):
+        # Conduct half of the diffusion steps.
+        for k in range(self.num_steps // 2):
+            Y_hat = self.lam * A @ Y + Y0
+            Y = (1 - self.alpha) * Y + self.alpha * (D_tild ** -1) @ Y_hat
+
+        # Calculate attention weight by equation (25) in the paper.
+        Y_i = Y[A.row]
+        Y_j = Y[A.col]
+        norm_ij = torch.linalg.vector_norm(Y_i - Y_j, dim=1)
+        # Bound the attention value within a range.
+        gamma_ij = torch.clamp(0.5 / (norm_ij + 1e-7), min=0.0, max=1.0)
+        # Update the adjacency matrix with the new weight
+        A = A(gamma_ij)
+        # Recompute D_tild
+        D_tild = self.lam * diag(A.sum(1)) + I
+
+        # Conduct the other half of the diffusion steps.
+        for k in range(self.num_steps // 2):
             Y_hat = self.lam * A @ Y + Y0
             Y = (1 - self.alpha) * Y + self.alpha * (D_tild ** -1) @ Y_hat
 
@@ -98,6 +108,7 @@ class TWIRLSWithAttention(nn.Module):
         return self.linear_out(Y)
 
 def evaluate(g, pred):
+    model.eval()
     label = g.ndata["label"]
     val_mask = g.ndata["val_mask"]
     test_mask = g.ndata["test_mask"]
@@ -111,9 +122,10 @@ def evaluate(g, pred):
 def train(g, model, A, X):
     labels = g.ndata["label"]
     train_mask = g.ndata["train_mask"]
-    optimizer = Adam(model.parameters(), lr=1e-3)
+    optimizer = Adam(model.parameters(), lr=5e-4)
 
     for epoch in range(300):
+        model.train()
         # Forward.
         logits = model(A, X)
 
@@ -154,8 +166,8 @@ if __name__ == "__main__":
     # Create the TWIRLS model.
     in_size = X.shape[1]
     out_size = dataset.num_classes
-    #model = TWIRLS(in_size, out_size).to(dev)
-    model = TWIRLSWithAttention(in_size, out_size).to(dev)
+    model = TWIRLS(in_size, out_size).to(dev)
+    #model = TWIRLSWithAttention(in_size, out_size).to(dev)
 
     # Kick off training.
     train(g, model, A, X)
