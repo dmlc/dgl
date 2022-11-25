@@ -228,14 +228,13 @@ endif()
 
 # Compile gpu_cache
 if(USE_CUDA)
-  enable_language(CUDA)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUSE_GPU_CACHE")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_GPU_CACHE")
-  # gpu_cache is compiled with the new CMAKE_CUDA_FLAGS
-  string(REGEX REPLACE "[;]" " " CMAKE_CUDA_FLAGS "${CUDA_NVCC_FLAGS}")
-  message(STATUS "CMAKE_CUDA_FLAGS: ${CMAKE_CUDA_FLAGS}")
-  add_subdirectory("third_party/HugeCTR/gpu_cache/src")
-  set_target_properties(gpu_cache PROPERTIES LINKER_LANGUAGE CUDA)
+  # Manually build gpu_cache because CMake always builds it as shared
+  file(GLOB gpu_cache_src
+    third_party/HugeCTR/gpu_cache/src/nv_gpu_cache.cu
+  )
+  cuda_add_library(gpu_cache STATIC ${gpu_cache_src})
   target_include_directories(gpu_cache PRIVATE "third_party/HugeCTR/gpu_cache/include")
   target_include_directories(dgl PRIVATE "third_party/HugeCTR/gpu_cache/include")
   list(APPEND DGL_LINKER_LIBS gpu_cache)
