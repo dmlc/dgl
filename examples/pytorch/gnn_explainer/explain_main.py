@@ -1,19 +1,15 @@
 import argparse
 import os
-import dgl
-from gnnlens import Writer
-import torch as th
 
-from dgl import load_graphs
-from dgl.nn import GNNExplainer
+import torch as th
+from gnnlens import Writer
 from models import Model
 
-from dgl.data import (
-    BAShapeDataset,
-    BACommunityDataset,
-    TreeCycleDataset,
-    TreeGridDataset,
-)
+import dgl
+from dgl import load_graphs
+from dgl.data import (BACommunityDataset, BAShapeDataset, TreeCycleDataset,
+                      TreeGridDataset)
+from dgl.nn import GNNExplainer
 
 
 def main(args):
