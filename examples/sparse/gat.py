@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from dgl.data import CoraGraphDataset
-from dgl.mock_sparse import create_from_coo, identity, bspmm
+from dgl.mock_sparse import bspmm, create_from_coo, identity
 from torch.optim import Adam
 
 
@@ -25,7 +25,7 @@ class GATConv(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        gain = nn.init.calculate_gain('relu')
+        gain = nn.init.calculate_gain("relu")
         nn.init.xavier_normal_(self.W.weight, gain=gain)
         nn.init.xavier_normal_(self.a_l, gain=gain)
         nn.init.xavier_normal_(self.a_r, gain=gain)
@@ -42,21 +42,19 @@ class GATConv(nn.Module):
         A_atten.val = self.dropout(A_atten.val)
         return bspmm(A_atten, Z)
 
+
 class GAT(nn.Module):
     def __init__(
-        self,
-        in_size,
-        out_size,
-        hidden_size=8,
-        num_heads=8,
-        dropout=0.6
+        self, in_size, out_size, hidden_size=8, num_heads=8, dropout=0.6
     ):
         super().__init__()
 
-        self.in_conv = GATConv(in_size, hidden_size,
-                               num_heads=num_heads, dropout=dropout)
-        self.out_conv = GATConv(hidden_size * num_heads, out_size,
-                                num_heads=1, dropout=dropout)
+        self.in_conv = GATConv(
+            in_size, hidden_size, num_heads=num_heads, dropout=dropout
+        )
+        self.out_conv = GATConv(
+            hidden_size * num_heads, out_size, num_heads=1, dropout=dropout
+        )
 
     def forward(self, A_hat, X):
         # Flatten the head and feature dimension.
