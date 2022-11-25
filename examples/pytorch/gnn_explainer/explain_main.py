@@ -62,7 +62,7 @@ def main(args):
         subgraph_eweights=edge_mask,
     )
 
-    # Finish dumping
+    # Finish dumping.
     writer.close()
 
 
