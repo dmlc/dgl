@@ -23,34 +23,31 @@ enum SparseFormat { kCOO, kCSR, kCSC };
 
 /** @brief COO sparse structure. */
 struct COO {
-  /** @brief the dense shape of the matrix. */
+  /** @brief The shape of the matrix. */
   int64_t num_rows = 0, num_cols = 0;
-  /** @brief COO format row array of the matrix. */
+  /** @brief COO format row indices array of the matrix. */
   torch::Tensor row;
-  /** @brief COO format column array of the matrix. */
+  /** @brief COO format column indices array of the matrix. */
   torch::Tensor col;
-  /** @brief data index tensor. When it is null, assume it is from 0 to NNZ - 1.
-   */
-  torch::optional<torch::Tensor> data;
-  /** @brief whether the row indices are sorted. */
+  /** @brief Whether the row indices are sorted. */
   bool row_sorted = false;
-  /** @brief whether the column indices per row are sorted. */
+  /** @brief Whether the column indices per row are sorted. */
   bool col_sorted = false;
 };
 
 
 /** @brief CSR sparse structure. */
 struct CSR {
-  /** @brief the dense shape of the matrix. */
+  /** @brief The dense shape of the matrix. */
   int64_t num_rows = 0, num_cols = 0;
   /** @brief CSR format index pointer array of the matrix. */
   torch::Tensor indptr;
   /** @brief CSR format index array of the matrix. */
   torch::Tensor indices;
-  /** @brief data index tensor. When it is null, assume it is from 0 to NNZ - 1.
+  /** @brief Data index tensor. When it is null, assume it is from 0 to NNZ - 1.
    */
-  torch::optional<torch::Tensor> data;
-  /** @brief whether the column indices per row are sorted. */
+  torch::optional<torch::Tensor> value_indices;
+  /** @brief Whether the column indices per row are sorted. */
   bool sorted = false;
 };
 

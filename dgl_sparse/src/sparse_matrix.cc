@@ -93,31 +93,23 @@ std::shared_ptr<CSR> SparseMatrix::CSCPtr() {
   return csc_;
 }
 
-std::vector<torch::Tensor> SparseMatrix::COOTensors() {
+std::tuple<torch::Tensor, torch::Tensor> SparseMatrix::COOTensors() {
   auto coo = COOPtr();
   auto val = value();
-  if (coo->data.has_value()) {
-    val = val.index({coo->data.value()});
-  }
-  return {coo->row, coo->col, val};
+  return {coo->row, coo->col};
 }
 
-std::vector<torch::Tensor> SparseMatrix::CSRTensors() {
+std::tuple<torch::Tensor, torch::Tensor, torch::optional<torch::Tensor>>
+SparseMatrix::CSRTensors() {
   auto csr = CSRPtr();
   auto val = value();
-  if (csr->data.has_value()) {
-    val = val.index({csr->data.value()});
-  }
-  return {csr->indptr, csr->indices, val};
+  return {csr->indptr, csr->indices, csr->value_indices};
 }
 
-std::vector<torch::Tensor> SparseMatrix::CSCTensors() {
+std::tuple<torch::Tensor, torch::Tensor, torch::optional<torch::Tensor>>
+SparseMatrix::CSCTensors() {
   auto csc = CSCPtr();
-  auto val = value();
-  if (csc->data.has_value()) {
-    val = val.index({csc->data.value()});
-  }
-  return {csc->indptr, csc->indices, val};
+  return {csc->indptr, csc->indices, csc->value_indices};
 }
 
 void SparseMatrix::SetValue(torch::Tensor value) { value_ = value; }
@@ -158,9 +150,8 @@ void SparseMatrix::_CreateCSC() {
 c10::intrusive_ptr<SparseMatrix> CreateFromCOO(
     torch::Tensor row, torch::Tensor col, torch::Tensor value,
     const std::vector<int64_t>& shape) {
-  auto coo = std::make_shared<COO>(
-      COO{shape[0], shape[1], row, col, torch::optional<torch::Tensor>(), false,
-          false});
+  auto coo =
+      std::make_shared<COO>(COO{shape[0], shape[1], row, col, false, false});
   return SparseMatrix::FromCOO(coo, value, shape);
 }
 

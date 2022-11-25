@@ -109,8 +109,8 @@ class SparseMatrix:
 
         Returns
         -------
-        Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
-            A tuple of tensors containing row, column coordinates and values.
+        Tuple[torch.Tensor, torch.Tensor]
+            A tuple of tensors containing row and column coordinates.
         """
         return self.c_sparse_matrix.coo()
 
@@ -120,7 +120,7 @@ class SparseMatrix:
         Returns
         -------
         Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
-            A tuple of tensors containing row, column coordinates and values.
+            A tuple of tensors containing row, column coordinates and value indices.
         """
         return self.c_sparse_matrix.csr()
 
@@ -130,7 +130,7 @@ class SparseMatrix:
         Returns
         -------
         Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
-            A tuple of tensors containing row, column coordinates and values.
+            A tuple of tensors containing row, column coordinates and value indices.
         """
         return self.c_sparse_matrix.csc()
 
@@ -142,7 +142,8 @@ class SparseMatrix:
         torch.Tensor
             Dense representation of the sparse matrix.
         """
-        row, col, val = self.coo()
+        row, col = self.coo()
+        val = self.val
         shape = self.shape + val.shape[1:]
         mat = torch.zeros(shape, device=self.device)
         mat[row, col] = val
