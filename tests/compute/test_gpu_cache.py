@@ -14,17 +14,15 @@
 #   limitations under the License.
 #
 
-import numpy as np
-import networkx as nx
 import unittest
-import scipy.sparse as ssp
-import pytest
 
-import dgl
 import backend as F
 from test_utils import parametrize_idtype
 
+import dgl
+
 D = 5
+
 
 def generate_graph(idtype, grad=False, add_data=True):
     g = dgl.DGLGraph().to(F.ctx(), dtype=idtype)
@@ -41,16 +39,17 @@ def generate_graph(idtype, grad=False, add_data=True):
         if grad:
             ncol = F.attach_grad(ncol)
             ecol = F.attach_grad(ecol)
-        g.ndata['h'] = ncol
-        g.edata['l'] = ecol
+        g.ndata["h"] = ncol
+        g.edata["l"] = ecol
     return g
 
-@unittest.skipIf(not F.gpu_ctx(), reason='only necessary with GPU')
+
+@unittest.skipIf(not F.gpu_ctx(), reason="only necessary with GPU")
 @parametrize_idtype
 def test_gpu_cache(idtype):
     g = generate_graph(idtype)
     cache = dgl.contrib.GpuCache(5, D, idtype)
-    h = g.ndata['h']
+    h = g.ndata["h"]
 
     t = 5
     keys = F.arange(0, t, dtype=idtype)
@@ -67,6 +66,7 @@ def test_gpu_cache(idtype):
     assert (values != h[F.tensor(keys, F.int64)]).sum().item() == 0
     cache.replace(m_keys, m_values)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     test_gpu_cache(F.int64)
     test_gpu_cache(F.int32)
