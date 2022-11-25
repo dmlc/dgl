@@ -37,7 +37,7 @@
 #include <string>
 #include <utility>
 #include <vector>
-#include <pcg_random.hpp>
+#include <dgl/pcg32.h>
 
 namespace dgl {
 namespace aten {
