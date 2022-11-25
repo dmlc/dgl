@@ -25,7 +25,7 @@ class ParquetArrayParser(object):
         if not shape:
             logging.warning(
                 "Shape information not found in the metadata, read the data as "
-                "a 2 dim array. "
+                "a 2 dim array."
             )
         shape = tuple(eval(shape.decode())) if shape else arr.shape
         return arr.reshape(shape)
