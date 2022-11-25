@@ -10,7 +10,6 @@
 #include <dgl/array.h>
 #include <dmlc/logging.h>
 #include <dmlc/thread_local.h>
-#include <dgl/pcg32.h>
 
 #include <random>
 #include <thread>
@@ -48,7 +47,7 @@ class RandomEngine {
   }
 
   /** @brief Constructor with given seed */
-  explicit RandomEngine(uint32_t seed, uint32_t stream=GetThreadId()) { SetSeed(seed, stream); }
+  explicit RandomEngine(uint32_t seed) { SetSeed(seed); }
 
   /** @brief Get the thread-local random number generator instance */
   static RandomEngine* ThreadLocal() {
@@ -58,7 +57,10 @@ class RandomEngine {
   /**
    * @brief Set the seed of this random number generator
    */
-  void SetSeed(uint32_t seed, uint32_t stream=GetThreadId()) { rng_.seed(seed, stream); }
+  void SetSeed(uint32_t seed) {
+    std::seed_seq seq{seed, GetThreadId()};
+    rng_.seed(seq);
+  }
 
   /**
    * @brief Generate an arbitrary random 32-bit integer.
@@ -247,7 +249,7 @@ class RandomEngine {
   }
 
  private:
-  pcg32 rng_;
+  std::mt19937_64 rng_;
 };
 
 };  // namespace dgl
