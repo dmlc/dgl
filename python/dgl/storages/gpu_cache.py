@@ -3,8 +3,7 @@ to use with a modified DGLGraph object with GPUCached node or edge
 data storage"""
 
 from .. import backend as F
-from ..contrib.gpu_cache import GPUCache
-from ..contrib.unified_tensor import UnifiedTensor
+from ..contrib import GPUCache, UnifiedTensor
 from .base import FeatureStorage
 
 
