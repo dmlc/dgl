@@ -144,8 +144,8 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
     if((dataset_features is not None) and (len(dataset_features) > 0)):
         for ntype_name, ntype_feature_data in dataset_features.items():
             for feat_name, feat_data in ntype_feature_data.items():
-                assert feat_data[constants.STR_FORMAT][constants.STR_NAME] \
-                in [constants.STR_NUMPY, constants.STR_PARQUET]
+                assert (feat_data[constants.STR_FORMAT][constants.STR_NAME]
+                in [constants.STR_NUMPY, constants.STR_PARQUET])
                 # It is guaranteed that num_chunks is always greater 
                 # than num_partitions. 
                 num_chunks = len(feat_data[constants.STR_DATA])

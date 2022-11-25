@@ -11,13 +11,15 @@ from distpartitioning import array_readwriter
 )
 @pytest.mark.parametrize("format", ["numpy", "parquet"])
 def test_array_readwriter(format, shape):
-    original_arr = np.random.rand(*shape)
+    original_array = np.random.rand(*shape)
     fmt_meta = {"name": format}
 
     with tempfile.TemporaryDirectory() as test_dir:
         path = os.path.join(test_dir, f"nodes.{format}")
-        array_readwriter.get_array_parser(**fmt_meta).write(path, original_arr)
-        arr = array_readwriter.get_array_parser(**fmt_meta).read(path)
+        array_readwriter.get_array_parser(**fmt_meta).write(
+            path, original_array
+        )
+        array = array_readwriter.get_array_parser(**fmt_meta).read(path)
 
-        assert original_arr.shape == arr.shape
-        assert np.array_equal(original_arr, arr)
+        assert original_array.shape == array.shape
+        assert np.array_equal(original_array, array)

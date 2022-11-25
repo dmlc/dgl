@@ -24,18 +24,18 @@ class ParquetArrayParser(object):
         arr = table.to_pandas().to_numpy()
         if not shape:
             logging.warning(
-                "Shape info not found in the metadata,"
-                "read the data as a 2 dim array. "
+                "Shape information not found in the metadata, read the data as "
+                "a 2 dim array. "
             )
         shape = tuple(eval(shape.decode())) if shape else arr.shape
         return arr.reshape(shape)
 
-    def write(self, path, arr):
+    def write(self, path, array):
         logging.info("Writing to %s using parquet format" % path)
-        shape = arr.shape
+        shape = array.shape
         if len(shape) > 2:
-            arr = arr.reshape(shape[0], -1)
-        table = pyarrow.Table.from_pandas(pd.DataFrame(arr))
+            array = array.reshape(shape[0], -1)
+        table = pyarrow.Table.from_pandas(pd.DataFrame(array))
         table = table.replace_schema_metadata({"shape": str(shape)})
         pyarrow.parquet.write_table(table, path)
         logging.info("Done writing to %s" % path)
