@@ -102,6 +102,8 @@ class GpuCache : public runtime::Object {
 };
 
 DGL_DEFINE_OBJECT_REF(GpuCacheRef32, GpuCache<unsigned int>);
+// The cu file in HugeCTR gpu cache uses unsigned int and long long.
+// Changing to int64_t results in a mismatch of template arguments.
 DGL_DEFINE_OBJECT_REF(GpuCacheRef64, GpuCache<long long>);  // NOLINT
 
 /* CAPI **********************************************************************/
@@ -118,8 +120,8 @@ DGL_REGISTER_GLOBAL("cuda._CAPI_DGLGpuCacheCreate")
         *rv = GpuCacheRef32(
             std::make_shared<GpuCache<unsigned int>>(num_items, num_feats));
       else
-        *rv = GpuCacheRef64(std::make_shared<GpuCache<long long>>(
-            num_items, num_feats));  // NOLINT
+        *rv = GpuCacheRef64(std::make_shared<GpuCache<long long>>(  // NOLINT
+            num_items, num_feats));
     });
 
 DGL_REGISTER_GLOBAL("cuda._CAPI_DGLGpuCacheQuery")
