@@ -2,9 +2,14 @@
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
-import dgl
+from ...convert import to_homogeneous
+from ...batch import unbatch
+from ...transforms import shortest_dist
 
-__all__ = ["DegreeEncoder", "BiasedMultiheadAttention"]
+__all__ = ["DegreeEncoder",
+           "BiasedMultiheadAttention",
+           "PathEncoder"]
+
 
 class DegreeEncoder(nn.Module):
     r"""Degree Encoder, as introduced in
@@ -67,7 +72,7 @@ class DegreeEncoder(nn.Module):
             where :math:`N` is th number of nodes in the input graph.
         """
         if len(g.ntypes) > 1 or len(g.etypes) > 1:
-            g = dgl.to_homogeneous(g)
+            g = to_homogeneous(g)
         in_degree = th.clamp(g.in_degrees(), min=0, max=self.max_degree)
         out_degree = th.clamp(g.out_degrees(), min=0, max=self.max_degree)
 
@@ -219,3 +224,118 @@ class BiasedMultiheadAttention(nn.Module):
         attn = self.out_proj(attn.reshape(N, bsz, self.feat_size).transpose(0, 1))
 
         return attn
+
+
+class PathEncoder(nn.Module):
+    r"""Path Encoder, as introduced in Edge Encoding of
+    `Do Transformers Really Perform Bad for Graph Representation?
+    <https://proceedings.neurips.cc/paper/2021/file/f1c1592588411002af340cbaedd6fc33-Paper.pdf>`__
+    This module is a learnable path embedding module and encodes the shortest
+    path between each pair of nodes as attention bias.
+
+    Parameters
+    ----------
+    max_len : int
+        Maximum number of edges in each path to be encoded.
+        Exceeding part of each path will be truncated, i.e.
+        truncating edges with serial number no less than :attr:`max_len`.
+    feat_dim : int
+        Dimension of edge features in the input graph.
+    num_heads : int, optional
+        Number of attention heads if multi-head attention mechanism is applied.
+        Default : 1.
+
+    Examples
+    --------
+    >>> import torch as th
+    >>> import dgl
+
+    >>> u = th.tensor([0, 0, 0, 1, 1, 2, 3, 3])
+    >>> v = th.tensor([1, 2, 3, 0, 3, 0, 0, 1])
+    >>> g = dgl.graph((u, v))
+    >>> edata = th.rand(8, 16)
+    >>> path_encoder = dgl.PathEncoder(2, 16, 8)
+    >>> out = path_encoder(g, edata)
+    """
+
+    def __init__(self, max_len, feat_dim, num_heads=1):
+        super(PathEncoder, self).__init__()
+        self.max_len = max_len
+        self.feat_dim = feat_dim
+        self.num_heads = num_heads
+        self.embedding_table = nn.Embedding(
+            max_len * num_heads, feat_dim, padding_idx=0
+        )
+
+    def forward(self, g, edge_feat):
+        """
+        Parameters
+        ----------
+        g : DGLGraph
+            A DGLGraph to be encoded, which must be a homogeneous one.
+        edge_feat : torch.Tensor
+            The input edge feature of shape :math:`(E, feat_dim)`,
+            where :math:`E` is the number of edges in the input graph.
+
+        Returns
+        -------
+        torch.Tensor
+            Return attention bias as path encoding,
+            of shape :math:`(batch_size, N, N, num_heads)`,
+            where :math:`N` is the maximum number of nodes
+            and batch_size is the batch size of the input graph.
+        """
+
+        batch_size = g.batch_size
+        sum_num_edges = 0
+        max_num_nodes = th.max(g.batch_num_nodes())
+        for idx_g in range(batch_size):
+            num_nodes = g.batch_num_nodes()[idx_g]
+            ubg = unbatch(g)[idx_g]
+            edata = edge_feat[
+                sum_num_edges: (sum_num_edges + g.batch_num_edges()[idx_g]), :
+            ]
+            sum_num_edges = sum_num_edges + g.batch_num_edges()[idx_g]
+            edata = th.cat(
+                (edata, th.unsqueeze(th.zeros(self.feat_dim), 0)), 0
+            )
+            path = shortest_dist(ubg, root=None, return_paths=True)[1]
+            path_len = min(self.max_len, path.size(dim=2))
+
+            # shape of shortest path is [n, n, l], n = num_nodes, l = path_len
+            sp = path[:, :, 0: path_len]
+            # shape of path_data is [n, n, l, d], d = feat_dim
+            path_data = edata[sp]
+            # shape of embedding_idx is [l, h], h = num_heads
+            embedding_idx = th.reshape(
+                th.arange(self.num_heads * path_len),
+                (path_len, self.num_heads)
+            )
+            # shape of edge_embedding is [d, l, h]
+            edge_embedding = th.permute(
+                self.embedding_table(embedding_idx), (2, 0, 1)
+            )
+
+            # [n, n, l, d] einsum [d, l, h] -> [n, n, h]
+            # [n, n, h] -> [N, N, h], N = max_num_nodes, padded with -inf
+            if not idx_g:
+                path_encoding = th.full(
+                    (max_num_nodes, max_num_nodes, self.num_heads),
+                    float('-inf')
+                )
+                path_encoding[0: num_nodes, 0: num_nodes, :] = th.einsum(
+                    'xyld,dlh->xyh', path_data, edge_embedding
+                )
+                path_encoding = th.unsqueeze(path_encoding, 0)
+            else:
+                sub_path_encoding = th.full(
+                    (max_num_nodes, max_num_nodes, self.num_heads),
+                    float('-inf')
+                )
+                sub_path_encoding[0: num_nodes, 0: num_nodes, :] = th.einsum(
+                    'xyld,dlh->xyh', path_data, edge_embedding
+                )
+                path_encoding = th.cat(
+                    (path_encoding, th.unsqueeze(sub_path_encoding, 0)), 0
+                )
+        return path_encoding
