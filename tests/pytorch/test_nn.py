@@ -1819,3 +1819,4 @@ def test_PathEncoder(max_len, feat_dim, num_heads):
     model = nn.PathEncoder(max_len, feat_dim, num_heads=num_heads)
     bias = model(bg, edge_feat)
     assert bias.shape == (2, 6, 6, num_heads)
+    

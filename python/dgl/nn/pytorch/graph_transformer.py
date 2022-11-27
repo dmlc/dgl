@@ -339,3 +339,4 @@ class PathEncoder(nn.Module):
                     (path_encoding, th.unsqueeze(sub_path_encoding, 0)), 0
                 )
         return path_encoding
+    
