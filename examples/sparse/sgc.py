@@ -32,7 +32,7 @@ def evaluate(g, pred):
     return val_acc, test_acc
 
 
-def train(g, X_sgc, model):
+def train(model, g, X_sgc):
     label = g.ndata["label"]
     train_mask = g.ndata["train_mask"]
     optimizer = Adam(model.parameters(), lr=2e-1, weight_decay=5e-6)
@@ -91,4 +91,4 @@ if __name__ == "__main__":
     model = nn.Linear(in_size, out_size).to(dev)
 
     # Kick off training.
-    train(g, X_sgc, model)
+    train(model, g, X_sgc)
