@@ -45,7 +45,7 @@ void SpMMCsr(
       int64_t x_length = 1;
       for (int i = 1; i < ufeat->ndim; ++i) x_length *= ufeat->shape[i];
       if (!IsNullArray(csr.data)) {
-        efeat = _IndexSelect<DType, IdType>(efeat, csr.data);
+        efeat = IndexSelect(efeat, csr.data);
       }
       CusparseCsrmm2<DType, IdType>(
           ufeat->ctx, csr, static_cast<DType*>(ufeat->data),

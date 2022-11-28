@@ -44,7 +44,8 @@ def test_diag(val_shape, mat_shape):
     assert sp_mat.device == mat.device
     # row, col, val
     edge_index = torch.arange(len(val)).to(mat.device)
-    row, col, val = sp_mat.coo()
+    row, col = sp_mat.coo()
+    val = sp_mat.val
     assert torch.allclose(row, edge_index)
     assert torch.allclose(col, edge_index)
     assert torch.allclose(val, val)

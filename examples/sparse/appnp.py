@@ -1,6 +1,6 @@
 """
-[Simplifying Graph Convolutional Networks]
-(https://arxiv.org/abs/1902.07153)
+[Predict then Propagate: Graph Neural Networks meet Personalized PageRank]
+(https://arxiv.org/abs/1810.05997)
 """
 
 import torch
@@ -11,14 +11,38 @@ from dgl.mock_sparse import create_from_coo, diag, identity
 from torch.optim import Adam
 
 
-################################################################################
-# (HIGHLIGHT) Take the advantage of DGL sparse APIs to implement the feature
-# pre-computation.
-################################################################################
-def pre_compute(A, X, k):
-    for _ in range(k):
-        X = A @ X
-    return X
+class APPNP(nn.Module):
+    def __init__(
+        self,
+        in_size,
+        out_size,
+        hidden_size=64,
+        dropout=0.1,
+        num_hops=10,
+        alpha=0.1,
+    ):
+        super().__init__()
+
+        self.f_theta = nn.Sequential(
+            nn.Dropout(dropout),
+            nn.Linear(in_size, hidden_size),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_size, out_size),
+        )
+        self.num_hops = num_hops
+        self.A_dropout = nn.Dropout(dropout)
+        self.alpha = alpha
+
+    def forward(self, A_hat, X):
+        A_val_0 = A_hat.val
+        Z_0 = Z = self.f_theta(X)
+        for _ in range(self.num_hops):
+            A_hat.val = self.A_dropout(A_val_0)
+            Z = (1 - self.alpha) * A_hat @ Z + self.alpha * Z_0
+        # Reset A_hat.val to avoid value corruption.
+        A_hat.val = A_val_0
+        return Z
 
 
 def evaluate(g, pred):
@@ -32,16 +56,17 @@ def evaluate(g, pred):
     return val_acc, test_acc
 
 
-def train(model, g, X_sgc):
+def train(model, g, A_hat, X):
     label = g.ndata["label"]
     train_mask = g.ndata["train_mask"]
-    optimizer = Adam(model.parameters(), lr=2e-1, weight_decay=5e-6)
+    optimizer = Adam(model.parameters(), lr=1e-2, weight_decay=5e-4)
 
-    for epoch in range(20):
+    for epoch in range(50):
         # Forward.
-        logits = model(X_sgc)
+        model.train()
+        logits = model(A_hat, X)
 
-        # Compute loss with nodes in the training set.
+        # Compute loss with nodes in training set.
         loss = F.cross_entropy(logits[train_mask], label[train_mask])
 
         # Backward.
@@ -50,6 +75,8 @@ def train(model, g, X_sgc):
         optimizer.step()
 
         # Compute prediction.
+        model.eval()
+        logits = model(A_hat, X)
         pred = logits.argmax(dim=1)
 
         # Evaluate the prediction.
@@ -69,7 +96,7 @@ if __name__ == "__main__":
     dataset = CoraGraphDataset()
     g = dataset[0].to(dev)
 
-    # Create the sparse adjacency matrix A
+    # Create the sparse adjacency matrix A.
     src, dst = g.edges()
     N = g.num_nodes()
     A = create_from_coo(dst, src, shape=(N, N))
@@ -80,15 +107,11 @@ if __name__ == "__main__":
     D_hat = diag(A_hat.sum(dim=1)) ** -0.5
     A_hat = D_hat @ A_hat @ D_hat
 
-    # 2-hop diffusion.
-    k = 2
+    # Create APPNP model.
     X = g.ndata["feat"]
-    X_sgc = pre_compute(A_hat, X, k)
-
-    # Create model.
     in_size = X.shape[1]
     out_size = dataset.num_classes
-    model = nn.Linear(in_size, out_size).to(dev)
+    model = APPNP(in_size, out_size).to(dev)
 
     # Kick off training.
-    train(model, g, X_sgc)
+    train(model, g, A_hat, X)
