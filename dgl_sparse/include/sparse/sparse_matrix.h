@@ -15,12 +15,14 @@
 #include <torch/script.h>
 
 #include <memory>
+#include <tuple>
+#include <utility>
 #include <vector>
 
 namespace dgl {
 namespace sparse {
 
-/** @brief SparseMatrix bound to Python  */
+/** @brief SparseMatrix bound to Python.  */
 class SparseMatrix : public torch::CustomClassHolder {
  public:
   /**
@@ -100,12 +102,14 @@ class SparseMatrix : public torch::CustomClassHolder {
   /** @brief Check whether this sparse matrix has CSC format. */
   inline bool HasCSC() const { return csc_ != nullptr; }
 
-  /** @return {row, col, value} tensors in the COO format. */
-  std::vector<torch::Tensor> COOTensors();
-  /** @return {row, col, value} tensors in the CSR format. */
-  std::vector<torch::Tensor> CSRTensors();
-  /** @return {row, col, value} tensors in the CSC format. */
-  std::vector<torch::Tensor> CSCTensors();
+  /** @return {row, col} tensors in the COO format. */
+  std::tuple<torch::Tensor, torch::Tensor> COOTensors();
+  /** @return {row, col, value_indices} tensors in the CSR format. */
+  std::tuple<torch::Tensor, torch::Tensor, torch::optional<torch::Tensor>>
+  CSRTensors();
+  /** @return {row, col, value_indices} tensors in the CSC format. */
+  std::tuple<torch::Tensor, torch::Tensor, torch::optional<torch::Tensor>>
+  CSCTensors();
 
   /**
    * @brief Set non-zero values of the sparse matrix
