@@ -109,8 +109,8 @@ class SparseMatrix:
 
         Returns
         -------
-        Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
-            A tuple of tensors containing row, column coordinates and values.
+        Tuple[torch.Tensor, torch.Tensor]
+            A tuple of tensors containing row and column coordinates.
         """
         return self.c_sparse_matrix.coo()
 
@@ -120,7 +120,7 @@ class SparseMatrix:
         Returns
         -------
         Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
-            A tuple of tensors containing row, column coordinates and values.
+            A tuple of tensors containing row, column coordinates and value indices.
         """
         return self.c_sparse_matrix.csr()
 
@@ -130,7 +130,7 @@ class SparseMatrix:
         Returns
         -------
         Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
-            A tuple of tensors containing row, column coordinates and values.
+            A tuple of tensors containing row, column coordinates and value indices.
         """
         return self.c_sparse_matrix.csc()
 
@@ -142,7 +142,8 @@ class SparseMatrix:
         torch.Tensor
             Dense representation of the sparse matrix.
         """
-        row, col, val = self.coo()
+        row, col = self.coo()
+        val = self.val
         shape = self.shape + val.shape[1:]
         mat = torch.zeros(shape, device=self.device)
         mat[row, col] = val
@@ -186,16 +187,16 @@ def create_from_coo(
     >>> A = create_from_coo(dst, src)
     >>> print(A)
     SparseMatrix(indices=tensor([[1, 1, 2],
-                                 [2, 4, 3]]),
-                 values=tensor([1., 1., 1.]),
-                 shape=(3, 5), nnz=3)
+            [2, 4, 3]]),
+    values=tensor([1., 1., 1.]),
+    shape=(3, 5), nnz=3)
     >>> # Specify shape
     >>> A = create_from_coo(dst, src, shape=(5, 5))
     >>> print(A)
     SparseMatrix(indices=tensor([[1, 1, 2],
-                                 [2, 4, 3]]),
-                 values=tensor([1., 1., 1.]),
-                 shape=(5, 5), nnz=3)
+            [2, 4, 3]]),
+    values=tensor([1., 1., 1.]),
+    shape=(5, 5), nnz=3)
 
     Case2: Sparse matrix with scalar/vector values. Following example is with
     vector data.
@@ -203,11 +204,11 @@ def create_from_coo(
     >>> val = torch.tensor([[1., 1.], [2., 2.], [3., 3.]])
     >>> A = create_from_coo(dst, src, val)
     SparseMatrix(indices=tensor([[1, 1, 2],
-                                 [2, 4, 3]]),
-                 values=tensor([[1, 1],
-                                [2, 2],
-                                [3, 3]]),
-                 shape=(3, 5), nnz=3)
+            [2, 4, 3]]),
+    values=tensor([[1., 1.],
+            [2., 2.],
+            [3., 3.]]),
+    shape=(3, 5), nnz=3)
     """
     if shape is None:
         shape = (torch.max(row).item() + 1, torch.max(col).item() + 1)
@@ -219,8 +220,6 @@ def create_from_coo(
     )
 
 
-# FIXME: The docstring cannot print A because we cannot print
-# the indices of CSR/CSC
 def create_from_csr(
     indptr: torch.Tensor,
     indices: torch.Tensor,
@@ -269,16 +268,16 @@ def create_from_csr(
     >>> A = create_from_csr(indptr, indices)
     >>> print(A)
     SparseMatrix(indices=tensor([[0, 1, 2, 2, 2],
-                                 [1, 2, 0, 1, 2]]),
-                 values=tensor([1., 1., 1., 1., 1.]),
-                 shape=(3, 3), nnz=5)
+            [1, 2, 0, 1, 2]]),
+    values=tensor([1., 1., 1., 1., 1.]),
+    shape=(3, 3), nnz=5)
     >>> # Specify shape
-    >>> A = create_from_csr(indptr, indices, shape=(5, 3))
+    >>> A = create_from_csr(indptr, indices, shape=(3, 5))
     >>> print(A)
     SparseMatrix(indices=tensor([[0, 1, 2, 2, 2],
             [1, 2, 0, 1, 2]]),
     values=tensor([1., 1., 1., 1., 1.]),
-    shape=(5, 3), nnz=5)
+    shape=(3, 5), nnz=5)
 
     Case2: Sparse matrix with scalar/vector values. Following example is with
     vector data.
@@ -305,8 +304,6 @@ def create_from_csr(
     )
 
 
-# FIXME: The docstring cannot print A because we cannot print
-# the indices of CSR/CSC
 def create_from_csc(
     indptr: torch.Tensor,
     indices: torch.Tensor,
@@ -354,15 +351,15 @@ def create_from_csc(
     >>> indices = torch.tensor([2, 0, 2, 1, 2])
     >>> A = create_from_csc(indptr, indices)
     >>> print(A)
-    SparseMatrix(indices=tensor([[0, 1, 2, 2, 2],
-                                 [1, 2, 0, 1, 2]]),
-                 values=tensor([1., 1., 1., 1., 1.]),
-                 shape=(3, 3), nnz=5)
+    SparseMatrix(indices=tensor([[2, 0, 2, 1, 2],
+            [0, 1, 1, 2, 2]]),
+    values=tensor([1., 1., 1., 1., 1.]),
+    shape=(3, 3), nnz=5)
     >>> # Specify shape
     >>> A = create_from_csc(indptr, indices, shape=(5, 3))
     >>> print(A)
-    SparseMatrix(indices=tensor([[0, 1, 2, 2, 2],
-            [1, 2, 0, 1, 2]]),
+    SparseMatrix(indices=tensor([[2, 0, 2, 1, 2],
+            [0, 1, 1, 2, 2]]),
     values=tensor([1., 1., 1., 1., 1.]),
     shape=(5, 3), nnz=5)
 
@@ -372,12 +369,12 @@ def create_from_csc(
     >>> val = torch.tensor([[1, 1], [2, 2], [3, 3], [4, 4], [5, 5]])
     >>> A = create_from_csc(indptr, indices, val)
     >>> print(A)
-    SparseMatrix(indices=tensor([[0, 1, 2, 2, 2],
-            [1, 2, 0, 1, 2]]),
-    values=tensor([[2, 2],
-            [4, 4],
-            [1, 1],
+    SparseMatrix(indices=tensor([[2, 0, 2, 1, 2],
+            [0, 1, 1, 2, 2]]),
+    values=tensor([[1, 1],
+            [2, 2],
             [3, 3],
+            [4, 4],
             [5, 5]]),
     shape=(3, 3), nnz=5)
     """
