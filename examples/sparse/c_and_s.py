@@ -1,6 +1,6 @@
 """
-[Combining Label Propagation and Simple Models Out-performs Graph Neural Networks]
-(https://arxiv.org/abs/2010.13993)
+[Combining Label Propagation and Simple Models Out-performs
+Graph Neural Networks](https://arxiv.org/abs/2010.13993)
 """
 
 import torch
