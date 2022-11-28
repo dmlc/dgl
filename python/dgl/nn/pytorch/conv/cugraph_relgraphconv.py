@@ -8,14 +8,16 @@ from torch import nn
 
 try:
     from pylibcugraphops import make_mfg_csr_hg
-    from pylibcugraphops.operators import \
-        agg_hg_basis_mfg_n2n_post_bwd as agg_bwd
-    from pylibcugraphops.operators import \
-        agg_hg_basis_mfg_n2n_post_fwd as agg_fwd
-except ModuleNotFoundError:
-    raise ModuleNotFoundError(
-        "dgl.nn.CuGraphRelGraphConv requires pylibcugraphops to be installed."
+    from pylibcugraphops.operators import (
+        agg_hg_basis_mfg_n2n_post_bwd as agg_bwd,
     )
+    from pylibcugraphops.operators import (
+        agg_hg_basis_mfg_n2n_post_fwd as agg_fwd,
+    )
+except ModuleNotFoundError:
+    has_pylibcugraphops = False
+else:
+    has_pylibcugraphops = True
 
 
 class RelGraphConvAgg(th.autograd.Function):
@@ -209,6 +211,11 @@ class CuGraphRelGraphConv(nn.Module):
         layer_norm=False,
         max_in_degree=None,
     ):
+        if has_pylibcugraphops is False:
+            raise ModuleNotFoundError(
+                f"dgl.nn.CuGraphRelGraphConv requires pylibcugraphops "
+                f"to be installed."
+            )
         super().__init__()
         self.in_feat = in_feat
         self.out_feat = out_feat
