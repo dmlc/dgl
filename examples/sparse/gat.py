@@ -30,13 +30,19 @@ class GATConv(nn.Module):
         nn.init.xavier_normal_(self.a_l, gain=gain)
         nn.init.xavier_normal_(self.a_r, gain=gain)
 
+    ###########################################################################
+    # (HIGHLIGHT) Take the advantage of DGL sparse APIs to implement
+    # multihead attention.
+    ###########################################################################
     def forward(self, A_hat, Z):
         Z = self.dropout(Z)
         Z = self.W(Z).view(Z.shape[0], self.out_size, self.num_heads)
+
         # a^T [Wh_i || Wh_j] = a_l Wh_i + a_r Wh_j
         e_l = (Z * self.a_l).sum(dim=1)
         e_r = (Z * self.a_r).sum(dim=1)
         e = e_l[A_hat.row] + e_r[A_hat.col]
+
         A_hat.val = F.leaky_relu(e)
         A_atten = A_hat.softmax()
         A_atten.val = self.dropout(A_atten.val)
