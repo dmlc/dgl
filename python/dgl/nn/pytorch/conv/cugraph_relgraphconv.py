@@ -16,6 +16,12 @@ try:
     )
 except ModuleNotFoundError:
     has_pylibcugraphops = False
+
+    def make_mfg_csr_hg(*args):
+        raise NotImplementedError(
+            "RelGraphConvAgg requires pylibcugraphops to be installed."
+        )
+
 else:
     has_pylibcugraphops = True
 
@@ -213,8 +219,8 @@ class CuGraphRelGraphConv(nn.Module):
     ):
         if has_pylibcugraphops is False:
             raise ModuleNotFoundError(
-                f"dgl.nn.CuGraphRelGraphConv requires pylibcugraphops "
-                f"to be installed."
+                "dgl.nn.CuGraphRelGraphConv requires pylibcugraphops "
+                "to be installed."
             )
         super().__init__()
         self.in_feat = in_feat
