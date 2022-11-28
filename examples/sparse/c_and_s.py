@@ -18,6 +18,9 @@ class LabelPropagation(nn.Module):
         self.num_layers = num_layers
         self.alpha = alpha
 
+    ###########################################################################
+    # (HIGHLIGHT) Compute Label Propagation with Sparse Matrix API
+    ###########################################################################
     @torch.no_grad()
     def forward(self, A_hat, label):
         Y = label
