@@ -10,11 +10,12 @@
 #include <dgl/array.h>
 #include <dmlc/logging.h>
 #include <dmlc/thread_local.h>
-#include <pcg_random.hpp>
 
 #include <random>
 #include <thread>
 #include <vector>
+
+#include <pcg_random.hpp>
 
 namespace dgl {
 
