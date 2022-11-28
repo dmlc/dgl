@@ -217,9 +217,8 @@ def _test_pipeline(num_chunks, num_parts, world_size, graph_formats=None, data_f
 
 
 @pytest.mark.parametrize("num_chunks, num_parts, world_size", [[8, 4, 2], [9, 6, 3], [11, 11, 1], [11, 4, 2], [5, 3, 1]])
-@pytest.mark.parametrize("data_fmt", ['numpy', 'parquet'])
-def test_pipeline_basics(num_chunks, num_parts, world_size, data_fmt):
-    _test_pipeline(num_chunks, num_parts, world_size, data_fmt=data_fmt)
+def test_pipeline_basics(num_chunks, num_parts, world_size):
+    _test_pipeline(num_chunks, num_parts, world_size)
 
 
 @pytest.mark.parametrize(
@@ -228,3 +227,9 @@ def test_pipeline_basics(num_chunks, num_parts, world_size, data_fmt):
 def test_pipeline_formats(graph_formats):
     _test_pipeline(4, 4, 4, graph_formats)
 
+
+@pytest.mark.parametrize(
+    "data_fmt", ['numpy', "parquet"]
+)
+def test_pipeline_feature_format(data_fmt):
+    _test_pipeline(4, 4, 4, data_fmt=data_fmt)
