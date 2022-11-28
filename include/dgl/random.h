@@ -49,7 +49,7 @@ class RandomEngine {
 
   /** @brief Constructor with given seed */
   explicit RandomEngine(uint64_t seed, uint64_t stream = GetThreadId()) {
-    SetSeed(seed);
+    SetSeed(seed, stream);
   }
 
   /** @brief Get the thread-local random number generator instance */
