@@ -134,7 +134,7 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--part-config", type=str, help="The file of the partition config"
+        "--part_config", type=str, help="The file of the partition config"
     )
     args, _ = parser.parse_known_args()
     assert (
