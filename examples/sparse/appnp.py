@@ -56,7 +56,7 @@ def evaluate(g, pred):
     return val_acc, test_acc
 
 
-def train(g, A_hat, X, model):
+def train(model, g, A_hat, X):
     label = g.ndata["label"]
     train_mask = g.ndata["train_mask"]
     optimizer = Adam(model.parameters(), lr=1e-2, weight_decay=5e-4)
@@ -114,4 +114,4 @@ if __name__ == "__main__":
     model = APPNP(in_size, out_size).to(dev)
 
     # Kick off training.
-    train(g, A_hat, X, model)
+    train(model, g, A_hat, X)
