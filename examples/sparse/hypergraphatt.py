@@ -3,7 +3,6 @@ Hypergraph Convolution and Hypergraph Attention
 (https://arxiv.org/pdf/1901.08150.pdf).
 """
 import dgl
-import dgl.data
 import dgl.mock_sparse as dglsp
 import torch
 import torch.nn as nn
@@ -11,10 +10,6 @@ import torch.nn.functional as F
 from torchmetrics.functional import accuracy
 import tqdm
 
-# Question:
-# The paper proposed two models, but HypergraphConv is essentially
-# what is in the HGNN paper (identical).  So should I rewrite HGNN
-# in the same fashion as this file?
 def hypergraph_laplacian(H):
     ###########################################################
     # (HIGHLIGHT) Compute the Laplacian with Sparse Matrix API
@@ -25,17 +20,12 @@ def hypergraph_laplacian(H):
     D_V_invsqrt = dglsp.diag(d_V ** -0.5)  # D_V ** (-1/2)
     D_E_inv = dglsp.diag(d_E ** -1)  # D_E ** (-1)
     W = dglsp.identity((n_edges, n_edges))
-    laplacian = D_V_invsqrt @ H @ W @ D_E_inv @ H.T @ D_V_invsqrt
-
-    return laplacian
+    return D_V_invsqrt @ H @ W @ D_E_inv @ H.T @ D_V_invsqrt
 
 class HypergraphAttention(nn.Module):
-    """Hypergraph Attention module.
-
-    As per Section 3.3 in the paper
+    """Hypergraph Attention module as in the paper
     `Hypergraph Convolution and Hypergraph Attention
-    <https://arxiv.org/pdf/1901.08150.pdf>`_, this module only works when
-    the number of hyperedges equal the number of nodes.
+    <https://arxiv.org/pdf/1901.08150.pdf>`_.
     """
     def __init__(self, in_size, out_size):
         super().__init__()
@@ -48,7 +38,7 @@ class HypergraphAttention(nn.Module):
         Z_edges = self.P(X_edges)
         sim = self.a(torch.cat([Z[H.row], Z_edges[H.col]], 1))
         sim = F.leaky_relu(sim, 0.2).squeeze(1)
-        # Reassign the hypergraph with new weights
+        # Reassign the hypergraph new weights.
         H_att = dglsp.create_from_coo(H.row, H.col, sim, shape=H.shape)
         H_att = H_att.softmax()
         return hypergraph_laplacian(H_att) @ Z
