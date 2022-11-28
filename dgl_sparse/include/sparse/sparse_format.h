@@ -18,42 +18,68 @@
 namespace dgl {
 namespace sparse {
 
-/** @brief SparseFormat enumeration */
+/** @brief SparseFormat enumeration. */
 enum SparseFormat { kCOO, kCSR, kCSC };
 
-/** @brief CSR sparse structure */
-struct CSR {
-  // CSR format index pointer array of the matrix
-  torch::Tensor indptr;
-  // CSR format index array of the matrix
-  torch::Tensor indices;
-  // The element order of the sparse format. In the SparseMatrix, we have data
-  // (value_) for each non-zero value. The order of non-zero values in (value_)
-  // may differ from the order of non-zero entries in CSR. So we store
-  // `value_indices` in CSR to indicate its relative non-zero value order to the
-  // SparseMatrix. With `value_indices`, we can retrieve the correct value for
-  // CSR, i.e., `value_[value_indices]`. If `value_indices` is not defined, this
-  // CSR follows the same non-zero value order as the SparseMatrix.
-  torch::optional<torch::Tensor> value_indices;
-};
-
-/** @brief COO sparse structure */
+/** @brief COO sparse structure. */
 struct COO {
-  // COO format row array of the matrix
+  /** @brief The shape of the matrix. */
+  int64_t num_rows = 0, num_cols = 0;
+  /** @brief COO format row indices array of the matrix. */
   torch::Tensor row;
-  // COO format column array of the matrix
+  /** @brief COO format column indices array of the matrix. */
   torch::Tensor col;
+  /** @brief Whether the row indices are sorted. */
+  bool row_sorted = false;
+  /** @brief Whether the column indices per row are sorted. */
+  bool col_sorted = false;
 };
 
-/**
- * @brief Convert a CSR format to COO format
- * @param num_rows Number of rows of the sparse format
- * @param num_cols Number of cols of the sparse format
- * @param csr CSR sparse format
- * @return COO sparse format
- */
-std::shared_ptr<COO> CSRToCOO(
-    int64_t num_rows, int64_t num_cols, const std::shared_ptr<CSR> csr);
+
+/** @brief CSR sparse structure. */
+struct CSR {
+  /** @brief The dense shape of the matrix. */
+  int64_t num_rows = 0, num_cols = 0;
+  /** @brief CSR format index pointer array of the matrix. */
+  torch::Tensor indptr;
+  /** @brief CSR format index array of the matrix. */
+  torch::Tensor indices;
+  /** @brief Data index tensor. When it is null, assume it is from 0 to NNZ - 1.
+   */
+  torch::optional<torch::Tensor> value_indices;
+  /** @brief Whether the column indices per row are sorted. */
+  bool sorted = false;
+};
+
+/** @brief Convert an old DGL COO format to a COO in the sparse library. */
+std::shared_ptr<COO> COOFromOldDGLCOO(const aten::COOMatrix& dgl_coo);
+
+/** @brief Convert a COO in the sparse library to an old DGL COO matrix. */
+aten::COOMatrix COOToOldDGLCOO(const std::shared_ptr<COO>& coo);
+
+/** @brief Convert an old DGL CSR format to a CSR in the sparse library. */
+std::shared_ptr<CSR> CSRFromOldDGLCSR(const aten::CSRMatrix& dgl_csr);
+
+/** @brief Convert a CSR in the sparse library to an old DGL CSR matrix. */
+aten::CSRMatrix CSRToOldDGLCSR(const std::shared_ptr<CSR>& csr);
+
+/** @brief Convert a CSR format to COO format. */
+std::shared_ptr<COO> CSRToCOO(const std::shared_ptr<CSR>& csr);
+
+/** @brief Convert a CSC format to COO format. */
+std::shared_ptr<COO> CSCToCOO(const std::shared_ptr<CSR>& csc);
+
+/** @brief Convert a COO format to CSR format. */
+std::shared_ptr<CSR> COOToCSR(const std::shared_ptr<COO>& coo);
+
+/** @brief Convert a CSC format to CSR format. */
+std::shared_ptr<CSR> CSCToCSR(const std::shared_ptr<CSR>& csc);
+
+/** @brief Convert a COO format to CSC format. */
+std::shared_ptr<CSR> COOToCSC(const std::shared_ptr<COO>& coo);
+
+/** @brief Convert a CSR format to CSC format. */
+std::shared_ptr<CSR> CSRToCSC(const std::shared_ptr<CSR>& csr);
 
 }  // namespace sparse
 }  // namespace dgl
