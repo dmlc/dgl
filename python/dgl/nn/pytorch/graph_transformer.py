@@ -4,7 +4,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 import dgl
 
-__all__ = ["DegreeEncoder", "BiasedMultiheadAttention"]
+__all__ = [
+    "DegreeEncoder",
+    "BiasedMultiheadAttention",
+    "GraphTransformerLayer"
+]
 
 class DegreeEncoder(nn.Module):
     r"""Degree Encoder, as introduced in
@@ -219,3 +223,104 @@ class BiasedMultiheadAttention(nn.Module):
         attn = self.out_proj(attn.reshape(N, bsz, self.feat_size).transpose(0, 1))
 
         return attn
+
+
+class GraphTransformerLayer(nn.Module):
+    r"""Graph Transformer Layer with Dense Multi-Head Attention, as introduced
+    in `Do Transformers Really Perform Bad for Graph Representation?
+    <https://arxiv.org/pdf/2106.05234>`__
+
+    Parameters
+    ----------
+    feat_size : int
+        Feature size.
+    ffn_size : int
+        Hidden size of feedforward layers.
+    num_heads : int
+        Number of attention heads, by which attr:`feat_size` is divisible.
+    attn_bias_type : str, optional
+        The type of attention bias used for modifying attention. Selected from
+        'add' or 'mul'. Default: 'add'.
+
+        * 'add' is for additive attention bias.
+        * 'mul' is for multiplicative attention bias.
+    norm_first : bool, optional
+        If True, it performs layer norm before attention and feedforward
+        operations. Otherwise, it applies layer norm after. Default: False.
+    dropout : float, optional
+        Dropout probability. Default: 0.1.
+    activation : str, optional
+        Activation function. Default: 'relu'.
+
+    Examples
+    --------
+    >>> import torch as th
+    >>> from dgl.nn import GraphTransformerLayer
+
+    >>> ndata = th.rand(16, 100, 512)
+    >>> bias = th.rand(16, 100, 100, 8)
+    >>> net = GraphTransformerLayer(feat_size=512, ffn_size=2048, num_heads=8)
+    >>> out = net(ndata, bias)
+    """
+
+    def __init__(
+        self, feat_size, ffn_size, num_heads, attn_bias_type='add',
+        norm_first=False, dropout=0.1, activation='relu'):
+        super().__init__()
+
+        self.norm_first = norm_first
+
+        self.attn = BiasedMultiheadAttention(feat_size=feat_size,
+                                             num_heads=num_heads,
+                                             attn_bias_type=attn_bias_type,
+                                             attn_drop=dropout)
+        self.fc1 = nn.Linear(feat_size, ffn_size)
+        self.fc2 = nn.Linear(ffn_size, feat_size)
+
+        self.dropout = nn.Dropout(p=dropout)
+        self.activation_dropout = nn.Dropout(p=dropout)
+        self.activation = getattr(F, activation)
+        self.attn_layer_norm = nn.LayerNorm(feat_size)
+        self.ffn_layer_norm =  nn.LayerNorm(feat_size)
+
+    def forward(self, ndata, attn_bias=None, attn_mask=None):
+        """Forward computation.
+
+        Parameters
+        ----------
+        ndata : torch.Tensor
+            A 3D input tensor. Shape: (batch_size, N, :attr:`feat_size`), where
+            N is the maximum number of nodes.
+        attn_bias : torch.Tensor, optional
+            The attention bias used for attention modification. Shape:
+            (batch_size, N, N, :attr:`num_heads`).
+        attn_mask : torch.Tensor, optional
+            The attention mask used for avoiding computation on invalid
+            positions. Shape: (batch_size, N, N).
+
+        Returns
+        -------
+        y : torch.Tensor
+            The output tensor. Shape: (batch_size, N, :attr:`feat_size`)
+        """
+        residual = ndata
+        if self.norm_first:
+            ndata = self.attn_layer_norm(ndata)
+        ndata = self.attn(ndata, attn_bias, attn_mask)
+        ndata = self.dropout(ndata)
+        ndata = residual + ndata
+        if not self.norm_first:
+            ndata = self.attn_layer_norm(ndata)
+
+        residual = ndata
+        if self.norm_first:
+            ndata = self.ffn_layer_norm(ndata)
+        ndata = self.activation(self.fc1(ndata))
+        ndata = self.activation_dropout(ndata)
+        ndata = self.fc2(ndata)
+        ndata = self.dropout(ndata)
+        ndata = residual + ndata
+        if not self.norm_first:
+            ndata = self.ffn_layer_norm(ndata)
+
+        return ndata
