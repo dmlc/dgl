@@ -264,16 +264,25 @@ class GraphTransformerLayer(nn.Module):
     """
 
     def __init__(
-        self, feat_size, ffn_size, num_heads, attn_bias_type='add',
-        norm_first=False, dropout=0.1, activation='relu'):
+        self,
+        feat_size,
+        ffn_size,
+        num_heads,
+        attn_bias_type='add',
+        norm_first=False,
+        dropout=0.1,
+        activation='relu'
+    ):
         super().__init__()
 
         self.norm_first = norm_first
 
-        self.attn = BiasedMultiheadAttention(feat_size=feat_size,
-                                             num_heads=num_heads,
-                                             attn_bias_type=attn_bias_type,
-                                             attn_drop=dropout)
+        self.attn = BiasedMultiheadAttention(
+            feat_size=feat_size,
+            num_heads=num_heads,
+            attn_bias_type=attn_bias_type,
+            attn_drop=dropout
+        )
         self.fc1 = nn.Linear(feat_size, ffn_size)
         self.fc2 = nn.Linear(ffn_size, feat_size)
 
@@ -281,7 +290,7 @@ class GraphTransformerLayer(nn.Module):
         self.activation_dropout = nn.Dropout(p=dropout)
         self.activation = getattr(F, activation)
         self.attn_layer_norm = nn.LayerNorm(feat_size)
-        self.ffn_layer_norm =  nn.LayerNorm(feat_size)
+        self.ffn_layer_norm = nn.LayerNorm(feat_size)
 
     def forward(self, ndata, attn_bias=None, attn_mask=None):
         """Forward computation.
