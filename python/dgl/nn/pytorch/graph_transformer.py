@@ -303,9 +303,9 @@ class PathEncoder(nn.Module):
             path_len = min(self.max_len, path.size(dim=2))
 
             # shape of shortest path is [n, n, l], n = num_nodes, l = path_len
-            sp = path[:, :, 0: path_len]
+            shortest_path = path[:, :, 0: path_len]
             # shape of path_data is [n, n, l, d], d = feat_dim
-            path_data = edata[sp]
+            path_data = edata[shortest_path]
             # shape of embedding_idx is [l, h], h = num_heads
             embedding_idx = th.reshape(
                 th.arange(self.num_heads * path_len),
@@ -339,4 +339,3 @@ class PathEncoder(nn.Module):
                     (path_encoding, th.unsqueeze(sub_path_encoding, 0)), 0
                 )
         return path_encoding
-    
