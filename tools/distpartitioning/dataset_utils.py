@@ -5,6 +5,7 @@ import numpy as np
 import pyarrow
 import torch
 from pyarrow import csv
+import array_readwriter
 
 import constants
 from utils import get_idranges, map_partid_rank
@@ -106,7 +107,7 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
     to mention all the files present for this given node feature.
 
     Data read from each of the node features file is a multi-dimensional tensor data and is read
-    in numpy format, which is also the storage format of node features on the permanent storage.
+    in numpy or parquet format, which is also the storage format of node features on the permanent storage.
 
         "node_type" : ["ntype0-name", "ntype1-name", ....], #m node types
         "num_nodes_per_chunk" : [
@@ -143,12 +144,13 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
     if((dataset_features is not None) and (len(dataset_features) > 0)):
         for ntype_name, ntype_feature_data in dataset_features.items():
             for feat_name, feat_data in ntype_feature_data.items():
-                assert feat_data[constants.STR_FORMAT][constants.STR_NAME] == constants.STR_NUMPY
-
+                assert (feat_data[constants.STR_FORMAT][constants.STR_NAME]
+                in [constants.STR_NUMPY, constants.STR_PARQUET])
                 # It is guaranteed that num_chunks is always greater 
                 # than num_partitions. 
                 num_chunks = len(feat_data[constants.STR_DATA])
                 read_list = np.array_split(np.arange(num_chunks), num_parts)
+                reader_fmt_meta = {"name": feat_data[constants.STR_FORMAT][constants.STR_NAME]}
                 for local_part_id in range(num_parts):
                     if map_partid_rank(local_part_id, world_size) == rank:
                         nfeat = []
@@ -158,7 +160,11 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
                             if not os.path.isabs(nfeat_file):
                                 nfeat_file = os.path.join(input_dir, nfeat_file)
                             logging.info(f'Loading node feature[{feat_name}] of ntype[{ntype_name}] from {nfeat_file}')
-                            nfeat.append(np.load(nfeat_file))
+                            nfeat.append(
+                                array_readwriter.get_array_parser(
+                                    **reader_fmt_meta
+                                ).read(nfeat_file)
+                            )
                         nfeat = np.concatenate(nfeat) if len(nfeat) != 0 else np.array([])
                         node_features[ntype_name+"/"+feat_name+"/"+str(local_part_id//world_size)] = torch.from_numpy(nfeat)
                         nfeat_tids.append(node_tids[ntype_name][local_part_id])
@@ -241,7 +247,8 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
     if dataset_features and (len(dataset_features) > 0):
         for etype_name, etype_feature_data in dataset_features.items():
             for feat_name, feat_data in etype_feature_data.items():
-                assert feat_data[constants.STR_FORMAT][constants.STR_NAME] == constants.STR_NUMPY
+                assert feat_data[constants.STR_FORMAT][constants.STR_NAME] in [constants.STR_NUMPY, constants.STR_PARQUET]
+                reader_fmt_meta = {"name": feat_data[constants.STR_FORMAT][constants.STR_NAME]}
                 num_chunks = len(feat_data[constants.STR_DATA])
                 read_list = np.array_split(np.arange(num_chunks), num_parts)
                 for local_part_id in range(num_parts):
@@ -249,14 +256,17 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
                         efeats = []
                         efeat_tids = []
                         for idx in read_list[local_part_id]:
-                            feature_fname = feat_data[constants.STR_DATA][idx]
-                            if (os.path.isabs(feature_fname)):
-                                logging.info(f'Loading numpy from {feature_fname}')
-                                efeats.append(torch.from_numpy(np.load(feature_fname)))
-                            else:
-                                numpy_path = os.path.join(input_dir, feature_fname)
-                                logging.info(f'Loading numpy from {numpy_path}')
-                                efeats.append(torch.from_numpy(np.load(numpy_path)))
+                            efeat_file = feat_data[constants.STR_DATA][idx]
+                            if not os.path.isabs(efeat_file):
+                                efeat_file = os.path.join(input_dir, efeat_file)
+                            logging.info(
+                                f'Loading edge feature[{feat_name}] of etype[{etype_name}] from {efeat_file}'
+                            )
+                            efeats.append(
+                                array_readwriter.get_array_parser(
+                                    **reader_fmt_meta
+                                ).read(efeat_file)
+                            )
                         efeat_tids.append(edge_tids[etype_name][local_part_id])
                         edge_features[etype_name+'/'+feat_name+"/"+str(local_part_id//world_size)] = torch.from_numpy(np.concatenate(efeats))
                         edge_feature_tids[etype_name+"/"+feat_name+"/"+str(local_part_id//world_size)] = efeat_tids
