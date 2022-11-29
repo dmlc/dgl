@@ -114,6 +114,20 @@ SparseMatrix::CSCTensors() {
 
 void SparseMatrix::SetValue(torch::Tensor value) { value_ = value; }
 
+c10::intrusive_ptr<SparseMatrix> SparseMatrix::Transpose() const {
+  auto shape = shape_;
+  std::swap(shape[0], shape[1]);
+  auto value = value_;
+  if (HasCOO()) {
+    auto coo = COOTranspose(coo_);
+    return SparseMatrix::FromCOO(coo, value, shape);
+  } else if (HasCSR()) {
+    return SparseMatrix::FromCSC(csr_, value, shape);
+  } else {
+    return SparseMatrix::FromCSR(csc_, value, shape);
+  }
+}
+
 void SparseMatrix::_CreateCOO() {
   if (HasCOO()) return;
   if (HasCSR()) {
