@@ -37,8 +37,14 @@ def get_proc_info():
         Rank of the current process.
     """
     env_variables = dict(os.environ)
-    return int(os.environ.get("PMI_RANK") or 0)
-
+    # mpich
+    if "PMI_RANK" in env_variables:
+        return int(env_variables["PMI_RANK"])
+    #openmpi
+    elif "OMPI_COMM_WORLD_RANK" in env_variables:
+        return int(env_variables["OMPI_COMM_WORLD_RANK"])
+    else:
+        return 0
 
 def gen_edge_files(schema_map, output):
     """Function to create edges files to be consumed by ParMETIS
