@@ -19,17 +19,8 @@ def get_proc_info():
     environment when `mpirun` is used to run this python program.
 
     Please note that for mpi(openmpi) installation the rank is retrieved from the
-    environment using OMPI_COMM_WORLD_RANK and for mpi(standard installation) it is
-    retrieved from the environment using MPI_LOCALRANKID.
-
-    For retrieving world_size please use OMPI_COMM_WORLD_SIZE or
-    MPI_WORLDSIZE appropriately as described above to retrieve total no. of
-    processes, when needed.
-
-    MPI_LOCALRANKID is only valid on a single-node cluster. In a multi-node cluster
-    the correct key to use is PMI_RANK. In a multi-node cluster, MPI_LOCALRANKID
-    returns local rank of the process in the context of a particular node in which
-    it is unique.
+    environment using OMPI_COMM_WORLD_RANK. For mpich it is
+    retrieved from the environment using PMI_RANK.
 
     Returns:
     --------
