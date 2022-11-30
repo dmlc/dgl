@@ -1516,7 +1516,7 @@ def test_hgt(idtype, in_size, num_heads):
     sorted_y = m(sorted_g, sorted_x, sorted_ntype, sorted_etype, presorted=False)
     assert sorted_y.shape == (g.num_nodes(), head_size * num_heads)
     # mini-batch
-    train_idx = th.randint(0, 100, (10, ), dtype = idtype)
+    train_idx = th.randperm(100, dtype=idtype)[:10]
     sampler = dgl.dataloading.NeighborSampler([-1])
     train_loader = dgl.dataloading.DataLoader(g, train_idx.to(dev), sampler,
                                             batch_size=8, device=dev,
