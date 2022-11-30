@@ -17,10 +17,9 @@ using namespace dgl::runtime;
 namespace aten {
 namespace cusparse {
 
-#if 0  // disabling CUDA 11.0+ implementation for now because of problems on
-       // bigger graphs
+#if __CUDACC_VER_MAJOR__ == 12
 
-/** @brief Cusparse implementation of SpGEMM on Csr format for CUDA 11.0+ */
+/** @brief Cusparse implementation of SpGEMM on Csr format for CUDA 12.0+ */
 template <typename DType, typename IdType>
 std::pair<CSRMatrix, NDArray> CusparseSpgemm(
     const CSRMatrix& A, const NDArray A_weights_array, const CSRMatrix& B,
@@ -52,16 +51,18 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
   IdType* dC_csrOffsets_data = dC_csrOffsets.Ptr<IdType>();
   constexpr auto idtype = cusparse_idtype<IdType>::value;
   constexpr auto dtype = cuda_dtype<DType>::value;
+  cusparseSpGEMMAlg_t alg = CUSPARSE_SPGEMM_ALG3;//CUSPARSE_SPGEMM_DEFAULT
+
   // Create sparse matrix A, B and C in CSR format
   CUSPARSE_CALL(cusparseCreateCsr(
-      &matA, A.num_rows, A.num_cols, nnzA, A.indptr.Ptr<DType>(),
-      A.indices.Ptr<DType>(),
+      &matA, A.num_rows, A.num_cols, nnzA, A.indptr.Ptr<IdType>(),
+      A.indices.Ptr<IdType>(),
       // cusparseCreateCsr only accepts non-const pointers.
       const_cast<DType*>(A_weights),
       idtype, idtype, CUSPARSE_INDEX_BASE_ZERO, dtype));
   CUSPARSE_CALL(cusparseCreateCsr(
-      &matB, B.num_rows, B.num_cols, nnzB, B.indptr.Ptr<DType>(),
-      B.indices.Ptr<DType>(),
+      &matB, B.num_rows, B.num_cols, nnzB, B.indptr.Ptr<IdType>(),
+      B.indices.Ptr<IdType>(),
       // cusparseCreateCsr only accepts non-const pointers.
       const_cast<DType*>(B_weights),
       idtype, idtype, CUSPARSE_INDEX_BASE_ZERO, dtype));
@@ -71,29 +72,36 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
   // SpGEMM Computation
   cusparseSpGEMMDescr_t spgemmDesc;
   CUSPARSE_CALL(cusparseSpGEMM_createDescr(&spgemmDesc));
-  size_t workspace_size1 = 0, workspace_size2 = 0;
+  size_t workspace_size1 = 0, workspace_size2 = 0, workspace_size3 = 0;
   // ask bufferSize1 bytes for external memory
   CUSPARSE_CALL(cusparseSpGEMM_workEstimation(
       thr_entry->cusparse_handle, transA, transB, &alpha, matA, matB, &beta,
-      matC, dtype, CUSPARSE_SPGEMM_DEFAULT, spgemmDesc, &workspace_size1,
+      matC, dtype, alg, spgemmDesc, &workspace_size1,
       NULL));
   void* workspace1 = (device->AllocWorkspace(ctx, workspace_size1));
   // inspect the matrices A and B to understand the memory requiremnent
   // for the next step
   CUSPARSE_CALL(cusparseSpGEMM_workEstimation(
       thr_entry->cusparse_handle, transA, transB, &alpha, matA, matB, &beta,
-      matC, dtype, CUSPARSE_SPGEMM_DEFAULT, spgemmDesc, &workspace_size1,
+      matC, dtype, alg, spgemmDesc, &workspace_size1,
       workspace1));
-  // ask bufferSize2 bytes for external memory
-  CUSPARSE_CALL(cusparseSpGEMM_compute(
+  // estimate memory if ALG2/ALG3 is enabled; note chunk_fraction is only used by ALG3
+  CUSPARSE_CALL(cusparseSpGEMM_estimateMemory(
       thr_entry->cusparse_handle, transA, transB, &alpha, matA, matB, &beta,
-      matC, dtype, CUSPARSE_SPGEMM_DEFAULT, spgemmDesc, &workspace_size2,
-      NULL));
+      matC, dtype, alg, spgemmDesc, 0.01, /*chunk_fraction*/ &workspace_size3,
+      NULL, NULL));
+  void* workspace3 = (device->AllocWorkspace(ctx, workspace_size3));
+
+  CUSPARSE_CALL(cusparseSpGEMM_estimateMemory(
+      thr_entry->cusparse_handle, transA, transB, &alpha, matA, matB, &beta,
+      matC, dtype, alg, spgemmDesc, 0.01, /*chunk_fraction*/ &workspace_size3,
+      workspace3, &workspace_size2));
+  // ask bufferSize2 bytes for external memory
   void* workspace2 = device->AllocWorkspace(ctx, workspace_size2);
   // compute the intermediate product of A * B
   CUSPARSE_CALL(cusparseSpGEMM_compute(
       thr_entry->cusparse_handle, transA, transB, &alpha, matA, matB, &beta,
-      matC, dtype, CUSPARSE_SPGEMM_DEFAULT, spgemmDesc, &workspace_size2,
+      matC, dtype, alg, spgemmDesc, &workspace_size2,
       workspace2));
   // get matrix C non-zero entries C_nnz1
   int64_t C_num_rows1, C_num_cols1, C_nnz1;
@@ -110,10 +118,11 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
   // copy the final products to the matrix C
   CUSPARSE_CALL(cusparseSpGEMM_copy(
       thr_entry->cusparse_handle, transA, transB, &alpha, matA, matB, &beta,
-      matC, dtype, CUSPARSE_SPGEMM_DEFAULT, spgemmDesc));
+      matC, dtype, alg, spgemmDesc));
 
   device->FreeWorkspace(ctx, workspace1);
   device->FreeWorkspace(ctx, workspace2);
+  device->FreeWorkspace(ctx, workspace3);
   // destroy matrix/vector descriptors
   CUSPARSE_CALL(cusparseSpGEMM_destroyDescr(spgemmDesc));
   CUSPARSE_CALL(cusparseDestroySpMat(matA));
@@ -126,7 +135,7 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
       dC_weights};
 }
 
-#else  // __CUDACC_VER_MAJOR__ != 11
+#else  // __CUDACC_VER_MAJOR__ != 12
 
 /** @brief Cusparse implementation of SpGEMM on Csr format for older CUDA
  * versions */
@@ -202,7 +211,7 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
       C_weights};
 }
 
-#endif  // __CUDACC_VER_MAJOR__ == 11
+#endif  // __CUDACC_VER_MAJOR__ == 12
 }  // namespace cusparse
 
 template <int XPU, typename IdType, typename DType>
