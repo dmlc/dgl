@@ -4,26 +4,31 @@ import os
 import numpy as np
 import pyarrow
 import torch
-from pyarrow import csv
-import array_readwriter
 
+import array_readwriter
 import constants
 from utils import get_idranges, map_partid_rank
 from gloo_wrapper import alltoallv_cpu
 
 
 DATA_TYPE_ID = {
-    torch.int32: 0,
-    torch.int64: 1,
-    torch.float32: 2,
-    torch.float64: 3,
-    torch.int8: 4,
-    torch.uint8: 5,
-    torch.int16: 6,
+    data_type: id for id, data_type in enumerate([
+        torch.float32,
+        torch.float64,
+        torch.float16,
+        torch.uint8,
+        torch.int8,
+        torch.int16,
+        torch.int32,
+        torch.int64,
+        torch.bool
+    ])
 }
 
 
-REV_DATA_TYPE_ID = {v:k for k,v in DATA_TYPE_ID.items()}
+REV_DATA_TYPE_ID = {
+    id: data_type for data_type, id in DATA_TYPE_ID.items()
+}
 
 
 def _shuffle_data(data, rank, world_size, tids, num_parts):
