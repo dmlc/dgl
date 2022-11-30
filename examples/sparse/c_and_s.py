@@ -2,7 +2,6 @@
 [Combining Label Propagation and Simple Models Out-performs
 Graph Neural Networks](https://arxiv.org/abs/2010.13993)
 """
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -11,52 +10,40 @@ from dgl.mock_sparse import create_from_coo, diag, identity
 from torch.optim import Adam
 
 
-class LabelPropagation(nn.Module):
-    def __init__(self, num_layers=20, alpha=0.9):
-        super().__init__()
-
-        self.num_layers = num_layers
-        self.alpha = alpha
-
-    ###########################################################################
-    # (HIGHLIGHT) Compute Label Propagation with Sparse Matrix API
-    ###########################################################################
-    @torch.no_grad()
-    def forward(self, A_hat, label):
-        Y = label
-        for _ in range(self.num_layers):
-            Y = self.alpha * A_hat @ Y + (1 - self.alpha) * label
-            Y = Y.clamp_(0.0, 1.0)
-        return Y
+###############################################################################
+# (HIGHLIGHT) Compute Label Propagation with Sparse Matrix API
+###############################################################################
+@torch.no_grad()
+def label_propagation(A_hat, label, num_layers=20, alpha=0.9):
+    Y = label
+    for _ in range(num_layers):
+        Y = alpha * A_hat @ Y + (1 - alpha) * label
+        Y = Y.clamp_(0.0, 1.0)
+    return Y
 
 
-class CorrectAndSmooth(nn.Module):
-    def __init__(self):
-        super().__init__()
+def correct(A_hat, label, soft_label, mask):
+    # Compute error.
+    error = torch.zeros_like(soft_label)
+    error[mask] = label[mask] - soft_label[mask]
 
-        self.lp = LabelPropagation()
+    # Smooth error.
+    smoothed_error = label_propagation(A_hat, error)
 
-    def correct(self, A_hat, label, soft_label, mask):
-        # Compute error.
-        error = torch.zeros_like(soft_label)
-        error[mask] = label[mask] - soft_label[mask]
+    # Autoscale.
+    sigma = error[mask].abs()
+    sigma = sigma.sum() / sigma.shape[0]
+    scale = sigma / smoothed_error.abs().sum(dim=1, keepdim=True)
+    scale[scale.isinf() | (scale > 1000)] = 1.0
 
-        # Smooth error.
-        smoothed_error = self.lp(A_hat, error)
+    # Correct.
+    result = soft_label + scale * smoothed_error
+    return result
 
-        # Autoscale.
-        sigma = error[mask].abs()
-        sigma = sigma.sum() / sigma.shape[0]
-        scale = sigma / smoothed_error.abs().sum(dim=1, keepdim=True)
-        scale[scale.isinf() | (scale > 1000)] = 1.0
 
-        # Correct.
-        result = soft_label + scale * smoothed_error
-        return result
-
-    def smooth(self, A_hat, label, soft_label, mask):
-        soft_label[mask] = label[mask].float()
-        return self.lp(A_hat, soft_label)
+def smooth(A_hat, label, soft_label, mask):
+    soft_label[mask] = label[mask].float()
+    return label_propagation(A_hat, soft_label)
 
 
 def evaluate(g, pred):
@@ -70,11 +57,10 @@ def evaluate(g, pred):
     return val_acc, test_acc
 
 
-def train(base_model, model, g, A_hat, X):
+def train(base_model, g, X):
     label = g.ndata["label"]
     train_mask = g.ndata["train_mask"]
 
-    # Stage1: Train the base model.
     optimizer = Adam(base_model.parameters(), lr=0.01)
 
     for epoch in range(10):
@@ -101,15 +87,7 @@ def train(base_model, model, g, A_hat, X):
             f"Base model, In epoch {epoch}, loss: {loss:.3f}, "
             f"val acc: {val_acc:.3f}, test acc: {test_acc:.3f}"
         )
-
-    # Stage2: Correct and Smooth.
-    soft_label = F.softmax(logits, dim=1)
-    label = F.one_hot(label)
-    soft_label = model.correct(A_hat, label, soft_label, train_mask)
-    soft_label = model.smooth(A_hat, label, soft_label, train_mask)
-    pred = soft_label.argmax(dim=1)
-    val_acc, test_acc = evaluate(g, pred)
-    print(f"val acc: {val_acc:.3f}, test acc: {test_acc:.3f}")
+    return logits
 
 
 if __name__ == "__main__":
@@ -137,7 +115,15 @@ if __name__ == "__main__":
     in_size = X.shape[1]
     out_size = dataset.num_classes
     base_model = nn.Linear(in_size, out_size).to(dev)
-    model = CorrectAndSmooth().to(dev)
 
-    # Kick off training.
-    train(base_model, model, g, A_hat, X)
+    # Stage1: Train the base model.
+    logits = train(base_model, g, X)
+
+    # Stage2: Correct and Smooth.
+    soft_label = F.softmax(logits, dim=1)
+    label = F.one_hot(g.ndata["label"])
+    soft_label = correct(A_hat, label, soft_label, g.ndata["train_mask"])
+    soft_label = smooth(A_hat, label, soft_label, g.ndata["train_mask"])
+    pred = soft_label.argmax(dim=1)
+    val_acc, test_acc = evaluate(g, pred)
+    print(f"val acc: {val_acc:.3f}, test acc: {test_acc:.3f}")
