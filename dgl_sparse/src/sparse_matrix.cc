@@ -188,7 +188,8 @@ c10::intrusive_ptr<SparseMatrix> CreateFromCSC(
 c10::intrusive_ptr<SparseMatrix> CreateValLike(
     const c10::intrusive_ptr<SparseMatrix>& mat, torch::Tensor value) {
   CHECK_EQ(mat->value().size(0), value.size(0))
-      << "The first dimension of the old values and the new values must be the same.";
+      << "The first dimension of the old values and the new values must be the "
+         "same.";
   CHECK_EQ(mat->value().device(), value.device())
       << "The device of the old values and the new values must be the same.";
   auto shape = mat->shape();
