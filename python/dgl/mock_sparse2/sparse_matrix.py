@@ -149,6 +149,39 @@ class SparseMatrix:
         mat[row, col] = val
         return mat
 
+    def t(self):
+        """Alias of :meth:`transpose()`"""
+        return self.transpose()
+
+    @property
+    def T(self):  # pylint: disable=C0103
+        """Alias of :meth:`transpose()`"""
+        return self.transpose()
+
+    def transpose(self):
+        """Return the transpose of this sparse matrix.
+
+        Returns
+        -------
+        SparseMatrix
+            The transpose of this sparse matrix.
+
+        Example
+        -------
+
+        >>> row = torch.tensor([1, 1, 3])
+        >>> col = torch.tensor([2, 1, 3])
+        >>> val = torch.tensor([1, 1, 2])
+        >>> A = create_from_coo(row, col, val)
+        >>> A = A.transpose()
+        >>> print(A)
+        SparseMatrix(indices=tensor([[2, 1, 3],
+                [1, 1, 3]]),
+        values=tensor([1, 1, 2]),
+        shape=(4, 4), nnz=3)
+        """
+        return SparseMatrix(self.c_sparse_matrix.transpose())
+
 
 def create_from_coo(
     row: torch.Tensor,

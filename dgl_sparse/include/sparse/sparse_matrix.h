@@ -117,6 +117,11 @@ class SparseMatrix : public torch::CustomClassHolder {
    */
   void SetValue(torch::Tensor value);
 
+  /** @brief Return the transposition of the sparse matrix. It transposes the
+   * first existing sparse format by checking COO, CSR, and CSC.
+   */
+  c10::intrusive_ptr<SparseMatrix> Transpose() const;
+
  private:
   /** @brief Create the COO format for the sparse matrix internally */
   void _CreateCOO();
