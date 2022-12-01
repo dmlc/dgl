@@ -6,10 +6,11 @@
 #include <dgl/array.h>
 #include <dgl/runtime/device_api.h>
 
+#include <limits>
+
 #include "../../runtime/cuda/cuda_common.h"
 #include "./cusparse_dispatcher.cuh"
 #include "./functor.cuh"
-#include <limits>
 namespace dgl {
 
 using namespace dgl::runtime;
@@ -73,7 +74,7 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
   // below to estimate upperbound of num_prods to decide DEFAULT or ALG2
   int int_max = std::numeric_limits<int>::max();
   int64_t nnzAB_norm = (nnzA / A.num_rows) * (nnzB / B.num_rows);
-  int64_t dense_norm = B.num_cols;  //if denseMM, numprods = nrowA*ncolA*ncolB
+  int64_t dense_norm = B.num_cols;  // if denseMM, numprods=nrowA*ncolA*ncolB
   int64_t max_nprods = (nnzAB_norm > dense_norm) ? dense_norm : nnzAB_norm;
   max_nprods = max_nprods * A.num_rows * B.num_rows;
   cusparseSpGEMMAlg_t alg;
@@ -112,7 +113,7 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
     device->FreeWorkspace(ctx, workspace1);
     // rerun cusparseSpGEMM_workEstimation
     CUSPARSE_CALL(cusparseSpGEMM_workEstimation(thr_entry->cusparse_handle,
-                                                transA,transB, &alpha, matA,
+                                                transA, transB, &alpha, matA,
                                                 matB, &beta, matC, dtype, alg,
                                                 spgemmDesc, &workspace_size1,
                                                 NULL));
@@ -131,7 +132,7 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
     device->FreeWorkspace(ctx, workspace1);
     // rerun cusparseSpGEMM_workEstimation
     CUSPARSE_CALL(cusparseSpGEMM_workEstimation(thr_entry->cusparse_handle,
-                                                transA,transB, &alpha, matA,
+                                                transA, transB, &alpha, matA,
                                                 matB, &beta, matC, dtype, alg,
                                                 spgemmDesc, &workspace_size1,
                                                 NULL));
