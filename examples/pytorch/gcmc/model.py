@@ -89,7 +89,7 @@ class GCMCGraphConv(nn.Module):
 
             feat = feat * self.dropout(cj)
             graph.srcdata['h'] = feat
-            graph.update_all(fn.copy_src(src='h', out='m'),
+            graph.update_all(fn.copy_u(u='h', out='m'),
                              fn.sum(msg='m', out='h'))
             rst = graph.dstdata['h']
             rst = rst * ci

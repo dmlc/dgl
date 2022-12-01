@@ -335,19 +335,6 @@ class NodeEmbedding:  # NodeEmbedding
         self._trace = []
 
     @property
-    def emb_tensor(self):
-        """Return the tensor storing the node embeddings
-
-        DEPRECATED: renamed weight
-
-        Returns
-        -------
-        torch.Tensor
-            The tensor storing the node embeddings
-        """
-        return self._tensor
-
-    @property
     def weight(self):
         """Return the tensor storing the node embeddings
 

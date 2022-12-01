@@ -31,11 +31,11 @@ class GNNModule(nn.Module):
     def aggregate(self, g, z):
         z_list = []
         g.ndata['z'] = z
-        g.update_all(fn.copy_src(src='z', out='m'), fn.sum(msg='m', out='z'))
+        g.update_all(fn.copy_u(u='z', out='m'), fn.sum(msg='m', out='z'))
         z_list.append(g.ndata['z'])
         for i in range(self.radius - 1):
             for j in range(2 ** i):
-                g.update_all(fn.copy_src(src='z', out='m'), fn.sum(msg='m', out='z'))
+                g.update_all(fn.copy_u(u='z', out='m'), fn.sum(msg='m', out='z'))
             z_list.append(g.ndata['z'])
         return z_list
 
@@ -45,7 +45,7 @@ class GNNModule(nn.Module):
         sum_x = sum(theta(z) for theta, z in zip(self.theta_list, self.aggregate(g, x)))
 
         g.edata['y'] = y
-        g.update_all(fn.copy_edge(edge='y', out='m'), fn.sum('m', 'pmpd_y'))
+        g.update_all(fn.copy_e(e='y', out='m'), fn.sum('m', 'pmpd_y'))
         pmpd_y = g.ndata.pop('pmpd_y')
 
         x = self.theta_x(x) + self.theta_deg(deg_g * x) + sum_x + self.theta_y(pmpd_y)
