@@ -259,13 +259,11 @@ class PathEncoder(nn.Module):
     """
 
     def __init__(self, max_len, feat_dim, num_heads=1):
-        super(PathEncoder, self).__init__()
+        super().__init__()
         self.max_len = max_len
         self.feat_dim = feat_dim
         self.num_heads = num_heads
-        self.embedding_table = nn.Embedding(
-            max_len * num_heads, feat_dim, padding_idx=0
-        )
+        self.embedding_table = nn.Embedding(max_len * num_heads, feat_dim)
 
     def forward(self, g, edge_feat):
         """
@@ -286,56 +284,53 @@ class PathEncoder(nn.Module):
             and batch_size is the batch size of the input graph.
         """
 
-        batch_size = g.batch_size
+        ubg_list = unbatch(g)
         sum_num_edges = 0
         max_num_nodes = th.max(g.batch_num_nodes())
-        for idx_g in range(batch_size):
-            num_nodes = g.batch_num_nodes()[idx_g]
-            ubg = unbatch(g)[idx_g]
-            edata = edge_feat[
-                sum_num_edges: (sum_num_edges + g.batch_num_edges()[idx_g]), :
-            ]
-            sum_num_edges = sum_num_edges + g.batch_num_edges()[idx_g]
+        path_encoding = []
+
+        for ubg in ubg_list:
+            num_nodes = ubg.num_nodes()
+            num_edges = ubg.num_edges()
+            edata = edge_feat[sum_num_edges: (sum_num_edges + num_edges)]
+            sum_num_edges = sum_num_edges + num_edges
             edata = th.cat(
-                (edata, th.unsqueeze(th.zeros(self.feat_dim), 0)), 0
+                (edata, th.zeros(1, self.feat_dim).to(edata.device)),
+                dim=0
             )
-            path = shortest_dist(ubg, root=None, return_paths=True)[1]
+            _, path = shortest_dist(ubg, root=None, return_paths=True)
             path_len = min(self.max_len, path.size(dim=2))
 
-            # shape of shortest path is [n, n, l], n = num_nodes, l = path_len
+            # shape: [n, n, l], n = num_nodes, l = path_len
             shortest_path = path[:, :, 0: path_len]
-            # shape of path_data is [n, n, l, d], d = feat_dim
+            # shape: [n, n]
+            shortest_distance = shortest_dist(
+                ubg, root=None, return_paths=False
+            )
+            # shape: [n, n, l, d], d = feat_dim
             path_data = edata[shortest_path]
-            # shape of embedding_idx is [l, h], h = num_heads
+            # shape: [l, h], h = num_heads
             embedding_idx = th.reshape(
                 th.arange(self.num_heads * path_len),
                 (path_len, self.num_heads)
             )
-            # shape of edge_embedding is [d, l, h]
+            # shape: [d, l, h]
             edge_embedding = th.permute(
                 self.embedding_table(embedding_idx), (2, 0, 1)
             )
 
             # [n, n, l, d] einsum [d, l, h] -> [n, n, h]
             # [n, n, h] -> [N, N, h], N = max_num_nodes, padded with -inf
-            if not idx_g:
-                path_encoding = th.full(
-                    (max_num_nodes, max_num_nodes, self.num_heads),
-                    float('-inf')
-                )
-                path_encoding[0: num_nodes, 0: num_nodes, :] = th.einsum(
+            sub_encoding = th.full(
+                (max_num_nodes, max_num_nodes, self.num_heads),
+                float('-inf')
+            )
+            sub_encoding[0: num_nodes, 0: num_nodes] = th.div(
+                th.einsum(
                     'xyld,dlh->xyh', path_data, edge_embedding
-                )
-                path_encoding = th.unsqueeze(path_encoding, 0)
-            else:
-                sub_path_encoding = th.full(
-                    (max_num_nodes, max_num_nodes, self.num_heads),
-                    float('-inf')
-                )
-                sub_path_encoding[0: num_nodes, 0: num_nodes, :] = th.einsum(
-                    'xyld,dlh->xyh', path_data, edge_embedding
-                )
-                path_encoding = th.cat(
-                    (path_encoding, th.unsqueeze(sub_path_encoding, 0)), 0
-                )
-        return path_encoding
+                ).permute(2, 0, 1),
+                shortest_distance
+            ).permute(1, 2, 0)
+            path_encoding.append(sub_encoding)
+
+        return th.stack(path_encoding, dim=0)
