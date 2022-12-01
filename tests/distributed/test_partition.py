@@ -341,8 +341,8 @@ def check_partition(
     g.edata["feats"] = F.tensor(
         np.random.randn(g.number_of_edges(), 10), F.float32
     )
-    g.update_all(fn.copy_src("feats", "msg"), fn.sum("msg", "h"))
-    g.update_all(fn.copy_edge("feats", "msg"), fn.sum("msg", "eh"))
+    g.update_all(fn.copy_u("feats", "msg"), fn.sum("msg", "h"))
+    g.update_all(fn.copy_e("feats", "msg"), fn.sum("msg", "eh"))
     num_hops = 2
 
     orig_nids, orig_eids = partition_graph(
@@ -464,8 +464,8 @@ def check_partition(
                 g.edata["feats"], part_g.edata[dgl.NID]
             )
 
-        part_g.update_all(fn.copy_src("feats", "msg"), fn.sum("msg", "h"))
-        part_g.update_all(fn.copy_edge("feats", "msg"), fn.sum("msg", "eh"))
+        part_g.update_all(fn.copy_u("feats", "msg"), fn.sum("msg", "h"))
+        part_g.update_all(fn.copy_e("feats", "msg"), fn.sum("msg", "eh"))
         assert F.allclose(
             F.gather_row(g.ndata["h"], local_nodes),
             F.gather_row(part_g.ndata["h"], llocal_nodes),

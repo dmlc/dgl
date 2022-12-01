@@ -93,10 +93,10 @@ def test_copy_src_reduce():
 
         with F.record_grad():
             if partial:
-                g.pull(nid, fn.copy_src(src='u', out='m'),
+                g.pull(nid, fn.copy_u(u='u', out='m'),
                        builtin[red](msg='m', out='r1'))
             else:
-                g.update_all(fn.copy_src(src='u', out='m'),
+                g.update_all(fn.copy_u(u='u', out='m'),
                              builtin[red](msg='m', out='r1'))
             r1 = g.ndata['r1']
             F.backward(F.reduce_sum(r1))
@@ -155,10 +155,10 @@ def test_copy_edge_reduce():
 
         with F.record_grad():
             if partial:
-                g.pull(nid, fn.copy_edge(edge='e', out='m'),
+                g.pull(nid, fn.copy_e(e='e', out='m'),
                        builtin[red](msg='m', out='r1'))
             else:
-                g.update_all(fn.copy_edge(edge='e', out='m'),
+                g.update_all(fn.copy_e(e='e', out='m'),
                              builtin[red](msg='m', out='r1'))
             r1 = g.ndata['r1']
             F.backward(F.reduce_sum(r1))
@@ -339,14 +339,14 @@ def test_all_binary_builtins():
     # NOTE(zihao): add self-loop to avoid zero-degree nodes.
     g.add_edges(g.nodes(), g.nodes())
     for i in range(2, 18):
-        g.add_edge(0, i)
-        g.add_edge(1, i)
-        g.add_edge(i, 18)
-        g.add_edge(i, 19)
-    g.add_edge(18, 0)
-    g.add_edge(18, 1)
-    g.add_edge(19, 0)
-    g.add_edge(19, 1)
+        g.add_edges(0, i)
+        g.add_edges(1, i)
+        g.add_edges(i, 18)
+        g.add_edges(i, 19)
+    g.add_edges(18, 0)
+    g.add_edges(18, 1)
+    g.add_edges(19, 0)
+    g.add_edges(19, 1)
     g = g.to(F.ctx())
     nid = F.tensor([0, 1, 4, 5, 7, 12, 14, 15, 18, 19], g.idtype)
     target = ["u", "v", "e"]

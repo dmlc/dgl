@@ -86,5 +86,11 @@ std::shared_ptr<CSR> CSRToCSC(const std::shared_ptr<CSR>& csr) {
   return CSRFromOldDGLCSR(dgl_csc);
 }
 
+std::shared_ptr<COO> COOTranspose(const std::shared_ptr<COO>& coo) {
+  auto dgl_coo = COOToOldDGLCOO(coo);
+  auto dgl_coo_tr = aten::COOTranspose(dgl_coo);
+  return COOFromOldDGLCOO(dgl_coo_tr);
+}
+
 }  // namespace sparse
 }  // namespace dgl

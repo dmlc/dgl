@@ -19,17 +19,8 @@ def get_proc_info():
     environment when `mpirun` is used to run this python program.
 
     Please note that for mpi(openmpi) installation the rank is retrieved from the
-    environment using OMPI_COMM_WORLD_RANK and for mpi(standard installation) it is
-    retrieved from the environment using MPI_LOCALRANKID.
-
-    For retrieving world_size please use OMPI_COMM_WORLD_SIZE or
-    MPI_WORLDSIZE appropriately as described above to retrieve total no. of
-    processes, when needed.
-
-    MPI_LOCALRANKID is only valid on a single-node cluster. In a multi-node cluster
-    the correct key to use is PMI_RANK. In a multi-node cluster, MPI_LOCALRANKID
-    returns local rank of the process in the context of a particular node in which
-    it is unique.
+    environment using OMPI_COMM_WORLD_RANK. For mpich it is
+    retrieved from the environment using PMI_RANK.
 
     Returns:
     --------
@@ -37,8 +28,14 @@ def get_proc_info():
         Rank of the current process.
     """
     env_variables = dict(os.environ)
-    return int(os.environ.get("PMI_RANK") or 0)
-
+    # mpich
+    if "PMI_RANK" in env_variables:
+        return int(env_variables["PMI_RANK"])
+    #openmpi
+    elif "OMPI_COMM_WORLD_RANK" in env_variables:
+        return int(env_variables["OMPI_COMM_WORLD_RANK"])
+    else:
+        return 0
 
 def gen_edge_files(schema_map, output):
     """Function to create edges files to be consumed by ParMETIS
