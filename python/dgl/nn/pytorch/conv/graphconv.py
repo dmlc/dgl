@@ -114,13 +114,13 @@ class EdgeWeightNorm(nn.Module):
             if self._norm == 'both':
                 reversed_g = reverse(graph)
                 reversed_g.edata['_edge_w'] = edge_weight
-                reversed_g.update_all(fn.copy_edge('_edge_w', 'm'), fn.sum('m', 'out_weight'))
+                reversed_g.update_all(fn.copy_e('_edge_w', 'm'), fn.sum('m', 'out_weight'))
                 degs = reversed_g.dstdata['out_weight'] + self._eps
                 norm = th.pow(degs, -0.5)
                 graph.srcdata['_src_out_w'] = norm
 
             if self._norm != 'none':
-                graph.update_all(fn.copy_edge('_edge_w', 'm'), fn.sum('m', 'in_weight'))
+                graph.update_all(fn.copy_e('_edge_w', 'm'), fn.sum('m', 'in_weight'))
                 degs = graph.dstdata['in_weight'] + self._eps
                 if self._norm == 'both':
                     norm = th.pow(degs, -0.5)
@@ -389,7 +389,7 @@ class GraphConv(nn.Module):
                                    'the issue. Setting ``allow_zero_in_degree`` '
                                    'to be `True` when constructing this module will '
                                    'suppress the check and let the code run.')
-            aggregate_fn = fn.copy_src('h', 'm')
+            aggregate_fn = fn.copy_u('h', 'm')
             if edge_weight is not None:
                 assert edge_weight.shape[0] == graph.number_of_edges()
                 graph.edata['_edge_weight'] = edge_weight

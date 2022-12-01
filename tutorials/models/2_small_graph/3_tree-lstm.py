@@ -243,7 +243,7 @@ import torch as th
 trv_graph.ndata['a'] = th.ones(graph.number_of_nodes(), 1)
 traversal_order = dgl.topological_nodes_generator(trv_graph)
 trv_graph.prop_nodes(traversal_order,
-                     message_func=fn.copy_src('a', 'a'),
+                     message_func=fn.copy_u('a', 'a'),
                      reduce_func=fn.sum('a', 'a'))
 
 # the following is a syntax sugar that does the same

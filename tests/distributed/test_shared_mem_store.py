@@ -133,7 +133,7 @@ def check_compute_func(worker_id, graph_name, return_dict):
         g._sync_barrier(60)
         in_feats = g.nodes[0].data['feat'].shape[1]
         # Test update all.
-        g.update_all(fn.copy_src(src='feat', out='m'), fn.sum(msg='m', out='preprocess'))
+        g.update_all(fn.copy_u(u='feat', out='m'), fn.sum(msg='m', out='preprocess'))
         adj = g.adjacency_matrix(transpose=True)
         tmp = F.spmm(adj, g.nodes[:].data['feat'])
         assert_almost_equal(F.asnumpy(g.nodes[:].data['preprocess']), F.asnumpy(tmp))
@@ -154,12 +154,12 @@ def check_compute_func(worker_id, graph_name, return_dict):
         g.init_ndata('tmp', (g.number_of_nodes(), 10), 'float32')
         data = g.nodes[:].data['tmp']
         # Test pull
-        g.pull(1, fn.copy_src(src='feat', out='m'), fn.sum(msg='m', out='tmp'))
+        g.pull(1, fn.copy_u(u='feat', out='m'), fn.sum(msg='m', out='tmp'))
         assert_almost_equal(F.asnumpy(data[1]), np.squeeze(F.asnumpy(g.nodes[1].data['preprocess'])))
 
         # Test send_and_recv
         in_edges = g.in_edges(v=2)
-        g.send_and_recv(in_edges, fn.copy_src(src='feat', out='m'), fn.sum(msg='m', out='tmp'))
+        g.send_and_recv(in_edges, fn.copy_u(u='feat', out='m'), fn.sum(msg='m', out='tmp'))
         assert_almost_equal(F.asnumpy(data[2]), np.squeeze(F.asnumpy(g.nodes[2].data['preprocess'])))
 
         g.destroy()

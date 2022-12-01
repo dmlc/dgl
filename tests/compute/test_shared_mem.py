@@ -23,7 +23,6 @@ def create_test_graph(idtype):
     return g
 
 def _assert_is_identical_hetero(g, g2):
-    assert g.is_readonly == g2.is_readonly
     assert g.ntypes == g2.ntypes
     assert g.canonical_etypes == g2.canonical_etypes
 
