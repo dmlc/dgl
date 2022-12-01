@@ -99,10 +99,10 @@ def test_no_backtracking():
     L = G.line_graph(backtracking=False)
     assert L.number_of_nodes() == 2 * N
     for i in range(1, N):
-        e1 = G.edge_id(0, i)
-        e2 = G.edge_id(i, 0)
-        assert not L.has_edge_between(e1, e2)
-        assert not L.has_edge_between(e2, e1)
+        e1 = G.edge_ids(0, i)
+        e2 = G.edge_ids(i, 0)
+        assert not L.has_edges_between(e1, e2)
+        assert not L.has_edges_between(e2, e1)
 
 # reverse graph related
 @parametrize_idtype
@@ -122,9 +122,9 @@ def test_reverse(idtype):
     assert g.number_of_edges() == rg.number_of_edges()
     assert F.allclose(F.astype(rg.has_edges_between(
         [1, 2, 1], [0, 1, 2]), F.float32), F.ones((3,)))
-    assert g.edge_id(0, 1) == rg.edge_id(1, 0)
-    assert g.edge_id(1, 2) == rg.edge_id(2, 1)
-    assert g.edge_id(2, 1) == rg.edge_id(1, 2)
+    assert g.edge_ids(0, 1) == rg.edge_ids(1, 0)
+    assert g.edge_ids(1, 2) == rg.edge_ids(2, 1)
+    assert g.edge_ids(2, 1) == rg.edge_ids(1, 2)
 
     # test dgl.reverse
     # test homogeneous graph

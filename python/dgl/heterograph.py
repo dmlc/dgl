@@ -346,14 +346,6 @@ class DGLGraph(object):
             self._node_frames[ntid].append(data)
         self._reset_cached_info()
 
-    def add_edge(self, u, v, data=None, etype=None):
-        """Add one edge to the graph.
-
-        DEPRECATED: please use ``add_edges``.
-        """
-        dgl_warning("DGLGraph.add_edge is deprecated. Please use DGLGraph.add_edges")
-        self.add_edges(u, v, data, etype)
-
     def add_edges(self, u, v, data=None, etype=None):
         r"""Add multiple new edges for the specified edge type
 
@@ -2624,20 +2616,6 @@ class DGLGraph(object):
         return len(self.ntypes) == 1 and len(self.etypes) == 1
 
     @property
-    def is_readonly(self):
-        """**DEPRECATED**: DGLGraph will always be mutable.
-
-        Returns
-        -------
-        bool
-            True if the graph is readonly, False otherwise.
-        """
-        dgl_warning('DGLGraph.is_readonly is deprecated in v0.5.\n'
-                    'DGLGraph now always supports mutable operations like add_nodes'
-                    ' and add_edges.')
-        return False
-
-    @property
     def idtype(self):
         """The data type for storing the structure-related graph information
         such as node and edge IDs.
@@ -2681,12 +2659,6 @@ class DGLGraph(object):
             th.int32/th.int64 or tf.int32/tf.int64 etc.
         """
         return self._graph.dtype
-
-    def __contains__(self, vid):
-        """**DEPRECATED**: please directly call :func:`has_nodes`."""
-        dgl_warning('DGLGraph.__contains__ is deprecated.'
-                    ' Please directly call has_nodes.')
-        return self.has_nodes(vid)
 
     def has_nodes(self, vid, ntype=None):
         """Return whether the graph contains the given nodes.
@@ -2744,14 +2716,6 @@ class DGLGraph(object):
             return bool(F.as_scalar(ret))
         else:
             return F.astype(ret, F.bool)
-
-    def has_node(self, vid, ntype=None):
-        """Whether the graph has a particular node of a given type.
-
-        **DEPRECATED**: see :func:`~DGLGraph.has_nodes`
-        """
-        dgl_warning("DGLGraph.has_node is deprecated. Please use DGLGraph.has_nodes")
-        return self.has_nodes(vid, ntype)
 
     def has_edges_between(self, u, v, etype=None):
         """Return whether the graph contains the given edges.
@@ -2842,15 +2806,6 @@ class DGLGraph(object):
             return bool(F.as_scalar(ret))
         else:
             return F.astype(ret, F.bool)
-
-    def has_edge_between(self, u, v, etype=None):
-        """Whether the graph has edges of type ``etype``.
-
-        **DEPRECATED**: please use :func:`~DGLGraph.has_edge_between`.
-        """
-        dgl_warning("DGLGraph.has_edge_between is deprecated. "
-                    "Please use DGLGraph.has_edges_between")
-        return self.has_edges_between(u, v, etype)
 
     def predecessors(self, v, etype=None):
         """Return the predecessor(s) of a particular node with the specified edge type.
@@ -2969,17 +2924,7 @@ class DGLGraph(object):
             raise DGLError('Non-existing node ID {}'.format(v))
         return self._graph.successors(self.get_etype_id(etype), v)
 
-    def edge_id(self, u, v, force_multi=None, return_uv=False, etype=None):
-        """Return the edge ID, or an array of edge IDs, between source node
-        `u` and destination node `v`, with the specified edge type
-
-        **DEPRECATED**: See edge_ids
-        """
-        dgl_warning("DGLGraph.edge_id is deprecated. Please use DGLGraph.edge_ids.")
-        return self.edge_ids(u, v, force_multi=force_multi,
-                             return_uv=return_uv, etype=etype)
-
-    def edge_ids(self, u, v, force_multi=None, return_uv=False, etype=None):
+    def edge_ids(self, u, v, return_uv=False, etype=None):
         """Return the edge ID(s) given the two endpoints of the edge(s).
 
         Parameters
@@ -2999,9 +2944,6 @@ class DGLGraph(object):
             * Int Tensor: Each element is a node ID. The tensor must have the same device type
               and ID data type as the graph's.
             * iterable[int]: Each element is a node ID.
-        force_multi : bool, optional
-            **DEPRECATED**, use :attr:`return_uv` instead. Whether to allow the graph to be a
-            multigraph, i.e. there can be multiple edges from one node to another.
         return_uv : bool, optional
             Whether to return the source and destination node IDs along with the edges. If
             False (default), it assumes that the graph is a simple graph and there is only
@@ -3084,10 +3026,6 @@ class DGLGraph(object):
         v = utils.prepare_tensor(self, v, 'v')
         if F.as_scalar(F.sum(self.has_nodes(v, ntype=dsttype), dim=0)) != len(v):
             raise DGLError('v contains invalid node IDs')
-        if force_multi is not None:
-            dgl_warning("force_multi will be deprecated, " \
-                        "Please use return_uv instead")
-            return_uv = force_multi
 
         if return_uv:
             return self._graph.edge_ids_all(self.get_etype_id(etype), u, v)
@@ -3424,14 +3362,6 @@ class DGLGraph(object):
         else:
             raise DGLError('Invalid form: {}. Must be "all", "uv" or "eid".'.format(form))
 
-    def in_degree(self, v, etype=None):
-        """Return the in-degree of node ``v`` with edges of type ``etype``.
-
-        **DEPRECATED**: Please use in_degrees
-        """
-        dgl_warning("DGLGraph.in_degree is deprecated. Please use DGLGraph.in_degrees")
-        return self.in_degrees(v, etype)
-
     def in_degrees(self, v=ALL, etype=None):
         """Return the in-degree(s) of the given nodes.
 
@@ -3507,14 +3437,6 @@ class DGLGraph(object):
             return F.as_scalar(deg)
         else:
             return deg
-
-    def out_degree(self, u, etype=None):
-        """Return the out-degree of node `u` with edges of type ``etype``.
-
-        DEPRECATED: please use DGL.out_degrees
-        """
-        dgl_warning("DGLGraph.out_degree is deprecated. Please use DGLGraph.out_degrees")
-        return self.out_degrees(u, etype)
 
     def out_degrees(self, u=ALL, etype=None):
         """Return the out-degree(s) of the given nodes.
@@ -3712,15 +3634,6 @@ class DGLGraph(object):
             return self._graph.adjacency_matrix_tensors(etid, True, 'csr')[2:]
         else:
             return self._graph.adjacency_matrix_tensors(etid, False, fmt)[2:]
-
-    def adjacency_matrix_scipy(self, transpose=False, fmt='csr', return_edge_ids=None):
-        """DEPRECATED: please use ``dgl.adjacency_matrix(transpose, scipy_fmt=fmt)``.
-        """
-        dgl_warning('DGLGraph.adjacency_matrix_scipy is deprecated. '
-                    'Please replace it with:\n\n\t'
-                    'DGLGraph.adjacency_matrix(transpose, scipy_fmt="{}").\n'.format(fmt))
-
-        return self.adjacency_matrix(transpose=transpose, scipy_fmt=fmt)
 
     def inc(self, typestr, ctx=F.cpu(), etype=None):
         """Return the incidence matrix representation of edges with the given
@@ -4283,7 +4196,7 @@ class DGLGraph(object):
     # Message passing
     #################################################################
 
-    def apply_nodes(self, func, v=ALL, ntype=None, inplace=False):
+    def apply_nodes(self, func, v=ALL, ntype=None):
         """Update the features of the specified nodes by the provided function.
 
         Parameters
@@ -4303,8 +4216,6 @@ class DGLGraph(object):
         ntype : str, optional
             The node type name. Can be omitted if there is
             only one type of nodes in the graph.
-        inplace : bool, optional
-            **DEPRECATED**.
 
         Examples
         --------
@@ -4340,8 +4251,6 @@ class DGLGraph(object):
         --------
         apply_edges
         """
-        if inplace:
-            raise DGLError('The `inplace` option is removed in v0.5.')
         ntid = self.get_ntype_id(ntype)
         ntype = self.ntypes[ntid]
         if is_all(v):
@@ -4351,7 +4260,7 @@ class DGLGraph(object):
         ndata = core.invoke_node_udf(self, v_id, ntype, func, orig_nid=v_id)
         self._set_n_repr(ntid, v, ndata)
 
-    def apply_edges(self, func, edges=ALL, etype=None, inplace=False):
+    def apply_edges(self, func, edges=ALL, etype=None):
         """Update the features of the specified edges by the provided function.
 
         Parameters
@@ -4381,9 +4290,6 @@ class DGLGraph(object):
               triplet format in the graph.
 
             Can be omitted if the graph has only one type of edges.
-
-        inplace: bool, optional
-            **DEPRECATED**.
 
         Notes
         -----
@@ -4435,8 +4341,6 @@ class DGLGraph(object):
         --------
         apply_nodes
         """
-        if inplace:
-            raise DGLError('The `inplace` option is removed in v0.5.')
         # Graph with one relation type
         if self._graph.number_of_etypes() == 1 or etype is not None:
             etid = self.get_etype_id(etype)
@@ -4476,8 +4380,7 @@ class DGLGraph(object):
                       message_func,
                       reduce_func,
                       apply_node_func=None,
-                      etype=None,
-                      inplace=False):
+                      etype=None):
         """Send messages along the specified edges and reduce them on
         the destination nodes to update their features.
 
@@ -4512,9 +4415,6 @@ class DGLGraph(object):
               triplet format in the graph.
 
             Can be omitted if the graph has only one type of edges.
-
-        inplace: bool, optional
-            **DEPRECATED**.
 
         Notes
         -----
@@ -4558,7 +4458,7 @@ class DGLGraph(object):
         ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1])
         ... })
         >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [2.]])
-        >>> g.send_and_recv(g['follows'].edges(), fn.copy_src('h', 'm'),
+        >>> g.send_and_recv(g['follows'].edges(), fn.copy_u('h', 'm'),
         ...                 fn.sum('m', 'h'), etype='follows')
         >>> g.nodes['user'].data['h']
         tensor([[0.],
@@ -4588,8 +4488,6 @@ class DGLGraph(object):
 
         Note that the feature of node 0 remains the same as it has no incoming edges.
         """
-        if inplace:
-            raise DGLError('The `inplace` option is removed in v0.5.')
         # edge type
         etid = self.get_etype_id(etype)
         _, dtid = self._graph.metagraph.find_edge(etid)
@@ -4612,8 +4510,7 @@ class DGLGraph(object):
              message_func,
              reduce_func,
              apply_node_func=None,
-             etype=None,
-             inplace=False):
+             etype=None):
         """Pull messages from the specified node(s)' predecessors along the
         specified edge type, aggregate them to update the node features.
 
@@ -4644,9 +4541,6 @@ class DGLGraph(object):
               triplet format in the graph.
 
             Can be omitted if the graph has only one type of edges.
-
-        inplace: bool, optional
-            **DEPRECATED**.
 
         Notes
         -----
@@ -4688,14 +4582,12 @@ class DGLGraph(object):
 
         Pull.
 
-        >>> g['follows'].pull(2, fn.copy_src('h', 'm'), fn.sum('m', 'h'), etype='follows')
+        >>> g['follows'].pull(2, fn.copy_u('h', 'm'), fn.sum('m', 'h'), etype='follows')
         >>> g.nodes['user'].data['h']
         tensor([[0.],
                 [1.],
                 [1.]])
         """
-        if inplace:
-            raise DGLError('The `inplace` option is removed in v0.5.')
         v = utils.prepare_tensor(self, v, 'v')
         if len(v) == 0:
             # no computation
@@ -4716,8 +4608,7 @@ class DGLGraph(object):
              message_func,
              reduce_func,
              apply_node_func=None,
-             etype=None,
-             inplace=False):
+             etype=None):
         """Send message from the specified node(s) to their successors
         along the specified edge type and update their node features.
 
@@ -4748,9 +4639,6 @@ class DGLGraph(object):
               triplet format in the graph.
 
             Can be omitted if the graph has only one type of edges.
-
-        inplace: bool, optional
-            **DEPRECATED**.
 
         Notes
         -----
@@ -4785,14 +4673,12 @@ class DGLGraph(object):
 
         Push.
 
-        >>> g['follows'].push(0, fn.copy_src('h', 'm'), fn.sum('m', 'h'), etype='follows')
+        >>> g['follows'].push(0, fn.copy_u('h', 'm'), fn.sum('m', 'h'), etype='follows')
         >>> g.nodes['user'].data['h']
         tensor([[0.],
                 [0.],
                 [0.]])
         """
-        if inplace:
-            raise DGLError('The `inplace` option is removed in v0.5.')
         edges = self.out_edges(u, form='eid', etype=etype)
         self.send_and_recv(edges, message_func, reduce_func, apply_node_func, etype=etype)
 
@@ -4864,7 +4750,7 @@ class DGLGraph(object):
         Update all.
 
         >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [2.]])
-        >>> g['follows'].update_all(fn.copy_src('h', 'm'), fn.sum('m', 'h'), etype='follows')
+        >>> g['follows'].update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'), etype='follows')
         >>> g.nodes['user'].data['h']
         tensor([[0.],
                 [0.],
@@ -4881,7 +4767,7 @@ class DGLGraph(object):
 
         >>> g.nodes['user'].data['h'] = torch.tensor([[1.], [2.]])
         >>> g.nodes['game'].data['h'] = torch.tensor([[1.]])
-        >>> g.update_all(fn.copy_src('h', 'm'), fn.sum('m', 'h'))
+        >>> g.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
         >>> g.nodes['user'].data['h']
         tensor([[0.],
                 [4.]])
@@ -4989,8 +4875,8 @@ class DGLGraph(object):
         Update all.
 
         >>> g.multi_update_all(
-        ...     {'follows': (fn.copy_src('h', 'm'), fn.sum('m', 'h')),
-        ...      'attracts': (fn.copy_src('h', 'm'), fn.sum('m', 'h'))},
+        ...     {'follows': (fn.copy_u('h', 'm'), fn.sum('m', 'h')),
+        ...      'attracts': (fn.copy_u('h', 'm'), fn.sum('m', 'h'))},
         ... "sum")
         >>> g.nodes['user'].data['h']
         tensor([[0.],
@@ -5004,8 +4890,8 @@ class DGLGraph(object):
         Use the user-defined cross reducer.
 
         >>> g.multi_update_all(
-        ...     {'follows': (fn.copy_src('h', 'm'), fn.sum('m', 'h')),
-        ...      'attracts': (fn.copy_src('h', 'm'), fn.sum('m', 'h'))},
+        ...     {'follows': (fn.copy_u('h', 'm'), fn.sum('m', 'h')),
+        ...      'attracts': (fn.copy_u('h', 'm'), fn.sum('m', 'h'))},
         ... cross_sum)
         """
         all_out = defaultdict(list)
@@ -5088,7 +4974,7 @@ class DGLGraph(object):
 
         >>> g = dgl.heterograph({('user', 'follows', 'user'): ([0, 1, 2, 3], [2, 3, 4, 4])})
         >>> g.nodes['user'].data['h'] = torch.tensor([[1.], [2.], [3.], [4.], [5.]])
-        >>> g['follows'].prop_nodes([[2, 3], [4]], fn.copy_src('h', 'm'),
+        >>> g['follows'].prop_nodes([[2, 3], [4]], fn.copy_u('h', 'm'),
         ...                         fn.sum('m', 'h'), etype='follows')
         tensor([[1.],
                 [2.],
@@ -5151,7 +5037,7 @@ class DGLGraph(object):
 
         >>> g = dgl.heterograph({('user', 'follows', 'user'): ([0, 1, 2, 3], [2, 3, 4, 4])})
         >>> g.nodes['user'].data['h'] = torch.tensor([[1.], [2.], [3.], [4.], [5.]])
-        >>> g['follows'].prop_edges([[0, 1], [2, 3]], fn.copy_src('h', 'm'),
+        >>> g['follows'].prop_edges([[0, 1], [2, 3]], fn.copy_u('h', 'm'),
         ...                         fn.sum('m', 'h'), etype='follows')
         >>> g.nodes['user'].data['h']
         tensor([[1.],
@@ -6061,113 +5947,6 @@ class DGLGraph(object):
         idtype
         """
         return self.astype(F.int32)
-
-    #################################################################
-    # DEPRECATED: from the old DGLGraph
-    #################################################################
-
-    def from_networkx(self, nx_graph, node_attrs=None, edge_attrs=None):
-        """DEPRECATED: please use
-
-            ``dgl.from_networkx(nx_graph, node_attrs, edge_attrs)``
-
-        which will return a new graph created from the networkx graph.
-        """
-        raise DGLError('DGLGraph.from_networkx is deprecated. Please call the following\n\n'
-                       '\t dgl.from_networkx(nx_graph, node_attrs, edge_attrs)\n\n'
-                       ', which creates a new DGLGraph from the networkx graph.')
-
-    def from_scipy_sparse_matrix(self, spmat, multigraph=None):
-        """DEPRECATED: please use
-
-            ``dgl.from_scipy(spmat)``
-
-        which will return a new graph created from the scipy matrix.
-        """
-        raise DGLError('DGLGraph.from_scipy_sparse_matrix is deprecated. '
-                       'Please call the following\n\n'
-                       '\t dgl.from_scipy(spmat)\n\n'
-                       ', which creates a new DGLGraph from the scipy matrix.')
-
-    def register_apply_node_func(self, func):
-        """Deprecated: please directly call :func:`apply_nodes` with ``func``
-        as argument.
-        """
-        raise DGLError('DGLGraph.register_apply_node_func is deprecated.'
-                       ' Please directly call apply_nodes with func as the argument.')
-
-    def register_apply_edge_func(self, func):
-        """Deprecated: please directly call :func:`apply_edges` with ``func``
-        as argument.
-        """
-        raise DGLError('DGLGraph.register_apply_edge_func is deprecated.'
-                       ' Please directly call apply_edges with func as the argument.')
-
-    def register_message_func(self, func):
-        """Deprecated: please directly call :func:`update_all` with ``func``
-        as argument.
-        """
-        raise DGLError('DGLGraph.register_message_func is deprecated.'
-                       ' Please directly call update_all with func as the argument.')
-
-    def register_reduce_func(self, func):
-        """Deprecated: please directly call :func:`update_all` with ``func``
-        as argument.
-        """
-        raise DGLError('DGLGraph.register_reduce_func is deprecated.'
-                       ' Please directly call update_all with func as the argument.')
-
-    def group_apply_edges(self, group_by, func, edges=ALL, etype=None, inplace=False):
-        """**DEPRECATED**: The API is removed in 0.5."""
-        raise DGLError('DGLGraph.group_apply_edges is removed in 0.5.')
-
-    def send(self, edges, message_func, etype=None):
-        """Send messages along the given edges with the same edge type.
-
-        DEPRECATE: please use send_and_recv, update_all.
-        """
-        raise DGLError('DGLGraph.send is deprecated. As a replacement, use DGLGraph.apply_edges\n'
-                       ' API to compute messages as edge data. Then use DGLGraph.send_and_recv\n'
-                       ' and set the message function as dgl.function.copy_e to conduct message\n'
-                       ' aggregation.')
-
-    def recv(self, v, reduce_func, apply_node_func=None, etype=None, inplace=False):
-        r"""Receive and reduce incoming messages and update the features of node(s) :math:`v`.
-
-        DEPRECATE: please use send_and_recv, update_all.
-        """
-        raise DGLError('DGLGraph.recv is deprecated. As a replacement, use DGLGraph.apply_edges\n'
-                       ' API to compute messages as edge data. Then use DGLGraph.send_and_recv\n'
-                       ' and set the message function as dgl.function.copy_e to conduct message\n'
-                       ' aggregation.')
-
-    def multi_recv(self, v, reducer_dict, cross_reducer, apply_node_func=None, inplace=False):
-        r"""Receive messages from multiple edge types and perform aggregation.
-
-        DEPRECATE: please use multi_send_and_recv, multi_update_all.
-        """
-        raise DGLError('DGLGraph.multi_recv is deprecated. As a replacement,\n'
-                       ' use DGLGraph.apply_edges API to compute messages as edge data.\n'
-                       ' Then use DGLGraph.multi_send_and_recv and set the message function\n'
-                       ' as dgl.function.copy_e to conduct message aggregation.')
-
-    def multi_send_and_recv(self, etype_dict, cross_reducer, apply_node_func=None, inplace=False):
-        r"""**DEPRECATED**: The API is removed in v0.5."""
-        raise DGLError('DGLGraph.multi_pull is removed in v0.5. As a replacement,\n'
-                       ' use DGLGraph.edge_subgraph to extract the subgraph first \n'
-                       ' and then call DGLGraph.multi_update_all.')
-
-    def multi_pull(self, v, etype_dict, cross_reducer, apply_node_func=None, inplace=False):
-        r"""**DEPRECATED**: The API is removed in v0.5."""
-        raise DGLError('DGLGraph.multi_pull is removed in v0.5. As a replacement,\n'
-                       ' use DGLGraph.edge_subgraph to extract the subgraph first \n'
-                       ' and then call DGLGraph.multi_update_all.')
-
-    def readonly(self, readonly_state=True):
-        """Deprecated: DGLGraph will always be mutable."""
-        dgl_warning('DGLGraph.readonly is deprecated in v0.5.\n'
-                    'DGLGraph now always supports mutable operations like add_nodes'
-                    ' and add_edges.')
 
 ############################################################
 # Internal APIs

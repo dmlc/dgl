@@ -10,7 +10,7 @@ def test_node_removal(idtype):
     g = dgl.DGLGraph()
     g = g.astype(idtype).to(F.ctx())
     g.add_nodes(10)
-    g.add_edge(0, 0)
+    g.add_edges(0, 0)
     assert g.number_of_nodes() == 10
     g.ndata["id"] = F.arange(0, 10)
 
@@ -42,8 +42,8 @@ def test_multigraph_node_removal(idtype):
     g = g.astype(idtype).to(F.ctx())
     g.add_nodes(5)
     for i in range(5):
-        g.add_edge(i, i)
-        g.add_edge(i, i)
+        g.add_edges(i, i)
+        g.add_edges(i, i)
     assert g.number_of_nodes() == 5
     assert g.number_of_edges() == 10
 
@@ -54,8 +54,8 @@ def test_multigraph_node_removal(idtype):
 
     # add nodes
     g.add_nodes(1)
-    g.add_edge(1, 1)
-    g.add_edge(1, 1)
+    g.add_edges(1, 1)
+    g.add_edges(1, 1)
     assert g.number_of_nodes() == 4
     assert g.number_of_edges() == 8
 
@@ -71,8 +71,8 @@ def test_multigraph_edge_removal(idtype):
     g = g.astype(idtype).to(F.ctx())
     g.add_nodes(5)
     for i in range(5):
-        g.add_edge(i, i)
-        g.add_edge(i, i)
+        g.add_edges(i, i)
+        g.add_edges(i, i)
     assert g.number_of_nodes() == 5
     assert g.number_of_edges() == 10
 
@@ -82,8 +82,8 @@ def test_multigraph_edge_removal(idtype):
     assert g.number_of_edges() == 8
 
     # add edges
-    g.add_edge(1, 1)
-    g.add_edge(1, 1)
+    g.add_edges(1, 1)
+    g.add_edges(1, 1)
     assert g.number_of_nodes() == 5
     assert g.number_of_edges() == 10
 
@@ -100,7 +100,7 @@ def test_edge_removal(idtype):
     g.add_nodes(5)
     for i in range(5):
         for j in range(5):
-            g.add_edge(i, j)
+            g.add_edges(i, j)
     g.edata["id"] = F.arange(0, 25)
 
     # remove edges
@@ -114,7 +114,7 @@ def test_edge_removal(idtype):
     assert dgl.EID not in g.edata
 
     # add edges
-    g.add_edge(3, 3)
+    g.add_edges(3, 3)
     assert g.number_of_nodes() == 5
     assert g.number_of_edges() == 19
     assert F.array_equal(
@@ -138,7 +138,7 @@ def test_node_and_edge_removal(idtype):
     g.add_nodes(10)
     for i in range(10):
         for j in range(10):
-            g.add_edge(i, j)
+            g.add_edges(i, j)
     g.edata["id"] = F.arange(0, 100)
     assert g.number_of_nodes() == 10
     assert g.number_of_edges() == 100
@@ -161,7 +161,7 @@ def test_node_and_edge_removal(idtype):
     # add edges
     for i in range(8, 10):
         for j in range(8, 10):
-            g.add_edge(i, j)
+            g.add_edges(i, j)
     assert g.number_of_nodes() == 10
     assert g.number_of_edges() == 58
 

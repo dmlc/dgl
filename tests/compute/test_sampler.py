@@ -375,7 +375,7 @@ def check_negative_sampler(mode, exclude_positive, neg_size):
         for i in range(len(neg_eid)):
             u, v = F.asnumpy(neg_src[i]), F.asnumpy(neg_dst[i])
             if g.has_edge_between(u, v):
-                eid = g.edge_id(u, v)
+                eid = g.edge_ids(u, v)
                 etype = g.edata['etype'][eid]
                 exist = neg_edges.edata['etype'][i] == etype
                 assert F.asnumpy(exists[i]) == F.asnumpy(exist)
@@ -461,7 +461,7 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
         for i in range(len(neg_eid)):
             u, v = F.asnumpy(neg_src[i]), F.asnumpy(neg_dst[i])
             if g.has_edge_between(u, v):
-                eid = g.edge_id(u, v)
+                eid = g.edge_ids(u, v)
                 etype = g.edata['etype'][eid]
                 exist = neg_edges.edata['etype'][i] == etype
                 assert F.asnumpy(exists[i]) == F.asnumpy(exist)
@@ -488,7 +488,7 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
         for i in range(len(neg_eid)):
             u, v = F.asnumpy(neg_src[i]), F.asnumpy(neg_dst[i])
             if g.has_edge_between(u, v):
-                eid = g.edge_id(u, v)
+                eid = g.edge_ids(u, v)
                 etype = g.edata['etype'][eid]
                 exist = neg_edges.edata['etype'][i] == etype
                 assert F.asnumpy(exists[i]) == F.asnumpy(exist)

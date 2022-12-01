@@ -96,7 +96,6 @@ def check_rpc_sampling(tmpdir, num_server):
     generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
     g = CitationGraphDataset("cora")[0]
-    g.readonly()
     print(g.idtype)
     num_parts = num_server
     num_hops = 1
@@ -128,7 +127,6 @@ def check_rpc_find_edges_shuffle(tmpdir, num_server):
     generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
     g = CitationGraphDataset("cora")[0]
-    g.readonly()
     num_parts = num_server
 
     orig_nid, orig_eid = partition_graph(g, 'test_find_edges', num_parts, tmpdir,
@@ -225,7 +223,6 @@ def check_rpc_get_degree_shuffle(tmpdir, num_server):
     generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
     g = CitationGraphDataset("cora")[0]
-    g.readonly()
     num_parts = num_server
 
     orig_nid, _ = partition_graph(g, 'test_get_degrees', num_parts, tmpdir,
@@ -278,7 +275,6 @@ def check_rpc_sampling_shuffle(tmpdir, num_server, num_groups=1):
     generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
     g = CitationGraphDataset("cora")[0]
-    g.readonly()
     num_parts = num_server
     num_hops = 1
 
@@ -906,7 +902,6 @@ def check_rpc_in_subgraph_shuffle(tmpdir, num_server):
     generate_ip_config("rpc_ip_config.txt", num_server, num_server)
 
     g = CitationGraphDataset("cora")[0]
-    g.readonly()
     num_parts = num_server
 
     orig_nid, orig_eid = partition_graph(g, 'test_in_subgraph', num_parts, tmpdir,
