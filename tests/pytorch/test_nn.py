@@ -1820,7 +1820,7 @@ def test_GraphTransformerLayer(attn_bias_type, norm_first):
         attn_bias_type=attn_bias_type,
         norm_first=norm_first,
         dropout=0.1,
-        activation=nn.ReLU()
+        activation=th.nn.ReLU()
     )
     out = net(nfeat, attn_bias, attn_mask)
 
