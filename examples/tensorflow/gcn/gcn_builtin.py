@@ -45,7 +45,7 @@ class GCNLayer(layers.Layer):
             h = self.dropout(h)
         self.g.ndata['h'] = tf.matmul(h, self.weight)
         self.g.ndata['norm_h'] = self.g.ndata['h'] * self.g.ndata['norm']
-        self.g.update_all(fn.copy_src('norm_h', 'm'),
+        self.g.update_all(fn.copy_u('norm_h', 'm'),
                           fn.sum('m', 'h'))
         h = self.g.ndata['h']
         if self.bias is not None:
