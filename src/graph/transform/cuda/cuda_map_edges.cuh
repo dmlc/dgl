@@ -1,5 +1,5 @@
 /**
- *  Copyright 2020-2021 Contributors
+ *  Copyright 2020-2022 Contributors
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -20,6 +20,8 @@
 #ifndef DGL_GRAPH_TRANSFORM_CUDA_CUDA_MAP_EDGES_CUH_
 #define DGL_GRAPH_TRANSFORM_CUDA_CUDA_MAP_EDGES_CUH_
 
+#include <dgl/runtime/c_runtime_api.h>
+#include <dgl/base_heterograph.h>
 #include <cuda_runtime.h>
 #include <dgl/runtime/c_runtime_api.h>
 

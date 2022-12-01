@@ -58,6 +58,7 @@ class KVClient(object):
     def delete_data(self, name):
         '''delete the data'''
         del self._data[name]
+        self._gdata_name_list.remove(name)
 
     def data_name_list(self):
         '''get the names of all data'''

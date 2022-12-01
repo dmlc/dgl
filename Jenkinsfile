@@ -1,6 +1,6 @@
 #!/usr/bin/env groovy
 
-dgl_linux_libs = 'build/libdgl.so, build/runUnitTests, python/dgl/_ffi/_cy3/core.cpython-*-x86_64-linux-gnu.so, build/tensoradapter/pytorch/*.so'
+dgl_linux_libs = 'build/libdgl.so, build/runUnitTests, python/dgl/_ffi/_cy3/core.cpython-*-x86_64-linux-gnu.so, build/tensoradapter/pytorch/*.so, build/dgl_sparse/*.so'
 // Currently DGL on Windows is not working with Cython yet
 dgl_win64_libs = "build\\dgl.dll, build\\runUnitTests.exe, build\\tensoradapter\\pytorch\\*.dll"
 
@@ -65,7 +65,7 @@ def unit_test_linux(backend, dev) {
 def unit_distributed_linux(backend, dev) {
   init_git()
   unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
-  timeout(time: 30, unit: 'MINUTES') {
+  timeout(time: 40, unit: 'MINUTES') {
     sh "bash tests/scripts/task_distributed_test.sh ${backend} ${dev}"
   }
 }
@@ -535,50 +535,6 @@ pipeline {
                   steps {
                     sh 'nvidia-smi'
                     unit_test_cugraph('pytorch', 'cugraph')
-                  }
-                }
-              }
-              post {
-                always {
-                  cleanWs disableDeferredWipeout: true, deleteDirs: true
-                }
-              }
-            }
-            stage('MXNet CPU') {
-              agent {
-                docker {
-                  label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:cu101_v220629"
-                  alwaysPull true
-                }
-              }
-              stages {
-                stage('MXNet CPU Unit test') {
-                  steps {
-                    unit_test_linux('mxnet', 'cpu')
-                  }
-                }
-              }
-              post {
-                always {
-                  cleanWs disableDeferredWipeout: true, deleteDirs: true
-                }
-              }
-            }
-            stage('MXNet GPU') {
-              agent {
-                docker {
-                  label "linux-gpu-node"
-                  image "dgllib/dgl-ci-gpu:cu101_v220816"
-                  args "--runtime nvidia"
-                  alwaysPull true
-                }
-              }
-              stages {
-                stage('MXNet GPU Unit test') {
-                  steps {
-                    sh 'nvidia-smi'
-                    unit_test_linux('mxnet', 'gpu')
                   }
                 }
               }

@@ -794,7 +794,7 @@ class BasicPartitionBook(GraphPartitionBook):
             DEFAULT_ETYPE,
             DEFAULT_ETYPE[1],
         ), "Base partition book only supports homogeneous graph."
-        return self.canonical_etypes
+        return self.canonical_etypes[0]
 
 
 class RangePartitionBook(GraphPartitionBook):
@@ -1231,21 +1231,22 @@ class PartitionPolicy(object):
     """
 
     def __init__(self, policy_str, partition_book):
-        if POLICY_DELIMITER not in policy_str:
-            assert policy_str in (
-                EDGE_PART_POLICY,
-                NODE_PART_POLICY,
-            ), "policy_str must contain 'edge' or 'node'."
-            if NODE_PART_POLICY == policy_str:
-                policy_str = NODE_PART_POLICY + POLICY_DELIMITER + DEFAULT_NTYPE
-            else:
-                policy_str = EDGE_PART_POLICY + POLICY_DELIMITER + DEFAULT_ETYPE[1]
+        assert (policy_str.startswith(NODE_PART_POLICY) or
+            policy_str.startswith(EDGE_PART_POLICY)), (
+                f"policy_str must start with {NODE_PART_POLICY} or "
+                f"{EDGE_PART_POLICY}, but got {policy_str}."
+            )
+        if NODE_PART_POLICY == policy_str:
+            policy_str = NODE_PART_POLICY + POLICY_DELIMITER + DEFAULT_NTYPE
+        if EDGE_PART_POLICY == policy_str:
+            policy_str = EDGE_PART_POLICY + POLICY_DELIMITER + DEFAULT_ETYPE[1]
         self._policy_str = policy_str
         self._part_id = partition_book.partid
         self._partition_book = partition_book
         part_policy, self._type_name = policy_str.split(POLICY_DELIMITER, 1)
         if part_policy == EDGE_PART_POLICY:
             self._type_name = _etype_str_to_tuple(self._type_name)
+        self._is_node = self.policy_str.startswith(NODE_PART_POLICY)
 
     @property
     def policy_str(self):
@@ -1291,10 +1292,20 @@ class PartitionPolicy(object):
         """
         return self._partition_book
 
+    @property
+    def is_node(self):
+        """Indicate whether the policy is for node or edge
+
+        Returns
+        -------
+        bool
+            node or edge
+        """
+        return self._is_node
+
     def get_data_name(self, name):
         """Get HeteroDataName"""
-        is_node = NODE_PART_POLICY in self.policy_str
-        return HeteroDataName(is_node, self.type_name, name)
+        return HeteroDataName(self.is_node, self.type_name, name)
 
     def to_local(self, id_tensor):
         """Mapping global ID to local ID.
@@ -1309,16 +1320,14 @@ class PartitionPolicy(object):
         tensor
             local ID tensor
         """
-        if EDGE_PART_POLICY in self.policy_str:
-            return self._partition_book.eid2localeid(
-                id_tensor, self._part_id, self.type_name
-            )
-        elif NODE_PART_POLICY in self.policy_str:
+        if self.is_node:
             return self._partition_book.nid2localnid(
                 id_tensor, self._part_id, self.type_name
             )
         else:
-            raise RuntimeError("Cannot support policy: %s " % self.policy_str)
+            return self._partition_book.eid2localeid(
+                id_tensor, self._part_id, self.type_name
+            )
 
     def to_partid(self, id_tensor):
         """Mapping global ID to partition ID.
@@ -1333,12 +1342,10 @@ class PartitionPolicy(object):
         tensor
             partition ID
         """
-        if EDGE_PART_POLICY in self.policy_str:
-            return self._partition_book.eid2partid(id_tensor, self.type_name)
-        elif NODE_PART_POLICY in self.policy_str:
+        if self.is_node:
             return self._partition_book.nid2partid(id_tensor, self.type_name)
         else:
-            raise RuntimeError("Cannot support policy: %s " % self.policy_str)
+            return self._partition_book.eid2partid(id_tensor, self.type_name)
 
     def get_part_size(self):
         """Get data size of current partition.
@@ -1348,16 +1355,14 @@ class PartitionPolicy(object):
         int
             data size
         """
-        if EDGE_PART_POLICY in self.policy_str:
-            return len(
-                self._partition_book.partid2eids(self._part_id, self.type_name)
-            )
-        elif NODE_PART_POLICY in self.policy_str:
+        if self.is_node:
             return len(
                 self._partition_book.partid2nids(self._part_id, self.type_name)
             )
         else:
-            raise RuntimeError("Cannot support policy: %s " % self.policy_str)
+            return len(
+                self._partition_book.partid2eids(self._part_id, self.type_name)
+            )
 
     def get_size(self):
         """Get the full size of the data.
@@ -1367,12 +1372,10 @@ class PartitionPolicy(object):
         int
             data size
         """
-        if EDGE_PART_POLICY in self.policy_str:
-            return self._partition_book._num_edges(self.type_name)
-        elif NODE_PART_POLICY in self.policy_str:
+        if self.is_node:
             return self._partition_book._num_nodes(self.type_name)
         else:
-            raise RuntimeError("Cannot support policy: %s " % self.policy_str)
+            return self._partition_book._num_edges(self.type_name)
 
 
 class NodePartitionPolicy(PartitionPolicy):

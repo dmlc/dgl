@@ -7,9 +7,9 @@ from libc.stdint cimport int32_t, int64_t, uint64_t, uint8_t, uint16_t
 import ctypes
 
 cdef enum DGLObjectTypeCode:
-    kInt = 0
-    kUInt = 1
-    kFloat = 2
+    kObjectInt = 0
+    kObjectUInt = 1
+    kObjectFloat = 2
     kHandle = 3
     kNull = 4
     kDGLDataType = 5

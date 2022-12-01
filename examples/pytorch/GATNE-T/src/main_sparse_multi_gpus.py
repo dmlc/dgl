@@ -39,7 +39,7 @@ def get_graph(network_data, vocab):
         mapping node IDs to node indices
     Output
     ------
-    DGLHeteroGraph
+    DGLGraph
         a heterogenous graph, with one node type and different edge types
     """
     graphs = []

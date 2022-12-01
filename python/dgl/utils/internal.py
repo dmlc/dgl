@@ -620,7 +620,7 @@ def expand_as_pair(input_, g=None):
     ----------
     input_ : Tensor, dict[str, Tensor], or their pairs
         The input features
-    g : DGLHeteroGraph or DGLGraph or None
+    g : DGLGraph or None
         The graph.
 
         If None, skip checking if the graph is a block.
@@ -955,7 +955,7 @@ def extract_edge_subframes(graph, edges_or_device, store_ids=True):
                 subf[EID] = ind_edges
             edge_frames.append(subf)
     else:  # device object
-        edge_frames = [nf.to(device) for nf in graph._edge_frames]
+        edge_frames = [nf.to(edges_or_device) for nf in graph._edge_frames]
     return edge_frames
 
 

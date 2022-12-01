@@ -1,5 +1,5 @@
 /**
- *  Copyright (c) 2019 by Contributors
+ *  Copyright (c) 2019-2022 by Contributors
  * @file array/array_op.h
  * @brief Array operator templates
  */
@@ -166,6 +166,16 @@ COOMatrix COOReorder(
 template <DGLDeviceType XPU, typename IdType>
 CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries);
 
+template <DGLDeviceType XPU, typename IdType, typename FloatType>
+std::pair<COOMatrix, FloatArray> CSRLaborSampling(
+    CSRMatrix mat,
+    IdArray rows,
+    int64_t num_samples,
+    FloatArray prob,
+    int importance_sampling,
+    IdArray random_seed,
+    IdArray NIDs);
+
 // FloatType is the type of probability data.
 template <DGLDeviceType XPU, typename IdType, typename DType>
 COOMatrix CSRRowWiseSampling(
@@ -212,7 +222,7 @@ CSRMatrix UnionCsr(const std::vector<CSRMatrix>& csrs);
 template <DGLDeviceType XPU, typename IdType>
 std::tuple<CSRMatrix, IdArray, IdArray> CSRToSimple(CSRMatrix csr);
 
-///////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 template <DGLDeviceType XPU, typename IdType>
 bool COOIsNonZero(COOMatrix coo, int64_t row, int64_t col);
@@ -272,6 +282,16 @@ std::pair<bool, bool> COOIsSorted(COOMatrix coo);
 
 template <DGLDeviceType XPU, typename IdType>
 COOMatrix COORemove(COOMatrix coo, IdArray entries);
+
+template <DGLDeviceType XPU, typename IdType, typename FloatType>
+std::pair<COOMatrix, FloatArray> COOLaborSampling(
+    COOMatrix mat,
+    IdArray rows,
+    int64_t num_samples,
+    FloatArray prob,
+    int importance_sampling,
+    IdArray random_seed,
+    IdArray NIDs);
 
 // FloatType is the type of probability data.
 template <DGLDeviceType XPU, typename IdType, typename DType>

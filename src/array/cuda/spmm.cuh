@@ -99,19 +99,6 @@ cublasStatus_t Xgeam<double>(
 }
 
 /**
- * @brief IndexSelect operator kernel implementation.
- * @note duplicate of IndexSelectKernel defined in array_index_select.cu
- */
-template <typename DType, typename IdType>
-__global__ void _IndexSelectKernel(
-    const DType* __restrict__ in, const IdType* __restrict__ idx,
-    DType* __restrict__ out, int n, int m) {
-  int i = blockIdx.x;
-  for (int j = threadIdx.x; j < m; j += blockDim.x)
-    out[i * m + j] = in[idx[i] * m + j];
-}
-
-/**
  * @brief Transpose operator kernel implementation.
  * @note not efficient but it's not a bottleneck, used for float16 dtype.
  */
@@ -146,7 +133,7 @@ void _Transpose(const DType* in, DType* out, int row, int col) {
  * @note cuBLAS has no geam API for half data type, fallback to our kernel.
  */
 template <>
-void _Transpose<half>(const half* in, half* out, int row, int col) {
+void _Transpose<__half>(const __half* in, __half* out, int row, int col) {
   cudaStream_t stream = runtime::getCurrentCUDAStream();
   int nt = FindNumThreads(row);
   int nb = col;
@@ -167,42 +154,6 @@ void _Transpose<__nv_bfloat16>(
   CUDA_KERNEL_CALL(_TransposeKernel, nb, nt, 0, stream, in, out, col, row);
 }
 #endif  // BF16_ENABLED
-
-/**
- * @brief
- */
-template <typename DType, typename IdType>
-__global__ void _IndexSelectKernel(
-    const DType* array, const IdType* index, int64_t length, DType* out) {
-  int tx = blockIdx.x * blockDim.x + threadIdx.x;
-  int stride_x = gridDim.x * blockDim.x;
-  while (tx < length) {
-    out[tx] = array[index[tx]];
-    tx += stride_x;
-  }
-}
-
-/* @brief IndexSelect operator.
- * @note duplicate of IndexSelect defined in array_op.h but it can
- *    not be applied to float16 dtype.
- */
-template <typename DType, typename IdType>
-NDArray _IndexSelect(NDArray array, NDArray index) {
-  cudaStream_t stream = runtime::getCurrentCUDAStream();
-  const DType* array_data = static_cast<DType*>(array->data);
-  const IdType* idx_data = static_cast<IdType*>(index->data);
-  const int64_t arr_len = array->shape[0];
-  const int64_t len = index->shape[0];
-  NDArray ret = NDArray::Empty({len}, array->dtype, array->ctx);
-  if (len == 0) return ret;
-  DType* ret_data = static_cast<DType*>(ret->data);
-  const int nt = FindNumThreads(len);
-  const int nb = (len + nt - 1) / nt;
-  CUDA_KERNEL_CALL(
-      _IndexSelectKernel, nb, nt, 0, stream, array_data, idx_data, len,
-      ret_data);
-  return ret;
-}
 
 #if CUDART_VERSION < 11000
 template <typename DType>
@@ -553,7 +504,7 @@ __global__ void SpMMCsrKernel(
   while (ty < num_rows) {
     int tx = blockIdx.y * blockDim.x + threadIdx.x;
     while (tx < out_len) {
-      DType local_accum = ReduceOp::zero();
+      typename accum_dtype<DType>::type local_accum = ReduceOp::zero();
       Idx local_argu = 0, local_arge = 0;
       const int lhs_add = UseBcast ? ubcast_off[tx] : tx;
       const int rhs_add = UseBcast ? ebcast_off[tx] : tx;
@@ -573,7 +524,7 @@ __global__ void SpMMCsrKernel(
       // Separate kernel `SpMMCmpCsrHeteroKernel` is used for max- and
       // min-reducer. It does not affect the output on homogeneous graph as
       // `out` is initialized to zero.
-      out[ty * out_len + tx] += local_accum;
+      out[ty * out_len + tx] += static_cast<DType>(local_accum);
       if (ReduceOp::require_arg && BinaryOp::use_lhs)
         arg_u[ty * out_len + tx] = local_argu;
       if (ReduceOp::require_arg && BinaryOp::use_rhs)
@@ -610,7 +561,9 @@ __global__ void SpMMCmpCsrHeteroKernel(
   while (ty < num_rows) {
     int tx = blockIdx.x * blockDim.x + threadIdx.x;
     while (tx < out_len) {
-      DType new_out = out[ty * out_len + tx];  // ReduceOp::zero();
+      using accum_type = typename accum_dtype<DType>::type;
+      accum_type local_accum = static_cast<accum_type>(
+          out[ty * out_len + tx]);  // ReduceOp::zero();
       Idx local_argu = 0, local_arge = 0;
       const int lhs_add = UseBcast ? ubcast_off[tx] : tx;
       const int rhs_add = UseBcast ? ebcast_off[tx] : tx;
@@ -622,10 +575,12 @@ __global__ void SpMMCmpCsrHeteroKernel(
         const DType* eoff =
             BinaryOp::use_rhs ? (efeat + eid * efeat_len) : nullptr;
         DType tmp_out = BinaryOp::Call(uoff + lhs_add, eoff + rhs_add);
-        ReduceOp::Call(&new_out, &local_argu, &local_arge, tmp_out, cid, eid);
+        ReduceOp::Call(
+            &local_accum, &local_argu, &local_arge, tmp_out, cid, eid);
       }
       // Update output only when max/min values are different that original
       // output
+      DType new_out = static_cast<DType>(local_accum);
       if (out[ty * out_len + tx] != new_out) {
         out[ty * out_len + tx] = new_out;
         if (ReduceOp::require_arg && BinaryOp::use_lhs) {
@@ -663,12 +618,20 @@ template <typename Idx, typename DType, typename BinaryOp, typename ReduceOp>
 void SpMMCoo(
     const BcastOff& bcast, const COOMatrix& coo, NDArray ufeat, NDArray efeat,
     NDArray out, NDArray argu, NDArray arge) {
-#if defined(CUDART_VERSION) && CUDART_VERSION <= 10000
-  if (std::is_same<DType, half>::value)
-    LOG(FATAL) << "SpMMCoo requires atomicCAS, which is not supported "
-               << "for float16 in CUDA 10.0. Please upgrade your CUDA "
-               << "to later versions.";
-#endif
+  /**
+   * TODO(Xin): Disable half precision for SpMMCoo due to the round-off error.
+   * We should use fp32 for the accumulation but it's hard to modify the 
+   * current implementation.
+   */
+#if BF16_ENABLED
+  if (std::is_same<DType, __half>::value ||
+      std::is_same<DType, __nv_bfloat16>::value)
+#else
+  if (std::is_same<DType, __half>::value)
+#endif  // BF16_ENABLED
+    LOG(FATAL) << "SpMMCoo doesn't support half precision fow now. "
+               << "Please use SpMMCsr instead by allowing the graph "
+               << "materialize CSR/CSC formats.";
   const Idx *row = coo.row.Ptr<Idx>(), *col = coo.col.Ptr<Idx>(),
             *edge_map = coo.data.Ptr<Idx>();
   const DType *ufeat_data = ufeat.Ptr<DType>(),

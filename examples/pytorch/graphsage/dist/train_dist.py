@@ -1,30 +1,16 @@
-import os
-
-os.environ["DGLBACKEND"] = "pytorch"
 import argparse
-import math
 import socket
 import time
-from functools import wraps
-from multiprocessing import Process
+from contextlib import contextmanager
 
 import numpy as np
 import torch as th
-import torch.multiprocessing as mp
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import tqdm
-from torch.utils.data import DataLoader
-
 import dgl
-import dgl.function as fn
 import dgl.nn.pytorch as dglnn
-from dgl import DGLGraph
-from dgl.data import load_data, register_data_args
-from dgl.data.utils import load_graphs
-from dgl.distributed import DistDataLoader
-
 
 def load_subtensor(g, seeds, input_nodes, device, load_feat=True):
     """
@@ -35,40 +21,6 @@ def load_subtensor(g, seeds, input_nodes, device, load_feat=True):
     )
     batch_labels = g.ndata["labels"][seeds].to(device)
     return batch_inputs, batch_labels
-
-
-class NeighborSampler(object):
-    def __init__(self, g, fanouts, sample_neighbors, device, load_feat=True):
-        self.g = g
-        self.fanouts = fanouts
-        self.sample_neighbors = sample_neighbors
-        self.device = device
-        self.load_feat = load_feat
-
-    def sample_blocks(self, seeds):
-        seeds = th.LongTensor(np.asarray(seeds))
-        blocks = []
-        for fanout in self.fanouts:
-            # For each seed node, sample ``fanout`` neighbors.
-            frontier = self.sample_neighbors(
-                self.g, seeds, fanout, replace=True
-            )
-            # Then we compact the frontier into a bipartite graph for message passing.
-            block = dgl.to_block(frontier, seeds)
-            # Obtain the seed nodes for next layer.
-            seeds = block.srcdata[dgl.NID]
-
-            blocks.insert(0, block)
-
-        input_nodes = blocks[0].srcdata[dgl.NID]
-        seeds = blocks[-1].dstdata[dgl.NID]
-        batch_inputs, batch_labels = load_subtensor(
-            self.g, seeds, input_nodes, "cpu", self.load_feat
-        )
-        if self.load_feat:
-            blocks[0].srcdata["features"] = batch_inputs
-        blocks[-1].dstdata["labels"] = batch_labels
-        return blocks
 
 
 class DistSAGE(nn.Module):
@@ -89,72 +41,68 @@ class DistSAGE(nn.Module):
 
     def forward(self, blocks, x):
         h = x
-        for l, (layer, block) in enumerate(zip(self.layers, blocks)):
+        for i, (layer, block) in enumerate(zip(self.layers, blocks)):
             h = layer(block, h)
-            if l != len(self.layers) - 1:
+            if i != len(self.layers) - 1:
                 h = self.activation(h)
                 h = self.dropout(h)
         return h
 
     def inference(self, g, x, batch_size, device):
         """
-        Inference with the GraphSAGE model on full neighbors (i.e. without neighbor sampling).
+        Inference with the GraphSAGE model on full neighbors (i.e. without
+        neighbor sampling).
+
         g : the entire graph.
         x : the input of entire node set.
 
-        The inference code is written in a fashion that it could handle any number of nodes and
-        layers.
+        Distributed layer-wise inference.
         """
-        # During inference with sampling, multi-layer blocks are very inefficient because
-        # lots of computations in the first few layers are repeated.
-        # Therefore, we compute the representation of all nodes layer by layer.  The nodes
-        # on each layer are of course splitted in batches.
+        # During inference with sampling, multi-layer blocks are very
+        # inefficient because lots of computations in the first few layers
+        # are repeated. Therefore, we compute the representation of all nodes
+        # layer by layer.  The nodes on each layer are of course splitted in
+        # batches.
         # TODO: can we standardize this?
         nodes = dgl.distributed.node_split(
-            np.arange(g.number_of_nodes()),
+            np.arange(g.num_nodes()),
             g.get_partition_book(),
             force_even=True,
         )
         y = dgl.distributed.DistTensor(
-            (g.number_of_nodes(), self.n_hidden),
+            (g.num_nodes(), self.n_hidden),
             th.float32,
             "h",
             persistent=True,
         )
-        for l, layer in enumerate(self.layers):
-            if l == len(self.layers) - 1:
+        for i, layer in enumerate(self.layers):
+            if i == len(self.layers) - 1:
                 y = dgl.distributed.DistTensor(
-                    (g.number_of_nodes(), self.n_classes),
+                    (g.num_nodes(), self.n_classes),
                     th.float32,
                     "h_last",
                     persistent=True,
                 )
-
-            sampler = NeighborSampler(
-                g, [-1], dgl.distributed.sample_neighbors, device
-            )
             print(
-                "|V|={}, eval batch size: {}".format(
-                    g.number_of_nodes(), batch_size
-                )
+                f"|V|={g.num_nodes()}, eval batch size: {batch_size}"
             )
-            # Create PyTorch DataLoader for constructing blocks
-            dataloader = DistDataLoader(
-                dataset=nodes,
+
+            sampler = dgl.dataloading.NeighborSampler([-1])
+            dataloader = dgl.dataloading.DistNodeDataLoader(
+                g,
+                nodes,
+                sampler,
                 batch_size=batch_size,
-                collate_fn=sampler.sample_blocks,
                 shuffle=False,
                 drop_last=False,
             )
 
-            for blocks in tqdm.tqdm(dataloader):
+            for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
                 block = blocks[0].to(device)
-                input_nodes = block.srcdata[dgl.NID]
-                output_nodes = block.dstdata[dgl.NID]
                 h = x[input_nodes].to(device)
                 h_dst = h[: block.number_of_dst_nodes()]
                 h = layer(block, (h, h_dst))
-                if l != len(self.layers) - 1:
+                if i != len(self.layers) - 1:
                     h = self.activation(h)
                     h = self.dropout(h)
 
@@ -163,6 +111,11 @@ class DistSAGE(nn.Module):
             x = y
             g.barrier()
         return y
+
+    @contextmanager
+    def join(self):
+        """dummy join for standalone"""
+        yield
 
 
 def compute_acc(pred, labels):
@@ -196,23 +149,18 @@ def run(args, device, data):
     # Unpack data
     train_nid, val_nid, test_nid, in_feats, n_classes, g = data
     shuffle = True
-    # Create sampler
-    sampler = NeighborSampler(
-        g,
-        [int(fanout) for fanout in args.fan_out.split(",")],
-        dgl.distributed.sample_neighbors,
-        device,
+    # prefetch_node_feats/prefetch_labels are not supported for DistGraph yet.
+    sampler = dgl.dataloading.NeighborSampler(
+        [int(fanout) for fanout in args.fan_out.split(",")]
     )
-
-    # Create DataLoader for constructing blocks
-    dataloader = DistDataLoader(
-        dataset=train_nid.numpy(),
+    dataloader = dgl.dataloading.DistNodeDataLoader(
+        g,
+        train_nid,
+        sampler,
         batch_size=args.batch_size,
-        collate_fn=sampler.sample_blocks,
         shuffle=shuffle,
         drop_last=False,
     )
-
     # Define model and optimizer
     model = DistSAGE(
         in_feats,
@@ -247,28 +195,27 @@ def run(args, device, data):
         num_seeds = 0
         num_inputs = 0
         start = time.time()
-        # Loop over the dataloader to sample the computation dependency graph as a list of
-        # blocks.
+        # Loop over the dataloader to sample the computation dependency graph
+        # as a list of blocks.
         step_time = []
 
         with model.join():
-            for step, blocks in enumerate(dataloader):
+            for step, (input_nodes, seeds, blocks) in enumerate(dataloader):
                 tic_step = time.time()
                 sample_time += tic_step - start
-
-                # The nodes for input lies at the LHS side of the first block.
-                # The nodes for output lies at the RHS side of the last block.
-                batch_inputs = blocks[0].srcdata["features"]
-                batch_labels = blocks[-1].dstdata["labels"]
+                # fetch features/labels
+                batch_inputs, batch_labels = load_subtensor(
+                    g, seeds, input_nodes, "cpu"
+                )
                 batch_labels = batch_labels.long()
-
                 num_seeds += len(blocks[-1].dstdata[dgl.NID])
                 num_inputs += len(blocks[0].srcdata[dgl.NID])
+                # move to target device
                 blocks = [block.to(device) for block in blocks]
+                batch_inputs = batch_inputs.to(device)
                 batch_labels = batch_labels.to(device)
                 # Compute loss and prediction
                 start = time.time()
-                # print(g.rank(), blocks[0].device, model.module.layers[0].fc_neigh.weight.device, dev_id)
                 batch_pred = model(blocks, batch_inputs)
                 loss = loss_fcn(batch_pred, batch_labels)
                 forward_end = time.time()
@@ -292,7 +239,9 @@ def run(args, device, data):
                         else 0
                     )
                     print(
-                        "Part {} | Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU {:.1f} MB | time {:.3f} s".format(
+                        "Part {} | Epoch {:05d} | Step {:05d} | Loss {:.4f} | "
+                        "Train Acc {:.4f} | Speed (samples/sec) {:.4f} | GPU "
+                        "{:.1f} MB | time {:.3f} s".format(
                             g.rank(),
                             epoch,
                             step,
@@ -300,14 +249,16 @@ def run(args, device, data):
                             acc.item(),
                             np.mean(iter_tput[3:]),
                             gpu_mem_alloc,
-                            np.sum(step_time[-args.log_every :]),
+                            np.sum(step_time[-args.log_every:]),
                         )
                     )
                 start = time.time()
 
         toc = time.time()
         print(
-            "Part {}, Epoch Time(s): {:.4f}, sample+data_copy: {:.4f}, forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #seeds: {}, #inputs: {}".format(
+            "Part {}, Epoch Time(s): {:.4f}, sample+data_copy: {:.4f}, "
+            "forward: {:.4f}, backward: {:.4f}, update: {:.4f}, #seeds: {}, "
+            "#inputs: {}".format(
                 g.rank(),
                 toc - tic,
                 sample_time,
@@ -323,7 +274,7 @@ def run(args, device, data):
         if epoch % args.eval_every == 0 and epoch != 0:
             start = time.time()
             val_acc, test_acc = evaluate(
-                model.module,
+                model if args.standalone else model.module,
                 g,
                 g.ndata["features"],
                 g.ndata["labels"],
@@ -333,7 +284,8 @@ def run(args, device, data):
                 device,
             )
             print(
-                "Part {}, Val Acc {:.4f}, Test Acc {:.4f}, time: {:.4f}".format(
+                "Part {}, Val Acc {:.4f}, Test Acc {:.4f}, time: {:.4f}".format
+                (
                     g.rank(), val_acc, test_acc, time.time() - start
                 )
             )
@@ -346,7 +298,10 @@ def main(args):
         print(socket.gethostname(), "Initializing DGL process group")
         th.distributed.init_process_group(backend=args.backend)
     print(socket.gethostname(), "Initializing DistGraph")
-    g = dgl.distributed.DistGraph(args.graph_name, part_config=args.part_config)
+    g = dgl.distributed.DistGraph(
+            args.graph_name,
+            part_config=args.part_config
+        )
     print(socket.gethostname(), "rank:", g.rank())
 
     pb = g.get_partition_book()
@@ -381,7 +336,8 @@ def main(args):
         )
     local_nid = pb.partid2nids(pb.partid).detach().numpy()
     print(
-        "part {}, train: {} (local: {}), val: {} (local: {}), test: {} (local: {})".format(
+        "part {}, train: {} (local: {}), val: {} (local: {}), test: {} "
+        "(local: {})".format(
             g.rank(),
             len(train_nid),
             len(np.intersect1d(train_nid.numpy(), local_nid)),
@@ -398,8 +354,8 @@ def main(args):
         dev_id = g.rank() % args.num_gpus
         device = th.device("cuda:" + str(dev_id))
     n_classes = args.n_classes
-    if n_classes == -1:
-        labels = g.ndata["labels"][np.arange(g.number_of_nodes())]
+    if n_classes == 0:
+        labels = g.ndata["labels"][np.arange(g.num_nodes())]
         n_classes = len(th.unique(labels[th.logical_not(th.isnan(labels))]))
         del labels
     print("#labels:", n_classes)
@@ -413,7 +369,6 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="GCN")
-    register_data_args(parser)
     parser.add_argument("--graph_name", type=str, help="graph name")
     parser.add_argument("--id", type=int, help="the partition id")
     parser.add_argument(
@@ -422,14 +377,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--part_config", type=str, help="The path to the partition config file"
     )
-    parser.add_argument("--num_clients", type=int, help="The number of clients")
     parser.add_argument(
-        "--n_classes",
-        type=int,
-        default=-1,
-        help="The number of classes. If not specified, this"
-        " value will be calculated via scaning all the labels"
-        " in the dataset which probably causes memory burst.",
+        "--n_classes", type=int, default=0, help="the number of classes"
     )
     parser.add_argument(
         "--backend",
@@ -463,7 +412,8 @@ if __name__ == "__main__":
         "--pad-data",
         default=False,
         action="store_true",
-        help="Pad train nid to the same length across machine, to ensure num of batches to be the same.",
+        help="Pad train nid to the same length across machine, to ensure num "
+             "of batches to be the same.",
     )
     parser.add_argument(
         "--net_type",
