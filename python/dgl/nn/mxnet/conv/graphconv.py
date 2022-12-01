@@ -261,13 +261,13 @@ class GraphConv(gluon.Block):
                 if weight is not None:
                     feat_src = mx.nd.dot(feat_src, weight)
                 graph.srcdata['h'] = feat_src
-                graph.update_all(fn.copy_src(src='h', out='m'),
+                graph.update_all(fn.copy_u(u='h', out='m'),
                                  fn.sum(msg='m', out='h'))
                 rst = graph.dstdata.pop('h')
             else:
                 # aggregate first then mult W
                 graph.srcdata['h'] = feat_src
-                graph.update_all(fn.copy_src(src='h', out='m'),
+                graph.update_all(fn.copy_u(u='h', out='m'),
                                  fn.sum(msg='m', out='h'))
                 rst = graph.dstdata.pop('h')
                 if weight is not None:

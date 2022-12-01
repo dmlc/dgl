@@ -21,7 +21,7 @@ def dfs_order(forest, roots):
         # using find_edges().
         yield e ^ l, l
 
-dec_tree_node_msg = DGLF.copy_edge(edge='m', out='m')
+dec_tree_node_msg = DGLF.copy_e(edge='m', out='m')
 dec_tree_node_reduce = DGLF.sum(msg='m', out='h')
 
 
@@ -353,7 +353,7 @@ class DGLJTNNDecoder(nn.Module):
                     break   # At root, terminate
 
                 pu, _ = stack[-2]
-                u_pu = mol_tree_graph.edge_id(u, pu)
+                u_pu = mol_tree_graph.edge_ids(u, pu)
 
                 mol_tree_graph_lg.pull(u_pu, DGLF.copy_u('m', 'm'), DGLF.sum('m', 's'))
                 mol_tree_graph_lg.pull(u_pu, DGLF.copy_u('rm', 'rm'), DGLF.sum('rm', 'accum_rm'))
