@@ -234,10 +234,10 @@ class GraphTransformerLayer(nn.Module):
     ----------
     feat_size : int
         Feature size.
-    ffn_size : int
+    hidden_size : int
         Hidden size of feedforward layers.
     num_heads : int
-        Number of attention heads, by which attr:`feat_size` is divisible.
+        Number of attention heads, by which :attr:`feat_size` is divisible.
     attn_bias_type : str, optional
         The type of attention bias used for modifying attention. Selected from
         'add' or 'mul'. Default: 'add'.
@@ -245,33 +245,42 @@ class GraphTransformerLayer(nn.Module):
         * 'add' is for additive attention bias.
         * 'mul' is for multiplicative attention bias.
     norm_first : bool, optional
-        If True, it performs layer norm before attention and feedforward
-        operations. Otherwise, it applies layer norm after. Default: False.
+        If True, it performs layer normalization before attention and
+        feedforward operations. Otherwise, it applies layer normalization
+        afterwards. Default: False.
     dropout : float, optional
         Dropout probability. Default: 0.1.
-    activation : str, optional
-        Activation function. Default: 'relu'.
+    activation : callable activation layer, optional
+        Activation function. Default: nn.ReLU().
 
     Examples
     --------
     >>> import torch as th
     >>> from dgl.nn import GraphTransformerLayer
 
-    >>> ndata = th.rand(16, 100, 512)
-    >>> bias = th.rand(16, 100, 100, 8)
-    >>> net = GraphTransformerLayer(feat_size=512, ffn_size=2048, num_heads=8)
-    >>> out = net(ndata, bias)
+    >>> batch_size = 16
+    >>> num_nodes = 100
+    >>> feat_size = 512
+    >>> num_heads = 8
+    >>> nfeat = th.rand(batch_size, num_nodes, feat_size)
+    >>> bias = th.rand(batch_size, num_nodes, num_nodes, num_heads)
+    >>> net = GraphTransformerLayer(
+            feat_size=feat_size,
+            hidden_size=2048,
+            num_heads=num_heads
+        )
+    >>> out = net(nfeat, bias)
     """
 
     def __init__(
         self,
         feat_size,
-        ffn_size,
+        hidden_size,
         num_heads,
         attn_bias_type='add',
         norm_first=False,
         dropout=0.1,
-        activation='relu'
+        activation=nn.ReLU()
     ):
         super().__init__()
 
@@ -283,21 +292,24 @@ class GraphTransformerLayer(nn.Module):
             attn_bias_type=attn_bias_type,
             attn_drop=dropout
         )
-        self.fc1 = nn.Linear(feat_size, ffn_size)
-        self.fc2 = nn.Linear(ffn_size, feat_size)
+        self.ffn = nn.Sequential(
+            nn.Linear(feat_size, hidden_size),
+            activation,
+            nn.Dropout(p=dropout),
+            nn.Linear(hidden_size, feat_size),
+            nn.Dropout(p=dropout)
+        )
 
         self.dropout = nn.Dropout(p=dropout)
-        self.activation_dropout = nn.Dropout(p=dropout)
-        self.activation = getattr(F, activation)
         self.attn_layer_norm = nn.LayerNorm(feat_size)
         self.ffn_layer_norm = nn.LayerNorm(feat_size)
 
-    def forward(self, ndata, attn_bias=None, attn_mask=None):
+    def forward(self, nfeat, attn_bias=None, attn_mask=None):
         """Forward computation.
 
         Parameters
         ----------
-        ndata : torch.Tensor
+        nfeat : torch.Tensor
             A 3D input tensor. Shape: (batch_size, N, :attr:`feat_size`), where
             N is the maximum number of nodes.
         attn_bias : torch.Tensor, optional
@@ -312,24 +324,21 @@ class GraphTransformerLayer(nn.Module):
         y : torch.Tensor
             The output tensor. Shape: (batch_size, N, :attr:`feat_size`)
         """
-        residual = ndata
+        residual = nfeat
         if self.norm_first:
-            ndata = self.attn_layer_norm(ndata)
-        ndata = self.attn(ndata, attn_bias, attn_mask)
-        ndata = self.dropout(ndata)
-        ndata = residual + ndata
+            nfeat = self.attn_layer_norm(nfeat)
+        nfeat = self.attn(nfeat, attn_bias, attn_mask)
+        nfeat = self.dropout(nfeat)
+        nfeat = residual + nfeat
         if not self.norm_first:
-            ndata = self.attn_layer_norm(ndata)
+            nfeat = self.attn_layer_norm(nfeat)
 
-        residual = ndata
+        residual = nfeat
         if self.norm_first:
-            ndata = self.ffn_layer_norm(ndata)
-        ndata = self.activation(self.fc1(ndata))
-        ndata = self.activation_dropout(ndata)
-        ndata = self.fc2(ndata)
-        ndata = self.dropout(ndata)
-        ndata = residual + ndata
+            nfeat = self.ffn_layer_norm(nfeat)
+        nfeat = self.ffn(nfeat)
+        nfeat = residual + nfeat
         if not self.norm_first:
-            ndata = self.ffn_layer_norm(ndata)
+            nfeat = self.ffn_layer_norm(nfeat)
 
-        return ndata
+        return nfeat

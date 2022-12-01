@@ -1802,21 +1802,26 @@ def test_BiasedMultiheadAttention(feat_size, num_heads, bias, attn_bias_type, at
 
     assert out.shape == (16, 100, feat_size)
 
-@pytest.mark.parametrize('feat_size', [128, 512])
-@pytest.mark.parametrize('ffn_size', [1024, 2048])
-@pytest.mark.parametrize('num_heads', [8, 16])
 @pytest.mark.parametrize('attn_bias_type', ['add', 'mul'])
 @pytest.mark.parametrize('norm_first', [True, False])
-@pytest.mark.parametrize('dropout', [0.1, 0.5])
-@pytest.mark.parametrize('activation', ['relu', 'leaky_relu'])
-def test_GraphTransformerLayer(feat_size, ffn_size, num_heads, attn_bias_type,
-                               norm_first, dropout, activation):
-    ndata = th.rand(16, 100, feat_size)
-    attn_bias = th.rand(16, 100, 100, num_heads)
-    attn_mask = th.rand(16, 100, 100) < 0.5
+def test_GraphTransformerLayer(attn_bias_type, norm_first):
+    batch_size = 16
+    num_nodes = 100
+    feat_size = 512
+    num_heads = 8
+    nfeat = th.rand(batch_size, num_nodes, feat_size)
+    attn_bias = th.rand(batch_size, num_nodes, num_nodes, num_heads)
+    attn_mask = th.rand(batch_size, num_nodes, num_nodes) < 0.5
 
-    net = nn.GraphTransformerLayer(feat_size, ffn_size, num_heads, attn_bias_type,
-                                   norm_first, dropout, activation)
-    out = net(ndata, attn_bias, attn_mask)
+    net = nn.GraphTransformerLayer(
+        feat_size=feat_size,
+        hidden_size=2048,
+        num_heads=num_heads,
+        attn_bias_type=attn_bias_type,
+        norm_first=norm_first,
+        dropout=0.1,
+        activation=nn.ReLU()
+    )
+    out = net(nfeat, attn_bias, attn_mask)
 
-    assert out.shape == (16, 100, feat_size)
+    assert out.shape == (batch_size, num_nodes, feat_size)
