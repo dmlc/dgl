@@ -51,7 +51,7 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
   IdType* dC_csrOffsets_data = dC_csrOffsets.Ptr<IdType>();
   constexpr auto idtype = cusparse_idtype<IdType>::value;
   constexpr auto dtype = cuda_dtype<DType>::value;
-  cusparseSpGEMMAlg_t alg = CUSPARSE_SPGEMM_ALG3;//CUSPARSE_SPGEMM_DEFAULT
+  cusparseSpGEMMAlg_t alg = CUSPARSE_SPGEMM_ALG3;
 
   // Create sparse matrix A, B and C in CSR format
   CUSPARSE_CALL(cusparseCreateCsr(
@@ -85,7 +85,7 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
       thr_entry->cusparse_handle, transA, transB, &alpha, matA, matB, &beta,
       matC, dtype, alg, spgemmDesc, &workspace_size1,
       workspace1));
-  // estimate memory if ALG2/ALG3 is enabled; note chunk_fraction is only used by ALG3
+  // estimate memory for ALG2/ALG3; note chunk_fraction is only used by ALG3
   CUSPARSE_CALL(cusparseSpGEMM_estimateMemory(
       thr_entry->cusparse_handle, transA, transB, &alpha, matA, matB, &beta,
       matC, dtype, alg, spgemmDesc, 0.01, /*chunk_fraction*/ &workspace_size3,
