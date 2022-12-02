@@ -1,7 +1,6 @@
 import json
 import os
 import tempfile
-import unittest
 
 import numpy as np
 import pytest
@@ -55,7 +54,7 @@ def _verify_graph_feats(
                 continue
             true_feats = g.nodes[ntype].data[name][orig_id]
             ndata = node_feats[ntype + "/" + name][local_nids]
-            assert torch.equal(ndata, true_feats)
+            assert np.array_equal(ndata.numpy(), true_feats.numpy())
 
     for etype in g.canonical_etypes:
         etype_id = g.get_etype_id(etype)
@@ -74,7 +73,7 @@ def _verify_graph_feats(
                 continue
             true_feats = g.edges[etype].data[name][orig_id]
             edata = edge_feats[_etype_tuple_to_str(etype) + "/" + name][local_eids]
-            assert torch.equal(edata, true_feats)
+            assert np.array_equal(edata.numpy(), true_feats.numpy())
 
 
 def _test_chunk_graph(
