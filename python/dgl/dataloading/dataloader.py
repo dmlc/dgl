@@ -3,7 +3,7 @@ from collections.abc import Mapping, Sequence
 from queue import Queue, Empty, Full
 import itertools
 import threading
-from distutils.version import LooseVersion
+from packaging import version
 import math
 import inspect
 import re
@@ -31,7 +31,7 @@ from .. import backend as F
 from ..distributed import DistGraph
 from ..multiprocessing import call_once_and_share
 
-PYTORCH_VER = LooseVersion(torch.__version__)
+PYTORCH_VER = version.parse(torch.__version__)
 PYTHON_EXIT_STATUS = False
 def _set_python_exit_flag():
     global PYTHON_EXIT_STATUS
@@ -76,7 +76,7 @@ class _TensorizedDatasetIter(object):
         # convert the type-ID pairs to dictionary
         type_ids = batch[:, 0]
         indices = batch[:, 1]
-        if PYTORCH_VER >= LooseVersion("1.10.0"):
+        if PYTORCH_VER >= version.parse("1.10.0"):
             _, type_ids_sortidx = torch.sort(type_ids, stable=True)
         else:
             if not self.shuffle:

@@ -2,7 +2,7 @@ from __future__ import absolute_import
 
 import builtins
 import numbers
-from distutils.version import LooseVersion
+from packaging import version
 
 import numpy as np
 import scipy  # Weird bug in new pytorch when import scipy after import torch
@@ -13,7 +13,7 @@ from ... import ndarray as nd
 from ..._deprecate import kernel as K
 from ...function.base import TargetCode
 
-if LooseVersion(th.__version__) < LooseVersion("1.9.0"):
+if version.parse(th.__version__) < version.parse("1.9.0"):
     raise RuntimeError("DGL requires PyTorch >= 1.9.0")
 
 
@@ -425,7 +425,7 @@ def zerocopy_from_numpy(np_array):
     return th.as_tensor(np_array)
 
 
-if LooseVersion(th.__version__) >= LooseVersion("1.10.0"):
+if version.parse(th.__version__) >= version.parse("1.10.0"):
 
     def zerocopy_to_dgl_ndarray(data):
         if data.dtype == th.bool:
