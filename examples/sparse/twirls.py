@@ -17,6 +17,7 @@ from torch.optim import Adam
 from dgl.data import CoraGraphDataset
 import dgl.mock_sparse as dglsp
 
+
 class MLP(nn.Module):
     def __init__(self, in_size, hidden_size):
         super().__init__()
@@ -31,13 +32,21 @@ class MLP(nn.Module):
         H = self.linear_2(H)
         return H
 
+
 ################################################################################
 # (HIGHLIGHT) Use DGL sparse API to implement the iterative graph diffusion
 # algorithm.
 ################################################################################
 class TWIRLS(nn.Module):
-    def __init__(self, in_size, out_size, hidden_size=128,
-                 num_steps=16, lam=1.0, alpha=0.5):
+    def __init__(
+        self,
+        in_size,
+        out_size,
+        hidden_size=128,
+        num_steps=16,
+        lam=1.0,
+        alpha=0.5,
+    ):
         super().__init__()
         self.num_steps = num_steps
         self.lam = lam
@@ -57,18 +66,26 @@ class TWIRLS(nn.Module):
         for k in range(self.num_steps):
             Y_hat = self.lam * A @ Y + Y0
             # The inverse of a diagonal matrix inverses its diagonal values.
-            Y = (1 - self.alpha) * Y + self.alpha * (D_tild ** -1) @ Y_hat
+            Y = (1 - self.alpha) * Y + self.alpha * (D_tild**-1) @ Y_hat
 
         # Apply a linear layer on the final output.
         return self.linear_out(Y)
+
 
 ################################################################################
 # (HIGHLIGHT) Implementation of the advanced TWIRLS model with attention
 # to show the usage of differentiable weighted sparse matrix.
 ################################################################################
 class TWIRLSWithAttention(nn.Module):
-    def __init__(self, in_size, out_size, hidden_size=128,
-                 num_steps=16, lam=1.0, alpha=0.5):
+    def __init__(
+        self,
+        in_size,
+        out_size,
+        hidden_size=128,
+        num_steps=16,
+        lam=1.0,
+        alpha=0.5,
+    ):
         super().__init__()
         self.num_steps = num_steps
         self.lam = lam
@@ -87,7 +104,7 @@ class TWIRLSWithAttention(nn.Module):
         # Conduct half of the diffusion steps.
         for k in range(self.num_steps // 2):
             Y_hat = self.lam * A @ Y + Y0
-            Y = (1 - self.alpha) * Y + self.alpha * (D_tild ** -1) @ Y_hat
+            Y = (1 - self.alpha) * Y + self.alpha * (D_tild**-1) @ Y_hat
 
         # Calculate attention weight by equation (25) in the paper.
         Y_i = Y[A.row]
@@ -96,17 +113,18 @@ class TWIRLSWithAttention(nn.Module):
         # Bound the attention value within [0.0, 1.0).
         gamma_ij = torch.clamp(0.5 / (norm_ij + 1e-7), min=0.0, max=1.0)
         # Create a new adjacency matrix with the new weight.
-        A = A(gamma_ij)
+        A = dglsp.val_like(A, gamma_ij)
         # Recompute D_tild.
         D_tild = self.lam * dglsp.diag(A.sum(1)) + I
 
         # Conduct the other half of the diffusion steps.
         for k in range(self.num_steps // 2):
             Y_hat = self.lam * A @ Y + Y0
-            Y = (1 - self.alpha) * Y + self.alpha * (D_tild ** -1) @ Y_hat
+            Y = (1 - self.alpha) * Y + self.alpha * (D_tild**-1) @ Y_hat
 
         # Apply a linear layer on the final output.
         return self.linear_out(Y)
+
 
 def evaluate(g, pred):
     model.eval()
@@ -151,7 +169,9 @@ def train(g, model, A, X):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("TWIRLS example in DGL Sparse.")
-    parser.add_argument("--attention", action="store_true", help="Use TWIRLS with attention.")
+    parser.add_argument(
+        "--attention", action="store_true", help="Use TWIRLS with attention."
+    )
     args = parser.parse_args()
     # If CUDA is available, use GPU to accelerate the training, use CPU
     # otherwise.
