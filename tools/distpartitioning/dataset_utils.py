@@ -4,6 +4,7 @@ import os
 import numpy as np
 import pyarrow
 import torch
+import torch.distributed as dist
 
 import array_readwriter
 import constants
@@ -62,16 +63,18 @@ def _shuffle_data(data, rank, world_size, tids, num_parts):
     assert len(data.shape) in [1, 2], (
         f"Data is expected to be 1-D or 2-D but got {data.shape}."
     )
-    data_shape = torch.zeros(3, dtype=torch.int64)
-    if len(data.shape) > 0:
-        data_shape = list(data.shape)
-        if len(data_shape) == 1:
-            data_shape.append(1)
-        data_shape.append(DATA_TYPE_ID[data.dtype])
-        data_shape = torch.tensor(data_shape, dtype=torch.int64)
-    data_shape_input = [data_shape] * world_size
-    data_shape_output = alltoallv_cpu(rank, world_size, data_shape_input)
-    # Rank~0 always succeed to load data, so we fetch info from it.
+    data_shape = list(data.shape)
+    if len(data_shape) == 1:
+        data_shape.append(1)
+    data_shape.append(DATA_TYPE_ID[data.dtype])
+    data_shape = torch.tensor(data_shape, dtype=torch.int64)
+
+    data_shape_output = [
+        torch.zeros_like(data_shape) for _ in range(world_size)
+    ]
+    dist.all_gather(data_shape_output, data_shape)
+
+    # Rank~0 always succeeds to load non-empty data, so we fetch info from it.
     data_dim = data_shape_output[0][1].item()
     data_type = REV_DATA_TYPE_ID[data_shape_output[0][2].item()]
     data_lines = [data_shape[0].item() for data_shape in data_shape_output]
