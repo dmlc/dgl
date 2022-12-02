@@ -373,7 +373,7 @@ def test_segment_mm(idtype, feat_size, dtype, tol):
             "Only support float32 and float64 on CPU."
         )
     if F._default_context_str == "gpu" \
-        and version.parsee(torch.version.cuda) < version.parse("11.0") \
+        and version.parse(torch.version.cuda) < version.parse("11.0") \
         and dtype == torch.bfloat16:
         pytest.skip(
             "BF16 requires CUDA >= 11.0."
