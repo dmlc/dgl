@@ -223,7 +223,7 @@ class SubgraphXExplainer(nn.Module):
 
     Parameters
     ----------
-    model: nn.Module
+    model : nn.Module
         The GNN model to explain.
     hyperparam: float
         The hyperparameter that encourages exploration.
