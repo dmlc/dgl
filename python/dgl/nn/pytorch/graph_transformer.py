@@ -284,12 +284,12 @@ class PathEncoder(nn.Module):
             and batch_size is the batch size of the input graph.
         """
 
-        ubg_list = unbatch(g)
+        g_list = unbatch(g)
         sum_num_edges = 0
         max_num_nodes = th.max(g.batch_num_nodes())
         path_encoding = []
 
-        for ubg in ubg_list:
+        for ubg in g_list:
             num_nodes = ubg.num_nodes()
             num_edges = ubg.num_edges()
             edata = edge_feat[sum_num_edges: (sum_num_edges + num_edges)]
@@ -304,8 +304,10 @@ class PathEncoder(nn.Module):
             # shape: [n, n, l], n = num_nodes, l = path_len
             shortest_path = path[:, :, 0: path_len]
             # shape: [n, n]
-            shortest_distance = shortest_dist(
-                ubg, root=None, return_paths=False
+            shortest_distance = th.clamp(
+                shortest_dist(ubg, root=None, return_paths=False),
+                min=0,
+                max=path_len
             )
             # shape: [n, n, l, d], d = feat_dim
             path_data = edata[shortest_path]
@@ -313,7 +315,7 @@ class PathEncoder(nn.Module):
             embedding_idx = th.reshape(
                 th.arange(self.num_heads * path_len),
                 (path_len, self.num_heads)
-            )
+            ).to(next(self.embedding_table.parameters()).device)
             # shape: [d, l, h]
             edge_embedding = th.permute(
                 self.embedding_table(embedding_idx), (2, 0, 1)
