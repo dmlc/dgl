@@ -1395,7 +1395,7 @@ def test_heterognnexplainer(g, idtype, input_dim, output_dim):
 
 
 @pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
-@pytest.mark.parametrize('idtype', [F.int64])
+@parametrize_idtype
 @pytest.mark.parametrize('out_dim', [2])
 @pytest.mark.parametrize('max_iter', [40])
 @pytest.mark.parametrize('node_min', [20])
