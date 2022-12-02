@@ -168,7 +168,6 @@ __global__ void GatherMMScatterKernel2(
       __syncwarp();
 
       for (unsigned int outloop = 0; outloop < out_len; outloop += 32) {
-        DType out_reg = static_cast<DType>(0.0f);  // thread private
         const unsigned int l = laneId;
         if (l < out_len) {
           const DType b_val = B[row_b * out_len + (outloop + l)];
