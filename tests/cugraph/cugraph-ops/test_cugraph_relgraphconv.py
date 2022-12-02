@@ -4,7 +4,7 @@ import dgl
 from dgl.nn import CuGraphRelGraphConv
 from dgl.nn import RelGraphConv
 
-# TODO(tingyu66): Re-enable the following tests after update cugraph CI image
+# TODO(tingyu66): Re-enable the following tests after updating cuGraph CI image.
 """ use_longs = [False, True]
 max_in_degrees = [None, 8]
 regularizers = [None, "basis"] """
