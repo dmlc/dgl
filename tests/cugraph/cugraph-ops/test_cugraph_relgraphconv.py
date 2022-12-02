@@ -7,7 +7,8 @@ from dgl.nn import RelGraphConv
 # TODO(tingyu66): Re-enable the following tests after updating cuGraph CI image.
 """ use_longs = [False, True]
 max_in_degrees = [None, 8]
-regularizers = [None, "basis"] """
+regularizers = [None, "basis"]
+"""
 use_longs = []
 max_in_degrees = []
 regularizers = []
