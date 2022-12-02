@@ -151,16 +151,25 @@ def check_file(
     if original == replacement:
         return []
 
+    line = 0
+    original = original.decode("utf-8")
+    replacement = replacement.decode("utf-8")
+    for line, (i, j) in enumerate(
+        zip(original.split("\n"), replacement.split("\n"))
+    ):
+        if i != j:
+            break
+
     return [
         LintMessage(
             path=filename,
-            line=None,
+            line=line,
             char=None,
             code="CLANGFORMAT",
             severity=LintSeverity.WARNING,
             name="format",
-            original=original.decode("utf-8"),
-            replacement=replacement.decode("utf-8"),
+            original=original,
+            replacement=replacement,
             description="See https://clang.llvm.org/docs/ClangFormat.html.\nRun `lintrunner -a` to apply this patch.",
         )
     ]

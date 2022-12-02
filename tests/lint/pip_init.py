@@ -36,7 +36,8 @@ if __name__ == "__main__":
         help="verbose logging",
     )
     parser.add_argument(
-        "--dry-run", help="do not install anything, just print what would be done."
+        "--dry-run",
+        help="do not install anything, just print what would be done.",
     )
     parser.add_argument(
         "--no-black-binary",

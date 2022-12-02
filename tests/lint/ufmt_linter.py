@@ -80,10 +80,17 @@ def check_file(
         if original == replacement:
             return []
 
+        line = 0
+        for line, (i, j) in enumerate(
+            zip(original.split("\n"), replacement.split("\n"))
+        ):
+            if i != j:
+                break
+
         return [
             LintMessage(
                 path=filename,
-                line=None,
+                line=line,
                 char=None,
                 code="UFMT",
                 severity=LintSeverity.WARNING,
