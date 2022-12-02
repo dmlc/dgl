@@ -306,7 +306,7 @@ class PathEncoder(nn.Module):
             # shape: [n, n]
             shortest_distance = th.clamp(
                 shortest_dist(ubg, root=None, return_paths=False),
-                min=0,
+                min=1,
                 max=path_len
             )
             # shape: [n, n, l, d], d = feat_dim
