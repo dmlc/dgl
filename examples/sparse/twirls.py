@@ -8,13 +8,14 @@ graph diffusion algorithm. The other is an advanced implementation
 with attention.
 """
 
+import argparse
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import Adam
 
 from dgl.data import CoraGraphDataset
-from dgl.mock_sparse import create_from_coo, diag, identity
+import dgl.mock_sparse as dglsp
 
 class MLP(nn.Module):
     def __init__(self, in_size, hidden_size):
@@ -49,8 +50,8 @@ class TWIRLS(nn.Module):
         Y = Y0 = self.mlp(X)
 
         # Compute diagonal matrix D_tild.
-        I = identity(A.shape, device=A.device)
-        D_tild = self.lam * diag(A.sum(1)) + I
+        I = dglsp.identity(A.shape, device=A.device)
+        D_tild = self.lam * dglsp.diag(A.sum(1)) + I
 
         # Iteratively compute new Y by equation (6) in the paper.
         for k in range(self.num_steps):
@@ -80,8 +81,8 @@ class TWIRLSWithAttention(nn.Module):
         Y = Y0 = self.mlp(X)
 
         # Compute diagonal matrix D_tild.
-        I = identity(A.shape, device=A.device)
-        D_tild = self.lam * diag(A.sum(1)) + I
+        I = dglsp.identity(A.shape, device=A.device)
+        D_tild = self.lam * dglsp.diag(A.sum(1)) + I
 
         # Conduct half of the diffusion steps.
         for k in range(self.num_steps // 2):
@@ -92,12 +93,12 @@ class TWIRLSWithAttention(nn.Module):
         Y_i = Y[A.row]
         Y_j = Y[A.col]
         norm_ij = torch.linalg.vector_norm(Y_i - Y_j, dim=1)
-        # Bound the attention value within a range.
+        # Bound the attention value within [0.0, 1.0).
         gamma_ij = torch.clamp(0.5 / (norm_ij + 1e-7), min=0.0, max=1.0)
-        # Update the adjacency matrix with the new weight
+        # Create a new adjacency matrix with the new weight.
         A = A(gamma_ij)
-        # Recompute D_tild
-        D_tild = self.lam * diag(A.sum(1)) + I
+        # Recompute D_tild.
+        D_tild = self.lam * dglsp.diag(A.sum(1)) + I
 
         # Conduct the other half of the diffusion steps.
         for k in range(self.num_steps // 2):
@@ -149,6 +150,9 @@ def train(g, model, A, X):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser("TWIRLS example in DGL Sparse.")
+    parser.add_argument("--attention", action="store_true", help="Use TWIRLS with attention.")
+    args = parser.parse_args()
     # If CUDA is available, use GPU to accelerate the training, use CPU
     # otherwise.
     dev = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -161,13 +165,15 @@ if __name__ == "__main__":
     # Create the sparse adjacency matrix A.
     src, dst = g.edges()
     N = g.num_nodes()
-    A = create_from_coo(dst, src, shape=(N, N))
+    A = dglsp.create_from_coo(dst, src, shape=(N, N))
 
     # Create the TWIRLS model.
     in_size = X.shape[1]
     out_size = dataset.num_classes
-    model = TWIRLS(in_size, out_size).to(dev)
-    #model = TWIRLSWithAttention(in_size, out_size).to(dev)
+    if args.attention:
+        model = TWIRLSWithAttention(in_size, out_size).to(dev)
+    else:
+        model = TWIRLS(in_size, out_size).to(dev)
 
     # Kick off training.
     train(g, model, A, X)
