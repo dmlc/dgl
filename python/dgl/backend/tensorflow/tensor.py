@@ -3,7 +3,7 @@ from __future__ import absolute_import
 
 import builtins
 import numbers
-from distutils.version import LooseVersion
+from packaging import version
 
 import numpy as np
 import tensorflow as tf
@@ -12,7 +12,7 @@ from ... import ndarray as nd
 from ..._deprecate import kernel as K
 from ...function.base import TargetCode
 
-if LooseVersion(tf.__version__) < LooseVersion("2.3.0"):
+if version.parse(tf.__version__) < version.parse("2.3.0"):
     raise RuntimeError(
         "DGL requires TensorFlow>=2.3.0 for the official DLPack support."
     )

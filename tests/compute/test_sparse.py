@@ -1,4 +1,4 @@
-from distutils.version import LooseVersion
+from packaging import version
 import random
 import unittest
 
@@ -189,7 +189,7 @@ def test_spmm(idtype, g, shp, msg, reducer):
     [(torch.float16, 1e-3, 0.5), (torch.bfloat16, 4e-3, 2.)]
 )
 def test_half_spmm(idtype, dtype, rtol, atol):
-    if LooseVersion(torch.version.cuda) < LooseVersion("11.0") \
+    if version.parse(torch.version.cuda) < version.parse("11.0") \
         and dtype == torch.bfloat16:
         pytest.skip("BF16 requires CUDA >= 11.0.")
 
@@ -373,7 +373,7 @@ def test_segment_mm(idtype, feat_size, dtype, tol):
             "Only support float32 and float64 on CPU."
         )
     if F._default_context_str == "gpu" \
-        and LooseVersion(torch.version.cuda) < LooseVersion("11.0") \
+        and version.parse(torch.version.cuda) < version.parse("11.0") \
         and dtype == torch.bfloat16:
         pytest.skip(
             "BF16 requires CUDA >= 11.0."
@@ -426,7 +426,7 @@ def test_gather_mm_idx_b(feat_size, dtype, tol):
     if F._default_context_str == "cpu" and dtype in (torch.float16, torch.bfloat16):
         pytest.skip("Only support float32 and float64 on CPU.")
     if F._default_context_str == "gpu" \
-        and LooseVersion(torch.version.cuda) < LooseVersion("11.0") \
+        and version.parse(torch.version.cuda) < version.parse("11.0") \
         and dtype == torch.bfloat16:
         pytest.skip("BF16 requires CUDA >= 11.0.")
 
