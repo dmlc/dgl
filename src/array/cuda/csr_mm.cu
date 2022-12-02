@@ -70,15 +70,7 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
       idtype, CUSPARSE_INDEX_BASE_ZERO, dtype));
   // SpGEMM Computation
   cusparseSpGEMMDescr_t spgemmDesc;
-  // CUSPARSE_SPGEMM_DEFAULT not support getting num_prods > 2^31 -1
-  // below to estimate upperbound of num_prods to decide DEFAULT or ALG2
-  int int_max = std::numeric_limits<int>::max();
-  int64_t nnzAB_norm = (nnzA / A.num_rows) * (nnzB / B.num_rows);
-  int64_t dense_norm = B.num_cols;  // if denseMM, numprods=nrowA*ncolA*ncolB
-  int64_t max_nprods = (nnzAB_norm > dense_norm) ? dense_norm : nnzAB_norm;
-  max_nprods = max_nprods * A.num_rows * B.num_rows;
-  cusparseSpGEMMAlg_t alg;
-  alg = (max_nprods < int_max) ? CUSPARSE_SPGEMM_DEFAULT : CUSPARSE_SPGEMM_ALG2;
+  cusparseSpGEMMAlg_t alg = CUSPARSE_SPGEMM_DEFAULT;
 
   CUSPARSE_CALL(cusparseSpGEMM_createDescr(&spgemmDesc));
   size_t workspace_size1 = 0, workspace_size2 = 0, workspace_size3 = 0;
@@ -89,21 +81,44 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
       NULL));
   void* workspace1 = (device->AllocWorkspace(ctx, workspace_size1));
   // inspect the matrices A and B to understand the memory requiremnent
-  // for the next step
-  CUSPARSE_CALL(cusparseSpGEMM_workEstimation(
-      thr_entry->cusparse_handle, transA, transB, &alpha, matA, matB, &beta,
-      matC, dtype, alg, spgemmDesc, &workspace_size1,
-      workspace1));
+  cusparseStatus_t e =
+    cusparseSpGEMM_workEstimation(thr_entry->cusparse_handle, transA,
+                                  transB, &alpha, matA, matB, &beta,
+                                  matC, dtype, alg, spgemmDesc,
+                                  &workspace_size1, workspace1);
+  // CUSPARSE_SPGEMM_DEFAULT not support getting num_prods > 2^31 -1
+  // and throws insufficient memory error within workEstimation call
+  if (e == CUSPARSE_STATUS_INSUFFICIENT_RESOURCES) {
+    // fall back to ALG2 to estimate num_prods
+    alg = CUSPARSE_SPGEMM_ALG2;
+    device->FreeWorkspace(ctx, workspace1);
+    // rerun cusparseSpGEMM_workEstimation
+    CUSPARSE_CALL(cusparseSpGEMM_workEstimation(thr_entry->cusparse_handle,
+                                                transA, transB, &alpha, matA,
+                                                matB, &beta, matC, dtype, alg,
+                                                spgemmDesc, &workspace_size1,
+                                                NULL));
+    void* workspace1 = (device->AllocWorkspace(ctx, workspace_size1));
+    CUSPARSE_CALL(cusparseSpGEMM_workEstimation(thr_entry->cusparse_handle,
+                                                transA, transB, &alpha, matA,
+                                                matB, &beta, matC, dtype, alg,
+                                                spgemmDesc, &workspace_size1,
+                                                workspace1));
+  } else {
+    CHECK(e == CUSPARSE_STATUS_SUCCESS) << "CUSPARSE ERROR: " << e;
+  }
+
+  // you can print num_prods, for better memory estimation
   int64_t num_prods;
   CUSPARSE_CALL(cusparseSpGEMM_getNumProducts(spgemmDesc, &num_prods));
-  // printf("num_prods is: %ld\n", num_prods);
+
+  // assume free GPU mem at least ~15G for below heuristics to work  
   // user-defined medium problem size (below will use DEFAULT)
-  // assuming free GPU mem at least ~10G for alloc. workspace2
   int64_t MEDIUM_NUM_PRODUCTS = 400*1000*1000;
   // user-defined large problem size (above will use ALG3)
-  int64_t LARGE_NUM_PRODUCTS  = 1000*1000*1000;
+  int64_t LARGE_NUM_PRODUCTS  = 800*1000*1000;
 
-  // switch to new SpGEMM algorithms for medium & large problem size
+  // switch to ALG2/ALG3 for medium & large problem size
   if (alg == CUSPARSE_SPGEMM_DEFAULT && num_prods > MEDIUM_NUM_PRODUCTS) {
     // use ALG3 for very large problem
     if (num_prods <= LARGE_NUM_PRODUCTS)
@@ -126,28 +141,12 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
   } else if (alg == CUSPARSE_SPGEMM_ALG2 && num_prods > LARGE_NUM_PRODUCTS) {
     // no need to rerun cusparseSpGEMM_workEstimation between ALG2 and ALG3
     alg = CUSPARSE_SPGEMM_ALG3;
-  } else if (alg == CUSPARSE_SPGEMM_ALG2 && num_prods < MEDIUM_NUM_PRODUCTS) {
-    // use DEFAULT for small problems
-    alg = CUSPARSE_SPGEMM_DEFAULT;
-    device->FreeWorkspace(ctx, workspace1);
-    // rerun cusparseSpGEMM_workEstimation
-    CUSPARSE_CALL(cusparseSpGEMM_workEstimation(thr_entry->cusparse_handle,
-                                                transA, transB, &alpha, matA,
-                                                matB, &beta, matC, dtype, alg,
-                                                spgemmDesc, &workspace_size1,
-                                                NULL));
-    void* workspace1 = (device->AllocWorkspace(ctx, workspace_size1));
-    CUSPARSE_CALL(cusparseSpGEMM_workEstimation(thr_entry->cusparse_handle,
-                                                transA, transB, &alpha, matA,
-                                                matB, &beta, matC, dtype, alg,
-                                                spgemmDesc, &workspace_size1,
-                                                workspace1));
   }
 
   if (alg == CUSPARSE_SPGEMM_ALG2 || alg == CUSPARSE_SPGEMM_ALG3) {
     // estimate memory for ALG2/ALG3; note chunk_fraction is only used by ALG3
-    // keep reducing chunk_fraction if num_prods is too large
-    float chunk_fraction = num_prods < 5 * LARGE_NUM_PRODUCTS ? 0.2 : 0.05;
+    // reduce chunk_fraction if crash due to mem., but it trades off speed
+    float chunk_fraction = num_prods < 4 * LARGE_NUM_PRODUCTS ? 0.15 : 0.05;
     CUSPARSE_CALL(cusparseSpGEMM_estimateMemory(thr_entry->cusparse_handle,
                                                 transA, transB, &alpha, matA,
                                                 matB, &beta, matC, dtype, alg,
