@@ -73,8 +73,19 @@ def __alltoall_cpu(rank, world_size, output_tensor_list, input_tensor_list):
         The tensors to exchange
     """
     input_tensor_list = [tensor.to(torch.device('cpu')) for tensor in input_tensor_list]
+    # [TODO][Rui] Boolean is not supported as dist.scatter fails.
+    dtypes = [ t.dtype for t in input_tensor_list]
+    for i, dtype in enumerate(dtypes):
+        if dtype == torch.bool:
+            input_tensor_list[i] = input_tensor_list[i].to(torch.int8)
+            output_tensor_list[i] = output_tensor_list[i].to(torch.int8)
     for i in range(world_size):
         dist.scatter(output_tensor_list[i], input_tensor_list if i == rank else [], src=i)
+    # Convert back to original dtype
+    for i, dtype in enumerate(dtypes):
+        if dtype == torch.bool:
+            input_tensor_list[i] = input_tensor_list[i].to(dtype)
+            output_tensor_list[i] = output_tensor_list[i].to(dtype)
 
 def alltoallv_cpu(rank, world_size, input_tensor_list):
     """
