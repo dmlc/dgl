@@ -15,7 +15,7 @@ from dgl.data.utils import load_graphs, load_tensors
 
 
 def create_chunked_dataset(
-    root_dir, num_chunks, include_masks=False, data_fmt='numpy', **kwargs
+    root_dir, num_chunks, include_masks=True, data_fmt='numpy', **kwargs
 ):
     """
     This function creates a sample dataset, based on MAG240 dataset.
@@ -72,17 +72,21 @@ def create_chunked_dataset(
 
     # masks.
     if include_masks:
-        paper_train_mask = np.random.randint(0, 2, num_papers)
-        paper_test_mask = np.random.randint(0, 2, num_papers)
-        paper_val_mask = np.random.randint(0, 2, num_papers)
+        paper_train_mask = np.random.choice([True, False], num_papers)
+        paper_test_mask = np.random.choice([True, False], num_papers)
+        paper_val_mask = np.random.choice([True, False], num_papers)
 
-        author_train_mask = np.random.randint(0, 2, num_authors)
-        author_test_mask = np.random.randint(0, 2, num_authors)
-        author_val_mask = np.random.randint(0, 2, num_authors)
+        author_train_mask = np.random.choice([True, False], num_authors)
+        author_test_mask = np.random.choice([True, False], num_authors)
+        author_val_mask = np.random.choice([True, False], num_authors)
 
-        inst_train_mask = np.random.randint(0, 2, num_institutions)
-        inst_test_mask = np.random.randint(0, 2, num_institutions)
-        inst_val_mask = np.random.randint(0, 2, num_institutions)
+        inst_train_mask = np.random.choice([True, False], num_institutions)
+        inst_test_mask = np.random.choice([True, False], num_institutions)
+        inst_val_mask = np.random.choice([True, False], num_institutions)
+
+        write_train_mask = np.random.choice([True, False], num_write_edges)
+        write_test_mask = np.random.choice([True, False], num_write_edges)
+        write_val_mask = np.random.choice([True, False], num_write_edges)
 
     # Edge features.
     cite_count = np.random.choice(10, num_cite_edges)
@@ -143,44 +147,62 @@ def create_chunked_dataset(
         paper_train_mask_path = os.path.join(input_dir, 'paper/train_mask.npy')
         with open(paper_train_mask_path, 'wb') as f:
             np.save(f, paper_train_mask)
+        g.nodes['paper'].data['train_mask'] = torch.from_numpy(
+            paper_train_mask)
 
         paper_test_mask_path = os.path.join(input_dir, 'paper/test_mask.npy')
         with open(paper_test_mask_path, 'wb') as f:
             np.save(f, paper_test_mask)
+        g.nodes['paper'].data['test_mask'] = torch.from_numpy(
+            paper_test_mask)
 
         paper_val_mask_path = os.path.join(input_dir, 'paper/val_mask.npy')
         with open(paper_val_mask_path, 'wb') as f:
             np.save(f, paper_val_mask)
+        g.nodes['paper'].data['val_mask'] = torch.from_numpy(
+            paper_val_mask)
 
         author_train_mask_path = os.path.join(
             input_dir, 'author/train_mask.npy'
         )
         with open(author_train_mask_path, 'wb') as f:
             np.save(f, author_train_mask)
+        g.nodes['author'].data['train_mask'] = torch.from_numpy(
+            author_train_mask)
 
         author_test_mask_path = os.path.join(input_dir, 'author/test_mask.npy')
         with open(author_test_mask_path, 'wb') as f:
             np.save(f, author_test_mask)
+        g.nodes['author'].data['test_mask'] = torch.from_numpy(
+            author_test_mask)
 
         author_val_mask_path = os.path.join(input_dir, 'author/val_mask.npy')
         with open(author_val_mask_path, 'wb') as f:
             np.save(f, author_val_mask)
+        g.nodes['author'].data['val_mask'] = torch.from_numpy(
+            author_val_mask)
 
         inst_train_mask_path = os.path.join(
             input_dir, 'institution/train_mask.npy'
         )
         with open(inst_train_mask_path, 'wb') as f:
             np.save(f, inst_train_mask)
+        g.nodes['institution'].data['train_mask'] = torch.from_numpy(
+            inst_train_mask)
 
         inst_test_mask_path = os.path.join(
             input_dir, 'institution/test_mask.npy'
         )
         with open(inst_test_mask_path, 'wb') as f:
             np.save(f, inst_test_mask)
+        g.nodes['institution'].data['test_mask'] = torch.from_numpy(
+            inst_test_mask)
 
         inst_val_mask_path = os.path.join(input_dir, 'institution/val_mask.npy')
         with open(inst_val_mask_path, 'wb') as f:
             np.save(f, inst_val_mask)
+        g.nodes['institution'].data['val_mask'] = torch.from_numpy(
+            inst_val_mask)
 
         node_data = {
             'paper': {
@@ -217,13 +239,33 @@ def create_chunked_dataset(
         'cites': {'count': cite_count_path},
         ('author', 'writes', 'paper'): {
             'year': write_year_path,
-            'orig_ids': writes_orig_ids_path
+            'orig_ids': writes_orig_ids_path,
         },
         'rev_writes': {'year': write_year_path},
         ('institution', 'writes', 'paper'): {
             'year': write2_year_path,
         },
     }
+    if include_masks:
+        etype = ('author', 'writes', 'paper')
+
+        write_train_mask_path = os.path.join(input_dir, 'writes/train_mask.npy')
+        with open(write_train_mask_path, 'wb') as f:
+            np.save(f, write_train_mask)
+        g.edges[etype].data['train_mask'] = torch.from_numpy(write_train_mask)
+        edge_data[etype]['train_mask'] = write_train_mask_path
+
+        write_test_mask_path = os.path.join(input_dir, 'writes/test_mask.npy')
+        with open(write_test_mask_path, 'wb') as f:
+            np.save(f, write_test_mask)
+        g.edges[etype].data['test_mask'] = torch.from_numpy(write_test_mask)
+        edge_data[etype]['test_mask'] = write_test_mask_path
+
+        write_val_mask_path = os.path.join(input_dir, 'writes/val_mask.npy')
+        with open(write_val_mask_path, 'wb') as f:
+            np.save(f, write_val_mask)
+        g.edges[etype].data['val_mask'] = torch.from_numpy(write_val_mask)
+        edge_data[etype]['val_mask'] = write_val_mask_path
 
     output_dir = os.path.join(root_dir, 'chunked-data')
     chunk_graph(

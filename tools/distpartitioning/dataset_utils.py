@@ -21,7 +21,7 @@ DATA_TYPE_ID = {
         torch.int16,
         torch.int32,
         torch.int64,
-        torch.bool
+        torch.bool,
     ])
 }
 
@@ -101,7 +101,7 @@ def _shuffle_data(data, rank, world_size, tids, num_parts):
             else:
                 data_input[i] = torch.zeros((0, data_dim), dtype=data_type)
         else:
-            data_input[i] = torch.cat(data)
+            data_input[i] = torch.cat(data).to(dtype=data_type)
 
     # scatter and gather data
     data_output = alltoallv_cpu(rank, world_size, data_input)
@@ -265,11 +265,19 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
                     data_file = feat_data[constants.STR_DATA][idx]
                     if not os.path.isabs(data_file):
                         data_file = os.path.join(input_dir, data_file)
-                    node_data.append(
-                        array_readwriter.get_array_parser(
-                            **reader_fmt_meta
-                        ).read(data_file)
-                    )
+                    read_data = array_readwriter.get_array_parser(
+                                    **reader_fmt_meta
+                                ).read(data_file)
+                    # [TODO][Rui] Boolean is not supported as dist.scatter fails.
+                    if read_data.dtype == np.bool_:
+                        print(
+                            f"[WARNING] Node data read from {data_file} for "
+                            f"{ntype_name}/{feat_name} is boolean. As boolean "
+                            "data cannot be scattered, it's converted to "
+                            "numpy.uint8."
+                        )
+                        read_data = read_data.astype(np.uint8)
+                    node_data.append(read_data)
                 if len(node_data) > 0:
                     node_data = np.concatenate(node_data)
                 else:
@@ -390,11 +398,19 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
                     data_file = feat_data[constants.STR_DATA][idx]
                     if not os.path.isabs(data_file):
                         data_file = os.path.join(input_dir, data_file)
-                    edge_data.append(
-                        array_readwriter.get_array_parser(
-                            **reader_fmt_meta
-                        ).read(data_file)
-                    )
+                    read_data = array_readwriter.get_array_parser(
+                                    **reader_fmt_meta
+                                ).read(data_file)
+                    # [TODO][Rui] Boolean is not supported as dist.scatter fails.
+                    if read_data.dtype == np.bool_:
+                        print(
+                            f"[WARNING] Edge data read from {data_file} for "
+                            f"{etype_name}/{feat_name} is boolean. As boolean "
+                            "data cannot be scattered, it's converted to "
+                            "numpy.uint8."
+                        )
+                        read_data = read_data.astype(np.uint8)
+                    edge_data.append(read_data)
                 if len(edge_data) > 0:
                     edge_data = np.concatenate(edge_data)
                 else:

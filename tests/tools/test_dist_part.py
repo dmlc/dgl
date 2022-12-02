@@ -132,7 +132,7 @@ def _test_chunk_graph(
             data = []
             for i in range(num_chunks):
                 fname = os.path.join(sub_dir, f'{feat}-{i}.{suffix}')
-                assert os.path.isfile(fname)
+                assert os.path.isfile(fname), f'{fname} cannot be found.'
                 feat_array =  array_readwriter.get_array_parser(
                             **reader_fmt_meta
                         ).read(fname)
