@@ -215,7 +215,7 @@ class SubgraphXExplainer(nn.Module):
     r"""SubgraphXExplainer model from `SubgraphXExplainer: On Explainability of
     Graph Neural Networks via Subgraph Explorations <https://arxiv.org/pdf/2102.05152.pdf>`.
 
-    It identifies subgraphs from the original graph  that play a
+    It identifies subgraphs from the original graph that play a
     critical role in GNN-based graph classification.
 
     To generate an explanation, by efficiently exploring different subgraphs with
