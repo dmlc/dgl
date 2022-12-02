@@ -13,10 +13,10 @@ def generate_graph(idtype):
     g.add_nodes(10)
     # create a graph where 0 is the source and 9 is the sink
     for i in range(1, 9):
-        g.add_edge(0, i)
-        g.add_edge(i, 9)
+        g.add_edges(0, i)
+        g.add_edges(i, 9)
     # add a back flow from 9 to 0
-    g.add_edge(9, 0)
+    g.add_edges(9, 0)
     g.ndata.update({'f1' : F.randn((10,)), 'f2' : F.randn((10, D))})
     weights = F.randn((17,))
     g.edata.update({'e1': weights, 'e2': F.unsqueeze(weights, 1)})
@@ -42,7 +42,7 @@ def test_v2v_update_all(idtype):
         g = generate_graph(idtype)
         # update all
         v1 = g.ndata[fld]
-        g.update_all(fn.copy_src(src=fld, out='m'), fn.sum(msg='m', out=fld), apply_func)
+        g.update_all(fn.copy_u(u=fld, out='m'), fn.sum(msg='m', out=fld), apply_func)
         v2 = g.ndata[fld]
         g.ndata.update({fld : v1})
         g.update_all(message_func, reduce_func, apply_func)
@@ -50,7 +50,7 @@ def test_v2v_update_all(idtype):
         assert F.allclose(v2, v3)
         # update all with edge weights
         v1 = g.ndata[fld]
-        g.update_all(fn.src_mul_edge(src=fld, edge='e1', out='m'),
+        g.update_all(fn.u_mul_e(fld, 'e1', 'm'),
                 fn.sum(msg='m', out=fld), apply_func)
         v2 = g.ndata[fld]
         g.ndata.update({fld : v1})
@@ -84,7 +84,7 @@ def test_v2v_snr(idtype):
         g = generate_graph(idtype)
         # send and recv
         v1 = g.ndata[fld]
-        g.send_and_recv((u, v), fn.copy_src(src=fld, out='m'),
+        g.send_and_recv((u, v), fn.copy_u(u=fld, out='m'),
                 fn.sum(msg='m', out=fld), apply_func)
         v2 = g.ndata[fld]
         g.ndata.update({fld : v1})
@@ -93,7 +93,7 @@ def test_v2v_snr(idtype):
         assert F.allclose(v2, v3)
         # send and recv with edge weights
         v1 = g.ndata[fld]
-        g.send_and_recv((u, v), fn.src_mul_edge(src=fld, edge='e1', out='m'),
+        g.send_and_recv((u, v), fn.u_mul_e(fld, 'e1', 'm'),
                 fn.sum(msg='m', out=fld), apply_func)
         v2 = g.ndata[fld]
         g.ndata.update({fld : v1})
@@ -127,7 +127,7 @@ def test_v2v_pull(idtype):
         g = generate_graph(idtype)
         # send and recv
         v1 = g.ndata[fld]
-        g.pull(nodes, fn.copy_src(src=fld, out='m'), fn.sum(msg='m', out=fld), apply_func)
+        g.pull(nodes, fn.copy_u(u=fld, out='m'), fn.sum(msg='m', out=fld), apply_func)
         v2 = g.ndata[fld]
         g.ndata[fld] = v1
         g.pull(nodes, message_func, reduce_func, apply_func)
@@ -135,7 +135,7 @@ def test_v2v_pull(idtype):
         assert F.allclose(v2, v3)
         # send and recv with edge weights
         v1 = g.ndata[fld]
-        g.pull(nodes, fn.src_mul_edge(src=fld, edge='e1', out='m'),
+        g.pull(nodes, fn.u_mul_e(fld, 'e1', 'm'),
                 fn.sum(msg='m', out=fld), apply_func)
         v2 = g.ndata[fld]
         g.ndata[fld] = v1
@@ -154,8 +154,8 @@ def test_update_all_multi_fallback(idtype):
     g = g.astype(idtype).to(F.ctx())
     g.add_nodes(10)
     for i in range(1, 9):
-        g.add_edge(0, i)
-        g.add_edge(i, 9)
+        g.add_edges(0, i)
+        g.add_edges(i, 9)
     g.ndata['h'] = F.randn((10, D))
     g.edata['w1'] = F.randn((16,))
     g.edata['w2'] = F.randn((16, D))
@@ -183,12 +183,12 @@ def test_update_all_multi_fallback(idtype):
     g.update_all(_mfunc_hxw1, _rfunc_m1max, _afunc)
     o3 = g.ndata.pop('o3')
     # v2v spmv
-    g.update_all(fn.src_mul_edge(src='h', edge='w1', out='m1'),
+    g.update_all(fn.u_mul_e('h', 'w1', 'm1'),
                  fn.sum(msg='m1', out='o1'),
                  _afunc)
     assert F.allclose(o1, g.ndata.pop('o1'))
     # v2v fallback to e2v
-    g.update_all(fn.src_mul_edge(src='h', edge='w2', out='m2'),
+    g.update_all(fn.u_mul_e('h', 'w2', 'm2'),
                  fn.sum(msg='m2', out='o2'),
                  _afunc)
     assert F.allclose(o2, g.ndata.pop('o2'))
@@ -200,8 +200,8 @@ def test_pull_multi_fallback(idtype):
     g = g.astype(idtype).to(F.ctx())
     g.add_nodes(10)
     for i in range(1, 9):
-        g.add_edge(0, i)
-        g.add_edge(i, 9)
+        g.add_edges(0, i)
+        g.add_edges(i, 9)
     g.ndata['h'] = F.randn((10, D))
     g.edata['w1'] = F.randn((16,))
     g.edata['w2'] = F.randn((16, D))
@@ -231,12 +231,12 @@ def test_pull_multi_fallback(idtype):
         g.pull(nodes, _mfunc_hxw1, _rfunc_m1max, _afunc)
         o3 = g.ndata.pop('o3')
         # v2v spmv
-        g.pull(nodes, fn.src_mul_edge(src='h', edge='w1', out='m1'),
+        g.pull(nodes, fn.u_mul_e('h', 'w1', 'm1'),
                      fn.sum(msg='m1', out='o1'),
                      _afunc)
         assert F.allclose(o1, g.ndata.pop('o1'))
         # v2v fallback to e2v
-        g.pull(nodes, fn.src_mul_edge(src='h', edge='w2', out='m2'),
+        g.pull(nodes, fn.u_mul_e('h', 'w2', 'm2'),
                      fn.sum(msg='m2', out='o2'),
                      _afunc)
         assert F.allclose(o2, g.ndata.pop('o2'))
@@ -268,7 +268,7 @@ def test_spmv_3d_feat(idtype):
 
     g.ndata['h'] = h
     g.edata['h'] = e
-    g.update_all(message_func=fn.src_mul_edge('h', 'h', 'sum'), reduce_func=fn.sum('sum', 'h')) # 1
+    g.update_all(message_func=fn.u_mul_e('h', 'h', 'sum'), reduce_func=fn.sum('sum', 'h')) # 1
     ans = g.ndata['h']
 
     g.ndata['h'] = h
@@ -290,7 +290,7 @@ def test_spmv_3d_feat(idtype):
 
     g.ndata['h'] = h
     g.edata['h'] = e
-    g.update_all(message_func=fn.src_mul_edge('h', 'h', 'sum'), reduce_func=fn.sum('sum', 'h')) # 1
+    g.update_all(message_func=fn.u_mul_e('h', 'h', 'sum'), reduce_func=fn.sum('sum', 'h')) # 1
     ans = g.ndata['h']
 
     g.ndata['h'] = h

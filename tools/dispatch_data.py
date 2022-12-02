@@ -59,14 +59,12 @@ def submit_jobs(args) -> str:
     with open(args.ip_config, "r") as f:
         num_ips = len(f.readlines())
         assert (
-            num_ips == num_parts
-        ), f"The number of lines[{args.ip_config}] should be equal to num_parts[{num_parts}]."
+            num_parts % num_ips == 0
+        ), f"The num_parts[{args.num_parts}] should be a multiple of number of lines(ip addresses)[{args.ip_config}]."
 
     argslist = ""
-    argslist += "--world-size {} ".format(num_parts)
-    argslist += "--partitions-dir {} ".format(
-        os.path.abspath(args.partitions_dir)
-    )
+    argslist += "--world-size {} ".format(num_ips)
+    argslist += "--partitions-dir {} ".format(os.path.abspath(args.partitions_dir))
     argslist += "--input-dir {} ".format(os.path.abspath(args.in_dir))
     argslist += "--graph-name {} ".format(graph_name)
     argslist += "--schema {} ".format(schema_path)

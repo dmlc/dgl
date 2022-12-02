@@ -9,7 +9,7 @@ from .._deprecate.runtime import ir
 from .._deprecate.runtime.ir import var
 
 
-__all__ = ["src_mul_edge", "copy_src", "copy_edge", "copy_u", "copy_e",
+__all__ = ["copy_u", "copy_e",
            "BinaryMessageFunction", "CopyMessageFunction"]
 
 
@@ -34,7 +34,7 @@ class BinaryMessageFunction(MessageFunction):
 
     See Also
     --------
-    src_mul_edge
+    u_mul_e
     """
     def __init__(self, binary_op, lhs, rhs, lhs_field, rhs_field, out_field):
         self.binary_op = binary_op
@@ -73,7 +73,7 @@ class CopyMessageFunction(MessageFunction):
 
     See Also
     --------
-    copy_src
+    copy_u
     """
     def __init__(self, target, in_field, out_field):
         self.target = target
@@ -218,86 +218,3 @@ def _register_builtin_message_func():
                 __all__.append(func.__name__)
 
 _register_builtin_message_func()
-
-
-##############################################################################
-# For backward compatibility
-
-def src_mul_edge(src, edge, out):
-    """Builtin message function that computes message by performing
-    binary operation mul between src feature and edge feature.
-
-    Notes
-    -----
-    This function is deprecated. Please use :func:`~dgl.function.u_mul_e` instead.
-
-    Parameters
-    ----------
-    src : str
-        The source feature field.
-    edge : str
-        The edge feature field.
-    out : str
-        The output message field.
-
-    Examples
-    --------
-    >>> import dgl
-    >>> message_func = dgl.function.src_mul_edge('h', 'e', 'm')
-    """
-    return getattr(sys.modules[__name__], "u_mul_e")(src, edge, out)
-
-
-def copy_src(src, out):
-    """Builtin message function that computes message using source node
-    feature.
-
-    Notes
-    -----
-    This function is deprecated. Please use :func:`~dgl.function.copy_u` instead.
-
-    Parameters
-    ----------
-    src : str
-        The source feature field.
-    out : str
-        The output message field.
-
-    Examples
-    --------
-    >>> import dgl
-    >>> message_func = dgl.function.copy_src('h', 'm')
-
-    The above example is equivalent to the following user defined function:
-
-    >>> def message_func(edges):
-    >>>     return {'m': edges.src['h']}
-    """
-    return copy_u(src, out)
-
-
-def copy_edge(edge, out):
-    """Builtin message function that computes message using edge feature.
-
-    Notes
-    -----
-    This function is deprecated. Please use :func:`~dgl.function.copy_e` instead.
-
-    Parameters
-    ----------
-    edge : str
-        The edge feature field.
-    out : str
-        The output message field.
-
-    Examples
-    --------
-    >>> import dgl
-    >>> message_func = dgl.function.copy_edge('h', 'm')
-
-    The above example is equivalent to the following user defined function:
-
-    >>> def message_func(edges):
-    >>>     return {'m': edges.data['h']}
-    """
-    return copy_e(edge, out)

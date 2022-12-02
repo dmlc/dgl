@@ -15,7 +15,7 @@ def compute_pagerank(g):
     degrees = g.out_degrees(g.nodes()).type(torch.float32)
     for k in range(K):
         g.ndata['pv'] = g.ndata['pv'] / degrees
-        g.update_all(message_func=fn.copy_src(src='pv', out='m'),
+        g.update_all(message_func=fn.copy_u(u='pv', out='m'),
                      reduce_func=fn.sum(msg='m', out='pv'))
         g.ndata['pv'] = (1 - DAMP) / N + DAMP * g.ndata['pv']
     return g.ndata['pv']

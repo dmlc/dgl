@@ -15,12 +15,14 @@
 #include <torch/script.h>
 
 #include <memory>
+#include <tuple>
+#include <utility>
 #include <vector>
 
 namespace dgl {
 namespace sparse {
 
-/** @brief SparseMatrix bound to Python  */
+/** @brief SparseMatrix bound to Python.  */
 class SparseMatrix : public torch::CustomClassHolder {
  public:
   /**
@@ -100,18 +102,19 @@ class SparseMatrix : public torch::CustomClassHolder {
   /** @brief Check whether this sparse matrix has CSC format. */
   inline bool HasCSC() const { return csc_ != nullptr; }
 
-  /** @return {row, col, value} tensors in the COO format. */
-  std::vector<torch::Tensor> COOTensors();
-  /** @return {row, col, value} tensors in the CSR format. */
-  std::vector<torch::Tensor> CSRTensors();
-  /** @return {row, col, value} tensors in the CSC format. */
-  std::vector<torch::Tensor> CSCTensors();
+  /** @return {row, col} tensors in the COO format. */
+  std::tuple<torch::Tensor, torch::Tensor> COOTensors();
+  /** @return {row, col, value_indices} tensors in the CSR format. */
+  std::tuple<torch::Tensor, torch::Tensor, torch::optional<torch::Tensor>>
+  CSRTensors();
+  /** @return {row, col, value_indices} tensors in the CSC format. */
+  std::tuple<torch::Tensor, torch::Tensor, torch::optional<torch::Tensor>>
+  CSCTensors();
 
-  /**
-   * @brief Set non-zero values of the sparse matrix
-   * @param value Values of the sparse matrix
+  /** @brief Return the transposition of the sparse matrix. It transposes the
+   * first existing sparse format by checking COO, CSR, and CSC.
    */
-  void SetValue(torch::Tensor value);
+  c10::intrusive_ptr<SparseMatrix> Transpose() const;
 
  private:
   /** @brief Create the COO format for the sparse matrix internally */
@@ -168,6 +171,16 @@ c10::intrusive_ptr<SparseMatrix> CreateFromCSR(
 c10::intrusive_ptr<SparseMatrix> CreateFromCSC(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor value,
     const std::vector<int64_t>& shape);
+
+/**
+ * @brief Create a SparseMatrix from a SparseMatrix using new values.
+ * @param mat An existing sparse matrix
+ * @param value New values of the sparse matrix
+ *
+ * @return SparseMatrix
+ */
+c10::intrusive_ptr<SparseMatrix> CreateValLike(
+    const c10::intrusive_ptr<SparseMatrix>& mat, torch::Tensor value);
 
 }  // namespace sparse
 }  // namespace dgl

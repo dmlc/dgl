@@ -7,12 +7,13 @@ import sys
 import dgl
 from dgl.mock_sparse2 import create_from_coo, diag
 
-# FIXME: Skipping tests on win.
+# FIXME(issue #4818): Skipping tests on win.
 if not sys.platform.startswith("linux"):
     pytest.skip("skipping tests on win", allow_module_level=True)
 
 def all_close_sparse(A, row, col, val, shape):
-    rowA, colA, valA = A.coo()
+    rowA, colA = A.coo()
+    valA = A.val
     assert torch.allclose(rowA, row)
     assert torch.allclose(colA, col)
     assert torch.allclose(valA, val)
