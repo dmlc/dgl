@@ -72,11 +72,11 @@ class RelGraphConvAgg(th.autograd.Function):
             indptr,
             indices,
             max_in_degree,
-            0,
-            num_rels,
-            None,
-            None,
-            ctx.edge_types_perm,
+            n_node_types = 0,
+            n_edge_types = num_rels,
+            out_node_types = None,
+            in_node_types = None,
+            edge_types = ctx.edge_types_perm,
         )
         ctx.mfg = mfg
 
