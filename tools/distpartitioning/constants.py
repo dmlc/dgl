@@ -30,6 +30,7 @@ STR_NODE_DATA = "node_data"
 STR_EDGE_DATA = "edge_data"
 
 STR_NUMPY = "numpy"
+STR_PARQUET = "parquet"
 STR_CSV = "csv"
 STR_NAME = "name"
 

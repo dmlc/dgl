@@ -213,7 +213,7 @@ class SAGEConv(nn.Module):
                 feat_src = feat_dst = self.feat_drop(feat)
                 if graph.is_block:
                     feat_dst = feat_src[:graph.number_of_dst_nodes()]
-            msg_fn = fn.copy_src('h', 'm')
+            msg_fn = fn.copy_u('h', 'm')
             if edge_weight is not None:
                 assert edge_weight.shape[0] == graph.number_of_edges()
                 graph.edata['_edge_weight'] = edge_weight

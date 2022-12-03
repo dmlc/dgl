@@ -136,7 +136,7 @@ class GINConv(nn.Module):
         """
         _reducer = getattr(fn, self._aggregator_type)
         with graph.local_scope():
-            aggregate_fn = fn.copy_src('h', 'm')
+            aggregate_fn = fn.copy_u('h', 'm')
             if edge_weight is not None:
                 assert edge_weight.shape[0] == graph.number_of_edges()
                 graph.edata['_edge_weight'] = edge_weight

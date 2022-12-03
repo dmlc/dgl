@@ -24,11 +24,12 @@ TORCH_LIBRARY(dgl_sparse, m) {
       .def("coo", &SparseMatrix::COOTensors)
       .def("csr", &SparseMatrix::CSRTensors)
       .def("csc", &SparseMatrix::CSCTensors)
-      .def("set_val", &SparseMatrix::SetValue);
+      .def("transpose", &SparseMatrix::Transpose);
   m.def("create_from_coo", &CreateFromCOO)
       .def("create_from_csr", &CreateFromCSR)
       .def("create_from_csc", &CreateFromCSC)
-      .def("spsp_add", &SpSpAdd);
+      .def("spsp_add", &SpSpAdd)
+      .def("val_like", &CreateValLike);
 }
 
 }  // namespace sparse

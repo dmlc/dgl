@@ -237,10 +237,6 @@ def test_features(idtype):
         node_attrs={'user': ['h2'], 'game': ['h2']},
         edge_attrs={('user', 'follows', 'user'): ['h1']})
 
-    # test legacy
-    bg = dgl.batch([g1, g2], edge_attrs=['h1'])
-    assert 'h2' not in bg.edges['follows'].data.keys()
-
 
 @unittest.skipIf(F.backend_name == 'mxnet', reason="MXNet does not support split array with zero-length segment.")
 @parametrize_idtype
