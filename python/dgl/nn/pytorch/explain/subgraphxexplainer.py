@@ -161,7 +161,7 @@ class MCTSNode:
     num_visit: int
         Number times this node has been visited.
     total_reward: float
-        the total reward for all node visits.
+        The total reward for all node visits.
     immediate_reward: float
         Immediate reward for selecting this node (property score).
     """
@@ -221,7 +221,6 @@ class SubgraphXExplainer(nn.Module):
     It identifies the most important subgraph from the original graph that play a
     critical role in GNN-based graph classification.
 
-    To generate an explanation, by efficiently exploring different subgraphs with
     It employs Monte Carlo tree search in efficiently exploring different subgraphs for explanation
     and uses Shapley values as the measure of subgraph importance.
 
@@ -235,7 +234,7 @@ class SubgraphXExplainer(nn.Module):
     pruning_action: str
         Pruning action either "High2low" or "Low2high" (refer to paper).
         "High2low": Whether to expand children nodes from high degree to low degree when
-          extend the child nodes in the search tree. "Low2high" is opposite of "High2low".
+        extend the child nodes in the search tree. "Low2high" is opposite of "High2low".
     num_child_expand: int
         Max number of children a tree node is allowed to have/expand to.
     max_iter: int
