@@ -222,7 +222,8 @@ class SubgraphXExplainer(nn.Module):
     critical role in GNN-based graph classification.
 
     To generate an explanation, by efficiently exploring different subgraphs with
-    It employs Monte Carlo tree search in efficiently exploring different subgraphs for explanation and uses Shapley values as the measure of subgraph importance.
+    It employs Monte Carlo tree search in efficiently exploring different subgraphs for explanation
+    and uses Shapley values as the measure of subgraph importance.
 
     Parameters
     ----------
