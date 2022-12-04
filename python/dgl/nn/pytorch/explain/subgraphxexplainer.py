@@ -11,7 +11,7 @@ __all__ = ["SubgraphXExplainer"]
 
 def marginal_contribution(graph, exclude_masks, include_masks, model, features):
     r"""Calculate the marginal value for the sample coalition nodes (identified by
-    inluded_masks).
+    include_masks).
 
     Parameters
     ----------
@@ -177,7 +177,7 @@ class MCTSNode:
         immediate_reward=0.0,
     ):
         self.nodes = nodes
-        self.a = pruning_action
+        self.pruning_action = pruning_action
         self.coef = coef
         self.num_visit = num_visit
         self.total_reward = total_reward
@@ -335,7 +335,7 @@ class SubgraphXExplainer(nn.Module):
 
     def prune_graph(self, graph, strategy):
         r"""Find the graph based on the chosen strategy. Once prunes, return the
-        lsit of subgraphs, list of subgraph nodes and list of pruned nodes.
+        list of subgraphs, list of subgraph nodes and list of pruned nodes.
 
         Parameters
         ----------
