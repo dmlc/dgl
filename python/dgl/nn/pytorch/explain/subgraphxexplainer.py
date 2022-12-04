@@ -248,7 +248,7 @@ class SubgraphXExplainer(nn.Module):
         self,
         model,
         coef=10.0,
-        pruning_action='High2low',
+        pruning_action="High2low",
         num_child_expand=2,
         max_iter=20,
         node_min=3,
@@ -388,7 +388,9 @@ class SubgraphXExplainer(nn.Module):
 
         return subgraphs, subgraphs_nodes_mapping, pruned_nodes
 
-    def explain_graph(self, graph, features, num_gnn_layers=4, mc_sampling_steps=100, **kwargs):
+    def explain_graph(
+        self, graph, features, num_gnn_layers=4, mc_sampling_steps=100, **kwargs
+    ):
         r"""Find the subgraph that play a crucial role to explain the prediction made
         by the GNN for a graph.
 
