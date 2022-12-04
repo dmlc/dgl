@@ -112,7 +112,19 @@ SparseMatrix::CSCTensors() {
   return {csc->indptr, csc->indices, csc->value_indices};
 }
 
-void SparseMatrix::SetValue(torch::Tensor value) { value_ = value; }
+c10::intrusive_ptr<SparseMatrix> SparseMatrix::Transpose() const {
+  auto shape = shape_;
+  std::swap(shape[0], shape[1]);
+  auto value = value_;
+  if (HasCOO()) {
+    auto coo = COOTranspose(coo_);
+    return SparseMatrix::FromCOO(coo, value, shape);
+  } else if (HasCSR()) {
+    return SparseMatrix::FromCSC(csr_, value, shape);
+  } else {
+    return SparseMatrix::FromCSR(csc_, value, shape);
+  }
+}
 
 void SparseMatrix::_CreateCOO() {
   if (HasCOO()) return;
@@ -171,6 +183,23 @@ c10::intrusive_ptr<SparseMatrix> CreateFromCSC(
       CSR{shape[1], shape[0], indptr, indices, torch::optional<torch::Tensor>(),
           false});
   return SparseMatrix::FromCSC(csc, value, shape);
+}
+
+c10::intrusive_ptr<SparseMatrix> CreateValLike(
+    const c10::intrusive_ptr<SparseMatrix>& mat, torch::Tensor value) {
+  CHECK_EQ(mat->value().size(0), value.size(0))
+      << "The first dimension of the old values and the new values must be the "
+         "same.";
+  CHECK_EQ(mat->value().device(), value.device())
+      << "The device of the old values and the new values must be the same.";
+  auto shape = mat->shape();
+  if (mat->HasCOO()) {
+    return SparseMatrix::FromCOO(mat->COOPtr(), value, shape);
+  } else if (mat->HasCSR()) {
+    return SparseMatrix::FromCSR(mat->CSRPtr(), value, shape);
+  } else {
+    return SparseMatrix::FromCSC(mat->CSCPtr(), value, shape);
+  }
 }
 
 }  // namespace sparse

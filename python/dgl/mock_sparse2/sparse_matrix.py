@@ -21,17 +21,6 @@ class SparseMatrix:
         """
         return self.c_sparse_matrix.val()
 
-    @val.setter
-    def val(self, x: torch.Tensor):
-        """Set the non-zero values inplace.
-
-        Parameters
-        ----------
-        x : torch.Tensor, optional
-            The values of shape (nnz) or (nnz, D)
-        """
-        self.c_sparse_matrix.set_val(x)
-
     @property
     def shape(self) -> Tuple[int]:
         """Shape of the sparse matrix.
@@ -95,7 +84,7 @@ class SparseMatrix:
             Indices of the nonzero elements
         """
         if fmt == "COO" and not return_shuffle:
-            row, col, _ = self.coo()
+            row, col = self.coo()
             return torch.stack([row, col])
         else:
             raise NotImplementedError
@@ -120,7 +109,8 @@ class SparseMatrix:
         Returns
         -------
         Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
-            A tuple of tensors containing row, column coordinates and value indices.
+            A tuple of tensors containing row, column coordinates and value
+            indices.
         """
         return self.c_sparse_matrix.csr()
 
@@ -130,7 +120,8 @@ class SparseMatrix:
         Returns
         -------
         Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
-            A tuple of tensors containing row, column coordinates and value indices.
+            A tuple of tensors containing row, column coordinates and value
+            indices.
         """
         return self.c_sparse_matrix.csc()
 
@@ -148,6 +139,39 @@ class SparseMatrix:
         mat = torch.zeros(shape, device=self.device)
         mat[row, col] = val
         return mat
+
+    def t(self):
+        """Alias of :meth:`transpose()`"""
+        return self.transpose()
+
+    @property
+    def T(self):  # pylint: disable=C0103
+        """Alias of :meth:`transpose()`"""
+        return self.transpose()
+
+    def transpose(self):
+        """Return the transpose of this sparse matrix.
+
+        Returns
+        -------
+        SparseMatrix
+            The transpose of this sparse matrix.
+
+        Example
+        -------
+
+        >>> row = torch.tensor([1, 1, 3])
+        >>> col = torch.tensor([2, 1, 3])
+        >>> val = torch.tensor([1, 1, 2])
+        >>> A = create_from_coo(row, col, val)
+        >>> A = A.transpose()
+        >>> print(A)
+        SparseMatrix(indices=tensor([[2, 1, 3],
+                [1, 1, 3]]),
+        values=tensor([1, 1, 2]),
+        shape=(4, 4), nnz=3)
+        """
+        return SparseMatrix(self.c_sparse_matrix.transpose())
 
 
 def create_from_coo(
@@ -386,3 +410,38 @@ def create_from_csc(
     return SparseMatrix(
         torch.ops.dgl_sparse.create_from_csc(indptr, indices, val, shape)
     )
+
+
+def val_like(mat: SparseMatrix, val: torch.Tensor) -> SparseMatrix:
+    """Create a sparse matrix from an existing sparse matrix using new values.
+
+    The new sparse matrix will have the same nonzero indices as the given
+    sparse matrix and use the given values as the new nonzero values.
+
+    Parameters
+    ----------
+    mat : SparseMatrix
+        An existing sparse matrix with nnz nonzero values
+    val : tensor
+        The new nonzero values, a tensor of shape (nnz) or (nnz, D)
+
+    Returns
+    -------
+    SparseMatrix
+        New sparse matrix
+
+    Examples
+    --------
+
+    >>> row = torch.tensor([1, 1, 2])
+    >>> col = torch.tensor([2, 4, 3])
+    >>> val = torch.ones(3)
+    >>> A = create_from_coo(row, col, val)
+    >>> B = val_like(A, torch.tensor([2, 2, 2]))
+    >>> print(B)
+    SparseMatrix(indices=tensor([[1, 1, 2],
+            [2, 4, 3]]),
+    values=tensor([2, 2, 2]),
+    shape=(3, 5), nnz=3)
+    """
+    return SparseMatrix(torch.ops.dgl_sparse.val_like(mat.c_sparse_matrix, val))

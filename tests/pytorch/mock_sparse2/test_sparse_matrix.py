@@ -4,9 +4,9 @@ import sys
 
 import backend as F
 
-from dgl.mock_sparse2 import create_from_coo, create_from_csr, create_from_csc
+from dgl.mock_sparse2 import create_from_coo, create_from_csr, create_from_csc, val_like
 
-# FIXME: Skipping tests on win.
+# FIXME(issue #4818): Skipping tests on win.
 if not sys.platform.startswith("linux"):
     pytest.skip("skipping tests on win", allow_module_level=True)
 
@@ -109,20 +109,6 @@ def test_dense(val_shape):
     mat = torch.zeros(shape, device=ctx)
     mat[row, col] = val
     assert torch.allclose(A_dense, mat)
-
-
-def test_set_val():
-    ctx = F.ctx()
-
-    row = torch.tensor([1, 1, 2]).to(ctx)
-    col = torch.tensor([2, 4, 3]).to(ctx)
-    nnz = len(row)
-    old_val = torch.ones(nnz).to(ctx)
-    A = create_from_coo(row, col, old_val)
-
-    new_val = torch.zeros(nnz).to(ctx)
-    A.val = new_val
-    assert torch.allclose(new_val, A.val)
 
 
 @pytest.mark.parametrize("dense_dim", [None, 4])
@@ -350,3 +336,35 @@ def test_csr_to_csc(dense_dim, indptr, indices, shape):
     assert torch.allclose(mat_val, val)
     assert torch.allclose(mat_indptr, indptr)
     assert torch.allclose(mat_indices, indices)
+
+@pytest.mark.parametrize("val_shape", [(3), (3, 2)])
+@pytest.mark.parametrize("shape", [(3, 5), (5, 5)])
+def test_val_like(val_shape, shape):
+    def check_val_like(A, B):
+        assert A.shape == B.shape
+        assert A.nnz == B.nnz
+        assert torch.allclose(torch.stack(A.coo()), torch.stack(B.coo()))
+        assert A.val.device == B.val.device
+
+    ctx = F.ctx()
+
+    # COO
+    row = torch.tensor([1, 1, 2]).to(ctx)
+    col = torch.tensor([2, 4, 3]).to(ctx)
+    val = torch.randn(3).to(ctx)
+    coo_A = create_from_coo(row, col, val, shape)
+    new_val = torch.randn(val_shape).to(ctx)
+    coo_B = val_like(coo_A, new_val)
+    check_val_like(coo_A, coo_B)
+
+    # CSR
+    indptr, indices, _ = coo_A.csr()
+    csr_A = create_from_csr(indptr, indices, val, shape)
+    csr_B = val_like(csr_A, new_val)
+    check_val_like(csr_A, csr_B)
+
+    # CSC
+    indptr, indices, _ = coo_A.csc()
+    csc_A = create_from_csc(indptr, indices, val, shape)
+    csc_B = val_like(csc_A, new_val)
+    check_val_like(csc_A, csc_B)
