@@ -1399,9 +1399,9 @@ def test_heterognnexplainer(g, idtype, input_dim, output_dim):
 @pytest.mark.parametrize('out_dim', [2])
 @pytest.mark.parametrize('max_iter', [40])
 @pytest.mark.parametrize('node_min', [20])
-@pytest.mark.parametrize('hyperparameter', [6])
+@pytest.mark.parametrize('coef', [6])
 @pytest.mark.parametrize('pruning_action', ['High2low'])
-def test_subgraphxexplainer(g, idtype, out_dim, max_iter, node_min, hyperparameter, pruning_action):
+def test_subgraphxexplainer(g, idtype, out_dim, max_iter, node_min, coef, pruning_action):
     g = g.astype(idtype).to(F.ctx())
     feat = F.randn((g.num_nodes(), 5))
 
@@ -1433,7 +1433,7 @@ def test_subgraphxexplainer(g, idtype, out_dim, max_iter, node_min, hyperparamet
     model = Model(5, out_dim, graph=True)
     model = model.to(F.ctx())
     explainer = nn.explain.SubgraphXExplainer(model,
-                                              hyperparam=hyperparameter,
+                                              coef=coef,
                                               pruning_action=pruning_action,
                                               max_iter=max_iter,
                                               node_min=node_min)

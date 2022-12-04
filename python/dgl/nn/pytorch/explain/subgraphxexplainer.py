@@ -156,8 +156,9 @@ class MCTSNode:
         The node ids of the graph that are associated with this tree node.
     pruning_action: str
         A representation of the pruning action used to get to this node.
-    c_puct: flaot
-        The hyper-parameter to encourage exploration while searching.
+    coef: float
+        The hyperparameter that encourages exploration, so high number encourages
+        exploration. It is high for moves with few simulations.
     num_visit: int
         Number times this node has been visited.
     total_reward: float
@@ -170,14 +171,14 @@ class MCTSNode:
         self,
         nodes,
         pruning_action,
-        c_puct=10.0,
+        coef=10.0,
         num_visit=0,
         total_reward=0.0,
         immediate_reward=0.0,
     ):
         self.nodes = nodes
         self.a = pruning_action
-        self.c_puct = c_puct
+        self.coef = coef
         self.num_visit = num_visit
         self.total_reward = total_reward
         self.immediate_reward = immediate_reward
@@ -207,7 +208,7 @@ class MCTSNode:
             Returns the action selection criteria of node.
         """
         return (
-            self.c_puct
+            self.coef
             * self.immediate_reward
             * math.sqrt(total_visit_count)
             / (1 + self.num_visit)
@@ -228,7 +229,7 @@ class SubgraphXExplainer(nn.Module):
     ----------
     model: nn.Module
         The GNN model to explain.
-    hyperparam: float
+    coef: float
         The hyperparameter that encourages exploration, so high number encourages
         exploration. It is high for moves with few simulations.
     pruning_action: str
@@ -246,7 +247,7 @@ class SubgraphXExplainer(nn.Module):
     def __init__(
         self,
         model,
-        hyperparam=10.0,
+        coef=10.0,
         pruning_action='High2low',
         num_child_expand=2,
         max_iter=20,
@@ -254,7 +255,7 @@ class SubgraphXExplainer(nn.Module):
     ):
         super(SubgraphXExplainer, self).__init__()
 
-        self.hyperparam = hyperparam
+        self.coef = coef
         self.pruning_action = pruning_action
         self.num_child_expand = num_child_expand
         self.max_iter = max_iter
@@ -461,7 +462,7 @@ class SubgraphXExplainer(nn.Module):
         ...     optimizer.step()
 
         >>> # Initialize the explainer
-        >>> explainer = SubgraphXExplainer(model, hyperparam=6, pruning_action="High2low",
+        >>> explainer = SubgraphXExplainer(model, coef=6, pruning_action="High2low",
         ...     max_iter=50, node_min=6)
 
         >>> # Explain the prediction for graph 0
@@ -475,7 +476,7 @@ class SubgraphXExplainer(nn.Module):
 
         # MCTS initialization
         self.tree_root = MCTSNode(
-            nodes=graph.nodes(), pruning_action="-1", c_puct=self.hyperparam
+            nodes=graph.nodes(), pruning_action="-1", coef=self.coef
         )
 
         leaf_set = set()
