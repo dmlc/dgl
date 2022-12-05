@@ -18,7 +18,7 @@ using namespace dgl::runtime;
 namespace aten {
 namespace cusparse {
 
-#if __CUDACC_VER_MAJOR__ == 12
+#if CUDART_VERSION >= 12000
 
 /** @brief Cusparse implementation of SpGEMM on Csr format for CUDA 12.0+ */
 template <typename DType, typename IdType>
@@ -121,10 +121,9 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
   // switch to ALG2/ALG3 for medium & large problem size
   if (alg == CUSPARSE_SPGEMM_DEFAULT && num_prods > MEDIUM_NUM_PRODUCTS) {
     // use ALG3 for very large problem
-    if (num_prods <= LARGE_NUM_PRODUCTS)
-      alg = CUSPARSE_SPGEMM_ALG2;
-    else
-      alg = CUSPARSE_SPGEMM_ALG3;
+    alg = num_prods > LARGE_NUM_PRODUCTS ? CUSPARSE_SPGEMM_ALG3 :
+      CUSPARSE_SPGEMM_ALG2;
+
     device->FreeWorkspace(ctx, workspace1);
     // rerun cusparseSpGEMM_workEstimation
     CUSPARSE_CALL(cusparseSpGEMM_workEstimation(thr_entry->cusparse_handle,
@@ -206,7 +205,7 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
       dC_weights};
 }
 
-#else  // __CUDACC_VER_MAJOR__ != 12
+#else  // CUDART_VERSION < 12000
 
 /** @brief Cusparse implementation of SpGEMM on Csr format for older CUDA
  * versions */
@@ -282,7 +281,7 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
       C_weights};
 }
 
-#endif  // __CUDACC_VER_MAJOR__ == 12
+#endif  // CUDART_VERSION >= 12000
 }  // namespace cusparse
 
 template <int XPU, typename IdType, typename DType>
