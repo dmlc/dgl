@@ -73,7 +73,9 @@ def __alltoall_cpu(rank, world_size, output_tensor_list, input_tensor_list):
         The tensors to exchange
     """
     input_tensor_list = [tensor.to(torch.device('cpu')) for tensor in input_tensor_list]
-    # [TODO][Rui] Boolean is not supported as dist.scatter fails.
+    # [TODO][Rui] Boolean is not supported in ``torch.distributed.scatter``.
+    # See more details in `Issue <https://discuss.pytorch.org/t/invalid-scalar-type-
+    # when-dist-scatter-boolean-tensor/167335>`_.
     dtypes = [ t.dtype for t in input_tensor_list]
     for i, dtype in enumerate(dtypes):
         if dtype == torch.bool:

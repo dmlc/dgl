@@ -23,7 +23,7 @@ not yet configured in the CI framework.
 def test_parmetis_preprocessing():
     with tempfile.TemporaryDirectory() as root_dir:
         num_chunks = 2
-        g = create_chunked_dataset(root_dir, num_chunks, include_masks=True)
+        g = create_chunked_dataset(root_dir, num_chunks)
 
         # Trigger ParMETIS pre-processing here.
         schema_path = os.path.join(root_dir, 'chunked-data/metadata.json')
@@ -114,7 +114,7 @@ def test_parmetis_preprocessing():
 def test_parmetis_postprocessing():
     with tempfile.TemporaryDirectory() as root_dir:
         num_chunks = 2
-        g = create_chunked_dataset(root_dir, num_chunks, include_masks=True)
+        g = create_chunked_dataset(root_dir, num_chunks)
 
         num_nodes = g.number_of_nodes()
         num_institutions = g.number_of_nodes('institution')
@@ -174,7 +174,7 @@ def test_parmetis_wrapper():
     with tempfile.TemporaryDirectory() as root_dir:
         num_chunks = 2
         graph_name = "mag240m"
-        g = create_chunked_dataset(root_dir, num_chunks, include_masks=True)
+        g = create_chunked_dataset(root_dir, num_chunks)
         all_ntypes = g.ntypes
         all_etypes = g.etypes
         num_constraints = len(all_ntypes) + 3
