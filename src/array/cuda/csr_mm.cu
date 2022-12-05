@@ -114,9 +114,9 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
 
   // assume free GPU mem at least ~15G for below heuristics to work
   // user-defined medium problem size (below will use DEFAULT)
-  int64_t MEDIUM_NUM_PRODUCTS = 400*1000*1000;
+  int64_t MEDIUM_NUM_PRODUCTS = 400000000;  // 400*1000*1000;
   // user-defined large problem size (above will use ALG3)
-  int64_t LARGE_NUM_PRODUCTS  = 800*1000*1000;
+  int64_t LARGE_NUM_PRODUCTS  = 800000000;  // 800*1000*1000;
 
   // switch to ALG2/ALG3 for medium & large problem size
   if (alg == CUSPARSE_SPGEMM_DEFAULT && num_prods > MEDIUM_NUM_PRODUCTS) {
