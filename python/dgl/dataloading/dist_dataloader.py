@@ -10,11 +10,10 @@ from .. import utils
 from ..convert import heterograph
 from ..distributed import DistDataLoader
 
-'''
-[TODO][Rui] As implementation of ``dgl.distributed.DistDataLoader`` is
-independent of ``dgl.dataloading.DataLoader`` currently, dedicated collators
-are defined in here instead of using existing ``CollateWrapper``.
-'''
+# [TODO][Rui] As implementation of ``dgl.distributed.DistDataLoader`` is
+# independent of ``dgl.dataloading.DataLoader`` currently, dedicated collators
+# are defined in here instead of using existing ``CollateWrapper``.
+
 
 def _find_exclude_eids_with_reverse_id(g, eids, reverse_eid_map):
     if isinstance(eids, Mapping):
