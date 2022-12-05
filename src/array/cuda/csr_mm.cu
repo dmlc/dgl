@@ -98,17 +98,18 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
                                                 matB, &beta, matC, dtype, alg,
                                                 spgemmDesc, &workspace_size1,
                                                 NULL));
-    void* workspace1 = (device->AllocWorkspace(ctx, workspace_size1));
+    workspace1 = (device->AllocWorkspace(ctx, workspace_size1));
     CUSPARSE_CALL(cusparseSpGEMM_workEstimation(thr_entry->cusparse_handle,
                                                 transA, transB, &alpha, matA,
                                                 matB, &beta, matC, dtype, alg,
                                                 spgemmDesc, &workspace_size1,
                                                 workspace1));
   } else {
-    CHECK(e == CUSPARSE_STATUS_SUCCESS) << "CUSPARSE ERROR: " << e;
+    CHECK(e == CUSPARSE_STATUS_SUCCESS) << "CUSPARSE ERROR in SpGEMM: " << e;
   }
 
-  // you can print num_prods, for better memory estimation
+  // get the number of intermediate products required for SpGEMM compute
+  // num_prods indicates device memory consumption for SpGEMM if using ALG2/3
   int64_t num_prods;
   CUSPARSE_CALL(cusparseSpGEMM_getNumProducts(spgemmDesc, &num_prods));
 
@@ -131,7 +132,7 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
                                                 matB, &beta, matC, dtype, alg,
                                                 spgemmDesc, &workspace_size1,
                                                 NULL));
-    void* workspace1 = (device->AllocWorkspace(ctx, workspace_size1));
+    workspace1 = (device->AllocWorkspace(ctx, workspace_size1));
     CUSPARSE_CALL(cusparseSpGEMM_workEstimation(thr_entry->cusparse_handle,
                                                 transA, transB, &alpha, matA,
                                                 matB, &beta, matC, dtype, alg,
