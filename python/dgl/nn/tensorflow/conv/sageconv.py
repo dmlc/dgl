@@ -166,24 +166,24 @@ class SAGEConv(layers.Layer):
 
             if self._aggre_type == 'mean':
                 graph.srcdata['h'] = feat_src
-                graph.update_all(fn.copy_src('h', 'm'), fn.mean('m', 'neigh'))
+                graph.update_all(fn.copy_u('h', 'm'), fn.mean('m', 'neigh'))
                 h_neigh = graph.dstdata['neigh']
             elif self._aggre_type == 'gcn':
                 check_eq_shape(feat)
                 graph.srcdata['h'] = feat_src
                 graph.dstdata['h'] = feat_dst       # same as above if homogeneous
-                graph.update_all(fn.copy_src('h', 'm'), fn.sum('m', 'neigh'))
+                graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'neigh'))
                 # divide in_degrees
                 degs = tf.cast(graph.in_degrees(), tf.float32)
                 h_neigh = (graph.dstdata['neigh'] + graph.dstdata['h']
                            ) / (tf.expand_dims(degs, -1) + 1)
             elif self._aggre_type == 'pool':
                 graph.srcdata['h'] = tf.nn.relu(self.fc_pool(feat_src))
-                graph.update_all(fn.copy_src('h', 'm'), fn.max('m', 'neigh'))
+                graph.update_all(fn.copy_u('h', 'm'), fn.max('m', 'neigh'))
                 h_neigh = graph.dstdata['neigh']
             elif self._aggre_type == 'lstm':
                 graph.srcdata['h'] = feat_src
-                graph.update_all(fn.copy_src('h', 'm'), self._lstm_reducer)
+                graph.update_all(fn.copy_u('h', 'm'), self._lstm_reducer)
                 h_neigh = graph.dstdata['neigh']
             else:
                 raise KeyError(

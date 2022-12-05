@@ -32,10 +32,10 @@ def generate_graph_old(grad=False):
     # create a graph where 0 is the source and 9 is the sink
     # 17 edges
     for i in range(1, 9):
-        g.add_edge(0, i)
-        g.add_edge(i, 9)
+        g.add_edges(0, i)
+        g.add_edges(i, 9)
     # add a back flow from 9 to 0
-    g.add_edge(9, 0)
+    g.add_edges(9, 0)
     g = g.to(F.ctx())
     ncol = F.randn((10, D))
     ecol = F.randn((17, D))
@@ -431,8 +431,8 @@ def test_dynamic_addition():
     assert g.ndata['h1'].shape[0] == g.ndata['h2'].shape[0] == N + 3
 
     # Test edge addition
-    g.add_edge(0, 1)
-    g.add_edge(1, 0)
+    g.add_edges(0, 1)
+    g.add_edges(1, 0)
     g.edata.update({'h1': F.randn((2, D)),
                     'h2': F.randn((2, D))})
     assert g.edata['h1'].shape[0] == g.edata['h2'].shape[0] == 2
@@ -441,12 +441,12 @@ def test_dynamic_addition():
     g.edata['h1'] = F.randn((4, D))
     assert g.edata['h1'].shape[0] == g.edata['h2'].shape[0] == 4
 
-    g.add_edge(1, 2)
+    g.add_edges(1, 2)
     g.edges[4].data['h1'] = F.randn((1, D))
     assert g.edata['h1'].shape[0] == g.edata['h2'].shape[0] == 5
 
     # test add edge with part of the features
-    g.add_edge(2, 1, {'h1': F.randn((1, D))})
+    g.add_edges(2, 1, {'h1': F.randn((1, D))})
     assert len(g.edata['h1']) == len(g.edata['h2'])
 
 

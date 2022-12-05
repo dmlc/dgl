@@ -270,8 +270,8 @@ if __name__ == "__main__":
     mask[test_idx] = True
     graph.ndata["test_mask"] = mask
 
-    graph.in_degree(0)
-    graph.out_degree(0)
+    graph.in_degrees(0)
+    graph.out_degrees(0)
     graph.find_edges(0)
 
     cluster_iter_data = ClusterIter(

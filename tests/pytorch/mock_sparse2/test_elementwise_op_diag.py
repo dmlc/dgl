@@ -4,9 +4,9 @@ import numpy as np
 import pytest
 import torch
 import sys
-from dgl.mock_sparse import diag
+from dgl.mock_sparse2 import diag
 
-# FIXME: Skipping tests on win.
+# FIXME(issue #4818): Skipping tests on win.
 if not sys.platform.startswith("linux"):
     pytest.skip("skipping tests on win", allow_module_level=True)
 
