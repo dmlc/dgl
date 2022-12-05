@@ -21,6 +21,8 @@ class DegreeEncoder(nn.Module):
     <https://arxiv.org/abs/2106.05234>`__
     This module is a learnable degree embedding module.
 
+
+
     Parameters
     ----------
     max_degree : int
@@ -123,11 +125,13 @@ class BiasedMHA(nn.Module):
         If True, it uses bias for linear projection. Default: True.
     attn_bias_type : str, optional
         The type of attention bias used for modifying attention. Selected from
-        'add' or 'mul'. Default: 'add'.
+        'add', 'mul', or None. Default: 'add'.
 
         * 'add' is for additive attention bias.
         * 'mul' is for multiplicative attention bias.
-    attn_drop : float, optional
+        * None is for no attention bias. :attr:`attn_bias` in forward
+        computation will be ignored.
+    dropout : float, optional
         Dropout probability on attention weights. Default: 0.1.
 
     Examples
@@ -145,7 +149,7 @@ class BiasedMHA(nn.Module):
 
     def __init__(
         self, feat_size, num_heads, bias=True, attn_bias_type="add",
-        attn_drop=0.1
+        dropout=0.1
     ):
         super().__init__()
         self.feat_size = feat_size
@@ -162,7 +166,7 @@ class BiasedMHA(nn.Module):
         self.v_proj = nn.Linear(feat_size, feat_size, bias=bias)
         self.out_proj = nn.Linear(feat_size, feat_size, bias=bias)
 
-        self.dropout = nn.Dropout(p=attn_drop)
+        self.dropout = nn.Dropout(p=dropout)
 
         self.reset_parameters()
 
@@ -189,11 +193,11 @@ class BiasedMHA(nn.Module):
             N is the maximum number of nodes.
         attn_bias : torch.Tensor, optional
             The attention bias used for attention modification. Shape:
-            (batch_size, N, N, :attr:`num_heads`).
+            (batch_size, N, N, :attr:`num_heads`). Default: None
         attn_mask : torch.Tensor, optional
             The attention mask used for avoiding computation on invalid
             positions, where invalid positions are indicated by non-zero values.
-            Shape: (batch_size, N, N).
+            Shape: (batch_size, N, N). Default: None.
 
         Returns
         -------
@@ -221,11 +225,10 @@ class BiasedMHA(nn.Module):
             .transpose(0, 2)
         )
 
-        if attn_bias is not None:
-            if self.attn_bias_type == "add":
-                attn_weights += attn_bias
-            else:
-                attn_weights *= attn_bias
+        if self.attn_bias_type == "add":
+            attn_weights += attn_bias
+        elif self.attn_bias_type == 'mul':
+            attn_weights *= attn_bias
 
         if attn_mask is not None:
             attn_weights[attn_mask.to(th.bool)] = float("-inf")
@@ -273,14 +276,16 @@ class SparseBiasedMHA(nn.Module):
     num_heads : int
         Number of attention heads, by which :attr:`feat_size` is divisible.
     bias : bool, optional
-        If True, it uses bias for linear projection. Default: True.
+        If True, it uses bias for linear projection. Default: False.
     attn_bias_type : str, optional
         The type of attention bias used for modifying attention. Selected from
-        'add' or 'mul'. Default: 'add'.
+        'add', 'mul', or None. Default: None.
 
         * 'add' is for additive attention bias.
         * 'mul' is for multiplicative attention bias.
-    attn_drop : float, optional
+        * None is for no attention bias. :attr:`attn_bias` in forward
+        computation will be ignored.
+    dropout : float, optional
         Dropout probability on attention weights. Default: 0.
 
     Examples
@@ -304,8 +309,8 @@ class SparseBiasedMHA(nn.Module):
     """
 
     def __init__(
-        self, feat_size, num_heads, bias=True, attn_bias_type='add',
-        attn_drop=0.
+        self, feat_size, num_heads, bias=False, attn_bias_type=None,
+        dropout=0.
     ):
         super().__init__()
         self.feat_size = feat_size
@@ -322,7 +327,7 @@ class SparseBiasedMHA(nn.Module):
         self.v_proj = nn.Linear(feat_size, feat_size, bias=bias)
         self.out_proj = nn.Linear(feat_size, feat_size, bias=bias)
 
-        self.dropout = nn.Dropout(p=attn_drop)
+        self.dropout = nn.Dropout(p=dropout)
 
         self.reset_parameters()
 
@@ -347,10 +352,10 @@ class SparseBiasedMHA(nn.Module):
         g : DGLGraph
             The input graph of N nodes and E edges.
         nfeat : torch.Tensor
-            A 2D input tensor of node features. Shape: (N, :attr:`feat_size`)
+            A 2D input tensor of node features. Shape: (N, :attr:`feat_size`).
         attn_bias : torch.Tensor, optional
             The attention bias used for attention modification.
-            Shape: (E, :attr:`num_heads`)
+            Shape: (E, :attr:`num_heads`). Default: None.
 
         Returns
         -------
@@ -372,11 +377,10 @@ class SparseBiasedMHA(nn.Module):
 
             # compute attention weights
             g.apply_edges(fn.u_dot_v('k_h', 'q_h', 'attn'))
-            if attn_bias is not None:
-                if self.attn_bias_type == 'add':
-                    g.edata['attn'] += attn_bias.unsqueeze(-1)
-                else:
-                    g.edata['attn'] *= attn_bias.unsqueeze(-1)
+            if self.attn_bias_type == 'add':
+                g.edata['attn'] += attn_bias.unsqueeze(-1)
+            elif self.attn_bias_type == 'mul':
+                g.edata['attn'] *= attn_bias.unsqueeze(-1)
             g.edata['attn'] = self.dropout(
                 edge_softmax(g, g.edata['attn'], norm_by="dst")
             )
