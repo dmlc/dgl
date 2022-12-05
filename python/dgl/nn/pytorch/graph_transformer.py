@@ -343,6 +343,9 @@ class SparseBiasedMHA(nn.Module):
         nn.init.xavier_uniform_(self.out_proj.weight)
         if self.out_proj.bias is not None:
             nn.init.constant_(self.out_proj.bias, 0.0)
+            nn.init.constant_(self.q_proj.bias, 0.0)
+            nn.init.constant_(self.k_proj.bias, 0.0)
+            nn.init.constant_(self.v_proj.bias, 0.0)
 
     def forward(self, g, nfeat, attn_bias=None):
         """Forward computation.
