@@ -8,10 +8,9 @@ import unittest
 import dgl
 import numpy as np
 import torch
-from chunk_graph import chunk_graph
 from dgl.data.utils import load_graphs, load_tensors
 
-from create_chunked_dataset import create_chunked_dataset
+from utils import create_chunked_dataset
 
 """
 TODO: skipping this test case since the dependency, mpirun, is

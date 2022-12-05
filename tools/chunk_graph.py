@@ -25,58 +25,8 @@ def chunk_numpy_array(arr, fmt_meta, chunk_sizes, path_fmt):
 
     return paths
 
-def _initialize_num_chunks(g, num_chunks, kwargs=None):
-    '''Initialize num_chunks for each node/edge.
 
-    Parameters
-    ----------
-    g: DGLGraph
-        Graph to be chunked.
-    num_chunks: int
-        Default number of chunks to be applied onto node/edge data.
-    kwargs: dict
-        Key word arguments to specify details for each node/edge data.
-
-    Returns
-    -------
-    num_chunks_data: dict
-        Detailed number of chunks for each node/edge.
-    '''
-    def _init(g, num_chunks, key, kwargs=None):
-        chunks_data = kwargs.get(key, None)
-        is_node = '_node' in key
-        data_types = g.ntypes if is_node else g.canonical_etypes
-        if isinstance(chunks_data, int):
-            chunks_data = {
-                data_type: chunks_data for data_type in data_types
-            }
-        elif isinstance(chunks_data, dict):
-            for data_type in data_types:
-                if data_type not in chunks_data:
-                    chunks_data[data_type] = num_chunks
-        else:
-            chunks_data = {
-                data_type: num_chunks for data_type in data_types
-            }
-        for _, data in chunks_data.items():
-            if isinstance(data, dict):
-                n_chunks = list(data.values())
-            else:
-                n_chunks = [data]
-            assert all(isinstance(v, int) for v in n_chunks), (
-                    "num_chunks for each data type should be int."
-                )
-        return chunks_data
-    num_chunks_data = {}
-    for key in [
-        'num_chunks_nodes', 'num_chunks_edges', 'num_chunks_node_data',
-        'num_chunks_edge_data'
-    ]:
-        num_chunks_data[key] = _init(g, num_chunks, key, kwargs=kwargs)
-    return num_chunks_data
-
-def _chunk_graph(g, name, ndata_paths, edata_paths, num_chunks,
-        data_fmt, **kwargs):
+def _chunk_graph(g, name, ndata_paths, edata_paths, num_chunks, output_path, data_fmt):
     # First deal with ndata and edata that are homogeneous (i.e. not a dict-of-dict)
     if len(g.ntypes) == 1 and not isinstance(
         next(iter(ndata_paths.values())), dict
@@ -97,32 +47,28 @@ def _chunk_graph(g, name, ndata_paths, edata_paths, num_chunks,
     metadata["graph_name"] = name
     metadata["node_type"] = g.ntypes
 
-    # Initialize num_chunks for each node/edge.
-    num_chunks_details = _initialize_num_chunks(g, num_chunks, kwargs=kwargs)
-
     # Compute the number of nodes per chunk per node type
     metadata["num_nodes_per_chunk"] = num_nodes_per_chunk = []
-    num_chunks_nodes = num_chunks_details['num_chunks_nodes']
     for ntype in g.ntypes:
         num_nodes = g.num_nodes(ntype)
         num_nodes_list = []
-        n_chunks = num_chunks_nodes[ntype]
-        for i in range(n_chunks):
-            n = num_nodes // n_chunks + (i < num_nodes % n_chunks)
+        for i in range(num_chunks):
+            n = num_nodes // num_chunks + (i < num_nodes % num_chunks)
             num_nodes_list.append(n)
         num_nodes_per_chunk.append(num_nodes_list)
+    num_nodes_per_chunk_dict = {
+        k: v for k, v in zip(g.ntypes, num_nodes_per_chunk)
+    }
 
     metadata["edge_type"] = [etypestrs[etype] for etype in g.canonical_etypes]
 
     # Compute the number of edges per chunk per edge type
     metadata["num_edges_per_chunk"] = num_edges_per_chunk = []
-    num_chunks_edges = num_chunks_details['num_chunks_edges']
     for etype in g.canonical_etypes:
         num_edges = g.num_edges(etype)
         num_edges_list = []
-        n_chunks = num_chunks_edges[etype]
-        for i in range(n_chunks):
-            n = num_edges // n_chunks + (i < num_edges % n_chunks)
+        for i in range(num_chunks):
+            n = num_edges // num_chunks + (i < num_edges % num_chunks)
             num_edges_list.append(n)
         num_edges_per_chunk.append(num_edges_list)
     num_edges_per_chunk_dict = {
@@ -152,7 +98,6 @@ def _chunk_graph(g, name, ndata_paths, edata_paths, num_chunks,
     reader_fmt_meta, writer_fmt_meta = {"name": "numpy"}, {"name": data_fmt}
     file_suffix = 'npy' if data_fmt == 'numpy' else 'parquet'
     metadata["node_data"] = {}
-    num_chunks_node_data = num_chunks_details['num_chunks_node_data']
     with setdir("node_data"):
         for ntype, ndata_per_type in ndata_paths.items():
             ndata_meta = {}
@@ -161,18 +106,6 @@ def _chunk_graph(g, name, ndata_paths, edata_paths, num_chunks,
                     logging.info(
                         "Chunking node data for type %s key %s" % (ntype, key)
                     )
-                    chunk_sizes = []
-                    num_nodes = g.num_nodes(ntype)
-                    n_chunks = num_chunks_node_data[ntype]
-                    if isinstance(n_chunks, dict):
-                        n_chunks = n_chunks.get(key, num_chunks)
-                    assert isinstance(n_chunks, int), (
-                        f"num_chunks for {ntype}/{key} should be int while "
-                        f"{type(n_chunks)} is got."
-                    )
-                    for i in range(n_chunks):
-                        n = num_nodes // n_chunks + (i < num_nodes % n_chunks)
-                        chunk_sizes.append(n)
                     ndata_key_meta = {}
                     arr = array_readwriter.get_array_parser(
                         **reader_fmt_meta
@@ -181,8 +114,8 @@ def _chunk_graph(g, name, ndata_paths, edata_paths, num_chunks,
                     ndata_key_meta["data"] = chunk_numpy_array(
                         arr,
                         writer_fmt_meta,
-                        chunk_sizes,
-                        key + "-%d." + file_suffix
+                        num_nodes_per_chunk_dict[ntype],
+                        key + "-%d." + file_suffix,
                     )
                     ndata_meta[key] = ndata_key_meta
 
@@ -190,39 +123,26 @@ def _chunk_graph(g, name, ndata_paths, edata_paths, num_chunks,
 
     # Chunk edge data
     metadata["edge_data"] = {}
-    num_chunks_edge_data = num_chunks_details['num_chunks_edge_data']
     with setdir("edge_data"):
         for etypestr, edata_per_type in edata_paths.items():
             edata_meta = {}
-            etype = tuple(etypestr.split(":"))
             with setdir(etypestr):
                 for key, path in edata_per_type.items():
                     logging.info(
                         "Chunking edge data for type %s key %s"
                         % (etypestr, key)
                     )
-                    chunk_sizes = []
-                    num_edges = g.num_edges(etype)
-                    n_chunks = num_chunks_edge_data[etype]
-                    if isinstance(n_chunks, dict):
-                        n_chunks = n_chunks.get(key, num_chunks)
-                    assert isinstance(n_chunks, int), (
-                        f"num_chunks for {etype}/{key} should be int while "
-                        f"{type(n_chunks)} is got."
-                    )
-                    for i in range(n_chunks):
-                        n = num_edges // n_chunks + (i < num_edges % n_chunks)
-                        chunk_sizes.append(n)
                     edata_key_meta = {}
                     arr = array_readwriter.get_array_parser(
                         **reader_fmt_meta
                     ).read(path)
                     edata_key_meta["format"] = writer_fmt_meta
+                    etype = tuple(etypestr.split(":"))
                     edata_key_meta["data"] = chunk_numpy_array(
                         arr,
                         writer_fmt_meta,
-                        chunk_sizes,
-                        key + "-%d." + file_suffix
+                        num_edges_per_chunk_dict[etype],
+                        key + "-%d." + file_suffix,
                     )
                     edata_meta[key] = edata_key_meta
 
@@ -234,8 +154,7 @@ def _chunk_graph(g, name, ndata_paths, edata_paths, num_chunks,
     logging.info("Saved metadata in %s" % os.path.abspath(metadata_path))
 
 
-def chunk_graph(g, name, ndata_paths, edata_paths, num_chunks, output_path,
-        data_fmt='numpy', **kwargs):
+def chunk_graph(g, name, ndata_paths, edata_paths, num_chunks, output_path, data_fmt='numpy'):
     """
     Split the graph into multiple chunks.
 
@@ -258,10 +177,6 @@ def chunk_graph(g, name, ndata_paths, edata_paths, num_chunks, output_path,
         The number of chunks
     output_path : pathlike
         The output directory saving the chunked graph.
-    data_fmt : str
-        Format of node/edge data: 'numpy' or 'parquet'.
-    kwargs : dict
-        Key word arguments to control chunk details.
     """
     for ntype, ndata in ndata_paths.items():
         for key in ndata.keys():
@@ -270,8 +185,7 @@ def chunk_graph(g, name, ndata_paths, edata_paths, num_chunks, output_path,
         for key in edata.keys():
             edata[key] = os.path.abspath(edata[key])
     with setdir(output_path):
-        _chunk_graph(g, name, ndata_paths, edata_paths, num_chunks,
-            data_fmt, **kwargs)
+        _chunk_graph(g, name, ndata_paths, edata_paths, num_chunks, output_path, data_fmt)
 
 
 if __name__ == "__main__":

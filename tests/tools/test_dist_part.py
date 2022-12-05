@@ -5,8 +5,7 @@ import tempfile
 import numpy as np
 import pytest
 import torch
-from chunk_graph import chunk_graph
-from create_chunked_dataset import create_chunked_dataset
+from utils import create_chunked_dataset
 from distpartitioning import array_readwriter
 
 import dgl
