@@ -1,4 +1,5 @@
 """DGL unary operators for diagonal matrix module."""
+# pylint: disable= invalid-name
 from .diag_matrix import DiagMatrix, diag
 
 
@@ -27,8 +28,7 @@ def neg(D: DiagMatrix) -> DiagMatrix:
 def inv(D: DiagMatrix) -> DiagMatrix:
     """Return the inverse of the diagonal matrix.
 
-    This function only supports square matrices with nonzero values of shape
-    (nnz).
+    This function only supports square matrices with scalar nonzero values.
 
     Returns
     -------
