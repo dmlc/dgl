@@ -94,12 +94,6 @@ if __name__ == "__main__":
     labels = g.ndata["label"]
     masks = g.ndata["train_mask"], g.ndata["val_mask"], g.ndata["test_mask"]
 
-    # normalization
-    degs = g.in_degrees().float()
-    norm = torch.pow(degs, -0.5).to(device)
-    norm[torch.isinf(norm)] = 0
-    g.ndata["norm"] = norm.unsqueeze(1)
-
     # create GCN model
     in_size = features.shape[1]
     out_size = data.num_classes

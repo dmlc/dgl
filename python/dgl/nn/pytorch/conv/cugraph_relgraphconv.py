@@ -7,20 +7,26 @@ import torch as th
 from torch import nn
 
 try:
-    from pylibcugraphops.legacy.aggregators.node_level import (
-        agg_hg_basis_post_bwd_int32,
-        agg_hg_basis_post_bwd_int64,
-        agg_hg_basis_post_fwd_int32,
-        agg_hg_basis_post_fwd_int64,
+    from pylibcugraphops import make_mfg_csr_hg
+    from pylibcugraphops.operators import (
+        agg_hg_basis_mfg_n2n_post_bwd as agg_bwd,
     )
-    from pylibcugraphops.legacy.structure.graph_types import (
-        message_flow_graph_hg_csr_int32,
-        message_flow_graph_hg_csr_int64,
+    from pylibcugraphops.operators import (
+        agg_hg_basis_mfg_n2n_post_fwd as agg_fwd,
     )
-except ModuleNotFoundError:
-    raise ModuleNotFoundError(
-        "dgl.nn.CuGraphRelGraphConv requires pylibcugraphops to be installed."
-    )
+except ImportError:
+    has_pylibcugraphops = False
+
+    def make_mfg_csr_hg(*args):
+        r"""A dummy function to help raise error in RelGraphConvAgg when
+        pylibcugraphops is not found."""
+
+        raise NotImplementedError(
+            "RelGraphConvAgg requires pylibcugraphops to be installed."
+        )
+
+else:
+    has_pylibcugraphops = True
 
 
 class RelGraphConvAgg(th.autograd.Function):
@@ -57,46 +63,31 @@ class RelGraphConvAgg(th.autograd.Function):
             num_rels * in_feat) when ``coeff=None``; Shape: (num_dst_nodes,
             num_bases * in_feat) otherwise.
         """
-        if g.idtype == th.int32:
-            mfg_csr_func = message_flow_graph_hg_csr_int32
-            agg_fwd_func = agg_hg_basis_post_fwd_int32
-        elif g.idtype == th.int64:
-            mfg_csr_func = message_flow_graph_hg_csr_int64
-            agg_fwd_func = agg_hg_basis_post_fwd_int64
-        else:
-            raise TypeError(
-                f"Supported ID type: torch.int32 or torch.int64, but got "
-                f"{g.idtype}."
-            )
-        ctx.idtype = g.idtype
 
-        _in_feat = feat.shape[-1]
+        in_feat = feat.shape[-1]
         indptr, indices, edge_ids = g.adj_sparse("csc")
         # Edge_ids is in a mixed order, need to permutate incoming etypes.
-        ctx.edge_types_int32 = edge_types[edge_ids.long()].int()
-        # Node_types are not being used in agg_fwd_func.
-        _num_node_types = 0
-        _out_node_types = _in_node_types = None
+        ctx.edge_types_perm = edge_types[edge_ids.long()].int()
 
-        mfg = mfg_csr_func(
-            max_in_degree,
+        mfg = make_mfg_csr_hg(
             g.dstnodes(),
             g.srcnodes(),
             indptr,
             indices,
-            _num_node_types,
-            num_rels,
-            _out_node_types,
-            _in_node_types,
-            ctx.edge_types_int32,
+            max_in_degree,
+            n_node_types=0,
+            n_edge_types=num_rels,
+            out_node_types=None,
+            in_node_types=None,
+            edge_types=ctx.edge_types_perm,
         )
         ctx.mfg = mfg
 
         if coeff is None:
-            leading_dimension = num_rels * _in_feat
+            leading_dimension = num_rels * in_feat
         else:
-            _num_bases = coeff.shape[-1]
-            leading_dimension = _num_bases * _in_feat
+            num_bases = coeff.shape[-1]
+            leading_dimension = num_bases * in_feat
 
         agg_output = th.empty(
             g.num_dst_nodes(),
@@ -104,15 +95,11 @@ class RelGraphConvAgg(th.autograd.Function):
             dtype=th.float32,
             device=feat.device,
         )
+
         if coeff is None:
-            agg_fwd_func(agg_output, feat.detach(), mfg)
+            agg_fwd(agg_output, feat.detach(), None, mfg)
         else:
-            agg_fwd_func(
-                agg_output,
-                feat.detach(),
-                mfg,
-                weights_combination=coeff.detach()
-            )
+            agg_fwd(agg_output, feat.detach(), coeff.detach(), mfg)
 
         ctx.save_for_backward(feat, coeff)
         return agg_output
@@ -130,26 +117,19 @@ class RelGraphConvAgg(th.autograd.Function):
         """
         feat, coeff = ctx.saved_tensors
 
-        if ctx.idtype == th.int32:
-            agg_bwd_func = agg_hg_basis_post_bwd_int32
-        else:
-            agg_bwd_func = agg_hg_basis_post_bwd_int64
+        grad_feat = th.empty_like(feat)
+        grad_coeff = None if coeff is None else th.empty_like(coeff)
 
-        grad_feat = th.empty_like(feat, dtype=th.float32, device=feat.device)
         if coeff is None:
-            grad_coeff = None
-            agg_bwd_func(grad_feat, grad_output, feat.detach(), ctx.mfg)
+            agg_bwd(grad_feat, None, grad_output, feat.detach(), None, ctx.mfg)
         else:
-            grad_coeff = th.empty_like(
-                coeff, dtype=th.float32, device=coeff.device
-            )
-            agg_bwd_func(
+            agg_bwd(
                 grad_feat,
+                grad_coeff,
                 grad_output,
                 feat.detach(),
+                coeff.detach(),
                 ctx.mfg,
-                output_weight_gradient=grad_coeff,
-                weights_combination=coeff.detach()
             )
 
         return None, None, None, None, grad_feat, grad_coeff
@@ -225,6 +205,7 @@ class CuGraphRelGraphConv(nn.Module):
             [-1.4335, -2.3758],
             [-1.4331, -2.3295]], device='cuda:0', grad_fn=<AddBackward0>)
     """
+
     def __init__(
         self,
         in_feat,
@@ -237,8 +218,13 @@ class CuGraphRelGraphConv(nn.Module):
         self_loop=True,
         dropout=0.0,
         layer_norm=False,
-        max_in_degree=None
+        max_in_degree=None,
     ):
+        if has_pylibcugraphops is False:
+            raise ModuleNotFoundError(
+                "dgl.nn.CuGraphRelGraphConv requires pylibcugraphops "
+                "to be installed."
+            )
         super().__init__()
         self.in_feat = in_feat
         self.out_feat = out_feat
