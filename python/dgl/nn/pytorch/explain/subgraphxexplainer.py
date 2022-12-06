@@ -9,7 +9,7 @@ import dgl
 __all__ = ["SubgraphXExplainer"]
 
 
-def marginal_contribution(graph, exclude_masks, include_masks, model, features):
+def marginal_contribution(graph, exclude_masks, include_masks, model, feat):
     r"""Calculate the marginal value for the sample coalition nodes (identified by
     include_masks).
 
@@ -25,7 +25,7 @@ def marginal_contribution(graph, exclude_masks, include_masks, model, features):
         is the number of nodes in the graph.
     model: nn.Module
         The GNN model to explain.
-    features: Tensor
+    feat: Tensor
         The input feature of shape :math:`(N, D)`. :math:`N` is the
         number of nodes, and :math:`D` is the feature size.
 
@@ -52,14 +52,14 @@ def marginal_contribution(graph, exclude_masks, include_masks, model, features):
             i: include_nodes[i] for i in range(len(include_nodes))
         }
 
-        exclude_features = features[list(exclude_nodes_map.values())]
-        include_features = features[list(include_nodes_map.values())]
+        exclude_feat = feat[list(exclude_nodes_map.values())]
+        include_feat = feat[list(include_nodes_map.values())]
 
         exclude_subgraph = dgl.add_self_loop(exclude_subgraph)
         include_subgraph = dgl.add_self_loop(include_subgraph)
 
-        exclude_values = model(exclude_subgraph, exclude_features)
-        include_values = model(include_subgraph, include_features)
+        exclude_values = model(exclude_subgraph, exclude_feat)
+        include_values = model(include_subgraph, include_feat)
 
         margin_values = include_values - exclude_values
         marginal_contribution_list.append(margin_values)
@@ -69,7 +69,7 @@ def marginal_contribution(graph, exclude_masks, include_masks, model, features):
 
 
 def shapley(
-    model, graph, subgraph_nodes, num_gnn_layers, mc_sampling_steps, features
+    model, graph, subgraph_nodes, num_gnn_layers, mc_sampling_steps, feat
 ):
     r"""Monte carlo sampling approximation of the shapley value.
 
@@ -89,7 +89,7 @@ def shapley(
         The GNN model has l layers.
     mc_sampling_steps: int
         Monte carlo sampling steps.
-    features: Tensor
+    feat: Tensor
         The input feature of shape :math:`(N, D)`. :math:`N` is the
         number of nodes, and :math:`D` is the feature size.
 
@@ -140,7 +140,7 @@ def shapley(
     exclude_masks = np.stack(set_exclude_masks, axis=0)
     include_masks = np.stack(set_include_masks, axis=0)
     marginal_contributions = marginal_contribution(
-        graph, exclude_masks, include_masks, model, features
+        graph, exclude_masks, include_masks, model, feat
     )
 
     shapley_value = marginal_contributions.mean().item()
@@ -291,12 +291,12 @@ class SubgraphXExplainer(nn.Module):
         self.model = model
         self.model.eval()
 
-    def get_value_func(self, features, **kwargs):
+    def get_value_func(self, feat, **kwargs):
         r"""Get the value function.
 
         Parameters
         ----------
-        features: Tensor
+        feat: Tensor
             The input feature of shape :math:`(N, D)`. :math:`N` is the
             number of nodes, and :math:`D` is the feature size.
         kwargs: dict
@@ -324,7 +324,7 @@ class SubgraphXExplainer(nn.Module):
                 Returns a tensor of probabilities.
             """
             with torch.no_grad():
-                logits = self.model(graph, features, **kwargs)
+                logits = self.model(graph, feat, **kwargs)
                 probs = nn.functional.softmax(logits, dim=-1)
                 return probs
 
