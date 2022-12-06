@@ -157,8 +157,12 @@ class MCTSNode:
     high2low: bool
         A representation of whether the 'high2low' pruning action was used to get to this node
     coef: float
-        The hyperparameter that encourages exploration, so high number encourages
-        exploration. It is high for moves with few simulations.
+        The hyperparameter that controls the trade-off between exploration and exploitation.
+        A higher exploration rate encourages exploration of relatively unvisited nodes.
+        So, the more a node has been visited (and the more certain is its total reward value),
+        the less it will be visited. For example, if a node has been visited many times and
+        has a high total reward value, a high coef will cause the algorithm to explore other nodes
+        instead of continuing to visit that node.
     num_visit: int
         Number times this node has been visited.
     total_reward: float
@@ -234,7 +238,6 @@ class SubgraphXExplainer(nn.Module):
         node features.
         * The output of its forward function is the logits for the predicted
           graph classes.
-
     num_gnn_layers: int
         Number of layers of GNN model. Needed to calculate the l-hop neighbouring
         nodes of graph. Computing shapley values for big and complex graphs
