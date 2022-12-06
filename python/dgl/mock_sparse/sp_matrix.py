@@ -8,6 +8,7 @@ __all__ = [
     "create_from_coo",
     "create_from_csr",
     "create_from_csc",
+    "val_like",
 ]
 
 
@@ -500,3 +501,37 @@ def create_from_csc(
     col, row = adj_coo.indices()
 
     return SparseMatrix(row=row, col=col, val=val, shape=shape)
+
+def val_like(mat: SparseMatrix, val: torch.Tensor) -> SparseMatrix:
+    """Create a sparse matrix from an existing sparse matrix using new values.
+
+    The new sparse matrix will have the same nonzero indices as the given
+    sparse matrix and use the given values as the new nonzero values.
+
+    Parameters
+    ----------
+    mat : SparseMatrix
+        An existing sparse matrix with nnz nonzero values
+    val : tensor
+        The new nonzero values, a tensor of shape (nnz) or (nnz, D)
+
+    Returns
+    -------
+    SparseMatrix
+        New sparse matrix
+
+    Examples
+    --------
+
+    >>> row = torch.tensor([1, 1, 2])
+    >>> col = torch.tensor([2, 4, 3])
+    >>> val = torch.ones(3)
+    >>> A = create_from_coo(row, col, val)
+    >>> B = val_like(A, torch.tensor([2, 2, 2]))
+    >>> print(B)
+    SparseMatrix(indices=tensor([[1, 1, 2],
+            [2, 4, 3]]),
+    values=tensor([2, 2, 2]),
+    shape=(3, 5), nnz=3)
+    """
+    return SparseMatrix(row=mat.row, col=mat.col, val=val, shape=mat.shape)
