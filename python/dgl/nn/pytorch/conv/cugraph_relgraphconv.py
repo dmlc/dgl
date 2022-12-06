@@ -18,6 +18,9 @@ except ModuleNotFoundError:
     has_pylibcugraphops = False
 
     def make_mfg_csr_hg(*args):
+        r"""A dummy function to help raise error in RelGraphConvAgg when
+        pylibcugraphops is not found."""
+
         raise NotImplementedError(
             "RelGraphConvAgg requires pylibcugraphops to be installed."
         )
@@ -72,11 +75,11 @@ class RelGraphConvAgg(th.autograd.Function):
             indptr,
             indices,
             max_in_degree,
-            n_node_types = 0,
-            n_edge_types = num_rels,
-            out_node_types = None,
-            in_node_types = None,
-            edge_types = ctx.edge_types_perm,
+            n_node_types=0,
+            n_edge_types=num_rels,
+            out_node_types=None,
+            in_node_types=None,
+            edge_types=ctx.edge_types_perm,
         )
         ctx.mfg = mfg
 
