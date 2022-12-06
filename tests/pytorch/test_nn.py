@@ -1400,8 +1400,8 @@ def test_heterognnexplainer(g, idtype, input_dim, output_dim):
 @pytest.mark.parametrize('max_iter', [40])
 @pytest.mark.parametrize('node_min', [20])
 @pytest.mark.parametrize('coef', [6])
-@pytest.mark.parametrize('pruning_action', ['High2low'])
-def test_subgraphxexplainer(g, idtype, out_dim, max_iter, node_min, coef, pruning_action):
+@pytest.mark.parametrize('high2low ', [True])
+def test_subgraphxexplainer(g, idtype, out_dim, max_iter, node_min, coef, high2low):
     g = g.astype(idtype).to(F.ctx())
     feat = F.randn((g.num_nodes(), 5))
 
@@ -1433,12 +1433,13 @@ def test_subgraphxexplainer(g, idtype, out_dim, max_iter, node_min, coef, prunin
     model = Model(5, out_dim, graph=True)
     model = model.to(F.ctx())
     explainer = nn.explain.SubgraphXExplainer(model,
+                                              num_gnn_layers=2,
                                               coef=coef,
-                                              pruning_action=pruning_action,
+                                              high2low =high2low ,
                                               max_iter=max_iter,
                                               node_min=node_min)
     g_nodes_explain = explainer.explain_graph(g,
-                                              features=feat)
+                                              feat=feat)
 
 
 def test_jumping_knowledge():
