@@ -384,7 +384,9 @@ class SubgraphXExplainer(nn.Module):
         for node, in_degree, out_degree in zip(nodes, in_degrees, out_degrees):
             node_degree.append((node, in_degree + out_degree))
 
-        node_degree = sorted(node_degree, key=lambda x: x[1], reverse=bool(high2low))
+        node_degree = sorted(
+            node_degree, key=lambda x: x[1], reverse=bool(high2low)
+        )
 
         if len(node_degree) < self.num_child_expand:
             pruned_nodes = nodes
