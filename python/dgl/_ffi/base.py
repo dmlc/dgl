@@ -151,4 +151,5 @@ def load_tensor_adapter(backend, version):
 
 
 def is_tensor_adaptor_enabled() -> bool:
+    """Check whether TensorAdaptor is enabled."""
     return tensor_adapter_loaded
