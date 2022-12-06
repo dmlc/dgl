@@ -148,3 +148,7 @@ def load_tensor_adapter(backend, version):
     if not tensor_adapter_loaded:
         logger = logging.getLogger("dgl-core")
         logger.debug("Memory optimization with PyTorch is not enabled.")
+
+
+def is_tensor_adaptor_enabled() -> bool:
+    return tensor_adapter_loaded
