@@ -11,9 +11,9 @@ import torch as th
 import torch.nn.functional as F
 from model import EntityClassify, RelGraphEmbed
 
+
 import dgl
 from dgl.data.rdf import AIFBDataset, AMDataset, BGSDataset, MUTAGDataset
-
 
 def extract_embed(node_embed, input_nodes):
     emb = {}
@@ -78,6 +78,12 @@ def main(args):
         train_idx = train_idx[len(train_idx) // 5 :]
     else:
         val_idx = train_idx
+    
+    #Only change done
+    if args.use_cugraph_storage:
+        from dgl.contrib.cugraph.convert import cugraph_storage_from_heterograph
+        g = cugraph_storage_from_heterograph(g)
+
 
     # create embeddings
     embed_layer = RelGraphEmbed(g, args.n_hidden)
@@ -245,6 +251,13 @@ if __name__ == "__main__":
         "be undesired if they cannot fit in GPU memory at once. "
         "This flag disables that.",
     )
+    
+    parser.add_argument(
+        "--use_cugraph_storage",
+        action="store_true",
+        help="Uses cugraph backed",
+    )
+
     fp = parser.add_mutually_exclusive_group(required=False)
     fp.add_argument("--validation", dest="validation", action="store_true")
     fp.add_argument("--testing", dest="validation", action="store_false")
@@ -253,3 +266,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(args)
     main(args)
+  

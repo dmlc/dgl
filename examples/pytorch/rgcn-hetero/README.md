@@ -81,6 +81,28 @@ AM: accuracy best=89.39% avg=88.55%
 python3 entity_classify_mb.py -d am --l2norm 5e-4 --n-bases 40 --testing --gpu 0
 ```
 
+### Entity Classification w/ minibatch training with cugraph
+
+AIFB: 
+```
+python3 entity_classify_mb.py -d aifb --testing --gpu 0 --fanout=8 --use_cugraph_storage
+```
+
+MUTAG:
+```
+python3 entity_classify_mb.py -d mutag --l2norm 5e-4 --n-bases 30 --testing --gpu 0 --batch-size=50 --fanout=8 --use_cugraph_storage
+```
+
+BGS:
+```
+python3 entity_classify_mb.py -d bgs --l2norm 5e-4 --n-bases 40 --testing --gpu 0 --use_cugraph_storage
+```
+
+AM: 
+```
+python3 entity_classify_mb.py -d am --l2norm 5e-4 --n-bases 40 --testing --gpu 0 --use_cugraph_storage
+```
+
 ### Offline Inferencing
 Trained Model can be exported by providing '--model\_path <PATH>' parameter to entity\_classify.py. And then test\_classify.py can load the saved model and do the testing offline.
 
