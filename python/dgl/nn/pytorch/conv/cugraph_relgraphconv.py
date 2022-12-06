@@ -14,7 +14,7 @@ try:
     from pylibcugraphops.operators import (
         agg_hg_basis_mfg_n2n_post_fwd as agg_fwd,
     )
-except ModuleNotFoundError:
+except ImportError:
     has_pylibcugraphops = False
 
     def make_mfg_csr_hg(*args):

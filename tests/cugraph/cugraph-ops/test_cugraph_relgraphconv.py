@@ -5,13 +5,9 @@ from dgl.nn import CuGraphRelGraphConv
 from dgl.nn import RelGraphConv
 
 # TODO(tingyu66): Re-enable the following tests after updating cuGraph CI image.
-""" use_longs = [False, True]
+use_longs = [False, True]
 max_in_degrees = [None, 8]
 regularizers = [None, "basis"]
-"""
-use_longs = []
-max_in_degrees = []
-regularizers = []
 device = "cuda"
 
 
@@ -23,6 +19,7 @@ def generate_graph():
     g.edata[dgl.ETYPE] = torch.randint(num_rels, (g.num_edges(),))
     return g
 
+@pytest.mark.skip()
 @pytest.mark.parametrize('use_long', use_longs)
 @pytest.mark.parametrize('max_in_degree', max_in_degrees)
 @pytest.mark.parametrize("regularizer", regularizers)
@@ -63,6 +60,7 @@ def test_full_graph(use_long, max_in_degree, regularizer):
             conv1.linear_r.coeff.grad, conv2.coeff.grad, atol=1e-6
         )
 
+@pytest.mark.skip()
 @pytest.mark.parametrize('max_in_degree', max_in_degrees)
 @pytest.mark.parametrize("regularizer", regularizers)
 def test_mfg(max_in_degree, regularizer):
