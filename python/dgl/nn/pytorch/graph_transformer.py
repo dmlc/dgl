@@ -1,5 +1,6 @@
 """Torch modules for graph transformers."""
 import torch as th
+import math
 import torch.nn as nn
 import torch.nn.functional as F
 from ...convert import to_homogeneous
@@ -8,7 +9,9 @@ from ...transforms import shortest_dist
 
 __all__ = ["DegreeEncoder",
            "BiasedMultiheadAttention",
-           "PathEncoder"]
+           "PathEncoder",
+           "SpatialEncoder",
+           "SpatialEncoder3d"]
 
 
 class DegreeEncoder(nn.Module):
@@ -249,12 +252,13 @@ class PathEncoder(nn.Module):
     --------
     >>> import torch as th
     >>> import dgl
+    >>> from dgl.nn import PathEncoder
 
     >>> u = th.tensor([0, 0, 0, 1, 1, 2, 3, 3])
     >>> v = th.tensor([1, 2, 3, 0, 3, 0, 0, 1])
     >>> g = dgl.graph((u, v))
     >>> edata = th.rand(8, 16)
-    >>> path_encoder = dgl.PathEncoder(2, 16, 8)
+    >>> path_encoder = PathEncoder(2, 16, num_heads=8)
     >>> out = path_encoder(g, edata)
     """
 
@@ -336,3 +340,186 @@ class PathEncoder(nn.Module):
             path_encoding.append(sub_encoding)
 
         return th.stack(path_encoding, dim=0)
+
+
+class SpatialEncoder(nn.Module):
+    r"""Spatial Encoder, as introduced in
+    `Do Transformers Really Perform Bad for Graph Representation?
+    <https://proceedings.neurips.cc/paper/2021/file/f1c1592588411002af340cbaedd6fc33-Paper.pdf>`__
+    This module is a learnable spatial embedding module and encodes
+    the distance of the shortest path between each node pair as attention bias.
+
+    Parameters
+    ----------
+    max_dist : int
+        Upper bound of the shortest path distance
+        between each node pair to be encoded.
+        Each 2D distance will be clamped into the range :math:`[0, max_dist]`.
+    num_heads : int, optional
+        Number of attention heads if multi-head attention mechanism is applied.
+        Default : 1.
+
+    Examples
+    --------
+    >>> import torch as th
+    >>> import dgl
+    >>> from dgl.nn import SpatialEncoder
+
+    >>> u = th.tensor([0, 0, 0, 1, 1, 2, 3, 3])
+    >>> v = th.tensor([1, 2, 3, 0, 3, 0, 0, 1])
+    >>> g = dgl.graph((u, v))
+    >>> spatial_encoder = SpatialEncoder(2, num_heads=8)
+    >>> out = spatial_encoder(g)
+    """
+
+    def __init__(self, max_dist, num_heads=1):
+        super().__init__()
+        self.max_dist = max_dist
+        self.num_heads = num_heads
+        # deactivate node pair between which the distance is 0 or -1
+        self.embedding_table = nn.Embedding(
+            max_dist + 1, num_heads, padding_idx=0
+        )
+
+    def forward(self, g):
+        """
+        Parameters
+        ----------
+        g : DGLGraph
+            A DGLGraph to be encoded, which must be a homogeneous one.
+
+        Returns
+        -------
+        torch.Tensor
+            Return attention bias as spatial encoding of shape
+            :math:`(batch_size, N, N, num_heads)`,
+            where :math:`N` is the maximum number of nodes
+            and batch_size is the batch size of the input graph.
+        """
+        device = g.device
+        g_list = unbatch(g)
+        max_num_nodes = th.max(g.batch_num_nodes())
+        spatial_encoding = []
+
+        for ubg in g_list:
+            num_nodes = ubg.num_nodes()
+            dist = th.clamp(
+                shortest_dist(ubg, root=None, return_paths=False),
+                min=0, max=self.max_dist
+            )
+            # shape: [n, n, h], n = num_nodes, h = num_heads
+            dist_embedding = self.embedding_table(dist)
+            # [n, n, h] -> [N, N, h], N = max_num_nodes, padded with -inf
+            padded_encoding = th.full(
+                (max_num_nodes, max_num_nodes, self.num_heads),
+                float('-inf')
+            ).to(device)
+            padded_encoding[0: num_nodes, 0: num_nodes] = dist_embedding
+            spatial_encoding.append(padded_encoding)
+
+        return th.stack(spatial_encoding, dim=0)
+
+
+class SpatialEncoder3d(nn.Module):
+    r"""3D Spatial Encoder, as introduced in
+    `One Transformer Can Understand Both 2D & 3D Molecular Data
+    <https://arxiv.org/pdf/2210.01765.pdf>`__
+    This module encodes pair-wise relation between atoms in the 3D space,
+    by means of Gaussian Basis Kernels and learnable parameters.
+
+    Parameters
+    ----------
+    num_kernels : int
+        Number of Gaussian Basis Kernels to be applied.
+        Each Gaussian Basis Kernel contains learnable kernel center
+        and learnable scaling factor.
+    num_heads : int, optional
+        Number of attention heads if multi-head attention mechanism is applied.
+        Default : 1.
+
+    Examples
+    --------
+    >>> import torch as th
+    >>> import dgl
+    >>> from dgl.nn import SpatialEncoder
+
+    >>> u = th.tensor([0, 0, 0, 1, 1, 2, 3, 3])
+    >>> v = th.tensor([1, 2, 3, 0, 3, 0, 0, 1])
+    >>> g = dgl.graph((u, v))
+    >>> coordinate = th.rand(4, 3)
+    >>> spatial_encoder = SpatialEncoder(4, num_heads=8)
+    >>> out = spatial_encoder(g, coordinate)
+    """
+
+    def __init__(self, num_kernels, num_heads=1):
+        super().__init__()
+        self.num_kernels = num_kernels
+        self.num_heads = num_heads
+        self.embedding_table = nn.Embedding(num_kernels, 2)
+        self.linear_layer_1 = nn.Linear(1, 1)
+        self.linear_layer_2 = nn.Linear(num_kernels, num_kernels)
+        self.linear_layer_3 = nn.Linear(num_kernels, num_heads)
+
+    def forward(self, g, ndata):
+        """
+        Parameters
+        ----------
+        g : DGLGraph
+            A DGLGraph to be encoded, which must be a homogeneous one.
+        ndata : th.Tensor
+            3D coordinates of nodes in :attr:`g`,
+            of shape :math:`(N, 3)`,
+            where :math:`N`: is the number of nodes in :attr:`g`.
+
+        Returns
+        -------
+        torch.Tensor
+            Return attention bias as 3D spatial encoding of shape
+            :math:`(batch_size, n, n, num_heads)`,
+            where :math:`n` is the maximum number of nodes
+            in unbatched graphs from :attr:`g`.
+        """
+        device = g.device
+        g_list = unbatch(g)
+        max_num_nodes = th.max(g.batch_num_nodes())
+        spatial_encoding = []
+        sum_num_nodes = 0
+
+        for ubg in g_list:
+            num_nodes = ubg.num_nodes()
+            atom_coordinate = ndata[sum_num_nodes: sum_num_nodes + num_nodes]
+            sum_num_nodes += num_nodes
+            # shape: [n, n, 1], n = num_nodes
+            euc_dist = th.cdist(
+                atom_coordinate, atom_coordinate, p=2
+            ).unsqueeze(2)
+            # shape: [n, n, k], k = num_kernels
+            scaled_dist = th.stack(
+                [self.linear_layer_1(euc_dist).squeeze(2)] * self.num_kernels,
+                dim=2
+            )
+            gaussian_para = self.embedding_table(th.arange(self.num_kernels))
+            # shape: [k]
+            gaussian_mean = gaussian_para[:, 0]
+            gaussian_var = gaussian_para[:, 1].abs()
+            # shape: [n, n, k]
+            gaussian_kernel = (
+                -0.5 * (th.div(scaled_dist - gaussian_mean, gaussian_var)
+                        .square())
+            ).exp().div(
+                -math.sqrt(2 * math.pi) * gaussian_var
+            )
+            # [n, n, k] -> [n, n, k]
+            encoding = self.linear_layer_2(gaussian_kernel)
+            encoding = F.gelu(encoding)
+            # [n, n, k] -> [n, n, a], a = num_heads
+            encoding = self.linear_layer_3(encoding)
+            # [n, n, a] -> [N, N, a], N = max_num_nodes, padded with -inf
+            padded_encoding = th.full(
+                (max_num_nodes, max_num_nodes, self.num_heads),
+                float('-inf')
+            ).to(device)
+            padded_encoding[0: num_nodes, 0: num_nodes] = encoding
+            spatial_encoding.append(padded_encoding)
+
+        return th.stack(spatial_encoding, dim=0)

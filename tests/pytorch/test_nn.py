@@ -1820,4 +1820,25 @@ def test_PathEncoder(max_len, feat_dim, num_heads):
     model = nn.PathEncoder(max_len, feat_dim, num_heads=num_heads).to(dev)
     bias = model(bg, edge_feat)
     assert bias.shape == (2, 6, 6, num_heads)
-    
+
+@pytest.mark.parametrize('max_dist', [1, 4])
+@pytest.mark.parametrize('num_kernels', [8, 16])
+@pytest.mark.parametrize('num_heads', [1, 8])
+def test_SpatialEncoder(max_dist, num_kernels, num_heads):
+    dev = F.ctx()
+    g1 = dgl.graph((
+        th.tensor([0, 0, 0, 1, 1, 2, 3, 3]),
+        th.tensor([1, 2, 3, 0, 3, 0, 0, 1])
+    )).to(dev)
+    g2 = dgl.graph((
+        th.tensor([0, 1, 2, 3, 2, 5]),
+        th.tensor([1, 2, 3, 4, 0, 3])
+    )).to(dev)
+    bg = dgl.batch([g1, g2])
+    ndata = th.rand(bg.num_nodes(), 3)
+    model_1 = nn.SpatialEncoder(max_dist, num_heads=num_heads).to(dev)
+    model_2 = nn.SpatialEncoder3d(num_kernels, num_heads=num_heads).to(dev)
+    encoding = model_1(bg)
+    encoding3d = model_2(bg, ndata)
+    assert encoding.shape == (2, 6, 6, num_heads)
+    assert encoding3d.shape == (2, 6, 6, num_heads)
