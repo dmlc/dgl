@@ -244,9 +244,13 @@ class SubgraphXExplainer(nn.Module):
         is time and resource consuming. The shapley algorithm implemented in the paper
         efficiently approximate shapley values by finding coalition of l-hop neighboring
         nodes of the graph, where the GNN model has l layers.
-    coef: float, optional
+    coef: float
         The hyperparameter that controls the trade-off between exploration and exploitation.
-        A higher number encourages encourages exploration. It is high for moves with few simulations.
+        A higher exploration rate encourages exploration of relatively unvisited nodes.
+        So, the more a node has been visited (and the more certain is its total reward value),
+        the less it will be visited. For example, if a node has been visited many times and
+        has a high total reward value, a high coef will cause the algorithm to explore other nodes
+        instead of continuing to visit that node.
     high2low: bool, optional
         Pruning action either "High2low" or "Low2high" (refer to paper).
         "High2low": Whether to expand children nodes from high degree to low degree when
