@@ -182,8 +182,7 @@ def edge_subgraph(
     *,
     relabel_nodes=True,
     store_ids=True,
-    output_device=None,
-    **deprecated_kwargs
+    output_device=None
 ):
     """Return a subgraph induced on the given edges.
 
@@ -309,11 +308,6 @@ def edge_subgraph(
     --------
     node_subgraph
     """
-    if len(deprecated_kwargs) != 0:
-        dgl_warning(
-            "Key word argument preserve_nodes is deprecated. Use relabel_nodes instead."
-        )
-        relabel_nodes = not deprecated_kwargs.get("preserve_nodes")
     if graph.is_block and relabel_nodes:
         raise DGLError("Extracting subgraph from a block graph is not allowed.")
     if not isinstance(edges, Mapping):
