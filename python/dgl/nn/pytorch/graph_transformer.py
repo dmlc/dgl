@@ -7,7 +7,7 @@ import dgl
 __all__ = [
     "DegreeEncoder",
     "BiasedMultiheadAttention",
-    "GraphTransformerLayer"
+    "GraphormerLayer"
 ]
 
 class DegreeEncoder(nn.Module):
@@ -225,8 +225,8 @@ class BiasedMultiheadAttention(nn.Module):
         return attn
 
 
-class GraphTransformerLayer(nn.Module):
-    r"""Graph Transformer Layer with Dense Multi-Head Attention, as introduced
+class GraphormerLayer(nn.Module):
+    r"""Graphormer Layer with Dense Multi-Head Attention, as introduced
     in `Do Transformers Really Perform Bad for Graph Representation?
     <https://arxiv.org/pdf/2106.05234>`__
 
@@ -256,7 +256,7 @@ class GraphTransformerLayer(nn.Module):
     Examples
     --------
     >>> import torch as th
-    >>> from dgl.nn import GraphTransformerLayer
+    >>> from dgl.nn import GraphormerLayer
 
     >>> batch_size = 16
     >>> num_nodes = 100
@@ -264,7 +264,7 @@ class GraphTransformerLayer(nn.Module):
     >>> num_heads = 8
     >>> nfeat = th.rand(batch_size, num_nodes, feat_size)
     >>> bias = th.rand(batch_size, num_nodes, num_nodes, num_heads)
-    >>> net = GraphTransformerLayer(
+    >>> net = GraphormerLayer(
             feat_size=feat_size,
             hidden_size=2048,
             num_heads=num_heads

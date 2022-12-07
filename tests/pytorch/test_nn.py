@@ -1804,7 +1804,7 @@ def test_BiasedMultiheadAttention(feat_size, num_heads, bias, attn_bias_type, at
 
 @pytest.mark.parametrize('attn_bias_type', ['add', 'mul'])
 @pytest.mark.parametrize('norm_first', [True, False])
-def test_GraphTransformerLayer(attn_bias_type, norm_first):
+def test_GraphormerLayer(attn_bias_type, norm_first):
     batch_size = 16
     num_nodes = 100
     feat_size = 512
@@ -1813,7 +1813,7 @@ def test_GraphTransformerLayer(attn_bias_type, norm_first):
     attn_bias = th.rand(batch_size, num_nodes, num_nodes, num_heads)
     attn_mask = th.rand(batch_size, num_nodes, num_nodes) < 0.5
 
-    net = nn.GraphTransformerLayer(
+    net = nn.GraphormerLayer(
         feat_size=feat_size,
         hidden_size=2048,
         num_heads=num_heads,
