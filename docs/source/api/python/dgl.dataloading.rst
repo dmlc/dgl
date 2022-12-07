@@ -43,6 +43,7 @@ Samplers
 
     Sampler
     NeighborSampler
+    LaborSampler
     MultiLayerFullNeighborSampler
     ClusterGCNSampler
     ShaDowKHopSampler
