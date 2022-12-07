@@ -12,21 +12,22 @@ from torch.optim import Adam
 class GCN(nn.Module):
     def __init__(self, A, in_size, out_size, hidden_size=16):
         super().__init__()
-        # two-layer GCN
+        
+        # Two-layer GCN.
         self.Theta1 = nn.Linear(in_size, hidden_size)
         self.Theta2 = nn.Linear(hidden_size, out_size)
-        self.dropout = nn.Dropout(0.5)
-        # calculate the symmetrically normalized adjacency matrix
+        
+        # Calculate the symmetrically normalized adjacency matrix.
         I = identity(A.shape, device=dev)
         A_hat = A + I
         D_hat = diag(A_hat.sum(1)) ** -0.5
-        A_hat = D_hat @ A_hat @ D_hat
-        self.A_hat = A_hat
+        A_norm = D_hat @ A_hat @ D_hat
+        self.A_norm = A_norm
         
     def forward(self, X):
-        X = self.A_hat @ self.Theta1(self.dropout(X))
+        X = self.A_norm @ self.Theta1(X)
         X = F.relu(X)
-        X = self.A_hat @ self.Theta2(self.dropout(X))
+        X = self.A_norm @ self.Theta2(X)
         return X
         
         
@@ -34,6 +35,7 @@ def evaluate(g, pred):
     label = g.ndata["label"]
     val_mask = g.ndata["val_mask"]
     test_mask = g.ndata["test_mask"]
+    
     # Compute accuracy on validation/test set.
     val_acc = (pred[val_mask] == label[val_mask]).float().mean()
     test_acc = (pred[test_mask] == label[test_mask]).float().mean()
@@ -43,13 +45,17 @@ def evaluate(g, pred):
 def train(model, g, X):
     label = g.ndata["label"]
     train_mask = g.ndata["train_mask"]
-    optimizer = Adam(model.parameters(), lr=2e-1, weight_decay=5e-6)
-    for epoch in range(20):
+    optimizer = Adam(model.parameters(), lr=1e-2, weight_decay=5e-4)
+    loss_fcn = nn.CrossEntropyLoss()
+    
+    for epoch in range(200):
+        model.train()
+        
         # Forward.
         logits = model(X)
 
         # Compute loss with nodes in the training set.
-        loss = F.cross_entropy(logits[train_mask], label[train_mask])
+        loss = loss_fcn(logits[train_mask], label[train_mask])
 
         # Backward.
         optimizer.zero_grad()
@@ -61,10 +67,11 @@ def train(model, g, X):
 
         # Evaluate the prediction.
         val_acc, test_acc = evaluate(g, pred)
-        print(
-            f"In epoch {epoch}, loss: {loss:.3f}, val acc: {val_acc:.3f}, test"
-            f" acc: {test_acc:.3f}"
-        )
+        if (epoch % 20 == 0):
+            print(
+                f"In epoch {epoch}, loss: {loss:.3f}, val acc: {val_acc:.3f}, test"
+                f" acc: {test_acc:.3f}"
+            )
 
 
 if __name__ == "__main__":
