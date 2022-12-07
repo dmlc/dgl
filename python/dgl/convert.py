@@ -10,7 +10,7 @@ from . import heterograph_index
 from .heterograph import DGLGraph, combine_frames, DGLBlock
 from . import graph_index
 from . import utils
-from .base import NTYPE, ETYPE, NID, EID, DGLError, dgl_warning
+from .base import NTYPE, ETYPE, NID, EID, DGLError
 
 __all__ = [
     'graph',
