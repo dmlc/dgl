@@ -10,19 +10,17 @@ from dgl.mock_sparse import create_from_coo, diag, identity
 from torch.optim import Adam
 
 class GCN(nn.Module):
-    def __init__(self, A_norm, in_size, out_size, hidden_size=16):
+    def __init__(self, in_size, out_size, hidden_size=16):
         super().__init__()
         
         # Two-layer GCN.
         self.Theta1 = nn.Linear(in_size, hidden_size)
         self.Theta2 = nn.Linear(hidden_size, out_size)
         
-        self.A_norm = A_norm
-        
-    def forward(self, X):
-        X = self.A_norm @ self.Theta1(X)
+    def forward(self, A_norm, X):
+        X = A_norm @ self.Theta1(X)
         X = F.relu(X)
-        X = self.A_norm @ self.Theta2(X)
+        X = A_norm @ self.Theta2(X)
         return X
         
         
@@ -37,7 +35,7 @@ def evaluate(g, pred):
     return val_acc, test_acc
 
 
-def train(model, g, A, X):
+def train(model, g, A_norm, X):
     label = g.ndata["label"]
     train_mask = g.ndata["train_mask"]
     optimizer = Adam(model.parameters(), lr=1e-2, weight_decay=5e-4)
@@ -47,7 +45,7 @@ def train(model, g, A, X):
         model.train()
         
         # Forward.
-        logits = model(X)
+        logits = model(A_norm, X)
 
         # Compute loss with nodes in the training set.
         loss = loss_fcn(logits[train_mask], label[train_mask])
@@ -94,7 +92,7 @@ if __name__ == "__main__":
     # Create model.
     in_size = X.shape[1]
     out_size = num_classes
-    model = GCN(A_norm, in_size, out_size).to(dev)
+    model = GCN(in_size, out_size).to(dev)
     
     # Kick off training.
-    train(model, g, A, X)
+    train(model, g, A_norm, X)
