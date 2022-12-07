@@ -48,6 +48,12 @@ void SpMM(
   });
 }
 
+void SpMM(
+    const char* op, const char* reduce, HeteroGraphPtr graph, NDArray ufeat,
+    NDArray efeat, NDArray out, std::vector<NDArray> out_aux) {
+  SpMM(std::string(op), std::string(reduce), graph, ufeat, efeat, out, out_aux);
+}
+
 /** @brief Generalized segmented dense Matrix-Matrix Multiplication. */
 void SegmentMM(
     const NDArray A, const NDArray B, NDArray C, const NDArray seglen_A,
@@ -250,6 +256,12 @@ void SDDMM(
       });
     });
   });
+}
+
+void SDDMM(
+    const char* op, HeteroGraphPtr graph, NDArray ufeat, NDArray vfeat,
+    NDArray out, int lhs_target, int rhs_target) {
+  SDDMM(std::string(op), graph, ufeat, vfeat, out, lhs_target, rhs_target);
 }
 
 /**

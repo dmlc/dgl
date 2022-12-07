@@ -84,6 +84,9 @@ std::shared_ptr<CSR> CSRToCSC(const std::shared_ptr<CSR>& csr);
 /** @brief COO transposition. */
 std::shared_ptr<COO> COOTranspose(const std::shared_ptr<COO>& coo);
 
+HeteroGraphPtr COOToDGLGraph(const std::shared_ptr<COO>& coo);
+HeteroGraphPtr CSRToDGLGraph(const std::shared_ptr<CSR>& csr);
+HeteroGraphPtr CSCToDGLGraph(const std::shared_ptr<CSR>& csc);
 
 }  // namespace sparse
 }  // namespace dgl
