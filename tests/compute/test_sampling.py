@@ -14,7 +14,7 @@ def check_random_walk(g, metapath, traces, ntypes, prob=None, trace_eids=None):
 
     for i in range(traces.shape[0]):
         for j in range(traces.shape[1] - 1):
-            assert g.has_edge_between(
+            assert g.has_edges_between(
                 traces[i, j], traces[i, j+1], etype=metapath[j])
             if prob is not None and prob in g.edges[metapath[j]].data:
                 p = F.asnumpy(g.edges[metapath[j]].data['p'])

@@ -4,7 +4,7 @@ import sys
 
 from dgl.mock_sparse2 import diag, identity, DiagMatrix
 
-# FIXME(issue #4818): Skipping tests on win.
+# TODO(#4818): Skipping tests on win.
 if not sys.platform.startswith("linux"):
     pytest.skip("skipping tests on win", allow_module_level=True)
 

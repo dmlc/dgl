@@ -1,12 +1,15 @@
 """dgl sparse class."""
-import sys
 import os
+import sys
+
 import torch
 
 from .._ffi import libinfo
-from .sparse_matrix import *
 from .diag_matrix import *
 from .elementwise_op import *
+from .sparse_matrix import *
+from .unary_op_diag import *
+from .unary_op_sp import *
 
 
 def load_dgl_sparse():

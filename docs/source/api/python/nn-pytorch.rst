@@ -118,6 +118,8 @@ Utility Modules
     ~dgl.nn.pytorch.graph_transformer.DegreeEncoder
     ~dgl.nn.pytorch.utils.LaplacianPosEnc
     ~dgl.nn.pytorch.graph_transformer.BiasedMultiheadAttention
+    ~dgl.nn.pytorch.graph_transformer.GraphormerLayer
+    ~dgl.nn.pytorch.graph_transformer.PathEncoder
 
 Network Embedding Modules
 ----------------------------------------

@@ -1,4 +1,4 @@
-/*!
+/**
  *   Copyright (c) 2022, NVIDIA Corporation
  *   Copyright (c) 2022, GT-TDAlab (Muhammed Fatih Balin & Umit V. Catalyurek)
  *   All rights reserved.
@@ -15,8 +15,8 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  *
- * \file array/cpu/labor_pick.h
- * \brief Template implementation for layerwise pick operators.
+ * @file array/cpu/labor_pick.h
+ * @brief Template implementation for layerwise pick operators.
  */
 
 #ifndef DGL_ARRAY_CPU_LABOR_PICK_H_
@@ -37,7 +37,6 @@
 #include <string>
 #include <utility>
 #include <vector>
-#include <pcg_random.hpp>
 
 namespace dgl {
 namespace aten {
