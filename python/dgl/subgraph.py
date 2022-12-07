@@ -8,7 +8,7 @@ from collections.abc import Mapping
 from . import backend as F
 from . import graph_index, heterograph_index, utils
 from ._ffi.function import _init_api
-from .base import DGLError, dgl_warning
+from .base import DGLError
 from .heterograph import DGLGraph
 from .utils import context_of, recursive_apply
 
