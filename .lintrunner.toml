@@ -33,7 +33,9 @@ is_formatter = true
 code = 'CLANGFORMAT'
 include_patterns = [
     '**/*.h',
+    '**/*.c',
     '**/*.cc',
+    '**/*.cpp',
     '**/*.cuh',
     '**/*.cu',
 ]
