@@ -1516,7 +1516,7 @@ def test_hgt(idtype, in_size, num_heads):
     sorted_y = m(sorted_g, sorted_x, sorted_ntype, sorted_etype, presorted=False)
     assert sorted_y.shape == (g.num_nodes(), head_size * num_heads)
     # mini-batch
-    train_idx = th.randperm(100, dtype=idtype)[:10]
+    train_idx = th.randint(0, 100, (10, ), dtype = idtype)
     sampler = dgl.dataloading.NeighborSampler([-1])
     train_loader = dgl.dataloading.DataLoader(g, train_idx.to(dev), sampler,
                                             batch_size=8, device=dev,
@@ -1825,3 +1825,22 @@ def test_GraphormerLayer(attn_bias_type, norm_first):
     out = net(nfeat, attn_bias, attn_mask)
 
     assert out.shape == (batch_size, num_nodes, feat_size)
+
+@pytest.mark.parametrize('max_len', [1, 4])
+@pytest.mark.parametrize('feat_dim', [16])
+@pytest.mark.parametrize('num_heads', [1, 8])
+def test_PathEncoder(max_len, feat_dim, num_heads):
+    dev = F.ctx()
+    g1 = dgl.graph((
+        th.tensor([0, 0, 0, 1, 1, 2, 3, 3]),
+        th.tensor([1, 2, 3, 0, 3, 0, 0, 1])
+    )).to(dev)
+    g2 = dgl.graph((
+        th.tensor([0, 1, 2, 3, 2, 5]),
+        th.tensor([1, 2, 3, 4, 0, 3])
+    )).to(dev)
+    bg = dgl.batch([g1, g2])
+    edge_feat = th.rand(bg.num_edges(), feat_dim).to(dev)
+    model = nn.PathEncoder(max_len, feat_dim, num_heads=num_heads).to(dev)
+    bias = model(bg, edge_feat)
+    assert bias.shape == (2, 6, 6, num_heads)
