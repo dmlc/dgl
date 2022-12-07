@@ -1,6 +1,6 @@
 """Torch modules for graph transformers."""
-import torch as th
 import math
+import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 from ...convert import to_homogeneous
@@ -302,29 +302,21 @@ class PathEncoder(nn.Module):
                 (edata, th.zeros(1, self.feat_dim).to(edata.device)),
                 dim=0
             )
-            _, path = shortest_dist(ubg, root=None, return_paths=True)
+            dist, path = shortest_dist(ubg, root=None, return_paths=True)
             path_len = min(self.max_len, path.size(dim=2))
 
             # shape: [n, n, l], n = num_nodes, l = path_len
             shortest_path = path[:, :, 0: path_len]
             # shape: [n, n]
-            shortest_distance = th.clamp(
-                shortest_dist(ubg, root=None, return_paths=False),
-                min=1,
-                max=path_len
-            )
+            shortest_distance = th.clamp(dist, min=1, max=path_len)
             # shape: [n, n, l, d], d = feat_dim
             path_data = edata[shortest_path]
-            # shape: [l, h], h = num_heads
-            embedding_idx = th.reshape(
-                th.arange(self.num_heads * path_len),
-                (path_len, self.num_heads)
-            ).to(next(self.embedding_table.parameters()).device)
             # shape: [d, l, h]
-            edge_embedding = th.permute(
-                self.embedding_table(embedding_idx), (2, 0, 1)
-            )
-
+            edge_embedding = self.embedding_table.weight[
+                0: path_len * self.num_heads
+            ].reshape(
+                path_len, self.num_heads, -1
+            ).permute(2, 0, 1)
             # [n, n, l, d] einsum [d, l, h] -> [n, n, h]
             # [n, n, h] -> [N, N, h], N = max_num_nodes, padded with -inf
             sub_encoding = th.full(
@@ -498,7 +490,7 @@ class SpatialEncoder3d(nn.Module):
                 [self.linear_layer_1(euc_dist).squeeze(2)] * self.num_kernels,
                 dim=2
             )
-            gaussian_para = self.embedding_table(th.arange(self.num_kernels))
+            gaussian_para = self.embedding_table.weight
             # shape: [k]
             gaussian_mean = gaussian_para[:, 0]
             gaussian_var = gaussian_para[:, 1].abs()
