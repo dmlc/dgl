@@ -10,18 +10,13 @@ from dgl.mock_sparse import create_from_coo, diag, identity
 from torch.optim import Adam
 
 class GCN(nn.Module):
-    def __init__(self, A, in_size, out_size, hidden_size=16):
+    def __init__(self, A_norm, in_size, out_size, hidden_size=16):
         super().__init__()
         
         # Two-layer GCN.
         self.Theta1 = nn.Linear(in_size, hidden_size)
         self.Theta2 = nn.Linear(hidden_size, out_size)
         
-        # Calculate the symmetrically normalized adjacency matrix.
-        I = identity(A.shape, device=dev)
-        A_hat = A + I
-        D_hat = diag(A_hat.sum(1)) ** -0.5
-        A_norm = D_hat @ A_hat @ D_hat
         self.A_norm = A_norm
         
     def forward(self, X):
@@ -90,10 +85,16 @@ if __name__ == "__main__":
     N = g.num_nodes()
     A = create_from_coo(dst, src, shape=(N, N))
     
+    # Calculate the symmetrically normalized adjacency matrix.
+    I = identity(A.shape, device=dev)
+    A_hat = A + I
+    D_hat = diag(A_hat.sum(1)) ** -0.5
+    A_norm = D_hat @ A_hat @ D_hat
+    
     # Create model.
     in_size = X.shape[1]
     out_size = num_classes
-    model = GCN(A, in_size, out_size).to(dev)
-
+    model = GCN(A_norm, in_size, out_size).to(dev)
+    
     # Kick off training.
     train(model, g, X)
