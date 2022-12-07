@@ -2,19 +2,25 @@
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
+
 from ...convert import to_homogeneous
+from ... import function as fn
+from ..functional import edge_softmax
 from ...batch import unbatch
 from ...transforms import shortest_dist
 
-__all__ = ["DegreeEncoder",
-           "BiasedMultiheadAttention",
-           "PathEncoder"]
 
+__all__ = [
+    "DegreeEncoder",
+    "BiasedMHA",
+    "SparseBiasedMHA",
+    "PathEncoder"
+]
 
 class DegreeEncoder(nn.Module):
     r"""Degree Encoder, as introduced in
     `Do Transformers Really Perform Bad for Graph Representation?
-    <https://proceedings.neurips.cc/paper/2021/file/f1c1592588411002af340cbaedd6fc33-Paper.pdf>`__
+    <https://arxiv.org/abs/2106.05234>`__
     This module is a learnable degree embedding module.
 
     Parameters
@@ -39,6 +45,8 @@ class DegreeEncoder(nn.Module):
     >>> g = dgl.graph(([0,0,0,1,1,2,3,3], [1,2,3,0,3,0,0,1]))
     >>> degree_encoder = DegreeEncoder(5, 16)
     >>> degree_embedding = degree_encoder(g)
+    >>> print(degree_embedding.size())
+    torch.Size([8, 16])
     """
 
     def __init__(self, max_degree, embedding_dim, direction="both"):
@@ -92,7 +100,7 @@ class DegreeEncoder(nn.Module):
         return degree_embedding
 
 
-class BiasedMultiheadAttention(nn.Module):
+class BiasedMHA(nn.Module):
     r"""Dense Multi-Head Attention Module with Graph Attention Bias.
 
     Compute attention between nodes with attention bias obtained from graph
@@ -103,7 +111,7 @@ class BiasedMultiheadAttention(nn.Module):
 
         \text{Attn}=\text{softmax}(\dfrac{QK^T}{\sqrt{d}} \circ b)
 
-    :math:`Q` and :math:`K` are feature representation of nodes. :math:`d`
+    :math:`Q` and :math:`K` are feature representations of nodes. :math:`d`
     is the corresponding :attr:`feat_size`. :math:`b` is attention bias, which
     can be additive or multiplicative according to the operator :math:`\circ`.
 
@@ -112,30 +120,37 @@ class BiasedMultiheadAttention(nn.Module):
     feat_size : int
         Feature size.
     num_heads : int
-        Number of attention heads, by which attr:`feat_size` is divisible.
+        Number of attention heads, by which :attr:`feat_size` is divisible.
     bias : bool, optional
         If True, it uses bias for linear projection. Default: True.
     attn_bias_type : str, optional
         The type of attention bias used for modifying attention. Selected from
-        'add' or 'mul'. Default: 'add'.
+        'add', 'mul', or None. Default: 'add'.
 
         * 'add' is for additive attention bias.
         * 'mul' is for multiplicative attention bias.
-    attn_drop : float, optional
-        Dropout probability on attention weights. Defalt: 0.1.
+        * None is for no attention bias. :attr:`attn_bias` in forward
+        computation will be ignored.
+    dropout : float, optional
+        Dropout probability on attention weights. Default: 0.1.
 
     Examples
     --------
     >>> import torch as th
-    >>> from dgl.nn import BiasedMultiheadAttention
+    >>> from dgl.nn import BiasedMHA
 
     >>> ndata = th.rand(16, 100, 512)
     >>> bias = th.rand(16, 100, 100, 8)
-    >>> net = BiasedMultiheadAttention(feat_size=512, num_heads=8)
+    >>> net = BiasedMHA(feat_size=512, num_heads=8)
     >>> out = net(ndata, bias)
+    >>> print(out.size())
+    torch.Size([16, 100, 512])
     """
 
-    def __init__(self, feat_size, num_heads, bias=True, attn_bias_type="add", attn_drop=0.1):
+    def __init__(
+        self, feat_size, num_heads, bias=True, attn_bias_type="add",
+        dropout=0.1
+    ):
         super().__init__()
         self.feat_size = feat_size
         self.num_heads = num_heads
@@ -143,7 +158,7 @@ class BiasedMultiheadAttention(nn.Module):
         assert (
             self.head_dim * num_heads == feat_size
         ), "feat_size must be divisible by num_heads"
-        self.scaling = self.head_dim**-0.5
+        self.scaling = self.head_dim ** -0.5
         self.attn_bias_type = attn_bias_type
 
         self.q_proj = nn.Linear(feat_size, feat_size, bias=bias)
@@ -151,48 +166,57 @@ class BiasedMultiheadAttention(nn.Module):
         self.v_proj = nn.Linear(feat_size, feat_size, bias=bias)
         self.out_proj = nn.Linear(feat_size, feat_size, bias=bias)
 
-        self.dropout = nn.Dropout(p=attn_drop)
+        self.dropout = nn.Dropout(p=dropout)
 
         self.reset_parameters()
 
     def reset_parameters(self):
-        """Reset parameters of projection matrices, the same settings as that in Graphormer.
+        """Reset parameters of projection matrices, the same settings as that
+        in Graphormer.
         """
-        nn.init.xavier_uniform_(self.q_proj.weight, gain=2**-0.5)
-        nn.init.xavier_uniform_(self.k_proj.weight, gain=2**-0.5)
-        nn.init.xavier_uniform_(self.v_proj.weight, gain=2**-0.5)
+        gain = 2 ** -0.5
+        nn.init.xavier_uniform_(self.q_proj.weight, gain=gain)
+        nn.init.xavier_uniform_(self.k_proj.weight, gain=gain)
+        nn.init.xavier_uniform_(self.v_proj.weight, gain=gain)
 
         nn.init.xavier_uniform_(self.out_proj.weight)
         if self.out_proj.bias is not None:
             nn.init.constant_(self.out_proj.bias, 0.0)
 
-    def forward(self, ndata, attn_bias=None, attn_mask=None):
+    def forward(self, nfeat, attn_bias=None, attn_mask=None):
         """Forward computation.
 
         Parameters
         ----------
-        ndata : torch.Tensor
+        nfeat : torch.Tensor
             A 3D input tensor. Shape: (batch_size, N, :attr:`feat_size`), where
             N is the maximum number of nodes.
         attn_bias : torch.Tensor, optional
             The attention bias used for attention modification. Shape:
-            (batch_size, N, N, :attr:`num_heads`).
+            (batch_size, N, N, :attr:`num_heads`). Default: None
         attn_mask : torch.Tensor, optional
-            The attention mask used for avoiding computation on invalid positions, where
-            invalid positions are indicated by non-zero values. Shape: (batch_size, N, N).
+            The attention mask used for avoiding computation on invalid
+            positions, where invalid positions are indicated by non-zero values.
+            Shape: (batch_size, N, N). Default: None.
 
         Returns
         -------
-        y : torch.Tensor
+        torch.Tensor
             The output tensor. Shape: (batch_size, N, :attr:`feat_size`)
         """
-        q_h = self.q_proj(ndata).transpose(0, 1)
-        k_h = self.k_proj(ndata).transpose(0, 1)
-        v_h = self.v_proj(ndata).transpose(0, 1)
-        bsz, N, _ = ndata.shape
-        q_h = q_h.reshape(N, bsz * self.num_heads, self.head_dim).transpose(0, 1) / self.scaling
-        k_h = k_h.reshape(N, bsz * self.num_heads, self.head_dim).permute(1, 2, 0)
-        v_h = v_h.reshape(N, bsz * self.num_heads, self.head_dim).transpose(0, 1)
+        q_h = self.q_proj(nfeat).transpose(0, 1)
+        k_h = self.k_proj(nfeat).transpose(0, 1)
+        v_h = self.v_proj(nfeat).transpose(0, 1)
+        bsz, N, _ = nfeat.shape
+        q_h = q_h.reshape(
+            N, bsz * self.num_heads, self.head_dim
+        ).transpose(0, 1) / self.scaling
+        k_h = k_h.reshape(
+            N, bsz * self.num_heads, self.head_dim
+        ).permute(1, 2, 0)
+        v_h = v_h.reshape(
+            N, bsz * self.num_heads, self.head_dim
+        ).transpose(0, 1)
 
         attn_weights = (
             th.bmm(q_h, k_h)
@@ -201,11 +225,10 @@ class BiasedMultiheadAttention(nn.Module):
             .transpose(0, 2)
         )
 
-        if attn_bias is not None:
-            if self.attn_bias_type == "add":
-                attn_weights += attn_bias
-            else:
-                attn_weights *= attn_bias
+        if self.attn_bias_type == "add":
+            attn_weights += attn_bias
+        elif self.attn_bias_type == 'mul':
+            attn_weights *= attn_bias
 
         if attn_mask is not None:
             attn_weights[attn_mask.to(th.bool)] = float("-inf")
@@ -221,9 +244,155 @@ class BiasedMultiheadAttention(nn.Module):
 
         attn = th.bmm(attn_weights, v_h).transpose(0, 1)
 
-        attn = self.out_proj(attn.reshape(N, bsz, self.feat_size).transpose(0, 1))
+        attn = self.out_proj(
+            attn.reshape(N, bsz, self.feat_size).transpose(0, 1)
+        )
 
         return attn
+
+
+class SparseBiasedMHA(nn.Module):
+    r"""Sparse Multi-Head Attention Module with Graph Attention Bias.
+
+    Implement sparse attention computation restricted to neighborhoods of
+    nodes, as introduced in `A Generalization of Transformer Networks to
+    Graphs <https://arxiv.org/pdf/2012.09699>`__
+
+    .. math::
+
+        \text{Attn}_{ij}=\text{softmax}_{j\in\mathcal{N}(i)}(\dfrac{Q_iK_j^T}
+        {\sqrt{d}} \circ b)
+
+    :math:`Q_i` and :math:`K_j` are feature representations of nodes. :math:`d`
+    is the corresponding :attr:`feat_size`. :math:`b` is attention bias, which
+    can be additive or multiplicative according to the operator :math:`\circ`.
+    :math:`\mathcal{N}(i)` is the set of nodes that have an outgoing edge to
+    the node :math:`i`.
+
+    Parameters
+    ----------
+    feat_size : int
+        Feature size.
+    num_heads : int
+        Number of attention heads, by which :attr:`feat_size` is divisible.
+    bias : bool, optional
+        If True, it uses bias for linear projection. Default: False.
+    attn_bias_type : str, optional
+        The type of attention bias used for modifying attention. Selected from
+        'add', 'mul', or None. Default: None.
+
+        * 'add' is for additive attention bias.
+        * 'mul' is for multiplicative attention bias.
+        * None is for no attention bias. :attr:`attn_bias` in forward
+        computation will be ignored.
+    dropout : float, optional
+        Dropout probability on attention weights. Default: 0.
+
+    Examples
+    --------
+    >>> import dgl
+    >>> import torch as th
+    >>> from dgl.nn import SparseBiasedMHA
+
+    >>> num_nodes = 100
+    >>> num_edges = 80
+    >>> feat_size = 512
+    >>> num_heads = 8
+
+    >>> g = dgl.rand_graph(num_nodes, num_edges)
+    >>> nfeat = th.rand(num_nodes, feat_size)
+    >>> bias = th.rand(num_edges, num_heads)
+    >>> net = SparseBiasedMHA(feat_size=feat_size, num_heads=num_heads)
+    >>> out = net(g, nfeat, bias)
+    >>> print(out.size())
+    torch.Size([100, 512])
+    """
+
+    def __init__(
+        self, feat_size, num_heads, bias=False, attn_bias_type=None,
+        dropout=0.
+    ):
+        super().__init__()
+        self.feat_size = feat_size
+        self.num_heads = num_heads
+        self.head_dim = feat_size // num_heads
+        assert (
+            self.head_dim * num_heads == feat_size
+        ), "feat_size must be divisible by num_heads"
+        self.scaling = self.head_dim ** -0.5
+        self.attn_bias_type = attn_bias_type
+
+        self.q_proj = nn.Linear(feat_size, feat_size, bias=bias)
+        self.k_proj = nn.Linear(feat_size, feat_size, bias=bias)
+        self.v_proj = nn.Linear(feat_size, feat_size, bias=bias)
+        self.out_proj = nn.Linear(feat_size, feat_size, bias=bias)
+
+        self.dropout = nn.Dropout(p=dropout)
+
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        """Reset parameters of projection matrices, the same settings as that
+        in Graphormer.
+        """
+        gain = 2 ** -0.5
+        nn.init.xavier_uniform_(self.q_proj.weight, gain=gain)
+        nn.init.xavier_uniform_(self.k_proj.weight, gain=gain)
+        nn.init.xavier_uniform_(self.v_proj.weight, gain=gain)
+
+        nn.init.xavier_uniform_(self.out_proj.weight)
+        if self.out_proj.bias is not None:
+            nn.init.constant_(self.out_proj.bias, 0.0)
+            nn.init.constant_(self.q_proj.bias, 0.0)
+            nn.init.constant_(self.k_proj.bias, 0.0)
+            nn.init.constant_(self.v_proj.bias, 0.0)
+
+    def forward(self, g, nfeat, attn_bias=None):
+        """Forward computation.
+
+        Parameters
+        ----------
+        g : DGLGraph
+            The input graph of N nodes and E edges.
+        nfeat : torch.Tensor
+            A 2D input tensor of node features. Shape: (N, :attr:`feat_size`).
+        attn_bias : torch.Tensor, optional
+            The attention bias used for attention modification.
+            Shape: (E, :attr:`num_heads`). Default: None.
+
+        Returns
+        -------
+        torch.Tensor
+            The output tensor. Shape: (N, :attr:`feat_size`)
+        """
+        N = g.num_nodes()
+        with g.local_scope():
+            # linear projection
+            g.ndata['q_h'] = self.q_proj(nfeat).reshape(
+                N, self.num_heads, self.head_dim
+            ) / self.scaling
+            g.ndata['k_h'] = self.k_proj(nfeat).reshape(
+                N, self.num_heads, self.head_dim
+            )
+            g.ndata['v_h'] = self.v_proj(nfeat).reshape(
+                N, self.num_heads, self.head_dim
+            )
+
+            # compute attention weights
+            g.apply_edges(fn.u_dot_v('k_h', 'q_h', 'attn'))
+            if self.attn_bias_type == 'add':
+                g.edata['attn'] += attn_bias.unsqueeze(-1)
+            elif self.attn_bias_type == 'mul':
+                g.edata['attn'] *= attn_bias.unsqueeze(-1)
+            g.edata['attn'] = self.dropout(
+                edge_softmax(g, g.edata['attn'], norm_by="dst")
+            )
+
+            # compute output
+            g.update_all(fn.u_mul_e('v_h', 'attn', 'v_a'), fn.sum('v_a', 'out'))
+            attn_val = self.out_proj(g.ndata['out'].reshape(N, self.feat_size))
+
+            return attn_val
 
 
 class PathEncoder(nn.Module):
