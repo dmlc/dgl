@@ -22,6 +22,7 @@ Neighbor sampling
     :toctree: ../../generated/
 
     sample_neighbors
+    sample_labors
     sample_neighbors_biased
     select_topk
     PinSAGESampler
