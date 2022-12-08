@@ -19,10 +19,10 @@ class GCN(nn.Module):
         self.Theta1 = nn.Linear(in_size, hidden_size)
         self.Theta2 = nn.Linear(hidden_size, out_size)
 
-    ###########################################################################
+    ############################################################################
     # (HIGHLIGHT) Take the advantage of DGL sparse APIs to implement
     # the GCN forward process.
-    ###########################################################################
+    ############################################################################
     def forward(self, A_norm, X):
         X = A_norm @ self.Theta1(X)
         X = F.relu(X)
@@ -89,10 +89,10 @@ if __name__ == "__main__":
     N = g.num_nodes()
     A = create_from_coo(dst, src, shape=(N, N))
 
-    ###########################################################
+    ############################################################################
     # (HIGHLIGHT) Compute the symmetrically normalized
     # adjacency matrix with Sparse Matrix API
-    ###########################################################
+    ############################################################################
     I = identity(A.shape, device=dev)
     A_hat = A + I
     D_hat = diag(A_hat.sum(1)) ** -0.5
