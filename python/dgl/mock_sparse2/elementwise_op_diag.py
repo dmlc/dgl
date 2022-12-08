@@ -23,8 +23,8 @@ def diag_add(D1: DiagMatrix, D2: DiagMatrix) -> DiagMatrix:
 
     Examples
     --------
-    >>> D1 = DiagMatrix(torch.arange(1, 4))
-    >>> D2 = DiagMatrix(torch.arange(10, 13))
+    >>> D1 = diag(torch.arange(1, 4))
+    >>> D2 = diag(torch.arange(10, 13))
     >>> D1 + D2
     DiagMatrix(val=tensor([11, 13, 15]),
     shape=(3, 3))
@@ -54,9 +54,9 @@ def diag_sub(D1: DiagMatrix, D2: DiagMatrix) -> DiagMatrix:
 
     Examples
     --------
-    >>> D1 = DiagMatrix(torch.arange(1, 4))
-    >>> D2 = DiagMatrix(torch.arange(10, 13))
-    >>> D1 -D2
+    >>> D1 = diag(torch.arange(1, 4))
+    >>> D2 = diag(torch.arange(10, 13))
+    >>> D1 - D2
     DiagMatrix(val=tensor([-9, -9, -9]),
     shape=(3, 3))
     """
@@ -73,30 +73,27 @@ def diag_mul(
 ) -> DiagMatrix:
     """Elementwise multiplication.
 
-     Parameters
-     ----------
-     D1 : DiagMatrix or scalar
-         Diagonal matrix or scalar value
-     D2 : DiagMatrix or scalar
-         Diagonal matrix or scalar value
+    Parameters
+    ----------
+    D1 : DiagMatrix or scalar
+        Diagonal matrix or scalar value
+    D2 : DiagMatrix or scalar
+        Diagonal matrix or scalar value
 
     Returns
-     -------
-     DiagMatrix
-         diagonal matrix
+    -------
+    DiagMatrix
+        Diagonal matrix
 
-     Examples
-     --------
-     >>> D1 = DiagMatrix(torch.arange(1, 4))
-     >>> D2 = DiagMatrix(torch.arange(10, 13))
-     DiagMatrix(val=tensor([10, 22, 36]),
-     shape=(3, 3))
-     >>> D1 * 2.5
-     DiagMatrix(val=tensor([2.5000, 5.0000, 7.5000]),
-     shape=(3, 3))
-     >>> 2 * D1
-     DiagMatrix(val=tensor([2, 4, 6]),
-     shape=(3, 3))
+    Examples
+    --------
+    >>> D = diag(torch.arange(1, 4))
+    >>> D * 2.5
+    DiagMatrix(val=tensor([2.5000, 5.0000, 7.5000]),
+    shape=(3, 3))
+    >>> 2 * D
+    DiagMatrix(val=tensor([2, 4, 6]),
+    shape=(3, 3))
     """
     if isinstance(D1, DiagMatrix) and isinstance(D2, DiagMatrix):
         assert (
@@ -125,13 +122,12 @@ def diag_div(D1: DiagMatrix, D2: Union[DiagMatrix, float]) -> DiagMatrix:
 
     Examples
     --------
-    >>> D1 = DiagMatrix(torch.arange(1, 4))
-    >>> D2 = DiagMatrix(torch.arange(10, 13))
+    >>> D1 = diag(torch.arange(1, 4))
+    >>> D2 = diag(torch.arange(10, 13))
     >>> D1 / D2
-    >>> D1/D2
     DiagMatrix(val=tensor([0.1000, 0.1818, 0.2500]),
     shape=(3, 3))
-    >>> D1/2.5
+    >>> D1 / 2.5
     DiagMatrix(val=tensor([0.4000, 0.8000, 1.2000]),
     shape=(3, 3))
     """
@@ -178,7 +174,7 @@ def diag_power(D1: DiagMatrix, D2: float) -> DiagMatrix:
 
     Examples
     --------
-    >>> D1 = DiagMatrix(torch.arange(1, 4))
+    >>> D1 = diag(torch.arange(1, 4))
     >>> pow(D1, 2)
     DiagMatrix(val=tensor([1, 4, 9]),
     shape=(3, 3))
