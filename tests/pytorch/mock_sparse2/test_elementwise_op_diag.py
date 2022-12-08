@@ -35,7 +35,7 @@ def test_diag_op_diag(op):
 def test_diag_op_scalar(v_scalar):
     ctx = F.ctx()
     shape = (3, 4)
-    D1 = diag(torch.arange(1, 50).to(ctx), shape=shape)
+    D1 = diag(torch.arange(1, 4).to(ctx), shape=shape)
 
     # D * v
     D2 = D1 * v_scalar
