@@ -1,7 +1,6 @@
 """DGL elementwise operators for sparse matrix module."""
 import torch
 
-from .diag_matrix import DiagMatrix
 from .sparse_matrix import SparseMatrix
 
 __all__ = ["sp_add"]
