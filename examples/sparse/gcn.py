@@ -90,8 +90,8 @@ if __name__ == "__main__":
     A = create_from_coo(dst, src, shape=(N, N))
 
     ############################################################################
-    # (HIGHLIGHT) Compute the symmetrically normalized
-    # adjacency matrix with Sparse Matrix API
+    # (HIGHLIGHT) Compute the symmetrically normalized adjacency matrix 
+    # with Sparse Matrix API
     ############################################################################
     I = identity(A.shape, device=dev)
     A_hat = A + I
