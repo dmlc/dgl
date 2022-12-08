@@ -30,8 +30,10 @@ def diag_add(D1: DiagMatrix, D2: DiagMatrix) -> DiagMatrix:
     shape=(3, 3))
     """
     if isinstance(D1, DiagMatrix) and isinstance(D2, DiagMatrix):
-        assert D1.shape == D2.shape, "The shape of diagonal matrix D1 " \
+        assert D1.shape == D2.shape, (
+            "The shape of diagonal matrix D1 "
             f"{D1.shape} and D2 {D2.shape} must match."
+        )
         return diag(D1.val + D2.val, D1.shape)
     raise RuntimeError(
         "Elementwise addition between "
@@ -63,8 +65,10 @@ def diag_sub(D1: DiagMatrix, D2: DiagMatrix) -> DiagMatrix:
     shape=(3, 3))
     """
     if isinstance(D1, DiagMatrix) and isinstance(D2, DiagMatrix):
-        assert D1.shape == D2.shape, "The shape of diagonal matrix D1 " \
+        assert D1.shape == D2.shape, (
+            "The shape of diagonal matrix D1 "
             f"{D1.shape} and D2 {D2.shape} must match."
+        )
         return diag(D1.val - D2.val, D1.shape)
     raise RuntimeError(
         "Elementwise subtraction between "
@@ -100,8 +104,10 @@ def diag_mul(
     shape=(3, 3))
     """
     if isinstance(D1, DiagMatrix) and isinstance(D2, DiagMatrix):
-        assert D1.shape == D2.shape, "The shape of diagonal matrix D1 " \
+        assert D1.shape == D2.shape, (
+            "The shape of diagonal matrix D1 "
             f"{D1.shape} and D2 {D2.shape} must match."
+        )
         return diag(D1.val * D2.val, D1.shape)
     elif isinstance(D1, DiagMatrix) and isinstance(D2, (float, int)):
         return diag(D1.val * D2, D1.shape)
