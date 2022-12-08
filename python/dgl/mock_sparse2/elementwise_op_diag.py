@@ -29,12 +29,14 @@ def diag_add(D1: DiagMatrix, D2: DiagMatrix) -> DiagMatrix:
     DiagMatrix(val=tensor([11, 13, 15]),
     shape=(3, 3))
     """
-    assert (
-        D1.shape == D2.shape
-    ), "The shape of diagonal matrix D1 {} and" " D2 {} must match.".format(
-        D1.shape, D2.shape
+    if isinstance(D1, DiagMatrix) and isinstance(D2, DiagMatrix):
+        assert (D1.shape == D2.shape), "The shape of diagonal matrix D1 " \
+            f"{D1.shape} and D2 {D2.shape} must match."
+        return DiagMatrix(D1.val + D2.val)
+    raise RuntimeError(
+        "Elementwise addition between "
+        f"{type(D1)} and {type(D2)} is not supported."
     )
-    return DiagMatrix(D1.val + D2.val)
 
 
 def diag_sub(D1: DiagMatrix, D2: DiagMatrix) -> DiagMatrix:

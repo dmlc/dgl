@@ -1,9 +1,10 @@
 import operator
+import sys
 
+import backend as F
 import numpy as np
 import pytest
 import torch
-import sys
 from dgl.mock_sparse2 import diag
 
 # TODO(#4818): Skipping tests on win.
@@ -21,9 +22,10 @@ def all_close_sparse(A, B):
     "op", [operator.add, operator.sub, operator.mul, operator.truediv]
 )
 def test_diag_op_diag(op):
-    D1 = diag(torch.arange(1, 4))
-    D2 = diag(torch.arange(10, 13))
-    assert np.allclose(op(D1, D2).val, op(D1.val, D2.val), rtol=1e-4, atol=1e-4)
+    ctx = F.ctx()
+    D1 = diag(torch.arange(1, 4).to(ctx))
+    D2 = diag(torch.arange(10, 13).to(ctx))
+    assert torch.allclose(op(D1, D2).val, op(D1.val, D2.val), rtol=1e-4, atol=1e-4)
 
 
 @pytest.mark.parametrize("v_scalar", [2, 2.5])

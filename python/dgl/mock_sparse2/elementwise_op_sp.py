@@ -8,14 +8,13 @@ __all__ = ["sp_add"]
 
 
 def spsp_add(A, B):
-    """ Invoke C++ sparse library for addition """
+    """Invoke C++ sparse library for addition """
     return SparseMatrix(
         torch.ops.dgl_sparse.spsp_add(A.c_sparse_matrix, B.c_sparse_matrix)
     )
 
 
-def sp_add(
-    A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
+def sp_add(A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
     """Elementwise addition.
 
     Parameters
