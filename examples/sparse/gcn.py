@@ -64,7 +64,7 @@ def train(model, g, A_norm, X):
 
         # Evaluate the prediction.
         val_acc, test_acc = evaluate(g, pred)
-        if (epoch % 20 == 0):
+        if epoch % 20 == 0:
             print(
                 f"In epoch {epoch}, loss: {loss:.3f}, val acc: {val_acc:.3f}, test"
                 f" acc: {test_acc:.3f}"
