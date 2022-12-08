@@ -1,7 +1,7 @@
 """DGL elementwise operators for diagonal matrix module."""
 from typing import Union
 
-from .diag_matrix import DiagMatrix
+from .diag_matrix import DiagMatrix, diag
 
 __all__ = ["diag_add", "diag_sub", "diag_mul", "diag_div", "diag_power"]
 
@@ -30,9 +30,9 @@ def diag_add(D1: DiagMatrix, D2: DiagMatrix) -> DiagMatrix:
     shape=(3, 3))
     """
     if isinstance(D1, DiagMatrix) and isinstance(D2, DiagMatrix):
-        assert (D1.shape == D2.shape), "The shape of diagonal matrix D1 " \
+        assert D1.shape == D2.shape, "The shape of diagonal matrix D1 " \
             f"{D1.shape} and D2 {D2.shape} must match."
-        return DiagMatrix(D1.val + D2.val)
+        return diag(D1.val + D2.val, D1.shape)
     raise RuntimeError(
         "Elementwise addition between "
         f"{type(D1)} and {type(D2)} is not supported."
@@ -62,24 +62,26 @@ def diag_sub(D1: DiagMatrix, D2: DiagMatrix) -> DiagMatrix:
     DiagMatrix(val=tensor([-9, -9, -9]),
     shape=(3, 3))
     """
-    assert (
-        D1.shape == D2.shape
-    ), "The shape of diagonal matrix D1 {} and" "D2 {} must match".format(
-        D1.shape, D2.shape
+    if isinstance(D1, DiagMatrix) and isinstance(D2, DiagMatrix):
+        assert D1.shape == D2.shape, "The shape of diagonal matrix D1 " \
+            f"{D1.shape} and D2 {D2.shape} must match."
+        return diag(D1.val - D2.val, D1.shape)
+    raise RuntimeError(
+        "Elementwise subtraction between "
+        f"{type(D1)} and {type(D2)} is not supported."
     )
-    return DiagMatrix(D1.val - D2.val)
 
 
 def diag_mul(
-    D1: Union[DiagMatrix, float], D2: Union[DiagMatrix, float]
+    D1: Union[DiagMatrix, float, int], D2: Union[DiagMatrix, float, int]
 ) -> DiagMatrix:
     """Elementwise multiplication.
 
     Parameters
     ----------
-    D1 : DiagMatrix or scalar
+    D1 : DiagMatrix or float or int
         Diagonal matrix or scalar value
-    D2 : DiagMatrix or scalar
+    D2 : DiagMatrix or float or int
         Diagonal matrix or scalar value
 
     Returns
@@ -98,13 +100,18 @@ def diag_mul(
     shape=(3, 3))
     """
     if isinstance(D1, DiagMatrix) and isinstance(D2, DiagMatrix):
-        assert (
-            D1.shape == D2.shape
-        ), "The shape of diagonal matrix D1 {} and" "D2 {} must match".format(
-            D1.shape, D2.shape
-        )
-        return DiagMatrix(D1.val * D2.val)
-    return DiagMatrix(D1.val * D2)
+        assert D1.shape == D2.shape, "The shape of diagonal matrix D1 " \
+            f"{D1.shape} and D2 {D2.shape} must match."
+        return diag(D1.val * D2.val, D1.shape)
+    elif isinstance(D1, DiagMatrix) and isinstance(D2, (float, int)):
+        return diag(D1.val * D2, D1.shape)
+    elif isinstance(D1, (float, int)) and isinstance(D2, DiagMatrix):
+        return diag(D1 * D2.val, D2.shape)
+
+    raise RuntimeError(
+        "Elementwise multiplication between "
+        f"{type(D1)} and {type(D2)} is not supported."
+    )
 
 
 def diag_div(D1: DiagMatrix, D2: Union[DiagMatrix, float]) -> DiagMatrix:
@@ -139,8 +146,8 @@ def diag_div(D1: DiagMatrix, D2: Union[DiagMatrix, float]) -> DiagMatrix:
         ), "The shape of diagonal matrix D1 {} and" "D2 {} must match".format(
             D1.shape, D2.shape
         )
-        return DiagMatrix(D1.val / D2.val)
-    return DiagMatrix(D1.val / D2)
+        return diag(D1.val / D2.val, D1.shape)
+    return diag(D1.val / D2, D1.shape)
 
 
 def diag_rdiv(D1: float, D2: DiagMatrix):
