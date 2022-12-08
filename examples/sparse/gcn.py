@@ -1,5 +1,6 @@
 """
-[Semi-Supervised Classification with Graph Convolutional Networks](https://arxiv.org/abs/1609.02907)
+[Semi-Supervised Classification with Graph Convolutional Networks]
+(https://arxiv.org/abs/1609.02907)
 """
 
 import torch
@@ -67,8 +68,8 @@ def train(model, g, A_norm, X):
         val_acc, test_acc = evaluate(g, pred)
         if epoch % 20 == 0:
             print(
-                f"In epoch {epoch}, loss: {loss:.3f}, val acc: {val_acc:.3f}, test"
-                f" acc: {test_acc:.3f}"
+                f"In epoch {epoch}, loss: {loss:.3f}, val acc: {val_acc:.3f}"
+                f", test acc: {test_acc:.3f}"
             )
 
 
@@ -89,7 +90,8 @@ if __name__ == "__main__":
     A = create_from_coo(dst, src, shape=(N, N))
 
     ###########################################################
-    # (HIGHLIGHT) Compute the symmetrically normalized adjacency matrix with Sparse Matrix API
+    # (HIGHLIGHT) Compute the symmetrically normalized
+    # adjacency matrix with Sparse Matrix API
     ###########################################################
     I = identity(A.shape, device=dev)
     A_hat = A + I
