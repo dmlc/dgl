@@ -9,14 +9,15 @@ from dgl.data import CoraGraphDataset
 from dgl.mock_sparse import create_from_coo, diag, identity
 from torch.optim import Adam
 
+
 class GCN(nn.Module):
     def __init__(self, in_size, out_size, hidden_size=16):
         super().__init__()
-        
+
         # Two-layer GCN.
         self.Theta1 = nn.Linear(in_size, hidden_size)
         self.Theta2 = nn.Linear(hidden_size, out_size)
-        
+
     ###########################################################################
     # (HIGHLIGHT) Take the advantage of DGL sparse APIs to implement
     # the GCN forward process.
@@ -26,13 +27,13 @@ class GCN(nn.Module):
         X = F.relu(X)
         X = A_norm @ self.Theta2(X)
         return X
-        
-        
+
+
 def evaluate(g, pred):
     label = g.ndata["label"]
     val_mask = g.ndata["val_mask"]
     test_mask = g.ndata["test_mask"]
-    
+
     # Compute accuracy on validation/test set.
     val_acc = (pred[val_mask] == label[val_mask]).float().mean()
     test_acc = (pred[test_mask] == label[test_mask]).float().mean()
@@ -44,10 +45,10 @@ def train(model, g, A_norm, X):
     train_mask = g.ndata["train_mask"]
     optimizer = Adam(model.parameters(), lr=1e-2, weight_decay=5e-4)
     loss_fcn = nn.CrossEntropyLoss()
-    
+
     for epoch in range(200):
         model.train()
-        
+
         # Forward.
         logits = model(A_norm, X)
 
@@ -81,12 +82,12 @@ if __name__ == "__main__":
     g = dataset[0].to(dev)
     num_classes = dataset.num_classes
     X = g.ndata["feat"]
-    
+
     # Create the adjacency matrix of graph.
     src, dst = g.edges()
     N = g.num_nodes()
     A = create_from_coo(dst, src, shape=(N, N))
-    
+
     ###########################################################
     # (HIGHLIGHT) Compute the symmetrically normalized adjacency matrix with Sparse Matrix API
     ###########################################################
@@ -94,11 +95,11 @@ if __name__ == "__main__":
     A_hat = A + I
     D_hat = diag(A_hat.sum(1)) ** -0.5
     A_norm = D_hat @ A_hat @ D_hat
-    
+
     # Create model.
     in_size = X.shape[1]
     out_size = num_classes
     model = GCN(in_size, out_size).to(dev)
-    
+
     # Kick off training.
     train(model, g, A_norm, X)
