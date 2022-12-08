@@ -48,9 +48,11 @@ def test_diag_op_scalar(v_scalar):
     assert D1.shape == D2.shape
 
     # D / v
+    D2 = D1 / v_scalar
     assert np.allclose(
-        D1.val / v_scalar, (D1 / v_scalar).val, rtol=1e-4, atol=1e-4
+        D1.val / v_scalar, D2.val, rtol=1e-4, atol=1e-4
     )
+    assert D1.shape == D2.shape
 
     # D ^ v
     assert np.allclose(
