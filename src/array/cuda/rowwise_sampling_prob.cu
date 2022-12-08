@@ -21,9 +21,9 @@
 static_assert(
     CUB_VERSION >= 101700, "Require CUB >= 1.17 to use DeviceSegmentedSort");
 
-using namespace dgl::aten::cuda;
-
 namespace dgl {
+using namespace cuda;
+using namespace aten::cuda;
 namespace aten {
 namespace impl {
 
@@ -496,18 +496,12 @@ COOMatrix _CSRRowWiseSampling(
   IdType* const out_cols = static_cast<IdType*>(picked_col->data);
   IdType* const out_idxs = static_cast<IdType*>(picked_idx->data);
 
-  const IdType* in_ptr = mat.indptr.Ptr<IdType>();
-  const IdType* in_cols = mat.indices.Ptr<IdType>();
-  const IdType* data = CSRHasData(mat) ? mat.data.Ptr<IdType>() : nullptr;
-  const FloatType* prob_data = prob.Ptr<FloatType>();
-  if (mat.is_pinned) {
-    CUDA_CALL(cudaHostGetDevicePointer(&in_ptr, mat.indptr.Ptr<IdType>(), 0));
-    CUDA_CALL(cudaHostGetDevicePointer(&in_cols, mat.indices.Ptr<IdType>(), 0));
-    if (CSRHasData(mat)) {
-      CUDA_CALL(cudaHostGetDevicePointer(&data, mat.data.Ptr<IdType>(), 0));
-    }
-    CUDA_CALL(cudaHostGetDevicePointer(&prob_data, prob.Ptr<FloatType>(), 0));
-  }
+  const IdType* in_ptr = static_cast<IdType*>(GetDevicePointer(mat.indptr));
+  const IdType* in_cols = static_cast<IdType*>(GetDevicePointer(mat.indices));
+  const IdType* data = CSRHasData(mat)
+                           ? static_cast<IdType*>(GetDevicePointer(mat.data))
+                           : nullptr;
+  const FloatType* prob_data = static_cast<FloatType*>(GetDevicePointer(prob));
 
   // compute degree
   // out_deg: the size of each row in the sampled matrix
