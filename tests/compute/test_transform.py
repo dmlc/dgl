@@ -99,10 +99,10 @@ def test_no_backtracking():
     L = G.line_graph(backtracking=False)
     assert L.number_of_nodes() == 2 * N
     for i in range(1, N):
-        e1 = G.edge_id(0, i)
-        e2 = G.edge_id(i, 0)
-        assert not L.has_edge_between(e1, e2)
-        assert not L.has_edge_between(e2, e1)
+        e1 = G.edge_ids(0, i)
+        e2 = G.edge_ids(i, 0)
+        assert not L.has_edges_between(e1, e2)
+        assert not L.has_edges_between(e2, e1)
 
 # reverse graph related
 @parametrize_idtype
@@ -122,9 +122,9 @@ def test_reverse(idtype):
     assert g.number_of_edges() == rg.number_of_edges()
     assert F.allclose(F.astype(rg.has_edges_between(
         [1, 2, 1], [0, 1, 2]), F.float32), F.ones((3,)))
-    assert g.edge_id(0, 1) == rg.edge_id(1, 0)
-    assert g.edge_id(1, 2) == rg.edge_id(2, 1)
-    assert g.edge_id(2, 1) == rg.edge_id(1, 2)
+    assert g.edge_ids(0, 1) == rg.edge_ids(1, 0)
+    assert g.edge_ids(1, 2) == rg.edge_ids(2, 1)
+    assert g.edge_ids(2, 1) == rg.edge_ids(1, 2)
 
     # test dgl.reverse
     # test homogeneous graph
@@ -2671,6 +2671,34 @@ def test_shortest_dist(idtype):
     )
     assert F.array_equal(dist, tgt_dist)
     assert F.array_equal(paths, tgt_paths)
+
+@parametrize_idtype
+def test_module_to_levi(idtype):
+    transform = dgl.ToLevi()
+    g = dgl.graph(([0, 1, 2, 3], [1, 2, 3, 0]), idtype=idtype, device=F.ctx())
+    g.ndata['h'] = F.randn((g.num_nodes(), 2))
+    g.edata['w'] = F.randn((g.num_edges(), 2))
+    lg = transform(g)
+    assert lg.device == g.device
+    assert lg.idtype == g.idtype
+    assert lg.ntypes == ['edge', 'node']
+    assert lg.canonical_etypes == [('edge', 'e2n', 'node'),
+                                   ('node', 'n2e', 'edge')]
+    assert lg.num_nodes('node') == g.num_nodes()
+    assert lg.num_nodes('edge') == g.num_edges()
+    assert lg.num_edges('n2e') == g.num_edges()
+    assert lg.num_edges('e2n') == g.num_edges()
+
+    src, dst = lg.edges(etype='n2e')
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 0), (1, 1), (2, 2), (3, 3)}
+
+    src, dst = lg.edges(etype='e2n')
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 1), (1, 2), (2, 3), (3, 0)}
+
+    assert F.allclose(lg.nodes['node'].data['h'], g.ndata['h'])
+    assert F.allclose(lg.nodes['edge'].data['w'], g.edata['w'])
 
 if __name__ == '__main__':
     test_partition_with_halo()

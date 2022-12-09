@@ -124,7 +124,6 @@ def net2graph(net_sm):
 
 
 def make_undirected(G):
-    # G.readonly(False)
     G.add_edges(G.edges()[1], G.edges()[0])
     return G
 

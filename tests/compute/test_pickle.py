@@ -14,7 +14,6 @@ from test_utils import parametrize_idtype, get_cases
 from utils import assert_is_identical, assert_is_identical_hetero
 
 def _assert_is_identical_nodeflow(nf1, nf2):
-    assert nf1.is_readonly == nf2.is_readonly
     assert nf1.number_of_nodes() == nf2.number_of_nodes()
     src, dst = nf1.all_edges()
     src2, dst2 = nf2.all_edges()
@@ -122,7 +121,7 @@ def test_pickling_batched_heterograph():
     g2.nodes['game'].data['g_h'] = F.randn((2, 5))
     g2.edges['plays'].data['p_h'] = F.randn((4, 6))
 
-    bg = dgl.batch_hetero([g, g2])
+    bg = dgl.batch([g, g2])
     new_bg = _reconstruct_pickle(bg)
     test_utils.check_graph_equal(bg, new_bg)
 

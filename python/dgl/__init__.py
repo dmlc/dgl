@@ -36,8 +36,8 @@ from .readout import *
 from .batch import *
 from .convert import *
 from .generators import *
-from .heterograph import DGLHeteroGraph
-from .heterograph import DGLHeteroGraph as DGLGraph  # pylint: disable=reimported
+from .heterograph import DGLGraph
+from .heterograph import DGLGraph as DGLHeteroGraph  # pylint: disable=reimported
 from .dataloading import set_src_lazy_features, set_dst_lazy_features, set_edge_lazy_features, \
     set_node_lazy_features
 from .merge import *

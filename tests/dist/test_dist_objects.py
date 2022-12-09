@@ -14,6 +14,7 @@ from dgl.distributed import partition_graph
 
 graph_name = os.environ.get("DIST_DGL_TEST_GRAPH_NAME", "random_test_graph")
 target = os.environ.get("DIST_DGL_TEST_OBJECT_TYPE", "")
+blacklist = os.environ.get("DIST_DGL_TEST_OBJECT_TYPE_BLACKLIST", "")
 shared_workspace = os.environ.get('DIST_DGL_TEST_WORKSPACE', '/shared_workspace/dgl_dist_tensor_test/')
 
 
@@ -66,7 +67,7 @@ def create_graph(num_part, dist_graph_path, hetero):
 
 
         for _, etype, _ in etypes:
-            edge_u, edge_v = g.find_edges(F.arange(0, g.number_of_edges(etype)))
+            edge_u, edge_v = g.find_edges(F.arange(0, g.number_of_edges(etype)), etype=etype)
             g.edges[etype].data["edge_u"] = edge_u
             g.edges[etype].data["edge_v"] = edge_v
 
@@ -136,6 +137,7 @@ def test_dist_objects(net_type, num_servers, num_clients, hetero, shared_mem):
             cmd_envs = (
                 base_envs + f"DIST_DGL_TEST_PART_ID={part_id} "
                 f"DIST_DGL_TEST_OBJECT_TYPE={target} "
+                f"DIST_DGL_TEST_OBJECT_TYPE_BLACKLIST={blacklist} "
                 f"DIST_DGL_TEST_MODE=client "
             )
             procs.append(

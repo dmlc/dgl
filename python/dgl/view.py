@@ -13,7 +13,7 @@ EdgeSpace = namedtuple("EdgeSpace", ["data"])
 
 
 class HeteroNodeView(object):
-    """A NodeView class to act as G.nodes for a DGLHeteroGraph."""
+    """A NodeView class to act as G.nodes for a DGLGraph."""
 
     __slots__ = ["_graph", "_typeid_getter"]
 
@@ -140,7 +140,7 @@ class HeteroNodeDataView(MutableMapping):
 
 
 class HeteroEdgeView(object):
-    """A EdgeView class to act as G.edges for a DGLHeteroGraph."""
+    """A EdgeView class to act as G.edges for a DGLGraph."""
 
     __slots__ = ["_graph"]
 

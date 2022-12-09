@@ -19,17 +19,8 @@ def get_proc_info():
     environment when `mpirun` is used to run this python program.
 
     Please note that for mpi(openmpi) installation the rank is retrieved from the
-    environment using OMPI_COMM_WORLD_RANK and for mpi(standard installation) it is
-    retrieved from the environment using MPI_LOCALRANKID.
-
-    For retrieving world_size please use OMPI_COMM_WORLD_SIZE or
-    MPI_WORLDSIZE appropriately as described above to retrieve total no. of
-    processes, when needed.
-
-    MPI_LOCALRANKID is only valid on a single-node cluster. In a multi-node cluster
-    the correct key to use is PMI_RANK. In a multi-node cluster, MPI_LOCALRANKID
-    returns local rank of the process in the context of a particular node in which
-    it is unique.
+    environment using OMPI_COMM_WORLD_RANK. For mpich it is
+    retrieved from the environment using PMI_RANK.
 
     Returns:
     --------
@@ -37,8 +28,14 @@ def get_proc_info():
         Rank of the current process.
     """
     env_variables = dict(os.environ)
-    return int(os.environ.get("PMI_RANK") or 0)
-
+    # mpich
+    if "PMI_RANK" in env_variables:
+        return int(env_variables["PMI_RANK"])
+    #openmpi
+    elif "OMPI_COMM_WORLD_RANK" in env_variables:
+        return int(env_variables["OMPI_COMM_WORLD_RANK"])
+    else:
+        return 0
 
 def gen_edge_files(schema_map, output):
     """Function to create edges files to be consumed by ParMETIS
@@ -293,8 +290,8 @@ def gen_parmetis_input_args(params, schema_map):
     #   num_constraints = no. of node types + train_mask + test_mask + val_mask
     #   Here, (train/test/val) masks will be set to 1 if these masks exist for
     #   all the node types in the graph, otherwise these flags will be set to 0
-    assert constants.GRAPH_NAMEe in schema_map, "Graph name is not present in the json file"
-    graph_name = schema_map[constants.GRAPH_NAME]
+    assert constants.STR_GRAPH_NAME in schema_map, "Graph name is not present in the json file"
+    graph_name = schema_map[constants.STR_GRAPH_NAME]
     if not os.path.isfile(f'{graph_name}_stats.txt'):
         num_nodes = np.sum(np.concatenate(schema_map[constants.STR_NUM_NODES_PER_CHUNK]))
         num_edges = np.sum(np.concatenate(schema_map[constants.STR_NUM_EDGES_PER_CHUNK]))
@@ -312,7 +309,7 @@ def gen_parmetis_input_args(params, schema_map):
         train_mask = train_mask // num_ntypes
         test_mask = test_mask // num_ntypes
         val_mask = val_mask // num_ntypes
-        num_constraints = num_nyptes + train_mask + test_mask + val_mask
+        num_constraints = num_ntypes + train_mask + test_mask + val_mask
 
         with open(f'{graph_name}_stats.txt', 'w') as sf:
             sf.write(f'{num_nodes} {num_edges} {num_constraints}')

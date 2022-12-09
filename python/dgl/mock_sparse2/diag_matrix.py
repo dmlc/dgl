@@ -36,42 +36,33 @@ class DiagMatrix:
             )
         else:
             shape = (len_val, len_val)
-        self.val = val
-        self.shape = shape
+        self._val = val
+        self._shape = shape
 
-    def __repr__(self):
-        return f"DiagMatrix(val={self.val}, \nshape={self.shape})"
-
-    def __call__(self, x: torch.Tensor):
-        """Create a new diagonal matrix with the same shape as self
-        but different values.
-
-        Parameters
-        ----------
-        x : torch.Tensor
-            Values of the diagonal matrix
+    @property
+    def val(self) -> torch.Tensor:
+        """Get the values of the nonzero elements.
 
         Returns
         -------
-        DiagMatrix
-            Diagonal matrix
-
-        Examples
-        --------
-
-        >>> import torch
-        >>> val = torch.ones(5)
-        >>> mat = diag(val)
-        >>> print(mat)
-        DiagMatrix(val=tensor([1., 1., 1., 1., 1.]),
-                   shape=(5, 5))
-        >>> val = torch.ones(5) + 1
-        >>> mat = mat(val)
-        >>> print(mat)
-        DiagMatrix(val=tensor([2., 2., 2., 2., 2.]),
-                   shape=(5, 5))
+        torch.Tensor
+            Values of the nonzero elements
         """
-        return diag(x, self.shape)
+        return self._val
+
+    @property
+    def shape(self) -> Tuple[int]:
+        """Shape of the sparse matrix.
+
+        Returns
+        -------
+        Tuple[int]
+            The shape of the matrix
+        """
+        return self._shape
+
+    def __repr__(self):
+        return f"DiagMatrix(val={self.val}, \nshape={self.shape})"
 
     @property
     def nnz(self) -> int:

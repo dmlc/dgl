@@ -171,7 +171,7 @@ def main(args):
                 root_ids = [
                     i
                     for i in range(batch.graph.number_of_nodes())
-                    if batch.graph.out_degree(i) == 0
+                    if batch.graph.out_degrees(i) == 0
                 ]
                 root_acc = np.sum(
                     batch.label.asnumpy()[root_ids] == pred.asnumpy()[root_ids]
@@ -208,7 +208,7 @@ def main(args):
             root_ids = [
                 i
                 for i in range(batch.graph.number_of_nodes())
-                if batch.graph.out_degree(i) == 0
+                if batch.graph.out_degrees(i) == 0
             ]
             root_acc = np.sum(
                 batch.label.asnumpy()[root_ids] == pred.asnumpy()[root_ids]
@@ -261,7 +261,7 @@ def main(args):
         root_ids = [
             i
             for i in range(batch.graph.number_of_nodes())
-            if batch.graph.out_degree(i) == 0
+            if batch.graph.out_degrees(i) == 0
         ]
         root_acc = np.sum(
             batch.label.asnumpy()[root_ids] == pred.asnumpy()[root_ids]

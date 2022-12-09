@@ -133,7 +133,7 @@ class WeightedSAGEConv(nn.Module):
 class SAGENet(nn.Module):
     def __init__(self, hidden_dims, n_layers):
         """
-        g : DGLHeteroGraph
+        g : DGLGraph
             The user-item interaction graph.
             This is only for finding the range of categorical variables.
         item_textsets : torchtext.data.Dataset
@@ -357,7 +357,7 @@ def assign_textual_node_features(ndata, textset, ntype):
     The length would be stored as another node feature with name
     ``field_name + '__len'``.
 
-    block : DGLHeteroGraph
+    block : DGLGraph
         First element of the compacted blocks, with "dgl.NID" as the
         corresponding node ID in the original graph, hence the index to the
         text dataset.

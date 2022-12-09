@@ -1,13 +1,13 @@
 import unittest
 
 import backend as F
+
+import dgl
 import networkx as nx
 import numpy as np
 import pytest
 import scipy.sparse as ssp
 from test_utils import parametrize_idtype
-
-import dgl
 
 D = 5
 
@@ -17,10 +17,10 @@ def generate_graph(grad=False, add_data=True):
     g.add_nodes(10)
     # create a graph where 0 is the source and 9 is the sink
     for i in range(1, 9):
-        g.add_edge(0, i)
-        g.add_edge(i, 9)
+        g.add_edges(0, i)
+        g.add_edges(i, 9)
     # add a back flow from 9 to 0
-    g.add_edge(9, 0)
+    g.add_edges(9, 0)
     if add_data:
         ncol = F.randn((10, D))
         ecol = F.randn((17, D))
@@ -119,6 +119,32 @@ def create_test_heterograph(idtype):
             ("user", "plays", "game"): ([0, 1, 2, 1], [0, 0, 1, 1]),
             ("user", "wishes", "game"): ([0, 2], [1, 0]),
             ("developer", "develops", "game"): ([0, 1], [0, 1]),
+        },
+        idtype=idtype,
+        device=F.ctx(),
+    )
+    for etype in g.etypes:
+        g.edges[etype].data["weight"] = F.randn((g.num_edges(etype),))
+    assert g.idtype == idtype
+    assert g.device == F.ctx()
+    return g
+
+
+def create_test_heterograph2(idtype):
+    """test heterograph from the docstring, with an empty relation"""
+    # 3 users, 2 games, 2 developers
+    # metagraph:
+    #    ('user', 'follows', 'user'),
+    #    ('user', 'plays', 'game'),
+    #    ('user', 'wishes', 'game'),
+    #    ('developer', 'develops', 'game')
+
+    g = dgl.heterograph(
+        {
+            ("user", "follows", "user"): ([0, 1], [1, 2]),
+            ("user", "plays", "game"): ([0, 1, 2, 1], [0, 0, 1, 1]),
+            ("user", "wishes", "game"): ([0, 2], [1, 0]),
+            ("developer", "develops", "game"): ([], []),
         },
         idtype=idtype,
         device=F.ctx(),
@@ -788,14 +814,14 @@ def test_subframes(parent_idx_device, child_device):
 @unittest.skipIf(
     F._default_context_str != "gpu", reason="UVA only available on GPU"
 )
-@pytest.mark.parametrize("device", [F.cpu(), F.cuda()])
 @unittest.skipIf(
     dgl.backend.backend_name != "pytorch",
     reason="UVA only supported for PyTorch",
 )
+@pytest.mark.parametrize("device", [F.cpu(), F.cuda()])
 @parametrize_idtype
 def test_uva_subgraph(idtype, device):
-    g = create_test_heterograph(idtype)
+    g = create_test_heterograph2(idtype)
     g = g.to(F.cpu())
     g.create_formats_()
     g.pin_memory_()
@@ -805,16 +831,13 @@ def test_uva_subgraph(idtype, device):
     assert g.edge_subgraph(edge_indices).device == device
     assert g.in_subgraph(indices).device == device
     assert g.out_subgraph(indices).device == device
-    if dgl.backend.backend_name != "tensorflow":
-        # (BarclayII) Most of Tensorflow functions somehow do not preserve device: a CPU tensor
-        # becomes a GPU tensor after operations such as concat(), unique() or even sin().
-        # Not sure what should be the best fix.
-        assert g.khop_in_subgraph(indices, 1)[0].device == device
-        assert g.khop_out_subgraph(indices, 1)[0].device == device
+    assert g.khop_in_subgraph(indices, 1)[0].device == device
+    assert g.khop_out_subgraph(indices, 1)[0].device == device
     assert g.sample_neighbors(indices, 1).device == device
     g.unpin_memory_()
 
 
 if __name__ == "__main__":
     test_edge_subgraph()
-    # test_uva_subgraph(F.int64, F.cpu())
+    test_uva_subgraph(F.int64, F.cpu())
+    test_uva_subgraph(F.int64, F.cuda())

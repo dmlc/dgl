@@ -134,7 +134,7 @@ void SpMMCsrHetero(
           cusparse_available<DType, IdType>(more_nnz)) {  // cusparse
         NDArray efeat = vec_efeat[etype];
         if (!IsNullArray(csr.data))
-          efeat = _IndexSelect<DType, IdType>(efeat, csr.data);
+          efeat = IndexSelect(efeat, csr.data);
         CusparseCsrmm2Hetero<DType, IdType>(
             csr.indptr->ctx, csr, static_cast<DType*>(vec_ufeat[src_id]->data),
             static_cast<DType*>(efeat->data),

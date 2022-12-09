@@ -4,7 +4,7 @@ import sys
 
 from dgl.mock_sparse2 import diag, identity, DiagMatrix
 
-# FIXME: Skipping tests on win.
+# TODO(#4818): Skipping tests on win.
 if not sys.platform.startswith("linux"):
     pytest.skip("skipping tests on win", allow_module_level=True)
 
@@ -24,8 +24,6 @@ def test_diag(val_shape, mat_shape):
 
     # __call__
     val = torch.randn(val_shape)
-    mat = mat(val)
-    assert torch.allclose(mat.val, val)
 
     # nnz
     assert mat.nnz == val.shape[0]
@@ -46,7 +44,8 @@ def test_diag(val_shape, mat_shape):
     assert sp_mat.device == mat.device
     # row, col, val
     edge_index = torch.arange(len(val)).to(mat.device)
-    row, col, val = sp_mat.coo()
+    row, col = sp_mat.coo()
+    val = sp_mat.val
     assert torch.allclose(row, edge_index)
     assert torch.allclose(col, edge_index)
     assert torch.allclose(val, val)
