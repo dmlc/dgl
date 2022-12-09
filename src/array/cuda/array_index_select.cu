@@ -16,12 +16,6 @@ namespace impl {
 
 template <DGLDeviceType XPU, typename DType, typename IdType>
 NDArray IndexSelect(NDArray array, IdArray index) {
-  cudaStream_t stream = runtime::getCurrentCUDAStream();
-  const DType* array_data = array.Ptr<DType>();
-  if (array.IsPinned()) {
-    CUDA_CALL(cudaHostGetDevicePointer(&array_data, array.Ptr<DType>(), 0));
-  }
-  const IdType* idx_data = static_cast<IdType*>(index->data);
   const int64_t arr_len = array->shape[0];
   const int64_t len = index->shape[0];
   int64_t num_feat = 1;
@@ -33,9 +27,13 @@ NDArray IndexSelect(NDArray array, IdArray index) {
 
   // use index->ctx for pinned array
   NDArray ret = NDArray::Empty(shape, array->dtype, index->ctx);
-  if (len == 0) return ret;
+  if (len == 0 || arr_len * num_feat == 0) return ret;
   DType* ret_data = static_cast<DType*>(ret->data);
 
+  const DType* array_data = static_cast<DType*>(cuda::GetDevicePointer(array));
+  const IdType* idx_data = static_cast<IdType*>(index->data);
+
+  cudaStream_t stream = runtime::getCurrentCUDAStream();
   if (num_feat == 1) {
     const int nt = cuda::FindNumThreads(len);
     const int nb = (len + nt - 1) / nt;
