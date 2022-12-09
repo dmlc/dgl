@@ -7,7 +7,7 @@
 
 외부 소스들로부터 :class:`~dgl.DGLGraph` 를 만드는 옵션들:
 
-- 그래프 및 성긴 행렬(sparse matrix)을 위한 python 라이브러리(NetworkX 및 SciPy)로부터 변환하기
+- 그래프 및 성긴(sparse) 행렬을 위한 python 라이브러리(NetworkX 및 SciPy)로부터 변환하기
 - 디스크에서 그래프를 로딩하기
 
 이 절에서는 다른 그래프를 변환해서 그래프를 생성하는 함수들은 다루지 않겠다. 그 방법들에 대한 소개는 매뉴얼의 API를 참조하자.
