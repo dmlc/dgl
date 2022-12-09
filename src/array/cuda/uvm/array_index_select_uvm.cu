@@ -34,7 +34,7 @@ NDArray IndexSelectCPUFromGPU(NDArray array, IdArray index) {
   }
 
   NDArray ret = NDArray::Empty(shape, array->dtype, index->ctx);
-  if (len == 0 || arr_len == 0) return ret;
+  if (len == 0 || arr_len * num_feat == 0) return ret;
   DType* ret_data = static_cast<DType*>(ret->data);
 
   if (num_feat == 1) {

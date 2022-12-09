@@ -27,7 +27,7 @@ NDArray IndexSelect(NDArray array, IdArray index) {
 
   // use index->ctx for pinned array
   NDArray ret = NDArray::Empty(shape, array->dtype, index->ctx);
-  if (len == 0 || arr_len == 0) return ret;
+  if (len == 0 || arr_len * num_feat == 0) return ret;
   DType* ret_data = static_cast<DType*>(ret->data);
 
   const DType* array_data = static_cast<DType*>(cuda::GetDevicePointer(array));
