@@ -23,7 +23,7 @@ class GCNIIConvolution(nn.Module):
         self.reset_parameters()
 
     ############################################################################
-    # (HIGHLIGHT) Take the advantage of DGL sparse APIs to implement the GCNII 
+    # (HIGHLIGHT) Take the advantage of DGL sparse APIs to implement the GCNII
     # forward process.
     ############################################################################
     def forward(self, A_norm, H, H0, lamda, alpha, l):
@@ -154,7 +154,7 @@ if __name__ == "__main__":
     A = create_from_coo(dst, src, shape=(N, N))
 
     ############################################################################
-    # (HIGHLIGHT) Compute the symmetrically normalized adjacency matrix with 
+    # (HIGHLIGHT) Compute the symmetrically normalized adjacency matrix with
     # Sparse Matrix API
     ############################################################################
     I = identity(A.shape, device=dev)
