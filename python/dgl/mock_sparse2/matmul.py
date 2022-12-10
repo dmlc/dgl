@@ -67,8 +67,8 @@ def mm_sp(
     A1 : SparseMatrix
         Matrix of shape (N, M), with values of shape (nnz1)
     A2 : torch.Tensor, SparseMatrix, or DiagMatrix
-        Matrix of shape (M, P). If it is a SparseMatrix or DiagMatrix,
-        it should have values of shape (nnz2)
+        If A2 is a dense tensor, it can have shapes of (M, P) or (M, ).
+        Otherwise it must have a shape of (M, P).
 
     Returns
     -------

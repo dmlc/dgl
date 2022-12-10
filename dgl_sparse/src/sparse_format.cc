@@ -94,17 +94,17 @@ std::shared_ptr<COO> COOTranspose(const std::shared_ptr<COO>& coo) {
 
 HeteroGraphPtr COOToDGLGraph(const std::shared_ptr<COO>& coo) {
   auto dgl_coo = COOToOldDGLCOO(coo);
-  return UnitGraph::CreateFromCOO(2, dgl_coo);
+  return UnitGraph::CreateFromCOO(2 /* Number of node types */, dgl_coo);
 }
 
 HeteroGraphPtr CSRToDGLGraph(const std::shared_ptr<CSR>& csr) {
   auto dgl_csr = CSRToOldDGLCSR(csr);
-  return UnitGraph::CreateFromCSR(2, dgl_csr);
+  return UnitGraph::CreateFromCSR(2 /* Number of node types */, dgl_csr);
 }
 
 HeteroGraphPtr CSCToDGLGraph(const std::shared_ptr<CSR>& csc) {
   auto dgl_csc = CSRToOldDGLCSR(csc);
-  return UnitGraph::CreateFromCSC(2, dgl_csc);
+  return UnitGraph::CreateFromCSC(2 /* Number of node types */, dgl_csc);
 }
 
 }  // namespace sparse

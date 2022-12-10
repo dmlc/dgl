@@ -17,7 +17,7 @@ namespace dgl {
 namespace sparse {
 
 /**
- * @brief Performs a matrix multiplication of the sparse matrix and dense
+ * @brief Perform a matrix multiplication of the sparse matrix and dense
  * matrix. It uses the sparse formats of `sparse_mat` and non-zero values of
  * `sparse_val` for SpMM. The `sparse_val` must be 1-dimensional. If the sparse
  * matrix has shape (n, m), the dense matrix must have shape (m, k) or (m,). and
@@ -26,7 +26,7 @@ namespace sparse {
  *
  * This function does not take care of autograd.
  *
- * @param sparse_matrix The sparse matrix.
+ * @param sparse_mat The sparse matrix.
  * @param sparse_val Non-zero values of the sparse matrix.
  * @param dense_mat The dense matrix.
  *
@@ -37,9 +37,9 @@ torch::Tensor SpMMImpl(
     torch::Tensor sparse_val, torch::Tensor dense_mat);
 
 /**
- * @brief Performs a matrix multiplication of the sparse matrix and dense
+ * @brief Perform a matrix multiplication of the sparse matrix and dense
  * matrix. The sparse matrix must have 1-dimensional values. If the sparse
- * matrix has shape (n, m), the dense matrix must have shape (m, k) or (m,). and
+ * matrix has shape (n, m), the dense matrix must have shape (m, k) or (m,), and
  * the returned dense matrix has shape (n, k) or (n,).
  *
  * This function supports autograd for both the sparse and dense matrix.
@@ -47,7 +47,7 @@ torch::Tensor SpMMImpl(
  * @param sparse_mat The sparse matrix.
  * @param dense_mat The dense matrix.
  *
- * @return Result dense matrix.
+ * @return Dense matrix.
  */
 torch::Tensor SpMM(
     const c10::intrusive_ptr<SparseMatrix>& sparse_mat,

@@ -17,8 +17,8 @@ namespace dgl {
 namespace sparse {
 
 /**
- * @brief Performs a sampled matrix multiplication of a sparse matrix and two
- * dense matrix. For efficiency, `mat2_tr` is the transposition of the matrix to
+ * @brief Perform a sampled matrix multiplication of a sparse matrix and two
+ * dense matrices. For efficiency, `mat2_tr` is the transposition of the matrix to
  * be multiplied. If the sparse matrix has shape (n, m), `mat1` and `mat2_tr`
  * must have shapes of `(n, k)` and `(m, k)` or
  * `(n,)` and `(m,)` respectively. And the returned tensor has shape
@@ -26,7 +26,7 @@ namespace sparse {
  *
  * This function does not take care of autograd.
  *
- * @param sparse_matrix The sparse matrix.
+ * @param sparse_mat The sparse matrix.
  * @param mat1 The first dense matrix.
  * @param mat2_tr Transposition of the second matrix.
  *
