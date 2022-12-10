@@ -1,10 +1,12 @@
 """Matmul ops for SparseMatrix"""
 # pylint: disable=invalid-name
 from typing import Union
+
 import torch
 
-from .sparse_matrix import SparseMatrix
 from .diag_matrix import DiagMatrix
+
+from .sparse_matrix import SparseMatrix
 
 __all__ = ["spmm"]
 

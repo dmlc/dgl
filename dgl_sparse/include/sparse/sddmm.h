@@ -18,8 +18,8 @@ namespace sparse {
 
 /**
  * @brief Perform a sampled matrix multiplication of a sparse matrix and two
- * dense matrices. For efficiency, `mat2_tr` is the transposition of the matrix to
- * be multiplied. If the sparse matrix has shape (n, m), `mat1` and `mat2_tr`
+ * dense matrices. For efficiency, `mat2_tr` is the transposition of the matrix
+ * to be multiplied. If the sparse matrix has shape (n, m), `mat1` and `mat2_tr`
  * must have shapes of `(n, k)` and `(m, k)` or
  * `(n,)` and `(m,)` respectively. And the returned tensor has shape
  * `(sparse_matrix->nnz())`.
