@@ -11,6 +11,7 @@ from .sparse_matrix import *
 from .unary_op_diag import *
 from .unary_op_sp import *
 from .matmul import *
+from .reduction import *
 
 
 def load_dgl_sparse():
