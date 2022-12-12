@@ -172,7 +172,7 @@ def exchange_edge_data(rank, world_size, num_parts, edge_data):
                 input_list.append(torch.from_numpy(filt_data))
 
         dist.barrier ()
-        output_list = alltoallv_cpu(rank, world_size, input_list)
+        output_list = alltoallv_cpu(rank, world_size, input_list, retain_nones=False)
 
         #Replace the values of the edge_data, with the received data from all the other processes.
         rcvd_edge_data = torch.cat(output_list).numpy()
@@ -264,7 +264,6 @@ def exchange_feature(rank, data, id_lookup, feat_type, feat_key, featdata_key, g
     tokens = feat_key.split("/")
     assert len(tokens) == 3
     local_feat_key = "/".join(tokens[:-1]) +"/"+ str(local_part_id)
-    print(f"------ Rank:{rank}, feat_type:{feat_type}, feat_key:{feat_key}, local_feat_key:{local_feat_key}, cur_features:{cur_features.keys()}")
     for idx in range(world_size):
         # Get the partition ids for the range of global nids.
         if feat_type == constants.STR_NODE_FEATURES:
@@ -300,19 +299,17 @@ def exchange_feature(rank, data, id_lookup, feat_type, feat_key, featdata_key, g
 
     #features (and global nids) per rank to be sent out are ready
     #for transmission, perform alltoallv here.
-    output_feat_list = alltoallv_cpu(rank, world_size, feats_per_rank)
-    output_id_list = alltoallv_cpu(rank, world_size, global_id_per_rank)
+    output_feat_list = alltoallv_cpu(rank, world_size, feats_per_rank, retain_nones=False)
+    output_id_list = alltoallv_cpu(rank, world_size, global_id_per_rank, retain_nones=False)
+    assert len(output_feat_list) == len(output_id_list), (
+        "Length of feature list and id list are expected to be equal while "
+        f"got {len(output_feat_list)} and {len(output_id_list)}."
+    )
 
     #stitch node_features together to form one large feature tensor
-    output_feat_list = [data for data in output_feat_list if data is not None]
-    output_id_list = [data for data in output_id_list if data is not None]
     if len(output_feat_list) > 0:
         output_feat_list = torch.cat(output_feat_list)
-    if len(output_id_list) > 0:
         output_id_list = torch.cat(output_id_list)
-
-    print(f"==== Rank:{rank}, {len(output_feat_list)}, {len(output_id_list)}")
-    if len(output_feat_list) > 0:
         if local_feat_key in cur_features: 
             temp = cur_features[local_feat_key]
             cur_features[local_feat_key] = torch.cat([temp, output_feat_list])

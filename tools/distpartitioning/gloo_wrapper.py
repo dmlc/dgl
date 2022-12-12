@@ -89,7 +89,7 @@ def __alltoall_cpu(rank, world_size, output_tensor_list, input_tensor_list):
             input_tensor_list[i] = input_tensor_list[i].to(dtype)
             output_tensor_list[i] = output_tensor_list[i].to(dtype)
 
-def alltoallv_cpu(rank, world_size, input_tensor_list):
+def alltoallv_cpu(rank, world_size, input_tensor_list, retain_nones=True):
     """
     Wrapper function to providing the alltoallv functionality by using underlying alltoall
     messaging primitive. This function, in its current implementation, supports exchanging 
@@ -111,6 +111,8 @@ def alltoallv_cpu(rank, world_size, input_tensor_list):
         The size of the entire
     input_tensor_list : List of tensor
         The tensors to exchange
+    retain_nones : bool
+        Indicates whether to retain ``None`` data in returned value.
 
     Returns:
     --------
@@ -164,8 +166,8 @@ def alltoallv_cpu(rank, world_size, input_tensor_list):
     return_vals = []
     for s, t in zip(recv_counts, output_tensor_list):
         if s[0] == 0:
-            #continue
-            return_vals.append(None)
+            if retain_nones:
+                return_vals.append(None)
         else:
             return_vals.append(t[0:s[0]])
     return return_vals

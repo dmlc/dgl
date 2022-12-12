@@ -107,13 +107,8 @@ def _shuffle_data(data, rank, world_size, tids, num_parts):
             data_input[i] = torch.cat(data).to(dtype=data_type)
 
     # scatter and gather data
-    data_output = alltoallv_cpu(rank, world_size, data_input)
-
-    # collect gathered data
-    shuffled_data = []
-    for data in data_output:
-        if data is not None:
-            shuffled_data.append(data)
+    shuffled_data = alltoallv_cpu(rank, world_size, data_input,
+        retain_nones=False)
     shuffled_data = torch.cat(shuffled_data)
 
     return shuffled_data
