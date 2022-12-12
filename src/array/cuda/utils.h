@@ -264,6 +264,14 @@ void MaskSelect(
   device->FreeWorkspace(ctx, workspace);
 }
 
+inline void* GetDevicePointer(runtime::NDArray array) {
+  void* ptr = array->data;
+  if (array.IsPinned()) {
+    CUDA_CALL(cudaHostGetDevicePointer(&ptr, ptr, 0));
+  }
+  return ptr;
+}
+
 }  // namespace cuda
 }  // namespace dgl
 

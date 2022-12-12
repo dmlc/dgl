@@ -13,10 +13,11 @@
 #include "../../array/cuda/atomic.cuh"
 #include "../../runtime/cuda/cuda_common.h"
 #include "./dgl_cub.cuh"
-
-using namespace dgl::aten::cuda;
+#include "./utils.h"
 
 namespace dgl {
+using namespace cuda;
+using namespace aten::cuda;
 namespace aten {
 namespace impl {
 
@@ -248,16 +249,11 @@ COOMatrix _CSRRowWiseSamplingUniform(
   IdType* const out_cols = static_cast<IdType*>(picked_col->data);
   IdType* const out_idxs = static_cast<IdType*>(picked_idx->data);
 
-  const IdType* in_ptr = mat.indptr.Ptr<IdType>();
-  const IdType* in_cols = mat.indices.Ptr<IdType>();
-  const IdType* data = CSRHasData(mat) ? mat.data.Ptr<IdType>() : nullptr;
-  if (mat.is_pinned) {
-    CUDA_CALL(cudaHostGetDevicePointer(&in_ptr, mat.indptr.Ptr<IdType>(), 0));
-    CUDA_CALL(cudaHostGetDevicePointer(&in_cols, mat.indices.Ptr<IdType>(), 0));
-    if (CSRHasData(mat)) {
-      CUDA_CALL(cudaHostGetDevicePointer(&data, mat.data.Ptr<IdType>(), 0));
-    }
-  }
+  const IdType* in_ptr = static_cast<IdType*>(GetDevicePointer(mat.indptr));
+  const IdType* in_cols = static_cast<IdType*>(GetDevicePointer(mat.indices));
+  const IdType* data = CSRHasData(mat)
+                           ? static_cast<IdType*>(GetDevicePointer(mat.data))
+                           : nullptr;
 
   // compute degree
   IdType* out_deg = static_cast<IdType*>(
