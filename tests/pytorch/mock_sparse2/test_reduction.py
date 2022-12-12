@@ -12,7 +12,7 @@ dgl_op_map = {
     "amin": "smin",
     "amax": "smax",
     "mean": "smean",
-    "prod": "prod",
+    "prod": "sprod",
 }
 default_entry = {
     "sum": 0,
