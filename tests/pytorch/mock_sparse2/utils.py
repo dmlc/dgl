@@ -50,11 +50,13 @@ def sparse_matrix_to_dense(A: SparseMatrix):
     return dense
 
 
-def sparse_matrix_to_torch_sparse(A: SparseMatrix):
+def sparse_matrix_to_torch_sparse(A: SparseMatrix, val=None):
     row, col = A.coo()
     edge_index = torch.cat((row.unsqueeze(0), col.unsqueeze(0)), 0)
     shape = A.shape
-    val = A.val.clone().detach()
+    if val is None:
+        val = A.val
+    val = val.clone().detach()
     if len(A.val.shape) > 1:
         shape += (A.val.shape[-1],)
     ret = torch.sparse_coo_tensor(edge_index, val, shape).coalesce()

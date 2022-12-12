@@ -98,5 +98,21 @@ torch::Tensor SDDMMNoAutoGrad(
   return ret;
 }
 
+c10::intrusive_ptr<SparseMatrix> SpSpMMNoAutoGrad(
+    const c10::intrusive_ptr<SparseMatrix>& lhs_mat, torch::Tensor lhs_val,
+    const c10::intrusive_ptr<SparseMatrix>& rhs_mat, torch::Tensor rhs_val) {
+  auto lhs_dgl_csr = CSRToOldDGLCSR(lhs_mat->CSRPtr());
+  auto rhs_dgl_csr = CSRToOldDGLCSR(rhs_mat->CSRPtr());
+  auto lhs_dgl_val = TorchTensorToDGLArray(lhs_val);
+  auto rhs_dgl_val = TorchTensorToDGLArray(rhs_val);
+  std::vector<int64_t> ret_shape({lhs_mat->shape()[0], rhs_mat->shape()[1]});
+  aten::CSRMatrix ret_dgl_csr;
+  runtime::NDArray ret_val;
+  std::tie(ret_dgl_csr, ret_val) =
+      aten::CSRMM(lhs_dgl_csr, lhs_dgl_val, rhs_dgl_csr, rhs_dgl_val);
+  return SparseMatrix::FromCSR(
+      CSRFromOldDGLCSR(ret_dgl_csr), DGLArrayToTorchTensor(ret_val), ret_shape);
+}
+
 }  // namespace sparse
 }  // namespace dgl

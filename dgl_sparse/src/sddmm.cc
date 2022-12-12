@@ -95,6 +95,8 @@ c10::intrusive_ptr<SparseMatrix> SDDMM(
     torch::Tensor mat2) {
   if (mat1.dim() == 1) {
     mat1 = mat1.view({mat1.size(0), 1});
+  }
+  if (mat2.dim() == 1) {
     mat2 = mat2.view({1, mat2.size(0)});
   }
   _SDDMMSanityCheck(sparse_mat, mat1, mat2);

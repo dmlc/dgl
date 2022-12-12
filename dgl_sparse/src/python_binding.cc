@@ -12,6 +12,7 @@
 #include <sparse/sddmm.h>
 #include <sparse/sparse_matrix.h>
 #include <sparse/spmm.h>
+#include <sparse/spspmm.h>
 #include <torch/custom_class.h>
 #include <torch/script.h>
 
@@ -40,7 +41,8 @@ TORCH_LIBRARY(dgl_sparse, m) {
       .def("sprod", &ReduceProd)
       .def("val_like", &CreateValLike)
       .def("spmm", &SpMM)
-      .def("sddmm", &SDDMM);
+      .def("sddmm", &SDDMM)
+      .def("spspmm", &SpSpMM);
 }
 
 }  // namespace sparse
