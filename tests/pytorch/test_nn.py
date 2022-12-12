@@ -1405,8 +1405,23 @@ def test_subgraphxexplainer(g, idtype, out_dim, max_iter, node_min, coef, high2l
     g = g.astype(idtype).to(F.ctx())
     feat = F.randn((g.num_nodes(), 5))
 
+    class Model(th.nn.Module):
+        def __init__(self, in_dim, hidden_dim, n_classes):
+            super(Model, self).__init__()
+            self.conv1 = nn.GraphConv(in_dim, hidden_dim)
+            self.conv2 = nn.GraphConv(hidden_dim, hidden_dim)
+            self.classify = th.nn.Linear(hidden_dim, n_classes)
+
+        def forward(self, g, h):
+            h = th.nn.functional.relu(self.conv1(g, h))
+            h = th.nn.functional.relu(self.conv2(g, h))
+            with g.local_scope():
+                g.ndata['h'] = h
+                hg = dgl.mean_nodes(g, 'h')
+                return self.classify(hg)
+
     # Explain graph prediction
-    model = nn.GraphConv(5, out_dim)
+    model = Model(5, 10, out_dim)
     model = model.to(F.ctx())
     explainer = nn.explain.SubgraphXExplainer(model,
                                               num_gnn_layers=2,

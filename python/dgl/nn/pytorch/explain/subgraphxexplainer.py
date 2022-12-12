@@ -432,7 +432,7 @@ class SubgraphXExplainer(nn.Module):
         ...     optimizer.step()
 
         >>> # Initialize the explainer
-        >>> explainer = SubgraphXExplainer(model, num_gnn_layers=1)
+        >>> explainer = SubgraphXExplainer(model, num_gnn_layers=2)
 
         >>> # Explain the prediction for graph 0
         >>> graph, l = data[0]
