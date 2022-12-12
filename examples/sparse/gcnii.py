@@ -50,28 +50,31 @@ class GCNII(nn.Module):
         self.lamda = lamda
         self.alpha = alpha
 
-        self.FC_layers = nn.ModuleList()
-        self.FC_layers.append(nn.Linear(in_size, hidden_size))
-        self.FC_layers.append(nn.Linear(hidden_size, out_size))
-
-        self.CONV_layers = nn.ModuleList()
+        # The CGNII model.
+        self.layers = nn.ModuleList()
+        self.layers.append(nn.Linear(in_size, hidden_size))
         for _ in range(n_layers):
-            self.CONV_layers.append(GCNIIConvolution(hidden_size, hidden_size))
+            self.layers.append(GCNIIConvolution(hidden_size, hidden_size))
+        self.layers.append(nn.Linear(hidden_size, out_size))
+
         self.activation = nn.ReLU()
         self.dropout = dropout
 
     def forward(self, A_norm, feature):
         H = feature
         H = F.dropout(H, self.dropout, training=self.training)
-        H = self.FC_layers[0](H)
+        H = self.layers[0](H)
         H = self.activation(H)
         H0 = H
-        for i, conv in enumerate(self.CONV_layers):
+
+        # The CGNII convolution forward.
+        for i, conv in enumerate(self.layers[1:-1]):
             H = F.dropout(H, self.dropout, training=self.training)
             H = conv(A_norm, H, H0, self.lamda, self.alpha, i + 1)
             H = self.activation(H)
+
         H = F.dropout(H, self.dropout, training=self.training)
-        H = self.FC_layers[-1](H)
+        H = self.layers[-1](H)
 
         return H
 
