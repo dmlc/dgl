@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.distributed as dist
+from utils import memory_snapshot
 
 def allgather_sizes(send_data, world_size, num_parts, return_sizes=False):
     """ 
@@ -120,6 +121,7 @@ def alltoallv_cpu(rank, world_size, input_tensor_list, retain_nones=True):
         list of tensors received from other processes during alltoall message
 
     """
+    memory_snapshot("alltoallv_cpu_begin", rank)
     #ensure len of input_tensor_list is same as the world_size.
     assert input_tensor_list != None
     assert len(input_tensor_list) == world_size
@@ -156,6 +158,8 @@ def alltoallv_cpu(rank, world_size, input_tensor_list, retain_nones=True):
     #allocate buffers for receiving message
     output_tensor_list = []
     recv_counts = [ tsize.numpy() for tsize in recv_counts]
+    print(f"------- Rank~{rank}, recv_counts:{recv_counts}")
+    memory_snapshot("alltoallv_cpu_begin2", rank)
     for idx, tsize in enumerate(recv_counts):
         output_tensor_list.append(torch.zeros(tuple(tsize[1:])).type(input_tensor_list[idx].dtype))
 
