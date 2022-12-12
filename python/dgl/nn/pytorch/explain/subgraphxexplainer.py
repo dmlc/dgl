@@ -390,9 +390,11 @@ class SubgraphXExplainer(nn.Module):
         Examples
         --------
 
+        >>> import dgl
         >>> import dgl.function as fn
         >>> import torch
         >>> import torch.nn as nn
+        >>> import torch.nn.functional as F
         >>> from dgl.data import GINDataset
         >>> from dgl.dataloading import GraphDataLoader
         >>> from dgl.nn import GraphConv, SubgraphXExplainer
@@ -401,9 +403,25 @@ class SubgraphXExplainer(nn.Module):
         >>> data = GINDataset('MUTAG', self_loop=True)
         >>> dataloader = GraphDataLoader(data, batch_size=64, shuffle=True)
 
+        >>> # Define the model
+        >>> class Model(nn.Module):
+        ...     def __init__(self, in_dim, hidden_dim, n_classes):
+        ...         super(Model, self).__init__()
+        ...         self.conv1 = GraphConv(in_dim, hidden_dim)
+        ...         self.conv2 = GraphConv(hidden_dim, hidden_dim)
+        ...         self.classify = nn.Linear(hidden_dim, n_classes)
+        ...
+        ...     def forward(self, g, h):
+        ...         h = F.relu(self.conv1(g, h))
+        ...         h = F.relu(self.conv2(g, h))
+        ...         with g.local_scope():
+        ...             g.ndata['h'] = h
+        ...             hg = dgl.mean_nodes(g, 'h')
+        ...             return self.classify(hg)
+
         >>> # Train the model
         >>> feat_size = data[0][0].ndata['attr'].shape[1]
-        >>> model = GraphConv(feat_size, data.gclasses)
+        >>> model = Model(feat_size, 128, data.gclasses)
         >>> criterion = nn.CrossEntropyLoss()
         >>> optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
         >>> for bg, labels in dataloader:
