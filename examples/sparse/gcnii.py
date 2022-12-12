@@ -122,15 +122,6 @@ def train(model, g, A_norm, H):
 
 
 if __name__ == "__main__":
-    # Training settings.
-    hidden_size = 64
-    n_layers = 64
-    dropout = 0.5
-
-    # Hyperparameter settings.
-    alpha = 0.2
-    lamda = 0.5
-
     # If CUDA is available, use GPU to accelerate the training, use CPU
     # otherwise.
     dev = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -161,11 +152,11 @@ if __name__ == "__main__":
     model = GCNII(
         in_size,
         out_size,
-        hidden_size,
-        n_layers,
-        lamda,
-        alpha,
-        dropout,
+        hidden_size=64,
+        n_layers=64,
+        lamda=0.5,
+        alpha=0.2,
+        dropout=0.5,
     ).to(dev)
 
     # Kick off training.
