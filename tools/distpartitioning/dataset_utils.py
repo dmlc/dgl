@@ -9,11 +9,7 @@ import torch.distributed as dist
 
 import array_readwriter
 import constants
-from utils import (
-    get_idranges,
-    map_partid_rank,
-    memory_snapshot
-)
+from utils import get_idranges, map_partid_rank
 from gloo_wrapper import alltoallv_cpu
 
 
@@ -61,7 +57,6 @@ def _shuffle_data(data, rank, world_size, tids, num_parts):
     shuffled_data: tensor
         Shuffled node or edge data.
     '''
-    memory_snapshot("ShuffleData_Begin", rank)
     # Broadcast basic information of loaded data:
     #   1. number of data lines
     #   2. data dimension
@@ -114,13 +109,19 @@ def _shuffle_data(data, rank, world_size, tids, num_parts):
     del data_list
     gc.collect()
 
-    # scatter and gather data
-    memory_snapshot("alltoallv_cpu_Begin", rank)
-    shuffled_data = alltoallv_cpu(rank, world_size, data_input,
-        retain_nones=False)
-    shuffled_data = torch.cat(shuffled_data)
+    local_data = data_input[rank]
+    if data_dim == 1:
+        data_input[rank] = torch.zeros((0,), dtype=data_type)
+    else:
+        data_input[rank] = torch.zeros((0, data_dim), dtype=data_type)
 
-    return shuffled_data
+    # scatter and gather data
+    data_output = alltoallv_cpu(rank, world_size, data_input)
+    data_output[rank] = local_data
+    data_output = [data for data in data_output if data is not None]
+    data_output = torch.cat(data_output)
+
+    return data_output
 
 
 def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
