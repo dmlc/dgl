@@ -28,8 +28,8 @@ class GCNIIConvolution(nn.Module):
 
         # Multiply a sparse matrix by a dense matrix.
         H = A_norm @ H
-        support = (1 - alpha) * H + alpha * H0
-        H = (1 - beta) * support + beta * self.weight(support)
+        H = (1 - alpha) * H + alpha * H0
+        H = (1 - beta) * H + beta * self.weight(H)
         return H
 
 
