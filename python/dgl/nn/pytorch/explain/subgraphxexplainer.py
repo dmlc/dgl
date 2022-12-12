@@ -154,8 +154,6 @@ class MCTSNode:
     ----------
     nodes: list
         The node ids of the graph that are associated with this tree node.
-    high2low: bool
-        A representation of whether the 'high2low' pruning action was used to get to this node
     coef: float
         The hyperparameter that controls the trade-off between exploration and exploitation.
         A higher exploration rate encourages exploration of relatively unvisited nodes.
@@ -174,14 +172,12 @@ class MCTSNode:
     def __init__(
         self,
         nodes,
-        high2low,
         coef=10.0,
         num_visit=0,
         total_reward=0.0,
         immediate_reward=0.0,
     ):
         self.nodes = nodes
-        self.high2low = high2low
         self.coef = coef
         self.num_visit = num_visit
         self.total_reward = total_reward
@@ -235,34 +231,34 @@ class SubgraphXExplainer(nn.Module):
         The GNN model to explain.
 
         * The required arguments of its forward function are `DGLGraph` graph and its
-        node features.
+          node features.
         * The output of its forward function is the logits for the predicted
           graph classes.
     num_gnn_layers: int
         Number of layers of GNN model. Needed to calculate the l-hop neighbouring
-        nodes of graph. Computing shapley values for big and complex graphs
-        is time and resource consuming. The shapley algorithm implemented in the paper
-        efficiently approximate shapley values by finding coalition of l-hop neighboring
-        nodes of the graph, where the GNN model has l layers.
+        nodes of graph. Computing Shapley values for big and complex graphs
+        is time and resource consuming. The Shapley algorithm implemented in the paper
+        efficiently approximates Shapley values by finding coalitions of l-hop neighboring
+        nodes of the graph, where the GNN model has l GNN layers.
     coef: float
         The hyperparameter that controls the trade-off between exploration and exploitation.
         A higher exploration rate encourages exploration of relatively unvisited nodes.
         So, the more a node has been visited (and the more certain is its total reward value),
         the less it will be visited. For example, if a node has been visited many times and
         has a high total reward value, a high coef will cause the algorithm to explore other nodes
-        instead of continuing to visit that node.
+        instead of continuing to visit that node. Default: 10.0.
     high2low: bool, optional
         Pruning action either "High2low" or "Low2high" (refer to paper).
         "High2low": Whether to expand children nodes from high degree to low degree when
         extend the child nodes in the search tree. "Low2high" is opposite of "High2low".
-        If True, it will use "High2low" pruning action, default to True.
+        If True, it will use "High2low" pruning action, otherwise "Low2high". Default: True.
     num_child_expand: int, optional
         Max number of children a tree node is allowed to have/expand to.
     max_iter: int, optional
         Max number of iterations for MCTS.
     node_min: int, optional
         The leaf threshold node number.
-    mc_sampling_steps: int
+    mc_sampling_steps: int, optional
         Monte carlo sampling steps.
     """
 
@@ -286,49 +282,7 @@ class SubgraphXExplainer(nn.Module):
         self.node_min = node_min
         self.mc_sampling_steps = mc_sampling_steps
 
-        self.shapley = shapley
-
         self.model = model
-        self.model.eval()
-
-    def get_value_func(self, feat, **kwargs):
-        r"""Get the value function.
-
-        Parameters
-        ----------
-        feat: Tensor
-            The input feature of shape :math:`(N, D)`. :math:`N` is the
-            number of nodes, and :math:`D` is the feature size.
-        kwargs: dict
-            Additional arguments passed to the GNN model. Tensors whose
-            first dimension is the number of nodes or edges will be
-            assumed to be node/edge features.
-
-        Returns
-        -------
-        Function
-            Returns the value function.
-        """
-
-        def value_func(graph):
-            r"""Get the model predictions.
-
-            Parameters
-            ----------
-            graph: DGLGraph
-                A homogeneous graph.
-
-            Returns
-            -------
-            Tensor
-                Returns a tensor of probabilities.
-            """
-            with torch.no_grad():
-                logits = self.model(graph, feat, **kwargs)
-                probs = nn.functional.softmax(logits, dim=-1)
-                return probs
-
-        return value_func
 
     def biggest_weak_component(self, graph):
         r"""Find the weakly connected components in subgraph and
@@ -413,7 +367,7 @@ class SubgraphXExplainer(nn.Module):
         return subgraphs, subgraphs_nodes_mapping, pruned_nodes
 
     def explain_graph(self, graph, feat, **kwargs):
-        r"""Find the subgraph that play a crucial role to explain the prediction made
+        r"""Find the subgraph that plays a crucial role to explain the prediction made
         by the GNN for a graph.
 
         Parameters
@@ -424,9 +378,7 @@ class SubgraphXExplainer(nn.Module):
             The input feature of shape :math:`(N, D)`. :math:`N` is the
             number of nodes, and :math:`D` is the feature size.
         kwargs: dict
-            Additional arguments passed to the GNN model. Tensors whose
-            first dimension is the number of nodes or edges will be
-            assumed to be node/edge features.
+            Additional arguments passed to the GNN model.
 
         Returns
         -------
@@ -441,33 +393,15 @@ class SubgraphXExplainer(nn.Module):
         >>> import torch.nn as nn
         >>> from dgl.data import GINDataset
         >>> from dgl.dataloading import GraphDataLoader
-        >>> from dgl.nn import AvgPooling, SubgraphXExplainer
+        >>> from dgl.nn import GraphConv, SubgraphXExplainer
 
         >>> # Load dataset
         >>> data = GINDataset('MUTAG', self_loop=True)
         >>> dataloader = GraphDataLoader(data, batch_size=64, shuffle=True)
 
-        >>> # Define a model
-        >>> class Model(nn.Module):
-        ...     def __init__(self, in_feats, out_feats):
-        ...         super(Model, self).__init__()
-        ...         self.linear = nn.Linear(in_feats, out_feats)
-        ...         self.pool = AvgPooling()
-        ...
-        ...     def forward(self, graph, feat, eweight=None):
-        ...         with graph.local_scope():
-        ...             feat = self.linear(feat)
-        ...             graph.ndata['h'] = feat
-        ...             if eweight is None:
-        ...                 graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
-        ...             else:
-        ...                 graph.edata['w'] = eweight
-        ...                 graph.update_all(fn.u_mul_e('h', 'w', 'm'), fn.sum('m', 'h'))
-        ...             return self.pool(graph, graph.ndata['h'])
-
         >>> # Train the model
         >>> feat_size = data[0][0].ndata['attr'].shape[1]
-        >>> model = Model(feat_size, data.gclasses)
+        >>> model = GraphConv(feat_size, data.gclasses)
         >>> criterion = nn.CrossEntropyLoss()
         >>> optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
         >>> for bg, labels in dataloader:
@@ -478,29 +412,25 @@ class SubgraphXExplainer(nn.Module):
         ...     optimizer.step()
 
         >>> # Initialize the explainer
-        >>> explainer = SubgraphXExplainer(model, num_gnn_layers=1, coef=6, high2low=True,
-        ...     max_iter=50, node_min=6)
+        >>> explainer = SubgraphXExplainer(model, num_gnn_layers=1)
 
         >>> # Explain the prediction for graph 0
         >>> graph, l = data[0]
         >>> graph_feat = graph.ndata.pop("attr")
-        >>> g_nodes_explain = explainer.explain_graph(graph, feat=graph_feat)
+        >>> g_nodes_explain = explainer.explain_graph(graph, graph_feat)
         >>> g_nodes_explain
         tensor([14, 15, 16, 17, 18, 19])
         """
-        self.value_func = self.get_value_func(feat, **kwargs)
+        self.model.eval()
 
         # MCTS initialization
-        self.tree_root = MCTSNode(
-            nodes=graph.nodes(), high2low=self.high2low, coef=self.coef
-        )
+        tree_root = MCTSNode(nodes=graph.nodes(), coef=self.coef)
 
         leaf_set = set()
 
         for _ in range(self.max_iter):
             # print("iteration number=", i)
-            curr_node = self.tree_root
-            curr_path = [curr_node]
+            curr_node = tree_root
 
             while len(curr_node.nodes) > self.node_min:
                 # print("curr_node.nodes = ", len(curr_node.nodes))
@@ -520,7 +450,7 @@ class SubgraphXExplainer(nn.Module):
                             curr_node.nodes[subgraphs_nodes_mapping[j]],
                             pruned_nodes[j],
                         )
-                        new_child_node.R = self.shapley(
+                        new_child_node.R = shapley(
                             self.model,
                             graph,
                             new_child_node.nodes,
@@ -543,11 +473,10 @@ class SubgraphXExplainer(nn.Module):
                     ),
                 )
                 curr_node = next_node
-                curr_path.append(next_node)
 
             leaf_set.add(curr_node)
 
-            score_leaf_node = self.shapley(
+            score_leaf_node = shapley(
                 self.model,
                 graph,
                 curr_node.nodes,

@@ -1405,32 +1405,8 @@ def test_subgraphxexplainer(g, idtype, out_dim, max_iter, node_min, coef, high2l
     g = g.astype(idtype).to(F.ctx())
     feat = F.randn((g.num_nodes(), 5))
 
-    class Model(th.nn.Module):
-        def __init__(self, in_feats, out_feats, graph=False):
-            super(Model, self).__init__()
-            self.linear = th.nn.Linear(in_feats, out_feats)
-            if graph:
-                self.pool = nn.AvgPooling()
-            else:
-                self.pool = None
-
-        def forward(self, graph, feat, eweight=None):
-            with graph.local_scope():
-                feat = self.linear(feat)
-                graph.ndata['h'] = feat
-                if eweight is None:
-                    graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
-                else:
-                    graph.edata['w'] = eweight
-                    graph.update_all(fn.u_mul_e('h', 'w', 'm'), fn.sum('m', 'h'))
-
-                if self.pool:
-                    return self.pool(graph, graph.ndata['h'])
-                else:
-                    return graph.ndata['h']
-
     # Explain graph prediction
-    model = Model(5, out_dim, graph=True)
+    model = nn.GraphConv(5, out_dim)
     model = model.to(F.ctx())
     explainer = nn.explain.SubgraphXExplainer(model,
                                               num_gnn_layers=2,
