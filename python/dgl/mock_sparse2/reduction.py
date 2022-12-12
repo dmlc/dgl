@@ -1,6 +1,6 @@
 """DGL sparse matrix reduce operators."""
 from typing import Optional
-from numbers import Number
+
 import torch
 
 from .sparse_matrix import SparseMatrix

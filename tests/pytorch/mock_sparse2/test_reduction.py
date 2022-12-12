@@ -1,10 +1,11 @@
-import pytest
-import torch
-import sys
 import operator
+import sys
+
+import backend as F
 
 import dgl.mock_sparse2 as dglsp
-import backend as F
+import pytest
+import torch
 
 dgl_op_map = {
     "sum": "sum",
