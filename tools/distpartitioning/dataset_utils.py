@@ -105,6 +105,7 @@ def _shuffle_data(data, rank, world_size, tids, num_parts):
                 data_input[i] = torch.zeros((0, data_dim), dtype=data_type)
         else:
             data_input[i] = torch.cat(data).to(dtype=data_type)
+    del data_list
 
     # scatter and gather data
     shuffled_data = alltoallv_cpu(rank, world_size, data_input,
