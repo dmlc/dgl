@@ -264,6 +264,7 @@ def exchange_feature(rank, data, id_lookup, feat_type, feat_key, featdata_key, g
     tokens = feat_key.split("/")
     assert len(tokens) == 3
     local_feat_key = "/".join(tokens[:-1]) +"/"+ str(local_part_id)
+    print(f"------ Rank:{rank}, feat_type:{feat_type}, feat_key:{feat_key}, ")
     for idx in range(world_size):
         # Get the partition ids for the range of global nids.
         if feat_type == constants.STR_NODE_FEATURES:
@@ -292,7 +293,7 @@ def exchange_feature(rank, data, id_lookup, feat_type, feat_key, featdata_key, g
 
         if (gids_per_partid.shape[0] == 0):
             feats_per_rank.append(torch.empty((0,1), dtype=torch.float))
-            global_id_per_rank.append(np.empty((0,1), dtype=np.int64))
+            global_id_per_rank.append(torch.empty((0,1), dtype=torch.int64))
         else:
             feats_per_rank.append(featdata_key[local_idx_partid])
             global_id_per_rank.append(torch.from_numpy(gids_per_partid).type(torch.int64))
@@ -303,6 +304,9 @@ def exchange_feature(rank, data, id_lookup, feat_type, feat_key, featdata_key, g
     output_id_list = alltoallv_cpu(rank, world_size, global_id_per_rank)
 
     #stitch node_features together to form one large feature tensor
+    # collect gathered data
+    output_feat_list = [data for data in output_feat_list if data is not None]
+    output_id_list = [data for data in output_id_list if data is not None]
     output_feat_list = torch.cat(output_feat_list)
     output_id_list = torch.cat(output_id_list)
 
