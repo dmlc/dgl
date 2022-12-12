@@ -162,6 +162,8 @@ def alltoallv_cpu(rank, world_size, input_tensor_list, retain_nones=True):
     memory_snapshot("alltoallv_cpu_begin2", rank)
     for idx, tsize in enumerate(recv_counts):
         output_tensor_list.append(torch.zeros(tuple(tsize[1:])).type(input_tensor_list[idx].dtype))
+    tt = [t.shape for t in output_tensor_list]
+    print(f"----------- Rank~{rank}, output_tensor_list:{tt}")
 
     #send actual message itself. 
     __alltoall_cpu(rank, world_size, output_tensor_list, input_tensor_list)
