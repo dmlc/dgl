@@ -25,8 +25,7 @@ NDArray IndexSelectCPUFromGPU(NDArray array, IdArray index) {
   std::vector<int64_t> shape{len};
 
   CHECK(array.IsPinned());
-  const DType* array_data = nullptr;
-  CUDA_CALL(cudaHostGetDevicePointer(&array_data, array.Ptr<DType>(), 0));
+  const DType* array_data = static_cast<DType*>(cuda::GetDevicePointer(array));
   CHECK_EQ(index->ctx.device_type, kDGLCUDA);
 
   for (int d = 1; d < array->ndim; ++d) {
@@ -35,7 +34,7 @@ NDArray IndexSelectCPUFromGPU(NDArray array, IdArray index) {
   }
 
   NDArray ret = NDArray::Empty(shape, array->dtype, index->ctx);
-  if (len == 0) return ret;
+  if (len == 0 || arr_len * num_feat == 0) return ret;
   DType* ret_data = static_cast<DType*>(ret->data);
 
   if (num_feat == 1) {
@@ -85,8 +84,7 @@ void IndexScatterGPUToCPU(NDArray dest, IdArray index, NDArray source) {
   std::vector<int64_t> shape{len};
 
   CHECK(dest.IsPinned());
-  DType* dest_data = nullptr;
-  CUDA_CALL(cudaHostGetDevicePointer(&dest_data, dest.Ptr<DType>(), 0));
+  DType* dest_data = static_cast<DType*>(cuda::GetDevicePointer(dest));
   CHECK_EQ(index->ctx.device_type, kDGLCUDA);
   CHECK_EQ(source->ctx.device_type, kDGLCUDA);
 

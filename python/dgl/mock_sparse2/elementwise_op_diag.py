@@ -1,7 +1,7 @@
 """DGL elementwise operators for diagonal matrix module."""
 from typing import Union
 
-from .diag_matrix import DiagMatrix
+from .diag_matrix import diag, DiagMatrix
 
 __all__ = ["diag_add", "diag_sub", "diag_mul", "diag_div", "diag_power"]
 
@@ -23,18 +23,22 @@ def diag_add(D1: DiagMatrix, D2: DiagMatrix) -> DiagMatrix:
 
     Examples
     --------
-    >>> D1 = DiagMatrix(torch.arange(1, 4))
-    >>> D2 = DiagMatrix(torch.arange(10, 13))
+    >>> D1 = diag(torch.arange(1, 4))
+    >>> D2 = diag(torch.arange(10, 13))
     >>> D1 + D2
     DiagMatrix(val=tensor([11, 13, 15]),
     shape=(3, 3))
     """
-    assert (
-        D1.shape == D2.shape
-    ), "The shape of diagonal matrix D1 {} and" " D2 {} must match.".format(
-        D1.shape, D2.shape
+    if isinstance(D1, DiagMatrix) and isinstance(D2, DiagMatrix):
+        assert D1.shape == D2.shape, (
+            "The shape of diagonal matrix D1 "
+            f"{D1.shape} and D2 {D2.shape} must match."
+        )
+        return diag(D1.val + D2.val, D1.shape)
+    raise RuntimeError(
+        "Elementwise addition between "
+        f"{type(D1)} and {type(D2)} is not supported."
     )
-    return DiagMatrix(D1.val + D2.val)
 
 
 def diag_sub(D1: DiagMatrix, D2: DiagMatrix) -> DiagMatrix:
@@ -54,58 +58,66 @@ def diag_sub(D1: DiagMatrix, D2: DiagMatrix) -> DiagMatrix:
 
     Examples
     --------
-    >>> D1 = DiagMatrix(torch.arange(1, 4))
-    >>> D2 = DiagMatrix(torch.arange(10, 13))
-    >>> D1 -D2
+    >>> D1 = diag(torch.arange(1, 4))
+    >>> D2 = diag(torch.arange(10, 13))
+    >>> D1 - D2
     DiagMatrix(val=tensor([-9, -9, -9]),
     shape=(3, 3))
     """
-    assert (
-        D1.shape == D2.shape
-    ), "The shape of diagonal matrix D1 {} and" "D2 {} must match".format(
-        D1.shape, D2.shape
+    if isinstance(D1, DiagMatrix) and isinstance(D2, DiagMatrix):
+        assert D1.shape == D2.shape, (
+            "The shape of diagonal matrix D1 "
+            f"{D1.shape} and D2 {D2.shape} must match."
+        )
+        return diag(D1.val - D2.val, D1.shape)
+    raise RuntimeError(
+        "Elementwise subtraction between "
+        f"{type(D1)} and {type(D2)} is not supported."
     )
-    return DiagMatrix(D1.val - D2.val)
 
 
 def diag_mul(
-    D1: Union[DiagMatrix, float], D2: Union[DiagMatrix, float]
+    D1: Union[DiagMatrix, float, int], D2: Union[DiagMatrix, float, int]
 ) -> DiagMatrix:
     """Elementwise multiplication.
 
-     Parameters
-     ----------
-     D1 : DiagMatrix or scalar
-         Diagonal matrix or scalar value
-     D2 : DiagMatrix or scalar
-         Diagonal matrix or scalar value
+    Parameters
+    ----------
+    D1 : DiagMatrix or float or int
+        Diagonal matrix or scalar value
+    D2 : DiagMatrix or float or int
+        Diagonal matrix or scalar value
 
     Returns
-     -------
-     DiagMatrix
-         diagonal matrix
+    -------
+    DiagMatrix
+        Diagonal matrix
 
-     Examples
-     --------
-     >>> D1 = DiagMatrix(torch.arange(1, 4))
-     >>> D2 = DiagMatrix(torch.arange(10, 13))
-     DiagMatrix(val=tensor([10, 22, 36]),
-     shape=(3, 3))
-     >>> D1 * 2.5
-     DiagMatrix(val=tensor([2.5000, 5.0000, 7.5000]),
-     shape=(3, 3))
-     >>> 2 * D1
-     DiagMatrix(val=tensor([2, 4, 6]),
-     shape=(3, 3))
+    Examples
+    --------
+    >>> D = diag(torch.arange(1, 4))
+    >>> D * 2.5
+    DiagMatrix(val=tensor([2.5000, 5.0000, 7.5000]),
+    shape=(3, 3))
+    >>> 2 * D
+    DiagMatrix(val=tensor([2, 4, 6]),
+    shape=(3, 3))
     """
     if isinstance(D1, DiagMatrix) and isinstance(D2, DiagMatrix):
-        assert (
-            D1.shape == D2.shape
-        ), "The shape of diagonal matrix D1 {} and" "D2 {} must match".format(
-            D1.shape, D2.shape
+        assert D1.shape == D2.shape, (
+            "The shape of diagonal matrix D1 "
+            f"{D1.shape} and D2 {D2.shape} must match."
         )
-        return DiagMatrix(D1.val * D2.val)
-    return DiagMatrix(D1.val * D2)
+        return diag(D1.val * D2.val, D1.shape)
+    elif isinstance(D1, DiagMatrix) and isinstance(D2, (float, int)):
+        return diag(D1.val * D2, D1.shape)
+    elif isinstance(D1, (float, int)) and isinstance(D2, DiagMatrix):
+        return diag(D1 * D2.val, D2.shape)
+
+    raise RuntimeError(
+        "Elementwise multiplication between "
+        f"{type(D1)} and {type(D2)} is not supported."
+    )
 
 
 def diag_div(D1: DiagMatrix, D2: Union[DiagMatrix, float]) -> DiagMatrix:
@@ -125,13 +137,12 @@ def diag_div(D1: DiagMatrix, D2: Union[DiagMatrix, float]) -> DiagMatrix:
 
     Examples
     --------
-    >>> D1 = DiagMatrix(torch.arange(1, 4))
-    >>> D2 = DiagMatrix(torch.arange(10, 13))
+    >>> D1 = diag(torch.arange(1, 4))
+    >>> D2 = diag(torch.arange(10, 13))
     >>> D1 / D2
-    >>> D1/D2
     DiagMatrix(val=tensor([0.1000, 0.1818, 0.2500]),
     shape=(3, 3))
-    >>> D1/2.5
+    >>> D1 / 2.5
     DiagMatrix(val=tensor([0.4000, 0.8000, 1.2000]),
     shape=(3, 3))
     """
@@ -141,8 +152,8 @@ def diag_div(D1: DiagMatrix, D2: Union[DiagMatrix, float]) -> DiagMatrix:
         ), "The shape of diagonal matrix D1 {} and" "D2 {} must match".format(
             D1.shape, D2.shape
         )
-        return DiagMatrix(D1.val / D2.val)
-    return DiagMatrix(D1.val / D2)
+        return diag(D1.val / D2.val, D1.shape)
+    return diag(D1.val / D2, D1.shape)
 
 
 def diag_rdiv(D1: float, D2: DiagMatrix):
@@ -178,7 +189,7 @@ def diag_power(D1: DiagMatrix, D2: float) -> DiagMatrix:
 
     Examples
     --------
-    >>> D1 = DiagMatrix(torch.arange(1, 4))
+    >>> D1 = diag(torch.arange(1, 4))
     >>> pow(D1, 2)
     DiagMatrix(val=tensor([1, 4, 9]),
     shape=(3, 3))
