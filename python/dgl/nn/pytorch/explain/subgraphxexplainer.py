@@ -452,7 +452,7 @@ class SubgraphXExplainer(nn.Module):
                             curr_node.nodes[subgraphs_nodes_mapping[j]],
                             pruned_nodes[j],
                         )
-                        new_child_node.R = shapley(
+                        new_child_node.immediate_reward = shapley(
                             self.model,
                             graph,
                             new_child_node.nodes,
