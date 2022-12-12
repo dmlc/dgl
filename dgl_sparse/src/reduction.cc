@@ -12,6 +12,7 @@
 #include <sparse/sparse_matrix.h>
 #include <torch/script.h>
 
+#include <string>
 #include <vector>
 
 namespace dgl {

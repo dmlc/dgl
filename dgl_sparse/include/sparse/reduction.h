@@ -8,6 +8,8 @@
 
 #include <sparse/sparse_matrix.h>
 
+#include <string>
+
 namespace dgl {
 namespace sparse {
 
@@ -59,4 +61,4 @@ inline torch::Tensor ReduceProd(
 }  // namespace sparse
 }  // namespace dgl
 
-#endif  // SPARSE_ELEMENTWISE_OP_H_
+#endif  // SPARSE_REDUCTION_H_
