@@ -38,7 +38,7 @@ TORCH_LIBRARY(dgl_sparse, m) {
       .def("smean", &ReduceMean)
       .def("smin", &ReduceMin)
       .def("smax", &ReduceMax)
-      .def("prod", &ReduceProd);
+      .def("sprod", &ReduceProd);
 }
 
 }  // namespace sparse
