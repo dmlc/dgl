@@ -164,6 +164,7 @@ def alltoallv_cpu(rank, world_size, input_tensor_list):
     return_vals = []
     for s, t in zip(recv_counts, output_tensor_list):
         if s[0] == 0:
+            #continue
             return_vals.append(None)
         else:
             return_vals.append(t[0:s[0]])

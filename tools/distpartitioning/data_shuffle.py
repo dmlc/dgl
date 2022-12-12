@@ -312,20 +312,15 @@ def exchange_feature(rank, data, id_lookup, feat_type, feat_key, featdata_key, g
         output_id_list = torch.cat(output_id_list)
 
     print(f"==== Rank:{rank}, {len(output_feat_list)}, {len(output_id_list)}")
-    if local_feat_key in cur_features: 
-        temp = cur_features[local_feat_key]
-        data = [temp]
-        if len(output_feat_list) > 0:
-            data.append(output_feat_list)
-        cur_features[local_feat_key] = torch.cat(data)
-        temp = cur_global_ids[local_feat_key]
-        data = [temp]
-        if len(output_id_list) > 0:
-            data.append(output_id_list)
-        cur_global_ids[local_feat_key] = torch.cat(data)
-    else:
-        cur_features[local_feat_key] = output_feat_list
-        cur_global_ids[local_feat_key] = output_id_list
+    if len(output_feat_list) > 0:
+        if local_feat_key in cur_features: 
+            temp = cur_features[local_feat_key]
+            cur_features[local_feat_key] = torch.cat([temp, output_feat_list])
+            temp = cur_global_ids[local_feat_key]
+            cur_global_ids[local_feat_key] = torch.cat([temp, output_id_list])
+        else:
+            cur_features[local_feat_key] = output_feat_list
+            cur_global_ids[local_feat_key] = output_id_list
 
     return cur_features, cur_global_ids
 
