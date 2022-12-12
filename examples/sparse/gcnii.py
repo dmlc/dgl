@@ -26,7 +26,7 @@ class GCNIIConvolution(nn.Module):
     def forward(self, A_norm, H, H0, lamda, alpha, l):
         beta = math.log(lamda / l + 1)
 
-        # SPMM: Multiply a sparse matrix by a dense matrix
+        # Multiply a sparse matrix by a dense matrix.
         H = A_norm @ H
         support = (1 - alpha) * H + alpha * H0
         H = (1 - beta) * support + beta * self.weight(support)
@@ -80,6 +80,7 @@ def evaluate(model, A_norm, H, label, val_mask, test_mask):
     model.eval()
     logits = model(A_norm, H)
     pred = logits.argmax(dim=1)
+
     # Compute accuracy on validation/test set.
     val_acc = (pred[val_mask] == label[val_mask]).float().mean()
     test_acc = (pred[test_mask] == label[test_mask]).float().mean()
@@ -121,12 +122,12 @@ def train(model, g, A_norm, H):
 
 
 if __name__ == "__main__":
-    # Training settings
+    # Training settings.
     hidden_size = 64
     n_layers = 64
     dropout = 0.5
 
-    # Hyperparameter
+    # Hyperparameter settings.
     alpha = 0.2
     lamda = 0.5
 
