@@ -1,5 +1,6 @@
 import logging
 import os
+import gc
 
 import numpy as np
 import pyarrow
@@ -106,6 +107,7 @@ def _shuffle_data(data, rank, world_size, tids, num_parts):
         else:
             data_input[i] = torch.cat(data).to(dtype=data_type)
     del data_list
+    gc.collect()
 
     # scatter and gather data
     shuffled_data = alltoallv_cpu(rank, world_size, data_input,
