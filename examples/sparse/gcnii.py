@@ -3,14 +3,13 @@
 (https://arxiv.org/abs/2007.02133)
 """
 
-import argparse
 import math
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from dgl.data import CoraGraphDataset
-from dgl.mock_sparse import create_from_coo, diag, identity, spmm
+from dgl.mock_sparse import create_from_coo, diag, identity
 from torch.nn.parameter import Parameter
 from torch.optim import Adam
 
@@ -19,8 +18,7 @@ class GCNIIConvolution(nn.Module):
     def __init__(self, in_size, out_size):
         super().__init__()
         self.out_size = out_size
-        self.weight = Parameter(torch.FloatTensor(in_size, out_size))
-        self.reset_parameters()
+        self.weight = nn.Linear(in_size, out_size, bias=False)
 
     ############################################################################
     # (HIGHLIGHT) Take the advantage of DGL sparse APIs to implement the GCNII
@@ -28,14 +26,11 @@ class GCNIIConvolution(nn.Module):
     ############################################################################
     def forward(self, A_norm, H, H0, lamda, alpha, l):
         beta = math.log(lamda / l + 1)
-        H = spmm(A_norm, H)
+        # Multiply a sparse matrix by a dense matrix
+        H = A_norm @ H
         support = (1 - alpha) * H + alpha * H0
-        H = (1 - beta) * support + beta * support @ self.weight
+        H = (1 - beta) * support + beta * self.weight(support)
         return H
-
-    def reset_parameters(self):
-        std = 1 / math.sqrt(self.out_size)
-        self.weight.data.uniform_(-std, std)
 
 
 class GCNII(nn.Module):
@@ -78,7 +73,7 @@ class GCNII(nn.Module):
         H = F.dropout(H, self.dropout)
         H = self.FC_layers[-1](H)
 
-        return F.log_softmax(H, dim=1)
+        return H
 
 
 def evaluate(g, pred):
@@ -92,14 +87,14 @@ def evaluate(g, pred):
     return val_acc, test_acc
 
 
-def train(args, model, g, A_norm, H):
+def train(model, g, A_norm, H):
     label = g.ndata["label"]
     train_mask = g.ndata["train_mask"]
-    optimizer = Adam(model.parameters(), args.lr, weight_decay=args.wd)
+    optimizer = Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
 
-    loss_fcn = nn.NLLLoss()
+    loss_fcn = nn.CrossEntropyLoss()
 
-    for epoch in range(args.epochs):
+    for epoch in range(1500):
         model.train()
         optimizer.zero_grad()
 
@@ -127,16 +122,13 @@ def train(args, model, g, A_norm, H):
 
 if __name__ == "__main__":
     # Training settings
-    argparse = argparse.ArgumentParser()
-    argparse.add_argument("--epochs", type=int, default=1500)
-    argparse.add_argument("--lr", type=float, default=0.01)
-    argparse.add_argument("--wd", type=float, default=5e-4)
-    argparse.add_argument("--n_layers", type=int, default=64)
-    argparse.add_argument("--hidden_size", type=int, default=64)
-    argparse.add_argument("--dropout", type=float, default=0.5)
-    argparse.add_argument("--alpha", type=float, default=0.2)
-    argparse.add_argument("--lamda", type=float, default=0.5)
-    args = argparse.parse_args()
+    hidden_size = 64
+    n_layers = 64
+    dropout = 0.5
+
+    # Hyperparameter
+    alpha = 0.2
+    lamda = 0.5
 
     # If CUDA is available, use GPU to accelerate the training, use CPU
     # otherwise.
@@ -168,12 +160,12 @@ if __name__ == "__main__":
     model = GCNII(
         in_size,
         out_size,
-        args.hidden_size,
-        args.n_layers,
-        args.lamda,
-        args.alpha,
-        args.dropout,
+        hidden_size,
+        n_layers,
+        lamda,
+        alpha,
+        dropout,
     ).to(dev)
 
     # Kick off training.
-    train(args, model, g, A_norm, H)
+    train(model, g, A_norm, H)
