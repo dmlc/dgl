@@ -1,9 +1,11 @@
 """Torch Module for SubgraphX"""
 import math
-import torch
-import numpy as np
-from torch import nn
+
 import networkx as nx
+import numpy as np
+import torch
+from torch import nn
+
 import dgl
 
 __all__ = ["SubgraphXExplainer"]
