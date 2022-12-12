@@ -10,7 +10,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from dgl.data import CoraGraphDataset
 from dgl.mock_sparse import create_from_coo, diag, identity
-from torch.nn.parameter import Parameter
 from torch.optim import Adam
 
 
@@ -26,7 +25,8 @@ class GCNIIConvolution(nn.Module):
     ############################################################################
     def forward(self, A_norm, H, H0, lamda, alpha, l):
         beta = math.log(lamda / l + 1)
-        # Multiply a sparse matrix by a dense matrix
+
+        # SPMM: Multiply a sparse matrix by a dense matrix
         H = A_norm @ H
         support = (1 - alpha) * H + alpha * H0
         H = (1 - beta) * support + beta * self.weight(support)
@@ -62,25 +62,24 @@ class GCNII(nn.Module):
 
     def forward(self, A_norm, feature):
         H = feature
-        H = F.dropout(H, self.dropout)
+        H = F.dropout(H, self.dropout, training=self.training)
         H = self.FC_layers[0](H)
         H = self.activation(H)
         H0 = H
         for i, conv in enumerate(self.CONV_layers):
-            H = F.dropout(H, self.dropout)
+            H = F.dropout(H, self.dropout, training=self.training)
             H = conv(A_norm, H, H0, self.lamda, self.alpha, i + 1)
             H = self.activation(H)
-        H = F.dropout(H, self.dropout)
+        H = F.dropout(H, self.dropout, training=self.training)
         H = self.FC_layers[-1](H)
 
         return H
 
 
-def evaluate(g, pred):
-    label = g.ndata["label"]
-    val_mask = g.ndata["val_mask"]
-    test_mask = g.ndata["test_mask"]
-
+def evaluate(model, A_norm, H, label, val_mask, test_mask):
+    model.eval()
+    logits = model(A_norm, H)
+    pred = logits.argmax(dim=1)
     # Compute accuracy on validation/test set.
     val_acc = (pred[val_mask] == label[val_mask]).float().mean()
     test_acc = (pred[test_mask] == label[test_mask]).float().mean()
@@ -90,6 +89,8 @@ def evaluate(g, pred):
 def train(model, g, A_norm, H):
     label = g.ndata["label"]
     train_mask = g.ndata["train_mask"]
+    val_mask = g.ndata["val_mask"]
+    test_mask = g.ndata["test_mask"]
     optimizer = Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
 
     loss_fcn = nn.CrossEntropyLoss()
@@ -108,11 +109,10 @@ def train(model, g, A_norm, H):
         loss.backward()
         optimizer.step()
 
-        # Compute prediction.
-        pred = logits.argmax(dim=1)
-
         # Evaluate the prediction.
-        val_acc, test_acc = evaluate(g, pred)
+        val_acc, test_acc = evaluate(
+            model, A_norm, H, label, val_mask, test_mask
+        )
         if epoch % 20 == 0:
             print(
                 f"In epoch {epoch}, loss: {loss:.3f}, val acc: {val_acc:.3f}"
