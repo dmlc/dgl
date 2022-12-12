@@ -211,8 +211,8 @@ void NDArray::PinContainer(NDArray::Container* ptr) {
   auto* tensor = &(ptr->dl_tensor);
   CHECK_EQ(tensor->ctx.device_type, kDGLCPU)
       << "Only NDArray on CPU can be pinned";
-  DeviceAPI::Get(kDGLCUDA)->PinData(tensor->data, GetDataSize(*tensor));
-  ptr->pinned_by_dgl_ = true;
+  ptr->pinned_by_dgl_ =
+      DeviceAPI::Get(kDGLCUDA)->PinData(tensor->data, GetDataSize(*tensor));
 }
 
 void NDArray::UnpinContainer(NDArray::Container* ptr) {

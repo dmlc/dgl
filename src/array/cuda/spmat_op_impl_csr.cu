@@ -19,6 +19,7 @@
 namespace dgl {
 
 using runtime::NDArray;
+using namespace cuda;
 
 namespace aten {
 namespace impl {
@@ -61,14 +62,10 @@ NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col) {
   const int nt = dgl::cuda::FindNumThreads(rstlen);
   const int nb = (rstlen + nt - 1) / nt;
   const IdType* data = nullptr;
-  const IdType* indptr_data = csr.indptr.Ptr<IdType>();
-  const IdType* indices_data = csr.indices.Ptr<IdType>();
-  if (csr.is_pinned) {
-    CUDA_CALL(
-        cudaHostGetDevicePointer(&indptr_data, csr.indptr.Ptr<IdType>(), 0));
-    CUDA_CALL(
-        cudaHostGetDevicePointer(&indices_data, csr.indices.Ptr<IdType>(), 0));
-  }
+  const IdType* indptr_data =
+      static_cast<IdType*>(GetDevicePointer(csr.indptr));
+  const IdType* indices_data =
+      static_cast<IdType*>(GetDevicePointer(csr.indices));
   // TODO(minjie): use binary search for sorted csr
   CUDA_KERNEL_CALL(
       dgl::cuda::_LinearSearchKernel, nb, nt, 0, stream, indptr_data,
@@ -155,11 +152,8 @@ NDArray CSRGetRowNNZ(CSRMatrix csr, NDArray rows) {
   cudaStream_t stream = runtime::getCurrentCUDAStream();
   const auto len = rows->shape[0];
   const IdType* vid_data = rows.Ptr<IdType>();
-  const IdType* indptr_data = csr.indptr.Ptr<IdType>();
-  if (csr.is_pinned) {
-    CUDA_CALL(
-        cudaHostGetDevicePointer(&indptr_data, csr.indptr.Ptr<IdType>(), 0));
-  }
+  const IdType* indptr_data =
+      static_cast<IdType*>(GetDevicePointer(csr.indptr));
   NDArray rst = NDArray::Empty({len}, rows->dtype, rows->ctx);
   IdType* rst_data = static_cast<IdType*>(rst->data);
   const int nt = dgl::cuda::FindNumThreads(len);
@@ -267,19 +261,13 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
   // Copy indices.
   IdArray ret_indices = NDArray::Empty({nnz}, csr.indptr->dtype, rows->ctx);
 
-  const IdType* indptr_data = csr.indptr.Ptr<IdType>();
-  const IdType* indices_data = csr.indices.Ptr<IdType>();
-  const IdType* data_data = CSRHasData(csr) ? csr.data.Ptr<IdType>() : nullptr;
-  if (csr.is_pinned) {
-    CUDA_CALL(
-        cudaHostGetDevicePointer(&indptr_data, csr.indptr.Ptr<IdType>(), 0));
-    CUDA_CALL(
-        cudaHostGetDevicePointer(&indices_data, csr.indices.Ptr<IdType>(), 0));
-    if (CSRHasData(csr)) {
-      CUDA_CALL(
-          cudaHostGetDevicePointer(&data_data, csr.data.Ptr<IdType>(), 0));
-    }
-  }
+  const IdType* indptr_data =
+      static_cast<IdType*>(GetDevicePointer(csr.indptr));
+  const IdType* indices_data =
+      static_cast<IdType*>(GetDevicePointer(csr.indices));
+  const IdType* data_data =
+      CSRHasData(csr) ? static_cast<IdType*>(GetDevicePointer(csr.data))
+                      : nullptr;
 
   CUDA_KERNEL_CALL(
       _SegmentCopyKernel, nb, nt, 0, stream, indptr_data, indices_data,
@@ -381,14 +369,10 @@ std::vector<NDArray> CSRGetDataAndIndices(
   const int64_t col_stride = (collen == 1 && rowlen != 1) ? 0 : 1;
   cudaStream_t stream = runtime::getCurrentCUDAStream();
 
-  const IdType* indptr_data = csr.indptr.Ptr<IdType>();
-  const IdType* indices_data = csr.indices.Ptr<IdType>();
-  if (csr.is_pinned) {
-    CUDA_CALL(
-        cudaHostGetDevicePointer(&indptr_data, csr.indptr.Ptr<IdType>(), 0));
-    CUDA_CALL(
-        cudaHostGetDevicePointer(&indices_data, csr.indices.Ptr<IdType>(), 0));
-  }
+  const IdType* indptr_data =
+      static_cast<IdType*>(GetDevicePointer(csr.indptr));
+  const IdType* indices_data =
+      static_cast<IdType*>(GetDevicePointer(csr.indices));
 
   // Generate a 0-1 mask for matched (row, col) positions.
   IdArray mask = Full(0, nnz, nbits, ctx);
@@ -618,14 +602,10 @@ CSRMatrix CSRSliceMatrix(
         hashmap.Insert(key[i]);
       });
 
-  const IdType* indptr_data = csr.indptr.Ptr<IdType>();
-  const IdType* indices_data = csr.indices.Ptr<IdType>();
-  if (csr.is_pinned) {
-    CUDA_CALL(
-        cudaHostGetDevicePointer(&indptr_data, csr.indptr.Ptr<IdType>(), 0));
-    CUDA_CALL(
-        cudaHostGetDevicePointer(&indices_data, csr.indices.Ptr<IdType>(), 0));
-  }
+  const IdType* indptr_data =
+      static_cast<IdType*>(GetDevicePointer(csr.indptr));
+  const IdType* indices_data =
+      static_cast<IdType*>(GetDevicePointer(csr.indices));
 
   // Execute SegmentMaskColKernel
   const int64_t num_rows = csr.num_rows;
