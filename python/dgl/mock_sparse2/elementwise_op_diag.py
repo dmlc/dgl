@@ -181,6 +181,7 @@ def diag_rdiv(D1: DiagMatrix, D2: Union[float, int]):
     )
 
 
+# pylint: disable=invalid-name
 def diag_power(D: DiagMatrix, scalar: Union[float, int]) -> DiagMatrix:
     """Take the power of each nonzero element and return a diagonal matrix with
     the result.
