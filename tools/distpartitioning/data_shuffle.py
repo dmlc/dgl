@@ -431,7 +431,7 @@ def exchange_features(rank, world_size, num_parts, feature_tids, type_id_map, id
                         own_global_ids)
 
     end = timer()
-    logging.info(f'[Rank: {rank}] Total time for feature exchange {feat_key}: {timedelta(seconds = end - start)}')
+    logging.info(f'[Rank: {rank}] Total time for feature exchange: {timedelta(seconds = end - start)}')
     return own_features, own_global_ids
 
 def exchange_graph_data(rank, world_size, num_parts, node_features, edge_features, 
