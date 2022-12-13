@@ -41,7 +41,7 @@ TA_EXPORTS cudaStream_t CUDACurrentStream() {
 
 TA_EXPORTS void RecordStream(void* ptr, cudaStream_t stream, int device_id) {
   c10::DataPtr data_ptr{
-      ptr, ptr, &c10::cuda::CUDACachingAllocator::raw_delete,
+      ptr, ptr, c10::cuda::CUDACachingAllocator::get()->raw_deleter(),
       c10::Device(c10::DeviceType::CUDA, device_id)};
   c10::cuda::CUDACachingAllocator::recordStream(
       data_ptr,

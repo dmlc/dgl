@@ -36,8 +36,30 @@ class DiagMatrix:
             )
         else:
             shape = (len_val, len_val)
-        self.val = val
-        self.shape = shape
+        self._val = val
+        self._shape = shape
+
+    @property
+    def val(self) -> torch.Tensor:
+        """Get the values of the nonzero elements.
+
+        Returns
+        -------
+        torch.Tensor
+            Values of the nonzero elements
+        """
+        return self._val
+
+    @property
+    def shape(self) -> Tuple[int]:
+        """Shape of the sparse matrix.
+
+        Returns
+        -------
+        Tuple[int]
+            The shape of the matrix
+        """
+        return self._shape
 
     def __repr__(self):
         return f"DiagMatrix(val={self.val}, \nshape={self.shape})"

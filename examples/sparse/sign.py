@@ -9,10 +9,10 @@ operator on top of symmetrically normalized adjacency matrix A_hat.
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.optim import Adam
-
 from dgl.data import CoraGraphDataset
 from dgl.mock_sparse import create_from_coo, diag, identity
+from torch.optim import Adam
+
 
 ################################################################################
 # (HIGHLIGHT) Take the advantage of DGL sparse APIs to implement the feature
@@ -57,7 +57,7 @@ def evaluate(g, pred):
     return val_acc, test_acc
 
 
-def train(g, X_sign, model):
+def train(model, g, X_sign):
     label = g.ndata["label"]
     train_mask = g.ndata["train_mask"]
     optimizer = Adam(model.parameters(), lr=3e-3)
@@ -124,4 +124,4 @@ if __name__ == "__main__":
     model = SIGN(in_size, out_size, r).to(dev)
 
     # Kick off training.
-    train(g, X_sign, model)
+    train(model, g, X_sign)

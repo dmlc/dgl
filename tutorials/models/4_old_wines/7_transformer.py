@@ -231,7 +231,7 @@ Transformer as a Graph Neural Network
 # - ``fn.src_mul_egdes(src_field, edges_field, out_field)`` multiplies
 #   source’s attribute and edges attribute, and send the result to the
 #   destination node’s mailbox keyed by ``out_field``.
-# - ``fn.copy_edge(edges_field, out_field)`` copies edge’s attribute to
+# - ``fn.copy_e(edges_field, out_field)`` copies edge’s attribute to
 #   destination node’s mailbox.
 # - ``fn.sum(edges_field, out_field)`` sums up
 #   edge’s attribute and sends aggregation to destination node’s mailbox.
@@ -259,11 +259,11 @@ Transformer as a Graph Neural Network
 #       in-coming edges of each node for normalization. Note that here
 #       :math:`\textrm{wv}` is not normalized.
 #
-#       -  ``msg: fn.src_mul_edge('v', 'score', 'v'), reduce: fn.sum('v', 'wv')``
+#       -  ``msg: fn.u_mul_e('v', 'score', 'v'), reduce: fn.sum('v', 'wv')``
 #
 #          .. math:: \textrm{wv}_j=\sum_{i=1}^{N} \textrm{score}_{ij} \cdot v_i
 #
-#       -  ``msg: fn.copy_edge('score', 'score'), reduce: fn.sum('score', 'z')``
+#       -  ``msg: fn.copy_e('score', 'score'), reduce: fn.sum('score', 'z')``
 #
 #          .. math:: \textrm{z}_j=\sum_{i=1}^{N} \textrm{score}_{ij}
 #
@@ -291,7 +291,7 @@ Transformer as a Graph Neural Network
 #        g.apply_edges(scaled_exp('score', np.sqrt(self.d_k)))
 #        # Update node state
 #        g.send_and_recv(eids,
-#                        [fn.src_mul_edge('v', 'score', 'v'), fn.copy_edge('score', 'score')],
+#                        [fn.u_mul_e('v', 'score', 'v'), fn.copy_e('score', 'score')],
 #                        [fn.sum('v', 'wv'), fn.sum('score', 'z')])
 #
 # Preprocessing and postprocessing
@@ -431,7 +431,7 @@ Transformer as a Graph Neural Network
 #            g.apply_edges(scaled_exp('score', np.sqrt(self.d_k)))
 #            # Send weighted values to target nodes
 #            g.send_and_recv(eids,
-#                            [fn.src_mul_edge('v', 'score', 'v'), fn.copy_edge('score', 'score')],
+#                            [fn.u_mul_e('v', 'score', 'v'), fn.copy_e('score', 'score')],
 #                            [fn.sum('v', 'wv'), fn.sum('score', 'z')])
 #
 #        def update_graph(self, g, eids, pre_pairs, post_pairs):
@@ -774,7 +774,7 @@ Transformer as a Graph Neural Network
 #            g.apply_edges(scaled_exp('score', np.sqrt(self.d_k)), eids)
 #            # Send weighted values to target nodes
 #            g.send_and_recv(eids,
-#                            [fn.src_mul_edge('v', 'score', 'v'), fn.copy_edge('score', 'score')],
+#                            [fn.u_mul_e('v', 'score', 'v'), fn.copy_e('score', 'score')],
 #                            [fn.sum('v', 'wv'), fn.sum('score', 'z')])
 #
 #        def update_graph(self, g, eids, pre_pairs, post_pairs):

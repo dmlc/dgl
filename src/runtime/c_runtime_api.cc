@@ -121,8 +121,9 @@ void DeviceAPI::SyncStreamFromTo(
   LOG(FATAL) << "Device does not support stream api.";
 }
 
-void DeviceAPI::PinData(void* ptr, size_t nbytes) {
+bool DeviceAPI::PinData(void* ptr, size_t nbytes) {
   LOG(FATAL) << "Device does not support cudaHostRegister api.";
+  return false;
 }
 
 void DeviceAPI::UnpinData(void* ptr) {

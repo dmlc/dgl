@@ -13,6 +13,9 @@ message(STATUS "find_cmake.py output: ${TORCH_PREFIX_VER}")
 list(GET TORCH_PREFIX_VER 0 TORCH_PREFIX)
 list(GET TORCH_PREFIX_VER 1 TORCH_VER)
 message(STATUS "Configuring for PyTorch ${TORCH_VER}")
+string(REPLACE "." ";" TORCH_VERSION_LIST ${TORCH_VER})
+list(GET TORCH_VERSION_LIST 0 TORCH_VERSION_MAJOR)
+list(GET TORCH_VERSION_LIST 1 TORCH_VERSION_MINOR)
 
 if(USE_CUDA)
   add_definitions(-DDGL_USE_CUDA)
@@ -34,6 +37,8 @@ add_library(${LIB_DGL_SPARSE_NAME} SHARED ${SPARSE_SRC} ${SPARSE_HEADERS})
 target_include_directories(
   ${LIB_DGL_SPARSE_NAME} PRIVATE ${SPARSE_DIR} ${SPARSE_HEADERS})
 target_link_libraries(${LIB_DGL_SPARSE_NAME} "${TORCH_LIBRARIES}")
+target_compile_definitions(${LIB_DGL_SPARSE_NAME} PRIVATE TORCH_VERSION_MAJOR=${TORCH_VERSION_MAJOR})
+target_compile_definitions(${LIB_DGL_SPARSE_NAME} PRIVATE TORCH_VERSION_MINOR=${TORCH_VERSION_MINOR})
 
 target_include_directories(${LIB_DGL_SPARSE_NAME} PRIVATE "${CMAKE_SOURCE_DIR}/third_party/dmlc-core/include")
 target_link_libraries(${LIB_DGL_SPARSE_NAME} dmlc)
