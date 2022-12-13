@@ -3,7 +3,7 @@ from collections.abc import Mapping, Sequence
 from queue import Queue, Empty, Full
 import itertools
 import threading
-from packaging import version
+from setuptools.extern.packaging import version
 import math
 import inspect
 import re
