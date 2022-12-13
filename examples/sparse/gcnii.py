@@ -99,7 +99,7 @@ def train(model, g, A_norm, H):
 
     loss_fcn = nn.CrossEntropyLoss()
 
-    for epoch in range(200):
+    for epoch in range(100):
         model.train()
         optimizer.zero_grad()
 
@@ -117,7 +117,7 @@ def train(model, g, A_norm, H):
         val_acc, test_acc = evaluate(
             model, A_norm, H, label, val_mask, test_mask
         )
-        if epoch % 20 == 0:
+        if epoch % 5 == 0:
             print(
                 f"In epoch {epoch}, loss: {loss:.3f}, val acc: {val_acc:.3f}"
                 f", test acc: {test_acc:.3f}"
@@ -158,7 +158,7 @@ if __name__ == "__main__":
         hidden_size=64,
         n_layers=64,
         lamda=0.5,
-        alpha=0.1,
+        alpha=0.2,
         dropout=0.5,
     ).to(dev)
 
