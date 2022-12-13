@@ -3,7 +3,7 @@ from __future__ import absolute_import
 import builtins
 import numbers
 import os
-from packaging import version
+from setuptools.extern.packaging import version
 
 import mxnet as mx
 import mxnet.ndarray as nd

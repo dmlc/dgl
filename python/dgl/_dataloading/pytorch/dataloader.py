@@ -3,7 +3,7 @@ import inspect
 import math
 import threading
 import queue
-from packaging import version
+from setuptools.extern.packaging import version
 import torch as th
 from torch.utils.data import DataLoader, IterableDataset
 from torch.utils.data.distributed import DistributedSampler

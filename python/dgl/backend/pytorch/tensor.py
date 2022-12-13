@@ -2,11 +2,11 @@ from __future__ import absolute_import
 
 import builtins
 import numbers
-from packaging import version
 
 import numpy as np
 import scipy  # Weird bug in new pytorch when import scipy after import torch
 import torch as th
+from setuptools.extern.packaging import version
 from torch.utils import dlpack
 
 from ... import ndarray as nd

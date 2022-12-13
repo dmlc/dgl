@@ -3,7 +3,7 @@ from __future__ import absolute_import
 
 import builtins
 import numbers
-from packaging import version
+from setuptools.extern.packaging import version
 
 import numpy as np
 import tensorflow as tf

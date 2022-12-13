@@ -1,4 +1,4 @@
-from packaging import version
+from setuptools.extern.packaging import version
 import random
 import unittest
 

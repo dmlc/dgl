@@ -24,7 +24,7 @@ from torch.utils.data import DataLoader
 import torch.optim as optim
 import torch as th
 
-from packaging import version
+from setuptools.extern.packaging import version
 if version.parse(th.__version__) < version.parse("1.2"):
     raise RuntimeError("DGL-ke has to work with Pytorch version >= 1.2")
 from models.pytorch.tensor_models import thread_wrapped_func
