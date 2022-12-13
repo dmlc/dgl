@@ -125,7 +125,7 @@ class SAGELightning(LightningModule):
 
 class DataModule(LightningDataModule):
     def __init__(self, dataset_name, undirected, data_cpu=False, use_uva=False, fan_out=[10, 25],
-                 device=th.device('cpu'), batch_size=1000, num_workers=4, sampler='labor', importance_sampling=0, layer_dependency=False):
+                 device=th.device('cpu'), batch_size=1000, num_workers=4, sampler='labor', importance_sampling=0, layer_dependency=False, batch_dependency=1):
         super().__init__()
 
         g, n_classes, multilabel = load_dataset(dataset_name)
@@ -144,7 +144,7 @@ class DataModule(LightningDataModule):
         if sampler == 'neighbor':
             sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts, prefetch_node_feats=['features'], prefetch_labels=['labels'])
         else:
-            sampler = dgl.dataloading.LaborSampler(fanouts, importance_sampling=importance_sampling, layer_dependency=layer_dependency, prefetch_node_feats=['features'], prefetch_labels=['labels'])
+            sampler = dgl.dataloading.LaborSampler(fanouts, importance_sampling=importance_sampling, layer_dependency=layer_dependency, batch_dependency=batch_dependency, prefetch_node_feats=['features'], prefetch_labels=['labels'])
 
         dataloader_device = th.device('cpu')
         g = g.formats(['csc'])
@@ -268,6 +268,7 @@ if __name__ == '__main__':
     argparser.add_argument('--sampler', type=str, default='labor')
     argparser.add_argument('--importance-sampling', type=int, default=0)
     argparser.add_argument('--layer-dependency', action='store_true')
+    argparser.add_argument('--batch-dependency', type=int, default=1)
     argparser.add_argument('--logdir', type=str, default='tb_logs')
     argparser.add_argument('--vertex-limit', type=int, default=-1)
     argparser.add_argument('--use-uva', action='store_true')
@@ -285,7 +286,7 @@ if __name__ == '__main__':
     datamodule = DataModule(
         args.dataset, args.undirected, args.data_cpu, args.use_uva,
         [int(_) for _ in args.fan_out.split(',')],
-        device, args.batch_size, args.num_workers, args.sampler, args.importance_sampling, args.layer_dependency)
+        device, args.batch_size, args.num_workers, args.sampler, args.importance_sampling, args.layer_dependency, args.batch_dependency)
     model = SAGELightning(
         datamodule.in_feats, args.num_hidden, datamodule.n_classes, args.num_layers,
         F.relu, args.dropout, args.lr, datamodule.multilabel)
@@ -296,7 +297,7 @@ if __name__ == '__main__':
         callbacks.append(ModelCheckpoint(monitor='val_acc', save_top_k=1))
     callbacks.append(BatchSizeCallback(args.vertex_limit))
     callbacks.append(EarlyStopping(monitor='val_acc', stopping_threshold=args.val_acc_target, mode='max', patience=args.early_stopping_patience))
-    subdir = '{}_{}_{}_{}'.format(args.dataset, args.sampler, args.importance_sampling, args.layer_dependency)
+    subdir = '{}_{}_{}_{}_{}'.format(args.dataset, args.sampler, args.importance_sampling, args.layer_dependency, args.batch_dependency)
     logger = TensorBoardLogger(args.logdir, name=subdir)
     trainer = Trainer(gpus=[args.gpu] if args.gpu != -1 else None,
                       max_epochs=args.num_epochs,
