@@ -146,7 +146,6 @@ def graph(data,
     from_scipy
     from_networkx
     """
-    # Deprecated arguments
     if isinstance(data, spmatrix):
         raise DGLError("dgl.graph no longer supports graph construction from a SciPy "
                        "sparse matrix, use dgl.from_scipy instead.")
