@@ -211,10 +211,11 @@ class CUDADeviceAPI final : public DeviceAPI {
    *        The pinned memory can be seen by all CUDA contexts,
    *        not just the one that performed the allocation
    */
-  void PinData(void* ptr, size_t nbytes) {
+  bool PinData(void* ptr, size_t nbytes) override {
     // prevent users from pinning empty tensors or graphs
-    if (ptr == nullptr || nbytes == 0) return;
+    if (ptr == nullptr || nbytes == 0) return false;
     CUDA_CALL(cudaHostRegister(ptr, nbytes, cudaHostRegisterDefault));
+    return true;
   }
 
   void UnpinData(void* ptr) {
