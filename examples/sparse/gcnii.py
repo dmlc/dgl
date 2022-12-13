@@ -50,7 +50,7 @@ class GCNII(nn.Module):
         self.lamda = lamda
         self.alpha = alpha
 
-        # The CGNII model.
+        # The GCNII model.
         self.layers = nn.ModuleList()
         self.layers.append(nn.Linear(in_size, hidden_size))
         for _ in range(n_layers):
@@ -67,7 +67,7 @@ class GCNII(nn.Module):
         H = self.activation(H)
         H0 = H
 
-        # The CGNII convolution forward.
+        # The GCNII convolution forward.
         for i, conv in enumerate(self.layers[1:-1]):
             H = F.dropout(H, self.dropout, training=self.training)
             H = conv(A_norm, H, H0, self.lamda, self.alpha, i + 1)
@@ -99,7 +99,7 @@ def train(model, g, A_norm, H):
 
     loss_fcn = nn.CrossEntropyLoss()
 
-    for epoch in range(1500):
+    for epoch in range(200):
         model.train()
         optimizer.zero_grad()
 
@@ -158,7 +158,7 @@ if __name__ == "__main__":
         hidden_size=64,
         n_layers=64,
         lamda=0.5,
-        alpha=0.2,
+        alpha=0.1,
         dropout=0.5,
     ).to(dev)
 
