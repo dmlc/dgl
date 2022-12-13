@@ -1,7 +1,7 @@
 """DGL elementwise operators for diagonal matrix module."""
 from typing import Union
 
-from .diag_matrix import diag, DiagMatrix
+from .diag_matrix import DiagMatrix, diag
 
 __all__ = ["diag_add", "diag_sub", "diag_mul", "diag_div", "diag_power"]
 
@@ -42,7 +42,7 @@ def diag_add(D1: DiagMatrix, D2: DiagMatrix) -> DiagMatrix:
 
 
 def diag_sub(D1: DiagMatrix, D2: DiagMatrix) -> DiagMatrix:
-    """Elementwise subtraction.
+    """Elementwise subtraction
 
     Parameters
     ----------
@@ -79,7 +79,7 @@ def diag_sub(D1: DiagMatrix, D2: DiagMatrix) -> DiagMatrix:
 def diag_mul(
     D1: Union[DiagMatrix, float, int], D2: Union[DiagMatrix, float, int]
 ) -> DiagMatrix:
-    """Elementwise multiplication.
+    """Elementwise multiplication
 
     Parameters
     ----------
@@ -122,7 +122,7 @@ def diag_mul(
 
 def diag_div(D1: DiagMatrix, D2: Union[DiagMatrix, float, int]) -> DiagMatrix:
     """Elementwise division of a diagonal matrix by a diagonal matrix or a
-    scalar.
+    scalar
 
     Parameters
     ----------
@@ -148,26 +148,25 @@ def diag_div(D1: DiagMatrix, D2: Union[DiagMatrix, float, int]) -> DiagMatrix:
     DiagMatrix(val=tensor([0.4000, 0.8000, 1.2000]),
     shape=(3, 3))
     """
-    if isinstance(D1, DiagMatrix):
-        if isinstance(D2, DiagMatrix):
-            assert D1.shape == D2.shape, (
-                "The shape of diagonal matrix D1 "
-                f"{D1.shape} and D2 {D2.shape} must match."
-            )
-            return diag(D1.val / D2.val, D1.shape)
-        elif isinstance(D2, (float, int)):
-            assert D2 != 0, "Division by zero is not allowed."
-            return diag(D1.val / D2, D1.shape)
+    if isinstance(D2, DiagMatrix):
+        assert D1.shape == D2.shape, (
+            "The shape of diagonal matrix D1 "
+            f"{D1.shape} and D2 {D2.shape} must match."
+        )
+        return diag(D1.val / D2.val, D1.shape)
+    elif isinstance(D2, (float, int)):
+        assert D2 != 0, "Division by zero is not allowed."
+        return diag(D1.val / D2, D1.shape)
 
     raise RuntimeError(
         "Elementwise division between "
-        f"{type(D1)} and {type(D2)} is not supported."
+        f"a diagonal matrix and {type(D2)} is not supported."
     )
 
 
 def diag_rdiv(D1: DiagMatrix, D2: Union[float, int]):
     """Function for preventing elementwise division of a scalar by a diagonal
-    matrix.
+    matrix
 
     Parameters
     ----------
@@ -178,12 +177,13 @@ def diag_rdiv(D1: DiagMatrix, D2: Union[float, int]):
     """
     raise RuntimeError(
         "Elementwise division of "
-        f"{type(D2)} by {type(D1)} is not supported."
+        f"{type(D2)} by a diagonal matrix is not supported."
     )
 
 
 def diag_power(D: DiagMatrix, scalar: Union[float, int]) -> DiagMatrix:
-    """Power operation.
+    """Take the power of each nonzero element and return a diagonal matrix with
+    the result.
 
     Parameters
     ----------
@@ -204,18 +204,16 @@ def diag_power(D: DiagMatrix, scalar: Union[float, int]) -> DiagMatrix:
     DiagMatrix(val=tensor([1, 4, 9]),
     shape=(3, 3))
     """
-    if isinstance(D, DiagMatrix) and isinstance(scalar, (float, int)):
-        num_rows, num_cols = D.shape
-        assert num_rows == num_cols, "Diagonal matrix must be a square matrix."
-        return diag(D.val ** scalar)
+    if isinstance(scalar, (float, int)):
+        return diag(D.val**scalar, D.shape)
 
     raise RuntimeError(
-        f"Raising {type(D)} to exponent {type(scalar)} is not allowed."
+        f"Raising a diagonal matrix to exponent {type(scalar)} is not allowed."
     )
 
 
 def diag_rpower(D: DiagMatrix, scalar: Union[float, int]):
-    """Function for preventing raising a scalar to a diagonal matrix exponent.
+    """Function for preventing raising a scalar to a diagonal matrix exponent
 
     Parameters
     ----------
@@ -225,7 +223,8 @@ def diag_rpower(D: DiagMatrix, scalar: Union[float, int]):
         Scalar
     """
     raise RuntimeError(
-        f"Raising {type(scalar)} to exponent {type(D)} is not allowed."
+        f"Raising {type(scalar)} to a diagonal matrix component is not "
+        "allowed."
     )
 
 
