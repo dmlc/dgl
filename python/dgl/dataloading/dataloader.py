@@ -23,10 +23,9 @@ from .._ffi.base import is_tensor_adaptor_enabled
 from ..heterograph import DGLGraph
 from ..utils import (
     recursive_apply, ExceptionWrapper, recursive_apply_pair, set_num_threads, get_num_threads,
-    get_numa_nodes_cores, context_of, dtype_of)
+    get_numa_nodes_cores, dtype_of)
 from ..frame import LazyFeature
 from ..storages import wrap_storage
-from .base import BlockSampler, as_edge_prediction_sampler
 from .. import backend as F
 from ..distributed import DistGraph
 from ..multiprocessing import call_once_and_share
@@ -966,7 +965,7 @@ class DataLoader(torch.utils.data.DataLoader):
     def attach_data(self, name, data):
         """Add a data other than node and edge features for prefetching."""
         self.other_storages[name] = wrap_storage(data)
-        
+
 
 ######## Graph DataLoaders ########
 # GraphDataLoader loads a set of graphs so it's not relevant to the above.  They are currently
