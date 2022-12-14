@@ -101,7 +101,7 @@ def check_rpc_sampling(tmpdir, num_server):
     num_hops = 1
 
     partition_graph(g, 'test_sampling', num_parts, tmpdir,
-                    num_hops=num_hops, part_method='metis', reshuffle=False)
+                    num_hops=num_hops, part_method='metis')
 
     pserver_list = []
     ctx = mp.get_context('spawn')
@@ -131,7 +131,7 @@ def check_rpc_find_edges_shuffle(tmpdir, num_server):
 
     orig_nid, orig_eid = partition_graph(g, 'test_find_edges', num_parts, tmpdir,
                                          num_hops=1, part_method='metis',
-                                         reshuffle=True, return_mapping=True)
+                                         return_mapping=True)
 
     pserver_list = []
     ctx = mp.get_context('spawn')
@@ -177,7 +177,7 @@ def check_rpc_hetero_find_edges_shuffle(tmpdir, num_server):
 
     orig_nid, orig_eid = partition_graph(g, 'test_find_edges', num_parts, tmpdir,
                                          num_hops=1, part_method='metis',
-                                         reshuffle=True, return_mapping=True)
+                                         return_mapping=True)
 
     pserver_list = []
     ctx = mp.get_context('spawn')
@@ -226,7 +226,7 @@ def check_rpc_get_degree_shuffle(tmpdir, num_server):
     num_parts = num_server
 
     orig_nid, _ = partition_graph(g, 'test_get_degrees', num_parts, tmpdir,
-        num_hops=1, part_method='metis', reshuffle=True, return_mapping=True)
+        num_hops=1, part_method='metis', return_mapping=True)
 
     pserver_list = []
     ctx = mp.get_context('spawn')
@@ -279,7 +279,7 @@ def check_rpc_sampling_shuffle(tmpdir, num_server, num_groups=1):
     num_hops = 1
 
     orig_nids, orig_eids = partition_graph(g, 'test_sampling', num_parts, tmpdir,
-        num_hops=num_hops, part_method='metis', reshuffle=True, return_mapping=True)
+        num_hops=num_hops, part_method='metis', return_mapping=True)
 
     pserver_list = []
     ctx = mp.get_context('spawn')
@@ -375,7 +375,7 @@ def check_rpc_hetero_sampling_shuffle(tmpdir, num_server):
     num_hops = 1
 
     orig_nid_map, orig_eid_map = partition_graph(g, 'test_sampling', num_parts, tmpdir,
-        num_hops=num_hops, part_method='metis', reshuffle=True, return_mapping=True)
+        num_hops=num_hops, part_method='metis', return_mapping=True)
 
     pserver_list = []
     ctx = mp.get_context('spawn')
@@ -426,7 +426,7 @@ def check_rpc_hetero_sampling_empty_shuffle(tmpdir, num_server):
 
     orig_nids, _ = partition_graph(g, 'test_sampling', num_parts, tmpdir,
                                    num_hops=num_hops, part_method='metis',
-                                   reshuffle=True, return_mapping=True)
+                                   return_mapping=True)
 
     pserver_list = []
     ctx = mp.get_context('spawn')
@@ -455,7 +455,7 @@ def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server, graph_formats=No
     num_hops = 1
 
     orig_nid_map, orig_eid_map = partition_graph(g, 'test_sampling', num_parts, tmpdir,
-        num_hops=num_hops, part_method='metis', reshuffle=True, return_mapping=True,
+        num_hops=num_hops, part_method='metis', return_mapping=True,
         graph_formats=graph_formats)
 
     pserver_list = []
@@ -508,7 +508,7 @@ def check_rpc_hetero_etype_sampling_empty_shuffle(tmpdir, num_server):
 
     orig_nids, _ = partition_graph(g, 'test_sampling', num_parts, tmpdir,
                                    num_hops=num_hops, part_method='metis',
-                                   reshuffle=True, return_mapping=True)
+                                   return_mapping=True)
 
     pserver_list = []
     ctx = mp.get_context('spawn')
@@ -599,7 +599,7 @@ def check_rpc_bipartite_sampling_empty(tmpdir, num_server):
     num_hops = 1
 
     orig_nids, _ = partition_graph(g, 'test_sampling', num_parts, tmpdir,
-                                   num_hops=num_hops, part_method='metis', reshuffle=True, return_mapping=True)
+                                   num_hops=num_hops, part_method='metis', return_mapping=True)
 
     pserver_list = []
     ctx = mp.get_context('spawn')
@@ -632,7 +632,7 @@ def check_rpc_bipartite_sampling_shuffle(tmpdir, num_server):
     num_hops = 1
 
     orig_nid_map, orig_eid_map = partition_graph(g, 'test_sampling', num_parts, tmpdir,
-        num_hops=num_hops, part_method='metis', reshuffle=True, return_mapping=True)
+        num_hops=num_hops, part_method='metis', return_mapping=True)
 
     pserver_list = []
     ctx = mp.get_context('spawn')
@@ -682,7 +682,7 @@ def check_rpc_bipartite_etype_sampling_empty(tmpdir, num_server):
     num_hops = 1
 
     orig_nids, _ = partition_graph(g, 'test_sampling', num_parts, tmpdir,
-                                   num_hops=num_hops, part_method='metis', reshuffle=True, return_mapping=True)
+                                   num_hops=num_hops, part_method='metis', return_mapping=True)
 
     pserver_list = []
     ctx = mp.get_context('spawn')
@@ -716,7 +716,7 @@ def check_rpc_bipartite_etype_sampling_shuffle(tmpdir, num_server):
     num_hops = 1
 
     orig_nid_map, orig_eid_map = partition_graph(g, 'test_sampling', num_parts, tmpdir,
-        num_hops=num_hops, part_method='metis', reshuffle=True, return_mapping=True)
+        num_hops=num_hops, part_method='metis', return_mapping=True)
 
     pserver_list = []
     ctx = mp.get_context('spawn')
@@ -783,7 +783,7 @@ def test_rpc_sampling_shuffle(num_server):
         check_rpc_bipartite_etype_sampling_empty(Path(tmpdirname), num_server)
         check_rpc_bipartite_etype_sampling_shuffle(Path(tmpdirname), num_server)
 
-def check_standalone_sampling(tmpdir, reshuffle):
+def check_standalone_sampling(tmpdir):
     g = CitationGraphDataset("cora")[0]
     prob = np.maximum(np.random.randn(g.num_edges()), 0)
     mask = (prob > 0)
@@ -792,7 +792,7 @@ def check_standalone_sampling(tmpdir, reshuffle):
     num_parts = 1
     num_hops = 1
     partition_graph(g, 'test_sampling', num_parts, tmpdir,
-                    num_hops=num_hops, part_method='metis', reshuffle=reshuffle)
+                    num_hops=num_hops, part_method='metis')
 
     os.environ['DGL_DIST_MODE'] = 'standalone'
     dgl.distributed.initialize("rpc_ip_config.txt")
@@ -817,7 +817,7 @@ def check_standalone_sampling(tmpdir, reshuffle):
     assert (prob[eid] > 0).all()
     dgl.distributed.exit_client()
 
-def check_standalone_etype_sampling(tmpdir, reshuffle):
+def check_standalone_etype_sampling(tmpdir):
     hg = CitationGraphDataset('cora')[0]
     prob = np.maximum(np.random.randn(hg.num_edges()), 0)
     mask = (prob > 0)
@@ -827,7 +827,7 @@ def check_standalone_etype_sampling(tmpdir, reshuffle):
     num_hops = 1
 
     partition_graph(hg, 'test_sampling', num_parts, tmpdir,
-                    num_hops=num_hops, part_method='metis', reshuffle=reshuffle)
+                    num_hops=num_hops, part_method='metis')
     os.environ['DGL_DIST_MODE'] = 'standalone'
     dgl.distributed.initialize("rpc_ip_config.txt")
     dist_graph = DistGraph("test_sampling", part_config=tmpdir / 'test_sampling.json')
@@ -851,7 +851,7 @@ def check_standalone_etype_sampling(tmpdir, reshuffle):
     assert (prob[eid] > 0).all()
     dgl.distributed.exit_client()
 
-def check_standalone_etype_sampling_heterograph(tmpdir, reshuffle):
+def check_standalone_etype_sampling_heterograph(tmpdir):
     hg = CitationGraphDataset('cora')[0]
     num_parts = 1
     num_hops = 1
@@ -860,7 +860,7 @@ def check_standalone_etype_sampling_heterograph(tmpdir, reshuffle):
                               ('paper', 'cite-by', 'paper'): (dst, src)},
                               {'paper': hg.number_of_nodes()})
     partition_graph(new_hg, 'test_hetero_sampling', num_parts, tmpdir,
-                    num_hops=num_hops, part_method='metis', reshuffle=reshuffle)
+                    num_hops=num_hops, part_method='metis')
     os.environ['DGL_DIST_MODE'] = 'standalone'
     dgl.distributed.initialize("rpc_ip_config.txt")
     dist_graph = DistGraph("test_hetero_sampling", part_config=tmpdir / 'test_hetero_sampling.json')
@@ -880,8 +880,7 @@ def test_standalone_sampling():
     import tempfile
     os.environ['DGL_DIST_MODE'] = 'standalone'
     with tempfile.TemporaryDirectory() as tmpdirname:
-        check_standalone_sampling(Path(tmpdirname), False)
-        check_standalone_sampling(Path(tmpdirname), True)
+        check_standalone_sampling(Path(tmpdirname))
 
 def start_in_subgraph_client(rank, tmpdir, disable_shared_mem, nodes):
     gpb = None
@@ -905,7 +904,7 @@ def check_rpc_in_subgraph_shuffle(tmpdir, num_server):
     num_parts = num_server
 
     orig_nid, orig_eid = partition_graph(g, 'test_in_subgraph', num_parts, tmpdir,
-        num_hops=1, part_method='metis', reshuffle=True, return_mapping=True)
+        num_hops=1, part_method='metis', return_mapping=True)
 
     pserver_list = []
     ctx = mp.get_context('spawn')
@@ -951,23 +950,21 @@ def test_standalone_etype_sampling():
     import tempfile
     with tempfile.TemporaryDirectory() as tmpdirname:
         os.environ['DGL_DIST_MODE'] = 'standalone'
-        check_standalone_etype_sampling_heterograph(Path(tmpdirname), True)
+        check_standalone_etype_sampling_heterograph(Path(tmpdirname))
     with tempfile.TemporaryDirectory() as tmpdirname:
         os.environ['DGL_DIST_MODE'] = 'standalone'
-        check_standalone_etype_sampling(Path(tmpdirname), True)
+        check_standalone_etype_sampling(Path(tmpdirname))
 
 if __name__ == "__main__":
     import tempfile
     with tempfile.TemporaryDirectory() as tmpdirname:
         os.environ['DGL_DIST_MODE'] = 'standalone'
-        check_standalone_etype_sampling_heterograph(Path(tmpdirname), True)
+        check_standalone_etype_sampling_heterograph(Path(tmpdirname))
 
     with tempfile.TemporaryDirectory() as tmpdirname:
         os.environ['DGL_DIST_MODE'] = 'standalone'
-        check_standalone_etype_sampling(Path(tmpdirname), True)
-        check_standalone_etype_sampling(Path(tmpdirname), False)
-        check_standalone_sampling(Path(tmpdirname), True)
-        check_standalone_sampling(Path(tmpdirname), False)
+        check_standalone_etype_sampling(Path(tmpdirname))
+        check_standalone_sampling(Path(tmpdirname))
         os.environ['DGL_DIST_MODE'] = 'distributed'
         check_rpc_sampling(Path(tmpdirname), 2)
         check_rpc_sampling(Path(tmpdirname), 1)

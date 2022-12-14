@@ -162,7 +162,6 @@ def test_standalone():
             test_dir,
             num_hops=num_hops,
             part_method="metis",
-            reshuffle=True,
             return_mapping=True,
         )
         part_config = os.path.join(test_dir, "test_sampling.json")
@@ -262,7 +261,6 @@ def check_neg_dataloader(g, num_server, num_workers):
             test_dir,
             num_hops=num_hops,
             part_method="metis",
-            reshuffle=True,
             return_mapping=True,
         )
         part_config = os.path.join(test_dir, "test_sampling.json")
@@ -341,7 +339,6 @@ def test_dist_dataloader(
             test_dir,
             num_hops=num_hops,
             part_method="metis",
-            reshuffle=reshuffle,
             return_mapping=True,
         )
 
@@ -556,7 +553,6 @@ def check_dataloader(g, num_server, num_workers, dataloader_type):
             test_dir,
             num_hops=num_hops,
             part_method="metis",
-            reshuffle=True,
             return_mapping=True,
         )
         part_config = os.path.join(test_dir, "test_sampling.json")

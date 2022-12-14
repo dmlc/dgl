@@ -36,7 +36,7 @@ g.add_edges(2, 5)  # 6
 g.ndata[dgl.NID] = global_nid
 g.edata[dgl.EID] = global_eid
 
-gpb = dgl.distributed.graph_partition_book.BasicPartitionBook(
+gpb = dgl.distributed.graph_partition_book.RangePartitionBook(
     part_id=0, num_parts=1, node_map=node_map, edge_map=edge_map, part_graph=g
 )
 

@@ -430,7 +430,7 @@ class DistGraph:
     The example shows the creation of ``DistGraph`` in the standalone mode.
 
     >>> dgl.distributed.partition_graph(g, 'graph_name', 1, num_hops=1, part_method='metis',
-    ...                                 out_path='output/', reshuffle=True)
+    ...                                 out_path='output/')
     >>> g = dgl.distributed.DistGraph('graph_name', part_config='output/graph_name.json')
 
     The example shows the creation of ``DistGraph`` in the distributed mode.
