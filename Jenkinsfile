@@ -574,7 +574,7 @@ pipeline {
     always {
       script {
         node("dglci-post-linux") {
-          docker.image('dgllib/dgl-ci-awscli:v220418').inside("--pull always --entrypoint=''") {
+          docker.image('dgllib/dgl-ci-awscli:v220418').inside("--pull always --entrypoint='' --args='--network=host'") {
             sh("rm -rf ci_tmp")
             dir('ci_tmp') {
               sh("curl -k -o cireport.log ${BUILD_URL}consoleText")
