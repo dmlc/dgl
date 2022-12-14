@@ -513,7 +513,7 @@ class DistGraph:
         assert self._client is not None, \
                 'Distributed module is not initialized. Please call dgl.distributed.initialize.'
         self._g = _get_graph_from_shared_mem(self.graph_name)
-        self._gpb = get_shared_mem_partition_book(self.graph_name, self._g)
+        self._gpb = get_shared_mem_partition_book(self.graph_name)
         if self._gpb is None:
             self._gpb = gpb
         self._client.map_shared_data(self._gpb)

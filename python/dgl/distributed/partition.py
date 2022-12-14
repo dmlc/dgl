@@ -172,7 +172,7 @@ def load_partition(part_config, part_id, load_feats=True):
     assert NID in graph.ndata, "the partition graph should contain node mapping to global node ID"
     assert EID in graph.edata, "the partition graph should contain edge mapping to global edge ID"
 
-    gpb, graph_name, ntypes, etypes = load_partition_book(part_config, part_id, graph)
+    gpb, graph_name, ntypes, etypes = load_partition_book(part_config, part_id)
     ntypes_list = list(ntypes.keys())
     etypes_list = list(etypes.keys())
     if 'DGL_DIST_DEBUG' in os.environ:
@@ -267,7 +267,7 @@ def load_partition_feats(part_config, part_id, load_nodes=True, load_edges=True)
 
     return node_feats, edge_feats
 
-def load_partition_book(part_config, part_id, graph=None):
+def load_partition_book(part_config, part_id):
     '''Load a graph partition book from the partition config file.
 
     Parameters
@@ -276,8 +276,6 @@ def load_partition_book(part_config, part_id, graph=None):
         The path of the partition config file.
     part_id : int
         The partition ID.
-    graph : DGLGraph
-        The graph structure
 
     Returns
     -------
