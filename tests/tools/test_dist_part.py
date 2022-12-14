@@ -6,7 +6,9 @@ import numpy as np
 import pytest
 import torch
 from utils import create_chunked_dataset
+
 from distpartitioning import array_readwriter
+from distpartitioning.utils import generate_read_list
 
 import dgl
 from dgl.data.utils import load_graphs, load_tensors
@@ -361,3 +363,11 @@ def test_pipeline_formats(graph_formats):
 )
 def test_pipeline_feature_format(data_fmt):
     _test_pipeline(4, 4, 4, data_fmt=data_fmt)
+
+
+def test_utils_generate_read_list():
+    read_list = generate_read_list(10, 4)
+    assert np.array_equal(read_list[0], np.array([0, 1, 2]))
+    assert np.array_equal(read_list[1], np.array([3, 4, 5]))
+    assert np.array_equal(read_list[2], np.array([6, 7]))
+    assert np.array_equal(read_list[3], np.array([8, 9]))

@@ -9,7 +9,7 @@ import torch.distributed as dist
 
 import array_readwriter
 import constants
-from utils import get_idranges, map_partid_rank
+from utils import get_idranges, map_partid_rank, generate_read_list
 from gloo_wrapper import alltoallv_cpu
 
 
@@ -265,10 +265,10 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
                 num_files = len(feat_data[constants.STR_DATA])
                 if num_files == 0:
                     continue
-                read_list = np.array_split(np.arange(num_files), world_size)
                 reader_fmt_meta = {
                     "name": feat_data[constants.STR_FORMAT][constants.STR_NAME]
                 }
+                read_list = generate_read_list(num_files, world_size)
                 for idx in read_list[rank]:
                     data_file = feat_data[constants.STR_DATA][idx]
                     if not os.path.isabs(data_file):
@@ -390,10 +390,10 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
                 num_files = len(feat_data[constants.STR_DATA])
                 if num_files == 0:
                     continue
-                read_list = np.array_split(np.arange(num_files), world_size)
                 reader_fmt_meta = {
                     "name": feat_data[constants.STR_FORMAT][constants.STR_NAME]
                 }
+                read_list = generate_read_list(num_files, world_size)
                 for idx in read_list[rank]:
                     data_file = feat_data[constants.STR_DATA][idx]
                     if not os.path.isabs(data_file):
@@ -513,7 +513,7 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
         dst_ntype_name = tokens[2]
 
         num_chunks = len(edge_info)
-        read_list = np.array_split(np.arange(num_chunks), num_parts)
+        read_list = generate_read_list(num_chunks, num_parts)
         src_ids = []
         dst_ids = []
 
