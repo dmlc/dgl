@@ -150,8 +150,8 @@ def diag_div(D1: DiagMatrix, D2: Union[DiagMatrix, float, int]) -> DiagMatrix:
     """
     if isinstance(D2, DiagMatrix):
         assert D1.shape == D2.shape, (
-            "The shape of diagonal matrix D1 "
-            f"{D1.shape} and D2 {D2.shape} must match."
+            f"The shape of diagonal matrix D1 {D1.shape} and D2 {D2.shape} "
+            "must match."
         )
         return diag(D1.val / D2.val, D1.shape)
     elif isinstance(D2, (float, int)):
@@ -159,8 +159,8 @@ def diag_div(D1: DiagMatrix, D2: Union[DiagMatrix, float, int]) -> DiagMatrix:
         return diag(D1.val / D2, D1.shape)
 
     raise RuntimeError(
-        "Elementwise division between "
-        f"a diagonal matrix and {type(D2)} is not supported."
+        f"Elementwise division between a diagonal matrix and {type(D2)} is "
+        "not supported."
     )
 
 
@@ -176,8 +176,8 @@ def diag_rdiv(D1: DiagMatrix, D2: Union[float, int]):
         Scalar value
     """
     raise RuntimeError(
-        "Elementwise division of "
-        f"{type(D2)} by a diagonal matrix is not supported."
+        f"Elementwise division of {type(D2)} by a diagonal matrix is not "
+        "supported."
     )
 
 
