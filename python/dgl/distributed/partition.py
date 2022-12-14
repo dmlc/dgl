@@ -6,7 +6,7 @@ import time
 import numpy as np
 
 from .. import backend as F
-from ..base import NID, EID, NTYPE, ETYPE, dgl_warning, DGLError
+from ..base import NID, EID, NTYPE, ETYPE, DGLError
 from ..convert import to_homogeneous
 from ..random import choice as random_choice
 from ..transforms import sort_csr_by_tag, sort_csc_by_tag
