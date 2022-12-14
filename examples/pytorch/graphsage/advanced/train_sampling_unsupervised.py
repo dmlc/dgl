@@ -73,7 +73,7 @@ def run(proc_id, n_gpus, args, devices, data):
     if args.data_device == 'gpu':
         nfeat = nfeat.to(device)
     elif args.data_device == 'uva':
-        nfeat = dgl.contrib.UnifiedTensor(nfeat, device=device)
+        nfeat = dgl.utils.pin_memory_inplace(nfeat)
     in_feats = nfeat.shape[1]
 
     # Create PyTorch DataLoader for constructing blocks
@@ -133,8 +133,8 @@ def run(proc_id, n_gpus, args, devices, data):
         # blocks.
         tic_step = time.time()
         for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(dataloader):
-            input_nodes = input_nodes.to(nfeat.device)
-            batch_inputs = nfeat[input_nodes].to(device)
+            input_nodes = input_nodes.to(device)
+            batch_inputs = dgl.utils.gather_pinned_tensor_rows(nfeat, input_nodes)
             blocks = [block.int() for block in blocks]
             d_step = time.time()
 
