@@ -15,8 +15,7 @@ class ShaDowKHopSampler(NeighborSamplingMixin, Sampler):
     seed nodes from which the neighbors are sampled will appear the first in the
     induced nodes of the subgraph.
 
-    This is used in conjunction with :class:`dgl.dataloading.pytorch.NodeDataLoader`
-    and :class:`dgl.dataloading.pytorch.EdgeDataLoader`.
+    This is used in conjunction with :class:`dgl.dataloading.pytorch.DataLoader`.
 
     Parameters
     ----------
@@ -44,7 +43,7 @@ class ShaDowKHopSampler(NeighborSamplingMixin, Sampler):
 
     >>> g = dgl.data.CoraFullDataset()[0]
     >>> sampler = dgl.dataloading.ShaDowKHopSampler([5, 10, 15])
-    >>> dataloader = dgl.dataloading.NodeDataLoader(
+    >>> dataloader = dgl.dataloading.DataLoader(
     ...     g, torch.arange(g.num_nodes()), sampler,
     ...     batch_size=5, shuffle=True, drop_last=False, num_workers=4)
     >>> for input_nodes, output_nodes, (subgraph,) in dataloader:

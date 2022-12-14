@@ -3,7 +3,7 @@ import dgl
 
 from dgl._dataloading.dataloader import EdgeCollator
 from dgl._dataloading import BlockSampler
-from dgl._dataloading.pytorch import _pop_subgraph_storage, _pop_storages, EdgeDataLoader
+from dgl._dataloading.pytorch import _pop_subgraph_storage, _pop_storages, DataLoader
 from dgl.base import DGLError
 
 from functools import partial
@@ -234,7 +234,7 @@ class TemporalEdgeCollator(EdgeCollator):
         return result
 
 
-class TemporalEdgeDataLoader(EdgeDataLoader):
+class TemporalEdgeDataLoader(DataLoader):
     """ TemporalEdgeDataLoader is an iteratable object to generate blocks for temporal embedding
     as well as pos and neg pair graph for memory update.
 
@@ -276,7 +276,7 @@ class TemporalEdgeDataLoader(EdgeDataLoader):
         self.collator = collator(g, eids, graph_sampler, **collator_kwargs)
 
         assert not isinstance(g, dgl.distributed.DistGraph), \
-            'EdgeDataLoader does not support DistGraph for now. ' \
+            'DataLoader does not support DistGraph for now. ' \
             + 'Please use DistDataLoader directly.'
         self.dataloader = torch.utils.data.DataLoader(
             self.collator.dataset, collate_fn=self.collator.collate, **dataloader_kwargs)

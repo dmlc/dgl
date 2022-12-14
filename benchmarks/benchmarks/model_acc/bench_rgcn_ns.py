@@ -261,7 +261,7 @@ def track_acc(data):
 
     g = g.formats('csc')
     sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts)
-    train_loader = dgl.dataloading.NodeDataLoader(
+    train_loader = dgl.dataloading.DataLoader(
         g,
         target_nids[train_idx],
         sampler,
@@ -269,7 +269,7 @@ def track_acc(data):
         shuffle=True,
         drop_last=False,
         num_workers=num_workers)
-    test_loader = dgl.dataloading.NodeDataLoader(
+    test_loader = dgl.dataloading.DataLoader(
         g,
         target_nids[test_idx],
         sampler,

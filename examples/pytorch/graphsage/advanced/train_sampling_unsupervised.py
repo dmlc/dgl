@@ -100,7 +100,7 @@ def run(proc_id, n_gpus, args, devices, data):
             th.arange(0, n_edges // 2)]).to(train_seeds),
         negative_sampler=NegativeSampler(g, args.num_negs, args.neg_share,
                                          device if args.graph_device == 'uva' else None))
-    dataloader = dgl.dataloading.EdgeDataLoader(
+    dataloader = dgl.dataloading.DataLoader(
         g, train_seeds, sampler,
         device=device,
         use_ddp=n_gpus > 1,

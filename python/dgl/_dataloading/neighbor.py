@@ -88,7 +88,7 @@ class MultiLayerNeighborSampler(NeighborSamplingMixin, BlockSampler):
     the first, second, and third layer respectively (assuming the backend is PyTorch):
 
     >>> sampler = dgl.dataloading.MultiLayerNeighborSampler([5, 10, 15])
-    >>> dataloader = dgl.dataloading.NodeDataLoader(
+    >>> dataloader = dgl.dataloading.DataLoader(
     ...     g, train_nid, sampler,
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
     >>> for input_nodes, output_nodes, blocks in dataloader:
@@ -169,7 +169,7 @@ class MultiLayerFullNeighborSampler(MultiLayerNeighborSampler):
     second, and third layer respectively (assuming the backend is PyTorch):
 
     >>> sampler = dgl.dataloading.MultiLayerFullNeighborSampler(3)
-    >>> dataloader = dgl.dataloading.NodeDataLoader(
+    >>> dataloader = dgl.dataloading.DataLoader(
     ...     g, train_nid, sampler,
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
     >>> for input_nodes, output_nodes, blocks in dataloader:
