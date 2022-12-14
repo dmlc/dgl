@@ -3,7 +3,6 @@ from __future__ import absolute_import
 import builtins
 import numbers
 import os
-from setuptools.extern.packaging import version
 
 import mxnet as mx
 import mxnet.ndarray as nd
@@ -12,6 +11,7 @@ import numpy as np
 from ... import ndarray as dglnd
 from ..._deprecate import kernel as K
 from ...function.base import TargetCode
+from ...utils import version
 
 if version.parse(mx.__version__) < version.parse("1.6.0"):
     raise RuntimeError("DGL requires MXNet >= 1.6")

@@ -3,7 +3,6 @@ import inspect
 import math
 import threading
 import queue
-from setuptools.extern.packaging import version
 import torch as th
 from torch.utils.data import DataLoader, IterableDataset
 from torch.utils.data.distributed import DistributedSampler
@@ -13,7 +12,7 @@ from ...distributed import DistGraph
 from ...ndarray import NDArray as DGLNDArray
 from ... import backend as F
 from ...base import DGLError, dgl_warning
-from ...utils import to_dgl_context, check_device
+from ...utils import to_dgl_context, check_device, version
 
 __all__ = ['NodeDataLoader', 'EdgeDataLoader', 'GraphDataLoader',
            # Temporary exposure.

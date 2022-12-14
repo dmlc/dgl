@@ -6,12 +6,12 @@ import numbers
 import numpy as np
 import scipy  # Weird bug in new pytorch when import scipy after import torch
 import torch as th
-from setuptools.extern.packaging import version
 from torch.utils import dlpack
 
 from ... import ndarray as nd
 from ..._deprecate import kernel as K
 from ...function.base import TargetCode
+from ...utils import version
 
 if version.parse(th.__version__) < version.parse("1.9.0"):
     raise RuntimeError("DGL requires PyTorch >= 1.9.0")

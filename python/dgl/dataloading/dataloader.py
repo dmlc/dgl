@@ -3,7 +3,6 @@ from collections.abc import Mapping, Sequence
 from queue import Queue, Empty, Full
 import itertools
 import threading
-from setuptools.extern.packaging import version
 import math
 import inspect
 import re
@@ -23,7 +22,7 @@ from .._ffi.base import is_tensor_adaptor_enabled
 from ..heterograph import DGLGraph
 from ..utils import (
     recursive_apply, ExceptionWrapper, recursive_apply_pair, set_num_threads, get_num_threads,
-    get_numa_nodes_cores, context_of, dtype_of)
+    get_numa_nodes_cores, context_of, dtype_of, version)
 from ..frame import LazyFeature
 from ..storages import wrap_storage
 from .base import BlockSampler, as_edge_prediction_sampler

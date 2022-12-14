@@ -3,7 +3,6 @@ from __future__ import absolute_import
 
 import builtins
 import numbers
-from setuptools.extern.packaging import version
 
 import numpy as np
 import tensorflow as tf
@@ -11,6 +10,7 @@ import tensorflow as tf
 from ... import ndarray as nd
 from ..._deprecate import kernel as K
 from ...function.base import TargetCode
+from ...utils import version
 
 if version.parse(tf.__version__) < version.parse("2.3.0"):
     raise RuntimeError(

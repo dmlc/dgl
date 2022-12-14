@@ -1,4 +1,3 @@
-from setuptools.extern.packaging import version
 import random
 import unittest
 
@@ -11,6 +10,7 @@ from test_utils.graph_cases import get_cases
 
 import dgl
 from dgl.ops import edge_softmax, gsddmm, gspmm, segment_reduce
+from dgl.utils import version
 
 random.seed(42)
 np.random.seed(42)
