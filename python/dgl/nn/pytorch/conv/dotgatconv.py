@@ -99,7 +99,7 @@ class DotGatConv(nn.Module):
     >>> # Case 2: Unidirectional bipartite graph
     >>> u = [0, 1, 0, 0, 1]
     >>> v = [0, 1, 2, 3, 2]
-    >>> g = dgl.bipartite((u, v))
+    >>> g = dgl.heterograph({('_N', '_E', '_N'):(u, v)})
     >>> u_feat = th.tensor(np.random.rand(2, 5).astype(np.float32))
     >>> v_feat = th.tensor(np.random.rand(4, 10).astype(np.float32))
     >>> dotgatconv = DotGatConv((5,10), 2, 3)

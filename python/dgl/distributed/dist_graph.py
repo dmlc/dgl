@@ -652,7 +652,9 @@ class DistGraph:
         --------
         The following example uses PyTorch backend.
 
-        >>> g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 2, 1]), 'user', 'plays', 'game')
+        >>> g = dgl.heterograph({
+        ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1])
+        ... })
         >>> print(g.device)
         device(type='cpu')
         >>> g = g.to('cuda:0')
