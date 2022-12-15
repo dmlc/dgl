@@ -73,10 +73,23 @@ def __alltoall_cpu(rank, world_size, output_tensor_list, input_tensor_list):
         The tensors to exchange
     """
     input_tensor_list = [tensor.to(torch.device('cpu')) for tensor in input_tensor_list]
+    # TODO(#5002): As Boolean data is not supported in
+    # ``torch.distributed.scatter()``, we convert boolean into uint8 before
+    # scatter and convert it back afterwards.
+    dtypes = [ t.dtype for t in input_tensor_list]
+    for i, dtype in enumerate(dtypes):
+        if dtype == torch.bool:
+            input_tensor_list[i] = input_tensor_list[i].to(torch.int8)
+            output_tensor_list[i] = output_tensor_list[i].to(torch.int8)
     for i in range(world_size):
         dist.scatter(output_tensor_list[i], input_tensor_list if i == rank else [], src=i)
+    # Convert back to original dtype
+    for i, dtype in enumerate(dtypes):
+        if dtype == torch.bool:
+            input_tensor_list[i] = input_tensor_list[i].to(dtype)
+            output_tensor_list[i] = output_tensor_list[i].to(dtype)
 
-def alltoallv_cpu(rank, world_size, input_tensor_list):
+def alltoallv_cpu(rank, world_size, input_tensor_list, retain_nones=True):
     """
     Wrapper function to providing the alltoallv functionality by using underlying alltoall
     messaging primitive. This function, in its current implementation, supports exchanging 
@@ -98,6 +111,8 @@ def alltoallv_cpu(rank, world_size, input_tensor_list):
         The size of the entire
     input_tensor_list : List of tensor
         The tensors to exchange
+    retain_nones : bool
+        Indicates whether to retain ``None`` data in returned value.
 
     Returns:
     --------
@@ -151,7 +166,8 @@ def alltoallv_cpu(rank, world_size, input_tensor_list):
     return_vals = []
     for s, t in zip(recv_counts, output_tensor_list):
         if s[0] == 0:
-            return_vals.append(None)
+            if retain_nones:
+                return_vals.append(None)
         else:
             return_vals.append(t[0:s[0]])
     return return_vals
