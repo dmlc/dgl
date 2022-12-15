@@ -11,6 +11,7 @@ import torch
 from dgl.data.utils import load_graphs, load_tensors
 
 from utils import create_chunked_dataset
+from partition_algo.base import load_partition_meta
 
 """
 TODO: skipping this test case since the dependency, mpirun, is
@@ -160,6 +161,13 @@ def test_parmetis_postprocessing():
             assert part_ids.shape[0] == ntype_count[ntype_name]
             assert np.min(part_ids) == 0
             assert np.max(part_ids) == 1
+
+        # check partition meta file
+        part_meta_file = os.path.join(results_dir, "partition_meta.json")
+        assert os.path.isfile(part_meta_file)
+        part_meta = load_partition_meta(part_meta_file)
+        assert part_meta.num_parts == 2
+        assert part_meta.algo_name == "metis"
 
 
 """
