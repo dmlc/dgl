@@ -11,6 +11,7 @@ import pyarrow.csv as csv
 
 import constants
 from utils import get_idranges, get_node_types, read_json
+from partition_algo.base import PartitionMeta, dump_partition_meta
 
 
 def post_process(params):
@@ -39,6 +40,7 @@ def post_process(params):
     )
     global_nids = metis_df["f0"].to_numpy()
     partition_ids = metis_df["f1"].to_numpy()
+    num_parts = np.unique(partition_ids).size
 
     sort_idx = np.argsort(global_nids)
     global_nids = global_nids[sort_idx]
@@ -66,6 +68,13 @@ def post_process(params):
             options,
         )
         logging.info(f"Generated {out_file}")
+
+    # generate partition meta file.
+    part_meta = PartitionMeta(
+        version="1.0.0", num_parts=num_parts, algo_name="metis"
+    )
+    dump_partition_meta(part_meta, os.path.join(outdir, "partition_meta.json"))
+
     logging.info("Done processing parmetis output")
 
 
