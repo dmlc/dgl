@@ -73,7 +73,7 @@ def run(proc_id, n_gpus, args, devices, data):
     if args.data_device == 'gpu':
         nfeat = nfeat.to(device)
     elif args.data_device == 'uva':
-        nfeat = dgl.utils.pin_memory_inplace(nfeat)
+        nfeat = nfeat.pin_memory()
     in_feats = nfeat.shape[1]
 
     # Create PyTorch DataLoader for constructing blocks
