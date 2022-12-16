@@ -3,11 +3,14 @@ import os
 import backend as F
 import torch as th
 import dgl
+import json
 import numpy as np
 import pytest
+import tempfile
 from dgl import function as fn
 from dgl.distributed import (
     load_partition,
+    load_partition_book,
     load_partition_feats,
     partition_graph,
 )
@@ -656,3 +659,27 @@ def test_RangePartitionBook():
     assert expect_except
     data_name = HeteroDataName(False, c_etype, "feat")
     assert data_name.get_type() == c_etype
+
+
+def test_UnknownPartitionBook():
+    node_map = {'_N': {0:0, 1:1, 2:2}}
+    edge_map = {'_N:_E:_N': {0:0, 1:1, 2:2}}
+
+    part_metadata = {
+        "num_parts": 1,
+        "num_nodes": len(node_map),
+        "num_edges": len(edge_map),
+        "node_map": node_map,
+        "edge_map": edge_map,
+        "graph_name": "test_graph"
+    }
+
+    with tempfile.TemporaryDirectory() as test_dir:
+        part_config = os.path.join(test_dir, "test_graph.json")
+        with open(part_config, "w") as file:
+            json.dump(part_metadata, file, indent = 4)
+        try:
+            load_partition_book(part_config, 0)
+        except Exception as e:
+            if not isinstance(e, TypeError):
+                raise e

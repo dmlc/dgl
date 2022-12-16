@@ -313,10 +313,9 @@ def check_neg_dataloader(g, num_server, num_workers):
 @pytest.mark.parametrize("num_server", [3])
 @pytest.mark.parametrize("num_workers", [0, 4])
 @pytest.mark.parametrize("drop_last", [True, False])
-@pytest.mark.parametrize("reshuffle", [True, False])
 @pytest.mark.parametrize("num_groups", [1])
 def test_dist_dataloader(
-    num_server, num_workers, drop_last, reshuffle, num_groups
+    num_server, num_workers, drop_last, num_groups
 ):
     reset_envs()
     # No multiple partitions on single machine for

@@ -223,7 +223,7 @@ def get_shared_mem_partition_book(graph_name):
             part_id, num_parts, node_map, edge_map, ntypes, etypes
         )
     else:
-        raise Exception("Only RangePartitionBook is supported currently.")
+        raise TypeError("Only RangePartitionBook is supported currently.")
 
 
 def get_node_partition_from_book(book, device):

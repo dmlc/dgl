@@ -330,13 +330,13 @@ def load_partition_book(part_config, part_id):
         for key in edge_map:
             assert key in etypes, 'The edge type {} is invalid'.format(key)
 
-    if is_range_part:
-        node_map = _get_part_ranges(node_map)
-        edge_map = _get_part_ranges(edge_map)
-        return RangePartitionBook(part_id, num_parts, node_map, edge_map, ntypes, etypes), \
-                part_metadata['graph_name'], ntypes, etypes
-    else:
-        raise Exception("Only RangePartitionBook is supported currently.")
+    if not is_range_part:
+        raise TypeError("Only RangePartitionBook is supported currently.")
+
+    node_map = _get_part_ranges(node_map)
+    edge_map = _get_part_ranges(edge_map)
+    return RangePartitionBook(part_id, num_parts, node_map, edge_map, ntypes, etypes), \
+            part_metadata['graph_name'], ntypes, etypes
 
 def _get_orig_ids(g, sim_g, reshuffle, orig_nids, orig_eids):
     '''Convert/construct the original node IDs and edge IDs.
