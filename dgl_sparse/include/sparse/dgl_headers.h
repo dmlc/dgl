@@ -14,7 +14,6 @@
 
 #include <dgl/aten/coo.h>
 #include <dgl/aten/csr.h>
-#include <dgl/graph.h>
 #include <dgl/kernel.h>
 #include <dgl/runtime/dlpack_convert.h>
 #include <dmlc/logging.h>

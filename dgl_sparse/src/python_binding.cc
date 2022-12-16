@@ -9,6 +9,7 @@
 
 #include <sparse/elementwise_op.h>
 #include <sparse/reduction.h>
+#include <sparse/sddmm.h>
 #include <sparse/sparse_matrix.h>
 #include <sparse/spmm.h>
 #include <torch/custom_class.h>
@@ -38,7 +39,8 @@ TORCH_LIBRARY(dgl_sparse, m) {
       .def("smax", &ReduceMax)
       .def("sprod", &ReduceProd)
       .def("val_like", &CreateValLike)
-      .def("spmm", &SpMM);
+      .def("spmm", &SpMM)
+      .def("sddmm", &SDDMM);
 }
 
 }  // namespace sparse

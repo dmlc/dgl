@@ -42,12 +42,10 @@ void SpMM(
  * @param ufeat The source node feature.
  * @param vfeat The destination node feature.
  * @param out The output feature on edge.
- * @param lhs_target Type of `ufeat`. (0: source; 1: edge; 2: destination)
- * @param rhs_target Type of `vfeat`. (0: source; 1: edge; 2: destination)
  */
 void SDDMM(
-    const std::string& op, HeteroGraphPtr graph, NDArray ufeat, NDArray vfeat,
-    NDArray out, int lhs_target, int rhs_target);
+    const std::string& op, HeteroGraphPtr graph, NDArray ufeat, NDArray efeat,
+    NDArray out);
 
 /**
  * @brief Sparse-sparse matrix multiplication.

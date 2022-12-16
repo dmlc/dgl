@@ -20,9 +20,8 @@ namespace sparse {
  * @brief Perform a matrix multiplication of the sparse matrix and dense
  * matrix. It uses the sparse formats of `sparse_mat` and non-zero values of
  * `sparse_val` for SpMM. The `sparse_val` must be 1-dimensional. If the sparse
- * matrix has shape (n, m), the dense matrix must have shape (m, k) or (m,). and
- * the returned dense matrix has shape (n, k) or (n,
- * ).
+ * matrix has shape (n, m), the dense matrix must have shape (m, k). And
+ * the returned dense matrix has shape (n, k).
  *
  * This function does not take care of autograd.
  *
@@ -43,7 +42,8 @@ torch::Tensor SpMMImpl(
  * matrix has shape (n, m), the dense matrix must have shape (m, k) or (m,), and
  * the returned dense matrix has shape (n, k) or (n,).
  *
- * This function supports autograd for both the sparse and dense matrix.
+ * This function supports autograd for both the sparse and dense matrix but does
+ * not support higher order gradient.
  *
  * @param sparse_mat The sparse matrix.
  * @param dense_mat The dense matrix.

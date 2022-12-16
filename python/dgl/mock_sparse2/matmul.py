@@ -12,7 +12,7 @@ __all__ = ["spmm"]
 
 
 def spmm(A: Union[SparseMatrix, DiagMatrix], X: torch.Tensor) -> torch.Tensor:
-    """Multiply a sparse matrix by a dense matrix
+    """Multiply a sparse matrix by a dense matrix.
 
     Parameters
     ----------
@@ -24,7 +24,7 @@ def spmm(A: Union[SparseMatrix, DiagMatrix], X: torch.Tensor) -> torch.Tensor:
     Returns
     -------
     torch.Tensor
-        The result of multiplication
+        The multiplication result of shape (N, F) or (N)
 
     Examples
     --------
@@ -34,7 +34,7 @@ def spmm(A: Union[SparseMatrix, DiagMatrix], X: torch.Tensor) -> torch.Tensor:
     >>> val = torch.randn(len(row))
     >>> A = create_from_coo(row, col, val)
     >>> X = torch.randn(2, 3)
-    >>> result = A @ X
+    >>> result = dgl.sparse.spmm(A, X)
     >>> print(type(result))
     <class 'torch.Tensor'>
     >>> print(result.shape)
@@ -46,14 +46,8 @@ def spmm(A: Union[SparseMatrix, DiagMatrix], X: torch.Tensor) -> torch.Tensor:
     assert isinstance(
         X, torch.Tensor
     ), f"Expect arg2 to be a torch.Tensor, got {type(X)}"
-    assert (
-        A.shape[1] == X.shape[0]
-    ), f"Expect arg1.shape[1] == arg2.shape[0], got {A.shape[1]} and {X.shape[0]}"
-    val_dim = len(A.val.shape)
-    assert val_dim == 1, f"Expect arg1.val to be a 1D tensor, got {val_dim}D"
-    val_dim = len(X.shape)
-    assert val_dim <= 2, f"Expect arg2 to be a 1D/2D tensor, got {val_dim}D"
 
+    # The input is a DiagMatrix. Cast it to SparseMatrix
     if not isinstance(A, SparseMatrix):
         A = A.as_sparse()
     return torch.ops.dgl_sparse.spmm(A.c_sparse_matrix, X)
@@ -62,7 +56,7 @@ def spmm(A: Union[SparseMatrix, DiagMatrix], X: torch.Tensor) -> torch.Tensor:
 def mm_sp(
     A1: SparseMatrix, A2: Union[torch.Tensor, SparseMatrix, DiagMatrix]
 ) -> Union[torch.Tensor, SparseMatrix]:
-    """Internal function for multiplying a sparse matrix by a dense/sparse/diagonal matrix
+    """Internal function for multiplying a sparse matrix by a dense/sparse/diagonal matrix.
 
     Parameters
     ----------
