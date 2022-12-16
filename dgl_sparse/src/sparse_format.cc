@@ -48,6 +48,20 @@ aten::CSRMatrix CSRToOldDGLCSR(const std::shared_ptr<CSR>& csr) {
       csr->num_rows, csr->num_cols, indptr, indices, data, csr->sorted);
 }
 
+torch::Tensor COOToTorchCOO(
+    const std::shared_ptr<COO>& coo, torch::Tensor value) {
+  std::vector<torch::Tensor> indices = {coo->row, coo->col};
+  if (value.ndimension() == 2) {
+    return torch::sparse_coo_tensor(
+      torch::stack(indices), value,
+      {coo->num_rows, coo->num_cols, value.size(1)});
+  } else {
+    return torch::sparse_coo_tensor(
+      torch::stack(indices), value,
+      {coo->num_rows, coo->num_cols});
+  }
+}
+
 std::shared_ptr<COO> CSRToCOO(const std::shared_ptr<CSR>& csr) {
   auto dgl_csr = CSRToOldDGLCSR(csr);
   auto dgl_coo = aten::CSRToCOO(dgl_csr, csr->value_indices.has_value());

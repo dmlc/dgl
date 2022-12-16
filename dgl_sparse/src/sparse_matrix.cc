@@ -119,7 +119,8 @@ c10::intrusive_ptr<SparseMatrix> SparseMatrix::Transpose() const {
   if (HasCOO()) {
     auto coo = COOTranspose(coo_);
     return SparseMatrix::FromCOO(coo, value, shape);
-  } else if (HasCSR()) {
+  }
+   if (HasCSR()) {
     return SparseMatrix::FromCSC(csr_, value, shape);
   } else {
     return SparseMatrix::FromCSR(csc_, value, shape);
