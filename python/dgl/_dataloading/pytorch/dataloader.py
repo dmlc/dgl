@@ -3,6 +3,7 @@ import inspect
 import math
 import threading
 import queue
+from distutils.version import LooseVersion
 import torch as th
 from torch.utils.data import DataLoader, IterableDataset
 from torch.utils.data.distributed import DistributedSampler
@@ -12,16 +13,16 @@ from ...distributed import DistGraph
 from ...ndarray import NDArray as DGLNDArray
 from ... import backend as F
 from ...base import DGLError, dgl_warning
-from ...utils import to_dgl_context, check_device, version
+from ...utils import to_dgl_context, check_device
 
 __all__ = ['NodeDataLoader', 'EdgeDataLoader', 'GraphDataLoader',
            # Temporary exposure.
            '_pop_subgraph_storage', '_pop_storages',
            '_restore_subgraph_storage', '_restore_storages']
 
-PYTORCH_VER = version.parse(th.__version__)
-PYTORCH_16 = PYTORCH_VER >= version.parse("1.6.0")
-PYTORCH_17 = PYTORCH_VER >= version.parse("1.7.0")
+PYTORCH_VER = LooseVersion(th.__version__)
+PYTORCH_16 = PYTORCH_VER >= LooseVersion("1.6.0")
+PYTORCH_17 = PYTORCH_VER >= LooseVersion("1.7.0")
 
 def _check_graph_type(g):
     if isinstance(g, DistGraph):
