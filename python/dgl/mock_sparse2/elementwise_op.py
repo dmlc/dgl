@@ -2,8 +2,6 @@
 from typing import Union
 
 from .diag_matrix import DiagMatrix
-from .elementwise_op_diag import diag_add
-from .elementwise_op_sp import sp_add
 from .sparse_matrix import SparseMatrix
 
 __all__ = ["add", "power"]

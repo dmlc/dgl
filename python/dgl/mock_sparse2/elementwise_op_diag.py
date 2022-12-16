@@ -1,14 +1,15 @@
 """DGL elementwise operators for diagonal matrix module."""
 from typing import Union
 
-from .diag_matrix import diag, DiagMatrix
+from .diag_matrix import DiagMatrix, diag
 from .sparse_matrix import SparseMatrix
 
 __all__ = ["diag_add", "diag_sub", "diag_mul", "diag_div", "diag_power"]
 
 
-def diag_add(D1: DiagMatrix, D2: Union[DiagMatrix, SparseMatrix])\
-    -> Union[DiagMatrix, SparseMatrix]:
+def diag_add(
+    D1: DiagMatrix, D2: Union[DiagMatrix, SparseMatrix]
+) -> Union[DiagMatrix, SparseMatrix]:
     """Elementwise addition
 
     Parameters

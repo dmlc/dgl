@@ -16,8 +16,7 @@ def spsp_add(A, B):
     )
 
 
-def sp_add(A: SparseMatrix, B: Union[DiagMatrix, SparseMatrix])\
-    -> SparseMatrix:
+def sp_add(A: SparseMatrix, B: Union[DiagMatrix, SparseMatrix]) -> SparseMatrix:
     """Elementwise addition
 
     Parameters

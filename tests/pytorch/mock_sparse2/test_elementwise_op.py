@@ -2,12 +2,15 @@ import sys
 
 import backend as F
 import pytest
+import torch
 
-from dgl.mock_sparse2 import *
+from dgl.mock_sparse2 import (add, create_from_coo, create_from_csc,
+                              create_from_csr, diag)
 
 # TODO(#4818): Skipping tests on win.
 if not sys.platform.startswith("linux"):
     pytest.skip("skipping tests on win", allow_module_level=True)
+
 
 @pytest.mark.parametrize("val_shape", [(), (2,)])
 def test_add_coo(val_shape):
@@ -29,6 +32,7 @@ def test_add_coo(val_shape):
     assert torch.allclose(dense_sum, sum1)
     assert torch.allclose(dense_sum, sum2)
 
+
 @pytest.mark.parametrize("val_shape", [(), (2,)])
 def test_add_csr(val_shape):
     ctx = F.ctx()
@@ -48,6 +52,7 @@ def test_add_csr(val_shape):
 
     assert torch.allclose(dense_sum, sum1)
     assert torch.allclose(dense_sum, sum2)
+
 
 @pytest.mark.parametrize("val_shape", [(), (2,)])
 def test_add_csc(val_shape):
@@ -69,6 +74,7 @@ def test_add_csc(val_shape):
     assert torch.allclose(dense_sum, sum1)
     assert torch.allclose(dense_sum, sum2)
 
+
 @pytest.mark.parametrize("val_shape", [(), (2,)])
 def test_add_diag(val_shape):
     ctx = F.ctx()
@@ -83,6 +89,7 @@ def test_add_diag(val_shape):
 
     assert torch.allclose(dense_sum, sum1)
     assert torch.allclose(dense_sum, sum2)
+
 
 @pytest.mark.parametrize("val_shape", [(), (2,)])
 def test_add_sparse_diag(val_shape):
