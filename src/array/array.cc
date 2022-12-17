@@ -4,6 +4,7 @@
  * @brief DGL array utilities implementation
  */
 #include <dgl/array.h>
+#include <dgl/bcast.h>
 #include <dgl/graph_traversal.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/container.h>
@@ -15,6 +16,7 @@
 #include "../c_api_common.h"
 #include "./arith.h"
 #include "./array_op.h"
+#include "./kernel_decl.h"
 
 using namespace dgl::runtime;
 
@@ -545,9 +547,8 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
     int importance_sampling, IdArray random_seed, IdArray NIDs) {
   std::pair<COOMatrix, FloatArray> ret;
   ATEN_CSR_SWITCH_CUDA_UVA(mat, rows, XPU, IdType, "CSRLaborSampling", {
-    const auto dtype = IsNullArray(prob)
-                           ? DGLDataTypeTraits<float>::dtype
-                           : prob->dtype;
+    const auto dtype =
+        IsNullArray(prob) ? DGLDataTypeTraits<float>::dtype : prob->dtype;
     ATEN_FLOAT_TYPE_SWITCH(dtype, FloatType, "probability", {
       ret = impl::CSRLaborSampling<XPU, IdType, FloatType>(
           mat, rows, num_samples, prob, importance_sampling, random_seed, NIDs);
@@ -819,9 +820,8 @@ std::pair<COOMatrix, FloatArray> COOLaborSampling(
     int importance_sampling, IdArray random_seed, IdArray NIDs) {
   std::pair<COOMatrix, FloatArray> ret;
   ATEN_COO_SWITCH(mat, XPU, IdType, "COOLaborSampling", {
-    const auto dtype = IsNullArray(prob)
-                           ? DGLDataTypeTraits<float>::dtype
-                           : prob->dtype;
+    const auto dtype =
+        IsNullArray(prob) ? DGLDataTypeTraits<float>::dtype : prob->dtype;
     ATEN_FLOAT_TYPE_SWITCH(dtype, FloatType, "probability", {
       ret = impl::COOLaborSampling<XPU, IdType, FloatType>(
           mat, rows, num_samples, prob, importance_sampling, random_seed, NIDs);
@@ -1086,6 +1086,93 @@ Frontiers DGLDFSLabeledEdges(
     });
   });
   return ret;
+}
+
+void CSRSpMM(
+    const std::string& op, const std::string& reduce, const CSRMatrix& csr,
+    NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux) {
+  const auto& bcast = CalcBcastOff(op, ufeat, efeat);
+
+  ATEN_XPU_SWITCH_CUDA(csr.indptr->ctx.device_type, XPU, "SpMM", {
+    ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {
+      ATEN_FLOAT_TYPE_SWITCH_16BITS(out->dtype, Dtype, XPU, "Feature data", {
+        SpMMCsr<XPU, IdType, Dtype>(
+            op, reduce, bcast, csr, ufeat, efeat, out, out_aux);
+      });
+    });
+  });
+}
+
+void CSRSpMM(
+    const char* op, const char* reduce, const CSRMatrix& csr, NDArray ufeat,
+    NDArray efeat, NDArray out, std::vector<NDArray> out_aux) {
+  CSRSpMM(
+      std::string(op), std::string(reduce), csr, ufeat, efeat, out, out_aux);
+}
+
+void CSRSDDMM(
+    const std::string& op, const CSRMatrix& csr, NDArray ufeat, NDArray efeat,
+    NDArray out, int lhs_target, int rhs_target) {
+  const auto& bcast = CalcBcastOff(op, ufeat, efeat);
+
+  ATEN_XPU_SWITCH_CUDA(csr.indptr->ctx.device_type, XPU, "SDDMM", {
+    ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {
+      ATEN_FLOAT_TYPE_SWITCH_16BITS(out->dtype, Dtype, XPU, "Feature data", {
+        SDDMMCsr<XPU, IdType, Dtype>(
+            op, bcast, csr, ufeat, efeat, out, lhs_target, rhs_target);
+      });
+    });
+  });
+}
+
+void CSRSDDMM(
+    const char* op, const CSRMatrix& csr, NDArray ufeat, NDArray efeat,
+    NDArray out, int lhs_target, int rhs_target) {
+  return CSRSDDMM(
+      std::string(op), csr, ufeat, efeat, out, lhs_target, rhs_target);
+}
+
+void COOSpMM(
+    const std::string& op, const std::string& reduce, const COOMatrix& coo,
+    NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux) {
+  const auto& bcast = CalcBcastOff(op, ufeat, efeat);
+
+  ATEN_XPU_SWITCH_CUDA(coo.row->ctx.device_type, XPU, "SpMM", {
+    ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {
+      ATEN_FLOAT_TYPE_SWITCH_16BITS(out->dtype, Dtype, XPU, "Feature data", {
+        SpMMCoo<XPU, IdType, Dtype>(
+            op, reduce, bcast, coo, ufeat, efeat, out, out_aux);
+      });
+    });
+  });
+}
+
+void COOSpMM(
+    const char* op, const char* reduce, const COOMatrix& coo, NDArray ufeat,
+    NDArray efeat, NDArray out, std::vector<NDArray> out_aux) {
+  COOSpMM(
+      std::string(op), std::string(reduce), coo, ufeat, efeat, out, out_aux);
+}
+
+void COOSDDMM(
+    const std::string& op, const COOMatrix& coo, NDArray ufeat, NDArray efeat,
+    NDArray out, int lhs_target, int rhs_target) {
+  const auto& bcast = CalcBcastOff(op, ufeat, efeat);
+
+  ATEN_XPU_SWITCH_CUDA(coo.row->ctx.device_type, XPU, "SDDMM", {
+    ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {
+      ATEN_FLOAT_TYPE_SWITCH_16BITS(out->dtype, Dtype, XPU, "Feature data", {
+        SDDMMCoo<XPU, IdType, Dtype>(
+            op, bcast, coo, ufeat, efeat, out, lhs_target, rhs_target);
+      });
+    });
+  });
+}
+
+void COOSDDMM(
+    const char* op, const COOMatrix& coo, NDArray ufeat, NDArray efeat,
+    NDArray out, int lhs_target, int rhs_target) {
+  COOSDDMM(std::string(op), coo, ufeat, efeat, out, lhs_target, rhs_target);
 }
 
 ///////////////////////// C APIs /////////////////////////
