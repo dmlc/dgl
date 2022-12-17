@@ -380,7 +380,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:v221216"
+                  image "dgllib/dgl-ci-cpu:v220816"
                   alwaysPull true
                 }
               }
@@ -401,7 +401,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-gpu-node"
-                  image "dgllib/dgl-ci-gpu:cu102_v221216"
+                  image "dgllib/dgl-ci-gpu:cu101_v220816"
                   args "--runtime nvidia"
                   alwaysPull true
                 }
