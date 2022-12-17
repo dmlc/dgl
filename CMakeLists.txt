@@ -357,6 +357,5 @@ endif(BUILD_CPP_TEST)
 
 if(BUILD_SPARSE)
   set(DGL_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/include")
-  list(APPEND DGL_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/src")
   add_subdirectory(dgl_sparse)
 endif(BUILD_SPARSE)
