@@ -1396,41 +1396,30 @@ def test_heterognnexplainer(g, idtype, input_dim, output_dim):
 
 @pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
 @parametrize_idtype
-@pytest.mark.parametrize('out_dim', [2])
-@pytest.mark.parametrize('max_iter', [40])
-@pytest.mark.parametrize('node_min', [20])
-@pytest.mark.parametrize('coef', [6])
-@pytest.mark.parametrize('high2low ', [True])
-def test_subgraphxexplainer(g, idtype, out_dim, max_iter, node_min, coef, high2low):
-    g = g.astype(idtype).to(F.ctx())
+@pytest.mark.parametrize('n_classes', [2])
+@pytest.mark.parametrize('high2low ', [True, False])
+def test_subgraphx(g, idtype, n_classes, high2low):
+    ctx = F.ctx()
+    g = g.astype(idtype).to(ctx)
     feat = F.randn((g.num_nodes(), 5))
 
     class Model(th.nn.Module):
-        def __init__(self, in_dim, hidden_dim, n_classes):
-            super(Model, self).__init__()
+        def __init__(self, in_dim, n_classes, hidden_dim=5):
+            super().__init__()
             self.conv1 = nn.GraphConv(in_dim, hidden_dim)
-            self.conv2 = nn.GraphConv(hidden_dim, hidden_dim)
-            self.classify = th.nn.Linear(hidden_dim, n_classes)
+            self.conv2 = nn.GraphConv(hidden_dim, n_classes)
+            self.pool = nn.AvgPooling()
 
         def forward(self, g, h):
             h = th.nn.functional.relu(self.conv1(g, h))
-            h = th.nn.functional.relu(self.conv2(g, h))
-            with g.local_scope():
-                g.ndata['h'] = h
-                hg = dgl.mean_nodes(g, 'h')
-                return self.classify(hg)
+            h = self.conv2(g, h)
+            return self.pool(g, h)
 
-    # Explain graph prediction
-    model = Model(5, 10, out_dim)
-    model = model.to(F.ctx())
-    explainer = nn.explain.SubgraphXExplainer(model,
-                                              num_gnn_layers=2,
-                                              coef=coef,
-                                              high2low =high2low ,
-                                              max_iter=max_iter,
-                                              node_min=node_min)
-    g_nodes_explain = explainer.explain_graph(g,
-                                              feat=feat)
+    model = Model(feat.shape[1], n_classes)
+    model = model.to(ctx)
+    explainer = nn.SubgraphX(model, num_hops=2, high2low=high2low,
+                             node_min=g.num_nodes() // 2)
+    explainer.explain_graph(g, feat, target_class=0)
 
 
 def test_jumping_knowledge():
