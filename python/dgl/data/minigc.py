@@ -178,7 +178,7 @@ class MiniGCDataset(DGLDataset):
         for i in range(self.num_graphs):
             # convert to DGLGraph, and add self loops
             self.graphs[i] = add_self_loop(from_networkx(self.graphs[i]))
-        self.labels = F.tensor(np.array(self.labels).astype(np.int))
+        self.labels = F.tensor(np.array(self.labels).astype(np.int64))
 
     def _gen_cycle(self, n):
         for _ in range(n):
