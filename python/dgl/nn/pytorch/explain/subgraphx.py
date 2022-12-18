@@ -199,7 +199,7 @@ class SubgraphX(nn.Module):
         mcts_children_maps = dict()
 
         for node in chosen_nodes:
-            new_subg = remove_nodes(subg, node, store_ids=True)
+            new_subg = remove_nodes(subg, node.to(subg.idtype), store_ids=True)
             # Get the largest weakly connected component in the subgraph.
             nx_graph = to_networkx(new_subg.cpu())
             largest_cc_nids = list(
