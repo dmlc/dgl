@@ -341,7 +341,7 @@ def pack_padded_tensor(input, lengths):
 
 def boolean_mask(input, mask):
     if "bool" not in str(mask.dtype):
-        mask = th.tensor(mask, dtype=th.bool)
+        mask = th.as_tensor(mask, dtype=th.bool)
     return input[mask]
 
 
