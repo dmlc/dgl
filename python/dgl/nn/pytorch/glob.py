@@ -729,8 +729,8 @@ class MultiHeadAttention(nn.Module):
         max_len_x = max(lengths_x)
         max_len_mem = max(lengths_mem)
         device = x.device
-        lengths_x = th.tensor(lengths_x, dtype=th.int64, device=device)
-        lengths_mem = th.tensor(lengths_mem, dtype=th.int64, device=device)
+        lengths_x = th.as_tensor(lengths_x, dtype=th.int64, device=device)
+        lengths_mem = th.as_tensor(lengths_mem, dtype=th.int64, device=device)
 
         queries = self.proj_q(x).view(-1, self.num_heads, self.d_head)
         keys = self.proj_k(mem).view(-1, self.num_heads, self.d_head)
