@@ -46,7 +46,7 @@ torch::Tensor ReduceAlong(
   //
   //   [A.num_rows if dim == 1 else A.num_cols] + A.val.shape[1:]
   std::vector<int64_t> output_shape = value.sizes().vec();
-  std::vector<int64_t> view_dims(value_shape.size(), 1);
+  std::vector<int64_t> view_dims(output_shape.size(), 1);
   view_dims[0] = -1;
   torch::Tensor idx;
   if (dim == 0) {
