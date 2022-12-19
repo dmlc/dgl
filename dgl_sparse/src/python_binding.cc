@@ -31,7 +31,6 @@ TORCH_LIBRARY(dgl_sparse, m) {
       .def("create_from_csc", &CreateFromCSC)
       .def("spsp_add", &SpSpAdd)
       .def("val_like", &CreateValLike)
-      .def("spmm", &SpMM)
       .def("reduce", &Reduce)
       .def("sum", &ReduceSum)
       .def("smean", &ReduceMean)
