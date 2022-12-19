@@ -20,7 +20,7 @@ namespace sparse {
  * @param dim The sparse dimension to reduce along.  Must be either 0 (rows) or
  * 1 (columns).
  * @param reduce The reduce operator.  Must be either "sum", "smin", "smax",
- * "mean", or "prod".
+ * "mean", or "sprod".
  *
  * @return Tensor
  */
@@ -55,7 +55,7 @@ inline torch::Tensor ReduceMean(
 inline torch::Tensor ReduceProd(
     const c10::intrusive_ptr<SparseMatrix>& A,
     const torch::optional<int64_t>& dim = torch::nullopt) {
-  return Reduce(A, "prod", dim);
+  return Reduce(A, "sprod", dim);
 }
 
 }  // namespace sparse

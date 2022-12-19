@@ -35,7 +35,7 @@ torch::Tensor ReduceAlong(
     reduce_op = "amax";
   } else if (reduce == "smean") {
     reduce_op = "mean";
-  } else if (reduce == "prod") {
+  } else if (reduce == "sprod") {
     reduce_op = "prod";
   } else {
     TORCH_CHECK(false, "unknown reduce function ", reduce);
@@ -45,10 +45,7 @@ torch::Tensor ReduceAlong(
   // Create the output tensor with shape
   //
   //   [A.num_rows if dim == 1 else A.num_cols] + A.val.shape[1:]
-  //
-  // (BarclayII) I'm not sure how to get the Tensor's shape as a vector...
-  auto value_shape = value.sizes();
-  std::vector<int64_t> output_shape(value_shape.begin(), value_shape.end());
+  std::vector<int64_t> output_shape = value.sizes().vec();
   std::vector<int64_t> view_dims(value_shape.size(), 1);
   view_dims[0] = -1;
   torch::Tensor idx;
@@ -80,7 +77,7 @@ torch::Tensor ReduceAll(
     return A->value().amax(0);
   } else if (reduce == "smean") {
     return A->value().mean(0);
-  } else if (reduce == "prod") {
+  } else if (reduce == "sprod") {
     return A->value().prod(0);
   }
 
