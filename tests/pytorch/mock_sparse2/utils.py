@@ -45,10 +45,7 @@ def rand_csc(shape, nnz, dev):
 
 
 def sparse_matrix_to_dense(A: SparseMatrix):
-    dense = torch.zeros(A.shape, dtype=A.dtype, device=A.device)
-    row, col = A.coo()
-    for r, c, v in zip(row, col, A.val):
-        dense[r, c] += v
+    dense = A.dense()
     dense.requires_grad_()
     return dense
 

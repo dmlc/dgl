@@ -3,15 +3,13 @@
  * @file spmm.cc
  * @brief DGL C++ sparse SpMM operator implementation.
  */
-// clang-format off
-#include <sparse/dgl_headers.h>
-// clang-format on
 
 #include <sparse/sddmm.h>
 #include <sparse/sparse_matrix.h>
 #include <sparse/spmm.h>
 #include <torch/script.h>
 
+#include "./matmul.h"
 #include "./utils.h"
 
 namespace dgl {
@@ -53,55 +51,11 @@ void _SpMMSanityCheck(
          "on the same device.";
 }
 
-torch::Tensor SpMMImpl(
-    const c10::intrusive_ptr<SparseMatrix>& sparse_mat,
-    torch::Tensor sparse_val, torch::Tensor dense_mat, bool transpose_sparse) {
-  const std::string op = "mul";
-  const std::string reduce = "sum";
-  const int64_t out_row =
-      transpose_sparse ? sparse_mat->shape()[1] : sparse_mat->shape()[0];
-  const std::vector<int64_t> shape = {out_row, dense_mat.size(1)};
-
-  auto ret = torch::zeros(shape, dense_mat.options());
-  auto dgl_sparse_val = TorchTensorToDGLArray(sparse_val);
-  auto dgl_dense_mat = TorchTensorToDGLArray(dense_mat);
-  auto dgl_ret = TorchTensorToDGLArray(ret);
-  if (!transpose_sparse) {
-    if (sparse_mat->HasCSR() || !sparse_mat->HasCOO()) {
-      auto csr = CSRToOldDGLCSR(sparse_mat->CSRPtr());
-      aten::CSRSpMM(
-          op.c_str(), reduce.c_str(), csr, dgl_dense_mat, dgl_sparse_val,
-          dgl_ret, {});
-    } else {  // COO
-      // Use the reverse order of aten::COOSpMM because it calculates A^T @ X.
-      auto coo = COOToOldDGLCOO(sparse_mat->COOPtr());
-      coo = aten::COOTranspose(coo);
-      aten::COOSpMM(
-          op.c_str(), reduce.c_str(), coo, dgl_dense_mat, dgl_sparse_val,
-          dgl_ret, {});
-    }
-  } else {  // transpose_sparse
-    if (sparse_mat->HasCSC() || !sparse_mat->HasCOO()) {
-      auto csc = CSRToOldDGLCSR(sparse_mat->CSCPtr());
-      aten::CSRSpMM(
-          op.c_str(), reduce.c_str(), csc, dgl_dense_mat, dgl_sparse_val,
-          dgl_ret, {});
-    } else {  // COO
-      // Use the reverse order of aten::COOSpMM because it calculates A^T @ X.
-      auto coo = COOToOldDGLCOO(sparse_mat->COOPtr());
-      aten::COOSpMM(
-          op.c_str(), reduce.c_str(), coo, dgl_dense_mat, dgl_sparse_val,
-          dgl_ret, {});
-    }
-  }
-  return ret;
-}
-
 torch::Tensor SpMMAutoGrad::forward(
     AutogradContext* ctx, c10::intrusive_ptr<SparseMatrix> sparse_mat,
     torch::Tensor sparse_val, torch::Tensor dense_mat) {
   _SpMMSanityCheck(sparse_mat, sparse_val, dense_mat);
-  auto ret = SpMMImpl(sparse_mat, sparse_val, dense_mat, false);
+  auto ret = SpMMNoAutoGrad(sparse_mat, sparse_val, dense_mat, false);
 
   const bool sparse_requires_grad = sparse_val.requires_grad();
   const bool dense_requires_grad = dense_mat.requires_grad();
@@ -135,10 +89,12 @@ tensor_list SpMMAutoGrad::backward(
 
   torch::Tensor dense_mat_grad, sparse_val_grad;
   if (sparse_requires_grad) {
-    sparse_val_grad = SDDMMImpl(sparse_mat, output_grad, dense_mat);
+    // A @ B = C -> dA = dC @ (B^T)
+    sparse_val_grad = SDDMMNoAutoGrad(sparse_mat, output_grad, dense_mat);
   }
   if (dense_requires_grad) {
-    dense_mat_grad = SpMMImpl(sparse_mat, sparse_val, output_grad, true);
+    // A @ B = C -> dB = (A^T) @ dC
+    dense_mat_grad = SpMMNoAutoGrad(sparse_mat, sparse_val, output_grad, true);
   }
   return {torch::Tensor(), sparse_val_grad, dense_mat_grad};
 }

@@ -3,14 +3,11 @@
  * @file sddmm.cc
  * @brief DGL C++ sparse SDDMM operator implementation.
  */
-// clang-format off
-#include <sparse/dgl_headers.h>
-// clang-format on
-
 #include <sparse/sparse_matrix.h>
 #include <sparse/spmm.h>
 #include <torch/script.h>
 
+#include "./matmul.h"
 #include "./utils.h"
 
 namespace dgl {
@@ -38,39 +35,15 @@ void _SDDMMSanityCheck(
       << "SDDMM: the first dense matrix should have the same first dimension "
          "as the sparse matrix";
   CHECK_EQ(sparse_mat->shape()[1], mat2.size(1))
-      << "SDDMM: the seond dense matrix should have the same second dimension "
+      << "SDDMM: the second dense matrix should have the same second dimension "
          "as the sparse matrix";
   CHECK_EQ(mat1.size(1), mat2.size(0))
       << "SDDMM: the second dimension of the first dense matrix should be "
          "equal to the first dimension of the second dense matrix.";
   CHECK_EQ(mat1.dtype(), mat2.dtype())
       << "SDDMM: the two dense matrices should have the same dtype.";
-}
-
-torch::Tensor SDDMMImpl(
-    const c10::intrusive_ptr<SparseMatrix>& sparse_mat, torch::Tensor mat1,
-    torch::Tensor mat2_tr) {
-  const int64_t out_row = sparse_mat->nnz();
-  const std::vector<int64_t> shape({out_row});
-  auto ret = torch::zeros(shape, mat1.options());
-  const std::string op = "dot";
-  auto dgl_mat1 = TorchTensorToDGLArray(mat1);
-  auto dgl_mat2_tr = TorchTensorToDGLArray(mat2_tr);
-  auto dgl_ret = TorchTensorToDGLArray(ret);
-  // Use CSR if the sparse matrix has CSR or does not have COO. Otherwise use
-  // COO.
-  if (sparse_mat->HasCSR() || !sparse_mat->HasCOO()) {
-    auto csr = CSRToOldDGLCSR(sparse_mat->CSRPtr());
-    aten::CSRSDDMM(
-        op.c_str(), csr, dgl_mat1, dgl_mat2_tr, dgl_ret, 0 /* Lhs target: u */,
-        2 /* rhs target: v */);
-  } else {  // COO
-    auto coo = COOToOldDGLCOO(sparse_mat->COOPtr());
-    aten::COOSDDMM(
-        op.c_str(), coo, dgl_mat1, dgl_mat2_tr, dgl_ret, 0 /* Lhs target: u */,
-        2 /* rhs target: v */);
-  }
-  return ret;
+  CHECK_EQ(mat1.device(), mat2.device())
+      << "SDDMM: the two dense matrices should on the same device.";
 }
 
 torch::Tensor SDDMMAutoGrad::forward(
@@ -78,7 +51,7 @@ torch::Tensor SDDMMAutoGrad::forward(
     torch::Tensor mat1, torch::Tensor mat2) {
   _SDDMMSanityCheck(sparse_mat, mat1, mat2);
   auto mat2_tr = mat2.transpose(0, 1).contiguous();
-  auto ret = SDDMMImpl(sparse_mat, mat1, mat2_tr);
+  auto ret = SDDMMNoAutoGrad(sparse_mat, mat1, mat2_tr);
   torch::Tensor cache_mat1, cache_mat2;
   if (mat1.requires_grad()) {
     cache_mat2 = mat2;
@@ -103,12 +76,12 @@ tensor_list SDDMMAutoGrad::backward(
   torch::Tensor mat1_grad, mat2_grad;
   if (ctx->saved_data["mat1_requires_grad"].toBool()) {
     // SDDMM(M, A, B) = C. dA = SpMM(dC, B^T)
-    mat1_grad =
-        SpMMImpl(sparse_mat, grad, mat2.transpose(0, 1).contiguous(), false);
+    mat1_grad = SpMMNoAutoGrad(
+        sparse_mat, grad, mat2.transpose(0, 1).contiguous(), false);
   }
   if (ctx->saved_data["mat2_requires_grad"].toBool()) {
     // SDDMM(M, A, B) = C. dB = SpMM(dC^T, A)^T
-    auto mat2_tr_grad = SpMMImpl(sparse_mat, grad, mat1, true);
+    auto mat2_tr_grad = SpMMNoAutoGrad(sparse_mat, grad, mat1, true);
     mat2_grad = mat2_tr_grad.transpose(0, 1).contiguous();
   }
   return {torch::Tensor(), mat1_grad, mat2_grad};

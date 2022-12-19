@@ -5,7 +5,8 @@ import pytest
 import torch
 
 from dgl.mock_sparse2 import val_like
-from utils import (
+
+from .utils import (
     clone_detach_and_grad,
     rand_coo,
     rand_csc,
