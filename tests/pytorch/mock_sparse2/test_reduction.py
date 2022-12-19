@@ -32,16 +32,13 @@ binary_op_map = {
 
 def _coalesce_dense(row, col, val, nrows, ncols, op):
     M = torch.zeros(10, 15, device=F.ctx())
-    A2 = torch.index_put(
-        torch.full(
-            (10, 15, 20) + val.shape[1:],
-            default_entry[op],
-            device=F.ctx(),
-            dtype=val.dtype,
-        ),
-        (row, col, torch.arange(20)),
-        val,
+    A2 = torch.full(
+        (10, 15, 20) + val.shape[1:],
+        default_entry[op],
+        device=F.ctx(),
+        dtype=val.dtype
     )
+    A2 = torch.index_put(A2, (row, col, torch.arange(20)), val)
     for i in range(20):
         M[row[i], col[i]] += 1
     if op == "mean":
@@ -93,12 +90,10 @@ def test_reduce_all(shape, op, use_reduce):
 def test_reduce_along(shape, dim, empty_nnz, op, use_reduce):
     row = torch.randint(0, 10, (20,), device=F.ctx())
     col = torch.randint(0, 15, (20,), device=F.ctx())
-    mask = (
-        torch.bincount(
-            col if dim == 0 else row, minlength=15 if dim == 0 else 10
-        )
-        == 0
-    )
+    if dim == 0:
+        mask = torch.bincount(col, minlength=15) == 0
+    else:
+        mask = torch.bincount(row, minlength=10) == 0
     val = torch.randn(*shape, device=F.ctx())
     val2 = val.clone()
     val = val.requires_grad_()
