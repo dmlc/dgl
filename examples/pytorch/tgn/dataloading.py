@@ -275,9 +275,10 @@ class TemporalEdgeDataLoader(DataLoader):
                 dataloader_kwargs[k] = v
         self.collator = collator(g, eids, graph_sampler, **collator_kwargs)
 
-        assert not isinstance(g, dgl.distributed.DistGraph), \
-            'DataLoader does not support DistGraph for now. ' \
-            + 'Please use DistDataLoader directly.'
+        assert not isinstance(g, dgl.distributed.DistGraph), (
+            "DataLoader does not support DistGraph for now. "
+            + "Please use DistDataLoader directly."
+        )
         self.dataloader = torch.utils.data.DataLoader(
             self.collator.dataset, collate_fn=self.collator.collate, **dataloader_kwargs)
         self.device = device
