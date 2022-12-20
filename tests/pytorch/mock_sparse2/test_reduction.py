@@ -40,7 +40,7 @@ def _coalesce_dense(row, col, val, nrows, ncols, op):
         (NUM_ROWS, NUM_COLS, 20) + val.shape[1:],
         default_entry[op],
         device=F.ctx(),
-        dtype=val.dtype
+        dtype=val.dtype,
     )
     A2 = torch.index_put(A2, (row, col, torch.arange(20)), val)
     for i in range(20):
@@ -54,9 +54,11 @@ def _coalesce_dense(row, col, val, nrows, ncols, op):
 
 
 # Add docstring tests of dglsp.reduction to unit tests
-@pytest.mark.parametrize('func', ['reduce', 'sum', 'smin', 'smax', 'sprod', 'smean'])
+@pytest.mark.parametrize(
+    "func", ["reduce", "sum", "smin", "smax", "sprod", "smean"]
+)
 def test_docstring(func):
-    globs = {'torch': torch, 'dglsp': dglsp}
+    globs = {"torch": torch, "dglsp": dglsp}
     runner = doctest.DebugRunner()
     finder = doctest.DocTestFinder()
     obj = getattr(dglsp, func)
@@ -113,9 +115,13 @@ def test_reduce_along(shape, dim, empty_nnz, op, use_reduce):
     val2 = val.clone()
     val = val.requires_grad_()
     val2 = val2.requires_grad_()
+    
+    # empty_nnz controls whether at least one column or one row has no
+    # non-zero entry.
     if empty_nnz:
         row[row == 0] = 1
         col[col == 0] = 1
+
     A = dglsp.create_from_coo(row, col, val, shape=(NUM_ROWS, NUM_COLS))
 
     A2, M = _coalesce_dense(row, col, val2, NUM_ROWS, NUM_COLS, op)

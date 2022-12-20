@@ -1,4 +1,4 @@
-"""DGL sparse matrix reduce operators."""
+"""DGL sparse matrix reduce operators"""
 from typing import Optional
 
 import torch
@@ -10,11 +10,6 @@ def reduce(A: SparseMatrix, dim: Optional[int] = None, rtype: str = "sum"):
     """Compute the reduction of non-zero values in sparse matrix A along
     the given dimension :attr:`dim`.
 
-    If :attr:`dim` is None, it reduces all the elements in the sparse
-    matrix. Otherwise, it reduces on the row (``dim=0``) or column (``dim=1``)
-    dimension, sproducing a tensor of shape ``(A.shape[1],) + A.val.shape[1:]``
-    or ``(A.shape[0],) + A.val.shape[1:]``.
-
     The reduction does not count zero values. If the row or column to be
     reduced does not have any non-zero value, the result will be 0.
 
@@ -23,12 +18,17 @@ def reduce(A: SparseMatrix, dim: Optional[int] = None, rtype: str = "sum"):
     A : SparseMatrix
         Sparse matrix
     dim : int, optional
-        The dimension to reduce.  Must be either 0 (by rows) or 1 (by columns).
+        The dimension to reduce.  Must be either 0 (by rows) or 1 (by columns)
+        or None (on all non-zero entries).
 
-        If not given, the reduction will happen across all non-zero entries.
+        If :attr:`dim` is None, it reduces all the elements in the sparse
+        matrix. Otherwise, it reduces on the row (``dim=0``) or column
+        (``dim=1``) dimension, producing a tensor of shape
+        ``(A.shape[1],) + A.val.shape[1:]`` or
+        ``(A.shape[0],) + A.val.shape[1:]``.
     rtype: str, optional
         Reduction type, one of ``['sum', 'smin', 'smax', 'smean', 'sprod']``,
-        representing taking the sum, minimum, maximum, mean, and sproduct of the
+        representing taking the sum, minimum, maximum, mean, and product of the
         non-zero entries.
 
     Returns
@@ -82,15 +82,17 @@ def sum(A: SparseMatrix, dim: Optional[int] = None):
     """Compute the sum of non-zero values in sparse matrix A along
     the given dimension :attr:`dim`.
 
-    If :attr:`dim` is None, it reduces all the elements in the sparse matrix.
-    Otherwise, it reduces on the row (``dim=0``) or column (``dim=1``) dimension,
-    sproducing a tensor of shape ``(A.shape[1], ) + A.val.shape[1:]`` or
-    ``(A.shape[0],) + A.val.shape[1:]``.
-
     Parameters
     ----------
     dim : int, optional
-        The dimension to reduce
+        The dimension to reduce.  Must be either 0 (by rows) or 1 (by columns)
+        or None (on all non-zero entries).
+
+        If :attr:`dim` is None, it reduces all the elements in the sparse
+        matrix. Otherwise, it reduces on the row (``dim=0``) or column
+        (``dim=1``) dimension, producing a tensor of shape
+        ``(A.shape[1],) + A.val.shape[1:]`` or
+        ``(A.shape[0],) + A.val.shape[1:]``.
 
     Returns
     ----------
@@ -129,18 +131,20 @@ def smax(A: SparseMatrix, dim: Optional[int] = None):
     """Compute the maximum of non-zero values in sparse matrix A along
     the given dimension :attr:`dim`.
 
-    If :attr:`dim` is None, it reduces all the elements in the sparse matrix.
-    Otherwise, it reduces on the row (``dim=0``) or column (``dim=1``) dimension,
-    sproducing a tensor of shape ``(A.shape[1], ) + A.val.shape[1:]`` or
-    ``(A.shape[0],) + A.val.shape[1:]``.
-
     The reduction does not count zero values. If the row or column to be
     reduced does not have any non-zero value, the result will be 0.
 
     Parameters
     ----------
     dim : int, optional
-        The dimension to reduce
+        The dimension to reduce.  Must be either 0 (by rows) or 1 (by columns)
+        or None (on all non-zero entries).
+
+        If :attr:`dim` is None, it reduces all the elements in the sparse
+        matrix. Otherwise, it reduces on the row (``dim=0``) or column
+        (``dim=1``) dimension, producing a tensor of shape
+        ``(A.shape[1],) + A.val.shape[1:]`` or
+        ``(A.shape[0],) + A.val.shape[1:]``.
 
     Returns
     ----------
@@ -180,18 +184,20 @@ def smin(A: SparseMatrix, dim: Optional[int] = None):
     """Compute the minimum of non-zero values in sparse matrix A along
     the given dimension :attr:`dim`.
 
-    If :attr:`dim` is None, it reduces all the elements in the sparse matrix.
-    Otherwise, it reduces on the row (``dim=0``) or column (``dim=1``) dimension,
-    sproducing a tensor of shape ``(A.shape[1], ) + A.val.shape[1:]`` or
-    ``(A.shape[0],) + A.val.shape[1:]``.
-
     The reduction does not count zero values. If the row or column to be reduced
     does not have any non-zero value, the result will be 0.
 
     Parameters
     ----------
     dim : int, optional
-        The dimension to reduce
+        The dimension to reduce.  Must be either 0 (by rows) or 1 (by columns)
+        or None (on all non-zero entries).
+
+        If :attr:`dim` is None, it reduces all the elements in the sparse
+        matrix. Otherwise, it reduces on the row (``dim=0``) or column
+        (``dim=1``) dimension, producing a tensor of shape
+        ``(A.shape[1],) + A.val.shape[1:]`` or
+        ``(A.shape[0],) + A.val.shape[1:]``.
 
     Returns
     ----------
@@ -235,18 +241,20 @@ def smean(A: SparseMatrix, dim: Optional[int] = None):
     """Compute the mean of non-zero values in sparse matrix A along
     the given dimension :attr:`dim`.
 
-    If :attr:`dim` is None, it reduces all the elements in the sparse matrix.
-    Otherwise, it reduces on the row (``dim=0``) or column (``dim=1``) dimension,
-    sproducing a tensor of shape ``(A.shape[1], ) + A.val.shape[1:]`` or
-    ``(A.shape[0],) + A.val.shape[1:]``.
-
     The reduction does not count zero values. If the row or column to be reduced
     does not have any non-zero value, the result will be 0.
 
     Parameters
     ----------
     dim : int, optional
-        The dimension to reduce
+        The dimension to reduce.  Must be either 0 (by rows) or 1 (by columns)
+        or None (on all non-zero entries).
+
+        If :attr:`dim` is None, it reduces all the elements in the sparse
+        matrix. Otherwise, it reduces on the row (``dim=0``) or column
+        (``dim=1``) dimension, producing a tensor of shape
+        ``(A.shape[1],) + A.val.shape[1:]`` or
+        ``(A.shape[0],) + A.val.shape[1:]``.
 
     Returns
     ----------
@@ -290,18 +298,20 @@ def sprod(A: SparseMatrix, dim: Optional[int] = None):
     """Compute the product of non-zero values in sparse matrix A along
     the given dimension :attr:`dim`.
 
-    If :attr:`dim` is None, it reduces all the elements in the sparse matrix.
-    Otherwise, it reduces on the row (``dim=0``) or column (``dim=1``) dimension,
-    sproducing a tensor of shape ``(A.shape[1], ) + A.val.shape[1:]`` or
-    ``(A.shape[0],) + A.val.shape[1:]``.
-
     The reduction does not count zero values. If the row or column to be reduced
     does not have any non-zero value, the result will be 0.
 
     Parameters
     ----------
     dim : int, optional
-        The dimension to reduce
+        The dimension to reduce.  Must be either 0 (by rows) or 1 (by columns)
+        or None (on all non-zero entries).
+
+        If :attr:`dim` is None, it reduces all the elements in the sparse
+        matrix. Otherwise, it reduces on the row (``dim=0``) or column
+        (``dim=1``) dimension, producing a tensor of shape
+        ``(A.shape[1],) + A.val.shape[1:]`` or
+        ``(A.shape[0],) + A.val.shape[1:]``.
 
     Returns
     ----------
