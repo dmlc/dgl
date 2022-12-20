@@ -274,10 +274,10 @@ class GraphPartitionBook(ABC):
     * the node IDs and the edge IDs that a partition has.
     * the local IDs of nodes and edges in a partition.
 
-    Currently, only one class that implement ``GraphPartitionBook``:``RangePartitionBook``.
-    It calculates the mapping between node/edge IDs and partition IDs based on some small
-    metadata because nodes/edges have been relabeled to have IDs in the same partition
-    fall in a contiguous ID range.
+    Currently, only one class that implement ``GraphPartitionBook``
+    :``RangePartitionBook``. It calculates the mapping between node/edge IDs
+    and partition IDs based on some small metadata because nodes/edges have been
+    relabeled to have IDs in the same partition fall in a contiguous ID range.
 
     A graph partition book is constructed automatically when a graph is partitioned.
     When a graph partition is loaded, a graph partition book is loaded as well.

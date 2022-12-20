@@ -338,7 +338,7 @@ def load_partition_book(part_config, part_id):
     return RangePartitionBook(part_id, num_parts, node_map, edge_map, ntypes, etypes), \
             part_metadata['graph_name'], ntypes, etypes
 
-def _get_orig_ids(g, sim_g, reshuffle, orig_nids, orig_eids):
+def _get_orig_ids(g, sim_g, orig_nids, orig_eids):
     '''Convert/construct the original node IDs and edge IDs.
 
     It handles multiple cases:
@@ -355,8 +355,6 @@ def _get_orig_ids(g, sim_g, reshuffle, orig_nids, orig_eids):
        The input graph for partitioning.
     sim_g : DGLGraph
         The homogeneous version of the input graph.
-    reshuffle : bool
-        Whether the input graph is reshuffled during partitioning.
     orig_nids : tensor or None
         The original node IDs after the input graph is reshuffled.
     orig_eids : tensor or None
@@ -367,23 +365,17 @@ def _get_orig_ids(g, sim_g, reshuffle, orig_nids, orig_eids):
     tensor or dict of tensors, tensor or dict of tensors
     '''
     is_hetero = not g.is_homogeneous
-    if reshuffle and is_hetero:
-        # Get the type IDs
-        orig_ntype = F.gather_row(sim_g.ndata[NTYPE], orig_nids)
-        orig_etype = F.gather_row(sim_g.edata[ETYPE], orig_eids)
-        # Mapping between shuffled global IDs to original per-type IDs
-        orig_nids = F.gather_row(sim_g.ndata[NID], orig_nids)
-        orig_eids = F.gather_row(sim_g.edata[EID], orig_eids)
-        orig_nids = {ntype: F.boolean_mask(orig_nids, orig_ntype == g.get_ntype_id(ntype)) \
-                for ntype in g.ntypes}
-        orig_eids = {etype: F.boolean_mask(orig_eids, orig_etype == g.get_etype_id(etype)) \
-                for etype in g.canonical_etypes}
-    elif not reshuffle and not is_hetero:
-        orig_nids = F.arange(0, sim_g.number_of_nodes())
-        orig_eids = F.arange(0, sim_g.number_of_edges())
-    elif not reshuffle:
-        orig_nids = {ntype: F.arange(0, g.number_of_nodes(ntype)) for ntype in g.ntypes}
-        orig_eids = {etype: F.arange(0, g.number_of_edges(etype)) for etype in g.canonical_etypes}
+    if is_hetero:
+       # Get the type IDs
+       orig_ntype = F.gather_row(sim_g.ndata[NTYPE], orig_nids)
+       orig_etype = F.gather_row(sim_g.edata[ETYPE], orig_eids)
+       # Mapping between shuffled global IDs to original per-type IDs
+       orig_nids = F.gather_row(sim_g.ndata[NID], orig_nids)
+       orig_eids = F.gather_row(sim_g.edata[EID], orig_eids)
+       orig_nids = {ntype: F.boolean_mask(orig_nids, orig_ntype == g.get_ntype_id(ntype)) \
+            for ntype in g.ntypes}
+       orig_eids = {etype: F.boolean_mask(orig_eids, orig_etype == g.get_etype_id(etype)) \
+            for etype in g.canonical_etypes}
     return orig_nids, orig_eids
 
 def _set_trainer_ids(g, sim_g, node_parts):
@@ -687,7 +679,14 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         parts[0].ndata['orig_id'] = orig_nids
         parts[0].edata['orig_id'] = orig_eids
         if return_mapping:
-            orig_nids, orig_eids = _get_orig_ids(g, sim_g, False, orig_nids, orig_eids)
+            if not g.is_homogeneous:
+                orig_nids = F.arange(0, sim_g.number_of_nodes())
+                orig_eids = F.arange(0, sim_g.number_of_edges())
+            else:
+                orig_nids = {ntype: F.arange(0, g.number_of_nodes(ntype))
+                             for ntype in g.ntypes}
+                orig_eids = {etype: F.arange(0, g.number_of_edges(etype))
+                             for etype in g.canonical_etypes}
         parts[0].ndata['inner_node'] = F.ones((sim_g.number_of_nodes(),),
             RESERVED_FIELD_DTYPE['inner_node'], F.cpu())
         parts[0].edata['inner_edge'] = F.ones((sim_g.number_of_edges(),),
@@ -728,7 +727,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         print('Splitting the graph into partitions takes {:.3f}s, peak mem: {:.3f} GB'.format(
             time.time() - start, get_peak_mem()))
         if return_mapping:
-            orig_nids, orig_eids = _get_orig_ids(g, sim_g, True, orig_nids, orig_eids)
+            orig_nids, orig_eids = _get_orig_ids(g, sim_g, orig_nids, orig_eids)
     else:
         raise Exception('Unknown partitioning method: ' + part_method)
 
