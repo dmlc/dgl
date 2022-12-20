@@ -3,7 +3,6 @@ from __future__ import absolute_import
 import builtins
 import numbers
 import os
-from distutils.version import LooseVersion
 
 import mxnet as mx
 import mxnet.ndarray as nd
@@ -12,8 +11,9 @@ import numpy as np
 from ... import ndarray as dglnd
 from ..._deprecate import kernel as K
 from ...function.base import TargetCode
+from ...utils import version
 
-if LooseVersion(mx.__version__) < LooseVersion("1.6.0"):
+if version.parse(mx.__version__) < version.parse("1.6.0"):
     raise RuntimeError("DGL requires MXNet >= 1.6")
 
 # After MXNet 1.5, empty tensors aren't supprted by default.
@@ -31,7 +31,7 @@ def data_type_dict():
         "int16": np.int16,
         "int32": np.int32,
         "int64": np.int64,
-        "bool": np.bool,
+        "bool": np.bool_,
     }  # mxnet does not support bool
 
 
@@ -40,7 +40,7 @@ def cpu():
 
 
 def tensor(data, dtype=None):
-    if dtype == np.bool:
+    if dtype == np.bool_:
         # mxnet doesn't support bool
         dtype = np.int32
     if isinstance(data, nd.NDArray):
@@ -53,7 +53,7 @@ def tensor(data, dtype=None):
             data = [data]
         if dtype is None:
             if isinstance(data, np.ndarray):
-                dtype = np.int32 if data.dtype == np.bool else data.dtype
+                dtype = np.int32 if data.dtype == np.bool_ else data.dtype
             elif len(data) == 0:
                 dtype = np.int64
             else:
@@ -165,7 +165,7 @@ def to_backend_ctx(dglctx):
 
 
 def astype(input, ty):
-    if ty == np.bool:
+    if ty == np.bool_:
         ty = np.int32
     return input.astype(ty)
 

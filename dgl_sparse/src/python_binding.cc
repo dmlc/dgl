@@ -8,8 +8,8 @@
 // clang-format on
 
 #include <sparse/elementwise_op.h>
+#include <sparse/reduction.h>
 #include <sparse/sparse_matrix.h>
-#include <sparse/spmm.h>
 #include <torch/custom_class.h>
 #include <torch/script.h>
 
@@ -30,8 +30,13 @@ TORCH_LIBRARY(dgl_sparse, m) {
       .def("create_from_csr", &CreateFromCSR)
       .def("create_from_csc", &CreateFromCSC)
       .def("spsp_add", &SpSpAdd)
-      .def("val_like", &CreateValLike)
-      .def("spmm", &SpMM);
+      .def("reduce", &Reduce)
+      .def("sum", &ReduceSum)
+      .def("smean", &ReduceMean)
+      .def("smin", &ReduceMin)
+      .def("smax", &ReduceMax)
+      .def("sprod", &ReduceProd)
+      .def("val_like", &CreateValLike);
 }
 
 }  // namespace sparse
