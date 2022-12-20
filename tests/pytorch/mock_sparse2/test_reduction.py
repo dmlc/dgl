@@ -8,6 +8,10 @@ import dgl.mock_sparse2 as dglsp
 import pytest
 import torch
 
+# TODO(#5013): Skipping tests on win.
+if not sys.platform.startswith("linux"):
+    pytest.skip("skipping tests on win", allow_module_level=True)
+
 dgl_op_map = {
     "sum": "sum",
     "amin": "smin",
