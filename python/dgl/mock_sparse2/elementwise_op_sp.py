@@ -3,6 +3,7 @@ from typing import Union
 
 import torch
 
+from .diag_matrix import DiagMatrix
 from .sparse_matrix import SparseMatrix, val_like
 
 __all__ = ["sp_add", "sp_power"]
@@ -15,15 +16,15 @@ def spsp_add(A, B):
     )
 
 
-def sp_add(A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
-    """Elementwise addition.
+def sp_add(A: SparseMatrix, B: Union[DiagMatrix, SparseMatrix]) -> SparseMatrix:
+    """Elementwise addition
 
     Parameters
     ----------
     A : SparseMatrix
         Sparse matrix
-    B : SparseMatrix
-        Sparse matrix
+    B : DiagMatrix or SparseMatrix
+        Diagonal matrix or sparse matrix
 
     Returns
     -------
@@ -43,6 +44,8 @@ def sp_add(A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
     values=tensor([40, 20, 60]),
     shape=(3, 4), nnz=3)
     """
+    if isinstance(B, DiagMatrix):
+        B = B.as_sparse()
     if isinstance(A, SparseMatrix) and isinstance(B, SparseMatrix):
         return spsp_add(A, B)
     raise RuntimeError(

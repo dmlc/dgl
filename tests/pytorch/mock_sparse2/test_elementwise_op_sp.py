@@ -21,22 +21,6 @@ def all_close_sparse(A, row, col, val, shape):
     assert A.shape == shape
 
 
-@pytest.mark.parametrize("op", [operator.add])
-def test_sparse_op_sparse(op):
-    ctx = F.ctx()
-    rowA = torch.tensor([1, 0, 2, 7, 1]).to(ctx)
-    colA = torch.tensor([0, 49, 2, 1, 7]).to(ctx)
-    valA = torch.rand(len(rowA)).to(ctx)
-    A = create_from_coo(rowA, colA, valA, shape=(10, 50))
-    w = torch.rand(len(rowA)).to(ctx)
-    A1 = create_from_coo(rowA, colA, w, shape=(10, 50))
-
-    def _test():
-        all_close_sparse(op(A, A1), rowA, colA, valA + w, (10, 50))
-
-    _test()
-
-
 @pytest.mark.parametrize("val_shape", [(3,), (3, 2)])
 def test_pow(val_shape):
     # A ** v

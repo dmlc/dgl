@@ -1,25 +1,28 @@
 """DGL elementwise operators for diagonal matrix module."""
 from typing import Union
 
-from .diag_matrix import diag, DiagMatrix
+from .diag_matrix import DiagMatrix, diag
+from .sparse_matrix import SparseMatrix
 
 __all__ = ["diag_add", "diag_sub", "diag_mul", "diag_div", "diag_power"]
 
 
-def diag_add(D1: DiagMatrix, D2: DiagMatrix) -> DiagMatrix:
+def diag_add(
+    D1: DiagMatrix, D2: Union[DiagMatrix, SparseMatrix]
+) -> Union[DiagMatrix, SparseMatrix]:
     """Elementwise addition
 
     Parameters
     ----------
     D1 : DiagMatrix
         Diagonal matrix
-    D2 : DiagMatrix
-        Diagonal matrix
+    D2 : DiagMatrix or SparseMatrix
+        Diagonal matrix or sparse matrix
 
     Returns
     -------
-    DiagMatrix
-        Diagonal matrix
+    DiagMatrix or SparseMatrix
+        Diagonal matrix or sparse matrix, same as D2
 
     Examples
     --------
@@ -35,6 +38,13 @@ def diag_add(D1: DiagMatrix, D2: DiagMatrix) -> DiagMatrix:
             f"{D1.shape} and D2 {D2.shape} must match."
         )
         return diag(D1.val + D2.val, D1.shape)
+    elif isinstance(D1, DiagMatrix) and isinstance(D2, SparseMatrix):
+        assert D1.shape == D2.shape, (
+            "The shape of diagonal matrix D1 "
+            f"{D1.shape} and sparse matrix D2 {D2.shape} must match."
+        )
+        D1 = D1.as_sparse()
+        return D1 + D2
     raise RuntimeError(
         "Elementwise addition between "
         f"{type(D1)} and {type(D2)} is not supported."
