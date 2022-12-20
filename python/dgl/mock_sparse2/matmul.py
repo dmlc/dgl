@@ -56,7 +56,8 @@ def spmm(A: Union[SparseMatrix, DiagMatrix], X: torch.Tensor) -> torch.Tensor:
 def mm_sp(
     A1: SparseMatrix, A2: Union[torch.Tensor, SparseMatrix, DiagMatrix]
 ) -> Union[torch.Tensor, SparseMatrix]:
-    """Internal function for multiplying a sparse matrix by a dense/sparse/diagonal matrix.
+    """Internal function for multiplying a sparse matrix by
+    a dense/sparse/diagonal matrix.
 
     Parameters
     ----------
@@ -88,9 +89,10 @@ def mm_sp(
     >>> print(result.shape)
     torch.Size([2, 3])
     """
-    assert isinstance(
-        A2, (torch.Tensor, SparseMatrix, DiagMatrix)
-    ), f"Expect arg2 to be a torch Tensor, SparseMatrix, or DiagMatrix object, got {type(A2)}"
+    assert isinstance(A2, (torch.Tensor, SparseMatrix, DiagMatrix)), (
+        f"Expect arg2 to be a torch Tensor, SparseMatrix, or DiagMatrix object,"
+        f"got {type(A2)}"
+    )
 
     if isinstance(A2, torch.Tensor):
         return spmm(A1, A2)

@@ -54,7 +54,6 @@ void _SpMMSanityCheck(
 torch::Tensor SpMMAutoGrad::forward(
     AutogradContext* ctx, c10::intrusive_ptr<SparseMatrix> sparse_mat,
     torch::Tensor sparse_val, torch::Tensor dense_mat) {
-  _SpMMSanityCheck(sparse_mat, sparse_val, dense_mat);
   auto ret = SpMMNoAutoGrad(sparse_mat, sparse_val, dense_mat, false);
 
   const bool sparse_requires_grad = sparse_val.requires_grad();
@@ -102,6 +101,7 @@ tensor_list SpMMAutoGrad::backward(
 torch::Tensor SpMM(
     const c10::intrusive_ptr<SparseMatrix>& sparse_mat,
     torch::Tensor dense_mat) {
+  _SpMMSanityCheck(sparse_mat, sparse_mat->value(), dense_mat);
   bool expand_dim = false;
   if (dense_mat.dim() == 1) {
     dense_mat = dense_mat.view({-1, 1});
