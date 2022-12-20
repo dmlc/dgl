@@ -31,7 +31,11 @@ torch::Tensor SpMMNoAutoGrad(
   auto dgl_dense_mat = TorchTensorToDGLArray(dense_mat);
   auto dgl_ret = TorchTensorToDGLArray(ret);
   if (!transpose_sparse) {
+    // The format for calculation will be chosen in the following order: CSR,
+    // COO. CSR is created if the sparse matrix only has CSC format.
     if (sparse_mat->HasCSR() || !sparse_mat->HasCOO()) {
+      // sparse_mat->CSRPtr() will implicitly convert CSC to CSR format if CSR
+      // does not exist.
       auto csr = CSRToOldDGLCSR(sparse_mat->CSRPtr());
       aten::CSRSpMM(
           op.c_str(), reduce.c_str(), csr, dgl_dense_mat, dgl_sparse_val,
@@ -45,8 +49,12 @@ torch::Tensor SpMMNoAutoGrad(
           dgl_ret, {});
     }
   } else {  // transpose_sparse
-    // Use CSC in DGL's CSRSpMM is equivalent as computing A^T @ X.
+    // The format for calculation will be chosen in the following order: CSC,
+    // COO. CSC is created if the sparse matrix only has CSR format.
     if (sparse_mat->HasCSC() || !sparse_mat->HasCOO()) {
+      // sparse_mat->CSCPtr() will implicitly convert CSR to CSC format if CSR
+      // does not exist.
+      // Use CSC in DGL's CSRSpMM is equivalent as computing A^T @ X.
       auto csc = CSRToOldDGLCSR(sparse_mat->CSCPtr());
       aten::CSRSpMM(
           op.c_str(), reduce.c_str(), csc, dgl_dense_mat, dgl_sparse_val,
@@ -72,9 +80,11 @@ torch::Tensor SDDMMNoAutoGrad(
   auto dgl_mat1 = TorchTensorToDGLArray(mat1);
   auto dgl_mat2_tr = TorchTensorToDGLArray(mat2_tr);
   auto dgl_ret = TorchTensorToDGLArray(ret);
-  // Use CSR if the sparse matrix has CSR or does not have COO. Otherwise use
-  // COO.
+  // The format for calculation will be chosen in the following order: CSR,
+  // COO. CSR is created if the sparse matrix only has CSC format.
   if (sparse_mat->HasCSR() || !sparse_mat->HasCOO()) {
+    // sparse_mat->CSRPtr() will implicitly convert CSC to CSR format if CSR
+    // does not exist.
     auto csr = CSRToOldDGLCSR(sparse_mat->CSRPtr());
     aten::CSRSDDMM(
         op.c_str(), csr, dgl_mat1, dgl_mat2_tr, dgl_ret, 0 /* Lhs target: u */,

@@ -25,7 +25,7 @@ namespace sparse {
  *
  * @param sparse_mat The sparse matrix.
  * @param mat1 The first dense matrix.
- * @param mat2 The Second dense matrix.
+ * @param mat2 The second dense matrix.
  *
  * @return SparseMatrix
  */
