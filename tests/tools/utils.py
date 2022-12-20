@@ -76,7 +76,7 @@ def _initialize_num_chunks(g, num_chunks, kwargs=None):
 
 
 def _chunk_graph(
-    g, name, ndata_paths, edata_paths, num_chunks, data_fmt, **kwargs
+    g, name, ndata_paths, edata_paths, num_chunks, data_fmt, edges_format, **kwargs
 ):
     # First deal with ndata and edata that are homogeneous
     # (i.e. not a dict-of-dict)
@@ -138,7 +138,12 @@ def _chunk_graph(
             etypestr = etypestrs[etype]
             logging.info("Chunking edge index for %s" % etypestr)
             edges_meta = {}
-            fmt_meta = {"name": "csv", "delimiter": " "}
+            if edges_format == 'csv':
+                fmt_meta = {"name": edges_format, "delimiter": " "}
+            elif edges_format == 'parquet':
+                fmt_meta = {"name": edges_format}
+            else:
+                raise RuntimeError(f"Invalid edges_fmt: {edges_format}")
             edges_meta["format"] = fmt_meta
 
             srcdst = torch.stack(g.edges(etype=etype), 1)
@@ -244,6 +249,7 @@ def chunk_graph(
     num_chunks,
     output_path,
     data_fmt="numpy",
+    edges_fmt='csv',
     **kwargs,
 ):
     """
@@ -281,11 +287,12 @@ def chunk_graph(
             edata[key] = os.path.abspath(edata[key])
     with setdir(output_path):
         _chunk_graph(
-            g, name, ndata_paths, edata_paths, num_chunks, data_fmt, **kwargs
+            g, name, ndata_paths, edata_paths, num_chunks, data_fmt, edges_fmt, **kwargs
         )
 
 
-def create_chunked_dataset(root_dir, num_chunks, data_fmt="numpy", **kwargs):
+def create_chunked_dataset(
+    root_dir, num_chunks, data_fmt="numpy", edges_fmt='csv', **kwargs):
     """
     This function creates a sample dataset, based on MAG240 dataset.
 
@@ -523,6 +530,7 @@ def create_chunked_dataset(root_dir, num_chunks, data_fmt="numpy", **kwargs):
         num_chunks=num_chunks,
         output_path=output_dir,
         data_fmt=data_fmt,
+        edges_fmt=edges_fmt,
         **kwargs,
     )
     print("Done with creating chunked graph")
