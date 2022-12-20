@@ -35,22 +35,35 @@ NUM_COLS = 15
 
 
 def _coalesce_dense(row, col, val, nrows, ncols, op):
+    # Sparse matrix coalescing on a dense matrix.
+    #
+    # It is done by stacking every non-zero entry on an individual slice
+    # of an (nrows x ncols x nnz), that is, construct a tensor A with
+    # shape (nrows, ncols, len(val)) where
+    #
+    #     A[row[i], col[i], i] = val[i]
+    #
+    # and then reducing on the third "nnz" dimension.
+    #
+    # The mask matrix M has the same sparsity pattern as A with 1 being
+    # the non-zero entries.  This is used for division if the reduce
+    # operator is mean.
     M = torch.zeros(NUM_ROWS, NUM_COLS, device=F.ctx())
-    A2 = torch.full(
+    A = torch.full(
         (NUM_ROWS, NUM_COLS, 20) + val.shape[1:],
         default_entry[op],
         device=F.ctx(),
         dtype=val.dtype,
     )
-    A2 = torch.index_put(A2, (row, col, torch.arange(20)), val)
+    A = torch.index_put(A, (row, col, torch.arange(20)), val)
     for i in range(20):
         M[row[i], col[i]] += 1
     if op == "mean":
-        A2 = A2.sum(2)
+        A = A.sum(2)
     else:
-        A2 = getattr(A2, op)(2)
+        A = getattr(A, op)(2)
     M = M.view(NUM_ROWS, NUM_COLS, *([1] * (val.dim() - 1)))
-    return A2, M
+    return A, M
 
 
 # Add docstring tests of dglsp.reduction to unit tests
