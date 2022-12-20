@@ -16,7 +16,6 @@ from .logging import enable_verbose_logging
 from .backend import load_backend, backend_name
 
 from . import function
-from . import contrib
 from . import container
 from . import distributed
 from . import random
