@@ -457,7 +457,7 @@ class SpatialEncoder3d(nn.Module):
     >>> spatial_encoder = SpatialEncoder3d(num_kernels=4,
     ...                                    num_heads=8,
     ...                                    max_node_type=7)
-    >>> out = spatial_encoder(g, coordinate)
+    >>> out = spatial_encoder(g, coordinate, node_type=node_type)
     >>> print(out.shape)
     torch.Size([1, 4, 4, 8])
     """
@@ -495,7 +495,8 @@ class SpatialEncoder3d(nn.Module):
             where :math:`N`: is the number of nodes in :attr:`g`.
         node_type : th.Tensor, optional
             Type of nodes in :attr:`g`, of shape :math:`(N)`
-            indexed to assign learnable :math:`\gamma_{(i,j)}, \beta_{(i,j)}`,
+            indexed to assign learnable parameter
+            :math:`\gamma_{(i,j)}, \beta_{(i,j)}`,
             which would not vary if :attr:`node_type` is None.
             Default : None.
 
@@ -507,6 +508,7 @@ class SpatialEncoder3d(nn.Module):
             where :math:`n` is the maximum number of nodes
             in unbatched graphs from :attr:`g`.
         """
+
         device = g.device
         g_list = unbatch(g)
         max_num_nodes = th.max(g.batch_num_nodes())
