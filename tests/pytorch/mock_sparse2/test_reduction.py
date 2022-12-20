@@ -66,7 +66,7 @@ def test_docstring(func):
         runner.run(test)
 
 
-@pytest.mark.parametrize("shape", [(20,), (20, 20), (20, 20, 20)])
+@pytest.mark.parametrize("shape", [(20,), (20, 20)])
 @pytest.mark.parametrize("op", ["sum", "amin", "amax", "mean", "prod"])
 @pytest.mark.parametrize("use_reduce", [False, True])
 def test_reduce_all(shape, op, use_reduce):
@@ -99,7 +99,7 @@ def test_reduce_all(shape, op, use_reduce):
     assert (val.grad - val2.grad).abs().max() < 1e-4
 
 
-@pytest.mark.parametrize("shape", [(20,), (20, 20), (20, 20, 20)])
+@pytest.mark.parametrize("shape", [(20,), (20, 20)])
 @pytest.mark.parametrize("dim", [0, 1])
 @pytest.mark.parametrize("empty_nnz", [False, True])
 @pytest.mark.parametrize("op", ["sum", "amin", "amax", "mean", "prod"])
