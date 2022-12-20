@@ -367,14 +367,14 @@ def _get_orig_ids(g, sim_g, orig_nids, orig_eids):
     is_hetero = not g.is_homogeneous
     if is_hetero:
        # Get the type IDs
-       orig_ntype = F.gather_row(sim_g.ndata[NTYPE], orig_nids)
-       orig_etype = F.gather_row(sim_g.edata[ETYPE], orig_eids)
-       # Mapping between shuffled global IDs to original per-type IDs
-       orig_nids = F.gather_row(sim_g.ndata[NID], orig_nids)
-       orig_eids = F.gather_row(sim_g.edata[EID], orig_eids)
-       orig_nids = {ntype: F.boolean_mask(orig_nids, orig_ntype == g.get_ntype_id(ntype)) \
+        orig_ntype = F.gather_row(sim_g.ndata[NTYPE], orig_nids)
+        orig_etype = F.gather_row(sim_g.edata[ETYPE], orig_eids)
+        # Mapping between shuffled global IDs to original per-type IDs
+        orig_nids = F.gather_row(sim_g.ndata[NID], orig_nids)
+        orig_eids = F.gather_row(sim_g.edata[EID], orig_eids)
+        orig_nids = {ntype: F.boolean_mask(orig_nids, orig_ntype == g.get_ntype_id(ntype)) \
             for ntype in g.ntypes}
-       orig_eids = {etype: F.boolean_mask(orig_eids, orig_etype == g.get_etype_id(etype)) \
+        orig_eids = {etype: F.boolean_mask(orig_eids, orig_etype == g.get_etype_id(etype)) \
             for etype in g.canonical_etypes}
     return orig_nids, orig_eids
 
