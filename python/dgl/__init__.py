@@ -16,7 +16,6 @@ from .logging import enable_verbose_logging
 from .backend import load_backend, backend_name
 
 from . import function
-from . import contrib
 from . import container
 from . import distributed
 from . import random
@@ -25,7 +24,6 @@ from . import storages
 from . import dataloading
 from . import ops
 from . import cuda
-from . import _dataloading  # legacy dataloading modules
 
 from ._ffi.runtime_ctypes import TypeCode
 from ._ffi.function import register_func, get_global_func, list_global_func_names, extract_ext_funcs

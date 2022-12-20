@@ -10,20 +10,16 @@ from . import heterograph_index
 from .heterograph import DGLGraph, combine_frames, DGLBlock
 from . import graph_index
 from . import utils
-from .base import NTYPE, ETYPE, NID, EID, DGLError, dgl_warning
+from .base import NTYPE, ETYPE, NID, EID, DGLError
 
 __all__ = [
     'graph',
-    'bipartite',
-    'hetero_from_relations',
     'hetero_from_shared_memory',
     'heterograph',
     'create_block',
     'block_to_graph',
     'to_heterogeneous',
-    'to_hetero',
     'to_homogeneous',
-    'to_homo',
     'from_scipy',
     'bipartite_from_scipy',
     'from_networkx',
@@ -34,14 +30,12 @@ __all__ = [
 ]
 
 def graph(data,
-          ntype=None, etype=None,
           *,
           num_nodes=None,
           idtype=None,
           device=None,
           row_sorted=False,
-          col_sorted=False,
-          **deprecated_kwargs):
+          col_sorted=False):
     """Create a graph and return.
 
     Parameters
@@ -67,10 +61,6 @@ def graph(data,
 
         The tensors can be replaced with any iterable of integers (e.g. list, tuple,
         numpy.ndarray).
-    ntype : str, optional
-        Deprecated. To construct a graph with named node types, use :func:`dgl.heterograph`.
-    etype : str, optional
-        Deprecated. To construct a graph with named edge types, use :func:`dgl.heterograph`.
     num_nodes : int, optional
         The number of nodes in the graph. If not given, this will be the largest node ID
         plus 1 from the :attr:`data` argument. If given and the value is no greater than
@@ -156,14 +146,6 @@ def graph(data,
     from_scipy
     from_networkx
     """
-    # Deprecated arguments
-    if ntype is not None:
-        raise DGLError('The ntype argument is deprecated for dgl.graph. To construct ' \
-                       'a graph with named node types, use dgl.heterograph.')
-    if etype is not None:
-        raise DGLError('The etype argument is deprecated for dgl.graph. To construct ' \
-                       'a graph with named edge types, use dgl.heterograph.')
-
     if isinstance(data, spmatrix):
         raise DGLError("dgl.graph no longer supports graph construction from a SciPy "
                        "sparse matrix, use dgl.from_scipy instead.")
@@ -171,12 +153,6 @@ def graph(data,
     if isinstance(data, nx.Graph):
         raise DGLError("dgl.graph no longer supports graph construction from a NetworkX "
                        "graph, use dgl.from_networkx instead.")
-
-    if len(deprecated_kwargs) != 0:
-        raise DGLError("Key word arguments {} have been removed from dgl.graph()."
-                       " They are moved to dgl.from_scipy() and dgl.from_networkx()."
-                       " Please refer to their API documents for more details.".format(
-                           deprecated_kwargs.keys()))
 
     (sparse_fmt, arrays), urange, vrange = utils.graphdata2tensors(data, idtype)
     if num_nodes is not None:  # override the number of nodes
@@ -189,24 +165,6 @@ def graph(data,
                           row_sorted=row_sorted, col_sorted=col_sorted)
 
     return g.to(device)
-
-def bipartite(data,
-              utype='_U', etype='_E', vtype='_V',
-              num_nodes=None,
-              card=None,
-              validate=True,
-              restrict_format='any',
-              **kwargs):
-    """DEPRECATED: use dgl.heterograph instead."""
-    raise DGLError(
-        'dgl.bipartite is deprecated. Use dgl.heterograph({' +
-        "('{}', '{}', '{}')".format(utype, etype, vtype) +
-        ' : data} to create a bipartite graph instead.')
-
-def hetero_from_relations(rel_graphs, num_nodes_per_type=None):
-    """DEPRECATED: use dgl.heterograph instead."""
-    raise DGLError('dgl.hetero_from_relations is deprecated.\n\n'
-                   'Use dgl.heterograph instead.')
 
 def hetero_from_shared_memory(name):
     """Create a heterograph from shared memory with the given name.
@@ -826,16 +784,6 @@ def to_heterogeneous(G, ntypes, etypes, ntype_field=NTYPE,
 
     return hg
 
-def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE,
-              metagraph=None):
-    """Convert the given homogeneous graph to a heterogeneous graph.
-
-    DEPRECATED: Please use to_heterogeneous
-    """
-    dgl_warning("dgl.to_hetero is deprecated. Please use dgl.to_heterogeneous")
-    return to_heterogeneous(G, ntypes, etypes, ntype_field=ntype_field,
-                            etype_field=etype_field, metagraph=metagraph)
-
 def to_homogeneous(G, ndata=None, edata=None, store_type=True, return_count=False):
     """Convert a heterogeneous graph to a homogeneous graph and return.
 
@@ -990,14 +938,6 @@ def to_homogeneous(G, ndata=None, edata=None, store_type=True, return_count=Fals
         return retg, ntype_count, etype_count
     else:
         return retg
-
-def to_homo(G):
-    """Convert the given heterogeneous graph to a homogeneous graph.
-
-    DEPRECATED: Please use to_homogeneous
-    """
-    dgl_warning("dgl.to_homo is deprecated. Please use dgl.to_homogeneous")
-    return to_homogeneous(G)
 
 def from_scipy(sp_mat,
                eweight_name=None,
