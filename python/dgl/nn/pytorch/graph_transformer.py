@@ -303,7 +303,7 @@ class PathEncoder(nn.Module):
                 dim=0
             )
             dist, path = shortest_dist(ubg, root=None, return_paths=True)
-            path_len = min(self.max_len, path.size(dim=2))
+            path_len = max(1, min(self.max_len, path.size(dim=2)))
 
             # shape: [n, n, l], n = num_nodes, l = path_len
             shortest_path = path[:, :, 0: path_len]
@@ -368,9 +368,9 @@ class SpatialEncoder(nn.Module):
         super().__init__()
         self.max_dist = max_dist
         self.num_heads = num_heads
-        # deactivate node pair between which the distance is 0 or -1
+        # deactivate node pair between which the distance is -1
         self.embedding_table = nn.Embedding(
-            max_dist + 1, num_heads, padding_idx=0
+            max_dist + 2, num_heads, padding_idx=0
         )
 
     def forward(self, g):
@@ -397,8 +397,8 @@ class SpatialEncoder(nn.Module):
             num_nodes = ubg.num_nodes()
             dist = th.clamp(
                 shortest_dist(ubg, root=None, return_paths=False),
-                min=0, max=self.max_dist
-            )
+                min=-1, max=self.max_dist
+            ) + 1
             # shape: [n, n, h], n = num_nodes, h = num_heads
             dist_embedding = self.embedding_table(dist)
             # [n, n, h] -> [N, N, h], N = max_num_nodes, padded with -inf
@@ -438,33 +438,52 @@ class SpatialEncoder3d(nn.Module):
     num_heads : int, optional
         Number of attention heads if multi-head attention mechanism is applied.
         Default : 1.
+    max_node_type : int, optional
+        Maximum element in :attr:`node_type`,
+        which should be set as 0 if and only if :attr:`node_type` is None.
+        Default : 1.
 
     Examples
     --------
     >>> import torch as th
     >>> import dgl
-    >>> from dgl.nn import SpatialEncoder
+    >>> from dgl.nn import SpatialEncoder3d
 
     >>> u = th.tensor([0, 0, 0, 1, 1, 2, 3, 3])
     >>> v = th.tensor([1, 2, 3, 0, 3, 0, 0, 1])
     >>> g = dgl.graph((u, v))
     >>> coordinate = th.rand(4, 3)
-    >>> spatial_encoder = SpatialEncoder(num_kernels=4, num_heads=8)
+    >>> node_type = th.tensor([7, 3, 3, 2])
+    >>> spatial_encoder = SpatialEncoder3d(num_kernels=4,
+    ...                                    num_heads=8,
+    ...                                    max_node_type=7)
     >>> out = spatial_encoder(g, coordinate)
     >>> print(out.shape)
     torch.Size([1, 4, 4, 8])
     """
 
-    def __init__(self, num_kernels, num_heads=1):
+    def __init__(self, num_kernels, num_heads=1, max_node_type=0):
         super().__init__()
         self.num_kernels = num_kernels
         self.num_heads = num_heads
-        self.embedding_table = nn.Embedding(num_kernels, 2)
-        self.linear_layer_1 = nn.Linear(1, 1)
-        self.linear_layer_2 = nn.Linear(num_kernels, num_kernels)
-        self.linear_layer_3 = nn.Linear(num_kernels, num_heads)
+        self.max_node_type = max_node_type
+        self.gaussian_means = nn.Embedding(1, num_kernels)
+        self.gaussian_stds = nn.Embedding(1, num_kernels)
+        self.linear_layer_1 = nn.Linear(num_kernels, num_kernels)
+        self.linear_layer_2 = nn.Linear(num_kernels, num_heads)
+        if max_node_type == 0:
+            self.mul = nn.Embedding(1, 1)
+            self.bias = nn.Embedding(1, 1)
+        else:
+            self.mul = nn.Embedding(max_node_type + 1, 2)
+            self.bias = nn.Embedding(max_node_type + 1, 2)
 
-    def forward(self, g, coord):
+        nn.init.uniform_(self.gaussian_means.weight, 0, 3)
+        nn.init.uniform_(self.gaussian_stds.weight, 0, 3)
+        nn.init.constant_(self.mul.weight, 0)
+        nn.init.constant_(self.bias.weight, 1)
+
+    def forward(self, g, coord, node_type=None):
         """
         Parameters
         ----------
@@ -474,6 +493,11 @@ class SpatialEncoder3d(nn.Module):
             3D coordinates of nodes in :attr:`g`,
             of shape :math:`(N, 3)`,
             where :math:`N`: is the number of nodes in :attr:`g`.
+        node_type : th.Tensor, optional
+            Type of nodes in :attr:`g`, of shape :math:`(N)`
+            indexed to assign learnable :math:`\gamma_{(i,j)}, \beta_{(i,j)}`,
+            which would not vary if :attr:`node_type` is None.
+            Default : None.
 
         Returns
         -------
@@ -489,24 +513,44 @@ class SpatialEncoder3d(nn.Module):
         spatial_encoding = []
         sum_num_nodes = 0
         eps = 1e-2
+        if (self.max_node_type == 0) != (node_type is None):
+            raise ValueError(
+                'max_node_type should be set as 0 if and only if '
+                'node_type is None.'
+            )
 
         for ubg in g_list:
             num_nodes = ubg.num_nodes()
-            atom_coordinate = coord[sum_num_nodes: sum_num_nodes + num_nodes]
-            sum_num_nodes += num_nodes
-            # shape: [n, n, 1], n = num_nodes
-            euc_dist = th.cdist(
-                atom_coordinate, atom_coordinate, p=2
-            ).unsqueeze(2)
+            sub_coord = coord[sum_num_nodes: sum_num_nodes + num_nodes]
+            # shape: [n, n], n = num_nodes
+            euc_dist = th.cdist(sub_coord, sub_coord, p=2)
+            if node_type is None:
+                # shape: [1]
+                mul = self.mul.weight[0, 0]
+                bias = self.bias.weight[0, 0]
+            else:
+                sub_node_type = node_type[
+                                sum_num_nodes: sum_num_nodes + num_nodes
+                                ]
+                mul_embedding = self.mul(sub_node_type)
+                bias_embedding = self.bias(sub_node_type)
+                # shape: [n, n]
+                mul = (
+                    mul_embedding[:, 0].unsqueeze(-1).repeat(1, num_nodes) +
+                    mul_embedding[:, 1].unsqueeze(0).repeat(num_nodes, 1)
+                )
+                bias = (
+                    bias_embedding[:, 0].unsqueeze(-1).repeat(1, num_nodes) +
+                    bias_embedding[:, 1].unsqueeze(0).repeat(num_nodes, 1)
+                )
             # shape: [n, n, k], k = num_kernels
-            scaled_dist = th.stack(
-                [self.linear_layer_1(euc_dist).squeeze(2)] * self.num_kernels,
-                dim=2
-            )
-            gaussian_para = self.embedding_table.weight
+            scaled_dist = (mul * euc_dist + bias)\
+                .repeat(self.num_kernels, 1, 1).permute((1, 2, 0))
             # shape: [k]
-            gaussian_mean = gaussian_para[:, 0]
-            gaussian_var = gaussian_para[:, 1].abs() + eps
+            gaussian_mean = self.gaussian_means.weight.float().view(-1)
+            gaussian_var = (
+                    self.gaussian_stds.weight.float().view(-1).abs() + eps
+            )
             # shape: [n, n, k]
             gaussian_kernel = (
                 -0.5 * (th.div(scaled_dist - gaussian_mean, gaussian_var)
@@ -514,11 +558,11 @@ class SpatialEncoder3d(nn.Module):
             ).exp().div(
                 -math.sqrt(2 * math.pi) * gaussian_var
             )
-            # [n, n, k] -> [n, n, k]
-            encoding = self.linear_layer_2(gaussian_kernel)
+
+            encoding = self.linear_layer_1(gaussian_kernel)
             encoding = F.gelu(encoding)
             # [n, n, k] -> [n, n, a], a = num_heads
-            encoding = self.linear_layer_3(encoding)
+            encoding = self.linear_layer_2(encoding)
             # [n, n, a] -> [N, N, a], N = max_num_nodes, padded with -inf
             padded_encoding = th.full(
                 (max_num_nodes, max_num_nodes, self.num_heads),
@@ -526,5 +570,6 @@ class SpatialEncoder3d(nn.Module):
             ).to(device)
             padded_encoding[0: num_nodes, 0: num_nodes] = encoding
             spatial_encoding.append(padded_encoding)
+            sum_num_nodes += num_nodes
 
         return th.stack(spatial_encoding, dim=0)
