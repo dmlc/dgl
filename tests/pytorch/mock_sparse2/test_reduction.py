@@ -1,3 +1,4 @@
+import doctest
 import operator
 import sys
 
@@ -6,7 +7,6 @@ import backend as F
 import dgl.mock_sparse2 as dglsp
 import pytest
 import torch
-import doctest
 
 dgl_op_map = {
     "sum": "sum",
