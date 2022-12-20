@@ -19,7 +19,7 @@ def all_close_sparse(A, B):
 
 
 @pytest.mark.parametrize(
-    "op", [operator.add, operator.sub, operator.mul, operator.truediv]
+    "op", [operator.sub, operator.mul, operator.truediv]
 )
 def test_diag_op_diag(op):
     ctx = F.ctx()

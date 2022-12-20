@@ -136,7 +136,7 @@ class SparseMatrix:
         row, col = self.coo()
         val = self.val
         shape = self.shape + val.shape[1:]
-        mat = torch.zeros(shape, device=self.device)
+        mat = torch.zeros(shape, device=self.device, dtype=self.dtype)
         mat[row, col] = val
         return mat
 
