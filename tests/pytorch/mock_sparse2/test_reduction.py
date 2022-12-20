@@ -128,7 +128,7 @@ def test_reduce_along(shape, dim, empty_nnz, op, use_reduce):
     val2 = val.clone()
     val = val.requires_grad_()
     val2 = val2.requires_grad_()
-    
+
     # empty_nnz controls whether at least one column or one row has no
     # non-zero entry.
     if empty_nnz:
