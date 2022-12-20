@@ -42,7 +42,7 @@ def reduce(A: SparseMatrix, dim: Optional[int] = None, rtype: str = "sum"):
     >>> row = torch.tensor([0, 1, 1])
     >>> col = torch.tensor([0, 0, 2])
     >>> val = torch.tensor([1, 1, 2])
-    >>> A = create_from_coo(row, col, val, shape=(4, 3))
+    >>> A = dglsp.create_from_coo(row, col, val, shape=(4, 3))
     >>> print(A.reduce(rtype='sum'))
     tensor(4)
     >>> print(A.reduce(0, 'sum'))
@@ -57,15 +57,22 @@ def reduce(A: SparseMatrix, dim: Optional[int] = None, rtype: str = "sum"):
     >>> row = torch.tensor([0, 1, 1])
     >>> col = torch.tensor([0, 0, 2])
     >>> val = torch.tensor([[1., 2.], [2., 1.], [2., 2.]])
-    >>> A = create_from_coo(row, col, val, shape=(4, 3))
-    >>> print(A.reduce(reduce='sum'))
-    tensor([5, 5])
+    >>> A = dglsp.create_from_coo(row, col, val, shape=(4, 3))
+    >>> print(A.reduce(rtype='sum'))
+    tensor([5., 5.])
     >>> print(A.reduce(0, 'sum'))
-    tensor([[3., 3.], [0., 0.], [2., 2.]])
+    tensor([[3., 3.],
+            [0., 0.],
+            [2., 2.]])
     >>> print(A.reduce(1, 'smin'))
-    tensor([[1., 2.], [2., 1.], [0., 0.], [0., 0.]])
+    tensor([[1., 2.],
+            [2., 1.],
+            [0., 0.],
+            [0., 0.]])
     >>> print(A.reduce(0, 'smean'))
-    tensor([[1.5, 1.5], [0., 0.], [2., 2.]])
+    tensor([[1.5000, 1.5000],
+            [0.0000, 0.0000],
+            [2.0000, 2.0000]])
     """
     return torch.ops.dgl_sparse.reduce(A.c_sparse_matrix, rtype, dim)
 
@@ -96,7 +103,7 @@ def sum(A: SparseMatrix, dim: Optional[int] = None):
     >>> row = torch.tensor([0, 1, 1])
     >>> col = torch.tensor([0, 0, 2])
     >>> val = torch.tensor([1, 1, 2])
-    >>> A = create_from_coo(row, col, val, shape=(4, 3))
+    >>> A = dglsp.create_from_coo(row, col, val, shape=(4, 3))
     >>> print(A.sum())
     tensor(4)
     >>> print(A.sum(0))
@@ -107,11 +114,13 @@ def sum(A: SparseMatrix, dim: Optional[int] = None):
     >>> row = torch.tensor([0, 1, 1])
     >>> col = torch.tensor([0, 0, 2])
     >>> val = torch.tensor([[1, 2], [2, 1], [2, 2]])
-    >>> A = create_from_coo(row, col, val, shape=(4, 3))
+    >>> A = dglsp.create_from_coo(row, col, val, shape=(4, 3))
     >>> print(A.sum())
     tensor([5, 5])
     >>> print(A.sum(0))
-    tensor([[3, 3], [0, 0], [2, 2]])
+    tensor([[3, 3],
+            [0, 0],
+            [2, 2]])
     """
     return torch.ops.dgl_sparse.sum(A.c_sparse_matrix, dim)
 
@@ -144,7 +153,7 @@ def smax(A: SparseMatrix, dim: Optional[int] = None):
     >>> row = torch.tensor([0, 1, 1])
     >>> col = torch.tensor([0, 0, 2])
     >>> val = torch.tensor([1, 1, 2])
-    >>> A = create_from_coo(row, col, val, shape=(4, 3))
+    >>> A = dglsp.create_from_coo(row, col, val, shape=(4, 3))
     >>> print(A.smax())
     tensor(2)
     >>> print(A.smax(0))
@@ -155,11 +164,14 @@ def smax(A: SparseMatrix, dim: Optional[int] = None):
     >>> row = torch.tensor([0, 1, 1])
     >>> col = torch.tensor([0, 0, 2])
     >>> val = torch.tensor([[1, 2], [2, 1], [2, 2]])
-    >>> A = create_from_coo(row, col, val, shape=(4, 3))
+    >>> A = dglsp.create_from_coo(row, col, val, shape=(4, 3))
     >>> print(A.smax())
     tensor([2, 2])
     >>> print(A.smax(1))
-    tensor([[1, 2], [2, 2], [0, 0], [0, 0]])
+    tensor([[1, 2],
+            [2, 2],
+            [0, 0],
+            [0, 0]])
     """
     return torch.ops.dgl_sparse.smax(A.c_sparse_matrix, dim)
 
@@ -192,7 +204,7 @@ def smin(A: SparseMatrix, dim: Optional[int] = None):
     >>> row = torch.tensor([0, 1, 1])
     >>> col = torch.tensor([0, 0, 2])
     >>> val = torch.tensor([1, 1, 2])
-    >>> A = create_from_coo(row, col, val, shape=(4, 3))
+    >>> A = dglsp.create_from_coo(row, col, val, shape=(4, 3))
     >>> print(A.smin())
     tensor(1)
     >>> print(A.smin(0))
@@ -203,13 +215,18 @@ def smin(A: SparseMatrix, dim: Optional[int] = None):
     >>> row = torch.tensor([0, 1, 1])
     >>> col = torch.tensor([0, 0, 2])
     >>> val = torch.tensor([[1, 2], [2, 1], [2, 2]])
-    >>> A = create_from_coo(row, col, val, shape=(4, 3))
+    >>> A = dglsp.create_from_coo(row, col, val, shape=(4, 3))
     >>> print(A.smin())
     tensor([1, 1])
     >>> print(A.smin(0))
-    tensor([[1, 1], [0, 0], [2, 2]])
+    tensor([[1, 1],
+            [0, 0],
+            [2, 2]])
     >>> print(A.smin(1))
-    tensor([[1, 2], [2, 1], [0, 0], [0, 0]])
+    tensor([[1, 2],
+            [2, 1],
+            [0, 0],
+            [0, 0]])
     """
     return torch.ops.dgl_sparse.smin(A.c_sparse_matrix, dim)
 
@@ -242,24 +259,29 @@ def smean(A: SparseMatrix, dim: Optional[int] = None):
     >>> row = torch.tensor([0, 1, 1])
     >>> col = torch.tensor([0, 0, 2])
     >>> val = torch.tensor([1., 1., 2.])
-    >>> A = create_from_coo(row, col, val, shape=(4, 3))
+    >>> A = dglsp.create_from_coo(row, col, val, shape=(4, 3))
     >>> print(A.smean())
     tensor(1.3333)
     >>> print(A.smean(0))
     tensor([1., 0., 2.])
     >>> print(A.smean(1))
-    tensor([1., 1.5, 0., 0.])
+    tensor([1.0000, 1.5000, 0.0000, 0.0000])
 
     >>> row = torch.tensor([0, 1, 1])
     >>> col = torch.tensor([0, 0, 2])
     >>> val = torch.tensor([[1., 2.], [2., 1.], [2., 2.]])
-    >>> A = create_from_coo(row, col, val, shape=(4, 3))
+    >>> A = dglsp.create_from_coo(row, col, val, shape=(4, 3))
     >>> print(A.smean())
     tensor([1.6667, 1.6667])
     >>> print(A.smean(0))
-    tensor([[1.5, 1.5], [0., 0.], [2., 2.]])
+    tensor([[1.5000, 1.5000],
+            [0.0000, 0.0000],
+            [2.0000, 2.0000]])
     >>> print(A.smean(1))
-    tensor([[1., 2.], [2., 1.5], [0., 0.], [0., 0.]])
+    tensor([[1.0000, 2.0000],
+            [2.0000, 1.5000],
+            [0.0000, 0.0000],
+            [0.0000, 0.0000]])
     """
     return torch.ops.dgl_sparse.smean(A.c_sparse_matrix, dim)
 
@@ -292,9 +314,9 @@ def sprod(A: SparseMatrix, dim: Optional[int] = None):
     >>> row = torch.tensor([0, 1, 1])
     >>> col = torch.tensor([0, 0, 2])
     >>> val = torch.tensor([1, 1, 2])
-    >>> A = create_from_coo(row, col, val, shape=(4, 3))
+    >>> A = dglsp.create_from_coo(row, col, val, shape=(4, 3))
     >>> print(A.sprod())
-    tensor(1)
+    tensor(2)
     >>> print(A.sprod(0))
     tensor([1, 0, 2])
     >>> print(A.sprod(1))
@@ -303,13 +325,18 @@ def sprod(A: SparseMatrix, dim: Optional[int] = None):
     >>> row = torch.tensor([0, 1, 1])
     >>> col = torch.tensor([0, 0, 2])
     >>> val = torch.tensor([[1, 2], [2, 1], [2, 2]])
-    >>> A = create_from_coo(row, col, val, shape=(4, 3))
+    >>> A = dglsp.create_from_coo(row, col, val, shape=(4, 3))
     >>> print(A.sprod())
     tensor([4, 4])
     >>> print(A.sprod(0))
-    tensor([[2, 2], [0, 0], [2, 2]])
+    tensor([[2, 2],
+            [0, 0],
+            [2, 2]])
     >>> print(A.sprod(1))
-    tensor([[1, 2], [4, 2], [0, 0], [0, 0]])
+    tensor([[1, 2],
+            [4, 2],
+            [0, 0],
+            [0, 0]])
     """
     return torch.ops.dgl_sparse.sprod(A.c_sparse_matrix, dim)
 

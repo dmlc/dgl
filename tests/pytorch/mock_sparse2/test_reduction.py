@@ -6,6 +6,7 @@ import backend as F
 import dgl.mock_sparse2 as dglsp
 import pytest
 import torch
+import doctest
 
 dgl_op_map = {
     "sum": "sum",
@@ -29,11 +30,14 @@ binary_op_map = {
     "prod": operator.mul,
 }
 
+NUM_ROWS = 10
+NUM_COLS = 15
+
 
 def _coalesce_dense(row, col, val, nrows, ncols, op):
-    M = torch.zeros(10, 15, device=F.ctx())
+    M = torch.zeros(NUM_ROWS, NUM_COLS, device=F.ctx())
     A2 = torch.full(
-        (10, 15, 20) + val.shape[1:],
+        (NUM_ROWS, NUM_COLS, 20) + val.shape[1:],
         default_entry[op],
         device=F.ctx(),
         dtype=val.dtype
@@ -45,23 +49,34 @@ def _coalesce_dense(row, col, val, nrows, ncols, op):
         A2 = A2.sum(2)
     else:
         A2 = getattr(A2, op)(2)
-    M = M.view(10, 15, *([1] * (val.dim() - 1)))
+    M = M.view(NUM_ROWS, NUM_COLS, *([1] * (val.dim() - 1)))
     return A2, M
+
+
+# Add docstring tests of dglsp.reduction to unit tests
+@pytest.mark.parametrize('func', ['reduce', 'sum', 'smin', 'smax', 'sprod', 'smean'])
+def test_docstring(func):
+    globs = {'torch': torch, 'dglsp': dglsp}
+    runner = doctest.DebugRunner()
+    finder = doctest.DocTestFinder()
+    obj = getattr(dglsp, func)
+    for test in finder.find(obj, func, globs=globs):
+        runner.run(test)
 
 
 @pytest.mark.parametrize("shape", [(20,), (20, 20), (20, 20, 20)])
 @pytest.mark.parametrize("op", ["sum", "amin", "amax", "mean", "prod"])
 @pytest.mark.parametrize("use_reduce", [False, True])
 def test_reduce_all(shape, op, use_reduce):
-    row = torch.randint(0, 10, (20,), device=F.ctx())
-    col = torch.randint(0, 15, (20,), device=F.ctx())
+    row = torch.randint(0, NUM_ROWS, (20,), device=F.ctx())
+    col = torch.randint(0, NUM_COLS, (20,), device=F.ctx())
     val = torch.randn(*shape, device=F.ctx())
     val2 = val.clone()
     val = val.requires_grad_()
     val2 = val2.requires_grad_()
-    A = dglsp.create_from_coo(row, col, val, shape=(10, 15))
+    A = dglsp.create_from_coo(row, col, val, shape=(NUM_ROWS, NUM_COLS))
 
-    A2, M = _coalesce_dense(row, col, val2, 10, 15, op)
+    A2, M = _coalesce_dense(row, col, val2, NUM_ROWS, NUM_COLS, op)
 
     if not use_reduce:
         output = getattr(A, dgl_op_map[op])()
@@ -88,12 +103,12 @@ def test_reduce_all(shape, op, use_reduce):
 @pytest.mark.parametrize("op", ["sum", "amin", "amax", "mean", "prod"])
 @pytest.mark.parametrize("use_reduce", [False, True])
 def test_reduce_along(shape, dim, empty_nnz, op, use_reduce):
-    row = torch.randint(0, 10, (20,), device=F.ctx())
-    col = torch.randint(0, 15, (20,), device=F.ctx())
+    row = torch.randint(0, NUM_ROWS, (20,), device=F.ctx())
+    col = torch.randint(0, NUM_COLS, (20,), device=F.ctx())
     if dim == 0:
-        mask = torch.bincount(col, minlength=15) == 0
+        mask = torch.bincount(col, minlength=NUM_COLS) == 0
     else:
-        mask = torch.bincount(row, minlength=10) == 0
+        mask = torch.bincount(row, minlength=NUM_ROWS) == 0
     val = torch.randn(*shape, device=F.ctx())
     val2 = val.clone()
     val = val.requires_grad_()
@@ -101,9 +116,9 @@ def test_reduce_along(shape, dim, empty_nnz, op, use_reduce):
     if empty_nnz:
         row[row == 0] = 1
         col[col == 0] = 1
-    A = dglsp.create_from_coo(row, col, val, shape=(10, 15))
+    A = dglsp.create_from_coo(row, col, val, shape=(NUM_ROWS, NUM_COLS))
 
-    A2, M = _coalesce_dense(row, col, val2, 10, 15, op)
+    A2, M = _coalesce_dense(row, col, val2, NUM_ROWS, NUM_COLS, op)
 
     if not use_reduce:
         output = getattr(A, dgl_op_map[op])(dim)
