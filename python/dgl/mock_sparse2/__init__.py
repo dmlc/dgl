@@ -10,7 +10,7 @@ from .elementwise_op import *
 from .sparse_matrix import *
 from .unary_op_diag import *
 from .unary_op_sp import *
-from .reduction import *
+from .reduction import *  # pylint: disable=W0622
 
 
 def load_dgl_sparse():
