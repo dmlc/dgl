@@ -16,17 +16,17 @@ class GCN(nn.Module):
         super().__init__()
 
         # Two-layer GCN.
-        self.Theta1 = nn.Linear(in_size, hidden_size)
-        self.Theta2 = nn.Linear(hidden_size, out_size)
+        self.W1 = nn.Linear(in_size, hidden_size)
+        self.W2 = nn.Linear(hidden_size, out_size)
 
     ############################################################################
     # (HIGHLIGHT) Take the advantage of DGL sparse APIs to implement the GCN
     # forward process.
     ############################################################################
     def forward(self, A_norm, X):
-        X = A_norm @ self.Theta1(X)
+        X = A_norm @ self.W1(X)
         X = F.relu(X)
-        X = A_norm @ self.Theta2(X)
+        X = A_norm @ self.W2(X)
         return X
 
 
