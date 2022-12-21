@@ -679,7 +679,7 @@ def partition_graph(g, graph_name, num_parts, out_path, num_hops=1, part_method=
         parts[0].ndata['orig_id'] = orig_nids
         parts[0].edata['orig_id'] = orig_eids
         if return_mapping:
-            if not g.is_homogeneous:
+            if g.is_homogeneous:
                 orig_nids = F.arange(0, sim_g.number_of_nodes())
                 orig_eids = F.arange(0, sim_g.number_of_edges())
             else:
