@@ -14,6 +14,7 @@ from .unary_op_diag import *
 from .unary_op_sp import *
 from .matmul import *
 from .sddmm import *
+from .softmax import *
 
 
 def load_dgl_sparse():

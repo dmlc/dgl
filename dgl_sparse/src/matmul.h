@@ -33,6 +33,21 @@ torch::Tensor SpMMNoAutoGrad(
     torch::Tensor sparse_val, torch::Tensor dense_mat, bool transpose_sparse);
 
 /**
+ * @brief Perform a generalized sparse matrix multiplication with copy_rhs op.
+ *
+ * This function does not take care of autograd.
+ *
+ * @param sparse_mat The sparse matrix
+ * @param sparse_val Non-zero values of the sparse matrix
+ * @param reduce Reduce operator, can be sum, max, or min
+ *
+ * @return Dense tensor
+ */
+torch::Tensor SpMMNoAutoGrad(
+    const c10::intrusive_ptr<SparseMatrix>& sparse_mat,
+    torch::Tensor sparse_val, const std::string& reduce);
+
+/**
  * @brief Perform a sampled matrix multiplication of a sparse matrix and two
  * dense matrices. It calculates `(mat1 @ mat2_tr^T) * spy(A)` and does consider
  * the values of the sparse matrix. For efficiency, `mat2_tr` is the
