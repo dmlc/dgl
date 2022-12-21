@@ -306,8 +306,10 @@ def check_neg_dataloader(g, num_server, num_workers):
 
         for p in pserver_list:
             p.join()
+            assert p.exitcode == 0
         for p in ptrainer_list:
             p.join()
+            assert p.exitcode == 0
 
 
 @pytest.mark.parametrize("num_server", [3])
@@ -388,6 +390,7 @@ def test_dist_dataloader(
 
         for p in ptrainer_list:
             p.join()
+            assert p.exitcode == 0
         if keep_alive:
             for p in pserver_list:
                 assert p.is_alive()
@@ -395,6 +398,7 @@ def test_dist_dataloader(
             dgl.distributed.shutdown_servers("mp_ip_config.txt", 1)
         for p in pserver_list:
             p.join()
+            assert p.exitcode == 0
 
 
 def start_node_dataloader(
@@ -614,8 +618,10 @@ def check_dataloader(g, num_server, num_workers, dataloader_type):
             ptrainer_list.append(p)
         for p in pserver_list:
             p.join()
+            assert p.exitcode == 0
         for p in ptrainer_list:
             p.join()
+            assert p.exitcode == 0
 
 
 def create_random_hetero():
@@ -752,7 +758,9 @@ def test_multiple_dist_dataloaders(
         p_client.start()
 
         p_client.join()
+        assert p_client.exitcode == 0
         for p in p_servers:
             p.join()
+            assert p.exitcode == 0
     reset_envs()
 

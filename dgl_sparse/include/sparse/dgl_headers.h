@@ -1,6 +1,6 @@
 /**
  *  Copyright (c) 2022 by Contributors
- * @file dgl_headers.h
+ * @file sparse/dgl_headers.h
  * @brief DGL headers used in the sparse library. This is a workaround to
  * avoid the macro naming conflict between dmlc/logging.h and torch logger. This
  * file includes all the DGL headers used in the sparse library and
@@ -14,6 +14,7 @@
 
 #include <dgl/aten/coo.h>
 #include <dgl/aten/csr.h>
+#include <dgl/kernel.h>
 #include <dgl/runtime/dlpack_convert.h>
 #include <dmlc/logging.h>
 

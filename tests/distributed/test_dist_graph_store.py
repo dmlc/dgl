@@ -165,9 +165,11 @@ def check_server_client_empty(shared_mem, num_servers, num_clients):
 
     for p in cli_ps:
         p.join()
+        assert p.exitcode == 0
 
     for p in serv_ps:
         p.join()
+        assert p.exitcode == 0
 
     print("clients have terminated")
 
@@ -528,6 +530,7 @@ def check_dist_emb_server_client(
         dgl.distributed.shutdown_servers("kv_ip_config.txt", num_servers)
     for p in serv_ps:
         p.join()
+        assert p.exitcode == 0
 
     print("clients have terminated")
 
@@ -585,6 +588,7 @@ def check_server_client(shared_mem, num_servers, num_clients, num_groups=1):
             cli_ps.append(p)
     for p in cli_ps:
         p.join()
+        assert p.exitcode == 0
 
     if keep_alive:
         for p in serv_ps:
@@ -593,6 +597,7 @@ def check_server_client(shared_mem, num_servers, num_clients, num_groups=1):
         dgl.distributed.shutdown_servers("kv_ip_config.txt", num_servers)
     for p in serv_ps:
         p.join()
+        assert p.exitcode == 0
 
     print("clients have terminated")
 
@@ -659,9 +664,10 @@ def check_server_client_hierarchy(shared_mem, num_servers, num_clients):
 
     for p in cli_ps:
         p.join()
+        assert p.exitcode == 0
     for p in serv_ps:
         p.join()
-
+        assert p.exitcode == 0
     nodes1 = []
     edges1 = []
     for n, e in return_dict.values():
@@ -889,9 +895,11 @@ def check_server_client_hetero(shared_mem, num_servers, num_clients):
 
     for p in cli_ps:
         p.join()
+        assert p.exitcode == 0
 
     for p in serv_ps:
         p.join()
+        assert p.exitcode == 0
 
     print("clients have terminated")
 
@@ -1022,6 +1030,7 @@ def check_dist_optim_server_client(
 
     for p in serv_ps:
         p.join()
+        assert p.exitcode == 0
 
 
 @unittest.skipIf(
