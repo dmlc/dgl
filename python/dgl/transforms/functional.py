@@ -2207,7 +2207,7 @@ def compact_graphs(graphs, always_preserve=None, copy_ndata=True, copy_edata=Tru
 
     return new_graphs
 
-def to_block(g, dst_nodes=None, include_dst_in_src=True, src_nodes=None):
+def to_block(g, dst_nodes=None, include_dst_in_src=True, src_nodes=None, sort_src=False):
     """Convert a graph into a bipartite-structured *block* for message passing.
 
     A block is a graph consisting of two sets of nodes: the
@@ -2248,6 +2248,9 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True, src_nodes=None):
         `include_dst_in_src` is True).
 
         If a tensor is given, the graph must have only one node type.
+    
+    sort_src : bool
+        If True, the created src_nodes will preserve original vertex order.
 
     Returns
     -------
@@ -2392,12 +2395,13 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True, src_nodes=None):
         for d in src_node_ids_nd:
             if g._graph.ctx != d.ctx:
                 raise ValueError('g and src_nodes need to have the same context.')
+        sort_src = False
     else:
         # use an empty list to signal we need to generate it
         src_node_ids_nd = []
 
     new_graph_index, src_nodes_ids_nd, induced_edges_nd = _CAPI_DGLToBlock(
-        g._graph, dst_node_ids_nd, include_dst_in_src, src_node_ids_nd)
+        g._graph, dst_node_ids_nd, include_dst_in_src, src_node_ids_nd, sort_src)
 
     # The new graph duplicates the original node types to SRC and DST sets.
     new_ntypes = (g.ntypes, g.ntypes)
@@ -2410,6 +2414,9 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True, src_nodes=None):
     node_frames = utils.extract_node_subframes_for_block(g, src_node_ids, dst_node_ids)
     edge_frames = utils.extract_edge_subframes(g, edge_ids)
     utils.set_new_frames(new_graph, node_frames=node_frames, edge_frames=edge_frames)
+
+    if include_dst_in_src:
+        new_graph.dst_in_src = F.searchsorted(new_graph.srcdata[NID], new_graph.dstdata[NID]) if sort_src else slice(0, new_graph.num_dst_nodes())
 
     return new_graph
 

@@ -1,5 +1,5 @@
 /**
- *  Copyright (c) 2021 by Contributors
+ *  Copyright (c) 2021-2022 by Contributors
  * @file runtime/cuda/cuda_device_common.cuh
  * @brief Device level functions for within cuda kernels.
  */
@@ -239,6 +239,8 @@ class OrderedHashTable {
   // Disable copying
   OrderedHashTable(const OrderedHashTable& other) = delete;
   OrderedHashTable& operator=(const OrderedHashTable& other) = delete;
+
+  void Clear(cudaStream_t stream);
 
   /**
    * @brief Fill the hashtable with the array containing possibly duplicate

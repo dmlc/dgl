@@ -153,6 +153,13 @@ def _edge_softmax_forward(gidx, e, op):
     myout = F.squeeze(myout, -1) if expand else myout
     return myout
 
+def lighter_gspmm(gidx, op, reduce_op, u, e, v, arg_u_nd, arg_e_nd):
+    _CAPI_DGLKernelSpMM(gidx, op, reduce_op,
+                            u,
+                            e,
+                            v,
+                            arg_u_nd,
+                            arg_e_nd)
 
 def _gspmm(gidx, op, reduce_op, u, e):
     r"""Generalized Sparse Matrix Multiplication interface. It takes the result of

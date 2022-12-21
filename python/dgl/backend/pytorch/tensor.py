@@ -194,6 +194,8 @@ def reduce_min(input):
 def argsort(input, dim, descending):
     return th.argsort(input, dim=dim, descending=descending)
 
+def searchsorted(input, values):
+    return th.searchsorted(input, values)
 
 def topk(input, k, dim, descending=True):
     return th.topk(input, k, dim, largest=descending)[0]

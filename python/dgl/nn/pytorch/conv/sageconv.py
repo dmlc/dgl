@@ -212,7 +212,8 @@ class SAGEConv(nn.Module):
             else:
                 feat_src = feat_dst = self.feat_drop(feat)
                 if graph.is_block:
-                    feat_dst = feat_src[:graph.number_of_dst_nodes()]
+                    assert hasattr(graph, 'dst_in_src'), "to_block needs to be called with include_dst_in_src=True"
+                    feat_dst = feat_src[graph.dst_in_src]
             msg_fn = fn.copy_u('h', 'm')
             if edge_weight is not None:
                 assert edge_weight.shape[0] == graph.number_of_edges()
