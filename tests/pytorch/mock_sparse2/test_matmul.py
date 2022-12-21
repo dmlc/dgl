@@ -44,9 +44,10 @@ def test_spmm(create_func, shape, nnz, out_dim):
     if out_dim is None:
         torch_sparse_result = torch_sparse_result.view(-1)
     torch_sparse_result.backward(grad)
-    assert torch.allclose(sparse_result, torch_sparse_result)
-    assert torch.allclose(X.grad, XX.grad)
+    assert torch.allclose(sparse_result, torch_sparse_result, atol=1e-05)
+    assert torch.allclose(X.grad, XX.grad, atol=1e-05)
     assert torch.allclose(
         adj.grad.coalesce().to_dense(),
         sparse_matrix_to_dense(val_like(A, A.val.grad)),
+        atol=1e-05,
     )
