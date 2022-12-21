@@ -200,7 +200,8 @@ def run(proc_id, n_gpus, args, devices, dataset):
                      for k in dataset.possible_rating_values}
     reverse_types.update({v: k for k, v in reverse_types.items()})
     sampler = dgl.dataloading.MultiLayerNeighborSampler([None], return_eids=True)
-    dataloader = dgl.dataloading.EdgeDataLoader(
+    sampler = dgl.dataloading.as_edge_prediction_sampler(sampler)
+    dataloader = dgl.dataloading.DataLoader(
         dataset.train_enc_graph,
         {to_etype_name(k): th.arange(
             dataset.train_enc_graph.number_of_edges(etype=to_etype_name(k)))
@@ -212,7 +213,7 @@ def run(proc_id, n_gpus, args, devices, dataset):
         drop_last=False)
 
     if proc_id == 0:
-        valid_dataloader = dgl.dataloading.EdgeDataLoader(
+        valid_dataloader = dgl.dataloading.DataLoader(
             dataset.valid_dec_graph,
             th.arange(dataset.valid_dec_graph.number_of_edges()),
             sampler,
@@ -220,7 +221,7 @@ def run(proc_id, n_gpus, args, devices, dataset):
             batch_size=args.minibatch_size,
             shuffle=False,
             drop_last=False)
-        test_dataloader = dgl.dataloading.EdgeDataLoader(
+        test_dataloader = dgl.dataloading.DataLoader(
             dataset.test_dec_graph,
             th.arange(dataset.test_dec_graph.number_of_edges()),
             sampler,

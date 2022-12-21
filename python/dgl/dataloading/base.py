@@ -513,7 +513,7 @@ def as_edge_prediction_sampler(
     >>> sampler = dgl.dataloading.as_edge_prediction_sampler(
     ...     dgl.dataloading.NeighborSampler([15, 10, 5]),
     ...     exclude='reverse_id', reverse_eids=reverse_eids)
-    >>> dataloader = dgl.dataloading.EdgeDataLoader(
+    >>> dataloader = dgl.dataloading.DataLoader(
     ...     g, train_eid, sampler,
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
     >>> for input_nodes, pair_graph, blocks in dataloader:
@@ -528,7 +528,7 @@ def as_edge_prediction_sampler(
     ...     dgl.dataloading.NeighborSampler([15, 10, 5]),
     ...     sampler, exclude='reverse_id', reverse_eids=reverse_eids,
     ...     negative_sampler=neg_sampler)
-    >>> dataloader = dgl.dataloading.EdgeDataLoader(
+    >>> dataloader = dgl.dataloading.DataLoader(
     ...     g, train_eid, sampler,
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
     >>> for input_nodes, pos_pair_graph, neg_pair_graph, blocks in dataloader:
@@ -550,7 +550,7 @@ def as_edge_prediction_sampler(
     ...     dgl.dataloading.NeighborSampler([15, 10, 5]),
     ...     exclude='reverse_types',
     ...     reverse_etypes={'click': 'clicked-by', 'clicked-by': 'click'})
-    >>> dataloader = dgl.dataloading.EdgeDataLoader(
+    >>> dataloader = dgl.dataloading.DataLoader(
     ...     g, {'click': train_eid}, sampler,
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
     >>> for input_nodes, pair_graph, blocks in dataloader:
@@ -564,7 +564,7 @@ def as_edge_prediction_sampler(
     ...     exclude='reverse_types',
     ...     reverse_etypes={'click': 'clicked-by', 'clicked-by': 'click'},
     ...     negative_sampler=neg_sampler)
-    >>> dataloader = dgl.dataloading.EdgeDataLoader(
+    >>> dataloader = dgl.dataloading.DataLoader(
     ...     g, train_eid, sampler,
     ...     batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
     >>> for input_nodes, pos_pair_graph, neg_pair_graph, blocks in dataloader:
