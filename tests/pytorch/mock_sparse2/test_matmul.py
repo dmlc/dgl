@@ -44,11 +44,12 @@ def test_spmm(create_func, shape, nnz, out_dim):
     if out_dim is None:
         torch_sparse_result = torch_sparse_result.view(-1)
     torch_sparse_result.backward(grad)
-    assert torch.allclose(sparse_result, torch_sparse_result)
-    assert torch.allclose(X.grad, XX.grad)
+    assert torch.allclose(sparse_result, torch_sparse_result, atol=1e-05)
+    assert torch.allclose(X.grad, XX.grad, atol=1e-05)
     assert torch.allclose(
         adj.grad.coalesce().to_dense(),
         sparse_matrix_to_dense(val_like(A, A.val.grad)),
+        atol=1e-05,
     )
 
 
@@ -77,10 +78,10 @@ def test_sparse_sparse_mm(
     torch_A3_grad = sparse_matrix_to_torch_sparse(A3, grad)
     torch_A3.backward(torch_A3_grad)
 
-    assert torch.allclose(A3.dense(), torch_A3.to_dense())
+    assert torch.allclose(A3.dense(), torch_A3.to_dense(), atol=1e-05)
     assert torch.allclose(
-        val_like(A1, A1.val.grad).dense(), torch_A1.grad.to_dense()
+        val_like(A1, A1.val.grad).dense(), torch_A1.grad.to_dense(), atol=1e-05
     )
     assert torch.allclose(
-        val_like(A2, A2.val.grad).dense(), torch_A2.grad.to_dense()
+        val_like(A2, A2.val.grad).dense(), torch_A2.grad.to_dense(), atol=1e-05
     )

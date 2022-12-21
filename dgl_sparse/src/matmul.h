@@ -65,12 +65,15 @@ torch::Tensor SDDMMNoAutoGrad(
  * @param lhs_val Sparse value for the first sparse matrix.
  * @param rhs_mat The second sparse matrix of shape (m, k).
  * @param rhs_val Sparse value for the second sparse matrix.
+ * @param lhs_transpose Whether the first matrix is transposed.
+ * @param rhs_transpose Whether the second matrix is transposed.
  *
  * @return Sparse matrix of shape (n, k).
  */
 c10::intrusive_ptr<SparseMatrix> SpSpMMNoAutoGrad(
     const c10::intrusive_ptr<SparseMatrix>& lhs_mat, torch::Tensor lhs_val,
-    const c10::intrusive_ptr<SparseMatrix>& rhs_mat, torch::Tensor rhs_val);
+    const c10::intrusive_ptr<SparseMatrix>& rhs_mat, torch::Tensor rhs_val,
+    bool lhs_transpose, bool rhs_transpose);
 
 }  // namespace sparse
 }  // namespace dgl

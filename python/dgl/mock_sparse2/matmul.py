@@ -8,7 +8,7 @@ from .diag_matrix import diag, DiagMatrix
 
 from .sparse_matrix import SparseMatrix
 
-__all__ = ["spmm"]
+__all__ = ["spmm", "spspmm", "mm"]
 
 
 def spmm(A: Union[SparseMatrix, DiagMatrix], X: torch.Tensor) -> torch.Tensor:
@@ -135,63 +135,17 @@ def spspmm(
     )
 
 
-def mm_sp(
-    A1: SparseMatrix, A2: Union[torch.Tensor, SparseMatrix, DiagMatrix]
-) -> Union[torch.Tensor, SparseMatrix]:
-    """Internal function for multiplying a sparse matrix by
-    a dense/sparse/diagonal matrix. If inputs are SparseMatrix or DiagMatrix,
-    the non-zero values of them should be 1-D.
-
-    Parameters
-    ----------
-    A1 : SparseMatrix
-        Matrix of shape (N, M), with values of shape (nnz1)
-    A2 : torch.Tensor, SparseMatrix, or DiagMatrix
-        If A2 is a dense tensor, it can have shapes of (M, P) or (M, ).
-        Otherwise it must have a shape of (M, P).
-
-    Returns
-    -------
-    torch.Tensor or SparseMatrix
-        The result of multiplication.
-
-        * It is a dense torch tensor if :attr:`A2` is so.
-        * It is a SparseMatrix object otherwise.
-
-    Examples
-    --------
-
-    >>> row = torch.tensor([0, 1, 1])
-    >>> col = torch.tensor([1, 0, 1])
-    >>> val = torch.randn(len(row))
-    >>> A1 = create_from_coo(row, col, val)
-    >>> A2 = torch.randn(2, 3)
-    >>> result = A1 @ A2
-    >>> print(type(result))
-    <class 'torch.Tensor'>
-    >>> print(result.shape)
-    torch.Size([2, 3])
-    """
-    assert isinstance(A2, (torch.Tensor, SparseMatrix, DiagMatrix)), (
-        f"Expect arg2 to be a torch Tensor, SparseMatrix, or DiagMatrix object,"
-        f"got {type(A2)}"
-    )
-
-    if isinstance(A2, torch.Tensor):
-        return spmm(A1, A2)
-    else:
-        return spspmm(A1, A2)
-
-
-def mm_diag(
-    A1: DiagMatrix, A2: Union[torch.Tensor, SparseMatrix, DiagMatrix]
+def mm(
+    A1: Union[SparseMatrix, DiagMatrix],
+    A2: Union[torch.Tensor, SparseMatrix, DiagMatrix],
 ) -> Union[torch.Tensor, SparseMatrix, DiagMatrix]:
-    """Multiply a diagonal matrix by a dense/sparse/diagonal matrix. If inputs
-    are SparseMatrix or DiagMatrix, the non-zero values of them should be 1-D.
+    """Multiply a sparse/diagonal matrix by a dense/sparse/diagonal matrix.
+    If an input is a SparseMatrix or DiagMatrix, its non-zero values should
+    be 1-D.
 
     Parameters
     ----------
-    A1 : DiagMatrix
+    A1 : SparseMatrix or DiagMatrix
         Matrix of shape (N, M), with values of shape (nnz1)
     A2 : torch.Tensor, SparseMatrix, or DiagMatrix
         Matrix of shape (M, P). If it is a SparseMatrix or DiagMatrix,
@@ -200,10 +154,10 @@ def mm_diag(
     Returns
     -------
     torch.Tensor or DiagMatrix or SparseMatrix
-        The result of multiplication.
+        The result of multiplication of shape (N, P)
 
         * It is a dense torch tensor if :attr:`A2` is so.
-        * It is a DiagMatrix object if :attr:`A2` is so.
+        * It is a DiagMatrix object if both :attr:`A1` and :attr:`A2` are so.
         * It is a SparseMatrix object otherwise.
 
     Examples
@@ -212,22 +166,25 @@ def mm_diag(
     >>> val = torch.randn(3)
     >>> A1 = diag(val)
     >>> A2 = torch.randn(3, 2)
-    >>> result = A1 @ A2
+    >>> result = dgl.sparse.mm(A1, A2)
     >>> print(type(result))
     <class 'torch.Tensor'>
     >>> print(result.shape)
     torch.Size([3, 2])
     """
+    assert isinstance(
+        A1, (SparseMatrix, DiagMatrix)
+    ), f"Expect arg1 to be a SparseMatrix, or DiagMatrix object, got {type(A1)}"
     assert isinstance(A2, (torch.Tensor, SparseMatrix, DiagMatrix)), (
         f"Expect arg2 to be a torch Tensor, SparseMatrix, or DiagMatrix"
         f"object, got {type(A2)}"
     )
-
     if isinstance(A2, torch.Tensor):
         return spmm(A1, A2)
-    else:
-        return spspmm(A1, A2)
+    if isinstance(A1, DiagMatrix) and isinstance(A2, DiagMatrix):
+        return _diag_diag_mm(A1, A2)
+    return spspmm(A1, A2)
 
 
-SparseMatrix.__matmul__ = mm_sp
-DiagMatrix.__matmul__ = mm_diag
+SparseMatrix.__matmul__ = mm
+DiagMatrix.__matmul__ = mm

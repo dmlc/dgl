@@ -100,12 +100,26 @@ torch::Tensor SDDMMNoAutoGrad(
 
 c10::intrusive_ptr<SparseMatrix> SpSpMMNoAutoGrad(
     const c10::intrusive_ptr<SparseMatrix>& lhs_mat, torch::Tensor lhs_val,
-    const c10::intrusive_ptr<SparseMatrix>& rhs_mat, torch::Tensor rhs_val) {
-  auto lhs_dgl_csr = CSRToOldDGLCSR(lhs_mat->CSRPtr());
-  auto rhs_dgl_csr = CSRToOldDGLCSR(rhs_mat->CSRPtr());
+    const c10::intrusive_ptr<SparseMatrix>& rhs_mat, torch::Tensor rhs_val,
+    bool lhs_transpose, bool rhs_transpose) {
+  aten::CSRMatrix lhs_dgl_csr, rhs_dgl_csr;
+  if (!lhs_transpose) {
+    lhs_dgl_csr = CSRToOldDGLCSR(lhs_mat->CSRPtr());
+  } else {
+    lhs_dgl_csr = CSRToOldDGLCSR(lhs_mat->CSCPtr());
+  }
+  if (!rhs_transpose) {
+    rhs_dgl_csr = CSRToOldDGLCSR(rhs_mat->CSRPtr());
+  } else {
+    rhs_dgl_csr = CSRToOldDGLCSR(rhs_mat->CSCPtr());
+  }
   auto lhs_dgl_val = TorchTensorToDGLArray(lhs_val);
   auto rhs_dgl_val = TorchTensorToDGLArray(rhs_val);
-  std::vector<int64_t> ret_shape({lhs_mat->shape()[0], rhs_mat->shape()[1]});
+  const int64_t ret_row =
+      lhs_transpose ? lhs_mat->shape()[1] : lhs_mat->shape()[0];
+  const int64_t ret_col =
+      rhs_transpose ? rhs_mat->shape()[0] : rhs_mat->shape()[1];
+  std::vector<int64_t> ret_shape({ret_row, ret_col});
   aten::CSRMatrix ret_dgl_csr;
   runtime::NDArray ret_val;
   std::tie(ret_dgl_csr, ret_val) =

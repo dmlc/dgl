@@ -70,7 +70,8 @@ variable_list SpSpMMAutoGrad::forward(
     AutogradContext* ctx, c10::intrusive_ptr<SparseMatrix> lhs_mat,
     torch::Tensor lhs_val, c10::intrusive_ptr<SparseMatrix> rhs_mat,
     torch::Tensor rhs_val) {
-  auto ret_mat = SpSpMMNoAutoGrad(lhs_mat, lhs_val, rhs_mat, rhs_val);
+  auto ret_mat =
+      SpSpMMNoAutoGrad(lhs_mat, lhs_val, rhs_mat, rhs_val, false, false);
 
   ctx->saved_data["lhs_mat"] = lhs_mat;
   ctx->saved_data["rhs_mat"] = rhs_mat;
@@ -99,13 +100,13 @@ tensor_list SpSpMMAutoGrad::backward(
   if (ctx->saved_data["lhs_require_grad"].toBool()) {
     // A @ B = C -> dA = dC @ (B^T)
     auto lhs_mat_grad =
-        SpSpMMNoAutoGrad(ret_mat, output_grad, rhs_mat->Transpose(), rhs_val);
+        SpSpMMNoAutoGrad(ret_mat, output_grad, rhs_mat, rhs_val, false, true);
     lhs_val_grad = _CSRMask(lhs_mat_grad, lhs_mat_grad->value(), lhs_mat);
   }
   if (ctx->saved_data["rhs_require_grad"].toBool()) {
     // A @ B = C -> dB = (A^T) @ dC
     auto rhs_mat_grad =
-        SpSpMMNoAutoGrad(lhs_mat->Transpose(), lhs_val, ret_mat, output_grad);
+        SpSpMMNoAutoGrad(lhs_mat, lhs_val, ret_mat, output_grad, true, false);
     rhs_val_grad = _CSRMask(rhs_mat_grad, rhs_mat_grad->value(), rhs_mat);
   }
   return {torch::Tensor(), lhs_val_grad, torch::Tensor(), rhs_val_grad};
