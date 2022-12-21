@@ -115,6 +115,7 @@ def check_rpc_sampling(tmpdir, num_server):
     print("Done sampling")
     for p in pserver_list:
         p.join()
+        assert p.exitcode == 0
 
     src, dst = sampled_graph.edges()
     assert sampled_graph.number_of_nodes() == g.number_of_nodes()
@@ -242,6 +243,7 @@ def check_rpc_get_degree_shuffle(tmpdir, num_server):
     print("Done get_degree")
     for p in pserver_list:
         p.join()
+        assert p.exitcode == 0
 
     print('check results')
     assert F.array_equal(g.in_degrees(orig_nid[nids]), in_degs)
@@ -303,6 +305,7 @@ def check_rpc_sampling_shuffle(tmpdir, num_server, num_groups=1):
             pclient_list.append(p)
     for p in pclient_list:
         p.join()
+        assert p.exitcode == 0
     if keep_alive:
         for p in pserver_list:
             assert p.is_alive()
@@ -310,6 +313,7 @@ def check_rpc_sampling_shuffle(tmpdir, num_server, num_groups=1):
         dgl.distributed.shutdown_servers("rpc_ip_config.txt", 1)
     for p in pserver_list:
         p.join()
+        assert p.exitcode == 0
 
 def start_hetero_sample_client(rank, tmpdir, disable_shared_mem, nodes):
     gpb = None
@@ -390,6 +394,7 @@ def check_rpc_hetero_sampling_shuffle(tmpdir, num_server):
     print("Done sampling")
     for p in pserver_list:
         p.join()
+        assert p.exitcode == 0
 
     for c_etype in block.canonical_etypes:
         src_type, etype, dst_type = c_etype
@@ -443,6 +448,7 @@ def check_rpc_hetero_sampling_empty_shuffle(tmpdir, num_server):
     print("Done sampling")
     for p in pserver_list:
         p.join()
+        assert p.exitcode == 0
 
     assert block.number_of_edges() == 0
     assert len(block.etypes) == len(g.etypes)
@@ -476,6 +482,7 @@ def check_rpc_hetero_etype_sampling_shuffle(tmpdir, num_server, graph_formats=No
     print("Done sampling")
     for p in pserver_list:
         p.join()
+        assert p.exitcode == 0
 
     src, dst = block.edges(etype=('n1', 'r13', 'n3'))
     assert len(src) == 18
@@ -526,6 +533,7 @@ def check_rpc_hetero_etype_sampling_empty_shuffle(tmpdir, num_server):
     print("Done sampling")
     for p in pserver_list:
         p.join()
+        assert p.exitcode == 0
 
     assert block.number_of_edges() == 0
     assert len(block.etypes) == len(g.etypes)
@@ -618,6 +626,7 @@ def check_rpc_bipartite_sampling_empty(tmpdir, num_server):
     print("Done sampling")
     for p in pserver_list:
         p.join()
+        assert p.exitcode == 0
 
     assert block.number_of_edges() == 0
     assert len(block.etypes) == len(g.etypes)
@@ -650,6 +659,7 @@ def check_rpc_bipartite_sampling_shuffle(tmpdir, num_server):
     print("Done sampling")
     for p in pserver_list:
         p.join()
+        assert p.exitcode == 0
 
     for c_etype in block.canonical_etypes:
         src_type, etype, dst_type = c_etype
@@ -701,6 +711,7 @@ def check_rpc_bipartite_etype_sampling_empty(tmpdir, num_server):
     print("Done sampling")
     for p in pserver_list:
         p.join()
+        assert p.exitcode == 0
 
     assert block is not None
     assert block.number_of_edges() == 0
@@ -735,6 +746,7 @@ def check_rpc_bipartite_etype_sampling_shuffle(tmpdir, num_server):
     print("Done sampling")
     for p in pserver_list:
         p.join()
+        assert p.exitcode == 0
 
     for c_etype in block.canonical_etypes:
         src_type, etype, dst_type = c_etype
@@ -919,6 +931,7 @@ def check_rpc_in_subgraph_shuffle(tmpdir, num_server):
     sampled_graph = start_in_subgraph_client(0, tmpdir, num_server > 1, nodes)
     for p in pserver_list:
         p.join()
+        assert p.exitcode == 0
 
     src, dst = sampled_graph.edges()
     src = orig_nid[src]
