@@ -578,7 +578,7 @@ class DistEdgeDataLoader(DistDataLoader):
     graph.
 
     All the arguments have the same meaning as the single-machine counterpart
-    :class:`dgl.dataloading.EdgeDataLoader` except the first argument
+    :class:`dgl.dataloading.DataLoader` except the first argument
     :attr:`g` which must be a :class:`dgl.distributed.DistGraph`.
 
     Parameters
@@ -587,11 +587,11 @@ class DistEdgeDataLoader(DistDataLoader):
         The distributed graph.
 
     eids, graph_sampler, device, kwargs :
-        See :class:`dgl.dataloading.EdgeDataLoader`.
+        See :class:`dgl.dataloading.DataLoader`.
 
     See also
     --------
-    dgl.dataloading.EdgeDataLoader
+    dgl.dataloading.DataLoader
     """
     def __init__(self, g, eids, graph_sampler, device=None, **kwargs):
         collator_kwargs = {}

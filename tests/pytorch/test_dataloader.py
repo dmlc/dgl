@@ -98,7 +98,7 @@ def test_neighbor_nonuniform(idtype, mode, use_ddp, use_mask):
 
     sampler = dgl.dataloading.MultiLayerNeighborSampler([2], prob=prob, mask=mask)
     for num_workers in [0, 1, 2] if mode == 'cpu' else [0]:
-        dataloader = dgl.dataloading.NodeDataLoader(
+        dataloader = dgl.dataloading.DataLoader(
             g, indices, sampler,
             batch_size=1, device=F.ctx(),
             num_workers=num_workers,
@@ -123,7 +123,7 @@ def test_neighbor_nonuniform(idtype, mode, use_ddp, use_mask):
     if mode == 'pure_gpu':
         g = g.to(F.cuda())
     for num_workers in [0, 1, 2] if mode == 'cpu' else [0]:
-        dataloader = dgl.dataloading.NodeDataLoader(
+        dataloader = dgl.dataloading.DataLoader(
             g, {'A': indices}, sampler,
             batch_size=1, device=F.ctx(),
             num_workers=num_workers,

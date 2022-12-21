@@ -49,27 +49,28 @@ def main(args):
     val_eid_dict['forward'] = graph.edges['forward'].data["val_mask"].nonzero().squeeze()
     test_eid_dict['forward'] = graph.edges['forward'].data["test_mask"].nonzero().squeeze()
 
-    tr_loader = dgl.dataloading.EdgeDataLoader(graph,
-                                               tr_eid_dict,
-                                               sampler,
-                                               batch_size=args.batch_size,
-                                               shuffle=True,
-                                               drop_last=False,
-                                               num_workers=args.num_workers)
-    val_loader = dgl.dataloading.EdgeDataLoader(graph,
-                                                val_eid_dict,
-                                                sampler,
-                                                batch_size=args.batch_size,
-                                                shuffle=True,
-                                                drop_last=False,
-                                                num_workers=args.num_workers)
-    test_loader = dgl.dataloading.EdgeDataLoader(graph,
-                                                 test_eid_dict,
-                                                 sampler,
-                                                 batch_size=args.batch_size,
-                                                 shuffle=True,
-                                                 drop_last=False,
-                                                 num_workers=args.num_workers)
+    sampler = dgl.dataloading.as_edge_prediction_sampler(sampler)
+    tr_loader = dgl.dataloading.DataLoader(graph,
+                                           tr_eid_dict,
+                                           sampler,
+                                           batch_size=args.batch_size,
+                                           shuffle=True,
+                                           drop_last=False,
+                                           num_workers=args.num_workers)
+    val_loader = dgl.dataloading.DataLoader(graph,
+                                            val_eid_dict,
+                                            sampler,
+                                            batch_size=args.batch_size,
+                                            shuffle=True,
+                                            drop_last=False,
+                                            num_workers=args.num_workers)
+    test_loader = dgl.dataloading.DataLoader(graph,
+                                             test_eid_dict,
+                                             sampler,
+                                             batch_size=args.batch_size,
+                                             shuffle=True,
+                                             drop_last=False,
+                                             num_workers=args.num_workers)
 
     # check cuda
     if args.gpu >= 0 and th.cuda.is_available():
