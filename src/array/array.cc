@@ -1132,40 +1132,6 @@ void CSRSDDMM(
       std::string(op), csr, ufeat, efeat, out, lhs_target, rhs_target);
 }
 
-void CSREdgeSoftmaxForward(
-    const std::string& op, const CSRMatrix& csr, NDArray ufeat, NDArray efeat,
-    NDArray out) {
-  // TODO(zhejiang): add gpu op for edge_softmax
-  const auto& bcast = CalcBcastOff(op, ufeat, efeat);
-
-  ATEN_XPU_SWITCH(csr.indptr->ctx.device_type, XPU, "edge_softmax", {
-    ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {
-      ATEN_FLOAT_TYPE_SWITCH_16BITS(
-          out->dtype, Dtype, XPU, "edge_softmax out data", {
-            Edge_softmax_csr_forward<XPU, IdType, Dtype>(
-                op, bcast, csr, ufeat, efeat, out);
-          });
-    });
-  });
-}
-
-void CSREdgeSoftmaxBackward(
-    const std::string& op, const CSRMatrix& csr, NDArray out, NDArray sds,
-    NDArray back_out, NDArray ufeat) {
-  // TODO(zhejiang): add gpu op for edge_softmax
-  const auto& bcast = CalcBcastOff(op, ufeat, sds);
-
-  ATEN_XPU_SWITCH(csr.indptr->ctx.device_type, XPU, "edge_softmax_back", {
-    ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {
-      ATEN_FLOAT_TYPE_SWITCH_16BITS(
-          out->dtype, Dtype, XPU, "edge_softmax out data_back", {
-            Edge_softmax_csr_backward<XPU, IdType, Dtype>(
-                op, bcast, csr, out, sds, back_out);
-          });
-    });
-  });
-}
-
 void COOSpMM(
     const std::string& op, const std::string& reduce, const COOMatrix& coo,
     NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux) {

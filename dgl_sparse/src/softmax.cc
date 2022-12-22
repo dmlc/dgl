@@ -3,9 +3,6 @@
  * @file softmax.cc
  * @brief DGL C++ Softmax operator implementation
  */
-// clang-format off
-#include <sparse/dgl_headers.h>
-// clang-format on
 
 #include <sparse/sparse_matrix.h>
 #include <torch/script.h>
@@ -41,22 +38,12 @@ torch::Tensor SoftmaxAutoGrad::forward(
     AutogradContext* ctx, c10::intrusive_ptr<SparseMatrix> sparse_mat,
     torch::Tensor sparse_val) {
   torch::Tensor sparse_score;
-  if (sparse_val.device() == torch::kCPU) {
-    auto csr = CSRToOldDGLCSR(sparse_mat->CSRPtr());
-    auto dgl_ufeat = aten::NullArray();
-    auto dgl_sparse_val = TorchTensorToDGLArray(sparse_val);
-    sparse_score = torch::zeros(sparse_val.sizes(), sparse_val.options());
-    auto dgl_sparse_score = TorchTensorToDGLArray(sparse_score);
-    aten::CSREdgeSoftmaxForward(
-        "copy_rhs", csr, dgl_ufeat, dgl_sparse_val, dgl_sparse_score);
-  } else {
-    auto sparse_val_max = SpMMNoAutoGrad(sparse_mat, sparse_val, "max");
-    auto sparse_val_exp = SDDMMNoAutoGrad(
-        sparse_mat, sparse_val, sparse_val_max, "sub").exp();
-    auto sparse_val_sum = SpMMNoAutoGrad(sparse_mat, sparse_val_exp, "sum");
-    sparse_score = SDDMMNoAutoGrad(
-        sparse_mat, sparse_val_exp, sparse_val_sum, "div");
-  }
+  auto sparse_val_max = SpMMNoAutoGrad(sparse_mat, sparse_val, "max");
+  auto sparse_val_exp = SDDMMNoAutoGrad(
+      sparse_mat, sparse_val, sparse_val_max, "sub").exp();
+  auto sparse_val_sum = SpMMNoAutoGrad(sparse_mat, sparse_val_exp, "sum");
+  sparse_score = SDDMMNoAutoGrad(
+      sparse_mat, sparse_val_exp, sparse_val_sum, "div");
 
   const bool sparse_requires_grad = sparse_val.requires_grad();
   torch::Tensor cache_sparse_score;
@@ -82,14 +69,10 @@ tensor_list SoftmaxAutoGrad::backward(
 
   torch::Tensor sparse_val_grad;
   if (sparse_requires_grad) {
-    if (sparse_score.device() == torch::kCPU) {
-
-    } else {
-      auto sds = sparse_score * output_grad;
-      auto accum = SpMMNoAutoGrad(sparse_mat, sds, "sum");
-      sparse_val_grad = sds - SDDMMNoAutoGrad(
-          sparse_mat, sparse_score, accum, "mul");
-    }
+    auto sds = sparse_score * output_grad;
+    auto accum = SpMMNoAutoGrad(sparse_mat, sds, "sum");
+    sparse_val_grad = sds - SDDMMNoAutoGrad(
+        sparse_mat, sparse_score, accum, "mul");
   }
 
   return {torch::Tensor(), sparse_val_grad};

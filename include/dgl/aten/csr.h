@@ -934,31 +934,6 @@ void CSRSDDMM(
     const char* op, const CSRMatrix& csr, NDArray ufeat, NDArray efeat,
     NDArray out, int lhs_target, int rhs_target);
 
-/**
- * @brief Edge softmax forward function on CSR
- * @param op The binary operator
- * @param csr The CSR we apply edge softmax on
- * @param ufeat The source node feature
- * @param efeat The edge feature
- * @param out The output edge feature
- */
-void CSREdgeSoftmaxForward(
-    const std::string& op, const CSRMatrix& csr, NDArray ufeat, NDArray efeat,
-    NDArray out);
-
-/**
- * @brief Edge softmax backward function on CSR
- * @param op The binary operator
- * @param csr The CSR we apply edge softmax on
- * @param out The output of edge softmax forward
- * @param sds The result of out * gradient
- * @param back_out The output of edge softmax backward
- * @param ufeat The source node feature
- */
-void CSREdgeSoftmaxBackward(
-    const std::string& op, const CSRMatrix& csr, NDArray out, NDArray sds,
-    NDArray back_out, NDArray ufeat);
-
 }  // namespace aten
 }  // namespace dgl
 
