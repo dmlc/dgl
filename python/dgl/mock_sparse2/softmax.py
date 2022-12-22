@@ -44,9 +44,15 @@ def softmax(A: SparseMatrix) -> SparseMatrix:
 
     Case2: matrix with values of shape (nnz, D)
 
-    >>> val = torch.arange(nnz * 2).float().reshape(nnz, 2)
+    >>> val = torch.tensor([[0., 7.], [1., 3.], [2., 2.], [3., 1.]])
     >>> A = create_from_coo(row, col, val)
     >>> softmax(A)
-    TODO
+    SparseMatrix(indices=tensor([[0, 0, 1, 2],
+        [1, 2, 2, 0]]),
+    values=tensor([[0.2689, 0.9820],
+        [0.7311, 0.0180],
+        [1.0000, 1.0000],
+        [1.0000, 1.0000]]),
+    shape=(3, 3), nnz=4)
     """
     return SparseMatrix(torch.ops.dgl_sparse.softmax(A.c_sparse_matrix))
