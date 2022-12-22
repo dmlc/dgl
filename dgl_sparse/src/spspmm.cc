@@ -28,27 +28,21 @@ class SpSpMMAutoGrad : public Function<SpSpMMAutoGrad> {
 };
 
 void _SpSpMMSanityCheck(
-    const c10::intrusive_ptr<SparseMatrix>& lhs_mat, torch::Tensor lhs_val,
-    const c10::intrusive_ptr<SparseMatrix>& rhs_mat, torch::Tensor rhs_val) {
+    const c10::intrusive_ptr<SparseMatrix>& lhs_mat,
+    const c10::intrusive_ptr<SparseMatrix>& rhs_mat) {
   const auto& lhs_shape = lhs_mat->shape();
   const auto& rhs_shape = rhs_mat->shape();
   CHECK_EQ(lhs_shape[1], rhs_shape[0])
       << "SpSpMM: the second dim of lhs_mat should be equal to the first dim "
          "of the second matrix";
-  CHECK_EQ(lhs_val.dim(), 1)
+  CHECK_EQ(lhs_mat->value().dim(), 1)
       << "SpSpMM: the value shape of lhs_mat should be 1-D";
-  CHECK_EQ(rhs_val.dim(), 1)
+  CHECK_EQ(rhs_mat->value().dim(), 1)
       << "SpSpMM: the value shape of rhs_mat should be 1-D";
-  CHECK_EQ(lhs_val.size(0), lhs_mat->nnz())
-      << "SpSpMM: the number of lhs_val should be equal to the nnz of lhs_mat";
-  CHECK_EQ(rhs_val.size(0), rhs_mat->nnz())
-      << "SpSpMM: the number of rhs_val should be equal to the nnz of rhs_mat";
   CHECK_EQ(lhs_mat->device(), rhs_mat->device())
       << "SpSpMM: lhs_mat and rhs_mat should on the same device";
-  CHECK_EQ(lhs_val.dtype(), rhs_val.dtype())
-      << "SpSpMM: lhs_val and rhs_val should have the same dtype";
-  CHECK_EQ(lhs_val.device(), rhs_val.device())
-      << "SpSpMM: lhs_val and rhs_val should on the same device";
+  CHECK_EQ(lhs_mat->dtype(), rhs_mat->dtype())
+      << "SpSpMM: lhs_mat and rhs_mat should have the same dtype";
 }
 
 // Mask select value of `mat` by `sub_mat`.
@@ -115,7 +109,7 @@ tensor_list SpSpMMAutoGrad::backward(
 c10::intrusive_ptr<SparseMatrix> SpSpMM(
     const c10::intrusive_ptr<SparseMatrix>& lhs_mat,
     const c10::intrusive_ptr<SparseMatrix>& rhs_mat) {
-  _SpSpMMSanityCheck(lhs_mat, lhs_mat->value(), rhs_mat, rhs_mat->value());
+  _SpSpMMSanityCheck(lhs_mat, rhs_mat);
   auto results = SpSpMMAutoGrad::apply(
       lhs_mat, lhs_mat->value(), rhs_mat, rhs_mat->value());
   std::vector<int64_t> ret_shape({lhs_mat->shape()[0], rhs_mat->shape()[1]});
