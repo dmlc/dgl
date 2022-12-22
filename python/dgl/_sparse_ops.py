@@ -2,8 +2,7 @@
 # pylint: disable= invalid-name
 from __future__ import absolute_import
 
-from . import backend as F
-from . import ndarray as nd
+from . import backend as F, ndarray as nd
 from ._ffi.function import _init_api
 from .base import DGLError
 

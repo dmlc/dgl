@@ -1,8 +1,6 @@
 import numpy as np
 import tensorflow as tf
 
-from ...base import ALL, is_all
-from ...heterograph_index import create_unitgraph_from_csr
 from ..._sparse_ops import (
     _bwd_segment_cmp,
     _csrmask,
@@ -13,6 +11,9 @@ from ..._sparse_ops import (
     _scatter_add,
     _segment_reduce,
 )
+
+from ...base import ALL, is_all
+from ...heterograph_index import create_unitgraph_from_csr
 from .tensor import asnumpy, context, copy_to, tensor, zerocopy_from_numpy
 
 __all__ = [
