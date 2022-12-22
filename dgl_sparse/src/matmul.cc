@@ -138,5 +138,32 @@ torch::Tensor SDDMMNoAutoGrad(
   return ret;
 }
 
+torch::Tensor SDDMMNoAutoGrad(
+    const c10::intrusive_ptr<SparseMatrix>& sparse_mat, torch::Tensor e,
+    torch::Tensor v, const std::string& op) {
+  auto ret = torch::zeros(e.sizes(), e.options());
+
+  auto dgl_e = TorchTensorToDGLArray(e);
+  auto dgl_v = TorchTensorToDGLArray(v);
+  auto dgl_ret = TorchTensorToDGLArray(ret);
+
+  // The format for calculation will be chosen in the following order: CSR,
+  // COO. CSR is created if the sparse matrix only has CSC format.
+  if (sparse_mat->HasCSR() || !sparse_mat->HasCOO()) {
+    // sparse_mat->CSRPtr() will implicitly convert CSC to CSR format if CSR
+    // does not exist.
+    auto csr = CSRToOldDGLCSR(sparse_mat->CSRPtr());
+    aten::CSRSDDMM(
+        op.c_str(), csr, dgl_e, dgl_v, dgl_ret, 1 /* Lhs target: e */,
+        0 /* rhs target: u due to transpose */);
+  } else {  // COO
+    auto coo = COOToOldDGLCOO(sparse_mat->COOPtr());
+    aten::COOSDDMM(
+        op.c_str(), coo, dgl_e, dgl_v, dgl_ret, 1 /* Lhs target: e */,
+        0 /* rhs target: u due to transpose */);
+  }
+  return ret;
+}
+
 }  // namespace sparse
 }  // namespace dgl

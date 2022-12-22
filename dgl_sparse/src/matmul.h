@@ -34,6 +34,9 @@ torch::Tensor SpMMNoAutoGrad(
 
 /**
  * @brief Perform a generalized sparse matrix multiplication with copy_rhs op.
+ * Mathematically, it calculates x_v = \psi({x_e | (u, v, e)\in G}), where
+ * x_v is the returned feature on destination nodes, x_e is the edge feature,
+ * \psi is reduce operator, and G is the graph.
  *
  * This function does not take care of autograd.
  *
@@ -67,6 +70,25 @@ torch::Tensor SpMMNoAutoGrad(
 torch::Tensor SDDMMNoAutoGrad(
     const c10::intrusive_ptr<SparseMatrix>& sparse_mat, torch::Tensor mat1,
     torch::Tensor mat2_tr);
+
+/**
+ * @brief Perform a variant of generalized sampled-dense-dense matrix
+ * multiplication. Mathematically, it calculates x_e = \phi(x_e, x_v), where
+ * x_e is the edge feature, x_v is the destination node feature, and \phi is
+ * add, sub, mul, or div.
+ *
+ * This function does not take care of autograd.
+ *
+ * @param sparse_mat The sparse matrix with nnz non-zero values and N rows
+ * @param e Edge feature of shape (nnz, D)
+ * @param v Destination node feature of shape (N, D)
+ * @param op Operator, can be add, sub, mul, or div
+ *
+ * @return Dense tensor of shape (nnz, D)
+ */
+torch::Tensor SDDMMNoAutoGrad(
+    const c10::intrusive_ptr<SparseMatrix>& sparse_mat, torch::Tensor e,
+    torch::Tensor v, const std::string& op);
 
 }  // namespace sparse
 }  // namespace dgl
