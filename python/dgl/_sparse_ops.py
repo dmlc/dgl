@@ -1036,4 +1036,4 @@ def libra2dgl_set_lr(gdt_key, gdt_value, lrtensor, nc, Nn):
     )
 
 
-_init_api("dgl.sparse")
+_init_api("dgl.sparse", __name__)

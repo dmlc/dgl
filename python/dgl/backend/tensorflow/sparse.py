@@ -3,7 +3,7 @@ import tensorflow as tf
 
 from ...base import ALL, is_all
 from ...heterograph_index import create_unitgraph_from_csr
-from ...sparse import (
+from ..._sparse_ops import (
     _bwd_segment_cmp,
     _csrmask,
     _csrmm,

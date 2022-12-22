@@ -36,7 +36,7 @@ def _random_simple_graph(idtype, dtype, ctx, M, N, max_nnz, srctype, dsttype, et
 def test_csrmm(idtype, dtype):
     a, A = _random_simple_graph(idtype, dtype, F.ctx(), 500, 600, 9000, 'A', 'B', 'AB')
     b, B = _random_simple_graph(idtype, dtype, F.ctx(), 600, 700, 9000, 'B', 'C', 'BC')
-    C, C_weights = dgl.sparse._csrmm(A._graph, A.edata['w'], B._graph, B.edata['w'], 2)
+    C, C_weights = dgl._sparse_ops._csrmm(A._graph, A.edata['w'], B._graph, B.edata['w'], 2)
     C_adj = C.adjacency_matrix_scipy(0, False, 'csr')
     C_adj.data = F.asnumpy(C_weights)
     C_adj = F.tensor(C_adj.todense(), dtype=dtype)
@@ -86,7 +86,7 @@ def test_csrmm_backward(idtype, dtype, num_vtypes):
 def test_csrsum(idtype, dtype):
     a, A = _random_simple_graph(idtype, dtype, F.ctx(), 500, 600, 9000, 'A', 'B', 'AB')
     b, B = _random_simple_graph(idtype, dtype, F.ctx(), 500, 600, 9000, 'A', 'B', 'AB')
-    C, C_weights = dgl.sparse._csrsum([A._graph, B._graph], [A.edata['w'], B.edata['w']])
+    C, C_weights = dgl._sparse_ops._csrsum([A._graph, B._graph], [A.edata['w'], B.edata['w']])
     C_adj = C.adjacency_matrix_scipy(0, False, 'csr')
     C_adj.data = F.asnumpy(C_weights)
     C_adj = F.tensor(C_adj.todense(), dtype=dtype)
@@ -155,7 +155,7 @@ def test_csrsum_backward(idtype, dtype, nelems):
 def test_csrmask(idtype, dtype, A_nnz, B_nnz):
     a, A = _random_simple_graph(idtype, dtype, F.ctx(), 500, 600, A_nnz, 'A', 'B', 'AB')
     b, B = _random_simple_graph(idtype, dtype, F.ctx(), 500, 600, B_nnz, 'A', 'B', 'AB')
-    C = dgl.sparse._csrmask(A._graph, A.edata['w'], B._graph)
+    C = dgl._sparse_ops._csrmask(A._graph, A.edata['w'], B._graph)
     B_row, B_col = B.edges(order='eid')
     B_row = F.asnumpy(B_row)
     B_col = F.asnumpy(B_col)

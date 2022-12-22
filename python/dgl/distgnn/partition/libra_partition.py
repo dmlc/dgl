@@ -27,7 +27,7 @@ import torch as th
 from dgl import DGLGraph
 from dgl.base import DGLError
 from dgl.data.utils import save_graphs, save_tensors
-from dgl.sparse import (
+from dgl._sparse_ops import (
     libra2dgl_build_adjlist,
     libra2dgl_build_dict,
     libra2dgl_set_lr,
