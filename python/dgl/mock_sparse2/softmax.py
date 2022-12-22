@@ -33,16 +33,17 @@ def softmax(A: SparseMatrix) -> SparseMatrix:
 
     >>> row = torch.tensor([0, 0, 1, 2])
     >>> col = torch.tensor([1, 2, 2, 0])
-    >>> val = torch.ones(len(row))
+    >>> nnz = len(row)
+    >>> val = torch.arange(nnz).float()
     >>> A = create_from_coo(row, col, val)
     >>> softmax(A)
-    TODO
+    SparseMatrix(indices=tensor([[0, 0, 1, 2],
+        [1, 2, 2, 0]]),
+    values=tensor([0.2689, 0.7311, 1.0000, 1.0000]),
+    shape=(3, 3), nnz=4)
 
     Case2: matrix with values of shape (nnz, D)
 
-    >>> row = torch.tensor([0, 0, 1, 2])
-    >>> col = torch.tensor([1, 2, 2, 0])
-    >>> nnz = len(row)
     >>> val = torch.arange(nnz * 2).float().reshape(nnz, 2)
     >>> A = create_from_coo(row, col, val)
     >>> softmax(A)

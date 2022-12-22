@@ -37,12 +37,11 @@ void _SoftmaxSanityCheck(
 torch::Tensor SoftmaxAutoGrad::forward(
     AutogradContext* ctx, c10::intrusive_ptr<SparseMatrix> sparse_mat,
     torch::Tensor sparse_val) {
-  torch::Tensor sparse_score;
   auto sparse_val_max = SpMMNoAutoGrad(sparse_mat, sparse_val, "max");
   auto sparse_val_exp = SDDMMNoAutoGrad(
       sparse_mat, sparse_val, sparse_val_max, "sub").exp();
   auto sparse_val_sum = SpMMNoAutoGrad(sparse_mat, sparse_val_exp, "sum");
-  sparse_score = SDDMMNoAutoGrad(
+  auto sparse_score = SDDMMNoAutoGrad(
       sparse_mat, sparse_val_exp, sparse_val_sum, "div");
 
   const bool sparse_requires_grad = sparse_val.requires_grad();

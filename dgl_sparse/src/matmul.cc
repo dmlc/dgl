@@ -83,9 +83,10 @@ torch::Tensor SpMMNoAutoGrad(
   auto dgl_ret = TorchTensorToDGLArray(ret);
 
   std::vector<NDArray> dgl_ret_aux = {};
-  if (reduce == "max"||reduce == "min") {
+  if (reduce == "max" || reduce == "min") {
     auto arg_dgl_dense_mat = aten::NullArray();
-    auto arg_sparse_val = torch::zeros(shape, sparse_val.options());
+    auto arg_sparse_val = torch::zeros(
+      shape, torch::dtype(torch::kInt64).device(sparse_val.device()));
     auto arg_dgl_sparse_val = TorchTensorToDGLArray(arg_sparse_val);
     dgl_ret_aux = {arg_dgl_dense_mat, arg_dgl_sparse_val};
   }
@@ -141,7 +142,9 @@ torch::Tensor SDDMMNoAutoGrad(
 torch::Tensor SDDMMNoAutoGrad(
     const c10::intrusive_ptr<SparseMatrix>& sparse_mat, torch::Tensor e,
     torch::Tensor v, const std::string& op) {
-  auto ret = torch::zeros(e.sizes(), e.options());
+  const int64_t out_row = sparse_mat->nnz();
+  const std::vector<int64_t> shape({out_row, e.size(1)});
+  auto ret = torch::zeros(shape, e.options());
 
   auto dgl_e = TorchTensorToDGLArray(e);
   auto dgl_v = TorchTensorToDGLArray(v);
