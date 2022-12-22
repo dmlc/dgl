@@ -86,7 +86,7 @@ torch::Tensor SpMMNoAutoGrad(
   if (reduce == "max" || reduce == "min") {
     auto arg_dgl_dense_mat = aten::NullArray();
     auto arg_sparse_val = torch::zeros(
-      shape, torch::dtype(torch::kInt64).device(sparse_val.device()));
+        shape, torch::dtype(torch::kInt64).device(sparse_val.device()));
     auto arg_dgl_sparse_val = TorchTensorToDGLArray(arg_sparse_val);
     dgl_ret_aux = {arg_dgl_dense_mat, arg_dgl_sparse_val};
   }
@@ -98,15 +98,15 @@ torch::Tensor SpMMNoAutoGrad(
     // does not exist.
     auto csr = CSRToOldDGLCSR(sparse_mat->CSRPtr());
     aten::CSRSpMM(
-        op.c_str(), reduce.c_str(), csr, dgl_dense_mat, dgl_sparse_val,
-        dgl_ret, dgl_ret_aux);
+        op.c_str(), reduce.c_str(), csr, dgl_dense_mat, dgl_sparse_val, dgl_ret,
+        dgl_ret_aux);
   } else {  // COO
     // Use the reverse order of aten::COOSpMM because it calculates f(A^T).
     auto coo = COOToOldDGLCOO(sparse_mat->COOPtr());
     coo = aten::COOTranspose(coo);
     aten::COOSpMM(
-        op.c_str(), reduce.c_str(), coo, dgl_dense_mat, dgl_sparse_val,
-        dgl_ret, dgl_ret_aux);
+        op.c_str(), reduce.c_str(), coo, dgl_dense_mat, dgl_sparse_val, dgl_ret,
+        dgl_ret_aux);
   }
   return ret;
 }

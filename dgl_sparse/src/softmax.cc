@@ -38,11 +38,11 @@ torch::Tensor SoftmaxAutoGrad::forward(
     AutogradContext* ctx, c10::intrusive_ptr<SparseMatrix> sparse_mat,
     torch::Tensor sparse_val) {
   auto sparse_val_max = SpMMNoAutoGrad(sparse_mat, sparse_val, "max");
-  auto sparse_val_exp = SDDMMNoAutoGrad(
-      sparse_mat, sparse_val, sparse_val_max, "sub").exp();
+  auto sparse_val_exp =
+      SDDMMNoAutoGrad(sparse_mat, sparse_val, sparse_val_max, "sub").exp();
   auto sparse_val_sum = SpMMNoAutoGrad(sparse_mat, sparse_val_exp, "sum");
-  auto sparse_score = SDDMMNoAutoGrad(
-      sparse_mat, sparse_val_exp, sparse_val_sum, "div");
+  auto sparse_score =
+      SDDMMNoAutoGrad(sparse_mat, sparse_val_exp, sparse_val_sum, "div");
 
   const bool sparse_requires_grad = sparse_val.requires_grad();
   torch::Tensor cache_sparse_score;
@@ -70,8 +70,8 @@ tensor_list SoftmaxAutoGrad::backward(
   if (sparse_requires_grad) {
     auto sds = sparse_score * output_grad;
     auto accum = SpMMNoAutoGrad(sparse_mat, sds, "sum");
-    sparse_val_grad = sds - SDDMMNoAutoGrad(
-        sparse_mat, sparse_score, accum, "mul");
+    sparse_val_grad =
+        sds - SDDMMNoAutoGrad(sparse_mat, sparse_score, accum, "mul");
   }
 
   return {torch::Tensor(), sparse_val_grad};

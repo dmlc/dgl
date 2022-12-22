@@ -10,9 +10,9 @@
 #include <sparse/elementwise_op.h>
 #include <sparse/reduction.h>
 #include <sparse/sddmm.h>
+#include <sparse/softmax.h>
 #include <sparse/sparse_matrix.h>
 #include <sparse/spmm.h>
-#include <sparse/softmax.h>
 #include <torch/custom_class.h>
 #include <torch/script.h>
 
