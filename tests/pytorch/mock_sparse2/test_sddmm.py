@@ -44,7 +44,7 @@ def test_sddmm(create_func, shape, nnz, hidden):
     dense_val = dense_result[row, col] * A_val_clone
     dense_val.backward(grad)
 
-    assert torch.allclose(dense_val, sparse_result.val)
-    assert torch.allclose(dense_C.grad, C.grad)
-    assert torch.allclose(dense_B.grad, B.grad)
-    assert torch.allclose(A_val_clone.grad, A.val.grad)
+    assert torch.allclose(dense_val, sparse_result.val, atol=1e-05)
+    assert torch.allclose(dense_C.grad, C.grad, atol=1e-05)
+    assert torch.allclose(dense_B.grad, B.grad, atol=1e-05)
+    assert torch.allclose(A_val_clone.grad, A.val.grad, atol=1e-05)
