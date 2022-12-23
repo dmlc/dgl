@@ -1,10 +1,11 @@
 import sys
 
 import backend as F
+
+import dgl
 import pytest
 import torch
 
-import dgl
 from dgl.mock_sparse2 import create_from_coo, softmax
 
 # TODO(#4818): Skipping tests on win.
