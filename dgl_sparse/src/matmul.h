@@ -6,6 +6,8 @@
 #ifndef DGL_SPARSE_MATMUL_H_
 #define DGL_SPARSE_MATMUL_H_
 
+#include <string>
+
 #include <sparse/sparse_matrix.h>
 #include <torch/script.h>
 
