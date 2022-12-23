@@ -1,4 +1,6 @@
+import numpy as np
 import torch
+
 from dgl.mock_sparse2 import (
     create_from_coo,
     create_from_csc,
@@ -6,6 +8,8 @@ from dgl.mock_sparse2 import (
     SparseMatrix,
 )
 
+np.random.seed(42)
+torch.random.manual_seed(42)
 
 def clone_detach_and_grad(t):
     t = t.clone().detach()
@@ -14,33 +18,79 @@ def clone_detach_and_grad(t):
 
 
 def rand_coo(shape, nnz, dev):
-    row = torch.randint(0, shape[0], (nnz,), device=dev)
-    col = torch.randint(0, shape[1], (nnz,), device=dev)
+    # Create a sparse matrix without duplicate entries.
+    nnzid = np.random.choice(shape[0] * shape[1], nnz, replace=False)
+    nnzid = torch.tensor(nnzid, device=dev).long()
+    row = torch.div(nnzid, shape[1], rounding_mode='floor')
+    col = nnzid % shape[1]
     val = torch.randn(nnz, device=dev, requires_grad=True)
     return create_from_coo(row, col, val, shape)
 
 
 def rand_csr(shape, nnz, dev):
-    row = torch.randint(0, shape[0], (nnz,), device=dev)
-    col = torch.randint(0, shape[1], (nnz,), device=dev)
+    # Create a sparse matrix without duplicate entries.
+    nnzid = np.random.choice(shape[0] * shape[1], nnz, replace=False)
+    nnzid = torch.tensor(nnzid, device=dev).long()
+    row = torch.div(nnzid, shape[1], rounding_mode='floor')
+    col = nnzid % shape[1]
     val = torch.randn(nnz, device=dev, requires_grad=True)
     indptr = torch.zeros(shape[0] + 1, device=dev, dtype=torch.int64)
     for r in row.tolist():
         indptr[r + 1] += 1
     indptr = torch.cumsum(indptr, 0)
-    indices = col
+    row_sorted, row_sorted_idx = torch.sort(row)
+    indices = col[row_sorted_idx]
     return create_from_csr(indptr, indices, val, shape=shape)
 
 
 def rand_csc(shape, nnz, dev):
-    row = torch.randint(0, shape[0], (nnz,), device=dev)
-    col = torch.randint(0, shape[1], (nnz,), device=dev)
+    # Create a sparse matrix without duplicate entries.
+    nnzid = np.random.choice(shape[0] * shape[1], nnz, replace=False)
+    nnzid = torch.tensor(nnzid, device=dev).long()
+    row = torch.div(nnzid, shape[1], rounding_mode='floor')
+    col = nnzid % shape[1]
     val = torch.randn(nnz, device=dev, requires_grad=True)
     indptr = torch.zeros(shape[1] + 1, device=dev, dtype=torch.int64)
     for c in col.tolist():
         indptr[c + 1] += 1
     indptr = torch.cumsum(indptr, 0)
-    indices = row
+    col_sorted, col_sorted_idx = torch.sort(col)
+    indices = row[col_sorted_idx]
+    return create_from_csc(indptr, indices, val, shape=shape)
+
+def rand_coo_uncoalesced(shape, nnz, dev):
+    # Create a sparse matrix with possible duplicate entries.
+    row = torch.randint(shape[0], (nnz,), device=dev)
+    col = torch.randint(shape[1], (nnz,), device=dev)
+    val = torch.randn(nnz, device=dev, requires_grad=True)
+    return create_from_coo(row, col, val, shape)
+
+
+def rand_csr_uncoalesced(shape, nnz, dev):
+    # Create a sparse matrix with possible duplicate entries.
+    row = torch.randint(shape[0], (nnz,), device=dev)
+    col = torch.randint(shape[1], (nnz,), device=dev)
+    val = torch.randn(nnz, device=dev, requires_grad=True)
+    indptr = torch.zeros(shape[0] + 1, device=dev, dtype=torch.int64)
+    for r in row.tolist():
+        indptr[r + 1] += 1
+    indptr = torch.cumsum(indptr, 0)
+    row_sorted, row_sorted_idx = torch.sort(row)
+    indices = col[row_sorted_idx]
+    return create_from_csr(indptr, indices, val, shape=shape)
+
+
+def rand_csc_uncoalesced(shape, nnz, dev):
+    # Create a sparse matrix with possible duplicate entries.
+    row = torch.randint(shape[0], (nnz,), device=dev)
+    col = torch.randint(shape[1], (nnz,), device=dev)
+    val = torch.randn(nnz, device=dev, requires_grad=True)
+    indptr = torch.zeros(shape[1] + 1, device=dev, dtype=torch.int64)
+    for c in col.tolist():
+        indptr[c + 1] += 1
+    indptr = torch.cumsum(indptr, 0)
+    col_sorted, col_sorted_idx = torch.sort(col)
+    indices = row[col_sorted_idx]
     return create_from_csc(indptr, indices, val, shape=shape)
 
 
