@@ -174,10 +174,10 @@ def mm(
     """
     assert isinstance(
         A1, (SparseMatrix, DiagMatrix)
-    ), f"Expect arg1 to be a SparseMatrix, or DiagMatrix object, got {type(A1)}"
+    ), f"Expect arg1 to be a SparseMatrix, or DiagMatrix object, got {type(A1)}."
     assert isinstance(A2, (torch.Tensor, SparseMatrix, DiagMatrix)), (
         f"Expect arg2 to be a torch Tensor, SparseMatrix, or DiagMatrix"
-        f"object, got {type(A2)}"
+        f"object, got {type(A2)}."
     )
     if isinstance(A2, torch.Tensor):
         return spmm(A1, A2)
