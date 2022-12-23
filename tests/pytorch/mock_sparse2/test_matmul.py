@@ -19,6 +19,7 @@ from .utils import (
 if not sys.platform.startswith("linux"):
     pytest.skip("skipping tests on win", allow_module_level=True)
 
+
 @pytest.mark.parametrize("create_func", [rand_coo, rand_csr, rand_csc])
 @pytest.mark.parametrize("shape", [(2, 7), (5, 2)])
 @pytest.mark.parametrize("nnz", [1, 10])
@@ -67,15 +68,15 @@ def test_sparse_sparse_mm(
     A1 = create_func1(shape1, nnz1, dev)
     A2 = create_func2(shape2, nnz2, dev)
 
-    print('------------A1------------')
+    print("------------A1------------")
     print(A1)
     print(A1.dense())
 
-    print('------------A2------------')
+    print("------------A2------------")
     print(A2)
     print(A2.dense())
 
-    print('------------A3------------')
+    print("------------A3------------")
     print(A1.dense() @ A2.dense())
 
     A3 = A1 @ A2
@@ -91,8 +92,12 @@ def test_sparse_sparse_mm(
     with torch.no_grad():
         assert torch.allclose(A3.dense(), torch_A3.to_dense(), atol=1e-05)
         assert torch.allclose(
-            val_like(A1, A1.val.grad).dense(), torch_A1.grad.to_dense(), atol=1e-05
+            val_like(A1, A1.val.grad).dense(),
+            torch_A1.grad.to_dense(),
+            atol=1e-05,
         )
         assert torch.allclose(
-            val_like(A2, A2.val.grad).dense(), torch_A2.grad.to_dense(), atol=1e-05
+            val_like(A2, A2.val.grad).dense(),
+            torch_A2.grad.to_dense(),
+            atol=1e-05,
         )
