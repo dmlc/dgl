@@ -67,18 +67,6 @@ def test_sparse_sparse_mm(
     shape2 = (shape_n_m[1], shape_k)
     A1 = create_func1(shape1, nnz1, dev)
     A2 = create_func2(shape2, nnz2, dev)
-
-    print("------------A1------------")
-    print(A1)
-    print(A1.dense())
-
-    print("------------A2------------")
-    print(A2)
-    print(A2.dense())
-
-    print("------------A3------------")
-    print(A1.dense() @ A2.dense())
-
     A3 = A1 @ A2
     grad = torch.randn_like(A3.val)
     A3.val.backward(grad)
