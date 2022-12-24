@@ -51,3 +51,41 @@ def test_spmm(create_func, shape, nnz, out_dim):
         sparse_matrix_to_dense(val_like(A, A.val.grad)),
         atol=1e-05,
     )
+
+
+@pytest.mark.parametrize("create_func1", [rand_coo, rand_csr, rand_csc])
+@pytest.mark.parametrize("create_func2", [rand_coo, rand_csr, rand_csc])
+@pytest.mark.parametrize("shape_n_m", [(5, 5), (5, 6)])
+@pytest.mark.parametrize("shape_k", [3, 4])
+@pytest.mark.parametrize("nnz1", [1, 10])
+@pytest.mark.parametrize("nnz2", [1, 10])
+def test_sparse_sparse_mm(
+    create_func1, create_func2, shape_n_m, shape_k, nnz1, nnz2
+):
+    dev = F.ctx()
+    shape1 = shape_n_m
+    shape2 = (shape_n_m[1], shape_k)
+    A1 = create_func1(shape1, nnz1, dev)
+    A2 = create_func2(shape2, nnz2, dev)
+    A3 = A1 @ A2
+    grad = torch.randn_like(A3.val)
+    A3.val.backward(grad)
+
+    torch_A1 = sparse_matrix_to_torch_sparse(A1)
+    torch_A2 = sparse_matrix_to_torch_sparse(A2)
+    torch_A3 = torch.sparse.mm(torch_A1, torch_A2)
+    torch_A3_grad = sparse_matrix_to_torch_sparse(A3, grad)
+    torch_A3.backward(torch_A3_grad)
+
+    with torch.no_grad():
+        assert torch.allclose(A3.dense(), torch_A3.to_dense(), atol=1e-05)
+        assert torch.allclose(
+            val_like(A1, A1.val.grad).dense(),
+            torch_A1.grad.to_dense(),
+            atol=1e-05,
+        )
+        assert torch.allclose(
+            val_like(A2, A2.val.grad).dense(),
+            torch_A2.grad.to_dense(),
+            atol=1e-05,
+        )

@@ -53,6 +53,28 @@ torch::Tensor SDDMMNoAutoGrad(
     const c10::intrusive_ptr<SparseMatrix>& sparse_mat, torch::Tensor mat1,
     torch::Tensor mat2_tr);
 
+/**
+ * @brief Perform a sparse-sparse matrix multiplication with possibly different
+ * sparsities. The two sparse values must have 1-dimensional values. If the
+ * first sparse matrix has shape (n, m), the second sparse matrix must have
+ * shape (m, k), and the returned sparse matrix has shape (n, k).
+ *
+ * This function does not take care of autograd.
+ *
+ * @param lhs_mat The first sparse matrix of shape (n, m).
+ * @param lhs_val Sparse value for the first sparse matrix.
+ * @param rhs_mat The second sparse matrix of shape (m, k).
+ * @param rhs_val Sparse value for the second sparse matrix.
+ * @param lhs_transpose Whether the first matrix is transposed.
+ * @param rhs_transpose Whether the second matrix is transposed.
+ *
+ * @return Sparse matrix of shape (n, k).
+ */
+c10::intrusive_ptr<SparseMatrix> SpSpMMNoAutoGrad(
+    const c10::intrusive_ptr<SparseMatrix>& lhs_mat, torch::Tensor lhs_val,
+    const c10::intrusive_ptr<SparseMatrix>& rhs_mat, torch::Tensor rhs_val,
+    bool lhs_transpose, bool rhs_transpose);
+
 }  // namespace sparse
 }  // namespace dgl
 

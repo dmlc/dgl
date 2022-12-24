@@ -13,7 +13,7 @@ if not sys.platform.startswith("linux"):
 
 
 @pytest.mark.parametrize("create_func", [rand_coo, rand_csr, rand_csc])
-@pytest.mark.parametrize("shape", [(2, 3), (5, 2)])
+@pytest.mark.parametrize("shape", [(5, 5), (5, 4)])
 @pytest.mark.parametrize("nnz", [2, 10])
 @pytest.mark.parametrize("hidden", [1, 5])
 def test_sddmm(create_func, shape, nnz, hidden):
