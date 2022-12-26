@@ -4,14 +4,14 @@
 ------------------------------------------
 
 Before launching training jobs, DGL requires the input data to be partitioned
-and distributed to the target machines. In order to handle diffierent scales
+and distributed to the target machines. In order to handle different scales
 of graphs, DGL provides 2 partitioning approaches:
 
-* A partitioning API for relatively small graphs.
-* A distributed partition pipeline for relatively large graphs.
+* A partitioning API for graphs that can fit in a single machine memory.
+* A distributed partition pipeline for graphs beyond a single machine capacity.
 
-Partitioning API
-^^^^^^^^^^^^^^^^
+7.1.1 Partitioning API
+^^^^^^^^^^^^^^^^^^^^^^
 
 For relatively small graphs, DGL provides a partitioning API
 :func:`~dgl.distributed.partition_graph` that partitions
@@ -113,8 +113,42 @@ second dictionary contains the mapping for each edge type.
     orig_node_emb[node_map] = node_emb
 
 
-Parallel Data Preparation Pipeline
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Load partitioned graphs
+^^^^^^^^^^^^^^^^^^^^^^^
+
+DGL provides a :func:`dgl.distributed.load_partition` function to load one partition
+for inspection.
+
+.. code:: python
+
+  >>> import dgl
+  >>> # load partition 0
+  >>> part_data = dgl.distributed.load_partition('data_root_dir/graph_name.json', 0)
+  >>> g, nfeat, efeat, partition_book, graph_name, ntypes, etypes = part_data  # unpack
+  >>> print(g)
+  Graph(num_nodes=966043, num_edges=34270118,
+        ndata_schemes={'orig_id': Scheme(shape=(), dtype=torch.int64),
+                       'part_id': Scheme(shape=(), dtype=torch.int64),
+                       '_ID': Scheme(shape=(), dtype=torch.int64),
+                       'inner_node': Scheme(shape=(), dtype=torch.int32)}
+        edata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64),
+                       'inner_edge': Scheme(shape=(), dtype=torch.int8),
+                       'orig_id': Scheme(shape=(), dtype=torch.int64)})
+
+As mentioned in the `ID mapping`_ section, each partition carries auxiliary information
+saved as ndata or edata such as original node/edge IDs, partition IDs, etc. Each partition
+not only saves nodes/edges it owns, but also includes node/edges that are adjacent to
+the partition (called **HALO** nodes/edges). The ``inner_node`` and ``inner_edge``
+indicate whether a node/edge truely belongs to the partition (value is ``True``)
+or is a HALO node/edge (value is ``False``).
+
+The :func:`~dgl.distributed.load_partition` function loads all data at once. Users can
+load features or the partition book using the :func:`dgl.distributed.load_partition_feats`
+and :func:`dgl.distributed.load_partition_book` APIs respectively.
+
+
+7.1.2 Distributed Graph Partitioning Pipeline
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 To handle massive graph data that cannot fit in the CPU RAM of a
 single machine, DGL utilizes data chunking and parallel processing to reduce
@@ -471,35 +505,3 @@ is able to hold the entire graph data. Node ownership is determined by the resul
 of partitioning algorithm where as for edges the owner of the destination node
 also owns the edge as well.
 
-Load partitioned graphs
-^^^^^^^^^^^^^^^^^^^^^^^
-
-DGL provides a :func:`dgl.distributed.load_partition` function to load one partition
-for inspection.
-
-.. code:: python
-
-  >>> import dgl
-  >>> # load partition 0
-  >>> part_data = dgl.distributed.load_partition('data_root_dir/graph_name.json', 0)
-  >>> g, nfeat, efeat, partition_book, graph_name, ntypes, etypes = part_data  # unpack
-  >>> print(g)
-  Graph(num_nodes=966043, num_edges=34270118,
-        ndata_schemes={'orig_id': Scheme(shape=(), dtype=torch.int64),
-                       'part_id': Scheme(shape=(), dtype=torch.int64),
-                       '_ID': Scheme(shape=(), dtype=torch.int64),
-                       'inner_node': Scheme(shape=(), dtype=torch.int32)}
-        edata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64),
-                       'inner_edge': Scheme(shape=(), dtype=torch.int8),
-                       'orig_id': Scheme(shape=(), dtype=torch.int64)})
-
-As mentioned in the `ID mapping`_ section, each partition carries auxiliary information
-saved as ndata or edata such as original node/edge IDs, partition IDs, etc. Each partition
-not only saves nodes/edges it owns, but also includes node/edges that are adjacent to
-the partition (called **HALO** nodes/edges). The ``inner_node`` and ``inner_edge``
-indicate whether a node/edge truely belongs to the partition (value is ``True``)
-or is a HALO node/edge (value is ``False``).
-
-The :func:`~dgl.distributed.load_partition` function loads all data at once. Users can
-load features or the partition book using the :func:`dgl.distributed.load_partition_feats`
-and :func:`dgl.distributed.load_partition_book` APIs respectively.
