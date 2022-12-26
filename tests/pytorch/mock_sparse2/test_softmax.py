@@ -33,7 +33,7 @@ def test_softmax(val_D, csr):
         A.csr()
 
     A_max = softmax(A)
-    g = dgl.graph((col, row), num_nodes=A.shape[0])
+    g = dgl.graph((col, row), num_nodes=max(A.shape))
     val_g = val.clone().requires_grad_()
     score = dgl.nn.functional.edge_softmax(g, val_g)
     assert torch.allclose(A_max.val, score)
