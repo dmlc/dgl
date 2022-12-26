@@ -59,9 +59,7 @@ def test_spmm(create_func, shape, nnz, out_dim):
 @pytest.mark.parametrize("shape_k", [3, 4])
 @pytest.mark.parametrize("nnz1", [1, 10])
 @pytest.mark.parametrize("nnz2", [1, 10])
-def test_spspmm(
-    create_func1, create_func2, shape_n_m, shape_k, nnz1, nnz2
-):
+def test_spspmm(create_func1, create_func2, shape_n_m, shape_k, nnz1, nnz2):
     dev = F.ctx()
     shape1 = shape_n_m
     shape2 = (shape_n_m[1], shape_k)
@@ -89,6 +87,7 @@ def test_spspmm(
             torch_A2.grad.to_dense(),
             atol=1e-05,
         )
+
 
 def test_spspmm_duplicate():
     dev = F.ctx()

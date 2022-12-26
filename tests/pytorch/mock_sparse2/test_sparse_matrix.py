@@ -4,7 +4,12 @@ import sys
 
 import backend as F
 
-from dgl.mock_sparse2 import create_from_coo, create_from_csr, create_from_csc, val_like
+from dgl.mock_sparse2 import (
+    create_from_coo,
+    create_from_csr,
+    create_from_csc,
+    val_like,
+)
 
 # TODO(#4818): Skipping tests on win.
 if not sys.platform.startswith("linux"):
@@ -337,6 +342,7 @@ def test_csr_to_csc(dense_dim, indptr, indices, shape):
     assert torch.allclose(mat_indptr, indptr)
     assert torch.allclose(mat_indices, indices)
 
+
 @pytest.mark.parametrize("val_shape", [(3), (3, 2)])
 @pytest.mark.parametrize("shape", [(3, 5), (5, 5)])
 def test_val_like(val_shape, shape):
@@ -369,6 +375,7 @@ def test_val_like(val_shape, shape):
     csc_B = val_like(csc_A, new_val)
     check_val_like(csc_A, csc_B)
 
+
 def test_coalesce():
     ctx = F.ctx()
 
@@ -388,6 +395,7 @@ def test_coalesce():
     # Values of duplicate indices are added together.
     assert list(A_coalesced.val) == [3, 3, 0, 4]
     assert not A_coalesced.has_duplicate()
+
 
 def test_has_duplicate():
     ctx = F.ctx()

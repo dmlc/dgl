@@ -88,7 +88,6 @@ class SparseMatrix:
         """
         return self.coo()[1]
 
-
     def indices(
         self, fmt: str, return_shuffle=False
     ) -> Tuple[torch.Tensor, ...]:
