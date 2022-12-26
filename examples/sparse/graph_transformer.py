@@ -28,7 +28,8 @@ class SparseMHA(nn.Module):
 
     def forward(self, A, h):
         N = len(h)
-        q = self.q_proj(h).reshape(N, self.num_heads, self.head_dim) * self.scaling
+        q = self.q_proj(h).reshape(N, self.num_heads, self.head_dim) \
+            * self.scaling
         k = self.k_proj(h).reshape(N, self.num_heads, self.head_dim)
         v = self.v_proj(h).reshape(N, self.num_heads, self.head_dim)
 
