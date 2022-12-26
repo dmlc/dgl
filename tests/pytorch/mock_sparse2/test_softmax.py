@@ -41,4 +41,4 @@ def test_softmax(val_D, csr):
     grad = torch.randn_like(score).to(dev)
     A_max.val.backward(grad)
     score.backward(grad)
-    assert torch.allclose(A_max.val.grad, score.grad)
+    assert torch.allclose(A.val.grad, val_g.grad)
