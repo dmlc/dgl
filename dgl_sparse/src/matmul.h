@@ -35,24 +35,6 @@ torch::Tensor SpMMNoAutoGrad(
     torch::Tensor sparse_val, torch::Tensor dense_mat, bool transpose_sparse);
 
 /**
- * @brief Perform a generalized sparse matrix multiplication with copy_rhs op.
- * Mathematically, it calculates x_v = \psi({x_e | (u, v, e)\in G}), where
- * x_v is the returned feature on destination nodes, x_e is the edge feature,
- * \psi is reduce operator, and G is the graph.
- *
- * This function does not take care of autograd.
- *
- * @param sparse_mat The sparse matrix
- * @param sparse_val Non-zero values of the sparse matrix
- * @param reduce Reduce operator, can be sum, max, or min
- *
- * @return Dense tensor
- */
-torch::Tensor SpMMNoAutoGrad(
-    const c10::intrusive_ptr<SparseMatrix>& sparse_mat,
-    torch::Tensor sparse_val, const std::string& reduce);
-
-/**
  * @brief Perform a sampled matrix multiplication of a sparse matrix and two
  * dense matrices. It calculates `(mat1 @ mat2_tr^T) * spy(A)` and does consider
  * the values of the sparse matrix. For efficiency, `mat2_tr` is the
@@ -74,10 +56,9 @@ torch::Tensor SDDMMNoAutoGrad(
     torch::Tensor mat2_tr);
 
 /**
- * @brief Perform a variant of generalized sampled-dense-dense matrix
- * multiplication. Mathematically, it calculates x_e = \phi(x_e, x_v), where
- * x_e is the edge feature, x_v is the destination node feature, and \phi is
- * add, sub, mul, or div.
+ * @brief Broadcast the node feature to the edges and then compute
+ * x_e = \phi(x_e, x_v), where x_e is the edge feature, x_v is the destination
+ * node feature, and \phi is add, sub, mul, or div.
  *
  * This function does not take care of autograd.
  *
@@ -88,9 +69,60 @@ torch::Tensor SDDMMNoAutoGrad(
  *
  * @return Dense tensor of shape (nnz, D)
  */
-torch::Tensor SDDMMNoAutoGrad(
+torch::Tensor BroadcastOpNoAutoGrad(
     const c10::intrusive_ptr<SparseMatrix>& sparse_mat, torch::Tensor e,
     torch::Tensor v, const std::string& op);
+
+/**
+ * @brief Broadcast the node feature to the edges and then compute
+ * x_e = x_e - x_v, where x_e is the edge feature, x_v is the destination
+ * node feature.
+ *
+ * This function does not take care of autograd.
+ *
+ * @param sparse_mat The sparse matrix with nnz non-zero values and N rows
+ * @param e Edge feature of shape (nnz, D)
+ * @param v Destination node feature of shape (N, D)
+ *
+ * @return Dense tensor of shape (nnz, D)
+ */
+torch::Tensor BroadcastSubNoAutoGrad(
+    const c10::intrusive_ptr<SparseMatrix>& sparse_mat, torch::Tensor e,
+    torch::Tensor v);
+
+/**
+ * @brief Broadcast the node feature to the edges and then compute
+ * x_e = x_e / x_v, where x_e is the edge feature, x_v is the destination
+ * node feature.
+ *
+ * This function does not take care of autograd.
+ *
+ * @param sparse_mat The sparse matrix with nnz non-zero values and N rows
+ * @param e Edge feature of shape (nnz, D)
+ * @param v Destination node feature of shape (N, D)
+ *
+ * @return Dense tensor of shape (nnz, D)
+ */
+torch::Tensor BroadcastDivNoAutoGrad(
+    const c10::intrusive_ptr<SparseMatrix>& sparse_mat, torch::Tensor e,
+    torch::Tensor v);
+
+/**
+ * @brief Broadcast the node feature to the edges and then compute
+ * x_e = x_e * x_v, where x_e is the edge feature, x_v is the destination
+ * node feature.
+ *
+ * This function does not take care of autograd.
+ *
+ * @param sparse_mat The sparse matrix with nnz non-zero values and N rows
+ * @param e Edge feature of shape (nnz, D)
+ * @param v Destination node feature of shape (N, D)
+ *
+ * @return Dense tensor of shape (nnz, D)
+ */
+torch::Tensor BroadcastMulNoAutoGrad(
+    const c10::intrusive_ptr<SparseMatrix>& sparse_mat, torch::Tensor e,
+    torch::Tensor v);
 
 /**
  * @brief Perform a sparse-sparse matrix multiplication with possibly different

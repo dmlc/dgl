@@ -4,6 +4,7 @@
  * @brief DGL C++ Softmax operator implementation
  */
 
+#include <sparse/reduction.h>
 #include <sparse/sparse_matrix.h>
 #include <torch/script.h>
 
@@ -27,12 +28,13 @@ class SoftmaxAutoGrad : public Function<SoftmaxAutoGrad> {
 torch::Tensor SoftmaxAutoGrad::forward(
     AutogradContext* ctx, c10::intrusive_ptr<SparseMatrix> sparse_mat,
     torch::Tensor sparse_val) {
-  auto sparse_val_max = SpMMNoAutoGrad(sparse_mat, sparse_val, "max");
+  // Reduce by columns with dim 1.
+  auto sparse_val_max = ReduceMax(sparse_mat, 1);
   auto sparse_val_exp =
-      SDDMMNoAutoGrad(sparse_mat, sparse_val, sparse_val_max, "sub").exp();
-  auto sparse_val_sum = SpMMNoAutoGrad(sparse_mat, sparse_val_exp, "sum");
+      BroadcastSubNoAutoGrad(sparse_mat, sparse_val, sparse_val_max).exp();
+  auto sparse_val_sum = ReduceSum(CreateValLike(sparse_mat, sparse_val_exp), 1);
   auto sparse_score =
-      SDDMMNoAutoGrad(sparse_mat, sparse_val_exp, sparse_val_sum, "div");
+      BroadcastDivNoAutoGrad(sparse_mat, sparse_val_exp, sparse_val_sum);
 
   const bool sparse_requires_grad = sparse_val.requires_grad();
   torch::Tensor cache_sparse_score;
@@ -59,9 +61,9 @@ tensor_list SoftmaxAutoGrad::backward(
   torch::Tensor sparse_val_grad;
   if (sparse_requires_grad) {
     auto sds = sparse_score * output_grad;
-    auto accum = SpMMNoAutoGrad(sparse_mat, sds, "sum");
+    auto accum = ReduceSum(CreateValLike(sparse_mat, sds), 1);
     sparse_val_grad =
-        sds - SDDMMNoAutoGrad(sparse_mat, sparse_score, accum, "mul");
+        sds - BroadcastMulNoAutoGrad(sparse_mat, sparse_score, accum);
   }
 
   return {torch::Tensor(), sparse_val_grad};
@@ -71,11 +73,15 @@ c10::intrusive_ptr<SparseMatrix> Softmax(
     const c10::intrusive_ptr<SparseMatrix>& sparse_mat) {
   auto sparse_val = sparse_mat->value();
   bool expand_dim = false;
+  auto new_sparse_mat = sparse_mat;
   if (sparse_val.dim() == 1) {
     sparse_val = sparse_val.view({-1, 1});
     expand_dim = true;
+    new_sparse_mat = CreateValLike(sparse_mat, sparse_val);
   }
-  auto new_sparse_val = SoftmaxAutoGrad::apply(sparse_mat, sparse_val);
+
+  auto new_sparse_val = SoftmaxAutoGrad::apply(new_sparse_mat, sparse_val);
+
   if (expand_dim) {
     new_sparse_val = new_sparse_val.view(-1);
   }
