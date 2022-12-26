@@ -1,7 +1,7 @@
 /**
  *  Copyright (c) 2022 by Contributors
- * @file elementwise_op.cc
- * @brief DGL C++ sparse elementwise operator implementation.
+ * @file sparse_matrix_coalesce.cc
+ * @brief Operators related to sparse matrix coalescing.
  */
 // clang-format off
 #include <sparse/dgl_headers.h>

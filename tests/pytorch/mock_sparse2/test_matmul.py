@@ -4,7 +4,7 @@ import backend as F
 import pytest
 import torch
 
-from dgl.mock_sparse2 import val_like
+from dgl.mock_sparse2 import val_like, create_from_coo
 
 from .utils import (
     clone_detach_and_grad,
@@ -59,7 +59,7 @@ def test_spmm(create_func, shape, nnz, out_dim):
 @pytest.mark.parametrize("shape_k", [3, 4])
 @pytest.mark.parametrize("nnz1", [1, 10])
 @pytest.mark.parametrize("nnz2", [1, 10])
-def test_sparse_sparse_mm(
+def test_spspmm(
     create_func1, create_func2, shape_n_m, shape_k, nnz1, nnz2
 ):
     dev = F.ctx()
@@ -89,3 +89,32 @@ def test_sparse_sparse_mm(
             torch_A2.grad.to_dense(),
             atol=1e-05,
         )
+
+def test_spspmm_duplicate():
+    dev = F.ctx()
+
+    row = torch.tensor([1, 0, 0, 0, 1]).to(dev)
+    col = torch.tensor([1, 1, 1, 2, 2]).to(dev)
+    val = torch.randn(len(row)).to(dev)
+    shape = (4, 4)
+    A1 = create_from_coo(row, col, val, shape)
+
+    row = torch.tensor([1, 0, 0, 1]).to(dev)
+    col = torch.tensor([1, 1, 2, 2]).to(dev)
+    val = torch.randn(len(row)).to(dev)
+    shape = (4, 4)
+    A2 = create_from_coo(row, col, val, shape)
+
+    try:
+        A1 @ A2
+    except:
+        pass
+    else:
+        assert False, "Should raise error."
+
+    try:
+        A2 @ A1
+    except:
+        pass
+    else:
+        assert False, "Should raise error."
