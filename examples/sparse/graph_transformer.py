@@ -3,23 +3,25 @@
 (https://arxiv.org/abs/2012.09699)
 """
 
+import dgl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import dgl
+
 from dgl.data import CoraGraphDataset
-from dgl.mock_sparse import create_from_coo, bspmm, mock_bsddmm as bsddmm
+from dgl.mock_sparse import bspmm, create_from_coo, mock_bsddmm as bsddmm
 from torch.optim import Adam
 
 
 class SparseMHA(nn.Module):
     """Sparse Multi-head Attention Module"""
+
     def __init__(self, hidden_size=80, num_heads=8):
         super().__init__()
         self.hidden_size = hidden_size
         self.num_heads = num_heads
         self.head_dim = hidden_size // num_heads
-        self.scaling = self.head_dim ** -0.5
+        self.scaling = self.head_dim**-0.5
 
         self.q_proj = nn.Linear(hidden_size, hidden_size)
         self.k_proj = nn.Linear(hidden_size, hidden_size)
@@ -45,6 +47,7 @@ class SparseMHA(nn.Module):
 
 class GTLayer(nn.Module):
     """Graph Transformer Layer"""
+
     def __init__(self, hidden_size=80, num_heads=8) -> None:
         super().__init__()
         self.MHA = SparseMHA(hidden_size=hidden_size, num_heads=num_heads)
@@ -67,22 +70,27 @@ class GTLayer(nn.Module):
 
 class GTModel(nn.Module):
     def __init__(
-        self, in_size, out_size, hidden_size=80, pos_enc_size=2,
-        num_layers=4, num_heads=8
+        self,
+        in_size,
+        out_size,
+        hidden_size=64,
+        pos_enc_size=2,
+        num_layers=6,
+        num_heads=8
     ):
         super().__init__()
         self.h_linear = nn.Linear(in_size, hidden_size)
         self.pos_linear = nn.Linear(pos_enc_size, hidden_size)
         self.out_linear = nn.Linear(hidden_size, out_size)
-        self.layers = nn.ModuleList([
-            GTLayer(hidden_size, num_heads) for _ in range(num_layers)
-        ])
+        self.layers = nn.ModuleList(
+            [GTLayer(hidden_size, num_heads) for _ in range(num_layers)]
+        )
 
     def forward(self, A, X, pos_enc):
         h = self.h_linear(X) + self.pos_linear(pos_enc)
         for layer in self.layers:
             h = layer(A, h)
-        
+
         return self.out_linear(h)
 
 
@@ -100,10 +108,10 @@ def evaluate(g, pred):
 def train(model, g, A, X, pos_enc):
     label = g.ndata["label"]
     train_mask = g.ndata["train_mask"]
-    optimizer = Adam(model.parameters(), lr=1e-2, weight_decay=5e-4)
+    optimizer = Adam(model.parameters(), lr=1e-3, weight_decay=5e-4)
     loss_fcn = nn.CrossEntropyLoss()
 
-    for epoch in range(200):
+    for epoch in range(20):
         model.train()
 
         # Forward.
@@ -122,11 +130,10 @@ def train(model, g, A, X, pos_enc):
 
         # Evaluate the prediction.
         val_acc, test_acc = evaluate(g, pred)
-        if epoch % 20 == 0:
-            print(
-                f"In epoch {epoch}, loss: {loss:.3f}, val acc: {val_acc:.3f}"
-                f", test acc: {test_acc:.3f}"
-            )
+        print(
+            f"In epoch {epoch}, loss: {loss:.3f}, val acc: {val_acc:.3f}"
+            f", test acc: {test_acc:.3f}"
+        )
 
 
 if __name__ == "__main__":
