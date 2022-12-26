@@ -30,8 +30,8 @@ class SparseMHA(nn.Module):
 
     def forward(self, A, h):
         N = len(h)
-        q = self.q_proj(h).reshape(N, self.num_heads, self.head_dim) \
-            * self.scaling
+        q = self.q_proj(h).reshape(N, self.num_heads, self.head_dim)
+        q *= self.scaling
         k = self.k_proj(h).reshape(N, self.num_heads, self.head_dim)
         v = self.v_proj(h).reshape(N, self.num_heads, self.head_dim)
 
@@ -76,7 +76,7 @@ class GTModel(nn.Module):
         hidden_size=64,
         pos_enc_size=2,
         num_layers=6,
-        num_heads=8
+        num_heads=8,
     ):
         super().__init__()
         self.h_linear = nn.Linear(in_size, hidden_size)
