@@ -166,6 +166,7 @@ torch::Tensor SDDMMNoAutoGrad(
         0 /* rhs target: u due to transpose */);
   }
   return ret;
+}
 
 c10::intrusive_ptr<SparseMatrix> SpSpMMNoAutoGrad(
     const c10::intrusive_ptr<SparseMatrix>& lhs_mat, torch::Tensor lhs_val,

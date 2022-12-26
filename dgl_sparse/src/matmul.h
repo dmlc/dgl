@@ -92,6 +92,7 @@ torch::Tensor SDDMMNoAutoGrad(
     const c10::intrusive_ptr<SparseMatrix>& sparse_mat, torch::Tensor e,
     torch::Tensor v, const std::string& op);
 
+/**
  * @brief Perform a sparse-sparse matrix multiplication with possibly different
  * sparsities. The two sparse values must have 1-dimensional values. If the
  * first sparse matrix has shape (n, m), the second sparse matrix must have

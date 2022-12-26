@@ -43,7 +43,7 @@ TORCH_LIBRARY(dgl_sparse, m) {
       .def("val_like", &CreateValLike)
       .def("spmm", &SpMM)
       .def("sddmm", &SDDMM)
-      .def("softmax", &Softmax);
+      .def("softmax", &Softmax)
       .def("spspmm", &SpSpMM);
 }
 
