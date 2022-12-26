@@ -368,3 +368,45 @@ def test_val_like(val_shape, shape):
     csc_A = create_from_csc(indptr, indices, val, shape)
     csc_B = val_like(csc_A, new_val)
     check_val_like(csc_A, csc_B)
+
+def test_coalesce():
+    ctx = F.ctx()
+
+    row = torch.tensor([1, 0, 0, 0, 1]).to(ctx)
+    col = torch.tensor([1, 1, 1, 2, 2]).to(ctx)
+    val = torch.arange(len(row)).to(ctx)
+    A = create_from_coo(row, col, val, (4, 4))
+
+    assert A.has_duplicate()
+
+    A_coalesced = A.coalesce()
+
+    assert A_coalesced.nnz == 4
+    assert A_coalesced.shape == (4, 4)
+    assert list(A_coalesced.row) == [0, 0, 1, 1]
+    assert list(A_coalesced.col) == [1, 2, 1, 2]
+    # Values of duplicate indices are added together.
+    assert list(A_coalesced.val) == [3, 3, 0, 4]
+    assert not A_coalesced.has_duplicate()
+
+def test_has_duplicate():
+    ctx = F.ctx()
+
+    row = torch.tensor([1, 0, 0, 0, 1]).to(ctx)
+    col = torch.tensor([1, 1, 1, 2, 2]).to(ctx)
+    val = torch.arange(len(row)).to(ctx)
+    shape = (4, 4)
+
+    # COO
+    coo_A = create_from_coo(row, col, val, shape)
+    assert coo_A.has_duplicate()
+
+    # CSR
+    indptr, indices, _ = coo_A.csr()
+    csr_A = create_from_csr(indptr, indices, val, shape)
+    assert csr_A.has_duplicate()
+
+    # CSC
+    indptr, indices, _ = coo_A.csc()
+    csc_A = create_from_csc(indptr, indices, val, shape)
+    assert csc_A.has_duplicate()

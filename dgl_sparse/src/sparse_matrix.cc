@@ -32,7 +32,8 @@ SparseMatrix::SparseMatrix(
     CHECK_EQ(coo->row.dim(), 1);
     CHECK_EQ(coo->col.dim(), 1);
     CHECK_EQ(coo->row.size(0), coo->col.size(0));
-    CHECK_EQ(coo->row.size(0), value.size(0));
+    //CHECK_EQ(coo->row.size(0), value.size(0));
+    TORCH_CHECK(coo->row.size(0) == value.size(0), "Error");
     CHECK_EQ(coo->row.device(), value.device());
     CHECK_EQ(coo->col.device(), value.device());
   }
