@@ -88,6 +88,8 @@ def main():
                 },
                 refresh=False,
             )
+    
+    print(f"Test acc: {test_acc:.3f}")
 
 if __name__ == '__main__':
     main()

@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from dgl.data import CoraGraphDataset
-from dgl.mock_sparse import create_from_coo, diag, identity
+from dgl.mock_sparse2 import create_from_coo, diag, identity
 from torch.optim import Adam
 
 

@@ -2,6 +2,7 @@
 Hypergraph Convolution and Hypergraph Attention
 (https://arxiv.org/pdf/1901.08150.pdf).
 """
+import argparse
 import dgl
 import dgl.mock_sparse as dglsp
 import torch
@@ -39,7 +40,7 @@ class HypergraphAttention(nn.Module):
         sim = self.a(torch.cat([Z[H.row], Z_edges[H.col]], 1))
         sim = F.leaky_relu(sim, 0.2).squeeze(1)
         # Reassign the hypergraph new weights.
-        H_att = dglsp.create_from_coo(H.row, H.col, sim, shape=H.shape)
+        H_att = dglsp.val_like(H, sim)
         H_att = H_att.softmax()
         return hypergraph_laplacian(H_att) @ Z
 
@@ -94,12 +95,12 @@ def load_data():
     test_mask = graph.ndata["test_mask"]
     return H, X, Y, dataset.num_classes, train_mask, val_mask, test_mask
 
-def main():
+def main(args):
     H, X, Y, num_classes, train_mask, val_mask, test_mask = load_data()
     model = Net(X.shape[1], num_classes)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
-    with tqdm.trange(500) as tq:
+    with tqdm.trange(args.epochs) as tq:
         for epoch in tq:
             loss = train(model, optimizer, H, X, Y, train_mask)
             val_acc, test_acc = evaluate(model, H, X, Y, val_mask, test_mask)
@@ -112,5 +113,15 @@ def main():
                 refresh=False,
             )
 
+    print(f"Test acc: {test_acc:.3f}")
+
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser(description="Hypergraph Attention Example")
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=500,
+        help="Number of training epochs."
+    )
+    args = parser.parse_args()
+    main(args)
