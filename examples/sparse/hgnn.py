@@ -3,7 +3,7 @@ Hypergraph Neural Networks (https://arxiv.org/pdf/1809.09401.pdf)
 """
 import dgl
 import dgl.data
-import dgl.mock_sparse as dglsp
+import dgl.mock_sparse2 as dglsp
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

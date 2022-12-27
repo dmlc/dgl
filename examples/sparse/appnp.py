@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from dgl.data import CoraGraphDataset
-from dgl.mock_sparse import create_from_coo, diag, identity
+from dgl.mock_sparse import create_from_coo, diag, identity, val_like
 from torch.optim import Adam
 
 
@@ -35,13 +35,10 @@ class APPNP(nn.Module):
         self.alpha = alpha
 
     def forward(self, A_hat, X):
-        A_val_0 = A_hat.val
         Z_0 = Z = self.f_theta(X)
         for _ in range(self.num_hops):
-            A_hat.val = self.A_dropout(A_val_0)
-            Z = (1 - self.alpha) * A_hat @ Z + self.alpha * Z_0
-        # Reset A_hat.val to avoid value corruption.
-        A_hat.val = A_val_0
+            A_drop = val_like(A_hat, self.A_dropout(A_hat.val))
+            Z = (1 - self.alpha) * A_drop @ Z + self.alpha * Z_0
         return Z
 
 
