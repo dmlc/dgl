@@ -119,14 +119,13 @@ def _divide_by_worker(dataset, batch_size, drop_last):
     num_samples = dataset.shape[0]
     worker_info = torch.utils.data.get_worker_info()
     if worker_info:
-        num_batches = (num_samples + (0 if drop_last else batch_size - 1)) // batch_size
-        num_batches_per_worker = num_batches // worker_info.num_workers
-        left_over = num_batches % worker_info.num_workers
-        start = (num_batches_per_worker * worker_info.id) + min(left_over, worker_info.id)
-        end = start + num_batches_per_worker + (worker_info.id < left_over)
-        start *= batch_size
-        end = min(end * batch_size, num_samples)
-        dataset = dataset[start:end]
+        num_batches = (
+            num_samples + (0 if drop_last else batch_size - 1)
+        ) // batch_size
+        segments = []
+        for i in range(worker_info.id, num_batches, worker_info.num_workers):
+            segments.append(dataset[i * batch_size : (i + 1) * batch_size])
+        dataset = torch.concat(segments)
     return dataset
 
 
