@@ -10,6 +10,7 @@
 #include <sparse/elementwise_op.h>
 #include <sparse/reduction.h>
 #include <sparse/sddmm.h>
+#include <sparse/softmax.h>
 #include <sparse/sparse_matrix.h>
 #include <sparse/spmm.h>
 #include <sparse/spspmm.h>
@@ -42,6 +43,7 @@ TORCH_LIBRARY(dgl_sparse, m) {
       .def("val_like", &CreateValLike)
       .def("spmm", &SpMM)
       .def("sddmm", &SDDMM)
+      .def("softmax", &Softmax)
       .def("spspmm", &SpSpMM);
 }
 
