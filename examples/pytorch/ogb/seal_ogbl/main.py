@@ -1,7 +1,6 @@
 import argparse
 import math
 import os
-import random
 import sys
 import time
 
@@ -21,7 +20,12 @@ from torch.nn import (
 from tqdm import tqdm
 
 import dgl
-from dgl.dataloading import DataLoader, Sampler
+from dgl.dataloading import (
+    DataLoader,
+    Sampler,
+    set_node_lazy_features,
+    set_edge_lazy_features
+)
 from dgl.nn import GraphConv, SortPooling
 from dgl.sampling import global_uniform_negative_sampling
 
@@ -120,7 +124,8 @@ class SealSampler(Sampler):
         for eid in seed_edges:
             src, dst = map(int, aug_g.find_edges(eid))
             # construct the enclosing graph
-            visited, nodes, fringe = [np.unique([src, dst]) for _ in range(3)]
+            nodes = [src, dst]
+            visited, fringe = np.unique([src, dst]), np.unique([src, dst])
             for _ in range(self.num_hops):
                 if not self.directed:
                     _, fringe = g.out_edges(fringe)
@@ -138,7 +143,7 @@ class SealSampler(Sampler):
                     )
                 if len(fringe) == 0:
                     break
-                nodes = np.union1d(nodes, fringe)
+                nodes = nodes + fringe.tolist()
             subg = g.subgraph(nodes, store_ids=True)
 
             # remove edges to predict
@@ -160,8 +165,8 @@ class SealSampler(Sampler):
             subgraphs.append(subg_aug)
 
         subgraphs = dgl.batch(subgraphs)
-        dgl.set_src_lazy_features(subg_aug, self.prefetch_node_feats)
-        dgl.set_edge_lazy_features(subg_aug, self.prefetch_edge_feats)
+        set_node_lazy_features(subgraphs, self.prefetch_node_feats)
+        set_edge_lazy_features(subgraphs, self.prefetch_edge_feats)
 
         return subgraphs, aug_g.edata["y"][seed_edges]
 
@@ -463,12 +468,12 @@ if __name__ == "__main__":
 
     # reconstruct the graph for ogbl-collab data for validation edge augmentation and coalesce
     if args.dataset == "ogbl-collab":
+        # float edata for to_simple transform
+        graph.edata.pop("year")
+        graph.edata["weight"] = graph.edata["weight"].to(torch.float)
         if args.use_valedges_as_input:
             val_edges = split_edge["valid"]["edge"]
             row, col = val_edges.t()
-            # float edata for to_simple transform
-            graph.edata.pop("year")
-            graph.edata["weight"] = graph.edata["weight"].to(torch.float)
             val_weights = torch.ones(size=(val_edges.size(0), 1))
             graph.add_edges(
                 torch.cat([row, col]),
