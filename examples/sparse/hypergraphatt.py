@@ -11,6 +11,7 @@ import torch.nn.functional as F
 from torchmetrics.functional import accuracy
 import tqdm
 
+
 def hypergraph_laplacian(H):
     ###########################################################
     # (HIGHLIGHT) Compute the Laplacian with Sparse Matrix API
@@ -23,11 +24,13 @@ def hypergraph_laplacian(H):
     W = dglsp.identity((n_edges, n_edges))
     return D_V_invsqrt @ H @ W @ D_E_inv @ H.T @ D_V_invsqrt
 
+
 class HypergraphAttention(nn.Module):
     """Hypergraph Attention module as in the paper
     `Hypergraph Convolution and Hypergraph Attention
     <https://arxiv.org/pdf/1901.08150.pdf>`_.
     """
+
     def __init__(self, in_size, out_size):
         super().__init__()
 
@@ -44,6 +47,7 @@ class HypergraphAttention(nn.Module):
         H_att = H_att.softmax()
         return hypergraph_laplacian(H_att) @ Z
 
+
 class Net(nn.Module):
     def __init__(self, in_size, out_size, hidden_size=16):
         super().__init__()
@@ -57,6 +61,7 @@ class Net(nn.Module):
         Z = self.layer2(H, Z, Z)
         return Z
 
+
 def train(model, optimizer, H, X, Y, train_mask):
     model.train()
     Y_hat = model(H, X)
@@ -66,12 +71,14 @@ def train(model, optimizer, H, X, Y, train_mask):
     optimizer.step()
     return loss.item()
 
+
 def evaluate(model, H, X, Y, val_mask, test_mask):
     model.eval()
     Y_hat = model(H, X)
     val_acc = accuracy(Y_hat[val_mask], Y[val_mask])
     test_acc = accuracy(Y_hat[test_mask], Y[test_mask])
     return val_acc, test_acc
+
 
 def load_data():
     dataset = dgl.data.CoraGraphDataset()
@@ -95,6 +102,7 @@ def load_data():
     test_mask = graph.ndata["test_mask"]
     return H, X, Y, dataset.num_classes, train_mask, val_mask, test_mask
 
+
 def main(args):
     H, X, Y, num_classes, train_mask, val_mask, test_mask = load_data()
     model = Net(X.shape[1], num_classes)
@@ -115,13 +123,11 @@ def main(args):
 
     print(f"Test acc: {test_acc:.3f}")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Hypergraph Attention Example")
     parser.add_argument(
-        "--epochs",
-        type=int,
-        default=500,
-        help="Number of training epochs."
+        "--epochs", type=int, default=500, help="Number of training epochs."
     )
     args = parser.parse_args()
     main(args)
