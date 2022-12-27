@@ -31,10 +31,10 @@ torch::Tensor SoftmaxAutoGrad::forward(
   // Reduce by columns with dim 1.
   auto sparse_val_max = ReduceMax(sparse_mat, 1);
   auto sparse_val_exp =
-      BroadcastSubNoAutoGrad(sparse_mat, sparse_val, sparse_val_max).exp();
+      BroadcastSubNoAutoGrad(sparse_mat, sparse_val_max).exp();
   auto sparse_val_sum = ReduceSum(CreateValLike(sparse_mat, sparse_val_exp), 1);
-  auto sparse_score =
-      BroadcastDivNoAutoGrad(sparse_mat, sparse_val_exp, sparse_val_sum);
+  auto sparse_score = BroadcastDivNoAutoGrad(
+      CreateValLike(sparse_mat, sparse_val_exp), sparse_val_sum);
 
   const bool sparse_requires_grad = sparse_val.requires_grad();
   torch::Tensor cache_sparse_score;
@@ -62,8 +62,8 @@ tensor_list SoftmaxAutoGrad::backward(
   if (sparse_requires_grad) {
     auto sds = sparse_score * output_grad;
     auto accum = ReduceSum(CreateValLike(sparse_mat, sds), 1);
-    sparse_val_grad =
-        sds - BroadcastMulNoAutoGrad(sparse_mat, sparse_score, accum);
+    sparse_val_grad = sds - BroadcastMulNoAutoGrad(
+                                CreateValLike(sparse_mat, sparse_score), accum);
   }
 
   return {torch::Tensor(), sparse_val_grad};

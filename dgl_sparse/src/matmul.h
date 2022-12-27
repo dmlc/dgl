@@ -56,73 +56,69 @@ torch::Tensor SDDMMNoAutoGrad(
     torch::Tensor mat2_tr);
 
 /**
- * @brief Broadcast the node feature to the edges and then compute
- * x_e = \phi(x_e, x_v), where x_e is the edge feature, x_v is the destination
- * node feature, and \phi is add, sub, mul, or div.
+ * @brief Broadcast the dense feature to the nonzero entries and then compute
+ * x_e = \phi(x_e, x_v), where x_e is the nonzero value, x_v is the dense
+ * feature, and \phi is add, sub, mul, or div.
  *
  * This function does not take care of autograd.
  *
- * @param sparse_mat The sparse matrix with nnz non-zero values and N rows
- * @param e Edge feature of shape (nnz, D)
- * @param v Destination node feature of shape (N, D)
+ * @param sparse_mat The sparse matrix with N rows and (nnz, D) nonzero values
+ * @param dense_mat Dense feature of shape (N, D)
  * @param op Operator, can be add, sub, mul, or div
  *
  * @return Dense tensor of shape (nnz, D)
  */
 torch::Tensor BroadcastOpNoAutoGrad(
-    const c10::intrusive_ptr<SparseMatrix>& sparse_mat, torch::Tensor e,
-    torch::Tensor v, const std::string& op);
+    const c10::intrusive_ptr<SparseMatrix>& sparse_mat, torch::Tensor dense_mat,
+    const std::string& op);
 
 /**
- * @brief Broadcast the node feature to the edges and then compute
- * x_e = x_e - x_v, where x_e is the edge feature, x_v is the destination
- * node feature.
+ * @brief Broadcast the dense feature to the nonzero entries and then compute
+ * x_e = x_e - x_v, where x_e is the nonzero value, x_v is the dense
+ * feature.
  *
  * This function does not take care of autograd.
  *
- * @param sparse_mat The sparse matrix with nnz non-zero values and N rows
- * @param e Edge feature of shape (nnz, D)
- * @param v Destination node feature of shape (N, D)
+ * @param sparse_mat The sparse matrix with N rows and (nnz, D) nonzero values
+ * @param dense_mat Dense feature of shape (N, D)
  *
  * @return Dense tensor of shape (nnz, D)
  */
 torch::Tensor BroadcastSubNoAutoGrad(
-    const c10::intrusive_ptr<SparseMatrix>& sparse_mat, torch::Tensor e,
-    torch::Tensor v);
+    const c10::intrusive_ptr<SparseMatrix>& sparse_mat,
+    torch::Tensor dense_mat);
 
 /**
- * @brief Broadcast the node feature to the edges and then compute
- * x_e = x_e / x_v, where x_e is the edge feature, x_v is the destination
- * node feature.
+ * @brief Broadcast the dense feature to the nonzero entries and then compute
+ * x_e = x_e / x_v, where x_e is the nonzero value, x_v is the dense
+ * feature.
  *
  * This function does not take care of autograd.
  *
- * @param sparse_mat The sparse matrix with nnz non-zero values and N rows
- * @param e Edge feature of shape (nnz, D)
- * @param v Destination node feature of shape (N, D)
+ * @param sparse_mat The sparse matrix with N rows and (nnz, D) nonzero values
+ * @param dense_mat Dense feature of shape (N, D)
  *
  * @return Dense tensor of shape (nnz, D)
  */
 torch::Tensor BroadcastDivNoAutoGrad(
-    const c10::intrusive_ptr<SparseMatrix>& sparse_mat, torch::Tensor e,
-    torch::Tensor v);
+    const c10::intrusive_ptr<SparseMatrix>& sparse_mat,
+    torch::Tensor dense_mat);
 
 /**
- * @brief Broadcast the node feature to the edges and then compute
- * x_e = x_e * x_v, where x_e is the edge feature, x_v is the destination
- * node feature.
+ * @brief Broadcast the dense feature to the nonzero entries and then compute
+ * x_e = x_e * x_v, where x_e is the nonzero value, x_v is the dense
+ * feature.
  *
  * This function does not take care of autograd.
  *
- * @param sparse_mat The sparse matrix with nnz non-zero values and N rows
- * @param e Edge feature of shape (nnz, D)
- * @param v Destination node feature of shape (N, D)
+ * @param sparse_mat The sparse matrix with N rows and (nnz, D) nonzero values
+ * @param dense_mat Dense feature of shape (N, D)
  *
  * @return Dense tensor of shape (nnz, D)
  */
 torch::Tensor BroadcastMulNoAutoGrad(
-    const c10::intrusive_ptr<SparseMatrix>& sparse_mat, torch::Tensor e,
-    torch::Tensor v);
+    const c10::intrusive_ptr<SparseMatrix>& sparse_mat,
+    torch::Tensor dense_mat);
 
 /**
  * @brief Perform a sparse-sparse matrix multiplication with possibly different

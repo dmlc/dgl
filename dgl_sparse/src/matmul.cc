@@ -99,50 +99,51 @@ torch::Tensor SDDMMNoAutoGrad(
 }
 
 torch::Tensor BroadcastOpNoAutoGrad(
-    const c10::intrusive_ptr<SparseMatrix>& sparse_mat, torch::Tensor e,
-    torch::Tensor v, const std::string& op) {
+    const c10::intrusive_ptr<SparseMatrix>& sparse_mat, torch::Tensor dense_mat,
+    const std::string& op) {
+  auto sparse_val = sparse_mat->value();
   const int64_t out_row = sparse_mat->nnz();
-  const std::vector<int64_t> shape({out_row, e.size(1)});
-  auto ret = torch::zeros(shape, e.options());
+  const std::vector<int64_t> shape({out_row, sparse_val.size(1)});
+  auto ret = torch::zeros(shape, sparse_val.options());
 
-  auto dgl_e = TorchTensorToDGLArray(e);
-  auto dgl_v = TorchTensorToDGLArray(v);
+  auto dgl_sparse_val = TorchTensorToDGLArray(sparse_val);
+  auto dgl_dense_mat = TorchTensorToDGLArray(dense_mat);
   auto dgl_ret = TorchTensorToDGLArray(ret);
 
-  // The format for calculation will be chosen in the following order: CSR,
-  // COO. CSR is created if the sparse matrix only has CSC format.
-  if (sparse_mat->HasCSR() || !sparse_mat->HasCOO()) {
-    // sparse_mat->CSRPtr() will implicitly convert CSC to CSR format if CSR
+  // The format for calculation will be chosen in the following order: COO, CSR
+  // . COO is created if the sparse matrix only has CSC format.
+  if (sparse_mat->HasCOO() || !sparse_mat->HasCSR()) {
+    // sparse_mat->COOPtr() will implicitly convert CSC to COO format if COO
     // does not exist.
-    auto csr = CSRToOldDGLCSR(sparse_mat->CSRPtr());
-    aten::CSRSDDMM(
-        op.c_str(), csr, dgl_e, dgl_v, dgl_ret, 1 /* Lhs target: e */,
-        0 /* rhs target: u due to transpose */);
-  } else {  // COO
     auto coo = COOToOldDGLCOO(sparse_mat->COOPtr());
     aten::COOSDDMM(
-        op.c_str(), coo, dgl_e, dgl_v, dgl_ret, 1 /* Lhs target: e */,
-        0 /* rhs target: u due to transpose */);
+        op.c_str(), coo, dgl_sparse_val, dgl_dense_mat, dgl_ret,
+        1 /* Lhs target: e */, 0 /* rhs target: u due to transpose */);
+  } else {
+    auto csr = CSRToOldDGLCSR(sparse_mat->CSRPtr());
+    aten::CSRSDDMM(
+        op.c_str(), csr, dgl_sparse_val, dgl_dense_mat, dgl_ret,
+        1 /* Lhs target: e */, 0 /* rhs target: u due to transpose */);
   }
   return ret;
 }
 
 torch::Tensor BroadcastSubNoAutoGrad(
-    const c10::intrusive_ptr<SparseMatrix>& sparse_mat, torch::Tensor e,
-    torch::Tensor v) {
-  return BroadcastOpNoAutoGrad(sparse_mat, e, v, "sub");
+    const c10::intrusive_ptr<SparseMatrix>& sparse_mat,
+    torch::Tensor dense_mat) {
+  return BroadcastOpNoAutoGrad(sparse_mat, dense_mat, "sub");
 }
 
 torch::Tensor BroadcastDivNoAutoGrad(
-    const c10::intrusive_ptr<SparseMatrix>& sparse_mat, torch::Tensor e,
-    torch::Tensor v) {
-  return BroadcastOpNoAutoGrad(sparse_mat, e, v, "div");
+    const c10::intrusive_ptr<SparseMatrix>& sparse_mat,
+    torch::Tensor dense_mat) {
+  return BroadcastOpNoAutoGrad(sparse_mat, dense_mat, "div");
 }
 
 torch::Tensor BroadcastMulNoAutoGrad(
-    const c10::intrusive_ptr<SparseMatrix>& sparse_mat, torch::Tensor e,
-    torch::Tensor v) {
-  return BroadcastOpNoAutoGrad(sparse_mat, e, v, "mul");
+    const c10::intrusive_ptr<SparseMatrix>& sparse_mat,
+    torch::Tensor dense_mat) {
+  return BroadcastOpNoAutoGrad(sparse_mat, dense_mat, "mul");
 }
 
 c10::intrusive_ptr<SparseMatrix> SpSpMMNoAutoGrad(
