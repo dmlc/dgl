@@ -24,7 +24,11 @@ torch::Tensor SpMMNoAutoGrad(
   const std::string reduce = "sum";
   const int64_t out_row =
       transpose_sparse ? sparse_mat->shape()[1] : sparse_mat->shape()[0];
-  const std::vector<int64_t> shape = {out_row, dense_mat.size(1)};
+  std::vector<int64_t> shape = {out_row, dense_mat.size(1)};
+  // Batched SpMM
+  if (sparse_val.dim() >= 2) {
+    shape = {out_row, dense_mat.size(1), sparse_val.size(1)};
+  }
 
   auto ret = torch::zeros(shape, dense_mat.options());
   auto dgl_sparse_val = TorchTensorToDGLArray(sparse_val);
@@ -74,7 +78,15 @@ torch::Tensor SDDMMNoAutoGrad(
     const c10::intrusive_ptr<SparseMatrix>& sparse_mat, torch::Tensor mat1,
     torch::Tensor mat2_tr) {
   const int64_t out_row = sparse_mat->nnz();
-  const std::vector<int64_t> shape({out_row});
+  std::vector<int64_t> shape({out_row});
+  // Batched SDDMM
+  if (mat1.dim() >= 3) {
+    shape.push_back(mat1.size(2));
+    // (N, K, B) -> (N, B, K)
+    mat1 = mat1.transpose(1, 2).contiguous();
+    // (M, K, B) -> (M, B, K)
+    mat2_tr = mat2_tr.transpose(1, 2).contiguous();
+  }
   auto ret = torch::zeros(shape, mat1.options());
   const std::string op = "dot";
   auto dgl_mat1 = TorchTensorToDGLArray(mat1);

@@ -35,12 +35,15 @@ void _SpMMSanityCheck(
   CHECK_EQ(sparse_mat_shape[1], dense_shape[0])
       << "SpMM: the second dimension of the sparse matrix should be equal to "
          "the first dimension of the dense matrix.";
-  CHECK_EQ(val_shape.size(), 1)
+  CHECK_LE(val_shape.size(), 2)
       << "SpMM: the values tensor for SpMM can only be 1-dimensional.";
   CHECK_EQ(val_shape[0], sparse_mat->nnz())
       << "SpMM: the value shape does not match nnz of the sparse matrix.";
-  CHECK_LE(dense_shape.size(), 2)
-      << "SpMM: the dense matrix can have at most two dimensions.";
+  CHECK_LE(dense_shape.size(), 3)
+      << "SpMM: the dense matrix can have at most three dimensions.";
+  if (dense_shape.size() == 3 || val_shape.size() == 2) {
+    CHECK_EQ(dense_shape.size(), val_shape.size() + 1);
+  }
   CHECK_EQ(sparse_val.dtype(), dense_mat.dtype())
       << "SpMM: the non-zero values does not have the same dtype as the dense "
          "matrix.";

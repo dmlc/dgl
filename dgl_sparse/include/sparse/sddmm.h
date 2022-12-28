@@ -14,10 +14,15 @@ namespace sparse {
 
 /**
  * @brief Perform a sampled matrix multiplication of a sparse matrix and two
- * dense matrices. It calculates `(mat1 @ mat2) * sparse_mat`. If the sparse
- * matrix has shape (n, m), `mat1` and `mat2` must have shapes of `(n, k)` and
- * `(k, m)` or `(n,)` and `(m,)` respectively. And the returned tensor has shape
- * `(sparse_matrix->nnz(),)`.
+ * dense matrices. It calculates `(mat1 @ mat2) * sparse_mat`. The SDDMM can be
+ * batched, where the batch dimension is the last dimension for all input
+ * matrices.
+ *
+ * There are four cases for the input and output matrix shapes:
+ *   (1) (n, m), (n, k), (k, m), and (n, m);
+ *   (2) (n, m), (n,), and (m,), and (n, m);
+ *   (3) (n, m, b), (n, k, b), (k, m, b), and (n, m, b);
+ *   (4) (n, m), (n, k, b), (k, m, b), and (n, m, b);
  *
  * This function supports autograd for `mat1` and `mat2` but does not support
  * high order gradient.

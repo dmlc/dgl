@@ -31,15 +31,24 @@ void _SDDMMSanityCheck(
   const int64_t mat2_dim = mat2.dim();
   CHECK_EQ(mat1_dim, mat2_dim)
       << "SDDMM: the two dense matrices should have the same dimensions.";
-  CHECK_LE(mat1_dim, 2)
+  CHECK_LE(mat1_dim, 3)
       << "SDDMM: the first dense matrix should have at most two dimensions.";
   CHECK_EQ(sparse_mat->shape()[0], mat1.size(0))
       << "SDDMM: the first dense matrix should have the same first dimension "
          "as the sparse matrix";
-  CHECK_EQ(sparse_mat->shape()[1], mat2.size(mat2_dim - 1))
-      << "SDDMM: the second dense matrix should have the same last dimension "
-         "as the sparse matrix";
-  if (mat1_dim == 2) {
+  if (mat1_dim == 3) {
+    CHECK_EQ(sparse_mat->shape()[1], mat2.size(1))
+        << "SDDMM: the second dense matrix should have the same second "
+           "dimension as the sparse matrix";
+    CHECK_EQ(mat1.size(2), mat2.size(2))
+        << "SDDMM: the two dense matrices should have the same batch dimension "
+           "for batched SDDMM";
+  } else {
+    CHECK_EQ(sparse_mat->shape()[1], mat2.size(mat2.dim() - 1))
+        << "SDDMM: the second dense matrix should have the same last dimension "
+           "as the sparse matrix";
+  }
+  if (mat1_dim >= 2) {
     CHECK_EQ(mat1.size(1), mat2.size(0))
         << "SDDMM: the second dimension of the first dense matrix should be "
            "equal to the first dimension of the second dense matrix.";
@@ -101,7 +110,12 @@ c10::intrusive_ptr<SparseMatrix> SDDMM(
   }
   _SDDMMSanityCheck(sparse_mat, mat1, mat2);
   auto val = SDDMMAutoGrad::apply(sparse_mat, mat1, mat2);
-  val = val * sparse_mat->value();
+  auto sparse_val = sparse_mat->value();
+  // Broadcast the sparse value in batched SDDMM.
+  if (sparse_val.dim() < val.dim()) {
+    sparse_val = sparse_val.unsqueeze(-1);
+  }
+  val = val * sparse_val;
   return CreateValLike(sparse_mat, val);
 }
 
