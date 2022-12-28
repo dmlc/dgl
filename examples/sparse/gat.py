@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import Adam
 
-import dgl.mock_sparse as dglsp
+import dgl.mock_sparse2 as dglsp
 from dgl.data import CoraGraphDataset
 
 
