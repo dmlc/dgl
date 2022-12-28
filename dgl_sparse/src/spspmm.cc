@@ -32,17 +32,30 @@ void _SpSpMMSanityCheck(
     const c10::intrusive_ptr<SparseMatrix>& rhs_mat) {
   const auto& lhs_shape = lhs_mat->shape();
   const auto& rhs_shape = rhs_mat->shape();
-  CHECK_EQ(lhs_shape[1], rhs_shape[0])
-      << "SpSpMM: the second dim of lhs_mat should be equal to the first dim "
-         "of the second matrix";
-  CHECK_EQ(lhs_mat->value().dim(), 1)
-      << "SpSpMM: the value shape of lhs_mat should be 1-D";
-  CHECK_EQ(rhs_mat->value().dim(), 1)
-      << "SpSpMM: the value shape of rhs_mat should be 1-D";
-  CHECK_EQ(lhs_mat->device(), rhs_mat->device())
-      << "SpSpMM: lhs_mat and rhs_mat should on the same device";
-  CHECK_EQ(lhs_mat->dtype(), rhs_mat->dtype())
-      << "SpSpMM: lhs_mat and rhs_mat should have the same dtype";
+  TORCH_CHECK(
+      lhs_shape[1] == rhs_shape[0],
+      "SpSpMM: the second dim of lhs_mat should be equal to the first dim ",
+      "of the second matrix");
+  TORCH_CHECK(
+      lhs_mat->value().dim() == 1,
+      "SpSpMM: the value shape of lhs_mat should be 1-D");
+  TORCH_CHECK(
+      rhs_mat->value().dim() == 1,
+      "SpSpMM: the value shape of rhs_mat should be 1-D");
+  TORCH_CHECK(
+      lhs_mat->device() == rhs_mat->device(),
+      "SpSpMM: lhs_mat and rhs_mat should be on the same device");
+  TORCH_CHECK(
+      lhs_mat->dtype() == rhs_mat->dtype(),
+      "SpSpMM: lhs_mat and rhs_mat should have the same dtype");
+  TORCH_CHECK(
+      !lhs_mat->HasDuplicate(),
+      "SpSpMM does not support lhs_mat with duplicate indices. ",
+      "Call A = A.coalesce() to dedup first.");
+  TORCH_CHECK(
+      !rhs_mat->HasDuplicate(),
+      "SpSpMM does not support rhs_mat with duplicate indices. ",
+      "Call A = A.coalesce() to dedup first.");
 }
 
 // Mask select value of `mat` by `sub_mat`.
