@@ -7,9 +7,8 @@ import torch.nn.functional as F
 import tqdm
 from torchmetrics.functional import accuracy
 
-import dgl
-import dgl.data
 import dgl.mock_sparse2 as dglsp
+from dgl.data import CoraGraphDataset
 
 
 class HGNN(nn.Module):
@@ -56,7 +55,7 @@ def evaluate(model, X, Y, val_mask, test_mask):
 
 
 def load_data():
-    dataset = dgl.data.CoraGraphDataset()
+    dataset = CoraGraphDataset()
 
     graph = dataset[0]
     # The paper created a hypergraph from the original graph. For each node in

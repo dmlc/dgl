@@ -10,8 +10,8 @@ import torch.nn.functional as F
 import tqdm
 from torchmetrics.functional import accuracy
 
-import dgl
 import dgl.mock_sparse as dglsp
+from dgl.data import CoraGraphDataset
 
 
 def hypergraph_laplacian(H):
@@ -83,7 +83,7 @@ def evaluate(model, H, X, Y, val_mask, test_mask):
 
 
 def load_data():
-    dataset = dgl.data.CoraGraphDataset()
+    dataset = CoraGraphDataset()
 
     graph = dataset[0]
     # The paper created a hypergraph from the original graph. For each node in
