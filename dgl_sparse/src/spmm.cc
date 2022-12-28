@@ -41,13 +41,16 @@ void _SpMMSanityCheck(
   shape_check &= dense_shape.size() <= 3;
   if (dense_shape.size() == 3 || val_shape.size() == 2) {
     shape_check &= dense_shape.size() == val_shape.size() + 1;
+    shape_check &= dense_shape[2] == val_shape[1];
   }
   if (!shape_check) {
     std::stringstream error;
     error << "SpMM: Invalid input shapes. sparse_mat: "
           << c10::IntArrayRef(sparse_mat->shape())
           << ", sparse_val: " << sparse_mat->value().sizes()
-          << ", dense_mat: " << dense_mat.sizes();
+          << ", dense_mat: " << dense_mat.sizes()
+          << ". Valid input shapes (sparse_mat, dense_mat) are: (1) (n, m) and "
+             "(m, k); (2) (n, m) and (m,); (3) (n, m, b) and (m, k, b).";
     TORCH_CHECK(false, error.str());
   }
   TORCH_CHECK(

@@ -50,7 +50,11 @@ void _SDDMMSanityCheck(
     error << "SDDMM: Invalid input shapes. sparse_mat: "
           << c10::IntArrayRef(sparse_mat->shape())
           << ", sparse_val: " << sparse_mat->value().sizes()
-          << ", mat1: " << mat1.sizes() << ", mat2: " << mat2.sizes();
+          << ", mat1: " << mat1.sizes() << ", mat2: " << mat2.sizes()
+          << ". Valid input shapes (sparse_mat, mat1, mat2) are: (1) (n, m), "
+             "(n, k), and (k, m); (2) (n, m), (n,), and (m,); (3) (n, m, b), "
+             "(n, k, b) and (k, m, b); (4) "
+             "(n, m), (n, k, b), and (k, m, b).";
     TORCH_CHECK(false, error.str());
   }
   TORCH_CHECK(
