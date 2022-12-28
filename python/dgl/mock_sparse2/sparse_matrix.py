@@ -66,6 +66,28 @@ class SparseMatrix:
         """
         return self.c_sparse_matrix.device()
 
+    @property
+    def row(self) -> torch.Tensor:
+        """Get the row indices of the nonzero elements.
+
+        Returns
+        -------
+        tensor
+            Row indices of the nonzero elements
+        """
+        return self.coo()[0]
+
+    @property
+    def col(self) -> torch.Tensor:
+        """Get the column indices of the nonzero elements.
+
+        Returns
+        -------
+        tensor
+            Column indices of the nonzero elements
+        """
+        return self.coo()[1]
+
     def indices(
         self, fmt: str, return_shuffle=False
     ) -> Tuple[torch.Tensor, ...]:
@@ -172,6 +194,60 @@ class SparseMatrix:
         shape=(4, 4), nnz=3)
         """
         return SparseMatrix(self.c_sparse_matrix.transpose())
+
+    def coalesce(self):
+        """Return a coalesced sparse matrix.
+
+        A coalesced sparse matrix satisfies the following properties:
+
+          - the indices of the non-zero elements are unique,
+          - the indices are sorted in lexicographical order.
+
+        The coalescing process will accumulate the non-zero values of the same
+        indices by summation.
+
+        The function does not support autograd.
+
+        Returns
+        -------
+        SparseMatrix
+            The coalesced sparse matrix.
+
+        Examples
+        --------
+        >>> row = torch.tensor([1, 0, 0, 0, 1])
+        >>> col = torch.tensor([1, 1, 1, 2, 2])
+        >>> val = torch.tensor([0, 1, 2, 3, 4])
+        >>> A = create_from_coo(row, col, val)
+        >>> A = A.coalesce()
+        >>> print(A)
+        SparseMatrix(indices=tensor([[0, 0, 1, 1],
+                [1, 2, 1, 2]]),
+        values=tensor([3, 3, 0, 4]),
+        shape=(2, 3), nnz=4)
+        """
+        return SparseMatrix(self.c_sparse_matrix.coalesce())
+
+    def has_duplicate(self):
+        """Return whether this sparse matrix contains duplicate indices.
+
+        Returns
+        -------
+        bool
+            True if this sparse matrix contains duplicate indices.
+
+        Examples
+        --------
+        >>> row = torch.tensor([1, 0, 0, 0, 1])
+        >>> col = torch.tensor([1, 1, 1, 2, 2])
+        >>> val = torch.tensor([0, 1, 2, 3, 4])
+        >>> A = create_from_coo(row, col, val)
+        >>> print(A.has_duplicate())
+        True
+        >>> print(A.coalesce().has_duplicate())
+        False
+        """
+        return self.c_sparse_matrix.has_duplicate()
 
 
 def create_from_coo(
