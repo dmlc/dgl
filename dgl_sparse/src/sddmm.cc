@@ -7,6 +7,8 @@
 #include <sparse/spmm.h>
 #include <torch/script.h>
 
+#include <sstream>
+
 #include "./matmul.h"
 #include "./utils.h"
 
@@ -43,15 +45,20 @@ void _SDDMMSanityCheck(
   if (mat1.dim() >= 2) {
     shape_check &= mat1.size(1) == mat2.size(0);
   }
-  CHECK(shape_check) << "SDDMM: Invalid input shapes. sparse_mat: "
-                     << c10::IntArrayRef(sparse_mat->shape())
-                     << ", sparse_val: " << sparse_mat->value().sizes()
-                     << ", mat1: " << mat1.sizes()
-                     << ", mat2: " << mat2.sizes();
-  CHECK_EQ(mat1.dtype(), mat2.dtype())
-      << "SDDMM: the two dense matrices should have the same dtype.";
-  CHECK_EQ(mat1.device(), mat2.device())
-      << "SDDMM: the two dense matrices should on the same device.";
+  if (!shape_check) {
+    std::stringstream error;
+    error << "SDDMM: Invalid input shapes. sparse_mat: "
+          << c10::IntArrayRef(sparse_mat->shape())
+          << ", sparse_val: " << sparse_mat->value().sizes()
+          << ", mat1: " << mat1.sizes() << ", mat2: " << mat2.sizes();
+    TORCH_CHECK(false, error.str());
+  }
+  TORCH_CHECK(
+      mat1.dtype() == mat2.dtype(),
+      "SDDMM: the two dense matrices should have the same dtype.");
+  TORCH_CHECK(
+      mat1.device() == mat2.device(),
+      "SDDMM: the two dense matrices should on the same device.");
 }
 
 torch::Tensor SDDMMAutoGrad::forward(
