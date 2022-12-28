@@ -14,9 +14,13 @@ namespace sparse {
 
 /**
  * @brief Perform a matrix multiplication of the sparse matrix and dense
- * matrix. The sparse matrix must have 1-dimensional values. If the sparse
- * matrix has shape (n, m), the dense matrix must have shape (m, k) or (m,), and
- * the returned dense matrix has shape (n, k) or (n,).
+ * matrix. The SpMM can be batched, where the batch dimension is the last
+ * dimension for both sparse and dense matrices.
+ *
+ * There are three cases for sparse, dense, and output matrix shapes:
+ *   (1) (n, m), (m, k), and (n, k);
+ *   (2) (n, m), (m,), and (n,);
+ *   (3) (n, m, b), (m, k, b), and (n, k, b).
  *
  * This function supports autograd for both the sparse and dense matrix but does
  * not support higher order gradient.
