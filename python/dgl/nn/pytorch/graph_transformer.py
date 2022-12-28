@@ -439,8 +439,7 @@ class SpatialEncoder3d(nn.Module):
         Number of attention heads if multi-head attention mechanism is applied.
         Default : 1.
     max_node_type : int, optional
-        Maximum element in :attr:`node_type`,
-        which should be set as 0 if and only if :attr:`node_type` is None.
+        Maximum number of node types.
         Default : 1.
 
     Examples
@@ -453,16 +452,16 @@ class SpatialEncoder3d(nn.Module):
     >>> v = th.tensor([1, 2, 3, 0, 3, 0, 0, 1])
     >>> g = dgl.graph((u, v))
     >>> coordinate = th.rand(4, 3)
-    >>> node_type = th.tensor([7, 3, 3, 2])
+    >>> node_type = th.tensor([1, 0, 2, 1])
     >>> spatial_encoder = SpatialEncoder3d(num_kernels=4,
     ...                                    num_heads=8,
-    ...                                    max_node_type=7)
+    ...                                    max_node_type=3)
     >>> out = spatial_encoder(g, coordinate, node_type=node_type)
     >>> print(out.shape)
     torch.Size([1, 4, 4, 8])
     """
 
-    def __init__(self, num_kernels, num_heads=1, max_node_type=0):
+    def __init__(self, num_kernels, num_heads=1, max_node_type=1):
         super().__init__()
         self.num_kernels = num_kernels
         self.num_heads = num_heads
@@ -471,7 +470,7 @@ class SpatialEncoder3d(nn.Module):
         self.gaussian_stds = nn.Embedding(1, num_kernels)
         self.linear_layer_1 = nn.Linear(num_kernels, num_kernels)
         self.linear_layer_2 = nn.Linear(num_kernels, num_heads)
-        if max_node_type == 0:
+        if max_node_type == 1:
             self.mul = nn.Embedding(1, 1)
             self.bias = nn.Embedding(1, 1)
         else:
@@ -489,17 +488,17 @@ class SpatialEncoder3d(nn.Module):
         ----------
         g : DGLGraph
             A DGLGraph to be encoded, which must be a homogeneous one.
-        coord : th.Tensor
+        coord : torch.Tensor
             3D coordinates of nodes in :attr:`g`,
             of shape :math:`(N, 3)`,
             where :math:`N`: is the number of nodes in :attr:`g`.
-        node_type : th.Tensor, optional
-            Type of nodes in :attr:`g`, of shape :math:`(N)`
-            indexed to assign learnable parameter
-            :math:`\gamma_{(i,j)}, \beta_{(i,j)}`,
-            which would not vary if :attr:`node_type` is None.
+        node_type : torch.Tensor, optional
+            Node types of :attr:`g`.
             Default : None.
-
+            * If :attr:`max_node_type` is not 1, :attr:`node_type` needs to
+              be a tensor in shape :math:`(N)`. The scaling factors of
+              each pair of nodes are determined by their node types.
+            * Otherwise, :attr:`node_type` should be None.
         Returns
         -------
         torch.Tensor
@@ -514,10 +513,9 @@ class SpatialEncoder3d(nn.Module):
         max_num_nodes = th.max(g.batch_num_nodes())
         spatial_encoding = []
         sum_num_nodes = 0
-        eps = 1e-2
-        if (self.max_node_type == 0) != (node_type is None):
+        if (self.max_node_type == 1) != (node_type is None):
             raise ValueError(
-                'max_node_type should be set as 0 if and only if '
+                'max_node_type should be set as 1 if and only if '
                 'node_type is None.'
             )
 
@@ -551,7 +549,7 @@ class SpatialEncoder3d(nn.Module):
             # shape: [k]
             gaussian_mean = self.gaussian_means.weight.float().view(-1)
             gaussian_var = (
-                    self.gaussian_stds.weight.float().view(-1).abs() + eps
+                    self.gaussian_stds.weight.float().view(-1).abs() + 1e-2
             )
             # shape: [n, n, k]
             gaussian_kernel = (

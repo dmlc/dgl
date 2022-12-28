@@ -1838,11 +1838,10 @@ def test_SpatialEncoder(max_dist, num_kernels, num_heads):
     ndata = th.rand(bg.num_nodes(), 3).to(dev)
     num_nodes = bg.num_nodes()
     node_type = th.randint(0, 512, (num_nodes,)).to(dev)
-    max_node_type = th.max(node_type)
     model_1 = nn.SpatialEncoder(max_dist, num_heads=num_heads).to(dev)
     model_2 = nn.SpatialEncoder3d(num_kernels, num_heads=num_heads).to(dev)
     model_3 = nn.SpatialEncoder3d(
-        num_kernels, num_heads=num_heads, max_node_type=max_node_type
+        num_kernels, num_heads=num_heads, max_node_type=512
     ).to(dev)
     encoding = model_1(bg)
     encoding3d_1 = model_2(bg, ndata)
