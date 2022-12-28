@@ -198,7 +198,7 @@ class SparseMatrix:
     def coalesce(self):
         """Return a coalesced sparse matrix.
 
-        A coalesced sparse matrix satisfies the following properties::
+        A coalesced sparse matrix satisfies the following properties:
 
           - the indices of the non-zero elements are unique,
           - the indices are sorted in lexicographical order.
