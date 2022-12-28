@@ -27,32 +27,27 @@ class SDDMMAutoGrad : public Function<SDDMMAutoGrad> {
 void _SDDMMSanityCheck(
     const c10::intrusive_ptr<SparseMatrix>& sparse_mat, torch::Tensor mat1,
     torch::Tensor mat2) {
-  const int64_t mat1_dim = mat1.dim();
-  const int64_t mat2_dim = mat2.dim();
-  CHECK_EQ(mat1_dim, mat2_dim)
-      << "SDDMM: the two dense matrices should have the same dimensions.";
-  CHECK_LE(mat1_dim, 3)
-      << "SDDMM: the first dense matrix should have at most two dimensions.";
-  CHECK_EQ(sparse_mat->shape()[0], mat1.size(0))
-      << "SDDMM: the first dense matrix should have the same first dimension "
-         "as the sparse matrix";
-  if (mat1_dim == 3) {
-    CHECK_EQ(sparse_mat->shape()[1], mat2.size(1))
-        << "SDDMM: the second dense matrix should have the same second "
-           "dimension as the sparse matrix";
-    CHECK_EQ(mat1.size(2), mat2.size(2))
-        << "SDDMM: the two dense matrices should have the same batch dimension "
-           "for batched SDDMM";
+  bool shape_check = true;
+  shape_check &= mat1.dim() == mat2.dim();
+  shape_check &= mat1.dim() <= 3;
+  shape_check &= sparse_mat->shape()[0] == mat1.size(0);
+  if (mat1.dim() == 3) {
+    shape_check &= sparse_mat->shape()[1] == mat2.size(1);
+    shape_check &= mat1.size(2) == mat2.size(2);
+    if (sparse_mat->value().dim() > 1) {
+      shape_check &= sparse_mat->value().size(1) == mat1.size(2);
+    }
   } else {
-    CHECK_EQ(sparse_mat->shape()[1], mat2.size(mat2.dim() - 1))
-        << "SDDMM: the second dense matrix should have the same last dimension "
-           "as the sparse matrix";
+    shape_check &= sparse_mat->shape()[1] == mat2.size(mat2.dim() - 1);
   }
-  if (mat1_dim >= 2) {
-    CHECK_EQ(mat1.size(1), mat2.size(0))
-        << "SDDMM: the second dimension of the first dense matrix should be "
-           "equal to the first dimension of the second dense matrix.";
+  if (mat1.dim() >= 2) {
+    shape_check &= mat1.size(1) == mat2.size(0);
   }
+  CHECK(shape_check) << "SDDMM: Invalid input shapes. sparse_mat: "
+                     << c10::IntArrayRef(sparse_mat->shape())
+                     << ", sparse_val: " << sparse_mat->value().sizes()
+                     << ", mat1: " << mat1.sizes()
+                     << ", mat2: " << mat2.sizes();
   CHECK_EQ(mat1.dtype(), mat2.dtype())
       << "SDDMM: the two dense matrices should have the same dtype.";
   CHECK_EQ(mat1.device(), mat2.device())

@@ -14,7 +14,7 @@ namespace sparse {
 
 /**
  * @brief Perform a sampled matrix multiplication of a sparse matrix and two
- * dense matrices. It calculates `(mat1 @ mat2) * sparse_mat`. The SDDMM can be
+ * dense matrices. It calculates `sparse_mat * (mat1 @ mat2)`. The SDDMM can be
  * batched, where the batch dimension is the last dimension for all input
  * matrices.
  *

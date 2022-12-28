@@ -4,7 +4,7 @@ import backend as F
 import pytest
 import torch
 
-from dgl.mock_sparse2 import create_from_coo, val_like
+from dgl.mock_sparse2 import bspmm, create_from_coo, val_like
 
 from .utils import (
     clone_detach_and_grad,
@@ -62,7 +62,7 @@ def test_bspmm(create_func, shape, nnz):
     A = create_func(shape, nnz, dev, 2)
     X = torch.randn(shape[1], 10, 2, requires_grad=True, device=dev)
 
-    sparse_result = A @ X
+    sparse_result = bspmm(A, X)
     grad = torch.randn_like(sparse_result)
     sparse_result.backward(grad)
 

@@ -3,7 +3,7 @@ import sys
 import backend as F
 import pytest
 import torch
-from dgl.mock_sparse2 import sddmm
+from dgl.mock_sparse2 import bsddmm, sddmm
 
 from .utils import clone_detach_and_grad, rand_coo, rand_csc, rand_csr
 
@@ -65,7 +65,7 @@ def test_bsddmm(create_func, shape, nnz, nz_dim):
     dense_B = clone_detach_and_grad(B)
     dense_C = clone_detach_and_grad(C)
 
-    sparse_result = sddmm(A, B, C)
+    sparse_result = bsddmm(A, B, C)
 
     grad = torch.rand_like(sparse_result.val)
     sparse_result.val.backward(grad)

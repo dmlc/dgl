@@ -32,18 +32,18 @@ void _SpMMSanityCheck(
   const auto& sparse_mat_shape = sparse_mat->shape();
   auto val_shape = sparse_val.sizes();
   auto dense_shape = dense_mat.sizes();
-  CHECK_EQ(sparse_mat_shape[1], dense_shape[0])
-      << "SpMM: the second dimension of the sparse matrix should be equal to "
-         "the first dimension of the dense matrix.";
-  CHECK_LE(val_shape.size(), 2)
-      << "SpMM: the values tensor for SpMM can only be 1-dimensional.";
-  CHECK_EQ(val_shape[0], sparse_mat->nnz())
-      << "SpMM: the value shape does not match nnz of the sparse matrix.";
-  CHECK_LE(dense_shape.size(), 3)
-      << "SpMM: the dense matrix can have at most three dimensions.";
+  bool shape_check = true;
+  shape_check &= sparse_mat_shape[1] == dense_shape[0];
+  shape_check &= val_shape.size() <= 2;
+  shape_check &= val_shape[0] == sparse_mat->nnz();
+  shape_check &= dense_shape.size() <= 3;
   if (dense_shape.size() == 3 || val_shape.size() == 2) {
-    CHECK_EQ(dense_shape.size(), val_shape.size() + 1);
+    shape_check &= dense_shape.size() == val_shape.size() + 1;
   }
+  CHECK(shape_check) << "SpMM: Invalid input shapes. sparse_mat: "
+                     << c10::IntArrayRef(sparse_mat->shape())
+                     << ", sparse_val: " << sparse_mat->value().sizes()
+                     << ", dense_mat: " << dense_mat.sizes();
   CHECK_EQ(sparse_val.dtype(), dense_mat.dtype())
       << "SpMM: the non-zero values does not have the same dtype as the dense "
          "matrix.";
