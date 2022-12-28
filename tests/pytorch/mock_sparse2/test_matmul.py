@@ -4,10 +4,11 @@ import backend as F
 import pytest
 import torch
 
-from dgl.mock_sparse2 import create_from_coo, val_like
+from dgl.mock_sparse2 import bspmm, create_from_coo, val_like
 
 from .utils import (
     clone_detach_and_grad,
+    dense_mask,
     rand_coo,
     rand_csc,
     rand_csr,
@@ -48,6 +49,34 @@ def test_spmm(create_func, shape, nnz, out_dim):
     assert torch.allclose(X.grad, XX.grad, atol=1e-05)
     assert torch.allclose(
         adj.grad.coalesce().to_dense(),
+        sparse_matrix_to_dense(val_like(A, A.val.grad)),
+        atol=1e-05,
+    )
+
+
+@pytest.mark.parametrize("create_func", [rand_coo, rand_csr, rand_csc])
+@pytest.mark.parametrize("shape", [(2, 7), (5, 2)])
+@pytest.mark.parametrize("nnz", [1, 10])
+def test_bspmm(create_func, shape, nnz):
+    dev = F.ctx()
+    A = create_func(shape, nnz, dev, 2)
+    X = torch.randn(shape[1], 10, 2, requires_grad=True, device=dev)
+
+    sparse_result = bspmm(A, X)
+    grad = torch.randn_like(sparse_result)
+    sparse_result.backward(grad)
+
+    XX = clone_detach_and_grad(X)
+    torch_A = A.dense().clone().detach().requires_grad_()
+    torch_result = torch_A.permute(2, 0, 1) @ XX.permute(2, 0, 1)
+
+    torch_result.backward(grad.permute(2, 0, 1))
+    assert torch.allclose(
+        sparse_result.permute(2, 0, 1), torch_result, atol=1e-05
+    )
+    assert torch.allclose(X.grad, XX.grad, atol=1e-05)
+    assert torch.allclose(
+        dense_mask(torch_A.grad, A),
         sparse_matrix_to_dense(val_like(A, A.val.grad)),
         atol=1e-05,
     )
