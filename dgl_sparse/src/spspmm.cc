@@ -76,7 +76,7 @@ variable_list SpSpMMAutoGrad::forward(
 
   auto csr = ret_mat->CSRPtr();
   auto val = ret_mat->value();
-  CHECK(!csr->value_indices.has_value());
+  TORCH_CHECK(!csr->value_indices.has_value());
   return {csr->indptr, csr->indices, val};
 }
 
