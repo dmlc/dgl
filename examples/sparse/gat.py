@@ -44,9 +44,10 @@ class GATConv(nn.Module):
         e_r = (Z * self.a_r).sum(dim=1)
         e = e_l[A_hat.row] + e_r[A_hat.col]
 
-        A_hat.val = F.leaky_relu(e)
-        A_atten = A_hat.softmax()
-        A_atten.val = self.dropout(A_atten.val)
+        a = F.leaky_relu(e)
+        A_atten = dglsp.val_like(A_hat, a).softmax()
+        a_drop = self.dropout(A_atten.val)
+        A_atten = dglsp.val_like(A_atten, a_drop)
         return dglsp.bspmm(A_atten, Z)
 
 

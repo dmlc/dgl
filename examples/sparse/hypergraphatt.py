@@ -10,7 +10,7 @@ import torch.nn.functional as F
 import tqdm
 from torchmetrics.functional import accuracy
 
-import dgl.mock_sparse as dglsp
+import dgl.mock_sparse2 as dglsp
 from dgl.data import CoraGraphDataset
 
 
