@@ -6,9 +6,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from dgl.data import CoraGraphDataset
-from dgl.mock_sparse import bspmm, create_from_coo, identity
 from torch.optim import Adam
+
+import dgl.mock_sparse as dglsp
+from dgl.data import CoraGraphDataset
 
 
 class GATConv(nn.Module):
@@ -46,7 +47,7 @@ class GATConv(nn.Module):
         A_hat.val = F.leaky_relu(e)
         A_atten = A_hat.softmax()
         A_atten.val = self.dropout(A_atten.val)
-        return bspmm(A_atten, Z)
+        return dglsp.bspmm(A_atten, Z)
 
 
 class GAT(nn.Module):
@@ -124,10 +125,10 @@ if __name__ == "__main__":
     # Create the sparse adjacency matrix A.
     src, dst = g.edges()
     N = g.num_nodes()
-    A = create_from_coo(dst, src, shape=(N, N))
+    A = dglsp.create_from_coo(dst, src, shape=(N, N))
 
     # Add self-loops.
-    I = identity(A.shape, device=dev)
+    I = dglsp.identity(A.shape, device=dev)
     A_hat = A + I
 
     # Create GAT model.

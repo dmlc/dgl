@@ -6,9 +6,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from dgl.data import CoraGraphDataset
-from dgl.mock_sparse2 import create_from_coo, diag, identity
 from torch.optim import Adam
+
+import dgl.mock_sparse2 as dglsp
+from dgl.data import CoraGraphDataset
 
 
 class GCN(nn.Module):
@@ -87,15 +88,15 @@ if __name__ == "__main__":
     # Create the adjacency matrix of graph.
     src, dst = g.edges()
     N = g.num_nodes()
-    A = create_from_coo(dst, src, shape=(N, N))
+    A = dglsp.create_from_coo(dst, src, shape=(N, N))
 
     ############################################################################
     # (HIGHLIGHT) Compute the symmetrically normalized adjacency matrix with
     # Sparse Matrix API
     ############################################################################
-    I = identity(A.shape, device=dev)
+    I = dglsp.identity(A.shape, device=dev)
     A_hat = A + I
-    D_hat = diag(A_hat.sum(1)) ** -0.5
+    D_hat = dglsp.diag(A_hat.sum(1)) ** -0.5
     A_norm = D_hat @ A_hat @ D_hat
 
     # Create model.

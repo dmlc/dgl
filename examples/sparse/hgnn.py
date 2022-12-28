@@ -1,14 +1,16 @@
 """
 Hypergraph Neural Networks (https://arxiv.org/pdf/1809.09401.pdf)
 """
-import dgl
-import dgl.data
-import dgl.mock_sparse2 as dglsp
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchmetrics.functional import accuracy
 import tqdm
+from torchmetrics.functional import accuracy
+
+import dgl
+import dgl.data
+import dgl.mock_sparse2 as dglsp
+
 
 class HGNN(nn.Module):
     def __init__(self, H, in_size, out_size, hidden_dims=16):
@@ -24,8 +26,8 @@ class HGNN(nn.Module):
         d_V = H.sum(1)  # node degree
         d_E = H.sum(0)  # edge degree
         n_edges = d_E.shape[0]
-        D_V_invsqrt = dglsp.diag(d_V ** -0.5)  # D_V ** (-1/2)
-        D_E_inv = dglsp.diag(d_E ** -1)  # D_E ** (-1)
+        D_V_invsqrt = dglsp.diag(d_V**-0.5)  # D_V ** (-1/2)
+        D_E_inv = dglsp.diag(d_E**-1)  # D_E ** (-1)
         W = dglsp.identity((n_edges, n_edges))
         self.laplacian = D_V_invsqrt @ H @ W @ D_E_inv @ H.T @ D_V_invsqrt
 
@@ -35,6 +37,7 @@ class HGNN(nn.Module):
         X = self.laplacian @ self.Theta2(self.dropout(X))
         return X
 
+
 def train(model, optimizer, X, Y, train_mask):
     model.train()
     Y_hat = model(X)
@@ -43,12 +46,14 @@ def train(model, optimizer, X, Y, train_mask):
     loss.backward()
     optimizer.step()
 
+
 def evaluate(model, X, Y, val_mask, test_mask):
     model.eval()
     Y_hat = model(X)
     val_acc = accuracy(Y_hat[val_mask], Y[val_mask])
     test_acc = accuracy(Y_hat[test_mask], Y[test_mask])
     return val_acc, test_acc
+
 
 def load_data():
     dataset = dgl.data.CoraGraphDataset()
@@ -72,6 +77,7 @@ def load_data():
     test_mask = graph.ndata["test_mask"]
     return H, X, Y, dataset.num_classes, train_mask, val_mask, test_mask
 
+
 def main():
     H, X, Y, num_classes, train_mask, val_mask, test_mask = load_data()
     model = HGNN(H, X.shape[1], num_classes)
@@ -88,8 +94,9 @@ def main():
                 },
                 refresh=False,
             )
-    
+
     print(f"Test acc: {test_acc:.3f}")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

@@ -3,13 +3,15 @@ Hypergraph Convolution and Hypergraph Attention
 (https://arxiv.org/pdf/1901.08150.pdf).
 """
 import argparse
-import dgl
-import dgl.mock_sparse as dglsp
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchmetrics.functional import accuracy
 import tqdm
+from torchmetrics.functional import accuracy
+
+import dgl
+import dgl.mock_sparse as dglsp
 
 
 def hypergraph_laplacian(H):
@@ -19,8 +21,8 @@ def hypergraph_laplacian(H):
     d_V = H.sum(1)  # node degree
     d_E = H.sum(0)  # edge degree
     n_edges = d_E.shape[0]
-    D_V_invsqrt = dglsp.diag(d_V ** -0.5)  # D_V ** (-1/2)
-    D_E_inv = dglsp.diag(d_E ** -1)  # D_E ** (-1)
+    D_V_invsqrt = dglsp.diag(d_V**-0.5)  # D_V ** (-1/2)
+    D_E_inv = dglsp.diag(d_E**-1)  # D_E ** (-1)
     W = dglsp.identity((n_edges, n_edges))
     return D_V_invsqrt @ H @ W @ D_E_inv @ H.T @ D_V_invsqrt
 
