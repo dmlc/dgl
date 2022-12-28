@@ -125,7 +125,7 @@ def _divide_by_worker(dataset, batch_size, drop_last):
         segments = []
         for i in range(worker_info.id, num_batches, worker_info.num_workers):
             segments.append(dataset[i * batch_size : (i + 1) * batch_size])
-        dataset = torch.concat(segments)
+        dataset = torch.cat(segments) if segments else dataset[0:0]
     return dataset
 
 
