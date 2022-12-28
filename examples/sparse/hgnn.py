@@ -1,14 +1,13 @@
 """
 Hypergraph Neural Networks (https://arxiv.org/pdf/1809.09401.pdf)
 """
+import dgl.mock_sparse2 as dglsp
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import tqdm
-from torchmetrics.functional import accuracy
-
-import dgl.mock_sparse2 as dglsp
 from dgl.data import CoraGraphDataset
+from torchmetrics.functional import accuracy
 
 
 class HGNN(nn.Module):

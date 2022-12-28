@@ -3,14 +3,12 @@
 (https://arxiv.org/abs/1902.07153)
 """
 
+import dgl.mock_sparse2 as dglsp
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.optim import Adam
-
-import dgl.mock_sparse2 as dglsp
 from dgl.data import CoraGraphDataset
-
+from torch.optim import Adam
 
 ################################################################################
 # (HIGHLIGHT) Take the advantage of DGL sparse APIs to implement the feature
