@@ -116,6 +116,23 @@ class SparseMatrix : public torch::CustomClassHolder {
    */
   c10::intrusive_ptr<SparseMatrix> Transpose() const;
 
+  /**
+   * @brief Return a new coalesced matrix.
+   *
+   * A coalesced sparse matrix satisfies the following properties:
+   *   - the indices of the non-zero elements are unique,
+   *   - the indices are sorted in lexicographical order.
+   *
+   * @return A coalesced sparse matrix.
+   */
+  c10::intrusive_ptr<SparseMatrix> Coalesce();
+
+  /**
+   * @brief Return true if this sparse matrix contains duplicate indices.
+   * @return A bool flag.
+   */
+  bool HasDuplicate();
+
  private:
   /** @brief Create the COO format for the sparse matrix internally */
   void _CreateCOO();
