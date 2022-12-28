@@ -44,18 +44,18 @@ void _SpSpMMSanityCheck(
       "SpSpMM: the value shape of rhs_mat should be 1-D");
   TORCH_CHECK(
       lhs_mat->device() == rhs_mat->device(),
-      "SpSpMM: lhs_mat and rhs_mat should on the same device");
+      "SpSpMM: lhs_mat and rhs_mat should be on the same device");
   TORCH_CHECK(
       lhs_mat->dtype() == rhs_mat->dtype(),
       "SpSpMM: lhs_mat and rhs_mat should have the same dtype");
   TORCH_CHECK(
       !lhs_mat->HasDuplicate(),
       "SpSpMM does not support lhs_mat with duplicate indices. ",
-      "Call coalesce() to dedup first.");
+      "Call A = A.coalesce() to dedup first.");
   TORCH_CHECK(
       !rhs_mat->HasDuplicate(),
       "SpSpMM does not support rhs_mat with duplicate indices. ",
-      "Call coalesce() to dedup first.");
+      "Call A = A.coalesce() to dedup first.");
 }
 
 // Mask select value of `mat` by `sub_mat`.

@@ -206,6 +206,8 @@ class SparseMatrix:
         The coalescing process will accumulate the non-zero values of the same
         indices by summation.
 
+        The function does not support autograd.
+
         Returns
         -------
         SparseMatrix
