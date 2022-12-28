@@ -46,11 +46,18 @@ def train(model, optimizer, X, Y, train_mask):
     optimizer.step()
 
 
-def evaluate(model, X, Y, val_mask, test_mask):
+def evaluate(model, X, Y, val_mask, test_mask, num_classes):
     model.eval()
     Y_hat = model(X)
-    val_acc = accuracy(Y_hat[val_mask], Y[val_mask])
-    test_acc = accuracy(Y_hat[test_mask], Y[test_mask])
+    val_acc = accuracy(
+        Y_hat[val_mask], Y[val_mask], task="multiclass", num_classes=num_classes
+    )
+    test_acc = accuracy(
+        Y_hat[test_mask],
+        Y[test_mask],
+        task="multiclass",
+        num_classes=num_classes,
+    )
     return val_acc, test_acc
 
 
@@ -85,7 +92,9 @@ def main():
     with tqdm.trange(500) as tq:
         for epoch in tq:
             train(model, optimizer, X, Y, train_mask)
-            val_acc, test_acc = evaluate(model, X, Y, val_mask, test_mask)
+            val_acc, test_acc = evaluate(
+                model, X, Y, val_mask, test_mask, num_classes
+            )
             tq.set_postfix(
                 {
                     "Val acc": f"{val_acc:.5f}",

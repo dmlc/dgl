@@ -74,11 +74,18 @@ def train(model, optimizer, H, X, Y, train_mask):
     return loss.item()
 
 
-def evaluate(model, H, X, Y, val_mask, test_mask):
+def evaluate(model, H, X, Y, val_mask, test_mask, num_classes):
     model.eval()
     Y_hat = model(H, X)
-    val_acc = accuracy(Y_hat[val_mask], Y[val_mask])
-    test_acc = accuracy(Y_hat[test_mask], Y[test_mask])
+    val_acc = accuracy(
+        Y_hat[val_mask], Y[val_mask], task="multiclass", num_classes=num_classes
+    )
+    test_acc = accuracy(
+        Y_hat[test_mask],
+        Y[test_mask],
+        task="multiclass",
+        num_classes=num_classes,
+    )
     return val_acc, test_acc
 
 
@@ -113,7 +120,9 @@ def main(args):
     with tqdm.trange(args.epochs) as tq:
         for epoch in tq:
             loss = train(model, optimizer, H, X, Y, train_mask)
-            val_acc, test_acc = evaluate(model, H, X, Y, val_mask, test_mask)
+            val_acc, test_acc = evaluate(
+                model, H, X, Y, val_mask, test_mask, num_classes
+            )
             tq.set_postfix(
                 {
                     "Loss": f"{loss:.5f}",
