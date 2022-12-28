@@ -43,7 +43,7 @@ inline static void ElementwiseOpSanityCheck(
   TORCH_CHECK(
       A->value().dtype() == B->value().dtype(),
       "Elementwise operators"
-      "do not support two sparse matrices with different dtypes.");
+      " do not support two sparse matrices with different dtypes.");
   TORCH_CHECK(
       A->shape()[0] == B->shape()[0] && A->shape()[1] == B->shape()[1],
       "Elementwise operators do not support two sparse matrices with different"
