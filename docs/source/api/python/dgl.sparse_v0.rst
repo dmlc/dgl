@@ -16,22 +16,19 @@ Sparse matrix class
 
     Class for creating a sparse matrix representation
 
-    The row and column indices of the sparse matrix can be the destination
-    (row) and source (column) indices of a homogeneous graph.
-
     There are a few ways to create a sparse matrix:
 
     * In COO format using row and col indices, use :func:`create_from_coo`.
     * In CSR format using row pointers and col indices, use :func:`create_from_csr`.
     * In CSC format using col pointers and row indices, use :func:`create_from_csc`.
 
-    For example, we can create COO matrices as follows:
+    For example, one can create COO matrices as follows:
 
     Case1: Sparse matrix with row and column indices without values
 
-        >>> dst = torch.tensor([1, 1, 2])
-        >>> src = torch.tensor([2, 4, 3])
-        >>> A = create_from_coo(dst, src)
+        >>> row = torch.tensor([1, 1, 2])
+        >>> col = torch.tensor([2, 4, 3])
+        >>> A = create_from_coo(row, col)
         >>> A
         SparseMatrix(indices=tensor([[1, 1, 2],
                                      [2, 4, 3]]),
@@ -42,7 +39,7 @@ Sparse matrix class
 
         >>> # vector values
         >>> val = torch.tensor([[1, 1], [2, 2], [3, 3]])
-        >>> A = create_from_coo(dst, src, val)
+        >>> A = create_from_coo(row, col, val)
         SparseMatrix(indices=tensor([[1, 1, 2],
                                      [2, 4, 3]]),
                      values=tensor([[1, 1],
@@ -50,7 +47,7 @@ Sparse matrix class
                                     [3, 3]]),
                      shape=(3, 5), nnz=3)
 
-    Similarly, we can create a CSR matrix as follows:
+    Similarly, one can create a CSR matrix as follows:
 
         >>> indptr = torch.tensor([0, 1, 2, 5])
         >>> indices = torch.tensor([1, 2, 0, 1, 2])
