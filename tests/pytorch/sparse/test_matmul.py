@@ -4,7 +4,7 @@ import backend as F
 import pytest
 import torch
 
-from dgl.mock_sparse2 import bspmm, create_from_coo, val_like
+from dgl.sparse import bspmm, create_from_coo, val_like
 
 from .utils import (
     clone_detach_and_grad,
