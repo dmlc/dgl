@@ -1,9 +1,10 @@
+import sys
+
+import backend as F
 import pytest
 import torch
-import sys
-import backend as F
 
-from dgl.mock_sparse2 import diag, identity, DiagMatrix
+from dgl.mock_sparse2 import diag, DiagMatrix, identity
 
 # TODO(#4818): Skipping tests on win.
 if not sys.platform.startswith("linux"):
@@ -76,7 +77,7 @@ def test_print():
     ctx = F.ctx()
 
     # basic
-    val = torch.tensor([1., 1., 2.]).to(ctx)
+    val = torch.tensor([1.0, 1.0, 2.0]).to(ctx)
     A = diag(val)
     print(A)
 

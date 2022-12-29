@@ -426,7 +426,7 @@ def test_print():
     # basic
     row = torch.tensor([1, 1, 3]).to(ctx)
     col = torch.tensor([2, 1, 3]).to(ctx)
-    val = torch.tensor([1., 1., 2.]).to(ctx)
+    val = torch.tensor([1.0, 1.0, 2.0]).to(ctx)
     A = create_from_coo(row, col, val)
     print(A)
 

@@ -522,7 +522,7 @@ def val_like(mat: SparseMatrix, val: torch.Tensor) -> SparseMatrix:
     return SparseMatrix(torch.ops.dgl_sparse.val_like(mat.c_sparse_matrix, val))
 
 
-def _sparse_matrix_str(spmat : SparseMatrix) -> str:
+def _sparse_matrix_str(spmat: SparseMatrix) -> str:
     """Internal function for converting a sparse matrix to string representation."""
     indices_str = str(spmat.indices("COO"))
     values_str = str(spmat.val)
@@ -531,17 +531,21 @@ def _sparse_matrix_str(spmat : SparseMatrix) -> str:
         val_size = tuple(spmat.val.shape[1:])
         meta_str += f", val_size={val_size}"
     prefix = f"{type(spmat).__name__}("
+
     def _add_indent(_str, indent):
-        lines = _str.split('\n')
-        lines = [lines[0]] + [' ' * indent + line for line in lines[1:]]
-        return '\n'.join(lines)
-    final_str = ("indices="
-            + _add_indent(indices_str, len("indices="))
-            + ",\n"
-            + "values="
-            + _add_indent(values_str, len("values="))
-            + ",\n"
-            + meta_str
-            + ")")
+        lines = _str.split("\n")
+        lines = [lines[0]] + [" " * indent + line for line in lines[1:]]
+        return "\n".join(lines)
+
+    final_str = (
+        "indices="
+        + _add_indent(indices_str, len("indices="))
+        + ",\n"
+        + "values="
+        + _add_indent(values_str, len("values="))
+        + ",\n"
+        + meta_str
+        + ")"
+    )
     final_str = prefix + _add_indent(final_str, len(prefix))
     return final_str
