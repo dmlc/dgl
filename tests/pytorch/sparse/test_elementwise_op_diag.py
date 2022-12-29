@@ -18,9 +18,7 @@ def all_close_sparse(A, B):
     assert A.shape == B.shape
 
 
-@pytest.mark.parametrize(
-    "op", [operator.sub, operator.mul, operator.truediv]
-)
+@pytest.mark.parametrize("op", [operator.sub, operator.mul, operator.truediv])
 def test_diag_op_diag(op):
     ctx = F.ctx()
     shape = (3, 4)
