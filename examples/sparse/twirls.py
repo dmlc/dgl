@@ -9,13 +9,14 @@ with attention.
 """
 
 import argparse
+
+import dgl.mock_sparse2 as dglsp
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.optim import Adam
-
 from dgl.data import CoraGraphDataset
-import dgl.mock_sparse as dglsp
+from torch.optim import Adam
 
 
 class MLP(nn.Module):
