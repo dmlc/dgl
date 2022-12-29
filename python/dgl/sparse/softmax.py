@@ -57,4 +57,5 @@ def softmax(A: SparseMatrix) -> SparseMatrix:
     """
     return SparseMatrix(torch.ops.dgl_sparse.softmax(A.c_sparse_matrix))
 
+
 SparseMatrix.softmax = softmax

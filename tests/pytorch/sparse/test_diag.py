@@ -4,7 +4,7 @@ import backend as F
 import pytest
 import torch
 
-from dgl.mock_sparse2 import diag, DiagMatrix, identity
+from dgl.sparse import diag, DiagMatrix, identity
 
 # TODO(#4818): Skipping tests on win.
 if not sys.platform.startswith("linux"):

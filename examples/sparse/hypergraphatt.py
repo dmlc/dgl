@@ -4,7 +4,7 @@ Hypergraph Convolution and Hypergraph Attention
 """
 import argparse
 
-import dgl.mock_sparse2 as dglsp
+import dgl.sparse as dglsp
 
 import torch
 import torch.nn as nn

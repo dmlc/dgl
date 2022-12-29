@@ -4,7 +4,7 @@ import sys
 
 import backend as F
 
-import dgl.mock_sparse2 as dglsp
+import dgl.sparse as dglsp
 import pytest
 import torch
 

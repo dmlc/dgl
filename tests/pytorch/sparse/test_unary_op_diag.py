@@ -1,10 +1,10 @@
-import pytest
-import torch
 import sys
 
 import backend as F
+import pytest
+import torch
 
-from dgl.mock_sparse2 import diag
+from dgl.sparse import diag
 
 
 def test_neg():
