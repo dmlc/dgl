@@ -418,3 +418,21 @@ def test_has_duplicate():
     indptr, indices, _ = coo_A.csc()
     csc_A = create_from_csc(indptr, indices, val, shape)
     assert csc_A.has_duplicate()
+
+
+def test_print():
+    ctx = F.ctx()
+
+    # basic
+    row = torch.tensor([1, 1, 3]).to(ctx)
+    col = torch.tensor([2, 1, 3]).to(ctx)
+    val = torch.tensor([1.0, 1.0, 2.0]).to(ctx)
+    A = create_from_coo(row, col, val)
+    print(A)
+
+    # vector-shape non zero
+    row = torch.tensor([1, 1, 3]).to(ctx)
+    col = torch.tensor([2, 1, 3]).to(ctx)
+    val = torch.randn(3, 2).to(ctx)
+    A = create_from_coo(row, col, val)
+    print(A)
