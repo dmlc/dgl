@@ -49,3 +49,15 @@ python3 multi_gpu_node_classification.py
 ```
 Test Accuracy: ~0.7632
 ```
+
+### Link prediction
+Run with following (available dataset: "ogbn-products", "reddit")
+
+```bash
+python3 multi_gpu_link_prediction.py --dataset ogbn-products
+```
+
+#### __Results__
+```
+Test Accuracy: ~0.7632
+```
