@@ -67,9 +67,15 @@ torch::Tensor _CSRMask(
   auto row = TorchTensorToDGLArray(sub_mat->COOPtr()->row);
   auto col = TorchTensorToDGLArray(sub_mat->COOPtr()->col);
   runtime::NDArray ret;
-  ATEN_FLOAT_TYPE_SWITCH(val->dtype, DType, "Value Type", {
-    ret = aten::CSRGetData<DType>(csr, row, col, val, 0.);
-  });
+  if (val->dtype.bits == 32) {
+    ret = aten::CSRGetData<float>(csr, row, col, val, 0.);
+  } else if (val->dtype.bits == 64) {
+    ret = aten::CSRGetData<double>(csr, row, col, val, 0.);
+  } else {
+    TORCH_CHECK(
+        false, "Dtype of value for SpSpMM should be 32 or 64 bits but got: " +
+                   std::to_string(val->dtype.bits));
+  }
   return DGLArrayToTorchTensor(ret);
 }
 
