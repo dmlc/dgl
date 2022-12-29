@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from dgl.mock_sparse2 import (
+from dgl.sparse import (
     create_from_coo,
     create_from_csc,
     create_from_csr,

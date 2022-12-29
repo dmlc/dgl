@@ -4,7 +4,7 @@ import sys
 
 import backend as F
 
-from dgl.mock_sparse2 import diag
+from dgl.sparse import diag
 
 
 def test_neg():

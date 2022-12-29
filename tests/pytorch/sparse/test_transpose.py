@@ -2,7 +2,7 @@ import pytest
 import torch
 import sys
 
-from dgl.mock_sparse2 import diag, create_from_coo
+from dgl.sparse import diag, create_from_coo
 
 import backend as F
 

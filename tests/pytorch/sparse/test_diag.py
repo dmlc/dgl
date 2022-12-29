@@ -2,7 +2,7 @@ import pytest
 import torch
 import sys
 
-from dgl.mock_sparse2 import diag, identity, DiagMatrix
+from dgl.sparse import diag, identity, DiagMatrix
 
 # TODO(#4818): Skipping tests on win.
 if not sys.platform.startswith("linux"):

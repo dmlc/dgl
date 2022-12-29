@@ -2,7 +2,7 @@
 [Combining Label Propagation and Simple Models Out-performs
 Graph Neural Networks](https://arxiv.org/abs/2010.13993)
 """
-import dgl.mock_sparse2 as dglsp
+import dgl.sparse as dglsp
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
