@@ -9,6 +9,8 @@
 #include <sparse/sparse_matrix.h>
 #include <torch/script.h>
 
+#include <string>
+
 namespace dgl {
 namespace sparse {
 
@@ -52,6 +54,93 @@ torch::Tensor SpMMNoAutoGrad(
 torch::Tensor SDDMMNoAutoGrad(
     const c10::intrusive_ptr<SparseMatrix>& sparse_mat, torch::Tensor mat1,
     torch::Tensor mat2_tr);
+
+/**
+ * @brief Broadcast the dense feature to the nonzero entries and then compute
+ * x_e = \phi(x_e, x_v), where x_e is the nonzero value, x_v is the dense
+ * feature, and \phi is add, sub, mul, or div.
+ *
+ * This function does not take care of autograd.
+ *
+ * @param sparse_mat The sparse matrix with N rows and (nnz, D) nonzero values
+ * @param dense_mat Dense feature of shape (N, D)
+ * @param op Operator, can be add, sub, mul, or div
+ *
+ * @return Dense tensor of shape (nnz, D)
+ */
+torch::Tensor BroadcastOpNoAutoGrad(
+    const c10::intrusive_ptr<SparseMatrix>& sparse_mat, torch::Tensor dense_mat,
+    const std::string& op);
+
+/**
+ * @brief Broadcast the dense feature to the nonzero entries and then compute
+ * x_e = x_e - x_v, where x_e is the nonzero value, x_v is the dense
+ * feature.
+ *
+ * This function does not take care of autograd.
+ *
+ * @param sparse_mat The sparse matrix with N rows and (nnz, D) nonzero values
+ * @param dense_mat Dense feature of shape (N, D)
+ *
+ * @return Dense tensor of shape (nnz, D)
+ */
+torch::Tensor BroadcastSubNoAutoGrad(
+    const c10::intrusive_ptr<SparseMatrix>& sparse_mat,
+    torch::Tensor dense_mat);
+
+/**
+ * @brief Broadcast the dense feature to the nonzero entries and then compute
+ * x_e = x_e / x_v, where x_e is the nonzero value, x_v is the dense
+ * feature.
+ *
+ * This function does not take care of autograd.
+ *
+ * @param sparse_mat The sparse matrix with N rows and (nnz, D) nonzero values
+ * @param dense_mat Dense feature of shape (N, D)
+ *
+ * @return Dense tensor of shape (nnz, D)
+ */
+torch::Tensor BroadcastDivNoAutoGrad(
+    const c10::intrusive_ptr<SparseMatrix>& sparse_mat,
+    torch::Tensor dense_mat);
+
+/**
+ * @brief Broadcast the dense feature to the nonzero entries and then compute
+ * x_e = x_e * x_v, where x_e is the nonzero value, x_v is the dense
+ * feature.
+ *
+ * This function does not take care of autograd.
+ *
+ * @param sparse_mat The sparse matrix with N rows and (nnz, D) nonzero values
+ * @param dense_mat Dense feature of shape (N, D)
+ *
+ * @return Dense tensor of shape (nnz, D)
+ */
+torch::Tensor BroadcastMulNoAutoGrad(
+    const c10::intrusive_ptr<SparseMatrix>& sparse_mat,
+    torch::Tensor dense_mat);
+
+/**
+ * @brief Perform a sparse-sparse matrix multiplication with possibly different
+ * sparsities. The two sparse values must have 1-dimensional values. If the
+ * first sparse matrix has shape (n, m), the second sparse matrix must have
+ * shape (m, k), and the returned sparse matrix has shape (n, k).
+ *
+ * This function does not take care of autograd.
+ *
+ * @param lhs_mat The first sparse matrix of shape (n, m).
+ * @param lhs_val Sparse value for the first sparse matrix.
+ * @param rhs_mat The second sparse matrix of shape (m, k).
+ * @param rhs_val Sparse value for the second sparse matrix.
+ * @param lhs_transpose Whether the first matrix is transposed.
+ * @param rhs_transpose Whether the second matrix is transposed.
+ *
+ * @return Sparse matrix of shape (n, k).
+ */
+c10::intrusive_ptr<SparseMatrix> SpSpMMNoAutoGrad(
+    const c10::intrusive_ptr<SparseMatrix>& lhs_mat, torch::Tensor lhs_val,
+    const c10::intrusive_ptr<SparseMatrix>& rhs_mat, torch::Tensor rhs_val,
+    bool lhs_transpose, bool rhs_transpose);
 
 }  // namespace sparse
 }  // namespace dgl

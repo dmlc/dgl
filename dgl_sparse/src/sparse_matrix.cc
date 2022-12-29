@@ -20,37 +20,38 @@ SparseMatrix::SparseMatrix(
     const std::shared_ptr<CSR>& csc, torch::Tensor value,
     const std::vector<int64_t>& shape)
     : coo_(coo), csr_(csr), csc_(csc), value_(value), shape_(shape) {
-  CHECK(coo != nullptr || csr != nullptr || csc != nullptr)
-      << "At least one of CSR/COO/CSC is provided to construct a "
-         "SparseMatrix";
-  CHECK_EQ(shape.size(), 2)
-      << "The shape of a sparse matrix should be 2-dimensional";
+  TORCH_CHECK(
+      coo != nullptr || csr != nullptr || csc != nullptr, "At least ",
+      "one of CSR/COO/CSC is required to construct a SparseMatrix.")
+  TORCH_CHECK(
+      shape.size() == 2, "The shape of a sparse matrix should be ",
+      "2-dimensional.");
   // NOTE: Currently all the tensors of a SparseMatrix should on the same
   // device. Do we allow the graph structure and values are on different
   // devices?
   if (coo != nullptr) {
-    CHECK_EQ(coo->row.dim(), 1);
-    CHECK_EQ(coo->col.dim(), 1);
-    CHECK_EQ(coo->row.size(0), coo->col.size(0));
-    CHECK_EQ(coo->row.size(0), value.size(0));
-    CHECK_EQ(coo->row.device(), value.device());
-    CHECK_EQ(coo->col.device(), value.device());
+    TORCH_CHECK(coo->row.dim() == 1);
+    TORCH_CHECK(coo->col.dim() == 1);
+    TORCH_CHECK(coo->row.size(0) == coo->col.size(0));
+    TORCH_CHECK(coo->row.size(0) == value.size(0));
+    TORCH_CHECK(coo->row.device() == value.device());
+    TORCH_CHECK(coo->col.device() == value.device());
   }
   if (csr != nullptr) {
-    CHECK_EQ(csr->indptr.dim(), 1);
-    CHECK_EQ(csr->indices.dim(), 1);
-    CHECK_EQ(csr->indptr.size(0), shape[0] + 1);
-    CHECK_EQ(csr->indices.size(0), value.size(0));
-    CHECK_EQ(csr->indptr.device(), value.device());
-    CHECK_EQ(csr->indices.device(), value.device());
+    TORCH_CHECK(csr->indptr.dim() == 1);
+    TORCH_CHECK(csr->indices.dim() == 1);
+    TORCH_CHECK(csr->indptr.size(0) == shape[0] + 1);
+    TORCH_CHECK(csr->indices.size(0) == value.size(0));
+    TORCH_CHECK(csr->indptr.device() == value.device());
+    TORCH_CHECK(csr->indices.device() == value.device());
   }
   if (csc != nullptr) {
-    CHECK_EQ(csc->indptr.dim(), 1);
-    CHECK_EQ(csc->indices.dim(), 1);
-    CHECK_EQ(csc->indptr.size(0), shape[1] + 1);
-    CHECK_EQ(csc->indices.size(0), value.size(0));
-    CHECK_EQ(csc->indptr.device(), value.device());
-    CHECK_EQ(csc->indices.device(), value.device());
+    TORCH_CHECK(csc->indptr.dim() == 1);
+    TORCH_CHECK(csc->indices.dim() == 1);
+    TORCH_CHECK(csc->indptr.size(0) == shape[1] + 1);
+    TORCH_CHECK(csc->indices.size(0) == value.size(0));
+    TORCH_CHECK(csc->indptr.device() == value.device());
+    TORCH_CHECK(csc->indices.device() == value.device());
   }
 }
 
@@ -187,11 +188,12 @@ c10::intrusive_ptr<SparseMatrix> CreateFromCSC(
 
 c10::intrusive_ptr<SparseMatrix> CreateValLike(
     const c10::intrusive_ptr<SparseMatrix>& mat, torch::Tensor value) {
-  CHECK_EQ(mat->value().size(0), value.size(0))
-      << "The first dimension of the old values and the new values must be the "
-         "same.";
-  CHECK_EQ(mat->value().device(), value.device())
-      << "The device of the old values and the new values must be the same.";
+  TORCH_CHECK(
+      mat->value().size(0) == value.size(0), "The first dimension of ",
+      "the old values and the new values must be the same.");
+  TORCH_CHECK(
+      mat->value().device() == value.device(), "The device of the ",
+      "old values and the new values must be the same.");
   auto shape = mat->shape();
   if (mat->HasCOO()) {
     return SparseMatrix::FromCOO(mat->COOPtr(), value, shape);
