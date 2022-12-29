@@ -1,6 +1,7 @@
 import pytest
 import torch
 import sys
+import backend as F
 
 from dgl.mock_sparse2 import diag, identity, DiagMatrix
 
@@ -12,8 +13,9 @@ if not sys.platform.startswith("linux"):
 @pytest.mark.parametrize("val_shape", [(3,), (3, 2)])
 @pytest.mark.parametrize("mat_shape", [None, (3, 5), (5, 3)])
 def test_diag(val_shape, mat_shape):
+    ctx = F.ctx()
     # creation
-    val = torch.randn(val_shape)
+    val = torch.randn(val_shape).to(ctx)
     mat = diag(val, mat_shape)
 
     # val, shape attributes
@@ -22,8 +24,7 @@ def test_diag(val_shape, mat_shape):
         mat_shape = (val_shape[0], val_shape[0])
     assert mat.shape == mat_shape
 
-    # __call__
-    val = torch.randn(val_shape)
+    val = torch.randn(val_shape).to(ctx)
 
     # nnz
     assert mat.nnz == val.shape[0]
@@ -54,6 +55,7 @@ def test_diag(val_shape, mat_shape):
 @pytest.mark.parametrize("shape", [(3, 3), (3, 5), (5, 3)])
 @pytest.mark.parametrize("d", [None, 2])
 def test_identity(shape, d):
+    ctx = F.ctx()
     # creation
     mat = identity(shape, d)
     # type
@@ -68,3 +70,17 @@ def test_identity(shape, d):
         val_shape = (len_val, d)
     val = torch.ones(val_shape)
     assert torch.allclose(val, mat.val)
+
+
+def test_print():
+    ctx = F.ctx()
+
+    # basic
+    val = torch.tensor([1., 1., 2.]).to(ctx)
+    A = diag(val)
+    print(A)
+
+    # vector-shape non zero
+    val = torch.randn(3, 2).to(ctx)
+    A = diag(val)
+    print(A)

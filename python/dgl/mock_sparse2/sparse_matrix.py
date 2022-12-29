@@ -112,8 +112,7 @@ class SparseMatrix:
             raise NotImplementedError
 
     def __repr__(self):
-        return f'SparseMatrix(indices={self.indices("COO")}, \
-                \nvalues={self.val}, \nshape={self.shape}, nnz={self.nnz})'
+        return _sparse_matrix_str(self)
 
     def coo(self) -> Tuple[torch.Tensor, ...]:
         """Get the coordinate (COO) representation of the sparse matrix.
@@ -521,3 +520,28 @@ def val_like(mat: SparseMatrix, val: torch.Tensor) -> SparseMatrix:
     shape=(3, 5), nnz=3)
     """
     return SparseMatrix(torch.ops.dgl_sparse.val_like(mat.c_sparse_matrix, val))
+
+
+def _sparse_matrix_str(spmat : SparseMatrix) -> str:
+    """Internal function for converting a sparse matrix to string representation."""
+    indices_str = str(spmat.indices("COO"))
+    values_str = str(spmat.val)
+    meta_str = f"size={spmat.shape}, nnz={spmat.nnz}"
+    if spmat.val.dim() > 1:
+        val_size = tuple(spmat.val.shape[1:])
+        meta_str += f", val_size={val_size}"
+    prefix = f"{type(spmat).__name__}("
+    def _add_indent(_str, indent):
+        lines = _str.split('\n')
+        lines = [lines[0]] + [' ' * indent + line for line in lines[1:]]
+        return '\n'.join(lines)
+    final_str = ("indices="
+            + _add_indent(indices_str, len("indices="))
+            + ",\n"
+            + "values="
+            + _add_indent(values_str, len("values="))
+            + ",\n"
+            + meta_str
+            + ")")
+    final_str = prefix + _add_indent(final_str, len(prefix))
+    return final_str
