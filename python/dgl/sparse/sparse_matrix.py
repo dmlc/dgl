@@ -314,9 +314,7 @@ def from_coo(
     if val is None:
         val = torch.ones(row.shape[0]).to(row.device)
 
-    return SparseMatrix(
-        torch.ops.dgl_sparse.from_coo(row, col, val, shape)
-    )
+    return SparseMatrix(torch.ops.dgl_sparse.from_coo(row, col, val, shape))
 
 
 def from_csr(
