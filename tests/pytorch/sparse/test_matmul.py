@@ -4,7 +4,7 @@ import backend as F
 import pytest
 import torch
 
-from dgl.sparse import bspmm, create_from_coo, val_like
+from dgl.sparse import bspmm, from_coo, val_like
 
 from .utils import (
     clone_detach_and_grad,
@@ -125,13 +125,13 @@ def test_spspmm_duplicate():
     col = torch.tensor([1, 1, 1, 2, 2]).to(dev)
     val = torch.randn(len(row)).to(dev)
     shape = (4, 4)
-    A1 = create_from_coo(row, col, val, shape)
+    A1 = from_coo(row, col, val, shape)
 
     row = torch.tensor([1, 0, 0, 1]).to(dev)
     col = torch.tensor([1, 1, 2, 2]).to(dev)
     val = torch.randn(len(row)).to(dev)
     shape = (4, 4)
-    A2 = create_from_coo(row, col, val, shape)
+    A2 = from_coo(row, col, val, shape)
 
     try:
         A1 @ A2

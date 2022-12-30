@@ -104,7 +104,7 @@ if __name__ == "__main__":
     # for adjacency matrix in the original paper).
     src, dst = g.edges()
     N = g.num_nodes()
-    A = dglsp.create_from_coo(dst, src, shape=(N, N))
+    A = dglsp.from_coo(dst, src, shape=(N, N))
 
     # Calculate the symmetrically normalized adjacency matrix.
     I = dglsp.identity(A.shape, device=dev)

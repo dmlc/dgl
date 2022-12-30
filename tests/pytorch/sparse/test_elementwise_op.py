@@ -6,9 +6,9 @@ import torch
 
 from dgl.sparse import (
     add,
-    create_from_coo,
-    create_from_csc,
-    create_from_csr,
+    from_coo,
+    from_csc,
+    from_csr,
     diag,
 )
 
@@ -23,12 +23,12 @@ def test_add_coo(val_shape):
     row = torch.tensor([1, 0, 2]).to(ctx)
     col = torch.tensor([0, 3, 2]).to(ctx)
     val = torch.randn(row.shape + val_shape).to(ctx)
-    A = create_from_coo(row, col, val)
+    A = from_coo(row, col, val)
 
     row = torch.tensor([1, 0]).to(ctx)
     col = torch.tensor([0, 2]).to(ctx)
     val = torch.randn(row.shape + val_shape).to(ctx)
-    B = create_from_coo(row, col, val, shape=A.shape)
+    B = from_coo(row, col, val, shape=A.shape)
 
     sum1 = (A + B).dense()
     sum2 = add(A, B).dense()
@@ -44,12 +44,12 @@ def test_add_csr(val_shape):
     indptr = torch.tensor([0, 1, 2, 3]).to(ctx)
     indices = torch.tensor([3, 0, 2]).to(ctx)
     val = torch.randn(indices.shape + val_shape).to(ctx)
-    A = create_from_csr(indptr, indices, val)
+    A = from_csr(indptr, indices, val)
 
     indptr = torch.tensor([0, 1, 2, 2]).to(ctx)
     indices = torch.tensor([2, 0]).to(ctx)
     val = torch.randn(indices.shape + val_shape).to(ctx)
-    B = create_from_csr(indptr, indices, val, shape=A.shape)
+    B = from_csr(indptr, indices, val, shape=A.shape)
 
     sum1 = (A + B).dense()
     sum2 = add(A, B).dense()
@@ -65,12 +65,12 @@ def test_add_csc(val_shape):
     indptr = torch.tensor([0, 1, 1, 2, 3]).to(ctx)
     indices = torch.tensor([1, 2, 0]).to(ctx)
     val = torch.randn(indices.shape + val_shape).to(ctx)
-    A = create_from_csc(indptr, indices, val)
+    A = from_csc(indptr, indices, val)
 
     indptr = torch.tensor([0, 1, 1, 2, 2]).to(ctx)
     indices = torch.tensor([1, 0]).to(ctx)
     val = torch.randn(indices.shape + val_shape).to(ctx)
-    B = create_from_csc(indptr, indices, val, shape=A.shape)
+    B = from_csc(indptr, indices, val, shape=A.shape)
 
     sum1 = (A + B).dense()
     sum2 = add(A, B).dense()
@@ -102,7 +102,7 @@ def test_add_sparse_diag(val_shape):
     row = torch.tensor([1, 0, 2]).to(ctx)
     col = torch.tensor([0, 3, 2]).to(ctx)
     val = torch.randn(row.shape + val_shape).to(ctx)
-    A = create_from_coo(row, col, val)
+    A = from_coo(row, col, val)
 
     shape = (3, 4)
     val_shape = (shape[0],) + val_shape

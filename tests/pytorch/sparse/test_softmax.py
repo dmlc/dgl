@@ -6,7 +6,7 @@ import dgl
 import pytest
 import torch
 
-from dgl.sparse import create_from_coo, softmax
+from dgl.sparse import from_coo, softmax
 
 # TODO(#4818): Skipping tests on win.
 if not sys.platform.startswith("linux"):
@@ -26,7 +26,7 @@ def test_softmax(val_D, csr):
         val = torch.randn(nnz, val_D).to(dev)
 
     val_sparse = val.clone().requires_grad_()
-    A = create_from_coo(row, col, val_sparse)
+    A = from_coo(row, col, val_sparse)
 
     if csr:
         # Test CSR
