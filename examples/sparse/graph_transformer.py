@@ -4,16 +4,16 @@
 """
 
 import dgl
-import dgl.sparse as dglsp
 import dgl.nn as dglnn
+import dgl.sparse as dglsp
 import torch
 import torch.nn as nn
-import torch.optim as optim
 import torch.nn.functional as F
+import torch.optim as optim
 
 from dgl.data import AsGraphPredDataset
 from dgl.dataloading import GraphDataLoader
-from ogb.graphproppred import DglGraphPropPredDataset, Evaluator, collate_dgl
+from ogb.graphproppred import collate_dgl, DglGraphPropPredDataset, Evaluator
 from ogb.graphproppred.mol_encoder import AtomEncoder
 from tqdm import tqdm
 
@@ -94,7 +94,7 @@ class GTModel(nn.Module):
             nn.ReLU(),
             nn.Linear(hidden_size // 2, hidden_size // 4),
             nn.ReLU(),
-            nn.Linear(hidden_size // 4, out_size)
+            nn.Linear(hidden_size // 4, out_size),
         )
 
     def forward(self, g, X, pos_enc):
@@ -116,21 +116,21 @@ def evaluate(model, dataloader, evaluator, device):
     y_pred = []
     for batched_g, labels in dataloader:
         batched_g, labels = batched_g.to(device), labels.to(device)
-        y_hat = model(
-            batched_g, batched_g.ndata['feat'], batched_g.ndata['PE']
-        )
+        y_hat = model(batched_g, batched_g.ndata["feat"], batched_g.ndata["PE"])
         y_true.append(labels.view(y_hat.shape).detach().cpu())
-        y_pred.append(y_hat.detach().cpu())          
+        y_pred.append(y_hat.detach().cpu())
     y_true = torch.cat(y_true, dim=0).numpy()
     y_pred = torch.cat(y_pred, dim=0).numpy()
-    input_dict = {'y_true': y_true, 'y_pred': y_pred}
-    return evaluator.eval(input_dict)['rocauc']
+    input_dict = {"y_true": y_true, "y_pred": y_pred}
+    return evaluator.eval(input_dict)["rocauc"]
 
 
 def train(model, dataset, evaluator, device):
     train_dataloader = GraphDataLoader(
-        dataset[dataset.train_idx], batch_size=256,
-        shuffle=True, collate_fn=collate_dgl
+        dataset[dataset.train_idx],
+        batch_size=256,
+        shuffle=True,
+        collate_fn=collate_dgl,
     )
     valid_dataloader = GraphDataLoader(
         dataset[dataset.val_idx], batch_size=256, collate_fn=collate_dgl
@@ -147,11 +147,11 @@ def train(model, dataset, evaluator, device):
 
     for epoch in range(num_epochs):
         model.train()
-        total_loss = 0.
+        total_loss = 0.0
         for batched_g, labels in train_dataloader:
             batched_g, labels = batched_g.to(device), labels.to(device)
             logits = model(
-                batched_g, batched_g.ndata['feat'], batched_g.ndata['PE']
+                batched_g, batched_g.ndata["feat"], batched_g.ndata["PE"]
             )
             loss = loss_fcn(logits, labels.float())
             total_loss += loss.item()
@@ -163,8 +163,8 @@ def train(model, dataset, evaluator, device):
         val_metric = evaluate(model, valid_dataloader, evaluator, device)
         test_metric = evaluate(model, test_dataloader, evaluator, device)
         print(
-            f'Epoch: {epoch:03d}, Loss: {avg_loss:.4f}, '
-            f'Val: {val_metric:.4f}, Test: {test_metric:.4f}'
+            f"Epoch: {epoch:03d}, Loss: {avg_loss:.4f}, "
+            f"Val: {val_metric:.4f}, Test: {test_metric:.4f}"
         )
 
 
@@ -176,12 +176,12 @@ if __name__ == "__main__":
     # load dataset
     pos_enc_size = 8
     dataset = AsGraphPredDataset(
-        DglGraphPropPredDataset('ogbg-molhiv', './data/OGB')
+        DglGraphPropPredDataset("ogbg-molhiv", "./data/OGB")
     )
-    evaluator = Evaluator('ogbg-molhiv')
+    evaluator = Evaluator("ogbg-molhiv")
     # laplacian positional encoding
     for g, _ in tqdm(dataset, desc="Computing Laplacian PE"):
-        g.ndata['PE'] = dgl.laplacian_pe(g, k=pos_enc_size, padding=True)
+        g.ndata["PE"] = dgl.laplacian_pe(g, k=pos_enc_size, padding=True)
 
     # Create model.
     out_size = dataset.num_tasks
