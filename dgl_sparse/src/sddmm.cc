@@ -7,6 +7,8 @@
 #include <sparse/spmm.h>
 #include <torch/script.h>
 
+#include <sstream>
+
 #include "./matmul.h"
 #include "./utils.h"
 
@@ -27,27 +29,40 @@ class SDDMMAutoGrad : public Function<SDDMMAutoGrad> {
 void _SDDMMSanityCheck(
     const c10::intrusive_ptr<SparseMatrix>& sparse_mat, torch::Tensor mat1,
     torch::Tensor mat2) {
-  const int64_t mat1_dim = mat1.dim();
-  const int64_t mat2_dim = mat2.dim();
-  CHECK_EQ(mat1_dim, mat2_dim)
-      << "SDDMM: the two dense matrices should have the same dimensions.";
-  CHECK_LE(mat1_dim, 2)
-      << "SDDMM: the first dense matrix should have at most two dimensions.";
-  CHECK_EQ(sparse_mat->shape()[0], mat1.size(0))
-      << "SDDMM: the first dense matrix should have the same first dimension "
-         "as the sparse matrix";
-  CHECK_EQ(sparse_mat->shape()[1], mat2.size(mat2_dim - 1))
-      << "SDDMM: the second dense matrix should have the same last dimension "
-         "as the sparse matrix";
-  if (mat1_dim == 2) {
-    CHECK_EQ(mat1.size(1), mat2.size(0))
-        << "SDDMM: the second dimension of the first dense matrix should be "
-           "equal to the first dimension of the second dense matrix.";
+  bool shape_check = true;
+  shape_check &= mat1.dim() == mat2.dim();
+  shape_check &= mat1.dim() <= 3;
+  shape_check &= sparse_mat->shape()[0] == mat1.size(0);
+  if (mat1.dim() == 3) {
+    shape_check &= sparse_mat->shape()[1] == mat2.size(1);
+    shape_check &= mat1.size(2) == mat2.size(2);
+    if (sparse_mat->value().dim() > 1) {
+      shape_check &= sparse_mat->value().size(1) == mat1.size(2);
+    }
+  } else {
+    shape_check &= sparse_mat->shape()[1] == mat2.size(mat2.dim() - 1);
   }
-  CHECK_EQ(mat1.dtype(), mat2.dtype())
-      << "SDDMM: the two dense matrices should have the same dtype.";
-  CHECK_EQ(mat1.device(), mat2.device())
-      << "SDDMM: the two dense matrices should on the same device.";
+  if (mat1.dim() >= 2) {
+    shape_check &= mat1.size(1) == mat2.size(0);
+  }
+  if (!shape_check) {
+    std::stringstream error;
+    error << "SDDMM: Invalid input shapes. sparse_mat: "
+          << c10::IntArrayRef(sparse_mat->shape())
+          << ", sparse_val: " << sparse_mat->value().sizes()
+          << ", mat1: " << mat1.sizes() << ", mat2: " << mat2.sizes()
+          << ". Valid input shapes (sparse_mat, mat1, mat2) are: (1) (n, m), "
+             "(n, k), and (k, m); (2) (n, m), (n,), and (m,); (3) (n, m, b), "
+             "(n, k, b) and (k, m, b); (4) "
+             "(n, m), (n, k, b), and (k, m, b).";
+    TORCH_CHECK(false, error.str());
+  }
+  TORCH_CHECK(
+      mat1.dtype() == mat2.dtype(),
+      "SDDMM: the two dense matrices should have the same dtype.");
+  TORCH_CHECK(
+      mat1.device() == mat2.device(),
+      "SDDMM: the two dense matrices should on the same device.");
 }
 
 torch::Tensor SDDMMAutoGrad::forward(
@@ -101,7 +116,12 @@ c10::intrusive_ptr<SparseMatrix> SDDMM(
   }
   _SDDMMSanityCheck(sparse_mat, mat1, mat2);
   auto val = SDDMMAutoGrad::apply(sparse_mat, mat1, mat2);
-  val = val * sparse_mat->value();
+  auto sparse_val = sparse_mat->value();
+  // Broadcast the sparse value in batched SDDMM.
+  if (sparse_val.dim() < val.dim()) {
+    sparse_val = sparse_val.unsqueeze(-1);
+  }
+  val = val * sparse_val;
   return CreateValLike(sparse_mat, val);
 }
 
