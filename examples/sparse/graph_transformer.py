@@ -4,13 +4,18 @@
 """
 
 import dgl
+import dgl.sparse as dglsp
+import dgl.nn as dglnn
 import torch
 import torch.nn as nn
+import torch.optim as optim
 import torch.nn.functional as F
 
-from dgl.data import CoraGraphDataset
-from dgl.mock_sparse import bspmm, create_from_coo, mock_bsddmm as bsddmm
-from torch.optim import Adam
+from dgl.data import AsGraphPredDataset
+from dgl.dataloading import GraphDataLoader
+from ogb.graphproppred import DglGraphPropPredDataset, Evaluator, collate_dgl
+from ogb.graphproppred.mol_encoder import AtomEncoder
+from tqdm import tqdm
 
 
 class SparseMHA(nn.Module):
@@ -30,17 +35,17 @@ class SparseMHA(nn.Module):
 
     def forward(self, A, h):
         N = len(h)
-        q = self.q_proj(h).reshape(N, self.num_heads, self.head_dim)
+        q = self.q_proj(h).reshape(N, self.head_dim, self.num_heads)
         q *= self.scaling
-        k = self.k_proj(h).reshape(N, self.num_heads, self.head_dim)
-        v = self.v_proj(h).reshape(N, self.num_heads, self.head_dim)
+        k = self.k_proj(h).reshape(N, self.head_dim, self.num_heads)
+        v = self.v_proj(h).reshape(N, self.head_dim, self.num_heads)
 
         ######################################################################
         # (HIGHLIGHT) Compute the multi-head attention with Sparse Matrix API
         ######################################################################
-        attn = bsddmm(A, q.permute(1, 0, 2), k.permute(1, 2, 0))  # [N, N, nh]
+        attn = dglsp.bsddmm(A, q, k.transpose(1, 0))  # [N, N, nh]
         attn = attn.softmax()
-        out = bspmm(attn, v.permute(0, 2, 1)).permute(0, 2, 1)
+        out = dglsp.bspmm(attn, v)
 
         return self.out_proj(out.reshape(N, -1))
 
@@ -48,7 +53,7 @@ class SparseMHA(nn.Module):
 class GTLayer(nn.Module):
     """Graph Transformer Layer"""
 
-    def __init__(self, hidden_size=80, num_heads=8) -> None:
+    def __init__(self, hidden_size=80, num_heads=8):
         super().__init__()
         self.MHA = SparseMHA(hidden_size=hidden_size, num_heads=num_heads)
         self.batchnorm1 = nn.BatchNorm1d(hidden_size)
@@ -71,68 +76,95 @@ class GTLayer(nn.Module):
 class GTModel(nn.Module):
     def __init__(
         self,
-        in_size,
         out_size,
-        hidden_size=64,
+        hidden_size=80,
         pos_enc_size=2,
-        num_layers=6,
+        num_layers=8,
         num_heads=8,
     ):
         super().__init__()
-        self.h_linear = nn.Linear(in_size, hidden_size)
+        self.atom_encoder = AtomEncoder(hidden_size)
         self.pos_linear = nn.Linear(pos_enc_size, hidden_size)
-        self.out_linear = nn.Linear(hidden_size, out_size)
         self.layers = nn.ModuleList(
             [GTLayer(hidden_size, num_heads) for _ in range(num_layers)]
         )
+        self.pooler = dglnn.SumPooling()
+        self.predictor = nn.Sequential(
+            nn.Linear(hidden_size, hidden_size // 2),
+            nn.ReLU(),
+            nn.Linear(hidden_size // 2, hidden_size // 4),
+            nn.ReLU(),
+            nn.Linear(hidden_size // 4, out_size)
+        )
 
-    def forward(self, A, X, pos_enc):
-        h = self.h_linear(X) + self.pos_linear(pos_enc)
+    def forward(self, g, X, pos_enc):
+        src, dst = g.edges()
+        N = g.num_nodes()
+        A = dglsp.create_from_coo(dst, src, shape=(N, N))
+        h = self.atom_encoder(X) + self.pos_linear(pos_enc)
         for layer in self.layers:
             h = layer(A, h)
+        h = self.pooler(g, h)
 
-        return self.out_linear(h)
-
-
-def evaluate(g, pred):
-    label = g.ndata["label"]
-    val_mask = g.ndata["val_mask"]
-    test_mask = g.ndata["test_mask"]
-
-    # Compute accuracy on validation/test set.
-    val_acc = (pred[val_mask] == label[val_mask]).float().mean()
-    test_acc = (pred[test_mask] == label[test_mask]).float().mean()
-    return val_acc, test_acc
+        return self.predictor(h)
 
 
-def train(model, g, A, X, pos_enc):
-    label = g.ndata["label"]
-    train_mask = g.ndata["train_mask"]
-    optimizer = Adam(model.parameters(), lr=1e-3, weight_decay=5e-4)
-    loss_fcn = nn.CrossEntropyLoss()
+@torch.no_grad()
+def evaluate(model, dataloader, evaluator, device):
+    model.eval()
+    y_true = []
+    y_pred = []
+    for batched_g, labels in dataloader:
+        batched_g, labels = batched_g.to(device), labels.to(device)
+        y_hat = model(
+            batched_g, batched_g.ndata['feat'], batched_g.ndata['PE']
+        )
+        y_true.append(labels.view(y_hat.shape).detach().cpu())
+        y_pred.append(y_hat.detach().cpu())          
+    y_true = torch.cat(y_true, dim=0).numpy()
+    y_pred = torch.cat(y_pred, dim=0).numpy()
+    input_dict = {'y_true': y_true, 'y_pred': y_pred}
+    return evaluator.eval(input_dict)['rocauc']
 
-    for epoch in range(20):
+
+def train(model, dataset, evaluator, device):
+    train_dataloader = GraphDataLoader(
+        dataset[dataset.train_idx], batch_size=256,
+        shuffle=True, collate_fn=collate_dgl
+    )
+    valid_dataloader = GraphDataLoader(
+        dataset[dataset.val_idx], batch_size=256, collate_fn=collate_dgl
+    )
+    test_dataloader = GraphDataLoader(
+        dataset[dataset.test_idx], batch_size=256, collate_fn=collate_dgl
+    )
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    num_epochs = 50
+    scheduler = optim.lr_scheduler.StepLR(
+        optimizer, step_size=num_epochs, gamma=0.5
+    )
+    loss_fcn = nn.BCEWithLogitsLoss()
+
+    for epoch in range(num_epochs):
         model.train()
-
-        # Forward.
-        logits = model(A, X, pos_enc)
-
-        # Compute loss with nodes in the training set.
-        loss = loss_fcn(logits[train_mask], label[train_mask])
-
-        # Backward.
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-        # Compute prediction.
-        pred = logits.argmax(dim=1)
-
-        # Evaluate the prediction.
-        val_acc, test_acc = evaluate(g, pred)
+        total_loss = 0.
+        for batched_g, labels in train_dataloader:
+            batched_g, labels = batched_g.to(device), labels.to(device)
+            logits = model(
+                batched_g, batched_g.ndata['feat'], batched_g.ndata['PE']
+            )
+            loss = loss_fcn(logits, labels.float())
+            total_loss += loss.item()
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+        scheduler.step()
+        avg_loss = total_loss / len(train_dataloader)
+        val_metric = evaluate(model, valid_dataloader, evaluator, device)
+        test_metric = evaluate(model, test_dataloader, evaluator, device)
         print(
-            f"In epoch {epoch}, loss: {loss:.3f}, val acc: {val_acc:.3f}"
-            f", test acc: {test_acc:.3f}"
+            f'Epoch: {epoch:03d}, Loss: {avg_loss:.4f}, '
+            f'Val: {val_metric:.4f}, Test: {test_metric:.4f}'
         )
 
 
@@ -141,23 +173,19 @@ if __name__ == "__main__":
     # otherwise.
     dev = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    # Load graph from the existing dataset.
-    dataset = CoraGraphDataset()
-    g = dataset[0].to(dev)
-    num_classes = dataset.num_classes
-    X = g.ndata["feat"]
+    # load dataset
+    pos_enc_size = 8
+    dataset = AsGraphPredDataset(
+        DglGraphPropPredDataset('ogbg-molhiv', './data/OGB')
+    )
+    evaluator = Evaluator('ogbg-molhiv')
     # laplacian positional encoding
-    pos_enc = dgl.laplacian_pe(g, 2).to(dev)
-
-    # Create the adjacency matrix of graph.
-    src, dst = g.edges()
-    N = g.num_nodes()
-    A = create_from_coo(dst, src, shape=(N, N))
+    for g, _ in tqdm(dataset, desc="Computing Laplacian PE"):
+        g.ndata['PE'] = dgl.laplacian_pe(g, k=pos_enc_size, padding=True)
 
     # Create model.
-    in_size = X.shape[1]
-    out_size = num_classes
-    model = GTModel(in_size, out_size).to(dev)
+    out_size = dataset.num_tasks
+    model = GTModel(out_size=out_size, pos_enc_size=pos_enc_size).to(dev)
 
     # Kick off training.
-    train(model, g, A, X, pos_enc)
+    train(model, dataset, evaluator, dev)
