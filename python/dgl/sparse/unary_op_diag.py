@@ -1,6 +1,6 @@
 """DGL unary operators for diagonal matrix module."""
 # pylint: disable= invalid-name
-from .diag_matrix import DiagMatrix, diag
+from .diag_matrix import diag, DiagMatrix
 
 
 def neg(D: DiagMatrix) -> DiagMatrix:
