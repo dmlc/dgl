@@ -4,9 +4,19 @@ import os
 import sys
 import time
 
+import dgl
+
 import numpy as np
 import torch
 import torch.nn.functional as F
+from dgl.dataloading import (
+    DataLoader,
+    Sampler,
+    set_edge_lazy_features,
+    set_node_lazy_features,
+)
+from dgl.nn import GraphConv, SortPooling
+from dgl.sampling import global_uniform_negative_sampling
 from ogb.linkproppred import DglLinkPropPredDataset, Evaluator
 from scipy.sparse.csgraph import shortest_path
 from torch.nn import (
@@ -18,16 +28,6 @@ from torch.nn import (
     ModuleList,
 )
 from tqdm import tqdm
-
-import dgl
-from dgl.dataloading import (
-    DataLoader,
-    Sampler,
-    set_node_lazy_features,
-    set_edge_lazy_features
-)
-from dgl.nn import GraphConv, SortPooling
-from dgl.sampling import global_uniform_negative_sampling
 
 
 class Logger(object):
