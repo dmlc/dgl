@@ -17,7 +17,7 @@ namespace sparse {
 std::shared_ptr<COO> COOFromOldDGLCOO(const aten::COOMatrix& dgl_coo) {
   auto row = DGLArrayToTorchTensor(dgl_coo.row);
   auto col = DGLArrayToTorchTensor(dgl_coo.col);
-  CHECK(aten::IsNullArray(dgl_coo.data));
+  TORCH_CHECK(aten::IsNullArray(dgl_coo.data));
   return std::make_shared<COO>(
       COO{dgl_coo.num_rows, dgl_coo.num_cols, row, col, dgl_coo.row_sorted,
           dgl_coo.col_sorted});

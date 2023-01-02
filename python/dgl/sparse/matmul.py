@@ -8,7 +8,7 @@ from .diag_matrix import diag, DiagMatrix
 
 from .sparse_matrix import SparseMatrix
 
-__all__ = ["spmm", "spspmm", "mm"]
+__all__ = ["spmm", "bspmm", "spspmm", "mm"]
 
 
 def spmm(A: Union[SparseMatrix, DiagMatrix], X: torch.Tensor) -> torch.Tensor:
@@ -51,6 +51,44 @@ def spmm(A: Union[SparseMatrix, DiagMatrix], X: torch.Tensor) -> torch.Tensor:
     if not isinstance(A, SparseMatrix):
         A = A.as_sparse()
     return torch.ops.dgl_sparse.spmm(A.c_sparse_matrix, X)
+
+
+def bspmm(A: Union[SparseMatrix, DiagMatrix], X: torch.Tensor) -> torch.Tensor:
+    """Multiply a sparse matrix by a dense matrix by batches.
+
+    Parameters
+    ----------
+    A : SparseMatrix or DiagMatrix
+        Sparse matrix of shape (N, M, B) with values of shape (nnz)
+    X : torch.Tensor
+        Dense tensor of shape (M, F, B)
+
+    Returns
+    -------
+    torch.Tensor
+        The multiplication result of shape (N, F, B)
+
+    Examples
+    --------
+
+    >>> row = torch.tensor([0, 1, 1])
+    >>> col = torch.tensor([1, 0, 2])
+    >>> val = torch.randn(len(row), 2)
+    >>> A = create_from_coo(row, col, val, shape=(3, 3))
+    >>> X = torch.randn(3, 3, 2)
+    >>> result = dgl.sparse.bspmm(A, X)
+    >>> print(type(result))
+    <class 'torch.Tensor'>
+    >>> print(result.shape)
+    torch.Size([3, 3, 2])
+    """
+    assert isinstance(
+        A, (SparseMatrix, DiagMatrix)
+    ), f"Expect arg1 to be a SparseMatrix or DiagMatrix object, got {type(A)}"
+    assert isinstance(
+        X, torch.Tensor
+    ), f"Expect arg2 to be a torch.Tensor, got {type(X)}"
+    return spmm(A, X)
 
 
 def _diag_diag_mm(A1: DiagMatrix, A2: DiagMatrix) -> DiagMatrix:
