@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 import pyarrow
 import pyarrow.csv as csv
+import pyarrow.parquet as pq
 import torch
 import torch.distributed as dist
 
@@ -77,7 +78,8 @@ def gen_edge_files(schema_map, output):
     num_parts = len(schema_map[constants.STR_NUM_EDGES_PER_CHUNK][0])
     for etype_name, etype_info in edge_data.items():
 
-        edge_info = etype_info[constants.STR_DATA]
+        edges_format = etype_info[constants.STR_FORMAT][constants.STR_NAME]
+        edge_data_files = etype_info[constants.STR_DATA]
 
         # ``edgetype`` strings are in canonical format, src_node_type:edge_type:dst_node_type
         tokens = etype_name.split(":")
@@ -87,29 +89,42 @@ def gen_edge_files(schema_map, output):
         rel_name = tokens[1]
         dst_ntype_name = tokens[2]
 
-        data_df = csv.read_csv(
-            edge_info[rank],
-            read_options=pyarrow.csv.ReadOptions(
-                autogenerate_column_names=True
-            ),
-            parse_options=pyarrow.csv.ParseOptions(delimiter=" "),
-        )
-        data_f0 = data_df["f0"].to_numpy()
-        data_f1 = data_df["f1"].to_numpy()
+        def convert_to_numpy_and_write_back(data_df):
+            data_f0 = data_df["f0"].to_numpy()
+            data_f1 = data_df["f1"].to_numpy()
 
-        global_src_id = data_f0 + ntype_gnid_offset[src_ntype_name][0, 0]
-        global_dst_id = data_f1 + ntype_gnid_offset[dst_ntype_name][0, 0]
-        cols = [global_src_id, global_dst_id]
-        col_names = ["global_src_id", "global_dst_id"]
+            global_src_id = data_f0 + ntype_gnid_offset[src_ntype_name][0, 0]
+            global_dst_id = data_f1 + ntype_gnid_offset[dst_ntype_name][0, 0]
+            cols = [global_src_id, global_dst_id]
+            col_names = ["global_src_id", "global_dst_id"]
 
-        out_file = edge_info[rank].split("/")[-1]
-        out_file = os.path.join(outdir, "edges_{}".format(out_file))
-        options = csv.WriteOptions(include_header=False, delimiter=" ")
-        options.delimiter = " "
+            out_file = edge_data_files[rank].split("/")[-1]
+            out_file = os.path.join(outdir, "edges_{}".format(out_file))
 
-        csv.write_csv(
-            pyarrow.Table.from_arrays(cols, names=col_names), out_file, options
-        )
+            # TODO(thvasilo): We should support writing to the same format as the input
+            options = csv.WriteOptions(include_header=False, delimiter=" ")
+            options.delimiter = " "
+            csv.write_csv(
+                pyarrow.Table.from_arrays(cols, names=col_names), out_file, options
+            )
+            return out_file
+
+        if edges_format == constants.STR_CSV:
+            delimiter = etype_info[constants.STR_FORMAT][constants.STR_FORMAT_DELIMITER]
+            data_df = csv.read_csv(
+                edge_data_files[rank],
+                read_options=pyarrow.csv.ReadOptions(
+                    autogenerate_column_names=True
+                ),
+                parse_options=pyarrow.csv.ParseOptions(delimiter=delimiter),
+            )
+        elif edges_format == constants.STR_PARQUET:
+            data_df = pq.read_table(edge_data_files[rank])
+            data_df = data_df.rename_columns(["f0", "f1"])
+        else:
+            raise NotImplementedError(f"Unknown edge format {edges_format}")
+
+        out_file = convert_to_numpy_and_write_back(data_df)
         edge_files.append(out_file)
 
     return edge_files
@@ -277,7 +292,8 @@ def gen_parmetis_input_args(params, schema_map):
     """
 
     num_nodes_per_chunk = schema_map[constants.STR_NUM_NODES_PER_CHUNK]
-    num_parts = len(num_nodes_per_chunk[0])
+    # TODO: This makes the assumption that all node files have the same number of chunks
+    num_node_parts = len(num_nodes_per_chunk[0])
     ntypes_ntypeid_map, ntypes, ntid_ntype_map = get_node_types(schema_map)
     type_nid_dict, ntype_gnid_offset = get_idranges(
         schema_map[constants.STR_NODE_TYPE],
@@ -319,7 +335,7 @@ def gen_parmetis_input_args(params, schema_map):
     os.makedirs(outdir, exist_ok=True)
     for ntype_id, ntype_name in ntid_ntype_map.items():
         global_nid_offset = ntype_gnid_offset[ntype_name][0, 0]
-        for r in range(num_parts):
+        for r in range(num_node_parts):
             type_start, type_end = (
                 type_nid_dict[ntype_name][r][0],
                 type_nid_dict[ntype_name][r][1],
@@ -345,9 +361,9 @@ def gen_parmetis_input_args(params, schema_map):
     edge_data = schema_map[constants.STR_EDGES]
     edge_files = []
     for etype_name, etype_info in edge_data.items():
-        edge_info = etype_info[constants.STR_DATA]
-        for r in range(num_parts):
-            out_file = edge_info[r].split("/")[-1]
+        edge_data_files = etype_info[constants.STR_DATA]
+        for edge_file_path in edge_data_files:
+            out_file = os.path.basename(edge_file_path)
             out_file = os.path.join(outdir, "edges_{}".format(out_file))
             edge_files.append(out_file)
 
