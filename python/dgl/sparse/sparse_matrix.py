@@ -66,6 +66,28 @@ class SparseMatrix:
         """
         return self.c_sparse_matrix.device()
 
+    @property
+    def row(self) -> torch.Tensor:
+        """Get the row indices of the nonzero elements.
+
+        Returns
+        -------
+        tensor
+            Row indices of the nonzero elements
+        """
+        return self.coo()[0]
+
+    @property
+    def col(self) -> torch.Tensor:
+        """Get the column indices of the nonzero elements.
+
+        Returns
+        -------
+        tensor
+            Column indices of the nonzero elements
+        """
+        return self.coo()[1]
+
     def indices(
         self, fmt: str, return_shuffle=False
     ) -> Tuple[torch.Tensor, ...]:
@@ -90,8 +112,7 @@ class SparseMatrix:
             raise NotImplementedError
 
     def __repr__(self):
-        return f'SparseMatrix(indices={self.indices("COO")}, \
-                \nvalues={self.val}, \nshape={self.shape}, nnz={self.nnz})'
+        return _sparse_matrix_str(self)
 
     def coo(self) -> Tuple[torch.Tensor, ...]:
         """Get the coordinate (COO) representation of the sparse matrix.
@@ -136,7 +157,7 @@ class SparseMatrix:
         row, col = self.coo()
         val = self.val
         shape = self.shape + val.shape[1:]
-        mat = torch.zeros(shape, device=self.device)
+        mat = torch.zeros(shape, device=self.device, dtype=self.dtype)
         mat[row, col] = val
         return mat
 
@@ -172,6 +193,60 @@ class SparseMatrix:
         shape=(4, 4), nnz=3)
         """
         return SparseMatrix(self.c_sparse_matrix.transpose())
+
+    def coalesce(self):
+        """Return a coalesced sparse matrix.
+
+        A coalesced sparse matrix satisfies the following properties:
+
+          - the indices of the non-zero elements are unique,
+          - the indices are sorted in lexicographical order.
+
+        The coalescing process will accumulate the non-zero values of the same
+        indices by summation.
+
+        The function does not support autograd.
+
+        Returns
+        -------
+        SparseMatrix
+            The coalesced sparse matrix.
+
+        Examples
+        --------
+        >>> row = torch.tensor([1, 0, 0, 0, 1])
+        >>> col = torch.tensor([1, 1, 1, 2, 2])
+        >>> val = torch.tensor([0, 1, 2, 3, 4])
+        >>> A = create_from_coo(row, col, val)
+        >>> A = A.coalesce()
+        >>> print(A)
+        SparseMatrix(indices=tensor([[0, 0, 1, 1],
+                [1, 2, 1, 2]]),
+        values=tensor([3, 3, 0, 4]),
+        shape=(2, 3), nnz=4)
+        """
+        return SparseMatrix(self.c_sparse_matrix.coalesce())
+
+    def has_duplicate(self):
+        """Return whether this sparse matrix contains duplicate indices.
+
+        Returns
+        -------
+        bool
+            True if this sparse matrix contains duplicate indices.
+
+        Examples
+        --------
+        >>> row = torch.tensor([1, 0, 0, 0, 1])
+        >>> col = torch.tensor([1, 1, 1, 2, 2])
+        >>> val = torch.tensor([0, 1, 2, 3, 4])
+        >>> A = create_from_coo(row, col, val)
+        >>> print(A.has_duplicate())
+        True
+        >>> print(A.coalesce().has_duplicate())
+        False
+        """
+        return self.c_sparse_matrix.has_duplicate()
 
 
 def create_from_coo(
@@ -445,3 +520,32 @@ def val_like(mat: SparseMatrix, val: torch.Tensor) -> SparseMatrix:
     shape=(3, 5), nnz=3)
     """
     return SparseMatrix(torch.ops.dgl_sparse.val_like(mat.c_sparse_matrix, val))
+
+
+def _sparse_matrix_str(spmat: SparseMatrix) -> str:
+    """Internal function for converting a sparse matrix to string representation."""
+    indices_str = str(spmat.indices("COO"))
+    values_str = str(spmat.val)
+    meta_str = f"size={spmat.shape}, nnz={spmat.nnz}"
+    if spmat.val.dim() > 1:
+        val_size = tuple(spmat.val.shape[1:])
+        meta_str += f", val_size={val_size}"
+    prefix = f"{type(spmat).__name__}("
+
+    def _add_indent(_str, indent):
+        lines = _str.split("\n")
+        lines = [lines[0]] + [" " * indent + line for line in lines[1:]]
+        return "\n".join(lines)
+
+    final_str = (
+        "indices="
+        + _add_indent(indices_str, len("indices="))
+        + ",\n"
+        + "values="
+        + _add_indent(values_str, len("values="))
+        + ",\n"
+        + meta_str
+        + ")"
+    )
+    final_str = prefix + _add_indent(final_str, len(prefix))
+    return final_str

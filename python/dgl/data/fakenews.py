@@ -162,9 +162,9 @@ class FakeNewsDataset(DGLBuiltinDataset):
         train_idx = np.load(os.path.join(self.raw_path, "train_idx.npy"))
         val_idx = np.load(os.path.join(self.raw_path, "val_idx.npy"))
         test_idx = np.load(os.path.join(self.raw_path, "test_idx.npy"))
-        train_mask = np.zeros(num_graphs, dtype=np.bool)
-        val_mask = np.zeros(num_graphs, dtype=np.bool)
-        test_mask = np.zeros(num_graphs, dtype=np.bool)
+        train_mask = np.zeros(num_graphs, dtype=np.bool_)
+        val_mask = np.zeros(num_graphs, dtype=np.bool_)
+        test_mask = np.zeros(num_graphs, dtype=np.bool_)
         train_mask[train_idx] = True
         val_mask[val_idx] = True
         test_mask[test_idx] = True

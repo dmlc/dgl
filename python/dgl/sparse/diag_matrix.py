@@ -3,7 +3,7 @@ from typing import Optional, Tuple
 
 import torch
 
-from .sparse_matrix import SparseMatrix, create_from_coo
+from .sparse_matrix import create_from_coo, SparseMatrix
 
 
 class DiagMatrix:
@@ -62,7 +62,7 @@ class DiagMatrix:
         return self._shape
 
     def __repr__(self):
-        return f"DiagMatrix(val={self.val}, \nshape={self.shape})"
+        return _diag_matrix_str(self)
 
     @property
     def nnz(self) -> int:
@@ -120,6 +120,22 @@ class DiagMatrix:
         """
         row = col = torch.arange(len(self.val)).to(self.device)
         return create_from_coo(row=row, col=col, val=self.val, shape=self.shape)
+
+    def dense(self) -> torch.Tensor:
+        """Return a dense representation of the matrix.
+
+        Returns
+        -------
+        torch.Tensor
+            Dense representation of the diagonal matrix.
+        """
+        val = self.val
+        device = self.device
+        shape = self.shape + val.shape[1:]
+        mat = torch.zeros(shape, device=device, dtype=self.dtype)
+        row = col = torch.arange(len(val)).to(device)
+        mat[row, col] = val
+        return mat
 
     def t(self):
         """Alias of :meth:`transpose()`"""
@@ -268,3 +284,28 @@ def identity(
         val_shape = (len_val, d)
     val = torch.ones(val_shape, dtype=dtype, device=device)
     return diag(val, shape)
+
+
+def _diag_matrix_str(spmat: DiagMatrix) -> str:
+    """Internal function for converting a diagonal matrix to string representation."""
+    values_str = str(spmat.val)
+    meta_str = f"size={spmat.shape}"
+    if spmat.val.dim() > 1:
+        val_size = tuple(spmat.val.shape[1:])
+        meta_str += f", val_size={val_size}"
+    prefix = f"{type(spmat).__name__}("
+
+    def _add_indent(_str, indent):
+        lines = _str.split("\n")
+        lines = [lines[0]] + [" " * indent + line for line in lines[1:]]
+        return "\n".join(lines)
+
+    final_str = (
+        "values="
+        + _add_indent(values_str, len("values="))
+        + ",\n"
+        + meta_str
+        + ")"
+    )
+    final_str = prefix + _add_indent(final_str, len(prefix))
+    return final_str

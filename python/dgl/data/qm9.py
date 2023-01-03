@@ -182,7 +182,7 @@ class QM9Dataset(DGLDataset):
         n_atoms = self.N[idx]
         R = self.R[self.N_cumsum[idx]:self.N_cumsum[idx + 1]]
         dist = np.linalg.norm(R[:, None, :] - R[None, :, :], axis=-1)
-        adj = sp.csr_matrix(dist <= self.cutoff) - sp.eye(n_atoms, dtype=np.bool)
+        adj = sp.csr_matrix(dist <= self.cutoff) - sp.eye(n_atoms, dtype=np.bool_)
         adj = adj.tocoo()
         u, v = F.tensor(adj.row), F.tensor(adj.col)
         g = dgl_graph((u, v))

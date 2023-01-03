@@ -557,3 +557,26 @@ def map_partid_rank(partid, world_size):
         id.
     """
     return partid % world_size
+
+
+def generate_read_list(num_files, world_size):
+    """Generate the file IDs to read for each rank.
+
+    Parameters:
+    -----------
+    num_files : int
+        Total number of files.
+    world_size : int
+        World size of group.
+
+    Returns:
+    --------
+    read_list : np.array
+        Array of target file IDs to read.
+
+    Examples
+    --------
+    >>> tools.distpartitionning.utils.generate_read_list(10, 4)
+    [array([0, 1, 2]), array([3, 4, 5]), array([6, 7]), array([8, 9])]
+    """
+    return np.array_split(np.arange(num_files), world_size)

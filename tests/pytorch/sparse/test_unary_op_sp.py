@@ -1,10 +1,10 @@
-import pytest
-import torch
 import sys
 
 import backend as F
+import pytest
+import torch
 
-from dgl.mock_sparse2 import create_from_coo
+from dgl.sparse import create_from_coo
 
 # TODO(#4818): Skipping tests on win.
 if not sys.platform.startswith("linux"):
