@@ -1,11 +1,10 @@
-import operator
 import sys
 
 import backend as F
 import pytest
 import torch
 
-from dgl.mock_sparse2 import create_from_coo, power
+from dgl.sparse import create_from_coo, power
 
 # TODO(#4818): Skipping tests on win.
 if not sys.platform.startswith("linux"):
@@ -19,6 +18,25 @@ def all_close_sparse(A, row, col, val, shape):
     assert torch.allclose(colA, col)
     assert torch.allclose(valA, val)
     assert A.shape == shape
+
+
+@pytest.mark.parametrize("v_scalar", [2, 2.5])
+def test_mul_scalar(v_scalar):
+    ctx = F.ctx()
+    row = torch.tensor([1, 0, 2]).to(ctx)
+    col = torch.tensor([0, 3, 2]).to(ctx)
+    val = torch.randn(len(row)).to(ctx)
+    A1 = create_from_coo(row, col, val, shape=(3, 4))
+
+    # A * v
+    A2 = A1 * v_scalar
+    assert torch.allclose(A1.val * v_scalar, A2.val, rtol=1e-4, atol=1e-4)
+    assert A1.shape == A2.shape
+
+    # v * A
+    A2 = v_scalar * A1
+    assert torch.allclose(A1.val * v_scalar, A2.val, rtol=1e-4, atol=1e-4)
+    assert A1.shape == A2.shape
 
 
 @pytest.mark.parametrize("val_shape", [(3,), (3, 2)])

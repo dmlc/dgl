@@ -40,14 +40,4 @@
 #undef DLOG
 #undef LOG_IF
 
-// For Pytorch version later than 1.12, redefine CHECK_* to TORCH_CHECK_*.
-#if !(TORCH_VERSION_MAJOR == 1 && TORCH_VERSION_MINOR <= 12)
-#define CHECK_EQ(val1, val2) TORCH_CHECK_EQ(val1, val2)
-#define CHECK_NE(val1, val2) TORCH_CHECK_NE(val1, val2)
-#define CHECK_LE(val1, val2) TORCH_CHECK_LE(val1, val2)
-#define CHECK_LT(val1, val2) TORCH_CHECK_LT(val1, val2)
-#define CHECK_GE(val1, val2) TORCH_CHECK_GE(val1, val2)
-#define CHECK_GT(val1, val2) TORCH_CHECK_GT(val1, val2)
-#endif
-
 #endif  // SPARSE_DGL_HEADERS_H_

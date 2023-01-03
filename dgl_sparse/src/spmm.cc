@@ -9,6 +9,8 @@
 #include <sparse/spmm.h>
 #include <torch/script.h>
 
+#include <sstream>
+
 #include "./matmul.h"
 #include "./utils.h"
 
@@ -32,23 +34,34 @@ void _SpMMSanityCheck(
   const auto& sparse_mat_shape = sparse_mat->shape();
   auto val_shape = sparse_val.sizes();
   auto dense_shape = dense_mat.sizes();
-  CHECK_EQ(sparse_mat_shape[1], dense_shape[0])
-      << "SpMM: the second dimension of the sparse matrix should be equal to "
-         "the first dimension of the dense matrix.";
-  CHECK_EQ(val_shape.size(), 1)
-      << "SpMM: the values tensor for SpMM can only be 1-dimensional.";
-  CHECK_EQ(val_shape[0], sparse_mat->nnz())
-      << "SpMM: the value shape does not match nnz of the sparse matrix.";
-  CHECK_LE(dense_shape.size(), 2)
-      << "SpMM: the dense matrix can have at most two dimensions.";
-  CHECK_EQ(sparse_val.dtype(), dense_mat.dtype())
-      << "SpMM: the non-zero values does not have the same dtype as the dense "
-         "matrix.";
-  CHECK(
+  bool shape_check = true;
+  shape_check &= sparse_mat_shape[1] == dense_shape[0];
+  shape_check &= val_shape.size() <= 2;
+  shape_check &= val_shape[0] == sparse_mat->nnz();
+  shape_check &= dense_shape.size() <= 3;
+  if (dense_shape.size() == 3 || val_shape.size() == 2) {
+    shape_check &= dense_shape.size() == val_shape.size() + 1;
+    shape_check &= dense_shape[2] == val_shape[1];
+  }
+  if (!shape_check) {
+    std::stringstream error;
+    error << "SpMM: Invalid input shapes. sparse_mat: "
+          << c10::IntArrayRef(sparse_mat->shape())
+          << ", sparse_val: " << sparse_mat->value().sizes()
+          << ", dense_mat: " << dense_mat.sizes()
+          << ". Valid input shapes (sparse_mat, dense_mat) are: (1) (n, m) and "
+             "(m, k); (2) (n, m) and (m,); (3) (n, m, b) and (m, k, b).";
+    TORCH_CHECK(false, error.str());
+  }
+  TORCH_CHECK(
+      sparse_val.dtype() == dense_mat.dtype(),
+      "SpMM: the non-zero values does not have the same dtype as the dense "
+      "matrix.");
+  TORCH_CHECK(
       sparse_val.device() == sparse_mat->device() &&
-      sparse_val.device() == dense_mat.device())
-      << "SpMM: sparse matrix, non-zero values and the dense matrix should be "
-         "on the same device.";
+          sparse_val.device() == dense_mat.device(),
+      "SpMM: sparse matrix, non-zero values and the dense matrix should be "
+      "on the same device.");
 }
 
 torch::Tensor SpMMAutoGrad::forward(

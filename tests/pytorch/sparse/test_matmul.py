@@ -4,10 +4,11 @@ import backend as F
 import pytest
 import torch
 
-from dgl.mock_sparse2 import val_like
+from dgl.sparse import bspmm, create_from_coo, val_like
 
 from .utils import (
     clone_detach_and_grad,
+    dense_mask,
     rand_coo,
     rand_csc,
     rand_csr,
@@ -53,15 +54,41 @@ def test_spmm(create_func, shape, nnz, out_dim):
     )
 
 
+@pytest.mark.parametrize("create_func", [rand_coo, rand_csr, rand_csc])
+@pytest.mark.parametrize("shape", [(2, 7), (5, 2)])
+@pytest.mark.parametrize("nnz", [1, 10])
+def test_bspmm(create_func, shape, nnz):
+    dev = F.ctx()
+    A = create_func(shape, nnz, dev, 2)
+    X = torch.randn(shape[1], 10, 2, requires_grad=True, device=dev)
+
+    sparse_result = bspmm(A, X)
+    grad = torch.randn_like(sparse_result)
+    sparse_result.backward(grad)
+
+    XX = clone_detach_and_grad(X)
+    torch_A = A.dense().clone().detach().requires_grad_()
+    torch_result = torch_A.permute(2, 0, 1) @ XX.permute(2, 0, 1)
+
+    torch_result.backward(grad.permute(2, 0, 1))
+    assert torch.allclose(
+        sparse_result.permute(2, 0, 1), torch_result, atol=1e-05
+    )
+    assert torch.allclose(X.grad, XX.grad, atol=1e-05)
+    assert torch.allclose(
+        dense_mask(torch_A.grad, A),
+        sparse_matrix_to_dense(val_like(A, A.val.grad)),
+        atol=1e-05,
+    )
+
+
 @pytest.mark.parametrize("create_func1", [rand_coo, rand_csr, rand_csc])
 @pytest.mark.parametrize("create_func2", [rand_coo, rand_csr, rand_csc])
 @pytest.mark.parametrize("shape_n_m", [(5, 5), (5, 6)])
 @pytest.mark.parametrize("shape_k", [3, 4])
 @pytest.mark.parametrize("nnz1", [1, 10])
 @pytest.mark.parametrize("nnz2", [1, 10])
-def test_sparse_sparse_mm(
-    create_func1, create_func2, shape_n_m, shape_k, nnz1, nnz2
-):
+def test_spspmm(create_func1, create_func2, shape_n_m, shape_k, nnz1, nnz2):
     dev = F.ctx()
     shape1 = shape_n_m
     shape2 = (shape_n_m[1], shape_k)
@@ -89,3 +116,33 @@ def test_sparse_sparse_mm(
             torch_A2.grad.to_dense(),
             atol=1e-05,
         )
+
+
+def test_spspmm_duplicate():
+    dev = F.ctx()
+
+    row = torch.tensor([1, 0, 0, 0, 1]).to(dev)
+    col = torch.tensor([1, 1, 1, 2, 2]).to(dev)
+    val = torch.randn(len(row)).to(dev)
+    shape = (4, 4)
+    A1 = create_from_coo(row, col, val, shape)
+
+    row = torch.tensor([1, 0, 0, 1]).to(dev)
+    col = torch.tensor([1, 1, 2, 2]).to(dev)
+    val = torch.randn(len(row)).to(dev)
+    shape = (4, 4)
+    A2 = create_from_coo(row, col, val, shape)
+
+    try:
+        A1 @ A2
+    except:
+        pass
+    else:
+        assert False, "Should raise error."
+
+    try:
+        A2 @ A1
+    except:
+        pass
+    else:
+        assert False, "Should raise error."

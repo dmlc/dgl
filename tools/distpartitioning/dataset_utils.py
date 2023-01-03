@@ -4,6 +4,7 @@ import gc
 
 import numpy as np
 import pyarrow
+import pyarrow.parquet as pq
 import torch
 import torch.distributed as dist
 
@@ -501,8 +502,6 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
         edge_datadict[col] = []
 
     for etype_name, etype_info in edge_data.items():
-        assert etype_info[constants.STR_FORMAT][constants.STR_NAME] == constants.STR_CSV
-
         edge_info = etype_info[constants.STR_DATA]
 
         #edgetype strings are in canonical format, src_node_type:edge_type:dst_node_type
@@ -528,16 +527,24 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
                 edge_file = os.path.join(input_dir, edge_file)
             logging.info(f'Loading edges of etype[{etype_name}] from {edge_file}')
 
-            read_options=pyarrow.csv.ReadOptions(use_threads=True, block_size=4096, autogenerate_column_names=True)
-            parse_options=pyarrow.csv.ParseOptions(delimiter=' ')
-            with pyarrow.csv.open_csv(edge_file, read_options=read_options, parse_options=parse_options) as reader:
-                for next_chunk in reader:
-                    if next_chunk is None:
-                        break
+            if etype_info[constants.STR_FORMAT][constants.STR_NAME] == constants.STR_CSV:
+                read_options=pyarrow.csv.ReadOptions(use_threads=True, block_size=4096, autogenerate_column_names=True)
+                parse_options=pyarrow.csv.ParseOptions(delimiter=' ')
+                with pyarrow.csv.open_csv(edge_file, read_options=read_options, parse_options=parse_options) as reader:
+                    for next_chunk in reader:
+                        if next_chunk is None:
+                            break
 
-                    next_table = pyarrow.Table.from_batches([next_chunk])
-                    src_ids.append(next_table['f0'].to_numpy())
-                    dst_ids.append(next_table['f1'].to_numpy())
+                        next_table = pyarrow.Table.from_batches([next_chunk])
+                        src_ids.append(next_table['f0'].to_numpy())
+                        dst_ids.append(next_table['f1'].to_numpy())
+            elif etype_info[constants.STR_FORMAT][constants.STR_NAME] == constants.STR_PARQUET:
+                data_df = pq.read_table(edge_file)
+                data_df = data_df.rename_columns(["f0", "f1"])
+                src_ids.append(data_df['f0'].to_numpy())
+                dst_ids.append(data_df['f1'].to_numpy())
+            else:
+                raise ValueError(f'Unknown edge format {etype_info[constants.STR_FORMAT][constants.STR_NAME]} for edge type {etype_name}')
 
         src_ids = np.concatenate(src_ids)
         dst_ids = np.concatenate(dst_ids)

@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from dgl.mock_sparse2 import (
+from dgl.sparse import (
     create_from_coo,
     create_from_csc,
     create_from_csr,
@@ -18,23 +18,29 @@ def clone_detach_and_grad(t):
     return t
 
 
-def rand_coo(shape, nnz, dev):
+def rand_coo(shape, nnz, dev, nz_dim=None):
     # Create a sparse matrix without duplicate entries.
     nnzid = np.random.choice(shape[0] * shape[1], nnz, replace=False)
     nnzid = torch.tensor(nnzid, device=dev).long()
     row = torch.div(nnzid, shape[1], rounding_mode="floor")
     col = nnzid % shape[1]
-    val = torch.randn(nnz, device=dev, requires_grad=True)
+    if nz_dim is None:
+        val = torch.randn(nnz, device=dev, requires_grad=True)
+    else:
+        val = torch.randn(nnz, nz_dim, device=dev, requires_grad=True)
     return create_from_coo(row, col, val, shape)
 
 
-def rand_csr(shape, nnz, dev):
+def rand_csr(shape, nnz, dev, nz_dim=None):
     # Create a sparse matrix without duplicate entries.
     nnzid = np.random.choice(shape[0] * shape[1], nnz, replace=False)
     nnzid = torch.tensor(nnzid, device=dev).long()
     row = torch.div(nnzid, shape[1], rounding_mode="floor")
     col = nnzid % shape[1]
-    val = torch.randn(nnz, device=dev, requires_grad=True)
+    if nz_dim is None:
+        val = torch.randn(nnz, device=dev, requires_grad=True)
+    else:
+        val = torch.randn(nnz, nz_dim, device=dev, requires_grad=True)
     indptr = torch.zeros(shape[0] + 1, device=dev, dtype=torch.int64)
     for r in row.tolist():
         indptr[r + 1] += 1
@@ -44,13 +50,16 @@ def rand_csr(shape, nnz, dev):
     return create_from_csr(indptr, indices, val, shape=shape)
 
 
-def rand_csc(shape, nnz, dev):
+def rand_csc(shape, nnz, dev, nz_dim=None):
     # Create a sparse matrix without duplicate entries.
     nnzid = np.random.choice(shape[0] * shape[1], nnz, replace=False)
     nnzid = torch.tensor(nnzid, device=dev).long()
     row = torch.div(nnzid, shape[1], rounding_mode="floor")
     col = nnzid % shape[1]
-    val = torch.randn(nnz, device=dev, requires_grad=True)
+    if nz_dim is None:
+        val = torch.randn(nnz, device=dev, requires_grad=True)
+    else:
+        val = torch.randn(nnz, nz_dim, device=dev, requires_grad=True)
     indptr = torch.zeros(shape[1] + 1, device=dev, dtype=torch.int64)
     for c in col.tolist():
         indptr[c + 1] += 1
@@ -113,4 +122,12 @@ def sparse_matrix_to_torch_sparse(A: SparseMatrix, val=None):
         shape += (A.val.shape[-1],)
     ret = torch.sparse_coo_tensor(edge_index, val, shape).coalesce()
     ret.requires_grad_()
+    return ret
+
+
+def dense_mask(dense, sparse):
+    ret = torch.zeros_like(dense)
+    row, col = sparse.coo()
+    for r, c in zip(row, col):
+        ret[r, c] = dense[r, c]
     return ret
