@@ -39,6 +39,8 @@ We test scalability of the code with dataset "ogbg-molhiv" in a machine of type 
 
 
 ### Node classification
+
+
 Run with following on dataset "ogbn-products"
 
 ```bash
@@ -51,6 +53,8 @@ Test Accuracy: ~0.7632
 ```
 
 ### Link prediction
+
+
 Run with following (available dataset: "ogbn-products", "reddit")
 
 ```bash
@@ -61,3 +65,9 @@ python3 multi_gpu_link_prediction.py --dataset ogbn-products
 ```
 Eval Accuracy: ~0.7999  Test Accuracy: ~0.6383
 ```
+
+Notably,
+
+* The loss function is defined by predicting whether an edge exists between two nodes or not. 
+* When computing the score of `(u, v)`, the connections between node `u` and `v` are removed from neighbor sampling.
+* The performance of the learned embeddings are measured by training a softmax regression with scikit-learn.

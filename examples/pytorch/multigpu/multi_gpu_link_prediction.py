@@ -1,28 +1,30 @@
 import argparse
-import time
 import os
+import time
+
+import dgl.function as fn
+
+import dgl.nn as dglnn
 import numpy as np
+import sklearn.linear_model as lm
+import sklearn.metrics as skm
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
 import torch.nn as nn
 import torch.nn.functional as F
 import tqdm
-from ogb.nodeproppred import DglNodePropPredDataset
-from torch.nn.parallel import DistributedDataParallel
-import sklearn.linear_model as lm
-import sklearn.metrics as skm
-
-import dgl.nn as dglnn
-import dgl.function as fn
 from dgl.data import AsNodePredDataset
 from dgl.dataloading import (
+    as_edge_prediction_sampler,
     DataLoader,
     MultiLayerFullNeighborSampler,
     NeighborSampler,
-    as_edge_prediction_sampler,
 )
 from dgl.multiprocessing import shared_tensor
+from ogb.nodeproppred import DglNodePropPredDataset
+from torch.nn.parallel import DistributedDataParallel
+
 
 class SAGE(nn.Module):
     def __init__(self, in_size, hid_size, out_size):
@@ -87,6 +89,7 @@ class SAGE(nn.Module):
         g.ndata.pop("h")
         return y
 
+
 class NegativeSampler(object):
     def __init__(self, g, k, neg_share=False, device=None):
         if device is None:
@@ -106,21 +109,25 @@ class NegativeSampler(object):
         src = src.repeat_interleave(self.k)
         return src, dst
 
+
 class CrossEntropyLoss(nn.Module):
     def forward(self, block_outputs, pos_graph, neg_graph):
         with pos_graph.local_scope():
-            pos_graph.ndata['h'] = block_outputs
-            pos_graph.apply_edges(fn.u_dot_v('h', 'h', 'score'))
-            pos_score = pos_graph.edata['score']
+            pos_graph.ndata["h"] = block_outputs
+            pos_graph.apply_edges(fn.u_dot_v("h", "h", "score"))
+            pos_score = pos_graph.edata["score"]
         with neg_graph.local_scope():
-            neg_graph.ndata['h'] = block_outputs
-            neg_graph.apply_edges(fn.u_dot_v('h', 'h', 'score'))
-            neg_score = neg_graph.edata['score']
+            neg_graph.ndata["h"] = block_outputs
+            neg_graph.apply_edges(fn.u_dot_v("h", "h", "score"))
+            neg_score = neg_graph.edata["score"]
 
         score = torch.cat([pos_score, neg_score])
-        label = torch.cat([torch.ones_like(pos_score), torch.zeros_like(neg_score)]).long()
+        label = torch.cat(
+            [torch.ones_like(pos_score), torch.zeros_like(neg_score)]
+        ).long()
         loss = F.binary_cross_entropy_with_logits(score, label.float())
         return loss
+
 
 def compute_acc_unsupervised(emb, labels, train_nids, val_nids, test_nids):
     """
@@ -142,6 +149,7 @@ def compute_acc_unsupervised(emb, labels, train_nids, val_nids, test_nids):
     f1_micro_test = skm.f1_score(test_labels, pred[test_nids], average="micro")
     return f1_micro_eval, f1_micro_test
 
+
 def evaluate(proc_id, model, g, device, use_uva):
     model.eval()
     batch_size = 10000
@@ -149,24 +157,28 @@ def evaluate(proc_id, model, g, device, use_uva):
         pred = model.module.inference(g, device, batch_size, use_uva)
     return pred
 
-def train(proc_id, nprocs, device, g, train_idx, val_idx, test_idx, model, use_uva):
+
+def train(
+        proc_id, nprocs, device, g, train_idx, val_idx, test_idx, model, use_uva
+):
     # Create PyTorch DataLoader for constructing blocks
     n_edges = g.num_edges()
     train_seeds = torch.arange(n_edges).to(device)
     labels = g.ndata["label"].to("cpu")
 
-    sampler = NeighborSampler(
-        [10, 25], prefetch_node_feats=["feat"]
-    )
+    sampler = NeighborSampler([10, 25], prefetch_node_feats=["feat"])
     sampler = as_edge_prediction_sampler(
-        sampler, exclude='reverse_id',
+        sampler,
+        exclude="reverse_id",
         # For each edge with ID e in Reddit dataset, the reverse edge is e ± |E|/2.
-        reverse_eids=torch.cat([
-            torch.arange(n_edges // 2, n_edges),
-            torch.arange(0, n_edges // 2)]).to(train_seeds),
+        reverse_eids=torch.cat(
+            [torch.arange(n_edges // 2, n_edges),torch.arange(0, n_edges // 2)]
+        ).to(train_seeds),
         # num_negs = 1, neg_share = False
-        negative_sampler=NegativeSampler(g, 1, False,
-                                         device if use_uva else None))
+        negative_sampler=NegativeSampler(
+            g, 1, False, device if use_uva else None
+        ),
+    )
     train_dataloader = DataLoader(
         g,
         train_seeds,
@@ -187,7 +199,8 @@ def train(proc_id, nprocs, device, g, train_idx, val_idx, test_idx, model, use_u
         tic = time.time()
         model.train()
         for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(
-                train_dataloader):
+                train_dataloader
+        ):
             x = blocks[0].srcdata["feat"]
             y_hat = model(blocks, x)
             loss = loss_fcn(y_hat, pos_graph, neg_graph)
@@ -196,23 +209,33 @@ def train(proc_id, nprocs, device, g, train_idx, val_idx, test_idx, model, use_u
             opt.step()
 
             if step % 20 == 0 and proc_id == 0: # log every 20 steps
-                gpu_mem_alloc = (torch.cuda.max_memory_allocated() / 1000000
-                                 if torch.cuda.is_available() else 0)
-                print("Epoch {:05d} | Step {:05d} | Loss {:.4f} | GPU {:.1f} MB".
-                      format(epoch, step, loss.item(), gpu_mem_alloc))
+                # gpu memory reserved by PyTorch
+                gpu_mem_alloc = (
+                    torch.cuda.max_memory_allocated() / 1000000
+                    if torch.cuda.is_available()
+                    else 0
+                )
+                print(
+                    "Epoch {:05d} | Step {:05d} | Loss {:.4f} | GPU {:.1f} MB".format(
+                        epoch, step, loss.item(), gpu_mem_alloc
+                    )
+                )
 
         toc = time.time()
-        if proc_id == 0: print("Epoch Time(s): {:.4f}".format(toc - tic))
+        if proc_id == 0:
+            print("Epoch Time(s): {:.4f}".format(toc - tic))
         if (epoch + 1) % 5 == 0: # eval every 5 epochs
             pred = evaluate(proc_id, model, g, device, use_uva) # in parallel
             if proc_id == 0:
-                # only master proc does the computation
+                # only master proc does the accuracy computation
                 eval_acc, test_acc = compute_acc_unsupervised(
                     pred, labels, train_idx, val_idx, test_idx
                 )
-                print("Epoch {:05d} | Eval Acc {:.4f} | Test Acc {:.4f}".
-                      format(epoch, eval_acc, test_acc))
-
+                print(
+                    "Epoch {:05d} | Eval Acc {:.4f} | Test Acc {:.4f}".format(
+                        epoch, eval_acc, test_acc
+                    )
+                )
 
 
 def run(proc_id, nprocs, devices, g, data, mode):
@@ -236,7 +259,9 @@ def run(proc_id, nprocs, devices, g, data, mode):
     )
     # training + testing
     use_uva = mode == "mixed"
-    train(proc_id, nprocs, device, g, train_idx, val_idx, test_idx, model, use_uva)
+    train(
+        proc_id, nprocs, device, g, train_idx, val_idx, test_idx, model, use_uva
+    )
     # cleanup process group
     dist.destroy_process_group()
 
