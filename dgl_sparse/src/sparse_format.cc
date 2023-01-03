@@ -17,7 +17,7 @@ namespace sparse {
 std::shared_ptr<COO> COOFromOldDGLCOO(const aten::COOMatrix& dgl_coo) {
   auto row = DGLArrayToTorchTensor(dgl_coo.row);
   auto col = DGLArrayToTorchTensor(dgl_coo.col);
-  CHECK(aten::IsNullArray(dgl_coo.data));
+  TORCH_CHECK(aten::IsNullArray(dgl_coo.data));
   return std::make_shared<COO>(
       COO{dgl_coo.num_rows, dgl_coo.num_cols, row, col, dgl_coo.row_sorted,
           dgl_coo.col_sorted});
@@ -46,6 +46,19 @@ aten::CSRMatrix CSRToOldDGLCSR(const std::shared_ptr<CSR>& csr) {
   auto data = OptionalTorchTensorToDGLArray(csr->value_indices);
   return aten::CSRMatrix(
       csr->num_rows, csr->num_cols, indptr, indices, data, csr->sorted);
+}
+
+torch::Tensor COOToTorchCOO(
+    const std::shared_ptr<COO>& coo, torch::Tensor value) {
+  std::vector<torch::Tensor> indices = {coo->row, coo->col};
+  if (value.ndimension() == 2) {
+    return torch::sparse_coo_tensor(
+        torch::stack(indices), value,
+        {coo->num_rows, coo->num_cols, value.size(1)});
+  } else {
+    return torch::sparse_coo_tensor(
+        torch::stack(indices), value, {coo->num_rows, coo->num_cols});
+  }
 }
 
 std::shared_ptr<COO> CSRToCOO(const std::shared_ptr<CSR>& csr) {

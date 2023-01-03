@@ -1,8 +1,6 @@
 import torch as th
 
-from ...base import ALL, is_all
-from ...heterograph_index import create_unitgraph_from_csr
-from ...sparse import (
+from ..._sparse_ops import (
     _bwd_segment_cmp,
     _csrmask,
     _csrmm,
@@ -22,6 +20,9 @@ from ...sparse import (
     _update_grad_minmax_hetero,
 )
 
+from ...base import ALL, is_all
+from ...heterograph_index import create_unitgraph_from_csr
+
 __all__ = [
     "gspmm",
     "gsddmm",
@@ -37,6 +38,7 @@ __all__ = [
     "gather_mm",
     "segment_mm",
 ]
+
 
 def _reduce_grad(grad, shape):
     """Reduce gradient on the broadcast dimension
@@ -125,23 +127,32 @@ def spmm_cache_argY(binary_op, reduce_op, req_grad_X, req_grad_Y):
             return True
     return False
 
-class empty_context():
+
+class empty_context:
     """Empty context that does nothing"""
+
     def __init__(self, *args, **kargs):
         return
+
     def __enter__(self, *args, **kargs):
         return self
+
     def __exit__(self, *args, **kargs):
         return
 
+
 # This is to avoid warnings in cpu-only dgl. We don't enable autocast for CPU ops
 autocast = th.cuda.amp.autocast if th.cuda.is_available() else empty_context
+
 
 def _cast_if_autocast_enabled(*args):
     if not th.is_autocast_enabled() or not th.cuda.is_available():
         return args
     else:
-        return th.cuda.amp.autocast_mode._cast(args, th.get_autocast_gpu_dtype())
+        return th.cuda.amp.autocast_mode._cast(
+            args, th.get_autocast_gpu_dtype()
+        )
+
 
 class GSpMM(th.autograd.Function):
     @staticmethod
@@ -1023,7 +1034,9 @@ def gsddmm(gidx, op, lhs_data, rhs_data, lhs_target="u", rhs_target="v"):
     if op == "div":
         op = "mul"
         rhs_data = 1.0 / rhs_data
-    args = _cast_if_autocast_enabled(gidx, op, lhs_data, rhs_data, lhs_target, rhs_target)
+    args = _cast_if_autocast_enabled(
+        gidx, op, lhs_data, rhs_data, lhs_target, rhs_target
+    )
     with autocast(enabled=False):
         return GSDDMM.apply(*args)
 
@@ -1052,7 +1065,9 @@ def gspmm_hetero(g, op, reduce_op, lhs_len, *lhs_and_rhs_tuple):
     if op in ["add", "mul"]:
         lhs_and_rhs_tuple = tuple(list(lhs_tuple) + list(rhs_tuple))
 
-    args = _cast_if_autocast_enabled(g, op, reduce_op, lhs_len, *lhs_and_rhs_tuple)
+    args = _cast_if_autocast_enabled(
+        g, op, reduce_op, lhs_len, *lhs_and_rhs_tuple
+    )
     with autocast(enabled=False):
         return GSpMM_hetero.apply(*args)
 
@@ -1083,7 +1098,9 @@ def gsddmm_hetero(
     if op in ["add", "mul"]:
         lhs_and_rhs_tuple = tuple(list(lhs_tuple) + list(rhs_tuple))
 
-    args = _cast_if_autocast_enabled(g, op, lhs_len, lhs_target, rhs_target, *lhs_and_rhs_tuple)
+    args = _cast_if_autocast_enabled(
+        g, op, lhs_len, lhs_target, rhs_target, *lhs_and_rhs_tuple
+    )
     with autocast(enabled=False):
         return GSDDMM_hetero.apply(*args)
 

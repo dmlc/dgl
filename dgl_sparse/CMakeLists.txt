@@ -1,3 +1,5 @@
+project(dgl_sparse C CXX)
+
 # Find PyTorch cmake files and PyTorch versions with the python interpreter $TORCH_PYTHON_INTERPS
 # ("python3" or "python" if empty)
 if(NOT TORCH_PYTHON_INTERPS)

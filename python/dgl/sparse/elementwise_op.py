@@ -2,20 +2,43 @@
 from typing import Union
 
 from .diag_matrix import DiagMatrix
-from .elementwise_op_diag import diag_add
-from .elementwise_op_sp import sp_add
 from .sparse_matrix import SparseMatrix
 
 __all__ = ["add", "power"]
 
 
 def add(
-    A: Union[SparseMatrix, DiagMatrix], B: Union[SparseMatrix, DiagMatrix]
-) -> Union[SparseMatrix, DiagMatrix]:
-    """Elementwise addition"""
-    if isinstance(A, DiagMatrix) and isinstance(B, DiagMatrix):
-        return diag_add(A, B)
-    return sp_add(A, B)
+    A: Union[DiagMatrix, SparseMatrix], B: Union[DiagMatrix, SparseMatrix]
+) -> Union[DiagMatrix, SparseMatrix]:
+    """Elementwise addition
+
+    Parameters
+    ----------
+    A : DiagMatrix or SparseMatrix
+        Diagonal matrix or sparse matrix
+    B : DiagMatrix or SparseMatrix
+        Diagonal matrix or sparse matrix
+
+    Returns
+    -------
+    DiagMatrix or SparseMatrix
+        Diagonal matrix if both :attr:`A` and :attr:`B` are diagonal matrices,
+        sparse matrix otherwise
+
+    Examples
+    --------
+    >>> row = torch.tensor([1, 0, 2])
+    >>> col = torch.tensor([0, 1, 2])
+    >>> val = torch.tensor([10, 20, 30])
+    >>> A = create_from_coo(row, col, val)
+    >>> B = diag(torch.arange(1, 4))
+    >>> A + B
+    SparseMatrix(indices=tensor([[0, 0, 1, 1, 2],
+            [0, 1, 0, 1, 2]]),
+    values=tensor([ 1, 20, 10,  2, 33]),
+    shape=(3, 3), nnz=5)
+    """
+    return A + B
 
 
 def power(
