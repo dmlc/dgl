@@ -122,7 +122,7 @@ c10::intrusive_ptr<SparseMatrix> SDDMM(
     sparse_val = sparse_val.unsqueeze(-1);
   }
   val = val * sparse_val;
-  return CreateValLike(sparse_mat, val);
+  return SparseMatrix::ValLike(sparse_mat, val);
 }
 
 }  // namespace sparse

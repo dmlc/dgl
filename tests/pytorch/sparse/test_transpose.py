@@ -4,7 +4,7 @@ import backend as F
 import pytest
 import torch
 
-from dgl.sparse import create_from_coo, diag
+from dgl.sparse import diag, from_coo
 
 # TODO(#4818): Skipping tests on win.
 if not sys.platform.startswith("linux"):
@@ -37,7 +37,7 @@ def test_sparse_matrix_transpose(dense_dim, row, col, extra_shape):
     val = torch.randn(val_shape).to(ctx)
     row = torch.tensor(row).to(ctx)
     col = torch.tensor(col).to(ctx)
-    mat = create_from_coo(row, col, val, mat_shape).transpose()
+    mat = from_coo(row, col, val, mat_shape).transpose()
     mat_row, mat_col = mat.coo()
     mat_val = mat.val
 

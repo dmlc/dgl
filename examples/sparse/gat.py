@@ -125,7 +125,7 @@ if __name__ == "__main__":
     # Create the sparse adjacency matrix A.
     src, dst = g.edges()
     N = g.num_nodes()
-    A = dglsp.create_from_coo(dst, src, shape=(N, N))
+    A = dglsp.from_coo(dst, src, shape=(N, N))
 
     # Add self-loops.
     I = dglsp.identity(A.shape, device=dev)

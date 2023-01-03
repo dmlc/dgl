@@ -1,12 +1,7 @@
 import numpy as np
 import torch
 
-from dgl.sparse import (
-    create_from_coo,
-    create_from_csc,
-    create_from_csr,
-    SparseMatrix,
-)
+from dgl.sparse import from_coo, from_csc, from_csr, SparseMatrix
 
 np.random.seed(42)
 torch.random.manual_seed(42)
@@ -28,7 +23,7 @@ def rand_coo(shape, nnz, dev, nz_dim=None):
         val = torch.randn(nnz, device=dev, requires_grad=True)
     else:
         val = torch.randn(nnz, nz_dim, device=dev, requires_grad=True)
-    return create_from_coo(row, col, val, shape)
+    return from_coo(row, col, val, shape)
 
 
 def rand_csr(shape, nnz, dev, nz_dim=None):
@@ -47,7 +42,7 @@ def rand_csr(shape, nnz, dev, nz_dim=None):
     indptr = torch.cumsum(indptr, 0)
     row_sorted, row_sorted_idx = torch.sort(row)
     indices = col[row_sorted_idx]
-    return create_from_csr(indptr, indices, val, shape=shape)
+    return from_csr(indptr, indices, val, shape=shape)
 
 
 def rand_csc(shape, nnz, dev, nz_dim=None):
@@ -66,7 +61,7 @@ def rand_csc(shape, nnz, dev, nz_dim=None):
     indptr = torch.cumsum(indptr, 0)
     col_sorted, col_sorted_idx = torch.sort(col)
     indices = row[col_sorted_idx]
-    return create_from_csc(indptr, indices, val, shape=shape)
+    return from_csc(indptr, indices, val, shape=shape)
 
 
 def rand_coo_uncoalesced(shape, nnz, dev):
@@ -74,7 +69,7 @@ def rand_coo_uncoalesced(shape, nnz, dev):
     row = torch.randint(shape[0], (nnz,), device=dev)
     col = torch.randint(shape[1], (nnz,), device=dev)
     val = torch.randn(nnz, device=dev, requires_grad=True)
-    return create_from_coo(row, col, val, shape)
+    return from_coo(row, col, val, shape)
 
 
 def rand_csr_uncoalesced(shape, nnz, dev):
@@ -88,7 +83,7 @@ def rand_csr_uncoalesced(shape, nnz, dev):
     indptr = torch.cumsum(indptr, 0)
     row_sorted, row_sorted_idx = torch.sort(row)
     indices = col[row_sorted_idx]
-    return create_from_csr(indptr, indices, val, shape=shape)
+    return from_csr(indptr, indices, val, shape=shape)
 
 
 def rand_csc_uncoalesced(shape, nnz, dev):
@@ -102,7 +97,7 @@ def rand_csc_uncoalesced(shape, nnz, dev):
     indptr = torch.cumsum(indptr, 0)
     col_sorted, col_sorted_idx = torch.sort(col)
     indices = row[col_sorted_idx]
-    return create_from_csc(indptr, indices, val, shape=shape)
+    return from_csc(indptr, indices, val, shape=shape)
 
 
 def sparse_matrix_to_dense(A: SparseMatrix):
