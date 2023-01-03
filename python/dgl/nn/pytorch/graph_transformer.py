@@ -1,10 +1,12 @@
 """Torch modules for graph transformers."""
 import math
+
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
-from ...convert import to_homogeneous
+
 from ...batch import unbatch
+from ...convert import to_homogeneous
 from ...transforms import shortest_dist
 
 __all__ = [
@@ -13,7 +15,7 @@ __all__ = [
     "PathEncoder",
     "GraphormerLayer",
     "SpatialEncoder",
-    "SpatialEncoder3d"
+    "SpatialEncoder3d",
 ]
 
 
@@ -87,14 +89,14 @@ class DegreeEncoder(nn.Module):
         elif self.direction == "out":
             degree_embedding = self.degree_encoder(out_degree)
         elif self.direction == "both":
-            degree_embedding = (self.degree_encoder_1(in_degree)
-                                + self.degree_encoder_2(out_degree))
+            degree_embedding = self.degree_encoder_1(
+                in_degree
+            ) + self.degree_encoder_2(out_degree)
         else:
             raise ValueError(
                 f'Supported direction options: "in", "out" and "both", '
-                f'but got {self.direction}'
+                f"but got {self.direction}"
             )
-
         return degree_embedding
 
 
@@ -165,39 +167,36 @@ class PathEncoder(nn.Module):
         for ubg in g_list:
             num_nodes = ubg.num_nodes()
             num_edges = ubg.num_edges()
-            edata = edge_feat[sum_num_edges: (sum_num_edges + num_edges)]
+            edata = edge_feat[sum_num_edges : (sum_num_edges + num_edges)]
             sum_num_edges = sum_num_edges + num_edges
             edata = th.cat(
-                (edata, th.zeros(1, self.feat_dim).to(edata.device)),
-                dim=0
+                (edata, th.zeros(1, self.feat_dim).to(edata.device)), dim=0
             )
             dist, path = shortest_dist(ubg, root=None, return_paths=True)
             path_len = max(1, min(self.max_len, path.size(dim=2)))
 
             # shape: [n, n, l], n = num_nodes, l = path_len
-            shortest_path = path[:, :, 0: path_len]
+            shortest_path = path[:, :, 0:path_len]
             # shape: [n, n]
             shortest_distance = th.clamp(dist, min=1, max=path_len)
             # shape: [n, n, l, d], d = feat_dim
             path_data = edata[shortest_path]
             # shape: [l, h, d]
             edge_embedding = self.embedding_table.weight[
-                0: path_len * self.num_heads
+                0 : path_len * self.num_heads
             ].reshape(path_len, self.num_heads, -1)
             # [n, n, l, d] einsum [l, h, d] -> [n, n, h]
             # [n, n, h] -> [N, N, h], N = max_num_nodes, padded with -inf
             sub_encoding = th.full(
-                (max_num_nodes, max_num_nodes, self.num_heads),
-                float('-inf')
+                (max_num_nodes, max_num_nodes, self.num_heads), float("-inf")
             )
-            sub_encoding[0: num_nodes, 0: num_nodes] = th.div(
-                th.einsum(
-                    'xyld,lhd->xyh', path_data, edge_embedding
-                ).permute(2, 0, 1),
-                shortest_distance
+            sub_encoding[0:num_nodes, 0:num_nodes] = th.div(
+                th.einsum("xyld,lhd->xyh", path_data, edge_embedding).permute(
+                    2, 0, 1
+                ),
+                shortest_distance,
             ).permute(1, 2, 0)
             path_encoding.append(sub_encoding)
-
         return th.stack(path_encoding, dim=0)
 
 
@@ -244,7 +243,14 @@ class BiasedMultiheadAttention(nn.Module):
     >>> out = net(ndata, bias)
     """
 
-    def __init__(self, feat_size, num_heads, bias=True, attn_bias_type="add", attn_drop=0.1):
+    def __init__(
+        self,
+        feat_size,
+        num_heads,
+        bias=True,
+        attn_bias_type="add",
+        attn_drop=0.1,
+    ):
         super().__init__()
         self.feat_size = feat_size
         self.num_heads = num_heads
@@ -265,8 +271,7 @@ class BiasedMultiheadAttention(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        """Reset parameters of projection matrices, the same settings as that in Graphormer.
-        """
+        """Reset parameters of projection matrices, the same settings as that in Graphormer."""
         nn.init.xavier_uniform_(self.q_proj.weight, gain=2**-0.5)
         nn.init.xavier_uniform_(self.k_proj.weight, gain=2**-0.5)
         nn.init.xavier_uniform_(self.v_proj.weight, gain=2**-0.5)
@@ -299,9 +304,16 @@ class BiasedMultiheadAttention(nn.Module):
         k_h = self.k_proj(ndata).transpose(0, 1)
         v_h = self.v_proj(ndata).transpose(0, 1)
         bsz, N, _ = ndata.shape
-        q_h = q_h.reshape(N, bsz * self.num_heads, self.head_dim).transpose(0, 1) / self.scaling
-        k_h = k_h.reshape(N, bsz * self.num_heads, self.head_dim).permute(1, 2, 0)
-        v_h = v_h.reshape(N, bsz * self.num_heads, self.head_dim).transpose(0, 1)
+        q_h = (
+            q_h.reshape(N, bsz * self.num_heads, self.head_dim).transpose(0, 1)
+            / self.scaling
+        )
+        k_h = k_h.reshape(N, bsz * self.num_heads, self.head_dim).permute(
+            1, 2, 0
+        )
+        v_h = v_h.reshape(N, bsz * self.num_heads, self.head_dim).transpose(
+            0, 1
+        )
 
         attn_weights = (
             th.bmm(q_h, k_h)
@@ -315,10 +327,8 @@ class BiasedMultiheadAttention(nn.Module):
                 attn_weights += attn_bias
             else:
                 attn_weights *= attn_bias
-
         if attn_mask is not None:
             attn_weights[attn_mask.to(th.bool)] = float("-inf")
-
         attn_weights = F.softmax(
             attn_weights.transpose(0, 2)
             .reshape(N, N, bsz * self.num_heads)
@@ -330,7 +340,9 @@ class BiasedMultiheadAttention(nn.Module):
 
         attn = th.bmm(attn_weights, v_h).transpose(0, 1)
 
-        attn = self.out_proj(attn.reshape(N, bsz, self.feat_size).transpose(0, 1))
+        attn = self.out_proj(
+            attn.reshape(N, bsz, self.feat_size).transpose(0, 1)
+        )
 
         return attn
 
@@ -387,10 +399,10 @@ class GraphormerLayer(nn.Module):
         feat_size,
         hidden_size,
         num_heads,
-        attn_bias_type='add',
+        attn_bias_type="add",
         norm_first=False,
         dropout=0.1,
-        activation=nn.ReLU()
+        activation=nn.ReLU(),
     ):
         super().__init__()
 
@@ -400,14 +412,14 @@ class GraphormerLayer(nn.Module):
             feat_size=feat_size,
             num_heads=num_heads,
             attn_bias_type=attn_bias_type,
-            attn_drop=dropout
+            attn_drop=dropout,
         )
         self.ffn = nn.Sequential(
             nn.Linear(feat_size, hidden_size),
             activation,
             nn.Dropout(p=dropout),
             nn.Linear(hidden_size, feat_size),
-            nn.Dropout(p=dropout)
+            nn.Dropout(p=dropout),
         )
 
         self.dropout = nn.Dropout(p=dropout)
@@ -442,7 +454,6 @@ class GraphormerLayer(nn.Module):
         nfeat = residual + nfeat
         if not self.norm_first:
             nfeat = self.attn_layer_norm(nfeat)
-
         residual = nfeat
         if self.norm_first:
             nfeat = self.ffn_layer_norm(nfeat)
@@ -450,7 +461,6 @@ class GraphormerLayer(nn.Module):
         nfeat = residual + nfeat
         if not self.norm_first:
             nfeat = self.ffn_layer_norm(nfeat)
-
         return nfeat
 
 
@@ -517,20 +527,22 @@ class SpatialEncoder(nn.Module):
 
         for ubg in g_list:
             num_nodes = ubg.num_nodes()
-            dist = th.clamp(
-                shortest_dist(ubg, root=None, return_paths=False),
-                min=-1, max=self.max_dist
-            ) + 1
+            dist = (
+                th.clamp(
+                    shortest_dist(ubg, root=None, return_paths=False),
+                    min=-1,
+                    max=self.max_dist,
+                )
+                + 1
+            )
             # shape: [n, n, h], n = num_nodes, h = num_heads
             dist_embedding = self.embedding_table(dist)
             # [n, n, h] -> [N, N, h], N = max_num_nodes, padded with -inf
             padded_encoding = th.full(
-                (max_num_nodes, max_num_nodes, self.num_heads),
-                float('-inf')
+                (max_num_nodes, max_num_nodes, self.num_heads), float("-inf")
             ).to(device)
-            padded_encoding[0: num_nodes, 0: num_nodes] = dist_embedding
+            padded_encoding[0:num_nodes, 0:num_nodes] = dist_embedding
             spatial_encoding.append(padded_encoding)
-
         return th.stack(spatial_encoding, dim=0)
 
 
@@ -546,8 +558,8 @@ class SpatialEncoder3d(nn.Module):
     r_j \rvert \rvert + \beta_{(i,j)} - \mu^k}{\lvert \sigma^k \rvert} \right)
     ^2 \right)}，k=1,...,K,`
 
-    where :math:`K` is the number of Gaussian Basis kernels,
-    :math:`r_i` is the Cartesian coordinate of atom :math:`i`,
+    where :math:`K` is the number of Gaussian Basis kernels.
+    :math:`r_i` is the Cartesian coordinate of atom :math:`i`.
     :math:`\gamma_{(i,j)}, \beta_{(i,j)}` are learnable scaling factors of
     the Gaussian Basis kernels.
 
@@ -597,7 +609,6 @@ class SpatialEncoder3d(nn.Module):
         else:
             self.mul = nn.Embedding(max_node_type + 1, 2)
             self.bias = nn.Embedding(max_node_type + 1, 2)
-
         nn.init.uniform_(self.gaussian_means.weight, 0, 3)
         nn.init.uniform_(self.gaussian_stds.weight, 0, 3)
         nn.init.constant_(self.mul.weight, 0)
@@ -615,7 +626,7 @@ class SpatialEncoder3d(nn.Module):
             where :math:`N`: is the number of nodes in :attr:`g`.
         node_type : torch.Tensor, optional
             Node types of :attr:`g`. Default : None.
-            
+
             * If :attr:`max_node_type` is not 1, :attr:`node_type` needs to
               be a tensor in shape :math:`(N,)`. The scaling factors of
               each pair of nodes are determined by their node types.
@@ -636,13 +647,12 @@ class SpatialEncoder3d(nn.Module):
         sum_num_nodes = 0
         if (self.max_node_type == 1) != (node_type is None):
             raise ValueError(
-                'input node_type should be None if and only if '
-                'max_node_type is 1.'
+                "input node_type should be None if and only if "
+                "max_node_type is 1."
             )
-
         for ubg in g_list:
             num_nodes = ubg.num_nodes()
-            sub_coord = coord[sum_num_nodes: sum_num_nodes + num_nodes]
+            sub_coord = coord[sum_num_nodes : sum_num_nodes + num_nodes]
             # shape: [n, n], n = num_nodes
             euc_dist = th.cdist(sub_coord, sub_coord, p=2)
             if node_type is None:
@@ -651,33 +661,40 @@ class SpatialEncoder3d(nn.Module):
                 bias = self.bias.weight[0, 0]
             else:
                 sub_node_type = node_type[
-                                sum_num_nodes: sum_num_nodes + num_nodes
-                                ]
+                    sum_num_nodes : sum_num_nodes + num_nodes
+                ]
                 mul_embedding = self.mul(sub_node_type)
                 bias_embedding = self.bias(sub_node_type)
                 # shape: [n, n]
-                mul = (
-                    mul_embedding[:, 0].unsqueeze(-1).repeat(1, num_nodes) +
-                    mul_embedding[:, 1].unsqueeze(0).repeat(num_nodes, 1)
-                )
-                bias = (
-                    bias_embedding[:, 0].unsqueeze(-1).repeat(1, num_nodes) +
-                    bias_embedding[:, 1].unsqueeze(0).repeat(num_nodes, 1)
-                )
+                mul = mul_embedding[:, 0].unsqueeze(-1).repeat(
+                    1, num_nodes
+                ) + mul_embedding[:, 1].unsqueeze(0).repeat(num_nodes, 1)
+                bias = bias_embedding[:, 0].unsqueeze(-1).repeat(
+                    1, num_nodes
+                ) + bias_embedding[:, 1].unsqueeze(0).repeat(num_nodes, 1)
             # shape: [n, n, k], k = num_kernels
-            scaled_dist = (mul * euc_dist + bias)\
-                .repeat(self.num_kernels, 1, 1).permute((1, 2, 0))
+            scaled_dist = (
+                (mul * euc_dist + bias)
+                .repeat(self.num_kernels, 1, 1)
+                .permute((1, 2, 0))
+            )
             # shape: [k]
             gaussian_mean = self.gaussian_means.weight.float().view(-1)
             gaussian_var = (
-                    self.gaussian_stds.weight.float().view(-1).abs() + 1e-2
+                self.gaussian_stds.weight.float().view(-1).abs() + 1e-2
             )
             # shape: [n, n, k]
             gaussian_kernel = (
-                -0.5 * (th.div(scaled_dist - gaussian_mean, gaussian_var)
-                        .square())
-            ).exp().div(
-                -math.sqrt(2 * math.pi) * gaussian_var
+                (
+                    -0.5
+                    * (
+                        th.div(
+                            scaled_dist - gaussian_mean, gaussian_var
+                        ).square()
+                    )
+                )
+                .exp()
+                .div(-math.sqrt(2 * math.pi) * gaussian_var)
             )
 
             encoding = self.linear_layer_1(gaussian_kernel)
@@ -686,11 +703,9 @@ class SpatialEncoder3d(nn.Module):
             encoding = self.linear_layer_2(encoding)
             # [n, n, a] -> [N, N, a], N = max_num_nodes, padded with -inf
             padded_encoding = th.full(
-                (max_num_nodes, max_num_nodes, self.num_heads),
-                float('-inf')
+                (max_num_nodes, max_num_nodes, self.num_heads), float("-inf")
             ).to(device)
-            padded_encoding[0: num_nodes, 0: num_nodes] = encoding
+            padded_encoding[0:num_nodes, 0:num_nodes] = encoding
             spatial_encoding.append(padded_encoding)
             sum_num_nodes += num_nodes
-
         return th.stack(spatial_encoding, dim=0)
