@@ -384,9 +384,9 @@ class SpatialEncoder(nn.Module):
         -------
         torch.Tensor
             Return attention bias as spatial encoding of shape
-            :math:`(\text{batch_size}, N, N, \text{num_heads})`,
-            where :math:`N` is the maximum number of nodes
-            and batch_size is the batch size of the input graph.
+            :math:`(B, N, N, H)`, where :math:`N` is the maximum number of
+            nodes, :math:`B` is the batch size of the input graph, and
+            :math:`H` is :attr:`num_heads`.
         """
         device = g.device
         g_list = unbatch(g)
@@ -424,10 +424,10 @@ class SpatialEncoder3d(nn.Module):
     r_j \rvert \rvert + \beta_{(i,j)} - \mu^k}{\lvert \sigma^k \rvert} \right)
     ^2 \right)}，k=1,...,K,`
 
-    where :math:`K` is the number of Gaussian Basis kernel,
+    where :math:`K` is the number of Gaussian Basis kernels,
     :math:`r_i` is the Cartesian coordinate of atom :math:`i`,
     :math:`\gamma_{(i,j)}, \beta_{(i,j)}` are learnable scaling factors of
-    the :math:`k`-th Gaussian Basis Kernel.
+    the Gaussian Basis kernels.
 
     Parameters
     ----------
@@ -439,8 +439,7 @@ class SpatialEncoder3d(nn.Module):
         Number of attention heads if multi-head attention mechanism is applied.
         Default : 1.
     max_node_type : int, optional
-        Maximum number of node types.
-        Default : 1.
+        Maximum number of node types. Default : 1.
 
     Examples
     --------
@@ -493,19 +492,19 @@ class SpatialEncoder3d(nn.Module):
             of shape :math:`(N, 3)`,
             where :math:`N`: is the number of nodes in :attr:`g`.
         node_type : torch.Tensor, optional
-            Node types of :attr:`g`.
-            Default : None.
+            Node types of :attr:`g`. Default : None.
+            
             * If :attr:`max_node_type` is not 1, :attr:`node_type` needs to
-              be a tensor in shape :math:`(N)`. The scaling factors of
+              be a tensor in shape :math:`(N,)`. The scaling factors of
               each pair of nodes are determined by their node types.
             * Otherwise, :attr:`node_type` should be None.
         Returns
         -------
         torch.Tensor
             Return attention bias as 3D spatial encoding of shape
-            :math:`(\text{batch_size}, n, n, \text{num_heads})`,
-            where :math:`n` is the maximum number of nodes
-            in unbatched graphs from :attr:`g`.
+            :math:`(B, n, n, H)`, where :math:`B` is the batch size, :math:`n`
+            is the maximum number of nodes in unbatched graphs from :attr:`g`,
+            and :math:`H` is :attr:`num_heads`.
         """
 
         device = g.device
@@ -515,8 +514,8 @@ class SpatialEncoder3d(nn.Module):
         sum_num_nodes = 0
         if (self.max_node_type == 1) != (node_type is None):
             raise ValueError(
-                'max_node_type should be set as 1 if and only if '
-                'node_type is None.'
+                'input node_type should be None if and only if '
+                'max_node_type is 1.'
             )
 
         for ubg in g_list:
