@@ -28,7 +28,7 @@ c10::intrusive_ptr<SparseMatrix> SpSpAdd(
   auto indices = sum.indices();
   auto row = indices[0];
   auto col = indices[1];
-  return FromCOO(row, col, sum.values(), A->shape());
+  return SparseMatrix::FromCOO(row, col, sum.values(), A->shape());
 }
 
 }  // namespace sparse

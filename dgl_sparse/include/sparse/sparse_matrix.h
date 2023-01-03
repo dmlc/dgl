@@ -77,6 +77,55 @@ class SparseMatrix : public torch::CustomClassHolder {
       const std::shared_ptr<CSR>& csc, torch::Tensor value,
       const std::vector<int64_t>& shape);
 
+  /**
+   * @brief Create a SparseMatrix from tensors in COO format.
+   * @param row Row indices of the COO.
+   * @param col Column indices of the COO.
+   * @param value Values of the sparse matrix.
+   * @param shape Shape of the sparse matrix.
+   *
+   * @return SparseMatrix
+   */
+  static c10::intrusive_ptr<SparseMatrix> FromCOO(
+      torch::Tensor row, torch::Tensor col, torch::Tensor value,
+      const std::vector<int64_t>& shape);
+
+  /**
+   * @brief Create a SparseMatrix from tensors in CSR format.
+   * @param indptr Index pointer array of the CSR
+   * @param indices Indices array of the CSR
+   * @param value Values of the sparse matrix
+   * @param shape Shape of the sparse matrix
+   *
+   * @return SparseMatrix
+   */
+  static c10::intrusive_ptr<SparseMatrix> FromCSR(
+      torch::Tensor indptr, torch::Tensor indices, torch::Tensor value,
+      const std::vector<int64_t>& shape);
+
+  /**
+   * @brief Create a SparseMatrix from tensors in CSC format.
+   * @param indptr Index pointer array of the CSC
+   * @param indices Indices array of the CSC
+   * @param value Values of the sparse matrix
+   * @param shape Shape of the sparse matrix
+   *
+   * @return SparseMatrix
+   */
+  static c10::intrusive_ptr<SparseMatrix> FromCSC(
+      torch::Tensor indptr, torch::Tensor indices, torch::Tensor value,
+      const std::vector<int64_t>& shape);
+
+  /**
+   * @brief Create a SparseMatrix from a SparseMatrix using new values.
+   * @param mat An existing sparse matrix
+   * @param value New values of the sparse matrix
+   *
+   * @return SparseMatrix
+   */
+  static c10::intrusive_ptr<SparseMatrix> ValLike(
+      const c10::intrusive_ptr<SparseMatrix>& mat, torch::Tensor value);
+
   /** @return Value of the sparse matrix. */
   inline torch::Tensor value() const { return value_; }
   /** @return Shape of the sparse matrix. */
@@ -149,56 +198,6 @@ class SparseMatrix : public torch::CustomClassHolder {
   // Shape of the SparseMatrix
   const std::vector<int64_t> shape_;
 };
-
-/**
- * @brief Create a SparseMatrix from tensors in COO format.
- * @param row Row indices of the COO.
- * @param col Column indices of the COO.
- * @param value Values of the sparse matrix.
- * @param shape Shape of the sparse matrix.
- *
- * @return SparseMatrix
- */
-c10::intrusive_ptr<SparseMatrix> FromCOO(
-    torch::Tensor row, torch::Tensor col, torch::Tensor value,
-    const std::vector<int64_t>& shape);
-
-/**
- * @brief Create a SparseMatrix from tensors in CSR format.
- * @param indptr Index pointer array of the CSR
- * @param indices Indices array of the CSR
- * @param value Values of the sparse matrix
- * @param shape Shape of the sparse matrix
- *
- * @return SparseMatrix
- */
-c10::intrusive_ptr<SparseMatrix> FromCSR(
-    torch::Tensor indptr, torch::Tensor indices, torch::Tensor value,
-    const std::vector<int64_t>& shape);
-
-/**
- * @brief Create a SparseMatrix from tensors in CSC format.
- * @param indptr Index pointer array of the CSC
- * @param indices Indices array of the CSC
- * @param value Values of the sparse matrix
- * @param shape Shape of the sparse matrix
- *
- * @return SparseMatrix
- */
-c10::intrusive_ptr<SparseMatrix> FromCSC(
-    torch::Tensor indptr, torch::Tensor indices, torch::Tensor value,
-    const std::vector<int64_t>& shape);
-
-/**
- * @brief Create a SparseMatrix from a SparseMatrix using new values.
- * @param mat An existing sparse matrix
- * @param value New values of the sparse matrix
- *
- * @return SparseMatrix
- */
-c10::intrusive_ptr<SparseMatrix> CreateValLike(
-    const c10::intrusive_ptr<SparseMatrix>& mat, torch::Tensor value);
-
 }  // namespace sparse
 }  // namespace dgl
 

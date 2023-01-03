@@ -135,7 +135,7 @@ c10::intrusive_ptr<SparseMatrix> SpSpMM(
   auto indptr = results[0];
   auto indices = results[1];
   auto value = results[2];
-  return FromCSR(indptr, indices, value, ret_shape);
+  return SparseMatrix::FromCSR(indptr, indices, value, ret_shape);
 }
 
 }  // namespace sparse
