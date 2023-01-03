@@ -49,7 +49,7 @@ class SparseMatrix : public torch::CustomClassHolder {
    *
    * @return SparseMatrix
    */
-  static c10::intrusive_ptr<SparseMatrix> FromCOO(
+  static c10::intrusive_ptr<SparseMatrix> FromCOOPointer(
       const std::shared_ptr<COO>& coo, torch::Tensor value,
       const std::vector<int64_t>& shape);
 
@@ -61,7 +61,7 @@ class SparseMatrix : public torch::CustomClassHolder {
    *
    * @return SparseMatrix
    */
-  static c10::intrusive_ptr<SparseMatrix> FromCSR(
+  static c10::intrusive_ptr<SparseMatrix> FromCSRPointer(
       const std::shared_ptr<CSR>& csr, torch::Tensor value,
       const std::vector<int64_t>& shape);
 
@@ -73,7 +73,7 @@ class SparseMatrix : public torch::CustomClassHolder {
    *
    * @return SparseMatrix
    */
-  static c10::intrusive_ptr<SparseMatrix> FromCSC(
+  static c10::intrusive_ptr<SparseMatrix> FromCSCPointer(
       const std::shared_ptr<CSR>& csc, torch::Tensor value,
       const std::vector<int64_t>& shape);
 
