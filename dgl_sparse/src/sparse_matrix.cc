@@ -55,22 +55,66 @@ SparseMatrix::SparseMatrix(
   }
 }
 
-c10::intrusive_ptr<SparseMatrix> SparseMatrix::FromCOO(
+c10::intrusive_ptr<SparseMatrix> SparseMatrix::FromCOOPointer(
     const std::shared_ptr<COO>& coo, torch::Tensor value,
     const std::vector<int64_t>& shape) {
   return c10::make_intrusive<SparseMatrix>(coo, nullptr, nullptr, value, shape);
 }
 
-c10::intrusive_ptr<SparseMatrix> SparseMatrix::FromCSR(
+c10::intrusive_ptr<SparseMatrix> SparseMatrix::FromCSRPointer(
     const std::shared_ptr<CSR>& csr, torch::Tensor value,
     const std::vector<int64_t>& shape) {
   return c10::make_intrusive<SparseMatrix>(nullptr, csr, nullptr, value, shape);
 }
 
-c10::intrusive_ptr<SparseMatrix> SparseMatrix::FromCSC(
+c10::intrusive_ptr<SparseMatrix> SparseMatrix::FromCSCPointer(
     const std::shared_ptr<CSR>& csc, torch::Tensor value,
     const std::vector<int64_t>& shape) {
   return c10::make_intrusive<SparseMatrix>(nullptr, nullptr, csc, value, shape);
+}
+
+c10::intrusive_ptr<SparseMatrix> SparseMatrix::FromCOO(
+    torch::Tensor row, torch::Tensor col, torch::Tensor value,
+    const std::vector<int64_t>& shape) {
+  auto coo =
+      std::make_shared<COO>(COO{shape[0], shape[1], row, col, false, false});
+  return SparseMatrix::FromCOOPointer(coo, value, shape);
+}
+
+c10::intrusive_ptr<SparseMatrix> SparseMatrix::FromCSR(
+    torch::Tensor indptr, torch::Tensor indices, torch::Tensor value,
+    const std::vector<int64_t>& shape) {
+  auto csr = std::make_shared<CSR>(
+      CSR{shape[0], shape[1], indptr, indices, torch::optional<torch::Tensor>(),
+          false});
+  return SparseMatrix::FromCSRPointer(csr, value, shape);
+}
+
+c10::intrusive_ptr<SparseMatrix> SparseMatrix::FromCSC(
+    torch::Tensor indptr, torch::Tensor indices, torch::Tensor value,
+    const std::vector<int64_t>& shape) {
+  auto csc = std::make_shared<CSR>(
+      CSR{shape[1], shape[0], indptr, indices, torch::optional<torch::Tensor>(),
+          false});
+  return SparseMatrix::FromCSCPointer(csc, value, shape);
+}
+
+c10::intrusive_ptr<SparseMatrix> SparseMatrix::ValLike(
+    const c10::intrusive_ptr<SparseMatrix>& mat, torch::Tensor value) {
+  TORCH_CHECK(
+      mat->value().size(0) == value.size(0), "The first dimension of ",
+      "the old values and the new values must be the same.");
+  TORCH_CHECK(
+      mat->value().device() == value.device(), "The device of the ",
+      "old values and the new values must be the same.");
+  auto shape = mat->shape();
+  if (mat->HasCOO()) {
+    return SparseMatrix::FromCOOPointer(mat->COOPtr(), value, shape);
+  } else if (mat->HasCSR()) {
+    return SparseMatrix::FromCSRPointer(mat->CSRPtr(), value, shape);
+  } else {
+    return SparseMatrix::FromCSCPointer(mat->CSCPtr(), value, shape);
+  }
 }
 
 std::shared_ptr<COO> SparseMatrix::COOPtr() {
@@ -119,11 +163,11 @@ c10::intrusive_ptr<SparseMatrix> SparseMatrix::Transpose() const {
   auto value = value_;
   if (HasCOO()) {
     auto coo = COOTranspose(coo_);
-    return SparseMatrix::FromCOO(coo, value, shape);
+    return SparseMatrix::FromCOOPointer(coo, value, shape);
   } else if (HasCSR()) {
-    return SparseMatrix::FromCSC(csr_, value, shape);
+    return SparseMatrix::FromCSCPointer(csr_, value, shape);
   } else {
-    return SparseMatrix::FromCSR(csc_, value, shape);
+    return SparseMatrix::FromCSRPointer(csc_, value, shape);
   }
 }
 
@@ -157,50 +201,6 @@ void SparseMatrix::_CreateCSC() {
     csc_ = CSRToCSC(csr_);
   } else {
     LOG(FATAL) << "SparseMatrix does not have any sparse format";
-  }
-}
-
-c10::intrusive_ptr<SparseMatrix> CreateFromCOO(
-    torch::Tensor row, torch::Tensor col, torch::Tensor value,
-    const std::vector<int64_t>& shape) {
-  auto coo =
-      std::make_shared<COO>(COO{shape[0], shape[1], row, col, false, false});
-  return SparseMatrix::FromCOO(coo, value, shape);
-}
-
-c10::intrusive_ptr<SparseMatrix> CreateFromCSR(
-    torch::Tensor indptr, torch::Tensor indices, torch::Tensor value,
-    const std::vector<int64_t>& shape) {
-  auto csr = std::make_shared<CSR>(
-      CSR{shape[0], shape[1], indptr, indices, torch::optional<torch::Tensor>(),
-          false});
-  return SparseMatrix::FromCSR(csr, value, shape);
-}
-
-c10::intrusive_ptr<SparseMatrix> CreateFromCSC(
-    torch::Tensor indptr, torch::Tensor indices, torch::Tensor value,
-    const std::vector<int64_t>& shape) {
-  auto csc = std::make_shared<CSR>(
-      CSR{shape[1], shape[0], indptr, indices, torch::optional<torch::Tensor>(),
-          false});
-  return SparseMatrix::FromCSC(csc, value, shape);
-}
-
-c10::intrusive_ptr<SparseMatrix> CreateValLike(
-    const c10::intrusive_ptr<SparseMatrix>& mat, torch::Tensor value) {
-  TORCH_CHECK(
-      mat->value().size(0) == value.size(0), "The first dimension of ",
-      "the old values and the new values must be the same.");
-  TORCH_CHECK(
-      mat->value().device() == value.device(), "The device of the ",
-      "old values and the new values must be the same.");
-  auto shape = mat->shape();
-  if (mat->HasCOO()) {
-    return SparseMatrix::FromCOO(mat->COOPtr(), value, shape);
-  } else if (mat->HasCSR()) {
-    return SparseMatrix::FromCSR(mat->CSRPtr(), value, shape);
-  } else {
-    return SparseMatrix::FromCSC(mat->CSCPtr(), value, shape);
   }
 }
 

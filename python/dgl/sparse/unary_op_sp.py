@@ -17,7 +17,7 @@ def neg(A: SparseMatrix) -> SparseMatrix:
     >>> row = torch.tensor([1, 1, 3])
     >>> col = torch.tensor([1, 2, 3])
     >>> val = torch.tensor([1., 1., 2.])
-    >>> A = create_from_coo(row, col, val)
+    >>> A = from_coo(row, col, val)
     >>> A = -A
     >>> print(A)
     SparseMatrix(indices=tensor([[1, 1, 3],

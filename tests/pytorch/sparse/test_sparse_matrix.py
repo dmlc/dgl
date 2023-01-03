@@ -4,12 +4,7 @@ import backend as F
 import pytest
 import torch
 
-from dgl.sparse import (
-    create_from_coo,
-    create_from_csc,
-    create_from_csr,
-    val_like,
-)
+from dgl.sparse import from_coo, from_csc, from_csr, val_like
 
 # TODO(#4818): Skipping tests on win.
 if not sys.platform.startswith("linux"):
@@ -20,7 +15,7 @@ if not sys.platform.startswith("linux"):
 @pytest.mark.parametrize("row", [(0, 0, 1, 2), (0, 1, 2, 4)])
 @pytest.mark.parametrize("col", [(0, 1, 2, 2), (1, 3, 3, 4)])
 @pytest.mark.parametrize("shape", [None, (5, 5), (5, 6)])
-def test_create_from_coo(dense_dim, row, col, shape):
+def test_from_coo(dense_dim, row, col, shape):
     val_shape = (len(row),)
     if dense_dim is not None:
         val_shape += (dense_dim,)
@@ -28,7 +23,7 @@ def test_create_from_coo(dense_dim, row, col, shape):
     val = torch.randn(val_shape).to(ctx)
     row = torch.tensor(row).to(ctx)
     col = torch.tensor(col).to(ctx)
-    mat = create_from_coo(row, col, val, shape)
+    mat = from_coo(row, col, val, shape)
 
     if shape is None:
         shape = (torch.max(row).item() + 1, torch.max(col).item() + 1)
@@ -48,7 +43,7 @@ def test_create_from_coo(dense_dim, row, col, shape):
 @pytest.mark.parametrize("indptr", [(0, 0, 1, 4), (0, 1, 2, 4)])
 @pytest.mark.parametrize("indices", [(0, 1, 2, 3), (1, 2, 3, 4)])
 @pytest.mark.parametrize("shape", [None, (3, 5)])
-def test_create_from_csr(dense_dim, indptr, indices, shape):
+def test_from_csr(dense_dim, indptr, indices, shape):
     val_shape = (len(indices),)
     if dense_dim is not None:
         val_shape += (dense_dim,)
@@ -56,7 +51,7 @@ def test_create_from_csr(dense_dim, indptr, indices, shape):
     val = torch.randn(val_shape).to(ctx)
     indptr = torch.tensor(indptr).to(ctx)
     indices = torch.tensor(indices).to(ctx)
-    mat = create_from_csr(indptr, indices, val, shape)
+    mat = from_csr(indptr, indices, val, shape)
 
     if shape is None:
         shape = (indptr.numel() - 1, torch.max(indices).item() + 1)
@@ -76,7 +71,7 @@ def test_create_from_csr(dense_dim, indptr, indices, shape):
 @pytest.mark.parametrize("indptr", [(0, 0, 1, 4), (0, 1, 2, 4)])
 @pytest.mark.parametrize("indices", [(0, 1, 2, 3), (1, 2, 3, 4)])
 @pytest.mark.parametrize("shape", [None, (5, 3)])
-def test_create_from_csc(dense_dim, indptr, indices, shape):
+def test_from_csc(dense_dim, indptr, indices, shape):
     val_shape = (len(indices),)
     if dense_dim is not None:
         val_shape += (dense_dim,)
@@ -84,7 +79,7 @@ def test_create_from_csc(dense_dim, indptr, indices, shape):
     val = torch.randn(val_shape).to(ctx)
     indptr = torch.tensor(indptr).to(ctx)
     indices = torch.tensor(indices).to(ctx)
-    mat = create_from_csc(indptr, indices, val, shape)
+    mat = from_csc(indptr, indices, val, shape)
 
     if shape is None:
         shape = (torch.max(indices).item() + 1, indptr.numel() - 1)
@@ -107,7 +102,7 @@ def test_dense(val_shape):
     row = torch.tensor([1, 1, 2]).to(ctx)
     col = torch.tensor([2, 4, 3]).to(ctx)
     val = torch.randn(val_shape).to(ctx)
-    A = create_from_coo(row, col, val)
+    A = from_coo(row, col, val)
     A_dense = A.dense()
 
     shape = A.shape + val.shape[1:]
@@ -128,7 +123,7 @@ def test_csr_to_coo(dense_dim, indptr, indices, shape):
     val = torch.randn(val_shape).to(ctx)
     indptr = torch.tensor(indptr).to(ctx)
     indices = torch.tensor(indices).to(ctx)
-    mat = create_from_csr(indptr, indices, val, shape)
+    mat = from_csr(indptr, indices, val, shape)
 
     if shape is None:
         shape = (indptr.numel() - 1, torch.max(indices).item() + 1)
@@ -163,7 +158,7 @@ def test_csc_to_coo(dense_dim, indptr, indices, shape):
     val = torch.randn(val_shape).to(ctx)
     indptr = torch.tensor(indptr).to(ctx)
     indices = torch.tensor(indices).to(ctx)
-    mat = create_from_csc(indptr, indices, val, shape)
+    mat = from_csc(indptr, indices, val, shape)
 
     if shape is None:
         shape = (torch.max(indices).item() + 1, indptr.numel() - 1)
@@ -205,7 +200,7 @@ def test_coo_to_csr(dense_dim, row, col, shape):
     val = torch.randn(val_shape).to(ctx)
     row = torch.tensor(row).to(ctx)
     col = torch.tensor(col).to(ctx)
-    mat = create_from_coo(row, col, val, shape)
+    mat = from_coo(row, col, val, shape)
 
     if shape is None:
         shape = (torch.max(row).item() + 1, torch.max(col).item() + 1)
@@ -237,7 +232,7 @@ def test_csc_to_csr(dense_dim, indptr, indices, shape):
     val = torch.randn(val_shape).to(ctx)
     indptr = torch.tensor(indptr).to(ctx)
     indices = torch.tensor(indices).to(ctx)
-    mat = create_from_csc(indptr, indices, val, shape)
+    mat = from_csc(indptr, indices, val, shape)
     mat_indptr, mat_indices, value_indices = mat.csr()
     mat_val = mat.val if value_indices is None else mat.val[value_indices]
 
@@ -280,7 +275,7 @@ def test_coo_to_csc(dense_dim, row, col, shape):
     val = torch.randn(val_shape).to(ctx)
     row = torch.tensor(row).to(ctx)
     col = torch.tensor(col).to(ctx)
-    mat = create_from_coo(row, col, val, shape)
+    mat = from_coo(row, col, val, shape)
 
     if shape is None:
         shape = (torch.max(row).item() + 1, torch.max(col).item() + 1)
@@ -312,7 +307,7 @@ def test_csr_to_csc(dense_dim, indptr, indices, shape):
     val = torch.randn(val_shape).to(ctx)
     indptr = torch.tensor(indptr).to(ctx)
     indices = torch.tensor(indices).to(ctx)
-    mat = create_from_csr(indptr, indices, val, shape)
+    mat = from_csr(indptr, indices, val, shape)
     mat_indptr, mat_indices, value_indices = mat.csc()
     mat_val = mat.val if value_indices is None else mat.val[value_indices]
 
@@ -358,20 +353,20 @@ def test_val_like(val_shape, shape):
     row = torch.tensor([1, 1, 2]).to(ctx)
     col = torch.tensor([2, 4, 3]).to(ctx)
     val = torch.randn(3).to(ctx)
-    coo_A = create_from_coo(row, col, val, shape)
+    coo_A = from_coo(row, col, val, shape)
     new_val = torch.randn(val_shape).to(ctx)
     coo_B = val_like(coo_A, new_val)
     check_val_like(coo_A, coo_B)
 
     # CSR
     indptr, indices, _ = coo_A.csr()
-    csr_A = create_from_csr(indptr, indices, val, shape)
+    csr_A = from_csr(indptr, indices, val, shape)
     csr_B = val_like(csr_A, new_val)
     check_val_like(csr_A, csr_B)
 
     # CSC
     indptr, indices, _ = coo_A.csc()
-    csc_A = create_from_csc(indptr, indices, val, shape)
+    csc_A = from_csc(indptr, indices, val, shape)
     csc_B = val_like(csc_A, new_val)
     check_val_like(csc_A, csc_B)
 
@@ -382,7 +377,7 @@ def test_coalesce():
     row = torch.tensor([1, 0, 0, 0, 1]).to(ctx)
     col = torch.tensor([1, 1, 1, 2, 2]).to(ctx)
     val = torch.arange(len(row)).to(ctx)
-    A = create_from_coo(row, col, val, (4, 4))
+    A = from_coo(row, col, val, (4, 4))
 
     assert A.has_duplicate()
 
@@ -406,17 +401,17 @@ def test_has_duplicate():
     shape = (4, 4)
 
     # COO
-    coo_A = create_from_coo(row, col, val, shape)
+    coo_A = from_coo(row, col, val, shape)
     assert coo_A.has_duplicate()
 
     # CSR
     indptr, indices, _ = coo_A.csr()
-    csr_A = create_from_csr(indptr, indices, val, shape)
+    csr_A = from_csr(indptr, indices, val, shape)
     assert csr_A.has_duplicate()
 
     # CSC
     indptr, indices, _ = coo_A.csc()
-    csc_A = create_from_csc(indptr, indices, val, shape)
+    csc_A = from_csc(indptr, indices, val, shape)
     assert csc_A.has_duplicate()
 
 
@@ -427,12 +422,12 @@ def test_print():
     row = torch.tensor([1, 1, 3]).to(ctx)
     col = torch.tensor([2, 1, 3]).to(ctx)
     val = torch.tensor([1.0, 1.0, 2.0]).to(ctx)
-    A = create_from_coo(row, col, val)
+    A = from_coo(row, col, val)
     print(A)
 
     # vector-shape non zero
     row = torch.tensor([1, 1, 3]).to(ctx)
     col = torch.tensor([2, 1, 3]).to(ctx)
     val = torch.randn(3, 2).to(ctx)
-    A = create_from_coo(row, col, val)
+    A = from_coo(row, col, val)
     print(A)

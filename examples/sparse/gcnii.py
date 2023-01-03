@@ -139,7 +139,7 @@ if __name__ == "__main__":
     # Create the adjacency matrix of graph.
     src, dst = g.edges()
     N = g.num_nodes()
-    A = dglsp.create_from_coo(dst, src, shape=(N, N))
+    A = dglsp.from_coo(dst, src, shape=(N, N))
 
     ############################################################################
     # (HIGHLIGHT) Compute the symmetrically normalized adjacency matrix with
