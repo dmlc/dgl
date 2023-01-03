@@ -412,7 +412,7 @@ CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries);
  * row using arXiv:2210.13339, Labor sampling.
  *
  * The picked indices are returned in the form of a COO matrix.
- * 
+ *
  * The passed random_seed makes it so that for any seed vertex s and its
  * neighbor t, the rolled random variate r_t is the same for any call to this
  * function with the same random seed. When sampling as part of the same batch,
@@ -459,16 +459,13 @@ CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries);
  *         array.
  */
 std::pair<COOMatrix, FloatArray> CSRLaborSampling(
-    CSRMatrix mat,
-    IdArray rows,
-    int64_t num_samples,
-    FloatArray prob = NullArray(),
-    int importance_sampling = 0,
-    IdArray random_seed = NullArray(),
-    IdArray NIDs = NullArray());
+    CSRMatrix mat, IdArray rows, int64_t num_samples,
+    FloatArray prob = NullArray(), int importance_sampling = 0,
+    IdArray random_seed = NullArray(), IdArray NIDs = NullArray());
 
 /*!
- * @brief Randomly select a fixed number of non-zero entries along each given row independently.
+ * @brief Randomly select a fixed number of non-zero entries along each given
+ * row independently.
  *
  * The function performs random choices along each row independently.
  * The picked indices are returned in the form of a COO matrix.
@@ -894,6 +891,48 @@ CSRMatrix CSRSliceContiguousChunk(
     const CSRMatrix& csr, const std::vector<uint64_t>& edge_range,
     const std::vector<uint64_t>& src_vertex_range,
     const std::vector<uint64_t>& dst_vertex_range);
+
+/**
+ * @brief Generalized Sparse Matrix-Matrix Multiplication on CSR.
+ * @param op The binary operator, could be `add`, `sub', `mul`, 'div',
+ *        `copy_u`, `copy_e'.
+ * @param op The reduce operator, could be `sum`, `min`, `max'.
+ * @param csr The CSR we apply SpMM on.
+ * @param ufeat The source node feature.
+ * @param efeat The edge feature.
+ * @param out The output feature on destination nodes.
+ * @param out_aux A list of NDArray's that contains auxiliary information such
+ *        as the argmax on source nodes and edges for reduce operators such as
+ *        `min` and `max`.
+ */
+void CSRSpMM(
+    const std::string& op, const std::string& reduce, const CSRMatrix& csr,
+    NDArray ufeat, NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
+
+/** @brief CSRSpMM C interface without std::string. */
+void CSRSpMM(
+    const char* op, const char* reduce, const CSRMatrix& csr, NDArray ufeat,
+    NDArray efeat, NDArray out, std::vector<NDArray> out_aux);
+
+/**
+ * @brief Generalized Sampled Dense-Dense Matrix Multiplication on CSR.
+ * @param op The binary operator, could be `add`, `sub', `mul`, 'div',
+ *        `dot`, `copy_u`, `copy_e'.
+ * @param csr The CSR we apply SpMM on.
+ * @param ufeat The source node feature.
+ * @param vfeat The destination node feature.
+ * @param out The output feature on edge.
+ * @param lhs_target Type of `ufeat` (0: source, 1: edge, 2: destination).
+ * @param rhs_target Type of `ufeat` (0: source, 1: edge, 2: destination).
+ */
+void CSRSDDMM(
+    const std::string& op, const CSRMatrix& csr, NDArray ufeat, NDArray efeat,
+    NDArray out, int lhs_target, int rhs_target);
+
+/** @brief CSRSDDMM C interface without std::string. */
+void CSRSDDMM(
+    const char* op, const CSRMatrix& csr, NDArray ufeat, NDArray efeat,
+    NDArray out, int lhs_target, int rhs_target);
 
 }  // namespace aten
 }  // namespace dgl

@@ -21,16 +21,14 @@ namespace sparse {
 c10::intrusive_ptr<SparseMatrix> SpSpAdd(
     const c10::intrusive_ptr<SparseMatrix>& A,
     const c10::intrusive_ptr<SparseMatrix>& B) {
-  auto fmt = FindAnyExistingFormat(A, B);
-  auto value = A->value() + B->value();
   ElementwiseOpSanityCheck(A, B);
-  if (fmt == SparseFormat::kCOO) {
-    return SparseMatrix::FromCOO(A->COOPtr(), value, A->shape());
-  } else if (fmt == SparseFormat::kCSR) {
-    return SparseMatrix::FromCSR(A->CSRPtr(), value, A->shape());
-  } else {
-    return SparseMatrix::FromCSC(A->CSCPtr(), value, A->shape());
-  }
+  auto torch_A = COOToTorchCOO(A->COOPtr(), A->value());
+  auto torch_B = COOToTorchCOO(B->COOPtr(), B->value());
+  auto sum = (torch_A + torch_B).coalesce();
+  auto indices = sum.indices();
+  auto row = indices[0];
+  auto col = indices[1];
+  return CreateFromCOO(row, col, sum.values(), A->shape());
 }
 
 }  // namespace sparse

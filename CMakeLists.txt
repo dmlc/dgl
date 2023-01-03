@@ -254,8 +254,10 @@ if(NOT MSVC)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
   # Avoid exposing third-party symbols when using DGL as a library.
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wl,--exclude-libs,ALL")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,--exclude-libs,ALL")
+  if (NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wl,--exclude-libs,ALL")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,--exclude-libs,ALL")
+  endif()
 endif(NOT MSVC)
 
 # Compile TVM Runtime and Featgraph
@@ -355,5 +357,6 @@ endif(BUILD_CPP_TEST)
 
 if(BUILD_SPARSE)
   set(DGL_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/include")
+  list(APPEND DGL_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/src")
   add_subdirectory(dgl_sparse)
 endif(BUILD_SPARSE)

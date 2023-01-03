@@ -149,8 +149,9 @@ class DeviceAPI {
    *
    * @param ptr The host memory pointer to be pinned.
    * @param nbytes The size to be pinned.
+   * @return false when pinning an empty tensor. true otherwise.
    */
-  DGL_DLL virtual void PinData(void* ptr, size_t nbytes);
+  DGL_DLL virtual bool PinData(void* ptr, size_t nbytes);
 
   /**
    * @brief Unpin host memory using cudaHostUnregister().

@@ -172,7 +172,7 @@ def exchange_edge_data(rank, world_size, num_parts, edge_data):
                 input_list.append(torch.from_numpy(filt_data))
 
         dist.barrier ()
-        output_list = alltoallv_cpu(rank, world_size, input_list)
+        output_list = alltoallv_cpu(rank, world_size, input_list, retain_nones=False)
 
         #Replace the values of the edge_data, with the received data from all the other processes.
         rcvd_edge_data = torch.cat(output_list).numpy()
@@ -292,28 +292,32 @@ def exchange_feature(rank, data, id_lookup, feat_type, feat_key, featdata_key, g
 
         if (gids_per_partid.shape[0] == 0):
             feats_per_rank.append(torch.empty((0,1), dtype=torch.float))
-            global_id_per_rank.append(np.empty((0,1), dtype=np.int64))
+            global_id_per_rank.append(torch.empty((0,1), dtype=torch.int64))
         else:
             feats_per_rank.append(featdata_key[local_idx_partid])
             global_id_per_rank.append(torch.from_numpy(gids_per_partid).type(torch.int64))
 
     #features (and global nids) per rank to be sent out are ready
     #for transmission, perform alltoallv here.
-    output_feat_list = alltoallv_cpu(rank, world_size, feats_per_rank)
-    output_id_list = alltoallv_cpu(rank, world_size, global_id_per_rank)
+    output_feat_list = alltoallv_cpu(rank, world_size, feats_per_rank, retain_nones=False)
+    output_id_list = alltoallv_cpu(rank, world_size, global_id_per_rank, retain_nones=False)
+    assert len(output_feat_list) == len(output_id_list), (
+        "Length of feature list and id list are expected to be equal while "
+        f"got {len(output_feat_list)} and {len(output_id_list)}."
+    )
 
     #stitch node_features together to form one large feature tensor
-    output_feat_list = torch.cat(output_feat_list)
-    output_id_list = torch.cat(output_id_list)
-
-    if local_feat_key in cur_features: 
-        temp = cur_features[local_feat_key]
-        cur_features[local_feat_key] = torch.cat([temp, output_feat_list])
-        temp = cur_global_ids[local_feat_key]
-        cur_global_ids[local_feat_key] = torch.cat([temp, output_id_list])
-    else:
-        cur_features[local_feat_key] = output_feat_list
-        cur_global_ids[local_feat_key] = output_id_list
+    if len(output_feat_list) > 0:
+        output_feat_list = torch.cat(output_feat_list)
+        output_id_list = torch.cat(output_id_list)
+        if local_feat_key in cur_features: 
+            temp = cur_features[local_feat_key]
+            cur_features[local_feat_key] = torch.cat([temp, output_feat_list])
+            temp = cur_global_ids[local_feat_key]
+            cur_global_ids[local_feat_key] = torch.cat([temp, output_id_list])
+        else:
+            cur_features[local_feat_key] = output_feat_list
+            cur_global_ids[local_feat_key] = output_id_list
 
     return cur_features, cur_global_ids
 
@@ -431,7 +435,7 @@ def exchange_features(rank, world_size, num_parts, feature_tids, type_id_map, id
                         own_global_ids)
 
     end = timer()
-    logging.info(f'[Rank: {rank}] Total time for feature exchange {feat_key}: {timedelta(seconds = end - start)}')
+    logging.info(f'[Rank: {rank}] Total time for feature exchange: {timedelta(seconds = end - start)}')
     return own_features, own_global_ids
 
 def exchange_graph_data(rank, world_size, num_parts, node_features, edge_features, 

@@ -1,14 +1,15 @@
-import pytest
-import torch
 import sys
 
-from dgl.mock_sparse2 import diag, create_from_coo
-
 import backend as F
+import pytest
+import torch
 
-# FIXME(issue #4818): Skipping tests on win.
+from dgl.sparse import create_from_coo, diag
+
+# TODO(#4818): Skipping tests on win.
 if not sys.platform.startswith("linux"):
     pytest.skip("skipping tests on win", allow_module_level=True)
+
 
 @pytest.mark.parametrize("val_shape", [(3,), (3, 2)])
 @pytest.mark.parametrize("mat_shape", [None, (3, 5), (5, 3)])

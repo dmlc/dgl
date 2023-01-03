@@ -35,7 +35,6 @@ struct COO {
   bool col_sorted = false;
 };
 
-
 /** @brief CSR sparse structure. */
 struct CSR {
   /** @brief The dense shape of the matrix. */
@@ -63,6 +62,16 @@ std::shared_ptr<CSR> CSRFromOldDGLCSR(const aten::CSRMatrix& dgl_csr);
 /** @brief Convert a CSR in the sparse library to an old DGL CSR matrix. */
 aten::CSRMatrix CSRToOldDGLCSR(const std::shared_ptr<CSR>& csr);
 
+/**
+ *  @brief Convert a COO and its nonzero values to a Torch COO matrix.
+ *  @param coo The COO format in the sparse library
+ *  @param value Values of the sparse matrix
+ *
+ *  @return Torch Sparse Tensor in COO format
+ */
+torch::Tensor COOToTorchCOO(
+    const std::shared_ptr<COO>& coo, torch::Tensor value);
+
 /** @brief Convert a CSR format to COO format. */
 std::shared_ptr<COO> CSRToCOO(const std::shared_ptr<CSR>& csr);
 
@@ -83,7 +92,6 @@ std::shared_ptr<CSR> CSRToCSC(const std::shared_ptr<CSR>& csr);
 
 /** @brief COO transposition. */
 std::shared_ptr<COO> COOTranspose(const std::shared_ptr<COO>& coo);
-
 
 }  // namespace sparse
 }  // namespace dgl

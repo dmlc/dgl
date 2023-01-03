@@ -2,8 +2,7 @@
 # pylint: disable= invalid-name
 from __future__ import absolute_import
 
-from . import backend as F
-from . import ndarray as nd
+from . import backend as F, ndarray as nd
 from ._ffi.function import _init_api
 from .base import DGLError
 
@@ -605,7 +604,7 @@ def _gsddmm_hetero(
                 expand_lhs = True
         if use_rhs:
             if rhs is not None and F.ndim(rhs) == 1:
-                rhs = F.unsqueeze(lhs, -1)
+                rhs = F.unsqueeze(rhs, -1)
                 expand_rhs = True
         ctx = F.context(lhs) if use_lhs else F.context(rhs)
         dtype = F.dtype(lhs) if use_lhs else F.dtype(rhs)
@@ -1036,4 +1035,4 @@ def libra2dgl_set_lr(gdt_key, gdt_value, lrtensor, nc, Nn):
     )
 
 
-_init_api("dgl.sparse")
+_init_api("dgl.sparse", __name__)
