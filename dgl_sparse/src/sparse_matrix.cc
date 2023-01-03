@@ -160,7 +160,7 @@ void SparseMatrix::_CreateCSC() {
   }
 }
 
-c10::intrusive_ptr<SparseMatrix> CreateFromCOO(
+c10::intrusive_ptr<SparseMatrix> FromCOO(
     torch::Tensor row, torch::Tensor col, torch::Tensor value,
     const std::vector<int64_t>& shape) {
   auto coo =
@@ -168,7 +168,7 @@ c10::intrusive_ptr<SparseMatrix> CreateFromCOO(
   return SparseMatrix::FromCOO(coo, value, shape);
 }
 
-c10::intrusive_ptr<SparseMatrix> CreateFromCSR(
+c10::intrusive_ptr<SparseMatrix> FromCSR(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor value,
     const std::vector<int64_t>& shape) {
   auto csr = std::make_shared<CSR>(
@@ -177,7 +177,7 @@ c10::intrusive_ptr<SparseMatrix> CreateFromCSR(
   return SparseMatrix::FromCSR(csr, value, shape);
 }
 
-c10::intrusive_ptr<SparseMatrix> CreateFromCSC(
+c10::intrusive_ptr<SparseMatrix> FromCSC(
     torch::Tensor indptr, torch::Tensor indices, torch::Tensor value,
     const std::vector<int64_t>& shape) {
   auto csc = std::make_shared<CSR>(
