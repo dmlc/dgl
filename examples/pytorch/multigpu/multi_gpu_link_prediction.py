@@ -216,14 +216,12 @@ def train(
                     else 0
                 )
                 print(
-                    "Epoch {:05d} | Step {:05d} | Loss {:.4f} | GPU {:.1f} MB".format(
-                        epoch, step, loss.item(), gpu_mem_alloc
-                    )
+                    f"Epoch {epoch:05d} | Step {step:05d} | Loss {loss.item():.4f} | GPU {gpu_mem_alloc:.1f} MB"
                 )
 
-        toc = time.time()
+        t = time.time() - tic
         if proc_id == 0:
-            print("Epoch Time(s): {:.4f}".format(toc - tic))
+            print(f"Epoch Time(s): {t:.4f}")
         if (epoch + 1) % 5 == 0: # eval every 5 epochs
             pred = evaluate(proc_id, model, g, device, use_uva) # in parallel
             if proc_id == 0:
@@ -232,9 +230,7 @@ def train(
                     pred, labels, train_idx, val_idx, test_idx
                 )
                 print(
-                    "Epoch {:05d} | Eval Acc {:.4f} | Test Acc {:.4f}".format(
-                        epoch, eval_acc, test_acc
-                    )
+                    f"Epoch {epoch:05d} | Eval F1-score {eval_acc:.4f} | Test F1-Score {test_acc:.4f}"
                 )
 
 

@@ -63,7 +63,7 @@ python3 multi_gpu_link_prediction.py --dataset ogbn-products
 
 #### __Results__
 ```
-Eval Accuracy: ~0.7999  Test Accuracy: ~0.6383
+Eval F1-score: ~0.7999  Test F1-score: ~0.6383
 ```
 
 Notably,
