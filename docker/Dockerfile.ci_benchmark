@@ -18,10 +18,6 @@ RUN bash /install/ubuntu_install_conda.sh
 
 ENV CONDA_ALWAYS_YES="true"
 
-COPY install/conda_env/torch_gpu.yml /install/conda_env/torch_gpu.yml
-COPY install/conda_env/torch_gpu_pip_latest.txt /install/conda_env/torch_gpu_pip.txt
-RUN ["/bin/bash", "-i", "-c", "conda env create -f /install/conda_env/torch_gpu.yml"]
-
 ENV CONDA_ALWAYS_YES=
 
 # Environment variables
