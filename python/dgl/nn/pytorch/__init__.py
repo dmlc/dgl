@@ -11,9 +11,8 @@ from .sparse_emb import NodeEmbedding
 from .utils import (
     JumpingKnowledge,
     LabelPropagation,
-    LaplacianPosEnc,
     Sequential,
     WeightBasis,
 )
 from .network_emb import *
-from .graph_transformer import *
+from .gt import *
